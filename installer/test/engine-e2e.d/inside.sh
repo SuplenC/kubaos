@@ -258,7 +258,9 @@ EOF
   local nm="$R/etc/NetworkManager/system-connections/Home_5G.nmconnection"
   check "Wi-Fi keyfile root:root 0600" eq "$(stat -c %u:%g:%a "$nm")" 0:0:600
   check "Wi-Fi keyfile has ssid and psk" bash -c "grep -qx 'ssid=Home 5G' '$nm' && grep -qx 'psk=$WIFIPSK' '$nm'"
-  check "git identity" has "$T/@home/kuba/.gitconfig" 'email = kuba@example.com'
+  local gid="$T/@home/kuba/.config/git-identity/identity.gitconfig"
+  check "git identity in ~/.config/git-identity" has "$gid" 'email = "kuba@example.com"'
+  check "  owned by kuba down from ~/.config" eq "$(stat -c %u:%g "$T/@home/kuba/.config" "$T/@home/kuba/.config/git-identity" "$gid" | sort -u)" 1000:1000
   check "grub.cfg on /boot" test -s /mnt/check/boot/grub/grub.cfg
   local efi=aa64
   [[ "$(uname -m)" == x86_64 ]] && efi=x64
