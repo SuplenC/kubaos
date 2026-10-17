@@ -78,9 +78,4 @@ pub struct Manifest {
     pub kernel: String,
     /// Store path of the home-manager activation package.
     pub home_generation: String,
-    /// Prefills the Git screen (from the repo's git config at build time).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub git_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub git_email: Option<String>,
 }

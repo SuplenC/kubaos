@@ -69,20 +69,8 @@ impl Form {
             encrypt: true,
             luks_same_as_password: true,
             disk,
-            git_name: manifest
-                .and_then(|m| m.git_name.clone())
-                .unwrap_or_default(),
-            git_email: manifest
-                .and_then(|m| m.git_email.clone())
-                .unwrap_or_default(),
             ..Self::default()
         };
-        // A name from the image is the user's choice; don't overwrite it with
-        // whatever they type as their full name.
-        f.git_name_touched = !f.git_name.is_empty();
-        // The image belongs to one person (the username is baked in), and
-        // its git name is their name: start with it as a real, editable value.
-        f.full_name = f.git_name.clone();
         f.disk_mode = f.selected_disk(probe).map(|d| d.default_mode(probe));
         f
     }

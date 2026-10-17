@@ -188,8 +188,6 @@ mod tests {
             sha256: "00".into(),
             kernel: "6.17.0-5-generic".into(),
             home_generation: "/nix/store/xxx-home-manager-generation".into(),
-            git_name: None,
-            git_email: None,
         }
     }
 

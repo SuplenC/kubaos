@@ -10,7 +10,7 @@
 #   local flake inputs (git+file:// or path: in flake.lock), read-only at
 #          their host paths, listed in LOCAL_INPUTS (colon-separated)
 # Environment: ARCH HOST PAYLOAD_USER COMMIT VERSION BUILD_ID BUILT_AT
-# ZSTD_LEVEL CPUS GIT_NAME GIT_EMAIL, and the OS_* names from build.
+# ZSTD_LEVEL CPUS, and the OS_* names from build.
 #
 # Steps: realise the home-manager generation, run the Nix half of system/
 # (60-nix.sh, 65-recorder.sh, 70-bitwarden.sh), copy this container's / into
@@ -337,18 +337,6 @@ rootfs_bytes="$(stat -c %s "/out/$ROOTFS_NAME")"
 say "sha256"
 sha="$(sha256sum "/out/$ROOTFS_NAME" | cut -d' ' -f1)"
 
-# json_str S: S as a JSON string.
-json_str() {
-  local s="$1"
-  s="${s//\\/\\\\}"
-  s="${s//\"/\\\"}"
-  s="${s//$'\t'/\\t}"
-  s="${s//$'\n'/\\n}"
-  printf '"%s"' "$s"
-}
-git_fields=""
-[[ -z "${GIT_NAME:-}" ]] || git_fields+=$',\n  "git_name": '"$(json_str "$GIT_NAME")"
-[[ -z "${GIT_EMAIL:-}" ]] || git_fields+=$',\n  "git_email": '"$(json_str "$GIT_EMAIL")"
 cat >/out/manifest.json <<EOF
 {
   "version": "$VERSION",
@@ -363,7 +351,7 @@ cat >/out/manifest.json <<EOF
   "installed_bytes": $installed_bytes,
   "sha256": "$sha",
   "kernel": "$kernel",
-  "home_generation": "$gen"$git_fields
+  "home_generation": "$gen"
 }
 EOF
 cat /out/manifest.json

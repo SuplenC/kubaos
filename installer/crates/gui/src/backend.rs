@@ -415,8 +415,6 @@ pub fn demo_probe() -> Probe {
             sha256: "0".repeat(64),
             kernel: "6.17.0-5-generic".into(),
             home_generation: "/nix/store/demo-home-manager-generation".into(),
-            git_name: Some("Kuba Example".into()),
-            git_email: Some("kuba@example.com".into()),
         }),
     }
 }

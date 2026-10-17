@@ -9,7 +9,7 @@ This file is the contract between the parts. If you need to change an interface,
 1. **Payload.** We build the whole installed system ahead of time as one compressed image. It contains Ubuntu 26.04, everything `system/*.sh` installs, and `/nix` with the home-manager generation for `<user>@<host>` already built. It ships with `manifest.json` (`dotinstall_core::Manifest`).
 2. **Live ISO.** A small Ubuntu live system holding the payload, `dotinstall` and `dotinstall-gui`. It boots straight into the GUI, full screen in `cage`. There's a text fallback on tty2.
 3. **Engine.** `dotinstall run` partitions the disk, sets up LUKS and btrfs, unpacks the payload, configures the system, creates the user, installs the bootloader, activates home and takes the factory snapshot. It reports progress as JSON events.
-4. **GUI.** `dotinstall-gui` asks the questions and writes `install.toml` plus the secrets. It runs `dotinstall run --events json` and shows the event stream. It runs as root under `cage` on the live system, and its Reboot button runs `systemctl reboot`. The Git screen is prefilled from `manifest.git_name` and `manifest.git_email` when the payload sets them.
+4. **GUI.** `dotinstall-gui` asks the questions and writes `install.toml` plus the secrets. It runs `dotinstall run --events json` and shows the event stream. It runs as root under `cage` on the live system, and its Reboot button runs `systemctl reboot`.
 5. **First boot.** The same GUI runs in setup mode (`dotinstall-gui --setup`, `kubaos-setup`) for anything that needs you or the hardware: TUXEDO drivers, the fingerprint reader, the YubiKey, Bitwarden. It opens by itself at the first login. See "First boot" below.
 
 ## Layout and owners
@@ -132,7 +132,7 @@ Built by `installer/image/build [--arch aarch64|x86_64]` into `installer/out/pay
 - **Identity:** no user (Docker's `ubuntu` and the build user are removed, uid and gid 1000 are free), empty `/etc/machine-id`, no SSH host keys (`openssh-server` installed but disabled), `/etc/hostname` `localhost`, no fstab or crypttab, no apt lists. `/etc/resolv.conf` links to resolved's stub.
 - **KubaOS:** `/usr/lib/os-release` per `docs/BRAND.md` (diverted from base-files). The boot (splash, GRUB theme and names) is `system/25-boot.sh`, described in "Boot" below. The EFI directory stays `EFI/ubuntu` for shim.
 - **`/usr/share/dotinstall/`:** `dotfiles/` (the checkout), `image.json` (user, groups, generation, kernel), `snapper-root.conf` (`20-base.sh`'s snapper settings as `KEY=VALUE` lines).
-- `manifest.git_name` and `git_email` come from the repo's git config at build time, and are left out when unset.
+- **No git identity:** the manifest carries no git name or email, so the builder's never ships in the ISO. The user enters theirs on the Git screen.
 
 ## Boot
 

@@ -95,9 +95,6 @@ VERSION=0.1.0
 BUILD_ID="$(date -u +%Y%m%d)-${COMMIT:0:12}"
 [[ "$COMMIT" == *-dirty ]] && BUILD_ID+="-dirty"
 BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-# Prefill for the GUI's Git screen (Manifest.git_name / git_email); omitted when unset.
-GIT_NAME="$(git -C "$ROOT" config user.name || true)"
-GIT_EMAIL="$(git -C "$ROOT" config user.email || true)"
 
 # Local flake inputs (git+file:// or path: in flake.lock, like ukiyo's
 # checkout): mounted read-only at the same path, so Nix in the container
@@ -124,7 +121,7 @@ docker run --rm --name "$CONTAINER" --platform "linux/$DARCH" \
   -e LOCAL_INPUTS="$LOCAL_INPUTS" -e UKIYO_OVERRIDE_URL="$UKIYO_OVERRIDE_URL" \
   -e ARCH="$ARCH" -e HOST="$HOST" -e PAYLOAD_USER="$PAYLOAD_USER" -e COMMIT="$COMMIT" \
   -e VERSION="$VERSION" -e BUILT_AT="$BUILT_AT" -e ZSTD_LEVEL="$ZSTD_LEVEL" -e CPUS="$CPUS" \
-  -e GIT_NAME="$GIT_NAME" -e GIT_EMAIL="$GIT_EMAIL" -e BUILD_ID="$BUILD_ID" \
+  -e BUILD_ID="$BUILD_ID" \
   -e OS_NAME=KubaOS -e OS_ID=kubaos -e OS_CODENAME=shinjuku -e OS_CODENAME_NAME=Shinjuku \
   -e OS_VERSION_SHORT="${VERSION%.*}" -e OS_HOME_URL="${KUBAOS_HOME_URL:-}" \
   "$IMAGE" /in/src/installer/image/lib/assemble.sh

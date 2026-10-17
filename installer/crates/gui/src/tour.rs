@@ -85,9 +85,7 @@ pub fn script() -> Vec<Step> {
         Shot("04-wifi"),
         Tap(Enter),
         Until("account", |a| a.screen == Screen::Account),
-        // The name is already there (from the image), focus is on the
-        // password. Shift+Tab back selects the whole name; typing replaces it.
-        Tap(ShiftTab),
+        // Focus starts on the empty name.
         Type("Kuba Example"),
         Tap(Tab),
         Type("correct horse battery"),
@@ -115,6 +113,9 @@ pub fn script() -> Vec<Step> {
         Tap(Space),    // on again
         Tap(Enter),
         Until("git", |a| a.screen == Screen::Git),
+        Wait(SETTLE),
+        // The name mirrors the full name, so focus is on the email.
+        Type("kuba@example.com"),
         Wait(SETTLE),
         Shot("08-git"),
         Tap(Enter),
@@ -407,10 +408,9 @@ mod tests {
         use Step::*;
         let mut app = ready();
         let _ = app.go(Screen::Account);
-        assert_eq!(
-            app.form.full_name, "Kuba Example",
-            "prefilled from the image"
-        );
+        assert_eq!(app.form.full_name, "", "the image carries no name");
+        assert_eq!(app.focus, Some(F::FullName));
+        keys(&mut app, vec![Type("Kuba Example"), Tap(Tab)]);
         assert_eq!(app.focus, Some(F::Password));
         // Back into the name: all of it selected, so typing replaces it.
         keys(&mut app, vec![Tap(ShiftTab), Type("Kuba")]);
