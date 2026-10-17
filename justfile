@@ -52,8 +52,8 @@ test:
 vm arch=host *flags="":
     test/vm/run boot-iso --arch {{arch}} {{flags}}
 
-# Headless install of the bench ISO onto a fresh disk, then boot the installed system and check it (user kuba, password bench, LUKS passphrase bench-luks).
-vm-install arch=host:
+# Headless install of the bench ISO onto a fresh disk, then boot the installed system and check it (user kuba, password bench, LUKS passphrase bench-luks). `just vm-install aarch64 test/vm/examples/install-alice.toml` installs as alice, whose generation the engine builds.
+vm-install arch=host config="":
     #!/usr/bin/env bash
     set -euo pipefail
     iso="$(ls -t iso/kubaos-*-{{arch}}-vm.iso 2>/dev/null | head -1)"
@@ -61,6 +61,7 @@ vm-install arch=host:
     cfg=test/vm/examples/install.toml
     sb=()
     if [[ {{arch}} == x86_64 ]]; then cfg=test/vm/examples/install-x86_64.toml; sb=(--secure-boot); fi
+    [[ -z "{{config}}" ]] || cfg="{{config}}"
     test/vm/run install "$cfg" test/vm/examples/secrets.toml --iso "$iso" --arch {{arch}} ${sb[@]+"${sb[@]}"} --ssh --timeout 3000
     test/vm/run boot-disk
     sleep 45

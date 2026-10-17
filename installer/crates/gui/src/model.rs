@@ -98,8 +98,18 @@ impl Form {
     }
 
     pub fn account_ok(&self) -> Result<(), &'static str> {
+        use dotinstall_core::engine::validate::{reserved_username, valid_username};
         if self.full_name.trim().is_empty() {
             return Err("Type your name.");
+        }
+        if self.username.is_empty() {
+            return Err("Pick a username.");
+        }
+        if !valid_username(&self.username) {
+            return Err("Usernames are lowercase: a-z first, then a-z, 0-9, - or _.");
+        }
+        if reserved_username(&self.username) {
+            return Err("That one's a system account. Pick another.");
         }
         self.password_ok()
     }
@@ -390,6 +400,23 @@ mod tests {
     }
 
     #[test]
+    fn username_is_yours_to_pick() {
+        let p = demo_probe();
+        let mut f = Form::new(&p);
+        f.full_name = "Alice Example".into();
+        f.password = "correct horse battery".into();
+        f.password_confirm = f.password.clone();
+        assert!(f.account_ok().is_ok());
+        f.username = "alice".into();
+        assert!(f.account_ok().is_ok());
+        assert_eq!(f.to_config(&p).user.username, "alice");
+        for bad in ["", "Alice", "1alice", "al ice", "root", "nixbld3"] {
+            f.username = bad.into();
+            assert!(f.account_ok().is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
     fn git_skips_without_email() {
         let mut f = Form::default();
         assert!(f.git_ok().is_ok());
@@ -422,6 +449,7 @@ mod tests {
     fn confirmation_still_typing_is_not_a_mismatch() {
         let mut f = Form {
             full_name: "J".into(),
+            username: "j".into(),
             password: "hunter22".into(),
             password_confirm: "hunt".into(),
             ..Form::default()

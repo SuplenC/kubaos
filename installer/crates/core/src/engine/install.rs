@@ -20,6 +20,9 @@ mod firstboot;
 /// Where the dotfiles checkout sits inside the payload's rootfs. The user
 /// step copies it to `~/Projects/dotfiles`, where the live links point.
 pub const PAYLOAD_DOTFILES: &str = "/usr/share/dotinstall/dotfiles";
+/// Out-link of the generation built for a username the payload wasn't
+/// built for, inside the target. /tmp: home-manager's profile roots it after.
+const HOME_REBUILT: &str = "/tmp/dotinstall-home-generation";
 /// The target's PATH inside the chroot.
 const CHROOT_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const NIX_BIN: &str = "/nix/var/nix/profiles/default/bin";
@@ -1100,9 +1103,16 @@ impl<'a> Install<'a> {
     }
 
     fn home(&mut self) -> R<()> {
-        let generation = self.manifest.home_generation.clone();
+        // The payload's generation is built for manifest.username. Anyone
+        // else gets theirs built here, offline (rebuild_home).
+        let rebuild = self.cfg.user.username != self.manifest.username;
+        let generation = if rebuild {
+            HOME_REBUILT.to_string()
+        } else {
+            self.manifest.home_generation.clone()
+        };
         let activate = format!("{generation}/activate");
-        if !self.dry() && !self.r.exists(&self.t(&activate)) {
+        if !rebuild && !self.dry() && !self.r.exists(&self.t(&activate)) {
             return Err(StepError {
                 message: format!("{activate} is not in the payload"),
                 hint: Some(
@@ -1174,30 +1184,75 @@ impl<'a> Install<'a> {
         } else {
             ""
         };
-        let script = format!("cd \"$HOME\" && exec {bus}{activate}");
-        let mut args: Vec<String> = vec![
-            "setpriv".into(),
-            format!("--reuid={uid}"),
-            format!("--regid={gid}"),
-            "--init-groups".into(),
-            "--".into(),
-            "env".into(),
-            "-i".into(),
-        ];
-        args.extend(user_env);
-        args.extend(["/bin/sh".into(), "-c".into(), script]);
-        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
-        let cmd = self.chroot(&refs);
-        let res = self.sh_stream(cmd, Level::Info);
+        let as_user = |script: String| -> Vec<String> {
+            let mut args: Vec<String> = vec![
+                "setpriv".into(),
+                format!("--reuid={uid}"),
+                format!("--regid={gid}"),
+                "--init-groups".into(),
+                "--".into(),
+                "env".into(),
+                "-i".into(),
+            ];
+            args.extend(user_env.iter().cloned());
+            args.extend(["/bin/sh".into(), "-c".into(), script]);
+            args
+        };
+        let mut res = Ok(());
+        if rebuild {
+            let args = as_user(self.rebuild_home_script());
+            let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+            let cmd = self.chroot(&refs);
+            self.info(format!(
+                "building the home-manager generation for {name} (the payload's is for {})",
+                self.manifest.username
+            ));
+            res = self.sh_stream(cmd, Level::Debug).map_err(|e| StepError {
+                message: e.message,
+                hint: Some(
+                    "Building the generation for another username failed; the log has Nix's output. \
+                     The payload's own username needs no build."
+                        .into(),
+                ),
+            });
+            self.progress(0.6, None);
+        }
+        if res.is_ok() {
+            let args = as_user(format!("cd \"$HOME\" && exec {bus}{activate}"));
+            let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+            let cmd = self.chroot(&refs);
+            res = self.sh_stream(cmd, Level::Info).map_err(|e| StepError {
+                message: e.message,
+                hint: Some("home-manager activation failed; the log has its output.".into()),
+            });
+        }
         if let Some(pid) = self.daemon.take() {
             self.r.kill(pid);
         }
-        res.map_err(|e| StepError {
-            message: e.message,
-            hint: Some("home-manager activation failed; the log has its output.".into()),
-        })?;
+        res?;
         self.progress(1.0, None);
         Ok(())
+    }
+
+    /// As the user, in ~/Projects/dotfiles: write the name into
+    /// home/username (flake.nix reads it), commit that, and build
+    /// `<user>@<host>` offline. Only the derivations that name the user
+    /// rebuild; the payload carries their build inputs (installer/image).
+    /// The username is validated (a-z, 0-9, - and _), so it goes in as is.
+    fn rebuild_home_script(&self) -> String {
+        let user = &self.cfg.user.username;
+        let flake_out = format!(
+            "homeConfigurations.\\\"{user}@{}\\\".activationPackage",
+            self.cfg.host.hostname
+        );
+        format!(
+            "set -e; cd \"$HOME/Projects/dotfiles\" && printf '%s\\n' {user} > home/username && \
+             git add home/username && \
+             git -c user.name=dotinstall -c user.email=dotinstall@localhost commit -q --no-gpg-sign \
+             -m \"chore: home-manager generation for {user}\" && \
+             exec nix --offline --option experimental-features 'nix-command flakes' build -L \
+             --out-link {HOME_REBUILT} \".#{flake_out}\""
+        )
     }
 
     fn snapshot(&mut self) -> R<()> {

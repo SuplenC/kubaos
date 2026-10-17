@@ -31,7 +31,10 @@
       ...
     }@inputs:
     let
-      username = "kuba";
+      # The account the generations are for. The installer rewrites this file
+      # in the installed checkout when the user picks another name
+      # (docs/INSTALLER.md, "Another username").
+      username = nixpkgs.lib.trim (builtins.readFile ./home/username);
 
       systems = [
         "x86_64-linux"

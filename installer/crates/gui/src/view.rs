@@ -938,25 +938,27 @@ fn strength_meter<'a>(pw: &str, p: &Palette) -> El<'a> {
 fn account<'a>(app: &'a App, p: &Palette) -> El<'a> {
     let f = &app.form;
     let mismatch = mismatched(&f.password, &f.password_confirm);
-    let username = text_field(
-        FieldLook {
-            value: &f.username,
-            placeholder: "",
-            secret: false,
-            caret: None,
-            blink_from: app.focus_at,
-            locked: true,
-            error: false,
-            icon: None,
-        },
-        None::<fn(crate::field::Pointer) -> Message>,
-        p,
-    );
-    let host = app
-        .ready_probe()
-        .and_then(|p| p.payload.as_ref())
-        .map(|m| m.hostname.clone())
-        .unwrap_or_default();
+    let payload = app.ready_probe().and_then(|p| p.payload.as_ref());
+    let host = payload.map(|m| m.hostname.clone()).unwrap_or_default();
+    let baked = payload.is_some_and(|m| m.username == f.username);
+    let bad_name =
+        !f.username.is_empty() && !dotinstall_core::engine::validate::valid_username(&f.username);
+    let username = input_err(app, F::Username, "you", None, bad_name, p);
+    let username_note = if f.username.is_empty() {
+        "Your login and home folder.".to_string()
+    } else if bad_name {
+        "Lowercase: a-z first, then a-z, 0-9, - or _.".to_string()
+    } else if baked {
+        format!(
+            "/home/{}. The image's home config is built for {}@{host} already.",
+            f.username, f.username
+        )
+    } else {
+        format!(
+            "/home/{}. The install builds the home config for {}@{host}: a few seconds more.",
+            f.username, f.username
+        )
+    };
     let half = |e: El<'a>| container(e).width(Length::FillPortion(1));
     let names = row![
         half(field(
@@ -969,13 +971,10 @@ fn account<'a>(app: &'a App, p: &Palette) -> El<'a> {
             "Username",
             username,
             Some(
-                text(format!(
-                    "Baked into the system image as {}@{host}. Not up for debate.",
-                    f.username
-                ))
-                .size(size::SM)
-                .color(p.outline)
-                .into()
+                text(username_note)
+                    .size(size::SM)
+                    .color(if bad_name { p.error } else { p.outline })
+                    .into()
             ),
             p
         )),

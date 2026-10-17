@@ -87,6 +87,7 @@ pub fn script() -> Vec<Step> {
         Until("account", |a| a.screen == Screen::Account),
         // Focus starts on the empty name.
         Type("Kuba Example"),
+        Tap(Tab), // Username, the payload's kuba: keep it
         Tap(Tab),
         Type("correct horse battery"),
         Tap(Tab),
@@ -411,9 +412,13 @@ mod tests {
         assert_eq!(app.form.full_name, "", "the image carries no name");
         assert_eq!(app.focus, Some(F::FullName));
         keys(&mut app, vec![Type("Kuba Example"), Tap(Tab)]);
+        assert_eq!(app.focus, Some(F::Username));
+        // Selected on focus, so typing replaces the payload's name.
+        keys(&mut app, vec![Type("alice"), Tap(Tab)]);
+        assert_eq!(app.form.username, "alice");
         assert_eq!(app.focus, Some(F::Password));
         // Back into the name: all of it selected, so typing replaces it.
-        keys(&mut app, vec![Tap(ShiftTab), Type("Kuba")]);
+        keys(&mut app, vec![Tap(ShiftTab), Tap(ShiftTab), Type("Kuba")]);
         assert_eq!(app.form.full_name, "Kuba");
         // Caret moves: fix "Kuba" -> "Kuuba" -> "XKuuba!"
         keys(&mut app, vec![Tap(Left), Tap(Left), Tap(Left), Type("u")]);
@@ -458,6 +463,7 @@ mod tests {
                 Screen::Account,
                 vec![
                     F::FullName,
+                    F::Username,
                     F::Password,
                     F::PasswordConfirm,
                     F::ShowSecrets,

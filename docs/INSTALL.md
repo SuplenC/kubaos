@@ -42,7 +42,7 @@ The installer starts on its own a few seconds after GRUB. Everything works from 
 2. **Language and keyboard**, with a field to test the layout.
 3. **Time zone.**
 4. **Wi-Fi**, only when the live system has no network. The network you pick here is also saved on the installed system.
-5. **Account.** Your full name and password. The username comes with the image (`kuba`), as does the hostname (`tuxedo`), because home-manager picks its config by `<user>@<hostname>`.
+5. **Account.** Your full name, username and password. The username starts as the image's (`kuba`). Any other builds its home-manager config during the install, a few seconds more. The hostname comes with the image (`tuxedo`), because home-manager picks its config by `<user>@<hostname>`.
 6. **Disk.** Either the whole disk or the free space next to an existing system (Windows, say). KubaOS always encrypts with LUKS2: pick a passphrase you'll type at every boot, and don't lose it. There is no recovery.
 7. **Git identity**, prefilled from the image, with a preview of the `~/.gitconfig` it writes.
 8. **Review.** It names the disk that gets erased. Read it. Then hold the button (or Enter) to start.

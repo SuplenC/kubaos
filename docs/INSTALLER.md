@@ -63,7 +63,7 @@ timezone = "Europe/Rome"
 hostname = "tuxedo"          # v1: must equal manifest.hostname (flake output <user>@<hostname>)
 
 [user]
-username = "kuba"           # v1: must equal manifest.username
+username = "kuba"           # any; not manifest.username means a build at install (below)
 full_name = "Kuba Example"
 
 [disk]
@@ -107,10 +107,20 @@ How the engine does it:
 - The chroot gets `/dev`, `/dev/pts`, `/proc`, `/sys` (and `efivarfs` when the live system has it), and a fresh tmpfs on `/run`, so nothing inside can talk to the live system's systemd or D-Bus.
 - `useradd` creates the user with uid 1000, a group of the same name, shell `/usr/bin/zsh`, and whichever of `adm sudo users plugdev dip video render i2c docker` exist in the payload. Password through `chpasswd` on stdin. `[git]` becomes `~/.config/git-identity/identity.gitconfig`, the file the Git card writes (the directories are chowned to the user, because home-manager writes in `~/.config` next). The dotfiles checkout at `/usr/share/dotinstall/dotfiles` in the payload is copied to `~/Projects/dotfiles`, where the live links point.
 - The bootloader step runs `update-initramfs` for each kernel in `/boot`, so the initramfs knows the new crypttab. Then `grub-install --target=x86_64-efi|arm64-efi --bootloader-id=ubuntu`, then `--removable` for firmware that forgets boot entries, then `update-grub`. Without EFI variables (VMs, containers) it passes `--no-nvram`. In free-space mode another system's `EFI/BOOT` is set aside and put back, because Ubuntu's `grub-install` writes the fallback path too when it can't write NVRAM.
-- home-manager's `activate` needs the Nix store, which belongs to `nix-daemon` in a multi-user install. Nothing runs in a chroot, so the engine starts `/nix/var/nix/profiles/default/bin/nix-daemon --option sandbox false` inside it (the sandbox can't `pivot_root` in a chroot; the profile path is resolved inside the target, because its links point into `/nix/store`), waits for its socket, runs `setpriv --reuid=<uid> --regid=<gid> --init-groups env -i HOME=… USER=… PATH=<nix>:… NIX_REMOTE=daemon HOME_MANAGER_BACKUP_EXT=hm-backup sh -c 'cd ~ && exec dbus-run-session -- <home_generation>/activate'` (`dbus-run-session` when the payload has it: home-manager's dconf step needs a session bus), then stops the daemon. `hm-backup` keeps `/etc/skel` files out of home-manager's way. Without systemd running, home-manager skips reloading user units. Without a `nix-daemon` in the payload, activation runs against the store directly (single-user) with a warning.
+- home-manager's `activate` needs the Nix store, which belongs to `nix-daemon` in a multi-user install. Nothing runs in a chroot, so the engine starts `/nix/var/nix/profiles/default/bin/nix-daemon --option sandbox false` inside it (the sandbox can't `pivot_root` in a chroot; the profile path is resolved inside the target, because its links point into `/nix/store`), waits for its socket, runs `setpriv --reuid=<uid> --regid=<gid> --init-groups env -i HOME=… USER=… PATH=<nix>:… NIX_REMOTE=daemon HOME_MANAGER_BACKUP_EXT=hm-backup sh -c 'cd ~ && exec dbus-run-session -- <home_generation>/activate'` (`dbus-run-session` when the payload has it: home-manager's dconf step needs a session bus), then stops the daemon. For a username that isn't `manifest.username`, see "Another username" below: the generation activated is the one built there. `hm-backup` keeps `/etc/skel` files out of home-manager's way. Without systemd running, home-manager skips reloading user units. Without a `nix-daemon` in the payload, activation runs against the store directly (single-user) with a warning.
 - The snapshot step runs `snapper --no-dbus create-config /` with the same `@snapshots` swap as `system/20-base.sh`, applies the `20-base.sh` retention settings, then runs `snapper create --description factory` (#1). `SYNC_ACL=yes` is set last and dropped with a warning when the btrfs has no ACLs. Without snapper in the payload it takes a read-only `btrfs subvolume snapshot` of `@` to `@snapshots/1/snapshot` and writes snapper's `info.xml`. When grub-btrfs is installed, `update-grub` runs again so the snapshot is in the menu from the first boot.
 - `finish` copies the live log to `/var/log/dotinstall/install.log` (0600), unmounts in reverse and closes LUKS. Any failure does the same cleanup before `failed`.
-- `validate` requires `hostname` to equal `manifest.hostname`, so `home-manager switch` later finds the flake output `<user>@<hostname>`.
+- `validate` requires `hostname` to equal `manifest.hostname`, so `home-manager switch` later finds the flake output `<user>@<hostname>`. The username is anything `useradd` takes, minus the accounts the payload already has (`root`, the services', `nixbld*`).
+
+### Another username
+
+The payload's generation is built for `manifest.username` (`kuba`). home-manager bakes the user into it: the activation checks `$USER`, and the live links, units and session variables all name `/home/<user>`. So renaming a template user at install can't work, and the engine builds the generation for the name it was given instead. `flake.nix` reads the username from `home/username`. The home step, as the user in the chroot, with the throwaway nix-daemon already up:
+
+1. writes the name to `~/Projects/dotfiles/home/username` and commits it there (`chore: home-manager generation for <user>`, as `dotinstall`), so later `home-manager switch` runs find `<user>@<host>` too
+2. runs `nix --offline build -L --out-link /tmp/dotinstall-home-generation '.#homeConfigurations."<user>@<host>".activationPackage'`
+3. activates that, not `manifest.home_generation`
+
+Only about 50 small derivations name the user: the `hm_*` links and files, `home-manager-files`, `home-manager-path`, the session vars, the activation script and the generation. They build in seconds. Everything else is the payload's generation, already in the store. The builders they need (stdenv's setup scripts, perl for `buildEnv`, a few tools, about 18 MB on aarch64) are in the payload because `assemble.sh` builds a probe user's generation and keeps the inputs of whatever differs (installer/image/README.md). `installer/image/check` builds one for `kubaos-check` offline to prove it. The payload's own username skips all of this.
 
 What the engine needs on the live ISO: `sgdisk` (gdisk), `sfdisk` (fdisk), util-linux (`wipefs`, `blkid`, `lsblk`, `findmnt`, `losetup`, `mount`), `partprobe` (parted), `cryptsetup`, `mkfs.vfat` (dosfstools), `mkfs.ext4` (e2fsprogs), btrfs-progs 6.1 or newer (`mkswapfile`), coreutils `chroot`, and `unsquashfs` (squashfs-tools, `-percentage`) or `tar` with `zstd`. `preflight` lists any that are missing.
 
@@ -214,4 +224,4 @@ All the commands, and how config gets in, are in `test/vm/README.md`.
 
 ## Scope v1
 
-Personal. The username and the flake host come from the payload. Supported: whole-disk and free-space installs, LUKS on, GRUB, aarch64 for the VM and x86_64 for the TUXEDO.
+Personal. The flake host comes from the payload. The username is yours to pick, and anything but the payload's builds its generation at install. Supported: whole-disk and free-space installs, LUKS on, GRUB, aarch64 for the VM and x86_64 for the TUXEDO.

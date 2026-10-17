@@ -244,6 +244,23 @@ if out="$(in_root /nix/var/nix/profiles/default/bin/nix --offline --option exper
 else
   fail "  the flake doesn't evaluate offline: $(tail -3 <<<"$out")"
 fi
+# Another username: the engine builds <user>@<host> offline from the checkout
+# with home/username rewritten (engine/install.rs, rebuild_home_script). The
+# payload carries the build inputs for that; building one proves it.
+t="$(now)"
+rm -rf "$R/tmp/check-dotfiles"
+cp -a "$R/usr/share/dotinstall/dotfiles" "$R/tmp/check-dotfiles"
+if out="$(in_root sh -c "cd /tmp/check-dotfiles && printf 'kubaos-check\n' >home/username && \
+  git -c safe.directory=* add home/username && \
+  git -c safe.directory=* -c user.name=check -c user.email=check@localhost commit -q --no-gpg-sign -m check && \
+  /nix/var/nix/profiles/default/bin/nix --offline --option sandbox false --option experimental-features 'nix-command flakes' \
+    build --no-link --print-out-paths 'git+file:///tmp/check-dotfiles#homeConfigurations.\"kubaos-check@$host\".activationPackage'" 2>&1)" &&
+  [[ -x "$R$(tail -1 <<<"$out")/activate" ]]; then
+  ok "  a generation for another username builds offline ($(since "$t") s)"
+else
+  fail "  a generation for another username doesn't build offline: $(tail -5 <<<"$out")"
+fi
+rm -rf "$R/tmp/check-dotfiles"
 check "image.json parses" jq -e .home_generation "$R/usr/share/dotinstall/image.json"
 info "image.json groups: $(jq -c .groups "$R/usr/share/dotinstall/image.json")"
 

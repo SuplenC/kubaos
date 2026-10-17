@@ -27,13 +27,7 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
             if c.host.hostname != m.hostname {
                 bad(format!(
                     "hostname must be \"{}\": the payload is built for the flake output {}@{}",
-                    m.hostname, m.username, m.hostname
-                ));
-            }
-            if c.user.username != m.username {
-                bad(format!(
-                    "username must be \"{}\": the payload's home-manager generation is built for that user",
-                    m.username
+                    m.hostname, c.user.username, m.hostname
                 ));
             }
         }
@@ -46,6 +40,12 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
     if !valid_username(&c.user.username) {
         bad(format!(
             "username \"{}\" must start with a lowercase letter and use only a-z, 0-9, - and _ (at most 32)",
+            c.user.username
+        ));
+    }
+    if reserved_username(&c.user.username) {
+        bad(format!(
+            "username \"{}\" is a system account already; pick another",
             c.user.username
         ));
     }
@@ -164,6 +164,63 @@ pub fn valid_username(u: &str) -> bool {
         && ch.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
+/// Accounts the payload already has (Ubuntu's base users, the services the
+/// image installs, Nix's build users): useradd would fail on them after the
+/// disk is already gone.
+pub fn reserved_username(u: &str) -> bool {
+    const TAKEN: &[&str] = &[
+        "root",
+        "daemon",
+        "bin",
+        "sys",
+        "sync",
+        "games",
+        "man",
+        "lp",
+        "mail",
+        "news",
+        "uucp",
+        "proxy",
+        "www-data",
+        "backup",
+        "list",
+        "irc",
+        "_apt",
+        "nobody",
+        "messagebus",
+        "polkitd",
+        "syslog",
+        "uuidd",
+        "tcpdump",
+        "sshd",
+        "dnsmasq",
+        "avahi",
+        "colord",
+        "rtkit",
+        "geoclue",
+        "pulse",
+        "saned",
+        "usbmux",
+        "fwupd-refresh",
+        "tss",
+        "cups-pk-helper",
+        "gdm",
+        "sddm",
+        "greeter",
+        "kernoops",
+        "whoopsie",
+        "dhcpcd",
+        "landscape",
+        "ubuntu",
+        "docker",
+        "nixbld",
+    ];
+    TAKEN.contains(&u)
+        || u.starts_with("systemd-")
+        || u.strip_prefix("nixbld")
+            .is_some_and(|n| n.chars().all(|c| c.is_ascii_digit()))
+}
+
 pub fn valid_hostname(h: &str) -> bool {
     (1..=63).contains(&h.len())
         && !h.starts_with('-')
@@ -274,9 +331,9 @@ mod tests {
         c.locale.keyboard_layout = "xx".into();
         c.disk.device = "/dev/sda".into();
         let p = problems(&c, &probe());
-        assert_eq!(p.len(), 7, "{p:#?}");
+        assert_eq!(p.len(), 6, "{p:#?}");
         assert!(p[0].contains("hostname must be \"tuxedo\""));
-        assert!(p[1].contains("username must be \"kuba\""));
+        assert!(p[1].contains("username \"Root\" must start with a lowercase letter"));
         assert!(
             p.iter()
                 .any(|s| s.contains("medium the installer runs from"))
@@ -295,6 +352,22 @@ mod tests {
         assert!(p.iter().any(|s| s.starts_with("git:")), "{p:#?}");
         c.git.as_mut().unwrap().name = "Kuba \"K\" Example".into();
         assert_eq!(problems(&c, &probe()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn any_valid_username_goes() {
+        // The engine builds the generation for a name the payload wasn't
+        // built for.
+        let mut c = config();
+        c.user.username = "alice".into();
+        assert_eq!(problems(&c, &probe()), Vec::<String>::new());
+        for taken in ["root", "nixbld12", "systemd-network", "messagebus"] {
+            c.user.username = taken.into();
+            assert!(
+                problems(&c, &probe())[0].contains("system account"),
+                "{taken}"
+            );
+        }
     }
 
     #[test]

@@ -357,6 +357,60 @@ mod tests {
     }
 
     #[test]
+    fn another_username_builds_its_own_generation() {
+        let activation = |cmds: &[String]| {
+            cmds.iter()
+                .find(|c| c.contains("/activate"))
+                .cloned()
+                .expect("an activation")
+        };
+
+        // The payload's user: its prebuilt generation, nothing to build.
+        let mut r = DryRunner::new();
+        dry(&mut r, false).0.unwrap();
+        let cmds = r.commands();
+        assert!(!cmds.iter().any(|c| c.contains("homeConfigurations")));
+        assert!(activation(&cmds).contains("/nix/store/abc-home-manager-generation/activate"));
+
+        // Anyone else: the checkout learns the name, Nix builds
+        // <user>@<host> offline as that user, and that's what activates.
+        let p = payload();
+        let mut cfg = config(&p);
+        cfg.user.username = "alice".into();
+        let mut r = DryRunner::new();
+        let opts = RunOptions {
+            dry_run: true,
+            target_root: Some("/mnt/t".into()),
+            log_file: None,
+        };
+        run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}).unwrap();
+        let cmds = r.commands();
+        let build = cmds
+            .iter()
+            .find(|c| c.contains("homeConfigurations"))
+            .expect("a build");
+        for want in [
+            "--reuid=1000",
+            "USER=alice",
+            "HOME=/home/alice",
+            "home/username",
+            "git -c user.name=dotinstall",
+            "nix --offline",
+            "alice@vm",
+            "--out-link /tmp/dotinstall-home-generation",
+        ] {
+            assert!(build.contains(want), "{want} not in {build}");
+        }
+        let act = activation(&cmds);
+        assert!(
+            act.contains("/tmp/dotinstall-home-generation/activate"),
+            "{act}"
+        );
+        let i = |c: &String| cmds.iter().position(|x| x == c).unwrap();
+        assert!(i(build) < i(&act));
+    }
+
+    #[test]
     fn failure_cleans_up_in_reverse_and_ends_with_failed() {
         let mut r = DryRunner::new();
         let (res, events) = dry(&mut r, true);

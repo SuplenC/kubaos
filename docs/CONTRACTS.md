@@ -7,7 +7,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 ## Repo location and ownership
 
 - The repo lives at `~/Projects/dotfiles` on every machine. Nix code refers to it as `dotfilesDir = "${config.home.homeDirectory}/Projects/dotfiles"`.
-- Linux username is a single variable in `flake.nix` (default `kuba`). Nothing else hardcodes it.
+- Linux username is one line in `home/username` (default `kuba`), read by `flake.nix`. Nothing else hardcodes it. The installer rewrites and commits it in the installed checkout for another name.
 - Hostnames: `tuxedo` (laptop, x86_64) and `vm` (UTM test VM, aarch64). Flake outputs are `<user>@tuxedo` and `<user>@vm`, so plain `home-manager switch --flake ~/Projects/dotfiles` picks the right one.
 - Flakes only see files git knows about: `git add` new files under `config/`, `scripts/`, `home/` before `home-manager switch` (no commit needed).
 

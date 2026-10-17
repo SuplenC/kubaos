@@ -12,7 +12,8 @@
 # Environment: ARCH HOST PAYLOAD_USER COMMIT VERSION BUILD_ID BUILT_AT
 # ZSTD_LEVEL CPUS, and the OS_* names from build.
 #
-# Steps: realise the home-manager generation, run the Nix half of system/
+# Steps: realise the home-manager generation (and find what a rebuild for
+# another username needs), run the Nix half of system/
 # (60-nix.sh, 65-recorder.sh, 70-bitwarden.sh), copy this container's / into
 # /work/root, put a minimal /nix next to it (just the closure of what the
 # payload needs), strip machine identity and the build user, pack squashfs,
@@ -90,6 +91,43 @@ gen="$(as_user "$NIX_BIN/nix" --option cores "$CPUS" --option max-jobs "$CPUS" b
   "$REPO#homeConfigurations.\"$HM_CONFIG\".activationPackage")"
 [[ -x "$gen/activate" ]] || die "no activate in $gen"
 echo "    $gen"
+[[ "$(tr -d '[:space:]' <"$REPO/home/username")" == "$PAYLOAD_USER" ]] ||
+  die "home/username isn't $PAYLOAD_USER (the build user, installer/image/build PAYLOAD_USER)"
+
+# Another username at install: the engine writes it to home/username in the
+# checkout and builds <user>@<host> offline. Only the derivations that name
+# the user rebuild (dotfiles, unit and session files, the activation script,
+# home-path). A probe user's generation shows which ones; the store paths
+# their builders need (stdenv's scripts, perl for buildEnv, ...) go into the
+# payload next to the generation.
+PROBE_USER=kubaos-probe
+say "build inputs for another username (probe: $PROBE_USER@$HOST)"
+probe_repo="/home/$PAYLOAD_USER/probe-dotfiles"   # /home stays out of the payload
+rm -rf "$probe_repo"
+as_user cp -a "$REPO" "$probe_repo"
+as_user sh -c "cd '$probe_repo' && printf '%s\n' '$PROBE_USER' >home/username && git add home/username && \
+  git -c user.name=dotinstall -c user.email=dotinstall@localhost commit -q --no-gpg-sign -m probe"
+drv_of() { as_user "$NIX_BIN/nix" eval --raw "$1#homeConfigurations.\"$2@$HOST\".activationPackage.drvPath"; }
+gen_drv="$(drv_of "$REPO" "$PAYLOAD_USER")"
+probe_drv="$(drv_of "$probe_repo" "$PROBE_USER")"
+nix_ build --no-link "$probe_drv^out" >/dev/null
+"$NIX_BIN/nix-store" -qR "$gen_drv" | sort >/tmp/gen-drvs
+"$NIX_BIN/nix-store" -qR "$probe_drv" | sort >/tmp/probe-drvs
+comm -13 /tmp/gen-drvs /tmp/probe-drvs | grep '\.drv$' >/tmp/differing-drvs || die "the probe generation is the payload's?"
+mapfile -t differing </tmp/differing-drvs
+"$NIX_BIN/nix" derivation show "${differing[@]}" |
+  python3 /in/src/installer/image/lib/build-inputs.py /tmp/gen-drvs /tmp/differing-drvs >/tmp/build-inputs
+rebuild_paths=()
+while read -r p outs; do
+  if [[ -n "${outs:-}" ]]; then
+    mapfile -t -O "${#rebuild_paths[@]}" rebuild_paths < <("$NIX_BIN/nix" path-info "$p^${outs// /,}")
+  else
+    rebuild_paths+=("$p")
+  fi
+done </tmp/build-inputs
+mapfile -t rebuild_paths < <(printf '%s\n' "${rebuild_paths[@]}" | sort -u)
+echo "    ${#differing[@]} derivations name the user; their builds need ${#rebuild_paths[@]} store paths"
+rm -rf "$probe_repo"
 
 # The Nix half of system/: PAM module links (60-nix.sh, 70-bitwarden.sh), the
 # setcap'd gsr-kms-server (65-recorder.sh). They build from the flake's
@@ -123,7 +161,7 @@ command -v rsync mksquashfs >/dev/null
 
 # ---------------------------------------------------------------------------
 # Roots of the payload's store: everything else in this cache store stays out.
-roots=("$gen" "${flake_paths[@]}")
+roots=("$gen" "${flake_paths[@]}" "${rebuild_paths[@]}")
 for p in $gpu_paths; do roots+=("$p"); done
 declare -A gcroot_target=()
 for l in /nix/var/nix/gcroots/dotfiles-*; do
@@ -236,6 +274,8 @@ for name in "${!gcroot_target[@]}"; do ln -sfn "${gcroot_target[$name]}" "$ROOT/
 ln -sfn "$gen" "$ROOT/nix/var/nix/gcroots/dotinstall/home-generation"
 i=0
 for p in "${flake_paths[@]}"; do ln -sfn "$p" "$ROOT/nix/var/nix/gcroots/dotinstall/flake-input-$((i++))"; done
+i=0
+for p in "${rebuild_paths[@]}"; do ln -sfn "$p" "$ROOT/nix/var/nix/gcroots/dotinstall/rebuild-input-$((i++))"; done
 i=0
 for p in $gpu_paths; do ln -sfn "$p" "$ROOT/nix/var/nix/gcroots/dotinstall/gpu-$((i++))"; done
 chmod 1775 "$ROOT/nix/store"

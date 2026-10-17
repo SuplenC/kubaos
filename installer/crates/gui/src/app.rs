@@ -77,6 +77,7 @@ pub enum F {
     WifiList,
     WifiPsk,
     FullName,
+    Username,
     Password,
     PasswordConfirm,
     ShowSecrets,
@@ -109,6 +110,7 @@ impl F {
                 | F::TzQ
                 | F::WifiPsk
                 | F::FullName
+                | F::Username
                 | F::Password
                 | F::PasswordConfirm
                 | F::Luks
@@ -434,6 +436,7 @@ impl App {
             Screen::Account => {
                 vec![
                     F::FullName,
+                    F::Username,
                     F::Password,
                     F::PasswordConfirm,
                     F::ShowSecrets,
@@ -1244,6 +1247,7 @@ impl App {
             F::TzQ => &mut self.tz_q,
             F::WifiPsk => &mut form.wifi_psk,
             F::FullName => &mut form.full_name,
+            F::Username => &mut form.username,
             F::Password => &mut form.password,
             F::PasswordConfirm => &mut form.password_confirm,
             F::Luks => &mut form.luks,
@@ -1263,6 +1267,7 @@ impl App {
             F::TzQ => &self.tz_q,
             F::WifiPsk => &form.wifi_psk,
             F::FullName => &form.full_name,
+            F::Username => &form.username,
             F::Password => &form.password,
             F::PasswordConfirm => &form.password_confirm,
             F::Luks => &form.luks,
@@ -1509,7 +1514,7 @@ pub fn reveal_target(screen: Screen, f: F) -> Option<(&'static str, &'static str
         (Screen::Disk, F::Encrypt) => ids::REVEAL_ENCRYPT,
         (Screen::Disk, F::LuksSame) => ids::REVEAL_LUKS_SAME,
         (Screen::Disk, F::Luks | F::LuksConfirm | F::ShowSecrets) => ids::REVEAL_LUKS,
-        (Screen::Account, F::FullName) => ids::REVEAL_NAMES,
+        (Screen::Account, F::FullName | F::Username) => ids::REVEAL_NAMES,
         (Screen::Account, F::Password | F::PasswordConfirm | F::ShowSecrets) => {
             ids::REVEAL_PASSWORDS
         }

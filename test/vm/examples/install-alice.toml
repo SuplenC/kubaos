@@ -1,0 +1,26 @@
+# install.toml as someone other than the payload's user: the engine builds
+# alice@vm's home-manager generation offline (docs/INSTALLER.md, "Another username").
+[locale]
+lang = "en_US.UTF-8"
+keyboard_layout = "us"
+keyboard_variant = ""
+timezone = "Europe/Rome"
+
+[host]
+hostname = "vm"
+
+[user]
+username = "alice"
+full_name = "Alice Example"
+
+[disk]
+device = "/dev/vda"
+encrypt = true
+target = { mode = "whole" }
+
+[git]
+name = "Alice Example"
+email = "alice@example.com"
+
+[payload]
+dir = "/run/dotinstall/payload"
