@@ -213,7 +213,6 @@ pub fn reserved_username(u: &str) -> bool {
         "landscape",
         "ubuntu",
         "docker",
-        "nixbld",
     ];
     TAKEN.contains(&u)
         || u.starts_with("systemd-")

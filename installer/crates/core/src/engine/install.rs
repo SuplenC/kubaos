@@ -976,6 +976,22 @@ impl<'a> Install<'a> {
         }
         self.install_keyring(&home, &owner)?;
 
+        // What the image's scripts wrote into /etc for the build user.
+        for (template, dest) in files::USER_TEMPLATES {
+            if !self.r.exists(&self.t(dest)) {
+                continue;
+            }
+            let src = format!("{PAYLOAD_DOTFILES}/{template}");
+            match self.r.read_file(&self.t(&src)) {
+                Some(t) => {
+                    self.write(dest, &files::render_user_template(&t, &name, &home), 0o644)?
+                }
+                None => self.warn(format!(
+                    "{dest} names the payload's user, and {src} isn't there to render it for {name}"
+                )),
+            }
+        }
+
         // The live links point into ~/Projects/dotfiles; the image carries
         // the checkout.
         if self.dry() || self.r.exists(&self.t(PAYLOAD_DOTFILES)) {

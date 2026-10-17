@@ -261,6 +261,20 @@ else
   fail "  a generation for another username doesn't build offline: $(tail -5 <<<"$out")"
 fi
 rm -rf "$R/tmp/check-dotfiles"
+# Files in the system that name the build user: each must be one the engine
+# renders again for the real user (engine/files.rs USER_TEMPLATES, read from
+# the payload's own checkout), or a username other than the payload's gets
+# the payload's (tty1 autologin into an account that isn't there).
+templates="$(sed -n '/^pub const USER_TEMPLATES/,/^];/p' "$R/usr/share/dotinstall/dotfiles/installer/crates/core/src/engine/files.rs" |
+  grep -o '"/[^"]*"' | tr -d '"')"
+[[ -n "$templates" ]] && ok "engine renders $(wc -l <<<"$templates" | tr -d ' ') system file(s) for the user" ||
+  fail "no USER_TEMPLATES in the checkout's engine/files.rs"
+stray=""
+while IFS= read -r f; do
+  grep -qxF "${f#"$R"}" <<<"$templates" || stray+=" ${f#"$R"}"
+done < <(grep -rIlw --exclude-dir=dotinstall -e "$user" "$R/etc" "$R/usr/local" "$R/usr/lib/systemd" "$R/var/lib" 2>/dev/null |
+  grep -v -e '^'"$R"'/etc/\(passwd\|group\|shadow\|gshadow\|subuid\|subgid\)' )
+[[ -z "$stray" ]] && ok "  no other system file names $user" || fail "  name $user, and the engine doesn't render them:$stray"
 check "image.json parses" jq -e .home_generation "$R/usr/share/dotinstall/image.json"
 info "image.json groups: $(jq -c .groups "$R/usr/share/dotinstall/image.json")"
 

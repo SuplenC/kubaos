@@ -172,6 +172,32 @@ pub fn nmconnection_name(ssid: &str) -> String {
     )
 }
 
+/// System files the image's scripts render for the build user (template in
+/// the dotfiles checkout, file in the target). The engine renders them again
+/// for the real user; installer/image/check fails on any other file in the
+/// payload that names the build user.
+pub const USER_TEMPLATES: &[(&str, &str)] = &[
+    // system/50-hyprland.sh: tty1 autologin
+    (
+        "system/files/getty/autologin.conf.in",
+        "/etc/systemd/system/getty@tty1.service.d/autologin.conf",
+    ),
+    // system/40-apps.sh: Chrome's theme color follows the wallpaper
+    (
+        "system/files/chrome/dot-chrome-theme.path.in",
+        "/etc/systemd/system/dot-chrome-theme.path",
+    ),
+    (
+        "system/files/chrome/dot-chrome-theme.service.in",
+        "/etc/systemd/system/dot-chrome-theme.service",
+    ),
+];
+
+/// `render_template` from system/lib.sh: `@USER@` and `@HOME@`.
+pub fn render_user_template(template: &str, user: &str, home: &str) -> String {
+    template.replace("@USER@", user).replace("@HOME@", home)
+}
+
 /// Where the git identity lives, under the home. Not in ~/.config/git: that
 /// is a live link into the dotfiles checkout. config/git/config includes it.
 pub const GIT_IDENTITY: &str = ".config/git-identity/identity.gitconfig";

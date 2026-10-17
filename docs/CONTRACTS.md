@@ -7,13 +7,13 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 ## Repo location and ownership
 
 - The repo lives at `~/Projects/dotfiles` on every machine. Nix code refers to it as `dotfilesDir = "${config.home.homeDirectory}/Projects/dotfiles"`.
-- Linux username is one line in `home/username` (default `kuba`), read by `flake.nix`. Nothing else hardcodes it. The installer rewrites and commits it in the installed checkout for another name.
+- Linux username is one line in `home/username` (default `kuba`), read by `flake.nix`. The payload build's user (`installer/image/build` `PAYLOAD_USER`, the image's Dockerfile) must match it; `assemble.sh` checks. The installer rewrites and commits it in the installed checkout for another name.
 - Hostnames: `tuxedo` (laptop, x86_64) and `vm` (UTM test VM, aarch64). Flake outputs are `<user>@tuxedo` and `<user>@vm`, so plain `home-manager switch --flake ~/Projects/dotfiles` picks the right one.
 - Flakes only see files git knows about: `git add` new files under `config/`, `scripts/`, `home/` before `home-manager switch` (no commit needed).
 
 | Path | Owner | What |
 |---|---|---|
-| `flake.nix`, `flake.lock`, `home/default.nix`, `home/links.nix`, `home/cli.nix`, `home/dev.nix`, `home/desktop.nix` | nix | Flake, module wiring, live links, packages, cargo config (linker switch), Quickshell + GPU wiring, fonts |
+| `flake.nix`, `flake.lock`, `home/username`, `home/default.nix`, `home/links.nix`, `home/cli.nix`, `home/dev.nix`, `home/desktop.nix` | nix | Flake, module wiring, live links, packages, cargo config (linker switch), Quickshell + GPU wiring, fonts |
 | `home/shell.nix`, `home/terminal.nix`, `config/{nvim,tmux,tms,ghostty,ohmyposh,lazygit,btop,git,bat,bacon,yazi,foot,fuzzel}` | ports | zsh, tmux, tms, ghostty, ported user configs, the fallback terminal and launcher |
 | `config/hypr/`, `scripts/dot-hypr-*` | hypr | Hyprland Lua config, hypridle, lid and monitor scripts, screenshots and screen recording |
 | `config/quickshell/`, `scripts/dot-qs-*` | quickshell | The desktop shell |

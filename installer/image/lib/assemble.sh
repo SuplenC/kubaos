@@ -120,7 +120,9 @@ mapfile -t differing </tmp/differing-drvs
 rebuild_paths=()
 while read -r p outs; do
   if [[ -n "${outs:-}" ]]; then
-    mapfile -t -O "${#rebuild_paths[@]}" rebuild_paths < <("$NIX_BIN/nix" path-info "$p^${outs// /,}")
+    # Not in < <(...): set -e must see path-info fail on a missing output.
+    out="$("$NIX_BIN/nix" path-info "$p^${outs// /,}")" || die "no output $outs of $p in the store"
+    mapfile -t -O "${#rebuild_paths[@]}" rebuild_paths <<<"$out"
   else
     rebuild_paths+=("$p")
   fi

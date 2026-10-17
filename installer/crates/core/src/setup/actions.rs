@@ -638,6 +638,21 @@ fn git(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
         .write(&path, &crate::engine::files::gitconfig(name, email))
         .map_err(|e| Fail::from(format!("can't write {path}: {e}")))?;
     ctx.log(Level::Info, format!("  ok  {path}: {name} <{email}>"));
+    // git reads ~/.gitconfig after the include, so a [user] there wins.
+    for (key, want) in [("user.name", name), ("user.email", email)] {
+        let got = ctx
+            .sys
+            .run(&Cmd::new(detect::GIT).args(["config", "--global", "--includes", "--get", key]))
+            .ok()
+            .map(|o| o.stdout.trim().to_string());
+        if let Some(got) = got.filter(|g| g != want) {
+            return Err(fail(
+                format!("git still says {key} = {got}"),
+                "~/.gitconfig sets it and wins over the include. Delete the [user] lines there, \
+                 or change them there.",
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -950,6 +965,30 @@ mod tests {
             "[user]\n\tname = \"Kuba \\\"K\\\" W\\\\asil\"\n\temail = \"kuba@example.com\"\n"
         );
         assert!(matches!(evs.last(), Some(SetupEvent::Finished { .. })));
+    }
+
+    #[test]
+    fn git_says_when_gitconfig_wins() {
+        // ~/.gitconfig is read after the include, so its [user] wins.
+        let mut s = FakeSys::new().ok(
+            "/usr/bin/git config --global --includes --get user.name",
+            "Old Name\n",
+        );
+        let inputs = Inputs {
+            git: Some(GitIdentity {
+                name: "Kuba Example".into(),
+                email: "kuba@example.com".into(),
+            }),
+            ..Default::default()
+        };
+        let (ok, evs) = go(&mut s, CardId::Git, &inputs);
+        assert!(!ok);
+        match evs.last() {
+            Some(SetupEvent::Failed { hint: Some(h), .. }) => {
+                assert!(h.contains("~/.gitconfig"), "{h}")
+            }
+            e => panic!("{e:?}"),
+        }
     }
 
     #[test]
