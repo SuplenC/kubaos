@@ -546,12 +546,15 @@ c_ukiyo() {
     sleep 0.25
   done
   jq -e '.state == "still" and (.still_frames | length > 0)' <<<"$out" >/dev/null 2>&1 &&
-    echo "ok   locked: ukiyo is still, lock frame $(jq -r '.still_frames[0]' <<<"$out")" || { echo "FAIL lock: $(jq -c '{state, reasons, still_frames}' <<<"$out" 2>&1)"; bad=1; }
+    echo "ok   locked: ukiyo is still, lock frame $(jq -r '.still_frames[0]' <<<"$out")" || { echo "FAIL lock: $(jq -c '{state, still, reasons, still_frames, outputs}' <<<"$out" 2>&1)"; bad=1; }
   [[ -n $pid ]] && echo "     ukiyo CPU, still: $(cpu_pct "$pid" 3)%"
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
-  in_session 'dot-theme set ~/Pictures/wallpapers/japanese/tokyo-tower-blue-hour.jpg' >/dev/null 2>&1
+  in_session 'dot-theme set ~/Pictures/wallpapers/japanese/tokyo-tower-blue-hour.jpg' >"$LOGS/ukiyo-stop.log" 2>&1
   for _ in $(seq 20); do pgrep -u "$USER_NAME" -x ukiyo >/dev/null || break; sleep 0.5; done
-  pgrep -u "$USER_NAME" -x ukiyo >/dev/null && { echo "FAIL ukiyo still runs with a still as the wallpaper"; bad=1; } ||
+  pgrep -u "$USER_NAME" -x ukiyo >/dev/null && {
+    echo "FAIL ukiyo still runs with a still as the wallpaper:"; cat "$LOGS/ukiyo-stop.log"
+    pgrep -a -u "$USER_NAME" -x ukiyo; tail -n 5 "$st/ukiyo.log"; bad=1
+  } ||
     echo "ok   a still as the wallpaper stops the daemon"
   session_stop
   return "$bad"

@@ -151,7 +151,9 @@ ukiyo_start() {
     systemctl --user start ukiyo.service || return 1
   else
     mkdir -p "$STATE"
-    setsid -f ukiyo daemon >"$STATE/ukiyo.log" 2>&1 </dev/null
+    # 9>&-: not with our run lock (lock()), or the daemon would hold it for
+    # as long as it runs and every later dot-theme would wait it out.
+    setsid -f ukiyo daemon >"$STATE/ukiyo.log" 2>&1 </dev/null 9>&-
   fi
   local _
   for _ in $(seq 50); do
@@ -181,9 +183,9 @@ ukiyo_show() {
 ukiyo_hide() {
   command -v ukiyo >/dev/null || return 0
   if user_unit && systemctl --user is-active --quiet ukiyo.service; then
-    setsid -f sh -c 'sleep 1.5; systemctl --user stop ukiyo.service' >/dev/null 2>&1 </dev/null
+    setsid -f sh -c 'sleep 1.5; systemctl --user stop ukiyo.service' >/dev/null 2>&1 </dev/null 9>&-
   elif ukiyo_running; then
-    setsid -f sh -c 'sleep 1.5; ukiyo quit' >/dev/null 2>&1 </dev/null
+    setsid -f sh -c 'sleep 1.5; ukiyo quit' >/dev/null 2>&1 </dev/null 9>&-
   fi
 }
 
