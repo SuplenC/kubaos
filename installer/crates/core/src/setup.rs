@@ -1,11 +1,11 @@
 //! First-boot setup (docs/INSTALLER.md, "First boot"): the things the
 //! payload can't carry because they need the hardware or the person.
 //!
-//! Four cards, each detected from the machine on every start, so re-running
+//! Five cards, each detected from the machine on every start, so re-running
 //! never redoes a finished one: TUXEDO drivers (with the Secure Boot key),
-//! the fingerprint reader, the YubiKey for sudo/polkit/lock screen, and the
+//! the fingerprint reader, the YubiKey for sudo/polkit/lock screen, the
 //! Bitwarden vault (SSH keys, git signing, gh, project env through
-//! `dot-bw-setup`).
+//! `dot-bw-setup`), and the name and email git commits with.
 //!
 //! Runs as the desktop user. The few steps that need root go through
 //! `pkexec /usr/lib/kubaos/setup-helper`, a fixed root-owned script with
@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 pub use crate::engine::runner::{Cmd, Output, Stream};
 use crate::event::Level;
 
-pub use actions::{YKMAN_PREP, mok_password_ok, run};
+pub use actions::{YKMAN_PREP, git_identity_ok, mok_password_ok, run};
 pub use detect::{card_status, status};
 pub use parse::*;
 
@@ -45,14 +45,16 @@ pub enum CardId {
     Fingerprint,
     Yubikey,
     Bitwarden,
+    Git,
 }
 
 impl CardId {
-    pub const ALL: [CardId; 4] = [
+    pub const ALL: [CardId; 5] = [
         CardId::Tuxedo,
         CardId::Fingerprint,
         CardId::Yubikey,
         CardId::Bitwarden,
+        CardId::Git,
     ];
 
     pub fn title(self) -> &'static str {
@@ -61,6 +63,7 @@ impl CardId {
             CardId::Fingerprint => "Fingerprint",
             CardId::Yubikey => "YubiKey",
             CardId::Bitwarden => "Bitwarden",
+            CardId::Git => "Git",
         }
     }
 
@@ -70,7 +73,7 @@ impl CardId {
 
     /// Needs the internet to do its thing (apt, the vault).
     pub fn needs_network(self) -> bool {
-        !matches!(self, CardId::Yubikey)
+        !matches!(self, CardId::Yubikey | CardId::Git)
     }
 }
 
@@ -150,6 +153,13 @@ pub enum Facts {
         configured: bool,
         /// The desktop app (its SSH agent) is installed (amd64 only).
         desktop: bool,
+    },
+    Git {
+        /// What git commits with now, from any of its config files.
+        name: Option<String>,
+        email: Option<String>,
+        /// The account's full name (passwd), a guess for `name`.
+        full_name: Option<String>,
     },
 }
 
@@ -266,6 +276,15 @@ pub struct Inputs {
     /// fprintd finger name, e.g. `right-index-finger`.
     pub finger: Option<String>,
     pub bw: Option<BwLogin>,
+    pub git: Option<GitIdentity>,
+}
+
+/// The name and email git commits with. Not secret.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GitIdentity {
+    pub name: String,
+    pub email: String,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -290,6 +309,7 @@ impl std::fmt::Debug for Inputs {
             )
             .field("finger", &self.finger)
             .field("bw", &self.bw)
+            .field("git", &self.git)
             .finish()
     }
 }

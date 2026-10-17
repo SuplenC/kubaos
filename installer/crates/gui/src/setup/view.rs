@@ -80,6 +80,7 @@ fn card_icon(id: CardId) -> Icon {
         CardId::Fingerprint => Icon::Badge,
         CardId::Yubikey => Icon::Key,
         CardId::Bitwarden => Icon::Lock,
+        CardId::Git => Icon::Code,
     }
 }
 
@@ -614,6 +615,17 @@ fn explain<'a>(s: &'a Setup, c: &'a CardStatus, p: &Palette) -> Vec<El<'a>> {
                 ));
             }
         }
+        (Facts::Git { .. }, st) => v.push(para(
+            if st == State::Done {
+                "git commits with this name and email. Change them here any time; they live in \
+                 ~/.config/git-identity/identity.gitconfig, outside the dotfiles repo."
+            } else {
+                "The name and email git puts on every commit. The dotfiles don't carry one, so the \
+                 repo stays yours to share. Saved to ~/.config/git-identity/identity.gitconfig, which \
+                 the git config includes."
+            },
+            p,
+        )),
         _ => {}
     }
     v
@@ -825,6 +837,18 @@ fn form<'a>(s: &'a Setup, fields: &[SF], p: &Palette) -> El<'a> {
             ),
             SF::ClientId => field("client_id", input(s, sf, "user.…", Some(Icon::Badge), p), None, p),
             SF::ClientSecret => field("client_secret", input(s, sf, "", Some(Icon::Key), p), None, p),
+            SF::GitName => field("Name", input(s, sf, "Your name", Some(Icon::Person), p), None, p),
+            SF::GitEmail => field(
+                "Email",
+                input(s, sf, "you@example.com", Some(Icon::Mail), p),
+                Some(
+                    text("Public on every commit you push. GitHub's noreply address works too.")
+                        .size(size::SM)
+                        .color(p.on_surface_variant)
+                        .into(),
+                ),
+                p,
+            ),
             _ => continue,
         };
         col = col.push(el);

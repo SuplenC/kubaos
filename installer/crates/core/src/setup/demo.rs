@@ -1,5 +1,6 @@
 //! A made-up machine for GUI work and screenshots: a TUXEDO with Secure Boot
-//! on, a fingerprint reader, a YubiKey plugged in and Bitwarden logged out.
+//! on, a fingerprint reader, a YubiKey plugged in, Bitwarden logged out and
+//! no git identity.
 //! Actions play the real event shapes with fake timings and flip the card.
 
 use std::sync::Mutex;
@@ -299,6 +300,28 @@ impl Demo {
                     *configured = true;
                 }
             }
+            CardId::Git => {
+                let g = inputs.git.clone().unwrap_or_default();
+                if let Err(why) = super::git_identity_ok(&g.name, &g.email) {
+                    emit(fail("no name and email to commit with", why));
+                    return false;
+                }
+                let (name, email) = (g.name.trim().to_string(), g.email.trim().to_string());
+                self.wait(300);
+                emit(log(&format!(
+                    "  ok  ~/{}: {name} <{email}>",
+                    crate::engine::files::GIT_IDENTITY
+                )));
+                next.state = State::Done;
+                next.summary = format!("Commits as {name} <{email}>.");
+                if let Facts::Git {
+                    name: n, email: e, ..
+                } = &mut next.facts
+                {
+                    *n = Some(name);
+                    *e = Some(email);
+                }
+            }
         }
         {
             let mut s = self.status.lock().expect("demo lock");
@@ -329,6 +352,16 @@ fn initial(machine: Machine) -> Status {
             server: Some("https://vault.bitwarden.eu".into()),
             configured: false,
             desktop: machine == Machine::Tuxedo,
+        },
+    };
+    let git = CardStatus {
+        id: CardId::Git,
+        state: State::Needed,
+        summary: "No name and email for commits yet.".into(),
+        facts: Facts::Git {
+            name: None,
+            email: None,
+            full_name: Some("Kuba Example".into()),
         },
     };
     let cards = match machine {
@@ -370,6 +403,7 @@ fn initial(machine: Machine) -> Status {
                 },
             },
             bitwarden,
+            git,
         ],
         Machine::Vm => vec![
             absent(
@@ -408,6 +442,7 @@ fn initial(machine: Machine) -> Status {
                 },
             },
             bitwarden,
+            git,
         ],
     };
     Status {
@@ -419,7 +454,7 @@ fn initial(machine: Machine) -> Status {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::setup::BwLogin;
+    use crate::setup::{BwLogin, GitIdentity};
 
     #[test]
     fn demo_cards_flip() {
@@ -433,6 +468,10 @@ mod tests {
                 password: "x".into(),
                 code: "123456".into(),
                 ..Default::default()
+            }),
+            git: Some(GitIdentity {
+                name: "Kuba Example".into(),
+                email: "kuba@example.com".into(),
             }),
             ..Default::default()
         };

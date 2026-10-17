@@ -172,8 +172,15 @@ pub fn nmconnection_name(ssid: &str) -> String {
     )
 }
 
+/// Where the git identity lives, under the home. Not in ~/.config/git: that
+/// is a live link into the dotfiles checkout. config/git/config includes it.
+pub const GIT_IDENTITY: &str = ".config/git-identity/identity.gitconfig";
+
+/// The `[user]` section of [`GIT_IDENTITY`]. Values are quoted, so a `"`,
+/// `\`, `#` or `;` in a name survives; newlines are the caller's to refuse.
 pub fn gitconfig(name: &str, email: &str) -> String {
-    format!("[user]\n\tname = {name}\n\temail = {email}\n")
+    let q = |v: &str| format!("\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\""));
+    format!("[user]\n\tname = {}\n\temail = {}\n", q(name), q(email))
 }
 
 /// `<n>/info.xml` the way snapper writes it, for the raw-btrfs fallback.

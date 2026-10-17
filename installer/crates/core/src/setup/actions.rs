@@ -165,6 +165,7 @@ pub fn run(
         CardId::Fingerprint => fingerprint(&mut ctx, inputs),
         CardId::Yubikey => yubikey(&mut ctx),
         CardId::Bitwarden => bitwarden(&mut ctx, inputs),
+        CardId::Git => git(&mut ctx, inputs),
     };
     let Ctx { sys, emit, .. } = ctx;
     match r {
@@ -605,6 +606,41 @@ fn bitwarden(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
     Ok(())
 }
 
+// --------------------------------------------------------------------- Git
+
+/// Why git can't commit with this name and email.
+pub fn git_identity_ok(name: &str, email: &str) -> Result<(), &'static str> {
+    let (name, email) = (name.trim(), email.trim());
+    if name.is_empty() {
+        Err("Your name, the way commits should show it.")
+    } else if name.contains(['\n', '\r']) || email.contains(['\n', '\r']) {
+        Err("One line each, please.")
+    } else if email.contains(char::is_whitespace)
+        || !email
+            .split_once('@')
+            .is_some_and(|(u, d)| !u.is_empty() && !d.is_empty())
+    {
+        Err("That doesn't look like an email.")
+    } else {
+        Ok(())
+    }
+}
+
+/// Writes the identity file config/git/config includes. Whatever was there
+/// is replaced: the file is setup's (and the installer's), nobody else's.
+fn git(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
+    let g = inputs.git.clone().unwrap_or_default();
+    git_identity_ok(&g.name, &g.email)
+        .map_err(|why| fail("no name and email to commit with", why))?;
+    let path = ctx.env.home_path(crate::engine::files::GIT_IDENTITY);
+    let (name, email) = (g.name.trim(), g.email.trim());
+    ctx.sys
+        .write(&path, &crate::engine::files::gitconfig(name, email))
+        .map_err(|e| Fail::from(format!("can't write {path}: {e}")))?;
+    ctx.log(Level::Info, format!("  ok  {path}: {name} <{email}>"));
+    Ok(())
+}
+
 fn bw_fail(e: &str) -> Fail {
     let (error, hint) = bw_error(e);
     Fail { error, hint }
@@ -628,7 +664,7 @@ fn remember(ctx: &mut Ctx, key: &str, value: &str) -> R<()> {
 #[cfg(test)]
 mod tests {
     use super::super::fake::FakeSys;
-    use super::super::{BwLogin, State};
+    use super::super::{BwLogin, GitIdentity, State};
     use super::*;
     use std::path::PathBuf;
 
@@ -895,6 +931,43 @@ mod tests {
         assert!(!s.ran_any("/home/kuba/.local/bin/dot-bw-setup"));
         // Same server: no bw config call.
         assert!(!s.ran_any("/usr/local/bin/bw config"));
+    }
+
+    #[test]
+    fn git_writes_the_identity_file_quoted() {
+        let mut s = FakeSys::new();
+        let inputs = Inputs {
+            git: Some(GitIdentity {
+                name: "  Kuba \"K\" W\\asil ".into(),
+                email: " kuba@example.com ".into(),
+            }),
+            ..Default::default()
+        };
+        let (ok, evs) = go(&mut s, CardId::Git, &inputs);
+        assert!(ok, "{}", all_text(&evs));
+        assert_eq!(
+            s.files["/home/kuba/.config/git-identity/identity.gitconfig"],
+            "[user]\n\tname = \"Kuba \\\"K\\\" W\\\\asil\"\n\temail = \"kuba@example.com\"\n"
+        );
+        assert!(matches!(evs.last(), Some(SetupEvent::Finished { .. })));
+    }
+
+    #[test]
+    fn git_wants_a_name_and_a_real_email() {
+        for (name, email) in [("", "a@b.c"), ("A", "nope"), ("A\nB", "a@b.c")] {
+            let mut s = FakeSys::new();
+            let inputs = Inputs {
+                git: Some(GitIdentity {
+                    name: name.into(),
+                    email: email.into(),
+                }),
+                ..Default::default()
+            };
+            let (ok, evs) = go(&mut s, CardId::Git, &inputs);
+            assert!(!ok, "{name:?} {email:?}");
+            assert!(matches!(evs.last(), Some(SetupEvent::Failed { .. })));
+            assert!(s.files.is_empty());
+        }
     }
 
     #[test]

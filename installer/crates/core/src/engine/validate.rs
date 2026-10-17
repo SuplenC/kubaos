@@ -52,6 +52,11 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
     if c.user.full_name.contains([':', '\n', ',']) {
         bad("the full name can't contain ':', ',' or a newline".into());
     }
+    if let Some(g) = &c.git
+        && let Err(why) = crate::setup::git_identity_ok(&g.name, &g.email)
+    {
+        bad(format!("git: {why}"));
+    }
     if !valid_hostname(&c.host.hostname) {
         bad(format!(
             "hostname \"{}\" must be 1-63 characters of a-z, 0-9 and -, not starting or ending with -",
@@ -277,6 +282,19 @@ mod tests {
                 .any(|s| s.contains("medium the installer runs from"))
         );
         assert!(p.iter().any(|s| s.contains("Mars/Olympus")));
+    }
+
+    #[test]
+    fn git_identity_is_one_line_with_a_real_email() {
+        let mut c = config();
+        c.git = Some(crate::config::Git {
+            name: "Kuba\n[core]".into(),
+            email: "kuba@example.com".into(),
+        });
+        let p = problems(&c, &probe());
+        assert!(p.iter().any(|s| s.starts_with("git:")), "{p:#?}");
+        c.git.as_mut().unwrap().name = "Kuba \"K\" Example".into();
+        assert_eq!(problems(&c, &probe()), Vec::<String>::new());
     }
 
     #[test]

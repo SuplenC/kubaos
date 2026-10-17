@@ -957,9 +957,19 @@ impl<'a> Install<'a> {
         let owner = format!("{uid}:{gid}");
 
         if let Some(g) = &c.git {
-            let f = format!("{home}/.gitconfig");
-            self.write(&f, &files::gitconfig(&g.name, &g.email), 0o644)?;
-            self.sh(Cmd::new("chown").args([&owner, &self.ts(&f)]))?;
+            // ~/.config/git-identity/identity.gitconfig, the file first-boot
+            // setup's Git card writes too. Root makes the directories, so
+            // hand them over before home-manager wants ~/.config.
+            let f = format!("{home}/{}", files::GIT_IDENTITY);
+            let dir = format!("{home}/.config/git-identity");
+            self.mkdir(&self.t(&dir))?;
+            self.write(&f, &files::gitconfig(g.name.trim(), g.email.trim()), 0o644)?;
+            self.sh(Cmd::new("chown").args([
+                &owner,
+                &self.ts(&format!("{home}/.config")),
+                &self.ts(&dir),
+                &self.ts(&f),
+            ]))?;
         }
         self.install_keyring(&home, &owner)?;
 

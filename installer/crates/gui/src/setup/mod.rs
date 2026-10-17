@@ -18,8 +18,8 @@ use std::time::{Duration, Instant};
 
 use dotinstall_core::Level;
 use dotinstall_core::setup::{
-    BwLogin, BwMethod, CardId, CardStatus, Facts, Inputs, MokState, PromptKind, SetupEvent, State,
-    Status, YKMAN_PREP, mok_password_ok, next_finger,
+    BwLogin, BwMethod, CardId, CardStatus, Facts, GitIdentity, Inputs, MokState, PromptKind,
+    SetupEvent, State, Status, YKMAN_PREP, git_identity_ok, mok_password_ok, next_finger,
 };
 use iced::{Size, Subscription, Task, event, window};
 
@@ -45,6 +45,8 @@ pub enum SF {
     Code,
     ClientId,
     ClientSecret,
+    GitName,
+    GitEmail,
     ShowSecrets,
     Primary,
     Secondary,
@@ -65,6 +67,8 @@ impl SF {
                 | SF::Code
                 | SF::ClientId
                 | SF::ClientSecret
+                | SF::GitName
+                | SF::GitEmail
         )
     }
 
@@ -124,6 +128,8 @@ pub struct Form {
     pub code: String,
     pub client_id: String,
     pub client_secret: String,
+    pub git_name: String,
+    pub git_email: String,
     prefilled: bool,
 }
 
@@ -326,6 +332,7 @@ impl Setup {
                 ("Unlock and pull", Act::Run)
             }
             (CardId::Bitwarden, State::Needed) => ("Log in and pull", Act::Run),
+            (CardId::Git, State::Needed) => ("Save", Act::Run),
             _ => return None,
         };
         Some(r)
@@ -338,6 +345,7 @@ impl Setup {
             (CardId::Fingerprint, State::Done) => Some(("Add another finger", Act::Run)),
             (CardId::Yubikey, State::Needed | State::Done) => Some(("Check again", Act::Recheck)),
             (CardId::Bitwarden, State::Done) => Some(("Pull again", Act::Run)),
+            (CardId::Git, State::Done) => Some(("Save changes", Act::Run)),
             _ => None,
         }
     }
@@ -363,6 +371,7 @@ impl Setup {
                 v
             }
             (CardId::Bitwarden, State::Done) => vec![SF::Password],
+            (CardId::Git, State::Needed | State::Done) => vec![SF::GitName, SF::GitEmail],
             _ => vec![],
         }
     }
@@ -435,6 +444,7 @@ impl Setup {
                     _ => None,
                 }
             }
+            CardId::Git => git_identity_ok(&f.git_name, &f.git_email).err(),
             _ => None,
         }
     }
@@ -460,18 +470,33 @@ impl Setup {
                     client_secret: f.client_secret.trim().to_string(),
                 })
             }
+            CardId::Git => {
+                i.git = Some(GitIdentity {
+                    name: f.git_name.trim().to_string(),
+                    email: f.git_email.trim().to_string(),
+                })
+            }
             _ => {}
         }
         i
     }
 
     /// Email and server from what's on the machine (bw, dot-bw-setup's
-    /// config), once.
+    /// config), and git's name and email (or the account's full name), once.
     fn prefill(&mut self) {
         if self.form.prefilled {
             return;
         }
         self.form.prefilled = true;
+        if let Some(Facts::Git {
+            name,
+            email,
+            full_name,
+        }) = self.card(CardId::Git).map(|c| c.facts.clone())
+        {
+            self.form.git_name = name.or(full_name).unwrap_or_default();
+            self.form.git_email = email.unwrap_or_default();
+        }
         if let Some(Facts::Bitwarden { email, server, .. }) =
             self.card(CardId::Bitwarden).map(|c| c.facts.clone())
         {
@@ -1061,6 +1086,8 @@ impl Setup {
             SF::Code => &mut form.code,
             SF::ClientId => &mut form.client_id,
             SF::ClientSecret => &mut form.client_secret,
+            SF::GitName => &mut form.git_name,
+            SF::GitEmail => &mut form.git_email,
             _ => return None,
         })
     }
@@ -1076,6 +1103,8 @@ impl Setup {
             SF::Code => &form.code,
             SF::ClientId => &form.client_id,
             SF::ClientSecret => &form.client_secret,
+            SF::GitName => &form.git_name,
+            SF::GitEmail => &form.git_email,
             _ => "",
         }
     }

@@ -16,7 +16,7 @@ The default wallpaper is alive: Kabukichō in the rain, drawn by [ukiyo](https:/
 
 ## Install it
 
-The installer is offline: the whole system is on the USB stick. Write the ISO with `dd` or Etcher, boot it (UEFI, Secure Boot works), click through language, keyboard, disk and account, and hold the button to erase the disk. It's LUKS2-encrypted, with a `factory` snapshot to roll back to. Git name and email aren't set in the repo: first-boot setup is meant to ask for them (not wired up yet), so until then `git config --global user.name` and `user.email` are on you.
+The installer is offline: the whole system is on the USB stick. Write the ISO with `dd` or Etcher, boot it (UEFI, Secure Boot works), click through language, keyboard, disk and account, and hold the button to erase the disk. It's LUKS2-encrypted, with a `factory` snapshot to roll back to. Git name and email aren't in the repo: the installer's Git screen or the Git card in first-boot setup asks for them and writes `~/.config/git-identity/identity.gitconfig`.
 
 Flashing, checks and what to expect: [`docs/RELEASE-shinjuku.md`](docs/RELEASE-shinjuku.md). The details: [`docs/INSTALL.md`](docs/INSTALL.md) and [`docs/INSTALLER.md`](docs/INSTALLER.md).
 

@@ -32,6 +32,7 @@ pub fn card_status(sys: &mut dyn Sys, env: &Env, id: CardId, online: bool) -> Ca
         CardId::Fingerprint => fingerprint(sys, env),
         CardId::Yubikey => yubikey(sys, env),
         CardId::Bitwarden => bitwarden(sys, env),
+        CardId::Git => git(sys, env),
     };
     if c.state == State::Needed && id.needs_network() && !online && !offline_ok(&c) {
         c.state = State::Waiting;
@@ -415,6 +416,46 @@ fn bitwarden(sys: &mut dyn Sys, env: &Env) -> CardStatus {
     }
 }
 
+// --------------------------------------------------------------------- Git
+
+pub const GIT: &str = "/usr/bin/git";
+
+/// git's answer, not a file: a name set by hand in ~/.gitconfig counts too.
+fn git(sys: &mut dyn Sys, env: &Env) -> CardStatus {
+    let mut get = |key: &str| {
+        sys.run(&Cmd::new(GIT).args(["config", "--global", "--includes", "--get", key]))
+            .ok()
+            .map(|o| o.stdout.trim().to_string())
+            .filter(|v| !v.is_empty())
+    };
+    let name = get("user.name");
+    let email = get("user.email");
+    let passwd = sys.read("/etc/passwd").unwrap_or_default();
+    let full_name = passwd
+        .lines()
+        .map(|l| l.split(':').collect::<Vec<_>>())
+        .find(|f| f.len() > 4 && f[0] == env.user)
+        .and_then(|f| f[4].split(',').next().map(str::trim).map(str::to_string))
+        .filter(|n| !n.is_empty());
+    let (state, summary) = match (&name, &email) {
+        (Some(n), Some(e)) => (State::Done, format!("Commits as {n} <{e}>.")),
+        _ => (
+            State::Needed,
+            "No name and email for commits yet.".to_string(),
+        ),
+    };
+    CardStatus {
+        id: CardId::Git,
+        state,
+        summary,
+        facts: Facts::Git {
+            name,
+            email,
+            full_name,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::fake::FakeSys;
@@ -605,6 +646,50 @@ mod tests {
         let c = yubikey(&mut s, &env());
         assert_eq!(c.state, State::Done);
         assert!(c.summary.contains("backup"));
+    }
+
+    #[test]
+    fn git_states() {
+        // Nothing set: the full name from passwd is there to suggest.
+        let mut s = FakeSys::new().file(
+            "/etc/passwd",
+            "root:x:0:0:root:/root:/bin/bash\nkuba:x:1000:1000:Kuba Example,,,:/home/kuba:/usr/bin/zsh\n",
+        );
+        let c = card_status(&mut s, &env(), CardId::Git, false);
+        assert_eq!(c.state, State::Needed, "offline is fine: {}", c.summary);
+        assert_eq!(
+            c.facts,
+            Facts::Git {
+                name: None,
+                email: None,
+                full_name: Some("Kuba Example".into()),
+            }
+        );
+
+        // A name without an email isn't an identity yet.
+        let mut s = FakeSys::new().ok(
+            "/usr/bin/git config --global --includes --get user.name",
+            "Kuba Example\n",
+        );
+        assert_eq!(git(&mut s, &env()).state, State::Needed);
+
+        // Set by setup, the installer or by hand: git says so either way.
+        let mut s = FakeSys::new()
+            .ok(
+                "/usr/bin/git config --global --includes --get user.name",
+                "Kuba Example\n",
+            )
+            .ok(
+                "/usr/bin/git config --global --includes --get user.email",
+                "kuba@example.com\n",
+            );
+        let c = git(&mut s, &env());
+        assert_eq!(c.state, State::Done);
+        assert!(
+            c.summary.contains("Kuba Example <kuba@example.com>"),
+            "{}",
+            c.summary
+        );
     }
 
     #[test]

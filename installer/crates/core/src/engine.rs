@@ -340,7 +340,18 @@ mod tests {
         ));
         assert!(r.files.contains_key(Path::new("/mnt/t/etc/crypttab")));
         assert!(r.files[Path::new("/mnt/t/etc/fstab")].contains("subvol=@nix"));
-        assert!(r.files[Path::new("/mnt/t/home/kuba/.gitconfig")].contains("j@example.com"));
+        // The identity goes where config/git/config includes it, owned by
+        // the user all the way down from ~/.config (home-manager writes there).
+        let id = Path::new("/mnt/t/home/kuba/.config/git-identity/identity.gitconfig");
+        assert!(r.files[id].contains("email = \"j@example.com\""));
+        assert!(
+            !r.files
+                .contains_key(Path::new("/mnt/t/home/kuba/.gitconfig"))
+        );
+        assert!(has(
+            "chown 1000:1000 /mnt/t/home/kuba/.config /mnt/t/home/kuba/.config/git-identity \
+             /mnt/t/home/kuba/.config/git-identity/identity.gitconfig"
+        ));
         // Finish leaves nothing mounted or open.
         assert_eq!(cmds.last().unwrap(), "cryptsetup close cryptroot");
     }

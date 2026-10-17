@@ -121,11 +121,21 @@ pub fn script() -> Vec<Step> {
         Wait(SETTLE),
         Shot("09-bitwarden-done"),
         Tap(Esc),
+        Tap(Down),
+        Tap(Enter), // Name, from the account's full name
+        Tap(Tab),   // Email
+        Type("kuba@git.example"),
+        Wait(SETTLE),
+        Shot("10-git"),
+        Tap(Enter), // last field: Save
+        Until("git done", |s| state(s, CardId::Git) == Some(State::Done)),
+        Tap(Esc),
+        Tap(Up),
         Tap(Up),
         Tap(Up),
         Tap(Up),
         Wait(SETTLE),
-        Shot("10-all-set"),
+        Shot("11-all-set"),
         Exit,
     ]
 }
@@ -311,6 +321,14 @@ mod tests {
         // Secrets are gone once their run worked.
         assert!(s.form.password.is_empty() && s.form.code.is_empty() && s.form.mok.is_empty());
         assert_eq!(s.form.email, "kuba@example.com");
+        // The account's full name stood in for the git name.
+        match &st.card(CardId::Git).unwrap().facts {
+            dotinstall_core::setup::Facts::Git { name, email, .. } => {
+                assert_eq!(name.as_deref(), Some("Kuba Example"));
+                assert_eq!(email.as_deref(), Some("kuba@git.example"));
+            }
+            f => panic!("{f:?}"),
+        }
     }
 
     #[test]
