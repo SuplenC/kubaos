@@ -1,0 +1,23 @@
+# macOS / editors
+.DS_Store
+._*
+*.swp
+*.swo
+*~
+
+# Nix build outputs and direnv caches
+result
+result-*
+.direnv/
+
+# Machine-local overrides (also listed in config/hypr/.gitignore)
+config/hypr/local.lua
+config/hypr/no-autostart
+
+# Neovim scratch and runtime files (see config/nvim/.gitignore)
+config/nvim/scretch
+config/nvim/.repro
+config/nvim/lazyvim.json.bak
+
+# ISOs (just iso)
+/iso/

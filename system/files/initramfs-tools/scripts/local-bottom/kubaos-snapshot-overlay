@@ -1,0 +1,40 @@
+#!/bin/sh
+# KubaOS: installed to /etc/initramfs-tools/scripts/local-bottom/ by
+# system/25-boot.sh, with hooks/kubaos-snapshot-overlay.
+#
+# Booting a snapper snapshot from GRUB's "KubaOS snapshots" (grub-btrfs)
+# mounts a read-only subvolume as /. systemd then can't write /etc or /var
+# (sysusers, logind fail) and the desktop never starts. Like grub-btrfs's
+# own overlayfs hook for mkinitcpio and dracut: lay a tmpfs over the
+# snapshot, so the system runs normally and every change vanishes at
+# reboot. The snapshot itself stays untouched; `snapper rollback` makes one
+# permanent. Normal boots (subvol=@) don't match and pass straight through.
+# rootmnt is set by initramfs-tools' init, which sources this script.
+# shellcheck disable=SC2154
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in
+  prereqs) prereqs; exit 0 ;;
+esac
+
+. /scripts/functions
+
+case " $(cat /proc/cmdline) " in
+  *subvol=\"@snapshots/*|*subvol=@snapshots/*) ;;
+  *) exit 0 ;;
+esac
+
+base=/run/kubaos-snapshot
+mkdir -p "$base/lower" "$base/rw"
+mount -t tmpfs -o mode=0755 kubaos-snapshot "$base/rw" || exit 0
+mkdir -p "$base/rw/upper" "$base/rw/work"
+if ! mount -n -o move "${rootmnt}" "$base/lower"; then
+  log_failure_msg "kubaos: couldn't move the snapshot aside; booting it read-only"
+  exit 0
+fi
+if mount -t overlay -o "lowerdir=$base/lower,upperdir=$base/rw/upper,workdir=$base/rw/work" overlay "${rootmnt}"; then
+  log_success_msg "kubaos: snapshot booted with a throwaway overlay"
+else
+  log_failure_msg "kubaos: overlay failed; booting the snapshot read-only"
+  mount -n -o move "$base/lower" "${rootmnt}"
+fi

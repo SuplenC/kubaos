@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# engine-e2e: run `dotinstall run` for real against a loop-device disk in a
+# privileged Docker container, then re-open the disk and check the result.
+#
+#   installer/test/engine-e2e [build|payload|run [SCENARIO...]|all|clean]
+#
+#   build     build dotinstall for Linux (rust:latest, target dir cached in
+#             the volume dotinstall-engine-target) and the live-tools image
+#   payload   build the fake payload image and turn it into
+#             rootfs.sqfs + rootfs.tar.zst in the volume dotinstall-engine-payload
+#             (skipped when the image hasn't changed)
+#   run       scenarios: sqfs, tar, fail, dual (default: all four)
+#   all       build, payload, run (the default)
+#   clean     remove this script's containers and volumes
+#
+# Everything is named dotinstall-engine-*. Containers get 4 CPUs and 6 GB.
+# Results (event streams, logs) go to $DOTINSTALL_E2E_OUT
+# (default /tmp/dotinstall-engine-e2e).
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALLER="$(cd "$HERE/.." && pwd)"
+D="$HERE/engine-e2e.d"
+OUT="${DOTINSTALL_E2E_OUT:-/tmp/dotinstall-engine-e2e}"
+LIMITS=(--cpus 4 --memory 6g)
+LIVE=dotinstall-engine-live
+PAYLOAD_IMG=dotinstall-engine-payload-src
+# Every checkout (worktree) shares the target volume, and cargo goes by mtime,
+# so each builds in its own subdirectory; run mounts only that one at /target.
+TSUB="$(printf '%s' "$INSTALLER" | shasum | cut -c1-12)"
+
+build() {
+  echo "==> live tools image"
+  docker build -q -t "$LIVE" -f "$D/live.Dockerfile" "$D" >/dev/null
+  echo "==> cargo build --release (linux/$(docker version -f '{{.Server.Arch}}'))"
+  docker run --rm --name dotinstall-engine-build "${LIMITS[@]}" \
+    -v dotinstall-engine-cargo:/usr/local/cargo/registry \
+    -v dotinstall-engine-target:/target \
+    -v "$INSTALLER":/src:ro -w /src -e CARGO_TARGET_DIR="/target/$TSUB" \
+    rust:latest cargo build --release --locked -p dotinstall
+}
+
+payload() {
+  echo "==> fake payload image"
+  docker build -q -t "$PAYLOAD_IMG" -f "$D/payload.Dockerfile" "$D" >/dev/null
+  local id have
+  id="$(docker image inspect -f '{{.Id}}' "$PAYLOAD_IMG")"
+  have="$(docker run --rm -v dotinstall-engine-payload:/payload "$LIVE" cat /payload/stamp 2>/dev/null || true)"
+  if [[ "$have" == "$id" ]]; then
+    echo "    unchanged, keeping the payload volume"
+    return
+  fi
+  echo "==> export it as rootfs.sqfs and rootfs.tar.zst"
+  docker rm -f dotinstall-engine-payload-c >/dev/null 2>&1 || true
+  docker create --name dotinstall-engine-payload-c "$PAYLOAD_IMG" true >/dev/null
+  docker export dotinstall-engine-payload-c |
+    docker run -i --rm --name dotinstall-engine-prepare "${LIMITS[@]}" \
+      -v dotinstall-engine-payload:/payload -v "$D":/e2e:ro "$LIVE" bash /e2e/inside.sh prepare
+  docker rm dotinstall-engine-payload-c >/dev/null
+  docker run --rm -v dotinstall-engine-payload:/payload "$LIVE" sh -c "echo '$id' >/payload/stamp"
+}
+
+run() {
+  local scenarios=("$@") failed=()
+  ((${#scenarios[@]})) || scenarios=(sqfs tar fail dual)
+  mkdir -p "$OUT"
+  for sc in "${scenarios[@]}"; do
+    echo
+    echo "################ scenario: $sc"
+    if ! docker run --rm --privileged --name "dotinstall-engine-e2e-$sc" "${LIMITS[@]}" \
+      --mount "type=volume,source=dotinstall-engine-target,target=/target,readonly,volume-subpath=$TSUB" \
+      -v dotinstall-engine-payload:/payload:ro \
+      -v "$D":/e2e:ro -v "$OUT":/out \
+      "$LIVE" bash /e2e/inside.sh run "$sc"; then
+      failed+=("$sc")
+    fi
+  done
+  echo
+  echo "event streams and logs: $OUT"
+  if ((${#failed[@]})); then
+    echo "FAILED: ${failed[*]}"
+    return 1
+  fi
+  echo "all scenarios passed: ${scenarios[*]}"
+}
+
+clean() {
+  docker ps -aq --filter name='^dotinstall-engine-' | xargs -r docker rm -f
+  for v in dotinstall-engine-target dotinstall-engine-cargo dotinstall-engine-payload; do
+    docker volume rm "$v" 2>/dev/null || true
+  done
+}
+
+case "${1:-all}" in
+  build) build ;;
+  payload) payload ;;
+  run) shift; run "$@" ;;
+  all) build && payload && run ;;
+  clean) clean ;;
+  -h | --help) sed -n '2,20p' "$0" ;;
+  *) echo "unknown command $1 (see --help)" >&2; exit 2 ;;
+esac

@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Screenshot to clipboard and file.
+#
+#   dot-hypr-screenshot region   select an area with slurp (Esc cancels)
+#   dot-hypr-screenshot output   the focused monitor
+#   dot-hypr-screenshot window   the active window
+#   dot-hypr-screenshot MODE --edit   then open it in satty to annotate
+#   dot-hypr-screenshot edit FILE     open an existing image in satty
+#
+# Saves to $DOT_SCREENSHOT_DIR or ~/Pictures/Screenshots, copies the PNG to
+# the clipboard, and sends a notification with an "Edit" action. satty saves
+# the annotated copy next to the original (<name>-annotated.png) and copies
+# it to the clipboard (Enter or Ctrl+C; Ctrl+S saves).
+# Needs: grim, slurp, wl-clipboard (apt), jq, satty (Nix), hyprctl.
+set -euo pipefail
+
+edit() {
+  satty --filename "$1" --output-filename "${1%.*}-annotated.png" \
+    --copy-command wl-copy --actions-on-enter save-to-clipboard,save-to-file --early-exit
+}
+
+mode=${1:-region}
+if [[ $mode == edit ]]; then
+  [[ -f ${2:-} ]] || { echo "usage: $(basename "$0") edit FILE" >&2; exit 2; }
+  edit "$2"
+  exit
+fi
+annotate=0
+[[ ${2:-} == --edit ]] && annotate=1
+pictures=$(xdg-user-dir PICTURES 2>/dev/null || true)
+# xdg-user-dir prints $HOME when PICTURES is not configured.
+[[ $pictures == "$HOME" ]] && pictures=
+dir=${DOT_SCREENSHOT_DIR:-${pictures:-$HOME/Pictures}/Screenshots}
+mkdir -p "$dir"
+file="$dir/Screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"
+
+case "$mode" in
+  region)
+    geometry=$(slurp -d) || exit 0 # cancelled
+    grim -g "$geometry" "$file"
+    ;;
+  output)
+    monitor=$(hyprctl -j activeworkspace | jq -r '.monitor')
+    grim -o "$monitor" "$file"
+    ;;
+  window)
+    geometry=$(hyprctl -j activewindow | jq -r 'select(.at != null) | "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')
+    [[ -n $geometry ]] || { echo "no active window to shoot" >&2; exit 1; }
+    grim -g "$geometry" "$file"
+    ;;
+  *)
+    echo "usage: $(basename "$0") region|output|window [--edit] | edit FILE" >&2
+    exit 2
+    ;;
+esac
+
+wl-copy --type image/png <"$file"
+
+if ((annotate)); then
+  edit "$file"
+  exit
+fi
+
+if command -v notify-send >/dev/null 2>&1; then
+  # The notification waits for its action in the background, so the bind returns.
+  (
+    action=$(notify-send -a Screenshot -i "$file" --action=edit=Edit "Screenshot copied" "${file/#$HOME/\~}" || true)
+    [[ $action != edit ]] || edit "$file"
+  ) </dev/null >/dev/null 2>&1 &
+  disown
+else
+  hyprctl notify -1 3000 'rgb(c2c1ff)' "Screenshot copied: ${file/#$HOME/\~}" >/dev/null || true
+fi

@@ -1,0 +1,239 @@
+{
+   "blockdevices": [
+      {
+         "name": "loop0",
+         "path": "/dev/loop0",
+         "type": "loop",
+         "size": 2147483648,
+         "model": null,
+         "rm": false,
+         "ro": true,
+         "tran": null,
+         "fstype": "squashfs",
+         "label": null,
+         "parttype": null,
+         "partlabel": null,
+         "pttype": null,
+         "start": null,
+         "log-sec": 512,
+         "mountpoints": [
+            "/rofs"
+         ],
+         "pkname": null
+      },
+      {
+         "name": "sda",
+         "path": "/dev/sda",
+         "type": "disk",
+         "size": 30765219840,
+         "model": "SanDisk 3.2Gen1",
+         "rm": true,
+         "ro": false,
+         "tran": "usb",
+         "fstype": "iso9660",
+         "label": "dotinstall",
+         "parttype": null,
+         "partlabel": null,
+         "pttype": "dos",
+         "start": null,
+         "log-sec": 512,
+         "mountpoints": [
+            null
+         ],
+         "pkname": null,
+         "children": [
+            {
+               "name": "sda1",
+               "path": "/dev/sda1",
+               "type": "part",
+               "size": 6442450944,
+               "model": null,
+               "rm": false,
+               "ro": false,
+               "tran": null,
+               "fstype": "iso9660",
+               "label": "dotinstall",
+               "parttype": "0x0",
+               "partlabel": null,
+               "pttype": "dos",
+               "start": 0,
+               "log-sec": 512,
+               "mountpoints": [
+                  "/cdrom"
+               ],
+               "pkname": "sda"
+            },
+            {
+               "name": "sda2",
+               "path": "/dev/sda2",
+               "type": "part",
+               "size": 5242880,
+               "model": null,
+               "rm": false,
+               "ro": false,
+               "tran": null,
+               "fstype": "vfat",
+               "label": "ESP",
+               "parttype": "0xef",
+               "partlabel": null,
+               "pttype": "dos",
+               "start": 12582912,
+               "log-sec": 512,
+               "mountpoints": [
+                  null
+               ],
+               "pkname": "sda"
+            }
+         ]
+      },
+      {
+         "name": "sr0",
+         "path": "/dev/sr0",
+         "type": "rom",
+         "size": 1073741312,
+         "model": "QEMU DVD-ROM",
+         "rm": true,
+         "ro": false,
+         "tran": "sata",
+         "fstype": null,
+         "label": null,
+         "parttype": null,
+         "partlabel": null,
+         "pttype": null,
+         "start": null,
+         "log-sec": 2048,
+         "mountpoints": [
+            null
+         ],
+         "pkname": null
+      },
+      {
+         "name": "zram0",
+         "path": "/dev/zram0",
+         "type": "disk",
+         "size": 8589934592,
+         "model": null,
+         "rm": false,
+         "ro": false,
+         "tran": null,
+         "fstype": "swap",
+         "label": null,
+         "parttype": null,
+         "partlabel": null,
+         "pttype": null,
+         "start": null,
+         "log-sec": 4096,
+         "mountpoints": [
+            "[SWAP]"
+         ],
+         "pkname": null
+      },
+      {
+         "name": "nvme0n1",
+         "path": "/dev/nvme0n1",
+         "type": "disk",
+         "size": 769024147968,
+         "model": "Samsung SSD 990 PRO 1TB",
+         "rm": false,
+         "ro": false,
+         "tran": "nvme",
+         "fstype": null,
+         "label": null,
+         "parttype": null,
+         "partlabel": null,
+         "pttype": "gpt",
+         "start": null,
+         "log-sec": 512,
+         "mountpoints": [
+            null
+         ],
+         "pkname": null,
+         "children": [
+            {
+               "name": "nvme0n1p1",
+               "path": "/dev/nvme0n1p1",
+               "type": "part",
+               "size": 104857600,
+               "model": null,
+               "rm": false,
+               "ro": false,
+               "tran": null,
+               "fstype": "vfat",
+               "label": "SYSTEM",
+               "parttype": "c12a7328-f81f-11d2-ba4b-00a0c93ec93b",
+               "partlabel": "EFI system partition",
+               "pttype": "gpt",
+               "start": 2048,
+               "log-sec": 512,
+               "mountpoints": [
+                  null
+               ],
+               "pkname": "nvme0n1"
+            },
+            {
+               "name": "nvme0n1p2",
+               "path": "/dev/nvme0n1p2",
+               "type": "part",
+               "size": 16777216,
+               "model": null,
+               "rm": false,
+               "ro": false,
+               "tran": null,
+               "fstype": null,
+               "label": null,
+               "parttype": "e3c9e316-0b5c-4db8-817d-f92df00215ae",
+               "partlabel": "Microsoft reserved partition",
+               "pttype": "gpt",
+               "start": 206848,
+               "log-sec": 512,
+               "mountpoints": [
+                  null
+               ],
+               "pkname": "nvme0n1"
+            },
+            {
+               "name": "nvme0n1p3",
+               "path": "/dev/nvme0n1p3",
+               "type": "part",
+               "size": 268435456000,
+               "model": null,
+               "rm": false,
+               "ro": false,
+               "tran": null,
+               "fstype": "ntfs",
+               "label": "Windows",
+               "parttype": "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7",
+               "partlabel": "Basic data partition",
+               "pttype": "gpt",
+               "start": 239616,
+               "log-sec": 512,
+               "mountpoints": [
+                  null
+               ],
+               "pkname": "nvme0n1"
+            },
+            {
+               "name": "nvme0n1p4",
+               "path": "/dev/nvme0n1p4",
+               "type": "part",
+               "size": 1024000000,
+               "model": null,
+               "rm": false,
+               "ro": false,
+               "tran": null,
+               "fstype": "ntfs",
+               "label": "Recovery",
+               "parttype": "de94bba4-06d1-4d40-a16a-bfd50179d6ac",
+               "partlabel": null,
+               "pttype": "gpt",
+               "start": 1500000256,
+               "log-sec": 512,
+               "mountpoints": [
+                  null
+               ],
+               "pkname": "nvme0n1"
+            }
+         ]
+      }
+   ]
+}

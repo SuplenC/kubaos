@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# installer/image/build: build the dotinstall payload (manifest.json + a
+# squashfs of the installed system). installer/image/README.md has the details.
+#
+#   installer/image/build [--arch aarch64|x86_64] [--out DIR] [--allow-dirty]
+#                         [--zstd-level N] [--no-cache] [--progress plain]
+#
+#   --arch         aarch64 (default; host vm, native on Apple Silicon) or
+#                  x86_64 (host tuxedo, through QEMU)
+#   --out          payload dir (default installer/out/payload-<arch>)
+#   --allow-dirty  build from the working tree (tracked + untracked, not
+#                  ignored) instead of HEAD; the commit gets a -dirty suffix
+#                  and the shipped checkout is HEAD with the working tree laid over it
+#   --zstd-level   squashfs zstd level, 1-22 (default 15)
+#   --no-cache     rebuild the system image from scratch
+#
+# KUBAOS_HOME_URL=<url> sets HOME_URL in os-release (left out when unset).
+#
+# Docker objects it uses, all named dotinstall-image-*:
+#   images     dotinstall-image-system:<amd64|arm64>
+#   volumes    dotinstall-image-nix-<arch>-<nix version> (build Nix store),
+#              dotinstall-image-work-<arch> (the payload tree)
+#   container  dotinstall-image-assemble-<arch> (removed after the run)
+#   BuildKit   cache mounts dotinstall-image-apt-{cache,lists}-<amd64|arm64>
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+ARCH=aarch64 OUT="" ALLOW_DIRTY=0 ZSTD_LEVEL=15 BUILD_ARGS=()
+CPUS="${DOTINSTALL_IMAGE_CPUS:-6}" MEM="${DOTINSTALL_IMAGE_MEM:-8g}"
+PAYLOAD_USER=kuba   # flake.nix `username`; the engine checks install.toml against it
+
+die() { printf 'build: %s\n' "$*" >&2; exit 1; }
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+say() { printf '\e[1;34m==> %s\e[0m\n' "$*"; }
+mmss() { printf '%dm%02ds' $(($1 / 60)) $(($1 % 60)); }
+
+while (($#)); do
+  case "$1" in
+    --arch) ARCH="${2:?--arch needs aarch64 or x86_64}"; shift ;;
+    --out) OUT="${2:?--out needs a dir}"; shift ;;
+    --allow-dirty) ALLOW_DIRTY=1 ;;
+    --zstd-level) ZSTD_LEVEL="${2:?}"; shift ;;
+    --no-cache) BUILD_ARGS+=(--no-cache) ;;
+    --progress) BUILD_ARGS+=("--progress=${2:?}"); shift ;;
+    --progress=*) BUILD_ARGS+=("$1") ;;
+    -h | --help) usage; exit 0 ;;
+    *) die "unknown argument $1 (see --help)" ;;
+  esac
+  shift
+done
+
+case "$ARCH" in
+  aarch64) DARCH=arm64 HOST=vm ;;
+  x86_64) DARCH=amd64 HOST=tuxedo ;;
+  *) die "--arch must be aarch64 or x86_64" ;;
+esac
+OUT="${OUT:-$ROOT/installer/out/payload-$ARCH}"
+mkdir -p "$OUT"
+OUT="$(cd "$OUT" && pwd)"
+IMAGE="dotinstall-image-system:$DARCH"
+NIX_VERSION="$(sed -n 's/^NIX_VERSION="\(.*\)"$/\1/p' "$ROOT/system/60-nix.sh")"
+[[ -n "$NIX_VERSION" ]] || die "can't read NIX_VERSION from system/60-nix.sh"
+NIX_VOLUME="dotinstall-image-nix-$ARCH-$NIX_VERSION"
+WORK_VOLUME="dotinstall-image-work-$ARCH"
+CONTAINER="dotinstall-image-assemble-$ARCH"
+
+# --------------------------------------------------------------------------
+# The repo snapshot the flake is built from, and the bundle the payload checkout is cloned from.
+COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
+if [[ -n "$(git -C "$ROOT" status --porcelain)" ]]; then
+  ((ALLOW_DIRTY)) || die "the worktree has changes; commit them or pass --allow-dirty"
+  COMMIT="$COMMIT-dirty"
+else
+  ALLOW_DIRTY=0
+fi
+IN="$(mktemp -d "${TMPDIR:-/tmp}/dotinstall-image.XXXXXX")"
+trap 'rm -rf "$IN"' EXIT
+if ((ALLOW_DIRTY)); then
+  (cd "$ROOT" && git ls-files -z -co --exclude-standard |
+    COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata --null -T - -cf "$IN/src.tar")
+else
+  git -C "$ROOT" archive --format=tar -o "$IN/src.tar" HEAD
+fi
+# Unpacked here, not in the container: GNU tar can't create directories
+# under Rosetta (the amd64 build), and cp can.
+mkdir "$IN/src"
+tar -C "$IN/src" -xf "$IN/src.tar"
+rm -f "$IN/src.tar"
+branch="$(git -C "$ROOT" symbolic-ref -q HEAD || true)"   # refs/heads/<name>: unambiguous
+git -C "$ROOT" bundle create -q "$IN/dotfiles.bundle" HEAD ${branch:+"$branch"}
+# KubaOS release (docs/BRAND.md). manifest.version is the release; the build
+# id (date + commit) goes to /usr/share/dotinstall/image.json.
+VERSION=0.1.0
+BUILD_ID="$(date -u +%Y%m%d)-${COMMIT:0:12}"
+[[ "$COMMIT" == *-dirty ]] && BUILD_ID+="-dirty"
+BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+# Prefill for the GUI's Git screen (Manifest.git_name / git_email); omitted when unset.
+GIT_NAME="$(git -C "$ROOT" config user.name || true)"
+GIT_EMAIL="$(git -C "$ROOT" config user.email || true)"
+
+# Local flake inputs (git+file:// or path: in flake.lock, like ukiyo's
+# checkout): mounted read-only at the same path, so Nix in the container
+# fetches them where the lock file says, and `nix flake archive` puts them
+# in the payload for offline switches on the machine.
+# shellcheck source=test/lib/local-inputs.sh
+. "$ROOT/test/lib/local-inputs.sh"
+local_input_mounts "$IN/src"
+
+# --------------------------------------------------------------------------
+T0=$SECONDS
+say "system image $IMAGE (linux/$DARCH)"
+docker buildx build --platform "linux/$DARCH" ${BUILD_ARGS[@]+"${BUILD_ARGS[@]}"} \
+  -f "$HERE/Dockerfile" --target system -t "$IMAGE" --load "$ROOT"
+T1=$SECONDS
+say "system image in $(mmss $((T1 - T0)))"
+
+say "assemble in $CONTAINER (Nix store volume $NIX_VOLUME)"
+docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+docker run --rm --name "$CONTAINER" --platform "linux/$DARCH" \
+  --cpus "$CPUS" --memory "$MEM" --hostname "$HOST" \
+  -v "$NIX_VOLUME:/nix" -v "$WORK_VOLUME:/work" \
+  -v "$IN:/in:ro" -v "$OUT:/out" ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} \
+  -e LOCAL_INPUTS="$LOCAL_INPUTS" -e UKIYO_OVERRIDE_URL="$UKIYO_OVERRIDE_URL" \
+  -e ARCH="$ARCH" -e HOST="$HOST" -e PAYLOAD_USER="$PAYLOAD_USER" -e COMMIT="$COMMIT" \
+  -e VERSION="$VERSION" -e BUILT_AT="$BUILT_AT" -e ZSTD_LEVEL="$ZSTD_LEVEL" -e CPUS="$CPUS" \
+  -e GIT_NAME="$GIT_NAME" -e GIT_EMAIL="$GIT_EMAIL" -e BUILD_ID="$BUILD_ID" \
+  -e OS_NAME=KubaOS -e OS_ID=kubaos -e OS_CODENAME=shinjuku -e OS_CODENAME_NAME=Shinjuku \
+  -e OS_VERSION_SHORT="${VERSION%.*}" -e OS_HOME_URL="${KUBAOS_HOME_URL:-}" \
+  "$IMAGE" /in/src/installer/image/lib/assemble.sh
+T2=$SECONDS
+say "assemble in $(mmss $((T2 - T1)))"
+ls -l "$OUT"
+say "payload $OUT in $(mmss $((T2 - T0))) (image $(mmss $((T1 - T0))), assemble $(mmss $((T2 - T1))))"

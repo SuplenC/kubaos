@@ -1,0 +1,166 @@
+# Quickshell desktop shell
+
+KubaOS's desktop shell: my own, for Hyprland, written in QML on [Quickshell](https://quickshell.org) **v0.3.2**, the version pinned in `flake.lock`.
+
+## Design
+
+Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dots/shell). Every screen gets a frame: the bar along the top and a thin border on the other three edges, with rounded inner corners. Panels are not floating cards. They grow out of the frame's edges and meet it through concave fillets, so the frame and every open panel read as one surface with one soft shadow. The colors come from the wallpaper (matugen, `scheme-fidelity`), which keeps the photo's own neon hue in the accents: amber and cyan on the Shinjuku street, violet and gold at purple hour.
+
+- **Type:** Geist for the interface, with tabular figures for anything that ticks. M PLUS 1 for the few Japanese accents: the weekday kanji next to the bar clock, 曜日 in the control center, and 東京 on the lock screen. Material Symbols Rounded for icons, whose `FILL` axis animates on toggles.
+- **Motion:** Material 3 curves (`Theme.anim`). Things that appear use the "spatial" curve, which decelerates in with a slight overshoot (450 ms). Things that leave accelerate out, quicker (300 ms). Opening a panel animates its depth, and the content rides on its leading edge, so it slides out from under the frame instead of fading in place. List rows cascade in (22 ms stagger). Selection highlights, tab indicators and the workspace indicator slide. The workspace indicator stretches: its leading edge moves first and the trailing edge follows.
+- **Placement:**
+
+  | Panel | Position |
+  |---|---|
+  | Launcher | Drops from the bar under the clock |
+  | Control center | Side sheet on the right |
+  | Power menu | Column on the right edge |
+  | Wallpaper picker | Rises from the bottom |
+  | OSD | Small bar rising from the bottom |
+  | Notifications | Top-right corner |
+
+- **Density:** sized for Full HD at scale 1 (the laptop runs at 1.5, see `config/hypr/monitors.lua`): a 36 px bar, 13 px body text.
+- **Panels over windows:** only the frame reserves space (the bar's 36 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (power menu 45%, control center 20%, launcher 15%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
+- **Glass:** the frame is drawn at 94% opacity. Hyprland blurs what shows through (`qs-frame` layer rule, `ignore_alpha 0.5`, so the shadow is not blurred).
+
+The design was studied from Caelestia's source and README: its frame and drawer structure, Material 3 roles and motion tokens. No code comes from it (Caelestia is GPL-3.0); everything here was written from scratch, and the panel shapes are built differently (an SVG path per panel, see `components/drawerpath.js`).
+
+Screenshots: `just shots` (see `docs/TESTING.md`).
+
+## Run and reload
+
+```sh
+qs                      # starts config/quickshell (linked to ~/.config/quickshell)
+qs log                  # follow the log of the running instance
+qs ipc show             # list IPC targets
+```
+
+Quickshell hot-reloads on save. Lock state, do-not-disturb and notifications survive a reload.
+
+## IPC (bound in Hyprland)
+
+| Call | Effect |
+|---|---|
+| `qs ipc call launcher toggle` | App launcher + calculator |
+| `qs ipc call session lock` | Lock screen |
+| `qs ipc call powermenu toggle` | Lock / suspend / log out / reboot / shut down |
+| `qs ipc call wallpaper toggle` | Wallpaper picker |
+| `qs ipc call wallpaper settings` | Wallpaper picker on its Settings tab (Motion and every ukiyo option) |
+| `qs ipc call wallpaper animate <always\|ac\|never>` | Wallpaper motion, remembered across restarts, mirrored into ukiyo's config |
+| `qs ipc call wallpaper status` | What's shown, which screens play a video, the ukiyo scene and whether ukiyo draws it (JSON) |
+| `qs ipc call notifications toggleDnd` | Do not disturb on/off |
+| `qs ipc call notifications clear` | Dismiss all notifications |
+| `qs ipc call controlcenter toggle` | Wi-Fi, Bluetooth, audio, power profile, notification history |
+| `qs ipc call recorder toggle` / `stop` | Record the focused monitor / stop any recording or replay (`dot-hypr-record`) |
+
+All handlers live in `IpcHandlers.qml`. `docs/CONTRACTS.md` is the source of truth.
+
+## File map
+
+```
+shell.qml               entry point: per screen a Wallpaper and a Frame; Lock, polkit, IPC once
+IpcHandlers.qml         qs ipc targets
+theme/Theme.qml         design tokens: M3 colors (from colors.json), spacing, rounding, frame,
+                        bar, type, motion curves and durations, elevation, state layers
+settings/Settings.qml   user knobs: wallpaper folders, the scene folder, wallpaper motion, lock loop, kanji workspaces, launcher hide list, terminal, security key, fingerprint, polkit
+services/               singletons, no UI
+  Audio                 PipeWire default sink, volume, output list
+  Brightness            /sys/class/backlight (watched) + brightnessctl
+  Battery, Profiles     UPower battery, power-profiles-daemon
+  Net, Bt               NetworkManager and BlueZ via Quickshell.Networking / .Bluetooth
+  Notifs                notification server, popups, history, DND
+  Wallpapers            current wallpaper, picker preview, folder listing (stills, videos, posters, ukiyo scenes), `dot-theme set`
+  Motion                when moving wallpapers may decode: always / on AC / never (persisted), lock, idle, fullscreen
+  Ukiyo                 the live wallpaper daemon (docs/UKIYO.md): scenes, status over its socket, Motion and lock
+                        mapping, config schema, set and reset for the settings panel
+  Hypr                  focused screen, workspace switching (Lua and classic dispatch)
+  Panels                which panel is open, and on which screen
+  Session               lock state, suspend/logout/reboot/poweroff
+  Recorder              screen recording state ($XDG_RUNTIME_DIR/dot-record.json, watched), dot-hypr-record calls
+components/             reusable pieces, all built on Theme tokens
+  Drawer, drawerpath.js a panel that grows out of a frame edge; its SVG outline
+  Anim, CAnim           number/color animations with the shell's curves
+  Pill, IconButton, StateLayer, Tooltip, FocusRing, Elevation
+  ListRow, NavList      rows with cascade-in; keyboard list with a sliding highlight
+  SearchField, StyledSlider, TabBar, EmptyState, StyledText, Icon, PanelSurface
+  WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
+modules/
+  frame/                Frame (one layer per screen: bar, border, every panel, input mask),
+                        Exclusions (exclusive zones as four empty windows)
+  bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, Status, RecordingIndicator
+  launcher/             Launcher, Calculator (qalc), fuzzy.js
+  controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history
+  notifications/        Popups, NotificationCard
+  osd/                  volume / brightness OSD
+  lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
+  powermenu/            PowerMenu
+  wallpaper/            Wallpaper (background, crossfade, preview, steps aside for ukiyo), WallpaperPicker,
+                        WallpaperSettings (the picker's Settings tab, generated from ukiyo's schema)
+  polkit/               Polkit agent + dialog (off by default)
+```
+
+### How the frame works
+
+`modules/frame/Frame.qml` is one transparent full-screen layer (`qs-frame`, layer Top) per screen. Its input mask only covers the frame, the bar and the notification popups, so clicks elsewhere reach the windows. While a panel is open, the mask covers the whole screen, keyboard focus is exclusive, and a click outside closes the panel. The frame path (screen rectangle minus a rounded inner rectangle) and each panel's path (`Drawer.path`) are drawn in one `Shape` inside one layer. That layer carries the opacity and a single `MultiEffect` shadow, so overlaps never double up and panel and frame merge. Panel contents sit above it at full opacity. The exclusive zones come from four empty 1x1 windows (`Exclusions.qml`, `qs-exclusion`), so the frame window never has to move. On a fullscreen workspace the frame retracts (`reveal` 1 -> 0) and comes back for an open panel, switching to the Overlay layer.
+
+### Performance
+
+- Paths are rebuilt only while a panel moves, and are short strings.
+- The shadow layer re-renders only while something in it changes.
+- Images decode at their displayed size in device pixels: `sourceSize` × `devicePixelRatio`, and half resolution for the blurred lock background.
+- Nothing runs per-frame JavaScript.
+
+In the headless test the GUI thread spent 0 ms (median) per frame on polish, animations and sync. All frame time was software rasterization, see `docs/TESTING.md`.
+
+Imports use Quickshell's module paths: `import qs.services`, `import qs.components`, and so on.
+
+## Live wallpapers (ukiyo)
+
+A wallpaper can be a ukiyo scene, `ukiyo:<id>`: a separate daemon draws it on its own background layer and reacts to the cursor, workspaces, typing, CPU, music and builds. `services/Ukiyo.qml` is the shell's side: it lists the scenes for the picker (first in the Shinjuku tab, live badge, poster thumbnail), keeps the poster on screen until the daemon says it's drawing and then unmaps the shell's own wallpaper layer, maps Motion onto the daemon (pause/resume, `still` while locked), keeps Motion's mode and ukiyo's config in step, and backs the Settings tab, which is generated from `ukiyo config schema --json`, one row per option. The lock screen shows the frame ukiyo saves when it goes still. The whole story, with the reasons: `docs/UKIYO.md`. Screenshots: `docs/screenshots/ukiyo/`.
+
+## Keyboard
+
+Every panel works without a mouse. Esc closes it.
+
+- Launcher: type to search, Up/Down or Ctrl+j/k or Ctrl+n/p to move, Enter to launch. Input that starts with `=` or looks like arithmetic goes to `qalc`; Enter copies the result.
+- Control center: Tab/Shift+Tab move between controls, Enter/Space toggle a tile, h/l or arrows move sliders and tabs, 1-4 jump to a tab, j/k move in lists, Delete dismisses a notification.
+- Power menu: h/j/k/l, arrows or Tab, then Enter.
+- Wallpaper picker: h/j/k/l or arrows move (the desktop previews the selection), Tab switches folder, S opens Settings, Enter applies, Esc goes back to the current wallpaper.
+- Wallpaper settings (the picker's last tab): Tab/Shift+Tab or Up/Down between rows, Left/Right change a value (Shift: 10 steps), Home/End to the ends, Space toggles, Enter activates or edits a colour, Delete resets to the default, Esc back to the wallpapers.
+- Lock screen: type the password and press Enter. Esc clears the field.
+
+## Theme
+
+`Theme.qml` watches `~/.local/state/theme/colors.json` (written by `dot-theme`/matugen) and updates live; colors crossfade where components animate them. If the file is missing it falls back to the default wallpaper's palette (the same as `config/matugen/default-colors.json`). Color roles are exposed as `Theme.m3<role>` (`Theme.m3primary`, `Theme.m3onSurface`, ...). The `m3` prefix is needed because QML reads any property named `on<Something>` as a signal handler.
+
+## Adding a module
+
+1. Create `modules/<name>/<Name>.qml`. For a bar item, start from `Pill`. For a panel, start from `Drawer { edge: "top" | "bottom" | "left" | "right" }`. Set `contentWidth`/`contentHeight` from your content's implicit size; `align`, `flushStart`/`flushEnd` place it along the edge. Use only `Theme` tokens for sizes, colors and motion.
+2. Put data and side effects in a singleton under `services/` (`pragma Singleton` + `Singleton {}`), so UI files only bind to it.
+3. Add it to `modules/frame/Frame.qml`, with `frame: geo` and `shown: root.panel === "<name>"`, and add a `PanelPath { drawer: <id> }` to the background `Shape`. Or add it to `Bar.qml`.
+4. If Hyprland should open it, add an `IpcHandler` to `IpcHandlers.qml` that calls `Panels.toggle("<name>")`, and add the row to `docs/CONTRACTS.md`.
+
+## PAM and polkit
+
+The lock screen runs PAM conversations in parallel, and any one unlocks:
+
+- `/etc/pam.d/qs-lock`: password
+- `/etc/pam.d/qs-lock-u2f`: FIDO2 security key (`Settings.u2f`, on). Runs only when `/etc/u2f_mappings` has a key for you (`dot-u2f-enroll`), restarts every 4 s so a key plugged in later works, and shows "Or use your security key", then "Touch your security key" once pam_u2f has found it. A key that wants a PIN can't be answered here; the password still works.
+- `/etc/pam.d/qs-lock-fingerprint`: fprintd reader (`Settings.fingerprint`, off since the security key replaced the USB reader), restarted after each failed scan, and skipped silently if there is no reader
+
+The files come from `system/`. Quickshell is built by Nix and links Nix's libpam, which can't load Ubuntu's PAM modules, so the files use Nix's `pam_unix.so` (with Ubuntu's `unix_chkpwd` linked to `/run/wrappers/bin`) and nixpkgs' `pam_u2f.so` and `pam_fprintd.so` through root-owned links; `docs/INSTALL.md` and `docs/SECRETS.md` have the details. Password auth is verified in a container. Test it on the machine on day one: lock with `qs ipc call session lock` while a second TTY is logged in. If unlocking fails, hypridle's `|| hyprlock` fallback stays the lock screen. If the shell crashes while locked, Hyprland keeps the screen locked: switch to a TTY and start `hyprlock` against the session.
+
+The polkit agent is in-shell but turned off (`Settings.polkitAgent: false`), and hyprpolkitagent stays the agent. To try the in-shell one, set the flag to true and set `POLKIT_AGENT = "quickshell"` at the top of `config/hypr/autostart.lua` (only one agent can register per session), then restart the session.
+
+## Runtime dependencies
+
+| Tool | Used for | From |
+|---|---|---|
+| `qalc` (libqalculate) | launcher calculator | apt |
+| `brightnessctl` | setting brightness | apt |
+| `dot-theme` | applying a wallpaper | this repo |
+| `ukiyo` | live wallpapers: scenes, status, config | Nix (`home/ukiyo.nix`) |
+| `dot-hypr-record`, `dot-hypr-screenshot` | recording indicator, capture buttons | this repo |
+| `systemctl`, `loginctl` | power menu | system |
+| NetworkManager, BlueZ, PipeWire, UPower, power-profiles-daemon | services over D-Bus | apt |
+| Fonts: Geist, M PLUS 1, Material Symbols Rounded, JetBrainsMono Nerd Font | UI, Japanese accents, icons | Nix (`home/desktop.nix`) |

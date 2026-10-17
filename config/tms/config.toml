@@ -1,0 +1,21 @@
+[[search_dirs]]
+path = "~/Projects"
+depth = 1
+
+[[search_dirs]]
+path = "~/.config"
+depth = 1
+
+[[search_dirs]]
+path = "~/Scripts"
+depth = 1
+
+# ANSI names, so the picker follows the terminal palette (the wallpaper
+# theme): the selected row is a tinted bar (palette 0, surface_container_highest)
+# under the normal text, not a light blue block.
+[picker_colors]
+highlight_color = "black"
+highlight_text_color = "white"
+border_color = "darkgray"
+info_color = "darkgray"
+prompt_color = "cyan"

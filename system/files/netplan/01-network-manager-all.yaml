@@ -1,0 +1,5 @@
+# Installed to /etc/netplan/01-network-manager-all.yaml by system/20-base.sh.
+# Hand every interface to NetworkManager (nmcli / nmtui / the shell's panel).
+network:
+  version: 2
+  renderer: NetworkManager

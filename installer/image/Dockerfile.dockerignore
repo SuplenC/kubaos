@@ -1,0 +1,5 @@
+# Build context is the repo root; the image only COPYs files from system/.
+*
+!system/
+system/*.md
+**/.DS_Store

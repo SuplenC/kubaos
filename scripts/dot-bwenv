@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+# dot-bwenv: project env secrets, Bitwarden -> GNOME keyring -> direnv.
+#
+#   dot-bwenv pull <project>...   fetch the project's variables from Bitwarden
+#                                 (asks for the master password) and replace
+#                                 what the keyring holds for it
+#   dot-bwenv refresh             pull every project the keyring already has
+#   dot-bwenv list [project]      projects and variable names (never values)
+#   dot-bwenv clear <project>...  forget a project (--all: every project)
+#   dot-bwenv env <project>       NAME=VALUE records, NUL-separated, from the
+#                                 keyring only (used by `use bwenv` in .envrc)
+#
+# In the vault (docs/SECRETS.md): every custom field of every item in folder
+# env/<project>, plus the items anywhere that have a field bwenv=<project>.
+# Field name = variable name.
+#
+# Keyring entries: attributes service=dotfiles-env project=<p> name=<VAR>,
+# label "dotfiles-env/<p>/<VAR>". Values with a newline or tab are stored
+# base64 and the label gets "#base64", so `secret-tool search` output stays
+# one line per value. Nothing is written to disk in plaintext; BW_SESSION lives only in
+# this process and the bw processes it starts.
+set -euo pipefail
+
+SERVICE=dotfiles-env
+NAME_RE='^[A-Za-z_][A-Za-z0-9_]*$'
+PROJECT_RE='^[A-Za-z0-9][A-Za-z0-9._-]*$'
+
+die() { printf 'dot-bwenv: %s\n' "$*" >&2; exit 1; }
+note() { printf 'dot-bwenv: %s\n' "$*" >&2; }
+usage() { sed -n '2,/^# In the vault/{/^# In the vault/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+
+need() { command -v "$1" >/dev/null || die "$1 not found ($2)"; }
+
+check_project() { [[ $1 =~ $PROJECT_RE ]] || die "bad project name '$1' (letters, digits, . _ -)"; }
+
+# keyring_dump [project]: "project<TAB>name<TAB>value" lines for our entries.
+# One secret-tool call for all of them (~10 ms). secret-tool prints the
+# attribute lines on stderr, so names come from the label on stdout.
+keyring_dump() {
+  local -a attrs=(service "$SERVICE")
+  [[ -n ${1:-} ]] && attrs+=(project "$1")
+  secret-tool search --all --unlock "${attrs[@]}" 2>/dev/null | awk -v svc="$SERVICE" '
+    /^\[/ { label = ""; next }
+    /^label = / { label = substr($0, 9); next }
+    /^secret = / {
+      if (index(label, svc "/") != 1) next
+      rest = substr(label, length(svc) + 2)
+      enc = "raw"
+      if (rest ~ /#base64$/) { enc = "b64"; rest = substr(rest, 1, length(rest) - 7) }
+      n = index(rest, "/"); if (n == 0) next
+      printf "%s\t%s\t%s\t%s\n", substr(rest, 1, n - 1), substr(rest, n + 1), enc, substr($0, 10)
+    }'
+}
+
+# store PROJECT NAME VALUE
+store() {
+  local label="$SERVICE/$1/$2" value="$3"
+  if [[ $value == *[$'\n\r\t']* ]]; then
+    label+="#base64"
+    value="$(printf '%s' "$value" | base64 -w0)"
+  fi
+  printf '%s' "$value" | secret-tool store --label="$label" service "$SERVICE" project "$1" name "$2"
+}
+
+cmd_env() {
+  (($# == 1)) || die "usage: dot-bwenv env <project>"
+  check_project "$1"
+  local p name enc value dump found=0
+  dump="$(keyring_dump "$1")" ||
+    die "can't read the keyring (gnome-keyring not running, or you dismissed its unlock prompt)"
+  while IFS=$'\t' read -r p name enc value; do
+    [[ $p == "$1" && $name =~ $NAME_RE ]] || continue
+    [[ $enc == b64 ]] && value="$(printf '%s' "$value" | base64 -d)"
+    printf '%s=%s\0' "$name" "$value"
+    found=1
+  done <<<"$dump"
+  ((found)) || note "nothing for '$1' in the keyring; run: dot-bwenv pull $1"
+}
+
+cmd_list() {
+  local p name enc value
+  keyring_dump "${1:-}" | while IFS=$'\t' read -r p name enc value; do printf '%s\t%s\n' "$p" "$name"; done |
+    sort | awk -F'\t' '$1 != last { if (last != "") printf "\n"; printf "%s:", $1; last = $1 } { printf " %s", $2 } END { if (last != "") printf "\n" }'
+}
+
+projects_in_keyring() {
+  keyring_dump | cut -f1 | sort -u
+}
+
+cmd_clear() {
+  (($#)) || die "usage: dot-bwenv clear <project>... | --all"
+  local p
+  if [[ $1 == --all ]]; then
+    secret-tool clear service "$SERVICE" 2>/dev/null || true
+    note "cleared every project"
+    return
+  fi
+  for p in "$@"; do
+    check_project "$p"
+    secret-tool clear service "$SERVICE" project "$p" 2>/dev/null || true
+    note "cleared $p"
+  done
+}
+
+# import_project PROJECT: read Bitwarden items (JSON array) on stdin, replace
+# the project's keyring entries with their custom fields.
+import_project() {
+  local project="$1" name value n=0 tsv
+  local -a skipped=()
+  # name<TAB>base64(value): base64 keeps tabs and newlines in values intact.
+  tsv="$(jq -r '.[] | .fields // [] | .[]
+      | select(.name != "bwenv" and .type != 3 and .value != null)
+      | [.name, (.value | tostring | @base64)] | @tsv')"
+  secret-tool clear service "$SERVICE" project "$project" 2>/dev/null || true
+  while IFS=$'\t' read -r name value; do
+    [[ -n $name ]] || continue
+    if [[ ! $name =~ $NAME_RE ]]; then
+      skipped+=("$name")
+      continue
+    fi
+    store "$project" "$name" "$(printf '%s' "$value" | base64 -d)"
+    n=$((n + 1))
+  done <<<"$tsv"
+  ((${#skipped[@]} == 0)) || note "$project: skipped fields that aren't variable names: ${skipped[*]}"
+  printf '  %-20s %d variable(s)\n' "$project" "$n"
+}
+
+# cmd_import [--prune] [PROJECT...]: read {"folders": [...], "items": [...]}
+# (bw list folders / bw list items) on stdin and import the given projects, or
+# every project the vault has. --prune also forgets keyring projects the vault
+# no longer has. dot-bw-setup feeds it what it already fetched, so a full
+# setup costs one `bw list items`.
+cmd_import() {
+  local prune=0 vault p
+  local -a want=() found=()
+  [[ ${1:-} == --prune ]] && { prune=1; shift; }
+  for p in "$@"; do check_project "$p"; want+=("$p"); done
+  vault="$(cat)"
+  # Projects: folders named env/<p>, plus every bwenv=<p> field.
+  mapfile -t found < <(jq -r '
+    ([.folders[] | .name | select(startswith("env/")) | ltrimstr("env/")]
+     + [.items[] | .fields // [] | .[] | select(.name == "bwenv") | .value | tostring])
+    | unique | .[]' <<<"$vault")
+  ((${#want[@]})) || want=("${found[@]}")
+  for p in "${want[@]}"; do
+    if [[ ! $p =~ $PROJECT_RE ]]; then
+      note "skipping project '$p' (letters, digits, . _ - only)"
+      continue
+    fi
+    if ! printf '%s\n' "${found[@]}" | grep -qxF -- "$p"; then
+      note "$p: no folder env/$p and no item with bwenv=$p in the vault"
+      continue
+    fi
+    jq -c --arg p "$p" '
+      ([.folders[] | select(.name == "env/" + $p) | .id]) as $ids
+      | [.items[] | select((.folderId as $f | $ids | index($f))
+          or ([.fields // [] | .[] | select(.name == "bwenv" and (.value | tostring) == $p)] | length > 0))]' \
+      <<<"$vault" | import_project "$p"
+  done
+  if ((prune)); then
+    while IFS= read -r p; do
+      printf '%s\n' "${found[@]}" | grep -qxF -- "$p" && continue
+      secret-tool clear service "$SERVICE" project "$p" 2>/dev/null || true
+      note "$p: gone from the vault, removed from the keyring"
+    done < <(projects_in_keyring)
+  fi
+}
+
+# bw_unlock: set SESSION, unlocking with bw's own prompt (master password, or
+# the desktop app when bw supports that). BW_SESSION from the caller is reused.
+bw_unlock() {
+  if [[ -n ${BW_SESSION:-} ]]; then
+    SESSION="$BW_SESSION"
+    return
+  fi
+  SESSION="$(bw unlock --raw)" || die "bw unlock failed (not logged in? run dot-bw-setup)"
+  [[ -n $SESSION ]] || die "bw unlock returned no session"
+}
+
+# bwq ARGS: bw with the session, no prompts, stderr only shown on failure.
+bwq() {
+  local err rc=0 out
+  err="$(mktemp)"
+  out="$(BW_SESSION="$SESSION" BW_NOINTERACTION=true bw "$@" 2>"$err")" || rc=$?
+  if ((rc)); then
+    sed 's/^/  bw: /' "$err" >&2
+    rm -f "$err"
+    return "$rc"
+  fi
+  rm -f "$err"
+  printf '%s' "$out"
+}
+
+cmd_pull() {
+  (($#)) || die "usage: dot-bwenv pull <project>..."
+  local p folders items
+  for p in "$@"; do check_project "$p"; done
+  need bw "system/70-bitwarden.sh installs it"
+  bw_unlock
+  note "syncing the vault (each bw call takes a few seconds)"
+  bwq sync >/dev/null
+  folders="$(bwq list folders | jq -c '[.[] | {id, name}]')"
+  # Only names, folders and custom fields leave this pipeline (no SSH private
+  # keys, no passwords).
+  items="$(bwq list items | jq -c '[.[] | {name, folderId, fields}]')"
+  # Through stdin, never argv: /proc/<pid>/cmdline is readable by every user.
+  printf '%s\n%s\n' "$folders" "$items" | jq -cs '{folders: .[0], items: .[1]}' | cmd_import "$@"
+}
+
+cmd_refresh() {
+  local -a projects
+  mapfile -t projects < <(projects_in_keyring)
+  ((${#projects[@]})) || { note "no projects in the keyring yet (dot-bwenv pull <project>)"; return; }
+  cmd_pull "${projects[@]}"
+}
+
+SESSION=""
+cmd="${1:-}"
+(($#)) && shift
+case "$cmd" in -h | --help | help | "") usage; exit 0 ;; esac
+need secret-tool "apt install libsecret-tools; system/70-bitwarden.sh does"
+need jq "home-manager installs it"
+case "$cmd" in
+  pull) cmd_pull "$@" ;;
+  refresh) cmd_refresh ;;
+  list | ls) cmd_list "$@" ;;
+  clear | rm) cmd_clear "$@" ;;
+  env) cmd_env "$@" ;;
+  import) cmd_import "$@" ;; # internal: dot-bw-setup
+  *) die "unknown command '$cmd' (see --help)" ;;
+esac

@@ -1,0 +1,6 @@
+# Installed to /etc/apt/preferences.d/no-snapd by system/10-strip.sh.
+# A negative priority means apt never installs snapd, not even as a
+# dependency. Anything that hard-depends on it will refuse to install.
+Package: snapd
+Pin: release a=*
+Pin-Priority: -10

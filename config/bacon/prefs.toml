@@ -1,0 +1,42 @@
+# bacon user preferences. Linked to ~/.config/bacon (home/links.nix).
+#
+# Colors are ANSI palette indices (0-15), so bacon follows the terminal
+# palette, which comes from the wallpaper theme (config/matugen/templates/
+# ghostty): 0 = surface_container_highest, 1-6 = the harmonized hues,
+# 7 = on_surface_variant, 8 = outline, 15 = on_surface. bacon's defaults are
+# fixed 256-color pinks and yellows that ignore the theme.
+[skin]
+status_fg = 7
+status_bg = 0
+key_fg = 3
+status_key_fg = 3
+project_name_badge_fg = 15
+project_name_badge_bg = 0
+job_label_badge_fg = 0
+job_label_badge_bg = 6
+errors_badge_fg = 0
+errors_badge_bg = 1
+test_fails_badge_fg = 0
+test_fails_badge_bg = 1
+test_pass_badge_fg = 0
+test_pass_badge_bg = 2
+warnings_badge_fg = 0
+warnings_badge_bg = 3
+command_error_badge_fg = 0
+command_error_badge_bg = 1
+dismissed_badge_fg = 0
+dismissed_badge_bg = 8
+change_badge_fg = 0
+change_badge_bg = 6
+computing_fg = 0
+computing_bg = 8
+found_fg = 3
+found_selected_bg = 3
+search_input_prefix_fg = 3
+search_summary_fg = 3
+menu_border = 8
+menu_bg = 0
+menu_item_bg = 0
+menu_item_selected_bg = 8
+menu_item_fg = 7
+menu_item_selected_fg = 0

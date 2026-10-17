@@ -1,0 +1,10 @@
+#!/bin/sh
+# KubaOS: installed to /etc/initramfs-tools/hooks/ by system/25-boot.sh. The
+# overlay module for scripts/local-bottom/kubaos-snapshot-overlay.
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in
+  prereqs) prereqs; exit 0 ;;
+esac
+. /usr/share/initramfs-tools/hook-functions
+manual_add_modules overlay

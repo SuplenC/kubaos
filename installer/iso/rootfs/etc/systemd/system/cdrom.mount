@@ -1,0 +1,21 @@
+# KubaOS live: the medium casper mounted at /cdrom.
+#
+# The live root runs from the squashfs on it, so /cdrom is busy until the very
+# end and stopping this unit at shutdown failed, every time, with
+# "[FAILED] Failed unmounting cdrom.mount" over the screen. casper masks the
+# unit (casper-bottom/25disable_cdrom.mount links /usr/lib/.../cdrom.mount to
+# /dev/null), which is exactly what lets systemd try anyway; masked units
+# take no drop-ins. This file in /etc wins over that mask and is casper's own
+# commented-out fix: no default dependencies, so shutdown doesn't stop it,
+# and a lazy unmount if anything does. The medium is read-only; nothing to
+# flush.
+[Unit]
+Description=KubaOS live medium
+DefaultDependencies=no
+
+[Mount]
+What=/dev/disk/by-label/KUBAOS_0_1
+Where=/cdrom
+Type=iso9660
+Options=ro
+LazyUnmount=yes

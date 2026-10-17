@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Chrome's theme color follows the wallpaper.
+#
+# Reads "surface_container" from USER's ~/.local/state/theme/colors.json
+# (written by dot-theme through matugen) and writes it as the BrowserThemeColor
+# policy. Chrome builds its theme from that color: the frame and tab strip
+# take it as is, the toolbar, omnibox and new tab page are derived from it.
+# surface_container is the shell's own surface, a dark tone tinted by the
+# wallpaper; primary would make a bright amber/blue frame. Chrome watches
+# its policy directory, so open windows recolor without a restart.
+# Light/dark for web pages follows the system (portal color-scheme,
+# home/theme.nix).
+#
+# Root-owned helper, installed to /usr/local/libexec by system/40-apps.sh and
+# started by dot-chrome-theme.path. It takes nothing from the user's file but
+# a value that matches #rrggbb, so the policy directory stays root's: the user
+# can't use it to set any other policy. No color found -> the file is removed
+# and Chrome goes back to its default theme.
+#
+# Usage: dot-chrome-theme USER [POLICY_DIR]
+#   POLICY_DIR defaults to Chrome's /etc/opt/chrome/policies/managed
+#   (Chromium reads /etc/chromium/policies/managed).
+set -euo pipefail
+
+user="${1:?usage: dot-chrome-theme USER [POLICY_DIR]}"
+dir="${2:-/etc/opt/chrome/policies/managed}"
+[[ "$user" =~ ^[a-z_][a-z0-9_-]*$ ]] || { echo "bad user name: $user" >&2; exit 2; }
+home="$(getent passwd "$user" | cut -d: -f6)"
+[[ -n "$home" ]] || { echo "no such user: $user" >&2; exit 2; }
+
+src="$home/.local/state/theme/colors.json"
+out="$dir/dot-theme.json"
+
+color=""
+if [[ -f "$src" ]]; then
+  color="$(head -c 65536 "$src" |
+    grep -o '"surface_container"[[:space:]]*:[[:space:]]*"#[0-9A-Fa-f]\{6\}"' |
+    grep -o '#[0-9A-Fa-f]\{6\}' | head -n 1 || true)"
+fi
+
+if [[ -z "$color" ]]; then
+  rm -f "$out"
+  exit 0
+fi
+
+want="$(printf '{\n  "BrowserThemeColor": "%s"\n}' "$color")"
+[[ -f "$out" && "$(cat "$out")" == "$want" ]] && exit 0
+
+install -d -m 0755 "$dir"
+tmp="$(mktemp "$dir/.dot-theme.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+printf '%s\n' "$want" >"$tmp"
+chmod 0644 "$tmp"
+mv -f "$tmp" "$out"
+trap - EXIT

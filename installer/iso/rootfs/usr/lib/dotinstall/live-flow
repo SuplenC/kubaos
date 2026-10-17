@@ -1,0 +1,128 @@
+#!/bin/bash
+# The live system's boot flow, run by root's autologin on tty1.
+#
+# A disk labelled DOTINSTALL with install.toml on it: headless install, output
+# also on the serial console, then poweroff/reboot/shell (DOTINSTALL_AFTER).
+# Otherwise: the GUI in cage, falling back to the text installer.
+#
+# DOTINSTALL disk layout (any filesystem; the bench uses ISO9660):
+#   install.toml     the InstallConfig (required for the headless path)
+#   secrets.toml     the Secrets (copied to a 0600 file in /run)
+#   dotinstall.env   optional KEY=value lines:
+#                      DOTINSTALL_AFTER=poweroff|reboot|shell   (default poweroff)
+#                      DOTINSTALL_VERBOSE=1     `run -v`: every command and its output
+#                      DOTINSTALL_DEMO=1        run `dotinstall demo` instead of `run`
+#                      DOTINSTALL_DEMO_SPEED=N  (default 10)
+#                      DOTINSTALL_DEMO_FAIL_AT=STEP
+#                      DOTINSTALL_GUI_ARGS=...  extra dotinstall-gui arguments
+set -u
+
+CFG=/run/dotinstall/config
+mkdir -p /run/dotinstall
+
+mount_config_disk() {
+  udevadm settle -t 5 2>/dev/null || true
+  local dev=/dev/disk/by-label/DOTINSTALL
+  [ -e "$dev" ] || return 1
+  mkdir -p "$CFG"
+  mountpoint -q "$CFG" || mount -o ro "$dev" "$CFG" || return 1
+}
+
+# The serial consoles the kernel writes to (ttyS0, ttyAMA0, ...).
+serial_consoles() {
+  local c
+  for c in $(cat /sys/class/tty/console/active 2>/dev/null); do
+    case "$c" in tty[0-9]*) ;; *) [ -w "/dev/$c" ] && echo "/dev/$c" ;; esac
+  done
+}
+
+headless() {
+  local env="$CFG/dotinstall.env" rc
+  DOTINSTALL_AFTER=poweroff
+  DOTINSTALL_DEMO=0
+  DOTINSTALL_DEMO_SPEED=10
+  DOTINSTALL_DEMO_FAIL_AT=
+  # shellcheck disable=SC1090
+  [ -f "$env" ] && . "$env"
+
+  # The serial login prompt would interleave with the install log.
+  systemctl stop 'serial-getty@*.service' 2>/dev/null
+  # everything below also goes to the serial console(s) and a log file
+  exec 3>&1 4>&2
+  exec > >(tee -a /var/log/dotinstall-live.log $(serial_consoles)) 2>&1
+  local tee_pid=$!
+
+  echo "DOTINSTALL-BEGIN $(cat /etc/dotinstall-live 2>/dev/null | tr '\n' ' ')"
+  echo "uptime: $(cut -d' ' -f1 /proc/uptime)s"
+  if [ "$DOTINSTALL_DEMO" = 1 ]; then
+    set -- dotinstall demo --events human --speed "$DOTINSTALL_DEMO_SPEED"
+    [ -n "$DOTINSTALL_DEMO_FAIL_AT" ] && set -- "$@" --fail-at "$DOTINSTALL_DEMO_FAIL_AT"
+  else
+    install -m 600 /dev/null /run/dotinstall/secrets.toml
+    [ -f "$CFG/secrets.toml" ] && cat "$CFG/secrets.toml" >/run/dotinstall/secrets.toml
+    set -- dotinstall run --config "$CFG/install.toml" --secrets /run/dotinstall/secrets.toml --events human
+    [ "${DOTINSTALL_VERBOSE:-0}" = 1 ] && set -- "$@" -v
+  fi
+  echo "\$ $*"
+  "$@"
+  rc=$?
+  if [ $rc -eq 0 ]; then
+    echo "DOTINSTALL-RESULT: done"
+  else
+    echo "DOTINSTALL-RESULT: failed rc=$rc"
+  fi
+  rm -f /run/dotinstall/secrets.toml
+  sync
+
+  # Close the tee before shutting down: a tee still writing to the serial tty
+  # can hold up the session's stop job.
+  exec >&3 2>&4 3>&- 4>&-
+  wait "$tee_pid" 2>/dev/null
+  case "$DOTINSTALL_AFTER" in
+    poweroff) systemctl poweroff; sleep infinity ;;
+    # Rebooting after a failure would loop back into the installer.
+    reboot) if [ $rc -eq 0 ]; then systemctl reboot; sleep infinity; fi ;;
+  esac
+  if [ $rc -eq 0 ]; then
+    echo "Done. Reboot whenever you like. Log: /var/log/dotinstall-live.log"
+  else
+    echo "Well, shit. The install failed (exit $rc); the reason is above. Log: /var/log/dotinstall-live.log"
+  fi
+}
+
+gui() {
+  local rc=127
+  if [ -x /usr/bin/dotinstall-gui ] && command -v cage >/dev/null; then
+    # No render node (VM without virgl): software rendering in the compositor.
+    ls /dev/dri/renderD* >/dev/null 2>&1 || export WLR_RENDERER=pixman
+    [ "$(systemd-detect-virt 2>/dev/null)" != none ] && export WLR_NO_HARDWARE_CURSORS=1
+    # shellcheck disable=SC2086
+    # No --fullscreen: cage already gives the one window the whole output, and
+    # cage 0.2.1 asserts (wlr_xdg_surface_schedule_configure: surface->initialized)
+    # when a client asks for fullscreen before its first commit, as winit does.
+    cage -s -- dotinstall-gui ${DOTINSTALL_GUI_ARGS:-} 2>>/var/log/dotinstall-gui.log
+    rc=$?
+  fi
+  [ $rc -eq 0 ] && return 0
+  clear
+  echo "The graphical installer fell over (exit $rc, log in /var/log/dotinstall-gui.log)."
+  echo "Text mode it is. Same questions, fewer pixels."
+  echo
+  dotinstall-text --fallback
+}
+
+echo "$(. /etc/dotinstall-live 2>/dev/null; echo "${DOTINSTALL_LIVE_NAME:-KubaOS} live (${DOTINSTALL_LIVE_VERSION:-?}, ${DOTINSTALL_LIVE_ARCH:-})"), up in $(cut -d' ' -f1 /proc/uptime)s"
+# Headless when the DOTINSTALL disk has install.toml, or asks for the demo.
+headless_wanted() {
+  mount_config_disk || return 1
+  [ -f "$CFG/install.toml" ] || grep -qs '^DOTINSTALL_DEMO=1' "$CFG/dotinstall.env"
+}
+
+if headless_wanted; then
+  headless
+else
+  # shellcheck disable=SC1091
+  [ -f "$CFG/dotinstall.env" ] && . "$CFG/dotinstall.env"
+  for c in $(serial_consoles); do echo "DOTINSTALL-INTERACTIVE uptime=$(cut -d' ' -f1 /proc/uptime)s" >"$c"; done
+  gui
+fi

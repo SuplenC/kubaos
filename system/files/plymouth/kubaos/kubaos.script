@@ -1,0 +1,365 @@
+# KubaOS boot splash (Plymouth script module).
+#
+# The クバ mark in the middle of the dark, turning on like a neon sign and then
+# breathing slowly. When the initramfs asks for the disk passphrase, a field
+# shows up under it. Wrong passphrase: the field shakes and says so.
+#
+# Installed to /usr/share/plymouth/themes/kubaos by system/25-boot.sh.
+# Assets come from branding/boot.py. Text is drawn by label-freetype with
+# /usr/share/fonts/Plymouth.ttf (Geist), which the initramfs hook provides.
+#
+# HiDPI: plymouthd.conf sets DeviceScale=1, so this script works in device
+# pixels and picks the @2x assets itself on screens 1600 px tall or more
+# (the laptop's 2880x1800). Plymouth's own 2x scaling would upscale the 1x
+# PNGs and blur them.
+#
+# The cryptsetup initramfs script talks to us through plymouth:
+#   ask-for-password  "Please unlock disk cryptroot: "   -> password field
+#   message           "cryptsetup: ERROR: cryptroot: cryptsetup failed, bad password or options?"
+#   message           "cryptsetup: cryptroot: set up successfully"
+
+# --- palette (installer/crates/gui/src/theme.rs) -----------------------------
+Window.SetBackgroundTopColor(0.071, 0.051, 0.039);      # #120d0a
+Window.SetBackgroundBottomColor(0.071, 0.051, 0.039);
+
+text_main.r = 0.925; text_main.g = 0.878; text_main.b = 0.855;   # on_surface #ece0da
+text_dim.r = 0.839;  text_dim.g = 0.765;  text_dim.b = 0.714;    # on_surface_variant #d6c3b6
+text_amber.r = 0.992; text_amber.g = 0.722; text_amber.b = 0.510; # primary #fdb882
+text_error.r = 1.0;  text_error.g = 0.706; text_error.b = 0.671; # error #ffb4ab
+
+FPS = 30;
+Plymouth.SetRefreshRate(FPS);
+
+# --- strings -----------------------------------------------------------------
+# Passphrase prompts stay plain and serious (docs/BRAND.md, rule 4).
+LABEL = "Disk passphrase";
+HINT = "The one you set when you installed KubaOS. Enter unlocks.";
+# ASCII only: in the initramfs there is no UTF-8 locale, and label-freetype
+# decodes with mbrtowc.
+BUSY = "Unlocking...";
+WRONG = "Wrong passphrase. Try again.";
+CAPS = "Caps Lock is on.";
+
+# --- state -------------------------------------------------------------------
+frame = 0;
+scale = 0;              # 1 or 2, set by layout()
+prompt = "none";        # none | password | busy | error-shown
+bullets = 0;
+wrong = 0;              # a wrong passphrase was reported and not typed over yet
+shake_start = -100;
+prompt_alpha = 0;       # fades the prompt block in and out
+prompt_target = 0;
+message_text = "";
+
+fun contains(haystack, needle)
+{
+  n = needle.Length();
+  h = haystack.Length();
+  for (i = 0; i + n <= h; i++)
+    {
+      if (haystack.SubString(i, i + n) == needle)
+        return 1;
+    }
+  return 0;
+}
+
+fun asset(name)
+{
+  if (global.scale == 2)
+    return Image(name + "@2x.png");
+  return Image(name + ".png");
+}
+
+fun font(px)
+{
+  return "Geist " + (px * global.scale) + "px";
+}
+
+fun text_image(str, color, px)
+{
+  return Image.Text(str, color.r, color.g, color.b, 1, font(px));
+}
+
+# --- layout --------------------------------------------------------------------
+fun layout()
+{
+  W = Window.GetWidth();
+  H = Window.GetHeight();
+  s = 1;
+  if (H >= 1600)
+    s = 2;
+  if (s != global.scale)
+    {
+      global.scale = s;
+      global.img_mark = asset("mark");
+      global.img_halo = asset("halo");
+      global.img_field = asset("field");
+      global.img_field_busy = asset("field-busy");
+      global.img_field_error = asset("field-error");
+      global.img_bullet = asset("bullet");
+      global.img_label = text_image(LABEL, text_main, 15);
+      global.img_hint = text_image(HINT, text_dim, 13);
+      global.img_busy = text_image(BUSY, text_dim, 13);
+      global.img_wrong = text_image(WRONG, text_error, 13);
+      global.img_caps = text_image(CAPS, text_amber, 13);
+      if (global.message_text != "")
+        global.img_message = text_image(global.message_text, text_dim, 13);
+    }
+  global.W = W;
+  global.H = H;
+  # The mark sits a bit above the middle; the prompt hangs under it.
+  global.cx = Window.GetX() + W / 2;
+  global.mark_cy = Window.GetY() + H / 2 - 70 * s;
+  global.field_x = global.cx - global.img_field.GetWidth() / 2;
+  global.field_y = global.mark_cy + 136 * s;
+  global.label_y = global.field_y - 30 * s;
+  global.hint_y = global.field_y + global.img_field.GetHeight() + 14 * s;
+  global.message_y = Window.GetY() + H - 64 * s;
+
+  if (!global.spr_mark)
+    {
+      global.spr_halo = Sprite();
+      global.spr_mark = Sprite();
+      global.spr_field = Sprite();
+      global.spr_label = Sprite();
+      global.spr_hint = Sprite();
+      global.spr_message = Sprite();
+      global.spr_halo.SetZ(1);
+      global.spr_mark.SetZ(2);
+      global.spr_field.SetZ(10);
+      global.spr_label.SetZ(12);
+      global.spr_hint.SetZ(12);
+      global.spr_message.SetZ(12);
+      global.spr_field.SetOpacity(0);
+      global.spr_label.SetOpacity(0);
+      global.spr_hint.SetOpacity(0);
+    }
+  global.spr_halo.SetImage(global.img_halo);
+  global.spr_mark.SetImage(global.img_mark);
+  global.spr_label.SetImage(global.img_label);
+  global.spr_halo.SetX(global.cx - global.img_halo.GetWidth() / 2);
+  global.spr_halo.SetY(global.mark_cy - global.img_halo.GetHeight() / 2);
+  global.spr_mark.SetX(global.cx - global.img_mark.GetWidth() / 2);
+  global.spr_mark.SetY(global.mark_cy - global.img_mark.GetHeight() / 2);
+  global.spr_label.SetX(global.cx - global.img_label.GetWidth() / 2);
+  global.spr_label.SetY(global.label_y);
+  global.spr_field.SetX(global.field_x);
+  global.spr_field.SetY(global.field_y);
+  if (global.message_text != "")
+    {
+      global.spr_message.SetImage(global.img_message);
+      global.spr_message.SetX(global.cx - global.img_message.GetWidth() / 2);
+      global.spr_message.SetY(global.message_y);
+    }
+  update_prompt();
+}
+
+# --- the prompt block ------------------------------------------------------------
+fun update_prompt()
+{
+  if (global.prompt == "busy")
+    global.spr_field.SetImage(global.img_field_busy);
+  else if (global.wrong)
+    global.spr_field.SetImage(global.img_field_error);
+  else
+    global.spr_field.SetImage(global.img_field);
+
+  # One line under the field: what went wrong beats Caps Lock beats the hint.
+  if (global.prompt == "busy")
+    {
+      line = global.img_busy;
+      global.hint_shown = "busy";
+    }
+  else if (global.wrong)
+    {
+      line = global.img_wrong;
+      global.hint_shown = "wrong";
+    }
+  else if (Plymouth.GetCapslockState())
+    {
+      line = global.img_caps;
+      global.hint_shown = "caps";
+    }
+  else
+    {
+      line = global.img_hint;
+      global.hint_shown = "hint";
+    }
+  global.spr_hint.SetImage(line);
+  global.spr_hint.SetX(global.cx - line.GetWidth() / 2);
+  global.spr_hint.SetY(global.hint_y);
+
+  # Bullets, centred in the field; past what fits, the row just stops growing.
+  step = 14 * global.scale;
+  inner = global.img_field.GetWidth() - 32 * global.scale;
+  max = Math.Int(inner / step);
+  shown = Math.Min(global.bullets, max);
+  bw = global.img_bullet.GetWidth();
+  row = shown * step - (step - bw);
+  x0 = global.cx - row / 2;
+  global.bullet_x0 = x0;
+  y0 = global.field_y + global.img_field.GetHeight() / 2 - global.img_bullet.GetHeight() / 2;
+  for (i = 0; i < max; i++)
+    {
+      if (!global.spr_bullets[i])
+        {
+          global.spr_bullets[i] = Sprite(global.img_bullet);
+          global.spr_bullets[i].SetZ(11);
+        }
+      global.spr_bullets[i].SetImage(global.img_bullet);
+      global.spr_bullets[i].SetX(x0 + i * step);
+      global.spr_bullets[i].SetY(y0);
+      global.bullet_on[i] = (i < shown);
+    }
+  global.bullet_max = max;
+}
+
+fun set_prompt_opacity(a)
+{
+  global.spr_field.SetOpacity(a);
+  global.spr_label.SetOpacity(a);
+  global.spr_hint.SetOpacity(a);
+  dim = 1;
+  if (global.prompt == "busy")
+    dim = 0.45;
+  for (i = 0; i < global.bullet_max; i++)
+    {
+      if (global.bullet_on[i])
+        global.spr_bullets[i].SetOpacity(a * dim);
+      else
+        global.spr_bullets[i].SetOpacity(0);
+    }
+}
+
+# --- animation ------------------------------------------------------------------
+# Neon turning on: a couple of flickers in the first half second, then a slow
+# breath (4 s), subtle on the tubes, a little stronger on the glow.
+fun neon(t)
+{
+  if (t < 0.06) return 0.0;
+  if (t < 0.12) return 0.7;
+  if (t < 0.18) return 0.15;
+  if (t < 0.26) return 0.9;
+  if (t < 0.32) return 0.35;
+  if (t < 0.7) return 0.35 + (t - 0.32) / 0.38 * 0.65;
+  return 1.0;
+}
+
+fun refresh()
+{
+  global.frame++;
+  t = global.frame / FPS;
+  if (Window.GetWidth() != global.W || Window.GetHeight() != global.H)
+    layout();
+
+  on = neon(t);
+  breath = 0.5 + 0.5 * Math.Cos(2 * Math.Pi * (t - 0.7) / 4.0);   # 1 at the end of the turn-on
+  global.spr_mark.SetOpacity(on * (0.86 + 0.14 * breath));
+  global.spr_halo.SetOpacity(on * (0.45 + 0.55 * breath));
+
+  # The prompt fades in and out over about a fifth of a second.
+  if (global.prompt_alpha < global.prompt_target)
+    global.prompt_alpha = Math.Min(global.prompt_target, global.prompt_alpha + 0.17);
+  else if (global.prompt_alpha > global.prompt_target)
+    global.prompt_alpha = Math.Max(global.prompt_target, global.prompt_alpha - 0.17);
+
+  # Shake on a wrong passphrase: 0.45 s, decaying.
+  dx = 0;
+  st = t - global.shake_start;
+  if (st >= 0 && st < 0.45)
+    dx = Math.Int(Math.Sin(st * 2 * Math.Pi * 6) * (1 - st / 0.45) * 10 * global.scale);
+  global.spr_field.SetX(global.field_x + dx);
+  for (i = 0; i < global.bullet_max; i++)
+    global.spr_bullets[i].SetX(global.bullet_x0 + i * 14 * global.scale + dx);
+
+  if (global.prompt == "password")
+    update_hint_only();
+  set_prompt_opacity(global.prompt_alpha);
+}
+
+# Caps Lock can change between keystrokes; only the line under the field cares.
+fun update_hint_only()
+{
+  if (global.wrong)
+    which = "wrong";
+  else if (Plymouth.GetCapslockState())
+    which = "caps";
+  else
+    which = "hint";
+  if (which != global.hint_shown)
+    update_prompt();
+}
+
+# --- plymouth callbacks -----------------------------------------------------------
+fun on_password(prompt_text, count)
+{
+  # Typing again after a wrong passphrase clears the complaint.
+  if (global.prompt == "password" && count > global.bullets)
+    global.wrong = 0;
+  global.prompt = "password";
+  global.bullets = count;
+  global.prompt_target = 1;
+  update_prompt();
+}
+
+fun on_normal()
+{
+  # Enter was pressed (or the prompt went away): keep the field up, dimmed,
+  # while cryptsetup works through argon2id. A message settles it.
+  if (global.prompt == "password")
+    {
+      global.prompt = "busy";
+      update_prompt();
+    }
+}
+
+fun on_message(text)
+{
+  if (contains(text, "bad password"))
+    {
+      global.wrong = 1;
+      global.bullets = 0;
+      global.prompt = "password";
+      global.shake_start = global.frame / FPS;
+      update_prompt();
+      return;
+    }
+  if (contains(text, "set up successfully"))
+    {
+      global.wrong = 0;
+      global.prompt = "none";
+      global.prompt_target = 0;
+      return;
+    }
+  # Anything else (fsck, a missing disk, ...): small, at the bottom.
+  global.message_text = text;
+  global.img_message = text_image(text, text_dim, 13);
+  global.spr_message.SetImage(global.img_message);
+  global.spr_message.SetX(global.cx - global.img_message.GetWidth() / 2);
+  global.spr_message.SetY(global.message_y);
+  global.spr_message.SetOpacity(1);
+}
+
+fun on_hide_message(text)
+{
+  if (text == global.message_text)
+    {
+      global.message_text = "";
+      global.spr_message.SetOpacity(0);
+    }
+}
+
+fun on_quit()
+{
+  global.prompt_target = 0;
+  set_prompt_opacity(0);
+}
+
+layout();
+Plymouth.SetRefreshFunction(refresh);
+Plymouth.SetDisplayPasswordFunction(on_password);
+Plymouth.SetDisplayNormalFunction(on_normal);
+Plymouth.SetMessageFunction(on_message);
+Plymouth.SetHideMessageFunction(on_hide_message);
+Plymouth.SetDisplayHotplugFunction(layout);
+Plymouth.SetQuitFunction(on_quit);

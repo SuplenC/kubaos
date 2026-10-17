@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# dot-ssh-sk-new: an SSH key that lives on the YubiKey (ed25519-sk). Every use
+# needs your finger on the sensor (-O verify-required; OpenSSH uses the key's
+# built-in verification and asks for the PIN only if that fails).
+#
+#   dot-ssh-sk-new NAME             ~/.ssh/NAME_sk (key handle) + NAME_sk.pub
+#   dot-ssh-sk-new NAME --resident  also store the key on the YubiKey, so
+#                                   `ssh-keygen -K` can fetch it on another
+#                                   machine (asks for the key's PIN; the Bio
+#                                   holds 25 or 100 such keys, by firmware)
+#
+# When to use it instead of a Bitwarden SSH key (docs/SECRETS.md): for the few
+# hosts where "the key must be physically here" matters (production, the
+# homelab's root). Bitwarden keys stay the default: they sync to every machine
+# and the desktop agent serves them; Bitwarden's agent can't hold -sk keys, so
+# these go straight from the file, without an agent.
+#
+# ~/.ssh/NAME_sk isn't a secret on its own (useless without the YubiKey and
+# your finger), so it has no passphrase. One key per YubiKey: run it again
+# with the backup key plugged in (NAME-backup) and authorize both.
+set -euo pipefail
+
+die() { printf 'dot-ssh-sk-new: %s\n' "$*" >&2; exit 1; }
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+
+NAME="" RESIDENT=0
+while (($#)); do
+  case "$1" in
+    --resident) RESIDENT=1 ;;
+    -h | --help) usage; exit 0 ;;
+    -*) die "unknown flag: $1 (see --help)" ;;
+    *) [[ -z $NAME ]] || die "one NAME only"; NAME="$1" ;;
+  esac
+  shift
+done
+[[ -n $NAME ]] || { usage; exit 1; }
+[[ $NAME =~ ^[A-Za-z0-9._-]+$ ]] || die "NAME: letters, digits, . _ - only"
+
+FILE="$HOME/.ssh/${NAME}_sk"
+[[ -e $FILE || -e $FILE.pub ]] && die "$FILE exists; pick another name or remove it first"
+command -v ssh-keygen >/dev/null || die "ssh-keygen not found"
+if command -v fido2-token >/dev/null; then
+  n="$(fido2-token -L 2>/dev/null | grep -c . || true)"
+  ((n == 1)) || die "$n FIDO keys plugged in; leave exactly the one to use"
+fi
+
+opts=(-O verify-required -O "application=ssh:$NAME")
+((RESIDENT)) && opts+=(-O resident)
+install -d -m 0700 "$HOME/.ssh"
+echo "Put an enrolled finger on the sensor when the key blinks$( ((RESIDENT)) && printf ' (it asks for the PIN first)')."
+ssh-keygen -q -t ed25519-sk "${opts[@]}" -N "" -C "$(id -un)@$(hostname) $NAME (YubiKey)" -f "$FILE" ||
+  die "ssh-keygen failed (wrong finger? fingerprint locked: replug the key)"
+
+cat <<EOF
+
+Created $FILE.pub:
+  $(cat "$FILE.pub")
+
+Next:
+  - Add the public key where you log in (GitHub: Settings -> SSH keys; a
+    server: ~/.ssh/authorized_keys, prefix it with  verify-required  so the
+    server insists on the finger too).
+  - A Host block in ~/.ssh/config.d/local (dot-bw-setup never touches it):
+      Host myhost
+        IdentityFile $FILE
+        IdentitiesOnly yes
+        IdentityAgent none
+EOF

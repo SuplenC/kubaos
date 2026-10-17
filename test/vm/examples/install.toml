@@ -1,0 +1,25 @@
+# A whole-disk install onto the bench's target disk (/dev/vda).
+[locale]
+lang = "en_US.UTF-8"
+keyboard_layout = "us"
+keyboard_variant = ""
+timezone = "Europe/Rome"
+
+[host]
+hostname = "vm"
+
+[user]
+username = "kuba"
+full_name = "Kuba Example"
+
+[disk]
+device = "/dev/vda"
+encrypt = true
+target = { mode = "whole" }
+
+[git]
+name = "Kuba Example"
+email = "kuba@example.com"
+
+[payload]
+dir = "/run/dotinstall/payload"

@@ -1,0 +1,43 @@
+{
+   "partitiontable": {
+      "label": "gpt",
+      "id": "5D3A6F0E-7C1B-4F7E-9A55-2E0C3B1D9F11",
+      "device": "/dev/nvme0n1",
+      "unit": "sectors",
+      "firstlba": 34,
+      "lastlba": 1502000255,
+      "sectorsize": 512,
+      "partitions": [
+         {
+            "node": "/dev/nvme0n1p1",
+            "start": 2048,
+            "size": 204800,
+            "type": "C12A7328-F81F-11D2-BA4B-00A0C93EC93B",
+            "uuid": "0A6B5E8C-1E24-4C7B-8B8E-0E1F9C2D3A41",
+            "name": "EFI system partition",
+            "attrs": "GUID:63"
+         },{
+            "node": "/dev/nvme0n1p2",
+            "start": 206848,
+            "size": 32768,
+            "type": "E3C9E316-0B5C-4DB8-817D-F92DF00215AE",
+            "uuid": "4F1C2D3E-5A6B-4C7D-8E9F-0A1B2C3D4E5F",
+            "name": "Microsoft reserved partition"
+         },{
+            "node": "/dev/nvme0n1p3",
+            "start": 239616,
+            "size": 524288000,
+            "type": "EBD0A0A2-B9E5-4433-87C0-68B6B72699C7",
+            "uuid": "7A8B9C0D-1E2F-4A3B-8C4D-5E6F7A8B9C0D",
+            "name": "Basic data partition"
+         },{
+            "node": "/dev/nvme0n1p4",
+            "start": 1500000256,
+            "size": 2000000,
+            "type": "DE94BBA4-06D1-4D40-A16A-BFD50179D6AC",
+            "uuid": "9C0D1E2F-3A4B-4C5D-8E6F-7A8B9C0D1E2F",
+            "attrs": "RequiredPartition GUID:63"
+         }
+      ]
+   }
+}

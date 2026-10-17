@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+modprobe qemu_fw_cfg 2>/dev/null || true
+key=/sys/firmware/qemu_fw_cfg/by_name/opt/dotinstall/authorized_keys/raw
+[ -r "$key" ] || { echo "bench-ssh: no fw_cfg key, sshd stays off"; exit 0; }
+install -d -m 700 /root/.ssh
+cat "$key" >/root/.ssh/authorized_keys
+chmod 600 /root/.ssh/authorized_keys
+ssh-keygen -A
+systemctl start ssh.service
+echo "bench-ssh: sshd started"

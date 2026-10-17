@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+# test/run: the cached Docker test harness for this repo (docs/TESTING.md).
+#
+#   test/run build [--progress=plain] [--no-cache]   build the image (dotfiles-test:latest)
+#   test/run warm                       realise the home-manager generation and
+#                                       test tools into the dotfiles-nix volume
+#   test/run e2e [--only a,b] [--keep]  every check, PASS/FAIL table, exit 1 on failure
+#   test/run shell                      login zsh as kuba after a fresh switch
+#   test/run bitwarden                  Vaultwarden + dot-bw-setup + direnv
+#   test/run shots [--hyprland] [--dir NAME | --out PATH] [--size WxH] [--scale N]
+#                  [--wallpaper FOLDER/FILE | ukiyo:SCENE]
+#                                       start a headless session (sway, or Hyprland
+#                                       once its stage exists) with Quickshell
+#   test/run shots shot NAME [--webp]   screenshot into the output dir
+#   test/run shots run CMD...           run in the session (qs ipc call launcher toggle)
+#   test/run shots record start NAME | record stop
+#   test/run shots log | stop
+#   test/run clean                      remove the harness's containers, keep volumes
+#   test/run nuke [--yes]               clean, then delete the harness's volumes
+#
+# DOTFILES_SRC=<checkout> tests another copy of the repo (default: this one).
+# DOTFILES_TEST_MEM / DOTFILES_TEST_CPUS: container limits (5g / 6).
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
+IMAGE=dotfiles-test:latest
+SHOTS=dotfiles-test-shots
+VOLUMES=(dotfiles-nix dotfiles-test-cache dotfiles-test-vw-certs dotfiles-test-vw-data)
+
+export DOTFILES_SRC="${DOTFILES_SRC:-$ROOT}"
+DOTFILES_SRC="$(cd "$DOTFILES_SRC" && pwd)"
+export DOTFILES_TEST_OUT="${DOTFILES_TEST_OUT:-$HERE/out}"
+
+die() { printf 'test/run: %s\n' "$*" >&2; exit 1; }
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+compose() { docker compose -f "$HERE/compose.yaml" "$@"; }
+
+# Local flake inputs (git+file:// or path: in flake.lock, like ukiyo's
+# checkout): bind-mounted read-only at the same path, and trusted by git in
+# the container (harness.sh, trust_local_inputs).
+# shellcheck source=test/lib/local-inputs.sh
+. "$HERE/lib/local-inputs.sh"
+# run_dotfiles ARGS...: `compose run` of the dotfiles service with them.
+run_dotfiles() {
+  local_input_mounts "$DOTFILES_SRC"
+  compose run ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} -e DOTFILES_LOCAL_INPUTS="$LOCAL_INPUTS" -e UKIYO_OVERRIDE_URL="$UKIYO_OVERRIDE_URL" "$@"
+}
+elapsed() { printf '%dm%02ds' $((SECONDS / 60)) $((SECONDS % 60)); }
+
+need_image() {
+  docker image inspect "$IMAGE" >/dev/null 2>&1 || die "no $IMAGE yet: run test/run build"
+}
+
+# in_container NAME ARGS...: a fresh container (removed after) running
+# test/lib/entry ARGS as root.
+in_container() {
+  local name="$1" tty=()
+  shift
+  need_image
+  docker rm -f "$name" >/dev/null 2>&1 || true
+  mkdir -p "$DOTFILES_TEST_OUT"
+  [[ -t 0 && -t 1 ]] || tty=(-T)
+  run_dotfiles --rm ${tty[@]+"${tty[@]}"} --name "$name" dotfiles /src/test/lib/entry "$@"
+}
+
+cmd_build() {
+  local args=()
+  while (($#)); do
+    case "$1" in
+      --progress=*) args+=("$1") ;;
+      --progress) args+=("--progress=${2:?}"); shift ;;
+      --no-cache) args+=(--no-cache) ;;
+      *) die "build: unknown flag $1" ;;
+    esac
+    shift
+  done
+  docker buildx build ${args[@]+"${args[@]}"} -f "$HERE/Dockerfile" --target harness -t "$IMAGE" "$ROOT"
+  echo "built $IMAGE in $(elapsed)"
+}
+
+cmd_warm() {
+  in_container dotfiles-test-warm warm "$@"
+  echo "warm done in $(elapsed)"
+}
+
+cmd_e2e() {
+  local only="" keep=0 rc=0
+  while (($#)); do
+    case "$1" in
+      --only) only="${2:?--only needs a,b,c}"; shift ;;
+      --keep) keep=1 ;;
+      *) die "e2e: unknown flag $1" ;;
+    esac
+    shift
+  done
+  if ((keep)); then
+    need_image
+    docker rm -f dotfiles-test-e2e >/dev/null 2>&1 || true
+    run_dotfiles -d --name dotfiles-test-e2e dotfiles sleep infinity >/dev/null
+    local t=()
+    [[ -t 1 ]] && t=(-t)
+    docker exec ${t[@]+"${t[@]}"} dotfiles-test-e2e /src/test/lib/entry e2e "$only" || rc=$?
+    echo "container kept: docker exec -it dotfiles-test-e2e bash  (test/run clean removes it)"
+  else
+    in_container dotfiles-test-e2e e2e "$only" || rc=$?
+  fi
+  echo "e2e finished in $(elapsed)"
+  return "$rc"
+}
+
+cmd_shell() {
+  in_container dotfiles-test-shell shell
+}
+
+cmd_bitwarden() {
+  need_image
+  # A fresh vault every run; certificates are reused.
+  compose --profile bitwarden rm -sf vaultwarden >/dev/null 2>&1 || true
+  docker volume rm dotfiles-test-vw-data >/dev/null 2>&1 || true
+  compose --profile bitwarden up -d --wait vaultwarden
+  local rc=0
+  in_container dotfiles-test-bitwarden bitwarden || rc=$?
+  compose --profile bitwarden stop vaultwarden >/dev/null 2>&1 || true
+  echo "bitwarden finished in $(elapsed)"
+  return "$rc"
+}
+
+shots_running() { [[ "$(docker inspect -f '{{.State.Running}}' "$SHOTS" 2>/dev/null)" == true ]]; }
+# shots_out: the host directory behind the session's /out.
+shots_out() {
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/out"}}{{.Source}}{{end}}{{end}}' "$SHOTS" |
+    sed 's#^/host_mnt##'
+}
+
+cmd_shots() {
+  case "${1:-}" in
+    shot)
+      shift
+      shots_running || die "no session: test/run shots first"
+      local out
+      out="$(shots_out)"
+      docker exec "$SHOTS" /src/test/lib/entry shot "$@" | sed "s#^/out#$out#"
+      return
+      ;;
+    run)
+      shift
+      shots_running || die "no session: test/run shots first"
+      docker exec "$SHOTS" /src/test/lib/entry run "$@"
+      return
+      ;;
+    record)
+      shift
+      shots_running || die "no session: test/run shots first"
+      case "${1:-}" in
+        start) docker exec "$SHOTS" /src/test/lib/entry record-start "${2:?record start NAME}" | sed "s#^/out#$(shots_out)#" ;;
+        stop) docker exec "$SHOTS" /src/test/lib/entry record-stop ;;
+        *) die "shots record start NAME | stop" ;;
+      esac
+      return
+      ;;
+    log)
+      docker exec "$SHOTS" /src/test/lib/entry qs-log
+      return
+      ;;
+    stop)
+      docker rm -f "$SHOTS" >/dev/null 2>&1 || true
+      echo "session stopped"
+      return
+      ;;
+  esac
+
+  local compositor=sway size=1920x1080 scale=1 wall=cyberpunk/shinjuku-neon-canyon.jpg
+  while (($#)); do
+    case "$1" in
+      --hyprland) compositor=hyprland ;;
+      --dir) DOTFILES_TEST_OUT="$ROOT/docs/screenshots/${2:?--dir needs a name}"; shift ;;
+      --out) DOTFILES_TEST_OUT="${2:?--out needs a path}"; shift ;;
+      --size) size="${2:?--size WxH}"; shift ;;
+      --scale) scale="${2:?--scale N}"; shift ;;
+      --wallpaper) wall="${2:?--wallpaper FOLDER/FILE or ukiyo:SCENE}"; shift ;;
+      *) die "shots: unknown flag $1 (see test/run --help)" ;;
+    esac
+    shift
+  done
+  mkdir -p "$DOTFILES_TEST_OUT"
+  DOTFILES_TEST_OUT="$(cd "$DOTFILES_TEST_OUT" && pwd)"
+  export DOTFILES_TEST_OUT
+  need_image
+  docker rm -f "$SHOTS" >/dev/null 2>&1 || true
+  run_dotfiles -d --name "$SHOTS" dotfiles /src/test/lib/entry shots-start "$compositor" "$size" "$scale" "$wall" >/dev/null
+  for _ in $(seq 900); do
+    docker exec "$SHOTS" test -f /tmp/dotfiles-test/session-ready 2>/dev/null && break
+    shots_running || { docker logs "$SHOTS" 2>&1 | tail -30; docker rm -f "$SHOTS" >/dev/null; die "session failed to start"; }
+    sleep 1
+  done
+  shots_running || die "session failed to start"
+  echo "session up in $(elapsed): $compositor $size scale $scale, wallpaper $wall"
+  echo "output: $DOTFILES_TEST_OUT"
+  echo "next:   test/run shots run qs ipc call launcher toggle; test/run shots shot launcher --webp; test/run shots stop"
+}
+
+cmd_clean() {
+  compose --profile bitwarden down --remove-orphans 2>/dev/null || true
+  local c
+  for c in $(docker ps -aq --filter name='^dotfiles-test-'); do
+    docker rm -f "$c" >/dev/null
+  done
+  echo "harness containers removed (volumes kept: ${VOLUMES[*]})"
+}
+
+cmd_nuke() {
+  local yes=0 reply
+  [[ ${1:-} == --yes ]] && yes=1
+  if ((!yes)); then
+    [[ -t 0 ]] || die "nuke: needs --yes when not interactive"
+    read -r -p "Delete the harness volumes (${VOLUMES[*]})? The next warm downloads everything again. [y/N] " reply
+    [[ $reply == [yY]* ]] || { echo "kept"; return 0; }
+  fi
+  cmd_clean
+  docker volume rm "${VOLUMES[@]}" 2>/dev/null || true
+  echo "volumes removed; the image $IMAGE stays (docker image rm $IMAGE)"
+}
+
+main() {
+  local cmd="${1:-}"
+  shift || true
+  cd "$ROOT"
+  case "$cmd" in
+    build) cmd_build "$@" ;;
+    warm) cmd_warm "$@" ;;
+    e2e) cmd_e2e "$@" ;;
+    shell) cmd_shell "$@" ;;
+    bitwarden) cmd_bitwarden "$@" ;;
+    shots) cmd_shots "$@" ;;
+    clean) cmd_clean "$@" ;;
+    nuke) cmd_nuke "$@" ;;
+    -h | --help | help | "") usage ;;
+    *) die "unknown command '$cmd' (test/run --help)" ;;
+  esac
+}
+
+main "$@"

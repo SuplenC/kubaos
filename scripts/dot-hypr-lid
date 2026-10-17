@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Laptop panel on/off for the lid switch.
+#
+#   dot-hypr-lid close   lid closed (Hyprland "switch:on:Lid Switch" bind)
+#   dot-hypr-lid open    lid opened ("switch:off:Lid Switch")
+#   dot-hypr-lid sync    re-evaluate (login, monitor hotplug)
+#
+# Rule: the panel is off only while the lid is closed AND another monitor is
+# active. If the laptop panel is the only monitor it stays on: on battery
+# logind suspends on lid close anyway, on AC the lid is ignored.
+#
+# State lives in a flag file that config/hypr/monitors.lua reads, so a config
+# reload keeps the panel in the state chosen here. Changing it triggers
+# `hyprctl reload`, which re-runs monitors.lua.
+set -euo pipefail
+
+laptop=${DOT_HYPR_LAPTOP:-eDP-1}
+state_dir="${XDG_RUNTIME_DIR:-/tmp}/dot-hypr"
+flag="$state_dir/laptop-panel-off"
+recorded="$state_dir/lid"
+
+mkdir -p "$state_dir"
+exec 9>"$state_dir/lid.lock"
+flock -w 5 9
+
+lid_closed() {
+  local f
+  for f in /proc/acpi/button/lid/*/state; do
+    [[ -r $f ]] || continue
+    grep -q closed "$f"
+    return
+  done
+  # No ACPI lid node: trust the last switch event.
+  [[ -f $recorded && $(<"$recorded") == closed ]]
+}
+
+other_monitor_active() {
+  # `hyprctl monitors` lists enabled monitors only, one "Monitor NAME (ID n):"
+  # header each.
+  hyprctl monitors | awk -v laptop="$laptop" '$1 == "Monitor" && $2 != laptop { found = 1 } END { exit !found }'
+}
+
+sync() {
+  local want_off=0 have_off=0
+  if lid_closed && other_monitor_active; then
+    want_off=1
+  fi
+  [[ -f $flag ]] && have_off=1
+  ((want_off == have_off)) && return 0
+
+  if ((want_off)); then
+    : >"$flag"
+  else
+    rm -f "$flag"
+  fi
+  hyprctl reload >/dev/null
+}
+
+case "${1:-}" in
+  close) echo closed >"$recorded" ;;
+  open) echo open >"$recorded" ;;
+  sync) ;;
+  *)
+    echo "usage: $(basename "$0") open|close|sync" >&2
+    exit 2
+    ;;
+esac
+
+sync

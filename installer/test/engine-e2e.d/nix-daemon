@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fake nix-daemon: just owns the socket until it's told to stop.
+mkdir -p /nix/var/nix/daemon-socket
+exec socat UNIX-LISTEN:/nix/var/nix/daemon-socket/socket,fork,unlink-early,mode=0666 SYSTEM:true

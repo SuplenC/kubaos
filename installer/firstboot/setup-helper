@@ -1,0 +1,95 @@
+#!/bin/bash
+# /usr/lib/kubaos/setup-helper: the root half of KubaOS first-boot setup
+# (kubaos-setup, dotinstall setup). Only ever run through pkexec; polkit
+# action org.kubaos.setup asks for the password. Written by the installer
+# (installer/firstboot/, docs/INSTALLER.md "First boot").
+#
+#   setup-helper tuxedo [--mok-password-stdin]   TUXEDO repo, DKMS drivers, MOK
+#   setup-helper fingerprint                     fprintd, pam-auth-update fprintd
+#   setup-helper u2f-add                         one pamu2fcfg credential on stdin
+#
+# The TUXEDO and fingerprint verbs run system/30-hardware.sh from the
+# root-owned checkout the payload carries, never the user's writable copy
+# in ~/Projects/dotfiles: anything running as the user could edit that one.
+set -euo pipefail
+umask 022
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive
+
+SYSTEM=/usr/share/dotinstall/dotfiles/system
+MAP=/etc/u2f_mappings
+
+die() { printf '  xx  %s\n' "$*" >&2; exit 1; }
+ok() { printf '  ok  %s\n' "$*"; }
+
+((EUID == 0)) || die "this runs through pkexec, as root"
+[[ -n ${PKEXEC_UID:-} ]] || die "this runs through pkexec (PKEXEC_UID is unset)"
+USER_NAME="$(getent passwd "$PKEXEC_UID" | cut -d: -f1)"
+[[ -n $USER_NAME ]] || die "no user with uid $PKEXEC_UID"
+# lib.sh: the desktop user is SUDO_USER when running as root.
+export SUDO_USER="$USER_NAME"
+
+# root_only FILE: owned by root, nobody else may write it or its directory.
+root_only() {
+  local f
+  for f in "$1" "$(dirname "$1")"; do
+    [[ -e $f ]] || die "$f is missing"
+    read -r owner mode < <(stat -L -c '%u %a' "$f")
+    [[ $owner == 0 ]] || die "$f isn't owned by root; refusing to run it as root"
+    (((8#$mode & 8#022) == 0)) || die "$f is writable by others; refusing to run it as root"
+  done
+}
+
+hardware() {
+  local hw="$SYSTEM/30-hardware.sh"
+  root_only "$hw"
+  root_only "$SYSTEM/lib.sh"
+  exec bash "$hw" "$@"
+}
+
+u2f_add() {
+  local cred line new kh c replaced=0 n
+  IFS= read -r cred || true
+  [[ $cred =~ ^[A-Za-z0-9+/=_*-]+,[A-Za-z0-9+/=_-]+,[A-Za-z0-9]+,[+a-z]*$ ]] ||
+    die "that's not a pamu2fcfg credential"
+  [[ -f $MAP ]] || die "$MAP is missing: system/70-bitwarden.sh creates it"
+  line="$(grep -m1 "^$USER_NAME:" "$MAP" || true)"
+  if [[ -z $line ]]; then
+    new="$USER_NAME:$cred"
+  else
+    # The same key again (same key handle) replaces its old credential.
+    kh="${cred%%,*}"
+    new="$USER_NAME"
+    IFS=: read -r -a creds <<<"${line#*:}"
+    for c in "${creds[@]}"; do
+      [[ -n $c ]] || continue
+      if [[ ${c%%,*} == "$kh" ]]; then
+        new+=":$cred"
+        replaced=1
+      else
+        new+=":$c"
+      fi
+    done
+    ((replaced)) || new+=":$cred"
+  fi
+  tmp="$(mktemp)"
+  { grep -v "^$USER_NAME:" "$MAP" || true; printf '%s\n' "$new"; } >"$tmp"
+  install -m 0644 -o root -g root "$tmp" "$MAP"
+  rm -f "$tmp"
+  n="$(tr -cd ':' <<<"$new" | wc -c)"
+  ok "$MAP: $USER_NAME has $n key(s)"
+}
+
+case "${1:-}" in
+  tuxedo)
+    shift
+    case "${1:-}" in
+      "") hardware --only tuxedo,mok ;;
+      --mok-password-stdin) hardware --only tuxedo,mok --mok-password-stdin ;;
+      *) die "tuxedo: unknown flag $1" ;;
+    esac
+    ;;
+  fingerprint) hardware --only fingerprint ;;
+  u2f-add) u2f_add ;;
+  *) die "usage: setup-helper tuxedo [--mok-password-stdin] | fingerprint | u2f-add" ;;
+esac

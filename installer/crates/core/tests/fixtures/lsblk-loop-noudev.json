@@ -1,0 +1,62 @@
+{
+   "blockdevices": [
+      {
+         "name": "loop0",
+         "path": "/dev/loop0",
+         "type": "loop",
+         "size": 21474836480,
+         "model": null,
+         "rm": false,
+         "ro": false,
+         "tran": null,
+         "fstype": null,
+         "label": null,
+         "parttype": null,
+         "partlabel": null,
+         "pttype": null,
+         "start": null,
+         "log-sec": 512,
+         "mountpoints": [],
+         "pkname": null,
+         "children": [
+            {
+               "name": "loop0p1",
+               "path": "/dev/loop0p1",
+               "type": "part",
+               "size": 104857600,
+               "model": null,
+               "rm": false,
+               "ro": false,
+               "tran": null,
+               "fstype": null,
+               "label": null,
+               "parttype": null,
+               "partlabel": null,
+               "pttype": null,
+               "start": 2048,
+               "log-sec": 512,
+               "mountpoints": [],
+               "pkname": "loop0"
+            },{
+               "name": "loop0p2",
+               "path": "/dev/loop0p2",
+               "type": "part",
+               "size": 8589934592,
+               "model": null,
+               "rm": false,
+               "ro": false,
+               "tran": null,
+               "fstype": null,
+               "label": null,
+               "parttype": null,
+               "partlabel": null,
+               "pttype": null,
+               "start": 206848,
+               "log-sec": 512,
+               "mountpoints": [],
+               "pkname": "loop0"
+            }
+         ]
+      }
+   ]
+}

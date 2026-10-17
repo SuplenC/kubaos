@@ -1,0 +1,80 @@
+# Ghostty is a plain terminal here: tmux does panes/windows, Hyprland does
+# window management. No splits or tabs.
+
+window-padding-x = 10
+window-padding-y = 6
+window-padding-balance = true
+window-step-resize = false
+window-padding-color = extend
+
+# Sized for Full HD density: 1080p externals at scale 1 and the laptop panel
+# at scale 1.5 (config/hypr/monitors.lua) show the same text size.
+font-size = 11
+font-family = "MesloLGM Nerd Font"
+# A little more line spacing than the font's own; easier to scan code.
+adjust-cell-height = 6%
+
+# Lightly translucent: Hyprland blurs and darkens what shows through
+# (decoration:blur in config/hypr/looks.lua), so the wallpaper reads as a
+# dim, frosted tint behind the text. Ghostty's own blur only works on KDE.
+# Cells with an explicit background (Neovim floats, tmux pills, selections)
+# stay opaque; Neovim and tmux leave the main background unpainted
+# (config/nvim/lua/config/theme.lua, config/tmux/tmux.conf).
+background-opacity = 0.85
+background-opacity-cells = false
+background-blur = false
+
+# Hyprland draws no title bar for us anyway; drop the GTK header bar.
+window-decoration = none
+gtk-single-instance = false
+
+# Fallback colors if the generated theme file below is missing.
+theme = Monokai Soda
+
+# Colors from the wallpaper theme pipeline (dot-theme / matugen).
+# Loaded after this file, so it overrides `theme` above. `?` = optional.
+config-file = ?~/.local/state/theme/ghostty
+# dot-theme reloads every Ghostty window when the wallpaper changes; skip the
+# "Reloaded the configuration" toast that would pop up in each of them.
+app-notifications = no-config-reload
+
+# --- Unbind tab/split/window defaults (tmux and Hyprland own these) ---
+keybind = ctrl+shift+n=unbind
+keybind = ctrl+shift+t=unbind
+keybind = ctrl+shift+w=unbind
+keybind = ctrl+shift+o=unbind
+keybind = ctrl+shift+e=unbind
+keybind = ctrl+shift+enter=unbind
+keybind = ctrl+shift+arrow_left=unbind
+keybind = ctrl+shift+arrow_right=unbind
+keybind = ctrl+shift+tab=unbind
+keybind = ctrl+tab=unbind
+keybind = ctrl+page_up=unbind
+keybind = ctrl+page_down=unbind
+keybind = ctrl+alt+arrow_up=unbind
+keybind = ctrl+alt+arrow_down=unbind
+keybind = ctrl+alt+arrow_left=unbind
+keybind = ctrl+alt+arrow_right=unbind
+keybind = super+ctrl+[=unbind
+keybind = super+ctrl+]=unbind
+keybind = super+ctrl+shift+arrow_up=unbind
+keybind = super+ctrl+shift+arrow_down=unbind
+keybind = super+ctrl+shift+arrow_left=unbind
+keybind = super+ctrl+shift+arrow_right=unbind
+keybind = alt+digit_1=unbind
+keybind = alt+digit_2=unbind
+keybind = alt+digit_3=unbind
+keybind = alt+digit_4=unbind
+keybind = alt+digit_5=unbind
+keybind = alt+digit_6=unbind
+keybind = alt+digit_7=unbind
+keybind = alt+digit_8=unbind
+keybind = alt+1=unbind
+keybind = alt+2=unbind
+keybind = alt+3=unbind
+keybind = alt+4=unbind
+keybind = alt+5=unbind
+keybind = alt+6=unbind
+keybind = alt+7=unbind
+keybind = alt+8=unbind
+keybind = alt+9=unbind

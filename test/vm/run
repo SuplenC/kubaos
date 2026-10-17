@@ -1,0 +1,492 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2054  # QEMU's own option syntax uses commas inside one argument
+# test/vm/run: the QEMU test bench for dotinstall (test/vm/README.md).
+#
+#   test/vm/run boot-iso [ISO] [--arch aarch64|x86_64] [--gui] [--keep-disk] [--secure-boot]
+#                        [--config FILE --secrets FILE] [--demo] [--after poweroff|reboot|shell]
+#                        [--env KEY=VALUE]...
+#                                       boot an ISO (default: the newest KubaOS ISO
+#                                       in iso) with a fresh target disk, in the background
+#   test/vm/run install CONFIG SECRETS [--iso ISO] [--arch A] [--demo] [--demo-fail-at STEP] [--gui]
+#                       [--timeout SECS] [--keep-running] [--ssh] [--secure-boot]
+#                                       headless install: inject CONFIG+SECRETS on a
+#                                       DOTINSTALL disk, wait for done/failed on serial,
+#                                       power off, exit 0 (done) / 1 (failed) / 3 (timeout).
+#                                       --ssh: afterwards put the bench key in the installed
+#                                       system's /root and enable its sshd (bench only)
+#   test/vm/run target-ssh CONFIG SECRETS
+#                                       on a running live ISO: the same as install --ssh
+#   test/vm/run boot-disk [--gui]       boot the target disk (no ISO), with the firmware
+#                                       mode (plain or Secure Boot) of the last boot-iso/install
+#
+#   --secure-boot (x86_64): Ubuntu's OVMF with Secure Boot on and Microsoft's keys
+#   enrolled (OVMF_CODE_4M.secboot.fd + OVMF_VARS_4M.ms.fd from ovmf-generic,
+#   fetched once into test/vm/cache/ovmf), SMM on. Fresh vars every boot-iso/install.
+#   test/vm/run ssh [CMD...]            SSH into the VM as root (live ISO dev builds only)
+#   test/vm/run wait-serial PATTERN [--timeout SECS]
+#   test/vm/run wait-ssh [--timeout SECS]
+#   test/vm/run serial [-f]             print (or follow) the serial log
+#   test/vm/run shot NAME [--png]       QMP screendump into out/shots/NAME.webp
+#   test/vm/run snapshot save|restore|delete NAME | snapshot list
+#                                       qcow2 internal snapshots: the whole VM while
+#                                       running (savevm/loadvm), the disk when stopped
+#   test/vm/run type TEXT               type into the VM's keyboard (\n = Enter)
+#   test/vm/run key COMBO...            press keys, e.g. ctrl-alt-f2, ret, esc
+#   test/vm/run qmp JSON                send one raw QMP command, print the reply
+#   test/vm/run status | stop | clean
+#
+# Env: VM_OUT (state dir, default test/vm/out), VM_MEM (MiB, 4096), VM_CPUS (4),
+#      VM_DISK_SIZE (64G), VM_SSH_PORT (2229), VM_RES (1920x1080; 2880x1800 is the
+#      laptop's panel).
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
+OUT="${VM_OUT:-$HERE/out}"
+MEM="${VM_MEM:-4096}"
+CPUS="${VM_CPUS:-4}"
+DISK_SIZE="${VM_DISK_SIZE:-64G}"
+SSH_PORT="${VM_SSH_PORT:-2229}"
+RES="${VM_RES:-1920x1080}"
+FW=/opt/homebrew/share/qemu
+# Secure Boot firmware for x86_64: Homebrew ships no vars with keys enrolled.
+OVMF_DEB_URL=http://archive.ubuntu.com/ubuntu/pool/main/e/edk2/ovmf-generic_2025.11-3ubuntu7.3_all.deb
+OVMF_DEB_SHA256=d35554c74dccef60c12d63dda1120bf1ddc3a44054a1bf4b596f7dda7504c588
+OVMF_DIR="$HERE/cache/ovmf"
+
+DISK="$OUT/disk.qcow2"
+VARS="$OUT/vars.qcow2"
+SERIAL="$OUT/serial.log"
+QMP="$OUT/qmp.sock"
+PIDF="$OUT/qemu.pid"
+KEY="$OUT/id_ed25519"
+CFGDIR="$OUT/cfg"
+CFGISO="$OUT/cfg.iso"
+SHOTS="$OUT/shots"
+
+die() { printf 'test/vm/run: %s\n' "$*" >&2; exit 1; }
+say() { printf '==> %s\n' "$*" >&2; }
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+elapsed() { printf '%dm%02ds' $((SECONDS / 60)) $((SECONDS % 60)); }
+
+running() { [[ -f $PIDF ]] && kill -0 "$(cat "$PIDF")" 2>/dev/null; }
+need_running() { running || die "no VM running (test/vm/run boot-iso or boot-disk first)"; }
+
+# qmp CMD ARGS...: test/vm/lib/qmp.py on the running VM's QMP socket.
+qmp() {
+  need_running
+  python3 -I "$HERE/lib/qmp.py" "$QMP" "$@"
+}
+
+ensure_key() {
+  [[ -f $KEY ]] || ssh-keygen -q -t ed25519 -N '' -C dotinstall-bench -f "$KEY"
+}
+
+new_disk() {
+  rm -f "$DISK"
+  qemu-img create -q -f qcow2 "$DISK" "$DISK_SIZE"
+}
+
+# ensure_ovmf: Ubuntu's Secure Boot OVMF (code + MS-enrolled vars) in cache/ovmf.
+ensure_ovmf() {
+  [[ -f $OVMF_DIR/OVMF_CODE_4M.secboot.fd && -f $OVMF_DIR/OVMF_VARS_4M.ms.fd ]] && return 0
+  local tmp
+  tmp="$(mktemp -d)"
+  say "fetching Ubuntu's OVMF (Secure Boot, MS keys) into $OVMF_DIR"
+  curl -fsSL -o "$tmp/ovmf.deb" "$OVMF_DEB_URL" || { rm -rf "$tmp"; die "can't download $OVMF_DEB_URL"; }
+  [[ "$(shasum -a 256 "$tmp/ovmf.deb" | cut -d' ' -f1)" == "$OVMF_DEB_SHA256" ]] || { rm -rf "$tmp"; die "OVMF .deb checksum mismatch"; }
+  (cd "$tmp" && ar x ovmf.deb && mkdir x && zstd -qdc data.tar.zst | tar -C x -xf -)
+  mkdir -p "$OVMF_DIR"
+  cp "$tmp/x/usr/share/OVMF/OVMF_CODE_4M.secboot.fd" "$tmp/x/usr/share/OVMF/OVMF_VARS_4M.ms.fd" "$OVMF_DIR/"
+  rm -rf "$tmp"
+}
+
+# new_vars ARCH SECURE: a fresh UEFI variable store (with MS keys when SECURE).
+new_vars() {
+  local arch="$1" secure="${2:-0}" src
+  case "$arch" in
+    aarch64) src="$FW/edk2-arm-vars.fd" ;;
+    x86_64) src="$FW/edk2-i386-vars.fd" ;;
+  esac
+  if ((secure)); then ensure_ovmf; src="$OVMF_DIR/OVMF_VARS_4M.ms.fd"; fi
+  rm -f "$VARS"
+  # qcow2 rather than raw so savevm can snapshot the whole VM.
+  qemu-img convert -q -f raw -O qcow2 "$src" "$VARS"
+}
+
+# make_cfg_disk [CONFIG SECRETS] [ENV-LINES...]: the DOTINSTALL disk (ISO9660,
+# volume label DOTINSTALL) the live system looks for. Always written, so the
+# bench can pass options even without an install.
+make_cfg_disk() {
+  local config="$1" secrets="$2" env="$3"
+  rm -rf "$CFGDIR" "$CFGISO"
+  mkdir -p "$CFGDIR"
+  [[ -n $config ]] && cp "$config" "$CFGDIR/install.toml"
+  [[ -n $secrets ]] && cp "$secrets" "$CFGDIR/secrets.toml"
+  printf '%s\n' "$env" >"$CFGDIR/dotinstall.env"
+  hdiutil makehybrid -quiet -iso -joliet -default-volume-name DOTINSTALL -o "$CFGISO" "$CFGDIR"
+}
+
+# latest_iso ARCH: the newest KubaOS ISO for ARCH in iso (hw or vm).
+latest_iso() {
+  local arch="$1" f
+  f="$(ls -t "$ROOT"/iso/kubaos-*-"$arch".iso "$ROOT"/iso/kubaos-*-"$arch"-vm.iso 2>/dev/null | head -1 || true)"
+  [[ -n $f ]] || die "no ISO given and none in iso for $arch (installer/iso/build --arch $arch)"
+  printf '%s\n' "$f"
+}
+
+# launch ARCH GUI ISO-or-empty CFG-or-empty [SECURE]: start QEMU in the background.
+# SECURE: 1 Secure Boot, 0 plain, "" (boot-disk) whatever the last launch used.
+launch() {
+  local arch="$1" gui="$2" iso="$3" cfg="$4" secure="${5:-}" q=() display=() mode
+  running && die "a VM is already running (test/vm/run stop)"
+  [[ -f $DISK ]] || new_disk
+  mode="$(cat "$OUT/secureboot" 2>/dev/null || echo 0)"
+  [[ -n $secure ]] || secure="$mode"
+  [[ $secure == 1 && $arch != x86_64 ]] && die "--secure-boot is x86_64 only"
+  # A fresh disk (rm'd vars) or a firmware switch starts with fresh vars.
+  if [[ ! -f $VARS || ! -f $OUT/arch || $(cat "$OUT/arch" 2>/dev/null) != "$arch" || $secure != "$mode" ]]; then
+    new_vars "$arch" "$secure"
+  fi
+  echo "$arch" >"$OUT/arch"
+  echo "$secure" >"$OUT/secureboot"
+  ensure_key
+  rm -f "$QMP" "$SERIAL"
+  : >"$SERIAL"
+
+  case "$arch" in
+    aarch64)
+      q=(qemu-system-aarch64 -machine virt,pflash0=code,pflash1=vars -accel hvf -cpu host
+        -blockdev "driver=file,filename=$FW/edk2-aarch64-code.fd,node-name=code,read-only=on")
+      ;;
+    x86_64)
+      if ((secure)); then
+        # SMM keeps the variable store out of the OS's reach; OVMF's
+        # secboot build refuses to run without it.
+        q=(qemu-system-x86_64 -machine q35,smm=on,pflash0=code,pflash1=vars -accel tcg,thread=multi -cpu max -vga none
+          -global driver=cfi.pflash01,property=secure,value=on
+          -blockdev "driver=file,filename=$OVMF_DIR/OVMF_CODE_4M.secboot.fd,node-name=code,read-only=on")
+      else
+        q=(qemu-system-x86_64 -machine q35,pflash0=code,pflash1=vars -accel tcg,thread=multi -cpu max -vga none
+          -blockdev "driver=file,filename=$FW/edk2-x86_64-code.fd,node-name=code,read-only=on")
+      fi
+      ;;
+    *) die "unknown arch $arch" ;;
+  esac
+  # opt/dotinstall/authorized_keys: only the bench passes it; a dev live ISO
+  # enables sshd with that key when it sees it.
+  q+=(-name "dotinstall-bench-$arch" -smp "$CPUS" -m "$MEM"
+    -blockdev "driver=file,filename=$VARS,node-name=vars-file"
+    -blockdev "driver=qcow2,file=vars-file,node-name=vars"
+    -device virtio-scsi-pci,id=scsi
+    -blockdev "driver=file,filename=$DISK,node-name=target-file,discard=unmap"
+    -blockdev "driver=qcow2,file=target-file,node-name=target,discard=unmap"
+    -device virtio-blk-pci,drive=target,bootindex=2
+    -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:$SSH_PORT-:22"
+    -device virtio-net-pci,netdev=net0
+    -device virtio-rng-pci
+    -device qemu-xhci -device usb-kbd -device usb-tablet
+    -device "virtio-gpu-pci,xres=${RES%x*},yres=${RES#*x}"
+    -chardev "file,id=ser0,path=$SERIAL" -serial chardev:ser0
+    -qmp "unix:$QMP,server=on,wait=off"
+    -fw_cfg "name=opt/dotinstall/authorized_keys,file=$KEY.pub")
+  if [[ -n $iso ]]; then
+    q+=(-drive "if=none,id=live,format=raw,readonly=on,media=cdrom,file=$iso"
+      -device scsi-cd,drive=live,bus=scsi.0,bootindex=1)
+  fi
+  if [[ -n $cfg ]]; then
+    q+=(-drive "if=none,id=cfg,format=raw,readonly=on,media=cdrom,file=$cfg"
+      -device scsi-cd,drive=cfg,bus=scsi.0)
+  fi
+
+  # Never -daemonize: on macOS the forked child aborts in the ObjC runtime as
+  # soon as Hypervisor.framework serializes state (savevm).
+  if ((gui)); then display=(-display cocoa); else display=(-display none); fi
+  nohup "${q[@]}" "${display[@]}" -pidfile "$PIDF" </dev/null >"$OUT/qemu.log" 2>&1 &
+  disown
+  printf '%s\n' "${q[*]}" >"$OUT/cmdline"
+  for _ in $(seq 100); do [[ -S $QMP ]] && break; sleep 0.1; done
+  [[ -S $QMP ]] || { cat "$OUT/qemu.log" >&2; die "qemu failed to start"; }
+  say "VM up ($arch$( ((secure)) && echo ', Secure Boot'), $CPUS cpus, ${MEM} MiB): serial $SERIAL, ssh port $SSH_PORT"
+}
+
+cmd_boot_iso() {
+  local iso="" arch=aarch64 gui=0 keep=0 config="" secrets="" demo=0 after="" extra="" secure=0
+  while (($#)); do
+    case "$1" in
+      --arch) arch="${2:?}"; shift ;;
+      --gui) gui=1 ;;
+      --secure-boot) secure=1 ;;
+      --keep-disk) keep=1 ;;
+      --config) config="${2:?}"; shift ;;
+      --secrets) secrets="${2:?}"; shift ;;
+      --demo) demo=1 ;;
+      --after) after="${2:?}"; shift ;;
+      --env) extra+="${2:?}"$'\n'; shift ;;
+      -*) die "boot-iso: unknown flag $1" ;;
+      *) iso="$1" ;;
+    esac
+    shift
+  done
+  [[ -n $iso ]] || iso="$(latest_iso "$arch")"
+  [[ -f $iso ]] || die "no such ISO: $iso"
+  mkdir -p "$OUT"
+  ((keep)) || { new_disk; rm -f "$VARS"; }
+  local env="" cfg=""
+  ((demo)) && env+="DOTINSTALL_DEMO=1"$'\n'
+  [[ -n $after ]] && env+="DOTINSTALL_AFTER=$after"$'\n'
+  env+="$extra"
+  if [[ -n $config || -n $env ]]; then
+    make_cfg_disk "$config" "$secrets" "$env"
+    cfg="$CFGISO"
+  fi
+  launch "$arch" "$gui" "$iso" "$cfg" "$secure"
+  echo "next: test/vm/run serial -f | shot NAME | ssh | stop"
+}
+
+# target_ssh CONFIG SECRETS: on the live system after a done install, open the
+# target and let the bench in: the bench key in /root/.ssh, ssh.socket enabled.
+# Bench only; a real install never gets this.
+target_ssh() {
+  local config="$1" secrets="$2" dev pass
+  dev="$(sed -n 's/^device *= *"\(.*\)"/\1/p' "$config" | head -1)"
+  pass="$(sed -n 's/^luks_passphrase *= *"\(.*\)"/\1/p' "$secrets" | head -1)"
+  cmd_wait_ssh --timeout 120 >/dev/null
+  say "enabling ssh on the installed system ($dev)"
+  # shellcheck disable=SC2016  # expanded on the guest
+  # The passphrase is the bench's throwaway one; argv on the guest is fine here.
+  # ssh joins argv with spaces for the remote shell, so quote each one.
+  (cmd_ssh bash -euo pipefail -s -- "$(printf '%q' "$dev")" "$(printf '%q' "$(cat "$KEY.pub")")" "$(printf '%q' "$pass")" <<'EOF'
+dev="$1" key="$2" pass="$3"
+root="$(lsblk -lnpo NAME,FSTYPE "$dev" | awk '$2 == "crypto_LUKS" {print $1; exit}')"
+if [[ -n $root ]]; then
+  printf '%s' "$pass" | cryptsetup open "$root" bench-root --key-file=-
+  blk=/dev/mapper/bench-root
+else
+  blk="$(lsblk -lnpo NAME,FSTYPE "$dev" | awk '$2 == "btrfs" {print $1; exit}')"
+fi
+mkdir -p /mnt/bench && mount -o subvol=@ "$blk" /mnt/bench
+install -d -m 0700 /mnt/bench/root/.ssh
+printf '%s\n' "$key" >>/mnt/bench/root/.ssh/authorized_keys
+chmod 0600 /mnt/bench/root/.ssh/authorized_keys
+mkdir -p /mnt/bench/etc/systemd/system/sockets.target.wants
+ln -sf /usr/lib/systemd/system/ssh.socket /mnt/bench/etc/systemd/system/sockets.target.wants/ssh.socket
+umount /mnt/bench
+[[ $blk == /dev/mapper/bench-root ]] && cryptsetup close bench-root
+echo "bench ssh enabled on $dev"
+EOF
+  )
+}
+
+cmd_install() {
+  local config="" secrets="" iso="" arch=aarch64 demo=0 gui=0 timeout=1800 keep=0 fail_at="" sshon=0 secure=0
+  while (($#)); do
+    case "$1" in
+      --secure-boot) secure=1 ;;
+      --iso) iso="${2:?}"; shift ;;
+      --arch) arch="${2:?}"; shift ;;
+      --demo) demo=1 ;;
+      --demo-fail-at) demo=1; fail_at="${2:?}"; shift ;;
+      --gui) gui=1 ;;
+      --timeout) timeout="${2:?}"; shift ;;
+      --keep-running) keep=1 ;;
+      --ssh) sshon=1 ;;
+      -*) die "install: unknown flag $1" ;;
+      *) if [[ -z $config ]]; then config="$1"; elif [[ -z $secrets ]]; then secrets="$1"; else die "install: too many arguments"; fi ;;
+    esac
+    shift
+  done
+  [[ -f $config && -f $secrets ]] || die "install CONFIG.toml SECRETS.toml"
+  [[ -n $iso ]] || iso="$(latest_iso "$arch")"
+  mkdir -p "$OUT"
+  new_disk
+  rm -f "$VARS"
+  local env
+  env="DOTINSTALL_AFTER=$( ((keep || sshon)) && echo shell || echo poweroff)"$'\n'"DOTINSTALL_VERBOSE=1"
+  ((demo)) && env+=$'\n'"DOTINSTALL_DEMO=1"
+  [[ -n $fail_at ]] && env+=$'\n'"DOTINSTALL_DEMO_FAIL_AT=$fail_at"
+  make_cfg_disk "$config" "$secrets" "$env"
+  launch "$arch" "$gui" "$iso" "$CFGISO" "$secure"
+  say "waiting for the install (timeout ${timeout}s; serial: $SERIAL)"
+  local rc=3 line
+  line="$(wait_serial 'DOTINSTALL-RESULT: (done|failed)' "$timeout")" || true
+  case "$line" in
+    *"DOTINSTALL-RESULT: done"*) rc=0 ;;
+    *"DOTINSTALL-RESULT: failed"*) rc=1 ;;
+  esac
+  sed -n '/DOTINSTALL-BEGIN/,/DOTINSTALL-RESULT/p' "$SERIAL" | tr -d '\r' >"$OUT/install.log"
+  if ((sshon && rc == 0)); then
+    target_ssh "$config" "$secrets" || { say "could not enable ssh on the target"; rc=1; }
+    ((keep)) || { cmd_ssh systemctl poweroff >/dev/null 2>&1 & }
+  fi
+  if ((keep)); then
+    say "VM left running"
+  else
+    # The live system powers off by itself; give it a moment, then force.
+    for _ in $(seq 60); do running || break; sleep 1; done
+    running && cmd_stop >/dev/null
+  fi
+  case $rc in
+    0) say "install done in $(elapsed) (log: $OUT/install.log)" ;;
+    1) say "install FAILED after $(elapsed) (log: $OUT/install.log)"; tail -20 "$OUT/install.log" >&2 ;;
+    3) say "install TIMED OUT after $(elapsed); serial tail:"; tail -30 "$SERIAL" | tr -d '\r' >&2 ;;
+  esac
+  return $rc
+}
+
+cmd_boot_disk() {
+  local gui=0 arch
+  [[ ${1:-} == --gui ]] && gui=1
+  [[ -f $DISK ]] || die "no target disk yet"
+  arch="$(cat "$OUT/arch" 2>/dev/null || echo aarch64)"
+  launch "$arch" "$gui" "" ""
+}
+
+# wait_serial PATTERN TIMEOUT: print the first matching line, 1 on timeout.
+wait_serial() {
+  local pattern="$1" timeout="$2" end=$((SECONDS + $2)) line
+  while ((SECONDS < end)); do
+    line="$(tr -d '\r' <"$SERIAL" 2>/dev/null | grep -E -m1 "$pattern" || true)"
+    [[ -n $line ]] && { printf '%s\n' "$line"; return 0; }
+    running || { sleep 0.5; line="$(tr -d '\r' <"$SERIAL" | grep -E -m1 "$pattern" || true)"; [[ -n $line ]] && { printf '%s\n' "$line"; return 0; }; return 1; }
+    sleep 0.5
+  done
+  return 1
+}
+
+cmd_wait_serial() {
+  local pattern="${1:?wait-serial PATTERN}" timeout=300
+  shift
+  [[ ${1:-} == --timeout ]] && timeout="${2:?}"
+  wait_serial "$pattern" "$timeout" || die "no '$pattern' on serial within ${timeout}s"
+}
+
+ssh_opts() {
+  printf '%s\n' -i "$KEY" -p "$SSH_PORT" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+    -o LogLevel=ERROR -o ConnectTimeout=5 -o BatchMode=yes
+}
+
+cmd_ssh() {
+  need_running
+  local opts=() t=()
+  while IFS= read -r o; do opts+=("$o"); done < <(ssh_opts)
+  [[ $# -eq 0 && -t 0 ]] && t=(-t)
+  exec ssh "${opts[@]}" ${t[@]+"${t[@]}"} root@127.0.0.1 "$@"
+}
+
+cmd_wait_ssh() {
+  local timeout=300 end opts=()
+  [[ ${1:-} == --timeout ]] && timeout="${2:?}"
+  end=$((SECONDS + timeout))
+  while IFS= read -r o; do opts+=("$o"); done < <(ssh_opts)
+  while ((SECONDS < end)); do
+    running || die "VM stopped"
+    ssh "${opts[@]}" root@127.0.0.1 true 2>/dev/null </dev/null && { say "ssh up after $(elapsed)"; return 0; }
+    sleep 2
+  done
+  die "no ssh within ${timeout}s"
+}
+
+cmd_serial() {
+  [[ -f $SERIAL ]] || die "no serial log yet"
+  if [[ ${1:-} == -f ]]; then tail -n +1 -f "$SERIAL"; else tr -d '\r' <"$SERIAL"; fi
+}
+
+cmd_shot() {
+  local name="${1:?shot NAME}" png=0
+  [[ ${2:-} == --png ]] && png=1
+  mkdir -p "$SHOTS"
+  local f="$SHOTS/$name.png"
+  rm -f "$f"
+  qmp raw "{\"execute\":\"screendump\",\"arguments\":{\"filename\":\"$f\",\"format\":\"png\"}}" >/dev/null
+  for _ in $(seq 20); do [[ -s $f ]] && break; sleep 0.1; done
+  if ((png)); then
+    echo "$f"
+  else
+    cwebp -quiet -q 92 -sharp_yuv "$f" -o "$SHOTS/$name.webp" && rm -f "$f"
+    echo "$SHOTS/$name.webp"
+  fi
+}
+
+cmd_snapshot() {
+  local op="${1:?snapshot save|restore|delete NAME | list}" name="${2:-}"
+  [[ $op == list || -n $name ]] || die "snapshot $op NAME"
+  if running; then
+    case "$op" in
+      save | delete) qmp snapshot "$op" "$name" ;;
+      restore) qmp snapshot load "$name" ;;
+      list) qmp hmp "info snapshots" ;;
+      *) die "snapshot: unknown op $op" ;;
+    esac
+  else
+    [[ -f $DISK ]] || die "no target disk"
+    case "$op" in
+      save) qemu-img snapshot -c "$name" "$DISK" ;;
+      restore) qemu-img snapshot -a "$name" "$DISK" ;;
+      delete) qemu-img snapshot -d "$name" "$DISK" ;;
+      list) qemu-img snapshot -l "$DISK" ;;
+      *) die "snapshot: unknown op $op" ;;
+    esac
+  fi
+  say "snapshot $op $name: ok ($(running && echo 'whole VM' || echo 'disk only'))"
+}
+
+cmd_key() { qmp key "$@"; }
+cmd_type() { qmp type "${1:?type TEXT}"; }
+
+cmd_status() {
+  if running; then
+    echo "running: pid $(cat "$PIDF"), arch $(cat "$OUT/arch"), ssh 127.0.0.1:$SSH_PORT"
+  else
+    echo "stopped"
+  fi
+  [[ -f $DISK ]] && qemu-img info -U "$DISK" | sed -n 's/^\(virtual size\|disk size\): /  disk \1: /p'
+  return 0
+}
+
+cmd_stop() {
+  if running; then
+    local pid
+    pid="$(cat "$PIDF")"
+    qmp raw '{"execute":"quit"}' >/dev/null 2>&1 || kill "$pid" 2>/dev/null || true
+    for _ in $(seq 50); do kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
+    kill -9 "$pid" 2>/dev/null || true
+    echo "stopped"
+  else
+    echo "not running"
+  fi
+  rm -f "$PIDF" "$QMP"
+}
+
+cmd_clean() {
+  cmd_stop >/dev/null
+  rm -rf "$OUT"
+  echo "removed $OUT (the ISO cache in test/vm/cache stays)"
+}
+
+main() {
+  local cmd="${1:-}"
+  shift || true
+  case "$cmd" in
+    boot-iso) cmd_boot_iso "$@" ;;
+    install) cmd_install "$@" ;;
+    boot-disk) cmd_boot_disk "$@" ;;
+    target-ssh) target_ssh "${1:?target-ssh CONFIG SECRETS}" "${2:?target-ssh CONFIG SECRETS}" ;;
+    ssh) cmd_ssh "$@" ;;
+    wait-serial) cmd_wait_serial "$@" ;;
+    wait-ssh) cmd_wait_ssh "$@" ;;
+    serial) cmd_serial "$@" ;;
+    shot) cmd_shot "$@" ;;
+    snapshot) cmd_snapshot "$@" ;;
+    qmp) qmp raw "$@" ;;
+    key) cmd_key "$@" ;;
+    type) cmd_type "$@" ;;
+    status) cmd_status ;;
+    stop) cmd_stop ;;
+    clean) cmd_clean ;;
+    -h | --help | help | "") usage ;;
+    *) die "unknown command '$cmd' (test/vm/run --help)" ;;
+  esac
+}
+
+main "$@"

@@ -1,0 +1,273 @@
+#!/usr/bin/env bash
+# dot-u2f-enroll: register a FIDO2 security key for sudo, polkit and the lock
+# screen (pam_u2f, set up by system/70-bitwarden.sh). Made for the YubiKey C
+# Bio: the PAM lines demand user verification, so the key wants an enrolled
+# finger, not a touch. Enroll two keys: the second one is your backup. The
+# password keeps working either way.
+#
+#   dot-u2f-enroll              add the key that's plugged in (one key at a time)
+#   dot-u2f-enroll --replace    same, and if this key is enrolled already,
+#                               replace its credential without asking
+#   dot-u2f-enroll --pin        add a key without a fingerprint reader (a backup
+#                               YubiKey 5, say): it asks for the key's PIN at
+#                               sudo and polkit. The lock screen can't ask for
+#                               a PIN and skips such a key.
+#   dot-u2f-enroll --info       what the plugged-in key is and how it's set up
+#   dot-u2f-enroll --list       your enrolled keys (marks the plugged-in one)
+#   dot-u2f-enroll --remove N   remove key N (from --list)
+#   dot-u2f-enroll --test       try sudo's PAM stack (pamtester): finger, then
+#                               PIN, then password
+#   dot-u2f-enroll --test-lock  try the lock screen's qs-lock-u2f (finger only)
+#
+# Before the first enrollment the key needs a FIDO2 PIN and at least one
+# fingerprint (docs/SECRETS.md, "YubiKey C Bio"):
+#   ykman fido access change-pin
+#   ykman fido fingerprints add right-index
+#
+# Keys live in /etc/u2f_mappings, root:root 0644. Writing it needs sudo: a
+# file you could edit as yourself would let any process running as you add
+# its own "key" and get sudo without your password.
+set -euo pipefail
+
+MAP=/etc/u2f_mappings
+USER_NAME="$(id -un)"
+# pamu2fcfg's and pam_u2f's default relying party: credentials only count on
+# this host name.
+ORIGIN="pam://$(hostname)"
+DOTFILES="${DOTFILES_DIR:-$HOME/Projects/dotfiles}"
+MODE=auto REPLACE=0
+DEV="" DEV_INFO=""
+
+die() { printf 'dot-u2f-enroll: %s\n' "$*" >&2; exit 1; }
+say() { printf '%s\n' "$*"; }
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+
+# Our line in the mapping file: user:cred1:cred2... (one credential per key).
+my_line() { [[ -r $MAP ]] && grep -m1 "^$USER_NAME:" "$MAP" || true; }
+my_creds() { my_line | cut -d: -f2- | tr ':' '\n' | grep . || true; }
+
+# write_map NEW_LINE: replace (or add) our line, as root, keeping 0644.
+write_map() {
+  local tmp
+  tmp="$(mktemp)"
+  { [[ -r $MAP ]] && grep -v "^$USER_NAME:" "$MAP" || true; [[ -n $1 ]] && printf '%s\n' "$1"; } >"$tmp"
+  sudo install -m 0644 -o root -g root "$tmp" "$MAP"
+  rm -f "$tmp"
+}
+
+need_fido2_tools() {
+  if ! command -v fido2-token >/dev/null || ! command -v fido2-assert >/dev/null; then
+    die "fido2-token/fido2-assert not found: run system/75-yubikey.sh (apt fido2-tools)"
+  fi
+}
+
+# find_key: DEV is the one FIDO device plugged in, DEV_INFO its fido2-token -I.
+find_key() {
+  local -a devs
+  need_fido2_tools
+  mapfile -t devs < <(fido2-token -L 2>/dev/null | cut -d: -f1 | grep . || true)
+  case ${#devs[@]} in
+    0) die "no FIDO key found. Plugged in? 'ls -l /dev/hidraw*' should show a + (uaccess ACL) for you." ;;
+    1) DEV="${devs[0]}" ;;
+    *) die "${#devs[@]} FIDO keys plugged in; leave only the one to enroll" ;;
+  esac
+  DEV_INFO="$(fido2-token -I "$DEV" 2>/dev/null)" || die "can't talk to $DEV (fido2-token -I failed)"
+}
+
+# opt NAME: 0 when the key reports option NAME as true, 1 when false or absent.
+opt() { grep -m1 '^options:' <<<"$DEV_INFO" | tr -d ' ' | cut -d: -f2 | tr ',' '\n' | grep -qx "$1"; }
+has_opt() { opt "$1" || opt "no$1"; }
+info_val() { grep -m1 "^$1:" <<<"$DEV_INFO" | cut -d: -f2- | sed 's/^ *//'; }
+
+# show_key: model, firmware and edition (ykman if installed), FIDO state.
+show_key() {
+  local yk type
+  say "Key: $DEV  $(fido2-token -L 2>/dev/null | grep -m1 "^$DEV:" | cut -d: -f2- | sed 's/^ *//')"
+  if command -v ykman >/dev/null && yk="$(ykman info 2>/dev/null)"; then
+    type="$(grep -m1 '^Device type:' <<<"$yk" | cut -d: -f2- | sed 's/^ *//')"
+    say "  model:        ${type:-unknown}"
+    say "  firmware:     $(grep -m1 '^Firmware version:' <<<"$yk" | cut -d: -f2- | sed 's/^ *//')"
+    # The Multi-protocol Edition adds PIV (smart card); the FIDO Edition has
+    # FIDO2 and U2F only.
+    if grep -Eq '^PIV[[:space:]]+Enabled' <<<"$yk" || [[ $type == *Multi-protocol* ]]; then
+      say "  edition:      Multi-protocol (PIV/smart card too)"
+      if [[ ! -e /usr/lib/systemd/system/pcscd.socket ]]; then
+        say "                PIV needs pcscd: system/75-yubikey.sh --piv"
+      fi
+    else
+      say "  edition:      FIDO (FIDO2 and U2F only)"
+    fi
+  else
+    say "  (ykman not found: model and edition unknown; home-manager switch installs it)"
+  fi
+  local pin="not supported" retries
+  if opt clientPin; then pin="set"; elif has_opt clientPin; then pin="NOT set"; fi
+  retries="$(info_val 'pin retries')"
+  [[ -n $retries && $retries != undefined ]] && pin+=", $retries tries left"
+  say "  PIN:          $pin"
+  if has_opt bioEnroll; then
+    say "  fingerprints: $(opt bioEnroll && echo enrolled || echo 'none yet')$(
+      [[ -n $(info_val 'uv retries') && $(info_val 'uv retries') != undefined ]] && printf ', %s scans left before the PIN is needed' "$(info_val 'uv retries')")"
+  else
+    say "  fingerprints: no reader"
+  fi
+}
+
+# enrolled_index: N if the plugged-in key holds enrolled credential N, else
+# empty. Asks the key, without a touch, whether it knows each credential id
+# (what pam_u2f's own key detection does). Resident credentials ("*") skipped.
+enrolled_index() {
+  local n=0 c kh cdh
+  cdh="$(head -c 32 /dev/urandom | base64 -w0)"
+  while IFS= read -r c; do
+    n=$((n + 1))
+    kh="${c%%,*}"
+    [[ $kh == "*" ]] && continue
+    if printf '%s\n%s\n%s\n' "$cdh" "$ORIGIN" "$kh" | fido2-assert -G -t up=false "$DEV" >/dev/null 2>&1; then
+      printf '%s' "$n"
+      return
+    fi
+  done < <(my_creds)
+}
+
+cmd_info() {
+  find_key
+  show_key
+  local idx
+  idx="$(enrolled_index)"
+  say "  this host:    $([[ -n $idx ]] && echo "enrolled as key $idx" || echo 'not enrolled') ($ORIGIN)"
+}
+
+cmd_list() {
+  local n=0 c here=""
+  if command -v fido2-assert >/dev/null && [[ $(fido2-token -L 2>/dev/null | grep -c .) == 1 ]]; then
+    DEV="$(fido2-token -L | cut -d: -f1)"
+    here="$(enrolled_index)"
+  fi
+  while IFS= read -r c; do
+    n=$((n + 1))
+    # KeyHandle,PublicKey,CoseType,Options
+    say "  $n) $(cut -d, -f3 <<<"$c") $(cut -d, -f4 <<<"$c")  credential ${c:0:16}...$([[ $n == "$here" ]] && printf '  (plugged in)')"
+  done < <(my_creds)
+  ((n)) || say "  no keys enrolled for $USER_NAME in $MAP"
+}
+
+cmd_remove() {
+  local n="$1" i=0 c kept=() line
+  [[ $n =~ ^[0-9]+$ ]] || die "--remove needs a number from --list"
+  while IFS= read -r c; do
+    i=$((i + 1))
+    ((i == n)) || kept+=("$c")
+  done < <(my_creds)
+  ((n >= 1 && n <= i)) || die "no key $n (see --list)"
+  if ((${#kept[@]})); then
+    line="$USER_NAME:$(IFS=:; printf '%s' "${kept[*]}")"
+  else
+    line=""
+  fi
+  write_map "$line"
+  say "removed key $n; ${#kept[@]} left"
+}
+
+cmd_test() {
+  command -v pamtester >/dev/null || die "pamtester not installed (system/70-bitwarden.sh)"
+  say "sudo's stack: put an enrolled finger on the sensor when it says so. If that"
+  say "fails it asks for the key's PIN (Enter skips), then your password (Enter fails)."
+  if pamtester sudo "$USER_NAME" authenticate; then
+    say "sudo accepts it."
+  else
+    say "sudo did not accept it. Without the key, sudo asks for the password as before."
+  fi
+}
+
+cmd_test_lock() {
+  command -v nix >/dev/null || die "nix not found"
+  [[ -e /usr/local/lib/security/pam_u2f.so ]] || die "/usr/local/lib/security/pam_u2f.so missing: run system/70-bitwarden.sh"
+  # The lock screen's stack, through Nix's libpam like Quickshell.
+  say "Lock screen's qs-lock-u2f: put an enrolled finger on the sensor."
+  if nix shell --inputs-from "$DOTFILES" nixpkgs#pamtester -c pamtester qs-lock-u2f "$USER_NAME" authenticate; then
+    say "The lock screen accepts it."
+  else
+    say "Not accepted (no key, wrong finger, timeout, or a PIN-only key). The password still unlocks."
+  fi
+}
+
+cmd_add() {
+  local -a flags=(-u "$USER_NAME")
+  local out cred existing idx="" line c n=0 reply
+  command -v pamu2fcfg >/dev/null || die "pamu2fcfg not found: run system/70-bitwarden.sh"
+  [[ -f $MAP ]] || die "$MAP missing: run system/70-bitwarden.sh"
+  find_key
+  show_key
+  say ""
+
+  has_opt clientPin || die "this key has no FIDO2 PIN support; sudo and the lock screen need a fingerprint or PIN key"
+  opt clientPin || die "set the key's FIDO2 PIN first: ykman fido access change-pin  (the Bio needs it before fingerprints)"
+  if [[ $MODE == auto ]]; then
+    if opt uv; then
+      MODE=verification
+    elif has_opt bioEnroll; then
+      die "no fingerprint on this key yet: ykman fido fingerprints add right-index  (enroll 2-3 fingers, one from the other hand)"
+    else
+      die "this key has no fingerprint reader. Enroll it with --pin (sudo and polkit ask for its PIN; the lock screen skips it)"
+    fi
+  fi
+  case "$MODE" in
+    # +verification: the credential is made with UV (your finger, during
+    # enrollment) and pam_u2f always asks for it. No +pin: pam_u2f would then
+    # ask for the PIN on every use, and the lock screen can't.
+    verification) flags+=(-V) ;;
+    pin) flags+=(-N) ;;
+  esac
+
+  # Re-enrolling the same key: replace its credential in place.
+  idx="$(enrolled_index)"
+  if [[ -n $idx ]]; then
+    if ((!REPLACE)); then
+      [[ -t 0 ]] || die "this key is enrolled already (key $idx); --replace to make a new credential for it"
+      read -r -p "This key is enrolled already (key $idx). Replace its credential? [y/N] " reply
+      [[ ${reply,,} == y* ]] || { say "left as it was"; exit 0; }
+    fi
+  fi
+
+  existing="$(my_line)"
+  if [[ $MODE == verification ]]; then
+    say "Put an enrolled finger on the sensor when the key blinks."
+  else
+    say "Enter the key's PIN, then touch the key when it blinks."
+  fi
+  # -n: only ":credential", we assemble the line ourselves.
+  out="$(pamu2fcfg -n "${flags[@]}")" || die "pamu2fcfg failed (wrong finger? timeout? fingerprint locked: unplug and replug the key)"
+  cred="${out#:}"
+  [[ -n $cred && $cred != *:* ]] || die "unexpected pamu2fcfg output"
+
+  if [[ -n $idx ]]; then
+    line="$USER_NAME"
+    while IFS= read -r c; do
+      n=$((n + 1))
+      if ((n == idx)); then line+=":$cred"; else line+=":$c"; fi
+    done < <(my_creds)
+    write_map "$line"
+    say "Replaced key $idx. Your keys:"
+  else
+    if [[ -n $existing ]]; then write_map "$existing:$cred"; else write_map "$USER_NAME:$cred"; fi
+    say "Enrolled. Your keys:"
+  fi
+  cmd_list
+  [[ $(my_creds | grep -c .) -ge 2 ]] || say "Enroll a second key as a backup: dot-u2f-enroll (with only the other key plugged in). Keys get lost."
+  say "Test it: dot-u2f-enroll --test (sudo), --test-lock (lock screen), or from a second tty: sudo -k; sudo true"
+}
+
+case "${1:-}" in
+  "") cmd_add ;;
+  --replace) REPLACE=1; cmd_add ;;
+  --pin) MODE=pin; [[ ${2:-} == --replace ]] && REPLACE=1; cmd_add ;;
+  --touch) die "--touch is gone: pam_u2f now demands your finger (or the PIN), so a touch-only credential can't sign in. Use the default or --pin." ;;
+  --info) cmd_info ;;
+  --list) cmd_list ;;
+  --remove) cmd_remove "${2:-}" ;;
+  --test) cmd_test ;;
+  --test-lock) cmd_test_lock ;;
+  -h | --help) usage ;;
+  *) die "unknown argument: $1 (see --help)" ;;
+esac

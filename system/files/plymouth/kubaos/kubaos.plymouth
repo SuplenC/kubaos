@@ -1,0 +1,11 @@
+[Plymouth Theme]
+Name=KubaOS
+Description=The クバ mark on the dark, breathing like a neon sign, with the disk passphrase prompt
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/kubaos
+ScriptFile=/usr/share/plymouth/themes/kubaos/kubaos.script
+# Console text (Esc, or a boot that falls back to details) in the palette.
+ConsoleLogTextColor=0xd6c3b6
+ConsoleLogBackgroundColor=0x120d0a

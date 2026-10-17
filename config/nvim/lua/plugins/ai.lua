@@ -1,0 +1,82 @@
+return {
+  -- {
+  --   "milanglacier/minuet-ai.nvim",
+  --   dependencies = { "nvim-lua/plenary.nvim" },
+  --   config = function()
+  --     require("minuet").setup({
+  --       provider = "gemini",
+  --       provider_options = {
+  --         gemini = {
+  --           model = "gemini-2.5-flash",
+  --           stream = true,
+  --         },
+  --       },
+  --     })
+  --   end,
+  -- },
+  -- {
+  --   "saghen/blink.cmp",
+  --   dependencies = { "milanglacier/minuet-ai.nvim" },
+  --   opts = {
+  --     sources = {
+  --       default = { "lsp", "path", "snippets", "buffer", "minuet" },
+  --       providers = {
+  --         minuet = {
+  --           name = "minuet",
+  --           module = "minuet.blink",
+  --           async = true,
+  --           timeout_ms = 3000,
+  --           score_offset = 50,
+  --         },
+  --       },
+  --     },
+  --     completion = { trigger = { prefetch_on_insert = false } },
+  --   },
+  -- },
+  -- {
+  --   "olimorris/codecompanion.nvim",
+  --   dependencies = {
+  --     "nvim-lua/plenary.nvim",
+  --     "nvim-treesitter/nvim-treesitter",
+  --   },
+  --   opts = {
+  --     strategies = {
+  --       chat = { adapter = "gemini" },
+  --       inline = { adapter = "gemini" },
+  --     },
+  --     display = {
+  --       action_palette = { provider = "default" },
+  --     },
+  --   },
+  --   keys = {
+  --     { "<leader>cy", "<cmd>CodeCompanionActions<cr>", mode = { "n", "v" }, desc = "CodeCompanion Actions" },
+  --     { "<leader>ch", "<cmd>CodeCompanionChat Toggle<cr>", mode = { "n", "v" }, desc = "CodeCompanion Chat" },
+  --     { "ga", "<cmd>CodeCompanionChat Add<cr>", mode = "v", desc = "Add to CodeCompanion Chat" },
+  --     { "<leader>cj", ":<C-u>'<,'>CodeCompanion ", mode = "v", desc = "Prompt for visual selection" },
+  --   },
+  -- },
+  -- {
+  --   "coder/claudecode.nvim",
+  --   dependencies = { "folke/snacks.nvim" },
+  --   config = true,
+  --   keys = {
+  --     { "<leader>a", nil, desc = "AI/Claude Code" },
+  --     { "<leader>ac", "<cmd>ClaudeCode<cr>", desc = "Toggle Claude" },
+  --     { "<leader>af", "<cmd>ClaudeCodeFocus<cr>", desc = "Focus Claude" },
+  --     { "<leader>ar", "<cmd>ClaudeCode --resume<cr>", desc = "Resume Claude" },
+  --     { "<leader>aC", "<cmd>ClaudeCode --continue<cr>", desc = "Continue Claude" },
+  --     { "<leader>am", "<cmd>ClaudeCodeSelectModel<cr>", desc = "Select Claude model" },
+  --     { "<leader>ab", "<cmd>ClaudeCodeAdd %<cr>", desc = "Add current buffer" },
+  --     { "<leader>as", "<cmd>ClaudeCodeSend<cr>", mode = "v", desc = "Send to Claude" },
+  --     {
+  --       "<leader>as",
+  --       "<cmd>ClaudeCodeTreeAdd<cr>",
+  --       desc = "Add file",
+  --       ft = { "NvimTree", "neo-tree", "oil", "minifiles", "netrw" },
+  --     },
+  --     -- Diff management
+  --     { "<leader>aa", "<cmd>ClaudeCodeDiffAccept<cr>", desc = "Accept diff" },
+  --     { "<leader>ad", "<cmd>ClaudeCodeDiffDeny<cr>", desc = "Deny diff" },
+  --   },
+  -- },
+}

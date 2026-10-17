@@ -1,0 +1,10 @@
+# Installed to /etc/systemd/system/getty@tty1.service.d/autologin.conf by
+# system/50-hyprland.sh, which fills in the user name. The disk is LUKS-encrypted, so
+# the passphrase at boot is the login. Remove this file to get a normal login.
+#
+# Silent on purpose: between the boot splash and Hyprland's first frame tty1
+# shows nothing (no /etc/issue, no "login: ... (automatic login)"). The motd
+# and "Last login" are hushed by ~/.hushlogin (/etc/skel/.hushlogin).
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty -o '-p -f -- \\u' --skip-login --noissue --nohostname --autologin @USER@ %I $TERM

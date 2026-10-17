@@ -1,0 +1,17 @@
+# One-shot: copy the wallpaper's surface color into Chrome's managed policy.
+# See /usr/local/libexec/dot-chrome-theme (system/files/chrome/).
+[Unit]
+Description=Write Chrome's BrowserThemeColor from @USER@'s wallpaper colors
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/dot-chrome-theme @USER@
+# Reads one file in the user's home, writes one file in Chrome's policy dir.
+ProtectSystem=strict
+ReadWritePaths=/etc/opt/chrome/policies/managed
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+RestrictAddressFamilies=AF_UNIX

@@ -1,0 +1,8 @@
+os:
+  editPreset: "nvim-remote"
+gui:
+  # Colors: ~/.local/state/theme/lazygit.yml (dot-theme), loaded after this
+  # file through LG_CONFIG_FILE (home/shell.nix).
+  border: rounded
+  nerdFontsVersion: "3"
+  showRandomTip: false

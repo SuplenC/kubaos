@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Exit 0 when the laptop runs on external power, 1 on battery.
+# "On AC" = any power supply of type Mains reports online=1. With USB-C/USB4
+# charging the ACPI adapter (ADP1/ACAD) still reports Mains on most laptops.
+# Used by hypridle.conf to skip the 30 min suspend while plugged in.
+set -euo pipefail
+shopt -s nullglob
+
+for supply in /sys/class/power_supply/*; do
+  [[ -r $supply/type && -r $supply/online ]] || continue
+  [[ $(<"$supply/type") == Mains ]] || continue
+  [[ $(<"$supply/online") == 1 ]] && exit 0
+done
+
+exit 1

@@ -1,0 +1,98 @@
+# Test harness services. Driven by test/run; see docs/TESTING.md.
+# Every container is named dotfiles-test-*, every volume dotfiles-*.
+name: dotfiles-test
+
+x-limits: &limits
+  # Docker Desktop's VM has about 7.75 GB; leave room for other containers.
+  mem_limit: ${DOTFILES_TEST_MEM:-5g}
+  cpus: ${DOTFILES_TEST_CPUS:-6}
+
+services:
+  dotfiles:
+    image: dotfiles-test:latest
+    build:
+      context: ..
+      dockerfile: test/Dockerfile
+      target: harness
+    hostname: vm
+    init: true
+    <<: *limits
+    shm_size: 1g
+    environment:
+      DOTFILES_TEST_SHOT_SIZE: ${DOTFILES_TEST_SHOT_SIZE:-1920x1080}
+      DOTFILES_TEST_SHOT_SCALE: ${DOTFILES_TEST_SHOT_SCALE:-1}
+    volumes:
+      # The config under test: read-only, copied into the container per run.
+      - type: bind
+        source: ${DOTFILES_SRC:-..}
+        target: /src
+        read_only: true
+      # Screenshots and recordings (test/run shots).
+      - type: bind
+        source: ${DOTFILES_TEST_OUT:-./out}
+        target: /out
+      - dotfiles-nix:/nix
+      - dotfiles-cache:/var/cache/dotfiles-test
+      # Vaultwarden's CA (test/run bitwarden); empty otherwise.
+      - dotfiles-vw-certs:/vw-certs:ro
+    networks: [default, vault]
+    command: ["sleep", "infinity"]
+
+  # One-shot: a CA and a TLS certificate for "vw" (bw only talks https).
+  vw-certs:
+    profiles: [bitwarden]
+    image: dotfiles-test:latest
+    container_name: dotfiles-test-vw-certs
+    network_mode: none
+    volumes:
+      - type: bind
+        source: ${DOTFILES_SRC:-..}
+        target: /src
+        read_only: true
+      - dotfiles-vw-certs:/certs
+    command: ["bash", "/src/test/lib/vw-certs.sh", "/certs"]
+
+  vaultwarden:
+    profiles: [bitwarden]
+    image: vaultwarden/server:${DOTFILES_TEST_VW_TAG:-latest}
+    container_name: dotfiles-test-vaultwarden
+    hostname: vw
+    mem_limit: 256m
+    cpus: 1
+    depends_on:
+      vw-certs:
+        condition: service_completed_successfully
+    environment:
+      DOMAIN: https://vw
+      SIGNUPS_ALLOWED: "true"
+      SIGNUPS_VERIFY: "false"
+      ROCKET_PORT: "443"
+      ROCKET_TLS: '{certs="/certs/cert.pem",key="/certs/key.pem"}'
+      LOG_LEVEL: warn
+    volumes:
+      - dotfiles-vw-certs:/certs:ro
+      - dotfiles-vw-data:/data
+    networks:
+      vault:
+        aliases: [vw]
+    healthcheck:
+      test: ["CMD", "/healthcheck.sh"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 2s
+
+networks:
+  # Private: only the test container and Vaultwarden; no route out.
+  vault:
+    internal: true
+
+volumes:
+  dotfiles-nix:
+    name: dotfiles-nix
+  dotfiles-cache:
+    name: dotfiles-test-cache
+  dotfiles-vw-certs:
+    name: dotfiles-test-vw-certs
+  dotfiles-vw-data:
+    name: dotfiles-test-vw-data

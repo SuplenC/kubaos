@@ -1,0 +1,23 @@
+#%PAM-1.0
+# Quickshell lock screen, security-key half: PamContext { config: "qs-lock-u2f" }.
+# Runs in parallel with qs-lock (password). Installed to /etc/pam.d/qs-lock-u2f
+# by system/70-bitwarden.sh.
+#
+# Nix's libpam can't load Ubuntu's pam_u2f.so (Nix's loader doesn't search
+# /usr/lib/<triplet>, so libfido2.so.1 isn't found and PAM reports "Module is
+# unknown"). So this loads nixpkgs' module through a root-owned link that
+# system/70-bitwarden.sh (and update.sh --nix) points at the flake's nixpkgs
+# and pins with a GC root in /nix/var/nix/gcroots/.
+#
+# Keys come from the root-owned /etc/u2f_mappings (dot-u2f-enroll). The lock
+# screen runs PAM as you, so the file must stay world-readable (0644); it holds
+# credential ids and public keys, nothing secret. No key plugged in: the module
+# fails at once and the lock screen retries every few seconds.
+#
+# userverification=1: the YubiKey C Bio wants an enrolled finger, a touch
+# isn't enough. pinverification=0: a lock screen can't take the key's PIN, so
+# there's no PIN fallback here (sudo and polkit have one). After 3 bad scans
+# the Bio wants its PIN: unlock with the password, then `sudo true` and its
+# PIN prompt clear that. Keys without a fingerprint (PIN-only
+# backups) are skipped silently. pam_u2f >= 1.1 (nixpkgs has 1.4).
+auth     required   /usr/local/lib/security/pam_u2f.so authfile=/etc/u2f_mappings cue userverification=1 pinverification=0 [cue_prompt=Touch the fingerprint sensor]

@@ -1,0 +1,166 @@
+# Static fallback for when ~/.local/state/theme/ohmyposh.toml is missing.
+# Same layout as config.toml.tmpl; colors are the default wallpaper's.
+#:schema https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json
+
+version = 3
+final_space = true
+console_title_template = '{{ .Shell }} in {{ .Folder }}'
+
+# Pills like the tmux status bar and the Quickshell bar: rounded caps, a
+# raised surface, the accent only on icons and state. The tmux session pill
+# above stays the one filled accent block.
+[[blocks]]
+  type = 'prompt'
+  alignment = 'left'
+
+  [[blocks.segments]]
+    type = 'path'
+    style = 'diamond'
+    leading_diamond = ''
+    trailing_diamond = ''
+    foreground = 'p:text'
+    background = 'p:surface'
+    template = ' <p:accent></>  {{ path .Path .Location }} '
+
+    [blocks.segments.properties]
+      # ~/P/d/config/nvim: short enough for a 40% tmux pane.
+      style = 'agnoster_short'
+      max_depth = 3
+      folder_separator_icon = '/'
+
+  [[blocks.segments]]
+    type = 'git'
+    style = 'diamond'
+    leading_diamond = ' '
+    trailing_diamond = ''
+    foreground = 'p:ok'
+    foreground_templates = [
+      '{{ if or (.Working.Changed) (.Staging.Changed) }}p:warn{{ end }}',
+      '{{ if and (gt .Ahead 0) (gt .Behind 0) }}p:err{{ end }}',
+      '{{ if or (gt .Ahead 0) (gt .Behind 0) }}p:accent2{{ end }}',
+    ]
+    background = 'p:surface'
+    # Every icon is followed by two spaces: Ghostty draws a Nerd Font icon
+    # that has a space after it across two cells, so with a single space the
+    # icon touches the next character (the old branch-icon overlap).
+    template = ' {{ if .UpstreamURL }}{{ url .UpstreamIcon .UpstreamURL }}  {{ end }}{{ .HEAD }}{{ if .BranchStatus }} {{ .BranchStatus }}{{ end }}{{ if .Working.Changed }}  <p:muted></>  {{ .Working.String }}{{ end }}{{ if .Staging.Changed }}  <p:muted></>  {{ .Staging.String }}{{ end }} '
+
+    [blocks.segments.properties]
+      branch_icon = '  '
+      branch_max_length = 25
+      fetch_status = true
+      fetch_upstream_icon = true
+
+  # No pill: a coloured check, or the exit code in red.
+  [[blocks.segments]]
+    type = 'status'
+    style = 'plain'
+    foreground = 'p:ok'
+    foreground_templates = ['{{ if gt .Code 0 }}p:err{{ end }}']
+    template = ' {{ if gt .Code 0 }} {{ .Code }}{{ else }}{{ end }}'
+
+    [blocks.segments.properties]
+      always_enabled = true
+
+[[blocks]]
+  type = 'prompt'
+  alignment = 'left'
+  newline = true
+
+  [[blocks.segments]]
+    type = 'text'
+    style = 'plain'
+    foreground = 'p:accent'
+    foreground_templates = ['{{ if gt .Code 0 }}p:err{{ end }}']
+    template = '❯'
+
+[[blocks]]
+  type = 'rprompt'
+
+  [[blocks.segments]]
+    type = 'node'
+    style = 'plain'
+    foreground = 'p:ok'
+    template = ' '
+
+    [blocks.segments.properties]
+      display_mode = 'files'
+      fetch_package_manager = false
+      home_enabled = false
+
+  [[blocks.segments]]
+    type = 'go'
+    style = 'plain'
+    foreground = 'p:accent2'
+    template = ' '
+
+    [blocks.segments.properties]
+      fetch_version = false
+
+  [[blocks.segments]]
+    type = 'python'
+    style = 'plain'
+    foreground = 'p:warn'
+    template = ' '
+
+    [blocks.segments.properties]
+      display_mode = 'files'
+      fetch_version = false
+      fetch_virtual_env = false
+
+  [[blocks.segments]]
+    type = 'shell'
+    style = 'plain'
+    foreground = 'p:muted'
+    template = 'in <p:text>{{ .Name }}</> '
+
+  [[blocks.segments]]
+    type = 'time'
+    style = 'plain'
+    foreground = 'p:muted'
+    template = 'at <p:text>{{ .CurrentDate | date "15:04" }}</>'
+
+[[tooltips]]
+  type = 'aws'
+  tips = ['aws']
+  style = 'diamond'
+  foreground = 'p:text'
+  background = 'p:surface'
+  leading_diamond = ''
+  trailing_diamond = ''
+  template = '<p:warn></> {{ .Profile }}{{ if .Region }}@{{ .Region }}{{ end }} '
+
+  [tooltips.properties]
+    display_default = true
+
+[[tooltips]]
+  type = 'az'
+  tips = ['az']
+  style = 'diamond'
+  foreground = 'p:text'
+  background = 'p:surface'
+  leading_diamond = ''
+  trailing_diamond = ''
+  template = '<p:accent2></> {{ .Name }} '
+
+  [tooltips.properties]
+    display_default = true
+
+[transient_prompt]
+  foreground = 'p:accent'
+  foreground_templates = ['{{ if gt .Code 0 }}p:err{{ end }}']
+  template = '❯ '
+
+[secondary_prompt]
+  foreground = 'p:muted'
+  template = '❯❯ '
+
+[palette]
+  surface = '#372524'  # pill background
+  text = '#fadbd9'  # text on pills
+  muted = '#ac8886'  # icons, right prompt
+  accent = '#ffb3ae'  # folder icon, prompt char
+  accent2 = '#78d3ed'  # ahead/behind
+  ok = '#9ece6a'  # clean repo, success
+  warn = '#e0af68'  # dirty repo
+  err = '#f7768e'  # diverged, exit code

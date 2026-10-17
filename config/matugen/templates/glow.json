@@ -1,0 +1,200 @@
+{
+  "document": {
+    "block_prefix": "\n",
+    "block_suffix": "\n",
+    "color": "{{colors.on_surface.default.hex}}",
+    "margin": 2
+  },
+  "block_quote": {
+    "indent": 1,
+    "indent_token": "│ ",
+    "color": "{{colors.on_surface_variant.default.hex}}",
+    "italic": true
+  },
+  "paragraph": {},
+  "list": {
+    "level_indent": 2
+  },
+  "heading": {
+    "block_suffix": "\n",
+    "color": "{{colors.primary.default.hex}}",
+    "bold": true
+  },
+  "h1": {
+    "prefix": " ",
+    "suffix": " ",
+    "color": "{{colors.on_primary.default.hex}}",
+    "background_color": "{{colors.primary.default.hex}}",
+    "bold": true
+  },
+  "h2": {
+    "prefix": "▌ ",
+    "color": "{{colors.primary.default.hex}}"
+  },
+  "h3": {
+    "prefix": "▌ ",
+    "color": "{{colors.tertiary.default.hex}}"
+  },
+  "h4": {
+    "prefix": "▌ ",
+    "color": "{{colors.secondary.default.hex}}"
+  },
+  "h5": {
+    "prefix": "▌ ",
+    "color": "{{colors.on_surface_variant.default.hex}}"
+  },
+  "h6": {
+    "prefix": "▌ ",
+    "color": "{{colors.outline.default.hex}}",
+    "bold": false
+  },
+  "text": {},
+  "strikethrough": {
+    "crossed_out": true
+  },
+  "emph": {
+    "italic": true
+  },
+  "strong": {
+    "bold": true,
+    "color": "{{colors.on_surface.default.hex}}"
+  },
+  "hr": {
+    "color": "{{colors.outline_variant.default.hex}}",
+    "format": "\n────────\n"
+  },
+  "item": {
+    "block_prefix": "• "
+  },
+  "enumeration": {
+    "block_prefix": ". ",
+    "color": "{{colors.tertiary.default.hex}}"
+  },
+  "task": {
+    "ticked": "[✓] ",
+    "unticked": "[ ] "
+  },
+  "link": {
+    "color": "{{colors.tertiary.default.hex}}",
+    "underline": true
+  },
+  "link_text": {
+    "color": "{{colors.primary.default.hex}}",
+    "bold": true
+  },
+  "image": {
+    "color": "{{colors.tertiary.default.hex}}",
+    "underline": true
+  },
+  "image_text": {
+    "color": "{{colors.outline.default.hex}}"
+  },
+  "code": {
+    "prefix": " ",
+    "suffix": " ",
+    "color": "{{colors.tertiary.default.hex}}",
+    "background_color": "{{colors.surface_container_high.default.hex}}"
+  },
+  "code_block": {
+    "color": "{{colors.on_surface_variant.default.hex}}",
+    "margin": 2,
+    "chroma": {
+      "text": {
+        "color": "{{colors.on_surface.default.hex}}"
+      },
+      "error": {
+        "color": "{{colors.on_error.default.hex}}",
+        "background_color": "{{colors.error.default.hex}}"
+      },
+      "comment": {
+        "color": "{{colors.outline.default.hex}}",
+        "italic": true
+      },
+      "comment_preproc": {
+        "color": "{{colors.tertiary.default.hex}}"
+      },
+      "keyword": {
+        "color": "{{colors.magenta.default.hex}}"
+      },
+      "keyword_reserved": {
+        "color": "{{colors.magenta.default.hex}}"
+      },
+      "keyword_namespace": {
+        "color": "{{colors.magenta.default.hex}}"
+      },
+      "keyword_type": {
+        "color": "{{colors.cyan.default.hex}}"
+      },
+      "operator": {
+        "color": "{{colors.cyan.default.hex}}"
+      },
+      "punctuation": {
+        "color": "{{colors.outline.default.hex}}"
+      },
+      "name": {
+        "color": "{{colors.on_surface.default.hex}}"
+      },
+      "name_builtin": {
+        "color": "{{colors.tertiary.default.hex}}"
+      },
+      "name_tag": {
+        "color": "{{colors.magenta.default.hex}}"
+      },
+      "name_attribute": {
+        "color": "{{colors.tertiary.default.hex}}"
+      },
+      "name_class": {
+        "color": "{{colors.cyan.default.hex}}",
+        "bold": true
+      },
+      "name_constant": {
+        "color": "{{colors.yellow.default.hex}}"
+      },
+      "name_decorator": {
+        "color": "{{colors.tertiary.default.hex}}"
+      },
+      "name_function": {
+        "color": "{{colors.primary.default.hex}}"
+      },
+      "literal_number": {
+        "color": "{{colors.yellow.default.hex}}"
+      },
+      "literal_string": {
+        "color": "{{colors.green.default.hex}}"
+      },
+      "literal_string_escape": {
+        "color": "{{colors.tertiary.default.hex}}"
+      },
+      "generic_deleted": {
+        "color": "{{colors.red.default.hex}}"
+      },
+      "generic_emph": {
+        "italic": true
+      },
+      "generic_inserted": {
+        "color": "{{colors.green.default.hex}}"
+      },
+      "generic_strong": {
+        "bold": true
+      },
+      "generic_subheading": {
+        "color": "{{colors.outline.default.hex}}"
+      },
+      "background": {
+        "background_color": "{{colors.surface_container_low.default.hex}}"
+      }
+    }
+  },
+  "table": {
+    "color": "{{colors.on_surface.default.hex}}"
+  },
+  "definition_list": {},
+  "definition_term": {
+    "color": "{{colors.primary.default.hex}}"
+  },
+  "definition_description": {
+    "block_prefix": "\n  "
+  },
+  "html_block": {},
+  "html_span": {}
+}

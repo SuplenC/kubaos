@@ -1,0 +1,30 @@
+#! /bin/sh
+# KubaOS: /etc/grub.d/10_linux, installed by system/25-boot.sh.
+#
+# Ubuntu's 10_linux names the entries "<GRUB_DISTRIBUTOR> GNU/Linux" for any
+# distributor but Ubuntu, so the menu read "KubaOS GNU/Linux". The packaged
+# script is diverted (dpkg-divert --local --rename) to
+# /usr/share/kubaos/grub/10_linux.ubuntu, where grub upgrades keep updating
+# it; this wrapper runs it and renames the entries after os-release's
+# PRETTY_NAME ("KubaOS Shinjuku"). Undo: rm this file, then
+#   dpkg-divert --local --rename --remove /etc/grub.d/10_linux
+set -e
+
+real=/usr/share/kubaos/grub/10_linux.ubuntu
+if [ ! -x "$real" ]; then
+  # No entries would mean an unbootable menu: fail, and grub-mkconfig keeps
+  # the old grub.cfg.
+  echo "KubaOS: $real is missing; see /etc/grub.d/10_linux" >&2
+  exit 1
+fi
+
+pretty="$( . /etc/os-release 2>/dev/null && printf '%s' "${PRETTY_NAME:-}" )"
+out="$(mktemp)"
+trap 'rm -f "$out"' EXIT
+"$real" "$@" >"$out"
+if [ -n "${GRUB_DISTRIBUTOR:-}" ] && [ -n "$pretty" ]; then
+  # sed's | delimiter: neither name has one.
+  sed "s|${GRUB_DISTRIBUTOR} GNU/Linux|${pretty}|g" "$out"
+else
+  cat "$out"
+fi

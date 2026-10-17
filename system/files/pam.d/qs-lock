@@ -1,0 +1,13 @@
+#%PAM-1.0
+# Quickshell lock screen, password half: PamContext { config: "qs-lock" }.
+# The security-key half (qs-lock-u2f) and, if enabled, the fingerprint half
+# (qs-lock-fingerprint) run in parallel with it.
+# Installed to /etc/pam.d/qs-lock by system/50-hyprland.sh.
+#
+# Quickshell is built by Nix and links Nix's libpam, so this name resolves to
+# Nix's pam_unix.so, not Ubuntu's. It checks the password through
+# /run/wrappers/bin/unix_chkpwd, which /etc/tmpfiles.d/qs-lock-unix-chkpwd.conf
+# links to Ubuntu's /usr/sbin/unix_chkpwd. Do NOT switch to the absolute path
+# of Ubuntu's module: Nix's loader can't resolve its libcrypt.so.1 and PAM
+# reports "Module is unknown".
+auth     required   pam_unix.so

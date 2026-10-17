@@ -1,0 +1,273 @@
+#!/usr/bin/env bash
+# Screen recording with gpu-screen-recorder (VA-API on the iGPU).
+#
+#   dot-hypr-record region [--audio] [--mic]   start, or stop if recording
+#   dot-hypr-record window [--audio] [--mic]   the active window's area
+#   dot-hypr-record output [--audio] [--mic]   the focused monitor
+#   dot-hypr-record stop                       stop whatever runs (recording or replay)
+#   dot-hypr-record replay [start|stop|toggle] keep the last 30 s of the focused monitor in RAM
+#   dot-hypr-record replay save                write those 30 s to a file
+#   dot-hypr-record status                     print the state file
+#
+# Videos go to $DOT_RECORD_DIR or ~/Videos/Recordings (mp4). Audio is off
+# unless asked: --audio records the default output, --mic the default input.
+# The state lives in $XDG_RUNTIME_DIR/dot-record.json, which Quickshell
+# watches for the bar indicator: {"state":"idle|recording|replay", ...}.
+#
+# Capture is KMS (gsr-kms-server), which needs the root-owned setcap'd copy
+# that system/65-recorder.sh installs into /run/wrappers/bin; without it gsr
+# asks for the password through polkit. Region and window are a crop of the
+# monitor, so a window covered by another one records what covers it.
+# DOT_RECORD_BACKEND=wf-recorder uses wf-recorder instead (no replay; the
+# test harness has no GPU for gsr). DOT_RECORD_CODEC=hevc for smaller files.
+# Needs: gpu-screen-recorder (Nix), slurp, libnotify-bin (apt), jq, hyprctl.
+set -euo pipefail
+
+REPLAY_SECONDS=30
+state_file="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/dot-record.json"
+log_file="${XDG_RUNTIME_DIR:-/tmp}/dot-record.log"
+videos=$(xdg-user-dir VIDEOS 2>/dev/null || true)
+[[ $videos == "$HOME" ]] && videos=
+dir=${DOT_RECORD_DIR:-${videos:-$HOME/Videos}/Recordings}
+codec=${DOT_RECORD_CODEC:-h264}
+
+usage() {
+  sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+}
+
+backend() {
+  if [[ -n ${DOT_RECORD_BACKEND:-} ]]; then
+    echo "$DOT_RECORD_BACKEND"
+  elif command -v gpu-screen-recorder >/dev/null; then
+    echo gsr
+  else
+    echo wf-recorder
+  fi
+}
+
+notify() { # notify SUMMARY BODY [notify-send args...]
+  local summary=$1 body=$2
+  shift 2
+  if command -v notify-send >/dev/null; then
+    notify-send -a Recorder -i media-record "$@" "$summary" "$body" || true
+  else
+    hyprctl notify -1 3000 'rgb(ffb4ab)' "$summary: $body" >/dev/null 2>&1 || true
+  fi
+}
+
+write_state() { # write_state STATE [MODE PID FILE]
+  local tmp
+  tmp=$(mktemp "$state_file.XXXXXX")
+  jq -n --arg state "$1" --arg mode "${2:-}" --arg pid "${3:-}" --arg file "${4:-}" \
+    --arg backend "$(backend)" --argjson started "$(date +%s)" \
+    '{state: $state, mode: $mode, pid: ($pid | tonumber? // null), file: $file,
+      backend: $backend, started: $started}' >"$tmp"
+  mv -f "$tmp" "$state_file" # atomic, so the shell never reads half a file
+}
+
+# Prints "STATE PID" of a live recorder, or "idle"; repairs a stale file.
+current() {
+  local state pid
+  [[ -s $state_file ]] || { echo idle; return; }
+  state=$(jq -r '.state // "idle"' "$state_file" 2>/dev/null || echo idle)
+  pid=$(jq -r '.pid // empty' "$state_file" 2>/dev/null || true)
+  if [[ $state != idle ]] && [[ -n $pid ]] && kill -0 "$pid" 2>/dev/null; then
+    echo "$state $pid"
+  else
+    [[ $state == idle ]] || write_state idle
+    echo idle
+  fi
+}
+
+monitor() {
+  hyprctl -j activeworkspace 2>/dev/null | jq -r '.monitor // empty' 2>/dev/null || true
+}
+
+# Geometry as gsr wants it (WxH+X+Y) or wf-recorder (X,Y WxH), in logical pixels.
+geometry() { # geometry MODE FORMAT
+  local fmt=$2
+  case $1 in
+    region)
+      if [[ $fmt == gsr ]]; then slurp -d -f '%wx%h+%x+%y'; else slurp -d; fi
+      ;;
+    window)
+      hyprctl -j activewindow | jq -er --arg f "$fmt" 'select(.at != null) |
+        if $f == "gsr" then "\(.size[0])x\(.size[1])+\(.at[0])+\(.at[1])"
+        else "\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])" end'
+      ;;
+  esac
+}
+
+audio_args() { # audio_args BACKEND AUDIO MIC
+  local sources=()
+  (($2)) && sources+=(default_output)
+  (($3)) && sources+=(default_input)
+  ((${#sources[@]})) || return 0
+  if [[ $1 == gsr ]]; then
+    local IFS='|'
+    printf '%s\n' -a "${sources[*]}" # one merged track
+  else
+    printf '%s\n' --audio # wf-recorder: the default source only
+  fi
+}
+
+# Runs the recorder in the background under a small supervisor that resets
+# the state and notifies when it exits, whoever stopped it.
+launch() { # launch STATE MODE FILE CMD...
+  local state=$1 mode=$2 file=$3
+  shift 3
+  : >"$log_file"
+  (
+    if [[ $state == replay ]]; then
+      # gsr prints the path of each saved replay on stdout.
+      "$@" 2>>"$log_file" > >(while IFS= read -r saved; do
+        (
+          action=$(notify "Replay saved" "${saved/#$HOME/\~}" --action=open="Open folder" --action=play="Play")
+          case $action in
+            open) xdg-open "$(dirname "$saved")" ;;
+            play) xdg-open "$saved" ;;
+          esac
+        ) &
+      done) &
+    else
+      "$@" >>"$log_file" 2>&1 &
+    fi
+    pid=$!
+    write_state "$state" "$mode" "$pid" "$file"
+    wait || true
+    while kill -0 "$pid" 2>/dev/null; do sleep 0.2; done
+    write_state idle
+    if [[ $state == recording ]]; then
+      if [[ -s $file ]]; then
+        action=$(notify "Recording saved" "${file/#$HOME/\~}" --action=open="Open folder" --action=play="Play")
+        case $action in
+          open) xdg-open "$dir" ;;
+          play) xdg-open "$file" ;;
+        esac
+      else
+        notify "Recording failed" "Well, shit. Nothing got saved. The reason is in $log_file" -u critical
+      fi
+    fi
+  ) </dev/null >/dev/null 2>&1 &
+  disown
+  # Wait for the state file, so `status` right after start is accurate.
+  for _ in $(seq 20); do
+    [[ $(current) != idle ]] && return 0
+    sleep 0.1
+  done
+}
+
+stop() {
+  local cur pid
+  cur=$(current)
+  [[ $cur != idle ]] || { echo "nothing is recording" >&2; return 1; }
+  pid=${cur#* }
+  kill -INT "$pid"
+  # gsr finishes the file on SIGINT; give it time to write the trailer.
+  for _ in $(seq 100); do
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+  done
+}
+
+start_recording() { # start_recording MODE AUDIO MIC
+  local mode=$1 be file geom mon
+  local -a cmd audio
+  be=$(backend)
+  mkdir -p "$dir"
+  file="$dir/Recording_$(date +%Y-%m-%d_%H-%M-%S).mp4"
+  mon=$(monitor)
+  if [[ $mode != output ]]; then
+    geom=$(geometry "$mode" "$be") || { [[ $mode == region ]] && exit 0; echo "no active window to record" >&2; exit 1; }
+  fi
+  mapfile -t audio < <(audio_args "$be" "$2" "$3")
+  case $be in
+    gsr)
+      cmd=(gpu-screen-recorder -c mp4 -k "$codec" -f 60 -cursor yes -o "$file")
+      if [[ $mode == output ]]; then
+        cmd+=(-w "${mon:-screen}")
+      else
+        cmd+=(-w region -region "$geom")
+      fi
+      ;;
+    wf-recorder)
+      cmd=(wf-recorder -y -f "$file")
+      if [[ -e /dev/dri/renderD128 ]]; then
+        cmd+=(-c h264_vaapi -d /dev/dri/renderD128)
+      fi
+      if [[ $mode == output ]]; then
+        [[ -z $mon ]] || cmd+=(-o "$mon")
+      else
+        cmd+=(-g "$geom")
+      fi
+      ;;
+    *)
+      echo "unknown backend: $be" >&2
+      exit 2
+      ;;
+  esac
+  launch recording "$mode" "$file" "${cmd[@]}" "${audio[@]}"
+}
+
+replay() { # replay start|stop|toggle|save AUDIO MIC
+  local cur
+  cur=$(current)
+  case $1 in
+    toggle)
+      if [[ $cur == replay* ]]; then stop; else replay start "$2" "$3"; fi
+      ;;
+    stop)
+      [[ $cur == replay* ]] || { echo "replay isn't running" >&2; return 1; }
+      stop
+      notify "Replay off" "The last ${REPLAY_SECONDS} s are gone. Hope you didn't need them."
+      ;;
+    save)
+      [[ $cur == replay* ]] || { notify "Replay isn't running" "Nothing to save. SUPER+CTRL+R starts it."; return 1; }
+      kill -USR1 "${cur#* }"
+      ;;
+    start)
+      [[ $cur == idle ]] || { echo "already busy (${cur%% *}); dot-hypr-record stop first" >&2; return 1; }
+      [[ $(backend) == gsr ]] || { echo "replay needs gpu-screen-recorder; wf-recorder can't do it" >&2; return 1; }
+      local mon audio
+      mon=$(monitor)
+      mapfile -t audio < <(audio_args gsr "$2" "$3")
+      mkdir -p "$dir"
+      launch replay output "$dir" gpu-screen-recorder -w "${mon:-screen}" -c mp4 -k "$codec" -f 60 \
+        -r "$REPLAY_SECONDS" -replay-storage ram -cursor yes -o "$dir" "${audio[@]}"
+      notify "Replay on" "Keeping the last ${REPLAY_SECONDS} s in RAM. SUPER+SHIFT+P saves them."
+      ;;
+    *) usage ;;
+  esac
+}
+
+verb=${1:-}
+[[ -n $verb ]] || usage
+shift
+sub=
+if [[ $verb == replay ]] && [[ ${1:-} != -* ]] && [[ -n ${1:-} ]]; then
+  sub=$1
+  shift
+fi
+want_audio=0 want_mic=0
+for arg in "$@"; do
+  case $arg in
+    --audio) want_audio=1 ;;
+    --mic) want_mic=1 ;;
+    *) usage ;;
+  esac
+done
+
+case $verb in
+  region | window | output)
+    if [[ $(current) != idle ]]; then stop; else start_recording "$verb" "$want_audio" "$want_mic"; fi
+    ;;
+  stop) stop ;;
+  replay) replay "${sub:-toggle}" "$want_audio" "$want_mic" ;;
+  status)
+    current >/dev/null
+    if [[ -s $state_file ]]; then cat "$state_file"; else echo '{"state":"idle"}'; fi
+    ;;
+  -h | --help | help) usage ;;
+  *) usage ;;
+esac

@@ -1,0 +1,32 @@
+#!/bin/sh
+# KubaOS: installed to /etc/initramfs-tools/hooks/kubaos-plymouth by
+# system/25-boot.sh.
+#
+# The kubaos Plymouth theme draws its text with label-freetype. Ubuntu's
+# plymouth hook only copies label-pango (which drags in pango, cairo and a
+# font package), so copy the freetype plugin here. In the initramfs there is
+# no fc-match, so the plugin loads /usr/share/fonts/Plymouth.ttf and
+# Plymouth-monospace.ttf: point them at the theme's Geist and JetBrains Mono,
+# which the plymouth hook copies with the theme. Without the monospace one,
+# plymouthd 24.004 crashes in its console viewer (the text it shows instead
+# of fbcon) as soon as console output arrives, e.g. the passphrase prompt.
+PREREQ="plymouth"
+prereqs() { echo "$PREREQ"; }
+case "$1" in
+  prereqs) prereqs; exit 0 ;;
+esac
+
+. /usr/share/initramfs-tools/hook-functions
+
+theme=/usr/share/plymouth/themes/kubaos
+[ -d "${DESTDIR}${theme}" ] || exit 0   # not the default theme: nothing to do
+
+plugins="$(plymouth --get-splash-plugin-path)"
+if [ -f "${plugins}label-freetype.so" ]; then
+  copy_exec "${plugins}label-freetype.so"
+else
+  echo "W: kubaos-plymouth: ${plugins}label-freetype.so missing (plymouth-label-ft): the splash will have no text" >&2
+fi
+mkdir -p "${DESTDIR}/usr/share/fonts"
+ln -sf "${theme}/Geist-Regular.ttf" "${DESTDIR}/usr/share/fonts/Plymouth.ttf"
+ln -sf "${theme}/JetBrainsMono-Regular.ttf" "${DESTDIR}/usr/share/fonts/Plymouth-monospace.ttf"

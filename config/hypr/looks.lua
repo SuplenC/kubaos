@@ -1,0 +1,177 @@
+-- Look and feel: gaps, borders, rounding, blur, shadows, animations, layout.
+-- Colors come from colors.lua (matugen output with fallbacks).
+--
+-- Sizes and motion follow the Quickshell design tokens
+-- (config/quickshell/theme/Theme.qml): the shell draws an 8 px frame with
+-- 20 px inner corners and reserves it as exclusive zones. Windows sit
+-- gaps_out (8) inside it, measured to the outside of the 2 px border, and
+-- Hyprland rounds that outer edge with rounding + border_size. Concentric
+-- with the frame means 20 - 8 = 12 for the outer edge, so rounding = 10
+-- (OUTERROUND in Hyprland 0.56.2 src/render/decorations/CHyprBorderDecoration.cpp).
+
+local colors = require("colors")
+
+hl.config({
+  general = {
+    layout = "dwindle",
+    gaps_in = 4,  -- 8 px between windows
+    gaps_out = 8, -- inside the shell's frame
+    gaps_workspaces = 40,
+    border_size = 2,
+    resize_on_border = true,
+    extend_border_grab_area = 8,
+    hover_icon_on_border = true,
+    allow_tearing = false,
+  },
+
+  decoration = {
+    rounding = 10, -- + border_size 2 = 12 on the outer edge, see the top
+    rounding_power = 2,
+    dim_inactive = false,
+    active_opacity = 1.0,
+    inactive_opacity = 1.0,
+
+    -- Frosted glass for the shell's frame and panels (see the qs-frame layer
+    -- rule in rules.lua) and the translucent terminals (Ghostty and foot draw
+    -- their background at 85% opacity; every window with alpha is blurred):
+    -- wide and soft, a little vibrancy so neon survives, slightly darker so
+    -- text stays readable over bright signage.
+    blur = {
+      enabled = true,
+      size = 8,
+      passes = 3,
+      new_optimizations = true,
+      ignore_opacity = true,
+      xray = false,
+      noise = 0.012,
+      contrast = 0.9,
+      brightness = 0.85,
+      vibrancy = 0.2,
+      vibrancy_darkness = 0.1,
+      popups = true,
+      special = false,
+    },
+
+    shadow = {
+      enabled = true,
+      range = 20,
+      render_power = 3,
+    },
+  },
+
+  dwindle = {
+    preserve_split = true, -- needed for togglesplit
+    smart_resizing = true,
+    force_split = 2,       -- new window goes right / below
+  },
+
+  group = {
+    groupbar = {
+      font_size = 10,
+      height = 18,
+      gradients = true,
+      rounding = 6,
+      gaps_in = 3,
+      gaps_out = 2,
+    },
+  },
+
+  misc = {
+    disable_hyprland_logo = true,
+    disable_splash_rendering = true,
+    force_default_wallpaper = 0,
+    focus_on_activate = true,
+    animate_manual_resizes = false,
+    animate_mouse_windowdragging = false,
+    key_press_enables_dpms = true,
+    mouse_move_enables_dpms = true,
+    -- Lets a restarted Quickshell take over a session lock its crashed
+    -- predecessor held, instead of leaving a red "locked" screen.
+    allow_session_lock_restore = true,
+  },
+
+  -- XWayland apps stay upscaled by the compositor (slightly soft on the 1.5x
+  -- panel) rather than tiny; Chrome, Electron, Qt and GTK run native Wayland.
+  xwayland = {
+    force_zero_scaling = false,
+  },
+
+  ecosystem = {
+    no_update_news = true,
+  },
+
+  animations = {
+    enabled = true,
+  },
+})
+
+-- Animations, on the shell's Material 3 curves (Theme.anim) so windows and
+-- panels move alike: things that appear decelerate in with a slight
+-- overshoot ("spatial"), things that leave accelerate out, quicker.
+-- speed is in deciseconds (4 = 400 ms). The shell's own layers have no_anim
+-- (rules.lua): Quickshell animates them itself.
+hl.curve("spatial", { type = "bezier", points = { { 0.38, 1.21 }, { 0.22, 1 } } })
+hl.curve("emphasizedDecel", { type = "bezier", points = { { 0.05, 0.7 }, { 0.1, 1 } } })
+hl.curve("emphasizedAccel", { type = "bezier", points = { { 0.3, 0 }, { 0.8, 0.15 } } })
+hl.curve("standard", { type = "bezier", points = { { 0.2, 0 }, { 0, 1 } } })
+hl.curve("effects", { type = "bezier", points = { { 0.34, 0.8 }, { 0.34, 1 } } })
+
+hl.animation({ leaf = "windowsIn", enabled = true, speed = 4, bezier = "spatial", style = "popin 88%" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 2, bezier = "emphasizedAccel", style = "popin 92%" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 4, bezier = "emphasizedDecel" })
+hl.animation({ leaf = "layersIn", enabled = true, speed = 3.5, bezier = "emphasizedDecel", style = "slide" })
+hl.animation({ leaf = "layersOut", enabled = true, speed = 2, bezier = "emphasizedAccel", style = "slide" })
+hl.animation({ leaf = "fadeLayers", enabled = true, speed = 3, bezier = "effects" })
+hl.animation({ leaf = "fade", enabled = true, speed = 3, bezier = "effects" })
+hl.animation({ leaf = "fadeDim", enabled = true, speed = 3, bezier = "effects" })
+hl.animation({ leaf = "border", enabled = true, speed = 3, bezier = "standard" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 4, bezier = "emphasizedDecel", style = "slide" })
+hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 4, bezier = "emphasizedDecel", style = "slidefadevert 15%" })
+
+-- Colors. Applied at load and again on demand: dot-theme can run
+--   hyprctl eval 'dot.reload_colors()'
+-- after regenerating ~/.local/state/theme/hypr.lua (a plain `hyprctl reload`
+-- works too, it just re-runs the whole config).
+local function apply_colors(c)
+  -- Neon edge: primary into its complementary tertiary (scheme-fidelity).
+  local active = { colors = { colors.rgba(c.primary, "ff"), colors.rgba(c.tertiary, "ff") }, angle = 45 }
+  local inactive = colors.rgba(c.surface_container_highest, "cc")
+
+  hl.config({
+    general = {
+      col = {
+        active_border = active,
+        inactive_border = inactive,
+      },
+    },
+    group = {
+      col = {
+        border_active = active,
+        border_inactive = inactive,
+        border_locked_active = colors.rgba(c.error, "ee"),
+        border_locked_inactive = inactive,
+      },
+      groupbar = {
+        text_color = colors.rgba(c.on_surface),
+        col = {
+          active = colors.rgba(c.primary_container, "cc"),
+          inactive = colors.rgba(c.surface_container_high, "99"),
+        },
+      },
+    },
+    decoration = {
+      shadow = {
+        color = colors.rgba(c.shadow, "55"),
+      },
+    },
+    misc = {
+      background_color = colors.rgba(c.surface),
+    },
+  })
+end
+
+apply_colors(colors.load())
+
+function dot.reload_colors()
+  apply_colors(colors.load())
+end

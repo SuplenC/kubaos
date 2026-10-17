@@ -1,0 +1,8 @@
+# bat (also the fzf Ctrl-T preview and delta's syntax theme source).
+# "base16" uses the terminal's 16 colors, which come from the wallpaper theme,
+# so bat matches Ghostty and delta; comments in palette 8 (outline) like
+# Neovim's. No background.
+--theme=base16
+# Line numbers, git changes and the file name; no grid rules.
+--style=numbers,changes,header-filename
+--italic-text=always

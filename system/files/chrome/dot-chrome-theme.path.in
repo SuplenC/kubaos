@@ -1,0 +1,11 @@
+# Rewrites Chrome's theme color policy whenever dot-theme regenerates the
+# wallpaper colors. Rendered and installed by system/40-apps.sh.
+[Unit]
+Description=Chrome theme color follows @USER@'s wallpaper
+
+[Path]
+PathChanged=@HOME@/.local/state/theme/colors.json
+Unit=dot-chrome-theme.service
+
+[Install]
+WantedBy=multi-user.target

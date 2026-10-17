@@ -1,0 +1,118 @@
+# matugen 4.x config for the dot-theme pipeline. See README.md.
+# Run through `dot-theme`, which passes `-c <this file> -m dark --source-color-index 0`.
+# Relative input paths resolve from this directory; `~` expands to $HOME.
+
+[config]
+version_check = false
+caching = false
+# Used when an image yields no usable color (the default wallpaper's source).
+fallback_color = "#db2b34"
+
+# Terminal hues (ANSI 1-6), seeded with Tokyo Night's. matugen derives red,
+# on_red, red_container, ... for each and harmonizes them toward the
+# wallpaper's source color, so the terminal palette stays readable and
+# distinct but leans toward the wallpaper.
+[config.custom_colors]
+red = "#f7768e"
+green = "#9ece6a"
+yellow = "#e0af68"
+blue = "#7aa2f7"
+magenta = "#bb9af7"
+cyan = "#7dcfff"
+
+[templates.colors_json]
+input_path = "./templates/colors.json"
+output_path = "~/.local/state/theme/colors.json"
+
+[templates.tmux]
+input_path = "./templates/tmux.conf"
+output_path = "~/.local/state/theme/tmux.conf"
+
+[templates.ghostty]
+input_path = "./templates/ghostty"
+output_path = "~/.local/state/theme/ghostty"
+
+[templates.nvim]
+input_path = "./templates/nvim.lua"
+output_path = "~/.local/state/theme/nvim.lua"
+
+[templates.hypr]
+input_path = "./templates/hypr.lua"
+output_path = "~/.local/state/theme/hypr.lua"
+
+# Owned by the ports side: ~/.config/ohmyposh/config.toml.tmpl, a full
+# oh-my-posh config in matugen syntax with oh-my-posh's own Go templates
+# escaped as \{{ ... }}. dot-theme points the link below at it before each run
+# (or at an empty stub, deleting the output afterwards, when it is missing):
+# matugen 4.2 aborts the remaining templates when an input file is missing.
+[templates.ohmyposh]
+input_path = "~/.local/state/theme/.ohmyposh.toml.tmpl"
+output_path = "~/.local/state/theme/ohmyposh.toml"
+
+[templates.gtk]
+input_path = "./templates/gtk.css"
+output_path = "~/.local/state/theme/gtk.css"
+
+[templates.qt6ct]
+input_path = "./templates/qt6ct.colors"
+output_path = "~/.local/state/theme/qt6ct.colors"
+
+[templates.fuzzel]
+input_path = "./templates/fuzzel.ini"
+output_path = "~/.local/state/theme/fuzzel.ini"
+
+[templates.foot]
+input_path = "./templates/foot.ini"
+output_path = "~/.local/state/theme/foot.ini"
+
+[templates.hyprlock]
+input_path = "./templates/hyprlock.colors"
+output_path = "~/.local/state/theme/hyprlock.colors"
+
+# Terminal apps (see docs/CONTRACTS.md, theme pipeline table). Each reads its
+# file at start; none of them needs a reload signal.
+
+# LG_CONFIG_FILE adds it after config/lazygit/config.yml (home/shell.nix).
+[templates.lazygit]
+input_path = "./templates/lazygit.yml"
+output_path = "~/.local/state/theme/lazygit.yml"
+
+# config/yazi/theme.toml is a relative link to this output.
+[templates.yazi]
+input_path = "./templates/yazi.toml"
+output_path = "~/.local/state/theme/yazi.toml"
+
+# config/btop/themes/matugen.theme is a relative link to this output.
+[templates.btop]
+input_path = "./templates/btop.theme"
+output_path = "~/.local/state/theme/btop.theme"
+
+# [include]d by config/git/config (git skips a missing include).
+[templates.delta]
+input_path = "./templates/delta.gitconfig"
+output_path = "~/.local/state/theme/delta.gitconfig"
+
+# FZF_DEFAULT_OPTS_FILE (home/shell.nix).
+[templates.fzf]
+input_path = "./templates/fzf"
+output_path = "~/.local/state/theme/fzf"
+
+# ~/.config/atuin/themes/matugen.toml links here (home/shell.nix).
+[templates.atuin]
+input_path = "./templates/atuin.toml"
+output_path = "~/.local/state/theme/atuin.toml"
+
+# ~/.config/eza/theme.yml links here (home/cli.nix).
+[templates.eza]
+input_path = "./templates/eza.yml"
+output_path = "~/.local/state/theme/eza.yml"
+
+# glow -s <this> through the zsh wrapper in home/shell.nix.
+[templates.glow]
+input_path = "./templates/glow.json"
+output_path = "~/.local/state/theme/glow.json"
+
+# ~/.config/lazydocker/config.yml links here (home/cli.nix).
+[templates.lazydocker]
+input_path = "./templates/lazydocker.yml"
+output_path = "~/.local/state/theme/lazydocker.yml"

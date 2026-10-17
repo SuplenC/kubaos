@@ -1,0 +1,68 @@
+# KubaOS GRUB theme. Installed to /boot/grub/themes/kubaos by
+# system/25-boot.sh, which renders the .pf2 fonts next to it with grub-mkfont
+# (Geist and JetBrains Mono, from system/files/fonts). The PNGs come from
+# branding/boot.py.
+#
+# GRUB draws in device pixels at the firmware's native mode (GRUB_GFXMODE=auto),
+# so the sizes here are picked for the laptop's 2880x1800 panel and are still
+# fine on a 1080p screen.
+title-text: ""
+desktop-color: "#120d0a"
+desktop-image: "background.png"
+desktop-image-scale-method: "stretch"
+terminal-font: "JetBrains Mono Regular 24"
+terminal-left: "8%"
+terminal-top: "8%"
+terminal-width: "84%"
+terminal-height: "80%"
+terminal-border: "0"
+terminal-box: "terminal_box_*.png"
+
++ image {
+  left = 50%-96
+  top = 12%
+  file = "mark.png"
+}
+
++ boot_menu {
+  left = 50%-440
+  width = 880
+  top = 12%+240
+  height = 100%-400
+  item_font = "Geist Regular 30"
+  selected_item_font = "Geist Medium Regular 30"
+  item_color = "#d6c3b6"
+  selected_item_color = "#fdb882"
+  # Each entry is a 9-slice box (item_*, select_*) whose 14 px borders sit
+  # outside item_height: the spacing leaves room for both, plus a few pixels.
+  item_height = 48
+  item_padding = 24
+  item_spacing = 34
+  item_icon_space = 0
+  icon_width = 0
+  icon_height = 0
+  item_pixmap_style = "item_*.png"
+  selected_item_pixmap_style = "select_*.png"
+  scrollbar = false
+}
+
++ label {
+  id = "__timeout__"
+  left = 0
+  top = 100%-128
+  width = 100%
+  align = "center"
+  font = "Geist Regular 22"
+  color = "#9f8d82"
+  text = "Booting in %d s. Any key stops the clock."
+}
+
++ label {
+  left = 0
+  top = 100%-80
+  width = 100%
+  align = "center"
+  font = "Geist Regular 22"
+  color = "#9f8d82"
+  text = "Arrows pick, Enter boots. E edits the entry, C opens a GRUB shell."
+}
