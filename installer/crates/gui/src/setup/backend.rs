@@ -84,30 +84,40 @@ impl SetupBackend for Real {
     }
 
     fn start_bitwarden(&self) {
+        const BITWARDEN: &str = "/opt/Bitwarden/bitwarden";
         // amd64 only; already running when setup was opened by hand.
-        let installed = std::path::Path::new("/opt/Bitwarden/bitwarden").exists();
+        let installed = std::path::Path::new(BITWARDEN).exists();
         let running = Command::new("pgrep")
-            .args(["-f", "/opt/Bitwarden/bitwarden"])
+            .args(["-f", BITWARDEN])
             .stdout(Stdio::null())
             .status()
             .is_ok_and(|s| s.success());
         if !installed || running {
             return;
         }
-        // Through Hyprland, like its autostart: a child of ours would die
-        // with setup's user unit.
-        let ok = Command::new("hyprctl")
-            .args(["dispatch", "exec", "bitwarden"])
+        // Its own user unit, which has the session's environment
+        // (config/hypr/autostart.lua imports it before setup starts): a
+        // child of ours would die with setup's unit. Not hyprctl: the Lua
+        // config rejects `dispatch exec` and hyprctl still exits 0.
+        let started = Command::new("systemd-run")
+            .args([
+                "--user",
+                "--collect",
+                "--property=PartOf=graphical-session.target",
+                BITWARDEN,
+            ])
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
             .status()
-            .is_ok_and(|s| s.success());
-        if !ok {
-            let _ = Command::new("systemd-run")
-                .args(["--user", "--collect", "bitwarden"])
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .status();
+            .map_err(|e| e.to_string())
+            .and_then(|s| {
+                if s.success() {
+                    Ok(())
+                } else {
+                    Err(s.to_string())
+                }
+            });
+        if let Err(e) = started {
+            eprintln!("kubaos-setup: can't start Bitwarden: systemd-run: {e}");
         }
     }
 }
