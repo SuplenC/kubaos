@@ -73,11 +73,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792251190,
-        "narHash": "sha256-X6aFkhA2ZIL8X0NVRo/dYQ9oMPDvFRGWSFO8rWn/irM=",
+        "lastModified": 1792279820,
+        "narHash": "sha256-280lkVbojZF3J8V4ocrhW5nwi/35T3OA3GqgqqLw0QU=",
         "owner": "SuplenC",
         "repo": "ukiyo",
-        "rev": "7b8f3fc437f8b20d88e6547c5b39e3630415467e",
+        "rev": "9565669ae1700b439868359f8d5d8559edf7f691",
         "type": "github"
       },
       "original": {
