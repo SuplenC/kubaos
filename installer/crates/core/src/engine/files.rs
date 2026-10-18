@@ -199,7 +199,7 @@ pub fn render_user_template(template: &str, user: &str, home: &str) -> String {
 }
 
 /// Where the git identity lives, under the home. Not in ~/.config/git: that
-/// is a live link into the dotfiles checkout. config/git/config includes it.
+/// holds KubaOS's read-only defaults. config/git/config includes it.
 pub const GIT_IDENTITY: &str = ".config/git-identity/identity.gitconfig";
 
 /// The `[user]` section of [`GIT_IDENTITY`]. Values are quoted, so a `"`,

@@ -84,12 +84,12 @@ Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (arm64 VM, 8 CPUs, 7
 | `login_shell` | `zsh -l -i` in a pty prints nothing (no warnings, zoxide doctor quiet); `y`, `eza`, `glow`, the oh-my-posh refresh are functions; atuin owns Ctrl-R; the direnv hook is in; `.zprofile` sources the autostart snippet |
 | `path` | `~/.local/bin`, `~/.cargo/bin`, `~/.proto/{shims,bin}`, `~/.nix-profile/bin` on PATH, Nix's before `/usr/bin` |
 | `tools` | every tool in CONTRACTS ("Packages: who installs what") that exists on arm64 resolves, the Nix ones into `~/.nix-profile/bin`, the apt ones into `/usr`, `bw` to `/usr/local/bin`; nvim is 0.12; the login shell is `/usr/bin/zsh` |
-| `links` | every `config/<dir>`, `scripts/<file>` and `wallpapers/` resolves into the repo copy; scripts are `dot-*`, executable, env shebang, `set -euo pipefail` |
+| `links` | every tracked file under `config/` is a store file with the repo's content in a real `~/.config/<app>` directory (except the ones `dot-config` seeds or merges); every `scripts/<file>` and `wallpapers/` resolves into the repo copy; scripts are `dot-*`, executable, env shebang, `set -euo pipefail` |
 | `theme` | `dot-theme apply --force`, `set`, `next`, `toggle-folder`; all 21 files in `~/.local/state/theme`, every M3 key in `colors.json`; `apply` with nothing changed is a no-op; the theme links resolve |
 | `tmux` | the real `tmux.conf` loads with the theme and plugins, nothing complains |
 | `nvim` | `Lazy! restore` from the lockfile; Mason tools and treesitter parsers installed (once, cached); starts with the matugen colorscheme; opening Markdown, Nix, shell, Lua and QML files leaves no error in `:messages` |
 | `ghostty` | `ghostty +validate-config`, `foot --check-config` |
-| `tms` | runs, reads the repo's config |
+| `tms` | runs, reads the config seeded from the repo's |
 | `pam` | through Nix's libpam (Nix's pamtester, as kuba, like Quickshell): `qs-lock` takes the right password and refuses a wrong one; `qs-lock-u2f` and `qs-lock-fingerprint` load their modules and fail with no device. Through Ubuntu's (apt pamtester, sudo-rs): `sudo`, `sudo-i`, `polkit-1` carry the pam_u2f line and, with a well-formed mapping for a key that isn't plugged in, fall back to the password; also with no mapping file |
 | `lua` | `luac5.5 -p` on every tracked `.lua` (not the matugen templates) and on the rendered `hypr.lua`, `nvim.lua` |
 | `shellcheck` | `shellcheck -x` on every shell script in `scripts/`, `system/`, `test/`, `config/`: no warnings or errors (info and style notes are listed, not fatal) |
@@ -98,6 +98,7 @@ Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (arm64 VM, 8 CPUs, 7
 | `recorder` | in a headless sway session with Quickshell: Quickshell creates `$XDG_RUNTIME_DIR/dot-record.json`; `dot-hypr-record output` (wf-recorder backend, gsr needs a GPU) sets it to `recording`; `qs ipc call recorder stop` brings it back to `idle` and leaves an mp4 in `~/Videos/Recordings`; `replay save` refuses with no replay running; no QML errors |
 | `ukiyo` | `ukiyo` on PATH from the profile, `ukiyo --version`; `ukiyo config schema --json` reports `defaults.toml`'s values with source `defaults` and includes the gate's params; the zsh hook is in `.zshrc` and `_ukiyo_precmd` in an interactive zsh's `precmd_functions`; `dot-theme set ukiyo:kabukicho-gate` gives the same colors as its poster and names `ukiyo:kabukicho-gate`; `apply` stays quiet. In sway: the daemon draws (llvmpipe), Quickshell's status says `ukiyo: true`, locking makes ukiyo `still` with a lock frame on disk, a still wallpaper stops the daemon; prints ukiyo's CPU drawing and still |
 | `wallpaper_video` | `dot-theme set <video>` gives the same colors as its poster and names the video in `colors.json`, `hypr.lua`, `nvim.lua`; `apply` stays a no-op; a lap of `next` over `shinjuku/` visits stills and videos, never posters. Quickshell plays it (software decode), `qs ipc call wallpaper animate never` stops it and the mode lands in `~/.local/state/quickshell/kubaos.json`; prints Quickshell's CPU playing and not; no QML errors |
+| `user_layer` | `test/user-layer-check` (issue #9): every file of `~/.config/kubaos` and the seeded btop and tms configs exist; the user changes each one; newer defaults are committed and switched to; every user file is byte-identical, the new defaults are live (tmux, git, git ignore, bat) and the user's values win (tmux, git, Ghostty, Neovim, zsh, lazygit, bacon, fastfetch, yazi, btop). Commits to the checkout, so it runs last |
 
 `test/run bitwarden` starts `vaultwarden/server` (profile `bitwarden`) with a throwaway CA on a private network (`https://vw`), then:
 
@@ -125,7 +126,7 @@ The `hyprland` stage in `test/Dockerfile` is a placeholder (`# TODO(lead): recip
 
 ## The installer in a VM
 
-The Docker harness can't boot an ISO. `test/vm/run` (QEMU on HVF, `test/vm/README.md`) boots the dotinstall live ISO from `installer/iso/build`, runs headless installs from an `install.toml`, boots the result, and takes screenshots and snapshots.
+The Docker harness can't boot an ISO. `test/vm/run` (QEMU on HVF, `test/vm/README.md`) boots the dotinstall live ISO from `installer/iso/build`, runs headless installs from an `install.toml`, boots the result, and takes screenshots and snapshots. After `just vm-install`, `just vm-user-layer` runs `test/user-layer-check` on the installed system as its user: the same promise, from a real install.
 
 ## What this can't test
 

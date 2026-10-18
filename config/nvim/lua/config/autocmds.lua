@@ -12,3 +12,6 @@ vim.api.nvim_create_autocmd("FileType", {
     vim.opt_local.spell = false
   end,
 })
+
+-- The user layer's autocmds.lua, last so it wins.
+require("config.user").run("autocmds")

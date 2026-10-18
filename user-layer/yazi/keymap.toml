@@ -1,0 +1,6 @@
+# Your yazi keys: ~/.config/yazi/keymap.toml links here.
+# Docs: https://yazi-rs.github.io/docs/configuration/keymap
+#
+# [[mgr.prepend_keymap]]
+# on = "<C-n>"
+# run = "create"

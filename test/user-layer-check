@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# test/user-layer-check: proves the promise of the user layer (issue #9,
+# docs/CONTRACTS.md "Defaults and the user layer"). Run as the user, on an
+# installed system or in the test harness:
+#
+#   1. the install left every user file in ~/.config/kubaos, and the defaults
+#      are read-only store files;
+#   2. it puts a change in every user file;
+#   3. it applies a newer defaults tree: a commit to the checkout, then
+#      home-manager switch, which is what an update does;
+#   4. every user file is byte-identical, the new defaults are live, and the
+#      user's values win where both set one.
+#
+#   test/user-layer-check [REPO]   REPO: the checkout (~/Projects/dotfiles)
+#
+# It commits to REPO and leaves the user files changed: run it on a throwaway
+# system. Prints ok/FAIL lines, exits 1 on the first failed step.
+set -euo pipefail
+
+REPO="${1:-$HOME/Projects/dotfiles}"
+U="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos"
+C="${XDG_CONFIG_HOME:-$HOME/.config}"
+PATH="$PATH:/nix/var/nix/profiles/default/bin"
+HM_CONFIG="${HM_CONFIG:-$(cat "$REPO/home/username")@$(hostname -s)}"
+
+USER_FILES=(hypr/hyprland.lua hypr/hypridle.conf hypr/hyprlock.conf tmux/tmux.conf git/config git/ignore
+  foot/foot.ini ghostty/config fuzzel/fuzzel.ini nvim/options.lua nvim/keymaps.lua nvim/autocmds.lua
+  nvim/plugins/example.lua nvim/lazy-lock.json nvim/lazyvim.json lazygit/config.yml bacon/prefs.toml
+  bat/config fastfetch/config.jsonc yazi/yazi.toml yazi/keymap.toml zsh/zshrc)
+# Files the app rewrites itself: copied from the defaults once, then the user's.
+SEEDED=(btop/btop.conf tms/config.toml)
+
+bad=0
+fail() { echo "FAIL $*"; bad=1; }
+step_done() { ((bad == 0)) || exit 1; echo "ok   $*"; }
+
+hashes() {
+  local f
+  for f in "${USER_FILES[@]}"; do sha256sum "$U/$f"; done
+  for f in "${SEEDED[@]}"; do sha256sum "$C/$f"; done
+}
+# add FILE TEXT: append a line, the way an editor would.
+add() { printf '%s\n' "$2" >>"$1"; }
+json_add() { jq '. + {"probe": "mine"}' "$1" >"$1.tmp" && mv "$1.tmp" "$1"; }
+
+# 1. The install.
+for f in "${USER_FILES[@]}"; do
+  [[ -f $U/$f ]] || fail "the install left no $U/$f"
+done
+for f in "${SEEDED[@]}"; do
+  [[ -f $C/$f && ! -L $C/$f ]] || fail "$C/$f isn't a plain file"
+done
+for f in hypr/hyprland.lua tmux/tmux.conf git/config ghostty/config nvim/init.lua lazygit/config.yml; do
+  [[ "$(readlink -f "$C/$f")" == /nix/store/* ]] || fail "$C/$f isn't a store file"
+done
+step_done "${#USER_FILES[@]} user files and ${#SEEDED[@]} seeded files exist; defaults are store files"
+
+# 2. The user changes every file.
+add "$U/hypr/hyprland.lua" 'dot.user_probe = true'
+add "$U/hypr/hypridle.conf" '# user probe'
+add "$U/hypr/hyprlock.conf" '# user probe'
+add "$U/tmux/tmux.conf" 'set -g @user_probe mine'
+add "$U/git/config" $'[kubaos]\n\tuserprobe = mine'
+add "$U/git/ignore" '*.userprobe'
+add "$U/foot/foot.ini" $'[main]\npad=3x3'
+add "$U/ghostty/config" 'font-size = 17'
+add "$U/fuzzel/fuzzel.ini" $'[main]\nlines=13'
+add "$U/nvim/options.lua" 'vim.g.user_probe = "mine"'
+add "$U/nvim/keymaps.lua" '-- user probe'
+add "$U/nvim/autocmds.lua" '-- user probe'
+add "$U/nvim/plugins/example.lua" '-- user probe'
+json_add "$U/nvim/lazy-lock.json"
+json_add "$U/nvim/lazyvim.json"
+add "$U/lazygit/config.yml" $'gui:\n  showFileTree: false'
+add "$U/bacon/prefs.toml" 'summary = true'
+add "$U/bat/config" '--tabs=7'
+printf '%s\n' '// mine' '{ "display": { "separator": " => " } }' >"$U/fastfetch/config.jsonc"
+add "$U/yazi/yazi.toml" '# user probe'
+add "$U/yazi/keymap.toml" '# user probe'
+add "$U/zsh/zshrc" "alias userprobe='echo mine'"
+add "$C/btop/btop.conf" 'update_ms = 1717'
+add "$C/tms/config.toml" '# user probe'
+before="$(hashes)"
+step_done "changed $(wc -l <<<"$before") user files"
+
+# 3. A newer defaults tree. New defaults go above the user layer's include,
+# where a real change to an entry file goes; git's also sets a value the
+# user overrode.
+# (One && chain: errexit doesn't apply on the left of ||.)
+(
+  cd "$REPO" &&
+    add config/tmux/tmux.conf 'set -g @kubaos_probe new' &&
+    awk '/^# Your settings, last/ { print "[kubaos]\n\tdefaultprobe = new\n\tuserprobe = ours\n" } 1' \
+      config/git/config >config/git/config.tmp &&
+    mv config/git/config.tmp config/git/config &&
+    add config/git/ignore '*.kubaosprobe' &&
+    add config/bat/config '--wrap=never' &&
+    add config/btop/btop.conf 'update_ms = 4242' &&
+    add config/ghostty/config 'cursor-style = underline' &&
+    add config/nvim/lua/config/options.lua 'vim.g.kubaos_probe = "new"' &&
+    git add -A &&
+    git -c user.name=test -c user.email=test@kubaos -c commit.gpgsign=false commit -q -m 'test: newer defaults'
+) || fail "couldn't commit the newer defaults"
+out="$(home-manager switch -b hm-backup --flake "$REPO#$HM_CONFIG" 2>&1)" ||
+  { printf '%s\n' "$out" | tail -20; fail "home-manager switch onto the newer defaults"; }
+step_done "home-manager switch onto the newer defaults"
+
+# 4. Byte-identical, new defaults live, the user's values win.
+after="$(hashes)"
+if [[ $before != "$after" ]]; then
+  diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") || true
+  fail "the update changed user files"
+fi
+step_done "$(wc -l <<<"$after") user files byte-identical after the update"
+
+out="$(tmux -L user-layer-check -f "$C/tmux/tmux.conf" new-session -d -s t &&
+  tmux -L user-layer-check show -gv @kubaos_probe; tmux -L user-layer-check show -gv @user_probe
+  tmux -L user-layer-check kill-server)" || true
+[[ $out == $'new\nmine' ]] || fail "tmux: want new/mine, got: $out"
+out="$(git config --get kubaos.defaultprobe; git config --get kubaos.userprobe)" || true
+[[ $out == $'new\nmine' ]] || fail "git config: want new/mine, got: $out"
+(cd "$REPO" && git check-ignore -q a.kubaosprobe && git check-ignore -q a.userprobe) ||
+  fail "git ignore: ours and the user's should both apply"
+[[ "$(grep -c -e '^--wrap=never' -e '^--tabs=7' "$C/bat/config")" == 2 ]] || fail "bat config lacks ours or the user's"
+bat --list-themes >/dev/null || fail "bat doesn't take its config"
+out="$(ghostty +show-config 2>/dev/null | grep -e '^font-size' -e '^cursor-style = ' || true)"
+[[ $out == *'font-size = 17'* && $out == *'cursor-style = underline'* ]] || fail "ghostty: want ours and the user's, got: $out"
+foot --check-config >/dev/null 2>&1 || fail "foot --check-config"
+fuzzel --check-config >/dev/null 2>&1 || fail "fuzzel --check-config"
+out="$(nvim --headless +'lua io.write(tostring(vim.g.kubaos_probe), " ", tostring(vim.g.user_probe))' +qa 2>&1 | tr -d '\r')"
+[[ $out == 'new mine' ]] || fail "nvim options: want new/mine, got: $out"
+out="$(zsh -l -i -c 'userprobe; print -r -- "$LG_CONFIG_FILE|$BACON_PREFS"' 2>/dev/null | tr -d '\r')"
+[[ $out == mine$'\n'*",$U/lazygit/config.yml|$U/bacon/prefs.toml" ]] || fail "zsh/lazygit/bacon: $out"
+out="$(fastfetch --pipe -s title:os 2>&1)" || true
+[[ $out == *' => '* ]] || fail "fastfetch didn't take the user's separator: $out"
+[[ "$(readlink -f "$C/yazi/yazi.toml")" == "$U/yazi/yazi.toml" ]] || fail "$C/yazi/yazi.toml isn't the user's"
+grep -qx 'update_ms = 1717' "$C/btop/btop.conf" || fail "btop lost the user's value"
+step_done "new defaults live, the user's values win"

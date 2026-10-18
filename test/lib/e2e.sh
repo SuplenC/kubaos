@@ -211,10 +211,21 @@ c_tms() {
 
 c_links() {
   local d n bad=0 target
+  # Defaults: every file under config/ is a read-only store file with the
+  # repo's content, except the ones dot-config seeds or merges.
+  local f n_files=0 layer
+  layer="$(awk '{print $2}' "$USER_HOME/.local/share/kubaos/layer")"
+  while IFS= read -r f; do
+    f="${f#config/}"
+    grep -qxF -- "$f" <<<"$layer" && continue
+    target="$(readlink -f "$USER_HOME/.config/$f" || true)"
+    [[ $target == /nix/store/* ]] && cmp -s "$target" "$REPO/config/$f" ||
+      { echo "FAIL ~/.config/$f -> $target"; bad=1; }
+    n_files=$((n_files + 1))
+  done < <(as_user git -C "$REPO" ls-files config)
   for d in "$REPO"/config/*/; do
     n="$(basename "$d")"
-    target="$(readlink -f "$USER_HOME/.config/$n" || true)"
-    [[ $target == "$REPO/config/$n" ]] || { echo "FAIL ~/.config/$n -> $target"; bad=1; }
+    [[ -d $USER_HOME/.config/$n && ! -L $USER_HOME/.config/$n ]] || { echo "FAIL ~/.config/$n isn't a directory"; bad=1; }
   done
   for d in "$REPO"/scripts/*; do
     n="$(basename "$d")"
@@ -229,7 +240,7 @@ c_links() {
   [[ $target == "$REPO/wallpapers" ]] || { echo "FAIL ~/Pictures/wallpapers -> $target"; bad=1; }
   [[ -f $USER_HOME/.config/tmux-nix/plugins.conf ]] || { echo "FAIL no ~/.config/tmux-nix/plugins.conf"; bad=1; }
   [[ -f $USER_HOME/.config/direnv/lib/bwenv.sh ]] || { echo "FAIL no direnv bwenv.sh"; bad=1; }
-  ((bad == 0)) && echo "ok   $(ls -d "$REPO"/config/*/ | wc -l) config dirs, $(ls "$REPO"/scripts | wc -l) scripts, wallpapers linked into the repo"
+  ((bad == 0)) && echo "ok   $n_files default files from the store, $(ls "$REPO"/scripts | wc -l) scripts and wallpapers linked into the repo"
   return "$bad"
 }
 
@@ -570,6 +581,12 @@ cpu_pct() {
   awk -v d=$((t1 - t0)) -v hz="$hz" -v s="$secs" 'BEGIN { printf "%.0f", d * 100 / (hz * s) }'
 }
 
+# The user layer (issue #9): test/user-layer-check, which the VM bench also
+# runs on an installed system. Commits to the checkout, so it runs last.
+c_user_layer() {
+  zrun "'$REPO/test/user-layer-check' '$REPO'"
+}
+
 e2e_main() {
   local t0 only="${1:-}"
   t0="$(now)"
@@ -577,7 +594,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell recorder wallpaper_video ukiyo; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell recorder wallpaper_video ukiyo user_layer; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

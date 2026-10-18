@@ -13,7 +13,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 
 | Path | Owner | What |
 |---|---|---|
-| `flake.nix`, `flake.lock`, `home/username`, `home/default.nix`, `home/links.nix`, `home/cli.nix`, `home/dev.nix`, `home/desktop.nix` | nix | Flake, module wiring, live links, packages, cargo config (linker switch), Quickshell + GPU wiring, fonts |
+| `flake.nix`, `flake.lock`, `home/username`, `home/default.nix`, `home/links.nix`, `home/cli.nix`, `home/dev.nix`, `home/desktop.nix`, `scripts/dot-config`, `user-layer/` | nix | Flake, module wiring, defaults and the user layer, packages, cargo config (linker switch), Quickshell + GPU wiring, fonts |
 | `home/shell.nix`, `home/terminal.nix`, `config/{nvim,tmux,tms,ghostty,ohmyposh,lazygit,btop,git,bat,bacon,yazi,foot,fuzzel}` | ports | zsh, tmux, tms, ghostty, ported user configs, the fallback terminal and launcher |
 | `config/hypr/`, `scripts/dot-hypr-*` | hypr | Hyprland Lua config, hypridle, lid and monitor scripts, screenshots and screen recording |
 | `config/quickshell/`, `scripts/dot-qs-*` | quickshell | The desktop shell |
@@ -22,11 +22,45 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 | `home/secrets.nix`, `scripts/dot-bw*`, `scripts/dot-u2f-enroll`, `scripts/dot-ssh-sk-new`, `system/70-bitwarden.sh`, `system/75-yubikey.sh`, `system/files/pam.d/`, `docs/SECRETS.md` | secrets | Bitwarden (SSH agent, git signing, gh, project env), the security key (YubiKey C Bio: pam_u2f, ed25519-sk) |
 | `README.md`, `docs/CONTRACTS.md`, `docs/PLAN.md` | lead | Overview and these contracts |
 
-## Live links (home/links.nix)
+## Defaults and the user layer (home/links.nix, scripts/dot-config)
 
-- Every directory directly under `config/` is linked to `~/.config/<name>` with `config.lib.file.mkOutOfStoreSymlink "${dotfilesDir}/config/<name>"`. `links.nix` discovers them with `builtins.readDir ../config`, so adding a new `config/<name>/` needs no Nix change.
-- Every file in `scripts/` is linked to `~/.local/bin/<name>`. Scripts are executable, start with `#!/usr/bin/env bash` (or another env shebang), use `set -euo pipefail`, and are prefixed `dot-`.
-- **Never** manage a path that is live-linked with a `programs.<x>` option that writes the same file (for example `programs.tmux.extraConfig` or `programs.ghostty.settings`). Install the package with `home.packages` or `programs.<x>.enable` only if that option writes nothing under the linked path. If Nix needs to hand a store path to a live config (tmux plugins, for example), write it to a generated file outside the linked dir, such as `~/.config/tmux-nix/plugins.conf` via `xdg.configFile."tmux-nix/plugins.conf"`, and have the live config `source` it if it exists.
+KubaOS ships defaults. The user extends or overrides them in a layer of their own, and an update never overwrites it. An update can add new defaults and fix bugs in ours, and that's all.
+
+- **Defaults** are `config/<app>/`. `links.nix` copies `config/` into the store once (`kubaos-defaults`) and links each file read-only into `~/.config/<app>/`, which is a real directory, so apps can still write their own files next to ours. `links.nix` finds the files with `builtins.readDir`, so a new file or app needs no Nix change. An update replaces this layer whole. Editing `config/` takes a `home-manager switch`. The shipped tree is also at `~/.local/share/kubaos/defaults`, for reading.
+- **The user layer** is `~/.config/kubaos/<app>/`, with the same file names the app uses. The defaults load it last, so anything set there wins. Updates never write to a file in it. `dot-config apply`, which every `home-manager switch` runs (the installer's included), creates each missing file from `user-layer/<app>/`: a comment saying how it's loaded and a commented example. Deleting a file brings the example back on the next apply.
+- When a default changes, users who never overrode it get the new value. Users who did keep theirs. In an entry file, the user layer's include stays the last line, below every default.
+- A migration may change a user file only if it adds to the file and doesn't rewrite it, is safe to run more than once, backs the file up first, and skips any setting the user has changed. It may create a user file that doesn't exist.
+
+How each app loads the user layer (`U` is `~/.config/kubaos`):
+
+| App | User file | How |
+|---|---|---|
+| Hyprland | `U/hypr/hyprland.lua` | `config/hypr/hyprland.lua` `dofile`s it last, in a `pcall`; an error is a notification, the rest of the config still loads. A pre-#9 `config/hypr/local.lua` in the checkout is copied here once |
+| hypridle, hyprlock | `U/hypr/hypridle.conf`, `U/hypr/hyprlock.conf` | `source =` on the last line |
+| tmux | `U/tmux/tmux.conf` | `source-file -q`, after the plugins |
+| git | `U/git/config` | the last `[include]` |
+| foot, fuzzel | `U/foot/foot.ini`, `U/fuzzel/fuzzel.ini` | `include=` in a final `[main]`. A missing include is an error in `--check-config`, a logged warning at runtime |
+| Ghostty | `U/ghostty/config` | `config-file = ?…` (optional) |
+| Neovim | `U/nvim/{options,keymaps,autocmds}.lua`, `U/nvim/plugins/*.lua` | `lua/config/user.lua`: each of ours ends by running the user's; their plugin specs come after ours. KubaOS's LazyVim extras are imported in `lua/config/lazy.lua`; `:LazyExtras` writes the user's to `U/nvim/lazyvim.json` (`vim.g.lazyvim_json`) |
+| lazygit | `U/lazygit/config.yml` | last in `LG_CONFIG_FILE` (zsh) |
+| bacon | `U/bacon/prefs.toml` | `BACON_PREFS` (zsh) |
+| zsh | `U/zsh/zshrc` | sourced at order 1900, before zoxide (`home/shell.nix`) |
+| yazi | `U/yazi/{yazi,keymap}.toml` | `~/.config/yazi/yazi.toml` and `keymap.toml` link there; KubaOS ships only `theme.toml` |
+| bat, git ignore | `U/bat/config`, `U/git/ignore` | no include: `dot-config` writes `~/.config/<file>` = defaults + yours |
+| fastfetch | `U/fastfetch/config.jsonc` | no include: `dot-config` writes `~/.config/fastfetch/config.jsonc`, yours merged over ours (objects key by key, anything else replaced) |
+| btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml` | the app rewrites them, so they're the user's: copied from the defaults once, never again. Fixes reach them only through migrations |
+| lazy.nvim | `U/nvim/lazy-lock.json` | `:Lazy update` rewrites it: copied from `config/nvim/lazy-lock.json` once (lazy.nvim's `lockfile`) |
+
+The merged files (bat, git ignore, fastfetch) change when `dot-config apply` runs: after an update, or by hand after editing the user file. Every other user file applies the way the app reloads its config.
+
+Not in the user layer yet: Quickshell (`config/quickshell/settings/Settings.qml`), the matugen templates, and oh-my-posh (a matugen template). They ship as read-only defaults until they get their own design.
+
+The `layer` table in `links.nix` lists the files that aren't plain links (seeded, `concat`, `json`); it's written to `~/.local/share/kubaos/layer` for `dot-config`.
+
+## Other links (home/links.nix)
+
+- Every file in `scripts/` is live-linked to `~/.local/bin/<name>` (`mkOutOfStoreSymlink` into the checkout). Scripts are executable, start with `#!/usr/bin/env bash` (or another env shebang), use `set -euo pipefail`, and are prefixed `dot-`.
+- **Never** manage a path under `config/` with a `programs.<x>` option that writes the same file (for example `programs.tmux.extraConfig` or `programs.ghostty.settings`). Install the package with `home.packages` or `programs.<x>.enable` only if that option writes nothing under the linked path. If Nix needs to hand a store path to a config (tmux plugins, for example), write it to a generated file outside the app's dir, such as `~/.config/tmux-nix/plugins.conf` via `xdg.configFile."tmux-nix/plugins.conf"`, and have the config `source` it if it exists.
 
 ## Theme pipeline
 
@@ -67,7 +101,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 - A committed fallback `config/matugen/default-colors.json` (same schema, generated from the default wallpaper) is copied to `~/.local/state/theme/colors.json` by `dot-theme apply` when no wallpaper is set yet, so everything renders before the first wallpaper. Every consumer must also tolerate the file being missing.
 - After regenerating, `dot-theme` reloads consumers: tmux (`tmux source-file` if a server runs), Ghostty (its config reload signal or action), Neovim (each running server under `$XDG_RUNTIME_DIR` via `nvim --server ... --remote-send` or an autocmd that watches `nvim.lua`), Hyprland (`hyprctl eval 'dot.reload_colors()'`, falling back to `hyprctl reload`), Quickshell (watches `colors.json` itself with `FileView` + `watchChanges`, no action needed). oh-my-posh needs no hook either: a zsh `precmd` re-runs `oh-my-posh init` when `ohmyposh.toml`'s mtime changes, so open shells switch at their next prompt. The other terminal apps (lazygit, yazi, btop, bat, delta, fzf, atuin, eza, glow, bacon, foot, fuzzel) read their file or the terminal palette at start.
 - Chrome: `system/40-apps.sh` installs a root-owned helper (`system/files/chrome/dot-chrome-theme` -> `/usr/local/libexec/`) and `dot-chrome-theme.path`, which watches `~/.local/state/theme/colors.json` and writes its `surface_container` color as the `BrowserThemeColor` policy to `/etc/opt/chrome/policies/managed/dot-theme.json`. Chrome reloads policy files live. Only a value matching `#rrggbb` crosses from the user's file into the policy, and the policy directory stays root-owned. Light/dark for pages follows the portal's `color-scheme` (dconf `prefer-dark`, `home/theme.nix`).
-- Links from a live-linked `config/<app>/` into `~/.local/state/theme/` are committed as relative symlinks; links from paths home-manager owns (`~/.config/{eza,atuin,lazydocker,qt5ct,qt6ct}/...`) use `mkOutOfStoreSymlink`. Either may dangle before the first `dot-theme` run; each consumer then falls back to its defaults.
+- Links into `~/.local/state/theme/` are `mkOutOfStoreSymlink`s in Nix (`~/.config/{yazi/theme.toml,btop/themes/matugen.theme}` in `home/links.nix`, `~/.config/{eza,atuin,lazydocker,qt5ct,qt6ct}/...` next to their app), never committed symlinks: the defaults are a store copy, where a relative link would point nowhere. Either may dangle before the first `dot-theme` run; each consumer then falls back to its defaults.
 - Terminal backgrounds are translucent (Ghostty and foot at 85% opacity, blurred by Hyprland). Terminal apps leave the main background unpainted (Neovim `Normal` and friends `NONE`, tmux `bg=default`, btop `theme_background = false`, fzf `bg:-1`); only floats, selections, pills and diff tints are painted. Selected rows use `secondary_container` / `on_secondary_container` everywhere (Quickshell lists, fuzzel, lazygit, yazi, fzf, btop, Neovim menus).
 - Quickshell exposes the roles as `Theme.m3<role>` in camelCase (`Theme.m3primary`, `Theme.m3onSurface`); the `m3` prefix avoids QML treating `on<X>` as a signal handler.
 

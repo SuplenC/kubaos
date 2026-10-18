@@ -1,0 +1,4 @@
+-- Your Neovim options, run after KubaOS's (lua/config/options.lua).
+--
+-- vim.opt.relativenumber = false
+-- vim.opt.scrolloff = 4

@@ -1,0 +1,6 @@
+# Your git settings, [include]d last by ~/.config/git/config, so they win.
+#
+# [pull]
+# 	rebase = false
+# [alias]
+# 	st = status -sb

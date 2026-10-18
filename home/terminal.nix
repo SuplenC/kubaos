@@ -1,6 +1,6 @@
 # Terminal stack: Ghostty (plain terminal), tmux, tms.
 #
-# The configs themselves are live-linked from config/{ghostty,tmux,tms} by
+# The configs themselves come from config/{ghostty,tmux,tms} through
 # links.nix. This module only installs packages and generates the tmux plugin
 # loader, so nothing here writes under ~/.config/{tmux,ghostty,tms}.
 { pkgs, lib, ... }:

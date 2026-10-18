@@ -1,0 +1,4 @@
+# Your lazygit settings, loaded after KubaOS's and the theme's, so they win.
+#
+# gui:
+#   showFileTree: false

@@ -5,3 +5,6 @@
 -- vim.keymap.set("n", "<C-u>", "<C-u>zz")
 
 vim.keymap.set("n", "<leader>T", "<cmd>silent !tmux neww tms<CR>")
+
+-- The user layer's keymaps.lua, last so it wins.
+require("config.user").run("keymaps")

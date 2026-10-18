@@ -1,0 +1,4 @@
+# Your zsh settings, sourced near the end of ~/.zshrc, so they win.
+#
+# alias ll='eza -l --git'
+# export MANPAGER='nvim +Man!'

@@ -21,10 +21,17 @@ require("rules")
 require("keybinds")
 require("autostart")
 
--- Optional machine-local overrides, git-ignored (see README.md).
+-- The user layer, last so it wins (docs/CONTRACTS.md, "Defaults and the user
+-- layer"). Not a require: the file isn't on package.path, and an error in it
+-- must not take the rest down. dot-config creates it on install.
 local config_home = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
-local local_file = io.open(config_home .. "/hypr/local.lua", "r")
-if local_file then
-  local_file:close()
-  require("local")
+local user_file = config_home .. "/kubaos/hypr/hyprland.lua"
+local f = io.open(user_file, "r")
+if f then
+  f:close()
+  local ok, err = pcall(dofile, user_file)
+  if not ok then
+    local msg = tostring(err):gsub("'", "'\\''")
+    hl.exec_cmd("notify-send -u critical 'Error in your Hyprland config' '" .. msg .. "'")
+  end
 end

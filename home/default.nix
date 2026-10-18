@@ -17,7 +17,7 @@
     ./ukiyo.nix
   ];
 
-  # Absolute path of this repo on disk; live links point here, not into the store.
+  # Absolute path of this repo on disk; scripts and wallpapers link here.
   _module.args.dotfilesDir = "${config.home.homeDirectory}/Projects/dotfiles";
 
   home = {

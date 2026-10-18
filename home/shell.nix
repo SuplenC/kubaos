@@ -7,6 +7,7 @@
 #   ~910  fzf (Ctrl-T, Alt-C)
 #   1000  direnv hook, atuin (Ctrl-R), aliases, oh-my-posh
 #   1500  ukiyo's hook: finished builds pulse the wallpaper (home/ukiyo.nix)
+#   1900  the user layer's zshrc (~/.config/kubaos/zsh/zshrc)
 #   2000  zoxide as `cd`, last, so `zoxide doctor` stays quiet
 #
 # PATH for proto/bun/cargo/~/.local/bin lives in home.sessionPath (nix agent).
@@ -80,8 +81,15 @@ in
         # exists, because lazygit refuses to start with a missing config.
         _dot_theme="$HOME/.local/state/theme"
         [[ -r $_dot_theme/fzf ]] && export FZF_DEFAULT_OPTS_FILE="$_dot_theme/fzf"
-        [[ -r $_dot_theme/lazygit.yml ]] &&
-          export LG_CONFIG_FILE="''${XDG_CONFIG_HOME:-$HOME/.config}/lazygit/config.yml,$_dot_theme/lazygit.yml"
+        # The user layer (~/.config/kubaos, docs/CONTRACTS.md) goes last, so it wins.
+        _dot_user="''${XDG_CONFIG_HOME:-$HOME/.config}/kubaos"
+        () {
+          local -a lg=("''${XDG_CONFIG_HOME:-$HOME/.config}/lazygit/config.yml")
+          [[ -r $_dot_theme/lazygit.yml ]] && lg+=("$_dot_theme/lazygit.yml")
+          [[ -r $_dot_user/lazygit/config.yml ]] && lg+=("$_dot_user/lazygit/config.yml")
+          (( $#lg > 1 )) && export LG_CONFIG_FILE="''${(j:,:)lg}"
+        }
+        [[ -r $_dot_user/bacon/prefs.toml ]] && export BACON_PREFS="$_dot_user/bacon/prefs.toml"
         # oh-my-zsh exports LS_COLORS (dircolors) and eza lets it override
         # ~/.config/eza/theme.yml; keep LS_COLORS for ls, fd and completion.
         function eza() { LS_COLORS= command eza "$@"; }
@@ -112,6 +120,11 @@ in
 
       (lib.mkOrder 1500 ''
         source ${ukiyoHook}
+      '')
+
+      # The user layer's zshrc, after everything but zoxide, so it wins.
+      (lib.mkOrder 1900 ''
+        [[ -r $_dot_user/zsh/zshrc ]] && source "$_dot_user/zsh/zshrc"
       '')
 
       # Must be the very last thing in ~/.zshrc.

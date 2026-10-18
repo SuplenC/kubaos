@@ -42,6 +42,30 @@ system/update.sh --no-apt --nix --input quickshell
 - **System broken.** Boot a snapshot from GRUB's "KubaOS snapshots" menu, then swap `@` by hand ([`system/00-btrfs-subvolumes.md`](../system/00-btrfs-subvolumes.md), "Rolling back the system later"). `snapper rollback` does not work with Ubuntu's GRUB layout. apt runs take their own pre/post snapshots too.
 - **Hyprland won't start.** `Ctrl+Alt+F2`, log in, `touch ~/.config/hypr/no-autostart`.
 
+## Make it yours
+
+Don't edit `~/Projects/dotfiles` or the files in `~/.config/<app>`. Those are KubaOS's defaults: read-only, and replaced whole by every update. Your changes go in `~/.config/kubaos/<app>/`, which every app loads after ours, so what you set there wins. Updates never write to it. When we change a default you haven't touched, you get the new one; when you've set your own, you keep yours.
+
+Each file starts as a comment and an example:
+
+| To change | Edit | Applies |
+|---|---|---|
+| Hyprland: binds, gaps, monitors, rules | `~/.config/kubaos/hypr/hyprland.lua` (same Lua API as `~/.config/hypr/`) | `hyprctl reload` (`SUPER + SHIFT + CTRL + R`) |
+| Idle, lock screen | `~/.config/kubaos/hypr/{hypridle,hyprlock}.conf` | restart hypridle / next lock |
+| Shell aliases, exports | `~/.config/kubaos/zsh/zshrc` | new shell |
+| tmux | `~/.config/kubaos/tmux/tmux.conf` | `tmux source-file ~/.config/tmux/tmux.conf` |
+| Ghostty, foot, fuzzel | `~/.config/kubaos/{ghostty/config,foot/foot.ini,fuzzel/fuzzel.ini}` | reload or new window |
+| git | `~/.config/kubaos/git/config`, `~/.config/kubaos/git/ignore` | at once (`ignore` after `dot-config apply`) |
+| Neovim | `~/.config/kubaos/nvim/{options,keymaps,autocmds}.lua`, `plugins/*.lua`; extras with `:LazyExtras` | restart Neovim |
+| lazygit, bacon, yazi | `~/.config/kubaos/{lazygit/config.yml,bacon/prefs.toml,yazi/yazi.toml,yazi/keymap.toml}` | next start (lazygit and bacon: in a new shell) |
+| bat, fastfetch | `~/.config/kubaos/{bat/config,fastfetch/config.jsonc}` | after `dot-config apply` |
+| btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml`: they rewrite their own file, so it's yours as is | next start |
+
+- To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
+- Delete a file in `~/.config/kubaos` to get the example back on the next `dot-config apply` or update.
+- Quickshell's settings, the colors (matugen) and the prompt (oh-my-posh) can't be overridden yet.
+- Hacking on KubaOS itself is different: edit `config/` in the repo and run `home-manager switch --flake ~/Projects/dotfiles` to see it. `docs/CONTRACTS.md` ("Defaults and the user layer") has the details.
+
 ## Daily commands
 
 | Command | What |
@@ -50,6 +74,7 @@ system/update.sh --no-apt --nix --input quickshell
 | `dot-theme set <image>` | Set a wallpaper (an image, a loop, or `ukiyo:kabukicho-gate` for the live one) and regenerate colors everywhere |
 | `dot-theme next`, `prev`, `toggle-folder` | Cycle wallpapers (stills and loops), cycle the shinjuku, japanese and cyberpunk folders |
 | `dot-theme apply [--force]` | Regenerate from the current wallpaper; without `--force` it does nothing when no input changed (login runs it) |
+| `dot-config apply` | Create missing files in `~/.config/kubaos` and rewrite the merged configs (bat, git ignore, fastfetch) from the defaults plus yours. Every `home-manager switch` runs it |
 | `qs ipc show` | List the Quickshell IPC targets Hyprland binds call |
 | `dot-hypr-record region\|window\|output [--audio] [--mic]` | Start or stop a recording (gpu-screen-recorder, `~/Videos/Recordings`); `replay` keeps the last 30 s, `replay save` writes them. Run `system/65-recorder.sh` once so monitor capture needs no password |
 | `dot-bw-setup [--refresh]` | Log in to Bitwarden and write SSH keys (public halves), Host blocks, git signing, gh token and project env from the vault |
@@ -113,7 +138,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 - **Compositor:** Hyprland 0.56 from `ppa:cppiber/hyprland`, held in apt, with a Lua config split into files (`config/hypr/`). Dwindle layout, Omarchy 4 keybinds moved to hjkl. hypridle locks after 5 min, turns screens off after 10, and suspends after 30 on battery only.
 - **Shell:** my own, written in QML on Quickshell v0.3.2 (pinned), in the structure of Caelestia: bar, launcher with calculator, notifications, OSD, control center, power menu, wallpaper picker, lock screen with password, fingerprint and security key in parallel.
 - **Live wallpaper:** [ukiyo](UKIYO.md), a Rust and wgpu scene engine on the Wayland background layer, from its own flake. A systemd user unit that runs only while a scene is the wallpaper, a settings panel generated from its schema, a zsh hook that reports finished builds over its socket.
-- **User environment:** standalone home-manager (nixos-26.05) owns everything in `$HOME`. Configs you edit often are symlinked from this repo into `~/.config`, so edits apply without a rebuild. Nix apps get the GPU through home-manager's `targets.genericLinux.gpu`.
+- **User environment:** standalone home-manager (nixos-26.05) owns everything in `$HOME`. KubaOS's configs are read-only links from the store into `~/.config`, and yours live in `~/.config/kubaos` (above, "Make it yours"). Nix apps get the GPU through home-manager's `targets.genericLinux.gpu`.
 - **Theming:** matugen (`scheme-fidelity`) turns the wallpaper into Material 3 colors and renders 21 files in `~/.local/state/theme/` for every consumer. Geist, M PLUS 1 for the Japanese bits, Material Symbols, Papirus, Bibata.
 - **Terminal and dev:** Ghostty (foot as the fallback), tmux + tms, Neovim 0.12 (LazyVim), rustup, proto + moon, sccache, clang + mold (wild optional), Docker Engine + lazydocker, Chrome.
 - **Secrets:** Bitwarden desktop's SSH agent (private keys never touch the disk), `bw` for SSH Host blocks, git signing, the gh token and per-project env through direnv. A YubiKey C Bio does sudo, polkit and the lock screen with a fingerprint; the password stays as the fallback.
@@ -125,10 +150,11 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | Path | What |
 |---|---|
 | `flake.nix`, `flake.lock` | Inputs (nixpkgs 26.05, home-manager, Quickshell v0.3.2) and the `kuba@tuxedo` / `kuba@vm` outputs |
-| `home/` | home-manager modules: packages, zsh, tmux plugins, GPU wiring, GTK/Qt theme, live links |
+| `home/` | home-manager modules: packages, zsh, tmux plugins, GPU wiring, GTK/Qt theme, defaults and the user layer (`links.nix`) |
 | `wallpapers/` | Tokyo wallpapers: `shinjuku/` (five stills, five HEVC loops with posters), `cyberpunk/`, `japanese/`, their credits and `make-loops.py`; linked to `~/Pictures/wallpapers` |
-| `config/` | Live-linked configs, one dir per app: `hypr`, `quickshell`, `nvim`, `tmux`, `tms`, `ghostty`, `foot`, `fuzzel`, `matugen`, `ohmyposh`, `lazygit`, `yazi`, `btop`, `bat`, `bacon`, `git` |
-| `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
+| `config/` | The defaults, one dir per app, linked read-only into `~/.config`: `hypr`, `quickshell`, `nvim`, `tmux`, `tms`, `ghostty`, `foot`, `fuzzel`, `matugen`, `ohmyposh`, `lazygit`, `yazi`, `btop`, `bat`, `bacon`, `git` |
+| `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
+| `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `update.sh`, files for `/etc` |
 | `installer/` | `dotinstall`: the engine, the CLI and the GUI |
 | `test/` | The Docker test harness (`test/run`) |

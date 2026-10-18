@@ -1,6 +1,6 @@
 # Identity (user.name, user.email) isn't in the repo. The installer's Git
-# screen or first-boot setup's Git card writes it, outside the live-linked
-# ~/.config/git. Git skips a missing include.
+# screen or first-boot setup's Git card writes it, outside
+# ~/.config/git (read-only defaults). Git skips a missing include.
 [include]
 	path = ~/.config/git-identity/identity.gitconfig
 # Commit signing with an SSH key from Bitwarden, through its SSH agent:
@@ -55,3 +55,7 @@
 # missing include, so this is safe before the first run.
 [include]
 	path = ~/.local/state/theme/delta.gitconfig
+
+# Your settings, last so they win (~/.config/kubaos, docs/CONTRACTS.md).
+[include]
+	path = ~/.config/kubaos/git/config

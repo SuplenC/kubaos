@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# dot-config: keep the user layer (~/.config/kubaos) in step with the defaults.
+# See docs/CONTRACTS.md, "Defaults and the user layer".
+#
+#   dot-config apply   create the user layer's missing files, seed the files
+#                      apps rewrite, and rewrite the merged files (bat, git
+#                      ignore, fastfetch) from the defaults plus yours. Every
+#                      home-manager switch runs it; run it after editing one
+#                      of the merged files.
+#   dot-config path    print the user layer's directory
+#
+# It never changes a file in the user layer that exists. Delete one to get the
+# commented example back on the next apply.
+set -euo pipefail
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
+USER_LAYER="$CONFIG/kubaos"
+DATA="${XDG_DATA_HOME:-$HOME/.local/share}/kubaos"
+DEFAULTS="$DATA/defaults"
+SKEL="$DATA/skel"
+LAYER="$DATA/layer"
+
+die() { printf 'dot-config: %s\n' "$*" >&2; exit 1; }
+say() { printf 'dot-config: %s\n' "$*"; }
+
+usage() {
+  sed -n '2,13s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+}
+
+# copy_new SRC DST: DST = SRC, only when DST doesn't exist (a dangling link
+# counts as missing). Writable: the source is a read-only store file.
+copy_new() {
+  [[ -e $2 ]] && return 0
+  [[ -L $2 ]] && rm -f -- "$2"
+  install -D -m 0644 -- "$1" "$2"
+  say "created ${2/#$HOME/\~}"
+}
+
+# replace DST: move DST.new over DST unless they're the same.
+replace() {
+  if [[ -f $1 && ! -L $1 ]] && cmp -s -- "$1.new" "$1"; then
+    rm -f -- "$1.new"
+    return 0
+  fi
+  mv -f -- "$1.new" "$1"
+  say "wrote ${1/#$HOME/\~}"
+}
+
+# merge_concat FILE: the defaults, then the user's lines.
+merge_concat() {
+  local out="$CONFIG/$1"
+  mkdir -p -- "$(dirname -- "$out")"
+  {
+    printf '# Written by dot-config from %s and %s. Edit the second.\n' \
+      "${DEFAULTS/#$HOME/\~}/$1" "${USER_LAYER/#$HOME/\~}/$1"
+    cat -- "$DEFAULTS/$1"
+    if [[ -f $USER_LAYER/$1 ]]; then
+      printf '\n'
+      cat -- "$USER_LAYER/$1"
+    fi
+  } >"$out.new"
+  replace "$out"
+}
+
+# merge_json FILE: the user's JSON (comments allowed) merged over the
+# defaults, objects key by key. Written as plain JSON. A user file that
+# doesn't parse keeps the last merge: a typo must not stop an update.
+merge_json() {
+  local out="$CONFIG/$1"
+  mkdir -p -- "$(dirname -- "$out")"
+  if ! python3 - "$DEFAULTS/$1" "$USER_LAYER/$1" >"$out.new" <<'PY'; then
+import json, os, sys
+
+def strip_comments(text):
+    """JSONC to JSON: drop // and /* */ comments outside strings."""
+    out, i, n, in_str = [], 0, len(text), False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\":
+                out.append(text[i + 1 : i + 2])
+                i += 1
+            elif c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+            out.append(c)
+        elif text.startswith("//", i):
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        elif text.startswith("/*", i):
+            end = text.find("*/", i + 2)
+            i = n if end < 0 else end + 2
+            continue
+        else:
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+def drop_trailing_commas(text):
+    """A comma outside strings whose next non-space character is } or ]."""
+    out, in_str, escaped = [], False, False
+    for i, c in enumerate(text):
+        if in_str:
+            in_str = escaped or c != '"'
+            escaped = not escaped and c == "\\"
+        elif c == '"':
+            in_str = True
+        elif c == "," and text[i + 1 :].lstrip()[:1] in ("}", "]"):
+            continue
+        out.append(c)
+    return "".join(out)
+
+def load(path):
+    if not os.path.exists(path):
+        return {}
+    text = drop_trailing_commas(strip_comments(open(path, encoding="utf-8").read()))
+    return json.loads(text) if text.strip() else {}
+
+def merge(base, over):
+    if isinstance(base, dict) and isinstance(over, dict):
+        out = dict(base)
+        for k, v in over.items():
+            out[k] = merge(base[k], v) if k in base else v
+        return out
+    return over
+
+try:
+    merged = merge(load(sys.argv[1]), load(sys.argv[2]))
+except ValueError as e:
+    sys.exit(f"{sys.argv[2]}: {e}")
+json.dump(merged, sys.stdout, indent=2, ensure_ascii=False)
+print()
+PY
+    rm -f -- "$out.new"
+    printf 'dot-config: %s is not valid JSON; kept the last %s\n' \
+      "${USER_LAYER/#$HOME/\~}/$1" "${out/#$HOME/\~}" >&2
+    return 0
+  fi
+  replace "$out"
+}
+
+cmd_apply() {
+  [[ -d $DEFAULTS && -d $SKEL && -f $LAYER ]] ||
+    die "no defaults in ${DATA/#$HOME/\~} (run home-manager switch)"
+  local f kind src dst
+  # The user layer: every missing file from the examples.
+  while IFS= read -r -d '' f; do
+    copy_new "$f" "$USER_LAYER/${f#"$SKEL"/}"
+  done < <(find -L "$SKEL" -type f -print0 | sort -z)
+  while read -r kind src dst; do
+    case "$kind" in
+      seed) copy_new "$DEFAULTS/$src" "$CONFIG/$dst" ;;
+      concat) merge_concat "$src" ;;
+      json) merge_json "$src" ;;
+      '' | '#'*) ;;
+      *) die "unknown entry in $LAYER: $kind" ;;
+    esac
+  done <"$LAYER"
+}
+
+case "${1:-}" in
+  apply) cmd_apply ;;
+  path) printf '%s\n' "$USER_LAYER" ;;
+  -h | --help | help | '') usage ;;
+  *) die "unknown command '$1' (dot-config --help)" ;;
+esac

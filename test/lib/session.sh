@@ -55,7 +55,7 @@ in_session() {
   zrun "set -a; . $SESSION_ENV; set +a; $1"
 }
 
-# qs_start: Quickshell with the live-linked config, log in $QS_LOG. Waits
+# qs_start: Quickshell with the config from the generation, log in $QS_LOG. Waits
 # until the config has loaded (or failed).
 qs_start() {
 

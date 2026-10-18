@@ -30,12 +30,12 @@ Screenshots: `just shots` (see `docs/TESTING.md`).
 ## Run and reload
 
 ```sh
-qs                      # starts config/quickshell (linked to ~/.config/quickshell)
+qs                      # starts ~/.config/quickshell (config/quickshell, from the store)
 qs log                  # follow the log of the running instance
 qs ipc show             # list IPC targets
 ```
 
-Quickshell hot-reloads on save. Lock state, do-not-disturb and notifications survive a reload.
+Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`home-manager switch` updates it), so to hack on the shell run the checkout instead: `qs kill; qs -p ~/Projects/dotfiles/config/quickshell`. Lock state, do-not-disturb and notifications survive a reload.
 
 ## IPC (bound in Hyprland)
 

@@ -7,7 +7,7 @@ The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTAL
 1. **Nothing updates by surprise.** Hyprland is held in apt, Quickshell and all user tools are pinned in `flake.lock`. You upgrade them on purpose, after a snapshot.
 2. **One job, one tool.** The shell does bar, launcher, notifications, OSD. Hyprland does windows. tmux does terminal panes. No second daemon for the same job.
 3. **System from apt, user from Nix.** apt owns the kernel, drivers, Hyprland, PAM, Docker, Chrome. home-manager owns everything in `$HOME`. rustup and proto own project-pinned toolchains.
-4. **Live-linked configs.** nvim, hypr, quickshell, tmux, tms and ghostty are symlinked out of the Nix store into your dotfiles repo (`mkOutOfStoreSymlink`), so edits apply instantly without a rebuild.
+4. **Defaults apart from your changes.** KubaOS's configs are read-only links from the Nix store; yours live in `~/.config/kubaos`, load last and are never touched by an update (issue #9, `docs/CONTRACTS.md`). This replaced the original live links into the dotfiles repo, which made every update a merge.
 5. **Always a way back.** Btrfs snapshots for the system, home-manager generations for the user environment, a minimal fallback session that works without your shell.
 
 ## Decisions (from the grilling)

@@ -1,0 +1,5 @@
+# Your yazi settings: ~/.config/yazi/yazi.toml links here. KubaOS only ships
+# the theme (theme.toml), so this file is all yours. Docs: https://yazi-rs.github.io/docs/configuration/yazi
+#
+# [mgr]
+# show_hidden = true

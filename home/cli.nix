@@ -1,6 +1,7 @@
 # Plain CLI tools. zsh/fzf/zoxide/atuin/direnv/oh-my-posh live in shell.nix,
-# tmux/tms/ghostty in terminal.nix. lazygit, btop, nvim and git configs are
-# live-linked, so they are installed as packages only (no programs.<x>.settings).
+# tmux/tms/ghostty in terminal.nix. lazygit, btop, nvim and git configs come
+# from config/ (links.nix), so they are installed as packages only (no
+# programs.<x>.settings).
 {
   config,
   lib,
@@ -42,7 +43,7 @@ in
     yubikey-manager
   ];
 
-  # ~/.config/git is live-linked, so delta's git settings live next to it.
+  # ~/.config/git holds config/git's files, so delta's git settings live next to it.
   # config/git/config pulls them in with:
   #   [include]
   #     path = ~/.config/git-nix/delta.gitconfig
@@ -61,7 +62,7 @@ in
     };
   };
 
-  # Wallpaper colors for eza and lazydocker (neither has a live-linked dir).
+  # Wallpaper colors for eza and lazydocker (neither has a dir in config/).
   # Until dot-theme has run the links dangle and both use their defaults.
   xdg.configFile."eza/theme.yml".source = theme "eza.yml";
   xdg.configFile."lazydocker/config.yml".source = theme "lazydocker.yml";

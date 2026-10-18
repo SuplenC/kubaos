@@ -10,3 +10,6 @@ vim.opt.showcmd = false
 -- Rounded borders on every float (hover, signature help, blink.cmp menus,
 -- diagnostics), matching the shell's rounded panels. Colors: config/theme.lua.
 vim.o.winborder = "rounded"
+
+-- The user layer's options.lua, last so it wins.
+require("config.user").run("options")

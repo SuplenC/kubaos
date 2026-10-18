@@ -1,8 +1,10 @@
 # config/hypr
 
 KubaOS's Hyprland 0.56+ Lua config, plus hypridle and hyprlock (those two still use
-hyprlang `.conf`). Live-linked to `~/.config/hypr`, so edits apply without a
-home-manager rebuild.
+hyprlang `.conf`). These are KubaOS's defaults, linked read-only into
+`~/.config/hypr` by home-manager; editing them here takes a `home-manager switch`.
+Your own settings go in `~/.config/kubaos/hypr/` (`hyprland.lua`, `hypridle.conf`,
+`hyprlock.conf`), which load last.
 
 ## Files
 
@@ -21,7 +23,7 @@ home-manager rebuild.
 | `autostart.lua` | Session startup; the polkit agent toggle is at the top |
 | `hypridle.conf` | Lock 5 min, screens off 10 min, suspend 30 min on battery only |
 | `hyprlock.conf` | Fallback lock screen, themed, fingerprint enabled |
-| `local.lua` | Optional, git-ignored machine overrides, loaded last if present |
+| `~/.config/kubaos/hypr/hyprland.lua` | Yours, not in the repo: loaded last (`docs/CONTRACTS.md`, "Defaults and the user layer") |
 
 Scripts (in `scripts/`, linked to `~/.local/bin`): `dot-hypr-workspaces`
 (event-socket listener, puts workspaces back on replug), `dot-hypr-lid`
