@@ -360,6 +360,67 @@ mod tests {
         assert_eq!(cmds.last().unwrap(), "cryptsetup close cryptroot");
     }
 
+    /// The payload's user-flake template and lock, as installer/image ships them.
+    fn user_flake_payload(r: &mut DryRunner) {
+        r.files.insert(
+            "/mnt/t/usr/share/kubaos/user-flake/flake.nix.in".into(),
+            "homeConfigurations.\"@USER@@@HOST@\" = kubaos.lib.mkHome { \
+             pkgs = nixpkgs.legacyPackages.@SYSTEM@; username = \"@USER@\"; };\n"
+                .into(),
+        );
+        r.files.insert(
+            "/mnt/t/usr/share/kubaos/user-flake/home.nix".into(),
+            "{ pkgs, ... }: { home.packages = [ ]; }\n".into(),
+        );
+        r.files.insert(
+            "/mnt/t/usr/share/dotinstall/user-flake.lock".into(),
+            "{\"version\": 7}\n".into(),
+        );
+    }
+
+    #[test]
+    fn the_user_gets_a_flake_of_their_own() {
+        let p = payload();
+        let mut cfg = config(&p);
+        cfg.user.username = "alice".into();
+        let mut r = DryRunner::new();
+        user_flake_payload(&mut r);
+        let opts = RunOptions {
+            dry_run: true,
+            target_root: Some("/mnt/t".into()),
+            log_file: None,
+        };
+        run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}).unwrap();
+        let dir = "/mnt/t/home/alice/.config/kubaos/home";
+        let flake = &r.files[Path::new(&format!("{dir}/flake.nix"))];
+        assert_eq!(
+            flake,
+            "homeConfigurations.\"alice@vm\" = kubaos.lib.mkHome { \
+             pkgs = nixpkgs.legacyPackages.x86_64-linux; username = \"alice\"; };\n"
+        );
+        assert_eq!(
+            r.files[Path::new(&format!("{dir}/home.nix"))],
+            "{ pkgs, ... }: { home.packages = [ ]; }\n"
+        );
+        assert_eq!(
+            r.files[Path::new(&format!("{dir}/flake.lock"))],
+            "{\"version\": 7}\n"
+        );
+        let cmds = r.commands();
+        assert!(
+            cmds.iter()
+                .any(|c| c == "chown -R 1000:1000 /mnt/t/home/alice/.config/kubaos"),
+            "{cmds:#?}"
+        );
+        // KubaOS's checkout stays in /usr/share/kubaos: nothing copies it to
+        // the home or commits there.
+        assert!(
+            !cmds.iter().any(|c| c.contains("Projects/dotfiles")),
+            "{cmds:#?}"
+        );
+        assert!(!cmds.iter().any(|c| c.contains("git ")), "{cmds:#?}");
+    }
+
     #[test]
     fn another_username_builds_its_own_generation() {
         let activation = |cmds: &[String]| {
@@ -376,8 +437,8 @@ mod tests {
         assert!(!cmds.iter().any(|c| c.contains("homeConfigurations")));
         assert!(activation(&cmds).contains("/nix/store/abc-home-manager-generation/activate"));
 
-        // Anyone else: the checkout learns the name, Nix builds
-        // <user>@<host> offline as that user, and that's what activates.
+        // Anyone else: Nix builds <user>@<host> from their user flake,
+        // offline, as that user, and that's what activates.
         let p = payload();
         let mut cfg = config(&p);
         cfg.user.username = "alice".into();
@@ -397,8 +458,7 @@ mod tests {
             "--reuid=1000",
             "USER=alice",
             "HOME=/home/alice",
-            "home/username",
-            "git -c user.name=dotinstall",
+            "cd \"$HOME/.config/kubaos/home\"",
             "nix --offline",
             "alice@vm",
             "--out-link /tmp/dotinstall-home-generation",
@@ -422,7 +482,7 @@ mod tests {
         let mut cfg = config(&p);
         cfg.user.username = "alice".into();
         let mut r = DryRunner::new();
-        let tpl = "/mnt/t/usr/share/dotinstall/dotfiles/system/files";
+        let tpl = "/mnt/t/usr/share/kubaos/system/files";
         r.files.insert(
             format!("{tpl}/getty/autologin.conf.in").into(),
             "ExecStart=-/sbin/agetty --autologin @USER@ %I $TERM\n".into(),

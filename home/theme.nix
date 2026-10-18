@@ -2,10 +2,9 @@
 # GTK / Qt / cursor / icons. Generated colors live in ~/.local/state/theme/.
 {
   config,
-  inputs,
+  kubaosPkgs,
   lib,
   pkgs,
-  dotfilesDir,
   ...
 }:
 let
@@ -16,13 +15,15 @@ let
     @import url("file://${stateDir}/gtk.css");
   '';
   iconTheme = "Papirus-Dark";
-  # Papirus with cyan folders, the neon accent most Tokyo wallpapers share.
-  iconPackage = pkgs.papirus-icon-theme.override { color = "cyan"; };
   # Interface font, the same one the shell uses (home/desktop.nix installs it).
   # 10 pt is sized for Full HD density: the 1080p externals at scale 1 and the
   # laptop panel at scale 1.5 (config/hypr/monitors.lua) look the same.
   uiFont = "Geist";
   uiFontSize = 10;
+  wallpapers = builtins.path {
+    path = ../wallpapers;
+    name = "kubaos-wallpapers";
+  };
   qtFont =
     family: size: weight:
     ''"${family},${toString size},-1,5,${toString weight},0,0,0,0,0,0,0,0,0,0,1"'';
@@ -74,7 +75,7 @@ in
     };
     iconTheme = {
       name = iconTheme;
-      package = iconPackage;
+      package = kubaosPkgs.papirus-cyan;
     };
     font = {
       name = uiFont;
@@ -98,7 +99,14 @@ in
 
   qt = {
     enable = true;
-    platformTheme.name = "qtct";
+    platformTheme = {
+      name = "qtct";
+      # Quickshell loads these plugins, so they're built against its Qt.
+      package = [
+        kubaosPkgs.qt5ct
+        kubaosPkgs.qt6ct
+      ];
+    };
     qt5ctSettings = qtctSettings "qt5ct";
     qt6ctSettings = qtctSettings "qt6ct";
   };
@@ -125,22 +133,24 @@ in
   # libadwaita reads the button layout from here (through the portal).
   dconf.settings."org/gnome/desktop/wm/preferences".button-layout = ":";
 
-  # The wallpapers live in the repo (wallpapers/{japanese,cyberpunk}/), linked
-  # live like config/, so adding an image there needs no rebuild.
-  home.file."Pictures/wallpapers".source =
-    config.lib.file.mkOutOfStoreSymlink "${dotfilesDir}/wallpapers";
+  # KubaOS's wallpapers (wallpapers/<folder>/), each file linked from the
+  # store into real folders under ~/Pictures/wallpapers, so your own images
+  # can sit next to them and an update replaces only KubaOS's.
+  home.file = lib.mapAttrs' (
+    folder: _:
+    lib.nameValuePair "Pictures/wallpapers/${folder}" {
+      source = "${wallpapers}/${folder}";
+      recursive = true;
+    }
+  ) (lib.filterAttrs (_: type: type == "directory") (builtins.readDir ../wallpapers));
 
-  # Migration: older generations made ~/Pictures/wallpapers a real directory
-  # holding only .keep markers. Replace it with the link above; if anything
-  # else is inside, leave it and let home-manager report the conflict.
-  home.activation.wallpapersToLink = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
+  # Migration: older generations linked ~/Pictures/wallpapers itself to the
+  # checkout's wallpapers/. Remove that link before home-manager links the
+  # files above, or they would land in the checkout.
+  home.activation.wallpapersFromStore = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
     walls="${config.home.homeDirectory}/Pictures/wallpapers"
-    if [ -d "$walls" ] && [ ! -L "$walls" ]; then
-      if [ -z "$(find "$walls" -mindepth 1 ! -type d ! -name .keep -print -quit)" ]; then
-        run rm -rf "$walls"
-      else
-        warnEcho "$walls has your own files; move them into ${dotfilesDir}/wallpapers and remove it."
-      fi
+    if [ -L "$walls" ]; then
+      run rm "$walls"
     fi
   '';
 
@@ -154,7 +164,7 @@ in
         lib.makeBinPath [
           pkgs.matugen
           pkgs.jq
-          inputs.ukiyo.packages.${pkgs.stdenv.hostPlatform.system}.default
+          kubaosPkgs.ukiyo
         ]
       }:$PATH" \
         XDG_DATA_DIRS="${config.home.profileDirectory}/share:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \

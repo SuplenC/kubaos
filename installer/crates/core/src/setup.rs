@@ -34,9 +34,9 @@ pub use parse::*;
 
 /// Where the engine puts the privileged helper (installer/firstboot/).
 pub const HELPER: &str = "/usr/lib/kubaos/setup-helper";
-/// The root-owned dotfiles checkout from the payload; the helper runs
-/// `system/30-hardware.sh` from here, never from the user's writable copy.
-pub const SYSTEM_DOTFILES: &str = "/usr/share/dotinstall/dotfiles";
+/// KubaOS's root-owned checkout from the payload; the helper runs
+/// `system/30-hardware.sh` from here, never from anything the user can write.
+pub const SYSTEM_KUBAOS: &str = "/usr/share/kubaos";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

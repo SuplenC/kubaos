@@ -4,8 +4,9 @@
 # gsr (Nix, home/desktop.nix) records a monitor by asking its small helper
 # gsr-kms-server for the framebuffer, which needs CAP_SYS_ADMIN. A file
 # capability can't live in the read-only Nix store, so this script:
-#   - builds nixpkgs#gpu-screen-recorder from the flake's pinned nixpkgs (the
-#     same store path home-manager installs) and pins it with a GC root, so
+#   - builds nixpkgs#gpu-screen-recorder from KubaOS's pinned nixpkgs
+#     (KUBAOS_DIR, system/lib.sh: the same store path home-manager installs
+#     from the curated set) and pins it with a GC root, so
 #     the helper's libraries stay;
 #   - copies gsr-kms-server to /usr/local/libexec/dotfiles/gsr-kms-server,
 #     root:<you> 0750 with cap_sys_admin+ep: only your user can run it;
@@ -13,7 +14,7 @@
 #     wrapper puts /run/wrappers/bin first on its PATH to find the helper,
 #     the NixOS module's place for it.
 # Without this, gsr falls back to pkexec and asks for the password each time.
-# Re-run after every flake update (system/update.sh --nix does): the helper
+# Re-run after every KubaOS update (system/update.sh --nix does): the helper
 # and gsr must speak the same protocol version.
 #
 # Why not the portal (-w portal, no privileges): gsr's portal capture is
@@ -63,10 +64,10 @@ apt_install libcap2-bin # setcap, getcap
 step "gsr-kms-server with CAP_SYS_ADMIN"
 command -v nix >/dev/null || ((DRY_RUN)) || die "nix not found: run system/60-nix.sh first"
 if ((DRY_RUN)); then
-  run nix build --no-link --print-out-paths --inputs-from "$DOTFILES_DIR" nixpkgs#gpu-screen-recorder
+  run nix build --no-link --print-out-paths --inputs-from "$KUBAOS_DIR" nixpkgs#gpu-screen-recorder
   out="<gpu-screen-recorder store path>"
 else
-  out="$(nix build --no-link --print-out-paths --inputs-from "$DOTFILES_DIR" nixpkgs#gpu-screen-recorder)" ||
+  out="$(nix build --no-link --print-out-paths --inputs-from "$KUBAOS_DIR" nixpkgs#gpu-screen-recorder)" ||
     die "nix build nixpkgs#gpu-screen-recorder failed (the error is above); fix that, then re-run"
   [[ -x "$out/bin/gsr-kms-server" ]] || die "no gsr-kms-server in $out"
 fi

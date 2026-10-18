@@ -1,31 +1,25 @@
 # Quickshell, GPU drivers for Nix apps on Ubuntu, fonts.
 {
-  inputs,
+  kubaosPkgs,
   lib,
   pkgs,
   ...
 }:
-let
-  # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
-  quickshell = inputs.quickshell.packages.${pkgs.stdenv.hostPlatform.system}.default.withModules (
-    with pkgs.qt6;
-    [
-      qt5compat # Qt5Compat.GraphicalEffects
-      qtmultimedia
-      qtimageformats # webp, avif, tiff wallpapers
-    ]
-  );
-in
 {
   # home-manager's non-NixOS GPU support: every Nix GL/Vulkan app (Quickshell,
   # Ghostty, ...) loads Mesa from /run/opengl-driver, no per-app wrapping.
   # One-time, and again whenever activation warns that drivers changed:
   #   sudo "$(command -v non-nixos-gpu-setup)"
-  targets.genericLinux.gpu.enable = true;
+  # Mesa comes from KubaOS's nixpkgs, never newer than the user's: an app
+  # built against a newer glibc can load an older Mesa, not the other way.
+  targets.genericLinux.gpu = {
+    enable = true;
+    packages = kubaosPkgs.nixpkgs;
+  };
 
   # No systemd service: Hyprland's autostart runs `qs`.
   home.packages = [
-    quickshell
+    kubaosPkgs.quickshell
 
     # Fonts for the shell (config/quickshell/theme/Theme.qml): Geist for the
     # interface, M PLUS 1 for Japanese accents, Material Symbols for icons.
@@ -38,7 +32,7 @@ in
     # Screen recording and screenshot annotation (scripts/dot-hypr-record,
     # dot-hypr-screenshot). gsr's KMS capture finds the setcap'd
     # gsr-kms-server in /run/wrappers/bin (system/65-recorder.sh).
-    pkgs.gpu-screen-recorder
+    kubaosPkgs.gpu-screen-recorder
     pkgs.satty
   ]
   # aarch64 is the VM. The Hyprland PPA builds no arm64 binaries and Ubuntu's
@@ -47,7 +41,7 @@ in
   # hyprland.lua, and ~/.nix-profile/bin comes first on PATH, so tty1's
   # start-hyprland is this one. It renders through /run/opengl-driver
   # (llvmpipe in QEMU). The laptop keeps the PPA's.
-  ++ lib.optionals pkgs.stdenv.hostPlatform.isAarch64 [ pkgs.hyprland ];
+  ++ lib.optionals pkgs.stdenv.hostPlatform.isAarch64 [ kubaosPkgs.hyprland ];
 
   # start-hyprland (no uwsm) never activates graphical-session.target, and
   # xdg-desktop-portal refuses to start without it (Requisite=), which leaves

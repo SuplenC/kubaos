@@ -10,6 +10,12 @@ set -euo pipefail
 SYSTEM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FILES_DIR="$SYSTEM_DIR/files"
 DOTFILES_DIR="$(cd "$SYSTEM_DIR/.." && pwd)"
+# The KubaOS checkout whose nixpkgs built the curated set (home/curated.nix),
+# which the lock screen's PAM modules and the recorder helper must match:
+# the root-owned one on an installed machine, else this one (a dev machine
+# without it, the test harness).
+KUBAOS_DIR="${KUBAOS_DIR:-/usr/share/kubaos}"
+[[ -f "$KUBAOS_DIR/flake.nix" ]] || KUBAOS_DIR="$DOTFILES_DIR"
 
 DRY_RUN=0
 APT_DIRTY=0
@@ -298,20 +304,20 @@ PAM_FPRINTD_GCROOT=/nix/var/nix/gcroots/dotfiles-pam-fprintd
 PAM_U2F_LINK=/usr/local/lib/security/pam_u2f.so
 PAM_U2F_GCROOT=/nix/var/nix/gcroots/dotfiles-pam-u2f
 
-# link_nix_pam_module ATTR MODULE LINK GCROOT: build nixpkgs#ATTR from the
-# flake's pinned nixpkgs (the same nixpkgs Quickshell and its libpam come
-# from), pin it with GCROOT and point LINK at its lib/security/MODULE.
-# Re-run after every flake update.
+# link_nix_pam_module ATTR MODULE LINK GCROOT: build nixpkgs#ATTR from
+# KubaOS's pinned nixpkgs (KUBAOS_DIR: the same nixpkgs Quickshell and its
+# libpam come from), pin it with GCROOT and point LINK at its
+# lib/security/MODULE. Re-run after every KubaOS update.
 link_nix_pam_module() {
   local attr="$1" module="$2" link="$3" gcroot="$4" out so
   if ((DRY_RUN)); then
-    run nix build --no-link --print-out-paths --inputs-from "$DOTFILES_DIR" "nixpkgs#$attr"
+    run nix build --no-link --print-out-paths --inputs-from "$KUBAOS_DIR" "nixpkgs#$attr"
     sudo_run ln -sfn "<$attr store path>" "$gcroot"
     sudo_run install -d -m 0755 "$(dirname "$link")"
     sudo_run ln -sfn "<$attr store path>/lib/security/$module" "$link"
     return 0
   fi
-  out="$(nix build --no-link --print-out-paths --inputs-from "$DOTFILES_DIR" "nixpkgs#$attr")" ||
+  out="$(nix build --no-link --print-out-paths --inputs-from "$KUBAOS_DIR" "nixpkgs#$attr")" ||
     die "nix build nixpkgs#$attr failed"
   so="$out/lib/security/$module"
   [[ -f "$so" ]] || die "no $module in $out"

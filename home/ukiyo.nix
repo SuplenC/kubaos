@@ -12,13 +12,13 @@
 #   which wins; `ukiyo config reset` goes back to these.
 # The zsh hook that pulses the scene on finished builds is in shell.nix.
 {
-  inputs,
+  kubaosPkgs,
   lib,
   pkgs,
   ...
 }:
 let
-  ukiyo = inputs.ukiyo.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  inherit (kubaosPkgs) ukiyo;
   toml = pkgs.formats.toml { };
   defaults = toml.generate "ukiyo-defaults.toml" {
     scene = "kabukicho-gate";
@@ -43,7 +43,7 @@ in
   systemd.user.services.ukiyo = {
     Unit = {
       Description = "ukiyo live wallpaper";
-      Documentation = [ "file://%h/Projects/dotfiles/docs/UKIYO.md" ];
+      Documentation = [ "file:///usr/share/kubaos/docs/UKIYO.md" ];
       PartOf = [ "graphical-session.target" ];
       After = [ "graphical-session.target" ];
       # Hyprland's autostart imports it (config/hypr/autostart.lua); without

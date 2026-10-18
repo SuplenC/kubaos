@@ -28,37 +28,67 @@
 
   outputs =
     {
+      self,
       nixpkgs,
       home-manager,
       ...
     }@inputs:
     let
-      # The account the generations are for. The installer rewrites this file
-      # in the installed checkout when the user picks another name
-      # (docs/INSTALLER.md, "Another username").
-      username = nixpkgs.lib.trim (builtins.readFile ./home/username);
-
       systems = [
         "x86_64-linux"
         "aarch64-linux"
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
-
-      mkHome =
-        system:
-        home-manager.lib.homeManagerConfiguration {
-          pkgs = nixpkgs.legacyPackages.${system};
-          extraSpecialArgs = { inherit inputs username; };
-          modules = [ ./home ];
-        };
     in
     {
-      homeConfigurations = {
-        # The laptop (TUXEDO InfinityBook Pro 14 Gen10).
-        "${username}@tuxedo" = mkHome "x86_64-linux";
-        # UTM VM on an Apple Silicon Mac, for testing.
-        "${username}@vm" = mkHome "aarch64-linux";
-      };
+      # The curated set (home/curated.nix), from this flake's nixpkgs.
+      packages = forAllSystems (pkgs: import ./home/curated.nix { inherit pkgs inputs; });
+
+      homeModules.default = ./home;
+
+      # A KubaOS home for `username`. pkgs is the caller's nixpkgs, for every
+      # ordinary package; the curated set and home-manager come from this
+      # flake's lock. The user flake (user-flake/flake.nix.in) calls this.
+      lib.mkHome =
+        {
+          pkgs,
+          username,
+          modules ? [ ],
+        }:
+        let
+          system = pkgs.stdenv.hostPlatform.system;
+        in
+        home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          extraSpecialArgs = {
+            inherit username;
+            # The packages, plus the package set itself for the GPU driver
+            # bundle (targets.genericLinux.gpu.packages, home/desktop.nix).
+            kubaosPkgs = self.packages.${system} // {
+              nixpkgs = nixpkgs.legacyPackages.${system};
+            };
+          };
+          modules = [ self.homeModules.default ] ++ modules;
+        };
+
+      # This checkout's own homes, for the payload build's user and the test
+      # harness (docs/TESTING.md). Installed machines switch their user flake
+      # (~/.config/kubaos/home) instead.
+      homeConfigurations =
+        let
+          home =
+            system:
+            self.lib.mkHome {
+              pkgs = nixpkgs.legacyPackages.${system};
+              username = "kuba";
+            };
+        in
+        {
+          # The laptop (TUXEDO InfinityBook Pro 14 Gen10).
+          "kuba@tuxedo" = home "x86_64-linux";
+          # UTM VM on an Apple Silicon Mac, for testing.
+          "kuba@vm" = home "aarch64-linux";
+        };
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);
 

@@ -198,6 +198,19 @@ pub fn render_user_template(template: &str, user: &str, home: &str) -> String {
     template.replace("@USER@", user).replace("@HOME@", home)
 }
 
+/// The user flake, under the home (user-flake/ in the repo): the user's own
+/// nixpkgs, KubaOS as an input, and home.nix for their own packages.
+pub const USER_FLAKE: &str = ".config/kubaos/home";
+
+/// user-flake/flake.nix.in for `user` on `host`. `system` is Nix's, e.g.
+/// `x86_64-linux`.
+pub fn user_flake(template: &str, user: &str, host: &str, system: &str) -> String {
+    template
+        .replace("@USER@", user)
+        .replace("@HOST@", host)
+        .replace("@SYSTEM@", system)
+}
+
 /// Where the git identity lives, under the home. Not in ~/.config/git: that
 /// holds KubaOS's read-only defaults. config/git/config includes it.
 pub const GIT_IDENTITY: &str = ".config/git-identity/identity.gitconfig";

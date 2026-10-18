@@ -1,5 +1,4 @@
 {
-  config,
   pkgs,
   username,
   ...
@@ -16,9 +15,6 @@
     ./theme.nix
     ./ukiyo.nix
   ];
-
-  # Absolute path of this repo on disk; scripts and wallpapers link here.
-  _module.args.dotfilesDir = "${config.home.homeDirectory}/Projects/dotfiles";
 
   home = {
     inherit username;

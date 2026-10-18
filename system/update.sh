@@ -3,8 +3,10 @@
 #   1. snapper snapshot "before update"
 #   2. apt update + upgrade (held packages stay put), report what's held back
 #   3. --hyprland: unhold, upgrade Hyprland + hypr* libs, re-hold
-#   4. --nix: nix flake update (all inputs or --input NAME), home-manager switch,
-#      relink the lock screen's pam_fprintd.so and pam_u2f.so (lib.sh)
+#   4. --nix: nix flake update (all inputs or --input NAME) of the user flake
+#      (~/.config/kubaos/home; a checkout's flake where there is none),
+#      home-manager switch, relink the lock screen's pam_fprintd.so and
+#      pam_u2f.so (lib.sh)
 #   5. report newer Bitwarden desktop/CLI releases (pinned in 70-bitwarden.sh)
 set -euo pipefail
 # shellcheck source=system/lib.sh
@@ -13,6 +15,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 DO_APT=1 DO_HYPR=0 DO_NIX=0 ASSUME_YES=0
 NIX_INPUTS=()
 HM_USER="${USER:-$(id -un)}"
+# The user flake the installer wrote: your nixpkgs, KubaOS from
+# /usr/share/kubaos. Without one (a machine set up by hand), this checkout.
+USER_FLAKE="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/home"
+if [[ -f "$USER_FLAKE/flake.nix" ]]; then FLAKE="$USER_FLAKE"; else FLAKE="$DOTFILES_DIR"; fi
 case "$(hostname -s 2>/dev/null || true)" in
   vm) HM_HOST="vm" ;;
   *) HM_HOST="tuxedo" ;;
@@ -26,7 +32,7 @@ Usage: $0 [--dry-run] [--yes] [--hyprland] [--nix [--input NAME]...] [--no-apt]
   --yes           don't ask before apt upgrade
   --hyprland      also upgrade the held Hyprland stack (read the release notes
                   first: https://github.com/hyprwm/Hyprland/releases)
-  --nix           nix flake update + home-manager switch
+  --nix           nix flake update + home-manager switch ($FLAKE)
   --input NAME    with --nix: update only this flake input (repeatable),
                   e.g. --input quickshell
   --no-apt        skip the apt part (e.g. only --nix)
@@ -140,18 +146,20 @@ if ((DO_NIX)); then
     set -u
   fi
   if ((DRY_RUN)) || command -v nix >/dev/null; then
-    run nix flake update "${NIX_INPUTS[@]}" --flake "$DOTFILES_DIR"
-    if ((!DRY_RUN)) && command -v git >/dev/null; then
+    run nix flake update "${NIX_INPUTS[@]}" --flake "$FLAKE"
+    if ((!DRY_RUN)) && [[ $FLAKE == "$DOTFILES_DIR" ]] && command -v git >/dev/null; then
       git -C "$DOTFILES_DIR" --no-pager diff --stat -- flake.lock || true
     fi
     # -b hm-backup, as in 60-nix.sh: a file in the way is renamed, not fatal.
     if command -v home-manager >/dev/null; then
-      run home-manager switch -b hm-backup --flake "$DOTFILES_DIR#$HM_USER@$HM_HOST"
+      run home-manager switch -b hm-backup --flake "$FLAKE#$HM_USER@$HM_HOST"
     else
-      run nix run --inputs-from "$DOTFILES_DIR" home-manager -- \
-        switch -b hm-backup --flake "$DOTFILES_DIR#$HM_USER@$HM_HOST"
+      run nix run --inputs-from "$KUBAOS_DIR" home-manager -- \
+        switch -b hm-backup --flake "$FLAKE#$HM_USER@$HM_HOST"
     fi
-    # The lock screen's PAM modules follow the new nixpkgs too.
+    # The lock screen's PAM modules follow KubaOS's nixpkgs (lib.sh), which
+    # moves with a release, not with the update above; relinking is a no-op
+    # until then.
     link_pam_fprintd
     if [[ -L "$PAM_U2F_LINK" ]] || ((DRY_RUN)); then link_pam_u2f; fi
     # gpu-screen-recorder's setcap'd KMS helper must match the new gsr.
@@ -162,7 +170,7 @@ if ((DO_NIX)); then
     fi
     info "If activation warned about GPU drivers: system/60-nix.sh --no-switch --no-chsh --force-gpu"
     info "Broken? home-manager generations, then run <path>/activate of the previous one."
-    info "Happy? commit flake.lock."
+    [[ $FLAKE != "$DOTFILES_DIR" ]] || info "Happy? commit flake.lock."
   else
     warn "nix not found; skipping the Nix update (system/60-nix.sh installs it)"
   fi

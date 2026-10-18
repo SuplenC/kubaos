@@ -34,7 +34,8 @@ USER_NAME="$(id -un)"
 # pamu2fcfg's and pam_u2f's default relying party: credentials only count on
 # this host name.
 ORIGIN="pam://$(hostname)"
-DOTFILES="${DOTFILES_DIR:-$HOME/Projects/dotfiles}"
+# KubaOS's checkout: its nixpkgs built the lock screen's PAM modules.
+KUBAOS_DIR="${KUBAOS_DIR:-/usr/share/kubaos}"
 MODE=auto REPLACE=0
 DEV="" DEV_INFO=""
 
@@ -185,7 +186,7 @@ cmd_test_lock() {
   [[ -e /usr/local/lib/security/pam_u2f.so ]] || die "/usr/local/lib/security/pam_u2f.so missing: run system/70-bitwarden.sh"
   # The lock screen's stack, through Nix's libpam like Quickshell.
   say "Lock screen's qs-lock-u2f: put an enrolled finger on the sensor."
-  if nix shell --inputs-from "$DOTFILES" nixpkgs#pamtester -c pamtester qs-lock-u2f "$USER_NAME" authenticate; then
+  if nix shell --inputs-from "$KUBAOS_DIR" nixpkgs#pamtester -c pamtester qs-lock-u2f "$USER_NAME" authenticate; then
     say "The lock screen accepts it."
   else
     say "Not accepted (no key, wrong finger, timeout, or a PIN-only key). The password still unlocks."

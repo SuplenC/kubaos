@@ -17,9 +17,12 @@ use crate::{Event, Level, StepId};
 
 mod firstboot;
 
-/// Where the dotfiles checkout sits inside the payload's rootfs. The user
-/// step copies it to `~/Projects/dotfiles`, where the live links point.
-pub const PAYLOAD_DOTFILES: &str = "/usr/share/dotinstall/dotfiles";
+/// KubaOS's root-owned checkout in the payload's rootfs, on its `release`
+/// branch. The user flake takes KubaOS from here.
+pub const PAYLOAD_KUBAOS: &str = crate::setup::SYSTEM_KUBAOS;
+/// The user flake's lock, generated at payload build: the user's nixpkgs at
+/// KubaOS's revision, KubaOS at the payload's commit.
+const USER_FLAKE_LOCK: &str = "/usr/share/dotinstall/user-flake.lock";
 /// Out-link of the generation built for a username the payload wasn't
 /// built for, inside the target. /tmp: home-manager's profile roots it after.
 const HOME_REBUILT: &str = "/tmp/dotinstall-home-generation";
@@ -981,7 +984,7 @@ impl<'a> Install<'a> {
             if !self.r.exists(&self.t(dest)) {
                 continue;
             }
-            let src = format!("{PAYLOAD_DOTFILES}/{template}");
+            let src = format!("{PAYLOAD_KUBAOS}/{template}");
             match self.r.read_file(&self.t(&src)) {
                 Some(t) => {
                     self.write(dest, &files::render_user_template(&t, &name, &home), 0o644)?
@@ -992,23 +995,54 @@ impl<'a> Install<'a> {
             }
         }
 
-        // The live links point into ~/Projects/dotfiles; the image carries
-        // the checkout.
-        if self.dry() || self.r.exists(&self.t(PAYLOAD_DOTFILES)) {
-            let projects = self.t(&format!("{home}/Projects"));
-            self.mkdir(&projects)?;
-            self.sh(Cmd::new("cp").args([
-                "-a",
-                &self.ts(PAYLOAD_DOTFILES),
-                &projects.join("dotfiles").display().to_string(),
-            ]))?;
-            self.sh(Cmd::new("chown").args(["-R", &owner, &projects.display().to_string()]))?;
-        } else {
-            self.warn(format!(
-                "no dotfiles checkout at {PAYLOAD_DOTFILES} in the payload; ~/Projects/dotfiles is missing and the live links will dangle"
-            ));
-        }
+        self.write_user_flake(&home, &owner)?;
         self.progress(1.0, None);
+        Ok(())
+    }
+
+    /// ~/.config/kubaos/home: user-flake/ from KubaOS's checkout with the
+    /// name, host and system filled in, and the payload's lock. The name is
+    /// a literal in the user's own file, so KubaOS's checkout stays clean.
+    fn write_user_flake(&mut self, home: &str, owner: &str) -> R<()> {
+        let c = self.cfg;
+        let system = format!("{}-linux", self.manifest.arch);
+        let dir = format!("{home}/{}", files::USER_FLAKE);
+        let template = format!("{PAYLOAD_KUBAOS}/user-flake");
+        // (source, file in the user flake, filled in from the template)
+        let sources = [
+            (format!("{template}/flake.nix.in"), "flake.nix", true),
+            (format!("{template}/home.nix"), "home.nix", false),
+            (USER_FLAKE_LOCK.to_string(), "flake.lock", false),
+        ];
+        self.mkdir(&self.t(&dir))?;
+        for (src, name, fill) in sources {
+            let contents = match self.r.read_file(&self.t(&src)) {
+                Some(t) if fill => {
+                    files::user_flake(&t, &c.user.username, &c.host.hostname, &system)
+                }
+                Some(t) => t,
+                None if self.dry() => {
+                    self.info(format!("would write {dir}/{name} from {src}"));
+                    continue;
+                }
+                None => {
+                    return Err(StepError {
+                        message: format!("{src} is not in the payload"),
+                        hint: Some(
+                            "The payload ships the user flake's template and lock (installer/image)."
+                                .into(),
+                        ),
+                    });
+                }
+            };
+            self.write(&format!("{dir}/{name}"), &contents, 0o644)?;
+        }
+        self.sh(Cmd::new("chown").args([owner, &self.ts(&format!("{home}/.config"))]))?;
+        self.sh(Cmd::new("chown").args([
+            "-R",
+            owner,
+            &self.ts(&format!("{home}/.config/kubaos")),
+        ]))?;
         Ok(())
     }
 
@@ -1250,8 +1284,7 @@ impl<'a> Install<'a> {
         Ok(())
     }
 
-    /// As the user, in ~/Projects/dotfiles: write the name into
-    /// home/username (flake.nix reads it), commit that, and build
+    /// As the user, in the user flake (write_user_flake): build
     /// `<user>@<host>` offline. Only the derivations that name the user
     /// rebuild; the payload carries their build inputs (installer/image).
     /// The username is validated (a-z, 0-9, - and _), so it goes in as is.
@@ -1262,12 +1295,9 @@ impl<'a> Install<'a> {
             self.cfg.host.hostname
         );
         format!(
-            "set -e; cd \"$HOME/Projects/dotfiles\" && printf '%s\\n' {user} > home/username && \
-             git add home/username && \
-             git -c user.name=dotinstall -c user.email=dotinstall@localhost commit -q --no-gpg-sign \
-             -m \"chore: home-manager generation for {user}\" && \
-             exec nix --offline --option experimental-features 'nix-command flakes' build -L \
-             --out-link {HOME_REBUILT} \".#{flake_out}\""
+            "set -e; cd \"$HOME/{}\" && exec nix --offline --option experimental-features 'nix-command flakes' build -L \
+             --out-link {HOME_REBUILT} \".#{flake_out}\"",
+            files::USER_FLAKE
         )
     }
 

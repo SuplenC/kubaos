@@ -7,7 +7,7 @@ echo "Starting Home Manager activation"
 [ "$PWD" = "$HOME" ] || { echo "cwd $PWD is not $HOME" >&2; exit 1; }
 [ "$NIX_REMOTE" = daemon ] || { echo "NIX_REMOTE=$NIX_REMOTE" >&2; exit 1; }
 [ -S /nix/var/nix/daemon-socket/socket ] || { echo "no nix-daemon socket" >&2; exit 1; }
-[ -d "$HOME/Projects/dotfiles" ] || { echo "no ~/Projects/dotfiles" >&2; exit 1; }
+[ -f "$HOME/.config/kubaos/home/flake.lock" ] || { echo "no user flake in ~/.config/kubaos/home" >&2; exit 1; }
 printf 'user=%s uid=%s groups=%s home=%s nix_remote=%s backup=%s\n' \
   "$USER" "$(id -u)" "$(id -Gn | tr ' ' ,)" "$HOME" "$NIX_REMOTE" "$HOME_MANAGER_BACKUP_EXT" \
   > "$HOME/.hm-activated"

@@ -28,7 +28,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
 ARCH=aarch64 OUT="" ALLOW_DIRTY=0 ZSTD_LEVEL=15 BUILD_ARGS=()
 CPUS="${DOTINSTALL_IMAGE_CPUS:-6}" MEM="${DOTINSTALL_IMAGE_MEM:-8g}"
-PAYLOAD_USER=kuba   # the build user (Dockerfile) and home/username; the engine rebuilds for any other name
+PAYLOAD_USER=kuba   # the build user (Dockerfile); the engine rebuilds for any other name
 
 die() { printf 'build: %s\n' "$*" >&2; exit 1; }
 usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }

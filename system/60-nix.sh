@@ -38,7 +38,9 @@ Usage: $0 [--dry-run] [--user NAME] [--host NAME] [--no-switch] [--no-gpu] [--fo
 
   --user NAME   username part of the flake output (default: $HM_USER)
   --host NAME   host part of the flake output: tuxedo or vm (default: $HM_HOST)
-                -> home-manager switch --flake $DOTFILES_DIR#<user>@<host>
+                -> home-manager switch --flake <flake>#<user>@<host>, the
+                   flake being ~/.config/kubaos/home if there is one, else
+                   $DOTFILES_DIR
   --no-switch   skip home-manager switch (the GPU step still runs if the
                 current generation has non-nixos-gpu-setup)
   --no-gpu      skip the non-NixOS GPU setup
@@ -68,8 +70,12 @@ if ((EUID == 0)) && ! in_container; then
 fi
 require_sudo
 HM_CONFIG="$HM_USER@$HM_HOST"
+# The user flake the installer wrote (your nixpkgs, KubaOS from
+# /usr/share/kubaos); without one (a machine set up by hand), this checkout.
+USER_FLAKE="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/home"
+if [[ -f "$USER_FLAKE/flake.nix" ]]; then FLAKE="$USER_FLAKE"; else FLAKE="$DOTFILES_DIR"; fi
 if [[ "$(hostname -s 2>/dev/null || true)" != "$HM_HOST" ]] && ! in_container; then
-  warn "hostname is $(hostname -s), not $HM_HOST: plain 'home-manager switch --flake $DOTFILES_DIR'"
+  warn "hostname is $(hostname -s), not $HM_HOST: plain 'home-manager switch --flake $FLAKE'"
   warn "won't find $HM_CONFIG. Fix with: sudo hostnamectl set-hostname $HM_HOST"
 fi
 NIX_BIN=/nix/var/nix/profiles/default/bin
@@ -149,22 +155,22 @@ fi
 
 # --------------------------------------------------------------------------
 if ((DO_SWITCH)); then
-  step "home-manager switch --flake $DOTFILES_DIR#$HM_CONFIG"
-  [[ -f "$DOTFILES_DIR/flake.nix" ]] || die "no flake.nix in $DOTFILES_DIR"
+  step "home-manager switch --flake $FLAKE#$HM_CONFIG"
+  [[ -f "$FLAKE/flake.nix" ]] || die "no flake.nix in $FLAKE"
   # Flakes only see git-tracked files.
-  if command -v git >/dev/null && [[ -n "$(git -C "$DOTFILES_DIR" ls-files --others --exclude-standard -- home config scripts flake.nix 2>/dev/null)" ]]; then
+  if [[ $FLAKE == "$DOTFILES_DIR" ]] && command -v git >/dev/null && [[ -n "$(git -C "$DOTFILES_DIR" ls-files --others --exclude-standard -- home config scripts flake.nix 2>/dev/null)" ]]; then
     warn "untracked files under home/ config/ scripts/ are invisible to the flake; git add them first"
   fi
   if command -v home-manager >/dev/null; then
-    run home-manager switch -b hm-backup --flake "$DOTFILES_DIR#$HM_CONFIG"
+    run home-manager switch -b hm-backup --flake "$FLAKE#$HM_CONFIG"
   else
-    # First run: use the home-manager the flake pins in flake.lock
+    # First run: use the home-manager KubaOS's flake pins in flake.lock
     # (--inputs-from resolves "home-manager" to that input), so the CLI
     # matches the module version. Equivalent to
     #   nix run home-manager/release-26.05 -- switch --flake ...
     # (the flake pins release-26.05) without repeating the branch here.
-    run nix run --inputs-from "$DOTFILES_DIR" home-manager -- \
-      switch -b hm-backup --flake "$DOTFILES_DIR#$HM_CONFIG"
+    run nix run --inputs-from "$KUBAOS_DIR" home-manager -- \
+      switch -b hm-backup --flake "$FLAKE#$HM_CONFIG"
   fi
   info "-b hm-backup: files home-manager would overwrite are renamed *.hm-backup"
 fi

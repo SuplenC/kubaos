@@ -1,9 +1,8 @@
 # Start Hyprland on tty1 after autologin.
 #
-# Source this from ~/.zprofile, AFTER the Nix / home-manager environment is set
-# up (so Hyprland and everything it launches inherit PATH, XDG_DATA_DIRS etc.):
-#
-#   source ~/Projects/dotfiles/system/files/hyprland-autostart.zsh
+# ~/.zprofile sources this from the Nix store (home/shell.nix), AFTER the Nix
+# / home-manager environment is set up, so Hyprland and everything it launches
+# inherit PATH, XDG_DATA_DIRS etc.
 #
 # start-hyprland ships in the hyprland package (PPA and Ubuntu archive). It is
 # the launcher the Hyprland wiki documents; it watches the compositor and

@@ -22,7 +22,6 @@ FOLDERS=(shinjuku japanese cyberpunk)
 # wallpaper's own neon hue in the accent roles (tonal-spot washes it out);
 # override per run with DOT_THEME_SCHEME (scheme-vibrant, scheme-content, ...).
 SCHEME="${DOT_THEME_SCHEME:-scheme-fidelity}"
-DOTFILES="${DOTFILES_DIR:-$HOME/Projects/dotfiles}"
 # First-boot wallpaper: a ukiyo scene (ukiyo:<id>), or a path relative to
 # $WALLS. config/matugen/default-colors.json is generated from it (see
 # config/matugen/README.md).
@@ -41,7 +40,7 @@ usage() {
 
 matugen_dir() {
   local d
-  for d in "${XDG_CONFIG_HOME:-$HOME/.config}/matugen" "$DOTFILES/config/matugen"; do
+  for d in "${XDG_CONFIG_HOME:-$HOME/.config}/matugen" "${XDG_DATA_HOME:-$HOME/.local/share}/kubaos/defaults/matugen"; do
     [[ -f $d/config.toml ]] && { printf '%s\n' "$d"; return; }
   done
   die "matugen config.toml not found (expected ~/.config/matugen/config.toml)"
@@ -404,7 +403,7 @@ set_wallpaper() {
     return
   fi
   [[ -f $file ]] || die "no such file: $file"
-  # -s: keep ~/Pictures/wallpapers/... as is (it is a link into the repo).
+  # -s: keep ~/Pictures/wallpapers/... as is (KubaOS's are links into the store).
   file=$(realpath -s -- "$file")
   case ${file,,} in
     *.jpg | *.jpeg | *.png | *.webp | *.mp4 | *.webm | *.mkv | *.mov) ;;

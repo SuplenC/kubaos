@@ -8,15 +8,15 @@
 #   setup-helper fingerprint                     fprintd, pam-auth-update fprintd
 #   setup-helper u2f-add                         one pamu2fcfg credential on stdin
 #
-# The TUXEDO and fingerprint verbs run system/30-hardware.sh from the
-# root-owned checkout the payload carries, never the user's writable copy
-# in ~/Projects/dotfiles: anything running as the user could edit that one.
+# The TUXEDO and fingerprint verbs run system/30-hardware.sh from KubaOS's
+# root-owned checkout (/usr/share/kubaos), never from a copy anything running
+# as the user could edit.
 set -euo pipefail
 umask 022
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive
 
-SYSTEM=/usr/share/dotinstall/dotfiles/system
+SYSTEM=/usr/share/kubaos/system
 MAP=/etc/u2f_mappings
 
 die() { printf '  xx  %s\n' "$*" >&2; exit 1; }

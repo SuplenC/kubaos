@@ -230,17 +230,30 @@ c_links() {
   for d in "$REPO"/scripts/*; do
     n="$(basename "$d")"
     target="$(readlink -f "$USER_HOME/.local/bin/$n" || true)"
-    [[ $target == "$REPO/scripts/$n" ]] || { echo "FAIL ~/.local/bin/$n -> $target"; bad=1; }
+    [[ $target == /nix/store/*-kubaos-scripts/"$n" ]] && cmp -s "$target" "$d" ||
+      { echo "FAIL ~/.local/bin/$n -> $target"; bad=1; }
     [[ -x $d ]] || { echo "FAIL scripts/$n isn't executable"; bad=1; }
     [[ $n == dot-* ]] || { echo "FAIL scripts/$n has no dot- prefix"; bad=1; }
     head -1 "$d" | grep -q '^#!/usr/bin/env ' || { echo "FAIL scripts/$n: no env shebang"; bad=1; }
     grep -q '^set -euo pipefail' "$d" || { echo "FAIL scripts/$n: no set -euo pipefail"; bad=1; }
   done
-  target="$(readlink -f "$USER_HOME/Pictures/wallpapers" || true)"
-  [[ $target == "$REPO/wallpapers" ]] || { echo "FAIL ~/Pictures/wallpapers -> $target"; bad=1; }
+  # Wallpapers: real folders (the user's own images go there too), each of
+  # KubaOS's files a link into the store.
+  local n_walls=0
+  for d in "$REPO"/wallpapers/*/; do
+    n="$(basename "$d")"
+    [[ -d $USER_HOME/Pictures/wallpapers/$n && ! -L $USER_HOME/Pictures/wallpapers/$n ]] ||
+      { echo "FAIL ~/Pictures/wallpapers/$n isn't a directory"; bad=1; }
+    for f in "$d"*; do
+      target="$(readlink -f "$USER_HOME/Pictures/wallpapers/$n/$(basename "$f")" || true)"
+      [[ $target == /nix/store/* ]] && cmp -s "$target" "$f" ||
+        { echo "FAIL ~/Pictures/wallpapers/$n/$(basename "$f") -> $target"; bad=1; }
+      n_walls=$((n_walls + 1))
+    done
+  done
   [[ -f $USER_HOME/.config/tmux-nix/plugins.conf ]] || { echo "FAIL no ~/.config/tmux-nix/plugins.conf"; bad=1; }
   [[ -f $USER_HOME/.config/direnv/lib/bwenv.sh ]] || { echo "FAIL no direnv bwenv.sh"; bad=1; }
-  ((bad == 0)) && echo "ok   $n_files default files from the store, $(ls "$REPO"/scripts | wc -l) scripts and wallpapers linked into the repo"
+  ((bad == 0)) && echo "ok   $n_files default files, $(ls "$REPO"/scripts | wc -l) scripts and $n_walls wallpapers from the store"
   return "$bad"
 }
 

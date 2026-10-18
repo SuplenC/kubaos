@@ -108,7 +108,8 @@ mod tests {
     #[test]
     fn the_files_say_what_the_code_expects() {
         assert!(HELPER.starts_with("#!/bin/bash"));
-        assert!(HELPER.contains("/usr/share/dotinstall/dotfiles/system"));
+        assert!(HELPER.contains("SYSTEM=/usr/share/kubaos/system\n"));
+        assert!(HELPER.contains(&format!("{}/system", crate::setup::SYSTEM_KUBAOS)));
         assert!(POLICY.contains("/usr/lib/kubaos/setup-helper"));
         assert!(POLICY.contains(crate::setup::HELPER));
         assert!(UNIT.contains("ExecStart=/usr/bin/dotinstall-gui --setup --first-boot"));

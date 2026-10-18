@@ -13,24 +13,11 @@
 # PATH for proto/bun/cargo/~/.local/bin lives in home.sessionPath (nix agent).
 {
   config,
-  inputs,
+  kubaosPkgs,
   pkgs,
   lib,
-  dotfilesDir,
   ...
 }:
-let
-  # `ukiyo shell-hook zsh`, generated once at build time, so no shell start
-  # runs ukiyo. It sends each finished command (line, exit status, duration)
-  # down the daemon's socket with zsocket, no process per prompt, and does
-  # nothing when no daemon runs. The daemon decides what counts as a build.
-  ukiyoHook =
-    pkgs.runCommand "ukiyo-hook.zsh"
-      { nativeBuildInputs = [ inputs.ukiyo.packages.${pkgs.stdenv.hostPlatform.system}.default ]; }
-      ''
-        ukiyo shell-hook zsh >$out
-      '';
-in
 {
   home.packages = [ pkgs.oh-my-posh ];
 
@@ -51,7 +38,7 @@ in
     };
 
     shellAliases = {
-      zshrc = "nvim ~/Projects/dotfiles/home/shell.nix && echo 'Apply with: home-manager switch --flake ~/Projects/dotfiles'";
+      zshrc = "nvim ~/.config/kubaos/zsh/zshrc";
       wipe = "clear && tmux clear-history";
       nvimconfig = "nvim ~/.config/nvim";
       tma = "tmux attach";
@@ -118,8 +105,13 @@ in
         precmd_functions=(_dot_omp_init ''${precmd_functions:#_dot_omp_init})
       ''
 
+      # `ukiyo shell-hook zsh`, generated at build time (home/curated.nix), so
+      # no shell start runs ukiyo. It sends each finished command (line, exit
+      # status, duration) down the daemon's socket with zsocket, no process
+      # per prompt, and does nothing when no daemon runs. The daemon decides
+      # what counts as a build.
       (lib.mkOrder 1500 ''
-        source ${ukiyoHook}
+        source ${kubaosPkgs.ukiyo-zsh-hook}
       '')
 
       # The user layer's zshrc, after everything but zoxide, so it wins.
@@ -136,9 +128,7 @@ in
     # Autologin on tty1 starts Hyprland. The snippet is owned by system/
     # and must be the last thing in ~/.zprofile.
     profileExtra = lib.mkOrder 2000 ''
-      if [[ -r ${dotfilesDir}/system/files/hyprland-autostart.zsh ]]; then
-        source ${dotfilesDir}/system/files/hyprland-autostart.zsh
-      fi
+      source ${../system/files/hyprland-autostart.zsh}
     '';
   };
 

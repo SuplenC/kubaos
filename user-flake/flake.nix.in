@@ -1,0 +1,26 @@
+# Your home: KubaOS plus your own packages and options (home.nix). The
+# installer wrote this file; from here on it's yours. Apply with
+#   home-manager switch --flake ~/.config/kubaos/home
+{
+  description = "@USER@'s KubaOS home";
+
+  inputs = {
+    # Your packages. `nix flake update --flake ~/.config/kubaos/home` moves
+    # this one (and re-reads kubaos, below).
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
+    # KubaOS: the root-owned checkout, at the installed release. Only a
+    # KubaOS update moves its `release` branch. No `follows`: KubaOS's own
+    # packages keep KubaOS's nixpkgs.
+    kubaos.url = "git+file:///usr/share/kubaos?ref=refs/heads/release";
+  };
+
+  outputs =
+    { nixpkgs, kubaos, ... }:
+    {
+      homeConfigurations."@USER@@@HOST@" = kubaos.lib.mkHome {
+        pkgs = nixpkgs.legacyPackages.@SYSTEM@;
+        username = "@USER@";
+        modules = [ ./home.nix ];
+      };
+    };
+}

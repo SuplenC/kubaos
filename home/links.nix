@@ -10,17 +10,16 @@
 # handles them: it seeds the ones the app rewrites, merges the ones with no
 # include, and creates the user layer's missing files from user-layer/.
 #
-# scripts/<file> stays live-linked to ~/.local/bin/<file>. New files need
-# `git add` before the next switch (flakes only see tracked files).
+# scripts/<file> is linked from the store to ~/.local/bin/<file> the same way.
+# In a checkout, new files need `git add` before the next switch (flakes only
+# see tracked files).
 {
   config,
   lib,
   pkgs,
-  dotfilesDir,
   ...
 }:
 let
-  repoLink = path: config.lib.file.mkOutOfStoreSymlink "${dotfilesDir}/${path}";
   outOfStore = config.lib.file.mkOutOfStoreSymlink;
   userLayer = "${config.xdg.configHome}/kubaos";
 
@@ -70,9 +69,16 @@ let
     );
   linked = lib.subtractLists notLinked (files defaults);
 
+  scriptsDir = builtins.path {
+    path = ../scripts;
+    name = "kubaos-scripts";
+  };
   scripts = lib.attrNames (
     lib.filterAttrs (name: t: t == "regular" && !lib.hasPrefix "." name) (builtins.readDir ../scripts)
   );
+  # Where the repo lived before the user flake: machines installed then
+  # still have live links into it.
+  oldCheckout = "${config.home.homeDirectory}/Projects/dotfiles";
 in
 {
   xdg.configFile =
@@ -97,7 +103,7 @@ in
   };
 
   home.file = lib.listToAttrs (
-    map (name: lib.nameValuePair ".local/bin/${name}" { source = repoLink "scripts/${name}"; }) scripts
+    map (name: lib.nameValuePair ".local/bin/${name}" { source = "${scriptsDir}/${name}"; }) scripts
   );
 
   # Migration from live links: ~/.config/<app> used to be a link to
@@ -107,12 +113,12 @@ in
   # hyprland.lua, unless that already exists.
   home.activation.liveLinksToDefaults = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
     for l in "${config.xdg.configHome}"/*; do
-      if [ -L "$l" ] && [ "$(readlink -f "$l")" = "${dotfilesDir}/config/$(basename "$l")" ]; then
+      if [ -L "$l" ] && [ "$(readlink -f "$l")" = "${oldCheckout}/config/$(basename "$l")" ]; then
         run rm "$l"
       fi
     done
-    if [ -f "${dotfilesDir}/config/hypr/local.lua" ] && [ ! -e "${userLayer}/hypr/hyprland.lua" ]; then
-      run install -D -m 0644 "${dotfilesDir}/config/hypr/local.lua" "${userLayer}/hypr/hyprland.lua"
+    if [ -f "${oldCheckout}/config/hypr/local.lua" ] && [ ! -e "${userLayer}/hypr/hyprland.lua" ]; then
+      run install -D -m 0644 "${oldCheckout}/config/hypr/local.lua" "${userLayer}/hypr/hyprland.lua"
     fi
   '';
 

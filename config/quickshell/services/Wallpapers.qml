@@ -103,7 +103,8 @@ Singleton {
     Process {
         id: lister
 
-        command: ["find", ...Settings.wallpaperFolders.map(f => `${Settings.wallpaperRoot}/${f}`), `${Theme.stateDir}/posters`, "-maxdepth", "1", "-type", "f", ...root.nameArgs([...root.imageExtensions, ...root.videoExtensions])]
+        // -L: KubaOS's own wallpapers are links into the Nix store.
+        command: ["find", "-L", ...Settings.wallpaperFolders.map(f => `${Settings.wallpaperRoot}/${f}`), `${Theme.stateDir}/posters`, "-maxdepth", "1", "-type", "f", ...root.nameArgs([...root.imageExtensions, ...root.videoExtensions])]
         stdout: StdioCollector {
             onStreamFinished: {
                 const found = {};

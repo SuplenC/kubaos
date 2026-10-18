@@ -26,14 +26,16 @@ The layout is whatever you picked in the installer (`/etc/default/keyboard`, `us
 
 ## Updating and rolling back
 
-Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Quickshell and every user tool are pinned in `flake.lock`. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run:
+Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, ukiyo, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run:
 
 ```sh
-system/update.sh                                  # snapshot, then apt upgrade (Hyprland stays held)
-system/update.sh --hyprland                       # also the held Hyprland stack; read its release notes first
-system/update.sh --no-apt --nix                   # nix flake update + home-manager switch; commit flake.lock if happy
-system/update.sh --no-apt --nix --input quickshell
+S=/usr/share/kubaos/system
+$S/update.sh                              # snapshot, then apt upgrade (Hyprland stays held)
+$S/update.sh --hyprland                   # also the held Hyprland stack; read its release notes first
+$S/update.sh --no-apt --nix               # nix flake update of your flake + home-manager switch
 ```
+
+`--nix` is the same as `nix flake update --flake ~/.config/kubaos/home` and a switch: it moves your nixpkgs, and KubaOS's packages keep their exact store paths.
 
 `update.sh` takes a snapper snapshot first, every time. Ways back, from smallest to largest:
 
@@ -44,7 +46,7 @@ system/update.sh --no-apt --nix --input quickshell
 
 ## Make it yours
 
-Don't edit `~/Projects/dotfiles` or the files in `~/.config/<app>`. Those are KubaOS's defaults: read-only, and replaced whole by every update. Your changes go in `~/.config/kubaos/<app>/`, which every app loads after ours, so what you set there wins. Updates never write to it. When we change a default you haven't touched, you get the new one; when you've set your own, you keep yours.
+Don't edit `/usr/share/kubaos` or the files in `~/.config/<app>`. Those are KubaOS's defaults: read-only, and replaced whole by every update. Your changes go in `~/.config/kubaos/<app>/`, which every app loads after ours, so what you set there wins. Updates never write to it. When we change a default you haven't touched, you get the new one; when you've set your own, you keep yours.
 
 Each file starts as a comment and an example:
 
@@ -60,17 +62,30 @@ Each file starts as a comment and an example:
 | lazygit, bacon, yazi | `~/.config/kubaos/{lazygit/config.yml,bacon/prefs.toml,yazi/yazi.toml,yazi/keymap.toml}` | next start (lazygit and bacon: in a new shell) |
 | bat, fastfetch | `~/.config/kubaos/{bat/config,fastfetch/config.jsonc}` | after `dot-config apply` |
 | btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml`: they rewrite their own file, so it's yours as is | next start |
+| Nix packages and home-manager options | `~/.config/kubaos/home/home.nix`, e.g. `home.packages = [ pkgs.hello ];` | `home-manager switch --flake ~/.config/kubaos/home` |
 
 - To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
 - Delete a file in `~/.config/kubaos` to get the example back on the next `dot-config apply` or update.
 - Quickshell's settings, the colors (matugen) and the prompt (oh-my-posh) can't be overridden yet.
-- Hacking on KubaOS itself is different: edit `config/` in the repo and run `home-manager switch --flake ~/Projects/dotfiles` to see it. `docs/CONTRACTS.md` ("Defaults and the user layer") has the details.
+- Your own wallpapers go in `~/Pictures/wallpapers/<folder>/` next to KubaOS's, which are links into the store.
+- `~/.config/kubaos/home/` is your flake: KubaOS wrote it once, and an update never does again. Put it under git if you like (then `git add` new files before a switch).
+
+## Hacking on KubaOS
+
+KubaOS itself is the root-owned checkout `/usr/share/kubaos`. To change it, clone it anywhere and point your flake at the clone for a switch:
+
+```sh
+git clone https://github.com/SuplenC/kubaos.git ~/Projects/kubaos
+home-manager switch --flake ~/.config/kubaos/home --override-input kubaos git+file://$HOME/Projects/kubaos
+```
+
+`--override-input` doesn't touch your `flake.lock`, so a plain `home-manager switch --flake ~/.config/kubaos/home` goes back to the installed release. The clone's flake sees files git knows about: `git add` new ones first. `docs/CONTRACTS.md` ("Defaults and the user layer") has the details.
 
 ## Daily commands
 
 | Command | What |
 |---|---|
-| `home-manager switch --flake ~/Projects/dotfiles` | Apply changes under `home/` (new files need `git add` first) |
+| `home-manager switch --flake ~/.config/kubaos/home` | Apply your `home.nix` |
 | `dot-theme set <image>` | Set a wallpaper (an image, a loop, or `ukiyo:kabukicho-gate` for the live one) and regenerate colors everywhere |
 | `dot-theme next`, `prev`, `toggle-folder` | Cycle wallpapers (stills and loops), cycle the shinjuku, japanese and cyberpunk folders |
 | `dot-theme apply [--force]` | Regenerate from the current wallpaper; without `--force` it does nothing when no input changed (login runs it) |
@@ -170,7 +185,7 @@ Two benches, both on the Mac.
 Verified in an arm64 `ubuntu:26.04` container (user `kuba`, hostname `vm`, Nix installed with the official `--daemon` installer, daemon started by hand because there is no systemd):
 
 - `system/10-strip.sh`, `20-base.sh`, `50-hyprland.sh` (Ubuntu's arm64 hyprland, not the PPA) and `60-nix.sh` run clean; systemd, netplan and snapper steps skip themselves.
-- `home-manager switch --flake .#kuba@vm` builds and activates; every `~/.config/<dir>` and `~/.local/bin/dot-*` is a link into the repo.
+- `home-manager switch --flake .#kuba@vm` builds and activates; every file in `~/.config/<dir>` and `~/.local/bin/dot-*` is a link into the store.
 - zsh login shell loads without errors (zoxide doctor quiet), PATH order, atuin Ctrl-R, direnv hook, oh-my-posh prompt, `.zprofile` sources the autostart snippet.
 - `dot-theme apply` and `dot-theme set` write every file in `~/.local/state/theme/`; tmux, Neovim (LazyVim from the lockfile), Ghostty config validation and tms work with the real configs.
 - PAM: through Nix's libpam (the same build Quickshell links), `qs-lock` accepts the right password and rejects a wrong one as a non-root user, using Ubuntu's `unix_chkpwd` linked to `/run/wrappers/bin`. Ubuntu's own modules don't load under Nix's libpam; details in `docs/INSTALL.md`.

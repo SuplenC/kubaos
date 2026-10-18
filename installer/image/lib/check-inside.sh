@@ -234,41 +234,64 @@ a="$(in_root dpkg --audit 2>&1)"
 for p in linux-generic cryptsetup-initramfs btrfs-progs snapper network-manager docker-ce hyprland hypridle hyprlock; do
   grep -q "^installed $p " "$P/packages.txt" && ok "$p $(awk -v p="$p" '$2 == p {print $3}' "$P/packages.txt")" || fail "$p not installed"
 done
-check "dotfiles checkout at /usr/share/dotinstall/dotfiles" in_root git -c safe.directory=* -C /usr/share/dotinstall/dotfiles rev-parse --verify HEAD
-check "  with flake.nix" test -f "$R/usr/share/dotinstall/dotfiles/flake.nix"
+K=/usr/share/kubaos
+check "KubaOS checkout at $K, on release" eq "$(in_root git -C "$K" symbolic-ref --short HEAD)" release
+check "  origin is GitHub" eq "$(in_root git -C "$K" remote get-url origin)" https://github.com/SuplenC/kubaos.git
+check "  owned by root" eq "$(stat -c %u:%g "$R$K" "$R$K/flake.nix" | sort -u)" 0:0
+# Nix's fetcher refuses a repository another user owns unless git's system
+# config lists it. nobody stands in for the user the payload doesn't have.
+check "  readable by another user (safe.directory in /etc/gitconfig)" \
+  in_root setpriv --reuid=65534 --regid=65534 --clear-groups env HOME=/nonexistent git -C "$K" rev-parse --verify HEAD
+check "  with user-flake/" test -f "$R$K/user-flake/flake.nix.in"
+check "user flake lock at /usr/share/dotinstall/user-flake.lock" test -s "$R/usr/share/dotinstall/user-flake.lock"
+check "no dotfiles checkout in the payload any more" test ! -e "$R/usr/share/dotinstall/dotfiles"
+# The user flake as the engine writes it (engine/install.rs, write_user_flake).
+arch="$(jq -r .arch "$M")"
+host="$(jq -r .hostname "$M")"
+user_flake() {
+  rm -rf "$R/tmp/$1"
+  mkdir -p "$R/tmp/$1"
+  sed -e "s/@USER@/$2/g" -e "s/@HOST@/$host/g" -e "s/@SYSTEM@/$arch-linux/g" \
+    "$R$K/user-flake/flake.nix.in" >"$R/tmp/$1/flake.nix"
+  cp "$R$K/user-flake/home.nix" "$R/usr/share/dotinstall/user-flake.lock" "$R/tmp/$1/"
+  mv "$R/tmp/$1/user-flake.lock" "$R/tmp/$1/flake.lock"
+}
+# nix_offline SUBCOMMAND ARGS...: --no-update-lock-file, so the shipped lock
+# has to be complete.
+nix_offline() {
+  in_root /nix/var/nix/profiles/default/bin/nix --offline --option experimental-features 'nix-command flakes' \
+    "$1" --no-update-lock-file "${@:2}"
+}
 # home-manager switch on the machine must work offline: every flake input
 # (local ones too, like ukiyo's checkout) is in the store from `nix flake
-# archive`. Evaluating the generation's derivation path proves it.
+# archive`. The payload's user's flake evaluating to the shipped generation
+# proves it, and that the shipped lock is complete.
 t="$(now)"
-host="$(jq -r .hostname "$M")"
-if out="$(in_root /nix/var/nix/profiles/default/bin/nix --offline --option experimental-features 'nix-command flakes' \
-  eval --raw "git+file:///usr/share/dotinstall/dotfiles#homeConfigurations.\"$user@$host\".activationPackage.drvPath" 2>&1)"; then
-  ok "  the flake evaluates offline ($(since "$t") s)"
+user_flake check-home "$user"
+if out="$(nix_offline eval --raw "path:/tmp/check-home#homeConfigurations.\"$user@$host\".activationPackage.outPath" 2>&1)" &&
+  [[ "$out" == "$(jq -r .home_generation "$M")" ]]; then
+  ok "  the user flake evaluates offline to the shipped generation ($(since "$t") s)"
 else
-  fail "  the flake doesn't evaluate offline: $(tail -3 <<<"$out")"
+  fail "  the user flake doesn't evaluate offline to the shipped generation: $(tail -3 <<<"$out")"
 fi
-# Another username: the engine builds <user>@<host> offline from the checkout
-# with home/username rewritten (engine/install.rs, rebuild_home_script). The
-# payload carries the build inputs for that; building one proves it.
+# Another username: the engine builds <user>@<host> offline from the user
+# flake with that name in it, no commit anywhere. The payload carries the
+# build inputs for that; building one proves it.
 t="$(now)"
-rm -rf "$R/tmp/check-dotfiles"
-cp -a "$R/usr/share/dotinstall/dotfiles" "$R/tmp/check-dotfiles"
-if out="$(in_root sh -c "cd /tmp/check-dotfiles && printf 'kubaos-check\n' >home/username && \
-  git -c safe.directory=* add home/username && \
-  git -c safe.directory=* -c user.name=check -c user.email=check@localhost commit -q --no-gpg-sign -m check && \
-  /nix/var/nix/profiles/default/bin/nix --offline --option sandbox false --option experimental-features 'nix-command flakes' \
-    build --no-link --print-out-paths 'git+file:///tmp/check-dotfiles#homeConfigurations.\"kubaos-check@$host\".activationPackage'" 2>&1)" &&
+user_flake check-other kubaos-check
+if out="$(nix_offline build --option sandbox false --no-link --print-out-paths \
+  "path:/tmp/check-other#homeConfigurations.\"kubaos-check@$host\".activationPackage" 2>&1)" &&
   [[ -x "$R$(tail -1 <<<"$out")/activate" ]]; then
   ok "  a generation for another username builds offline ($(since "$t") s)"
 else
   fail "  a generation for another username doesn't build offline: $(tail -5 <<<"$out")"
 fi
-rm -rf "$R/tmp/check-dotfiles"
+rm -rf "$R/tmp/check-home" "$R/tmp/check-other"
 # Files in the system that name the build user: each must be one the engine
 # renders again for the real user (engine/files.rs USER_TEMPLATES, read from
 # the payload's own checkout), or a username other than the payload's gets
 # the payload's (tty1 autologin into an account that isn't there).
-templates="$(sed -n '/^pub const USER_TEMPLATES/,/^];/p' "$R/usr/share/dotinstall/dotfiles/installer/crates/core/src/engine/files.rs" |
+templates="$(sed -n '/^pub const USER_TEMPLATES/,/^];/p' "$R$K/installer/crates/core/src/engine/files.rs" |
   grep -o '"/[^"]*"' | tr -d '"')"
 [[ -n "$templates" ]] && ok "engine renders $(wc -l <<<"$templates" | tr -d ' ') system file(s) for the user" ||
   fail "no USER_TEMPLATES in the checkout's engine/files.rs"

@@ -1,7 +1,7 @@
 # A tiny stand-in for the real payload: Ubuntu 26.04 with GRUB (EFI),
 # snapper, zsh, locales, no users, an empty machine-id, a fake Nix store
-# with a home-manager "generation" and a fake nix-daemon, and a dotfiles
-# checkout where the image is meant to put it.
+# with a home-manager "generation" and a fake nix-daemon, and KubaOS's
+# checkout with the user flake's template and lock where the image puts them.
 FROM ubuntu:26.04
 RUN set -eux; \
     case "$(dpkg --print-architecture)" in arm64) g=grub-efi-arm64-bin ;; amd64) g=grub-efi-amd64-bin ;; esac; \
@@ -21,5 +21,7 @@ RUN set -eux; \
     mkdir -p /nix/var/nix/profiles/per-user /nix/var/nix/gcroots/per-user /nix/var/nix/daemon-socket; \
     ln -s /nix/store/0000000000000000000000000000test-nix /nix/var/nix/profiles/default-1-link; \
     ln -s default-1-link /nix/var/nix/profiles/default; \
-    mkdir -p /usr/share/dotinstall/dotfiles/config; \
-    echo "fake checkout" > /usr/share/dotinstall/dotfiles/README.md
+    mkdir -p /usr/share/kubaos/user-flake /usr/share/dotinstall; \
+    echo 'homeConfigurations."@USER@@@HOST@" = mkHome "@SYSTEM@";' > /usr/share/kubaos/user-flake/flake.nix.in; \
+    echo '{ }' > /usr/share/kubaos/user-flake/home.nix; \
+    echo '{"version": 7}' > /usr/share/dotinstall/user-flake.lock

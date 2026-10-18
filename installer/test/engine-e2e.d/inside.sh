@@ -254,7 +254,11 @@ EOF
   check "password is the one given" password_matches "$R"
   check "home on @home" test -d "$T/@home/kuba"
   check "home activated as kuba via nix-daemon" has "$T/@home/kuba/.hm-activated" 'user=kuba uid=1000 .*nix_remote=daemon backup=hm-backup'
-  check "dotfiles checkout owned by kuba" eq "$(stat -c %u:%g "$T/@home/kuba/Projects/dotfiles/README.md")" 1000:1000
+  local uf="$T/@home/kuba/.config/kubaos/home"
+  check "user flake for kuba@vm" has "$uf/flake.nix" "^homeConfigurations.\"kuba@vm\" = mkHome \"$(uname -m)-linux\";\$"
+  check "  with the payload's lock" has "$uf/flake.lock" '^\{"version": 7\}$'
+  check "  owned by kuba" eq "$(stat -c %u:%g "$uf" "$uf/flake.nix" "$uf/home.nix" "$uf/flake.lock" | sort -u)" 1000:1000
+  check "no ~/Projects/dotfiles" test ! -e "$T/@home/kuba/Projects/dotfiles"
   local nm="$R/etc/NetworkManager/system-connections/Home_5G.nmconnection"
   check "Wi-Fi keyfile root:root 0600" eq "$(stat -c %u:%g:%a "$nm")" 0:0:600
   check "Wi-Fi keyfile has ssid and psk" bash -c "grep -qx 'ssid=Home 5G' '$nm' && grep -qx 'psk=$WIFIPSK' '$nm'"

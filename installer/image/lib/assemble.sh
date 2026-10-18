@@ -12,8 +12,9 @@
 # Environment: ARCH HOST PAYLOAD_USER COMMIT VERSION BUILD_ID BUILT_AT
 # ZSTD_LEVEL CPUS, and the OS_* names from build.
 #
-# Steps: realise the home-manager generation (and find what a rebuild for
-# another username needs), run the Nix half of system/
+# Steps: put KubaOS's checkout at /usr/share/kubaos, lock the user flake,
+# realise its home-manager generation (and find what a rebuild for another
+# username needs), run the Nix half of system/
 # (60-nix.sh, 65-recorder.sh, 70-bitwarden.sh), copy this container's / into
 # /work/root, put a minimal /nix next to it (just the closure of what the
 # payload needs), strip machine identity and the build user, pack squashfs,
@@ -26,6 +27,13 @@ CPUS="${CPUS:-6}"
 
 NIX_BIN=/nix/var/nix/profiles/default/bin
 REPO="/home/$PAYLOAD_USER/Projects/dotfiles"
+# KubaOS's root-owned checkout on the machine; the user flake takes KubaOS
+# from its release branch (docs/INSTALLER.md, "The user flake").
+KUBAOS=/usr/share/kubaos
+KUBAOS_ORIGIN=https://github.com/SuplenC/kubaos.git
+# The build user's user flake. /home stays out of the payload; the lock ships
+# as $SHARE/user-flake.lock.
+USER_FLAKE="/home/$PAYLOAD_USER/.config/kubaos/home"
 ROOT=/work/root
 ROOTFS_NAME="${OS_ID:?}-${OS_CODENAME:?}-$ARCH.squashfs"
 SHARE=usr/share/dotinstall   # relative to the payload root
@@ -85,31 +93,79 @@ if [[ -n "${UKIYO_OVERRIDE_URL:-}" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# A clone of the commit (full history) on a local `release` branch, which
+# only the updater moves, with origin on GitHub. A --allow-dirty build, or
+# a ukiyo override, commits what it built from on top, so the release
+# branch holds the files the generation is built from.
+say "KubaOS checkout $KUBAOS (branch release, origin $KUBAOS_ORIGIN)"
+kubaos_git() { git -c user.name=dotinstall -c user.email=dotinstall@localhost -C "$KUBAOS" "$@"; }
+rm -rf "$KUBAOS"
+git clone -q /in/dotfiles.bundle "$KUBAOS"
+kubaos_git remote set-url origin "$KUBAOS_ORIGIN"
+kubaos_git checkout -q -B release
+if [[ "$COMMIT" == *-dirty ]]; then
+  # The tree as it was built from, deletions included.
+  find "$KUBAOS" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+  cp -a /in/src/. "$KUBAOS/"
+fi
+cp "$REPO/flake.lock" "$KUBAOS/flake.lock"
+if [[ -n "$(kubaos_git status --porcelain)" ]]; then
+  kubaos_git add -A
+  kubaos_git commit -q --no-gpg-sign -m "build: what payload $BUILD_ID was built from"
+fi
+chown -R root:root "$KUBAOS"
+# Nix's fetcher (libgit2) refuses a repository another user owns unless
+# git's system config lists it. This one ships.
+git config --system --get-all safe.directory | grep -qxF "$KUBAOS" ||
+  git config --system --add safe.directory "$KUBAOS"
+echo "    release at $(kubaos_git rev-parse --short=12 HEAD)"
+
+# user-flake/ for USER in DIR, the way the engine writes it
+# (engine/install.rs, write_user_flake).
+render_user_flake() {
+  local dir=$1 user=$2
+  as_user install -d "$dir"
+  sed -e "s/@USER@/$user/g" -e "s/@HOST@/$HOST/g" -e "s/@SYSTEM@/$ARCH-linux/g" \
+    "$KUBAOS/user-flake/flake.nix.in" | as_user tee "$dir/flake.nix" >/dev/null
+  as_user cp "$KUBAOS/user-flake/home.nix" "$dir/home.nix"
+}
+
+# The user's nixpkgs starts at KubaOS's revision, so day one has one
+# nixpkgs; they part when the user updates theirs.
+say "user flake lock (nixpkgs at KubaOS's revision, kubaos at release)"
+rm -rf "$USER_FLAKE"
+render_user_flake "$USER_FLAKE" "$PAYLOAD_USER"
+lock_py=/in/src/installer/image/lib/user-flake-lock.py
+as_user "$NIX_BIN/nix" flake lock --override-input nixpkgs "$(python3 "$lock_py" override "$KUBAOS/flake.lock")" \
+  "path:$USER_FLAKE"
+as_user python3 "$lock_py" pin "$KUBAOS/flake.lock" "$USER_FLAKE/flake.lock"
+
 HM_CONFIG="$PAYLOAD_USER@$HOST"
-say "home-manager generation $HM_CONFIG"
+say "home-manager generation $HM_CONFIG (the user flake)"
+# --no-update-lock-file: the lock as shipped must be complete.
 gen="$(as_user "$NIX_BIN/nix" --option cores "$CPUS" --option max-jobs "$CPUS" build --no-link --print-out-paths \
-  "$REPO#homeConfigurations.\"$HM_CONFIG\".activationPackage")"
+  --no-update-lock-file "path:$USER_FLAKE#homeConfigurations.\"$HM_CONFIG\".activationPackage")"
 [[ -x "$gen/activate" ]] || die "no activate in $gen"
 echo "    $gen"
-[[ "$(tr -d '[:space:]' <"$REPO/home/username")" == "$PAYLOAD_USER" ]] ||
-  die "home/username isn't $PAYLOAD_USER (the build user, installer/image/build PAYLOAD_USER)"
 
-# Another username at install: the engine writes it to home/username in the
-# checkout and builds <user>@<host> offline. Only the derivations that name
-# the user rebuild (dotfiles, unit and session files, the activation script,
+# Another username at install: the engine writes the user flake with that
+# name and builds <user>@<host> offline. Only the derivations that name the
+# user rebuild (dotfiles, unit and session files, the activation script,
 # home-path). A probe user's generation shows which ones; the store paths
 # their builders need (stdenv's scripts, perl for buildEnv, ...) go into the
 # payload next to the generation.
 PROBE_USER=kubaos-probe
 say "build inputs for another username (probe: $PROBE_USER@$HOST)"
-probe_repo="/home/$PAYLOAD_USER/probe-dotfiles"   # /home stays out of the payload
-rm -rf "$probe_repo"
-as_user cp -a "$REPO" "$probe_repo"
-as_user sh -c "cd '$probe_repo' && printf '%s\n' '$PROBE_USER' >home/username && git add home/username && \
-  git -c user.name=dotinstall -c user.email=dotinstall@localhost commit -q --no-gpg-sign -m probe"
-drv_of() { as_user "$NIX_BIN/nix" eval --raw "$1#homeConfigurations.\"$2@$HOST\".activationPackage.drvPath"; }
-gen_drv="$(drv_of "$REPO" "$PAYLOAD_USER")"
-probe_drv="$(drv_of "$probe_repo" "$PROBE_USER")"
+probe_flake="/home/$PAYLOAD_USER/probe-flake"   # /home stays out of the payload
+rm -rf "$probe_flake"
+render_user_flake "$probe_flake" "$PROBE_USER"
+as_user cp "$USER_FLAKE/flake.lock" "$probe_flake/flake.lock"
+drv_of() {
+  as_user "$NIX_BIN/nix" eval --raw --no-update-lock-file \
+    "path:$1#homeConfigurations.\"$2@$HOST\".activationPackage.drvPath"
+}
+gen_drv="$(drv_of "$USER_FLAKE" "$PAYLOAD_USER")"
+probe_drv="$(drv_of "$probe_flake" "$PROBE_USER")"
 nix_ build --no-link "$probe_drv^out" >/dev/null
 "$NIX_BIN/nix-store" -qR "$gen_drv" | sort >/tmp/gen-drvs
 "$NIX_BIN/nix-store" -qR "$probe_drv" | sort >/tmp/probe-drvs
@@ -129,11 +185,12 @@ while read -r p outs; do
 done </tmp/build-inputs
 mapfile -t rebuild_paths < <(printf '%s\n' "${rebuild_paths[@]}" | sort -u)
 echo "    ${#differing[@]} derivations name the user; their builds need ${#rebuild_paths[@]} store paths"
-rm -rf "$probe_repo"
+rm -rf "$probe_flake"
 
 # The Nix half of system/: PAM module links (60-nix.sh, 70-bitwarden.sh), the
-# setcap'd gsr-kms-server (65-recorder.sh). They build from the flake's
-# nixpkgs and leave GC roots in /nix/var/nix/gcroots/dotfiles-*.
+# setcap'd gsr-kms-server (65-recorder.sh). They build from KubaOS's nixpkgs
+# (--inputs-from $KUBAOS, system/lib.sh) and leave GC roots in
+# /nix/var/nix/gcroots/dotfiles-*.
 say "system/60-nix.sh --no-switch (pam_fprintd link)"
 as_user "$REPO/system/60-nix.sh" --host "$HOST" --user "$PAYLOAD_USER" --no-switch --no-gpu --no-chsh
 say "system/65-recorder.sh (gsr-kms-server, cap_sys_admin)"
@@ -151,13 +208,16 @@ gpu_paths="$(grep -o '/nix/store/[^ ]*' /etc/tmpfiles.d/non-nixos-gpu.conf | sor
 # The conf itself is a link into the setup package's store path.
 [[ -n "$gpu_paths" ]] || die "non-nixos-gpu.conf names no store path"
 
+# The user flake's inputs (KubaOS at release and its own inputs, the user's
+# nixpkgs) and the checkout's, for --inputs-from $KUBAOS.
 say "flake inputs (for offline evaluation on the machine)"
-flake_json="$(as_user "$NIX_BIN/nix" flake archive --json "$REPO")"
+flake_json="$(as_user "$NIX_BIN/nix" flake archive --json "path:$USER_FLAKE")"
+flake_json+="$(as_user "$NIX_BIN/nix" flake archive --json "$KUBAOS")"
 mapfile -t flake_paths < <(grep -o '/nix/store/[a-z0-9]\{32\}-[^"]*' <<<"$flake_json" | sort -u)
 echo "    ${#flake_paths[@]} store paths"
 
 say "packing tools from the flake's nixpkgs (not part of the payload)"
-tools="$(as_user "$NIX_BIN/nix" build --no-link --print-out-paths --inputs-from "$REPO" nixpkgs#rsync nixpkgs#squashfsTools | tr '\n' ' ')"
+tools="$(as_user "$NIX_BIN/nix" build --no-link --print-out-paths --inputs-from "$KUBAOS" nixpkgs#rsync nixpkgs#squashfsTools | tr '\n' ' ')"
 for t in $tools; do PATH="$t/bin:$PATH"; done
 command -v rsync mksquashfs >/dev/null
 
@@ -338,14 +398,8 @@ systemctl --root="$ROOT" disable ssh.service ssh.socket 2>&1 | sed 's/^/    /' |
 # ---------------------------------------------------------------------------
 say "dotinstall metadata ($SHARE)"
 install -d -m 0755 "$ROOT/$SHARE"
-# The dotfiles checkout the engine copies to ~/Projects/dotfiles: a clone of
-# the commit (full history). A --allow-dirty build lays the working tree it
-# was built from over it, so the files match the generation.
-rm -rf "$ROOT/$SHARE/dotfiles"
-git clone -q /in/dotfiles.bundle "$ROOT/$SHARE/dotfiles"
-git -C "$ROOT/$SHARE/dotfiles" remote remove origin
-if [[ "$COMMIT" == *-dirty ]]; then cp -a /in/src/. "$ROOT/$SHARE/dotfiles/"; fi
-chown -R root:root "$ROOT/$SHARE/dotfiles"
+# The engine writes it into the user flake, next to user-flake/ from $KUBAOS.
+install -m 0644 "$USER_FLAKE/flake.lock" "$ROOT/$SHARE/user-flake.lock"
 kernel="$(find "$ROOT/boot" -maxdepth 1 -name 'vmlinuz-*' -printf '%f\n' | sed 's/^vmlinuz-//' | sort -V | tail -1)"
 [[ -n "$kernel" && -f "$ROOT/boot/initrd.img-$kernel" ]] || die "no kernel + initrd in /boot"
 json_list() { local s="" x; for x in "$@"; do s+="${s:+, }\"$x\""; done; printf '[%s]' "$s"; }
@@ -360,8 +414,8 @@ cat >"$ROOT/$SHARE/image.json" <<EOF
   "hostname": "$HOST",
   "home_generation": "$gen",
   "groups": $(json_list "${user_groups[@]}"),
-  "dotfiles": "/$SHARE/dotfiles",
-  "dotfiles_target": "$REPO",
+  "kubaos": "$KUBAOS",
+  "user_flake_lock": "/$SHARE/user-flake.lock",
   "snapper_root_config": "/$SHARE/snapper-root.conf",
   "kernel": "$kernel"
 }
