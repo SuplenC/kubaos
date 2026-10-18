@@ -89,9 +89,13 @@ tar -C "$IN/src" -xf "$IN/src.tar"
 rm -f "$IN/src.tar"
 branch="$(git -C "$ROOT" symbolic-ref -q HEAD || true)"   # refs/heads/<name>: unambiguous
 git -C "$ROOT" bundle create -q "$IN/dotfiles.bundle" HEAD ${branch:+"$branch"}
-# KubaOS release (docs/BRAND.md). manifest.version is the release; the build
-# id (date + commit) goes to /usr/share/dotinstall/image.json.
-VERSION=0.1.0
+# KubaOS release (docs/BRAND.md), from VERSION and CODENAME in the tree being
+# built. manifest.version is the release; the build id (date + commit) goes to
+# /usr/share/dotinstall/image.json.
+unset KUBAOS_VERSION KUBAOS_RELEASE_ID   # VERSION and CODENAME win over the environment
+# shellcheck source=../iso/lib/brand.env
+. "$IN/src/installer/iso/lib/brand.env"
+VERSION="$KUBAOS_VERSION"
 BUILD_ID="$(date -u +%Y%m%d)-${COMMIT:0:12}"
 [[ "$COMMIT" == *-dirty ]] && BUILD_ID+="-dirty"
 BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -122,8 +126,8 @@ docker run --rm --name "$CONTAINER" --platform "linux/$DARCH" \
   -e ARCH="$ARCH" -e HOST="$HOST" -e PAYLOAD_USER="$PAYLOAD_USER" -e COMMIT="$COMMIT" \
   -e VERSION="$VERSION" -e BUILT_AT="$BUILT_AT" -e ZSTD_LEVEL="$ZSTD_LEVEL" -e CPUS="$CPUS" \
   -e BUILD_ID="$BUILD_ID" \
-  -e OS_NAME=KubaOS -e OS_ID=kubaos -e OS_CODENAME=shinjuku -e OS_CODENAME_NAME=Shinjuku \
-  -e OS_VERSION_SHORT="${VERSION%.*}" -e OS_HOME_URL="${KUBAOS_HOME_URL:-}" \
+  -e OS_NAME=KubaOS -e OS_ID=kubaos -e OS_CODENAME="$KUBAOS_RELEASE_ID" -e OS_CODENAME_NAME="$KUBAOS_RELEASE" \
+  -e OS_VERSION_SHORT="$KUBAOS_VERSION_SHORT" -e OS_HOME_URL="${KUBAOS_HOME_URL:-}" \
   "$IMAGE" /in/src/installer/image/lib/assemble.sh
 T2=$SECONDS
 say "assemble in $(mmss $((T2 - T1)))"

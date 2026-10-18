@@ -163,14 +163,17 @@ n="$(find "$R/var/log" -type f | wc -l)"
 sect "KubaOS"
 osr() { (. "$R/usr/lib/os-release" && eval "printf '%s' \"\${$1}\""); }
 [[ "$(osr NAME)" == KubaOS ]] && ok "os-release NAME=KubaOS" || fail "os-release NAME=$(osr NAME)"
-[[ "$(osr PRETTY_NAME)" == "KubaOS Shinjuku" ]] && ok "PRETTY_NAME=$(osr PRETTY_NAME)" || fail "PRETTY_NAME=$(osr PRETTY_NAME)"
+codename="$(jq -r .codename "$M")"
+version="$(jq -r .version "$M")"
+[[ "$(osr PRETTY_NAME)" == "KubaOS $codename" ]] && ok "PRETTY_NAME=$(osr PRETTY_NAME)" || fail "PRETTY_NAME=$(osr PRETTY_NAME), manifest says $codename"
+[[ "$(osr VERSION)" == "${version%.*} ($codename)" ]] && ok "VERSION=$(osr VERSION)" || fail "VERSION=$(osr VERSION), manifest says $version ($codename)"
 [[ "$(osr ID)" == ubuntu && "$(osr VERSION_CODENAME)" == resolute && "$(osr VERSION_ID)" == 26.04 ]] &&
   ok "ID, VERSION_ID, VERSION_CODENAME stay Ubuntu's ($(osr ID) $(osr VERSION_ID) $(osr VERSION_CODENAME))" || fail "ID/VERSION_* changed"
 [[ "$(readlink "$R/etc/os-release")" == ../usr/lib/os-release ]] && ok "/etc/os-release -> ../usr/lib/os-release" || fail "/etc/os-release isn't the usual link"
 d="$(in_root dpkg-divert --list /usr/lib/os-release)"
 [[ "$d" == *"/usr/lib/os-release.ubuntu"* ]] && ok "diverted: $d" || fail "/usr/lib/os-release not diverted"
 grep -q 'GRUB_DISTRIBUTOR="KubaOS"' "$R/etc/default/grub.d/10-kubaos.cfg" && ok "GRUB_DISTRIBUTOR=KubaOS" || fail "no GRUB_DISTRIBUTOR"
-[[ "$(basename "$rootfs")" == "kubaos-shinjuku-$(jq -r .arch "$M").squashfs" ]] && ok "rootfs name $(basename "$rootfs")" || fail "rootfs name $(basename "$rootfs")"
+[[ "$(basename "$rootfs")" == "kubaos-${codename,,}-$(jq -r .arch "$M").squashfs" ]] && ok "rootfs name $(basename "$rootfs")" || fail "rootfs name $(basename "$rootfs")"
 
 sect "boot: splash and GRUB (system/25-boot.sh)"
 for p in plymouth plymouth-label-ft; do

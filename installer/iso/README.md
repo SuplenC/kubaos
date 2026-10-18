@@ -20,7 +20,7 @@ installer/iso/build clean                         # dotinstall-iso-* containers,
 | `--payload DIR` | Copied onto the ISO as `/dotinstall/payload` and bind-mounted read-only at `/run/dotinstall/payload`. The default is `stub-payload/`, which holds only a `manifest.json`: probe and the GUI work, but `run` refuses (wrong arch, no rootfs) |
 | `--bin DIR` | Prebuilt Linux `dotinstall` (and optionally `dotinstall-gui`). Without it, `build bins` compiles `installer/` in Docker first |
 | `--branding DIR` | Branding hook (below). The default is `branding/iso` in the repo, if it exists |
-| `--name NAME` | Output name. The default is `kubaos-shinjuku-0.1.0-ARCH`, plus `-vm` for the vm profile. Release identity is in `lib/brand.env` |
+| `--name NAME` | Output name. The default is `kubaos-CODENAME-VERSION-ARCH` (today `kubaos-shinjuku-0.1.0-ARCH`), plus `-vm` for the vm profile. `lib/brand.env` derives the release identity from the repo's `VERSION` and `CODENAME` |
 | `--zstd N` | squashfs zstd level (default 19) |
 | `--rebuild-base` | Ignore the cached base rootfs |
 
@@ -51,7 +51,7 @@ mmdebstrap is in the archive and runs fine in a privileged container on Docker D
 
 ## Branding
 
-KubaOS Shinjuku 0.1.0 (docs/BRAND.md). The volume label is `KUBAOS_0_1` and the ESP label `KUBAOS_EFI`. GRUB entries are "Install KubaOS Shinjuku", "… (safe graphics)" and "… (verbose boot)". The live hostname is `kubaos-live`. `/etc/os-release` says KubaOS but keeps Ubuntu's `ID`, `VERSION_ID` and `VERSION_CODENAME`, and `/etc/issue` reads "KubaOS Shinjuku live". The console strings in `live-flow` and `dotinstall-text` follow BRAND.md's voice. The disk-erase confirmation is plain on purpose.
+KubaOS Shinjuku 0.1.0 (docs/BRAND.md), from `VERSION` and `CODENAME` at the repo root. The volume label is `KUBAOS_0_1` (`KUBAOS_<major>_<minor>`) and the ESP label `KUBAOS_EFI`. GRUB entries are "Install KubaOS Shinjuku", "… (safe graphics)" and "… (verbose boot)". The live hostname is `kubaos-live`. `/etc/os-release` says KubaOS but keeps Ubuntu's `ID`, `VERSION_ID` and `VERSION_CODENAME`, and `/etc/issue` reads "KubaOS Shinjuku live". The console strings in `live-flow` and `dotinstall-text` follow BRAND.md's voice. The disk-erase confirmation is plain on purpose.
 
 The hook for logo and splash assets is `--branding DIR` (default `branding/iso`). Every part is optional:
 

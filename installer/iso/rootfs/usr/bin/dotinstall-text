@@ -36,10 +36,12 @@ manifest_field() {
   sed -n "s/.*\"$1\" *: *\"\\([^\"]*\\)\".*/\\1/p" "$PAYLOAD/manifest.json" 2>/dev/null | head -1
 }
 
+codename="$(manifest_field codename)"
+name="KubaOS${codename:+ $codename}"
 if [ "${1:-}" = --fallback ]; then
-  echo "KubaOS Shinjuku. Text mode, because the pretty one didn't start."
+  echo "$name. Text mode, because the pretty one didn't start."
 else
-  echo "KubaOS Shinjuku, text mode. The graphical installer is on tty1 (Ctrl+Alt+F1)."
+  echo "$name, text mode. The graphical installer is on tty1 (Ctrl+Alt+F1)."
 fi
 echo "Let's get rid of whatever's on this thing."
 echo

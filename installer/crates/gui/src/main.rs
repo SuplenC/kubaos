@@ -164,7 +164,7 @@ fn main() -> ExitCode {
         App::update,
         view::view,
     )
-    .title("KubaOS Shinjuku installer")
+    .title(|app: &App| format!("KubaOS {} installer", app.codename()))
     .subscription(App::subscription)
     .theme(|_: &App| Theme::custom("dotfiles", theme::iced_palette()))
     .window(window::Settings {

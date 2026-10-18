@@ -4,8 +4,9 @@
 #   installer/iso/build [--arch aarch64|x86_64] [--profile hw|vm] [--release]
 #                       [--payload DIR] [--bin DIR] [--branding DIR] [--name NAME] [--zstd N]
 #                       [--rebuild-base]
-#                                 build iso/NAME.iso (default kubaos-shinjuku-0.1.0-ARCH,
-#                                 with -vm appended for --profile vm)
+#                                 build iso/NAME.iso (default kubaos-CODENAME-VERSION-ARCH,
+#                                 from the repo's CODENAME and VERSION, with -vm
+#                                 appended for --profile vm)
 #   installer/iso/build bins [--arch A]
 #                                 only build dotinstall + dotinstall-gui into iso/bin/ARCH
 #   installer/iso/build clean     remove this builder's containers, images and volumes
@@ -93,6 +94,7 @@ cmd_build() {
   done
   [[ $profile == hw || $profile == vm ]] || die "--profile hw|vm"
   platform "$arch" >/dev/null
+  unset KUBAOS_VERSION KUBAOS_RELEASE_ID   # VERSION and CODENAME win over the environment
   # shellcheck disable=SC1091
   . "$HERE/lib/brand.env"
   local suffix=""
@@ -101,6 +103,13 @@ cmd_build() {
   if [[ -d $branding ]]; then branding="$(cd "$branding" && pwd)"; else branding="$OUT/.no-branding"; mkdir -p "$branding"; fi
   [[ -d $payload ]] || die "no payload dir $payload"
   payload="$(cd "$payload" && pwd)"
+  # The payload is built from git HEAD, the ISO from the working tree: a
+  # VERSION bump the payload hasn't seen would name the ISO after the wrong
+  # release. The stub payload (0.0.0-stub) is exempt.
+  local pv
+  pv="$(sed -n 's/.*"version" *: *"\([^"]*\)".*/\1/p' "$payload/manifest.json" | head -1)"
+  [[ $pv == *-stub || $pv == "$KUBAOS_VERSION" ]] ||
+    die "payload $payload is release ${pv:-?}, VERSION says $KUBAOS_VERSION: rebuild it (just payload $arch)"
   if [[ -z $bins ]]; then
     cmd_bins --arch "$arch"
     bins="$OUT/bin/$arch"
@@ -121,6 +130,7 @@ cmd_build() {
     -v "$branding:/branding:ro" \
     -e ARCH="$arch" -e PROFILE="$profile" -e RELEASE="$release" -e NAME="$name" \
     -e ZSTD_LEVEL="$zstd" -e REBUILD_BASE="$rebuild" \
+    -e KUBAOS_VERSION="$KUBAOS_VERSION" -e KUBAOS_RELEASE_ID="$KUBAOS_RELEASE_ID" \
     dotinstall-iso-iso:arm64 bash /src/lib/build-iso.sh
   say "built $OUT/$name.iso in $(elapsed)"
 }

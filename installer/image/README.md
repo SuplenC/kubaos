@@ -14,7 +14,7 @@ installer/image/check [--arch x86_64]       # unpack + chroot checks; writes che
 
 | | |
 |---|---|
-| `manifest.json` | `Manifest`. `version` is the KubaOS release, `0.1.0` (Shinjuku). The build id (`<UTC date>-<commit 12>[-dirty]`) is in `image.json`. The payload carries no git identity: the user enters it on the Git screen. `kernel` is the `uname -r` of the one installed kernel. `installed_bytes` is the apparent size of the unpacked tree, which is also what unpack progress should count |
+| `manifest.json` | `Manifest`. `version` and `codename` are the KubaOS release, `0.1.0` and Shinjuku, from `VERSION` and `CODENAME` in the tree being built (`--allow-dirty` reads the working tree's). The build id (`<UTC date>-<commit 12>[-dirty]`) is in `image.json`. The payload carries no git identity: the user enters it on the Git screen. `kernel` is the `uname -r` of the one installed kernel. `installed_bytes` is the apparent size of the unpacked tree, which is also what unpack progress should count |
 | `kubaos-shinjuku-<arch>.squashfs` | The root tree, squashfs with zstd (level 15, 1 MiB blocks), xattrs on |
 | `check.txt`, `packages.txt` | Written by `check`, not used by the engine |
 

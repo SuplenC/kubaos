@@ -4,7 +4,9 @@
 
 host := `case "$(uname -m)" in arm64|aarch64) echo aarch64 ;; *) echo x86_64 ;; esac`
 dirty := if env("ALLOW_DIRTY", "") == "" { "" } else { "--allow-dirty" }
-ver := "0.1.0"
+# The release (docs/adr/0001-release-and-update-model.md, "Versions").
+ver := trim(read(justfile_directory() / "VERSION"))
+codename := trim(read(justfile_directory() / "CODENAME"))
 
 # List the recipes.
 default:
@@ -27,7 +29,7 @@ iso arch=host profile="release":
     [[ -f $p/manifest.json ]] || just payload {{arch}}
     if [[ "{{profile}}" == vm ]]; then flags=(--profile vm); else flags=(--release); fi
     installer/iso/build --arch {{arch}} --payload "$p" "${flags[@]}"
-    ls -lh iso/*{{arch}}*.iso
+    ls -lh iso/kubaos-{{codename}}-{{ver}}-{{arch}}*.iso
 
 # All four ISOs (aarch64 and x86_64, release and vm), after the tests and payload checks. Needs a clean tree.
 release: test
@@ -39,7 +41,7 @@ release: test
     just iso aarch64
     just iso x86_64 vm
     just iso x86_64
-    ls -lh iso/*.iso
+    ls -lh iso/kubaos-{{codename}}-{{ver}}-*.iso
 
 # Cargo tests, the shell harness (Docker) and the engine end-to-end test.
 test:

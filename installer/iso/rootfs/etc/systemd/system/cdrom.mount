@@ -8,13 +8,13 @@
 # take no drop-ins. This file in /etc wins over that mask and is casper's own
 # commented-out fix: no default dependencies, so shutdown doesn't stop it,
 # and a lazy unmount if anything does. The medium is read-only; nothing to
-# flush.
+# flush. lib/build-iso.sh fills in the volume label (lib/brand.env).
 [Unit]
 Description=KubaOS live medium
 DefaultDependencies=no
 
 [Mount]
-What=/dev/disk/by-label/KUBAOS_0_1
+What=/dev/disk/by-label/@VOLID@
 Where=/cdrom
 Type=iso9660
 Options=ro

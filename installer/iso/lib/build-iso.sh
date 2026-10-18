@@ -82,6 +82,7 @@ say "live rootfs: overlay, binaries"
 cp -a "$BASE/rootfs" "$W/rootfs"
 R="$W/rootfs"
 cp -a /src/rootfs/. "$R/"
+sed -i "s/@VOLID@/$KUBAOS_VOLID/" "$R/etc/systemd/system/cdrom.mount"
 install -m 0755 /bins/dotinstall "$R/usr/bin/dotinstall"
 if [[ -f /bins/dotinstall-gui ]]; then
   install -m 0755 /bins/dotinstall-gui "$R/usr/bin/dotinstall-gui"
