@@ -15,11 +15,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # The live wallpaper engine (docs/UKIYO.md). To build against a local
+    # The live wallpaper engine (docs/UKIYO.md). Pinned to a commit (ukiyo has
+    # no tags yet), so a release rebuilds the same ukiyo. Bump the rev on
+    # purpose, then `nix flake update ukiyo`. To build against a local
     # checkout instead: --override-input ukiyo git+file://$HOME/Projects/ukiyo
     # (the Docker builds bind-mount it, see test/lib/local-inputs.sh).
     ukiyo = {
-      url = "github:SuplenC/ukiyo/main";
+      url = "github:SuplenC/ukiyo/9565669ae1700b439868359f8d5d8559edf7f691";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

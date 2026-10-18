@@ -82,11 +82,11 @@ Why not draw the scene live under the lock: the still costs zero GPU while locke
 
 ## The flake input and Docker
 
-ukiyo comes in as a flake input from GitHub:
+ukiyo comes in as a flake input from GitHub, pinned to a commit so a release always rebuilds the same ukiyo (it has no tags yet). Bumping it is release work: change the rev, then `nix flake update ukiyo`.
 
 ```nix
 ukiyo = {
-  url = "github:SuplenC/ukiyo/main";
+  url = "github:SuplenC/ukiyo/<rev>";
   inputs.nixpkgs.follows = "nixpkgs";
 };
 ```

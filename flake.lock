@@ -82,8 +82,8 @@
       },
       "original": {
         "owner": "SuplenC",
-        "ref": "main",
         "repo": "ukiyo",
+        "rev": "9565669ae1700b439868359f8d5d8559edf7f691",
         "type": "github"
       }
     }
