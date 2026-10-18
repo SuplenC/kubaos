@@ -363,7 +363,7 @@ Drawer {
             StyledText {
                 anchors.centerIn: parent
                 visible: grid.count === 0
-                text: `Nothing in ${root.folders[root.lastFolder]?.dir || root.folder}. Drop some images or videos in.`
+                text: `Nothing in ${root.folders[root.folderIndex]?.dir || root.folder}. Drop some images or videos in.`
                 color: Theme.m3onSurfaceVariant
             }
         }

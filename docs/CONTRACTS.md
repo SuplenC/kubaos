@@ -19,7 +19,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 | `home/shell.nix`, `home/terminal.nix`, `config/{nvim,tmux,tms,ghostty,ohmyposh,lazygit,btop,git,bat,bacon,yazi,foot,fuzzel}` | ports | zsh, tmux, tms, ghostty, ported user configs, the fallback terminal and launcher |
 | `config/hypr/`, `scripts/dot-hypr-*` | hypr | Hyprland Lua config, hypridle, lid and monitor scripts, screenshots and screen recording |
 | `config/quickshell/`, `scripts/dot-qs-*` | quickshell | The desktop shell |
-| `home/theme.nix`, `config/matugen/`, `scripts/dot-theme*`, `wallpapers/` | theme | Wallpaper + matugen color pipeline, the wallpapers, GTK/Qt/cursor/icons |
+| `home/theme.nix`, `config/matugen/`, `scripts/dot-theme*`, the `kubaos-wallpapers` input | theme | Wallpaper + matugen color pipeline, the wallpaper sets, GTK/Qt/cursor/icons |
 | `system/`, `docs/INSTALL.md` | system | Ubuntu bootstrap scripts and `/etc` files |
 | `home/secrets.nix`, `scripts/dot-bw*`, `scripts/dot-u2f-enroll`, `scripts/dot-ssh-sk-new`, `system/70-bitwarden.sh`, `system/75-yubikey.sh`, `system/files/pam.d/`, `docs/SECRETS.md` | secrets | Bitwarden (SSH agent, git signing, gh, project env), the security key (YubiKey C Bio: pam_u2f, ed25519-sk) |
 | `README.md`, `docs/CONTRACTS.md`, `docs/PLAN.md` | lead | Overview and these contracts |
@@ -61,7 +61,7 @@ The `layer` table in `links.nix` lists the files that aren't plain links (seeded
 
 ## Other links (home/links.nix)
 
-- Every file in `scripts/` is linked from the store (`kubaos-scripts`) to `~/.local/bin/<name>`, like the defaults. So are the wallpapers, file by file into real folders under `~/Pictures/wallpapers/<folder>/`, where the user's own images can sit next to them, and `~/.zprofile` sources the tty1 autostart snippet (`system/files/hyprland-autostart.zsh`) from the store. Scripts are executable, start with `#!/usr/bin/env bash` (or another env shebang), use `set -euo pipefail`, and are prefixed `dot-`.
+- Every file in `scripts/` is linked from the store (`kubaos-scripts`) to `~/.local/bin/<name>`, like the defaults. `~/.zprofile` sources the tty1 autostart snippet (`system/files/hyprland-autostart.zsh`) from the store. Scripts are executable, start with `#!/usr/bin/env bash` (or another env shebang), use `set -euo pipefail`, and are prefixed `dot-`.
 - **Never** manage a path under `config/` with a `programs.<x>` option that writes the same file (for example `programs.tmux.extraConfig` or `programs.ghostty.settings`). Install the package with `home.packages` or `programs.<x>.enable` only if that option writes nothing under the linked path. If Nix needs to hand a store path to a config (tmux plugins, for example), write it to a generated file outside the app's dir, such as `~/.config/tmux-nix/plugins.conf` via `xdg.configFile."tmux-nix/plugins.conf"`, and have the config `source` it if it exists.
 
 ## Theme pipeline

@@ -153,7 +153,7 @@ in
         {
           echo "# Wallpaper sets the picker shows, one per line (from /usr/share/kubaos/wallpapers)."
           echo "# Your own images go in ~/Pictures/wallpapers."
-          for d in /usr/share/kubaos/wallpapers/*/; do basename "$d"; done
+          for d in /usr/share/kubaos/wallpapers/*/; do if [ -d "$d" ]; then basename "$d"; fi; done
         } >"$sets"
       fi
     fi
