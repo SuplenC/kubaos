@@ -67,7 +67,7 @@ Each file starts as a comment and an example:
 - To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
 - Delete a file in `~/.config/kubaos` to get the example back on the next `dot-config apply` or update.
 - Quickshell's settings, the colors (matugen) and the prompt (oh-my-posh) can't be overridden yet.
-- Your own wallpapers go in `~/Pictures/wallpapers/<folder>/` next to KubaOS's, which are links into the store.
+- Your own wallpapers go in `~/Pictures/wallpapers/`, the picker's last tab; KubaOS's sets are in `/usr/share/kubaos/wallpapers/`.
 - `~/.config/kubaos/home/` is your flake: KubaOS wrote it once, and an update never does again. Put it under git if you like (then `git add` new files before a switch).
 
 ## Hacking on KubaOS

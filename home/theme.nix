@@ -136,12 +136,27 @@ in
   # Migration: older generations linked it to the checkout's wallpapers/.
   # Replace the link with the folder; the sets are in /usr/share now, and
   # dot-theme moves a current wallpaper from the old path.
+  #
+  # ~/.config/kubaos/wallpapers/sets, when the installer didn't write it
+  # (a machine from before, or one set up with system/): the sets on disk
+  # now, so the ones a later release adds stay opt-in. Never touched again.
   home.activation.wallpapersFolder = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     walls="${config.home.homeDirectory}/Pictures/wallpapers"
     if [ -L "$walls" ]; then
       run rm "$walls"
     fi
     run mkdir -p "$walls"
+    sets="${config.xdg.configHome}/kubaos/wallpapers/sets"
+    if [ ! -e "$sets" ] && [ -d /usr/share/kubaos/wallpapers/ ]; then
+      run mkdir -p "$(dirname "$sets")"
+      if [ -z "''${DRY_RUN:-}" ]; then
+        {
+          echo "# Wallpaper sets the picker shows, one per line (from /usr/share/kubaos/wallpapers)."
+          echo "# Your own images go in ~/Pictures/wallpapers."
+          for d in /usr/share/kubaos/wallpapers/*/; do basename "$d"; done
+        } >"$sets"
+      fi
+    fi
   '';
 
   # First run: render defaults so every consumer has a file before login.

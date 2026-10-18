@@ -309,7 +309,9 @@ check "  pinned by a gcroot" test "$(readlink "$R/nix/var/nix/gcroots/dotfiles-w
 n="$(jq -r '.wallpaper_sets | length' "$M")"
 ((n > 0)) && ok "manifest lists $n set(s): $(jq -r '[.wallpaper_sets[].id] | join(", ")' "$M")" || fail "manifest lists no wallpaper_sets"
 while IFS=$'\t' read -r id images preview; do
-  have="$(find -L "$R$tgt/$id" -maxdepth 1 -type f ! -iname '*.poster.*' ! -iname '*.md' | wc -l)"
+  # The same filter as assemble.sh: images and videos, not posters.
+  have="$(find -L "$R$tgt/$id" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \
+    -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \) ! -iname '*.poster.*' | wc -l)"
   [[ "$have" == "$images" ]] && ok "  $id: $images wallpapers" || fail "  $id: manifest says $images, the set has $have"
   [[ -z "$preview" || -s "$P/$preview" ]] && ok "  $id: preview ${preview:-none}" || fail "  $id: no $P/$preview"
 done < <(jq -r '.wallpaper_sets[] | [.id, .images, (.preview // "")] | @tsv' "$M")

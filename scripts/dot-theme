@@ -7,7 +7,7 @@
 #                                 and regenerate colors
 #   dot-theme next | prev         next/previous wallpaper in the current folder
 #   dot-theme folder <name>       switch folder (one of `dot-theme folders`)
-#   dot-theme folders             the picker's folders: name, tab, directory
+#   dot-theme folders             the picker's folders, name<TAB>directory
 #                                 (live: ukiyo's scenes; your chosen sets;
 #                                 yours: ~/Pictures/wallpapers)
 #   dot-theme toggle-folder       switch to the next folder

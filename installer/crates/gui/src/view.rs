@@ -356,7 +356,7 @@ pub fn hints(app: &App) -> Vec<(&'static str, &'static str)> {
         }
         Screen::Wifi => v.extend([("↑ ↓", "pick"), ("Tab", "next field")]),
         Screen::Account | Screen::Git => v.push(("Tab", "next field")),
-        Screen::Wallpapers => v.extend([("Space", "pick or drop"), ("← →", "move")]),
+        Screen::Wallpapers => v.extend([("Space", "pick or drop"), ("← ↑ ↓ →", "move")]),
         Screen::Disk => v.extend([
             ("↑ ↓", "pick a disk"),
             ("← →", "keep or erase"),
@@ -1726,7 +1726,7 @@ fn wallpapers<'a>(app: &'a App, p: &Palette) -> El<'a> {
         header(
             jp::WALLPAPERS,
             "Wallpapers",
-            "Every set gets installed. Pick the ones the wallpaper picker shows; you can change it later. Your own images go in ~/Pictures/wallpapers.",
+            "Every set gets installed. Pick the ones the wallpaper picker shows (later: ~/.config/kubaos/wallpapers/sets). Your own images go in ~/Pictures/wallpapers.",
             p
         ),
         Space::new().height(space::XXL),

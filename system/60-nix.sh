@@ -155,6 +155,16 @@ if ((units_fixed)) && has_systemd; then
 fi
 
 # --------------------------------------------------------------------------
+# The wallpaper sets, like the PAM link: not tied to DO_SWITCH. Before the
+# switch: its activation seeds ~/.config/kubaos/wallpapers/sets from them.
+step "Wallpaper sets ($WALLPAPERS_LINK)"
+if ((DRY_RUN)) || command -v nix >/dev/null; then
+  link_wallpapers
+else
+  warn "nix not found; skipping"
+fi
+
+# --------------------------------------------------------------------------
 if ((DO_SWITCH)); then
   step "home-manager switch --flake $FLAKE#$HM_CONFIG"
   [[ -f "$FLAKE/flake.nix" ]] || die "no flake.nix in $FLAKE"
@@ -183,15 +193,6 @@ fi
 step "pam_fprintd.so for the Quickshell lock ($PAM_FPRINTD_LINK)"
 if ((DRY_RUN)) || command -v nix >/dev/null; then
   link_pam_fprintd
-else
-  warn "nix not found; skipping"
-fi
-
-# --------------------------------------------------------------------------
-# The wallpaper sets, like the PAM link: not tied to DO_SWITCH.
-step "Wallpaper sets ($WALLPAPERS_LINK)"
-if ((DRY_RUN)) || command -v nix >/dev/null; then
-  link_wallpapers
 else
   warn "nix not found; skipping"
 fi

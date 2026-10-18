@@ -991,7 +991,7 @@ impl<'a> Install<'a> {
         };
         if c.wallpapers.is_some() || !sets.is_empty() {
             let f = format!("{home}/{}", files::WALLPAPER_SETS);
-            let dir = format!("{home}/.config/kubaos/wallpapers");
+            let dir = f.rsplit_once('/').map_or("", |(d, _)| d).to_string();
             self.mkdir(&self.t(&dir))?;
             self.write(&f, &files::wallpaper_sets(&sets), 0o644)?;
             self.sh(Cmd::new("chown").args([

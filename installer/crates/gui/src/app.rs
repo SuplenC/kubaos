@@ -1152,6 +1152,19 @@ impl App {
                         self.toggle_mode();
                         Task::none()
                     }
+                    // The grid is three wide (view.rs, wallpapers).
+                    Some(F::WallpaperSet(i)) if matches!(k, Key::Up | Key::Down) => {
+                        let n = self.wallpaper_sets().len();
+                        let j = if d < 0 {
+                            i.checked_sub(3).unwrap_or(i)
+                        } else if i + 3 < n {
+                            i + 3
+                        } else {
+                            i
+                        };
+                        self.set_focus(Some(F::WallpaperSet(j)));
+                        Task::none()
+                    }
                     Some(f) if f.lists() => self.move_selection(d),
                     _ => Task::none(),
                 }

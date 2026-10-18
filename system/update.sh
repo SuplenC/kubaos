@@ -150,6 +150,9 @@ if ((DO_NIX)); then
     if ((!DRY_RUN)) && [[ $FLAKE == "$DOTFILES_DIR" ]] && command -v git >/dev/null; then
       git -C "$DOTFILES_DIR" --no-pager diff --stat -- flake.lock || true
     fi
+    # A release's new wallpaper sets (opt-in: dot-theme shows the chosen
+    # ones). Before the switch, as in 60-nix.sh.
+    link_wallpapers
     # -b hm-backup, as in 60-nix.sh: a file in the way is renamed, not fatal.
     if command -v home-manager >/dev/null; then
       run home-manager switch -b hm-backup --flake "$FLAKE#$HM_USER@$HM_HOST"
@@ -162,8 +165,6 @@ if ((DO_NIX)); then
     # until then.
     link_pam_fprintd
     if [[ -L "$PAM_U2F_LINK" ]] || ((DRY_RUN)); then link_pam_u2f; fi
-    # A release's new wallpaper sets (opt-in: dot-theme shows the chosen ones).
-    link_wallpapers
     # gpu-screen-recorder's setcap'd KMS helper must match the new gsr.
     if [[ -e /usr/local/libexec/dotfiles/gsr-kms-server ]]; then
       rec_args=()

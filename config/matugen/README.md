@@ -31,7 +31,7 @@ regenerates anyway; `set`, `next`, `prev` and the folder commands always do.
 The scheme type is set in one place, `SCHEME` at the top of `scripts/dot-theme`
 (`DOT_THEME_SCHEME=scheme-... dot-theme apply` tries another for one run). It
 is `scheme-fidelity`, chosen by rendering all six types on every wallpaper in
-`wallpapers/`:
+`wallpapers/` (the sets, now SuplenC/kubaos-wallpapers):
 
 - `tonal-spot` (matugen's default) and `rainbow` wash neon out into pastel
   greys. `expressive` rotates the hue away from the photo (the Tokyo Tower

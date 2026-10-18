@@ -438,6 +438,10 @@ c_wallpaper_sets() {
   [[ -n "$(zrun 'ukiyo scenes --json 2>/dev/null | jq -r ".[].id"' 2>/dev/null)" ]] && live="live "
   folders() { zrun 'dot-theme folders' | cut -f1 | tr '\n' ' '; }
 
+  # The switch seeded the file (no installer here) with today's sets.
+  [[ "$(grep -v '^#' "$sets" 2>/dev/null | tr '\n' ' ')" == "cyberpunk japanese shinjuku " ]] &&
+    echo "ok   activation seeded the sets file with the sets on disk" ||
+    { echo "FAIL sets file after the switch: $(cat "$sets" 2>&1)"; bad=1; }
   rm -f "$sets"
   got="$(folders)"
   [[ $got == "${live}cyberpunk japanese shinjuku yours " ]] && echo "ok   no sets file: every set ($got)" ||
