@@ -72,7 +72,7 @@ vm-install arch=host config="":
 
 # After `just vm-install`: the user-layer promise (issue #9) on the installed system. Fills every file in ~/.config/kubaos, commits newer defaults to the VM's checkout, switches, and checks the user's files are untouched and the new defaults live.
 vm-user-layer user="kuba":
-    test/vm/run ssh "runuser -l {{user}} -c 'export XDG_RUNTIME_DIR=/run/user/\$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$(id -u)/bus; ~/Projects/dotfiles/test/user-layer-check'"
+    test/vm/run ssh "runuser -l {{user}} -c '. /etc/default/locale; export LANG XDG_RUNTIME_DIR=/run/user/\$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$(id -u)/bus; ~/Projects/dotfiles/test/user-layer-check'"
 
 # Screenshot session in Docker (test/run shots): `just shots`, then `test/run shots shot NAME`.
 shots *flags="--hyprland":

@@ -127,7 +127,9 @@ out="$(ghostty +show-config 2>/dev/null | grep -e '^font-size' -e '^cursor-style
 [[ $out == *'font-size = 17'* && $out == *'cursor-style = underline'* ]] || fail "ghostty: want ours and the user's, got: $out"
 foot --check-config >/dev/null 2>&1 || fail "foot --check-config"
 fuzzel --check-config >/dev/null 2>&1 || fail "fuzzel --check-config"
-out="$(nvim --headless +'lua io.write(tostring(vim.g.kubaos_probe), " ", tostring(vim.g.user_probe))' +qa 2>&1 | tr -d '\r')"
+# A marker line: on a fresh home, Neovim's first start also prints its plugin installs.
+out="$(nvim --headless +'lua io.write("\nPROBE=", tostring(vim.g.kubaos_probe), " ", tostring(vim.g.user_probe), "\n")' +qa 2>&1 |
+  tr -d '\r' | sed -n 's/^PROBE=//p')"
 [[ $out == 'new mine' ]] || fail "nvim options: want new/mine, got: $out"
 out="$(zsh -l -i -c 'userprobe; print -r -- "$LG_CONFIG_FILE|$BACON_PREFS"' 2>/dev/null | tr -d '\r')"
 [[ $out == mine$'\n'*",$U/lazygit/config.yml|$U/bacon/prefs.toml" ]] || fail "zsh/lazygit/bacon: $out"
