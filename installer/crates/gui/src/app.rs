@@ -38,6 +38,7 @@ pub enum Screen {
     Account,
     Disk,
     Git,
+    Wallpapers,
     Summary,
     Installing,
     Done,
@@ -54,6 +55,7 @@ impl Screen {
             Screen::Account => "You",
             Screen::Disk => "Disk",
             Screen::Git => "Git",
+            Screen::Wallpapers => "Wallpapers",
             Screen::Summary => "Last chance",
             Screen::Installing | Screen::Done | Screen::Failed => "Install",
         }
@@ -89,6 +91,8 @@ pub enum F {
     LuksConfirm,
     GitName,
     GitEmail,
+    /// A tile on the Wallpapers screen: the manifest's set at this index.
+    WallpaperSet(usize),
     Edit(Screen),
     Hold,
     ToggleLog,
@@ -136,6 +140,7 @@ pub mod ids {
     pub const LOG: &str = "log";
     pub const DISK_SCROLL: &str = "disk-scroll";
     pub const ACCOUNT_SCROLL: &str = "account-scroll";
+    pub const WALLPAPER_SCROLL: &str = "wallpaper-scroll";
     pub const REVEAL_DISKS: &str = "reveal-disks";
     pub const REVEAL_MODE: &str = "reveal-mode";
     pub const REVEAL_ENCRYPT: &str = "reveal-encrypt";
@@ -396,14 +401,20 @@ impl App {
         if !online {
             v.push(Screen::Wifi);
         }
-        v.extend([
-            Screen::Account,
-            Screen::Disk,
-            Screen::Git,
-            Screen::Summary,
-            Screen::Installing,
-        ]);
+        v.extend([Screen::Account, Screen::Disk, Screen::Git]);
+        // An older payload has no sets to pick from.
+        if !self.wallpaper_sets().is_empty() {
+            v.push(Screen::Wallpapers);
+        }
+        v.extend([Screen::Summary, Screen::Installing]);
         v
+    }
+
+    /// The payload's wallpaper sets, in its order.
+    pub fn wallpaper_sets(&self) -> &[dotinstall_core::probe::WallpaperSet] {
+        self.ready_probe()
+            .and_then(|p| p.payload.as_ref())
+            .map_or(&[], |m| m.wallpaper_sets.as_slice())
     }
 
     pub fn flow_index(&self, s: Screen) -> usize {
@@ -456,6 +467,10 @@ impl App {
                 v
             }
             Screen::Git => vec![F::GitName, F::GitEmail, F::Back, F::Next],
+            Screen::Wallpapers => (0..self.wallpaper_sets().len())
+                .map(F::WallpaperSet)
+                .chain([F::Back, F::Next])
+                .collect(),
             Screen::Summary => {
                 let mut v = vec![
                     F::Hold,
@@ -962,6 +977,12 @@ impl App {
                 self.flipped(f);
                 Task::none()
             }
+            F::WallpaperSet(i) => {
+                if let Some(id) = self.wallpaper_sets().get(i).map(|s| s.id.clone()) {
+                    self.form.toggle_wallpaper_set(&id);
+                }
+                Task::none()
+            }
             F::Edit(s) => {
                 if self.install.as_ref().is_none_or(|i| i.outcome.is_some()) {
                     self.go(s)
@@ -1155,6 +1176,14 @@ impl App {
                     } else {
                         DiskMode::Whole
                     });
+                } else if let Some(F::WallpaperSet(i)) = focus {
+                    let n = self.wallpaper_sets().len();
+                    let j = if left {
+                        i.saturating_sub(1)
+                    } else {
+                        (i + 1).min(n - 1)
+                    };
+                    self.set_focus(Some(F::WallpaperSet(j)));
                 }
                 Task::none()
             }

@@ -1,7 +1,9 @@
 //! The answers so far, their validation, and turning them into
 //! `install.toml` plus the secrets.
 
-use dotinstall_core::config::{Disk, DiskTarget, Git, Host, Locale, Payload, User, Wifi};
+use dotinstall_core::config::{
+    Disk, DiskTarget, Git, Host, Locale, Payload, User, Wallpapers, Wifi,
+};
 use dotinstall_core::probe::{DiskInfo, Region};
 use dotinstall_core::{InstallConfig, Probe, Secrets};
 
@@ -44,6 +46,9 @@ pub struct Form {
     pub git_email: String,
     /// The user edited the git name; stop mirroring the full name into it.
     pub git_name_touched: bool,
+
+    /// Ids of the wallpaper sets picked, in no particular order.
+    pub wallpaper_sets: Vec<String>,
 }
 
 impl Form {
@@ -69,6 +74,9 @@ impl Form {
             encrypt: true,
             luks_same_as_password: true,
             disk,
+            wallpaper_sets: manifest
+                .map(|m| m.wallpaper_sets.iter().map(|s| s.id.clone()).collect())
+                .unwrap_or_default(),
             ..Self::default()
         };
         f.disk_mode = f.selected_disk(probe).map(|d| d.default_mode(probe));
@@ -167,6 +175,18 @@ impl Form {
         Ok(())
     }
 
+    pub fn wallpaper_set_on(&self, id: &str) -> bool {
+        self.wallpaper_sets.iter().any(|s| s == id)
+    }
+
+    pub fn toggle_wallpaper_set(&mut self, id: &str) {
+        if self.wallpaper_set_on(id) {
+            self.wallpaper_sets.retain(|s| s != id);
+        } else {
+            self.wallpaper_sets.push(id.to_string());
+        }
+    }
+
     /// `secured`: the picked network wants a password.
     pub fn wifi_ok(&self, secured: bool) -> Result<(), &'static str> {
         match self.wifi_psk.chars().count() {
@@ -219,6 +239,17 @@ impl Form {
             },
             git,
             wifi: self.wifi_ssid.clone().map(|ssid| Wifi { ssid }),
+            // An older payload has no sets to pick from.
+            wallpapers: manifest
+                .filter(|m| !m.wallpaper_sets.is_empty())
+                .map(|m| Wallpapers {
+                    sets: m
+                        .wallpaper_sets
+                        .iter()
+                        .filter(|s| self.wallpaper_set_on(&s.id))
+                        .map(|s| s.id.clone())
+                        .collect(),
+                }),
             payload: Payload {
                 dir: PAYLOAD_DIR.into(),
             },
@@ -430,6 +461,33 @@ mod tests {
         assert!(f.git_ok().is_ok());
         f.git_email = "nope".into();
         assert!(f.git_ok().is_err());
+    }
+
+    #[test]
+    fn every_wallpaper_set_by_default() {
+        let p = demo_probe();
+        let mut f = Form::new(&p);
+        let sets = |f: &Form| f.to_config(&p).wallpapers.map(|w| w.sets);
+        let all = ["cyberpunk", "japanese", "shinjuku"]
+            .map(String::from)
+            .to_vec();
+        assert_eq!(sets(&f), Some(all.clone()));
+        f.toggle_wallpaper_set("japanese");
+        assert_eq!(sets(&f), Some(vec!["cyberpunk".into(), "shinjuku".into()]));
+        f.toggle_wallpaper_set("cyberpunk");
+        f.toggle_wallpaper_set("shinjuku");
+        assert_eq!(sets(&f), Some(vec![]), "none: only your own folder");
+        f.toggle_wallpaper_set("shinjuku");
+        f.toggle_wallpaper_set("japanese");
+        f.toggle_wallpaper_set("cyberpunk");
+        assert_eq!(sets(&f), Some(all), "the payload's order, not the clicks'");
+    }
+
+    #[test]
+    fn no_wallpaper_sets_in_an_older_payload() {
+        let mut p = demo_probe();
+        p.payload.as_mut().unwrap().wallpaper_sets.clear();
+        assert_eq!(Form::new(&p).to_config(&p).wallpapers, None);
     }
 
     #[test]

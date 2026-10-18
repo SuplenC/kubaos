@@ -70,10 +70,9 @@ case "$cmd" in
     prepare
     session_start "$compositor" "$size" "$scale"
     if [[ -n $wall ]]; then
-      # FOLDER/FILE under ~/Pictures/wallpapers, or a ukiyo scene (ukiyo:<id>),
-      # set in the session so a scene's daemon finds the display.
-      # shellcheck disable=SC2088  # the session shell expands the tilde
-      [[ $wall == ukiyo:* ]] || wall="~/Pictures/wallpapers/$wall"
+      # SET/FILE under /usr/share/kubaos/wallpapers, or a ukiyo scene
+      # (ukiyo:<id>), set in the session so a scene's daemon finds the display.
+      [[ $wall == ukiyo:* ]] || wall="/usr/share/kubaos/wallpapers/$wall"
       in_session "dot-theme set $wall" >"$LOGS/dot-theme.log" 2>&1 ||
         { cat "$LOGS/dot-theme.log"; die "dot-theme set $wall failed"; }
     fi

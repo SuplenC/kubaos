@@ -4,14 +4,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.theme
-import qs.settings
 
 // Current wallpaper (from ~/.local/state/theme/wallpaper, written by dot-theme)
 // and the wallpapers available in each folder: stills, and videos that loop
 // over a poster frame (<name>.poster.jpg next to <name>.mp4; dot-theme makes
-// one in ~/.local/state/theme/posters/ for a video that has none). ukiyo's
-// live scenes are wallpapers too, `ukiyo:<id>`, listed first in
-// Settings.sceneFolder; their still is the scene's poster (services/Ukiyo.qml).
+// one in ~/.local/state/theme/posters/ for a video that has none). The
+// folders are `dot-theme folders`: the chosen sets in
+// /usr/share/kubaos/wallpapers, then ~/Pictures/wallpapers. ukiyo's live
+// scenes are wallpapers too, `ukiyo:<id>`, a folder of their own first;
+// their still is the scene's poster (services/Ukiyo.qml).
 Singleton {
     id: root
 
@@ -22,13 +23,16 @@ Singleton {
     readonly property string shown: preview || current
     // The picker opens on its settings tab next time (`qs ipc call wallpaper settings`).
     property bool openSettings: false
-    // folder name -> sorted list of absolute paths (stills and videos), the
-    // scenes (ukiyo:<id>) first in Settings.sceneFolder
+    // The picker's tabs, in order: [{ name, dir }], dir "" for the scenes.
+    // dot-theme decides which sets show (scripts/dot-theme, `folders`).
+    property var folders: []
+    // dot-theme's SCENE_FOLDER.
+    readonly property string sceneFolder: "live"
+    // folder name -> sorted list of absolute paths (stills and videos), or
+    // of the scenes (ukiyo:<id>) in sceneFolder
     readonly property var images: {
         const all = Object.assign({}, files);
-        const scenes = Ukiyo.scenes.map(s => `ukiyo:${s.id}`);
-        if (scenes.length)
-            all[Settings.sceneFolder] = [...scenes, ...(files[Settings.sceneFolder] ?? [])];
+        all[sceneFolder] = Ukiyo.scenes.map(s => `ukiyo:${s.id}`);
         return all;
     }
     // folder name -> sorted list of the files in it
@@ -61,9 +65,18 @@ Singleton {
         return posters[sibling] ? sibling : posters[cached] ? cached : "";
     }
 
+    // Folders first: the file listing needs their directories.
     function refresh(): void {
-        lister.running = true;
+        folderLister.running = true;
         Ukiyo.refreshScenes();
+    }
+
+    // The folder a wallpaper file is in, or "".
+    function folderOf(path: string): string {
+        if (isScene(path))
+            return sceneFolder;
+        const dir = path.slice(0, path.lastIndexOf("/"));
+        return folders.find(f => f.dir && f.dir === dir)?.name ?? "";
     }
 
     function set(path: string): void {
@@ -101,23 +114,41 @@ Singleton {
     }
 
     Process {
+        id: folderLister
+
+        command: ["dot-theme", "folders"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.folders = text.split("\n").filter(Boolean).map(l => {
+                    const [name, dir] = l.split("\t");
+                    return {
+                        name,
+                        dir: dir ?? ""
+                    };
+                });
+                lister.running = true;
+            }
+        }
+    }
+
+    Process {
         id: lister
 
-        // -L: KubaOS's own wallpapers are links into the Nix store.
-        command: ["find", "-L", ...Settings.wallpaperFolders.map(f => `${Settings.wallpaperRoot}/${f}`), `${Theme.stateDir}/posters`, "-maxdepth", "1", "-type", "f", ...root.nameArgs([...root.imageExtensions, ...root.videoExtensions])]
+        // -L: the sets are a link into the Nix store.
+        command: ["find", "-L", ...root.folders.filter(f => f.dir).map(f => f.dir), `${Theme.stateDir}/posters`, "-maxdepth", "1", "-type", "f", ...root.nameArgs([...root.imageExtensions, ...root.videoExtensions])]
         stdout: StdioCollector {
             onStreamFinished: {
                 const found = {};
-                for (const folder of Settings.wallpaperFolders)
-                    found[folder] = [];
+                for (const f of root.folders)
+                    if (f.dir)
+                        found[f.name] = [];
                 const posters = {};
                 for (const path of text.split("\n").filter(Boolean)) {
                     if (/\.poster\.[^./]+$/i.test(path) || path.startsWith(`${Theme.stateDir}/posters/`)) {
                         posters[path] = true;
                         continue;
                     }
-                    const folder = path.slice(Settings.wallpaperRoot.length + 1).split("/")[0];
-                    found[folder]?.push(path);
+                    found[root.folderOf(path)]?.push(path);
                 }
                 for (const folder in found)
                     found[folder].sort();

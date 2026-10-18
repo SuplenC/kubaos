@@ -57,6 +57,15 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
     {
         bad(format!("git: {why}"));
     }
+    if let (Some(w), Some(m)) = (&c.wallpapers, manifest) {
+        let known: Vec<&str> = m.wallpaper_sets.iter().map(|s| s.id.as_str()).collect();
+        for set in w.sets.iter().filter(|s| !known.contains(&s.as_str())) {
+            bad(format!(
+                "wallpaper set \"{set}\" isn't in the payload ({})",
+                known.join(", ")
+            ));
+        }
+    }
     if !valid_hostname(&c.host.hostname) {
         bad(format!(
             "hostname \"{}\" must be 1-63 characters of a-z, 0-9 and -, not starting or ending with -",
@@ -232,7 +241,7 @@ pub fn valid_hostname(h: &str) -> bool {
 mod tests {
     use super::*;
     use crate::config::*;
-    use crate::probe::{DiskInfo, Manifest, PartitionInfo, Region};
+    use crate::probe::{DiskInfo, Manifest, PartitionInfo, Region, WallpaperSet};
 
     pub fn manifest() -> Manifest {
         Manifest {
@@ -249,6 +258,13 @@ mod tests {
             sha256: "00".into(),
             kernel: "6.17.0-5-generic".into(),
             home_generation: "/nix/store/xxx-home-manager-generation".into(),
+            wallpaper_sets: ["cyberpunk", "japanese", "shinjuku"]
+                .map(|id| WallpaperSet {
+                    id: id.into(),
+                    images: 3,
+                    preview: Some(format!("wallpapers/{id}.jpg")),
+                })
+                .into(),
         }
     }
 
@@ -351,6 +367,32 @@ mod tests {
         assert!(p.iter().any(|s| s.starts_with("git:")), "{p:#?}");
         c.git.as_mut().unwrap().name = "Kuba \"K\" Example".into();
         assert_eq!(problems(&c, &probe()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn wallpaper_sets_must_be_in_the_payload() {
+        let mut c = config();
+        c.wallpapers = Some(Wallpapers {
+            sets: vec!["shinjuku".into(), "japanese".into()],
+        });
+        assert_eq!(problems(&c, &probe()), Vec::<String>::new());
+        c.wallpapers = Some(Wallpapers { sets: vec![] });
+        assert_eq!(
+            problems(&c, &probe()),
+            Vec::<String>::new(),
+            "none is a choice"
+        );
+        c.wallpapers = Some(Wallpapers {
+            sets: vec!["shinjuku".into(), "vaporwave".into(), "../etc".into()],
+        });
+        let p = problems(&c, &probe());
+        assert_eq!(
+            p,
+            vec![
+                "wallpaper set \"vaporwave\" isn't in the payload (cyberpunk, japanese, shinjuku)",
+                "wallpaper set \"../etc\" isn't in the payload (cyberpunk, japanese, shinjuku)",
+            ],
+        );
     }
 
     #[test]

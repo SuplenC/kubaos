@@ -9,7 +9,7 @@ import qs.services
 // decoded frame. While `playing` is false the video fades back to the poster
 // and its decoder is released; turning it on again starts from the top.
 // One player per view: Qt can't feed one decoder into two windows, so every
-// screen decodes its own copy (cheap with VA-API, see wallpapers/CREDITS.md).
+// screen decodes its own copy (cheap with VA-API).
 Item {
     id: root
 

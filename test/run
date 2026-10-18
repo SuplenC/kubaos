@@ -8,7 +8,7 @@
 #   test/run shell                      login zsh as kuba after a fresh switch
 #   test/run bitwarden                  Vaultwarden + dot-bw-setup + direnv
 #   test/run shots [--hyprland] [--dir NAME | --out PATH] [--size WxH] [--scale N]
-#                  [--wallpaper FOLDER/FILE | ukiyo:SCENE]
+#                  [--wallpaper SET/FILE | ukiyo:SCENE]
 #                                       start a headless session (sway, or Hyprland
 #                                       once its stage exists) with Quickshell
 #   test/run shots shot NAME [--webp]   screenshot into the output dir
@@ -178,7 +178,7 @@ cmd_shots() {
       --out) DOTFILES_TEST_OUT="${2:?--out needs a path}"; shift ;;
       --size) size="${2:?--size WxH}"; shift ;;
       --scale) scale="${2:?--scale N}"; shift ;;
-      --wallpaper) wall="${2:?--wallpaper FOLDER/FILE or ukiyo:SCENE}"; shift ;;
+      --wallpaper) wall="${2:?--wallpaper SET/FILE or ukiyo:SCENE}"; shift ;;
       *) die "shots: unknown flag $1 (see test/run --help)" ;;
     esac
     shift

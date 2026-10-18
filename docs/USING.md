@@ -87,7 +87,8 @@ home-manager switch --flake ~/.config/kubaos/home --override-input kubaos git+fi
 |---|---|
 | `home-manager switch --flake ~/.config/kubaos/home` | Apply your `home.nix` |
 | `dot-theme set <image>` | Set a wallpaper (an image, a loop, or `ukiyo:kabukicho-gate` for the live one) and regenerate colors everywhere |
-| `dot-theme next`, `prev`, `toggle-folder` | Cycle wallpapers (stills and loops), cycle the shinjuku, japanese and cyberpunk folders |
+| `dot-theme next`, `prev`, `toggle-folder` | Cycle wallpapers (stills and loops), cycle the folders: the live scenes, the sets you picked, your own `~/Pictures/wallpapers` |
+| `~/.config/kubaos/wallpapers/sets` | The wallpaper sets the picker shows, one per line (every set in `/usr/share/kubaos/wallpapers` without the file). A set a new release brings shows up once you add it |
 | `dot-theme apply [--force]` | Regenerate from the current wallpaper; without `--force` it does nothing when no input changed (login runs it) |
 | `dot-config apply` | Create missing files in `~/.config/kubaos` and rewrite the merged configs (bat, git ignore, fastfetch) from the defaults plus yours. Every `home-manager switch` runs it |
 | `qs ipc show` | List the Quickshell IPC targets Hyprland binds call |
@@ -166,7 +167,6 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 |---|---|
 | `flake.nix`, `flake.lock` | Inputs (nixpkgs 26.05, home-manager, Quickshell v0.3.2) and the `kuba@tuxedo` / `kuba@vm` outputs |
 | `home/` | home-manager modules: packages, zsh, tmux plugins, GPU wiring, GTK/Qt theme, defaults and the user layer (`links.nix`) |
-| `wallpapers/` | Tokyo wallpapers: `shinjuku/` (five stills, five HEVC loops with posters), `cyberpunk/`, `japanese/`, their credits and `make-loops.py`; linked to `~/Pictures/wallpapers` |
 | `config/` | The defaults, one dir per app, linked read-only into `~/.config`: `hypr`, `quickshell`, `nvim`, `tmux`, `tms`, `ghostty`, `foot`, `fuzzel`, `matugen`, `ohmyposh`, `lazygit`, `yazi`, `btop`, `bat`, `bacon`, `git` |
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
@@ -213,5 +213,5 @@ Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland
 - [Omarchy](https://omarchy.org) for the keybinds and the idea that installing a desktop should take one stick and a few minutes.
 - [Caelestia](https://github.com/caelestia-dots/shell) for the shell's structure: the frame, panels that grow out of it, the Material 3 motion. No code was taken; the shell here is written from scratch.
 - [Quickshell](https://quickshell.org), [Hyprland](https://hyprland.org), [matugen](https://github.com/InioX/matugen), [home-manager](https://github.com/nix-community/home-manager) and Ubuntu, which do the actual work.
-- The wallpapers are by Pema G. Lama, Alex Knight, Jezael Melgoza, Marek Okon, Manuel Cosentino, LoboStudio Hamburg, ayumi kubo, Letian Zhang and Lucius Hunter on Unsplash, and Bobby Brown on Pexels ([`wallpapers/CREDITS.md`](../wallpapers/CREDITS.md)). The live gate is Basile Morin's photo (CC BY-SA 4.0, Wikimedia Commons), brought to life by ukiyo.
+- The wallpapers are by Pema G. Lama, Alex Knight, Jezael Melgoza, Marek Okon, Manuel Cosentino, LoboStudio Hamburg, ayumi kubo, Letian Zhang and Lucius Hunter on Unsplash, and Bobby Brown on Pexels (each set's `CREDITS.md` in [SuplenC/kubaos-wallpapers](https://github.com/SuplenC/kubaos-wallpapers)). The live gate is Basile Morin's photo (CC BY-SA 4.0, Wikimedia Commons), brought to life by ukiyo.
 - Built with Claude. Kuba made the calls; the robots typed.

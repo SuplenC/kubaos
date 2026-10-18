@@ -13,6 +13,9 @@ pub struct InstallConfig {
     pub git: Option<Git>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wifi: Option<Wifi>,
+    /// `None`: every set in the payload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallpapers: Option<Wallpapers>,
     pub payload: Payload,
 }
 
@@ -81,6 +84,16 @@ pub struct Git {
 #[serde(deny_unknown_fields)]
 pub struct Wifi {
     pub ssid: String,
+}
+
+/// The wallpaper sets the picker shows. Every set ships in the payload
+/// either way (`/usr/share/kubaos/wallpapers/<id>/`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Wallpapers {
+    /// Ids from the manifest's `wallpaper_sets`. Empty: only the user's own
+    /// folder.
+    pub sets: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

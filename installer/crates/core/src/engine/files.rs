@@ -222,6 +222,23 @@ pub fn gitconfig(name: &str, email: &str) -> String {
     format!("[user]\n\tname = {}\n\temail = {}\n", q(name), q(email))
 }
 
+/// The wallpaper sets the user chose, under the home: the user layer, so
+/// an update never changes it. scripts/dot-theme reads it (`folders`).
+pub const WALLPAPER_SETS: &str = ".config/kubaos/wallpapers/sets";
+
+/// [`WALLPAPER_SETS`]: one set id per line, `#` comments.
+pub fn wallpaper_sets(sets: &[String]) -> String {
+    let mut s = String::from(
+        "# Wallpaper sets the picker shows, one per line (from /usr/share/kubaos/wallpapers).\n\
+         # Your own images go in ~/Pictures/wallpapers.\n",
+    );
+    for set in sets {
+        s.push_str(set);
+        s.push('\n');
+    }
+    s
+}
+
 /// `<n>/info.xml` the way snapper writes it, for the raw-btrfs fallback.
 pub fn snapper_info(num: u32, date_utc: &str, description: &str) -> String {
     format!(
@@ -384,6 +401,23 @@ mod tests {
         assert_eq!(nmconnection_name("Home 5G"), "Home_5G.nmconnection");
         assert_eq!(nmconnection_name("../x"), "_x.nmconnection");
         assert_eq!(nmconnection_name("..."), "wifi.nmconnection");
+    }
+
+    #[test]
+    fn wallpaper_sets_file() {
+        let sets = ["shinjuku".to_string(), "cyberpunk".to_string()];
+        assert_eq!(WALLPAPER_SETS, ".config/kubaos/wallpapers/sets");
+        assert_eq!(
+            wallpaper_sets(&sets),
+            "# Wallpaper sets the picker shows, one per line (from /usr/share/kubaos/wallpapers).\n\
+             # Your own images go in ~/Pictures/wallpapers.\n\
+             shinjuku\n\
+             cyberpunk\n"
+        );
+        assert!(
+            wallpaper_sets(&[]).lines().all(|l| l.starts_with('#')),
+            "no sets: only the comment"
+        );
     }
 
     #[test]

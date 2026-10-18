@@ -356,6 +356,7 @@ pub fn hints(app: &App) -> Vec<(&'static str, &'static str)> {
         }
         Screen::Wifi => v.extend([("↑ ↓", "pick"), ("Tab", "next field")]),
         Screen::Account | Screen::Git => v.push(("Tab", "next field")),
+        Screen::Wallpapers => v.extend([("Space", "pick or drop"), ("← →", "move")]),
         Screen::Disk => v.extend([
             ("↑ ↓", "pick a disk"),
             ("← →", "keep or erase"),
@@ -397,6 +398,7 @@ pub fn hints(app: &App) -> Vec<(&'static str, &'static str)> {
             | Screen::Account
             | Screen::Disk
             | Screen::Git
+            | Screen::Wallpapers
     ) {
         v.extend([("Enter", "continue"), ("Esc", "back")]);
     } else if app.screen == Screen::Summary {
@@ -470,6 +472,7 @@ fn content(app: &App) -> El<'_> {
         Screen::Account => account(app, &p),
         Screen::Disk => disk(app, &p),
         Screen::Git => git(app, &p),
+        Screen::Wallpapers => wallpapers(app, &p),
         Screen::Summary => summary(app, &p),
         Screen::Installing => installing(app, &p),
         Screen::Failed => failed(app, &p),
@@ -1597,6 +1600,143 @@ fn git<'a>(app: &'a App, p: &Palette) -> El<'a> {
     .into()
 }
 
+/// `cyberpunk` -> "Cyberpunk", `neo-tokyo` -> "Neo tokyo".
+fn set_name(id: &str) -> String {
+    let s = id.replace(['-', '_'], " ");
+    let mut c = s.chars();
+    c.next()
+        .map(|f| f.to_uppercase().chain(c).collect())
+        .unwrap_or_default()
+}
+
+fn wallpapers<'a>(app: &'a App, p: &Palette) -> El<'a> {
+    let sets = app.wallpaper_sets();
+    let tile = |i: usize| -> El<'a> {
+        let s = &sets[i];
+        let on = app.form.wallpaper_set_on(&s.id);
+        let pp = *p;
+        // The payload carries a small JPEG per set; the demo has none.
+        let preview: El = match &s.preview {
+            Some(rel) => image(image::Handle::from_path(
+                std::path::Path::new(model::PAYLOAD_DIR).join(rel),
+            ))
+            .content_fit(ContentFit::Cover)
+            .width(Length::Fill)
+            .height(112)
+            .into(),
+            None => center(icon(
+                Icon::Wallpaper,
+                32.0,
+                alpha(p.on_surface_variant, 0.6),
+            ))
+            .width(Length::Fill)
+            .height(112)
+            .style(move |_t| container::Style {
+                background: Some(Background::Color(alpha(pp.surface_container_highest, 0.6))),
+                ..container::Style::default()
+            })
+            .into(),
+        };
+        let fg = if on {
+            p.on_secondary_container
+        } else {
+            p.on_surface
+        };
+        let b = button(
+            column![
+                container(preview)
+                    .clip(true)
+                    .style(move |_t| container::Style {
+                        border: Border::default().rounded(radius::MD),
+                        ..container::Style::default()
+                    }),
+                row![
+                    icon(
+                        if on { Icon::CheckCircle } else { Icon::Circle },
+                        20.0,
+                        if on { p.primary } else { p.outline }
+                    ),
+                    text(set_name(&s.id))
+                        .font(theme::SANS_SEMIBOLD)
+                        .size(size::MD)
+                        .color(fg)
+                        .width(Length::Fill),
+                    text(match s.images {
+                        1 => "1 wallpaper".to_string(),
+                        n => format!("{n} wallpapers"),
+                    })
+                    .size(size::SM)
+                    .color(alpha(if on { fg } else { p.on_surface_variant }, 0.85)),
+                ]
+                .spacing(space::SM)
+                .align_y(Alignment::Center),
+            ]
+            .spacing(space::MD),
+        )
+        .width(Length::Fill)
+        .padding(space::MD)
+        .on_press(Message::Click(F::WallpaperSet(i)))
+        .style(move |_t: &Theme, status| button::Style {
+            background: Some(Background::Color(if on {
+                alpha(pp.secondary_container, 0.85)
+            } else if matches!(status, button::Status::Hovered) {
+                alpha(pp.on_surface, theme::STATE_HOVER)
+            } else {
+                alpha(pp.surface_container_low, 0.6)
+            })),
+            text_color: pp.on_surface,
+            border: Border {
+                color: if on {
+                    alpha(pp.primary, 0.8)
+                } else {
+                    alpha(pp.outline_variant, 0.7)
+                },
+                width: 1.0,
+                radius: radius::LG.into(),
+            },
+            shadow: Shadow::default(),
+            snap: true,
+        });
+        container(ring(b, app.is_focused(F::WallpaperSet(i)), radius::LG, p))
+            .width(Length::FillPortion(1))
+            .into()
+    };
+    let mut grid = column![].spacing(space::LG);
+    for start in (0..sets.len()).step_by(3) {
+        let mut r = row![].spacing(space::LG);
+        for i in start..(start + 3) {
+            r = r.push(if i < sets.len() {
+                tile(i)
+            } else {
+                Space::new().width(Length::FillPortion(1)).into()
+            });
+        }
+        grid = grid.push(r);
+    }
+    let n = sets
+        .iter()
+        .filter(|s| app.form.wallpaper_set_on(&s.id))
+        .count();
+    let note = if n == 0 {
+        "None picked: the picker shows ukiyo's live scenes and your own folder only.".to_string()
+    } else {
+        format!("{n} of {} in the picker.", sets.len())
+    };
+    column![
+        header(
+            jp::WALLPAPERS,
+            "Wallpapers",
+            "Every set gets installed. Pick the ones the wallpaper picker shows; you can change it later. Your own images go in ~/Pictures/wallpapers.",
+            p
+        ),
+        Space::new().height(space::XXL),
+        scroll(ids::WALLPAPER_SCROLL, grid, p),
+        Space::new().height(space::LG),
+        text(note).size(size::SM).color(p.on_surface_variant),
+    ]
+    .into()
+}
+
 /// A summary row with a second, quieter line (paths, emails, versions):
 /// those break badly when wrapped mid-token, so they get their own line.
 fn kv2<'a>(k: &'a str, v: String, sub: String, p: &Palette) -> El<'a> {
@@ -1788,6 +1928,19 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
                 })
                 .unwrap_or_default(),
                 m.map(|m| format!("Linux {}", m.kernel)).unwrap_or_default(),
+                p,
+            ),
+            kv(
+                "Wallpapers",
+                match cfg.wallpapers.as_ref().map(|w| w.sets.as_slice()) {
+                    None => "Every set".into(),
+                    Some([]) => "Only your own".into(),
+                    Some(sets) => sets
+                        .iter()
+                        .map(|s| set_name(s))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                },
                 p,
             ),
             kv(

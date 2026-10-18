@@ -977,6 +977,31 @@ impl<'a> Install<'a> {
                 &self.ts(&f),
             ]))?;
         }
+        // ~/.config/kubaos/wallpapers/sets: the sets the picker shows. All of
+        // the payload's unless the user picked; an older payload lists none,
+        // and without the file dot-theme shows every set on the machine.
+        let sets: Vec<String> = match &c.wallpapers {
+            Some(w) => w.sets.clone(),
+            None => self
+                .manifest
+                .wallpaper_sets
+                .iter()
+                .map(|s| s.id.clone())
+                .collect(),
+        };
+        if c.wallpapers.is_some() || !sets.is_empty() {
+            let f = format!("{home}/{}", files::WALLPAPER_SETS);
+            let dir = format!("{home}/.config/kubaos/wallpapers");
+            self.mkdir(&self.t(&dir))?;
+            self.write(&f, &files::wallpaper_sets(&sets), 0o644)?;
+            self.sh(Cmd::new("chown").args([
+                &owner,
+                &self.ts(&format!("{home}/.config")),
+                &self.ts(&format!("{home}/.config/kubaos")),
+                &self.ts(&dir),
+                &self.ts(&f),
+            ]))?;
+        }
         self.install_keyring(&home, &owner)?;
 
         // What the image's scripts wrote into /etc for the build user.

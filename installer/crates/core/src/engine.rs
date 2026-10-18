@@ -98,6 +98,7 @@ fn placeholder_manifest(config: &InstallConfig) -> Manifest {
         sha256: String::new(),
         kernel: "<kernel>".into(),
         home_generation: "/nix/store/<hash>-home-manager-generation".into(),
+        wallpaper_sets: Vec::new(),
     }
 }
 

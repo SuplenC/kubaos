@@ -47,4 +47,4 @@ One payload build at a time, they eat the RAM. How it all fits together: [`insta
 
 ## Licence
 
-MIT OR Apache-2.0, except the wallpapers and fonts. See [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE) and [`wallpapers/CREDITS.md`](wallpapers/CREDITS.md).
+MIT OR Apache-2.0, except the wallpapers and fonts. See [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE) and the wallpapers' credits in [SuplenC/kubaos-wallpapers](https://github.com/SuplenC/kubaos-wallpapers).

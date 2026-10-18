@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Phase 6: Nix (official multi-user installer), flakes, first home-manager
 # switch for <user>@<host>, nixpkgs' pam_fprintd.so for the Quickshell lock,
-# the one-time GPU setup for Nix apps, zsh as login shell.
+# the wallpaper sets in /usr/share/kubaos/wallpapers, the one-time GPU setup
+# for Nix apps, zsh as login shell.
 #
 # Installer choice: the official script from nixos.org (`--daemon`). It
 # installs upstream Nix, the same Nix nixpkgs and home-manager are tested
@@ -182,6 +183,15 @@ fi
 step "pam_fprintd.so for the Quickshell lock ($PAM_FPRINTD_LINK)"
 if ((DRY_RUN)) || command -v nix >/dev/null; then
   link_pam_fprintd
+else
+  warn "nix not found; skipping"
+fi
+
+# --------------------------------------------------------------------------
+# The wallpaper sets, like the PAM link: not tied to DO_SWITCH.
+step "Wallpaper sets ($WALLPAPERS_LINK)"
+if ((DRY_RUN)) || command -v nix >/dev/null; then
+  link_wallpapers
 else
   warn "nix not found; skipping"
 fi

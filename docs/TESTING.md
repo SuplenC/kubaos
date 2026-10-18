@@ -31,7 +31,7 @@ Needs Docker with BuildKit and Compose v2 (Docker Desktop on the Mac is fine). E
 test/run shots --dir v4 --size 2880x1800 --scale 1.5
 test/run shots run qs ipc call launcher toggle
 test/run shots shot cyberpunk-launcher-1800 --webp
-test/run shots run 'dot-theme set ~/Pictures/wallpapers/japanese/tokyo-tower-blue-hour.jpg'
+test/run shots run 'dot-theme set /usr/share/kubaos/wallpapers/japanese/tokyo-tower-blue-hour.jpg'
 test/run shots stop
 ```
 
@@ -97,7 +97,7 @@ Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (arm64 VM, 8 CPUs, 7
 | `quickshell` | headless sway (pixman), Quickshell from the generation on Mesa llvmpipe: config loads, no QML error in the log, `qs ipc show` lists every target in CONTRACTS. Warnings about services a container lacks (NetworkManager, BlueZ, UPower, portals, Hyprland under sway) are printed, not fatal |
 | `recorder` | in a headless sway session with Quickshell: Quickshell creates `$XDG_RUNTIME_DIR/dot-record.json`; `dot-hypr-record output` (wf-recorder backend, gsr needs a GPU) sets it to `recording`; `qs ipc call recorder stop` brings it back to `idle` and leaves an mp4 in `~/Videos/Recordings`; `replay save` refuses with no replay running; no QML errors |
 | `ukiyo` | `ukiyo` on PATH from the profile, `ukiyo --version`; `ukiyo config schema --json` reports `defaults.toml`'s values with source `defaults` and includes the gate's params; the zsh hook is in `.zshrc` and `_ukiyo_precmd` in an interactive zsh's `precmd_functions`; `dot-theme set ukiyo:kabukicho-gate` gives the same colors as its poster and names `ukiyo:kabukicho-gate`; `apply` stays quiet. In sway: the daemon draws (llvmpipe), Quickshell's status says `ukiyo: true`, locking makes ukiyo `still` with a lock frame on disk, a still wallpaper stops the daemon; prints ukiyo's CPU drawing and still |
-| `wallpaper_video` | `dot-theme set <video>` gives the same colors as its poster and names the video in `colors.json`, `hypr.lua`, `nvim.lua`; `apply` stays a no-op; a lap of `next` over `shinjuku/` visits stills and videos, never posters. Quickshell plays it (software decode), `qs ipc call wallpaper animate never` stops it and the mode lands in `~/.local/state/quickshell/kubaos.json`; prints Quickshell's CPU playing and not; no QML errors |
+| `wallpaper_video` | `dot-theme set <video>` gives the same colors as its poster and names the video in `colors.json`, `hypr.lua`, `nvim.lua`; `apply` stays a no-op; a lap of `next` over the video's folder visits stills and videos, never posters. Quickshell plays it (software decode), `qs ipc call wallpaper animate never` stops it and the mode lands in `~/.local/state/quickshell/kubaos.json`; prints Quickshell's CPU playing and not; no QML errors |
 | `user_layer` | `test/user-layer-check` (issue #9): every file of `~/.config/kubaos` and the seeded btop and tms configs exist; the user changes each one; newer defaults are committed and switched to; every user file is byte-identical, the new defaults are live (tmux, git, git ignore, bat) and the user's values win (tmux, git, Ghostty, Neovim, zsh, lazygit, bacon, fastfetch, yazi, btop). Commits to the checkout, so it runs last |
 
 `test/run bitwarden` starts `vaultwarden/server` (profile `bitwarden`) with a throwaway CA on a private network (`https://vw`), then:

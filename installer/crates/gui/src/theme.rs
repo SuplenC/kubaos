@@ -35,7 +35,7 @@ pub struct Palette {
 }
 
 /// config/matugen/default-colors.json: matugen `scheme-fidelity` on
-/// wallpapers/cyberpunk/shinjuku-neon-canyon.jpg.
+/// cyberpunk/shinjuku-neon-canyon.jpg (SuplenC/kubaos-wallpapers).
 pub const DARK: Palette = Palette {
     primary: color!(0xfdb882),
     on_primary: color!(0x4e2600),
@@ -243,6 +243,7 @@ pub enum Icon {
     Timer,
     Visibility,
     VisibilityOff,
+    Wallpaper,
     Warning,
     Wifi,
     WifiLock,
@@ -256,7 +257,7 @@ pub enum Icon {
 impl Icon {
     /// Every icon, for the icon sheet (gallery.rs).
     #[cfg(test)]
-    pub const ALL: [Icon; 46] = [
+    pub const ALL: [Icon; 47] = [
         Icon::ArrowBack,
         Icon::ArrowForward,
         Icon::Badge,
@@ -295,6 +296,7 @@ impl Icon {
         Icon::Timer,
         Icon::Visibility,
         Icon::VisibilityOff,
+        Icon::Wallpaper,
         Icon::Warning,
         Icon::Wifi,
         Icon::WifiLock,
@@ -345,6 +347,7 @@ impl Icon {
             Icon::Timer => 0xe425,
             Icon::Visibility => 0xe8f4,
             Icon::VisibilityOff => 0xe8f5,
+            Icon::Wallpaper => 0xe1bc,
             Icon::Warning => 0xf083,
             Icon::Wifi => 0xe63e,
             Icon::WifiLock => 0xe1e1,
@@ -368,6 +371,7 @@ pub mod jp {
     pub const ACCOUNT: &str = "アカウント";
     pub const DISK: &str = "ディスク";
     pub const GIT: &str = "署名";
+    pub const WALLPAPERS: &str = "壁紙";
     pub const SUMMARY: &str = "確認";
     pub const INSTALLING: &str = "インストール中";
     pub const DONE: &str = "完了";

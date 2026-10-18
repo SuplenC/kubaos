@@ -20,10 +20,6 @@ let
   # laptop panel at scale 1.5 (config/hypr/monitors.lua) look the same.
   uiFont = "Geist";
   uiFontSize = 10;
-  wallpapers = builtins.path {
-    path = ../wallpapers;
-    name = "kubaos-wallpapers";
-  };
   qtFont =
     family: size: weight:
     ''"${family},${toString size},-1,5,${toString weight},0,0,0,0,0,0,0,0,0,0,1"'';
@@ -133,25 +129,19 @@ in
   # libadwaita reads the button layout from here (through the portal).
   dconf.settings."org/gnome/desktop/wm/preferences".button-layout = ":";
 
-  # KubaOS's wallpapers (wallpapers/<folder>/), each file linked from the
-  # store into real folders under ~/Pictures/wallpapers, so your own images
-  # can sit next to them and an update replaces only KubaOS's.
-  home.file = lib.mapAttrs' (
-    folder: _:
-    lib.nameValuePair "Pictures/wallpapers/${folder}" {
-      source = "${wallpapers}/${folder}";
-      recursive = true;
-    }
-  ) (lib.filterAttrs (_: type: type == "directory") (builtins.readDir ../wallpapers));
-
-  # Migration: older generations linked ~/Pictures/wallpapers itself to the
-  # checkout's wallpapers/. Remove that link before home-manager links the
-  # files above, or they would land in the checkout.
-  home.activation.wallpapersFromStore = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
+  # KubaOS's wallpaper sets are read-only in /usr/share/kubaos/wallpapers
+  # (system/60-nix.sh); ~/Pictures/wallpapers is yours, a real folder that
+  # dot-theme and the picker show as the last tab.
+  #
+  # Migration: older generations linked it to the checkout's wallpapers/.
+  # Replace the link with the folder; the sets are in /usr/share now, and
+  # dot-theme moves a current wallpaper from the old path.
+  home.activation.wallpapersFolder = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     walls="${config.home.homeDirectory}/Pictures/wallpapers"
     if [ -L "$walls" ]; then
       run rm "$walls"
     fi
+    run mkdir -p "$walls"
   '';
 
   # First run: render defaults so every consumer has a file before login.

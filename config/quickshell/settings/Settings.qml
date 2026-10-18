@@ -7,12 +7,10 @@ import Quickshell
 Singleton {
     readonly property string home: Quickshell.env("HOME")
 
-    // Wallpaper picker: one tab per folder under wallpaperRoot.
-    readonly property string wallpaperRoot: `${home}/Pictures/wallpapers`
-    readonly property list<string> wallpaperFolders: ["shinjuku", "japanese", "cyberpunk"]
-    // ukiyo's live scenes (docs/UKIYO.md) are listed first in this folder,
-    // the same one dot-theme steps through them in (SCENE_FOLDER).
-    readonly property string sceneFolder: "shinjuku"
+    // The wallpaper picker's tabs are `dot-theme folders`: ukiyo's live
+    // scenes, the sets picked in ~/.config/kubaos/wallpapers/sets (from this
+    // directory), and ~/Pictures/wallpapers.
+    readonly property string wallpaperSets: "/usr/share/kubaos/wallpapers"
     // Moving wallpapers (mp4, webm, mkv, mov next to a <name>.poster.jpg):
     // "always", "ac" or "never". On AC by default, because a looping 4K city
     // on battery is how a laptop dies by 3pm. Off, you get the poster frame.
@@ -20,8 +18,8 @@ Singleton {
     // `qs ipc call wallpaper animate <mode>`) changes it and remembers it in
     // ~/.local/state/quickshell/kubaos.json.
     readonly property string wallpaperAnimate: "ac"
-    // Lock screen loop when the wallpaper itself is a still, relative to
-    // wallpaperRoot. "" = the still, blurred, no motion. An animated
+    // Lock screen loop when the wallpaper itself is a still: a path, or
+    // relative to wallpaperSets. "" = the still, blurred, no motion. An animated
     // wallpaper always plays itself on the lock screen.
     readonly property string lockLoop: ""
     // Seconds of no input before the screens go dark (hypridle's DPMS

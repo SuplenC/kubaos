@@ -78,4 +78,19 @@ pub struct Manifest {
     pub kernel: String,
     /// Store path of the home-manager activation package.
     pub home_generation: String,
+    /// The wallpaper sets in the rootfs (`/usr/share/kubaos/wallpapers/`),
+    /// sorted by id. Empty for older images.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub wallpaper_sets: Vec<WallpaperSet>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WallpaperSet {
+    /// The folder name in the wallpaper repo, e.g. `shinjuku`.
+    pub id: String,
+    /// Images and videos in it.
+    pub images: u32,
+    /// A small JPEG of its first image, relative to the payload dir.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preview: Option<String>,
 }

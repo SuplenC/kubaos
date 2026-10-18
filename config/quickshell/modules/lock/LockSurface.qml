@@ -47,7 +47,7 @@ WlSessionLockSurface {
         const wall = Wallpapers.current;
         if (Wallpapers.isVideo(wall) || Wallpapers.isScene(wall) || !Settings.lockLoop)
             return wall;
-        return `${Settings.wallpaperRoot}/${Settings.lockLoop}`;
+        return Settings.lockLoop.startsWith("/") ? Settings.lockLoop : `${Settings.wallpaperSets}/${Settings.lockLoop}`;
     }
 
     // ukiyo under the lock: the session lock covers the background layer, so

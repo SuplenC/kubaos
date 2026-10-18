@@ -18,7 +18,7 @@ ukiyo is its own project (`~/Projects/ukiyo`, Rust, wgpu). KubaOS is its first u
 
 ## A scene is a wallpaper
 
-`ukiyo:kabukicho-gate` is a wallpaper the way a video in `~/Pictures/wallpapers/shinjuku/` is. `dot-theme set ukiyo:kabukicho-gate` takes the colours from the scene's poster (`ukiyo scenes --json` says where it is), writes `ukiyo:kabukicho-gate` wherever a path would go (`~/.local/state/theme/wallpaper`, `colors.json`, `hypr.lua`, `nvim.lua`), then starts the daemon and switches it to the scene. `next`, `prev` and the folder commands step through scenes too: they're listed first in `shinjuku/`. It's the first-boot default (`DEFAULT_WALLPAPER`), and `config/matugen/default-colors.json` comes from its poster.
+`ukiyo:kabukicho-gate` is a wallpaper the way a video in `~/Pictures/wallpapers/` is. `dot-theme set ukiyo:kabukicho-gate` takes the colours from the scene's poster (`ukiyo scenes --json` says where it is), writes `ukiyo:kabukicho-gate` wherever a path would go (`~/.local/state/theme/wallpaper`, `colors.json`, `hypr.lua`, `nvim.lua`), then starts the daemon and switches it to the scene. `next`, `prev` and the folder commands step through scenes too: they're the folder `live`, the picker's first tab. It's the first-boot default (`DEFAULT_WALLPAPER`), and `config/matugen/default-colors.json` comes from its poster.
 
 Setting a still or a loop afterwards **stops** the daemon instead of pausing it. A paused daemon keeps its layer surface on the background layer, where it can sit above Quickshell's and cover the new wallpaper, and it keeps a few hundred MB of textures on the GPU. Starting again takes a fraction of a second, and the poster covers that. The stop waits 1.5 s, so Quickshell's layer is back before ukiyo's goes.
 

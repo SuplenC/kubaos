@@ -301,6 +301,29 @@ while IFS= read -r f; do
 done < <(grep -rIlw --exclude-dir=dotinstall -e "$user" "$R/etc" "$R/usr/local" "$R/usr/lib/systemd" "$R/var/lib" 2>/dev/null |
   grep -v -e '^'"$R"'/etc/\(passwd\|group\|shadow\|gshadow\|subuid\|subgid\)' )
 [[ -z "$stray" ]] && ok "  no other system file names $user" || fail "  name $user, and the engine doesn't render them:$stray"
+sect "wallpaper sets"
+walls=/usr/share/kubaos/wallpapers
+tgt="$(readlink "$R$walls")"
+[[ "$tgt" == /nix/store/* && -d "$R$tgt" ]] && ok "$walls -> $tgt" || fail "$walls -> '$tgt', want a store path in the payload"
+check "  pinned by a gcroot" test "$(readlink "$R/nix/var/nix/gcroots/dotfiles-wallpapers")" == "$tgt"
+n="$(jq -r '.wallpaper_sets | length' "$M")"
+((n > 0)) && ok "manifest lists $n set(s): $(jq -r '[.wallpaper_sets[].id] | join(", ")' "$M")" || fail "manifest lists no wallpaper_sets"
+while IFS=$'\t' read -r id images preview; do
+  have="$(find -L "$R$tgt/$id" -maxdepth 1 -type f ! -iname '*.poster.*' ! -iname '*.md' | wc -l)"
+  [[ "$have" == "$images" ]] && ok "  $id: $images wallpapers" || fail "  $id: manifest says $images, the set has $have"
+  [[ -z "$preview" || -s "$P/$preview" ]] && ok "  $id: preview ${preview:-none}" || fail "  $id: no $P/$preview"
+done < <(jq -r '.wallpaper_sets[] | [.id, .images, (.preview // "")] | @tsv' "$M")
+
+# The ISO carries the live system (about 1.8 GB on x86_64, issue #6) next to
+# this payload, and has to stay under 8 GB (docs/adr/0001, "Hosting").
+sect "size"
+ISO_BUDGET=8000000000 LIVE_RESERVE=2000000000
+bytes="$(du -s -B1 --apparent-size "$P" --exclude=check.txt --exclude=packages.txt | cut -f1)"
+info "payload $((bytes / 1000000)) MB, of which wallpaper previews $(du -s -B1 "$P/wallpapers" 2>/dev/null | awk '{printf "%.1f", $1 / 1e6}') MB; sets $(du -sL -B1 --apparent-size "$R$tgt" | awk '{printf "%.0f", $1 / 1e6}') MB unpacked"
+((bytes <= ISO_BUDGET - LIVE_RESERVE)) &&
+  ok "payload fits the ISO budget ($((bytes / 1000000)) MB of $(((ISO_BUDGET - LIVE_RESERVE) / 1000000)) MB)" ||
+  fail "payload is $((bytes / 1000000)) MB: with the live system the ISO goes over 8 GB"
+
 check "image.json parses" jq -e .home_generation "$R/usr/share/dotinstall/image.json"
 info "image.json groups: $(jq -c .groups "$R/usr/share/dotinstall/image.json")"
 

@@ -335,6 +335,37 @@ link_nix_pam_module() {
 link_pam_fprintd() { link_nix_pam_module fprintd pam_fprintd.so "$PAM_FPRINTD_LINK" "$PAM_FPRINTD_GCROOT"; }
 link_pam_u2f() { link_nix_pam_module pam_u2f pam_u2f.so "$PAM_U2F_LINK" "$PAM_U2F_GCROOT"; }
 
+# The wallpaper sets (flake input kubaos-wallpapers), read-only for every
+# user. scripts/dot-theme shows the ones in ~/.config/kubaos/wallpapers/sets.
+WALLPAPERS_LINK=/usr/share/kubaos/wallpapers
+WALLPAPERS_GCROOT=/nix/var/nix/gcroots/dotfiles-wallpapers
+
+# link_wallpapers: point WALLPAPERS_LINK at the flake's pinned wallpaper
+# input, pinned with WALLPAPERS_GCROOT (the payload build ships every
+# dotfiles-* root). From KUBAOS_DIR's lock, so a new set comes with a release.
+# The link sits inside the /usr/share/kubaos clone (.gitignore: /wallpapers).
+# Re-run after every flake update.
+link_wallpapers() {
+  local out
+  if ((DRY_RUN)); then
+    run nix eval --raw "$KUBAOS_DIR#lib.wallpapers"
+    sudo_run ln -sfn "<wallpapers store path>" "$WALLPAPERS_GCROOT"
+    sudo_run install -d -m 0755 "$(dirname "$WALLPAPERS_LINK")"
+    sudo_run ln -sfn "<wallpapers store path>" "$WALLPAPERS_LINK"
+    return 0
+  fi
+  out="$(nix eval --raw "$KUBAOS_DIR#lib.wallpapers")" || die "nix eval .#lib.wallpapers failed"
+  [[ -d "$out" ]] || die "no wallpapers at $out"
+  if [[ "$(readlink "$WALLPAPERS_GCROOT" 2>/dev/null)" == "$out" &&
+    "$(readlink "$WALLPAPERS_LINK" 2>/dev/null)" == "$out" ]]; then
+    ok "$WALLPAPERS_LINK -> $out"
+    return 0
+  fi
+  sudo_run ln -sfn "$out" "$WALLPAPERS_GCROOT"
+  sudo_run install -d -m 0755 "$(dirname "$WALLPAPERS_LINK")"
+  sudo_run ln -sfn "$out" "$WALLPAPERS_LINK"
+}
+
 # Packages held with the Hyprland stack (50-hyprland.sh, update.sh): the
 # compositor's own packages plus every hypr*/aquamarine library.
 HYPR_HOLD_RE='^(hypr|libhypr|libaquamarine|xdg-desktop-portal-hyprland)'

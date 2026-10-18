@@ -4,7 +4,8 @@
 # Fonts: Geist and JetBrains Mono (SIL OFL 1.1), M PLUS 1 (SIL OFL 1.1, a
 # subset with only the Japanese accents the GUI shows), Material Symbols
 # Rounded (Apache 2.0, a subset with only the icons in src/theme.rs).
-# Wallpaper: the default theme wallpaper (wallpapers/CREDITS.md), shrunk, plus
+# Wallpaper: cyberpunk/shinjuku-neon-canyon.jpg from a SuplenC/kubaos-wallpapers
+# checkout (WALLPAPERS, default ../kubaos-wallpapers next to this repo), shrunk, plus
 # a heavily blurred copy for the glass panels.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -13,9 +14,9 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 # Keep in sync with JP_ACCENTS in src/theme.rs.
-jp="ようこそ言語と入力時間帯接続アカウントディスク署名確認インストール中完了失敗初期設定"
+jp="ようこそ言語と入力時間帯接続アカウントディスク署名確認インストール中完了失敗初期設定壁紙"
 # Keep in sync with the Icon enum in src/theme.rs (Google wants them sorted).
-icons="account_circle arrow_back arrow_forward badge bolt check check_circle chevron_right circle close code computer deployed_code download draft error expand_less expand_more folder_open hard_drive key keyboard language lock lock_open mail network_wifi_1_bar network_wifi_2_bar network_wifi_3_bar person power_settings_new progress_activity public radio_button_checked radio_button_unchecked restart_alt rocket_launch save schedule search signal_wifi_4_bar storage terminal timer visibility visibility_off warning wifi wifi_lock wifi_off"
+icons="account_circle arrow_back arrow_forward badge bolt check check_circle chevron_right circle close code computer deployed_code download draft error expand_less expand_more folder_open hard_drive key keyboard language lock lock_open mail network_wifi_1_bar network_wifi_2_bar network_wifi_3_bar person power_settings_new progress_activity public radio_button_checked radio_button_unchecked restart_alt rocket_launch save schedule search signal_wifi_4_bar storage terminal timer visibility visibility_off wallpaper warning wifi wifi_lock wifi_off"
 
 gfont() { # css url -> first font url in it
   curl -fsSL "$1" | grep -o 'https://fonts.gstatic.com[^)]*' | head -1
@@ -41,7 +42,7 @@ curl -fsSL -o fonts/MaterialSymbolsRounded-subset.ttf \
 # (different codepoints for some icons) can't shadow it. Needs fontTools.
 python3 rename-icon-font.py fonts/MaterialSymbolsRounded-subset.ttf
 
-wp="$repo/wallpapers/cyberpunk/shinjuku-neon-canyon.jpg"
+wp="${WALLPAPERS:-$repo/../kubaos-wallpapers}/cyberpunk/shinjuku-neon-canyon.jpg"
 magick "$wp" -resize 2560x -strip -quality 84 wallpaper.jpg
 magick "$wp" -resize 640x -blur 0x18 -strip -quality 90 wallpaper-blur.jpg
 

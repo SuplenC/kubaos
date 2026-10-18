@@ -217,9 +217,39 @@ mapfile -t flake_paths < <(grep -o '/nix/store/[a-z0-9]\{32\}-[^"]*' <<<"$flake_
 echo "    ${#flake_paths[@]} store paths"
 
 say "packing tools from the flake's nixpkgs (not part of the payload)"
-tools="$(as_user "$NIX_BIN/nix" build --no-link --print-out-paths --inputs-from "$KUBAOS" nixpkgs#rsync nixpkgs#squashfsTools | tr '\n' ' ')"
+tools="$(as_user "$NIX_BIN/nix" build --no-link --print-out-paths --inputs-from "$KUBAOS" nixpkgs#rsync nixpkgs#squashfsTools 'nixpkgs#libjpeg_turbo^bin' | tr '\n' ' ')"
 for t in $tools; do PATH="$t/bin:$PATH"; done
-command -v rsync mksquashfs >/dev/null
+command -v rsync mksquashfs djpeg cjpeg >/dev/null
+
+# The wallpaper sets (system/60-nix.sh linked them): the installer's
+# Wallpapers screen lists them from the manifest, with a small JPEG of each
+# set's first image next to it (the squashfs isn't mounted before the install).
+WALLS=/usr/share/kubaos/wallpapers
+say "wallpaper sets ($WALLS -> $(readlink "$WALLS" || echo missing))"
+[[ -d "$WALLS/" ]] || die "no $WALLS (system/60-nix.sh, link_wallpapers)"
+rm -rf /out/wallpapers
+install -d /out/wallpapers
+wallpaper_sets=""
+for d in "$WALLS"/*/; do
+  id="$(basename "$d")"
+  [[ "$id" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die "wallpaper set '$id': ids are a-z, 0-9 and -"
+  # What dot-theme lists: images and videos, not the videos' posters.
+  mapfile -t walls < <(find -L "$d" -maxdepth 1 -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' \
+    -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \) \
+    ! -iname '*.poster.*' | LC_ALL=C sort)
+  ((${#walls[@]})) || die "wallpaper set '$id' is empty"
+  preview=null
+  first="$(printf '%s\n' "${walls[@]}" | grep -iE '\.jpe?g$' | head -1 || true)"
+  if [[ -n "$first" ]]; then
+    # 3840 px wide originals -> 480 px tiles.
+    djpeg -scale 1/8 "$first" | cjpeg -quality 85 -progressive -optimize >"/out/wallpapers/$id.jpg"
+    preview="\"wallpapers/$id.jpg\""
+  else
+    echo "    $id: no JPEG to preview"
+  fi
+  wallpaper_sets+="${wallpaper_sets:+, }{\"id\": \"$id\", \"images\": ${#walls[@]}, \"preview\": $preview}"
+  echo "    $id: ${#walls[@]} wallpapers"
+done
 
 # ---------------------------------------------------------------------------
 # Roots of the payload's store: everything else in this cache store stays out.
@@ -447,7 +477,8 @@ cat >/out/manifest.json <<EOF
   "installed_bytes": $installed_bytes,
   "sha256": "$sha",
   "kernel": "$kernel",
-  "home_generation": "$gen"
+  "home_generation": "$gen",
+  "wallpaper_sets": [$wallpaper_sets]
 }
 EOF
 cat /out/manifest.json

@@ -2,16 +2,16 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell.Widgets
 import qs.theme
-import qs.settings
 import qs.components
 import qs.services
 
-// Wallpaper picker, rising out of the bottom edge: one tab per folder, a grid
+// Wallpaper picker, rising out of the bottom edge: one tab per folder
+// (Wallpapers.folders: live, the chosen sets, yours), a grid
 // of 16:10 thumbnails. Moving the selection previews it on the desktop; Enter
 // applies it through `dot-theme set`, which also regenerates all colors.
 // Moving wallpapers carry a badge and play in their thumbnail while selected
-// or hovered (unless motion is set to never). ukiyo's live scenes come first
-// in their folder, with a "live" badge and their poster. The last tab is the
+// or hovered (unless motion is set to never). ukiyo's live scenes are the
+// first folder, with a "live" badge and their poster. The last tab is the
 // wallpaper settings (WallpaperSettings.qml): Motion and every ukiyo option.
 // Keys: hjkl/arrows move, Tab/Shift+Tab switch folder, S settings, Enter
 // apply, Esc close (from the settings: back to the wallpapers).
@@ -21,9 +21,10 @@ Drawer {
     property int folderIndex: 0
     // The tab before the settings, for Esc to go back to.
     property int lastFolder: 0
-    readonly property int settingsIndex: Settings.wallpaperFolders.length
+    readonly property var folders: Wallpapers.folders
+    readonly property int settingsIndex: folders.length
     readonly property bool settingsOpen: folderIndex === settingsIndex
-    readonly property string folder: Settings.wallpaperFolders[settingsOpen ? lastFolder : folderIndex]
+    readonly property string folder: folders[settingsOpen ? lastFolder : folderIndex]?.name ?? ""
     readonly property var images: Wallpapers.images[folder] ?? []
     readonly property real dpr: frame.screen?.devicePixelRatio ?? 1
     // Up to four per row; fewer images make a narrower panel (it morphs when
@@ -40,8 +41,8 @@ Drawer {
     contentHeight: header.implicitHeight + (settingsOpen ? Math.min(560, (frame.b - frame.t) * 0.7) : rows * cellHeight) + Theme.spacing.lg * 2 + Theme.spacing.md
     onOpened: {
         Wallpapers.refresh();
-        const current = Wallpapers.isScene(Wallpapers.current) ? Settings.wallpaperFolders.indexOf(Settings.sceneFolder) : Settings.wallpaperFolders.findIndex(f => Wallpapers.current.startsWith(`${Settings.wallpaperRoot}/${f}/`));
-        folderIndex = Math.max(0, current);
+        const current = Wallpapers.folderOf(Wallpapers.current);
+        folderIndex = Math.max(0, folders.findIndex(f => f.name === current));
         lastFolder = folderIndex;
         if (Wallpapers.openSettings) {
             Wallpapers.openSettings = false;
@@ -62,7 +63,7 @@ Drawer {
 
     // Folders and the settings tab, in a ring.
     function switchFolder(delta: int): void {
-        const n = Settings.wallpaperFolders.length + 1;
+        const n = folders.length + 1;
         pick((folderIndex + delta + n) % n);
     }
 
@@ -109,7 +110,7 @@ Drawer {
             spacing: Theme.spacing.sm
 
             TabBar {
-                labels: [...Settings.wallpaperFolders.map(f => `${f.charAt(0).toUpperCase()}${f.slice(1)}  ${(Wallpapers.images[f] ?? []).length}`), "Settings"]
+                labels: [...root.folders.map(f => `${f.name.charAt(0).toUpperCase()}${f.name.slice(1).replace(/-/g, " ")}  ${(Wallpapers.images[f.name] ?? []).length}`), "Settings"]
                 currentIndex: root.folderIndex
                 activeFocusOnTab: false
                 onPicked: index => root.pick(index)
@@ -362,7 +363,7 @@ Drawer {
             StyledText {
                 anchors.centerIn: parent
                 visible: grid.count === 0
-                text: `Nothing in ${Settings.wallpaperRoot}/${root.folder}. Drop some images or videos in.`
+                text: `Nothing in ${root.folders[root.lastFolder]?.dir || root.folder}. Drop some images or videos in.`
                 color: Theme.m3onSurfaceVariant
             }
         }

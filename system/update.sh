@@ -162,6 +162,8 @@ if ((DO_NIX)); then
     # until then.
     link_pam_fprintd
     if [[ -L "$PAM_U2F_LINK" ]] || ((DRY_RUN)); then link_pam_u2f; fi
+    # A release's new wallpaper sets (opt-in: dot-theme shows the chosen ones).
+    link_wallpapers
     # gpu-screen-recorder's setcap'd KMS helper must match the new gsr.
     if [[ -e /usr/local/libexec/dotfiles/gsr-kms-server ]]; then
       rec_args=()

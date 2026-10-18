@@ -130,8 +130,8 @@ c_theme() {
   expect_ok "dot-theme apply --force" zrun 'dot-theme apply --force' || return 1
   theme_files_ok || return 1
   before="$(jq -r .primary "$st/colors.json")"
-  wall="$(zrun 'ls ~/Pictures/wallpapers/japanese/*.jpg | head -1')"
-  [[ -n $wall ]] || { echo "FAIL no wallpaper under ~/Pictures/wallpapers/japanese"; return 1; }
+  wall="$(zrun 'ls /usr/share/kubaos/wallpapers/japanese/*.jpg | head -1')"
+  [[ -n $wall ]] || { echo "FAIL no wallpaper under /usr/share/kubaos/wallpapers/japanese"; return 1; }
   expect_ok "dot-theme set $wall" zrun "dot-theme set '$wall'" || return 1
   theme_files_ok || return 1
   [[ "$(zrun 'dot-theme current')" == "$wall" ]] || { echo "FAIL dot-theme current isn't $wall"; return 1; }
@@ -237,23 +237,11 @@ c_links() {
     head -1 "$d" | grep -q '^#!/usr/bin/env ' || { echo "FAIL scripts/$n: no env shebang"; bad=1; }
     grep -q '^set -euo pipefail' "$d" || { echo "FAIL scripts/$n: no set -euo pipefail"; bad=1; }
   done
-  # Wallpapers: real folders (the user's own images go there too), each of
-  # KubaOS's files a link into the store.
-  local n_walls=0
-  for d in "$REPO"/wallpapers/*/; do
-    n="$(basename "$d")"
-    [[ -d $USER_HOME/Pictures/wallpapers/$n && ! -L $USER_HOME/Pictures/wallpapers/$n ]] ||
-      { echo "FAIL ~/Pictures/wallpapers/$n isn't a directory"; bad=1; }
-    for f in "$d"*; do
-      target="$(readlink -f "$USER_HOME/Pictures/wallpapers/$n/$(basename "$f")" || true)"
-      [[ $target == /nix/store/* ]] && cmp -s "$target" "$f" ||
-        { echo "FAIL ~/Pictures/wallpapers/$n/$(basename "$f") -> $target"; bad=1; }
-      n_walls=$((n_walls + 1))
-    done
-  done
+  [[ -d $USER_HOME/Pictures/wallpapers && ! -L $USER_HOME/Pictures/wallpapers ]] ||
+    { echo "FAIL ~/Pictures/wallpapers isn't a real folder"; bad=1; }
   [[ -f $USER_HOME/.config/tmux-nix/plugins.conf ]] || { echo "FAIL no ~/.config/tmux-nix/plugins.conf"; bad=1; }
   [[ -f $USER_HOME/.config/direnv/lib/bwenv.sh ]] || { echo "FAIL no direnv bwenv.sh"; bad=1; }
-  ((bad == 0)) && echo "ok   $n_files default files, $(ls "$REPO"/scripts | wc -l) scripts and $n_walls wallpapers from the store"
+  ((bad == 0)) && echo "ok   $n_files default files and $(ls "$REPO"/scripts | wc -l) scripts from the store"
   return "$bad"
 }
 
@@ -436,6 +424,53 @@ c_recorder() {
   return "$bad"
 }
 
+# Wallpaper sets (issue #16): every set read-only in /usr/share/kubaos/wallpapers,
+# the picker's folders are the chosen ones (~/.config/kubaos/wallpapers/sets,
+# all of them without the file) plus ~/Pictures/wallpapers, a real folder.
+# ukiyo's scenes are their own folder, `live`.
+c_wallpaper_sets() {
+  local sys=/usr/share/kubaos/wallpapers sets="$USER_HOME/.config/kubaos/wallpapers/sets"
+  local own="$USER_HOME/Pictures/wallpapers" st="$USER_HOME/.local/state/theme" got live="" first bad=0 wall
+  [[ "$(readlink "$sys")" == /nix/store/* ]] && echo "ok   $sys -> $(readlink "$sys")" ||
+    { echo "FAIL $sys isn't a link into the store"; return 1; }
+  [[ -d $own && ! -L $own ]] && echo "ok   ~/Pictures/wallpapers is a real folder" ||
+    { echo "FAIL ~/Pictures/wallpapers isn't a real folder"; return 1; }
+  [[ -n "$(zrun 'ukiyo scenes --json 2>/dev/null | jq -r ".[].id"' 2>/dev/null)" ]] && live="live "
+  folders() { zrun 'dot-theme folders' | cut -f1 | tr '\n' ' '; }
+
+  rm -f "$sets"
+  got="$(folders)"
+  [[ $got == "${live}cyberpunk japanese shinjuku yours " ]] && echo "ok   no sets file: every set ($got)" ||
+    { echo "FAIL no sets file: folders are '$got'"; bad=1; }
+  as_user mkdir -p "$(dirname "$sets")"
+  printf '# picked at install\nshinjuku\nvaporwave\n' | as_user tee "$sets" >/dev/null
+  got="$(folders)"
+  [[ $got == "${live}shinjuku yours " ]] && echo "ok   sets file: the chosen set, unknown ones skipped ($got)" ||
+    { echo "FAIL sets file 'shinjuku vaporwave': folders are '$got'"; bad=1; }
+  zrun 'dot-theme folder japanese' >/dev/null 2>&1 && { echo "FAIL dot-theme folder japanese works, but it isn't chosen"; bad=1; } ||
+    echo "ok   dot-theme folder refuses a set that isn't chosen"
+
+  as_user cp "$sys/japanese/tokyo-tower-blue-hour.jpg" "$own/mine.jpg"
+  expect_ok "dot-theme folder yours" zrun 'dot-theme folder yours' || bad=1
+  [[ "$(zrun 'dot-theme current')" == "$own/mine.jpg" && "$(<"$st/folder")" == yours ]] &&
+    echo "ok   your own image is the wallpaper, folder yours" || { echo "FAIL current $(zrun 'dot-theme current'), folder $(<"$st/folder")"; bad=1; }
+  expect_ok "dot-theme toggle-folder" zrun 'dot-theme toggle-folder' || bad=1
+  first="${live% }"
+  [[ "$(<"$st/folder")" == "${first:-shinjuku}" ]] && echo "ok   toggle-folder wraps from yours to ${first:-shinjuku}" ||
+    { echo "FAIL toggle-folder from yours went to $(<"$st/folder")"; bad=1; }
+
+  # An older machine's wallpaper was under ~/Pictures/wallpapers/<set>/:
+  # apply finds it in /usr/share.
+  wall="$sys/shinjuku/train-neon-streak.jpg"
+  printf '%s\n' "$own/shinjuku/train-neon-streak.jpg" >"$st/wallpaper"
+  expect_ok "dot-theme apply (old path)" zrun 'dot-theme apply' || bad=1
+  [[ "$(zrun 'dot-theme current')" == "$wall" ]] && echo "ok   the old ~/Pictures/wallpapers/shinjuku path moves to $wall" ||
+    { echo "FAIL old path: current is $(zrun 'dot-theme current')"; bad=1; }
+
+  rm -f "$sets" "$own/mine.jpg"
+  return "$bad"
+}
+
 # Moving wallpapers. dot-theme takes a video's colors from its poster and
 # names the video as the wallpaper; next/prev step over stills and videos
 # alike. Quickshell plays it (software decode here, llvmpipe) and stops when
@@ -443,9 +478,9 @@ c_recorder() {
 # with it stopped.
 c_wallpaper_video() {
   local st="$USER_HOME/.local/state/theme" vid poster a b out seen n i bad=0 pid
-  vid="$(zrun 'ls ~/Pictures/wallpapers/*/*.mp4 2>/dev/null | head -1')"
-  # The repo ships no video wallpapers any more (the live scene replaced them).
-  [[ -n $vid ]] || { echo "skip no video wallpaper under ~/Pictures/wallpapers"; return 0; }
+  vid="$(zrun 'ls /usr/share/kubaos/wallpapers/*/*.mp4 ~/Pictures/wallpapers/*.mp4 2>/dev/null | head -1')"
+  # The sets have no video wallpapers any more (the live scene replaced them).
+  [[ -n $vid ]] || { echo "skip no video wallpaper in the sets or ~/Pictures/wallpapers"; return 0; }
   poster="${vid%.*}.poster.jpg"
   [[ -f $poster ]] || { echo "FAIL $vid has no poster ($poster)"; return 1; }
   expect_ok "dot-theme set <poster>" zrun "dot-theme set '$poster'" || return 1
@@ -461,10 +496,9 @@ c_wallpaper_video() {
   out="$(zrun 'dot-theme apply' 2>&1)"
   [[ $(jq -S 'del(.wallpaper)' "$st/colors.json") == "$b" && -z $out ]] &&
     echo "ok   dot-theme apply on a video is a no-op when nothing changed" || { echo "FAIL apply: $out"; bad=1; }
-  # A full lap of `next` visits stills and videos (and ukiyo's scenes, listed
-  # first in shinjuku/) and comes back.
-  n="$(zrun 'ls ~/Pictures/wallpapers/shinjuku' | grep -cvE '\.poster\.')"
-  n=$((n + $(zrun 'ukiyo scenes --json 2>/dev/null | jq length' 2>/dev/null || echo 0)))
+  # A full lap of `next` over the video's folder visits stills and videos
+  # and comes back.
+  n="$(find -L "$(dirname "$vid")" -maxdepth 1 -type f -regextype posix-extended -iregex '.*\.(jpe?g|png|webp|mp4|webm|mkv|mov)' ! -iname '*.poster.*' | wc -l)"
   seen=""
   for ((i = 0; i < n; i++)); do
     zrun 'dot-theme next' >/dev/null 2>&1 || { echo "FAIL dot-theme next"; bad=1; break; }
@@ -472,8 +506,8 @@ c_wallpaper_video() {
   done
   grep -q '\.mp4$' <<<"$seen" && grep -q '\.jpg$' <<<"$seen" && [[ "$(zrun 'dot-theme current')" == "$vid" ]] &&
     ! grep -q '\.poster\.' <<<"$seen" &&
-    echo "ok   next: $n wallpapers in shinjuku/, stills and videos, no posters, back to the start" ||
-    { echo "FAIL next didn't lap shinjuku/ over stills and videos:"; printf '%s' "$seen"; bad=1; }
+    echo "ok   next: $n wallpapers in $(basename "$(dirname "$vid")")/, stills and videos, no posters, back to the start" ||
+    { echo "FAIL next didn't lap $(dirname "$vid") over stills and videos:"; printf '%s' "$seen"; bad=1; }
 
   session_start sway 1280x800 1
   if ! qs_start; then
@@ -573,7 +607,7 @@ c_ukiyo() {
     echo "ok   locked: ukiyo is still, lock frame $(jq -r '.still_frames[0]' <<<"$out")" || { echo "FAIL lock: $(jq -c '{state, still, reasons, still_frames, outputs}' <<<"$out" 2>&1)"; bad=1; }
   [[ -n $pid ]] && echo "     ukiyo CPU, still: $(cpu_pct "$pid" 3)%"
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
-  in_session 'dot-theme set ~/Pictures/wallpapers/japanese/tokyo-tower-blue-hour.jpg' >"$LOGS/ukiyo-stop.log" 2>&1
+  in_session 'dot-theme set /usr/share/kubaos/wallpapers/japanese/tokyo-tower-blue-hour.jpg' >"$LOGS/ukiyo-stop.log" 2>&1
   for _ in $(seq 20); do pgrep -u "$USER_NAME" -x ukiyo >/dev/null || break; sleep 0.5; done
   pgrep -u "$USER_NAME" -x ukiyo >/dev/null && {
     echo "FAIL ukiyo still runs with a still as the wallpaper:"; cat "$LOGS/ukiyo-stop.log"
@@ -607,7 +641,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell recorder wallpaper_video ukiyo user_layer; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell recorder wallpaper_sets wallpaper_video ukiyo user_layer; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

@@ -6,7 +6,10 @@
 #   dot-theme set <file|ukiyo:id> set wallpaper (image, video or live scene)
 #                                 and regenerate colors
 #   dot-theme next | prev         next/previous wallpaper in the current folder
-#   dot-theme folder <name>       switch folder (shinjuku | japanese | cyberpunk)
+#   dot-theme folder <name>       switch folder (one of `dot-theme folders`)
+#   dot-theme folders             the picker's folders: name, tab, directory
+#                                 (live: ukiyo's scenes; your chosen sets;
+#                                 yours: ~/Pictures/wallpapers)
 #   dot-theme toggle-folder       switch to the next folder
 #   dot-theme apply [--force]     regenerate from the current wallpaper (login);
 #                                 a no-op when nothing changed, unless --force
@@ -16,26 +19,35 @@ set -euo pipefail
 STATE="$HOME/.local/state/theme"
 # Inputs of the last successful run; `apply` skips matugen when they match.
 STAMP="$STATE/.stamp"
+# Every wallpaper set, one folder each, read-only (system/60-nix.sh links it
+# to the flake input kubaos-wallpapers).
+SETS_DIR="${KUBAOS_WALLPAPERS:-/usr/share/kubaos/wallpapers}"
+# The sets the picker shows, one id per line, # comments. The installer
+# writes it; without it, every set shows. A set a release adds shows up once
+# it's in here.
+SETS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/wallpapers/sets"
+# Your own images and videos: a real folder, the last tab.
 WALLS="$HOME/Pictures/wallpapers"
-FOLDERS=(shinjuku japanese cyberpunk)
+OWN_FOLDER=yours
 # matugen scheme type, the one place to change it. Fidelity keeps the
 # wallpaper's own neon hue in the accent roles (tonal-spot washes it out);
 # override per run with DOT_THEME_SCHEME (scheme-vibrant, scheme-content, ...).
 SCHEME="${DOT_THEME_SCHEME:-scheme-fidelity}"
 # First-boot wallpaper: a ukiyo scene (ukiyo:<id>), or a path relative to
-# $WALLS. config/matugen/default-colors.json is generated from it (see
+# $SETS_DIR. config/matugen/default-colors.json is generated from it (see
 # config/matugen/README.md).
 DEFAULT_WALLPAPER="ukiyo:kabukicho-gate"
 # Source color of DEFAULT_WALLPAPER, used when no image exists at all.
 DEFAULT_SEED="#db2b34"
-# ukiyo's scenes show up in this folder, before its stills and loops.
-SCENE_FOLDER=shinjuku
+# ukiyo's scenes are a folder of their own, the first tab. Not a set: any
+# set may be left out.
+SCENE_FOLDER=live
 
 die() { printf 'dot-theme: %s\n' "$*" >&2; exit 1; }
 hint() { printf 'dot-theme: %s\n' "$*" >&2; }
 
 usage() {
-  sed -n '2,14s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+  sed -n '2,17s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
 }
 
 matugen_dir() {
@@ -49,7 +61,13 @@ matugen_dir() {
 current_folder() {
   local f=""
   [[ -r $STATE/folder ]] && read -r f <"$STATE/folder" || true
-  [[ -n $f ]] && printf '%s\n' "$f" || printf '%s\n' "${FOLDERS[0]}"
+  if [[ -n $f ]] && valid_folder "$f"; then
+    printf '%s\n' "$f"
+  else
+    # Not `| head`: with pipefail, list_folders' SIGPIPE would fail us.
+    read -r f < <(list_folders)
+    printf '%s\n' "$f"
+  fi
 }
 
 current_wallpaper() {
@@ -188,11 +206,62 @@ ukiyo_hide() {
   fi
 }
 
+# --- folders ---------------------------------------------------------------
+# The picker's tabs, in order: live (when ukiyo has scenes), the chosen sets
+# by name, yours. Quickshell asks `dot-theme folders` (services/Wallpapers.qml).
+
+# The sets in $SETS_FILE (all without it) that are on this machine, sorted.
+chosen_sets() {
+  local d id
+  local -a want=()
+  if [[ -f $SETS_FILE ]]; then
+    while read -r id _; do
+      [[ -z $id || $id == \#* ]] || want+=("$id")
+    done <"$SETS_FILE"
+  fi
+  for d in "$SETS_DIR"/*/; do
+    [[ -d $d ]] || continue
+    id=$(basename -- "$d")
+    # The two names that aren't sets.
+    [[ $id == "$SCENE_FOLDER" || $id == "$OWN_FOLDER" ]] && continue
+    if [[ -f $SETS_FILE ]]; then
+      [[ " ${want[*]-} " == *" $id "* ]] || continue
+    fi
+    printf '%s\n' "$id"
+  done | LC_ALL=C sort
+}
+
+list_folders() {
+  [[ -n $(list_scenes) ]] && printf '%s\n' "$SCENE_FOLDER"
+  chosen_sets
+  printf '%s\n' "$OWN_FOLDER"
+}
+
+# Where a folder's files are; nothing for live.
+folder_dir() {
+  case $1 in
+    "$SCENE_FOLDER") ;;
+    "$OWN_FOLDER") printf '%s\n' "$WALLS" ;;
+    *) printf '%s\n' "$SETS_DIR/$1" ;;
+  esac
+}
+
+# The folder a wallpaper file is in, if it's one of the picker's.
+folder_of() {
+  local parent f
+  parent=$(dirname -- "$1")
+  while read -r f; do
+    [[ $f != "$SCENE_FOLDER" && $parent == "$(folder_dir "$f")" ]] && { printf '%s\n' "$f"; return 0; }
+  done < <(list_folders)
+  return 1
+}
+
 # Wallpapers (images and videos, not posters) in a folder, sorted by name,
 # one per line.
 list_images() {
-  local dir="$WALLS/$1" f
-  [[ -d $dir ]] || return 0
+  local dir f
+  dir=$(folder_dir "$1")
+  [[ -n $dir && -d $dir ]] || return 0
   local -a files=()
   shopt -s nullglob nocaseglob
   for f in "$dir"/*.{jpg,jpeg,png,webp,mp4,webm,mkv,mov}; do
@@ -204,11 +273,10 @@ list_images() {
   printf '%s\n' "${files[@]}" | LC_ALL=C sort
 }
 
-# What `next`, `prev` and the folders step through: the scenes (in
-# SCENE_FOLDER, first), then the images and videos.
+# What `next`, `prev` and the folders step through: the scenes in
+# SCENE_FOLDER, the images and videos everywhere else.
 list_wallpapers() {
-  [[ $1 == "$SCENE_FOLDER" ]] && list_scenes
-  list_images "$1"
+  if [[ $1 == "$SCENE_FOLDER" ]]; then list_scenes; else list_images "$1"; fi
 }
 
 # The wallpaper is there: a file, or an installed scene.
@@ -217,9 +285,9 @@ wallpaper_exists() {
 }
 
 valid_folder() {
-  local f
-  for f in "${FOLDERS[@]}"; do [[ $1 == "$f" ]] && return 0; done
-  return 1
+  local f ok=1
+  while read -r f; do [[ $f == "$1" ]] && ok=0; done < <(list_folders)
+  return "$ok"
 }
 
 # Write a small state file in place (keeps inotify watches on it valid).
@@ -403,7 +471,7 @@ set_wallpaper() {
     return
   fi
   [[ -f $file ]] || die "no such file: $file"
-  # -s: keep ~/Pictures/wallpapers/... as is (KubaOS's are links into the store).
+  # -s: keep /usr/share/kubaos/wallpapers/... as is (it is a link into the store).
   file=$(realpath -s -- "$file")
   case ${file,,} in
     *.jpg | *.jpeg | *.png | *.webp | *.mp4 | *.webm | *.mkv | *.mov) ;;
@@ -421,10 +489,8 @@ set_wallpaper() {
   write_state wallpaper "$file"
   printf '%s\n' "$stamp" >"$STAMP.new" && mv -f "$STAMP.new" "$STAMP"
 
-  local parent folder
-  parent=$(dirname -- "$file")
-  folder=$(basename -- "$parent")
-  if [[ $parent == "$WALLS/$folder" ]] && valid_folder "$folder"; then
+  local folder
+  if folder=$(folder_of "$file"); then
     write_state folder "$folder"
     write_state "last-$folder" "$file"
   fi
@@ -459,7 +525,7 @@ step() {
   mapfile -t imgs < <(list_wallpapers "$folder")
   n=${#imgs[@]}
   if ((n == 0)); then
-    hint "nothing in $WALLS/$folder (jpg, jpeg, png, webp, mp4, webm, mkv, mov). Drop some in, then try again."
+    hint "nothing in $folder ($(folder_dir "$folder"); jpg, jpeg, png, webp, mp4, webm, mkv, mov). Drop some in, then try again."
     return 0
   fi
   cur=$(current_wallpaper)
@@ -477,7 +543,7 @@ step() {
 
 switch_folder() {
   local folder=$1 last=""
-  valid_folder "$folder" || die "unknown folder '$folder' (one of: ${FOLDERS[*]})"
+  valid_folder "$folder" || die "no folder '$folder' (one of: $(list_folders | paste -sd ' ')). Another set: add it to $SETS_FILE"
   write_state folder "$folder"
   [[ -r $STATE/last-$folder ]] && read -r last <"$STATE/last-$folder" || true
   if [[ -n $last ]] && wallpaper_exists "$last"; then
@@ -487,18 +553,21 @@ switch_folder() {
   local first
   first=$(list_wallpapers "$folder" | head -n1)
   if [[ -z $first ]]; then
-    hint "switched to '$folder', but $WALLS/$folder is empty (jpg, jpeg, png, webp, mp4, webm, mkv, mov)."
+    hint "switched to '$folder', but $(folder_dir "$folder") is empty (jpg, jpeg, png, webp, mp4, webm, mkv, mov)."
     return 0
   fi
   set_wallpaper "$first"
 }
 
 toggle_folder() {
-  local cur next=${FOLDERS[0]} i
+  local cur i
+  local -a folders=()
+  mapfile -t folders < <(list_folders)
+  local next=${folders[0]}
   cur=$(current_folder)
-  for i in "${!FOLDERS[@]}"; do
-    if [[ ${FOLDERS[$i]} == "$cur" ]]; then
-      next=${FOLDERS[$(((i + 1) % ${#FOLDERS[@]}))]}
+  for i in "${!folders[@]}"; do
+    if [[ ${folders[$i]} == "$cur" ]]; then
+      next=${folders[$(((i + 1) % ${#folders[@]}))]}
       break
     fi
   done
@@ -508,6 +577,11 @@ toggle_folder() {
 apply() {
   local force=$1 wp
   wp=$(current_wallpaper)
+  # The sets used to live in ~/Pictures/wallpapers/<set>/: the same file is
+  # in $SETS_DIR now.
+  if [[ $wp == "$WALLS"/*/* && ! -f $wp && -f $SETS_DIR/${wp#"$WALLS"/} ]]; then
+    wp=$SETS_DIR/${wp#"$WALLS"/}
+  fi
   if [[ -n $wp ]] && wallpaper_exists "$wp"; then
     # Login runs this every time: skip matugen and the reloads when the last
     # run had the same inputs and its outputs are still there. A scene still
@@ -522,7 +596,7 @@ apply() {
   # No wallpaper yet (or a scene that's no longer installed): the default
   # one, else the first of the current folder, else default colors.
   local default=$DEFAULT_WALLPAPER
-  is_scene "$default" || default="$WALLS/$default"
+  is_scene "$default" || default="$SETS_DIR/$default"
   if wallpaper_exists "$default"; then
     set_wallpaper "$default"
     return
@@ -535,7 +609,7 @@ apply() {
   fi
   lock
   apply_default
-  hint "no wallpaper set and $WALLS/$(current_folder) is empty, so: default colors. Add a wallpaper and run dot-theme next."
+  hint "no wallpaper set and $(current_folder) is empty, so: default colors. Add a wallpaper to $WALLS and run dot-theme next."
   reload_all
 }
 
@@ -543,7 +617,7 @@ main() {
   local cmd=${1:-}
   (($#)) && shift
   # Read the scene list once, here, so the subshells below reuse it.
-  case $cmd in set | next | prev | folder | toggle-folder | apply) scenes_json >/dev/null ;; esac
+  case $cmd in set | next | prev | folder | folders | toggle-folder | apply) scenes_json >/dev/null ;; esac
   case $cmd in
     set)
       (($# == 1)) || die "usage: dot-theme set <file|ukiyo:id>"
@@ -552,8 +626,14 @@ main() {
     next) step 1 ;;
     prev) step -1 ;;
     folder)
-      (($# == 1)) || die "usage: dot-theme folder <${FOLDERS[*]// /|}>"
+      (($# == 1)) || die "usage: dot-theme folder <$(list_folders | paste -sd '|')>"
       switch_folder "$1"
+      ;;
+    folders)
+      local f
+      while read -r f; do
+        printf '%s\t%s\n' "$f" "$(folder_dir "$f")"
+      done < <(list_folders)
       ;;
     toggle-folder) toggle_folder ;;
     apply)

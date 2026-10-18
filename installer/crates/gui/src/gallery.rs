@@ -172,6 +172,12 @@ fn gallery() {
         shot(&dir, "git-bad-email", &app, size);
         app.form.git_email = "kuba@example.com".into();
 
+        go(&mut app, Screen::Wallpapers);
+        app.form.toggle_wallpaper_set("japanese");
+        app.focus = Some(F::WallpaperSet(1));
+        shot(&dir, "wallpapers", &app, size);
+        app.form.toggle_wallpaper_set("japanese");
+
         go(&mut app, Screen::Summary);
         shot(&dir, "summary-alongside", &app, size);
 

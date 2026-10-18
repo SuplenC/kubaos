@@ -120,32 +120,39 @@ pub fn script() -> Vec<Step> {
         Wait(SETTLE),
         Shot("08-git"),
         Tap(Enter),
+        Until("wallpapers", |a| a.screen == Screen::Wallpapers),
+        Wait(SETTLE),
+        Tap(Right), // japanese
+        Tap(Space), // dropped
+        Wait(SETTLE),
+        Shot("09-wallpapers"),
+        Tap(Enter),
         Until("summary", |a| a.screen == Screen::Summary),
         Wait(SETTLE),
-        Shot("09-summary"),
+        Shot("10-summary"),
         EnterDown,
         Until("holding", |a| {
             a.hold
                 .is_some_and(|t| a.now - t >= crate::app::HOLD.mul_f32(0.6))
         }),
-        Shot("10-summary-holding"),
+        Shot("11-summary-holding"),
         Until("installing", |a| a.screen == Screen::Installing),
         EnterUp,
         Until("42%", |a| {
             a.install.as_ref().is_some_and(|i| i.shown > 0.42)
         }),
-        Shot("11-installing"),
+        Shot("12-installing"),
         Tap(Enter), // show log
         Wait(450),
-        Shot("12-installing-log"),
+        Shot("13-installing-log"),
         Tap(Enter), // hide it
         Until("failed", |a| a.screen == Screen::Failed),
         Wait(SETTLE + 200),
-        Shot("13-failed"),
+        Shot("14-failed"),
         Tap(Enter), // try again
         Until("done", |a| a.screen == Screen::Done),
         Wait(SETTLE + 200),
-        Shot("14-done"),
+        Shot("15-done"),
         Exit,
     ]
 }
@@ -367,8 +374,8 @@ mod tests {
         assert_eq!(
             seen,
             [
-                Welcome, Language, Timezone, Wifi, Account, Disk, Git, Summary, Installing, Failed,
-                Installing, Done
+                Welcome, Language, Timezone, Wifi, Account, Disk, Git, Wallpapers, Summary,
+                Installing, Failed, Installing, Done
             ]
         );
         let f = &app.form;
@@ -384,6 +391,12 @@ mod tests {
         assert_eq!(
             (f.git_name.as_str(), f.git_email.as_str()),
             ("Kuba Example", "kuba@example.com")
+        );
+        // Right to the second set, Space drops it.
+        let probe = app.ready_probe().unwrap();
+        assert_eq!(
+            f.to_config(probe).wallpapers.unwrap().sets,
+            ["cyberpunk", "shinjuku"]
         );
     }
 
@@ -483,6 +496,16 @@ mod tests {
                 ],
             ),
             (Screen::Git, vec![F::GitName, F::GitEmail, F::Back, F::Next]),
+            (
+                Screen::Wallpapers,
+                vec![
+                    F::WallpaperSet(0),
+                    F::WallpaperSet(1),
+                    F::WallpaperSet(2),
+                    F::Back,
+                    F::Next,
+                ],
+            ),
         ];
         for (s, order) in expect {
             let _ = app.go(s);

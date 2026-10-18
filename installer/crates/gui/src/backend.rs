@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use dotinstall_core::probe::{DiskInfo, PartitionInfo, Region, WifiNetwork};
+use dotinstall_core::probe::{DiskInfo, PartitionInfo, Region, WallpaperSet, WifiNetwork};
 use dotinstall_core::{Event, InstallConfig, Manifest, Probe, Secrets, StepId, demo};
 
 /// What an install reports, in order: events, then exactly one `Exited`.
@@ -415,6 +415,14 @@ pub fn demo_probe() -> Probe {
             sha256: "0".repeat(64),
             kernel: "6.17.0-5-generic".into(),
             home_generation: "/nix/store/demo-home-manager-generation".into(),
+            // No previews: the demo has no payload dir.
+            wallpaper_sets: [("cyberpunk", 3), ("japanese", 2), ("shinjuku", 5)]
+                .map(|(id, images)| WallpaperSet {
+                    id: id.into(),
+                    images,
+                    preview: None,
+                })
+                .into(),
         }),
     }
 }
