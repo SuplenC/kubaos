@@ -30,22 +30,37 @@ The layout is whatever you picked in Kōbō (`/etc/default/keyboard`, `us` if th
 
 ## Updating and rolling back
 
-Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run:
+Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run `kubaos update`, or pick Update KubaOS in the menu (`SUPER + Space`), which opens a terminal running it. A daily timer runs `kubaos update --check`: it only looks. When there is something new it sends one notification, puts a marker in the bar, and the menu's Update KubaOS says what is waiting.
 
 ```sh
-S=/usr/share/kubaos/system
-$S/update.sh                              # snapshot, then apt upgrade (Hyprland stays held)
-$S/update.sh --hyprland                   # also the held Hyprland stack; read its release notes first
-$S/update.sh --no-apt --nix               # nix flake update of your flake + home-manager switch
+kubaos update                    # the whole update, after showing what it brings and asking
+kubaos update -y                 # without asking
+kubaos update --packages-only    # apt and your flake; KubaOS stays at its release
+kubaos update --check            # only look; writes ~/.local/state/kubaos/update-available
+kubaos rollback                  # undo the last update: KubaOS's release and your flake.lock
+kubaos channel                   # which channel this machine follows
+kubaos channel stable            # or edge
+kubaos upgrade                   # stable only: move to the next series (Upgrade to <codename> in the menu)
 ```
 
-`--nix` is the same as `nix flake update --flake ~/.config/kubaos/home` and a switch: it moves your nixpkgs, and KubaOS's packages keep their exact store paths.
+An update, in order:
 
-`update.sh` takes a snapper snapshot first, every time. Ways back, from smallest to largest:
+1. Refuses when another update runs, when `/` or `/nix` has less than 3 GiB free, or when `origin` can't be reached.
+2. Picks the release. On **edge** (a machine installed from a build that wasn't a verified release) that's `origin/main`'s head; with `/usr/share/kubaos-keys/allowed_signers` on the machine the head must be signed by one of its keys, without it the update warns once and goes on. On **stable** it's the newest verified `v*` tag of the installed series; with no such tag it says so and only updates packages.
+3. Shows the release's commits, the apt packages, a Hyprland pin change and the system migrations it will run, and asks.
+4. Takes a snapper snapshot, copies your `flake.lock` to `~/.local/state/kubaos/locks/`, and adds a line to `/var/lib/kubaos/update-history`.
+5. `apt-get upgrade`, then moves `/usr/share/kubaos`'s `release` branch.
+6. When the release's `system/files/apt/preferences.d/kubaos-hyprland` differs from the installed one (amd64): unholds the Hyprland stack, installs the pinned versions, holds it again.
+7. Runs the release's new system migrations (`migrations/system/`, as root), each once.
+8. `nix flake update --flake ~/.config/kubaos/home`, `system/relink.sh` (the wallpaper, PAM and recorder links), and a switch.
+9. Runs the new user migrations (`migrations/user/`, as you), each once, and writes `/var/lib/kubaos/release`.
+
+Your Nix packages move with your flake's nixpkgs; KubaOS's keep their exact store paths until its release moves. Ways back, from smallest to largest:
 
 - **Shell broken.** `SUPER + ALT + Return` opens foot and `SUPER + ALT + Space` opens fuzzel. Both come from apt and work without Nix or Quickshell.
+- **The last update.** `kubaos rollback` (Roll back last update in the menu) moves `release` back to where that update found it, puts back the `flake.lock` it saved and switches. Migrations only go forward: what they changed stays.
 - **User environment broken.** `home-manager generations`, then run the previous generation's `activate`.
-- **System broken.** Boot a snapshot from GRUB's "KubaOS snapshots" menu, then swap `@` by hand ([`system/00-btrfs-subvolumes.md`](../system/00-btrfs-subvolumes.md), "Rolling back the system later"). `snapper rollback` does not work with Ubuntu's GRUB layout. apt runs take their own pre/post snapshots too.
+- **System broken.** Boot the "before kubaos update" snapshot from GRUB's "KubaOS snapshots" menu, then swap `@` by hand ([`system/00-btrfs-subvolumes.md`](../system/00-btrfs-subvolumes.md), "Rolling back the system later"). `snapper rollback` does not work with Ubuntu's GRUB layout. apt runs take their own pre/post snapshots too. Your home isn't in the snapshot: `kubaos rollback` covers your flake.
 - **Hyprland won't start.** `Ctrl+Alt+F2`, log in, `touch ~/.config/hypr/no-autostart`.
 
 ## Make it yours
@@ -197,7 +212,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `config/` | The defaults, one dir per app, linked read-only into `~/.config`: `hypr`, `quickshell`, `nvim`, `tmux`, `tms`, `ghostty`, `foot`, `fuzzel`, `matugen`, `ohmyposh`, `lazygit`, `yazi`, `btop`, `bat`, `bacon`, `git` |
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
-| `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `update.sh`, files for `/etc` |
+| `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `relink.sh`, which `kubaos update` runs, files for `/etc` |
 | `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, and `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles |
 | `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |
 | `test/` | The Docker test harness (`test/run`) |

@@ -6,7 +6,7 @@
 # Nix's libpam can't load Ubuntu's pam_u2f.so (Nix's loader doesn't search
 # /usr/lib/<triplet>, so libfido2.so.1 isn't found and PAM reports "Module is
 # unknown"). So this loads nixpkgs' module through a root-owned link that
-# system/70-bitwarden.sh (and update.sh --nix) points at the flake's nixpkgs
+# system/70-bitwarden.sh (and system/relink.sh) points at the flake's nixpkgs
 # and pins with a GC root in /nix/var/nix/gcroots/.
 #
 # Keys come from the root-owned /etc/u2f_mappings (dot-u2f-enroll). The lock

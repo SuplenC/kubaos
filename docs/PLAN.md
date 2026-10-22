@@ -4,7 +4,7 @@ The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTAL
 
 ## Guiding rules
 
-1. **Nothing updates by surprise.** Hyprland is held in apt, Quickshell and all user tools are pinned in `flake.lock`. You upgrade them on purpose, after a snapshot.
+1. **Nothing updates by surprise.** Hyprland is held in apt at the release's versions, KubaOS's own tools are pinned in the release's `flake.lock` and yours in your flake's. `kubaos update` moves them on purpose, after a snapshot; the daily check only says what's waiting.
 2. **One job, one tool.** The shell does bar, launcher, notifications, OSD. Hyprland does windows. tmux does terminal panes. No second daemon for the same job.
 3. **System from apt, user from Nix.** apt owns the kernel, drivers, Hyprland, PAM, Docker, Chrome. home-manager owns everything in `$HOME`. rustup and proto own project-pinned toolchains.
 4. **Defaults apart from your changes.** KubaOS's configs, scripts and wallpapers are read-only links from the Nix store; yours live in `~/.config/kubaos`, load last and are never touched by an update (issue #9, `docs/CONTRACTS.md`). The same goes for Nix: your flake (`~/.config/kubaos/home`) has its own nixpkgs and lock and takes KubaOS from the root-owned `/usr/share/kubaos` as an input, so your packages update freely and KubaOS's move only with a release (issue #12, `docs/adr/0001-release-and-update-model.md`). This replaced the original live links into the dotfiles repo and its one shared lock, which made every update a merge.
@@ -198,15 +198,7 @@ Built with Claude, inspired by Caelestia, lives in `config/quickshell/`. Each st
 
 ## Update routine
 
-Weekly or whenever you feel like it:
-
-1. `snapper create -d "before update"`
-2. `sudo apt update && sudo apt upgrade` (held packages stay put)
-3. When you want new Hyprland: `apt-mark unhold`, upgrade, test, re-hold. Check the release notes for Lua config changes first.
-4. When you want new tools or Quickshell: `nix flake update` (or update one input), `home-manager switch`.
-5. Broken system: boot the "before update" snapshot from GRUB's "KubaOS snapshots" menu, then make it permanent by swapping `@` by hand (`system/00-btrfs-subvolumes.md`, "Rolling back the system later"; `snapper rollback` does not work with Ubuntu's `subvol=@` GRUB). Broken user environment: `home-manager generations`, activate the previous one. Broken shell only: `SUPER+ALT+Return` gives you foot, fix it there.
-
-`system/update.sh` does steps 1-4 (`--hyprland`, `--nix`).
+Weekly or whenever the bar's marker shows: `kubaos update` (or Update KubaOS in the menu). It takes a snapper snapshot, saves your `flake.lock`, upgrades apt, moves `/usr/share/kubaos`'s `release` to the channel's next release, installs that release's Hyprland pin, runs the system migrations, updates your flake, relinks, switches, then runs your migrations. `docs/USING.md` ("Updating and rolling back") has the details and the ways back.
 
 ## Moving to Fedora or Arch later
 

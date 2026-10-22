@@ -366,7 +366,7 @@ link_wallpapers() {
   sudo_run ln -sfn "$out" "$WALLPAPERS_LINK"
 }
 
-# Packages held with the Hyprland stack (50-hyprland.sh, update.sh): the
+# Packages held with the Hyprland stack (50-hyprland.sh; kubaos update holds the same set): the
 # compositor's own packages plus every hypr*/aquamarine library.
 HYPR_HOLD_RE='^(hypr|libhypr|libaquamarine|xdg-desktop-portal-hyprland)'
 
