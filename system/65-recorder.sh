@@ -14,7 +14,7 @@
 #     wrapper puts /run/wrappers/bin first on its PATH to find the helper,
 #     the NixOS module's place for it.
 # Without this, gsr falls back to pkexec and asks for the password each time.
-# Re-run after every KubaOS update (system/update.sh --nix does): the helper
+# Re-run after every KubaOS update (system/relink.sh does, from kubaos update): the helper
 # and gsr must speak the same protocol version.
 #
 # Why not the portal (-w portal, no privileges): gsr's portal capture is

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# /usr/bin/kubaos: runs the user's `kubaos`, the one home-manager installs
+# from the release with every switch, so a fix to kubaos reaches the machine
+# with the update that carries it. Without one (root, or a home not switched
+# yet) it runs the build the install copied to /usr/lib/kubaos/kubaos.
+set -euo pipefail
+
+for kubaos in "${HOME:-/nonexistent}/.nix-profile/bin/kubaos" /usr/lib/kubaos/kubaos; do
+  if [[ -x $kubaos ]]; then
+    exec "$kubaos" "$@"
+  fi
+done
+echo "kubaos: not in ~/.nix-profile/bin or /usr/lib/kubaos; run home-manager switch" >&2
+exit 127

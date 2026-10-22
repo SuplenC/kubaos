@@ -16,6 +16,7 @@
     ./suites.nix
     ./terminal.nix
     ./theme.nix
+    ./updates.nix
   ];
 
   home = {

@@ -27,7 +27,7 @@
 #            The official standalone binary exists for amd64 and arm64,
 #            starts as fast, and 2026.10 can unlock through the desktop app.
 #
-# Updating: system/update.sh lists newer releases (this script's
+# Updating: kubaos update lists newer releases (this script's
 # --check-updates); bump the versions and sha256s below, re-run this script.
 set -euo pipefail
 # shellcheck source=system/lib.sh

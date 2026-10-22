@@ -7,7 +7,7 @@
 # Nix's libpam ships no pam_fprintd, and Ubuntu's pam_fprintd.so can't be
 # loaded by it (Nix's loader can't find Ubuntu's libsystemd). So this loads
 # nixpkgs' module through a root-owned link: system/60-nix.sh (and
-# update.sh --nix) builds fprintd from the flake's nixpkgs, links its
+# system/relink.sh, on each kubaos update) builds fprintd from the flake's nixpkgs, links its
 # pam_fprintd.so here and pins the store path with a GC root in
 # /nix/var/nix/gcroots/. It talks to Ubuntu's fprintd daemon over D-Bus.
 auth     required   /usr/local/lib/security/pam_fprintd.so

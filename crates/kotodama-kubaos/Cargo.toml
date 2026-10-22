@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-kotodama-extension.workspace = true
+kotodama-extension = { workspace = true, features = ["watch"] }
 kotodama-protocol.workspace = true
 thiserror.workspace = true
 

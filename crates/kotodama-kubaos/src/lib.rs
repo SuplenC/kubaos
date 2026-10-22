@@ -22,6 +22,7 @@ pub mod extension;
 pub mod registry;
 pub mod run;
 pub mod toggles;
+pub mod updates;
 
 #[cfg(test)]
 mod fake;

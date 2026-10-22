@@ -75,6 +75,37 @@ fn hiding_an_action_later_takes_its_item_away() {
 }
 
 #[test]
+fn the_upgrade_action_is_listed_while_the_update_check_has_one() {
+    let state = tempfile::tempdir().expect("a state folder");
+    let dir = state.path().join("kubaos");
+    std::fs::create_dir_all(&dir).expect("make the state folder");
+    std::fs::write(
+        dir.join("update-available"),
+        "upgrade=0.2.0\nupgrade-codename=akihabara\n",
+    )
+    .expect("write the check");
+    let mut extension = Spawned::start(
+        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_STATE_HOME", state.path()),
+        WAIT,
+    );
+    extension.send(config(
+        "[actions.upgrade]\ntitle = \"Upgrade KubaOS\"\nrun = [\"kubaos\", \"upgrade\"]\n\
+         [actions.update]\ntitle = \"Update KubaOS\"\nrun = [\"kubaos\", \"update\"]",
+    ));
+    let added = extension.added();
+    let upgrade = added
+        .iter()
+        .find(|item| item.id == "upgrade")
+        .expect("the upgrade Item");
+    assert_eq!(upgrade.title, "Upgrade to Akihabara");
+
+    std::fs::write(dir.join("update-available.tmp"), "").expect("write the check");
+    std::fs::rename(dir.join("update-available.tmp"), dir.join("update-available")).expect("replace the check");
+
+    assert_eq!(extension.removed(), ["upgrade"]);
+}
+
+#[test]
 fn running_an_action_starts_its_command_and_closes_the_menu() {
     let dir = tempfile::tempdir().unwrap();
     let marker = dir.path().join("ran");

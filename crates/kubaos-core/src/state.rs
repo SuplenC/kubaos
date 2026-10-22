@@ -148,6 +148,36 @@ impl Paths {
     pub fn edit_lock(&self) -> PathBuf {
         self.state.join("kubaos.d.lock")
     }
+
+    /// The user flake's `flake.lock`.
+    pub fn flake_lock(&self) -> PathBuf {
+        self.flake.join("flake.lock")
+    }
+
+    /// A marker per user migration that ran, `~/.local/state/kubaos/migrations/`.
+    pub fn migration_markers(&self) -> PathBuf {
+        self.state.join("migrations")
+    }
+
+    /// The user flake's `flake.lock` as each update found it, for a rollback.
+    pub fn saved_locks(&self) -> PathBuf {
+        self.state.join("locks")
+    }
+
+    /// What the daily check found to install (`update::notice`).
+    pub fn update_available(&self) -> PathBuf {
+        self.state.join("update-available")
+    }
+
+    /// The updates the daily check notified, one per line.
+    pub fn notified(&self) -> PathBuf {
+        self.state.join("notified")
+    }
+
+    /// The lock `kubaos update`, `upgrade` and `rollback` hold while they run.
+    pub fn update_lock(&self) -> PathBuf {
+        self.state.join("update.lock")
+    }
 }
 
 /// The state directory at one path. Nothing is read until asked.

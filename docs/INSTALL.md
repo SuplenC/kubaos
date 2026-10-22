@@ -89,24 +89,23 @@ Kōbō will do this part itself one day (the first-boot setup screen, `docs/scre
 ## Updating
 
 ```sh
-system/update.sh                      # snapshot, apt upgrade, report held packages
-system/update.sh --hyprland           # + unhold, upgrade Hyprland stack, re-hold
-system/update.sh --no-apt --nix       # nix flake update + home-manager switch
-system/update.sh --no-apt --nix --input quickshell
+kubaos update              # snapshot, apt, the release, migrations, your flake, switch
+kubaos update --check      # only see what's waiting (the daily timer runs this)
+kubaos update --packages-only
+kubaos rollback            # back to where the last update started
+kubaos channel             # edge or stable; `kubaos channel stable` to change it
+kubaos upgrade             # to the next KubaOS series, on stable
 ```
 
-Read <https://github.com/hyprwm/Hyprland/releases> before `--hyprland`
-(Lua config changes). After `--nix`, commit `flake.lock` if all is well.
+The menu has the same: Update KubaOS, Roll back last update, Switch channel
+and, when one is out, Upgrade to <codename>. The bar shows a marker while
+an update waits. `docs/USING.md` ("Updating") says what each step does and
+how to go back further.
 
-`--nix` also relinks the lock screen's `pam_fprintd.so` and `pam_u2f.so` to
-the new nixpkgs. If you run `nix flake update` and `home-manager switch` by
-hand instead, do that step yourself: `system/60-nix.sh --no-switch --no-gpu
---no-chsh` and `system/70-bitwarden.sh --no-desktop --no-cli`.
-
-Every run of `update.sh` also reports newer Bitwarden desktop and CLI
-releases (`system/70-bitwarden.sh --check-updates`) and prints the new
-version and sha256 lines. Paste them into `70-bitwarden.sh`, re-run it,
-commit.
+Each update also reports newer Bitwarden desktop and CLI releases
+(`system/70-bitwarden.sh --check-updates`) and prints the new version and
+sha256 lines. Paste them into `70-bitwarden.sh` on the dev machine and
+release them.
 
 ## Troubleshooting
 
@@ -205,7 +204,7 @@ lists its flags.
 | `system/65-recorder.sh` | gpu-screen-recorder's KMS helper: root-owned copy with `cap_sys_admin`, runnable only by you, linked into `/run/wrappers/bin` | no |
 | `system/70-bitwarden.sh` | Bitwarden desktop + `bw` CLI, security key (pam_u2f) for sudo, polkit, lock screen | no |
 | `system/75-yubikey.sh` | YubiKey C Bio tools (`fido2-tools`), udev check, `--piv`: pcscd for the Multi-protocol Edition | no |
-| `system/update.sh` | the weekly update routine | |
+| `system/relink.sh` | points the wallpaper, PAM and recorder links at the installed release; `kubaos update` runs it | |
 
 ### Before you start (on the Mac)
 

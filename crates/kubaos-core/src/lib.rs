@@ -12,6 +12,7 @@ pub mod state;
 pub mod step;
 pub mod suites;
 pub mod switch;
+pub mod update;
 
 pub use config::{InstallConfig, Secrets};
 pub use event::{Event, Level, StepInfo};

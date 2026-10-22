@@ -18,6 +18,9 @@ rec {
   # The menu's KubaOS Extension: the actions and the system toggles
   # (home/menu.nix installs it with the Bundled ones).
   kotodama-kubaos = pkgs.callPackage ../crates/kotodama-kubaos/package.nix { };
+  # The `kubaos` command, so an update's fixes to it arrive with the release
+  # (home/updates.nix installs it).
+  kubaos = pkgs.callPackage ../crates/kubaos-cli/package.nix { };
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (
