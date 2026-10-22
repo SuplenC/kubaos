@@ -1,4 +1,6 @@
 use std::fs;
+use std::path::Path;
+use std::path::PathBuf;
 
 use super::MigrateError;
 use super::Migration;
@@ -69,13 +71,34 @@ fn a_file_that_does_not_end_in_a_lone_brace_is_left_alone() {
     assert_eq!(wire("{ lib, ... }:\nlib.mkMerge [\n  { }\n]\n"), None);
 }
 
+/// A user flake holding `home.nix`, and the backups folder outside it.
+fn flake_with(text: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {
+    let tmp = tempfile::tempdir().unwrap();
+    let flake = tmp.path().join("flake");
+    fs::create_dir(&flake).unwrap();
+    let home_nix = flake.join("home.nix");
+    fs::write(&home_nix, text).unwrap();
+    let backups = tmp.path().join("state/backups");
+    (tmp, home_nix, backups)
+}
+
+fn files_in(dir: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(dir)
+        .map(|entries| {
+            entries
+                .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default();
+    names.sort();
+    names
+}
+
 #[test]
 fn wiring_the_file_backs_it_up_first() {
-    let tmp = tempfile::tempdir().unwrap();
-    let home_nix = tmp.path().join("home.nix");
-    fs::write(&home_nix, OLD_TEMPLATE).unwrap();
+    let (_tmp, home_nix, backups) = flake_with(OLD_TEMPLATE);
 
-    let migration = wire_home_nix(&home_nix).unwrap();
+    let migration = wire_home_nix(&home_nix, &backups).unwrap();
 
     let Migration::Wired { backup } = migration else {
         panic!("{migration:?}")
@@ -85,53 +108,55 @@ fn wiring_the_file_backs_it_up_first() {
 }
 
 #[test]
+fn the_backup_lives_outside_the_user_flake() {
+    let (_tmp, home_nix, backups) = flake_with(OLD_TEMPLATE);
+
+    let Migration::Wired { backup } = wire_home_nix(&home_nix, &backups).unwrap() else {
+        panic!("not wired")
+    };
+
+    assert!(backup.starts_with(&backups), "{backup:?}");
+    assert_eq!(files_in(home_nix.parent().unwrap()), ["home.nix"]);
+}
+
+#[test]
 fn wiring_twice_changes_the_file_once_and_backs_it_up_once() {
-    let tmp = tempfile::tempdir().unwrap();
-    let home_nix = tmp.path().join("home.nix");
-    fs::write(&home_nix, OLD_TEMPLATE).unwrap();
-    wire_home_nix(&home_nix).unwrap();
+    let (_tmp, home_nix, backups) = flake_with(OLD_TEMPLATE);
+    wire_home_nix(&home_nix, &backups).unwrap();
     let once = fs::read_to_string(&home_nix).unwrap();
 
-    let second = wire_home_nix(&home_nix).unwrap();
+    let second = wire_home_nix(&home_nix, &backups).unwrap();
 
     assert!(matches!(second, Migration::AlreadyWired), "{second:?}");
     assert_eq!(fs::read_to_string(&home_nix).unwrap(), once);
-    let backups = fs::read_dir(tmp.path())
-        .unwrap()
-        .filter(|e| e.as_ref().unwrap().file_name() != "home.nix");
-    assert_eq!(backups.count(), 1);
+    assert_eq!(files_in(&backups).len(), 1);
 }
 
 #[test]
 fn an_earlier_backup_is_never_overwritten() {
-    let tmp = tempfile::tempdir().unwrap();
-    let home_nix = tmp.path().join("home.nix");
-    fs::write(&home_nix, OLD_TEMPLATE).unwrap();
-    fs::write(tmp.path().join("home.nix.kubaos.bak"), "older").unwrap();
+    let (_tmp, home_nix, backups) = flake_with(OLD_TEMPLATE);
+    fs::create_dir_all(&backups).unwrap();
+    fs::write(backups.join("home.nix.bak"), "older").unwrap();
 
-    let Migration::Wired { backup } = wire_home_nix(&home_nix).unwrap() else {
+    let Migration::Wired { backup } = wire_home_nix(&home_nix, &backups).unwrap() else {
         panic!("not wired")
     };
 
-    assert_eq!(
-        fs::read_to_string(tmp.path().join("home.nix.kubaos.bak")).unwrap(),
-        "older"
-    );
+    assert_eq!(fs::read_to_string(backups.join("home.nix.bak")).unwrap(), "older");
     assert_eq!(fs::read_to_string(backup).unwrap(), OLD_TEMPLATE);
 }
 
 #[test]
 fn a_file_it_cannot_wire_is_an_error_and_stays_as_it_was() {
-    let tmp = tempfile::tempdir().unwrap();
-    let home_nix = tmp.path().join("home.nix");
     let text = "{ pkgs, ... }: { home.packages = [ ]; }\n";
-    fs::write(&home_nix, text).unwrap();
+    let (_tmp, home_nix, backups) = flake_with(text);
 
-    let err = wire_home_nix(&home_nix).unwrap_err();
+    let err = wire_home_nix(&home_nix, &backups).unwrap_err();
 
     assert!(matches!(err, MigrateError::NoClosingBrace { .. }), "{err:?}");
     assert_eq!(fs::read_to_string(&home_nix).unwrap(), text);
-    assert_eq!(fs::read_dir(tmp.path()).unwrap().count(), 1);
+    assert_eq!(files_in(home_nix.parent().unwrap()), ["home.nix"]);
+    assert!(files_in(&backups).is_empty());
 }
 
 #[test]

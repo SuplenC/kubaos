@@ -10,6 +10,7 @@ pub mod probe;
 pub mod setup;
 pub mod state;
 pub mod step;
+pub mod suites;
 pub mod switch;
 
 pub use config::{InstallConfig, Secrets};

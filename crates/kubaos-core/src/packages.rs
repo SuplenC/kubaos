@@ -3,7 +3,8 @@
 //!
 //! Every edit is a read, change and atomic rewrite of `packages.toml` under one lock, so two
 //! `kubaos package add` at once both land. The file is the tool's: it is rewritten whole, sorted
-//! and without duplicates, and says so in its first line.
+//! and without duplicates, and says so in its first line. When the user flake is a git
+//! repository, a write ends by recording the file in git's index, so Nix sees it.
 //!
 //! # Owns
 //!
@@ -26,8 +27,10 @@ use std::path::PathBuf;
 
 use serde::Serialize;
 
+use crate::state::GitError;
 use crate::state::ReadError;
 use crate::state::StateDir;
+use crate::state::lock_file;
 use crate::state::read_state_file;
 use crate::state::write_atomic;
 
@@ -40,6 +43,7 @@ const HEADER: &str = "\
 /// `packages.toml` in one state directory, and the lock its edits take.
 #[derive(Clone, Debug)]
 pub struct Packages {
+    state: StateDir,
     file: PathBuf,
     lock: PathBuf,
 }
@@ -90,6 +94,10 @@ pub enum EditError {
         #[source]
         source: io::Error,
     },
+    /// The file is written, but git's index could not be brought in step with it, so Nix may not
+    /// see it.
+    #[error("recording packages.toml in git")]
+    Git(#[source] GitError),
 }
 
 #[derive(Serialize)]
@@ -137,6 +145,7 @@ impl Packages {
     #[must_use]
     pub fn new(state: &StateDir, lock: impl Into<PathBuf>) -> Self {
         Self {
+            state: state.clone(),
             file: state.packages_file(),
             lock: lock.into(),
         }
@@ -193,6 +202,7 @@ impl Packages {
         }
         if !changed.is_empty() {
             self.write(&current)?;
+            self.state.sync_git().map_err(EditError::Git)?;
         }
         Ok(Change {
             changed: changed.into_iter().collect(),
@@ -217,21 +227,10 @@ impl Packages {
 
     /// Takes the edit lock, held until the returned file is dropped.
     fn lock(&self) -> Result<File, EditError> {
-        let lock_err = |source| EditError::Lock {
+        lock_file(&self.lock).map_err(|source| EditError::Lock {
             path: self.lock.clone(),
             source,
-        };
-        if let Some(dir) = self.lock.parent() {
-            fs::create_dir_all(dir).map_err(lock_err)?;
-        }
-        let file = File::options()
-            .create(true)
-            .truncate(false)
-            .write(true)
-            .open(&self.lock)
-            .map_err(lock_err)?;
-        file.lock().map_err(lock_err)?;
-        Ok(file)
+        })
     }
 }
 

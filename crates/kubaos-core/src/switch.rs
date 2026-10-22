@@ -8,10 +8,14 @@
 //! finds nothing to do when an earlier worker already ran its job. A front end follows a job by
 //! reading its two files.
 //!
+//! A job records the name of its worker unit. A job still queued whose unit is gone, while no
+//! worker holds the lock, will never run (its program failed to start, say), and [`Queue::reap`]
+//! fails it; following a job and listing the jobs both reap.
+//!
 //! ```text
 //! queued ──► running ──► succeeded
 //!    │          └──────► failed (the switch failed, or its worker died)
-//!    └─────────────────► failed (the worker unit did not start)
+//!    └─────────────────► failed (the worker unit did not start, or died before taking the job)
 //! ```
 //!
 //! # Owns
@@ -30,6 +34,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::fs;
 use std::fs::File;
+use std::fs::TryLockError;
 use std::io;
 use std::io::Read;
 use std::io::Seek;
@@ -49,6 +54,7 @@ use std::time::UNIX_EPOCH;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::state::lock_file;
 use crate::state::write_atomic;
 
 /// The environment variables a worker unit gets from the process that submits it. The user
@@ -148,16 +154,29 @@ pub struct Job {
     pub finished_at: Option<u64>,
     /// Why a failed job failed, for a front end to show.
     pub error: Option<String>,
+    /// The systemd user unit that runs it, or `None` when it runs in the process that queued it.
+    #[serde(default)]
+    pub unit: Option<String>,
 }
 
 /// What the queue needs from the machine: starting a worker unit, and the switch itself.
 pub trait Host {
+    /// The name of the unit [`Host::start_worker`] starts for `job`.
+    fn worker_unit(&self, job: &JobId) -> String;
+
     /// Starts a worker for `job`, which runs [`Queue::work`] in a process of its own.
     ///
     /// # Errors
     ///
     /// [`HostError`] when the worker could not be started.
     fn start_worker(&self, job: &JobId) -> Result<(), HostError>;
+
+    /// Whether the worker unit `unit` is still starting or running.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when its state could not be read.
+    fn worker_alive(&self, unit: &str) -> Result<bool, HostError>;
 
     /// Runs one switch to the end, its output going to `log`.
     ///
@@ -231,6 +250,13 @@ pub enum QueueError {
         #[source]
         source: HostError,
     },
+    /// Whether the job's worker unit is alive could not be found out.
+    #[error("checking the worker of job {job}")]
+    Check {
+        job: JobId,
+        #[source]
+        source: HostError,
+    },
 }
 
 impl QueueError {
@@ -259,9 +285,15 @@ impl Queue {
     ///
     /// [`QueueError::Io`] when the job file cannot be written.
     pub fn enqueue(&self) -> Result<JobId, QueueError> {
+        self.enqueue_with(|_| None)
+    }
+
+    /// Queues a job whose worker unit, if any, `unit` names from its id.
+    fn enqueue_with(&self, unit: impl FnOnce(&JobId) -> Option<String>) -> Result<JobId, QueueError> {
         fs::create_dir_all(&self.dir).map_err(QueueError::io(&self.dir))?;
         let id = JobId::next();
         let job = Job {
+            unit: unit(&id),
             id: id.clone(),
             state: JobState::Queued,
             queued_at: now_ms(),
@@ -280,7 +312,7 @@ impl Queue {
     /// [`QueueError::Start`] when the worker does not start, after marking the job failed, and
     /// [`QueueError::Io`] when the job file cannot be written.
     pub fn submit(&self, host: &impl Host) -> Result<JobId, QueueError> {
-        let id = self.enqueue()?;
+        let id = self.enqueue_with(|id| Some(host.worker_unit(id)))?;
         if let Err(source) = host.start_worker(&id) {
             let mut job = self.job(&id)?;
             job.state = JobState::Failed;
@@ -338,6 +370,56 @@ impl Queue {
         Ok(ran)
     }
 
+    /// Fails every queued job that will never run: its worker unit is gone, and no other worker
+    /// holds the lock to run it. Returns the jobs it failed. A job without a unit runs in the
+    /// process that queued it, and is left alone.
+    ///
+    /// # Errors
+    ///
+    /// [`QueueError`] when a job file or the lock cannot be used, or a unit's state cannot be read.
+    pub fn reap(&self, host: &impl Host) -> Result<Vec<JobId>, QueueError> {
+        let mut reaped = Vec::new();
+        for job in self.jobs()? {
+            if self.reap_job(host, &job)? {
+                reaped.push(job.id);
+            }
+        }
+        Ok(reaped)
+    }
+
+    /// Fails `job` if it is queued, its unit is gone and the lock is free; returns whether it did.
+    fn reap_job(&self, host: &impl Host, job: &Job) -> Result<bool, QueueError> {
+        let Some(unit) = job.unit.as_deref() else {
+            return Ok(false);
+        };
+        if job.state != JobState::Queued {
+            return Ok(false);
+        }
+        let alive = host.worker_alive(unit).map_err(|source| QueueError::Check {
+            job: job.id.clone(),
+            source,
+        })?;
+        if alive {
+            return Ok(false);
+        }
+        // HAZARD: re-read the job under the lock. Its unit may have run it between the first read
+        // and the unit's check, and failing it then would overwrite a finished job.
+        let Some(_lock) = self.try_lock()? else {
+            return Ok(false);
+        };
+        let mut job = self.job(&job.id)?;
+        if job.state != JobState::Queued {
+            return Ok(false);
+        }
+        job.state = JobState::Failed;
+        job.finished_at = Some(now_ms());
+        job.error = Some(format!(
+            "its worker unit {unit} stopped without running it (journalctl --user -u {unit})"
+        ));
+        self.write_job(&job)?;
+        Ok(true)
+    }
+
     /// One job.
     ///
     /// # Errors
@@ -391,14 +473,45 @@ impl Queue {
     /// # Errors
     ///
     /// [`QueueError`] when the job or its log cannot be read.
-    pub fn follow(&self, id: &JobId, poll: Duration, mut on_output: impl FnMut(&str)) -> Result<Job, QueueError> {
+    pub fn follow(&self, id: &JobId, poll: Duration, on_output: impl FnMut(&str)) -> Result<Job, QueueError> {
+        self.follow_with(id, poll, None::<&Systemd>, on_output)
+    }
+
+    /// [`Queue::follow`] for a job [`Queue::submit`] queued, which also fails the job when its
+    /// worker unit dies before running it ([`Queue::reap`]), so the follower never waits forever.
+    ///
+    /// # Errors
+    ///
+    /// [`QueueError`] when the job or its log cannot be read, or its unit's state cannot be.
+    pub fn follow_worker(
+        &self,
+        id: &JobId,
+        poll: Duration,
+        host: &impl Host,
+        on_output: impl FnMut(&str),
+    ) -> Result<Job, QueueError> {
+        self.follow_with(id, poll, Some(host), on_output)
+    }
+
+    fn follow_with<H: Host>(
+        &self,
+        id: &JobId,
+        poll: Duration,
+        host: Option<&H>,
+        mut on_output: impl FnMut(&str),
+    ) -> Result<Job, QueueError> {
         let log_path = self.log_path(id);
         let mut offset = 0;
         let mut pending = Vec::new();
         loop {
             // HAZARD: read the state before the log. Read after, a job that ends between the two
             // reads loses the output it wrote last.
-            let job = self.job(id)?;
+            let mut job = self.job(id)?;
+            if let Some(host) = host
+                && self.reap_job(host, &job)?
+            {
+                job = self.job(id)?;
+            }
             offset += read_from(&log_path, offset, &mut pending).map_err(QueueError::io(&log_path))?;
             let text_end = if job.state.is_done() {
                 pending.len()
@@ -431,16 +544,28 @@ impl Queue {
 
     /// Takes the switch lock, held until the returned file is dropped.
     fn lock(&self) -> Result<File, QueueError> {
-        fs::create_dir_all(&self.dir).map_err(QueueError::io(&self.dir))?;
-        let path = self.dir.join("switch.lock");
+        let path = self.lock_path();
+        lock_file(&path).map_err(QueueError::io(&path))
+    }
+
+    /// Takes the switch lock if no worker holds it.
+    fn try_lock(&self) -> Result<Option<File>, QueueError> {
+        let path = self.lock_path();
         let file = File::options()
             .create(true)
             .truncate(false)
             .write(true)
             .open(&path)
             .map_err(QueueError::io(&path))?;
-        file.lock().map_err(QueueError::io(&path))?;
-        Ok(file)
+        match file.try_lock() {
+            Ok(()) => Ok(Some(file)),
+            Err(TryLockError::WouldBlock) => Ok(None),
+            Err(TryLockError::Error(e)) => Err(QueueError::io(&path)(e)),
+        }
+    }
+
+    fn lock_path(&self) -> PathBuf {
+        self.dir.join("switch.lock")
     }
 }
 
@@ -466,7 +591,7 @@ impl Systemd {
         let mut argv: Vec<OsString> = vec![
             "systemd-run".into(),
             "--user".into(),
-            format!("--unit=kubaos-switch-{job}").into(),
+            format!("--unit={}", self.worker_unit(job)).into(),
             format!("--description=KubaOS switch {job}").into(),
             "--collect".into(),
             "--quiet".into(),
@@ -478,6 +603,15 @@ impl Systemd {
         }
         argv.extend([self.kubaos.as_os_str().to_owned(), "job".into(), "work".into()]);
         argv
+    }
+
+    /// The `systemctl` command that prints a unit's `ActiveState`. A unit systemd no longer knows,
+    /// as `--collect` makes of a failed one, is `inactive`.
+    pub fn unit_state_command(unit: &str) -> Vec<OsString> {
+        ["systemctl", "--user", "show", "--property=ActiveState", "--value", unit]
+            .into_iter()
+            .map(OsString::from)
+            .collect()
     }
 
     /// The switch itself. `-b hm-backup` moves a file home-manager would replace aside, as
@@ -492,6 +626,25 @@ impl Systemd {
 }
 
 impl Host for Systemd {
+    fn worker_unit(&self, job: &JobId) -> String {
+        format!("kubaos-switch-{job}")
+    }
+
+    fn worker_alive(&self, unit: &str) -> Result<bool, HostError> {
+        let argv = Self::unit_state_command(unit);
+        let program = "systemctl";
+        let out = Command::new(&argv[0])
+            .args(&argv[1..])
+            .stdin(Stdio::null())
+            .stderr(Stdio::null())
+            .output()
+            .map_err(|e| HostError::spawn(program, e))?;
+        if !out.status.success() {
+            return Err(HostError::exited(program, out.status.code()));
+        }
+        Ok(is_alive_state(String::from_utf8_lossy(&out.stdout).trim()))
+    }
+
     fn start_worker(&self, job: &JobId) -> Result<(), HostError> {
         let env: Vec<(&str, OsString)> = WORKER_ENV
             .iter()
@@ -505,6 +658,11 @@ impl Host for Systemd {
         let stderr = log.try_clone().map_err(|e| HostError::spawn(program, e))?;
         run(&self.switch_command(), Stdio::from(log), Stdio::from(stderr))
     }
+}
+
+/// Whether a unit in systemd's `ActiveState` `state` still has, or is about to have, a process.
+fn is_alive_state(state: &str) -> bool {
+    matches!(state, "active" | "activating" | "deactivating" | "reloading")
 }
 
 /// Runs `argv` to the end with stdin closed.

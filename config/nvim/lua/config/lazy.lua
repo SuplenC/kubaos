@@ -46,6 +46,8 @@ require("lazy").setup({
     { import = "lazyvim.plugins.extras.util.dot" },
     { import = "lazyvim.plugins.extras.util.mini-hipatterns" },
     { import = "lazyvim.plugins.extras.vscode" },
+    -- The installed Suites' extras and settings (home/suites.nix writes the file).
+    require("kubaos.suites"),
     -- KubaOS's plugins, then the user layer's plugins/*.lua
     { import = "plugins" },
     user.plugins(),

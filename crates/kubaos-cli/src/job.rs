@@ -7,7 +7,8 @@
 //!   kubaos job work
 //!
 //! A switch runs in a transient systemd user unit, one at a time; the command follows its output
-//! until it ends, and Ctrl-C stops only the following. `--foreground` runs the queue in this
+//! until it ends, and Ctrl-C stops only the following. Following a job, and listing the jobs, fail
+//! a queued job whose unit died before it ran. `--foreground` runs the queue in this
 //! process instead, for a session without a systemd user manager. Exit codes: 0 ok, 1 the switch
 //! failed, 2 usage.
 //!
@@ -72,15 +73,19 @@ pub fn main(cmd: JobCmd) -> ExitCode {
         Err(e) => return usage_error(e),
     };
     let queue = Queue::new(paths.jobs());
+    let host = match host(&paths) {
+        Ok(host) => host,
+        Err(code) => return code,
+    };
     match cmd {
-        JobCmd::List { json } => list(&queue, json),
+        JobCmd::List { json } => list(&queue, &host, json),
         JobCmd::Follow { id } => match JobId::parse(id) {
-            Ok(id) => follow(&queue, &id),
+            Ok(id) => follow(&queue, &id, Some(&host)),
             Err(e) => usage_error(e),
         },
-        JobCmd::Work => match host(&paths).and_then(|host| queue.work(&host).map_err(report)) {
+        JobCmd::Work => match queue.work(&host) {
             Ok(_) => ExitCode::SUCCESS,
-            Err(code) => code,
+            Err(e) => report(e),
         },
     }
 }
@@ -104,7 +109,7 @@ pub fn switch(paths: &Paths, mode: SwitchMode) -> ExitCode {
             let queue = queue.clone();
             thread::spawn(move || queue.work(&host))
         };
-        let code = follow(&queue, &id);
+        let code = follow(&queue, &id, None);
         return match worker.join().expect("the switch worker thread panicked") {
             Ok(_) => code,
             Err(e) => report(e),
@@ -119,7 +124,7 @@ pub fn switch(paths: &Paths, mode: SwitchMode) -> ExitCode {
         return ExitCode::SUCCESS;
     }
     println!("switch queued as job {id}; Ctrl-C stops following, not the switch");
-    follow(&queue, &id)
+    follow(&queue, &id, Some(&host))
 }
 
 fn host(paths: &Paths) -> Result<Systemd, ExitCode> {
@@ -129,11 +134,17 @@ fn host(paths: &Paths) -> Result<Systemd, ExitCode> {
     }
 }
 
-fn follow(queue: &Queue, id: &JobId) -> ExitCode {
+/// Prints the job's output until it ends. With `host`, the job runs in a worker unit, and fails
+/// if that unit dies before running it.
+fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
     let mut out = io::stdout();
-    let job = queue.follow(id, FOLLOW_POLL, |chunk| {
+    let print = |chunk: &str| {
         let _ = out.write_all(chunk.as_bytes()).and_then(|()| out.flush());
-    });
+    };
+    let job = match host {
+        Some(host) => queue.follow_worker(id, FOLLOW_POLL, host, print),
+        None => queue.follow(id, FOLLOW_POLL, print),
+    };
     match job {
         Ok(Job {
             state: JobState::Succeeded,
@@ -153,7 +164,10 @@ fn follow(queue: &Queue, id: &JobId) -> ExitCode {
     }
 }
 
-fn list(queue: &Queue, json: bool) -> ExitCode {
+fn list(queue: &Queue, host: &Systemd, json: bool) -> ExitCode {
+    if let Err(e) = queue.reap(host) {
+        eprintln!("kubaos: not checking the worker units: {e}");
+    }
     let jobs = match queue.jobs() {
         Ok(jobs) => jobs,
         Err(e) => return report(e),

@@ -69,12 +69,13 @@ Each file starts as a comment and an example:
 | Command menu: your own actions, hiding KubaOS's | `~/.config/kubaos/kotodama/user.toml` (below) | `systemctl --user restart kotodamad` |
 | Nix packages and home-manager options | `~/.config/kubaos/home/home.nix`, e.g. `home.packages = [ pkgs.hello ];` | `home-manager switch --flake ~/.config/kubaos/home` |
 | A package, without writing Nix | `kubaos package add ripgrep` (`remove`, `list`); `kubaos try cowsay` opens a shell with it and installs nothing | the switch `add` and `remove` queue |
+| A whole language setup (a Suite) | `kubaos suite list`, `kubaos suite add NAME [--version V] [--extra E]`, `configure`, `remove [--purge-caches]`; `kubaos suite new NAME PROJECT` starts a project in `~/Projects` | the switch `add`, `configure` and `remove` queue |
 
 - To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
 - Delete a file in `~/.config/kubaos` to get the example back on the next `dot-config apply` or update.
 - Quickshell's settings, the colors (matugen) and the prompt (oh-my-posh) can't be overridden yet.
 - Your own wallpapers go in `~/Pictures/wallpapers/`, the picker's last tab; KubaOS's sets are in `/usr/share/kubaos/wallpapers/`.
-- `~/.config/kubaos/home/` is your flake: KubaOS wrote it once, and an update never does again. Put it under git if you like (then `git add` new files before a switch).
+- `~/.config/kubaos/home/` is your flake: KubaOS wrote it once, and an update never does again. Put it under git if you like (then `git add` new files of yours before a switch; the `kubaos` command does that for what it writes into `kubaos.d/`).
 - The Command menu's KubaOS actions and toggles are listed in `~/.local/share/kubaos/defaults/kotodama/kubaos.toml`, each under `[extensions.kubaos.actions.<id>]`. Add your own in `user.toml` the same way, and hide any of KubaOS's, actions or toggles (`wifi`, `bluetooth`, `volume`, `brightness`, `power-saver` and so on), by id:
 
   ```toml
@@ -94,7 +95,8 @@ Each file starts as a comment and an example:
   ```
 
   Keys set under one of KubaOS's ids change only those keys of its action. `terminal = true` runs it in a terminal, and `delay_ms` waits that long first, so the menu is gone before a screenshot. The Extension logs what it can't use, such as an id it doesn't know (`journalctl --user -u kotodamad`).
-- `kubaos package add` records the package in `~/.config/kubaos/home/kubaos.d/packages.toml`, a file the command owns, and switches. Every switch (`kubaos switch`, or one an `add` queued) runs in a systemd user unit, one at a time: closing the terminal doesn't stop it, and `kubaos job list` and `kubaos job follow <id>` show it. The first `add` on an older install adds `kubaos.stateDir = ./kubaos.d;` to your `home.nix`, after backing it up as `home.nix.kubaos.bak`. If your flake is under git, add `kubaos.d/` to it once, or Nix won't see the files.
+- `kubaos package add` records the package in `~/.config/kubaos/home/kubaos.d/packages.toml`, a file the command owns, and switches. Every switch (`kubaos switch`, or one an `add` queued) runs in a systemd user unit, one at a time: closing the terminal doesn't stop it, and `kubaos job list` and `kubaos job follow <id>` show it. The first `add` on an older install adds `kubaos.stateDir = ./kubaos.d;` to your `home.nix`, after backing it up to `~/.local/state/kubaos/backups/home.nix.bak`. If your flake is under git, the command records each file it writes with `git add --intent-to-add` (and drops the ones it deletes from the index), so Nix sees them; it never commits.
+- `kubaos suite add` installs a Suite: its toolchain, environment and editor settings, which load before yours in `~/.config/kubaos/nvim/`, so your settings win. It writes `kubaos.d/suites/<name>.toml` and creates any file of yours it has an example for only if that file is missing. `kubaos suite remove` takes it all away again, shows the size of its caches and keeps them unless you pass `--purge-caches`, lists your files that mention the Suite, and never touches your projects.
 
 ## Hacking on KubaOS
 

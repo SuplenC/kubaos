@@ -10,5 +10,9 @@ serde_json.workspace = true
 toml.workspace = true
 thiserror.workspace = true
 
+[features]
+# The test Suite (`suites::catalog::TEST`), for the test harness's `kubaos` build.
+test-suite = []
+
 [dev-dependencies]
 tempfile.workspace = true

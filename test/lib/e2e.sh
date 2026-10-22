@@ -737,18 +737,34 @@ kz() { zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; $1"; }
 # doesn't ship (ripgrep is in home/cli.nix). Switches use --foreground: the
 # container has no systemd user manager, so the queue runs in the calling
 # process, behind the same lock.
-c_packages() {
-  local u="$USER_HOME/.config/kubaos/home" jobs="$USER_HOME/.local/state/kubaos/jobs" nixpkgs gen1 out
+# install_kubaos: /out/kubaos, which test/run built, as the kubaos on PATH.
+install_kubaos() {
   [[ -x /out/kubaos ]] || { echo "FAIL no /out/kubaos (test/run e2e builds it)"; return 1; }
   install -m 0755 /out/kubaos /usr/local/bin/kubaos
+}
 
+# user_flake DIR: a fresh user flake in DIR, rendered from user-flake/ with
+# the repo copy as KubaOS and KubaOS's own locked nixpkgs as the user's, and
+# no home.nix yet.
+user_flake() {
+  local u="$1" nixpkgs
   nixpkgs="$(as_user "$NIX_BIN/nix" flake archive --dry-run --json "$REPO" | jq -r .inputs.nixpkgs.path)"
   [[ $nixpkgs == /nix/store/* ]] || { echo "FAIL KubaOS's nixpkgs: $nixpkgs"; return 1; }
-  as_user install -d "$u/kubaos.d/suites"
+  rm -rf "$u"
+  as_user install -d "$u"
   sed -e 's/@USER@/kuba/g; s/@HOST@/vm/g' -e "s/@SYSTEM@/$(uname -m)-linux/" \
     -e "s#github:NixOS/nixpkgs/nixos-26.05#path:$nixpkgs#" \
     -e "s#git+file:///usr/share/kubaos?ref=refs/heads/release#git+file://$REPO#" \
     "$REPO/user-flake/flake.nix.in" | as_user tee "$u/flake.nix" >/dev/null
+}
+
+c_packages() {
+  local u="$USER_HOME/.config/kubaos/home" jobs="$USER_HOME/.local/state/kubaos/jobs" gen1 out
+  local backups="$USER_HOME/.local/state/kubaos/backups"
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  rm -rf "$backups"
+  as_user install -d "$u/kubaos.d/suites"
   # home.nix as installs before the state directory wrote it, for the migration.
   printf '{ pkgs, ... }:\n{\n  home.packages = [ ];\n}\n' | as_user tee "$u/home.nix" >/dev/null
   echo 'packages = ["hello"]' | as_user tee "$u/kubaos.d/suites/demo.toml" >/dev/null
@@ -756,9 +772,12 @@ c_packages() {
   out="$(kz 'kubaos package add cowsay --foreground' 2>&1)" ||
     { echo "FAIL kubaos package add cowsay"; printf '%s\n' "$out" | tail -20; return 1; }
   echo "ok   kubaos package add cowsay, then a switch"
-  grep -q '^  kubaos.stateDir = ./kubaos.d;$' "$u/home.nix" && [[ -f $u/home.nix.kubaos.bak ]] ||
-    { echo "FAIL home.nix not wired, or no backup"; cat "$u/home.nix"; return 1; }
-  echo "ok   home.nix wired to kubaos.d/, the old one in home.nix.kubaos.bak"
+  grep -q '^  kubaos.stateDir = ./kubaos.d;$' "$u/home.nix" && cmp -s "$backups/home.nix.bak" \
+    <(printf '{ pkgs, ... }:\n{\n  home.packages = [ ];\n}\n') ||
+    { echo "FAIL home.nix not wired, or no backup in $backups"; cat "$u/home.nix"; ls -la "$backups"; return 1; }
+  [[ -z $(find "$u" -maxdepth 1 -name 'home.nix?*') ]] ||
+    { echo "FAIL a backup inside the user flake, which would reach the Nix store"; ls -la "$u"; return 1; }
+  echo "ok   home.nix wired to kubaos.d/, the old one in ~/.local/state/kubaos/backups, outside the flake"
   has_bin cowsay && zrun 'cowsay hi' >/dev/null || { echo "FAIL cowsay not on PATH"; return 1; }
   has_bin hello || { echo "FAIL hello, from suites/demo.toml, not on PATH"; return 1; }
   echo "ok   cowsay (packages.toml) and hello (suites/demo.toml) on PATH: the union"
@@ -800,6 +819,108 @@ c_packages() {
   echo "ok   kubaos switch after deleting the Suite file: hello gone"
 }
 
+# The Suite framework (issue #21), through the test Suite (home/suites/test.nix,
+# in a kubaos built with the test-suite feature) and a user flake under git,
+# so every file kubaos writes into kubaos.d/ must reach git's index for Nix to
+# see it. Add, configure, scaffold and remove it, with a user override in
+# ~/.config/kubaos/nvim/ that must win throughout, and nothing of the Suite
+# left in the generation afterwards. Switches run --foreground, as in packages.
+c_suites() {
+  local u="$USER_HOME/.config/kubaos/home" layer="$USER_HOME/.config/kubaos" out gen
+  local mine="$USER_HOME/.config/kubaos/nvim/plugins/test-suite.lua"
+  local cache="$USER_HOME/.cache/kubaos-test-suite" project="$USER_HOME/Projects/test-suite-demo"
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$mine" "$cache" "$project"
+  as_user git -C "$u" init -q
+  as_user git -C "$u" add -A
+  as_user git -C "$u" -c user.name=t -c user.email=t@t commit -q -m 'the user flake'
+  # opts NAME: LazyVim's opts.kubaos_test_suite as "<greeting> <version>", as
+  # the Defaults plus the user layer give them.
+  opts() {
+    zrun "nvim --headless +'lua local o = LazyVim.opts(\"LazyVim\").kubaos_test_suite or {}; io.write(\"\\nOPTS \", tostring(o.greeting), \" \", tostring(o.version))' +qa" 2>&1 |
+      tr -d '\r' | sed -n 's/^OPTS //p'
+  }
+
+  out="$(kz 'kubaos suite add test --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add test"; printf '%s\n' "$out" | tail -20; return 1; }
+  echo "ok   kubaos suite add test, then a switch"
+  as_user git -C "$u" ls-files --error-unmatch kubaos.d/suites/test.toml >/dev/null 2>&1 ||
+    { echo "FAIL kubaos.d/suites/test.toml not in git's index"; as_user git -C "$u" status --short; return 1; }
+  echo "ok   the Suite file is in git's index (intent to add), so the flake sees it"
+  has_bin kubaos-test-suite && [[ $(zrun 'kubaos-test-suite version') == 1 ]] ||
+    { echo "FAIL kubaos-test-suite (version 1) not on PATH"; return 1; }
+  [[ $(zrun 'print -r -- "$KUBAOS_TEST_SUITE_VERSION"') == 1 ]] ||
+    { echo "FAIL KUBAOS_TEST_SUITE_VERSION is not 1"; return 1; }
+  zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.local/share/kubaos-test-suite/bin" ||
+    { echo "FAIL the Suite's PATH entry is missing"; return 1; }
+  echo "ok   its package, environment variable and PATH entry"
+  [[ -f $mine ]] && grep -q 'created ~/.config/kubaos/nvim/plugins/test-suite.lua' <<<"$out" ||
+    { echo "FAIL the missing user-layer file was not seeded"; printf '%s\n' "$out"; return 1; }
+  out="$(opts)"
+  [[ $out == "from the test Suite 1" ]] || { echo "FAIL the Suite's Neovim setting: $out"; return 1; }
+  echo "ok   a commented example seeded in the user layer; the Suite's Neovim setting is in the Defaults"
+
+  printf 'return {\n  { "LazyVim/LazyVim", opts = { kubaos_test_suite = { greeting = "mine" } } },\n}\n' |
+    as_user tee "$mine" >/dev/null
+  as_user cp "$mine" "$LOGS/suites-mine.lua"
+  out="$(opts)"
+  [[ $out == "mine 1" ]] || { echo "FAIL the user's override in $mine doesn't win: $out"; return 1; }
+  echo "ok   the user's override of the same setting wins"
+
+  out="$(kz 'kubaos suite configure test --version 2 --extra greeting --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite configure test"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(zrun 'kubaos-test-suite version') == 2 ]] && has_bin kubaos-test-suite-greet ||
+    { echo "FAIL configure: not version 2 with kubaos-test-suite-greet"; return 1; }
+  cmp -s "$mine" "$LOGS/suites-mine.lua" && grep -q 'kept ~/.config/kubaos/nvim/plugins/test-suite.lua' <<<"$out" ||
+    { echo "FAIL configure wrote to the user's file"; printf '%s\n' "$out"; return 1; }
+  out="$(opts)"
+  [[ $out == "mine 2" ]] || { echo "FAIL after configure: $out (want the user's greeting, the Suite's version 2)"; return 1; }
+  echo "ok   kubaos suite configure --version 2 --extra greeting: applied, the user's file untouched and still winning"
+
+  out="$(kz 'kubaos suite new test test-suite-demo' 2>&1)" ||
+    { echo "FAIL kubaos suite new"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -q 'Made by the test Suite 2' "$project/README.md" ||
+    { echo "FAIL no scaffolded project in $project"; return 1; }
+  echo "ok   kubaos suite new test test-suite-demo: a project in the Projects root"
+  zrun 'kubaos-test-suite run' && [[ -s $cache/build.log ]] || { echo "FAIL kubaos-test-suite run made no cache"; return 1; }
+
+  out="$(kz 'kubaos suite remove test --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove test"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -qE '^cache ~/.cache/kubaos-test-suite \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -s $cache/build.log ]] ||
+    { echo "FAIL remove: the cache's size not shown, or the cache not kept"; printf '%s\n' "$out"; return 1; }
+  grep -qx '  ~/.config/kubaos/nvim/plugins/test-suite.lua' <<<"$out" ||
+    { echo "FAIL remove doesn't list the user-layer file that mentions the Suite"; printf '%s\n' "$out"; return 1; }
+  cmp -s "$mine" "$LOGS/suites-mine.lua" && [[ -f $project/README.md ]] ||
+    { echo "FAIL remove touched the user's file or the project"; return 1; }
+  echo "ok   kubaos suite remove test: the cache kept with its size shown, the user's file listed, the project untouched"
+  ! as_user git -C "$u" ls-files --error-unmatch kubaos.d/suites/test.toml >/dev/null 2>&1 ||
+    { echo "FAIL the deleted Suite file is still in git's index"; return 1; }
+  gen="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  out="$("$NIX_BIN/nix-store" -qR "$gen" | grep kubaos-test-suite || true)"
+  [[ -z $out ]] || { echo "FAIL the Suite's packages are still in the generation:"; printf '%s\n' "$out"; return 1; }
+  ! grep -qs -e KUBAOS_TEST_SUITE -e kubaos-test-suite "$gen/home-path/etc/profile.d/hm-session-vars.sh" ||
+    { echo "FAIL the Suite's environment is still in hm-session-vars.sh"; return 1; }
+  ! grep -qs kubaos_test_suite "$gen/home-files/.config/nvim/lua/kubaos/suites.lua" ||
+    { echo "FAIL the Suite's Neovim setting is still in the Defaults"; return 1; }
+  [[ -f $gen/home-files/.config/nvim/lua/kubaos/suites.lua && ! -e $gen/home-files/.local/share/kubaos/kubaos.d/suites/test.toml ]] ||
+    { echo "FAIL the generation's suites.lua is missing, or its kubaos.d still has test.toml"; return 1; }
+  ! has_bin kubaos-test-suite && ! has_bin kubaos-test-suite-greet || { echo "FAIL the Suite's commands are still on PATH"; return 1; }
+  out="$(opts)"
+  [[ $out == "mine nil" ]] || { echo "FAIL after remove, Neovim has: $out"; return 1; }
+  echo "ok   no leftovers in the generation: packages, environment, PATH, Neovim setting and Suite file all gone"
+
+  out="$(kz 'kubaos suite add test --no-switch && kubaos suite remove test --purge-caches --no-switch' 2>&1)" ||
+    { echo "FAIL add + remove --purge-caches"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ ! -e $cache ]] && grep -qE '^cache ~/.cache/kubaos-test-suite \([0-9.]+ [KMG]?i?B\): deleted' <<<"$out" ||
+    { echo "FAIL --purge-caches: the cache is still there"; printf '%s\n' "$out"; return 1; }
+  [[ -f $project/README.md ]] && cmp -s "$mine" "$LOGS/suites-mine.lua" ||
+    { echo "FAIL --purge-caches touched the project or the user's file"; return 1; }
+  echo "ok   kubaos suite remove --purge-caches: the cache gone, the project and the user's file still there"
+  rm -rf "$mine" "$project" "$u/.git"
+}
+
 # The user layer (issue #9): test/user-layer-check, which the VM bench also
 # runs on an installed system. Commits to the checkout, so it runs last.
 c_user_layer() {
@@ -813,7 +934,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages user_layer; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
