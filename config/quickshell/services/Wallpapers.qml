@@ -24,7 +24,7 @@ Singleton {
     // The picker's tabs, in order: [{ name, dir }].
     // dot-theme decides which sets show (scripts/dot-theme, `folders`).
     property var folders: []
-    // folder name -> sorted list of absolute paths (stills and videos)
+    // folder name -> the absolute paths it shows, sorted (`dot-theme wallpapers`)
     property var images: ({})
     // Poster files next to videos and in dot-theme's cache, as a set (path -> true).
     property var posters: ({})
@@ -104,33 +104,46 @@ Singleton {
                         dir
                     };
                 });
-                lister.running = true;
+                wallpaperLister.running = true;
             }
         }
     }
 
+    // Which wallpapers each folder shows is dot-theme's to say: a set can be
+    // picked one wallpaper at a time (the sets file), so a folder's files
+    // aren't all offered.
     Process {
-        id: lister
+        id: wallpaperLister
 
-        // -L: the sets are a link into the Nix store.
-        command: ["find", "-L", ...root.folders.map(f => f.dir), `${Theme.stateDir}/posters`, "-maxdepth", "1", "-type", "f", ...root.nameArgs([...root.imageExtensions, ...root.videoExtensions])]
+        command: ["dot-theme", "wallpapers"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const found = {};
                 for (const f of root.folders)
                     found[f.name] = [];
+                for (const line of text.split("\n").filter(Boolean)) {
+                    const tab = line.indexOf("\t");
+                    found[line.slice(0, tab)]?.push(line.slice(tab + 1));
+                }
+                root.images = found;
+                posterLister.running = true;
+            }
+        }
+    }
+
+    Process {
+        id: posterLister
+
+        // -L: the sets are a link into the Nix store.
+        command: ["find", "-L", ...root.folders.map(f => f.dir), `${Theme.stateDir}/posters`, "-maxdepth", "1", "-type", "f", ...root.nameArgs(root.imageExtensions)]
+        stdout: StdioCollector {
+            onStreamFinished: {
                 const posters = {};
                 for (const path of text.split("\n").filter(Boolean)) {
-                    if (/\.poster\.[^./]+$/i.test(path) || path.startsWith(`${Theme.stateDir}/posters/`)) {
+                    if (/\.poster\.[^./]+$/i.test(path) || path.startsWith(`${Theme.stateDir}/posters/`))
                         posters[path] = true;
-                        continue;
-                    }
-                    found[root.folderOf(path)]?.push(path);
                 }
-                for (const folder in found)
-                    found[folder].sort();
                 root.posters = posters;
-                root.images = found;
                 root.listed = true;
             }
         }
