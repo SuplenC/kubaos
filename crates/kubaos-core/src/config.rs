@@ -35,7 +35,9 @@ pub struct Locale {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Host {
-    /// `tuxedo` or `vm`; also picks the flake output `<user>@<hostname>`.
+    /// Any RFC 1123 label. The user flake's output is `<user>@<hostname>`, so plain
+    /// `home-manager switch --flake ~/.config/kubaos/home` finds it; the home config itself
+    /// never reads the hostname.
     pub hostname: String,
 }
 

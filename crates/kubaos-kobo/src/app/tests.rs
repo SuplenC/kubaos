@@ -616,3 +616,111 @@ fn the_demo_backend_has_a_battery_to_show() {
 
     assert_eq!(demo.battery(), Some(crate::backend::DEMO_BATTERY));
 }
+
+/// The sizes Kōbō lays out at: the gallery's, and what `auto_scale` leaves of larger outputs.
+const LAYOUT_SIZES: [(f32, f32); 5] = [
+    (1024.0, 768.0),
+    (1280.0, 720.0),
+    (1280.0, 800.0),
+    (1440.0, 900.0),
+    (1536.0, 864.0),
+];
+
+#[test]
+fn last_chance_shows_its_cards_as_an_even_two_by_two_grid() {
+    use iced::widget::Id;
+    use iced_test::simulator::Simulator;
+    let cards = [
+        ids::SUMMARY_LANGUAGE,
+        ids::SUMMARY_ACCOUNT,
+        ids::SUMMARY_DISK,
+        ids::SUMMARY_SYSTEM,
+    ];
+    for (w, h) in LAYOUT_SIZES {
+        let (mut app, _) = recorded(Recorder::default());
+        app.form.full_name = "Kuba Example".into();
+        let _ = app.go(Screen::Summary);
+        let mut ui = Simulator::with_size(
+            iced::Settings::default(),
+            Size::new(w, h),
+            crate::view::view(&app),
+        );
+
+        let b: Vec<_> = cards
+            .iter()
+            .map(|id| ui.find(Id::new(id)).expect("a summary card").bounds())
+            .collect();
+
+        for card in &b {
+            assert_eq!(card.width, b[0].width, "at {w}x{h}");
+            assert_eq!(card.height, b[0].height, "at {w}x{h}");
+        }
+        assert_eq!(b[0].y, b[1].y, "at {w}x{h}");
+        assert_eq!(b[2].y, b[3].y, "at {w}x{h}");
+        assert_eq!(b[0].x, b[2].x, "at {w}x{h}");
+        assert!(b[1].x > b[0].x + b[0].width, "at {w}x{h}");
+        assert!(b[2].y > b[0].y + b[0].height, "at {w}x{h}");
+    }
+}
+
+#[test]
+fn last_chance_has_no_edit_buttons_and_tab_goes_from_hold_to_back() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Summary);
+
+    assert_eq!(app.focus_order(), vec![F::Hold, F::Back, F::Power]);
+    assert!(!draws(&app, "Edit"));
+    assert!(
+        !draws(&app, "edit"),
+        "the rail's key hints offer no edit either"
+    );
+}
+
+#[test]
+fn the_rail_still_takes_you_back_from_last_chance() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Summary);
+
+    let _ = app.update_inner(Message::Click(F::Step(Screen::Account)));
+
+    assert_eq!(app.screen, Screen::Account);
+}
+
+#[test]
+fn the_hostname_starts_as_the_payload_s_and_takes_what_you_type() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Account);
+    assert_eq!(app.form.hostname, "tuxedo");
+    assert!(draws(&app, "kuba@tuxedo"));
+
+    press(
+        &mut app,
+        &[Key::Tab { shift: false }, Key::Tab { shift: false }],
+    );
+    assert_eq!(app.focus, Some(F::Hostname));
+    press(
+        &mut app,
+        &[Key::Text("nerv-hq".into()), Key::Tab { shift: false }],
+    );
+
+    assert_eq!(app.form.hostname, "nerv-hq");
+    assert_eq!(app.focus, Some(F::Password));
+    assert!(draws(&app, "kuba@nerv-hq"));
+    let probe = app.ready_probe().expect("the demo probe");
+    assert_eq!(app.form.to_config(probe).host.hostname, "nerv-hq");
+}
+
+#[test]
+fn a_bad_hostname_says_why_and_holds_continue() {
+    let (mut app, _) = recorded(Recorder::default());
+    app.form.full_name = "Kuba Example".into();
+    app.form.password = "correct horse battery".into();
+    app.form.password_confirm = app.form.password.clone();
+    let _ = app.go(Screen::Account);
+    assert_eq!(app.blocker(), None);
+
+    app.form.hostname = "Nerv.HQ".into();
+
+    assert!(app.blocker().is_some());
+    assert!(draws(&app, crate::model::HOSTNAME_RULE));
+}

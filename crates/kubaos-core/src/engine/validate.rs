@@ -24,12 +24,6 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
                     m.arch, p.arch
                 ));
             }
-            if c.host.hostname != m.hostname {
-                bad(format!(
-                    "hostname must be \"{}\": the payload is built for the flake output {}@{}",
-                    m.hostname, c.user.username, m.hostname
-                ));
-            }
         }
     }
     if !p.uefi {
@@ -346,9 +340,12 @@ mod tests {
         c.locale.keyboard_layout = "xx".into();
         c.disk.device = "/dev/sda".into();
         let p = problems(&c, &probe());
-        assert_eq!(p.len(), 6, "{p:#?}");
-        assert!(p[0].contains("hostname must be \"tuxedo\""));
-        assert!(p[1].contains("username \"Root\" must start with a lowercase letter"));
+        assert_eq!(p.len(), 5, "{p:#?}");
+        assert!(p[0].contains("username \"Root\" must start with a lowercase letter"));
+        assert!(
+            p.iter()
+                .any(|s| s.contains("hostname \"-bad\" must be 1-63 characters"))
+        );
         assert!(
             p.iter()
                 .any(|s| s.contains("medium this install runs from"))
@@ -440,12 +437,39 @@ mod tests {
     }
 
     #[test]
-    fn hostname_must_match_the_payload() {
+    fn any_valid_hostname_passes_whatever_the_payload_was_built_on() {
         let mut c = config();
-        c.host.hostname = "vm".into();
-        let p = problems(&c, &probe());
-        assert_eq!(p.len(), 1);
-        assert!(p[0].contains("kuba@tuxedo"), "{}", p[0]);
+        for host in ["vm", "nerv-hq", "alice-laptop", "x"] {
+            c.host.hostname = host.into();
+
+            assert_eq!(problems(&c, &probe()), Vec::<String>::new(), "{host}");
+        }
+    }
+
+    #[test]
+    fn a_hostname_that_is_not_one_rfc_1123_label_is_refused() {
+        let mut c = config();
+        let long = "a".repeat(64);
+        for host in [
+            "",
+            "Nerv",
+            "-nerv",
+            "nerv-",
+            "nerv.hq",
+            "nerv hq",
+            long.as_str(),
+        ] {
+            c.host.hostname = host.into();
+
+            let p = problems(&c, &probe());
+
+            assert_eq!(p.len(), 1, "{host:?}: {p:#?}");
+            assert!(
+                p[0].contains("must be 1-63 characters"),
+                "{host:?}: {}",
+                p[0]
+            );
+        }
     }
 
     #[test]

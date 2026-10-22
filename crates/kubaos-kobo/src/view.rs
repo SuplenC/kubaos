@@ -25,6 +25,7 @@ use kubaos_core::probe::DiskInfo;
 use crate::app::{App, F, HOLD, List, Message, PowerAction, ProbeState, Screen, ids};
 use crate::data;
 use crate::elide::elide;
+use crate::grid::grid;
 use crate::model::{self, DiskExt, DiskMode, human_bytes};
 use crate::progress::{LOG_VIEW_LINES, Outcome, StepState, fmt_duration};
 use crate::theme::{self, DARK, Icon, Palette, alpha, jp, mix, motion, radius, size, space};
@@ -284,7 +285,7 @@ fn rail(app: &App) -> El<'_> {
         let item = button(row![dot, lbl].spacing(space::MD).align_y(Alignment::Center))
             .width(Length::Fill)
             .padding(Padding::from([8.0, 10.0]))
-            .on_press_maybe(clickable.then_some(Message::Click(F::Edit(target))))
+            .on_press_maybe(clickable.then_some(Message::Click(F::Step(target))))
             .style(move |_t: &Theme, status| {
                 let bg = if current {
                     Some(alpha(p.secondary_container, 0.85))
@@ -388,7 +389,7 @@ pub fn hints(app: &App) -> Vec<(&'static str, &'static str)> {
             ("Space", "switch"),
             ("Tab", "next field"),
         ]),
-        Screen::Summary => v.extend([("Enter", "hold to install"), ("Tab", "edit")]),
+        Screen::Summary => v.push(("Enter", "hold to install")),
         Screen::Installing => v.push(("Enter", log_verb(app))),
         Screen::Failed => v.extend([
             (
@@ -967,7 +968,6 @@ fn account<'a>(app: &'a App, p: &Palette) -> El<'a> {
     let f = &app.form;
     let mismatch = mismatched(&f.password, &f.password_confirm);
     let payload = app.ready_probe().and_then(|p| p.payload.as_ref());
-    let host = payload.map(|m| m.hostname.clone()).unwrap_or_default();
     let baked = payload.is_some_and(|m| m.username == f.username);
     let bad_name =
         !f.username.is_empty() && !kubaos_core::engine::validate::valid_username(&f.username);
@@ -978,14 +978,37 @@ fn account<'a>(app: &'a App, p: &Palette) -> El<'a> {
         "Lowercase: a-z first, then a-z, 0-9, - or _.".to_string()
     } else if baked {
         format!(
-            "/home/{}. The image's home config is built for {}@{host} already.",
+            "/home/{}. The image's home config is built for {} already.",
             f.username, f.username
         )
     } else {
         format!(
-            "/home/{}. The install builds the home config for {}@{host}: a few seconds more.",
+            "/home/{}. The install builds the home config for {}: a few seconds more.",
             f.username, f.username
         )
+    };
+    let bad_host =
+        !f.hostname.is_empty() && !kubaos_core::engine::validate::valid_hostname(&f.hostname);
+    let hostname = input_err(app, F::Hostname, "this-machine", None, bad_host, p);
+    let note = |s: &'static str, c: Color| -> El<'a> { text(s).size(size::SM).color(c).into() };
+    let hostname_note = if bad_host {
+        note(model::HOSTNAME_RULE, p.error)
+    } else if f.hostname.is_empty() || f.username.is_empty() {
+        note(
+            "This machine's name on the network and in your prompt.",
+            p.outline,
+        )
+    } else {
+        row![
+            note("You'll be", p.outline),
+            text(format!("{}@{}", f.username, f.hostname))
+                .font(theme::MONO)
+                .size(size::SM)
+                .color(p.on_surface_variant),
+        ]
+        .spacing(4)
+        .align_y(Alignment::Center)
+        .into()
     };
     let half = |e: El<'a>| container(e).width(Length::FillPortion(1));
     let names = row![
@@ -1006,6 +1029,11 @@ fn account<'a>(app: &'a App, p: &Palette) -> El<'a> {
             ),
             p
         )),
+    ]
+    .spacing(space::XL);
+    let host = row![
+        half(field("Hostname", hostname, Some(hostname_note), p)),
+        half(Space::new().into()),
     ]
     .spacing(space::XL);
     let passwords = row![
@@ -1033,7 +1061,7 @@ fn account<'a>(app: &'a App, p: &Palette) -> El<'a> {
         header(
             jp::ACCOUNT,
             "You",
-            "Your login and your sudo password. Pick one you'll still remember at 2am.",
+            "Your login, this machine's name and your sudo password. Pick one you'll still remember at 2am.",
             p
         ),
         Space::new().height(space::XXL),
@@ -1041,6 +1069,8 @@ fn account<'a>(app: &'a App, p: &Palette) -> El<'a> {
             ids::ACCOUNT_SCROLL,
             column![
                 container(names).id(ids::REVEAL_NAMES),
+                Space::new().height(space::XL),
+                container(host).id(ids::REVEAL_HOST),
                 Space::new().height(space::XL),
                 container(passwords).id(ids::REVEAL_PASSWORDS),
             ]
@@ -1790,37 +1820,8 @@ fn kv<'a>(k: &'a str, v: String, p: &Palette) -> El<'a> {
     .into()
 }
 
-fn block<'a>(
-    app: &'a App,
-    ic: Icon,
-    t: &'a str,
-    rows: Vec<El<'a>>,
-    to: Option<Screen>,
-    p: &Palette,
-) -> El<'a> {
-    let pp = *p;
-    let edit: El = match to {
-        Some(s) => {
-            let b = button(
-                text("Edit")
-                    .font(theme::SANS_MEDIUM)
-                    .size(size::SM)
-                    .color(p.primary),
-            )
-            .padding(Padding::from([4.0, 10.0]))
-            .on_press(Message::Click(F::Edit(s)))
-            .style(move |_t: &Theme, status| button::Style {
-                background: matches!(status, button::Status::Hovered)
-                    .then_some(Background::Color(alpha(pp.primary, 0.12))),
-                text_color: pp.primary,
-                border: Border::default().rounded(radius::FULL),
-                shadow: Shadow::default(),
-                snap: true,
-            });
-            ring(b, app.is_focused(F::Edit(s)), radius::FULL, p)
-        }
-        None => Space::new().into(),
-    };
+/// A card on Last chance, sized by the grid it sits in.
+fn block<'a>(id: &'static str, ic: Icon, t: &'a str, rows: Vec<El<'a>>, p: &Palette) -> El<'a> {
     container(
         column![
             row![
@@ -1829,8 +1830,6 @@ fn block<'a>(
                     .font(theme::SANS_SEMIBOLD)
                     .size(size::MD)
                     .color(p.on_surface),
-                Space::new().width(Length::Fill),
-                edit
             ]
             .spacing(space::SM)
             .align_y(Alignment::Center)
@@ -1839,8 +1838,10 @@ fn block<'a>(
         ]
         .spacing(space::SM),
     )
+    .id(id)
     .padding(space::LG)
     .width(Length::Fill)
+    .height(Length::Fill)
     .style(well(*p))
     .into()
 }
@@ -1856,7 +1857,7 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
     let whole = f.disk_mode != Some(DiskMode::FreeSpace);
 
     let lang = block(
-        app,
+        ids::SUMMARY_LANGUAGE,
         Icon::Language,
         "Language",
         vec![
@@ -1875,11 +1876,10 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
                 p,
             ),
         ],
-        Some(Screen::Language),
         p,
     );
     let acct = block(
-        app,
+        ids::SUMMARY_ACCOUNT,
         Icon::Person,
         "You",
         vec![
@@ -1894,11 +1894,10 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
                 None => kv("Git", "Later".into(), p),
             },
         ],
-        Some(Screen::Account),
         p,
     );
     let disk_block = block(
-        app,
+        ids::SUMMARY_DISK,
         Icon::HardDrive,
         "Disk",
         vec![
@@ -1933,11 +1932,10 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
                 p,
             ),
         ],
-        Some(Screen::Disk),
         p,
     );
     let sys = block(
-        app,
+        ids::SUMMARY_SYSTEM,
         Icon::DeployedCode,
         "System",
         vec![
@@ -1977,7 +1975,6 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
                 p,
             ),
         ],
-        app.flow().contains(&Screen::Wifi).then_some(Screen::Wifi),
         p,
     );
 
@@ -2124,7 +2121,7 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
     let mut top = column![header(
         jp::SUMMARY,
         "Last chance",
-        "Nothing's been written yet. Check it over, then hold the button. Tab gets you to Edit.",
+        "Nothing's been written yet. Check it over, then hold the button.",
         p
     )];
     if let Some(note) = low_battery_note(app) {
@@ -2146,12 +2143,8 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
         Space::new().height(space::XL),
         scroll(
             "summary-scroll",
-            column![
-                row![lang, acct].spacing(space::LG),
-                row![disk_block, sys].spacing(space::LG)
-            ]
-            .spacing(space::LG)
-            .padding(Padding::default().right(14)),
+            container(grid(2, space::LG, [lang, acct, disk_block, sys]))
+                .padding(Padding::default().right(14)),
             p
         )
         .height(Length::Fill),
