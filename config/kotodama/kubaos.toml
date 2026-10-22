@@ -14,9 +14,10 @@ hidden = ["qt5ct", "qt6ct", "org.codeberg.dnkl.footclient", "org.codeberg.dnkl.f
 names = { nvim = "Neovim" }
 
 [extensions.hyprland]
-# Windows, workspaces and the Shortcuts View (SUPER + F1). KubaOS sets
-# nothing here yet, so the Extension's defaults apply: the open windows are in
-# the main search, and the binds only in the Shortcuts View.
+# Windows, workspaces and the Shortcuts View (SUPER + F1). Every bind is in
+# the main search too, titled by its description in config/hypr/keybinds.lua
+# with its keys beside, so typing "move to workspace 3" finds the bind.
+in_search = true
 
 [extensions.folders]
 # A script's window stays open after it exits, so its output can be read.
