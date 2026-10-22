@@ -673,7 +673,7 @@ mod tests {
         );
         assert_eq!(git(&mut s, &env()).state, State::Needed);
 
-        // Set by setup, the installer or by hand: git says so either way.
+        // Set by setup, the install or by hand: git says so either way.
         let mut s = FakeSys::new()
             .ok(
                 "/usr/bin/git config --global --includes --get user.name",

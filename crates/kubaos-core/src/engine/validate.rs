@@ -1,4 +1,4 @@
-//! Config vs. machine vs. payload. Every problem is collected, so the GUI
+//! Config vs. machine vs. payload. Every problem is collected, so Kōbō
 //! (and `kubaos validate`) can show them all at once.
 
 use super::disk::{self, MIB};
@@ -33,7 +33,7 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
         }
     }
     if !p.uefi {
-        bad("the machine didn't boot in UEFI mode; dotinstall installs GRUB for EFI only".into());
+        bad("the machine didn't boot in UEFI mode; KubaOS installs GRUB for EFI only".into());
     }
 
     // User and host.
@@ -104,7 +104,7 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
         return out;
     };
     if d.is_boot_medium {
-        bad(format!("{} is the medium the installer runs from", d.path));
+        bad(format!("{} is the medium this install runs from", d.path));
     }
     let installed = manifest.map_or(0, |m| m.installed_bytes);
     match c.disk.target {
@@ -120,7 +120,7 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
             }
         }
         DiskTarget::FreeSpace { start, end } => {
-            // Probe's regions are aligned already; allow the GUI to pick a
+            // Probe's regions are aligned already; allow Kōbō to pick a
             // sub-range of one.
             let inside = d
                 .free_regions
@@ -326,7 +326,7 @@ mod tests {
             device = "/dev/nvme0n1"
             target = { mode = "whole" }
             [payload]
-            dir = "/run/dotinstall/payload"
+            dir = "/run/kubaos/payload"
             "#,
         )
         .unwrap()
@@ -351,7 +351,7 @@ mod tests {
         assert!(p[1].contains("username \"Root\" must start with a lowercase letter"));
         assert!(
             p.iter()
-                .any(|s| s.contains("medium the installer runs from"))
+                .any(|s| s.contains("medium this install runs from"))
         );
         assert!(p.iter().any(|s| s.contains("Mars/Olympus")));
     }

@@ -1,8 +1,8 @@
 # The KubaOS Rust workspace: the engine (`kubaos-core`), the `kubaos` CLI
-# (`kubaos-cli`) and the installer GUI, which still lives in `installer/`.
+# (`kubaos-cli`) and Kōbō (`kubaos-kobo`), its graphical front end.
 [workspace]
 resolver = "3"
-members = ["crates/kubaos-core", "crates/kubaos-cli", "installer/crates/gui"]
+members = ["crates/kubaos-core", "crates/kubaos-cli", "crates/kubaos-kobo"]
 
 [workspace.package]
 version = "0.1.0"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2054  # QEMU's own option syntax uses commas inside one argument
-# test/vm/run: the QEMU test bench for dotinstall (test/vm/README.md).
+# test/vm/run: the QEMU test bench for the live ISO and its installs (test/vm/README.md).
 #
 #   test/vm/run boot-iso [ISO] [--arch aarch64|x86_64] [--gui] [--keep-disk] [--secure-boot]
 #                        [--config FILE --secrets FILE] [--demo] [--after poweroff|reboot|shell]
@@ -10,7 +10,7 @@
 #   test/vm/run install CONFIG SECRETS [--iso ISO] [--arch A] [--demo] [--demo-fail-at STEP] [--gui]
 #                       [--timeout SECS] [--keep-running] [--ssh] [--secure-boot]
 #                                       headless install: inject CONFIG+SECRETS on a
-#                                       DOTINSTALL disk, wait for done/failed on serial,
+#                                       KUBAOS_CFG disk, wait for done/failed on serial,
 #                                       power off, exit 0 (done) / 1 (failed) / 3 (timeout).
 #                                       --ssh: afterwards put the bench key in the installed
 #                                       system's /root and enable its sshd (bench only)
@@ -79,7 +79,7 @@ qmp() {
 }
 
 ensure_key() {
-  [[ -f $KEY ]] || ssh-keygen -q -t ed25519 -N '' -C dotinstall-bench -f "$KEY"
+  [[ -f $KEY ]] || ssh-keygen -q -t ed25519 -N '' -C kubaos-bench -f "$KEY"
 }
 
 new_disk() {
@@ -114,8 +114,8 @@ new_vars() {
   qemu-img convert -q -f raw -O qcow2 "$src" "$VARS"
 }
 
-# make_cfg_disk [CONFIG SECRETS] [ENV-LINES...]: the DOTINSTALL disk (ISO9660,
-# volume label DOTINSTALL) the live system looks for. Always written, so the
+# make_cfg_disk [CONFIG SECRETS] [ENV-LINES...]: the KUBAOS_CFG disk (ISO9660,
+# volume label KUBAOS_CFG) the live system looks for. Always written, so the
 # bench can pass options even without an install.
 make_cfg_disk() {
   local config="$1" secrets="$2" env="$3"
@@ -123,15 +123,15 @@ make_cfg_disk() {
   mkdir -p "$CFGDIR"
   [[ -n $config ]] && cp "$config" "$CFGDIR/install.toml"
   [[ -n $secrets ]] && cp "$secrets" "$CFGDIR/secrets.toml"
-  printf '%s\n' "$env" >"$CFGDIR/dotinstall.env"
-  hdiutil makehybrid -quiet -iso -joliet -default-volume-name DOTINSTALL -o "$CFGISO" "$CFGDIR"
+  printf '%s\n' "$env" >"$CFGDIR/kubaos.env"
+  hdiutil makehybrid -quiet -iso -joliet -default-volume-name KUBAOS_CFG -o "$CFGISO" "$CFGDIR"
 }
 
 # latest_iso ARCH: the newest KubaOS ISO for ARCH in iso (hw or vm).
 latest_iso() {
   local arch="$1" f
   f="$(ls -t "$ROOT"/iso/kubaos-*-"$arch".iso "$ROOT"/iso/kubaos-*-"$arch"-vm.iso 2>/dev/null | head -1 || true)"
-  [[ -n $f ]] || die "no ISO given and none in iso for $arch (installer/iso/build --arch $arch)"
+  [[ -n $f ]] || die "no ISO given and none in iso for $arch (install/iso/build --arch $arch)"
   printf '%s\n' "$f"
 }
 
@@ -173,9 +173,9 @@ launch() {
       ;;
     *) die "unknown arch $arch" ;;
   esac
-  # opt/dotinstall/authorized_keys: only the bench passes it; a dev live ISO
+  # opt/kubaos/authorized_keys: only the bench passes it; a dev live ISO
   # enables sshd with that key when it sees it.
-  q+=(-name "dotinstall-bench-$arch" -smp "$CPUS" -m "$MEM"
+  q+=(-name "kubaos-bench-$arch" -smp "$CPUS" -m "$MEM"
     -blockdev "driver=file,filename=$VARS,node-name=vars-file"
     -blockdev "driver=qcow2,file=vars-file,node-name=vars"
     -device virtio-scsi-pci,id=scsi
@@ -189,7 +189,7 @@ launch() {
     -device "virtio-gpu-pci,xres=${RES%x*},yres=${RES#*x}"
     -chardev "file,id=ser0,path=$SERIAL" -serial chardev:ser0
     -qmp "unix:$QMP,server=on,wait=off"
-    -fw_cfg "name=opt/dotinstall/authorized_keys,file=$KEY.pub")
+    -fw_cfg "name=opt/kubaos/authorized_keys,file=$KEY.pub")
   if [[ -n $iso ]]; then
     q+=(-drive "if=none,id=live,format=raw,readonly=on,media=cdrom,file=$iso"
       -device scsi-cd,drive=live,bus=scsi.0,bootindex=1)
@@ -233,8 +233,8 @@ cmd_boot_iso() {
   mkdir -p "$OUT"
   ((keep)) || { new_disk; rm -f "$VARS"; }
   local env="" cfg=""
-  ((demo)) && env+="DOTINSTALL_DEMO=1"$'\n'
-  [[ -n $after ]] && env+="DOTINSTALL_AFTER=$after"$'\n'
+  ((demo)) && env+="KUBAOS_DEMO=1"$'\n'
+  [[ -n $after ]] && env+="KUBAOS_AFTER=$after"$'\n'
   env+="$extra"
   if [[ -n $config || -n $env ]]; then
     make_cfg_disk "$config" "$secrets" "$env"
@@ -302,19 +302,19 @@ cmd_install() {
   new_disk
   rm -f "$VARS"
   local env
-  env="DOTINSTALL_AFTER=$( ((keep || sshon)) && echo shell || echo poweroff)"$'\n'"DOTINSTALL_VERBOSE=1"
-  ((demo)) && env+=$'\n'"DOTINSTALL_DEMO=1"
-  [[ -n $fail_at ]] && env+=$'\n'"DOTINSTALL_DEMO_FAIL_AT=$fail_at"
+  env="KUBAOS_AFTER=$( ((keep || sshon)) && echo shell || echo poweroff)"$'\n'"KUBAOS_VERBOSE=1"
+  ((demo)) && env+=$'\n'"KUBAOS_DEMO=1"
+  [[ -n $fail_at ]] && env+=$'\n'"KUBAOS_DEMO_FAIL_AT=$fail_at"
   make_cfg_disk "$config" "$secrets" "$env"
   launch "$arch" "$gui" "$iso" "$CFGISO" "$secure"
   say "waiting for the install (timeout ${timeout}s; serial: $SERIAL)"
   local rc=3 line
-  line="$(wait_serial 'DOTINSTALL-RESULT: (done|failed)' "$timeout")" || true
+  line="$(wait_serial 'KUBAOS-RESULT: (done|failed)' "$timeout")" || true
   case "$line" in
-    *"DOTINSTALL-RESULT: done"*) rc=0 ;;
-    *"DOTINSTALL-RESULT: failed"*) rc=1 ;;
+    *"KUBAOS-RESULT: done"*) rc=0 ;;
+    *"KUBAOS-RESULT: failed"*) rc=1 ;;
   esac
-  sed -n '/DOTINSTALL-BEGIN/,/DOTINSTALL-RESULT/p' "$SERIAL" | tr -d '\r' >"$OUT/install.log"
+  sed -n '/KUBAOS-BEGIN/,/KUBAOS-RESULT/p' "$SERIAL" | tr -d '\r' >"$OUT/install.log"
   if ((sshon && rc == 0)); then
     target_ssh "$config" "$secrets" || { say "could not enable ssh on the target"; rc=1; }
     ((keep)) || { cmd_ssh systemctl poweroff >/dev/null 2>&1 & }

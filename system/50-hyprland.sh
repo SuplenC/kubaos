@@ -124,7 +124,7 @@ else
 fi
 
 # Hush login(1) on the autologin: no motd, no "Last login" between the boot
-# splash and Hyprland. /etc/skel covers users made later (the installer's
+# splash and Hyprland. /etc/skel covers users made later (the install's
 # useradd -m); the target user gets it now.
 step "Quiet login (~/.hushlogin)"
 if [[ -f /etc/skel/.hushlogin ]]; then

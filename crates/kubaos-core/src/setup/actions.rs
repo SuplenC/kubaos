@@ -627,7 +627,7 @@ pub fn git_identity_ok(name: &str, email: &str) -> Result<(), &'static str> {
 }
 
 /// Writes the identity file config/git/config includes. Whatever was there
-/// is replaced: the file is setup's (and the installer's), nobody else's.
+/// is replaced: the file is setup's (and the install's), nobody else's.
 fn git(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
     let g = inputs.git.clone().unwrap_or_default();
     git_identity_ok(&g.name, &g.email)

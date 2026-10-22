@@ -1,4 +1,4 @@
-# Identity (user.name, user.email) isn't in the repo. The installer's Git
+# Identity (user.name, user.email) isn't in the repo. Kōbō's Git
 # screen or first-boot setup's Git card writes it, outside
 # ~/.config/git (read-only defaults). Git skips a missing include.
 [include]

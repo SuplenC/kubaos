@@ -1,5 +1,5 @@
 # Your home: KubaOS plus your own packages and options (home.nix). The
-# installer wrote this file; from here on it's yours. Apply with
+# install wrote this file; from here on it's yours. Apply with
 #   home-manager switch --flake ~/.config/kubaos/home
 {
   description = "@USER@'s KubaOS home";

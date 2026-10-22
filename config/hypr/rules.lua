@@ -78,9 +78,9 @@ hl.window_rule({ match = { title = ".*is sharing (your screen|a window).*" }, wo
 -- Tag effects (keep last)
 ---------------------------------------------------------------------------
 
--- KubaOS first-boot setup (dotinstall-gui --setup, app id kubaos-setup): a
--- centred panel, not half a tiled screen. The newest window has focus.
-hl.window_rule({ match = { class = "^kubaos-setup$" }, float = true, center = true, size = { "monitor_w*0.8", "monitor_h*0.85" } })
+-- Kōbō, such as first-boot setup (kobo --setup, app id kobo): a centred
+-- panel, not half a tiled screen. The newest window has focus.
+hl.window_rule({ match = { class = "^kobo$" }, float = true, center = true, size = { "monitor_w*0.8", "monitor_h*0.85" } })
 hl.window_rule({ match = { tag = "float-small" }, float = true, center = true })
 hl.window_rule({ match = { tag = "float-medium" }, float = true, center = true, size = { "monitor_w*0.45", "monitor_h*0.55" } })
 hl.window_rule({ match = { tag = "float-large" }, float = true, center = true, size = { "monitor_w*0.6", "monitor_h*0.7" } })

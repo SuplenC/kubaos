@@ -22,4 +22,4 @@ name = "Kuba Example"
 email = "kuba@example.com"
 
 [payload]
-dir = "/run/dotinstall/payload"
+dir = "/run/kubaos/payload"

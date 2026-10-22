@@ -1,0 +1,128 @@
+#!/bin/bash
+# The live system's boot flow, run by root's autologin on tty1.
+#
+# A disk labelled KUBAOS_CFG with install.toml on it: headless install, output
+# also on the serial console, then poweroff/reboot/shell (KUBAOS_AFTER).
+# Otherwise: Kōbō in cage, falling back to its text mode (kobo-text).
+#
+# KUBAOS_CFG disk layout (any filesystem; the bench uses ISO9660):
+#   install.toml     the InstallConfig (required for the headless path)
+#   secrets.toml     the Secrets (copied to a 0600 file in /run)
+#   kubaos.env       optional KEY=value lines:
+#                      KUBAOS_AFTER=poweroff|reboot|shell   (default poweroff)
+#                      KUBAOS_VERBOSE=1     `run -v`: every command and its output
+#                      KUBAOS_DEMO=1        run `kubaos demo` instead of `run`
+#                      KUBAOS_DEMO_SPEED=N  (default 10)
+#                      KUBAOS_DEMO_FAIL_AT=STEP
+#                      KOBO_ARGS=...        extra kobo arguments
+set -u
+
+CFG=/run/kubaos/config
+mkdir -p /run/kubaos
+
+mount_config_disk() {
+  udevadm settle -t 5 2>/dev/null || true
+  local dev=/dev/disk/by-label/KUBAOS_CFG
+  [ -e "$dev" ] || return 1
+  mkdir -p "$CFG"
+  mountpoint -q "$CFG" || mount -o ro "$dev" "$CFG" || return 1
+}
+
+# The serial consoles the kernel writes to (ttyS0, ttyAMA0, ...).
+serial_consoles() {
+  local c
+  for c in $(cat /sys/class/tty/console/active 2>/dev/null); do
+    case "$c" in tty[0-9]*) ;; *) [ -w "/dev/$c" ] && echo "/dev/$c" ;; esac
+  done
+}
+
+headless() {
+  local env="$CFG/kubaos.env" rc
+  KUBAOS_AFTER=poweroff
+  KUBAOS_DEMO=0
+  KUBAOS_DEMO_SPEED=10
+  KUBAOS_DEMO_FAIL_AT=
+  # shellcheck disable=SC1090
+  [ -f "$env" ] && . "$env"
+
+  # The serial login prompt would interleave with the install log.
+  systemctl stop 'serial-getty@*.service' 2>/dev/null
+  # everything below also goes to the serial console(s) and a log file
+  exec 3>&1 4>&2
+  exec > >(tee -a /var/log/kubaos-live.log $(serial_consoles)) 2>&1
+  local tee_pid=$!
+
+  echo "KUBAOS-BEGIN $(cat /etc/kubaos-live 2>/dev/null | tr '\n' ' ')"
+  echo "uptime: $(cut -d' ' -f1 /proc/uptime)s"
+  if [ "$KUBAOS_DEMO" = 1 ]; then
+    set -- kubaos demo --events human --speed "$KUBAOS_DEMO_SPEED"
+    [ -n "$KUBAOS_DEMO_FAIL_AT" ] && set -- "$@" --fail-at "$KUBAOS_DEMO_FAIL_AT"
+  else
+    install -m 600 /dev/null /run/kubaos/secrets.toml
+    [ -f "$CFG/secrets.toml" ] && cat "$CFG/secrets.toml" >/run/kubaos/secrets.toml
+    set -- kubaos run --config "$CFG/install.toml" --secrets /run/kubaos/secrets.toml --events human
+    [ "${KUBAOS_VERBOSE:-0}" = 1 ] && set -- "$@" -v
+  fi
+  echo "\$ $*"
+  "$@"
+  rc=$?
+  if [ $rc -eq 0 ]; then
+    echo "KUBAOS-RESULT: done"
+  else
+    echo "KUBAOS-RESULT: failed rc=$rc"
+  fi
+  rm -f /run/kubaos/secrets.toml
+  sync
+
+  # Close the tee before shutting down: a tee still writing to the serial tty
+  # can hold up the session's stop job.
+  exec >&3 2>&4 3>&- 4>&-
+  wait "$tee_pid" 2>/dev/null
+  case "$KUBAOS_AFTER" in
+    poweroff) systemctl poweroff; sleep infinity ;;
+    # Rebooting after a failure would loop back into the live system.
+    reboot) if [ $rc -eq 0 ]; then systemctl reboot; sleep infinity; fi ;;
+  esac
+  if [ $rc -eq 0 ]; then
+    echo "Done. Reboot whenever you like. Log: /var/log/kubaos-live.log"
+  else
+    echo "Well, shit. The install failed (exit $rc); the reason is above. Log: /var/log/kubaos-live.log"
+  fi
+}
+
+gui() {
+  local rc=127
+  if [ -x /usr/bin/kobo ] && command -v cage >/dev/null; then
+    # No render node (VM without virgl): software rendering in the compositor.
+    ls /dev/dri/renderD* >/dev/null 2>&1 || export WLR_RENDERER=pixman
+    [ "$(systemd-detect-virt 2>/dev/null)" != none ] && export WLR_NO_HARDWARE_CURSORS=1
+    # shellcheck disable=SC2086
+    # No --fullscreen: cage already gives the one window the whole output, and
+    # cage 0.2.1 asserts (wlr_xdg_surface_schedule_configure: surface->initialized)
+    # when a client asks for fullscreen before its first commit, as winit does.
+    cage -s -- kobo ${KOBO_ARGS:-} 2>>/var/log/kobo.log
+    rc=$?
+  fi
+  [ $rc -eq 0 ] && return 0
+  clear
+  echo "Kōbō fell over (exit $rc, log in /var/log/kobo.log)."
+  echo "Text mode it is. Same questions, fewer pixels."
+  echo
+  kobo-text --fallback
+}
+
+echo "$(. /etc/kubaos-live 2>/dev/null; echo "${KUBAOS_LIVE_NAME:-KubaOS} live (${KUBAOS_LIVE_VERSION:-?}, ${KUBAOS_LIVE_ARCH:-})"), up in $(cut -d' ' -f1 /proc/uptime)s"
+# Headless when the KUBAOS_CFG disk has install.toml, or asks for the demo.
+headless_wanted() {
+  mount_config_disk || return 1
+  [ -f "$CFG/install.toml" ] || grep -qs '^KUBAOS_DEMO=1' "$CFG/kubaos.env"
+}
+
+if headless_wanted; then
+  headless
+else
+  # shellcheck disable=SC1091
+  [ -f "$CFG/kubaos.env" ] && . "$CFG/kubaos.env"
+  for c in $(serial_consoles); do echo "KUBAOS-INTERACTIVE uptime=$(cut -d' ' -f1 /proc/uptime)s" >"$c"; done
+  gui
+fi

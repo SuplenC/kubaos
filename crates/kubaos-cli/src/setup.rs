@@ -1,4 +1,4 @@
-//! `kubaos setup`: first-boot setup without the GUI (docs/INSTALLER.md,
+//! `kubaos setup`: first-boot setup without Kōbō (docs/INSTALL-INTERNALS.md,
 //! "First boot"). Runs as the desktop user, like `kubaos-setup`.
 //!
 //!   kubaos setup status [--json] [--demo vm|tuxedo]

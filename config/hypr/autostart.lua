@@ -46,7 +46,7 @@ hl.on("hyprland.start", function()
   -- hidden. Not installed (arm64 VM): the exec fails quietly.
   -- While KubaOS first-boot setup is pending (its user unit is installed and
   -- its marker isn't there yet), setup has the screen to itself and starts
-  -- Bitwarden when it closes (installer/crates/gui/src/setup).
+  -- Bitwarden when it closes (crates/kubaos-kobo/src/setup).
   start('[ -e /usr/lib/systemd/user/kubaos-setup.service ] && '
     .. '[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/kubaos/setup-done" ] || exec bitwarden')
 

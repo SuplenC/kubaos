@@ -1,5 +1,5 @@
 //! What the machine offers: `kubaos probe --json` prints one `Probe`.
-//! The GUI fills its pickers from it.
+//! Kōbō fills its pickers from it.
 
 use serde::{Deserialize, Serialize};
 
@@ -15,7 +15,7 @@ pub struct Probe {
     pub locales: Vec<String>,
     pub wifi: Vec<WifiNetwork>,
     pub online: bool,
-    /// `None` when no payload was found (the GUI refuses to continue).
+    /// `None` when no payload was found (Kōbō refuses to continue).
     pub payload: Option<Manifest>,
 }
 

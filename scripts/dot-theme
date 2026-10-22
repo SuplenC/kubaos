@@ -19,7 +19,7 @@ STAMP="$STATE/.stamp"
 # Every wallpaper set, one folder each, read-only (system/60-nix.sh links it
 # to the flake input kubaos-wallpapers).
 SETS_DIR="${KUBAOS_WALLPAPERS:-/usr/share/kubaos/wallpapers}"
-# The sets the picker shows, one id per line, # comments. The installer
+# The sets the picker shows, one id per line, # comments. The install
 # writes it; without it, every set shows. A set a release adds shows up once
 # it's in here.
 SETS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/wallpapers/sets"

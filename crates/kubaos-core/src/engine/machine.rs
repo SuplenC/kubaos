@@ -10,12 +10,12 @@ use serde::Deserialize;
 use super::disk::{GIB, Part, PartTable};
 use crate::probe::{DiskInfo, Manifest, PartitionInfo, Probe, WifiNetwork};
 
-pub const DEFAULT_PAYLOAD_DIR: &str = "/run/dotinstall/payload";
+pub const DEFAULT_PAYLOAD_DIR: &str = "/run/kubaos/payload";
 
-/// Test-only switch (`DOTINSTALL_TEST=1`): offer loop devices as disks and
+/// Test-only switch (`KUBAOS_TEST=1`): offer loop devices as disks and
 /// pretend to be booted with UEFI, so the e2e test can run in a container.
 pub fn test_mode() -> bool {
-    std::env::var("DOTINSTALL_TEST").is_ok_and(|v| v == "1")
+    std::env::var("KUBAOS_TEST").is_ok_and(|v| v == "1")
 }
 
 // ---------------------------------------------------------------------------
@@ -613,7 +613,7 @@ mod tests {
 
     #[test]
     fn zoneinfo_walk() {
-        let root = std::env::temp_dir().join(format!("dotinstall-tz-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("kubaos-tz-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         for (p, c) in [
             ("Europe/Rome", &b"TZif2..."[..]),

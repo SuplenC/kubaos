@@ -15,7 +15,7 @@ pub const SUBVOLUMES: [(&str, &str); 8] = [
 
 pub const BTRFS_OPTS: &str = "noatime,compress=zstd:1";
 
-/// Mount options for a subvolume, as fstab and the installer both use them.
+/// Mount options for a subvolume, as fstab and the install both use them.
 pub fn subvol_opts(subvol: &str) -> String {
     if subvol == "@swap" {
         format!("noatime,subvol={subvol}")
@@ -37,7 +37,7 @@ pub struct FsUuids {
 
 pub fn fstab(u: &FsUuids, swapfile: bool) -> String {
     let mut s = String::from(
-        "# /etc/fstab: written by dotinstall. Subvolumes as in\n\
+        "# /etc/fstab: written by the KubaOS install. Subvolumes as in\n\
          # system/00-btrfs-subvolumes.md; names, not ids, so a rollback that\n\
          # replaces @ keeps working.\n\
          # <file system>  <mount point>  <type>  <options>  <dump>  <pass>\n",
@@ -90,7 +90,7 @@ pub fn hosts(hostname: &str) -> String {
 /// systemd-localed for X11/Wayland defaults.
 pub fn keyboard(layout: &str, variant: &str) -> String {
     format!(
-        "# KEYBOARD CONFIGURATION FILE (written by dotinstall)\n\
+        "# KEYBOARD CONFIGURATION FILE (written by the KubaOS install)\n\
          XKBMODEL=\"pc105\"\n\
          XKBLAYOUT=\"{layout}\"\n\
          XKBVARIANT=\"{variant}\"\n\
@@ -174,7 +174,7 @@ pub fn nmconnection_name(ssid: &str) -> String {
 
 /// System files the image's scripts render for the build user (template in
 /// the dotfiles checkout, file in the target). The engine renders them again
-/// for the real user; installer/image/check fails on any other file in the
+/// for the real user; install/image/check fails on any other file in the
 /// payload that names the build user.
 pub const USER_TEMPLATES: &[(&str, &str)] = &[
     // system/50-hyprland.sh: tty1 autologin
@@ -300,7 +300,7 @@ pub fn snapper_settings(user: &str) -> Vec<String> {
 }
 
 /// Groups the first user gets, if the target has them: Ubuntu's defaults
-/// for the installer-created user plus what `system/*.sh` adds (i2c from
+/// for the user the install creates plus what `system/*.sh` adds (i2c from
 /// 20-base.sh, docker from 40-apps.sh).
 pub const USER_GROUPS: [&str; 9] = [
     "adm", "sudo", "users", "plugdev", "dip", "video", "render", "i2c", "docker",

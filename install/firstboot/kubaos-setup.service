@@ -1,0 +1,17 @@
+# KubaOS first-boot setup: opens once at the first login into Hyprland,
+# until it's finished or closed (the marker below). Run it again any time
+# with kubaos-setup. Written by the install (install/firstboot/).
+[Unit]
+Description=KubaOS first-boot setup
+# %S is $XDG_STATE_HOME (~/.local/state) in a user unit.
+ConditionPathExists=!%S/kubaos/setup-done
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/kobo --setup --first-boot
+Restart=no
+
+[Install]
+WantedBy=graphical-session.target

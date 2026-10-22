@@ -1,4 +1,4 @@
-//! The install commands: the headless installer. See docs/INSTALLER.md.
+//! The install commands: putting KubaOS on a machine without Kōbō. See docs/INSTALL-INTERNALS.md.
 //!
 //!   kubaos probe [--json] [--payload DIR]
 //!   kubaos validate --config FILE
@@ -26,7 +26,7 @@ use signal_hook::iterator::Signals;
 use crate::Events;
 use crate::usage_error;
 
-const LIVE_LOG: &str = "/var/log/dotinstall.log";
+const LIVE_LOG: &str = "/var/log/kubaos-install.log";
 
 #[derive(Subcommand)]
 pub(crate) enum InstallCmd {
@@ -34,7 +34,7 @@ pub(crate) enum InstallCmd {
     Probe {
         #[arg(long)]
         json: bool,
-        /// Payload directory (default /run/dotinstall/payload).
+        /// Payload directory (default /run/kubaos/payload).
         #[arg(long)]
         payload: Option<PathBuf>,
     },
@@ -65,17 +65,17 @@ pub(crate) enum InstallCmd {
         /// Print the commands each step would run; change nothing.
         #[arg(long)]
         dry_run: bool,
-        /// Where to mount the target (default /mnt/dotinstall).
+        /// Where to mount the target (default /mnt/kubaos).
         #[arg(long)]
         target: Option<String>,
-        /// Log file (default /var/log/dotinstall.log when installing).
+        /// Log file (default /var/log/kubaos-install.log when installing).
         #[arg(long)]
         log: Option<PathBuf>,
         /// Show debug lines (every command and its output) in human mode.
         #[arg(long, short)]
         verbose: bool,
     },
-    /// A fake install with real event shapes, for GUI work.
+    /// A fake install with real event shapes, for work on Kōbō.
     Demo {
         #[arg(long, default_value_t = 1.0)]
         speed: f32,

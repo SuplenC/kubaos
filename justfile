@@ -12,23 +12,23 @@ codename := trim(read(justfile_directory() / "CODENAME"))
 default:
     @just --list
 
-# Build the installer payload (the whole system as a squashfs) into installer/out/payload-<arch>. One at a time.
+# Build the payload (the whole system as a squashfs) into install/out/payload-<arch>. One at a time.
 payload arch=host:
-    installer/image/build --arch {{arch}} {{dirty}}
+    install/image/build --arch {{arch}} {{dirty}}
 
 # Check a built payload (unpack + chroot checks).
 check arch=host:
-    installer/image/check --arch {{arch}}
+    install/image/check --arch {{arch}}
 
 # Build the live ISO into iso/ (builds the payload first if there isn't one). `just iso aarch64 vm` makes the bench ISO (ssh, no firmware).
 iso arch=host profile="release":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{profile}}" in release|vm) ;; *) echo "profile is 'vm' or empty (release)" >&2; exit 2 ;; esac
-    p=installer/out/payload-{{arch}}
+    p=install/out/payload-{{arch}}
     [[ -f $p/manifest.json ]] || just payload {{arch}}
     if [[ "{{profile}}" == vm ]]; then flags=(--profile vm); else flags=(--release); fi
-    installer/iso/build --arch {{arch}} --payload "$p" "${flags[@]}"
+    install/iso/build --arch {{arch}} --payload "$p" "${flags[@]}"
     ls -lh iso/kubaos-{{codename}}-{{ver}}-{{arch}}*.iso
 
 # All four ISOs (aarch64 and x86_64, release and vm), after the tests and payload checks. Needs a clean tree.
@@ -48,7 +48,7 @@ test:
     cargo test --workspace
     test/run build
     test/run e2e
-    installer/test/engine-e2e
+    install/test/engine-e2e
 
 # Boot the newest ISO for <arch> in QEMU (test/vm/run boot-iso). Add --gui for a window.
 vm arch=host *flags="":
@@ -82,5 +82,5 @@ shots *flags="--hyprland":
 
 # Remove iso/ and the build outputs. Never touches Docker volumes or images.
 clean:
-    rm -rf iso installer/out installer/target test/out
+    rm -rf iso install/out install/target test/out
     test/vm/run clean

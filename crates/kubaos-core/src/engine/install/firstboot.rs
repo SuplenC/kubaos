@@ -1,18 +1,18 @@
-//! The first-boot setup app goes onto the target from the live system that
-//! installs it (docs/INSTALLER.md, "First boot"): the same `kubaos` and
-//! `dotinstall-gui`, plus the files in `installer/firstboot/` that make it
-//! open at the first login and give it a way to root.
+//! First-boot setup goes onto the target from the live system that installs
+//! it (docs/INSTALL-INTERNALS.md, "First boot"): the same `kubaos` and `kobo`,
+//! plus the files in `install/firstboot/` that make Kōbō open at the first
+//! login and give it a way to root.
 
 use std::path::{Path, PathBuf};
 
 use super::{Install, R};
 use crate::engine::runner::Cmd;
 
-const HELPER: &str = include_str!("../../../../../installer/firstboot/setup-helper");
-const WRAPPER: &str = include_str!("../../../../../installer/firstboot/kubaos-setup");
-const POLICY: &str = include_str!("../../../../../installer/firstboot/org.kubaos.setup.policy");
-const UNIT: &str = include_str!("../../../../../installer/firstboot/kubaos-setup.service");
-const DESKTOP: &str = include_str!("../../../../../installer/firstboot/kubaos-setup.desktop");
+const HELPER: &str = include_str!("../../../../../install/firstboot/setup-helper");
+const WRAPPER: &str = include_str!("../../../../../install/firstboot/kubaos-setup");
+const POLICY: &str = include_str!("../../../../../install/firstboot/org.kubaos.setup.policy");
+const UNIT: &str = include_str!("../../../../../install/firstboot/kubaos-setup.service");
+const DESKTOP: &str = include_str!("../../../../../install/firstboot/kobo.desktop");
 
 /// gnome-keyring's plaintext format: a keyring without a password is
 /// stored unencrypted and is never locked, so nothing ever asks for it.
@@ -29,7 +29,7 @@ impl Install<'_> {
     /// nothing would ever unlock a password-protected login keyring, and the
     /// first app to want a secret (Bitwarden, Chrome, gh, secret-tool) would
     /// pop "Choose password for new keyring" on the first login. The disk
-    /// encryption is the boundary instead; docs/INSTALLER.md has the
+    /// encryption is the boundary instead; docs/INSTALL-INTERNALS.md has the
     /// trade-off. Left alone if the home already has keyrings.
     pub(super) fn install_keyring(&mut self, home: &str, owner: &str) -> R<()> {
         let dir = format!("{home}/.local/share/keyrings");
@@ -50,7 +50,7 @@ impl Install<'_> {
     }
 
     /// Copies the binaries and writes the setup files. Without a
-    /// `dotinstall-gui` next to us (a CLI-only live system, the engine
+    /// `kobo` next to us (a CLI-only live system, the engine
     /// tests) setup isn't installed, with a warning: the install itself is
     /// fine, the TUXEDO bits then need `system/30-hardware.sh` by hand.
     pub(super) fn install_setup(&mut self) -> R<()> {
@@ -58,19 +58,19 @@ impl Install<'_> {
             .ok()
             .and_then(|p| p.parent().map(Path::to_path_buf));
         let (cli, gui) = match dir {
-            Some(d) => (d.join("kubaos"), d.join("dotinstall-gui")),
+            Some(d) => (d.join("kubaos"), d.join("kobo")),
             None => (PathBuf::new(), PathBuf::new()),
         };
         let found = self.r.exists(&cli) && self.r.exists(&gui);
         if !self.dry() && !found {
             self.warn(format!(
-                "no dotinstall-gui next to {}: first-boot setup isn't installed. \
+                "no kobo next to {}: first-boot setup isn't installed. \
                  Run system/30-hardware.sh by hand for the TUXEDO drivers.",
                 cli.display()
             ));
             return Ok(());
         }
-        for (src, dst) in [(&cli, "/usr/bin/kubaos"), (&gui, "/usr/bin/dotinstall-gui")] {
+        for (src, dst) in [(&cli, "/usr/bin/kubaos"), (&gui, "/usr/bin/kobo")] {
             let cmd =
                 Cmd::new("install").args(["-m", "0755", &src.display().to_string(), &self.ts(dst)]);
             self.sh(cmd)?;
@@ -83,11 +83,7 @@ impl Install<'_> {
             0o644,
         )?;
         self.write(UNIT_PATH, UNIT, 0o644)?;
-        self.write(
-            "/usr/share/applications/kubaos-setup.desktop",
-            DESKTOP,
-            0o644,
-        )?;
+        self.write("/usr/share/applications/kobo.desktop", DESKTOP, 0o644)?;
         let wants = self.t(UNIT_WANTS);
         if let Some(d) = wants.parent() {
             self.mkdir(d)?;
@@ -109,9 +105,9 @@ mod tests {
         assert!(HELPER.contains(&format!("{}/system", crate::setup::SYSTEM_KUBAOS)));
         assert!(POLICY.contains("/usr/lib/kubaos/setup-helper"));
         assert!(POLICY.contains(crate::setup::HELPER));
-        assert!(UNIT.contains("ExecStart=/usr/bin/dotinstall-gui --setup --first-boot"));
+        assert!(UNIT.contains("ExecStart=/usr/bin/kobo --setup --first-boot"));
         assert!(UNIT.contains("ConditionPathExists=!%S/kubaos/setup-done"));
-        assert!(WRAPPER.contains("dotinstall-gui --setup"));
+        assert!(WRAPPER.contains("kobo --setup"));
         assert!(DESKTOP.contains("Exec=kubaos-setup"));
         assert!(KEYRING.starts_with("[keyring]\n") && KEYRING.contains("lock-on-idle=false"));
     }

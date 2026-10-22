@@ -2,7 +2,7 @@
 -- https://wiki.hypr.land/Configuring/Variables/#input
 
 -- The keyboard layout is the system's: /etc/default/keyboard, which the
--- installer writes from its Keyboard screen and `localectl set-x11-keymap`
+-- install writes from Kōbō's Keyboard screen and `localectl set-x11-keymap`
 -- rewrites. Read on every config load, so after a change `hyprctl reload`
 -- picks it up. Without the file (a hand-install that never set one), or
 -- without a layout in it, the US layout (`us`).

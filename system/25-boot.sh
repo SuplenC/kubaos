@@ -4,7 +4,7 @@
 # hidden menu that shows up when you need it. Runs after 20-base.sh (GRUB and
 # grub-btrfs are there). Safe to re-run.
 #
-# What and why: docs/INSTALLER.md, "Boot". Assets: branding/boot.py.
+# What and why: docs/INSTALL-INTERNALS.md, "Boot". Assets: branding/boot.py.
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -14,7 +14,7 @@ usage() {
 Usage: $0 [--dry-run]
 
 Installs the KubaOS boot splash and GRUB theme, then rebuilds the initramfs
-and grub.cfg (not in image builds: the installer does that on the target).
+and grub.cfg (not in image builds: the install does that on the target).
 $(common_usage)
 EOF
 }
@@ -132,7 +132,7 @@ done
 
 # --------------------------------------------------------------------------
 if ((IMAGE_BUILD)); then
-  step "Image build: the installer rebuilds the initramfs and grub.cfg on the target"
+  step "Image build: the install rebuilds the initramfs and grub.cfg on the target"
 elif ! command -v update-grub >/dev/null; then
   warn "no update-grub here; skipping the initramfs and grub.cfg"
 else

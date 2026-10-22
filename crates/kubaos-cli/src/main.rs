@@ -1,5 +1,5 @@
-//! `kubaos`: the KubaOS CLI, which does the work of changing a KubaOS machine. The GUIs are
-//! front ends to it. See docs/INSTALLER.md, "CLI".
+//! `kubaos`: the KubaOS CLI, which does the work of changing a KubaOS machine. Kōbō, its
+//! graphical front end, runs the same engine in-process. See docs/INSTALL-INTERNALS.md, "CLI".
 //!
 //! Exit codes: 0 ok, 1 the work failed (the last event is `failed`), 2 a usage or config error.
 //!
@@ -56,8 +56,6 @@ pub(crate) enum Events {
 }
 
 /// Prints `kubaos: <msg>` on stderr and returns exit code 2.
-///
-/// The GUI shows the last stderr line of an exit 2 as the reason, without the `kubaos: ` prefix.
 pub(crate) fn usage_error(msg: impl Display) -> ExitCode {
     eprintln!("kubaos: {msg}");
     ExitCode::from(2)

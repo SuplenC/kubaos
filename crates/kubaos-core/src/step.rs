@@ -1,4 +1,4 @@
-//! The fixed step list. Titles are what the GUI shows; weights are rough
+//! The fixed step list. Titles are what Kōbō shows; weights are rough
 //! shares of total time on the laptop.
 
 use serde::{Deserialize, Serialize};

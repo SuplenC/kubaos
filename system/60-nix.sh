@@ -71,7 +71,7 @@ if ((EUID == 0)) && ! in_container; then
 fi
 require_sudo
 HM_CONFIG="$HM_USER@$HM_HOST"
-# The user flake the installer wrote (your nixpkgs, KubaOS from
+# The user flake the install wrote (your nixpkgs, KubaOS from
 # /usr/share/kubaos); without one (a machine set up by hand), this checkout.
 USER_FLAKE="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/home"
 if [[ -f "$USER_FLAKE/flake.nix" ]]; then FLAKE="$USER_FLAKE"; else FLAKE="$DOTFILES_DIR"; fi

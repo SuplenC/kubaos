@@ -1,4 +1,0 @@
-#!/bin/sh
-# KubaOS first-boot setup, any time: TUXEDO drivers, fingerprint, YubiKey,
-# Bitwarden. Each card is checked fresh, so finished ones stay finished.
-exec /usr/bin/dotinstall-gui --setup "$@"

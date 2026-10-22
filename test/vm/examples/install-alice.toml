@@ -1,5 +1,5 @@
 # install.toml as someone other than the payload's user: the engine builds
-# alice@vm's home-manager generation offline (docs/INSTALLER.md, "Another username").
+# alice@vm's home-manager generation offline (docs/INSTALL-INTERNALS.md, "Another username").
 [locale]
 lang = "en_US.UTF-8"
 keyboard_layout = "us"
@@ -23,4 +23,4 @@ name = "Alice Example"
 email = "alice@example.com"
 
 [payload]
-dir = "/run/dotinstall/payload"
+dir = "/run/kubaos/payload"

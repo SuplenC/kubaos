@@ -137,7 +137,7 @@ in
   # Replace the link with the folder; the sets are in /usr/share now, and
   # dot-theme moves a current wallpaper from the old path.
   #
-  # ~/.config/kubaos/wallpapers/sets, when the installer didn't write it
+  # ~/.config/kubaos/wallpapers/sets, when the install didn't write it
   # (a machine from before, or one set up with system/): the sets on disk
   # now, so the ones a later release adds stay opt-in. Never touched again.
   home.activation.wallpapersFolder = lib.hm.dag.entryAfter [ "linkGeneration" ] ''

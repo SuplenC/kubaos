@@ -796,18 +796,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dotinstall-gui"
-version = "0.1.0"
-dependencies = [
- "iced",
- "iced_test",
- "image",
- "kubaos-core",
- "serde_json",
- "toml",
-]
-
-[[package]]
 name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1784,6 +1772,20 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.21",
+ "toml",
+]
+
+[[package]]
+name = "kubaos-kobo"
+version = "0.1.0"
+dependencies = [
+ "iced",
+ "iced_test",
+ "image",
+ "kubaos-core",
+ "rustix 1.1.5",
+ "serde_json",
+ "signal-hook",
  "toml",
 ]
 

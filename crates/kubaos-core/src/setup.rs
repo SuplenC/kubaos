@@ -1,4 +1,4 @@
-//! First-boot setup (docs/INSTALLER.md, "First boot"): the things the
+//! First-boot setup (docs/INSTALL-INTERNALS.md, "First boot"): the things the
 //! payload can't carry because they need the hardware or the person.
 //!
 //! Five cards, each detected from the machine on every start, so re-running
@@ -9,7 +9,7 @@
 //!
 //! Runs as the desktop user. The few steps that need root go through
 //! `pkexec /usr/lib/kubaos/setup-helper`, a fixed root-owned script with
-//! four verbs (installer/firstboot/setup-helper); the session's polkit agent
+//! four verbs (install/firstboot/setup-helper); the session's polkit agent
 //! asks for the password. Secrets (master password, MOK password) travel on
 //! stdin or in a child's environment, never in argv or a log.
 //!
@@ -32,7 +32,7 @@ pub use actions::{YKMAN_PREP, git_identity_ok, mok_password_ok, run};
 pub use detect::{card_status, status};
 pub use parse::*;
 
-/// Where the engine puts the privileged helper (installer/firstboot/).
+/// Where the engine puts the privileged helper (install/firstboot/).
 pub const HELPER: &str = "/usr/lib/kubaos/setup-helper";
 /// KubaOS's root-owned checkout from the payload; the helper runs
 /// `system/30-hardware.sh` from here, never from anything the user can write.
@@ -111,7 +111,7 @@ pub enum MokState {
     Unknown,
 }
 
-/// What detection found, per card. The GUI words its screens from this.
+/// What detection found, per card. Kōbō words its screens from this.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(tag = "card", rename_all = "snake_case")]
 pub enum Facts {
@@ -210,7 +210,7 @@ pub enum PromptKind {
 }
 
 /// The setup's event stream. `kubaos setup run --events json` writes one
-/// per line; the GUI gets the same values in-process.
+/// per line; Kōbō gets the same values in-process.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SetupEvent {
