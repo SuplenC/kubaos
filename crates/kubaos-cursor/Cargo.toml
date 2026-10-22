@@ -1,0 +1,24 @@
+[package]
+name = "kubaos-cursor"
+description = "The pointer in the wallpaper's colours: Bibata recoloured into a hyprcursor and an XCursor theme"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+crc32fast = "1"
+# The version Kōbō's iced already locks, so the workspace builds one resvg. No text and no
+# raster images: Bibata's SVGs are paths, gradients and filters only.
+resvg = { version = "0.45", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "1", features = ["fs"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

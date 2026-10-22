@@ -1,9 +1,10 @@
 # The KubaOS Rust workspace: the engine (`kubaos-core`), the `kubaos` CLI
-# (`kubaos-cli`), Kōbō (`kubaos-kobo`), its graphical front end, and the
-# Command menu's KubaOS Extension (`kotodama-kubaos`).
+# (`kubaos-cli`), the recoloured pointer it writes (`kubaos-cursor`), Kōbō
+# (`kubaos-kobo`), its graphical front end, and the Command menu's KubaOS
+# Extension (`kotodama-kubaos`).
 [workspace]
 resolver = "3"
-members = ["crates/kubaos-core", "crates/kubaos-cli", "crates/kubaos-kobo", "crates/kotodama-kubaos"]
+members = ["crates/kubaos-core", "crates/kubaos-cli", "crates/kubaos-cursor", "crates/kubaos-kobo", "crates/kotodama-kubaos"]
 
 [workspace.package]
 version = "0.1.0"
@@ -12,6 +13,7 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 kubaos-core = { path = "crates/kubaos-core" }
+kubaos-cursor = { path = "crates/kubaos-cursor" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.9"
