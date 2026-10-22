@@ -1,0 +1,542 @@
+use super::*;
+
+#[test]
+fn scale_fits_the_output() {
+    let at = |w, h| auto_scale(Size::new(w, h));
+    assert_eq!(at(1024.0, 768.0), 1.0);
+    assert_eq!(at(1280.0, 800.0), 1.0);
+    assert_eq!(at(1440.0, 900.0), 1.0);
+    assert_eq!(at(1920.0, 1080.0), 1.25);
+    assert_eq!(at(1920.0, 1200.0), 1.5);
+    assert_eq!(at(2880.0, 1800.0), 2.25);
+    assert_eq!(at(3840.0, 2160.0), 2.5);
+}
+
+fn app_with_every_keymap() -> App {
+    let mut p = crate::backend::demo_probe();
+    p.keymaps = include_str!("../../assets/keymaps.tsv")
+        .lines()
+        .filter_map(|l| l.split('\t').next())
+        .map(str::to_string)
+        .collect();
+    let mut app = App::headless(std::sync::Arc::new(crate::backend::Demo::new(40.0, None)));
+    app.set_probe(Ok(p));
+    app
+}
+
+fn shows_row(y: f32, row: usize) {
+    let pitch = crate::widgets::ROW_HEIGHT + crate::widgets::ROW_GAP;
+    let top = row as f32 * pitch;
+    assert!(y <= top, "row {row} at {top} starts above the offset {y}");
+    assert!(
+        top + crate::widgets::ROW_HEIGHT <= y + 4.0 * pitch,
+        "row {row} at {top} is below offset {y}"
+    );
+}
+
+#[test]
+fn the_language_screen_opens_with_the_preselected_layout_in_view() {
+    let mut app = app_with_every_keymap();
+    let row = app
+        .list_items(List::Keymap)
+        .iter()
+        .position(|k| *k == app.form.keymap)
+        .expect("the preselected layout is listed");
+    assert!(
+        row > 10,
+        "the preselected layout is near the top ({row}), so the test proves nothing"
+    );
+
+    let _ = app.go(Screen::Language);
+
+    let scrolls = app.selection_scrolls();
+    let &(_, y) = scrolls
+        .iter()
+        .find(|(id, _)| *id == ids::KEYMAP_LIST)
+        .expect("the keymap list scrolls to its selection");
+    shows_row(y, row);
+}
+
+/// A backend that records what the app asks of it. Its install runs until it's stopped, unless
+/// it's `stubborn`, and then until the machine is told to go down.
+#[derive(Default)]
+struct Recorder {
+    calls: std::sync::Mutex<Vec<&'static str>>,
+    stubborn: bool,
+}
+
+impl Recorder {
+    fn calls(&self) -> Vec<&'static str> {
+        self.calls.lock().expect("calls mutex poisoned").clone()
+    }
+
+    fn record(&self, call: &'static str) {
+        self.calls.lock().expect("calls mutex poisoned").push(call);
+    }
+
+    fn answered(&self, call: &str) -> bool {
+        self.calls().contains(&call)
+    }
+}
+
+impl Backend for Recorder {
+    fn probe(&self) -> Result<Probe, String> {
+        Ok(crate::backend::demo_probe())
+    }
+
+    fn run(
+        &self,
+        _config: &kubaos_core::InstallConfig,
+        _secrets: &kubaos_core::Secrets,
+        emit: &mut dyn FnMut(RunMsg),
+    ) {
+        use kubaos_core::{Event, StepId};
+        emit(RunMsg::Event(Event::Plan {
+            steps: StepId::ALL.iter().map(|s| s.info()).collect(),
+        }));
+        emit(RunMsg::Event(Event::StepStarted { id: StepId::Unpack }));
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let done = |r: &Self| {
+            if r.stubborn {
+                r.answered("poweroff") || r.answered("reboot")
+            } else {
+                r.answered("stop")
+            }
+        };
+        while !done(self) && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        emit(RunMsg::Event(Event::Failed {
+            id: StepId::Unpack,
+            error: "interrupted".into(),
+            hint: None,
+        }));
+        emit(RunMsg::Exited(Ok(())));
+    }
+
+    fn stop(&self) {
+        self.record("stop");
+    }
+
+    fn reboot(&self) -> Result<(), String> {
+        self.record("reboot");
+        Ok(())
+    }
+
+    fn poweroff(&self) -> Result<(), String> {
+        self.record("poweroff");
+        Ok(())
+    }
+
+    fn is_demo(&self) -> bool {
+        false
+    }
+}
+
+fn recorded(recorder: Recorder) -> (App, Arc<Recorder>) {
+    let recorder = Arc::new(recorder);
+    let backend: Arc<dyn Backend> = Arc::clone(&recorder) as Arc<dyn Backend>;
+    let mut app = App::headless(backend);
+    app.set_probe(Ok(crate::backend::demo_probe()));
+    (app, recorder)
+}
+
+fn press(app: &mut App, keys: &[Key]) {
+    for k in keys {
+        let _ = app.update_inner(Message::Key(k.clone()));
+    }
+}
+
+/// Ticks the app until `done`, failing after a few seconds.
+fn tick_until(app: &mut App, what: &str, done: impl Fn(&App) -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !done(app) {
+        assert!(Instant::now() < deadline, "stuck waiting for {what}");
+        let _ = app.update_inner(Message::Tick(Instant::now()));
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+fn wait_for(recorder: &Recorder, call: &str) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !recorder.answered(call) {
+        assert!(Instant::now() < deadline, "the backend never got {call}");
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+const EVERY_SCREEN: [Screen; 12] = [
+    Screen::Welcome,
+    Screen::Language,
+    Screen::Timezone,
+    Screen::Wifi,
+    Screen::Account,
+    Screen::Disk,
+    Screen::Git,
+    Screen::Wallpapers,
+    Screen::Summary,
+    Screen::Installing,
+    Screen::Failed,
+    Screen::Done,
+];
+
+fn open_menu_with_keys(app: &mut App) {
+    let order = app.focus_order();
+    let start = order
+        .iter()
+        .position(|f| Some(*f) == app.focus)
+        .unwrap_or(0);
+    let tabs = order.len() - 1 - start;
+    press(app, &vec![Key::Tab { shift: false }; tabs]);
+    assert_eq!(
+        app.focus,
+        Some(F::Power),
+        "Tab ends on the power button on {:?}",
+        app.screen
+    );
+    press(app, &[Key::Enter]);
+}
+
+#[test]
+fn every_screen_opens_the_power_menu_from_the_keyboard() {
+    for screen in EVERY_SCREEN {
+        let (mut app, recorder) = recorded(Recorder::default());
+        let _ = app.go(screen);
+
+        open_menu_with_keys(&mut app);
+
+        assert!(app.power.is_some(), "no power menu on {screen:?}");
+        assert_eq!(app.focus, Some(F::PowerCancel), "{screen:?}");
+        assert_eq!(app.screen, screen, "opening the menu left {screen:?}");
+        assert_eq!(
+            app.hold, None,
+            "Enter on the power button started the hold on {screen:?}"
+        );
+        assert!(recorder.calls().is_empty(), "{screen:?}");
+    }
+}
+
+#[test]
+fn shift_tab_from_a_screen_s_first_control_reaches_the_power_button() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Language);
+    assert_eq!(app.focus, Some(F::LocaleQ));
+
+    press(&mut app, &[Key::Tab { shift: true }]);
+
+    assert_eq!(app.focus, Some(F::Power));
+}
+
+#[test]
+fn every_screen_draws_a_clickable_power_button() {
+    use iced_test::simulator::Simulator;
+    for screen in EVERY_SCREEN {
+        let (mut app, _) = recorded(Recorder::default());
+        let _ = app.go(screen);
+        let mut ui = Simulator::with_size(
+            iced::Settings::default(),
+            Size::new(1280.0, 800.0),
+            crate::view::view(&app),
+        );
+
+        ui.click("Power")
+            .unwrap_or_else(|e| panic!("no power button on {screen:?}: {e}"));
+
+        let clicked = ui
+            .into_messages()
+            .any(|m| matches!(m, Message::Click(F::Power)));
+        assert!(
+            clicked,
+            "the power button on {screen:?} doesn't open the menu"
+        );
+    }
+}
+
+#[test]
+fn the_open_menu_draws_its_choices_and_keeps_clicks_from_the_screen_behind() {
+    use iced_test::simulator::Simulator;
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Language);
+    let _ = app.update_inner(Message::Click(F::Power));
+    let mut ui = Simulator::with_size(
+        iced::Settings::default(),
+        Size::new(1280.0, 800.0),
+        crate::view::view(&app),
+    );
+
+    ui.click("Power off").expect("a Power off button");
+    ui.click("Restart").expect("a Restart button");
+    ui.click("Cancel").expect("a Cancel button");
+    let _ = ui.click("Continue");
+
+    let clicks: Vec<F> = ui
+        .into_messages()
+        .filter_map(|m| match m {
+            Message::Click(f) => Some(f),
+            _ => None,
+        })
+        .collect();
+    // The last click lands on the scrim over Continue, which closes the menu.
+    assert_eq!(
+        clicks,
+        [F::PowerOff, F::PowerRestart, F::PowerCancel, F::PowerCancel]
+    );
+}
+
+#[test]
+fn a_menu_taking_the_machine_down_lets_no_click_through() {
+    use iced_test::simulator::Simulator;
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Language);
+    let _ = app.update_inner(Message::Click(F::Power));
+    let _ = app.update_inner(Message::Click(F::PowerOff));
+    let mut ui = Simulator::with_size(
+        iced::Settings::default(),
+        Size::new(1280.0, 800.0),
+        crate::view::view(&app),
+    );
+
+    let _ = ui.click("Continue");
+    let _ = ui.click("Back");
+
+    assert_eq!(ui.into_messages().count(), 0);
+}
+
+#[test]
+fn cancel_and_esc_close_the_menu_and_touch_nothing() {
+    let (mut app, recorder) = recorded(Recorder::default());
+    let _ = app.go(Screen::Timezone);
+    app.focus = Some(F::Power);
+
+    press(&mut app, &[Key::Enter, Key::Enter]);
+
+    assert!(app.power.is_none(), "Enter on Cancel closes the menu");
+    assert_eq!(app.focus, Some(F::Power), "focus goes back where it was");
+
+    press(
+        &mut app,
+        &[Key::Enter, Key::Text("x".into()), Key::Down, Key::Esc],
+    );
+
+    assert!(app.power.is_none(), "Esc closes the menu");
+    assert_eq!(
+        app.screen,
+        Screen::Timezone,
+        "Esc in the menu doesn't go back a screen"
+    );
+    assert_eq!(
+        app.field_value(F::TzQ),
+        "",
+        "typing in the menu doesn't reach the search box"
+    );
+    assert!(recorder.calls().is_empty());
+    assert!(app.shutting_down.is_none());
+}
+
+#[test]
+fn tab_and_arrows_stay_inside_the_menu() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Git);
+    let _ = app.update_inner(Message::Click(F::Power));
+
+    press(&mut app, &[Key::Tab { shift: false }]);
+    assert_eq!(app.focus, Some(F::PowerRestart));
+    press(
+        &mut app,
+        &[Key::Right {
+            word: false,
+            shift: false,
+        }],
+    );
+    assert_eq!(app.focus, Some(F::PowerOff));
+    press(&mut app, &[Key::Tab { shift: false }]);
+    assert_eq!(app.focus, Some(F::PowerCancel), "Tab wraps inside the menu");
+    press(
+        &mut app,
+        &[Key::Left {
+            word: false,
+            shift: false,
+        }],
+    );
+    assert_eq!(app.focus, Some(F::PowerOff));
+}
+
+#[test]
+fn power_off_before_the_install_powers_off_at_once() {
+    let (mut app, recorder) = recorded(Recorder::default());
+    let _ = app.go(Screen::Disk);
+    let _ = app.update_inner(Message::Click(F::Power));
+
+    let _ = app.update_inner(Message::Click(F::PowerOff));
+
+    wait_for(&recorder, "poweroff");
+    assert_eq!(recorder.calls(), ["poweroff"]);
+    assert_eq!(app.shutting_down, Some(PowerAction::PowerOff));
+    assert_eq!(
+        crate::view::power_copy(&app).status.as_deref(),
+        Some("Powering off…")
+    );
+}
+
+#[test]
+fn restart_before_the_install_restarts_at_once() {
+    let (mut app, recorder) = recorded(Recorder::default());
+    let _ = app.go(Screen::Welcome);
+    let _ = app.update_inner(Message::Click(F::Power));
+
+    press(&mut app, &[Key::Tab { shift: false }, Key::Enter]);
+
+    wait_for(&recorder, "reboot");
+    assert_eq!(recorder.calls(), ["reboot"]);
+    assert_eq!(app.shutting_down, Some(PowerAction::Restart));
+}
+
+#[test]
+fn the_menu_before_the_install_says_no_disk_was_touched() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Summary);
+    let _ = app.update_inner(Message::Click(F::Power));
+
+    let copy = crate::view::power_copy(&app);
+
+    assert_eq!(copy.title, "Power off or restart?");
+    assert!(
+        copy.body.contains("Nothing has been written"),
+        "{}",
+        copy.body
+    );
+    assert!(!copy.danger);
+    assert_eq!((copy.off, copy.restart), ("Power off", "Restart"));
+}
+
+fn installing(recorder: Recorder) -> (App, Arc<Recorder>) {
+    let (mut app, recorder) = recorded(recorder);
+    let _ = app.go(Screen::Summary);
+    let _ = app.start_install();
+    tick_until(&mut app, "the install to start", |a| {
+        a.install.as_ref().is_some_and(|i| i.current().is_some())
+    });
+    (app, recorder)
+}
+
+#[test]
+fn the_menu_while_installing_warns_the_disk_is_left_unbootable() {
+    let (mut app, recorder) = installing(Recorder::default());
+    let _ = app.update_inner(Message::Click(F::Power));
+    let disk = app.form.disk.clone().expect("a disk is picked");
+
+    let copy = crate::view::power_copy(&app);
+
+    assert_eq!(copy.title, "Stop the install?");
+    assert!(copy.danger);
+    assert!(copy.body.contains(&disk), "{}", copy.body);
+    assert!(copy.body.contains("won't boot"), "{}", copy.body);
+    assert!(
+        copy.body.contains("install KubaOS on it again"),
+        "{}",
+        copy.body
+    );
+    assert_eq!(
+        (copy.off, copy.restart),
+        ("Stop and power off", "Stop and restart")
+    );
+    assert!(
+        recorder.calls().is_empty(),
+        "opening the menu doesn't stop anything"
+    );
+}
+
+#[test]
+fn power_off_while_installing_stops_the_install_first() {
+    let (mut app, recorder) = installing(Recorder::default());
+    let _ = app.update_inner(Message::Click(F::Power));
+
+    let _ = app.update_inner(Message::Click(F::PowerOff));
+
+    assert_eq!(
+        recorder.calls(),
+        ["stop"],
+        "nothing goes down before the install stops"
+    );
+    assert!(app.power.is_some_and(|m| m.stopping.is_some()));
+    let status = crate::view::power_copy(&app).status.unwrap_or_default();
+    assert!(status.starts_with("Stopping the install"), "{status}");
+    press(&mut app, &[Key::Esc]);
+    assert!(app.power.is_some(), "a stopping install can't be cancelled");
+
+    tick_until(&mut app, "the install to end", |a| {
+        a.shutting_down.is_some()
+    });
+
+    wait_for(&recorder, "poweroff");
+    assert_eq!(recorder.calls(), ["stop", "poweroff"]);
+    assert_eq!(app.shutting_down, Some(PowerAction::PowerOff));
+    assert!(
+        app.power.is_some(),
+        "the menu stays up while the machine goes down"
+    );
+}
+
+#[test]
+fn restart_while_installing_stops_the_install_then_restarts() {
+    let (mut app, recorder) = installing(Recorder::default());
+    let _ = app.update_inner(Message::Click(F::Power));
+
+    let _ = app.update_inner(Message::Click(F::PowerRestart));
+    tick_until(&mut app, "the install to end", |a| {
+        a.shutting_down.is_some()
+    });
+
+    wait_for(&recorder, "reboot");
+    assert_eq!(recorder.calls(), ["stop", "reboot"]);
+}
+
+#[test]
+fn an_install_that_won_t_stop_still_powers_off_after_the_grace_period() {
+    let (mut app, recorder) = installing(Recorder {
+        stubborn: true,
+        ..Recorder::default()
+    });
+    let _ = app.update_inner(Message::Click(F::Power));
+    let _ = app.update_inner(Message::Click(F::PowerOff));
+
+    let _ = app.update_inner(Message::Tick(Instant::now() + STOP_GRACE / 2));
+    assert!(
+        app.shutting_down.is_none(),
+        "too early to give up on the install"
+    );
+    let _ = app.update_inner(Message::Tick(Instant::now() + STOP_GRACE));
+
+    wait_for(&recorder, "poweroff");
+    assert_eq!(recorder.calls(), ["stop", "poweroff"]);
+}
+
+#[test]
+fn a_refused_power_off_closes_the_menu_and_says_so() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Account);
+    app.focus = Some(F::Power);
+    let _ = app.update_inner(Message::Key(Key::Enter));
+    let _ = app.update_inner(Message::Click(F::PowerOff));
+
+    let _ = app.update_inner(Message::ShutDown(PowerAction::PowerOff, Err("no".into())));
+
+    assert!(app.power.is_none());
+    assert!(app.shutting_down.is_none());
+    assert_eq!(app.focus, Some(F::Power));
+    let (toast, _) = app.toast.as_ref().expect("a toast");
+    assert!(toast.starts_with("Power off refused: no."), "{toast}");
+}
+
+#[test]
+fn the_done_screen_s_reboot_restarts_without_asking() {
+    let (mut app, recorder) = recorded(Recorder::default());
+    let _ = app.go(Screen::Done);
+    assert_eq!(app.focus, Some(F::Reboot));
+
+    press(&mut app, &[Key::Enter]);
+
+    wait_for(&recorder, "reboot");
+    assert!(app.power.is_none());
+    assert_eq!(app.shutting_down, Some(PowerAction::Restart));
+}

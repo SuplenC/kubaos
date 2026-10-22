@@ -5,6 +5,7 @@
 //!
 //! - The `Backend` seam the install screens talk to, and its two sides, `Engine` and `Demo`.
 //! - The live system's install log and what a signal does while an install runs.
+//! - Stopping an install and taking the machine down (`systemctl poweroff` and `reboot`).
 //!
 //! # Not here
 //!
@@ -21,6 +22,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
@@ -47,7 +49,21 @@ pub enum RunMsg {
 pub trait Backend: Send + Sync {
     fn probe(&self) -> Result<Probe, String>;
     fn run(&self, config: &InstallConfig, secrets: &Secrets, emit: &mut dyn FnMut(RunMsg));
+    /// Asks the running install to stop. It unwinds on `run`'s thread, which then reports a
+    /// `failed` event and `Exited`, as it does for any failure. Does nothing when no install runs.
+    fn stop(&self);
+    /// `systemctl reboot`: returns once systemd has the job, before the machine goes down.
+    ///
+    /// # Errors
+    ///
+    /// systemctl couldn't run or refused, with its reason.
     fn reboot(&self) -> Result<(), String>;
+    /// `systemctl poweroff`, as `reboot` does.
+    ///
+    /// # Errors
+    ///
+    /// systemctl couldn't run or refused, with its reason.
+    fn poweroff(&self) -> Result<(), String>;
     /// Shown in the corner so nobody mistakes the demo for a real install.
     fn is_demo(&self) -> bool;
 }
@@ -89,20 +105,36 @@ impl Backend for Engine {
         emit(RunMsg::Exited(result));
     }
 
-    fn reboot(&self) -> Result<(), String> {
-        let status = Command::new("systemctl")
-            .arg("reboot")
-            .status()
-            .map_err(|e| e.to_string())?;
-        if status.success() {
-            Ok(())
-        } else {
-            Err(format!("systemctl reboot: {status}"))
+    /// The runner refuses new commands and kills the one streaming, then the engine unmounts and
+    /// closes what it opened, as it does on SIGTERM.
+    fn stop(&self) {
+        if INSTALLING.load(Ordering::SeqCst) {
+            runner::INTERRUPTED.store(true, Ordering::SeqCst);
         }
+    }
+
+    fn reboot(&self) -> Result<(), String> {
+        systemctl("reboot")
+    }
+
+    fn poweroff(&self) -> Result<(), String> {
+        systemctl("poweroff")
     }
 
     fn is_demo(&self) -> bool {
         false
+    }
+}
+
+fn systemctl(verb: &str) -> Result<(), String> {
+    let status = Command::new("systemctl")
+        .arg(verb)
+        .status()
+        .map_err(|e| e.to_string())?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(format!("systemctl {verb}: {status}"))
     }
 }
 
@@ -115,6 +147,9 @@ impl Engine {
         secrets: &Secrets,
         emit: &mut dyn FnMut(RunMsg),
     ) -> Result<(), String> {
+        // Marked before preflight, so a stop or a signal during it holds and the engine stops at
+        // its first step. Marked after, `Installing::start` would clear it.
+        let _installing = Installing::start();
         if !self.dry_run {
             if !rustix::process::geteuid().is_root() {
                 return Err("Kōbō has to run as root to install".into());
@@ -139,7 +174,6 @@ impl Engine {
             log_file: log.as_ref().map(|_| self.log.clone()),
         };
 
-        let _installing = Installing::start();
         let result = panic::catch_unwind(AssertUnwindSafe(|| {
             engine::run(config, secrets, &opts, &mut |ev| {
                 if let Some(log) = log.as_mut() {
@@ -281,6 +315,8 @@ pub struct Demo {
     pub fail_at: Option<StepId>,
     /// `--demo-fail-at` fails the first attempt only, so Retry can be shown working.
     failed_once: AtomicBool,
+    /// Set by `stop`, cleared when a run starts.
+    stopped: AtomicBool,
 }
 
 impl Demo {
@@ -289,6 +325,7 @@ impl Demo {
             speed,
             fail_at,
             failed_once: AtomicBool::new(false),
+            stopped: AtomicBool::new(false),
         }
     }
 }
@@ -299,6 +336,7 @@ impl Backend for Demo {
     }
 
     fn run(&self, _config: &InstallConfig, _secrets: &Secrets, emit: &mut dyn FnMut(RunMsg)) {
+        self.stopped.store(false, Ordering::SeqCst);
         let fail_at = if self.failed_once.swap(true, Ordering::SeqCst) {
             None
         } else {
@@ -308,13 +346,47 @@ impl Backend for Demo {
             speed: self.speed,
             fail_at,
         };
-        demo::run(&opts, &mut |ev| {
-            emit(RunMsg::Event(demo_detail(ev)));
+        // core's demo can't be stopped, so it runs on a thread of its own and a stopped run leaves
+        // it to finish unheard.
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            demo::run(&opts, &mut |ev| {
+                let _ = tx.send(demo_detail(ev));
+            });
         });
+        let mut step = StepId::Preflight;
+        loop {
+            if self.stopped.load(Ordering::SeqCst) {
+                emit(RunMsg::Event(Event::Failed {
+                    id: step,
+                    error: "interrupted".into(),
+                    hint: None,
+                }));
+                break;
+            }
+            match rx.recv_timeout(Duration::from_millis(20)) {
+                Ok(ev) => {
+                    if let Event::StepStarted { id } = ev {
+                        step = id;
+                    }
+                    emit(RunMsg::Event(ev));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
         emit(RunMsg::Exited(Ok(())));
     }
 
+    fn stop(&self) {
+        self.stopped.store(true, Ordering::SeqCst);
+    }
+
     fn reboot(&self) -> Result<(), String> {
+        std::process::exit(0);
+    }
+
+    fn poweroff(&self) -> Result<(), String> {
         std::process::exit(0);
     }
 

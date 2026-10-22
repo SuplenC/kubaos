@@ -1,9 +1,15 @@
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+use std::time::Instant;
 
 use kubaos_core::Event;
 use kubaos_core::StepId;
 
 use super::Backend;
+use super::Demo;
 use super::Engine;
 use super::RunMsg;
 use super::demo_probe;
@@ -102,4 +108,37 @@ fn a_failed_step_is_left_to_its_event_and_a_crash_gets_a_reason() {
 
     assert_eq!(exit_reason(Ok(Err(step))), Ok(()));
     assert!(crash.is_err_and(|e| e.contains("crashed")));
+}
+
+#[test]
+fn a_stopped_demo_fails_its_current_step_and_exits() {
+    let demo = Arc::new(Demo::new(0.05, None));
+    let (tx, rx) = mpsc::channel();
+    let runner = Arc::clone(&demo);
+    let started = Instant::now();
+    let run = thread::spawn(move || {
+        let probe = demo_probe();
+        let form = crate::model::Form::new(&probe);
+        runner.run(&form.to_config(&probe), &form.to_secrets(), &mut |m| {
+            let _ = tx.send(m);
+        });
+    });
+    let first_step = rx.iter().find_map(|m| match m {
+        RunMsg::Event(Event::StepStarted { id }) => Some(id),
+        _ => None,
+    });
+
+    demo.stop();
+    run.join().expect("the demo run");
+
+    let rest: Vec<RunMsg> = rx.iter().collect();
+    assert!(
+        started.elapsed() < Duration::from_secs(5),
+        "a stop doesn't wait for the demo's whole install"
+    );
+    assert!(matches!(
+        &rest[rest.len() - 2],
+        RunMsg::Event(Event::Failed { id, error, .. }) if Some(*id) == first_step && error == "interrupted"
+    ));
+    assert!(matches!(rest.last(), Some(RunMsg::Exited(Ok(())))));
 }

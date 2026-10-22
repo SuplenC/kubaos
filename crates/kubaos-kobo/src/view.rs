@@ -1,6 +1,6 @@
 //! Everything on screen. Panel screens share the glass panel with the step
-//! rail; Welcome and Done are full-bleed over the wallpaper. First-boot
-//! setup is its own app (setup/).
+//! rail; Welcome and Done are full-bleed over the wallpaper. The power menu
+//! opens over either. First-boot setup is its own app (setup/).
 //!
 //! Copy follows docs/BRAND.md: plain facts first, attitude around them, at
 //! most one swear per screen, none near the disk that gets erased or the
@@ -12,7 +12,7 @@ use std::time::Duration;
 use iced::border::Radius;
 use iced::gradient::Linear;
 use iced::widget::{
-    Space, button, center, column, container, image, mouse_area, row, stack, svg, text,
+    Space, button, center, column, container, image, mouse_area, opaque, row, stack, svg, text,
 };
 use iced::{
     Alignment, Background, Border, Color, ContentFit, Element, Gradient, Length, Padding, Radians,
@@ -22,7 +22,7 @@ use iced::{
 use kubaos_core::Level;
 use kubaos_core::probe::DiskInfo;
 
-use crate::app::{App, F, HOLD, List, Message, ProbeState, Screen, ids};
+use crate::app::{App, F, HOLD, List, Message, PowerAction, ProbeState, Screen, ids};
 use crate::data;
 use crate::elide::elide;
 use crate::model::{self, DiskExt, DiskMode, human_bytes};
@@ -30,7 +30,7 @@ use crate::progress::{LOG_VIEW_LINES, Outcome, StepState, fmt_duration};
 use crate::theme::{self, DARK, Icon, Palette, alpha, jp, mix, motion, radius, size, space};
 use crate::widgets::{
     FieldLook, Kind, ROW_GAP, accent, bar, body, btn, chip, field, field_with, header, icon, label,
-    list_row, ring, scroll, spinner, switch_anim, text_field, title, well, well_ring,
+    list_row, quiet_btn, ring, scroll, spinner, switch_anim, text_field, title, well, well_ring,
 };
 
 type El<'a> = Element<'a, Message>;
@@ -59,18 +59,27 @@ pub fn view(app: &App) -> El<'_> {
     let mut layers = stack![background(app), fg]
         .width(Length::Fill)
         .height(Length::Fill);
+    // The panel screens carry the power button in the rail; the full-bleed ones in the corner.
+    let mut corner = row![].spacing(space::MD).align_y(Alignment::Center);
     if app.backend.is_demo() {
-        layers = layers.push(
-            container(chip(
-                Some(Icon::Bolt),
-                "Demo",
-                DARK.tertiary,
-                alpha(DARK.tertiary_container, 0.45),
-            ))
+        corner = corner.push(chip(
+            Some(Icon::Bolt),
+            "Demo",
+            DARK.tertiary,
+            alpha(DARK.tertiary_container, 0.45),
+        ));
+    }
+    if !app.screen.in_panel() {
+        corner = corner.push(power_button(app));
+    }
+    layers = layers.push(
+        container(corner)
             .width(Length::Fill)
             .align_right(Length::Fill)
             .padding(14),
-        );
+    );
+    if app.power.is_some() {
+        layers = layers.push(power_menu(app));
     }
     if let Some((msg, at)) = &app.toast {
         let t = (app.now - *at).as_secs_f32();
@@ -313,7 +322,9 @@ fn rail(app: &App) -> El<'_> {
             Space::new().height(space::XL),
             items,
             Space::new().height(Length::Fill),
-            keys
+            keys,
+            Space::new().height(space::LG),
+            power_button(app),
         ]
         .padding(Padding {
             top: 22.0,
@@ -2702,10 +2713,10 @@ fn done<'a>(app: &'a App, p: &Palette) -> El<'a> {
         ),
         Space::new().height(space::XXXL),
         row![
-            if app.rebooting {
+            if let Some(action) = app.shutting_down {
                 row![
                     spinner((app.now - app.epoch).as_secs_f32(), 18.0, p.primary),
-                    text("Rebooting…")
+                    text(going_down(action))
                         .size(size::MD)
                         .color(p.on_surface_variant)
                 ]
@@ -2740,4 +2751,182 @@ fn done<'a>(app: &'a App, p: &Palette) -> El<'a> {
         hint_row(app, p),
     ]
     .into()
+}
+
+// ---------------------------------------------------------------- power --
+
+/// The button that opens the power menu, on every screen.
+fn power_button(app: &App) -> El<'_> {
+    quiet_btn(
+        "Power",
+        Icon::Power,
+        Some(Message::Click(F::Power)),
+        app.is_focused(F::Power),
+        &DARK,
+    )
+}
+
+/// What the power menu says, for where the install stands.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PowerCopy {
+    pub title: &'static str,
+    pub body: String,
+    /// Going down now loses work: the menu is drawn in the error colour.
+    pub danger: bool,
+    pub off: &'static str,
+    pub restart: &'static str,
+    /// Shown in place of the choices once one is taken.
+    pub status: Option<String>,
+}
+
+pub fn power_copy(app: &App) -> PowerCopy {
+    let disk = app.form.disk.as_deref().unwrap_or("The disk");
+    let running = app.install_running();
+    let body = match app.install.as_ref().map(|i| &i.outcome) {
+        None => "Nothing has been written to any disk yet.".to_string(),
+        Some(None) => format!(
+            "The install stops where it is. {disk} is left partly written and won't boot: \
+             install KubaOS on it again to use it."
+        ),
+        Some(Some(Outcome::Done { .. })) => {
+            "KubaOS is installed. Pull the USB stick first, or the machine starts this installer \
+             again."
+                .to_string()
+        }
+        Some(Some(Outcome::Failed { .. })) => format!(
+            "The install didn't finish, so {disk} won't boot until KubaOS is installed on it again."
+        ),
+    };
+    let stopping = app.power.is_some_and(|m| m.stopping.is_some());
+    let status = match app.shutting_down {
+        Some(action) => Some(going_down(action).to_string()),
+        None if stopping => Some("Stopping the install and unmounting the disk…".to_string()),
+        None => None,
+    };
+    PowerCopy {
+        title: if running {
+            "Stop the install?"
+        } else {
+            "Power off or restart?"
+        },
+        body,
+        danger: running,
+        off: if running {
+            "Stop and power off"
+        } else {
+            "Power off"
+        },
+        restart: if running {
+            "Stop and restart"
+        } else {
+            "Restart"
+        },
+        status,
+    }
+}
+
+fn going_down(action: PowerAction) -> &'static str {
+    match action {
+        PowerAction::PowerOff => "Powering off…",
+        PowerAction::Restart => "Restarting…",
+    }
+}
+
+/// The power menu over the dimmed screen. It takes every click: one outside the card cancels,
+/// and nothing behind it reacts.
+fn power_menu(app: &App) -> El<'_> {
+    let p = DARK;
+    let copy = power_copy(app);
+    let tint = if copy.danger { p.error } else { p.primary };
+    let busy = copy.status.is_some();
+    let lead = icon(
+        if copy.danger {
+            Icon::Warning
+        } else {
+            Icon::Power
+        },
+        24.0,
+        tint,
+    );
+    let actions: El = match &copy.status {
+        Some(status) => row![
+            spinner((app.now - app.epoch).as_secs_f32(), 18.0, tint),
+            text(status.clone())
+                .size(size::MD)
+                .color(p.on_surface_variant)
+        ]
+        .spacing(space::MD)
+        .align_y(Alignment::Center)
+        .padding(Padding::from([13.0, 4.0]))
+        .into(),
+        None => row![
+            btn(
+                "Cancel",
+                None,
+                false,
+                Kind::Text,
+                Some(Message::Click(F::PowerCancel)),
+                app.is_focused(F::PowerCancel),
+                &p
+            ),
+            Space::new().width(Length::Fill),
+            btn(
+                copy.restart,
+                Some(Icon::Restart),
+                false,
+                Kind::Tonal,
+                Some(Message::Click(F::PowerRestart)),
+                app.is_focused(F::PowerRestart),
+                &p
+            ),
+            btn(
+                copy.off,
+                Some(Icon::Power),
+                false,
+                Kind::Primary,
+                Some(Message::Click(F::PowerOff)),
+                app.is_focused(F::PowerOff),
+                &p
+            ),
+        ]
+        .spacing(space::SM)
+        .align_y(Alignment::Center)
+        .into(),
+    };
+    let card = container(
+        column![
+            row![lead, title(copy.title, &p).size(24)]
+                .spacing(space::MD)
+                .align_y(Alignment::Center),
+            Space::new().height(space::MD),
+            body(copy.body, &p),
+            Space::new().height(space::XXL),
+            actions,
+        ]
+        .width(Length::Fill),
+    )
+    .width(Length::Fixed(if copy.danger { 560.0 } else { 500.0 }))
+    .padding(space::XXL)
+    .style(move |_t| container::Style {
+        background: Some(Background::Color(p.surface_container_high)),
+        border: Border {
+            color: alpha(tint, if copy.danger { 0.6 } else { 0.25 }),
+            width: 1.0,
+            radius: radius::PANEL.into(),
+        },
+        shadow: Shadow {
+            color: alpha(p.scrim, 0.6),
+            offset: Vector::new(0.0, 18.0),
+            blur_radius: 48.0,
+        },
+        ..container::Style::default()
+    });
+    let scrim = container(opaque(card))
+        .center(Length::Fill)
+        .style(|_t| container::Style::default().background(alpha(DARK.scrim, 0.6)));
+    let mut area = mouse_area(scrim);
+    if !busy {
+        area = area.on_press(Message::Click(F::PowerCancel));
+    }
+    opaque(area)
 }

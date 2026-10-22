@@ -507,8 +507,10 @@ mod tests {
                 ],
             ),
         ];
-        for (s, order) in expect {
+        for (s, mut order) in expect {
             let _ = app.go(s);
+            // The power button, in the rail, ends every screen's order.
+            order.push(F::Power);
             assert_eq!(app.focus_order(), order, "{s:?}");
         }
         // Own passphrase: its fields slot in after the switch that asks for them.

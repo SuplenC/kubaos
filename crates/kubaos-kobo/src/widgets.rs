@@ -204,6 +204,39 @@ pub fn icon_btn<'a>(
     ring(b, focused, radius::FULL, &p)
 }
 
+/// A small icon-and-label button in the muted colour, for the chrome around a screen rather than
+/// the screen's own task.
+pub fn quiet_btn<'a>(
+    label: &'a str,
+    ic: Icon,
+    on_press: Option<Message>,
+    focused: bool,
+    p: &Palette,
+) -> Element<'a, Message> {
+    let p = *p;
+    let fg = p.on_surface_variant;
+    let content = row![
+        icon(ic, 18.0, fg),
+        text(label)
+            .font(theme::SANS_MEDIUM)
+            .size(size::SM)
+            .color(fg)
+    ]
+    .spacing(6)
+    .align_y(Alignment::Center);
+    let b = button(content)
+        .padding(Padding::from([6.0, 12.0]))
+        .on_press_maybe(on_press)
+        .style(move |_t: &Theme, status| button::Style {
+            background: state_layer(None, p.on_surface, status),
+            text_color: fg,
+            border: Border::default().rounded(radius::FULL),
+            shadow: Shadow::default(),
+            snap: true,
+        });
+    ring(b, focused, radius::FULL, &p)
+}
+
 /// Label above a control, with an optional note under it.
 pub fn field<'a>(
     lbl: &'a str,

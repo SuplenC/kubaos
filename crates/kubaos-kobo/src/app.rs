@@ -6,6 +6,9 @@
 //! draws, `edit.rs` edits), so typing goes through `App::key` too. That keeps
 //! one code path for real keys and the synthetic ones the key tour and the
 //! tests send.
+//!
+//! The power menu opens over every screen (`F::Power`). While it's open it owns the keys and the
+//! focus, and while an install runs it stops the install before the machine goes down.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -102,6 +105,12 @@ pub enum F {
     Stay,
     Back,
     Next,
+    /// Opens the power menu, on every screen.
+    Power,
+    /// The power menu's buttons.
+    PowerCancel,
+    PowerRestart,
+    PowerOff,
 }
 
 impl F {
@@ -122,6 +131,10 @@ impl F {
                 | F::GitName
                 | F::GitEmail
         )
+    }
+
+    fn in_power_menu(self) -> bool {
+        matches!(self, F::PowerCancel | F::PowerRestart | F::PowerOff)
     }
 
     pub fn is_secret(self) -> bool {
@@ -229,8 +242,8 @@ pub enum Message {
 
     HoldStart,
     HoldEnd,
-    /// `systemctl reboot` answered.
-    Rebooted(Result<(), String>),
+    /// `systemctl poweroff` or `reboot` answered.
+    ShutDown(PowerAction, Result<(), String>),
 
     TourShot(String, window::Screenshot),
 
@@ -259,6 +272,27 @@ pub const NUDGE: Duration = Duration::from_millis(1200);
 
 /// How long the Summary's button (or Enter) must be held.
 pub const HOLD: Duration = Duration::from_millis(1100);
+
+/// How long a stopping install gets to unwind before the machine goes down anyway. A command that
+/// doesn't stream (a `mkfs`, `grub-install`) runs to its end before the engine sees the stop, and
+/// systemd unmounts whatever is left on the way down.
+pub const STOP_GRACE: Duration = Duration::from_secs(30);
+
+/// What the power menu does to the machine.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PowerAction {
+    PowerOff,
+    Restart,
+}
+
+/// The power menu, open over the screen it was opened on.
+#[derive(Debug, Clone, Copy)]
+pub struct PowerMenu {
+    /// Where focus goes back to when the menu closes.
+    return_focus: Option<F>,
+    /// The install is being stopped, since then; the action follows once it has.
+    pub stopping: Option<(PowerAction, Instant)>,
+}
 
 pub struct App {
     pub backend: Arc<dyn Backend>,
@@ -302,8 +336,9 @@ pub struct App {
     pub show_secrets: bool,
 
     pub hold: Option<Instant>,
-    /// Reboot pressed and accepted: the system is going down.
-    pub rebooting: bool,
+    pub power: Option<PowerMenu>,
+    /// Power off or restart asked of systemd: the system is going down.
+    pub shutting_down: Option<PowerAction>,
     pub install: Option<Install>,
     run_rx: Option<mpsc::Receiver<RunMsg>>,
     pub log_open: (bool, Instant),
@@ -368,7 +403,8 @@ impl App {
             glide: None,
             show_secrets: false,
             hold: None,
-            rebooting: false,
+            power: None,
+            shutting_down: None,
             install: None,
             run_rx: None,
             log_open: (false, now),
@@ -426,8 +462,17 @@ impl App {
         self.flow().iter().position(|x| *x == s).unwrap_or(0)
     }
 
-    /// The focus targets of the current screen, in Tab order.
+    /// The focus targets of the current screen, or of the power menu when it's open, in Tab order.
     pub fn focus_order(&self) -> Vec<F> {
+        if self.power.is_some() {
+            return vec![F::PowerCancel, F::PowerRestart, F::PowerOff];
+        }
+        let mut v = self.screen_focus_order();
+        v.push(F::Power);
+        v
+    }
+
+    fn screen_focus_order(&self) -> Vec<F> {
         let f = &self.form;
         match self.screen {
             Screen::Welcome => match self.probe {
@@ -498,7 +543,17 @@ impl App {
                 Some(F::Next)
             }
             Screen::Git if !self.form.git_name.is_empty() => Some(F::GitEmail),
-            _ => self.focus_order().first().copied(),
+            _ => self.screen_focus_order().first().copied(),
+        }
+    }
+
+    /// Focuses where the current screen starts. With the power menu open, that's where focus goes
+    /// back to when it closes.
+    fn focus_screen(&mut self) {
+        let f = self.initial_focus();
+        match &mut self.power {
+            Some(menu) => menu.return_focus = f,
+            None => self.set_focus(f),
         }
     }
 
@@ -571,7 +626,8 @@ impl App {
                 .as_ref()
                 .is_some_and(|i| (i.shown - i.overall()).abs() > 0.0)
             || self.tour.is_some()
-            || self.rebooting
+            || self.power.is_some_and(|m| m.stopping.is_some())
+            || self.shutting_down.is_some()
             || self.glide.is_some()
     }
 
@@ -601,8 +657,7 @@ impl App {
         self.nudged = None;
         self.glide = None;
         self.reached = self.reached.max(self.flow_index(to));
-        let f = self.initial_focus();
-        self.set_focus(f);
+        self.focus_screen();
         self.scroll_screen_to_selection()
     }
 
@@ -631,11 +686,16 @@ impl App {
         }
     }
 
+    /// An install started and hasn't ended yet.
+    pub fn install_running(&self) -> bool {
+        self.install.as_ref().is_some_and(|i| i.outcome.is_none())
+    }
+
     pub(crate) fn start_install(&mut self) -> Task<Message> {
         let Some(probe) = self.ready_probe() else {
             return Task::none();
         };
-        if self.install.as_ref().is_some_and(|i| i.outcome.is_none()) {
+        if self.install_running() {
             return Task::none(); // one at a time
         }
         let config = self.form.to_config(probe);
@@ -679,8 +739,7 @@ impl App {
             }
             Err(e) => ProbeState::Failed(e),
         };
-        let f = self.initial_focus();
-        self.set_focus(f);
+        self.focus_screen();
     }
 
     /// Glass under the panel: the blurred wallpaper cropped to the panel's
@@ -748,6 +807,7 @@ impl App {
                 self.scroll_to_selection()
             }
             Message::Pasted(None) => Task::none(),
+            Message::Click(f) if self.power.is_some() && !f.in_power_menu() => Task::none(),
             Message::Click(f) => {
                 self.set_focus(Some(f));
                 if f.is_field() || matches!(f, F::WifiList | F::DiskList | F::DiskMode) {
@@ -824,14 +884,20 @@ impl App {
                 }
                 Task::none()
             }
-            Message::Rebooted(Ok(())) => Task::none(),
-            Message::Rebooted(Err(e)) => {
-                self.rebooting = false;
+            Message::ShutDown(_, Ok(())) => Task::none(),
+            Message::ShutDown(action, Err(e)) => {
+                self.shutting_down = None;
+                if let Some(menu) = self.power.take() {
+                    self.set_focus(menu.return_focus);
+                }
                 self.now = Instant::now();
-                self.toast = Some((
-                    format!("Reboot refused: {e}. Pull the plug, then."),
-                    self.now,
-                ));
+                let msg = match action {
+                    PowerAction::PowerOff => {
+                        format!("Power off refused: {e}. Hold the power button, then.")
+                    }
+                    PowerAction::Restart => format!("Restart refused: {e}. Pull the plug, then."),
+                };
+                self.toast = Some((msg, self.now));
                 Task::none()
             }
             Message::HoldEnd => {
@@ -866,8 +932,7 @@ impl App {
                 }
                 Err(e) => ProbeState::Failed(e),
             };
-            let f = self.initial_focus();
-            self.set_focus(f);
+            self.focus_screen();
         }
         let mut task = Task::none();
         // Asking for fullscreen in the window settings makes winit request it
@@ -887,6 +952,13 @@ impl App {
         }
         if let Some(i) = &mut self.install {
             i.tick(dt, now);
+        }
+        if let Some(menu) = &mut self.power
+            && let Some((action, since)) = menu.stopping
+            && now.saturating_duration_since(since) >= STOP_GRACE
+        {
+            menu.stopping = None;
+            task = Task::batch([task, self.shut_down(action)]);
         }
         if let Some(start) = self.hold
             && now - start >= HOLD
@@ -930,13 +1002,20 @@ impl App {
             RunMsg::Exited(r) => {
                 install.exited(r);
                 self.run_rx = None;
-                return match install.outcome {
+                let shown = match install.outcome {
                     Some(Outcome::Done { .. }) => self.go(Screen::Done),
                     _ => {
                         self.log_open = (true, now);
                         self.go(Screen::Failed)
                     }
                 };
+                let Some(menu) = &mut self.power else {
+                    return shown;
+                };
+                let Some((action, _)) = menu.stopping.take() else {
+                    return shown;
+                };
+                return Task::batch([shown, self.shut_down(action)]);
             }
         }
         Task::none()
@@ -1019,29 +1098,130 @@ impl App {
                 Task::none()
             }
             F::Retry => self.start_install(),
-            F::Reboot => {
-                if self.rebooting {
-                    return Task::none();
-                }
-                // `systemctl reboot` returns once systemd has the job, then
-                // the system takes a few seconds to go down: say so, and
-                // don't block the UI meanwhile.
-                self.rebooting = true;
-                let backend = self.backend.clone();
-                Task::perform(
-                    async move {
-                        let (tx, rx) = iced::futures::channel::oneshot::channel();
-                        std::thread::spawn(move || {
-                            let _ = tx.send(backend.reboot());
-                        });
-                        rx.await.unwrap_or_else(|_| Err("it crashed".into()))
-                    },
-                    Message::Rebooted,
-                )
-            }
+            F::Reboot => self.shut_down(PowerAction::Restart),
             F::Stay => iced::exit(),
+            F::Power => {
+                self.open_power();
+                Task::none()
+            }
+            F::PowerCancel => {
+                self.close_power();
+                Task::none()
+            }
+            F::PowerRestart => self.confirm_power(PowerAction::Restart),
+            F::PowerOff => self.confirm_power(PowerAction::PowerOff),
             _ => Task::none(),
         }
+    }
+
+    fn open_power(&mut self) {
+        if self.power.is_some() || self.shutting_down.is_some() {
+            return;
+        }
+        self.hold = None;
+        self.power = Some(PowerMenu {
+            return_focus: self.focus,
+            stopping: None,
+        });
+        // The safe answer first: Enter twice in a row never takes the machine down.
+        self.set_focus(Some(F::PowerCancel));
+    }
+
+    /// Closes the power menu, unless it's already taking the machine down.
+    fn close_power(&mut self) {
+        let Some(menu) = self.power else {
+            return;
+        };
+        if menu.stopping.is_some() || self.shutting_down.is_some() {
+            return;
+        }
+        self.power = None;
+        self.set_focus(menu.return_focus);
+    }
+
+    /// The menu's Power off or Restart: at once, or once the running install has stopped.
+    fn confirm_power(&mut self, action: PowerAction) -> Task<Message> {
+        if self.shutting_down.is_some() {
+            return Task::none();
+        }
+        let running = self.install_running();
+        let Some(menu) = &mut self.power else {
+            return Task::none();
+        };
+        if menu.stopping.is_some() {
+            return Task::none();
+        }
+        if !running {
+            return self.shut_down(action);
+        }
+        self.now = Instant::now();
+        menu.stopping = Some((action, self.now));
+        self.backend.stop();
+        Task::none()
+    }
+
+    /// Asks systemd to power off or restart, on a thread of its own. systemctl returns once
+    /// systemd has the job and the machine takes a few seconds to go down, so the screen says so
+    /// meanwhile.
+    fn shut_down(&mut self, action: PowerAction) -> Task<Message> {
+        if self.shutting_down.is_some() {
+            return Task::none();
+        }
+        self.shutting_down = Some(action);
+        self.now = Instant::now();
+        let backend = Arc::clone(&self.backend);
+        let (tx, rx) = iced::futures::channel::oneshot::channel();
+        std::thread::spawn(move || {
+            let r = match action {
+                PowerAction::PowerOff => backend.poweroff(),
+                PowerAction::Restart => backend.reboot(),
+            };
+            let _ = tx.send(r);
+        });
+        Task::perform(
+            async move { rx.await.unwrap_or_else(|_| Err("it crashed".into())) },
+            move |r| Message::ShutDown(action, r),
+        )
+    }
+
+    /// Keys while the power menu is open: it keeps them all, so nothing behind it moves.
+    fn power_key(&mut self, k: Key) -> Task<Message> {
+        let busy = self.shutting_down.is_some() || self.power.is_some_and(|m| m.stopping.is_some());
+        if busy {
+            return Task::none();
+        }
+        match k {
+            Key::Esc => {
+                self.close_power();
+                Task::none()
+            }
+            Key::Tab { shift } => self.cycle_focus(shift),
+            Key::Left { .. } => self.cycle_focus(true),
+            Key::Right { .. } => self.cycle_focus(false),
+            Key::Enter | Key::Space => match self.focus {
+                Some(f) if f.in_power_menu() => self.activate(f),
+                _ => Task::none(),
+            },
+            _ => Task::none(),
+        }
+    }
+
+    /// Tab and Shift+Tab: the next or previous focus target, round the end.
+    fn cycle_focus(&mut self, back: bool) -> Task<Message> {
+        let order = self.focus_order();
+        if order.is_empty() {
+            return Task::none();
+        }
+        let n = order.len();
+        let i = self.focus.and_then(|f| order.iter().position(|x| *x == f));
+        let j = match (i, back) {
+            (None, false) => 0,
+            (None, true) => n - 1,
+            (Some(i), false) => (i + 1) % n,
+            (Some(i), true) => (i + n - 1) % n,
+        };
+        self.set_focus(Some(order[j]));
+        self.reveal()
     }
 
     fn flipped(&mut self, f: F) {
@@ -1084,28 +1264,16 @@ impl App {
     }
 
     pub fn key(&mut self, k: Key) -> Task<Message> {
+        if self.power.is_some() {
+            return self.power_key(k);
+        }
         let focus = self.focus;
         match k {
-            Key::Tab { shift } => {
-                let order = self.focus_order();
-                if order.is_empty() {
-                    return Task::none();
-                }
-                let n = order.len();
-                let i = focus.and_then(|f| order.iter().position(|x| *x == f));
-                let j = match (i, shift) {
-                    (None, false) => 0,
-                    (None, true) => n - 1,
-                    (Some(i), false) => (i + 1) % n,
-                    (Some(i), true) => (i + n - 1) % n,
-                };
-                self.set_focus(Some(order[j]));
-                self.reveal()
-            }
+            Key::Tab { shift } => self.cycle_focus(shift),
             Key::Enter => match focus {
                 Some(F::Hold) => self.update_inner(Message::HoldStart),
                 _ if self.screen == Screen::Summary
-                    && !matches!(focus, Some(F::Edit(_) | F::Back)) =>
+                    && !matches!(focus, Some(F::Edit(_) | F::Back | F::Power)) =>
                 {
                     self.update_inner(Message::HoldStart)
                 }
@@ -1120,7 +1288,8 @@ impl App {
                     | F::SaveLog
                     | F::Retry
                     | F::Reboot
-                    | F::Stay),
+                    | F::Stay
+                    | F::Power),
                 ) => self.activate(f),
                 _ => self.next(),
             },
@@ -1737,63 +1906,4 @@ fn save_log(text: &str) -> std::io::Result<PathBuf> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn scale_fits_the_output() {
-        let at = |w, h| auto_scale(Size::new(w, h));
-        assert_eq!(at(1024.0, 768.0), 1.0);
-        assert_eq!(at(1280.0, 800.0), 1.0);
-        assert_eq!(at(1440.0, 900.0), 1.0);
-        assert_eq!(at(1920.0, 1080.0), 1.25);
-        assert_eq!(at(1920.0, 1200.0), 1.5);
-        assert_eq!(at(2880.0, 1800.0), 2.25);
-        assert_eq!(at(3840.0, 2160.0), 2.5);
-    }
-
-    fn app_with_every_keymap() -> App {
-        let mut p = crate::backend::demo_probe();
-        p.keymaps = include_str!("../assets/keymaps.tsv")
-            .lines()
-            .filter_map(|l| l.split('\t').next())
-            .map(str::to_string)
-            .collect();
-        let mut app = App::headless(std::sync::Arc::new(crate::backend::Demo::new(40.0, None)));
-        app.set_probe(Ok(p));
-        app
-    }
-
-    fn shows_row(y: f32, row: usize) {
-        let pitch = crate::widgets::ROW_HEIGHT + crate::widgets::ROW_GAP;
-        let top = row as f32 * pitch;
-        assert!(y <= top, "row {row} at {top} starts above the offset {y}");
-        assert!(
-            top + crate::widgets::ROW_HEIGHT <= y + 4.0 * pitch,
-            "row {row} at {top} is below offset {y}"
-        );
-    }
-
-    #[test]
-    fn the_language_screen_opens_with_the_preselected_layout_in_view() {
-        let mut app = app_with_every_keymap();
-        let row = app
-            .list_items(List::Keymap)
-            .iter()
-            .position(|k| *k == app.form.keymap)
-            .expect("the preselected layout is listed");
-        assert!(
-            row > 10,
-            "the preselected layout is near the top ({row}), so the test proves nothing"
-        );
-
-        let _ = app.go(Screen::Language);
-
-        let scrolls = app.selection_scrolls();
-        let &(_, y) = scrolls
-            .iter()
-            .find(|(id, _)| *id == ids::KEYMAP_LIST)
-            .expect("the keymap list scrolls to its selection");
-        shows_row(y, row);
-    }
-}
+mod tests;
