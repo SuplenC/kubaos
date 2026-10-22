@@ -14,6 +14,7 @@ use iced::{
 };
 
 use crate::app::Message;
+use crate::battery::Battery;
 use crate::edit::Caret;
 use crate::field::{Field, Pointer};
 use crate::theme::{self, Icon, Palette, alpha, mix, radius, size, space};
@@ -235,6 +236,66 @@ pub fn quiet_btn<'a>(
             snap: true,
         });
     ring(b, focused, radius::FULL, &p)
+}
+
+/// The battery's outline, in logical pixels: as tall as a line of `size::SM` text.
+const BATTERY_BODY: Size = Size::new(22.0, 12.0);
+
+/// The battery in the chrome, beside the power button: drawn filled to its percent, a bolt while
+/// the charger is in, and the percent. Muted like `quiet_btn`; low, in the error colour. Drawn
+/// rather than a glyph: the bundled icon subset has no battery, and a drawn one shows the level.
+pub fn battery<'a>(b: Battery, p: &Palette) -> Element<'a, Message> {
+    let fg = if b.is_low() {
+        p.error
+    } else {
+        p.on_surface_variant
+    };
+    let level = u16::from(b.percent.min(100));
+    let mut fill = row![].height(Length::Fill);
+    if level > 0 {
+        fill = fill.push(
+            container(Space::new())
+                .width(Length::FillPortion(level))
+                .height(Length::Fill)
+                .style(move |_t| {
+                    container::Style::default()
+                        .background(fg)
+                        .border(Border::default().rounded(1.5))
+                }),
+        );
+    }
+    if level < 100 {
+        fill = fill.push(Space::new().width(Length::FillPortion(100 - level)));
+    }
+    let outline = container(fill)
+        .width(BATTERY_BODY.width)
+        .height(BATTERY_BODY.height)
+        .padding(2)
+        .style(move |_t| {
+            container::Style::default().border(Border {
+                color: fg,
+                width: 1.5,
+                radius: 3.5.into(),
+            })
+        });
+    let nub = container(Space::new()).width(2).height(5).style(move |_t| {
+        container::Style::default()
+            .background(fg)
+            .border(Border::default().rounded(iced::border::Radius::default().right(1.0)))
+    });
+    let mut content = row![row![outline, nub].align_y(Alignment::Center)]
+        .spacing(6)
+        .align_y(Alignment::Center);
+    if b.on_charger() {
+        content = content.push(icon(Icon::Bolt, 15.0, fg));
+    }
+    content = content.push(
+        text(format!("{}%", b.percent))
+            .font(theme::SANS_MEDIUM)
+            .size(size::SM)
+            .color(fg),
+    );
+    container(content).padding(Padding::from([6.0, 4.0])).into()
 }
 
 /// Label above a control, with an optional note under it.

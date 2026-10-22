@@ -14,6 +14,7 @@
 
 mod app;
 mod backend;
+mod battery;
 mod data;
 mod edit;
 mod elide;

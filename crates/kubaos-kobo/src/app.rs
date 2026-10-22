@@ -9,11 +9,17 @@
 //!
 //! The power menu opens over every screen (`F::Power`). While it's open it owns the keys and the
 //! focus, and while an install runs it stops the install before the machine goes down.
+//!
+//! The battery is read on a thread of its own every `battery::POLL` (`battery_watch`), since a
+//! read can wait on the firmware.
 
 use std::collections::HashMap;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use iced::keyboard::{self, key::Named};
@@ -22,6 +28,8 @@ use iced::{Size, Subscription, Task, event, window};
 use kubaos_core::Probe;
 
 use crate::backend::{Backend, RunMsg};
+use crate::battery;
+use crate::battery::Battery;
 use crate::edit::{self, Caret, Edit};
 use crate::field::Pointer;
 use crate::model::{DiskExt, DiskMode, Form};
@@ -244,6 +252,8 @@ pub enum Message {
     HoldEnd,
     /// `systemctl poweroff` or `reboot` answered.
     ShutDown(PowerAction, Result<(), String>),
+    /// A fresh battery reading: `None` on a machine without one.
+    Battery(Option<Battery>),
 
     TourShot(String, window::Screenshot),
 
@@ -339,6 +349,8 @@ pub struct App {
     pub power: Option<PowerMenu>,
     /// Power off or restart asked of systemd: the system is going down.
     pub shutting_down: Option<PowerAction>,
+    /// The last battery reading; `None` until the first one, and on a machine without a battery.
+    pub battery: Option<Battery>,
     pub install: Option<Install>,
     run_rx: Option<mpsc::Receiver<RunMsg>>,
     pub log_open: (bool, Instant),
@@ -405,6 +417,7 @@ impl App {
             hold: None,
             power: None,
             shutting_down: None,
+            battery: None,
             install: None,
             run_rx: None,
             log_open: (false, now),
@@ -635,6 +648,8 @@ impl App {
         let mut subs = vec![
             event::listen_with(on_event),
             window::resize_events().map(|(_, s)| Message::Resized(s)),
+            Subscription::run_with(BatteryWatch(Arc::clone(&self.backend)), battery_watch)
+                .map(Message::Battery),
         ];
         if self.animating() {
             subs.push(window::frames().map(Message::Tick));
@@ -902,6 +917,10 @@ impl App {
             }
             Message::HoldEnd => {
                 self.hold = None;
+                Task::none()
+            }
+            Message::Battery(b) => {
+                self.battery = b;
                 Task::none()
             }
             Message::Setup(_) => Task::none(),
@@ -1770,6 +1789,36 @@ impl F {
 /// at scale 1: 1920x1080 in the VM, 2880x1800 on the TUXEDO, where 14 px
 /// text would be tiny. So scale up to fill the window, in quarter steps,
 /// never below 1 (1024x768 stays 1).
+/// The backend whose battery `battery_watch` reads. There is one backend per run, so its address
+/// is the subscription's identity.
+struct BatteryWatch(Arc<dyn Backend>);
+
+impl Hash for BatteryWatch {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        Arc::as_ptr(&self.0).cast::<()>().hash(state);
+    }
+}
+
+/// Reads the battery at once, then every `battery::POLL`, on a thread of its own. The thread ends
+/// at the first reading after the subscription is dropped.
+fn battery_watch(watch: &BatteryWatch) -> iced::futures::channel::mpsc::Receiver<Option<Battery>> {
+    let (mut tx, rx) = iced::futures::channel::mpsc::channel(1);
+    let backend = Arc::clone(&watch.0);
+    thread::spawn(move || {
+        loop {
+            // A full channel means the app hasn't taken the last reading yet: this one is dropped
+            // and the next comes a poll later.
+            if let Err(e) = tx.try_send(backend.battery())
+                && e.is_disconnected()
+            {
+                return;
+            }
+            thread::sleep(battery::POLL);
+        }
+    });
+    rx
+}
+
 pub fn auto_scale(window: Size) -> f32 {
     let s = (window.width / 1280.0).min(window.height / 800.0);
     ((s * 4.0).floor() / 4.0).clamp(1.0, 3.0)
