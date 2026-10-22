@@ -1,6 +1,6 @@
 # The Command menu's KubaOS Extension (home/curated.nix), laid out as Kotodama
 # finds an Extension: share/kotodama/extensions/kubaos/, with manifest.toml and
-# the binary it names. home/menu.nix hands it to Kotodama's `withExtensions`.
+# the binary it names. home/menu.nix lists it in `programs.kotodama.extraExtensions`.
 {
   lib,
   stdenv,

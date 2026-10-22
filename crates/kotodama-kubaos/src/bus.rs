@@ -125,14 +125,14 @@ impl Bus for SystemBus {
         let call = Call::new(property.path, PROPERTIES, "Get", property.service).with_body("ss", body);
         let reply = SystemBus::call(&call)?;
         let mut read = reply.body();
-        let (Some(signature), Some(value)) = (read.u32(), read.u32()) else {
+        if read.variant() != Some("b") {
             return Err(BusError::answer(property.service, "a boolean"));
-        };
-        bool_variant(signature, value).ok_or_else(|| BusError::answer(property.service, "a boolean"))
+        }
+        read.bool().ok_or_else(|| BusError::answer(property.service, "a boolean"))
     }
 
     fn set_bool(&mut self, property: &Property, value: bool) -> Result<(), BusError> {
-        SystemBus::set(property, "b", |body| body.u32(u32::from(value)))
+        SystemBus::set(property, "b", |body| body.bool(value))
     }
 
     fn set_string(&mut self, property: &Property, value: &str) -> Result<(), BusError> {
@@ -146,25 +146,6 @@ impl Bus for SystemBus {
             .string()
             .ok_or_else(|| BusError::answer(service, "introspection XML"))?;
         Ok(child_nodes(xml))
-    }
-}
-
-/// The boolean in a variant whose first four bytes were read as the word
-/// `signature` and the next four as `value`, or `None` if it holds another
-/// type. A variant opens with its signature: a length byte, the type's
-/// letters and a nul, so a boolean's is `1 b 0`, padded to the 4-byte
-/// boundary its `u32` starts at. Each word was read in the message's own byte
-/// order, so its bytes are checked in both.
-// TODO(SuplenC/kotodama#234): read the variant with `dbus::Unmarshal` and drop
-// this; it can't decode variants or booleans yet.
-// https://github.com/SuplenC/kotodama/issues/234
-fn bool_variant(signature: u32, value: u32) -> Option<bool> {
-    let boolean = [1, b'b', 0];
-    let is_boolean = signature.to_le_bytes()[..3] == boolean || signature.to_be_bytes()[..3] == boolean;
-    match value {
-        0 if is_boolean => Some(false),
-        1 if is_boolean => Some(true),
-        _ => None,
     }
 }
 
