@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # test/vm/menu-check: the Command menu on an installed KubaOS in the bench VM,
 # driven through the VM's own keyboard. SUPER + Space opens Kotodama's menu,
-# typing an app's name and Enter launches it, a sum typed is answered and Enter
-# copies the answer, and SUPER + F1 opens the Shortcuts View.
+# typing an app's name shows it with its detail pane, Ctrl+K opens its
+# Action panel, Enter launches it, a sum typed is answered and Enter copies
+# the answer, and SUPER + F1 opens the Shortcuts View.
 #
 #   test/vm/menu-check [--user NAME]
 #
@@ -75,12 +76,21 @@ ok "SUPER + Space opened the menu"
 "$RUN" type "$APP"
 sleep 1
 "$RUN" shot menu-typed >/dev/null
+# Ctrl+K opens the Action panel on the app, Esc closes it again, leaving the
+# menu open on the same Results.
+"$RUN" key ctrl-k
+sleep 1
+"$RUN" shot menu-actions >/dev/null
+"$RUN" key esc
+sleep 0.5
+as_user "$(menu_shown)" || fail "Esc on the Action panel closed the menu"
+ok "Ctrl+K opened the Action panel (menu-actions.webp), Esc closed only the panel"
 "$RUN" key ret
 wait_for "Enter launches $APP" 20 "[ \$($(windows_of "$APP")) -gt $before ]"
 wait_for "the menu closes after the launch" 5 "! $(menu_shown)"
 "$RUN" shot menu-launched >/dev/null
 ok "typing '$APP' and Enter launched it and closed the menu"
-as_user "hyprctl dispatch closewindow class:$APP" >/dev/null
+as_user "hyprctl dispatch 'hl.dsp.window.close({ window = \"class:^($APP)\$\" })'" >/dev/null
 
 "$RUN" key meta_l-spc
 wait_for "SUPER + Space shows the menu again" 10 "$(menu_shown)"

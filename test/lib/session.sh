@@ -55,13 +55,13 @@ in_session() {
   zrun "set -a; . $SESSION_ENV; set +a; $1"
 }
 
-# qs_start: Quickshell with the config from the generation, log in $QS_LOG. Waits
-# until the config has loaded (or failed).
+# qs_start [VAR=VALUE...]: Quickshell with the config from the generation, and
+# VARs in its environment, log in $QS_LOG. Waits until the config has loaded
+# (or failed).
 qs_start() {
-
   : >"$QS_LOG"
   chown "$USER_NAME:" "$QS_LOG"
-  in_session "exec qs --no-color >$QS_LOG 2>&1" &
+  in_session "exec env $* qs --no-color >$QS_LOG 2>&1" &
   for _ in $(seq 600); do
     grep -q -E 'Configuration Loaded|Failed to load configuration' "$QS_LOG" && break
     sleep 0.1

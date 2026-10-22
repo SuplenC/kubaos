@@ -26,7 +26,7 @@ case "$cmd" in
     as_user "$NIX_BIN/nix" build --out-link "$CACHE/roots/home" \
       "$REPO#homeConfigurations.\"$HM_CONFIG\".activationPackage"
     say "home-manager CLI, PAM modules, test tools (flake's nixpkgs)"
-    for a in home-manager nixpkgs#fprintd nixpkgs#pam_u2f nixpkgs#pamtester nixpkgs#chromium; do
+    for a in home-manager nixpkgs#fprintd nixpkgs#pam_u2f nixpkgs#pamtester nixpkgs#chromium nixpkgs#wtype; do
       as_user "$NIX_BIN/nix" build --out-link "$CACHE/roots/${a#nixpkgs#}" --inputs-from "$REPO" "$a"
     done
     if [[ ${1:-} == --hyprland ]]; then
