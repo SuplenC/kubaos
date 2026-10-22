@@ -10,6 +10,9 @@
 # The KubaOS Extension (crates/kotodama-kubaos) isn't Bundled, and the module
 # has no option for other Extensions, so `package` hands it to the Daemon
 # through the `withExtensions` the module calls with the enabled Bundled ones.
+# TODO(SuplenC/kotodama#235): use the module's option for other Extensions and
+# drop the override; the module has none yet.
+# https://github.com/SuplenC/kotodama/issues/235
 { kubaosPkgs, ... }:
 let
   inherit (kubaosPkgs) kotodama;

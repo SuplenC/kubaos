@@ -155,6 +155,9 @@ impl Bus for SystemBus {
 /// letters and a nul, so a boolean's is `1 b 0`, padded to the 4-byte
 /// boundary its `u32` starts at. Each word was read in the message's own byte
 /// order, so its bytes are checked in both.
+// TODO(SuplenC/kotodama#234): read the variant with `dbus::Unmarshal` and drop
+// this; it can't decode variants or booleans yet.
+// https://github.com/SuplenC/kotodama/issues/234
 fn bool_variant(signature: u32, value: u32) -> Option<bool> {
     let boolean = [1, b'b', 0];
     let is_boolean = signature.to_le_bytes()[..3] == boolean || signature.to_be_bytes()[..3] == boolean;
