@@ -41,7 +41,7 @@ fn the_language_screen_opens_with_the_preselected_layout_in_view() {
     let row = app
         .list_items(List::Keymap)
         .iter()
-        .position(|k| *k == app.form.keymap)
+        .position(|k| *k == app.form.keymaps[0])
         .expect("the preselected layout is listed");
     assert!(
         row > 10,
@@ -852,4 +852,122 @@ fn the_wallpapers_screen_counts_what_is_picked() {
 
     assert!(draws(&app, "8 of 10 picked."));
     assert!(draws(&app, "2 wallpapers"), "the dropped set's header");
+}
+
+/// The demo machine on the Language screen, the keymap search focused.
+fn on_the_keymap_list() -> App {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Language);
+    press(&mut app, &[Key::Tab { shift: false }]);
+    assert_eq!(app.focus, Some(F::KeymapQ));
+    app
+}
+
+#[test]
+fn space_on_the_keymap_list_picks_the_row_and_again_unpicks_it() {
+    let mut app = on_the_keymap_list();
+    assert_eq!(app.form.keymaps, ["us"]);
+
+    press(&mut app, &[Key::Down, Key::Space]);
+    let row = app.keymap_row();
+    assert_ne!(row, "us", "Down moves off the default layout");
+    assert_eq!(app.form.keymaps, ["us".to_string(), row.clone()]);
+    assert!(
+        draws(&app, "Default"),
+        "with two picked, the first says it is the default"
+    );
+
+    press(&mut app, &[Key::Space]);
+    assert_eq!(app.form.keymaps, ["us"]);
+}
+
+#[test]
+fn typing_a_layout_and_enter_picks_it_and_clears_the_search() {
+    let mut app = on_the_keymap_list();
+
+    press(&mut app, &[Key::Text("ital".into()), Key::Enter]);
+
+    assert_eq!(app.form.keymaps, ["us", "it"]);
+    assert_eq!(app.keymap_q, "");
+    assert_eq!(app.screen, Screen::Language, "the first Enter picks");
+    press(&mut app, &[Key::Enter]);
+    assert_eq!(
+        app.screen,
+        Screen::Timezone,
+        "with nothing typed, Enter goes on"
+    );
+}
+
+#[test]
+fn shift_space_makes_the_row_the_default_layout() {
+    let mut app = on_the_keymap_list();
+
+    press(
+        &mut app,
+        &[Key::Text("ital".into()), Key::Enter, Key::ShiftSpace],
+    );
+    assert_eq!(
+        app.form.keymaps,
+        ["it", "us"],
+        "the row Enter picked is still the one Space acts on"
+    );
+
+    let probe = app.ready_probe().expect("the demo probe").clone();
+    let cfg = app.form.to_config(&probe);
+    assert_eq!(cfg.locale.keyboard_layout, ["it", "us"]);
+    let problems = kubaos_core::engine::validate::problems(&cfg, &probe);
+    assert!(
+        !problems.iter().any(|p| p.contains("keyboard")),
+        "{problems:#?}"
+    );
+}
+
+#[test]
+fn a_search_still_takes_a_space() {
+    let mut app = on_the_keymap_list();
+
+    press(
+        &mut app,
+        &[Key::Text("english".into()), Key::Space, Key::ShiftSpace],
+    );
+
+    assert_eq!(app.keymap_q, "english  ");
+    assert_eq!(app.form.keymaps, ["us"]);
+}
+
+#[test]
+fn a_click_on_a_row_toggles_it_and_the_chips_reorder_and_drop() {
+    let mut app = on_the_keymap_list();
+
+    let _ = app.update_inner(Message::Pick(List::Keymap, "de".into()));
+    let _ = app.update_inner(Message::Pick(List::Keymap, "pl".into()));
+    assert_eq!(app.form.keymaps, ["us", "de", "pl"]);
+    let _ = app.update_inner(Message::KeymapDefault("pl".into()));
+    assert_eq!(app.form.keymaps, ["pl", "us", "de"]);
+    let _ = app.update_inner(Message::KeymapDrop("us".into()));
+    assert_eq!(app.form.keymaps, ["pl", "de"]);
+    let _ = app.update_inner(Message::Pick(List::Keymap, "de".into()));
+
+    assert_eq!(app.form.keymaps, ["pl"]);
+}
+
+#[test]
+fn the_last_layout_stays_and_a_toast_says_why() {
+    let mut app = on_the_keymap_list();
+
+    press(&mut app, &[Key::Space]);
+
+    assert_eq!(app.form.keymaps, ["us"]);
+    let toast = app.toast.as_ref().map(|(msg, _)| msg.as_str());
+    assert_eq!(toast, Some("Keep one layout at least."));
+}
+
+#[test]
+fn last_chance_lists_every_layout_the_default_first() {
+    let mut app = on_the_keymap_list();
+    let _ = app.update_inner(Message::Pick(List::Keymap, "it".into()));
+
+    let _ = app.go(Screen::Summary);
+
+    assert!(draws(&app, "English (US), Italian"));
 }

@@ -382,7 +382,7 @@ mod tests {
             ]
         );
         let f = &app.form;
-        assert_eq!(f.keymap, "us");
+        assert_eq!(f.keymaps, ["us"]);
         assert_eq!(f.keyboard_test, "Zażółć gęślą jaźń, 0123");
         assert_eq!(f.timezone, "Europe/Rome");
         assert_eq!(f.wifi_ssid.as_deref(), Some("Nerv HQ"));

@@ -31,8 +31,8 @@ use crate::progress::{LOG_VIEW_LINES, Outcome, StepState, fmt_duration};
 use crate::theme::{self, DARK, Icon, Palette, alpha, jp, mix, motion, radius, size, space};
 use crate::widgets::{
     FieldLook, Kind, ROW_GAP, accent, bar, battery, body, btn, chip, field, field_with, header,
-    icon, label, list_row, play_badge, quiet_btn, ring, scroll, spinner, switch_anim, text_field, title, well,
-    well_ring,
+    icon, label, list_row, pick_chip, play_badge, quiet_btn, ring, scroll, spinner, switch_anim, text_field,
+    title, well, well_ring,
 };
 
 type El<'a> = Element<'a, Message>;
@@ -648,6 +648,19 @@ fn check_if<'a>(on: bool, p: &Palette) -> El<'a> {
 }
 
 fn two_line<'a>(main: String, sub: String, selected: bool, p: &Palette) -> El<'a> {
+    picked_line(main, sub, selected, selected, None, p)
+}
+
+/// A list row's text: `main`, then `tag` if any, then `sub` in mono. `selected` colours it for
+/// the selected row's background, and `checked` shows the check mark.
+fn picked_line<'a>(
+    main: String,
+    sub: String,
+    selected: bool,
+    checked: bool,
+    tag: Option<&'a str>,
+    p: &Palette,
+) -> El<'a> {
     let (c1, c2) = if selected {
         (
             p.on_secondary_container,
@@ -656,14 +669,72 @@ fn two_line<'a>(main: String, sub: String, selected: bool, p: &Palette) -> El<'a
     } else {
         (p.on_surface, p.on_surface_variant)
     };
-    row![
-        elide(main, theme::SANS_MEDIUM, size::MD, c1).width(Length::Fill),
-        Space::new().width(space::MD),
-        text(sub).font(theme::MONO).size(size::XS).color(c2),
-        Space::new().width(space::MD),
-        check_if(selected, p),
+    let mut line = row![elide(main, theme::SANS_MEDIUM, size::MD, c1).width(Length::Fill)]
+        .align_y(Alignment::Center);
+    if let Some(tag) = tag {
+        line = line.push(Space::new().width(space::SM)).push(chip(
+            None,
+            tag,
+            p.primary,
+            alpha(p.primary, 0.16),
+        ));
+    }
+    line.push(Space::new().width(space::MD))
+        .push(text(sub).font(theme::MONO).size(size::XS).color(c2))
+        .push(Space::new().width(space::MD))
+        .push(check_if(checked, p))
+        .into()
+}
+
+/// The keymap list: every layout, a check mark on the picked ones, the highlight on the row
+/// Space acts on.
+fn keymap_rows<'a>(app: &'a App, p: &Palette) -> Vec<El<'a>> {
+    let at = app.keymap_row();
+    let default = app.form.keymaps.first();
+    app.list_items(List::Keymap)
+        .into_iter()
+        .map(|v| {
+            let here = v == at;
+            let picked = app.form.keymap_picked(&v);
+            let tag = (default == Some(&v) && app.form.keymaps.len() > 1).then_some("Default");
+            let name = data::keymap_name(&v).into_owned();
+            list_row(
+                picked_line(name, v.clone(), here, picked, tag, p),
+                here,
+                Message::Pick(List::Keymap, v),
+                p,
+            )
+        })
+        .collect()
+}
+
+/// The picked layouts, the default first. A click makes one the default; its close button
+/// unpicks it, all but the last one.
+fn keymap_chips<'a>(app: &'a App, p: &Palette) -> El<'a> {
+    let keymaps = &app.form.keymaps;
+    let chips = keymaps.iter().enumerate().map(|(i, k)| {
+        let lead = i == 0;
+        pick_chip(
+            data::keymap_name(k).into_owned(),
+            lead,
+            (!lead).then(|| Message::KeymapDefault(k.clone())),
+            (keymaps.len() > 1).then(|| Message::KeymapDrop(k.clone())),
+            p,
+        )
+    });
+    let hint = if keymaps.len() > 1 {
+        "The first is the default. Click one to make it the default."
+    } else {
+        "Space picks more. Shift+Space makes one the default."
+    };
+    column![
+        row(chips)
+            .spacing(space::SM)
+            .wrap()
+            .vertical_spacing(space::SM),
+        text(hint).size(size::XS).color(p.on_surface_variant),
     ]
-    .align_y(Alignment::Center)
+    .spacing(6)
     .into()
 }
 
@@ -673,11 +744,7 @@ fn language<'a>(app: &'a App, p: &Palette) -> El<'a> {
             .into_iter()
             .map(|v| {
                 let sel = v == cur;
-                let name = match list {
-                    List::Locale => data::locale_name(&v),
-                    _ => data::keymap_name(&v),
-                }
-                .into_owned();
+                let name = data::locale_name(&v).into_owned();
                 list_row(
                     two_line(name, v.clone(), sel, p),
                     sel,
@@ -699,7 +766,7 @@ fn language<'a>(app: &'a App, p: &Palette) -> El<'a> {
         header(
             jp::LANGUAGE,
             "Language and keyboard",
-            "The language you want to read, and the layout your fingers actually know. Type to search, arrows to pick.",
+            "The language you want to read, and the layouts your fingers actually know. Type to search, arrows to move, Space to pick a layout.",
             p
         ),
         Space::new().height(space::XL),
@@ -713,8 +780,9 @@ fn language<'a>(app: &'a App, p: &Palette) -> El<'a> {
                 col(
                     "Keyboard",
                     input(app, F::KeymapQ, "Search layouts", Some(Icon::Search), p),
-                    list_well(ids::KEYMAP_LIST, rows(List::Keymap, &app.form.keymap), key_focus, p),
+                    list_well(ids::KEYMAP_LIST, keymap_rows(app, p), key_focus, p),
                 ),
+                keymap_chips(app, p),
                 input(app, F::KeyboardTest, "Mash some keys to check the layout", Some(Icon::Keyboard), p),
             ]
             .spacing(10)
@@ -1962,7 +2030,15 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
         "Language",
         vec![
             kv("Language", data::locale_name(&f.locale).into_owned(), p),
-            kv("Keyboard", data::keymap_name(&f.keymap).into_owned(), p),
+            kv(
+                "Keyboard",
+                f.keymaps
+                    .iter()
+                    .map(|k| data::keymap_name(k))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                p,
+            ),
             kv(
                 "Time zone",
                 {

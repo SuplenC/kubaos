@@ -501,6 +501,61 @@ pub fn well_ring(p: Palette, focused: bool) -> impl Fn(&Theme) -> container::Sty
     }
 }
 
+/// One of several things picked, as a chip. Pressing it sends `on_press` and its close button
+/// `on_remove`; `lead` fills it with a check mark, for the one that comes first.
+pub fn pick_chip<'a>(
+    s: String,
+    lead: bool,
+    on_press: Option<Message>,
+    on_remove: Option<Message>,
+    p: &Palette,
+) -> Element<'a, Message> {
+    let p = *p;
+    let (bg, fg) = if lead {
+        (p.secondary_container, p.on_secondary_container)
+    } else {
+        (p.surface_container_high, p.on_surface)
+    };
+    let style = move |_t: &Theme, status| button::Style {
+        background: state_layer(None, fg, status),
+        text_color: fg,
+        border: Border::default().rounded(radius::FULL),
+        shadow: Shadow::default(),
+        snap: true,
+    };
+    let name = text(s).font(theme::SANS_MEDIUM).size(size::SM).color(fg);
+    let body: Element<'a, Message> = if lead {
+        row![icon(Icon::Check, 15.0, fg), name]
+            .spacing(6)
+            .align_y(Alignment::Center)
+            .into()
+    } else {
+        name.into()
+    };
+    let mut parts = row![
+        button(body)
+            .padding(Padding::from([5.0, 10.0]))
+            .on_press_maybe(on_press)
+            .style(style)
+    ]
+    .align_y(Alignment::Center);
+    if let Some(remove) = on_remove {
+        parts = parts.push(
+            button(icon(Icon::Close, 15.0, alpha(fg, 0.8)))
+                .padding(Padding::from([5.0, 8.0]))
+                .on_press(remove)
+                .style(style),
+        );
+    }
+    container(parts)
+        .style(move |_t| container::Style {
+            background: Some(Background::Color(bg)),
+            border: Border::default().rounded(radius::FULL),
+            ..container::Style::default()
+        })
+        .into()
+}
+
 pub fn chip<'a>(
     ic: Option<Icon>,
     s: impl text::IntoFragment<'a>,

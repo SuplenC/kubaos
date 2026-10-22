@@ -969,7 +969,7 @@ impl Setup {
                 }
                 Task::none()
             }
-            Key::Space => match focus {
+            Key::Space | Key::ShiftSpace => match focus {
                 Some(f) if f.is_field() => {
                     self.type_text(" ");
                     Task::none()

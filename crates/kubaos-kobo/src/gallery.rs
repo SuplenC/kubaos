@@ -141,6 +141,13 @@ fn gallery() {
         let mut app = app_with(Ok(hard_probe()), size);
         go(&mut app, Screen::Language);
         shot(&dir, "language-all", &app, size);
+
+        // Two layouts picked, the second highlighted.
+        let mut two = app_with(Ok(demo_probe()), size);
+        go(&mut two, Screen::Language);
+        let _ = two.update_inner(Message::Pick(crate::app::List::Keymap, "fr".into()));
+        shot(&dir, "language-two-layouts", &two, size);
+
         go(&mut app, Screen::Wifi);
         let _ = app.update_inner(Message::Pick(
             crate::app::List::Wifi,
