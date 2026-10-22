@@ -18,7 +18,8 @@ in
   programs.kotodama = {
     enable = true;
     package = kotodama // {
-      withExtensions = select: kotodama.withExtensions (bundled: select bundled ++ [ kubaosPkgs.kotodama-kubaos ]);
+      withExtensions =
+        select: kotodama.withExtensions (bundled: select bundled ++ [ kubaosPkgs.kotodama-kubaos ]);
     };
     # KubaOS's shell places `KotodamaMenu` itself. With the ready menu running
     # too, the keybind opens only one of the two and the other wastes memory.
