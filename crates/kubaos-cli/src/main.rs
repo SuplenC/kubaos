@@ -15,6 +15,7 @@
 //! - Packages (`package`, `try`): `package.rs`.
 //! - Suites (`suite`): `suite.rs`.
 //! - Switch jobs (`switch`, `job`): `job.rs`.
+//! - Updates (`update`, `upgrade`, `rollback`, `channel`): `update.rs`.
 //! - The work itself: the `kubaos-core` crate.
 
 #![forbid(unsafe_code)]
@@ -31,6 +32,7 @@ mod job;
 mod package;
 mod setup;
 mod suite;
+mod update;
 
 #[derive(Parser)]
 #[command(
@@ -74,6 +76,14 @@ enum Cmd {
         #[command(subcommand)]
         cmd: job::JobCmd,
     },
+    /// Update packages and move to the newest KubaOS release of your channel.
+    Update(update::UpdateArgs),
+    /// Move to the next KubaOS release series, on the stable channel.
+    Upgrade(update::UpgradeArgs),
+    /// Undo the last update: the KubaOS release and your flake.lock go back.
+    Rollback(update::RollbackArgs),
+    /// Print the channel updates follow, or set it: stable or edge.
+    Channel(update::ChannelArgs),
 }
 
 /// How a command prints its events: JSON lines for a front end to parse, or text for a human.
@@ -101,5 +111,9 @@ fn main() -> ExitCode {
             Err(e) => usage_error(e),
         },
         Cmd::Job { cmd } => job::main(cmd),
+        Cmd::Update(args) => update::update(&args),
+        Cmd::Upgrade(args) => update::upgrade(&args),
+        Cmd::Rollback(args) => update::rollback(&args),
+        Cmd::Channel(args) => update::channel(&args),
     }
 }

@@ -518,6 +518,53 @@ mod tests {
     }
 
     #[test]
+    fn the_install_records_its_release_for_kubaos_update() {
+        let p = payload();
+        let cfg = config(&p);
+        let mut r = DryRunner::new();
+        user_flake_payload(&mut r);
+        r.files.insert("/mnt/t/usr/share/kubaos/VERSION".into(), "0.1.0\n".into());
+        r.files.insert(
+            "/mnt/t/usr/share/kubaos/.git/refs/heads/release".into(),
+            "1a2b3c4d5e6f\n".into(),
+        );
+        let chroot = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+                      LANG=C.UTF-8 DEBIAN_FRONTEND=noninteractive chroot /mnt/t find";
+        r.responses.push((
+            format!("{chroot} /usr/share/kubaos/migrations/system"),
+            "1790000000-fix-apt.sh\nREADME.md\n".into(),
+        ));
+        r.responses.push((
+            format!("{chroot} /usr/share/kubaos/migrations/user"),
+            "1790000001-move-config.sh\n".into(),
+        ));
+        let opts = RunOptions {
+            dry_run: true,
+            target_root: Some("/mnt/t".into()),
+            log_file: None,
+        };
+
+        run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}).unwrap();
+
+        assert_eq!(r.files[Path::new("/mnt/t/etc/kubaos/channel")], "edge\n");
+        let release = &r.files[Path::new("/mnt/t/var/lib/kubaos/release")];
+        assert!(release.starts_with("version=0.1.0\n"), "{release}");
+        assert!(release.contains("commit=1a2b3c4d5e6f\nchannel=edge\n"), "{release}");
+        assert!(r.files.contains_key(Path::new(
+            "/mnt/t/var/lib/kubaos/migrations/1790000000-fix-apt.sh"
+        )));
+        assert!(!r.files.contains_key(Path::new("/mnt/t/var/lib/kubaos/migrations/README.md")));
+        assert!(r.files.contains_key(Path::new(
+            "/mnt/t/home/kuba/.local/state/kubaos/migrations/1790000001-move-config.sh"
+        )));
+        let cmds = r.commands();
+        assert!(
+            cmds.iter().any(|c| c == "chown -R 1000:1000 /mnt/t/home/kuba/.local"),
+            "{cmds:#?}"
+        );
+    }
+
+    #[test]
     fn failure_cleans_up_in_reverse_and_ends_with_failed() {
         let mut r = DryRunner::new();
         let (res, events) = dry(&mut r, true);

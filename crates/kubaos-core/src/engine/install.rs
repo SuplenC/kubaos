@@ -16,6 +16,7 @@ use crate::probe::{DiskInfo, Manifest};
 use crate::{Event, Level, StepId};
 
 mod firstboot;
+mod records;
 
 /// KubaOS's root-owned checkout in the payload's rootfs, on its `release`
 /// branch. The user flake takes KubaOS from here.
@@ -1023,6 +1024,7 @@ impl<'a> Install<'a> {
         }
 
         self.write_user_flake(&home, &owner)?;
+        self.write_release_records(&home, &owner)?;
         self.progress(1.0, None);
         Ok(())
     }

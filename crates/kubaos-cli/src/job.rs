@@ -137,6 +137,20 @@ fn host(paths: &Paths) -> Result<Systemd, ExitCode> {
 /// Prints the job's output until it ends. With `host`, the job runs in a worker unit, and fails
 /// if that unit dies before running it.
 fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
+    match wait(queue, id, host) {
+        Ok(()) => {
+            println!("switch {id} done");
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("kubaos: switch {id} failed: {e}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Prints the job's output until it ends; why it failed, when it did.
+fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> Result<(), String> {
     let mut out = io::stdout();
     let print = |chunk: &str| {
         let _ = out.write_all(chunk.as_bytes()).and_then(|()| out.flush());
@@ -149,19 +163,38 @@ fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
         Ok(Job {
             state: JobState::Succeeded,
             ..
-        }) => {
-            println!("switch {id} done");
-            ExitCode::SUCCESS
-        }
-        Ok(job) => {
-            eprintln!(
-                "kubaos: switch {id} failed: {}",
-                job.error.as_deref().unwrap_or("no reason recorded")
-            );
-            ExitCode::FAILURE
-        }
-        Err(e) => report(e),
+        }) => Ok(()),
+        Ok(job) => Err(job.error.unwrap_or_else(|| "no reason recorded".to_owned())),
+        Err(e) => Err(chain(&e)),
     }
+}
+
+/// Runs one switch of the user flake to its end, for a command that switches as one of its
+/// steps: in a worker unit, or in this process with `foreground`.
+///
+/// # Errors
+///
+/// Why the switch failed.
+pub fn switch_step(paths: &Paths, foreground: bool) -> Result<(), String> {
+    let host = std::env::current_exe()
+        .map(|exe| Systemd::new(exe, paths.flake()))
+        .map_err(|e| chain(&e))?;
+    let queue = Queue::new(paths.jobs());
+    if foreground {
+        let id = queue.enqueue().map_err(|e| chain(&e))?;
+        let worker = {
+            let queue = queue.clone();
+            thread::spawn(move || queue.work(&host))
+        };
+        let waited = wait(&queue, &id, None);
+        worker
+            .join()
+            .expect("the switch worker thread panicked")
+            .map_err(|e| chain(&e))?;
+        return waited;
+    }
+    let id = queue.submit(&host).map_err(|e| chain(&e))?;
+    wait(&queue, &id, Some(&host))
 }
 
 fn list(queue: &Queue, host: &Systemd, json: bool) -> ExitCode {
@@ -188,6 +221,12 @@ fn list(queue: &Queue, host: &Systemd, json: bool) -> ExitCode {
 
 /// Prints `e` with its causes on stderr and returns exit code 1.
 pub fn report(e: impl std::error::Error) -> ExitCode {
+    eprintln!("kubaos: {}", chain(&e));
+    ExitCode::FAILURE
+}
+
+/// `e` and its causes, on one line.
+pub fn chain(e: &dyn std::error::Error) -> String {
     let mut text = e.to_string();
     let mut source = e.source();
     while let Some(cause) = source {
@@ -195,6 +234,5 @@ pub fn report(e: impl std::error::Error) -> ExitCode {
         text.push_str(&cause.to_string());
         source = cause.source();
     }
-    eprintln!("kubaos: {text}");
-    ExitCode::FAILURE
+    text
 }
