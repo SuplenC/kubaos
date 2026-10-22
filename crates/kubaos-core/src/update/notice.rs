@@ -1,7 +1,7 @@
 //! What the daily check found, for the bar and the Command menu, and which of it was notified.
 //!
-//! `~/.local/state/kubaos/update-available` holds `key=value` lines, and is missing when there is
-//! nothing to install:
+//! `~/.local/state/kubaos/update-available` holds `key=value` lines, and is empty when there is
+//! nothing to install (missing before the first check):
 //!
 //! ```text
 //! update=main at 1a2b3c4 (0.1.0)
@@ -25,6 +25,7 @@
 //! - Finding what is available: `policy.rs`. Sending the notification: `updater.rs`.
 
 use std::collections::BTreeSet;
+use std::fmt::Write;
 
 use super::policy::Pick;
 use super::policy::Target;
@@ -59,9 +60,9 @@ impl Available {
             let Some(target) = target else {
                 continue;
             };
-            text.push_str(&format!("{key}={}\n{key}-commit={}\n", target.label, target.commit));
+            let _ = write!(text, "{key}={}\n{key}-commit={}\n", target.label, target.commit);
             if let Some(codename) = &target.codename {
-                text.push_str(&format!("{key}-codename={codename}\n"));
+                let _ = writeln!(text, "{key}-codename={codename}");
             }
         }
         text

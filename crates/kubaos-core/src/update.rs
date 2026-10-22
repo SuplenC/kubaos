@@ -27,6 +27,7 @@ pub mod version;
 
 mod updater;
 
+pub use updater::Confirm;
 pub use updater::MIN_FREE_BYTES;
 pub use updater::UpdateError;
 pub use updater::UpdateOptions;

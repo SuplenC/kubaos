@@ -1,7 +1,7 @@
 //! The Hyprland pin: the apt preferences file a release ships
 //! (`system/files/apt/preferences.d/kubaos-hyprland`), one record per package, each pinning the
 //! exact version the release was tested with at priority 1001, which apt installs even as a
-//! downgrade (apt_preferences(5)).
+//! downgrade (`apt_preferences(5)`).
 //!
 //! ```text
 //! Package: hyprland

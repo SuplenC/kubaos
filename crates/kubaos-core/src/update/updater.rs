@@ -151,13 +151,48 @@ impl UpdateError {
     }
 }
 
-/// How an update goes.
+/// Whether a command asks before it changes anything.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Confirm {
+    #[default]
+    Ask,
+    AssumeYes,
+}
+
+/// How an update goes: asking first, and moving to the channel's release too.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct UpdateOptions {
-    /// Don't ask before changing anything.
-    pub yes: bool,
-    /// Update packages only: don't move `release` or run migrations.
-    pub packages_only: bool,
+    confirm: Confirm,
+    packages_only: bool,
+}
+
+impl UpdateOptions {
+    /// An update that asks first and moves to the channel's release.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Asks, or doesn't, before changing anything.
+    #[must_use]
+    pub fn confirm(mut self, confirm: Confirm) -> Self {
+        self.confirm = confirm;
+        self
+    }
+
+    /// Updates packages only: `release` stays and no migration runs.
+    #[must_use]
+    pub fn packages_only(mut self) -> Self {
+        self.packages_only = true;
+        self
+    }
+
+    /// Moves to the channel's release too.
+    #[must_use]
+    pub fn no_packages_only(mut self) -> Self {
+        self.packages_only = false;
+        self
+    }
 }
 
 /// What the apply step does on top of packages.
@@ -188,7 +223,7 @@ impl<'a, M: Machine> Updater<'a, M> {
     }
 
     fn unix(&self) -> u64 {
-        self.now.duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
+        self.now.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
     }
 
     fn refs(&self) -> GitRefs {
@@ -235,11 +270,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         }
         let target = pick.upgrade.ok_or(UpdateError::NoUpgrade)?;
         self.m.say(&format!("Upgrade: KubaOS {} → {}", installed.describe(), upgrade_name(&target)));
-        let opts = UpdateOptions {
-            yes: false,
-            packages_only: false,
-        };
-        self.apply(&installed, Some(&target), opts, Kind::Upgrade)
+        self.apply(&installed, Some(&target), UpdateOptions::new(), Kind::Upgrade)
     }
 
     /// Moves `release` back to where the last update found it, puts back the user's `flake.lock`
@@ -248,7 +279,7 @@ impl<'a, M: Machine> Updater<'a, M> {
     /// # Errors
     ///
     /// [`UpdateError::NothingToRollBack`] with no history, else the step that failed.
-    pub fn rollback(&mut self, yes: bool) -> Result<(), UpdateError> {
+    pub fn rollback(&mut self, confirm: Confirm) -> Result<(), UpdateError> {
         let _lock = self.lock()?;
         let installed = self.installed()?;
         let path = self.sys.history();
@@ -267,7 +298,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             Some(lock) => self.m.say(&format!("Your flake.lock goes back to {}", lock.display())),
             None => self.m.warn("that update saved no flake.lock: your packages stay where they are"),
         }
-        if !yes && !self.m.confirm("Roll back?") {
+        if confirm == Confirm::Ask && !self.m.confirm("Roll back?") {
             return Err(UpdateError::Declined);
         }
         self.snapshot(&format!("before kubaos rollback {}", self.date()));
@@ -349,7 +380,7 @@ impl<'a, M: Machine> Updater<'a, M> {
                 Err(e) => self.m.warn(&format!("notifying: {e}")),
             }
         }
-        let text: String = notified.iter().map(|key| format!("{key}\n")).collect();
+        let text: String = notified.iter().flat_map(|key| [key.as_str(), "\n"]).collect();
         write_user(&notified_path, &text)?;
         Ok(available)
     }
@@ -453,7 +484,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         }
         self.summarise(installed, target)?;
         // An upgrade always asks: it moves to a new Ubuntu-and-nixpkgs pairing.
-        let ask = !opts.yes || kind == Kind::Upgrade;
+        let ask = opts.confirm == Confirm::Ask || kind == Kind::Upgrade;
         if ask && !self.m.confirm("Update now?") {
             return Err(UpdateError::Declined);
         }
@@ -620,7 +651,6 @@ impl<'a, M: Machine> Updater<'a, M> {
             return Ok(());
         }
         let pins = hyprland::parse(&wanted);
-        self.write_root(&self.sys.apt_pin(), &wanted)?;
         let held: BTreeSet<String> = self
             .m
             .output(&Cmd::user("apt-mark").arg("showhold"))
@@ -640,23 +670,25 @@ impl<'a, M: Machine> Updater<'a, M> {
             .args(pins.iter().map(hyprland::Pin::install_arg));
         // TODO(#14): when the PPA no longer has a pinned version, install the release's .debs,
         // checked against its signed SHA256SUMS; releases don't attach them yet.
-        let installed = self
+        let pinned = self
             .m
             .stream(&install)
             .map_err(UpdateError::step("installing the pinned Hyprland"));
-        let mut hold = held;
-        hold.extend(self.installed_hypr_packages());
-        let rehold = if hold.is_empty() {
+        let mut to_hold = held;
+        to_hold.extend(self.installed_hypr_packages());
+        let rehold = if to_hold.is_empty() {
             Ok(())
         } else {
             self.m
-                .output(&Cmd::root("apt-mark").arg("hold").args(&hold))
+                .output(&Cmd::root("apt-mark").arg("hold").args(&to_hold))
                 .map(drop)
                 .map_err(UpdateError::step("holding the Hyprland stack again"))
         };
-        installed?;
+        pinned?;
         rehold?;
-        self.m.say(&format!("Hyprland pin applied, {} packages held", hold.len()));
+        // Written once the versions are in, so a failed install is tried again on the next update.
+        self.write_root(&self.sys.apt_pin(), &wanted)?;
+        self.m.say(&format!("Hyprland pin applied, {} packages held", to_hold.len()));
         if self.m.output(&Cmd::user("Hyprland").arg("--verify-config")).is_err() {
             self.m
                 .warn("Hyprland --verify-config reports problems: run it and fix your config before logging out");
@@ -779,15 +811,10 @@ impl<'a, M: Machine> Updater<'a, M> {
         self.write_available(&kept)
     }
 
+    /// Writes `update-available`, empty when nothing is: the bar watches the file, and a watch
+    /// needs a file to follow.
     fn write_available(&self, available: &Available) -> Result<(), UpdateError> {
-        let path = self.user.update_available();
-        if available.is_empty() {
-            return match fs::remove_file(&path) {
-                Err(e) if e.kind() != io::ErrorKind::NotFound => Err(UpdateError::io(&path)(e)),
-                _ => Ok(()),
-            };
-        }
-        write_user(&path, &available.to_text())
+        write_user(&self.user.update_available(), &available.to_text())
     }
 
     fn write_root(&mut self, path: &Path, text: &str) -> Result<(), UpdateError> {

@@ -6,7 +6,8 @@ import qs.components
 import qs.services
 
 // The top edge of the frame. Left: workspaces and window title.
-// Center: clock. Right: recording indicator (while recording), tray, status
+// Center: clock. Right: recording indicator (while recording), the update
+// marker (while a KubaOS release waits), tray, status
 // (opens the control center), power menu.
 Item {
     id: root
@@ -43,6 +44,8 @@ Item {
         spacing: Theme.spacing.sm
 
         RecordingIndicator {}
+
+        UpdateIndicator {}
 
         Tray {
             window: root.window

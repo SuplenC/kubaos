@@ -13,7 +13,7 @@
 //!
 //! # Owns
 //!
-//! - The command line of these commands.
+//! - The command line of these commands, and the real machine the updater runs on.
 //!
 //! # Not here
 //!
@@ -24,14 +24,20 @@ use std::time::SystemTime;
 
 use clap::Args;
 use kubaos_core::state::Paths;
+use kubaos_core::update::Confirm;
+use kubaos_core::update::UpdateError;
 use kubaos_core::update::UpdateOptions;
 use kubaos_core::update::Updater;
-use kubaos_core::update::machine::System;
 use kubaos_core::update::record::Channel;
 use kubaos_core::update::record::SystemPaths;
 
 use crate::job;
+use crate::job::SwitchIn;
 use crate::usage_error;
+
+mod system;
+
+use system::System;
 
 #[derive(Args)]
 pub struct UpdateArgs {
@@ -72,18 +78,26 @@ pub struct ChannelArgs {
     channel: Option<String>,
 }
 
+fn place(foreground: bool) -> SwitchIn {
+    if foreground { SwitchIn::Process } else { SwitchIn::Unit }
+}
+
+fn confirm(yes: bool) -> Confirm {
+    if yes { Confirm::AssumeYes } else { Confirm::Ask }
+}
+
 /// The user's paths and the machine, or the exit code of why there are none.
-fn machine(foreground: bool) -> Result<(Paths, System), ExitCode> {
+fn machine(place: SwitchIn) -> Result<(Paths, System), ExitCode> {
     if rustix::process::geteuid().is_root() {
-        return Err(usage_error(kubaos_core::update::UpdateError::Root));
+        return Err(usage_error(UpdateError::Root));
     }
     let paths = Paths::from_env().map_err(usage_error)?;
     let for_switch = paths.clone();
-    let system = System::new(move || job::switch_step(&for_switch, foreground));
+    let system = System::new(move || job::switch_step(&for_switch, place));
     Ok((paths, system))
 }
 
-fn done(result: Result<(), kubaos_core::update::UpdateError>) -> ExitCode {
+fn done(result: Result<(), UpdateError>) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => job::report(e),
@@ -91,7 +105,7 @@ fn done(result: Result<(), kubaos_core::update::UpdateError>) -> ExitCode {
 }
 
 pub fn update(args: &UpdateArgs) -> ExitCode {
-    let (paths, mut system) = match machine(args.foreground) {
+    let (paths, mut system) = match machine(place(args.foreground)) {
         Ok(m) => m,
         Err(code) => return code,
     };
@@ -99,14 +113,12 @@ pub fn update(args: &UpdateArgs) -> ExitCode {
     if args.check {
         return done(updater.check().map(drop));
     }
-    done(updater.update(UpdateOptions {
-        yes: args.yes,
-        packages_only: args.packages_only,
-    }))
+    let opts = UpdateOptions::new().confirm(confirm(args.yes));
+    done(updater.update(if args.packages_only { opts.packages_only() } else { opts }))
 }
 
 pub fn upgrade(args: &UpgradeArgs) -> ExitCode {
-    let (paths, mut system) = match machine(args.foreground) {
+    let (paths, mut system) = match machine(place(args.foreground)) {
         Ok(m) => m,
         Err(code) => return code,
     };
@@ -114,30 +126,31 @@ pub fn upgrade(args: &UpgradeArgs) -> ExitCode {
 }
 
 pub fn rollback(args: &RollbackArgs) -> ExitCode {
-    let (paths, mut system) = match machine(args.foreground) {
-        Ok(m) => m,
-        Err(code) => return code,
-    };
-    done(Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).rollback(args.yes))
-}
-
-pub fn channel(args: &ChannelArgs) -> ExitCode {
-    let (paths, mut system) = match machine(false) {
+    let (paths, mut system) = match machine(place(args.foreground)) {
         Ok(m) => m,
         Err(code) => return code,
     };
     let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now());
-    match &args.channel {
-        None => match updater.installed() {
+    done(updater.rollback(confirm(args.yes)))
+}
+
+pub fn channel(args: &ChannelArgs) -> ExitCode {
+    let (paths, mut system) = match machine(SwitchIn::Unit) {
+        Ok(m) => m,
+        Err(code) => return code,
+    };
+    let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now());
+    let Some(name) = &args.channel else {
+        return match updater.installed() {
             Ok(installed) => {
                 println!("{}", updater.channel(&installed));
                 ExitCode::SUCCESS
             }
             Err(e) => job::report(e),
-        },
-        Some(name) => match name.parse::<Channel>() {
-            Ok(channel) => done(updater.set_channel(channel)),
-            Err(e) => usage_error(e),
-        },
+        };
+    };
+    match name.parse::<Channel>() {
+        Ok(channel) => done(updater.set_channel(channel)),
+        Err(e) => usage_error(e),
     }
 }

@@ -169,18 +169,27 @@ fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> Result<(), String>
     }
 }
 
+/// Where a switch runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SwitchIn {
+    /// A transient systemd user unit.
+    Unit,
+    /// This process, for a session without a systemd user manager.
+    Process,
+}
+
 /// Runs one switch of the user flake to its end, for a command that switches as one of its
-/// steps: in a worker unit, or in this process with `foreground`.
+/// steps.
 ///
 /// # Errors
 ///
 /// Why the switch failed.
-pub fn switch_step(paths: &Paths, foreground: bool) -> Result<(), String> {
+pub fn switch_step(paths: &Paths, place: SwitchIn) -> Result<(), String> {
     let host = std::env::current_exe()
         .map(|exe| Systemd::new(exe, paths.flake()))
         .map_err(|e| chain(&e))?;
     let queue = Queue::new(paths.jobs());
-    if foreground {
+    if place == SwitchIn::Process {
         let id = queue.enqueue().map_err(|e| chain(&e))?;
         let worker = {
             let queue = queue.clone();

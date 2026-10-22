@@ -19,10 +19,7 @@ impl Install<'_> {
     /// `/etc/kubaos/channel`, `/var/lib/kubaos/release`, and the migration markers, system ones in
     /// `/var/lib/kubaos/migrations/` and the user's in their state folder.
     pub(super) fn write_release_records(&mut self, home: &str, owner: &str) -> R<()> {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
+        let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs());
         let date = files::utc_datetime(now);
         let commit = self.release_commit();
         let channel = self.install_channel();

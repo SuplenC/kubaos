@@ -7,6 +7,7 @@ use std::process::Command;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 
+use super::Confirm;
 use super::UpdateError;
 use super::UpdateOptions;
 use super::Updater;
@@ -24,10 +25,11 @@ use crate::update::record::SystemPaths;
 use crate::update::record::parse_history;
 
 /// Runs git, bash and sh for real, as this user even for root commands; answers the rest from
-/// `canned`, and records every command.
+/// `canned`, and records every command. A command whose line starts with one of `failing` fails.
 struct Fake {
     ran: Vec<String>,
     canned: BTreeMap<&'static str, Result<String, ()>>,
+    failing: Vec<&'static str>,
     switches: usize,
     answer: bool,
     asked: usize,
@@ -45,6 +47,7 @@ impl Fake {
                 ("apt-mark", Ok(String::new())),
                 ("dpkg-query", Ok("installed hyprland\ninstalled firefox\n".to_owned())),
             ]),
+            failing: Vec::new(),
             switches: 0,
             answer: true,
             asked: 0,
@@ -90,6 +93,9 @@ impl Fake {
 impl Machine for Fake {
     fn output(&mut self, cmd: &Cmd) -> Result<String, MachineError> {
         self.ran.push(cmd.display());
+        if self.failing.iter().any(|prefix| cmd.display().starts_with(prefix)) {
+            return Err(MachineError::exited(cmd, Some(100), "failing (test)"));
+        }
         match cmd.program().as_str() {
             "git" | "bash" | "sh" => Self::run(cmd),
             program => match self.canned.get(program) {
@@ -212,10 +218,7 @@ impl World {
 }
 
 fn yes() -> UpdateOptions {
-    UpdateOptions {
-        yes: true,
-        packages_only: false,
-    }
+    UpdateOptions::new().confirm(Confirm::AssumeYes)
 }
 
 #[test]
@@ -327,11 +330,7 @@ fn packages_only_leaves_release_and_the_migrations_alone() {
     w.push(&[("migrations/system/1790000000-later.sh", &w.migration("system"))], true);
     let mut m = Fake::new();
 
-    let opts = UpdateOptions {
-        yes: true,
-        packages_only: true,
-    };
-    w.updater(&mut m).update(opts).unwrap();
+    w.updater(&mut m).update(yes().packages_only()).unwrap();
 
     assert_eq!(w.release(), before);
     assert_eq!(w.ran_log(), "");
@@ -347,7 +346,7 @@ fn saying_no_changes_nothing() {
     let mut m = Fake::new();
     m.answer = false;
 
-    let err = w.updater(&mut m).update(UpdateOptions::default()).unwrap_err();
+    let err = w.updater(&mut m).update(UpdateOptions::new()).unwrap_err();
 
     assert!(matches!(err, UpdateError::Declined));
     assert_eq!(m.asked, 1);
@@ -396,7 +395,7 @@ fn a_rollback_puts_release_and_the_flake_lock_back_and_keeps_the_markers() {
     fs::write(w.user.flake_lock(), "lock after\n").unwrap();
 
     let mut back = Fake::new();
-    w.updater(&mut back).rollback(true).unwrap();
+    w.updater(&mut back).rollback(Confirm::AssumeYes).unwrap();
 
     assert_eq!(w.release(), before);
     assert_eq!(fs::read_to_string(w.user.flake_lock()).unwrap(), "lock before\n");
@@ -406,7 +405,7 @@ fn a_rollback_puts_release_and_the_flake_lock_back_and_keeps_the_markers() {
     assert!(w.sys.markers().join("1790000000-fix.sh").is_file());
     assert_eq!(back.switches, 1);
 
-    let err = w.updater(&mut Fake::new()).rollback(true).unwrap_err();
+    let err = w.updater(&mut Fake::new()).rollback(Confirm::AssumeYes).unwrap_err();
     assert!(matches!(err, UpdateError::NothingToRollBack { .. }));
 }
 
@@ -497,6 +496,23 @@ fn a_changed_hyprland_pin_is_installed_exactly_and_the_stack_held_again() {
 }
 
 #[test]
+fn a_failed_hyprland_install_holds_the_stack_again_and_is_tried_next_time() {
+    let w = World::new(Channel::Edge, true);
+    let pin = "Package: hyprland\nPin: version 0.50.1-1\nPin-Priority: 1001\n";
+    w.push(&[("system/files/apt/preferences.d/kubaos-hyprland", pin)], true);
+    let mut m = Fake::new();
+    m.canned.insert("apt-mark", Ok("hyprland\n".to_owned()));
+    m.failing.push("sudo apt-get install");
+
+    let err = w.updater(&mut m).update(yes()).unwrap_err();
+
+    assert!(matches!(err, UpdateError::Step { ref what, .. } if what == "installing the pinned Hyprland"));
+    assert_eq!(m.ran("sudo apt-mark hold hyprland"), 1);
+    assert!(!w.sys.apt_pin().exists());
+    assert_eq!(m.switches, 0);
+}
+
+#[test]
 fn the_hyprland_pin_is_left_alone_off_amd64() {
     let w = World::new(Channel::Edge, true);
     w.push(&[("system/files/apt/preferences.d/kubaos-hyprland", "Package: hyprland\n")], true);
@@ -527,11 +543,11 @@ fn the_daily_check_writes_what_is_available_and_notifies_once() {
     assert_eq!(again.ran("notify-send"), 0);
 
     w.updater(&mut Fake::new()).update(yes()).unwrap();
-    assert!(!w.user.update_available().exists());
+    assert_eq!(fs::read_to_string(w.user.update_available()).unwrap(), "");
     let mut after = Fake::new();
     let available = w.updater(&mut after).check().unwrap();
     assert!(available.is_empty());
-    assert!(!w.user.update_available().exists());
+    assert_eq!(fs::read_to_string(w.user.update_available()).unwrap(), "");
     assert!(after.ran.iter().all(|line| !line.starts_with("sudo")));
 }
 
