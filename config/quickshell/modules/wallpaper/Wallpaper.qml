@@ -11,12 +11,6 @@ import qs.services
 // pixels. A video plays over its poster while Motion allows it here (mode,
 // AC, not locked, screens on, no fullscreen window) and falls back to the
 // poster otherwise.
-//
-// A ukiyo scene draws on its own background layer (namespace "ukiyo"). This
-// one shows the scene's poster until ukiyo says it's on screen, then fades
-// out and unmaps, so whichever of the two layers is on top, ukiyo shows, and
-// there's never a black frame between them. A preview from the picker brings
-// it back on top for as long as it lasts.
 PanelWindow {
     id: root
 
@@ -24,19 +18,6 @@ PanelWindow {
     readonly property real dpr: screen?.devicePixelRatio ?? 1
     readonly property bool motion: Motion.desktopOn(screen)
     property WallpaperView front: first
-    // ukiyo draws the current scene and nothing is being previewed.
-    readonly property bool ceded: Ukiyo.shown && Wallpapers.preview === "" && Wallpapers.isScene(source)
-    // 1 while shown, 0 once ceded to ukiyo; the window unmaps at 0.
-    property real presence: ceded ? 0 : 1
-
-    visible: presence > 0 || !ceded
-
-    Behavior on presence {
-        Anim {
-            duration: Theme.anim.slow
-            easing.bezierCurve: Theme.anim.effects
-        }
-    }
 
     anchors {
         top: true
@@ -45,7 +26,7 @@ PanelWindow {
         right: true
     }
     exclusionMode: ExclusionMode.Ignore
-    color: root.ceded ? "transparent" : Theme.m3surface
+    color: Theme.m3surface
     WlrLayershell.layer: WlrLayer.Background
     WlrLayershell.namespace: "qs-wallpaper"
 
@@ -82,16 +63,11 @@ PanelWindow {
         }
     }
 
-    Item {
-        anchors.fill: parent
-        opacity: root.presence
+    Layer {
+        id: first
+    }
 
-        Layer {
-            id: first
-        }
-
-        Layer {
-            id: second
-        }
+    Layer {
+        id: second
     }
 }

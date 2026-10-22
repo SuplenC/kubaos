@@ -37,7 +37,7 @@ Scope {
             Panels.toggle("wallpaper");
         }
 
-        // The picker on its settings tab: Motion and every ukiyo option.
+        // The picker on its settings tab.
         function settings(): void {
             Wallpapers.openSettings = true;
             Panels.open("wallpaper");
@@ -49,16 +49,11 @@ Scope {
         }
 
         // JSON: what's shown, the motion mode, whether motion is allowed
-        // right now, which screens are playing which video, and the ukiyo
-        // scene (if one is the wallpaper).
+        // right now, and which screens are playing which video.
         function status(): string {
             return JSON.stringify({
                 wallpaper: Wallpapers.shown,
                 video: Wallpapers.isVideo(Wallpapers.shown),
-                // ukiyo: the current scene, and whether ukiyo draws it (the
-                // desktop's own layer has stepped aside).
-                scene: Ukiyo.current,
-                ukiyo: Ukiyo.shown,
                 mode: Motion.mode,
                 allowed: Motion.allowed,
                 onBattery: Motion.onBattery,

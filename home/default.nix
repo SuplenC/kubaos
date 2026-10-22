@@ -13,7 +13,6 @@
     ./shell.nix
     ./terminal.nix
     ./theme.nix
-    ./ukiyo.nix
   ];
 
   home = {

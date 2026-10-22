@@ -161,18 +161,13 @@ in
 
   # First run: render defaults so every consumer has a file before login.
   # After linkGeneration, so ~/.local/bin/dot-theme exists on a fresh home.
-  # The default wallpaper is a ukiyo scene: dot-theme asks ukiyo for its
-  # poster, from the profile's share, the same path the session sees.
   home.activation.dotThemeDefaults = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     if [ ! -e "${stateDir}/colors.json" ] && [ -x "${config.home.homeDirectory}/.local/bin/dot-theme" ]; then
       run env PATH="${
         lib.makeBinPath [
           pkgs.matugen
-          pkgs.jq
-          kubaosPkgs.ukiyo
         ]
       }:$PATH" \
-        XDG_DATA_DIRS="${config.home.profileDirectory}/share:''${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \
         "${config.home.homeDirectory}/.local/bin/dot-theme" apply || true
     fi
   '';

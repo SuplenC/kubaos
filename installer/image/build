@@ -100,7 +100,7 @@ BUILD_ID="$(date -u +%Y%m%d)-${COMMIT:0:12}"
 [[ "$COMMIT" == *-dirty ]] && BUILD_ID+="-dirty"
 BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# Local flake inputs (git+file:// or path: in flake.lock, like ukiyo's
+# Local flake inputs (git+file:// or path: in flake.lock, such as a local
 # checkout): mounted read-only at the same path, so Nix in the container
 # fetches them where the lock file says, and `nix flake archive` puts them
 # in the payload for offline switches on the machine.
@@ -122,7 +122,7 @@ docker run --rm --name "$CONTAINER" --platform "linux/$DARCH" \
   --cpus "$CPUS" --memory "$MEM" --hostname "$HOST" \
   -v "$NIX_VOLUME:/nix" -v "$WORK_VOLUME:/work" \
   -v "$IN:/in:ro" -v "$OUT:/out" ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} \
-  -e LOCAL_INPUTS="$LOCAL_INPUTS" -e UKIYO_OVERRIDE_URL="$UKIYO_OVERRIDE_URL" \
+  -e LOCAL_INPUTS="$LOCAL_INPUTS" \
   -e ARCH="$ARCH" -e HOST="$HOST" -e PAYLOAD_USER="$PAYLOAD_USER" -e COMMIT="$COMMIT" \
   -e VERSION="$VERSION" -e BUILT_AT="$BUILT_AT" -e ZSTD_LEVEL="$ZSTD_LEVEL" -e CPUS="$CPUS" \
   -e BUILD_ID="$BUILD_ID" \

@@ -15,19 +15,10 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # The live wallpaper engine (docs/UKIYO.md). Pinned to a commit (ukiyo has
-    # no tags yet), so a release rebuilds the same ukiyo. Bump the rev on
-    # purpose, then `nix flake update ukiyo`. To build against a local
-    # checkout instead: --override-input ukiyo git+file://$HOME/Projects/ukiyo
-    # (the Docker builds bind-mount it, see test/lib/local-inputs.sh).
-    ukiyo = {
-      url = "github:SuplenC/ukiyo/9565669ae1700b439868359f8d5d8559edf7f691";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     # The wallpaper sets, one folder each (SuplenC/kubaos-wallpapers), pinned
-    # to a commit like ukiyo. system/60-nix.sh links /usr/share/kubaos/wallpapers
-    # to it, so a new set reaches machines with a KubaOS release: bump the
-    # rev, then `nix flake update kubaos-wallpapers`.
+    # to a commit. system/60-nix.sh links /usr/share/kubaos/wallpapers to it,
+    # so a new set reaches machines with a KubaOS release: bump the rev, then
+    # `nix flake update kubaos-wallpapers`.
     kubaos-wallpapers = {
       url = "github:SuplenC/kubaos-wallpapers/8a8465973564bfefd5abbfe82339cd645464ce92";
       flake = false;

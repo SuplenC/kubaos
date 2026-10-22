@@ -12,8 +12,7 @@ import qs.settings
 // remembered on disk) and what the machine is doing: on battery, locked,
 // screens off (idle as long as hypridle waits before DPMS), a fullscreen
 // window on that monitor. Anything that says no stops the video and shows
-// its poster frame. ukiyo's live scenes follow the same rules (Ukiyo.qml):
-// the mode is mirrored into ukiyo's config, and a change there comes back.
+// its poster frame.
 Singleton {
     id: root
 
@@ -34,14 +33,6 @@ Singleton {
     property var playing: ({})
 
     function setMode(m: string): bool {
-        if (!adopt(m))
-            return false;
-        Ukiyo.pushMode(m);
-        return true;
-    }
-
-    // Take a mode without telling ukiyo (it's where the mode came from).
-    function adopt(m: string): bool {
         if (!modes.includes(m))
             return false;
         prefs.animate = m;

@@ -121,7 +121,7 @@ theme_files_ok() {
     jq -e --arg k "$k" '.[$k] | test("^#[0-9a-fA-F]{6}$")' "$st/colors.json" >/dev/null ||
       { echo "FAIL colors.json: $k missing or not #rrggbb"; return 1; }
   done
-  jq -e '.mode == "dark" and (.wallpaper | startswith("/") or startswith("ukiyo:"))' "$st/colors.json" >/dev/null ||
+  jq -e '.mode == "dark" and (.wallpaper | startswith("/"))' "$st/colors.json" >/dev/null ||
     { echo "FAIL colors.json: mode/wallpaper"; return 1; }
   echo "ok   ${#THEME_FILES[@]} theme files, ${#M3_KEYS[@]} color keys"
 }
@@ -427,15 +427,13 @@ c_recorder() {
 # Wallpaper sets (issue #16): every set read-only in /usr/share/kubaos/wallpapers,
 # the picker's folders are the chosen ones (~/.config/kubaos/wallpapers/sets,
 # all of them without the file) plus ~/Pictures/wallpapers, a real folder.
-# ukiyo's scenes are their own folder, `live`.
 c_wallpaper_sets() {
   local sys=/usr/share/kubaos/wallpapers sets="$USER_HOME/.config/kubaos/wallpapers/sets"
-  local own="$USER_HOME/Pictures/wallpapers" st="$USER_HOME/.local/state/theme" got live="" first bad=0 wall
+  local own="$USER_HOME/Pictures/wallpapers" st="$USER_HOME/.local/state/theme" got bad=0 wall
   [[ "$(readlink "$sys")" == /nix/store/* ]] && echo "ok   $sys -> $(readlink "$sys")" ||
     { echo "FAIL $sys isn't a link into the store"; return 1; }
   [[ -d $own && ! -L $own ]] && echo "ok   ~/Pictures/wallpapers is a real folder" ||
     { echo "FAIL ~/Pictures/wallpapers isn't a real folder"; return 1; }
-  [[ -n "$(zrun 'ukiyo scenes --json 2>/dev/null | jq -r ".[].id"' 2>/dev/null)" ]] && live="live "
   folders() { zrun 'dot-theme folders' | cut -f1 | tr '\n' ' '; }
 
   # The switch seeded the file (no installer here) with today's sets.
@@ -444,12 +442,12 @@ c_wallpaper_sets() {
     { echo "FAIL sets file after the switch: $(cat "$sets" 2>&1)"; bad=1; }
   rm -f "$sets"
   got="$(folders)"
-  [[ $got == "${live}cyberpunk japanese shinjuku yours " ]] && echo "ok   no sets file: every set ($got)" ||
+  [[ $got == "cyberpunk japanese shinjuku yours " ]] && echo "ok   no sets file: every set ($got)" ||
     { echo "FAIL no sets file: folders are '$got'"; bad=1; }
   as_user mkdir -p "$(dirname "$sets")"
   printf '# picked at install\nshinjuku\nvaporwave\n' | as_user tee "$sets" >/dev/null
   got="$(folders)"
-  [[ $got == "${live}shinjuku yours " ]] && echo "ok   sets file: the chosen set, unknown ones skipped ($got)" ||
+  [[ $got == "shinjuku yours " ]] && echo "ok   sets file: the chosen set, unknown ones skipped ($got)" ||
     { echo "FAIL sets file 'shinjuku vaporwave': folders are '$got'"; bad=1; }
   zrun 'dot-theme folder japanese' >/dev/null 2>&1 && { echo "FAIL dot-theme folder japanese works, but it isn't chosen"; bad=1; } ||
     echo "ok   dot-theme folder refuses a set that isn't chosen"
@@ -459,8 +457,7 @@ c_wallpaper_sets() {
   [[ "$(zrun 'dot-theme current')" == "$own/mine.jpg" && "$(<"$st/folder")" == yours ]] &&
     echo "ok   your own image is the wallpaper, folder yours" || { echo "FAIL current $(zrun 'dot-theme current'), folder $(<"$st/folder")"; bad=1; }
   expect_ok "dot-theme toggle-folder" zrun 'dot-theme toggle-folder' || bad=1
-  first="${live% }"
-  [[ "$(<"$st/folder")" == "${first:-shinjuku}" ]] && echo "ok   toggle-folder wraps from yours to ${first:-shinjuku}" ||
+  [[ "$(<"$st/folder")" == shinjuku ]] && echo "ok   toggle-folder wraps from yours to shinjuku" ||
     { echo "FAIL toggle-folder from yours went to $(<"$st/folder")"; bad=1; }
 
   # An older machine's wallpaper was under ~/Pictures/wallpapers/<set>/:
@@ -470,6 +467,19 @@ c_wallpaper_sets() {
   expect_ok "dot-theme apply (old path)" zrun 'dot-theme apply' || bad=1
   [[ "$(zrun 'dot-theme current')" == "$wall" ]] && echo "ok   the old ~/Pictures/wallpapers/shinjuku path moves to $wall" ||
     { echo "FAIL old path: current is $(zrun 'dot-theme current')"; bad=1; }
+
+  wall="$sys/shinjuku/kabukicho-red-gate.jpg"
+  : >"$st/wallpaper"
+  expect_ok "dot-theme apply (first boot)" zrun 'dot-theme apply' || bad=1
+  [[ "$(zrun 'dot-theme current')" == "$wall" ]] && echo "ok   first boot: the default is $wall" ||
+    { echo "FAIL first boot: current is $(zrun 'dot-theme current')"; bad=1; }
+
+  # Machines from earlier releases may have a live scene, `ukiyo:<id>`, as the
+  # wallpaper: apply moves them to the default.
+  printf '%s\n' ukiyo:kabukicho-gate >"$st/wallpaper"
+  expect_ok "dot-theme apply (old live scene)" zrun 'dot-theme apply' || bad=1
+  [[ "$(zrun 'dot-theme current')" == "$wall" ]] && echo "ok   the old live scene ukiyo:kabukicho-gate moves to $wall" ||
+    { echo "FAIL old live scene: current is $(zrun 'dot-theme current')"; bad=1; }
 
   rm -f "$sets" "$own/mine.jpg"
   return "$bad"
@@ -483,7 +493,7 @@ c_wallpaper_sets() {
 c_wallpaper_video() {
   local st="$USER_HOME/.local/state/theme" vid poster a b out seen n i bad=0 pid
   vid="$(zrun 'ls /usr/share/kubaos/wallpapers/*/*.mp4 ~/Pictures/wallpapers/*.mp4 2>/dev/null | head -1')"
-  # The sets have no video wallpapers any more (the live scene replaced them).
+  # None of the sets has a video wallpaper.
   [[ -n $vid ]] || { echo "skip no video wallpaper in the sets or ~/Pictures/wallpapers"; return 0; }
   poster="${vid%.*}.poster.jpg"
   [[ -f $poster ]] || { echo "FAIL $vid has no poster ($poster)"; return 1; }
@@ -550,78 +560,6 @@ c_wallpaper_video() {
   return "$bad"
 }
 
-# ukiyo, the live wallpaper (docs/UKIYO.md): the package on PATH, the
-# declarative defaults parse and are what the schema reports, the zsh hook is
-# in the interactive shell, dot-theme takes ukiyo:<id> with colors from the
-# scene's poster. Then in a sway session: the daemon draws, Quickshell steps
-# aside, locking makes it still with a lock frame on disk, unlocking resumes,
-# and a still wallpaper stops the daemon. Prints ukiyo's CPU while drawing.
-c_ukiyo() {
-  local st="$USER_HOME/.local/state/theme" out poster a b bad=0 pid
-  out="$(zrun 'command -v ukiyo')"
-  [[ $out == "$USER_HOME/.nix-profile/bin/ukiyo" ]] && echo "ok   ukiyo on PATH: $out" || { echo "FAIL ukiyo -> $out"; return 1; }
-  out="$(zrun 'ukiyo --version' 2>&1)" && [[ $out == ukiyo* ]] && echo "ok   $out" || { echo "FAIL ukiyo --version: $out"; bad=1; }
-  [[ -s $USER_HOME/.config/ukiyo/defaults.toml ]] && echo "ok   ~/.config/ukiyo/defaults.toml" || { echo "FAIL no defaults.toml"; bad=1; }
-  out="$(zrun 'ukiyo config schema --json' 2>&1)"
-  if jq -e 'map(select(.key == "performance.idle_timeout" and .value == 600 and .source == "defaults")) | length == 1' <<<"$out" >/dev/null 2>&1 &&
-    jq -e 'map(select(.key == "signals.typing.source" and .value == "idle")) | length == 1' <<<"$out" >/dev/null &&
-    jq -e 'map(select(.key | startswith("scenes.kabukicho-gate."))) | length > 0' <<<"$out" >/dev/null; then
-    echo "ok   the schema reads defaults.toml ($(jq length <<<"$out") options, the gate's included)"
-  else
-    echo "FAIL ukiyo config schema doesn't show the defaults: ${out:0:300}"; bad=1
-  fi
-  out="$(as_user script -qec "zsh -l -i -c 'whence -w _ukiyo_precmd; print -l \$precmd_functions'" /dev/null | tr -d '\r')"
-  grep -q '_ukiyo_precmd: function' <<<"$out" && grep -qx '_ukiyo_precmd' <<<"$out" &&
-    echo "ok   the zsh hook is sourced (_ukiyo_precmd in precmd_functions)" || { echo "FAIL zsh hook: $out"; bad=1; }
-  grep -q 'ukiyo-hook.zsh' "$USER_HOME/.zshrc" || { echo "FAIL ~/.zshrc doesn't source the generated hook"; bad=1; }
-
-  poster="$(zrun 'ukiyo scenes --json' | jq -r '.[] | select(.id == "kabukicho-gate") | .poster')"
-  [[ -f $poster ]] || { echo "FAIL no poster for kabukicho-gate: '$poster'"; return 1; }
-  expect_ok "dot-theme set <the scene's poster>" zrun "dot-theme set '$poster'" || return 1
-  a="$(jq -S 'del(.wallpaper)' "$st/colors.json")"
-  expect_ok "dot-theme set ukiyo:kabukicho-gate" zrun 'dot-theme set ukiyo:kabukicho-gate' || return 1
-  b="$(jq -S 'del(.wallpaper)' "$st/colors.json")"
-  [[ $a == "$b" ]] && echo "ok   colors come from the scene's poster" || { echo "FAIL colors differ from the poster's"; bad=1; }
-  [[ "$(zrun 'dot-theme current')" == ukiyo:kabukicho-gate ]] && jq -e '.wallpaper == "ukiyo:kabukicho-gate"' "$st/colors.json" >/dev/null &&
-    echo "ok   the wallpaper is ukiyo:kabukicho-gate" || { echo "FAIL dot-theme current / colors.json wallpaper"; bad=1; }
-  out="$(zrun 'dot-theme apply' 2>&1)"
-  [[ -z $out ]] && echo "ok   dot-theme apply on a scene is quiet with nothing changed" || { echo "FAIL apply: $out"; bad=1; }
-
-  session_start sway 1280x800 1
-  in_session 'dot-theme set ukiyo:kabukicho-gate' >"$LOGS/ukiyo-set.log" 2>&1 || { echo "FAIL dot-theme set in the session:"; cat "$LOGS/ukiyo-set.log"; bad=1; }
-  if ! qs_start; then
-    echo "FAIL Quickshell didn't load"; session_stop; return 1
-  fi
-  for _ in $(seq 60); do
-    out="$(in_session 'qs ipc call wallpaper status' 2>/dev/null)"
-    jq -e '.ukiyo == true' <<<"$out" >/dev/null 2>&1 && break
-    sleep 0.5
-  done
-  jq -e '.scene == "kabukicho-gate" and .ukiyo == true' <<<"$out" >/dev/null 2>&1 &&
-    echo "ok   ukiyo draws the scene, Quickshell's layer stepped aside" || { echo "FAIL not drawing: $out"; in_session 'ukiyo status' 2>&1 | head; bad=1; }
-  pid="$(pgrep -u "$USER_NAME" -n -x ukiyo || true)"
-  [[ -n $pid ]] && echo "     ukiyo CPU (100% = one core, llvmpipe), drawing: $(cpu_pct "$pid" 5)%"
-  in_session 'qs ipc call session lock' >/dev/null 2>&1
-  for _ in $(seq 40); do
-    out="$(in_session 'ukiyo status --json' 2>/dev/null)"
-    jq -e '.state == "still" and (.still_frames | length > 0)' <<<"$out" >/dev/null 2>&1 && break
-    sleep 0.25
-  done
-  jq -e '.state == "still" and (.still_frames | length > 0)' <<<"$out" >/dev/null 2>&1 &&
-    echo "ok   locked: ukiyo is still, lock frame $(jq -r '.still_frames[0]' <<<"$out")" || { echo "FAIL lock: $(jq -c '{state, still, reasons, still_frames, outputs}' <<<"$out" 2>&1)"; bad=1; }
-  [[ -n $pid ]] && echo "     ukiyo CPU, still: $(cpu_pct "$pid" 3)%"
-  [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
-  in_session 'dot-theme set /usr/share/kubaos/wallpapers/japanese/tokyo-tower-blue-hour.jpg' >"$LOGS/ukiyo-stop.log" 2>&1
-  for _ in $(seq 20); do pgrep -u "$USER_NAME" -x ukiyo >/dev/null || break; sleep 0.5; done
-  pgrep -u "$USER_NAME" -x ukiyo >/dev/null && {
-    echo "FAIL ukiyo still runs with a still as the wallpaper:"; cat "$LOGS/ukiyo-stop.log"
-    pgrep -a -u "$USER_NAME" -x ukiyo; tail -n 5 "$st/ukiyo.log"; bad=1
-  } ||
-    echo "ok   a still as the wallpaper stops the daemon"
-  session_stop
-  return "$bad"
-}
-
 # cpu_pct PID SECONDS: the process's CPU use over SECONDS, in percent of one core.
 cpu_pct() {
   local pid=$1 secs=$2 t0 t1 hz
@@ -645,7 +583,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell recorder wallpaper_sets wallpaper_video ukiyo user_layer; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell recorder wallpaper_sets wallpaper_video user_layer; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

@@ -80,29 +80,7 @@
         "home-manager": "home-manager",
         "kubaos-wallpapers": "kubaos-wallpapers",
         "nixpkgs": "nixpkgs",
-        "quickshell": "quickshell",
-        "ukiyo": "ukiyo"
-      }
-    },
-    "ukiyo": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1792279820,
-        "narHash": "sha256-280lkVbojZF3J8V4ocrhW5nwi/35T3OA3GqgqqLw0QU=",
-        "owner": "SuplenC",
-        "repo": "ukiyo",
-        "rev": "9565669ae1700b439868359f8d5d8559edf7f691",
-        "type": "github"
-      },
-      "original": {
-        "owner": "SuplenC",
-        "repo": "ukiyo",
-        "rev": "9565669ae1700b439868359f8d5d8559edf7f691",
-        "type": "github"
+        "quickshell": "quickshell"
       }
     }
   },

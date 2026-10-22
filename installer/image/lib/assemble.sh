@@ -83,20 +83,10 @@ for d in ${local_inputs[@]+"${local_inputs[@]}"}; do
   echo "    local input $d"
 done
 
-# UKIYO_OVERRIDE_URL (git+file://, from the host's UKIYO_OVERRIDE): lock ukiyo
-# to a local checkout instead of github:SuplenC/ukiyo, for every nix command
-# below and the shipped repo (system/lib.sh's --inputs-from included).
-if [[ -n "${UKIYO_OVERRIDE_URL:-}" ]]; then
-  say "ukiyo input -> $UKIYO_OVERRIDE_URL"
-  as_user sh -c "cd '$REPO' && $NIX_BIN/nix flake lock --override-input ukiyo '$UKIYO_OVERRIDE_URL' && git add -A && \
-    git -c user.name=dotinstall -c user.email=dotinstall@localhost commit -q --no-gpg-sign -m 'ukiyo override'"
-fi
-
 # ---------------------------------------------------------------------------
 # A clone of the commit (full history) on a local `release` branch, which
-# only the updater moves, with origin on GitHub. A --allow-dirty build, or
-# a ukiyo override, commits what it built from on top, so the release
-# branch holds the files the generation is built from.
+# only the updater moves, with origin on GitHub. A --allow-dirty build
+# commits what it built from on top, so the release branch holds the files the generation is built from.
 say "KubaOS checkout $KUBAOS (branch release, origin $KUBAOS_ORIGIN)"
 kubaos_git() { git -c user.name=dotinstall -c user.email=dotinstall@localhost -C "$KUBAOS" "$@"; }
 rm -rf "$KUBAOS"

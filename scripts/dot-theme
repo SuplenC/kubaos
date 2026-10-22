@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
 # dot-theme: change the wallpaper, KubaOS recolors itself. See config/matugen/README.md.
 # Videos are wallpapers too: colors come from <name>.poster.jpg next to them.
-# So are ukiyo's live scenes (docs/UKIYO.md): ukiyo:<id>, colors from the poster.
 #
-#   dot-theme set <file|ukiyo:id> set wallpaper (image, video or live scene)
-#                                 and regenerate colors
+#   dot-theme set <file>          set wallpaper (image or video) and regenerate colors
 #   dot-theme next | prev         next/previous wallpaper in the current folder
 #   dot-theme folder <name>       switch folder (one of `dot-theme folders`)
 #   dot-theme folders             the picker's folders, name<TAB>directory
-#                                 (live: ukiyo's scenes; your chosen sets;
-#                                 yours: ~/Pictures/wallpapers)
+#                                 (your chosen sets; yours: ~/Pictures/wallpapers)
 #   dot-theme toggle-folder       switch to the next folder
 #   dot-theme apply [--force]     regenerate from the current wallpaper (login);
 #                                 a no-op when nothing changed, unless --force
-#   dot-theme current             print the current wallpaper (path or ukiyo:id)
+#   dot-theme current             print the current wallpaper's path
 set -euo pipefail
 
 STATE="$HOME/.local/state/theme"
@@ -33,21 +30,18 @@ OWN_FOLDER=yours
 # wallpaper's own neon hue in the accent roles (tonal-spot washes it out);
 # override per run with DOT_THEME_SCHEME (scheme-vibrant, scheme-content, ...).
 SCHEME="${DOT_THEME_SCHEME:-scheme-fidelity}"
-# First-boot wallpaper: a ukiyo scene (ukiyo:<id>), or a path relative to
-# $SETS_DIR. config/matugen/default-colors.json is generated from it (see
+# First-boot wallpaper, a path relative to $SETS_DIR.
+# config/matugen/default-colors.json is generated from it (see
 # config/matugen/README.md).
-DEFAULT_WALLPAPER="ukiyo:kabukicho-gate"
+DEFAULT_WALLPAPER="shinjuku/kabukicho-red-gate.jpg"
 # Source color of DEFAULT_WALLPAPER, used when no image exists at all.
 DEFAULT_SEED="#db2b34"
-# ukiyo's scenes are a folder of their own, the first tab. Not a set: any
-# set may be left out.
-SCENE_FOLDER=live
 
 die() { printf 'dot-theme: %s\n' "$*" >&2; exit 1; }
 hint() { printf 'dot-theme: %s\n' "$*" >&2; }
 
 usage() {
-  sed -n '2,17s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+  sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"
 }
 
 matugen_dir() {
@@ -102,113 +96,14 @@ poster_for() {
   printf '%s\n' "$cached"
 }
 
-# --- ukiyo scenes ----------------------------------------------------------
-# A scene is the wallpaper `ukiyo:<id>`. Its colors come from its poster (from
-# `ukiyo scenes --json`); the daemon draws it (ukiyo.service, home/ukiyo.nix).
-# While a still or a loop is the wallpaper, no daemon runs.
-
-is_scene() { [[ $1 == ukiyo:* ]]; }
-
-# scenes_json: `ukiyo scenes --json`, once per run. Empty without ukiyo.
-SCENES_JSON=""
-scenes_json() {
-  if [[ -z $SCENES_JSON ]]; then
-    command -v ukiyo >/dev/null && command -v jq >/dev/null || return 0
-    SCENES_JSON=$(ukiyo scenes --json 2>/dev/null) || SCENES_JSON="[]"
-  fi
-  printf '%s\n' "$SCENES_JSON"
-}
-
-# Installed scenes as ukiyo:<id>, one per line, sorted by id.
-list_scenes() {
-  scenes_json | jq -r '.[] | select(.poster != null) | "ukiyo:\(.id)"' 2>/dev/null || true
-}
-
-# The poster of scene <id>; fails when it isn't installed.
-scene_poster() {
-  local poster
-  poster=$(scenes_json | jq -r --arg id "$1" '.[] | select(.id == $id) | .poster // empty' 2>/dev/null)
-  [[ -n $poster && -f $poster ]] || return 1
-  printf '%s\n' "$poster"
-}
-
-# The image matugen reads for a wallpaper: a scene's or a video's poster, or
-# the still itself.
+# The image matugen reads for a wallpaper: a video's poster, or the still itself.
 source_image() {
-  if is_scene "$1"; then
-    scene_poster "${1#ukiyo:}" || die "no ukiyo scene '${1#ukiyo:}' installed (ukiyo scenes lists them)"
-  elif is_video "$1"; then
-    poster_for "$1"
-  else
-    printf '%s\n' "$1"
-  fi
-}
-
-ukiyo_running() { ukiyo status --json >/dev/null 2>&1; }
-
-# systemd --user runs and has ukiyo.service (home/ukiyo.nix).
-user_unit() {
-  command -v systemctl >/dev/null &&
-    systemctl --user show-environment >/dev/null 2>&1 &&
-    systemctl --user cat ukiyo.service >/dev/null 2>&1
-}
-
-# Start the daemon: the user unit when systemd --user has it, else a plain
-# background process (the test harness has no systemd). Waits until it answers.
-ukiyo_start() {
-  # No session (a tty, home-manager's activation): the next login's
-  # `dot-theme apply` starts it.
-  [[ -n ${WAYLAND_DISPLAY:-} ]] || return 1
-  if user_unit; then
-    # Hyprland's autostart imports the display too, in parallel with the
-    # `dot-theme apply` that may get here first.
-    local -a vars=(WAYLAND_DISPLAY)
-    [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && vars+=(HYPRLAND_INSTANCE_SIGNATURE)
-    systemctl --user import-environment "${vars[@]}" 2>/dev/null || true
-    systemctl --user start ukiyo.service || return 1
-  else
-    mkdir -p "$STATE"
-    # 9>&-: not with our run lock (lock()), or the daemon would hold it for
-    # as long as it runs and every later dot-theme would wait it out.
-    setsid -f ukiyo daemon >"$STATE/ukiyo.log" 2>&1 </dev/null 9>&-
-  fi
-  local _
-  for _ in $(seq 50); do
-    ukiyo_running && return 0
-    sleep 0.1
-  done
-  return 1
-}
-
-# Show scene <id>: start the daemon if it isn't running, then switch to it.
-ukiyo_show() {
-  command -v ukiyo >/dev/null || die "ukiyo isn't installed (home/ukiyo.nix); can't show ukiyo:$1"
-  if ! ukiyo_running && ! ukiyo_start; then
-    [[ -n ${WAYLAND_DISPLAY:-} ]] &&
-      hint "well, shit. ukiyo didn't start: journalctl --user -u ukiyo, or $STATE/ukiyo.log. The colors are set anyway."
-    return 0
-  fi
-  ukiyo set "$1" >/dev/null || hint "ukiyo refused scene '$1'; the colors are set anyway"
-}
-
-# A still or a loop is the wallpaper now: stop the daemon. Stopped, not
-# paused: a paused daemon keeps its layer surface on the background layer,
-# which can sit above Quickshell's and cover the new wallpaper, and keeps its
-# textures in GPU memory. Starting again costs a fraction of a second, which
-# the scene's poster hides. The stop waits a moment, so Quickshell's layer
-# is back up before ukiyo's goes away (no black frame between them).
-ukiyo_hide() {
-  command -v ukiyo >/dev/null || return 0
-  if user_unit && systemctl --user is-active --quiet ukiyo.service; then
-    setsid -f sh -c 'sleep 1.5; systemctl --user stop ukiyo.service' >/dev/null 2>&1 </dev/null 9>&-
-  elif ukiyo_running; then
-    setsid -f sh -c 'sleep 1.5; ukiyo quit' >/dev/null 2>&1 </dev/null 9>&-
-  fi
+  if is_video "$1"; then poster_for "$1"; else printf '%s\n' "$1"; fi
 }
 
 # --- folders ---------------------------------------------------------------
-# The picker's tabs, in order: live (when ukiyo has scenes), the chosen sets
-# by name, yours. Quickshell asks `dot-theme folders` (services/Wallpapers.qml).
+# The picker's tabs, in order: the chosen sets by name, then yours.
+# Quickshell asks `dot-theme folders` (services/Wallpapers.qml).
 
 # The sets in $SETS_FILE (all without it) that are on this machine, sorted.
 chosen_sets() {
@@ -222,8 +117,8 @@ chosen_sets() {
   for d in "$SETS_DIR"/*/; do
     [[ -d $d ]] || continue
     id=$(basename -- "$d")
-    # The two names that aren't sets.
-    [[ $id == "$SCENE_FOLDER" || $id == "$OWN_FOLDER" ]] && continue
+    # The name that isn't a set.
+    [[ $id == "$OWN_FOLDER" ]] && continue
     if [[ -f $SETS_FILE ]]; then
       [[ " ${want[*]-} " == *" $id "* ]] || continue
     fi
@@ -232,15 +127,13 @@ chosen_sets() {
 }
 
 list_folders() {
-  [[ -n $(list_scenes) ]] && printf '%s\n' "$SCENE_FOLDER"
   chosen_sets
   printf '%s\n' "$OWN_FOLDER"
 }
 
-# Where a folder's files are; nothing for live.
+# Where a folder's files are.
 folder_dir() {
   case $1 in
-    "$SCENE_FOLDER") ;;
     "$OWN_FOLDER") printf '%s\n' "$WALLS" ;;
     *) printf '%s\n' "$SETS_DIR/$1" ;;
   esac
@@ -251,7 +144,7 @@ folder_of() {
   local parent f
   parent=$(dirname -- "$1")
   while read -r f; do
-    [[ $f != "$SCENE_FOLDER" && $parent == "$(folder_dir "$f")" ]] && { printf '%s\n' "$f"; return 0; }
+    [[ $parent == "$(folder_dir "$f")" ]] && { printf '%s\n' "$f"; return 0; }
   done < <(list_folders)
   return 1
 }
@@ -271,17 +164,6 @@ list_images() {
   shopt -u nullglob nocaseglob
   ((${#files[@]})) || return 0
   printf '%s\n' "${files[@]}" | LC_ALL=C sort
-}
-
-# What `next`, `prev` and the folders step through: the scenes in
-# SCENE_FOLDER, the images and videos everywhere else.
-list_wallpapers() {
-  if [[ $1 == "$SCENE_FOLDER" ]]; then list_scenes; else list_images "$1"; fi
-}
-
-# The wallpaper is there: a file, or an installed scene.
-wallpaper_exists() {
-  if is_scene "$1"; then scene_poster "${1#ukiyo:}" >/dev/null; else [[ -f $1 ]]; fi
 }
 
 valid_folder() {
@@ -401,12 +283,7 @@ theme_stamp() {
   local -a inputs=("$dir/config.toml" "$dir"/templates/*)
   [[ -f $omp ]] && inputs+=("$omp")
   printf 'wallpaper %s\n' "$file"
-  if is_scene "$file"; then
-    poster=$(source_image "$file")
-    printf 'poster %s %s\n' "$poster" "$(stat -L -c '%Y %s' -- "$poster")"
-  else
-    printf 'image %s\n' "$(stat -L -c '%Y %s' -- "$file")"
-  fi
+  printf 'image %s\n' "$(stat -L -c '%Y %s' -- "$file")"
   if is_video "$file"; then
     poster=$(poster_for "$file")
     printf 'poster %s %s\n' "$poster" "$(stat -L -c '%Y %s' -- "$poster")"
@@ -466,10 +343,6 @@ name_wallpaper() {
 
 set_wallpaper() {
   local file=$1
-  if is_scene "$file"; then
-    set_scene "${file#ukiyo:}"
-    return
-  fi
   [[ -f $file ]] || die "no such file: $file"
   # -s: keep /usr/share/kubaos/wallpapers/... as is (it is a link into the store).
   file=$(realpath -s -- "$file")
@@ -480,8 +353,8 @@ set_wallpaper() {
   [[ $file != *[\"\\]* && $file != *$'\n'* ]] || die "path contains quotes, backslashes or newlines: $file"
 
   lock
-  local stamp source=$file
-  is_video "$file" && source=$(poster_for "$file")
+  local stamp source
+  source=$(source_image "$file")
   stamp=$(theme_stamp "$file")
   run_matugen image "$source" || die "matugen failed for $source"
   # matugen wrote the poster's path as {{image}}; the wallpaper is the video.
@@ -494,26 +367,6 @@ set_wallpaper() {
     write_state folder "$folder"
     write_state "last-$folder" "$file"
   fi
-  ukiyo_hide
-  reload_all
-}
-
-# set_scene <id>: a ukiyo scene as the wallpaper. Colors from its poster,
-# `ukiyo:<id>` as the wallpaper everywhere a path would be, then the daemon.
-set_scene() {
-  local id=$1 file="ukiyo:$1" stamp poster
-  [[ $id =~ ^[A-Za-z0-9._-]+$ ]] || die "not a scene id: '$id'"
-  poster=$(source_image "$file")
-  [[ $poster != *[\"\\]* && $poster != *$'\n'* ]] || die "poster path contains quotes, backslashes or newlines: $poster"
-  lock
-  stamp=$(theme_stamp "$file")
-  run_matugen image "$poster" || die "matugen failed for $poster"
-  name_wallpaper "$poster" "$file"
-  write_state wallpaper "$file"
-  printf '%s\n' "$stamp" >"$STAMP.new" && mv -f "$STAMP.new" "$STAMP"
-  write_state folder "$SCENE_FOLDER"
-  write_state "last-$SCENE_FOLDER" "$file"
-  ukiyo_show "$id"
   reload_all
 }
 
@@ -522,7 +375,7 @@ step() {
   local dir=$1 folder cur i n=0
   folder=$(current_folder)
   local -a imgs=()
-  mapfile -t imgs < <(list_wallpapers "$folder")
+  mapfile -t imgs < <(list_images "$folder")
   n=${#imgs[@]}
   if ((n == 0)); then
     hint "nothing in $folder ($(folder_dir "$folder"); jpg, jpeg, png, webp, mp4, webm, mkv, mov). Drop some in, then try again."
@@ -546,12 +399,12 @@ switch_folder() {
   valid_folder "$folder" || die "no folder '$folder' (one of: $(list_folders | paste -sd ' ')). Another set: add it to $SETS_FILE"
   write_state folder "$folder"
   [[ -r $STATE/last-$folder ]] && read -r last <"$STATE/last-$folder" || true
-  if [[ -n $last ]] && wallpaper_exists "$last"; then
+  if [[ -n $last && -f $last ]]; then
     set_wallpaper "$last"
     return
   fi
   local first
-  first=$(list_wallpapers "$folder" | head -n1)
+  first=$(list_images "$folder" | head -n1)
   if [[ -z $first ]]; then
     hint "switched to '$folder', but $(folder_dir "$folder") is empty (jpg, jpeg, png, webp, mp4, webm, mkv, mov)."
     return 0
@@ -574,6 +427,14 @@ toggle_folder() {
   switch_folder "$next"
 }
 
+# A machine set up by an earlier release may run ukiyo.service, the daemon
+# that drew its live scenes (`ukiyo:<id>`), and it draws over the wallpaper.
+stop_live_wallpaper_daemon() {
+  command -v systemctl >/dev/null || return 0
+  systemctl --user stop ukiyo.service >/dev/null 2>&1 || true
+  systemctl --user disable ukiyo.service >/dev/null 2>&1 || true
+}
+
 apply() {
   local force=$1 wp
   wp=$(current_wallpaper)
@@ -582,27 +443,26 @@ apply() {
   if [[ $wp == "$WALLS"/*/* && ! -f $wp && -f $SETS_DIR/${wp#"$WALLS"/} ]]; then
     wp=$SETS_DIR/${wp#"$WALLS"/}
   fi
-  if [[ -n $wp ]] && wallpaper_exists "$wp"; then
+  if [[ -n $wp && -f $wp ]]; then
     # Login runs this every time: skip matugen and the reloads when the last
-    # run had the same inputs and its outputs are still there. A scene still
-    # needs its daemon.
+    # run had the same inputs and its outputs are still there.
     if ((!force)) && up_to_date "$wp"; then
-      if is_scene "$wp"; then ukiyo_show "${wp#ukiyo:}"; else ukiyo_hide; fi
       return 0
     fi
     set_wallpaper "$wp"
     return
   fi
-  # No wallpaper yet (or a scene that's no longer installed): the default
-  # one, else the first of the current folder, else default colors.
-  local default=$DEFAULT_WALLPAPER
-  is_scene "$default" || default="$SETS_DIR/$default"
-  if wallpaper_exists "$default"; then
+  [[ $wp == ukiyo:* ]] && stop_live_wallpaper_daemon
+  # No wallpaper yet, or one that's gone (a deleted file, a live scene from an
+  # earlier release): the default one, else the first of the current folder,
+  # else default colors.
+  local default="$SETS_DIR/$DEFAULT_WALLPAPER"
+  if [[ -f $default ]]; then
     set_wallpaper "$default"
     return
   fi
   local first
-  first=$(list_wallpapers "$(current_folder)" | head -n1)
+  first=$(list_images "$(current_folder)" | head -n1)
   if [[ -n $first ]]; then
     set_wallpaper "$first"
     return
@@ -616,11 +476,9 @@ apply() {
 main() {
   local cmd=${1:-}
   (($#)) && shift
-  # Read the scene list once, here, so the subshells below reuse it.
-  case $cmd in set | next | prev | folder | folders | toggle-folder | apply) scenes_json >/dev/null ;; esac
   case $cmd in
     set)
-      (($# == 1)) || die "usage: dot-theme set <file|ukiyo:id>"
+      (($# == 1)) || die "usage: dot-theme set <file>"
       set_wallpaper "$1"
       ;;
     next) step 1 ;;

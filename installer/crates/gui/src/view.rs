@@ -1718,7 +1718,7 @@ fn wallpapers<'a>(app: &'a App, p: &Palette) -> El<'a> {
         .filter(|s| app.form.wallpaper_set_on(&s.id))
         .count();
     let note = if n == 0 {
-        "None picked: the picker shows ukiyo's live scenes and your own folder only.".to_string()
+        "None picked: the picker shows your own folder only.".to_string()
     } else {
         format!("{n} of {} in the picker.", sets.len())
     };

@@ -9,7 +9,6 @@
 { pkgs, inputs }:
 let
   inherit (pkgs.stdenv.hostPlatform) system;
-  ukiyo = inputs.ukiyo.packages.${system}.default;
 in
 {
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
@@ -24,13 +23,6 @@ in
   # The qtct platform theme plugins Quickshell loads: its Qt, not the user's.
   inherit (pkgs.libsForQt5) qt5ct;
   inherit (pkgs.qt6Packages) qt6ct;
-
-  inherit ukiyo;
-  # `ukiyo shell-hook zsh`, generated once at build time, so no shell start
-  # runs ukiyo (home/shell.nix sources it).
-  ukiyo-zsh-hook = pkgs.runCommand "ukiyo-hook.zsh" { nativeBuildInputs = [ ukiyo ]; } ''
-    ukiyo shell-hook zsh >$out
-  '';
 
   # Papirus with cyan folders, the neon accent most Tokyo wallpapers share.
   # An override, so cache.nixos.org doesn't have it.

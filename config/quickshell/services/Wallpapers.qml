@@ -10,9 +10,7 @@ import qs.theme
 // over a poster frame (<name>.poster.jpg next to <name>.mp4; dot-theme makes
 // one in ~/.local/state/theme/posters/ for a video that has none). The
 // folders are `dot-theme folders`: the chosen sets in
-// /usr/share/kubaos/wallpapers, then ~/Pictures/wallpapers. ukiyo's live
-// scenes are wallpapers too, `ukiyo:<id>`, a folder of their own first;
-// their still is the scene's poster (services/Ukiyo.qml).
+// /usr/share/kubaos/wallpapers, then ~/Pictures/wallpapers.
 Singleton {
     id: root
 
@@ -23,30 +21,17 @@ Singleton {
     readonly property string shown: preview || current
     // The picker opens on its settings tab next time (`qs ipc call wallpaper settings`).
     property bool openSettings: false
-    // The picker's tabs, in order: [{ name, dir }], dir "" for the scenes.
+    // The picker's tabs, in order: [{ name, dir }].
     // dot-theme decides which sets show (scripts/dot-theme, `folders`).
     property var folders: []
-    // dot-theme's SCENE_FOLDER.
-    readonly property string sceneFolder: "live"
-    // folder name -> sorted list of absolute paths (stills and videos), or
-    // of the scenes (ukiyo:<id>) in sceneFolder
-    readonly property var images: {
-        const all = Object.assign({}, files);
-        all[sceneFolder] = Ukiyo.scenes.map(s => `ukiyo:${s.id}`);
-        return all;
-    }
-    // folder name -> sorted list of the files in it
-    property var files: ({})
+    // folder name -> sorted list of absolute paths (stills and videos)
+    property var images: ({})
     // Poster files next to videos and in dot-theme's cache, as a set (path -> true).
     property var posters: ({})
     // The first listing is in: `poster()` knows what exists.
     property bool listed: false
     readonly property list<string> videoExtensions: ["mp4", "webm", "mkv", "mov"]
     readonly property list<string> imageExtensions: ["jpg", "jpeg", "png", "webp"]
-
-    function isScene(path: string): bool {
-        return path.startsWith("ukiyo:");
-    }
 
     function isVideo(path: string): bool {
         return videoExtensions.includes(path.split(".").pop().toLowerCase());
@@ -56,8 +41,6 @@ Singleton {
     // before the first frame and whenever motion is off. "" when it has none
     // (or before the first listing). Must match poster_for in scripts/dot-theme.
     function poster(path: string): string {
-        if (isScene(path))
-            return Ukiyo.poster(path.slice(6));
         if (!isVideo(path))
             return path;
         const sibling = path.replace(/\.[^./]+$/, ".poster.jpg");
@@ -68,13 +51,10 @@ Singleton {
     // Folders first: the file listing needs their directories.
     function refresh(): void {
         folderLister.running = true;
-        Ukiyo.refreshScenes();
     }
 
     // The folder a wallpaper file is in, or "".
     function folderOf(path: string): string {
-        if (isScene(path))
-            return sceneFolder;
         const dir = path.slice(0, path.lastIndexOf("/"));
         return folders.find(f => f.dir && f.dir === dir)?.name ?? "";
     }
@@ -85,8 +65,6 @@ Singleton {
 
     // Display name: file name without extension, dashes as spaces.
     function label(path: string): string {
-        if (isScene(path))
-            return Ukiyo.name(path.slice(6));
         return path.split("/").pop().replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ");
     }
 
@@ -123,7 +101,7 @@ Singleton {
                     const [name, dir] = l.split("\t");
                     return {
                         name,
-                        dir: dir ?? ""
+                        dir
                     };
                 });
                 lister.running = true;
@@ -135,13 +113,12 @@ Singleton {
         id: lister
 
         // -L: the sets are a link into the Nix store.
-        command: ["find", "-L", ...root.folders.filter(f => f.dir).map(f => f.dir), `${Theme.stateDir}/posters`, "-maxdepth", "1", "-type", "f", ...root.nameArgs([...root.imageExtensions, ...root.videoExtensions])]
+        command: ["find", "-L", ...root.folders.map(f => f.dir), `${Theme.stateDir}/posters`, "-maxdepth", "1", "-type", "f", ...root.nameArgs([...root.imageExtensions, ...root.videoExtensions])]
         stdout: StdioCollector {
             onStreamFinished: {
                 const found = {};
                 for (const f of root.folders)
-                    if (f.dir)
-                        found[f.name] = [];
+                    found[f.name] = [];
                 const posters = {};
                 for (const path of text.split("\n").filter(Boolean)) {
                     if (/\.poster\.[^./]+$/i.test(path) || path.startsWith(`${Theme.stateDir}/posters/`)) {
@@ -153,7 +130,7 @@ Singleton {
                 for (const folder in found)
                     found[folder].sort();
                 root.posters = posters;
-                root.files = found;
+                root.images = found;
                 root.listed = true;
             }
         }

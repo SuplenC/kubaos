@@ -108,6 +108,3 @@ hl.layer_rule({ match = { namespace = "^hyprpicker$" }, animation = "fade" })
 hl.layer_rule({ match = { namespace = "^qs-frame$" }, blur = true, ignore_alpha = 0.5, no_anim = true })
 hl.layer_rule({ match = { namespace = "^qs-(wallpaper|exclusion)$" }, no_anim = true })
 hl.layer_rule({ match = { namespace = "^qs-polkit$" }, animation = "fade" })
--- ukiyo, the live wallpaper (docs/UKIYO.md): a background layer that appears
--- under Quickshell's poster, which then fades out. No slide or pop-in.
-hl.layer_rule({ match = { namespace = "^ukiyo$" }, no_anim = true })
