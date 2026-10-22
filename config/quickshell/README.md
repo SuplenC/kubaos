@@ -70,7 +70,7 @@ services/               singletons, no UI
   Notifs                notification server, popups, history, DND
   Wallpapers            current wallpaper, picker preview, folder listing (stills, videos, posters), `dot-theme set`
   Motion                when moving wallpapers may decode: always / on AC / never (persisted), lock, idle, fullscreen
-  Hypr                  focused screen, workspace switching (Lua and classic dispatch)
+  Hypr                  focused screen, each screen's block of workspaces, workspace switching
   Panels                which panel is open, and on which screen
   Session               lock state, suspend/logout/reboot/poweroff
   Recorder              screen recording state ($XDG_RUNTIME_DIR/dot-record.json, watched), dot-hypr-record calls

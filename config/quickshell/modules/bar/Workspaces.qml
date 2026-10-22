@@ -6,9 +6,10 @@ import qs.settings
 import qs.components
 import qs.services
 
-// The workspace group of this monitor (1-3, 4-6 or 7-9), chosen from the
-// monitor's active workspace. If an unplugged monitor's workspaces land here,
-// the group follows whichever one is active. Scroll to move within the group.
+// This screen's workspaces, numbered 1-10 as SUPER + 1-0 reach them: its
+// first always, then those of its own that exist, then the guests, which are
+// workspaces of an unplugged screen that found no room among this one's
+// (config/hypr/workspaces.lua). Scroll to step through them.
 //
 // The active indicator stretches toward the new workspace: its leading edge
 // moves fast, the trailing edge follows a little later.
@@ -17,20 +18,37 @@ Pill {
 
     required property ShellScreen screen
     readonly property HyprlandMonitor monitor: Hyprland.monitorFor(screen)
-    readonly property int size: Settings.workspacesPerMonitor
-    readonly property int activeId: Math.max(1, monitor?.activeWorkspace?.id ?? 1)
-    readonly property int first: Math.floor((activeId - 1) / size) * size + 1
-    readonly property int slot: activeId - first
+    readonly property int block: Hypr.blockOfMonitor(monitor)
+    readonly property int activeId: monitor?.activeWorkspace?.id ?? 0
+    readonly property var ids: {
+        const own = [block * Hypr.slots + 1];
+        const guests = [];
+        for (const workspace of Hyprland.workspaces.values) {
+            const id = workspace.id;
+            if (id <= 0)
+                continue;
+            if (Hypr.blockOf(id) === block) {
+                if (!own.includes(id))
+                    own.push(id);
+            } else if (workspace.monitor?.name === monitor?.name) {
+                guests.push(id);
+            }
+        }
+        own.sort((a, b) => a - b);
+        guests.sort((a, b) => a - b);
+        return own.concat(guests);
+    }
+    readonly property int slot: Math.max(0, ids.indexOf(activeId))
     readonly property int cell: Theme.bar.pillHeight - 6
-    readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九"]
+    readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
 
     padding: 3
     spacing: 0
     interactive: true
-    onScrolled: steps => Hypr.focusWorkspace(first + (slot - steps + size) % size)
+    onScrolled: steps => Hypr.focusOn(monitor, ids[(slot - steps + ids.length) % ids.length])
 
     Item {
-        implicitWidth: root.size * root.cell
+        implicitWidth: root.ids.length * root.cell
         implicitHeight: root.cell
 
         Rectangle {
@@ -91,13 +109,14 @@ Pill {
 
         Row {
             Repeater {
-                model: root.size
+                model: root.ids
 
                 delegate: Item {
                     id: cell
 
-                    required property int index
-                    readonly property int workspaceId: root.first + index
+                    required property int modelData
+                    readonly property int workspaceId: modelData
+                    readonly property int number: Hypr.slotOf(workspaceId)
                     readonly property bool isActive: workspaceId === root.activeId
                     readonly property bool occupied: Hyprland.workspaces.values.some(w => w.id === workspaceId && w.toplevels.values.length > 0)
 
@@ -106,7 +125,7 @@ Pill {
 
                     Text {
                         anchors.centerIn: parent
-                        text: Settings.workspaceKanji ? root.kanji[cell.workspaceId - 1] ?? cell.workspaceId : cell.workspaceId
+                        text: Settings.workspaceKanji ? root.kanji[cell.number - 1] : cell.number
                         font.family: Settings.workspaceKanji ? Theme.font.jp : Theme.font.sans
                         font.pixelSize: Theme.font.sm + 1
                         font.weight: cell.isActive || cell.occupied ? Font.DemiBold : Font.Medium
@@ -140,7 +159,7 @@ Pill {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Hypr.focusWorkspace(cell.workspaceId)
+                        onClicked: Hypr.focusOn(root.monitor, cell.workspaceId)
                     }
                 }
             }
