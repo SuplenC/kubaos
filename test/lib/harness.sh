@@ -103,7 +103,9 @@ link_caches() {
 # copy_repo: /src -> ~/Projects/dotfiles, fresh git index so the flake sees
 # untracked files too. docs/screenshots and .git stay behind (60 MB each;
 # nothing reads them, and the flake would copy them into the store on every
-# changed run).
+# changed run), and so do the build outputs (target, install/out, iso) and
+# the agents' worktrees in .claude: gigabytes, still being written while the
+# copy reads them.
 copy_repo() {
   local t0
   t0="$(now)"
@@ -111,7 +113,8 @@ copy_repo() {
   rm -rf "$REPO"
   install -d -o "$USER_NAME" -g "$USER_NAME" "$REPO"
   tar -C "$SRC" --exclude=./.git --exclude=./docs/screenshots --exclude='._*' --exclude=.DS_Store \
-    --exclude=./test/out -cf - . | runuser -u "$USER_NAME" -- tar -C "$REPO" -xf -
+    --exclude=./test/out --exclude=./target --exclude=./install/out --exclude=./iso --exclude=./.claude \
+    -cf - . | runuser -u "$USER_NAME" -- tar -C "$REPO" -xf -
   as_user sh -c "cd '$REPO' && git init -q -b main && git add -A && \
     git -c user.name=test -c user.email=test@vm commit -q -m 'test snapshot' --no-gpg-sign"
   note "repo copied in $(since "$t0") s"
