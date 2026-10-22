@@ -88,6 +88,8 @@ PanelWindow {
     }
     // The pane is behind the selection, until the next frame is on screen.
     property bool paneStale: true
+    // Typing moved it there, so the pane swaps rather than crossfades.
+    property bool paneTyped: false
 
     // 0 hidden, 1 open; the window fades and drops in between.
     property real openness: 0
@@ -175,7 +177,8 @@ PanelWindow {
     function catchUp(): void {
         if (paneStale && paneShown && !typing) {
             paneStale = false;
-            pane.show(paneEntry());
+            pane.show(paneEntry(), !paneTyped);
+            paneTyped = false;
         }
     }
 
@@ -513,9 +516,9 @@ PanelWindow {
                 font.family: Theme.font.sans
                 font.pixelSize: menu.look.font.query
                 focus: true
-                cursorDelegate: Caret {}
                 onTextChanged: {
                     keystroke.restart();
+                    menu.paneTyped = true;
                     search.query = text;
                     list.currentIndex = 0;
                     list.positionViewAtBeginning();
@@ -557,11 +560,11 @@ PanelWindow {
                 renderType: Text.NativeRendering
                 font.family: Theme.font.sans
                 font.pixelSize: menu.look.font.query
-                cursorDelegate: Caret {}
                 // The selection stays where it is until the matches come;
                 // see onSelectRow.
                 onTextChanged: {
                     keystroke.restart();
+                    menu.paneTyped = true;
                     search.filter(text);
                 }
 

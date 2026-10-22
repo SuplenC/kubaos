@@ -87,7 +87,7 @@ modules/
   bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, Status, RecordingIndicator
   menu/                 Menu: the Command menu on KotodamaSearch. MenuLook (sizes for the screen,
                         motion), ResultRow, DetailPane + PaneContent, ActionPanel, FormView,
-                        ProgressView, DetailView, IntroCard, JobBar, KeyHints, Keycap, Caret,
+                        ProgressView, DetailView, IntroCard, JobBar, KeyHints, Keycap,
                         Probe (test-only timing and state lines)
   controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history
   notifications/        Popups, NotificationCard

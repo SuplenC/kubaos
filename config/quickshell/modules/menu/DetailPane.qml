@@ -2,9 +2,9 @@ import QtQuick
 import qs.theme
 import qs.components
 
-// The pane right of the list: the selected row, in full. A new selection
-// crossfades in over the last; the same row changing in place, as its
-// matched characters do while typing, just updates.
+// The pane right of the list: the selected row, in full. A row the selection
+// moved to crossfades in over the last, one the Results brought swaps at
+// once, and the same row changing in place just updates.
 Item {
     id: pane
 
@@ -12,15 +12,19 @@ Item {
     // Which of the two contents shows the entry now.
     property bool flipped: false
     readonly property PaneContent shown: flipped ? second : first
+    // Whether the last flip crossfades. A fade still running when the next
+    // key comes would make that frame wait on the screen's refresh.
+    property bool fading: false
 
     // Shows `entry`, an object as `Menu.qml`'s `paneEntry` builds it, or null
-    // for no row.
-    function show(entry: var): void {
+    // for no row, crossfading if `fade`.
+    function show(entry: var, fade: bool): void {
         if ((entry?.key ?? "") === (shown.entry?.key ?? "")) {
             shown.entry = entry;
             return;
         }
         (flipped ? first : second).entry = entry;
+        fading = fade;
         flipped = !flipped;
     }
 
@@ -44,6 +48,8 @@ Item {
         visible: opacity > 0
 
         Behavior on opacity {
+            enabled: pane.fading
+
             NumberAnimation {
                 duration: pane.look.motion.fade
                 easing.type: Easing.BezierSpline
@@ -61,6 +67,8 @@ Item {
         visible: opacity > 0
 
         Behavior on opacity {
+            enabled: pane.fading
+
             NumberAnimation {
                 duration: pane.look.motion.fade
                 easing.type: Easing.BezierSpline
