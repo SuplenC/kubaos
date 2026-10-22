@@ -56,7 +56,30 @@ hl.env("NIXOS_OZONE_WL", "1")
 -- Java (IntelliJ and friends) on tiling WMs.
 hl.env("_JAVA_AWT_WM_NONREPARENTING", "1")
 
--- Cursor size. The theme name comes from home-manager (home.pointerCursor,
--- owned by home/theme.nix), which exports XCURSOR_THEME / HYPRCURSOR_THEME.
-hl.env("XCURSOR_SIZE", "24")
-hl.env("HYPRCURSOR_SIZE", "24")
+-- Cursor: KubaOS-Bibata, the recoloured Bibata `kubaos cursor` writes (and
+-- home/theme.nix names for every other client), at the size in the user's
+-- ~/.config/kubaos/cursor/cursor.toml, which the Command menu sets. The
+-- classic style is the same name: its theme inherits Bibata-Modern-Classic.
+do
+  local size = "24"
+  local config = os.getenv("XDG_CONFIG_HOME")
+  if not config or config == "" then
+    config = home .. "/.config"
+  end
+  local file = io.open(config .. "/kubaos/cursor/cursor.toml", "r")
+  if file then
+    for line in file:lines() do
+      -- The range `kubaos cursor` takes (crates/kubaos-cursor/src/settings.rs).
+      local value = line:match("^%s*size%s*=%s*(%d+)%s*$")
+      if value and tonumber(value) >= 16 and tonumber(value) <= 96 then
+        size = value
+        break
+      end
+    end
+    file:close()
+  end
+  hl.env("XCURSOR_THEME", "KubaOS-Bibata")
+  hl.env("HYPRCURSOR_THEME", "KubaOS-Bibata")
+  hl.env("XCURSOR_SIZE", size)
+  hl.env("HYPRCURSOR_SIZE", size)
+end

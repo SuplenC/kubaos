@@ -233,12 +233,26 @@ reload_gtk() {
   gsettings set org.gnome.desktop.interface gtk-theme "$theme" 2>/dev/null || true
 }
 
+# The pointer in the new colours (`kubaos cursor`, crates/kubaos-cursor): the
+# hyprcursor theme and `hyprctl setcursor` now, the XCursor theme in the
+# background. Without kubaos, or when it fails, the pointer is
+# Bibata-Modern-Classic and the rest of the theme stands.
+reload_cursor() {
+  command -v kubaos >/dev/null || return 0
+  local err
+  # HAZARD: close the run lock (fd 9) for kubaos. Its background render would
+  # inherit it and hold every next dot-theme run until it finished.
+  err=$(kubaos cursor apply 2>&1 >/dev/null 9>&-) ||
+    hint "the pointer stays Bibata-Modern-Classic: ${err:-kubaos cursor apply failed}"
+}
+
 reload_all() {
   reload_tmux &
   reload_ghostty &
   reload_nvim &
   reload_hypr &
   reload_gtk &
+  reload_cursor &
   wait
   # Quickshell watches colors.json itself.
 }
@@ -445,8 +459,11 @@ apply() {
   fi
   if [[ -n $wp && -f $wp ]]; then
     # Login runs this every time: skip matugen and the reloads when the last
-    # run had the same inputs and its outputs are still there.
+    # run had the same inputs and its outputs are still there. The cursor
+    # still runs: it skips what's up to date itself, and finishes a background
+    # render the last session ended before.
     if ((!force)) && up_to_date "$wp"; then
+      reload_cursor
       return 0
     fi
     set_wallpaper "$wp"

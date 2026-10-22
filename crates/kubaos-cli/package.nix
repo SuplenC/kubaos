@@ -39,7 +39,7 @@ rustPlatform.buildRustPackage {
   doCheck = false;
 
   meta = {
-    description = "The kubaos command: packages, Suites, switches and KubaOS updates";
+    description = "The kubaos command: packages, Suites, switches, KubaOS updates and the pointer";
     license = with lib.licenses; [
       mit
       asl20

@@ -11,8 +11,10 @@ matugen extracts a source color, builds a Material 3 dark scheme, and renders
 every `[templates.*]` entry in `config.toml` into `~/.local/state/theme/`.
 After that, `dot-theme` reloads tmux, Ghostty (SIGUSR2), Neovim (`:ThemeReload`
 on each `$XDG_RUNTIME_DIR/nvim.*` socket), Hyprland
-(`hyprctl eval 'dot.reload_colors()'`, falling back to `hyprctl reload`) and
-GTK 3 (a quick `gtk-theme` bounce, only if gsettings works). Quickshell watches
+(`hyprctl eval 'dot.reload_colors()'`, falling back to `hyprctl reload`),
+GTK 3 (a quick `gtk-theme` bounce, only if gsettings works) and the pointer
+(`kubaos cursor apply`: the hyprcursor theme at once, the XCursor theme in the
+background, Bibata-Modern-Classic if either fails). Quickshell watches
 `colors.json` on its own, open zsh prompts re-init oh-my-posh when
 `ohmyposh.toml` changes, and the other terminal apps read their file at start.
 
@@ -78,6 +80,7 @@ If you change the default wallpaper, regenerate them all from
 | `delta.gitconfig` | same | `[delta]` colors, included by `config/git/config` |
 | `fzf`, `atuin.toml`, `eza.yml`, `glow.json` | same | fzf `--color` options file, atuin theme, eza theme, glamour style |
 | `hyprlock.colors` | `hyprlock.colors` | `$key = rrggbb` |
+| `cursor.toml` | `cursor.toml` | The pointer's fill, outline, spinner disc and four spinner tones per style; `dot-theme` then runs `kubaos cursor apply`, which recolours Bibata with them |
 
 matugen 4.2 stops rendering the rest of the templates when an input file is
 missing. The oh-my-posh input therefore goes through a link,

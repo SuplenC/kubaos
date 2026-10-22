@@ -14,8 +14,10 @@ test-suite = ["kubaos-core/test-suite"]
 
 [dependencies]
 kubaos-core.workspace = true
+kubaos-cursor.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 clap = { version = "4", features = ["derive"] }
 rustix = { version = "1", features = ["process", "fs"] }
 signal-hook = "0.3"
+thiserror.workspace = true
