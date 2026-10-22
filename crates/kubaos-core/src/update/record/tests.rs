@@ -54,7 +54,10 @@ fn history_lines_read_back_and_junk_is_skipped() {
         to_version: "0.1.1".into(),
         lock: Some(PathBuf::from("/home/kuba/.local/state/kubaos/locks/1.lock")),
     };
-    let no_lock = HistoryEntry { lock: None, ..entry.clone() };
+    let no_lock = HistoryEntry {
+        lock: None,
+        ..entry.clone()
+    };
     let text = format!("{}garbage\n\n{}", entry.line(), no_lock.line());
 
     assert_eq!(parse_history(&text), [entry, no_lock]);

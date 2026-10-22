@@ -59,11 +59,7 @@ impl Install<'_> {
         for name in self.migrations("user") {
             self.write(&format!("{user}/{name}"), &marker, 0o644)?;
         }
-        self.sh(crate::engine::runner::Cmd::new("chown").args([
-            "-R",
-            owner,
-            &self.ts(&format!("{home}/.local")),
-        ]))?;
+        self.sh(crate::engine::runner::Cmd::new("chown").args(["-R", owner, &self.ts(&format!("{home}/.local"))]))?;
         Ok(())
     }
 
@@ -74,12 +70,14 @@ impl Install<'_> {
         let branch = format!("refs/heads/{}", record::RELEASE_BRANCH);
         let loose = self.r.read_file(&self.t(&format!("{git}/{branch}")));
         let packed = || {
-            self.r.read_file(&self.t(&format!("{git}/packed-refs"))).and_then(|text| {
-                text.lines()
-                    .filter_map(|line| line.split_once(' '))
-                    .find(|(_, name)| *name == branch)
-                    .map(|(commit, _)| commit.to_owned())
-            })
+            self.r
+                .read_file(&self.t(&format!("{git}/packed-refs")))
+                .and_then(|text| {
+                    text.lines()
+                        .filter_map(|line| line.split_once(' '))
+                        .find(|(_, name)| *name == branch)
+                        .map(|(commit, _)| commit.to_owned())
+                })
         };
         loose
             .map(|text| text.trim().to_owned())
@@ -96,7 +94,16 @@ impl Install<'_> {
             return Channel::Edge;
         }
         let config = format!("gpg.ssh.allowedSignersFile={signers}");
-        let list = self.chroot(&["git", "-C", PAYLOAD_KUBAOS, "tag", "--points-at", record::RELEASE_BRANCH, "--list", "v*"]);
+        let list = self.chroot(&[
+            "git",
+            "-C",
+            PAYLOAD_KUBAOS,
+            "tag",
+            "--points-at",
+            record::RELEASE_BRANCH,
+            "--list",
+            "v*",
+        ]);
         let Ok(out) = self.sh(list) else {
             return Channel::Edge;
         };

@@ -236,7 +236,12 @@ impl Installed {
     pub fn describe(&self) -> String {
         let name = self.codename.as_deref().map(capitalise).unwrap_or_default();
         let sep = if name.is_empty() { "" } else { " " };
-        format!("{name}{sep}{} ({}, {})", self.version, self.channel, short(&self.commit))
+        format!(
+            "{name}{sep}{} ({}, {})",
+            self.version,
+            self.channel,
+            short(&self.commit)
+        )
     }
 }
 

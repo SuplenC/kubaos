@@ -25,7 +25,9 @@ pub struct System {
 
 impl std::fmt::Debug for System {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("System").field("is_root", &self.is_root).finish_non_exhaustive()
+        f.debug_struct("System")
+            .field("is_root", &self.is_root)
+            .finish_non_exhaustive()
     }
 }
 
@@ -77,7 +79,11 @@ impl Machine for System {
         if out.status.success() {
             return Ok(String::from_utf8_lossy(&out.stdout).into_owned());
         }
-        Err(MachineError::exited(cmd, out.status.code(), &String::from_utf8_lossy(&out.stderr)))
+        Err(MachineError::exited(
+            cmd,
+            out.status.code(),
+            &String::from_utf8_lossy(&out.stderr),
+        ))
     }
 
     fn stream(&mut self, cmd: &Cmd) -> Result<(), MachineError> {

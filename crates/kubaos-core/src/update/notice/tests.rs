@@ -37,8 +37,14 @@ fn each_notification_is_sent_once() {
     assert_eq!(
         first,
         [
-            ("update aaa".to_owned(), "KubaOS main at aaa is ready: kubaos update".to_owned()),
-            ("upgrade bbb".to_owned(), "KubaOS Akihabara (0.2.0) is out: kubaos upgrade".to_owned()),
+            (
+                "update aaa".to_owned(),
+                "KubaOS main at aaa is ready: kubaos update".to_owned()
+            ),
+            (
+                "upgrade bbb".to_owned(),
+                "KubaOS Akihabara (0.2.0) is out: kubaos upgrade".to_owned()
+            ),
         ]
     );
     assert_eq!(again.len(), 1);

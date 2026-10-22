@@ -242,11 +242,15 @@ impl<'a, M: Machine> Updater<'a, M> {
         self.m.say(&format!("Installed: KubaOS {}", installed.describe()));
         let pick = self.fetch_and_pick(&installed)?;
         if let Some(upgrade) = &pick.upgrade {
-            self.m.say(&format!("KubaOS {} is available: kubaos upgrade", upgrade_name(upgrade)));
+            self.m.say(&format!(
+                "KubaOS {} is available: kubaos upgrade",
+                upgrade_name(upgrade)
+            ));
         }
         let target = if opts.packages_only { None } else { pick.update };
         if target.is_none() && !opts.packages_only {
-            self.m.say("KubaOS is at the newest release of its channel: updating packages");
+            self.m
+                .say("KubaOS is at the newest release of its channel: updating packages");
         }
         self.apply(&installed, target.as_ref(), opts, Kind::Update)
     }
@@ -269,7 +273,11 @@ impl<'a, M: Machine> Updater<'a, M> {
             return Err(UpdateError::PatchFirst { label: patch.label });
         }
         let target = pick.upgrade.ok_or(UpdateError::NoUpgrade)?;
-        self.m.say(&format!("Upgrade: KubaOS {} → {}", installed.describe(), upgrade_name(&target)));
+        self.m.say(&format!(
+            "Upgrade: KubaOS {} → {}",
+            installed.describe(),
+            upgrade_name(&target)
+        ));
         self.apply(&installed, Some(&target), UpdateOptions::new(), Kind::Upgrade)
     }
 
@@ -284,7 +292,9 @@ impl<'a, M: Machine> Updater<'a, M> {
         let installed = self.installed()?;
         let path = self.sys.history();
         let mut history = parse_history(&read_or_empty(&path)?);
-        let entry = history.pop().ok_or(UpdateError::NothingToRollBack { path: path.clone() })?;
+        let entry = history
+            .pop()
+            .ok_or(UpdateError::NothingToRollBack { path: path.clone() })?;
         self.m.say(&format!(
             "Roll back the update of {}: KubaOS {} ({}) → {} ({})",
             entry.date,
@@ -296,7 +306,9 @@ impl<'a, M: Machine> Updater<'a, M> {
         let lock = entry.lock.as_ref().filter(|lock| lock.is_file());
         match lock {
             Some(lock) => self.m.say(&format!("Your flake.lock goes back to {}", lock.display())),
-            None => self.m.warn("that update saved no flake.lock: your packages stay where they are"),
+            None => self
+                .m
+                .warn("that update saved no flake.lock: your packages stay where they are"),
         }
         if confirm == Confirm::Ask && !self.m.confirm("Roll back?") {
             return Err(UpdateError::Declined);
@@ -334,10 +346,12 @@ impl<'a, M: Machine> Updater<'a, M> {
     pub fn set_channel(&mut self, channel: Channel) -> Result<(), UpdateError> {
         self.write_root(&self.sys.channel(), &format!("{channel}\n"))?;
         match channel {
-            Channel::Edge => self.m.say("Channel: edge. kubaos update follows origin/main from now on."),
-            Channel::Stable => self.m.say(
-                "Channel: stable. kubaos update moves to the next verified release at or above this one.",
-            ),
+            Channel::Edge => self
+                .m
+                .say("Channel: edge. kubaos update follows origin/main from now on."),
+            Channel::Stable => self
+                .m
+                .say("Channel: stable. kubaos update moves to the next verified release at or above this one."),
         }
         Ok(())
     }
@@ -490,7 +504,12 @@ impl<'a, M: Machine> Updater<'a, M> {
         }
 
         let to = target.map_or_else(|| installed.version.to_string(), |t| t.label.clone());
-        self.snapshot(&format!("before kubaos {} {} ({} → {to})", kind_word(kind), self.date(), installed.version));
+        self.snapshot(&format!(
+            "before kubaos {} {} ({} → {to})",
+            kind_word(kind),
+            self.date(),
+            installed.version
+        ));
         let lock = self.save_lock()?;
         self.record_history(installed, target, lock)?;
 
@@ -539,7 +558,8 @@ impl<'a, M: Machine> Updater<'a, M> {
             }
             let pin = refs.file_at(&target.commit, record::RELEASE_PIN);
             if pin.is_some() && pin != fs::read_to_string(self.sys.apt_pin()).ok() {
-                self.m.say("The Hyprland pin changes: Hyprland is installed at the release's versions.");
+                self.m
+                    .say("The Hyprland pin changes: Hyprland is installed at the release's versions.");
             }
             let markers = self.sys.markers();
             let new: Vec<String> = refs
@@ -622,10 +642,13 @@ impl<'a, M: Machine> Updater<'a, M> {
     }
 
     fn move_release(&mut self, commit: &str) -> Result<(), UpdateError> {
-        let cmd = Cmd::root("git")
-            .arg("-C")
-            .arg(self.sys.checkout())
-            .args(["checkout", "--quiet", "-B", record::RELEASE_BRANCH, commit]);
+        let cmd = Cmd::root("git").arg("-C").arg(self.sys.checkout()).args([
+            "checkout",
+            "--quiet",
+            "-B",
+            record::RELEASE_BRANCH,
+            commit,
+        ]);
         self.m
             .output(&cmd)
             .map_err(UpdateError::step(format!("moving release to {}", short(commit))))?;
@@ -647,7 +670,8 @@ impl<'a, M: Machine> Updater<'a, M> {
             .output(&Cmd::user("dpkg").arg("--print-architecture"))
             .unwrap_or_default();
         if arch.trim() != "amd64" {
-            self.m.say("Hyprland pin: skipped, Hyprland comes from KubaOS's nixpkgs on this architecture");
+            self.m
+                .say("Hyprland pin: skipped, Hyprland comes from KubaOS's nixpkgs on this architecture");
             return Ok(());
         }
         let pins = hyprland::parse(&wanted);
@@ -688,7 +712,8 @@ impl<'a, M: Machine> Updater<'a, M> {
         rehold?;
         // Written once the versions are in, so a failed install is tried again on the next update.
         self.write_root(&self.sys.apt_pin(), &wanted)?;
-        self.m.say(&format!("Hyprland pin applied, {} packages held", to_hold.len()));
+        self.m
+            .say(&format!("Hyprland pin applied, {} packages held", to_hold.len()));
         if self.m.output(&Cmd::user("Hyprland").arg("--verify-config")).is_err() {
             self.m
                 .warn("Hyprland --verify-config reports problems: run it and fix your config before logging out");
@@ -757,9 +782,9 @@ impl<'a, M: Machine> Updater<'a, M> {
         if !script.is_file() {
             return Ok(());
         }
-        self.m
-            .stream(&Cmd::user(&script))
-            .map_err(UpdateError::step("relinking the lock screen's PAM modules and the recorder"))
+        self.m.stream(&Cmd::user(&script)).map_err(UpdateError::step(
+            "relinking the lock screen's PAM modules and the recorder",
+        ))
     }
 
     /// Reports newer Bitwarden releases, which are pinned downloads, not apt packages.

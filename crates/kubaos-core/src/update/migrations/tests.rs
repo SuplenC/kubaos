@@ -8,7 +8,14 @@ use super::stamp_of;
 #[test]
 fn only_timestamped_scripts_with_a_slug_are_migrations() {
     assert_eq!(stamp_of("1761130000-move-the-bar.sh"), Some(1_761_130_000));
-    for not in ["move.sh", "1761130000.sh", "1761130000-.sh", "abc-move.sh", "1761130000-Move.sh", "1-x.bash"] {
+    for not in [
+        "move.sh",
+        "1761130000.sh",
+        "1761130000-.sh",
+        "abc-move.sh",
+        "1761130000-Move.sh",
+        "1-x.bash",
+    ] {
         assert_eq!(stamp_of(not), None, "{not}");
     }
 }

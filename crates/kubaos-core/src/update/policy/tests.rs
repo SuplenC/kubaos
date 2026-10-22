@@ -77,7 +77,8 @@ fn edge_refs(head: &str, verdict: Verified) -> FakeRefs {
         ..FakeRefs::default()
     };
     refs.verdicts.insert(head.into(), verdict);
-    refs.file(head, "VERSION", "0.1.0\n").file(head, "CODENAME", "shinjuku\n")
+    refs.file(head, "VERSION", "0.1.0\n")
+        .file(head, "CODENAME", "shinjuku\n")
 }
 
 #[test]
@@ -106,7 +107,9 @@ fn edge_on_mains_head_has_nothing_to_do() {
 fn edge_refuses_a_head_signed_by_no_allowed_key() {
     let refs = edge_refs("bbbb", Verified::Bad);
 
-    let err = Edge.pick(&installed("0.1.0", "aaaa", Channel::Edge), &refs).unwrap_err();
+    let err = Edge
+        .pick(&installed("0.1.0", "aaaa", Channel::Edge), &refs)
+        .unwrap_err();
 
     assert!(matches!(err, PolicyError::Unsigned { commit } if commit == "bbbb"));
 }
@@ -149,7 +152,9 @@ fn stable_without_tags_or_keys_updates_only_packages() {
     let unkeyed = FakeRefs::default().tag("v0.1.1", "c1", Verified::NoKeys);
 
     let no_tags = Stable.pick(&installed("0.1.0", "c0", Channel::Stable), &none).unwrap();
-    let no_keys = Stable.pick(&installed("0.1.0", "c0", Channel::Stable), &unkeyed).unwrap();
+    let no_keys = Stable
+        .pick(&installed("0.1.0", "c0", Channel::Stable), &unkeyed)
+        .unwrap();
 
     assert_eq!(no_tags, super::Pick::default());
     assert_eq!((no_keys.update, no_keys.upgrade), (None, None));

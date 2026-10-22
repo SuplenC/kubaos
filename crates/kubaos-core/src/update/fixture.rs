@@ -11,7 +11,14 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .arg("-C")
         .arg(dir)
-        .args(["-c", "user.name=t", "-c", "user.email=t@kubaos", "-c", "commit.gpgsign=false"])
+        .args([
+            "-c",
+            "user.name=t",
+            "-c",
+            "user.email=t@kubaos",
+            "-c",
+            "commit.gpgsign=false",
+        ])
         .args(["-c", "tag.gpgsign=false", "-c", "init.defaultBranch=main"])
         .args(args)
         .output()
@@ -40,7 +47,11 @@ pub fn key(dir: &Path) -> Key {
         .arg(&private)
         .output()
         .expect("run ssh-keygen");
-    assert!(out.status.success(), "ssh-keygen: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "ssh-keygen: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     let public = fs::read_to_string(dir.join("key.pub")).expect("read the public key");
     let allowed_signers = dir.join("allowed_signers");
     fs::write(&allowed_signers, format!("t@kubaos namespaces=\"git\" {public}")).expect("write allowed_signers");
@@ -65,10 +76,27 @@ pub fn origin(dir: &Path, version: &str, files: &[(&str, &str)]) -> PathBuf {
     let work = dir.join("work");
     fs::create_dir_all(&work).expect("make the work tree");
     git(&work, &["init", "-q"]);
-    commit(&work, "first", &[&[("VERSION", version), ("CODENAME", "shinjuku")], files].concat(), None);
+    commit(
+        &work,
+        "first",
+        &[&[("VERSION", version), ("CODENAME", "shinjuku")], files].concat(),
+        None,
+    );
     let bare = dir.join("origin.git");
-    git(dir, &["clone", "-q", "--bare", work.to_str().expect("a UTF-8 path"), "origin.git"]);
-    git(&work, &["remote", "add", "origin", bare.to_str().expect("a UTF-8 path")]);
+    git(
+        dir,
+        &[
+            "clone",
+            "-q",
+            "--bare",
+            work.to_str().expect("a UTF-8 path"),
+            "origin.git",
+        ],
+    );
+    git(
+        &work,
+        &["remote", "add", "origin", bare.to_str().expect("a UTF-8 path")],
+    );
     bare
 }
 

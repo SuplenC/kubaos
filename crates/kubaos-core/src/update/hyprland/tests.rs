@@ -29,7 +29,13 @@ fn every_complete_record_of_the_pin_file_is_a_pin() {
 
 #[test]
 fn the_held_stack_is_what_system_lib_sh_holds() {
-    for held in ["hyprland", "hyprlock", "libhyprutils7", "libaquamarine9", "xdg-desktop-portal-hyprland"] {
+    for held in [
+        "hyprland",
+        "hyprlock",
+        "libhyprutils7",
+        "libaquamarine9",
+        "xdg-desktop-portal-hyprland",
+    ] {
         assert!(is_held_stack(held), "{held}");
     }
     assert!(!is_held_stack("xdg-desktop-portal-gtk"));

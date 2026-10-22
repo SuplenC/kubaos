@@ -46,7 +46,11 @@ impl GitRefs {
 
     /// The commit `rev` names, or `None` when it names none.
     pub fn commit_of(&self, rev: &str) -> Option<String> {
-        let out = git(&self.dir, ["rev-parse", "--verify", "--quiet", &format!("{rev}^{{commit}}")]).ok()?;
+        let out = git(
+            &self.dir,
+            ["rev-parse", "--verify", "--quiet", &format!("{rev}^{{commit}}")],
+        )
+        .ok()?;
         out.status
             .success()
             .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
@@ -57,7 +61,10 @@ impl GitRefs {
         let range = format!("{from}..{to}");
         let max = format!("--max-count={limit}");
         match git(&self.dir, ["log", "--oneline", "--no-decorate", &max, &range]) {
-            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).lines().map(str::to_owned).collect(),
+            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .map(str::to_owned)
+                .collect(),
             _ => Vec::new(),
         }
     }
@@ -65,7 +72,10 @@ impl GitRefs {
     /// The names of the files in the folder `dir` at `commit`; none when it has no such folder.
     pub fn file_list(&self, commit: &str, dir: &str) -> Vec<String> {
         match git(&self.dir, ["ls-tree", "--name-only", &format!("{commit}:{dir}")]) {
-            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout).lines().map(str::to_owned).collect(),
+            Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .map(str::to_owned)
+                .collect(),
             _ => Vec::new(),
         }
     }
@@ -84,9 +94,16 @@ impl GitRefs {
         };
         let mut config = std::ffi::OsString::from("gpg.ssh.allowedSignersFile=");
         config.push(signers);
-        let out = git(&self.dir, [OsStr::new("-c"), &config, OsStr::new(what), OsStr::new(rev)])
-            .map_err(|e| RefsError::new(format!("git {what} {rev}"), e))?;
-        Ok(if out.status.success() { Verified::Good } else { Verified::Bad })
+        let out = git(
+            &self.dir,
+            [OsStr::new("-c"), &config, OsStr::new(what), OsStr::new(rev)],
+        )
+        .map_err(|e| RefsError::new(format!("git {what} {rev}"), e))?;
+        Ok(if out.status.success() {
+            Verified::Good
+        } else {
+            Verified::Bad
+        })
     }
 }
 

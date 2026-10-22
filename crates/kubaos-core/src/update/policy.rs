@@ -164,7 +164,10 @@ pub const NO_KEYS_EDGE: &str = "no /usr/share/kubaos-keys/allowed_signers on thi
 
 impl Policy for Edge {
     fn pick(&self, installed: &Installed, refs: &dyn Refs) -> Result<Pick, PolicyError> {
-        let head = refs.main_head().map_err(PolicyError::Refs)?.ok_or(PolicyError::NoMain)?;
+        let head = refs
+            .main_head()
+            .map_err(PolicyError::Refs)?
+            .ok_or(PolicyError::NoMain)?;
         let mut pick = Pick::default();
         if head == installed.commit {
             return Ok(pick);

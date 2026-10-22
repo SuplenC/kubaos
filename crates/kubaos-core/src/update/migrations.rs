@@ -63,7 +63,9 @@ pub fn file_name(stamp: u64, slug: &str) -> Result<String, InvalidSlug> {
 fn is_slug(slug: &str) -> bool {
     !slug.is_empty()
         && !slug.starts_with('-')
-        && slug.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        && slug
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 /// The migrations in `dir`, oldest first. A missing folder has none, and files that are not

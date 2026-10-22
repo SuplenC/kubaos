@@ -73,7 +73,9 @@ impl Fake {
         } else {
             std::process::Stdio::null()
         });
-        command.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped());
+        command
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped());
         let mut child = command.spawn().map_err(|source| MachineError::Spawn {
             program: cmd.program(),
             source,
@@ -85,7 +87,11 @@ impl Fake {
         if out.status.success() {
             Ok(String::from_utf8_lossy(&out.stdout).into_owned())
         } else {
-            Err(MachineError::exited(cmd, out.status.code(), &String::from_utf8_lossy(&out.stderr)))
+            Err(MachineError::exited(
+                cmd,
+                out.status.code(),
+                &String::from_utf8_lossy(&out.stderr),
+            ))
         }
     }
 }
@@ -242,10 +248,16 @@ fn an_edge_update_moves_release_to_main_and_runs_each_migration_once() {
     assert!(w.sys.markers().join("1790000000-fix-apt.sh").is_file());
     assert!(w.user.migration_markers().join("1790000001-move-config.sh").is_file());
     let installed = w.installed();
-    assert_eq!((installed.commit.as_str(), installed.version.to_string()), (head.as_str(), "0.1.1".into()));
+    assert_eq!(
+        (installed.commit.as_str(), installed.version.to_string()),
+        (head.as_str(), "0.1.1".into())
+    );
     let history = parse_history(&fs::read_to_string(w.sys.history()).unwrap());
     assert_eq!(history.len(), 1);
-    assert_eq!((history[0].from_commit.as_str(), history[0].to_commit.as_str()), (before.as_str(), head.as_str()));
+    assert_eq!(
+        (history[0].from_commit.as_str(), history[0].to_commit.as_str()),
+        (before.as_str(), head.as_str())
+    );
     let saved = history[0].lock.as_ref().unwrap();
     assert_eq!(fs::read_to_string(saved).unwrap(), "lock before\n");
     assert_eq!(m.switches, 1);
@@ -265,7 +277,14 @@ fn an_edge_update_moves_release_to_main_and_runs_each_migration_once() {
         .collect();
     assert_eq!(
         order,
-        ["sudo apt-get", "sudo git", "sudo bash", "nix flake", "switch", "bash -euo"]
+        [
+            "sudo apt-get",
+            "sudo git",
+            "sudo bash",
+            "nix flake",
+            "switch",
+            "bash -euo"
+        ]
     );
 
     let mut again = Fake::new();
@@ -327,7 +346,10 @@ fn a_failed_system_migration_stops_the_update_and_runs_again_next_time() {
 fn packages_only_leaves_release_and_the_migrations_alone() {
     let w = World::new(Channel::Edge, true);
     let before = w.release();
-    w.push(&[("migrations/system/1790000000-later.sh", &w.migration("system"))], true);
+    w.push(
+        &[("migrations/system/1790000000-later.sh", &w.migration("system"))],
+        true,
+    );
     let mut m = Fake::new();
 
     w.updater(&mut m).update(yes().packages_only()).unwrap();
@@ -515,7 +537,10 @@ fn a_failed_hyprland_install_holds_the_stack_again_and_is_tried_next_time() {
 #[test]
 fn the_hyprland_pin_is_left_alone_off_amd64() {
     let w = World::new(Channel::Edge, true);
-    w.push(&[("system/files/apt/preferences.d/kubaos-hyprland", "Package: hyprland\n")], true);
+    w.push(
+        &[("system/files/apt/preferences.d/kubaos-hyprland", "Package: hyprland\n")],
+        true,
+    );
     let mut m = Fake::new();
     m.canned.insert("dpkg", Ok("arm64\n".to_owned()));
 
