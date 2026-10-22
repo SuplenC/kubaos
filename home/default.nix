@@ -12,6 +12,7 @@
     ./menu.nix
     ./secrets.nix
     ./shell.nix
+    ./state.nix
     ./terminal.nix
     ./theme.nix
   ];
