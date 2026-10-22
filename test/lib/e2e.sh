@@ -532,6 +532,22 @@ c_workspaces() {
   echo "ok   per-screen workspaces: blocks, slots, joining on unplug and returning on replug"
 }
 
+# Keyboard layouts: config/hypr/input.lua hands Hyprland every layout in
+# /etc/default/keyboard, and `kubaos keyboard show` reads the same file.
+c_keyboard() {
+  as_user lua5.5 "$REPO/test/lua/input_test.lua" "$REPO" || { echo "FAIL test/lua/input_test.lua"; return 1; }
+  echo "ok   input.lua: two layouts as XKB's lists, one as a name, US without the file"
+  local file out
+  install_kubaos || return 1
+  file="$(mktemp)"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=",intl"\nXKBOPTIONS=""\n' >"$file"
+  chmod 644 "$file"
+  out="$(kz "KUBAOS_KEYBOARD_FILE='$file' kubaos keyboard show" 2>&1)" || { echo "FAIL kubaos keyboard show: $out"; rm -f "$file"; return 1; }
+  rm -f "$file"
+  [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; return 1; }
+  echo "ok   kubaos keyboard show lists the layouts, the default first"
+}
+
 c_quickshell() {
   local out t
   session_start sway 1920x1080 1
@@ -794,6 +810,10 @@ PY
   ((bad)) || echo "ok   the Extension's Kotodama crates are the Daemon's commit, $out"
 
   [[ -e $layer ]] && cp -p "$layer" "$saved"
+  # The keyboard Items are the layouts of this file, which the Extension reads at start.
+  local kb=/etc/default/keyboard kb_saved="$LOGS/keyboard.saved"
+  [[ -e $kb ]] && cp -p "$kb" "$kb_saved"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb"
   install -D -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/stdin "$layer" <<'TOML'
 [extensions.kubaos]
 hide = ["theme-next", "bluetooth"]
@@ -840,6 +860,30 @@ TOML
     echo "ok   the actions the user layer hides aren't found"
   fi
 
+  out="$(in_session "$query 'Keyboard: next layout' 'Keyboard: add a layout' 'Keyboard: set layouts' Keyboard" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  for want in 'Keyboard: next layout:keyboard-next' 'Keyboard: add a layout:keyboard-add' \
+    'Keyboard: set layouts:keyboard-set' 'Keyboard:keyboard:us' 'Keyboard:keyboard:it'; do
+    grep -E -- "^${want%%:keyboard*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/keyboard${want#*:keyboard}( |$)" ||
+      { echo "FAIL typing '${want%%:keyboard*}' doesn't find kubaos/keyboard${want#*:keyboard}"; bad=1; }
+  done
+  ((bad)) || echo "ok   the keyboard Items are found: next, add, set, and one a layout"
+
+  # localed writes the file through a temporary one and a rename; the Items follow it.
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,de"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb.new"
+  mv "$kb.new" "$kb"
+  for i in $(seq 20); do
+    out="$(in_session "$query Keyboard" 2>&1 || true)"
+    grep -qE 'kubaos/keyboard:de( |$)' <<<"$out" && ! grep -qE 'kubaos/keyboard:it( |$)' <<<"$out" && break
+    sleep 1
+  done
+  if grep -qE 'kubaos/keyboard:de( |$)' <<<"$out" && ! grep -qE 'kubaos/keyboard:it( |$)' <<<"$out"; then
+    echo "ok   a change to $kb reaches the keyboard Items (${i}s)"
+  else
+    echo "FAIL the keyboard Items kept the old layouts after $kb changed: $out"
+    bad=1
+  fi
+
   # ~/.config/kotodama/user.toml is a link to the user layer's file, and an
   # edit to the file it points at reaches the running Daemon with no restart.
   cat >"$layer" <<'TOML'
@@ -867,6 +911,7 @@ TOML
   if ((bad)); then tail -20 "$log"; fi
   menu_stop "$daemon"
   if [[ -e $saved ]]; then mv "$saved" "$layer"; else rm -f "$layer"; fi
+  if [[ -e $kb_saved ]]; then mv "$kb_saved" "$kb"; else rm -f "$kb"; fi
   return "$bad"
 }
 
@@ -1450,7 +1495,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

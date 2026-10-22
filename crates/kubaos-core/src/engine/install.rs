@@ -12,6 +12,7 @@ use super::runner::{Cmd, Output, Runner, Stream, interrupted};
 use super::unpack;
 use super::validate;
 use crate::config::{DiskTarget, InstallConfig, Secrets, Wallpapers};
+use crate::keyboard;
 use crate::probe::{DiskInfo, Manifest};
 use crate::{Event, Level, StepId};
 
@@ -850,9 +851,11 @@ impl<'a> Install<'a> {
             let cmd = self.chroot(&["locale-gen", &c.locale.lang]);
             self.try_sh(cmd);
         }
+        // Every layout goes to the one file: Hyprland takes them all (`config/hypr/input.lua`),
+        // and the console and the LUKS prompt type with the first, the default.
         self.write(
-            "/etc/default/keyboard",
-            &files::keyboard(&c.locale.keyboard_layout, &c.locale.keyboard_variant),
+            keyboard::DEFAULT_KEYBOARD,
+            &keyboard::default_keyboard(&c.locale.keyboards()),
             0o644,
         )?;
         self.progress(0.6, None);

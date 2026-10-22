@@ -4,6 +4,7 @@
 use super::disk::{self, MIB};
 use super::machine::gib;
 use crate::config::{DiskTarget, InstallConfig, Secrets, Wallpapers};
+use crate::keyboard;
 use crate::probe::{Manifest, Probe};
 
 pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
@@ -67,22 +68,11 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
     if !p.timezones.is_empty() && !p.timezones.contains(&c.locale.timezone) {
         bad(format!("unknown timezone \"{}\"", c.locale.timezone));
     }
-    if !p.keymaps.is_empty() && !p.keymaps.contains(&c.locale.keyboard_layout) {
-        bad(format!(
-            "unknown keyboard layout \"{}\"",
-            c.locale.keyboard_layout
-        ));
+    if c.locale.keyboard_variant.len() > c.locale.keyboard_layout.len() {
+        bad("more keyboard variants than keyboard layouts".into());
     }
-    if !c
-        .locale
-        .keyboard_variant
-        .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || "_-".contains(ch))
-    {
-        bad(format!(
-            "odd keyboard variant \"{}\"",
-            c.locale.keyboard_variant
-        ));
+    for problem in keyboard::problems(&c.locale.keyboards(), &p.keymaps) {
+        bad(problem.to_string());
     }
     if !p.locales.is_empty() && !p.locales.contains(&c.locale.lang) {
         bad(format!("unknown locale \"{}\"", c.locale.lang));
@@ -392,7 +382,7 @@ mod tests {
         c.user.username = "Root".into();
         c.host.hostname = "-bad".into();
         c.locale.timezone = "Mars/Olympus".into();
-        c.locale.keyboard_layout = "xx".into();
+        c.locale.keyboard_layout = vec!["xx".into()];
         c.disk.device = "/dev/sda".into();
         let p = problems(&c, &probe());
         assert_eq!(p.len(), 5, "{p:#?}");
@@ -406,6 +396,53 @@ mod tests {
                 .any(|s| s.contains("medium this install runs from"))
         );
         assert!(p.iter().any(|s| s.contains("Mars/Olympus")));
+        assert!(p.iter().any(|s| s == "unknown keyboard layout \"xx\""));
+    }
+
+    #[test]
+    fn two_keyboard_layouts_pass() {
+        let mut c = config();
+        c.locale.keyboard_layout = vec!["us".into(), "it".into()];
+        c.locale.keyboard_variant = vec!["intl".into(), String::new()];
+
+        assert_eq!(problems(&c, &probe()), Vec::<String>::new());
+    }
+
+    #[test]
+    fn keyboard_layouts_are_one_to_four_each_once() {
+        let problems_with = |layouts: &[&str], variants: &[&str]| {
+            let mut c = config();
+            c.locale.keyboard_layout = layouts.iter().map(|s| (*s).to_string()).collect();
+            c.locale.keyboard_variant = variants.iter().map(|s| (*s).to_string()).collect();
+            problems(&c, &probe())
+        };
+
+        assert_eq!(
+            problems_with(&[], &[]),
+            ["pick at least one keyboard layout"]
+        );
+        assert_eq!(
+            problems_with(
+                &["us", "it", "us", "it", "us"],
+                &["", "", "intl", "", "dvorak"]
+            ),
+            [
+                "at most 4 keyboard layouts, XKB holds no more",
+                "keyboard layout \"it\" is listed twice"
+            ]
+        );
+        assert_eq!(
+            problems_with(&["us", "us"], &[]),
+            ["keyboard layout \"us\" is listed twice"]
+        );
+        assert_eq!(
+            problems_with(&["us"], &["", "intl"]),
+            ["more keyboard variants than keyboard layouts"]
+        );
+        assert_eq!(
+            problems_with(&["us"], &["in tl"]),
+            ["odd keyboard layout \"us(in tl)\""]
+        );
     }
 
     #[test]

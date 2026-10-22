@@ -404,4 +404,11 @@ test("SUPER + SHIFT + CTRL + Right moves the window to a new workspace", functio
   same(found[key("SUPER + SHIFT + CTRL + Right")].description, "Move window to a new workspace", "description")
 end)
 
+test("SUPER + SHIFT + Space switches to the next keyboard layout", function()
+  local found = binds()
+  local switch = found[key("SUPER + SHIFT + Space")]
+  same(switch.description, "Next keyboard layout", "description")
+  same({ switch.action.dsp, switch.action.args }, { "exec_cmd", "hyprctl switchxkblayout all next" }, "action")
+end)
+
 os.exit(failed == 0 and 0 or 1)

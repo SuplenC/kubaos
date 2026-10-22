@@ -1827,6 +1827,7 @@ version = "0.1.0"
 dependencies = [
  "kotodama-extension",
  "kotodama-protocol",
+ "kubaos-core",
  "tempfile",
  "thiserror 2.0.21",
  "toml 0.9.12+spec-1.1.0",

@@ -220,6 +220,8 @@ pub enum Key {
     PageUp,
     PageDown,
     Space,
+    /// Shift+Space: on the keymap list, makes the row the default layout.
+    ShiftSpace,
     Backspace {
         word: bool,
     },
@@ -251,6 +253,10 @@ pub enum Message {
     /// Mouse: clicking a control focuses it and acts like Enter/Space on it.
     Click(F),
     Pick(List, String),
+    /// A click on a picked layout's chip: make it the default.
+    KeymapDefault(String),
+    /// A click on a picked layout's remove button.
+    KeymapDrop(String),
     /// A click or drag in a text field.
     FieldPointer(F, Pointer),
     /// A list scrolled: its id, offset and visible height.
@@ -339,6 +345,8 @@ pub struct App {
 
     pub locale_q: String,
     pub keymap_q: String,
+    /// The keymap row the arrows have reached, which Space picks; `None` is the default layout's.
+    pub keymap_cursor: Option<String>,
     pub tz_q: String,
     pub list: List,
     pub focus: Option<F>,
@@ -419,6 +427,7 @@ impl App {
             thumbs: HashMap::new(),
             locale_q: String::new(),
             keymap_q: String::new(),
+            keymap_cursor: None,
             tz_q: String::new(),
             list: List::Locale,
             focus: Some(F::Start),
@@ -910,7 +919,21 @@ impl App {
                     List::Disk => F::DiskList,
                 };
                 self.set_focus(Some(f));
-                self.set_selected(list, v);
+                self.set_selected(list, v.clone());
+                if list == List::Keymap {
+                    self.toggle_keymap(&v);
+                }
+                Task::none()
+            }
+            Message::KeymapDefault(v) => {
+                let r = self.form.make_default_keymap(&v);
+                self.refused(r);
+                Task::none()
+            }
+            Message::KeymapDrop(v) => {
+                if self.form.keymap_picked(&v) {
+                    self.toggle_keymap(&v);
+                }
                 Task::none()
             }
             Message::WifiNone => {
@@ -1331,6 +1354,16 @@ impl App {
         let focus = self.focus;
         match k {
             Key::Tab { shift } => self.cycle_focus(shift),
+            // A search typed: Enter picks the row it found, and clears it for the next one.
+            Key::Enter if focus == Some(F::KeymapQ) && !self.keymap_q.trim().is_empty() => {
+                let row = self.keymap_row();
+                if !self.form.keymap_picked(&row) {
+                    self.toggle_keymap(&row);
+                }
+                self.keymap_q.clear();
+                self.caret = Caret::at(0);
+                self.scroll_to_selection()
+            }
             Key::Enter => match focus {
                 Some(F::Hold) => self.update_inner(Message::HoldStart),
                 _ if self.screen == Screen::Summary
@@ -1355,6 +1388,18 @@ impl App {
             },
             Key::EnterUp => self.update_inner(Message::HoldEnd),
             Key::Esc => self.back(),
+            Key::Space if self.keymap_list_keys() => {
+                let row = self.keymap_row();
+                self.toggle_keymap(&row);
+                Task::none()
+            }
+            Key::ShiftSpace if self.keymap_list_keys() => {
+                let row = self.keymap_row();
+                let r = self.form.make_default_keymap(&row);
+                self.refused(r);
+                Task::none()
+            }
+            Key::ShiftSpace => self.key(Key::Space),
             Key::Space => match focus {
                 Some(f) if f.is_field() => {
                     self.edit(Edit::Insert(" ".into()));
@@ -1641,7 +1686,7 @@ impl App {
     fn selected(&self, list: List) -> Option<String> {
         match list {
             List::Locale => Some(self.form.locale.clone()),
-            List::Keymap => Some(self.form.keymap.clone()),
+            List::Keymap => Some(self.keymap_row()),
             List::Timezone => Some(self.form.timezone.clone()),
             List::Wifi => self.form.wifi_ssid.clone(),
             List::Disk => self.form.disk.clone(),
@@ -1651,7 +1696,7 @@ impl App {
     fn set_selected(&mut self, list: List, v: String) {
         match list {
             List::Locale => self.form.locale = v,
-            List::Keymap => self.form.keymap = v,
+            List::Keymap => self.keymap_cursor = Some(v),
             List::Timezone => self.form.timezone = v,
             List::Wifi => {
                 self.form.wifi_ssid = Some(v);
@@ -1664,6 +1709,33 @@ impl App {
                     self.form.disk_mode = mode;
                 }
             }
+        }
+    }
+
+    /// The keymap row Space acts on: the cursor's, else the default layout's.
+    pub fn keymap_row(&self) -> String {
+        self.keymap_cursor
+            .clone()
+            .or_else(|| self.form.keymaps.first().cloned())
+            .unwrap_or_default()
+    }
+
+    /// Space and Shift+Space act on the keymap list while its search box has the focus with
+    /// nothing typed: a search never starts with a space.
+    fn keymap_list_keys(&self) -> bool {
+        self.focus == Some(F::KeymapQ) && self.keymap_q.is_empty()
+    }
+
+    fn toggle_keymap(&mut self, keymap: &str) {
+        let r = self.form.toggle_keymap(keymap);
+        self.refused(r);
+    }
+
+    /// Shows why a change to the form was refused.
+    fn refused(&mut self, r: Result<(), &'static str>) {
+        if let Err(why) = r {
+            self.now = Instant::now();
+            self.toast = Some((why.to_string(), self.now));
         }
     }
 
@@ -2003,6 +2075,7 @@ pub fn translate(k: &keyboard::Event) -> Option<Key> {
                     Named::End => Some(Key::End { shift }),
                     Named::PageUp => Some(Key::PageUp),
                     Named::PageDown => Some(Key::PageDown),
+                    Named::Space if shift => Some(Key::ShiftSpace),
                     Named::Space => Some(Key::Space),
                     Named::Backspace => Some(Key::Backspace { word }),
                     Named::Delete => Some(Key::Delete { word }),

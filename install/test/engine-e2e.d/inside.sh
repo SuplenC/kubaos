@@ -130,7 +130,8 @@ run_scenario() {
   cat >/work/install.toml <<EOF
 [locale]
 lang = "en_US.UTF-8"
-keyboard_layout = "us"
+keyboard_layout = ["us", "it"]
+keyboard_variant = ["", "intl"]
 timezone = "Europe/Rome"
 
 [host]
@@ -249,7 +250,8 @@ EOF
   check "locale" has "$R/etc/locale.conf" '^LANG=en_US.UTF-8$'
   check "/etc/default/locale -> ../locale.conf" eq "$(readlink "$R/etc/default/locale")" ../locale.conf
   check "locale generated" bash -c "chroot $R locale -a | grep -qi en_US.utf8"
-  check "keyboard" has "$R/etc/default/keyboard" '^XKBLAYOUT="us"$'
+  check "keyboard layouts, the first the default" has "$R/etc/default/keyboard" '^XKBLAYOUT="us,it"$'
+  check "keyboard variants" has "$R/etc/default/keyboard" '^XKBVARIANT=",intl"$'
   check "machine-id is new" has "$R/etc/machine-id" '^[0-9a-f]{32}$'
   check "user kuba: uid 1000, zsh" has "$R/etc/passwd" '^kuba:x:1000:1000:Kuba Example:/home/kuba:/usr/bin/zsh$'
   check "kuba in sudo" has "$R/etc/group" '^sudo:x:[0-9]+:.*kuba'

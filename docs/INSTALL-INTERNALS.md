@@ -69,8 +69,8 @@ The package, suite, switch and job commands run as the user, never root: docs/CO
 ```toml
 [locale]
 lang = "en_US.UTF-8"
-keyboard_layout = "us"
-keyboard_variant = ""
+keyboard_layout = ["us", "it"]   # 1 to 4, the first the default; "us" or "us,it" too
+keyboard_variant = ["", "intl"]  # one a layout, "" for its own; may be left out
 timezone = "Europe/Rome"
 
 [host]

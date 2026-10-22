@@ -182,6 +182,19 @@ keyword = "cursor-size"
 run = ["kubaos", "cursor", "size", "{size}"]
 arguments = [{ name = "size", placeholder = "32" }]
 
+# The keyboard layouts (kubaos keyboard), kept in /etc/default/keyboard as
+# the install wrote them. The Extension itself sends "Keyboard: next layout",
+# one Item a layout and "Keyboard: add a layout"; this one replaces them all.
+
+[extensions.kubaos.actions.keyboard-set]
+title = "Keyboard: set layouts"
+subtitle = "Every layout, comma-separated, the default first: us,it(intl)"
+icon = "input-keyboard"
+keywords = ["keyboard layout", "keymap", "language", "input"]
+keyword = "keyboard-layouts"
+run = ["kubaos", "keyboard", "set", "{layouts}"]
+arguments = [{ name = "layouts", placeholder = "us,it" }]
+
 # The shell's panels and notifications (config/quickshell/IpcHandlers.qml).
 
 [extensions.kubaos.actions.control-center]

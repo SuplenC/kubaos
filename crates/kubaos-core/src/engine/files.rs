@@ -88,20 +88,6 @@ pub fn hosts(hostname: &str) -> String {
     )
 }
 
-/// `/etc/default/keyboard`: console-setup reads it for the console and
-/// systemd-localed for X11/Wayland defaults.
-pub fn keyboard(layout: &str, variant: &str) -> String {
-    format!(
-        "# KEYBOARD CONFIGURATION FILE (written by the KubaOS install)\n\
-         XKBMODEL=\"pc105\"\n\
-         XKBLAYOUT=\"{layout}\"\n\
-         XKBVARIANT=\"{variant}\"\n\
-         XKBOPTIONS=\"\"\n\
-         \n\
-         BACKSPACE=\"guess\"\n"
-    )
-}
-
 pub fn locale(lang: &str) -> String {
     format!("LANG={lang}\n")
 }
@@ -385,7 +371,6 @@ mod tests {
     #[test]
     fn small_files() {
         assert!(hosts("tuxedo").contains("127.0.1.1\ttuxedo\n"));
-        assert!(keyboard("it", "").contains("XKBLAYOUT=\"it\"\nXKBVARIANT=\"\"\n"));
         assert_eq!(locale("en_US.UTF-8"), "LANG=en_US.UTF-8\n");
     }
 

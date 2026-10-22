@@ -264,6 +264,15 @@ bind("SUPER + X", "Cut", send_once("CTRL", "X"))
 bind("SUPER + A", "Select all", send_once("CTRL", "A"))
 
 ---------------------------------------------------------------------------
+-- Keyboard layouts (config/hypr/input.lua takes them from
+-- /etc/default/keyboard). Windows and GNOME switch on SUPER + Space, which
+-- is the Command menu here, so the switch takes SHIFT with it. It is a bind,
+-- not an XKB `grp:` option, so the Command menu finds it with the others.
+---------------------------------------------------------------------------
+
+bind("SUPER + SHIFT + Space", "Next keyboard layout", "hyprctl switchxkblayout all next")
+
+---------------------------------------------------------------------------
 -- Media, volume, brightness (wpctl, brightnessctl, playerctl).
 -- Quickshell draws the OSD by watching PipeWire and the backlight.
 ---------------------------------------------------------------------------

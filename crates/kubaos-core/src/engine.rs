@@ -456,6 +456,29 @@ mod tests {
     }
 
     #[test]
+    fn every_keyboard_layout_reaches_the_keyboard_file_the_first_the_default() {
+        let p = payload();
+        let mut cfg = config(&p);
+        cfg.locale.keyboard_layout = vec!["it".into(), "us".into()];
+        cfg.locale.keyboard_variant = vec![String::new(), "intl".into()];
+        let mut r = DryRunner::new();
+        user_flake_payload(&mut r);
+        let opts = RunOptions {
+            dry_run: true,
+            target_root: Some("/mnt/t".into()),
+            log_file: None,
+        };
+
+        run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}).unwrap();
+
+        let keyboard = &r.files[Path::new("/mnt/t/etc/default/keyboard")];
+        assert!(
+            keyboard.contains("XKBLAYOUT=\"it,us\"\nXKBVARIANT=\",intl\"\n"),
+            "{keyboard}"
+        );
+    }
+
+    #[test]
     fn another_username_builds_its_own_generation() {
         let activation = |cmds: &[String]| {
             cmds.iter()
@@ -557,7 +580,8 @@ mod tests {
         let cfg = config(&p);
         let mut r = DryRunner::new();
         user_flake_payload(&mut r);
-        r.files.insert("/mnt/t/usr/share/kubaos/VERSION".into(), "0.1.0\n".into());
+        r.files
+            .insert("/mnt/t/usr/share/kubaos/VERSION".into(), "0.1.0\n".into());
         r.files.insert(
             "/mnt/t/usr/share/kubaos/.git/refs/heads/release".into(),
             "1a2b3c4d5e6f\n".into(),
@@ -583,17 +607,24 @@ mod tests {
         assert_eq!(r.files[Path::new("/mnt/t/etc/kubaos/channel")], "edge\n");
         let release = &r.files[Path::new("/mnt/t/var/lib/kubaos/release")];
         assert!(release.starts_with("version=0.1.0\n"), "{release}");
-        assert!(release.contains("commit=1a2b3c4d5e6f\nchannel=edge\n"), "{release}");
+        assert!(
+            release.contains("commit=1a2b3c4d5e6f\nchannel=edge\n"),
+            "{release}"
+        );
         assert!(r.files.contains_key(Path::new(
             "/mnt/t/var/lib/kubaos/migrations/1790000000-fix-apt.sh"
         )));
-        assert!(!r.files.contains_key(Path::new("/mnt/t/var/lib/kubaos/migrations/README.md")));
+        assert!(
+            !r.files
+                .contains_key(Path::new("/mnt/t/var/lib/kubaos/migrations/README.md"))
+        );
         assert!(r.files.contains_key(Path::new(
             "/mnt/t/home/kuba/.local/state/kubaos/migrations/1790000001-move-config.sh"
         )));
         let cmds = r.commands();
         assert!(
-            cmds.iter().any(|c| c == "chown -R 1000:1000 /mnt/t/home/kuba/.local"),
+            cmds.iter()
+                .any(|c| c == "chown -R 1000:1000 /mnt/t/home/kuba/.local"),
             "{cmds:#?}"
         );
     }

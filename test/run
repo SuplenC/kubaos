@@ -6,7 +6,7 @@
 #                                       test tools into the dotfiles-nix volume
 #   test/run e2e [--only a,b] [--keep]  every check, PASS/FAIL table, exit 1 on failure;
 #                                       builds the kubaos CLI for Linux first when the
-#                                       packages or suites check runs
+#                                       packages, suites or keyboard check runs
 #   test/run shell                     login zsh as kuba after a fresh switch
 #   test/run bitwarden                  Vaultwarden + dot-bw-setup + direnv
 #   test/run shots [--hyprland] [--dir NAME | --out PATH] [--size WxH] [--scale N]
@@ -116,7 +116,7 @@ cmd_e2e() {
     esac
     shift
   done
-  if [[ -z $only || ,$only, =~ ,(packages|suites|update_edge|update_stable|rollback), ]]; then
+  if [[ -z $only || ,$only, =~ ,(packages|suites|keyboard|update_edge|update_stable|rollback), ]]; then
     build_kubaos
   fi
   if ((keep)); then

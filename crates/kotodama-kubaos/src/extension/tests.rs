@@ -102,6 +102,61 @@ fn a_new_config_replaces_the_actions() {
     assert!(!ids(&extension).contains(&"old".to_owned()));
 }
 
+fn with_layouts(text: &str) -> Extension<FakeBus, FakeRunner> {
+    let mut extension = configured(text);
+    extension.set_keyboards(Keyboards::parse(
+        "XKBLAYOUT=\"us,it\"\nXKBVARIANT=\",\"\n",
+        "! layout\n  us  English (US)\n  it  Italian\n",
+    ));
+    extension
+}
+
+#[test]
+fn the_keyboard_items_come_after_the_toggles() {
+    let extension = with_layouts("");
+
+    let ids = ids(&extension);
+
+    assert_eq!(ids[..toggles::ids().len()], toggles::ids());
+    assert_eq!(
+        ids[toggles::ids().len()..],
+        ["keyboard-next", "keyboard:us", "keyboard:it", "keyboard-add"]
+    );
+}
+
+#[test]
+fn a_keyboard_item_runs_through_the_extension() {
+    let mut extension = with_layouts("");
+
+    let ran = extension.run(keyboard::RUN, &item(keyboard::KIND, "keyboard:it"), &BTreeMap::new());
+
+    assert_eq!(ran, Ok(Ran::Close));
+    assert_eq!(extension.runner.ran(), ["hyprctl switchxkblayout all 1"]);
+}
+
+#[test]
+fn hide_takes_out_a_keyboard_item_and_its_run() {
+    let mut extension = with_layouts(r#"hide = ["keyboard-next"]"#);
+
+    let ran = extension.run(keyboard::RUN, &item(keyboard::KIND, keyboard::NEXT), &BTreeMap::new());
+
+    assert!(!ids(&extension).contains(&"keyboard-next".to_owned()));
+    assert!(ids(&extension).contains(&"keyboard-add".to_owned()));
+    assert!(ran.is_err());
+    assert!(extension.runner.ran().is_empty());
+}
+
+#[test]
+fn an_action_may_not_take_a_keyboard_items_id() {
+    let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
+
+    let problems = extension.configure(
+        &toml::from_str("[actions.keyboard-add]\ntitle = \"Mine\"\nrun = [\"true\"]").expect("the test's config"),
+    );
+
+    assert_eq!(problems.len(), 1, "{problems:?}");
+}
+
 #[test]
 fn an_unknown_item_or_action_says_so() {
     let mut extension = configured("");

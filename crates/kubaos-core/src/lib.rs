@@ -5,6 +5,7 @@ pub mod config;
 pub mod demo;
 pub mod engine;
 pub mod event;
+pub mod keyboard;
 pub mod packages;
 pub mod probe;
 pub mod setup;

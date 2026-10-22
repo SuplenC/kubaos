@@ -4,10 +4,9 @@
 use std::collections::BTreeSet;
 
 use kubaos_core::config::{Disk, DiskTarget, Git, Host, Locale, Payload, User, Wallpapers, Wifi};
+use kubaos_core::keyboard::{self, Layout};
 use kubaos_core::probe::{DiskInfo, Region, WallpaperFile, WallpaperSet};
 use kubaos_core::{InstallConfig, Probe, Secrets};
-
-use crate::data;
 
 /// Where the live ISO keeps the payload (docs/INSTALL-INTERNALS.md, `[payload]`).
 pub const PAYLOAD_DIR: &str = "/run/kubaos/payload";
@@ -49,7 +48,8 @@ pub enum DiskMode {
 #[derive(Debug, Clone, Default)]
 pub struct Form {
     pub locale: String,
-    pub keymap: String,
+    /// The layouts picked, as `layout` or `layout(variant)`, the first the default.
+    pub keymaps: Vec<String>,
     pub keyboard_test: String,
     pub timezone: String,
 
@@ -97,7 +97,7 @@ impl Form {
             .map(|d| d.path.clone());
         let mut f = Self {
             locale: pick(&probe.locales, "en_US.UTF-8"),
-            keymap: pick(&probe.keymaps, "us"),
+            keymaps: vec![pick(&probe.keymaps, "us")],
             timezone: pick(&probe.timezones, "Europe/Rome"),
             username: manifest.map(|m| m.username.clone()).unwrap_or_default(),
             hostname: manifest.map(|m| m.hostname.clone()).unwrap_or_default(),
@@ -121,6 +121,44 @@ impl Form {
     /// The free region a dual-boot install would use: the largest one.
     pub fn free_region(&self, probe: &Probe) -> Option<Region> {
         self.selected_disk(probe)?.largest_free()
+    }
+
+    pub fn keymap_picked(&self, keymap: &str) -> bool {
+        self.keymaps.iter().any(|k| k == keymap)
+    }
+
+    /// Picks `keymap`, or unpicks it if it was picked.
+    ///
+    /// # Errors
+    ///
+    /// Why it can't: it is the last one, or there are already as many as XKB holds.
+    pub fn toggle_keymap(&mut self, keymap: &str) -> Result<(), &'static str> {
+        if self.keymap_picked(keymap) {
+            if self.keymaps.len() == 1 {
+                return Err("Keep one layout at least.");
+            }
+            self.keymaps.retain(|k| k != keymap);
+        } else {
+            if self.keymaps.len() >= keyboard::MAX_LAYOUTS {
+                return Err("Four layouts at most: XKB holds no more.");
+            }
+            self.keymaps.push(keymap.to_string());
+        }
+        Ok(())
+    }
+
+    /// Makes `keymap` the default, the first one, picking it if it wasn't.
+    ///
+    /// # Errors
+    ///
+    /// When it wasn't picked and there are already as many as XKB holds.
+    pub fn make_default_keymap(&mut self, keymap: &str) -> Result<(), &'static str> {
+        if !self.keymap_picked(keymap) {
+            self.toggle_keymap(keymap)?;
+        }
+        self.keymaps.retain(|k| k != keymap);
+        self.keymaps.insert(0, keymap.to_string());
+        Ok(())
     }
 
     pub fn password_ok(&self) -> Result<(), &'static str> {
@@ -295,7 +333,6 @@ impl Form {
 
     pub fn to_config(&self, probe: &Probe) -> InstallConfig {
         let manifest = probe.payload.as_ref();
-        let (layout, variant) = data::split_keymap(&self.keymap);
         let target = match self.disk_mode {
             Some(DiskMode::FreeSpace) => match self.free_region(probe) {
                 Some(r) => DiskTarget::FreeSpace {
@@ -306,6 +343,7 @@ impl Form {
             },
             _ => DiskTarget::Whole,
         };
+        let layouts: Vec<Layout> = self.keymaps.iter().map(|k| Layout::parse(k)).collect();
         let git =
             (!self.git_name.trim().is_empty() && !self.git_email.trim().is_empty()).then(|| Git {
                 name: self.git_name.trim().to_string(),
@@ -314,8 +352,8 @@ impl Form {
         InstallConfig {
             locale: Locale {
                 lang: self.locale.clone(),
-                keyboard_layout: layout,
-                keyboard_variant: variant,
+                keyboard_layout: layouts.iter().map(|l| l.layout.clone()).collect(),
+                keyboard_variant: layouts.iter().map(|l| l.variant.clone()).collect(),
                 timezone: self.timezone.clone(),
             },
             host: Host {
@@ -505,16 +543,51 @@ mod tests {
         f.full_name = "Kuba".into();
         f.password = "hunter2".into();
         f.password_confirm = "hunter2".into();
-        f.keymap = "us(intl)".into();
+        f.keymaps = vec!["us(intl)".into(), "it".into()];
         let cfg = f.to_config(&p);
-        assert_eq!(cfg.locale.keyboard_layout, "us");
-        assert_eq!(cfg.locale.keyboard_variant, "intl");
+        assert_eq!(cfg.locale.keyboard_layout, ["us", "it"]);
+        assert_eq!(cfg.locale.keyboard_variant, ["intl", ""]);
         assert!(matches!(cfg.disk.target, DiskTarget::FreeSpace { .. }));
         let toml = toml::to_string(&cfg).unwrap();
         assert_eq!(InstallConfig::from_toml(&toml).unwrap(), cfg);
         let s = f.to_secrets();
         assert_eq!(s.luks_passphrase.as_deref(), Some("hunter2"));
         assert_eq!(s.wifi_psk, None);
+    }
+
+    #[test]
+    fn layouts_are_picked_in_order_one_to_four() {
+        let p = demo_probe();
+        let mut f = Form::new(&p);
+        assert_eq!(f.keymaps, ["us"], "the probe's layout is picked");
+
+        assert_eq!(f.toggle_keymap("us"), Err("Keep one layout at least."));
+        f.toggle_keymap("it").unwrap();
+        f.toggle_keymap("de").unwrap();
+        f.toggle_keymap("pl").unwrap();
+        assert_eq!(
+            f.toggle_keymap("fr"),
+            Err("Four layouts at most: XKB holds no more.")
+        );
+        f.toggle_keymap("de").unwrap();
+
+        assert_eq!(f.keymaps, ["us", "it", "pl"]);
+    }
+
+    #[test]
+    fn making_a_layout_the_default_moves_it_first() {
+        let p = demo_probe();
+        let mut f = Form::new(&p);
+        f.toggle_keymap("it").unwrap();
+
+        f.make_default_keymap("it").unwrap();
+        assert_eq!(f.keymaps, ["it", "us"]);
+        f.make_default_keymap("de").unwrap();
+        assert_eq!(
+            f.keymaps,
+            ["de", "it", "us"],
+            "a layout not yet picked is picked first"
+        );
     }
 
     #[test]
