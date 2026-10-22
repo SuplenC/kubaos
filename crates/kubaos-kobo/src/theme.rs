@@ -131,6 +131,7 @@ pub const STATE_HOVER: f32 = 0.08;
 pub const STATE_PRESS: f32 = 0.14;
 
 pub mod space {
+    pub const XS: f32 = 4.0;
     pub const SM: f32 = 8.0;
     pub const MD: f32 = 12.0;
     pub const LG: f32 = 16.0;

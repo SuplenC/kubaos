@@ -718,6 +718,45 @@ pub fn spinner<'a>(t: f32, px: f32, color: Color) -> Element<'a, Message> {
     .into()
 }
 
+/// A play triangle on a dark disc: the badge on a video wallpaper's thumbnail. Drawn, since the
+/// bundled icon font has no play icon.
+struct PlayBadge {
+    fg: Color,
+    bg: Color,
+}
+
+impl<Message> canvas::Program<Message> for PlayBadge {
+    type State = ();
+
+    fn draw(
+        &self,
+        _s: &(),
+        renderer: &Renderer,
+        _th: &Theme,
+        bounds: Rectangle,
+        _c: mouse::Cursor,
+    ) -> Vec<Geometry> {
+        let mut frame = Frame::new(renderer, bounds.size());
+        let r = bounds.width.min(bounds.height) / 2.0;
+        let c = Point::new(bounds.width / 2.0, bounds.height / 2.0);
+        frame.fill(&Path::circle(c, r), self.bg);
+        // The triangle's centroid sits a little right of the disc's centre, so it looks centred.
+        let s = r * 0.42;
+        let tri = Path::new(|b| {
+            b.move_to(Point::new(c.x - s * 0.7, c.y - s));
+            b.line_to(Point::new(c.x + s * 1.1, c.y));
+            b.line_to(Point::new(c.x - s * 0.7, c.y + s));
+            b.close();
+        });
+        frame.fill(&tri, self.fg);
+        vec![frame.into_geometry()]
+    }
+}
+
+pub fn play_badge<'a>(px: f32, fg: Color, bg: Color) -> Element<'a, Message> {
+    canvas(PlayBadge { fg, bg }).width(px).height(px).into()
+}
+
 /// The Show/Hide toggle for secrets: small, for the right of a label.
 pub fn show_toggle<'a>(
     shown: bool,

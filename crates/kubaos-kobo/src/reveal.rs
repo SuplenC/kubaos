@@ -76,10 +76,10 @@ pub struct Find {
 }
 
 impl Find {
-    pub fn new(scroll: &'static str, item: &'static str) -> Self {
+    pub fn new(scroll: &'static str, item: Id) -> Self {
         Self {
             scroll: Id::new(scroll),
-            item: Id::new(item),
+            item,
             view: None,
             found: None,
         }

@@ -123,8 +123,10 @@ pub fn script() -> Vec<Step> {
         Tap(Enter),
         Until("wallpapers", |a| a.screen == Screen::Wallpapers),
         Wait(SETTLE),
-        Tap(Right), // japanese
+        Tap(Tab),   // the japanese set
         Tap(Space), // dropped
+        Tap(Down),  // its first wallpaper
+        Tap(Space), // picked again
         Wait(SETTLE),
         Shot("09-wallpapers"),
         Tap(Enter),
@@ -393,12 +395,11 @@ mod tests {
             (f.git_name.as_str(), f.git_email.as_str()),
             ("Kuba Example", "kuba@example.com")
         );
-        // Right to the second set, Space drops it.
+        // The second set dropped, then its first wallpaper picked again.
         let probe = app.ready_probe().unwrap();
-        assert_eq!(
-            f.to_config(probe).wallpapers.unwrap().sets,
-            ["cyberpunk", "shinjuku"]
-        );
+        let w = f.to_config(probe).wallpapers.unwrap();
+        assert_eq!(w.sets, ["cyberpunk", "shinjuku"]);
+        assert_eq!(w.files, ["japanese/shinjuku-purple-hour.jpg"]);
     }
 
     fn ready() -> App {
