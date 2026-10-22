@@ -89,7 +89,7 @@ cmd_warm() {
 
 # build_kubaos: the kubaos CLI for the container's Linux, as $DOTFILES_TEST_OUT/kubaos (the
 # container's /out/kubaos), for the packages check. The image has no Rust toolchain, so it builds
-# in rust:latest, as installer/test/engine-e2e does. Cargo's registry and target dir live in the
+# in rust:latest, as install/test/engine-e2e does. Cargo's registry and target dir live in the
 # dotfiles-test-cargo and dotfiles-test-target volumes, with a target subdirectory per checkout:
 # cargo goes by mtime, and worktrees share the volume.
 build_kubaos() {
