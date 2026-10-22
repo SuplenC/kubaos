@@ -4,16 +4,20 @@ Keys, updates, daily commands, how it is built, the repo map and known limitatio
 
 ## Keys that matter
 
-`SUPER + F1` lists every bind in the Command menu, searchable by what it does. These are the ones you'll use every day:
+Every bind is in the Command menu, found by what it does: type "move to workspace 3" and the bind shows with its keys beside it. `SUPER + F1` lists them all. These are the ones you'll use every day:
 
 | Keys | What |
 |---|---|
 | `SUPER + Return` | Terminal (Ghostty) |
 | `SUPER + CTRL + Return` | Terminal in tmux session `main` |
-| `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows. Type a sum to calculate |
+| `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows, binds. Type a sum to calculate. It opens on the focused screen |
 | `SUPER + Q` | Close window |
-| `SUPER + h/j/k/l` | Focus. `+ SHIFT` moves the window, `+ CTRL` resizes |
-| `SUPER + 1..9` | Workspace. `+ SHIFT` takes the window along |
+| `SUPER + h/j/k/l` | Focus the screen left, below, above, right |
+| `SUPER + ←/↓/↑/→` | Focus the window that way. `SUPER + SHIFT + h/j/k/l` moves the window, `SUPER + CTRL + h/j/k/l` resizes it |
+| `SUPER + 1..0` | Workspace 1-10 of the focused screen. `+ SHIFT` takes the window along, `+ SHIFT + ALT` sends it without following |
+| `SUPER + SHIFT + CTRL + →` | Move the window to a new workspace after the screen's last |
+| `SUPER + Tab` / `SUPER + CTRL + →/←` | Next / previous workspace on the focused screen (`+ SHIFT` on Tab for previous); `SUPER + CTRL + Tab` its former one |
+| `SUPER + ALT + Tab` | Next window in a group (`+ SHIFT` for previous) |
 | `SUPER + CTRL + A` / `B` / `W` | Control center: audio, Bluetooth, Wi-Fi |
 | `SUPER + CTRL + Space` | Wallpaper picker (the colors follow) |
 | `Print` / `SUPER + SHIFT + S` | Screenshot a region, copied and saved |
@@ -206,13 +210,14 @@ Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland
 - Fingerprint unlock in the Quickshell lock screen is untested: no reader in a container. nixpkgs' `pam_fprintd.so` loads and answers like Ubuntu's does without a reader. It's off now (`Settings.fingerprint`); hyprlock is the fallback.
 - Untested without hardware: a real FIDO2 touch (sudo, polkit, lock screen), Bitwarden desktop's SSH agent and its polkit unlock (amd64 only), and `bw` with real two-step login. `bw` can't do FIDO2 two-step login; `dot-bw-setup --login apikey` is the way in for a key-only account (`docs/SECRETS.md`).
 - The in-shell polkit agent is off; hyprpolkitagent is the agent until the Quickshell one is tested on the machine.
+- The Command menu lists every bind, but Enter on one fails: under the Lua config Hyprland reports each bind's action as `__lua <ref>`, and Kotodama sends that back to the socket as it is, which Hyprland can't run. The keys themselves work. Number-key binds show as `code:12` and so on beside their titles, since they are bound by keycode.
 - The arm64 VM can't run the Hyprland Lua config from apt (the PPA is amd64 only, Ubuntu's own build is 0.53).
 - grub-btrfs is built from source (not packaged for 26.04) and isn't tracked by dpkg.
 - The official Nix installer has no uninstaller; the manual steps are in `docs/INSTALL.md`.
 
 ## Credits
 
-- [Omarchy](https://omarchy.org) for the keybinds and the idea that installing a desktop should take one stick and a few minutes.
+- [Omarchy](https://omarchy.org) for the keybinds, per-screen workspaces (`config/hypr/workspaces.lua` adapts its `monitor-workspaces.lua`, MIT) and the idea that installing a desktop should take one stick and a few minutes.
 - [Caelestia](https://github.com/caelestia-dots/shell) for the shell's structure: the frame, panels that grow out of it, the Material 3 motion. No code was taken; the shell here is written from scratch.
 - [Quickshell](https://quickshell.org), [Hyprland](https://hyprland.org), [matugen](https://github.com/InioX/matugen), [home-manager](https://github.com/nix-community/home-manager) and Ubuntu, which do the actual work.
 - The wallpapers are by Pema G. Lama, Alex Knight, Jezael Melgoza, Marek Okon, Manuel Cosentino, LoboStudio Hamburg, ayumi kubo, Letian Zhang and Lucius Hunter on Unsplash, and Bobby Brown on Pexels (each set's `CREDITS.md` in [SuplenC/kubaos-wallpapers](https://github.com/SuplenC/kubaos-wallpapers)).

@@ -35,7 +35,7 @@ The `virt` machine (aarch64) or `q35` (x86_64), with edk2 UEFI from pflash. The 
 - The KUBAOS_CFG disk is a second `scsi-cd`.
 - The target is `virtio-blk` and appears as `/dev/vda`.
 - Network is virtio-net user mode, with `127.0.0.1:2229` forwarded to guest port 22.
-- Display is `virtio-gpu-pci` at 1920×1080 (`VM_RES`), plus USB keyboard and tablet and virtio-rng.
+- Display is `virtio-gpu-pci` at 1920×1080 (`VM_RES`), plus USB keyboard and tablet and virtio-rng. One screen: for a second one, `workspaces-check` has Hyprland make a headless output (`hyprctl output create headless NAME`, gone again with `hyprctl output remove NAME`), which plugs and unplugs like a real screen and shows in `shot` only through its windows' workspace ids.
 - The serial console (`ttyAMA0` or `ttyS0`) goes to `out/serial.log`.
 
 `--gui` opens a Cocoa window, otherwise it's `-display none`. QEMU always runs in the background as a plain child process, never with `-daemonize`. On macOS the forked daemon aborts inside the ObjC runtime as soon as Hypervisor.framework serializes vGIC state (savevm).
@@ -79,6 +79,7 @@ test/vm/run boot-disk && sleep 15 && test/vm/run type 'bench-luks\n' && test/vm/
 test/vm/run ssh snapper list                           # root on the installed system
 test/vm/run shot first-boot
 test/vm/menu-check                                     # SUPER + Space launches an app, a sum, SUPER + F1
+test/vm/workspaces-check                               # two screens (one headless): per-screen workspaces, unplug, the menu
 test/vm/run snapshot save fresh; …; test/vm/run snapshot restore fresh
 test/vm/run stop
 ```

@@ -20,9 +20,10 @@
 --        description: LG Electronics LG ULTRAGEAR 312NTXX1A234
 --      The two UltraGears share make and model, so the serial at the end is
 --      what tells them apart. Copy the whole line after "description: ".
---   3. Paste them below as desc:<description> (external_1 = the one that
---      should hold workspaces 4-6, external_2 = 7-9), and fix the positions
---      so they match the physical layout on your desk.
+--   3. Paste them below as desc:<description> (external_1 = the one left of
+--      external_2), and fix the positions so they match the physical layout
+--      on your desk. Workspaces don't depend on this: workspaces.lua knows
+--      each screen by the same description.
 --   4. Save. Hyprland reloads by itself (or run: hyprctl reload).
 -- Until then the placeholders match nothing and the catch-all rule at the
 -- bottom places any monitor automatically.

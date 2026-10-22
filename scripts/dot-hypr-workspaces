@@ -1,22 +1,16 @@
 #!/usr/bin/env bash
 # Long-running helper started from config/hypr/autostart.lua.
 #
-# Listens on Hyprland's event socket. When a monitor is added (dock plugged
-# back in), moves every numbered workspace that has a monitor rule back to
-# that monitor (4-6 to external 1, 7-9 to external 2). The rules are read
-# from Hyprland (`hyprctl -j workspacerules`), so workspaces.lua stays the
-# only place that defines them. On monitor add/remove it also re-runs
-# `dot-hypr-lid sync`, so the laptop panel comes back on when the last
-# external disappears with the lid closed.
-#
-# Hyprland 0.56 already moves *persistent* workspaces back to their rule's
-# monitor on connect (WorkspacePlacementController), so the restore pass is
-# a safety net; it is a no-op when Hyprland got there first.
+# Listens on Hyprland's event socket and runs `dot-hypr-lid sync` at login and
+# on every monitor added or removed, so the laptop panel comes back on when
+# the last external disappears with the lid closed. Putting each screen's
+# workspaces back on it is config/hypr/workspaces.lua's job, on the same
+# events.
 #
 # Battery: grep filters the event stream, so this script only wakes up for
 # monitor events (Hyprland sends one event per focus/title change).
 #
-# Needs: socat, grep (apt), jq (Nix, home/cli.nix), hyprctl.
+# Needs: socat, grep (apt), hyprctl.
 set -euo pipefail
 
 : "${HYPRLAND_INSTANCE_SIGNATURE:?not running inside Hyprland}"
@@ -34,42 +28,8 @@ flock -n 9 || exit 0
 # from a terminal to see this.
 log() { printf 'dot-hypr-workspaces: %s\n' "$*" >&2; }
 
-# Prints "<workspace> <monitor-name>" for each workspace that is not on the
-# monitor its rule asks for, when that monitor is connected. A rule monitor is
-# either a connector name or "desc:<prefix of the description>".
-pending_moves() {
-  jq -rn \
-    --argjson rules "$(hyprctl -j workspacerules)" \
-    --argjson mons "$(hyprctl -j monitors)" \
-    --argjson wss "$(hyprctl -j workspaces)" '
-    def target($sel):
-      if ($sel | startswith("desc:"))
-      then ($sel[5:] | ltrimstr(" ")) as $d | first($mons[] | select(.description | startswith($d)))
-      else first($mons[] | select(.name == $sel))
-      end;
-    $rules[]
-    | select((.monitor // "") != "" and (.workspaceString | test("^[0-9]+$")))
-    | .workspaceString as $ws
-    | (try target(.monitor) catch null) as $mon
-    | select($mon != null)
-    | (first($wss[] | select((.id | tostring) == $ws)) // null) as $cur
-    | select($cur != null and $cur.monitor != $mon.name)
-    | "\($ws) \($mon.name)"'
-}
-
-restore() {
-  local ws mon moves
-  moves=$(pending_moves) || { log "could not read Hyprland state"; return 0; }
-  while read -r ws mon; do
-    [[ -n ${ws:-} ]] || continue
-    log "workspace $ws -> $mon"
-    hyprctl dispatch "hl.dsp.workspace.move({ workspace = \"$ws\", monitor = \"$mon\" })" >/dev/null || true
-  done <<<"$moves"
-}
-
 on_monitor_change() {
   dot-hypr-lid sync || log "dot-hypr-lid sync failed"
-  restore
 }
 
 # Monitor events only, v2 (Hyprland sends v1 and v2 of each).

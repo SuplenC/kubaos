@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# test/vm/workspaces-check: per-screen workspaces on an installed KubaOS in the
+# bench VM, with two screens. The second screen is a Hyprland headless output
+# (`hyprctl output create headless`), so plugging and unplugging it is a
+# command, and it is told apart from the VM's own screen by its description,
+# as a real one is.
+#
+#   test/vm/workspaces-check [--user NAME]
+#
+# It checks that SUPER + 2 on each screen opens that screen's own workspace 2,
+# that SUPER + SHIFT + 4 moves a window to a new workspace 4 on its screen,
+# that SUPER + H and SUPER + L move the focus between the screens, that
+# unplugging a screen with workspaces 1-3 puts them after the other screen's
+# own and plugging it back returns them, and that the Command menu finds and
+# runs "move to workspace 3".
+#
+# The VM runs the installed disk with the bench's SSH key in root's account and
+# the user's desktop up (test/vm/README.md: `install … --ssh`, `boot-disk`, the
+# LUKS passphrase, `wait-ssh`). NAME is the desktop's user, `kuba` by default.
+# Screenshots go to test/vm/out/shots/workspaces-*. Prints ok/FAIL lines and
+# exits 1 on the first failed step.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN="$HERE/run"
+USER_NAME=kuba
+# The second screen's connector, and the window the checks move: foot comes
+# from apt, so it is on every install.
+SECOND=HEADLESS-KUBAOS
+APP=foot
+
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+
+while (($#)); do
+  case "$1" in
+    --user) USER_NAME="${2:?--user NAME}"; shift ;;
+    -h | --help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+fail() { echo "FAIL $*"; "$RUN" shot workspaces-failed >/dev/null || true; exit 1; }
+ok() { echo "ok   $*"; }
+
+# as_user SCRIPT: SCRIPT, which sh reads from stdin, in the user's desktop
+# session, over SSH as root, as test/vm/menu-check does.
+as_user() {
+  "$RUN" ssh "uid=\$(id -u $USER_NAME) && run=/run/user/\$uid && \
+    his=\$(ls -t \$run/hypr 2>/dev/null | head -1) && way=\$(cd \$run && ls -d wayland-[0-9] | head -1) && \
+    exec runuser -u $USER_NAME -- env XDG_RUNTIME_DIR=\$run WAYLAND_DISPLAY=\$way \
+      HYPRLAND_INSTANCE_SIGNATURE=\$his DBUS_SESSION_BUS_ADDRESS=unix:path=\$run/bus \
+      PATH=/home/$USER_NAME/.nix-profile/bin:/usr/local/bin:/usr/bin:/bin sh -s" <<<"$1"
+}
+
+# wait_for DESC SECONDS CMD: until CMD succeeds in the session.
+wait_for() {
+  local desc="$1" secs="$2" cmd="$3" end
+  end=$((SECONDS + secs))
+  until as_user "$cmd" >/dev/null 2>&1; do
+    ((SECONDS < end)) || fail "$desc: not within ${secs}s"
+    sleep 1
+  done
+}
+
+# Scripts for as_user, printing: the workspace a screen shows, the ids on a
+# screen (sorted, space separated), the focused screen, and the workspace of
+# the newest window of $APP.
+shown_on() { echo "hyprctl monitors -j | jq -r '.[] | select(.name == \"$1\") | .activeWorkspace.id'"; }
+ids_on() { echo "hyprctl workspaces -j | jq -r '[.[] | select(.monitor == \"$1\" and .id > 0) | .id] | sort | map(tostring) | join(\" \")'"; }
+focused() { echo "hyprctl monitors -j | jq -r '.[] | select(.focused) | .name'"; }
+app_workspace() { echo "hyprctl clients -j | jq -r '[.[] | select(.class == \"$APP\")] | last | .workspace.id'"; }
+
+# expect DESC SCRIPT WANT: SCRIPT's output is WANT, within a few seconds.
+expect() {
+  local desc="$1" script="$2" want="$3" got end
+  end=$((SECONDS + 5))
+  while true; do
+    got="$(as_user "$script" 2>/dev/null || true)"
+    [[ $got == "$want" ]] && { ok "$desc"; return 0; }
+    ((SECONDS < end)) || fail "$desc: got '$got', want '$want'"
+    sleep 0.5
+  done
+}
+
+dispatch() { as_user "hyprctl dispatch '$1'" >/dev/null; }
+open_app() {
+  local before
+  before="$(as_user "hyprctl clients -j | jq '[.[] | select(.class == \"$APP\")] | length'")"
+  as_user "hyprctl dispatch 'hl.dsp.exec_cmd(\"$APP\")'" >/dev/null
+  wait_for "$APP opens" 20 "[ \$(hyprctl clients -j | jq '[.[] | select(.class == \"$APP\")] | length') -gt $before ]"
+}
+
+wait_for "Hyprland answers" 120 "hyprctl version"
+wait_for "the per-screen module wrote its screens file" 30 "test -s \"\${XDG_STATE_HOME:-\$HOME/.local/state}/kubaos/hypr/workspace-screens\""
+first="$(as_user "hyprctl monitors -j | jq -r '.[0].name'")"
+ok "session up on $first"
+
+as_user "hyprctl output create headless $SECOND" >/dev/null
+wait_for "the second screen appears" 10 "hyprctl monitors -j | jq -e '.[] | select(.name == \"$SECOND\")'"
+expect "the first screen shows its workspace 1" "$(shown_on "$first")" 1
+expect "the second screen shows its own workspace 1, 11" "$(shown_on "$SECOND")" 11
+
+dispatch "hl.dsp.focus({ monitor = \"$SECOND\" })"
+"$RUN" key meta_l-2
+expect "SUPER + 2 on the second screen opens 12" "$(shown_on "$SECOND")" 12
+dispatch "hl.dsp.focus({ monitor = \"$first\" })"
+"$RUN" key meta_l-2
+expect "SUPER + 2 on the first screen opens 2" "$(shown_on "$first")" 2
+"$RUN" shot workspaces-two-screens >/dev/null
+
+"$RUN" key meta_l-1
+open_app
+"$RUN" key meta_l-shift-4
+expect "SUPER + SHIFT + 4 moves the window to a new workspace 4" "$(app_workspace)" 4
+expect "and follows it" "$(shown_on "$first")" 4
+
+"$RUN" key meta_l-l
+expect "SUPER + L focuses the screen to the right" "$(focused)" "$SECOND"
+"$RUN" key meta_l-h
+expect "SUPER + H focuses the screen to the left" "$(focused)" "$first"
+
+# Workspaces 1-3 of the second screen, a window on each.
+dispatch "hl.dsp.focus({ monitor = \"$SECOND\" })"
+for slot in 1 2 3; do
+  dispatch "dot.workspaces.focus($slot)"
+  open_app
+done
+expect "the second screen has 11 12 13" "$(ids_on "$SECOND")" "11 12 13"
+own="$(as_user "$(ids_on "$first")")"
+
+as_user "hyprctl output remove $SECOND" >/dev/null
+wait_for "the second screen goes" 10 "! hyprctl monitors -j | jq -e '.[] | select(.name == \"$SECOND\")'"
+last="${own##* }"
+expect "unplugged, its workspaces follow the first screen's own" "$(ids_on "$first")" "$own $((last + 1)) $((last + 2)) $((last + 3))"
+"$RUN" shot workspaces-unplugged >/dev/null
+
+as_user "hyprctl output create headless $SECOND" >/dev/null
+wait_for "the second screen comes back" 10 "hyprctl monitors -j | jq -e '.[] | select(.name == \"$SECOND\")'"
+expect "plugged back, they return as 11 12 13" "$(ids_on "$SECOND")" "11 12 13"
+expect "and the first screen keeps its own" "$(ids_on "$first")" "$own"
+
+# The Command menu runs a bind: the window on the second screen's 11 moves to
+# its 13.
+dispatch "hl.dsp.focus({ monitor = \"$SECOND\" })"
+dispatch "dot.workspaces.focus(1)"
+window="$(as_user "hyprctl activewindow -j | jq -r .address")"
+[[ $window == 0x* ]] || fail "no window focused on 11: '$window'"
+"$RUN" key meta_l-spc
+wait_for "SUPER + Space shows the menu" 10 "hyprctl layers -j | grep -Eq '\"namespace\": ?\"kotodama\"'"
+expect "the menu opens on the focused screen" \
+  "hyprctl layers -j | jq -r 'to_entries[] | select(any(.value.levels[][]; .namespace == \"kotodama\")) | .key'" "$SECOND"
+"$RUN" type "move to workspace 3"
+sleep 1
+"$RUN" shot workspaces-menu >/dev/null
+"$RUN" key ret
+expect "the menu's \"Move window to workspace 3\" moves it to 13" \
+  "hyprctl clients -j | jq -r '.[] | select(.address == \"$window\") | .workspace.id'" 13
+
+as_user "hyprctl output remove $SECOND" >/dev/null
+ok "per-screen workspaces, screen focus and the menu's binds work on two screens"

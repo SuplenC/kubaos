@@ -26,8 +26,6 @@ Singleton {
     // listener, config/hypr/hypridle.conf). Videos stop decoding then.
     readonly property int screenOffAfter: 600
 
-    // Hyprland workspaces are grouped per monitor: 1-3, 4-6, 7-9.
-    readonly property int workspacesPerMonitor: 3
     // Label workspaces with kanji numerals (一 二 三) instead of digits.
     readonly property bool workspaceKanji: false
 

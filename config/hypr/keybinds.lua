@@ -1,10 +1,10 @@
 -- Keybinds, ported from Omarchy 4 ("Quattro", default/hypr/bindings/*.lua)
--- with movement on hjkl (docs/CONTRACTS.md) and apps adapted to this setup.
--- SUPER + F1 lists every bind by its description, in the Command menu's
--- Shortcuts View. The terminal, the menu and the survival binds live in
--- fallback.lua.
+-- with screen focus on hjkl (docs/CONTRACTS.md) and apps adapted to this
+-- setup. Each description is the bind's title in the Command menu, which
+-- finds it by typing what it does; SUPER + F1 lists them all in its Shortcuts
+-- View. The terminal, the menu and the survival binds live in fallback.lua.
 --
--- Number and punctuation keys use keycodes (code:10 = "1" ... code:18 = "9",
+-- Number and punctuation keys use keycodes (code:10 = "1" ... code:19 = "0",
 -- code:20/21 = the two keys right of "0", code:49 = the key left of "1"),
 -- so the binds sit on the same physical keys with the Italian layout.
 
@@ -76,7 +76,8 @@ bind("SUPER + O", "Pop window out (float and pin)", function()
   end
 end)
 
--- Focus / move / resize. hjkl per CONTRACTS, arrows as in Omarchy.
+-- Screens on hjkl, windows on the arrows (docs/CONTRACTS.md). Moving and
+-- resizing keep hjkl under SHIFT and CTRL.
 local dirs = {
   { key = "H", arrow = "Left", dir = "l", dx = -50, dy = 0, name = "left" },
   { key = "J", arrow = "Down", dir = "d", dx = 0, dy = 50, name = "down" },
@@ -84,14 +85,14 @@ local dirs = {
   { key = "L", arrow = "Right", dir = "r", dx = 50, dy = 0, name = "right" },
 }
 for _, d in ipairs(dirs) do
-  bind("SUPER + " .. d.key, "Focus " .. d.name, hl.dsp.focus({ direction = d.dir }))
-  bind("SUPER + " .. d.arrow, "Focus " .. d.name, hl.dsp.focus({ direction = d.dir }))
+  bind("SUPER + " .. d.key, "Focus screen " .. d.name, hl.dsp.focus({ monitor = d.dir }))
+  bind("SUPER + " .. d.arrow, "Focus window " .. d.name, hl.dsp.focus({ direction = d.dir }))
   bind("SUPER + SHIFT + " .. d.key, "Move window " .. d.name, hl.dsp.window.move({ direction = d.dir }))
   bind("SUPER + SHIFT + " .. d.arrow, "Swap window " .. d.name, hl.dsp.window.swap({ direction = d.dir }))
   bind("SUPER + CTRL + " .. d.key, "Resize window " .. d.name,
     hl.dsp.window.resize({ x = d.dx, y = d.dy, relative = true }), { repeating = true })
-  bind("SUPER + SHIFT + ALT + " .. d.key, "Move workspace to monitor " .. d.name, hl.dsp.workspace.move({ monitor = d.dir }))
-  bind("SUPER + SHIFT + ALT + " .. d.arrow, "Move workspace to monitor " .. d.name, hl.dsp.workspace.move({ monitor = d.dir }))
+  bind("SUPER + SHIFT + ALT + " .. d.key, "Move workspace to screen " .. d.name, dot.workspaces.move_to_monitor(d.dir))
+  bind("SUPER + SHIFT + ALT + " .. d.arrow, "Move workspace to screen " .. d.name, dot.workspaces.move_to_monitor(d.dir))
   bind("SUPER + ALT + " .. d.arrow, "Move window into group " .. d.name, hl.dsp.window.move({ into_group = d.dir }))
 end
 
@@ -122,8 +123,6 @@ bind("SUPER + G", "Toggle group", hl.dsp.group.toggle())
 bind("SUPER + ALT + G", "Move window out of group", hl.dsp.window.move({ out_of_group = true }))
 bind("SUPER + ALT + Tab", "Next window in group", hl.dsp.group.next())
 bind("SUPER + ALT + SHIFT + Tab", "Previous window in group", hl.dsp.group.prev())
-bind("SUPER + CTRL + Left", "Previous window in group", hl.dsp.group.prev())
-bind("SUPER + CTRL + Right", "Next window in group", hl.dsp.group.next())
 bind("SUPER + ALT + mouse_down", "Next window in group", hl.dsp.group.next())
 bind("SUPER + ALT + mouse_up", "Previous window in group", hl.dsp.group.prev())
 for index = 1, 5 do
@@ -131,22 +130,26 @@ for index = 1, 5 do
 end
 
 ---------------------------------------------------------------------------
--- Workspaces
+-- Workspaces: each screen has its own 1-10 (workspaces.lua). `m+1` and
+-- `previous_per_monitor` stay on the focused screen.
 ---------------------------------------------------------------------------
 
-for ws = 1, 9 do
-  local key = "code:" .. (ws + 9)
-  bind("SUPER + " .. key, "Workspace " .. ws, hl.dsp.focus({ workspace = tostring(ws) }))
-  bind("SUPER + SHIFT + " .. key, "Move window to workspace " .. ws, hl.dsp.window.move({ workspace = tostring(ws) }))
-  bind("SUPER + SHIFT + ALT + " .. key, "Move window silently to workspace " .. ws,
-    hl.dsp.window.move({ workspace = tostring(ws), follow = false }))
+for slot = 1, dot.workspaces.slots do
+  local key = "code:" .. (slot + 9)
+  bind("SUPER + " .. key, "Go to workspace " .. slot, dot.workspaces.focus(slot))
+  bind("SUPER + SHIFT + " .. key, "Move window to workspace " .. slot, dot.workspaces.move_window(slot))
+  bind("SUPER + SHIFT + ALT + " .. key, "Move window silently to workspace " .. slot,
+    dot.workspaces.move_window(slot, false))
 end
+bind("SUPER + SHIFT + CTRL + Right", "Move window to a new workspace", dot.workspaces.move_window_to_new())
 
-bind("SUPER + Tab", "Next workspace", hl.dsp.focus({ workspace = "e+1" }))
-bind("SUPER + SHIFT + Tab", "Previous workspace", hl.dsp.focus({ workspace = "e-1" }))
-bind("SUPER + CTRL + Tab", "Last workspace", hl.dsp.focus({ workspace = "previous" }))
-bind("SUPER + mouse_down", "Next workspace", hl.dsp.focus({ workspace = "e+1" }))
-bind("SUPER + mouse_up", "Previous workspace", hl.dsp.focus({ workspace = "e-1" }))
+bind("SUPER + Tab", "Next workspace", hl.dsp.focus({ workspace = "m+1" }))
+bind("SUPER + SHIFT + Tab", "Previous workspace", hl.dsp.focus({ workspace = "m-1" }))
+bind("SUPER + CTRL + Right", "Next workspace", hl.dsp.focus({ workspace = "m+1" }))
+bind("SUPER + CTRL + Left", "Previous workspace", hl.dsp.focus({ workspace = "m-1" }))
+bind("SUPER + CTRL + Tab", "Former workspace", hl.dsp.focus({ workspace = "previous_per_monitor" }))
+bind("SUPER + mouse_down", "Next workspace", hl.dsp.focus({ workspace = "m+1" }))
+bind("SUPER + mouse_up", "Previous workspace", hl.dsp.focus({ workspace = "m-1" }))
 
 -- Scratchpad. code:49 is the key left of 1 (backslash on Italian).
 bind("SUPER + S", "Toggle scratchpad", hl.dsp.workspace.toggle_special("scratchpad"))

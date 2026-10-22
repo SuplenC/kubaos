@@ -20,7 +20,7 @@ The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTAL
 | Power | `power-profiles-daemon` + `tuxedo-drivers`, no Control Center |
 | Fingerprint | USB reader for lock screen, sudo, polkit |
 | Compositor | Hyprland 0.56+ (PPA), Lua config, dwindle, Omarchy 4 keybinds with hjkl |
-| Workspaces | 1-3 laptop, 4-6 external 1, 7-9 external 2, fall back to laptop on unplug |
+| Workspaces | Per screen, 1-10 each (Omarchy's block of ten ids per screen, known by make, model and serial); on unplug they join the remaining screen after its own, on replug they return. `SUPER+hjkl` focuses screens (#41) |
 | Shell | Your own Quickshell config, Caelestia-inspired, Quickshell pinned via Nix to a tagged release |
 | Theme | Material You colors from wallpaper (`matugen`), Japanese and Cyberpunk wallpaper folders with a toggle |
 | Idle | Lock 5 min, screens off 10 min. Battery: suspend 30 min and on lid close. AC: never suspend |
@@ -114,12 +114,12 @@ sudo apt-mark hold hyprland xdg-desktop-portal-hyprland hypridle hyprlock hyprpo
 
 **Lua config** in `~/Projects/dotfiles/config/hypr/`, split into files:
 - `monitors.lua`: laptop panel, the two UltraGears at 1920x1080@120, positions
-- `workspaces.lua`: 1-3 bound to laptop, 4-6 to external 1, 7-9 to external 2
-- `keybinds.lua`: ported from Omarchy 4 (already Lua), movement on `SUPER+hjkl`, move window `SUPER+SHIFT+hjkl`, resize `SUPER+CTRL+hjkl`, workspaces `SUPER+1..9`
+- `workspaces.lua`: per-screen workspaces, 1-10 on each screen
+- `keybinds.lua`: ported from Omarchy 4 (already Lua), screen focus on `SUPER+hjkl`, window focus on `SUPER+arrows`, move window `SUPER+SHIFT+hjkl`, resize `SUPER+CTRL+hjkl`, workspaces `SUPER+1..0`
 - `fallback.lua`: `SUPER+ALT+Return` foot and `SUPER+ALT+Space` fuzzel, always bound, so you can work with the shell dead
-- `autostart.lua`: starts your shell, `hypridle`, the workspace-return script
+- `autostart.lua`: starts your shell, `hypridle`, the lid sync on hotplug
 
-**Workspace return on replug:** Hyprland moves workspaces to the laptop when a monitor disappears, but does not move them back. A small script listening on Hyprland's event socket for `monitoradded` moves 4-6 and 7-9 back. Ship it in the dotfiles.
+**Workspace return on replug:** Hyprland moves workspaces to another screen when one disappears, and knows the screen only by its connector, which a dock renames. `workspaces.lua` renumbers them into the remaining screen's block on `monitor.removed` and returns them on `monitor.added`, by the screen's description (#41).
 
 **Idle and lid** (hypridle + logind):
 - `/etc/systemd/logind.conf.d/lid.conf`: `HandleLidSwitch=suspend`, `HandleLidSwitchExternalPower=ignore`, `HandleLidSwitchDocked=ignore`
