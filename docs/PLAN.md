@@ -194,7 +194,7 @@ Built with Claude, inspired by Caelestia, lives in `config/quickshell/`. Each st
 
 - `matugen` templates in `config/matugen/` for: Quickshell, Ghostty, tmux, oh-my-posh, Neovim, GTK 3/4, Qt (`qt6ct`), hyprlock fallback, Hyprland borders.
 - Wallpapers: the sets in `/usr/share/kubaos/wallpapers/` (picked at install) and your own in `~/Pictures/wallpapers/`. One key cycles within a folder, another switches folders. Each change regenerates all colors.
-- Cursor and icons: a hyprcursor theme and Papirus, through home-manager.
+- Cursor and icons: Bibata recoloured from the wallpaper by `kubaos cursor` (hyprcursor and XCursor), and Papirus through home-manager.
 
 ## Update routine
 

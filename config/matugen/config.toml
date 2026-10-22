@@ -69,6 +69,11 @@ output_path = "~/.local/state/theme/foot.ini"
 input_path = "./templates/hyprlock.colors"
 output_path = "~/.local/state/theme/hyprlock.colors"
 
+# The pointer's colours; dot-theme runs `kubaos cursor apply` after matugen.
+[templates.cursor]
+input_path = "./templates/cursor.toml"
+output_path = "~/.local/state/theme/cursor.toml"
+
 # Terminal apps (see docs/CONTRACTS.md, theme pipeline table). Each reads its
 # file at start; none of them needs a reload signal.
 

@@ -121,6 +121,60 @@ icon = "video-x-generic"
 keywords = ["video wallpaper", "motion", "still"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "never"]
 
+# The pointer, in the wallpaper's colours (kubaos cursor). Each applies at
+# once and is kept in ~/.config/kubaos/cursor/cursor.toml.
+
+[extensions.kubaos.actions.cursor-dark]
+title = "Dark cursor"
+subtitle = "A dark pointer with a light outline, readable on any wallpaper"
+icon = "input-mouse"
+keywords = ["cursor style", "pointer", "mouse", "theme"]
+run = ["kubaos", "cursor", "style", "dark"]
+
+[extensions.kubaos.actions.cursor-accent]
+title = "Accent cursor"
+subtitle = "The pointer in the wallpaper's accent colour"
+icon = "input-mouse"
+keywords = ["cursor style", "pointer", "mouse", "theme", "colour"]
+run = ["kubaos", "cursor", "style", "accent"]
+
+[extensions.kubaos.actions.cursor-classic]
+title = "Classic cursor"
+subtitle = "Bibata black and white, whatever the wallpaper"
+icon = "input-mouse"
+keywords = ["cursor style", "pointer", "mouse", "bibata"]
+run = ["kubaos", "cursor", "style", "classic"]
+
+[extensions.kubaos.actions.cursor-size-24]
+title = "Cursor size 24"
+subtitle = "The default pointer size"
+icon = "input-mouse"
+keywords = ["pointer size", "small cursor", "mouse"]
+run = ["kubaos", "cursor", "size", "24"]
+
+[extensions.kubaos.actions.cursor-size-32]
+title = "Cursor size 32"
+subtitle = "A larger pointer"
+icon = "input-mouse"
+keywords = ["pointer size", "bigger cursor", "mouse"]
+run = ["kubaos", "cursor", "size", "32"]
+
+[extensions.kubaos.actions.cursor-size-48]
+title = "Cursor size 48"
+subtitle = "A large pointer"
+icon = "input-mouse"
+keywords = ["pointer size", "big cursor", "large cursor", "mouse"]
+run = ["kubaos", "cursor", "size", "48"]
+
+[extensions.kubaos.actions.cursor-size]
+title = "Set cursor size"
+subtitle = "The pointer's size in pixels, 16 to 96"
+icon = "input-mouse"
+keywords = ["pointer size", "mouse"]
+keyword = "cursor-size"
+run = ["kubaos", "cursor", "size", "{size}"]
+arguments = [{ name = "size", placeholder = "32" }]
+
 # The shell's panels and notifications (config/quickshell/IpcHandlers.qml).
 
 [extensions.kubaos.actions.control-center]

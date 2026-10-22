@@ -12,6 +12,7 @@
 //!
 //! - The install commands (`probe`, `validate`, `plan`, `run`, `demo`): `install.rs`.
 //! - First-boot setup (`setup`): `setup.rs`.
+//! - The recoloured pointer (`cursor`): `cursor.rs`.
 //! - Packages (`package`, `try`): `package.rs`.
 //! - Suites (`suite`): `suite.rs`.
 //! - Switch jobs (`switch`, `job`): `job.rs`.
@@ -27,6 +28,7 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 
+mod cursor;
 mod install;
 mod job;
 mod package;
@@ -84,6 +86,11 @@ enum Cmd {
     Rollback(update::RollbackArgs),
     /// Print the channel updates follow, or set it: stable or edge.
     Channel(update::ChannelArgs),
+    /// The pointer in the wallpaper's colours: its style and size.
+    Cursor {
+        #[command(subcommand)]
+        cmd: cursor::CursorCmd,
+    },
 }
 
 /// How a command prints its events: JSON lines for a front end to parse, or text for a human.
@@ -115,5 +122,6 @@ fn main() -> ExitCode {
         Cmd::Upgrade(args) => update::upgrade(&args),
         Cmd::Rollback(args) => update::rollback(&args),
         Cmd::Channel(args) => update::channel(&args),
+        Cmd::Cursor { cmd } => cursor::main(cmd),
     }
 }

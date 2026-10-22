@@ -15,6 +15,10 @@ let
     @import url("file://${stateDir}/gtk.css");
   '';
   iconTheme = "Papirus-Dark";
+  # The recoloured pointer `kubaos cursor` writes, and the theme it inherits
+  # (THEME_NAME and FALLBACK_THEME in crates/kubaos-cursor/src/lib.rs).
+  cursorTheme = "KubaOS-Bibata";
+  cursorFallback = "Bibata-Modern-Classic";
   # Interface font, the same one the shell uses (home/desktop.nix installs it).
   # 10 pt is sized for Full HD density: the 1080p externals at scale 1 and the
   # laptop panel at scale 1.5 (config/hypr/monitors.lua) look the same.
@@ -46,21 +50,55 @@ in
     # Ubuntu's base system, so nothing else is needed here.
   ];
 
+  # The pointer follows the wallpaper: `kubaos cursor` (crates/kubaos-cursor),
+  # run by dot-theme, recolours Bibata's SVG sources into
+  # ~/.local/share/icons/KubaOS-Bibata, a hyprcursor theme for Hyprland and an
+  # XCursor theme for XWayland and GTK 3. Every client asks for that name. Its
+  # index.theme inherits Bibata-Modern-Classic, installed below, so the
+  # `classic` style, a failed render and a cursor it lacks all show the classic
+  # pointer; without the directory, the `default` theme home-manager writes
+  # inherits it too.
   home.pointerCursor = {
     enable = true;
-    # Black with a white outline: crisp on dark, neon-lit wallpapers.
-    name = "Bibata-Modern-Classic";
+    # Black with a white outline: the classic style and the fallback.
+    name = cursorFallback;
     package = pkgs.bibata-cursors;
     size = 24;
-    gtk.enable = true;
     x11.enable = true;
-    # Sets HYPRCURSOR_THEME/SIZE. Bibata ships XCursor only; Hyprland falls back
-    # to it when no hyprcursor theme of that name exists, at the same size.
-    hyprcursor = {
-      enable = true;
-      size = 24;
-    };
   };
+  home.sessionVariables = {
+    XCURSOR_THEME = cursorTheme;
+    HYPRCURSOR_THEME = cursorTheme;
+    HYPRCURSOR_SIZE = 24;
+  };
+  xresources.properties."Xcursor.theme" = lib.mkForce cursorTheme;
+  gtk.cursorTheme = {
+    name = cursorTheme;
+    size = 24;
+  };
+  # Bibata's sources for `kubaos cursor`: the release nixpkgs 26.05 builds
+  # bibata-cursors from, so the recoloured pointer and the classic one are the
+  # same drawing. Pinned here, not taken from the user's nixpkgs, because
+  # `kubaos cursor` reads this release's file layout.
+  xdg.dataFile."kubaos/cursor/bibata".source = pkgs.fetchFromGitHub {
+    owner = "ful1e5";
+    repo = "Bibata_Cursor";
+    rev = "v2.0.7";
+    hash = "sha256-kIKidw1vditpuxO1gVuZeUPdWBzkiksO/q2R/+DUdEc=";
+  };
+  # A home that never ran `kubaos cursor` (before its first login) gets the
+  # classic stub, so the name every client asks for exists. `kubaos cursor`
+  # replaces it whole.
+  home.activation.cursorTheme = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    theme="${config.xdg.dataHome}/icons/${cursorTheme}"
+    if [ ! -e "$theme" ]; then
+      run mkdir -p "$theme"
+      if [ -z "''${DRY_RUN:-}" ]; then
+        printf '[Icon Theme]\nName=${cursorTheme}\nComment=Bibata Modern in the colours of the wallpaper\nInherits=${cursorFallback}\n' \
+          >"$theme/index.theme"
+      fi
+    fi
+  '';
 
   gtk = {
     enable = true;
@@ -122,8 +160,9 @@ in
     icon-theme = iconTheme;
     font-name = "${uiFont} ${toString uiFontSize}";
     monospace-font-name = "JetBrainsMono Nerd Font ${toString uiFontSize}";
-    cursor-theme = config.home.pointerCursor.name;
-    cursor-size = config.home.pointerCursor.size;
+    # The size is `kubaos cursor`'s: it sets cursor-size from the user's
+    # setting, which a switch would otherwise reset.
+    cursor-theme = cursorTheme;
   };
 
   # libadwaita reads the button layout from here (through the portal).

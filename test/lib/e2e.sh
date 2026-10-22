@@ -104,7 +104,7 @@ c_tools() {
 
 THEME_FILES=(colors.json wallpaper tmux.conf ghostty nvim.lua hypr.lua hyprlock.colors ohmyposh.toml
   gtk.css qt6ct.colors fuzzel.ini foot.ini lazygit.yml lazydocker.yml yazi.toml btop.theme
-  delta.gitconfig fzf atuin.toml eza.yml glow.json)
+  delta.gitconfig fzf atuin.toml eza.yml glow.json cursor.toml)
 M3_KEYS=(primary on_primary primary_container on_primary_container secondary on_secondary
   secondary_container on_secondary_container tertiary on_tertiary tertiary_container
   on_tertiary_container error on_error error_container on_error_container background on_background
@@ -152,6 +152,133 @@ c_theme() {
   echo "ok   theme links resolve"
   expect_ok "dot-theme next" zrun 'dot-theme next' || return 1
   expect_ok "dot-theme toggle-folder" zrun 'dot-theme toggle-folder' || return 1
+}
+
+# The pointer in the wallpaper's colours (kubaos cursor): dot-theme writes the
+# palette and the hyprcursor theme, the XCursor theme follows in the
+# background, the menu's style and size apply at once, and the pointer is
+# Bibata-Modern-Classic whenever the theme can't be written. There is no
+# Hyprland here, so `hyprctl setcursor` is left out.
+CUR_ICONS=$USER_HOME/.local/share/icons
+CUR_THEME=$CUR_ICONS/KubaOS-Bibata
+CUR_SETTINGS=$USER_HOME/.config/kubaos/cursor/cursor.toml
+CUR_PALETTE=$USER_HOME/.local/state/theme/cursor.toml
+# cursor_sizes SIZES: waits up to 60 s for the background render to leave an
+# XCursor theme at SIZES ("24 36 48").
+cursor_sizes() {
+  local _
+  for _ in $(seq 120); do
+    grep -qx "sizes $1" "$CUR_THEME/cursors/.stamp" 2>/dev/null && return 0
+    sleep 0.5
+  done
+  echo "FAIL no XCursor theme at sizes $1 within 60 s:"
+  cat "$CUR_THEME/cursors/.stamp" "$USER_HOME/.local/state/theme/cursor.log" 2>&1 | tail -10
+  return 1
+}
+# cursor_svg_has COLOUR: left_ptr's image in the hyprcursor theme is drawn in COLOUR.
+cursor_svg_has() {
+  unzip -tq "$CUR_THEME/hyprcursors/left_ptr.hlc" >/dev/null &&
+    unzip -p "$CUR_THEME/hyprcursors/left_ptr.hlc" left_ptr.svg | grep -qiF "$1"
+}
+# cursor_classic: the theme is the stub that inherits Bibata-Modern-Classic,
+# and Bibata-Modern-Classic is there to inherit.
+cursor_classic() {
+  grep -qx 'Inherits=Bibata-Modern-Classic' "$CUR_THEME/index.theme" && [[ ! -e $CUR_THEME/manifest.hl ]] &&
+    [[ -s $CUR_ICONS/Bibata-Modern-Classic/cursors/left_ptr ]]
+}
+c_cursor() {
+  local surface on_surface primary on_primary out rc n
+  local saved
+  saved="$(cat "$CUR_SETTINGS")"
+  as_user tee "$CUR_SETTINGS" <<<'style = "dark"' >/dev/null
+
+  expect_ok "dot-theme apply --force" zrun 'dot-theme apply --force' || return 1
+  read -r surface on_surface primary on_primary < <(jq -r '[.surface, .on_surface, .primary, .on_primary] | join(" ")' \
+    "$USER_HOME/.local/state/theme/colors.json")
+  python3 -I - "$CUR_PALETTE" "$surface" "$on_surface" "$primary" "$on_primary" <<'PY' || return 1
+import sys, tomllib
+path, surface, on_surface, primary, on_primary = sys.argv[1:]
+with open(path, "rb") as f:
+    p = tomllib.load(f)
+want = {"dark": [surface, on_surface, primary], "accent": [primary, on_primary, primary]}
+for style, colours in want.items():
+    got = [p[style][k].lower() for k in ("fill", "outline", "watch")]
+    if got != [c.lower() for c in colours]:
+        sys.exit(f"FAIL ~/.local/state/theme/cursor.toml [{style}] is {got}, colors.json says {colours}")
+print("ok   cursor.toml has the palette's surface, on_surface, primary and on_primary")
+PY
+  [[ -s $CUR_THEME/manifest.hl ]] || { echo "FAIL no hyprcursor manifest in $CUR_THEME"; return 1; }
+  local hlc=("$CUR_THEME"/hyprcursors/*.hlc)
+  n=${#hlc[@]}
+  ((n >= 50)) || { echo "FAIL $n hyprcursor shapes, Bibata has 56"; return 1; }
+  cursor_svg_has "$surface" || { echo "FAIL left_ptr.hlc isn't a zip with left_ptr.svg filled $surface"; return 1; }
+  cursor_svg_has '#00FF00' && { echo "FAIL left_ptr.svg still has Bibata's placeholder fill"; return 1; }
+  echo "ok   hyprcursor theme: $n shapes, left_ptr filled $surface"
+
+  cursor_sizes "24 36 48" || return 1
+  python3 -I - "$CUR_THEME/cursors" "$surface" <<'PY' || return 1
+import os, struct, sys
+d, fill = sys.argv[1], int(sys.argv[2].lstrip("#"), 16)
+for name in ("left_ptr", "default", "arrow", "watch", "pointer"):
+    with open(os.path.join(d, name), "rb") as f:
+        data = f.read()
+    if data[:4] != b"Xcur":
+        sys.exit(f"FAIL cursors/{name} isn't an XCursor file")
+with open(os.path.join(d, "left_ptr"), "rb") as f:
+    data = f.read()
+(ntoc,) = struct.unpack_from("<I", data, 12)
+sizes, opaque = set(), 0
+for i in range(ntoc):
+    _, nominal, pos = struct.unpack_from("<III", data, 16 + 12 * i)
+    w, h = struct.unpack_from("<II", data, pos + 16)
+    sizes.add(nominal)
+    pixels = struct.unpack_from(f"<{w * h}I", data, pos + 36)
+    opaque += sum(1 for p in pixels if p == 0xFF000000 | fill)
+if sizes != {24, 36, 48}:
+    sys.exit(f"FAIL cursors/left_ptr has sizes {sorted(sizes)}, not 24 36 48")
+if not opaque:
+    sys.exit(f"FAIL cursors/left_ptr has no pixel of the fill #{fill:06x}")
+print(f"ok   XCursor theme at 24 36 48, its aliases linked, left_ptr filled with {opaque} #{fill:06x} pixels")
+PY
+
+  expect_ok "kubaos cursor style accent" zrun 'kubaos cursor style accent' || return 1
+  grep -qx 'style = "accent"' "$CUR_SETTINGS" || { echo "FAIL the settings don't say accent:"; cat "$CUR_SETTINGS"; return 1; }
+  cursor_svg_has "$primary" || { echo "FAIL left_ptr.svg isn't filled $primary after style accent"; return 1; }
+  cursor_svg_has "$surface" && { echo "FAIL left_ptr.svg still has the dark style's fill $surface"; return 1; }
+  echo "ok   style accent: left_ptr filled $primary"
+  expect_ok "kubaos cursor size 32" zrun 'kubaos cursor size 32' || return 1
+  cursor_sizes "32 48 64" || return 1
+  [[ $(zrun 'kubaos cursor show') == "style=accent size=32" ]] || { echo "FAIL kubaos cursor show: $(zrun 'kubaos cursor show')"; return 1; }
+  rc=0; out="$(zrun 'kubaos cursor size 7' 2>&1)" || rc=$?
+  ((rc == 2)) || { echo "FAIL kubaos cursor size 7 exited $rc, not 2: $out"; return 1; }
+  echo "ok   size 32: XCursor at 32 48 64; size 7 is refused"
+  expect_ok "kubaos cursor style classic" zrun 'kubaos cursor style classic' || return 1
+  cursor_classic || { echo "FAIL style classic didn't leave the Bibata-Modern-Classic stub"; ls -la "$CUR_THEME"; return 1; }
+  echo "ok   style classic: the theme inherits Bibata-Modern-Classic"
+
+  # The fallback: a theme that can't be written leaves the classic stub, and
+  # dot-theme carries on.
+  expect_ok "kubaos cursor style dark" zrun 'kubaos cursor style dark' || return 1
+  [[ -s $CUR_THEME/manifest.hl ]] || { echo "FAIL style dark wrote no hyprcursor theme"; return 1; }
+  as_user install -d /var/tmp/kubaos-no-bibata
+  rc=0; out="$(zrun 'KUBAOS_CURSOR_SOURCE=/var/tmp/kubaos-no-bibata kubaos cursor apply --sync' 2>&1)" || rc=$?
+  ((rc == 1)) || { echo "FAIL apply without Bibata's sources exited $rc, not 1: $out"; return 1; }
+  cursor_classic || { echo "FAIL without Bibata's sources the theme isn't the classic stub"; ls -la "$CUR_THEME"; return 1; }
+  echo "ok   without Bibata's sources: exit 1, the pointer is Bibata-Modern-Classic"
+  out="$(zrun 'KUBAOS_CURSOR_SOURCE=/var/tmp/kubaos-no-bibata dot-theme apply --force' 2>&1)" ||
+    { echo "FAIL dot-theme failed with the cursor theme failing:"; printf '%s\n' "$out" | tail -10; return 1; }
+  grep -q 'Bibata-Modern-Classic' <<<"$out" || { echo "FAIL dot-theme didn't say the pointer fell back: $out"; return 1; }
+  cursor_classic || { echo "FAIL after dot-theme the theme isn't the classic stub"; return 1; }
+  echo "ok   dot-theme carries on and says so"
+  as_user mv "$CUR_PALETTE" "$CUR_PALETTE.saved"
+  rc=0; out="$(zrun 'kubaos cursor apply --sync' 2>&1)" || rc=$?
+  as_user mv "$CUR_PALETTE.saved" "$CUR_PALETTE"
+  ((rc == 1)) && cursor_classic || { echo "FAIL without a palette: exit $rc, not 1, or no classic stub: $out"; return 1; }
+  echo "ok   without a palette: exit 1, the pointer is Bibata-Modern-Classic"
+
+  printf '%s\n' "$saved" | as_user tee "$CUR_SETTINGS" >/dev/null
+  expect_ok "kubaos cursor apply --sync" zrun 'kubaos cursor apply --sync' || return 1
+  rmdir /var/tmp/kubaos-no-bibata
 }
 
 c_tmux() {
@@ -1146,9 +1273,9 @@ c_update_edge() {
   # A new kubaos, told apart by its version.
   as_user sed -i 's/^version = "0.1.0"$/version = "0.1.0-harness"/' "$UPD_WORK/Cargo.toml"
   as_user awk -v v='version = "0.1.0-harness"' \
-    'prev ~ /^name = "(kubaos-core|kubaos-cli|kubaos-kobo|kotodama-kubaos)"$/ && /^version = / { $0 = v } { print; prev = $0 }' \
+    'prev ~ /^name = "(kubaos-core|kubaos-cli|kubaos-cursor|kubaos-kobo|kotodama-kubaos)"$/ && /^version = / { $0 = v } { print; prev = $0 }' \
     "$UPD_WORK/Cargo.lock" | as_user tee "$UPD_WORK/Cargo.lock.new" >/dev/null && as_user mv "$UPD_WORK/Cargo.lock.new" "$UPD_WORK/Cargo.lock"
-  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 4 ]] ||
+  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 5 ]] ||
     { echo "FAIL bumping the workspace's version in Cargo.lock"; return 1; }
   work add migrations Cargo.toml Cargo.lock && work commit -q -m 'test: a new kubaos, a system and a user migration' &&
     work push -q origin HEAD:main ||
@@ -1270,7 +1397,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
