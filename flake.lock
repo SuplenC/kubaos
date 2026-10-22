@@ -47,17 +47,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1792656645,
-        "narHash": "sha256-8zdZ//Qnn7wFRc4m/rRgi2FJkm/TiIXti+T8KI0H36E=",
+        "lastModified": 1792662071,
+        "narHash": "sha256-s8A8cvbbfkIKksm+88RDFPsZIR0aLhgvtlI/s/F+TQY=",
         "owner": "SuplenC",
         "repo": "kotodama",
-        "rev": "40d3fc7284b09d58c24e12b88ae4124c4f838d82",
+        "rev": "f7a12444548c432834504c225f27f6bb3de17a8d",
         "type": "github"
       },
       "original": {
         "owner": "SuplenC",
+        "ref": "main",
         "repo": "kotodama",
-        "rev": "40d3fc7284b09d58c24e12b88ae4124c4f838d82",
         "type": "github"
       }
     },
