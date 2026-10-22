@@ -1,6 +1,8 @@
 //! What the user chose: `install.toml`. Secrets never live in this file.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+
+use crate::keyboard::Layout;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -24,12 +26,46 @@ pub struct InstallConfig {
 pub struct Locale {
     /// glibc locale, e.g. `en_US.UTF-8`.
     pub lang: String,
-    /// XKB layout, e.g. `us`, `it`.
-    pub keyboard_layout: String,
-    #[serde(default)]
-    pub keyboard_variant: String,
+    /// XKB layouts, the first the default: `["us", "it"]`. One string, as older configs have
+    /// it, reads as XKB's comma-separated field: `"us"`, `"us,it"`.
+    #[serde(deserialize_with = "one_or_many")]
+    pub keyboard_layout: Vec<String>,
+    /// The layouts' variants, by position; a missing or empty one is the layout's own.
+    #[serde(default, deserialize_with = "one_or_many")]
+    pub keyboard_variant: Vec<String>,
     /// IANA zone, e.g. `Europe/Rome`.
     pub timezone: String,
+}
+
+impl Locale {
+    /// The keyboard layouts with their variants, the first the default.
+    pub fn keyboards(&self) -> Vec<Layout> {
+        let mut variants = self.keyboard_variant.iter();
+        self.keyboard_layout
+            .iter()
+            .map(|layout| Layout::new(layout.as_str(), variants.next().map_or("", String::as_str)))
+            .collect()
+    }
+
+    /// Sets both keyboard fields to `layouts`.
+    pub fn set_keyboards(&mut self, layouts: &[Layout]) {
+        self.keyboard_layout = layouts.iter().map(|l| l.layout.clone()).collect();
+        self.keyboard_variant = layouts.iter().map(|l| l.variant.clone()).collect();
+    }
+}
+
+/// A list, or one string holding XKB's comma-separated field.
+fn one_or_many<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+    Ok(match OneOrMany::deserialize(d)? {
+        OneOrMany::One(s) => s.split(',').map(|part| part.trim().to_string()).collect(),
+        OneOrMany::Many(v) => v,
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -132,3 +168,6 @@ impl InstallConfig {
         toml::from_str(s)
     }
 }
+
+#[cfg(test)]
+mod tests;
