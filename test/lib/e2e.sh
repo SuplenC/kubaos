@@ -810,6 +810,10 @@ PY
   ((bad)) || echo "ok   the Extension's Kotodama crates are the Daemon's commit, $out"
 
   [[ -e $layer ]] && cp -p "$layer" "$saved"
+  # The keyboard Items are the layouts of this file, which the Extension reads at start.
+  local kb=/etc/default/keyboard kb_saved="$LOGS/keyboard.saved"
+  [[ -e $kb ]] && cp -p "$kb" "$kb_saved"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb"
   install -D -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/stdin "$layer" <<'TOML'
 [extensions.kubaos]
 hide = ["theme-next", "bluetooth"]
@@ -856,6 +860,30 @@ TOML
     echo "ok   the actions the user layer hides aren't found"
   fi
 
+  out="$(in_session "$query 'Keyboard: next layout' 'Keyboard: add a layout' 'Keyboard: set layouts' Keyboard" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  for want in 'Keyboard: next layout:keyboard-next' 'Keyboard: add a layout:keyboard-add' \
+    'Keyboard: set layouts:keyboard-set' 'Keyboard:keyboard:us' 'Keyboard:keyboard:it'; do
+    grep -E -- "^${want%%:keyboard*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/keyboard${want#*:keyboard}( |$)" ||
+      { echo "FAIL typing '${want%%:keyboard*}' doesn't find kubaos/keyboard${want#*:keyboard}"; bad=1; }
+  done
+  ((bad)) || echo "ok   the keyboard Items are found: next, add, set, and one a layout"
+
+  # localed writes the file through a temporary one and a rename; the Items follow it.
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,de"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb.new"
+  mv "$kb.new" "$kb"
+  for i in $(seq 20); do
+    out="$(in_session "$query Keyboard" 2>&1 || true)"
+    grep -qE 'kubaos/keyboard:de( |$)' <<<"$out" && ! grep -qE 'kubaos/keyboard:it( |$)' <<<"$out" && break
+    sleep 1
+  done
+  if grep -qE 'kubaos/keyboard:de( |$)' <<<"$out" && ! grep -qE 'kubaos/keyboard:it( |$)' <<<"$out"; then
+    echo "ok   a change to $kb reaches the keyboard Items (${i}s)"
+  else
+    echo "FAIL the keyboard Items kept the old layouts after $kb changed: $out"
+    bad=1
+  fi
+
   # ~/.config/kotodama/user.toml is a link to the user layer's file, and an
   # edit to the file it points at reaches the running Daemon with no restart.
   cat >"$layer" <<'TOML'
@@ -883,6 +911,7 @@ TOML
   if ((bad)); then tail -20 "$log"; fi
   menu_stop "$daemon"
   if [[ -e $saved ]]; then mv "$saved" "$layer"; else rm -f "$layer"; fi
+  if [[ -e $kb_saved ]]; then mv "$kb_saved" "$kb"; else rm -f "$kb"; fi
   return "$bad"
 }
 

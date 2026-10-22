@@ -14,13 +14,15 @@ rustPlatform.buildRustPackage {
   pname = "kotodama-kubaos";
   version = (lib.importTOML ../../Cargo.toml).workspace.package.version;
 
-  # The workspace alone, so a change outside the crates doesn't rebuild it.
+  # The workspace, and the first-boot files kubaos-core embeds (the keyboard
+  # layouts come from it), so a change elsewhere doesn't rebuild it.
   src = lib.fileset.toSource {
     inherit root;
     fileset = lib.fileset.unions [
       ../../Cargo.toml
       ../../Cargo.lock
       ../../crates
+      ../../install/firstboot
     ];
   };
 
