@@ -20,13 +20,14 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + ALT + Tab` | Next window in a group (`+ SHIFT` for previous) |
 | `SUPER + CTRL + A` / `B` / `W` | Control center: audio, Bluetooth, Wi-Fi |
 | `SUPER + CTRL + Space` | Wallpaper picker (the colors follow) |
+| `SUPER + SHIFT + Space` | Next keyboard layout, with two or more |
 | `Print` / `SUPER + SHIFT + S` | Screenshot a region, copied and saved |
 | `SUPER + SHIFT + R` | Record a region, same key stops |
 | `SUPER + Escape` | Power menu |
 | `SUPER + CTRL + Escape` | Lock |
 | `SUPER + ALT + Return` / `SUPER + ALT + Space` | foot and fuzzel: the emergency terminal and app menu, for when the shell is dead |
 
-The layout is whatever you picked in Kōbō (`/etc/default/keyboard`, `us` if there is no such file). Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
+The layouts are the ones you picked in Kōbō, the first the default (`/etc/default/keyboard`, `us` if there is no such file). The console and the disk passphrase prompt type with the default. With two or more, the bar shows the one in use ("US", "IT"); click it or press `SUPER + SHIFT + Space` for the next. The Command menu has each layout ("Keyboard: Italian") to switch to it, make it the default or remove it, plus "Keyboard: add a layout" and "Keyboard: set layouts". `kubaos keyboard show|set|add|remove|default` does the same from a terminal, through `localectl`, and reloads Hyprland. Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
 
 ## Updating and rolling back
 
@@ -134,6 +135,7 @@ home-manager switch --flake ~/.config/kubaos/home --override-input kubaos git+fi
 | `~/.config/kubaos/wallpapers/sets` | What the picker shows, one per line: a set's name for all of it, `<set>/<file>` for one wallpaper (every set in `/usr/share/kubaos/wallpapers` without the file). A set a new release brings shows up once you add it; `dot-theme all-sets` (Command menu: Show every wallpaper set) lists every set again |
 | `dot-theme apply [--force]` | Regenerate from the current wallpaper; without `--force` it does nothing when no input changed (login runs it) |
 | `kubaos cursor style dark\|accent\|classic`, `kubaos cursor size <16-96>` | The pointer: dark with a light outline, the wallpaper's accent, or plain Bibata black and white, and its size. Applies at once and is kept in `~/.config/kubaos/cursor/cursor.toml`; the Command menu has both ("cursor") |
+| `kubaos keyboard show`, `kubaos keyboard set us,it(intl)`, `kubaos keyboard add\|remove\|default <layout>` | The keyboard layouts in `/etc/default/keyboard`, the first the default. Written through `localectl`, which may ask for your password, then Hyprland reloads. At most 4, and the last one stays; the Command menu has them all ("keyboard") |
 | `dot-config apply` | Create missing files in `~/.config/kubaos` and rewrite the merged configs (bat, git ignore, fastfetch) from the defaults plus yours. Every `home-manager switch` runs it |
 | `qs ipc show` | List the Quickshell IPC targets Hyprland binds call |
 | `dot-hypr-record region\|window\|output [--audio] [--mic]` | Start or stop a recording (gpu-screen-recorder, `~/Videos/Recordings`); `replay` keeps the last 30 s, `replay save` writes them. Run `system/65-recorder.sh` once so monitor capture needs no password |
