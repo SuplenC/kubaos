@@ -572,6 +572,30 @@ TOML
     echo "ok   the actions the user layer hides aren't found"
   fi
 
+  # ~/.config/kotodama/user.toml is a link to the user layer's file, and an
+  # edit to the file it points at reaches the running Daemon with no restart.
+  cat >"$layer" <<'TOML'
+[extensions.kubaos]
+hide = ["theme-next"]
+
+[extensions.kubaos.actions.harness-notes]
+title = "Restore harness notes"
+run = ["true"]
+TOML
+  for i in $(seq 20); do
+    out="$(in_session "$query 'Restore harness notes' Bluetooth" 2>&1 || true)"
+    grep -qE '^Restore harness notes[[:blank:]].*kubaos/harness-notes' <<<"$out" &&
+      grep -qE 'kubaos/bluetooth( |$)' <<<"$out" && break
+    sleep 1
+  done
+  if grep -qE '^Restore harness notes[[:blank:]].*kubaos/harness-notes' <<<"$out" &&
+    grep -qE 'kubaos/bluetooth( |$)' <<<"$out"; then
+    echo "ok   an edit to the linked user layer reaches the running Daemon (${i}s)"
+  else
+    echo "FAIL the running Daemon kept the old user layer after an edit: $out"
+    bad=1
+  fi
+
   if ((bad)); then tail -20 "$log"; fi
   menu_stop "$daemon"
   if [[ -e $saved ]]; then mv "$saved" "$layer"; else rm -f "$layer"; fi
