@@ -53,7 +53,7 @@ How each app loads the user layer (`U` is `~/.config/kubaos`):
 | bat, git ignore | `U/bat/config`, `U/git/ignore` | no include: `dot-config` writes `~/.config/<file>` = defaults + yours |
 | fastfetch | `U/fastfetch/config.jsonc` | no include: `dot-config` writes `~/.config/fastfetch/config.jsonc`, yours merged over ours (objects key by key, anything else replaced) |
 | btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml` | the app rewrites them, so they're the user's: copied from the defaults once, never again. Fixes reach them only through migrations. The tms default's `search_dirs` are written by `home/links.nix` from the Command menu's folders (`config/kotodama/kubaos.toml`) |
-| Kotodama | `U/kotodama/user.toml` | `~/.config/kotodama/user.toml` links there. The Daemon merges every `*.toml` in that directory by file name, so it comes after `kubaos.toml` (the defaults, through `XDG_CONFIG_DIRS`) and home-manager's `home-manager.toml`. Tables merge key by key, lists replace. Applied on `systemctl --user restart kotodamad` |
+| Kotodama | `U/kotodama/user.toml` | `~/.config/kotodama/user.toml` links there. The Daemon merges every `*.toml` in that directory by file name, so it comes after `kubaos.toml` (the defaults, through `XDG_CONFIG_DIRS`) and home-manager's `home-manager.toml`. Tables merge key by key, lists replace. Applied on save: the Daemon follows the link |
 | lazy.nvim | `U/nvim/lazy-lock.json` | `:Lazy update` rewrites it: copied from `config/nvim/lazy-lock.json` once (lazy.nvim's `lockfile`) |
 
 The merged files (bat, git ignore, fastfetch) change when `dot-config apply` runs: after an update, or by hand after editing the user file. Every other user file applies the way the app reloads its config.

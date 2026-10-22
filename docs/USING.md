@@ -66,7 +66,7 @@ Each file starts as a comment and an example:
 | lazygit, bacon, yazi | `~/.config/kubaos/{lazygit/config.yml,bacon/prefs.toml,yazi/yazi.toml,yazi/keymap.toml}` | next start (lazygit and bacon: in a new shell) |
 | bat, fastfetch | `~/.config/kubaos/{bat/config,fastfetch/config.jsonc}` | after `dot-config apply` |
 | btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml`: they rewrite their own file, so it's yours as is | next start |
-| Command menu: your own actions, hiding KubaOS's | `~/.config/kubaos/kotodama/user.toml` (below) | `systemctl --user restart kotodamad` |
+| Command menu: your own actions, hiding KubaOS's | `~/.config/kubaos/kotodama/user.toml` (below) | on save |
 | Nix packages and home-manager options | `~/.config/kubaos/home/home.nix`, e.g. `home.packages = [ pkgs.hello ];` | `home-manager switch --flake ~/.config/kubaos/home` |
 | A package, without writing Nix | `kubaos package add ripgrep` (`remove`, `list`); `kubaos try cowsay` opens a shell with it and installs nothing | the switch `add` and `remove` queue |
 | A whole language setup (a Suite) | `kubaos suite list`, `kubaos suite add NAME [--version V] [--extra E]`, `configure`, `remove [--purge-caches]`; `kubaos suite new NAME PROJECT` starts a project in `~/Projects` | the switch `add`, `configure` and `remove` queue |
@@ -232,7 +232,6 @@ Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland
 - Fingerprint unlock in the Quickshell lock screen is untested: no reader in a container. nixpkgs' `pam_fprintd.so` loads and answers like Ubuntu's does without a reader. It's off now (`Settings.fingerprint`); hyprlock is the fallback.
 - Untested without hardware: a real FIDO2 touch (sudo, polkit, lock screen), Bitwarden desktop's SSH agent and its polkit unlock (amd64 only), and `bw` with real two-step login. `bw` can't do FIDO2 two-step login; `dot-bw-setup --login apikey` is the way in for a key-only account (`docs/SECRETS.md`).
 - The in-shell polkit agent is off; hyprpolkitagent is the agent until the Quickshell one is tested on the machine.
-- The Command menu lists every bind, but Enter on one fails: under the Lua config Hyprland reports each bind's action as `__lua <ref>`, and Kotodama sends that back to the socket as it is, which Hyprland can't run. The keys themselves work. Number-key binds show as `code:12` and so on beside their titles, since they are bound by keycode.
 - The arm64 VM can't run the Hyprland Lua config from apt (the PPA is amd64 only, Ubuntu's own build is 0.53).
 - grub-btrfs is built from source (not packaged for 26.04) and isn't tracked by dpkg.
 - The official Nix installer has no uninstaller; the manual steps are in `docs/INSTALL.md`.
