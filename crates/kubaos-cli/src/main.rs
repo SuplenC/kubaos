@@ -12,6 +12,8 @@
 //!
 //! - The install commands (`probe`, `validate`, `plan`, `run`, `demo`): `install.rs`.
 //! - First-boot setup (`setup`): `setup.rs`.
+//! - Packages (`package`, `try`): `package.rs`.
+//! - Switch jobs (`switch`, `job`): `job.rs`.
 //! - The work itself: the `kubaos-core` crate.
 
 #![forbid(unsafe_code)]
@@ -24,6 +26,8 @@ use clap::Subcommand;
 use clap::ValueEnum;
 
 mod install;
+mod job;
+mod package;
 mod setup;
 
 #[derive(Parser)]
@@ -46,6 +50,23 @@ enum Cmd {
         #[command(subcommand)]
         cmd: setup::SetupCmd,
     },
+    /// Packages from your nixpkgs, recorded in kubaos.d/ and installed by a switch.
+    Package {
+        #[command(subcommand)]
+        cmd: package::PackageCmd,
+    },
+    /// Open a shell with a package from your nixpkgs, installing nothing.
+    Try { name: String },
+    /// Switch your home to the user flake, as a queued job.
+    Switch {
+        #[command(flatten)]
+        mode: job::SwitchMode,
+    },
+    /// Switch jobs: list them, follow one.
+    Job {
+        #[command(subcommand)]
+        cmd: job::JobCmd,
+    },
 }
 
 /// How a command prints its events: JSON lines for a front end to parse, or text for a human.
@@ -65,5 +86,12 @@ fn main() -> ExitCode {
     match Cli::parse().cmd {
         Cmd::Install(cmd) => install::main(cmd),
         Cmd::Setup { cmd } => setup::main(cmd),
+        Cmd::Package { cmd } => package::main(cmd),
+        Cmd::Try { name } => package::try_main(&name),
+        Cmd::Switch { mode } => match kubaos_core::state::Paths::from_env() {
+            Ok(paths) => job::switch(&paths, mode),
+            Err(e) => usage_error(e),
+        },
+        Cmd::Job { cmd } => job::main(cmd),
     }
 }
