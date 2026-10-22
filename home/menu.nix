@@ -18,7 +18,8 @@
     package = kubaosPkgs.kotodama;
     extraExtensions = [ kubaosPkgs.kotodama-kubaos ];
     strictExtensions = true;
-    # KubaOS's shell places `KotodamaMenu` itself. With the ready menu running
+    # KubaOS's shell has its own menu on `KotodamaSearch`
+    # (config/quickshell/modules/menu/). With Kotodama's ready menu running
     # too, the keybind opens only one of the two and the other wastes memory.
     frontEnd.enable = false;
 
