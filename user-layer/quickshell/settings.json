@@ -1,0 +1,6 @@
+// Your Quickshell settings, over KubaOS's (config/quickshell/settings/Settings.qml).
+// JSON, with whole-line // comments. The shell reads it again as soon as it changes.
+{
+  // The Command menu's motion: "full", or "fades" for fades alone.
+  // "menuMotion": "fades"
+}

@@ -54,11 +54,12 @@ How each app loads the user layer (`U` is `~/.config/kubaos`):
 | fastfetch | `U/fastfetch/config.jsonc` | no include: `dot-config` writes `~/.config/fastfetch/config.jsonc`, yours merged over ours (objects key by key, anything else replaced) |
 | btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml` | the app rewrites them, so they're the user's: copied from the defaults once, never again. Fixes reach them only through migrations. The tms default's `search_dirs` are written by `home/links.nix` from the Command menu's folders (`config/kotodama/kubaos.toml`) |
 | Kotodama | `U/kotodama/user.toml` | `~/.config/kotodama/user.toml` links there. The Daemon merges every `*.toml` in that directory by file name, so it comes after `kubaos.toml` (the defaults, through `XDG_CONFIG_DIRS`) and home-manager's `home-manager.toml`. Tables merge key by key, lists replace. Applied on save: the Daemon follows the link |
+| Quickshell | `U/quickshell/settings.json` | `config/quickshell/settings/Settings.qml` reads it with a `FileView` and watches it: JSON with whole-line `//` comments, its keys over the defaults. Only `menuMotion` (`"full"`, or `"fades"` for the Command menu's fades alone) so far; an unreadable file is a logged warning and changes nothing |
 | lazy.nvim | `U/nvim/lazy-lock.json` | `:Lazy update` rewrites it: copied from `config/nvim/lazy-lock.json` once (lazy.nvim's `lockfile`) |
 
 The merged files (bat, git ignore, fastfetch) change when `dot-config apply` runs: after an update, or by hand after editing the user file. Every other user file applies the way the app reloads its config.
 
-Not in the user layer yet: Quickshell (`config/quickshell/settings/Settings.qml`), the matugen templates, and oh-my-posh (a matugen template). They ship as read-only defaults until they get their own design.
+Not in the user layer yet: the rest of Quickshell's settings (`config/quickshell/settings/Settings.qml`), the matugen templates, and oh-my-posh (a matugen template). They ship as read-only defaults until they get their own design.
 
 The `layer` table in `links.nix` lists the files that aren't plain links (seeded, `concat`, `json`); it's written to `~/.local/share/kubaos/layer` for `dot-config`.
 
