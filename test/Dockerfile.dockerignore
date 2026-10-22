@@ -1,8 +1,6 @@
-# Build context is the repo root; the image only COPYs files from system/.
-.git
-docs
-config
-home
-scripts
-test
+# Build context is the repo root; the image only COPYs files from system/,
+# so everything else stays out of the context, build output and worktrees
+# included.
+*
+!system/
 **/.DS_Store
