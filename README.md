@@ -14,9 +14,9 @@ _Screenshots are being retaken._
 
 ## Install it
 
-The installer is offline: the whole system is on the USB stick. Write the ISO with `dd` or Etcher, boot it (UEFI, Secure Boot works), click through language, keyboard, disk and account, and hold the button to erase the disk. It's LUKS2-encrypted, with a `factory` snapshot to roll back to. Git name and email aren't in the repo: the installer's Git screen or the Git card in first-boot setup asks for them and writes `~/.config/git-identity/identity.gitconfig`.
+The install is offline: the whole system is on the USB stick. Write the ISO with `dd` or Etcher, boot it (UEFI, Secure Boot works), click through language, keyboard, disk and account, and hold the button to erase the disk. It's LUKS2-encrypted, with a `factory` snapshot to roll back to. Git name and email aren't in the repo: Kōbō's Git screen or the Git card in first-boot setup asks for them and writes `~/.config/git-identity/identity.gitconfig`.
 
-Flashing, checks and what to expect: [`docs/RELEASE-shinjuku.md`](docs/RELEASE-shinjuku.md). The details: [`docs/INSTALL.md`](docs/INSTALL.md) and [`docs/INSTALLER.md`](docs/INSTALLER.md).
+Flashing, checks and what to expect: [`docs/RELEASE-shinjuku.md`](docs/RELEASE-shinjuku.md). The details: [`docs/INSTALL.md`](docs/INSTALL.md) and [`docs/INSTALL-INTERNALS.md`](docs/INSTALL-INTERNALS.md).
 
 ## Build it yourself
 
@@ -24,7 +24,7 @@ You need Docker and [`just`](https://github.com/casey/just). On macOS you also n
 
 ```sh
 just                       # list everything
-just payload x86_64        # the system image the installer lays down
+just payload x86_64        # the system image the install lays down
 just iso x86_64            # the USB-stick ISO into iso/
 just iso aarch64 vm        # the bench ISO (ssh, no firmware) for QEMU
 just vm-install aarch64    # install it headless in QEMU, boot it, look around
@@ -34,7 +34,7 @@ just release               # tests, checks and all four ISOs
 just clean                 # remove iso/ and the build outputs
 ```
 
-One payload build at a time, they eat the RAM. How it all fits together: [`installer/image/README.md`](installer/image/README.md), [`installer/iso/README.md`](installer/iso/README.md) and [`test/vm/README.md`](test/vm/README.md).
+One payload build at a time, they eat the RAM. How it all fits together: [`install/image/README.md`](install/image/README.md), [`install/iso/README.md`](install/iso/README.md) and [`test/vm/README.md`](test/vm/README.md).
 
 ## More
 

@@ -48,7 +48,7 @@ test/run shots stop
 | volume `dotfiles-test-cache` | Nix's fetcher and eval caches, Neovim's plugins, Mason tools and treesitter parsers, GC roots for `warm` | `nuke` |
 | apt `.deb`s | BuildKit cache mounts on `/var/cache/apt`, `/var/lib/apt` | `docker builder prune` |
 
-**Local flake inputs.** `flake.lock` can point at a checkout on the Mac (`git+file://...` or `path:`). Inside the container that path doesn't exist, so `test/run` reads `flake.lock` and bind-mounts each such input read-only at the same absolute path (and a git worktree's main `.git`), and the container lists them as git `safe.directory` (`trust_local_inputs` in `harness.sh`): they're owned by root in there, and git, Nix's fetcher included, won't read a repository owned by someone else otherwise. `test/lib/local-inputs.sh` does the finding, for `installer/image/build` too.
+**Local flake inputs.** `flake.lock` can point at a checkout on the Mac (`git+file://...` or `path:`). Inside the container that path doesn't exist, so `test/run` reads `flake.lock` and bind-mounts each such input read-only at the same absolute path (and a git worktree's main `.git`), and the container lists them as git `safe.directory` (`trust_local_inputs` in `harness.sh`): they're owned by root in there, and git, Nix's fetcher included, won't read a repository owned by someone else otherwise. `test/lib/local-inputs.sh` does the finding, for `install/image/build` too.
 
 Not cached, on purpose: the repo. Each run bind-mounts it read-only at `/src`, copies it to `/home/kuba/Projects/dotfiles` (without `.git` and `docs/screenshots`), makes a fresh one-commit git repo there so the flake sees untracked files, and runs `system/60-nix.sh --host vm` (home-manager switch, the `pam_fprintd` link, the GPU setup, zsh) and `system/70-bitwarden.sh --no-desktop --no-cli` (the `pam_u2f` link) from a bash login shell, the way you would on the laptop. The home directory starts empty every run, so every run is a first activation.
 
@@ -124,9 +124,9 @@ No image rebuild is needed for steps 1 to 3: `test/` is read from the mounted re
 
 The `hyprland` stage in `test/Dockerfile` is a placeholder (`# TODO(lead): recipe from screenshot agent`). Ubuntu's arm64 hyprland is 0.53, which predates the Lua config, and the PPA builds amd64 only. The contract the stage has to meet is written next to it: an executable `/usr/local/lib/dotfiles-test/hyprland-session` that starts Hyprland 0.56 headless with `~/.config/hypr` and writes `WAYLAND_DISPLAY` and `HYPRLAND_INSTANCE_SIGNATURE` to the file it's given. Store paths it needs must be realised at run time (`test/run warm --hyprland`, also a TODO in `test/lib/entry`), because the `dotfiles-nix` volume hides the image's `/nix`. Until then `test/run shots --hyprland` stops with a message, and everything runs under sway: no blur, no rounded corners or gradient borders, no workspace animations, and the workspace indicator stays on 1.
 
-## The installer in a VM
+## Kōbō and the live ISO in a VM
 
-The Docker harness can't boot an ISO. `test/vm/run` (QEMU on HVF, `test/vm/README.md`) boots the dotinstall live ISO from `installer/iso/build`, runs headless installs from an `install.toml`, boots the result, and takes screenshots and snapshots. After `just vm-install`, `just vm-user-layer` runs `test/user-layer-check` on the installed system as its user: the same promise, from a real install.
+The Docker harness can't boot an ISO. `test/vm/run` (QEMU on HVF, `test/vm/README.md`) boots the live ISO from `install/iso/build`, runs headless installs from an `install.toml`, boots the result, and takes screenshots and snapshots. After `just vm-install`, `just vm-user-layer` runs `test/user-layer-check` on the installed system as its user: the same promise, from a real install.
 
 ## What this can't test
 

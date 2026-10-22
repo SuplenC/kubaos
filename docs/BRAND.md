@@ -7,7 +7,8 @@ Every user-facing string, doc and image follows this file. Agents: read it befor
 - **KubaOS**: one word, capital K, capital OS. Never "Kuba OS", "kubaOS" or "KUBAOS". The lowercase id `kubaos` is for files, packages and volume labels.
 - **Logo:** クバ (Kuba in katakana). It's the mark; "KubaOS" is the wordmark next to it or under it. The sources live in `branding/`.
 - **Releases are named after Tokyo neighbourhoods,** in this order: **Shinjuku** (0.1), Akihabara, Shibuya, Kabukichō, Harajuku, Ikebukuro, Shimokitazawa, Koenji, Nakano, Ginza. Written as "KubaOS Shinjuku". The id is `shinjuku`.
-- Internal tool names stay: `dotinstall`, `dot-*` scripts, the `dotfiles` repo. Nobody sees them unless they go looking, and anyone who does can read.
+- **Kōbō** (工房, "workshop"): the app that puts KubaOS on a machine and sets it up afterwards. Written with its macrons wherever a person reads it; the id is `kobo` (the binary, the app id, the desktop entry). Never "the installer".
+- Internal tool names stay: the `dot-*` scripts. Nobody sees them unless they go looking, and anyone who does can read.
 
 ## `/etc/os-release`
 
@@ -40,7 +41,7 @@ The boot menu says **KubaOS Shinjuku** (the entry), "Advanced options for KubaOS
 | Wrong passphrase | Wrong passphrase. Try again. |
 | Caps Lock | Caps Lock is on. |
 
-How it's built: `docs/INSTALLER.md`, "Boot".
+How it's built: `docs/INSTALL-INTERNALS.md`, "Boot".
 
 ## How we describe it
 
@@ -81,4 +82,4 @@ Examples:
 
 ## Keyboard first
 
-KubaOS is used from the keyboard, and so is its installer. Everything you can do with the mouse, you can do with keys: a visible focus ring, Tab and Shift+Tab, arrows in lists and choices, Space to toggle, Enter to go on, Esc to go back. Shortcuts are on screen where they're needed. The mouse works, but you never need it.
+KubaOS is used from the keyboard, and so is Kōbō. Everything you can do with the mouse, you can do with keys: a visible focus ring, Tab and Shift+Tab, arrows in lists and choices, Space to toggle, Enter to go on, Esc to go back. Shortcuts are on screen where they're needed. The mouse works, but you never need it.

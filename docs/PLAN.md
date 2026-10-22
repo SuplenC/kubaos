@@ -1,6 +1,6 @@
 # KubaOS plan: TUXEDO InfinityBook Pro 14 Gen10, Ubuntu + Hyprland + own Quickshell
 
-The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTALLER.md`) now does most of these phases in one go, all but the TUXEDO drivers and SentinelOne. The phases still describe what it installs and why. Hardware: Ryzen AI 9 HX 370, 64 GB DDR5, 2 TB WD_Black SN7100, USB4 dock with 2x LG UltraGear 1080p 120 Hz.
+The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTALL-INTERNALS.md`) now does most of these phases in one go, all but the TUXEDO drivers and SentinelOne. The phases still describe what it installs and why. Hardware: Ryzen AI 9 HX 370, 64 GB DDR5, 2 TB WD_Black SN7100, USB4 dock with 2x LG UltraGear 1080p 120 Hz.
 
 ## Guiding rules
 

@@ -1,29 +1,29 @@
-# dotinstall: the KubaOS installer
+# Putting KubaOS on a machine: the engine, Kōbō and the live ISO
 
-An Omarchy-style installer for KubaOS. You boot a USB stick, answer a few screens, and a minute or two later you reboot into the finished KubaOS. That includes Ubuntu, Hyprland, Quickshell and your home-manager generation, all ready to use. The install needs no network.
+An Omarchy-style install for KubaOS. You boot a USB stick, answer a few screens, and a minute or two later you reboot into the finished KubaOS. That includes Ubuntu, Hyprland, Quickshell and your home-manager generation, all ready to use. The install needs no network.
 
 This file is the contract between the parts. If you need to change an interface, change it here in the same commit.
 
 ## How it works
 
 1. **Payload.** We build the whole installed system ahead of time as one compressed image. It contains Ubuntu 26.04, everything `system/*.sh` installs, and `/nix` with the home-manager generation for `<user>@<host>` already built. It ships with `manifest.json` (`kubaos_core::Manifest`).
-2. **Live ISO.** A small Ubuntu live system holding the payload, `kubaos` and `dotinstall-gui`. It boots straight into the GUI, full screen in `cage`. There's a text fallback on tty2.
+2. **Live ISO.** A small Ubuntu live system holding the payload, `kubaos` and `kobo`. It boots straight into Kōbō, full screen in `cage`. There's a text fallback on tty2.
 3. **Engine.** `kubaos run` partitions the disk, sets up LUKS and btrfs, unpacks the payload, configures the system, creates the user, installs the bootloader, activates home and takes the factory snapshot. It reports progress as JSON events.
-4. **GUI.** `dotinstall-gui` asks the questions and writes `install.toml` plus the secrets. It runs `kubaos run --events json` and shows the event stream. It runs as root under `cage` on the live system, and its Reboot button runs `systemctl reboot`.
-5. **First boot.** The same GUI runs in setup mode (`dotinstall-gui --setup`, `kubaos-setup`) for anything that needs you or the hardware: TUXEDO drivers, the fingerprint reader, the YubiKey, Bitwarden, the git name and email. It opens by itself at the first login. See "First boot" below.
+4. **Kōbō.** `kobo` (工房, "workshop") asks the questions and builds the `InstallConfig` and the `Secrets`. It runs the install in its own process through `kubaos_core::engine`, the same engine `kubaos run` drives, and shows the event stream. It checks what `kubaos run` checks before it starts, writes the same log, and a signal stops and unwinds the install as it does for `kubaos run`. It runs as root under `cage` on the live system, and its Reboot button runs `systemctl reboot`.
+5. **First boot.** Kōbō runs in setup mode (`kobo --setup`, `kubaos-setup`) for anything that needs you or the hardware: TUXEDO drivers, the fingerprint reader, the YubiKey, Bitwarden, the git name and email. It opens by itself at the first login. See "First boot" below.
 
 ## Layout and owners
 
 | Path | Owner | What |
 |---|---|---|
-| `Cargo.toml`, `Cargo.lock` | lead | The Cargo workspace: `crates/kubaos-core`, `crates/kubaos-cli` and the GUI in `installer/crates/gui` |
+| `Cargo.toml`, `Cargo.lock` | lead | The Cargo workspace: `crates/kubaos-core`, `crates/kubaos-cli` and Kōbō in `crates/kubaos-kobo` |
 | `crates/kubaos-core/src/{config,event,step,probe,lib}.rs` | lead | The contract types |
 | `crates/kubaos-core/src/engine.rs`, `crates/kubaos-core/src/engine/**`, `crates/kubaos-cli/**` | engine | The real install, `probe`, `validate`, `run` |
-| `crates/kubaos-core/src/demo.rs` | lead | Fake event stream for GUI work |
-| `installer/crates/gui/**` | gui | The iced app |
-| `crates/kubaos-core/src/setup{.rs,/**}`, `installer/crates/gui/src/setup/**`, `crates/kubaos-cli/src/setup.rs`, `crates/kubaos-core/src/engine/install/firstboot.rs`, `installer/firstboot/**` | firstboot | First-boot setup |
-| `installer/image/**` | image | Builds the payload (rootfs image + manifest) |
-| `installer/iso/**` | iso | Builds the live ISO |
+| `crates/kubaos-core/src/demo.rs` | lead | Fake event stream for work on Kōbō |
+| `crates/kubaos-kobo/**` | kobo | Kōbō, the iced app |
+| `crates/kubaos-core/src/setup{.rs,/**}`, `crates/kubaos-kobo/src/setup/**`, `crates/kubaos-cli/src/setup.rs`, `crates/kubaos-core/src/engine/install/firstboot.rs`, `install/firstboot/**` | firstboot | First-boot setup |
+| `install/image/**` | image | Builds the payload (rootfs image + manifest) |
+| `install/iso/**` | iso | Builds the live ISO |
 | `test/vm/**` | iso | QEMU test bench on the Mac |
 
 Agents only edit files they own. If you need a change in someone else's file, put it in your report.
@@ -44,10 +44,10 @@ kubaos setup done                                     write the marker
 ```
 
 - Exit codes: `0` ok, `1` a step failed (the last event is `failed`), `2` usage or config error.
-- `--events json`: one `Event` per line on stdout, nothing else on stdout. Human-readable logs go to stderr and to `/var/log/dotinstall.log` on the live system. The log is copied to `/var/log/dotinstall/` on the target.
+- `--events json`: one `Event` per line on stdout, nothing else on stdout. Human-readable logs go to stderr and to `/var/log/kubaos-install.log` on the live system. The log is copied to `/var/log/kubaos/` on the target.
 - `run` must be root. `probe`, `validate`, `plan` and `demo` work unprivileged. `run --dry-run` needs neither root nor secrets and prints every command and file it would write, as `log` events.
-- `probe --payload` defaults to `/run/dotinstall/payload`. `validate` reads the manifest from the config's `[payload] dir`. `run` validates again before it starts (exit 2), then re-checks in `preflight`.
-- `run --target` is where the target is mounted (default `/mnt/dotinstall`), `--log` the live log (default `/var/log/dotinstall.log`), `-v` shows `debug` lines in human mode: each command and its output. SIGINT, SIGTERM and SIGHUP stop the install: the running command is killed, everything is unmounted and closed, and the last event is `failed`.
+- `probe --payload` defaults to `/run/kubaos/payload`. `validate` reads the manifest from the config's `[payload] dir`. `run` validates again before it starts (exit 2), then re-checks in `preflight`.
+- `run --target` is where the target is mounted (default `/mnt/kubaos`), `--log` the live log (default `/var/log/kubaos-install.log`), `-v` shows `debug` lines in human mode: each command and its output. SIGINT, SIGTERM and SIGHUP stop the install: the running command is killed, everything is unmounted and closed, and the last event is `failed`.
 
 ## Files
 
@@ -80,10 +80,10 @@ email = "..."
 sets = ["cyberpunk", "shinjuku"]   # ids from manifest.wallpaper_sets; [] = only your own
 
 [payload]
-dir = "/run/dotinstall/payload"
+dir = "/run/kubaos/payload"
 ```
 
-Secrets (`Secrets`), never logged: `luks_passphrase` (required when `encrypt`), `user_password`, `wifi_psk`. The LUKS passphrase never reaches the target. The user password reaches it only as its hash in `/etc/shadow`. The Wi-Fi network from `[wifi]` is written to the target as `/etc/NetworkManager/system-connections/<ssid>.nmconnection`, root:root 0600, with the psk, the way NetworkManager stores it itself, so the installed system comes up on Wi-Fi. Pass them as a TOML file with mode 0600 (`--secrets`) or as one JSON object on stdin (`--secrets-stdin`). The GUI uses stdin.
+Secrets (`Secrets`), never logged: `luks_passphrase` (required when `encrypt`), `user_password`, `wifi_psk`. The LUKS passphrase never reaches the target. The user password reaches it only as its hash in `/etc/shadow`. The Wi-Fi network from `[wifi]` is written to the target as `/etc/NetworkManager/system-connections/<ssid>.nmconnection`, root:root 0600, with the psk, the way NetworkManager stores it itself, so the installed system comes up on Wi-Fi. Pass them as a TOML file with mode 0600 (`--secrets`) or as one JSON object on stdin (`--secrets-stdin`). Kōbō passes them to the engine in-process and writes neither.
 
 ## Event order
 
@@ -107,13 +107,13 @@ How the engine does it:
 - LUKS2, `--pbkdf argon2id`, passphrase on stdin (never argv), opened as `cryptroot`. `/etc/crypttab` uses the same name: `cryptroot UUID=<luks> none luks,discard,tries=0`. `tries=0` keeps asking until the passphrase is right; with the default of 3 the initramfs gives up on the root device and drops to a busybox shell.
 - `@` is the default subvolume. fstab names everything by UUID and subvolume name. `/boot/efi` is mounted with `umask=0077`. The swap file (`/swap/swapfile`, 8 GiB) is only created when the root partition is 64 GiB or more.
 - The disk needs the ESP (unless reused) + `/boot` + `installed_bytes` + a fifth of it (at least 4 GiB) as headroom.
-- Configure writes `/etc/{fstab,crypttab,hostname,hosts,timezone,localtime,locale.conf,default/keyboard}` (`/etc/default/locale` is a link to `../locale.conf`, as systemd's tmpfiles on Ubuntu 26.04 makes it on every boot), runs `locale-gen <lang>` and `ssh-keygen -A` (when sshd is there) in the chroot, and writes a new random `/etc/machine-id`. An empty one would make systemd's first boot run `preset-all`, which can undo unit choices the image made. Free-space mode adds `/etc/default/grub.d/90-dotinstall-os-prober.cfg` (`GRUB_DISABLE_OS_PROBER=false`).
+- Configure writes `/etc/{fstab,crypttab,hostname,hosts,timezone,localtime,locale.conf,default/keyboard}` (`/etc/default/locale` is a link to `../locale.conf`, as systemd's tmpfiles on Ubuntu 26.04 makes it on every boot), runs `locale-gen <lang>` and `ssh-keygen -A` (when sshd is there) in the chroot, and writes a new random `/etc/machine-id`. An empty one would make systemd's first boot run `preset-all`, which can undo unit choices the image made. Free-space mode adds `/etc/default/grub.d/90-kubaos-os-prober.cfg` (`GRUB_DISABLE_OS_PROBER=false`).
 - The chroot gets `/dev`, `/dev/pts`, `/proc`, `/sys` (and `efivarfs` when the live system has it), and a fresh tmpfs on `/run`, so nothing inside can talk to the live system's systemd or D-Bus.
-- `useradd` creates the user with uid 1000, a group of the same name, shell `/usr/bin/zsh`, and whichever of `adm sudo users plugdev dip video render i2c docker` exist in the payload. Password through `chpasswd` on stdin. `[git]` becomes `~/.config/git-identity/identity.gitconfig`, the file the Git card writes (the directories are chowned to the user, because home-manager writes in `~/.config` next). `[wallpapers]` (or every set of `manifest.wallpaper_sets`) becomes `~/.config/kubaos/wallpapers/sets`, one id per line, which `dot-theme folders` and the wallpaper picker read; a payload without sets writes no file. The user flake goes to `~/.config/kubaos/home/` (below), owned by the user. There's no copy of the repo in the home: scripts, wallpapers and the defaults come from the store, and KubaOS stays in `/usr/share/kubaos`. The system files the image's scripts rendered for the build user (the tty1 autologin drop-in, the `dot-chrome-theme` units: `engine/files.rs` `USER_TEMPLATES`) are rendered again from their `system/files/*.in` templates for the real user. `installer/image/check` fails on any other file in the payload's `/etc`, `/usr/local`, `/usr/lib/systemd` or `/var/lib` that names the build user.
+- `useradd` creates the user with uid 1000, a group of the same name, shell `/usr/bin/zsh`, and whichever of `adm sudo users plugdev dip video render i2c docker` exist in the payload. Password through `chpasswd` on stdin. `[git]` becomes `~/.config/git-identity/identity.gitconfig`, the file the Git card writes (the directories are chowned to the user, because home-manager writes in `~/.config` next). `[wallpapers]` (or every set of `manifest.wallpaper_sets`) becomes `~/.config/kubaos/wallpapers/sets`, one id per line, which `dot-theme folders` and the wallpaper picker read; a payload without sets writes no file. The user flake goes to `~/.config/kubaos/home/` (below), owned by the user. There's no copy of the repo in the home: scripts, wallpapers and the defaults come from the store, and KubaOS stays in `/usr/share/kubaos`. The system files the image's scripts rendered for the build user (the tty1 autologin drop-in, the `dot-chrome-theme` units: `engine/files.rs` `USER_TEMPLATES`) are rendered again from their `system/files/*.in` templates for the real user. `install/image/check` fails on any other file in the payload's `/etc`, `/usr/local`, `/usr/lib/systemd` or `/var/lib` that names the build user.
 - The bootloader step runs `update-initramfs` for each kernel in `/boot`, so the initramfs knows the new crypttab. Then `grub-install --target=x86_64-efi|arm64-efi --bootloader-id=ubuntu`, then `--removable` for firmware that forgets boot entries, then `update-grub`. Without EFI variables (VMs, containers) it passes `--no-nvram`. In free-space mode another system's `EFI/BOOT` is set aside and put back, because Ubuntu's `grub-install` writes the fallback path too when it can't write NVRAM.
 - home-manager's `activate` needs the Nix store, which belongs to `nix-daemon` in a multi-user install. Nothing runs in a chroot, so the engine starts `/nix/var/nix/profiles/default/bin/nix-daemon --option sandbox false` inside it (the sandbox can't `pivot_root` in a chroot; the profile path is resolved inside the target, because its links point into `/nix/store`), waits for its socket, runs `setpriv --reuid=<uid> --regid=<gid> --init-groups env -i HOME=… USER=… PATH=<nix>:… NIX_REMOTE=daemon HOME_MANAGER_BACKUP_EXT=hm-backup sh -c 'cd ~ && exec dbus-run-session -- <home_generation>/activate'` (`dbus-run-session` when the payload has it: home-manager's dconf step needs a session bus), then stops the daemon. For a username that isn't `manifest.username`, see "Another username" below: the generation activated is the one built there. `hm-backup` keeps `/etc/skel` files out of home-manager's way. Without systemd running, home-manager skips reloading user units. Without a `nix-daemon` in the payload, activation runs against the store directly (single-user) with a warning.
 - The snapshot step runs `snapper --no-dbus create-config /` with the same `@snapshots` swap as `system/20-base.sh`, applies the `20-base.sh` retention settings, then runs `snapper create --description factory` (#1). `SYNC_ACL=yes` is set last and dropped with a warning when the btrfs has no ACLs. Without snapper in the payload it takes a read-only `btrfs subvolume snapshot` of `@` to `@snapshots/1/snapshot` and writes snapper's `info.xml`. When grub-btrfs is installed, `update-grub` runs again so the snapshot is in the menu from the first boot.
-- `finish` copies the live log to `/var/log/dotinstall/install.log` (0600), unmounts in reverse and closes LUKS. Any failure does the same cleanup before `failed`.
+- `finish` copies the live log to `/var/log/kubaos/install.log` (0600), unmounts in reverse and closes LUKS. Any failure does the same cleanup before `failed`.
 - `validate` requires `hostname` to equal `manifest.hostname`, so `home-manager switch` later finds the flake output `<user>@<hostname>`. The username is anything `useradd` takes, minus the accounts the payload already has (`root`, the services', `nixbld*`).
 
 ### The user flake
@@ -122,7 +122,7 @@ Every install gets `~/.config/kubaos/home/`, the flake the user switches from th
 
 - `flake.nix` from `/usr/share/kubaos/user-flake/flake.nix.in`, with `@USER@`, `@HOST@` and `@SYSTEM@` (`<manifest.arch>-linux`) filled in. Its `nixpkgs` input is the user's (`nixos-26.05`); `kubaos` is `git+file:///usr/share/kubaos?ref=refs/heads/release`, with no `follows`.
 - `home.nix` from `user-flake/home.nix`: where the user adds their own packages.
-- `flake.lock` from `/usr/share/dotinstall/user-flake.lock`, generated at payload build: `kubaos` at the payload's commit on `release`, and the user's `nixpkgs` at KubaOS's own revision with `original` still `nixos-26.05`. So day one has one nixpkgs, and the two only part when the user runs `nix flake update` on their flake.
+- `flake.lock` from `/usr/share/kubaos-image/user-flake.lock`, generated at payload build: `kubaos` at the payload's commit on `release`, and the user's `nixpkgs` at KubaOS's own revision with `original` still `nixos-26.05`. So day one has one nixpkgs, and the two only part when the user runs `nix flake update` on their flake.
 
 The username is a literal in the user's own `flake.nix`, so nothing is committed anywhere, and `/usr/share/kubaos` stays a clean checkout that an update can move. The flake is the user's from then on. `/usr/share/kubaos` is root-owned and listed in `safe.directory` in `/etc/gitconfig`, because Nix's git fetcher refuses a repository another user owns otherwise.
 
@@ -130,24 +130,24 @@ The username is a literal in the user's own `flake.nix`, so nothing is committed
 
 The payload's generation is built for `manifest.username` (`kuba`). home-manager bakes the user into it: the activation checks `$USER`, and the links, units and session variables all name `/home/<user>`. So renaming a template user at install can't work, and the engine builds the generation for the name it was given instead. The home step, as the user in the chroot, with the throwaway nix-daemon already up:
 
-1. in `~/.config/kubaos/home` (the user flake, with their name in it), runs `nix --offline build -L --out-link /tmp/dotinstall-home-generation '.#homeConfigurations."<user>@<host>".activationPackage'`
+1. in `~/.config/kubaos/home` (the user flake, with their name in it), runs `nix --offline build -L --out-link /tmp/kubaos-home-generation '.#homeConfigurations."<user>@<host>".activationPackage'`
 2. activates that, not `manifest.home_generation`
 
-Only about 50 small derivations name the user: the `hm_*` links and files, `home-manager-files`, `home-manager-path`, the session vars, the activation script and the generation. They build in seconds. Everything else is the payload's generation, already in the store. The builders they need (stdenv's setup scripts, perl for `buildEnv`, a few tools, about 18 MB on aarch64) are in the payload because `assemble.sh` builds a probe user's generation and keeps the inputs of whatever differs (installer/image/README.md). `installer/image/check` builds one for `kubaos-check` offline to prove it. The payload's own username skips all of this.
+Only about 50 small derivations name the user: the `hm_*` links and files, `home-manager-files`, `home-manager-path`, the session vars, the activation script and the generation. They build in seconds. Everything else is the payload's generation, already in the store. The builders they need (stdenv's setup scripts, perl for `buildEnv`, a few tools, about 18 MB on aarch64) are in the payload because `assemble.sh` builds a probe user's generation and keeps the inputs of whatever differs (install/image/README.md). `install/image/check` builds one for `kubaos-check` offline to prove it. The payload's own username skips all of this.
 
 What the engine needs on the live ISO: `sgdisk` (gdisk), `sfdisk` (fdisk), util-linux (`wipefs`, `blkid`, `lsblk`, `findmnt`, `losetup`, `mount`), `partprobe` (parted), `cryptsetup`, `mkfs.vfat` (dosfstools), `mkfs.ext4` (e2fsprogs), btrfs-progs 6.1 or newer (`mkswapfile`), coreutils `chroot`, and `unsquashfs` (squashfs-tools, `-percentage`) or `tar` with `zstd`. `preflight` lists any that are missing.
 
-What it needs in the payload: `grub-efi-<arch>-bin` and `grub2-common` (plus `shim-signed` and the signed GRUB for Secure Boot), `cryptsetup-initramfs` and `btrfs-progs` in the initramfs, `snapper`, `zsh`, `locales`, util-linux (`setpriv`), `passwd`, multi-user Nix with its `nix-daemon`, KubaOS's checkout at `/usr/share/kubaos` with `user-flake/`, `/usr/share/dotinstall/user-flake.lock`, and no user with uid 1000. File capabilities survive the unpack: `unsquashfs` keeps xattrs by default, and `tar` runs with `--xattrs --acls`.
+What it needs in the payload: `grub-efi-<arch>-bin` and `grub2-common` (plus `shim-signed` and the signed GRUB for Secure Boot), `cryptsetup-initramfs` and `btrfs-progs` in the initramfs, `snapper`, `zsh`, `locales`, util-linux (`setpriv`), `passwd`, multi-user Nix with its `nix-daemon`, KubaOS's checkout at `/usr/share/kubaos` with `user-flake/`, `/usr/share/kubaos-image/user-flake.lock`, and no user with uid 1000. File capabilities survive the unpack: `unsquashfs` keeps xattrs by default, and `tar` runs with `--xattrs --acls`.
 
-`installer/test/engine-e2e` runs real installs (squashfs, tar.zst, a failing one, and a free-space one next to a fake Windows) onto a loop device in a privileged Docker container and checks the disk afterwards. `DOTINSTALL_TEST=1` is for that test only: probe then offers loop devices and assumes UEFI.
+`install/test/engine-e2e` runs real installs (squashfs, tar.zst, a failing one, and a free-space one next to a fake Windows) onto a loop device in a privileged Docker container and checks the disk afterwards. `KUBAOS_TEST=1` is for that test only: probe then offers loop devices and assumes UEFI.
 
 ## Payload (image)
 
-`<payload dir>/manifest.json` plus `<payload dir>/<manifest.rootfs>`, a compressed archive of the root tree that the engine can unpack with progress. Format: squashfs (zstd) or a zstd-compressed tar. The image agent chooses and documents it here. The tree is a complete system without machine identity: empty `/etc/machine-id`, no SSH host keys, no user. The user's home-manager generation is in `/nix/store` and named by `manifest.home_generation`. KubaOS's checkout is at `/usr/share/kubaos` in the tree, on its `release` branch, and the user flake's lock at `/usr/share/dotinstall/user-flake.lock`; the engine writes the user flake from them ("The user flake" above). The engine creates the user and runs that generation's `activate` as the user in a chroot. The activation creates the user layer, `~/.config/kubaos` (`dot-config apply`, `docs/CONTRACTS.md`).
+`<payload dir>/manifest.json` plus `<payload dir>/<manifest.rootfs>`, a compressed archive of the root tree that the engine can unpack with progress. Format: squashfs (zstd) or a zstd-compressed tar. The image agent chooses and documents it here. The tree is a complete system without machine identity: empty `/etc/machine-id`, no SSH host keys, no user. The user's home-manager generation is in `/nix/store` and named by `manifest.home_generation`. KubaOS's checkout is at `/usr/share/kubaos` in the tree, on its `release` branch, and the user flake's lock at `/usr/share/kubaos-image/user-flake.lock`; the engine writes the user flake from them ("The user flake" above). The engine creates the user and runs that generation's `activate` as the user in a chroot. The activation creates the user layer, `~/.config/kubaos` (`dot-config apply`, `docs/CONTRACTS.md`).
 
 `installed_bytes` is used for the disk-size check and for unpack progress.
 
-Built by `installer/image/build [--arch aarch64|x86_64]` into `installer/out/payload-<arch>/` and checked by `installer/image/check` (`installer/image/README.md` has the details):
+Built by `install/image/build [--arch aarch64|x86_64]` into `install/out/payload-<arch>/` and checked by `install/image/check` (`install/image/README.md` has the details):
 
 - **Format: squashfs, zstd** (level 15, 1 MiB blocks), file `kubaos-shinjuku-<arch>.squashfs`; `manifest.version` is the KubaOS release (`0.1.0`). `unsquashfs` decompresses on every core (about 540 MiB/s of files on the Mac's Docker VM), restores xattrs as root without extra flags (the `cap_sys_admin` file cap on `gsr-kms-server` survives), keeps hardlinks, and prints `-percentage`. `installed_bytes` is the apparent size of the unpacked tree.
 - **The tree** is Ubuntu 26.04 after the real `system/10-strip.sh`, `20-base.sh`, `25-boot.sh`, `40-apps.sh`, `50-hyprland.sh`, `60-nix.sh`, `65-recorder.sh`, `70-bitwarden.sh` and `75-yubikey.sh` (in image mode, `DOTFILES_IMAGE_BUILD=1`), plus `linux-generic`, GRUB EFI (plain and signed), shim-signed, cryptsetup-initramfs and the rest of what the engine needs. Not in it: `system/30-hardware.sh` (TUXEDO repo and DKMS drivers, MOK, fingerprint PAM: first-boot setup) and SentinelOne.
@@ -155,8 +155,8 @@ Built by `installer/image/build [--arch aarch64|x86_64]` into `installer/out/pay
 - **Identity:** no user (Docker's `ubuntu` and the build user are removed, uid and gid 1000 are free), empty `/etc/machine-id`, no SSH host keys (`openssh-server` installed but disabled), `/etc/hostname` `localhost`, no fstab or crypttab, no apt lists. `/etc/resolv.conf` links to resolved's stub.
 - **KubaOS:** `/usr/lib/os-release` per `docs/BRAND.md` (diverted from base-files). The boot (splash, GRUB theme and names) is `system/25-boot.sh`, described in "Boot" below. The EFI directory stays `EFI/ubuntu` for shim.
 - **`/usr/share/kubaos/`:** KubaOS's checkout (above, "The user flake").
-- **`/usr/share/dotinstall/`:** `user-flake.lock`, `image.json` (user, groups, generation, kernel), `snapper-root.conf` (`20-base.sh`'s snapper settings as `KEY=VALUE` lines).
-- **Wallpapers:** `/usr/share/kubaos/wallpapers` links to the flake input `kubaos-wallpapers` (every set, read-only, GC root `dotfiles-wallpapers`; `system/60-nix.sh`). `manifest.wallpaper_sets` lists them, `[{ "id", "images", "preview" }]` sorted by id, and `<payload dir>/wallpapers/<id>.jpg` is a 480 px JPEG of each set's first image, for the installer's Wallpapers screen (the squashfs isn't mounted before the install). The screen comes after Git, every set picked; Space drops or picks the focused one. `installer/image/check` fails when the payload is over 6 GB, which with the live system (about 1.8 GB) keeps the ISO under 8 GB.
+- **`/usr/share/kubaos-image/`:** `user-flake.lock`, `image.json` (user, groups, generation, kernel), `snapper-root.conf` (`20-base.sh`'s snapper settings as `KEY=VALUE` lines).
+- **Wallpapers:** `/usr/share/kubaos/wallpapers` links to the flake input `kubaos-wallpapers` (every set, read-only, GC root `dotfiles-wallpapers`; `system/60-nix.sh`). `manifest.wallpaper_sets` lists them, `[{ "id", "images", "preview" }]` sorted by id, and `<payload dir>/wallpapers/<id>.jpg` is a 480 px JPEG of each set's first image, for Kōbō's Wallpapers screen (the squashfs isn't mounted before the install). The screen comes after Git, every set picked; Space drops or picks the focused one. `install/image/check` fails when the payload is over 6 GB, which with the live system (about 1.8 GB) keeps the ISO under 8 GB.
 - **No git identity:** the manifest carries no git name or email, so the builder's never ships in the ISO. The user enters theirs on the Git screen, or later on first-boot setup's Git card.
 
 ## Boot
@@ -191,15 +191,15 @@ grub-btrfs titles the snapshot entries by date and description (`GRUB_BTRFS_TITL
 
 ## Live ISO (iso)
 
-`installer/iso/build` (details in `installer/iso/README.md`). On the live system:
+`install/iso/build` (details in `install/iso/README.md`). On the live system:
 
-- `kubaos` and `dotinstall-gui` are in `/usr/bin`. The payload is mounted read-only at `/run/dotinstall/payload` (on the ISO it's `/dotinstall/payload`). There are no apt sources and no network wait.
-- tty1 autologs in as root. When a filesystem labelled `DOTINSTALL` holds `install.toml`, the install runs headless: `kubaos run --config <disk>/install.toml --secrets /run/dotinstall/secrets.toml --events human [-v]`, with output on the serial console framed by `DOTINSTALL-BEGIN` and `DOTINSTALL-RESULT: done|failed rc=N`, then poweroff. Otherwise it runs `cage -s -- dotinstall-gui` as root (not `--fullscreen`, which trips an assertion in cage 0.2.1) inside a logind session, and falls back to `dotinstall-text` when the GUI exits non-zero. tty2 always has `dotinstall-text`.
-- The GUI gets a logind seat (`XDG_RUNTIME_DIR=/run/user/0`) and Mesa (EGL/GLES and Vulkan, with llvmpipe/lavapipe in VMs), plus `fonts-inter` and `fonts-dejavu-core`. Exit 0 means the user finished (installed or quit on purpose). Any other exit means "use the text installer".
+- `kubaos` and `kobo` are in `/usr/bin`. The payload is mounted read-only at `/run/kubaos/payload` (on the ISO it's `/kubaos/payload`). There are no apt sources and no network wait.
+- tty1 autologs in as root. When a filesystem labelled `KUBAOS_CFG` holds `install.toml`, the install runs headless: `kubaos run --config <disk>/install.toml --secrets /run/kubaos/secrets.toml --events human [-v]`, with output on the serial console framed by `KUBAOS-BEGIN` and `KUBAOS-RESULT: done|failed rc=N`, then poweroff. Otherwise it runs `cage -s -- kobo` as root (not `--fullscreen`, which trips an assertion in cage 0.2.1) inside a logind session, and falls back to `kobo-text` when Kōbō exits non-zero. tty2 always has `kobo-text`.
+- Kōbō gets a logind seat (`XDG_RUNTIME_DIR=/run/user/0`) and Mesa (EGL/GLES and Vulkan, with llvmpipe/lavapipe in VMs), plus `fonts-inter` and `fonts-dejavu-core`. Exit 0 means the user finished (installed or quit on purpose). Any other exit means "use the text mode".
 
 ## First boot (firstboot)
 
-What the payload can't carry, because it needs the hardware or the person, happens at the first login: a checklist of five cards in the installer's look. `dotinstall-gui --setup` is a separate iced application in the same crate. It shares `theme.rs`, `widgets.rs`, the key translation and `app::Message` (one variant, `Message::Setup`). The logic is in `kubaos_core::setup`, and `kubaos setup` runs the same code headless with JSON events.
+What the payload can't carry, because it needs the hardware or the person, happens at the first login: a checklist of five cards in the install screens' look. `kobo --setup` is a separate iced application in the same crate. It shares `theme.rs`, `widgets.rs`, the key translation and `app::Message` (one variant, `Message::Setup`). The logic is in `kubaos_core::setup`, and `kubaos setup` runs the same code headless with JSON events.
 
 | Card | Shown when | Done when | What it does |
 |---|---|---|---|
@@ -215,11 +215,11 @@ Every card is detected fresh on each start, so finishing one by hand (the script
 
 **Secrets.** The MOK password goes to the helper on stdin. The master password and API key go to `bw` in its environment, and the session to `dot-bw-setup` the same way, as docs/SECRETS.md does it. None of them is logged or written. The form clears them once a run succeeds. One exception to "never in argv": the two-step code (`bw login --code`), which bw can't take any other way without a terminal. It's spent the moment bw uses it.
 
-**On the target.** The engine's configure step (`install_setup`) copies the live system's `kubaos` and `dotinstall-gui` to `/usr/bin` and writes, from `installer/firstboot/`: `/usr/lib/kubaos/setup-helper`, `/usr/share/polkit-1/actions/org.kubaos.setup.policy`, `/usr/bin/kubaos-setup`, `/usr/share/applications/kubaos-setup.desktop`, and the user unit `/usr/lib/systemd/user/kubaos-setup.service`, enabled globally (linked into `/etc/systemd/user/graphical-session.target.wants/`). The unit has `ConditionPathExists=!%S/kubaos/setup-done` and runs `dotinstall-gui --setup --first-boot` once `autostart.lua` starts the graphical session. Without a `dotinstall-gui` next to `kubaos`, setup isn't installed, with a warning.
+**On the target.** The engine's configure step (`install_setup`) copies the live system's `kubaos` and `kobo` to `/usr/bin` and writes, from `install/firstboot/`: `/usr/lib/kubaos/setup-helper`, `/usr/share/polkit-1/actions/org.kubaos.setup.policy`, `/usr/bin/kubaos-setup`, `/usr/share/applications/kobo.desktop`, and the user unit `/usr/lib/systemd/user/kubaos-setup.service`, enabled globally (linked into `/etc/systemd/user/graphical-session.target.wants/`). The unit has `ConditionPathExists=!%S/kubaos/setup-done` and runs `kobo --setup --first-boot` once `autostart.lua` starts the graphical session. Without a `kobo` next to `kubaos`, setup isn't installed, with a warning.
 
 **A calm first login.** Setup is the only window at the first login:
 
-- `config/hypr/rules.lua` floats the app id `kubaos-setup` in the centre at 80 × 85 % of the monitor, instead of half a tiled screen. As the newest window, it has focus. The window is one solid panel, edge to edge: no photo behind it, because the wallpaper is right there around it and Hyprland draws the border and the rounding. Only the installer, full screen under `cage`, has the Shinjuku photo.
+- `config/hypr/rules.lua` floats the app id `kobo` in the centre at 80 × 85 % of the monitor, instead of half a tiled screen. As the newest window, it has focus. The window is one solid panel, edge to edge: no photo behind it, because the wallpaper is right there around it and Hyprland draws the border and the rounding. Only the install screens, full screen under `cage`, have the Shinjuku photo.
 - `config/hypr/autostart.lua` doesn't start Bitwarden desktop while setup is pending (its unit is installed and the marker is missing). Setup starts it with `systemd-run --user` when it closes (not `hyprctl dispatch exec`: the Lua config rejects that syntax and hyprctl still exits 0), and from then on the autostart runs it as before. Nothing else autostarts a window: Quickshell, hypridle and the theme helper are silent, and there's no update checker or timer.
 - **The keyring.** The user step writes `~/.local/share/keyrings/Default_keyring.keyring` (gnome-keyring's plaintext format, so no password) and `default` (`Default_keyring`), unless the home already has keyrings, as Omarchy does. Otherwise the first app that wants a secret (Bitwarden desktop, Chrome, `gh`, `git credential-libsecret`, `secret-tool` through `dot-bwenv`) pops "Choose password for new keyring". Nothing would ever unlock a password-protected one either: the login is tty autologin right after the LUKS passphrase, so PAM never sees a password to unlock it with.
 
@@ -229,13 +229,13 @@ Every card is detected fresh on each start, so finishing one by hand (the script
 
 **The marker** `~/.local/state/kubaos/setup-done` is written by "Done for now"/"All set", by closing the window, and by `kubaos setup done`. The one exception is a card waiting on a reboot (a queued MOK): then setup opens once more after the reboot, to confirm the drivers loaded. `kubaos-setup` or the launcher entry opens it any time.
 
-Screenshots: `docs/screenshots/setup/` (from `dotinstall-gui --setup --demo [--demo-machine vm] --screenshot-tour DIR`).
+Screenshots: `docs/screenshots/setup/` (from `kobo --setup --demo [--demo-machine vm] --screenshot-tour DIR`).
 
 ## Test bench (iso)
 
 All the commands, and how config gets in, are in `test/vm/README.md`.
 
-`test/vm/run` drives QEMU on the Mac. aarch64 runs with HVF, which is fast. x86_64 runs under TCG, which is slow and meant for occasional correctness checks. Each command uses an EFI firmware copy, a qcow2 target disk, a serial console log, SSH via a forwarded port, screenshots via QMP, and qcow2 snapshots. Minimum commands: boot the ISO, run a headless install with a given `install.toml`, boot the installed disk, run a command over SSH, take a screenshot, snapshot and restore. You can open the same ISO in UTM to click through the GUI yourself.
+`test/vm/run` drives QEMU on the Mac. aarch64 runs with HVF, which is fast. x86_64 runs under TCG, which is slow and meant for occasional correctness checks. Each command uses an EFI firmware copy, a qcow2 target disk, a serial console log, SSH via a forwarded port, screenshots via QMP, and qcow2 snapshots. Minimum commands: boot the ISO, run a headless install with a given `install.toml`, boot the installed disk, run a command over SSH, take a screenshot, snapshot and restore. You can open the same ISO in UTM to click through Kōbō yourself.
 
 ## Scope v1
 
