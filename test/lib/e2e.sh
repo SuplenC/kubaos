@@ -377,6 +377,14 @@ c_lua() {
   return "$bad"
 }
 
+# Per-screen workspaces (config/hypr/workspaces.lua): the block bookkeeping,
+# and the module itself against a stand-in for Hyprland's Lua API, under the
+# Lua 5.5 that Hyprland runs.
+c_workspaces() {
+  as_user lua5.5 "$REPO/test/lua/workspaces_test.lua" "$REPO" || { echo "FAIL test/lua/workspaces_test.lua"; return 1; }
+  echo "ok   per-screen workspaces: blocks, slots, joining on unplug and returning on replug"
+}
+
 c_quickshell() {
   local out t
   session_start sway 1920x1080 1
@@ -482,10 +490,11 @@ c_menu() {
   local want
   for want in 'terminal = \["ghostty", "-e"\]  # .*/kotodama/kubaos\.toml' \
     'hidden = \[.*"org\.codeberg\.dnkl\.footclient".*\]  # .*/kotodama/kubaos\.toml' \
-    'nvim = "Neovim"  # .*/kotodama/kubaos\.toml'; do
+    'nvim = "Neovim"  # .*/kotodama/kubaos\.toml' \
+    'in_search = true  # .*/kotodama/kubaos\.toml'; do
     grep -qE -- "^$want$" <<<"$out" || { echo "FAIL kotodama config lacks /$want/"; bad=1; }
   done
-  ((bad)) || echo "ok   the apps Extension's hidden, renamed apps and terminal come from kubaos.toml"
+  ((bad)) || echo "ok   the apps' hidden, renamed apps and terminal, and the binds in the search, come from kubaos.toml"
 
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
   if ((bad)); then tail -20 "$log"; fi
@@ -729,7 +738,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell menu recorder wallpaper_sets wallpaper_video packages user_layer; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu recorder wallpaper_sets wallpaper_video packages user_layer; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
