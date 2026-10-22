@@ -10,11 +10,16 @@
 //!
 //! - What a Suite's fields mean, and everything done with them: `suites.rs`.
 
+#[cfg(any(test, feature = "test-suite"))]
 use super::Cache;
+#[cfg(any(test, feature = "test-suite"))]
 use super::Extra;
+#[cfg(any(test, feature = "test-suite"))]
 use super::Scaffolder;
+#[cfg(any(test, feature = "test-suite"))]
 use super::Seed;
 use super::Suite;
+#[cfg(any(test, feature = "test-suite"))]
 use super::Toolchain;
 
 /// The Suites KubaOS ships, by name.
