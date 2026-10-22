@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# test/vm/menu-check: the Command menu on an installed KubaOS in the bench VM,
+# driven through the VM's own keyboard. SUPER + Space opens Kotodama's menu,
+# typing an app's name and Enter launches it, a sum typed is answered and Enter
+# copies the answer, and SUPER + F1 opens the Shortcuts View.
+#
+#   test/vm/menu-check [--user NAME]
+#
+# The VM runs the installed disk with the bench's SSH key in root's account and
+# the user's desktop up (test/vm/README.md: `install … --ssh`, `boot-disk`, the
+# LUKS passphrase, `wait-ssh`). NAME is the desktop's user, `kuba` by default
+# (test/vm/examples/install.toml). Screenshots go to test/vm/out/shots/menu-*.
+# Prints ok/FAIL lines and exits 1 on the first failed step.
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN="$HERE/run"
+USER_NAME=kuba
+# The app the menu launches: foot comes from apt, so it is on every install.
+APP=foot
+
+die() { printf 'test/vm/menu-check: %s\n' "$*" >&2; exit 1; }
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+
+while (($#)); do
+  case "$1" in
+    --user) USER_NAME="${2:?--user NAME}"; shift ;;
+    -h | --help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+  shift
+done
+
+fail() { echo "FAIL $*"; "$RUN" shot menu-failed >/dev/null || true; exit 1; }
+ok() { echo "ok   $*"; }
+
+# as_user SCRIPT: SCRIPT, which sh reads from stdin, in the user's desktop
+# session, over SSH as root: the newest Hyprland instance in the user's
+# runtime directory, and the first Wayland socket there.
+as_user() {
+  "$RUN" ssh "uid=\$(id -u $USER_NAME) && run=/run/user/\$uid && \
+    his=\$(ls -t \$run/hypr 2>/dev/null | head -1) && way=\$(cd \$run && ls -d wayland-[0-9] | head -1) && \
+    exec runuser -u $USER_NAME -- env XDG_RUNTIME_DIR=\$run WAYLAND_DISPLAY=\$way \
+      HYPRLAND_INSTANCE_SIGNATURE=\$his DBUS_SESSION_BUS_ADDRESS=unix:path=\$run/bus \
+      PATH=/home/$USER_NAME/.nix-profile/bin:/usr/local/bin:/usr/bin:/bin sh -s" <<<"$1"
+}
+
+# wait_for DESC SECONDS CMD: until CMD succeeds in the session.
+wait_for() {
+  local desc="$1" secs="$2" cmd="$3" end
+  end=$((SECONDS + secs))
+  until as_user "$cmd" >/dev/null 2>&1; do
+    ((SECONDS < end)) || fail "$desc: not within ${secs}s"
+    sleep 1
+  done
+}
+
+# Scripts for as_user: whether the menu's layer is mapped, and how many
+# windows of a class are open.
+menu_shown() { echo "hyprctl layers -j | grep -Eq '\"namespace\": ?\"kotodama\"'"; }
+windows_of() { echo "hyprctl clients -j | grep -Ec '\"class\": ?\"$1\"' || true"; }
+
+wait_for "Hyprland answers" 120 "hyprctl version"
+# `kotodama check` exits 2 only when it can't reach the Daemon.
+wait_for "the Daemon answers" 60 "kotodama check; [ \$? -ne 2 ]"
+as_user "! $(menu_shown)" || fail "the menu is open before SUPER + Space"
+before="$(as_user "$(windows_of "$APP")")"
+ok "session up: Hyprland, the Daemon, the menu closed, $before $APP window(s)"
+
+"$RUN" key meta_l-spc
+wait_for "SUPER + Space shows the menu" 10 "$(menu_shown)"
+"$RUN" shot menu-open >/dev/null
+ok "SUPER + Space opened the menu"
+
+"$RUN" type "$APP"
+sleep 1
+"$RUN" shot menu-typed >/dev/null
+"$RUN" key ret
+wait_for "Enter launches $APP" 20 "[ \$($(windows_of "$APP")) -gt $before ]"
+wait_for "the menu closes after the launch" 5 "! $(menu_shown)"
+"$RUN" shot menu-launched >/dev/null
+ok "typing '$APP' and Enter launched it and closed the menu"
+as_user "hyprctl dispatch closewindow class:$APP" >/dev/null
+
+"$RUN" key meta_l-spc
+wait_for "SUPER + Space shows the menu again" 10 "$(menu_shown)"
+"$RUN" type "6*7"
+sleep 1
+"$RUN" shot menu-calculator >/dev/null
+"$RUN" key ret
+wait_for "Enter copies the calculator's answer" 10 "[ \"\$(wl-paste -n)\" = 42 ]"
+ok "6*7 answered, Enter copied 42"
+
+"$RUN" key meta_l-f1
+wait_for "SUPER + F1 shows the menu" 10 "$(menu_shown)"
+"$RUN" shot menu-shortcuts >/dev/null
+# Each Esc steps back once: out of the View, out of the app, then closed.
+for _ in 1 2 3 4; do
+  as_user "$(menu_shown)" || break
+  "$RUN" key esc
+  sleep 0.5
+done
+wait_for "Esc closes the menu" 5 "! $(menu_shown)"
+ok "SUPER + F1 opened the menu (check menu-shortcuts.webp for the Shortcuts View), Esc closed it"

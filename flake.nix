@@ -23,6 +23,16 @@
       url = "github:SuplenC/kubaos-wallpapers/8a8465973564bfefd5abbfe82339cd645464ce92";
       flake = false;
     };
+
+    # The Command menu (SuplenC/kotodama), pinned to a commit: bump the rev,
+    # then `nix flake update kotodama`. It builds from this flake's nixpkgs,
+    # so its QML module is built against the Qt that the curated Quickshell
+    # loads it into.
+    kotodama = {
+      url = "github:SuplenC/kotodama/40d3fc7284b09d58c24e12b88ae4124c4f838d82";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.home-manager.follows = "home-manager";
+    };
   };
 
   outputs =
@@ -43,7 +53,14 @@
       # The curated set (home/curated.nix), from this flake's nixpkgs.
       packages = forAllSystems (pkgs: import ./home/curated.nix { inherit pkgs inputs; });
 
-      homeModules.default = ./home;
+      # KubaOS's home, with Kotodama's module (`programs.kotodama`) for the
+      # Command menu (home/menu.nix).
+      homeModules.default = {
+        imports = [
+          ./home
+          inputs.kotodama.homeModules.default
+        ];
+      };
 
       # Store path of the wallpaper sets, for `nix eval --raw .#lib.wallpapers`
       # (system/lib.sh, link_wallpapers).

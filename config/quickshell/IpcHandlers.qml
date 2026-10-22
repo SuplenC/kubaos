@@ -7,14 +7,6 @@ import qs.services
 // The table in docs/CONTRACTS.md is the source of truth; keep them in sync.
 Scope {
     IpcHandler {
-        target: "launcher"
-
-        function toggle(): void {
-            Panels.toggle("launcher");
-        }
-    }
-
-    IpcHandler {
         target: "controlcenter"
 
         function toggle(): void {

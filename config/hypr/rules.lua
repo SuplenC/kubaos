@@ -108,3 +108,5 @@ hl.layer_rule({ match = { namespace = "^hyprpicker$" }, animation = "fade" })
 hl.layer_rule({ match = { namespace = "^qs-frame$" }, blur = true, ignore_alpha = 0.5, no_anim = true })
 hl.layer_rule({ match = { namespace = "^qs-(wallpaper|exclusion)$" }, no_anim = true })
 hl.layer_rule({ match = { namespace = "^qs-polkit$" }, animation = "fade" })
+-- The Command menu (config/quickshell/modules/menu/Menu.qml), translucent like the frame.
+hl.layer_rule({ match = { namespace = "^kotodama$" }, blur = true, ignore_alpha = 0.5, animation = "popin 90%" })
