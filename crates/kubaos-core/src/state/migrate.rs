@@ -2,7 +2,9 @@
 //! `kubaos.stateDir = ./kubaos.d;`, which KubaOS's home module reads.
 //!
 //! It follows the rules for changing a user file: it only adds, running it again changes nothing,
-//! and it backs the file up before writing. A `home.nix` whose last line is not the closing `}` of
+//! and it backs the file up before writing. The backup goes to KubaOS's state folder
+//! (`~/.local/state/kubaos/backups/`), outside the user flake, so that it never becomes part of the
+//! flake's source in the Nix store. A `home.nix` whose last line is not the closing `}` of
 //! its attribute set is left alone, with an error asking the user to add the line by hand.
 //!
 //! # Owns
@@ -109,13 +111,13 @@ pub fn wire(text: &str) -> Option<String> {
 }
 
 /// Adds the setting to the `home.nix` at `path` unless it is already there, backing the file up
-/// first as `home.nix.kubaos.bak` (or `.1`, `.2`, … when that exists).
+/// first into `backups` (`Paths::backups`) as `home.nix.bak` (or `.1`, `.2`, … when that exists).
 ///
 /// # Errors
 ///
 /// [`MigrateError`] when the file cannot be read, has no place for the line, or the backup or the
 /// write fails. The file is unchanged in every case.
-pub fn wire_home_nix(path: &Path) -> Result<Migration, MigrateError> {
+pub fn wire_home_nix(path: &Path, backups: &Path) -> Result<Migration, MigrateError> {
     let text = fs::read_to_string(path).map_err(|source| MigrateError::Read {
         path: path.to_path_buf(),
         source,
@@ -128,7 +130,7 @@ pub fn wire_home_nix(path: &Path) -> Result<Migration, MigrateError> {
             path: path.to_path_buf(),
         });
     };
-    let backup = back_up(path, &text)?;
+    let backup = back_up(path, backups, &text)?;
     write_atomic(path, &wired).map_err(|source| MigrateError::Write {
         path: path.to_path_buf(),
         source,
@@ -136,17 +138,17 @@ pub fn wire_home_nix(path: &Path) -> Result<Migration, MigrateError> {
     Ok(Migration::Wired { backup })
 }
 
-/// Writes `text` to the first free backup name next to `path`, never replacing an earlier backup.
-fn back_up(path: &Path, text: &str) -> Result<PathBuf, MigrateError> {
-    let base = {
-        let mut name = path.as_os_str().to_owned();
-        name.push(".kubaos.bak");
-        PathBuf::from(name)
-    };
+/// Writes `text` to the first free backup name for `path` in `backups`, never replacing an earlier
+/// backup.
+fn back_up(path: &Path, backups: &Path, text: &str) -> Result<PathBuf, MigrateError> {
     let backup_err = |source| MigrateError::Backup {
         path: path.to_path_buf(),
         source,
     };
+    let mut name = path.file_name().unwrap_or("home.nix".as_ref()).to_owned();
+    name.push(".bak");
+    let base = backups.join(name);
+    fs::create_dir_all(backups).map_err(backup_err)?;
     for n in 0u32.. {
         let candidate = if n == 0 {
             base.clone()

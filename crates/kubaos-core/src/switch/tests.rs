@@ -25,16 +25,29 @@ struct FakeHost {
     /// The switches that fail, counted from 1.
     failing: Vec<usize>,
     refuse_to_start: bool,
+    /// Every worker unit is gone, as when its program failed to start.
+    units_dead: bool,
+    /// The units asked about.
+    checked: Mutex<Vec<String>>,
     switch_time: Duration,
 }
 
 impl Host for FakeHost {
+    fn worker_unit(&self, job: &JobId) -> String {
+        format!("fake-{job}")
+    }
+
     fn start_worker(&self, job: &JobId) -> Result<(), HostError> {
         if self.refuse_to_start {
             return Err(HostError::exited("systemd-run", Some(1)));
         }
         self.started.lock().unwrap().push(job.clone());
         Ok(())
+    }
+
+    fn worker_alive(&self, unit: &str) -> Result<bool, HostError> {
+        self.checked.lock().unwrap().push(unit.to_owned());
+        Ok(!self.units_dead)
     }
 
     fn switch(&self, mut log: File) -> Result<(), HostError> {
@@ -289,4 +302,132 @@ fn the_systemd_host_runs_the_worker_in_a_transient_user_unit() {
             "/home/kuba/.config/kubaos/home"
         ]
     );
+}
+
+fn dead_units() -> FakeHost {
+    FakeHost {
+        units_dead: true,
+        ..FakeHost::default()
+    }
+}
+
+#[test]
+fn a_submitted_job_names_its_worker_unit() {
+    let tmp = tempfile::tempdir().unwrap();
+    let queue = Queue::new(tmp.path());
+
+    let id = queue.submit(&FakeHost::default()).unwrap();
+
+    assert_eq!(queue.job(&id).unwrap().unit, Some(format!("fake-{id}")));
+}
+
+#[test]
+fn a_queued_job_whose_worker_unit_died_is_failed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let queue = Queue::new(tmp.path());
+    let host = dead_units();
+    let id = queue.submit(&host).unwrap();
+
+    let reaped = queue.reap(&host).unwrap();
+
+    assert_eq!(reaped, std::slice::from_ref(&id));
+    let job = queue.job(&id).unwrap();
+    assert_eq!(job.state, JobState::Failed);
+    let error = job.error.unwrap();
+    assert!(error.contains(&format!("fake-{id}")), "{error}");
+    assert!(job.finished_at.is_some());
+}
+
+#[test]
+fn a_queued_job_whose_worker_unit_is_alive_stays_queued() {
+    let tmp = tempfile::tempdir().unwrap();
+    let queue = Queue::new(tmp.path());
+    let host = FakeHost::default();
+    let id = queue.submit(&host).unwrap();
+
+    let reaped = queue.reap(&host).unwrap();
+
+    assert!(reaped.is_empty());
+    assert_eq!(queue.job(&id).unwrap().state, JobState::Queued);
+}
+
+#[test]
+fn a_queued_job_stays_queued_while_another_worker_holds_the_lock() {
+    let tmp = tempfile::tempdir().unwrap();
+    let queue = Queue::new(tmp.path());
+    let host = dead_units();
+    let id = queue.submit(&host).unwrap();
+    let lock = queue.lock().unwrap();
+
+    let reaped = queue.reap(&host).unwrap();
+    drop(lock);
+
+    assert!(reaped.is_empty(), "the worker holding the lock runs every queued job");
+    assert_eq!(queue.job(&id).unwrap().state, JobState::Queued);
+}
+
+#[test]
+fn a_job_run_in_the_calling_process_is_never_reaped() {
+    let tmp = tempfile::tempdir().unwrap();
+    let queue = Queue::new(tmp.path());
+    let host = dead_units();
+    let id = queue.enqueue().unwrap();
+
+    queue.reap(&host).unwrap();
+
+    assert_eq!(queue.job(&id).unwrap().state, JobState::Queued);
+    assert!(host.checked.lock().unwrap().is_empty());
+}
+
+#[test]
+fn following_a_job_whose_worker_unit_died_ends_with_it_failed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let queue = Queue::new(tmp.path());
+    let host = dead_units();
+    let id = queue.submit(&host).unwrap();
+
+    let job = queue
+        .follow_worker(&id, Duration::from_millis(10), &host, |_| {})
+        .unwrap();
+
+    assert_eq!(job.state, JobState::Failed);
+}
+
+#[test]
+fn a_job_file_from_before_worker_units_were_recorded_still_reads() {
+    let tmp = tempfile::tempdir().unwrap();
+    let queue = Queue::new(tmp.path());
+    std::fs::write(
+        tmp.path().join("1-2-3.json"),
+        r#"{"id":"1-2-3","state":"queued","queued_at":1,"started_at":null,"finished_at":null,"error":null}"#,
+    )
+    .unwrap();
+
+    let job = queue.job(&JobId::parse("1-2-3").unwrap()).unwrap();
+
+    assert_eq!(job.unit, None);
+}
+
+#[test]
+fn the_systemd_host_asks_systemd_for_the_units_state() {
+    let host = super::Systemd::new("/usr/bin/kubaos", "/f");
+
+    assert_eq!(host.worker_unit(&JobId::parse("7-8-9").unwrap()), "kubaos-switch-7-8-9");
+    assert_eq!(
+        super::Systemd::unit_state_command("kubaos-switch-7-8-9"),
+        [
+            "systemctl",
+            "--user",
+            "show",
+            "--property=ActiveState",
+            "--value",
+            "kubaos-switch-7-8-9"
+        ]
+    );
+    for alive in ["active", "activating", "deactivating", "reloading"] {
+        assert!(super::is_alive_state(alive), "{alive}");
+    }
+    for dead in ["inactive", "failed", ""] {
+        assert!(!super::is_alive_state(dead), "{dead:?}");
+    }
 }

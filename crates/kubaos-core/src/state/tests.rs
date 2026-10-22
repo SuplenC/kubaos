@@ -123,6 +123,20 @@ fn paths_follow_the_xdg_variables_and_fall_back_to_home() {
 }
 
 #[test]
+fn paths_name_the_user_layer_the_projects_root_and_the_backups() {
+    let defaults = Paths::from_vars(Some("/home/kuba".into()), None, None).unwrap();
+    let custom = Paths::from_vars(Some("/home/kuba".into()), Some("/cfg".into()), Some("/st".into())).unwrap();
+
+    assert_eq!(defaults.home(), Path::new("/home/kuba"));
+    assert_eq!(defaults.user_layer(), Path::new("/home/kuba/.config/kubaos"));
+    assert_eq!(defaults.projects_root(), Path::new("/home/kuba/Projects"));
+    assert_eq!(defaults.backups(), Path::new("/home/kuba/.local/state/kubaos/backups"));
+    assert_eq!(custom.user_layer(), Path::new("/cfg/kubaos"));
+    assert_eq!(custom.backups(), Path::new("/st/kubaos/backups"));
+    assert!(!defaults.backups().starts_with(defaults.flake()));
+}
+
+#[test]
 fn paths_need_a_home() {
     assert!(Paths::from_vars(None, None, None).is_err());
 }

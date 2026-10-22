@@ -13,6 +13,7 @@
     ./secrets.nix
     ./shell.nix
     ./state.nix
+    ./suites.nix
     ./terminal.nix
     ./theme.nix
   ];

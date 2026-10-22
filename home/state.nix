@@ -5,7 +5,9 @@
 # reach this module through the flake's own source.
 #
 # packages.toml and every suites/<name>.toml may list `packages`, attribute
-# paths into the user's pkgs; the home gets the union. Each generation also
+# paths into the user's pkgs; the home gets the union. Each suites/<name>.toml
+# also turns on the Suite <name> (suites.nix) with the file's `version` and
+# `extras`. Each generation also
 # links its copy of the directory to ~/.local/share/kubaos/kubaos.d, which is
 # what a rollback restores the directory from.
 {
@@ -29,6 +31,19 @@ let
       lib.attrNames (lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".toml" name) entries)
     );
   files = lib.optional (builtins.pathExists (dir + "/packages.toml")) (dir + "/packages.toml") ++ tomlFiles "suites";
+
+  suites = lib.listToAttrs (
+    map (
+      file:
+      let
+        toml = readToml file;
+      in
+      lib.nameValuePair (lib.removeSuffix ".toml" (baseNameOf file)) {
+        version = toml.version or null;
+        extras = toml.extras or [ ];
+      }
+    ) (tomlFiles "suites")
+  );
 
   # name -> the files that list it, so a missing package names its file.
   listed = lib.foldl' (
@@ -58,6 +73,7 @@ in
 
   config = lib.mkIf present {
     home.packages = lib.mapAttrsToList package listed;
+    kubaos.suites = suites;
     xdg.dataFile."kubaos/kubaos.d".source = dir;
   };
 }

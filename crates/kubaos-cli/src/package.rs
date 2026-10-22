@@ -7,7 +7,8 @@
 //!   kubaos package restore GENERATION
 //!   kubaos try NAME
 //!
-//! `add` and `remove` first wire `home.nix` to the state directory if it isn't yet, backing it up.
+//! `add` and `remove` first wire `home.nix` to the state directory if it isn't yet, backing it up
+//! to `~/.local/state/kubaos/backups/`.
 //! `try` opens `nix shell` with the package, in this terminal or a new one, and writes nothing.
 //! Exit codes: 0 ok, 1 the work failed, 2 usage.
 //!
@@ -131,22 +132,31 @@ enum Edit {
     Remove,
 }
 
-fn edit(paths: &Paths, names: &[String], how: Edit, no_switch: bool, mode: SwitchMode) -> ExitCode {
+/// Wires `home.nix` to the state directory unless it is already, as every command that edits the
+/// directory does first. Returns whether it changed the file, or the exit code of the failure.
+pub fn wire(paths: &Paths) -> Result<bool, ExitCode> {
     let home_nix = paths.home_nix();
     if !home_nix.is_file() {
-        return usage_error(format!("no user flake: {} is missing", home_nix.display()));
+        return Err(usage_error(format!("no user flake: {} is missing", home_nix.display())));
     }
-    let wired = match wire_home_nix(&home_nix) {
-        Ok(Migration::AlreadyWired) => false,
+    match wire_home_nix(&home_nix, &paths.backups()) {
+        Ok(Migration::AlreadyWired) => Ok(false),
         Ok(Migration::Wired { backup }) => {
             println!(
                 "wired {} to kubaos.d/ (backup: {})",
                 home_nix.display(),
                 backup.display()
             );
-            true
+            Ok(true)
         }
-        Err(e) => return report(e),
+        Err(e) => Err(report(e)),
+    }
+}
+
+fn edit(paths: &Paths, names: &[String], how: Edit, no_switch: bool, mode: SwitchMode) -> ExitCode {
+    let wired = match wire(paths) {
+        Ok(wired) => wired,
+        Err(code) => return code,
     };
     let packages = Packages::new(&paths.state_dir(), paths.edit_lock());
     let change = match how {

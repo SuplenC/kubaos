@@ -12,25 +12,34 @@
 //! - Reading every file of the state directory into what it declares ([`StateDir::declared`]).
 //! - Restoring the directory from a home-manager generation.
 //! - Wiring `home.nix` to the directory, in [`migrate`].
+//! - Keeping git's index in step with the directory when the user flake is a git repository, in
+//!   `git.rs`.
+//! - The edit lock and the atomic write every edit of the directory uses.
 //!
 //! # Not here
 //!
 //! - Editing `packages.toml`: `packages.rs`.
+//! - Writing and deleting Suite files: `suites.rs`.
 //! - Running the switch that applies the directory: `switch.rs`.
 //! - The Nix side: `home/state.nix`.
 
+mod git;
 pub mod migrate;
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::ffi::OsString;
 use std::fs;
+use std::fs::File;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process;
 
 use serde::Deserialize;
+
+pub use self::git::GitError;
+pub use self::git::GitSync;
 
 /// The state directory's name, inside the user flake.
 pub const DIR_NAME: &str = "kubaos.d";
@@ -42,9 +51,15 @@ pub const SUITES_DIR: &str = "suites";
 /// generation. `home/state.nix` links it as `~/.local/share/kubaos/kubaos.d`.
 pub const GENERATION_COPY: &str = "home-files/.local/share/kubaos/kubaos.d";
 
-/// Where the user flake, its state directory and the switch jobs live for one user.
+/// The Projects root, relative to the home.
+pub const PROJECTS_ROOT: &str = "Projects";
+
+/// Where the user flake, its state directory, the user layer and the switch jobs live for one
+/// user.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Paths {
+    home: PathBuf,
+    config: PathBuf,
     flake: PathBuf,
     state: PathBuf,
 }
@@ -82,7 +97,30 @@ impl Paths {
         Ok(Self {
             flake: config.join("kubaos/home"),
             state: state.join("kubaos"),
+            config,
+            home,
         })
+    }
+
+    /// The user's home.
+    pub fn home(&self) -> &Path {
+        &self.home
+    }
+
+    /// The user layer, `~/.config/kubaos`.
+    pub fn user_layer(&self) -> PathBuf {
+        self.config.join("kubaos")
+    }
+
+    /// The Projects root, `~/Projects`, where scaffolded projects go.
+    pub fn projects_root(&self) -> PathBuf {
+        self.home.join(PROJECTS_ROOT)
+    }
+
+    /// Where a migration backs up a user file before changing it: KubaOS's state folder, outside
+    /// the user flake, so a backup never becomes part of the flake's source.
+    pub fn backups(&self) -> PathBuf {
+        self.state.join("backups")
     }
 
     /// The user flake, `~/.config/kubaos/home`.
@@ -182,12 +220,12 @@ pub enum ReadError {
 }
 
 impl ReadError {
-    fn read(path: &Path) -> impl FnOnce(io::Error) -> Self {
+    pub(crate) fn read(path: &Path) -> impl FnOnce(io::Error) -> Self {
         let path = path.to_path_buf();
         move |source| Self::Read { path, source }
     }
 
-    fn parse(path: &Path) -> impl FnOnce(toml::de::Error) -> Self {
+    pub(crate) fn parse(path: &Path) -> impl FnOnce(toml::de::Error) -> Self {
         let path = path.to_path_buf();
         move |source| Self::Parse { path, source }
     }
@@ -215,6 +253,9 @@ pub enum RestoreError {
         #[source]
         source: io::Error,
     },
+    /// The directory is restored, but git's index could not be brought in step with it.
+    #[error("recording the restored state directory in git")]
+    Git(#[source] GitError),
 }
 
 impl StateDir {
@@ -229,9 +270,34 @@ impl StateDir {
         &self.root
     }
 
+    /// The user flake the directory is in: its parent.
+    pub fn flake(&self) -> &Path {
+        self.root.parent().unwrap_or(&self.root)
+    }
+
     /// `packages.toml`.
     pub fn packages_file(&self) -> PathBuf {
         self.root.join(PACKAGES_FILE)
+    }
+
+    /// `suites/`.
+    pub fn suites_dir(&self) -> PathBuf {
+        self.root.join(SUITES_DIR)
+    }
+
+    /// `suites/<name>.toml`, the file of one Suite.
+    pub fn suite_file(&self, name: &str) -> PathBuf {
+        self.suites_dir().join(format!("{name}.toml"))
+    }
+
+    /// Makes git's index list the directory as it is on disk, when the user flake is in a git
+    /// work tree: every edit of the directory ends with this, or Nix would not see a new file.
+    ///
+    /// # Errors
+    ///
+    /// [`GitError`] when a git command fails.
+    pub fn sync_git(&self) -> Result<GitSync, GitError> {
+        git::sync(self.flake(), &self.root)
     }
 
     /// Reads `packages.toml` and every `suites/*.toml`. A missing directory or file declares
@@ -255,8 +321,8 @@ impl StateDir {
     }
 
     /// The Suite files, `suites/<name>.toml`, by name.
-    fn suite_files(&self) -> Result<Vec<(String, PathBuf)>, ReadError> {
-        let dir = self.root.join(SUITES_DIR);
+    pub(crate) fn suite_files(&self) -> Result<Vec<(String, PathBuf)>, ReadError> {
+        let dir = self.suites_dir();
         let entries = match fs::read_dir(&dir) {
             Ok(entries) => entries,
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -316,7 +382,9 @@ impl StateDir {
             Err(e) => return Err(swap_err(e)),
         }
         fs::rename(&fresh, &self.root).map_err(swap_err)?;
-        remove_dir_if_present(&old).map_err(swap_err)
+        remove_dir_if_present(&old).map_err(swap_err)?;
+        self.sync_git().map_err(RestoreError::Git)?;
+        Ok(())
     }
 
     /// A working directory next to the state directory, hidden and outside it.
@@ -348,6 +416,17 @@ pub(crate) fn write_atomic(path: &Path, contents: &str) -> io::Result<()> {
     fs::rename(&tmp, path).inspect_err(|_| {
         let _ = fs::remove_file(&tmp);
     })
+}
+
+/// Takes the lock at `path`, made with its folder when missing, held until the returned file is
+/// dropped.
+pub(crate) fn lock_file(path: &Path) -> io::Result<File> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let file = File::options().create(true).truncate(false).write(true).open(path)?;
+    file.lock()?;
+    Ok(file)
 }
 
 fn remove_dir_if_present(path: &Path) -> io::Result<()> {
