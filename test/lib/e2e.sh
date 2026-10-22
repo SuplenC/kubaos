@@ -454,29 +454,122 @@ menu_stop() {
   session_stop
 }
 
-# The Command menu: Kotodama's Daemon, started by hand as its socket unit
-# would, and the menu inside KubaOS's Quickshell. `kotodama toggle` succeeds
-# only when a menu answers it. KubaOS's settings reach the Daemon, which finds
-# nothing wrong with them. The container has no logind and no Hyprland, so
-# what an Extension reports (`extension <name>: ...`) is listed, not fatal.
-c_menu() {
-  local out bad=0 log="$LOGS/kotodamad.log" daemon
-  session_start sway 1280x720 1
-  : >"$log"
-  chown "$USER_NAME:" "$log"
-  in_session "exec kotodamad >$log 2>&1" &
-  daemon=$!
-  if ! qs_start; then
+# menu_wtype: wtype, the menu's keyboard, from the flake's nixpkgs: the root
+# warm made, or built now.
+menu_wtype() {
+  local root="$CACHE/roots/wtype"
+  [[ -x $root/bin/wtype ]] ||
+    as_user "$NIX_BIN/nix" build --out-link "$root" --inputs-from "$REPO" nixpkgs#wtype >/dev/null 2>&1
+  [[ -x $root/bin/wtype ]] && echo "$root/bin/wtype"
+}
+
+# menu_example [--remove]: Kotodama's example shell Extension, from the
+# Kotodama in flake.lock, as the user's own Extension: bookmarks in a list
+# View, a timer with its forms, its job and its progress View, an app with an
+# intro card. --remove takes it away again.
+menu_example() {
+  local src ext="$USER_HOME/.config/kotodama/extensions"
+  rm -rf "$ext/shell-example" "$USER_HOME/.config/kotodama/shell-example.toml"
+  [[ ${1:-} == --remove ]] && return 0
+  src="$(as_user "$NIX_BIN/nix" eval --raw --impure \
+    --expr "(builtins.getFlake \"path:$REPO\").inputs.kotodama.outPath")" || return 1
+  as_user mkdir -p "$ext"
+  as_user cp -r "$src/examples/shell-extension" "$ext/shell-example"
+  as_user chmod -R u+w "$ext/shell-example"
+  as_user tee "$USER_HOME/.config/kotodama/shell-example.toml" >/dev/null <<'EOF'
+[extensions.shell-example]
+bookmarks = [
+  { title = "Kotodama", url = "https://github.com/SuplenC/kotodama" },
+  { title = "Quickshell", url = "https://quickshell.org" },
+  { title = "Hyprland wiki", url = "https://wiki.hypr.land" },
+]
+EOF
+}
+
+# menu_up SIZE: a session at SIZE, the Daemon (its job in MENU_DAEMON) and
+# Quickshell with the menu's probe, which logs `menu probe: ...` lines
+# (config/quickshell/modules/menu/Probe.qml).
+menu_up() {
+  session_start sway "$1" 1
+  in_session "exec kotodamad >>$LOGS/kotodamad.log 2>&1" &
+  MENU_DAEMON=$!
+  if ! qs_start KUBAOS_MENU_PROBE=1; then
     echo "FAIL Quickshell didn't load:"
     tail -30 "$QS_LOG"
-    menu_stop "$daemon"
     return 1
   fi
   sleep 3
+}
 
-  expect_ok "kotodama toggle opens the menu in Quickshell" in_session 'kotodama toggle' || bad=1
-  expect_ok "kotodama toggle closes it" in_session 'kotodama toggle' || bad=1
+# menu_step DESC PATTERN CMD [SECONDS]: CMD in the session, then wait up to
+# SECONDS (3) for the probe to log a line matching PATTERN (ERE).
+menu_step() {
+  local desc="$1" pattern="$2" mark
+  mark=$(($(wc -l <"$QS_LOG") + 1))
+  in_session "$3" >/dev/null 2>&1
+  for _ in $(seq $((${4:-3} * 10))); do
+    if tail -n +"$mark" "$QS_LOG" | grep -q -E -- "menu probe: $pattern"; then
+      echo "ok   $desc"
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "FAIL $desc: the probe logged no /$pattern/; it logged:"
+  tail -n +"$mark" "$QS_LOG" | grep -o 'menu probe: .*' | tail -5 | sed 's/^/     /'
+  return 1
+}
 
+# menu_layout PANE MIN_ROWS: the window's last layout has the pane or not, and
+# at least MIN_ROWS rows.
+menu_layout() {
+  local line rows
+  line="$(grep -o 'menu probe: layout .*' "$QS_LOG" | tail -1)"
+  rows="$(sed -n 's/.* rows=\([0-9]*\).*/\1/p' <<<"$line")"
+  if [[ $line == *" pane=$1" && ${rows:-0} -ge $2 ]]; then
+    echo "ok   ${line#menu probe: }"
+  else
+    echo "FAIL want pane=$1 and at least $2 rows, got '${line#menu probe: }'"
+    return 1
+  fi
+}
+
+# menu_latency: the median of Kotodama's latency (query to Results in the
+# model) and of query to the frame with them on screen, over what was typed.
+menu_latency() {
+  local frames
+  frames="$(grep -o 'menu probe: frame .*' "$QS_LOG")"
+  [[ -n $frames ]] || { echo "FAIL the probe timed no frames"; return 1; }
+  median() { grep -o "$1=[0-9]*" | cut -d= -f2 | sort -n | awk '{a[NR]=$1} END {print a[int((NR+1)/2)]}'; }
+  echo "ok   $(wc -l <<<"$frames") keystrokes: median latency_us=$(median latency_us <<<"$frames") pixels_ms=$(median pixels_ms <<<"$frames")"
+}
+
+# The Command menu: Kotodama's Daemon, started by hand as its socket unit
+# would, and KubaOS's own menu inside Quickshell, driven by wtype. `kotodama
+# toggle` succeeds only when a menu answers it. KubaOS's settings reach the
+# Daemon, which finds nothing wrong with them. The container has no logind and
+# no Hyprland, so what an Extension reports (`extension <name>: ...`) is
+# listed, not fatal, and the Shortcuts View is test/vm/menu-check's.
+#
+# At 1280x800 the menu has no detail pane and more rows than Kotodama's own
+# menu (seven); at 1920x1080 it has the pane, and every View is walked through
+# with Kotodama's example shell Extension. A new virtual keyboard loses its
+# first key while the compositor takes its keymap, so each wtype waits 200 ms.
+c_menu() {
+  local out bad=0 log="$LOGS/kotodamad.log" key
+  : >"$log"
+  chown "$USER_NAME:" "$log"
+  key="$(menu_wtype)" || { echo "FAIL no wtype from the flake's nixpkgs"; return 1; }
+  key="$key -s 200"
+  menu_example || { echo "FAIL Kotodama's example Extension isn't in flake.lock's Kotodama"; return 1; }
+
+  menu_up 1280x800 || { menu_stop "$MENU_DAEMON"; return 1; }
+  menu_step "kotodama toggle opens the menu in Quickshell" 'visible true' 'kotodama toggle' || bad=1
+  menu_layout false 8 || bad=1
+  menu_step "kotodama toggle closes it" 'visible false' 'kotodama toggle' || bad=1
+  [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors at 1280x800:"; qs_problems | head; bad=1; }
+  menu_stop "$MENU_DAEMON"
+
+  menu_up 1920x1080 || { menu_stop "$MENU_DAEMON"; return 1; }
   out="$(in_session 'kotodama check' 2>&1 || true)"
   printf '%s\n' "$out" | sed 's/^/     kotodama check: /'
   if grep -v -e '^extension ' -e '^No problems\.$' <<<"$out" | grep -q .; then
@@ -496,10 +589,38 @@ c_menu() {
   done
   ((bad)) || echo "ok   the apps' hidden, renamed apps and terminal, and the binds in the search, come from kubaos.toml"
 
+  menu_step "kotodama toggle opens the menu" 'visible true' 'kotodama toggle' || bad=1
+  menu_layout true 8 || bad=1
+  menu_step "typing searches, and the Results reach the screen" 'frame query="tim" ' "$key -d 120 tim" || bad=1
+  menu_step "Ctrl+K opens the Action panel on Timer" 'actions [2-9]' "$key -M ctrl -k k -m ctrl" || bad=1
+  menu_step "Esc closes only the Action panel" 'actions 0' "$key -k Escape" || bad=1
+  menu_step "Enter on Timer pushes its form" 'view kind=form title="Start timer" depth=1' "$key -k Return" || bad=1
+  menu_step "the form's Enter starts a job, shown in a progress View" 'view kind=progress title="2 second timer" .*job=running' \
+    "sleep 0.5 && $key -d 50 2 && $key -k Return" || bad=1
+  menu_step "the job runs to the end" 'view kind=progress .*job=succeeded' ':' 8 || bad=1
+  menu_step "Esc pops the View" 'view kind= title="" depth=0' "$key -k Escape" || bad=1
+  menu_step "kotodama open --view opens a list View" 'view kind=list title="Bookmarks" depth=1' \
+    'kotodama open --view shell-example/bookmarks' || bad=1
+  menu_step "the list View's filter narrows it" 'listed 1$' "$key -d 50 quick" || bad=1
+  menu_step "Esc clears the filter first" 'listed 3$' "$key -k Escape" || bad=1
+  menu_step "Esc again leaves the list View" 'view kind= title="" depth=0' "$key -k Escape" || bad=1
+  menu_step "kotodama open --app enters an app, with its intro card" 'intro ".+"' 'kotodama open --app shell' || bad=1
+  menu_step "Backspace with nothing typed leaves the app" 'scope ""' "$key -k BackSpace" || bad=1
+  menu_step "Esc clears the query" 'frame query="" ' "$key -k Escape" || bad=1
+  menu_step "Enter on Power Off asks first" 'confirming "Power Off\? ' \
+    "$key -d 50 'power off' && sleep 1 && $key -k Return" || bad=1
+  menu_step "Esc cancels the confirmation" 'confirming ""' "$key -k Escape" || bad=1
+  menu_step "Forget on Timer leaves a Toast" 'toast ".+"' \
+    "$key -k Escape && $key -d 50 timer && sleep 1 && $key -M ctrl -M shift -k BackSpace -m shift -m ctrl" 5 || bad=1
+  menu_step "Ctrl+Z undoes it" 'toast ""' "$key -M ctrl -k z -m ctrl" 5 || bad=1
+  menu_step "Esc clears, and Esc again closes the menu" 'visible false' "$key -k Escape && sleep 0.5 && $key -k Escape" || bad=1
+  menu_latency || bad=1
+
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
   if ((bad)); then tail -20 "$log"; fi
-  menu_stop "$daemon"
-  ((bad)) || echo "ok   the menu answers kotodama toggle and takes KubaOS's settings"
+  menu_stop "$MENU_DAEMON"
+  menu_example --remove
+  ((bad)) || echo "ok   the menu answers kotodama toggle, takes KubaOS's settings and shows every View"
   return "$bad"
 }
 

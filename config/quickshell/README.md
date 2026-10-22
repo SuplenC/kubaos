@@ -7,12 +7,12 @@ KubaOS's desktop shell: my own, for Hyprland, written in QML on [Quickshell](htt
 Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dots/shell). Every screen gets a frame: the bar along the top and a thin border on the other three edges, with rounded inner corners. Panels are not floating cards. They grow out of the frame's edges and meet it through concave fillets, so the frame and every open panel read as one surface with one soft shadow. The colors come from the wallpaper (matugen, `scheme-fidelity`), which keeps the photo's own neon hue in the accents: amber and cyan on the Shinjuku street, violet and gold at purple hour.
 
 - **Type:** Geist for the interface, with tabular figures for anything that ticks. M PLUS 1 for the few Japanese accents: the weekday kanji next to the bar clock, 曜日 in the control center, and 東京 on the lock screen. Material Symbols Rounded for icons, whose `FILL` axis animates on toggles.
-- **Motion:** Material 3 curves (`Theme.anim`). Things that appear use the "spatial" curve, which decelerates in with a slight overshoot (450 ms). Things that leave accelerate out, quicker (300 ms). Opening a panel animates its depth, and the content rides on its leading edge, so it slides out from under the frame instead of fading in place. List rows cascade in (22 ms stagger). Selection highlights, tab indicators and the workspace indicator slide. The workspace indicator stretches: its leading edge moves first and the trailing edge follows.
+- **Motion:** Material 3 curves (`Theme.anim`). Things that appear use the "spatial" curve, which decelerates in with a slight overshoot (450 ms). Things that leave accelerate out, quicker (300 ms). Opening a panel animates its depth, and the content rides on its leading edge, so it slides out from under the frame instead of fading in place. List rows cascade in (22 ms stagger). Selection highlights, tab indicators and the workspace indicator slide. The workspace indicator stretches: its leading edge moves first and the trailing edge follows. The Command menu has its own, quicker set (`motion` in `modules/menu/MenuLook.qml`, after Kōbō's `reveal.rs`): a 220 ms glide for the highlight, moving rows and Views sliding in, 120 ms fades, 220 ms in and 120 ms out for the window. What a keystroke changes shows at once, never animated, so typing never waits on a frame.
 - **Placement:**
 
   | Panel | Position |
   |---|---|
-  | Command menu (Kotodama) | Its own window, centred a fifth of the way down |
+  | Command menu (Kotodama) | Its own window on the focused screen, centred, with two fifths of the free height above it. Its width, rows and type follow the screen; on screens at least 1560 logical pixels wide it has a detail pane |
   | Control center | Side sheet on the right |
   | Power menu | Column on the right edge |
   | Wallpaper picker | Rises from the bottom |
@@ -85,7 +85,10 @@ modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)
   bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, Status, RecordingIndicator
-  menu/                 Menu: Kotodama's Command menu window in the theme's colors
+  menu/                 Menu: the Command menu on KotodamaSearch. MenuLook (sizes for the screen,
+                        motion), ResultRow, DetailPane + PaneContent, ActionPanel, FormView,
+                        ProgressView, DetailView, IntroCard, JobBar, KeyHints, Keycap,
+                        Probe (test-only timing and state lines)
   controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history
   notifications/        Popups, NotificationCard
   osd/                  volume / brightness OSD
@@ -115,7 +118,7 @@ Imports use Quickshell's module paths: `import qs.services`, `import qs.componen
 
 Every panel works without a mouse. Esc closes it.
 
-- Command menu (SUPER + Space, `kotodama toggle`): type to search apps, projects, scripts and windows, Up/Down to move, Enter to run. A sum typed is answered in the list; Enter copies the answer. SUPER + F1 opens it on the Shortcuts View. Its config is `config/kotodama/kubaos.toml`, with your changes in `~/.config/kubaos/kotodama/user.toml`.
+- Command menu (SUPER + Space, `kotodama toggle`): type to search apps, projects, scripts and windows, Up/Down to move, Enter to run. A sum typed is answered in the list; Enter copies the answer. SUPER + F1 opens it on the Shortcuts View. Ctrl+K opens the selected row's Actions, Tab enters an app, Esc steps back (the Action panel, a View, the query, then closed), Backspace with nothing typed leaves an app. Wide screens show the selected row in a detail pane: its Actions with their keys, and its hints. `"menuMotion": "fades"` in `~/.config/kubaos/quickshell/settings.json` turns its motion down to fades. Its config is `config/kotodama/kubaos.toml`, with your changes in `~/.config/kubaos/kotodama/user.toml`.
 - Control center: Tab/Shift+Tab move between controls, Enter/Space toggle a tile, h/l or arrows move sliders and tabs, 1-4 jump to a tab, j/k move in lists, Delete dismisses a notification.
 - Power menu: h/j/k/l, arrows or Tab, then Enter.
 - Wallpaper picker: h/j/k/l or arrows move (the desktop previews the selection), Tab switches folder, S opens Settings, Enter applies, Esc goes back to the current wallpaper.

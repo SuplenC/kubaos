@@ -2,9 +2,14 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 
-// User-facing knobs. Edit these instead of hunting through modules.
+// User-facing knobs. Edit these instead of hunting through modules. The ones
+// read from `user` can be set in the user layer too:
+// ~/.config/kubaos/quickshell/settings.json wins over the defaults here.
 Singleton {
+    id: root
+
     readonly property string home: Quickshell.env("HOME")
 
     // The wallpaper picker's tabs are `dot-theme folders`: the sets picked in
@@ -29,6 +34,10 @@ Singleton {
     // Label workspaces with kanji numerals (一 二 三) instead of digits.
     readonly property bool workspaceKanji: false
 
+    // The Command menu's motion: "full", or "fades" for fades alone, with
+    // nothing sliding or moving. The user layer's `menuMotion` wins.
+    readonly property string menuMotion: ["full", "fades"].includes(user.menuMotion) ? user.menuMotion : "full"
+
     // The Command menu's hidden and renamed apps, and the terminal for apps
     // with Terminal=true, are Kotodama's settings: config/kotodama/kubaos.toml,
     // and yours in ~/.config/kubaos/kotodama/user.toml.
@@ -48,4 +57,27 @@ Singleton {
 
     // Popup lifetime when the sender does not set one, in milliseconds.
     readonly property int notificationTimeout: 6000
+
+    // The user layer's settings.json: JSON, with whole-line // comments.
+    property var user: ({})
+
+    function readUser(text: string): void {
+        try {
+            const json = text.split("\n").filter(line => !line.trim().startsWith("//")).join("\n");
+            root.user = json.trim() === "" ? {} : JSON.parse(json);
+        } catch (e) {
+            console.warn(`Settings: ignoring unreadable ${userFile.path}: ${e}`);
+        }
+    }
+
+    FileView {
+        id: userFile
+
+        path: `${Quickshell.env("XDG_CONFIG_HOME") || `${root.home}/.config`}/kubaos/quickshell/settings.json`
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: root.readUser(text())
+        onLoadFailed: root.user = {}
+    }
 }
