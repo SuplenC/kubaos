@@ -8,13 +8,16 @@
 # The menu itself runs inside KubaOS's own Quickshell (config/quickshell/shell.qml).
 #
 # The KubaOS Extension (crates/kotodama-kubaos) isn't Bundled; it goes in
-# beside the Bundled ones, through the same run-time checks.
+# beside the Bundled ones. `strictExtensions` holds it to the run-time rules
+# Kotodama keeps for its own (no shell, no libstdc++ and so on), since it is
+# KubaOS's code and is meant to stay as small.
 { kubaosPkgs, ... }:
 {
   programs.kotodama = {
     enable = true;
     package = kubaosPkgs.kotodama;
     extraExtensions = [ kubaosPkgs.kotodama-kubaos ];
+    strictExtensions = true;
     # KubaOS's shell places `KotodamaMenu` itself. With the ready menu running
     # too, the keybind opens only one of the two and the other wastes memory.
     frontEnd.enable = false;

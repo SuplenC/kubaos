@@ -45,9 +45,9 @@ rustPlatform.buildRustPackage {
 
   # A Rust binary needs only libgcc_s from GCC, but the linker leaves a
   # runpath to GCC's `lib` output, with libstdc++ in it too. Kotodama's
-  # `withExtensions` refuses an Extension that refers to it, so the runpath
-  # points at GCC's `libgcc` output, which holds libgcc_s alone, as Kotodama
-  # does for its own Extensions.
+  # strict check (`strictExtensions`, home/menu.nix) refuses an Extension
+  # that refers to it, so the runpath points at GCC's `libgcc` output, which
+  # holds libgcc_s alone, as Kotodama does for its own Extensions.
   postFixup = ''
     bin=$out/share/kotodama/extensions/kubaos/kotodama-kubaos
     rpath=":$(patchelf --print-rpath $bin):"
