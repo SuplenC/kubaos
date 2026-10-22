@@ -66,8 +66,9 @@ libwayland-egl1
 libwayland-cursor0
 # The XCursor theme Kōbō draws its pointer from. cage 0.2.1 has no cursor-shape protocol,
 # so without a theme Kōbō cannot set any pointer image, and once it hides the pointer
-# for keyboard use it can never show it again.
-dmz-cursor-theme
+# for keyboard use it can never show it again. Bibata-Modern-Classic is the installed
+# system's cursor (`home/theme.nix`); `base-customize.sh` makes it the `default` theme.
+bibata-cursor-theme
 fontconfig
 fonts-inter
 fonts-dejavu-core
