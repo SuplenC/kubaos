@@ -9,6 +9,7 @@ serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 thiserror.workspace = true
+rustix = { version = "1", features = ["process", "fs"] }
 
 [features]
 # The test Suite (`suites::catalog::TEST`), for the test harness's `kubaos` build.
