@@ -752,7 +752,9 @@ cpu_pct() {
 has_bin() { [[ -x $USER_HOME/.nix-profile/bin/$1 ]]; }
 # kz CMD: CMD in a login zsh with Nix's own bin on PATH, which home-manager
 # runs `nix` from; the harness's login zsh doesn't source nix-daemon.sh.
-kz() { zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; $1"; }
+# /usr/local/bin goes first, so `kubaos` is /out/kubaos, built with the test
+# Suite, and not the home's.
+kz() { zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; PATH=/usr/local/bin:\$PATH; $1"; }
 
 # The state directory and switch jobs (issue #20), through the kubaos binary
 # test/run built (/out/kubaos) and a user flake like the installer's, with the
@@ -985,7 +987,7 @@ update_setup() {
   printf '#!/bin/sh\necho "$*" >>%s/apt-get.log\n' "$LOGS" >/usr/local/bin/apt-get
   chmod 0755 /usr/local/bin/apt-get
   ln -sfn /usr/local/bin/apt-get /usr/local/sbin/apt-get
-  rm -rf "$UPD_ORIGIN" "$UPD_WORK" /var/lib/kubaos /etc/kubaos /usr/share/kubaos-keys \
+  rm -rf "$UPD_ORIGIN" "$UPD_WORK" /var/lib/kubaos /etc/kubaos /usr/share/kubaos-keys /usr/bin/kubaos \
     "$UPD_SYSTEM_LOG" "$UPD_USER_LOG" "$UPD_STATE/migrations" "$UPD_STATE/locks" \
     "$UPD_STATE/update-available" "$UPD_STATE/notified"
   # Root reads kuba's origin and kuba reads root's checkout, as on the machine.
@@ -1020,7 +1022,15 @@ c_update_edge() {
     as_user tee "$UPD_WORK/migrations/system/2000000000-harness-system.sh" >/dev/null
   printf '#!/usr/bin/env bash\nset -euo pipefail\necho "$(id -un) $KUBAOS_USER_FLAKE" >>%s\n' "$UPD_USER_LOG" |
     as_user tee "$UPD_WORK/migrations/user/2000000000-harness-user.sh" >/dev/null
-  work add migrations && work commit -q -m 'test: a system and a user migration' && work push -q origin HEAD:main ||
+  # A new kubaos, told apart by its version.
+  as_user sed -i 's/^version = "0.1.0"$/version = "0.1.0-harness"/' "$UPD_WORK/Cargo.toml"
+  as_user awk -v v='version = "0.1.0-harness"' \
+    'prev ~ /^name = "(kubaos-core|kubaos-cli|kubaos-kobo|kotodama-kubaos)"$/ && /^version = / { $0 = v } { print; prev = $0 }' \
+    "$UPD_WORK/Cargo.lock" | as_user tee "$UPD_WORK/Cargo.lock.new" >/dev/null && as_user mv "$UPD_WORK/Cargo.lock.new" "$UPD_WORK/Cargo.lock"
+  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 4 ]] ||
+    { echo "FAIL bumping the workspace's version in Cargo.lock"; return 1; }
+  work add migrations Cargo.toml Cargo.lock && work commit -q -m 'test: a new kubaos, a system and a user migration' &&
+    work push -q origin HEAD:main ||
     { echo "FAIL pushing a commit to origin/main"; return 1; }
   head="$(work rev-parse HEAD)"
 
@@ -1049,6 +1059,14 @@ c_update_edge() {
     { echo "FAIL update-history or update-available after the update"; return 1; }
   grep -q '^upgrade --with-new-pkgs -y$' "$LOGS/apt-get.log" || { echo "FAIL apt-get upgrade never ran"; return 1; }
   echo "ok   kubaos update on edge: release at main's head, both migrations ran once, the record, history and lock follow"
+
+  out="$(zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; command -v kubaos; kubaos --version" 2>&1)"
+  [[ $out == "$USER_HOME/.nix-profile/bin/kubaos"$'\n'"kubaos 0.1.0-harness" ]] ||
+    { echo "FAIL the kubaos on PATH after the update isn't the release's:"; printf '%s\n' "$out"; return 1; }
+  out="$(as_user /usr/bin/kubaos --version 2>&1)"
+  [[ $out == "kubaos 0.1.0-harness" ]] && cmp -s /usr/bin/kubaos "$UPD_KUBAOS/install/firstboot/kubaos-launcher" ||
+    { echo "FAIL /usr/bin/kubaos isn't the launcher, or runs another kubaos: $out"; return 1; }
+  echo "ok   the release's kubaos is on PATH after the update, and /usr/bin/kubaos, now the launcher, runs it"
 
   out="$(kz 'kubaos update -y --foreground' 2>&1)" ||
     { echo "FAIL kubaos update, again"; printf '%s\n' "$out" | tail -30; return 1; }
@@ -1119,7 +1137,7 @@ c_rollback() {
 
 # update_restore: the machine as before the update checks.
 update_restore() {
-  rm -f /usr/local/bin/apt-get /usr/local/sbin/apt-get "$UPD_READY"
+  rm -f /usr/local/bin/apt-get /usr/local/sbin/apt-get /usr/bin/kubaos "$UPD_READY"
   git config --system --unset gpg.ssh.program || true
   if [[ -e $UPD_SAVED ]]; then rm -rf "$UPD_KUBAOS" && mv "$UPD_SAVED" "$UPD_KUBAOS"; fi
 }

@@ -13,6 +13,11 @@ const WRAPPER: &str = include_str!("../../../../../install/firstboot/kubaos-setu
 const POLICY: &str = include_str!("../../../../../install/firstboot/org.kubaos.setup.policy");
 const UNIT: &str = include_str!("../../../../../install/firstboot/kubaos-setup.service");
 const DESKTOP: &str = include_str!("../../../../../install/firstboot/kobo.desktop");
+const LAUNCHER: &str = include_str!("../../../../../install/firstboot/kubaos-launcher");
+
+/// Where the install copies its own `kubaos`, which `/usr/bin/kubaos` runs until the user's home
+/// has one.
+pub const INSTALLED_KUBAOS: &str = "/usr/lib/kubaos/kubaos";
 
 /// gnome-keyring's plaintext format: a keyring without a password is
 /// stored unencrypted and is never locked, so nothing ever asks for it.
@@ -70,11 +75,15 @@ impl Install<'_> {
             ));
             return Ok(());
         }
-        for (src, dst) in [(&cli, "/usr/bin/kubaos"), (&gui, "/usr/bin/kobo")] {
+        self.mkdir(&self.t("/usr/lib/kubaos"))?;
+        for (src, dst) in [(&cli, INSTALLED_KUBAOS), (&gui, "/usr/bin/kobo")] {
             let cmd =
                 Cmd::new("install").args(["-m", "0755", &src.display().to_string(), &self.ts(dst)]);
             self.sh(cmd)?;
         }
+        // A launcher, not the binary: every switch installs the release's `kubaos` in the home,
+        // and the launcher runs that one, so a new kubaos needs no copy here.
+        self.write("/usr/bin/kubaos", LAUNCHER, 0o755)?;
         self.write("/usr/lib/kubaos/setup-helper", HELPER, 0o755)?;
         self.write("/usr/bin/kubaos-setup", WRAPPER, 0o755)?;
         self.write(
@@ -109,6 +118,8 @@ mod tests {
         assert!(UNIT.contains("ConditionPathExists=!%S/kubaos/setup-done"));
         assert!(WRAPPER.contains("kobo --setup"));
         assert!(DESKTOP.contains("Exec=kubaos-setup"));
+        assert!(LAUNCHER.contains("/.nix-profile/bin/kubaos"));
+        assert!(LAUNCHER.contains(INSTALLED_KUBAOS));
         assert!(KEYRING.starts_with("[keyring]\n") && KEYRING.contains("lock-on-idle=false"));
     }
 }

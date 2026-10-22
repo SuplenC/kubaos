@@ -1,22 +1,31 @@
-# The daily update check: `kubaos update --check` asks origin, as the user and
-# without changing anything, whether the channel has a new release. It writes
+# The `kubaos` command and the daily update check.
+#
+# `kubaos` comes with the release (home/curated.nix): each switch puts the
+# release's build on PATH, and /usr/bin/kubaos runs it, so a fix to
+# `kubaos update` reaches the machine with the update that carries it.
+#
+# `kubaos update --check` asks origin, as the user and without changing
+# anything, whether the channel has a new release. It writes
 # ~/.local/state/kubaos/update-available, which the bar's marker and the
 # Command menu's "Update KubaOS" read, and sends one notification per release.
 # Package updates never notify: they wait for the next `kubaos update`.
 #
 # Persistent: a laptop that was off at the time checks when it next starts.
 # The randomized delay keeps every machine from asking GitHub at once.
+{ kubaosPkgs, lib, ... }:
 {
+  home.packages = [ kubaosPkgs.kubaos ];
+
   systemd.user.services.kubaos-update-check = {
     Unit = {
       Description = "Check for a new KubaOS release";
-      # A machine set up by hand has no installed CLI to ask with.
-      ConditionPathExists = "/usr/bin/kubaos";
+      # A machine set up by hand has no KubaOS checkout to update.
+      ConditionPathExists = "/usr/share/kubaos/.git";
       After = [ "network-online.target" ];
     };
     Service = {
       Type = "oneshot";
-      ExecStart = "/usr/bin/kubaos update --check";
+      ExecStart = "${lib.getExe kubaosPkgs.kubaos} update --check";
     };
   };
 
