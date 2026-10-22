@@ -80,6 +80,27 @@ vm-user-layer user="kuba":
 shots *flags="--hyprland":
     test/run shots {{flags}}
 
+# New migration: migrations/<system|user>/<unix time>-<slug>.sh, which kubaos update runs once per machine or user (docs/CONTRACTS.md, "Migrations").
+migration kind slug:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "{{kind}}" in
+      system) who="as root, after apt and before the home-manager switch" ;;
+      user) who="as the user, after the home-manager switch; KUBAOS_USER_FLAKE is their flake" ;;
+      *) echo "just migration: the kind is system or user, not {{kind}}" >&2; exit 2 ;;
+    esac
+    [[ "{{slug}}" =~ ^[a-z0-9][a-z0-9-]*$ ]] || { echo "just migration: the slug is a-z, 0-9 and -, not {{slug}}" >&2; exit 2; }
+    f="migrations/{{kind}}/$(date +%s)-{{slug}}.sh"
+    printf '%s\n' \
+      "#!/usr/bin/env bash" \
+      "# {{slug}}: what this changes, and why the release needs it." \
+      "# kubaos update runs it once, $who," \
+      "# under bash -euo pipefail from the new release's checkout (KUBAOS_DIR). Exiting" \
+      "# non-zero stops the update; it runs again on the next one, so make it safe to rerun." \
+      '# shellcheck source=migrations/lib.sh' \
+      'source "$KUBAOS_DIR/migrations/lib.sh"' >"$f"
+    echo "$f"
+
 # Remove iso/ and the build outputs. Never touches Docker volumes or images.
 clean:
     rm -rf iso install/out install/target test/out

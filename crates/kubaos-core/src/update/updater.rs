@@ -4,8 +4,8 @@
 //! An update, in order: the lock and a free-space check; fetching `origin` into the checkout,
 //! which is the network check; the release policy's pick; showing it and asking; a snapper
 //! snapshot, the user's `flake.lock` saved and the update recorded in the history; apt; moving
-//! `release`; the Hyprland pin and the system migrations; `nix flake update` of the user flake and
-//! the switch; relinking what `system/` took from KubaOS's nixpkgs; the Bitwarden check; the user
+//! `release`; the Hyprland pin and the system migrations; `nix flake update` of the user flake;
+//! relinking what `system/` took from KubaOS's nixpkgs; the switch; the Bitwarden check; the user
 //! migrations; and the new release record. Packages first, then migrations, which are written
 //! against the new packages.
 //!
@@ -278,8 +278,8 @@ impl<'a, M: Machine> Updater<'a, M> {
             let dest = self.user.flake_lock();
             fs::copy(lock, &dest).map_err(UpdateError::io(&dest))?;
         }
-        self.m.switch().map_err(UpdateError::step("switching your home"))?;
         self.relink()?;
+        self.m.switch().map_err(UpdateError::step("switching your home"))?;
         let refs = self.refs();
         let rolled_back = Installed {
             version: Version::parse(&entry.from_version).unwrap_or(installed.version.clone()),
@@ -478,8 +478,8 @@ impl<'a, M: Machine> Updater<'a, M> {
         self.m
             .stream(&Cmd::user("nix").arg("flake").arg("update").arg("--flake").arg(&flake))
             .map_err(UpdateError::step("updating your flake's inputs (nix flake update)"))?;
-        self.m.switch().map_err(UpdateError::step("switching your home"))?;
         self.relink()?;
+        self.m.switch().map_err(UpdateError::step("switching your home"))?;
         self.check_bitwarden();
         if !opts.packages_only {
             self.run_user_migrations()?;
@@ -718,7 +718,8 @@ impl<'a, M: Machine> Updater<'a, M> {
     }
 
     /// Points what `system/` linked from KubaOS's nixpkgs (the lock screen's PAM modules, the
-    /// recorder's helper, the wallpaper sets) at the release's builds.
+    /// recorder's helper, the wallpaper sets) at the release's builds. Before the switch: the
+    /// new home reads the wallpaper link.
     fn relink(&mut self) -> Result<(), UpdateError> {
         let script = self.sys.checkout().join("system/relink.sh");
         if !script.is_file() {
