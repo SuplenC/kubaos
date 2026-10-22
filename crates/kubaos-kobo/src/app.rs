@@ -603,7 +603,7 @@ impl App {
         self.reached = self.reached.max(self.flow_index(to));
         let f = self.initial_focus();
         self.set_focus(f);
-        self.scroll_to_selection()
+        self.scroll_screen_to_selection()
     }
 
     pub fn next(&mut self) -> Task<Message> {
@@ -1499,26 +1499,48 @@ impl App {
     /// Keeps the selected row of the active list in view, scrolling as
     /// little as possible (like any list does).
     fn scroll_to_selection(&self) -> Task<Message> {
-        let id = match self.list {
+        scroll_lists(self.selection_scroll(self.list))
+    }
+
+    /// Scrolls every list on the screen so its selected row shows. A list
+    /// opens with a preselection (the probe's keymap, the time zone), and
+    /// only one of a screen's lists has the focus.
+    fn scroll_screen_to_selection(&self) -> Task<Message> {
+        scroll_lists(self.selection_scrolls())
+    }
+
+    /// The scrollables on this screen that must move to show their selected
+    /// row, with the offset each moves to.
+    pub(crate) fn selection_scrolls(&self) -> Vec<(&'static str, f32)> {
+        let lists: &[List] = match self.screen {
+            Screen::Language => &[List::Locale, List::Keymap],
+            Screen::Timezone => &[List::Timezone],
+            Screen::Wifi => &[List::Wifi],
+            _ => &[],
+        };
+        lists
+            .iter()
+            .filter_map(|&l| self.selection_scroll(l))
+            .collect()
+    }
+
+    /// Where `list`'s scrollable moves to show its selected row: `None` when
+    /// the row already shows, or the list has no selection or no scrollable.
+    fn selection_scroll(&self, list: List) -> Option<(&'static str, f32)> {
+        let id = match list {
             List::Locale => ids::LOCALE_LIST,
             List::Keymap => ids::KEYMAP_LIST,
             List::Timezone => ids::TZ_LIST,
             List::Wifi => ids::WIFI_LIST,
-            List::Disk => return Task::none(),
+            List::Disk => return None,
         };
-        let items = self.list_items(self.list);
-        let cur = self.selected(self.list);
-        let i = match (self.list, &cur) {
+        let items = self.list_items(list);
+        let cur = self.selected(list);
+        let i = match (list, &cur) {
             // Wi-Fi's first row is "Don't connect".
             (List::Wifi, None) => 0,
-            (List::Wifi, Some(c)) => match items.iter().position(|x| x == c) {
-                Some(i) => i + 1,
-                None => return Task::none(),
-            },
-            (_, cur) => match items.iter().position(|x| Some(x) == cur.as_ref()) {
-                Some(i) => i,
-                None => return Task::none(),
-            },
+            (List::Wifi, Some(c)) => items.iter().position(|x| x == c)? + 1,
+            (_, cur) => items.iter().position(|x| Some(x) == cur.as_ref())?,
         };
         let row = crate::widgets::ROW_HEIGHT + crate::widgets::ROW_GAP;
         let top = i as f32 * row;
@@ -1530,19 +1552,13 @@ impl App {
                 } else if bottom > off + h {
                     bottom - h
                 } else {
-                    return Task::none();
+                    return None;
                 }
             }
             // Not drawn yet: two rows of context above.
-            _ => (top - 2.0 * row).max(0.0),
+            _ => top - 2.0 * row,
         };
-        operation::scroll_to(
-            id,
-            operation::AbsoluteOffset {
-                x: None,
-                y: Some(y.max(0.0)),
-            },
-        )
+        Some((id, y.max(0.0)))
     }
 }
 
@@ -1588,6 +1604,19 @@ impl F {
 pub fn auto_scale(window: Size) -> f32 {
     let s = (window.width / 1280.0).min(window.height / 800.0);
     ((s * 4.0).floor() / 4.0).clamp(1.0, 3.0)
+}
+
+/// Moves each scrollable to its vertical offset.
+fn scroll_lists(scrolls: impl IntoIterator<Item = (&'static str, f32)>) -> Task<Message> {
+    Task::batch(scrolls.into_iter().map(|(id, y)| {
+        operation::scroll_to(
+            id,
+            operation::AbsoluteOffset {
+                x: None,
+                y: Some(y),
+            },
+        )
+    }))
 }
 
 /// iced keyboard event -> our `Key`. The window subscription and the key
@@ -1721,5 +1750,50 @@ mod tests {
         assert_eq!(at(1920.0, 1200.0), 1.5);
         assert_eq!(at(2880.0, 1800.0), 2.25);
         assert_eq!(at(3840.0, 2160.0), 2.5);
+    }
+
+    fn app_with_every_keymap() -> App {
+        let mut p = crate::backend::demo_probe();
+        p.keymaps = include_str!("../assets/keymaps.tsv")
+            .lines()
+            .filter_map(|l| l.split('\t').next())
+            .map(str::to_string)
+            .collect();
+        let mut app = App::headless(std::sync::Arc::new(crate::backend::Demo::new(40.0, None)));
+        app.set_probe(Ok(p));
+        app
+    }
+
+    fn shows_row(y: f32, row: usize) {
+        let pitch = crate::widgets::ROW_HEIGHT + crate::widgets::ROW_GAP;
+        let top = row as f32 * pitch;
+        assert!(y <= top, "row {row} at {top} starts above the offset {y}");
+        assert!(
+            top + crate::widgets::ROW_HEIGHT <= y + 4.0 * pitch,
+            "row {row} at {top} is below offset {y}"
+        );
+    }
+
+    #[test]
+    fn the_language_screen_opens_with_the_preselected_layout_in_view() {
+        let mut app = app_with_every_keymap();
+        let row = app
+            .list_items(List::Keymap)
+            .iter()
+            .position(|k| *k == app.form.keymap)
+            .expect("the preselected layout is listed");
+        assert!(
+            row > 10,
+            "the preselected layout is near the top ({row}), so the test proves nothing"
+        );
+
+        let _ = app.go(Screen::Language);
+
+        let scrolls = app.selection_scrolls();
+        let &(_, y) = scrolls
+            .iter()
+            .find(|(id, _)| *id == ids::KEYMAP_LIST)
+            .expect("the keymap list scrolls to its selection");
+        shows_row(y, row);
     }
 }
