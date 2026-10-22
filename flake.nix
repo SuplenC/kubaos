@@ -24,12 +24,13 @@
       flake = false;
     };
 
-    # The Command menu (SuplenC/kotodama), pinned to a commit: bump the rev,
-    # then `nix flake update kotodama`. It builds from this flake's nixpkgs,
-    # so its QML module is built against the Qt that the curated Quickshell
-    # loads it into.
+    # The Command menu (SuplenC/kotodama), following its main branch while
+    # the menu is being polished. flake.lock holds the commit, and
+    # `nix flake update kotodama` moves it to main's newest. It builds from
+    # this flake's nixpkgs, so its QML module is built against the Qt that the
+    # curated Quickshell loads it into.
     kotodama = {
-      url = "github:SuplenC/kotodama/40d3fc7284b09d58c24e12b88ae4124c4f838d82";
+      url = "github:SuplenC/kotodama/main";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.home-manager.follows = "home-manager";
     };
