@@ -72,7 +72,27 @@ while :; do
 done
 ask full "Your full name" "Kuba Example"
 ask lang "Locale" "en_US.UTF-8"
-ask kb "Keyboard. Pick the one your fingers actually know" "us"
+# Comma-separated, the default first; a variant goes in brackets, us(intl). The
+# engine checks the names against xkb when it validates.
+while :; do
+  ask kb "Keyboard layouts your fingers actually know, the default first (us,it)" "us"
+  kb="${kb// /}"
+  IFS=, read -r -a kbs <<<"$kb"
+  ok=true
+  for k in "${kbs[@]}"; do
+    [[ $k =~ ^[a-z0-9_-]+(\([A-Za-z0-9_-]+\))?$ ]] || ok=false
+  done
+  ((${#kbs[@]} >= 1 && ${#kbs[@]} <= 4)) && $ok && break
+  echo "One to four layouts, comma-separated, like us,it or us(intl). Again."
+done
+kb_layouts=""
+kb_variants=""
+for k in "${kbs[@]}"; do
+  variant=""
+  [[ $k == *\(* ]] && { variant="${k#*(}"; variant="${variant%)}"; }
+  kb_layouts+="${kb_layouts:+, }$(toml_str "${k%%(*}")"
+  kb_variants+="${kb_variants:+, }$(toml_str "$variant")"
+done
 ask tz "Timezone" "Europe/Rome"
 ask gitname "Git name" "$full"
 ask gitemail "Git email" ""
@@ -86,8 +106,8 @@ umask 077
 {
   echo "[locale]"
   echo "lang = $(toml_str "$lang")"
-  echo "keyboard_layout = $(toml_str "$kb")"
-  echo "keyboard_variant = \"\""
+  echo "keyboard_layout = [$kb_layouts]"
+  echo "keyboard_variant = [$kb_variants]"
   echo "timezone = $(toml_str "$tz")"
   echo
   echo "[host]"
