@@ -47,11 +47,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792677998,
-        "narHash": "sha256-FhPjgGa5FRwkDkSP/C8GSvSfi9ZTXw7h/VGXE4gXm4A=",
+        "lastModified": 1792692701,
+        "narHash": "sha256-YYfHSG8UCa0R9FtOzYLPr//9dukV6svEEvSKQ1nm+DQ=",
         "owner": "SuplenC",
         "repo": "kotodama",
-        "rev": "0ce5a6e6554c02b9decb7739e996a06572872561",
+        "rev": "189e5e59ceccfd92088481a6fe6f39ce0f4ff717",
         "type": "github"
       },
       "original": {
