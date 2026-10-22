@@ -11,7 +11,7 @@ use super::machine::{self, gib};
 use super::runner::{Cmd, Output, Runner, Stream, interrupted};
 use super::unpack;
 use super::validate;
-use crate::config::{DiskTarget, InstallConfig, Secrets};
+use crate::config::{DiskTarget, InstallConfig, Secrets, Wallpapers};
 use crate::probe::{DiskInfo, Manifest};
 use crate::{Event, Level, StepId};
 
@@ -980,23 +980,24 @@ impl<'a> Install<'a> {
                 &self.ts(&f),
             ]))?;
         }
-        // ~/.config/kubaos/wallpapers/sets: the sets the picker shows. All of
-        // the payload's unless the user picked; an older payload lists none,
-        // and without the file dot-theme shows every set on the machine.
-        let sets: Vec<String> = match &c.wallpapers {
-            Some(w) => w.sets.clone(),
-            None => self
+        // ~/.config/kubaos/wallpapers/sets: the wallpapers the picker shows.
+        // Every set of the payload's unless the user picked; an older payload
+        // lists none, and without the file dot-theme shows every set on the
+        // machine.
+        let wallpapers = c.wallpapers.clone().unwrap_or_else(|| Wallpapers {
+            sets: self
                 .manifest
                 .wallpaper_sets
                 .iter()
                 .map(|s| s.id.clone())
                 .collect(),
-        };
-        if c.wallpapers.is_some() || !sets.is_empty() {
+            files: Vec::new(),
+        });
+        if c.wallpapers.is_some() || !wallpapers.sets.is_empty() {
             let f = format!("{home}/{}", files::WALLPAPER_SETS);
             let dir = f.rsplit_once('/').map_or("", |(d, _)| d).to_string();
             self.mkdir(&self.t(&dir))?;
-            self.write(&f, &files::wallpaper_sets(&sets), 0o644)?;
+            self.write(&f, &files::wallpaper_sets(&wallpapers), 0o644)?;
             self.sh(Cmd::new("chown").args([
                 &owner,
                 &self.ts(&format!("{home}/.config")),

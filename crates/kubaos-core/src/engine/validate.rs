@@ -3,8 +3,8 @@
 
 use super::disk::{self, MIB};
 use super::machine::gib;
-use crate::config::{DiskTarget, InstallConfig, Secrets};
-use crate::probe::Probe;
+use crate::config::{DiskTarget, InstallConfig, Secrets, Wallpapers};
+use crate::probe::{Manifest, Probe};
 
 pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
     let mut out = Vec::new();
@@ -51,13 +51,9 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
     {
         bad(format!("git: {why}"));
     }
-    if let (Some(w), Some(m)) = (&c.wallpapers, manifest) {
-        let known: Vec<&str> = m.wallpaper_sets.iter().map(|s| s.id.as_str()).collect();
-        for set in w.sets.iter().filter(|s| !known.contains(&s.as_str())) {
-            bad(format!(
-                "wallpaper set \"{set}\" isn't in the payload ({})",
-                known.join(", ")
-            ));
+    if let Some(w) = &c.wallpapers {
+        for why in wallpaper_problems(w, manifest) {
+            bad(why);
         }
     }
     if !valid_hostname(&c.host.hostname) {
@@ -142,6 +138,59 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
         }
     }
     out
+}
+
+/// What's wrong with `[wallpapers]`: sets and wallpapers the payload doesn't have, and entries
+/// that aren't a set id and a file name. `scripts/dot-theme` reads them as lines of one word, so
+/// that shape is checked even without a payload.
+fn wallpaper_problems(w: &Wallpapers, manifest: Option<&Manifest>) -> Vec<String> {
+    let mut out = Vec::new();
+    let known = |id: &str| manifest.is_none_or(|m| m.wallpaper_sets.iter().any(|s| s.id == id));
+    let unknown_set = |id: &str| {
+        let ids: Vec<&str> = manifest
+            .map(|m| m.wallpaper_sets.iter().map(|s| s.id.as_str()).collect())
+            .unwrap_or_default();
+        format!("wallpaper set \"{id}\" isn't in the payload ({})", ids.join(", "))
+    };
+    for set in w.sets.iter().filter(|s| !known(s)) {
+        out.push(unknown_set(set));
+    }
+    for entry in &w.files {
+        let Some((id, name)) = entry
+            .split_once('/')
+            .filter(|(id, name)| valid_set_id(id) && valid_wallpaper_name(name))
+        else {
+            out.push(format!("wallpaper \"{entry}\" must be <set>/<file>"));
+            continue;
+        };
+        let Some(set) = manifest.and_then(|m| m.wallpaper_sets.iter().find(|s| s.id == id)) else {
+            if !known(id) {
+                out.push(unknown_set(id));
+            }
+            continue;
+        };
+        // An older payload doesn't list a set's files.
+        if !set.files.is_empty() && !set.files.iter().any(|f| f.name == name) {
+            out.push(format!("wallpaper \"{entry}\" isn't in the payload's {id} set"));
+        }
+    }
+    out
+}
+
+/// A wallpaper set's id, its folder's name: what `install/image/lib/assemble.sh` accepts.
+fn valid_set_id(id: &str) -> bool {
+    id.starts_with(|c: char| c.is_ascii_lowercase() || c.is_ascii_digit())
+        && id
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// A wallpaper's file name in its set's folder: what `install/image/lib/assemble.sh` accepts.
+fn valid_wallpaper_name(name: &str) -> bool {
+    name.starts_with(|c: char| c.is_ascii_alphanumeric())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
 }
 
 pub fn secret_problems(c: &InstallConfig, s: &Secrets) -> Vec<String> {
@@ -235,7 +284,7 @@ pub fn valid_hostname(h: &str) -> bool {
 mod tests {
     use super::*;
     use crate::config::*;
-    use crate::probe::{DiskInfo, Manifest, PartitionInfo, Region, WallpaperSet};
+    use crate::probe::{DiskInfo, Manifest, PartitionInfo, Region, WallpaperFile, WallpaperSet};
 
     pub fn manifest() -> Manifest {
         Manifest {
@@ -257,6 +306,12 @@ mod tests {
                     id: id.into(),
                     images: 3,
                     preview: Some(format!("wallpapers/{id}.jpg")),
+                    files: ["a.jpg", "b.jpg", "c.mp4"]
+                        .map(|name| WallpaperFile {
+                            name: name.into(),
+                            thumb: Some(format!("wallpapers/{id}/{name}.jpg")),
+                        })
+                        .into(),
                 })
                 .into(),
         }
@@ -371,9 +426,13 @@ mod tests {
         let mut c = config();
         c.wallpapers = Some(Wallpapers {
             sets: vec!["shinjuku".into(), "japanese".into()],
+            files: vec![],
         });
         assert_eq!(problems(&c, &probe()), Vec::<String>::new());
-        c.wallpapers = Some(Wallpapers { sets: vec![] });
+        c.wallpapers = Some(Wallpapers {
+            sets: vec![],
+            files: vec![],
+        });
         assert_eq!(
             problems(&c, &probe()),
             Vec::<String>::new(),
@@ -381,6 +440,7 @@ mod tests {
         );
         c.wallpapers = Some(Wallpapers {
             sets: vec!["shinjuku".into(), "vaporwave".into(), "../etc".into()],
+            files: vec![],
         });
         let p = problems(&c, &probe());
         assert_eq!(
@@ -389,6 +449,71 @@ mod tests {
                 "wallpaper set \"vaporwave\" isn't in the payload (cyberpunk, japanese, shinjuku)",
                 "wallpaper set \"../etc\" isn't in the payload (cyberpunk, japanese, shinjuku)",
             ],
+        );
+    }
+
+    #[test]
+    fn single_wallpapers_must_be_in_the_payload() {
+        let mut c = config();
+        let files = |f: &[&str]| {
+            Some(Wallpapers {
+                sets: vec!["cyberpunk".into()],
+                files: f.iter().map(|s| (*s).to_string()).collect(),
+            })
+        };
+        c.wallpapers = files(&["shinjuku/a.jpg", "japanese/c.mp4"]);
+        assert_eq!(problems(&c, &probe()), Vec::<String>::new());
+
+        c.wallpapers = files(&[
+            "shinjuku/nope.jpg",
+            "vaporwave/a.jpg",
+            "a.jpg",
+            "shinjuku/../a.jpg",
+            "shinjuku/.hidden.jpg",
+            "shinjuku/a b.jpg",
+            "shinjuku/",
+        ]);
+        assert_eq!(
+            problems(&c, &probe()),
+            vec![
+                "wallpaper \"shinjuku/nope.jpg\" isn't in the payload's shinjuku set",
+                "wallpaper set \"vaporwave\" isn't in the payload (cyberpunk, japanese, shinjuku)",
+                "wallpaper \"a.jpg\" must be <set>/<file>",
+                "wallpaper \"shinjuku/../a.jpg\" must be <set>/<file>",
+                "wallpaper \"shinjuku/.hidden.jpg\" must be <set>/<file>",
+                "wallpaper \"shinjuku/a b.jpg\" must be <set>/<file>",
+                "wallpaper \"shinjuku/\" must be <set>/<file>",
+            ],
+        );
+    }
+
+    #[test]
+    fn a_set_an_older_payload_lists_no_files_for_takes_any_file_name() {
+        let mut c = config();
+        let mut p = probe();
+        p.payload.as_mut().unwrap().wallpaper_sets[2].files.clear();
+        c.wallpapers = Some(Wallpapers {
+            sets: vec![],
+            files: vec!["shinjuku/whatever.jpg".into()],
+        });
+
+        assert_eq!(problems(&c, &p), Vec::<String>::new());
+    }
+
+    #[test]
+    fn single_wallpapers_are_checked_without_a_payload_too() {
+        let mut c = config();
+        let mut p = probe();
+        p.payload = None;
+        c.wallpapers = Some(Wallpapers {
+            sets: vec![],
+            files: vec!["shinjuku/a.jpg\nvaporwave".into()],
+        });
+
+        assert!(
+            problems(&c, &p).contains(&"wallpaper \"shinjuku/a.jpg\nvaporwave\" must be <set>/<file>".to_string()),
+            "{:#?}",
+            problems(&c, &p)
         );
     }
 

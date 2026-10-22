@@ -209,11 +209,25 @@ echo "    ${#flake_paths[@]} store paths"
 say "packing tools from the flake's nixpkgs (not part of the payload)"
 tools="$(as_user "$NIX_BIN/nix" build --no-link --print-out-paths --inputs-from "$KUBAOS" nixpkgs#rsync nixpkgs#squashfsTools 'nixpkgs#libjpeg_turbo^bin' | tr '\n' ' ')"
 for t in $tools; do PATH="$t/bin:$PATH"; done
-command -v rsync mksquashfs djpeg cjpeg >/dev/null
+command -v rsync mksquashfs djpeg cjpeg rdjpgcom >/dev/null
 
-# The wallpaper sets (system/60-nix.sh linked them): Kōbō's
-# Wallpapers screen lists them from the manifest, with a small JPEG of each
-# set's first image next to it (the squashfs isn't mounted before the install).
+# thumbnail SRC OUT: a JPEG about 480 px wide of the JPEG SRC. Kōbō draws a
+# few dozen of them on its Wallpapers screen; decoding the 3840 px originals
+# there takes too long. djpeg scales by n/8 while it decodes, never up.
+THUMB_WIDTH=480
+thumbnail() {
+  local width n
+  width="$(rdjpgcom -verbose "$1" | sed -n 's/^JPEG image is \([0-9]*\)w.*/\1/p')"
+  [[ -n "$width" ]] || return 1
+  n=$(((THUMB_WIDTH * 8 + width - 1) / width))
+  ((n >= 1 && n <= 8)) || n=8
+  djpeg -scale "$n/8" "$1" | cjpeg -quality 85 -progressive -optimize >"$2"
+}
+
+# The wallpaper sets (system/60-nix.sh linked them): Kōbō's Wallpapers
+# screen lists them and their wallpapers from the manifest, with a thumbnail
+# of each in /out/wallpapers/<set>/<file>.jpg (the squashfs isn't mounted
+# before the install). A video's thumbnail is its poster's.
 WALLS=/usr/share/kubaos/wallpapers
 say "wallpaper sets ($WALLS -> $(readlink "$WALLS" || echo missing))"
 [[ -d "$WALLS/" ]] || die "no $WALLS (system/60-nix.sh, link_wallpapers)"
@@ -228,17 +242,28 @@ for d in "$WALLS"/*/; do
     -o -iname '*.webp' -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \) \
     ! -iname '*.poster.*' | LC_ALL=C sort)
   ((${#walls[@]})) || die "wallpaper set '$id' is empty"
-  preview=null
-  first="$(printf '%s\n' "${walls[@]}" | grep -iE '\.jpe?g$' | head -1 || true)"
-  if [[ -n "$first" ]]; then
-    # 3840 px wide originals -> 480 px tiles.
-    djpeg -scale 1/8 "$first" | cjpeg -quality 85 -progressive -optimize >"/out/wallpapers/$id.jpg"
-    preview="\"wallpapers/$id.jpg\""
-  else
-    echo "    $id: no JPEG to preview"
-  fi
-  wallpaper_sets+="${wallpaper_sets:+, }{\"id\": \"$id\", \"images\": ${#walls[@]}, \"preview\": $preview}"
-  echo "    $id: ${#walls[@]} wallpapers"
+  install -d "/out/wallpapers/$id"
+  preview=null files="" thumbs=0
+  for w in "${walls[@]}"; do
+    name="$(basename "$w")"
+    # The sets file is one word per line, and the manifest is written by hand
+    # here: names stay within what needs no quoting (engine/validate.rs).
+    [[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] ||
+      die "wallpaper '$id/$name': file names are A-Z, a-z, 0-9, ., _ and -"
+    src="$w"
+    [[ "${name,,}" =~ \.(mp4|webm|mkv|mov)$ ]] && src="${w%.*}.poster.jpg"
+    thumb=null
+    if [[ "${src,,}" =~ \.jpe?g$ && -f "$src" ]] && thumbnail "$src" "/out/wallpapers/$id/$name.jpg"; then
+      thumb="\"wallpapers/$id/$name.jpg\""
+      thumbs=$((thumbs + 1))
+      [[ $preview != null ]] || preview="$thumb"
+    else
+      echo "    $id/$name: no JPEG to make a thumbnail of"
+    fi
+    files+="${files:+, }{\"name\": \"$name\", \"thumb\": $thumb}"
+  done
+  wallpaper_sets+="${wallpaper_sets:+, }{\"id\": \"$id\", \"images\": ${#walls[@]}, \"preview\": $preview, \"files\": [$files]}"
+  echo "    $id: ${#walls[@]} wallpapers, $thumbs thumbnails"
 done
 
 # ---------------------------------------------------------------------------
