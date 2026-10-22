@@ -1,0 +1,19 @@
+[package]
+name = "kotodama-kubaos"
+description = "The Command menu's KubaOS Extension: KubaOS's actions and the system toggles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kotodama-extension.workspace = true
+kotodama-protocol.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+kotodama-extension = { workspace = true, features = ["testing"] }
+tempfile.workspace = true
+toml.workspace = true
+
+[lints]
+workspace = true
