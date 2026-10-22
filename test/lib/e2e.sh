@@ -437,9 +437,12 @@ c_recorder() {
   return "$bad"
 }
 
+# menu_stop PID: the Daemon (PID is its in_session job), its Extensions and the
+# session. Waiting on the job keeps the shell's "Terminated" out of the log.
 menu_stop() {
   pkill -u "$USER_NAME" -x kotodamad 2>/dev/null || true
   pkill -u "$USER_NAME" -f '/kotodama-[a-z-]+$' 2>/dev/null || true
+  wait "$1" 2>/dev/null || true
   session_stop
 }
 
@@ -449,15 +452,16 @@ menu_stop() {
 # nothing wrong with them. The container has no logind and no Hyprland, so
 # what an Extension reports (`extension <name>: ...`) is listed, not fatal.
 c_menu() {
-  local out bad=0 log="$LOGS/kotodamad.log"
+  local out bad=0 log="$LOGS/kotodamad.log" daemon
   session_start sway 1280x720 1
   : >"$log"
   chown "$USER_NAME:" "$log"
   in_session "exec kotodamad >$log 2>&1" &
+  daemon=$!
   if ! qs_start; then
     echo "FAIL Quickshell didn't load:"
     tail -30 "$QS_LOG"
-    menu_stop
+    menu_stop "$daemon"
     return 1
   fi
   sleep 3
@@ -485,7 +489,8 @@ c_menu() {
 
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
   if ((bad)); then tail -20 "$log"; fi
-  menu_stop
+  menu_stop "$daemon"
+  ((bad)) || echo "ok   the menu answers kotodama toggle and takes KubaOS's settings"
   return "$bad"
 }
 
