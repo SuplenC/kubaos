@@ -19,6 +19,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 | `home/shell.nix`, `home/terminal.nix`, `config/{nvim,tmux,tms,ghostty,ohmyposh,lazygit,btop,git,bat,bacon,yazi,foot,fuzzel}` | ports | zsh, tmux, tms, ghostty, ported user configs, the fallback terminal and launcher |
 | `config/hypr/`, `scripts/dot-hypr-*` | hypr | Hyprland Lua config, hypridle, lid and monitor scripts, screenshots and screen recording |
 | `config/quickshell/`, `scripts/dot-qs-*` | quickshell | The desktop shell |
+| `home/menu.nix`, `config/kotodama/`, `config/quickshell/modules/menu/`, the `kotodama` input | menu | The Command menu: Kotodama, its Extensions and config, and the shell's window for it |
 | `home/theme.nix`, `config/matugen/`, `scripts/dot-theme*`, the `kubaos-wallpapers` input | theme | Wallpaper + matugen color pipeline, the wallpaper sets, GTK/Qt/cursor/icons |
 | `system/`, `docs/INSTALL.md` | system | Ubuntu bootstrap scripts and `/etc` files |
 | `Cargo.toml`, `Cargo.lock`, `crates/`, `install/`, `docs/INSTALL-INTERNALS.md` | install | The Rust workspace: the engine (`crates/kubaos-core`), the `kubaos` CLI (`crates/kubaos-cli`) and Kōbō (`crates/kubaos-kobo`); the payload build, the live ISO and first-boot setup. `docs/INSTALL-INTERNALS.md` splits it further |
@@ -51,7 +52,8 @@ How each app loads the user layer (`U` is `~/.config/kubaos`):
 | yazi | `U/yazi/{yazi,keymap}.toml` | `~/.config/yazi/yazi.toml` and `keymap.toml` link there; KubaOS ships only `theme.toml` |
 | bat, git ignore | `U/bat/config`, `U/git/ignore` | no include: `dot-config` writes `~/.config/<file>` = defaults + yours |
 | fastfetch | `U/fastfetch/config.jsonc` | no include: `dot-config` writes `~/.config/fastfetch/config.jsonc`, yours merged over ours (objects key by key, anything else replaced) |
-| btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml` | the app rewrites them, so they're the user's: copied from the defaults once, never again. Fixes reach them only through migrations |
+| btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml` | the app rewrites them, so they're the user's: copied from the defaults once, never again. Fixes reach them only through migrations. The tms default's `search_dirs` are written by `home/links.nix` from the Command menu's folders (`config/kotodama/kubaos.toml`) |
+| Kotodama | `U/kotodama/user.toml` | `~/.config/kotodama/user.toml` links there. The Daemon merges every `*.toml` in that directory by file name, so it comes after `kubaos.toml` (the defaults, through `XDG_CONFIG_DIRS`) and home-manager's `home-manager.toml`. Tables merge key by key, lists replace. Applied on `systemctl --user restart kotodamad` |
 | lazy.nvim | `U/nvim/lazy-lock.json` | `:Lazy update` rewrites it: copied from `config/nvim/lazy-lock.json` once (lazy.nvim's `lockfile`) |
 
 The merged files (bat, git ignore, fastfetch) change when `dot-config apply` runs: after an update, or by hand after editing the user file. Every other user file applies the way the app reloads its config.
@@ -113,7 +115,6 @@ Quickshell config lives in `config/quickshell/` with `shell.qml` at its root (th
 
 | Call | Effect |
 |---|---|
-| `qs ipc call launcher toggle` | App launcher + calculator |
 | `qs ipc call session lock` | Lock screen |
 | `qs ipc call powermenu toggle` | Lock / suspend / logout / reboot / shutdown |
 | `qs ipc call wallpaper toggle` | Wallpaper picker |
@@ -152,9 +153,10 @@ Volume and brightness keys are bound in Hyprland directly to `wpctl` and `bright
 - Session start: tty1 autologin (getty drop-in) -> zsh login shell -> `~/.zprofile` (home-manager) sources `system/files/hyprland-autostart.zsh` as its last step, which execs `start-hyprland` (shipped with the hyprland package; no uwsm). `~/.config/hypr/no-autostart` disables it.
 - Graphical session: without uwsm nothing activates `graphical-session.target`, and xdg-desktop-portal (`Requisite=graphical-session.target`) refuses to start. `config/hypr/autostart.lua` imports the session environment, then starts `hyprland-session.target` (defined in `home/desktop.nix`, `BindsTo=graphical-session.target`), and stops it on `hyprland.shutdown`.
 - Panels and windows: only the frame reserves space (exclusive zones from `config/quickshell/modules/frame/Exclusions.qml`: bar 36 px, 8 px elsewhere). Panels, popups and the OSD live in the frame layer with no exclusive zone and float over windows; opening one never resizes a window. Window corners: `gaps_out = 8`, `border_size = 2`, `rounding = 10` (Hyprland rounds the border's outer edge at rounding + border = 12 = frame radius 20 - gap 8, so the corners are concentric).
-- Primary terminal `ghostty`, fallback terminal `foot`. Primary launcher `qs ipc call launcher toggle`, fallback `fuzzel`. Fallback binds always exist and never depend on Quickshell or Nix GPU wiring:
+- Primary terminal `ghostty`, fallback terminal `foot`. The Command menu is `kotodama toggle`, fallback `fuzzel`. Fallback binds always exist and never depend on Quickshell or Nix GPU wiring:
   - `SUPER+Return` ghostty, `SUPER+ALT+Return` foot
-  - `SUPER+Space` launcher, `SUPER+ALT+Space` fuzzel
+  - `SUPER+Space` the Command menu (`kotodama toggle || pkill -x fuzzel || fuzzel`: fuzzel when no menu answers), `SUPER+ALT+Space` fuzzel
+- `SUPER+F1` opens the Command menu on Kotodama's Shortcuts View (`kotodama open --view hyprland/shortcuts`), which lists every bind by its `description`.
 - Movement on `SUPER+hjkl`, move window `SUPER+SHIFT+hjkl`, resize `SUPER+CTRL+hjkl`, workspaces `SUPER+1..9`, move to workspace `SUPER+SHIFT+1..9`. The rest ported from Omarchy 4.
 - Monitors: laptop panel `eDP-1` at scale 1.5 (1920x1200 logical), the two externals 1920x1080 at scale 1, so both show Full HD density and every size (Quickshell tokens, terminal and UI fonts) is tuned once for it. Externals are matched by description in `config/hypr/monitors.lua`, with placeholders and a comment explaining how to fill them in from `hyprctl monitors`.
 - Workspaces 1-3 on `eDP-1`, 4-6 on external 1, 7-9 on external 2. When an external disappears Hyprland moves its workspaces to the laptop; `dot-hypr-workspaces` listens on the Hyprland event socket and moves them back on `monitoradded`.
@@ -167,7 +169,7 @@ Volume and brightness keys are bound in Hyprland directly to `wpctl` and `bright
 - Pinned downloads (`system/70-bitwarden.sh`, sha256-checked): Bitwarden desktop `.deb` (amd64), `bw` standalone CLI to `/usr/local/bin/bw`.
 - apt (`system/`): kernel, firmware, Mesa (`mesa-libgallium` carries VA-API; `mesa-va-drivers` no longer exists), NetworkManager, PipeWire, portals, PAM, fprintd, bolt, power-profiles-daemon, snapper, Hyprland + hyprland-guiutils + hypridle + hyprlock + hyprpolkitagent + hyprpicker (held), foot, fuzzel, zsh, Docker, Chrome, fonts-noto*, build-essential, clang, mold, unzip, openjdk-25-jre-headless (Mason, sonarlint), openssh-client, tuxedo-drivers, SentinelOne, libsecret-tools, libpam-u2f, pamu2fcfg, pamtester, fido2-tools (`system/75-yubikey.sh`; pcscd + pcsc-tools only with `--piv`). `ykman` is Nix's `yubikey-manager` (`home/cli.nix`): apt's depends on pcscd. Runtime helpers for Hyprland binds and Quickshell: wl-clipboard, grim, slurp, playerctl, socat, qalc, libnotify-bin, brightnessctl. libcap2-bin (`setcap`, `system/65-recorder.sh`).
 - Built from source by `system/20-base.sh`: grub-btrfs (pinned tag, not packaged for resolute; not tracked by dpkg).
-- Nix (`home/`): quickshell (tagged release), ghostty, neovim (0.12; never from apt), tmux, tms, lazygit, yazi, fzf, zoxide, atuin, direnv + nix-direnv, eza, bat, fd, ripgrep, delta, dust, dysk, btop, jq, yq, xh, tealdeer, just, glow, gh, fastfetch, lazydocker, bacon, cargo-nextest, hyperfine, sccache, wild (`wild-unwrapped`; opt-in Rust linker, mold from apt stays the default, switch is `rustLinker` in `home/dev.nix`), oh-my-posh, matugen, gpu-screen-recorder, satty, Nerd Fonts, Material Symbols, Geist, M PLUS 1 (`mplus-outline-fonts.githubRelease`), bibata cursors, Papirus (cyan folders), adw-gtk3.
+- Nix (`home/`): quickshell (tagged release), kotodama (the `kotodama` flake input, pinned to a commit), ghostty, neovim (0.12; never from apt), tmux, tms, lazygit, yazi, fzf, zoxide, atuin, direnv + nix-direnv, eza, bat, fd, ripgrep, delta, dust, dysk, btop, jq, yq, xh, tealdeer, just, glow, gh, fastfetch, lazydocker, bacon, cargo-nextest, hyperfine, sccache, wild (`wild-unwrapped`; opt-in Rust linker, mold from apt stays the default, switch is `rustLinker` in `home/dev.nix`), oh-my-posh, matugen, gpu-screen-recorder, satty, Nerd Fonts, Material Symbols, Geist, M PLUS 1 (`mplus-outline-fonts.githubRelease`), bibata cursors, Papirus (cyan folders), adw-gtk3.
 - GPU for Nix apps: home-manager's `targets.genericLinux.gpu`; `sudo non-nixos-gpu-setup` once (run by `system/60-nix.sh`) links `/run/opengl-driver`. No nixGL.
 - Each tool has exactly one owner. Don't add a package to both lists.
 - Outside both: rustup (rustup.rs), proto (its installer; then `proto install moon` and project pins), Bun via proto.

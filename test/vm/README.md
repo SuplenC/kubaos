@@ -78,6 +78,7 @@ test/vm/run install test/vm/examples/install.toml test/vm/examples/secrets.toml 
 test/vm/run boot-disk && sleep 15 && test/vm/run type 'bench-luks\n' && test/vm/run wait-ssh
 test/vm/run ssh snapper list                           # root on the installed system
 test/vm/run shot first-boot
+test/vm/menu-check                                     # SUPER + Space launches an app, a sum, SUPER + F1
 test/vm/run snapshot save fresh; …; test/vm/run snapshot restore fresh
 test/vm/run stop
 ```

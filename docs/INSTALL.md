@@ -54,7 +54,7 @@ If Kōbō itself won't start, its text mode runs instead, and it's always on tty
 
 ### First boot
 
-LUKS passphrase, then autologin on tty1 straight into Hyprland. The bar, Ghostty (`SUPER + Return`) and the launcher (`SUPER + Space`) are there. snapper already has snapshot #1, `factory`, of the fresh system. The install log is in `/var/log/kubaos/install.log`.
+LUKS passphrase, then autologin on tty1 straight into Hyprland. The bar, Ghostty (`SUPER + Return`) and the Command menu (`SUPER + Space`) are there. snapper already has snapshot #1, `factory`, of the fresh system. The install log is in `/var/log/kubaos/install.log`.
 
 ### What the stick can't do
 
