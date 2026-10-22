@@ -43,15 +43,26 @@ pub const ARROW: &str = r##"<svg width="256" height="256" viewBox="0 0 256 256" 
 </svg>
 "##;
 
-/// A disc in the busy cursors' placeholder.
+/// A disc in the busy cursors' placeholder, under Bibata's four spinner segments.
 pub const WATCH: &str = r##"<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
 <circle cx="128" cy="128" r="96" fill="#FF0000" stroke="#0000FF" stroke-width="16"/>
+<path d="M128 56V128H200C200 88 168 56 128 56Z" fill="#F05024" fill-opacity="0.8"/>
+<path d="M200 128H128V200C168 200 200 168 200 128Z" fill="#FCB813" fill-opacity="0.8"/>
+<path d="M128 200V128H56C56 168 88 200 128 200Z" fill="#7EBA41" fill-opacity="0.8"/>
+<path d="M56 128H128V56C88 56 56 88 56 128Z" fill="#32A0DA" fill-opacity="0.8"/>
 </svg>
 "##;
 
+/// Bibata's spinner and corner colours, none of which a recoloured theme keeps.
+pub const RAINBOW: [&str; 8] = ["#F05024", "#FCB813", "#7EBA41", "#32A0DA", "#F1613A", "#FDBE2A", "#96C865", "#4FADDF"];
+
 /// The Shinjuku wallpaper's `dark` colours.
-pub const DARK: Colors =
-    Colors { fill: Rgb([0x1e, 0x0f, 0x0e]), outline: Rgb([0xfa, 0xdb, 0xd9]), watch: Rgb([0xff, 0xb3, 0xae]) };
+pub const DARK: Colors = Colors {
+    fill: Rgb([0x1e, 0x0f, 0x0e]),
+    outline: Rgb([0xfa, 0xdb, 0xd9]),
+    watch: Rgb([0x1e, 0x0f, 0x0e]),
+    spinner: [Rgb([0xff, 0xb3, 0xae]), Rgb([0xff, 0xda, 0xd6]), Rgb([0xab, 0x35, 0x37]), Rgb([0x89, 0x1d, 0x22])],
+};
 
 /// A Bibata source tree in a temporary directory.
 pub fn bibata() -> TempDir {

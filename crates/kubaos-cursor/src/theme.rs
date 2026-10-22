@@ -72,9 +72,10 @@ pub enum XcursorOutcome {
 pub fn stamp(style: Style, colors: Option<&Colors>, source: &Path) -> String {
     let head = format!("kubaos-cursor {FORMAT}\nstyle {style}\n");
     match colors {
-        Some(Colors { fill, outline, watch }) => {
-            format!("{head}fill {fill}\noutline {outline}\nwatch {watch}\nsource {}\n", source.display())
-        }
+        Some(Colors { fill, outline, watch, spinner: [a, b, c, d] }) => format!(
+            "{head}fill {fill}\noutline {outline}\nwatch {watch}\nspinner {a} {b} {c} {d}\nsource {}\n",
+            source.display()
+        ),
         None => head,
     }
 }

@@ -4,12 +4,14 @@ const SHINJUKU: &str = r##"
 [dark]
 fill = "#1e0f0e"
 outline = "#fadbd9"
-watch = "#ffb3ae"
+watch = "#1e0f0e"
+spinner = ["#ffb3ae", "#ffdad6", "#ab3537", "#891d22"]
 
 [accent]
 fill = "#ffb3ae"
 outline = "#68000c"
-watch = "#ffb3ae"
+watch = "#68000c"
+spinner = ["#ffb3ae", "#ffdad6", "#ab3537", "#891d22"]
 "##;
 
 #[test]
@@ -40,7 +42,16 @@ fn the_palette_file_gives_each_style_its_colours() {
 
 #[test]
 fn a_palette_missing_a_colour_is_an_error() {
-    let text = SHINJUKU.replace("watch = \"#ffb3ae\"\n\n[accent]", "\n[accent]");
+    let text = SHINJUKU.replace("watch = \"#1e0f0e\"\n", "");
 
     assert!(matches!(Palette::parse(&text), Err(PaletteError::Parse(_))));
+}
+
+#[test]
+fn the_spinner_parses_as_four_tones_and_any_other_count_is_an_error() {
+    let palette = Palette::parse(SHINJUKU).unwrap();
+    assert_eq!(palette.dark.spinner[2], Rgb([0xab, 0x35, 0x37]));
+
+    let three = SHINJUKU.replacen(r##", "#891d22"]"##, "]", 1);
+    assert!(matches!(Palette::parse(&three), Err(PaletteError::Parse(_))));
 }

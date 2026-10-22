@@ -5,12 +5,14 @@
 //! [dark]
 //! fill = "#1e0f0e"
 //! outline = "#fadbd9"
-//! watch = "#ffb3ae"
+//! watch = "#1e0f0e"
+//! spinner = ["#ffb3ae", "#ffdad6", "#ab3537", "#891d22"]
 //!
 //! [accent]
 //! fill = "#ffb3ae"
 //! outline = "#68000c"
-//! watch = "#ffb3ae"
+//! watch = "#68000c"
+//! spinner = ["#ffb3ae", "#ffdad6", "#ab3537", "#891d22"]
 //! ```
 //!
 //! # Owns
@@ -69,14 +71,15 @@ impl<'de> Deserialize<'de> for Rgb {
     }
 }
 
-/// The three colours of one style: the body of every cursor, its outline, and the disc behind the
-/// busy cursors' spinner.
+/// The colours of one style: the body of every cursor, its outline, the disc behind the busy
+/// cursors' spinner, and the spinner's four segments (also the four diagonal resize cursors).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Colors {
     pub fill: Rgb,
     pub outline: Rgb,
     pub watch: Rgb,
+    pub spinner: [Rgb; 4],
 }
 
 /// The palette file: the colours of each recoloured style.

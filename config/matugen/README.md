@@ -80,7 +80,7 @@ If you change the default wallpaper, regenerate them all from
 | `delta.gitconfig` | same | `[delta]` colors, included by `config/git/config` |
 | `fzf`, `atuin.toml`, `eza.yml`, `glow.json` | same | fzf `--color` options file, atuin theme, eza theme, glamour style |
 | `hyprlock.colors` | `hyprlock.colors` | `$key = rrggbb` |
-| `cursor.toml` | `cursor.toml` | The pointer's fill, outline and spinner per style; `dot-theme` then runs `kubaos cursor apply`, which recolours Bibata with them |
+| `cursor.toml` | `cursor.toml` | The pointer's fill, outline, spinner disc and four spinner tones per style; `dot-theme` then runs `kubaos cursor apply`, which recolours Bibata with them |
 
 matugen 4.2 stops rendering the rest of the templates when an input file is
 missing. The oh-my-posh input therefore goes through a link,

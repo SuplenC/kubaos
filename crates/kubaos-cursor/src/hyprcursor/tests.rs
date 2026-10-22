@@ -47,6 +47,8 @@ fn the_archive_holds_the_meta_and_the_recoloured_svgs() {
     let names: Vec<&str> = files.iter().map(|(name, _)| name.as_str()).collect();
     assert_eq!(names, ["meta.hl", "wait-01.svg", "wait-02.svg"]);
     let svg = String::from_utf8(files[1].1.clone()).unwrap();
-    assert!(svg.contains(r##"fill="#FFB3AE" stroke="#FADBD9""##), "{svg}");
+    assert!(svg.contains(r##"fill="#1E0F0E" stroke="#FADBD9""##), "{svg}");
+    assert!(svg.contains(r##"fill="#FFB3AE" fill-opacity="0.8""##), "{svg}");
     assert!(!svg.contains("#FF0000") && !svg.contains("#0000FF"));
+    assert!(fixture::RAINBOW.iter().all(|colour| !svg.contains(colour)), "{svg}");
 }

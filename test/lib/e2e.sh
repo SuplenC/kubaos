@@ -187,25 +187,34 @@ cursor_classic() {
     [[ -s $CUR_ICONS/Bibata-Modern-Classic/cursors/left_ptr ]]
 }
 c_cursor() {
-  local surface on_surface primary on_primary out rc n
+  local surface primary out rc n
   local saved
   saved="$(cat "$CUR_SETTINGS")"
   as_user tee "$CUR_SETTINGS" <<<'style = "dark"' >/dev/null
 
   expect_ok "dot-theme apply --force" zrun 'dot-theme apply --force' || return 1
-  read -r surface on_surface primary on_primary < <(jq -r '[.surface, .on_surface, .primary, .on_primary] | join(" ")' \
+  read -r surface primary < <(jq -r '[.surface, .primary] | join(" ")' \
     "$USER_HOME/.local/state/theme/colors.json")
-  python3 -I - "$CUR_PALETTE" "$surface" "$on_surface" "$primary" "$on_primary" <<'PY' || return 1
-import sys, tomllib
-path, surface, on_surface, primary, on_primary = sys.argv[1:]
-with open(path, "rb") as f:
+  python3 -I - "$CUR_PALETTE" "$USER_HOME/.local/state/theme/colors.json" <<'PY' || return 1
+import colorsys, json, sys, tomllib
+with open(sys.argv[1], "rb") as f:
     p = tomllib.load(f)
-want = {"dark": [surface, on_surface, primary], "accent": [primary, on_primary, primary]}
-for style, colours in want.items():
+with open(sys.argv[2]) as f:
+    c = json.load(f)
+want = {"dark": ["surface", "on_surface", "surface"], "accent": ["primary", "on_primary", "on_primary"]}
+for style, roles in want.items():
     got = [p[style][k].lower() for k in ("fill", "outline", "watch")]
-    if got != [c.lower() for c in colours]:
-        sys.exit(f"FAIL ~/.local/state/theme/cursor.toml [{style}] is {got}, colors.json says {colours}")
-print("ok   cursor.toml has the palette's surface, on_surface, primary and on_primary")
+    if got != [c[r].lower() for r in roles]:
+        sys.exit(f"FAIL ~/.local/state/theme/cursor.toml [{style}] is {got}, colors.json's {roles} are not")
+def hls(hex):
+    return colorsys.rgb_to_hls(*(int(hex[i:i + 2], 16) / 255 for i in (1, 3, 5)))
+for style in want:
+    spinner = [s.lower() for s in p[style]["spinner"]]
+    hues = [round(hls(s)[0] * 360) for s in spinner]
+    off = max(min(abs(h - hues[0]), 360 - abs(h - hues[0])) for h in hues)
+    if spinner[0] != c["primary"].lower() or len(set(spinner)) != 4 or off > 8:
+        sys.exit(f"FAIL [{style}] spinner {spinner} isn't four tones of primary {c['primary']} (hues {hues})")
+print(f"ok   cursor.toml has the palette's roles, the spinner {spinner}")
 PY
   [[ -s $CUR_THEME/manifest.hl ]] || { echo "FAIL no hyprcursor manifest in $CUR_THEME"; return 1; }
   local hlc=("$CUR_THEME"/hyprcursors/*.hlc)
@@ -214,6 +223,17 @@ PY
   cursor_svg_has "$surface" || { echo "FAIL left_ptr.hlc isn't a zip with left_ptr.svg filled $surface"; return 1; }
   cursor_svg_has '#00FF00' && { echo "FAIL left_ptr.svg still has Bibata's placeholder fill"; return 1; }
   echo "ok   hyprcursor theme: $n shapes, left_ptr filled $surface"
+  # Bibata's rainbow spinner and corners: none of it is left in the busy cursors and the corners.
+  local f svgs tones
+  tones="$(grep -m1 '^spinner' "$CUR_PALETTE" | grep -oiE '#[0-9a-f]{6}' | paste -sd '|')"
+  for f in wait left_ptr_watch top_left_corner bottom_right_corner; do
+    # Read whole first: grep -q stopping early would fail unzip, and the pipe with it.
+    svgs="$(unzip -p "$CUR_THEME/hyprcursors/$f.hlc" '*.svg')" || { echo "FAIL reading $f.hlc"; return 1; }
+    grep -qiE '#(F05024|FCB813|7EBA41|32A0DA|F1613A|FDBE2A|96C865|4FADDF)' <<<"$svgs" &&
+      { echo "FAIL $f.hlc still has Bibata's rainbow"; return 1; }
+    grep -qiE "$tones" <<<"$svgs" || { echo "FAIL $f.hlc has none of the spinner's tones ($tones)"; return 1; }
+  done
+  echo "ok   the spinner and the corners are in the accent's tones, no rainbow left"
 
   cursor_sizes "24 36 48" || return 1
   python3 -I - "$CUR_THEME/cursors" "$surface" <<'PY' || return 1
