@@ -12,8 +12,6 @@ It exists because macOS got worse with every update. Nothing stops you from read
 
 _Screenshots are being retaken._
 
-The default wallpaper is alive: Kabukichō in the rain, drawn by [ukiyo](https://github.com/SuplenC/ukiyo), a reactive wallpaper engine of its own. How the two fit: [`docs/UKIYO.md`](docs/UKIYO.md).
-
 ## Install it
 
 The installer is offline: the whole system is on the USB stick. Write the ISO with `dd` or Etcher, boot it (UEFI, Secure Boot works), click through language, keyboard, disk and account, and hold the button to erase the disk. It's LUKS2-encrypted, with a `factory` snapshot to roll back to. Git name and email aren't in the repo: the installer's Git screen or the Git card in first-boot setup asks for them and writes `~/.config/git-identity/identity.gitconfig`.
@@ -36,7 +34,7 @@ just release               # tests, checks and all four ISOs
 just clean                 # remove iso/ and the build outputs
 ```
 
-One payload build at a time, they eat the RAM. How it all fits together: [`installer/image/README.md`](installer/image/README.md), [`installer/iso/README.md`](installer/iso/README.md) and [`test/vm/README.md`](test/vm/README.md). The ukiyo input is `github:SuplenC/ukiyo`. To build against a local checkout, set `UKIYO_OVERRIDE=~/Projects/ukiyo` (and `UKIYO_REF=<branch>` for a branch other than HEAD).
+One payload build at a time, they eat the RAM. How it all fits together: [`installer/image/README.md`](installer/image/README.md), [`installer/iso/README.md`](installer/iso/README.md) and [`test/vm/README.md`](test/vm/README.md).
 
 ## More
 

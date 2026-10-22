@@ -6,14 +6,12 @@
 #   900   FZF_CTRL_R_COMMAND="" (keeps fzf off Ctrl-R)
 #   ~910  fzf (Ctrl-T, Alt-C)
 #   1000  direnv hook, atuin (Ctrl-R), aliases, oh-my-posh
-#   1500  ukiyo's hook: finished builds pulse the wallpaper (home/ukiyo.nix)
 #   1900  the user layer's zshrc (~/.config/kubaos/zsh/zshrc)
 #   2000  zoxide as `cd`, last, so `zoxide doctor` stays quiet
 #
 # PATH for proto/bun/cargo/~/.local/bin lives in home.sessionPath (nix agent).
 {
   config,
-  kubaosPkgs,
   pkgs,
   lib,
   ...
@@ -104,15 +102,6 @@
         _dot_omp_init
         precmd_functions=(_dot_omp_init ''${precmd_functions:#_dot_omp_init})
       ''
-
-      # `ukiyo shell-hook zsh`, generated at build time (home/curated.nix), so
-      # no shell start runs ukiyo. It sends each finished command (line, exit
-      # status, duration) down the daemon's socket with zsocket, no process
-      # per prompt, and does nothing when no daemon runs. The daemon decides
-      # what counts as a build.
-      (lib.mkOrder 1500 ''
-        source ${kubaosPkgs.ukiyo-zsh-hook}
-      '')
 
       # The user layer's zshrc, after everything but zoxide, so it wins.
       (lib.mkOrder 1900 ''

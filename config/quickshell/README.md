@@ -45,9 +45,9 @@ Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`hom
 | `qs ipc call session lock` | Lock screen |
 | `qs ipc call powermenu toggle` | Lock / suspend / log out / reboot / shut down |
 | `qs ipc call wallpaper toggle` | Wallpaper picker |
-| `qs ipc call wallpaper settings` | Wallpaper picker on its Settings tab (Motion and every ukiyo option) |
-| `qs ipc call wallpaper animate <always\|ac\|never>` | Wallpaper motion, remembered across restarts, mirrored into ukiyo's config |
-| `qs ipc call wallpaper status` | What's shown, which screens play a video, the ukiyo scene and whether ukiyo draws it (JSON) |
+| `qs ipc call wallpaper settings` | Wallpaper picker on its Settings tab (Motion) |
+| `qs ipc call wallpaper animate <always\|ac\|never>` | Wallpaper motion, remembered across restarts |
+| `qs ipc call wallpaper status` | What's shown, which screens play a video (JSON) |
 | `qs ipc call notifications toggleDnd` | Do not disturb on/off |
 | `qs ipc call notifications clear` | Dismiss all notifications |
 | `qs ipc call controlcenter toggle` | Wi-Fi, Bluetooth, audio, power profile, notification history |
@@ -62,17 +62,15 @@ shell.qml               entry point: per screen a Wallpaper and a Frame; Lock, p
 IpcHandlers.qml         qs ipc targets
 theme/Theme.qml         design tokens: M3 colors (from colors.json), spacing, rounding, frame,
                         bar, type, motion curves and durations, elevation, state layers
-settings/Settings.qml   user knobs: wallpaper folders, the scene folder, wallpaper motion, lock loop, kanji workspaces, launcher hide list, terminal, security key, fingerprint, polkit
+settings/Settings.qml   user knobs: wallpaper folders, wallpaper motion, lock loop, kanji workspaces, launcher hide list, terminal, security key, fingerprint, polkit
 services/               singletons, no UI
   Audio                 PipeWire default sink, volume, output list
   Brightness            /sys/class/backlight (watched) + brightnessctl
   Battery, Profiles     UPower battery, power-profiles-daemon
   Net, Bt               NetworkManager and BlueZ via Quickshell.Networking / .Bluetooth
   Notifs                notification server, popups, history, DND
-  Wallpapers            current wallpaper, picker preview, folder listing (stills, videos, posters, ukiyo scenes), `dot-theme set`
+  Wallpapers            current wallpaper, picker preview, folder listing (stills, videos, posters), `dot-theme set`
   Motion                when moving wallpapers may decode: always / on AC / never (persisted), lock, idle, fullscreen
-  Ukiyo                 the live wallpaper daemon (docs/UKIYO.md): scenes, status over its socket, Motion and lock
-                        mapping, config schema, set and reset for the settings panel
   Hypr                  focused screen, workspace switching (Lua and classic dispatch)
   Panels                which panel is open, and on which screen
   Session               lock state, suspend/logout/reboot/poweroff
@@ -94,8 +92,8 @@ modules/
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu
-  wallpaper/            Wallpaper (background, crossfade, preview, steps aside for ukiyo), WallpaperPicker,
-                        WallpaperSettings (the picker's Settings tab, generated from ukiyo's schema)
+  wallpaper/            Wallpaper (background, crossfade, preview), WallpaperPicker,
+                        WallpaperSettings (the picker's Settings tab)
   polkit/               Polkit agent + dialog (off by default)
 ```
 
@@ -113,10 +111,6 @@ modules/
 In the headless test the GUI thread spent 0 ms (median) per frame on polish, animations and sync. All frame time was software rasterization, see `docs/TESTING.md`.
 
 Imports use Quickshell's module paths: `import qs.services`, `import qs.components`, and so on.
-
-## Live wallpapers (ukiyo)
-
-A wallpaper can be a ukiyo scene, `ukiyo:<id>`: a separate daemon draws it on its own background layer and reacts to the cursor, workspaces, typing, CPU, music and builds. `services/Ukiyo.qml` is the shell's side: it lists the scenes for the picker (first in the Shinjuku tab, live badge, poster thumbnail), keeps the poster on screen until the daemon says it's drawing and then unmaps the shell's own wallpaper layer, maps Motion onto the daemon (pause/resume, `still` while locked), keeps Motion's mode and ukiyo's config in step, and backs the Settings tab, which is generated from `ukiyo config schema --json`, one row per option. The lock screen shows the frame ukiyo saves when it goes still. The whole story, with the reasons: `docs/UKIYO.md`. Screenshots: `docs/screenshots/ukiyo/`.
 
 ## Keyboard
 
@@ -159,7 +153,6 @@ The polkit agent is in-shell but turned off (`Settings.polkitAgent: false`), and
 | `qalc` (libqalculate) | launcher calculator | apt |
 | `brightnessctl` | setting brightness | apt |
 | `dot-theme` | applying a wallpaper | this repo |
-| `ukiyo` | live wallpapers: scenes, status, config | Nix (`home/ukiyo.nix`) |
 | `dot-hypr-record`, `dot-hypr-screenshot` | recording indicator, capture buttons | this repo |
 | `systemctl`, `loginctl` | power menu | system |
 | NetworkManager, BlueZ, PipeWire, UPower, power-profiles-daemon | services over D-Bus | apt |

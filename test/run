@@ -8,7 +8,7 @@
 #   test/run shell                      login zsh as kuba after a fresh switch
 #   test/run bitwarden                  Vaultwarden + dot-bw-setup + direnv
 #   test/run shots [--hyprland] [--dir NAME | --out PATH] [--size WxH] [--scale N]
-#                  [--wallpaper SET/FILE | ukiyo:SCENE]
+#                  [--wallpaper SET/FILE]
 #                                       start a headless session (sway, or Hyprland
 #                                       once its stage exists) with Quickshell
 #   test/run shots shot NAME [--webp]   screenshot into the output dir
@@ -36,7 +36,7 @@ die() { printf 'test/run: %s\n' "$*" >&2; exit 1; }
 usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
 compose() { docker compose -f "$HERE/compose.yaml" "$@"; }
 
-# Local flake inputs (git+file:// or path: in flake.lock, like ukiyo's
+# Local flake inputs (git+file:// or path: in flake.lock, such as a local
 # checkout): bind-mounted read-only at the same path, and trusted by git in
 # the container (harness.sh, trust_local_inputs).
 # shellcheck source=test/lib/local-inputs.sh
@@ -44,7 +44,7 @@ compose() { docker compose -f "$HERE/compose.yaml" "$@"; }
 # run_dotfiles ARGS...: `compose run` of the dotfiles service with them.
 run_dotfiles() {
   local_input_mounts "$DOTFILES_SRC"
-  compose run ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} -e DOTFILES_LOCAL_INPUTS="$LOCAL_INPUTS" -e UKIYO_OVERRIDE_URL="$UKIYO_OVERRIDE_URL" "$@"
+  compose run ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} -e DOTFILES_LOCAL_INPUTS="$LOCAL_INPUTS" "$@"
 }
 elapsed() { printf '%dm%02ds' $((SECONDS / 60)) $((SECONDS % 60)); }
 
@@ -178,7 +178,7 @@ cmd_shots() {
       --out) DOTFILES_TEST_OUT="${2:?--out needs a path}"; shift ;;
       --size) size="${2:?--size WxH}"; shift ;;
       --scale) scale="${2:?--scale N}"; shift ;;
-      --wallpaper) wall="${2:?--wallpaper SET/FILE or ukiyo:SCENE}"; shift ;;
+      --wallpaper) wall="${2:?--wallpaper SET/FILE}"; shift ;;
       *) die "shots: unknown flag $1 (see test/run --help)" ;;
     esac
     shift

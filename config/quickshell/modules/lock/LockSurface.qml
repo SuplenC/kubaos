@@ -41,25 +41,13 @@ WlSessionLockSurface {
 
     // The current wallpaper if it moves, else the lock loop from Settings
     // (or the still, when that is ""). Its poster shows at once and the video
-    // fades in over it; unlocking never waits for either. A ukiyo scene
-    // shows its poster here, and the frame below covers it.
+    // fades in over it; unlocking never waits for either.
     readonly property string scene: {
         const wall = Wallpapers.current;
-        if (Wallpapers.isVideo(wall) || Wallpapers.isScene(wall) || !Settings.lockLoop)
+        if (Wallpapers.isVideo(wall) || !Settings.lockLoop)
             return wall;
         return Settings.lockLoop.startsWith("/") ? Settings.lockLoop : `${Settings.wallpaperSets}/${Settings.lockLoop}`;
     }
-
-    // ukiyo under the lock: the session lock covers the background layer, so
-    // the scene can't show through. The moment it's told to go still
-    // (Ukiyo.qml, on lock), ukiyo saves the frame that's on this screen and
-    // stops drawing. That frame, blurred like any wallpaper, is the
-    // background: zero GPU while locked, and it's exactly what was on screen,
-    // so the blur-in is seamless. (A second live renderer in QML would mean
-    // the scene twice, in another shader language, burning battery behind a
-    // lock.) The poster stands in until the frame is written; the serial in
-    // the URL makes Image reload it for every lock.
-    readonly property string stillFrame: Wallpapers.isScene(Wallpapers.current) ? Ukiyo.stillFor(screen?.name ?? "") : ""
 
     // Blurred anyway: drawn at half size (the blur and the upscale are
     // cheap there), then stretched back over the screen by the effect.
@@ -73,25 +61,6 @@ WlSessionLockSurface {
         playing: Motion.lock && !root.unlocking
         visible: false
         layer.enabled: true
-
-        Image {
-            id: frame
-
-            anchors.fill: parent
-            source: root.stillFrame ? `file://${root.stillFrame}?${Ukiyo.stillSerial}` : ""
-            fillMode: Image.PreserveAspectCrop
-            sourceSize: Qt.size(parent.width, parent.height)
-            asynchronous: true
-            cache: false
-            retainWhileLoading: true
-            opacity: status === Image.Ready ? 1 : 0
-
-            Behavior on opacity {
-                Anim {
-                    duration: Theme.anim.normal
-                }
-            }
-        }
     }
 
     MultiEffect {

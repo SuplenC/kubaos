@@ -114,11 +114,6 @@ copy_repo() {
     --exclude=./test/out -cf - . | runuser -u "$USER_NAME" -- tar -C "$REPO" -xf -
   as_user sh -c "cd '$REPO' && git init -q -b main && git add -A && \
     git -c user.name=test -c user.email=test@vm commit -q -m 'test snapshot' --no-gpg-sign"
-  # UKIYO_OVERRIDE=<checkout> on the host: lock ukiyo to it instead of GitHub.
-  if [[ -n ${UKIYO_OVERRIDE_URL:-} ]]; then
-    as_user sh -c "cd '$REPO' && /nix/var/nix/profiles/default/bin/nix flake lock --override-input ukiyo '$UKIYO_OVERRIDE_URL' && git add -A && \
-      git -c user.name=test -c user.email=test@vm commit -q -m 'ukiyo override' --no-gpg-sign"
-  fi
   note "repo copied in $(since "$t0") s"
 }
 

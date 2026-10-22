@@ -26,7 +26,7 @@ The layout is whatever you picked in the installer (`/etc/default/keyboard`, `us
 
 ## Updating and rolling back
 
-Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, ukiyo, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run:
+Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run:
 
 ```sh
 S=/usr/share/kubaos/system
@@ -86,8 +86,8 @@ home-manager switch --flake ~/.config/kubaos/home --override-input kubaos git+fi
 | Command | What |
 |---|---|
 | `home-manager switch --flake ~/.config/kubaos/home` | Apply your `home.nix` |
-| `dot-theme set <image>` | Set a wallpaper (an image, a loop, or `ukiyo:kabukicho-gate` for the live one) and regenerate colors everywhere |
-| `dot-theme next`, `prev`, `toggle-folder` | Cycle wallpapers (stills and loops), cycle the folders: the live scenes, the sets you picked, your own `~/Pictures/wallpapers` |
+| `dot-theme set <image>` | Set a wallpaper (an image or a loop) and regenerate colors everywhere |
+| `dot-theme next`, `prev`, `toggle-folder` | Cycle wallpapers (stills and loops), cycle the folders: the sets you picked, your own `~/Pictures/wallpapers` |
 | `~/.config/kubaos/wallpapers/sets` | The wallpaper sets the picker shows, one per line (every set in `/usr/share/kubaos/wallpapers` without the file). A set a new release brings shows up once you add it |
 | `dot-theme apply [--force]` | Regenerate from the current wallpaper; without `--force` it does nothing when no input changed (login runs it) |
 | `dot-config apply` | Create missing files in `~/.config/kubaos` and rewrite the merged configs (bat, git ignore, fastfetch) from the defaults plus yours. Every `home-manager switch` runs it |
@@ -153,7 +153,6 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 - **Session:** autologin on tty1 after the LUKS unlock, zsh, `start-hyprland`. No display manager.
 - **Compositor:** Hyprland 0.56 from `ppa:cppiber/hyprland`, held in apt, with a Lua config split into files (`config/hypr/`). Dwindle layout, Omarchy 4 keybinds moved to hjkl. hypridle locks after 5 min, turns screens off after 10, and suspends after 30 on battery only.
 - **Shell:** my own, written in QML on Quickshell v0.3.2 (pinned), in the structure of Caelestia: bar, launcher with calculator, notifications, OSD, control center, power menu, wallpaper picker, lock screen with password, fingerprint and security key in parallel.
-- **Live wallpaper:** [ukiyo](UKIYO.md), a Rust and wgpu scene engine on the Wayland background layer, from its own flake. A systemd user unit that runs only while a scene is the wallpaper, a settings panel generated from its schema, a zsh hook that reports finished builds over its socket.
 - **User environment:** standalone home-manager (nixos-26.05) owns everything in `$HOME`. KubaOS's configs are read-only links from the store into `~/.config`, and yours live in `~/.config/kubaos` (above, "Make it yours"). Nix apps get the GPU through home-manager's `targets.genericLinux.gpu`.
 - **Theming:** matugen (`scheme-fidelity`) turns the wallpaper into Material 3 colors and renders 21 files in `~/.local/state/theme/` for every consumer. Geist, M PLUS 1 for the Japanese bits, Material Symbols, Papirus, Bibata.
 - **Terminal and dev:** Ghostty (foot as the fallback), tmux + tms, Neovim 0.12 (LazyVim), rustup, proto + moon, sccache, clang + mold (wild optional), Docker Engine + lazydocker, Chrome.
@@ -213,5 +212,5 @@ Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland
 - [Omarchy](https://omarchy.org) for the keybinds and the idea that installing a desktop should take one stick and a few minutes.
 - [Caelestia](https://github.com/caelestia-dots/shell) for the shell's structure: the frame, panels that grow out of it, the Material 3 motion. No code was taken; the shell here is written from scratch.
 - [Quickshell](https://quickshell.org), [Hyprland](https://hyprland.org), [matugen](https://github.com/InioX/matugen), [home-manager](https://github.com/nix-community/home-manager) and Ubuntu, which do the actual work.
-- The wallpapers are by Pema G. Lama, Alex Knight, Jezael Melgoza, Marek Okon, Manuel Cosentino, LoboStudio Hamburg, ayumi kubo, Letian Zhang and Lucius Hunter on Unsplash, and Bobby Brown on Pexels (each set's `CREDITS.md` in [SuplenC/kubaos-wallpapers](https://github.com/SuplenC/kubaos-wallpapers)). The live gate is Basile Morin's photo (CC BY-SA 4.0, Wikimedia Commons), brought to life by ukiyo.
+- The wallpapers are by Pema G. Lama, Alex Knight, Jezael Melgoza, Marek Okon, Manuel Cosentino, LoboStudio Hamburg, ayumi kubo, Letian Zhang and Lucius Hunter on Unsplash, and Bobby Brown on Pexels (each set's `CREDITS.md` in [SuplenC/kubaos-wallpapers](https://github.com/SuplenC/kubaos-wallpapers)).
 - Built with Claude. Kuba made the calls; the robots typed.

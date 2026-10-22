@@ -49,10 +49,9 @@ AA.
 
 ## Defaults
 
-`dot-theme apply` with no wallpaper set uses `DEFAULT_WALLPAPER`
-(`ukiyo:kabukicho-gate`, the live scene; matugen reads the scene's poster,
-the way it reads a video's, see `docs/UKIYO.md`). Without ukiyo it takes the
-first wallpaper of the current folder. With no images at all it renders the
+`dot-theme apply` with no wallpaper set, or one that's gone, uses
+`DEFAULT_WALLPAPER` (`shinjuku/kabukicho-red-gate.jpg`). Without it, it takes
+the first wallpaper of the current folder. With no images at all it renders the
 templates from `DEFAULT_SEED` (that wallpaper's source color, also
 `fallback_color` in `config.toml`) and copies `default-colors.json` to
 `colors.json`. The fallbacks built into the consumers use the same palette:

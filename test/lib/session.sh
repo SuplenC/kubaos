@@ -83,7 +83,6 @@ qs_env_warnings() {
 session_stop() {
   pkill -u "$USER_NAME" -x qs 2>/dev/null || true
   pkill -u "$USER_NAME" -x quickshell 2>/dev/null || true
-  pkill -u "$USER_NAME" -x ukiyo 2>/dev/null || true
   pkill -u "$USER_NAME" -x sway 2>/dev/null || true
   pkill -u "$USER_NAME" -x wireplumber 2>/dev/null || true
   pkill -u "$USER_NAME" -x pipewire 2>/dev/null || true

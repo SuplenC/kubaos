@@ -7,9 +7,9 @@ import Quickshell
 Singleton {
     readonly property string home: Quickshell.env("HOME")
 
-    // The wallpaper picker's tabs are `dot-theme folders`: ukiyo's live
-    // scenes, the sets picked in ~/.config/kubaos/wallpapers/sets (from this
-    // directory), and ~/Pictures/wallpapers.
+    // The wallpaper picker's tabs are `dot-theme folders`: the sets picked in
+    // ~/.config/kubaos/wallpapers/sets (from this directory), and
+    // ~/Pictures/wallpapers.
     readonly property string wallpaperSets: "/usr/share/kubaos/wallpapers"
     // Moving wallpapers (mp4, webm, mkv, mov next to a <name>.poster.jpg):
     // "always", "ac" or "never". On AC by default, because a looping 4K city

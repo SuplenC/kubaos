@@ -263,7 +263,7 @@ nix_offline() {
     "$1" --no-update-lock-file "${@:2}"
 }
 # home-manager switch on the machine must work offline: every flake input
-# (local ones too, like ukiyo's checkout) is in the store from `nix flake
+# (local ones too) is in the store from `nix flake
 # archive`. The payload's user's flake evaluating to the shipped generation
 # proves it, and that the shipped lock is complete.
 t="$(now)"

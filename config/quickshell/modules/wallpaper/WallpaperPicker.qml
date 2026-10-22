@@ -6,13 +6,12 @@ import qs.components
 import qs.services
 
 // Wallpaper picker, rising out of the bottom edge: one tab per folder
-// (Wallpapers.folders: live, the chosen sets, yours), a grid
+// (Wallpapers.folders: the chosen sets, yours), a grid
 // of 16:10 thumbnails. Moving the selection previews it on the desktop; Enter
 // applies it through `dot-theme set`, which also regenerates all colors.
 // Moving wallpapers carry a badge and play in their thumbnail while selected
-// or hovered (unless motion is set to never). ukiyo's live scenes are the
-// first folder, with a "live" badge and their poster. The last tab is the
-// wallpaper settings (WallpaperSettings.qml): Motion and every ukiyo option.
+// or hovered (unless motion is set to never). The last tab is the
+// wallpaper settings (WallpaperSettings.qml).
 // Keys: hjkl/arrows move, Tab/Shift+Tab switch folder, S settings, Enter
 // apply, Esc close (from the settings: back to the wallpapers).
 Drawer {
@@ -38,7 +37,7 @@ Drawer {
 
     edge: "bottom"
     contentWidth: (settingsOpen ? 4 : columns) * cellWidth + Theme.spacing.xl * 2 - Theme.spacing.md
-    contentHeight: header.implicitHeight + (settingsOpen ? Math.min(560, (frame.b - frame.t) * 0.7) : rows * cellHeight) + Theme.spacing.lg * 2 + Theme.spacing.md
+    contentHeight: header.implicitHeight + (settingsOpen ? Math.min(Math.max(cellHeight, settings.implicitHeight), (frame.b - frame.t) * 0.7) : rows * cellHeight) + Theme.spacing.lg * 2 + Theme.spacing.md
     onOpened: {
         Wallpapers.refresh();
         const current = Wallpapers.folderOf(Wallpapers.current);
@@ -71,7 +70,6 @@ Drawer {
         folderIndex = index;
         if (settingsOpen) {
             Wallpapers.preview = "";
-            Ukiyo.refreshSchema();
             settings.forceActiveFocus();
         } else {
             lastFolder = index;
@@ -121,7 +119,7 @@ Drawer {
             }
 
             Repeater {
-                model: root.settingsOpen ? [["Tab", "next"], ["←→", "change"], ["Space", "toggle"], ["Del", "reset"], ["Esc", "back"]] : [["Tab", "folder"], ["S", "settings"], ["Enter", "apply"], ["Esc", "close"]]
+                model: root.settingsOpen ? [["←→", "change"], ["Esc", "back"]] : [["Tab", "folder"], ["S", "settings"], ["Enter", "apply"], ["Esc", "close"]]
 
                 delegate: Row {
                     required property var modelData
@@ -260,43 +258,6 @@ Drawer {
                                 Anim {
                                     duration: Theme.anim.normal
                                     easing.bezierCurve: Theme.anim.effects
-                                }
-                            }
-                        }
-
-                        // Live badge: a ukiyo scene, it reacts to what you do.
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.bottom: parent.bottom
-                            anchors.margins: Theme.spacing.sm
-                            width: liveRow.implicitWidth + Theme.spacing.md * 2 - 2
-                            height: 26
-                            radius: 13
-                            color: Theme.m3primaryContainer
-                            visible: Wallpapers.isScene(cell.modelData)
-
-                            Row {
-                                id: liveRow
-
-                                anchors.centerIn: parent
-                                spacing: Theme.spacing.xs
-
-                                Rectangle {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 7
-                                    height: 7
-                                    radius: 4
-                                    color: Theme.m3onPrimaryContainer
-                                    opacity: Ukiyo.current === cell.modelData.slice(6) && Ukiyo.shown ? 1 : 0.55
-                                }
-
-                                StyledText {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    text: "live"
-                                    font.pixelSize: Theme.font.sm
-                                    font.weight: Font.DemiBold
-                                    font.letterSpacing: 0.5
-                                    color: Theme.m3onPrimaryContainer
                                 }
                             }
                         }
