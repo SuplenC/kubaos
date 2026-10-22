@@ -13,6 +13,7 @@
 //! - The install commands (`probe`, `validate`, `plan`, `run`, `demo`): `install.rs`.
 //! - First-boot setup (`setup`): `setup.rs`.
 //! - The recoloured pointer (`cursor`): `cursor.rs`.
+//! - The keyboard layouts (`keyboard`): `keyboard.rs`.
 //! - Packages (`package`, `try`): `package.rs`.
 //! - Suites (`suite`): `suite.rs`.
 //! - Switch jobs (`switch`, `job`): `job.rs`.
@@ -31,6 +32,7 @@ use clap::ValueEnum;
 mod cursor;
 mod install;
 mod job;
+mod keyboard;
 mod package;
 mod setup;
 mod suite;
@@ -91,6 +93,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: cursor::CursorCmd,
     },
+    /// The keyboard layouts, the first the default: show them, or change them.
+    Keyboard {
+        #[command(subcommand)]
+        cmd: keyboard::KeyboardCmd,
+    },
 }
 
 /// How a command prints its events: JSON lines for a front end to parse, or text for a human.
@@ -123,5 +130,6 @@ fn main() -> ExitCode {
         Cmd::Rollback(args) => update::rollback(&args),
         Cmd::Channel(args) => update::channel(&args),
         Cmd::Cursor { cmd } => cursor::main(cmd),
+        Cmd::Keyboard { cmd } => keyboard::main(cmd),
     }
 }

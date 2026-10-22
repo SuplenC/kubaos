@@ -538,6 +538,7 @@ c_keyboard() {
   as_user lua5.5 "$REPO/test/lua/input_test.lua" "$REPO" || { echo "FAIL test/lua/input_test.lua"; return 1; }
   echo "ok   input.lua: two layouts as XKB's lists, one as a name, US without the file"
   local file out
+  install_kubaos || return 1
   file="$(mktemp)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=",intl"\nXKBOPTIONS=""\n' >"$file"
   chmod 644 "$file"
