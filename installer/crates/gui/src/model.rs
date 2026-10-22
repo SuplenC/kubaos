@@ -1,11 +1,9 @@
 //! The answers so far, their validation, and turning them into
 //! `install.toml` plus the secrets.
 
-use dotinstall_core::config::{
-    Disk, DiskTarget, Git, Host, Locale, Payload, User, Wallpapers, Wifi,
-};
-use dotinstall_core::probe::{DiskInfo, Region};
-use dotinstall_core::{InstallConfig, Probe, Secrets};
+use kubaos_core::config::{Disk, DiskTarget, Git, Host, Locale, Payload, User, Wallpapers, Wifi};
+use kubaos_core::probe::{DiskInfo, Region};
+use kubaos_core::{InstallConfig, Probe, Secrets};
 
 use crate::data;
 
@@ -106,7 +104,7 @@ impl Form {
     }
 
     pub fn account_ok(&self) -> Result<(), &'static str> {
-        use dotinstall_core::engine::validate::{reserved_username, valid_username};
+        use kubaos_core::engine::validate::{reserved_username, valid_username};
         if self.full_name.trim().is_empty() {
             return Err("Type your name.");
         }

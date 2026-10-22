@@ -8,14 +8,14 @@
 #                                 from the repo's CODENAME and VERSION, with -vm
 #                                 appended for --profile vm)
 #   installer/iso/build bins [--arch A]
-#                                 only build dotinstall + dotinstall-gui into iso/bin/ARCH
+#                                 only build kubaos + dotinstall-gui into iso/bin/ARCH
 #   installer/iso/build clean     remove this builder's containers, images and volumes
 #
 # --profile hw (default): linux-image-generic + linux-firmware, for real machines.
 # --profile vm: linux-image-virtual, no firmware: smaller and faster for the bench.
 # --release: no openssh-server and no bench SSH hook.
-# --bin DIR: use prebuilt Linux binaries (dotinstall, optional dotinstall-gui) instead
-#            of building installer/ in Docker.
+# --bin DIR: use prebuilt Linux binaries (kubaos, optional dotinstall-gui) instead
+#            of building the Cargo workspace in Docker.
 # --branding DIR: optional rootfs/ and iso/ overlays plus hook.sh ROOTFS ISO_TREE
 #            (default: branding/iso in the repo, when it exists).
 # --payload DIR: copied to the ISO as /dotinstall/payload, mounted in the live
@@ -53,7 +53,7 @@ cmd_bins() {
     shift
   done
   local triple="$arch-unknown-linux-gnu" dest="$OUT/bin/$arch"
-  say "building dotinstall binaries for $triple"
+  say "building kubaos and dotinstall-gui for $triple"
   build_image rust linux/arm64
   mkdir -p "$dest"
   # The target volume is shared by every checkout (worktree) of the repo, and
@@ -65,12 +65,12 @@ cmd_bins() {
   docker run --rm --name "dotinstall-iso-cargo-$arch" --cpus "$CPUS" --memory "$MEM" \
     -v dotinstall-iso-cargo:/usr/local/cargo/registry \
     -v dotinstall-iso-target:/target \
-    -v "$ROOT/installer:/src:ro" \
+    -v "$ROOT:/src:ro" \
     -v "$dest:/dest" \
     -e CARGO_TARGET_DIR="$tdir" -e CARGO_PROFILE_RELEASE_STRIP=true -w /src \
     dotinstall-iso-rust:arm64 \
-    sh -c "cargo build --release --locked --target $triple -p dotinstall -p dotinstall-gui &&
-           install -m 755 $tdir/$triple/release/dotinstall $tdir/$triple/release/dotinstall-gui /dest/"
+    sh -c "cargo build --release --locked --target $triple -p kubaos-cli -p dotinstall-gui &&
+           install -m 755 $tdir/$triple/release/kubaos $tdir/$triple/release/dotinstall-gui /dest/"
   ls -la "$dest" >&2
 }
 
@@ -114,7 +114,7 @@ cmd_build() {
     cmd_bins --arch "$arch"
     bins="$OUT/bin/$arch"
   fi
-  [[ -x $bins/dotinstall ]] || die "no $bins/dotinstall"
+  [[ -x $bins/kubaos ]] || die "no $bins/kubaos"
   bins="$(cd "$bins" && pwd)"
   mkdir -p "$OUT"
 

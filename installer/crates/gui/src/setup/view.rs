@@ -4,10 +4,10 @@
 
 use std::f32::consts::PI;
 
-use dotinstall_core::Level;
-use dotinstall_core::setup::{CardId, CardStatus, Facts, MokState, PromptKind, State, finger_name};
 use iced::widget::{Space, button, column, container, row, stack, text};
 use iced::{Alignment, Background, Border, Color, Element, Length, Padding, Shadow, Theme, Vector};
+use kubaos_core::Level;
+use kubaos_core::setup::{CardId, CardStatus, Facts, MokState, PromptKind, State, finger_name};
 
 use super::{Act, Outcome, SF, Setup, method_label};
 use crate::app::Message;
@@ -804,9 +804,9 @@ fn form<'a>(s: &'a Setup, fields: &[SF], p: &Palette) -> El<'a> {
                     s,
                     sf,
                     [
-                        dotinstall_core::setup::BwMethod::Totp,
-                        dotinstall_core::setup::BwMethod::YubikeyOtp,
-                        dotinstall_core::setup::BwMethod::ApiKey,
+                        kubaos_core::setup::BwMethod::Totp,
+                        kubaos_core::setup::BwMethod::YubikeyOtp,
+                        kubaos_core::setup::BwMethod::ApiKey,
                     ]
                     .iter()
                     .map(|m| (method_label(*m), *m == f.method))
@@ -815,11 +815,11 @@ fn form<'a>(s: &'a Setup, fields: &[SF], p: &Palette) -> El<'a> {
                 ),
                 Some(
                     text(match f.method {
-                        dotinstall_core::setup::BwMethod::Totp => "The 6-digit code from your authenticator app.",
-                        dotinstall_core::setup::BwMethod::YubikeyOtp => {
+                        kubaos_core::setup::BwMethod::Totp => "The 6-digit code from your authenticator app.",
+                        kubaos_core::setup::BwMethod::YubikeyOtp => {
                             "A YubiKey 5 types its code when touched. The Bio can't."
                         }
-                        dotinstall_core::setup::BwMethod::ApiKey => {
+                        kubaos_core::setup::BwMethod::ApiKey => {
                             "Web vault: Settings, Security, Keys, View API key. No two-step code; bw keeps a refresh token."
                         }
                     })

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# engine-e2e: run `dotinstall run` for real against a loop-device disk in a
+# engine-e2e: run `kubaos run` for real against a loop-device disk in a
 # privileged Docker container, then re-open the disk and check the result.
 #
 #   installer/test/engine-e2e [build|payload|run [SCENARIO...]|all|clean]
 #
-#   build     build dotinstall for Linux (rust:latest, target dir cached in
+#   build     build kubaos for Linux (rust:latest, target dir cached in
 #             the volume dotinstall-engine-target) and the live-tools image
 #   payload   build the fake payload image and turn it into
 #             rootfs.sqfs + rootfs.tar.zst in the volume dotinstall-engine-payload
@@ -19,7 +19,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALLER="$(cd "$HERE/.." && pwd)"
+REPO="$(cd "$HERE/../.." && pwd)"
 D="$HERE/engine-e2e.d"
 OUT="${DOTINSTALL_E2E_OUT:-/tmp/dotinstall-engine-e2e}"
 LIMITS=(--cpus 4 --memory 6g)
@@ -27,7 +27,7 @@ LIVE=dotinstall-engine-live
 PAYLOAD_IMG=dotinstall-engine-payload-src
 # Every checkout (worktree) shares the target volume, and cargo goes by mtime,
 # so each builds in its own subdirectory; run mounts only that one at /target.
-TSUB="$(printf '%s' "$INSTALLER" | shasum | cut -c1-12)"
+TSUB="$(printf '%s' "$REPO" | shasum | cut -c1-12)"
 
 build() {
   echo "==> live tools image"
@@ -36,8 +36,8 @@ build() {
   docker run --rm --name dotinstall-engine-build "${LIMITS[@]}" \
     -v dotinstall-engine-cargo:/usr/local/cargo/registry \
     -v dotinstall-engine-target:/target \
-    -v "$INSTALLER":/src:ro -w /src -e CARGO_TARGET_DIR="/target/$TSUB" \
-    rust:latest cargo build --release --locked -p dotinstall
+    -v "$REPO":/src:ro -w /src -e CARGO_TARGET_DIR="/target/$TSUB" \
+    rust:latest cargo build --release --locked -p kubaos-cli
 }
 
 payload() {

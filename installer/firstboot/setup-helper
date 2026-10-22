@@ -1,6 +1,6 @@
 #!/bin/bash
 # /usr/lib/kubaos/setup-helper: the root half of KubaOS first-boot setup
-# (kubaos-setup, dotinstall setup). Only ever run through pkexec; polkit
+# (kubaos-setup, kubaos setup). Only ever run through pkexec; polkit
 # action org.kubaos.setup asks for the password. Written by the installer
 # (installer/firstboot/, docs/INSTALLER.md "First boot").
 #

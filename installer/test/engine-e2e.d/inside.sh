@@ -9,7 +9,7 @@
 # dual (free-space install next to a fake Windows, reusing its ESP).
 set -euo pipefail
 
-BIN=/target/release/dotinstall
+BIN=/target/release/kubaos
 GEN=/nix/store/0000000000000000000000000000test-home-manager-generation
 PASS='correct horse battery'
 USERPW='hunter22-e2e'
@@ -155,7 +155,7 @@ EOF
   export DOTINSTALL_TEST=1
   check "validate" "$BIN" validate --config /work/install.toml
 
-  say "dotinstall run --events json"
+  say "kubaos run --events json"
   local ev="$OUT/$sc.events" rc st
   rm -f "$OUT/$sc".*
   SECONDS=0

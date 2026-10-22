@@ -1,11 +1,11 @@
-//! `dotinstall setup`: first-boot setup without the GUI (docs/INSTALLER.md,
+//! `kubaos setup`: first-boot setup without the GUI (docs/INSTALLER.md,
 //! "First boot"). Runs as the desktop user, like `kubaos-setup`.
 //!
-//!   dotinstall setup status [--json] [--demo vm|tuxedo]
-//!   dotinstall setup run CARD [--input-stdin] [--events json|human] [--demo vm|tuxedo]
-//!   dotinstall setup done
+//!   kubaos setup status [--json] [--demo vm|tuxedo]
+//!   kubaos setup run CARD [--input-stdin] [--events json|human] [--demo vm|tuxedo]
+//!   kubaos setup done
 //!
-//! `run` takes the card's inputs (`dotinstall_core::setup::Inputs`) as one
+//! `run` takes the card's inputs (`kubaos_core::setup::Inputs`) as one
 //! JSON object on stdin, the way `run --secrets-stdin` does. Exit codes: 0
 //! ok, 1 the card failed (the last event is `failed`), 2 usage.
 
@@ -13,8 +13,8 @@ use std::io::Read;
 use std::process::ExitCode;
 
 use clap::{Subcommand, ValueEnum};
-use dotinstall_core::Level;
-use dotinstall_core::setup::{self, CardId, Env, Inputs, RealSys, SetupEvent, State, demo};
+use kubaos_core::Level;
+use kubaos_core::setup::{self, CardId, Env, Inputs, RealSys, SetupEvent, State, demo};
 
 use crate::Events;
 
@@ -63,10 +63,8 @@ fn machine(d: DemoMachine) -> demo::Machine {
 }
 
 pub fn main(cmd: SetupCmd) -> ExitCode {
-    if unsafe { libc::geteuid() } == 0 {
-        eprintln!(
-            "dotinstall setup: run it as yourself, not root; it asks for root when it needs it"
-        );
+    if rustix::process::geteuid().is_root() {
+        eprintln!("kubaos setup: run it as yourself, not root; it asks for root when it needs it");
         return ExitCode::from(2);
     }
     let env = Env::current();
@@ -135,7 +133,7 @@ pub fn main(cmd: SetupCmd) -> ExitCode {
                 ExitCode::SUCCESS
             }
             Err(e) => {
-                eprintln!("dotinstall setup: {e}");
+                eprintln!("kubaos setup: {e}");
                 ExitCode::from(1)
             }
         },

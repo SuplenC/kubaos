@@ -1,6 +1,6 @@
 //! The first-boot setup app goes onto the target from the live system that
-//! installs it (docs/INSTALLER.md, "First boot"): the same `dotinstall` and
-//! `dotinstall-gui`, plus the files in installer/firstboot/ that make it
+//! installs it (docs/INSTALLER.md, "First boot"): the same `kubaos` and
+//! `dotinstall-gui`, plus the files in `installer/firstboot/` that make it
 //! open at the first login and give it a way to root.
 
 use std::path::{Path, PathBuf};
@@ -8,11 +8,11 @@ use std::path::{Path, PathBuf};
 use super::{Install, R};
 use crate::engine::runner::Cmd;
 
-const HELPER: &str = include_str!("../../../../../firstboot/setup-helper");
-const WRAPPER: &str = include_str!("../../../../../firstboot/kubaos-setup");
-const POLICY: &str = include_str!("../../../../../firstboot/org.kubaos.setup.policy");
-const UNIT: &str = include_str!("../../../../../firstboot/kubaos-setup.service");
-const DESKTOP: &str = include_str!("../../../../../firstboot/kubaos-setup.desktop");
+const HELPER: &str = include_str!("../../../../../installer/firstboot/setup-helper");
+const WRAPPER: &str = include_str!("../../../../../installer/firstboot/kubaos-setup");
+const POLICY: &str = include_str!("../../../../../installer/firstboot/org.kubaos.setup.policy");
+const UNIT: &str = include_str!("../../../../../installer/firstboot/kubaos-setup.service");
+const DESKTOP: &str = include_str!("../../../../../installer/firstboot/kubaos-setup.desktop");
 
 /// gnome-keyring's plaintext format: a keyring without a password is
 /// stored unencrypted and is never locked, so nothing ever asks for it.
@@ -58,7 +58,7 @@ impl Install<'_> {
             .ok()
             .and_then(|p| p.parent().map(Path::to_path_buf));
         let (cli, gui) = match dir {
-            Some(d) => (d.join("dotinstall"), d.join("dotinstall-gui")),
+            Some(d) => (d.join("kubaos"), d.join("dotinstall-gui")),
             None => (PathBuf::new(), PathBuf::new()),
         };
         let found = self.r.exists(&cli) && self.r.exists(&gui);
@@ -70,10 +70,7 @@ impl Install<'_> {
             ));
             return Ok(());
         }
-        for (src, dst) in [
-            (&cli, "/usr/bin/dotinstall"),
-            (&gui, "/usr/bin/dotinstall-gui"),
-        ] {
+        for (src, dst) in [(&cli, "/usr/bin/kubaos"), (&gui, "/usr/bin/dotinstall-gui")] {
             let cmd =
                 Cmd::new("install").args(["-m", "0755", &src.display().to_string(), &self.ts(dst)]);
             self.sh(cmd)?;

@@ -159,7 +159,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 - **Terminal and dev:** Ghostty (foot as the fallback), tmux + tms, Neovim 0.12 (LazyVim), rustup, proto + moon, sccache, clang + mold (wild optional), Docker Engine + lazydocker, Chrome.
 - **Secrets:** Bitwarden desktop's SSH agent (private keys never touch the disk), `bw` for SSH Host blocks, git signing, the gh token and per-project env through direnv. A YubiKey C Bio does sudo, polkit and the lock screen with a fingerprint; the password stays as the fallback.
 - **Hardware:** `tuxedo-drivers` and power-profiles-daemon (no TUXEDO Control Center), fprintd, bolt for the dock.
-- **Installer:** `dotinstall`, a Rust engine plus an iced GUI, on a casper live ISO. It unpacks a prebuilt image with `/nix` and the home-manager generation already inside, which is why it needs no network.
+- **Installer:** `dotinstall`, a Rust engine (`kubaos-core`, behind the `kubaos` CLI) plus an iced GUI, on a casper live ISO. It unpacks a prebuilt image with `/nix` and the home-manager generation already inside, which is why it needs no network.
 
 ### Repo map
 
@@ -171,7 +171,8 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `update.sh`, files for `/etc` |
-| `installer/` | `dotinstall`: the engine, the CLI and the GUI |
+| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, and `kubaos-cli`, the `kubaos` command |
+| `installer/` | `dotinstall`: the GUI, the live ISO, the payload build and the first-boot files |
 | `test/` | The Docker test harness (`test/run`) |
 | `docs/` | `PLAN.md` (why), `INSTALL.md` (how), `CONTRACTS.md` and `INSTALLER.md` (interfaces), `SECRETS.md` (Bitwarden, security key), `TESTING.md`, `BRAND.md` (name and voice), `screenshots/` |
 

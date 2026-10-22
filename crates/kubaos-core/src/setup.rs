@@ -209,7 +209,7 @@ pub enum PromptKind {
     Wait,
 }
 
-/// The setup's event stream. `dotinstall setup run --events json` writes one
+/// The setup's event stream. `kubaos setup run --events json` writes one
 /// per line; the GUI gets the same values in-process.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

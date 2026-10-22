@@ -1,11 +1,10 @@
-//! dotinstall: the headless installer. See docs/INSTALLER.md.
+//! The install commands: the headless installer. See docs/INSTALLER.md.
 //!
-//!   dotinstall probe [--json] [--payload DIR]
-//!   dotinstall validate --config FILE
-//!   dotinstall plan --config FILE [--json]
-//!   dotinstall run --config FILE (--secrets FILE | --secrets-stdin) [--events json|human] [--dry-run]
-//!   dotinstall demo [--speed N] [--fail-at STEP] [--events json|human]
-//!   dotinstall setup status|run CARD|done     first-boot setup (setup.rs)
+//!   kubaos probe [--json] [--payload DIR]
+//!   kubaos validate --config FILE
+//!   kubaos plan --config FILE [--json]
+//!   kubaos run --config FILE (--secrets FILE | --secrets-stdin) [--events json|human] [--dry-run]
+//!   kubaos demo [--speed N] [--fail-at STEP] [--events json|human]
 //!
 //! Exit codes: 0 ok, 1 a step failed (the last event is `failed`), 2 usage
 //! or config error.
@@ -16,33 +15,21 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::Instant;
 
-mod setup;
+use clap::Subcommand;
+use kubaos_core::engine::{self, RunOptions, machine, runner};
+use kubaos_core::{Event, InstallConfig, Level, Secrets, StepId, demo};
+use signal_hook::consts::SIGHUP;
+use signal_hook::consts::SIGINT;
+use signal_hook::consts::SIGTERM;
+use signal_hook::iterator::Signals;
 
-use clap::{Parser, Subcommand, ValueEnum};
-use dotinstall_core::engine::{self, RunOptions, machine, runner};
-use dotinstall_core::{Event, InstallConfig, Level, Secrets, StepId, demo};
+use crate::Events;
+use crate::usage_error;
 
 const LIVE_LOG: &str = "/var/log/dotinstall.log";
 
-#[derive(Parser)]
-#[command(
-    name = "dotinstall",
-    version,
-    about = "Installs the dotfiles system from a prebuilt payload"
-)]
-struct Cli {
-    #[command(subcommand)]
-    cmd: Cmd,
-}
-
-#[derive(Clone, Copy, PartialEq, ValueEnum)]
-pub(crate) enum Events {
-    Json,
-    Human,
-}
-
 #[derive(Subcommand)]
-enum Cmd {
+pub(crate) enum InstallCmd {
     /// Machine facts: disks, keymaps, timezones, Wi-Fi, the payload.
     Probe {
         #[arg(long)]
@@ -97,11 +84,6 @@ enum Cmd {
         #[arg(long, value_enum, default_value = "human")]
         events: Events,
     },
-    /// First-boot setup on the installed system, as the desktop user.
-    Setup {
-        #[command(subcommand)]
-        cmd: setup::SetupCmd,
-    },
 }
 
 fn parse_step(s: &str) -> Result<StepId, String> {
@@ -109,13 +91,12 @@ fn parse_step(s: &str) -> Result<StepId, String> {
         .map_err(|_| format!("unknown step {s}"))
 }
 
-fn main() -> ExitCode {
-    let cli = Cli::parse();
-    match cli.cmd {
-        Cmd::Probe { json, payload } => cmd_probe(json, payload),
-        Cmd::Validate { config } => cmd_validate(&config),
-        Cmd::Plan { config, json } => cmd_plan(&config, json),
-        Cmd::Run {
+pub(crate) fn main(cmd: InstallCmd) -> ExitCode {
+    match cmd {
+        InstallCmd::Probe { json, payload } => cmd_probe(json, payload),
+        InstallCmd::Validate { config } => cmd_validate(&config),
+        InstallCmd::Plan { config, json } => cmd_plan(&config, json),
+        InstallCmd::Run {
             config,
             secrets,
             secrets_stdin,
@@ -134,8 +115,7 @@ fn main() -> ExitCode {
             log,
             verbose,
         ),
-        Cmd::Setup { cmd } => setup::main(cmd),
-        Cmd::Demo {
+        InstallCmd::Demo {
             speed,
             fail_at,
             events,
@@ -150,11 +130,6 @@ fn main() -> ExitCode {
             }
         }
     }
-}
-
-pub(crate) fn usage_error(msg: impl std::fmt::Display) -> ExitCode {
-    eprintln!("dotinstall: {msg}");
-    ExitCode::from(2)
 }
 
 fn load_config(path: &Path) -> Result<InstallConfig, String> {
@@ -235,7 +210,7 @@ fn cmd_probe(json: bool, payload: Option<PathBuf>) -> ExitCode {
 fn validate_config(c: &InstallConfig) -> Result<(), String> {
     let probe = engine::probe_with(Path::new(&c.payload.dir)).map_err(|e| e.to_string())?;
     engine::validate(c, &probe).map_err(|e| match e {
-        dotinstall_core::Error::Config(s) => s,
+        kubaos_core::Error::Config(s) => s,
         other => other.to_string(),
     })
 }
@@ -308,8 +283,21 @@ fn read_secrets(file: Option<PathBuf>, stdin: bool) -> Result<Option<Secrets>, S
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
-extern "C" fn on_signal(_: libc::c_int) {
-    runner::INTERRUPTED.store(true, std::sync::atomic::Ordering::SeqCst);
+/// Turns SIGINT, SIGTERM and SIGHUP into `runner::INTERRUPTED`, which stops the install and
+/// unwinds it instead of killing the process with the disk half done.
+fn stop_on_signals() {
+    let mut signals = match Signals::new([SIGINT, SIGTERM, SIGHUP]) {
+        Ok(signals) => signals,
+        Err(e) => {
+            eprintln!("kubaos: can't catch signals: {e}");
+            return;
+        }
+    };
+    std::thread::spawn(move || {
+        for _ in signals.forever() {
+            runner::INTERRUPTED.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    });
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -338,8 +326,7 @@ fn cmd_run(
         Err(e) => return usage_error(e),
     };
     if !dry_run {
-        // SAFETY: geteuid has no preconditions.
-        if unsafe { libc::geteuid() } != 0 {
+        if !rustix::process::geteuid().is_root() {
             return usage_error("run must be root (or use --dry-run)");
         }
         if let Err(problems) = validate_config(&c) {
@@ -352,10 +339,7 @@ fn cmd_run(
             return usage_error(e);
         }
     }
-    for sig in [libc::SIGINT, libc::SIGTERM, libc::SIGHUP] {
-        // SAFETY: the handler only stores to an atomic.
-        unsafe { libc::signal(sig, on_signal as *const () as libc::sighandler_t) };
-    }
+    stop_on_signals();
 
     let log_path = log.or_else(|| (!dry_run).then(|| PathBuf::from(LIVE_LOG)));
     let log_file = log_path.as_ref().and_then(|p| {
@@ -363,7 +347,7 @@ fn cmd_run(
             .create(true)
             .append(true)
             .open(p)
-            .map_err(|e| eprintln!("dotinstall: can't write the log {}: {e}", p.display()))
+            .map_err(|e| eprintln!("kubaos: can't write the log {}: {e}", p.display()))
             .ok()
     });
     let opts = RunOptions {
@@ -374,9 +358,9 @@ fn cmd_run(
     let mut out = Printer::new(events, log_file, verbose);
     match engine::run(&c, &secrets, &opts, &mut |e| out.event(&e)) {
         Ok(()) => ExitCode::SUCCESS,
-        Err(dotinstall_core::Error::Step { .. }) => ExitCode::from(1),
+        Err(kubaos_core::Error::Step { .. }) => ExitCode::from(1),
         Err(e) => {
-            eprintln!("dotinstall: {e}");
+            eprintln!("kubaos: {e}");
             ExitCode::from(1)
         }
     }

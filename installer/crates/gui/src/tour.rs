@@ -333,7 +333,7 @@ mod tests {
     use crate::app::F;
     use crate::backend::Demo;
     use crate::model::DiskMode;
-    use dotinstall_core::StepId;
+    use kubaos_core::StepId;
     use std::sync::Arc;
 
     /// The whole install with synthetic key events only, headless: no

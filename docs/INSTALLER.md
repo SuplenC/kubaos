@@ -6,40 +6,41 @@ This file is the contract between the parts. If you need to change an interface,
 
 ## How it works
 
-1. **Payload.** We build the whole installed system ahead of time as one compressed image. It contains Ubuntu 26.04, everything `system/*.sh` installs, and `/nix` with the home-manager generation for `<user>@<host>` already built. It ships with `manifest.json` (`dotinstall_core::Manifest`).
-2. **Live ISO.** A small Ubuntu live system holding the payload, `dotinstall` and `dotinstall-gui`. It boots straight into the GUI, full screen in `cage`. There's a text fallback on tty2.
-3. **Engine.** `dotinstall run` partitions the disk, sets up LUKS and btrfs, unpacks the payload, configures the system, creates the user, installs the bootloader, activates home and takes the factory snapshot. It reports progress as JSON events.
-4. **GUI.** `dotinstall-gui` asks the questions and writes `install.toml` plus the secrets. It runs `dotinstall run --events json` and shows the event stream. It runs as root under `cage` on the live system, and its Reboot button runs `systemctl reboot`.
+1. **Payload.** We build the whole installed system ahead of time as one compressed image. It contains Ubuntu 26.04, everything `system/*.sh` installs, and `/nix` with the home-manager generation for `<user>@<host>` already built. It ships with `manifest.json` (`kubaos_core::Manifest`).
+2. **Live ISO.** A small Ubuntu live system holding the payload, `kubaos` and `dotinstall-gui`. It boots straight into the GUI, full screen in `cage`. There's a text fallback on tty2.
+3. **Engine.** `kubaos run` partitions the disk, sets up LUKS and btrfs, unpacks the payload, configures the system, creates the user, installs the bootloader, activates home and takes the factory snapshot. It reports progress as JSON events.
+4. **GUI.** `dotinstall-gui` asks the questions and writes `install.toml` plus the secrets. It runs `kubaos run --events json` and shows the event stream. It runs as root under `cage` on the live system, and its Reboot button runs `systemctl reboot`.
 5. **First boot.** The same GUI runs in setup mode (`dotinstall-gui --setup`, `kubaos-setup`) for anything that needs you or the hardware: TUXEDO drivers, the fingerprint reader, the YubiKey, Bitwarden, the git name and email. It opens by itself at the first login. See "First boot" below.
 
 ## Layout and owners
 
 | Path | Owner | What |
 |---|---|---|
-| `installer/crates/core/src/{config,event,step,probe,lib}.rs` | lead | The contract types |
-| `installer/crates/core/src/engine.rs`, `installer/crates/core/src/engine/**`, `installer/crates/cli/**` | engine | The real install, `probe`, `validate`, `run` |
-| `installer/crates/core/src/demo.rs` | lead | Fake event stream for GUI work |
+| `Cargo.toml`, `Cargo.lock` | lead | The Cargo workspace: `crates/kubaos-core`, `crates/kubaos-cli` and the GUI in `installer/crates/gui` |
+| `crates/kubaos-core/src/{config,event,step,probe,lib}.rs` | lead | The contract types |
+| `crates/kubaos-core/src/engine.rs`, `crates/kubaos-core/src/engine/**`, `crates/kubaos-cli/**` | engine | The real install, `probe`, `validate`, `run` |
+| `crates/kubaos-core/src/demo.rs` | lead | Fake event stream for GUI work |
 | `installer/crates/gui/**` | gui | The iced app |
-| `installer/crates/core/src/setup{.rs,/**}`, `installer/crates/gui/src/setup/**`, `installer/crates/cli/src/setup.rs`, `installer/crates/core/src/engine/install/firstboot.rs`, `installer/firstboot/**` | firstboot | First-boot setup |
+| `crates/kubaos-core/src/setup{.rs,/**}`, `installer/crates/gui/src/setup/**`, `crates/kubaos-cli/src/setup.rs`, `crates/kubaos-core/src/engine/install/firstboot.rs`, `installer/firstboot/**` | firstboot | First-boot setup |
 | `installer/image/**` | image | Builds the payload (rootfs image + manifest) |
 | `installer/iso/**` | iso | Builds the live ISO |
 | `test/vm/**` | iso | QEMU test bench on the Mac |
 
 Agents only edit files they own. If you need a change in someone else's file, put it in your report.
 
-## CLI (`dotinstall`)
+## CLI (`kubaos`)
 
 ```
-dotinstall probe [--json] [--payload DIR]    machine facts -> Probe
-dotinstall validate --config FILE            exit 0 / 2 with reasons
-dotinstall plan --config FILE [--json]       the steps that would run
-dotinstall run --config FILE (--secrets FILE | --secrets-stdin)
-               [--events json|human] [--dry-run]
-               [--target DIR] [--log FILE] [-v]
-dotinstall demo [--speed N] [--fail-at STEP] [--events json|human]
-dotinstall setup status [--json] [--demo vm|tuxedo]     first-boot cards, as the user
-dotinstall setup run CARD [--input-stdin] [--events json|human] [--demo vm|tuxedo]
-dotinstall setup done                                     write the marker
+kubaos probe [--json] [--payload DIR]    machine facts -> Probe
+kubaos validate --config FILE            exit 0 / 2 with reasons
+kubaos plan --config FILE [--json]       the steps that would run
+kubaos run --config FILE (--secrets FILE | --secrets-stdin)
+           [--events json|human] [--dry-run]
+           [--target DIR] [--log FILE] [-v]
+kubaos demo [--speed N] [--fail-at STEP] [--events json|human]
+kubaos setup status [--json] [--demo vm|tuxedo]     first-boot cards, as the user
+kubaos setup run CARD [--input-stdin] [--events json|human] [--demo vm|tuxedo]
+kubaos setup done                                     write the marker
 ```
 
 - Exit codes: `0` ok, `1` a step failed (the last event is `failed`), `2` usage or config error.
@@ -192,13 +193,13 @@ grub-btrfs titles the snapshot entries by date and description (`GRUB_BTRFS_TITL
 
 `installer/iso/build` (details in `installer/iso/README.md`). On the live system:
 
-- `dotinstall` and `dotinstall-gui` are in `/usr/bin`. The payload is mounted read-only at `/run/dotinstall/payload` (on the ISO it's `/dotinstall/payload`). There are no apt sources and no network wait.
-- tty1 autologs in as root. When a filesystem labelled `DOTINSTALL` holds `install.toml`, the install runs headless: `dotinstall run --config <disk>/install.toml --secrets /run/dotinstall/secrets.toml --events human [-v]`, with output on the serial console framed by `DOTINSTALL-BEGIN` and `DOTINSTALL-RESULT: done|failed rc=N`, then poweroff. Otherwise it runs `cage -s -- dotinstall-gui` as root (not `--fullscreen`, which trips an assertion in cage 0.2.1) inside a logind session, and falls back to `dotinstall-text` when the GUI exits non-zero. tty2 always has `dotinstall-text`.
+- `kubaos` and `dotinstall-gui` are in `/usr/bin`. The payload is mounted read-only at `/run/dotinstall/payload` (on the ISO it's `/dotinstall/payload`). There are no apt sources and no network wait.
+- tty1 autologs in as root. When a filesystem labelled `DOTINSTALL` holds `install.toml`, the install runs headless: `kubaos run --config <disk>/install.toml --secrets /run/dotinstall/secrets.toml --events human [-v]`, with output on the serial console framed by `DOTINSTALL-BEGIN` and `DOTINSTALL-RESULT: done|failed rc=N`, then poweroff. Otherwise it runs `cage -s -- dotinstall-gui` as root (not `--fullscreen`, which trips an assertion in cage 0.2.1) inside a logind session, and falls back to `dotinstall-text` when the GUI exits non-zero. tty2 always has `dotinstall-text`.
 - The GUI gets a logind seat (`XDG_RUNTIME_DIR=/run/user/0`) and Mesa (EGL/GLES and Vulkan, with llvmpipe/lavapipe in VMs), plus `fonts-inter` and `fonts-dejavu-core`. Exit 0 means the user finished (installed or quit on purpose). Any other exit means "use the text installer".
 
 ## First boot (firstboot)
 
-What the payload can't carry, because it needs the hardware or the person, happens at the first login: a checklist of five cards in the installer's look. `dotinstall-gui --setup` is a separate iced application in the same crate. It shares `theme.rs`, `widgets.rs`, the key translation and `app::Message` (one variant, `Message::Setup`). The logic is in `dotinstall_core::setup`, and `dotinstall setup` runs the same code headless with JSON events.
+What the payload can't carry, because it needs the hardware or the person, happens at the first login: a checklist of five cards in the installer's look. `dotinstall-gui --setup` is a separate iced application in the same crate. It shares `theme.rs`, `widgets.rs`, the key translation and `app::Message` (one variant, `Message::Setup`). The logic is in `kubaos_core::setup`, and `kubaos setup` runs the same code headless with JSON events.
 
 | Card | Shown when | Done when | What it does |
 |---|---|---|---|
@@ -214,7 +215,7 @@ Every card is detected fresh on each start, so finishing one by hand (the script
 
 **Secrets.** The MOK password goes to the helper on stdin. The master password and API key go to `bw` in its environment, and the session to `dot-bw-setup` the same way, as docs/SECRETS.md does it. None of them is logged or written. The form clears them once a run succeeds. One exception to "never in argv": the two-step code (`bw login --code`), which bw can't take any other way without a terminal. It's spent the moment bw uses it.
 
-**On the target.** The engine's configure step (`install_setup`) copies the live system's `dotinstall` and `dotinstall-gui` to `/usr/bin` and writes, from `installer/firstboot/`: `/usr/lib/kubaos/setup-helper`, `/usr/share/polkit-1/actions/org.kubaos.setup.policy`, `/usr/bin/kubaos-setup`, `/usr/share/applications/kubaos-setup.desktop`, and the user unit `/usr/lib/systemd/user/kubaos-setup.service`, enabled globally (linked into `/etc/systemd/user/graphical-session.target.wants/`). The unit has `ConditionPathExists=!%S/kubaos/setup-done` and runs `dotinstall-gui --setup --first-boot` once `autostart.lua` starts the graphical session. Without a `dotinstall-gui` next to `dotinstall`, setup isn't installed, with a warning.
+**On the target.** The engine's configure step (`install_setup`) copies the live system's `kubaos` and `dotinstall-gui` to `/usr/bin` and writes, from `installer/firstboot/`: `/usr/lib/kubaos/setup-helper`, `/usr/share/polkit-1/actions/org.kubaos.setup.policy`, `/usr/bin/kubaos-setup`, `/usr/share/applications/kubaos-setup.desktop`, and the user unit `/usr/lib/systemd/user/kubaos-setup.service`, enabled globally (linked into `/etc/systemd/user/graphical-session.target.wants/`). The unit has `ConditionPathExists=!%S/kubaos/setup-done` and runs `dotinstall-gui --setup --first-boot` once `autostart.lua` starts the graphical session. Without a `dotinstall-gui` next to `kubaos`, setup isn't installed, with a warning.
 
 **A calm first login.** Setup is the only window at the first login:
 
@@ -226,7 +227,7 @@ Every card is detected fresh on each start, so finishing one by hand (the script
 
   The alternative that keeps a password is `pam_gnome_keyring` unlocking a login keyring with the account password, which needs a PAM login that sees the password: a display manager, or `auth optional pam_gnome_keyring.so` in hyprlock's stack plus `gnome-keyring-daemon --unlock` at the first unlock. With autologin there's no such moment at login. So the first secret would still prompt, or it would have to wait for the first screen lock, and a keyring that unlocks on the first lock is a puzzle, not security. If KubaOS ever drops tty autologin for a greeter, switch to that and give the keyring the login password.
 
-**The marker** `~/.local/state/kubaos/setup-done` is written by "Done for now"/"All set", by closing the window, and by `dotinstall setup done`. The one exception is a card waiting on a reboot (a queued MOK): then setup opens once more after the reboot, to confirm the drivers loaded. `kubaos-setup` or the launcher entry opens it any time.
+**The marker** `~/.local/state/kubaos/setup-done` is written by "Done for now"/"All set", by closing the window, and by `kubaos setup done`. The one exception is a card waiting on a reboot (a queued MOK): then setup opens once more after the reboot, to confirm the drivers loaded. `kubaos-setup` or the launcher entry opens it any time.
 
 Screenshots: `docs/screenshots/setup/` (from `dotinstall-gui --setup --demo [--demo-machine vm] --screenshot-tour DIR`).
 

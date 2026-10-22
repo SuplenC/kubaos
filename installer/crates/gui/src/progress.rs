@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use dotinstall_core::{Event, Level, StepId, StepInfo};
+use kubaos_core::{Event, Level, StepId, StepInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepState {

@@ -45,7 +45,7 @@ release: test
 
 # Cargo tests, the shell harness (Docker) and the engine end-to-end test.
 test:
-    cargo test --manifest-path installer/Cargo.toml
+    cargo test --workspace
     test/run build
     test/run e2e
     installer/test/engine-e2e

@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use dotinstall_core::probe::{DiskInfo, PartitionInfo, Region, WallpaperSet, WifiNetwork};
-use dotinstall_core::{Event, InstallConfig, Manifest, Probe, Secrets, StepId, demo};
+use kubaos_core::probe::{DiskInfo, PartitionInfo, Region, WallpaperSet, WifiNetwork};
+use kubaos_core::{Event, InstallConfig, Manifest, Probe, Secrets, StepId, demo};
 
 /// What an install reports, in order: events, then exactly one `Exited`.
 #[derive(Debug, Clone)]
@@ -168,7 +168,7 @@ impl Process {
                 Some(2) if !last_err.is_empty() => {
                     format!(
                         "dotinstall refused to start: {}",
-                        last_err.trim_start_matches("dotinstall: ")
+                        last_err.trim_start_matches("kubaos: ")
                     )
                 }
                 Some(2) => "dotinstall refused the configuration and didn't say why".into(),
@@ -217,7 +217,7 @@ impl Drop for TempConfig {
     }
 }
 
-/// Canned machine and `dotinstall_core::demo::run` on a thread.
+/// Canned machine and `kubaos_core::demo::run` on a thread.
 pub struct Demo {
     pub speed: f32,
     pub fail_at: Option<StepId>,

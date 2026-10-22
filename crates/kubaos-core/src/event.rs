@@ -1,4 +1,4 @@
-//! The progress stream. `dotinstall run --events json` writes one `Event`
+//! The progress stream. `kubaos run --events json` writes one `Event`
 //! per line on stdout; the GUI reads exactly that.
 
 use serde::{Deserialize, Serialize};

@@ -1,0 +1,2 @@
+# KubaOS is a name, not code: rustdoc may write it without backticks.
+doc-valid-idents = ["KubaOS", ".."]
