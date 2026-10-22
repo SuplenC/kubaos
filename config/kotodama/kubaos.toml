@@ -296,3 +296,42 @@ icon = "view-refresh"
 keywords = ["vault", "secrets", "ssh keys", "bwenv"]
 run = ["dot-bw-setup", "--refresh"]
 terminal = true
+
+# Updates (kubaos update). They run in a terminal, where sudo asks and apt
+# and the switch show what they do. The daily check fills in what is
+# waiting: "Update KubaOS" names it, and the upgrade is listed only while a
+# next release is out, under its codename (crates/kotodama-kubaos/src/updates.rs).
+
+[extensions.kubaos.actions.update]
+title = "Update KubaOS"
+subtitle = "Packages, and the newest release of your channel"
+icon = "system-software-update"
+keywords = ["upgrade", "apt", "nix", "packages", "release"]
+run = ["kubaos", "update"]
+terminal = true
+
+[extensions.kubaos.actions.upgrade]
+title = "Upgrade KubaOS"
+subtitle = "The next KubaOS release"
+icon = "system-software-update"
+keywords = ["release", "codename", "do-release-upgrade"]
+run = ["kubaos", "upgrade"]
+terminal = true
+
+[extensions.kubaos.actions.rollback]
+title = "Roll back last update"
+subtitle = "The KubaOS release and your flake.lock from before it"
+icon = "edit-undo"
+keywords = ["undo update", "downgrade", "revert"]
+run = ["kubaos", "rollback"]
+terminal = true
+
+[extensions.kubaos.actions.channel]
+title = "Switch channel (stable/edge)"
+subtitle = "Stable: signed releases. Edge: origin/main as it lands"
+icon = "preferences-system"
+keywords = ["release channel", "stable", "edge", "updates"]
+keyword = "channel"
+run = ["kubaos", "channel", "{channel}"]
+arguments = [{ name = "channel", placeholder = "stable or edge" }]
+terminal = true

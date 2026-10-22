@@ -4,7 +4,8 @@
 //!
 //! # Owns
 //!
-//! - Which Items there are under the current config, `hide` applied.
+//! - Which Items there are under the current config, `hide` applied, and what the update check
+//!   changes in the update actions.
 //! - Sending a run to the registry, a toggle or an audio device.
 //!
 //! # Not here
@@ -26,12 +27,14 @@ use crate::run::Runner;
 use crate::toggles;
 use crate::toggles::Ran;
 use crate::toggles::Toggle;
+use crate::updates::Pending;
 
 /// The Extension's state: the registry its config holds, and what it runs
 /// things with.
 #[derive(Debug)]
 pub struct Extension<B, R> {
     registry: Registry,
+    pending: Pending,
     bus: B,
     runner: R,
 }
@@ -41,6 +44,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
     pub fn new(bus: B, runner: R) -> Self {
         Extension {
             registry: Registry::default(),
+            pending: Pending::default(),
             bus,
             runner,
         }
@@ -54,13 +58,22 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         problems
     }
 
-    /// The Items to index: the actions and the toggles `hide` leaves in.
+    /// Takes what the update check found waiting.
+    pub fn set_pending(&mut self, pending: Pending) {
+        self.pending = pending;
+    }
+
+    /// The Items to index: the actions and the toggles `hide` leaves in, the
+    /// update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
             .filter(|toggle| !self.registry.hides(toggle.id()))
             .map(Toggle::item);
-        self.registry.items().chain(toggles)
+        self.registry
+            .items()
+            .filter_map(|item| self.pending.apply(item))
+            .chain(toggles)
     }
 
     /// Runs `action` on `item`; an error is what the user reads.
