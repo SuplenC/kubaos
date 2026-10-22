@@ -7,6 +7,8 @@
 #   dot-theme folder <name>       switch folder (one of `dot-theme folders`)
 #   dot-theme folders             the picker's folders, name<TAB>directory
 #                                 (your chosen sets; yours: ~/Pictures/wallpapers)
+#   dot-theme wallpapers          what the picker shows, folder<TAB>path, in order
+#   dot-theme all-sets            show every set again, whole (rewrites the sets file)
 #   dot-theme toggle-folder       switch to the next folder
 #   dot-theme apply [--force]     regenerate from the current wallpaper (login);
 #                                 a no-op when nothing changed, unless --force
@@ -19,9 +21,10 @@ STAMP="$STATE/.stamp"
 # Every wallpaper set, one folder each, read-only (system/60-nix.sh links it
 # to the flake input kubaos-wallpapers).
 SETS_DIR="${KUBAOS_WALLPAPERS:-/usr/share/kubaos/wallpapers}"
-# The sets the picker shows, one id per line, # comments. The install
-# writes it; without it, every set shows. A set a release adds shows up once
-# it's in here.
+# What the picker shows, one entry per line, # comments: a set's id for all
+# of it, <set>/<file> for one of its wallpapers. The install writes it;
+# without it, every set shows. A set a release adds shows up once it's in
+# here, and so does a wallpaper a release adds to a set listed by its id.
 SETS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/wallpapers/sets"
 # Your own images and videos: a real folder, the last tab.
 WALLS="$HOME/Pictures/wallpapers"
@@ -105,25 +108,57 @@ source_image() {
 # The picker's tabs, in order: the chosen sets by name, then yours.
 # Quickshell asks `dot-theme folders` (services/Wallpapers.qml).
 
-# The sets in $SETS_FILE (all without it) that are on this machine, sorted.
+# $SETS_FILE, read once: WHOLE_SETS[id] for a set listed by its id,
+# PICKED[set/file] for a single wallpaper, PICKED_SETS[id] for a set with any.
+declare -A WHOLE_SETS=() PICKED=() PICKED_SETS=()
+SETS_READ=0
+read_sets_file() {
+  ((SETS_READ)) && return 0
+  SETS_READ=1
+  [[ -f $SETS_FILE ]] || return 0
+  local entry
+  while read -r entry _; do
+    [[ -z $entry || $entry == \#* ]] && continue
+    if [[ $entry == */* ]]; then
+      PICKED[$entry]=1
+      PICKED_SETS[${entry%%/*}]=1
+    else
+      WHOLE_SETS[$entry]=1
+    fi
+  done <"$SETS_FILE"
+}
+
+# The sets in $SETS_FILE (all without it), whole or by a wallpaper of theirs,
+# that are on this machine, sorted.
 chosen_sets() {
   local d id
-  local -a want=()
-  if [[ -f $SETS_FILE ]]; then
-    while read -r id _; do
-      [[ -z $id || $id == \#* ]] || want+=("$id")
-    done <"$SETS_FILE"
-  fi
+  read_sets_file
   for d in "$SETS_DIR"/*/; do
     [[ -d $d ]] || continue
     id=$(basename -- "$d")
     # The name that isn't a set.
     [[ $id == "$OWN_FOLDER" ]] && continue
     if [[ -f $SETS_FILE ]]; then
-      [[ " ${want[*]-} " == *" $id "* ]] || continue
+      [[ -n ${WHOLE_SETS[$id]-} || -n ${PICKED_SETS[$id]-} ]] || continue
     fi
     printf '%s\n' "$id"
   done | LC_ALL=C sort
+}
+
+# Every set on this machine, whole, as the picker's choice: the same header
+# the install writes (crates/kubaos-core/src/engine/files.rs, wallpaper_sets).
+all_sets() {
+  local d
+  mkdir -p "$(dirname -- "$SETS_FILE")"
+  {
+    printf '%s\n' "# The wallpapers the picker shows (from /usr/share/kubaos/wallpapers), one per line:" \
+      "# a set's name for all of it, <set>/<file> for one wallpaper." \
+      "# Your own images go in ~/Pictures/wallpapers."
+    for d in "$SETS_DIR"/*/; do
+      if [[ -d $d ]]; then basename -- "$d"; fi
+    done | LC_ALL=C sort
+  } >"$SETS_FILE.new"
+  mv -f -- "$SETS_FILE.new" "$SETS_FILE"
 }
 
 list_folders() {
@@ -150,20 +185,35 @@ folder_of() {
 }
 
 # Wallpapers (images and videos, not posters) in a folder, sorted by name,
-# one per line.
+# one per line. Of a set picked one wallpaper at a time, only those.
 list_images() {
-  local dir f
+  local dir f only=0
   dir=$(folder_dir "$1")
   [[ -n $dir && -d $dir ]] || return 0
+  read_sets_file
+  if [[ $1 != "$OWN_FOLDER" && -f $SETS_FILE && -z ${WHOLE_SETS[$1]-} ]]; then
+    only=1
+  fi
   local -a files=()
   shopt -s nullglob nocaseglob
   for f in "$dir"/*.{jpg,jpeg,png,webp,mp4,webm,mkv,mov}; do
     [[ $f == *.poster.* ]] && continue
+    ((only)) && [[ -z ${PICKED[$1/${f##*/}]-} ]] && continue
     [[ -f $f ]] && files+=("$f")
   done
   shopt -u nullglob nocaseglob
   ((${#files[@]})) || return 0
   printf '%s\n' "${files[@]}" | LC_ALL=C sort
+}
+
+# Whether the picker shows a wallpaper file.
+offered() {
+  local folder f
+  folder=$(folder_of "$1") || return 1
+  while read -r f; do
+    [[ $f == "$1" ]] && return 0
+  done < <(list_images "$folder")
+  return 1
 }
 
 valid_folder() {
@@ -413,7 +463,7 @@ switch_folder() {
   valid_folder "$folder" || die "no folder '$folder' (one of: $(list_folders | paste -sd ' ')). Another set: add it to $SETS_FILE"
   write_state folder "$folder"
   [[ -r $STATE/last-$folder ]] && read -r last <"$STATE/last-$folder" || true
-  if [[ -n $last && -f $last ]]; then
+  if [[ -n $last && -f $last ]] && offered "$last"; then
     set_wallpaper "$last"
     return
   fi
@@ -471,10 +521,10 @@ apply() {
   fi
   [[ $wp == ukiyo:* ]] && stop_live_wallpaper_daemon
   # No wallpaper yet, or one that's gone (a deleted file, a live scene from an
-  # earlier release): the default one, else the first of the current folder,
-  # else default colors.
+  # earlier release): the default one if the picker shows it, else the first
+  # of the current folder, else default colors.
   local default="$SETS_DIR/$DEFAULT_WALLPAPER"
-  if [[ -f $default ]]; then
+  if [[ -f $default ]] && offered "$default"; then
     set_wallpaper "$default"
     return
   fi
@@ -510,6 +560,15 @@ main() {
         printf '%s\t%s\n' "$f" "$(folder_dir "$f")"
       done < <(list_folders)
       ;;
+    wallpapers)
+      local f w
+      while read -r f; do
+        while read -r w; do
+          printf '%s\t%s\n' "$f" "$w"
+        done < <(list_images "$f")
+      done < <(list_folders)
+      ;;
+    all-sets) all_sets ;;
     toggle-folder) toggle_folder ;;
     apply)
       case ${1:-} in

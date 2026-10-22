@@ -190,7 +190,8 @@ in
       run mkdir -p "$(dirname "$sets")"
       if [ -z "''${DRY_RUN:-}" ]; then
         {
-          echo "# Wallpaper sets the picker shows, one per line (from /usr/share/kubaos/wallpapers)."
+          echo "# The wallpapers the picker shows (from /usr/share/kubaos/wallpapers), one per line:"
+          echo "# a set's name for all of it, <set>/<file> for one wallpaper."
           echo "# Your own images go in ~/Pictures/wallpapers."
           for d in /usr/share/kubaos/wallpapers/*/; do if [ -d "$d" ]; then basename "$d"; fi; done
         } >"$sets"

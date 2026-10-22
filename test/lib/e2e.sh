@@ -927,6 +927,39 @@ c_wallpaper_sets() {
   [[ "$(zrun 'dot-theme current')" == "$wall" ]] && echo "ok   the old live scene ukiyo:kabukicho-gate moves to $wall" ||
     { echo "FAIL old live scene: current is $(zrun 'dot-theme current')"; bad=1; }
 
+  # Single wallpapers, as Kōbō writes them: a set shows only its picks, and
+  # the default isn't among them.
+  rm -f "$own/mine.jpg"
+  printf '# picked one by one\njapanese/tokyo-tower-blue-hour.jpg\nshinjuku/skyline-fuji-dusk.jpg\nshinjuku/train-neon-streak.jpg\nshinjuku/gone.jpg\n' |
+    as_user tee "$sets" >/dev/null
+  got="$(folders)"
+  [[ $got == "japanese shinjuku yours " ]] && echo "ok   single wallpapers: their sets are the folders ($got)" ||
+    { echo "FAIL single wallpapers: folders are '$got'"; bad=1; }
+  got="$(zrun 'dot-theme wallpapers' | tr '\t\n' ': ')"
+  [[ $got == "japanese:$sys/japanese/tokyo-tower-blue-hour.jpg shinjuku:$sys/shinjuku/skyline-fuji-dusk.jpg shinjuku:$sys/shinjuku/train-neon-streak.jpg " ]] &&
+    echo "ok   dot-theme wallpapers: only the picks, a missing one skipped" ||
+    { echo "FAIL dot-theme wallpapers: '$got'"; bad=1; }
+  expect_ok "dot-theme folder shinjuku" zrun 'dot-theme folder shinjuku' || bad=1
+  zrun 'dot-theme next' >/dev/null 2>&1
+  got="$(zrun 'dot-theme current')"
+  zrun 'dot-theme next' >/dev/null 2>&1
+  got+=" $(zrun 'dot-theme current')"
+  zrun 'dot-theme prev' >/dev/null 2>&1
+  got+=" $(zrun 'dot-theme current')"
+  [[ $got == "$sys/shinjuku/train-neon-streak.jpg $sys/shinjuku/skyline-fuji-dusk.jpg $sys/shinjuku/train-neon-streak.jpg" ]] &&
+    echo "ok   next and prev step over shinjuku's two picks only" ||
+    { echo "FAIL next, next, prev over shinjuku's picks: $got"; bad=1; }
+  wall="$sys/japanese/tokyo-tower-blue-hour.jpg"
+  : >"$st/wallpaper"
+  rm -f "$st/folder"
+  expect_ok "dot-theme apply (first boot, default not picked)" zrun 'dot-theme apply' || bad=1
+  [[ "$(zrun 'dot-theme current')" == "$wall" ]] && echo "ok   first boot without the default: the first pick, $wall" ||
+    { echo "FAIL first boot without the default: current is $(zrun 'dot-theme current')"; bad=1; }
+  expect_ok "dot-theme all-sets" zrun 'dot-theme all-sets' || bad=1
+  got="$(grep -v '^#' "$sets" | tr '\n' ' ') / $(folders) / $(zrun 'dot-theme wallpapers' | grep -c "^shinjuku")"
+  [[ $got == "cyberpunk japanese shinjuku  / cyberpunk japanese shinjuku yours  / 5" ]] &&
+    echo "ok   all-sets: every set again, whole ($got)" || { echo "FAIL all-sets: $got"; bad=1; }
+
   rm -f "$sets" "$own/mine.jpg"
   return "$bad"
 }

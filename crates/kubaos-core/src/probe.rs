@@ -93,4 +93,29 @@ pub struct WallpaperSet {
     /// A small JPEG of its first image, relative to the payload dir.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview: Option<String>,
+    /// Its wallpapers, in the order `dot-theme` steps through them. Empty for older images.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<WallpaperFile>,
+}
+
+/// One wallpaper of a [`WallpaperSet`]: an image or a video.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct WallpaperFile {
+    /// The file name in the set's folder, e.g. `kabukicho-red-gate.jpg`.
+    pub name: String,
+    /// A 480 px wide JPEG of it (of a video, its poster), relative to the payload dir. `None`
+    /// when the build couldn't make one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thumb: Option<String>,
+}
+
+impl WallpaperFile {
+    /// A video, which plays over its `<name>.poster.jpg` (`scripts/dot-theme`).
+    #[must_use]
+    pub fn is_video(&self) -> bool {
+        let ext = self.name.rsplit_once('.').map_or("", |(_, e)| e);
+        ["mp4", "webm", "mkv", "mov"]
+            .iter()
+            .any(|v| ext.eq_ignore_ascii_case(v))
+    }
 }

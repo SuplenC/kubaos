@@ -1,14 +1,39 @@
 //! The answers so far, their validation, and turning them into
 //! `install.toml` plus the secrets.
 
+use std::collections::BTreeSet;
+
 use kubaos_core::config::{Disk, DiskTarget, Git, Host, Locale, Payload, User, Wallpapers, Wifi};
-use kubaos_core::probe::{DiskInfo, Region};
+use kubaos_core::probe::{DiskInfo, Region, WallpaperFile, WallpaperSet};
 use kubaos_core::{InstallConfig, Probe, Secrets};
 
 use crate::data;
 
 /// Where the live ISO keeps the payload (docs/INSTALL-INTERNALS.md, `[payload]`).
 pub const PAYLOAD_DIR: &str = "/run/kubaos/payload";
+
+/// A wallpaper in [`Form::wallpapers`] and in `[wallpapers] files`: `<set>/<file>`.
+pub fn wallpaper_key(set: &WallpaperSet, file: &WallpaperFile) -> String {
+    format!("{}/{}", set.id, file.name)
+}
+
+/// Every wallpaper of the set as [`Form::wallpapers`] holds them: the set's id alone when the
+/// payload lists none of its files.
+fn wallpaper_keys(set: &WallpaperSet) -> Vec<String> {
+    if set.files.is_empty() {
+        return vec![set.id.clone()];
+    }
+    set.files.iter().map(|f| wallpaper_key(set, f)).collect()
+}
+
+/// The wallpapers in a set: its listed files, or the count of an older payload.
+fn wallpapers_in(set: &WallpaperSet) -> u32 {
+    if set.files.is_empty() {
+        set.images
+    } else {
+        u32::try_from(set.files.len()).unwrap_or(u32::MAX)
+    }
+}
 /// Smallest free region offered for a dual-boot install, on top of the payload size.
 const HEADROOM: u64 = 8_000_000_000;
 /// What a hostname may be: one RFC 1123 label, as
@@ -50,8 +75,9 @@ pub struct Form {
     /// The user edited the git name; stop mirroring the full name into it.
     pub git_name_touched: bool,
 
-    /// Ids of the wallpaper sets picked, in no particular order.
-    pub wallpaper_sets: Vec<String>,
+    /// The wallpapers picked, as `<set>/<file>`; a set the payload lists no files for (an older
+    /// payload) by its id alone.
+    pub wallpapers: BTreeSet<String>,
 }
 
 impl Form {
@@ -78,8 +104,8 @@ impl Form {
             encrypt: true,
             luks_same_as_password: true,
             disk,
-            wallpaper_sets: manifest
-                .map(|m| m.wallpaper_sets.iter().map(|s| s.id.clone()).collect())
+            wallpapers: manifest
+                .map(|m| m.wallpaper_sets.iter().flat_map(wallpaper_keys).collect())
                 .unwrap_or_default(),
             ..Self::default()
         };
@@ -185,16 +211,75 @@ impl Form {
         Ok(())
     }
 
-    pub fn wallpaper_set_on(&self, id: &str) -> bool {
-        self.wallpaper_sets.iter().any(|s| s == id)
+    pub fn wallpaper_on(&self, set: &WallpaperSet, file: &WallpaperFile) -> bool {
+        self.wallpapers.contains(&wallpaper_key(set, file))
     }
 
-    pub fn toggle_wallpaper_set(&mut self, id: &str) {
-        if self.wallpaper_set_on(id) {
-            self.wallpaper_sets.retain(|s| s != id);
-        } else {
-            self.wallpaper_sets.push(id.to_string());
+    pub fn toggle_wallpaper(&mut self, set: &WallpaperSet, file: &WallpaperFile) {
+        let key = wallpaper_key(set, file);
+        if !self.wallpapers.remove(&key) {
+            self.wallpapers.insert(key);
         }
+    }
+
+    /// How many of the set's wallpapers are picked.
+    pub fn wallpapers_on(&self, set: &WallpaperSet) -> u32 {
+        if set.files.is_empty() {
+            return if self.wallpapers.contains(&set.id) {
+                set.images
+            } else {
+                0
+            };
+        }
+        let on = set.files.iter().filter(|f| self.wallpaper_on(set, f)).count();
+        u32::try_from(on).unwrap_or(u32::MAX)
+    }
+
+    /// The set's header: drops every wallpaper of a set that's all picked, picks all of any other.
+    pub fn toggle_wallpaper_set(&mut self, set: &WallpaperSet) {
+        let all = self.wallpapers_on(set) == wallpapers_in(set);
+        for key in wallpaper_keys(set) {
+            if all {
+                self.wallpapers.remove(&key);
+            } else {
+                self.wallpapers.insert(key);
+            }
+        }
+    }
+
+    /// The wallpapers picked over every set.
+    pub fn wallpapers_picked(&self, sets: &[WallpaperSet]) -> u32 {
+        sets.iter().map(|s| self.wallpapers_on(s)).sum()
+    }
+
+    /// The picker needs something to show, and the first boot a wallpaper to start on.
+    pub fn wallpapers_ok(&self, sets: &[WallpaperSet]) -> Result<(), &'static str> {
+        if !sets.is_empty() && self.wallpapers_picked(sets) == 0 {
+            return Err("Pick at least one wallpaper.");
+        }
+        Ok(())
+    }
+
+    /// `[wallpapers]`: a set picked whole goes in by its id, so the wallpapers a release adds to
+    /// it show up too; the others' picks one by one. Both in the payload's order.
+    fn wallpapers_config(&self, sets: &[WallpaperSet]) -> Wallpapers {
+        let mut w = Wallpapers {
+            sets: Vec::new(),
+            files: Vec::new(),
+        };
+        for set in sets {
+            if self.wallpapers_on(set) == wallpapers_in(set) && wallpapers_in(set) > 0 {
+                w.sets.push(set.id.clone());
+            } else {
+                w.files.extend(
+                    set.files
+                        .iter()
+                        .filter(|f| self.wallpaper_on(set, f))
+                        .map(|f| wallpaper_key(set, f)),
+                );
+            }
+        }
+        w
     }
 
     /// `secured`: the picked network wants a password.
@@ -250,14 +335,7 @@ impl Form {
             // An older payload has no sets to pick from.
             wallpapers: manifest
                 .filter(|m| !m.wallpaper_sets.is_empty())
-                .map(|m| Wallpapers {
-                    sets: m
-                        .wallpaper_sets
-                        .iter()
-                        .filter(|s| self.wallpaper_set_on(&s.id))
-                        .map(|s| s.id.clone())
-                        .collect(),
-                }),
+                .map(|m| self.wallpapers_config(&m.wallpaper_sets)),
             payload: Payload {
                 dir: PAYLOAD_DIR.into(),
             },
@@ -502,28 +580,107 @@ mod tests {
     #[test]
     fn every_wallpaper_set_by_default() {
         let p = demo_probe();
+        let sets = &p.payload.as_ref().unwrap().wallpaper_sets;
         let mut f = Form::new(&p);
-        let sets = |f: &Form| f.to_config(&p).wallpapers.map(|w| w.sets);
+        let config = |f: &Form| f.to_config(&p).wallpapers.unwrap();
         let all = ["cyberpunk", "japanese", "shinjuku"]
             .map(String::from)
             .to_vec();
-        assert_eq!(sets(&f), Some(all.clone()));
-        f.toggle_wallpaper_set("japanese");
-        assert_eq!(sets(&f), Some(vec!["cyberpunk".into(), "shinjuku".into()]));
-        f.toggle_wallpaper_set("cyberpunk");
-        f.toggle_wallpaper_set("shinjuku");
-        assert_eq!(sets(&f), Some(vec![]), "none: only your own folder");
-        f.toggle_wallpaper_set("shinjuku");
-        f.toggle_wallpaper_set("japanese");
-        f.toggle_wallpaper_set("cyberpunk");
-        assert_eq!(sets(&f), Some(all), "the payload's order, not the clicks'");
+        assert_eq!(config(&f).sets, all);
+        assert_eq!(config(&f).files, Vec::<String>::new());
+        assert_eq!(f.wallpapers_picked(sets), 10);
+        f.toggle_wallpaper_set(&sets[1]);
+        assert_eq!(config(&f).sets, ["cyberpunk", "shinjuku"]);
+        f.toggle_wallpaper_set(&sets[0]);
+        f.toggle_wallpaper_set(&sets[2]);
+        assert_eq!(config(&f).sets, Vec::<String>::new());
+        assert_eq!(f.wallpapers_picked(sets), 0);
+        f.toggle_wallpaper_set(&sets[2]);
+        f.toggle_wallpaper_set(&sets[1]);
+        f.toggle_wallpaper_set(&sets[0]);
+        assert_eq!(config(&f).sets, all, "the payload's order, not the clicks'");
+    }
+
+    #[test]
+    fn single_wallpapers_go_in_one_by_one_and_a_set_picked_whole_by_its_id() {
+        let p = demo_probe();
+        let sets = &p.payload.as_ref().unwrap().wallpaper_sets;
+        let mut f = Form::new(&p);
+
+        f.toggle_wallpaper(&sets[2], &sets[2].files[1]);
+        f.toggle_wallpaper(&sets[2], &sets[2].files[3]);
+        f.toggle_wallpaper_set(&sets[1]);
+        f.toggle_wallpaper(&sets[1], &sets[1].files[1]);
+
+        let w = f.to_config(&p).wallpapers.unwrap();
+        assert_eq!(w.sets, ["cyberpunk"]);
+        assert_eq!(
+            w.files,
+            [
+                "japanese/tokyo-tower-blue-hour.jpg",
+                "shinjuku/kabukicho-red-gate.jpg",
+                "shinjuku/omoide-yokocho-lanterns.jpg",
+                "shinjuku/train-neon-streak.jpg",
+            ]
+        );
+        assert_eq!(f.wallpapers_on(&sets[2]), 3);
+        assert_eq!(f.wallpapers_picked(sets), 7);
+        assert!(!f.wallpaper_on(&sets[2], &sets[2].files[1]));
+    }
+
+    #[test]
+    fn a_set_header_picks_the_rest_of_a_set_and_drops_a_whole_one() {
+        let p = demo_probe();
+        let sets = &p.payload.as_ref().unwrap().wallpaper_sets;
+        let mut f = Form::new(&p);
+        f.toggle_wallpaper(&sets[2], &sets[2].files[0]);
+
+        f.toggle_wallpaper_set(&sets[2]);
+        assert_eq!(f.wallpapers_on(&sets[2]), 5, "partly picked: all of it");
+        f.toggle_wallpaper_set(&sets[2]);
+        assert_eq!(f.wallpapers_on(&sets[2]), 0, "all picked: none of it");
+    }
+
+    #[test]
+    fn at_least_one_wallpaper_must_be_picked() {
+        let p = demo_probe();
+        let sets = &p.payload.as_ref().unwrap().wallpaper_sets;
+        let mut f = Form::new(&p);
+        for s in sets {
+            f.toggle_wallpaper_set(s);
+        }
+        assert_eq!(f.wallpapers_ok(sets), Err("Pick at least one wallpaper."));
+
+        f.toggle_wallpaper(&sets[1], &sets[1].files[0]);
+
+        assert_eq!(f.wallpapers_ok(sets), Ok(()));
+        assert_eq!(
+            f.to_config(&p).wallpapers.unwrap().files,
+            ["japanese/shinjuku-purple-hour.jpg"]
+        );
+    }
+
+    #[test]
+    fn a_set_an_older_payload_lists_no_files_for_is_picked_whole() {
+        let mut p = demo_probe();
+        p.payload.as_mut().unwrap().wallpaper_sets[0].files.clear();
+        let sets = p.payload.as_ref().unwrap().wallpaper_sets.clone();
+        let mut f = Form::new(&p);
+        assert_eq!(f.wallpapers_on(&sets[0]), 3);
+
+        f.toggle_wallpaper_set(&sets[0]);
+
+        assert_eq!(f.wallpapers_on(&sets[0]), 0);
+        assert_eq!(f.to_config(&p).wallpapers.unwrap().sets, ["japanese", "shinjuku"]);
     }
 
     #[test]
     fn no_wallpaper_sets_in_an_older_payload() {
         let mut p = demo_probe();
         p.payload.as_mut().unwrap().wallpaper_sets.clear();
-        assert_eq!(Form::new(&p).to_config(&p).wallpapers, None);
+        let f = Form::new(&p);
+        assert_eq!(f.to_config(&p).wallpapers, None);
+        assert_eq!(f.wallpapers_ok(&[]), Ok(()), "nothing to pick from");
     }
 
     #[test]

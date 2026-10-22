@@ -183,11 +183,27 @@ fn gallery() {
         shot(&dir, "git-bad-email", &app, size);
         app.form.git_email = "kuba@example.com".into();
 
+        // A few dropped, focus on a thumbnail. GALLERY_PAYLOAD: a payload dir with the
+        // thumbnails (`wallpapers/<set>/<file>.jpg`); without it, placeholders.
+        if let Some(payload) = std::env::var_os("GALLERY_PAYLOAD") {
+            app.payload_dir = payload.into();
+            app.load_thumbs_now();
+        }
         go(&mut app, Screen::Wallpapers);
-        app.form.toggle_wallpaper_set("japanese");
-        app.focus = Some(F::WallpaperSet(1));
+        let picked = app.form.wallpapers.clone();
+        let sets = app.wallpaper_sets().to_vec();
+        app.form.toggle_wallpaper_set(&sets[1]);
+        app.form.toggle_wallpaper(&sets[1], &sets[1].files[1]);
+        app.form.toggle_wallpaper(&sets[2], &sets[2].files[1]);
+        app.form.toggle_wallpaper(&sets[2], &sets[2].files[3]);
+        app.focus = Some(F::Wallpaper(2, 1));
         shot(&dir, "wallpapers", &app, size);
-        app.form.toggle_wallpaper_set("japanese");
+        // None picked, Enter: the reason flashes.
+        app.form.wallpapers.clear();
+        app.focus = Some(F::WallpaperSet(0));
+        let _ = app.update_inner(Message::Key(crate::app::Key::Enter));
+        shot(&dir, "wallpapers-none", &app, size);
+        app.form.wallpapers = picked;
 
         go(&mut app, Screen::Summary);
         shot(&dir, "summary-alongside", &app, size);

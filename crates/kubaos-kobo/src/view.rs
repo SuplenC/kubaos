@@ -22,7 +22,7 @@ use iced::{
 use kubaos_core::Level;
 use kubaos_core::probe::DiskInfo;
 
-use crate::app::{App, F, HOLD, List, Message, PowerAction, ProbeState, Screen, ids};
+use crate::app::{App, F, HOLD, List, Message, PowerAction, ProbeState, Screen, WALLPAPER_COLUMNS, ids, wallpaper_item};
 use crate::data;
 use crate::elide::elide;
 use crate::grid::grid;
@@ -31,7 +31,7 @@ use crate::progress::{LOG_VIEW_LINES, Outcome, StepState, fmt_duration};
 use crate::theme::{self, DARK, Icon, Palette, alpha, jp, mix, motion, radius, size, space};
 use crate::widgets::{
     FieldLook, Kind, ROW_GAP, accent, bar, battery, body, btn, chip, field, field_with, header,
-    icon, label, list_row, quiet_btn, ring, scroll, spinner, switch_anim, text_field, title, well,
+    icon, label, list_row, play_badge, quiet_btn, ring, scroll, spinner, switch_anim, text_field, title, well,
     well_ring,
 };
 
@@ -382,7 +382,7 @@ pub fn hints(app: &App) -> Vec<(&'static str, &'static str)> {
         }
         Screen::Wifi => v.extend([("↑ ↓", "pick"), ("Tab", "next field")]),
         Screen::Account | Screen::Git => v.push(("Tab", "next field")),
-        Screen::Wallpapers => v.extend([("Space", "pick or drop"), ("← ↑ ↓ →", "move")]),
+        Screen::Wallpapers => v.extend([("Space", "pick or drop"), ("← ↑ ↓ →", "move"), ("Tab", "next set")]),
         Screen::Disk => v.extend([
             ("↑ ↓", "pick a disk"),
             ("← →", "keep or erase"),
@@ -1664,132 +1664,232 @@ fn set_name(id: &str) -> String {
         .unwrap_or_default()
 }
 
+/// `kabukicho-red-gate.jpg` -> "kabukicho red gate", as the shell's picker labels it.
+fn wallpaper_label(name: &str) -> String {
+    let stem = name.rsplit_once('.').map_or(name, |(s, _)| s);
+    stem.replace(['-', '_'], " ")
+}
+
+/// The Summary's line for `[wallpapers]`: the sets picked whole by name, the others with how many
+/// of theirs.
+pub fn wallpapers_summary(
+    w: Option<&kubaos_core::config::Wallpapers>,
+    sets: &[kubaos_core::probe::WallpaperSet],
+) -> String {
+    let Some(w) = w else {
+        return "Every set".into();
+    };
+    if w.sets.is_empty() && w.files.is_empty() {
+        return "Only your own".into();
+    }
+    let mut parts = Vec::new();
+    for set in sets {
+        let picked = w
+            .files
+            .iter()
+            .filter(|f| f.split_once('/').is_some_and(|(id, _)| id == set.id))
+            .count();
+        if w.sets.contains(&set.id) {
+            parts.push(set_name(&set.id));
+        } else if picked > 0 {
+            parts.push(format!("{} ({picked} of {})", set_name(&set.id), set.files.len()));
+        }
+    }
+    parts.join(", ")
+}
+
+/// Height of a thumbnail on the Wallpapers screen: 16:9 at the width four take in the panel.
+const THUMB_HEIGHT: f32 = 92.0;
+
 fn wallpapers<'a>(app: &'a App, p: &Palette) -> El<'a> {
     let sets = app.wallpaper_sets();
-    let tile = |i: usize| -> El<'a> {
-        let s = &sets[i];
-        let on = app.form.wallpaper_set_on(&s.id);
-        let pp = *p;
-        // The payload carries a small JPEG per set; the demo has none.
-        let preview: El = match &s.preview {
-            Some(rel) => image(image::Handle::from_path(
-                std::path::Path::new(model::PAYLOAD_DIR).join(rel),
-            ))
-            .content_fit(ContentFit::Cover)
-            .width(Length::Fill)
-            .height(112)
-            .into(),
-            None => center(icon(
-                Icon::Wallpaper,
-                32.0,
-                alpha(p.on_surface_variant, 0.6),
-            ))
-            .width(Length::Fill)
-            .height(112)
-            .style(move |_t| container::Style {
-                background: Some(Background::Color(alpha(pp.surface_container_highest, 0.6))),
-                ..container::Style::default()
-            })
-            .into(),
-        };
-        let fg = if on {
-            p.on_secondary_container
-        } else {
-            p.on_surface
-        };
-        let b = button(
-            column![
-                container(preview)
-                    .clip(true)
-                    .style(move |_t| container::Style {
-                        border: Border::default().rounded(radius::MD),
-                        ..container::Style::default()
-                    }),
-                row![
-                    icon(
-                        if on { Icon::CheckCircle } else { Icon::Circle },
-                        20.0,
-                        if on { p.primary } else { p.outline }
-                    ),
-                    text(set_name(&s.id))
-                        .font(theme::SANS_SEMIBOLD)
-                        .size(size::MD)
-                        .color(fg)
-                        .width(Length::Fill),
-                    text(match s.images {
-                        1 => "1 wallpaper".to_string(),
-                        n => format!("{n} wallpapers"),
-                    })
-                    .size(size::SM)
-                    .color(alpha(if on { fg } else { p.on_surface_variant }, 0.85)),
-                ]
-                .spacing(space::SM)
-                .align_y(Alignment::Center),
-            ]
-            .spacing(space::MD),
-        )
-        .width(Length::Fill)
-        .padding(space::MD)
-        .on_press(Message::Click(F::WallpaperSet(i)))
-        .style(move |_t: &Theme, status| button::Style {
-            background: Some(Background::Color(if on {
-                alpha(pp.secondary_container, 0.85)
-            } else if matches!(status, button::Status::Hovered) {
-                alpha(pp.on_surface, theme::STATE_HOVER)
-            } else {
-                alpha(pp.surface_container_low, 0.6)
-            })),
-            text_color: pp.on_surface,
-            border: Border {
-                color: if on {
-                    alpha(pp.primary, 0.8)
+    let mut sections = column![].spacing(space::XL);
+    for (s, set) in sets.iter().enumerate() {
+        let mut section = column![wallpaper_set_header(app, s, set, p)].spacing(space::SM);
+        for start in (0..set.files.len()).step_by(WALLPAPER_COLUMNS) {
+            let mut r = row![].spacing(space::SM);
+            for i in start..start + WALLPAPER_COLUMNS {
+                r = r.push(if i < set.files.len() {
+                    wallpaper_thumb(app, s, i, p)
                 } else {
-                    alpha(pp.outline_variant, 0.7)
-                },
-                width: 1.0,
-                radius: radius::LG.into(),
-            },
-            shadow: Shadow::default(),
-            snap: true,
-        });
-        container(ring(b, app.is_focused(F::WallpaperSet(i)), radius::LG, p))
-            .width(Length::FillPortion(1))
-            .into()
-    };
-    let mut grid = column![].spacing(space::LG);
-    for start in (0..sets.len()).step_by(3) {
-        let mut r = row![].spacing(space::LG);
-        for i in start..(start + 3) {
-            r = r.push(if i < sets.len() {
-                tile(i)
-            } else {
-                Space::new().width(Length::FillPortion(1)).into()
-            });
+                    Space::new().width(Length::FillPortion(1)).into()
+                });
+            }
+            section = section.push(r);
         }
-        grid = grid.push(r);
+        sections = sections.push(section);
     }
-    let n = sets
-        .iter()
-        .filter(|s| app.form.wallpaper_set_on(&s.id))
-        .count();
-    let note = if n == 0 {
-        "None picked: the picker shows your own folder only.".to_string()
-    } else {
-        format!("{n} of {} in the picker.", sets.len())
+    let total: u32 = sets.iter().map(|s| s.images).sum();
+    let picked = app.form.wallpapers_picked(sets);
+    let note = match picked {
+        0 => "None picked. The picker needs at least one to start on.".to_string(),
+        n if n == total => format!("All {total} picked."),
+        n => format!("{n} of {total} picked."),
     };
     column![
         header(
             jp::WALLPAPERS,
             "Wallpapers",
-            "Every set gets installed. Pick the ones the wallpaper picker shows (later: ~/.config/kubaos/wallpapers/sets). Your own images go in ~/Pictures/wallpapers.",
+            "Pick the ones the wallpaper picker shows; a set's name takes all of it. Every one gets installed either way (later: ~/.config/kubaos/wallpapers/sets). Your own images go in ~/Pictures/wallpapers.",
             p
         ),
-        Space::new().height(space::XXL),
-        scroll(ids::WALLPAPER_SCROLL, grid, p),
-        Space::new().height(space::LG),
+        Space::new().height(space::XL),
+        scroll(ids::WALLPAPER_SCROLL, container(sections).padding(Padding::ZERO.right(space::LG)), p)
+            .height(Length::Fill),
+        Space::new().height(space::MD),
         text(note).size(size::SM).color(p.on_surface_variant),
     ]
     .into()
+}
+
+/// A set's header: its name and how many of its wallpapers are picked. Space or a click picks the
+/// rest of it, or drops it when it's all picked.
+fn wallpaper_set_header<'a>(
+    app: &'a App,
+    s: usize,
+    set: &'a kubaos_core::probe::WallpaperSet,
+    p: &Palette,
+) -> El<'a> {
+    let on = app.form.wallpapers_on(set);
+    let all = on == set.images && on > 0;
+    let pp = *p;
+    let (ic, ic_color) = match on {
+        0 => (Icon::Circle, p.outline),
+        _ if all => (Icon::CheckCircle, p.primary),
+        _ => (Icon::CheckCircle, alpha(p.primary, 0.55)),
+    };
+    let b = button(
+        row![
+            icon(ic, 20.0, ic_color),
+            text(set_name(&set.id))
+                .font(theme::SANS_SEMIBOLD)
+                .size(size::MD)
+                .color(p.on_surface)
+                .width(Length::Fill),
+            text(match (on, set.images) {
+                (_, 1) if all => "1 wallpaper".to_string(),
+                (_, n) if all => format!("all {n}"),
+                (0, 1) => "1 wallpaper".to_string(),
+                (0, n) => format!("{n} wallpapers"),
+                (k, n) => format!("{k} of {n}"),
+            })
+            .size(size::SM)
+            .color(p.on_surface_variant),
+        ]
+        .spacing(space::SM)
+        .align_y(Alignment::Center),
+    )
+    .width(Length::Fill)
+    .padding([space::XS, space::SM])
+    .on_press(Message::Click(F::WallpaperSet(s)))
+    .style(move |_t: &Theme, status| button::Style {
+        background: matches!(status, button::Status::Hovered)
+            .then(|| Background::Color(alpha(pp.on_surface, theme::STATE_HOVER))),
+        text_color: pp.on_surface,
+        border: Border::default().rounded(radius::MD),
+        shadow: Shadow::default(),
+        snap: true,
+    });
+    let f = F::WallpaperSet(s);
+    container(ring(b, app.is_focused(f), radius::MD, p))
+        .id(wallpaper_item(f).unwrap_or_default())
+        .into()
+}
+
+/// A thumbnail: picked ones in full colour with a check, the others dimmed. Videos carry a play
+/// badge. Until (or unless) its picture is decoded, a placeholder.
+fn wallpaper_thumb<'a>(app: &'a App, s: usize, i: usize, p: &Palette) -> El<'a> {
+    let set = &app.wallpaper_sets()[s];
+    let file = &set.files[i];
+    let on = app.form.wallpaper_on(set, file);
+    let pp = *p;
+    let picture: El = match app.thumbs.get(&model::wallpaper_key(set, file)) {
+        Some(h) => image(h.clone())
+            .content_fit(ContentFit::Cover)
+            .width(Length::Fill)
+            .height(THUMB_HEIGHT)
+            .border_radius(radius::MD)
+            .opacity(if on { 1.0 } else { 0.4 })
+            .into(),
+        None => center(icon(Icon::Wallpaper, 28.0, alpha(p.on_surface_variant, 0.6)))
+            .width(Length::Fill)
+            .height(THUMB_HEIGHT)
+            .style(move |_t| container::Style {
+                background: Some(Background::Color(alpha(pp.surface_container_highest, 0.6))),
+                border: Border::default().rounded(radius::MD),
+                ..container::Style::default()
+            })
+            .into(),
+    };
+    let mut layers = stack![picture];
+    if file.is_video() {
+        layers = layers.push(
+            container(play_badge(22.0, Color::WHITE, alpha(Color::BLACK, 0.55)))
+                .padding(space::XS)
+                .width(Length::Fill)
+                .height(THUMB_HEIGHT)
+                .align_x(Alignment::Start)
+                .align_y(Alignment::End),
+        );
+    }
+    if on {
+        layers = layers.push(
+            container(
+                container(icon(Icon::CheckCircle, 20.0, p.on_primary))
+                    .padding(1)
+                    .style(move |_t| container::Style {
+                        background: Some(Background::Color(pp.primary)),
+                        border: Border::default().rounded(radius::FULL),
+                        ..container::Style::default()
+                    }),
+            )
+            .padding(space::XS)
+            .width(Length::Fill)
+            .align_x(Alignment::End),
+        );
+    }
+    let b = button(
+        column![
+            layers,
+            elide(
+                wallpaper_label(&file.name),
+                theme::SANS,
+                size::XS,
+                if on { p.on_surface } else { p.on_surface_variant },
+            )
+            .width(Length::Fill),
+        ]
+        .spacing(space::XS),
+    )
+    .width(Length::Fill)
+    .padding(space::XS)
+    .on_press(Message::Click(F::Wallpaper(s, i)))
+    .style(move |_t: &Theme, status| button::Style {
+        background: Some(Background::Color(if on {
+            alpha(pp.secondary_container, 0.7)
+        } else if matches!(status, button::Status::Hovered) {
+            alpha(pp.on_surface, theme::STATE_HOVER)
+        } else {
+            Color::TRANSPARENT
+        })),
+        text_color: pp.on_surface,
+        border: Border {
+            color: if on {
+                alpha(pp.primary, 0.8)
+            } else {
+                alpha(pp.outline_variant, 0.5)
+            },
+            width: 1.0,
+            radius: (radius::MD + 2.0).into(),
+        },
+        shadow: Shadow::default(),
+        snap: true,
+    });
+    let f = F::Wallpaper(s, i);
+    container(ring(b, app.is_focused(f), radius::MD + 2.0, p))
+        .id(wallpaper_item(f).unwrap_or_default())
+        .width(Length::FillPortion(1))
+        .into()
 }
 
 /// A summary row with a second, quieter line (paths, emails, versions):
@@ -1955,15 +2055,7 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
             ),
             kv(
                 "Wallpapers",
-                match cfg.wallpapers.as_ref().map(|w| w.sets.as_slice()) {
-                    None => "Every set".into(),
-                    Some([]) => "Only your own".into(),
-                    Some(sets) => sets
-                        .iter()
-                        .map(|s| set_name(s))
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                },
+                wallpapers_summary(cfg.wallpapers.as_ref(), app.wallpaper_sets()),
                 p,
             ),
             kv(

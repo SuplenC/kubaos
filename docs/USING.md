@@ -131,7 +131,7 @@ home-manager switch --flake ~/.config/kubaos/home --override-input kubaos git+fi
 | `home-manager switch --flake ~/.config/kubaos/home` | Apply your `home.nix` |
 | `dot-theme set <image>` | Set a wallpaper (an image or a loop) and regenerate colors everywhere |
 | `dot-theme next`, `prev`, `toggle-folder` | Cycle wallpapers (stills and loops), cycle the folders: the sets you picked, your own `~/Pictures/wallpapers` |
-| `~/.config/kubaos/wallpapers/sets` | The wallpaper sets the picker shows, one per line (every set in `/usr/share/kubaos/wallpapers` without the file). A set a new release brings shows up once you add it |
+| `~/.config/kubaos/wallpapers/sets` | What the picker shows, one per line: a set's name for all of it, `<set>/<file>` for one wallpaper (every set in `/usr/share/kubaos/wallpapers` without the file). A set a new release brings shows up once you add it; `dot-theme all-sets` (Command menu: Show every wallpaper set) lists every set again |
 | `dot-theme apply [--force]` | Regenerate from the current wallpaper; without `--force` it does nothing when no input changed (login runs it) |
 | `kubaos cursor style dark\|accent\|classic`, `kubaos cursor size <16-96>` | The pointer: dark with a light outline, the wallpaper's accent, or plain Bibata black and white, and its size. Applies at once and is kept in `~/.config/kubaos/cursor/cursor.toml`; the Command menu has both ("cursor") |
 | `dot-config apply` | Create missing files in `~/.config/kubaos` and rewrite the merged configs (bat, git ignore, fastfetch) from the defaults plus yours. Every `home-manager switch` runs it |

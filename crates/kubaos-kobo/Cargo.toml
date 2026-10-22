@@ -35,3 +35,4 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 [dev-dependencies]
 # Lays views out headlessly, so widget sizes can be tested.
 iced_test = "0.14"
+tempfile.workspace = true

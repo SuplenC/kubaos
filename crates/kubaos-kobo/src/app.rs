@@ -103,8 +103,10 @@ pub enum F {
     LuksConfirm,
     GitName,
     GitEmail,
-    /// A tile on the Wallpapers screen: the manifest's set at this index.
+    /// A set's header on the Wallpapers screen: the manifest's set at this index.
     WallpaperSet(usize),
+    /// A thumbnail on the Wallpapers screen: the set's file at the second index.
+    Wallpaper(usize, usize),
     /// A step in the rail, to go back to.
     Step(Screen),
     Hold,
@@ -242,6 +244,8 @@ pub enum Message {
     /// The mouse moved or clicked: show the pointer again.
     PointerMoved,
     Wallpaper(image::Handle),
+    /// Thumbnails of the Wallpapers screen, decoded, keyed like `model::wallpaper_key`.
+    Thumbs(Vec<(String, image::Handle)>),
     Pasted(Option<String>),
 
     /// Mouse: clicking a control focuses it and acts like Enter/Space on it.
@@ -328,6 +332,10 @@ pub struct App {
     pub wallpaper: Option<(image::Handle, Instant)>,
     pub glass: Option<(Size, image::Handle)>,
     blur_src: Option<::image::RgbaImage>,
+    /// Where the payload's wallpaper thumbnails are read from.
+    pub payload_dir: PathBuf,
+    /// The wallpaper thumbnails decoded so far, keyed like `model::wallpaper_key`.
+    pub thumbs: HashMap<String, image::Handle>,
 
     pub locale_q: String,
     pub keymap_q: String,
@@ -407,6 +415,8 @@ impl App {
             wallpaper: None,
             glass: None,
             blur_src: None,
+            payload_dir: PathBuf::from(crate::model::PAYLOAD_DIR),
+            thumbs: HashMap::new(),
             locale_q: String::new(),
             keymap_q: String::new(),
             tz_q: String::new(),
@@ -534,10 +544,21 @@ impl App {
                 v
             }
             Screen::Git => vec![F::GitName, F::GitEmail, F::Back, F::Next],
-            Screen::Wallpapers => (0..self.wallpaper_sets().len())
-                .map(F::WallpaperSet)
-                .chain([F::Back, F::Next])
-                .collect(),
+            Screen::Wallpapers => {
+                // Tab goes from set to set; the arrows move through a set's thumbnails. The
+                // focused thumbnail sits after its set's header, so Tab leaves it for the next set.
+                let mut v = Vec::new();
+                for s in 0..self.wallpaper_sets().len() {
+                    v.push(F::WallpaperSet(s));
+                    if let Some(f @ F::Wallpaper(fs, _)) = self.focus
+                        && fs == s
+                    {
+                        v.push(f);
+                    }
+                }
+                v.extend([F::Back, F::Next]);
+                v
+            }
             Screen::Summary => vec![F::Hold, F::Back],
             Screen::Installing => vec![F::ToggleLog],
             Screen::Failed => vec![F::Retry, F::SaveLog, F::ToggleLog, F::Back],
@@ -607,6 +628,7 @@ impl App {
             Screen::Account => self.form.account_ok(),
             Screen::Disk => probe.map_or(Err("No disks. None at all."), |p| self.form.disk_ok(p)),
             Screen::Git => self.form.git_ok(),
+            Screen::Wallpapers => self.form.wallpapers_ok(self.wallpaper_sets()),
             _ => Ok(()),
         };
         r.err()
@@ -740,6 +762,15 @@ impl App {
         self.ensure_glass();
     }
 
+    /// Decodes the wallpaper thumbnails from `payload_dir` right away (the gallery).
+    #[cfg(test)]
+    pub fn load_thumbs_now(&mut self) {
+        let sets = self.wallpaper_sets().to_vec();
+        for set in &sets {
+            self.thumbs.extend(decoded_thumbs(&self.payload_dir, set));
+        }
+    }
+
     /// Pretends the probe already answered (tests and the gallery).
     #[cfg(test)]
     pub fn set_probe(&mut self, p: Result<Probe, String>) {
@@ -804,6 +835,10 @@ impl App {
             Message::Wallpaper(h) => {
                 self.wallpaper = Some((h, Instant::now()));
                 self.now = Instant::now();
+                Task::none()
+            }
+            Message::Thumbs(thumbs) => {
+                self.thumbs.extend(thumbs);
                 Task::none()
             }
             Message::Key(k) => {
@@ -937,6 +972,7 @@ impl App {
             .min(Duration::from_millis(100));
         self.last_tick = now;
         self.now = now;
+        let mut task = Task::none();
         if let Some(rx) = &self.probe_rx
             && let Ok(r) = rx.try_recv()
         {
@@ -949,8 +985,9 @@ impl App {
                 Err(e) => ProbeState::Failed(e),
             };
             self.focus_screen();
+            // Long before the Wallpapers screen opens.
+            task = self.load_thumbs();
         }
-        let mut task = Task::none();
         // Asking for fullscreen in the window settings makes winit request it
         // before the first frame, which kills cage 0.2.1. Ask once the window
         // is up instead (cage gives us the whole output anyway).
@@ -1071,9 +1108,17 @@ impl App {
                 self.flipped(f);
                 Task::none()
             }
-            F::WallpaperSet(i) => {
-                if let Some(id) = self.wallpaper_sets().get(i).map(|s| s.id.clone()) {
-                    self.form.toggle_wallpaper_set(&id);
+            F::WallpaperSet(s) => {
+                if let Some(set) = self.wallpaper_sets().get(s).cloned() {
+                    self.form.toggle_wallpaper_set(&set);
+                }
+                Task::none()
+            }
+            F::Wallpaper(s, i) => {
+                if let Some(set) = self.wallpaper_sets().get(s).cloned()
+                    && let Some(file) = set.files.get(i)
+                {
+                    self.form.toggle_wallpaper(&set, file);
                 }
                 Task::none()
             }
@@ -1335,18 +1380,8 @@ impl App {
                         self.toggle_mode();
                         Task::none()
                     }
-                    // The grid is three wide (view.rs, wallpapers).
-                    Some(F::WallpaperSet(i)) if matches!(k, Key::Up | Key::Down) => {
-                        let n = self.wallpaper_sets().len();
-                        let j = if d < 0 {
-                            i.checked_sub(3).unwrap_or(i)
-                        } else if i + 3 < n {
-                            i + 3
-                        } else {
-                            i
-                        };
-                        self.set_focus(Some(F::WallpaperSet(j)));
-                        Task::none()
+                    Some(f @ (F::WallpaperSet(_) | F::Wallpaper(..))) if matches!(k, Key::Up | Key::Down) => {
+                        self.move_in_wallpapers(f, if d < 0 { Dir::Up } else { Dir::Down })
                     }
                     Some(f) if f.lists() => self.move_selection(d),
                     _ => Task::none(),
@@ -1372,14 +1407,8 @@ impl App {
                     } else {
                         DiskMode::Whole
                     });
-                } else if let Some(F::WallpaperSet(i)) = focus {
-                    let n = self.wallpaper_sets().len();
-                    let j = if left {
-                        i.saturating_sub(1)
-                    } else {
-                        (i + 1).min(n - 1)
-                    };
-                    self.set_focus(Some(F::WallpaperSet(j)));
+                } else if let Some(f @ (F::WallpaperSet(_) | F::Wallpaper(..))) = focus {
+                    return self.move_in_wallpapers(f, if left { Dir::Left } else { Dir::Right });
                 }
                 Task::none()
             }
@@ -1675,11 +1704,77 @@ impl App {
     /// (src/reveal.rs). The page title sits outside the scrollable, so it
     /// never goes anywhere.
     fn reveal(&self) -> Task<Message> {
-        let Some((scroll, item)) = self.focus.and_then(|f| reveal_target(self.screen, f)) else {
+        let target = self.focus.and_then(|f| match wallpaper_item(f) {
+            Some(item) => Some((ids::WALLPAPER_SCROLL, iced::widget::Id::from(item))),
+            None => reveal_target(self.screen, f).map(|(scroll, item)| (scroll, iced::widget::Id::new(item))),
+        });
+        let Some((scroll, item)) = target else {
             return Task::none();
         };
         iced::advanced::widget::operate(crate::reveal::Find::new(scroll, item))
             .map(move |found| Message::Reveal(scroll, found))
+    }
+
+    /// The arrow keys on the Wallpapers screen: through a set's grid of thumbnails, from its
+    /// header into it, and past its first or last row to the set above or below.
+    fn move_in_wallpapers(&mut self, from: F, dir: Dir) -> Task<Message> {
+        let Some(to) = self.wallpaper_neighbour(from, dir) else {
+            return Task::none();
+        };
+        self.set_focus(Some(to));
+        self.reveal()
+    }
+
+    /// Where an arrow key goes from a header or a thumbnail; `None` at the edge.
+    pub(crate) fn wallpaper_neighbour(&self, from: F, dir: Dir) -> Option<F> {
+        let sets = self.wallpaper_sets();
+        let files = |s: usize| sets.get(s).map_or(0, |set| set.files.len());
+        let cols = WALLPAPER_COLUMNS;
+        // The set above's last row, at its first thumbnail; its header when it has none.
+        let above = |s: usize| -> Option<F> {
+            let s = s.checked_sub(1)?;
+            Some(match files(s) {
+                0 => F::WallpaperSet(s),
+                n => F::Wallpaper(s, (n - 1) / cols * cols),
+            })
+        };
+        let below = |s: usize| (s + 1 < sets.len()).then_some(F::WallpaperSet(s + 1));
+        match (from, dir) {
+            (F::WallpaperSet(s), Dir::Up) => above(s),
+            (F::WallpaperSet(s), Dir::Down) => match files(s) {
+                0 => below(s),
+                _ => Some(F::Wallpaper(s, 0)),
+            },
+            (F::Wallpaper(s, i), Dir::Left) => i.checked_sub(1).map(|j| F::Wallpaper(s, j)),
+            (F::Wallpaper(s, i), Dir::Right) => (i + 1 < files(s)).then_some(F::Wallpaper(s, i + 1)),
+            (F::Wallpaper(s, i), Dir::Up) => Some(match i.checked_sub(cols) {
+                Some(j) => F::Wallpaper(s, j),
+                None => F::WallpaperSet(s),
+            }),
+            (F::Wallpaper(s, i), Dir::Down) => {
+                let n = files(s);
+                if i + cols < n {
+                    Some(F::Wallpaper(s, i + cols))
+                } else if i / cols < (n - 1) / cols {
+                    // The row below is short: its last thumbnail.
+                    Some(F::Wallpaper(s, n - 1))
+                } else {
+                    below(s)
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Decodes every set's thumbnails, a thread per set, so the screen fills in as they come.
+    fn load_thumbs(&self) -> Task<Message> {
+        let dir = self.payload_dir.clone();
+        Task::batch(
+            self.wallpaper_sets()
+                .iter()
+                .cloned()
+                .map(|set| Task::perform(load_thumbs(dir.clone(), set), Message::Thumbs)),
+        )
     }
 
     /// Keeps the selected row of the active list in view, scrolling as
@@ -1773,6 +1868,27 @@ pub fn reveal_target(screen: Screen, f: F) -> Option<(&'static str, &'static str
 
 /// Rows Page Up and Page Down move in a list.
 const PAGE: i32 = 8;
+
+/// Thumbnails in a row on the Wallpapers screen (`view.rs`, `wallpapers`).
+pub const WALLPAPER_COLUMNS: usize = 4;
+
+/// An arrow key's direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Dir {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+/// The container id of a header or thumbnail on the Wallpapers screen, which `reveal` scrolls to.
+pub fn wallpaper_item(f: F) -> Option<String> {
+    match f {
+        F::WallpaperSet(s) => Some(format!("wallpaper-set-{s}")),
+        F::Wallpaper(s, i) => Some(format!("wallpaper-{s}-{i}")),
+        _ => None,
+    }
+}
 
 impl F {
     /// Focus targets the arrow keys move a list selection for.
@@ -1930,6 +2046,29 @@ async fn decode_wallpaper() -> image::Handle {
     });
     rx.await
         .unwrap_or_else(|_| image::Handle::from_bytes(theme::WALLPAPER))
+}
+
+/// A set's thumbnails, decoded on a thread of their own (`thumbs::decode`), so a few dozen of them
+/// never hold up the UI thread's frames.
+async fn load_thumbs(payload: PathBuf, set: kubaos_core::probe::WallpaperSet) -> Vec<(String, image::Handle)> {
+    let (tx, rx) = iced::futures::channel::oneshot::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(decoded_thumbs(&payload, &set));
+    });
+    rx.await.unwrap_or_default()
+}
+
+fn decoded_thumbs(
+    payload: &std::path::Path,
+    set: &kubaos_core::probe::WallpaperSet,
+) -> Vec<(String, image::Handle)> {
+    crate::thumbs::decode(payload, std::path::Path::new(crate::thumbs::ORIGINALS), set)
+        .into_iter()
+        .map(|(key, img)| {
+            let (w, h) = img.dimensions();
+            (key, image::Handle::from_rgba(w, h, img.into_raw()))
+        })
+        .collect()
 }
 
 fn decode_blur() -> Option<::image::RgbaImage> {

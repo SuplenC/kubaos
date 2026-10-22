@@ -88,14 +88,18 @@ pub struct Wifi {
     pub ssid: String,
 }
 
-/// The wallpaper sets the picker shows. Every set ships in the payload
-/// either way (`/usr/share/kubaos/wallpapers/<id>/`).
+/// The wallpapers the picker shows: whole sets, and single wallpapers of other sets. Every set
+/// ships in the payload either way (`/usr/share/kubaos/wallpapers/<id>/`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Wallpapers {
-    /// Ids from the manifest's `wallpaper_sets`. Empty: only the user's own
-    /// folder.
+    /// Ids from the manifest's `wallpaper_sets`, shown whole, so a wallpaper a release adds to
+    /// one shows up too. Both lists empty: only the user's own folder.
+    #[serde(default)]
     pub sets: Vec<String>,
+    /// Single wallpapers, as `<set id>/<file name>`: `shinjuku/kabukicho-red-gate.jpg`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -100,6 +100,13 @@ icon = "folder-pictures"
 keywords = ["theme", "wallpaper settings"]
 run = ["qs", "ipc", "call", "wallpaper", "settings"]
 
+[extensions.kubaos.actions.wallpaper-all-sets]
+title = "Show every wallpaper set"
+subtitle = "The picker shows every set again, all of each"
+icon = "folder-pictures"
+keywords = ["theme", "wallpaper sets", "all wallpapers", "reset wallpapers"]
+run = ["dot-theme", "all-sets"]
+
 [extensions.kubaos.actions.wallpaper-motion-always]
 title = "Animate wallpaper always"
 subtitle = "Video wallpapers play, on battery too"

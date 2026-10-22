@@ -724,3 +724,132 @@ fn a_bad_hostname_says_why_and_holds_continue() {
     assert!(app.blocker().is_some());
     assert!(draws(&app, crate::model::HOSTNAME_RULE));
 }
+
+fn on_wallpapers() -> App {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Wallpapers);
+    app
+}
+
+fn picked(app: &App) -> u32 {
+    app.form.wallpapers_picked(app.wallpaper_sets())
+}
+
+const TAB: Key = Key::Tab { shift: false };
+const SHIFT_TAB: Key = Key::Tab { shift: true };
+const LEFT: Key = Key::Left {
+    word: false,
+    shift: false,
+};
+const RIGHT: Key = Key::Right {
+    word: false,
+    shift: false,
+};
+
+#[test]
+fn the_wallpapers_screen_opens_on_the_first_set_with_every_wallpaper_picked() {
+    let app = on_wallpapers();
+
+    assert_eq!(app.focus, Some(F::WallpaperSet(0)));
+    assert_eq!(picked(&app), 10);
+    assert_eq!(app.blocker(), None);
+}
+
+#[test]
+fn tab_goes_from_set_to_set_and_the_arrows_through_a_sets_thumbnails() {
+    let mut app = on_wallpapers();
+
+    press(&mut app, &[TAB, TAB]);
+    assert_eq!(app.focus, Some(F::WallpaperSet(2)), "shinjuku, the third set");
+    press(&mut app, &[Key::Down]);
+    assert_eq!(app.focus, Some(F::Wallpaper(2, 0)));
+    press(&mut app, &[RIGHT, RIGHT, RIGHT, RIGHT]);
+    assert_eq!(app.focus, Some(F::Wallpaper(2, 4)), "the second row");
+    press(&mut app, &[Key::Up]);
+    assert_eq!(app.focus, Some(F::Wallpaper(2, 0)), "the column above");
+    press(&mut app, &[Key::Up]);
+    assert_eq!(app.focus, Some(F::WallpaperSet(2)), "out of the grid to its header");
+    press(&mut app, &[Key::Up]);
+    assert_eq!(app.focus, Some(F::Wallpaper(1, 0)), "the set above's last row");
+
+    press(&mut app, &[RIGHT, TAB]);
+    assert_eq!(app.focus, Some(F::WallpaperSet(2)), "Tab leaves a thumbnail for the next set");
+    press(&mut app, &[Key::Down, SHIFT_TAB]);
+    assert_eq!(app.focus, Some(F::WallpaperSet(2)), "Shift+Tab, back to its own header");
+}
+
+#[test]
+fn the_arrows_stop_at_the_edges_and_down_from_a_short_last_row_goes_to_the_next_set() {
+    let app = on_wallpapers();
+
+    assert_eq!(app.wallpaper_neighbour(F::Wallpaper(0, 2), Dir::Down), Some(F::WallpaperSet(1)));
+    assert_eq!(app.wallpaper_neighbour(F::Wallpaper(2, 1), Dir::Down), Some(F::Wallpaper(2, 4)));
+    assert_eq!(app.wallpaper_neighbour(F::Wallpaper(2, 4), Dir::Down), None, "the last set");
+    assert_eq!(app.wallpaper_neighbour(F::Wallpaper(2, 4), Dir::Right), None);
+    assert_eq!(app.wallpaper_neighbour(F::Wallpaper(2, 0), Dir::Left), None);
+    assert_eq!(app.wallpaper_neighbour(F::WallpaperSet(0), Dir::Up), None);
+    assert_eq!(app.wallpaper_neighbour(F::WallpaperSet(1), Dir::Left), None);
+}
+
+#[test]
+fn space_drops_and_picks_a_thumbnail_and_a_whole_set() {
+    let mut app = on_wallpapers();
+
+    press(&mut app, &[Key::Down, Key::Space]);
+    assert_eq!(picked(&app), 9, "cyberpunk's first dropped");
+    press(&mut app, &[Key::Up, Key::Space]);
+    assert_eq!(picked(&app), 10, "the header picks the rest of the set");
+    press(&mut app, &[Key::Space]);
+    assert_eq!(picked(&app), 7, "and drops it when it's all picked");
+    press(&mut app, &[Key::Down, LEFT, Key::Space]);
+    assert_eq!(picked(&app), 8, "Left at a row's start stays put");
+}
+
+#[test]
+fn continue_waits_for_at_least_one_wallpaper() {
+    let mut app = on_wallpapers();
+    press(&mut app, &[Key::Space, TAB, Key::Space, TAB, Key::Space]);
+    assert_eq!(picked(&app), 0);
+
+    press(&mut app, &[Key::Enter]);
+
+    assert_eq!(app.screen, Screen::Wallpapers);
+    assert_eq!(app.blocker(), Some("Pick at least one wallpaper."));
+    assert!(app.nudged.is_some(), "the reason flashes");
+
+    let _ = app.update_inner(Message::Click(F::Wallpaper(1, 1)));
+    let _ = app.update_inner(Message::Click(F::Next));
+
+    assert_eq!(app.screen, Screen::Summary);
+}
+
+#[test]
+fn a_click_on_a_thumbnail_focuses_and_toggles_it() {
+    use iced_test::simulator::Simulator;
+    let mut app = on_wallpapers();
+    let mut ui = Simulator::with_size(
+        iced::Settings::default(),
+        Size::new(1280.0, 800.0),
+        crate::view::view(&app),
+    );
+
+    let tokyo_tower = wallpaper_item(F::Wallpaper(1, 1)).unwrap();
+    ui.click(iced::widget::Id::from(tokyo_tower)).expect("the thumbnail drawn");
+
+    for m in ui.into_messages().collect::<Vec<_>>() {
+        let _ = app.update_inner(m);
+    }
+    assert_eq!(app.focus, Some(F::Wallpaper(1, 1)));
+    assert_eq!(picked(&app), 9);
+}
+
+#[test]
+fn the_wallpapers_screen_counts_what_is_picked() {
+    let mut app = on_wallpapers();
+    assert!(draws(&app, "All 10 picked."));
+
+    press(&mut app, &[TAB, Key::Space]);
+
+    assert!(draws(&app, "8 of 10 picked."));
+    assert!(draws(&app, "2 wallpapers"), "the dropped set's header");
+}

@@ -28,6 +28,7 @@ mod progress;
 mod reveal;
 mod setup;
 mod theme;
+mod thumbs;
 mod tour;
 mod view;
 mod widgets;

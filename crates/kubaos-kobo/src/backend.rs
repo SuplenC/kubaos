@@ -32,7 +32,7 @@ use std::time::Instant;
 use kubaos_core::engine;
 use kubaos_core::engine::RunOptions;
 use kubaos_core::engine::runner;
-use kubaos_core::probe::{DiskInfo, PartitionInfo, Region, WallpaperSet, WifiNetwork};
+use kubaos_core::probe::{DiskInfo, PartitionInfo, Region, WallpaperFile, WallpaperSet, WifiNetwork};
 use kubaos_core::{Event, InstallConfig, Level, Manifest, Probe, Secrets, StepId, demo};
 use signal_hook::consts::SIGHUP;
 use signal_hook::consts::SIGINT;
@@ -568,15 +568,48 @@ pub fn demo_probe() -> Probe {
             sha256: "0".repeat(64),
             kernel: "6.17.0-5-generic".into(),
             home_generation: "/nix/store/demo-home-manager-generation".into(),
-            // No previews: the demo has no payload dir.
-            wallpaper_sets: [("cyberpunk", 3), ("japanese", 2), ("shinjuku", 5)]
-                .map(|(id, images)| WallpaperSet {
-                    id: id.into(),
-                    images,
-                    preview: None,
-                })
-                .into(),
+            wallpaper_sets: DEMO_WALLPAPERS
+                .iter()
+                .map(|(id, names)| demo_wallpaper_set(id, names))
+                .collect(),
         }),
+    }
+}
+
+/// The sets of SuplenC/kubaos-wallpapers, and their files.
+const DEMO_WALLPAPERS: [(&str, &[&str]); 3] = [
+    (
+        "cyberpunk",
+        &["akihabara-after-rain.jpg", "shibuya-rainy-corner.jpg", "shinjuku-neon-canyon.jpg"],
+    ),
+    ("japanese", &["shinjuku-purple-hour.jpg", "tokyo-tower-blue-hour.jpg"]),
+    (
+        "shinjuku",
+        &[
+            "kabukicho-red-gate.jpg",
+            "nishi-shinjuku-violet-rain.jpg",
+            "omoide-yokocho-lanterns.jpg",
+            "skyline-fuji-dusk.jpg",
+            "train-neon-streak.jpg",
+        ],
+    ),
+];
+
+/// A set with its thumbnails where a payload has them. The demo has no payload dir, so they're
+/// placeholders unless the app is pointed at one (`App::payload_dir`, the gallery's `GALLERY_PAYLOAD`).
+fn demo_wallpaper_set(id: &str, names: &[&str]) -> WallpaperSet {
+    let files: Vec<WallpaperFile> = names
+        .iter()
+        .map(|name| WallpaperFile {
+            name: (*name).into(),
+            thumb: Some(format!("wallpapers/{id}/{name}.jpg")),
+        })
+        .collect();
+    WallpaperSet {
+        id: id.into(),
+        images: u32::try_from(files.len()).unwrap_or(u32::MAX),
+        preview: files.first().and_then(|f| f.thumb.clone()),
+        files,
     }
 }
 

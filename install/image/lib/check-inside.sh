@@ -314,7 +314,13 @@ while IFS=$'\t' read -r id images preview; do
     -o -iname '*.mp4' -o -iname '*.webm' -o -iname '*.mkv' -o -iname '*.mov' \) ! -iname '*.poster.*' | wc -l)"
   [[ "$have" == "$images" ]] && ok "  $id: $images wallpapers" || fail "  $id: manifest says $images, the set has $have"
   [[ -z "$preview" || -s "$P/$preview" ]] && ok "  $id: preview ${preview:-none}" || fail "  $id: no $P/$preview"
+  listed="$(jq -r --arg id "$id" '.wallpaper_sets[] | select(.id == $id) | .files | length' "$M")"
+  [[ "$listed" == "$images" ]] && ok "  $id: lists its $listed wallpapers" || fail "  $id: lists $listed wallpapers of $images"
+  missing="$(jq -r --arg id "$id" '.wallpaper_sets[] | select(.id == $id) | .files[] | .thumb // empty' "$M" |
+    while read -r t; do [[ -s "$P/$t" ]] || printf ' %s' "$t"; done)"
+  [[ -z "$missing" ]] && ok "  $id: thumbnails in the payload" || fail "  $id: missing thumbnails:$missing"
 done < <(jq -r '.wallpaper_sets[] | [.id, .images, (.preview // "")] | @tsv' "$M")
+info "wallpaper thumbnails: $(find "$P/wallpapers" -type f -name '*.jpg' | wc -l) files, $(du -s -B1 --apparent-size "$P/wallpapers" | awk '{printf "%.1f", $1 / 1e6}') MB"
 
 # The ISO carries the live system (about 1.8 GB on x86_64, issue #6) next to
 # this payload, and has to stay under 8 GB (docs/adr/0001, "Hosting").

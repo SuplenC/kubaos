@@ -1,5 +1,7 @@
 //! Text of the files the engine writes into the target. Pure functions.
 
+use crate::config::Wallpapers;
+
 /// Btrfs subvolumes, flat under the top level (system/00-btrfs-subvolumes.md),
 /// and where each is mounted. Order matters: parents before children.
 pub const SUBVOLUMES: [(&str, &str); 8] = [
@@ -222,18 +224,20 @@ pub fn gitconfig(name: &str, email: &str) -> String {
     format!("[user]\n\tname = {}\n\temail = {}\n", q(name), q(email))
 }
 
-/// The wallpaper sets the user chose, under the home: the user layer, so
-/// an update never changes it. scripts/dot-theme reads it (`folders`).
+/// The wallpapers the user chose, under the home: the user layer, so
+/// an update never changes it. scripts/dot-theme reads it (`folders`, `wallpapers`).
 pub const WALLPAPER_SETS: &str = ".config/kubaos/wallpapers/sets";
 
-/// [`WALLPAPER_SETS`]: one set id per line, `#` comments.
-pub fn wallpaper_sets(sets: &[String]) -> String {
+/// [`WALLPAPER_SETS`]: one entry per line, the whole sets' ids, then the single wallpapers as
+/// `<set>/<file>`; `#` comments. `home/theme.nix` seeds the same header.
+pub fn wallpaper_sets(w: &Wallpapers) -> String {
     let mut s = String::from(
-        "# Wallpaper sets the picker shows, one per line (from /usr/share/kubaos/wallpapers).\n\
+        "# The wallpapers the picker shows (from /usr/share/kubaos/wallpapers), one per line:\n\
+         # a set's name for all of it, <set>/<file> for one wallpaper.\n\
          # Your own images go in ~/Pictures/wallpapers.\n",
     );
-    for set in sets {
-        s.push_str(set);
+    for entry in w.sets.iter().chain(&w.files) {
+        s.push_str(entry);
         s.push('\n');
     }
     s
@@ -405,18 +409,52 @@ mod tests {
 
     #[test]
     fn wallpaper_sets_file() {
-        let sets = ["shinjuku".to_string(), "cyberpunk".to_string()];
+        let w = Wallpapers {
+            sets: vec!["shinjuku".into(), "cyberpunk".into()],
+            files: vec![],
+        };
         assert_eq!(WALLPAPER_SETS, ".config/kubaos/wallpapers/sets");
         assert_eq!(
-            wallpaper_sets(&sets),
-            "# Wallpaper sets the picker shows, one per line (from /usr/share/kubaos/wallpapers).\n\
+            wallpaper_sets(&w),
+            "# The wallpapers the picker shows (from /usr/share/kubaos/wallpapers), one per line:\n\
+             # a set's name for all of it, <set>/<file> for one wallpaper.\n\
              # Your own images go in ~/Pictures/wallpapers.\n\
              shinjuku\n\
              cyberpunk\n"
         );
+        let none = Wallpapers {
+            sets: vec![],
+            files: vec![],
+        };
         assert!(
-            wallpaper_sets(&[]).lines().all(|l| l.starts_with('#')),
+            wallpaper_sets(&none).lines().all(|l| l.starts_with('#')),
             "no sets: only the comment"
+        );
+    }
+
+    #[test]
+    fn single_wallpapers_follow_the_whole_sets_in_the_sets_file() {
+        let w = Wallpapers {
+            sets: vec!["cyberpunk".into()],
+            files: vec![
+                "shinjuku/kabukicho-red-gate.jpg".into(),
+                "japanese/tokyo-tower-blue-hour.jpg".into(),
+            ],
+        };
+
+        let lines: Vec<String> = wallpaper_sets(&w)
+            .lines()
+            .filter(|l| !l.starts_with('#'))
+            .map(str::to_string)
+            .collect();
+
+        assert_eq!(
+            lines,
+            [
+                "cyberpunk",
+                "shinjuku/kabukicho-red-gate.jpg",
+                "japanese/tokyo-tower-blue-hour.jpg"
+            ]
         );
     }
 
