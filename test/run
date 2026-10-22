@@ -4,8 +4,10 @@
 #   test/run build [--progress=plain] [--no-cache]   build the image (dotfiles-test:latest)
 #   test/run warm                       realise the home-manager generation and
 #                                       test tools into the dotfiles-nix volume
-#   test/run e2e [--only a,b] [--keep]  every check, PASS/FAIL table, exit 1 on failure
-#   test/run shell                      login zsh as kuba after a fresh switch
+#   test/run e2e [--only a,b] [--keep]  every check, PASS/FAIL table, exit 1 on failure;
+#                                       builds the kubaos CLI for Linux first when the
+#                                       packages check runs
+#   test/run shell                     login zsh as kuba after a fresh switch
 #   test/run bitwarden                  Vaultwarden + dot-bw-setup + direnv
 #   test/run shots [--hyprland] [--dir NAME | --out PATH] [--size WxH] [--scale N]
 #                  [--wallpaper SET/FILE]
@@ -26,7 +28,8 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 IMAGE=dotfiles-test:latest
 SHOTS=dotfiles-test-shots
-VOLUMES=(dotfiles-nix dotfiles-test-cache dotfiles-test-vw-certs dotfiles-test-vw-data)
+VOLUMES=(dotfiles-nix dotfiles-test-cache dotfiles-test-vw-certs dotfiles-test-vw-data dotfiles-test-cargo
+  dotfiles-test-target)
 
 export DOTFILES_SRC="${DOTFILES_SRC:-$ROOT}"
 DOTFILES_SRC="$(cd "$DOTFILES_SRC" && pwd)"
@@ -84,6 +87,25 @@ cmd_warm() {
   echo "warm done in $(elapsed)"
 }
 
+# build_kubaos: the kubaos CLI for the container's Linux, as $DOTFILES_TEST_OUT/kubaos (the
+# container's /out/kubaos), for the packages check. The image has no Rust toolchain, so it builds
+# in rust:latest, as install/test/engine-e2e does. Cargo's registry and target dir live in the
+# dotfiles-test-cargo and dotfiles-test-target volumes, with a target subdirectory per checkout:
+# cargo goes by mtime, and worktrees share the volume.
+build_kubaos() {
+  local sub
+  sub="$(printf '%s' "$DOTFILES_SRC" | shasum | cut -c1-12)"
+  mkdir -p "$DOTFILES_TEST_OUT"
+  echo "==> cargo build -p kubaos-cli (linux/$(docker version -f '{{.Server.Arch}}'))"
+  docker rm -f dotfiles-test-cargo-build >/dev/null 2>&1 || true
+  # shellcheck disable=SC2016 # $CARGO_TARGET_DIR expands in the build container.
+  docker run --rm --name dotfiles-test-cargo-build \
+    --cpus "${DOTFILES_TEST_CPUS:-6}" --memory "${DOTFILES_TEST_MEM:-5g}" \
+    -v dotfiles-test-cargo:/usr/local/cargo/registry -v dotfiles-test-target:/target \
+    -v "$DOTFILES_SRC":/src:ro -v "$DOTFILES_TEST_OUT":/out -w /src -e CARGO_TARGET_DIR="/target/$sub" \
+    rust:latest sh -c 'cargo build --locked --quiet -p kubaos-cli && install -m 0755 "$CARGO_TARGET_DIR/debug/kubaos" /out/kubaos'
+}
+
 cmd_e2e() {
   local only="" keep=0 rc=0
   while (($#)); do
@@ -94,6 +116,9 @@ cmd_e2e() {
     esac
     shift
   done
+  if [[ -z $only || ",$only," == *",packages,"* ]]; then
+    build_kubaos
+  fi
   if ((keep)); then
     need_image
     docker rm -f dotfiles-test-e2e >/dev/null 2>&1 || true

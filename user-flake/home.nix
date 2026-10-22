@@ -6,4 +6,7 @@
   home.packages = [
     # pkgs.hello
   ];
+
+  # What `kubaos package add`, the Command menu and Kōbō install (kubaos.d/).
+  kubaos.stateDir = ./kubaos.d;
 }

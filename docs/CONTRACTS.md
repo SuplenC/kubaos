@@ -15,7 +15,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 
 | Path | Owner | What |
 |---|---|---|
-| `flake.nix`, `flake.lock`, `home/curated.nix`, `user-flake/`, `home/default.nix`, `home/links.nix`, `home/cli.nix`, `home/dev.nix`, `home/desktop.nix`, `scripts/dot-config`, `user-layer/` | nix | Flake, module wiring, defaults and the user layer, packages, cargo config (linker switch), Quickshell + GPU wiring, fonts |
+| `flake.nix`, `flake.lock`, `home/curated.nix`, `user-flake/`, `home/default.nix`, `home/links.nix`, `home/cli.nix`, `home/dev.nix`, `home/desktop.nix`, `home/state.nix`, `scripts/dot-config`, `user-layer/` | nix | Flake, module wiring, defaults and the user layer, packages, the state directory's Nix side, cargo config (linker switch), Quickshell + GPU wiring, fonts |
 | `home/shell.nix`, `home/terminal.nix`, `config/{nvim,tmux,tms,ghostty,ohmyposh,lazygit,btop,git,bat,bacon,yazi,foot,fuzzel}` | ports | zsh, tmux, tms, ghostty, ported user configs, the fallback terminal and launcher |
 | `config/hypr/`, `scripts/dot-hypr-*` | hypr | Hyprland Lua config, hypridle, lid and monitor scripts, screenshots and screen recording |
 | `config/quickshell/`, `scripts/dot-qs-*` | quickshell | The desktop shell |
@@ -61,6 +61,15 @@ The merged files (bat, git ignore, fastfetch) change when `dot-config apply` run
 Not in the user layer yet: Quickshell (`config/quickshell/settings/Settings.qml`), the matugen templates, and oh-my-posh (a matugen template). They ship as read-only defaults until they get their own design.
 
 The `layer` table in `links.nix` lists the files that aren't plain links (seeded, `concat`, `json`); it's written to `~/.local/share/kubaos/layer` for `dot-config`.
+
+## The state directory and switch jobs (home/state.nix, kubaos-core)
+
+What the `kubaos` CLI, the Command menu and Kōbō install is declared in files the tool owns, never in Nix code (`docs/adr/0002-suites.md`).
+
+- **The state directory** is `~/.config/kubaos/home/kubaos.d/`, inside the user flake: `packages.toml` and `suites/<name>.toml`. Any of them may hold `packages = ["ripgrep", "python3Packages.black"]`, attribute paths into the user's `pkgs`; the home installs the union. A Suite file's other keys (options, version) belong to the Suite framework. `kubaos package add|remove` rewrites `packages.toml` whole, sorted, under the lock `~/.local/state/kubaos/kubaos.d.lock`, through a temporary file and a rename. A Suite's install writes its file and its removal deletes it.
+- **Wiring.** `home.nix` sets `kubaos.stateDir = ./kubaos.d;` (`user-flake/home.nix` has it). `home/state.nix` reads the directory with `builtins.readDir` and `builtins.fromTOML` when the path exists, and does nothing otherwise. On an older `home.nix`, `kubaos package add|remove` adds the line above its closing `}`, after copying the file to `home.nix.kubaos.bak` (or `.1`, `.2`, …). It skips a file that already sets it, and refuses one whose last line isn't a lone `}`, asking the user to add the line by hand (`kubaos_core::state::migrate`).
+- **Rollback.** Each generation links its copy of the directory to `~/.local/share/kubaos/kubaos.d`, so `<generation>/home-files/.local/share/kubaos/kubaos.d` is the directory it was built from. `kubaos package restore <generation>` puts that copy back, and empties the directory for a generation that had none. `kubaos rollback` (#13) runs it with the generation it activates.
+- **Switch jobs.** Every switch is a job in `~/.local/state/kubaos/jobs/`: `<id>.json` (`id`; `state`, one of `queued`, `running`, `succeeded`, `failed`; `queued_at`, `started_at`, `finished_at` in Unix milliseconds; `error`) and `<id>.log`, the switch's output. Ids sort by queue time. Submitting writes the job, then starts `systemd-run --user --unit=kubaos-switch-<id> --collect kubaos job work`, passing on `PATH`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`, `NIX_PATH`, `LANG` and `LOCALE_ARCHIVE`. A worker takes `switch.lock` (`flock`) in that folder and runs every queued job, oldest first, each a `home-manager switch -b hm-backup --flake ~/.config/kubaos/home`, until none is left. A job still `running` when a worker gets the lock lost its worker, and is marked `failed`. So two switches never run at once, and none is lost. A front end follows a job by reading the two files (`kubaos_core::switch::Queue::follow`); `kubaos job follow <id>` prints the log as it grows. `--foreground` runs the queue in the calling process instead, for a session without a user manager (the test harness).
 
 ## Other links (home/links.nix)
 

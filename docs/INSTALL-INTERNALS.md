@@ -41,7 +41,15 @@ kubaos demo [--speed N] [--fail-at STEP] [--events json|human]
 kubaos setup status [--json] [--demo vm|tuxedo]     first-boot cards, as the user
 kubaos setup run CARD [--input-stdin] [--events json|human] [--demo vm|tuxedo]
 kubaos setup done                                     write the marker
+kubaos package add|remove NAME... [--no-switch] [--detach|--foreground]
+kubaos package list [--json]                          what kubaos.d/ installs, and from which file
+kubaos package restore GENERATION                     kubaos.d/ back from a home-manager generation
+kubaos try NAME                                       nix shell with NAME, installs nothing
+kubaos switch [--detach|--foreground]                 queue a switch of the user flake
+kubaos job list [--json] | kubaos job follow ID       switch jobs
 ```
+
+The package, switch and job commands run as the user, never root: docs/CONTRACTS.md, "The state directory and switch jobs".
 
 - Exit codes: `0` ok, `1` a step failed (the last event is `failed`), `2` usage or config error.
 - `--events json`: one `Event` per line on stdout, nothing else on stdout. Human-readable logs go to stderr and to `/var/log/kubaos-install.log` on the live system. The log is copied to `/var/log/kubaos/` on the target.

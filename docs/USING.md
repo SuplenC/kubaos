@@ -63,12 +63,14 @@ Each file starts as a comment and an example:
 | bat, fastfetch | `~/.config/kubaos/{bat/config,fastfetch/config.jsonc}` | after `dot-config apply` |
 | btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml`: they rewrite their own file, so it's yours as is | next start |
 | Nix packages and home-manager options | `~/.config/kubaos/home/home.nix`, e.g. `home.packages = [ pkgs.hello ];` | `home-manager switch --flake ~/.config/kubaos/home` |
+| A package, without writing Nix | `kubaos package add ripgrep` (`remove`, `list`); `kubaos try cowsay` opens a shell with it and installs nothing | the switch `add` and `remove` queue |
 
 - To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
 - Delete a file in `~/.config/kubaos` to get the example back on the next `dot-config apply` or update.
 - Quickshell's settings, the colors (matugen) and the prompt (oh-my-posh) can't be overridden yet.
 - Your own wallpapers go in `~/Pictures/wallpapers/`, the picker's last tab; KubaOS's sets are in `/usr/share/kubaos/wallpapers/`.
 - `~/.config/kubaos/home/` is your flake: KubaOS wrote it once, and an update never does again. Put it under git if you like (then `git add` new files before a switch).
+- `kubaos package add` records the package in `~/.config/kubaos/home/kubaos.d/packages.toml`, a file the command owns, and switches. Every switch (`kubaos switch`, or one an `add` queued) runs in a systemd user unit, one at a time: closing the terminal doesn't stop it, and `kubaos job list` and `kubaos job follow <id>` show it. The first `add` on an older install adds `kubaos.stateDir = ./kubaos.d;` to your `home.nix`, after backing it up as `home.nix.kubaos.bak`. If your flake is under git, add `kubaos.d/` to it once, or Nix won't see the files.
 
 ## Hacking on KubaOS
 
