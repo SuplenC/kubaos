@@ -177,6 +177,25 @@ fn gallery() {
 
         go(&mut app, Screen::Summary);
         shot(&dir, "summary-alongside", &app, size);
+        let _ = app.update_inner(Message::Click(F::Power));
+        shot(&dir, "power-menu", &app, size);
+        let _ = app.update_inner(Message::Click(F::PowerCancel));
+
+        // The power menu while an install runs: it warns about the disk.
+        let now = Instant::now();
+        let mut i = Install::new(now - Duration::from_secs(90));
+        i.apply(
+            &Event::Plan {
+                steps: StepId::ALL.iter().map(|s| s.info()).collect(),
+            },
+            now,
+        );
+        i.apply(&Event::StepStarted { id: StepId::Unpack }, now);
+        app.install = Some(i);
+        go(&mut app, Screen::Installing);
+        let _ = app.update_inner(Message::Click(F::Power));
+        shot(&dir, "power-menu-installing", &app, size);
+        let _ = app.update_inner(Message::Click(F::PowerCancel));
 
         // Failed with a long, real-looking error.
         let now = Instant::now();
