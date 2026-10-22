@@ -1,11 +1,14 @@
 -- Keyboard, touchpad, gestures.
 -- https://wiki.hypr.land/Configuring/Variables/#input
 
--- The keyboard layout is the system's: /etc/default/keyboard, which the
--- install writes from Kōbō's Keyboard screen and `localectl set-x11-keymap`
--- rewrites. Read on every config load, so after a change `hyprctl reload`
--- picks it up. Without the file (a hand-install that never set one), or
--- without a layout in it, the US layout (`us`).
+-- The keyboard layouts are the system's: /etc/default/keyboard, which the
+-- install writes from Kōbō's Language screen and `kubaos keyboard` rewrites
+-- through `localectl set-x11-keymap`. Several layouts are XKB's
+-- comma-separated lists (XKBLAYOUT="us,it", XKBVARIANT=",intl"), which
+-- Hyprland takes as they are, the first the default; SUPER + SHIFT + Space
+-- switches (keybinds.lua). Read on every config load, so after a change
+-- `hyprctl reload` picks it up. Without the file (a hand-install that never
+-- set one), or without a layout in it, the US layout (`us`).
 -- Workspace and other number/punctuation binds use keycodes (code:10 = the
 -- "1" key), so they work whatever the layout is.
 local function system_keyboard(path)

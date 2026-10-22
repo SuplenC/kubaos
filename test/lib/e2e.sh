@@ -532,6 +532,21 @@ c_workspaces() {
   echo "ok   per-screen workspaces: blocks, slots, joining on unplug and returning on replug"
 }
 
+# Keyboard layouts: config/hypr/input.lua hands Hyprland every layout in
+# /etc/default/keyboard, and `kubaos keyboard show` reads the same file.
+c_keyboard() {
+  as_user lua5.5 "$REPO/test/lua/input_test.lua" "$REPO" || { echo "FAIL test/lua/input_test.lua"; return 1; }
+  echo "ok   input.lua: two layouts as XKB's lists, one as a name, US without the file"
+  local file out
+  file="$(mktemp)"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=",intl"\nXKBOPTIONS=""\n' >"$file"
+  chmod 644 "$file"
+  out="$(kz "KUBAOS_KEYBOARD_FILE='$file' kubaos keyboard show" 2>&1)" || { echo "FAIL kubaos keyboard show: $out"; rm -f "$file"; return 1; }
+  rm -f "$file"
+  [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; return 1; }
+  echo "ok   kubaos keyboard show lists the layouts, the default first"
+}
+
 c_quickshell() {
   local out t
   session_start sway 1920x1080 1
@@ -1450,7 +1465,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
