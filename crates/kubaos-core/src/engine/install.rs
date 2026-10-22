@@ -22,10 +22,10 @@ mod firstboot;
 pub const PAYLOAD_KUBAOS: &str = crate::setup::SYSTEM_KUBAOS;
 /// The user flake's lock, generated at payload build: the user's nixpkgs at
 /// KubaOS's revision, KubaOS at the payload's commit.
-const USER_FLAKE_LOCK: &str = "/usr/share/dotinstall/user-flake.lock";
+const USER_FLAKE_LOCK: &str = "/usr/share/kubaos-image/user-flake.lock";
 /// Out-link of the generation built for a username the payload wasn't
 /// built for, inside the target. /tmp: home-manager's profile roots it after.
-const HOME_REBUILT: &str = "/tmp/dotinstall-home-generation";
+const HOME_REBUILT: &str = "/tmp/kubaos-home-generation";
 /// The target's PATH inside the chroot.
 const CHROOT_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const NIX_BIN: &str = "/nix/var/nix/profiles/default/bin";
@@ -116,7 +116,7 @@ impl<'a> Install<'a> {
             disk,
             r,
             emit,
-            top: PathBuf::from("/run/dotinstall/btrfs-top"),
+            top: PathBuf::from("/run/kubaos/btrfs-top"),
             target,
             log_file,
             step: StepId::Preflight,
@@ -412,7 +412,7 @@ impl<'a> Install<'a> {
             return Ok(());
         }
 
-        // Config vs machine, again: the GUI may call `run` directly.
+        // Config vs machine, again: Kōbō calls `run` directly.
         let probe = machine::probe(Path::new(&c.payload.dir))?;
         let mut problems = validate::problems(c, &probe);
         problems.extend(validate::secret_problems(c, self.secrets));
@@ -452,7 +452,9 @@ impl<'a> Install<'a> {
         if !missing.is_empty() {
             return Err(StepError {
                 message: format!("missing tools on the live system: {}", missing.join(", ")),
-                hint: Some("The ISO build must include them (see docs/INSTALLER.md).".into()),
+                hint: Some(
+                    "The ISO build must include them (see docs/INSTALL-INTERNALS.md).".into(),
+                ),
             });
         }
 
@@ -877,8 +879,8 @@ impl<'a> Install<'a> {
         if matches!(c.disk.target, DiskTarget::FreeSpace { .. }) {
             // Dual boot: let update-grub list the other system.
             self.write(
-                "/etc/default/grub.d/90-dotinstall-os-prober.cfg",
-                "# dotinstall: installed next to another system\nGRUB_DISABLE_OS_PROBER=false\n",
+                "/etc/default/grub.d/90-kubaos-os-prober.cfg",
+                "# KubaOS: installed next to another system\nGRUB_DISABLE_OS_PROBER=false\n",
                 0o644,
             )?;
         }
@@ -909,7 +911,7 @@ impl<'a> Install<'a> {
         if files::passwd_entry(&passwd, &name).is_some() {
             return Err(StepError {
                 message: format!("the payload already has a user {name}"),
-                hint: Some("The image must ship without users (docs/INSTALLER.md).".into()),
+                hint: Some("The image must ship without users (docs/INSTALL-INTERNALS.md).".into()),
             });
         }
         let mut cmd_args: Vec<String> = vec![
@@ -1054,7 +1056,7 @@ impl<'a> Install<'a> {
                     return Err(StepError {
                         message: format!("{src} is not in the payload"),
                         hint: Some(
-                            "The payload ships the user flake's template and lock (installer/image)."
+                            "The payload ships the user flake's template and lock (install/image)."
                                 .into(),
                         ),
                     });
@@ -1311,7 +1313,7 @@ impl<'a> Install<'a> {
 
     /// As the user, in the user flake (write_user_flake): build
     /// `<user>@<host>` offline. Only the derivations that name the user
-    /// rebuild; the payload carries their build inputs (installer/image).
+    /// rebuild; the payload carries their build inputs (install/image).
     /// The username is validated (a-z, 0-9, - and _), so it goes in as is.
     fn rebuild_home_script(&self) -> String {
         let user = &self.cfg.user.username;
@@ -1449,7 +1451,7 @@ impl<'a> Install<'a> {
         if let Some(log) = self.log_file.clone()
             && (self.dry() || log.exists())
         {
-            let dest = self.t("/var/log/dotinstall/install.log");
+            let dest = self.t("/var/log/kubaos/install.log");
             self.sh(Cmd::new("install").args([
                 "-D",
                 "-m",
@@ -1574,7 +1576,7 @@ mod resolve_tests {
 
     #[test]
     fn follows_absolute_links_inside_the_root() {
-        let root = std::env::temp_dir().join(format!("dotinstall-resolve-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("kubaos-resolve-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("nix/store/abc-env/bin")).unwrap();
         std::fs::write(root.join("nix/store/abc-env/bin/nix-daemon"), "").unwrap();

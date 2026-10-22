@@ -15,7 +15,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 DO_APT=1 DO_HYPR=0 DO_NIX=0 ASSUME_YES=0
 NIX_INPUTS=()
 HM_USER="${USER:-$(id -un)}"
-# The user flake the installer wrote: your nixpkgs, KubaOS from
+# The user flake the install wrote: your nixpkgs, KubaOS from
 # /usr/share/kubaos. Without one (a machine set up by hand), this checkout.
 USER_FLAKE="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/home"
 if [[ -f "$USER_FLAKE/flake.nix" ]]; then FLAKE="$USER_FLAKE"; else FLAKE="$DOTFILES_DIR"; fi

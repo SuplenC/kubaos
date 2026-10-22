@@ -1,5 +1,5 @@
-//! kubaos-core: the installer's types and engine. The contract between
-//! the engine, the CLI and the GUI is docs/INSTALLER.md.
+//! kubaos-core: the engine and its types. The contract between the
+//! engine, the CLI and Kōbō is docs/INSTALL-INTERNALS.md.
 
 pub mod config;
 pub mod demo;

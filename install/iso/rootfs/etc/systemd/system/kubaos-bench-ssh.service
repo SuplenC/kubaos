@@ -1,0 +1,14 @@
+# Dev builds only (install/iso/build drops this with --release).
+# sshd runs only when QEMU passes an authorized key via fw_cfg, which only
+# test/vm/run does.
+[Unit]
+Description=KubaOS test bench: sshd with the key from QEMU fw_cfg
+After=network.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/kubaos-live/bench-ssh
+
+[Install]
+WantedBy=multi-user.target

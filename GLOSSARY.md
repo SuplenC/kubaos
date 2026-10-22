@@ -29,7 +29,7 @@ The `kubaos` command, which does the actual work of changing a KubaOS machine: u
 _Avoid_: Kōbō, manager, helper scripts
 
 **Kōbō**:
-The graphical front end to the **KubaOS CLI** (工房, "workshop"): it walks the user through putting KubaOS on a machine and, afterwards, through tasks like adding **Suites** and setting up projects. The work itself is always done by the CLI.
+The graphical front end to the **KubaOS CLI** (工房, "workshop"): it walks the user through putting KubaOS on a machine and, afterwards, through tasks like adding **Suites** and setting up projects. The work itself is always done by the engine behind the CLI, which Kōbō runs in its own process.
 _Avoid_: Installer, setup app
 
 ## Command menu

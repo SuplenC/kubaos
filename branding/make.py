@@ -163,7 +163,7 @@ write(
     "kubaos-horizontal-white",
     svg(W, 120, f'<g transform="translate(10 10)">{mark("#ffffff", "#ffffff", glow=False)}</g><g transform="translate(142 30)">{wmw_white}</g>'),
 )
-# The wordmark alone (the GUI sets it next to its own mark).
+# The wordmark alone (Kōbō sets it next to its own mark).
 write("kubaos-wordmark", svg(int(wmw) + 12, 72, f'<g transform="translate(6 6)">{wm}</g>', defs=""))
 # Stacked: mark over the wordmark, centred.
 SW = max(int(wmw) + 24, 200)

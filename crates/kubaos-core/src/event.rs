@@ -1,5 +1,5 @@
 //! The progress stream. `kubaos run --events json` writes one `Event`
-//! per line on stdout; the GUI reads exactly that.
+//! per line on stdout; Kōbō gets the same events in-process.
 
 use serde::{Deserialize, Serialize};
 

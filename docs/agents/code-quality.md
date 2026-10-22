@@ -137,7 +137,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 
 ### Tests
 
-- **Unit tests in a sibling file**: `#[cfg(test)] mod tests;` at the bottom of `install.rs`, the tests in `install/tests.rs`. Behaviour across processes goes in the crate's `tests/` and the end-to-end suites (`installer/test/`, `test/`).
+- **Unit tests in a sibling file**: `#[cfg(test)] mod tests;` at the bottom of `install.rs`, the tests in `install/tests.rs`. Behaviour across processes goes in the crate's `tests/` and the end-to-end suites (`install/test/`, `test/`).
 - **Tests may `unwrap()`.** A fallible step whose line doesn't say what failed is `.expect("the step")`: `.expect("write the user flake")`.
 - **Never weaken a test to make a change pass.** If an expectation must change, the PR says which one and why.
 

@@ -47,7 +47,7 @@ pub struct TarZstd {
 /// Records between checkpoints; one record is 20 blocks of 512 bytes.
 const CHECKPOINT: u64 = 1000;
 const RECORD: u64 = 10240;
-const CKPT_TAG: &str = "dotinstall-ckpt ";
+const CKPT_TAG: &str = "kubaos-ckpt ";
 
 impl Unpacker for TarZstd {
     fn name(&self) -> &'static str {
@@ -129,19 +129,19 @@ mod tests {
         let mut u = TarZstd {
             installed_bytes: 10240 * 4000,
         };
-        assert_eq!(u.progress("tar: dotinstall-ckpt 1000"), Some(0.25));
-        assert_eq!(u.progress("tar: dotinstall-ckpt 9000"), Some(0.99));
+        assert_eq!(u.progress("tar: kubaos-ckpt 1000"), Some(0.25));
+        assert_eq!(u.progress("tar: kubaos-ckpt 9000"), Some(0.99));
         assert_eq!(u.progress("tar: something else"), None);
         let c = u.command(Path::new("/p/rootfs.tar.zst"), Path::new("/mnt/t"));
         assert!(
             c.display()
-                .contains("'--checkpoint-action=echo=dotinstall-ckpt %u'")
+                .contains("'--checkpoint-action=echo=kubaos-ckpt %u'")
         );
     }
 
     #[test]
     fn detect_by_magic_and_name() {
-        let dir = std::env::temp_dir().join(format!("dotinstall-unpack-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kubaos-unpack-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let sq = dir.join("a.img");
         std::fs::write(&sq, b"hsqs....").unwrap();

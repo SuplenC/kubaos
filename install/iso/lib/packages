@@ -1,0 +1,73 @@
+# Packages in the live system (install/iso/lib/build-iso.sh). One per line.
+# Lines tagged hw only go into --profile hw, vm into --profile vm; dev lines are dropped by --release.
+# Tags after "#": hw, vm, dev, amd64, arm64 (all must match). @EFIARCH@ = arm64 | amd64.
+
+# boot and live
+systemd-sysv
+udev
+dbus
+libpam-systemd
+casper
+initramfs-tools
+zstd
+kmod
+kbd
+console-setup
+locales
+sudo
+less
+ca-certificates
+
+# kernel: hw = generic + firmware (TUXEDO), vm = virtual (fast VM iterations)
+linux-image-generic # hw
+linux-firmware # hw
+intel-microcode # hw amd64
+amd64-microcode # hw amd64
+linux-image-virtual # vm
+
+# what the engine needs
+cryptsetup
+cryptsetup-bin
+btrfs-progs
+e2fsprogs
+dosfstools
+gdisk
+parted
+fdisk
+util-linux
+squashfs-tools
+tar
+rsync
+arch-install-scripts
+efibootmgr
+grub-efi-@EFIARCH@-bin
+grub-efi-@EFIARCH@-signed
+grub2-common
+shim-signed
+mokutil
+
+# network (the install itself is offline; wifi only for the first boot)
+network-manager
+wpasupplicant
+iw
+wireless-regdb
+
+# GUI: cage + mesa; Vulkan (lavapipe in VMs) for wgpu
+cage
+libegl1
+libgles2
+libgl1-mesa-dri
+libegl-mesa0
+mesa-vulkan-drivers
+libvulkan1
+libxkbcommon0
+libwayland-client0
+libwayland-egl1
+libwayland-cursor0
+fontconfig
+fonts-inter
+fonts-dejavu-core
+xkb-data
+
+# bench only
+openssh-server # dev

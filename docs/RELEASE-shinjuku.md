@@ -4,7 +4,7 @@ Read this before you put the stick in the real machine.
 
 ## What Shinjuku 0.1 is
 
-The first KubaOS release: Ubuntu 26.04, Hyprland, Quickshell, your home-manager generation, installed from a USB stick in about a minute. Four ISOs come out of `installer/iso/build`, into `iso/`:
+The first KubaOS release: Ubuntu 26.04, Hyprland, Quickshell, your home-manager generation, installed from a USB stick in about a minute. Four ISOs come out of `install/iso/build`, into `iso/`:
 
 | ISO | For |
 |---|---|
@@ -66,7 +66,7 @@ The TUXEDO DKMS drivers are kernel modules, and Secure Boot only loads signed on
 3. Reboot. The blue MokManager screen appears: "Enroll MOK", Continue, Yes, type the password, reboot. The screen assumes a US keyboard, which is why the password is letters and digits only.
 4. Log in. Setup opens once more to confirm the drivers loaded.
 
-Details are in `docs/INSTALLER.md`, "First boot".
+Details are in `docs/INSTALL-INTERNALS.md`, "First boot".
 
 ## What the VM release run verified
 
@@ -83,8 +83,8 @@ The GRUB menu is hidden on a normal boot. **Press F4 in the hidden second** afte
 None of this can be proven in a VM. Tick it on the real laptop.
 
 - [ ] F7 opens the boot menu and F2 opens the BIOS (confirm the keys above)
-- [ ] The stick boots under Secure Boot, and the installer comes up in `cage`
-- [ ] GRUB font size at 2880x1800 under Secure Boot: legible with the built-in 16 px font? If not, apply the lower `gfxmode` fix from `docs/INSTALLER.md`, "Boot"
+- [ ] The stick boots under Secure Boot, and Kōbō comes up in `cage`
+- [ ] GRUB font size at 2880x1800 under Secure Boot: legible with the built-in 16 px font? If not, apply the lower `gfxmode` fix from `docs/INSTALL-INTERNALS.md`, "Boot"
 - [ ] amdgpu handover: the splash goes from GRUB's mode to the kernel's without a black flash or a corrupt frame, and Plymouth's passphrase prompt shows at native resolution
 - [ ] TUXEDO DKMS drivers build and load, and the MOK enrolment works from the setup app (`mokutil --sb-state`, `lsmod | grep tuxedo`)
 - [ ] Fingerprint reader: `fprintd` enrols a finger from setup, and sudo and the lock screen accept it

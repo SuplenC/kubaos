@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# engine-e2e: run `kubaos run` for real against a loop-device disk in a
+# privileged Docker container, then re-open the disk and check the result.
+#
+#   install/test/engine-e2e [build|payload|run [SCENARIO...]|all|clean]
+#
+#   build     build kubaos for Linux (rust:latest, target dir cached in
+#             the volume kubaos-engine-target) and the live-tools image
+#   payload   build the fake payload image and turn it into
+#             rootfs.sqfs + rootfs.tar.zst in the volume kubaos-engine-payload
+#             (skipped when the image hasn't changed)
+#   run       scenarios: sqfs, tar, fail, dual (default: all four)
+#   all       build, payload, run (the default)
+#   clean     remove this script's containers and volumes
+#
+# Everything is named kubaos-engine-*. Containers get 4 CPUs and 6 GB.
+# Results (event streams, logs) go to $KUBAOS_E2E_OUT
+# (default /tmp/kubaos-engine-e2e).
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$HERE/../.." && pwd)"
+D="$HERE/engine-e2e.d"
+OUT="${KUBAOS_E2E_OUT:-/tmp/kubaos-engine-e2e}"
+LIMITS=(--cpus 4 --memory 6g)
+LIVE=kubaos-engine-live
+PAYLOAD_IMG=kubaos-engine-payload-src
+# Every checkout (worktree) shares the target volume, and cargo goes by mtime,
+# so each builds in its own subdirectory; run mounts only that one at /target.
+TSUB="$(printf '%s' "$REPO" | shasum | cut -c1-12)"
+
+build() {
+  echo "==> live tools image"
+  docker build -q -t "$LIVE" -f "$D/live.Dockerfile" "$D" >/dev/null
+  echo "==> cargo build --release (linux/$(docker version -f '{{.Server.Arch}}'))"
+  docker run --rm --name kubaos-engine-build "${LIMITS[@]}" \
+    -v kubaos-engine-cargo:/usr/local/cargo/registry \
+    -v kubaos-engine-target:/target \
+    -v "$REPO":/src:ro -w /src -e CARGO_TARGET_DIR="/target/$TSUB" \
+    rust:latest cargo build --release --locked -p kubaos-cli
+}
+
+payload() {
+  echo "==> fake payload image"
+  docker build -q -t "$PAYLOAD_IMG" -f "$D/payload.Dockerfile" "$D" >/dev/null
+  local id have
+  id="$(docker image inspect -f '{{.Id}}' "$PAYLOAD_IMG")"
+  have="$(docker run --rm -v kubaos-engine-payload:/payload "$LIVE" cat /payload/stamp 2>/dev/null || true)"
+  if [[ "$have" == "$id" ]]; then
+    echo "    unchanged, keeping the payload volume"
+    return
+  fi
+  echo "==> export it as rootfs.sqfs and rootfs.tar.zst"
+  docker rm -f kubaos-engine-payload-c >/dev/null 2>&1 || true
+  docker create --name kubaos-engine-payload-c "$PAYLOAD_IMG" true >/dev/null
+  docker export kubaos-engine-payload-c |
+    docker run -i --rm --name kubaos-engine-prepare "${LIMITS[@]}" \
+      -v kubaos-engine-payload:/payload -v "$D":/e2e:ro "$LIVE" bash /e2e/inside.sh prepare
+  docker rm kubaos-engine-payload-c >/dev/null
+  docker run --rm -v kubaos-engine-payload:/payload "$LIVE" sh -c "echo '$id' >/payload/stamp"
+}
+
+run() {
+  local scenarios=("$@") failed=()
+  ((${#scenarios[@]})) || scenarios=(sqfs tar fail dual)
+  mkdir -p "$OUT"
+  for sc in "${scenarios[@]}"; do
+    echo
+    echo "################ scenario: $sc"
+    if ! docker run --rm --privileged --name "kubaos-engine-e2e-$sc" "${LIMITS[@]}" \
+      --mount "type=volume,source=kubaos-engine-target,target=/target,readonly,volume-subpath=$TSUB" \
+      -v kubaos-engine-payload:/payload:ro \
+      -v "$D":/e2e:ro -v "$OUT":/out \
+      "$LIVE" bash /e2e/inside.sh run "$sc"; then
+      failed+=("$sc")
+    fi
+  done
+  echo
+  echo "event streams and logs: $OUT"
+  if ((${#failed[@]})); then
+    echo "FAILED: ${failed[*]}"
+    return 1
+  fi
+  echo "all scenarios passed: ${scenarios[*]}"
+}
+
+clean() {
+  docker ps -aq --filter name='^kubaos-engine-' | xargs -r docker rm -f
+  for v in kubaos-engine-target kubaos-engine-cargo kubaos-engine-payload; do
+    docker volume rm "$v" 2>/dev/null || true
+  done
+}
+
+case "${1:-all}" in
+  build) build ;;
+  payload) payload ;;
+  run) shift; run "$@" ;;
+  all) build && payload && run ;;
+  clean) clean ;;
+  -h | --help) sed -n '2,20p' "$0" ;;
+  *) echo "unknown command $1 (see --help)" >&2; exit 2 ;;
+esac

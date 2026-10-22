@@ -6,7 +6,7 @@ there; system/25-boot.sh installs them):
 
   system/files/plymouth/kubaos/   mark, halo, field, bullet (1x and @2x)
   system/files/grub/kubaos/       mark, selected-item 9-slice
-  system/files/fonts/             Geist and JetBrains Mono (the GUI's fonts):
+  system/files/fonts/             Geist and JetBrains Mono (Kōbō's fonts):
                                   Plymouth's label in the initramfs, and the
                                   source of GRUB's .pf2 fonts (grub-mkfont)
 
@@ -29,10 +29,10 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 PLY = REPO / "system/files/plymouth/kubaos"
 GRUB = REPO / "system/files/grub/kubaos"
-GUI_FONTS = REPO / "installer/crates/gui/assets/fonts"
+GUI_FONTS = REPO / "crates/kubaos-kobo/assets/fonts"
 FONTS = REPO / "system/files/fonts"
 
-# Palette: branding/README.md and installer/crates/gui/src/theme.rs.
+# Palette: branding/README.md and crates/kubaos-kobo/src/theme.rs.
 AMBER = "#fdb882"  # primary
 ERROR = "#ffb4ab"  # error
 FIELD = "#241e1b"  # surface_container

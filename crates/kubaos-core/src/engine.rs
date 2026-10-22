@@ -1,5 +1,5 @@
-//! The real installer (owner: engine). Emits `Event`s through `emit` in the
-//! order docs/INSTALLER.md describes.
+//! The install engine (owner: engine). Emits `Event`s through `emit` in the
+//! order docs/INSTALL-INTERNALS.md describes.
 //!
 //! Layout: `machine` (probe), `validate`, `disk` (partition math), `files`
 //! (text of the files written to the target), `unpack` (squashfs or
@@ -19,20 +19,20 @@ use std::time::Instant;
 use crate::{Error, Event, InstallConfig, Manifest, Probe, Secrets, StepId};
 use runner::{DryRunner, Runner, SystemRunner};
 
-pub const DEFAULT_TARGET: &str = "/mnt/dotinstall";
+pub const DEFAULT_TARGET: &str = "/mnt/kubaos";
 
 #[derive(Debug, Clone, Default)]
 pub struct RunOptions {
     /// Print what each step would do, touch nothing.
     pub dry_run: bool,
-    /// Mount point for the target while installing (default `/mnt/dotinstall`).
+    /// Mount point for the target while installing (default `/mnt/kubaos`).
     pub target_root: Option<String>,
     /// The live system's log; `finish` copies it to the target's
-    /// `/var/log/dotinstall/install.log`.
+    /// `/var/log/kubaos/install.log`.
     pub log_file: Option<PathBuf>,
 }
 
-/// Probe with the payload in the default place (`/run/dotinstall/payload`).
+/// Probe with the payload in the default place (`/run/kubaos/payload`).
 pub fn probe() -> Result<Probe, Error> {
     probe_with(Path::new(machine::DEFAULT_PAYLOAD_DIR))
 }
@@ -232,8 +232,7 @@ mod tests {
     }
 
     fn payload() -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("dotinstall-engine-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kubaos-engine-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let m = serde_json::json!({
             "version": "1", "arch": "x86_64", "built_at": "2026-10-16T10:00:00Z",
@@ -361,7 +360,7 @@ mod tests {
         assert_eq!(cmds.last().unwrap(), "cryptsetup close cryptroot");
     }
 
-    /// The payload's user-flake template and lock, as installer/image ships them.
+    /// The payload's user-flake template and lock, as install/image ships them.
     fn user_flake_payload(r: &mut DryRunner) {
         r.files.insert(
             "/mnt/t/usr/share/kubaos/user-flake/flake.nix.in".into(),
@@ -374,7 +373,7 @@ mod tests {
             "{ pkgs, ... }: { home.packages = [ ]; }\n".into(),
         );
         r.files.insert(
-            "/mnt/t/usr/share/dotinstall/user-flake.lock".into(),
+            "/mnt/t/usr/share/kubaos-image/user-flake.lock".into(),
             "{\"version\": 7}\n".into(),
         );
     }
@@ -462,13 +461,13 @@ mod tests {
             "cd \"$HOME/.config/kubaos/home\"",
             "nix --offline",
             "alice@vm",
-            "--out-link /tmp/dotinstall-home-generation",
+            "--out-link /tmp/kubaos-home-generation",
         ] {
             assert!(build.contains(want), "{want} not in {build}");
         }
         let act = activation(&cmds);
         assert!(
-            act.contains("/tmp/dotinstall-home-generation/activate"),
+            act.contains("/tmp/kubaos-home-generation/activate"),
             "{act}"
         );
         let i = |c: &String| cmds.iter().position(|x| x == c).unwrap();

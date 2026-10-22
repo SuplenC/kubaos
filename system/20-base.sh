@@ -176,8 +176,8 @@ step "Snapper: config \"root\" for /"
 root_fs="$(findmnt -no FSTYPE / 2>/dev/null || true)"
 SKIP_BTRFS=0
 if ((IMAGE_BUILD)); then
-  # The payload's / ends up on btrfs; the installer creates the config there.
-  info "image build: grub-btrfs and the timers only; dotinstall creates the snapper config"
+  # The payload's / ends up on btrfs; the install creates the config there.
+  info "image build: grub-btrfs and the timers only; the install creates the snapper config"
 elif [[ "$root_fs" != btrfs ]]; then
   warn "/ is $root_fs, not btrfs: skipping snapper and grub-btrfs"
   SKIP_BTRFS=1
@@ -226,8 +226,8 @@ if ((!SKIP_BTRFS)); then
     todo+=("$kv")
   done
   if ((IMAGE_BUILD)); then
-    # dotinstall runs `snapper -c root set-config $(cat this file)` after create-config.
-    printf '%s\n' "${want[@]}" | write_root_file /usr/share/dotinstall/snapper-root.conf 0644
+    # The install runs `snapper -c root set-config $(cat this file)` after create-config.
+    printf '%s\n' "${want[@]}" | write_root_file /usr/share/kubaos-image/snapper-root.conf 0644
   elif ((${#todo[@]})); then
     sudo_run snapper -c root set-config "${todo[@]}"
   else

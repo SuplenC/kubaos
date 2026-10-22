@@ -84,8 +84,8 @@ in_container() {
 arch() { dpkg --print-architecture; }
 is_amd64() { [[ "$(arch)" == amd64 ]]; }
 
-# Image mode (DOTFILES_IMAGE_BUILD=1, set only by installer/image): the
-# scripts run in a container whose / becomes the installer's payload, not on
+# Image mode (DOTFILES_IMAGE_BUILD=1, set only by install/image): the
+# scripts run in a container whose / becomes the install's payload, not on
 # the machine. Units are then enabled, disabled and masked offline (the
 # symlinks land in the image), runtime-only steps are skipped, and so is
 # anything that needs the target's own disk (the snapper config).

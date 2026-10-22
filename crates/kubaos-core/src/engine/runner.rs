@@ -321,7 +321,7 @@ impl Runner for SystemRunner {
         }
         // Create with the final mode right away: a 0600 file is never
         // briefly world-readable.
-        let tmp = path.with_extension("dotinstall-tmp");
+        let tmp = path.with_extension("kubaos-tmp");
         {
             use std::os::unix::fs::OpenOptionsExt;
             let mut f = std::fs::OpenOptions::new()

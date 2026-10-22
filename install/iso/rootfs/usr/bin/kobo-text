@@ -1,0 +1,134 @@
+#!/bin/bash
+# kobo-text: Kōbō's text mode, the fallback when the graphical one can't run.
+# Strings follow docs/BRAND.md.
+# Asks the same questions as Kōbō, writes /run/kubaos/install.toml and a
+# 0600 secrets file, then runs `kubaos run --events human`.
+set -u
+
+PAYLOAD=/run/kubaos/payload
+CONF=/run/kubaos/install.toml
+SECRETS=/run/kubaos/secrets.toml
+
+ask() { # ask VAR "Prompt" [default]
+  local __v __d="${3:-}"
+  read -r -p "$2${__d:+ [$__d]}: " __v
+  printf -v "$1" '%s' "${__v:-$__d}"
+}
+
+ask_secret() { # ask_secret VAR "Prompt": twice, must match, non-empty
+  local a b
+  while :; do
+    read -r -s -p "$2: " a; echo
+    read -r -s -p "Again: " b; echo
+    [ -n "$a" ] && [ "$a" = "$b" ] && break
+    echo "Empty, or the two didn't match. Again."
+  done
+  printf -v "$1" '%s' "$a"
+}
+
+toml_str() { # a TOML basic string
+  local s="${1//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '"%s"' "$s"
+}
+
+manifest_field() {
+  sed -n "s/.*\"$1\" *: *\"\\([^\"]*\\)\".*/\\1/p" "$PAYLOAD/manifest.json" 2>/dev/null | head -1
+}
+
+codename="$(manifest_field codename)"
+name="KubaOS${codename:+ $codename}"
+if [ "${1:-}" = --fallback ]; then
+  echo "$name. Text mode, because the pretty one didn't start."
+else
+  echo "$name, text mode. The graphical one is on tty1 (Ctrl+Alt+F1)."
+fi
+echo "Let's get rid of whatever's on this thing."
+echo
+if [ ! -f "$PAYLOAD/manifest.json" ]; then
+  echo "Well, shit. This stick has no system image on it ($PAYLOAD/manifest.json is missing)."
+  echo "Nothing to install. Rebuild the ISO with --payload. Here's a shell meanwhile."
+  exec bash -l
+fi
+
+default_user="$(manifest_field username)"
+default_host="$(manifest_field hostname)"
+
+echo "Disks:"
+lsblk -dpno NAME,SIZE,MODEL,TRAN -e 7,11 | grep -v '/dev/zram' | sed 's/^/  /'
+echo
+first_disk="$(lsblk -dpno NAME,RM,TYPE -e 7,11 | awk '$2==0 && $3=="disk"{print $1; exit}')"
+while :; do
+  ask disk "Install to which disk" "$first_disk"
+  [ -b "$disk" ] && break
+  echo "$disk isn't a disk. Pick one from the list."
+done
+ask host "Machine (tuxedo or vm)" "${default_host:-tuxedo}"
+ask user "Your username" "$default_user"
+ask full "Your full name" "Kuba Example"
+ask lang "Locale" "en_US.UTF-8"
+ask kb "Keyboard. Pick the one your fingers actually know" "us"
+ask tz "Timezone" "Europe/Rome"
+ask gitname "Git name" "$full"
+ask gitemail "Git email" ""
+ask enc "Encrypt the disk? (y/n)" "y"
+encrypt=true; [[ $enc == [nN]* ]] && encrypt=false
+luks=""
+$encrypt && ask_secret luks "Disk encryption passphrase (asked at every boot)"
+ask_secret pw "Login password for $user"
+
+umask 077
+{
+  echo "[locale]"
+  echo "lang = $(toml_str "$lang")"
+  echo "keyboard_layout = $(toml_str "$kb")"
+  echo "keyboard_variant = \"\""
+  echo "timezone = $(toml_str "$tz")"
+  echo
+  echo "[host]"
+  echo "hostname = $(toml_str "$host")"
+  echo
+  echo "[user]"
+  echo "username = $(toml_str "$user")"
+  echo "full_name = $(toml_str "$full")"
+  echo
+  echo "[disk]"
+  echo "device = $(toml_str "$disk")"
+  echo "encrypt = $encrypt"
+  echo "target = { mode = \"whole\" }"
+  if [ -n "$gitemail" ]; then
+    echo
+    echo "[git]"
+    echo "name = $(toml_str "$gitname")"
+    echo "email = $(toml_str "$gitemail")"
+  fi
+  echo
+  echo "[payload]"
+  echo "dir = \"$PAYLOAD\""
+} >"$CONF"
+{
+  $encrypt && echo "luks_passphrase = $(toml_str "$luks")"
+  echo "user_password = $(toml_str "$pw")"
+} >"$SECRETS"
+
+desc="$(lsblk -dno MODEL,SIZE "$disk" 2>/dev/null | sed 's/  */ /g; s/^ //')"
+echo
+cat "$CONF"
+echo
+echo "Everything on ${desc:+$desc, }$disk gets erased. Every partition, every OS on it. There's no undo."
+ask go "Type yes to erase $disk and install" ""
+[ "$go" = yes ] || { echo "Nothing touched. Your answers are in $CONF."; rm -f "$SECRETS"; exec bash -l; }
+echo
+echo "Installing. Go get a coffee. Actually, don't bother, it's faster than that."
+
+kubaos run --config "$CONF" --secrets "$SECRETS" --events human
+rc=$?
+rm -f "$SECRETS"
+if [ $rc -eq 0 ]; then
+  ask r "Done. Pull the stick, reboot and enjoy a computer that minds its own business. Reboot now? (y/n)" "y"
+  [[ $r == [yY]* ]] && systemctl reboot
+else
+  echo "Well, shit. The install failed (exit $rc); the reason is above."
+  echo "Full log: /var/log/kubaos-install.log. Fix it and run kobo-text again."
+fi
+exec bash -l

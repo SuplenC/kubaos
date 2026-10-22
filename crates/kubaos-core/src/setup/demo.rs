@@ -1,4 +1,4 @@
-//! A made-up machine for GUI work and screenshots: a TUXEDO with Secure Boot
+//! A made-up machine for work on Kōbō and screenshots: a TUXEDO with Secure Boot
 //! on, a fingerprint reader, a YubiKey plugged in, Bitwarden logged out and
 //! no git identity.
 //! Actions play the real event shapes with fake timings and flip the card.

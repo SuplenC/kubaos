@@ -1,0 +1,13 @@
+#!/bin/sh
+# Bind the payload from the live medium (casper mounts it at /cdrom) to
+# /run/kubaos/payload. No payload on the medium: nothing to do.
+set -eu
+mkdir -p /run/kubaos/payload
+for src in /cdrom/kubaos/payload /run/live/medium/kubaos/payload; do
+  if [ -d "$src" ]; then
+    mount --bind -o ro "$src" /run/kubaos/payload
+    echo "payload: $src"
+    exit 0
+  fi
+done
+echo "payload: none on the live medium"

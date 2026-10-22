@@ -16,7 +16,7 @@ KubaOS keeps secrets out of files. One Bitwarden account holds my SSH keys, proj
 
 ## First-time setup
 
-Installed from the KubaOS stick? Steps 1 and 2 and `system/75-yubikey.sh` are already done, and first-boot setup (`kubaos-setup`, docs/INSTALLER.md) runs step 4 and `dot-u2f-enroll` for you. What's left by hand is the desktop app's SSH agent toggle (step 3) and the key's own PIN and fingerprints.
+Installed from the KubaOS stick? Steps 1 and 2 and `system/75-yubikey.sh` are already done, and first-boot setup (`kubaos-setup`, docs/INSTALL-INTERNALS.md) runs step 4 and `dot-u2f-enroll` for you. What's left by hand is the desktop app's SSH agent toggle (step 3) and the key's own PIN and fingerprints.
 
 1. `system/70-bitwarden.sh` (after `60-nix.sh`). It installs the Bitwarden desktop `.deb` and the `bw` CLI, both pinned and sha256-checked, plus `secret-tool`, `pam_u2f` and `pamu2fcfg`. It puts the security key in front of the password for sudo and polkit and installs the lock screen's `qs-lock-u2f` service.
 2. `home-manager switch --flake ~/.config/kubaos/home` (`~/Projects/dotfiles` on a machine set up by hand, docs/INSTALL.md), then log out and in, so `SSH_AUTH_SOCK` points at Bitwarden everywhere.
@@ -90,7 +90,7 @@ There's no systemd unit or timer. A re-run needs the master password, a unit can
 
 SSH: the desktop app must be running and unlocked once since it started. It asks before each use of a key. Pick how often under Settings, "Ask for authorization when using SSH agent".
 
-The GNOME keyring: tty autologin means nobody types the login password, so nothing can unlock a password-protected login keyring. An install from the KubaOS stick gets a default keyring without a password (docs/INSTALLER.md, "A calm first login"): it's always open, and LUKS protects it at rest. On a machine set up by hand with these scripts, the first `cd` into a project (or `gh`) after boot shows the keyring's unlock prompt. Give that keyring the same password as your account so the prompt is easy to answer, or create the passwordless one the same way the installer does.
+The GNOME keyring: tty autologin means nobody types the login password, so nothing can unlock a password-protected login keyring. An install from the KubaOS stick gets a default keyring without a password (docs/INSTALL-INTERNALS.md, "A calm first login"): it's always open, and LUKS protects it at rest. On a machine set up by hand with these scripts, the first `cd` into a project (or `gh`) after boot shows the keyring's unlock prompt. Give that keyring the same password as your account so the prompt is easy to answer, or create the passwordless one the same way the install does.
 
 ## Rotation
 

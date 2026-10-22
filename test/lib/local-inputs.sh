@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2034  # LOCAL_INPUT_MOUNTS and LOCAL_INPUTS are read by the callers
-# Host side, sourced by test/run and installer/image/build: the flake inputs
+# Host side, sourced by test/run and install/image/build: the flake inputs
 # that live on this machine (git+file:// and path: in flake.lock, such as a
 # local checkout of an input), so Docker can bind-mount each one read-only at the
 # same absolute path and Nix inside the container finds it where the lock

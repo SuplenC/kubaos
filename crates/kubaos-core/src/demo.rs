@@ -1,4 +1,4 @@
-//! A fake install: the real event sequence with made-up timings, so the GUI
+//! A fake install: the real event sequence with made-up timings, so Kōbō
 //! can be built and screenshotted anywhere (macOS included).
 
 use std::thread::sleep;

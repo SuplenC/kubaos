@@ -2,11 +2,11 @@
 
 There are two ways onto the TUXEDO InfinityBook Pro 14 Gen10. The KubaOS stick takes a couple of minutes and a few keyboard-only screens. The hard way, at the end of this file, is a stock Ubuntu Server 26.04 install and nine scripts by hand, which takes an evening and is how KubaOS got built in the first place. Use the stick.
 
-The why is in `docs/PLAN.md`, how the installer works inside in `docs/INSTALLER.md`.
+The why is in `docs/PLAN.md`, how the install works inside in `docs/INSTALL-INTERNALS.md`.
 
 ## The KubaOS stick
 
-The stick holds a finished KubaOS: Ubuntu 26.04 after `system/10-strip.sh` through `75-yubikey.sh`, plus `/nix` with your home-manager generation already built. The installer partitions, encrypts, unpacks, creates your user and installs GRUB. No network needed, nothing downloaded, nothing compiled on the laptop.
+The stick holds a finished KubaOS: Ubuntu 26.04 after `system/10-strip.sh` through `75-yubikey.sh`, plus `/nix` with your home-manager generation already built. Kōbō, the app on the stick, partitions, encrypts, unpacks, creates your user and installs GRUB. No network needed, nothing downloaded, nothing compiled on the laptop.
 
 ### What you need
 
@@ -17,11 +17,11 @@ The stick holds a finished KubaOS: Ubuntu 26.04 after `system/10-strip.sh` throu
 
 ### Make the stick
 
-Build the payload and the ISO on the Mac (both run in Docker; details in `installer/image/README.md` and `installer/iso/README.md`):
+Build the payload and the ISO on the Mac (both run in Docker; details in `install/image/README.md` and `install/iso/README.md`):
 
 ```sh
-installer/image/build --arch x86_64          # the installed system, as one squashfs
-installer/iso/build --arch x86_64 --payload <payload dir> --release
+install/image/build --arch x86_64          # the installed system, as one squashfs
+install/iso/build --arch x86_64 --payload <payload dir> --release
 ```
 
 Then write the ISO to the stick with `dd`, balenaEtcher or Raspberry Pi Imager. Check the device name twice before you `dd`: it erases whatever disk you point it at.
@@ -36,7 +36,7 @@ Secure Boot: on or off, as IT wants. The stick boots either way. With it on, `tu
 
 ### The screens
 
-The installer starts on its own a few seconds after GRUB. Everything works from the keyboard: Tab and Shift+Tab move, arrows pick in lists, Space toggles, Enter goes on, Esc goes back.
+Kōbō starts on its own a few seconds after GRUB. Everything works from the keyboard: Tab and Shift+Tab move, arrows pick in lists, Space toggles, Enter goes on, Esc goes back.
 
 1. **Welcome.**
 2. **Language and keyboard**, with a field to test the layout.
@@ -48,13 +48,13 @@ The installer starts on its own a few seconds after GRUB. Everything works from 
 8. **Review.** It names the disk that gets erased. Read it. Then hold the button (or Enter) to start.
 9. **Installing.** Steps with timings, and a live log if you want it. Then **Done** and Restart.
 
-If a step fails, the installer shows what broke, a hint, the log, Save log and Try again. The live log is `/var/log/dotinstall.log`.
+If a step fails, Kōbō shows what broke, a hint, the log, Save log and Try again. The live log is `/var/log/kubaos-install.log`.
 
-If the GUI itself won't start, the text installer runs instead, and it's always on tty2 (`Ctrl+Alt+F2`). It asks the same questions.
+If Kōbō itself won't start, its text mode runs instead, and it's always on tty2 (`Ctrl+Alt+F2`). It asks the same questions.
 
 ### First boot
 
-LUKS passphrase, then autologin on tty1 straight into Hyprland. The bar, Ghostty (`SUPER + Return`) and the launcher (`SUPER + Space`) are there. snapper already has snapshot #1, `factory`, of the fresh system. The install log is in `/var/log/dotinstall/install.log`.
+LUKS passphrase, then autologin on tty1 straight into Hyprland. The bar, Ghostty (`SUPER + Return`) and the launcher (`SUPER + Space`) are there. snapper already has snapshot #1, `factory`, of the fresh system. The install log is in `/var/log/kubaos/install.log`.
 
 ### What the stick can't do
 
@@ -84,7 +84,7 @@ The MOK screen, the fingerprint enrollment and what to verify are in the hard wa
 
 Then the secrets. Bitwarden desktop, `bw` and the security-key PAM lines are already installed. Open Bitwarden (Hyprland starts it), log in, Settings -> enable "SSH agent", then run `dot-bw-setup`. Set the YubiKey's PIN and fingerprints with `ykman` and run `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md` has the order, and section 11 below says how to check it all works.
 
-The installer will do this part itself one day (the first-boot setup screen, `docs/screenshots/setup/`). Today it's a stub.
+Kōbō will do this part itself one day (the first-boot setup screen, `docs/screenshots/setup/`). Today it's a stub.
 
 ## Updating
 
@@ -110,10 +110,10 @@ commit.
 
 ## Troubleshooting
 
-**The installer failed.** Read the error and the hint on screen, then the log
+**The install failed.** Read the error and the hint on screen, then the log
 (Save log tells you where it put it; the live system also keeps it in
-`/var/log/dotinstall.log`). Try again runs the install again with the same
-answers. The text installer on tty2 (`Ctrl+Alt+F2`) runs the same engine.
+`/var/log/kubaos-install.log`). Try again runs the install again with the same
+answers. The text mode on tty2 (`Ctrl+Alt+F2`) runs the same engine.
 
 **Black screen / Hyprland won't start.** `Ctrl+Alt+F2`, log in. Hyprland's
 log: `ls $XDG_RUNTIME_DIR/hypr/*/hyprland.log` (from another tty:
@@ -317,7 +317,7 @@ system/25-boot.sh
 
 Installs Plymouth with the KubaOS theme, the GRUB theme on `/boot`, and
 renames the menu entries; then rebuilds the initramfs and `grub.cfg`.
-What each setting does is in `docs/INSTALLER.md`, "Boot".
+What each setting does is in `docs/INSTALL-INTERNALS.md`, "Boot".
 
 **Verify:** `update-alternatives --query default.plymouth` points at
 `kubaos`; `grep -E "^(menuentry|submenu) " /boot/grub/grub.cfg` lists

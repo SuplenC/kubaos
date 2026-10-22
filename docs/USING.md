@@ -22,7 +22,7 @@ Keys, updates, daily commands, how it is built, the repo map and known limitatio
 | `SUPER + CTRL + Escape` | Lock |
 | `SUPER + ALT + Return` / `SUPER + ALT + Space` | foot and fuzzel: the emergency terminal and launcher, for when the shell is dead |
 
-The layout is whatever you picked in the installer (`/etc/default/keyboard`, `us` if there is no such file). Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
+The layout is whatever you picked in Kōbō (`/etc/default/keyboard`, `us` if there is no such file). Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
 
 ## Updating and rolling back
 
@@ -158,7 +158,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 - **Terminal and dev:** Ghostty (foot as the fallback), tmux + tms, Neovim 0.12 (LazyVim), rustup, proto + moon, sccache, clang + mold (wild optional), Docker Engine + lazydocker, Chrome.
 - **Secrets:** Bitwarden desktop's SSH agent (private keys never touch the disk), `bw` for SSH Host blocks, git signing, the gh token and per-project env through direnv. A YubiKey C Bio does sudo, polkit and the lock screen with a fingerprint; the password stays as the fallback.
 - **Hardware:** `tuxedo-drivers` and power-profiles-daemon (no TUXEDO Control Center), fprintd, bolt for the dock.
-- **Installer:** `dotinstall`, a Rust engine (`kubaos-core`, behind the `kubaos` CLI) plus an iced GUI, on a casper live ISO. It unpacks a prebuilt image with `/nix` and the home-manager generation already inside, which is why it needs no network.
+- **Install:** Kōbō, an iced app, on a casper live ISO, with the Rust engine (`kubaos-core`, also behind the `kubaos` CLI) running inside it. It unpacks a prebuilt image with `/nix` and the home-manager generation already inside, which is why it needs no network.
 
 ### Repo map
 
@@ -170,17 +170,17 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `update.sh`, files for `/etc` |
-| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, and `kubaos-cli`, the `kubaos` command |
-| `installer/` | `dotinstall`: the GUI, the live ISO, the payload build and the first-boot files |
+| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, and `kubaos-kobo`, Kōbō |
+| `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |
 | `test/` | The Docker test harness (`test/run`) |
-| `docs/` | `PLAN.md` (why), `INSTALL.md` (how), `CONTRACTS.md` and `INSTALLER.md` (interfaces), `SECRETS.md` (Bitwarden, security key), `TESTING.md`, `BRAND.md` (name and voice), `screenshots/` |
+| `docs/` | `PLAN.md` (why), `INSTALL.md` (how), `CONTRACTS.md` and `INSTALL-INTERNALS.md` (interfaces), `SECRETS.md` (Bitwarden, security key), `TESTING.md`, `BRAND.md` (name and voice), `screenshots/` |
 
 ## Testing
 
 Two benches, both on the Mac.
 
 - **`test/run`** builds an arm64 Ubuntu 26.04 image with the repo's own `system/*.sh`, keeps the Nix store in a volume, and on every run does a real `home-manager switch` and the checks below. `test/run e2e` takes about 42 s warm. `test/run shots` starts a headless session with Quickshell for screenshots. Commands, caches and timings: [`docs/TESTING.md`](TESTING.md).
-- **`test/vm/run`** drives QEMU: boots the installer ISO, runs a headless install, boots the result, takes screenshots and snapshots. See [`docs/INSTALLER.md`](INSTALLER.md), "Test bench".
+- **`test/vm/run`** drives QEMU: boots the live ISO, runs a headless install, boots the result, takes screenshots and snapshots. See [`docs/INSTALL-INTERNALS.md`](INSTALL-INTERNALS.md), "Test bench".
 
 Verified in an arm64 `ubuntu:26.04` container (user `kuba`, hostname `vm`, Nix installed with the official `--daemon` installer, daemon started by hand because there is no systemd):
 

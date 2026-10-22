@@ -18,7 +18,7 @@
 #   message           "cryptsetup: ERROR: cryptroot: cryptsetup failed, bad password or options?"
 #   message           "cryptsetup: cryptroot: set up successfully"
 
-# --- palette (installer/crates/gui/src/theme.rs) -----------------------------
+# --- palette (crates/kubaos-kobo/src/theme.rs) -----------------------------
 Window.SetBackgroundTopColor(0.071, 0.051, 0.039);      # #120d0a
 Window.SetBackgroundBottomColor(0.071, 0.051, 0.039);
 
