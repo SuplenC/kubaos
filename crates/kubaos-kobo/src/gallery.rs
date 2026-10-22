@@ -15,7 +15,8 @@ use kubaos_core::probe::{DiskInfo, PartitionInfo, Region, WifiNetwork};
 use kubaos_core::{Event, Probe, StepId};
 
 use crate::app::{App, F, Message, Screen};
-use crate::backend::{Demo, demo_probe};
+use crate::backend::{DEMO_BATTERY, Demo, demo_probe};
+use crate::battery::{Battery, Supply};
 use crate::progress::Install;
 
 const GB: u64 = 1_000_000_000;
@@ -40,6 +41,8 @@ fn shot(dir: &std::path::Path, name: &str, app: &App, size: Size) {
 fn app_with(p: Result<Probe, String>, size: Size) -> App {
     let mut app = App::headless(Arc::new(Demo::new(40.0, None)));
     app.set_probe(p);
+    // The battery watch is a subscription, which a headless app never runs.
+    app.battery = Some(DEMO_BATTERY);
     app.load_images_now(size);
     app.transition.0 = Instant::now() - Duration::from_secs(5);
     app.now = Instant::now();
@@ -127,8 +130,13 @@ fn gallery() {
         p.payload = None;
         let app = app_with(Ok(p), size);
         shot(&dir, "welcome-no-image", &app, size);
-        let app = app_with(Err("probe failed: lsblk: command not found".into()), size);
+        let mut app = app_with(Err("probe failed: lsblk: command not found".into()), size);
         shot(&dir, "welcome-probe-failed", &app, size);
+        app.battery = Some(Battery {
+            percent: 100,
+            supply: Supply::PluggedIn,
+        });
+        shot(&dir, "welcome-plugged-in", &app, size);
 
         let mut app = app_with(Ok(hard_probe()), size);
         go(&mut app, Screen::Language);
@@ -177,6 +185,18 @@ fn gallery() {
 
         go(&mut app, Screen::Summary);
         shot(&dir, "summary-alongside", &app, size);
+        // Low and on battery: the indicator turns red and Last chance asks for the charger.
+        app.battery = Some(Battery {
+            percent: 14,
+            supply: Supply::Discharging,
+        });
+        shot(&dir, "summary-low-battery", &app, size);
+        app.battery = Some(Battery {
+            percent: 14,
+            supply: Supply::Charging,
+        });
+        shot(&dir, "summary-charging", &app, size);
+        app.battery = Some(DEMO_BATTERY);
         let _ = app.update_inner(Message::Click(F::Power));
         shot(&dir, "power-menu", &app, size);
         let _ = app.update_inner(Message::Click(F::PowerCancel));

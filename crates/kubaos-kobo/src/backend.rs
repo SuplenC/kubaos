@@ -6,11 +6,13 @@
 //! - The `Backend` seam the install screens talk to, and its two sides, `Engine` and `Demo`.
 //! - The live system's install log and what a signal does while an install runs.
 //! - Stopping an install and taking the machine down (`systemctl poweroff` and `reboot`).
+//! - Which battery the chrome shows: sysfs for `Engine`, a fixed one for `Demo`.
 //!
 //! # Not here
 //!
 //! - The install itself: `kubaos_core::engine`.
 //! - First-boot setup's backend: `setup/backend.rs`.
+//! - Reading and combining the batteries: `battery.rs`.
 
 use std::fs::File;
 use std::io;
@@ -36,6 +38,10 @@ use signal_hook::consts::SIGHUP;
 use signal_hook::consts::SIGINT;
 use signal_hook::consts::SIGTERM;
 use signal_hook::iterator::Signals;
+
+use crate::battery;
+use crate::battery::Battery;
+use crate::battery::Supply;
 
 /// What an install reports, in order: events, then exactly one `Exited`.
 #[derive(Debug, Clone)]
@@ -64,6 +70,9 @@ pub trait Backend: Send + Sync {
     ///
     /// systemctl couldn't run or refused, with its reason.
     fn poweroff(&self) -> Result<(), String>;
+    /// The machine's batteries combined, or `None` when it has none. Reads files, so the app
+    /// calls it off the UI thread.
+    fn battery(&self) -> Option<Battery>;
     /// Shown in the corner so nobody mistakes the demo for a real install.
     fn is_demo(&self) -> bool;
 }
@@ -119,6 +128,10 @@ impl Backend for Engine {
 
     fn poweroff(&self) -> Result<(), String> {
         systemctl("poweroff")
+    }
+
+    fn battery(&self) -> Option<Battery> {
+        battery::read(Path::new(battery::SYSFS))
     }
 
     fn is_demo(&self) -> bool {
@@ -390,10 +403,20 @@ impl Backend for Demo {
         std::process::exit(0);
     }
 
+    fn battery(&self) -> Option<Battery> {
+        Some(DEMO_BATTERY)
+    }
+
     fn is_demo(&self) -> bool {
         true
     }
 }
+
+/// The demo's laptop, on battery and well above low, so the chrome shows the indicator.
+pub const DEMO_BATTERY: Battery = Battery {
+    percent: 64,
+    supply: Supply::Discharging,
+};
 
 /// core's demo reports unpack progress in whole gigabytes ("4 / 9.4 GB");
 /// show what the real engine will send instead ("4.1 / 9.4 GB").

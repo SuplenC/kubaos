@@ -1,4 +1,5 @@
 use super::*;
+use crate::battery::Supply;
 
 #[test]
 fn scale_fits_the_output() {
@@ -126,6 +127,10 @@ impl Backend for Recorder {
     fn poweroff(&self) -> Result<(), String> {
         self.record("poweroff");
         Ok(())
+    }
+
+    fn battery(&self) -> Option<Battery> {
+        None
     }
 
     fn is_demo(&self) -> bool {
@@ -539,4 +544,75 @@ fn the_done_screen_s_reboot_restarts_without_asking() {
     wait_for(&recorder, "reboot");
     assert!(app.power.is_none());
     assert_eq!(app.shutting_down, Some(PowerAction::Restart));
+}
+
+fn on_battery(percent: u8, supply: Supply) -> Message {
+    Message::Battery(Some(Battery { percent, supply }))
+}
+
+fn draws(app: &App, text: &str) -> bool {
+    use iced_test::simulator::Simulator;
+    let mut ui = Simulator::with_size(
+        iced::Settings::default(),
+        Size::new(1280.0, 800.0),
+        crate::view::view(app),
+    );
+    ui.find(text).is_ok()
+}
+
+#[test]
+fn every_screen_shows_the_battery_beside_the_power_button() {
+    for screen in EVERY_SCREEN {
+        let (mut app, _) = recorded(Recorder::default());
+        let _ = app.go(screen);
+
+        let _ = app.update_inner(on_battery(64, Supply::Discharging));
+
+        assert!(draws(&app, "64%"), "no battery on {screen:?}");
+    }
+}
+
+#[test]
+fn a_machine_without_a_battery_shows_none() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Language);
+    let _ = app.update_inner(on_battery(64, Supply::Discharging));
+
+    let _ = app.update_inner(Message::Battery(None));
+
+    assert!(!draws(&app, "64%"));
+}
+
+#[test]
+fn a_low_battery_on_last_chance_asks_for_the_charger_and_still_installs() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Summary);
+
+    let _ = app.update_inner(on_battery(14, Supply::Discharging));
+
+    let note = crate::view::low_battery_note(&app).expect("a low battery note");
+    assert_eq!(
+        note,
+        "Battery at 14%. Plug in the charger: the install can take a while."
+    );
+    assert!(draws(&app, &note));
+    assert_eq!(app.blocker(), None);
+}
+
+#[test]
+fn a_battery_on_the_charger_asks_for_nothing() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Summary);
+
+    let _ = app.update_inner(on_battery(14, Supply::Charging));
+
+    assert_eq!(crate::view::low_battery_note(&app), None);
+    assert!(draws(&app, "14%"));
+}
+
+#[test]
+fn the_demo_backend_has_a_battery_to_show() {
+    let demo = crate::backend::Demo::new(40.0, None);
+
+    assert_eq!(demo.battery(), Some(crate::backend::DEMO_BATTERY));
 }

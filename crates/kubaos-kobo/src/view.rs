@@ -1,6 +1,6 @@
 //! Everything on screen. Panel screens share the glass panel with the step
 //! rail; Welcome and Done are full-bleed over the wallpaper. The power menu
-//! opens over either. First-boot setup is its own app (setup/).
+//! opens over either. The battery sits beside the power button on both. First-boot setup is its own app (setup/).
 //!
 //! Copy follows docs/BRAND.md: plain facts first, attitude around them, at
 //! most one swear per screen, none near the disk that gets erased or the
@@ -29,8 +29,9 @@ use crate::model::{self, DiskExt, DiskMode, human_bytes};
 use crate::progress::{LOG_VIEW_LINES, Outcome, StepState, fmt_duration};
 use crate::theme::{self, DARK, Icon, Palette, alpha, jp, mix, motion, radius, size, space};
 use crate::widgets::{
-    FieldLook, Kind, ROW_GAP, accent, bar, body, btn, chip, field, field_with, header, icon, label,
-    list_row, quiet_btn, ring, scroll, spinner, switch_anim, text_field, title, well, well_ring,
+    FieldLook, Kind, ROW_GAP, accent, bar, battery, body, btn, chip, field, field_with, header,
+    icon, label, list_row, quiet_btn, ring, scroll, spinner, switch_anim, text_field, title, well,
+    well_ring,
 };
 
 type El<'a> = Element<'a, Message>;
@@ -70,6 +71,9 @@ pub fn view(app: &App) -> El<'_> {
         ));
     }
     if !app.screen.in_panel() {
+        if let Some(b) = app.battery {
+            corner = corner.push(battery(b, &DARK));
+        }
         corner = corner.push(power_button(app));
     }
     layers = layers.push(
@@ -324,7 +328,7 @@ fn rail(app: &App) -> El<'_> {
             Space::new().height(Length::Fill),
             keys,
             Space::new().height(space::LG),
-            power_button(app),
+            rail_footer(app),
         ]
         .padding(Padding {
             top: 22.0,
@@ -351,6 +355,16 @@ fn rail(app: &App) -> El<'_> {
 
 /// The keys that do something on this screen, as (key, what it does).
 /// Every one of them works (`tour.rs` tests check the important ones).
+/// The power button, and the battery when the machine has one.
+fn rail_footer(app: &App) -> El<'_> {
+    let mut r =
+        row![power_button(app), Space::new().width(Length::Fill)].align_y(Alignment::Center);
+    if let Some(b) = app.battery {
+        r = r.push(battery(b, &DARK));
+    }
+    r.into()
+}
+
 pub fn hints(app: &App) -> Vec<(&'static str, &'static str)> {
     let mut v = vec![];
     match app.screen {
@@ -2107,19 +2121,37 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
         ..container::Style::default()
     });
 
+    let mut top = column![header(
+        jp::SUMMARY,
+        "Last chance",
+        "Nothing's been written yet. Check it over, then hold the button. Tab gets you to Edit.",
+        p
+    )];
+    if let Some(note) = low_battery_note(app) {
+        top = top.push(Space::new().height(space::MD)).push(
+            row![
+                icon(Icon::Warning, 18.0, p.error),
+                text(note)
+                    .font(theme::SANS_MEDIUM)
+                    .size(size::MD)
+                    .color(p.error)
+            ]
+            .spacing(space::SM)
+            .align_y(Alignment::Center),
+        );
+    }
+
     column![
-        header(
-            jp::SUMMARY,
-            "Last chance",
-            "Nothing's been written yet. Check it over, then hold the button. Tab gets you to Edit.",
-            p
-        ),
+        top,
         Space::new().height(space::XL),
         scroll(
             "summary-scroll",
-            column![row![lang, acct].spacing(space::LG), row![disk_block, sys].spacing(space::LG)]
-                .spacing(space::LG)
-                .padding(Padding::default().right(14)),
+            column![
+                row![lang, acct].spacing(space::LG),
+                row![disk_block, sys].spacing(space::LG)
+            ]
+            .spacing(space::LG)
+            .padding(Padding::default().right(14)),
             p
         )
         .height(Length::Fill),
@@ -2127,6 +2159,16 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
         confirm,
     ]
     .into()
+}
+
+/// Asks for the charger on Last chance when the battery is low. It warns only: an install on a
+/// low battery is the owner's call.
+pub fn low_battery_note(app: &App) -> Option<String> {
+    let b = app.battery.filter(|b| b.is_low())?;
+    Some(format!(
+        "Battery at {}%. Plug in the charger: the install can take a while.",
+        b.percent
+    ))
 }
 
 fn step_lead<'a>(state: StepState, t: f32, p: &Palette) -> El<'a> {
