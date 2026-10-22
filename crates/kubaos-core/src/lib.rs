@@ -5,9 +5,12 @@ pub mod config;
 pub mod demo;
 pub mod engine;
 pub mod event;
+pub mod packages;
 pub mod probe;
 pub mod setup;
+pub mod state;
 pub mod step;
+pub mod switch;
 
 pub use config::{InstallConfig, Secrets};
 pub use event::{Event, Level, StepInfo};
