@@ -62,8 +62,8 @@ hl.on("hyprland.start", function()
   -- Idle: lock 5 min, screens off 10 min, suspend 30 min on battery.
   start("hypridle")
 
-  -- Moves workspaces 4-9 back to their monitors when a dock is replugged,
-  -- and runs `dot-hypr-lid sync` at login and on every monitor hotplug.
+  -- Runs `dot-hypr-lid sync` at login and on every monitor hotplug, so the
+  -- laptop panel comes back when the last external goes with the lid closed.
   start("dot-hypr-workspaces")
 
   if POLKIT_AGENT == "auto" then
