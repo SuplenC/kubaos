@@ -1,5 +1,5 @@
 //! Config vs. machine vs. payload. Every problem is collected, so the GUI
-//! (and `dotinstall validate`) can show them all at once.
+//! (and `kubaos validate`) can show them all at once.
 
 use super::disk::{self, MIB};
 use super::machine::gib;
@@ -128,7 +128,7 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
                 .any(|r| r.start <= start && end <= r.end && start < end);
             if !inside {
                 bad(format!(
-                    "{start}..{end} on {} isn't inside a free region (see `dotinstall probe`)",
+                    "{start}..{end} on {} isn't inside a free region (see `kubaos probe`)",
                     d.path
                 ));
             }

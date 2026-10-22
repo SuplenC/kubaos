@@ -2,7 +2,7 @@
 # dotinstall-text: the KubaOS text installer (fallback when the GUI can't run).
 # Strings follow docs/BRAND.md.
 # Asks the same questions as the GUI, writes /run/dotinstall/install.toml and a
-# 0600 secrets file, then runs `dotinstall run --events human`.
+# 0600 secrets file, then runs `kubaos run --events human`.
 set -u
 
 PAYLOAD=/run/dotinstall/payload
@@ -121,7 +121,7 @@ ask go "Type yes to erase $disk and install" ""
 echo
 echo "Installing. Go get a coffee. Actually, don't bother, it's faster than that."
 
-dotinstall run --config "$CONF" --secrets "$SECRETS" --events human
+kubaos run --config "$CONF" --secrets "$SECRETS" --events human
 rc=$?
 rm -f "$SECRETS"
 if [ $rc -eq 0 ]; then

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs inside the dotinstall-iso-builder container (installer/iso/build).
 #
-# Mounts: /src = installer/iso (ro), /bins = dotinstall binaries (ro),
+# Mounts: /src = installer/iso (ro), /bins = kubaos and dotinstall-gui (ro),
 #         /branding = branding hook dir (ro, may be empty),
 #         /payload = payload dir (ro, may be empty), /out = output dir,
 #         /work = cache volume (base rootfs per package-list hash).
@@ -83,7 +83,7 @@ cp -a "$BASE/rootfs" "$W/rootfs"
 R="$W/rootfs"
 cp -a /src/rootfs/. "$R/"
 sed -i "s/@VOLID@/$KUBAOS_VOLID/" "$R/etc/systemd/system/cdrom.mount"
-install -m 0755 /bins/dotinstall "$R/usr/bin/dotinstall"
+install -m 0755 /bins/kubaos "$R/usr/bin/kubaos"
 if [[ -f /bins/dotinstall-gui ]]; then
   install -m 0755 /bins/dotinstall-gui "$R/usr/bin/dotinstall-gui"
 fi

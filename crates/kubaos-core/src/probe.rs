@@ -1,4 +1,4 @@
-//! What the machine offers: `dotinstall probe --json` prints one `Probe`.
+//! What the machine offers: `kubaos probe --json` prints one `Probe`.
 //! The GUI fills its pickers from it.
 
 use serde::{Deserialize, Serialize};

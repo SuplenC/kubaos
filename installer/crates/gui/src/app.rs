@@ -13,10 +13,10 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use dotinstall_core::Probe;
 use iced::keyboard::{self, key::Named};
 use iced::widget::{image, operation};
 use iced::{Size, Subscription, Task, event, window};
+use kubaos_core::Probe;
 
 use crate::backend::{Backend, RunMsg};
 use crate::edit::{self, Caret, Edit};
@@ -411,7 +411,7 @@ impl App {
     }
 
     /// The payload's wallpaper sets, in its order.
-    pub fn wallpaper_sets(&self) -> &[dotinstall_core::probe::WallpaperSet] {
+    pub fn wallpaper_sets(&self) -> &[kubaos_core::probe::WallpaperSet] {
         self.ready_probe()
             .and_then(|p| p.payload.as_ref())
             .map_or(&[], |m| m.wallpaper_sets.as_slice())

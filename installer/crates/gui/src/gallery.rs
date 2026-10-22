@@ -9,10 +9,10 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use dotinstall_core::probe::{DiskInfo, PartitionInfo, Region, WifiNetwork};
-use dotinstall_core::{Event, Probe, StepId};
 use iced::{Size, Theme};
 use iced_test::simulator::Simulator;
+use kubaos_core::probe::{DiskInfo, PartitionInfo, Region, WifiNetwork};
+use kubaos_core::{Event, Probe, StepId};
 
 use crate::app::{App, F, Message, Screen};
 use crate::backend::{Demo, demo_probe};

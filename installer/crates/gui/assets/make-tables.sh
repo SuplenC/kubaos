@@ -2,7 +2,7 @@
 # Regenerates locales.tsv and keymaps.tsv: display names for every UTF-8
 # locale glibc supports and every XKB layout and variant, taken from the same
 # Ubuntu release the live ISO and the payload use, so the names match what
-# `dotinstall probe` lists. Needs Docker.
+# `kubaos probe` lists. Needs Docker.
 #
 #   locales.tsv  en_SE.UTF-8<TAB>English (Sweden)
 #   keymaps.tsv  us<TAB>English (US)     us(intl)<TAB>English (US, intl., with dead keys)

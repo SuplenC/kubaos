@@ -3,7 +3,7 @@
 # Secure Boot MOK for DKMS, power profile check, Thunderbolt/USB4 dock (bolt),
 # fingerprint reader (fprintd + PAM).
 #
-# First-boot setup (dotinstall setup, kubaos-setup) runs parts of this as
+# First-boot setup (kubaos setup, kubaos-setup) runs parts of this as
 # root through its helper (installer/firstboot/setup-helper):
 #   --only tuxedo,mok --mok-password-stdin   the TUXEDO card
 #   --only fingerprint                       the fingerprint card

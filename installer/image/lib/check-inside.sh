@@ -291,7 +291,7 @@ rm -rf "$R/tmp/check-home" "$R/tmp/check-other"
 # renders again for the real user (engine/files.rs USER_TEMPLATES, read from
 # the payload's own checkout), or a username other than the payload's gets
 # the payload's (tty1 autologin into an account that isn't there).
-templates="$(sed -n '/^pub const USER_TEMPLATES/,/^];/p' "$R$K/installer/crates/core/src/engine/files.rs" |
+templates="$(sed -n '/^pub const USER_TEMPLATES/,/^];/p' "$R$K/crates/kubaos-core/src/engine/files.rs" |
   grep -o '"/[^"]*"' | tr -d '"')"
 [[ -n "$templates" ]] && ok "engine renders $(wc -l <<<"$templates" | tr -d ' ') system file(s) for the user" ||
   fail "no USER_TEMPLATES in the checkout's engine/files.rs"

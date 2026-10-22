@@ -3,7 +3,7 @@
 
 use std::process::{Command, Stdio};
 
-use dotinstall_core::setup::{self, CardId, Env, Inputs, RealSys, SetupEvent, Status, demo};
+use kubaos_core::setup::{self, CardId, Env, Inputs, RealSys, SetupEvent, Status, demo};
 
 pub trait SetupBackend: Send + Sync {
     /// Detects every card. Slow-ish (bw status takes a second or three):

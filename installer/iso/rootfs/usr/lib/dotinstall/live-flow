@@ -11,7 +11,7 @@
 #   dotinstall.env   optional KEY=value lines:
 #                      DOTINSTALL_AFTER=poweroff|reboot|shell   (default poweroff)
 #                      DOTINSTALL_VERBOSE=1     `run -v`: every command and its output
-#                      DOTINSTALL_DEMO=1        run `dotinstall demo` instead of `run`
+#                      DOTINSTALL_DEMO=1        run `kubaos demo` instead of `run`
 #                      DOTINSTALL_DEMO_SPEED=N  (default 10)
 #                      DOTINSTALL_DEMO_FAIL_AT=STEP
 #                      DOTINSTALL_GUI_ARGS=...  extra dotinstall-gui arguments
@@ -55,12 +55,12 @@ headless() {
   echo "DOTINSTALL-BEGIN $(cat /etc/dotinstall-live 2>/dev/null | tr '\n' ' ')"
   echo "uptime: $(cut -d' ' -f1 /proc/uptime)s"
   if [ "$DOTINSTALL_DEMO" = 1 ]; then
-    set -- dotinstall demo --events human --speed "$DOTINSTALL_DEMO_SPEED"
+    set -- kubaos demo --events human --speed "$DOTINSTALL_DEMO_SPEED"
     [ -n "$DOTINSTALL_DEMO_FAIL_AT" ] && set -- "$@" --fail-at "$DOTINSTALL_DEMO_FAIL_AT"
   else
     install -m 600 /dev/null /run/dotinstall/secrets.toml
     [ -f "$CFG/secrets.toml" ] && cat "$CFG/secrets.toml" >/run/dotinstall/secrets.toml
-    set -- dotinstall run --config "$CFG/install.toml" --secrets /run/dotinstall/secrets.toml --events human
+    set -- kubaos run --config "$CFG/install.toml" --secrets /run/dotinstall/secrets.toml --events human
     [ "${DOTINSTALL_VERBOSE:-0}" = 1 ] && set -- "$@" -v
   fi
   echo "\$ $*"

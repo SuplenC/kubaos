@@ -1,4 +1,4 @@
-//! dotinstall-core: the installer's types and engine. The contract between
+//! kubaos-core: the installer's types and engine. The contract between
 //! the engine, the CLI and the GUI is docs/INSTALLER.md.
 
 pub mod config;

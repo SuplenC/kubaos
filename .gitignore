@@ -24,3 +24,6 @@ config/nvim/lazyvim.json.bak
 # /usr/share/kubaos/wallpapers on a machine: a link to the wallpaper sets in
 # the store, inside the KubaOS clone (system/lib.sh, link_wallpapers)
 /wallpapers
+
+# Cargo build output of the workspace in Cargo.toml
+/target

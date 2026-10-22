@@ -19,8 +19,8 @@ use iced::{
     Rectangle, Shadow, Size, Theme, Vector,
 };
 
-use dotinstall_core::Level;
-use dotinstall_core::probe::DiskInfo;
+use kubaos_core::Level;
+use kubaos_core::probe::DiskInfo;
 
 use crate::app::{App, F, HOLD, List, Message, ProbeState, Screen, ids};
 use crate::data;
@@ -945,7 +945,7 @@ fn account<'a>(app: &'a App, p: &Palette) -> El<'a> {
     let host = payload.map(|m| m.hostname.clone()).unwrap_or_default();
     let baked = payload.is_some_and(|m| m.username == f.username);
     let bad_name =
-        !f.username.is_empty() && !dotinstall_core::engine::validate::valid_username(&f.username);
+        !f.username.is_empty() && !kubaos_core::engine::validate::valid_username(&f.username);
     let username = input_err(app, F::Username, "you", None, bad_name, p);
     let username_note = if f.username.is_empty() {
         "Your login and home folder.".to_string()

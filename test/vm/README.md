@@ -71,7 +71,7 @@ QEMU passes the bench's public key as `-fw_cfg name=opt/dotinstall/authorized_ke
 ```sh
 test/vm/run boot-iso                                   # newest KubaOS ISO, interactive flow
 test/vm/run wait-serial DOTINSTALL-INTERACTIVE && test/vm/run shot installer
-test/vm/run ssh dotinstall probe --json
+test/vm/run ssh kubaos probe --json
 test/vm/run install test/vm/examples/install.toml test/vm/examples/secrets.toml --demo
 test/vm/run install test/vm/examples/install.toml test/vm/examples/secrets.toml   # the real engine
 test/vm/run install test/vm/examples/install.toml test/vm/examples/secrets.toml --ssh   # then:

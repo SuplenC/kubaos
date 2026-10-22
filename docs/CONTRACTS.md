@@ -21,6 +21,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 | `config/quickshell/`, `scripts/dot-qs-*` | quickshell | The desktop shell |
 | `home/theme.nix`, `config/matugen/`, `scripts/dot-theme*`, the `kubaos-wallpapers` input | theme | Wallpaper + matugen color pipeline, the wallpaper sets, GTK/Qt/cursor/icons |
 | `system/`, `docs/INSTALL.md` | system | Ubuntu bootstrap scripts and `/etc` files |
+| `Cargo.toml`, `Cargo.lock`, `crates/`, `installer/`, `docs/INSTALLER.md` | installer | The Rust workspace: the engine (`crates/kubaos-core`), the `kubaos` CLI (`crates/kubaos-cli`) and the installer GUI (`installer/crates/gui`); the payload build, the live ISO and first-boot setup. `docs/INSTALLER.md` splits it further |
 | `home/secrets.nix`, `scripts/dot-bw*`, `scripts/dot-u2f-enroll`, `scripts/dot-ssh-sk-new`, `system/70-bitwarden.sh`, `system/75-yubikey.sh`, `system/files/pam.d/`, `docs/SECRETS.md` | secrets | Bitwarden (SSH agent, git signing, gh, project env), the security key (YubiKey C Bio: pam_u2f, ed25519-sk) |
 | `README.md`, `docs/CONTRACTS.md`, `docs/PLAN.md` | lead | Overview and these contracts |
 

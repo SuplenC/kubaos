@@ -3,7 +3,7 @@
 //! installer's theme, widgets, key translation and message type.
 //!
 //! A checklist: the cards on the left, the selected one on the right. Each
-//! card is detected fresh on every start (`dotinstall_core::setup`), so
+//! card is detected fresh on every start (`kubaos_core::setup`), so
 //! re-running never redoes a finished one. Keyboard first, like the
 //! installer: Up/Down pick a card, Enter or Tab go into it, Esc comes back,
 //! Space toggles, Left/Right switch choices.
@@ -16,12 +16,12 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-use dotinstall_core::Level;
-use dotinstall_core::setup::{
+use iced::{Size, Subscription, Task, event, window};
+use kubaos_core::Level;
+use kubaos_core::setup::{
     BwLogin, BwMethod, CardId, CardStatus, Facts, GitIdentity, Inputs, MokState, PromptKind,
     SetupEvent, State, Status, YKMAN_PREP, git_identity_ok, mok_password_ok, next_finger,
 };
-use iced::{Size, Subscription, Task, event, window};
 
 pub use view::view;
 

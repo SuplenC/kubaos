@@ -48,7 +48,7 @@ These replace the earlier open questions.
 
 - The version is hardcoded in three places: `justfile:7` (`ver := "0.1.0"`, never used), `installer/image/build:94` (`VERSION=0.1.0`), and `installer/iso/lib/brand.env:3-6` (`KUBAOS_VERSION`, `KUBAOS_RELEASE_ID=shinjuku`). The codename comes in separately through `installer/image/build:125` (`OS_CODENAME=shinjuku`).
 - The repo has no git tags, no GitHub Releases, and no `.github/` workflows. `README.md:7`: "Nothing is released yet." The repo and ukiyo are public on GitHub (`gh repo view`).
-- The payload records `version`, `codename`, and `commit` in `manifest.json` (`installer/crates/core/src/probe.rs:59-81`), and the build id `<date>-<commit12>` in `/usr/share/dotinstall/image.json` (`installer/image/README.md:17,35`).
+- The payload records `version`, `codename`, and `commit` in `manifest.json` (`crates/kubaos-core/src/probe.rs:59-81`), and the build id `<date>-<commit12>` in `/usr/share/dotinstall/image.json` (`installer/image/README.md:17,35`).
 - `/usr/lib/os-release` gets `PRETTY_NAME="KubaOS Shinjuku"` and `VERSION="0.1 (Shinjuku)"` at payload build time (`installer/image/lib/assemble.sh:202-203`). Nothing rewrites it after install, so a new codename (Akihabara is next, `docs/BRAND.md:9`) needs an in-system step.
 
 ### The GitHub limit
@@ -69,7 +69,7 @@ These replace the earlier open questions.
 
 - apt owns the system: kernel, drivers, Hyprland (held), PAM, Docker, Chrome. Standalone home-manager owns `$HOME` (`docs/PLAN.md:9`). system-manager is not used.
 - One flake, one lock. `flake.nix` has nixpkgs `nixos-26.05`, home-manager `release-26.05`, Quickshell `v0.3.2`, and ukiyo tracking `main`. home-manager, Quickshell, and ukiyo all `follows = "nixpkgs"` (`flake.nix:4-25`). So ordinary packages and curated ones share one nixpkgs revision.
-- The username lives in `home/username`, read by `flake.nix:37`. For a non-default name, the engine writes that file in the installed checkout and commits it as `dotinstall` (`installer/crates/core/src/engine/install.rs:1254-1270`, `docs/INSTALLER.md:115-123`). That local commit would block a clean `git checkout` of a release tag.
+- The username lives in `home/username`, read by `flake.nix:37`. For a non-default name, the engine writes that file in the installed checkout and commits it as `dotinstall` (`crates/kubaos-core/src/engine/install.rs:1254-1270`, `docs/INSTALLER.md:115-123`). That local commit would block a clean `git checkout` of a release tag.
 - `~/Projects/dotfiles` is a full clone of the payload's commit, "no remote" (`installer/image/README.md:36,141`). A root-owned copy stays at `/usr/share/dotinstall/dotfiles`, and first-boot `setup-helper` runs `system/30-hardware.sh` from it, never from the user's copy (`docs/INSTALLER.md:199`). Nothing updates it after install.
 - The payload ships `nix flake archive` of the inputs, so the flake evaluates offline (`installer/image/README.md:26`).
 - Subvolumes are flat: `@ @home @snapshots @log @cache @nix …` (`docs/INSTALLER.md:98`). A snapper snapshot of `@` covers `/usr/share/…` and `/etc`, but not `$HOME` or `/nix`.

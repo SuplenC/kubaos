@@ -7,9 +7,9 @@ use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
-use dotinstall_core::setup::{CardId, PromptKind, State};
 use iced::keyboard;
 use iced::{Task, window};
+use kubaos_core::setup::{CardId, PromptKind, State};
 
 use super::{Outcome, Setup};
 use crate::app::Message;
@@ -271,7 +271,7 @@ mod tests {
     use super::*;
     use crate::setup::SF;
     use crate::setup::backend::Demo;
-    use dotinstall_core::setup::demo;
+    use kubaos_core::setup::demo;
     use std::sync::Arc;
 
     fn headless(machine: demo::Machine) -> Setup {
@@ -323,7 +323,7 @@ mod tests {
         assert_eq!(s.form.email, "kuba@example.com");
         // The account's full name stood in for the git name.
         match &st.card(CardId::Git).unwrap().facts {
-            dotinstall_core::setup::Facts::Git { name, email, .. } => {
+            kubaos_core::setup::Facts::Git { name, email, .. } => {
                 assert_eq!(name.as_deref(), Some("Kuba Example"));
                 assert_eq!(email.as_deref(), Some("kuba@git.example"));
             }

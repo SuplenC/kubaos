@@ -1,6 +1,6 @@
 # The KubaOS live ISO (`installer/iso/build`)
 
-A small Ubuntu 26.04 live system that boots straight into the KubaOS installer. It holds the dotinstall binaries, every tool the engine runs, and the payload.
+A small Ubuntu 26.04 live system that boots straight into the KubaOS installer. It holds the installer binaries (`kubaos` and `dotinstall-gui`), every tool the engine runs, and the payload.
 
 ```sh
 installer/iso/build                               # aarch64, hw profile -> iso/kubaos-shinjuku-0.1.0-aarch64.iso
@@ -18,7 +18,7 @@ installer/iso/build clean                         # dotinstall-iso-* containers,
 | `--profile vm` | No firmware, no microcode: for the bench |
 | `--release` | No openssh-server and no bench SSH hook |
 | `--payload DIR` | Copied onto the ISO as `/dotinstall/payload` and bind-mounted read-only at `/run/dotinstall/payload`. The default is `stub-payload/`, which holds only a `manifest.json`: probe and the GUI work, but `run` refuses (wrong arch, no rootfs) |
-| `--bin DIR` | Prebuilt Linux `dotinstall` (and optionally `dotinstall-gui`). Without it, `build bins` compiles `installer/` in Docker first |
+| `--bin DIR` | Prebuilt Linux `kubaos` (and optionally `dotinstall-gui`). Without it, `build bins` compiles the Cargo workspace in Docker first |
 | `--branding DIR` | Branding hook (below). The default is `branding/iso` in the repo, if it exists |
 | `--name NAME` | Output name. The default is `kubaos-CODENAME-VERSION-ARCH` (today `kubaos-shinjuku-0.1.0-ARCH`), plus `-vm` for the vm profile. `lib/brand.env` derives the release identity from the repo's `VERSION` and `CODENAME` |
 | `--zstd N` | squashfs zstd level (default 19) |
@@ -62,9 +62,9 @@ The hook for logo and splash assets is `--branding DIR` (default `branding/iso`)
 ## The live system
 
 - **tty1**: root autologin. `/root/.bash_profile` runs `/usr/lib/dotinstall/live-flow`:
-  - If a filesystem labelled **`DOTINSTALL`** holds `install.toml`, or its `dotinstall.env` sets `DOTINSTALL_DEMO=1`, the install runs headless: `dotinstall run --config … --secrets … --events human [-v]` (or `dotinstall demo`). The output is tee'd to the serial consoles and `/var/log/dotinstall-live.log`, bracketed by `DOTINSTALL-BEGIN` and `DOTINSTALL-RESULT: done|failed rc=N`. Then it powers off (the default), reboots (only on success, so a failure never loops back into the installer), or drops to a shell (`DOTINSTALL_AFTER`). The disk format is in `test/vm/README.md`.
+  - If a filesystem labelled **`DOTINSTALL`** holds `install.toml`, or its `dotinstall.env` sets `DOTINSTALL_DEMO=1`, the install runs headless: `kubaos run --config … --secrets … --events human [-v]` (or `kubaos demo`). The output is tee'd to the serial consoles and `/var/log/dotinstall-live.log`, bracketed by `DOTINSTALL-BEGIN` and `DOTINSTALL-RESULT: done|failed rc=N`. Then it powers off (the default), reboots (only on success, so a failure never loops back into the installer), or drops to a shell (`DOTINSTALL_AFTER`). The disk format is in `test/vm/README.md`.
   - Otherwise it prints `DOTINSTALL-INTERACTIVE` on serial and runs `cage -s -- dotinstall-gui $DOTINSTALL_GUI_ARGS` (no `--fullscreen`: cage 0.2.1 aborts on it, and cage gives the single window the whole output anyway), with stderr in `/var/log/dotinstall-gui.log`. Without a DRM render node it sets `WLR_RENDERER=pixman`, and in a VM `WLR_NO_HARDWARE_CURSORS=1`. If the GUI exits non-zero, `dotinstall-text` starts.
-- **tty2**: root autologin into `dotinstall-text`. This is a bash wizard that asks for disk, host, user, locale, git and passphrases, writes `/run/dotinstall/install.toml` plus a 0600 secrets file, and runs `dotinstall run --events human`.
+- **tty2**: root autologin into `dotinstall-text`. This is a bash wizard that asks for disk, host, user, locale, git and passphrases, writes `/run/dotinstall/install.toml` plus a 0600 secrets file, and runs `kubaos run --events human`.
 - **Payload**: `dotinstall-payload.service` bind-mounts `/cdrom/dotinstall/payload` (casper's mount of the medium) read-only at `/run/dotinstall/payload`. ISO9660 level 3 is used, so files over 4 GiB are fine.
 - **Network**: NetworkManager manages everything, including ethernet. Nothing waits for it.
 - **Bench SSH** (dev builds only): see `test/vm/README.md`.

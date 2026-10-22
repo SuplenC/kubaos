@@ -1,5 +1,5 @@
 # Images for installer/iso/build. Two targets:
-#   rust: builds the dotinstall binaries for aarch64 and x86_64 Linux
+#   rust: builds the installer binaries for aarch64 and x86_64 Linux
 #   iso:  builds the live ISO (mmdebstrap + casper + grub + xorriso)
 
 FROM rust:1-trixie AS rust

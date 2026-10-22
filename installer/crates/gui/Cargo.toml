@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-dotinstall-core.workspace = true
+kubaos-core.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 # Default features minus linux-theme-detection (no D-Bus on the live ISO),

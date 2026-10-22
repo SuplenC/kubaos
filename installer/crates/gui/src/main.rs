@@ -32,8 +32,8 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use dotinstall_core::StepId;
 use iced::{Size, Theme, window};
+use kubaos_core::StepId;
 
 use crate::app::{App, Options};
 use crate::backend::{Backend, Demo, Process};
@@ -63,7 +63,7 @@ fn parse() -> Result<Args, String> {
         demo: false,
         demo_speed: None,
         demo_fail_at: None,
-        dotinstall: PathBuf::from("dotinstall"),
+        dotinstall: PathBuf::from("kubaos"),
         fullscreen: false,
         setup: false,
         first_boot: false,
@@ -192,7 +192,7 @@ fn main() -> ExitCode {
 
 /// `--setup`: the first-boot setup app (setup/mod.rs), as the desktop user.
 fn run_setup(args: Args) -> ExitCode {
-    use dotinstall_core::setup::demo;
+    use kubaos_core::setup::demo;
     use setup::backend::{Demo as SetupDemo, Real, SetupBackend};
     use std::sync::Mutex;
 
