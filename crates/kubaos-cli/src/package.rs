@@ -168,7 +168,7 @@ fn edit(paths: &Paths, names: &[String], how: Edit, no_switch: bool, mode: Switc
         println!("{name}: {didnt}");
     }
     if how == Edit::Remove {
-        warn_still_in_suites(paths, &change.changed);
+        warn_still_in_suites(paths, names);
     }
     if no_switch || (change.is_empty() && !wired) {
         return ExitCode::SUCCESS;
@@ -176,7 +176,7 @@ fn edit(paths: &Paths, names: &[String], how: Edit, no_switch: bool, mode: Switc
     job::switch(paths, mode)
 }
 
-/// A removed package a Suite also lists stays installed; say so.
+/// A package the user asked to remove that a Suite lists stays installed; say so.
 fn warn_still_in_suites(paths: &Paths, removed: &[String]) {
     let Ok(declared) = paths.state_dir().declared() else {
         return;

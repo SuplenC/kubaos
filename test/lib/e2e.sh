@@ -640,6 +640,82 @@ cpu_pct() {
   awk -v d=$((t1 - t0)) -v hz="$hz" -v s="$secs" 'BEGIN { printf "%.0f", d * 100 / (hz * s) }'
 }
 
+# has_bin NAME: whether the home profile has NAME.
+has_bin() { [[ -x $USER_HOME/.nix-profile/bin/$1 ]]; }
+# kz CMD: CMD in a login zsh with Nix's own bin on PATH, which home-manager
+# runs `nix` from; the harness's login zsh doesn't source nix-daemon.sh.
+kz() { zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; $1"; }
+
+# The state directory and switch jobs (issue #20), through the kubaos binary
+# test/run built (/out/kubaos) and a user flake like the installer's, with the
+# repo copy as KubaOS and KubaOS's own locked nixpkgs as the user's, so
+# nothing is downloaded but the packages. The packages are ones the home
+# doesn't ship (ripgrep is in home/cli.nix). Switches use --foreground: the
+# container has no systemd user manager, so the queue runs in the calling
+# process, behind the same lock.
+c_packages() {
+  local u="$USER_HOME/.config/kubaos/home" jobs="$USER_HOME/.local/state/kubaos/jobs" nixpkgs gen1 out
+  [[ -x /out/kubaos ]] || { echo "FAIL no /out/kubaos (test/run e2e builds it)"; return 1; }
+  install -m 0755 /out/kubaos /usr/local/bin/kubaos
+
+  nixpkgs="$(as_user "$NIX_BIN/nix" flake archive --dry-run --json "$REPO" | jq -r .inputs.nixpkgs.path)"
+  [[ $nixpkgs == /nix/store/* ]] || { echo "FAIL KubaOS's nixpkgs: $nixpkgs"; return 1; }
+  as_user install -d "$u/kubaos.d/suites"
+  sed -e 's/@USER@/kuba/g; s/@HOST@/vm/g' -e "s/@SYSTEM@/$(uname -m)-linux/" \
+    -e "s#github:NixOS/nixpkgs/nixos-26.05#path:$nixpkgs#" \
+    -e "s#git+file:///usr/share/kubaos?ref=refs/heads/release#git+file://$REPO#" \
+    "$REPO/user-flake/flake.nix.in" | as_user tee "$u/flake.nix" >/dev/null
+  # home.nix as installs before the state directory wrote it, for the migration.
+  printf '{ pkgs, ... }:\n{\n  home.packages = [ ];\n}\n' | as_user tee "$u/home.nix" >/dev/null
+  echo 'packages = ["hello"]' | as_user tee "$u/kubaos.d/suites/demo.toml" >/dev/null
+
+  out="$(kz 'kubaos package add cowsay --foreground' 2>&1)" ||
+    { echo "FAIL kubaos package add cowsay"; printf '%s\n' "$out" | tail -20; return 1; }
+  echo "ok   kubaos package add cowsay, then a switch"
+  grep -q '^  kubaos.stateDir = ./kubaos.d;$' "$u/home.nix" && [[ -f $u/home.nix.kubaos.bak ]] ||
+    { echo "FAIL home.nix not wired, or no backup"; cat "$u/home.nix"; return 1; }
+  echo "ok   home.nix wired to kubaos.d/, the old one in home.nix.kubaos.bak"
+  has_bin cowsay && zrun 'cowsay hi' >/dev/null || { echo "FAIL cowsay not on PATH"; return 1; }
+  has_bin hello || { echo "FAIL hello, from suites/demo.toml, not on PATH"; return 1; }
+  echo "ok   cowsay (packages.toml) and hello (suites/demo.toml) on PATH: the union"
+  gen1="$(readlink -f "$USER_HOME/.local/state/nix/profiles/home-manager")"
+  grep -q cowsay "$gen1/home-files/.local/share/kubaos/kubaos.d/packages.toml" ||
+    { echo "FAIL the generation carries no copy of kubaos.d"; return 1; }
+  echo "ok   the generation carries its kubaos.d"
+
+  kz 'kubaos package add figlet --foreground' >"$LOGS/packages-figlet.log" 2>&1 &
+  local a=$!
+  kz 'kubaos package add sl --foreground' >"$LOGS/packages-sl.log" 2>&1 &
+  local b=$!
+  wait "$a" || { echo "FAIL concurrent add figlet"; tail -20 "$LOGS/packages-figlet.log"; return 1; }
+  wait "$b" || { echo "FAIL concurrent add sl"; tail -20 "$LOGS/packages-sl.log"; return 1; }
+  has_bin figlet && has_bin sl || { echo "FAIL figlet or sl not on PATH after both adds"; return 1; }
+  # The jobs, by start: each ends before the next starts.
+  local overlap
+  overlap="$(jq -s 'map(select(.state == "succeeded")) | sort_by(.started_at)
+    | [range(1; length) as $i | select(.[$i - 1].finished_at > .[$i].started_at)] | length' "$jobs"/*.json)"
+  [[ $overlap == 0 ]] || { echo "FAIL $overlap switch jobs overlapped"; jq -c . "$jobs"/*.json; return 1; }
+  echo "ok   two adds at once: both installed, their switches one after the other ($(ls "$jobs"/*.json | wc -l) jobs)"
+
+  kz "kubaos package restore '$gen1' && '$gen1/activate'" >"$LOGS/packages-rollback.log" 2>&1 ||
+    { echo "FAIL restore + activate the first generation"; tail -20 "$LOGS/packages-rollback.log"; return 1; }
+  grep -q '^packages = \["cowsay"\]$' "$u/kubaos.d/packages.toml" || { echo "FAIL kubaos.d not restored"; cat "$u/kubaos.d/packages.toml"; return 1; }
+  ! has_bin figlet && has_bin cowsay || { echo "FAIL rollback: the first generation's packages aren't the ones on PATH"; return 1; }
+  echo "ok   rolling back: kubaos package restore + the generation's activate bring back both"
+
+  out="$(kz 'kubaos package remove cowsay hello --foreground' 2>&1)" ||
+    { echo "FAIL kubaos package remove"; printf '%s\n' "$out" | tail -20; return 1; }
+  ! has_bin cowsay || { echo "FAIL cowsay still on PATH after remove"; return 1; }
+  has_bin hello && grep -q 'hello stays installed: the demo Suite lists it' <<<"$out" ||
+    { echo "FAIL hello, still in suites/demo.toml, should stay (and say so)"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos package remove cowsay: gone; hello stays, the demo Suite lists it"
+  rm "$u/kubaos.d/suites/demo.toml"
+  kz 'kubaos switch --foreground' >"$LOGS/packages-switch.log" 2>&1 ||
+    { echo "FAIL kubaos switch"; tail -20 "$LOGS/packages-switch.log"; return 1; }
+  ! has_bin hello || { echo "FAIL hello still on PATH with no file listing it"; return 1; }
+  echo "ok   kubaos switch after deleting the Suite file: hello gone"
+}
+
 # The user layer (issue #9): test/user-layer-check, which the VM bench also
 # runs on an installed system. Commits to the checkout, so it runs last.
 c_user_layer() {
@@ -653,7 +729,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell menu recorder wallpaper_sets wallpaper_video user_layer; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell menu recorder wallpaper_sets wallpaper_video packages user_layer; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
