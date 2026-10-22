@@ -7,6 +7,14 @@
 # [extensions.apps]
 # names = { nvim = "Neovim", "google-chrome" = "Chrome" }
 #
+# Your own actions, and KubaOS's actions and toggles hidden by id (the ids
+# are in ~/.local/share/kubaos/defaults/kotodama/kubaos.toml):
+# [extensions.kubaos]
+# hide = ["screenshot-window", "bluetooth"]
+# [extensions.kubaos.actions.notes]
+# title = "Open my notes"
+# run = ["ghostty", "-e", "nvim"]
+#
 # [quicklinks.gh]
 # title = "Search GitHub"
 # url = "https://github.com/search?q={query}"

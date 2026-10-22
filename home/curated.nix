@@ -15,6 +15,9 @@ rec {
   # extensions and the QML module. The flake input follows KubaOS's nixpkgs,
   # so the module is built against the Qt that Quickshell loads it into.
   kotodama = inputs.kotodama.packages.${system}.default;
+  # The menu's KubaOS Extension: the actions and the system toggles
+  # (home/menu.nix installs it with the Bundled ones).
+  kotodama-kubaos = pkgs.callPackage ../crates/kotodama-kubaos/package.nix { };
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (

@@ -38,3 +38,261 @@ depth = 1
 [[extensions.folders.folders]]
 path = "~/Scripts"
 kind = "scripts"
+
+[extensions.kubaos]
+# KubaOS's own actions and the system toggles (crates/kotodama-kubaos). Add
+# yours, or change one of these key by key, under
+# [extensions.kubaos.actions.<id>] in ~/.config/kubaos/kotodama/user.toml, and
+# leave any out, toggles too, with `hide = ["<id>", ...]` there
+# (docs/USING.md). An action takes `title` and `run` (the program, then its
+# arguments, `{name}` filled in from its `arguments`), and may take
+# `subtitle`, `icon`, `keywords`, `keyword`, `terminal = true` (runs it in
+# `terminal` below), `confirm = true` (asks first) and `delay_ms` (waits that
+# long, so the menu is off the screen first).
+#
+# What a `terminal = true` action runs in. It stays open once the action
+# exits, so what it said can be read.
+terminal = ["ghostty", "--wait-after-command=true", "-e"]
+
+# Wallpaper and theme (scripts/dot-theme, the shell's picker).
+
+[extensions.kubaos.actions.theme-next]
+title = "Next wallpaper"
+subtitle = "The next wallpaper in the folder, and its colors"
+icon = "go-next"
+keywords = ["theme", "next theme", "background"]
+run = ["dot-theme", "next"]
+
+[extensions.kubaos.actions.theme-previous]
+title = "Previous wallpaper"
+subtitle = "The previous wallpaper in the folder, and its colors"
+icon = "go-previous"
+keywords = ["theme", "previous theme", "background"]
+run = ["dot-theme", "prev"]
+
+[extensions.kubaos.actions.theme-set]
+title = "Set wallpaper"
+subtitle = "An image or video by its path, and its colors"
+icon = "preferences-desktop-wallpaper"
+keywords = ["theme", "background"]
+keyword = "wallpaper"
+run = ["dot-theme", "set", "{file}"]
+arguments = [{ name = "file", placeholder = "~/Pictures/wallpapers/city.jpg" }]
+
+[extensions.kubaos.actions.wallpaper-folder]
+title = "Switch wallpaper folder"
+subtitle = "The next folder of wallpapers: a set, or yours"
+icon = "folder-pictures"
+keywords = ["theme", "wallpaper set"]
+run = ["dot-theme", "toggle-folder"]
+
+[extensions.kubaos.actions.wallpaper-picker]
+title = "Wallpaper picker"
+subtitle = "Pick a wallpaper in the shell"
+icon = "preferences-desktop-wallpaper"
+keywords = ["theme", "background", "choose wallpaper"]
+run = ["qs", "ipc", "call", "wallpaper", "toggle"]
+
+[extensions.kubaos.actions.wallpaper-sets]
+title = "Choose wallpaper sets"
+subtitle = "Which sets the wallpaper picker shows"
+icon = "folder-pictures"
+keywords = ["theme", "wallpaper settings"]
+run = ["qs", "ipc", "call", "wallpaper", "settings"]
+
+[extensions.kubaos.actions.wallpaper-motion-always]
+title = "Animate wallpaper always"
+subtitle = "Video wallpapers play, on battery too"
+icon = "video-x-generic"
+keywords = ["video wallpaper", "motion"]
+run = ["qs", "ipc", "call", "wallpaper", "animate", "always"]
+
+[extensions.kubaos.actions.wallpaper-motion-ac]
+title = "Animate wallpaper on AC"
+subtitle = "Video wallpapers play only while plugged in"
+icon = "video-x-generic"
+keywords = ["video wallpaper", "motion", "battery"]
+run = ["qs", "ipc", "call", "wallpaper", "animate", "ac"]
+
+[extensions.kubaos.actions.wallpaper-motion-never]
+title = "Never animate wallpaper"
+subtitle = "Video wallpapers stay still"
+icon = "video-x-generic"
+keywords = ["video wallpaper", "motion", "still"]
+run = ["qs", "ipc", "call", "wallpaper", "animate", "never"]
+
+# The shell's panels and notifications (config/quickshell/IpcHandlers.qml).
+
+[extensions.kubaos.actions.control-center]
+title = "Control center"
+subtitle = "Wi-Fi, Bluetooth, audio, brightness and capture in the shell"
+icon = "preferences-system"
+keywords = ["quick settings", "panel"]
+run = ["qs", "ipc", "call", "controlcenter", "toggle"]
+
+[extensions.kubaos.actions.power-menu]
+title = "Power menu"
+subtitle = "Lock, suspend, log out, reboot or shut down"
+icon = "system-shutdown"
+keywords = ["shutdown", "session"]
+run = ["qs", "ipc", "call", "powermenu", "toggle"]
+
+[extensions.kubaos.actions.do-not-disturb]
+title = "Do not disturb"
+subtitle = "Turn notification popups off or on"
+icon = "notifications-disabled"
+keywords = ["dnd", "notifications", "quiet", "focus"]
+run = ["qs", "ipc", "call", "notifications", "toggleDnd"]
+
+[extensions.kubaos.actions.clear-notifications]
+title = "Clear notifications"
+subtitle = "Empty the notification history"
+icon = "edit-clear-all"
+keywords = ["notifications", "dismiss"]
+run = ["qs", "ipc", "call", "notifications", "clear"]
+
+[extensions.kubaos.actions.restart-shell]
+title = "Restart Quickshell"
+subtitle = "Restart the bar, panels and lock screen"
+icon = "view-refresh"
+keywords = ["shell", "bar", "reload"]
+run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
+
+[extensions.kubaos.actions.idle]
+title = "Toggle idle (lock/suspend)"
+subtitle = "Stop or start the auto-lock, screen-off and suspend"
+icon = "preferences-desktop-screensaver"
+keywords = ["hypridle", "caffeine", "keep awake", "auto lock"]
+run = ["sh", "-c", "pkill -x hypridle && hyprctl notify -1 3000 'rgb(ffb4ab)' 'Idle off: no auto-lock or suspend' || { hyprctl notify -1 3000 'rgb(c2c1ff)' 'Idle on'; exec hypridle; }"]
+
+# Screenshots and recording (scripts/dot-hypr-screenshot, dot-hypr-record).
+# Each waits for the menu to leave the screen.
+
+[extensions.kubaos.actions.screenshot-region]
+title = "Screenshot region"
+subtitle = "Select an area; saved and copied"
+icon = "applets-screenshooter"
+keywords = ["screen capture", "print screen", "snip"]
+run = ["dot-hypr-screenshot", "region"]
+delay_ms = 400
+
+[extensions.kubaos.actions.screenshot-annotate]
+title = "Screenshot region and annotate"
+subtitle = "Select an area, then draw on it in satty"
+icon = "applets-screenshooter"
+keywords = ["screen capture", "edit screenshot", "satty"]
+run = ["dot-hypr-screenshot", "region", "--edit"]
+delay_ms = 400
+
+[extensions.kubaos.actions.screenshot-monitor]
+title = "Screenshot monitor"
+subtitle = "The focused monitor; saved and copied"
+icon = "applets-screenshooter"
+keywords = ["screen capture", "print screen", "screen"]
+run = ["dot-hypr-screenshot", "output"]
+delay_ms = 400
+
+[extensions.kubaos.actions.screenshot-window]
+title = "Screenshot window"
+subtitle = "The active window; saved and copied"
+icon = "applets-screenshooter"
+keywords = ["screen capture", "print screen"]
+run = ["dot-hypr-screenshot", "window"]
+delay_ms = 400
+
+[extensions.kubaos.actions.color-picker]
+title = "Color picker"
+subtitle = "Pick a color off the screen; copied"
+icon = "color-select"
+keywords = ["hyprpicker", "eyedropper", "colour"]
+run = ["hyprpicker", "-a"]
+delay_ms = 400
+
+[extensions.kubaos.actions.record-region]
+title = "Record region"
+subtitle = "Select an area and record it; again to stop"
+icon = "media-record"
+keywords = ["screen recording", "video", "capture"]
+run = ["dot-hypr-record", "region"]
+delay_ms = 400
+
+[extensions.kubaos.actions.record-monitor]
+title = "Record monitor"
+subtitle = "Record the focused monitor; again to stop"
+icon = "media-record"
+keywords = ["screen recording", "video", "capture"]
+run = ["dot-hypr-record", "output"]
+delay_ms = 400
+
+[extensions.kubaos.actions.record-monitor-sound]
+title = "Record monitor with sound"
+subtitle = "Record the focused monitor and what it plays; again to stop"
+icon = "media-record"
+keywords = ["screen recording", "video", "audio", "capture"]
+run = ["dot-hypr-record", "output", "--audio"]
+delay_ms = 400
+
+[extensions.kubaos.actions.record-stop]
+title = "Stop recording"
+subtitle = "Stop the recording or the replay buffer"
+icon = "media-playback-stop"
+keywords = ["screen recording", "video"]
+run = ["dot-hypr-record", "stop"]
+
+[extensions.kubaos.actions.replay-toggle]
+title = "Replay buffer on/off"
+subtitle = "Keep the last 30 seconds of the screen in memory"
+icon = "media-record"
+keywords = ["screen recording", "instant replay", "clip"]
+run = ["dot-hypr-record", "replay", "toggle"]
+
+[extensions.kubaos.actions.replay-save]
+title = "Save the last 30 seconds"
+subtitle = "Write the replay buffer to a video"
+icon = "document-save"
+keywords = ["screen recording", "instant replay", "clip"]
+run = ["dot-hypr-record", "replay", "save"]
+
+# Security keys and secrets (docs/SECRETS.md). They ask in a terminal.
+
+[extensions.kubaos.actions.u2f-enroll]
+title = "Enroll a security key"
+subtitle = "For sudo, polkit and the lock screen (YubiKey)"
+icon = "dialog-password"
+keywords = ["yubikey", "u2f", "fido2", "fingerprint"]
+run = ["dot-u2f-enroll"]
+terminal = true
+
+[extensions.kubaos.actions.u2f-list]
+title = "Enrolled security keys"
+subtitle = "The keys sudo and the lock screen take"
+icon = "dialog-password"
+keywords = ["yubikey", "u2f", "fido2"]
+run = ["dot-u2f-enroll", "--list"]
+terminal = true
+
+[extensions.kubaos.actions.ssh-key]
+title = "New SSH key on the security key"
+subtitle = "An ed25519-sk key that needs your finger on the YubiKey"
+icon = "dialog-password"
+keywords = ["yubikey", "ssh", "ed25519-sk"]
+keyword = "ssh-key"
+run = ["dot-ssh-sk-new", "{name}"]
+arguments = [{ name = "name", placeholder = "homelab" }]
+terminal = true
+
+[extensions.kubaos.actions.bitwarden-setup]
+title = "Set up Bitwarden"
+subtitle = "Log in once: SSH keys, git signing, gh and project secrets"
+icon = "dialog-password"
+keywords = ["vault", "secrets", "passwords", "ssh agent"]
+run = ["dot-bw-setup"]
+terminal = true
+
+[extensions.kubaos.actions.bitwarden-refresh]
+title = "Refresh from Bitwarden"
+subtitle = "Unlock and reconfigure after changing the vault"
+icon = "view-refresh"
+keywords = ["vault", "secrets", "ssh keys", "bwenv"]
+run = ["dot-bw-setup", "--refresh"]
+terminal = true

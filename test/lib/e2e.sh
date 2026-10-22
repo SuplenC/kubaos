@@ -503,6 +503,81 @@ c_menu() {
   return "$bad"
 }
 
+# The KubaOS Extension (issue #29, crates/kotodama-kubaos): it runs under the
+# Daemon and its Items are found by typing, with the user layer's action shown
+# and the ones it hides gone. test/lib/menu-query.py is the Front end, since
+# the `kotodama` command can't query. The Extension's Kotodama crates must be
+# the Daemon's commit (Cargo.lock against flake.lock).
+c_menu_kubaos() {
+  local out bad=0 log="$LOGS/kotodamad-kubaos.log" daemon
+  local layer="$USER_HOME/.config/kubaos/kotodama/user.toml" saved="$LOGS/user.toml.saved"
+  local query="python3 -I $REPO/test/lib/menu-query.py \$XDG_RUNTIME_DIR/kotodama.sock"
+
+  out="$(python3 -I - "$REPO/Cargo.lock" "$REPO/flake.lock" <<'PY'
+import json, sys, tomllib
+lock = tomllib.load(open(sys.argv[1], "rb"))
+pinned = json.load(open(sys.argv[2]))["nodes"]["kotodama"]["locked"]["rev"]
+revs = {p["source"].rsplit("#", 1)[1] for p in lock["package"] if p["name"].startswith("kotodama-") and "source" in p}
+if revs != {pinned}:
+    sys.exit(f"Cargo.lock has Kotodama at {sorted(revs)}, flake.lock at {pinned}")
+print(pinned)
+PY
+  )" || { echo "FAIL $out"; bad=1; }
+  ((bad)) || echo "ok   the Extension's Kotodama crates are the Daemon's commit, $out"
+
+  [[ -e $layer ]] && cp -p "$layer" "$saved"
+  install -D -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/stdin "$layer" <<'TOML'
+[extensions.kubaos]
+hide = ["theme-next", "bluetooth"]
+
+[extensions.kubaos.actions.harness-notes]
+title = "Back up harness notes"
+run = ["true"]
+TOML
+
+  session_start sway 1280x720 1
+  : >"$log"
+  chown "$USER_NAME:" "$log"
+  in_session "exec kotodamad >$log 2>&1" &
+  daemon=$!
+
+  # The Daemon starts its Extensions when it starts; give them a moment.
+  local i
+  for i in $(seq 20); do
+    out="$(in_session "$query Wi-Fi" 2>&1 || true)"
+    grep -q 'kubaos/wifi' <<<"$out" && break
+    sleep 1
+  done
+  if grep -q 'kubaos/wifi' <<<"$out"; then
+    echo "ok   the Extension runs under the Daemon: Wi-Fi is found (${i}s)"
+  else
+    echo "FAIL the Wi-Fi toggle isn't found: $out"
+    bad=1
+  fi
+
+  out="$(in_session "$query 'Back up harness notes' 'Previous wallpaper' 'Control center' 'Set volume' 'Next wallpaper' Bluetooth" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  printf '%s\n' "$out" | sed 's/^/     found: /'
+  local want
+  for want in 'Back up harness notes:harness-notes' 'Previous wallpaper:theme-previous' \
+    'Control center:control-center' 'Set volume:volume'; do
+    grep -qE -- "^${want%%:*}[[:blank:]](.* )?kubaos/${want#*:}( |$)" <<<"$out" ||
+      { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
+  done
+  ((bad)) || echo "ok   KubaOS's actions, the toggles and the user layer's action are found"
+  if grep -qE 'kubaos/(theme-next|bluetooth)( |$)' <<<"$out"; then
+    echo "FAIL the user layer hides theme-next and bluetooth, and the menu shows them"
+    bad=1
+  else
+    echo "ok   the actions the user layer hides aren't found"
+  fi
+
+  if ((bad)); then tail -20 "$log"; fi
+  menu_stop "$daemon"
+  if [[ -e $saved ]]; then mv "$saved" "$layer"; else rm -f "$layer"; fi
+  return "$bad"
+}
+
 # Wallpaper sets (issue #16): every set read-only in /usr/share/kubaos/wallpapers,
 # the picker's folders are the chosen ones (~/.config/kubaos/wallpapers/sets,
 # all of them without the file) plus ~/Pictures/wallpapers, a real folder.
@@ -738,7 +813,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu recorder wallpaper_sets wallpaper_video packages user_layer; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages user_layer; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

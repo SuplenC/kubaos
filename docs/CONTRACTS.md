@@ -19,10 +19,10 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 | `home/shell.nix`, `home/terminal.nix`, `config/{nvim,tmux,tms,ghostty,ohmyposh,lazygit,btop,git,bat,bacon,yazi,foot,fuzzel}` | ports | zsh, tmux, tms, ghostty, ported user configs, the fallback terminal and launcher |
 | `config/hypr/`, `scripts/dot-hypr-*` | hypr | Hyprland Lua config, hypridle, lid and monitor scripts, screenshots and screen recording |
 | `config/quickshell/`, `scripts/dot-qs-*` | quickshell | The desktop shell |
-| `home/menu.nix`, `config/kotodama/`, `config/quickshell/modules/menu/`, the `kotodama` input | menu | The Command menu: Kotodama, its Extensions and config, and the shell's window for it |
+| `home/menu.nix`, `config/kotodama/`, `config/quickshell/modules/menu/`, `crates/kotodama-kubaos/`, the `kotodama` input | menu | The Command menu: Kotodama, its Extensions and config, the KubaOS Extension (actions and system toggles), and the shell's window for it |
 | `home/theme.nix`, `config/matugen/`, `scripts/dot-theme*`, the `kubaos-wallpapers` input | theme | Wallpaper + matugen color pipeline, the wallpaper sets, GTK/Qt/cursor/icons |
 | `system/`, `docs/INSTALL.md` | system | Ubuntu bootstrap scripts and `/etc` files |
-| `Cargo.toml`, `Cargo.lock`, `crates/`, `install/`, `docs/INSTALL-INTERNALS.md` | install | The Rust workspace: the engine (`crates/kubaos-core`), the `kubaos` CLI (`crates/kubaos-cli`) and Kōbō (`crates/kubaos-kobo`); the payload build, the live ISO and first-boot setup. `docs/INSTALL-INTERNALS.md` splits it further |
+| `Cargo.toml`, `Cargo.lock`, `crates/`, `install/`, `docs/INSTALL-INTERNALS.md` | install | The Rust workspace: the engine (`crates/kubaos-core`), the `kubaos` CLI (`crates/kubaos-cli`) and Kōbō (`crates/kubaos-kobo`), but not the menu's `crates/kotodama-kubaos`; the payload build, the live ISO and first-boot setup. `docs/INSTALL-INTERNALS.md` splits it further |
 | `home/secrets.nix`, `scripts/dot-bw*`, `scripts/dot-u2f-enroll`, `scripts/dot-ssh-sk-new`, `system/70-bitwarden.sh`, `system/75-yubikey.sh`, `system/files/pam.d/`, `docs/SECRETS.md` | secrets | Bitwarden (SSH agent, git signing, gh, project env), the security key (YubiKey C Bio: pam_u2f, ed25519-sk) |
 | `README.md`, `docs/CONTRACTS.md`, `docs/PLAN.md` | lead | Overview and these contracts |
 
@@ -120,7 +120,7 @@ What the `kubaos` CLI, the Command menu and Kōbō install is declared in files 
 
 ## Quickshell IPC (Hyprland binds call these)
 
-Quickshell config lives in `config/quickshell/` with `shell.qml` at its root (the default config, started with `qs`). It exposes `IpcHandler` targets:
+Quickshell config lives in `config/quickshell/` with `shell.qml` at its root (the default config, started with `qs`). It exposes `IpcHandler` targets. The Command menu's KubaOS actions (`config/kotodama/kubaos.toml`) call some of them too, so a renamed one changes there as well:
 
 | Call | Effect |
 |---|---|

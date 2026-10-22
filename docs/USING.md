@@ -10,7 +10,7 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 |---|---|
 | `SUPER + Return` | Terminal (Ghostty) |
 | `SUPER + CTRL + Return` | Terminal in tmux session `main` |
-| `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows, binds. Type a sum to calculate. It opens on the focused screen |
+| `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows, binds, KubaOS's actions and the system toggles ("wifi", "volume 40", "next wallpaper"). Type a sum to calculate. It opens on the focused screen |
 | `SUPER + Q` | Close window |
 | `SUPER + h/j/k/l` | Focus the screen left, below, above, right |
 | `SUPER + ←/↓/↑/→` | Focus the window that way. `SUPER + SHIFT + h/j/k/l` moves the window, `SUPER + CTRL + h/j/k/l` resizes it |
@@ -66,6 +66,7 @@ Each file starts as a comment and an example:
 | lazygit, bacon, yazi | `~/.config/kubaos/{lazygit/config.yml,bacon/prefs.toml,yazi/yazi.toml,yazi/keymap.toml}` | next start (lazygit and bacon: in a new shell) |
 | bat, fastfetch | `~/.config/kubaos/{bat/config,fastfetch/config.jsonc}` | after `dot-config apply` |
 | btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml`: they rewrite their own file, so it's yours as is | next start |
+| Command menu: your own actions, hiding KubaOS's | `~/.config/kubaos/kotodama/user.toml` (below) | `systemctl --user restart kotodamad` |
 | Nix packages and home-manager options | `~/.config/kubaos/home/home.nix`, e.g. `home.packages = [ pkgs.hello ];` | `home-manager switch --flake ~/.config/kubaos/home` |
 | A package, without writing Nix | `kubaos package add ripgrep` (`remove`, `list`); `kubaos try cowsay` opens a shell with it and installs nothing | the switch `add` and `remove` queue |
 
@@ -74,6 +75,25 @@ Each file starts as a comment and an example:
 - Quickshell's settings, the colors (matugen) and the prompt (oh-my-posh) can't be overridden yet.
 - Your own wallpapers go in `~/Pictures/wallpapers/`, the picker's last tab; KubaOS's sets are in `/usr/share/kubaos/wallpapers/`.
 - `~/.config/kubaos/home/` is your flake: KubaOS wrote it once, and an update never does again. Put it under git if you like (then `git add` new files before a switch).
+- The Command menu's KubaOS actions and toggles are listed in `~/.local/share/kubaos/defaults/kotodama/kubaos.toml`, each under `[extensions.kubaos.actions.<id>]`. Add your own in `user.toml` the same way, and hide any of KubaOS's, actions or toggles (`wifi`, `bluetooth`, `volume`, `brightness`, `power-saver` and so on), by id:
+
+  ```toml
+  [extensions.kubaos]
+  hide = ["screenshot-window", "bluetooth"]
+
+  [extensions.kubaos.actions.notes]
+  title = "Open my notes"
+  keywords = ["journal"]
+  run = ["ghostty", "-e", "nvim"]
+
+  [extensions.kubaos.actions.timer]
+  title = "Timer"
+  keyword = "timer"   # type "timer 5m"
+  arguments = [{ name = "duration", placeholder = "5m" }]   # fills {duration}
+  run = ["sh", "-c", "sleep \"$1\" && notify-send Done", "sh", "{duration}"]
+  ```
+
+  Keys set under one of KubaOS's ids change only those keys of its action. `terminal = true` runs it in a terminal, and `delay_ms` waits that long first, so the menu is gone before a screenshot. The Extension logs what it can't use, such as an id it doesn't know (`journalctl --user -u kotodamad`).
 - `kubaos package add` records the package in `~/.config/kubaos/home/kubaos.d/packages.toml`, a file the command owns, and switches. Every switch (`kubaos switch`, or one an `add` queued) runs in a systemd user unit, one at a time: closing the terminal doesn't stop it, and `kubaos job list` and `kubaos job follow <id>` show it. The first `add` on an older install adds `kubaos.stateDir = ./kubaos.d;` to your `home.nix`, after backing it up as `home.nix.kubaos.bak`. If your flake is under git, add `kubaos.d/` to it once, or Nix won't see the files.
 
 ## Hacking on KubaOS
@@ -176,7 +196,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `update.sh`, files for `/etc` |
-| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, and `kubaos-kobo`, Kōbō |
+| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, and `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles |
 | `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |
 | `test/` | The Docker test harness (`test/run`) |
 | `docs/` | `PLAN.md` (why), `INSTALL.md` (how), `CONTRACTS.md` and `INSTALL-INTERNALS.md` (interfaces), `SECRETS.md` (Bitwarden, security key), `TESTING.md`, `BRAND.md` (name and voice), `screenshots/` |

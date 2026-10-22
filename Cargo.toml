@@ -1,8 +1,9 @@
 # The KubaOS Rust workspace: the engine (`kubaos-core`), the `kubaos` CLI
-# (`kubaos-cli`) and Kōbō (`kubaos-kobo`), its graphical front end.
+# (`kubaos-cli`), Kōbō (`kubaos-kobo`), its graphical front end, and the
+# Command menu's KubaOS Extension (`kotodama-kubaos`).
 [workspace]
 resolver = "3"
-members = ["crates/kubaos-core", "crates/kubaos-cli", "crates/kubaos-kobo"]
+members = ["crates/kubaos-core", "crates/kubaos-cli", "crates/kubaos-kobo", "crates/kotodama-kubaos"]
 
 [workspace.package]
 version = "0.1.0"
@@ -16,6 +17,13 @@ serde_json = "1"
 toml = "0.9"
 thiserror = "2"
 tempfile = "3"
+# Kotodama's crates for Extensions, at the commit flake.lock pins the
+# `kotodama` input to, so the Extension speaks the protocol of the Daemon it
+# runs under. They aren't on crates.io yet. Bump `rev` with every
+# `nix flake update kotodama`: the harness's `menu_kubaos` check fails while
+# the two differ.
+kotodama-extension = { git = "https://github.com/SuplenC/kotodama", rev = "f7a12444548c432834504c225f27f6bb3de17a8d" }
+kotodama-protocol = { git = "https://github.com/SuplenC/kotodama", rev = "f7a12444548c432834504c225f27f6bb3de17a8d" }
 
 # The lints of docs/agents/code-quality.md. A crate opts in with
 # `[lints] workspace = true` as part of its own restyle; until then, new

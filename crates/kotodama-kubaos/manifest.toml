@@ -1,0 +1,15 @@
+# The KubaOS Extension of the Command menu. The package (package.nix)
+# installs this directory as `share/kotodama/extensions/kubaos/`, with the
+# `kotodama-kubaos` binary next to this file.
+name = "kubaos"
+description = "KubaOS's actions (wallpaper and theme, screenshots and recording, the shell's panels, security keys) and the system toggles (Wi-Fi, Bluetooth, audio, brightness, power profiles)"
+command = ["./kotodama-kubaos"]
+word = "kubaos"
+title = "KubaOS"
+icon = "preferences-system"
+about = "KubaOS's own actions, and Wi-Fi, Bluetooth, audio, brightness and power profiles, which work with the shell down. Add your own actions and hide these in ~/.config/kubaos/kotodama/user.toml."
+examples = [
+    { query = "wifi", result = "Turn Wi-Fi on or off" },
+    { query = "volume 40", result = "Set the volume to 40%" },
+    { query = "next wallpaper", result = "The next wallpaper, and its colors" },
+]
