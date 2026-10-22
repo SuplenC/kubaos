@@ -124,17 +124,18 @@ printf 'KubaOS %s live\n' "$KUBAOS_RELEASE" >"$R/etc/issue.net"
 # Branding hook (install/iso/README.md): overlays and a script, all optional.
 if [[ -d /branding/rootfs ]]; then say "branding: rootfs overlay"; cp -a /branding/rootfs/. "$R/"; fi
 
-# The cursors Kōbō asks for (winit's legacy names for default, pointer and text) must
-# resolve in the `default` XCursor theme, the one it loads with no XCURSOR_THEME set.
-# HAZARD: a missing theme still boots and shows cage's built-in arrow, until Kōbō hides
-# the pointer for keyboard use; after that the pointer never comes back. The check runs
-# in the chroot because the `default` theme is an absolute symlink through /etc/alternatives.
+# The `default` XCursor theme (cage's) is Bibata-Modern-Classic, the installed system's
+# cursor, and the cursors Kōbō asks for (winit's legacy names for default, pointer and text)
+# resolve in it. HAZARD: a missing theme still boots and shows cage's built-in arrow, until
+# Kōbō hides the pointer for keyboard use; after that the pointer never comes back. The
+# check runs in the chroot so absolute symlinks in the theme resolve inside the rootfs.
 check_cursor_theme() {
   # shellcheck disable=SC2016 # Expanded by the chroot's shell.
   chroot "$R" sh -ec '
-    icons=/usr/share/icons
+    icons=/usr/share/icons want=Bibata-Modern-Classic
     theme="$(sed -n "s/^Inherits=\([^,]*\).*/\1/p" "$icons/default/index.theme" 2>/dev/null || true)"
-    [ -n "$theme" ] || { echo "no default XCursor theme ($icons/default/index.theme)" >&2; exit 1; }
+    [ "$theme" = "$want" ] ||
+      { echo "default XCursor theme is \"$theme\", not $want ($icons/default/index.theme)" >&2; exit 1; }
     for name in left_ptr hand2 xterm; do
       [ -e "$icons/$theme/cursors/$name" ] || { echo "cursor theme $theme has no $name" >&2; exit 1; }
     done
