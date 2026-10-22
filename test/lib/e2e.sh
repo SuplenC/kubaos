@@ -767,18 +767,18 @@ install_kubaos() {
   install -m 0755 /out/kubaos /usr/local/bin/kubaos
 }
 
-# user_flake DIR: a fresh user flake in DIR, rendered from user-flake/ with
-# the repo copy as KubaOS and KubaOS's own locked nixpkgs as the user's, and
-# no home.nix yet.
+# user_flake DIR [KUBAOS_URL]: a fresh user flake in DIR, rendered from
+# user-flake/ with KUBAOS_URL (the repo copy by default) as KubaOS and
+# KubaOS's own locked nixpkgs as the user's, and no home.nix yet.
 user_flake() {
-  local u="$1" nixpkgs
+  local u="$1" kubaos="${2:-git+file://$REPO}" nixpkgs
   nixpkgs="$(as_user "$NIX_BIN/nix" flake archive --dry-run --json "$REPO" | jq -r .inputs.nixpkgs.path)"
   [[ $nixpkgs == /nix/store/* ]] || { echo "FAIL KubaOS's nixpkgs: $nixpkgs"; return 1; }
   rm -rf "$u"
   as_user install -d "$u"
   sed -e 's/@USER@/kuba/g; s/@HOST@/vm/g' -e "s/@SYSTEM@/$(uname -m)-linux/" \
     -e "s#github:NixOS/nixpkgs/nixos-26.05#path:$nixpkgs#" \
-    -e "s#git+file:///usr/share/kubaos?ref=refs/heads/release#git+file://$REPO#" \
+    -e "s#git+file:///usr/share/kubaos?ref=refs/heads/release#$kubaos#" \
     "$REPO/user-flake/flake.nix.in" | as_user tee "$u/flake.nix" >/dev/null
 }
 
@@ -946,9 +946,182 @@ c_suites() {
 }
 
 # The user layer (issue #9): test/user-layer-check, which the VM bench also
-# runs on an installed system. Commits to the checkout, so it runs last.
+# runs on an installed system. Commits to the checkout, so it runs after the
+# other checks but the update ones, which start from a clone of it.
 c_user_layer() {
   zrun "'$REPO/test/user-layer-check' '$REPO'"
+}
+
+# kubaos update, the channels and kubaos rollback, through /out/kubaos: a
+# bare repo stands in for GitHub as origin, a root-owned clone of it on its
+# `release` branch for /usr/share/kubaos (the real one, the wallpaper link,
+# is put aside and back by c_rollback), and a user flake on that release like
+# the installer's. apt-get is a shim that logs what it was asked, so nothing
+# is downloaded or installed; the container has no snapper. The three checks
+# run in this order, each from where the last left the machine.
+UPD_KUBAOS=/usr/share/kubaos
+UPD_SAVED=/usr/share/kubaos.harness-saved
+UPD_ORIGIN=/var/tmp/kubaos-origin.git
+UPD_WORK=/var/tmp/kubaos-work
+UPD_READY=/var/tmp/kubaos-update.ready
+UPD_SYSTEM_LOG=/var/tmp/kubaos-system-migration.log
+UPD_USER_LOG=$USER_HOME/.local/state/kubaos-user-migration.log
+UPD_STATE=$USER_HOME/.local/state/kubaos
+
+# work GIT-ARGS...: git in the work clone of origin, as kuba.
+work() { as_user git -C "$UPD_WORK" -c user.name=test -c user.email=test@vm "$@"; }
+# release_of: the commit /usr/share/kubaos's `release` branch is at.
+release_of() { as_user git -C "$UPD_KUBAOS" rev-parse refs/heads/release; }
+# record KEY: KEY's value in /var/lib/kubaos/release.
+record() { sed -n "s/^$1=//p" /var/lib/kubaos/release 2>/dev/null; }
+# lock_rev: the commit the user flake's flake.lock has KubaOS at.
+lock_rev() { jq -r .nodes.kubaos.locked.rev "$USER_HOME/.config/kubaos/home/flake.lock"; }
+# lines FILE: how many lines FILE has, 0 when it isn't there.
+lines() { [[ -f $1 ]] && wc -l <"$1" | tr -d ' ' || echo 0; }
+
+update_setup() {
+  local u="$USER_HOME/.config/kubaos/home" dir
+  install_kubaos || return 1
+  printf '#!/bin/sh\necho "$*" >>%s/apt-get.log\n' "$LOGS" >/usr/local/bin/apt-get
+  chmod 0755 /usr/local/bin/apt-get
+  ln -sfn /usr/local/bin/apt-get /usr/local/sbin/apt-get
+  rm -rf "$UPD_ORIGIN" "$UPD_WORK" /var/lib/kubaos /etc/kubaos /usr/share/kubaos-keys \
+    "$UPD_SYSTEM_LOG" "$UPD_USER_LOG" "$UPD_STATE/migrations" "$UPD_STATE/locks" \
+    "$UPD_STATE/update-available" "$UPD_STATE/notified"
+  # Root reads kuba's origin and kuba reads root's checkout, as on the machine.
+  for dir in "$UPD_KUBAOS" "$UPD_ORIGIN"; do
+    git config --system --get-all safe.directory | grep -qxF -- "$dir" ||
+      git config --system --add safe.directory "$dir"
+  done
+  as_user git clone -q --bare "$REPO" "$UPD_ORIGIN" || { echo "FAIL cloning the repo copy as origin"; return 1; }
+  as_user git clone -q "$UPD_ORIGIN" "$UPD_WORK" || { echo "FAIL cloning origin to work in"; return 1; }
+  if [[ -e $UPD_KUBAOS && ! -e $UPD_SAVED ]]; then mv "$UPD_KUBAOS" "$UPD_SAVED"; fi
+  rm -rf "$UPD_KUBAOS"
+  git clone -q "$UPD_ORIGIN" "$UPD_KUBAOS" && git -C "$UPD_KUBAOS" checkout -q -B release origin/main ||
+    { echo "FAIL making $UPD_KUBAOS"; return 1; }
+  [[ -L $UPD_SAVED/wallpapers ]] && cp -P "$UPD_SAVED/wallpapers" "$UPD_KUBAOS/wallpapers"
+  user_flake "$u" "git+file://$UPD_KUBAOS?ref=refs/heads/release" || return 1
+  printf '{ pkgs, ... }:\n{\n  home.packages = [ ];\n}\n' | as_user tee "$u/home.nix" >/dev/null
+  kz "nix flake lock '$u'" >"$LOGS/update-lock.log" 2>&1 ||
+    { echo "FAIL nix flake lock of the user flake"; tail -20 "$LOGS/update-lock.log"; return 1; }
+  [[ $(lock_rev) == "$(release_of)" ]] || { echo "FAIL the user flake isn't locked at release"; return 1; }
+  touch "$UPD_READY"
+  echo "ok   origin, /usr/share/kubaos on release at $(release_of | cut -c1-7), a user flake locked there"
+}
+
+c_update_edge() {
+  local before head out
+  rm -f "$UPD_READY"
+  update_setup || return 1
+  before="$(release_of)"
+
+  as_user install -d "$UPD_WORK/migrations/system" "$UPD_WORK/migrations/user"
+  printf '#!/usr/bin/env bash\nset -euo pipefail\necho "$(id -un) $KUBAOS_DIR" >>%s\n' "$UPD_SYSTEM_LOG" |
+    as_user tee "$UPD_WORK/migrations/system/2000000000-harness-system.sh" >/dev/null
+  printf '#!/usr/bin/env bash\nset -euo pipefail\necho "$(id -un) $KUBAOS_USER_FLAKE" >>%s\n' "$UPD_USER_LOG" |
+    as_user tee "$UPD_WORK/migrations/user/2000000000-harness-user.sh" >/dev/null
+  work add migrations && work commit -q -m 'test: a system and a user migration' && work push -q origin HEAD:main ||
+    { echo "FAIL pushing a commit to origin/main"; return 1; }
+  head="$(work rev-parse HEAD)"
+
+  out="$(kz 'kubaos update --check' 2>&1)" || { echo "FAIL kubaos update --check"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -q "^update=.*${head:0:7}" "$UPD_STATE/update-available" ||
+    { echo "FAIL update-available doesn't name origin/main's head:"; cat "$UPD_STATE/update-available"; return 1; }
+  [[ $(release_of) == "$before" ]] || { echo "FAIL the check moved release"; return 1; }
+  echo "ok   kubaos update --check: update-available names main's new head, release stays"
+
+  out="$(kz 'kubaos update -y --foreground' 2>&1)" ||
+    { echo "FAIL kubaos update"; printf '%s\n' "$out" | tail -30; return 1; }
+  printf '%s\n' "$out" >"$LOGS/update-edge.log"
+  grep -q 'allowed_signers on this machine' <<<"$out" ||
+    { echo "FAIL no warning that origin/main's head is taken unchecked"; return 1; }
+  [[ $(release_of) == "$head" ]] || { echo "FAIL release is at $(release_of), not $head"; return 1; }
+  [[ $(cat "$UPD_SYSTEM_LOG" 2>/dev/null) == "root $UPD_KUBAOS" ]] ||
+    { echo "FAIL the system migration, as root once, logged: $(cat "$UPD_SYSTEM_LOG" 2>&1)"; return 1; }
+  [[ $(cat "$UPD_USER_LOG" 2>/dev/null) == "kuba $USER_HOME/.config/kubaos/home" ]] ||
+    { echo "FAIL the user migration, as kuba once, logged: $(cat "$UPD_USER_LOG" 2>&1)"; return 1; }
+  [[ -f /var/lib/kubaos/migrations/2000000000-harness-system.sh && -f $UPD_STATE/migrations/2000000000-harness-user.sh ]] ||
+    { echo "FAIL the migrations' markers are missing"; return 1; }
+  [[ $(record commit) == "$head" && $(record channel) == edge ]] ||
+    { echo "FAIL /var/lib/kubaos/release:"; cat /var/lib/kubaos/release; return 1; }
+  [[ $(lock_rev) == "$head" ]] || { echo "FAIL the user flake's lock has KubaOS at $(lock_rev)"; return 1; }
+  [[ $(lines /var/lib/kubaos/update-history) == 1 && ! -s $UPD_STATE/update-available ]] ||
+    { echo "FAIL update-history or update-available after the update"; return 1; }
+  grep -q '^upgrade --with-new-pkgs -y$' "$LOGS/apt-get.log" || { echo "FAIL apt-get upgrade never ran"; return 1; }
+  echo "ok   kubaos update on edge: release at main's head, both migrations ran once, the record, history and lock follow"
+
+  out="$(kz 'kubaos update -y --foreground' 2>&1)" ||
+    { echo "FAIL kubaos update, again"; printf '%s\n' "$out" | tail -30; return 1; }
+  grep -q 'newest release of its channel' <<<"$out" && [[ $(release_of) == "$head" ]] ||
+    { echo "FAIL the second update moved release or didn't say it is current"; printf '%s\n' "$out" | tail -20; return 1; }
+  [[ $(lines "$UPD_SYSTEM_LOG") == 1 && $(lines "$UPD_USER_LOG") == 1 ]] ||
+    { echo "FAIL a migration ran again"; return 1; }
+  echo "ok   kubaos update again: only packages, no migration runs twice"
+}
+
+c_update_stable() {
+  local key=/var/tmp/kubaos-release-key openssh tagged out
+  [[ -f $UPD_READY ]] || { echo "FAIL update_edge has to run first"; return 1; }
+  openssh="$(as_user "$NIX_BIN/nix" build --no-link --print-out-paths --inputs-from "$REPO" 'nixpkgs#openssh^out')" ||
+    { echo "FAIL building openssh for ssh-keygen"; return 1; }
+  git config --system gpg.ssh.program "$openssh/bin/ssh-keygen"
+  rm -f "$key" "$key.pub"
+  as_user "$openssh/bin/ssh-keygen" -q -t ed25519 -N '' -C release -f "$key" || { echo "FAIL ssh-keygen"; return 1; }
+  install -d -m 0755 /usr/share/kubaos-keys
+  echo "release@kubaos.test namespaces=\"git\" $(cat "$key.pub")" >/usr/share/kubaos-keys/allowed_signers
+
+  out="$(kz 'kubaos channel stable' 2>&1)" && [[ $(cat /etc/kubaos/channel) == stable ]] ||
+    { echo "FAIL kubaos channel stable"; printf '%s\n' "$out"; return 1; }
+  echo 0.1.1 | as_user tee "$UPD_WORK/VERSION" >/dev/null
+  work add VERSION && work commit -q -m 'release: 0.1.1' &&
+    work -c gpg.format=ssh -c user.signingkey="$key" -c user.email=release@kubaos.test tag -s v0.1.1 -m 'KubaOS 0.1.1' ||
+    { echo "FAIL signing tag v0.1.1"; return 1; }
+  tagged="$(work rev-parse HEAD)"
+  echo 0.1.2 | as_user tee "$UPD_WORK/VERSION" >/dev/null
+  work add VERSION && work commit -q -m 'release: 0.1.2, unsigned' && work tag -a v0.1.2 -m 'KubaOS 0.1.2' &&
+    work push -q origin HEAD:main v0.1.1 v0.1.2 || { echo "FAIL pushing the tags"; return 1; }
+
+  out="$(kz 'kubaos update -y --foreground' 2>&1)" ||
+    { echo "FAIL kubaos update on stable"; printf '%s\n' "$out" | tail -30; return 1; }
+  printf '%s\n' "$out" >"$LOGS/update-stable.log"
+  [[ $(release_of) == "$tagged" && $(record version) == 0.1.1 && $(record channel) == stable ]] ||
+    { echo "FAIL release isn't at the signed v0.1.1:"; cat /var/lib/kubaos/release; return 1; }
+  grep -q 'v0.1.2' <<<"$out" || { echo "FAIL nothing said the unsigned v0.1.2 was skipped"; return 1; }
+  [[ $(lock_rev) == "$tagged" ]] || { echo "FAIL the user flake's lock has KubaOS at $(lock_rev)"; return 1; }
+  echo "ok   kubaos update on stable: release at the signed v0.1.1, the unsigned v0.1.2 skipped"
+
+  out="$(kz 'kubaos channel edge && kubaos update -y --foreground' 2>&1)" &&
+    { echo "FAIL edge took main's unsigned head with allowed_signers there"; return 1; }
+  grep -q 'is not signed by a KubaOS key' <<<"$out" && [[ $(release_of) == "$tagged" ]] ||
+    { echo "FAIL edge's refusal of an unsigned head:"; printf '%s\n' "$out" | tail -10; return 1; }
+  kz 'kubaos channel stable' >/dev/null
+  echo "ok   with allowed_signers, edge refuses main's unsigned head and leaves release"
+}
+
+c_rollback() {
+  local edge out
+  [[ -f $UPD_READY ]] || { echo "FAIL update_edge and update_stable have to run first"; return 1; }
+  trap update_restore EXIT
+  # The commit the edge update moved to, where the stable one started.
+  edge="$(as_user git -C "$UPD_KUBAOS" log -1 --format=%H -- migrations)"
+  out="$(kz 'kubaos rollback -y --foreground' 2>&1)" ||
+    { echo "FAIL kubaos rollback"; printf '%s\n' "$out" | tail -30; return 1; }
+  printf '%s\n' "$out" >"$LOGS/rollback.log"
+  [[ $(release_of) == "$edge" && $(record commit) == "$edge" && $(record version) == 0.1.0 ]] ||
+    { echo "FAIL release isn't back at the edge update's $edge:"; cat /var/lib/kubaos/release; return 1; }
+  [[ $(lock_rev) == "$edge" ]] || { echo "FAIL the saved flake.lock isn't back: KubaOS at $(lock_rev)"; return 1; }
+  [[ $(lines /var/lib/kubaos/update-history) == 2 ]] ||
+    { echo "FAIL update-history keeps $(lines /var/lib/kubaos/update-history) lines, not 2"; return 1; }
+  [[ $(lines "$UPD_SYSTEM_LOG") == 1 && -f /var/lib/kubaos/migrations/2000000000-harness-system.sh ]] ||
+    { echo "FAIL rollback ran or dropped a migration"; return 1; }
+  echo "ok   kubaos rollback: release, the record and flake.lock back at the edge update, migration markers kept"
+}
+
+# update_restore: the machine as before the update checks.
+update_restore() {
+  rm -f /usr/local/bin/apt-get /usr/local/sbin/apt-get "$UPD_READY"
+  git config --system --unset gpg.ssh.program || true
+  if [[ -e $UPD_SAVED ]]; then rm -rf "$UPD_KUBAOS" && mv "$UPD_SAVED" "$UPD_KUBAOS"; fi
 }
 
 e2e_main() {
@@ -958,7 +1131,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua workspaces shellcheck flake_check quickshell menu menu_kubaos recorder wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

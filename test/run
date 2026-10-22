@@ -116,7 +116,7 @@ cmd_e2e() {
     esac
     shift
   done
-  if [[ -z $only || ",$only," == *",packages,"* || ",$only," == *",suites,"* ]]; then
+  if [[ -z $only || ,$only, =~ ,(packages|suites|update_edge|update_stable|rollback), ]]; then
     build_kubaos
   fi
   if ((keep)); then
