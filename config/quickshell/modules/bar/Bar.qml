@@ -45,6 +45,8 @@ Item {
 
         RecordingIndicator {}
 
+        KeyboardLayout {}
+
         UpdateIndicator {}
 
         Tray {
