@@ -11,6 +11,9 @@ use crate::data;
 pub const PAYLOAD_DIR: &str = "/run/kubaos/payload";
 /// Smallest free region offered for a dual-boot install, on top of the payload size.
 const HEADROOM: u64 = 8_000_000_000;
+/// What a hostname may be: one RFC 1123 label, as
+/// `kubaos_core::engine::validate::valid_hostname` checks it.
+pub const HOSTNAME_RULE: &str = "Lowercase a-z, 0-9 and -, up to 63, with no - at either end.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiskMode {
@@ -30,6 +33,8 @@ pub struct Form {
 
     pub full_name: String,
     pub username: String,
+    /// The machine's name, `/etc/hostname`. The home config doesn't depend on it.
+    pub hostname: String,
     pub password: String,
     pub password_confirm: String,
 
@@ -69,6 +74,7 @@ impl Form {
             keymap: pick(&probe.keymaps, "us"),
             timezone: pick(&probe.timezones, "Europe/Rome"),
             username: manifest.map(|m| m.username.clone()).unwrap_or_default(),
+            hostname: manifest.map(|m| m.hostname.clone()).unwrap_or_default(),
             encrypt: true,
             luks_same_as_password: true,
             disk,
@@ -104,7 +110,7 @@ impl Form {
     }
 
     pub fn account_ok(&self) -> Result<(), &'static str> {
-        use kubaos_core::engine::validate::{reserved_username, valid_username};
+        use kubaos_core::engine::validate::{reserved_username, valid_hostname, valid_username};
         if self.full_name.trim().is_empty() {
             return Err("Type your name.");
         }
@@ -116,6 +122,12 @@ impl Form {
         }
         if reserved_username(&self.username) {
             return Err("That one's a system account. Pick another.");
+        }
+        if self.hostname.is_empty() {
+            return Err("Name this machine.");
+        }
+        if !valid_hostname(&self.hostname) {
+            return Err(HOSTNAME_RULE);
         }
         self.password_ok()
     }
@@ -222,9 +234,7 @@ impl Form {
                 timezone: self.timezone.clone(),
             },
             host: Host {
-                hostname: manifest
-                    .map(|m| m.hostname.clone())
-                    .unwrap_or_else(|| "tuxedo".into()),
+                hostname: self.hostname.clone(),
             },
             user: User {
                 username: self.username.clone(),
@@ -404,6 +414,7 @@ mod tests {
         let f = Form::new(&p);
         assert_eq!(f.timezone, "Europe/Rome");
         assert_eq!(f.username, "kuba");
+        assert_eq!(f.hostname, "tuxedo", "the payload's");
         assert_eq!(f.disk.as_deref(), Some("/dev/nvme0n1"));
         assert_eq!(f.disk_mode, Some(DiskMode::FreeSpace));
         assert!(f.encrypt);
@@ -441,6 +452,33 @@ mod tests {
         assert_eq!(f.to_config(&p).user.username, "alice");
         for bad in ["", "Alice", "1alice", "al ice", "root", "nixbld3"] {
             f.username = bad.into();
+            assert!(f.account_ok().is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn hostname_is_yours_to_pick() {
+        let p = demo_probe();
+        let mut f = Form::new(&p);
+        f.full_name = "Alice Example".into();
+        f.password = "correct horse battery".into();
+        f.password_confirm = f.password.clone();
+        for good in ["tuxedo", "alice-laptop", "x", "a1-b2", &"a".repeat(63)] {
+            f.hostname = good.into();
+            assert!(f.account_ok().is_ok(), "{good:?}");
+            assert_eq!(f.to_config(&p).host.hostname, good);
+        }
+        for bad in [
+            "",
+            "Tuxedo",
+            "-box",
+            "box-",
+            "a.b",
+            "my box",
+            "zażółć",
+            &"a".repeat(64),
+        ] {
+            f.hostname = bad.into();
             assert!(f.account_ok().is_err(), "{bad:?}");
         }
     }
@@ -506,6 +544,7 @@ mod tests {
         let mut f = Form {
             full_name: "J".into(),
             username: "j".into(),
+            hostname: "j-laptop".into(),
             password: "hunter22".into(),
             password_confirm: "hunt".into(),
             ..Form::default()

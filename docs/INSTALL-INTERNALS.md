@@ -74,7 +74,7 @@ keyboard_variant = ""
 timezone = "Europe/Rome"
 
 [host]
-hostname = "tuxedo"          # v1: must equal manifest.hostname (flake output <user>@<hostname>)
+hostname = "tuxedo"          # any RFC 1123 label; names the user flake output <user>@<hostname>
 
 [user]
 username = "kuba"           # any; not manifest.username means a build at install (below)
@@ -127,7 +127,7 @@ How the engine does it:
 - home-manager's `activate` needs the Nix store, which belongs to `nix-daemon` in a multi-user install. Nothing runs in a chroot, so the engine starts `/nix/var/nix/profiles/default/bin/nix-daemon --option sandbox false` inside it (the sandbox can't `pivot_root` in a chroot; the profile path is resolved inside the target, because its links point into `/nix/store`), waits for its socket, runs `setpriv --reuid=<uid> --regid=<gid> --init-groups env -i HOME=… USER=… PATH=<nix>:… NIX_REMOTE=daemon HOME_MANAGER_BACKUP_EXT=hm-backup sh -c 'cd ~ && exec dbus-run-session -- <home_generation>/activate'` (`dbus-run-session` when the payload has it: home-manager's dconf step needs a session bus), then stops the daemon. For a username that isn't `manifest.username`, see "Another username" below: the generation activated is the one built there. `hm-backup` keeps `/etc/skel` files out of home-manager's way. Without systemd running, home-manager skips reloading user units. Without a `nix-daemon` in the payload, activation runs against the store directly (single-user) with a warning.
 - The snapshot step runs `snapper --no-dbus create-config /` with the same `@snapshots` swap as `system/20-base.sh`, applies the `20-base.sh` retention settings, then runs `snapper create --description factory` (#1). `SYNC_ACL=yes` is set last and dropped with a warning when the btrfs has no ACLs. Without snapper in the payload it takes a read-only `btrfs subvolume snapshot` of `@` to `@snapshots/1/snapshot` and writes snapper's `info.xml`. When grub-btrfs is installed, `update-grub` runs again so the snapshot is in the menu from the first boot.
 - `finish` copies the live log to `/var/log/kubaos/install.log` (0600), unmounts in reverse and closes LUKS. Any failure does the same cleanup before `failed`.
-- `validate` requires `hostname` to equal `manifest.hostname`, so `home-manager switch` later finds the flake output `<user>@<hostname>`. The username is anything `useradd` takes, minus the accounts the payload already has (`root`, the services', `nixbld*`).
+- `hostname` is any RFC 1123 label (a-z, 0-9 and `-`, 1-63, no `-` at either end). Nothing in `home/` reads it, so the payload's generation activates for any hostname; the user flake names its output `<user>@<hostname>`, which plain `home-manager switch` picks. The username is anything `useradd` takes, minus the accounts the payload already has (`root`, the services', `nixbld*`).
 
 ### The user flake
 

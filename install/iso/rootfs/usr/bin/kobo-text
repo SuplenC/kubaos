@@ -63,8 +63,13 @@ while :; do
   [ -b "$disk" ] && break
   echo "$disk isn't a disk. Pick one from the list."
 done
-ask host "Machine (tuxedo or vm)" "${default_host:-tuxedo}"
 ask user "Your username" "$default_user"
+# The same rule as `valid_hostname` in crates/kubaos-core/src/engine/validate.rs.
+while :; do
+  ask host "This machine's name (hostname)" "${default_host:-kubaos}"
+  [[ $host =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] && break
+  echo "Lowercase a-z, 0-9 and -, up to 63, with no - at either end. Again."
+done
 ask full "Your full name" "Kuba Example"
 ask lang "Locale" "en_US.UTF-8"
 ask kb "Keyboard. Pick the one your fingers actually know" "us"

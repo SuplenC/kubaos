@@ -88,6 +88,7 @@ pub fn script() -> Vec<Step> {
         // Focus starts on the empty name.
         Type("Kuba Example"),
         Tap(Tab), // Username, the payload's kuba: keep it
+        Tap(Tab), // Hostname, the payload's tuxedo: keep it
         Tap(Tab),
         Type("correct horse battery"),
         Tap(Tab),
@@ -429,9 +430,15 @@ mod tests {
         // Selected on focus, so typing replaces the payload's name.
         keys(&mut app, vec![Type("alice"), Tap(Tab)]);
         assert_eq!(app.form.username, "alice");
+        assert_eq!(app.focus, Some(F::Hostname));
+        keys(&mut app, vec![Type("alice-laptop"), Tap(Tab)]);
+        assert_eq!(app.form.hostname, "alice-laptop");
         assert_eq!(app.focus, Some(F::Password));
         // Back into the name: all of it selected, so typing replaces it.
-        keys(&mut app, vec![Tap(ShiftTab), Tap(ShiftTab), Type("Kuba")]);
+        keys(
+            &mut app,
+            vec![Tap(ShiftTab), Tap(ShiftTab), Tap(ShiftTab), Type("Kuba")],
+        );
         assert_eq!(app.form.full_name, "Kuba");
         // Caret moves: fix "Kuba" -> "Kuuba" -> "XKuuba!"
         keys(&mut app, vec![Tap(Left), Tap(Left), Tap(Left), Type("u")]);
@@ -477,6 +484,7 @@ mod tests {
                 vec![
                     F::FullName,
                     F::Username,
+                    F::Hostname,
                     F::Password,
                     F::PasswordConfirm,
                     F::ShowSecrets,
@@ -506,6 +514,7 @@ mod tests {
                     F::Next,
                 ],
             ),
+            (Screen::Summary, vec![F::Hold, F::Back]),
         ];
         for (s, mut order) in expect {
             let _ = app.go(s);

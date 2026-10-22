@@ -161,6 +161,12 @@ fn gallery() {
         app.focus = Some(F::PasswordConfirm);
         shot(&dir, "account-mismatch", &app, size);
         app.form.password_confirm = "hunter2".into();
+        app.form.hostname = "nerv-hq".into();
+        app.focus = Some(F::Hostname);
+        shot(&dir, "account-hostname", &app, size);
+        app.form.hostname = "Nerv.HQ".into();
+        shot(&dir, "account-bad-hostname", &app, size);
+        app.form.hostname = "tuxedo".into();
 
         go(&mut app, Screen::Disk);
         let _ = app.update_inner(Message::Pick(crate::app::List::Disk, "/dev/nvme1n1".into()));

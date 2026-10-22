@@ -113,9 +113,12 @@ run_scenario() {
   truncate -s 12G /work/disk.img
   LOOP=$(losetup -fP --show /work/disk.img)
   say "scenario $sc on $LOOP"
-  local payload="$sc" target='{ mode = "whole" }'
+  local payload="$sc" target='{ mode = "whole" }' host=vm
   if [[ "$sc" == dual ]]; then
     payload=sqfs
+    # A hostname of the owner's own, not the payload's: the payload's home
+    # generation still activates, with nothing built.
+    host=nerv-hq
     windows_like_disk
     # Kōbō's way: take a free region from probe.
     local region
@@ -131,7 +134,7 @@ keyboard_layout = "us"
 timezone = "Europe/Rome"
 
 [host]
-hostname = "vm"
+hostname = "$host"
 
 [user]
 username = "kuba"
@@ -240,8 +243,8 @@ EOF
   check "fstab /boot" has "$R/etc/fstab" "^UUID=$U_BOOT +/boot +ext4 "
   check "fstab /boot/efi" has "$R/etc/fstab" "^UUID=$U_ESP +/boot/efi +vfat "
   check "crypttab" has "$R/etc/crypttab" "^cryptroot UUID=$U_LUKS none luks,discard,tries=0$"
-  check "hostname" eq "$(cat "$R/etc/hostname")" vm
-  check "hosts" has "$R/etc/hosts" $'^127.0.1.1\tvm$'
+  check "hostname $host" eq "$(cat "$R/etc/hostname")" "$host"
+  check "hosts" has "$R/etc/hosts" "^127.0.1.1"$'\t'"$host\$"
   check "timezone" eq "$(readlink "$R/etc/localtime")" ../usr/share/zoneinfo/Europe/Rome
   check "locale" has "$R/etc/locale.conf" '^LANG=en_US.UTF-8$'
   check "/etc/default/locale -> ../locale.conf" eq "$(readlink "$R/etc/default/locale")" ../locale.conf
@@ -255,7 +258,8 @@ EOF
   check "home on @home" test -d "$T/@home/kuba"
   check "home activated as kuba via nix-daemon" has "$T/@home/kuba/.hm-activated" 'user=kuba uid=1000 .*nix_remote=daemon backup=hm-backup'
   local uf="$T/@home/kuba/.config/kubaos/home"
-  check "user flake for kuba@vm" has "$uf/flake.nix" "^homeConfigurations.\"kuba@vm\" = mkHome \"$(uname -m)-linux\";\$"
+  check "user flake for kuba@$host" has "$uf/flake.nix" "^homeConfigurations.\"kuba@$host\" = mkHome \"$(uname -m)-linux\";\$"
+  check "  the payload's generation, nothing built" bash -c "! grep -q 'building the home-manager generation' '$OUT/$sc.live.log'"
   check "  with the payload's lock" has "$uf/flake.lock" '^\{"version": 7\}$'
   check "  owned by kuba" eq "$(stat -c %u:%g "$uf" "$uf/flake.nix" "$uf/home.nix" "$uf/flake.lock" | sort -u)" 1000:1000
   check "no ~/Projects/dotfiles" test ! -e "$T/@home/kuba/Projects/dotfiles"

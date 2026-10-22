@@ -422,6 +422,40 @@ mod tests {
     }
 
     #[test]
+    fn a_hostname_of_your_own_names_the_machine_and_the_flake_output_and_builds_nothing() {
+        let p = payload();
+        let mut cfg = config(&p);
+        cfg.host.hostname = "nerv-hq".into();
+        let mut r = DryRunner::new();
+        user_flake_payload(&mut r);
+        let opts = RunOptions {
+            dry_run: true,
+            target_root: Some("/mnt/t".into()),
+            log_file: None,
+        };
+
+        run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}).unwrap();
+
+        assert_eq!(r.files[Path::new("/mnt/t/etc/hostname")], "nerv-hq\n");
+        assert!(r.files[Path::new("/mnt/t/etc/hosts")].contains("127.0.1.1\tnerv-hq\n"));
+        let flake = &r.files[Path::new("/mnt/t/home/kuba/.config/kubaos/home/flake.nix")];
+        assert!(
+            flake.contains("homeConfigurations.\"kuba@nerv-hq\""),
+            "{flake}"
+        );
+        let cmds = r.commands();
+        assert!(
+            !cmds.iter().any(|c| c.contains("homeConfigurations")),
+            "the payload's generation is reused: {cmds:#?}"
+        );
+        assert!(
+            cmds.iter()
+                .any(|c| c.contains("/nix/store/abc-home-manager-generation/activate")),
+            "{cmds:#?}"
+        );
+    }
+
+    #[test]
     fn another_username_builds_its_own_generation() {
         let activation = |cmds: &[String]| {
             cmds.iter()

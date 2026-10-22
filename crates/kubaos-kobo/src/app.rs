@@ -91,6 +91,7 @@ pub enum F {
     WifiPsk,
     FullName,
     Username,
+    Hostname,
     Password,
     PasswordConfirm,
     ShowSecrets,
@@ -104,7 +105,8 @@ pub enum F {
     GitEmail,
     /// A tile on the Wallpapers screen: the manifest's set at this index.
     WallpaperSet(usize),
-    Edit(Screen),
+    /// A step in the rail, to go back to.
+    Step(Screen),
     Hold,
     ToggleLog,
     SaveLog,
@@ -132,6 +134,7 @@ impl F {
                 | F::WifiPsk
                 | F::FullName
                 | F::Username
+                | F::Hostname
                 | F::Password
                 | F::PasswordConfirm
                 | F::Luks
@@ -168,7 +171,12 @@ pub mod ids {
     pub const REVEAL_LUKS_SAME: &str = "reveal-luks-same";
     pub const REVEAL_LUKS: &str = "reveal-luks";
     pub const REVEAL_NAMES: &str = "reveal-names";
+    pub const REVEAL_HOST: &str = "reveal-host";
     pub const REVEAL_PASSWORDS: &str = "reveal-passwords";
+    pub const SUMMARY_LANGUAGE: &str = "summary-language";
+    pub const SUMMARY_ACCOUNT: &str = "summary-account";
+    pub const SUMMARY_DISK: &str = "summary-disk";
+    pub const SUMMARY_SYSTEM: &str = "summary-system";
 }
 
 /// Which list the arrow keys move in.
@@ -506,6 +514,7 @@ impl App {
                 vec![
                     F::FullName,
                     F::Username,
+                    F::Hostname,
                     F::Password,
                     F::PasswordConfirm,
                     F::ShowSecrets,
@@ -529,19 +538,7 @@ impl App {
                 .map(F::WallpaperSet)
                 .chain([F::Back, F::Next])
                 .collect(),
-            Screen::Summary => {
-                let mut v = vec![
-                    F::Hold,
-                    F::Edit(Screen::Language),
-                    F::Edit(Screen::Account),
-                    F::Edit(Screen::Disk),
-                ];
-                if self.flow().contains(&Screen::Wifi) {
-                    v.push(F::Edit(Screen::Wifi));
-                }
-                v.push(F::Back);
-                v
-            }
+            Screen::Summary => vec![F::Hold, F::Back],
             Screen::Installing => vec![F::ToggleLog],
             Screen::Failed => vec![F::Retry, F::SaveLog, F::ToggleLog, F::Back],
             Screen::Done => vec![F::Reboot, F::Stay],
@@ -1080,7 +1077,7 @@ impl App {
                 }
                 Task::none()
             }
-            F::Edit(s) => {
+            F::Step(s) => {
                 if self.install.as_ref().is_none_or(|i| i.outcome.is_some()) {
                     self.go(s)
                 } else {
@@ -1292,7 +1289,7 @@ impl App {
             Key::Enter => match focus {
                 Some(F::Hold) => self.update_inner(Message::HoldStart),
                 _ if self.screen == Screen::Summary
-                    && !matches!(focus, Some(F::Edit(_) | F::Back | F::Power)) =>
+                    && !matches!(focus, Some(F::Back | F::Power)) =>
                 {
                     self.update_inner(Message::HoldStart)
                 }
@@ -1302,7 +1299,6 @@ impl App {
                     | F::Back
                     | F::Next
                     | F::ShowSecrets
-                    | F::Edit(_)
                     | F::ToggleLog
                     | F::SaveLog
                     | F::Retry
@@ -1477,6 +1473,7 @@ impl App {
             F::WifiPsk => &mut form.wifi_psk,
             F::FullName => &mut form.full_name,
             F::Username => &mut form.username,
+            F::Hostname => &mut form.hostname,
             F::Password => &mut form.password,
             F::PasswordConfirm => &mut form.password_confirm,
             F::Luks => &mut form.luks,
@@ -1497,6 +1494,7 @@ impl App {
             F::WifiPsk => &form.wifi_psk,
             F::FullName => &form.full_name,
             F::Username => &form.username,
+            F::Hostname => &form.hostname,
             F::Password => &form.password,
             F::PasswordConfirm => &form.password_confirm,
             F::Luks => &form.luks,
@@ -1760,6 +1758,7 @@ pub fn reveal_target(screen: Screen, f: F) -> Option<(&'static str, &'static str
         (Screen::Disk, F::LuksSame) => ids::REVEAL_LUKS_SAME,
         (Screen::Disk, F::Luks | F::LuksConfirm | F::ShowSecrets) => ids::REVEAL_LUKS,
         (Screen::Account, F::FullName | F::Username) => ids::REVEAL_NAMES,
+        (Screen::Account, F::Hostname) => ids::REVEAL_HOST,
         (Screen::Account, F::Password | F::PasswordConfirm | F::ShowSecrets) => {
             ids::REVEAL_PASSWORDS
         }

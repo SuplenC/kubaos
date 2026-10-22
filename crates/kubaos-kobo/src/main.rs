@@ -21,6 +21,7 @@ mod elide;
 mod field;
 #[cfg(test)]
 mod gallery;
+mod grid;
 mod model;
 mod pointer;
 mod progress;
