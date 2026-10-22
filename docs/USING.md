@@ -4,13 +4,13 @@ Keys, updates, daily commands, how it is built, the repo map and known limitatio
 
 ## Keys that matter
 
-`SUPER + F1` opens the full cheat sheet ([`config/hypr/KEYBINDS.md`](../config/hypr/KEYBINDS.md)). These are the ones you'll use every day:
+`SUPER + F1` lists every bind in the Command menu, searchable by what it does. These are the ones you'll use every day:
 
 | Keys | What |
 |---|---|
 | `SUPER + Return` | Terminal (Ghostty) |
 | `SUPER + CTRL + Return` | Terminal in tmux session `main` |
-| `SUPER + Space` | Launcher. Type `=` first to calculate |
+| `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows. Type a sum to calculate |
 | `SUPER + Q` | Close window |
 | `SUPER + h/j/k/l` | Focus. `+ SHIFT` moves the window, `+ CTRL` resizes |
 | `SUPER + 1..9` | Workspace. `+ SHIFT` takes the window along |
@@ -20,7 +20,7 @@ Keys, updates, daily commands, how it is built, the repo map and known limitatio
 | `SUPER + SHIFT + R` | Record a region, same key stops |
 | `SUPER + Escape` | Power menu |
 | `SUPER + CTRL + Escape` | Lock |
-| `SUPER + ALT + Return` / `SUPER + ALT + Space` | foot and fuzzel: the emergency terminal and launcher, for when the shell is dead |
+| `SUPER + ALT + Return` / `SUPER + ALT + Space` | foot and fuzzel: the emergency terminal and app menu, for when the shell is dead |
 
 The layout is whatever you picked in Kōbō (`/etc/default/keyboard`, `us` if there is no such file). Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
 
@@ -152,7 +152,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 - **Disk:** LUKS2, then btrfs with flat subvolumes (`@ @home @snapshots @log @cache @nix @docker @swap`), snapper with timeline and apt pre/post snapshots, grub-btrfs so snapshots are bootable from GRUB.
 - **Session:** autologin on tty1 after the LUKS unlock, zsh, `start-hyprland`. No display manager.
 - **Compositor:** Hyprland 0.56 from `ppa:cppiber/hyprland`, held in apt, with a Lua config split into files (`config/hypr/`). Dwindle layout, Omarchy 4 keybinds moved to hjkl. hypridle locks after 5 min, turns screens off after 10, and suspends after 30 on battery only.
-- **Shell:** my own, written in QML on Quickshell v0.3.2 (pinned), in the structure of Caelestia: bar, launcher with calculator, notifications, OSD, control center, power menu, wallpaper picker, lock screen with password, fingerprint and security key in parallel.
+- **Shell:** my own, written in QML on Quickshell v0.3.2 (pinned), in the structure of Caelestia: bar, notifications, OSD, control center, power menu, wallpaper picker, lock screen with password, fingerprint and security key in parallel. The Command menu is [Kotodama](https://github.com/SuplenC/kotodama), drawn by the shell in its colors.
 - **User environment:** standalone home-manager (nixos-26.05) owns everything in `$HOME`. KubaOS's configs are read-only links from the store into `~/.config`, and yours live in `~/.config/kubaos` (above, "Make it yours"). Nix apps get the GPU through home-manager's `targets.genericLinux.gpu`.
 - **Theming:** matugen (`scheme-fidelity`) turns the wallpaper into Material 3 colors and renders 21 files in `~/.local/state/theme/` for every consumer. Geist, M PLUS 1 for the Japanese bits, Material Symbols, Papirus, Bibata.
 - **Terminal and dev:** Ghostty (foot as the fallback), tmux + tms, Neovim 0.12 (LazyVim), rustup, proto + moon, sccache, clang + mold (wild optional), Docker Engine + lazydocker, Chrome.

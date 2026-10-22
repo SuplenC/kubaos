@@ -1,0 +1,39 @@
+# Kotodama, the Command menu: KubaOS's settings. The Daemon merges every
+# *.toml in ~/.config/kotodama in filename order, so user.toml, which links
+# to your ~/.config/kubaos/kotodama/user.toml, wins over this file.
+# `kotodama config` prints the merged config and where each value came from;
+# `kotodama config --schema` lists every key.
+
+[extensions.apps]
+# What starts apps with `Terminal=true`; the app's command follows.
+terminal = ["ghostty", "-e"]
+# Desktop ids to leave out, on top of the entries that set NoDisplay or
+# Hidden themselves.
+hidden = ["qt5ct", "qt6ct", "org.codeberg.dnkl.footclient", "org.codeberg.dnkl.foot-server"]
+# Display names by desktop id, for entries with clumsy names.
+names = { nvim = "Neovim" }
+
+[extensions.hyprland]
+# Windows, workspaces and the Shortcuts View (SUPER + F1). KubaOS sets
+# nothing here yet, so the Extension's defaults apply: the open windows are in
+# the main search, and the binds only in the Shortcuts View.
+
+[extensions.folders]
+# A script's window stays open after it exits, so its output can be read.
+terminal = ["ghostty", "--wait-after-command=true", "-e"]
+# A project opens in its tmux session, the one `tms` opens for it.
+open = ["ghostty", "-e", "tmux", "new-session", "-A", "-s", "{session}", "-c", "{path}"]
+shell = ["ghostty", "--working-directory={path}"]
+lazygit = ["ghostty", "-e", "lazygit", "--path", "{path}"]
+
+# The Projects root and the Scripts root. home/links.nix writes tms's
+# `search_dirs` from this same list into the tms config it seeds, so the menu
+# and `tms` find the same projects.
+[[extensions.folders.folders]]
+path = "~/Projects"
+kind = "projects"
+depth = 1
+
+[[extensions.folders.folders]]
+path = "~/Scripts"
+kind = "scripts"

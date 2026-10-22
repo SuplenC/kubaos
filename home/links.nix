@@ -23,10 +23,29 @@ let
   outOfStore = config.lib.file.mkOutOfStoreSymlink;
   userLayer = "${config.xdg.configHome}/kubaos";
 
-  defaults = builtins.path {
+  shipped = builtins.path {
     path = ../config;
-    name = "kubaos-defaults";
+    name = "kubaos-config";
   };
+
+  # tms's `search_dirs`, from the Command menu's folders, so both find the
+  # same projects. A folder without a depth, such as the Scripts root, is
+  # searched one level down.
+  menuFolders =
+    (builtins.fromTOML (builtins.readFile ../config/kotodama/kubaos.toml)).extensions.folders.folders;
+  tmsSearchDirs = lib.concatMapStrings (folder: ''
+    [[search_dirs]]
+    path = "${folder.path}"
+    depth = ${toString (folder.depth or 1)}
+
+  '') menuFolders;
+
+  # config/ as shipped, but for tms/config.toml, which gains the search_dirs.
+  defaults = pkgs.runCommand "kubaos-defaults" { } ''
+    cp -r ${shipped} $out
+    chmod -R u+w $out
+    { printf '%s' ${lib.escapeShellArg tmsSearchDirs}; cat ${shipped}/tms/config.toml; } >$out/tms/config.toml
+  '';
 
   # dot-config reads this as ~/.local/share/kubaos/layer.
   layer = {
@@ -67,7 +86,7 @@ let
           [ ]
       ) (builtins.readDir dir)
     );
-  linked = lib.subtractLists notLinked (files defaults);
+  linked = lib.subtractLists notLinked (files shipped);
 
   scriptsDir = builtins.path {
     path = ../scripts;
@@ -93,6 +112,9 @@ in
       # KubaOS ships no yazi settings besides the theme: these are the user's.
       "yazi/yazi.toml".source = outOfStore "${userLayer}/yazi/yazi.toml";
       "yazi/keymap.toml".source = outOfStore "${userLayer}/yazi/keymap.toml";
+      # The Daemon merges ~/.config/kotodama/*.toml in filename order: the
+      # user's file sorts after kubaos.toml, so it wins.
+      "kotodama/user.toml".source = outOfStore "${userLayer}/kotodama/user.toml";
     };
 
   xdg.dataFile = {

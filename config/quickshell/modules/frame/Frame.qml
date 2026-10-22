@@ -8,7 +8,6 @@ import qs.theme
 import qs.components
 import qs.services
 import qs.modules.bar
-import qs.modules.launcher
 import qs.modules.controlcenter
 import qs.modules.notifications
 import qs.modules.osd
@@ -110,8 +109,7 @@ Scope {
             color: Theme.m3scrim
             opacity: ({
                     powermenu: 0.45,
-                    controlcenter: 0.2,
-                    launcher: 0.15
+                    controlcenter: 0.2
                 })[root.panel] ?? 0
             visible: opacity > 0
 
@@ -148,10 +146,6 @@ Scope {
                     PathSvg {
                         path: DrawerPath.frame(root.width, root.height, geo, Theme.frame.rounding * root.reveal)
                     }
-                }
-
-                PanelPath {
-                    drawer: launcher
                 }
 
                 PanelPath {
@@ -208,13 +202,6 @@ Scope {
 
                 frame: geo
                 screen: root.screen
-            }
-
-            Launcher {
-                id: launcher
-
-                frame: geo
-                shown: root.panel === "launcher"
             }
 
             ControlCenter {

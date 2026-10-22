@@ -1,14 +1,5 @@
-[[search_dirs]]
-path = "~/Projects"
-depth = 1
-
-[[search_dirs]]
-path = "~/.config"
-depth = 1
-
-[[search_dirs]]
-path = "~/Scripts"
-depth = 1
+# `search_dirs` are the Command menu's folders (config/kotodama/kubaos.toml):
+# home/links.nix writes them above this comment in the tms config it seeds.
 
 # ANSI names, so the picker follows the terminal palette (the wallpaper
 # theme): the selected row is a tinted bar (palette 0, surface_container_highest)

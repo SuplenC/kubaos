@@ -12,7 +12,7 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
 
   | Panel | Position |
   |---|---|
-  | Launcher | Drops from the bar under the clock |
+  | Command menu (Kotodama) | Its own window, centred a fifth of the way down |
   | Control center | Side sheet on the right |
   | Power menu | Column on the right edge |
   | Wallpaper picker | Rises from the bottom |
@@ -20,7 +20,7 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
   | Notifications | Top-right corner |
 
 - **Density:** sized for Full HD at scale 1 (the laptop runs at 1.5, see `config/hypr/monitors.lua`): a 36 px bar, 13 px body text.
-- **Panels over windows:** only the frame reserves space (the bar's 36 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (power menu 45%, control center 20%, launcher 15%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
+- **Panels over windows:** only the frame reserves space (the bar's 36 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (power menu 45%, control center 20%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
 - **Glass:** the frame is drawn at 94% opacity. Hyprland blurs what shows through (`qs-frame` layer rule, `ignore_alpha 0.5`, so the shadow is not blurred).
 
 The design was studied from Caelestia's source and README: its frame and drawer structure, Material 3 roles and motion tokens. No code comes from it (Caelestia is GPL-3.0); everything here was written from scratch, and the panel shapes are built differently (an SVG path per panel, see `components/drawerpath.js`).
@@ -41,7 +41,6 @@ Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`hom
 
 | Call | Effect |
 |---|---|
-| `qs ipc call launcher toggle` | App launcher + calculator |
 | `qs ipc call session lock` | Lock screen |
 | `qs ipc call powermenu toggle` | Lock / suspend / log out / reboot / shut down |
 | `qs ipc call wallpaper toggle` | Wallpaper picker |
@@ -62,7 +61,7 @@ shell.qml               entry point: per screen a Wallpaper and a Frame; Lock, p
 IpcHandlers.qml         qs ipc targets
 theme/Theme.qml         design tokens: M3 colors (from colors.json), spacing, rounding, frame,
                         bar, type, motion curves and durations, elevation, state layers
-settings/Settings.qml   user knobs: wallpaper folders, wallpaper motion, lock loop, kanji workspaces, launcher hide list, terminal, security key, fingerprint, polkit
+settings/Settings.qml   user knobs: wallpaper folders, wallpaper motion, lock loop, kanji workspaces, security key, fingerprint, polkit
 services/               singletons, no UI
   Audio                 PipeWire default sink, volume, output list
   Brightness            /sys/class/backlight (watched) + brightnessctl
@@ -86,7 +85,7 @@ modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)
   bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, Status, RecordingIndicator
-  launcher/             Launcher, Calculator (qalc), fuzzy.js
+  menu/                 Menu: Kotodama's Command menu window in the theme's colors
   controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history
   notifications/        Popups, NotificationCard
   osd/                  volume / brightness OSD
@@ -116,7 +115,7 @@ Imports use Quickshell's module paths: `import qs.services`, `import qs.componen
 
 Every panel works without a mouse. Esc closes it.
 
-- Launcher: type to search, Up/Down or Ctrl+j/k or Ctrl+n/p to move, Enter to launch. Input that starts with `=` or looks like arithmetic goes to `qalc`; Enter copies the result.
+- Command menu (SUPER + Space, `kotodama toggle`): type to search apps, projects, scripts and windows, Up/Down to move, Enter to run. A sum typed is answered in the list; Enter copies the answer. SUPER + F1 opens it on the Shortcuts View. Its config is `config/kotodama/kubaos.toml`, with your changes in `~/.config/kubaos/kotodama/user.toml`.
 - Control center: Tab/Shift+Tab move between controls, Enter/Space toggle a tile, h/l or arrows move sliders and tabs, 1-4 jump to a tab, j/k move in lists, Delete dismisses a notification.
 - Power menu: h/j/k/l, arrows or Tab, then Enter.
 - Wallpaper picker: h/j/k/l or arrows move (the desktop previews the selection), Tab switches folder, S opens Settings, Enter applies, Esc goes back to the current wallpaper.
@@ -150,7 +149,7 @@ The polkit agent is in-shell but turned off (`Settings.polkitAgent: false`), and
 
 | Tool | Used for | From |
 |---|---|---|
-| `qalc` (libqalculate) | launcher calculator | apt |
+| `kotodama`, `kotodamad` | the Command menu's Daemon and CLI | Nix (`home/menu.nix`) |
 | `brightnessctl` | setting brightness | apt |
 | `dot-theme` | applying a wallpaper | this repo |
 | `dot-hypr-record`, `dot-hypr-screenshot` | recording indicator, capture buttons | this repo |

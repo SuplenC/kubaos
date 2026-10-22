@@ -10,7 +10,12 @@
 let
   inherit (pkgs.stdenv.hostPlatform) system;
 in
-{
+rec {
+  # The Command menu: the `kotodama` command, the Daemon, the Bundled
+  # extensions and the QML module. The flake input follows KubaOS's nixpkgs,
+  # so the module is built against the Qt that Quickshell loads it into.
+  kotodama = inputs.kotodama.packages.${system}.default;
+
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (
     with pkgs.qt6;
@@ -18,6 +23,8 @@ in
       qt5compat # Qt5Compat.GraphicalEffects
       qtmultimedia
       qtimageformats # webp, avif, tiff wallpapers
+      # `import Kotodama`, the Command menu in config/quickshell/shell.qml.
+      kotodama.qml
     ]
   );
   # The qtct platform theme plugins Quickshell loads: its Qt, not the user's.

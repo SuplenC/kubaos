@@ -19,7 +19,7 @@ Your own settings go in `~/.config/kubaos/hypr/` (`hyprland.lua`, `hypridle.conf
 | `looks.lua` | Gaps, borders, rounding, blur, shadows, animations, dwindle, colors. Sizes and curves match the Quickshell tokens (`config/quickshell/theme/Theme.qml`); `rounding = 10` plus the 2 px border makes the window's outer edge concentric with the frame's 20 px corners at `gaps_out = 8` |
 | `colors.lua` | Reads `~/.local/state/theme/hypr.lua`, falls back to built-in colors |
 | `rules.lua` | Window rules (floating dialogs, PiP, Chrome, terminals) and layer rules, including Quickshell's (`qs-frame` blurred with `ignore_alpha`, no Hyprland animation on the shell's own layers) |
-| `keybinds.lua` | Everything else, ported from Omarchy 4. Cheat sheet: `KEYBINDS.md` |
+| `keybinds.lua` | Everything else, ported from Omarchy 4. `SUPER + F1` lists them all in the Command menu |
 | `autostart.lua` | Session startup; the polkit agent toggle is at the top |
 | `hypridle.conf` | Lock 5 min, screens off 10 min, suspend 30 min on battery only |
 | `hyprlock.conf` | Fallback lock screen, themed, fingerprint enabled |

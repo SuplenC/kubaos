@@ -56,7 +56,7 @@ hl.on("hyprland.start", function()
   -- colors.json and repaints when it lands.
   start("dot-theme apply")
 
-  -- Desktop shell (bar, launcher, notifications, OSD, lock, wallpaper).
+  -- Desktop shell (bar, Command menu, notifications, OSD, lock, wallpaper).
   start("qs")
 
   -- Idle: lock 5 min, screens off 10 min, suspend 30 min on battery.

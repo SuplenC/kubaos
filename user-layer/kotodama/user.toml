@@ -1,0 +1,12 @@
+# Your Command menu (Kotodama) settings: ~/.config/kotodama/user.toml links
+# here, and the Daemon reads it after KubaOS's kubaos.toml, so yours win.
+# Tables merge key by key; a list replaces KubaOS's whole.
+# After editing: systemctl --user restart kotodamad
+# `kotodama config --schema` lists every key.
+#
+# [extensions.apps]
+# names = { nvim = "Neovim", "google-chrome" = "Chrome" }
+#
+# [quicklinks.gh]
+# title = "Search GitHub"
+# url = "https://github.com/search?q={query}"

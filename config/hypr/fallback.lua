@@ -9,11 +9,12 @@ hl.bind("SUPER + Return",
   { description = "Terminal (Ghostty, foot if missing)" })
 hl.bind("SUPER + ALT + Return", hl.dsp.exec_cmd("foot"), { description = "Fallback terminal (foot)" })
 
--- Primary launcher is Quickshell. `qs ipc call` fails when no shell is
--- running, and then fuzzel opens instead.
+-- The Command menu is Kotodama, drawn by Quickshell. `kotodama toggle` exits
+-- non-zero when no menu answers within two seconds (the shell is down) or
+-- when Nix is broken and it isn't on PATH, and then fuzzel opens instead.
 hl.bind("SUPER + Space",
-  hl.dsp.exec_cmd("qs ipc call launcher toggle || pkill -x fuzzel || fuzzel"),
-  { description = "Launcher (Quickshell, fuzzel if the shell is down)" })
+  hl.dsp.exec_cmd("kotodama toggle || pkill -x fuzzel || fuzzel"),
+  { description = "Command menu (Kotodama, fuzzel if the shell is down)" })
 hl.bind("SUPER + ALT + Space", hl.dsp.exec_cmd("pkill -x fuzzel || fuzzel"), { description = "Fallback launcher (fuzzel)" })
 
 -- Survival kit: close, reload, lock without the shell, leave.

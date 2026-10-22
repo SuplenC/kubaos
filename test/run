@@ -12,7 +12,7 @@
 #                                       start a headless session (sway, or Hyprland
 #                                       once its stage exists) with Quickshell
 #   test/run shots shot NAME [--webp]   screenshot into the output dir
-#   test/run shots run CMD...           run in the session (qs ipc call launcher toggle)
+#   test/run shots run CMD...           run in the session (qs ipc call controlcenter toggle)
 #   test/run shots record start NAME | record stop
 #   test/run shots log | stop
 #   test/run clean                      remove the harness's containers, keep volumes
@@ -197,7 +197,7 @@ cmd_shots() {
   shots_running || die "session failed to start"
   echo "session up in $(elapsed): $compositor $size scale $scale, wallpaper $wall"
   echo "output: $DOTFILES_TEST_OUT"
-  echo "next:   test/run shots run qs ipc call launcher toggle; test/run shots shot launcher --webp; test/run shots stop"
+  echo "next:   test/run shots run qs ipc call controlcenter toggle; test/run shots shot controlcenter --webp; test/run shots stop"
 }
 
 cmd_clean() {

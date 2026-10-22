@@ -31,16 +31,9 @@ Singleton {
     // Label workspaces with kanji numerals (一 二 三) instead of digits.
     readonly property bool workspaceKanji: false
 
-    // Launcher: desktop entry ids (file name without .desktop) to leave out, on
-    // top of the entries that set NoDisplay or Hidden themselves.
-    readonly property list<string> launcherHidden: ["qt5ct", "qt6ct", "org.codeberg.dnkl.footclient", "org.codeberg.dnkl.foot-server"]
-    // Launcher: display names by desktop entry id, for entries with clumsy names.
-    readonly property var launcherNames: ({
-            nvim: "Neovim"
-        })
-
-    // Terminal used for desktop entries with Terminal=true.
-    readonly property list<string> terminal: ["ghostty", "-e"]
+    // The Command menu's hidden and renamed apps, and the terminal for apps
+    // with Terminal=true, are Kotodama's settings: config/kotodama/kubaos.toml,
+    // and yours in ~/.config/kubaos/kotodama/user.toml.
 
     // Lock screen: a FIDO2 security key (qs-lock-u2f, pam_u2f) next to the password.
     // Only runs when /etc/u2f_mappings has a key for you (dot-u2f-enroll). Wants

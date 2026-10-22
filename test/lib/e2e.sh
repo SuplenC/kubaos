@@ -206,7 +206,20 @@ c_tms() {
   echo "ok   $out"
   out="$(zrun 'tmux -L tmstest new-session -d -s probe && TMUX_TMPDIR= tms sessions; tmux -L tmstest kill-server' 2>&1 || true)"
   echo "     tms sessions: ${out:0:80}"
-  grep -q 'search_dirs' "$USER_HOME/.config/tms/config.toml" && echo "ok   ~/.config/tms/config.toml is the repo's"
+  grep -q 'search_dirs' "$USER_HOME/.config/tms/config.toml" && echo "ok   ~/.config/tms/config.toml is the repo's" || return 1
+  # tms searches the Command menu's folders: the same paths, in the same order.
+  out="$(python3 -I - "$USER_HOME/.config/tms/config.toml" "$USER_HOME/.config/kotodama/kubaos.toml" <<'PY'
+import sys, tomllib
+tms = tomllib.load(open(sys.argv[1], "rb"))
+menu = tomllib.load(open(sys.argv[2], "rb"))
+searched = [d["path"] for d in tms["search_dirs"]]
+folders = [f["path"] for f in menu["extensions"]["folders"]["folders"]]
+if searched != folders or "~/Projects" not in folders or "~/Scripts" not in folders:
+    sys.exit(f"tms searches {searched}, the menu's folders are {folders}")
+print(" ".join(folders))
+PY
+  )" || { echo "FAIL $out"; return 1; }
+  echo "ok   tms and the menu search the same folders: $out"
 }
 
 c_links() {
@@ -387,7 +400,7 @@ c_quickshell() {
   echo "     environment warnings (services a container doesn't have):"
   qs_env_warnings | cut -c1-120 | sed 's/^/       /'
   
-  for t in launcher session powermenu wallpaper notifications controlcenter recorder; do
+  for t in session powermenu wallpaper notifications controlcenter recorder; do
     grep -qE "target $t\b" <<<"$ipc" || { echo "FAIL qs ipc show lacks target $t"; printf '%s\n' "$ipc"; return 1; }
   done
   echo "ok   qs ipc show lists every contract target"
@@ -421,6 +434,63 @@ c_recorder() {
   fi
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
   session_stop
+  return "$bad"
+}
+
+# menu_stop PID: the Daemon (PID is its in_session job), its Extensions and the
+# session. Waiting on the job keeps the shell's "Terminated" out of the log.
+menu_stop() {
+  pkill -u "$USER_NAME" -x kotodamad 2>/dev/null || true
+  pkill -u "$USER_NAME" -f '/kotodama-[a-z-]+$' 2>/dev/null || true
+  wait "$1" 2>/dev/null || true
+  session_stop
+}
+
+# The Command menu: Kotodama's Daemon, started by hand as its socket unit
+# would, and the menu inside KubaOS's Quickshell. `kotodama toggle` succeeds
+# only when a menu answers it. KubaOS's settings reach the Daemon, which finds
+# nothing wrong with them. The container has no logind and no Hyprland, so
+# what an Extension reports (`extension <name>: ...`) is listed, not fatal.
+c_menu() {
+  local out bad=0 log="$LOGS/kotodamad.log" daemon
+  session_start sway 1280x720 1
+  : >"$log"
+  chown "$USER_NAME:" "$log"
+  in_session "exec kotodamad >$log 2>&1" &
+  daemon=$!
+  if ! qs_start; then
+    echo "FAIL Quickshell didn't load:"
+    tail -30 "$QS_LOG"
+    menu_stop "$daemon"
+    return 1
+  fi
+  sleep 3
+
+  expect_ok "kotodama toggle opens the menu in Quickshell" in_session 'kotodama toggle' || bad=1
+  expect_ok "kotodama toggle closes it" in_session 'kotodama toggle' || bad=1
+
+  out="$(in_session 'kotodama check' 2>&1 || true)"
+  printf '%s\n' "$out" | sed 's/^/     kotodama check: /'
+  if grep -v -e '^extension ' -e '^No problems\.$' <<<"$out" | grep -q .; then
+    echo "FAIL the Daemon finds problems with the config"
+    bad=1
+  else
+    echo "ok   no problems with KubaOS's settings"
+  fi
+
+  out="$(in_session 'kotodama config' 2>&1)" || { echo "FAIL kotodama config: $out"; bad=1; }
+  local want
+  for want in 'terminal = \["ghostty", "-e"\]  # .*/kotodama/kubaos\.toml' \
+    'hidden = \[.*"org\.codeberg\.dnkl\.footclient".*\]  # .*/kotodama/kubaos\.toml' \
+    'nvim = "Neovim"  # .*/kotodama/kubaos\.toml'; do
+    grep -qE -- "^$want$" <<<"$out" || { echo "FAIL kotodama config lacks /$want/"; bad=1; }
+  done
+  ((bad)) || echo "ok   the apps Extension's hidden, renamed apps and terminal come from kubaos.toml"
+
+  [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
+  if ((bad)); then tail -20 "$log"; fi
+  menu_stop "$daemon"
+  ((bad)) || echo "ok   the menu answers kotodama toggle and takes KubaOS's settings"
   return "$bad"
 }
 
@@ -583,7 +653,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell recorder wallpaper_sets wallpaper_video user_layer; do
+  for c in login_shell path tools links theme tmux nvim ghostty tms pam lua shellcheck flake_check quickshell menu recorder wallpaper_sets wallpaper_video user_layer; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

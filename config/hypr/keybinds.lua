@@ -1,7 +1,8 @@
 -- Keybinds, ported from Omarchy 4 ("Quattro", default/hypr/bindings/*.lua)
 -- with movement on hjkl (docs/CONTRACTS.md) and apps adapted to this setup.
--- Cheat sheet: KEYBINDS.md (SUPER + F1 opens it). Terminal/launcher and the
--- survival binds live in fallback.lua.
+-- SUPER + F1 lists every bind by its description, in the Command menu's
+-- Shortcuts View. The terminal, the menu and the survival binds live in
+-- fallback.lua.
 --
 -- Number and punctuation keys use keycodes (code:10 = "1" ... code:18 = "9",
 -- code:20/21 = the two keys right of "0", code:49 = the key left of "1"),
@@ -39,8 +40,7 @@ bind("SUPER + SHIFT + N", "Editor (nvim)", tui("nvim"))
 bind("SUPER + CTRL + Return", "Terminal in tmux", tui("tmux new-session -A -s main"))
 bind("SUPER + SHIFT + D", "Docker (lazydocker)", tui("lazydocker"))
 bind("SUPER + CTRL + T", "Activity (btop)", tui("btop"))
-bind("SUPER + F1", "Keybind cheat sheet",
-  terminal .. " --class=dot.float -e glow -p " .. (os.getenv("HOME") or "~") .. "/.config/hypr/KEYBINDS.md")
+bind("SUPER + F1", "Keyboard shortcuts", "kotodama open --view hyprland/shortcuts")
 
 ---------------------------------------------------------------------------
 -- Windows
@@ -162,7 +162,7 @@ local function qs(target, fn)
   return "qs ipc call " .. target .. " " .. fn
 end
 
--- SUPER + Space (launcher) is in fallback.lua.
+-- SUPER + Space (the Command menu) is in fallback.lua.
 bind("SUPER + Escape", "Power menu", qs("powermenu", "toggle"))
 bind("XF86PowerOff", "Power menu", qs("powermenu", "toggle"), locked)
 bind("SUPER + CTRL + Escape", "Lock", "loginctl lock-session")

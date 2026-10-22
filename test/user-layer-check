@@ -37,7 +37,7 @@ fi
 USER_FILES=(hypr/hyprland.lua hypr/hypridle.conf hypr/hyprlock.conf tmux/tmux.conf git/config git/ignore
   foot/foot.ini ghostty/config fuzzel/fuzzel.ini nvim/options.lua nvim/keymaps.lua nvim/autocmds.lua
   nvim/plugins/example.lua nvim/lazy-lock.json nvim/lazyvim.json lazygit/config.yml bacon/prefs.toml
-  bat/config fastfetch/config.jsonc yazi/yazi.toml yazi/keymap.toml zsh/zshrc)
+  bat/config fastfetch/config.jsonc yazi/yazi.toml yazi/keymap.toml zsh/zshrc kotodama/user.toml)
 # Files the app rewrites itself: copied from the defaults once, then the user's.
 SEEDED=(btop/btop.conf tms/config.toml)
 
@@ -89,6 +89,7 @@ printf '%s\n' '// mine' '{ "display": { "separator": " => " } }' >"$U/fastfetch/
 add "$U/yazi/yazi.toml" '# user probe'
 add "$U/yazi/keymap.toml" '# user probe'
 add "$U/zsh/zshrc" "alias userprobe='echo mine'"
+add "$U/kotodama/user.toml" $'[extensions.apps.names]\nnvim = "Mine"'
 add "$C/btop/btop.conf" 'update_ms = 1717'
 add "$C/tms/config.toml" '# user probe'
 before="$(hashes)"
@@ -109,6 +110,7 @@ step_done "changed $(wc -l <<<"$before") user files"
     add config/btop/btop.conf 'update_ms = 4242' &&
     add config/ghostty/config 'cursor-style = underline' &&
     add config/nvim/lua/config/options.lua 'vim.g.kubaos_probe = "new"' &&
+    add config/kotodama/kubaos.toml $'\n[extensions.emoji]\nskin_tone = "medium"' &&
     git add -A &&
     git -c user.name=test -c user.email=test@kubaos -c commit.gpgsign=false commit -q -m 'test: newer defaults'
 ) || fail "couldn't commit the newer defaults"
@@ -148,4 +150,10 @@ out="$(fastfetch --pipe -s title:os 2>&1)" || true
 [[ $out == *' => '* ]] || fail "fastfetch didn't take the user's separator: $out"
 [[ "$(readlink -f "$C/yazi/yazi.toml")" == "$U/yazi/yazi.toml" ]] || fail "$C/yazi/yazi.toml isn't the user's"
 grep -qx 'update_ms = 1717' "$C/btop/btop.conf" || fail "btop lost the user's value"
+[[ "$(readlink -f "$C/kotodama/user.toml")" == "$U/kotodama/user.toml" ]] || fail "$C/kotodama/user.toml isn't the user's"
+out="$(kotodama config 2>&1)" || true
+grep -qE '^skin_tone = "medium"  # .*/kotodama/kubaos\.toml$' <<<"$out" ||
+  fail "kotodama config lacks the new default skin_tone: $(grep -m1 skin_tone <<<"$out")"
+grep -qE '^nvim = "Mine"  # .*/kotodama/user\.toml$' <<<"$out" ||
+  fail "kotodama config: the user's name for nvim doesn't win: $(grep -m1 '^nvim = ' <<<"$out")"
 step_done "new defaults live, the user's values win"

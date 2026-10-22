@@ -17,7 +17,7 @@ Needs Docker with BuildKit and Compose v2 (Docker Desktop on the Mac is fine). E
 | `test/run bitwarden` | Vaultwarden + `dot-bw-setup` + `use bwenv` (below) |
 | `test/run shots [--dir NAME \| --out PATH] [--size WxH] [--scale N] [--wallpaper FOLDER/FILE] [--hyprland]` | Headless session with Quickshell, left running for screenshots |
 | `test/run shots shot NAME [--webp]` | `grim` the whole output to `NAME.png` (or WebP, quality 92, `-sharp_yuv`) |
-| `test/run shots run CMD...` | Run in the session as kuba: `qs ipc call launcher toggle`, `notify-send hi`, `dot-theme next` |
+| `test/run shots run CMD...` | Run in the session as kuba: `qs ipc call controlcenter toggle`, `notify-send hi`, `dot-theme next` |
 | `test/run shots record start NAME`, `record stop` | `wf-recorder` to `NAME.mp4` |
 | `test/run shots log`, `shots stop` | Quickshell's log; end the session |
 | `test/run clean` | Remove the harness's containers, keep the volumes |
@@ -29,8 +29,8 @@ Needs Docker with BuildKit and Compose v2 (Docker Desktop on the Mac is fine). E
 
 ```sh
 test/run shots --dir v4 --size 2880x1800 --scale 1.5
-test/run shots run qs ipc call launcher toggle
-test/run shots shot cyberpunk-launcher-1800 --webp
+test/run shots run qs ipc call controlcenter toggle
+test/run shots shot cyberpunk-controlcenter-1800 --webp
 test/run shots run 'dot-theme set /usr/share/kubaos/wallpapers/japanese/tokyo-tower-blue-hour.jpg'
 test/run shots stop
 ```
