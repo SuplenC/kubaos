@@ -183,8 +183,9 @@ run = ["kubaos", "cursor", "size", "{size}"]
 arguments = [{ name = "size", placeholder = "32" }]
 
 # The keyboard layouts (kubaos keyboard), kept in /etc/default/keyboard as
-# the install wrote them. The Extension itself sends "Keyboard: next layout",
-# one Item a layout and "Keyboard: add a layout"; this one replaces them all.
+# the install wrote them. The Extension itself sends one Item a layout and
+# "Keyboard: add a layout"; this one replaces them all. The next layout is the
+# SUPER + SHIFT + Space bind, which the menu finds as "Next keyboard layout".
 
 [extensions.kubaos.actions.keyboard-set]
 title = "Keyboard: set layouts"

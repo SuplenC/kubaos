@@ -1,6 +1,6 @@
-//! The keyboard layouts in the menu: "Keyboard: next layout", one Item a layout to switch to it,
-//! make it the default or remove it, and "Keyboard: add a layout". They are the layouts of
-//! `/etc/default/keyboard`, the file the install wrote and `kubaos keyboard` changes.
+//! The keyboard layouts in the menu: one Item a layout to switch to it, make it the default or
+//! remove it, and "Keyboard: add a layout". They are the layouts of `/etc/default/keyboard`, the
+//! file the install wrote and `kubaos keyboard` changes.
 //!
 //! Switching is `hyprctl switchxkblayout`, at once. A change to the layouts is checked here, so
 //! a refusal reads in the menu, then launched as `kubaos keyboard`, which asks localed (and so
@@ -14,6 +14,8 @@
 //!
 //! - The layouts, the file's fields and the rules: `kubaos_core::keyboard`.
 //! - Writing the change: `kubaos keyboard` (`crates/kubaos-cli`).
+//! - Switching to the next layout: the `SUPER + SHIFT + Space` bind (`config/hypr/keybinds.lua`),
+//!   which the Bundled `hyprland` Extension puts in the search.
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -37,14 +39,12 @@ use crate::toggles::Ran;
 
 /// The Item kind of every keyboard Item.
 pub const KIND: &str = "kubaos.keyboard";
-/// The Item that switches to the next layout.
-pub const NEXT: &str = "keyboard-next";
 /// The Item that adds a layout.
 pub const ADD: &str = "keyboard-add";
 /// A layout's Item is this and its spelling, `keyboard:us(intl)`.
 const LAYOUT_PREFIX: &str = "keyboard:";
 
-/// The one Action of next and add, and a layout's primary Action: switch to it.
+/// The one Action of add, and a layout's primary Action: switch to it.
 pub const RUN: &str = "run";
 pub const MAKE_DEFAULT: &str = "default";
 pub const REMOVE: &str = "remove";
@@ -81,21 +81,13 @@ impl Keyboards {
         }
     }
 
-    /// The Items: next with two layouts or more, each layout, then add. None without a layout,
-    /// as on a machine KubaOS didn't install, where `kubaos keyboard` has no file to change.
+    /// The Items: each layout, then add. None without a layout, as on a machine KubaOS didn't
+    /// install, where `kubaos keyboard` has no file to change.
     pub fn items(&self) -> Vec<Item> {
         if self.layouts.is_empty() {
             return Vec::new();
         }
         let several = self.layouts.len() > 1;
-        let next = several.then(|| {
-            item(
-                NEXT,
-                "Keyboard: next layout".to_owned(),
-                "Type with the next keyboard layout (SUPER + SHIFT + Space)".to_owned(),
-                vec![Action::new(RUN, "Next layout")],
-            )
-        });
         let layouts = self.layouts.iter().enumerate().map(|(index, layout)| {
             let mut actions = vec![Action::new(RUN, "Type with it")];
             if index > 0 {
@@ -126,7 +118,7 @@ impl Keyboards {
                 optional: false,
             }])],
         );
-        next.into_iter().chain(layouts).chain(std::iter::once(add)).collect()
+        layouts.chain(std::iter::once(add)).collect()
     }
 
     /// Runs `action` on the keyboard Item `id`; the error is what the user reads.
@@ -143,7 +135,6 @@ impl Keyboards {
     ) -> Result<Ran, String> {
         let unknown = || format!("`{id}` has no Action `{action}`");
         match (id, action) {
-            (NEXT, RUN) => switch(runner, "next"),
             (ADD, RUN) => {
                 let typed = arguments.get(LAYOUT).map_or("", |typed| typed.trim());
                 self.change(runner, Change::Add(Layout::parse(typed)), "add", typed)
@@ -157,7 +148,7 @@ impl Keyboards {
                     .position(|l| *l == layout)
                     .ok_or_else(|| format!("`{spelled}` isn't one of the keyboard layouts"))?;
                 match action {
-                    RUN => switch(runner, &index.to_string()),
+                    RUN => switch(runner, index),
                     MAKE_DEFAULT => self.change(runner, Change::MakeDefault(layout), "default", spelled),
                     REMOVE => self.change(runner, Change::Remove(layout), "remove", spelled),
                     _ => Err(unknown()),
@@ -180,13 +171,14 @@ impl Keyboards {
 }
 
 /// Every id of an Item this module always sends, which no action of the registry may take.
-pub fn ids() -> [&'static str; 2] {
-    [NEXT, ADD]
+pub fn ids() -> [&'static str; 1] {
+    [ADD]
 }
 
-/// Switches every keyboard to `to`: `next`, or a layout's index.
-fn switch(runner: &impl Runner, to: &str) -> Result<Ran, String> {
-    let argv = ["hyprctl", "switchxkblayout", "all", to].map(str::to_owned);
+/// Switches every keyboard to the layout at `index`.
+fn switch(runner: &impl Runner, index: usize) -> Result<Ran, String> {
+    let index = index.to_string();
+    let argv = ["hyprctl", "switchxkblayout", "all", &index].map(str::to_owned);
     runner.output(&argv).map_err(|err| Chain(&err).to_string())?;
     Ok(Ran::Close)
 }

@@ -27,7 +27,7 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + CTRL + Escape` | Lock |
 | `SUPER + ALT + Return` / `SUPER + ALT + Space` | foot and fuzzel: the emergency terminal and app menu, for when the shell is dead |
 
-The layouts are the ones you picked in Kōbō, the first the default (`/etc/default/keyboard`, `us` if there is no such file). The console and the disk passphrase prompt type with the default. With two or more, the bar shows the one in use ("US", "IT"); click it or press `SUPER + SHIFT + Space` for the next. The Command menu has each layout ("Keyboard: Italian") to switch to it, make it the default or remove it, plus "Keyboard: add a layout" and "Keyboard: set layouts". `kubaos keyboard show|set|add|remove|default` does the same from a terminal, through `localectl`, and reloads Hyprland. Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
+The layouts are the ones you picked in Kōbō, the first the default (`/etc/default/keyboard`, `us` if there is no such file). The console and the disk passphrase prompt type with the default. With two or more, the bar shows the one in use ("US", "IT"); click it, press `SUPER + SHIFT + Space` or pick "Next keyboard layout" in the Command menu for the next. The Command menu has each layout ("Keyboard: Italian") to switch to it, make it the default or remove it, plus "Keyboard: add a layout" and "Keyboard: set layouts". `kubaos keyboard show|set|add|remove|default` does the same from a terminal, through `localectl`, and reloads Hyprland. Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
 
 ## Updating and rolling back
 

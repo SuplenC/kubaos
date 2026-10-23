@@ -106,7 +106,7 @@ fn with_layouts(text: &str) -> Extension<FakeBus, FakeRunner> {
     let mut extension = configured(text);
     extension.set_keyboards(Keyboards::parse(
         "XKBLAYOUT=\"us,it\"\nXKBVARIANT=\",\"\n",
-        "! layout\n  us  English (US)\n  it  Italian\n",
+        "! layout\n  us  English (US)\n  it  Italian\n  de  German\n",
     ));
     extension
 }
@@ -120,7 +120,7 @@ fn the_keyboard_items_come_after_the_toggles() {
     assert_eq!(ids[..toggles::ids().len()], toggles::ids());
     assert_eq!(
         ids[toggles::ids().len()..],
-        ["keyboard-next", "keyboard:us", "keyboard:it", "keyboard-add"]
+        ["keyboard:us", "keyboard:it", "keyboard-add"]
     );
 }
 
@@ -136,14 +136,15 @@ fn a_keyboard_item_runs_through_the_extension() {
 
 #[test]
 fn hide_takes_out_a_keyboard_item_and_its_run() {
-    let mut extension = with_layouts(r#"hide = ["keyboard-next"]"#);
+    let mut extension = with_layouts(r#"hide = ["keyboard-add"]"#);
+    let typed = BTreeMap::from([("layout".to_owned(), "de".to_owned())]);
 
-    let ran = extension.run(keyboard::RUN, &item(keyboard::KIND, keyboard::NEXT), &BTreeMap::new());
+    let ran = extension.run(keyboard::RUN, &item(keyboard::KIND, keyboard::ADD), &typed);
 
-    assert!(!ids(&extension).contains(&"keyboard-next".to_owned()));
-    assert!(ids(&extension).contains(&"keyboard-add".to_owned()));
+    assert!(!ids(&extension).contains(&"keyboard-add".to_owned()));
+    assert!(ids(&extension).contains(&"keyboard:us".to_owned()));
     assert!(ran.is_err());
-    assert!(extension.runner.ran().is_empty());
+    assert!(extension.runner.launched.borrow().is_empty());
 }
 
 #[test]

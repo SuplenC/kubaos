@@ -860,14 +860,21 @@ TOML
     echo "ok   the actions the user layer hides aren't found"
   fi
 
-  out="$(in_session "$query 'Keyboard: next layout' 'Keyboard: add a layout' 'Keyboard: set layouts' Keyboard" 2>&1)" ||
+  out="$(in_session "$query 'Keyboard: add a layout' 'Keyboard: set layouts' Keyboard 'next layout'" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
-  for want in 'Keyboard: next layout:keyboard-next' 'Keyboard: add a layout:keyboard-add' \
+  for want in 'Keyboard: add a layout:keyboard-add' \
     'Keyboard: set layouts:keyboard-set' 'Keyboard:keyboard:us' 'Keyboard:keyboard:it'; do
     grep -E -- "^${want%%:keyboard*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/keyboard${want#*:keyboard}( |$)" ||
       { echo "FAIL typing '${want%%:keyboard*}' doesn't find kubaos/keyboard${want#*:keyboard}"; bad=1; }
   done
-  ((bad)) || echo "ok   the keyboard Items are found: next, add, set, and one a layout"
+  ((bad)) || echo "ok   the keyboard Items are found: add, set, and one a layout"
+  # The next layout is the SUPER + SHIFT + Space bind's Item, from the hyprland Extension, alone.
+  if grep -E -- "^next layout[[:blank:]]" <<<"$out" | grep -qE 'kubaos/keyboard-next( |$)'; then
+    echo "FAIL the KubaOS Extension sends a next layout Item beside the bind's"
+    bad=1
+  else
+    echo "ok   no KubaOS Item doubles the next layout bind"
+  fi
 
   # localed writes the file through a temporary one and a rename; the Items follow it.
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,de"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb.new"
