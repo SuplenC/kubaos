@@ -35,13 +35,14 @@ qs log                  # follow the log of the running instance
 qs ipc show             # list IPC targets
 ```
 
-Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`home-manager switch` updates it), so to hack on the shell run a clone of KubaOS instead (docs/USING.md, "Hacking on KubaOS"): `qs kill; qs -p ~/Projects/kubaos/config/quickshell`. Lock state, do-not-disturb and notifications survive a reload.
+Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`home-manager switch` updates it and restarts the shell, `scripts/dot-session`), so to hack on the shell run a clone of KubaOS instead (docs/USING.md, "Hacking on KubaOS"): `qs kill; qs -p ~/Projects/kubaos/config/quickshell`. Lock state, do-not-disturb and notifications survive a reload.
 
 ## IPC (bound in Hyprland)
 
 | Call | Effect |
 |---|---|
 | `qs ipc call session lock` | Lock screen |
+| `qs ipc call session locked` | `true` while locked |
 | `qs ipc call powermenu toggle` | Lock / suspend / log out / reboot / shut down |
 | `qs ipc call wallpaper toggle` | Wallpaper picker |
 | `qs ipc call wallpaper settings` | Wallpaper picker on its Settings tab (Motion) |

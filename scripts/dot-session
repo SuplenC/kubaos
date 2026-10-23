@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+# dot-session: bring the running session onto the defaults a home-manager
+# switch has just linked. A switch writes no file: it points ~/.config's links
+# at new store files. Quickshell, hypridle, Ghostty and tmux read their config
+# when they start, and Hyprland only notices a config file written in place.
+#
+#   dot-session apply OLD NEW   compare the records (`kubaos-session`, from
+#                               home/session.nix) of generations OLD and NEW;
+#                               for each part that changed, reload Hyprland,
+#                               restart Quickshell or hypridle inside it, and
+#                               reload Ghostty or tmux. Home activation runs it.
+#   dot-session restart-shell   in the session: restart the default Quickshell
+#                               once the screen is unlocked
+#   dot-session restart-idle    in the session: restart hypridle
+#
+# It only touches what runs: with no Hyprland, no shell or no tmux server there
+# is nothing to do. A Quickshell or hypridle the user stopped stays stopped.
+# `apply` always exits 0, so it never fails a switch.
+set -euo pipefail
+
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+# The order `apply` takes them in: Hyprland's reload first, so a shell
+# restarted in it starts under the new rules.
+PARTS=(hyprland quickshell hypridle ghostty tmux)
+
+say() { printf 'dot-session: %s\n' "$*"; }
+
+usage() {
+  sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"
+}
+
+# record GEN PART: the store paths PART started from in generation GEN, empty
+# when GEN has no record.
+record() {
+  sed -n "s/^$2 //p" "$1/kubaos-session" 2>/dev/null || true
+}
+
+# hypr_instances: the signature of each Hyprland running as this user.
+hypr_instances() {
+  command -v hyprctl >/dev/null || return 0
+  hyprctl instances -j 2>/dev/null | jq -r '.[].instance' 2>/dev/null || true
+}
+
+# in_hyprland INSTANCE ARGS...: this script with ARGS, started by Hyprland, so
+# it gets the session's environment and outlives the switch (a switch from
+# `kubaos update` runs in a systemd unit that stops when it is done).
+in_hyprland() {
+  local instance="$1"
+  shift
+  hyprctl -i "$instance" dispatch "hl.dsp.exec_cmd([[bash '$SELF' $*]])" >/dev/null 2>&1
+}
+
+reload_ghostty() {
+  # Ghostty (GTK, 1.2+) reloads its config on SIGUSR2. Only the exact process
+  # names: SIGUSR2 kills a process that does not handle it. The Nix wrapper
+  # shows as ".ghostty-wrapped", cut to 15 characters.
+  local pids
+  pids=$(pgrep -u "$(id -u)" -x 'ghostty|\.ghostty-wrappe|\.ghostty-wrapped' || true)
+  [[ -n $pids ]] || return 0
+  # shellcheck disable=SC2086 # One argument per pid.
+  kill -USR2 $pids 2>/dev/null && say "reloaded Ghostty"
+}
+
+reload_tmux() {
+  command -v tmux >/dev/null || return 0
+  tmux has-session 2>/dev/null || return 0
+  tmux source-file -q "${XDG_CONFIG_HOME:-$HOME/.config}/tmux/tmux.conf" >/dev/null 2>&1 &&
+    say "reloaded tmux"
+}
+
+apply() {
+  local old="$1" new="$2" part instance changed=()
+  for part in "${PARTS[@]}"; do
+    [[ $(record "$old" "$part") == "$(record "$new" "$part")" ]] || changed+=("$part")
+  done
+  ((${#changed[@]})) || return 0
+
+  local instances=()
+  mapfile -t instances < <(hypr_instances)
+  for part in "${changed[@]}"; do
+    case "$part" in
+      hyprland)
+        for instance in "${instances[@]}"; do
+          hyprctl -i "$instance" reload >/dev/null 2>&1 && say "reloaded Hyprland"
+        done
+        ;;
+      quickshell)
+        for instance in "${instances[@]}"; do
+          in_hyprland "$instance" restart-shell && say "restarting Quickshell"
+        done
+        ;;
+      hypridle)
+        for instance in "${instances[@]}"; do
+          in_hyprland "$instance" restart-idle && say "restarting hypridle, if it runs"
+        done
+        ;;
+      ghostty) reload_ghostty ;;
+      tmux) reload_tmux ;;
+    esac
+  done
+}
+
+# wait_gone CMD...: until CMD fails, for up to 5 s.
+wait_gone() {
+  local _
+  for _ in $(seq 50); do
+    "$@" >/dev/null 2>&1 || return 0
+    sleep 0.1
+  done
+}
+
+restart_shell() {
+  exec 9>"$RUNTIME/dot-session-shell.lock"
+  # A restart already waiting starts the newest config anyway.
+  flock -n 9 || return 0
+  # A shell stopped while locked leaves Hyprland locked with no lock screen.
+  # A shell too old to answer is taken as unlocked.
+  while [[ $(qs ipc call session locked 2>/dev/null) == true ]]; do
+    sleep 2
+  done
+  qs kill >/dev/null 2>&1 || return 0
+  wait_gone qs ipc show
+  # HAZARD: close the lock before exec. Quickshell would hold it for as long
+  # as it runs, and every later restart would skip.
+  exec 9>&-
+  exec qs
+}
+
+restart_idle() {
+  pkill -u "$(id -u)" -x hypridle || return 0
+  wait_gone pgrep -u "$(id -u)" -x hypridle
+  exec hypridle
+}
+
+case "${1:-}" in
+  apply)
+    (($# == 3)) || { usage >&2; exit 2; }
+    apply "$2" "$3" || true
+    ;;
+  restart-shell) restart_shell ;;
+  restart-idle) restart_idle ;;
+  -h | --help) usage ;;
+  *) usage >&2; exit 2 ;;
+esac

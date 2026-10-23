@@ -608,6 +608,99 @@ c_recorder() {
   return "$bad"
 }
 
+# A switch run from a terminal in the session reloads or restarts only what
+# its new defaults changed (scripts/dot-session). Sway has no Hyprland, so a
+# stand-in hyprctl (test/lib/hyprctl-stub) in /usr/local/bin, which comes
+# before the home's and apt's hyprctl on activation's PATH, runs what Hyprland
+# would exec.
+RELOAD_DIR=/var/tmp/dotfiles-test-hyprctl
+RELOAD_CALLS=$RELOAD_DIR/calls.log
+RELOAD_STUB=/usr/local/bin/hyprctl
+
+# reload_switch: home-manager switch as kuba, the stand-in's calls in
+# $RELOAD_CALLS.
+reload_switch() {
+  : >"$RELOAD_CALLS"
+  zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; \
+    export HYPRCTL_STUB_LOG=$RELOAD_CALLS HYPRCTL_STUB_ENV=$SESSION_ENV HYPRCTL_STUB_OUT=$QS_LOG; \
+    home-manager switch -b hm-backup --flake '$REPO#$USER_NAME@vm'" \
+    >>"$LOGS/session-reload-switch.log" 2>&1
+}
+
+# reload_edit FILE MARK: a comment line, MARK and a timestamp, appended to FILE
+# in the repo copy.
+reload_edit() {
+  as_user sh -c "printf '\n%s e2e %s\n' '$2' \"\$(date +%s%N)\" >>'$REPO/$1'"
+}
+
+# qs_pids: kuba's Quickshell processes, space separated.
+qs_pids() { pgrep -u "$USER_NAME" -x 'qs|quickshell|\.quickshell-wra' | paste -sd ' ' || true; }
+
+c_session_reload() {
+  local pid now bad=0
+  [[ -e $RELOAD_STUB ]] && { echo "FAIL $RELOAD_STUB is taken"; return 1; }
+  install -d -o "$USER_NAME" "$RELOAD_DIR"
+  ln -s "$SRC/test/lib/hyprctl-stub" "$RELOAD_STUB"
+  : >"$RELOAD_CALLS"
+  chown "$USER_NAME:" "$RELOAD_CALLS"
+  : >"$LOGS/session-reload-switch.log"
+  chown "$USER_NAME:" "$LOGS/session-reload-switch.log"
+  session_start sway 1280x720 1
+  if ! qs_start; then
+    echo "FAIL Quickshell didn't load"; session_stop; rm -f "$RELOAD_STUB"; return 1
+  fi
+  pid="$(qs_pids)"
+  now="$(in_session 'qs ipc call session locked' 2>/dev/null || true)"
+  [[ $now == false ]] && echo "ok   qs ipc call session locked says false" ||
+    { echo "FAIL qs ipc call session locked said '$now'"; bad=1; }
+
+  reload_edit config/bat/config '#'
+  reload_switch || { echo "FAIL switch with a new bat default"; tail -20 "$LOGS/session-reload-switch.log"; bad=1; }
+  sleep 2
+  if [[ -s $RELOAD_CALLS ]] && grep -qv '^instances' "$RELOAD_CALLS"; then
+    echo "FAIL a switch changing only bat reached Hyprland:"; cat "$RELOAD_CALLS"; bad=1
+  fi
+  now="$(qs_pids)"
+  [[ $now == "$pid" ]] && echo "ok   a switch leaving the shell's defaults alone leaves Quickshell ($pid) running" ||
+    { echo "FAIL Quickshell went from '$pid' to '$now' on a bat change"; bad=1; }
+
+  reload_edit config/quickshell/shell.qml '//'
+  reload_switch || { echo "FAIL switch with a new shell default"; tail -20 "$LOGS/session-reload-switch.log"; bad=1; }
+  grep -q 'dispatch .*dot-session.* restart-shell' "$RELOAD_CALLS" && echo "ok   the switch asked Hyprland to restart the shell" ||
+    { echo "FAIL no restart-shell dispatch:"; cat "$RELOAD_CALLS"; bad=1; }
+  grep -qx -- '-i e2e reload' "$RELOAD_CALLS" && { echo "FAIL Hyprland reloaded with its config unchanged"; bad=1; }
+  for _ in $(seq 100); do
+    now="$(qs_pids)"
+    [[ -n $now && $now != "$pid" && $(grep -c 'Configuration Loaded' "$QS_LOG") -ge 2 ]] && break
+    sleep 0.2
+  done
+  [[ -n $now && $now != "$pid" && $now != *' '* ]] && echo "ok   Quickshell restarted on its new defaults ($pid -> $now)" ||
+    { echo "FAIL Quickshell is '$now', was '$pid'"; tail -20 "$QS_LOG"; bad=1; }
+  pid="$now"
+
+  reload_edit config/hypr/looks.lua '--'
+  reload_edit config/hypr/hypridle.conf '#'
+  reload_switch || { echo "FAIL switch with new Hyprland defaults"; tail -20 "$LOGS/session-reload-switch.log"; bad=1; }
+  grep -qx -- '-i e2e reload' "$RELOAD_CALLS" && echo "ok   a new Hyprland default reloads Hyprland" ||
+    { echo "FAIL no hyprctl reload:"; cat "$RELOAD_CALLS"; bad=1; }
+  grep -q 'dispatch .* restart-idle' "$RELOAD_CALLS" && echo "ok   a new hypridle default restarts hypridle" ||
+    { echo "FAIL no restart-idle dispatch:"; cat "$RELOAD_CALLS"; bad=1; }
+  sleep 2
+  now="$(qs_pids)"
+  [[ $now == "$pid" ]] && echo "ok   and leaves Quickshell running" ||
+    { echo "FAIL Quickshell went from '$pid' to '$now' on a Hyprland change"; bad=1; }
+  # The restarted shell logs in color: `dot-session` starts a plain `qs`.
+  sed -i 's/\x1b\[[0-9;]*m//g' "$QS_LOG"
+  [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
+  session_stop
+  rm -f "$RELOAD_STUB"
+
+  as_user git -C "$REPO" checkout -q -- config
+  reload_switch && echo "ok   a switch back with no Hyprland running succeeds" ||
+    { echo "FAIL switch back to the repo's defaults"; tail -20 "$LOGS/session-reload-switch.log"; bad=1; }
+  return "$bad"
+}
+
 # menu_stop PID: the Daemon (PID is its in_session job), its Extensions and the
 # session. Waiting on the job keeps the shell's "Terminated" out of the log.
 menu_stop() {
@@ -1633,7 +1726,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos files recorder wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos files recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
