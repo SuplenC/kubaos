@@ -51,6 +51,7 @@ Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`hom
 | `qs ipc call notifications toggleDnd` | Do not disturb on/off |
 | `qs ipc call notifications clear` | Dismiss all notifications |
 | `qs ipc call controlcenter toggle` | Wi-Fi, Bluetooth, audio, power profile, notification history |
+| `qs ipc call controlcenter bluetooth` | The control center on its Bluetooth tab, searching for devices |
 | `qs ipc call recorder toggle` / `stop` | Record the focused monitor / stop any recording or replay (`dot-hypr-record`) |
 
 All handlers live in `IpcHandlers.qml`. `docs/CONTRACTS.md` is the source of truth.
@@ -67,7 +68,7 @@ services/               singletons, no UI
   Audio                 PipeWire default sink, volume, output list
   Brightness            /sys/class/backlight (watched) + brightnessctl
   Battery, Profiles     UPower battery, power-profiles-daemon
-  Net, Bt               NetworkManager and BlueZ via Quickshell.Networking / .Bluetooth
+  Net, Bt               NetworkManager and BlueZ via Quickshell.Networking / .Bluetooth, pairing through kubaos-bluetooth
   Notifs                notification server, popups, history, DND
   Wallpapers            current wallpaper, picker preview, folder listing (stills, videos, posters), `dot-theme set`
   Motion                when moving wallpapers may decode: always / on AC / never (persisted), lock, idle, fullscreen
