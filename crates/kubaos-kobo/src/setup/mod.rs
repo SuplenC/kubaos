@@ -52,6 +52,7 @@ pub enum SF {
     Secondary,
     Skip,
     Log,
+    RebootAll,
     Finish,
 }
 
@@ -266,6 +267,28 @@ impl Setup {
         self.status.as_ref().is_some_and(Status::settled)
     }
 
+    pub fn reboot_pending(&self) -> bool {
+        self.status.as_ref().is_some_and(Status::reboot_pending)
+    }
+
+    /// The footer's line on what only takes effect after the reboot.
+    pub fn reboot_nudge(&self) -> Option<String> {
+        let waiting: Vec<CardId> = self
+            .status
+            .as_ref()?
+            .cards
+            .iter()
+            .filter(|c| c.state == State::Reboot)
+            .map(|c| c.id)
+            .collect();
+        match waiting.as_slice() {
+            [] => None,
+            [CardId::Tuxedo] => Some("The TUXEDO drivers load after a reboot.".into()),
+            [one] => Some(format!("{} waits on a reboot.", one.title())),
+            more => Some(format!("{} things wait on a reboot.", more.len())),
+        }
+    }
+
     // ------------------------------------------------------------ cards
 
     /// Secure Boot on and a key still to enroll: the TUXEDO card asks for
@@ -400,6 +423,9 @@ impl Setup {
         }
         if self.shown_run().is_some_and(|r| !r.log.is_empty()) {
             v.push(SF::Log);
+        }
+        if self.reboot_pending() {
+            v.push(SF::RebootAll);
         }
         v.push(SF::Finish);
         v
@@ -889,6 +915,7 @@ impl Setup {
                 self.log_open = !self.log_open;
                 Task::none()
             }
+            SF::RebootAll => self.act(Act::Reboot),
             SF::Finish => self.finish(),
             _ => Task::none(),
         }

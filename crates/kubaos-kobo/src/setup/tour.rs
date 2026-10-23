@@ -367,6 +367,43 @@ mod tests {
     }
 
     #[test]
+    fn a_card_waiting_on_a_reboot_puts_reboot_to_finish_before_done_for_now() {
+        let mut s = headless(demo::Machine::Tuxedo);
+        let script = script();
+        let upto = script.iter().position(|st| matches!(st, Step::Shot("04-tuxedo-reboot"))).unwrap();
+        play(&mut s, script.into_iter().take(upto).collect());
+
+        let order = s.focus_order();
+        let reboot = order.iter().position(|f| *f == SF::RebootAll);
+        let finish = order.iter().position(|f| *f == SF::Finish);
+
+        assert!(reboot.is_some() && reboot < finish, "{order:?}");
+        assert_eq!(s.reboot_nudge().as_deref(), Some("The TUXEDO drivers load after a reboot."));
+    }
+
+    #[test]
+    fn reboot_to_finish_reboots_through_the_card_path_and_toasts_a_refusal() {
+        let mut s = headless(demo::Machine::Tuxedo);
+        let script = script();
+        let upto = script.iter().position(|st| matches!(st, Step::Shot("04-tuxedo-reboot"))).unwrap();
+        play(&mut s, script.into_iter().take(upto).collect());
+
+        let _ = s.update_inner(Message::Setup(crate::setup::Msg::Click(SF::RebootAll)));
+
+        let toast = s.toast.as_ref().map(|(t, _)| t.as_str());
+        assert_eq!(toast, Some("Reboot refused: it's a demo, there's nothing to reboot."));
+    }
+
+    #[test]
+    fn with_nothing_waiting_on_a_reboot_the_footer_has_no_reboot_button() {
+        let mut s = headless(demo::Machine::Vm);
+        play(&mut s, script_vm());
+
+        assert!(!s.focus_order().contains(&SF::RebootAll));
+        assert_eq!(s.reboot_nudge(), None);
+    }
+
+    #[test]
     fn vm_shows_absent_cards_and_tab_reaches_everything() {
         let mut s = headless(demo::Machine::Vm);
         play(&mut s, script_vm());
