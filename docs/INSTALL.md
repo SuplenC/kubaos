@@ -168,8 +168,11 @@ usually has a point right before the breaking change.
 `sudo snapper -c root status <pre>..<post>` shows what changed.
 
 **Modules missing after Secure Boot change or kernel update.**
-`dkms status`; `mokutil --test-key /var/lib/shim-signed/mok/MOK.der`; re-run
-`system/30-hardware.sh` (it re-imports the key if needed) and reboot.
+`dkms status`; `sudo mokutil --test-key /var/lib/shim-signed/mok/MOK.der`
+(with `sudo`: mokutil keeps a queued request root-only, so without it a queued
+key reads as "is not enrolled"); `sudo mokutil --list-new` lists what's
+queued. Re-run `system/30-hardware.sh` (it re-imports the key if needed) and
+reboot.
 
 **No network after 20-base.** `ls /etc/netplan/` (only
 `01-network-manager-all.yaml` and NetworkManager's own `90-NM-*.yaml`
