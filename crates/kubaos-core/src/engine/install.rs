@@ -97,6 +97,8 @@ pub struct Install<'a> {
     daemon: Option<u32>,
     swapfile: bool,
     user: Option<(u32, u32, String)>,
+    /// Numbers of the partitions a free-space install added to the disk.
+    created: Vec<u32>,
 }
 
 impl<'a> Install<'a> {
@@ -128,6 +130,7 @@ impl<'a> Install<'a> {
             daemon: None,
             swapfile: false,
             user: None,
+            created: vec![],
         }
     }
 
@@ -330,6 +333,25 @@ impl<'a> Install<'a> {
         if self.luks_open {
             self.try_sh(Cmd::new("cryptsetup").args(["close", LUKS_NAME]));
             self.luks_open = false;
+        }
+        // A free-space install that stops before the system can boot gives
+        // the region back, or the next attempt finds no free space and only
+        // a partition editor gets it back. Once the bootloader is in, the
+        // installed system boots from these partitions, so they stay.
+        let bootable = matches!(self.step, StepId::Home | StepId::Snapshot | StepId::Finish);
+        if !self.created.is_empty() && !bootable {
+            self.info("removing the partitions this install made");
+            let dev = self.cfg.disk.device.clone();
+            let mut args: Vec<String> = self
+                .created
+                .iter()
+                .map(|n| format!("--delete={n}"))
+                .collect();
+            args.push(dev.clone());
+            if self.try_sh(Cmd::new("sgdisk").args(args)) {
+                self.try_sh(Cmd::new("partprobe").arg(&dev));
+            }
+            self.created.clear();
         }
     }
 
@@ -581,6 +603,9 @@ impl<'a> Install<'a> {
             .collect();
         args.push(dev.clone());
         self.sh(Cmd::new("sgdisk").args(args))?;
+        if matches!(c.disk.target, DiskTarget::FreeSpace { .. }) {
+            self.created = layout.new_parts().iter().map(|p| p.number).collect();
+        }
         self.try_sh(Cmd::new("partprobe").arg(&dev));
         if !self.dry() {
             let _ = self.r.run(&Cmd::new("udevadm").arg("settle"));

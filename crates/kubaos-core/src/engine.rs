@@ -193,6 +193,7 @@ pub fn run_with(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::DiskTarget;
     use runner::DryRunner;
 
     fn config(payload: &Path) -> InstallConfig {
@@ -627,6 +628,64 @@ mod tests {
                 .any(|c| c == "chown -R 1000:1000 /mnt/t/home/kuba/.local"),
             "{cmds:#?}"
         );
+    }
+
+    /// A dry free-space install into 100..400 GiB of an empty disk (so
+    /// partitions 1 to 3 are new) that fails on the first command matching
+    /// `fail_on`. Returns the step it failed in and the commands run.
+    fn dry_free_space(fail_on: &str) -> (StepId, Vec<String>) {
+        let p = payload();
+        let mut cfg = config(&p);
+        cfg.disk.target = DiskTarget::FreeSpace {
+            start: 100 * disk::GIB,
+            end: 400 * disk::GIB,
+        };
+        let mut r = DryRunner::new();
+        user_flake_payload(&mut r);
+        r.fail_on.push(fail_on.into());
+        let opts = RunOptions {
+            dry_run: true,
+            target_root: Some("/mnt/t".into()),
+            log_file: None,
+        };
+        let Err(Error::Step { step, .. }) = run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {})
+        else {
+            panic!("the install should fail on {fail_on}")
+        };
+        (step, r.commands())
+    }
+
+    #[test]
+    fn a_free_space_install_that_fails_before_the_bootloader_deletes_its_partitions() {
+        let (step, cmds) = dry_free_space("mkfs.btrfs");
+        assert_eq!(step, StepId::Filesystems);
+        let close = cmds
+            .iter()
+            .position(|c| c == "cryptsetup close cryptroot")
+            .expect("LUKS closes first");
+        assert_eq!(
+            cmds[close + 1..].first().map(String::as_str),
+            Some("sgdisk --delete=1 --delete=2 --delete=3 /dev/vdz"),
+            "{cmds:#?}"
+        );
+    }
+
+    #[test]
+    fn a_free_space_install_that_fails_after_the_bootloader_keeps_its_partitions() {
+        let (step, cmds) = dry_free_space("snapper");
+        assert_eq!(step, StepId::Snapshot);
+        assert!(
+            !cmds.iter().any(|c| c.contains("--delete")),
+            "the installed system boots from them: {cmds:#?}"
+        );
+    }
+
+    #[test]
+    fn a_whole_disk_install_that_fails_deletes_no_partitions() {
+        let mut r = DryRunner::new();
+        let (res, _) = dry(&mut r, true);
+        assert!(res.is_err());
+        assert!(!r.commands().iter().any(|c| c.contains("--delete")));
     }
 
     #[test]
