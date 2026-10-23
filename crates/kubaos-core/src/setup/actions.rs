@@ -229,9 +229,33 @@ fn tuxedo(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
             &["tuxedo", "--mok-password-stdin"],
             Some(&line),
             "Installing TUXEDO's drivers…",
-        )
+        )?;
+        key_queued(ctx)
     } else {
         ctx.privileged(&["tuxedo"], None, "Installing TUXEDO's drivers…")
+    }
+}
+
+/// The helper exits 0 when it has nothing to enroll, so success alone would send the card
+/// back to an empty password form with no word of what went wrong.
+fn key_queued(ctx: &mut Ctx) -> R<()> {
+    let c = detect::card_status(ctx.sys, ctx.env, CardId::Tuxedo, true);
+    match c.facts {
+        Facts::Tuxedo {
+            mok: Some(MokState::NoKey),
+            ..
+        } => Err(fail(
+            "the drivers are in, but DKMS made no signing key to enroll",
+            "Rebuild them so DKMS makes one (sudo dpkg-reconfigure tuxedo-drivers), then try again.",
+        )),
+        Facts::Tuxedo {
+            mok: Some(MokState::NotEnrolled),
+            ..
+        } => Err(fail(
+            "the drivers' key isn't queued for enrollment",
+            "mokutil --import didn't take it. The details are in the log below.",
+        )),
+        _ => Ok(()),
     }
 }
 
@@ -738,6 +762,59 @@ mod tests {
         // The password is in no event.
         assert!(!all_text(&evs).contains("kuba2026"));
         assert!(matches!(evs.last(), Some(SetupEvent::Finished { .. })));
+    }
+
+    fn tuxedo_drivers_in_key_not_enrolled() -> FakeSys {
+        tuxedo_sb_on()
+            .file("/var/lib/shim-signed/mok/MOK.der", "cert")
+            .ok("dpkg-query", "install ok installed")
+            .ok(
+                "sh -c mokutil",
+                "/var/lib/shim-signed/mok/MOK.der is not enrolled\n",
+            )
+            .ok(
+                "pkexec /usr/lib/kubaos/setup-helper tuxedo --mok-password-stdin",
+                "==> Secure Boot: DKMS signing key (MOK)\n  ok  queued\n",
+            )
+    }
+
+    fn kuba2026() -> Inputs {
+        Inputs {
+            mok_password: Some("kuba2026".into()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_queued_key_finishes_waiting_on_the_reboot() {
+        // The helper's `mokutil --import` leaves MokNew, which only root can read.
+        let mut s = tuxedo_drivers_in_key_not_enrolled().creates(
+            "pkexec /usr/lib/kubaos/setup-helper tuxedo --mok-password-stdin",
+            detect::MOK_NEW_VAR,
+        );
+
+        let (ok, evs) = go(&mut s, CardId::Tuxedo, &kuba2026());
+
+        assert!(ok, "{}", all_text(&evs));
+        match evs.last() {
+            Some(SetupEvent::Finished { status, .. }) => assert_eq!(status.state, State::Reboot),
+            e => panic!("{e:?}"),
+        }
+    }
+
+    #[test]
+    fn a_helper_run_that_leaves_the_key_unqueued_fails_instead_of_finishing() {
+        let mut s = tuxedo_drivers_in_key_not_enrolled();
+
+        let (ok, evs) = go(&mut s, CardId::Tuxedo, &kuba2026());
+
+        assert!(!ok);
+        match evs.last() {
+            Some(SetupEvent::Failed { error, .. }) => {
+                assert!(error.contains("isn't queued"), "{error}")
+            }
+            e => panic!("{e:?}"),
+        }
     }
 
     #[test]
