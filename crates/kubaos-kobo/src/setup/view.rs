@@ -578,7 +578,7 @@ fn explain<'a>(s: &'a Setup, c: &'a CardStatus, p: &Palette) -> Vec<El<'a>> {
                     p,
                 ));
             } else if st == State::Waiting && plugged.is_empty() && *enrolled == 0 {
-                v.push(para("Plug it in, then Check again. Or skip it; it's here whenever.", p));
+                v.push(para("Plug it in, then Check again. Or skip it; I'll be here.", p));
             }
         }
         (
@@ -995,7 +995,7 @@ fn run_view<'a>(s: &'a Setup, run: &'a super::Run, p: &Palette) -> El<'a> {
         }
         (Some(Outcome::Failed { error, hint }), _) => {
             let mut words = column![
-                text(format!("Well, shit. {}.", capital(error)))
+                text(format!("Fuck. {}.", capital(error)))
                     .font(theme::SANS_SEMIBOLD)
                     .size(16)
                     .color(p.on_error_container)

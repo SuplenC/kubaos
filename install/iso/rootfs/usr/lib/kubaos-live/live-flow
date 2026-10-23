@@ -86,7 +86,7 @@ headless() {
   if [ $rc -eq 0 ]; then
     echo "Done. Reboot whenever you like. Log: /var/log/kubaos-live.log"
   else
-    echo "Well, shit. The install failed (exit $rc); the reason is above. Log: /var/log/kubaos-live.log"
+    echo "Fuck. The install failed (exit $rc); the reason is above. Log: /var/log/kubaos-live.log"
   fi
 }
 

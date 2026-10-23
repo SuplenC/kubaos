@@ -30,7 +30,7 @@ fn a_pending_update_shows_in_the_update_subtitle() {
 
     assert_eq!(
         update.subtitle.as_deref(),
-        Some("KubaOS main at 1a2b3c4 (0.1.1) is ready")
+        Some("KubaOS main at 1a2b3c4 (0.1.1) is ready. Update when you feel like it")
     );
 }
 

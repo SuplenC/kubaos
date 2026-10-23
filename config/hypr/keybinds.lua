@@ -183,7 +183,7 @@ bind("SUPER + CTRL + ALT + Space", "Switch wallpaper folder", "dot-theme toggle-
 
 -- Idle on/off (stops hypridle: no auto-lock, no screen-off, no suspend).
 bind("SUPER + CTRL + I", "Toggle idle (lock/suspend)",
-  "pkill -x hypridle && hyprctl notify -1 3000 'rgb(ffb4ab)' 'Idle off: no auto-lock or suspend'"
+  "pkill -x hypridle && hyprctl notify -1 3000 'rgb(ffb4ab)' 'Idle off: no auto-lock, no suspend. I stay up all night'"
   .. " || { hyprctl notify -1 3000 'rgb(c2c1ff)' 'Idle on'; exec hypridle; }")
 
 ---------------------------------------------------------------------------

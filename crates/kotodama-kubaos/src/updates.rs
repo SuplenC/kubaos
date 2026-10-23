@@ -68,7 +68,7 @@ impl Pending {
         match item.id.as_str() {
             UPDATE => {
                 if let Some(update) = &self.update {
-                    item.subtitle = Some(format!("KubaOS {update} is ready"));
+                    item.subtitle = Some(format!("KubaOS {update} is ready. Update when you feel like it"));
                 }
                 Some(item)
             }

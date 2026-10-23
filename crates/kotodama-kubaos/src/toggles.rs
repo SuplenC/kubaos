@@ -186,8 +186,8 @@ impl Toggle {
             Toggle::BrightnessDown => "Lower the screen's brightness by 5%",
             Toggle::Brightness => "Set the screen's brightness, from 1 to 100%",
             Toggle::PowerSaver => "Power profile: longer battery, slower",
-            Toggle::Balanced => "Power profile: the default",
-            Toggle::Performance => "Power profile: faster, warmer, shorter battery",
+            Toggle::Balanced => "Power profile: the default, boring and fine",
+            Toggle::Performance => "Power profile: faster, hotter, and the battery can go to hell",
         }
     }
 
@@ -365,7 +365,7 @@ fn adapter(bus: &mut impl Bus) -> Result<String, String> {
         .into_iter()
         .find(|child| child.starts_with("hci"))
         .map(|adapter| format!("{BLUEZ_ROOT}/{adapter}"))
-        .ok_or_else(|| "There is no Bluetooth adapter".to_owned())
+        .ok_or_else(|| "There's no Bluetooth adapter, so there's nothing to turn on".to_owned())
 }
 
 fn power_profile(bus: &mut impl Bus, profile: &str) -> Result<Ran, String> {
@@ -417,7 +417,7 @@ fn device_list(runner: &impl Runner, direction: Direction) -> Result<Ran, String
         .map_err(|err| Chain(&err).to_string())?;
     let mut devices = audio::devices(&status, direction);
     if devices.is_empty() {
-        return Err("PipeWire lists no audio devices".to_owned());
+        return Err("PipeWire lists no audio devices. Hello? Anyone?".to_owned());
     }
     devices.sort_by_key(|device| !device.default);
     let list = match direction {

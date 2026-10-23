@@ -32,6 +32,26 @@ toml_str() { # a TOML basic string
   printf '"%s"' "$s"
 }
 
+# done_line SECONDS: the Done line, its quip picked by the time the install took. The
+# same buckets as `done_line` in crates/kubaos-kobo/src/view.rs.
+done_line() {
+  local s=$1 quip
+  if ((s < 120)); then
+    quip="Damn, that was quick."
+  elif ((s < 300)); then
+    quip='Not bad. Windows would still be on “Getting ready”.'
+  elif ((s < 900)); then
+    quip="Took its sweet time, but it's on there."
+  else
+    quip="Slow as hell. Blame the USB stick, I do."
+  fi
+  if ((s < 60)); then
+    printf 'Done in %ds. %s Pull the stick and reboot.\n' "$s" "$quip"
+  else
+    printf 'Done in %dm %02ds. %s Pull the stick and reboot.\n' $((s / 60)) $((s % 60)) "$quip"
+  fi
+}
+
 manifest_field() {
   sed -n "s/.*\"$1\" *: *\"\\([^\"]*\\)\".*/\\1/p" "$PAYLOAD/manifest.json" 2>/dev/null | head -1
 }
@@ -43,11 +63,11 @@ if [ "${1:-}" = --fallback ]; then
 else
   echo "$name, text mode. The graphical one is on tty1 (Ctrl+Alt+F1)."
 fi
-echo "Let's get rid of whatever's on this thing."
+echo "Whatever's on here, it's had its chance. Let's fix this shit."
 echo
 if [ ! -f "$PAYLOAD/manifest.json" ]; then
-  echo "Well, shit. This stick has no system image on it ($PAYLOAD/manifest.json is missing)."
-  echo "Nothing to install. Rebuild the ISO with --payload. Here's a shell meanwhile."
+  echo "Fuck. This stick has no system image on it ($PAYLOAD/manifest.json is missing)."
+  echo "I've got nothing to install. Rebuild the ISO with --payload. Here's a shell meanwhile."
   exec bash -l
 fi
 
@@ -140,20 +160,23 @@ desc="$(lsblk -dno MODEL,SIZE "$disk" 2>/dev/null | sed 's/  */ /g; s/^ //')"
 echo
 cat "$CONF"
 echo
+echo "Last chance to not fuck this up."
 echo "Everything on ${desc:+$desc, }$disk gets erased. Every partition, every OS on it. There's no undo."
 ask go "Type yes to erase $disk and install" ""
 [ "$go" = yes ] || { echo "Nothing touched. Your answers are in $CONF."; rm -f "$SECRETS"; exec bash -l; }
 echo
-echo "Installing. Go get a coffee. Actually, don't bother, it's faster than that."
+echo "Installing. Go stare at a wall, it'll be done before you get bored."
 
+started=$SECONDS
 kubaos run --config "$CONF" --secrets "$SECRETS" --events human
 rc=$?
 rm -f "$SECRETS"
 if [ $rc -eq 0 ]; then
-  ask r "Done. Pull the stick, reboot and enjoy a computer that minds its own business. Reboot now? (y/n)" "y"
+  done_line $((SECONDS - started))
+  ask r "Reboot now? (y/n)" "y"
   [[ $r == [yY]* ]] && systemctl reboot
 else
-  echo "Well, shit. The install failed (exit $rc); the reason is above."
+  echo "Fuck. The install failed (exit $rc); the reason is above."
   echo "Full log: /var/log/kubaos-install.log. Fix it and run kobo-text again."
 fi
 exec bash -l

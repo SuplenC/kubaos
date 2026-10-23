@@ -105,7 +105,7 @@ run = ["dot-theme", "all-sets"]
 
 [extensions.kubaos.actions.wallpaper-motion-always]
 title = "Animate wallpaper always"
-subtitle = "Video wallpapers play, on battery too"
+subtitle = "Video wallpapers play, on battery too. Battery be damned"
 icon = "video-x-generic"
 keywords = ["video wallpaper", "motion"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "always"]
@@ -119,7 +119,7 @@ run = ["qs", "ipc", "call", "wallpaper", "animate", "ac"]
 
 [extensions.kubaos.actions.wallpaper-motion-never]
 title = "Never animate wallpaper"
-subtitle = "Video wallpapers stay still"
+subtitle = "Video wallpapers stay still. Boring, but cheap"
 icon = "video-x-generic"
 keywords = ["video wallpaper", "motion", "still"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "never"]
@@ -164,7 +164,7 @@ run = ["kubaos", "cursor", "size", "32"]
 
 [extensions.kubaos.actions.cursor-size-48]
 title = "Cursor size 48"
-subtitle = "A large pointer"
+subtitle = "Large pointer. Grandpa mode."
 icon = "input-mouse"
 keywords = ["pointer size", "big cursor", "large cursor", "mouse"]
 run = ["kubaos", "cursor", "size", "48"]
@@ -210,21 +210,21 @@ run = ["qs", "ipc", "call", "powermenu", "toggle"]
 
 [extensions.kubaos.actions.do-not-disturb]
 title = "Do not disturb"
-subtitle = "Turn notification popups off or on"
+subtitle = "Notification popups off or on. Off means I shut up"
 icon = "notifications-disabled"
 keywords = ["dnd", "notifications", "quiet", "focus"]
 run = ["qs", "ipc", "call", "notifications", "toggleDnd"]
 
 [extensions.kubaos.actions.clear-notifications]
 title = "Clear notifications"
-subtitle = "Empty the notification history"
+subtitle = "Empty the notification history. Out of sight, out of mind"
 icon = "edit-clear-all"
 keywords = ["notifications", "dismiss"]
 run = ["qs", "ipc", "call", "notifications", "clear"]
 
 [extensions.kubaos.actions.restart-shell]
 title = "Restart Quickshell"
-subtitle = "Restart the bar, panels and lock screen"
+subtitle = "The bar, panels and lock screen. Off and on again, the classic"
 icon = "view-refresh"
 keywords = ["shell", "bar", "reload"]
 run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
@@ -312,7 +312,7 @@ run = ["dot-hypr-record", "stop"]
 
 [extensions.kubaos.actions.replay-toggle]
 title = "Replay buffer on/off"
-subtitle = "Keep the last 30 seconds of the screen in memory"
+subtitle = "I keep the last 30 s of the screen in memory, you're welcome"
 icon = "media-record"
 keywords = ["screen recording", "instant replay", "clip"]
 run = ["dot-hypr-record", "replay", "toggle"]
@@ -391,7 +391,7 @@ terminal = true
 
 [extensions.kubaos.actions.rollback]
 title = "Roll back last update"
-subtitle = "The KubaOS release and your flake.lock from before it"
+subtitle = "The KubaOS release and your flake.lock from before it. Like it never happened"
 icon = "edit-undo"
 keywords = ["undo update", "downgrade", "revert"]
 run = ["kubaos", "rollback"]
@@ -399,7 +399,7 @@ terminal = true
 
 [extensions.kubaos.actions.channel]
 title = "Switch channel (stable/edge)"
-subtitle = "Stable: signed releases. Edge: origin/main as it lands"
+subtitle = "Stable: signed releases. Edge: origin/main as it lands, bugs included"
 icon = "preferences-system"
 keywords = ["release channel", "stable", "edge", "updates"]
 keyword = "channel"

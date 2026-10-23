@@ -64,10 +64,10 @@ fi
 if command -v notify-send >/dev/null 2>&1; then
   # The notification waits for its action in the background, so the bind returns.
   (
-    action=$(notify-send -a Screenshot -i "$file" --action=edit=Edit "Screenshot copied" "${file/#$HOME/\~}" || true)
+    action=$(notify-send -a Screenshot -i "$file" --action=edit=Edit "Copied. Evidence secured." "${file/#$HOME/\~}" || true)
     [[ $action != edit ]] || edit "$file"
   ) </dev/null >/dev/null 2>&1 &
   disown
 else
-  hyprctl notify -1 3000 'rgb(c2c1ff)' "Screenshot copied: ${file/#$HOME/\~}" >/dev/null || true
+  hyprctl notify -1 3000 'rgb(c2c1ff)' "Copied. Evidence secured: ${file/#$HOME/\~}" >/dev/null || true
 fi

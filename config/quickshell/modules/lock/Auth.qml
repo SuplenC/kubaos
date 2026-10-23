@@ -39,7 +39,7 @@ Scope {
         case "waiting":
             return "Touch the fingerprint sensor";
         case "failed":
-            return "Fingerprint not recognised. Try again or type your password";
+            return "Fingerprint not recognised. Wrong finger? Try again or type your password";
         case "blocked":
             return "Fingerprint locked: type your password, then use the key's PIN once (sudo)";
         case "pin":
@@ -85,7 +85,7 @@ Scope {
         pendingPassword = text;
         message = "";
         if (!password.start())
-            fail("Well, shit. Couldn't start PAM: is /etc/pam.d/qs-lock installed?");
+            fail("Fuck. Couldn't start PAM: is /etc/pam.d/qs-lock installed?");
     }
 
     function fail(text: string): void {
@@ -122,7 +122,7 @@ Scope {
             if (result === PamResult.Success)
                 root.succeeded();
             else
-                root.fail(result === PamResult.Failed ? "Wrong password. Try again, slower this time." : `Authentication error: ${PamResult.toString(result)}`);
+                root.fail(result === PamResult.Failed ? "Wrong password. Fat fingers? Try again." : `Authentication error: ${PamResult.toString(result)}`);
         }
     }
 

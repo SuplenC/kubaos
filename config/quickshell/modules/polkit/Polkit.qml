@@ -106,7 +106,7 @@ Scope {
                 StyledText {
                     Layout.fillWidth: true
                     visible: text !== ""
-                    text: root.flow?.failed ? "Authentication failed, try again" : root.flow?.supplementaryMessage ?? ""
+                    text: root.flow?.failed ? "That didn't work. Fat fingers? Try again" : root.flow?.supplementaryMessage ?? ""
                     wrapMode: Text.Wrap
                     color: root.flow?.failed || root.flow?.supplementaryIsError ? Theme.m3error : Theme.m3onSurfaceVariant
                 }

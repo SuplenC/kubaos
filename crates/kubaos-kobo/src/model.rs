@@ -324,7 +324,7 @@ impl Form {
     pub fn wifi_ok(&self, secured: bool) -> Result<(), &'static str> {
         match self.wifi_psk.chars().count() {
             _ if !secured || self.wifi_ssid.is_none() => Ok(()),
-            0 => Err("Type its password, or pick No Wi-Fi."),
+            0 => Err("Type its password, or go with the cable."),
             // WPA's minimum; anything shorter can't be right.
             1..8 => Err("Wi-Fi passwords are at least 8 characters."),
             _ => Ok(()),

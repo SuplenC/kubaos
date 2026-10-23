@@ -109,7 +109,7 @@ fn the_last_set_in_the_picker_is_not_hidden() {
 
     let ran = sets.run("wallpaper-set:japanese", HIDE, &runner);
 
-    assert_eq!(ran, Err("At least one wallpaper set stays in the picker".to_owned()));
+    assert_eq!(ran, Err("At least one wallpaper set stays in the picker. Nice try".to_owned()));
     assert!(runner.ran().is_empty());
 }
 
