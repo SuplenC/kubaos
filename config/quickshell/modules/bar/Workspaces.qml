@@ -148,24 +148,6 @@ Pill {
                         }
                     }
 
-                    // Occupied but not active: a small dot under the number.
-                    Rectangle {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 2
-                        width: 3
-                        height: 3
-                        radius: 1.5
-                        color: Theme.m3tertiary
-                        opacity: cell.occupied && !cell.isActive ? 1 : 0
-
-                        Behavior on opacity {
-                            Anim {
-                                duration: Theme.anim.fast
-                            }
-                        }
-                    }
-
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
