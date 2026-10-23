@@ -9,7 +9,7 @@
 #   payload   build the fake payload image and turn it into
 #             rootfs.sqfs + rootfs.tar.zst in the volume kubaos-engine-payload
 #             (skipped when the image hasn't changed)
-#   run       scenarios: sqfs, tar, fail, dual (default: all four)
+#   run       scenarios: sqfs, tar, fail, dual, dual-fail (default: all five)
 #   all       build, payload, run (the default)
 #   clean     remove this script's containers and volumes
 #
@@ -62,7 +62,7 @@ payload() {
 
 run() {
   local scenarios=("$@") failed=()
-  ((${#scenarios[@]})) || scenarios=(sqfs tar fail dual)
+  ((${#scenarios[@]})) || scenarios=(sqfs tar fail dual dual-fail)
   mkdir -p "$OUT"
   for sc in "${scenarios[@]}"; do
     echo
