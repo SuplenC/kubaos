@@ -127,7 +127,7 @@ Drawer {
                 TabBar {
                     id: tabBar
 
-                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
                     labels: ["Wi-Fi", "Bluetooth", "Output", "Notifications"]
                     currentIndex: root.tab
                     onPicked: index => root.tab = index

@@ -26,10 +26,13 @@ Rectangle {
         anchors.fill: parent
         anchors.margins: Theme.spacing.sm
         anchors.leftMargin: Theme.spacing.lg
-        spacing: Theme.spacing.sm
+        // Five buttons share the row with the label; packed this close, the
+        // label keeps room for "Screenshot or record" in the 384 px panel.
+        spacing: Theme.spacing.xs
 
         ColumnLayout {
             Layout.fillWidth: true
+            Layout.rightMargin: Theme.spacing.xs
             spacing: 0
 
             StyledText {

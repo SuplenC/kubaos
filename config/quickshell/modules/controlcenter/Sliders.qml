@@ -19,6 +19,8 @@ ColumnLayout {
         }
 
         IconButton {
+            id: mute
+
             icon: Audio.muted ? "volume_off" : "volume_up"
             tooltip: Audio.muted ? "Unmute" : "Mute"
             baseColor: Theme.m3surfaceContainerHigh
@@ -29,7 +31,8 @@ ColumnLayout {
 
     StyledSlider {
         Layout.fillWidth: true
-        Layout.rightMargin: 36 + Theme.spacing.sm // lines up with the volume slider
+        // Ends where the volume slider does, beside the mute button.
+        Layout.rightMargin: mute.width + Theme.spacing.sm
         visible: Brightness.available
         icon: Brightness.icon
         value: Brightness.value

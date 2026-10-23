@@ -206,16 +206,24 @@ WlSessionLockSurface {
             }
         }
 
+        // PAM and the key write messages of any length; a long one wraps
+        // inside the screen instead of running off both sides.
         Item {
+            id: status
+
             Layout.alignment: Qt.AlignHCenter
             Layout.topMargin: Theme.spacing.md
+            Layout.maximumWidth: root.width - Theme.spacing.xl * 2
             implicitWidth: Math.max(error.implicitWidth, hint.implicitWidth)
-            implicitHeight: 24
+            implicitHeight: Math.max(24, error.height, hint.height)
 
             StyledText {
                 id: error
 
                 anchors.centerIn: parent
+                width: Math.min(implicitWidth, status.width)
+                wrapMode: Text.Wrap
+                horizontalAlignment: Text.AlignHCenter
                 text: root.auth.message
                 color: Theme.m3error
                 font.weight: Font.Medium
@@ -247,6 +255,8 @@ WlSessionLockSurface {
                 }
 
                 Icon {
+                    id: hintIcon
+
                     anchors.verticalCenter: parent.verticalCenter
                     name: hint.key && root.auth.keyState === "" ? "passkey" : "fingerprint"
                     size: 20
@@ -255,6 +265,8 @@ WlSessionLockSurface {
 
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
+                    width: Math.min(implicitWidth, status.width - hintIcon.width - hint.spacing)
+                    wrapMode: Text.Wrap
                     text: hint.key ? root.auth.keyHint : (root.auth.fingerprintMessage || "Or touch the fingerprint reader")
                     color: hint.key && root.auth.keyHintIsError ? Theme.m3error : hint.key && hint.keyWaiting ? Theme.m3primary : Theme.m3onSurfaceVariant
                 }

@@ -81,6 +81,7 @@ Scope {
                 }
 
                 StyledText {
+                    Layout.fillWidth: true
                     text: `As ${root.flow?.selectedIdentity?.displayName ?? ""}`
                     font.pixelSize: Theme.font.sm
                     color: Theme.m3outline

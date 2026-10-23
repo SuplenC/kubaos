@@ -101,12 +101,23 @@ Drawer {
             }
         }
 
+        // As wide as "100" in this font, so the bar keeps one length and the
+        // number never runs past the panel.
         StyledText {
-            Layout.preferredWidth: 30
+            id: percent
+
+            Layout.preferredWidth: Math.ceil(widest.advanceWidth)
             horizontalAlignment: Text.AlignRight
             text: Math.round(root.value * 100)
             font.weight: Font.DemiBold
             font.features: Theme.font.tabular
+
+            TextMetrics {
+                id: widest
+
+                font: percent.font
+                text: "100"
+            }
         }
     }
 }

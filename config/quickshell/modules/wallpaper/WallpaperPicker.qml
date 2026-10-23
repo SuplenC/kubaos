@@ -34,9 +34,13 @@ Drawer {
     readonly property real cellWidth: thumbWidth + Theme.spacing.md
     readonly property real cellHeight: thumbHeight + 34
     readonly property int rows: Math.max(1, Math.min(2, Math.ceil(images.length / columns)))
+    // The thumbnails without the last cell's gap.
+    readonly property real gridWidth: (settingsOpen ? 4 : columns) * cellWidth - Theme.spacing.md
 
     edge: "bottom"
-    contentWidth: (settingsOpen ? 4 : columns) * cellWidth + Theme.spacing.xl * 2 - Theme.spacing.md
+    // As wide as the thumbnails or the tabs and key hints above them,
+    // whichever is wider, and never wider than the screen.
+    contentWidth: Math.min(Math.max(gridWidth, header.implicitWidth) + Theme.spacing.xl * 2, frame.r - frame.l - Theme.frame.flare * 2)
     contentHeight: header.implicitHeight + (settingsOpen ? Math.min(Math.max(cellHeight, settings.implicitHeight), (frame.b - frame.t) * 0.7) : rows * cellHeight) + Theme.spacing.lg * 2 + Theme.spacing.md
     onOpened: {
         Wallpapers.refresh();
@@ -107,7 +111,11 @@ Drawer {
             Layout.fillWidth: true
             spacing: Theme.spacing.sm
 
+            // Gives up padding, then elides, on a screen too narrow for the
+            // whole header.
             TabBar {
+                Layout.fillWidth: true
+                Layout.maximumWidth: implicitWidth
                 labels: [...root.folders.map(f => `${f.name.charAt(0).toUpperCase()}${f.name.slice(1).replace(/-/g, " ")}  ${(Wallpapers.images[f.name] ?? []).length}`), "Settings"]
                 currentIndex: root.folderIndex
                 activeFocusOnTab: false
@@ -167,8 +175,12 @@ Drawer {
         GridView {
             id: grid
 
-            // Exactly `columns` cells wide; each cell carries its own right gap.
+            // Exactly `columns` cells wide; each cell carries its own right gap,
+            // which the left margin matches so the thumbnails sit centred when
+            // the header makes the panel wider than they are.
             Layout.preferredWidth: root.columns * root.cellWidth
+            Layout.leftMargin: Theme.spacing.md
+            Layout.alignment: Qt.AlignHCenter
             Layout.fillHeight: true
             visible: !root.settingsOpen
             clip: true
