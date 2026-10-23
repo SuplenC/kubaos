@@ -9,7 +9,7 @@ import qs.services
 // This screen's workspaces in groups, each numbered 1-10 as SUPER + 1-0 reach
 // them. Its own group first: its first workspace always, then those of its own
 // that exist. Then the group of each unplugged screen waiting here, ordered by
-// where those screens last sat, left to right, with a dot between groups. The
+// where those screens last sat, left to right, with a thin rule between groups. The
 // same order as `groups()` in config/hypr/workspace_blocks.lua, which next and
 // previous walk. Scroll to step through them.
 //
@@ -105,7 +105,8 @@ Pill {
     readonly property int slot: Math.max(0, ids.indexOf(activeId))
     readonly property int cell: Theme.bar.pillHeight - 6
     readonly property int groupGap: Theme.spacing.md
-    readonly property int separator: Theme.spacing.xs
+    // A thin rule between groups, not a dot: a dot reads as a notification.
+    readonly property int separator: Math.round(cell * 0.5)
     // How long a change of shape takes. The indicator follows a cell that
     // moves with the same duration and curve, so it stays on it.
     readonly property int glide: Theme.anim.large
@@ -330,9 +331,8 @@ Pill {
                     Rectangle {
                         visible: shape.isGap
                         anchors.centerIn: parent
-                        width: root.separator
-                        height: width
-                        radius: width / 2
+                        width: 1
+                        height: root.separator
                         color: Theme.m3outlineVariant
                     }
 
