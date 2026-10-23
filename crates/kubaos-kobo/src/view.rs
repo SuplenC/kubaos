@@ -377,6 +377,13 @@ pub fn hints(app: &App) -> Vec<(&'static str, &'static str)> {
                 "start"
             },
         )),
+        Screen::Language if app.is_focused(F::KeymapQ) => v.extend([
+            ("A–Z", "search"),
+            ("↑ ↓", "move"),
+            ("Space", "pick a layout"),
+            ("Shift Space", "make it the default"),
+            ("Tab", "next field"),
+        ]),
         Screen::Language | Screen::Timezone => {
             v.extend([("A–Z", "search"), ("↑ ↓", "pick"), ("Tab", "next field")]);
         }

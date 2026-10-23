@@ -864,6 +864,30 @@ fn on_the_keymap_list() -> App {
 }
 
 #[test]
+fn the_keymap_lists_hints_say_space_picks_and_the_arrows_move() {
+    let app = on_the_keymap_list();
+
+    let hints = crate::view::hints(&app);
+
+    assert!(hints.contains(&("↑ ↓", "move")), "{hints:?}");
+    assert!(hints.contains(&("Space", "pick a layout")), "{hints:?}");
+    assert!(hints.contains(&("Shift Space", "make it the default")), "{hints:?}");
+    assert!(!hints.contains(&("↑ ↓", "pick")), "{hints:?}");
+}
+
+#[test]
+fn the_language_lists_hints_say_the_arrows_pick() {
+    let (mut app, _) = recorded(Recorder::default());
+    let _ = app.go(Screen::Language);
+    assert_eq!(app.focus, Some(F::LocaleQ));
+
+    let hints = crate::view::hints(&app);
+
+    assert!(hints.contains(&("↑ ↓", "pick")), "{hints:?}");
+    assert!(!hints.iter().any(|(key, _)| *key == "Space"), "{hints:?}");
+}
+
+#[test]
 fn space_on_the_keymap_list_picks_the_row_and_again_unpicks_it() {
     let mut app = on_the_keymap_list();
     assert_eq!(app.form.keymaps, ["us"]);
