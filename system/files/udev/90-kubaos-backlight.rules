@@ -1,0 +1,10 @@
+# KubaOS: /etc/udev/rules.d/90-kubaos-backlight.rules, installed by
+# system/50-hyprland.sh.
+#
+# The screen and keyboard backlights writable by the video group, which the
+# installer puts the user in. brightnessctl (the Fn keys, the control
+# center's slider) otherwise needs logind's SetBrightness, and that fails for
+# a process outside the login session's scope, as Hyprland's children can be.
+# The rule is upstream brightnessctl's, which Ubuntu's package leaves out.
+ACTION=="add", SUBSYSTEM=="backlight", RUN+="/bin/chgrp video /sys/class/backlight/%k/brightness", RUN+="/bin/chmod g+w /sys/class/backlight/%k/brightness"
+ACTION=="add", SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", RUN+="/bin/chgrp video /sys/class/leds/%k/brightness", RUN+="/bin/chmod g+w /sys/class/leds/%k/brightness"

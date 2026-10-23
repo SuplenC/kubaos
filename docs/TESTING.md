@@ -42,7 +42,7 @@ test/run shots stop
 | image stage `base` | `ubuntu:26.04`, user kuba (sudo-rs, zsh), `system/10-strip.sh` and `system/20-base.sh` run for real | `system/lib.sh`, `10-strip.sh`, `20-base.sh`, `system/files/{apt,netplan,logind.conf.d}` change |
 | stage `nix` | Nix from the official installer, version, URL and sha256 read from `system/60-nix.sh`, `--daemon`, flakes on | `system/60-nix.sh` changes (or anything above) |
 | stage `tooling` | apt test tools: sway, swaybg, grim, slurp, wf-recorder, Mesa llvmpipe GL/GLES/EGL, dbus, gnome-keyring, secret-tool, pamtester, shellcheck, lua5.5, hyperfine, jq, expect, cwebp, ImageMagick, Python with requests/cryptography, Node (stand-in for proto's) | the Dockerfile's package list |
-| stage `desktop` | `system/50-hyprland.sh` and `system/70-bitwarden.sh` run for real: Ubuntu's arm64 hyprland 0.53, lock-screen PAM files, `unix_chkpwd` link, bw CLI, pam_u2f lines for sudo/sudo-i/polkit-1 | those two scripts or `system/files/{getty,pam.d,tmpfiles.d,systemd,hyprland-autostart.zsh}` |
+| stage `desktop` | `system/50-hyprland.sh` and `system/70-bitwarden.sh` run for real: Ubuntu's arm64 hyprland 0.53, lock-screen PAM files, `unix_chkpwd` link, bw CLI, pam_u2f lines for sudo/sudo-i/polkit-1 | those two scripts or `system/files/{getty,pam.d,tmpfiles.d,systemd,udev,hyprland-autostart.zsh}` |
 | stage `hyprland` | placeholder, see below | |
 | volume `dotfiles-nix` (`/nix`) | the whole Nix store and database. Docker seeds an empty volume from the image's `/nix` (the bare install) on first use | never by the harness; `test/run nuke` deletes it |
 | volume `dotfiles-test-cache` | Nix's fetcher and eval caches, Neovim's plugins, Mason tools and treesitter parsers, GC roots for `warm` | `nuke` |
