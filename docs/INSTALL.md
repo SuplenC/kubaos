@@ -443,7 +443,7 @@ starts from Hyprland's autostart (`qs`, no systemd unit).
 
 **Verify:** `home-manager generations` has one entry; `ls -l
 /run/opengl-driver`; Ghostty (`SUPER+Return`) and the bar render;
-`hyprctl monitors` shows both UltraGears at 120 Hz through the dock.
+`hyprctl monitors` shows every screen on the dock at its preferred mode.
 
 Then, outside Nix on purpose:
 
