@@ -66,6 +66,20 @@ run = 'shell --orphan -- ripdrag --and-exit --all --no-click "$@"'
 desc = "Drag the selected files out"
 ```
 
+## Bluetooth
+
+"Pair a Bluetooth device" in the Command menu, or `SUPER + CTRL + B`, opens the control center's Bluetooth tab; the menu item also starts a search. Put the device in pairing mode, then pick it in the list (Enter or a click):
+
+- A keyboard shows a six-digit code: type it on the keyboard, then Enter. The tab counts the digits as you type.
+- A phone shows a code to compare: check it matches, then Pair (the check button) or Cancel.
+- A device that wants a PIN or passkey from you gets a field to type it in.
+
+While it pairs, the row says "Pairing…"; Enter or a click on it cancels. A pairing gives up after a minute and a half, and a prompt nobody answers after 50 seconds. A failed one leaves its reason under the device ("Wrong code, or the device said no", "Couldn't reach it. Is it in pairing mode?") for 30 seconds, then the device drops off the list until the next search finds it. A paired device is trusted, so it reconnects by itself.
+
+The codes come from KubaOS's pairing agent, the `kubaos-bluetooth` user service: `systemctl --user status kubaos-bluetooth`, logs in `journalctl --user -u kubaos-bluetooth`. Without it the tab says so and can't pair. `bluetoothctl` works beside it; its own `agent on` takes over the prompts until it quits.
+
+When the adapter is off, the tab has a power button. When it is blocked (airplane mode), it says to run `rfkill unblock bluetooth`. When bluetoothd stops answering (it can after a pairing that hung), the tab says "Bluetooth isn't responding": run `sudo systemctl restart bluetooth`.
+
 ## Updating and rolling back
 
 Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run `kubaos update`, or pick Update KubaOS in the menu (`SUPER + Space`), which opens a terminal running it. A daily timer runs `kubaos update --check`: it only looks. When there is something new it sends one notification, puts a marker in the bar, and the menu's Update KubaOS says what is waiting.
@@ -255,7 +269,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `relink.sh`, which `kubaos update` runs, files for `/etc` |
-| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, and `kubaos-files`, yazi for `xdg-open` and "Show in folder" |
+| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, `kubaos-files`, yazi for `xdg-open` and "Show in folder", and `kubaos-bluetooth`, the Bluetooth pairing agent |
 | `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |
 | `test/` | The Docker test harness (`test/run`) |
 | `docs/` | `PLAN.md` (why), `INSTALL.md` (how), `CONTRACTS.md` and `INSTALL-INTERNALS.md` (interfaces), `SECRETS.md` (Bitwarden, security key), `TESTING.md`, `BRAND.md` (name and voice), `screenshots/` |
