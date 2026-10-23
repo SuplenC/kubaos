@@ -2256,22 +2256,27 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
             "Hold to install",
         )
     };
-    let fill_portion = (hold_t * 1000.0) as u16;
+    // The fill is a pill inside the border. iced doesn't clip children to a
+    // rounded container, and a pill narrower than it is tall squashes its
+    // radius, so it starts as a circle at the left end and fades in.
+    const HOLD_W: f32 = 270.0;
+    const HOLD_H: f32 = 48.0;
+    const HOLD_INSET: f32 = 3.0;
+    let inner_h = HOLD_H - 2.0 * HOLD_INSET;
     let mut fill = row![].height(Length::Fill);
-    if fill_portion > 0 {
+    if hold_t > 0.0 {
+        let w = inner_h + hold_t * (HOLD_W - 2.0 * HOLD_INSET - inner_h);
+        let fade = (hold_t * 12.0).min(1.0);
         fill = fill.push(
             container(Space::new())
-                .width(Length::FillPortion(fill_portion))
+                .width(w)
                 .height(Length::Fill)
                 .style(move |_t| {
                     container::Style::default()
-                        .background(alpha(tone, 0.55))
+                        .background(alpha(tone, 0.55 * fade))
                         .border(Border::default().rounded(radius::FULL))
                 }),
         );
-    }
-    if fill_portion < 1000 {
-        fill = fill.push(Space::new().width(Length::FillPortion(1000 - fill_portion)));
     }
     let label_txt = if app.hold.is_some() {
         "Keep holding…"
@@ -2280,7 +2285,10 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
     };
     let hold_btn = mouse_area(
         container(stack![
-            fill,
+            container(fill)
+                .padding(HOLD_INSET)
+                .width(Length::Fill)
+                .height(Length::Fill),
             center(
                 row![
                     icon(Icon::Download, 18.0, pp.on_surface),
@@ -2293,8 +2301,8 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
                 .align_y(Alignment::Center)
             )
         ])
-        .width(270)
-        .height(48)
+        .width(HOLD_W)
+        .height(HOLD_H)
         .style(move |_t| container::Style {
             background: Some(Background::Color(alpha(tone, 0.16))),
             border: Border {
