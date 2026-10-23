@@ -82,7 +82,7 @@ proto install moon
 
 The MOK screen, the fingerprint enrollment and what to verify are in the hard way's sections 1, 7 and 8 below: same scripts, same steps.
 
-Then the secrets. Bitwarden desktop, `bw` and the security-key PAM lines are already installed. Open Bitwarden (Hyprland starts it), log in, Settings -> enable "SSH agent", then run `dot-bw-setup`. Set the YubiKey's PIN and fingerprints with `ykman` and run `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md` has the order, and section 11 below says how to check it all works.
+Then the secrets. Bitwarden desktop, `bw` and the security-key PAM lines are already installed. Open Bitwarden (Hyprland starts it), log in, Settings -> enable "SSH agent", then run `kubaos bitwarden setup`. Set the YubiKey's PIN and fingerprints with `ykman` and run `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md` has the order, and section 11 below says how to check it all works.
 
 Kōbō will do this part itself one day (the first-boot setup screen, `docs/screenshots/setup/`). Today it's a stub.
 
@@ -145,7 +145,7 @@ stays the lock screen (hypridle's `lock_cmd` already falls back to it) and
 `hyprpolkitagent` stays the polkit agent (the in-shell agent is off by
 default).
 
-**SSH, git signing or `.envrc` secrets don't work.** `dot-bw-setup --check`,
+**SSH, git signing or `.envrc` secrets don't work.** `kubaos bitwarden check`,
 then `docs/SECRETS.md`, Troubleshooting.
 
 **home-manager: "path ... does not exist" or a new config dir is ignored.**
@@ -455,7 +455,7 @@ bash <(curl -fsSL https://moonrepo.dev/install/proto.sh)
 proto install moon
 ```
 
-### 11. `system/70-bitwarden.sh`, then `dot-bw-setup`
+### 11. `system/70-bitwarden.sh`, then `kubaos bitwarden setup`
 
 ```sh
 system/70-bitwarden.sh
@@ -484,8 +484,8 @@ self-update on Linux). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
 
 Then `system/75-yubikey.sh` (add `--piv` for the Multi-protocol Edition's
 smart card). As yourself, in the Hyprland session: open Bitwarden, log in,
-Settings -> enable "SSH agent". Run `dot-bw-setup` (SSH keys, git signing,
-gh, project env). Set the key's PIN and fingerprints with `ykman`, then run
+Settings -> enable "SSH agent". Run `kubaos bitwarden setup` (SSH keys, git
+signing, gh, project env). Set the key's PIN and fingerprints with `ykman`, then run
 `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md`, "YubiKey C
 Bio", has the order.
 
