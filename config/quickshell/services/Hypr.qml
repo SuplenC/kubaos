@@ -51,6 +51,23 @@ Singleton {
         return (id - 1) % slots + 1;
     }
 
+    // The id next creates after the last workspace of `block`'s group, given
+    // the ids in use: `append_slot` in `config/hypr/workspace_blocks.lua`, which
+    // this mirrors. 0 when all ten are taken.
+    function appendSlot(block: int, taken: var): int {
+        const first = block * slots + 1;
+        const last = first + slots - 1;
+        const own = taken.filter(id => id >= first && id <= last);
+        const highest = Math.max(first - 1, ...own);
+        if (highest < last)
+            return highest + 1;
+        for (let id = first; id <= last; id++) {
+            if (!own.includes(id))
+                return id;
+        }
+        return 0;
+    }
+
     // A monitor's block. Until Hyprland has written the file, the block of the
     // workspace it shows.
     function blockOfMonitor(monitor: HyprlandMonitor): int {

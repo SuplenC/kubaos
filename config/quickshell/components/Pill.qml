@@ -10,6 +10,9 @@ Rectangle {
     property int padding: Theme.spacing.md
     property alias spacing: row.spacing
     property bool interactive: false
+    // Off for content that animates its own width: the pill then follows it
+    // frame by frame, where a second animation would lag behind it.
+    property bool animatesWidth: true
     property string tooltip
     readonly property bool hovered: stateLayer.containsMouse
 
@@ -22,6 +25,8 @@ Rectangle {
     color: Theme.m3surfaceContainer
 
     Behavior on implicitWidth {
+        enabled: root.animatesWidth
+
         Anim {
             duration: Theme.anim.large
             easing.bezierCurve: Theme.anim.spatial
