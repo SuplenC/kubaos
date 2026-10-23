@@ -130,8 +130,11 @@ for index = 1, 5 do
 end
 
 ---------------------------------------------------------------------------
--- Workspaces: each screen has its own 1-10 (workspaces.lua). `m+1` and
--- `previous_per_monitor` stay on the focused screen.
+-- Workspaces: each screen has its own 1-10, and the groups of unplugged
+-- screens wait on the primary one (workspaces.lua). Next and previous walk the
+-- focused screen's groups as its bar shows them, the empty first workspace
+-- included, which Hyprland's `m+1` and its own swipe skip.
+-- `previous_per_monitor` stays on the focused screen.
 ---------------------------------------------------------------------------
 
 for slot = 1, dot.workspaces.slots do
@@ -143,13 +146,22 @@ for slot = 1, dot.workspaces.slots do
 end
 bind("SUPER + SHIFT + CTRL + Right", "Move window to a new workspace", dot.workspaces.move_window_to_new())
 
-bind("SUPER + Tab", "Next workspace", hl.dsp.focus({ workspace = "m+1" }))
-bind("SUPER + SHIFT + Tab", "Previous workspace", hl.dsp.focus({ workspace = "m-1" }))
-bind("SUPER + CTRL + Right", "Next workspace", hl.dsp.focus({ workspace = "m+1" }))
-bind("SUPER + CTRL + Left", "Previous workspace", hl.dsp.focus({ workspace = "m-1" }))
+bind("SUPER + Tab", "Next workspace", dot.workspaces.next())
+bind("SUPER + SHIFT + Tab", "Previous workspace", dot.workspaces.previous())
+bind("SUPER + CTRL + Right", "Next workspace", dot.workspaces.next())
+bind("SUPER + CTRL + Left", "Previous workspace", dot.workspaces.previous())
+bind("SUPER + CTRL + ALT + Right", "Next workspace group", dot.workspaces.next_group())
+bind("SUPER + CTRL + ALT + Left", "Previous workspace group", dot.workspaces.previous_group())
 bind("SUPER + CTRL + Tab", "Former workspace", hl.dsp.focus({ workspace = "previous_per_monitor" }))
-bind("SUPER + mouse_down", "Next workspace", hl.dsp.focus({ workspace = "m+1" }))
-bind("SUPER + mouse_up", "Previous workspace", hl.dsp.focus({ workspace = "m-1" }))
+bind("SUPER + mouse_down", "Next workspace", dot.workspaces.next())
+bind("SUPER + mouse_up", "Previous workspace", dot.workspaces.previous())
+
+-- Three fingers swipe through the workspaces as the binds above do. A function
+-- runs once the swipe ends, so the workspace switches without following the
+-- fingers. Under natural scrolling, fingers moving left bring the next one.
+-- https://wiki.hypr.land/configuring/core/binds/gestures/
+hl.gesture({ fingers = 3, direction = "left", action = dot.workspaces.next() })
+hl.gesture({ fingers = 3, direction = "right", action = dot.workspaces.previous() })
 
 -- Scratchpad. code:49 is the key left of 1 (backslash on Italian).
 bind("SUPER + S", "Toggle scratchpad", hl.dsp.workspace.toggle_special("scratchpad"))

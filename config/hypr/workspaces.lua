@@ -16,11 +16,20 @@
 -- screen gets the same block every time it comes back, and the bar reads the
 -- same file to know which block is its own.
 --
--- On unplug Hyprland moves the screen's workspaces to another one. Reconciling
--- on every monitor change renumbers them into that screen's block, after its
--- own, and a second state file remembers where each came from, so it goes
--- back under its old number when its screen returns. With no room in the
--- block they stay guests, and the bar lists them after the screen's own.
+-- A screen's block is its *group*. On unplug Hyprland moves the screen's
+-- workspaces to any other screen; reconciling on every monitor change gathers
+-- the group on the primary screen (the laptop panel, else the external
+-- Hyprland numbered first), under its own numbers, and its screen takes it
+-- back when it returns. A group with no windows has no workspaces left, so it vanishes.
+-- The bar shows a screen's own group, then each one waiting there.
+--
+-- HAZARD: no workspace is renumbered on unplug or replug. The bar's
+-- Quickshell (v0.3.2) keeps the id a workspace had when it first saw it, so a
+-- renumbered one shows under its old number and a click on it goes nowhere.
+--
+-- Next and previous walk the focused screen's groups in the bar's order
+-- (`workspace_blocks.step`). SUPER + 1-0 address the focused group: the
+-- screen's own, or the waiting group whose workspace it shows.
 --
 -- Every action is a function a bind runs, and also an expression the socket
 -- runs: `hyprctl dispatch 'dot.workspaces.focus(3)'` does what SUPER + 3 does.
@@ -38,7 +47,6 @@ local function state_dir()
 end
 
 local SCREENS_FILE = state_dir() .. "/workspace-screens"
-local MERGED_FILE = state_dir() .. "/workspace-merged"
 
 local M = { slots = SLOTS }
 
@@ -66,22 +74,13 @@ local function write(path, text)
   return true
 end
 
--- Identity -> block, kept across sessions, and connector -> identity for the
--- screens plugged in now.
-local blocks, current = blocks_lib.parse_blocks(read(SCREENS_FILE))
+-- Identity -> block and identity -> x where the screen last sat, kept across
+-- sessions, and connector -> identity for the screens plugged in now.
+local blocks, current, positions = blocks_lib.parse_blocks(read(SCREENS_FILE))
 local written = nil
 
--- Workspace id -> { id, identity }, for each workspace that joined another
--- screen's block while its own screen was unplugged. Kept in a file to outlive
--- config reloads, and cleared when Hyprland starts.
-local merged = blocks_lib.parse_merged(read(MERGED_FILE))
-
-local function save_merged()
-  write(MERGED_FILE, blocks_lib.format_merged(merged))
-end
-
 local function save(identities)
-  local text = blocks_lib.format_blocks(blocks, identities)
+  local text = blocks_lib.format_blocks(blocks, identities, positions)
   if text ~= written and write(SCREENS_FILE, text) then
     written = text
   end
@@ -114,25 +113,20 @@ local function connected(gone)
   return blocks_lib.sort_screens(monitors)
 end
 
--- Connector -> block for the screens plugged in now, and connector -> identity.
+-- Connector -> block for the screens plugged in now, noting where each sits.
 local function assign(monitors)
   local identities = blocks_lib.identities(monitors, current)
   current = identities
   local by_connector = blocks_lib.assign(blocks, monitors, identities)
+  for _, monitor in ipairs(monitors) do
+    positions[identities[monitor.name]] = monitor.x
+  end
   save(identities)
-  return by_connector, identities
+  return by_connector
 end
 
--- Give a workspace another id, carrying the record of where it came from.
 local function renumber(workspace, id)
-  local old = workspace.id
-  hl.dispatch(hl.dsp.workspace.change_id({ workspace = tostring(old), id = id }))
-  -- A record left under the new id belonged to a workspace that has gone.
-  if merged[old] or merged[id] then
-    merged[id] = merged[old]
-    merged[old] = nil
-    save_merged()
-  end
+  hl.dispatch(hl.dsp.workspace.change_id({ workspace = tostring(workspace.id), id = id }))
 end
 
 -- The plugged-in screen whose block holds `id`.
@@ -148,9 +142,33 @@ local function owner(id, monitors, by_connector)
   return nil
 end
 
+-- The block of the group a screen shows: the waiting group of an unplugged
+-- screen when it shows one of its workspaces, else its own.
+local function focused_block(monitor, monitors, by_connector)
+  local active = monitor.active_workspace
+  if regular(active) and not owner(active.id, monitors, by_connector) then
+    return block_of(active.id)
+  end
+  return by_connector[monitor.name] or 0
+end
+
+-- The id of a slot in the group a screen shows.
 function M.workspace_id(monitor, slot)
+  local monitors = connected()
+  return blocks_lib.id_of(focused_block(monitor, monitors, assign(monitors)), slot)
+end
+
+-- A screen's groups, as the bar shows them.
+local function groups_on(monitor)
   local by_connector = assign(connected())
-  return blocks_lib.id_of(by_connector[monitor.name] or 0, slot)
+  local workspaces = {}
+  for _, workspace in ipairs(hl.get_workspaces()) do
+    if regular(workspace) then
+      workspaces[#workspaces + 1] = { id = workspace.id, monitor = workspace.monitor and workspace.monitor.name }
+    end
+  end
+  return blocks_lib.groups(by_connector[monitor.name] or 0, monitor.name, workspaces,
+    blocks_lib.x_of_block(blocks, positions))
 end
 
 -- The workspace a screen falls back to when what it shows isn't its own: the
@@ -224,20 +242,79 @@ local function target_monitor(name)
   return hl.get_active_monitor()
 end
 
--- Go to a slot on a screen, the focused one unless named.
-function M.focus(slot, monitor_name)
+-- Show workspace `id` on a screen and focus it, bringing it back from another
+-- screen, or creating it here.
+local function go(monitor, id)
+  if not monitor.focused then
+    hl.dispatch(hl.dsp.focus({ monitor = monitor.name }))
+  end
+  reclaim(monitor, id)
+  hl.dispatch(hl.dsp.focus({ workspace = tostring(id) }))
+end
+
+-- An action that runs `fn(monitor)` on a screen, the focused one unless named.
+local function on_monitor(monitor_name, fn)
   return function()
     local monitor = target_monitor(monitor_name)
-    if not monitor then
+    if monitor then
+      fn(monitor)
+    end
+  end
+end
+
+-- Go to a slot of the group a screen shows, the focused screen unless named.
+function M.focus(slot, monitor_name)
+  return on_monitor(monitor_name, function(monitor)
+    go(monitor, M.workspace_id(monitor, slot))
+  end)
+end
+
+-- Go to workspace `id` on a screen, whichever group it is in: the bar's click.
+function M.go_to(id, monitor_name)
+  return on_monitor(monitor_name, function(monitor)
+    go(monitor, id)
+  end)
+end
+
+-- Next or previous workspace through a screen's groups (`direction` 1 or -1).
+local function scroll(direction, monitor_name)
+  return on_monitor(monitor_name, function(monitor)
+    local active = monitor.active_workspace
+    if not regular(active) then
       return
     end
-    if not monitor.focused then
-      hl.dispatch(hl.dsp.focus({ monitor = monitor.name }))
+    local id = blocks_lib.step(groups_on(monitor), active.id, direction, (active.windows or 0) > 0, taken_ids())
+    if id then
+      go(monitor, id)
     end
-    local id = M.workspace_id(monitor, slot)
-    reclaim(monitor, id)
-    hl.dispatch(hl.dsp.focus({ workspace = tostring(id) }))
-  end
+  end)
+end
+
+-- The first workspace of the next or previous group on a screen.
+local function scroll_group(direction, monitor_name)
+  return on_monitor(monitor_name, function(monitor)
+    local active = monitor.active_workspace
+    local id = regular(active) and blocks_lib.group_step(groups_on(monitor), active.id, direction)
+    if id then
+      go(monitor, id)
+    end
+  end)
+end
+
+function M.next(monitor_name)
+  return scroll(1, monitor_name)
+end
+
+function M.previous(monitor_name)
+  return scroll(-1, monitor_name)
+end
+
+function M.next_group(monitor_name)
+  return scroll_group(1, monitor_name)
+end
+
+function M.previous_group(monitor_name)
+  return scroll_group(-1, monitor_name)
 end
 
 local function move_active_window(id, follow)
@@ -262,16 +339,16 @@ function M.move_window(slot, follow)
   end
 end
 
--- Move the active window to a new workspace after the focused screen's last
--- one, and follow it. Does nothing when all ten are taken.
+-- Move the active window to a new workspace after the last of the focused
+-- group, and follow it. Does nothing when all ten are taken.
 function M.move_window_to_new()
   return function()
     local monitor = hl.get_active_monitor()
     if not monitor then
       return
     end
-    local by_connector = assign(connected())
-    local id = blocks_lib.append_slot(by_connector[monitor.name] or 0, taken_ids())
+    local monitors = connected()
+    local id = blocks_lib.append_slot(focused_block(monitor, monitors, assign(monitors)), taken_ids())
     if id then
       move_active_window(id, true)
     end
@@ -302,12 +379,6 @@ function M.move_to_monitor(direction)
       return
     end
 
-    -- Moved by hand, it belongs where it was put.
-    if merged[id] then
-      merged[id] = nil
-      save_merged()
-    end
-
     local monitors = connected()
     local by_connector = assign(monitors)
     local block = by_connector[moved.monitor.name]
@@ -332,7 +403,7 @@ function M.reconcile(added, gone)
     return
   end
 
-  local by_connector, identities = assign(monitors)
+  local by_connector = assign(monitors)
   local focused_window = hl.get_active_window()
   local focused_monitor = hl.get_active_monitor()
   local focused_name = focused_monitor and focused_monitor.name
@@ -376,80 +447,27 @@ function M.reconcile(added, gone)
     end
   end
 
-  -- Workspaces that joined another screen's block while theirs was unplugged
-  -- go back to it, under their old numbers when those are free.
-  local function restore()
-    local ids = {}
-    for id in pairs(merged) do
-      ids[#ids + 1] = id
-    end
-    table.sort(ids)
-
-    for _, id in ipairs(ids) do
-      local origin = merged[id]
-      local monitor = nil
-      for _, candidate in ipairs(monitors) do
-        if identities[candidate.name] == origin.identity then
-          monitor = candidate
-        end
-      end
-
-      if monitor then
-        merged[id] = nil
-        save_merged()
-        local workspace = hl.get_workspace(id)
-        if regular(workspace) then
-          if not workspace.monitor or workspace.monitor.name ~= monitor.name then
-            hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(id), monitor = monitor.name }))
-          end
-          if block_of(origin.id) == by_connector[monitor.name] and not hl.get_workspace(origin.id) then
-            renumber(workspace, origin.id)
-          elseif block_of(id) ~= by_connector[monitor.name] then
-            adopt(workspace, by_connector[monitor.name])
-          end
-          changed = true
-        end
-      end
-    end
-  end
-
-  -- A workspace whose screen is unplugged joins the block of the screen it
-  -- waits on, after that screen's own, and remembers where it came from. An
-  -- empty one is left to go away, and one with no room stays a guest.
-  local function merge()
-    local guests = {}
+  -- A workspace whose screen is unplugged waits on the primary screen, the
+  -- first `connected()` lists, with the rest of its group. An empty one is left
+  -- to go away.
+  local function gather()
+    local primary = monitors[1]
     for _, workspace in ipairs(hl.get_workspaces()) do
       if regular(workspace) and workspace.monitor and (workspace.windows or 0) > 0
-        and not owner(workspace.id, monitors, by_connector) and by_connector[workspace.monitor.name] then
-        guests[#guests + 1] = workspace
-      end
-    end
-    table.sort(guests, function(left, right) return left.id < right.id end)
-
-    for _, workspace in ipairs(guests) do
-      local old = workspace.id
-      local id = blocks_lib.append_slot(by_connector[workspace.monitor.name], taken_ids())
-      if id then
-        -- One merged before keeps the screen it first came from.
-        local identity = blocks_lib.identity_of_block(blocks, block_of(old))
-        if not merged[old] and identity then
-          merged[old] = { id = old, identity = identity }
-        end
-        renumber(workspace, id)
-        save_merged()
+        and not owner(workspace.id, monitors, by_connector) and workspace.monitor.name ~= primary.name then
+        hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(workspace.id), monitor = primary.name }))
         changed = true
       end
     end
   end
 
-  restore()
   -- Views first for a new screen, so the number Hyprland gave it is left
   -- empty and goes away instead of being carried to the screen that owns it.
   if added then
     own_views()
   end
   place()
-  merge()
+  gather()
   -- Moving a visible workspace home leaves a gap Hyprland fills with anything.
   own_views()
 
@@ -463,19 +481,7 @@ function M.reconcile(added, gone)
 end
 
 hl.on("hyprland.start", function()
-  -- Windows don't outlive a session, so neither do the workspaces that held them.
-  merged = {}
-  save_merged()
   M.reconcile()
-end)
-
--- A workspace created under a remembered number is a new one; the one that
--- came from elsewhere has gone.
-hl.on("workspace.created", function(workspace)
-  if workspace and merged[workspace.id] then
-    merged[workspace.id] = nil
-    save_merged()
-  end
 end)
 
 hl.on("config.reloaded", function()

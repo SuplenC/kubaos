@@ -16,6 +16,7 @@ function F.new()
     focused = nil,
     next_monitor_id = 0,
     next_window = 1,
+    renumbered = 0,
   }, F)
   world.hl = world:api()
   return world
@@ -100,6 +101,7 @@ function F:monitor_object(record)
       if key == "name" then return record.name end
       if key == "description" then return record.description end
       if key == "id" then return record.id end
+      if key == "x" then return record.x end
       if key == "is_mirror" then return false end
       if key == "focused" then return world.focused == record end
       if key == "active_workspace" then return world:workspace_object(record.active) end
@@ -219,6 +221,7 @@ function F:apply(action)
     local record = self:workspace_record(tonumber(args.workspace))
     assert(record and not self:workspace_record(args.id), "change_id onto a taken id")
     record.id = args.id
+    self.renumbered = self.renumbered + 1
   elseif kind == "window.move" then
     local address = args.window:gsub("^address:", "")
     local id = tonumber(args.workspace)
@@ -308,11 +311,12 @@ function F:plug(name, description, x)
   self:fire("monitor.added", self:monitor_object(record))
 end
 
--- Hyprland moves the screen's workspaces to the first other screen, then fires
--- `monitor.removed` while it still lists the screen.
-function F:unplug(name)
+-- Hyprland moves the screen's workspaces to the first other screen in its
+-- list (`backup` names another), then fires `monitor.removed` while it still
+-- lists the screen.
+function F:unplug(name, backup_name)
   local record = self:monitor_record(name)
-  local backup = nil
+  local backup = backup_name and self:monitor_record(backup_name)
   for _, other in ipairs(self.monitors) do
     if other ~= record then
       backup = backup or other

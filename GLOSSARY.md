@@ -73,3 +73,9 @@ _Avoid_: Workspace, code folder
 **Scripts root**:
 The folder (`~/Scripts` by default) of the user's own executable scripts, each of which the **Command menu** offers to run.
 _Avoid_: Bin folder, snippets
+
+## Screens
+
+**Workspace group**:
+One screen's workspaces 1-10, a block of Hyprland ids owned by that physical screen; while the screen is unplugged its group waits on the primary screen under the same numbers, shown apart in the bar.
+_Avoid_: Group (Hyprland's tabbed windows), merged workspaces, guests

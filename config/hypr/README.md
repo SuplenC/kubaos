@@ -72,15 +72,42 @@ Each screen has workspaces 1-10 of its own: `SUPER + 1..0` go to the
 focused screen's, `SUPER + H/J/K/L` focus another screen. Hyprland numbers
 workspaces globally, so `workspaces.lua` gives each screen a block of ten ids
 (the laptop panel 1-10, the next screen 11-20) and the bar labels them 1-10.
-Unplugging a screen puts its workspaces after the remaining screen's own;
-plugging it back returns them under their old numbers. The record of those is
-`~/.local/state/kubaos/hypr/workspace-merged`, cleared at each login.
+
+A screen's workspaces are its group. Unplugging a screen moves its group to
+the primary screen (the laptop panel; with the lid closed, the external
+Hyprland numbered first) under its own numbers, if it had any windows; an
+empty group vanishes. Plugging the screen back returns the group to it. The
+bar shows each group on its own, a dot between them, e.g. `1 2 3 · 1 2`: the
+screen's own first, then the waiting groups in the order their screens sat,
+left to right. That order is each screen's `x` when it was last plugged in,
+kept in `workspace-screens`; it holds while the screen is away, and a screen
+never seen there falls back to block order. Block order alone is stable too,
+but it is the order the screens were first seen, which says nothing about
+where they sit.
+
+Next and previous (`SUPER + Tab`, `SUPER + CTRL + →/←`, `SUPER + wheel`, the
+three-finger swipe, the bar's wheel) walk the focused screen's groups in that
+order. Within a group they visit every workspace the bar shows, the empty
+first one too. From a group's last, next opens one empty workspace after it
+(when the last has windows), and next again goes to the first of the group on
+the right; from a group's first, previous goes to the last of the group on
+the left. At either end they stay. `SUPER + CTRL + ALT + →/←` jump to the
+first workspace of the next or previous group. `SUPER + 1..0` address the
+focused group: the screen's own, or the waiting group whose workspace it
+shows, so on a waiting group `SUPER + 2` is that group's 2.
+
+No workspace is renumbered when a screen comes or goes. The Quickshell the
+bar runs (v0.3.2) keeps the id a workspace had when it first saw it, so a
+renumbered one shows under its old number and a click on it goes nowhere.
 
 Every action is also an expression for the socket:
 `hyprctl dispatch 'dot.workspaces.focus(3)'`,
 `dot.workspaces.move_window(3)` (`, false` not to follow),
-`dot.workspaces.move_window_to_new()`, `dot.workspaces.move_to_monitor("l")`.
-The bar's clicks go through `dot.workspaces.focus(slot, "<connector>")`.
+`dot.workspaces.move_window_to_new()`, `dot.workspaces.move_to_monitor("l")`,
+`dot.workspaces.next()`, `previous()`, `next_group()`, `previous_group()`
+(each takes a connector, the focused screen without one). The bar's clicks go
+through `dot.workspaces.go_to(id, "<connector>")`, its wheel through
+`dot.workspaces.next("<connector>")` and `previous`.
 
 ## Lid
 

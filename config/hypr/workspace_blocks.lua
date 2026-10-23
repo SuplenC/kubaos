@@ -1,7 +1,8 @@
 -- The bookkeeping behind per-screen workspaces (`workspaces.lua`): which block
--- of ids a screen owns, where a workspace joins another screen and where it
--- returns, and the two state files. It never calls Hyprland, so
--- `test/lua/workspaces_test.lua` runs it under plain Lua.
+-- of ids a screen owns, where a workspace joins another screen, the groups a
+-- screen shows and how next and previous walk them, and the screens file. It
+-- never calls Hyprland, so `test/lua/workspaces_test.lua` runs it under plain
+-- Lua.
 --
 -- Adapted from Omarchy's default/hypr/monitor-workspaces.lua (basecamp/omarchy,
 -- MIT) at 5d8cc3313b2c60786d4e5019a68906873aed36bd.
@@ -111,15 +112,6 @@ function M.assign(blocks, monitors, identities)
   return by_connector
 end
 
-function M.identity_of_block(blocks, block)
-  for identity, owned in pairs(blocks) do
-    if owned == block then
-      return identity
-    end
-  end
-  return nil
-end
-
 -- Where a screen's workspaces go after its own: the id after the highest in
 -- use in `block` (`taken` is the set of ids in use), or the first free one
 -- when slot 10 is taken. Nil when all ten are.
@@ -158,32 +150,131 @@ function M.adopt_id(block, id, taken)
   return nil
 end
 
+-- A screen's groups, in the order its bar shows them and next and previous
+-- walk them. Its own block comes first, with its first workspace whether it
+-- exists or not and its others wherever they are, as SUPER + 1-0 reach them.
+-- Then one group per other block with workspaces on this screen, which are
+-- those of unplugged screens, ordered by where their screens last sat, left
+-- to right, and by block where that is unknown. `workspaces` lists
+-- { id, monitor } with the connector it is on, `x_of_block` block -> x.
+function M.groups(own, connector, workspaces, x_of_block)
+  local sets, guests = { [own] = { [M.id_of(own, 1)] = true } }, {}
+  for _, workspace in ipairs(workspaces) do
+    local block = M.block_of(workspace.id)
+    if block == own or workspace.monitor == connector then
+      if not sets[block] then
+        sets[block] = {}
+        guests[#guests + 1] = block
+      end
+      sets[block][workspace.id] = true
+    end
+  end
+
+  table.sort(guests, function(left, right)
+    local l, r = x_of_block[left] or math.huge, x_of_block[right] or math.huge
+    if l ~= r then
+      return l < r
+    end
+    return left < right
+  end)
+  table.insert(guests, 1, own)
+
+  local groups = {}
+  for _, block in ipairs(guests) do
+    local ids = {}
+    for id in pairs(sets[block]) do
+      ids[#ids + 1] = id
+    end
+    table.sort(ids)
+    groups[#groups + 1] = { block = block, ids = ids }
+  end
+  return groups
+end
+
+-- The group and position of `id` in `groups`, or nil.
+local function find(groups, id)
+  for g, group in ipairs(groups) do
+    for i, candidate in ipairs(group.ids) do
+      if candidate == id then
+        return g, i
+      end
+    end
+  end
+  return nil
+end
+
+-- Where next (`direction` 1) or previous (-1) goes from `current`, nil to
+-- stay. It walks a group's workspaces in order. From a group's last, next
+-- opens one empty workspace after it when the last has windows
+-- (`has_windows`), and from an empty last goes to the first of the group on
+-- the right, so scrolling never leaves more than one empty workspace behind.
+-- From a group's first, previous goes to the last of the group on the left.
+-- `taken` is the set of ids in use.
+function M.step(groups, current, direction, has_windows, taken)
+  local g, i = find(groups, current)
+  if not g then
+    return nil
+  end
+  local ids = groups[g].ids
+  if direction < 0 then
+    if i > 1 then
+      return ids[i - 1]
+    end
+    local left = groups[g - 1]
+    return left and left.ids[#left.ids]
+  end
+  if i < #ids then
+    return ids[i + 1]
+  end
+  if has_windows then
+    local new = M.append_slot(groups[g].block, taken)
+    if new and new > current then
+      return new
+    end
+  end
+  local right = groups[g + 1]
+  return right and right.ids[1]
+end
+
+-- The first workspace of the group beside the one holding `current`, in
+-- `direction`, or nil.
+function M.group_step(groups, current, direction)
+  local g = find(groups, current)
+  local beside = g and groups[g + direction]
+  return beside and beside.ids[1]
+end
+
 -- The screens file: one line per screen ever seen, "block<TAB>connector<TAB>
--- identity", the connector empty while it is unplugged. The bar
--- (`config/quickshell/services/Hypr.qml`) maps its connector to a block with it.
+-- identity<TAB>x", the connector empty while it is unplugged and x where the
+-- screen last sat. The bar (`config/quickshell/services/Hypr.qml`) maps its
+-- connector to a block with it, and orders the groups by x.
 function M.parse_blocks(text)
-  local blocks, current = {}, {}
+  local blocks, current, positions = {}, {}, {}
   for line in text:gmatch("[^\n]+") do
-    local block, connector, identity = line:match("^(%d+)\t([^\t]*)\t(.+)$")
+    local block, connector, identity, x = line:match("^(%d+)\t([^\t]*)\t([^\t]+)\t?(-?%d*)$")
     if block then
       blocks[identity] = tonumber(block)
+      positions[identity] = tonumber(x)
       if connector ~= "" then
         current[connector] = identity
       end
     end
   end
-  return blocks, current
+  return blocks, current, positions
 end
 
--- `identities` is connector -> identity for the screens plugged in now.
-function M.format_blocks(blocks, identities)
+-- `identities` is connector -> identity for the screens plugged in now,
+-- `positions` identity -> x.
+function M.format_blocks(blocks, identities, positions)
   local connector = {}
   for name, identity in pairs(identities) do
     connector[identity] = name
   end
   local rows = {}
   for identity, block in pairs(blocks) do
-    rows[#rows + 1] = { block = block, line = block .. "\t" .. (connector[identity] or "") .. "\t" .. identity }
+    local x = positions and positions[identity]
+    local line = block .. "\t" .. (connector[identity] or "") .. "\t" .. identity .. (x and "\t" .. x or "")
+    rows[#rows + 1] = { block = block, line = line }
   end
   table.sort(rows, function(left, right) return left.block < right.block end)
   local lines = {}
@@ -193,30 +284,14 @@ function M.format_blocks(blocks, identities)
   return table.concat(lines)
 end
 
--- The merged file: one line per workspace that joined another screen while
--- its own was unplugged, "id now<TAB>id before<TAB>identity of its screen".
-function M.parse_merged(text)
-  local merged = {}
-  for line in text:gmatch("[^\n]+") do
-    local id, original, identity = line:match("^(%d+)\t(%d+)\t(.+)$")
-    if id then
-      merged[tonumber(id)] = { id = tonumber(original), identity = identity }
-    end
+-- Block -> x of the screen that owns it, from identity -> block and
+-- identity -> x.
+function M.x_of_block(blocks, positions)
+  local result = {}
+  for identity, block in pairs(blocks) do
+    result[block] = positions[identity]
   end
-  return merged
-end
-
-function M.format_merged(merged)
-  local ids = {}
-  for id in pairs(merged) do
-    ids[#ids + 1] = id
-  end
-  table.sort(ids)
-  local lines = {}
-  for _, id in ipairs(ids) do
-    lines[#lines + 1] = id .. "\t" .. merged[id].id .. "\t" .. merged[id].identity .. "\n"
-  end
-  return table.concat(lines)
+  return result
 end
 
 return M
