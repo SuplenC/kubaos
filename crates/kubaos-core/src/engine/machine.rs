@@ -167,6 +167,31 @@ impl BlockDev {
     }
 }
 
+/// What on one disk is in use, from its lsblk tree.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct InUse {
+    /// Active swap: the live system turns on any swap partition it finds,
+    /// so a disk with an old Linux on it usually has one.
+    pub swaps: Vec<String>,
+    /// Mount points of everything else that is mounted.
+    pub mounts: Vec<String>,
+}
+
+pub fn in_use(l: &Lsblk, disk: &str) -> InUse {
+    let mut u = InUse::default();
+    let devs = l.blockdevices.iter().filter(|b| b.dev_path() == disk);
+    for dev in devs.flat_map(BlockDev::walk) {
+        for m in dev.mounts() {
+            if m == "[SWAP]" {
+                u.swaps.push(dev.dev_path());
+            } else {
+                u.mounts.push(m);
+            }
+        }
+    }
+    u
+}
+
 pub fn parse_lsblk(json: &str) -> Result<Lsblk, String> {
     serde_json::from_str(json).map_err(|e| format!("can't parse lsblk --json: {e}"))
 }
@@ -505,6 +530,33 @@ mod tests {
 
     const LAPTOP: &str = include_str!("../../tests/fixtures/lsblk-laptop.json");
     const LOOP: &str = include_str!("../../tests/fixtures/lsblk-loop-noudev.json");
+
+    #[test]
+    fn a_disk_in_use_has_its_swap_apart_from_its_mounts() {
+        let l = parse_lsblk(
+            r#"{"blockdevices": [
+              {"name": "sda", "path": "/dev/sda", "type": "disk", "mountpoints": [null], "children": [
+                {"name": "sda1", "path": "/dev/sda1", "type": "part", "mountpoints": [null]},
+                {"name": "sda2", "path": "/dev/sda2", "type": "part", "fstype": "swap", "mountpoints": ["[SWAP]"]},
+                {"name": "sda3", "path": "/dev/sda3", "type": "part", "fstype": "crypto_LUKS", "mountpoints": [null], "children": [
+                  {"name": "luks-old", "path": "/dev/mapper/luks-old", "type": "crypt", "mountpoints": ["/media/old", "/media/old2"]}
+                ]}
+              ]},
+              {"name": "sdb", "path": "/dev/sdb", "type": "disk", "mountpoints": [null], "children": [
+                {"name": "sdb1", "path": "/dev/sdb1", "type": "part", "fstype": "swap", "mountpoints": ["[SWAP]"]}
+              ]}
+            ]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            in_use(&l, "/dev/sda"),
+            InUse {
+                swaps: vec!["/dev/sda2".into()],
+                mounts: vec!["/media/old".into(), "/media/old2".into()],
+            }
+        );
+        assert_eq!(in_use(&l, "/dev/sdc"), InUse::default());
+    }
 
     #[test]
     fn laptop_disks() {

@@ -498,28 +498,28 @@ impl<'a> Install<'a> {
                 )),
             });
         }
-        if let Some(d) = &self.disk {
-            let in_use: Vec<String> = machine::read_lsblk()?
-                .blockdevices
-                .iter()
-                .filter(|b| b.dev_path() == d.path)
-                .flat_map(|b| {
-                    b.walk()
-                        .into_iter()
-                        .flat_map(|x| x.mounts())
-                        .collect::<Vec<_>>()
-                })
-                .collect();
-            if matches!(c.disk.target, DiskTarget::Whole) && !in_use.is_empty() {
+        if let Some(path) = self.disk.as_ref().map(|d| d.path.clone())
+            && matches!(c.disk.target, DiskTarget::Whole)
+        {
+            let in_use = machine::in_use(&machine::read_lsblk()?, &path);
+            // The live system turned on the swap it found on this disk, which
+            // the install is about to erase anyway.
+            for swap in &in_use.swaps {
+                self.info(format!("turning off swap on {swap}"));
+                if let Err(e) = self.sh(Cmd::new("swapoff").arg(swap)) {
+                    return Err(StepError {
+                        message: e.message,
+                        hint: Some(format!("Free it and try again: swapoff {swap}")),
+                    });
+                }
+            }
+            if !in_use.mounts.is_empty() {
                 return Err(StepError {
                     message: format!(
-                        "{} is in use (mounted at {}), so nothing got written",
-                        d.path,
-                        in_use.join(", ")
+                        "{path} is in use (mounted at {}), so nothing got written",
+                        in_use.mounts.join(", ")
                     ),
-                    hint: Some(
-                        "Free it and try again: unmount it, and swapoff if it's swap.".into(),
-                    ),
+                    hint: Some("Free it and try again: unmount it.".into()),
                 });
             }
         }
