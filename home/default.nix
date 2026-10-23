@@ -9,6 +9,7 @@
     ./cli.nix
     ./dev.nix
     ./desktop.nix
+    ./files.nix
     ./menu.nix
     ./secrets.nix
     ./shell.nix

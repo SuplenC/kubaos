@@ -1907,6 +1907,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kubaos-files"
+version = "0.1.0"
+dependencies = [
+ "kotodama-extension",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "kubaos-kobo"
 version = "0.1.0"
 dependencies = [

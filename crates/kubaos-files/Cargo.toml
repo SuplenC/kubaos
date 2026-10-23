@@ -1,0 +1,22 @@
+[package]
+name = "kubaos-files"
+description = "KubaOS's file manager glue: yazi in a terminal window, for xdg-open and org.freedesktop.FileManager1"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-files"
+path = "src/main.rs"
+
+[dependencies]
+# Its few D-Bus calls and its launcher, which puts each window in a scope of
+# its own: no D-Bus library, no async runtime, no thread for a connection.
+kotodama-extension.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

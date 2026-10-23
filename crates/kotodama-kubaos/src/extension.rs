@@ -6,12 +6,14 @@
 //!
 //! - Which Items there are under the current config, `hide` applied, and what the update check
 //!   changes in the update actions.
-//! - Sending a run to the registry, a toggle, an audio device, a keyboard Item or a wallpaper set.
+//! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set or
+//!   a user folder.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
-//!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`].
+//!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
+//!   [`crate::files`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -22,6 +24,8 @@ use kotodama_protocol::ItemRef;
 use kotodama_protocol::Table;
 
 use crate::bus::Bus;
+use crate::files;
+use crate::files::UserFolders;
 use crate::keyboard;
 use crate::keyboard::Keyboards;
 use crate::registry;
@@ -42,6 +46,7 @@ pub struct Extension<B, R> {
     pending: Pending,
     keyboards: Keyboards,
     wallpapers: WallpaperSets,
+    folders: UserFolders,
     bus: B,
     runner: R,
 }
@@ -54,6 +59,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             pending: Pending::default(),
             keyboards: Keyboards::default(),
             wallpapers: WallpaperSets::default(),
+            folders: UserFolders::default(),
             bus,
             runner,
         }
@@ -83,8 +89,13 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.wallpapers = wallpapers;
     }
 
-    /// The Items to index: the actions, the toggles, the keyboard Items and the wallpaper sets
-    /// `hide` leaves in, the update actions as the update check has them.
+    /// Takes the user folders, as they are on disk now.
+    pub fn set_user_folders(&mut self, folders: UserFolders) {
+        self.folders = folders;
+    }
+
+    /// The Items to index: the actions, the toggles, the keyboard Items, the wallpaper sets and the
+    /// user folders `hide` leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -100,12 +111,18 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .items()
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
+        let folders = self
+            .folders
+            .items()
+            .into_iter()
+            .filter(|item| !self.registry.hides(&item.id));
         self.registry
             .items()
             .filter_map(|item| self.pending.apply(item))
             .chain(toggles)
             .chain(keyboards)
             .chain(wallpapers)
+            .chain(folders)
     }
 
     /// Runs `action` on `item`; an error is what the user reads.
@@ -134,6 +151,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
                 self.keyboards.run(&item.id, action, arguments, &self.runner)
             }
             wallpapers::KIND if !self.registry.hides(&item.id) => self.wallpapers.run(&item.id, action, &self.runner),
+            files::KIND if !self.registry.hides(&item.id) => self.folders.run(&item.id, action, &self.runner),
             _ => Err(unknown()),
         }
     }

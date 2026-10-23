@@ -1,8 +1,9 @@
 //! The KubaOS Extension's protocol loop: each config the Daemon sends makes
 //! the Items over, sending only the ones that changed, and so does each
 //! change the update check writes, each change to the keyboard layouts and
-//! each change to the wallpaper sets file; each run is answered with its
-//! outcome, after the View it pushes or pops.
+//! each change to the wallpaper sets file; each config also reads the user
+//! folders again; each run is answered with its outcome, after the View it
+//! pushes or pops.
 //!
 //! # Owns
 //!
@@ -30,6 +31,7 @@ use kotodama_extension::watch::RecursiveMode;
 use kotodama_extension::watch::Watcher;
 use kotodama_kubaos::bus::SystemBus;
 use kotodama_kubaos::extension::Extension;
+use kotodama_kubaos::files::UserFolders;
 use kotodama_kubaos::keyboard::Keyboards;
 use kotodama_kubaos::run::Programs;
 use kotodama_kubaos::toggles::Ran;
@@ -92,6 +94,9 @@ fn run() -> Result<(), Error> {
                 for problem in extension.configure(&table) {
                     config::warn(problem);
                 }
+                // The user folders are read again with each config, not watched: they change
+                // rarely, and a folder made since shows up at the next reload.
+                extension.set_user_folders(UserFolders::from_env());
                 configured = true;
                 sent.publish(&mut writer, extension.items())?;
             }
