@@ -48,8 +48,13 @@ Pill {
     onScrolled: steps => Hypr.focusOn(monitor, ids[(slot - steps + ids.length) % ids.length])
 
     Item {
+        id: cells
+
         implicitWidth: root.ids.length * root.cell
         implicitHeight: root.cell
+        // Whatever its two edges are animating, the indicator draws on the
+        // cells only, never onto the window title beside the pill.
+        clip: true
 
         Rectangle {
             id: indicator
@@ -68,8 +73,8 @@ Pill {
                 ready = true;
             }
 
-            x: start
-            width: end - start
+            x: Math.max(0, start)
+            width: Math.max(0, Math.min(end, cells.width) - x)
             height: root.cell
             radius: height / 2
             color: Theme.m3primary
@@ -77,12 +82,17 @@ Pill {
             Connections {
                 target: root
 
+                // Both edges come from the target. Under its Behavior, `start`
+                // still reads the old value right after it is set, and an end
+                // taken from it lands a cell off: the indicator vanished on
+                // the way right and covered two cells on the way back.
                 function onSlotChanged() {
-                    const right = root.slot * root.cell > indicator.start;
+                    const target = root.slot * root.cell;
+                    const right = target > indicator.start;
                     startAnim.duration = right ? indicator.trail : indicator.lead;
                     endAnim.duration = right ? indicator.lead : indicator.trail;
-                    indicator.start = root.slot * root.cell;
-                    indicator.end = indicator.start + root.cell;
+                    indicator.start = target;
+                    indicator.end = target + root.cell;
                 }
             }
 
