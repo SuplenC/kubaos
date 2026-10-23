@@ -17,5 +17,8 @@ if ! cmp -s "$src" "$rule"; then
   install -m 0644 "$src" "$rule"
   echo "installed $rule"
 fi
-udevadm control --reload
-udevadm trigger --subsystem-match=backlight --subsystem-match=leds --action=add
+# No udevd (a container, a chroot): the rule applies when the machine boots.
+if udevadm control --ping 2>/dev/null; then
+  udevadm control --reload
+  udevadm trigger --subsystem-match=backlight --subsystem-match=leds --action=add
+fi
