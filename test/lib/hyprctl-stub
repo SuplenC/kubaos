@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# A stand-in for hyprctl in the sway session, linked as /usr/local/bin/hyprctl
+# by the session_reload check (test/lib/e2e.sh). It answers to one Hyprland
+# instance, `e2e`, logs every call to $HYPRCTL_STUB_LOG, and runs the command
+# of a `dispatch 'hl.dsp.exec_cmd([[CMD]])'` detached in the session whose
+# environment is in $HYPRCTL_STUB_ENV, its output appended to
+# $HYPRCTL_STUB_OUT, the way Hyprland starts what it execs.
+set -euo pipefail
+
+printf '%s\n' "$*" >>"$HYPRCTL_STUB_LOG"
+case "$*" in
+  "instances -j")
+    printf '[{"instance": "e2e", "pid": %d, "wl_socket": "wayland-1"}]\n' "$PPID"
+    ;;
+  "-i e2e reload") ;;
+  "-i e2e dispatch hl.dsp.exec_cmd([["*"]])")
+    cmd="${4#hl.dsp.exec_cmd([[}"
+    cmd="${cmd%]])}"
+    set -a
+    # shellcheck source=/dev/null # Written by session_start.
+    . "$HYPRCTL_STUB_ENV"
+    set +a
+    setsid -f sh -c "$cmd" </dev/null >>"$HYPRCTL_STUB_OUT" 2>&1
+    ;;
+  *)
+    echo "hyprctl-stub: unexpected call: $*" >&2
+    exit 1
+    ;;
+esac
