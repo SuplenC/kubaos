@@ -221,6 +221,15 @@ icon = "preferences-system"
 keywords = ["quick settings", "panel"]
 run = ["qs", "ipc", "call", "controlcenter", "toggle"]
 
+# The code a keyboard or phone asks for shows in that tab, from the pairing
+# agent (home/bluetooth.nix).
+[extensions.kubaos.actions.bluetooth-pair]
+title = "Pair a Bluetooth device"
+subtitle = "Search for keyboards, headphones and phones in the control center, and pair one"
+icon = "bluetooth"
+keywords = ["bluetooth", "bt", "pair", "keyboard", "headphones", "connect", "scan"]
+run = ["qs", "ipc", "call", "controlcenter", "bluetooth"]
+
 [extensions.kubaos.actions.power-menu]
 title = "Power menu"
 subtitle = "Lock, suspend, log out, reboot or shut down"
