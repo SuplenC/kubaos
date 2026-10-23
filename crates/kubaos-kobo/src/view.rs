@@ -35,6 +35,10 @@ use crate::widgets::{
     icon, label, list_row, pick_chip, play_badge, quiet_btn, ring, scroll, spinner, switch_anim, text_field,
     title, well, well_ring,
 };
+use crate::widgets::HALO;
+use crate::widgets::Tick;
+use crate::widgets::check_badge;
+use crate::widgets::halo;
 
 type El<'a> = Element<'a, Message>;
 
@@ -1784,26 +1788,30 @@ pub fn wallpapers_summary(
     parts.join(", ")
 }
 
-/// Height of a thumbnail on the Wallpapers screen: 16:9 at the width four take in the panel.
-const THUMB_HEIGHT: f32 = 92.0;
+/// A wallpaper card's shape: the photo is cropped to it, whatever its own.
+const CARD_ASPECT: f32 = 16.0 / 10.0;
+
+/// Space between the cards, both ways.
+const CARD_GAP: f32 = space::LG;
+
+/// How far the label and badges sit from the card's edge: the corner radius, so text never runs
+/// into a rounded corner.
+const CARD_INSET: f32 = radius::MD;
+
+/// How far a card's glow reaches past its edge. The list is padded by it on the left, where the
+/// scroll area would otherwise cut the first column's glow off straight.
+const CARD_GLOW: f32 = 10.0;
 
 fn wallpapers<'a>(app: &'a App, p: &Palette) -> El<'a> {
     let sets = app.wallpaper_sets();
-    let mut sections = column![].spacing(space::XL);
+    let mut sections = column![].spacing(space::XXXL);
     for (s, set) in sets.iter().enumerate() {
-        let mut section = column![wallpaper_set_header(app, s, set, p)].spacing(space::SM);
-        for start in (0..set.files.len()).step_by(WALLPAPER_COLUMNS) {
-            let mut r = row![].spacing(space::SM);
-            for i in start..start + WALLPAPER_COLUMNS {
-                r = r.push(if i < set.files.len() {
-                    wallpaper_thumb(app, s, i, p)
-                } else {
-                    Space::new().width(Length::FillPortion(1)).into()
-                });
-            }
-            section = section.push(r);
-        }
-        sections = sections.push(section);
+        let cards = (0..set.files.len()).map(|i| wallpaper_card(app, s, i, p));
+        let grid = iced::widget::Grid::with_children(cards)
+            .columns(WALLPAPER_COLUMNS)
+            .spacing(CARD_GAP - 2.0 * HALO)
+            .height(iced::widget::grid::aspect_ratio(CARD_ASPECT, 1.0));
+        sections = sections.push(column![wallpaper_set_header(app, s, set, p), grid].spacing(space::SM));
     }
     let total: u32 = sets.iter().map(|s| s.images).sum();
     let picked = app.form.wallpapers_picked(sets);
@@ -1820,16 +1828,20 @@ fn wallpapers<'a>(app: &'a App, p: &Palette) -> El<'a> {
             p
         ),
         Space::new().height(space::XL),
-        scroll(ids::WALLPAPER_SCROLL, container(sections).padding(Padding::ZERO.right(space::LG)), p)
-            .height(Length::Fill),
+        scroll(
+            ids::WALLPAPER_SCROLL,
+            container(sections).padding(Padding::ZERO.left(CARD_GLOW - HALO).right(space::LG).bottom(space::LG)),
+            p
+        )
+        .height(Length::Fill),
         Space::new().height(space::MD),
         text(note).size(size::SM).color(p.on_surface_variant),
     ]
     .into()
 }
 
-/// A set's header: its name and how many of its wallpapers are picked. Space or a click picks the
-/// rest of it, or drops it when it's all picked.
+/// A set's header: its check, its name and a pill with how many of its wallpapers are picked.
+/// Space or a click picks the rest of it, or drops it when it's all picked.
 fn wallpaper_set_header<'a>(
     app: &'a App,
     s: usize,
@@ -1837,32 +1849,36 @@ fn wallpaper_set_header<'a>(
     p: &Palette,
 ) -> El<'a> {
     let on = app.form.wallpapers_on(set);
-    let all = on == set.images && on > 0;
+    let tick = Tick::of(on, set.images);
     let pp = *p;
-    let (ic, ic_color) = match on {
-        0 => (Icon::Circle, p.outline),
-        _ if all => (Icon::CheckCircle, p.primary),
-        _ => (Icon::CheckCircle, alpha(p.primary, 0.55)),
+    let count = match (tick, set.images) {
+        (Tick::Full | Tick::Empty, 1) => "1 wallpaper".to_string(),
+        (Tick::Full, n) => format!("all {n}"),
+        (Tick::Empty, n) => format!("{n} wallpapers"),
+        (Tick::Partial, n) => format!("{on} of {n}"),
     };
+    let (pill_fg, pill_bg) = match tick {
+        Tick::Full => (p.primary, alpha(p.primary, 0.14)),
+        Tick::Partial => (p.on_surface, alpha(p.on_surface, 0.08)),
+        Tick::Empty => (p.on_surface_variant, alpha(p.on_surface, 0.05)),
+    };
+    let pill = container(text(count).font(theme::SANS_MEDIUM).size(size::SM).color(pill_fg))
+        .padding([2.0, space::MD - 2.0])
+        .style(move |_t| container::Style {
+            background: Some(Background::Color(pill_bg)),
+            border: Border::default().rounded(radius::FULL),
+            ..container::Style::default()
+        });
     let b = button(
         row![
-            icon(ic, 20.0, ic_color),
+            check_badge(tick, 20.0, p.outline, Color::TRANSPARENT, p),
             text(set_name(&set.id))
                 .font(theme::SANS_SEMIBOLD)
-                .size(size::MD)
-                .color(p.on_surface)
-                .width(Length::Fill),
-            text(match (on, set.images) {
-                (_, 1) if all => "1 wallpaper".to_string(),
-                (_, n) if all => format!("all {n}"),
-                (0, 1) => "1 wallpaper".to_string(),
-                (0, n) => format!("{n} wallpapers"),
-                (k, n) => format!("{k} of {n}"),
-            })
-            .size(size::SM)
-            .color(p.on_surface_variant),
+                .size(size::LG)
+                .color(p.on_surface),
+            pill,
         ]
-        .spacing(space::SM)
+        .spacing(space::MD)
         .align_y(Alignment::Center),
     )
     .width(Length::Fill)
@@ -1877,105 +1893,132 @@ fn wallpaper_set_header<'a>(
         snap: true,
     });
     let f = F::WallpaperSet(s);
-    container(ring(b, app.is_focused(f), radius::MD, p))
+    container(halo(b, app.is_focused(f), radius::MD, p))
         .id(wallpaper_item(f).unwrap_or_default())
         .into()
 }
 
-/// A thumbnail: picked ones in full colour with a check, the others dimmed. Videos carry a play
-/// badge. Until (or unless) its picture is decoded, a placeholder.
-fn wallpaper_thumb<'a>(app: &'a App, s: usize, i: usize, p: &Palette) -> El<'a> {
+/// A wallpaper card: the photo edge to edge, its name over a scrim along the bottom, a check
+/// badge (and a play badge for videos) top right. Picked ones glow amber; the others are dimmed
+/// with an empty badge. Until (or unless) its picture is decoded, a placeholder.
+fn wallpaper_card<'a>(app: &'a App, s: usize, i: usize, p: &Palette) -> El<'a> {
     let set = &app.wallpaper_sets()[s];
     let file = &set.files[i];
     let on = app.form.wallpaper_on(set, file);
+    let f = F::Wallpaper(s, i);
+    let focused = app.is_focused(f);
     let pp = *p;
+    let fill = |el: El<'a>| container(el).width(Length::Fill).height(Length::Fill);
     let picture: El = match app.thumbs.get(&model::wallpaper_key(set, file)) {
         Some(h) => image(h.clone())
             .content_fit(ContentFit::Cover)
             .width(Length::Fill)
-            .height(THUMB_HEIGHT)
+            .height(Length::Fill)
             .border_radius(radius::MD)
-            .opacity(if on { 1.0 } else { 0.4 })
             .into(),
-        None => center(icon(Icon::Wallpaper, 28.0, alpha(p.on_surface_variant, 0.6)))
-            .width(Length::Fill)
-            .height(THUMB_HEIGHT)
-            .style(move |_t| container::Style {
-                background: Some(Background::Color(alpha(pp.surface_container_highest, 0.6))),
-                border: Border::default().rounded(radius::MD),
-                ..container::Style::default()
-            })
-            .into(),
+        None => center(icon(Icon::Wallpaper, 28.0, alpha(p.on_surface_variant, 0.6))).into(),
     };
-    let mut layers = stack![picture];
-    if file.is_video() {
-        layers = layers.push(
-            container(play_badge(22.0, Color::WHITE, alpha(Color::BLACK, 0.55)))
-                .padding(space::XS)
-                .width(Length::Fill)
-                .height(THUMB_HEIGHT)
-                .align_x(Alignment::Start)
-                .align_y(Alignment::End),
-        );
-    }
-    if on {
-        layers = layers.push(
-            container(
-                container(icon(Icon::CheckCircle, 20.0, p.on_primary))
-                    .padding(1)
-                    .style(move |_t| container::Style {
-                        background: Some(Background::Color(pp.primary)),
-                        border: Border::default().rounded(radius::FULL),
-                        ..container::Style::default()
-                    }),
-            )
-            .padding(space::XS)
-            .width(Length::Fill)
-            .align_x(Alignment::End),
-        );
-    }
-    let b = button(
-        column![
-            layers,
-            elide(
-                wallpaper_label(&file.name),
-                theme::SANS,
-                size::XS,
-                if on { p.on_surface } else { p.on_surface_variant },
-            )
-            .width(Length::Fill),
-        ]
-        .spacing(space::XS),
-    )
-    .width(Length::Fill)
-    .padding(space::XS)
-    .on_press(Message::Click(F::Wallpaper(s, i)))
-    .style(move |_t: &Theme, status| button::Style {
-        background: Some(Background::Color(if on {
-            alpha(pp.secondary_container, 0.7)
-        } else if matches!(status, button::Status::Hovered) {
-            alpha(pp.on_surface, theme::STATE_HOVER)
-        } else {
-            Color::TRANSPARENT
-        })),
-        text_color: pp.on_surface,
-        border: Border {
-            color: if on {
-                alpha(pp.primary, 0.8)
-            } else {
-                alpha(pp.outline_variant, 0.5)
-            },
-            width: 1.0,
-            radius: (radius::MD + 2.0).into(),
-        },
-        shadow: Shadow::default(),
-        snap: true,
+    let dim = fill(Space::new().into()).style(move |_t| container::Style {
+        background: (!on).then(|| Background::Color(alpha(DARK.scrim, 0.38))),
+        border: Border::default().rounded(radius::MD),
+        ..container::Style::default()
     });
-    let f = F::Wallpaper(s, i);
-    container(ring(b, app.is_focused(f), radius::MD + 2.0, p))
+    let scrim = fill(Space::new().into()).style(move |_t| {
+        let g = Linear::new(Radians(PI))
+            .add_stop(0.45, alpha(DARK.surface, 0.0))
+            .add_stop(0.75, alpha(DARK.surface, 0.4))
+            .add_stop(1.0, alpha(DARK.surface, 0.78));
+        container::Style {
+            background: Some(Background::Gradient(Gradient::Linear(g))),
+            border: Border::default().rounded(radius::MD),
+            ..container::Style::default()
+        }
+    });
+    let name = elide(
+        wallpaper_label(&file.name),
+        theme::SANS_MEDIUM,
+        size::SM,
+        if on { p.on_surface } else { alpha(p.on_surface, 0.72) },
+    )
+    .width(Length::Fill);
+    let label = fill(name.into())
+        .padding(Padding::new(CARD_INSET).top(0))
+        .align_y(Alignment::End);
+    let mut badges = row![].spacing(space::XS + 2.0).align_y(Alignment::Center);
+    if file.is_video() {
+        badges = badges.push(play_badge(22.0, Color::WHITE, alpha(Color::BLACK, 0.55)));
+    }
+    let tick = if on { Tick::Full } else { Tick::Empty };
+    badges = badges.push(check_badge(
+        tick,
+        22.0,
+        alpha(Color::WHITE, 0.85),
+        alpha(Color::BLACK, 0.3),
+        p,
+    ));
+    let badges = fill(badges.into())
+        .padding(space::SM + 2.0)
+        .align_x(Alignment::End)
+        .align_y(Alignment::Start);
+    // The border is a layer of its own on top: a button's border is drawn under its content,
+    // so the photo would cover it.
+    let edge = fill(Space::new().into()).style(move |_t| container::Style {
+        border: if on {
+            Border {
+                color: pp.primary,
+                width: 2.0,
+                radius: radius::MD.into(),
+            }
+        } else {
+            Border {
+                color: alpha(Color::WHITE, 0.08),
+                width: 1.0,
+                radius: radius::MD.into(),
+            }
+        },
+        ..container::Style::default()
+    });
+    let b = button(stack![picture, dim, scrim, label, badges, edge])
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(0)
+        .on_press(Message::Click(f))
+        .style(move |_t: &Theme, status| button::Style {
+            background: Some(Background::Color(pp.surface_container_highest)),
+            text_color: pp.on_surface,
+            border: Border::default().rounded(radius::MD),
+            shadow: card_shadow(on, focused, matches!(status, button::Status::Hovered), &pp),
+            snap: true,
+        });
+    container(halo(b, focused, radius::MD, p))
         .id(wallpaper_item(f).unwrap_or_default())
-        .width(Length::FillPortion(1))
+        .width(Length::Fill)
+        .height(Length::Fill)
         .into()
+}
+
+/// A card's shadow: a soft amber glow when picked, and a lift under it when focused (deeper) or
+/// hovered (lighter).
+fn card_shadow(on: bool, focused: bool, hovered: bool, p: &Palette) -> Shadow {
+    let color = |a: f32| if on { alpha(p.primary, a) } else { alpha(DARK.scrim, a + 0.15) };
+    match (focused, hovered) {
+        (true, _) => Shadow {
+            color: color(0.4),
+            offset: Vector::new(0.0, 6.0),
+            blur_radius: CARD_GLOW + 4.0,
+        },
+        (false, true) => Shadow {
+            color: color(0.3),
+            offset: Vector::new(0.0, 3.0),
+            blur_radius: CARD_GLOW,
+        },
+        (false, false) if on => Shadow {
+            color: color(0.24),
+            offset: Vector::ZERO,
+            blur_radius: CARD_GLOW,
+        },
+        (false, false) => Shadow::default(),
+    }
 }
 
 /// A summary row with a second, quieter line (paths, emails, versions):
