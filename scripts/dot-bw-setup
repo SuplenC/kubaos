@@ -17,13 +17,15 @@
 #                                   code (password is an alias of totp)
 #   --only ssh,git,gh,env           just these parts (default: all)
 #
-# What it configures, from folder "dotfiles" (and env/<project>):
-#   ssh   public keys -> ~/.ssh/<name>.pub, Host blocks -> ~/.ssh/config.d/bitwarden
+# What it configures, from the whole vault, whatever folder an item is in:
+#   ssh   every SSH key item -> ~/.ssh/<name>.pub, and a Host block in
+#         ~/.ssh/config.d/bitwarden for each one with a 'hosts' field
 #   git   commit signing with the key marked signing=true,
 #         ~/.config/git-bitwarden/{signing.gitconfig,allowed_signers}
 #   gh    token from item "gh-token" -> gh's keyring entry
 #   env   every project -> GNOME keyring (dot-bwenv), for `use bwenv` in .envrc
 #   agent checks the Bitwarden desktop SSH agent answers
+# folder=<name> in ~/.config/dot-bw/config narrows ssh and git to that folder.
 #
 # Private keys never leave the vault; nothing secret is written to disk or
 # logged. BW_SESSION exists only in this process and the bw/dot-bwenv
@@ -125,6 +127,42 @@ gitcfg() { (cd / && GIT_DIR=/nonexistent git config "$@" 2>/dev/null); }
 truthy() { [[ ${1,,} =~ ^(true|yes|1)$ ]]; }
 # field ITEM_JSON NAME: a custom field's value ("" when missing).
 field() { jq -r --arg n "$2" '[.fields[]? | select(.name == $n) | .value][0] // "" | tostring' <<<"$1"; }
+# key_label ITEM_JSON: the item's name and folder, which tells apart two keys of the same name.
+# It goes into a comment in ssh_config, so a control character (a newline would
+# start a directive) becomes a space.
+key_label() { jq -r '"\(.name) (\(.folder))" | gsub("[\u0000-\u001f\u007f]"; " ")' <<<"$1"; }
+# list WORDS: the words joined with ", ".
+list() {
+  local out
+  printf -v out '%s, ' "$@"
+  printf '%s' "${out%, }"
+}
+
+# name_pub_files: give every item in $ssh_items a .file, the name of its .pub,
+# each one different. Items come oldest first, so of two keys with the same name
+# the older keeps the plain name and a new one never takes over a .pub in use.
+name_pub_files() {
+  local name want folder base file k
+  local -a files=()
+  local -A owner=()
+  # One line per item, fields split by US (0x1f): a tab is IFS whitespace, and
+  # read would merge the empty 'file' field into the next.
+  while IFS=$'\x1f' read -r name want folder; do
+    base="$(slug "${want:-$name}")"
+    file="$base" k=2
+    while [[ -n ${owner[$file]:-} ]]; do
+      file="$base-$k"
+      ((k++))
+    done
+    if [[ $file != "$base" ]]; then
+      warn "~/.ssh/$base.pub is taken by ${owner[$base]}: \"$name\" ($folder) gets ~/.ssh/$file.pub (a 'file' field on it picks the name)"
+    fi
+    owner[$file]="\"$name\" ($folder)"
+    files+=("$file")
+  done < <(jq -r '.[] | [.name, ([.fields[] | select(.name == "file") | .value][0] // ""), .folder]
+    | map(tostring | gsub("[\n\r\u001f]"; " ")) | join("\u001f")' <<<"$ssh_items")
+  ssh_items="$(jq -c '[to_entries[] | .value + {file: $ARGS.positional[.key]}]' --args "${files[@]}" <<<"$ssh_items")"
+}
 
 # --- bw -----------------------------------------------------------------------
 SESSION=""
@@ -241,8 +279,9 @@ bw_login_unlock() {
 
 # --- ssh ------------------------------------------------------------------------
 setup_ssh() {
-  local items="$1" n i item name file pub fp hosts host_name user port block conf="" managed_new="" old
-  local -a words
+  local items="$1" n i item name label file pub fp hosts host_name user port block conf="" managed_new="" old h
+  local -a words with_block=() key_only=()
+  local -A host_owner=()
   step "SSH: public keys and Host blocks"
   install -d -m 0700 "$SSH_DIR" "$SSH_DIR/config.d"
   install -d -m 0700 "$STATE_DIR"
@@ -250,17 +289,17 @@ setup_ssh() {
   for ((i = 0; i < n; i++)); do
     item="$(jq -c ".[$i]" <<<"$items")"
     name="$(jq -r .name <<<"$item")"
+    label="$(key_label "$item")"
     pub="$(jq -r '.publicKey // ""' <<<"$item")"
     fp="$(jq -r '.fingerprint // ""' <<<"$item")"
     if [[ ! $pub =~ ^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp[0-9]+)\ [A-Za-z0-9+/=]+$ ]]; then
-      warn "$name: no usable public key in the item, skipped"
+      warn "$label: no usable public key in the item, skipped"
       continue
     fi
-    file="$(field "$item" file)"
-    file="$(slug "${file:-$name}")"
+    file="$(jq -r .file <<<"$item")"
     # A private key of that name on disk means this name is taken by a real key.
     if [[ -e $SSH_DIR/$file && -f $SSH_DIR/$file.pub ]] && [[ "$(cut -d' ' -f1,2 "$SSH_DIR/$file.pub")" != "$pub" ]]; then
-      warn "$name: ~/.ssh/$file is a different key on disk; set a 'file' field to pick another name"
+      warn "$label: ~/.ssh/$file is a different key on disk; set a 'file' field to pick another name"
       continue
     fi
     printf '%s %s\n' "$pub" "bitwarden:$name" | write_file "$SSH_DIR/$file.pub" 0644 >/dev/null
@@ -274,18 +313,31 @@ setup_ssh() {
     # Field values end up in ssh_config: refuse anything that could add a
     # directive (a newline plus ProxyCommand would run commands).
     if [[ "$hosts$host_name$user$port" == *[[:cntrl:]]* ]]; then
-      warn "$name: a hosts/hostname/user/port field has a newline or control character; no Host block"
+      warn "$label: a hosts/hostname/user/port field has a newline or control character; no Host block"
       continue
     fi
     read -r -a words <<<"${hosts//,/ }"
     hosts="${words[*]}"
-    [[ -n $hosts ]] || { info "no 'hosts' field: key only, no Host block"; continue; }
-    if [[ ! $hosts =~ ^[][A-Za-z0-9.*?!_:%\ -]+$ || -n $host_name && ! $host_name =~ ^[A-Za-z0-9._:%-]+$ ||
-      -n $user && ! $user =~ ^[A-Za-z0-9._@-]+$ || -n $port && ! $port =~ ^[0-9]{1,5}$ ]]; then
-      warn "$name: hosts/hostname/user/port contain characters ssh_config can't take safely; no Host block"
+    if [[ -z $hosts ]]; then
+      info "no 'hosts' field: key only, no Host block"
+      key_only+=("$label")
       continue
     fi
-    block="# $name ($fp)"$'\n'"Host $hosts"$'\n'
+    if [[ ! $hosts =~ ^[][A-Za-z0-9.*?!_:%\ -]+$ || -n $host_name && ! $host_name =~ ^[A-Za-z0-9._:%-]+$ ||
+      -n $user && ! $user =~ ^[A-Za-z0-9._@-]+$ || -n $port && ! $port =~ ^[0-9]{1,5}$ ]]; then
+      warn "$label: hosts/hostname/user/port contain characters ssh_config can't take safely; no Host block"
+      continue
+    fi
+    # ssh collects IdentityFile from every matching block, so a host in two
+    # items gets both keys offered and the server takes whichever it knows first.
+    for h in "${words[@]}"; do
+      if [[ -n ${host_owner[$h]:-} && ${host_owner[$h]} != "$label" ]]; then
+        warn "Host $h is in both ${host_owner[$h]} and $label, so ssh offers both keys there; give one an alias of its own (hosts=github-work hostname=github.com)"
+      else
+        host_owner[$h]="$label"
+      fi
+    done
+    block="# $label ($fp)"$'\n'"Host $hosts"$'\n'
     [[ -n $host_name ]] && block+="  HostName $host_name"$'\n'
     [[ -n $user ]] && block+="  User $user"$'\n'
     [[ -n $port ]] && block+="  Port $port"$'\n'
@@ -294,10 +346,11 @@ setup_ssh() {
     block+="  IdentitiesOnly yes"$'\n'
     conf+="$block"$'\n'
     info "Host $hosts"
+    with_block+=("$label")
   done
 
   {
-    printf '# Generated by dot-bw-setup from the Bitwarden folder "%s". Do not edit:\n' "$FOLDER"
+    printf '# Generated by dot-bw-setup from the Bitwarden SSH keys in %s. Do not edit:\n' "$SCOPE"
     printf '# change the vault, then run dot-bw-setup --refresh. The keys stay in the\n'
     printf '# vault; IdentityFile names the public key so the agent offers that one.\n\n'
     printf '%s' "$conf"
@@ -315,11 +368,18 @@ setup_ssh() {
   fi
   printf '%s' "$managed_new" >"$STATE_DIR/ssh-pubkeys"
   SUMMARY+=("ssh    $(grep -c . <<<"$managed_new" || true) public key(s), $(grep -c '^Host ' "$SSH_DIR/config.d/bitwarden" || true) Host block(s) in ~/.ssh/config.d/bitwarden")
+  if ((${#with_block[@]})); then
+    SUMMARY+=("       Host blocks: $(list "${with_block[@]}")")
+  fi
+  if ((${#key_only[@]})); then
+    SUMMARY+=("       key only: $(list "${key_only[@]}"). A 'hosts' field (hosts=example.com) gives a key its Host block")
+  fi
 }
 
 # --- git signing ----------------------------------------------------------------
 setup_git() {
   local items="$1" signers sign_item="" name file pub emails email allowed=""
+  local -a marked=()
   step "git: commit signing with an SSH key from the vault"
   signers="$(jq -c '[.[] | select([.fields[]? | select(.name == "signing")] | length > 0)]' <<<"$items")"
   local n i item v
@@ -331,11 +391,8 @@ setup_git() {
     pub="$(jq -r '.publicKey // ""' <<<"$item")"
     [[ -n $pub ]] || continue
     if truthy "$v"; then
-      if [[ -n $sign_item ]]; then
-        warn "more than one item has signing=true; using $(jq -r .name <<<"$sign_item")"
-      else
-        sign_item="$item"
-      fi
+      marked+=("$(key_label "$item")")
+      [[ -n $sign_item ]] || sign_item="$item"
     elif [[ ${v,,} != verify ]]; then
       continue
     fi
@@ -346,19 +403,25 @@ setup_git() {
     done
   done
   if [[ -z $sign_item ]]; then
-    warn "no SSH key item in \"$FOLDER\" has the field signing=true: commits stay unsigned"
+    warn "no SSH key in $SCOPE has the field signing=true: commits stay unsigned"
     rm -f "$GIT_DIR_OUT/signing.gitconfig"
     SUMMARY+=("git    no signing key (add a field signing=true to one SSH key item)")
     return
   fi
-  name="$(jq -r .name <<<"$sign_item")"
-  file="$(field "$sign_item" file)"
-  file="$(slug "${file:-$name}")"
-  [[ -f $SSH_DIR/$file.pub ]] || { warn "~/.ssh/$file.pub missing (run with ssh too)"; return; }
+  name="$(key_label "$sign_item")"
+  if ((${#marked[@]} > 1)); then
+    warn "${#marked[@]} SSH keys have signing=true: $(list "${marked[@]}"). Signing with the oldest, $name; set signing=verify on the others"
+  fi
+  file="$(jq -r .file <<<"$sign_item")"
+  pub="$(jq -r .publicKey <<<"$sign_item")"
+  if [[ ! -f $SSH_DIR/$file.pub || "$(cut -d' ' -f1,2 "$SSH_DIR/$file.pub")" != "$pub" ]]; then
+    warn "~/.ssh/$file.pub isn't the key of $name (run with ssh too)"
+    return
+  fi
   [[ -n $allowed ]] || warn "no email for allowed_signers: set user.email in config/git/config"
   printf '%s' "$allowed" | write_file "$GIT_DIR_OUT/allowed_signers" 0644 >/dev/null
   {
-    printf '# Generated by dot-bw-setup from the Bitwarden item "%s". Do not edit.\n' "$name"
+    printf '# Generated by dot-bw-setup from the Bitwarden SSH key %s. Do not edit.\n' "$name"
     printf '# Included by config/git/config. git signs through the agent in SSH_AUTH_SOCK.\n'
     printf '[user]\n\tsigningKey = %s\n' "$SSH_DIR/$file.pub"
     printf '[gpg]\n\tformat = ssh\n'
@@ -371,7 +434,7 @@ setup_git() {
     warn "config/git/config doesn't include ~/.config/git-bitwarden/signing.gitconfig"
   fi
   ok "allowed signers: $(grep -c . "$GIT_DIR_OUT/allowed_signers" || true) line(s)"
-  SUMMARY+=("git    commits signed with \"$name\" (~/.ssh/$file.pub)")
+  SUMMARY+=("git    commits signed with $name (~/.ssh/$file.pub)")
 }
 
 # --- gh -------------------------------------------------------------------------
@@ -379,7 +442,7 @@ setup_gh() {
   local token="$1" host="$2" current status
   step "gh: token from the vault into the system keyring"
   if [[ -z $token ]]; then
-    info "no item \"gh-token\" in \"$FOLDER\"; skipped (gh auth login works by hand too)"
+    info "no item \"gh-token\" in the vault; skipped (gh auth login works by hand too)"
     SUMMARY+=("gh     no gh-token item, skipped")
     return
   fi
@@ -438,7 +501,7 @@ check_agent() {
         grep -qF -- "$want" <<<"$listed" || { warn "agent doesn't offer $want (vault not synced in the app?)"; missing=1; }
       done
       ok "agent answers with $(grep -c . <<<"$listed") key(s)"
-      ((missing)) || SUMMARY+=("agent  running, serves every SSH key in \"$FOLDER\"")
+      ((missing)) || SUMMARY+=("agent  running, serves every SSH key in $SCOPE")
       ((missing)) && SUMMARY+=("agent  running, but some vault keys are missing (sync the desktop app)")
       ;;
     1)
@@ -457,7 +520,8 @@ check_agent() {
 
 # --- main -----------------------------------------------------------------------
 FOLDER="$(conf_get folder)"
-FOLDER="${FOLDER:-dotfiles}"
+SCOPE="your vault"
+[[ -z $FOLDER ]] || SCOPE="the folder \"$FOLDER\""
 for t in jq ssh-add ssh-keygen git; do command -v "$t" >/dev/null || die "$t not found"; done
 
 if ((CHECK)); then
@@ -482,24 +546,39 @@ else
   step "Reading the vault"
   bwq sync >/dev/null || die "bw sync failed"
   folders="$(bwq list folders | jq -c '[.[] | {id, name}]')"
-  folder_id="$(jq -r --arg n "$FOLDER" '[.[] | select(.name == $n) | .id][0] // ""' <<<"$folders")"
-  [[ -n $folder_id ]] || warn "no folder \"$FOLDER\" in the vault (docs/SECRETS.md): nothing for ssh, git, gh"
+  folder_id=""
+  if [[ -n $FOLDER ]]; then
+    folder_id="$(jq -r --arg n "$FOLDER" '[.[] | select(.name == $n) | .id][0] // ""' <<<"$folders")"
+    if [[ -z $folder_id ]]; then
+      warn "no folder \"$FOLDER\" in the vault (folder= in ~/.config/dot-bw/config): using every SSH key in the vault"
+      SCOPE="your vault"
+    fi
+  fi
   # One `bw list items` for everything. Only what's needed leaves this
   # pipeline: public keys, fingerprints, custom fields, and the gh token. SSH
-  # private keys and every other password are dropped here.
-  items="$(bwq list items | jq -c --arg f "$folder_id" '[.[] | {
-      name, type, folderId, fields: (.fields // []),
+  # private keys and every other password are dropped here. Folder names are
+  # not secret, so they may go in argv.
+  items="$(bwq list items | jq -c --argjson folders "$folders" '
+    ([$folders[] | select((.id // "") != "") | {(.id): .name}] | add // {}) as $names
+    | [.[] | {
+      id, name, type, folderId, folder: ($names[.folderId // ""] // "no folder"), created: (.creationDate // ""),
+      fields: (.fields // []),
       publicKey: (.sshKey.publicKey // null), fingerprint: (.sshKey.keyFingerprint // null),
-      token: (if .folderId == $f and .name == "gh-token"
+      token: (if .name == "gh-token"
               then (.login.password // ([.fields[]? | select(.name == "token") | .value][0]) // null)
               else null end)}]')" || die "bw list items failed"
   SESSION=""   # not needed past this point
-  ssh_items="$(jq -c --arg f "$folder_id" '[.[] | select(.type == 5 and .folderId == $f)]' <<<"$items")"
-  ok "$(jq length <<<"$items") items, $(jq length <<<"$ssh_items") SSH key(s) in \"$FOLDER\""
+  ssh_items="$(jq -c --arg f "$folder_id" \
+    '[.[] | select(.type == 5 and ($f == "" or .folderId == $f))] | sort_by(.created, .id)' <<<"$items")"
+  ok "$(jq length <<<"$items") items, $(jq length <<<"$ssh_items") SSH key(s) in $SCOPE"
+  name_pub_files
 
   want ssh && setup_ssh "$ssh_items"
   want git && setup_git "$ssh_items"
   if want gh; then
+    if (("$(jq '[.[] | select(.token != null)] | length' <<<"$items")" > 1)); then
+      warn "more than one item \"gh-token\" in the vault; gh gets the first"
+    fi
     gh_item="$(jq -c '[.[] | select(.token != null)][0] // {}' <<<"$items")"
     gh_host="$(field "$gh_item" host)"
     setup_gh "$(jq -r '.token // ""' <<<"$gh_item")" "${gh_host:-github.com}"

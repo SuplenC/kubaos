@@ -953,7 +953,7 @@ mod tests {
             .ok("/usr/local/bin/bw login k@x.eu --passwordenv BW_PASSWORD --method 0 --code 123456 --raw", "SESSIONKEY==\n")
             .ok(
                 "/home/kuba/.local/bin/dot-bw-setup",
-                "==> Bitwarden login\n  ok  unlocked\n  !!  no folder \"dotfiles\" in the vault\n",
+                "==> Bitwarden login\n  ok  unlocked\n  !!  no SSH key in your vault has the field signing=true\n",
             )
             .ok("nmcli", "full\n");
         let (ok, evs) = go(&mut s, CardId::Bitwarden, &bw_login());
@@ -975,7 +975,7 @@ mod tests {
         assert!(s.env[setup].contains(&("BW_SESSION".into(), "SESSIONKEY==".into())));
         let text = all_text(&evs);
         assert!(!text.contains("hunter2") && !text.contains("SESSIONKEY"));
-        assert!(text.contains("no folder"));
+        assert!(text.contains("signing=true"));
         assert_eq!(
             s.files
                 .get("/home/kuba/.config/dot-bw/config")

@@ -12,7 +12,7 @@ The stick holds a finished KubaOS: Ubuntu 26.04 after `system/10-strip.sh` throu
 
 - A USB stick bigger than the ISO. Everything on it gets overwritten.
 - The SentinelOne `.deb` and site token from IT, on a second stick or somewhere you can `curl` from. They're not on the KubaOS stick.
-- Your SSH keys as Bitwarden "SSH key" items in a `dotfiles` folder (`docs/SECRETS.md`, "Vault conventions"). Nothing to copy by hand.
+- Your SSH keys as Bitwarden "SSH key" items, in whatever folders you keep them (`docs/SECRETS.md`, "Vault conventions"). Nothing to copy by hand.
 - An Ethernet cable or a Wi-Fi password. The install doesn't need a network, but the first boot setup does.
 
 ### Make the stick
@@ -216,8 +216,9 @@ lists its flags.
   (`dd`, balenaEtcher, or Raspberry Pi Imager).
 - The SentinelOne `.deb` and site token from IT, on a second stick or
   somewhere you can `curl` from.
-- Your SSH keys as Bitwarden "SSH key" items in a `dotfiles` folder
-  (`docs/SECRETS.md`, "Vault conventions"). Nothing to copy by hand.
+- Your SSH keys as Bitwarden "SSH key" items, in whatever folders
+  you keep them (`docs/SECRETS.md`, "Vault conventions"). Nothing to
+  copy by hand.
 - An Ethernet cable (Wi-Fi gets configured after NetworkManager is in).
 
 ### 1. BIOS and Secure Boot
