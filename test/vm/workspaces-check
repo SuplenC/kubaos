@@ -10,9 +10,10 @@
 # It checks that SUPER + 2 on each screen opens that screen's own workspace 2,
 # that SUPER + SHIFT + 4 moves a window to a new workspace 4 on its screen,
 # that SUPER + H and SUPER + L move the focus between the screens, that
-# unplugging a screen with workspaces 1-3 puts them after the other screen's
-# own and plugging it back returns them, and that the Command menu finds and
-# runs "move to workspace 3".
+# unplugging a screen with workspaces 1-3 moves them, as a group under their
+# own numbers, to the other screen, that next and previous walk from that
+# screen's group into it, that plugging it back returns them, and that the
+# Command menu finds and runs "move to workspace 3".
 #
 # The VM runs the installed disk with the bench's SSH key in root's account and
 # the user's desktop up (test/vm/README.md: `install … --ssh`, `boot-disk`, the
@@ -131,9 +132,21 @@ own="$(as_user "$(ids_on "$first")")"
 
 as_user "hyprctl output remove $SECOND" >/dev/null
 wait_for "the second screen goes" 10 "! hyprctl monitors -j | jq -e '.[] | select(.name == \"$SECOND\")'"
-last="${own##* }"
-expect "unplugged, its workspaces follow the first screen's own" "$(ids_on "$first")" "$own $((last + 1)) $((last + 2)) $((last + 3))"
+expect "unplugged, its workspaces wait on the first screen under their own numbers" "$(ids_on "$first")" "$own 11 12 13"
 "$RUN" shot workspaces-unplugged >/dev/null
+
+# The first screen's own group is its empty 1 and the 4 with the window.
+dispatch "hl.dsp.focus({ monitor = \"$first\" })"
+dispatch "dot.workspaces.focus(4)"
+"$RUN" key meta_l-tab
+expect "SUPER + Tab after the group's last opens an empty 5" "$(shown_on "$first")" 5
+"$RUN" key meta_l-tab
+expect "SUPER + Tab from the empty one goes to the unplugged screen's group" "$(shown_on "$first")" 11
+"$RUN" key meta_l-shift-tab
+expect "SUPER + SHIFT + Tab goes back to the first screen's last" "$(shown_on "$first")" 4
+"$RUN" key meta_l-shift-tab
+expect "and on to its empty 1" "$(shown_on "$first")" 1
+dispatch "dot.workspaces.focus(4)"
 
 as_user "hyprctl output create headless $SECOND" >/dev/null
 wait_for "the second screen comes back" 10 "hyprctl monitors -j | jq -e '.[] | select(.name == \"$SECOND\")'"

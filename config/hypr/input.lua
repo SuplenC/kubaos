@@ -1,4 +1,4 @@
--- Keyboard, touchpad, gestures.
+-- Keyboard and touchpad.
 -- https://wiki.hypr.land/Configuring/Variables/#input
 
 -- The keyboard layouts are the system's: /etc/default/keyboard, which the
@@ -67,5 +67,5 @@ hl.config({
   },
 })
 
--- Three-finger horizontal swipe switches workspace.
-hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
+-- The three-finger swipe through the workspaces is in keybinds.lua, with the
+-- binds it shares an action with.
