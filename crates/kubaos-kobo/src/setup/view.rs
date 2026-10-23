@@ -196,7 +196,11 @@ fn left(s: &Setup) -> El<'_> {
         ),
         None => Space::new().into(),
     };
-    let (finish_label, kind) = if s.settled() {
+    let reboot = s.reboot_pending();
+    // Beside "Reboot to finish" the way out stays quiet, and a tonal pill wraps in the narrow column.
+    let (finish_label, kind) = if reboot {
+        ("Done for now", Kind::Text)
+    } else if s.settled() {
         ("All set", Kind::Primary)
     } else {
         ("Done for now", Kind::Tonal)
@@ -210,6 +214,29 @@ fn left(s: &Setup) -> El<'_> {
         s.is_focused(SF::Finish),
         &p,
     );
+    let footer: El = if reboot {
+        let reboot_all = btn(
+            "Reboot to finish",
+            Some(Icon::Restart),
+            false,
+            Kind::Primary,
+            Some(click(SF::RebootAll)),
+            s.is_focused(SF::RebootAll),
+            &p,
+        );
+        column![
+            text(s.reboot_nudge().unwrap_or_default())
+                .size(size::SM)
+                .color(p.on_surface_variant),
+            row![reboot_all, finish]
+                .spacing(space::MD)
+                .align_y(Alignment::Center),
+        ]
+        .spacing(space::MD)
+        .into()
+    } else {
+        row![finish].align_y(Alignment::Center).into()
+    };
     let detecting: El = if s.detecting() && s.status.is_some() {
         row![
             spinner(t, 14.0, p.primary),
@@ -242,7 +269,7 @@ fn left(s: &Setup) -> El<'_> {
             Space::new().height(Length::Fill),
             online,
             Space::new().height(space::LG),
-            row![finish].align_y(Alignment::Center),
+            footer,
             Space::new().height(space::LG),
             column![
                 row![
