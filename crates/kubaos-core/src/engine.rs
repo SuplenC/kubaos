@@ -681,6 +681,30 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_grub_install_puts_the_other_systems_fallback_loader_back() {
+        let (step, cmds) = dry_free_space("grub-install");
+        assert_eq!(step, StepId::Bootloader);
+        let failed = cmds
+            .iter()
+            .position(|c| c.contains("grub-install"))
+            .unwrap();
+        let restore = cmds[failed..]
+            .iter()
+            .position(|c| c == "cp -r /run/kubaos/efi-boot-saved /mnt/t/boot/efi/EFI/BOOT")
+            .expect("the saved EFI/BOOT goes back");
+        let umount = cmds[failed..]
+            .iter()
+            .position(|c| c == "umount /mnt/t/boot/efi")
+            .unwrap();
+        assert!(restore < umount, "{cmds:#?}");
+        assert!(
+            cmds.iter()
+                .any(|c| c == "sgdisk --delete=1 --delete=2 --delete=3 /dev/vdz"),
+            "{cmds:#?}"
+        );
+    }
+
+    #[test]
     fn a_whole_disk_install_that_fails_deletes_no_partitions() {
         let mut r = DryRunner::new();
         let (res, _) = dry(&mut r, true);

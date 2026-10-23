@@ -1110,6 +1110,15 @@ impl<'a> Install<'a> {
         Ok(())
     }
 
+    /// Put the other system's EFI/BOOT, set aside in `saved`, back.
+    fn restore_fallback(&mut self, fallback: &str, saved: &str) -> R<()> {
+        self.sh(Cmd::new("rm").args(["-rf", fallback]))?;
+        self.sh(Cmd::new("cp").args(["-r", saved, fallback]))?;
+        self.sh(Cmd::new("rm").args(["-rf", saved]))?;
+        self.info("kept the other system's EFI/BOOT fallback loader");
+        Ok(())
+    }
+
     fn installed_kernels(&mut self) -> Vec<String> {
         if self.dry() {
             return vec![self.manifest.kernel.clone()];
@@ -1182,18 +1191,20 @@ impl<'a> Install<'a> {
         }
         let refs: Vec<&str> = args.iter().map(String::as_str).collect();
         let cmd = self.chroot(&refs);
-        hint(
+        let installed = hint(
             self.sh(cmd).map_err(|e| e.message),
             "grub-install failed; is grub-efi in the payload?",
-        )?;
+        );
         self.progress(0.6, None);
 
         if keep_fallback {
-            self.sh(Cmd::new("rm").args(["-rf", &fallback]))?;
-            self.sh(Cmd::new("cp").args(["-r", &saved, &fallback]))?;
-            self.sh(Cmd::new("rm").args(["-rf", &saved]))?;
-            self.info("kept the other system's EFI/BOOT fallback loader");
+            // Even when grub-install failed: it may have written the path
+            // already, and the saved copy is on the live system's tmpfs.
+            let restored = self.restore_fallback(&fallback, &saved);
+            installed?;
+            restored?;
         } else {
+            installed?;
             // EFI/BOOT/BOOT<arch>.EFI, for firmware that forgets boot
             // entries (VMs).
             let t = format!("--target={grub_target}");
