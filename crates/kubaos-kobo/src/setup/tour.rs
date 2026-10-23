@@ -332,6 +332,41 @@ mod tests {
     }
 
     #[test]
+    fn a_run_that_leaves_its_card_to_do_shows_an_error_and_keeps_the_password() {
+        let mut s = headless(demo::Machine::Tuxedo);
+        play(
+            &mut s,
+            vec![Step::Until("detection", |s| s.status.is_some())],
+        );
+        let mut still = s.card(CardId::Tuxedo).unwrap().clone();
+        still.facts = kubaos_core::setup::Facts::Tuxedo {
+            vendor: "TUXEDO".into(),
+            product: String::new(),
+            secure_boot: Some(true),
+            drivers: true,
+            modules: vec![],
+            mok: Some(kubaos_core::setup::MokState::NotEnrolled),
+        };
+        s.form.mok = "kuba2026".into();
+        s.form.mok_again = "kuba2026".into();
+        let _ = s.start();
+
+        s.on_event(kubaos_core::setup::SetupEvent::Finished {
+            card: CardId::Tuxedo,
+            status: still,
+        });
+
+        let run = s.run.as_ref().unwrap();
+        assert!(
+            matches!(run.outcome, Some(crate::setup::Outcome::Failed { .. })),
+            "{:?}",
+            run.outcome
+        );
+        assert_eq!(s.form.mok, "kuba2026");
+        assert!(s.log_open);
+    }
+
+    #[test]
     fn vm_shows_absent_cards_and_tab_reaches_everything() {
         let mut s = headless(demo::Machine::Vm);
         play(&mut s, script_vm());
