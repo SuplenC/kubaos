@@ -170,6 +170,15 @@ else
 fi
 
 # --------------------------------------------------------------------------
+step "Backlights writable by the video group (brightnessctl without root)"
+install_root_file "$FILES_DIR/udev/90-kubaos-backlight.rules" /etc/udev/rules.d/90-kubaos-backlight.rules 0644
+# No udev in an image build: the rule applies when the machine boots.
+if udevadm control --ping 2>/dev/null; then
+  sudo_run udevadm control --reload
+  sudo_run udevadm trigger --subsystem-match=backlight --subsystem-match=leds --action=add
+fi
+
+# --------------------------------------------------------------------------
 step "Snapshot"
 snap_create "hyprland base"
 

@@ -100,7 +100,7 @@ v="$(in_root Hyprland --version 2>&1 | head -1)"
 held="$(in_root apt-mark showhold | tr '\n' ' ')"
 [[ "$held" == *hyprland* ]] && ok "held: $held" || fail "hyprland not held ($held)"
 for c in foot fuzzel zsh git docker bw; do check "$c" in_root sh -c "command -v $c"; done
-for f in /etc/pam.d/qs-lock /etc/pam.d/qs-lock-fingerprint /etc/pam.d/qs-lock-u2f /etc/tmpfiles.d/qs-lock-unix-chkpwd.conf; do
+for f in /etc/pam.d/qs-lock /etc/pam.d/qs-lock-fingerprint /etc/pam.d/qs-lock-u2f /etc/tmpfiles.d/qs-lock-unix-chkpwd.conf /etc/udev/rules.d/90-kubaos-backlight.rules; do
   check "$f" test -f "$R$f"
 done
 grep -q pam_u2f "$R/etc/pam.d/sudo" && ok "pam_u2f line in /etc/pam.d/sudo" || fail "no pam_u2f in /etc/pam.d/sudo"

@@ -98,6 +98,7 @@ COPY system/files/getty/ /opt/dotfiles/system/files/getty/
 COPY system/files/pam.d/ /opt/dotfiles/system/files/pam.d/
 COPY system/files/tmpfiles.d/ /opt/dotfiles/system/files/tmpfiles.d/
 COPY system/files/systemd/ /opt/dotfiles/system/files/systemd/
+COPY system/files/udev/ /opt/dotfiles/system/files/udev/
 COPY system/files/hyprland-autostart.zsh /opt/dotfiles/system/files/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
