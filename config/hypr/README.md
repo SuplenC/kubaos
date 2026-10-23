@@ -13,7 +13,7 @@ Your own settings go in `~/.config/kubaos/hypr/` (`hyprland.lua`, `hypridle.conf
 | `hyprland.lua` | Entry point, `require`s the modules below in order |
 | `fallback.lua` | Binds that never depend on Quickshell or Nix (loaded first) |
 | `env.lua` | Environment: PATH, Wayland vars for Qt/GTK/Electron/Chrome, cursor size |
-| `monitors.lua` | eDP-1 and the two LG UltraGears (fill in their descriptions, below) |
+| `monitors.lua` | Every screen at its preferred mode, placed by Hyprland; the laptop panel off while the lid is closed on a dock. Your own layout: below |
 | `workspaces.lua` | Per-screen workspaces: each screen has its own 1-10 (a block of ten ids, the laptop's first), joins another on unplug and returns on replug. `workspace_blocks.lua` is its bookkeeping, tested by `test/lua/workspaces_test.lua` |
 | `input.lua` | Keyboard layout from `/etc/default/keyboard` (`us` without it), repeat rate, touchpad, gestures |
 | `looks.lua` | Gaps, borders, rounding, blur, shadows, animations, dwindle, colors. Sizes and curves match the Quickshell tokens (`config/quickshell/theme/Theme.qml`); `rounding = 10` plus the 2 px border makes the window's outer edge concentric with the frame's 20 px corners at `gaps_out = 8` |
@@ -42,20 +42,29 @@ Scripts (in `scripts/`, linked to `~/.local/bin`): `dot-hypr-workspaces`
   `SUPER + CTRL + I`). hyprlock reads its config on every start.
 - Poke at the live Lua state: `hyprctl repl`.
 
-## Filling in the monitor descriptions
+## Your screens
 
-1. Plug in the dock and run `hyprctl monitors all`.
-2. Copy each UltraGear's `description:` line (they differ only by serial).
-3. In `monitors.lua`, replace the two `REPLACE-WITH-SERIAL` placeholders.
-4. Adjust the `position` values to match the desk, save. Done.
+The defaults place every screen at its preferred mode. Set your own layout in
+`~/.config/kubaos/hypr/hyprland.lua`, one line per screen:
 
-Workspaces don't depend on this: each screen gets its block the first time
-it is seen, by the same description, and keeps it
+1. Run `hyprctl monitors all`: each screen's `description:` (make, model,
+   serial) and `availableModes`.
+2. Add a line per screen, matched by description so it follows the screen
+   to any port or dock:
+
+   ```lua
+   hl.monitor({ output = "desc:LG Electronics LG ULTRAGEAR 312NTXX1A234", mode = "2560x1440@143.99", position = "1920x0", scale = 1 })
+   ```
+
+   `position` is the top-left corner in logical pixels (after scale): a
+   screen to the right of a 1920-wide one starts at `x = 1920`.
+3. `hyprctl reload`.
+
+A line of your own for `eDP-1` replaces the lid rule above it: copy the flag
+check from `monitors.lua` around it, or the panel stays on with the lid
+closed. Workspaces don't depend on any of this: each screen gets its block
+the first time it is seen, by its description, and keeps it
 (`~/.local/state/kubaos/hypr/workspace-screens`).
-
-The laptop panel is `eDP-1` at scale 1.5 (1920x1200 logical), the same
-density as the 1080p externals at scale 1; the reasoning is in
-`monitors.lua`.
 
 ## Workspaces
 
