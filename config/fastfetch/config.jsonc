@@ -6,11 +6,11 @@
   "logo": {
     "type": "file",
     "source": "~/.config/fastfetch/kubaos.txt",
-    "color": { "1": "38;2;253;184;130", "2": "38;2;141;209;226" },
+    "color": { "1": "38;2;255;183;121", "2": "38;2;133;207;255" },
     "padding": { "right": 2 }
   },
   "display": {
-    "color": { "keys": "38;2;253;184;130" }
+    "color": { "keys": "38;2;255;183;121" }
   },
   "modules": [
     "title",

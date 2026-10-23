@@ -35,31 +35,31 @@ pub struct Palette {
 }
 
 /// config/matugen/default-colors.json: matugen `scheme-fidelity` on
-/// cyberpunk/shinjuku-neon-canyon.jpg (SuplenC/kubaos-wallpapers).
+/// shinjuku/kubaos-neon-sign.jpg (SuplenC/kubaos-wallpapers).
 pub const DARK: Palette = Palette {
-    primary: color!(0xfdb882),
-    on_primary: color!(0x4e2600),
-    primary_container: color!(0xa36a3b),
-    secondary: color!(0xe4bfa5),
-    secondary_container: color!(0x5e4430),
-    on_secondary_container: color!(0xffdec7),
-    tertiary: color!(0x8dd1e2),
-    tertiary_container: color!(0x398090),
+    primary: color!(0xffb779),
+    on_primary: color!(0x4c2700),
+    primary_container: color!(0xd37b1b),
+    secondary: color!(0xf2bc8e),
+    secondary_container: color!(0x643e1b),
+    on_secondary_container: color!(0xffd9bb),
+    tertiary: color!(0x85cfff),
+    tertiary_container: color!(0x0f9ad6),
     error: color!(0xffb4ab),
     on_error: color!(0x690005),
     error_container: color!(0x93000a),
     on_error_container: color!(0xffdad6),
-    surface: color!(0x18120f),
-    on_surface: color!(0xece0da),
-    on_surface_variant: color!(0xd6c3b6),
-    surface_container_lowest: color!(0x120d0a),
-    surface_container_low: color!(0x201a17),
-    surface_container: color!(0x241e1b),
-    surface_container_high: color!(0x2f2925),
-    surface_container_highest: color!(0x3a332f),
-    surface_bright: color!(0x3f3833),
-    outline: color!(0x9f8d82),
-    outline_variant: color!(0x52443b),
+    surface: color!(0x19120b),
+    on_surface: color!(0xf0dfd4),
+    on_surface_variant: color!(0xdac2b1),
+    surface_container_lowest: color!(0x140d07),
+    surface_container_low: color!(0x221a13),
+    surface_container: color!(0x261e17),
+    surface_container_high: color!(0x312821),
+    surface_container_highest: color!(0x3d332b),
+    surface_bright: color!(0x413730),
+    outline: color!(0xa28d7d),
+    outline_variant: color!(0x544436),
     scrim: color!(0x000000),
 };
 
@@ -199,6 +199,12 @@ pub const WALLPAPER_BLUR: &[u8] = include_bytes!("../assets/wallpaper-blur.jpg")
 pub const LOGO_MARK: &[u8] = include_bytes!("../assets/logo/kubaos-mark.svg");
 /// "KubaOS" (branding/svg/kubaos-wordmark.svg).
 pub const LOGO_WORDMARK: &[u8] = include_bytes!("../assets/logo/kubaos-wordmark.svg");
+/// The neon sign cut out of its wall, 1024x396, for the logo at large sizes
+/// (branding/png/kubaos-sign-1024.png).
+pub const LOGO_SIGN: &[u8] = include_bytes!("../assets/logo/kubaos-sign-1024.png");
+/// [`LOGO_SIGN`]'s width over its height. Views size the sign with it, so the layout holds still
+/// while the PNG decodes.
+pub const LOGO_SIGN_ASPECT: f32 = 1024.0 / 396.0;
 
 /// Material Symbols Rounded codepoints. The bundled font is a subset; keep
 /// this list and the `icons` list in assets/make-assets.sh in sync. A few

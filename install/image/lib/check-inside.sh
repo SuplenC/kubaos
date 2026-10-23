@@ -183,7 +183,7 @@ alt="$(in_root update-alternatives --query default.plymouth 2>/dev/null | sed -n
 [[ "$alt" == /usr/share/plymouth/themes/kubaos/kubaos.plymouth ]] && ok "default.plymouth -> kubaos" || fail "default.plymouth is '$alt'"
 grep -qx 'Theme=kubaos' "$R/etc/plymouth/plymouthd.conf" && grep -qx 'DeviceScale=1' "$R/etc/plymouth/plymouthd.conf" &&
   ok "plymouthd.conf: Theme=kubaos, DeviceScale=1" || fail "plymouthd.conf: $(tr '\n' ' ' <"$R/etc/plymouth/plymouthd.conf")"
-for f in kubaos.plymouth kubaos.script mark.png mark@2x.png field@2x.png Geist-Regular.ttf JetBrainsMono-Regular.ttf; do
+for f in kubaos.plymouth kubaos.script sign-lit.png sign-lit@2x.png sign-ku@2x.png field@2x.png Geist-Regular.ttf JetBrainsMono-Regular.ttf; do
   check "theme file $f" test -s "$R/usr/share/plymouth/themes/kubaos/$f"
 done
 check "initramfs hook kubaos-plymouth" test -x "$R/etc/initramfs-tools/hooks/kubaos-plymouth"
@@ -216,7 +216,7 @@ for kv in 'GRUB_TIMEOUT_STYLE=hidden' 'GRUB_TIMEOUT=1' 'GRUB_RECORDFAIL_TIMEOUT=
   'GRUB_BACKGROUND="/boot/grub/themes/kubaos/background.png"'; do
   grep -qxF "$kv" "$g" && ok "10-kubaos.cfg: $kv" || fail "10-kubaos.cfg lacks $kv"
 done
-for f in theme.txt mark.png select_c.png item_c.png terminal_box_c.png background.png \
+for f in theme.txt logo.png select_c.png item_c.png terminal_box_c.png background.png \
   geist-regular-30.pf2 geist-medium-30.pf2 geist-regular-22.pf2 jetbrainsmono-regular-24.pf2; do
   check "GRUB theme /boot/grub/themes/kubaos/$f" test -s "$R/boot/grub/themes/kubaos/$f"
 done

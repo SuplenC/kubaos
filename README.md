@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="branding/kubaos-horizontal.svg" alt="クバ KubaOS" width="420">
+  <img src="branding/png/kubaos-hero.jpg" alt="The KubaOS neon sign: クバ KubaOS" width="800">
 </p>
 
 # KubaOS

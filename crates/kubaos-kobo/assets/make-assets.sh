@@ -49,6 +49,8 @@ magick "$wp" -resize 640x -blur 0x18 -strip -quality 90 wallpaper-blur.jpg
 curl -fsSL -o fonts/MPLUS1-OFL.txt https://raw.githubusercontent.com/google/fonts/main/ofl/mplus1/OFL.txt
 curl -fsSL -o fonts/MaterialSymbols-LICENSE.txt https://raw.githubusercontent.com/google/material-design-icons/master/LICENSE
 
-# The KubaOS logo (branding/, see its README). The crate carries copies, so it
-# builds from its own directory.
-cp "$repo/branding/svg/kubaos-mark.svg" "$repo/branding/svg/kubaos-wordmark.svg" logo/
+# The KubaOS logo (branding/, see its README): the vector mark and wordmark for
+# small sizes, the neon sign for the welcome screen. The crate carries copies,
+# so it builds from its own directory.
+cp "$repo/branding/svg/kubaos-mark.svg" "$repo/branding/svg/kubaos-wordmark.svg" \
+  "$repo/branding/png/kubaos-sign-1024.png" logo/

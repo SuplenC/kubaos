@@ -3,12 +3,12 @@
 drawn on a grid here. Run ./render.sh afterwards for the PNGs."""
 import os
 
-AMBER = "#fdb882"   # matugen primary of the default wallpaper
-CYAN = "#8dd1e2"    # tertiary
-INK = "#ece0da"     # on_surface
-NIGHT = "#18120f"   # surface
-DEEP = "#120d0a"    # surface_container_lowest
-EDGE = "#52443b"    # outline_variant
+# Roles from the default wallpaper's scheme, config/matugen/default-colors.json.
+AMBER = "#ffb779"   # primary
+CYAN = "#85cfff"    # tertiary
+INK = "#f0dfd4"     # on_surface
+NIGHT = "#19120b"   # surface
+DEEP = "#140d07"    # surface_container_lowest
 
 # --- the mark: クバ in a 100x100 box ---------------------------------------
 # ク: a short tick, then one stroke that runs right and sweeps down-left.
@@ -19,7 +19,7 @@ BA = ["M66 41 Q64.5 63 53 81", "M76.5 39 Q84 61 94 79"]
 DAKUTEN = ["M81 14 L85 25", "M90 11 L94 22"]
 # Lit core of the neon tube.
 CORE_AMBER = "#ffe6cf"
-CORE_CYAN = "#dff6fb"
+CORE_CYAN = "#dcf1ff"
 
 
 def strokes(paths, color, width):
@@ -69,39 +69,6 @@ def O(x):
 
 def S(x):
     return 44, [f"M{x+38} 10 C{x+32} 1 {x+7} 0 {x+6} 15 C{x+5} 30 {x+39} 27 {x+39} 44 C{x+39} 61 {x+9} 62 {x+3} 49"]
-
-
-# Capitals for the release name (letter-spaced, small, under the logo).
-def H(x):
-    return 40, [f"M{x+5} 0 V60", f"M{x+35} 0 V60", f"M{x+5} 30 H{x+35}"]
-
-def I(x):
-    return 12, [f"M{x+5} 0 V60"]
-
-def N(x):
-    return 42, [f"M{x+5} 60 V0 L{x+37} 60 V0"]
-
-def J(x):
-    return 36, [f"M{x+31} 0 V44 A13 14 0 0 1 {x+5} 46"]
-
-def U(x):
-    return 42, [f"M{x+5} 0 V42 A16 18 0 0 0 {x+37} 42 V0"]
-
-def KC(x):
-    return K(x)
-
-def SC(x):
-    return S(x)
-
-
-def caps(word, color, width=8, track=14):
-    table = {"S": SC, "H": H, "I": I, "N": N, "J": J, "U": U, "K": KC}
-    out, x = "", 0
-    for ch in word:
-        adv, ps = table[ch](x)
-        out += strokes(ps, color, width)
-        x += adv + track
-    return out, x - track
 
 
 def wordmark(x0=0, kuba=INK, os_=AMBER, width=9.5):
@@ -173,17 +140,4 @@ write(
 )
 # Dark-background versions (for docs on light pages, previews).
 write("kubaos-horizontal-dark", svg(W + 40, 160, f'<g transform="translate(30 30)">{mark()}</g><g transform="translate(162 50)">{wm}</g>', bg=DEEP, rx=24))
-# Boot splash: 1920x1080, near-black with a faint warm glow, the stacked
-# logo in the middle and the release name under it.
-rel, relw = caps("SHINJUKU", "#9f8d82")
-splash = (
-    '<defs><radialGradient id="warm" cx="0.5" cy="0.47" r="0.55">'
-    f'<stop offset="0" stop-color="#2a1d15"/><stop offset="1" stop-color="{DEEP}"/></radialGradient>'
-    '<filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter></defs>'
-    '<rect width="1920" height="1080" fill="url(#warm)"/>'
-    f'<g transform="translate({960 - 130} 330) scale(2.6)">{mark()}</g>'
-    f'<g transform="translate({960 - wmw * 0.9 / 2} 640) scale(0.9)">{wm}</g>'
-    f'<g transform="translate({960 - relw * 0.32 / 2} 740) scale(0.32)">{rel}</g>'
-)
-write("kubaos-splash", svg(1920, 1080, splash, defs=""))
 print("wrote svg/*.svg")
