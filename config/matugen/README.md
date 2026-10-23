@@ -52,7 +52,7 @@ AA.
 ## Defaults
 
 `dot-theme apply` with no wallpaper set, or one that's gone, uses
-`DEFAULT_WALLPAPER` (`shinjuku/kabukicho-red-gate.jpg`) when the picker shows it
+`DEFAULT_WALLPAPER` (`shinjuku/kubaos-neon-sign.jpg`) when the picker shows it
 (the sets file can leave it out). Otherwise it takes
 the first wallpaper of the current folder. With no images at all it renders the
 templates from `DEFAULT_SEED` (that wallpaper's source color, also

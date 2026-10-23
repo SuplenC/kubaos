@@ -20,7 +20,7 @@
     # so a new set reaches machines with a KubaOS release: bump the rev, then
     # `nix flake update kubaos-wallpapers`.
     kubaos-wallpapers = {
-      url = "github:SuplenC/kubaos-wallpapers/8a8465973564bfefd5abbfe82339cd645464ce92";
+      url = "github:SuplenC/kubaos-wallpapers/a817336e531f443ce4f2d2a9fbd5a0122aacce76";
       flake = false;
     };
 

@@ -38,9 +38,9 @@ SCHEME="${DOT_THEME_SCHEME:-scheme-fidelity}"
 # First-boot wallpaper, a path relative to $SETS_DIR.
 # config/matugen/default-colors.json is generated from it (see
 # config/matugen/README.md).
-DEFAULT_WALLPAPER="shinjuku/kabukicho-red-gate.jpg"
+DEFAULT_WALLPAPER="shinjuku/kubaos-neon-sign.jpg"
 # Source color of DEFAULT_WALLPAPER, used when no image exists at all.
-DEFAULT_SEED="#db2b34"
+DEFAULT_SEED="#cf7817"
 
 die() { printf 'dot-theme: %s\n' "$*" >&2; exit 1; }
 hint() { printf 'dot-theme: %s\n' "$*" >&2; }
