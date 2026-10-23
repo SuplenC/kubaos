@@ -976,7 +976,7 @@ c_wallpaper_sets() {
   [[ "$(zrun 'dot-theme current')" == "$wall" ]] && echo "ok   the old ~/Pictures/wallpapers/shinjuku path moves to $wall" ||
     { echo "FAIL old path: current is $(zrun 'dot-theme current')"; bad=1; }
 
-  wall="$sys/shinjuku/kabukicho-red-gate.jpg"
+  wall="$sys/shinjuku/kubaos-neon-sign.jpg"
   : >"$st/wallpaper"
   expect_ok "dot-theme apply (first boot)" zrun 'dot-theme apply' || bad=1
   [[ "$(zrun 'dot-theme current')" == "$wall" ]] && echo "ok   first boot: the default is $wall" ||
@@ -1019,7 +1019,7 @@ c_wallpaper_sets() {
     { echo "FAIL first boot without the default: current is $(zrun 'dot-theme current')"; bad=1; }
   expect_ok "dot-theme all-sets" zrun 'dot-theme all-sets' || bad=1
   got="$(grep -v '^#' "$sets" | tr '\n' ' ') / $(folders) / $(zrun 'dot-theme wallpapers' | grep -c "^shinjuku")"
-  [[ $got == "cyberpunk japanese shinjuku  / cyberpunk japanese shinjuku yours  / 5" ]] &&
+  [[ $got == "cyberpunk japanese shinjuku  / cyberpunk japanese shinjuku yours  / 6" ]] &&
     echo "ok   all-sets: every set again, whole ($got)" || { echo "FAIL all-sets: $got"; bad=1; }
 
   # The Command menu's set Items: hide-set and show-set rewrite the sets file, and the last set
@@ -1039,7 +1039,7 @@ c_wallpaper_sets() {
   expect_ok "dot-theme show-set shinjuku" zrun 'dot-theme show-set shinjuku' || bad=1
   expect_ok "dot-theme show-set japanese" zrun 'dot-theme show-set japanese' || bad=1
   got="$(grep -v '^#' "$sets" | tr '\n' ' ') / $(zrun 'dot-theme wallpapers' | grep -c "^shinjuku")"
-  [[ $got == "shinjuku japanese  / 5" ]] && echo "ok   show-set shows the whole set, its picks gone ($got)" ||
+  [[ $got == "shinjuku japanese  / 6" ]] && echo "ok   show-set shows the whole set, its picks gone ($got)" ||
     { echo "FAIL show-set: $got"; bad=1; }
   zrun 'dot-theme show-set yours' >/dev/null 2>&1 && { echo "FAIL show-set takes yours as a set"; bad=1; }
 

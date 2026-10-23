@@ -6,7 +6,7 @@
 version_check = false
 caching = false
 # Used when an image yields no usable color (the default wallpaper's source).
-fallback_color = "#db2b34"
+fallback_color = "#cf7817"
 
 # Terminal hues (ANSI 1-6), seeded with Tokyo Night's. matugen derives red,
 # on_red, red_container, ... for each and harmonizes them toward the

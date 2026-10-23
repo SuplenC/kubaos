@@ -156,11 +156,11 @@ console_title_template = '{{ .Shell }} in {{ .Folder }}'
   template = '❯❯ '
 
 [palette]
-  surface = '#372524'  # pill background
-  text = '#fadbd9'  # text on pills
-  muted = '#ac8886'  # icons, right prompt
-  accent = '#ffb3ae'  # folder icon, prompt char
-  accent2 = '#78d3ed'  # ahead/behind
+  surface = '#312821'  # pill background
+  text = '#f0dfd4'  # text on pills
+  muted = '#a28d7d'  # icons, right prompt
+  accent = '#ffb779'  # folder icon, prompt char
+  accent2 = '#85cfff'  # ahead/behind
   ok = '#9ece6a'  # clean repo, success
   warn = '#e0af68'  # dirty repo
   err = '#f7768e'  # diverged, exit code

@@ -11,23 +11,23 @@ local M = {}
 -- Dark Material 3 fallback palette (the same as
 -- config/matugen/default-colors.json: the default wallpaper's colors).
 M.defaults = {
-  primary = "#ffb3ae",
-  on_primary = "#68000c",
-  primary_container = "#db2b34",
-  secondary = "#ffb3ae",
-  tertiary = "#78d3ed",
+  primary = "#ffb779",
+  on_primary = "#4c2700",
+  primary_container = "#d37b1b",
+  secondary = "#f2bc8e",
+  tertiary = "#85cfff",
   error = "#ffb4ab",
-  background = "#1e0f0e",
-  surface = "#1e0f0e",
-  surface_container = "#2c1b1a",
-  surface_container_high = "#372524",
-  surface_container_highest = "#43302f",
-  on_surface = "#fadbd9",
-  on_surface_variant = "#e5bdba",
-  outline = "#ac8886",
-  outline_variant = "#5c403e",
+  background = "#19120b",
+  surface = "#19120b",
+  surface_container = "#261e17",
+  surface_container_high = "#312821",
+  surface_container_highest = "#3d332b",
+  on_surface = "#f0dfd4",
+  on_surface_variant = "#dac2b1",
+  outline = "#a28d7d",
+  outline_variant = "#544436",
   shadow = "#000000",
-  inverse_primary = "#bd0e22",
+  inverse_primary = "#8e4e00",
 }
 
 M.path = (os.getenv("HOME") or "") .. "/.local/state/theme/hypr.lua"
