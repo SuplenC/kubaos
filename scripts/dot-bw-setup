@@ -25,7 +25,8 @@
 #   gh    token from item "gh-token" -> gh's keyring entry
 #   env   every project -> GNOME keyring (dot-bwenv), for `use bwenv` in .envrc
 #   agent checks the Bitwarden desktop SSH agent answers
-# folder=<name> in ~/.config/dot-bw/config narrows ssh and git to that folder.
+# folders=<name>,<name> in ~/.config/dot-bw/config (or the older folder=) narrows
+# ssh and git to those folders.
 #
 # Private keys never leave the vault; nothing secret is written to disk or
 # logged. BW_SESSION exists only in this process and the bw/dot-bwenv
@@ -90,6 +91,54 @@ server_url() {
     https://*) echo "${1%/}" ;;
     *) die "server must be com, eu or an https:// URL, not '$1'" ;;
   esac
+}
+# read_folders: FOLDERS from folders= in the config (folder= is its older name),
+# comma-separated, without the spaces around each name.
+read_folders() {
+  local raw name
+  local -a parts=()
+  raw="$(conf_get folders)"
+  [[ -n $raw ]] || raw="$(conf_get folder)"
+  IFS=, read -r -a parts <<<"$raw"
+  for name in "${parts[@]}"; do
+    name="${name#"${name%%[![:space:]]*}"}"
+    name="${name%"${name##*[![:space:]]}"}"
+    [[ -z $name ]] || FOLDERS+=("$name")
+  done
+}
+# scope FOLDER_NAMES: where the SSH keys come from, for messages ("your vault" for none).
+scope() {
+  local -a quoted=()
+  local n
+  case $# in
+    0) printf 'your vault' ;;
+    1) printf 'the folder "%s"' "$1" ;;
+    *)
+      for n; do quoted+=("\"$n\""); done
+      printf 'the folders %s' "$(list "${quoted[@]}")"
+      ;;
+  esac
+}
+# pick_folders: folder_ids, the ids of FOLDERS in $folders as a JSON array ([]
+# means the whole vault), and SCOPE to match. A listed folder the vault doesn't
+# have gets a warning; with none of them there, the whole vault is used.
+pick_folders() {
+  local name ids
+  local -a found=()
+  folder_ids="[]"
+  for name in "${FOLDERS[@]}"; do
+    ids="$(jq -c --arg n "$name" '[.[] | select(.name == $n) | .id]' <<<"$folders")"
+    if [[ $ids == "[]" ]]; then
+      warn "no folder \"$name\" in the vault (folders= in ~/.config/dot-bw/config)"
+    else
+      found+=("$name")
+      folder_ids="$(jq -cn --argjson a "$folder_ids" --argjson b "$ids" '$a + $b')"
+    fi
+  done
+  if ((${#FOLDERS[@]} > 0 && ${#found[@]} == 0)); then
+    warn "none of the folders in ~/.config/dot-bw/config is in the vault: using every SSH key in the vault"
+  fi
+  SCOPE="$(scope "${found[@]}")"
 }
 ask() { # ask VAR PROMPT
   [[ -t 0 ]] || die "need an answer for '$2' but stdin isn't a terminal"
@@ -519,9 +568,9 @@ check_agent() {
 }
 
 # --- main -----------------------------------------------------------------------
-FOLDER="$(conf_get folder)"
-SCOPE="your vault"
-[[ -z $FOLDER ]] || SCOPE="the folder \"$FOLDER\""
+FOLDERS=()
+read_folders
+SCOPE="$(scope "${FOLDERS[@]}")"
 for t in jq ssh-add ssh-keygen git; do command -v "$t" >/dev/null || die "$t not found"; done
 
 if ((CHECK)); then
@@ -546,14 +595,7 @@ else
   step "Reading the vault"
   bwq sync >/dev/null || die "bw sync failed"
   folders="$(bwq list folders | jq -c '[.[] | {id, name}]')"
-  folder_id=""
-  if [[ -n $FOLDER ]]; then
-    folder_id="$(jq -r --arg n "$FOLDER" '[.[] | select(.name == $n) | .id][0] // ""' <<<"$folders")"
-    if [[ -z $folder_id ]]; then
-      warn "no folder \"$FOLDER\" in the vault (folder= in ~/.config/dot-bw/config): using every SSH key in the vault"
-      SCOPE="your vault"
-    fi
-  fi
+  pick_folders
   # One `bw list items` for everything. Only what's needed leaves this
   # pipeline: public keys, fingerprints, custom fields, and the gh token. SSH
   # private keys and every other password are dropped here. Folder names are
@@ -568,8 +610,8 @@ else
               then (.login.password // ([.fields[]? | select(.name == "token") | .value][0]) // null)
               else null end)}]')" || die "bw list items failed"
   SESSION=""   # not needed past this point
-  ssh_items="$(jq -c --arg f "$folder_id" \
-    '[.[] | select(.type == 5 and ($f == "" or .folderId == $f))] | sort_by(.created, .id)' <<<"$items")"
+  ssh_items="$(jq -c --argjson ids "$folder_ids" '[.[] | select(.type == 5)
+    | select(($ids | length) == 0 or (.folderId as $f | any($ids[]; . == $f)))] | sort_by(.created, .id)' <<<"$items")"
   ok "$(jq length <<<"$items") items, $(jq length <<<"$ssh_items") SSH key(s) in $SCOPE"
   name_pub_files
 

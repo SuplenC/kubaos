@@ -238,9 +238,20 @@ c_bw_folder() {
     { echo "FAIL folder=Work"; printf '%s\n' "$out" | tail -20; bad=1; }
 
   as_user sed -i '/^folder=/d' "$conf"
+  printf 'folders=Personal, Work,Archive\n' | as_user tee -a "$conf" >/dev/null
+  out="$(refresh_ssh)"
+  grep -qF 'no folder "Archive" in the vault' <<<"$out" &&
+    grep -qF '4 SSH key(s) in the folders "Personal", "Work"' <<<"$out" && [[ ! -e $h/.ssh/homelab-server.pub ]] &&
+    same_key "$h/.ssh/github.pub" github && same_key "$h/.ssh/github-2.pub" dup &&
+    [[ "$(grep -c '^Host ' "$h/.ssh/config.d/bitwarden")" == 2 ]] &&
+    echo "ok   folders=Personal, Work,Archive: a warning for Archive, the keys of both others, two Host blocks" ||
+    { echo "FAIL folders=Personal, Work,Archive"; printf '%s\n' "$out" | tail -20; bad=1; }
+
+  as_user sed -i '/^folders=/d' "$conf"
   printf 'folder=dotfiles\n' | as_user tee -a "$conf" >/dev/null
   out="$(refresh_ssh)"
-  grep -qF 'no folder "dotfiles" in the vault' <<<"$out" && grep -qF '5 SSH key(s) in your vault' <<<"$out" &&
+  grep -qF 'no folder "dotfiles" in the vault' <<<"$out" && grep -qF 'none of the folders' <<<"$out" &&
+    grep -qF '5 SSH key(s) in your vault' <<<"$out" &&
     same_key "$h/.ssh/github.pub" github && same_key "$h/.ssh/github-2.pub" dup && [[ -f $h/.ssh/homelab-server.pub ]] &&
     [[ "$(grep -c '^Host ' "$h/.ssh/config.d/bitwarden")" == 3 ]] &&
     echo "ok   folder=dotfiles, missing from the vault: a warning, then every SSH key in the vault" ||

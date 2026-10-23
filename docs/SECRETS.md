@@ -12,7 +12,7 @@ KubaOS keeps secrets out of files. One Bitwarden account holds my SSH keys, proj
 | Project env secrets | vault, cached in the GNOME keyring | `dot-bw-setup`, `dot-bwenv pull` |
 | Security key credentials | `/etc/u2f_mappings`, root:root 0644 | `dot-u2f-enroll` |
 | YubiKey SSH keys (optional) | `~/.ssh/<name>_sk` (key handle) + `.pub` | `dot-ssh-sk-new` |
-| Server URL, email, optional folder | `~/.config/dot-bw/config`, nothing secret | `dot-bw-setup` |
+| Server URL, email, optional folder list | `~/.config/dot-bw/config`, nothing secret | `dot-bw-setup` |
 
 ## First-time setup
 
@@ -52,7 +52,7 @@ Keep your vault the way it is. `dot-bw-setup` reads the whole vault: folders are
 
 Env secrets, one project per folder **`env/<project>`**: every custom field of every item in it becomes a variable. Field name is the variable name, so it must be a shell name (`DATABASE_URL`, not `database-url`). Items elsewhere join a project with a text field `bwenv` = `<project>`.
 
-To keep SSH keys and git signing to one folder, put `folder=<name>` in `~/.config/dot-bw/config`. gh and env still read the whole vault. If that folder isn't in the vault, `dot-bw-setup` warns and uses every SSH key in the vault.
+To keep SSH keys and git signing to some folders, list them in `~/.config/dot-bw/config`, comma-separated: `folders=Personal,Work` (`folder=` is read too, its older name). gh and env still read the whole vault. A listed folder that isn't in the vault gets a warning by name; if none of them is there, `dot-bw-setup` uses every SSH key in the vault.
 
 Example vault:
 
