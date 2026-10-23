@@ -108,6 +108,20 @@ An update, in order:
 8. `nix flake update --flake ~/.config/kubaos/home`, `system/relink.sh` (the wallpaper, PAM and recorder links), and a switch.
 9. Runs the new user migrations (`migrations/user/`, as you), each once, and writes `/var/lib/kubaos/release`.
 
+In a terminal each of these phases gets one line: a spinner and the program's latest line while it runs, then a tick, a cross or "skipped", its time and what it did. A warning is one dimmed line under its phase. sudo asks for your password only when its cached one has run out, on a clean line. The programs' own output doesn't scroll past: it goes to a log, `~/.local/state/kubaos/update/<date>-update.log` (the last 10 runs are kept). When a step fails you see its last 20 lines and the log's path. At the end a summary says what moved where, the changes, the packages, the migrations that ran, what the session reloaded, whether you need to log in again or reboot, and how to undo it:
+
+```text
+  ✓ Home               1m05s  reloaded Hyprland, restarting Quickshell
+
+  Updated     Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
+  Packages    12 apt packages, Nix inputs nixpkgs
+  Migrations  1792765570-backlight-rule.sh
+  Next        nothing, it's all running
+  Undo        kubaos rollback
+```
+
+Piped or in a log, the output is plain lines with no colour; `NO_COLOR=1` drops the colour in a terminal too. `--json` (on `update`, `upgrade` and `rollback`) prints one JSON event per line instead, for a program to show; the events are in [`docs/CONTRACTS.md`](CONTRACTS.md), "Updates and migrations". apt runs without questions and keeps your changed files under `/etc`, leaving the package's new version beside each as `.dpkg-dist`.
+
 The running desktop follows every switch (`kubaos update`, `kubaos rollback`, a `home-manager switch` of your own) without a new login, and only where the defaults changed: Hyprland reloads, Quickshell restarts (after you unlock, if the screen is locked), hypridle restarts if it was running, Ghostty and tmux reload their config. With no desktop running, a switch from a tty or over ssh leaves that for the next login. New Neovim, lazygit and other terminal app settings apply the next time you start them. The details are in [`docs/CONTRACTS.md`](CONTRACTS.md), "The running session after a switch".
 
 Your Nix packages move with your flake's nixpkgs; KubaOS's keep their exact store paths until its release moves. Ways back, from smallest to largest:
