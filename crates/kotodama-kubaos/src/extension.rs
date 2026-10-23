@@ -6,12 +6,12 @@
 //!
 //! - Which Items there are under the current config, `hide` applied, and what the update check
 //!   changes in the update actions.
-//! - Sending a run to the registry, a toggle, an audio device or a keyboard Item.
+//! - Sending a run to the registry, a toggle, an audio device, a keyboard Item or a wallpaper set.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
-//!   layouts: [`crate::keyboard`].
+//!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -31,6 +31,8 @@ use crate::toggles;
 use crate::toggles::Ran;
 use crate::toggles::Toggle;
 use crate::updates::Pending;
+use crate::wallpapers;
+use crate::wallpapers::WallpaperSets;
 
 /// The Extension's state: the registry its config holds, and what it runs
 /// things with.
@@ -39,6 +41,7 @@ pub struct Extension<B, R> {
     registry: Registry,
     pending: Pending,
     keyboards: Keyboards,
+    wallpapers: WallpaperSets,
     bus: B,
     runner: R,
 }
@@ -50,6 +53,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             registry: Registry::default(),
             pending: Pending::default(),
             keyboards: Keyboards::default(),
+            wallpapers: WallpaperSets::default(),
             bus,
             runner,
         }
@@ -74,8 +78,13 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.keyboards = keyboards;
     }
 
-    /// The Items to index: the actions, the toggles and the keyboard Items `hide` leaves in, the
-    /// update actions as the update check has them.
+    /// Takes the wallpaper sets, as the sets file now shows them.
+    pub fn set_wallpaper_sets(&mut self, wallpapers: WallpaperSets) {
+        self.wallpapers = wallpapers;
+    }
+
+    /// The Items to index: the actions, the toggles, the keyboard Items and the wallpaper sets
+    /// `hide` leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -86,11 +95,17 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .items()
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
+        let wallpapers = self
+            .wallpapers
+            .items()
+            .into_iter()
+            .filter(|item| !self.registry.hides(&item.id));
         self.registry
             .items()
             .filter_map(|item| self.pending.apply(item))
             .chain(toggles)
             .chain(keyboards)
+            .chain(wallpapers)
     }
 
     /// Runs `action` on `item`; an error is what the user reads.
@@ -118,6 +133,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             keyboard::KIND if !self.registry.hides(&item.id) => {
                 self.keyboards.run(&item.id, action, arguments, &self.runner)
             }
+            wallpapers::KIND if !self.registry.hides(&item.id) => self.wallpapers.run(&item.id, action, &self.runner),
             _ => Err(unknown()),
         }
     }

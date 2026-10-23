@@ -38,22 +38,17 @@ fn launched(runner: &FakeRunner) -> Vec<String> {
 }
 
 #[test]
-fn two_layouts_are_next_each_by_its_name_and_add() {
+fn two_layouts_are_each_by_its_name_and_add() {
     let keyboards = keyboards("us,it", ",");
 
     assert_eq!(
         titles(&keyboards),
-        [
-            "Keyboard: next layout",
-            "Keyboard: English (US)",
-            "Keyboard: Italian",
-            "Keyboard: add a layout"
-        ]
+        ["Keyboard: English (US)", "Keyboard: Italian", "Keyboard: add a layout"]
     );
     let items = keyboards.items();
     assert!(items.iter().all(|item| item.kind.name() == KIND));
-    assert_eq!(items[1].id, "keyboard:us");
-    assert_eq!(items[1].subtitle.as_deref(), Some("The default keyboard layout, us"));
+    assert_eq!(items[0].id, "keyboard:us");
+    assert_eq!(items[0].subtitle.as_deref(), Some("The default keyboard layout, us"));
 }
 
 #[test]
@@ -62,12 +57,12 @@ fn a_variant_is_named_and_spelled_in_the_id() {
 
     let items = keyboards.items();
 
-    assert_eq!(items[2].id, "keyboard:us(intl)");
-    assert_eq!(items[2].title, "Keyboard: English (US, intl., with dead keys)");
+    assert_eq!(items[1].id, "keyboard:us(intl)");
+    assert_eq!(items[1].title, "Keyboard: English (US, intl., with dead keys)");
 }
 
 #[test]
-fn one_layout_has_no_next_and_cannot_be_removed() {
+fn one_layout_cannot_be_removed() {
     let keyboards = keyboards("us", "");
 
     assert_eq!(titles(&keyboards), ["Keyboard: English (US)", "Keyboard: add a layout"]);
@@ -90,16 +85,6 @@ fn without_the_file_there_are_no_keyboard_items() {
 }
 
 #[test]
-fn next_switches_every_keyboard_to_the_next_layout() {
-    let runner = FakeRunner::default();
-
-    let ran = keyboards("us,it", "").run(NEXT, RUN, &none(), &runner);
-
-    assert_eq!(ran, Ok(Ran::Close));
-    assert_eq!(runner.ran(), ["hyprctl switchxkblayout all next"]);
-}
-
-#[test]
 fn a_layout_switches_to_its_index() {
     let runner = FakeRunner::default();
 
@@ -116,7 +101,7 @@ fn a_failing_switch_says_why() {
         ..FakeRunner::default()
     };
 
-    let ran = keyboards("us,it", "").run(NEXT, RUN, &none(), &runner);
+    let ran = keyboards("us,it", "").run("keyboard:it", RUN, &none(), &runner);
 
     assert!(ran.is_err_and(|message| message.contains("no such device")));
 }
@@ -195,6 +180,11 @@ fn a_layout_that_is_gone_is_refused() {
 fn an_unknown_action_is_refused() {
     let runner = FakeRunner::default();
 
-    assert!(keyboards("us,it", "").run(NEXT, REMOVE, &none(), &runner).is_err());
+    assert!(keyboards("us,it", "").run(ADD, REMOVE, &none(), &runner).is_err());
+    assert!(
+        keyboards("us,it", "")
+            .run("keyboard-next", RUN, &none(), &runner)
+            .is_err()
+    );
     assert!(keyboards("us,it", "").run("wifi", RUN, &none(), &runner).is_err());
 }

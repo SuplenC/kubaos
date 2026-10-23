@@ -9,6 +9,8 @@
 #                                 (your chosen sets; yours: ~/Pictures/wallpapers)
 #   dot-theme wallpapers          what the picker shows, folder<TAB>path, in order
 #   dot-theme all-sets            show every set again, whole (rewrites the sets file)
+#   dot-theme show-set <set>      show a set in the picker, whole
+#   dot-theme hide-set <set>      take a set out of the picker; one set always stays
 #   dot-theme toggle-folder       switch to the next folder
 #   dot-theme apply [--force]     regenerate from the current wallpaper (login);
 #                                 a no-op when nothing changed, unless --force
@@ -158,6 +160,51 @@ all_sets() {
       if [[ -d $d ]]; then basename -- "$d"; fi
     done | LC_ALL=C sort
   } >"$SETS_FILE.new"
+  mv -f -- "$SETS_FILE.new" "$SETS_FILE"
+}
+
+# Whether a set by that id is on this machine.
+set_on_disk() {
+  [[ -n $1 && $1 != "$OWN_FOLDER" && $1 != */* && -d $SETS_DIR/$1 ]]
+}
+
+# $SETS_FILE without the lines of set $1, whole or by a wallpaper of theirs.
+sets_file_without() {
+  local line entry
+  while IFS= read -r line || [[ -n $line ]]; do
+    read -r entry _ <<<"$line" || true
+    [[ $entry == "$1" || $entry == "$1"/* ]] && continue
+    printf '%s\n' "$line"
+  done <"$SETS_FILE"
+}
+
+# Whether $SETS_FILE.new names a set on this machine, whole or by a wallpaper.
+names_a_set() {
+  local entry
+  while read -r entry _; do
+    [[ -z $entry || $entry == \#* ]] && continue
+    set_on_disk "${entry%%/*}" && return 0
+  done <"$SETS_FILE.new"
+  return 1
+}
+
+# Show set $1 whole in the picker; without $SETS_FILE every set already is.
+show_set() {
+  set_on_disk "$1" || die "no set '$1' in $SETS_DIR"
+  [[ -f $SETS_FILE ]] || return 0
+  { sets_file_without "$1"; printf '%s\n' "$1"; } >"$SETS_FILE.new"
+  mv -f -- "$SETS_FILE.new" "$SETS_FILE"
+}
+
+# Take set $1 out of the picker. At least one set stays in it.
+hide_set() {
+  set_on_disk "$1" || die "no set '$1' in $SETS_DIR"
+  [[ -f $SETS_FILE ]] || all_sets
+  sets_file_without "$1" >"$SETS_FILE.new"
+  if ! names_a_set; then
+    rm -f -- "$SETS_FILE.new"
+    die "at least one wallpaper set stays in the picker"
+  fi
   mv -f -- "$SETS_FILE.new" "$SETS_FILE"
 }
 
@@ -569,6 +616,10 @@ main() {
       done < <(list_folders)
       ;;
     all-sets) all_sets ;;
+    show-set | hide-set)
+      (($# == 1)) || die "usage: dot-theme $cmd <set>"
+      if [[ $cmd == show-set ]]; then show_set "$1"; else hide_set "$1"; fi
+      ;;
     toggle-folder) toggle_folder ;;
     apply)
       case ${1:-} in

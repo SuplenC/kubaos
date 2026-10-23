@@ -106,7 +106,7 @@ fn with_layouts(text: &str) -> Extension<FakeBus, FakeRunner> {
     let mut extension = configured(text);
     extension.set_keyboards(Keyboards::parse(
         "XKBLAYOUT=\"us,it\"\nXKBVARIANT=\",\"\n",
-        "! layout\n  us  English (US)\n  it  Italian\n",
+        "! layout\n  us  English (US)\n  it  Italian\n  de  German\n",
     ));
     extension
 }
@@ -120,7 +120,7 @@ fn the_keyboard_items_come_after_the_toggles() {
     assert_eq!(ids[..toggles::ids().len()], toggles::ids());
     assert_eq!(
         ids[toggles::ids().len()..],
-        ["keyboard-next", "keyboard:us", "keyboard:it", "keyboard-add"]
+        ["keyboard:us", "keyboard:it", "keyboard-add"]
     );
 }
 
@@ -136,14 +136,15 @@ fn a_keyboard_item_runs_through_the_extension() {
 
 #[test]
 fn hide_takes_out_a_keyboard_item_and_its_run() {
-    let mut extension = with_layouts(r#"hide = ["keyboard-next"]"#);
+    let mut extension = with_layouts(r#"hide = ["keyboard-add"]"#);
+    let typed = BTreeMap::from([("layout".to_owned(), "de".to_owned())]);
 
-    let ran = extension.run(keyboard::RUN, &item(keyboard::KIND, keyboard::NEXT), &BTreeMap::new());
+    let ran = extension.run(keyboard::RUN, &item(keyboard::KIND, keyboard::ADD), &typed);
 
-    assert!(!ids(&extension).contains(&"keyboard-next".to_owned()));
-    assert!(ids(&extension).contains(&"keyboard-add".to_owned()));
+    assert!(!ids(&extension).contains(&"keyboard-add".to_owned()));
+    assert!(ids(&extension).contains(&"keyboard:us".to_owned()));
     assert!(ran.is_err());
-    assert!(extension.runner.ran().is_empty());
+    assert!(extension.runner.launched.borrow().is_empty());
 }
 
 #[test]
@@ -166,4 +167,45 @@ fn an_unknown_item_or_action_says_so() {
 
     assert_eq!(unknown_item, Err("`nope` has no Action `run`".to_owned()));
     assert!(unknown_action.is_err());
+}
+
+fn with_sets(text: &str) -> Extension<FakeBus, FakeRunner> {
+    let mut extension = configured(text);
+    extension.set_wallpaper_sets(WallpaperSets::parse(
+        ["japanese", "shinjuku"].map(str::to_owned),
+        Some("shinjuku\n"),
+    ));
+    extension
+}
+
+#[test]
+fn the_wallpaper_set_items_come_after_the_keyboard_items() {
+    let mut extension = with_sets("");
+    extension.set_keyboards(Keyboards::parse("XKBLAYOUT=\"us\"\n", ""));
+
+    let ids = ids(&extension);
+
+    assert_eq!(
+        ids[toggles::ids().len()..],
+        [
+            "keyboard:us",
+            "keyboard-add",
+            "wallpaper-set:japanese",
+            "wallpaper-set:shinjuku"
+        ]
+    );
+}
+
+#[test]
+fn a_wallpaper_set_item_runs_through_the_extension() {
+    let mut extension = with_sets("");
+
+    let ran = extension.run(
+        wallpapers::SHOW,
+        &item(wallpapers::KIND, "wallpaper-set:japanese"),
+        &BTreeMap::new(),
+    );
+
+    assert_eq!(ran, Ok(Ran::KeepOpen));
+    assert_eq!(extension.runner.ran(), ["dot-theme show-set japanese"]);
 }

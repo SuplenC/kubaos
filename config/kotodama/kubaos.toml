@@ -93,12 +93,8 @@ icon = "preferences-desktop-wallpaper"
 keywords = ["theme", "background", "choose wallpaper"]
 run = ["qs", "ipc", "call", "wallpaper", "toggle"]
 
-[extensions.kubaos.actions.wallpaper-sets]
-title = "Choose wallpaper sets"
-subtitle = "Which sets the wallpaper picker shows"
-icon = "folder-pictures"
-keywords = ["theme", "wallpaper settings"]
-run = ["qs", "ipc", "call", "wallpaper", "settings"]
+# The Extension itself sends one Item a wallpaper set, "Wallpaper set:
+# Shinjuku", to show it in the picker or hide it; this one shows them all.
 
 [extensions.kubaos.actions.wallpaper-all-sets]
 title = "Show every wallpaper set"
@@ -183,8 +179,9 @@ run = ["kubaos", "cursor", "size", "{size}"]
 arguments = [{ name = "size", placeholder = "32" }]
 
 # The keyboard layouts (kubaos keyboard), kept in /etc/default/keyboard as
-# the install wrote them. The Extension itself sends "Keyboard: next layout",
-# one Item a layout and "Keyboard: add a layout"; this one replaces them all.
+# the install wrote them. The Extension itself sends one Item a layout and
+# "Keyboard: add a layout"; this one replaces them all. The next layout is the
+# SUPER + SHIFT + Space bind, which the menu finds as "Next keyboard layout".
 
 [extensions.kubaos.actions.keyboard-set]
 title = "Keyboard: set layouts"
