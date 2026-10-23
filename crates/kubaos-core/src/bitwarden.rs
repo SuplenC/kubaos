@@ -397,6 +397,8 @@ pub enum Error {
     },
     #[error("unlock failed")]
     Unlock(#[source] BwError),
+    #[error("bw unlock failed (not logged in? run kubaos bitwarden setup)")]
+    NotUnlocked(#[source] BwError),
     #[error("bw returned no session")]
     NoSession,
     #[error("bw config server failed")]
