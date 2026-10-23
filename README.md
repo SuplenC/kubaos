@@ -4,6 +4,8 @@
 
 # KubaOS
 
+An OS that does what it's told and then shuts the fuck up.
+
 **Shinjuku**, work in progress. Nothing is released yet.
 
 Kuba's personal OS: Ubuntu 26.04 underneath, Nix and home-manager for everything you touch, Hyprland and a Quickshell desktop on top. It's built for one laptop, a TUXEDO InfinityBook Pro 14 Gen10, and for one person. It updates when you say so, never nags, and if you break it there's a snapshot to go back to.

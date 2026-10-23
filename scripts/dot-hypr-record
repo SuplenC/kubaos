@@ -146,7 +146,7 @@ launch() { # launch STATE MODE FILE CMD...
           play) xdg-open "$file" ;;
         esac
       else
-        notify "Recording failed" "Well, shit. Nothing got saved. The reason is in $log_file" -u critical
+        notify "Recording failed" "Fuck. Nothing got saved. The reason is in $log_file" -u critical
       fi
     fi
   ) </dev/null >/dev/null 2>&1 &
@@ -220,10 +220,10 @@ replay() { # replay start|stop|toggle|save AUDIO MIC
     stop)
       [[ $cur == replay* ]] || { echo "replay isn't running" >&2; return 1; }
       stop
-      notify "Replay off" "The last ${REPLAY_SECONDS} s are gone. Hope you didn't need them."
+      notify "Replay off" "Your last ${REPLAY_SECONDS} s just got yeeted into the void."
       ;;
     save)
-      [[ $cur == replay* ]] || { notify "Replay isn't running" "Nothing to save. SUPER+CTRL+R starts it."; return 1; }
+      [[ $cur == replay* ]] || { notify "Replay isn't running" "So there's nothing to save, genius. SUPER+CTRL+R starts it."; return 1; }
       kill -USR1 "${cur#* }"
       ;;
     start)
@@ -235,7 +235,7 @@ replay() { # replay start|stop|toggle|save AUDIO MIC
       mkdir -p "$dir"
       launch replay output "$dir" gpu-screen-recorder -w "${mon:-screen}" -c mp4 -k "$codec" -f 60 \
         -r "$REPLAY_SECONDS" -replay-storage ram -cursor yes -o "$dir" "${audio[@]}"
-      notify "Replay on" "Keeping the last ${REPLAY_SECONDS} s in RAM. SUPER+SHIFT+P saves them."
+      notify "Replay on" "I'll keep the last ${REPLAY_SECONDS} s, you're welcome. SUPER+SHIFT+P saves them."
       ;;
     *) usage ;;
   esac

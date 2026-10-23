@@ -112,7 +112,7 @@ fn bluetooth_without_an_adapter_says_so() {
         .run(ON, &none(), &mut bus, &FakeRunner::default())
         .unwrap_err();
 
-    assert_eq!(err, "There is no Bluetooth adapter");
+    assert_eq!(err, "There's no Bluetooth adapter, so there's nothing to turn on");
 }
 
 #[test]
@@ -251,7 +251,7 @@ fn no_audio_devices_is_said_rather_than_an_empty_list() {
         .run(RUN, &none(), &mut FakeBus::default(), &FakeRunner::default())
         .unwrap_err();
 
-    assert_eq!(err, "PipeWire lists no audio devices");
+    assert_eq!(err, "PipeWire lists no audio devices. Hello? Anyone?");
 }
 
 #[test]

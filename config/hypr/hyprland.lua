@@ -32,6 +32,6 @@ if f then
   local ok, err = pcall(dofile, user_file)
   if not ok then
     local msg = tostring(err):gsub("'", "'\\''")
-    hl.exec_cmd("notify-send -u critical 'Error in your Hyprland config' '" .. msg .. "'")
+    hl.exec_cmd("notify-send -u critical 'You broke your Hyprland config' '" .. msg .. "'")
   end
 end

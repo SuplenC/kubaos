@@ -132,7 +132,7 @@ impl WallpaperSets {
         }
         let word = if action == HIDE {
             if self.shown() == 1 {
-                return Err("At least one wallpaper set stays in the picker".to_owned());
+                return Err("At least one wallpaper set stays in the picker. Nice try".to_owned());
             }
             "hide-set"
         } else {

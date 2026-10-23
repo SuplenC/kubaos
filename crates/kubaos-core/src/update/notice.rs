@@ -73,16 +73,23 @@ impl Available {
     pub fn notifications(&self, notified: &BTreeSet<String>) -> Vec<(String, String)> {
         let mut out = Vec::new();
         if let Some(target) = &self.update {
+            let name = target.codename.as_deref().map_or_else(|| "KubaOS".to_owned(), capitalise);
             out.push((
                 format!("update {}", target.commit),
-                format!("KubaOS {} is ready: kubaos update", target.label),
+                format!(
+                    "{name} {} is ready. Update when you feel like it: kubaos update. Or don't, I'm not your mum.",
+                    target.label
+                ),
             ));
         }
         if let Some(target) = &self.upgrade {
             let name = target.codename.as_deref().map(capitalise);
             let text = match name {
-                Some(name) => format!("KubaOS {name} ({}) is out: kubaos upgrade", target.label),
-                None => format!("KubaOS {} is out: kubaos upgrade", target.label),
+                Some(name) => format!(
+                    "KubaOS {name} ({}) is out. kubaos upgrade when you're ready, I'll wait.",
+                    target.label
+                ),
+                None => format!("KubaOS {} is out. kubaos upgrade when you're ready, I'll wait.", target.label),
             };
             out.push((format!("upgrade {}", target.commit), text));
         }

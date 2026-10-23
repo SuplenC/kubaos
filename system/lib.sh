@@ -69,7 +69,7 @@ require_sudo() {
   command -v sudo >/dev/null || die "sudo is not installed"
   # sudo-rs (Ubuntu 26.04's sudo) rejects `sudo -v` under NOPASSWD, so try a
   # non-interactive no-op first and only prompt when that fails.
-  sudo -n true 2>/dev/null || sudo -v || die "Well, shit. sudo said no, and this script needs it. Check your password and run it again"
+  sudo -n true 2>/dev/null || sudo -v || die "Fuck. sudo said no, and this script needs it. Check your password and run it again"
 }
 
 # Booted with systemd as PID 1 (false in containers and chroots).

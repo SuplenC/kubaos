@@ -39,14 +39,30 @@ fn each_notification_is_sent_once() {
         [
             (
                 "update aaa".to_owned(),
-                "KubaOS main at aaa is ready: kubaos update".to_owned()
+                "KubaOS main at aaa is ready. Update when you feel like it: kubaos update. Or don't, I'm not your mum."
+                    .to_owned()
             ),
             (
                 "upgrade bbb".to_owned(),
-                "KubaOS Akihabara (0.2.0) is out: kubaos upgrade".to_owned()
+                "KubaOS Akihabara (0.2.0) is out. kubaos upgrade when you're ready, I'll wait.".to_owned()
             ),
         ]
     );
     assert_eq!(again.len(), 1);
     assert_eq!(again[0].0, "upgrade bbb");
+}
+
+#[test]
+fn an_update_notification_names_the_release() {
+    let available = Available {
+        update: Some(target("ccc", "0.1.3", Some("shinjuku"))),
+        upgrade: None,
+    };
+
+    let sent = available.notifications(&parse_notified(""));
+
+    assert_eq!(
+        sent[0].1,
+        "Shinjuku 0.1.3 is ready. Update when you feel like it: kubaos update. Or don't, I'm not your mum."
+    );
 }

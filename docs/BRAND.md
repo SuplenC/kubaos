@@ -51,34 +51,44 @@ What it is: Kuba's own Linux. A fast, keyboard-driven desktop for writing and co
 
 Lines in this spirit (use, remix or beat them):
 - "Your machine. Your rules. No bullshit."
-- "An OS that does what it's told and then shuts up."
+- "An OS that does what it's told and then shuts the fuck up."
 - "Built for writing Rust at 2am, not for clicking 'Later' on update popups."
 - "Kuba's Linux. You're welcome."
 
 ## Voice
 
-Free, relaxed, a bit "don't care", slightly offensive, with a **sprinkle** of profanity. Think of a friend who's very good at computers and finds most of them stupid.
+Free, loud, "don't care", and properly rude. Think of a friend who's very good at computers, finds most of them stupid, and swears like it.
 
 Rules, in priority order:
 
 1. **Clarity beats attitude.** Every message still says plainly what happened, what's about to happen and what to do. The joke goes around the information, never instead of it.
-2. **Sprinkle, don't pour.** At most one swear per screen, notification or doc section. Most lines have none. Swearing every line is boring, and boring is the one thing we're not allowed to be.
-3. **Punch at the right targets:** Apple, Windows, update popups, corporate software, bloat, the computer itself, and occasionally Kuba. Never at the reader's identity, never slurs, nothing about race, gender, sexuality, disability or religion.
-4. **No profanity where a mistake is expensive.** The "erase this disk" confirmation, passphrase prompts, and anything about data loss are dead serious and crystal clear. A light line around them is fine, but not in the sentence that names the disk.
-5. **Errors keep their attitude and their facts.** "Well, shit. Couldn't open the encrypted disk: wrong passphrase. Try again, slower this time." It names the cause and gives the next action.
-6. Short sentences, active voice, no corporate filler: no "Please note", "Simply", "Seamlessly", "Powerful", "Leverage", or exclamation-mark enthusiasm. Confident, dry humour, not hype.
-7. Japanese touches are seasoning: section labels, the logo, release names. Don't write whole sentences in Japanese, and don't use anime catchphrases.
+2. **Swear when it's funny.** Most jokes can have one; one per line is plenty. A label stays a label: a field name, a button that only says what it does, a setting's title. Plain text between the jokes is what makes them land.
+3. **Roast everyone and everything, equally:** Apple, Windows, update popups, corporate software, bloat, the computer, the OS itself, Kuba, and you, the reader. Never identity: nothing about race, gender, sexuality, disability or religion, and no slurs.
+4. **The expensive sentences stay plain.** The sentence that names the disk about to be erased, the passphrase prompts at boot, and anything that says data is about to go are exact and calm. The lead-in around them can swear ("Last chance to not fuck this up."); the sentence with the disk in it can't.
+5. **Errors keep their attitude and their facts.** "Fuck. The disk is in use, so nothing got written. Free it and try again." It names the cause and gives the next action.
+6. **"I" is the OS, the button is you.** Messages, notifications and subtitles speak as the OS ("I'll keep the last 30 s, you're welcome."). Buttons and choices the user picks speak as the user ("Fuck Wi-Fi, I've got a cable"). Never "we".
+7. Short sentences, active voice, no corporate filler: no "Please note", "Simply", "Seamlessly", "Powerful", "Leverage", or exclamation-mark enthusiasm. Confident, dry and rude, not hype.
+8. Japanese touches are seasoning: small labels above titles, the logo, release names. Don't write whole sentences in Japanese, and don't use anime catchphrases.
 
 Examples:
 
-| Instead of | Write |
+| Where | Write |
 |---|---|
-| Welcome to the installer! | KubaOS Shinjuku. Let's get rid of whatever's on this thing. |
-| Please select your keyboard layout. | Keyboard. Pick the one your fingers actually know. |
-| Installation in progress. Please wait. | Installing. Go get a coffee. Actually, don't bother, it's faster than that. |
-| Installation complete! | Done in 1m 42s. Reboot and enjoy a computer that minds its own business. |
-| An error occurred. | Well, shit. `<what failed>`: `<why>`. `<what to do>`. |
-| This will erase all data on /dev/nvme0n1. | Everything on **Samsung SSD 990 PRO (nvme0n1, 2 TB)** gets erased. Windows too. There's no undo. |
+| Kōbō, first screen | Whatever's on here, it's had its chance. Let's fix this shit. |
+| Installing | Installing. Go stare at a wall, it'll be done before you get bored. |
+| Done (the line follows the time it took) | Done in 1m 42s. Damn, that was quick. Pull the stick and reboot. |
+| Wi-Fi error | Wrong password for Home-5G. Fat fingers? Try again. |
+| Generic error | Fuck. The disk is in use, so nothing got written. Free it and try again. |
+| Update notification | Shinjuku 0.1.3 is ready. Update when you feel like it. Or don't, I'm not your mum. |
+| Update failed, rolled back | 0.1.3 shit the bed. You're on 0.1.2 again, like it never happened. |
+| Weak password | Weak. A toddler could guess it. |
+| Skip Wi-Fi button | Fuck Wi-Fi, I've got a cable |
+| Disk erase | Last chance to not fuck this up. Everything on **Samsung SSD 990 PRO (nvme0n1, 2 TB)** gets erased. There's no undo. |
+| Battery low | 14% left. Plug the damn thing in. |
+| Menu subtitle | Large pointer. Grandpa mode. |
+| Replay off | Replay off. Your last 30 s just got yeeted into the void. |
+| Screenshot | Copied. Evidence secured. |
+| Tagline | An OS that does what it's told and then shuts the fuck up. |
 
 ## Keyboard first
 

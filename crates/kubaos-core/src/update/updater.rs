@@ -334,7 +334,11 @@ impl<'a, M: Machine> Updater<'a, M> {
         self.write_root(&self.sys.release(), &rolled_back.to_text())?;
         let rest: String = history.iter().map(HistoryEntry::line).collect();
         self.write_root(&path, &rest)?;
-        self.m.say(&format!("Rolled back to KubaOS {}", rolled_back.describe()));
+        self.m.say(&format!(
+            "{} shit the bed? You're on KubaOS {} again, like it never happened.",
+            entry.to_version,
+            rolled_back.describe()
+        ));
         Ok(())
     }
 

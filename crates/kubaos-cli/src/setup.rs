@@ -171,7 +171,7 @@ fn print_event(e: &SetupEvent, events: Events) {
             println!("  ok {}: {}", state_word(status.state), status.summary)
         }
         SetupEvent::Failed { error, hint, .. } => {
-            println!("  xx Well, shit. {error}.");
+            println!("  xx Fuck. {error}.");
             if let Some(h) = hint {
                 println!("     {h}");
             }

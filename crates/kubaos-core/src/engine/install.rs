@@ -512,8 +512,14 @@ impl<'a> Install<'a> {
                 .collect();
             if matches!(c.disk.target, DiskTarget::Whole) && !in_use.is_empty() {
                 return Err(StepError {
-                    message: format!("{} is in use (mounted at {})", d.path, in_use.join(", ")),
-                    hint: Some("Unmount it (and swapoff) first.".into()),
+                    message: format!(
+                        "{} is in use (mounted at {}), so nothing got written",
+                        d.path,
+                        in_use.join(", ")
+                    ),
+                    hint: Some(
+                        "Free it and try again: unmount it, and swapoff if it's swap.".into(),
+                    ),
                 });
             }
         }

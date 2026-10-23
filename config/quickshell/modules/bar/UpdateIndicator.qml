@@ -14,7 +14,7 @@ Pill {
     visible: Updates.available
     interactive: true
     padding: Theme.spacing.sm
-    tooltip: onlyUpgrade ? `KubaOS ${Updates.upgradeCodename || Updates.upgrade} is out. Click to run kubaos upgrade` : `KubaOS ${Updates.update} is ready. Click to run kubaos update`
+    tooltip: onlyUpgrade ? `KubaOS ${Updates.upgradeCodename || Updates.upgrade} is out. Click and I'll run kubaos upgrade` : `KubaOS ${Updates.update} is ready. Click and I'll run kubaos update. Or don't, I'm not your mum`
     onClicked: Updates.run(onlyUpgrade ? "upgrade" : "update")
 
     Icon {

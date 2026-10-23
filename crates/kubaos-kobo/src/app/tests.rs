@@ -546,6 +546,46 @@ fn the_done_screen_s_reboot_restarts_without_asking() {
     assert_eq!(app.shutting_down, Some(PowerAction::Restart));
 }
 
+#[test]
+fn a_quick_install_brags_on_the_done_screen() {
+    let line = crate::view::done_line(Duration::from_secs(102));
+
+    assert_eq!(line, "Done in 1m 42s. Damn, that was quick. Pull the stick and reboot.");
+}
+
+#[test]
+fn the_done_line_changes_with_the_time_the_install_took() {
+    let at = |secs| crate::view::done_line(Duration::from_secs(secs));
+
+    assert!(at(0).contains("Damn, that was quick."), "{}", at(0));
+    assert!(at(119).contains("Damn, that was quick."), "{}", at(119));
+    assert!(at(120).contains("Not bad."), "{}", at(120));
+    assert!(at(299).contains("Not bad."), "{}", at(299));
+    assert!(at(300).contains("Took its sweet time"), "{}", at(300));
+    assert!(at(899).contains("Took its sweet time"), "{}", at(899));
+    assert!(at(900).contains("Slow as hell."), "{}", at(900));
+    assert!(at(3600).contains("Slow as hell."), "{}", at(3600));
+    for secs in [0, 119, 120, 299, 300, 899, 900, 3600] {
+        assert!(at(secs).ends_with(" Pull the stick and reboot."), "{}", at(secs));
+    }
+}
+
+#[test]
+fn the_done_screen_shows_the_time_the_install_took() {
+    let (mut app, _) = recorded(Recorder::default());
+    let mut install = Install::new(app.now);
+    install.outcome = Some(Outcome::Done { elapsed: Duration::from_secs(102) });
+    app.install = Some(install);
+    app.form.username = "kuba".into();
+    app.form.encrypt = false;
+    let _ = app.go(Screen::Done);
+
+    assert!(draws(
+        &app,
+        "Done in 1m 42s. Damn, that was quick. Pull the stick and reboot. You land on the desktop as kuba."
+    ));
+}
+
 fn on_battery(percent: u8, supply: Supply) -> Message {
     Message::Battery(Some(Battery { percent, supply }))
 }
@@ -591,10 +631,7 @@ fn a_low_battery_on_last_chance_asks_for_the_charger_and_still_installs() {
     let _ = app.update_inner(on_battery(14, Supply::Discharging));
 
     let note = crate::view::low_battery_note(&app).expect("a low battery note");
-    assert_eq!(
-        note,
-        "Battery at 14%. Plug in the charger: the install can take a while."
-    );
+    assert_eq!(note, "14% left. Plug the damn thing in.");
     assert!(draws(&app, &note));
     assert_eq!(app.blocker(), None);
 }

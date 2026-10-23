@@ -898,7 +898,7 @@ fn wifi<'a>(app: &'a App, p: &Palette) -> El<'a> {
         row![
             icon(Icon::WifiOff, 20.0, fg_none),
             elide(
-                "No Wi-Fi. I'll plug in a cable like an adult.",
+                "Fuck Wi-Fi, I've got a cable",
                 theme::SANS_MEDIUM,
                 size::MD,
                 fg_none
@@ -954,7 +954,7 @@ fn wifi<'a>(app: &'a App, p: &Palette) -> El<'a> {
         header(
             jp::NETWORK,
             "Wi-Fi",
-            "Optional. The install doesn't need the internet; this only saves a network for your first boot.",
+            "Optional. I don't need the internet to install; this only saves a network for your first boot.",
             p
         ),
         Space::new().height(space::XL),
@@ -2179,7 +2179,7 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
         (
             p.error,
             alpha(p.error_container, 0.30),
-            format!("Everything on {disk_name} gets erased."),
+            format!("Last chance to not fuck this up. Everything on {disk_name} gets erased."),
             if n == 0 {
                 "There's no undo.".to_string()
             } else {
@@ -2334,7 +2334,7 @@ fn summary<'a>(app: &'a App, p: &Palette) -> El<'a> {
 pub fn low_battery_note(app: &App) -> Option<String> {
     let b = app.battery.filter(|b| b.is_low())?;
     Some(format!(
-        "Battery at {}%. Plug in the charger: the install can take a while.",
+        "{}% left. Plug the damn thing in.",
         b.percent
     ))
 }
@@ -2538,10 +2538,7 @@ fn installing<'a>(app: &'a App, p: &Palette) -> El<'a> {
                 Space::new().height(2),
                 title("Installing", p),
                 Space::new().height(space::SM),
-                body(
-                    "Go get a coffee. Actually, don't bother, it's faster than that.",
-                    p
-                ),
+                body("Go stare at a wall, it'll be done before you get bored.", p),
             ]
             .width(Length::Fill),
             big,
@@ -2628,7 +2625,7 @@ fn failed<'a>(app: &'a App, p: &Palette) -> El<'a> {
         column![
             accent(jp::FAILED, p).color(p.error),
             Space::new().height(2),
-            title("Well, shit.", p),
+            title("Fuck.", p),
             Space::new().height(space::SM),
             body(at, p),
             Space::new().height(space::XL),
@@ -2776,7 +2773,7 @@ fn welcome<'a>(app: &'a App, p: &Palette) -> El<'a> {
         .into(),
         ProbeState::Ready(pr) if pr.payload.is_none() => row![
             icon(Icon::Error, 20.0, p.error),
-            text("No system image on this stick, so there's nothing to install. Rebuild the ISO and flash it again.")
+            text("No system image on this stick, so I've got nothing to install. Rebuild the ISO and flash it again.")
                 .size(size::MD)
                 .color(p.error)
                 .width(Length::Fixed(520.0)),
@@ -2858,12 +2855,16 @@ fn welcome<'a>(app: &'a App, p: &Palette) -> El<'a> {
         .spacing(space::XL)
         .align_y(Alignment::Center),
         Space::new().height(space::XL),
-        text("Your machine. Your rules. No bullshit.").font(theme::SANS_SEMIBOLD).size(30).color(p.on_surface),
+        text("Whatever's on here, it's had its chance. Let's fix this shit.")
+            .font(theme::SANS_SEMIBOLD)
+            .size(30)
+            .color(p.on_surface)
+            .width(Length::Fixed(640.0)),
         Space::new().height(space::LG),
         lede(
             "Kuba's own Linux: a fast, keyboard-driven desktop for writing Rust all day without the OS \
-             getting in the way. It updates when you say so, never nags, and if you break it there's always \
-             a way back. Let's get rid of whatever's on this thing.",
+             getting in the way. I update when you say so, I never nag, and if you break me there's always \
+             a way back.",
             p
         ),
         Space::new().height(space::XXXL),
@@ -2881,10 +2882,22 @@ fn welcome<'a>(app: &'a App, p: &Palette) -> El<'a> {
     .into()
 }
 
+/// The Done screen's first line: the time the install took and a quip picked by it, so a quick
+/// install brags and a slow one owns up.
+pub fn done_line(took: Duration) -> String {
+    let quip = match took.as_secs() {
+        0..120 => "Damn, that was quick.",
+        120..300 => "Not bad. Windows would still be on “Getting ready”.",
+        300..900 => "Took its sweet time, but it's on there.",
+        _ => "Slow as hell. Blame the USB stick, I do.",
+    };
+    format!("Done in {}. {quip} Pull the stick and reboot.", fmt_duration(took))
+}
+
 fn done<'a>(app: &'a App, p: &Palette) -> El<'a> {
     let took = match app.install.as_ref().and_then(|i| i.outcome.clone()) {
-        Some(Outcome::Done { elapsed }) => fmt_duration(elapsed),
-        _ => fmt_duration(Duration::ZERO),
+        Some(Outcome::Done { elapsed }) => elapsed,
+        _ => Duration::ZERO,
     };
     let pp = *p;
     let badge = container(icon(Icon::Check, 44.0, p.on_primary))
@@ -2903,24 +2916,18 @@ fn done<'a>(app: &'a App, p: &Palette) -> El<'a> {
     // tty1 logs in by itself and starts the desktop: the only thing to type
     // at boot is the disk passphrase.
     let boot = if app.form.encrypt {
-        format!("type the disk passphrase, and you're on the desktop as {user}")
+        format!("Type the disk passphrase at boot and you're on the desktop as {user}.")
     } else {
-        format!("and you're on the desktop as {user}")
+        format!("You land on the desktop as {user}.")
     };
     column![
         badge,
         Space::new().height(space::XXL),
         accent(jp::DONE, p).size(18),
         Space::new().height(space::SM),
-        display("Done.", p),
+        display("That's it.", p),
         Space::new().height(space::XL),
-        lede(
-            format!(
-                "Installed in {took}. Pull the USB stick, reboot, {boot}. \
-                 Enjoy a computer that minds its own business."
-            ),
-            p
-        ),
+        lede(format!("{} {boot}", done_line(took)), p),
         Space::new().height(space::XXXL),
         row![
             if let Some(action) = app.shutting_down {
