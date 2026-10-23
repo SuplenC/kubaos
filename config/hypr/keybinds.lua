@@ -35,7 +35,7 @@ end
 bind("SUPER + SHIFT + Return", "Browser", browser)
 bind("SUPER + SHIFT + B", "Browser", browser)
 bind("SUPER + SHIFT + ALT + B", "Browser (incognito)", browser .. " --incognito")
-bind("SUPER + SHIFT + F", "File manager (yazi)", tui("yazi"))
+bind("SUPER + SHIFT + F", "File manager (yazi)", "kubaos-files open")
 bind("SUPER + SHIFT + N", "Editor (nvim)", tui("nvim"))
 bind("SUPER + CTRL + Return", "Terminal in tmux", tui("tmux new-session -A -s main"))
 bind("SUPER + SHIFT + D", "Docker (lazydocker)", tui("lazydocker"))

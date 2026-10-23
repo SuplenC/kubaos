@@ -21,6 +21,9 @@ rec {
   # The `kubaos` command, so an update's fixes to it arrive with the release
   # (home/updates.nix installs it).
   kubaos = pkgs.callPackage ../crates/kubaos-cli/package.nix { };
+  # The file manager's glue: the folder handler and "Show in folder"
+  # (home/files.nix).
+  kubaos-files = pkgs.callPackage ../crates/kubaos-files/package.nix { };
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (

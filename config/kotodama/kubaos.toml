@@ -8,8 +8,9 @@
 # What starts apps with `Terminal=true`; the app's command follows.
 terminal = ["ghostty", "-e"]
 # Desktop ids to leave out, on top of the entries that set NoDisplay or
-# Hidden themselves.
-hidden = ["qt5ct", "qt6ct", "org.codeberg.dnkl.footclient", "org.codeberg.dnkl.foot-server"]
+# Hidden themselves. kubaos-files is the folder handler's entry (home/files.nix);
+# the KubaOS Extension's "Files" stands in for it.
+hidden = ["qt5ct", "qt6ct", "org.codeberg.dnkl.footclient", "org.codeberg.dnkl.foot-server", "kubaos-files"]
 # Display names by desktop id, for entries with clumsy names.
 names = { nvim = "Neovim" }
 
@@ -53,6 +54,25 @@ kind = "scripts"
 # What a `terminal = true` action runs in. It stays open once the action
 # exits, so what it said can be read.
 terminal = ["ghostty", "--wait-after-command=true", "-e"]
+
+# Files: yazi in Ghostty (crates/kubaos-files). The Extension itself sends one
+# Item a user folder that exists, "Files: Downloads" and the like.
+
+[extensions.kubaos.actions.files]
+title = "Files"
+subtitle = "Your home folder in yazi. A file manager that never wants the mouse"
+icon = "system-file-manager"
+keywords = ["file manager", "yazi", "folders", "explorer", "finder", "home"]
+run = ["kubaos-files", "open"]
+
+[extensions.kubaos.actions.files-open]
+title = "Open folder…"
+subtitle = "A folder or a file by its path, in yazi"
+icon = "folder-open"
+keywords = ["file manager", "yazi", "go to folder", "path"]
+keyword = "open-folder"
+run = ["kubaos-files", "open", "{path}"]
+arguments = [{ name = "path", placeholder = "~/Projects/kubaos" }]
 
 # Wallpaper and theme (scripts/dot-theme, the shell's picker).
 

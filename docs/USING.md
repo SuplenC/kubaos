@@ -11,6 +11,7 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + Return` | Terminal (Ghostty) |
 | `SUPER + CTRL + Return` | Terminal in tmux session `main` |
 | `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows, binds, KubaOS's actions and the system toggles ("wifi", "volume 40", "next wallpaper"). Type a sum to calculate. It opens on the focused screen |
+| `SUPER + SHIFT + F` | Files: yazi in your home folder |
 | `SUPER + Q` | Close window |
 | `SUPER + h/j/k/l` | Focus the screen left, below, above, right |
 | `SUPER + ←/↓/↑/→` | Focus the window that way. `SUPER + SHIFT + h/j/k/l` moves the window, `SUPER + CTRL + h/j/k/l` resizes it |
@@ -28,6 +29,42 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + ALT + Return` / `SUPER + ALT + Space` | foot and fuzzel: the emergency terminal and app menu, for when the shell is dead |
 
 The layouts are the ones you picked in Kōbō, the first the default (`/etc/default/keyboard`, `us` if there is no such file). The console and the disk passphrase prompt type with the default. With two or more, the bar shows the one in use ("US", "IT"); click it, press `SUPER + SHIFT + Space` or pick "Next keyboard layout" in the Command menu for the next. The Command menu has each layout ("Keyboard: Italian") to switch to it, make it the default or remove it, plus "Keyboard: add a layout" and "Keyboard: set layouts". `kubaos keyboard show|set|add|remove|default` does the same from a terminal, through `localectl`, and reloads Hyprland. Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
+
+## Files
+
+The file manager is [yazi](https://yazi-rs.github.io/), in Ghostty. No Finder, no Nautilus, no mouse required. It opens from:
+
+- `SUPER + SHIFT + F`, or "Files" in the Command menu: your home folder.
+- "Files: Downloads", "Files: Documents" and the rest in the Command menu: each XDG user folder that exists (the ones in `~/.config/user-dirs.dirs`, or the English names without it).
+- "Open folder…" in the Command menu (`open-folder` then the path): any folder, or a file, which opens in its folder with the cursor on it.
+- `xdg-open <folder>`, and every app's "Open folder". The Files desktop entry is KubaOS's default for folders, in `~/.local/share/applications/mimeapps.list`. Set another with `xdg-mime default <app>.desktop inode/directory`, which writes `~/.config/mimeapps.list`, and that one wins.
+- An app's "Show in folder" (Chrome's downloads, VS Code, Telegram): KubaOS answers `org.freedesktop.FileManager1` on the session bus and opens yazi with the file under the cursor. D-Bus starts it on the first click; it quits about ten seconds after the last. A folder it is asked to show opens inside it, since yazi can only point at files. A file that's already gone opens the nearest folder that isn't.
+- `y` in a shell: yazi in that terminal, and when you quit it, the shell `cd`s to where you ended up. Plain `yazi` leaves the shell where it was.
+
+`kubaos-files open [PATH|URI]...` does all of the above from a terminal: paths, `~`, and `file://` URIs, several at once as tabs.
+
+| Key in yazi | What |
+|---|---|
+| `Enter` / `l`, `h` | Open, go up |
+| `Space` | Select; `v` for a visual selection |
+| `y`, `x`, `p` | Copy, cut, paste |
+| `d` / `D` | Trash / delete for good |
+| `a`, `r` | Create (a trailing `/` makes a folder), rename |
+| `/`, `s` / `S` | Find in the folder, search names (fd) / contents (ripgrep) |
+| `z` / `Z` | Jump with fzf / zoxide |
+| `Ctrl + N` | Drag the selected files, or the hovered one, out of yazi (ripdrag): into Chrome, an upload form, anything that takes a drop |
+| `~` or `F1` | Every key |
+
+Image, video and PDF previews show in the right pane: yazi draws them with the kitty graphics protocol, which Ghostty speaks. Inside tmux they pass through as well (`allow-passthrough` in `config/tmux/tmux.conf`).
+
+The drag key lives in your own `~/.config/kubaos/yazi/keymap.toml`, which KubaOS seeds with it: change it or delete it there. yazi reads a single keymap file, so KubaOS can't ship keys of its own beside yours. If your file had its own keys before the drag key existed, the update left it alone; add this yourself:
+
+```toml
+[[mgr.prepend_keymap]]
+on = "<C-n>"
+run = 'shell --orphan -- ripdrag --and-exit --all --no-click "$@"'
+desc = "Drag the selected files out"
+```
 
 ## Updating and rolling back
 
@@ -79,7 +116,7 @@ Each file starts as a comment and an example:
 | Ghostty, foot, fuzzel | `~/.config/kubaos/{ghostty/config,foot/foot.ini,fuzzel/fuzzel.ini}` | reload or new window |
 | git | `~/.config/kubaos/git/config`, `~/.config/kubaos/git/ignore` | at once (`ignore` after `dot-config apply`) |
 | Neovim | `~/.config/kubaos/nvim/{options,keymaps,autocmds}.lua`, `plugins/*.lua`; extras with `:LazyExtras` | restart Neovim |
-| lazygit, bacon, yazi | `~/.config/kubaos/{lazygit/config.yml,bacon/prefs.toml,yazi/yazi.toml,yazi/keymap.toml}` | next start (lazygit and bacon: in a new shell) |
+| lazygit, bacon, yazi | `~/.config/kubaos/{lazygit/config.yml,bacon/prefs.toml,yazi/yazi.toml,yazi/keymap.toml}` | next start (lazygit and bacon: in a new shell). The yazi keymap starts with KubaOS's drag key ("Files") |
 | bat, fastfetch | `~/.config/kubaos/{bat/config,fastfetch/config.jsonc}` | after `dot-config apply` |
 | btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml`: they rewrite their own file, so it's yours as is | next start |
 | Command menu: your own actions, hiding KubaOS's | `~/.config/kubaos/kotodama/user.toml` (below) | on save |
@@ -216,7 +253,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-bw-setup`, `dot-bwenv`, `dot-u2f-enroll`, `dot-ssh-sk-new`) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `relink.sh`, which `kubaos update` runs, files for `/etc` |
-| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, and `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles |
+| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, and `kubaos-files`, yazi for `xdg-open` and "Show in folder" |
 | `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |
 | `test/` | The Docker test harness (`test/run`) |
 | `docs/` | `PLAN.md` (why), `INSTALL.md` (how), `CONTRACTS.md` and `INSTALL-INTERNALS.md` (interfaces), `SECRETS.md` (Bitwarden, security key), `TESTING.md`, `BRAND.md` (name and voice), `screenshots/` |

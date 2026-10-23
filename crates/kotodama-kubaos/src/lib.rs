@@ -6,7 +6,8 @@
 //!
 //! # Owns
 //!
-//! - The registry, the toggles, the keyboard layouts, and what each of their Actions runs.
+//! - The registry, the toggles, the keyboard layouts, the wallpaper sets, the user folders, and
+//!   what each of their Actions runs.
 //!
 //! # Not here
 //!
@@ -19,6 +20,7 @@
 pub mod audio;
 pub mod bus;
 pub mod extension;
+pub mod files;
 pub mod keyboard;
 pub mod registry;
 pub mod run;
