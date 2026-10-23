@@ -77,7 +77,7 @@ A screen's workspaces are its group. Unplugging a screen moves its group to
 the primary screen (the laptop panel; with the lid closed, the external
 Hyprland numbered first) under its own numbers, if it had any windows; an
 empty group vanishes. Plugging the screen back returns the group to it. The
-bar shows each group on its own, a dot between them, e.g. `1 2 3 · 1 2`: the
+bar shows each group on its own, a thin rule between them, e.g. `1 2 3 | 1 2`: the
 screen's own first, then the waiting groups in the order their screens sat,
 left to right. That order is each screen's `x` when it was last plugged in,
 kept in `workspace-screens`; it holds while the screen is away, and a screen
