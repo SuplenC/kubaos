@@ -13,6 +13,8 @@ fail() { printf '  FAIL  %s\n' "$*"; FAILS=$((FAILS + 1)); }
 info() { printf '        %s\n' "$*"; }
 sect() { printf '\n== %s\n' "$*"; }
 check() { local what="$1"; shift; if "$@" >/dev/null 2>&1; then ok "$what"; else fail "$what"; fi; }
+# eq ACTUAL WANT, for `check "..." eq "$(cmd)" value`.
+eq() { [[ "$1" == "$2" ]]; }
 in_root() { chroot "$R" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C.UTF-8 HOME=/root XDG_RUNTIME_DIR=/tmp "$@"; }
 now() { date +%s.%N; }
 since() { awk -v a="$1" -v b="$(now)" 'BEGIN { printf "%.1f", b - a }'; }
