@@ -6,6 +6,7 @@
 {
   imports = [
     ./links.nix
+    ./bluetooth.nix
     ./cli.nix
     ./dev.nix
     ./desktop.nix

@@ -1,7 +1,8 @@
 # The KubaOS Rust workspace: the engine (`kubaos-core`), the `kubaos` CLI
 # (`kubaos-cli`), the recoloured pointer it writes (`kubaos-cursor`), Kōbō
 # (`kubaos-kobo`), its graphical front end, the Command menu's KubaOS
-# Extension (`kotodama-kubaos`), and the file manager's glue (`kubaos-files`).
+# Extension (`kotodama-kubaos`), the file manager's glue (`kubaos-files`), and
+# the Bluetooth pairing agent (`kubaos-bluetooth`).
 [workspace]
 resolver = "3"
 members = [
@@ -11,6 +12,7 @@ members = [
     "crates/kubaos-kobo",
     "crates/kotodama-kubaos",
     "crates/kubaos-files",
+    "crates/kubaos-bluetooth",
 ]
 
 [workspace.package]
