@@ -19,7 +19,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 | `home/files.nix`, `crates/kubaos-files/` | files | The file manager: yazi in Ghostty as the folder handler and `org.freedesktop.FileManager1`, ripdrag |
 | `home/shell.nix`, `home/terminal.nix`, `config/{nvim,tmux,tms,ghostty,ohmyposh,lazygit,btop,git,bat,bacon,yazi,foot,fuzzel}` | ports | zsh, tmux, tms, ghostty, ported user configs, the fallback terminal and launcher |
 | `config/hypr/`, `scripts/dot-hypr-*` | hypr | Hyprland Lua config, hypridle, lid and monitor scripts, screenshots and screen recording |
-| `config/quickshell/`, `scripts/dot-qs-*` | quickshell | The desktop shell |
+| `config/quickshell/`, `scripts/dot-qs-*`, `home/session.nix`, `scripts/dot-session` | quickshell | The desktop shell, and bringing the running session onto new defaults after a switch |
 | `home/menu.nix`, `config/kotodama/`, `config/quickshell/modules/menu/`, `crates/kotodama-kubaos/`, the `kotodama` input | menu | The Command menu: Kotodama, its Extensions and config, the KubaOS Extension (actions and system toggles), and the shell's window for it |
 | `home/theme.nix`, `config/matugen/`, `scripts/dot-theme*`, the `kubaos-wallpapers` input | theme | Wallpaper + matugen color pipeline, the wallpaper sets, GTK/Qt/cursor/icons |
 | `system/`, `docs/INSTALL.md` | system | Ubuntu bootstrap scripts and `/etc` files |
@@ -64,6 +64,23 @@ The merged files (bat, git ignore, fastfetch) change when `dot-config apply` run
 Not in the user layer yet: the rest of Quickshell's settings (`config/quickshell/settings/Settings.qml`), the matugen templates, and oh-my-posh (a matugen template). They ship as read-only defaults until they get their own design.
 
 The `layer` table in `links.nix` lists the files that aren't plain links (seeded, `concat`, `json`); it's written to `~/.local/share/kubaos/layer` for `dot-config`.
+
+### The running session after a switch (home/session.nix, scripts/dot-session)
+
+A switch writes no file: it points the links in `~/.config` at new store files. Programs that read their config once at start keep the old defaults, and Hyprland, which watches its files for writes, doesn't notice either. So every generation records, in `kubaos-session` next to its `activate`, the store paths each of these parts starts from: its directory or file in `config/`, plus the package where KubaOS pins one. Home activation (`reloadSession`, after the user units and `dot-config apply`) compares the old generation's record with the new one's and runs `dot-session apply` for the parts that changed:
+
+| Part | Record | On a change |
+|---|---|---|
+| Hyprland | `config/hypr/` without `hypridle.conf`, `hyprlock.conf`, `README.md` | `hyprctl -i <instance> reload` |
+| Quickshell | `config/quickshell/`, `kubaosPkgs.quickshell` (which carries Kotodama's QML module) | Hyprland execs `dot-session restart-shell`: it waits while `qs ipc call session locked` says `true`, then `qs kill` and `exec qs`. When no Quickshell of the default config runs, nothing starts. Two restarts waiting at once start one shell |
+| hypridle | `config/hypr/hypridle.conf` | Hyprland execs `dot-session restart-idle`: when hypridle runs, it is stopped and started again. Turned off ("Toggle idle"), it stays off |
+| Ghostty | `config/ghostty/` | `SIGUSR2` to the user's Ghostty processes |
+| tmux | `config/tmux/` | `tmux source-file` when a server runs |
+
+- The Hyprland instances are `hyprctl instances` in `$XDG_RUNTIME_DIR` (`/run/user/<uid>` when unset), so it works from a terminal in the session, from `kubaos update`'s switch unit and over ssh, all as the desktop user. With no Hyprland running (a tty, ssh with nobody logged in), the Hyprland, Quickshell and hypridle parts do nothing.
+- A first activation (the installer's, a new home) has no old generation and does nothing. A part a generation has no record of counts as changed when the other has one, so the first switch onto a generation with records restarts everything that runs once.
+- It never fails a switch: `dot-session apply` exits 0, and a failed reload or restart is only a missing line in the output.
+- Left alone: the Kotodama Daemon (it follows its config links into the store, and its systemd unit is restarted by the switch's sd-switch when the package changes), hyprlock (starts afresh at each lock), Hyprland's own package (the VM's, from Nix: a new one needs a new login), `dot-hypr-workspaces` (a running script keeps its old copy until the next login), and Neovim and the other terminal apps (they read their config when they start).
 
 ## The state directory, Suites and switch jobs (home/state.nix, home/suites.nix, kubaos-core)
 
@@ -164,6 +181,7 @@ Quickshell config lives in `config/quickshell/` with `shell.qml` at its root (th
 | Call | Effect |
 |---|---|
 | `qs ipc call session lock` | Lock screen |
+| `qs ipc call session locked` | `true` while the lock screen is up (`scripts/dot-session` waits for `false` before it restarts the shell) |
 | `qs ipc call powermenu toggle` | Lock / suspend / logout / reboot / shutdown |
 | `qs ipc call wallpaper toggle` | Wallpaper picker |
 | `qs ipc call wallpaper animate <always\|ac\|never>` | Wallpaper motion mode, remembered in `~/.local/state/quickshell/kubaos.json` (default `Settings.wallpaperAnimate`, `ac`) |

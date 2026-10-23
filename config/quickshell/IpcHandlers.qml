@@ -61,6 +61,11 @@ Scope {
         function lock(): void {
             Session.lock();
         }
+
+        // `scripts/dot-session` waits for false before it restarts the shell.
+        function locked(): bool {
+            return Session.locked;
+        }
     }
 
     IpcHandler {

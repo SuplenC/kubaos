@@ -93,6 +93,8 @@ An update, in order:
 8. `nix flake update --flake ~/.config/kubaos/home`, `system/relink.sh` (the wallpaper, PAM and recorder links), and a switch.
 9. Runs the new user migrations (`migrations/user/`, as you), each once, and writes `/var/lib/kubaos/release`.
 
+The running desktop follows every switch (`kubaos update`, `kubaos rollback`, a `home-manager switch` of your own) without a new login, and only where the defaults changed: Hyprland reloads, Quickshell restarts (after you unlock, if the screen is locked), hypridle restarts if it was running, Ghostty and tmux reload their config. With no desktop running, a switch from a tty or over ssh leaves that for the next login. New Neovim, lazygit and other terminal app settings apply the next time you start them. The details are in [`docs/CONTRACTS.md`](CONTRACTS.md), "The running session after a switch".
+
 Your Nix packages move with your flake's nixpkgs; KubaOS's keep their exact store paths until its release moves. Ways back, from smallest to largest:
 
 - **Shell broken.** `SUPER + ALT + Return` opens foot and `SUPER + ALT + Space` opens fuzzel. Both come from apt and work without Nix or Quickshell.

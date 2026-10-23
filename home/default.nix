@@ -12,6 +12,7 @@
     ./files.nix
     ./menu.nix
     ./secrets.nix
+    ./session.nix
     ./shell.nix
     ./state.nix
     ./suites.nix
