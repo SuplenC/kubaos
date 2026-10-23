@@ -28,11 +28,19 @@ Rectangle {
         }
     }
 
-    Row {
-        id: row
+    // While the pill's width animates to fit new content, the content is cut
+    // at the pill's edge rather than drawn over its neighbours. Tooltips are
+    // popups, so this clip never cuts them.
+    Item {
+        anchors.fill: parent
+        clip: true
 
-        anchors.centerIn: parent
-        spacing: Theme.spacing.sm
+        Row {
+            id: row
+
+            anchors.centerIn: parent
+            spacing: Theme.spacing.sm
+        }
     }
 
     StateLayer {

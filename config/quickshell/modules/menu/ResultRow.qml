@@ -39,7 +39,7 @@ Item {
     IconImage {
         id: image
 
-        x: row.look.inset
+        x: row.look.rowPad
         y: row.look.snap((row.height - height) / 2)
         implicitSize: row.look.iconSize
         visible: row.iconSource !== ""
@@ -63,7 +63,7 @@ Item {
         id: badge
 
         anchors.right: parent.right
-        anchors.rightMargin: row.look.inset
+        anchors.rightMargin: row.look.rowPad
         y: row.look.snap((row.height - height) / 2)
         visible: row.alias !== ""
         width: visible ? row.look.snap(badgeText.implicitWidth + 2 * row.look.gap) : 0

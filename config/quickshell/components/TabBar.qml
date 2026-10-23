@@ -1,9 +1,14 @@
 import QtQuick
+import QtQuick.Layouts
 import qs.theme
 
 // Row of pill tabs with an indicator that slides to the selected one.
 // The owner keeps the state: bind currentIndex, handle picked().
 // Focusable: h/l or Left/Right pick the neighbouring tab.
+//
+// Its implicit width is every label with full padding. Given more, the tabs
+// share the extra; given less, they give up padding first and then elide
+// their labels, so no tab or indicator ever reaches past the bar's edges.
 Item {
     id: root
 
@@ -61,9 +66,10 @@ Item {
         }
     }
 
-    Row {
+    RowLayout {
         id: row
 
+        anchors.fill: parent
         spacing: Theme.spacing.xxs
 
         Repeater {
@@ -79,13 +85,17 @@ Item {
                 readonly property bool selected: root.currentIndex === index
                 readonly property real radius: Theme.rounding.full
 
-                implicitWidth: label.implicitWidth + Theme.spacing.lg * 2
-                implicitHeight: root.height
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.preferredWidth: label.implicitWidth + Theme.spacing.lg * 2
+                Layout.minimumWidth: Theme.spacing.sm * 2
 
                 StyledText {
                     id: label
 
                     anchors.centerIn: parent
+                    width: Math.min(implicitWidth, tab.width - Theme.spacing.sm * 2)
+                    horizontalAlignment: Text.AlignHCenter
                     text: tab.modelData
                     color: tab.selected ? Theme.m3onSecondaryContainer : Theme.m3onSurfaceVariant
                     font.weight: Font.Medium

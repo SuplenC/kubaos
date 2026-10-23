@@ -104,7 +104,8 @@ Item {
                 Rectangle {
                     required property string modelData
 
-                    width: content.look.snap(label.implicitWidth + 2 * content.look.badgePad)
+                    // A long Alias elides inside the pane.
+                    width: Math.min(content.look.snap(label.implicitWidth + 2 * content.look.badgePad), top.width)
                     height: content.look.badgeHeight
                     radius: height / 2
                     color: Theme.m3secondaryContainer
@@ -113,6 +114,7 @@ Item {
                         id: label
 
                         anchors.centerIn: parent
+                        width: Math.min(implicitWidth, parent.width - 2 * content.look.badgePad)
                         text: parent.modelData
                         color: Theme.m3onSecondaryContainer
                         font.pixelSize: content.look.font.small

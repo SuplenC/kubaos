@@ -15,20 +15,24 @@ Item {
     required property ShellScreen screen
     required property QsWindow window
 
-    RowLayout {
+    Workspaces {
+        id: workspaces
+
         anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
         anchors.leftMargin: Theme.bar.padding
-        spacing: Theme.spacing.md
+        anchors.verticalCenter: parent.verticalCenter
+        screen: root.screen
+    }
 
-        Workspaces {
-            screen: root.screen
-        }
-
-        ActiveWindow {
-            screen: root.screen
-            Layout.maximumWidth: Math.max(0, clock.x - x - Theme.spacing.xxxl - Theme.bar.padding)
-        }
+    // Anchored to the pill rather than laid out beside it, so its place
+    // follows the pill's width as it animates, and its width depends on
+    // nothing it sets itself.
+    ActiveWindow {
+        anchors.left: workspaces.right
+        anchors.leftMargin: Theme.spacing.md
+        anchors.verticalCenter: parent.verticalCenter
+        width: Math.max(0, Math.min(implicitWidth, clock.x - x - Theme.spacing.xxxl))
+        screen: root.screen
     }
 
     Clock {

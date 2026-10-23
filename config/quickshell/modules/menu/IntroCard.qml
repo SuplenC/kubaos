@@ -57,6 +57,8 @@ Rectangle {
                 spacing: card.look.gap
 
                 Rectangle {
+                    id: chip
+
                     anchors.verticalCenter: parent.verticalCenter
                     width: card.look.snap(query.implicitWidth + 2 * card.look.gap)
                     height: card.look.badgeHeight
@@ -74,14 +76,19 @@ Rectangle {
                 }
 
                 Icon {
+                    id: arrow
+
                     anchors.verticalCenter: parent.verticalCenter
                     name: "arrow_forward"
                     size: card.look.exampleIcon
                     color: Theme.m3onSurfaceVariant
                 }
 
+                // What's left of the card's width, so a long result elides
+                // inside the card.
                 StyledText {
                     anchors.verticalCenter: parent.verticalCenter
+                    width: Math.max(0, Math.min(implicitWidth, column.width - chip.width - arrow.width - 2 * example.spacing))
                     text: example.modelData.result
                     color: Theme.m3onSurfaceVariant
                     font.pixelSize: card.look.font.small
