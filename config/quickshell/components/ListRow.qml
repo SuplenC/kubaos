@@ -6,7 +6,7 @@ import qs.theme
 // One row in a list: leading glyph or image, title, optional subtitle, trailing items.
 // `current` marks the keyboard selection (NavList draws the highlight behind it),
 // `active` marks e.g. the connected network. Cascades in when the list's
-// enterSerial changes (NavList.playEnter()).
+// enterSerial changes (NavList.playEnter()), and fades in when the model adds it.
 Item {
     id: root
 
@@ -31,11 +31,28 @@ Item {
     }
 
     onEnterSerialChanged: {
+        arrival.stop();
         entrance.stop();
         if (enterIndex > 12)
             return;
         enter = 0;
         entrance.start();
+    }
+
+    ListView.onAdd: {
+        entrance.stop();
+        enter = 0;
+        arrival.start();
+    }
+
+    Anim {
+        id: arrival
+
+        target: root
+        property: "enter"
+        to: 1
+        duration: Theme.anim.small
+        easing.bezierCurve: Theme.anim.effects
     }
 
     SequentialAnimation {

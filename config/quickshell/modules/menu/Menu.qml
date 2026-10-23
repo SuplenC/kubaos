@@ -808,6 +808,16 @@ PanelWindow {
                             duration: menu.look.motion.fade
                         }
                     }
+                    // A Result that moves mid-fade comes back whole too: with
+                    // no `move` transition the view cancels the fade where it
+                    // is. Moved rows still jump to their place.
+                    move: Transition {
+                        NumberAnimation {
+                            property: "opacity"
+                            to: 1
+                            duration: menu.look.motion.fade
+                        }
+                    }
 
                     // A run names the Results of the last frame on screen, so
                     // the Daemon refuses a Late Result the user hasn't seen
