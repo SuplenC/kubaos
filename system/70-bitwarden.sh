@@ -3,14 +3,14 @@
 #   - Bitwarden desktop (official .deb, pinned + sha256-checked): its SSH agent
 #     serves the SSH keys from the vault on ~/.bitwarden-ssh-agent.sock
 #   - bw, the official CLI (standalone binary, pinned + sha256-checked) to
-#     /usr/local/bin/bw, for dot-bw-setup and dot-bwenv
-#   - libsecret-tools (secret-tool) for dot-bwenv's keyring cache
+#     /usr/local/bin/bw, for `kubaos bitwarden`
+#   - libsecret-tools (secret-tool) for `kubaos bitwarden env`'s keyring cache
 #   - pam_u2f: a FIDO2 security key (a YubiKey C Bio: your finger on its
 #     sensor) as an alternative to the password for sudo, polkit and the
 #     Quickshell lock screen. The password always keeps working.
 #     system/75-yubikey.sh adds the key's tools (fido2-tools, optional pcscd).
 #
-# Then, as yourself: dot-bw-setup (vault -> ssh, git, gh, env) and
+# Then, as yourself: kubaos bitwarden setup (vault -> ssh, git, gh, env) and
 # dot-u2f-enroll (security keys). docs/SECRETS.md has the whole flow.
 #
 # Why these builds (checked 2026-10):
@@ -314,7 +314,7 @@ if ((!REMOVE_U2F)); then
       As yourself (docs/SECRETS.md):
         1. Start Bitwarden, log in, Settings -> enable "SSH agent".
            Optional: "Unlock with system authentication" (polkit: your finger on the key).
-        2. dot-bw-setup            vault -> ~/.ssh, git signing, gh, project env
+        2. kubaos bitwarden setup  vault -> ~/.ssh, git signing, gh, project env
         3. system/75-yubikey.sh    the key's tools; then set its PIN and fingerprints
         4. dot-u2f-enroll          each security key (enroll a backup key too)
         5. Test from a second tty before you rely on it:  sudo -k; sudo true
