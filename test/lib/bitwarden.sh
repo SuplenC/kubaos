@@ -1,5 +1,5 @@
 # shellcheck shell=bash disable=SC2015,SC2016
-# test/run bitwarden: dot-bw-setup and `use bwenv` against a real Vaultwarden
+# test/run bitwarden: `kubaos bitwarden` and `use bwenv` against a real Vaultwarden
 # (compose service vaultwarden, https://vw on the private network). Sourced
 # by test/lib/entry after harness.sh; prepare() has run.
 #
@@ -58,7 +58,7 @@ c_bw_seed() {
     --method 0 --code "$(python3 -I "$LIB/vw-register.py" --totp "$TOTP_SECRET")" --raw)" ||
     { echo "FAIL seed login"; return 1; }
   export SEED_SESSION
-  # The user's own folders, none named for dot-bw-setup.
+  # The user's own folders, none named for kubaos.
   personal="$(create folder '{"name":"Personal"}')"
   work="$(create folder '{"name":"Work"}')"
   env_demo="$(create folder '{"name":"env/demo"}')"
@@ -121,11 +121,12 @@ c_bw_session() {
 }
 
 c_bw_setup() {
-  local log=$LOGS/dot-bw-setup.out rc=0
+  local log=$LOGS/bitwarden-setup.out rc=0
+  install_kubaos || return 1
   cat >"$LOGS/bw-setup.exp" <<'EOF'
 set timeout 120
 log_user 1
-spawn zsh -l -c "dot-bw-setup"
+spawn zsh -l -c "kubaos bitwarden setup"
 # After spawn: expect_after binds to the current spawn id.
 expect_after timeout { puts "\nexpect: timed out"; exit 98 }
 expect -ex "Choice \[1-3\]:" { send "3\r" }
@@ -136,7 +137,7 @@ expect -ex "Email:" { send "$env(BW_EMAIL)\r" }
 # mode: wait for the whole prompt, then a moment. (No (?i): expect's glob
 # pre-filter ignores it.)
 expect -re {[Mm]aster password.*hidden} { sleep 0.5; send "$env(BW_PASSWORD)\r" }
-# dot-bw-setup asks bw for the authenticator-app code (--method 0).
+# kubaos asks bw for the authenticator-app code (--method 0).
 # The prompt redraws on every keystroke, so answer it once.
 set code_sent 0
 expect {
@@ -157,13 +158,13 @@ EOF
   bw_env BW_EMAIL="$BW_EMAIL" BW_PASSWORD="$BW_PASSWORD" TOTP_SECRET="$TOTP_SECRET" \
     VW_REGISTER="$LIB/vw-register.py" expect -f "$LOGS/bw-setup.exp" >"$log" 2>&1 || rc=$?
   tr -d '\r' <"$log" | sed -n '/==> Summary/,$p'
-  ((rc == 0)) || { echo "FAIL dot-bw-setup exited $rc"; tail -30 "$log"; return 1; }
+  ((rc == 0)) || { echo "FAIL kubaos bitwarden setup exited $rc"; tail -30 "$log"; return 1; }
   grep -q 'vault unlocked for this run' "$log" || { echo "FAIL no unlock in the output"; return 1; }
   grep -q 'agent  running, serves every SSH key' "$log" || { echo "FAIL summary: agent doesn't serve every vault key"; return 1; }
-  echo "ok   dot-bw-setup: server prompt, password + authenticator code, unlock, all parts (exit 0)"
+  echo "ok   kubaos bitwarden setup: server prompt, password + authenticator code, unlock, all parts (exit 0)"
   tr -d '\r' <"$log" >"$log.txt"
   grep -qF '5 SSH key(s) in your vault' "$log.txt" || { echo "FAIL not every SSH key in the vault was read"; return 1; }
-  # shellcheck disable=SC2088 # dot-bw-setup prints ~ for $HOME.
+  # shellcheck disable=SC2088 # kubaos prints ~ for $HOME.
   grep -qF '~/.ssh/github.pub is taken by "GitHub" (Personal): "GitHub" (Work) gets ~/.ssh/github-2.pub' "$log.txt" ||
     { echo "FAIL no warning naming the two keys called GitHub"; return 1; }
   grep -qF 'Host blocks: GitHub (Personal), Work GitHub (Work), Homelab server (no folder)' "$log.txt" ||
@@ -212,9 +213,9 @@ c_bw_files() {
     echo "ok   no secret in plaintext under ~"
   fi
   [[ ! -e /tmp/pwned && ! -e /tmp/pwned-ssh ]] || { echo "FAIL something ran a vault value"; bad=1; }
-  out="$(bzsh 'dot-bw-setup --check' 2>&1)"
-  grep -q "agent answers with ${#SSH_KEYS[@]} key" <<<"$out" && echo "ok   dot-bw-setup --check: agent answers" ||
-    { echo "FAIL dot-bw-setup --check"; printf '%s\n' "$out" | tail -8; bad=1; }
+  out="$(bzsh 'kubaos bitwarden check' 2>&1)"
+  grep -q "agent answers with ${#SSH_KEYS[@]} key" <<<"$out" && echo "ok   kubaos bitwarden check: agent answers" ||
+    { echo "FAIL kubaos bitwarden check"; printf '%s\n' "$out" | tail -8; bad=1; }
   return "$bad"
 }
 
@@ -227,7 +228,7 @@ c_bw_folder() {
   local h=$USER_HOME conf=$USER_HOME/.config/dot-bw/config session out bad=0
   session="$(bw_env env BW_PASSWORD="$BW_PASSWORD" bw unlock --passwordenv BW_PASSWORD --raw)" ||
     { echo "FAIL bw unlock"; return 1; }
-  refresh_ssh() { bw_env env BW_SESSION="$session" zsh -l -c 'dot-bw-setup --refresh --only ssh' 2>&1 | tr -d '\r'; }
+  refresh_ssh() { bw_env env BW_SESSION="$session" zsh -l -c 'kubaos bitwarden refresh --only ssh' 2>&1 | tr -d '\r'; }
 
   printf 'folder=Work\n' | as_user tee -a "$conf" >/dev/null
   out="$(refresh_ssh)"
@@ -262,7 +263,7 @@ c_bw_folder() {
 
 c_bw_direnv() {
   local out t0 bad=0
-  out="$(bzsh 'dot-bwenv list')"
+  out="$(bzsh 'kubaos bitwarden env list')"
   printf '%s\n' "$out"
   grep -q '^demo' <<<"$out" || { echo "FAIL keyring has no project demo"; return 1; }
   for v in DATABASE_URL API_TOKEN TLS_KEY EXTRA_VAR; do
@@ -286,11 +287,26 @@ c_bw_direnv() {
   return "$bad"
 }
 
+# The old names, kept for one release: each says its new one and runs it.
+c_bw_alias() {
+  local out bad=0
+  out="$(bzsh 'dot-bw-setup --check' 2>&1)"
+  grep -qF 'dot-bw-setup is now: kubaos bitwarden check' <<<"$out" &&
+    grep -q "agent answers with ${#SSH_KEYS[@]} key" <<<"$out" &&
+    echo "ok   dot-bw-setup --check: names kubaos bitwarden check, then runs it" ||
+    { echo "FAIL dot-bw-setup --check"; printf '%s\n' "$out" | tail -8; bad=1; }
+  out="$(bzsh 'dot-bwenv list' 2>&1)"
+  grep -qF 'dot-bwenv is now: kubaos bitwarden env list' <<<"$out" && grep -q '^demo' <<<"$out" &&
+    echo "ok   dot-bwenv list: names kubaos bitwarden env list, then runs it" ||
+    { echo "FAIL dot-bwenv list"; printf '%s\n' "$out" | tail -8; bad=1; }
+  return "$bad"
+}
+
 bitwarden_main() {
   local c t0
   t0="$(now)"
   say "bitwarden checks against Vaultwarden at $VW_URL"
-  for c in bw_server bw_seed bw_session bw_setup bw_files bw_folder bw_direnv; do
+  for c in bw_server bw_seed bw_session bw_setup bw_files bw_folder bw_direnv bw_alias; do
     check "$c" "c_$c"
     # Each step needs the one before it.
     ((FAILED)) && break
