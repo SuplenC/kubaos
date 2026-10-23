@@ -723,7 +723,7 @@ fn a_pull_leaves_an_overview_of_folders_and_keys_for_the_card() {
     pull_all(&mut m);
 
     let o = Overview::read(&mut m, &paths());
-    assert_eq!(o.folders, ["No Folder", "Personal", "Work", "env/demo"]);
+    assert_eq!(o.folders, ["Personal", "Work", "env/demo"]);
     let github = o.keys.iter().find(|k| k.file.as_deref() == Some("github")).unwrap();
     assert!(github.block && github.signing);
     assert_eq!(github.hosts, ["github.com"]);

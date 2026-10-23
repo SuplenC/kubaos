@@ -10,6 +10,9 @@ use std::time::Duration;
 use super::{
     BwMethod, CardId, CardStatus, Facts, Inputs, MokState, PromptKind, SetupEvent, State, Status,
 };
+use crate::bitwarden::Agent;
+use crate::bitwarden::KeyInfo;
+use crate::bitwarden::Overview;
 use crate::event::Level;
 
 /// Which machine the demo pretends to be.
@@ -19,6 +22,8 @@ pub enum Machine {
     Tuxedo,
     /// The bench VM: no TUXEDO, no reader, no key.
     Vm,
+    /// A TUXEDO after first boot: every card done, Bitwarden pulled from a vault with folders.
+    Installed,
 }
 
 pub struct Demo {
@@ -210,14 +215,35 @@ impl Demo {
                 }
             }
             CardId::Bitwarden => {
+                let logged_in = matches!(
+                    &next.facts,
+                    Facts::Bitwarden { login, .. } if login == "locked" || login == "unlocked"
+                );
+                if inputs.bw_logout {
+                    emit(p(PromptKind::Wait, "Logging out…", None));
+                    self.wait(600);
+                    emit(log("logged out of Bitwarden"));
+                    next.state = State::Needed;
+                    next.summary = "Not logged in.".into();
+                    if let Facts::Bitwarden { login, agent, .. } = &mut next.facts {
+                        *login = "unauthenticated".into();
+                        *agent = None;
+                    }
+                    return self.finish(card, next, emit);
+                }
                 let Some(l) = &inputs.bw else {
                     emit(fail("nothing to log in with", "Fill in the form first."));
                     return false;
                 };
                 let empty = match l.method {
+                    _ if logged_in => l.password.is_empty(),
                     BwMethod::ApiKey => l.client_id.is_empty() || l.client_secret.is_empty(),
                     _ => l.email.is_empty() || l.password.is_empty() || l.code.is_empty(),
                 };
+                if empty && logged_in {
+                    emit(fail("the vault is locked", "Type the master password."));
+                    return false;
+                }
                 if empty {
                     emit(fail(
                         "email, master password and code, all three",
@@ -225,8 +251,19 @@ impl Demo {
                     ));
                     return false;
                 }
-                emit(p(PromptKind::Wait, "Logging in…", None));
-                emit(log(&format!("bw login {} --method 0", l.email)));
+                let server = match super::server_url(&l.server) {
+                    Ok(s) => s,
+                    Err(why) => {
+                        emit(fail(&why, "com, eu, or your server's https:// address."));
+                        return false;
+                    }
+                };
+                emit(p(PromptKind::Wait, "Bitwarden login…", None));
+                if logged_in {
+                    emit(log("ok  logged in as kuba@example.com"));
+                } else {
+                    emit(log(&format!("bw login {} --method 0", l.email)));
+                }
                 self.wait(2200);
                 if l.code == "000000" {
                     emit(fail(
@@ -235,69 +272,73 @@ impl Demo {
                     ));
                     return false;
                 }
+                let folders = match (&inputs.bw_folders, &next.facts) {
+                    (Some(f), _) => f.clone(),
+                    (None, Facts::Bitwarden { folders, .. }) => folders.clone(),
+                    _ => vec![],
+                };
+                let keys = demo_keys(&folders);
+                let scope = crate::bitwarden::scope(&folders);
+                let blocks = keys.iter().filter(|k| k.block).count();
+                let reading = format!("ok  8 items, {} SSH key(s) in {scope}", keys.len());
+                let written = format!("ok  ~/.ssh/config.d/bitwarden ({blocks} Host block(s))");
+                let served = format!("agent  running, serves every SSH key in {scope}");
                 for (step, lines) in [
-                    (
-                        "Reading the vault",
-                        &["  ok  57 items, 2 SSH key(s) in \"dotfiles\""][..],
-                    ),
+                    ("Reading the vault", vec![reading.as_str()]),
                     (
                         "SSH: public keys and Host blocks",
-                        &[
-                            "  ok  ~/.ssh/github.pub  (SHA256:4f1x…)",
-                            "      Host github.com",
-                            "  ok  ~/.ssh/config.d/bitwarden (2 Host block(s))",
-                        ][..],
+                        vec!["ok  ~/.ssh/github.pub  (SHA256:4f1x…)", "Host github.com", written.as_str()],
                     ),
                     (
                         "git: commit signing with an SSH key from the vault",
-                        &["  ok  signing with ~/.ssh/github.pub (GitHub); git config includes it"]
-                            [..],
+                        vec!["ok  signing with ~/.ssh/github.pub (GitHub (Personal)); git config includes it"],
                     ),
                     (
                         "gh: token from the vault into the system keyring",
-                        &["  ok  gh logged in to github.com, token in the keyring"][..],
+                        vec!["ok  gh logged in to github.com, token in the keyring"],
                     ),
-                    (
-                        "Project env: vault -> GNOME keyring (dot-bwenv)",
-                        &["arms 2 variable(s)"][..],
-                    ),
+                    ("Project env: vault -> GNOME keyring", vec!["demo                 4 variable(s)"]),
                     (
                         "Bitwarden desktop SSH agent (~/.bitwarden-ssh-agent.sock)",
-                        &[
-                            "  !!  no agent socket. Start Bitwarden desktop, log in, then Settings -> SSH agent -> turn on \"Enable SSH agent\"",
-                        ][..],
+                        vec!["ok  agent answers with 4 key(s)", served.as_str()],
                     ),
                 ] {
                     emit(p(PromptKind::Wait, &format!("{step}…"), None));
                     emit(log(step));
                     for line in lines {
                         self.wait(450);
-                        let (level, line) = match line.trim_start().strip_prefix("!!") {
-                            Some(w) => (Level::Warn, w.trim()),
-                            None => (Level::Info, *line),
-                        };
-                        emit(SetupEvent::Log {
-                            card,
-                            level,
-                            line: line.into(),
-                        });
+                        emit(log(line));
                     }
                 }
                 next.state = State::Done;
                 next.summary = format!(
-                    "Logged in as {}. SSH keys, git signing and project env come from the vault.",
-                    l.email
+                    "Logged in as {}. SSH keys, commit signing and project env come from the vault.",
+                    if l.email.is_empty() { "kuba@example.com" } else { &l.email }
                 );
                 if let Facts::Bitwarden {
                     login,
                     email,
+                    server: s,
                     configured,
+                    folders: f,
+                    overview,
+                    agent,
                     ..
                 } = &mut next.facts
                 {
-                    *login = "unlocked".into();
-                    *email = Some(l.email.clone());
+                    if !logged_in {
+                        *s = Some(server);
+                        if !l.email.is_empty() {
+                            *email = Some(l.email.clone());
+                        }
+                    }
+                    *login = "locked".into();
                     *configured = true;
+                    f.clone_from(&folders);
+                    overview.keys = keys;
+                    *agent = Some(Agent::Serving {
+                        keys: vec!["SHA256:4f1x".into(); 4],
+                    });
                 }
             }
             CardId::Git => {
@@ -323,6 +364,11 @@ impl Demo {
                 }
             }
         }
+        self.finish(card, next, emit)
+    }
+
+    /// The card flips to `next`, and the run ends with it.
+    fn finish(&self, card: CardId, next: CardStatus, emit: &mut dyn FnMut(SetupEvent)) -> bool {
         {
             let mut s = self.status.lock().expect("demo lock");
             if let Some(c) = s.cards.iter_mut().find(|c| c.id == card) {
@@ -332,6 +378,42 @@ impl Demo {
         emit(SetupEvent::Finished { card, status: next });
         true
     }
+}
+
+/// The demo vault's SSH keys, as a pull from `folders` (none: the whole vault) leaves them: the
+/// harness's vault without its hostile item.
+fn demo_keys(folders: &[String]) -> Vec<KeyInfo> {
+    let key = |name: &str, folder: &str, file: &str, hosts: &[&str]| KeyInfo {
+        name: name.into(),
+        folder: folder.into(),
+        fingerprint: format!("SHA256:{file}"),
+        file: Some(file.into()),
+        hosts: hosts.iter().map(|h| (*h).to_string()).collect(),
+        block: !hosts.is_empty(),
+        note: hosts.is_empty().then(|| "no 'hosts' field".to_string()),
+        signing: false,
+    };
+    let all = [
+        KeyInfo {
+            signing: true,
+            ..key("GitHub", "Personal", "github", &["github.com"])
+        },
+        key("Work GitHub", "Work", "work-github", &["github-work"]),
+        key("Homelab server", "no folder", "homelab-server", &["homelab", "nas.lan"]),
+        key("GitHub", "Work", "github-2", &[]),
+    ];
+    let mut keys: Vec<KeyInfo> = all
+        .into_iter()
+        .filter(|k| folders.is_empty() || folders.contains(&k.folder))
+        .collect();
+    // The older GitHub gone, the newer one takes the plain name.
+    if !keys.iter().any(|k| k.file.as_deref() == Some("github")) {
+        for k in keys.iter_mut().filter(|k| k.file.as_deref() == Some("github-2")) {
+            k.file = Some("github".into());
+            k.fingerprint = "SHA256:github".into();
+        }
+    }
+    keys
 }
 
 fn initial(machine: Machine) -> Status {
@@ -351,7 +433,10 @@ fn initial(machine: Machine) -> Status {
             email: Some("kuba@example.com".into()),
             server: Some("https://vault.bitwarden.eu".into()),
             configured: false,
-            desktop: machine == Machine::Tuxedo,
+            desktop: machine != Machine::Vm,
+            folders: vec![],
+            overview: Overview::default(),
+            agent: None,
         },
     };
     let git = CardStatus {
@@ -444,11 +529,86 @@ fn initial(machine: Machine) -> Status {
             bitwarden,
             git,
         ],
+        Machine::Installed => installed(),
     };
     Status {
         online: true,
         cards,
     }
+}
+
+/// Every card done: what the Command menu's "Set up Bitwarden" opens on.
+fn installed() -> Vec<CardStatus> {
+    let done = |id, summary: &str, facts| CardStatus {
+        id,
+        state: State::Done,
+        summary: summary.into(),
+        facts,
+    };
+    vec![
+        done(
+            CardId::Tuxedo,
+            "Drivers loaded: keyboard backlight, fans and power limits work.",
+            Facts::Tuxedo {
+                vendor: "TUXEDO".into(),
+                product: "InfinityBook Pro AMD Gen10".into(),
+                secure_boot: Some(true),
+                drivers: true,
+                modules: vec!["tuxedo_keyboard".into()],
+                mok: Some(MokState::Enrolled),
+            },
+        ),
+        done(
+            CardId::Fingerprint,
+            "One finger: right index. sudo and password dialogs take it.",
+            Facts::Fingerprint {
+                reader: Some("Goodix reader (27c6:609c)".into()),
+                fprintd: true,
+                fingers: vec!["right-index-finger".into()],
+                pam: true,
+            },
+        ),
+        done(
+            CardId::Yubikey,
+            "This key is enrolled (one key in total). Enroll a backup key too: keys get lost.",
+            Facts::Yubikey {
+                plugged: vec!["YubiKey C Bio - FIDO Edition".into()],
+                enrolled: 1,
+                this_key_enrolled: true,
+                pin: Some(true),
+                fingerprints: Some(true),
+            },
+        ),
+        done(
+            CardId::Bitwarden,
+            "Logged in as kuba@example.com. SSH keys, commit signing and project env come from the vault.",
+            Facts::Bitwarden {
+                bw: true,
+                login: "locked".into(),
+                email: Some("kuba@example.com".into()),
+                server: Some("https://vault.bitwarden.eu".into()),
+                configured: true,
+                desktop: true,
+                folders: vec![],
+                overview: Overview {
+                    folders: vec!["Personal".into(), "Work".into(), "env/demo".into()],
+                    keys: demo_keys(&[]),
+                },
+                agent: Some(Agent::Serving {
+                    keys: vec!["SHA256:4f1x".into(); 4],
+                }),
+            },
+        ),
+        done(
+            CardId::Git,
+            "Commits as Kuba Example <kuba@example.com>.",
+            Facts::Git {
+                name: Some("Kuba Example".into()),
+                email: Some("kuba@example.com".into()),
+                full_name: Some("Kuba Example".into()),
+            },
+        ),
+    ]
 }
 
 #[cfg(test)]
@@ -481,5 +641,35 @@ mod tests {
         let s = d.status();
         assert!(s.settled());
         assert!(s.reboot_pending());
+    }
+
+    #[test]
+    fn the_installed_bitwarden_card_narrows_its_keys_and_logs_out() {
+        let d = Demo::new(Machine::Installed, 1000.0);
+        assert!(d.status().settled());
+        let pull = Inputs {
+            bw: Some(BwLogin {
+                password: "x".into(),
+                ..Default::default()
+            }),
+            bw_folders: Some(vec!["Work".into()]),
+            ..Default::default()
+        };
+
+        assert!(d.run(CardId::Bitwarden, &pull, &mut |_| {}));
+        let Facts::Bitwarden { folders, overview, .. } = d.status().card(CardId::Bitwarden).unwrap().facts.clone()
+        else {
+            panic!("not the Bitwarden card")
+        };
+        assert_eq!(folders, ["Work"]);
+        let files: Vec<_> = overview.keys.iter().filter_map(|k| k.file.clone()).collect();
+        assert_eq!(files, ["work-github", "github"]);
+
+        let out = Inputs {
+            bw_logout: true,
+            ..Default::default()
+        };
+        assert!(d.run(CardId::Bitwarden, &out, &mut |_| {}));
+        assert_eq!(d.status().card(CardId::Bitwarden).unwrap().state, State::Needed);
     }
 }

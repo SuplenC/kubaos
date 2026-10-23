@@ -24,7 +24,7 @@
 //! - The command line: `crates/kubaos-cli/src/bitwarden.rs`.
 //! - The first-boot card, its form and its events: `crate::setup` (`setup/actions.rs`).
 
-mod agent;
+pub mod agent;
 mod base64;
 mod config;
 pub mod env;
@@ -57,6 +57,7 @@ pub use login::NoTerminal;
 pub use login::login;
 pub use login::logout;
 pub use real::Real;
+pub use vault::scope;
 
 /// The session `bw unlock` or `bw login` hands out. It unlocks the whole vault, so it stays in
 /// memory and goes to `bw` alone.
@@ -551,7 +552,8 @@ pub fn pull(m: &mut dyn Machine, paths: &Paths, session: &Session, parts: Parts,
     let mut keys = ssh::name_files(keys, p);
 
     let mut overview = Overview {
-        folders: folders.iter().map(|f| f.name.clone()).collect(),
+        // bw's "No Folder" has no id: no filter can name it.
+        folders: folders.iter().filter(|f| f.id.is_some()).map(|f| f.name.clone()).collect(),
         keys: vec![],
     };
     overview.folders.sort();

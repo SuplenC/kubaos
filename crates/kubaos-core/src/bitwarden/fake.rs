@@ -190,11 +190,10 @@ impl Bw for Fake {
     fn status(&mut self, session: Option<&Session>) -> Result<String, BwError> {
         self.bw.push("status".into());
         let status = if self.session_ok(session) { "unlocked" } else { self.state.as_str() };
-        let server = self.server.as_ref().map_or("null".to_string(), |s| format!("\"{s}\""));
-        Ok(format!(
-            r#"{{"serverUrl":{server},"userEmail":"{}","status":"{status}"}}"#,
-            self.email
-        ))
+        let quoted = |s: Option<&str>| s.map_or("null".to_string(), |s| format!("\"{s}\""));
+        let server = quoted(self.server.as_deref());
+        let email = quoted(Some(self.email.as_str()).filter(|e| !e.is_empty()));
+        Ok(format!(r#"{{"serverUrl":{server},"userEmail":{email},"status":"{status}"}}"#))
     }
 
     fn set_server(&mut self, url: &str) -> Result<(), BwError> {

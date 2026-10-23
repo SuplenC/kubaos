@@ -3,16 +3,26 @@
 //!
 //! Secrets: the MOK password goes to the helper on stdin; the master
 //! password and API key go to `bw` in its environment (`--passwordenv`,
-//! `BW_CLIENTID`), the session to `dot-bw-setup` as `BW_SESSION`, the way
-//! docs/SECRETS.md has it. None of them is logged. The one exception to "no
-//! secrets in argv" is the two-step code (`bw login --code`): bw has no other
-//! way to take it without a terminal, and it's spent the moment bw uses it.
+//! `BW_CLIENTID`), and the session stays in this process, going to each `bw`
+//! call as `BW_SESSION` ([`crate::bitwarden`]), the way docs/SECRETS.md has
+//! it. None of them is logged. The one exception to "no secrets in argv" is
+//! the two-step code (`bw login --code`): bw has no other way to take it
+//! without a terminal, and it's spent the moment bw uses it.
 
-use super::detect::{self, BW};
+use super::detect;
 use super::parse::*;
 use super::{
-    BwMethod, CardId, Cmd, Env, Facts, Inputs, MokState, PromptKind, SetupEvent, Stream, Sys,
+    BwLogin, BwMethod, CardId, Cmd, Env, Facts, Inputs, MokState, PromptKind, SetupEvent, Stream,
+    Sys,
 };
+use crate::bitwarden;
+use crate::bitwarden::FormMethod;
+use crate::bitwarden::Line;
+use crate::bitwarden::LoginRequest;
+use crate::bitwarden::NoTerminal;
+use crate::bitwarden::Parts;
+use crate::bitwarden::Progress;
+use crate::bitwarden::Sensitive;
 use crate::event::Level;
 
 struct Fail {
@@ -461,173 +471,113 @@ fn yubikey(ctx: &mut Ctx) -> R<()> {
 
 // ---------------------------------------------------------------- Bitwarden
 
+/// Logs in or unlocks with the form, then pulls everything from the vault, the way
+/// `kubaos bitwarden setup` does on a terminal. Or logs out, for another account or server.
 fn bitwarden(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
+    let paths = ctx.env.bitwarden.clone();
+    let card = ctx.card;
+    let emit = &mut *ctx.emit;
+    let m = ctx.sys.bitwarden();
+    let wait = |text: String| SetupEvent::Prompt {
+        card,
+        kind: PromptKind::Wait,
+        text,
+        count: None,
+    };
+    let log = |level, line: String| SetupEvent::Log { card, level, line };
+    if inputs.bw_logout {
+        emit(wait("Logging out…".into()));
+        bitwarden::logout(m).map_err(bw_failure)?;
+        emit(log(Level::Info, "logged out of Bitwarden".into()));
+        return Ok(());
+    }
     let Some(login) = &inputs.bw else {
         return Err(fail("nothing to log in with", "Fill in the form first."));
     };
-    let status = ctx
-        .sys
-        .run(&Cmd::new(BW).arg("status").env("BW_NOINTERACTION", "true"))
-        .ok()
-        .and_then(|o| parse_bw_status(&o.stdout))
-        .ok_or_else(|| fail("bw status didn't answer", "Is /usr/local/bin/bw installed?"))?;
-    let bw = |args: &[&str]| {
-        Cmd::new(BW)
-            .args(args.iter().copied())
-            .env("BW_NOINTERACTION", "true")
+    if let Some(folders) = &inputs.bw_folders {
+        bitwarden::set_folders(m, &paths, folders).map_err(bw_failure)?;
+    }
+    bitwarden::preflight(m, Parts::ALL).map_err(bw_failure)?;
+    let mut on_line = |l: &Line| match l {
+        Line::Step(s) => {
+            emit(wait(format!("{s}…")));
+            emit(log(Level::Info, s.clone()));
+        }
+        Line::Ok(s) => emit(log(Level::Info, format!("ok  {s}"))),
+        Line::Info(s) => emit(log(Level::Info, s.clone())),
+        Line::Warn(s) => emit(log(Level::Warn, s.clone())),
     };
-    let mut session = String::new();
-    if status.status == "unauthenticated" {
-        let url = server_url(&login.server)
-            .map_err(|e| fail(e, "com, eu, or your server's https:// address."))?;
-        let current = status
-            .server
-            .as_deref()
-            .map(|s| server_url(s).unwrap_or_default())
-            .unwrap_or_else(|| "https://vault.bitwarden.com".into());
-        if current != url {
-            ctx.log(Level::Info, format!("bw config server {url}"));
-            ctx.sys.run(&bw(&["config", "server", &url])).map_err(|e| {
-                fail(
-                    format!("bw config server failed: {e}"),
-                    "Check the address.",
-                )
-            })?;
-        }
-        ctx.prompt(PromptKind::Wait, "Logging in…", None);
-        match login.method {
-            BwMethod::Totp | BwMethod::YubikeyOtp => {
-                let (email, pw, code) = (login.email.trim(), &login.password, login.code.trim());
-                if email.is_empty() || pw.is_empty() || code.is_empty() {
-                    return Err(fail(
-                        "email, master password and code, all three",
-                        "Fill in the empty one.",
-                    ));
-                }
-                let method = if login.method == BwMethod::Totp {
-                    "0"
-                } else {
-                    "3"
-                };
-                ctx.log(Level::Info, format!("bw login {email} --method {method}"));
-                let out = ctx
-                    .sys
-                    .run(
-                        &bw(&[
-                            "login",
-                            email,
-                            "--passwordenv",
-                            "BW_PASSWORD",
-                            "--method",
-                            method,
-                            "--code",
-                            code,
-                            "--raw",
-                        ])
-                        .env("BW_PASSWORD", pw),
-                    )
-                    .map_err(|e| bw_fail(&e))?;
-                session = out.stdout.trim().to_string();
-            }
-            BwMethod::ApiKey => {
-                if login.client_id.trim().is_empty() || login.client_secret.trim().is_empty() {
-                    return Err(fail(
-                        "the API key needs client_id and client_secret",
-                        "Web vault: Settings, Security, Keys, View API key.",
-                    ));
-                }
-                ctx.log(Level::Info, "bw login --apikey");
-                ctx.sys
-                    .run(
-                        &bw(&["login", "--apikey"])
-                            .env("BW_CLIENTID", login.client_id.trim())
-                            .env("BW_CLIENTSECRET", login.client_secret.trim()),
-                    )
-                    .map_err(|e| bw_fail(&e))?;
-            }
-        }
-        remember(ctx, "server", &url)?;
-        if !login.email.trim().is_empty() {
-            remember(ctx, "email", login.email.trim())?;
-        }
-        ctx.log(Level::Info, format!("logged in on {url}"));
+    let mut p = Progress::new(&mut on_line);
+    let req = LoginRequest {
+        form: Some(form_of(login)),
+        ..LoginRequest::default()
+    };
+    let session = bitwarden::login(m, &paths, &req, &mut NoTerminal, &mut p).map_err(bw_failure)?;
+    bitwarden::pull(m, &paths, &session, Parts::ALL, &mut p).map_err(bw_failure)?;
+    drop(session);
+    let report = p.finish();
+    for line in report.summary {
+        emit(log(Level::Info, line));
     }
-    if session.is_empty() {
-        if login.password.is_empty() {
-            return Err(fail("the vault is locked", "Type the master password."));
-        }
-        ctx.prompt(PromptKind::Wait, "Unlocking the vault…", None);
-        ctx.log(Level::Info, "bw unlock");
-        let out = ctx
-            .sys
-            .run(
-                &bw(&["unlock", "--passwordenv", "BW_PASSWORD", "--raw"])
-                    .env("BW_PASSWORD", &login.password),
-            )
-            .map_err(|e| bw_fail(&e))?;
-        session = out.stdout.trim().to_string();
-    }
-    if session.is_empty() {
-        return Err(fail(
-            "bw returned no session",
-            "Try again; bw sometimes has a moment.",
+    if !report.warnings.is_empty() {
+        emit(log(
+            Level::Warn,
+            format!(
+                "{} thing(s) need you; they're in the lines marked above.",
+                report.warnings.len()
+            ),
         ));
     }
-
-    ctx.prompt(
-        PromptKind::Wait,
-        "Reading the vault: SSH keys, git signing, gh, project env…",
-        None,
-    );
-    let card = ctx.card;
-    let mut warnings = 0;
-    let emit = &mut *ctx.emit;
-    let cmd = Cmd::new(ctx.env.script("dot-bw-setup")).env("BW_SESSION", &session);
-    let r = ctx.sys.stream(&cmd, &mut |s| {
-        let Stream::Line(l) = s else { return };
-        let t = l.trim();
-        if t.is_empty() {
-            return;
-        }
-        let (level, line) = if let Some(s) = t.strip_prefix("==> ") {
-            emit(SetupEvent::Prompt {
-                card,
-                kind: PromptKind::Wait,
-                text: format!("{s}…"),
-                count: None,
-            });
-            (Level::Info, s.to_string())
-        } else if let Some(w) = t.strip_prefix("!!") {
-            warnings += 1;
-            (Level::Warn, w.trim().to_string())
-        } else if let Some(e) = t.strip_prefix("xx") {
-            (Level::Error, e.trim().to_string())
-        } else {
-            (Level::Info, t.to_string())
-        };
-        emit(SetupEvent::Log { card, level, line });
-    });
-    drop(session);
-    r.map_err(|e| {
-        fail(
-            format!(
-                "dot-bw-setup failed: {}",
-                e.lines()
-                    .last()
-                    .unwrap_or(&e)
-                    .trim_start_matches("xx")
-                    .trim()
-            ),
-            "The log below has the whole story. dot-bw-setup in a terminal says the same.",
-        )
-    })?;
-    if warnings > 0 {
-        ctx.log(
-            Level::Warn,
-            format!("{warnings} thing(s) need you; they're in the lines marked above."),
-        );
-    }
     Ok(())
+}
+
+/// The card's form, for [`bitwarden::login`].
+fn form_of(l: &BwLogin) -> bitwarden::Form {
+    bitwarden::Form {
+        server: l.server.clone(),
+        email: l.email.clone(),
+        password: Sensitive(l.password.clone()),
+        method: match l.method {
+            BwMethod::Totp => FormMethod::Totp,
+            BwMethod::YubikeyOtp => FormMethod::YubikeyOtp,
+            BwMethod::ApiKey => FormMethod::ApiKey,
+        },
+        code: l.code.clone(),
+        client_id: l.client_id.clone(),
+        client_secret: Sensitive(l.client_secret.clone()),
+    }
+}
+
+/// What stopped a Bitwarden run, in the card's words: bw's own reason when it gave one.
+fn bw_failure(e: bitwarden::Error) -> Fail {
+    use bitwarden::Error as E;
+    match e {
+        E::Login { cause, .. } | E::Unlock(cause) | E::NotUnlocked(cause) => {
+            let (error, hint) = bw_error(cause.detail());
+            Fail { error, hint }
+        }
+        E::Incomplete(what) => {
+            let hint = match what {
+                "the vault is locked" => "Type the master password.",
+                "the API key needs client_id and client_secret" => {
+                    "Web vault: Settings, Security, Keys, View API key."
+                }
+                _ => "Fill in the empty one.",
+            };
+            fail(what, hint)
+        }
+        E::Server(why) => fail(why, "com, eu, or your server's https:// address."),
+        other => {
+            let error = match std::error::Error::source(&other) {
+                Some(cause) => format!("{other}: {cause}"),
+                None => other.to_string(),
+            };
+            fail(
+                error,
+                "The log below has the whole story. kubaos bitwarden setup in a terminal says the same.",
+            )
+        }
+    }
 }
 
 // --------------------------------------------------------------------- Git
@@ -680,31 +630,14 @@ fn git(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
     Ok(())
 }
 
-fn bw_fail(e: &str) -> Fail {
-    let (error, hint) = bw_error(e);
-    Fail { error, hint }
-}
-
-/// `~/.config/dot-bw/config`: dot-bw-setup's non-secret settings.
-fn remember(ctx: &mut Ctx, key: &str, value: &str) -> R<()> {
-    let path = ctx.env.home_path(".config/dot-bw/config");
-    let old = ctx.sys.read(&path).unwrap_or_default();
-    let mut lines: Vec<String> = old
-        .lines()
-        .filter(|l| !l.starts_with(&format!("{key}=")) && !l.trim().is_empty())
-        .map(str::to_string)
-        .collect();
-    lines.push(format!("{key}={value}"));
-    ctx.sys
-        .write(&path, &(lines.join("\n") + "\n"))
-        .map_err(|e| Fail::from(format!("can't write {path}: {e}")))
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::fake::FakeSys;
-    use super::super::{BwLogin, GitIdentity, State};
+    use super::super::{GitIdentity, State};
     use super::*;
+    use crate::bitwarden::Login;
+    use crate::bitwarden::fake::Fake;
+    use crate::bitwarden::fake::SESSION;
     use std::path::PathBuf;
 
     fn env() -> Env {
@@ -712,6 +645,7 @@ mod tests {
             home: PathBuf::from("/home/kuba"),
             user: "kuba".into(),
             privileged: vec!["pkexec".into(), "/usr/lib/kubaos/setup-helper".into()],
+            bitwarden: crate::bitwarden::Paths::under(std::path::Path::new("/home/kuba")),
         }
     }
 
@@ -944,75 +878,74 @@ mod tests {
         }
     }
 
+    /// A vault with one SSH key in the folder Work, the agent serving it, git answering.
+    fn bw_machine(bw: Fake) -> FakeSys {
+        let folders = r#"[{"id":"f-work","name":"Work"},{"id":null,"name":"No Folder"}]"#;
+        let items = r#"[{"id":"i1","type":5,"name":"GitHub","folderId":"f-work","creationDate":"2026-01-01",
+            "fields":[{"name":"hosts","value":"github.com","type":0}],
+            "sshKey":{"privateKey":"-----BEGIN OPENSSH PRIVATE KEY-----","publicKey":"ssh-ed25519 AAAAgh",
+            "keyFingerprint":"SHA256:gh"}}]"#;
+        let mut bw = bw
+            .vault(folders, items)
+            .answer("timeout 20 ssh-add", 0, "256 SHA256:gh GitHub (ED25519)\n");
+        bw.sockets.insert("/home/kuba/.bitwarden-ssh-agent.sock".into());
+        let mut s = FakeSys::new().ok("nmcli", "full\n");
+        s.bw = bw;
+        s
+    }
+
     #[test]
-    fn bitwarden_logs_in_and_runs_dot_bw_setup() {
-        let mut s = FakeSys::new()
-            .file(BW, "")
-            .ok("/usr/local/bin/bw status", r#"{"serverUrl":null,"status":"unauthenticated"}"#)
-            .ok("/usr/local/bin/bw config server https://vault.bitwarden.eu", "")
-            .ok("/usr/local/bin/bw login k@x.eu --passwordenv BW_PASSWORD --method 0 --code 123456 --raw", "SESSIONKEY==\n")
-            .ok(
-                "/home/kuba/.local/bin/dot-bw-setup",
-                "==> Bitwarden login\n  ok  unlocked\n  !!  no SSH key in your vault has the field signing=true\n",
-            )
-            .ok("nmcli", "full\n");
+    fn bitwarden_logs_in_and_pulls_the_vault() {
+        let mut s = bw_machine(Fake::new());
+
         let (ok, evs) = go(&mut s, CardId::Bitwarden, &bw_login());
+
         assert!(ok, "{}", all_text(&evs));
-        // The master password only in bw's environment, the session only in
-        // dot-bw-setup's; neither in argv or an event.
-        let login = s.ran.iter().position(|l| l.contains("bw login")).unwrap();
-        assert!(s.env[login].contains(&("BW_PASSWORD".into(), "hunter2-master".into())));
-        assert!(
-            !s.ran
-                .iter()
-                .any(|l| l.contains("hunter2") || l.contains("SESSIONKEY"))
-        );
-        let setup = s
-            .ran
-            .iter()
-            .position(|l| l.contains("dot-bw-setup"))
-            .unwrap();
-        assert!(s.env[setup].contains(&("BW_SESSION".into(), "SESSIONKEY==".into())));
+        // The master password only in bw's environment, the session only in this process:
+        // neither in a command line or an event.
+        assert!(matches!(&s.bw.logins[0], Login::Password { password, .. } if password.0 == "hunter2-master"));
+        let lines = s.bw.lines().join("\n");
+        assert!(!lines.contains("hunter2") && !lines.contains(SESSION));
         let text = all_text(&evs);
-        assert!(!text.contains("hunter2") && !text.contains("SESSIONKEY"));
-        assert!(text.contains("signing=true"));
+        assert!(!text.contains("hunter2") && !text.contains(SESSION));
+        assert!(text.contains("signing=true"), "{text}");
+        assert!(text.contains("1 SSH key(s) in your vault"));
         assert_eq!(
-            s.files
-                .get("/home/kuba/.config/dot-bw/config")
-                .map(String::as_str),
+            s.bw.text("/home/kuba/.config/dot-bw/config"),
             Some("server=https://vault.bitwarden.eu\nemail=k@x.eu\n")
         );
+        match evs.last() {
+            Some(SetupEvent::Finished { status, .. }) => {
+                assert_eq!(status.state, State::Done);
+                let Facts::Bitwarden { overview, .. } = &status.facts else {
+                    panic!("{:?}", status.facts)
+                };
+                assert_eq!(overview.keys[0].hosts, ["github.com"]);
+            }
+            e => panic!("{e:?}"),
+        }
     }
 
     #[test]
     fn bitwarden_locked_only_unlocks() {
-        let mut s = FakeSys::new()
-            .file(BW, "")
-            .ok(
-                "/usr/local/bin/bw status",
-                r#"{"serverUrl":"https://vault.bitwarden.eu","userEmail":"k@x.eu","status":"locked"}"#,
-            )
-            .ok("/usr/local/bin/bw unlock --passwordenv BW_PASSWORD --raw", "S\n")
-            .ok("/home/kuba/.local/bin/dot-bw-setup", "")
-            .ok("nmcli", "full\n");
-        let (ok, _) = go(&mut s, CardId::Bitwarden, &bw_login());
-        assert!(ok);
-        assert!(!s.ran_any("/usr/local/bin/bw login"));
+        let mut s = bw_machine(Fake::new().locked("https://vault.bitwarden.eu", "k@x.eu"));
+
+        let (ok, evs) = go(&mut s, CardId::Bitwarden, &bw_login());
+
+        assert!(ok, "{}", all_text(&evs));
+        assert!(!s.bw.bw.iter().any(|c| c == "login"));
+        assert!(s.bw.bw.iter().any(|c| c == "unlock"));
     }
 
     #[test]
     fn bitwarden_wrong_password_names_the_cause() {
-        let mut s = FakeSys::new()
-            .file(BW, "")
-            .ok(
-                "/usr/local/bin/bw status",
-                r#"{"serverUrl":"https://vault.bitwarden.eu","status":"unauthenticated"}"#,
-            )
-            .fail(
-                "/usr/local/bin/bw login",
-                "bw exited with exit status: 1: Username or password is incorrect. Try again.",
-            );
+        let mut bw = Fake::new();
+        bw.server = Some("https://vault.bitwarden.eu".into());
+        bw.login_error = Some("Username or password is incorrect. Try again.".into());
+        let mut s = bw_machine(bw);
+
         let (ok, evs) = go(&mut s, CardId::Bitwarden, &bw_login());
+
         assert!(!ok);
         match evs.last() {
             Some(SetupEvent::Failed { error, .. }) => {
@@ -1020,9 +953,48 @@ mod tests {
             }
             e => panic!("{e:?}"),
         }
-        assert!(!s.ran_any("/home/kuba/.local/bin/dot-bw-setup"));
+        assert!(!s.bw.bw.iter().any(|c| c == "sync"));
         // Same server: no bw config call.
-        assert!(!s.ran_any("/usr/local/bin/bw config"));
+        assert!(!s.bw.bw.iter().any(|c| c.starts_with("config server")));
+    }
+
+    #[test]
+    fn bitwarden_ticked_folders_narrow_the_ssh_keys() {
+        let mut s = bw_machine(Fake::new().locked("https://vault.bitwarden.eu", "k@x.eu"));
+        let inputs = Inputs {
+            bw_folders: Some(vec!["Work".into()]),
+            ..bw_login()
+        };
+
+        let (ok, evs) = go(&mut s, CardId::Bitwarden, &inputs);
+
+        assert!(ok, "{}", all_text(&evs));
+        assert!(s.bw.text("/home/kuba/.config/dot-bw/config").unwrap().contains("folders=Work\n"));
+        assert!(all_text(&evs).contains(r#"1 SSH key(s) in the folder \"Work\""#));
+        match evs.last() {
+            Some(SetupEvent::Finished { status, .. }) => {
+                assert!(matches!(&status.facts, Facts::Bitwarden { folders, .. } if folders == &["Work"]))
+            }
+            e => panic!("{e:?}"),
+        }
+    }
+
+    #[test]
+    fn bitwarden_logs_out_and_asks_for_a_login_again() {
+        let mut s = bw_machine(Fake::new().locked("https://vault.bitwarden.eu", "k@x.eu"));
+        let inputs = Inputs {
+            bw_logout: true,
+            ..Inputs::default()
+        };
+
+        let (ok, evs) = go(&mut s, CardId::Bitwarden, &inputs);
+
+        assert!(ok, "{}", all_text(&evs));
+        assert!(s.bw.bw.iter().any(|c| c == "logout"));
+        match evs.last() {
+            Some(SetupEvent::Finished { status, .. }) => assert_eq!(status.state, State::Needed),
+            e => panic!("{e:?}"),
+        }
     }
 
     #[test]
