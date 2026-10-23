@@ -1,15 +1,16 @@
-//! The updater's seam to the machine: running programs as the user or as root, the home-manager
-//! switch, asking the user, and what the user reads. The `kubaos` command implements it on the
-//! real machine; the tests run the updater on a fake that runs git and the migrations for real in
-//! a temporary folder.
+//! The updater's seam to the machine: running programs as the user or as root with their output
+//! captured, the home-manager switch, sudo's password and the answer to a question. The `kubaos`
+//! command implements it on the real machine; the tests run the updater on a fake that runs git
+//! and the migrations for real in a temporary folder.
 //!
 //! # Owns
 //!
 //! - [`Machine`] and [`Cmd`], which says how a root command goes through `sudo`.
+//! - [`Lines`], which cuts a program's output into the lines the updater reports.
 //!
 //! # Not here
 //!
-//! - What the updater runs, and in which order: `updater.rs`.
+//! - What the updater runs, and in which order: `updater.rs`. What it reports: `event.rs`.
 //! - The real machine, and the switch through `switch.rs`'s queue: `kubaos-cli`'s `update.rs`.
 
 use std::ffi::OsStr;
@@ -30,6 +31,7 @@ pub struct Cmd {
     stdin: Option<Vec<u8>>,
     env: Vec<(String, OsString)>,
     cwd: Option<PathBuf>,
+    sudo_inside: bool,
 }
 
 impl Cmd {
@@ -42,6 +44,7 @@ impl Cmd {
             stdin: None,
             env: Vec::new(),
             cwd: None,
+            sudo_inside: false,
         }
     }
 
@@ -91,6 +94,19 @@ impl Cmd {
     pub fn cwd(mut self, dir: impl Into<PathBuf>) -> Self {
         self.cwd = Some(dir.into());
         self
+    }
+
+    /// Marks a user command that runs `sudo` itself, so sudo's password is asked before it starts
+    /// rather than behind its captured output.
+    #[must_use]
+    pub fn runs_sudo(mut self) -> Self {
+        self.sudo_inside = true;
+        self
+    }
+
+    /// Whether it needs sudo: it runs as root, or runs `sudo` itself.
+    pub fn uses_sudo(&self) -> bool {
+        self.root || self.sudo_inside
     }
 
     /// The program and its arguments, without `sudo`.
@@ -206,7 +222,8 @@ impl MachineError {
     }
 }
 
-/// What the updater needs from the machine.
+/// What the updater needs from the machine. Nothing here writes to the terminal: the updater
+/// reports what happens as events (`event.rs`).
 pub trait Machine {
     /// Runs `cmd` to the end and returns its stdout.
     ///
@@ -215,22 +232,36 @@ pub trait Machine {
     /// [`MachineError`] when it can't start or fails.
     fn output(&mut self, cmd: &Cmd) -> Result<String, MachineError>;
 
-    /// Runs `cmd` to the end with its output on the terminal.
+    /// Runs `cmd` to the end with no terminal input, handing each line it prints, on stdout or
+    /// stderr, to `on_line` as it comes.
     ///
     /// # Errors
     ///
     /// [`MachineError`] when it can't start or fails.
-    fn stream(&mut self, cmd: &Cmd) -> Result<(), MachineError>;
+    fn run(&mut self, cmd: &Cmd, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError>;
 
-    /// Switches the user's home to the user flake, through the switch queue.
+    /// Switches the user's home to the user flake, through the switch queue, handing each line of
+    /// the switch's output to `on_line`.
     ///
     /// # Errors
     ///
     /// [`MachineError::Switch`] when the switch fails.
-    fn switch(&mut self) -> Result<(), MachineError>;
+    fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError>;
 
-    /// Asks `question`, yes by default; whether the answer is yes.
+    /// Reads the answer to `question`, yes by default. The updater has reported the question as a
+    /// prompt before it asks.
     fn confirm(&mut self, question: &str) -> bool;
+
+    /// Whether sudo would ask for a password before a root command now.
+    fn needs_password(&mut self) -> bool;
+
+    /// Has sudo ask for the password on the terminal, so the root commands after it run without
+    /// asking.
+    ///
+    /// # Errors
+    ///
+    /// [`MachineError`] when sudo can't start or the password is refused.
+    fn authenticate(&mut self) -> Result<(), MachineError>;
 
     /// The bytes free for the user on the filesystem of `path`.
     ///
@@ -238,12 +269,38 @@ pub trait Machine {
     ///
     /// When the filesystem can't be asked.
     fn free_bytes(&self, path: &Path) -> io::Result<u64>;
+}
 
-    /// Tells the user one line.
-    fn say(&mut self, line: &str);
+/// Cuts a program's output into lines as it arrives, at `\n` and at `\r`, with which apt and nix
+/// redraw a progress line. Empty lines are dropped.
+#[derive(Debug, Default)]
+pub struct Lines {
+    pending: Vec<u8>,
+}
 
-    /// Warns the user with one line.
-    fn warn(&mut self, line: &str);
+impl Lines {
+    /// Takes the next bytes of the output and hands each line they finish to `on_line`.
+    pub fn push(&mut self, bytes: &[u8], mut on_line: impl FnMut(&str)) {
+        for &byte in bytes {
+            if byte == b'\n' || byte == b'\r' {
+                self.flush(&mut on_line);
+            } else {
+                self.pending.push(byte);
+            }
+        }
+    }
+
+    /// Hands the last line, one the output ended without a newline, to `on_line`.
+    pub fn finish(&mut self, mut on_line: impl FnMut(&str)) {
+        self.flush(&mut on_line);
+    }
+
+    fn flush(&mut self, on_line: &mut impl FnMut(&str)) {
+        if !self.pending.is_empty() {
+            on_line(&String::from_utf8_lossy(&self.pending));
+            self.pending.clear();
+        }
+    }
 }
 
 #[cfg(test)]

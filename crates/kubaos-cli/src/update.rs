@@ -1,23 +1,27 @@
 //! `kubaos update`, `upgrade`, `rollback` and `channel`: updating the installed KubaOS.
 //!
-//!   kubaos update [-y] [--packages-only] [--foreground]
-//!   kubaos update --check
-//!   kubaos upgrade [--foreground]
-//!   kubaos rollback [-y] [--foreground]
+//!   kubaos update [-y] [--packages-only] [--foreground] [--json]
+//!   kubaos update --check [--json]
+//!   kubaos upgrade [--foreground] [--json]
+//!   kubaos rollback [-y] [--foreground] [--json]
 //!   kubaos channel [stable | edge]
 //!
 //! They run as the desktop user and ask for sudo for the steps that need root. `--foreground`
 //! runs the home-manager switch in this process, for a session without a systemd user manager.
-//! `--check` is the daily notifier's: it only looks at origin. Exit codes: 0 ok, 1 the update
-//! failed or was declined, 2 usage.
+//! `--check` is the daily notifier's: it only looks at origin. On a terminal they show a live
+//! view of each phase; elsewhere plain lines; with `--json` one event per line
+//! (`kubaos_core::update::event`), reading a prompt's answer from stdin. Programs' output goes to
+//! the run's log, `~/.local/state/kubaos/update/`. Exit codes: 0 ok, 1 the update failed or was
+//! declined, 2 usage.
 //!
 //! # Owns
 //!
 //! - The command line of these commands, and the real machine the updater runs on.
+//! - Showing the updater's events: `update/render.rs`.
 //!
 //! # Not here
 //!
-//! - The steps: `kubaos_core::update`.
+//! - The steps and the events: `kubaos_core::update`.
 
 use std::process::ExitCode;
 use std::time::SystemTime;
@@ -35,8 +39,11 @@ use crate::job;
 use crate::job::SwitchIn;
 use crate::usage_error;
 
+mod render;
 mod system;
 
+use render::Mode;
+use render::Ui;
 use system::System;
 
 #[derive(Args)]
@@ -53,6 +60,9 @@ pub struct UpdateArgs {
     /// Only look for a new release: write ~/.local/state/kubaos/update-available and notify.
     #[arg(long)]
     check: bool,
+    /// Write one JSON event per line on stdout, for a graphical front end.
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Args)]
@@ -60,6 +70,9 @@ pub struct UpgradeArgs {
     /// Run the home-manager switch in this process rather than in a systemd user unit.
     #[arg(long)]
     foreground: bool,
+    /// Write one JSON event per line on stdout, for a graphical front end.
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Args)]
@@ -70,6 +83,9 @@ pub struct RollbackArgs {
     /// Run the home-manager switch in this process rather than in a systemd user unit.
     #[arg(long)]
     foreground: bool,
+    /// Write one JSON event per line on stdout, for a graphical front end.
+    #[arg(long)]
+    json: bool,
 }
 
 #[derive(Args)]
@@ -93,14 +109,15 @@ fn machine(place: SwitchIn) -> Result<(Paths, System), ExitCode> {
     }
     let paths = Paths::from_env().map_err(usage_error)?;
     let for_switch = paths.clone();
-    let system = System::new(move || job::switch_step(&for_switch, place));
+    let system = System::new(move |on_output| job::switch_step(&for_switch, place, on_output));
     Ok((paths, system))
 }
 
-fn done(result: Result<(), UpdateError>) -> ExitCode {
+/// The exit code of a run whose events have shown how it ended.
+fn done<T>(result: Result<T, UpdateError>) -> ExitCode {
     match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => job::report(e),
+        Ok(_) => ExitCode::SUCCESS,
+        Err(_) => ExitCode::FAILURE,
     }
 }
 
@@ -109,9 +126,11 @@ pub fn update(args: &UpdateArgs) -> ExitCode {
         Ok(m) => m,
         Err(code) => return code,
     };
-    let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now());
+    let mut ui = Ui::new(Mode::detect(args.json));
+    let mut updater =
+        Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     if args.check {
-        return done(updater.check().map(drop));
+        return done(updater.check());
     }
     let opts = UpdateOptions::new().confirm(confirm(args.yes));
     done(updater.update(if args.packages_only { opts.packages_only() } else { opts }))
@@ -122,7 +141,10 @@ pub fn upgrade(args: &UpgradeArgs) -> ExitCode {
         Ok(m) => m,
         Err(code) => return code,
     };
-    done(Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).upgrade())
+    let mut ui = Ui::new(Mode::detect(args.json));
+    let mut updater =
+        Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
+    done(updater.upgrade())
 }
 
 pub fn rollback(args: &RollbackArgs) -> ExitCode {
@@ -130,7 +152,9 @@ pub fn rollback(args: &RollbackArgs) -> ExitCode {
         Ok(m) => m,
         Err(code) => return code,
     };
-    let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now());
+    let mut ui = Ui::new(Mode::detect(args.json));
+    let mut updater =
+        Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     done(updater.rollback(confirm(args.yes)))
 }
 
@@ -139,7 +163,9 @@ pub fn channel(args: &ChannelArgs) -> ExitCode {
         Ok(m) => m,
         Err(code) => return code,
     };
-    let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now());
+    let mut ui = Ui::new(Mode::Plain);
+    let mut updater =
+        Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     let Some(name) = &args.channel else {
         return match updater.installed() {
             Ok(installed) => {
@@ -150,7 +176,10 @@ pub fn channel(args: &ChannelArgs) -> ExitCode {
         };
     };
     match name.parse::<Channel>() {
-        Ok(channel) => done(updater.set_channel(channel)),
+        Ok(channel) => match updater.set_channel(channel) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => job::report(e),
+        },
         Err(e) => usage_error(e),
     }
 }

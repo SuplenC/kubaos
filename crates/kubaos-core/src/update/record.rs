@@ -25,6 +25,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use serde::Deserialize;
+use serde::Serialize;
+
 use super::version::InvalidVersion;
 use super::version::Version;
 
@@ -124,7 +127,8 @@ impl SystemPaths {
 }
 
 /// Which releases a machine follows.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Channel {
     /// Verified release tags of the installed series.
     Stable,

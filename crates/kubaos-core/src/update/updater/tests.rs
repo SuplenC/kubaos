@@ -12,6 +12,13 @@ use super::UpdateError;
 use super::UpdateOptions;
 use super::Updater;
 use crate::state::Paths;
+use crate::update::event;
+use crate::update::event::Outcome;
+use crate::update::event::Phase;
+use crate::update::event::Prompt;
+use crate::update::event::Restart;
+use crate::update::event::Summary;
+use crate::update::event::UpdateEvent;
 use crate::update::fixture;
 use crate::update::fixture::Key;
 use crate::update::machine::Cmd;
@@ -24,18 +31,28 @@ use crate::update::record::Installed;
 use crate::update::record::SystemPaths;
 use crate::update::record::parse_history;
 
+/// What a program the fake ran printed, and whether it succeeded.
+struct Ran {
+    ok: bool,
+    code: Option<i32>,
+    stdout: String,
+    stderr: String,
+}
+
 /// Runs git, bash and sh for real, as this user even for root commands; answers the rest from
 /// `canned`, and records every command. A command whose line starts with one of `failing` fails.
+/// sudo's password is stale until the first `authenticate` when `password_stale` is set.
 struct Fake {
     ran: Vec<String>,
     canned: BTreeMap<&'static str, Result<String, ()>>,
     failing: Vec<&'static str>,
     switches: usize,
+    switch_output: Vec<&'static str>,
     answer: bool,
     asked: usize,
+    password_stale: bool,
+    authenticated: usize,
     free: u64,
-    said: Vec<String>,
-    warned: Vec<String>,
 }
 
 impl Fake {
@@ -49,11 +66,12 @@ impl Fake {
             ]),
             failing: Vec::new(),
             switches: 0,
+            switch_output: Vec::new(),
             answer: true,
             asked: 0,
+            password_stale: false,
+            authenticated: 0,
             free: u64::MAX,
-            said: Vec::new(),
-            warned: Vec::new(),
         }
     }
 
@@ -61,7 +79,7 @@ impl Fake {
         self.ran.iter().filter(|line| line.starts_with(prefix)).count()
     }
 
-    fn run(cmd: &Cmd) -> Result<String, MachineError> {
+    fn exec(cmd: &Cmd) -> Result<Ran, MachineError> {
         let mut command = Command::new(&cmd.argv()[0]);
         command.args(&cmd.argv()[1..]);
         command.envs(cmd.vars().iter().map(|(k, v)| (k, v)));
@@ -84,44 +102,78 @@ impl Fake {
             io::Write::write_all(&mut stdin, bytes).unwrap();
         }
         let out = child.wait_with_output().unwrap();
-        if out.status.success() {
-            Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-        } else {
-            Err(MachineError::exited(
-                cmd,
-                out.status.code(),
-                &String::from_utf8_lossy(&out.stderr),
-            ))
+        Ok(Ran {
+            ok: out.status.success(),
+            code: out.status.code(),
+            stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+        })
+    }
+
+    /// Runs or answers `cmd`.
+    fn answer(&mut self, cmd: &Cmd) -> Result<Ran, MachineError> {
+        self.ran.push(cmd.display());
+        if self.failing.iter().any(|prefix| cmd.display().starts_with(prefix)) {
+            return Ok(Ran {
+                ok: false,
+                code: Some(100),
+                stdout: String::new(),
+                stderr: "failing (test)".to_owned(),
+            });
         }
+        let canned = |stdout: String| Ran {
+            ok: true,
+            code: Some(0),
+            stdout,
+            stderr: String::new(),
+        };
+        Ok(match cmd.program().as_str() {
+            "git" | "bash" | "sh" => Self::exec(cmd)?,
+            program => match self.canned.get(program) {
+                Some(Ok(out)) => canned(out.clone()),
+                Some(Err(())) => Ran {
+                    ok: false,
+                    code: Some(1),
+                    stdout: String::new(),
+                    stderr: "canned failure".to_owned(),
+                },
+                None if program == "apt-get" && cmd.argv().iter().any(|a| a == "-s") => {
+                    canned("Inst vim [1] (2 Ubuntu)\nConf vim\n".to_owned())
+                }
+                None => canned(String::new()),
+            },
+        })
     }
 }
 
 impl Machine for Fake {
     fn output(&mut self, cmd: &Cmd) -> Result<String, MachineError> {
-        self.ran.push(cmd.display());
-        if self.failing.iter().any(|prefix| cmd.display().starts_with(prefix)) {
-            return Err(MachineError::exited(cmd, Some(100), "failing (test)"));
-        }
-        match cmd.program().as_str() {
-            "git" | "bash" | "sh" => Self::run(cmd),
-            program => match self.canned.get(program) {
-                Some(Ok(out)) => Ok(out.clone()),
-                Some(Err(())) => Err(MachineError::exited(cmd, Some(1), "canned failure")),
-                None if program == "apt-get" && cmd.argv().iter().any(|a| a == "-s") => {
-                    Ok("Inst vim [1] (2 Ubuntu)\nConf vim\n".to_owned())
-                }
-                None => Ok(String::new()),
-            },
+        let ran = self.answer(cmd)?;
+        if ran.ok {
+            Ok(ran.stdout)
+        } else {
+            Err(MachineError::exited(cmd, ran.code, &ran.stderr))
         }
     }
 
-    fn stream(&mut self, cmd: &Cmd) -> Result<(), MachineError> {
-        self.output(cmd).map(drop)
+    fn run(&mut self, cmd: &Cmd, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
+        let ran = self.answer(cmd)?;
+        for line in ran.stdout.lines().chain(ran.stderr.lines()) {
+            on_line(line);
+        }
+        if ran.ok {
+            Ok(())
+        } else {
+            Err(MachineError::exited(cmd, ran.code, ""))
+        }
     }
 
-    fn switch(&mut self) -> Result<(), MachineError> {
+    fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
         self.ran.push("switch".to_owned());
         self.switches += 1;
+        for line in &self.switch_output {
+            on_line(line);
+        }
         Ok(())
     }
 
@@ -130,16 +182,56 @@ impl Machine for Fake {
         self.answer
     }
 
+    fn needs_password(&mut self) -> bool {
+        self.password_stale
+    }
+
+    fn authenticate(&mut self) -> Result<(), MachineError> {
+        self.authenticated += 1;
+        self.password_stale = false;
+        Ok(())
+    }
+
     fn free_bytes(&self, _path: &Path) -> io::Result<u64> {
         Ok(self.free)
     }
+}
 
-    fn say(&mut self, line: &str) {
-        self.said.push(line.to_owned());
-    }
+/// The phases `events` started, in order.
+fn phases(events: &[UpdateEvent]) -> Vec<Phase> {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            UpdateEvent::PhaseStarted { phase } => Some(*phase),
+            _ => None,
+        })
+        .collect()
+}
 
-    fn warn(&mut self, line: &str) {
-        self.warned.push(line.to_owned());
+fn warnings(events: &[UpdateEvent]) -> Vec<&str> {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            UpdateEvent::Warning { text } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn notes(events: &[UpdateEvent]) -> Vec<&str> {
+    events
+        .iter()
+        .filter_map(|e| match e {
+            UpdateEvent::Note { text } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn summary(events: &[UpdateEvent]) -> &Summary {
+    match events.last() {
+        Some(UpdateEvent::Summary(summary)) => summary,
+        last => panic!("the last event is {last:?}, not a summary"),
     }
 }
 
@@ -192,6 +284,11 @@ impl World {
     fn updater<'a>(&self, m: &'a mut Fake) -> Updater<'a, Fake> {
         let now = UNIX_EPOCH + Duration::from_secs(1_790_000_000);
         Updater::new(m, self.sys.clone(), self.user.clone(), now)
+    }
+
+    /// [`World::updater`], its events recorded in `events`.
+    fn reporting<'a>(&self, m: &'a mut Fake, events: &'a mut Vec<UpdateEvent>) -> Updater<'a, Fake> {
+        self.updater(m).reporting(events)
     }
 
     /// Commits `files` on origin's main, signed when `signed`, and returns the commit.
@@ -296,6 +393,124 @@ fn an_edge_update_moves_release_to_main_and_runs_each_migration_once() {
 }
 
 #[test]
+fn an_update_reports_each_phase_that_runs_in_order_and_ends_with_its_summary() {
+    let w = World::new(Channel::Edge, true);
+    let before = w.release();
+    let head = w.push(
+        &[
+            ("VERSION", "0.1.1\n"),
+            ("migrations/system/1790000000-fix-apt.sh", &w.migration("system")),
+            ("migrations/user/1790000001-move-config.sh", &w.migration("user")),
+        ],
+        true,
+    );
+    let mut m = Fake::new();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(matches!(&events[0], UpdateEvent::Started { log: Some(_), .. }));
+    assert_eq!(
+        phases(&events),
+        [
+            Phase::Checking,
+            Phase::Fetching,
+            Phase::Verifying,
+            Phase::Reviewing,
+            Phase::Snapshot,
+            Phase::SystemPackages,
+            Phase::Release,
+            Phase::SystemMigrations,
+            Phase::Inputs,
+            Phase::Home,
+            Phase::UserMigrations,
+        ]
+    );
+    assert!(events.iter().all(|e| !matches!(
+        e,
+        UpdateEvent::PhaseFinished {
+            outcome: Outcome::Failed | Outcome::Skipped,
+            ..
+        }
+    )));
+    let preview = events.iter().find_map(|e| match e {
+        UpdateEvent::Preview(preview) => Some(preview),
+        _ => None,
+    });
+    let preview = preview.expect("a preview");
+    assert_eq!(preview.to.as_ref().map(|to| to.commit.as_str()), Some(head.as_str()));
+    assert_eq!(preview.migrations, ["1790000000-fix-apt.sh"]);
+    assert_eq!(preview.packages, 1);
+    let summary = summary(&events);
+    assert_eq!((summary.from.commit.as_str(), summary.to.commit.as_str()), (before.as_str(), head.as_str()));
+    assert_eq!(summary.to.version, "0.1.1");
+    assert_eq!(summary.migrations, ["1790000000-fix-apt.sh", "1790000001-move-config.sh"]);
+    assert_eq!(summary.changes.len(), 1);
+    assert_eq!(summary.restart, Restart::None);
+    assert_eq!(summary.undo.as_deref(), Some("kubaos rollback"));
+    let log = fs::read_to_string(summary.log.as_ref().unwrap()).unwrap();
+    assert!(log.contains("== System migrations"), "the log:\n{log}");
+    assert!(
+        log.contains("$ sudo bash -euo pipefail ") && log.contains("1790000000-fix-apt.sh"),
+        "the migration's command is not in the log:\n{log}"
+    );
+}
+
+#[test]
+fn a_stale_sudo_password_is_asked_once_before_the_first_root_command() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = Fake::new();
+    m.password_stale = true;
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert_eq!(m.authenticated, 1);
+    let asked = events
+        .iter()
+        .position(|e| {
+            matches!(
+                e,
+                UpdateEvent::Prompt {
+                    prompt: Prompt::Password
+                }
+            )
+        })
+        .expect("a password prompt");
+    assert!(matches!(
+        events[asked - 2],
+        UpdateEvent::PhaseStarted {
+            phase: Phase::Fetching
+        }
+    ));
+    assert_eq!(events[asked + 1], UpdateEvent::Answered { yes: true });
+}
+
+#[test]
+fn the_summary_names_what_the_session_reloaded_and_the_inputs_that_moved() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = Fake::new();
+    m.canned.insert("nix", Ok("• Updated input 'nixpkgs':\n".to_owned()));
+    m.switch_output = vec!["Activating reloadSession", "dot-session: reloaded Hyprland"];
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    let summary = summary(&events);
+    assert_eq!(summary.reloaded, ["reloaded Hyprland"]);
+    assert_eq!(summary.inputs, ["nixpkgs"]);
+    assert!(events.contains(&UpdateEvent::Output {
+        line: "Activating reloadSession".into()
+    }));
+    assert!(events.iter().any(|e| matches!(
+        e,
+        UpdateEvent::PhaseFinished { phase: Phase::Home, detail: Some(d), .. } if d == "reloaded Hyprland"
+    )));
+}
+
+#[test]
 fn an_edge_head_not_signed_by_a_kubaos_key_is_refused_before_anything_changes() {
     let w = World::new(Channel::Edge, true);
     let before = w.release();
@@ -315,11 +530,12 @@ fn without_allowed_signers_edge_warns_once_and_updates() {
     let w = World::new(Channel::Edge, false);
     let head = w.push(&[("VERSION", "0.1.1\n")], false);
     let mut m = Fake::new();
+    let mut events = Vec::new();
 
-    w.updater(&mut m).update(yes()).unwrap();
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
 
     assert_eq!(w.release(), head);
-    assert_eq!(m.warned.iter().filter(|w| *w == NO_KEYS_EDGE).count(), 1);
+    assert_eq!(warnings(&events).iter().filter(|w| **w == NO_KEYS_EDGE).count(), 1);
 }
 
 #[test]
@@ -333,13 +549,24 @@ fn a_failed_system_migration_stops_the_update_and_runs_again_next_time() {
         true,
     );
     let mut m = Fake::new();
+    let mut events = Vec::new();
 
-    let err = w.updater(&mut m).update(yes()).unwrap_err();
+    let err = w.reporting(&mut m, &mut events).update(yes()).unwrap_err();
 
     assert!(matches!(err, UpdateError::Migration { ref name, .. } if name == "1790000000-broken.sh"));
     assert!(!w.sys.markers().join("1790000000-broken.sh").exists());
     assert_eq!(w.ran_log(), "");
     assert_eq!(m.switches, 0);
+    let Some(UpdateEvent::Failed {
+        phase, error, output, log, ..
+    }) = events.last()
+    else {
+        panic!("the last event is {:?}, not a failure", events.last());
+    };
+    assert_eq!(*phase, Some(Phase::SystemMigrations));
+    assert_eq!(*error, event::chain(&err));
+    assert_eq!(output, &["broken"]);
+    assert!(log.as_ref().is_some_and(|log| log.is_file()));
 }
 
 #[test]
@@ -351,13 +578,17 @@ fn packages_only_leaves_release_and_the_migrations_alone() {
         true,
     );
     let mut m = Fake::new();
+    let mut events = Vec::new();
 
-    w.updater(&mut m).update(yes().packages_only()).unwrap();
+    w.reporting(&mut m, &mut events).update(yes().packages_only()).unwrap();
 
     assert_eq!(w.release(), before);
     assert_eq!(w.ran_log(), "");
     assert_eq!(m.ran("sudo apt-get upgrade"), 1);
     assert_eq!(m.switches, 1);
+    let ran = phases(&events);
+    assert!(!ran.contains(&Phase::Release) && !ran.contains(&Phase::SystemMigrations));
+    assert_eq!(summary(&events).to.commit, before);
 }
 
 #[test]
@@ -367,13 +598,26 @@ fn saying_no_changes_nothing() {
     w.push(&[("VERSION", "0.1.1\n")], true);
     let mut m = Fake::new();
     m.answer = false;
+    let mut events = Vec::new();
 
-    let err = w.updater(&mut m).update(UpdateOptions::new()).unwrap_err();
+    let err = w
+        .reporting(&mut m, &mut events)
+        .update(UpdateOptions::new())
+        .unwrap_err();
 
     assert!(matches!(err, UpdateError::Declined));
     assert_eq!(m.asked, 1);
     assert_eq!(w.release(), before);
     assert_eq!(m.ran("sudo apt-get upgrade") + m.ran("sudo snapper"), 0);
+    let tail: Vec<&UpdateEvent> = events.iter().rev().take(4).rev().collect();
+    assert!(matches!(tail[0], UpdateEvent::Preview(_)));
+    assert!(matches!(
+        tail[1],
+        UpdateEvent::Prompt {
+            prompt: Prompt::Confirm { .. }
+        }
+    ));
+    assert_eq!(tail[2..], [&UpdateEvent::Answered { yes: false }, &UpdateEvent::Declined]);
 }
 
 #[test]
@@ -417,7 +661,8 @@ fn a_rollback_puts_release_and_the_flake_lock_back_and_keeps_the_markers() {
     fs::write(w.user.flake_lock(), "lock after\n").unwrap();
 
     let mut back = Fake::new();
-    w.updater(&mut back).rollback(Confirm::AssumeYes).unwrap();
+    let mut events = Vec::new();
+    w.reporting(&mut back, &mut events).rollback(Confirm::AssumeYes).unwrap();
 
     assert_eq!(w.release(), before);
     assert_eq!(fs::read_to_string(w.user.flake_lock()).unwrap(), "lock before\n");
@@ -426,6 +671,13 @@ fn a_rollback_puts_release_and_the_flake_lock_back_and_keeps_the_markers() {
     assert_eq!(fs::read_to_string(w.sys.history()).unwrap(), "");
     assert!(w.sys.markers().join("1790000000-fix.sh").is_file());
     assert_eq!(back.switches, 1);
+    assert_eq!(
+        phases(&events),
+        [Phase::Checking, Phase::Snapshot, Phase::Release, Phase::Home]
+    );
+    let summary = summary(&events);
+    assert_eq!((summary.to.commit.as_str(), summary.to.version.as_str()), (before.as_str(), "0.1.0"));
+    assert_eq!(summary.undo, None);
 
     let err = w.updater(&mut Fake::new()).rollback(Confirm::AssumeYes).unwrap_err();
     assert!(matches!(err, UpdateError::NothingToRollBack { .. }));
@@ -441,12 +693,13 @@ fn stable_moves_to_the_newest_signed_patch_and_skips_an_unsigned_one() {
     w.push(&[("VERSION", "0.2.0-dev\n")], true);
     fixture::git(&w.work, &["push", "-q", "origin", "main", "--tags"]);
     let mut m = Fake::new();
+    let mut events = Vec::new();
 
-    w.updater(&mut m).update(yes()).unwrap();
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
 
     assert_eq!(w.release(), signed);
     assert_eq!(w.installed().version.to_string(), "0.1.1");
-    assert!(m.warned.iter().any(|w| w.contains("v0.1.2 is not signed")));
+    assert!(warnings(&events).iter().any(|w| w.contains("v0.1.2 is not signed")));
 }
 
 #[test]
@@ -455,11 +708,12 @@ fn stable_without_a_release_tag_says_so_and_updates_packages() {
     let before = w.release();
     w.push(&[("VERSION", "0.1.1\n")], true);
     let mut m = Fake::new();
+    let mut events = Vec::new();
 
-    w.updater(&mut m).update(yes()).unwrap();
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
 
     assert_eq!(w.release(), before);
-    assert!(m.said.iter().any(|s| s.contains("newest release of its channel")));
+    assert!(notes(&events).iter().any(|s| s.contains("newest release of its channel")));
     assert_eq!(m.ran("sudo apt-get upgrade"), 1);
 }
 
@@ -494,8 +748,9 @@ fn a_changed_hyprland_pin_is_installed_exactly_and_the_stack_held_again() {
     w.push(&[("system/files/apt/preferences.d/kubaos-hyprland", pin)], true);
     let mut m = Fake::new();
     m.canned.insert("apt-mark", Ok("hyprland\nfirefox\n".to_owned()));
+    let mut events = Vec::new();
 
-    w.updater(&mut m).update(yes()).unwrap();
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
 
     assert_eq!(fs::read_to_string(w.sys.apt_pin()).unwrap(), pin);
     let hypr: Vec<&String> = m
@@ -507,10 +762,13 @@ fn a_changed_hyprland_pin_is_installed_exactly_and_the_stack_held_again() {
         hypr,
         [
             "sudo apt-mark unhold hyprland",
-            "sudo apt-get install -y --no-install-recommends --allow-downgrades hyprland=0.50.1-1",
+            "sudo apt-get install -y --no-install-recommends --allow-downgrades \
+             -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold hyprland=0.50.1-1",
             "sudo apt-mark hold hyprland",
         ]
     );
+    assert!(phases(&events).contains(&Phase::Hyprland));
+    assert_eq!(summary(&events).restart, Restart::Relogin);
 
     let mut again = Fake::new();
     w.updater(&mut again).update(yes()).unwrap();
@@ -543,11 +801,21 @@ fn the_hyprland_pin_is_left_alone_off_amd64() {
     );
     let mut m = Fake::new();
     m.canned.insert("dpkg", Ok("arm64\n".to_owned()));
+    let mut events = Vec::new();
 
-    w.updater(&mut m).update(yes()).unwrap();
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
 
     assert!(!w.sys.apt_pin().exists());
     assert_eq!(m.ran("sudo apt-mark") + m.ran("sudo apt-get install"), 0);
+    assert!(events.iter().any(|e| matches!(
+        e,
+        UpdateEvent::PhaseFinished {
+            phase: Phase::Hyprland,
+            outcome: Outcome::Skipped,
+            ..
+        }
+    )));
+    assert_eq!(summary(&events).restart, Restart::None);
 }
 
 #[test]
@@ -555,10 +823,17 @@ fn the_daily_check_writes_what_is_available_and_notifies_once() {
     let w = World::new(Channel::Edge, true);
     let head = w.push(&[("VERSION", "0.1.1\n")], true);
     let mut m = Fake::new();
+    let mut events = Vec::new();
 
-    let available = w.updater(&mut m).check().unwrap();
+    let available = w.reporting(&mut m, &mut events).check().unwrap();
 
     assert_eq!(available.update.as_ref().unwrap().commit, head);
+    assert_eq!(
+        phases(&events),
+        [Phase::Checking, Phase::Fetching, Phase::Verifying]
+    );
+    assert!(matches!(events.last(), Some(UpdateEvent::Available { update: Some(u), upgrade: None }) if u.contains(&head[..7])));
+    assert!(!w.user.update_logs().exists(), "a check keeps no log");
     let text = fs::read_to_string(w.user.update_available()).unwrap();
     assert!(text.contains(&format!("update-commit={head}")));
     assert_eq!(m.ran("notify-send"), 1);
