@@ -12,7 +12,7 @@ KubaOS keeps secrets out of files. One Bitwarden account holds my SSH keys, proj
 | Project env secrets | vault, cached in the GNOME keyring | `dot-bw-setup`, `dot-bwenv pull` |
 | Security key credentials | `/etc/u2f_mappings`, root:root 0644 | `dot-u2f-enroll` |
 | YubiKey SSH keys (optional) | `~/.ssh/<name>_sk` (key handle) + `.pub` | `dot-ssh-sk-new` |
-| Server URL, email, folder name | `~/.config/dot-bw/config`, nothing secret | `dot-bw-setup` |
+| Server URL, email, optional folder list | `~/.config/dot-bw/config`, nothing secret | `dot-bw-setup` |
 
 ## First-time setup
 
@@ -31,55 +31,74 @@ What stays manual, and why: the SSH agent toggle (no supported config switch), t
 
 ## Vault conventions
 
-Folder **`dotfiles`** (rename it with `folder=<name>` in `~/.config/dot-bw/config`):
+Keep your vault the way it is. `dot-bw-setup` reads the whole vault: folders are yours to organise, and what it needs is the item type and a few custom fields.
 
-- **SSH key items** (Bitwarden item type "SSH key"). Optional custom fields:
+- **Every SSH key item** (Bitwarden item type "SSH key"), in any folder or in none. Optional custom fields:
 
   | Field | Example | Effect |
   |---|---|---|
-  | `hosts` | `github.com` or `homelab nas.lan` | writes a `Host` block for these patterns (space or comma separated) |
+  | `hosts` | `github.com` or `build build.example.com` | writes a `Host` block for these patterns (space or comma separated) |
   | `hostname` | `10.0.0.5` | `HostName` |
   | `user` | `git` | `User` |
   | `port` | `2222` | `Port` |
-  | `signing` | boolean `true` | git signs commits with this key. Exactly one. Text `verify` keeps an old key in `allowed_signers` after a rotation |
+  | `signing` | boolean `true` | git signs commits with this key. Exactly one in the vault; with two, the summary names both and the older item signs. Text `verify` keeps an old key in `allowed_signers` after a rotation |
   | `emails` | `me@work.com` | extra emails for `allowed_signers` (git's `user.email` is always in) |
   | `file` | `id_work` | name of the `.pub` file, default is the item name in lowercase with dashes |
 
-  The public key goes to `~/.ssh/<file>.pub`. The Host block names that file in `IdentityFile` with `IdentitiesOnly yes`, so ssh asks the agent for that key only. Without `hosts` you get the `.pub` file and no block.
-- **An item named `gh-token`**: a login item whose password is a GitHub token (classic with `repo`, `read:org`, or fine-grained), or any item with a hidden field `token`. Optional field `host` for GitHub Enterprise.
+  The public key goes to `~/.ssh/<file>.pub`. The Host block names that file in `IdentityFile` with `IdentitiesOnly yes`, so ssh asks the agent for that key only. Without `hosts` you get the `.pub` file and no block; the summary lists those keys under "key only", so you can see which ones still want a `hosts` field.
+
+  Two items with the same name (a "GitHub" in two folders, say) never share a `.pub`: the older item keeps `~/.ssh/github.pub`, the newer gets `~/.ssh/github-2.pub`, and the summary warns with both items' folders. A `file` field on one of them picks a name of its own and ends the warning.
+- **An item named `gh-token`**, in any folder: a login item whose password is a GitHub token (classic with `repo`, `read:org`, or fine-grained), or an item of any type with a hidden field `token`. Optional field `host` for GitHub Enterprise.
 
 Env secrets, one project per folder **`env/<project>`**: every custom field of every item in it becomes a variable. Field name is the variable name, so it must be a shell name (`DATABASE_URL`, not `database-url`). Items elsewhere join a project with a text field `bwenv` = `<project>`.
+
+To keep SSH keys and git signing to some folders, list them in `~/.config/dot-bw/config`, comma-separated: `folders=Personal,Work` (`folder=` is read too, its older name). gh and env still read the whole vault. A listed folder that isn't in the vault gets a warning by name; if none of them is there, `dot-bw-setup` uses every SSH key in the vault.
 
 Example vault:
 
 ```text
-dotfiles/
-  GitHub            SSH key   hosts=github.com  user=git  signing=true
-  Homelab server    SSH key   hosts="homelab nas.lan"  hostname=10.0.0.5  user=kuba  port=2222
+Personal/
+  Personal GitHub   SSH key   hosts=github.com  user=git  signing=true
   gh-token          Login     password=github_pat_...
-env/arms/
-  arms dev          Secure note  DATABASE_URL=postgres://...  STRIPE_KEY=sk_test_...
+Work/
+  Work GitHub       SSH key   hosts=github-work  hostname=github.com  user=git
+  Build server      SSH key   hosts="build build.example.com"  hostname=10.0.0.5  user=deploy  port=2222
+(no folder)
+  Old laptop        SSH key   no fields
+env/myapp/
+  myapp dev         Secure note  DATABASE_URL=postgres://...  STRIPE_KEY=sk_test_...
 Shared/
   web env           Secure note  bwenv=web  API_TOKEN=...
 ```
 
-This gives `~/.ssh/github.pub`, `~/.ssh/homelab-server.pub`, two Host blocks, signed commits with the GitHub key, gh logged in, and keyring entries for `arms` (2 variables) and `web` (1).
+This gives `~/.ssh/personal-github.pub`, `~/.ssh/work-github.pub`, `~/.ssh/build-server.pub` and `~/.ssh/old-laptop.pub`, three Host blocks (the summary lists "Old laptop" as key only), signed commits with the personal GitHub key, gh logged in, and keyring entries for `myapp` (2 variables) and `web` (1).
+
+### Two GitHub accounts
+
+GitHub tells accounts apart by the key, so each account needs its own key and its own Host name. In the example above, `Personal GitHub` answers for `github.com`; `Work GitHub` has `hosts=github-work` and `hostname=github.com`, an alias that reaches the same server with the work key only. Clone work repositories through the alias:
+
+```sh
+git clone git@github-work:my-company/app.git
+git remote set-url origin git@github-work:my-company/app.git   # a clone you already have
+```
+
+Give both items `hosts=github.com` and ssh offers both keys to GitHub, which logs you in as whichever account it checks first. `dot-bw-setup` warns when two items share a host.
 
 ## Daily use
 
 ```sh
-cd ~/Projects/arms
-echo 'use bwenv arms' >> .envrc && direnv allow   # once per project
+cd ~/Projects/myapp
+echo 'use bwenv myapp' >> .envrc && direnv allow   # once per project
 ```
 
-Every `cd` into the project then exports the variables from the keyring. One `secret-tool` call does it, and `direnv export` with 5 variables took 22 ms in the test container. Nothing talks to Bitwarden on `cd`. If the keyring has nothing for the project, direnv prints `run: dot-bwenv pull arms` and exports nothing.
+Every `cd` into the project then exports the variables from the keyring. One `secret-tool` call does it, and `direnv export` with 5 variables took 22 ms in the test container. Nothing talks to Bitwarden on `cd`. If the keyring has nothing for the project, direnv prints `run: dot-bwenv pull myapp` and exports nothing.
 
 | Command | What |
 |---|---|
-| `dot-bwenv pull arms` | fetch one project from the vault (asks for the master password, about 12 s) |
+| `dot-bwenv pull myapp` | fetch one project from the vault (asks for the master password, about 12 s) |
 | `dot-bwenv refresh` | pull every project the keyring already has |
 | `dot-bwenv list` | projects and variable names, never values |
-| `dot-bwenv clear arms` / `--all` | forget a project or all of them |
+| `dot-bwenv clear myapp` / `--all` | forget a project or all of them |
 | `dot-bw-setup --refresh` | after any vault change: SSH, git, gh, all projects (about 15 s) |
 | `dot-bw-setup --check` | no bw call: is the agent up, which files exist |
 | `dot-u2f-enroll --list` / `--remove N` | your enrolled keys |
@@ -94,7 +113,7 @@ The GNOME keyring: tty autologin means nobody types the login password, so nothi
 
 ## Rotation
 
-- **SSH key**: in Bitwarden, create a new SSH key item with the same fields. Change the old item's `signing` to `verify` or move it out of `dotfiles`. Add the new public key on GitHub and servers, then `dot-bw-setup --refresh`. Delete the old item once nothing uses it. Its `.pub` and Host block disappear on the next refresh.
+- **SSH key**: in Bitwarden, create a new SSH key item with the same fields. Change the old item's `signing` to `verify`. Add the new public key on GitHub and servers, then `dot-bw-setup --refresh`. Delete the old item once nothing uses it. Its `.pub` and Host block disappear on the next refresh.
 - **Env secret**: change the field in Bitwarden, then `dot-bwenv pull <project>` and `cd .` (or `direnv reload`).
 - **gh token**: put the new token in `gh-token`, `dot-bw-setup --refresh --only gh`.
 - **Master password**: change it in the web vault. Nothing here stores it.
