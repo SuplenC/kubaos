@@ -4,20 +4,19 @@
 Writes into system/files/ (the payload and a hand install both read from
 there; system/25-boot.sh installs them):
 
-  system/files/plymouth/kubaos/   mark, halo, field, bullet (1x and @2x)
-  system/files/grub/kubaos/       mark, selected-item 9-slice
+  system/files/plymouth/kubaos/   field, bullet (1x and @2x)
+  system/files/grub/kubaos/       background, the menu's 9-slice boxes
   system/files/fonts/             Geist and JetBrains Mono (Kōbō's fonts):
                                   Plymouth's label in the initramfs, and the
                                   source of GRUB's .pf2 fonts (grub-mkfont)
 
-The theme scripts (kubaos.script, theme.txt) are written by hand next to
-them. Needs python3 with Pillow and resvg on PATH. Run it from anywhere:
+The neon sign on both (Plymouth's switch-on layers, GRUB's logo) comes from
+neon.py. The theme scripts (kubaos.script, theme.txt) are written by hand next
+to them. Needs python3 with Pillow and resvg on PATH. Run it from anywhere:
 
   python3 branding/boot.py
 """
 
-import math
-import random
 import shutil
 import subprocess
 import tempfile
@@ -32,16 +31,16 @@ GRUB = REPO / "system/files/grub/kubaos"
 GUI_FONTS = REPO / "crates/kubaos-kobo/assets/fonts"
 FONTS = REPO / "system/files/fonts"
 
-# Palette: branding/README.md and crates/kubaos-kobo/src/theme.rs.
-AMBER = "#fdb882"  # primary
+# Roles from config/matugen/default-colors.json, as in
+# crates/kubaos-kobo/src/theme.rs.
+AMBER = "#ffb779"  # primary
 ERROR = "#ffb4ab"  # error
-FIELD = "#241e1b"  # surface_container
-SELECT = "#2f2925"  # surface_container_high
-OUTLINE_VARIANT = "#52443b"
+FIELD = "#261e17"  # surface_container
+SELECT = "#312821"  # surface_container_high
+OUTLINE_VARIANT = "#544436"
+DEEP = (0x14, 0x0D, 0x07)  # surface_container_lowest
 
 # Plymouth sizes at 1x (the script picks @2x on screens 1600 px and taller).
-MARK = 200  # the mark's box; the glyphs fill about two thirds of it
-HALO = 520
 FIELD_W, FIELD_H, FIELD_R = 320, 44, 12
 BULLET = 8
 
@@ -54,35 +53,6 @@ def resvg(svg: str, out: Path, width: int) -> None:
         subprocess.run(["resvg", "-w", str(width), src, str(out)], check=True)
     finally:
         Path(src).unlink()
-
-
-def resvg_file(src: Path, out: Path, width: int) -> None:
-    subprocess.run(["resvg", "-w", str(width), str(src), str(out)], check=True)
-
-
-def halo(out: Path, size: int) -> None:
-    """A soft amber glow behind the mark; the script pulses its opacity.
-
-    Drawn here rather than as an SVG gradient: the alpha is dithered, so the
-    8-bit falloff doesn't show as rings on the dark background.
-    """
-    random.seed(size)  # the same pixels on every run
-    amber = tuple(int(AMBER[i:i + 2], 16) for i in (1, 3, 5))
-    im = Image.new("RGBA", (size, size), amber + (0,))
-    px = im.load()
-    c = (size - 1) / 2
-    for y in range(size):
-        dy = (y - c) / c
-        for x in range(size):
-            dx = (x - c) / c
-            r = math.sqrt(dx * dx + dy * dy)
-            if r >= 1:
-                continue
-            # Smooth falloff: strong in the middle, gone at the edge.
-            a = 0.20 * (1 - r) ** 2.2 * 255
-            a = int(a + random.random())  # dither
-            px[x, y] = amber + (min(255, a),)
-    im.save(out, optimize=True)
 
 
 def field_svg(border: str, border_opacity: float) -> str:
@@ -102,8 +72,6 @@ def bullet_svg() -> str:
 def plymouth() -> None:
     PLY.mkdir(parents=True, exist_ok=True)
     for scale, suffix in ((1, ""), (2, "@2x")):
-        resvg_file(HERE / "svg/kubaos-mark.svg", PLY / f"mark{suffix}.png", MARK * scale)
-        halo(PLY / f"halo{suffix}.png", HALO * scale)
         resvg(field_svg(AMBER, 0.55), PLY / f"field{suffix}.png", FIELD_W * scale)
         resvg(field_svg(OUTLINE_VARIANT, 1.0), PLY / f"field-busy{suffix}.png", FIELD_W * scale)
         resvg(field_svg(ERROR, 0.9), PLY / f"field-error{suffix}.png", FIELD_W * scale)
@@ -126,13 +94,10 @@ def nine_slice(src: Path, prefix: Path, corner: int) -> None:
 
 def grub() -> None:
     GRUB.mkdir(parents=True, exist_ok=True)
-    # Sized for the laptop's 2880x1800 (GRUB draws in device pixels); it's
-    # still fine at 1080p.
-    resvg_file(HERE / "svg/kubaos-mark.svg", GRUB / "mark.png", 192)
     # One flat colour, as an image: theme.txt's desktop-image, and
     # GRUB_BACKGROUND, which makes GRUB's terminal draw black as transparent,
     # so the editor and the shell sit on terminal_box instead of a black slab.
-    Image.new("RGB", (16, 16), (0x12, 0x0D, 0x0A)).save(GRUB / "background.png")
+    Image.new("RGB", (16, 16), DEEP).save(GRUB / "background.png")
     # GRUB draws a box's border slices outside the item, so theme.txt's
     # item_spacing has to leave room for two of them (2 x 14 px).
     r = 12

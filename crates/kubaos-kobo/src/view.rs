@@ -7,6 +7,7 @@
 //! passphrase prompts.
 
 use std::f32::consts::PI;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use iced::border::Radius;
@@ -165,6 +166,16 @@ fn lockup<'a>(h: f32) -> El<'a> {
         .spacing(h * 0.05)
         .align_y(Alignment::Center)
         .into()
+}
+
+/// The neon sign's handle, made once: a handle made from bytes gets a new id every time, so one
+/// made in `view` would be decoded and uploaded again on every frame.
+static SIGN: LazyLock<image::Handle> = LazyLock::new(|| image::Handle::from_bytes(theme::LOGO_SIGN));
+
+/// The neon sign, `w` logical pixels wide. Nearly half its height is the glow on the wall around
+/// the glass.
+fn sign<'a>(w: f32) -> El<'a> {
+    image(SIGN.clone()).width(w).height(w / theme::LOGO_SIGN_ASPECT).into()
 }
 
 // ---------------------------------------------------------------- panel --
@@ -2839,7 +2850,7 @@ fn welcome<'a>(app: &'a App, p: &Palette) -> El<'a> {
         accent(jp::WELCOME, p).size(18),
         Space::new().height(space::SM),
         row![
-            lockup(76.0),
+            sign(540.0),
             container(
                 text(app.codename().to_uppercase()).font(theme::SANS_MEDIUM).size(size::MD).color(p.tertiary)
             )

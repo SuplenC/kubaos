@@ -5,7 +5,7 @@ Every user-facing string, doc and image follows this file. Agents: read it befor
 ## Name
 
 - **KubaOS**: one word, capital K, capital OS. Never "Kuba OS", "kubaOS" or "KUBAOS". The lowercase id `kubaos` is for files, packages and volume labels.
-- **Logo:** クバ (Kuba in katakana). It's the mark; "KubaOS" is the wordmark next to it or under it. The sources live in `branding/`.
+- **Logo:** the KubaOS neon sign: クバ (Kuba in katakana) in amber tubes with a blue dakuten, then "KubaOS", on a dark wall. The photo of it is the logo wherever it shows large (boot splash, GRUB, Kōbō, the README). Small sizes (icons, tray, fastfetch) use the vector クバ mark, with "KubaOS" as the wordmark next to it or under it. The sources live in `branding/`.
 - **Releases are named after Tokyo neighbourhoods,** in this order: **Shinjuku** (0.1), Akihabara, Shibuya, Kabukichō, Harajuku, Ikebukuro, Shimokitazawa, Koenji, Nakano, Ginza. Written as "KubaOS Shinjuku". The id is `shinjuku`.
 - **Kōbō** (工房, "workshop"): the app that puts KubaOS on a machine and sets it up afterwards. Written with its macrons wherever a person reads it; the id is `kobo` (the binary, the app id, the desktop entry). Never "the installer".
 - Internal tool names stay: the `dot-*` scripts. Nobody sees them unless they go looking, and anyone who does can read.
@@ -31,7 +31,7 @@ The file is `dpkg-divert`ed so a `base-files` upgrade can't silently put Ubuntu'
 
 ## Boot
 
-The boot menu says **KubaOS Shinjuku** (the entry), "Advanced options for KubaOS Shinjuku" and **KubaOS snapshots**, never "GNU/Linux" or "Ubuntu". The splash is the クバ mark on the dark, nothing else. The disk passphrase prompt is rule 4 territory, so it's plain, with no jokes and no swearing:
+The boot menu says **KubaOS Shinjuku** (the entry), "Advanced options for KubaOS Shinjuku" and **KubaOS snapshots**, never "GNU/Linux" or "Ubuntu". The splash is the neon sign on the dark, nothing else: it switches on a group of tubes at a time, then hums until the desktop shows up. The disk passphrase prompt is rule 4 territory, so it's plain, with no jokes and no swearing:
 
 | Where | Text |
 |---|---|
