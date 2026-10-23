@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # vw-certs.sh DIR: a throwaway CA and a server certificate for "vw" (the
-# Vaultwarden container), because bw and dot-bw-setup only talk https.
+# Vaultwarden container), because bw and kubaos bitwarden only talk https.
 # Runs once per volume (compose service vw-certs).
 set -euo pipefail
 dir="${1:?usage: vw-certs.sh DIR}"

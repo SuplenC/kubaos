@@ -4,8 +4,8 @@
 //! Five cards, each detected from the machine on every start, so re-running
 //! never redoes a finished one: TUXEDO drivers (with the Secure Boot key),
 //! the fingerprint reader, the YubiKey for sudo/polkit/lock screen, the
-//! Bitwarden vault (SSH keys, git signing, gh, project env through
-//! `dot-bw-setup`), and the name and email git commits with.
+//! Bitwarden vault (SSH keys, commit signing, gh, project env through
+//! [`crate::bitwarden`]), and the name and email git commits with.
 //!
 //! Runs as the desktop user. The few steps that need root go through
 //! `pkexec /usr/lib/kubaos/setup-helper`, a fixed root-owned script with
@@ -149,10 +149,19 @@ pub enum Facts {
         login: String,
         email: Option<String>,
         server: Option<String>,
-        /// `dot-bw-setup` has written its files.
+        /// A pull has written its files.
         configured: bool,
         /// The desktop app (its SSH agent) is installed (amd64 only).
         desktop: bool,
+        /// `folders=`: the folders SSH keys come from, none for the whole vault.
+        #[serde(default)]
+        folders: Vec<String>,
+        /// The vault's folders and SSH keys as the last pull found them.
+        #[serde(default)]
+        overview: crate::bitwarden::Overview,
+        /// What the desktop app's SSH agent answers.
+        #[serde(default)]
+        agent: Option<crate::bitwarden::Agent>,
     },
     Git {
         /// What git commits with now, from any of its config files.
@@ -276,6 +285,11 @@ pub struct Inputs {
     /// fprintd finger name, e.g. `right-index-finger`.
     pub finger: Option<String>,
     pub bw: Option<BwLogin>,
+    /// The folders the next pull takes SSH keys from; empty for the whole vault, `None` to
+    /// leave `folders=` as it is.
+    pub bw_folders: Option<Vec<String>>,
+    /// Log bw out instead of pulling: for another account or another server.
+    pub bw_logout: bool,
     pub git: Option<GitIdentity>,
 }
 
@@ -309,6 +323,8 @@ impl std::fmt::Debug for Inputs {
             )
             .field("finger", &self.finger)
             .field("bw", &self.bw)
+            .field("bw_folders", &self.bw_folders)
+            .field("bw_logout", &self.bw_logout)
             .field("git", &self.git)
             .finish()
     }
@@ -331,6 +347,8 @@ pub struct Env {
     pub user: String,
     /// `pkexec <helper>`: what runs the privileged verbs.
     pub privileged: Vec<String>,
+    /// Where the Bitwarden card's files live.
+    pub bitwarden: crate::bitwarden::Paths,
 }
 
 impl Env {
@@ -345,6 +363,7 @@ impl Env {
             home,
             user,
             privileged: vec!["pkexec".into(), HELPER.into()],
+            bitwarden: crate::bitwarden::Paths::from_env(),
         }
     }
 
@@ -398,12 +417,15 @@ pub trait Sys {
     fn reachable(&mut self) -> bool {
         false
     }
+    /// bw and the files a Bitwarden pull writes.
+    fn bitwarden(&mut self) -> &mut dyn crate::bitwarden::Machine;
 }
 
 /// The real machine.
 #[derive(Default)]
 pub struct RealSys {
     runner: crate::engine::runner::SystemRunner,
+    bitwarden: crate::bitwarden::Real,
 }
 
 impl RealSys {
@@ -460,6 +482,10 @@ impl Sys for RealSys {
             a.parse::<SocketAddr>()
                 .is_ok_and(|a| TcpStream::connect_timeout(&a, Duration::from_secs(2)).is_ok())
         })
+    }
+
+    fn bitwarden(&mut self) -> &mut dyn crate::bitwarden::Machine {
+        &mut self.bitwarden
     }
 }
 

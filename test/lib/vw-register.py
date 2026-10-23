@@ -4,7 +4,7 @@ Usage: python3 -I vw-register.py BASE_URL EMAIL MASTER_PASSWORD [TOTP_SECRET]
        python3 -I vw-register.py --totp TOTP_SECRET   (print a code bw can use now)
 
 With TOTP_SECRET (base32), the account also gets authenticator-app two-step
-login, the way dot-bw-setup expects a real account to have it.
+login, the way kubaos bitwarden expects a real account to have it.
 
 Derives the master key (PBKDF2-SHA256, 600000 iterations), creates the
 encrypted user key and RSA key pair, and calls the two-step registration

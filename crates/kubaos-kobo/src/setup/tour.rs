@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use iced::keyboard;
 use iced::{Task, window};
+use kubaos_core::setup::demo::Machine;
 use kubaos_core::setup::{CardId, PromptKind, State};
 
 use super::{Outcome, Setup};
@@ -162,6 +163,61 @@ pub fn script_vm() -> Vec<Step> {
     ]
 }
 
+fn finished(s: &Setup) -> bool {
+    s.run
+        .as_ref()
+        .is_some_and(|r| matches!(r.outcome, Some(Outcome::Done(_))))
+}
+
+/// After first boot, the Bitwarden card from the Command menu: narrow the SSH keys to a
+/// folder, pull again, log out, and log in to a self-hosted server.
+pub fn script_bitwarden() -> Vec<Step> {
+    use K::*;
+    use Step::*;
+    vec![
+        Until("status", |s| s.status.is_some()),
+        Tap(Home),
+        Tap(Down),
+        Tap(Down),
+        Tap(Down),
+        Wait(SETTLE),
+        Shot("bw-01-installed"),
+        Tap(Enter), // into the card: the folders
+        Tap(Right), // Work
+        Tap(Space),
+        Tap(Tab), // Master password
+        Type("correct horse battery staple"),
+        Wait(SETTLE),
+        Shot("bw-02-folders"),
+        Tap(Enter), // last field, no main button: Pull again
+        Until("pulled", finished),
+        Wait(SETTLE),
+        Shot("bw-03-pulled-work"),
+        Tap(ShiftTab), // from Next to Log out
+        Tap(Enter),
+        Until("logged out", |s| finished(s) && !s.bw_logged_in()),
+        Wait(SETTLE),
+        Shot("bw-04-logged-out"),
+        Tap(Enter), // into the card: Server
+        Tap(Right), // bitwarden.eu to Self-hosted
+        Tap(Tab),   // Server address
+        Type("https://vault.example.com"),
+        Tap(Tab), // Two-step login
+        Tap(Tab), // Email, kept
+        Tap(Tab), // Master password
+        Type("correct horse battery staple"),
+        Tap(Tab),
+        Type("424242"),
+        Wait(SETTLE),
+        Shot("bw-05-self-hosted"),
+        Tap(Enter),
+        Until("logged in", |s| finished(s) && s.bw_logged_in()),
+        Wait(SETTLE),
+        Shot("bw-06-self-hosted-done"),
+        Exit,
+    ]
+}
+
 pub struct Tour {
     dir: PathBuf,
     steps: VecDeque<Step>,
@@ -171,10 +227,15 @@ pub struct Tour {
 }
 
 impl Tour {
-    pub fn new(dir: PathBuf, pace: f32, vm: bool) -> Self {
+    pub fn new(dir: PathBuf, pace: f32, machine: Machine) -> Self {
+        let steps = match machine {
+            Machine::Tuxedo => script(),
+            Machine::Vm => script_vm(),
+            Machine::Installed => script_bitwarden(),
+        };
         Self {
             dir,
-            steps: if vm { script_vm() } else { script() }.into(),
+            steps: steps.into(),
             resume_at: None,
             pace,
             waiting_for_shot: false,
@@ -270,6 +331,7 @@ pub fn save(s: &Setup, name: &str, shot: &window::Screenshot) {
 mod tests {
     use super::*;
     use crate::setup::SF;
+    use kubaos_core::setup::Facts;
     use crate::setup::backend::Demo;
     use kubaos_core::setup::demo;
     use std::sync::Arc;
@@ -428,5 +490,52 @@ mod tests {
         }
         assert_eq!(s.focus, start);
         assert_eq!(s.card(CardId::Tuxedo).unwrap().state, State::Absent);
+    }
+
+    #[test]
+    fn the_installed_bitwarden_card_narrows_its_keys_logs_out_and_logs_in_to_another_server() {
+        let mut s = headless(demo::Machine::Installed);
+        let script = script_bitwarden();
+        let upto = |name| script.iter().position(|st| matches!(st, Step::Shot(n) if *n == name)).unwrap();
+        let (folders, pulled) = (upto("bw-02-folders"), upto("bw-04-logged-out"));
+        let mut steps = script.into_iter();
+
+        play(&mut s, steps.by_ref().take(folders).collect());
+        // The env/ folder holds project variables, so it isn't offered for SSH keys.
+        assert_eq!(s.bw_folders(), ["Personal", "Work"]);
+        assert_eq!(s.form.folders, ["Work"]);
+        assert!(s.focus_order().contains(&SF::LogOut));
+
+        play(&mut s, steps.by_ref().take(pulled - folders).collect());
+        let keys = |s: &Setup| match &s.card(CardId::Bitwarden).unwrap().facts {
+            Facts::Bitwarden { overview, .. } => overview.keys.iter().map(|k| k.name.clone()).collect::<Vec<_>>(),
+            f => panic!("{f:?}"),
+        };
+        assert_eq!(keys(&s), ["Work GitHub", "GitHub"]);
+        assert_eq!(s.card(CardId::Bitwarden).unwrap().state, State::Needed);
+        assert!(!s.focus_order().contains(&SF::LogOut));
+        assert!(s.form.password.is_empty());
+
+        play(&mut s, steps.collect());
+        let c = s.card(CardId::Bitwarden).unwrap();
+        assert_eq!(c.state, State::Done);
+        match &c.facts {
+            Facts::Bitwarden { server, folders, .. } => {
+                assert_eq!(server.as_deref(), Some("https://vault.example.com"));
+                assert_eq!(folders, &["Work"]);
+            }
+            f => panic!("{f:?}"),
+        }
+        assert!(s.form.password.is_empty() && s.form.code.is_empty());
+    }
+
+    #[test]
+    fn opening_setup_on_a_card_selects_it_once_detection_is_in() {
+        let mut s = headless(demo::Machine::Installed);
+        s.start = Some(CardId::Bitwarden);
+
+        play(&mut s, vec![Step::Until("status", |s| s.status.is_some())]);
+
+        assert_eq!(s.sel, CardId::Bitwarden);
     }
 }

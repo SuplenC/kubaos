@@ -5,8 +5,10 @@
 //!   kobo [--fullscreen]
 //!   kobo --demo [--demo-speed N] [--demo-fail-at STEP]
 //!   kobo --demo --screenshot-tour DIR
-//!   kobo --setup [--first-boot]        first-boot setup (setup/)
-//!   kobo --setup --demo [--demo-machine tuxedo|vm] [--screenshot-tour DIR]
+//!   kobo --setup [--first-boot] [--card CARD]   first-boot setup (setup/)
+//!   kobo --setup --demo [--demo-machine tuxedo|vm|installed] [--screenshot-tour DIR]
+//!
+//! `--card` opens setup on one card, the way the Command menu opens the Bitwarden one.
 //!
 //! Also: --size WxH (window size), --scale F (UI scale; picked from the
 //! window size when not given, see `app::auto_scale`), --tour-pace F
@@ -45,7 +47,8 @@ use crate::backend::{Backend, Demo, Engine};
 
 const USAGE: &str = "usage: kobo [--demo [--demo-speed N] [--demo-fail-at STEP]]
             [--fullscreen] [--size WxH] [--scale F] [--screenshot-tour DIR]
-       kobo --setup [--first-boot] [--demo [--demo-machine tuxedo|vm]]";
+       kobo --setup [--first-boot] [--card CARD]
+            [--demo [--demo-machine tuxedo|vm|installed]]";
 
 struct Args {
     demo: bool,
@@ -54,7 +57,8 @@ struct Args {
     fullscreen: bool,
     setup: bool,
     first_boot: bool,
-    demo_vm: bool,
+    card: Option<kubaos_core::setup::CardId>,
+    demo_machine: kubaos_core::setup::demo::Machine,
     size: Size,
     scale: Option<f32>,
     tour: Option<PathBuf>,
@@ -69,7 +73,8 @@ fn parse() -> Result<Args, String> {
         fullscreen: false,
         setup: false,
         first_boot: false,
-        demo_vm: false,
+        card: None,
+        demo_machine: kubaos_core::setup::demo::Machine::Tuxedo,
         size: Size::new(1280.0, 800.0),
         scale: None,
         tour: None,
@@ -94,11 +99,19 @@ fn parse() -> Result<Args, String> {
             "--setup" => a.setup = true,
             "--first-boot" => a.first_boot = true,
             "--demo-machine" => {
-                a.demo_vm = match val()?.as_str() {
-                    "vm" => true,
-                    "tuxedo" => false,
-                    v => return Err(format!("--demo-machine: tuxedo or vm, not {v}")),
+                use kubaos_core::setup::demo::Machine;
+                a.demo_machine = match val()?.as_str() {
+                    "vm" => Machine::Vm,
+                    "tuxedo" => Machine::Tuxedo,
+                    "installed" => Machine::Installed,
+                    v => return Err(format!("--demo-machine: tuxedo, vm or installed, not {v}")),
                 }
+            }
+            "--card" => {
+                let v = val()?;
+                a.card = Some(
+                    kubaos_core::setup::CardId::parse(&v).ok_or_else(|| format!("--card: unknown card {v}"))?,
+                );
             }
             "--size" => {
                 let v = val()?;
@@ -200,13 +213,8 @@ fn run_setup(args: Args) -> ExitCode {
         let speed = args
             .demo_speed
             .unwrap_or(if args.tour.is_some() { 2.5 } else { 1.0 });
-        let machine = if args.demo_vm {
-            demo::Machine::Vm
-        } else {
-            demo::Machine::Tuxedo
-        };
         Arc::new(SetupDemo {
-            demo: demo::Demo::new(machine, speed),
+            demo: demo::Demo::new(args.demo_machine, speed),
         })
     } else {
         Arc::new(Real::new())
@@ -218,9 +226,10 @@ fn run_setup(args: Args) -> ExitCode {
     let tour = Mutex::new(
         args.tour
             .clone()
-            .map(|d| setup::tour::Tour::new(d, args.tour_pace, args.demo_vm)),
+            .map(|d| setup::tour::Tour::new(d, args.tour_pace, args.demo_machine)),
     );
     let scale = args.scale;
+    let card = args.card;
     #[allow(unused_mut)]
     let mut settings = window::Settings {
         size: args.size,
@@ -236,7 +245,7 @@ fn run_setup(args: Args) -> ExitCode {
         settings.platform_specific.application_id = "kobo".into();
     }
     let mut app = iced::application(
-        move || setup::Setup::new(backend.clone(), tour.lock().ok().and_then(|mut t| t.take())),
+        move || setup::Setup::new(backend.clone(), tour.lock().ok().and_then(|mut t| t.take()), card),
         setup::Setup::update,
         setup::view,
     )

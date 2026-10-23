@@ -100,6 +100,9 @@ v="$(in_root Hyprland --version 2>&1 | head -1)"
 held="$(in_root apt-mark showhold | tr '\n' ' ')"
 [[ "$held" == *hyprland* ]] && ok "held: $held" || fail "hyprland not held ($held)"
 for c in foot fuzzel zsh git docker bw; do check "$c" in_root sh -c "command -v $c"; done
+# What `kubaos bitwarden` runs beside bw: the keyring for project env, and the
+# agent and key checks.
+for c in secret-tool ssh-add ssh-keygen timeout; do check "$c" in_root sh -c "command -v $c"; done
 for f in /etc/pam.d/qs-lock /etc/pam.d/qs-lock-fingerprint /etc/pam.d/qs-lock-u2f /etc/tmpfiles.d/qs-lock-unix-chkpwd.conf /etc/udev/rules.d/90-kubaos-backlight.rules; do
   check "$f" test -f "$R$f"
 done

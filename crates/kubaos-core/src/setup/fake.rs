@@ -18,6 +18,8 @@ pub struct FakeSys {
     pub online_fallback: bool,
     /// (prefix of the command line, path): running the command leaves that file behind.
     pub creates: Vec<(String, String)>,
+    /// The Bitwarden card's machine: bw, its files and the keyring.
+    pub bw: crate::bitwarden::fake::Fake,
 }
 
 impl FakeSys {
@@ -124,5 +126,9 @@ impl Sys for FakeSys {
 
     fn reachable(&mut self) -> bool {
         self.online_fallback
+    }
+
+    fn bitwarden(&mut self) -> &mut dyn crate::bitwarden::Machine {
+        &mut self.bw
     }
 }

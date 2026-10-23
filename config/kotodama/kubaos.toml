@@ -353,7 +353,9 @@ icon = "document-save"
 keywords = ["screen recording", "instant replay", "clip"]
 run = ["dot-hypr-record", "replay", "save"]
 
-# Security keys and secrets (docs/SECRETS.md). They ask in a terminal.
+# Security keys and secrets (docs/SECRETS.md). They ask in a terminal, but for
+# "Set up Bitwarden": that opens Kōbō's Bitwarden card (kubaos-setup --card),
+# with the server, the login, the folders and the keys the vault gave.
 
 [extensions.kubaos.actions.u2f-enroll]
 title = "Enroll a security key"
@@ -385,16 +387,15 @@ terminal = true
 title = "Set up Bitwarden"
 subtitle = "Log in once: SSH keys, git signing, gh and project secrets"
 icon = "dialog-password"
-keywords = ["vault", "secrets", "passwords", "ssh agent"]
-run = ["dot-bw-setup"]
-terminal = true
+keywords = ["vault", "secrets", "passwords", "ssh agent", "ssh keys", "folders", "log out"]
+run = ["kubaos-setup", "--card", "bitwarden"]
 
 [extensions.kubaos.actions.bitwarden-refresh]
 title = "Refresh from Bitwarden"
 subtitle = "Unlock and reconfigure after changing the vault"
 icon = "view-refresh"
 keywords = ["vault", "secrets", "ssh keys", "bwenv"]
-run = ["dot-bw-setup", "--refresh"]
+run = ["kubaos", "bitwarden", "refresh"]
 terminal = true
 
 # Updates (kubaos update). They run in a terminal, where sudo asks and apt

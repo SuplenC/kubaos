@@ -12,6 +12,7 @@
 //!
 //! - The install commands (`probe`, `validate`, `plan`, `run`, `demo`): `install.rs`.
 //! - First-boot setup (`setup`): `setup.rs`.
+//! - The Bitwarden vault (`bitwarden`): `bitwarden.rs`.
 //! - The recoloured pointer (`cursor`): `cursor.rs`.
 //! - The keyboard layouts (`keyboard`): `keyboard.rs`.
 //! - Packages (`package`, `try`): `package.rs`.
@@ -29,6 +30,7 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 
+mod bitwarden;
 mod cursor;
 mod install;
 mod job;
@@ -57,6 +59,11 @@ enum Cmd {
     Setup {
         #[command(subcommand)]
         cmd: setup::SetupCmd,
+    },
+    /// The Bitwarden vault: SSH keys, commit signing, gh and project env from it.
+    Bitwarden {
+        #[command(subcommand)]
+        cmd: bitwarden::BitwardenCmd,
     },
     /// Packages from your nixpkgs, recorded in kubaos.d/ and installed by a switch.
     Package {
@@ -117,6 +124,7 @@ fn main() -> ExitCode {
     match Cli::parse().cmd {
         Cmd::Install(cmd) => install::main(cmd),
         Cmd::Setup { cmd } => setup::main(cmd),
+        Cmd::Bitwarden { cmd } => bitwarden::main(cmd),
         Cmd::Package { cmd } => package::main(cmd),
         Cmd::Suite { cmd } => suite::main(cmd),
         Cmd::Try { name } => package::try_main(&name),

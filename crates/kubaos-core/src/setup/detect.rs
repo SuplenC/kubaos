@@ -3,6 +3,9 @@
 //! shows as done here too.
 
 use super::parse::*;
+use crate::bitwarden::Config;
+use crate::bitwarden::Overview;
+use crate::bitwarden::agent;
 use super::{CardId, CardStatus, Cmd, Env, Facts, MokState, State, Status, Sys};
 
 const SECURE_BOOT_VAR: &str =
@@ -357,13 +360,15 @@ fn yubikey(sys: &mut dyn Sys, env: &Env) -> CardStatus {
 
 // ---------------------------------------------------------------- Bitwarden
 
-pub const BW: &str = "/usr/local/bin/bw";
-
 fn bitwarden(sys: &mut dyn Sys, env: &Env) -> CardStatus {
     let desktop = sys.exists("/opt/Bitwarden");
-    let configured = sys.exists(&env.home_path(".config/dot-bw/config"))
-        && sys.exists(&env.home_path(".ssh/config.d/bitwarden"));
-    if !sys.exists(BW) {
+    let paths = &env.bitwarden;
+    let m = sys.bitwarden();
+    let config = Config::read(m, paths);
+    let configured = m.exists(&paths.config) && m.exists(&paths.ssh.join("config.d/bitwarden"));
+    let folders = config.folders();
+    let overview = Overview::read(m, paths);
+    if !m.installed() {
         return CardStatus {
             id: CardId::Bitwarden,
             state: State::Absent,
@@ -376,25 +381,21 @@ fn bitwarden(sys: &mut dyn Sys, env: &Env) -> CardStatus {
                 server: None,
                 configured,
                 desktop,
+                folders,
+                overview,
+                agent: None,
             },
         };
     }
-    let st = sys
-        .run(&Cmd::new(BW).arg("status").env("BW_NOINTERACTION", "true"))
+    let st = m
+        .status(None)
         .ok()
-        .and_then(|o| parse_bw_status(&o.stdout))
+        .and_then(|o| parse_bw_status(&o))
         .unwrap_or_default();
-    // dot-bw-setup remembers the email it logged in with.
-    let conf = sys
-        .read(&env.home_path(".config/dot-bw/config"))
-        .unwrap_or_default();
-    let conf_get = |k: &str| {
-        conf.lines()
-            .find_map(|l| l.strip_prefix(k)?.strip_prefix('='))
-            .map(str::to_string)
-    };
-    let email = st.email.clone().or_else(|| conf_get("email"));
-    let server = st.server.clone().or_else(|| conf_get("server"));
+    // The config remembers the email the last login used.
+    let email = st.email.clone().or_else(|| config.get("email").map(str::to_string));
+    let server = st.server.clone().or_else(|| config.get("server").map(str::to_string));
+    let agent = Some(agent::probe(m, paths));
     let logged_in = matches!(st.status.as_str(), "locked" | "unlocked");
     let who = email.clone().unwrap_or_else(|| "you".into());
     let (state, summary) = if !logged_in {
@@ -408,7 +409,7 @@ fn bitwarden(sys: &mut dyn Sys, env: &Env) -> CardStatus {
         (
             State::Done,
             format!(
-                "Logged in as {who}. SSH keys, git signing and project env come from the vault."
+                "Logged in as {who}. SSH keys, commit signing and project env come from the vault."
             ),
         )
     };
@@ -423,6 +424,9 @@ fn bitwarden(sys: &mut dyn Sys, env: &Env) -> CardStatus {
             server,
             configured,
             desktop,
+            folders,
+            overview,
+            agent,
         },
     }
 }
@@ -471,6 +475,8 @@ fn git(sys: &mut dyn Sys, env: &Env) -> CardStatus {
 mod tests {
     use super::super::fake::FakeSys;
     use super::*;
+    use crate::bitwarden::Agent;
+    use crate::bitwarden::fake::Fake;
     use std::path::PathBuf;
 
     pub fn env() -> Env {
@@ -478,6 +484,7 @@ mod tests {
             home: PathBuf::from("/home/kuba"),
             user: "kuba".into(),
             privileged: vec!["pkexec".into(), "/usr/lib/kubaos/setup-helper".into()],
+            bitwarden: crate::bitwarden::Paths::under(std::path::Path::new("/home/kuba")),
         }
     }
 
@@ -488,12 +495,7 @@ mod tests {
             .file("/sys/bus/usb/devices/1-1/idVendor", "0627\n")
             .file("/sys/bus/usb/devices/1-1/product", "QEMU USB Keyboard\n")
             .file("/sys/bus/usb/devices/usb1/idVendor", "1d6b\n")
-            .file("/usr/local/bin/bw", "")
             .ok("nmcli", "full\n")
-            .ok(
-                "/usr/local/bin/bw status",
-                r#"{"serverUrl":null,"status":"unauthenticated"}"#,
-            )
     }
 
     #[test]
@@ -730,30 +732,22 @@ mod tests {
     #[test]
     fn bitwarden_states() {
         let mut s = FakeSys::new();
+        s.bw.installed = false;
         assert_eq!(bitwarden(&mut s, &env()).state, State::Absent);
 
-        let mut s = FakeSys::new()
-            .file(BW, "")
-            .file("/home/kuba/.config/dot-bw/config", "server=https://vault.bitwarden.eu\nemail=k@x.eu\n")
-            .file("/home/kuba/.ssh/config.d/bitwarden", "")
-            .ok(
-                "/usr/local/bin/bw status",
-                r#"{"serverUrl":"https://vault.bitwarden.eu","userEmail":"k@x.eu","status":"locked"}"#,
-            );
+        let mut s = FakeSys::new();
+        s.bw = Fake::new()
+            .locked("https://vault.bitwarden.eu", "k@x.eu")
+            .file("/home/kuba/.config/dot-bw/config", "server=https://vault.bitwarden.eu\nfolders=Work\n")
+            .file("/home/kuba/.ssh/config.d/bitwarden", "");
         let c = bitwarden(&mut s, &env());
         assert_eq!(c.state, State::Done);
         assert!(c.summary.contains("k@x.eu"));
-        // bw status runs without prompts.
-        assert!(s.env[0].contains(&("BW_NOINTERACTION".into(), "true".into())));
+        assert!(matches!(c.facts, Facts::Bitwarden { ref folders, agent: Some(Agent::Off), .. } if folders == &["Work"]));
 
         // Logged out, but the config remembers the email for the form.
-        let mut s = FakeSys::new()
-            .file(BW, "")
-            .file("/home/kuba/.config/dot-bw/config", "email=k@x.eu\n")
-            .ok(
-                "/usr/local/bin/bw status",
-                r#"{"status":"unauthenticated"}"#,
-            );
+        let mut s = FakeSys::new();
+        s.bw = Fake::new().file("/home/kuba/.config/dot-bw/config", "email=k@x.eu\n");
         let c = bitwarden(&mut s, &env());
         assert_eq!(c.state, State::Needed);
         assert!(matches!(c.facts, Facts::Bitwarden { email: Some(ref e), .. } if e == "k@x.eu"));

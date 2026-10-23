@@ -612,17 +612,32 @@ fn explain<'a>(s: &'a Setup, c: &'a CardStatus, p: &Palette) -> Vec<El<'a>> {
             Facts::Bitwarden {
                 desktop,
                 configured,
+                server,
+                email,
+                login,
+                folders,
+                overview,
+                agent,
                 ..
             },
             st,
         ) => {
+            if let (Some(server), true) = (server, s.bw_logged_in()) {
+                let who = email.as_deref().unwrap_or("someone");
+                v.push(para(format!("Logged in to {server} as {who}, the vault {login}."), p));
+            }
             if st == State::Done {
                 v.push(para(
                     "SSH public keys and Host blocks, git commit signing, the gh token and every project's env \
-                     came from the vault (dot-bw-setup). Changed the vault? Pull again.",
+                     came from the vault. Changed the vault? Pull again; kubaos bitwarden refresh in a terminal \
+                     does the same.",
                     p,
                 ));
-            } else {
+            }
+            if *configured {
+                v.push(keys_overview(folders, overview, agent.as_ref(), p));
+            }
+            if st != State::Done {
                 v.push(para(
                     "Log in once and setup pulls what the dotfiles expect from the vault: SSH public keys and Host \
                      blocks, git commit signing, the gh token and your projects' env. The private keys never touch \
@@ -656,6 +671,84 @@ fn explain<'a>(s: &'a Setup, c: &'a CardStatus, p: &Palette) -> Vec<El<'a>> {
         _ => {}
     }
     v
+}
+
+/// The SSH keys the last pull found, read-only: what each became, and what serves them.
+fn keys_overview<'a>(
+    folders: &[String],
+    overview: &kubaos_core::bitwarden::Overview,
+    agent: Option<&kubaos_core::bitwarden::Agent>,
+    p: &Palette,
+) -> El<'a> {
+    use kubaos_core::bitwarden::Agent;
+    let scope = kubaos_core::bitwarden::scope(folders);
+    let mut lines: Vec<String> = overview
+        .keys
+        .iter()
+        .map(|k| {
+            let what = match (&k.note, k.block) {
+                (_, true) => format!("Host block for {}", k.hosts.join(", ")),
+                (Some(why), false) => format!("key only: {why}"),
+                (None, false) => "key only".to_string(),
+            };
+            let signs = if k.signing { "; signs your commits" } else { "" };
+            format!("{} ({}): {what}{signs}.", k.name, k.folder)
+        })
+        .collect();
+    if lines.is_empty() {
+        lines.push(format!("No SSH keys in {scope}."));
+    }
+    lines.push(match agent {
+        None | Some(Agent::Off) => {
+            "The desktop app's SSH agent is off. In Bitwarden desktop: Settings, Enable SSH agent.".into()
+        }
+        Some(Agent::Locked) => "The agent runs with no keys: unlock Bitwarden desktop.".into(),
+        Some(Agent::Serving { keys }) => format!("The agent serves {} key(s).", keys.len()),
+        Some(Agent::Dead) => "The agent's socket doesn't answer: restart Bitwarden desktop.".into(),
+    });
+    lines.push(
+        "A key gets a Host block from a text field hosts (comma-separated; hostname, user and port \
+         optional), and signs commits with a field signing set to true."
+            .into(),
+    );
+    notice(Icon::Key, "SSH keys", lines, p)
+}
+
+/// The vault's folders as ticks: none ticked is the whole vault.
+fn folder_ticks<'a>(s: &'a Setup, p: &Palette) -> El<'a> {
+    let pp = *p;
+    let focused = s.is_focused(SF::Folders) && !s.running();
+    let mut r = row![].spacing(4);
+    for (i, name) in s.bw_folders().into_iter().enumerate() {
+        let on = s.form.folders.iter().any(|f| f == name);
+        let here = focused && i == s.form.folder_at;
+        let mark = icon(
+            if on { Icon::CheckCircle } else { Icon::Circle },
+            16.0,
+            if on { pp.primary } else { pp.outline },
+        );
+        let label = text(name).font(theme::SANS_MEDIUM).size(size::SM).color(if on {
+            pp.on_secondary_container
+        } else {
+            pp.on_surface_variant
+        });
+        let b = button(row![mark, label].spacing(6).align_y(Alignment::Center))
+            .padding(Padding::from([7.0, 14.0]))
+            .on_press_maybe((!s.running()).then(|| Message::Setup(super::Msg::Folder(name.to_string()))))
+            .style(move |_t: &Theme, _st| button::Style {
+                background: on.then_some(Background::Color(pp.secondary_container)),
+                text_color: pp.on_surface,
+                border: Border {
+                    color: if here { pp.primary } else { alpha(pp.outline_variant, 0.9) },
+                    width: 1.0,
+                    radius: radius::FULL.into(),
+                },
+                shadow: Shadow::default(),
+                snap: true,
+            });
+        r = r.push(b);
+    }
+    ring(r, focused, radius::FULL, p)
 }
 
 /// Secure Boot and the blue screen. Dead serious: this is the one that
@@ -814,6 +907,21 @@ fn form<'a>(s: &'a Setup, fields: &[SF], p: &Palette) -> El<'a> {
                 p,
             ),
             SF::Email => field("Email", input(s, sf, "you@example.com", Some(Icon::Mail), p), None, p),
+            SF::Folders => field(
+                "SSH keys from",
+                folder_ticks(s, p),
+                Some(
+                    text(if f.folders.is_empty() {
+                        "The whole vault. Tick folders to take keys from those only; Pull again to apply."
+                    } else {
+                        "Only the ticked folders. Untick them all for the whole vault; Pull again to apply."
+                    })
+                    .size(size::SM)
+                    .color(p.on_surface_variant)
+                    .into(),
+                ),
+                p,
+            ),
             SF::Password => field(
                 "Master password",
                 input(s, sf, "", Some(Icon::Lock), p),
@@ -1133,6 +1241,17 @@ fn actions<'a>(s: &'a Setup, c: &'a CardStatus, p: &Palette) -> El<'a> {
         } else {
             p.on_surface_variant
         }));
+    }
+    if s.can_log_out() {
+        r = r.push(btn(
+            "Log out",
+            None,
+            false,
+            Kind::Text,
+            (!running).then(|| click(SF::LogOut)),
+            s.is_focused(SF::LogOut),
+            p,
+        ));
     }
     if let Some((l, a)) = s.secondary() {
         let ok = !(running || a == Act::Run && s.blocker().is_some());

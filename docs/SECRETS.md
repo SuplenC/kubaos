@@ -5,14 +5,17 @@ KubaOS keeps secrets out of files. One Bitwarden account holds my SSH keys, proj
 | Piece | Where it lives | Set up by |
 |---|---|---|
 | SSH private keys | Bitwarden vault only, served by the desktop app's SSH agent | you, in the vault |
-| SSH public keys, Host blocks | `~/.ssh/<name>.pub`, `~/.ssh/config.d/bitwarden` | `dot-bw-setup` |
+| SSH public keys, Host blocks | `~/.ssh/<name>.pub`, `~/.ssh/config.d/bitwarden` | `kubaos bitwarden setup` |
 | `SSH_AUTH_SOCK` | `~/.bitwarden-ssh-agent.sock` for zsh, Hyprland, systemd --user | `home/secrets.nix` |
-| git signing | `~/.config/git-bitwarden/{signing.gitconfig,allowed_signers}`, included by `config/git/config` | `dot-bw-setup` |
-| GitHub CLI token | GNOME keyring (gh's own entry) | `dot-bw-setup` |
-| Project env secrets | vault, cached in the GNOME keyring | `dot-bw-setup`, `dot-bwenv pull` |
+| git signing | `~/.config/git-bitwarden/{signing.gitconfig,allowed_signers}`, included by `config/git/config` | `kubaos bitwarden setup` |
+| GitHub CLI token | GNOME keyring (gh's own entry) | `kubaos bitwarden setup` |
+| Project env secrets | vault, cached in the GNOME keyring | `kubaos bitwarden setup`, `kubaos bitwarden env pull` |
 | Security key credentials | `/etc/u2f_mappings`, root:root 0644 | `dot-u2f-enroll` |
 | YubiKey SSH keys (optional) | `~/.ssh/<name>_sk` (key handle) + `.pub` | `dot-ssh-sk-new` |
-| Server URL, email, optional folder list | `~/.config/dot-bw/config`, nothing secret | `dot-bw-setup` |
+| Server URL, email, optional folder list | `~/.config/dot-bw/config`, nothing secret | `kubaos bitwarden setup`, Kōbō's Bitwarden card |
+| What the last pull found (folders, SSH keys) | `~/.local/state/dot-bw/overview.json`, nothing secret | `kubaos bitwarden setup` |
+
+`kubaos bitwarden` does the work, in Rust (`crates/kubaos-core/src/bitwarden.rs`), and Kōbō's Bitwarden card runs the same code. `dot-bw-setup` and `dot-bwenv`, the old scripts, are aliases for one release: each prints its new name and runs it.
 
 ## First-time setup
 
@@ -24,14 +27,24 @@ Installed from the KubaOS stick? Steps 1 and 2 and `system/75-yubikey.sh` are al
    - turn on **Enable SSH agent**. It's off by default. The app keeps the switch in its own `data.json` with no documented config-file way to set it, so this stays a click.
    - optional: **Unlock with system authentication**. That's a polkit prompt, and the security key answers it like it answers sudo.
    - optional: **Start to tray icon**, so the login start stays out of the way.
-4. `dot-bw-setup`. The first time it asks for the server (bitwarden.com, bitwarden.eu or your own URL) and how to log in. Then bw asks for the master password and the two-step code. After that it writes the SSH, git, gh and env pieces, checks the agent and prints a summary. Re-running it is safe.
+4. `kubaos bitwarden setup`, or "Set up Bitwarden" in the Command menu (below). The first time it asks for the server (bitwarden.com, bitwarden.eu or your own URL) and how to log in. Then bw asks for the master password and the two-step code. After that it writes the SSH, git, gh and env pieces, checks the agent and prints a summary. Re-running it is safe.
 5. The YubiKey: `system/75-yubikey.sh`, then the order in "YubiKey C Bio" below (PIN, fingerprints, Bitwarden two-step login, `dot-u2f-enroll` for each key).
 
-What stays manual, and why: the SSH agent toggle (no supported config switch), the master password and two-step code (typed into bw's own prompt, never into these scripts), the touch during enrollment, and the web vault's two-step settings.
+What stays manual, and why: the SSH agent toggle (no supported config switch), the master password and two-step code (typed into bw's own prompt in a terminal; in Kōbō they go to bw in its environment and are forgotten after the run), the touch during enrollment, and the web vault's two-step settings.
+
+### The Bitwarden card
+
+"Set up Bitwarden" in the Command menu opens Kōbō's Bitwarden card (`kubaos-setup --card bitwarden`), the same card first-boot setup shows. It has:
+
+- **Server and login**: bitwarden.com, bitwarden.eu or a self-hosted https:// address, and the authenticator-app code, a YubiKey OTP or the API key. Logged in already, it only wants the master password.
+- **SSH keys from**: the vault's folders as ticks (`env/` ones aren't offered: they hold project variables). None ticked is the whole vault. Ticking some writes `folders=` and limits SSH keys and git signing to them. Pull again applies it.
+- **SSH keys**, read-only: each key from the last pull, with its Host block and the hosts it answers for, or why it has none, which key signs commits, what the desktop app's agent serves, and the fields that change it.
+- **Pull again**: unlock and pull, with the same lines the terminal shows in the card's log.
+- **Log out**: for another account or server. The login form comes back.
 
 ## Vault conventions
 
-Keep your vault the way it is. `dot-bw-setup` reads the whole vault: folders are yours to organise, and what it needs is the item type and a few custom fields.
+Keep your vault the way it is. `kubaos bitwarden` reads the whole vault: folders are yours to organise, and what it needs is the item type and a few custom fields.
 
 - **Every SSH key item** (Bitwarden item type "SSH key"), in any folder or in none. Optional custom fields:
 
@@ -52,7 +65,7 @@ Keep your vault the way it is. `dot-bw-setup` reads the whole vault: folders are
 
 Env secrets, one project per folder **`env/<project>`**: every custom field of every item in it becomes a variable. Field name is the variable name, so it must be a shell name (`DATABASE_URL`, not `database-url`). Items elsewhere join a project with a text field `bwenv` = `<project>`.
 
-To keep SSH keys and git signing to some folders, list them in `~/.config/dot-bw/config`, comma-separated: `folders=Personal,Work` (`folder=` is read too, its older name). gh and env still read the whole vault. A listed folder that isn't in the vault gets a warning by name; if none of them is there, `dot-bw-setup` uses every SSH key in the vault.
+To keep SSH keys and git signing to some folders, tick them on the Bitwarden card, or list them in `~/.config/dot-bw/config`, comma-separated: `folders=Personal,Work` (`folder=` is read too, its older name). gh and env still read the whole vault. A listed folder that isn't in the vault gets a warning by name; if none of them is there, `kubaos bitwarden` uses every SSH key in the vault. The directory keeps its old `dot-bw` name, so a machine set up before keeps its settings.
 
 Example vault:
 
@@ -82,7 +95,7 @@ git clone git@github-work:my-company/app.git
 git remote set-url origin git@github-work:my-company/app.git   # a clone you already have
 ```
 
-Give both items `hosts=github.com` and ssh offers both keys to GitHub, which logs you in as whichever account it checks first. `dot-bw-setup` warns when two items share a host.
+Give both items `hosts=github.com` and ssh offers both keys to GitHub, which logs you in as whichever account it checks first. `kubaos bitwarden` warns when two items share a host.
 
 ## Daily use
 
@@ -91,19 +104,20 @@ cd ~/Projects/myapp
 echo 'use bwenv myapp' >> .envrc && direnv allow   # once per project
 ```
 
-Every `cd` into the project then exports the variables from the keyring. One `secret-tool` call does it, and `direnv export` with 5 variables took 22 ms in the test container. Nothing talks to Bitwarden on `cd`. If the keyring has nothing for the project, direnv prints `run: dot-bwenv pull myapp` and exports nothing.
+Every `cd` into the project then exports the variables from the keyring. One `secret-tool` call does it, and `direnv export` with 5 variables took 22 ms in the test container. Nothing talks to Bitwarden on `cd`. If the keyring has nothing for the project, direnv prints `run: kubaos bitwarden env pull myapp` and exports nothing.
 
 | Command | What |
 |---|---|
-| `dot-bwenv pull myapp` | fetch one project from the vault (asks for the master password, about 12 s) |
-| `dot-bwenv refresh` | pull every project the keyring already has |
-| `dot-bwenv list` | projects and variable names, never values |
-| `dot-bwenv clear myapp` / `--all` | forget a project or all of them |
-| `dot-bw-setup --refresh` | after any vault change: SSH, git, gh, all projects (about 15 s) |
-| `dot-bw-setup --check` | no bw call: is the agent up, which files exist |
+| `kubaos bitwarden env pull myapp` | fetch one project from the vault (asks for the master password, about 12 s) |
+| `kubaos bitwarden env refresh` | pull every project the keyring already has |
+| `kubaos bitwarden env list` | projects and variable names, never values |
+| `kubaos bitwarden env clear myapp` / `--all` | forget a project or all of them |
+| `kubaos bitwarden env export myapp` | the project's `NAME=VALUE` records, NUL-separated, from the keyring alone (what `use bwenv` reads) |
+| `kubaos bitwarden refresh` | after any vault change: SSH, git, gh, all projects (about 15 s). "Refresh from Bitwarden" in the Command menu |
+| `kubaos bitwarden check` | no bw call: is the agent up, which files exist |
 | `dot-u2f-enroll --list` / `--remove N` | your enrolled keys |
 
-Each `bw` call takes about 3 s, so the scripts sync once and read the whole vault with one `bw list items`. They unlock once per run and keep `BW_SESSION` in that process and its children. It's never written down. Export `BW_SESSION` yourself and they reuse it without asking.
+Each `bw` call takes about 3 s, so `kubaos bitwarden` syncs once and reads the whole vault with one `bw list items`. It unlocks once per run and keeps `BW_SESSION` in that process, handing it only to the bw calls that need it. It's never written down, and the other programs it runs (git, gh, ssh-add, secret-tool) never get it. Export `BW_SESSION` yourself and it reuses it without asking.
 
 There's no systemd unit or timer. A re-run needs the master password, a unit can't ask for it, and keeping a session around for one would be exactly the long-lived vault access this setup avoids.
 
@@ -113,9 +127,9 @@ The GNOME keyring: tty autologin means nobody types the login password, so nothi
 
 ## Rotation
 
-- **SSH key**: in Bitwarden, create a new SSH key item with the same fields. Change the old item's `signing` to `verify`. Add the new public key on GitHub and servers, then `dot-bw-setup --refresh`. Delete the old item once nothing uses it. Its `.pub` and Host block disappear on the next refresh.
-- **Env secret**: change the field in Bitwarden, then `dot-bwenv pull <project>` and `cd .` (or `direnv reload`).
-- **gh token**: put the new token in `gh-token`, `dot-bw-setup --refresh --only gh`.
+- **SSH key**: in Bitwarden, create a new SSH key item with the same fields. Change the old item's `signing` to `verify`. Add the new public key on GitHub and servers, then `kubaos bitwarden refresh`. Delete the old item once nothing uses it. Its `.pub` and Host block disappear on the next refresh.
+- **Env secret**: change the field in Bitwarden, then `kubaos bitwarden env pull <project>` and `cd .` (or `direnv reload`).
+- **gh token**: put the new token in `gh-token`, `kubaos bitwarden refresh --only gh`.
 - **Master password**: change it in the web vault. Nothing here stores it.
 - **Security key**: `dot-u2f-enroll` with the new key, `dot-u2f-enroll --remove N` for the old one, and do the same in the web vault.
 
@@ -191,10 +205,10 @@ Untouched: tty login (autologin, nothing to ask) and hyprlock, the fallback lock
 
 Bitwarden's help pages (checked 2026-10) list FIDO2 two-step login for the web vault, the browser extensions and the desktop apps on Windows, macOS and Linux. So the desktop app here can take the key directly. The `bw` CLI can't: it does the authenticator app (method 0), email (1) and YubiKey OTP (3), and the docs say FIDO2 and Duo aren't supported.
 
-`dot-bw-setup` therefore logs in like this:
+`kubaos bitwarden setup` therefore logs in like this:
 
 1. **Email + master password + authenticator-app code** (the default, Enter at the menu). It runs `bw login <email> --method 0`, so bw asks for the TOTP code even when the key is the account's preferred method.
-2. **Personal API key**, offered when that fails, or chosen with `--login apikey` (web vault → Settings → Security → Keys → View API key). `bw login --apikey` asks for `client_id` and `client_secret` and skips two-step login. The scripts never see or store the pair, but bw keeps a refresh token in `~/.config/Bitwarden CLI/data.json` like any login. The trade-off: the API key is one factor. Anyone with it, plus your master password, can read the vault. Keep it in the vault and rotate it in the web vault if it leaks.
+2. **Personal API key**, offered when that fails, or chosen with `--login apikey` (web vault → Settings → Security → Keys → View API key). `bw login --apikey` asks for `client_id` and `client_secret` and skips two-step login. On a terminal kubaos never sees the pair; Kōbō's card hands it to bw in its environment and forgets it. Neither stores it, but bw keeps a refresh token in `~/.config/Bitwarden CLI/data.json` like any login. The trade-off: the API key is one factor. Anyone with it, plus your master password, can read the vault. Keep it in the vault and rotate it in the web vault if it leaks.
 3. **SSO**, if an organization gives you one.
 
 The desktop app's first login can use the key, the TOTP code, or "Log in with device" (approve it from the phone app). After that, day to day, unlock it with system authentication: the polkit prompt, which your finger answers (table above).
@@ -233,7 +247,7 @@ Notes:
 - **Stolen laptop, powered off.** LUKS. Nothing secret sits outside the encrypted disk anyway, and the vault cache in `~/.config/Bitwarden*` is encrypted with your master password.
 - **Stolen laptop, locked.** The lock screen wants your password or your finger on your key. The keyring stays unlocked while you're logged in, so a lock-screen bypass would expose the env secrets but not the vault or the SSH private keys.
 - **Malware running as you.** It can read env secrets from the unlocked keyring and anything a process you run can read. It can ask the agent to sign, and Bitwarden asks you first unless you set its authorization prompt to Never. It can't copy the private keys: they don't exist on disk and the agent never hands them out. It can't enroll its own key for sudo (root-owned mappings). It can wait for you to type the master password into bw, as with any password manager. `bw` is root-owned in `/usr/local/bin`, but malware can still put its own `bw` earlier in your PATH.
-- **Other local users.** Secrets never appear in argv (`/proc/*/cmdline` is world-readable). The scripts pass them on stdin, and `BW_SESSION` travels in the environment, which only you and root can read.
+- **Other local users.** Secrets never appear in argv (`/proc/*/cmdline` is world-readable). `kubaos bitwarden` passes them on stdin, and `BW_SESSION` travels in the environment, which only you and root can read.
 - **Someone who takes the security key.** They need your enrolled finger or the key's PIN (8 tries, then the key wipes its FIDO2 side), and the key only counts on this machine (credentials are bound to `pam://<hostname>`).
 - **Vault compromise.** Everything here comes from it. That's the deal with one vault. The security key as two-step login protects the account itself.
 
@@ -249,7 +263,7 @@ The finger stopped working (a cut, a bandage): the PIN works at sudo and polkit,
 
 ## Troubleshooting
 
-- **`ssh -T git@github.com` asks for a password or says "no identities".** Run `dot-bw-setup --check`. Then `echo $SSH_AUTH_SOCK`: it should name `~/.bitwarden-ssh-agent.sock`. If not, log out and in after `home-manager switch`. `systemctl --user show-environment | grep SSH` shows what systemd services get.
+- **`ssh -T git@github.com` asks for a password or says "no identities".** Run `kubaos bitwarden check`, or look at the Bitwarden card's SSH keys. Then `echo $SSH_AUTH_SOCK`: it should name `~/.bitwarden-ssh-agent.sock`. If not, log out and in after `home-manager switch`. `systemctl --user show-environment | grep SSH` shows what systemd services get.
 - **sudo waits at "Touch the fingerprint sensor".** The key is plugged in and waiting for an enrolled finger. If it doesn't match, or you wait it out, sudo asks for the PIN. Press Enter there to get the password prompt, or pull the key out.
 - **The finger never works, the PIN does.** `dot-u2f-enroll --info`: "fingerprints: none yet" means none are enrolled (`ykman fido fingerprints add`). "N scans left" counts down to the PIN lockout.
 - **`dot-u2f-enroll`: "no FIDO key found".** `ls -l /dev/hidraw*` should show a `+` (ACL) on the key's node. If not, you're not on the active seat (over ssh, say), or udev didn't tag it: `udevadm info /dev/hidrawN | grep SECURITY_TOKEN`.

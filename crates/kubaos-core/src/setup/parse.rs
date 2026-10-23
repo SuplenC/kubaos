@@ -228,7 +228,7 @@ pub fn parse_bw_status(json: &str) -> Option<BwStatus> {
     })
 }
 
-/// `dot-bw-setup`'s rules: com, eu, or an https URL.
+/// A Bitwarden server as `kubaos bitwarden setup` takes it: com, eu, or an https URL.
 pub fn server_url(s: &str) -> Result<String, String> {
     let s = s.trim();
     match s {

@@ -8,7 +8,7 @@
 #                                       builds the kubaos CLI for Linux first when the
 #                                       packages, suites or keyboard check runs
 #   test/run shell                     login zsh as kuba after a fresh switch
-#   test/run bitwarden                  Vaultwarden + dot-bw-setup + direnv
+#   test/run bitwarden                  Vaultwarden + kubaos bitwarden + direnv
 #   test/run shots [--hyprland] [--dir NAME | --out PATH] [--size WxH] [--scale N]
 #                  [--wallpaper SET/FILE]
 #                                       start a headless session (sway, or Hyprland
@@ -88,7 +88,7 @@ cmd_warm() {
 }
 
 # build_kubaos: the kubaos CLI for the container's Linux, as $DOTFILES_TEST_OUT/kubaos (the
-# container's /out/kubaos), for the packages and suites checks, with the test Suite built in. The image has no Rust toolchain, so it builds
+# container's /out/kubaos), for the packages, suites and bitwarden checks, with the test Suite built in. The image has no Rust toolchain, so it builds
 # in rust:latest, as install/test/engine-e2e does. Cargo's registry and target dir live in the
 # dotfiles-test-cargo and dotfiles-test-target volumes, with a target subdirectory per checkout:
 # cargo goes by mtime, and worktrees share the volume.
@@ -140,6 +140,7 @@ cmd_shell() {
 
 cmd_bitwarden() {
   need_image
+  build_kubaos
   # A fresh vault every run; certificates are reused.
   compose --profile bitwarden rm -sf vaultwarden >/dev/null 2>&1 || true
   docker volume rm dotfiles-test-vw-data >/dev/null 2>&1 || true
