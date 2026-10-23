@@ -134,26 +134,22 @@ impl Keyboards {
         runner: &impl Runner,
     ) -> Result<Ran, String> {
         let unknown = || format!("`{id}` has no Action `{action}`");
-        match (id, action) {
-            (ADD, RUN) => {
-                let typed = arguments.get(LAYOUT).map_or("", |typed| typed.trim());
-                self.change(runner, Change::Add(Layout::parse(typed)), "add", typed)
-            }
-            _ => {
-                let spelled = id.strip_prefix(LAYOUT_PREFIX).ok_or_else(unknown)?;
-                let layout = Layout::parse(spelled);
-                let index = self
-                    .layouts
-                    .iter()
-                    .position(|l| *l == layout)
-                    .ok_or_else(|| format!("`{spelled}` isn't one of the keyboard layouts"))?;
-                match action {
-                    RUN => switch(runner, index),
-                    MAKE_DEFAULT => self.change(runner, Change::MakeDefault(layout), "default", spelled),
-                    REMOVE => self.change(runner, Change::Remove(layout), "remove", spelled),
-                    _ => Err(unknown()),
-                }
-            }
+        if (id, action) == (ADD, RUN) {
+            let typed = arguments.get(LAYOUT).map_or("", |typed| typed.trim());
+            return self.change(runner, Change::Add(Layout::parse(typed)), "add", typed);
+        }
+        let spelled = id.strip_prefix(LAYOUT_PREFIX).ok_or_else(unknown)?;
+        let layout = Layout::parse(spelled);
+        let index = self
+            .layouts
+            .iter()
+            .position(|l| *l == layout)
+            .ok_or_else(|| format!("`{spelled}` isn't one of the keyboard layouts"))?;
+        match action {
+            RUN => switch(runner, index),
+            MAKE_DEFAULT => self.change(runner, Change::MakeDefault(layout), "default", spelled),
+            REMOVE => self.change(runner, Change::Remove(layout), "remove", spelled),
+            _ => Err(unknown()),
         }
     }
 

@@ -24,6 +24,7 @@ pub mod registry;
 pub mod run;
 pub mod toggles;
 pub mod updates;
+pub mod wallpapers;
 
 #[cfg(test)]
 mod fake;

@@ -93,12 +93,8 @@ icon = "preferences-desktop-wallpaper"
 keywords = ["theme", "background", "choose wallpaper"]
 run = ["qs", "ipc", "call", "wallpaper", "toggle"]
 
-[extensions.kubaos.actions.wallpaper-sets]
-title = "Choose wallpaper sets"
-subtitle = "Which sets the wallpaper picker shows"
-icon = "folder-pictures"
-keywords = ["theme", "wallpaper settings"]
-run = ["qs", "ipc", "call", "wallpaper", "settings"]
+# The Extension itself sends one Item a wallpaper set, "Wallpaper set:
+# Shinjuku", to show it in the picker or hide it; this one shows them all.
 
 [extensions.kubaos.actions.wallpaper-all-sets]
 title = "Show every wallpaper set"

@@ -168,3 +168,44 @@ fn an_unknown_item_or_action_says_so() {
     assert_eq!(unknown_item, Err("`nope` has no Action `run`".to_owned()));
     assert!(unknown_action.is_err());
 }
+
+fn with_sets(text: &str) -> Extension<FakeBus, FakeRunner> {
+    let mut extension = configured(text);
+    extension.set_wallpaper_sets(WallpaperSets::parse(
+        ["japanese", "shinjuku"].map(str::to_owned),
+        Some("shinjuku\n"),
+    ));
+    extension
+}
+
+#[test]
+fn the_wallpaper_set_items_come_after_the_keyboard_items() {
+    let mut extension = with_sets("");
+    extension.set_keyboards(Keyboards::parse("XKBLAYOUT=\"us\"\n", ""));
+
+    let ids = ids(&extension);
+
+    assert_eq!(
+        ids[toggles::ids().len()..],
+        [
+            "keyboard:us",
+            "keyboard-add",
+            "wallpaper-set:japanese",
+            "wallpaper-set:shinjuku"
+        ]
+    );
+}
+
+#[test]
+fn a_wallpaper_set_item_runs_through_the_extension() {
+    let mut extension = with_sets("");
+
+    let ran = extension.run(
+        wallpapers::SHOW,
+        &item(wallpapers::KIND, "wallpaper-set:japanese"),
+        &BTreeMap::new(),
+    );
+
+    assert_eq!(ran, Ok(Ran::KeepOpen));
+    assert_eq!(extension.runner.ran(), ["dot-theme show-set japanese"]);
+}

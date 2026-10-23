@@ -1,12 +1,13 @@
 //! The KubaOS Extension's protocol loop: each config the Daemon sends makes
 //! the Items over, sending only the ones that changed, and so does each
-//! change the update check writes and each change to the keyboard layouts;
-//! each run is answered with its outcome, after the View it pushes or pops.
+//! change the update check writes, each change to the keyboard layouts and
+//! each change to the wallpaper sets file; each run is answered with its
+//! outcome, after the View it pushes or pops.
 //!
 //! # Owns
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
-//! - Watching the update check's file and `/etc/default/keyboard`.
+//! - Watching the update check's file, `/etc/default/keyboard` and the wallpaper sets file.
 //!
 //! # Not here
 //!
@@ -34,6 +35,8 @@ use kotodama_kubaos::run::Programs;
 use kotodama_kubaos::toggles::Ran;
 use kotodama_kubaos::updates;
 use kotodama_kubaos::updates::Pending;
+use kotodama_kubaos::wallpapers;
+use kotodama_kubaos::wallpapers::WallpaperSets;
 use kotodama_protocol::Error;
 use kotodama_protocol::FromExtension;
 use kotodama_protocol::Outcome;
@@ -50,6 +53,8 @@ enum Own {
     Pending(Pending),
     /// `/etc/default/keyboard` changed.
     Keyboards(Keyboards),
+    /// The wallpaper sets file changed.
+    WallpaperSets(WallpaperSets),
 }
 
 fn main() -> ExitCode {
@@ -73,6 +78,11 @@ fn run() -> Result<(), Error> {
     let keyboard_file = Path::new(keyboard::DEFAULT_KEYBOARD);
     extension.set_keyboards(read_keyboards(keyboard_file));
     let _keyboard_watcher = watch_keyboards(keyboard_file, events.clone());
+    let sets_file = wallpapers::sets_file();
+    if let Some(file) = &sets_file {
+        extension.set_wallpaper_sets(WallpaperSets::read(&wallpapers::sets_dir(), file));
+    }
+    let _sets_watcher = sets_file.and_then(|file| watch_wallpaper_sets(file, events.clone()));
     let _watcher = state.and_then(|dir| watch(dir, events));
     let mut configured = false;
 
@@ -89,6 +99,7 @@ fn run() -> Result<(), Error> {
                 match own {
                     Own::Pending(pending) => extension.set_pending(pending),
                     Own::Keyboards(keyboards) => extension.set_keyboards(keyboards),
+                    Own::WallpaperSets(sets) => extension.set_wallpaper_sets(sets),
                 }
                 if configured {
                     sent.publish(&mut writer, extension.items())?;
@@ -166,6 +177,31 @@ fn watch_keyboards(file: &Path, events: Sender<Event<Own>>) -> Option<Watcher> {
         },
     )
     .map_err(|err| kotodama_extension::log!("not watching the keyboard layouts: {err}"))
+    .ok()?;
+    watcher.watch(vec![dir]);
+    Some(watcher)
+}
+
+/// Watches the folder of the wallpaper sets `file`, sending the sets on each change to it. The
+/// folder may not be there yet; it is watched once it is. Without a watch the set Items keep the
+/// sets of the start.
+fn watch_wallpaper_sets(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let dir = file.parent()?.to_path_buf();
+    // The events name the real path, behind any symlink on the way.
+    let dir = dir.canonicalize().unwrap_or(dir);
+    let changed = dir.join(file.file_name()?);
+    let watcher = Watcher::start(
+        "wallpaper-sets",
+        RecursiveMode::NonRecursive,
+        SETTLE,
+        // `dot-theme` writes the file through a temporary one and a rename.
+        move |event, _| event.paths.contains(&changed),
+        move |_| {
+            let sets = WallpaperSets::read(&wallpapers::sets_dir(), &file);
+            let _ = events.send(Event::Own(Own::WallpaperSets(sets)));
+        },
+    )
+    .map_err(|err| kotodama_extension::log!("not watching the wallpaper sets: {err}"))
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)

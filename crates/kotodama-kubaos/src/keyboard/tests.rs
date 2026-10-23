@@ -181,6 +181,10 @@ fn an_unknown_action_is_refused() {
     let runner = FakeRunner::default();
 
     assert!(keyboards("us,it", "").run(ADD, REMOVE, &none(), &runner).is_err());
-    assert!(keyboards("us,it", "").run("keyboard-next", RUN, &none(), &runner).is_err());
+    assert!(
+        keyboards("us,it", "")
+            .run("keyboard-next", RUN, &none(), &runner)
+            .is_err()
+    );
     assert!(keyboards("us,it", "").run("wifi", RUN, &none(), &runner).is_err());
 }

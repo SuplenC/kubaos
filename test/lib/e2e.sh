@@ -876,6 +876,16 @@ TOML
     echo "ok   no KubaOS Item doubles the next layout bind"
   fi
 
+  out="$(in_session "$query 'Wallpaper set: Shinjuku' 'wallpaper sets'" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  if grep -E -- "^Wallpaper set: Shinjuku[[:blank:]]" <<<"$out" | grep -qE 'kubaos/wallpaper-set:shinjuku( |$)' &&
+    grep -E -- "^wallpaper sets[[:blank:]]" <<<"$out" | grep -qE 'kubaos/wallpaper-set:'; then
+    echo "ok   the wallpaper sets are Items, found by name and by 'wallpaper sets'"
+  else
+    echo "FAIL the wallpaper set Items aren't found: $out"
+    bad=1
+  fi
+
   # localed writes the file through a temporary one and a rename; the Items follow it.
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,de"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb.new"
   mv "$kb.new" "$kb"
@@ -1011,6 +1021,27 @@ c_wallpaper_sets() {
   got="$(grep -v '^#' "$sets" | tr '\n' ' ') / $(folders) / $(zrun 'dot-theme wallpapers' | grep -c "^shinjuku")"
   [[ $got == "cyberpunk japanese shinjuku  / cyberpunk japanese shinjuku yours  / 5" ]] &&
     echo "ok   all-sets: every set again, whole ($got)" || { echo "FAIL all-sets: $got"; bad=1; }
+
+  # The Command menu's set Items: hide-set and show-set rewrite the sets file, and the last set
+  # in the picker stays.
+  rm -f "$sets"
+  expect_ok "dot-theme hide-set japanese (no sets file)" zrun 'dot-theme hide-set japanese' || bad=1
+  got="$(grep -v '^#' "$sets" | tr '\n' ' ') / $(folders)"
+  [[ $got == "cyberpunk shinjuku  / cyberpunk shinjuku yours " ]] &&
+    echo "ok   hide-set without a sets file: every set but that one ($got)" || { echo "FAIL hide-set: $got"; bad=1; }
+  expect_ok "dot-theme hide-set cyberpunk" zrun 'dot-theme hide-set cyberpunk' || bad=1
+  zrun 'dot-theme hide-set shinjuku' >/dev/null 2>&1 && { echo "FAIL hide-set took the last set out of the picker"; bad=1; }
+  got="$(grep -v '^#' "$sets" | tr '\n' ' ')"
+  [[ $got == "shinjuku " ]] && echo "ok   hide-set refuses the last set in the picker" ||
+    { echo "FAIL hide-set on the last set: '$got'"; bad=1; }
+  printf 'shinjuku/train-neon-streak.jpg\n' | as_user tee "$sets" >/dev/null
+  zrun 'dot-theme hide-set shinjuku' >/dev/null 2>&1 && { echo "FAIL hide-set took the last pick out of the picker"; bad=1; }
+  expect_ok "dot-theme show-set shinjuku" zrun 'dot-theme show-set shinjuku' || bad=1
+  expect_ok "dot-theme show-set japanese" zrun 'dot-theme show-set japanese' || bad=1
+  got="$(grep -v '^#' "$sets" | tr '\n' ' ') / $(zrun 'dot-theme wallpapers' | grep -c "^shinjuku")"
+  [[ $got == "shinjuku japanese  / 5" ]] && echo "ok   show-set shows the whole set, its picks gone ($got)" ||
+    { echo "FAIL show-set: $got"; bad=1; }
+  zrun 'dot-theme show-set yours' >/dev/null 2>&1 && { echo "FAIL show-set takes yours as a set"; bad=1; }
 
   rm -f "$sets" "$own/mine.jpg"
   return "$bad"
