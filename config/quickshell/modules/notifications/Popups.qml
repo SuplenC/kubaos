@@ -70,11 +70,27 @@ Drawer {
             }
         }
 
+        // A card displaced mid-slide-in finishes the slide and the fade, or it stays faded and
+        // off to the side (see `components/NavList.qml`).
         displaced: Transition {
             Anim {
                 property: "y"
                 duration: Theme.anim.large
                 easing.bezierCurve: Theme.anim.spatial
+            }
+
+            Anim {
+                property: "x"
+                to: 0
+                duration: Theme.anim.large
+                easing.bezierCurve: Theme.anim.emphasizedDecel
+            }
+
+            Anim {
+                property: "opacity"
+                to: 1
+                duration: Theme.anim.small
+                easing.bezierCurve: Theme.anim.effects
             }
         }
 

@@ -46,16 +46,11 @@ ListView {
         }
     }
 
-    add: Transition {
-        Anim {
-            property: "opacity"
-            from: 0
-            to: 1
-            duration: Theme.anim.small
-            easing.bezierCurve: Theme.anim.effects
-        }
-    }
-
+    // HAZARD: no `add` transition on opacity; rows fade themselves in (ListRow, on `ListView.onAdd`).
+    // A model change that reaches a row mid-fade cancels the view's transition and leaves the
+    // opacity where the fade was. While a Wi-Fi scan re-sorts the list that strands rows
+    // near-invisible, as gaps.
+    // https://doc.qt.io/qt-6/qml-qtquick-viewtransition.html#handling-interrupted-animations
     displaced: Transition {
         Anim {
             property: "y"
