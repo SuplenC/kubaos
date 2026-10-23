@@ -48,6 +48,10 @@ QtObject {
     readonly property real footerHeight: px(36)
     readonly property real rowHeight: px(48)
     readonly property real iconSize: px(32)
+    // A row's icon and badge from its ends. The selection's corners curve in
+    // `rowRadius`; an icon at that distance sits on the curve and reads
+    // off-centre, so it stands a third further in.
+    readonly property real rowPad: px(Theme.spacing.lg)
     readonly property real smallRowHeight: px(36)
     readonly property real jobHeight: px(28)
     readonly property real fieldHeight: px(40)

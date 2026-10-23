@@ -38,7 +38,7 @@ PanelWindow {
     // The search under a name its children's own `search` properties don't
     // shadow.
     readonly property KotodamaSearch engine: search
-    readonly property string placeholder: "Search apps, projects, windows, or type a sum"
+    readonly property string placeholder: "Search apps, projects and windows. Sums work too"
 
     // Why the last Action failed, until the next Action or opening.
     property string failure: ""
