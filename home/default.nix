@@ -27,6 +27,10 @@
   };
 
   programs.home-manager.enable = true;
+  # home-manager's changelog of its own options, printed after every switch
+  # (kubaos update included). KubaOS pins home-manager and handles its changes,
+  # so the count only grows and means nothing to the user.
+  news.display = "silent";
 
   # Ubuntu, not NixOS: session vars, XDG_DATA_DIRS, GPU drivers (see desktop.nix).
   targets.genericLinux.enable = true;
