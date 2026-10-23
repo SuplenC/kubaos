@@ -27,6 +27,8 @@ FocusScope {
     property int enterDuration: Theme.anim.large
     property int exitDuration: Theme.anim.normal
     default property alias data: content.data
+    // Tooltips of the buttons inside open within this panel's edges.
+    readonly property bool keepsTooltips: true
 
     readonly property bool horizontal: edge === "top" || edge === "bottom"
     readonly property real span: horizontal ? contentWidth : contentHeight   // along the edge
