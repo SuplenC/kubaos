@@ -8,7 +8,9 @@
 #   --keep     leave the unpacked tree in volume kubaos-image-check-<arch>
 #
 # Writes <payload>/packages.txt (dpkg -l of the payload) and
-# <payload>/check.txt (this output).
+# <payload>/check.txt (this output). A pass also writes <payload>/check.ok,
+# the sha256 of the manifest it passed; install/iso/build refuses a payload
+# without a matching one.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -40,10 +42,12 @@ VOLUME="kubaos-image-check-$ARCH"
 
 docker buildx build -q --platform "linux/$DARCH" -f "$HERE/Dockerfile" --target tools -t "$TOOLS" --load "$ROOT" >/dev/null
 docker rm -f "kubaos-image-check-$ARCH" >/dev/null 2>&1 || true
+rm -f "$PAYLOAD/check.ok"
 rc=0
 docker run --rm --name "kubaos-image-check-$ARCH" --platform "linux/$DARCH" --privileged \
   --cpus 6 --memory 8g \
   -v "$VOLUME:/check" -v "$PAYLOAD:/payload" -v "$HERE/lib:/lib-image:ro" \
   -e KEEP="$KEEP" "$TOOLS" /lib-image/check-inside.sh 2>&1 | tee "$PAYLOAD/check.txt" || rc=$?
 ((KEEP)) || docker volume rm "$VOLUME" >/dev/null 2>&1 || true
+((rc)) || shasum -a 256 "$PAYLOAD/manifest.json" | cut -d' ' -f1 >"$PAYLOAD/check.ok"
 exit "$rc"

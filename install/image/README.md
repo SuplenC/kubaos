@@ -5,7 +5,7 @@
 ```sh
 install/image/build                       # aarch64, host vm -> install/out/payload-aarch64/
 install/image/build --arch x86_64         # host tuxedo, amd64 under Rosetta -> install/out/payload-x86_64/
-install/image/check [--arch x86_64]       # unpack + chroot checks; writes check.txt, packages.txt
+install/image/check [--arch x86_64]       # unpack + chroot checks; writes check.txt, packages.txt, and check.ok on a pass
 ```
 
 `build` refuses a dirty worktree unless you pass `--allow-dirty`. With it, the flake is built from the working tree (tracked plus untracked, not ignored), the commit gets a `-dirty` suffix, and the shipped checkout has the working tree laid over `HEAD`. Release payloads come from a clean tree.
@@ -17,6 +17,7 @@ install/image/check [--arch x86_64]       # unpack + chroot checks; writes check
 | `manifest.json` | `Manifest`. `version` and `codename` are the KubaOS release, `0.1.0` and Shinjuku, from `VERSION` and `CODENAME` in the tree being built (`--allow-dirty` reads the working tree's). The build id (`<UTC date>-<commit 12>[-dirty]`) is in `image.json`. The payload carries no git identity: the user enters it on the Git screen. `kernel` is the `uname -r` of the one installed kernel. `installed_bytes` is the apparent size of the unpacked tree, which is also what unpack progress should count |
 | `kubaos-shinjuku-<arch>.squashfs` | The root tree, squashfs with zstd (level 15, 1 MiB blocks), xattrs on |
 | `check.txt`, `packages.txt` | Written by `check`, not used by the engine |
+| `check.ok` | Written by `check` when every check passes: the sha256 of the `manifest.json` it checked. `install/iso/build` refuses a payload without a matching one |
 
 The tree is Ubuntu 26.04 after `system/10-strip.sh`, `20-base.sh`, `25-boot.sh`, `40-apps.sh`, `50-hyprland.sh`, `60-nix.sh`, `65-recorder.sh`, `70-bitwarden.sh` and `75-yubikey.sh`, plus what the Server installer would have put there first. That covers `ubuntu-minimal`, systemd, `linux-generic`, initramfs-tools, cryptsetup(-initramfs), btrfs-progs, dosfstools, e2fsprogs, GRUB EFI (plain and signed), shim-signed, efibootmgr, os-prober, locales, tzdata, keyboard-configuration, console-setup and openssh-server. `/nix` is a minimal store holding:
 

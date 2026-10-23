@@ -89,7 +89,7 @@ The largest items are `linux-modules` (275 MB), Mesa (LLVM 128 MB, gallium 48 MB
 
 ## Booting it in UTM yourself
 
-1. Build the payload and an ISO that carries it: `install/image/build`, then `install/iso/build --profile vm --payload "$PWD/install/out/payload-aarch64"`. Without `--payload` the ISO has the stub, and Kōbō refuses to install.
+1. Build the payload, check it and build an ISO that carries it: `install/image/build`, `install/image/check`, then `install/iso/build --profile vm --payload "$PWD/install/out/payload-aarch64"` (or `just iso aarch64 vm`, which does all three). `install/iso/build` refuses a payload that hasn't passed the check. Without `--payload` the ISO has the stub, and Kōbō refuses to install.
 2. In UTM: **+ → Virtualize → Linux**. Under "Boot ISO Image", **Browse…** and pick `iso/kubaos-shinjuku-0.1.0-aarch64-vm.iso`. Leave "Use Apple Virtualization" **off**, so it uses QEMU.
 3. Hardware: 8 GB RAM and 4 cores (4 GB installs fine, but the desktop renders on the CPU and wants the room). Storage: 64 GB or more. Turn shared directory off. Save.
 4. Before the first start, open the VM's settings:
