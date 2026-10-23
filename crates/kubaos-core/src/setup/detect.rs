@@ -9,6 +9,9 @@ const SECURE_BOOT_VAR: &str =
     "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c";
 /// Where DKMS keeps its signing certificate (Ubuntu's shim-signed path first).
 pub const MOK_KEYS: [&str; 2] = ["/var/lib/shim-signed/mok/MOK.der", "/var/lib/dkms/mok.pub"];
+/// shim's enrollment request, which `mokutil --import` writes for MokManager to show on the next boot.
+pub const MOK_NEW_VAR: &str =
+    "/sys/firmware/efi/efivars/MokNew-605dab50-e046-4300-abb6-3dd810dd8b23";
 
 pub fn status(sys: &mut dyn Sys, env: &Env) -> Status {
     let online = online(sys);
@@ -163,9 +166,17 @@ fn mok_state(sys: &mut dyn Sys) -> MokState {
     };
     // Exits 1 for "enrolled" too; read the words, both streams.
     let cmd = Cmd::new("sh").args(["-c", "mokutil --test-key \"$1\" 2>&1; true", "sh", key]);
-    match sys.run(&cmd) {
+    let state = match sys.run(&cmd) {
         Ok(o) => parse_mok(&o.stdout),
         Err(_) => MokState::Unknown,
+    };
+    // HAZARD: mokutil writes MokNew mode 0600, so as the user `--test-key` can't read the request
+    // and says "is not enrolled" for a key root just queued. Only the variable's presence is
+    // visible; trusting mokutil alone asks for the password again forever.
+    if state == MokState::NotEnrolled && sys.exists(MOK_NEW_VAR) {
+        MokState::Pending
+    } else {
+        state
     }
 }
 
@@ -577,6 +588,30 @@ mod tests {
             .file("/sys/class/dmi/id/board_vendor", "TUXEDO\n")
             .ok("dpkg --print-architecture", "arm64\n");
         assert_eq!(tuxedo(&mut s).state, State::Absent);
+    }
+
+    #[test]
+    fn a_key_root_queued_shows_as_reboot_although_the_user_cannot_read_the_request() {
+        let mut s = tuxedo_box()
+            .file(SECURE_BOOT_VAR, "\u{6}\0\0\0\u{1}")
+            .file("/var/lib/shim-signed/mok/MOK.der", "cert")
+            .file(MOK_NEW_VAR, "")
+            .ok("dpkg-query", "install ok installed")
+            .ok(
+                "sh -c mokutil",
+                "/var/lib/shim-signed/mok/MOK.der is not enrolled\n",
+            );
+
+        let c = tuxedo(&mut s);
+
+        assert_eq!(c.state, State::Reboot, "{}", c.summary);
+        assert!(matches!(
+            c.facts,
+            Facts::Tuxedo {
+                mok: Some(MokState::Pending),
+                ..
+            }
+        ));
     }
 
     #[test]

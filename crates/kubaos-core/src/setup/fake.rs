@@ -16,6 +16,8 @@ pub struct FakeSys {
     pub stdin: Vec<Option<String>>,
     pub env: Vec<Vec<(String, String)>>,
     pub online_fallback: bool,
+    /// (prefix of the command line, path): running the command leaves that file behind.
+    pub creates: Vec<(String, String)>,
 }
 
 impl FakeSys {
@@ -38,6 +40,11 @@ impl FakeSys {
         self
     }
 
+    pub fn creates(mut self, prefix: &str, path: &str) -> Self {
+        self.creates.push((prefix.into(), path.into()));
+        self
+    }
+
     fn line(cmd: &Cmd) -> String {
         std::iter::once(cmd.program.clone())
             .chain(cmd.args.iter().cloned())
@@ -50,6 +57,13 @@ impl FakeSys {
         self.ran.push(line.clone());
         self.stdin.push(cmd.stdin.as_ref().map(|s| s.0.clone()));
         self.env.push(cmd.env.clone());
+        for (_, path) in self
+            .creates
+            .iter()
+            .filter(|(p, _)| line.starts_with(p.as_str()))
+        {
+            self.files.insert(path.clone(), String::new());
+        }
         match self
             .responses
             .iter()

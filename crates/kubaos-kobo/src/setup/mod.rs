@@ -683,6 +683,21 @@ impl Setup {
                 run.prompt_at = now;
             }
             SetupEvent::Log { level, line, .. } => run.log.push((level, line)),
+            // A run that left its card still to do didn't work, whatever it exited with:
+            // showing "Done." over a cleared form would ask for the same thing again in silence.
+            SetupEvent::Finished { status, .. } if status.state == State::Needed => {
+                run.outcome = Some(Outcome::Failed {
+                    error: "it ran, but this still isn't done".into(),
+                    hint: Some(format!("{} The log has what it said.", status.summary)),
+                });
+                run.prompt = None;
+                if let Some(st) = &mut self.status
+                    && let Some(c) = st.cards.iter_mut().find(|c| c.id == status.id)
+                {
+                    *c = status;
+                }
+                self.log_open = true;
+            }
             SetupEvent::Finished { status, .. } => {
                 run.outcome = Some(Outcome::Done(status.summary.clone()));
                 run.prompt = None;
