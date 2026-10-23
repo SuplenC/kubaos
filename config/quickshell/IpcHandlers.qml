@@ -12,6 +12,11 @@ Scope {
         function toggle(): void {
             Panels.toggle("controlcenter");
         }
+
+        // The Bluetooth tab, searching for devices to pair.
+        function bluetooth(): void {
+            Bt.show(true);
+        }
     }
 
     IpcHandler {

@@ -35,6 +35,15 @@ Drawer {
         }
     }
 
+    // A pairing prompt, or "Pair a Bluetooth device" from the Command menu.
+    Connections {
+        target: Bt
+
+        function onReveal() {
+            root.tab = 1;
+        }
+    }
+
     SystemClock {
         id: clock
 

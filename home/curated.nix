@@ -39,6 +39,10 @@ rec {
   # The file manager's glue: the folder handler and "Show in folder"
   # (home/files.nix).
   kubaos-files = pkgs.callPackage ../crates/kubaos-files/package.nix { inherit cargoOutputHashes; };
+  # The Bluetooth pairing agent the shell pairs through (home/bluetooth.nix).
+  kubaos-bluetooth = pkgs.callPackage ../crates/kubaos-bluetooth/package.nix {
+    inherit cargoOutputHashes;
+  };
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (

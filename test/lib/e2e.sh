@@ -75,7 +75,7 @@ c_path() {
 # exists on arm64, resolved in a login shell, with its owner checked.
 NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv eza bat fd rg delta dust dysk
   btop jq yq xh tldr just glow gh fastfetch lazydocker bacon cargo-nextest hyperfine sccache wild
-  oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files ripdrag)
+  oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth ripdrag)
 APT_TOOLS=(foot fuzzel wl-copy grim slurp playerctl socat qalc notify-send brightnessctl clang mold
   java unzip git ssh secret-tool pamtester pamu2fcfg nmcli wpctl snapper fprintd-verify boltctl
   powerprofilesctl ddcutil xdg-open hyprlock hypridle)
@@ -1527,6 +1527,63 @@ c_files() {
   return "$bad"
 }
 
+# The Bluetooth pairing agent (home/bluetooth.nix, crates/kubaos-bluetooth),
+# started as its user unit would be, against the container's system bus,
+# where no bluetoothd runs: it takes its name on the session bus, writes the
+# state file the shell watches, and turns down what the shell can't ask of
+# it. Pairing a device needs an adapter, so that is checked on the laptop.
+c_bluetooth() {
+  local bad=0 out i rc
+  local bin="$USER_HOME/.nix-profile/bin/kubaos-bluetooth" state="$RUNTIME_DIR/kubaos-bluetooth.json"
+  local unit="$USER_HOME/.config/systemd/user/kubaos-bluetooth.service"
+
+  if grep -qE '^ExecStart=.*/bin/kubaos-bluetooth agent$' "$unit" 2>/dev/null; then
+    echo "ok   the user unit runs kubaos-bluetooth agent"
+  else
+    echo "FAIL $unit doesn't run kubaos-bluetooth agent"
+    bad=1
+  fi
+  [[ -x $bin ]] || { echo "FAIL the switch left no $bin"; return 1; }
+
+  out="$(as_user "$bin" pair /org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF 2>&1)" &&
+    { echo "FAIL pair succeeded with no agent running"; bad=1; }
+  if [[ $out == "The pairing agent isn't running"* ]]; then
+    echo "ok   with no agent, pair says so in one line"
+  else
+    echo "FAIL pair with no agent printed: $out"
+    bad=1
+  fi
+
+  rm -f "$state"
+  as_user "$bin" agent >"$LOGS/bluetooth-agent.log" 2>&1 &
+  for i in $(seq 50); do
+    [[ -s $state ]] && break
+    sleep 0.1
+  done
+  if [[ $(cat "$state" 2>/dev/null) == '{"agent":false,"prompt":null,"pairing":[],"errors":{}}' ]]; then
+    echo "ok   the agent writes its state, unregistered with no bluetoothd (${i}00 ms)"
+  else
+    echo "FAIL the agent wrote no state to $state:"
+    cat "$state" "$LOGS/bluetooth-agent.log" 2>/dev/null
+    bad=1
+  fi
+
+  out="$(as_user "$bin" answer 1 yes 2>&1)" && { echo "FAIL answering no prompt succeeded"; bad=1; }
+  [[ $out == "There's no prompt 1 to answer"* ]] || { echo "FAIL answer with no prompt printed: $out"; bad=1; }
+  out="$(as_user "$bin" pair /org/freedesktop/DBus 2>&1)" && { echo "FAIL pairing a non-BlueZ object succeeded"; bad=1; }
+  [[ $out == *"isn't a Bluetooth adapter or device" ]] || { echo "FAIL pair on a non-BlueZ object printed: $out"; bad=1; }
+  out="$(as_user "$bin" scan on /org/bluez/hci0 2>&1)" && { echo "FAIL scanning with no bluetoothd succeeded"; bad=1; }
+  [[ $out == "Couldn't scan"* ]] || { echo "FAIL scan with no bluetoothd printed: $out"; bad=1; }
+  rc=0
+  as_user "$bin" scan maybe /org/bluez/hci0 >/dev/null 2>&1 || rc=$?
+  ((rc == 2)) || { echo "FAIL a usage error exits $rc, not 2"; bad=1; }
+  ((bad)) || echo "ok   the agent turns down a stale answer, a foreign object and a scan bluetoothd can't take"
+
+  pkill -u "$USER_NAME" -f 'kubaos-bluetooth agent' || true
+  rm -f "$state"
+  return "$bad"
+}
+
 c_user_layer() {
   zrun "'$REPO/test/user-layer-check' '$REPO'"
 }
@@ -1602,9 +1659,9 @@ c_update_edge() {
   # A new kubaos, told apart by its version.
   as_user sed -i 's/^version = "0.1.0"$/version = "0.1.0-harness"/' "$UPD_WORK/Cargo.toml"
   as_user awk -v v='version = "0.1.0-harness"' \
-    'prev ~ /^name = "(kubaos-core|kubaos-cli|kubaos-cursor|kubaos-kobo|kotodama-kubaos|kubaos-files)"$/ && /^version = / { $0 = v } { print; prev = $0 }' \
+    'prev ~ /^name = "(kubaos-core|kubaos-cli|kubaos-cursor|kubaos-kobo|kotodama-kubaos|kubaos-files|kubaos-bluetooth)"$/ && /^version = / { $0 = v } { print; prev = $0 }' \
     "$UPD_WORK/Cargo.lock" | as_user tee "$UPD_WORK/Cargo.lock.new" >/dev/null && as_user mv "$UPD_WORK/Cargo.lock.new" "$UPD_WORK/Cargo.lock"
-  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 6 ]] ||
+  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 7 ]] ||
     { echo "FAIL bumping the workspace's version in Cargo.lock"; return 1; }
   work add migrations Cargo.toml Cargo.lock && work commit -q -m 'test: a new kubaos, a system and a user migration' &&
     work push -q origin HEAD:main ||
@@ -1726,7 +1783,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos files recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos files bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
