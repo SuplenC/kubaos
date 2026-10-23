@@ -45,6 +45,9 @@ pub enum SF {
     Code,
     ClientId,
     ClientSecret,
+    /// The vault's folders, one ticked or not under a cursor.
+    Folders,
+    LogOut,
     GitName,
     GitEmail,
     ShowSecrets,
@@ -87,6 +90,8 @@ pub enum Msg {
     /// A click or drag in a text field.
     Pointer(SF, Pointer),
     Pick(CardId),
+    /// A click on one of the vault's folders.
+    Folder(String),
     CloseRequested,
 }
 
@@ -129,6 +134,10 @@ pub struct Form {
     pub code: String,
     pub client_id: String,
     pub client_secret: String,
+    /// The folders SSH keys come from; none for the whole vault.
+    pub folders: Vec<String>,
+    /// Which of the vault's folders the cursor is on.
+    pub folder_at: usize,
     pub git_name: String,
     pub git_email: String,
     prefilled: bool,
@@ -141,6 +150,7 @@ pub enum Act {
     Reboot,
     Terminal,
     Recheck,
+    LogOut,
 }
 
 #[derive(Debug, Clone)]
@@ -159,6 +169,8 @@ pub struct Run {
     pub prompt_at: Instant,
     pub log: Vec<(Level, String)>,
     pub outcome: Option<Outcome>,
+    /// A log out, which leaves its card to do on purpose.
+    pub logout: bool,
 }
 
 impl Run {
@@ -194,12 +206,19 @@ pub struct Setup {
     pub window: Option<window::Id>,
     pub size: Size,
     pub tour: Option<tour::Tour>,
+    /// The card to open on, instead of the first that wants something.
+    pub start: Option<CardId>,
 }
 
 impl Setup {
-    pub fn new(backend: Arc<dyn SetupBackend>, tour: Option<tour::Tour>) -> (Self, Task<Message>) {
+    pub fn new(
+        backend: Arc<dyn SetupBackend>,
+        tour: Option<tour::Tour>,
+        start: Option<CardId>,
+    ) -> (Self, Task<Message>) {
         let mut s = Self::headless(backend);
         s.tour = tour;
+        s.start = start;
         (s, window::oldest().map(Message::Window))
     }
 
@@ -228,6 +247,7 @@ impl Setup {
             window: None,
             size: Size::new(1280.0, 800.0),
             tour: None,
+            start: None,
         };
         s.detect();
         s
@@ -308,6 +328,31 @@ impl Setup {
         }
     }
 
+    /// The vault's folders a person can tick for SSH keys. The `env/` ones hold project
+    /// variables, never SSH keys, so ticking one would only empty the keys.
+    pub fn bw_folders(&self) -> Vec<&str> {
+        match self.card(CardId::Bitwarden).map(|c| &c.facts) {
+            Some(Facts::Bitwarden { overview, .. }) => overview
+                .folders
+                .iter()
+                .map(String::as_str)
+                .filter(|f| !f.starts_with("env/"))
+                .collect(),
+            _ => vec![],
+        }
+    }
+
+    /// Ticks or unticks a folder; none ticked is the whole vault.
+    fn toggle_folder(&mut self, name: &str) {
+        let f = &mut self.form.folders;
+        match f.iter().position(|x| x == name) {
+            Some(i) => {
+                f.remove(i);
+            }
+            None => f.push(name.to_string()),
+        }
+    }
+
     pub fn bw_logged_in(&self) -> bool {
         matches!(
             self.card(CardId::Bitwarden).map(|c| &c.facts),
@@ -380,7 +425,16 @@ impl Setup {
         };
         match (c.id, c.state) {
             (CardId::Tuxedo, State::Needed) if self.wants_mok() => vec![SF::Mok, SF::MokAgain],
-            (CardId::Bitwarden, State::Needed) if self.bw_logged_in() => vec![SF::Password],
+            (CardId::Bitwarden, State::Needed | State::Done)
+                if self.bw_logged_in() || c.state == State::Done =>
+            {
+                let mut v = vec![];
+                if !self.bw_folders().is_empty() {
+                    v.push(SF::Folders);
+                }
+                v.push(SF::Password);
+                v
+            }
             (CardId::Bitwarden, State::Needed) => {
                 let mut v = vec![SF::Server];
                 if self.form.server == Server::Custom {
@@ -393,7 +447,6 @@ impl Setup {
                 }
                 v
             }
-            (CardId::Bitwarden, State::Done) => vec![SF::Password],
             (CardId::Git, State::Needed | State::Done) => vec![SF::GitName, SF::GitEmail],
             _ => vec![],
         }
@@ -418,6 +471,9 @@ impl Setup {
         if self.secondary().is_some() {
             v.push(SF::Secondary);
         }
+        if self.can_log_out() {
+            v.push(SF::LogOut);
+        }
         if self.status.is_some() {
             v.push(SF::Skip);
         }
@@ -429,6 +485,11 @@ impl Setup {
         }
         v.push(SF::Finish);
         v
+    }
+
+    /// A logged-in Bitwarden card offers to log out, for another account or server.
+    pub fn can_log_out(&self) -> bool {
+        self.sel == CardId::Bitwarden && self.bw_logged_in()
     }
 
     /// Why the selected card's Run can't start yet.
@@ -482,6 +543,9 @@ impl Setup {
             CardId::Tuxedo if self.wants_mok() => i.mok_password = Some(f.mok.clone()),
             CardId::Fingerprint => i.finger = Some(self.next_finger().to_string()),
             CardId::Bitwarden => {
+                if !self.bw_folders().is_empty() {
+                    i.bw_folders = Some(f.folders.clone());
+                }
                 i.bw = Some(BwLogin {
                     server: match f.server {
                         Server::Com => "com".into(),
@@ -507,7 +571,7 @@ impl Setup {
         i
     }
 
-    /// Email and server from what's on the machine (bw, dot-bw-setup's
+    /// Email, server and folders from what's on the machine (bw, the bitwarden
     /// config), and git's name and email (or the account's full name), once.
     fn prefill(&mut self) {
         if self.form.prefilled {
@@ -523,9 +587,14 @@ impl Setup {
             self.form.git_name = name.or(full_name).unwrap_or_default();
             self.form.git_email = email.unwrap_or_default();
         }
-        if let Some(Facts::Bitwarden { email, server, .. }) =
-            self.card(CardId::Bitwarden).map(|c| c.facts.clone())
+        if let Some(Facts::Bitwarden {
+            email,
+            server,
+            folders,
+            ..
+        }) = self.card(CardId::Bitwarden).map(|c| c.facts.clone())
         {
+            self.form.folders = folders;
             if let Some(e) = email {
                 self.form.email = e;
             }
@@ -631,6 +700,14 @@ impl Setup {
                     self.activate(f)
                 }
             }
+            Message::Setup(Msg::Folder(name)) => {
+                self.set_focus(Some(SF::Folders));
+                if let Some(i) = self.bw_folders().iter().position(|f| *f == name) {
+                    self.form.folder_at = i;
+                }
+                self.toggle_folder(&name);
+                Task::none()
+            }
             Message::Setup(Msg::Pick(id)) => {
                 self.set_focus(Some(SF::Cards));
                 self.select(id);
@@ -658,13 +735,14 @@ impl Setup {
             self.status = Some(st);
             self.prefill();
             if first {
-                // Start on the first card that wants something.
-                if let Some(c) = self
-                    .status
-                    .as_ref()
-                    .and_then(|s| s.cards.iter().find(|c| c.state.open()))
-                {
-                    self.sel = c.id;
+                // Start on the card asked for, else the first that wants something.
+                if let Some(c) = self.start.or_else(|| {
+                    self.status
+                        .as_ref()
+                        .and_then(|s| s.cards.iter().find(|c| c.state.open()))
+                        .map(|c| c.id)
+                }) {
+                    self.sel = c;
                 }
                 self.changed = now;
             }
@@ -709,6 +787,20 @@ impl Setup {
                 run.prompt_at = now;
             }
             SetupEvent::Log { level, line, .. } => run.log.push((level, line)),
+            // Logged out: the card is to do again on purpose, with the login form back.
+            SetupEvent::Finished { status, .. } if run.logout => {
+                run.outcome = Some(Outcome::Done(
+                    "Logged out. Log in again, to this server or another.".into(),
+                ));
+                run.prompt = None;
+                if let Some(st) = &mut self.status
+                    && let Some(c) = st.cards.iter_mut().find(|c| c.id == status.id)
+                {
+                    *c = status;
+                }
+                self.form.password.clear();
+                self.set_focus(Some(SF::Cards));
+            }
             // A run that left its card still to do didn't work, whatever it exited with:
             // showing "Done." over a cleared form would ask for the same thing again in silence.
             SetupEvent::Finished { status, .. } if status.state == State::Needed => {
@@ -731,6 +823,9 @@ impl Setup {
                     && let Some(c) = st.cards.iter_mut().find(|c| c.id == status.id)
                 {
                     *c = status;
+                }
+                if let Some(Facts::Bitwarden { folders, .. }) = self.card(CardId::Bitwarden).map(|c| &c.facts) {
+                    self.form.folders = folders.clone();
                 }
                 // Spent: never keep a secret longer than its run.
                 let f = &mut self.form;
@@ -764,8 +859,25 @@ impl Setup {
             self.flash = Some(Instant::now());
             return Task::none();
         }
-        let card = self.sel;
         let inputs = self.inputs();
+        self.spawn(inputs, false)
+    }
+
+    /// Logs out of Bitwarden: no form needed, the session goes with it.
+    fn log_out(&mut self) -> Task<Message> {
+        if self.running() {
+            self.flash = Some(Instant::now());
+            return Task::none();
+        }
+        let inputs = Inputs {
+            bw_logout: true,
+            ..Inputs::default()
+        };
+        self.spawn(inputs, true)
+    }
+
+    fn spawn(&mut self, inputs: Inputs, logout: bool) -> Task<Message> {
+        let card = self.sel;
         let (tx, rx) = mpsc::channel();
         let b = self.backend.clone();
         std::thread::spawn(move || {
@@ -780,6 +892,7 @@ impl Setup {
             prompt_at: Instant::now(),
             log: vec![],
             outcome: None,
+            logout,
         });
         self.log_open = false;
         self.now = Instant::now();
@@ -789,6 +902,7 @@ impl Setup {
     fn act(&mut self, a: Act) -> Task<Message> {
         match a {
             Act::Run => self.start(),
+            Act::LogOut => self.log_out(),
             Act::Recheck => {
                 if !self.detecting() && !self.running() {
                     self.detect();
@@ -915,9 +1029,24 @@ impl Setup {
                 self.log_open = !self.log_open;
                 Task::none()
             }
+            SF::LogOut => self.act(Act::LogOut),
+            SF::Folders => {
+                if let Some(name) = self.bw_folders().get(self.form.folder_at).map(|f| f.to_string()) {
+                    self.toggle_folder(&name);
+                }
+                Task::none()
+            }
             SF::RebootAll => self.act(Act::Reboot),
             SF::Finish => self.finish(),
             _ => Task::none(),
+        }
+    }
+
+    fn move_folder(&mut self, d: i32) {
+        let n = self.bw_folders().len();
+        if n > 0 {
+            let i = self.form.folder_at as i32 + d;
+            self.form.folder_at = i.clamp(0, n as i32 - 1) as usize;
         }
     }
 
@@ -997,6 +1126,11 @@ impl Setup {
                             self.set_focus(Some(SF::Primary));
                             return self.activate(SF::Primary);
                         }
+                        // A done card's button is its second one: Pull again.
+                        None if self.secondary().is_some() => {
+                            self.set_focus(Some(SF::Secondary));
+                            return self.activate(SF::Secondary);
+                        }
                         None => {}
                     }
                     Task::none()
@@ -1063,6 +1197,7 @@ impl Setup {
                     match focus {
                         Some(SF::Server) => self.cycle_server(d),
                         Some(SF::Method) => self.cycle_method(d),
+                        Some(SF::Folders) => self.move_folder(d),
                         _ => {}
                     }
                 }
