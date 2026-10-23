@@ -58,7 +58,7 @@ GridLayout {
         Layout.columnSpan: 2
         icon: Motion.mode === "never" ? "motion_photos_off" : Motion.mode === "always" ? "motion_photos_on" : "motion_photos_auto"
         title: "Wallpaper motion"
-        subtitle: Motion.mode === "never" ? "Never. Posters only" : Motion.mode === "always" ? "Always. Battery be damned" : Motion.onBattery ? "On AC. Paused, you're on battery" : "On AC. Plugged in, so it moves"
+        subtitle: Motion.mode === "never" ? "Never. Posters only" : Motion.mode === "always" ? "Always. Battery be damned" : Motion.onBattery ? "Only on AC. Paused, you're on battery" : "Only on AC. Plugged in, so it moves"
         checked: Motion.mode !== "never"
         onClicked: Motion.cycle()
     }

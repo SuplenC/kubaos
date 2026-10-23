@@ -2,7 +2,7 @@
 # installs this directory as `share/kotodama/extensions/kubaos/`, with the
 # `kotodama-kubaos` binary next to this file.
 name = "kubaos"
-description = "KubaOS's actions (wallpaper and theme, screenshots and recording, the shell's panels, security keys), the system toggles (Wi-Fi, Bluetooth, audio, brightness, power profiles) and the keyboard layouts"
+description = "Wallpapers, screenshots, panels, Wi-Fi, sound and keyboard layouts. Every knob I've got"
 command = ["./kotodama-kubaos"]
 word = "kubaos"
 title = "KubaOS"
