@@ -165,11 +165,12 @@ sed -e "s/@SERIAL@/$SERIAL/g" -e "s/@VERSION@/$version/g" -e "s/@RELEASE@/$KUBAO
 if [[ -d /branding/iso ]]; then say "branding: ISO overlay"; cp -a /branding/iso/. "$W/iso/"; fi
 if [[ -f /branding/hook.sh ]]; then say "branding: hook.sh"; bash /branding/hook.sh "$R" "$W/iso"; fi
 
-# payload: on the ISO next to the squashfs, bind-mounted at /run/kubaos/payload
+# payload: on the ISO next to the squashfs, bind-mounted at /run/kubaos/payload.
+# xorriso grafts it from /payload, so its gigabytes aren't copied first.
+payload_graft=()
 if [[ -n "$(ls -A /payload 2>/dev/null)" ]]; then
   say "payload: $(du -sh /payload | cut -f1)"
-  mkdir -p "$W/iso/kubaos"
-  cp -a /payload "$W/iso/kubaos/payload"
+  payload_graft=(/kubaos/payload=/payload)
 fi
 
 # ---- squashfs ------------------------------------------------------------
@@ -200,7 +201,8 @@ xorriso -as mkisofs -quiet \
   -partition_offset 16 \
   -append_partition 2 0xef "$esp" -appended_part_as_gpt \
   -e --interval:appended_partition_2:all:: -no-emul-boot \
-  -o "$iso.tmp" "$W/iso"
+  -graft-points \
+  -o "$iso.tmp" "$W/iso" ${payload_graft[@]+"${payload_graft[@]}"}
 mv "$iso.tmp" "$iso"
 (cd /out && sha256sum "$NAME.iso" >"$NAME.iso.sha256")
 {
