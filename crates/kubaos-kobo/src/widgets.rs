@@ -183,6 +183,87 @@ pub fn ring<'a>(
         .into()
 }
 
+/// How far the focus halo sits outside a card, in px.
+pub const HALO: f32 = 4.0;
+
+/// Keyboard focus around a card: a tertiary ring [`HALO`] px outside it. Amber means picked on
+/// the same cards, so focus never borrows it. The padding is there unfocused too, so moving
+/// focus never shifts the layout.
+pub fn halo<'a>(
+    content: impl Into<Element<'a, Message>>,
+    focused: bool,
+    r: f32,
+    p: &Palette,
+) -> Element<'a, Message> {
+    let c = if focused { p.tertiary } else { Color::TRANSPARENT };
+    container(content)
+        .padding(HALO)
+        .style(move |_t| container::Style {
+            border: Border {
+                color: c,
+                width: 2.0,
+                radius: (r + HALO).into(),
+            },
+            ..container::Style::default()
+        })
+        .into()
+}
+
+/// How much of something is picked, for its check badge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tick {
+    Empty,
+    Partial,
+    Full,
+}
+
+impl Tick {
+    /// `picked` out of `total`. An empty set reads as unpicked, not as fully picked.
+    pub fn of(picked: u32, total: u32) -> Self {
+        match picked {
+            0 => Tick::Empty,
+            n if n >= total => Tick::Full,
+            _ => Tick::Partial,
+        }
+    }
+}
+
+/// A round check badge `px` across: filled amber with a tick when full, amber-rimmed with a
+/// dash when partial, an empty `rim` ring on `fill` when empty.
+pub fn check_badge<'a>(tick: Tick, px: f32, rim: Color, fill: Color, p: &Palette) -> Element<'a, Message> {
+    let pp = *p;
+    let mark: Element<'a, Message> = match tick {
+        Tick::Full => icon(Icon::Check, px * 0.72, p.on_primary).into(),
+        Tick::Partial => container(Space::new())
+            .width(px * 0.46)
+            .height(2)
+            .style(move |_t| container::Style {
+                background: Some(Background::Color(pp.primary)),
+                border: Border::default().rounded(1),
+                ..container::Style::default()
+            })
+            .into(),
+        Tick::Empty => Space::new().into(),
+    };
+    let (bg, border) = match tick {
+        Tick::Full => (p.primary, p.primary),
+        Tick::Partial => (alpha(p.primary, 0.18), p.primary),
+        Tick::Empty => (fill, rim),
+    };
+    container(mark)
+        .center(px)
+        .style(move |_t| container::Style {
+            background: Some(Background::Color(bg)),
+            border: Border {
+                color: border,
+                width: 2.0,
+                radius: radius::FULL.into(),
+            },
+            ..container::Style::default()
+        })
+        .into()
+}
+
 /// A round icon-only button.
 #[allow(dead_code)] // for the first-boot setup screens
 pub fn icon_btn<'a>(
@@ -921,6 +1002,14 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_set_reads_full_partial_or_empty_from_its_picks() {
+        assert_eq!(Tick::of(0, 5), Tick::Empty);
+        assert_eq!(Tick::of(3, 5), Tick::Partial);
+        assert_eq!(Tick::of(5, 5), Tick::Full);
+        assert_eq!(Tick::of(0, 0), Tick::Empty);
     }
 
     /// Text fields are one line tall however tall their row is, and as wide
