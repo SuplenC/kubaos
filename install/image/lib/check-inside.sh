@@ -207,8 +207,8 @@ else
   fail "mkinitramfs: $(tail -5 /tmp/mkinitramfs.log)"
 fi
 d="$(in_root dpkg-divert --list /etc/grub.d/10_linux)"
-[[ "$d" == *"/usr/share/kubaos/grub/10_linux.ubuntu"* ]] && ok "10_linux diverted: $d" || fail "/etc/grub.d/10_linux not diverted ($d)"
-check "  Ubuntu's 10_linux at the diverted path" test -x "$R/usr/share/kubaos/grub/10_linux.ubuntu"
+[[ "$d" == *"/usr/lib/kubaos/grub/10_linux.ubuntu"* ]] && ok "10_linux diverted: $d" || fail "/etc/grub.d/10_linux not diverted ($d)"
+check "  Ubuntu's 10_linux at the diverted path" test -x "$R/usr/lib/kubaos/grub/10_linux.ubuntu"
 grep -q 'KubaOS' "$R/etc/grub.d/10_linux" && ok "  /etc/grub.d/10_linux is the KubaOS wrapper" || fail "  /etc/grub.d/10_linux isn't the wrapper"
 g="$R/etc/default/grub.d/10-kubaos.cfg"
 for kv in 'GRUB_TIMEOUT_STYLE=hidden' 'GRUB_TIMEOUT=1' 'GRUB_RECORDFAIL_TIMEOUT=10' \

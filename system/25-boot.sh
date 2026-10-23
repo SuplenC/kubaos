@@ -32,7 +32,9 @@ require_sudo
 
 PLY_THEME_DIR=/usr/share/plymouth/themes/kubaos
 GRUB_THEME_DIR=/boot/grub/themes/kubaos
-DIVERTED_10_LINUX=/usr/share/kubaos/grub/10_linux.ubuntu
+# Not under /usr/share/kubaos: the payload build and the updater replace that
+# checkout whole, and the wrapper fails without the script.
+DIVERTED_10_LINUX=/usr/lib/kubaos/grub/10_linux.ubuntu
 
 # install_dir SRC DEST: install_root_file for every file directly in SRC.
 install_dir() {
@@ -81,8 +83,19 @@ step "GRUB: entries named after os-release (10_linux wrapper, packaged script di
 # 10_linux appends "GNU/Linux" to any distributor but Ubuntu. Divert Ubuntu's
 # script out of /etc/grub.d (grub-mkconfig runs everything executable there)
 # and put a wrapper in its place; grub upgrades update the diverted copy.
-if dpkg-divert --list /etc/grub.d/10_linux | grep -qF "$DIVERTED_10_LINUX"; then
+divert="$(dpkg-divert --truename /etc/grub.d/10_linux)"
+if [[ "$divert" == "$DIVERTED_10_LINUX" ]]; then
   ok "/etc/grub.d/10_linux diverted to $DIVERTED_10_LINUX"
+elif [[ "$divert" != /etc/grub.d/10_linux ]]; then
+  # Diverted to the old place, inside the checkout: move it out.
+  sudo_run install -d -m 0755 "$(dirname "$DIVERTED_10_LINUX")"
+  sudo_run dpkg-divert --local --no-rename --remove /etc/grub.d/10_linux
+  sudo_run dpkg-divert --local --no-rename --divert "$DIVERTED_10_LINUX" --add /etc/grub.d/10_linux
+  if [[ -f "$divert" ]]; then
+    sudo_run mv "$divert" "$DIVERTED_10_LINUX"
+  else
+    warn "$divert is gone; reinstall grub2-common to get Ubuntu's 10_linux back at $DIVERTED_10_LINUX"
+  fi
 elif [[ -f /etc/grub.d/10_linux ]] || ((DRY_RUN)); then
   sudo_run install -d -m 0755 "$(dirname "$DIVERTED_10_LINUX")"
   sudo_run dpkg-divert --local --rename --divert "$DIVERTED_10_LINUX" --add /etc/grub.d/10_linux

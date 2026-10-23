@@ -4,13 +4,15 @@
 # Ubuntu's 10_linux names the entries "<GRUB_DISTRIBUTOR> GNU/Linux" for any
 # distributor but Ubuntu, so the menu read "KubaOS GNU/Linux". The packaged
 # script is diverted (dpkg-divert --local --rename) to
-# /usr/share/kubaos/grub/10_linux.ubuntu, where grub upgrades keep updating
+# /usr/lib/kubaos/grub/10_linux.ubuntu, where grub upgrades keep updating
 # it; this wrapper runs it and renames the entries after os-release's
 # PRETTY_NAME ("KubaOS Shinjuku"). Undo: rm this file, then
 #   dpkg-divert --local --rename --remove /etc/grub.d/10_linux
+# Not under /usr/share/kubaos: that's KubaOS's checkout, which the payload
+# build and the updater replace whole.
 set -e
 
-real=/usr/share/kubaos/grub/10_linux.ubuntu
+real=/usr/lib/kubaos/grub/10_linux.ubuntu
 if [ ! -x "$real" ]; then
   # No entries would mean an unbootable menu: fail, and grub-mkconfig keeps
   # the old grub.cfg.
