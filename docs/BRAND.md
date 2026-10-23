@@ -57,7 +57,7 @@ Lines in this spirit (use, remix or beat them):
 
 ## Voice
 
-Free, loud, "don't care", and properly rude. Think of a friend who's very good at computers, finds most of them stupid, and swears like it. The OS talks as "I": "I'll keep the last 30 s, you're welcome." A button is what the user says when they press it, so it's in their voice: "Fuck Wi-Fi, I've got a cable".
+Free, loud, "don't care", and properly rude. Think of a friend who's very good at computers, finds most of them stupid, and swears like it.
 
 Rules, in priority order:
 
@@ -66,7 +66,7 @@ Rules, in priority order:
 3. **Roast everyone and everything, equally:** Apple, Windows, update popups, corporate software, bloat, the computer, the OS itself, Kuba, and you, the reader. Never identity: nothing about race, gender, sexuality, disability or religion, and no slurs.
 4. **The expensive sentences stay plain.** The sentence that names the disk about to be erased, the passphrase prompts at boot, and anything that says data is about to go are exact and calm. The lead-in around them can swear ("Last chance to not fuck this up."); the sentence with the disk in it can't.
 5. **Errors keep their attitude and their facts.** "Fuck. The disk is in use, so nothing got written. Free it and try again." It names the cause and gives the next action.
-6. **"I" is the OS, the button is you.** Messages, notifications and subtitles speak as the OS ("I'll ask before I touch anything"). Buttons and choices the user picks speak as the user ("Fuck Wi-Fi, I've got a cable"). Never "we".
+6. **"I" is the OS, the button is you.** Messages, notifications and subtitles speak as the OS ("I'll keep the last 30 s, you're welcome."). Buttons and choices the user picks speak as the user ("Fuck Wi-Fi, I've got a cable"). Never "we".
 7. Short sentences, active voice, no corporate filler: no "Please note", "Simply", "Seamlessly", "Powerful", "Leverage", or exclamation-mark enthusiasm. Confident, dry and rude, not hype.
 8. Japanese touches are seasoning: small labels above titles, the logo, release names. Don't write whole sentences in Japanese, and don't use anime catchphrases.
 
