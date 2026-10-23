@@ -1,5 +1,5 @@
 //! What `kubaos update`, `upgrade`, `rollback`, `channel` and the daily check do, step by step,
-//! through a [`Machine`].
+//! through a [`Machine`], and what they report as they go.
 //!
 //! An update, in order: the lock and a free-space check; fetching `origin` into the checkout,
 //! which is the network check; the release policy's pick; showing it and asking; a snapper
@@ -9,6 +9,9 @@
 //! migrations; and the new release record. Packages first, then migrations, which are written
 //! against the new packages.
 //!
+//! Each stage is a [`Phase`] of the progress stream (`event.rs`). Programs run with their output
+//! captured: every line goes to the run's log and to the stream, never to the terminal directly.
+//!
 //! # Owns
 //!
 //! - [`Updater`] and the order of its steps, and [`UpdateError`].
@@ -17,6 +20,7 @@
 //!
 //! - Which release to move to: `policy.rs`. The files' formats: `record.rs`, `notice.rs`.
 //! - Running programs and the switch: `machine.rs` and `switch.rs`.
+//! - The events and the log: `event.rs` and `journal.rs`.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -28,9 +32,20 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use super::event::Command;
+use super::event::Phase;
+use super::event::Preview;
+use super::event::Prompt;
+use super::event::Release;
+use super::event::Restart;
+use super::event::Sink;
+use super::event::Summary;
+use super::event::UpdateEvent;
+use super::event::chain;
 use super::git::GitRefs;
 use super::git::RemoteRefs;
 use super::hyprland;
+use super::journal::Journal;
 use super::machine::Cmd;
 use super::machine::Machine;
 use super::machine::MachineError;
@@ -195,6 +210,19 @@ impl UpdateOptions {
     }
 }
 
+
+/// What dpkg does with a config file the user changed and the package changed too: keep the
+/// user's. Programs run with no terminal input, so dpkg can't ask.
+const DPKG_KEEP_CONFIG: [&str; 4] = [
+    "-o",
+    "Dpkg::Options::=--force-confdef",
+    "-o",
+    "Dpkg::Options::=--force-confold",
+];
+
+/// The command that undoes an update or upgrade.
+const UNDO: &str = "kubaos rollback";
+
 /// What the apply step does on top of packages.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
@@ -202,20 +230,44 @@ enum Kind {
     Upgrade,
 }
 
+impl Kind {
+    fn command(self) -> Command {
+        match self {
+            Self::Update => Command::Update,
+            Self::Upgrade => Command::Upgrade,
+        }
+    }
+}
+
 /// Updates, upgrades and rolls back one machine for one user.
 #[derive(Debug)]
 pub struct Updater<'a, M: Machine> {
     m: &'a mut M,
+    j: Journal<'a>,
     sys: SystemPaths,
     user: Paths,
     now: SystemTime,
 }
 
 impl<'a, M: Machine> Updater<'a, M> {
-    /// The updater of the machine at `sys`, for the user at `user`, as of `now`.
+    /// The updater of the machine at `sys`, for the user at `user`, as of `now`. It reports to
+    /// nothing until given a sink.
     #[must_use]
     pub fn new(m: &'a mut M, sys: SystemPaths, user: Paths, now: SystemTime) -> Self {
-        Self { m, sys, user, now }
+        Self {
+            m,
+            j: Journal::new(),
+            sys,
+            user,
+            now,
+        }
+    }
+
+    /// Sends what the updater does to `sink`, as [`UpdateEvent`]s.
+    #[must_use]
+    pub fn reporting(mut self, sink: &'a mut dyn Sink) -> Self {
+        self.j.send_to(sink);
+        self
     }
 
     fn date(&self) -> String {
@@ -236,21 +288,27 @@ impl<'a, M: Machine> Updater<'a, M> {
     ///
     /// [`UpdateError`] for the step that failed; the steps after it did not run.
     pub fn update(&mut self, opts: UpdateOptions) -> Result<(), UpdateError> {
-        let _lock = self.lock()?;
-        self.check_space()?;
-        let installed = self.installed()?;
-        self.m.say(&format!("Installed: KubaOS {}", installed.describe()));
+        self.begin(Command::Update);
+        let result = self.try_update(opts);
+        self.end(result)
+    }
+
+    fn try_update(&mut self, opts: UpdateOptions) -> Result<(), UpdateError> {
+        let (_lock, installed) = self.phase(Phase::Checking, |u| {
+            let lock = u.lock()?;
+            u.check_space()?;
+            let installed = u.checked_installed()?;
+            Ok((lock, installed))
+        })?;
         let pick = self.fetch_and_pick(&installed)?;
         if let Some(upgrade) = &pick.upgrade {
-            self.m.say(&format!(
-                "KubaOS {} is available: kubaos upgrade",
-                upgrade_name(upgrade)
-            ));
+            self.j
+                .note(format!("KubaOS {} is available: kubaos upgrade", upgrade_name(upgrade)));
         }
         let target = if opts.packages_only { None } else { pick.update };
         if target.is_none() && !opts.packages_only {
-            self.m
-                .say("KubaOS is at the newest release of its channel: updating packages");
+            self.j
+                .note("KubaOS is at the newest release of its channel: updating packages");
         }
         self.apply(&installed, target.as_ref(), opts, Kind::Update)
     }
@@ -262,18 +320,27 @@ impl<'a, M: Machine> Updater<'a, M> {
     /// [`UpdateError::EdgeUpgrade`] on edge, [`UpdateError::PatchFirst`] when a patch is pending,
     /// [`UpdateError::NoUpgrade`] when no newer series is out, else the step that failed.
     pub fn upgrade(&mut self) -> Result<(), UpdateError> {
-        let _lock = self.lock()?;
-        let installed = self.installed()?;
-        if self.channel(&installed) == Channel::Edge {
-            return Err(UpdateError::EdgeUpgrade);
-        }
-        self.check_space()?;
+        self.begin(Command::Upgrade);
+        let result = self.try_upgrade();
+        self.end(result)
+    }
+
+    fn try_upgrade(&mut self) -> Result<(), UpdateError> {
+        let (_lock, installed) = self.phase(Phase::Checking, |u| {
+            let lock = u.lock()?;
+            let installed = u.checked_installed()?;
+            if u.channel(&installed) == Channel::Edge {
+                return Err(UpdateError::EdgeUpgrade);
+            }
+            u.check_space()?;
+            Ok((lock, installed))
+        })?;
         let pick = self.fetch_and_pick(&installed)?;
         if let Some(patch) = pick.update {
             return Err(UpdateError::PatchFirst { label: patch.label });
         }
         let target = pick.upgrade.ok_or(UpdateError::NoUpgrade)?;
-        self.m.say(&format!(
+        self.j.note(format!(
             "Upgrade: KubaOS {} → {}",
             installed.describe(),
             upgrade_name(&target)
@@ -288,14 +355,23 @@ impl<'a, M: Machine> Updater<'a, M> {
     ///
     /// [`UpdateError::NothingToRollBack`] with no history, else the step that failed.
     pub fn rollback(&mut self, confirm: Confirm) -> Result<(), UpdateError> {
-        let _lock = self.lock()?;
-        let installed = self.installed()?;
+        self.begin(Command::Rollback);
+        let result = self.try_rollback(confirm);
+        self.end(result)
+    }
+
+    fn try_rollback(&mut self, confirm: Confirm) -> Result<(), UpdateError> {
         let path = self.sys.history();
-        let mut history = parse_history(&read_or_empty(&path)?);
+        let (_lock, installed, mut history) = self.phase(Phase::Checking, |u| {
+            let lock = u.lock()?;
+            let installed = u.checked_installed()?;
+            let history = parse_history(&read_or_empty(&path)?);
+            Ok((lock, installed, history))
+        })?;
         let entry = history
             .pop()
             .ok_or(UpdateError::NothingToRollBack { path: path.clone() })?;
-        self.m.say(&format!(
+        self.j.note(format!(
             "Roll back the update of {}: KubaOS {} ({}) → {} ({})",
             entry.date,
             entry.to_version,
@@ -303,26 +379,37 @@ impl<'a, M: Machine> Updater<'a, M> {
             entry.from_version,
             short(&entry.from_commit)
         ));
-        let lock = entry.lock.as_ref().filter(|lock| lock.is_file());
-        match lock {
-            Some(lock) => self.m.say(&format!("Your flake.lock goes back to {}", lock.display())),
+        let lock = entry.lock.clone().filter(|lock| lock.is_file());
+        match &lock {
+            Some(lock) => self
+                .j
+                .note(format!("Your flake.lock goes back to {}", lock.display())),
             None => self
-                .m
+                .j
                 .warn("that update saved no flake.lock: your packages stay where they are"),
         }
-        if confirm == Confirm::Ask && !self.m.confirm("Roll back?") {
+        if confirm == Confirm::Ask && !self.confirm("Roll back?") {
             return Err(UpdateError::Declined);
         }
-        self.snapshot(&format!("before kubaos rollback {}", self.date()));
+        let description = format!("before kubaos rollback {}", self.date());
+        self.phase(Phase::Snapshot, |u| {
+            u.snapshot(&description);
+            Ok(())
+        })?;
         if entry.from_commit != installed.commit {
-            self.move_release(&entry.from_commit)?;
+            self.phase(Phase::Release, |u| u.move_release(&entry.from_commit))?;
         }
-        if let Some(lock) = lock {
-            let dest = self.user.flake_lock();
-            fs::copy(lock, &dest).map_err(UpdateError::io(&dest))?;
-        }
-        self.relink()?;
-        self.m.switch().map_err(UpdateError::step("switching your home"))?;
+        self.phase(Phase::Home, |u| {
+            if let Some(lock) = &lock {
+                let dest = u.user.flake_lock();
+                u.j.step("Putting your flake.lock back");
+                fs::copy(lock, &dest).map_err(UpdateError::io(&dest))?;
+            }
+            u.relink()?;
+            u.switch()?;
+            u.report_reloaded();
+            Ok(())
+        })?;
         let refs = self.refs();
         let rolled_back = Installed {
             version: Version::parse(&entry.from_version).unwrap_or(installed.version.clone()),
@@ -334,11 +421,27 @@ impl<'a, M: Machine> Updater<'a, M> {
         self.write_root(&self.sys.release(), &rolled_back.to_text())?;
         let rest: String = history.iter().map(HistoryEntry::line).collect();
         self.write_root(&path, &rest)?;
-        self.m.say(&format!(
+        self.j.note(format!(
             "{} shit the bed? You're on KubaOS {} again, like it never happened.",
             entry.to_version,
             rolled_back.describe()
         ));
+        let summary = Summary {
+            command: Command::Rollback,
+            from: release_of(&installed),
+            to: release_of(&rolled_back),
+            channel: rolled_back.channel,
+            changes: Vec::new(),
+            packages: 0,
+            inputs: Vec::new(),
+            migrations: Vec::new(),
+            reloaded: self.j.reloaded.clone(),
+            restart: Restart::None,
+            restart_reason: None,
+            undo: None,
+            log: self.j.log_path(),
+        };
+        self.j.emit(&UpdateEvent::Summary(summary));
         Ok(())
     }
 
@@ -351,11 +454,11 @@ impl<'a, M: Machine> Updater<'a, M> {
         self.write_root(&self.sys.channel(), &format!("{channel}\n"))?;
         match channel {
             Channel::Edge => self
-                .m
-                .say("Channel: edge. kubaos update follows origin/main from now on."),
+                .j
+                .note("Channel: edge. kubaos update follows origin/main from now on."),
             Channel::Stable => self
-                .m
-                .say("Channel: stable. kubaos update moves to the next verified release at or above this one."),
+                .j
+                .note("Channel: stable. kubaos update moves to the next verified release at or above this one."),
         }
         Ok(())
     }
@@ -375,31 +478,48 @@ impl<'a, M: Machine> Updater<'a, M> {
     ///
     /// [`UpdateError`] when origin can't be listed or the files can't be written.
     pub fn check(&mut self) -> Result<Available, UpdateError> {
-        let installed = self.installed()?;
+        self.begin(Command::Check);
+        let result = self.try_check();
+        self.end(result)
+    }
+
+    fn try_check(&mut self) -> Result<Available, UpdateError> {
+        let installed = self.phase(Phase::Checking, Self::checked_installed)?;
         let channel = self.channel(&installed);
-        let local = self.refs();
-        let url = local.origin_url().ok_or_else(|| UpdateError::NoRelease {
-            path: self.sys.checkout(),
+        let refs = self.phase(Phase::Fetching, |u| {
+            let local = u.refs();
+            let url = local.origin_url().ok_or_else(|| UpdateError::NoRelease {
+                path: u.sys.checkout(),
+            })?;
+            u.j.step(format!("git ls-remote {url}"));
+            RemoteRefs::fetch(&url, local).map_err(|e| UpdateError::Policy(PolicyError::Refs(e)))
         })?;
-        let refs = RemoteRefs::fetch(&url, local).map_err(|e| UpdateError::Policy(PolicyError::Refs(e)))?;
-        let pick = policy::for_channel(channel)
-            .pick(&installed, &refs)
-            .map_err(UpdateError::Policy)?;
+        let pick = self.phase(Phase::Verifying, |u| {
+            let pick = policy::for_channel(channel)
+                .pick(&installed, &refs)
+                .map_err(UpdateError::Policy)?;
+            u.j.detail(pick_detail(&pick));
+            Ok(pick)
+        })?;
         let available = Available::from_pick(&pick);
         self.write_available(&available)?;
         let notified_path = self.user.notified();
         let mut notified = parse_notified(&read_or_empty(&notified_path)?);
         for (key, text) in available.notifications(&notified.clone()) {
             let cmd = Cmd::user("notify-send").args(["--app-name=KubaOS", "--urgency=low", "KubaOS", &text]);
-            match self.m.output(&cmd) {
+            match self.quiet(&cmd) {
                 Ok(_) => {
                     notified.insert(key);
                 }
-                Err(e) => self.m.warn(&format!("notifying: {e}")),
+                Err(e) => self.j.warn(format!("notifying: {e}")),
             }
         }
         let text: String = notified.iter().flat_map(|key| [key.as_str(), "\n"]).collect();
         write_user(&notified_path, &text)?;
+        self.j.emit(&UpdateEvent::Available {
+            update: available.update.as_ref().map(upgrade_name),
+            upgrade: available.upgrade.as_ref().map(upgrade_name),
+        });
         Ok(available)
     }
 
@@ -434,6 +554,129 @@ impl<'a, M: Machine> Updater<'a, M> {
             commit,
             date: String::new(),
         })
+    }
+
+    /// The installed release, reported as the running phase's result.
+    fn checked_installed(&mut self) -> Result<Installed, UpdateError> {
+        let installed = self.installed()?;
+        let channel = self.channel(&installed);
+        self.j
+            .detail(format!("KubaOS {}, {channel}", release_of(&installed).describe()));
+        Ok(installed)
+    }
+
+    /// Starts a run: its log, unless it is a check, and the `started` event.
+    fn begin(&mut self, command: Command) {
+        let stamp = self.date().replace(' ', "T").replace(':', "-");
+        let opened = if command == Command::Check {
+            Ok(())
+        } else {
+            self.j.open_log(&self.user.update_logs(), &stamp, command)
+        };
+        self.j.emit(&UpdateEvent::Started {
+            command,
+            log: self.j.log_path(),
+        });
+        if let Err(e) = opened {
+            self.j.warn(format!("no log of this run: {e}"));
+        }
+    }
+
+    /// Ends a run that stopped with its `declined` or `failed` event.
+    fn end<T>(&mut self, result: Result<T, UpdateError>) -> Result<T, UpdateError> {
+        if let Err(e) = &result {
+            self.j.failed(e);
+        }
+        result
+    }
+
+    /// Runs `work` as `phase`, which ends failed when `work` fails.
+    fn phase<T>(
+        &mut self,
+        phase: Phase,
+        work: impl FnOnce(&mut Self) -> Result<T, UpdateError>,
+    ) -> Result<T, UpdateError> {
+        self.j.phase_start(phase);
+        let result = work(self);
+        self.j.phase_end(result.is_ok());
+        result
+    }
+
+    /// Asks `question` through the machine, reported as a prompt and its answer.
+    fn confirm(&mut self, question: &str) -> bool {
+        self.j.prompt(Prompt::Confirm {
+            question: question.to_owned(),
+        });
+        let yes = self.m.confirm(question);
+        self.j.emit(&UpdateEvent::Answered { yes });
+        yes
+    }
+
+    /// Has sudo take the password before `cmd`, when it needs sudo and sudo would ask: sudo asks
+    /// on the terminal, which the captured program can't show.
+    fn authorise(&mut self, cmd: &Cmd) -> Result<(), MachineError> {
+        if !cmd.uses_sudo() || !self.m.needs_password() {
+            return Ok(());
+        }
+        self.j.prompt(Prompt::Password);
+        let taken = self.m.authenticate();
+        self.j.emit(&UpdateEvent::Answered { yes: taken.is_ok() });
+        taken
+    }
+
+    /// Runs `cmd` for its stdout; the command line and a failure go to the log.
+    fn quiet(&mut self, cmd: &Cmd) -> Result<String, MachineError> {
+        self.authorise(cmd)?;
+        self.j.command(cmd);
+        let out = self.m.output(cmd);
+        if let Err(e) = &out {
+            self.j.log_line(&format!("failed: {}", chain(e)));
+        }
+        out
+    }
+
+    /// Runs `cmd` with every line of its output reported.
+    fn run(&mut self, cmd: &Cmd) -> Result<(), MachineError> {
+        self.run_with(cmd, |_| {})
+    }
+
+    /// [`Updater::run`], handing each line to `also` too.
+    fn run_with(&mut self, cmd: &Cmd, mut also: impl FnMut(&str)) -> Result<(), MachineError> {
+        self.authorise(cmd)?;
+        self.j.command(cmd);
+        let j = &mut self.j;
+        let ran = self.m.run(cmd, &mut |line| {
+            j.output(line);
+            also(line);
+        });
+        match &ran {
+            Ok(()) => self.j.succeeded(),
+            Err(e) => self.j.log_line(&format!("failed: {}", chain(e))),
+        }
+        ran
+    }
+
+    /// The home-manager switch, its output reported.
+    fn switch(&mut self) -> Result<(), UpdateError> {
+        self.j.step("Switching your home");
+        self.j.command_line("home-manager switch (kubaos switch)");
+        let j = &mut self.j;
+        let switched = self.m.switch(&mut |line| j.output(line));
+        match switched {
+            Ok(()) => {
+                self.j.succeeded();
+                Ok(())
+            }
+            Err(e) => Err(UpdateError::step("switching your home")(e)),
+        }
+    }
+
+    /// Reports what the session reloaded after the switch as the running phase's result.
+    fn report_reloaded(&mut self) {
+        if !self.j.reloaded.is_empty() {
+            let reloaded = self.j.reloaded.join(", ");
+            self.j.detail(reloaded);
+        }
     }
 
     fn lock(&self) -> Result<File, UpdateError> {
@@ -477,18 +720,24 @@ impl<'a, M: Machine> Updater<'a, M> {
             .arg("-C")
             .arg(self.sys.checkout())
             .args(["fetch", "--quiet", "--tags", "--force", "origin"]);
-        self.m.output(&fetch).map_err(UpdateError::Offline)?;
+        self.phase(Phase::Fetching, |u| {
+            u.j.step("git fetch origin");
+            u.quiet(&fetch).map(drop).map_err(UpdateError::Offline)
+        })?;
         let channel = self.channel(installed);
-        let pick = policy::for_channel(channel)
-            .pick(installed, &self.refs())
-            .map_err(UpdateError::Policy)?;
-        for note in &pick.notes {
-            self.m.warn(note);
-        }
-        Ok(pick)
+        self.phase(Phase::Verifying, |u| {
+            let pick = policy::for_channel(channel)
+                .pick(installed, &u.refs())
+                .map_err(UpdateError::Policy)?;
+            for note in &pick.notes {
+                u.j.warn(note.clone());
+            }
+            u.j.detail(pick_detail(&pick));
+            Ok(pick)
+        })
     }
 
-    /// The steps shared by an update and an upgrade, from the summary on.
+    /// The steps shared by an update and an upgrade, from the preview on.
     fn apply(
         &mut self,
         installed: &Installed,
@@ -497,98 +746,142 @@ impl<'a, M: Machine> Updater<'a, M> {
         kind: Kind,
     ) -> Result<(), UpdateError> {
         let flake = self.user.flake().to_path_buf();
-        if !flake.join("flake.nix").is_file() {
-            return Err(UpdateError::NoUserFlake { path: flake });
-        }
-        self.summarise(installed, target)?;
+        let preview = self.phase(Phase::Reviewing, |u| {
+            if !flake.join("flake.nix").is_file() {
+                return Err(UpdateError::NoUserFlake { path: flake.clone() });
+            }
+            u.review(installed, target)
+        })?;
+        let packages = preview.packages;
+        let changes = preview.changes.clone();
+        self.j.emit(&UpdateEvent::Preview(preview));
         // An upgrade always asks: it moves to a new Ubuntu-and-nixpkgs pairing.
         let ask = opts.confirm == Confirm::Ask || kind == Kind::Upgrade;
-        if ask && !self.m.confirm("Update now?") {
+        if ask && !self.confirm("Update now?") {
             return Err(UpdateError::Declined);
         }
 
         let to = target.map_or_else(|| installed.version.to_string(), |t| t.label.clone());
-        self.snapshot(&format!(
+        let description = format!(
             "before kubaos {} {} ({} → {to})",
-            kind_word(kind),
+            kind.command().word(),
             self.date(),
             installed.version
-        ));
-        let lock = self.save_lock()?;
-        self.record_history(installed, target, lock)?;
-
-        self.m
-            .stream(&Cmd::root("apt-get").args(["upgrade", "--with-new-pkgs", "-y"]))
-            .map_err(UpdateError::step("upgrading apt packages"))?;
-
+        );
+        self.phase(Phase::Snapshot, |u| {
+            u.snapshot(&description);
+            let lock = u.save_lock()?;
+            u.record_history(installed, target, lock)
+        })?;
+        self.phase(Phase::SystemPackages, |u| u.upgrade_apt(packages))?;
         if let Some(target) = target {
-            self.move_release(&target.commit)?;
+            self.phase(Phase::Release, |u| u.move_release(&target.commit))?;
         }
+        let mut migrations = Vec::new();
+        let mut relogin = false;
         if !opts.packages_only {
-            self.apply_hyprland_pin()?;
-            self.run_system_migrations()?;
+            relogin = self.apply_hyprland_pin()?;
+            migrations.extend(self.run_system_migrations()?);
         }
-
-        self.m
-            .stream(&Cmd::user("nix").arg("flake").arg("update").arg("--flake").arg(&flake))
-            .map_err(UpdateError::step("updating your flake's inputs (nix flake update)"))?;
-        self.relink()?;
-        self.m.switch().map_err(UpdateError::step("switching your home"))?;
-        self.check_bitwarden();
+        self.phase(Phase::Inputs, |u| u.update_inputs(&flake))?;
+        self.phase(Phase::Home, |u| {
+            u.relink()?;
+            u.switch()?;
+            u.check_bitwarden();
+            u.report_reloaded();
+            Ok(())
+        })?;
         if !opts.packages_only {
-            self.run_user_migrations()?;
+            migrations.extend(self.run_user_migrations()?);
         }
 
         let now = self.record(installed, target)?;
         self.clear_available(&now)?;
-        self.m.say(&format!("Done: KubaOS {}", now.describe()));
-        if self.sys.root().join("var/run/reboot-required").exists() {
-            self.m.warn("reboot required: an updated package asks for it");
-        }
+        let (restart, restart_reason) = if self.sys.root().join("var/run/reboot-required").exists() {
+            (Restart::Reboot, Some("an updated package asks for it".to_owned()))
+        } else if relogin {
+            (
+                Restart::Relogin,
+                Some("Hyprland was updated, and the running one is the old version".to_owned()),
+            )
+        } else {
+            (Restart::None, None)
+        };
+        let summary = Summary {
+            command: kind.command(),
+            from: release_of(installed),
+            to: release_of(&now),
+            channel: now.channel,
+            changes,
+            packages,
+            inputs: self.j.inputs.clone(),
+            migrations,
+            reloaded: self.j.reloaded.clone(),
+            restart,
+            restart_reason,
+            undo: Some(UNDO.to_owned()),
+            log: self.j.log_path(),
+        };
+        self.j.emit(&UpdateEvent::Summary(summary));
         Ok(())
     }
 
-    /// Shows what the update brings: the release's commits, the apt packages, and whether the
-    /// Hyprland pin changes.
-    fn summarise(&mut self, installed: &Installed, target: Option<&Target>) -> Result<(), UpdateError> {
-        self.m
-            .output(&Cmd::root("apt-get").args(["update", "-q"]))
+    /// What the update brings: the release's commits, the apt packages, whether the Hyprland pin
+    /// changes, and the system migrations it will run.
+    fn review(&mut self, installed: &Installed, target: Option<&Target>) -> Result<Preview, UpdateError> {
+        self.j.step("Refreshing apt's package lists");
+        self.quiet(&Cmd::root("apt-get").args(["update", "-q"]))
             .map_err(UpdateError::step("refreshing apt's package lists"))?;
+        let mut preview = Preview {
+            from: release_of(installed),
+            to: None,
+            channel: self.channel(installed),
+            changes: Vec::new(),
+            packages: 0,
+            hyprland_pin: false,
+            migrations: Vec::new(),
+        };
         if let Some(target) = target {
-            self.m.say(&format!("KubaOS {} → {}", installed.version, target.label));
+            self.j.step("Reading the release's changes");
             let refs = self.refs();
-            for line in refs.log(&installed.commit, &target.commit, LOG_LINES) {
-                self.m.say(&format!("  {line}"));
-            }
+            preview.to = Some(Release {
+                version: target
+                    .version
+                    .as_ref()
+                    .map_or_else(|| target.label.clone(), ToString::to_string),
+                codename: target.codename.clone(),
+                commit: target.commit.clone(),
+            });
+            preview.changes = refs.log(&installed.commit, &target.commit, LOG_LINES);
             let pin = refs.file_at(&target.commit, record::RELEASE_PIN);
-            if pin.is_some() && pin != fs::read_to_string(self.sys.apt_pin()).ok() {
-                self.m
-                    .say("The Hyprland pin changes: Hyprland is installed at the release's versions.");
-            }
+            preview.hyprland_pin = pin.is_some() && pin != fs::read_to_string(self.sys.apt_pin()).ok();
             let markers = self.sys.markers();
-            let new: Vec<String> = refs
+            preview.migrations = refs
                 .file_list(&target.commit, "migrations/system")
                 .into_iter()
                 .filter(|name| migrations::stamp_of(name).is_some() && !markers.join(name).exists())
                 .collect();
-            if !new.is_empty() {
-                self.m.say(&format!("System migrations to run: {}", new.join(", ")));
-            }
         }
+        self.j.step("Counting the apt packages to upgrade");
         let simulated = self
-            .m
-            .output(&Cmd::user("apt-get").args(["-s", "-q", "upgrade", "--with-new-pkgs"]))
+            .quiet(&Cmd::user("apt-get").args(["-s", "-q", "upgrade", "--with-new-pkgs"]))
             .unwrap_or_default();
-        let packages = simulated.lines().filter(|line| line.starts_with("Inst ")).count();
-        self.m.say(&format!("apt: {packages} packages to upgrade"));
-        Ok(())
+        preview.packages = simulated.lines().filter(|line| line.starts_with("Inst ")).count();
+        let mut detail = vec![count(preview.packages, "apt package")];
+        if preview.to.is_some() {
+            detail.push(count(preview.changes.len(), "commit"));
+        }
+        self.j.detail(detail.join(", "));
+        Ok(preview)
     }
 
     fn snapshot(&mut self, description: &str) {
         if !self.sys.root().join("etc/snapper/configs/root").is_file() {
-            self.m.warn("snapper isn't set up: no snapshot to go back to this time");
+            self.j.warn("snapper isn't set up: no snapshot to go back to this time");
+            self.j.detail("no snapshot");
             return;
         }
+        self.j.step("Taking a snapper snapshot");
         let cmd = Cmd::root("snapper").args([
             "-c",
             "root",
@@ -598,9 +891,12 @@ impl<'a, M: Machine> Updater<'a, M> {
             "--description",
             description,
         ]);
-        match self.m.output(&cmd) {
-            Ok(_) => self.m.say(&format!("Snapshot: {description}")),
-            Err(e) => self.m.warn(&format!("no snapshot: {e}")),
+        match self.quiet(&cmd) {
+            Ok(_) => self.j.detail(description),
+            Err(e) => {
+                self.j.warn(format!("no snapshot: {e}"));
+                self.j.detail("no snapshot");
+            }
         }
     }
 
@@ -645,6 +941,19 @@ impl<'a, M: Machine> Updater<'a, M> {
         self.write_root(&path, &text)
     }
 
+    /// `apt-get upgrade`, its `Setting up` lines counted against the `packages` it will upgrade.
+    fn upgrade_apt(&mut self, packages: usize) -> Result<(), UpdateError> {
+        let cmd = Cmd::root("apt-get")
+            .args(["upgrade", "--with-new-pkgs", "-y"])
+            .args(DPKG_KEEP_CONFIG)
+            .env("DEBIAN_FRONTEND", "noninteractive");
+        self.j.step("apt-get upgrade");
+        self.j.count("Setting up ", packages);
+        self.run(&cmd).map_err(UpdateError::step("upgrading apt packages"))?;
+        self.j.detail(count(packages, "package"));
+        Ok(())
+    }
+
     fn move_release(&mut self, commit: &str) -> Result<(), UpdateError> {
         let cmd = Cmd::root("git").arg("-C").arg(self.sys.checkout()).args([
             "checkout",
@@ -653,35 +962,38 @@ impl<'a, M: Machine> Updater<'a, M> {
             record::RELEASE_BRANCH,
             commit,
         ]);
-        self.m
-            .output(&cmd)
+        self.j.step(format!("Moving release to {}", short(commit)));
+        self.quiet(&cmd)
             .map_err(UpdateError::step(format!("moving release to {}", short(commit))))?;
-        self.m.say(&format!("release is at {}", short(commit)));
+        self.j.detail(format!("release is at {}", short(commit)));
         Ok(())
     }
 
-    /// Installs the release's Hyprland pin when it differs from the one apt has: the pinned
-    /// versions exactly, then the whole stack held again, whatever happened.
-    fn apply_hyprland_pin(&mut self) -> Result<(), UpdateError> {
+    /// Installs the release's Hyprland pin when it differs from the one apt has. Whether it was
+    /// installed, so the running Hyprland is an old one.
+    fn apply_hyprland_pin(&mut self) -> Result<bool, UpdateError> {
         let Ok(wanted) = fs::read_to_string(self.sys.checkout().join(record::RELEASE_PIN)) else {
-            return Ok(());
+            return Ok(false);
         };
         if fs::read_to_string(self.sys.apt_pin()).ok().as_deref() == Some(wanted.as_str()) {
-            return Ok(());
+            return Ok(false);
         }
+        self.phase(Phase::Hyprland, |u| u.install_hyprland_pin(&wanted))
+    }
+
+    /// The pinned versions exactly, then the whole stack held again, whatever happened.
+    fn install_hyprland_pin(&mut self, wanted: &str) -> Result<bool, UpdateError> {
         let arch = self
-            .m
-            .output(&Cmd::user("dpkg").arg("--print-architecture"))
+            .quiet(&Cmd::user("dpkg").arg("--print-architecture"))
             .unwrap_or_default();
         if arch.trim() != "amd64" {
-            self.m
-                .say("Hyprland pin: skipped, Hyprland comes from KubaOS's nixpkgs on this architecture");
-            return Ok(());
+            self.j
+                .skip("Hyprland comes from KubaOS's nixpkgs on this architecture");
+            return Ok(false);
         }
-        let pins = hyprland::parse(&wanted);
+        let pins = hyprland::parse(wanted);
         let held: BTreeSet<String> = self
-            .m
-            .output(&Cmd::user("apt-mark").arg("showhold"))
+            .quiet(&Cmd::user("apt-mark").arg("showhold"))
             .unwrap_or_default()
             .lines()
             .map(str::trim)
@@ -689,45 +1001,45 @@ impl<'a, M: Machine> Updater<'a, M> {
             .map(str::to_owned)
             .collect();
         if !held.is_empty() {
-            self.m
-                .output(&Cmd::root("apt-mark").arg("unhold").args(&held))
+            self.j.step("Unholding the Hyprland stack");
+            self.quiet(&Cmd::root("apt-mark").arg("unhold").args(&held))
                 .map_err(UpdateError::step("unholding the Hyprland stack"))?;
         }
         let install = Cmd::root("apt-get")
             .args(["install", "-y", "--no-install-recommends", "--allow-downgrades"])
-            .args(pins.iter().map(hyprland::Pin::install_arg));
+            .args(DPKG_KEEP_CONFIG)
+            .args(pins.iter().map(hyprland::Pin::install_arg))
+            .env("DEBIAN_FRONTEND", "noninteractive");
         // TODO(#14): when the PPA no longer has a pinned version, install the release's .debs,
         // checked against its signed SHA256SUMS; releases don't attach them yet.
+        self.j.step("Installing the pinned Hyprland");
         let pinned = self
-            .m
-            .stream(&install)
+            .run(&install)
             .map_err(UpdateError::step("installing the pinned Hyprland"));
         let mut to_hold = held;
         to_hold.extend(self.installed_hypr_packages());
         let rehold = if to_hold.is_empty() {
             Ok(())
         } else {
-            self.m
-                .output(&Cmd::root("apt-mark").arg("hold").args(&to_hold))
+            self.j.step("Holding the Hyprland stack again");
+            self.quiet(&Cmd::root("apt-mark").arg("hold").args(&to_hold))
                 .map(drop)
                 .map_err(UpdateError::step("holding the Hyprland stack again"))
         };
         pinned?;
         rehold?;
         // Written once the versions are in, so a failed install is tried again on the next update.
-        self.write_root(&self.sys.apt_pin(), &wanted)?;
-        self.m
-            .say(&format!("Hyprland pin applied, {} packages held", to_hold.len()));
-        if self.m.output(&Cmd::user("Hyprland").arg("--verify-config")).is_err() {
-            self.m
+        self.write_root(&self.sys.apt_pin(), wanted)?;
+        self.j.detail(format!("applied, {} held", count(to_hold.len(), "package")));
+        if self.quiet(&Cmd::user("Hyprland").arg("--verify-config")).is_err() {
+            self.j
                 .warn("Hyprland --verify-config reports problems: run it and fix your config before logging out");
         }
-        Ok(())
+        Ok(true)
     }
 
     fn installed_hypr_packages(&mut self) -> Vec<String> {
-        self.m
-            .output(&Cmd::user("dpkg-query").args(["-W", "-f", "${db:Status-Status} ${Package}\n"]))
+        self.quiet(&Cmd::user("dpkg-query").args(["-W", "-f", "${db:Status-Status} ${Package}\n"]))
             .unwrap_or_default()
             .lines()
             .filter_map(|line| line.strip_prefix("installed "))
@@ -736,45 +1048,86 @@ impl<'a, M: Machine> Updater<'a, M> {
             .collect()
     }
 
-    fn run_system_migrations(&mut self) -> Result<(), UpdateError> {
+    /// The release's pending system migrations, as root; the names of those that ran.
+    fn run_system_migrations(&mut self) -> Result<Vec<String>, UpdateError> {
         let dir = self.sys.system_migrations();
         let pending = migrations::pending(&dir, &self.sys.markers()).map_err(UpdateError::io(&dir))?;
-        for migration in pending {
-            self.m.say(&format!("System migration {}", migration.name));
-            let cmd = Cmd::root("bash")
-                .args(["-euo", "pipefail"])
-                .arg(&migration.path)
-                .env("KUBAOS_DIR", self.sys.checkout())
-                .cwd(self.sys.checkout());
-            self.m.stream(&cmd).map_err(|source| UpdateError::Migration {
-                name: migration.name.clone(),
-                source,
-            })?;
-            let marker = self.sys.markers().join(&migration.name);
-            self.write_root(&marker, &format!("{}\n", self.date()))?;
+        if pending.is_empty() {
+            return Ok(Vec::new());
         }
-        Ok(())
+        self.phase(Phase::SystemMigrations, |u| {
+            u.each_migration(&pending, |u, migration| {
+                let cmd = Cmd::root("bash")
+                    .args(["-euo", "pipefail"])
+                    .arg(&migration.path)
+                    .env("KUBAOS_DIR", u.sys.checkout())
+                    .cwd(u.sys.checkout());
+                u.run(&cmd).map_err(|source| UpdateError::Migration {
+                    name: migration.name.clone(),
+                    source,
+                })?;
+                let marker = u.sys.markers().join(&migration.name);
+                u.write_root(&marker, &format!("{}\n", u.date()))
+            })
+        })
     }
 
-    fn run_user_migrations(&mut self) -> Result<(), UpdateError> {
+    /// The release's pending user migrations; the names of those that ran.
+    fn run_user_migrations(&mut self) -> Result<Vec<String>, UpdateError> {
         let dir = self.sys.user_migrations();
         let markers = self.user.migration_markers();
         let pending: Vec<Migration> = migrations::pending(&dir, &markers).map_err(UpdateError::io(&dir))?;
-        for migration in pending {
-            self.m.say(&format!("Your migration {}", migration.name));
-            let cmd = Cmd::user("bash")
-                .args(["-euo", "pipefail"])
-                .arg(&migration.path)
-                .env("KUBAOS_DIR", self.sys.checkout())
-                .env("KUBAOS_USER_FLAKE", self.user.flake())
-                .env("KUBAOS_BACKUPS", self.user.backups())
-                .cwd(self.user.home());
-            self.m.stream(&cmd).map_err(|source| UpdateError::Migration {
-                name: migration.name.clone(),
-                source,
-            })?;
-            write_user(&markers.join(&migration.name), &format!("{}\n", self.date()))?;
+        if pending.is_empty() {
+            return Ok(Vec::new());
         }
+        self.phase(Phase::UserMigrations, |u| {
+            u.each_migration(&pending, |u, migration| {
+                let cmd = Cmd::user("bash")
+                    .args(["-euo", "pipefail"])
+                    .arg(&migration.path)
+                    .env("KUBAOS_DIR", u.sys.checkout())
+                    .env("KUBAOS_USER_FLAKE", u.user.flake())
+                    .env("KUBAOS_BACKUPS", u.user.backups())
+                    .cwd(u.user.home());
+                u.run(&cmd).map_err(|source| UpdateError::Migration {
+                    name: migration.name.clone(),
+                    source,
+                })?;
+                write_user(&markers.join(&migration.name), &format!("{}\n", u.date()))
+            })
+        })
+    }
+
+    /// Runs `one` for each migration in turn, reporting the progress; the names of those that ran.
+    fn each_migration(
+        &mut self,
+        pending: &[Migration],
+        mut one: impl FnMut(&mut Self, &Migration) -> Result<(), UpdateError>,
+    ) -> Result<Vec<String>, UpdateError> {
+        let total = pending.len();
+        let mut ran = Vec::new();
+        for migration in pending {
+            self.j.progress(ran.len(), total);
+            self.j.step(migration.name.clone());
+            one(self, migration)?;
+            ran.push(migration.name.clone());
+        }
+        self.j.progress(total, total);
+        self.j.detail(format!("{} ran", count(total, "migration")));
+        Ok(ran)
+    }
+
+    /// `nix flake update` of the user flake, reporting the inputs it moved.
+    fn update_inputs(&mut self, flake: &Path) -> Result<(), UpdateError> {
+        self.j.step("nix flake update");
+        self.run(&Cmd::user("nix").arg("flake").arg("update").arg("--flake").arg(flake))
+            .map_err(UpdateError::step("updating your flake's inputs (nix flake update)"))?;
+        let detail = if self.j.inputs.is_empty() {
+            "none moved".to_owned()
+        } else {
+            self.j.inputs.join(", ")
+        };
+        self.j.detail(detail);
         Ok(())
     }
 
@@ -786,7 +1139,8 @@ impl<'a, M: Machine> Updater<'a, M> {
         if !script.is_file() {
             return Ok(());
         }
-        self.m.stream(&Cmd::user(&script)).map_err(UpdateError::step(
+        self.j.step("Relinking the lock screen's PAM modules and the recorder");
+        self.run(&Cmd::user(&script).runs_sudo()).map_err(UpdateError::step(
             "relinking the lock screen's PAM modules and the recorder",
         ))
     }
@@ -794,8 +1148,19 @@ impl<'a, M: Machine> Updater<'a, M> {
     /// Reports newer Bitwarden releases, which are pinned downloads, not apt packages.
     fn check_bitwarden(&mut self) {
         let script = self.sys.checkout().join("system/70-bitwarden.sh");
-        if script.is_file() && self.m.stream(&Cmd::user(&script).arg("--check-updates")).is_err() {
-            self.m.warn("the Bitwarden release check failed");
+        if !script.is_file() {
+            return;
+        }
+        self.j.step("Looking for new Bitwarden releases");
+        let mut news = Vec::new();
+        let checked = self.run_with(&Cmd::user(&script).arg("--check-updates"), |line| {
+            news.extend(bitwarden_news(line));
+        });
+        if checked.is_err() {
+            self.j.warn("the Bitwarden release check failed");
+        }
+        for text in news {
+            self.j.warn(text);
         }
     }
 
@@ -848,8 +1213,7 @@ impl<'a, M: Machine> Updater<'a, M> {
 
     fn write_root(&mut self, path: &Path, text: &str) -> Result<(), UpdateError> {
         let cmd = Cmd::root("sh").args(["-c", WRITE_FILE, "sh"]).arg(path).stdin(text);
-        self.m
-            .output(&cmd)
+        self.quiet(&cmd)
             .map(drop)
             .map_err(UpdateError::step(format!("writing {}", path.display())))
     }
@@ -879,11 +1243,34 @@ fn value(text: &str, key: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-fn kind_word(kind: Kind) -> &'static str {
-    match kind {
-        Kind::Update => "update",
-        Kind::Upgrade => "upgrade",
+fn release_of(installed: &Installed) -> Release {
+    Release {
+        version: installed.version.to_string(),
+        codename: installed.codename.clone(),
+        commit: installed.commit.clone(),
     }
+}
+
+/// What the policy found, in a few words.
+fn pick_detail(pick: &Pick) -> String {
+    match (&pick.update, &pick.upgrade) {
+        (Some(update), _) => format!("found {}", update.label),
+        (None, Some(upgrade)) => format!("found {}", upgrade_name(upgrade)),
+        (None, None) => "nothing newer".to_owned(),
+    }
+}
+
+/// "1 package", "12 packages".
+fn count(n: usize, what: &str) -> String {
+    if n == 1 { format!("1 {what}") } else { format!("{n} {what}s") }
+}
+
+/// A release `system/70-bitwarden.sh --check-updates` reports, from its `!!` lines: "bw CLI
+/// 2025.2.0 is out (pinned: 2025.1.0)".
+fn bitwarden_news(line: &str) -> Option<String> {
+    let text = line.trim().strip_prefix("!!")?.trim();
+    let text = text.split(". New pins").next().unwrap_or(text);
+    Some(format!("Bitwarden: {text}"))
 }
 
 /// "Akihabara (0.2.0)", or "0.2.0" without a codename.

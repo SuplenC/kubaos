@@ -174,6 +174,12 @@ impl Paths {
         self.state.join("notified")
     }
 
+    /// The full output of each `kubaos update`, `upgrade` and `rollback`, one log per run,
+    /// `~/.local/state/kubaos/update/`.
+    pub fn update_logs(&self) -> PathBuf {
+        self.state.join("update")
+    }
+
     /// The lock `kubaos update`, `upgrade` and `rollback` hold while they run.
     pub fn update_lock(&self) -> PathBuf {
         self.state.join("update.lock")

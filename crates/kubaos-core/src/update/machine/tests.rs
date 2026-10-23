@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 
 use super::Cmd;
+use super::Lines;
 use super::MachineError;
 
 fn argv(cmd: &std::process::Command) -> Vec<String> {
@@ -71,4 +72,23 @@ fn a_failure_keeps_the_last_lines_of_stderr() {
         err.to_string(),
         "`sudo apt-get upgrade` exited with code 100: line 4\nline 5\nline 6\nline 7\nline 8"
     );
+}
+
+#[test]
+fn output_is_cut_into_lines_at_newlines_and_progress_redraws() {
+    let mut lines = Lines::default();
+    let mut got = Vec::new();
+
+    lines.push(b"Unpacking vim\nProgress: 10%\rProgress: 2", |l| got.push(l.to_owned()));
+    lines.push(b"0%\r\n\nSetting up vim", |l| got.push(l.to_owned()));
+    lines.finish(|l| got.push(l.to_owned()));
+
+    assert_eq!(got, ["Unpacking vim", "Progress: 10%", "Progress: 20%", "Setting up vim"]);
+}
+
+#[test]
+fn a_user_command_that_runs_sudo_itself_uses_sudo() {
+    assert!(Cmd::user("system/relink.sh").runs_sudo().uses_sudo());
+    assert!(Cmd::root("apt-get").uses_sudo());
+    assert!(!Cmd::user("nix").uses_sudo());
 }

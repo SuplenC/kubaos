@@ -137,7 +137,11 @@ fn host(paths: &Paths) -> Result<Systemd, ExitCode> {
 /// Prints the job's output until it ends. With `host`, the job runs in a worker unit, and fails
 /// if that unit dies before running it.
 fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
-    match wait(queue, id, host) {
+    let mut out = io::stdout();
+    let print = |chunk: &str| {
+        let _ = out.write_all(chunk.as_bytes()).and_then(|()| out.flush());
+    };
+    match wait(queue, id, host, print) {
         Ok(()) => {
             println!("switch {id} done");
             ExitCode::SUCCESS
@@ -149,15 +153,11 @@ fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
     }
 }
 
-/// Prints the job's output until it ends; why it failed, when it did.
-fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> Result<(), String> {
-    let mut out = io::stdout();
-    let print = |chunk: &str| {
-        let _ = out.write_all(chunk.as_bytes()).and_then(|()| out.flush());
-    };
+/// Hands the job's output to `on_output` until it ends; why it failed, when it did.
+fn wait(queue: &Queue, id: &JobId, host: Option<&Systemd>, on_output: impl FnMut(&str)) -> Result<(), String> {
     let job = match host {
-        Some(host) => queue.follow_worker(id, FOLLOW_POLL, host, print),
-        None => queue.follow(id, FOLLOW_POLL, print),
+        Some(host) => queue.follow_worker(id, FOLLOW_POLL, host, on_output),
+        None => queue.follow(id, FOLLOW_POLL, on_output),
     };
     match job {
         Ok(Job {
@@ -179,12 +179,12 @@ pub enum SwitchIn {
 }
 
 /// Runs one switch of the user flake to its end, for a command that switches as one of its
-/// steps.
+/// steps, handing each chunk of its output to `on_output`.
 ///
 /// # Errors
 ///
 /// Why the switch failed.
-pub fn switch_step(paths: &Paths, place: SwitchIn) -> Result<(), String> {
+pub fn switch_step(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&str)) -> Result<(), String> {
     let host = std::env::current_exe()
         .map(|exe| Systemd::new(exe, paths.flake()))
         .map_err(|e| chain(&e))?;
@@ -195,7 +195,7 @@ pub fn switch_step(paths: &Paths, place: SwitchIn) -> Result<(), String> {
             let queue = queue.clone();
             thread::spawn(move || queue.work(&host))
         };
-        let waited = wait(&queue, &id, None);
+        let waited = wait(&queue, &id, None, on_output);
         worker
             .join()
             .expect("the switch worker thread panicked")
@@ -203,7 +203,7 @@ pub fn switch_step(paths: &Paths, place: SwitchIn) -> Result<(), String> {
         return waited;
     }
     let id = queue.submit(&host).map_err(|e| chain(&e))?;
-    wait(&queue, &id, Some(&host))
+    wait(&queue, &id, Some(&host), on_output)
 }
 
 fn list(queue: &Queue, host: &Systemd, json: bool) -> ExitCode {

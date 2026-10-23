@@ -1646,7 +1646,7 @@ update_setup() {
 }
 
 c_update_edge() {
-  local before head out
+  local before head out log
   rm -f "$UPD_READY"
   update_setup || return 1
   before="$(release_of)"
@@ -1691,8 +1691,18 @@ c_update_edge() {
   [[ $(lock_rev) == "$head" ]] || { echo "FAIL the user flake's lock has KubaOS at $(lock_rev)"; return 1; }
   [[ $(lines /var/lib/kubaos/update-history) == 1 && ! -s $UPD_STATE/update-available ]] ||
     { echo "FAIL update-history or update-available after the update"; return 1; }
-  grep -q '^upgrade --with-new-pkgs -y$' "$LOGS/apt-get.log" || { echo "FAIL apt-get upgrade never ran"; return 1; }
+  grep -q '^upgrade --with-new-pkgs -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold$' \
+    "$LOGS/apt-get.log" || { echo "FAIL apt-get upgrade never ran, or not keeping changed config files"; return 1; }
   echo "ok   kubaos update on edge: release at main's head, both migrations ran once, the record, history and lock follow"
+
+  # Off a terminal: plain lines, and the programs' output in the run's log.
+  ! grep -q $'\e' <<<"$out" || { echo "FAIL escape codes in the update's output off a terminal"; return 1; }
+  grep -q '^  ✓ Home' <<<"$out" && grep -q '^  Undo  *kubaos rollback$' <<<"$out" ||
+    { echo "FAIL the update's output has no Home phase or no summary:"; printf '%s\n' "$out" | tail -20; return 1; }
+  log="$(ls "$UPD_STATE"/update/*-update.log 2>/dev/null | tail -1)"
+  [[ -n $log ]] && grep -q '2000000000-harness-user.sh' "$log" ||
+    { echo "FAIL no update log in $UPD_STATE/update naming the migrations"; return 1; }
+  echo "ok   kubaos update's plain output: phases and a summary, the programs' output in ${log#"$USER_HOME"/}"
 
   out="$(zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; command -v kubaos; kubaos --version" 2>&1)"
   [[ $out == "$USER_HOME/.nix-profile/bin/kubaos"$'\n'"kubaos 0.1.0-harness" ]] ||
@@ -1702,13 +1712,15 @@ c_update_edge() {
     { echo "FAIL /usr/bin/kubaos isn't the launcher, or runs another kubaos: $out"; return 1; }
   echo "ok   the release's kubaos is on PATH after the update, and /usr/bin/kubaos, now the launcher, runs it"
 
-  out="$(kz 'kubaos update -y --foreground' 2>&1)" ||
-    { echo "FAIL kubaos update, again"; printf '%s\n' "$out" | tail -30; return 1; }
+  out="$(kz 'kubaos update -y --foreground --json' 2>/dev/null)" ||
+    { echo "FAIL kubaos update --json, again"; printf '%s\n' "$out" | tail -30; return 1; }
+  jq -e . >/dev/null <<<"$out" && [[ $(tail -1 <<<"$out" | jq -r .type) == summary ]] ||
+    { echo "FAIL kubaos update --json isn't JSON lines ending in a summary:"; printf '%s\n' "$out" | tail -10; return 1; }
   grep -q 'newest release of its channel' <<<"$out" && [[ $(release_of) == "$head" ]] ||
     { echo "FAIL the second update moved release or didn't say it is current"; printf '%s\n' "$out" | tail -20; return 1; }
   [[ $(lines "$UPD_SYSTEM_LOG") == 1 && $(lines "$UPD_USER_LOG") == 1 ]] ||
     { echo "FAIL a migration ran again"; return 1; }
-  echo "ok   kubaos update again: only packages, no migration runs twice"
+  echo "ok   kubaos update --json again: one JSON event a line, only packages, no migration runs twice"
 }
 
 c_update_stable() {
