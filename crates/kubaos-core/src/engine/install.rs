@@ -97,6 +97,8 @@ pub struct Install<'a> {
     daemon: Option<u32>,
     swapfile: bool,
     user: Option<(u32, u32, String)>,
+    /// Numbers of the partitions a free-space install added to the disk.
+    created: Vec<u32>,
 }
 
 impl<'a> Install<'a> {
@@ -128,6 +130,7 @@ impl<'a> Install<'a> {
             daemon: None,
             swapfile: false,
             user: None,
+            created: vec![],
         }
     }
 
@@ -331,6 +334,25 @@ impl<'a> Install<'a> {
             self.try_sh(Cmd::new("cryptsetup").args(["close", LUKS_NAME]));
             self.luks_open = false;
         }
+        // A free-space install that stops before the system can boot gives
+        // the region back, or the next attempt finds no free space and only
+        // a partition editor gets it back. Once the bootloader is in, the
+        // installed system boots from these partitions, so they stay.
+        let bootable = matches!(self.step, StepId::Home | StepId::Snapshot | StepId::Finish);
+        if !self.created.is_empty() && !bootable {
+            self.info("removing the partitions this install made");
+            let dev = self.cfg.disk.device.clone();
+            let mut args: Vec<String> = self
+                .created
+                .iter()
+                .map(|n| format!("--delete={n}"))
+                .collect();
+            args.push(dev.clone());
+            if self.try_sh(Cmd::new("sgdisk").args(args)) {
+                self.try_sh(Cmd::new("partprobe").arg(&dev));
+            }
+            self.created.clear();
+        }
     }
 
     fn parts(&self) -> R<Parts> {
@@ -498,28 +520,28 @@ impl<'a> Install<'a> {
                 )),
             });
         }
-        if let Some(d) = &self.disk {
-            let in_use: Vec<String> = machine::read_lsblk()?
-                .blockdevices
-                .iter()
-                .filter(|b| b.dev_path() == d.path)
-                .flat_map(|b| {
-                    b.walk()
-                        .into_iter()
-                        .flat_map(|x| x.mounts())
-                        .collect::<Vec<_>>()
-                })
-                .collect();
-            if matches!(c.disk.target, DiskTarget::Whole) && !in_use.is_empty() {
+        if let Some(path) = self.disk.as_ref().map(|d| d.path.clone())
+            && matches!(c.disk.target, DiskTarget::Whole)
+        {
+            let in_use = machine::in_use(&machine::read_lsblk()?, &path);
+            // The live system turned on the swap it found on this disk, which
+            // the install is about to erase anyway.
+            for swap in &in_use.swaps {
+                self.info(format!("turning off swap on {swap}"));
+                if let Err(e) = self.sh(Cmd::new("swapoff").arg(swap)) {
+                    return Err(StepError {
+                        message: e.message,
+                        hint: Some(format!("Free it and try again: swapoff {swap}")),
+                    });
+                }
+            }
+            if !in_use.mounts.is_empty() {
                 return Err(StepError {
                     message: format!(
-                        "{} is in use (mounted at {}), so nothing got written",
-                        d.path,
-                        in_use.join(", ")
+                        "{path} is in use (mounted at {}), so nothing got written",
+                        in_use.mounts.join(", ")
                     ),
-                    hint: Some(
-                        "Free it and try again: unmount it, and swapoff if it's swap.".into(),
-                    ),
+                    hint: Some("Free it and try again: unmount it.".into()),
                 });
             }
         }
@@ -581,6 +603,9 @@ impl<'a> Install<'a> {
             .collect();
         args.push(dev.clone());
         self.sh(Cmd::new("sgdisk").args(args))?;
+        if matches!(c.disk.target, DiskTarget::FreeSpace { .. }) {
+            self.created = layout.new_parts().iter().map(|p| p.number).collect();
+        }
         self.try_sh(Cmd::new("partprobe").arg(&dev));
         if !self.dry() {
             let _ = self.r.run(&Cmd::new("udevadm").arg("settle"));
@@ -1085,6 +1110,15 @@ impl<'a> Install<'a> {
         Ok(())
     }
 
+    /// Put the other system's EFI/BOOT, set aside in `saved`, back.
+    fn restore_fallback(&mut self, fallback: &str, saved: &str) -> R<()> {
+        self.sh(Cmd::new("rm").args(["-rf", fallback]))?;
+        self.sh(Cmd::new("cp").args(["-r", saved, fallback]))?;
+        self.sh(Cmd::new("rm").args(["-rf", saved]))?;
+        self.info("kept the other system's EFI/BOOT fallback loader");
+        Ok(())
+    }
+
     fn installed_kernels(&mut self) -> Vec<String> {
         if self.dry() {
             return vec![self.manifest.kernel.clone()];
@@ -1157,18 +1191,20 @@ impl<'a> Install<'a> {
         }
         let refs: Vec<&str> = args.iter().map(String::as_str).collect();
         let cmd = self.chroot(&refs);
-        hint(
+        let installed = hint(
             self.sh(cmd).map_err(|e| e.message),
             "grub-install failed; is grub-efi in the payload?",
-        )?;
+        );
         self.progress(0.6, None);
 
         if keep_fallback {
-            self.sh(Cmd::new("rm").args(["-rf", &fallback]))?;
-            self.sh(Cmd::new("cp").args(["-r", &saved, &fallback]))?;
-            self.sh(Cmd::new("rm").args(["-rf", &saved]))?;
-            self.info("kept the other system's EFI/BOOT fallback loader");
+            // Even when grub-install failed: it may have written the path
+            // already, and the saved copy is on the live system's tmpfs.
+            let restored = self.restore_fallback(&fallback, &saved);
+            installed?;
+            restored?;
         } else {
+            installed?;
             // EFI/BOOT/BOOT<arch>.EFI, for firmware that forgets boot
             // entries (VMs).
             let t = format!("--target={grub_target}");

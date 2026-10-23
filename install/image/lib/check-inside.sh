@@ -13,6 +13,8 @@ fail() { printf '  FAIL  %s\n' "$*"; FAILS=$((FAILS + 1)); }
 info() { printf '        %s\n' "$*"; }
 sect() { printf '\n== %s\n' "$*"; }
 check() { local what="$1"; shift; if "$@" >/dev/null 2>&1; then ok "$what"; else fail "$what"; fi; }
+# eq ACTUAL WANT, for `check "..." eq "$(cmd)" value`.
+eq() { [[ "$1" == "$2" ]]; }
 in_root() { chroot "$R" /usr/bin/env -i PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin LANG=C.UTF-8 HOME=/root XDG_RUNTIME_DIR=/tmp "$@"; }
 now() { date +%s.%N; }
 since() { awk -v a="$1" -v b="$(now)" 'BEGIN { printf "%.1f", b - a }'; }
@@ -279,7 +281,13 @@ fi
 # build inputs for that; building one proves it.
 t="$(now)"
 user_flake check-other kubaos-check
-if out="$(nix_offline build --option sandbox false --no-link --print-out-paths \
+# Rosetta (amd64 on Apple Silicon) can't load Nix's seccomp filter, as in
+# assemble.sh. The machine builds with it; only this check goes without.
+build_opts=(--option sandbox false)
+if [[ "$(uname -m)" == x86_64 ]] && grep -qi 'VirtualApple' /proc/cpuinfo; then
+  build_opts+=(--option filter-syscalls false)
+fi
+if out="$(nix_offline build "${build_opts[@]}" --no-link --print-out-paths \
   "path:/tmp/check-other#homeConfigurations.\"kubaos-check@$host\".activationPackage" 2>&1)" &&
   [[ -x "$R$(tail -1 <<<"$out")/activate" ]]; then
   ok "  a generation for another username builds offline ($(since "$t") s)"

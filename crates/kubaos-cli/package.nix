@@ -5,6 +5,8 @@
 {
   lib,
   rustPlatform,
+  # Hashes for Cargo.lock's git crates (home/curated.nix).
+  cargoOutputHashes ? { },
 }:
 
 let
@@ -28,7 +30,9 @@ rustPlatform.buildRustPackage {
 
   cargoLock = {
     lockFile = ../../Cargo.lock;
-    # Kotodama's crates come from git, at the rev in Cargo.lock.
+    # Kotodama's crates come from git, at the rev in Cargo.lock. One with no
+    # hash in outputHashes is cloned during evaluation.
+    outputHashes = cargoOutputHashes;
     allowBuiltinFetchGit = true;
   };
   cargoBuildFlags = [

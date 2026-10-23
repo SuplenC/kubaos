@@ -12,21 +12,23 @@ codename := trim(read(justfile_directory() / "CODENAME"))
 default:
     @just --list
 
-# Build the payload (the whole system as a squashfs) into install/out/payload-<arch>. One at a time.
+# Build the payload (the whole system as a squashfs) into install/out/payload-<arch>, then check it. One at a time.
 payload arch=host:
     install/image/build --arch {{arch}} {{dirty}}
+    install/image/check --arch {{arch}}
 
 # Check a built payload (unpack + chroot checks).
 check arch=host:
     install/image/check --arch {{arch}}
 
-# Build the live ISO into iso/ (builds the payload first if there isn't one). `just iso aarch64 vm` makes the bench ISO (ssh, no firmware).
+# Build the live ISO into iso/ (builds the payload first if there isn't one, and checks it if it hasn't passed). `just iso aarch64 vm` makes the bench ISO (ssh, no firmware).
 iso arch=host profile="release":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{profile}}" in release|vm) ;; *) echo "profile is 'vm' or empty (release)" >&2; exit 2 ;; esac
     p=install/out/payload-{{arch}}
     [[ -f $p/manifest.json ]] || just payload {{arch}}
+    [[ "$(cat "$p/check.ok" 2>/dev/null)" == "$(shasum -a 256 "$p/manifest.json" | cut -d' ' -f1)" ]] || just check {{arch}}
     if [[ "{{profile}}" == vm ]]; then flags=(--profile vm); else flags=(--release); fi
     install/iso/build --arch {{arch}} --payload "$p" "${flags[@]}"
     ls -lh iso/kubaos-{{codename}}-{{ver}}-{{arch}}*.iso
@@ -34,9 +36,7 @@ iso arch=host profile="release":
 # All four ISOs (aarch64 and x86_64, release and vm), after the tests and payload checks. Needs a clean tree.
 release: test
     just payload aarch64
-    just check aarch64
     just payload x86_64
-    just check x86_64
     just iso aarch64 vm
     just iso aarch64
     just iso x86_64 vm

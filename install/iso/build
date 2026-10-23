@@ -20,6 +20,7 @@
 #            (default: branding/iso in the repo, when it exists).
 # --payload DIR: copied to the ISO as /kubaos/payload, mounted in the live
 #            system at /run/kubaos/payload. Default: stub-payload/ (manifest only).
+#            A real payload must have passed install/image/check (check.ok).
 #
 # Docker objects are all called kubaos-iso-*. Limits: KUBAOS_ISO_CPUS (6),
 # KUBAOS_ISO_MEM (8g).
@@ -110,6 +111,23 @@ cmd_build() {
   pv="$(sed -n 's/.*"version" *: *"\([^"]*\)".*/\1/p' "$payload/manifest.json" | head -1)"
   [[ $pv == *-stub || $pv == "$KUBAOS_VERSION" ]] ||
     die "payload $payload is release ${pv:-?}, VERSION says $KUBAOS_VERSION: rebuild it (just payload $arch)"
+  # Only a payload that passed install/image/check goes on an ISO: a payload
+  # that unpacks but can't boot or install is caught there, not on hardware.
+  # check.ok holds the sha256 of the manifest that passed, so a rebuild
+  # without a new check doesn't count.
+  if [[ $pv != *-stub ]]; then
+    local want
+    want="$(shasum -a 256 "$payload/manifest.json" | cut -d' ' -f1)"
+    [[ -f $payload/check.ok && "$(<"$payload/check.ok")" == "$want" ]] ||
+      die "payload $payload hasn't passed install/image/check: run just check $arch"
+    # A payload from another commit passes its check, but ships that
+    # commit's system: say so, since the ISO is named after this tree.
+    local pc head
+    pc="$(sed -n 's/.*"commit" *: *"\([^"]*\)".*/\1/p' "$payload/manifest.json" | head -1)"
+    head="$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
+    [[ -z $head || $pc == "$head"* ]] ||
+      say "warning: payload $payload is from commit ${pc:0:12}, HEAD is ${head:0:12} (just payload $arch rebuilds it)"
+  fi
   if [[ -z $bins ]]; then
     cmd_bins --arch "$arch"
     bins="$OUT/bin/$arch"

@@ -9,6 +9,21 @@
 { pkgs, inputs }:
 let
   inherit (pkgs.stdenv.hostPlatform) system;
+  inherit (pkgs) lib;
+  # Kotodama's crates in Cargo.lock come from git, at the rev of the
+  # `kotodama` input. With the input's hash, rustPlatform fetches them as a
+  # fixed-output derivation, which evaluates without the network. Without
+  # it, it falls back to builtins.fetchGit, which clones during evaluation:
+  # the machine's home then can't evaluate offline (home-manager switch, the
+  # installer's build for a username other than the payload's).
+  # HAZARD: only crates at the input's own rev get the hash. A crate at
+  # another rev would be fetched under the wrong hash and fail to build.
+  kotodamaSource = "git+https://github.com/SuplenC/kotodama?rev=${inputs.kotodama.rev}#${inputs.kotodama.rev}";
+  cargoOutputHashes = lib.listToAttrs (
+    map (crate: lib.nameValuePair "${crate.name}-${crate.version}" inputs.kotodama.narHash) (
+      lib.filter (crate: crate.source or "" == kotodamaSource) (lib.importTOML ../Cargo.lock).package
+    )
+  );
 in
 rec {
   # The Command menu: the `kotodama` command, the Daemon, the Bundled
@@ -17,13 +32,13 @@ rec {
   kotodama = inputs.kotodama.packages.${system}.default;
   # The menu's KubaOS Extension: the actions and the system toggles
   # (home/menu.nix installs it with the Bundled ones).
-  kotodama-kubaos = pkgs.callPackage ../crates/kotodama-kubaos/package.nix { };
+  kotodama-kubaos = pkgs.callPackage ../crates/kotodama-kubaos/package.nix { inherit cargoOutputHashes; };
   # The `kubaos` command, so an update's fixes to it arrive with the release
   # (home/updates.nix installs it).
-  kubaos = pkgs.callPackage ../crates/kubaos-cli/package.nix { };
+  kubaos = pkgs.callPackage ../crates/kubaos-cli/package.nix { inherit cargoOutputHashes; };
   # The file manager's glue: the folder handler and "Show in folder"
   # (home/files.nix).
-  kubaos-files = pkgs.callPackage ../crates/kubaos-files/package.nix { };
+  kubaos-files = pkgs.callPackage ../crates/kubaos-files/package.nix { inherit cargoOutputHashes; };
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (

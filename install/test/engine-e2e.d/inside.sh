@@ -6,7 +6,9 @@
 #
 # Scenarios: sqfs (squashfs payload, snapper), tar (tar.zst payload without
 # snapper: raw btrfs factory snapshot), fail (home step fails: cleanup),
-# dual (free-space install next to a fake Windows, reusing its ESP).
+# dual (free-space install next to a fake Windows, reusing its ESP),
+# dual-fail (the same with a payload that fails to unpack: the free space
+# comes back).
 set -euo pipefail
 
 BIN=/target/release/kubaos
@@ -113,19 +115,26 @@ run_scenario() {
   truncate -s 12G /work/disk.img
   LOOP=$(losetup -fP --show /work/disk.img)
   say "scenario $sc on $LOOP"
-  local payload="$sc" target='{ mode = "whole" }' host=vm
-  if [[ "$sc" == dual ]]; then
-    payload=sqfs
+  local payload="/payload/$sc" target='{ mode = "whole" }' host=vm region=''
+  if [[ "$sc" == dual || "$sc" == dual-fail ]]; then
+    payload=/payload/sqfs
     # A hostname of the owner's own, not the payload's: the payload's home
     # generation still activates, with nothing built.
     host=nerv-hq
     windows_like_disk
     # Kōbō's way: take a free region from probe.
-    local region
     region=$(KUBAOS_TEST=1 "$BIN" probe --json --payload /payload/sqfs |
       jq -c --arg d "$LOOP" '.disks[] | select(.path == $d) | .free_regions[0]')
     echo "free region from probe: $region"
     target=$(jq -r '"{ mode = \"free_space\", start = \(.start), end = \(.end) }"' <<<"$region")
+  fi
+  if [[ "$sc" == dual-fail ]]; then
+    # Half a squashfs, with a manifest that says so: preflight passes and
+    # unsquashfs fails.
+    payload=/work/broken
+    mkdir -p "$payload"
+    head -c "$(($(stat -c %s /payload/sqfs/rootfs.sqfs) / 2))" /payload/sqfs/rootfs.sqfs >"$payload/rootfs.sqfs"
+    manifest "$payload" rootfs.sqfs "$GEN"
   fi
   cat >/work/install.toml <<EOF
 [locale]
@@ -154,7 +163,7 @@ email = "kuba@example.com"
 ssid = "Home 5G"
 
 [payload]
-dir = "/payload/$payload"
+dir = "$payload"
 EOF
   export KUBAOS_TEST=1
   check "validate" "$BIN" validate --config /work/install.toml
@@ -187,6 +196,15 @@ EOF
   if [[ "$sc" == fail ]]; then
     check "exit code 1" eq "$rc" 1
     check "last event is failed at home" eq "$(tail -1 "$ev.jsonl" | jq -r '.type + ":" + .id')" failed:home
+    return
+  fi
+  if [[ "$sc" == dual-fail ]]; then
+    check "exit code 1" eq "$rc" 1
+    check "last event is failed at unpack" eq "$(tail -1 "$ev.jsonl" | jq -r '.type + ":" + .id')" failed:unpack
+    sgdisk -p "$LOOP" >/work/gpt
+    check "GPT: only Windows' three partitions" bash -c "[[ \$(grep -cE '^ +[0-9]+ ' /work/gpt) == 3 ]] && grep -E '^ +2 .* 0700 ' /work/gpt && grep -E '^ +3 .* 2700 ' /work/gpt"
+    check "the free region is free again" eq "$(KUBAOS_TEST=1 "$BIN" probe --json --payload /payload/sqfs |
+      jq -c --arg d "$LOOP" '.disks[] | select(.path == $d) | .free_regions[0]')" "$region"
     return
   fi
 
@@ -301,7 +319,7 @@ case "${1:-}" in
     report
     ;;
   *)
-    echo "usage: $0 prepare | run sqfs|tar|fail|dual" >&2
+    echo "usage: $0 prepare | run sqfs|tar|fail|dual|dual-fail" >&2
     exit 2
     ;;
 esac
