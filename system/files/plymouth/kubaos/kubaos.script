@@ -9,8 +9,9 @@
 # On shutdown and reboot (plymouth-poweroff and plymouth-reboot start it in
 # those modes) the same sign plays backwards: lit, then OS, Kuba, the dakuten,
 # バ and ク sputter out, and the dead glass fades into black, in under two
-# seconds. Nothing waits for it: the machine powers off whenever it is ready,
-# mid-animation or not.
+# seconds. kubaos-shutdown-splash.service holds the final poweroff until 2 s
+# after the splash shows, so keep the whole of it, DARK_AT + DARK_FRAMES, under
+# that.
 #
 # Installed to /usr/share/plymouth/themes/kubaos by system/25-boot.sh. The
 # sign's layers come from branding/neon.py, the rest from branding/boot.py. Text is drawn by label-freetype with

@@ -1,0 +1,24 @@
+# KubaOS: installed to /etc/systemd/system and enabled by
+# install_shutdown_splash (system/lib.sh).
+#
+# The kubaos splash switches its sign off in about 1.7 s on shutdown and
+# reboot (kubaos.script), and Plymouth has no call that says an animation is
+# done. This starts right after plymouthd has shown the splash and holds the
+# final poweroff, reboot or halt until 2 s after that, while the rest of the
+# shutdown goes on beside it: a shutdown that takes longer than that waits for
+# nothing. With no plymouthd running (no `splash` on the kernel line,
+# plymouth.enable=0, a plymouthd that failed) it is skipped.
+[Unit]
+Description=Let the shutdown splash play out
+DefaultDependencies=no
+After=plymouth-poweroff.service plymouth-reboot.service plymouth-halt.service plymouth-kexec.service
+Before=systemd-poweroff.service systemd-reboot.service systemd-halt.service systemd-kexec.service
+
+[Service]
+Type=oneshot
+ExecCondition=/usr/bin/plymouth --ping
+ExecStart=/usr/bin/sleep 2
+TimeoutStartSec=3s
+
+[Install]
+WantedBy=poweroff.target reboot.target halt.target kexec.target

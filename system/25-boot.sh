@@ -58,6 +58,9 @@ install_root_file "$FILES_DIR/fonts/JetBrainsMono-OFL.txt" "$PLY_THEME_DIR/JetBr
 install_root_file "$FILES_DIR/plymouth/conf/plymouthd.conf" /etc/plymouth/plymouthd.conf 0644
 install_root_file "$FILES_DIR/initramfs-tools/hooks/kubaos-plymouth" /etc/initramfs-tools/hooks/kubaos-plymouth 0755
 
+step "Plymouth on poweroff and reboot: once Hyprland has let go of the screen, and played out"
+install_shutdown_splash
+
 step "Snapshot boots: a throwaway overlay over the read-only snapshot"
 install_root_file "$FILES_DIR/initramfs-tools/hooks/kubaos-snapshot-overlay" /etc/initramfs-tools/hooks/kubaos-snapshot-overlay 0755
 install_root_file "$FILES_DIR/initramfs-tools/scripts/local-bottom/kubaos-snapshot-overlay" \

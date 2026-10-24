@@ -2687,6 +2687,7 @@ c_splash() {
   grep -qE '^GRUB_CMDLINE_LINUX_DEFAULT=".*\bsplash\b' "$REPO/system/files/grub/kubaos.cfg" ||
     { echo "FAIL the kernel command line in system/files/grub/kubaos.cfg has no splash"; return 1; }
   echo "ok   poweroff and reboot start Plymouth in its shutdown and reboot modes, and the kernel line has splash"
+  shutdown_splash_migration || return 1
 
   install -d "$theme"
   install -m 0644 "$REPO"/system/files/plymouth/kubaos/* "$theme/"
@@ -2701,6 +2702,36 @@ c_splash() {
   done
   kill "$xvfb" 2>/dev/null
   return "$bad"
+}
+
+# The shutdown-splash system migration on a machine without its units, then
+# a second run, which changes nothing. Plymouth's shutdown units wait for
+# user.slice, the waiter is wanted by every target that ends the machine, and
+# with no plymouthd running its condition fails, so nothing waits.
+shutdown_splash_migration() {
+  local mig out unit
+  mig="$(ls "$REPO"/migrations/system/*-shutdown-splash.sh)"
+  systemctl disable kubaos-shutdown-splash.service >/dev/null 2>&1 || true
+  rm -rf /etc/systemd/system/plymouth-{poweroff,reboot,halt,kexec}.service.d \
+    /etc/systemd/system/kubaos-shutdown-splash.service
+
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig:"; echo "$out" | tail; return 1; }
+
+  for unit in poweroff reboot halt kexec; do
+    grep -qx 'After=user.slice' "/etc/systemd/system/plymouth-$unit.service.d/kubaos-after-session.conf" 2>/dev/null ||
+      { echo "FAIL plymouth-$unit.service isn't ordered after user.slice"; return 1; }
+    [[ -L /etc/systemd/system/$unit.target.wants/kubaos-shutdown-splash.service ]] ||
+      { echo "FAIL $unit.target doesn't want kubaos-shutdown-splash.service"; return 1; }
+  done
+  out="$(systemd-analyze verify /etc/systemd/system/kubaos-shutdown-splash.service 2>&1)" ||
+    { echo "FAIL systemd-analyze verify kubaos-shutdown-splash.service:"; echo "$out"; return 1; }
+  ! plymouth --ping 2>/dev/null || { echo "FAIL plymouth --ping answers with no plymouthd"; return 1; }
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig, run again:"; echo "$out" | tail; return 1; }
+  if grep -E '^\s+\+ |creating|replacing' <<<"$out"; then
+    echo "FAIL the shutdown-splash migration changed something on its second run (above)"
+    return 1
+  fi
+  echo "ok   the shutdown-splash migration: Plymouth after user.slice, the waiter wanted and skipped with no plymouthd"
 }
 
 # splash_mode MODE lit-at SECONDS lit | lit-by SECONDS | black-by SECONDS:

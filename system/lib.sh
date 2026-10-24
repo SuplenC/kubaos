@@ -458,6 +458,31 @@ install_fast_shutdown_boot() {
   fi
 }
 
+# install_shutdown_splash: the splash on poweroff and reboot shows every time
+# and gets to play out. Plymouth's shutdown units start once the sessions
+# have ended, so Hyprland no longer holds the screen, and
+# kubaos-shutdown-splash.service holds the final poweroff for the length of
+# the animation (both explained in their files). 25-boot.sh runs it, and a
+# migration on machines installed before it.
+install_shutdown_splash() {
+  local unit changed=0 dest
+  for unit in poweroff reboot halt kexec; do
+    dest="/etc/systemd/system/plymouth-$unit.service.d/kubaos-after-session.conf"
+    same_content "$FILES_DIR/systemd/plymouth-shutdown.d/kubaos-after-session.conf" "$dest" || changed=1
+    install_root_file "$FILES_DIR/systemd/plymouth-shutdown.d/kubaos-after-session.conf" "$dest" 0644
+  done
+  same_content "$FILES_DIR/systemd/kubaos-shutdown-splash.service" \
+    /etc/systemd/system/kubaos-shutdown-splash.service || changed=1
+  install_root_file "$FILES_DIR/systemd/kubaos-shutdown-splash.service" \
+    /etc/systemd/system/kubaos-shutdown-splash.service 0644
+  # The running manager reads unit files and their wants at a reload; without
+  # one the next shutdown still runs on the old ones.
+  if ((changed)) && has_systemd; then
+    sudo_run systemctl daemon-reload
+  fi
+  boot_unit kubaos-shutdown-splash.service enable
+}
+
 common_usage() {
   cat <<EOF
 Common flags:
