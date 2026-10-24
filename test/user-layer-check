@@ -38,7 +38,8 @@ USER_FILES=(hypr/hyprland.lua hypr/hypridle.conf hypr/hyprlock.conf tmux/tmux.co
   foot/foot.ini ghostty/config fuzzel/fuzzel.ini nvim/options.lua nvim/keymaps.lua nvim/autocmds.lua
   nvim/plugins/example.lua nvim/lazy-lock.json nvim/lazyvim.json lazygit/config.yml bacon/prefs.toml
   bat/config fastfetch/config.jsonc yazi/yazi.toml yazi/keymap.toml zsh/zshrc kotodama/user.toml
-  quickshell/settings.json cursor/cursor.toml keyboard/keyboard.toml clock/clock.toml)
+  quickshell/settings.json cursor/cursor.toml keyboard/keyboard.toml clock/clock.toml
+  sysmon/sysmon.toml)
 # Files the app rewrites itself: copied from the defaults once, then the user's.
 SEEDED=(btop/btop.conf tms/config.toml)
 
@@ -95,6 +96,7 @@ printf '%s\n' '// mine' '{ "menuMotion": "fades" }' >"$U/quickshell/settings.jso
 add "$U/cursor/cursor.toml" 'size = 32'
 add "$U/keyboard/keyboard.toml" 'mac_accents = false'
 add "$U/clock/clock.toml" 'analog = true'
+add "$U/sysmon/sysmon.toml" 'style = "bars"'
 add "$C/btop/btop.conf" 'update_ms = 1717'
 add "$C/tms/config.toml" '# user probe'
 before="$(hashes)"

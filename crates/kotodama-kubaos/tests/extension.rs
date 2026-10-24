@@ -211,3 +211,28 @@ fn a_query_that_is_not_a_date_is_answered_with_nothing() {
         }
     );
 }
+
+#[test]
+fn ram_is_answered_by_the_monitor() {
+    let runtime = tempfile::tempdir().expect("a runtime folder");
+    let mut extension = Spawned::start(
+        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_RUNTIME_DIR", runtime.path()),
+        WAIT,
+    );
+    extension.status();
+
+    extension.send(ToExtension::LiveQuery {
+        id: 5,
+        query: "ram".to_owned(),
+        prefix: None,
+    });
+    let FromExtension::LiveResults { results, done, .. } = extension.recv() else {
+        panic!("no Live results");
+    };
+
+    assert!(done);
+    assert_eq!(results.len(), 1);
+    assert!(results[0].answer);
+    assert_eq!(results[0].item.kind.name(), "kubaos.sysmon");
+    assert!(results[0].item.title.starts_with("RAM"), "{}", results[0].item.title);
+}

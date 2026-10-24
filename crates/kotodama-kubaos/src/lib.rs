@@ -9,6 +9,8 @@
 //! - The registry, the toggles, the keyboard layouts, the wallpaper sets, the user folders, the
 //!   mounted drives, and what each of their Actions runs.
 //! - The date answers, from the clock popup's engine.
+//! - The monitor answers (`cpu`, `ram`, `battery`) and the process search, from the system
+//!   monitor.
 //!
 //! # Not here
 //!
@@ -26,6 +28,7 @@ pub mod extension;
 pub mod files;
 pub mod keyboard;
 pub mod registry;
+pub mod sysmon;
 pub mod run;
 pub mod toggles;
 pub mod updates;

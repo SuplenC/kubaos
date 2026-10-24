@@ -13,6 +13,7 @@ import qs.modules.controlcenter
 import qs.modules.notifications
 import qs.modules.osd
 import qs.modules.powermenu
+import qs.modules.sysmon
 import qs.modules.wallpaper
 import "../../components/drawerpath.js" as DrawerPath
 
@@ -111,7 +112,8 @@ Scope {
             opacity: ({
                     powermenu: 0.45,
                     controlcenter: 0.2,
-                    clock: 0.2
+                    clock: 0.2,
+                    sysmon: 0.2
                 })[root.panel] ?? 0
             visible: opacity > 0
 
@@ -160,6 +162,10 @@ Scope {
 
                 PanelPath {
                     drawer: clockPopup
+                }
+
+                PanelPath {
+                    drawer: sysmonPopup
                 }
 
                 PanelPath {
@@ -222,6 +228,13 @@ Scope {
 
                 frame: geo
                 shown: root.panel === "clock"
+            }
+
+            SysmonPopup {
+                id: sysmonPopup
+
+                frame: geo
+                shown: root.panel === "sysmon"
             }
 
             PowerMenu {

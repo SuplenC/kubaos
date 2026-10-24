@@ -19,6 +19,7 @@
     ./shell.nix
     ./state.nix
     ./suites.nix
+    ./sysmon.nix
     ./terminal.nix
     ./theme.nix
     ./updates.nix

@@ -3,8 +3,8 @@
 //! change the update check writes, each change to the keyboard layouts, to
 //! the wallpaper sets file and to the drives file; each config also reads the
 //! user folders again; each run is answered with its outcome, after the View it
-//! pushes or pops. Each Live query is answered at once, with a date answer or
-//! nothing.
+//! pushes or pops. Each Live query is answered at once, with a monitor answer,
+//! processes to stop, a date answer, or nothing.
 //!
 //! # Owns
 //!
@@ -41,6 +41,8 @@ use kotodama_kubaos::extension::Extension;
 use kotodama_kubaos::files::UserFolders;
 use kotodama_kubaos::keyboard::Keyboards;
 use kotodama_kubaos::run::Programs;
+use kotodama_kubaos::sysmon;
+use kotodama_kubaos::sysmon::Monitor;
 use kotodama_kubaos::toggles::Ran;
 use kotodama_kubaos::updates;
 use kotodama_kubaos::updates::Pending;
@@ -49,10 +51,13 @@ use kotodama_kubaos::wallpapers::WallpaperSets;
 use kotodama_protocol::Clipboard;
 use kotodama_protocol::Error;
 use kotodama_protocol::FromExtension;
+use kotodama_protocol::LiveResult;
 use kotodama_protocol::Outcome;
 use kotodama_protocol::ToExtension;
 use kubaos_clock::settings as clock_settings;
 use kubaos_core::keyboard;
+use kubaos_sysmon::processes;
+use kubaos_sysmon::serve;
 
 /// How long the update check's folder stays quiet before its file is read:
 /// the check writes it through a temporary file and a rename.
@@ -70,6 +75,38 @@ enum Own {
     Drives(Drives),
 }
 
+/// What answers Live queries: the system monitor, then the dates.
+struct Answers {
+    dates: Dates,
+    monitor: Monitor,
+}
+
+impl Answers {
+    /// The kinds of the Items they answer with, whose Actions they run.
+    const KINDS: [&str; 3] = [clock::KIND, sysmon::KIND, sysmon::PROCESS_KIND];
+
+    fn live(&mut self, query: &str) -> Vec<LiveResult> {
+        let mut results = self.monitor.live(query, serve::now_ms());
+        if results.is_empty() {
+            results.extend(self.dates.live(query, &Zoned::now()));
+        }
+        results
+    }
+
+    fn run(&mut self, kind: &str, action: &str, id: &str) -> Outcome {
+        let ran = if kind == clock::KIND {
+            self.dates.run(action, id, &Zoned::now(), &Programs)
+        } else {
+            self.monitor.run(kind, action, id, &Programs, processes::signal)
+        };
+        match ran {
+            Ok(Some(text)) => Outcome::Copy(Clipboard::Text(text)),
+            Ok(None) => Outcome::Close,
+            Err(message) => Outcome::Failed { message },
+        }
+    }
+}
+
 fn main() -> ExitCode {
     kotodama_extension::main("kotodama-kubaos", run)
 }
@@ -81,7 +118,10 @@ fn run() -> Result<(), Error> {
         received,
     } = kotodama_extension::connect::<Own>()?;
     let mut extension = Extension::new(SystemBus, Programs);
-    let mut dates = Dates::new(clock_settings::dir());
+    let mut answers = Answers {
+        dates: Dates::new(clock_settings::dir()),
+        monitor: Monitor::new("/", serve::stream_file()),
+    };
     let mut sent = SentItems::default();
     // The toggles work on any machine, and the actions need only their programs.
     SentStatus::default().usable(&mut writer)?;
@@ -131,7 +171,7 @@ fn run() -> Result<(), Error> {
             Event::Message(ToExtension::LiveQuery { id, query, .. }) => {
                 writer.send(&FromExtension::LiveResults {
                     live_query: id,
-                    results: dates.live(&query, &Zoned::now()).into_iter().collect(),
+                    results: answers.live(&query),
                     done: true,
                 })?;
             }
@@ -140,12 +180,8 @@ fn run() -> Result<(), Error> {
                 action,
                 item,
                 ..
-            }) if item.kind.name() == clock::KIND => {
-                let outcome = match dates.run(&action, &item.id, &Zoned::now(), &Programs) {
-                    Ok(Some(text)) => Outcome::Copy(Clipboard::Text(text)),
-                    Ok(None) => Outcome::Close,
-                    Err(message) => Outcome::Failed { message },
-                };
+            }) if Answers::KINDS.contains(&item.kind.name()) => {
+                let outcome = answers.run(item.kind.name(), &action, &item.id);
                 writer.send(&FromExtension::ActionDone { invocation, outcome })?;
             }
             Event::Message(ToExtension::RunAction {

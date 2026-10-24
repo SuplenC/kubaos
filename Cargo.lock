@@ -2109,6 +2109,7 @@ dependencies = [
  "kotodama-protocol",
  "kubaos-clock",
  "kubaos-core",
+ "kubaos-sysmon",
  "tempfile",
  "thiserror 2.0.21",
  "toml 0.9.12+spec-1.1.0",
@@ -2250,6 +2251,19 @@ dependencies = [
  "signal-hook",
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "kubaos-sysmon"
+version = "0.1.0"
+dependencies = [
+ "rustix 1.1.5",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml 0.9.12+spec-1.1.0",
+ "toml_edit",
 ]
 
 [[package]]

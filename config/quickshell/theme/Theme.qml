@@ -57,6 +57,10 @@ Singleton {
     readonly property color m3inverseSurface: palette.inverse_surface
     readonly property color m3inverseOnSurface: palette.inverse_on_surface
     readonly property color m3inversePrimary: palette.inverse_primary
+    // Amber, between fine and the error colour: a reading close to its limit.
+    // Material 3 has no such role, so matugen never writes it and the default
+    // below holds.
+    readonly property color warning: palette.warning
 
     // Same color with a different alpha.
     function alpha(c: color, a: real): color {
@@ -194,7 +198,8 @@ Singleton {
             scrim: "#000000",
             inverse_surface: "#f0dfd4",
             inverse_on_surface: "#382f27",
-            inverse_primary: "#8e4e00"
+            inverse_primary: "#8e4e00",
+            warning: "#f2c14e"
         })
 
     function load(text: string): void {

@@ -3,8 +3,10 @@
 # (`kubaos-kobo`), its graphical front end, the Command menu's KubaOS
 # Extension (`kotodama-kubaos`), yazi's launcher and the Downloads tidy
 # (`kubaos-files`), the Bluetooth pairing agent (`kubaos-bluetooth`), the
-# automount for removable drives (`kubaos-automount`), and the date engine
-# behind the clock popup and the menu's date answers (`kubaos-clock`).
+# automount for removable drives (`kubaos-automount`), the date engine
+# behind the clock popup and the menu's date answers (`kubaos-clock`), and the
+# system monitor behind the bar's pill, its popup and the menu's `cpu`, `ram`
+# and `battery` answers (`kubaos-sysmon`).
 [workspace]
 resolver = "3"
 members = [
@@ -17,6 +19,7 @@ members = [
     "crates/kubaos-bluetooth",
     "crates/kubaos-automount",
     "crates/kubaos-clock",
+    "crates/kubaos-sysmon",
 ]
 
 [workspace.package]
@@ -28,6 +31,7 @@ license = "MIT OR Apache-2.0"
 kubaos-core = { path = "crates/kubaos-core" }
 kubaos-cursor = { path = "crates/kubaos-cursor" }
 kubaos-clock = { path = "crates/kubaos-clock" }
+kubaos-sysmon = { path = "crates/kubaos-sysmon" }
 # Kotodama's calculator reads dates with jiff too, so the menu and the popup agree on zones and
 # DST. The time zone database is the system's (`/usr/share/zoneinfo`, or `$TZDIR`), never bundled.
 jiff = { version = "0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo"] }
