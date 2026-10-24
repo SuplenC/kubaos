@@ -1,0 +1,14 @@
+// Lets the user at the machine start and stop keyd without a password:
+// `kubaos keyboard accents on|off` does, from the Command menu and at login.
+// keyd only runs the Mac-style accents on Left Alt (system/files/keyd), so
+// starting or stopping it changes nothing else. Installed as
+// /etc/polkit-1/rules.d/50-kubaos-keyd.rules by system/50-hyprland.sh.
+// https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.systemd1.html#Security
+polkit.addRule(function (action, subject) {
+  if (action.id == "org.freedesktop.systemd1.manage-units" &&
+      action.lookup("unit") == "keyd.service" &&
+      (action.lookup("verb") == "start" || action.lookup("verb") == "stop") &&
+      subject.local && subject.active) {
+    return polkit.Result.YES;
+  }
+});

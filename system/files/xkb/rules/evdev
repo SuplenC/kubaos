@@ -1,0 +1,10 @@
+// KubaOS's XKB options, on top of the system's rules: installed as
+// /etc/xkb/rules/evdev by system/50-hyprland.sh. libxkbcommon looks in
+// /etc/xkb before /usr/share/X11/xkb, so this file stands in for the
+// system's evdev rules and includes them whole.
+// https://xkbcommon.org/doc/current/user-configuration.html
+
+! include %S/evdev
+
+! option = symbols
+  kubaos:mac-accents = +kubaos(mac-accents)

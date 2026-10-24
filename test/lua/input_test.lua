@@ -28,8 +28,9 @@ end
 local real_open = io.open
 
 -- input.lua's `input` settings with /etc/default/keyboard holding `text`
--- (no file at all for nil).
-local function input_for(text)
+-- (no file at all for nil), and the accents' XKB symbols installed when
+-- `accents` is true.
+local function input_for(text, accents)
   local path = os.tmpname()
   if text then
     local f = assert(real_open(path, "w"))
@@ -41,6 +42,9 @@ local function input_for(text)
   io.open = function(name, mode)
     if name == "/etc/default/keyboard" then
       return real_open(path, mode)
+    end
+    if name == "/etc/xkb/symbols/kubaos" then
+      return accents and real_open(repo .. "/system/files/xkb/symbols/kubaos", mode) or nil
     end
     return real_open(name, mode)
   end
@@ -74,6 +78,23 @@ test("without the file the layout is US", function()
   local input = input_for(nil)
   same(input.kb_layout, "us", "kb_layout")
   same(input.kb_variant, "", "kb_variant")
+end)
+
+test("the accents' XKB option follows the file's own options", function()
+  local input = input_for('XKBLAYOUT="us,it"\nXKBOPTIONS="grp:alt_shift_toggle"\n', true)
+  same(input.kb_options, "grp:alt_shift_toggle,kubaos:mac-accents", "kb_options")
+end)
+
+test("the accents' XKB option stands alone without other options, and once", function()
+  same(input_for("XKBLAYOUT=us\n", true).kb_options, "kubaos:mac-accents", "kb_options")
+  same(input_for(nil, true).kb_options, "kubaos:mac-accents", "kb_options without the file")
+  local twice = input_for('XKBLAYOUT=us\nXKBOPTIONS="kubaos:mac-accents"\n', true)
+  same(twice.kb_options, "kubaos:mac-accents", "kb_options already naming it")
+end)
+
+test("without the accents' XKB symbols the options are the file's", function()
+  local input = input_for('XKBLAYOUT=us\nXKBOPTIONS="caps:escape"\n', false)
+  same(input.kb_options, "caps:escape", "kb_options")
 end)
 
 os.exit(failed == 0 and 0 or 1)

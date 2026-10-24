@@ -8,13 +8,15 @@ import qs.services
 // Side sheet on the right edge, from the bar down to the bottom border:
 // header, quick toggles, capture (screenshot, annotate, record, replay),
 // sliders, and tabs for Wi-Fi, Bluetooth, audio
-// output and notification history.
+// output, notification history and keyboard layouts.
 // Keys: Tab/Shift+Tab move between controls, h/l switch tabs on the tab bar,
-// 1-4 jump to a tab, j/k move in lists, Esc closes.
+// 1-5 jump to a tab, j/k move in lists, Esc closes.
 Drawer {
     id: root
 
     property int tab: 0
+    // The Keyboard tab, which the keyboard tile's arrow opens.
+    readonly property int keyboardTab: 4
     readonly property bool scanWifi: shown && tab === 0
     readonly property var kanji: ["日", "月", "火", "水", "木", "金", "土"]
 
@@ -112,6 +114,7 @@ Drawer {
             id: toggles
 
             Layout.fillWidth: true
+            onKeyboardExpanded: root.tab = root.keyboardTab
         }
 
         CaptureRow {
@@ -137,7 +140,7 @@ Drawer {
                     id: tabBar
 
                     Layout.fillWidth: true
-                    labels: ["Wi-Fi", "Bluetooth", "Output", "Notifications"]
+                    labels: ["Wi-Fi", "Bluetooth", "Output", "Notifications", "Keyboard"]
                     currentIndex: root.tab
                     onPicked: index => root.tab = index
                 }
@@ -155,6 +158,8 @@ Drawer {
                     OutputList {}
 
                     NotificationHistory {}
+
+                    KeyboardList {}
                 }
             }
         }

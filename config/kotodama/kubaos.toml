@@ -276,6 +276,25 @@ keyword = "keyboard-layouts"
 run = ["kubaos", "keyboard", "set", "{layouts}"]
 arguments = [{ name = "layouts", placeholder = "us,it" }]
 
+# Mac-style accents on Left Alt (kubaos keyboard accents), whatever the
+# layout: Left Alt + e, `, u, i or n, then the letter. Kept in
+# ~/.config/kubaos/keyboard/keyboard.toml; the chords are in the Shortcuts
+# View (SUPER + F1).
+
+[extensions.kubaos.actions.mac-accents-on]
+title = "Mac accents on Left Alt: on"
+subtitle = "Left Alt + e, then e, is é. Also ` à, u ö, i ô and n ñ"
+icon = "input-keyboard"
+keywords = ["accents", "dead keys", "option key", "macos", "diacritics", "keyboard"]
+run = ["kubaos", "keyboard", "accents", "on"]
+
+[extensions.kubaos.actions.mac-accents-off]
+title = "Mac accents on Left Alt: off"
+subtitle = "Left Alt is plain Alt again, e, `, u, i and n too"
+icon = "input-keyboard"
+keywords = ["accents", "dead keys", "option key", "macos", "diacritics", "keyboard"]
+run = ["kubaos", "keyboard", "accents", "off"]
+
 # The shell's panels and notifications (config/quickshell/IpcHandlers.qml).
 
 [extensions.kubaos.actions.control-center]

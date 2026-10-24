@@ -1,0 +1,29 @@
+// KubaOS's XKB symbols, installed as /etc/xkb/symbols/kubaos by
+// system/50-hyprland.sh and named by the options in /etc/xkb/rules/evdev.
+// Generated from crates/kubaos-core/src/keyboard/accents.rs; a test fails
+// when the two differ.
+
+// The keys keyd sends for the Mac-style accents on Left Alt
+// (system/files/keyd/kubaos.conf): a dead key for each mark, and the marks
+// alone for Space after a chord. No layout in xkeyboard-config puts a symbol
+// on these keycodes, and a key with one group types the same in every
+// layout, so they work whichever layout is active.
+partial
+xkb_symbols "mac-accents" {
+    // Left Alt + e: keyd's `move`.
+    key <I183> { [ dead_acute ] };
+    // Left Alt + `: keyd's `edit`.
+    key <I184> { [ dead_grave ] };
+    // Left Alt + u: keyd's `bassboost`.
+    key <I217> { [ dead_diaeresis ] };
+    // Left Alt + i: keyd's `question`.
+    key <I222> { [ dead_circumflex ] };
+    // Left Alt + n: keyd's `iso`.
+    key <I178> { [ dead_tilde ] };
+    // Space after a chord: keyd's `setup`.
+    key <I149> { [ acute, grave ] };
+    // Space after a chord: keyd's `deletefile`.
+    key <I154> { [ diaeresis, U02C6 ] };
+    // Space after a chord: keyd's `closecd`.
+    key <I168> { [ U02DC ] };
+};

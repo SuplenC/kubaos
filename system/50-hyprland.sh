@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Phase 5: Hyprland from ppa:cppiber/hyprland, held so apt never moves it,
-# getty autologin on tty1, PAM services for the Quickshell lock screen.
+# getty autologin on tty1, PAM services for the Quickshell lock screen, and
+# keyd for the Mac-style accents on Left Alt.
 #
 # Hyprland itself is started by ~/.zprofile sourcing
 # system/files/hyprland-autostart.zsh (exec start-hyprland on tty1).
@@ -177,6 +178,10 @@ if udevadm control --ping 2>/dev/null; then
   sudo_run udevadm control --reload
   sudo_run udevadm trigger --subsystem-match=backlight --subsystem-match=leds --action=add
 fi
+
+# --------------------------------------------------------------------------
+step "Mac-style accents on Left Alt (keyd, the kubaos:mac-accents XKB option)"
+install_mac_accents
 
 # --------------------------------------------------------------------------
 step "Snapshot"

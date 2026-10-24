@@ -6,7 +6,9 @@
 //! - A layout and its `layout(variant)` spelling, the rules a list of them follows, and the
 //!   changes the Command menu and `kubaos keyboard` make to one.
 //! - Reading and writing the layout fields of `/etc/default/keyboard`, and the layout names in
-//!   xkb's rules `.lst` files.
+//!   xkb's rules `.lst` files, with the catalogue of every layout and variant by name.
+//! - The Mac-style accents on Left Alt: their table ([`accents`]) and their setting
+//!   ([`settings`]).
 //!
 //! # Not here
 //!
@@ -84,6 +86,9 @@ pub enum LayoutsError {
     NotThere(String),
     #[error("the last keyboard layout stays")]
     Last,
+    /// A move to a place past the last, with the number of layouts.
+    #[error("keyboard layouts go from place 1 to {0}")]
+    Place(usize),
 }
 
 /// Every problem with `layouts`, in order. `known` holds the layout names the machine has; empty
@@ -211,6 +216,8 @@ pub enum Change {
     Remove(Layout),
     /// Moves one to the front, where it is the default.
     MakeDefault(Layout),
+    /// Moves one to the place at this index, the front 0.
+    Move(Layout, usize),
     /// Replaces them all.
     Set(Vec<Layout>),
 }
@@ -220,8 +227,8 @@ impl Change {
     ///
     /// # Errors
     ///
-    /// The first problem with the result, or a removal or a new default that names a layout
-    /// that isn't there, or the removal of the last one.
+    /// The first problem with the result, a removal, a move or a new default that names a
+    /// layout that isn't there, the removal of the last one, or a move past the last place.
     pub fn apply(self, layouts: &[Layout], known: &[String]) -> Result<Vec<Layout>, LayoutsError> {
         let not_there = |l: &Layout| LayoutsError::NotThere(l.to_string());
         let next = match self {
@@ -246,6 +253,18 @@ impl Change {
                 std::iter::once(l.clone())
                     .chain(layouts.iter().filter(|x| **x != l).cloned())
                     .collect()
+            }
+            Change::Move(l, to) => {
+                let Some(from) = layouts.iter().position(|x| *x == l) else {
+                    return Err(not_there(&l));
+                };
+                if to >= layouts.len() {
+                    return Err(LayoutsError::Place(layouts.len()));
+                }
+                let mut next = layouts.to_vec();
+                let moved = next.remove(from);
+                next.insert(to, moved);
+                next
             }
             Change::Set(next) => next,
         };
@@ -291,6 +310,17 @@ pub fn names(lst: &str) -> HashMap<String, String> {
     out
 }
 
+/// Every layout and variant in an xkb rules `.lst` file with its name, sorted by name, as a
+/// list to pick a layout from shows them.
+pub fn catalogue(lst: &str) -> Vec<(Layout, String)> {
+    let mut out: Vec<(Layout, String)> = names(lst)
+        .into_iter()
+        .map(|(spelled, name)| (Layout::parse(&spelled), name))
+        .collect();
+    out.sort_by_cached_key(|(layout, name)| (name.to_lowercase(), layout.to_string()));
+    out
+}
+
 /// What a person calls `layout`: its name in `names`, else its spelling in capitals.
 pub fn name(layout: &Layout, names: &HashMap<String, String>) -> String {
     names
@@ -298,6 +328,9 @@ pub fn name(layout: &Layout, names: &HashMap<String, String>) -> String {
         .cloned()
         .unwrap_or_else(|| layout.to_string().to_uppercase())
 }
+
+pub mod accents;
+pub mod settings;
 
 #[cfg(test)]
 mod tests;

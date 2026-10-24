@@ -110,6 +110,7 @@ Takeaways: oh-my-zsh costs a few milliseconds once its cache exists, and the who
 | cliphist (not installed) | Keep as the planned backend | none | Release v0.7.0 2025-10-11 is a year old, but commits 2026-10-07 and 54 repos. If clipboard history is added, take nixpkgs 0.7.0, not Ubuntu's 0.5.0 | None |
 | hypridle, hyprlock, hyprpolkitagent | Keep | none | hyprwm: hypridle v0.1.8 2026-07, hyprlock v0.9.6 2026-07, hyprpolkitagent v0.2.0 2026-09. Ubuntu has older (0.1.7, 0.9.2, 0.1.3); the PPA provides them | None |
 | matugen | Keep | none | v4.2.0 2026-08-17, nixpkgs 4.0.0 | None |
+| keyd (added 2026-10-24, Mac-style accents on Left Alt) | Adopt | us(mac) layout, kanata, xremap, an input method (fcitx5) | keyd 2.5.0 in Ubuntu 26.04 universe, a small C daemon on evdev and uinput, below the compositor. us(mac) changes the user's layout, which the feature must not. kanata and xremap aren't in Ubuntu. An input method is a second daemon in every app. keyd's own unicode output types a compose sequence with the US layout's keys, so KubaOS doesn't use it: keyd sends a dead key on a keycode no layout uses, and the `kubaos:mac-accents` XKB option gives it its symbol in every layout | One root daemon over every keyboard; turning the accents off stops it (a polkit rule for `keyd.service`) |
 | Quickshell, PipeWire/WirePlumber | Keep | n/a | User's own shell; PipeWire is the standard | None |
 
 ## System

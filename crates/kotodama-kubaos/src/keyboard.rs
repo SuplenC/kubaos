@@ -1,5 +1,5 @@
-//! The keyboard layouts in the menu: one Item a layout to switch to it, make it the default or
-//! remove it, and "Keyboard: add a layout". They are the layouts of `/etc/default/keyboard`, the
+//! The keyboard layouts in the menu: one Item a layout to switch to it, make it the default, move
+//! it up or down or remove it, and "Keyboard: add a layout". They are the layouts of `/etc/default/keyboard`, the
 //! file the install wrote and `kubaos keyboard` changes.
 //!
 //! Switching is `hyprctl switchxkblayout`, at once. A change to the layouts is checked here, so
@@ -47,6 +47,8 @@ const LAYOUT_PREFIX: &str = "keyboard:";
 /// The one Action of add, and a layout's primary Action: switch to it.
 pub const RUN: &str = "run";
 pub const MAKE_DEFAULT: &str = "default";
+pub const MOVE_UP: &str = "move-up";
+pub const MOVE_DOWN: &str = "move-down";
 pub const REMOVE: &str = "remove";
 
 /// The Argument of add.
@@ -88,10 +90,15 @@ impl Keyboards {
             return Vec::new();
         }
         let several = self.layouts.len() > 1;
+        let last = self.layouts.len() - 1;
         let layouts = self.layouts.iter().enumerate().map(|(index, layout)| {
             let mut actions = vec![Action::new(RUN, "Type with it")];
             if index > 0 {
                 actions.push(Action::new(MAKE_DEFAULT, "Make default"));
+                actions.push(Action::new(MOVE_UP, "Move up"));
+            }
+            if index < last {
+                actions.push(Action::new(MOVE_DOWN, "Move down"));
             }
             if several {
                 actions.push(Action::new(REMOVE, "Remove"));
@@ -136,7 +143,7 @@ impl Keyboards {
         let unknown = || format!("`{id}` has no Action `{action}`");
         if (id, action) == (ADD, RUN) {
             let typed = arguments.get(LAYOUT).map_or("", |typed| typed.trim());
-            return self.change(runner, Change::Add(Layout::parse(typed)), "add", typed);
+            return self.change(runner, Change::Add(Layout::parse(typed)), &["add", typed]);
         }
         let spelled = id.strip_prefix(LAYOUT_PREFIX).ok_or_else(unknown)?;
         let layout = Layout::parse(spelled);
@@ -147,18 +154,41 @@ impl Keyboards {
             .ok_or_else(|| format!("`{spelled}` isn't one of the keyboard layouts"))?;
         match action {
             RUN => switch(runner, index),
-            MAKE_DEFAULT => self.change(runner, Change::MakeDefault(layout), "default", spelled),
-            REMOVE => self.change(runner, Change::Remove(layout), "remove", spelled),
+            MAKE_DEFAULT => self.change(runner, Change::MakeDefault(layout), &["default", spelled]),
+            MOVE_UP => {
+                let to = index
+                    .checked_sub(1)
+                    .ok_or_else(|| format!("`{spelled}` is the first keyboard layout already"))?;
+                self.move_to(runner, layout, to)
+            }
+            MOVE_DOWN => {
+                let to = Some(index + 1)
+                    .filter(|&to| to < self.layouts.len())
+                    .ok_or_else(|| format!("`{spelled}` is the last keyboard layout already"))?;
+                self.move_to(runner, layout, to)
+            }
+            REMOVE => self.change(runner, Change::Remove(layout), &["remove", spelled]),
             _ => Err(unknown()),
         }
     }
 
-    /// Checks `change`, then leaves the writing to `kubaos keyboard <word> <layout>`.
-    fn change(&self, runner: &impl Runner, change: Change, word: &str, layout: &str) -> Result<Ran, String> {
+    /// Moves `layout` to the place at `to`, which `kubaos keyboard move` counts from 1.
+    fn move_to(&self, runner: &impl Runner, layout: Layout, to: usize) -> Result<Ran, String> {
+        let spelled = layout.to_string();
+        let place = (to + 1).to_string();
+        self.change(runner, Change::Move(layout, to), &["move", &spelled, &place])
+    }
+
+    /// Checks `change`, then leaves the writing to `kubaos keyboard <words>`.
+    fn change(&self, runner: &impl Runner, change: Change, words: &[&str]) -> Result<Ran, String> {
         change
             .apply(&self.layouts, &self.known)
             .map_err(|err| capitalise(&err.to_string()))?;
-        let argv = ["kubaos", "keyboard", word, layout].map(str::to_owned);
+        let argv: Vec<String> = ["kubaos", "keyboard"]
+            .iter()
+            .chain(words)
+            .map(|&word| word.to_owned())
+            .collect();
         runner
             .launch(&argv, Duration::ZERO)
             .map_err(|err| Chain(&err).to_string())?;

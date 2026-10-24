@@ -4,8 +4,14 @@ import Quickshell.Services.UPower
 import qs.theme
 import qs.services
 
-// Wi-Fi, Bluetooth, do-not-disturb, power profile and wallpaper motion tiles.
+// Wi-Fi, Bluetooth, do-not-disturb, power profile, wallpaper motion and
+// keyboard layout tiles.
 GridLayout {
+    id: root
+
+    // The keyboard tile's arrow: the control center shows its layouts tab.
+    signal keyboardExpanded
+
     columns: 2
     rowSpacing: Theme.spacing.sm
     columnSpacing: Theme.spacing.sm
@@ -55,11 +61,23 @@ GridLayout {
     // Always -> On AC -> Never. Remembered across restarts (services/Motion.qml).
     QuickTile {
         Layout.fillWidth: true
-        Layout.columnSpan: 2
         icon: Motion.mode === "never" ? "motion_photos_off" : Motion.mode === "always" ? "motion_photos_on" : "motion_photos_auto"
         title: "Wallpaper motion"
-        subtitle: Motion.mode === "never" ? "Never. Posters only" : Motion.mode === "always" ? "Always. Battery be damned" : Motion.onBattery ? "Only on AC. Paused, you're on battery" : "Only on AC. Plugged in, so it moves"
+        subtitle: Motion.mode === "never" ? "Never" : Motion.mode === "always" ? "Always" : Motion.onBattery ? "On AC, paused" : "On AC"
         checked: Motion.mode !== "never"
         onClicked: Motion.cycle()
+    }
+
+    // The layout in use; a click switches to the next, as the bar's pill does.
+    // The arrow lists them, to add, remove, reorder or pick the default.
+    QuickTile {
+        Layout.fillWidth: true
+        icon: "keyboard"
+        title: "Keyboard"
+        subtitle: Keyboard.several ? `${Keyboard.code} · ${Keyboard.active + 1} of ${Keyboard.layouts.length}` : Keyboard.code || "Layouts"
+        checked: Keyboard.several
+        expandable: true
+        onClicked: Keyboard.next()
+        onExpanded: root.keyboardExpanded()
     }
 }

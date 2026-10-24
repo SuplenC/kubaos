@@ -5,6 +5,8 @@ import qs.components
 
 // Toggle tile: icon, title and a status line. Enter or Space activates.
 // On, it fills with primary and its corners round further (M3 shape morph).
+// With `expandable`, an arrow at its end opens the tile's list (expanded());
+// Right does too, from the keyboard.
 Rectangle {
     id: root
 
@@ -12,8 +14,10 @@ Rectangle {
     property string title
     property string subtitle
     property bool checked: false
+    property bool expandable: false
 
     signal clicked
+    signal expanded
 
     implicitHeight: 58
     radius: stateLayer.pressed ? Theme.rounding.md : checked ? Theme.rounding.xxl : Theme.rounding.lg
@@ -23,6 +27,11 @@ Rectangle {
     Keys.onReturnPressed: clicked()
     Keys.onEnterPressed: clicked()
     Keys.onSpacePressed: clicked()
+    Keys.onRightPressed: event => {
+        event.accepted = expandable;
+        if (expandable)
+            expanded();
+    }
 
     Behavior on color {
         CAnim {}
@@ -38,7 +47,7 @@ Rectangle {
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: Theme.spacing.lg
-        anchors.rightMargin: Theme.spacing.md
+        anchors.rightMargin: root.expandable ? arrow.width + Theme.spacing.xs * 2 : Theme.spacing.md
         spacing: Theme.spacing.md
 
         Icon {
@@ -73,6 +82,22 @@ Rectangle {
 
         color: root.checked ? Theme.m3onPrimary : Theme.m3onSurface
         onClicked: root.clicked()
+    }
+
+    // After the StateLayer, so its clicks reach it and not the tile.
+    IconButton {
+        id: arrow
+
+        anchors.right: parent.right
+        anchors.rightMargin: Theme.spacing.xs
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.expandable
+        activeFocusOnTab: false
+        size: 32
+        icon: "chevron_right"
+        tooltip: `${root.title} settings`
+        tint: root.checked ? Theme.m3onPrimary : Theme.m3onSurfaceVariant
+        onClicked: root.expanded()
     }
 
     FocusRing {}

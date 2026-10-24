@@ -160,3 +160,64 @@ fn names_come_from_the_rules_list() {
     assert_eq!(name(&l("xx"), &names), "XX");
     assert!(!names.contains_key("pc105") && !names.contains_key("grp"));
 }
+
+#[test]
+fn a_layout_moves_to_another_place() {
+    let now = vec![l("us"), l("it"), l("de")];
+
+    assert_eq!(
+        Change::Move(l("de"), 1).apply(&now, &known()),
+        Ok(vec![l("us"), l("de"), l("it")])
+    );
+    assert_eq!(
+        Change::Move(l("us"), 2).apply(&now, &known()),
+        Ok(vec![l("it"), l("de"), l("us")])
+    );
+    assert_eq!(
+        Change::Move(l("it"), 0).apply(&now, &known()),
+        Ok(vec![l("it"), l("us"), l("de")]),
+        "the first place makes it the default"
+    );
+    assert_eq!(
+        Change::Move(l("it"), 1).apply(&now, &known()),
+        Ok(now.clone())
+    );
+}
+
+#[test]
+fn a_move_past_the_last_place_or_of_a_missing_layout_is_refused() {
+    let now = vec![l("us"), l("it")];
+
+    assert_eq!(
+        Change::Move(l("it"), 2).apply(&now, &known()),
+        Err(LayoutsError::Place(2))
+    );
+    assert_eq!(
+        Change::Move(l("de"), 0).apply(&now, &known()),
+        Err(LayoutsError::NotThere("de".into()))
+    );
+    assert_eq!(
+        LayoutsError::Place(2).to_string(),
+        "keyboard layouts go from place 1 to 2"
+    );
+}
+
+#[test]
+fn the_catalogue_is_every_layout_and_variant_by_name() {
+    let lst = "! layout\n  us              English (US)\n  it              Italian\n  de              German\n\n\
+               ! variant\n  intl            us: English (US, intl., with dead keys)\n  \
+               nodeadkeys      de: German (no dead keys)\n";
+
+    let catalogue = catalogue(lst);
+
+    assert_eq!(
+        catalogue,
+        vec![
+            (l("us"), "English (US)".to_owned()),
+            (l("us(intl)"), "English (US, intl., with dead keys)".to_owned()),
+            (l("de"), "German".to_owned()),
+            (l("de(nodeadkeys)"), "German (no dead keys)".to_owned()),
+            (l("it"), "Italian".to_owned()),
+        ]
+    );
+}

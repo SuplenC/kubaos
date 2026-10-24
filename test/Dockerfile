@@ -84,12 +84,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       mesa-utils libgl1-mesa-dri libegl-mesa0 libegl1 libgles2 \
       dbus-daemon dbus-user-session dbus-x11 gnome-keyring libsecret-tools \
       xdg-utils xdg-user-dirs fonts-noto-core fonts-dejavu-core \
-      pamtester shellcheck lua5.5 hyperfine jq expect procps psmisc less file \
+      pamtester shellcheck lua5.5 hyperfine jq expect procps psmisc less file libxkbcommon-tools \
       python3 python3-requests python3-cryptography openssl nodejs npm
 
 # ---------------------------------------------------------------------------
 # desktop: the system halves of system/50-hyprland.sh (Ubuntu's arm64
-# hyprland 0.53, lock-screen PAM files, unix_chkpwd link, tty1 autologin) and
+# hyprland 0.53, lock-screen PAM files, unix_chkpwd link, tty1 autologin,
+# keyd and the XKB option of the Mac-style accents) and
 # system/70-bitwarden.sh (bw CLI, pam_u2f lines for sudo/sudo-i/polkit-1,
 # qs-lock-u2f). The pam_u2f.so link into /nix is made at test time.
 FROM tooling AS desktop
@@ -99,6 +100,9 @@ COPY system/files/pam.d/ /opt/dotfiles/system/files/pam.d/
 COPY system/files/tmpfiles.d/ /opt/dotfiles/system/files/tmpfiles.d/
 COPY system/files/systemd/ /opt/dotfiles/system/files/systemd/
 COPY system/files/udev/ /opt/dotfiles/system/files/udev/
+COPY system/files/keyd/ /opt/dotfiles/system/files/keyd/
+COPY system/files/xkb/ /opt/dotfiles/system/files/xkb/
+COPY system/files/polkit/ /opt/dotfiles/system/files/polkit/
 COPY system/files/hyprland-autostart.zsh /opt/dotfiles/system/files/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
