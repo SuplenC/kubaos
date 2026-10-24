@@ -1145,7 +1145,7 @@ PanelWindow {
             listed: list.count
             selected: list.currentIndex
             selectedShown: list.currentShown && !follow.running
-            list: list
+            results: list
         }
     }
 }

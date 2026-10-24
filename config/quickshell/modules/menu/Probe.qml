@@ -33,7 +33,7 @@ QtObject {
     property bool selectedShown: true
     // The menu's list of Results, for the top row's title and subtitle on
     // each frame line: an answer, such as a date's, lands there.
-    property ListView list: null
+    property ListView results: null
 
     property real typedAt: 0
     // The Results for the query typed are in the model, and then in a frame
@@ -118,7 +118,7 @@ QtObject {
             if (!probe.drawn)
                 return;
             probe.drawn = false;
-            const first = probe.list?.itemAtIndex(0) ?? null;
+            const first = probe.results?.itemAtIndex(0) ?? null;
             const top = first ? `${first.title} · ${first.subtitle}` : "";
             probe.log(`frame query=${JSON.stringify(probe.search.query)} rows=${probe.search.rowCount()} latency_us=${probe.search.latency} pixels_ms=${Date.now() - probe.typedAt} top=${JSON.stringify(top)}`);
         }
