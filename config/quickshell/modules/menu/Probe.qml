@@ -27,6 +27,10 @@ QtObject {
     property int actions: 0
     // How many rows a pushed View lists, to see its filter work.
     property int listed: -1
+    // The selected row, and whether the list has it wholly in view once
+    // any scroll to it is over.
+    property int selected: -1
+    property bool selectedShown: true
 
     property real typedAt: 0
     // The Results for the query typed are in the model, and then in a frame
@@ -45,6 +49,8 @@ QtObject {
 
     onActionsChanged: log(`actions ${actions}`)
     onPaneChanged: layout()
+    onSelectedShownChanged: log(`selected row=${selected} shown=${selectedShown}`)
+    onSelectedChanged: log(`selected row=${selected} shown=${selectedShown}`)
     onListedChanged: {
         if (listed >= 0 && search.depth > 0)
             log(`listed ${listed}`);

@@ -869,6 +869,9 @@ c_menu() {
   menu_step "Forget on Timer leaves a Toast" 'toast ".+"' \
     "$key -k Escape && $key -d 50 timer && sleep 1 && $key -M ctrl -M shift -k BackSpace -m shift -m ctrl" 5 || bad=1
   menu_step "Ctrl+Z undoes it" 'toast ""' "$key -M ctrl -k z -m ctrl" 5 || bad=1
+  menu_step "Down past the last row on screen scrolls the selection into view" 'selected row=12 shown=true' \
+    "$key -k Escape && $key -d 50 s && sleep 1 && $key -d 60$(printf ' -k Down%.0s' {1..12})" 8 || bad=1
+  menu_step "PageUp brings the top row back into view" 'selected row=[0-4] shown=true' "$key -k Prior" || bad=1
   menu_step "Esc clears, and Esc again closes the menu" 'visible false' "$key -k Escape && sleep 0.5 && $key -k Escape" || bad=1
   menu_latency || bad=1
 
