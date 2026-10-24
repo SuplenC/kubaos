@@ -3,7 +3,8 @@
 //! change the update check writes, each change to the keyboard layouts, to
 //! the wallpaper sets file and to the drives file; each config also reads the
 //! user folders again; each run is answered with its outcome, after the View it
-//! pushes or pops.
+//! pushes or pops. Each Live query is answered at once, with a date answer or
+//! nothing.
 //!
 //! # Owns
 //!
@@ -23,6 +24,7 @@ use std::process::ExitCode;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 
+use jiff::Zoned;
 use kotodama_extension::Connection;
 use kotodama_extension::Event;
 use kotodama_extension::SentItems;
@@ -31,6 +33,8 @@ use kotodama_extension::config;
 use kotodama_extension::watch::RecursiveMode;
 use kotodama_extension::watch::Watcher;
 use kotodama_kubaos::bus::SystemBus;
+use kotodama_kubaos::clock;
+use kotodama_kubaos::clock::Dates;
 use kotodama_kubaos::drives;
 use kotodama_kubaos::drives::Drives;
 use kotodama_kubaos::extension::Extension;
@@ -42,10 +46,12 @@ use kotodama_kubaos::updates;
 use kotodama_kubaos::updates::Pending;
 use kotodama_kubaos::wallpapers;
 use kotodama_kubaos::wallpapers::WallpaperSets;
+use kotodama_protocol::Clipboard;
 use kotodama_protocol::Error;
 use kotodama_protocol::FromExtension;
 use kotodama_protocol::Outcome;
 use kotodama_protocol::ToExtension;
+use kubaos_clock::settings as clock_settings;
 use kubaos_core::keyboard;
 
 /// How long the update check's folder stays quiet before its file is read:
@@ -75,6 +81,7 @@ fn run() -> Result<(), Error> {
         received,
     } = kotodama_extension::connect::<Own>()?;
     let mut extension = Extension::new(SystemBus, Programs);
+    let mut dates = Dates::new(clock_settings::dir());
     let mut sent = SentItems::default();
     // The toggles work on any machine, and the actions need only their programs.
     SentStatus::default().usable(&mut writer)?;
@@ -120,6 +127,26 @@ fn run() -> Result<(), Error> {
                 if configured {
                     sent.publish(&mut writer, extension.items())?;
                 }
+            }
+            Event::Message(ToExtension::LiveQuery { id, query, .. }) => {
+                writer.send(&FromExtension::LiveResults {
+                    live_query: id,
+                    results: dates.live(&query, &Zoned::now()).into_iter().collect(),
+                    done: true,
+                })?;
+            }
+            Event::Message(ToExtension::RunAction {
+                invocation,
+                action,
+                item,
+                ..
+            }) if item.kind.name() == clock::KIND => {
+                let outcome = match dates.run(&action, &item.id, &Zoned::now(), &Programs) {
+                    Ok(Some(text)) => Outcome::Copy(Clipboard::Text(text)),
+                    Ok(None) => Outcome::Close,
+                    Err(message) => Outcome::Failed { message },
+                };
+                writer.send(&FromExtension::ActionDone { invocation, outcome })?;
             }
             Event::Message(ToExtension::RunAction {
                 invocation,

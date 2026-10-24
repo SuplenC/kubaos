@@ -47,6 +47,8 @@ rec {
   kubaos-bluetooth = pkgs.callPackage ../crates/kubaos-bluetooth/package.nix {
     inherit cargoOutputHashes;
   };
+  # The date engine behind the clock popup (home/clock.nix).
+  kubaos-clock = pkgs.callPackage ../crates/kubaos-clock/package.nix { inherit cargoOutputHashes; };
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (

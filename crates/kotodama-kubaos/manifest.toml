@@ -7,9 +7,29 @@ command = ["./kotodama-kubaos"]
 word = "kubaos"
 title = "KubaOS"
 icon = "preferences-system"
-about = "KubaOS's own actions, the keyboard layouts, and Wi-Fi, Bluetooth, audio, brightness and power profiles, which work with the shell down. Add your own actions and hide these in ~/.config/kubaos/kotodama/user.toml."
+about = "KubaOS's own actions, the keyboard layouts, and Wi-Fi, Bluetooth, audio, brightness and power profiles, which work with the shell down. Date queries such as `days until christmas` are answered with the clock popup's holidays and zones. Add your own actions and hide these in ~/.config/kubaos/kotodama/user.toml."
 examples = [
     { query = "wifi", result = "Turn Wi-Fi on or off" },
     { query = "volume 40", result = "Set the volume to 40%" },
     { query = "next wallpaper", result = "The next wallpaper, and its colors" },
+    { query = "days until christmas", result = "The days left, as the clock popup counts them" },
 ]
+
+# Date queries, answered by the clock popup's engine (kubaos-clock) with the
+# popup's holidays and zones. Every keystroke is sent at once: an answer must
+# land in the same frame, and only a debounce of 0 may mark one. Each trigger
+# is a way a date query starts; the Extension answers nothing else.
+[live_query]
+triggers = [
+    # A number: `24 dec`, `2027-03-01`, `15:00 tokyo`, `9am NY in Warsaw`.
+    '^\s*[0-9]',
+    # Counting and asking: `days until christmas`, `how long until friday 17:00`, `age 1993-05-12`.
+    '(?i)^\s*(days?|weeks?|how\s+(many|long|old)|age|born|when\s+(is|was)|time\s+in)\s',
+    # A day: `today + 90d`, `now + 36h`, `next friday`, `in 3 weeks`, `christmas eve`.
+    '(?i)^\s*(today|tomorrow|yesterday|now|next|last|this|in\s+[0-9a]|christmas|easter|new\s+year)',
+    # A weekday or a month first: `friday 17:00 - 3h`, `mar 12 to jul 4`, `dec 24`.
+    '(?i)^\s*(mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s',
+    # A place's time: `tokyo time`, `new york now`.
+    '(?i)\s(time|now)\s*$',
+]
+debounce_ms = 0

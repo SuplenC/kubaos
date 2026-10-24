@@ -8,6 +8,7 @@
 //!
 //! - The registry, the toggles, the keyboard layouts, the wallpaper sets, the user folders, the
 //!   mounted drives, and what each of their Actions runs.
+//! - The date answers, from the clock popup's engine.
 //!
 //! # Not here
 //!
@@ -19,6 +20,7 @@
 
 pub mod audio;
 pub mod bus;
+pub mod clock;
 pub mod drives;
 pub mod extension;
 pub mod files;

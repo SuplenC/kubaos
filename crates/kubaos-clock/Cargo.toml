@@ -1,0 +1,25 @@
+[package]
+name = "kubaos-clock"
+description = "KubaOS's date engine: date search and maths, the calendar, holidays, world clocks and countdowns"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-clock"
+path = "src/main.rs"
+
+[dependencies]
+jiff.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+# Writes the settings file in place, keeping the user's comments.
+toml_edit = "0.25"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

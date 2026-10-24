@@ -31,6 +31,12 @@ QtObject {
     // any scroll to it is over.
     property int selected: -1
     property bool selectedShown: true
+    // The menu's list of Results: its top row's title and subtitle are
+    // logged as they change, since an answer, such as a date's, lands there.
+    // Its delegate is made a frame after the Results arrive, so it's read on
+    // every frame, not on the frame line.
+    property ListView results: null
+    property string top: ""
 
     property real typedAt: 0
     // The Results for the query typed are in the model, and then in a frame
@@ -40,6 +46,15 @@ QtObject {
 
     function log(line: string): void {
         console.info(`menu probe: ${line}`);
+    }
+
+    function logTop(): void {
+        const first = results?.itemAtIndex(0) ?? null;
+        const line = first ? `${first.title} · ${first.subtitle}` : "";
+        if (line === top)
+            return;
+        top = line;
+        log(`top ${JSON.stringify(line)}`);
     }
 
     function layout(): void {
@@ -112,6 +127,7 @@ QtObject {
         }
 
         function onFrameSwapped(): void {
+            probe.logTop();
             if (!probe.drawn)
                 return;
             probe.drawn = false;

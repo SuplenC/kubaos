@@ -1,8 +1,10 @@
-"""menu-query.py SOCKET TEXT...: what the Command menu finds for each TEXT.
+"""menu-query.py SOCKET [--top] TEXT...: what the Command menu finds for each TEXT.
 
 A Front end of its own on the Daemon's socket (Kotodama protocol 1.0, JSON):
 for each TEXT it sends a `query` and prints one line, the TEXT, a tab, then
-`<extension>/<item id>` for every Result, best first. The `kotodama` command
+`<extension>/<item id>` for every Result, best first. With --top, the line is
+the TEXT, then the top Result's `<extension>/<item id>`, title and subtitle,
+tab-separated: what an answer in the top row says. The `kotodama` command
 has no query of its own. Run with `python3 -I`.
 """
 
@@ -43,7 +45,7 @@ class Daemon:
             self.buf += data
 
 
-def main(path, texts):
+def main(path, texts, top=False):
     daemon = Daemon(path)
     daemon.send({"version": 1, "minor": 0, "formats": ["json"]})
     hello = daemon.recv(WAIT)
@@ -61,11 +63,22 @@ def main(path, texts):
         # one before the Daemon goes quiet.
         while (message := daemon.recv(QUIET)) is not None:
             results = message.get("results", results)
-        found = [f"{r['extension']}/{r['item']['id']}" for r in results["results"]]
+        shown = results["results"]
+        if top:
+            first = shown[0] if shown else {"extension": "", "item": {"id": "", "title": ""}}
+            item = first["item"]
+            fields = [text, f"{first['extension']}/{item['id']}", item.get("title", ""), item.get("subtitle") or ""]
+            print("\t".join(fields))
+            continue
+        found = [f"{r['extension']}/{r['item']['id']}" for r in shown]
         print(text + "\t" + " ".join(found))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
+    args = sys.argv[2:]
+    top = bool(args) and args[0] == "--top"
+    if top:
+        args = args[1:]
+    if not args:
         sys.exit(__doc__)
-    main(sys.argv[1], sys.argv[2:])
+    main(sys.argv[1], args, top)

@@ -519,3 +519,113 @@ keyword = "channel"
 run = ["kubaos", "channel", "{channel}"]
 arguments = [{ name = "channel", placeholder = "stable or edge" }]
 terminal = true
+
+# The clock popup (crates/kubaos-clock, config/quickshell/modules/clock/).
+# Date queries such as `days until christmas` get an answer in the top row
+# from the Extension itself. The settings Items change
+# ~/.config/kubaos/clock/clock.toml through `kubaos-clock`, which the popup
+# reads at its next request; a notification says why when one is refused.
+
+[extensions.kubaos.actions.clock-open]
+title = "Open calendar"
+subtitle = "The clock popup: the month, world clocks, countdowns and date search"
+icon = "x-office-calendar"
+keywords = ["clock", "calendar", "date", "month", "week number", "holidays"]
+run = ["qs", "ipc", "call", "clock", "toggle"]
+
+[extensions.kubaos.actions.clock-settings]
+title = "Calendar settings"
+subtitle = "Holidays, first weekday, analog face, extra clocks and the bar's countdown"
+icon = "preferences-system-time"
+keywords = ["clock settings", "calendar", "time zones", "holidays", "first day of week"]
+run = ["qs", "ipc", "call", "clock", "settings"]
+
+[extensions.kubaos.actions.clock-add-countdown]
+title = "Add countdown"
+subtitle = "Count down to a date or time in the clock popup: 19 dec, friday 17:00"
+icon = "alarm-symbolic"
+keywords = ["countdown", "clock", "calendar", "vacation", "deadline"]
+keyword = "add-countdown"
+run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1); notify-send -a Clock Clock "$out"', "sh", "countdown", "add", "{name}", "{when}"]
+arguments = [{ name = "name", placeholder = "Vacation" }, { name = "when", placeholder = "19 dec" }]
+
+[extensions.kubaos.actions.clock-remove-countdown]
+title = "Remove countdown"
+subtitle = "Take a countdown out of the clock popup, and out of the bar"
+icon = "alarm-symbolic"
+keywords = ["countdown", "clock", "delete"]
+run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "countdown", "remove", "{name}"]
+arguments = [{ name = "name", placeholder = "Vacation" }]
+
+[extensions.kubaos.actions.clock-bar-countdown]
+title = "Countdown in the bar"
+subtitle = "Show a countdown next to the bar's clock, by name, or none"
+icon = "alarm-symbolic"
+keywords = ["countdown", "bar", "clock"]
+run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "set", "bar-countdown", "{name}"]
+arguments = [{ name = "name", placeholder = "Vacation, or none" }]
+
+[extensions.kubaos.actions.clock-add-zone]
+title = "Add time zone"
+subtitle = "An extra clock in the popup, up to four: Tokyo, New York, America/Chicago"
+icon = "preferences-system-time"
+keywords = ["time zone", "world clock", "clock", "city"]
+keyword = "add-zone"
+run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1); notify-send -a Clock Clock "$out"', "sh", "zone", "add", "{zone}"]
+arguments = [{ name = "zone", placeholder = "Tokyo" }]
+
+[extensions.kubaos.actions.clock-remove-zone]
+title = "Remove time zone"
+subtitle = "Take an extra clock out of the popup"
+icon = "preferences-system-time"
+keywords = ["time zone", "world clock", "clock", "delete"]
+run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "zone", "remove", "{zone}"]
+arguments = [{ name = "zone", placeholder = "Tokyo" }]
+
+[extensions.kubaos.actions.clock-holidays]
+title = "Holidays country"
+subtitle = "Whose public holidays the calendar marks and working days leave out: pl, de, gb, us, none"
+icon = "x-office-calendar"
+keywords = ["holidays", "calendar", "country", "public holidays", "bank holidays"]
+run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "set", "holidays", "{country}"]
+arguments = [{ name = "country", placeholder = "pl" }]
+
+[extensions.kubaos.actions.clock-first-weekday]
+title = "First day of the week"
+subtitle = "The calendar's first column: monday, sunday or any other day"
+icon = "x-office-calendar"
+keywords = ["calendar", "week start", "monday", "sunday"]
+run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "set", "first-weekday", "{day}"]
+arguments = [{ name = "day", placeholder = "monday" }]
+
+[extensions.kubaos.actions.clock-analog]
+title = "Analog clock face"
+subtitle = "Show or hide the analog face in the clock popup"
+icon = "preferences-system-time"
+keywords = ["clock", "analog", "watch face", "hands"]
+run = ["kubaos-clock", "set", "analog", "toggle"]
+
+[extensions.kubaos.actions.clock-timer]
+title = "Start timer"
+subtitle = "Rings with a notification and a sound: 25m, 1h30m, 90 seconds"
+icon = "alarm-symbolic"
+keywords = ["timer", "countdown", "pomodoro", "kitchen timer"]
+keyword = "clock-timer"
+run = ["qs", "ipc", "call", "clock", "timer", "{duration}"]
+arguments = [{ name = "duration", placeholder = "25m" }]
+
+[extensions.kubaos.actions.clock-alarm]
+title = "Set alarm"
+subtitle = "Rings at a time with a notification and a sound: 7:30, 6pm, friday 17:00"
+icon = "alarm-symbolic"
+keywords = ["alarm", "wake up", "reminder", "clock"]
+keyword = "clock-alarm"
+run = ["qs", "ipc", "call", "clock", "alarm", "{time}"]
+arguments = [{ name = "time", placeholder = "7:30" }]
+
+[extensions.kubaos.actions.clock-stopwatch]
+title = "Stopwatch"
+subtitle = "Start or stop the stopwatch in the clock popup"
+icon = "alarm-symbolic"
+keywords = ["stopwatch", "lap", "timer", "clock"]
+run = ["qs", "ipc", "call", "clock", "stopwatch"]

@@ -7,7 +7,9 @@ license.workspace = true
 
 [dependencies]
 kotodama-extension = { workspace = true, features = ["watch"] }
+jiff.workspace = true
 kotodama-protocol.workspace = true
+kubaos-clock.workspace = true
 kubaos-core.workspace = true
 thiserror.workspace = true
 

@@ -665,10 +665,62 @@ c_quickshell() {
   echo "     environment warnings (services a container doesn't have):"
   qs_env_warnings | cut -c1-120 | sed 's/^/       /'
   
-  for t in session powermenu wallpaper notifications controlcenter recorder; do
+  for t in session powermenu wallpaper notifications controlcenter recorder clock; do
     grep -qE "target $t\b" <<<"$ipc" || { echo "FAIL qs ipc show lacks target $t"; printf '%s\n' "$ipc"; return 1; }
   done
   echo "ok   qs ipc show lists every contract target"
+}
+
+# The clock popup: it opens under the bar's clock through the clock IPC, its
+# engine (kubaos-clock serve) runs behind it, and a search sent to it is
+# answered with no QML errors on the way. Esc closes it.
+c_clock() {
+  local out bad=0 i
+  session_start sway 1920x1080 1
+  if ! qs_start; then
+    echo "FAIL Quickshell didn't load its config:"
+    tail -30 "$QS_LOG"
+    session_stop
+    return 1
+  fi
+  sleep 3
+
+  out="$(in_session 'kubaos-clock eval "days until christmas"' 2>&1)" || { echo "FAIL kubaos-clock eval: $out"; bad=1; }
+  [[ $out == [0-9]*" day"* ]] && echo "ok   kubaos-clock answers 'days until christmas': ${out%%$'\n'*}" ||
+    { echo "FAIL kubaos-clock eval printed: $out"; bad=1; }
+
+  in_session 'qs ipc call clock toggle' >/dev/null 2>&1
+  for i in $(seq 30); do
+    out="$(in_session 'qs ipc call clock status' 2>&1 || true)"
+    [[ $out == *'"open":true'* && $out == *'"available":true'* ]] && break
+    sleep 0.2
+  done
+  if [[ $out == *'"open":true'* && $out == *'"available":true'* ]]; then
+    echo "ok   qs ipc call clock toggle opens the popup, its engine running"
+  else
+    echo "FAIL the popup isn't open with its engine: $out"
+    bad=1
+  fi
+
+  in_session "qs ipc call clock search 'next friday'" >/dev/null 2>&1
+  sleep 1
+  in_session 'qs ipc call clock toggle' >/dev/null 2>&1
+  for i in $(seq 30); do
+    out="$(in_session 'qs ipc call clock status' 2>&1 || true)"
+    [[ $out == *'"open":false'* ]] && break
+    sleep 0.2
+  done
+  [[ $out == *'"open":false'* ]] && echo "ok   toggling again closes it" || { echo "FAIL the popup stayed open: $out"; bad=1; }
+
+  out="$(qs_problems)"
+  session_stop
+  if [[ -n $out ]]; then
+    echo "FAIL QML errors/warnings with the popup open ($QS_LOG):"
+    printf '%s\n' "$out" | head -30
+    bad=1
+  fi
+  ((bad)) || echo "ok   no QML errors with the popup open"
+  return "$bad"
 }
 
 # dot-hypr-record's start/stop and state file, with wf-recorder (gsr needs a
@@ -963,6 +1015,8 @@ c_menu() {
   menu_step "Forget on Timer leaves a Toast" 'toast ".+"' \
     "$key -k Escape && $key -d 50 timer && sleep 1 && $key -M ctrl -M shift -k BackSpace -m shift -m ctrl" 5 || bad=1
   menu_step "Ctrl+Z undoes it" 'toast ""' "$key -M ctrl -k z -m ctrl" 5 || bad=1
+  menu_step "a date query is answered in the top row" 'top "[0-9]+ days? · until .* 25 December ' \
+    "$key -k Escape && $key -d 50 'days until christmas'" 5 || bad=1
   menu_step "Down past the last row on screen scrolls the selection into view" 'selected row=12 shown=true' \
     "$key -k Escape && $key -d 50 s && sleep 1 && $key -d 60$(printf ' -k Down%.0s' {1..12})" 8 || bad=1
   menu_step "PageUp brings the top row back into view" 'selected row=[0-4] shown=true' "$key -k Prior" || bad=1
@@ -1106,6 +1160,24 @@ TOML
       { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
   done
   ((bad)) || echo "ok   Yazi, Tidy Downloads and the mounted drive's Eject Item are found"
+
+  # The clock popup's Items, and a date query answered in the top row by its
+  # engine (crates/kubaos-clock), which the calculator can't read.
+  out="$(in_session "$query 'Open calendar' 'Add countdown' 'Add time zone' 'Calendar settings'" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  for want in 'Open calendar:clock-open' 'Add countdown:clock-add-countdown' \
+    'Add time zone:clock-add-zone' 'Calendar settings:clock-settings'; do
+    grep -E -- "^${want%%:*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${want#*:}( |$)" ||
+      { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
+  done
+  ((bad)) || echo "ok   Open calendar, Add countdown, Add time zone and Calendar settings are found"
+  out="$(in_session "$query --top 'days until christmas'" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
+  if [[ $out == "days until christmas"$'\t'"kubaos/days until christmas"$'\t'[0-9]*" day"*$'\t'"until "*" 25 December "* ]]; then
+    echo "ok   'days until christmas' is answered on top: $(cut -f3 <<<"$out"), $(cut -f4 <<<"$out")"
+  else
+    echo "FAIL 'days until christmas' has no KubaOS answer on top: $out"
+    bad=1
+  fi
 
   # localed writes the file through a temporary one and a rename; the Items follow it.
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,de"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb.new"
@@ -1977,7 +2049,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell clock menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

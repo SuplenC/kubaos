@@ -6,7 +6,7 @@ import qs.components
 import qs.services
 
 // The top edge of the frame. Left: workspaces and window title.
-// Center: clock. Right: recording indicator (while recording), the update
+// Center: clock (opens the clock popup). Right: recording indicator (while recording), the update
 // marker (while a KubaOS release waits), tray, status
 // (opens the control center), power menu.
 Item {

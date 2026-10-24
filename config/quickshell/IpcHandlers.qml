@@ -86,6 +86,58 @@ Scope {
     }
 
     IpcHandler {
+        target: "clock"
+
+        function toggle(): void {
+            Panels.toggle("clock");
+        }
+
+        function settings(): void {
+            Time.show("settings", "");
+        }
+
+        // The popup with `text` in its date search.
+        function search(text: string): void {
+            Time.show("", text);
+        }
+
+        // Starts a timer (25m, 1h30m, 90 seconds); a notification says
+        // when it rings, or why it didn't start.
+        function timer(duration: string): void {
+            Time.startTimer(duration, error => {
+                if (error !== "")
+                    Time.notify("No timer", error);
+                else
+                    Time.notify("Timer", `${Time.left(Time.timerTotal)}, rings at ${Qt.formatDateTime(new Date(Time.timerEnd), "HH:mm")}`);
+            });
+        }
+
+        // Sets an alarm (7:30, 6pm, friday 17:00), and says when.
+        function alarm(time: string): void {
+            Time.addAlarm(time, error => {
+                if (error !== "")
+                    Time.notify("No alarm", error);
+                else
+                    Time.notify("Alarm", Time.alarms.map(a => a.label).join(", "));
+            });
+        }
+
+        // Starts or stops the stopwatch, with the popup open on it.
+        function stopwatch(): void {
+            Time.toggleStopwatch();
+            Time.show("stopwatch", "");
+        }
+
+        // JSON: whether the engine runs, today, the zones, countdowns,
+        // timer, stopwatch and alarms, and whether the popup is open.
+        function status(): string {
+            return JSON.stringify(Object.assign(Time.status(), {
+                open: Panels.current === "clock"
+            }));
+        }
+    }
+
+    IpcHandler {
         target: "notifications"
 
         function toggleDnd(): void {
