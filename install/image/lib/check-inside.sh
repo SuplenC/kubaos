@@ -103,7 +103,8 @@ for c in foot fuzzel zsh git docker bw; do check "$c" in_root sh -c "command -v 
 # What `kubaos bitwarden` runs beside bw: the keyring for project env, and the
 # agent and key checks.
 for c in secret-tool ssh-add ssh-keygen timeout; do check "$c" in_root sh -c "command -v $c"; done
-for f in /etc/pam.d/qs-lock /etc/pam.d/qs-lock-fingerprint /etc/pam.d/qs-lock-u2f /etc/tmpfiles.d/qs-lock-unix-chkpwd.conf /etc/udev/rules.d/90-kubaos-backlight.rules; do
+for f in /etc/pam.d/qs-lock /etc/pam.d/qs-lock-fingerprint /etc/pam.d/qs-lock-u2f /etc/tmpfiles.d/qs-lock-unix-chkpwd.conf /etc/udev/rules.d/90-kubaos-backlight.rules \
+  /etc/polkit-1/rules.d/50-kubaos-keyboard.rules; do
   check "$f" test -f "$R$f"
 done
 grep -q pam_u2f "$R/etc/pam.d/sudo" && ok "pam_u2f line in /etc/pam.d/sudo" || fail "no pam_u2f in /etc/pam.d/sudo"

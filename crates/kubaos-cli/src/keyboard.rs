@@ -13,7 +13,8 @@
 //!
 //! A layout is spelled `it` or `us(intl)`. A change is checked against xkb's rules list, written
 //! by `localectl set-x11-keymap` (systemd-localed writes `/etc/default/keyboard` on Ubuntu, and
-//! asks polkit, so it runs as the desktop user), then reaches Hyprland with `hyprctl reload`.
+//! asks polkit, so it runs as the desktop user), then reaches Hyprland with `hyprctl reload`. A
+//! refusal is one line saying what didn't happen and why, which the control center shows as is.
 //! The Command menu and the control center's keyboard list run these. `KUBAOS_KEYBOARD_FILE`
 //! reads another file instead (the harness).
 //!
@@ -34,10 +35,13 @@
 //! - What keyd does with Left Alt: `system/files/keyd/kubaos.conf`.
 
 use std::env;
+use std::fmt::Display;
 use std::fs;
+use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitCode;
+use std::process::Stdio;
 
 use clap::Subcommand;
 use clap::ValueEnum;
@@ -125,8 +129,8 @@ pub fn main(cmd: KeyboardCmd) -> ExitCode {
         Ok(layouts) => layouts,
         Err(e) => return usage_error(e),
     };
-    if let Err(msg) = tell_localed(&file, &layouts) {
-        eprintln!("kubaos: {msg}");
+    if let Err(e) = tell_localed(&file, &layouts) {
+        eprintln!("kubaos: {}", chain(&e));
         return ExitCode::FAILURE;
     }
     reload_hyprland();
@@ -220,7 +224,11 @@ fn tell_keyd(accents: MacAccents) -> Result<(), String> {
 }
 
 /// Writes `layouts` through localed, keeping the file's model and options.
-fn tell_localed(file: &KeyboardFile, layouts: &[Layout]) -> Result<(), String> {
+///
+/// localed asks polkit, which lets an active admin at the machine through
+/// (`system/files/polkit/50-kubaos-keyboard.rules`) and asks anyone else for a password through the
+/// session's agent. localectl's stderr is read rather than passed on, so a refusal is one sentence.
+fn tell_localed(file: &KeyboardFile, layouts: &[Layout]) -> Result<(), LocaledError> {
     let (layout, variant) = keyboard::to_fields(layouts);
     // No variants at all go as one empty field, as a single layout's do, not as bare commas.
     let variant = if variant.chars().all(|c| c == ',') {
@@ -233,15 +241,57 @@ fn tell_localed(file: &KeyboardFile, layouts: &[Layout]) -> Result<(), String> {
     } else {
         &file.model
     };
-    let status = Command::new("localectl")
+    // stdin stays the caller's: in a terminal, localectl's pkttyagent asks for the password there.
+    let out = Command::new("localectl")
         .args(["set-x11-keymap", &layout, model, &variant, &file.options])
-        .status()
-        .map_err(|e| format!("running localectl: {e}"))?;
-    if status.success() {
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(LocaledError::Run)?;
+    if out.status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "localectl set-x11-keymap {layout} failed ({status})"
-        ))
+        Err(refusal(&String::from_utf8_lossy(&out.stderr), out.status))
     }
 }
+
+/// Why `localectl set-x11-keymap` failed.
+#[derive(Debug, thiserror::Error)]
+enum LocaledError {
+    #[error("running localectl")]
+    Run(#[source] io::Error),
+    /// polkit said no: no rule let the caller through and no agent asked for a password, or the
+    /// prompt was dismissed.
+    #[error("the keyboard layouts weren't changed: permission was refused")]
+    Denied,
+    #[error("the keyboard layouts weren't changed")]
+    Refused(#[source] LocalectlSaid),
+}
+
+/// localed's reason for a refusal, without localectl's "Failed to set keymap: ".
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+struct LocalectlSaid(String);
+
+/// The `sd_bus_error` messages localectl prints when polkit refuses: EACCES, and a check that
+/// needed a password prompt nobody could show.
+const DENIALS: [&str; 3] = ["Access denied", "Interactive authentication required", "Not authorized"];
+
+/// The error for a failed `localectl set-x11-keymap`, from its stderr and exit status.
+fn refusal(stderr: &str, status: impl Display) -> LocaledError {
+    let said = stderr.lines().map(str::trim).rfind(|line| !line.is_empty()).unwrap_or("");
+    if DENIALS.iter().any(|denial| said.contains(denial)) {
+        return LocaledError::Denied;
+    }
+    let reason = said.strip_prefix("Failed to set keymap: ").unwrap_or(said);
+    let reason = if reason.is_empty() {
+        format!("localectl failed ({status})")
+    } else {
+        reason.to_owned()
+    };
+    LocaledError::Refused(LocalectlSaid(reason))
+}
+
+#[cfg(test)]
+mod tests;
