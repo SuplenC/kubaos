@@ -1499,10 +1499,14 @@ c_files() {
     fi
   done
   ((bad)) || echo "ok   folders and archives open in Files, images, video and PDFs in the viewers KubaOS ships"
-  if as_user gio mime inode/directory 2>/dev/null | grep -qx '[[:blank:]]*kubaos-files.desktop'; then
+  # Open With lists GLib's apps for the type; the image has no `gio` command.
+  if as_user /usr/bin/python3 -I -c '
+from gi.repository import Gio
+print("\n".join(app.get_id() for app in Gio.AppInfo.get_all_for_type("inode/directory")))
+' 2>&1 | tee "$LOGS/files-open-with.log" | grep -qx 'kubaos-files.desktop'; then
     echo "ok   yazi is under Open With for folders"
   else
-    echo "FAIL kubaos-files.desktop isn't registered for folders"
+    echo "FAIL kubaos-files.desktop isn't among the apps for folders: $(tr "\n" " " <"$LOGS/files-open-with.log")"
     bad=1
   fi
 
@@ -1512,9 +1516,9 @@ c_files() {
 import sys
 from gi.repository import Nautilus
 for path in sys.argv[1:]:
-    exec(compile(open(path).read(), path, "exec"), {"__name__": path, "__file__": path})
-' "$data/nautilus-python/extensions/ghostty.py" "$data/nautilus-python/extensions/kubaos.py" 2>&1 | grep -v PyGIWarning)" &&
-    [[ -z $out ]] && echo "ok   the Ghostty and KubaOS right-click extensions load" ||
+    exec(compile(open(path).read(), path, "exec"), {"__name__": path.rsplit("/", 1)[1][:-3], "__file__": path})
+' "$data/nautilus-python/extensions/ghostty.py" "$data/nautilus-python/extensions/kubaos.py" 2>&1 | grep -v PyGIWarning || true)"
+  [[ -z $out ]] && echo "ok   the Ghostty and KubaOS right-click extensions load" ||
     { echo "FAIL the right-click extensions don't load: $out"; bad=1; }
 
   as_user "${bus[@]}" org.freedesktop.DBus.ReloadConfig >/dev/null 2>&1 || true
@@ -1526,7 +1530,7 @@ for path in sys.argv[1:]:
     bad=1
   fi
 
-  install -d -o "$USER_NAME" -g "$USER_NAME" "$stub" "$dir"
+  install -d -o "$USER_NAME" -g "$USER_NAME" "$stub" "$USER_HOME/Downloads" "$dir"
   printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>%s\n' "$log" >"$stub/ghostty"
   chmod 755 "$stub/ghostty"
   : >"$log"

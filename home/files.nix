@@ -98,8 +98,12 @@ in
     # xdg.mimeApps would make that file a read-only link instead. It names
     # only apps KubaOS ships.
     # https://specifications.freedesktop.org/mime-apps-spec/latest/file.html
+    # Added Associations puts yazi under Open With: GLib maps types to apps
+    # through each folder's mimeinfo.cache, which nothing writes for
+    # ~/.local/share/applications.
     "applications/mimeapps.list".text = lib.generators.toINI { } {
       "Default Applications" = defaults;
+      "Added Associations"."inode/directory" = "kubaos-files.desktop;";
     };
 
     "nautilus-python/extensions/ghostty.py".source =
