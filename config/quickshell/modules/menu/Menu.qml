@@ -350,6 +350,7 @@ PanelWindow {
         // top row is selected, as in the search, if it went away.
         onSelectRow: row => {
             list.currentIndex = row;
+            follow.stop();
             if (row === 0)
                 list.positionViewAtBeginning();
             else
@@ -359,6 +360,7 @@ PanelWindow {
         onDepthChanged: {
             menu.actions = [];
             list.currentIndex = 0;
+            follow.stop();
             list.positionViewAtBeginning();
             viewMove.from = search.depth > menu.lastDepth ? menu.look.motion.viewTravel : -menu.look.motion.viewTravel;
             menu.lastDepth = search.depth;
@@ -724,7 +726,49 @@ PanelWindow {
                     // A list View's filter keeps the selected Item selected. In
                     // the search, moving off the top row stops Late Results
                     // reranking the rows.
-                    onCurrentIndexChanged: search.select(currentIndex)
+                    onCurrentIndexChanged: {
+                        search.select(currentIndex);
+                        reveal(currentIndex);
+                    }
+
+                    // The view scrolls to keep the selection on screen. With
+                    // the highlight not following the current row, ListView
+                    // no longer does that itself, so it is done here, on the
+                    // selection's glide. Rows are all one height.
+                    function reveal(index: int): void {
+                        if (index < 0)
+                            return;
+                        const row = menu.look.rowHeight;
+                        const top = originY + index * row;
+                        let to = contentY;
+                        if (top < contentY)
+                            to = top;
+                        else if (top + row > contentY + height)
+                            to = top + row - height;
+                        to = Math.max(originY, Math.min(to, originY + contentHeight - height));
+                        follow.stop();
+                        if (to === contentY)
+                            return;
+                        if (menu.look.motion.moves && !menu.typing && menu.visible) {
+                            follow.to = to;
+                            follow.start();
+                        } else {
+                            contentY = to;
+                        }
+                    }
+
+                    // The selected row is wholly in view, for the probe.
+                    readonly property bool currentShown: currentIndex >= 0 && originY + currentIndex * menu.look.rowHeight >= contentY - 0.5 && originY + (currentIndex + 1) * menu.look.rowHeight <= contentY + height + 0.5
+
+                    NumberAnimation {
+                        id: follow
+
+                        target: list
+                        property: "contentY"
+                        duration: menu.look.motion.glide
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: menu.look.motion.arrive
+                    }
 
                     // Once the rerank after a keystroke is over, Late Results
                     // go below the rows on screen, so the Daemon is told which
@@ -1099,6 +1143,8 @@ PanelWindow {
             pane: menu.paneShown
             actions: menu.actions.length
             listed: list.count
+            selected: list.currentIndex
+            selectedShown: list.currentShown && !follow.running
         }
     }
 }
