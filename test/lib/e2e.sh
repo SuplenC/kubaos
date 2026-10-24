@@ -2438,6 +2438,200 @@ c_rollback() {
   echo "ok   kubaos rollback: release, the record and flake.lock back at the edge update, migration markers kept"
 }
 
+# Shutdown and boot: every way out stops the session's units before Hyprland
+# goes, they have short stop timeouts, and the fast-shutdown-boot migration
+# leaves nothing waiting for the network at boot. Real shutdown and boot
+# times are measured on the laptop.
+c_shutdown() {
+  as_user lua5.5 "$REPO/test/lua/session_test.lua" "$REPO" || { echo "FAIL test/lua/session_test.lua"; return 1; }
+  leave_order || return 1
+  session_unit_timeouts || return 1
+  fast_boot_migration || return 1
+}
+
+# `dot-session leave`, with a systemctl and a loginctl that log their
+# arguments: the stop of graphical-session.target comes before the action.
+leave_order() {
+  local dir action want cmd rc=0
+  dir="$(mktemp -d)"
+  for cmd in systemctl loginctl; do
+    printf '#!/bin/sh\necho "%s $*" >>"%s/calls"\n' "$cmd" "$dir" >"$dir/$cmd"
+    chmod 0755 "$dir/$cmd"
+  done
+  chown -R "$USER_NAME:" "$dir"
+  for action in reboot poweroff logout; do
+    rm -f "$dir/calls"
+    as_user env PATH="$dir:/usr/bin:/bin" XDG_SESSION_ID=7 bash "$REPO/scripts/dot-session" leave "$action" ||
+      { echo "FAIL dot-session leave $action exited $?"; rm -rf "$dir"; return 1; }
+    case "$action" in
+      logout) want=$'systemctl --user stop graphical-session.target\nloginctl terminate-session 7' ;;
+      *) want=$'systemctl --user stop graphical-session.target\n'"systemctl $action" ;;
+    esac
+    [[ $(cat "$dir/calls") == "$want" ]] ||
+      { echo "FAIL dot-session leave $action ran:"; cat "$dir/calls"; rm -rf "$dir"; return 1; }
+  done
+  as_user env PATH="$dir:/usr/bin:/bin" bash "$REPO/scripts/dot-session" leave suspend >/dev/null 2>&1 || rc=$?
+  rm -rf "$dir"
+  ((rc == 2)) || { echo "FAIL dot-session leave suspend exited $rc, not 2"; return 1; }
+  echo "ok   dot-session leave stops graphical-session.target, then logs out, reboots or powers off"
+}
+
+# The switch's drop-ins for the two Wayland clients that held the shutdown.
+session_unit_timeouts() {
+  local unit f
+  for unit in xdg-desktop-portal-hyprland hyprpolkitagent; do
+    f="$USER_HOME/.config/systemd/user/$unit.service.d/kubaos-stop.conf"
+    grep -qx 'TimeoutStopSec=5s' "$f" 2>/dev/null || { echo "FAIL no TimeoutStopSec=5s in $f"; return 1; }
+  done
+  echo "ok   the portal and the polkit agent stop within 5 s (user drop-ins)"
+}
+
+# The fast-shutdown-boot system migration on a machine as an older install
+# left it: no timeouts, NetworkManager-wait-online on, stand-ins for Docker's
+# and setvtrgb's units, enabled the way their packages enable them, and the
+# splash theme without its shutdown half.
+# Then a second run, which changes nothing.
+fast_boot_migration() {
+  local mig out bad=0 u
+  mig="$(ls "$REPO"/migrations/system/*-fast-shutdown-boot.sh)"
+  rm -f /etc/systemd/system.conf.d/kubaos-timeouts.conf /etc/systemd/user.conf.d/kubaos-timeouts.conf \
+    /etc/systemd/system/docker.service.d/kubaos-stop.conf
+  systemctl enable NetworkManager-wait-online.service >/dev/null 2>&1
+  stand_in_unit docker.service Service ExecStart=/bin/true multi-user.target
+  stand_in_unit containerd.service Service ExecStart=/bin/true multi-user.target
+  stand_in_unit setvtrgb.service Service ExecStart=/bin/true sysinit.target
+  stand_in_unit docker.socket Socket ListenStream=/run/stand-in.sock sockets.target
+  systemctl enable docker.service containerd.service setvtrgb.service >/dev/null 2>&1
+  install -d /usr/share/plymouth/themes/kubaos
+  echo '# the boot-only theme of an older release' >/usr/share/plymouth/themes/kubaos/kubaos.script
+
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig:"; echo "$out" | tail; bad=1; }
+  ((bad)) || fast_boot_state || bad=1
+  ((bad)) || cmp -s "$REPO/system/files/plymouth/kubaos/kubaos.script" /usr/share/plymouth/themes/kubaos/kubaos.script ||
+    { echo "FAIL the migration left the older splash theme"; bad=1; }
+  if ((!bad)); then
+    out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig, run again:"; echo "$out" | tail; bad=1; }
+    if grep -E '^\s+\+ |creating|replacing' <<<"$out"; then
+      echo "FAIL the migration changed something on its second run (above)"
+      bad=1
+    fi
+  fi
+  ((bad)) || echo "ok   the fast-shutdown-boot migration, and a second run changes nothing"
+
+  for u in docker.service containerd.service docker.socket setvtrgb.service; do
+    systemctl unmask "$u" >/dev/null 2>&1
+    systemctl disable "$u" >/dev/null 2>&1
+    rm -f "/usr/lib/systemd/system/$u"
+  done
+  rm -rf /etc/systemd/system/docker.service.d
+  return "$bad"
+}
+
+# stand_in_unit UNIT SECTION SETTING WANTED_BY: a unit file in the package
+# directory, installed into WANTED_BY.
+stand_in_unit() {
+  printf '[Unit]\nDescription=Stand-in for %s\n\n[%s]\n%s\n\n[Install]\nWantedBy=%s\n' "$1" "$2" "$3" "$4" \
+    >"/usr/lib/systemd/system/$1"
+}
+
+# fast_boot_state: what install_fast_shutdown_boot (system/lib.sh) leaves.
+fast_boot_state() {
+  local f state
+  for f in system.conf.d user.conf.d; do
+    cmp -s "$REPO/system/files/systemd/$f/kubaos-timeouts.conf" "/etc/systemd/$f/kubaos-timeouts.conf" &&
+      grep -qx 'DefaultTimeoutStopSec=10s' "/etc/systemd/$f/kubaos-timeouts.conf" ||
+      { echo "FAIL /etc/systemd/$f/kubaos-timeouts.conf doesn't set DefaultTimeoutStopSec=10s"; return 1; }
+  done
+  echo "ok   the system and user managers stop a unit after 10 s"
+  grep -qx 'TimeoutStopSec=20s' /etc/systemd/system/docker.service.d/kubaos-stop.conf 2>/dev/null ||
+    { echo "FAIL Docker has no 20 s stop timeout of its own"; return 1; }
+  for f in docker.socket:enabled docker.service:disabled containerd.service:disabled \
+    NetworkManager-wait-online.service:disabled setvtrgb.service:masked; do
+    state="$(systemctl is-enabled "${f%%:*}" 2>/dev/null || true)"
+    [[ $state == "${f#*:}" ]] || { echo "FAIL ${f%%:*} is $state, not ${f#*:}"; return 1; }
+  done
+  [[ ! -e /etc/systemd/system/multi-user.target.wants/docker.service &&
+    ! -e /etc/systemd/system/multi-user.target.wants/containerd.service ]] ||
+    { echo "FAIL multi-user.target still wants Docker"; return 1; }
+  [[ ! -e /etc/systemd/system/network-online.target.wants/NetworkManager-wait-online.service ]] ||
+    { echo "FAIL network-online.target still wants NetworkManager-wait-online"; return 1; }
+  echo "ok   Docker starts from its socket, nothing waits for the network, setvtrgb is masked"
+}
+
+# The boot splash under Xvfb (Plymouth's X11 renderer), in each mode the
+# machine runs it in: on boot the sign comes on and stays lit; on shutdown
+# and reboot (the modes plymouth-poweroff and plymouth-reboot use) it starts
+# lit and goes to black within a few seconds. A script Plymouth can't run
+# draws nothing, so this fails on that too.
+c_splash() {
+  local theme=/usr/share/plymouth/themes/kubaos unit mode f
+  for unit in poweroff:shutdown reboot:reboot; do
+    f="/usr/lib/systemd/system/plymouth-${unit%%:*}.service"
+    grep -q -- "--mode=${unit#*:}" "$f" && grep -qx 'ConditionKernelCommandLine=splash' "$f" &&
+      [[ -e /usr/lib/systemd/system/${unit%%:*}.target.wants/plymouth-${unit%%:*}.service ]] ||
+      { echo "FAIL plymouth-${unit%%:*}.service isn't wanted by ${unit%%:*}.target in --mode=${unit#*:}"; return 1; }
+  done
+  grep -qE '^GRUB_CMDLINE_LINUX_DEFAULT=".*\bsplash\b' "$REPO/system/files/grub/kubaos.cfg" ||
+    { echo "FAIL the kernel command line in system/files/grub/kubaos.cfg has no splash"; return 1; }
+  echo "ok   poweroff and reboot start Plymouth in its shutdown and reboot modes, and the kernel line has splash"
+
+  install -d "$theme"
+  install -m 0644 "$REPO"/system/files/plymouth/kubaos/* "$theme/"
+  install -m 0644 "$REPO/system/files/plymouth/conf/plymouthd.conf" /etc/plymouth/plymouthd.conf
+  Xvfb :93 -screen 0 1280x800x24 >"$LOGS/xvfb.log" 2>&1 &
+  local xvfb=$! bad=0
+  for _ in $(seq 50); do [[ -S /tmp/.X11-unix/X93 ]] && break; sleep 0.1; done
+  splash_mode boot lit-by 6 || bad=1
+  for mode in shutdown reboot; do
+    splash_mode "$mode" lit-at 0.3 lit || bad=1
+    splash_mode "$mode" black-by 6 || bad=1
+  done
+  kill "$xvfb" 2>/dev/null
+  return "$bad"
+}
+
+# splash_mode MODE lit-at SECONDS lit | lit-by SECONDS | black-by SECONDS:
+# plymouthd in MODE on Xvfb's :93, the splash shown, and the screen grabbed
+# at SECONDS, or every 0.25 s until SECONDS. Lit is a sign bright enough to
+# see; black is the whole screen at 0.
+splash_mode() {
+  local mode="$1" what="$2" secs="$3" want="${4:-}" t0 t shot="$LOGS/splash.png" stats max ok=0
+  pkill -x plymouthd 2>/dev/null; sleep 0.2
+  DISPLAY=:93 python3 -c '
+import os, pty, subprocess, sys
+master, slave = pty.openpty()
+subprocess.Popen(["plymouthd", "--no-daemon", "--mode=" + sys.argv[1], "--kernel-command-line=quiet splash",
+  "--graphical-boot", "--no-boot-log", "--tty=" + os.ttyname(slave)],
+  stdin=slave, stdout=slave, stderr=slave, start_new_session=True).wait()
+' "$mode" >/dev/null 2>&1 &
+  for _ in $(seq 50); do plymouth --ping 2>/dev/null && break; sleep 0.1; done
+  plymouth show-splash
+  t0="$(now)"
+  while :; do
+    t="$(since "$t0")"
+    if [[ $what == lit-at ]]; then sleep "$(awk -v a="$secs" -v b="$t" 'BEGIN { print (a > b ? a - b : 0) }')"; fi
+    DISPLAY=:93 import -window root "$shot"
+    stats="$(convert "$shot" -colorspace Gray -format '%[fx:maxima]' info:)"
+    max="$(awk -v m="$stats" 'BEGIN { print (m > 0.5) ? "lit" : (m == 0) ? "black" : "dark" }')"
+    case "$what" in
+      lit-at) [[ $max == "$want" ]] && ok=1; break ;;
+      lit-by) [[ $max == lit ]] && { ok=1; break; } ;;
+      black-by) [[ $max == black ]] && { ok=1; break; } ;;
+    esac
+    awk -v a="$(since "$t0")" -v b="$secs" 'BEGIN { exit !(a >= b) }' && break
+    sleep 0.25
+  done
+  t="$(since "$t0")"
+  pkill -x plymouthd 2>/dev/null
+  if ((ok)); then
+    echo "ok   $mode: ${want:-${what%-by}} at ${t} s (brightest pixel $stats)"
+  else
+    cp "$shot" "$LOGS/splash-$mode-$what.png"
+    echo "FAIL $mode: not ${want:-${what%-by}} by ${secs} s (brightest pixel $stats; $LOGS/splash-$mode-$what.png)"
+    return 1
+  fi
+}
+
 # update_restore: the machine as before the update checks.
 update_restore() {
   rm -f /usr/local/bin/apt-get /usr/local/sbin/apt-get /usr/bin/kubaos "$UPD_READY"
@@ -2452,7 +2646,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell clock sysmon menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shutdown splash shellcheck flake_check quickshell clock sysmon menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

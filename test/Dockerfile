@@ -44,6 +44,8 @@ COPY system/lib.sh system/10-strip.sh system/20-base.sh /opt/dotfiles/system/
 COPY system/files/apt/ /opt/dotfiles/system/files/apt/
 COPY system/files/netplan/ /opt/dotfiles/system/files/netplan/
 COPY system/files/logind.conf.d/ /opt/dotfiles/system/files/logind.conf.d/
+COPY system/files/systemd/system.conf.d/ /opt/dotfiles/system/files/systemd/system.conf.d/
+COPY system/files/systemd/user.conf.d/ /opt/dotfiles/system/files/systemd/user.conf.d/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     runuser -u kuba -- /opt/dotfiles/system/10-strip.sh \
@@ -75,6 +77,8 @@ RUN eval "$(grep -E '^NIX_(VERSION|INSTALL_URL|INSTALL_SHA256)=' /opt/dotfiles/s
 # nixpkgs at warm time. gpu-screen-recorder: not in resolute's archive, and
 # it needs a GPU anyway; wf-recorder records instead. nodejs/npm stand in
 # for the Node that proto installs on the laptop (Mason's npm packages).
+# Plymouth with its X11 renderer and Xvfb draw the boot splash for the
+# `splash` check, which runs the theme in boot, shutdown and reboot mode.
 FROM nix AS tooling
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -85,7 +89,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       dbus-daemon dbus-user-session dbus-x11 gnome-keyring libsecret-tools \
       xdg-utils xdg-user-dirs fonts-noto-core fonts-dejavu-core \
       pamtester shellcheck lua5.5 hyperfine jq expect procps psmisc less file libxkbcommon-tools \
-      python3 python3-requests python3-cryptography openssl nodejs npm
+      python3 python3-requests python3-cryptography openssl nodejs npm \
+      plymouth plymouth-label-ft plymouth-x11 xvfb
 
 # ---------------------------------------------------------------------------
 # desktop: the system halves of system/50-hyprland.sh (Ubuntu's arm64
