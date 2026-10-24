@@ -48,6 +48,8 @@ Singleton {
 
     // Alarms: { at (ms), label }, soonest first.
     property var alarms: []
+    // Countdowns that have rung, as "name@end".
+    property var rung: []
 
     // Now, to the second, while anything shown counts seconds; to the minute
     // otherwise.
@@ -222,9 +224,14 @@ Singleton {
             alarms = alarms.slice(1);
             ring("Alarm", alarm.label);
         }
+        // Both clocks check inside the window, so a countdown rings once by
+        // its name and end.
         for (const countdown of state.countdowns ?? []) {
-            if (countdown.end && countdown.end <= t && countdown.end > t - 1500)
+            const key = `${countdown.name}@${countdown.end}`;
+            if (countdown.end && countdown.end <= t && countdown.end > t - 1500 && !rung.includes(key)) {
+                rung = [key, ...rung].slice(0, 20);
                 ring(countdown.name, "The countdown has reached zero");
+            }
         }
     }
 
