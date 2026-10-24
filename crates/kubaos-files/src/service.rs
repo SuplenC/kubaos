@@ -1,6 +1,8 @@
 //! `org.freedesktop.FileManager1` on the session bus, which apps call for "Show in folder"
-//! (Chrome's downloads, VS Code, Telegram, …). D-Bus starts it on the first call; it answers until
-//! the calls stop for [`DEFAULT_IDLE`], then quits, so nothing stays resident.
+//! (Chrome's downloads, VS Code, Telegram, …), answered with yazi. Nautilus has the name by
+//! default; with an activation file of the user's for `kubaos-files serve`, D-Bus starts this on
+//! the first call instead. It answers until the calls stop for [`DEFAULT_IDLE`], then quits, so
+//! nothing stays resident.
 //!
 //! The interface: <https://www.freedesktop.org/wiki/Specifications/file-manager-interface/>
 //!
@@ -14,7 +16,7 @@
 //!
 //! - Marshalling and the socket: `kotodama_extension::dbus`.
 //! - Opening the window: [`crate::window`].
-//! - The activation file: `home/files.nix`.
+//! - Who has the name by default: `home/files.nix`.
 
 use std::io;
 use std::path::PathBuf;

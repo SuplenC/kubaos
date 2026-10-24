@@ -1,6 +1,6 @@
 [package]
 name = "kubaos-files"
-description = "KubaOS's file manager glue: yazi in a terminal window, for xdg-open and org.freedesktop.FileManager1"
+description = "yazi in a terminal window for KubaOS, and the Downloads tidy"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
