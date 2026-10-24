@@ -23,7 +23,7 @@ fn without_user_dirs_the_english_folders_that_exist_are_items() {
     let item = &folders.items()[0];
     assert_eq!(item.id, "files:download");
     assert_eq!(item.kind.name(), KIND);
-    assert_eq!(item.subtitle.as_deref(), Some("~/Downloads in yazi"));
+    assert_eq!(item.subtitle.as_deref(), Some("~/Downloads"));
 }
 
 #[test]
@@ -37,7 +37,7 @@ fn user_dirs_names_each_folder_under_the_home_or_anywhere() {
     assert_eq!(titles(&folders), ["Files: Scaricati", "Files: photos"]);
     let items = folders.items();
     assert!(items[0].keywords.contains(&"Downloads".to_owned()));
-    assert_eq!(items[1].subtitle.as_deref(), Some("/data/photos in yazi"));
+    assert_eq!(items[1].subtitle.as_deref(), Some("/data/photos"));
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn a_folder_user_dirs_leaves_out_is_no_item() {
 }
 
 #[test]
-fn open_starts_yazi_on_the_folder_and_closes_the_menu() {
+fn open_starts_files_on_the_folder_and_closes_the_menu() {
     let folders = UserFolders::parse(Path::new(HOME), None, every_folder_exists);
     let runner = FakeRunner::default();
 
@@ -65,7 +65,20 @@ fn open_starts_yazi_on_the_folder_and_closes_the_menu() {
 
     assert!(matches!(ran, Ok(Ran::Close)));
     let launched = runner.launched.borrow();
-    assert_eq!(launched[0].0, ["kubaos-files", "open", "/home/kuba/Documents"]);
+    assert_eq!(launched[0].0, ["nautilus", "--new-window", "/home/kuba/Documents"]);
+}
+
+#[test]
+fn the_second_action_opens_the_folder_in_yazi() {
+    let folders = UserFolders::parse(Path::new(HOME), None, every_folder_exists);
+    let runner = FakeRunner::default();
+
+    let ran = folders.run("files:documents", YAZI, &runner);
+
+    assert!(matches!(ran, Ok(Ran::Close)));
+    assert_eq!(runner.launched.borrow()[0].0, ["kubaos-files", "open", "/home/kuba/Documents"]);
+    let actions: Vec<String> = folders.items()[0].actions.iter().map(|action| action.id.clone()).collect();
+    assert_eq!(actions, [OPEN, YAZI]);
 }
 
 #[test]
