@@ -40,6 +40,19 @@ fn it_is_usable_from_the_start() {
 }
 
 #[test]
+fn the_layouts_app_is_usable_from_the_start() {
+    let config_home = tempfile::tempdir().expect("a config folder");
+    let extension = Spawned::start(
+        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos"))
+            .arg("layouts")
+            .env("XDG_CONFIG_HOME", config_home.path()),
+        WAIT,
+    );
+
+    assert_eq!(extension.status(), (true, None));
+}
+
+#[test]
 fn a_user_action_shows_and_a_hidden_one_does_not() {
     let mut extension = start();
 

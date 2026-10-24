@@ -83,7 +83,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.pending = pending;
     }
 
-    /// Takes the keyboard layouts, as `/etc/default/keyboard` now has them.
+    /// Takes the keyboard layouts, as the user's settings or `/etc/default/keyboard` now have them.
     pub fn set_keyboards(&mut self, keyboards: Keyboards) {
         self.keyboards = keyboards;
     }

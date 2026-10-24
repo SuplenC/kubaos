@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# kubaos-keyboard-write: writes the keyboard's XKB fields to /etc/default/keyboard, as root.
+#
+#   kubaos-keyboard-write LAYOUT MODEL VARIANT OPTIONS
+#   kubaos-keyboard-write --help
+#
+# `kubaos keyboard` runs it through pkexec (polkit action org.kubaos.keyboard.set,
+# system/files/polkit/). Installed as /usr/local/libexec/kubaos-keyboard-write by
+# system/50-hyprland.sh, root-owned, since pkexec runs it as root.
+#
+# Ubuntu's systemd-localed can't do this: a D-Bus policy shipped with systemd
+# (/usr/share/dbus-1/system.d/org.freedesktop.locale1.read-only.conf) refuses
+# SetX11Keyboard to everyone, root included, and Debian's localed no longer writes
+# /etc/default/keyboard at all. The file is console-setup's: the console and
+# the initramfs, where the disk's passphrase is typed, read it. `kubaos keyboard`
+# writes the user's default layout here; the full list is the user's
+# (~/.config/kubaos/keyboard/keyboard.toml), and needs no root.
+#
+# Each field is a comma-separated list of XKB names and may be empty; anything but
+# letters, digits and `_-,:()+.` is refused, so nothing typed can reach the file as
+# a quote or a new line. The other lines (BACKSPACE and the rest) are kept, and the
+# file is replaced in one rename.
+set -euo pipefail
+
+FILE=/etc/default/keyboard
+FIELD='^[A-Za-z0-9_,:()+.-]*$'
+
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+
+if [[ ${1:-} == --help || ${1:-} == -h ]]; then
+  usage
+  exit 0
+fi
+if (($# != 4)); then
+  usage >&2
+  exit 2
+fi
+for value in "$@"; do
+  [[ $value =~ $FIELD ]] || { echo "kubaos-keyboard-write: '$value' isn't an XKB name list" >&2; exit 2; }
+done
+[[ -n $1 ]] || { echo "kubaos-keyboard-write: no layout" >&2; exit 2; }
+
+tmp="$(mktemp "$FILE.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+{
+  if [[ -f $FILE ]]; then
+    grep -vE '^[[:space:]]*XKB(LAYOUT|MODEL|VARIANT|OPTIONS)=' "$FILE" || true
+  fi
+  printf 'XKBMODEL="%s"\nXKBLAYOUT="%s"\nXKBVARIANT="%s"\nXKBOPTIONS="%s"\n' "$2" "$1" "$3" "$4"
+} >"$tmp"
+chmod 0644 "$tmp"
+mv -f "$tmp" "$FILE"
+trap - EXIT
+
+# The console takes the new keymap through udev, and the initramfs, where the disk's
+# passphrase is typed, is rebuilt with it. That takes a while, so it runs on
+# after the helper exits, with its own output in the journal and none on the
+# caller's pipes, which `kubaos keyboard` waits on. KUBAOS_KEYBOARD_NO_BOOT skips
+# it (the harness, whose container has no initramfs); pkexec clears the
+# environment, so it never reaches a run from `kubaos keyboard`.
+[[ -z ${KUBAOS_KEYBOARD_NO_BOOT:-} ]] || exit 0
+(
+  set +e
+  {
+    if command -v setupcon >/dev/null; then setupcon --save-only; fi
+    if command -v udevadm >/dev/null; then udevadm trigger --subsystem-match=input --action=change; fi
+    if command -v update-initramfs >/dev/null; then update-initramfs -u; fi
+  } 2>&1 | logger -t kubaos-keyboard-write
+) </dev/null >/dev/null 2>&1 &

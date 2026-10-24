@@ -376,6 +376,19 @@ hypr_installed() {
     awk -v re="$HYPR_HOLD_RE" '$1 == "installed" && $2 ~ re {print $2}'
 }
 
+# install_keyboard_writer: what `kubaos keyboard` writes a new default layout
+# for the console and the disk unlock with. The root helper that writes
+# /etc/default/keyboard, the polkit action pkexec runs it
+# under, and the rule that lets an admin at the machine through without a
+# password. Ubuntu's localed refuses SetX11Keyboard through a D-Bus policy and
+# no longer writes that file (files/keyboard/kubaos-keyboard-write says more).
+# 50-hyprland.sh runs it, and a migration on machines installed before it.
+install_keyboard_writer() {
+  install_root_file "$FILES_DIR/keyboard/kubaos-keyboard-write" /usr/local/libexec/kubaos-keyboard-write 0755
+  install_root_file "$FILES_DIR/polkit/org.kubaos.keyboard.policy" /usr/share/polkit-1/actions/org.kubaos.keyboard.policy 0644
+  install_root_file "$FILES_DIR/polkit/50-kubaos-keyboard.rules" /etc/polkit-1/rules.d/50-kubaos-keyboard.rules 0644
+}
+
 # install_mac_accents: the Mac-style accents on Left Alt. After Left Alt + e,
 # `, u, i or n, keyd sends a dead key on a spare keycode and then the next
 # letter (files/keyd/kubaos.conf), the `kubaos:mac-accents` XKB option gives

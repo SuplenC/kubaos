@@ -1,10 +1,10 @@
 //! The keyboard layouts in the menu: one Item a layout to switch to it, make it the default, move
-//! it up or down or remove it, and "Keyboard: add a layout". They are the layouts of `/etc/default/keyboard`, the
-//! file the install wrote and `kubaos keyboard` changes.
+//! it up or down or remove it, and "Keyboard: add a layout". They are the user's layouts, as `kubaos keyboard` keeps them: the
+//! list in `~/.config/kubaos/keyboard/keyboard.toml`, else the one in `/etc/default/keyboard`.
 //!
 //! Switching is `hyprctl switchxkblayout`, at once. A change to the layouts is checked here, so
-//! a refusal reads in the menu, then launched as `kubaos keyboard`, which asks localed (and so
-//! polkit) and reloads Hyprland; the file's change comes back through the watch in `main.rs`.
+//! a refusal reads in the menu, then launched as `kubaos keyboard`, which writes it to the user's file
+//! and reloads Hyprland; the file's change comes back through the watch in `main.rs`.
 //!
 //! # Owns
 //!
@@ -33,6 +33,7 @@ use kubaos_core::keyboard;
 use kubaos_core::keyboard::Change;
 use kubaos_core::keyboard::KeyboardFile;
 use kubaos_core::keyboard::Layout;
+use kubaos_core::keyboard::settings::Settings;
 
 use crate::run::Runner;
 use crate::toggles::Ran;
@@ -67,20 +68,33 @@ pub struct Keyboards {
 }
 
 impl Keyboards {
-    /// Reads `file`, shaped as `/etc/default/keyboard`, and xkb's rules list `lst`. Either
-    /// missing leaves no layouts, or no names.
-    pub fn read(file: &Path, lst: &Path) -> Self {
+    /// Reads the user's keyboard settings `mine`, the system's `/etc/default/keyboard` `system`,
+    /// and xkb's rules list `lst`. The layouts are the user's list, else the system's; a settings
+    /// file that doesn't parse counts as none. Both missing leave no layouts, `lst` no names.
+    pub fn read(mine: &Path, system: &Path, lst: &Path) -> Self {
         let read = |path: &Path| fs::read_to_string(path).unwrap_or_default();
-        Self::parse(&read(file), &read(lst))
+        let user = Settings::load(mine).unwrap_or_default();
+        let system = KeyboardFile::parse(&read(system));
+        Self::new(keyboard::layouts(&user, &system), &read(lst))
     }
 
     /// The layouts in `file`'s text, named by the rules list's text `lst`.
     pub fn parse(file: &str, lst: &str) -> Self {
+        Self::new(KeyboardFile::parse(file).layouts, lst)
+    }
+
+    /// `layouts`, named by the rules list's text `lst`.
+    pub fn new(layouts: Vec<Layout>, lst: &str) -> Self {
         Keyboards {
-            layouts: KeyboardFile::parse(file).layouts,
+            layouts,
             names: keyboard::names(lst),
             known: kubaos_core::engine::machine::parse_xkb_layouts(lst),
         }
+    }
+
+    /// The layouts, the default first.
+    pub fn layouts(&self) -> &[Layout] {
+        &self.layouts
     }
 
     /// The Items: each layout, then add. None without a layout, as on a machine KubaOS didn't

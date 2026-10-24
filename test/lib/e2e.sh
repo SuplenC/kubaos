@@ -698,47 +698,101 @@ c_workspaces() {
   echo "ok   per-screen workspaces: blocks, slots, joining on unplug and returning on replug"
 }
 
-# Keyboard layouts: config/hypr/input.lua hands Hyprland every layout in
-# /etc/default/keyboard, and `kubaos keyboard show` reads the same file.
+# Keyboard layouts: config/hypr/input.lua hands Hyprland the user's layouts
+# (~/.config/kubaos/keyboard/keyboard.toml), else every layout in
+# /etc/default/keyboard, and `kubaos keyboard show` reads the same files.
 c_keyboard() {
   as_user lua5.5 "$REPO/test/lua/input_test.lua" "$REPO" || { echo "FAIL test/lua/input_test.lua"; return 1; }
-  echo "ok   input.lua: two layouts as XKB's lists, one as a name, US without the file"
-  local file out
+  echo "ok   input.lua: the user's layouts, else the system's as XKB's lists, US without either"
+  local dir out
   install_kubaos || return 1
-  file="$(mktemp)"
-  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=",intl"\nXKBOPTIONS=""\n' >"$file"
-  chmod 644 "$file"
-  out="$(kz "KUBAOS_KEYBOARD_FILE='$file' kubaos keyboard show" 2>&1)" || { echo "FAIL kubaos keyboard show: $out"; rm -f "$file"; return 1; }
-  rm -f "$file"
-  [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; return 1; }
-  echo "ok   kubaos keyboard show lists the layouts, the default first"
+  dir="$(mktemp -d)"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=",intl"\nXKBOPTIONS=""\n' >"$dir/keyboard"
+  chown -R "$USER_NAME:" "$dir"
+  chmod 644 "$dir/keyboard"
+  out="$(kz "XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard show" 2>&1)" ||
+    { echo "FAIL kubaos keyboard show: $out"; rm -rf "$dir"; return 1; }
+  [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; rm -rf "$dir"; return 1; }
+  out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard seed && kubaos keyboard seed && kubaos keyboard show" 2>&1)"
+  if [[ $out != $'us\nit(intl)' ]] || ! grep -qx 'layouts = \["us", "it(intl)"\]' "$dir/kubaos/keyboard/keyboard.toml"; then
+    echo "FAIL kubaos keyboard seed: printed $out, wrote $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1)"; rm -rf "$dir"; return 1
+  fi
+  printf 'layouts = ["de"]\n' >"$dir/kubaos/keyboard/keyboard.toml"
+  out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard seed && kubaos keyboard show" 2>&1)"
+  rm -rf "$dir"
+  [[ $out == de ]] || { echo "FAIL a user list of their own: kubaos keyboard seed then show printed $out"; return 1; }
+  echo "ok   kubaos keyboard show lists the system's layouts, then the user's once seeded or set, the default first"
   keyboard_changes || return 1
   keyboard_refusal || return 1
+  keyboard_writer || return 1
   mac_accents || return 1
   keyboard_tab_clicks || return 1
 }
 
-# A localectl that polkit turned down: `kubaos keyboard` says so in one
-# sentence of its own, not localed's words.
+# Ubuntu's own D-Bus policy turns localed's SetX11Keyboard away from everyone,
+# root included, so `kubaos keyboard` never asks localed. A new default goes to
+# /etc/default/keyboard through the root helper under the real pkexec and
+# polkitd: in the container the user has no active session, so polkit wants
+# a password, and with no terminal pkexec leaves the asking to an agent the
+# session hasn't got, as on a desktop whose polkit agent isn't running.
+# The user's layouts change all the same; pkexec's words are logged on a line of
+# their own, then the last line, which the Keyboard tab shows, says what the
+# console keeps and why.
 keyboard_refusal() {
-  local dir out
+  local policy=/usr/share/dbus-1/system.d/org.freedesktop.locale1.read-only.conf dir out
+  grep -q 'send_member="SetX11Keyboard"' "$policy" 2>/dev/null ||
+    { echo "FAIL $policy no longer denies SetX11Keyboard: localed may write the keyboard again"; return 1; }
+  [[ -x /usr/local/libexec/kubaos-keyboard-write ]] ||
+    { echo "FAIL system/50-hyprland.sh installed no /usr/local/libexec/kubaos-keyboard-write"; return 1; }
   dir="$(mktemp -d)"
-  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us"\nXKBVARIANT=""\nXKBOPTIONS=""\n' >"$dir/keyboard"
-  install -m 0755 /dev/stdin "$dir/localectl" <<'SH'
-#!/bin/sh
-echo 'Failed to set keymap: Access denied' >&2
-exit 1
-SH
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=""\nXKBOPTIONS=""\n' >"$dir/keyboard"
   chown -R "$USER_NAME:" "$dir"
-  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard add it" 2>&1)" && {
-    echo "FAIL kubaos keyboard add succeeded with localectl refused: $out"
-    rm -rf "$dir"
-    return 1
+  out="$(kz "XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard default it" 2>&1)" && {
+    echo "FAIL kubaos keyboard default it succeeded with polkit refusing: $out"; rm -rf "$dir"; return 1
   }
+  if ! grep -qx 'layouts = \["it", "us"\]' "$dir/kubaos/keyboard/keyboard.toml" 2>/dev/null; then
+    echo "FAIL a refused system default left the user's layouts unchanged: $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1)"
+    rm -rf "$dir"; return 1
+  fi
   rm -rf "$dir"
-  [[ $out == "kubaos: the keyboard layouts weren't changed: permission was refused" ]] ||
-    { echo "FAIL a refused localectl printed: $out"; return 1; }
-  echo "ok   a change polkit refuses says so in a sentence, without localectl's words"
+  [[ $(tail -1 <<<"$out") == "kubaos: the keyboard layouts changed, but the console and the disk's passphrase prompt still type with us: no polkit agent is running to ask for the password" ]] ||
+    { echo "FAIL a refused pkexec printed: $out"; return 1; }
+  grep -qx "kubaos: pkexec kubaos-keyboard-write failed (exit status: [0-9]*): .*No authentication agent found.*" <<<"$out" ||
+    { echo "FAIL a refused pkexec logged no line with what it said: $out"; return 1; }
+  echo "ok   a new default no agent can ask for still changes the user's layouts, logged with pkexec's words, said in a sentence"
+}
+
+# The root helper `kubaos keyboard` runs through pkexec, as root on the
+# container's /etc/default/keyboard: it writes the four XKB fields, keeps the
+# other lines, and refuses a value that could break out of its quotes. The
+# console and initramfs refresh is skipped: the container has neither.
+keyboard_writer() {
+  local helper=/usr/local/libexec/kubaos-keyboard-write kb=/etc/default/keyboard saved bad=0
+  cmp -s "$REPO/system/files/keyboard/kubaos-keyboard-write" "$helper" ||
+    { echo "FAIL $helper isn't system/files/keyboard/kubaos-keyboard-write"; return 1; }
+  saved="$(mktemp)"
+  [[ -e $kb ]] && cp -p "$kb" "$saved"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us"\nXKBVARIANT=""\nXKBOPTIONS=""\nBACKSPACE="guess"\n' >"$kb"
+  export KUBAOS_KEYBOARD_NO_BOOT=1
+  if ! "$helper" it pc105 intl caps:escape; then
+    echo "FAIL kubaos-keyboard-write it pc105 intl caps:escape failed"; bad=1
+  elif ! grep -qx 'XKBLAYOUT="it"' "$kb" || ! grep -qx 'XKBVARIANT="intl"' "$kb" ||
+    ! grep -qx 'XKBOPTIONS="caps:escape"' "$kb" || ! grep -qx 'BACKSPACE="guess"' "$kb" ||
+    [[ $(grep -c '^XKBLAYOUT=' "$kb") != 1 || $(stat -c %a "$kb") != 644 ]]; then
+    echo "FAIL kubaos-keyboard-write wrote: $(cat "$kb")"; bad=1
+  else
+    echo "ok   the root helper writes the XKB fields and keeps the other lines"
+  fi
+  if "$helper" 'us"' pc105 '' '' 2>/dev/null || "$helper" "$(printf 'us\nX=1')" pc105 '' '' 2>/dev/null ||
+    ! grep -qx 'XKBLAYOUT="it"' "$kb"; then
+    echo "FAIL kubaos-keyboard-write took a quote or a new line: $(cat "$kb")"; bad=1
+  else
+    echo "ok   the root helper refuses a quote or a new line, and leaves the file as it was"
+  fi
+  unset KUBAOS_KEYBOARD_NO_BOOT
+  if [[ -s $saved ]]; then cp -p "$saved" "$kb"; else rm -f "$kb"; fi
+  rm -f "$saved"
+  return "$bad"
 }
 
 # pointer_tools: VP_RUN, the command that drives test/lib/vpointer.py (Python
@@ -780,26 +834,31 @@ kb_probe_wait() {
 }
 
 # The control center's Keyboard tab under a real pointer (a virtual one, as
-# the headless session has none). A double-click on "Add a language…" opens
-# the matches where the row was, so its second click lands on one: that click
-# only picks it, and nothing runs localectl until the Add button is clicked.
-# Regression: #107.
+# the headless session has none), with the Daemon, which "Add a language…"
+# searches through. A double-click on "Add a language…" opens the search and
+# adds nothing. Once the search is in the "Add a keyboard layout" app, a click
+# on its first match only picks it, and the Add button adds it to the user's
+# layouts with no privilege asked.
 keyboard_tab_clicks() {
-  local dir at picked bad=0
+  local dir at picked daemon mine="$USER_HOME/.config/kubaos/keyboard/keyboard.toml" saved bad=0
   pointer_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$dir/keyboard"
-  install -m 0755 /dev/stdin "$dir/localectl" <<SH
-#!/bin/sh
-echo "\$*" >>'$dir/calls'
-SH
   chown -R "$USER_NAME:" "$dir"
+  saved="$dir/keyboard.toml.saved"
+  [[ -f $mine ]] && cp -p "$mine" "$saved"
+  as_user mkdir -p "$(dirname "$mine")"
+  printf 'layouts = ["us", "it"]\n' | as_user tee "$mine" >/dev/null
   session_start sway 1920x1080 1
-  if ! qs_start "PATH=$dir:/usr/local/bin:\$PATH" "KUBAOS_KEYBOARD_FILE=$dir/keyboard" KUBAOS_KEYBOARD_PROBE=1; then
-    echo "FAIL Quickshell didn't load"; tail -30 "$QS_LOG"; session_stop; rm -rf "$dir"; return 1
+  in_session "exec kotodamad >>$LOGS/kotodamad-keyboard.log 2>&1" &
+  daemon=$!
+  if ! qs_start "KUBAOS_KEYBOARD_FILE=$dir/keyboard" KUBAOS_KEYBOARD_PROBE=1; then
+    echo "FAIL Quickshell didn't load"; tail -30 "$QS_LOG"; bad=1
   fi
-  in_session 'qs ipc call controlcenter keyboard' >/dev/null 2>&1
-  kb_probe_wait 'at add-row' || { echo "FAIL qs ipc call controlcenter keyboard showed no \"Add a language…\""; bad=1; }
+  if ((!bad)); then
+    in_session 'qs ipc call controlcenter keyboard' >/dev/null 2>&1
+    kb_probe_wait 'at add-row' || { echo "FAIL qs ipc call controlcenter keyboard showed no \"Add a language…\""; bad=1; }
+  fi
   # The drawer slides in; the probe logs where the row is until it stops.
   sleep 1.5
   at="$(kb_probe_at add-row)"
@@ -807,15 +866,34 @@ SH
   if ((!bad)); then
     in_session "$VP_RUN 1920 1080 move:$at wait:0.3 click wait:0.12 click wait:1" >>"$LOGS/vpointer.log" 2>&1 ||
       { echo "FAIL test/lib/vpointer.py: $(tail -3 "$LOGS/vpointer.log")"; bad=1; }
-    picked="$(grep -o 'keyboard probe: picked .*' "$QS_LOG" | tail -1 | sed 's/.*picked //')"
-    if [[ -s $dir/calls ]]; then
-      echo "FAIL a double-click on \"Add a language…\" ran localectl $(cat "$dir/calls")"; bad=1
-    elif ! grep -q 'keyboard probe: adding true' "$QS_LOG" || [[ -z $picked ]]; then
-      echo "FAIL the double-click at $at didn't open the matches and pick one:"
+    if ! grep -qx 'layouts = \["us", "it"\]' "$mine"; then
+      echo "FAIL a double-click on \"Add a language…\" changed the layouts: $(cat "$mine")"; bad=1
+    elif ! grep -q 'keyboard probe: adding true' "$QS_LOG" || grep -q 'keyboard probe: adding false' "$QS_LOG"; then
+      echo "FAIL the double-click at $at didn't leave the search open:"
       grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
       bad=1
     else
-      echo "ok   a double-click on \"Add a language…\" picks $picked and adds nothing"
+      echo "ok   a double-click on \"Add a language…\" opens the search and adds nothing"
+    fi
+  fi
+
+  if ((!bad)); then
+    if ! kb_probe_wait 'entered true'; then
+      echo "FAIL the search never entered the \"Add a keyboard layout\" app:"
+      grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
+      tail -5 "$LOGS/kotodamad-keyboard.log" | sed 's/^/     /'
+      bad=1
+    else
+      sleep 0.5
+      at="$(kb_probe_at first-match)"
+      in_session "$VP_RUN 1920 1080 move:$at wait:0.2 click wait:0.5" >>"$LOGS/vpointer.log" 2>&1
+      picked="$(grep -o 'keyboard probe: picked .*' "$QS_LOG" | tail -1 | sed 's/.*picked //')"
+      if [[ -z $picked ]] || ! grep -qx 'layouts = \["us", "it"\]' "$mine"; then
+        echo "FAIL a click on the first match at '$at' didn't only pick it: picked '$picked', layouts $(cat "$mine")"
+        bad=1
+      else
+        echo "ok   the search lists the app's layouts, and a click on one picks $picked"
+      fi
     fi
   fi
 
@@ -823,43 +901,40 @@ SH
     sleep 0.5
     at="$(kb_probe_at add-button)"
     in_session "$VP_RUN 1920 1080 move:$at wait:0.2 click wait:0.5" >>"$LOGS/vpointer.log" 2>&1
-    for _ in $(seq 30); do [[ -s $dir/calls ]] && break; sleep 0.1; done
-    if grep -q "^set-x11-keymap us,it,${picked%%(*} " "$dir/calls" 2>/dev/null; then
-      echo "ok   the Add button adds the pick: localectl $(head -1 "$dir/calls")"
+    for _ in $(seq 30); do grep -q "\"$picked\"" "$mine" && break; sleep 0.1; done
+    if grep -qxF "layouts = [\"us\", \"it\", \"$picked\"]" "$mine"; then
+      echo "ok   the Add button adds the pick to the user's layouts, no privilege asked"
     else
-      echo "FAIL the Add button at $at didn't add $picked: localectl ran '$(cat "$dir/calls" 2>&1)'"; bad=1
+      echo "FAIL the Add button at $at didn't add $picked: $(cat "$mine")"; bad=1
     fi
   fi
 
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
-  session_stop
+  menu_stop "$daemon"
+  if [[ -f $saved ]]; then cp -p "$saved" "$mine"; else rm -f "$mine"; fi
   rm -rf "$dir"
   return "$bad"
 }
 
-# `kubaos keyboard move` and `list`, with a stand-in localectl that writes the
-# file as localed would: the container has no systemd-localed.
+# `kubaos keyboard move`, `add` and `list` with nothing stood in: a change that
+# keeps the default is the user's file alone, and asks for no privilege.
 keyboard_changes() {
   local dir out
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it,de"\nXKBVARIANT=",intl,"\nXKBOPTIONS="caps:escape"\n' >"$dir/keyboard"
-  install -m 0755 /dev/stdin "$dir/localectl" <<'SH'
-#!/bin/sh
-# localectl set-x11-keymap LAYOUT MODEL VARIANT OPTIONS
-printf 'XKBMODEL="%s"\nXKBLAYOUT="%s"\nXKBVARIANT="%s"\nXKBOPTIONS="%s"\n' "$3" "$2" "$4" "$5" >"$KUBAOS_KEYBOARD_FILE"
-SH
+  cp -p "$dir/keyboard" "$dir/keyboard.before"
   chown -R "$USER_NAME:" "$dir"
-  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 1" 2>&1)" ||
-    { echo "FAIL kubaos keyboard move de 1: $out"; rm -rf "$dir"; return 1; }
-  if ! grep -qx 'XKBLAYOUT="de,us,it"' "$dir/keyboard" || ! grep -qx 'XKBVARIANT=",,intl"' "$dir/keyboard" ||
-    ! grep -qx 'XKBOPTIONS="caps:escape"' "$dir/keyboard"; then
-    echo "FAIL kubaos keyboard move de 1 wrote: $(cat "$dir/keyboard")"
+  out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard move de 2 && kubaos keyboard add pl" 2>&1)" ||
+    { echo "FAIL kubaos keyboard move de 2, add pl: $out"; rm -rf "$dir"; return 1; }
+  if ! grep -qx 'layouts = \["us", "de", "it(intl)", "pl"\]' "$dir/kubaos/keyboard/keyboard.toml" ||
+    ! cmp -s "$dir/keyboard" "$dir/keyboard.before"; then
+    echo "FAIL kubaos keyboard move de 2, add pl wrote $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1), system $(cat "$dir/keyboard")"
     rm -rf "$dir"
     return 1
   fi
-  echo "ok   kubaos keyboard move puts a layout at a place through localectl, the options kept"
-  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 4" 2>&1)" && {
-    echo "FAIL kubaos keyboard move de 4 of 3 succeeded: $out"
+  echo "ok   kubaos keyboard move and add change the user's layouts alone while the default stays"
+  out="$(kz "XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 5" 2>&1)" && {
+    echo "FAIL kubaos keyboard move de 5 of 4 succeeded: $out"
     rm -rf "$dir"
     return 1
   }
@@ -1609,6 +1684,22 @@ TOML
       { echo "FAIL typing '${want%%:keyboard*}' doesn't find kubaos/keyboard${want#*:keyboard}"; bad=1; }
   done
   ((bad)) || echo "ok   the keyboard Items are found: add, set, and one a layout"
+  # The "Add a keyboard layout" app (crates/kotodama-kubaos/layouts/): its
+  # entry is found by its word, its layouts only inside it, and the ones in
+  # use aren't offered.
+  out="$(in_session "$query layout Czech" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
+  if ! grep -E '^layout[[:blank:]]' <<<"$out" | grep -qE 'kotodama/app:kubaos-layouts( |$)' ||
+    grep -qE 'kubaos-layouts/' <<<"$out"; then
+    echo "FAIL the layouts app's entry isn't found by 'layout', or its layouts show outside it: $out"; bad=1
+  fi
+  out="$(in_session "$query --app layout czech italian" 2>&1)" || { echo "FAIL entering the layouts app: $out"; bad=1; }
+  if grep -E '^czech[[:blank:]]' <<<"$out" | grep -qE 'kubaos-layouts/layout:cz( |$)' &&
+    grep -E '^italian[[:blank:]]' <<<"$out" | grep -qE 'kubaos-layouts/layout:it\(' &&
+    ! grep -E '^italian[[:blank:]]' <<<"$out" | grep -qE 'kubaos-layouts/layout:it( |$)'; then
+    echo "ok   the layouts app is entered by its word and searches the layouts not in use"
+  else
+    echo "FAIL in the layouts app, czech and italian found: $out"; bad=1
+  fi
   out="$(in_session "$query 'Mac accents on Left Alt' accents" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
   for want in 'Mac accents on Left Alt:mac-accents-on' 'Mac accents on Left Alt:mac-accents-off' \
@@ -1695,7 +1786,7 @@ TOML
     bad=1
   fi
 
-  # localed writes the file through a temporary one and a rename; the Items follow it.
+  # The helper writes the file through a temporary one and a rename; the Items follow it.
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,de"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb.new"
   mv "$kb.new" "$kb"
   for i in $(seq 20); do

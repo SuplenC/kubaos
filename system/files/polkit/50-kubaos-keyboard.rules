@@ -1,15 +1,16 @@
-// Lets an admin at the machine change the keyboard layouts without a password:
-// `kubaos keyboard` does, through localectl, from the control center's
-// Keyboard tab and the Command menu. Those run without a terminal, so the only
-// prompt polkit could show is the session agent's, and with no agent
-// registered for the caller's session localed answers "Access denied" with no
-// prompt at all. The action only covers the X11 and console keymaps localed
-// writes to /etc/default/keyboard, not the locale or anything else.
+// Lets an admin at the machine change the system keyboard layout (the console's
+// and the disk unlock's) without a password: `kubaos keyboard` does when the
+// default layout changes, from the control center's Keyboard tab and the
+// Command menu, by running /usr/local/libexec/kubaos-keyboard-write through
+// pkexec (action org.kubaos.keyboard.set, org.kubaos.keyboard.policy). Those
+// run without a terminal, so with no agent able to ask, pkexec would answer
+// "Not authorized" with no prompt at all. The helper writes only the XKB
+// fields of /etc/default/keyboard; the user's own list of layouts needs no rule.
 // Installed as /etc/polkit-1/rules.d/50-kubaos-keyboard.rules by
 // system/50-hyprland.sh.
-// https://www.freedesktop.org/software/systemd/man/latest/org.freedesktop.locale1.html#Security
+// https://www.freedesktop.org/software/polkit/docs/latest/polkit.8.html
 polkit.addRule(function (action, subject) {
-  if (action.id == "org.freedesktop.locale1.set-keyboard" &&
+  if (action.id == "org.kubaos.keyboard.set" &&
       subject.local && subject.active &&
       (subject.isInGroup("sudo") || subject.isInGroup("admin"))) {
     return polkit.Result.YES;

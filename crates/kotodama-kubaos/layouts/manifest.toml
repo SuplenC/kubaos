@@ -1,0 +1,18 @@
+# The "Add a keyboard layout" app of the Command menu: every layout and
+# variant xkb knows that isn't in use yet, searched by Kotodama. Kotodama has
+# one app an Extension, so this is an Extension of its own, run by the KubaOS
+# Extension's binary in its `layouts` mode. The package (package.nix) installs
+# this directory as `share/kotodama/extensions/kubaos-layouts/`, with a link to
+# that binary next to this file. The control center's "Add a language…" enters
+# the app with a search of its own (config/quickshell/modules/controlcenter/).
+name = "kubaos-layouts"
+description = "Every keyboard layout and variant xkb knows, to add one"
+command = ["./kotodama-kubaos", "layouts"]
+word = "layout"
+title = "Add a keyboard layout"
+icon = "input-keyboard"
+about = "Every keyboard layout and variant xkb knows that you don't type with yet, by name. Pick one to add it after your others; the first stays the default. The control center's Keyboard tab orders and removes them."
+examples = [
+    { query = "czech", result = "Czech, and its variants" },
+    { query = "us intl", result = "English (US, intl., with dead keys)" },
+]

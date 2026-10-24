@@ -117,6 +117,24 @@ fn a_move_past_either_end_is_refused_and_runs_nothing() {
 }
 
 #[test]
+fn the_users_layouts_win_over_the_systems_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let (mine, system, lst) = (dir.path().join("keyboard.toml"), dir.path().join("keyboard"), dir.path().join("evdev.lst"));
+    fs::write(&system, "XKBLAYOUT=\"us,it\"\n").unwrap();
+    fs::write(&lst, LST).unwrap();
+
+    let before = Keyboards::read(&mine, &system, &lst);
+    fs::write(&mine, "layouts = [\"de\", \"us(intl)\"]\n").unwrap();
+    let after = Keyboards::read(&mine, &system, &lst);
+
+    assert_eq!(titles(&before)[..2], ["Keyboard: English (US)", "Keyboard: Italian"]);
+    assert_eq!(
+        titles(&after)[..2],
+        ["Keyboard: German", "Keyboard: English (US, intl., with dead keys)"]
+    );
+}
+
+#[test]
 fn without_the_file_there_are_no_keyboard_items() {
     let keyboards = Keyboards::parse("", LST);
 

@@ -86,6 +86,7 @@ services/               singletons, no UI
   Motion                when moving wallpapers may decode: always / on AC / never (persisted), lock, idle, fullscreen
   Hypr                  focused screen, each screen's block of workspaces, workspace switching
   Panels                which panel is open, and on which screen
+  MenuRequests          `kotodama toggle` / `open` an embedded KotodamaSearch got, handed on to the Command menu
   Session               lock state, suspend/logout/reboot/poweroff
   Recorder              screen recording state ($XDG_RUNTIME_DIR/dot-record.json, watched), dot-hypr-record calls
   Time                  the clock engine (`kubaos-clock serve`, line JSON), clock.toml (watched),
@@ -109,7 +110,8 @@ modules/
                         motion), ResultRow, DetailPane + PaneContent, ActionPanel, FormView,
                         ProgressView, DetailView, IntroCard, JobBar, KeyHints, Keycap,
                         Probe (test-only timing and state lines)
-  controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history
+  controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history,
+                        KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)
   notifications/        Popups (corner), PopupsBelow (critical, under a panel), ToastList, NotificationCard, ToastProbe (tests)
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)

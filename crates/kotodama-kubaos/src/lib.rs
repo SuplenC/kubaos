@@ -27,6 +27,7 @@ pub mod drives;
 pub mod extension;
 pub mod files;
 pub mod keyboard;
+pub mod layouts;
 pub mod registry;
 pub mod sysmon;
 pub mod run;

@@ -1,5 +1,6 @@
 -- The keyboard part of `config/hypr/input.lua` under plain Lua: what it
--- hands Hyprland for the layouts in /etc/default/keyboard.
+-- hands Hyprland for the layouts in the user's keyboard settings, else in
+-- /etc/default/keyboard.
 --
 --   lua5.5 test/lua/input_test.lua REPO
 --
@@ -29,8 +30,8 @@ local real_open = io.open
 
 -- input.lua's `input` settings with /etc/default/keyboard holding `text`
 -- (no file at all for nil), and the accents' XKB symbols installed when
--- `accents` is true.
-local function input_for(text, accents)
+-- `accents` is true, and the user's keyboard.toml holding `mine` (none for nil).
+local function input_for(text, accents, mine)
   local path = os.tmpname()
   if text then
     local f = assert(real_open(path, "w"))
@@ -42,6 +43,18 @@ local function input_for(text, accents)
   io.open = function(name, mode)
     if name == "/etc/default/keyboard" then
       return real_open(path, mode)
+    end
+    if name:match("/kubaos/keyboard/keyboard%.toml$") then
+      if not mine then
+        return nil
+      end
+      local user = os.tmpname()
+      local f = assert(real_open(user, "w"))
+      f:write(mine)
+      f:close()
+      local opened = real_open(user, mode)
+      os.remove(user)
+      return opened
     end
     if name == "/etc/xkb/symbols/kubaos" then
       return accents and real_open(repo .. "/system/files/xkb/symbols/kubaos", mode) or nil
@@ -95,6 +108,20 @@ end)
 test("without the accents' XKB symbols the options are the file's", function()
   local input = input_for('XKBLAYOUT=us\nXKBOPTIONS="caps:escape"\n', false)
   same(input.kb_options, "caps:escape", "kb_options")
+end)
+
+test("the user's layouts win over the system's, whose options stay", function()
+  local input = input_for('XKBLAYOUT="us"\nXKBOPTIONS="caps:escape"\n', false,
+    '# Mine.\nmac_accents = false\nlayouts = ["de", "us(intl)", "it"]\n')
+  same(input.kb_layout, "de,us,it", "kb_layout")
+  same(input.kb_variant, ",intl,", "kb_variant")
+  same(input.kb_options, "caps:escape", "kb_options")
+end)
+
+test("a user file without layouts leaves the system's", function()
+  local input = input_for('XKBLAYOUT="us,it"\nXKBVARIANT=",intl"\n', false, "# layouts = [\"de\"]\n")
+  same(input.kb_layout, "us,it", "kb_layout")
+  same(input.kb_variant, ",intl", "kb_variant")
 end)
 
 os.exit(failed == 0 and 0 or 1)

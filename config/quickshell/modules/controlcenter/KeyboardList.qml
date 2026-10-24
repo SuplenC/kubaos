@@ -14,6 +14,13 @@ import qs.services
 // Shift+J/K moves it, x or Delete removes it. In the search, Enter adds the
 // selected match and Esc goes back.
 //
+// The search is Kotodama's, as every search over a list in the shell is: a
+// `KotodamaSearch` of its own enters the "Add a keyboard layout" app
+// (crates/kotodama-kubaos/layouts/), so typing matches the way the Command
+// menu does, accents and typos included, and this list draws its Results.
+// The add view is made anew each time it opens, so nothing from the last
+// time (a pick, a query, the selected row) shows over the new one.
+//
 // A click never adds a match: it picks it, and the Add button under the list
 // adds it. "Add a language…" opens the matches where the row was, so the
 // second click of a double-click lands on one. For the same reason a click
@@ -24,13 +31,10 @@ ColumnLayout {
 
     // "us", "us(intl)": the layouts as `kubaos keyboard show` spells them.
     property var layouts: []
-    // Every layout and variant, { spelling, name }, sorted by name.
-    property var catalogue: []
+    // Every layout and variant's name by its spelling.
     property var names: ({})
     property bool accents: true
     property bool adding: false
-    // The match a click picked, { spelling, name }, waiting for Add.
-    property var picked: null
     property bool busy: false
     property string problem: ""
     readonly property bool settling: settle.running
@@ -38,10 +42,6 @@ ColumnLayout {
     readonly property bool probed: Quickshell.env("KUBAOS_KEYBOARD_PROBE") === "1"
     // The most a keymap holds (kubaos_core::keyboard::MAX_LAYOUTS).
     readonly property int maxLayouts: 4
-    readonly property var matches: {
-        const query = search.text.trim().toLowerCase();
-        return catalogue.filter(c => !layouts.includes(c.spelling) && (query === "" || c.name.toLowerCase().includes(query) || c.spelling.includes(query)));
-    }
 
     spacing: Theme.spacing.sm
 
@@ -77,26 +77,18 @@ ColumnLayout {
     function startAdding(): void {
         if (layouts.length >= maxLayouts)
             return;
+        problem = "";
         adding = true;
-        search.text = "";
-        picked = null;
-        search.focusInput();
     }
 
     function stopAdding(): void {
         adding = false;
-        picked = null;
         list.forceActiveFocus();
     }
 
     function add(spelling: string): void {
         change(["add", spelling]);
         stopAdding();
-    }
-
-    function addPicked(): void {
-        if (picked && !settling)
-            add(picked.spelling);
     }
 
     // `kubaos keyboard` says "the keyboard layouts weren't changed: …";
@@ -119,11 +111,6 @@ ColumnLayout {
         probe(`adding ${adding}`);
     }
     onLayoutsChanged: settle.restart()
-    onPickedChanged: {
-        probe(`picked ${picked?.spelling ?? ""}`);
-        if (picked)
-            matchList.positionViewAtIndex(matchList.currentIndex, ListView.Contain);
-    }
 
     Timer {
         id: settle
@@ -146,7 +133,10 @@ ColumnLayout {
                 const p = item.mapToItem(null, item.width / 2, item.height / 2);
                 return `${name} x=${Math.round(p.x)} y=${Math.round(p.y)}`;
             };
-            const now = [at("add-row", addRow), at("add-button", addButton)].filter(s => s !== "").join(" ");
+            const button = adder.item?.button;
+            const matches = adder.item?.list;
+            const first = matches?.visible ? matches.itemAtIndex(0) : null;
+            const now = [at("add-row", addRow), first ? at("first-match", first) : "", button ? at("add-button", button) : ""].filter(s => s !== "").join(" ");
             if (now !== last) {
                 last = now;
                 root.probe(`at ${now}`);
@@ -187,20 +177,12 @@ ColumnLayout {
         stdout: StdioCollector {
             onStreamFinished: {
                 const names = {};
-                const catalogue = [];
                 for (const line of text.split("\n")) {
                     const tab = line.indexOf("\t");
-                    if (tab < 0)
-                        continue;
-                    const entry = {
-                        spelling: line.slice(0, tab),
-                        name: line.slice(tab + 1)
-                    };
-                    names[entry.spelling] = entry.name;
-                    catalogue.push(entry);
+                    if (tab >= 0)
+                        names[line.slice(0, tab)] = line.slice(tab + 1);
                 }
                 root.names = names;
-                root.catalogue = catalogue;
             }
         }
     }
@@ -355,111 +337,24 @@ ColumnLayout {
         onClicked: root.changeOnClick(["accents", root.accents ? "off" : "on"])
     }
 
-    // Adding: every layout and variant not in the list, by name.
-    SearchField {
-        id: search
-
-        Layout.fillWidth: true
-        visible: root.adding
-        placeholder: "Search languages and layouts"
-        catchEscape: true
-        forwardTo: [matchList]
-        onEscaped: root.stopAdding()
-        onTextChanged: root.picked = null
-    }
-
-    NavList {
-        id: matchList
+    // Adding: made while it shows, and gone once it closes.
+    Loader {
+        id: adder
 
         Layout.fillWidth: true
         Layout.fillHeight: true
-        visible: root.adding
-        vimKeys: false
-        model: ScriptModel {
-            values: root.matches
-        }
-        // Enter can't be a stray click, so it adds at once.
-        onActivated: index => root.add(root.matches[index].spelling)
-        // The Add bar takes its room from the list as it shows; the pick stays in view.
-        onHeightChanged: if (root.picked)
-            positionViewAtIndex(currentIndex, ListView.Contain)
-
-        delegate: ListRow {
-            required property var modelData
-            required property int index
-
-            width: ListView.view.width
-            title: modelData.name
-            subtitle: modelData.spelling
-            current: ListView.isCurrentItem
-            active: root.picked?.spelling === modelData.spelling
-            onClicked: {
-                ListView.view.currentIndex = index;
-                root.picked = modelData;
+        active: root.adding
+        visible: active
+        sourceComponent: KeyboardAddView {
+            onAdd: spelling => {
+                if (!root.settling)
+                    root.add(spelling);
             }
-        }
-    }
-
-    // The picked match and the button that adds it.
-    Rectangle {
-        Layout.fillWidth: true
-        visible: root.adding && root.picked !== null
-        implicitHeight: confirm.implicitHeight + Theme.spacing.sm * 2
-        radius: Theme.rounding.md
-        color: Theme.m3secondaryContainer
-
-        RowLayout {
-            id: confirm
-
-            anchors.fill: parent
-            anchors.leftMargin: Theme.spacing.md
-            anchors.rightMargin: Theme.spacing.sm
-            spacing: Theme.spacing.sm
-
-            StyledText {
-                Layout.fillWidth: true
-                text: `Add ${root.picked?.name ?? ""}`
-                color: Theme.m3onSecondaryContainer
-                font.weight: Font.Medium
-            }
-
-            IconButton {
-                size: 30
-                icon: "close"
-                tooltip: "Cancel"
-                tint: Theme.m3onSecondaryContainer
-                onClicked: root.picked = null
-            }
-
-            Rectangle {
-                id: addButton
-
-                readonly property real radius: Theme.rounding.full
-
-                implicitWidth: addLabel.implicitWidth + Theme.spacing.lg * 2
-                implicitHeight: 32
-                color: Theme.m3primary
-                activeFocusOnTab: true
-                Keys.onReturnPressed: root.addPicked()
-                Keys.onEnterPressed: root.addPicked()
-                Keys.onSpacePressed: root.addPicked()
-
-                StyledText {
-                    id: addLabel
-
-                    anchors.centerIn: parent
-                    text: "Add"
-                    color: Theme.m3onPrimary
-                    font.weight: Font.Medium
-                }
-
-                StateLayer {
-                    color: Theme.m3onPrimary
-                    onClicked: root.addPicked()
-                }
-
-                FocusRing {}
-            }
+            onAddAtOnce: spelling => root.add(spelling)
+            onCancelled: root.stopAdding()
+            onPickedChanged: root.probe(`picked ${picked?.spelling ?? ""}`)
+            onEnteredChanged: root.probe(`entered ${entered}`)
+            onFailed: message => root.problem = message
         }
     }
 

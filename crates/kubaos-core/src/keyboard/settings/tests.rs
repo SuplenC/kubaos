@@ -63,8 +63,45 @@ fn the_file_lives_in_the_user_layer() {
 
 #[test]
 fn the_setting_prints_as_on_or_off() {
-    let off = Settings { mac_accents: false };
+    let off = Settings {
+        mac_accents: false,
+        ..Settings::default()
+    };
 
     assert_eq!(MacAccents::from(Settings::default()).to_string(), "on");
     assert_eq!(MacAccents::from(off).to_string(), "off");
+}
+
+#[test]
+fn the_layouts_are_unset_until_the_file_lists_them() {
+    assert!(Settings::default().layouts.is_empty());
+
+    let settings = Settings::parse("layouts = [\"us\", \"it(intl)\"]\n").unwrap();
+
+    assert_eq!(settings.layouts, ["us", "it(intl)"]);
+}
+
+#[test]
+fn writing_the_layouts_keeps_the_comments_and_the_accents() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("keyboard.toml");
+    fs::write(&path, "# Mine.\nmac_accents = false\n").unwrap();
+
+    set_layouts(&path, &[Layout::parse("us"), Layout::parse("it(intl)")]).unwrap();
+    set_layouts(&path, &[Layout::parse("de")]).unwrap();
+
+    assert_eq!(fs::read_to_string(&path).unwrap(), "# Mine.\nmac_accents = false\nlayouts = [\"de\"]\n");
+    let settings = Settings::load(&path).unwrap();
+    assert!(!settings.mac_accents);
+    assert_eq!(settings.layouts, ["de"]);
+}
+
+#[test]
+fn writing_the_layouts_creates_the_file_and_its_folder() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("keyboard").join("keyboard.toml");
+
+    set_layouts(&path, &[Layout::parse("us"), Layout::parse("it")]).unwrap();
+
+    assert_eq!(fs::read_to_string(&path).unwrap(), "layouts = [\"us\", \"it\"]\n");
 }
