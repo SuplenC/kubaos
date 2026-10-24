@@ -698,20 +698,30 @@ c_workspaces() {
   echo "ok   per-screen workspaces: blocks, slots, joining on unplug and returning on replug"
 }
 
-# Keyboard layouts: config/hypr/input.lua hands Hyprland every layout in
-# /etc/default/keyboard, and `kubaos keyboard show` reads the same file.
+# Keyboard layouts: config/hypr/input.lua hands Hyprland the user's layouts
+# (~/.config/kubaos/keyboard/keyboard.toml), else every layout in
+# /etc/default/keyboard, and `kubaos keyboard show` reads the same files.
 c_keyboard() {
   as_user lua5.5 "$REPO/test/lua/input_test.lua" "$REPO" || { echo "FAIL test/lua/input_test.lua"; return 1; }
-  echo "ok   input.lua: two layouts as XKB's lists, one as a name, US without the file"
-  local file out
+  echo "ok   input.lua: the user's layouts, else the system's as XKB's lists, US without either"
+  local dir out
   install_kubaos || return 1
-  file="$(mktemp)"
-  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=",intl"\nXKBOPTIONS=""\n' >"$file"
-  chmod 644 "$file"
-  out="$(kz "KUBAOS_KEYBOARD_FILE='$file' kubaos keyboard show" 2>&1)" || { echo "FAIL kubaos keyboard show: $out"; rm -f "$file"; return 1; }
-  rm -f "$file"
-  [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; return 1; }
-  echo "ok   kubaos keyboard show lists the layouts, the default first"
+  dir="$(mktemp -d)"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=",intl"\nXKBOPTIONS=""\n' >"$dir/keyboard"
+  chown -R "$USER_NAME:" "$dir"
+  chmod 644 "$dir/keyboard"
+  out="$(kz "XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard show" 2>&1)" ||
+    { echo "FAIL kubaos keyboard show: $out"; rm -rf "$dir"; return 1; }
+  [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; rm -rf "$dir"; return 1; }
+  out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard seed && kubaos keyboard seed && kubaos keyboard show" 2>&1)"
+  if [[ $out != $'us\nit(intl)' ]] || ! grep -qx 'layouts = \["us", "it(intl)"\]' "$dir/kubaos/keyboard/keyboard.toml"; then
+    echo "FAIL kubaos keyboard seed: printed $out, wrote $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1)"; rm -rf "$dir"; return 1
+  fi
+  printf 'layouts = ["de"]\n' >"$dir/kubaos/keyboard/keyboard.toml"
+  out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard seed && kubaos keyboard show" 2>&1)"
+  rm -rf "$dir"
+  [[ $out == de ]] || { echo "FAIL a user list of their own: kubaos keyboard seed then show printed $out"; return 1; }
+  echo "ok   kubaos keyboard show lists the system's layouts, then the user's once seeded or set, the default first"
   keyboard_changes || return 1
   keyboard_refusal || return 1
   keyboard_writer || return 1
@@ -719,45 +729,52 @@ c_keyboard() {
   keyboard_tab_clicks || return 1
 }
 
-# A pkexec that polkit turned down: `kubaos keyboard` logs what pkexec said on
-# a line of its own, then says so in one sentence of its own, the last line,
-# which the Keyboard tab shows.
+# Ubuntu's own D-Bus policy turns localed's SetX11Keyboard away from everyone,
+# root included, so `kubaos keyboard` never asks localed. A new default goes to
+# /etc/default/keyboard through the root helper under the real pkexec and
+# polkitd: in the container the user has no active session, so polkit refuses.
+# The user's layouts change all the same; pkexec's words are logged on a line of
+# their own, then the last line, which the Keyboard tab shows, says what the
+# console keeps and why.
 keyboard_refusal() {
-  local dir out
+  local policy=/usr/share/dbus-1/system.d/org.freedesktop.locale1.read-only.conf dir out
+  grep -q 'send_member="SetX11Keyboard"' "$policy" 2>/dev/null ||
+    { echo "FAIL $policy no longer denies SetX11Keyboard: localed may write the keyboard again"; return 1; }
+  [[ -x /usr/local/libexec/kubaos-keyboard-write ]] ||
+    { echo "FAIL system/50-hyprland.sh installed no /usr/local/libexec/kubaos-keyboard-write"; return 1; }
   dir="$(mktemp -d)"
-  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us"\nXKBVARIANT=""\nXKBOPTIONS=""\n' >"$dir/keyboard"
-  install -m 0755 /dev/stdin "$dir/pkexec" <<'SH'
-#!/bin/sh
-echo 'Error executing command as another user: Not authorized' >&2
-echo >&2
-echo 'This incident has been reported.' >&2
-exit 127
-SH
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=""\nXKBOPTIONS=""\n' >"$dir/keyboard"
   chown -R "$USER_NAME:" "$dir"
-  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard add it" 2>&1)" && {
-    echo "FAIL kubaos keyboard add succeeded with pkexec refused: $out"
-    rm -rf "$dir"
-    return 1
+  out="$(kz "XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard default it" 2>&1)" && {
+    echo "FAIL kubaos keyboard default it succeeded with polkit refusing: $out"; rm -rf "$dir"; return 1
   }
+  if ! grep -qx 'layouts = \["it", "us"\]' "$dir/kubaos/keyboard/keyboard.toml" 2>/dev/null; then
+    echo "FAIL a refused system default left the user's layouts unchanged: $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1)"
+    rm -rf "$dir"; return 1
+  fi
   rm -rf "$dir"
-  [[ $(tail -1 <<<"$out") == "kubaos: the keyboard layouts weren't changed: permission was refused" ]] ||
+  [[ $(tail -1 <<<"$out") == "kubaos: the keyboard layouts changed, but the console and the disk's passphrase prompt still type with us: polkit refused it" ]] ||
     { echo "FAIL a refused pkexec printed: $out"; return 1; }
-  grep -qx "kubaos: pkexec kubaos-keyboard-write failed (exit status: 127): .*Not authorized / This incident has been reported\." <<<"$out" ||
+  grep -qx "kubaos: pkexec kubaos-keyboard-write failed (exit status: [0-9]*): .*Not authorized.*" <<<"$out" ||
     { echo "FAIL a refused pkexec logged no line with what it said: $out"; return 1; }
-  echo "ok   a change polkit refuses is logged with pkexec's words, then said in a sentence"
+  echo "ok   a new default polkit refuses still changes the user's layouts, logged with pkexec's words, said in a sentence"
 }
 
 # The root helper `kubaos keyboard` runs through pkexec, as root on the
 # container's /etc/default/keyboard: it writes the four XKB fields, keeps the
-# other lines, and refuses a value that could break out of its quotes.
+# other lines, and refuses a value that could break out of its quotes. The
+# console and initramfs refresh is skipped: the container has neither.
 keyboard_writer() {
-  local helper="$REPO/system/files/keyboard/kubaos-keyboard-write" kb=/etc/default/keyboard saved bad=0
+  local helper=/usr/local/libexec/kubaos-keyboard-write kb=/etc/default/keyboard saved bad=0
+  cmp -s "$REPO/system/files/keyboard/kubaos-keyboard-write" "$helper" ||
+    { echo "FAIL $helper isn't system/files/keyboard/kubaos-keyboard-write"; return 1; }
   saved="$(mktemp)"
   [[ -e $kb ]] && cp -p "$kb" "$saved"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us"\nXKBVARIANT=""\nXKBOPTIONS=""\nBACKSPACE="guess"\n' >"$kb"
-  if ! "$helper" us,it pc105 ,intl caps:escape; then
-    echo "FAIL kubaos-keyboard-write us,it pc105 ,intl caps:escape failed"; bad=1
-  elif ! grep -qx 'XKBLAYOUT="us,it"' "$kb" || ! grep -qx 'XKBVARIANT=",intl"' "$kb" ||
+  export KUBAOS_KEYBOARD_NO_BOOT=1
+  if ! "$helper" it pc105 intl caps:escape; then
+    echo "FAIL kubaos-keyboard-write it pc105 intl caps:escape failed"; bad=1
+  elif ! grep -qx 'XKBLAYOUT="it"' "$kb" || ! grep -qx 'XKBVARIANT="intl"' "$kb" ||
     ! grep -qx 'XKBOPTIONS="caps:escape"' "$kb" || ! grep -qx 'BACKSPACE="guess"' "$kb" ||
     [[ $(grep -c '^XKBLAYOUT=' "$kb") != 1 || $(stat -c %a "$kb") != 644 ]]; then
     echo "FAIL kubaos-keyboard-write wrote: $(cat "$kb")"; bad=1
@@ -765,11 +782,12 @@ keyboard_writer() {
     echo "ok   the root helper writes the XKB fields and keeps the other lines"
   fi
   if "$helper" 'us"' pc105 '' '' 2>/dev/null || "$helper" "$(printf 'us\nX=1')" pc105 '' '' 2>/dev/null ||
-    ! grep -qx 'XKBLAYOUT="us,it"' "$kb"; then
+    ! grep -qx 'XKBLAYOUT="it"' "$kb"; then
     echo "FAIL kubaos-keyboard-write took a quote or a new line: $(cat "$kb")"; bad=1
   else
     echo "ok   the root helper refuses a quote or a new line, and leaves the file as it was"
   fi
+  unset KUBAOS_KEYBOARD_NO_BOOT
   if [[ -s $saved ]]; then cp -p "$saved" "$kb"; else rm -f "$kb"; fi
   rm -f "$saved"
   return "$bad"
@@ -871,30 +889,25 @@ SH
   return "$bad"
 }
 
-# `kubaos keyboard move` and `list`, with a stand-in pkexec that writes the
-# file as the root helper would, without root.
+# `kubaos keyboard move`, `add` and `list` with nothing stood in: a change that
+# keeps the default is the user's file alone, and asks for no privilege.
 keyboard_changes() {
   local dir out
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it,de"\nXKBVARIANT=",intl,"\nXKBOPTIONS="caps:escape"\n' >"$dir/keyboard"
-  install -m 0755 /dev/stdin "$dir/pkexec" <<'SH'
-#!/bin/sh
-# pkexec /usr/local/libexec/kubaos-keyboard-write LAYOUT MODEL VARIANT OPTIONS
-[ "$1" = /usr/local/libexec/kubaos-keyboard-write ] || { echo "pkexec: not the helper: $1" >&2; exit 127; }
-printf 'XKBMODEL="%s"\nXKBLAYOUT="%s"\nXKBVARIANT="%s"\nXKBOPTIONS="%s"\n' "$3" "$2" "$4" "$5" >"$KUBAOS_KEYBOARD_FILE"
-SH
+  cp -p "$dir/keyboard" "$dir/keyboard.before"
   chown -R "$USER_NAME:" "$dir"
-  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 1" 2>&1)" ||
-    { echo "FAIL kubaos keyboard move de 1: $out"; rm -rf "$dir"; return 1; }
-  if ! grep -qx 'XKBLAYOUT="de,us,it"' "$dir/keyboard" || ! grep -qx 'XKBVARIANT=",,intl"' "$dir/keyboard" ||
-    ! grep -qx 'XKBOPTIONS="caps:escape"' "$dir/keyboard"; then
-    echo "FAIL kubaos keyboard move de 1 wrote: $(cat "$dir/keyboard")"
+  out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard move de 2 && kubaos keyboard add pl" 2>&1)" ||
+    { echo "FAIL kubaos keyboard move de 2, add pl: $out"; rm -rf "$dir"; return 1; }
+  if ! grep -qx 'layouts = \["us", "de", "it(intl)", "pl"\]' "$dir/kubaos/keyboard/keyboard.toml" ||
+    ! cmp -s "$dir/keyboard" "$dir/keyboard.before"; then
+    echo "FAIL kubaos keyboard move de 2, add pl wrote $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1), system $(cat "$dir/keyboard")"
     rm -rf "$dir"
     return 1
   fi
-  echo "ok   kubaos keyboard move puts a layout at a place through the helper, the options kept"
-  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 4" 2>&1)" && {
-    echo "FAIL kubaos keyboard move de 4 of 3 succeeded: $out"
+  echo "ok   kubaos keyboard move and add change the user's layouts alone while the default stays"
+  out="$(kz "XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 5" 2>&1)" && {
+    echo "FAIL kubaos keyboard move de 5 of 4 succeeded: $out"
     rm -rf "$dir"
     return 1
   }

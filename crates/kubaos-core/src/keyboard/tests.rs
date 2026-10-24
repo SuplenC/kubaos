@@ -221,3 +221,18 @@ fn the_catalogue_is_every_layout_and_variant_by_name() {
         ]
     );
 }
+
+#[test]
+fn the_users_layouts_win_over_the_systems() {
+    let system = KeyboardFile::parse("XKBLAYOUT=\"us,it\"\nXKBVARIANT=\",\"\n");
+    let mine = settings::Settings::parse("layouts = [\"de\", \"us(intl)\"]\n").unwrap();
+
+    assert_eq!(layouts(&mine, &system), [l("de"), l("us(intl)")]);
+}
+
+#[test]
+fn without_a_list_of_their_own_the_user_types_with_the_systems_layouts() {
+    let system = KeyboardFile::parse("XKBLAYOUT=\"us,it\"\nXKBVARIANT=\",intl\"\n");
+
+    assert_eq!(layouts(&settings::Settings::default(), &system), [l("us"), l("it(intl)")]);
+}

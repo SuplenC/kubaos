@@ -1,10 +1,11 @@
-// Lets an admin at the machine change the keyboard layouts without a password:
-// `kubaos keyboard` does, from the control center's Keyboard tab and the
+// Lets an admin at the machine change the system keyboard layout (the console's
+// and the disk unlock's) without a password: `kubaos keyboard` does when the
+// default layout changes, from the control center's Keyboard tab and the
 // Command menu, by running /usr/local/libexec/kubaos-keyboard-write through
 // pkexec (action org.kubaos.keyboard.set, org.kubaos.keyboard.policy). Those
 // run without a terminal, so with no agent able to ask, pkexec would answer
 // "Not authorized" with no prompt at all. The helper writes only the XKB
-// fields of /etc/default/keyboard.
+// fields of /etc/default/keyboard; the user's own list of layouts needs no rule.
 // Installed as /etc/polkit-1/rules.d/50-kubaos-keyboard.rules by
 // system/50-hyprland.sh.
 // https://www.freedesktop.org/software/polkit/docs/latest/polkit.8.html

@@ -2,20 +2,22 @@
 //!
 //! ```toml
 //! mac_accents = false
+//! layouts = ["us", "it(intl)"]
 //! ```
 //!
-//! The Command menu changes them through `kubaos keyboard accents on|off`, which edits the one
-//! line it changes, so the user's comments and the rest of the file stay as they are.
+//! The Command menu and the control center change them through `kubaos keyboard`, which edits the
+//! one line it changes, so the user's comments and the rest of the file stay as they are.
 //!
 //! # Owns
 //!
-//! - Whether the Mac-style accents on Left Alt are on, reading the file and changing it.
+//! - Whether the Mac-style accents on Left Alt are on, and the user's keyboard layouts: reading
+//!   the file and changing it.
 //!
 //! # Not here
 //!
-//! - Applying them (keyd, Hyprland): `kubaos keyboard accents` in the CLI. The seed with its
-//!   comments: `user-layer/keyboard/keyboard.toml`. Hyprland's own read of the file:
-//!   `config/hypr/accents.lua`.
+//! - Applying them (keyd, Hyprland): `kubaos keyboard` in the CLI. The seed with its comments:
+//!   `user-layer/keyboard/keyboard.toml`. Hyprland's own reads of the file:
+//!   `config/hypr/accents.lua` and `config/hypr/input.lua`.
 
 use std::fmt;
 use std::fs;
@@ -24,6 +26,8 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use serde::Deserialize;
+
+use super::Layout;
 
 /// The accents are on until the user turns them off: Left Alt + e, `, u, i and n are the only
 /// Alt chords they take, and macOS hands have them in their fingers.
@@ -34,23 +38,29 @@ const FILE: &str = "kubaos/keyboard/keyboard.toml";
 
 const MAC_ACCENTS: &str = "mac_accents";
 
+const LAYOUTS: &str = "layouts";
+
 /// The settings file for the config home `config_home`, usually `~/.config`.
 pub fn path(config_home: &Path) -> PathBuf {
     config_home.join(FILE)
 }
 
 /// The keyboard settings.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
     /// Left Alt + e, `, u, i or n starts an accent for the next letter.
     pub mac_accents: bool,
+    /// The layouts the user types with, spelled `it` or `us(intl)`, the first the default. Empty
+    /// until `kubaos keyboard` first changes them; until then they are the system's.
+    pub layouts: Vec<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Settings {
             mac_accents: DEFAULT_MAC_ACCENTS,
+            layouts: Vec::new(),
         }
     }
 }
@@ -124,13 +134,29 @@ impl fmt::Display for MacAccents {
 ///
 /// [`SettingsError::Read`] or [`SettingsError::Write`] when the file can't be read or replaced.
 pub fn set_mac_accents(path: &Path, accents: MacAccents) -> Result<(), SettingsError> {
+    set(path, MAC_ACCENTS, &(accents == MacAccents::On).to_string())
+}
+
+/// Writes `layouts` as the user's in the settings file at `path`, creating it when missing.
+///
+/// # Errors
+///
+/// [`SettingsError::Read`] or [`SettingsError::Write`] when the file can't be read or replaced.
+pub fn set_layouts(path: &Path, layouts: &[Layout]) -> Result<(), SettingsError> {
+    // The spellings are XKB names, which `problems` keeps to letters, digits, `_`, `-` and the
+    // variant's parentheses, so a plain quoted string holds each.
+    let list: Vec<String> = layouts.iter().map(|l| format!("\"{l}\"")).collect();
+    set(path, LAYOUTS, &format!("[{}]", list.join(", ")))
+}
+
+/// Sets `key` to `value` in the settings file at `path`, through a temporary file and a rename.
+fn set(path: &Path, key: &str, value: &str) -> Result<(), SettingsError> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
         Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
         Err(e) => return Err(SettingsError::Read(e)),
     };
-    let value = accents == MacAccents::On;
-    let new = with_value(&text, MAC_ACCENTS, &value.to_string());
+    let new = with_value(&text, key, value);
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(SettingsError::Write)?;
     }

@@ -279,9 +279,11 @@ keyword = "cursor-size"
 run = ["kubaos", "cursor", "size", "{size}"]
 arguments = [{ name = "size", placeholder = "32" }]
 
-# The keyboard layouts (kubaos keyboard), kept in /etc/default/keyboard as
-# the install wrote them. The Extension itself sends one Item a layout and
-# "Keyboard: add a layout"; this one replaces them all. The next layout is the
+# The keyboard layouts (kubaos keyboard), kept in
+# ~/.config/kubaos/keyboard/keyboard.toml; the default also goes to
+# /etc/default/keyboard, for the console and the disk unlock. The Extension
+# itself sends one Item a layout and "Keyboard: add a layout"; this one
+# replaces them all. The next layout is the
 # SUPER + SHIFT + Space bind, which the menu finds as "Next keyboard layout".
 
 [extensions.kubaos.actions.keyboard-set]

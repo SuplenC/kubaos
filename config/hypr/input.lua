@@ -1,14 +1,17 @@
 -- Keyboard and touchpad.
 -- https://wiki.hypr.land/Configuring/Variables/#input
 
--- The keyboard layouts are the system's: /etc/default/keyboard, which the
--- install writes from Kōbō's Language screen and `kubaos keyboard` rewrites
--- (through its root helper, system/files/keyboard). Several layouts are XKB's
--- comma-separated lists (XKBLAYOUT="us,it", XKBVARIANT=",intl"), which
--- Hyprland takes as they are, the first the default; SUPER + SHIFT + Space
--- switches (keybinds.lua). Read on every config load, so after a change
--- `hyprctl reload` picks it up. Without the file (a hand-install that never
--- set one), or without a layout in it, the US layout (`us`).
+-- The keyboard layouts are the user's: `layouts = ["us", "it(intl)"]` in
+-- ~/.config/kubaos/keyboard/keyboard.toml, which `kubaos keyboard` writes.
+-- Until the user has that list they are the system's: /etc/default/keyboard,
+-- which the install writes from Kōbō's Language screen, and whose model and
+-- options always apply. `kubaos keyboard` writes the user's default there as
+-- well, for the console and the disk unlock. Several layouts reach Hyprland
+-- as XKB's comma-separated lists (us,it and ,intl), the first the default;
+-- SUPER + SHIFT + Space switches (keybinds.lua). Read on every config load, so
+-- after a change `hyprctl reload` picks them up. Without either file (a
+-- hand-install that never set one), or without a layout in them, the US
+-- layout (`us`).
 -- Workspace and other number/punctuation binds use keycodes (code:10 = the
 -- "1" key), so they work whatever the layout is.
 local function system_keyboard(path)
@@ -33,6 +36,35 @@ local function system_keyboard(path)
     kb.options = found.XKBOPTIONS or ""
   end
   return kb
+end
+
+-- The user's list as kubaos_core::keyboard::settings writes it, on one line:
+-- `layouts = ["us", "it(intl)"]`. Nil without the file or the line, or with
+-- no layout in it.
+local function user_layouts()
+  local config_home = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
+  local file = io.open(config_home .. "/kubaos/keyboard/keyboard.toml", "r")
+  if not file then
+    return nil
+  end
+  local list
+  for line in file:lines() do
+    list = line:match("^%s*layouts%s*=%s*%[(.*)%]") or list
+  end
+  file:close()
+  if not list then
+    return nil
+  end
+  local layouts, variants = {}, {}
+  for spelled in list:gmatch('"([^"]*)"') do
+    local layout, variant = spelled:match("^([^(]+)%((.*)%)$")
+    layouts[#layouts + 1] = layout or spelled
+    variants[#variants + 1] = variant or ""
+  end
+  if #layouts == 0 then
+    return nil
+  end
+  return { layout = table.concat(layouts, ","), variant = table.concat(variants, ",") }
 end
 
 -- The Mac-style accents on Left Alt: after Left Alt + e, `, u, i or n, keyd
@@ -60,6 +92,10 @@ local function with_mac_accents(options, symbols)
 end
 
 local kb = system_keyboard("/etc/default/keyboard")
+local mine = user_layouts()
+if mine then
+  kb.layout, kb.variant = mine.layout, mine.variant
+end
 kb.options = with_mac_accents(kb.options, "/etc/xkb/symbols/kubaos")
 
 hl.config({

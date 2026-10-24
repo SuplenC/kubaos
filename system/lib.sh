@@ -376,8 +376,9 @@ hypr_installed() {
     awk -v re="$HYPR_HOLD_RE" '$1 == "installed" && $2 ~ re {print $2}'
 }
 
-# install_keyboard_writer: what `kubaos keyboard` changes the layouts with. The
-# root helper that writes /etc/default/keyboard, the polkit action pkexec runs it
+# install_keyboard_writer: what `kubaos keyboard` writes a new default layout
+# for the console and the disk unlock with. The root helper that writes
+# /etc/default/keyboard, the polkit action pkexec runs it
 # under, and the rule that lets an admin at the machine through without a
 # password. Ubuntu's localed refuses SetX11Keyboard through a D-Bus policy and
 # no longer writes that file (files/keyboard/kubaos-keyboard-write says more).

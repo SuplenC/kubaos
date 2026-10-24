@@ -1,10 +1,12 @@
-//! Keyboard layouts: the list a machine types with, the first of them the default, as
-//! `/etc/default/keyboard` holds it (`XKBLAYOUT="us,it"`, `XKBVARIANT=",intl"`).
+//! Keyboard layouts: the list a user types with, the first of them the default. The user's list
+//! is in their keyboard settings ([`settings`]); until they have one it is the system's, as
+//! `/etc/default/keyboard` holds it (`XKBLAYOUT="us,it"`, `XKBVARIANT=",intl"`). The system file
+//! is the console's and the disk passphrase prompt's, and follows the user's default.
 //!
 //! # Owns
 //!
-//! - A layout and its `layout(variant)` spelling, the rules a list of them follows, and the
-//!   changes the Command menu and `kubaos keyboard` make to one.
+//! - A layout and its `layout(variant)` spelling, the rules a list of them follows, which list is
+//!   the user's ([`layouts`]), and the changes the Command menu and `kubaos keyboard` make to one.
 //! - Reading and writing the layout fields of `/etc/default/keyboard`, and the layout names in
 //!   xkb's rules `.lst` files, with the catalogue of every layout and variant by name.
 //! - The Mac-style accents on Left Alt: their table ([`accents`]) and their setting
@@ -12,9 +14,10 @@
 //!
 //! # Not here
 //!
-//! - Writing the file at install: `engine::install`. Changing it on a running system goes
-//!   through `kubaos keyboard` (in the CLI) and its root helper, `system/files/keyboard`.
-//! - Hyprland reading it: `config/hypr/input.lua`.
+//! - Writing the system file at install: `engine::install`. On a running system `kubaos keyboard`
+//!   (in the CLI) writes the user's list, and a new default to the system file through its root
+//!   helper, `system/files/keyboard`.
+//! - Hyprland reading them: `config/hypr/input.lua`.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -22,7 +25,8 @@ use std::fmt;
 /// The most layouts a keymap holds: XKB has four groups.
 pub const MAX_LAYOUTS: usize = 4;
 
-/// Where the system's keyboard settings live, for the console, the installer and Hyprland.
+/// Where the system's keyboard settings live, for the console and the initramfs, and Hyprland
+/// until the user has a list of their own.
 pub const DEFAULT_KEYBOARD: &str = "/etc/default/keyboard";
 
 /// xkb's rules list, with a name for every layout and variant.
@@ -193,7 +197,8 @@ impl KeyboardFile {
 }
 
 /// The text of `/etc/default/keyboard` for `layouts`, the first the default. console-setup reads
-/// it for the console, which types with the first layout, and Hyprland (`config/hypr/input.lua`).
+/// it for the console, which types with the first layout, and Hyprland (`config/hypr/input.lua`)
+/// until the user has a list of their own.
 pub fn default_keyboard(layouts: &[Layout]) -> String {
     let (layout, variant) = to_fields(layouts);
     format!(
@@ -205,6 +210,17 @@ pub fn default_keyboard(layouts: &[Layout]) -> String {
          \n\
          BACKSPACE=\"guess\"\n"
     )
+}
+
+/// The layouts the user types with: their own list in the keyboard settings, else the system's
+/// in `/etc/default/keyboard`, which the install wrote and a machine set up before the user's
+/// list existed still holds.
+pub fn layouts(user: &settings::Settings, system: &KeyboardFile) -> Vec<Layout> {
+    if user.layouts.is_empty() {
+        system.layouts.clone()
+    } else {
+        user.layouts.iter().map(|spelled| Layout::parse(spelled)).collect()
+    }
 }
 
 /// A change to the layouts.

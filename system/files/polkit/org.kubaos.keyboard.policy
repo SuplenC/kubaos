@@ -2,17 +2,18 @@
 <!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
 <!--
-  The keyboard layouts in /etc/default/keyboard: what `pkexec` asks before it runs
+  The system keyboard layout in /etc/default/keyboard, which the console and the
+  disk's passphrase prompt type with: what `pkexec` asks before it runs
   /usr/local/libexec/kubaos-keyboard-write (system/files/keyboard/) for
-  `kubaos keyboard`. An admin at the machine needs no password
+  `kubaos keyboard`, when the user's default layout changes. An admin at the machine needs no password
   (50-kubaos-keyboard.rules); anyone else is asked for an admin's.
   Installed in /usr/share/polkit-1/actions/ by system/50-hyprland.sh.
 -->
 <policyconfig>
   <vendor>KubaOS</vendor>
   <action id="org.kubaos.keyboard.set">
-    <description>Change the keyboard layouts</description>
-    <message>Authentication is required to change the keyboard layouts.</message>
+    <description>Change the system keyboard layout</description>
+    <message>Authentication is required to change the keyboard layout of the console and the disk unlock.</message>
     <icon_name>input-keyboard</icon_name>
     <defaults>
       <allow_any>auth_admin</allow_any>

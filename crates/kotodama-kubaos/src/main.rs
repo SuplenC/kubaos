@@ -9,8 +9,8 @@
 //! # Owns
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
-//! - Watching the update check's file, `/etc/default/keyboard`, the wallpaper sets file and the
-//!   drives file.
+//! - Watching the update check's file, the keyboard settings and `/etc/default/keyboard`, the
+//!   wallpaper sets file and the drives file.
 //!
 //! # Not here
 //!
@@ -56,6 +56,7 @@ use kotodama_protocol::Outcome;
 use kotodama_protocol::ToExtension;
 use kubaos_clock::settings as clock_settings;
 use kubaos_core::keyboard;
+use kubaos_core::keyboard::settings as keyboard_settings;
 use kubaos_sysmon::processes;
 use kubaos_sysmon::serve;
 
@@ -67,7 +68,7 @@ const SETTLE: Duration = Duration::from_millis(200);
 enum Own {
     /// The update check's file changed.
     Pending(Pending),
-    /// `/etc/default/keyboard` changed.
+    /// The keyboard settings or `/etc/default/keyboard` changed.
     Keyboards(Keyboards),
     /// The wallpaper sets file changed.
     WallpaperSets(WallpaperSets),
@@ -129,9 +130,11 @@ fn run() -> Result<(), Error> {
     if let Some(dir) = &state {
         extension.set_pending(Pending::read(&dir.join(updates::FILE)));
     }
-    let keyboard_file = Path::new(keyboard::DEFAULT_KEYBOARD);
-    extension.set_keyboards(read_keyboards(keyboard_file));
-    let _keyboard_watcher = watch_keyboards(keyboard_file, events.clone());
+    let keyboard_files = KeyboardFiles::new();
+    if let Some(files) = &keyboard_files {
+        extension.set_keyboards(files.read());
+    }
+    let _keyboard_watcher = keyboard_files.and_then(|files| watch_keyboards(files, events.clone()));
     let sets_file = wallpapers::sets_file();
     if let Some(file) = &sets_file {
         extension.set_wallpaper_sets(WallpaperSets::read(&wallpapers::sets_dir(), file));
@@ -235,30 +238,57 @@ fn watch(dir: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
     Some(watcher)
 }
 
-fn read_keyboards(file: &Path) -> Keyboards {
-    Keyboards::read(file, Path::new(keyboard::RULES_LST))
+/// Where the keyboard layouts come from: the user's keyboard settings, then the system's file.
+#[derive(Clone)]
+struct KeyboardFiles {
+    mine: PathBuf,
 }
 
-/// Watches the folder of `file`, `/etc/default/keyboard`, sending the layouts on each change to
-/// it. Without a watch the keyboard Items keep the layouts of the start.
-fn watch_keyboards(file: &Path, events: Sender<Event<Own>>) -> Option<Watcher> {
-    let dir = file.parent()?.to_path_buf();
-    let file = file.to_path_buf();
-    let changed = file.clone();
+impl KeyboardFiles {
+    /// The files under `XDG_CONFIG_HOME`, else `~/.config`; none without either.
+    fn new() -> Option<Self> {
+        let var = |name| std::env::var_os(name).filter(|value| !value.is_empty()).map(PathBuf::from);
+        let config_home = var("XDG_CONFIG_HOME").or_else(|| var("HOME").map(|home| home.join(".config")))?;
+        Some(KeyboardFiles {
+            mine: keyboard_settings::path(&config_home),
+        })
+    }
+
+    fn system() -> &'static Path {
+        Path::new(keyboard::DEFAULT_KEYBOARD)
+    }
+
+    fn read(&self) -> Keyboards {
+        Keyboards::read(&self.mine, Self::system(), Path::new(keyboard::RULES_LST))
+    }
+}
+
+/// Watches the folders of the keyboard settings and of `/etc/default/keyboard`, sending the
+/// layouts on each change to either. Without a watch the keyboard Items keep the layouts of the
+/// start.
+fn watch_keyboards(files: KeyboardFiles, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let mine_dir = files.mine.parent()?.to_path_buf();
+    // `dot-config apply` makes the folder with its seed; one made here waits for the first change.
+    let _ = std::fs::create_dir_all(&mine_dir);
+    // The events name the real path, behind any symlink on the way.
+    let mine_dir = mine_dir.canonicalize().unwrap_or(mine_dir);
+    let mine = mine_dir.join(files.mine.file_name()?);
+    let system = KeyboardFiles::system().to_path_buf();
+    let system_dir = system.parent()?.to_path_buf();
     let watcher = Watcher::start(
         "keyboard",
         RecursiveMode::NonRecursive,
         SETTLE,
-        // `kubaos keyboard`'s helper writes the file through a temporary one and a rename, as the
-        // update check does.
-        move |event, _| event.paths.contains(&changed),
+        // `kubaos keyboard` writes the settings, and its helper the system's file, through a
+        // temporary file and a rename, as the update check does.
+        move |event, _| event.paths.iter().any(|path| *path == mine || *path == system),
         move |_| {
-            let _ = events.send(Event::Own(Own::Keyboards(read_keyboards(&file))));
+            let _ = events.send(Event::Own(Own::Keyboards(files.read())));
         },
     )
     .map_err(|err| kotodama_extension::log!("not watching the keyboard layouts: {err}"))
     .ok()?;
-    watcher.watch(vec![dir]);
+    watcher.watch(vec![mine_dir, system_dir]);
     Some(watcher)
 }
 

@@ -11,8 +11,10 @@
 # Ubuntu's systemd-localed can't do this: a D-Bus policy shipped with systemd
 # (/usr/share/dbus-1/system.d/org.freedesktop.locale1.read-only.conf) refuses
 # SetX11Keyboard to everyone, root included, and Debian's localed no longer writes
-# /etc/default/keyboard at all. The file is console-setup's, which Hyprland
-# (config/hypr/input.lua) and the console read.
+# /etc/default/keyboard at all. The file is console-setup's: the console and
+# the initramfs, where the disk's passphrase is typed, read it. `kubaos keyboard`
+# writes the user's default layout here; the full list is the user's
+# (~/.config/kubaos/keyboard/keyboard.toml), and needs no root.
 #
 # Each field is a comma-separated list of XKB names and may be empty; anything but
 # letters, digits and `_-,:()+.` is refused, so nothing typed can reach the file as
@@ -49,3 +51,19 @@ trap 'rm -f "$tmp"' EXIT
 chmod 0644 "$tmp"
 mv -f "$tmp" "$FILE"
 trap - EXIT
+
+# The console takes the new keymap through udev, and the initramfs, where the disk's
+# passphrase is typed, is rebuilt with it. That takes a while, so it runs on
+# after the helper exits, with its own output in the journal and none on the
+# caller's pipes, which `kubaos keyboard` waits on. KUBAOS_KEYBOARD_NO_BOOT skips
+# it (the harness, whose container has no initramfs); pkexec clears the
+# environment, so it never reaches a run from `kubaos keyboard`.
+[[ -z ${KUBAOS_KEYBOARD_NO_BOOT:-} ]] || exit 0
+(
+  set +e
+  {
+    if command -v setupcon >/dev/null; then setupcon --save-only; fi
+    if command -v udevadm >/dev/null; then udevadm trigger --subsystem-match=input --action=change; fi
+    if command -v update-initramfs >/dev/null; then update-initramfs -u; fi
+  } 2>&1 | logger -t kubaos-keyboard-write
+) </dev/null >/dev/null 2>&1 &
