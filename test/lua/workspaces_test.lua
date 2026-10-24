@@ -156,16 +156,9 @@ test("the screens file reads back what it wrote", function()
   same({ parsed[PANEL], parsed[LG_A], parsed[LG_B], current["DP-3"] }, { 0, 1, 2, LG_A }, "parsed")
 end)
 
-test("the screens file keeps where each screen last sat", function()
-  local text = blocks.format_blocks({ [PANEL] = 0, [LG_A] = 1 }, { ["eDP-1"] = PANEL }, { [PANEL] = 0, [LG_A] = 1920 })
-  same(text, "0\teDP-1\t" .. PANEL .. "\t0\n1\t\t" .. LG_A .. "\t1920\n", "text")
-  local _, _, positions = blocks.parse_blocks(text)
-  same({ positions[PANEL], positions[LG_A] }, { 0, 1920 }, "positions")
-end)
-
-test("a screens file without positions still reads", function()
-  local parsed, current, positions = blocks.parse_blocks("1\tDP-3\t" .. LG_A .. "\n")
-  same({ parsed[LG_A], current["DP-3"], positions[LG_A] }, { 1, LG_A, nil }, "parsed")
+test("a screens file with the position column it once had still reads", function()
+  local parsed, current = blocks.parse_blocks("0\teDP-1\t" .. PANEL .. "\t0\n1\t\t" .. LG_A .. "\t1920\n")
+  same({ parsed[PANEL], parsed[LG_A], current["eDP-1"] }, { 0, 1, PANEL }, "parsed")
 end)
 
 -- The groups of `groups()` as lists of ids, for comparing.
@@ -203,40 +196,88 @@ test("a screen's own group counts its workspaces left on another screen", functi
   same(ids_of(blocks.groups(0, "eDP-1", concat(on("eDP-1", 1), on("DP-1", 2, 11)), {})), { { 1, 2 } }, "groups")
 end)
 
-test("the groups of unplugged screens follow the screen's own, left to right as they sat", function()
-  local workspaces = concat(on("eDP-1", 1, 2), on("eDP-1", 11, 12), on("eDP-1", 21))
-  same(ids_of(blocks.groups(0, "eDP-1", workspaces, { [1] = 3840, [2] = 1920 })), { { 1, 2 }, { 21 }, { 11, 12 } }, "by x")
-  same(ids_of(blocks.groups(0, "eDP-1", workspaces, {})), { { 1, 2 }, { 11, 12 }, { 21 } }, "by block without positions")
+test("the groups of unplugged screens follow the screen's own in block order", function()
+  local workspaces = concat(on("eDP-1", 1, 2), on("eDP-1", 21), on("eDP-1", 11, 12))
+  same(ids_of(blocks.groups(0, "eDP-1", workspaces)), { { 1, 2 }, { 11, 12 }, { 21 } }, "groups")
 end)
 
-local GROUPS = { { block = 0, ids = { 1, 3 } }, { block = 1, ids = { 11, 12 } }, { block = 2, ids = { 21 } } }
+test("a waiting group with lower numbers comes before the screen's own, as the swipe walks ids", function()
+  local workspaces = concat(on("DP-1", 11, 12), on("DP-1", 1, 2))
+  same(ids_of(blocks.groups(1, "DP-1", workspaces)), { { 1, 2 }, { 11, 12 } }, "groups")
+end)
 
-test("next and previous walk a group's workspaces, the first one included", function()
-  same(blocks.step(GROUPS, 1, 1, false, set({ 3, 11, 12, 21 })), 3, "next")
-  same(blocks.step(GROUPS, 3, -1, true, set({ 3, 11, 12, 21 })), 1, "previous to the first, which does not exist")
+local GROUPS = { { block = 0, ids = { 1, 3, 4 } }, { block = 1, ids = { 11, 12 } }, { block = 2, ids = { 21 } } }
+
+test("next and previous walk a group's workspaces", function()
+  same(blocks.step(GROUPS, 1, 1), 3, "next")
+  same(blocks.step(GROUPS, 4, -1), 3, "previous")
+end)
+
+test("from a group's last, next goes to the first of the group on its right", function()
+  same(blocks.step(GROUPS, 4, 1), 11, "to the right")
+  same(blocks.step(GROUPS, 21, 1), nil, "nothing on the right: stay")
 end)
 
 test("previous from a group's first goes to the last of the group on its left", function()
-  same(blocks.step(GROUPS, 11, -1, true, set({ 1, 3, 11, 12, 21 })), 3, "to the left")
-  same(blocks.step(GROUPS, 1, -1, true, set({ 1, 3, 11, 12, 21 })), nil, "nothing on the left: stay")
-end)
-
-test("next from a group's last opens one empty workspace, then goes to the group on the right", function()
-  same(blocks.step(GROUPS, 3, 1, true, set({ 1, 3, 11, 12, 21 })), 4, "a new workspace after one with windows")
-  local with_new = { { block = 0, ids = { 1, 3, 4 } }, GROUPS[2], GROUPS[3] }
-  same(blocks.step(with_new, 4, 1, false, set({ 1, 3, 4, 11, 12, 21 })), 11, "from the empty one to the right")
-  same(blocks.step(GROUPS, 21, 1, false, set({ 1, 3, 11, 12, 21 })), nil, "nothing on the right: stay")
-end)
-
-test("next from a full group's last goes to the group on the right", function()
-  local full = { { block = 0, ids = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 } }, GROUPS[2] }
-  same(blocks.step(full, 10, 1, true, set({ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 })), 11, "right")
+  same(blocks.step(GROUPS, 11, -1), 4, "to the left")
+  same(blocks.step(GROUPS, 1, -1), nil, "nothing on the left: stay")
 end)
 
 test("next and previous group go to the first workspace of the group beside", function()
   same(blocks.group_step(GROUPS, 3, 1), 11, "next")
   same(blocks.group_step(GROUPS, 12, -1), 1, "previous")
   same(blocks.group_step(GROUPS, 21, 1), nil, "none")
+end)
+
+-- Workspaces for `kept()`: { id, monitor, windows }.
+local function holding(monitor, windows, ...)
+  local list = {}
+  for _, id in ipairs({ ... }) do
+    list[#list + 1] = { id = id, monitor = monitor, windows = windows }
+  end
+  return list
+end
+
+-- What `kept()` returns, as a sorted list of "id@connector".
+local function kept_list(screens, workspaces)
+  local result = {}
+  for id, connector in pairs(blocks.kept(screens, workspaces)) do
+    result[#result + 1] = id .. "@" .. connector
+  end
+  table.sort(result, function(left, right) return tonumber(left:match("^%d+")) < tonumber(right:match("^%d+")) end)
+  return result
+end
+
+local SCREENS = { { name = "eDP-1", block = 0 }, { name = "DP-1", block = 1 } }
+
+test("a screen with no windows keeps only its first workspace", function()
+  same(kept_list(SCREENS, {}), { "1@eDP-1", "11@DP-1" }, "kept")
+end)
+
+test("a group keeps one empty workspace after its last with windows", function()
+  local workspaces = concat(holding("eDP-1", 1, 1, 3), holding("eDP-1", 0, 2), holding("DP-1", 2, 11))
+  same(kept_list(SCREENS, workspaces), { "1@eDP-1", "4@eDP-1", "11@DP-1", "12@DP-1" }, "kept")
+end)
+
+test("a group whose first is empty still keeps it", function()
+  same(kept_list(SCREENS, holding("eDP-1", 1, 2)), { "1@eDP-1", "3@eDP-1", "11@DP-1" }, "kept")
+end)
+
+test("a group with windows on workspace 10 keeps no empty one after it", function()
+  same(kept_list({ SCREENS[1] }, holding("eDP-1", 1, 1, 10)), { "1@eDP-1" }, "kept")
+end)
+
+test("a waiting group keeps its first and one empty after its last, on the screen holding it", function()
+  local workspaces = concat(holding("eDP-1", 1, 1), holding("eDP-1", 1, 12, 13))
+  same(kept_list({ SCREENS[1] }, workspaces), { "1@eDP-1", "2@eDP-1", "11@eDP-1", "14@eDP-1" }, "kept")
+end)
+
+test("an unplugged screen's group with no windows keeps nothing", function()
+  same(kept_list({ SCREENS[1] }, holding("eDP-1", 0, 11)), { "1@eDP-1" }, "kept")
+end)
+
+test("a screen's own workspace left on another screen counts toward its group", function()
+  same(kept_list(SCREENS, holding("DP-1", 1, 2)), { "1@eDP-1", "3@eDP-1", "11@DP-1" }, "kept")
 end)
 
 -- The module on the fake Hyprland.
@@ -249,7 +290,7 @@ end)
 
 test("the screens file names each screen's block and connector", function()
   local world = two_screens()
-  same(read(world.state .. "/workspace-screens"), "0\teDP-1\t" .. PANEL .. "\t0\n1\tDP-1\t" .. LG_A .. "\t1920\n", "file")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\t" .. PANEL .. "\n1\tDP-1\t" .. LG_A .. "\n", "file")
 end)
 
 test("SUPER + 2 opens the focused screen's own workspace 2", function()
@@ -280,7 +321,7 @@ test("SUPER + SHIFT + 4 moves the window to a new workspace 4 and follows it", f
 
   same(window.workspace.id, 4, "window")
   same(world:shown_on("eDP-1"), 4, "followed")
-  same(world:ids_on("eDP-1"), { 4 }, "the empty 1 is gone")
+  same(world:ids_on("eDP-1"), { 1, 4, 5 }, "the empty 1 stays, and one empty after 4")
 end)
 
 test("SUPER + SHIFT + ALT + 4 moves the window without following", function()
@@ -339,7 +380,7 @@ test("unplugging a screen moves its group to the laptop under its own numbers", 
 
   world:unplug("DP-1")
 
-  same(world:ids_on("eDP-1"), { 1, 2, 11, 12, 13 }, "laptop")
+  same(world:ids_on("eDP-1"), { 1, 2, 3, 11, 12, 13, 14 }, "laptop")
   same(world.renumbered, 0, "renumbered")
 end)
 
@@ -349,7 +390,7 @@ test("an unplugged screen's group goes to the laptop even when Hyprland puts it 
 
   world:unplug("DP-1", "DP-2")
 
-  same(world:ids_on("eDP-1"), { 1, 2, 11, 12, 13 }, "laptop")
+  same(world:ids_on("eDP-1"), { 1, 2, 3, 11, 12, 13, 14 }, "laptop")
   same(world:ids_on("DP-2"), { 21 }, "the other external keeps its own")
 end)
 
@@ -367,8 +408,8 @@ test("plugging it back returns them under their old numbers", function()
 
   world:plug("DP-3", LG_A, 1920)
 
-  same(world:ids_on("eDP-1"), { 1, 2 }, "laptop")
-  same(world:ids_on("DP-3"), { 11, 12, 13 }, "external, on a new connector")
+  same(world:ids_on("eDP-1"), { 1, 2, 3 }, "laptop")
+  same(world:ids_on("DP-3"), { 11, 12, 13, 14 }, "external, on a new connector")
 end)
 
 test("a config reload between unplug and replug keeps the record", function()
@@ -378,7 +419,7 @@ test("a config reload between unplug and replug keeps the record", function()
 
   world:plug("DP-1", LG_A, 1920)
 
-  same(world:ids_on("DP-1"), { 11, 12, 13 }, "external")
+  same(world:ids_on("DP-1"), { 11, 12, 13, 14 }, "external")
 end)
 
 test("a second external gets the next block and keeps it across plugs", function()
@@ -399,11 +440,11 @@ test("closing the lid moves the laptop's group to the external and opening it br
   local world = busy()
 
   world:unplug("eDP-1")
-  same(world:ids_on("DP-1"), { 1, 2, 11, 12, 13 }, "external")
+  same(world:ids_on("DP-1"), { 1, 2, 3, 11, 12, 13, 14 }, "external")
 
   world:plug("eDP-1", PANEL, 0)
-  same(world:ids_on("eDP-1"), { 1, 2 }, "laptop")
-  same(world:ids_on("DP-1"), { 11, 12, 13 }, "external")
+  same(world:ids_on("eDP-1"), { 1, 2, 3 }, "laptop")
+  same(world:ids_on("DP-1"), { 11, 12, 13, 14 }, "external")
 end)
 
 -- Regression: an empty workspace 1, once left, was out of reach of every
@@ -444,14 +485,14 @@ test("next walks from the laptop's group into an unplugged screen's", function()
   run(module.focus(2))
 
   run(module.next())
-  same(world:shown_on("eDP-1"), 3, "one empty workspace after the laptop's own")
+  same(world:shown_on("eDP-1"), 3, "the empty workspace kept after the laptop's own")
   run(module.next())
   same(world:shown_on("eDP-1"), 11, "then the unplugged screen's first")
   run(module.previous())
-  same(world:shown_on("eDP-1"), 2, "and back to the laptop's last")
+  same(world:shown_on("eDP-1"), 3, "and back to the laptop's last, the empty one")
 end)
 
-test("the groups of two unplugged screens come in the order the screens sat", function()
+test("the groups of two unplugged screens come in block order, not where the screens sat", function()
   local world, module = session()
   world:plug("eDP-1", PANEL, 0)
   world:plug("DP-1", LG_A, 3840)
@@ -469,13 +510,13 @@ test("the groups of two unplugged screens come in the order the screens sat", fu
   run(module.focus(1))
 
   run(module.next_group())
-  same(world:shown_on("eDP-1"), 21, "the left one, DP-2, first")
+  same(world:shown_on("eDP-1"), 11, "DP-1's block first, though it sat on the right")
   run(module.next_group())
-  same(world:shown_on("eDP-1"), 11, "then the right one")
+  same(world:shown_on("eDP-1"), 21, "then DP-2's")
   run(module.next_group())
-  same(world:shown_on("eDP-1"), 11, "the last group stays")
+  same(world:shown_on("eDP-1"), 21, "the last group stays")
   run(module.previous_group())
-  same(world:shown_on("eDP-1"), 21, "previous group")
+  same(world:shown_on("eDP-1"), 11, "previous group")
 end)
 
 test("SUPER + 2 on an unplugged screen's group goes to that group's 2", function()
@@ -512,6 +553,44 @@ test("the bar's scroll walks the groups of the screen it names", function()
   same(world.focused.name, "DP-1", "focus")
 end)
 
+test("a window on a group's empty last workspace brings a new empty one after it", function()
+  local world, module = two_screens()
+  world:open_window()
+  run(module.next())
+
+  local window = world:open_window()
+  same(world:ids_on("eDP-1"), { 1, 2, 3 }, "one empty after the window")
+
+  world:close_window(window)
+  run(module.previous())
+  same(world:ids_on("eDP-1"), { 1, 2 }, "the one no longer needed goes")
+end)
+
+test("the kept workspaces are Hyprland's persistent workspaces, each bound to its screen", function()
+  local world = two_screens()
+  world:open_window()
+
+  same(world:kept(), { "1@eDP-1", "2@eDP-1", "11@DP-1" }, "kept")
+end)
+
+test("a workspace kept, released and kept again reuses its rule", function()
+  local world = two_screens()
+  local window = world:open_window()
+  world:close_window(window)
+  world:open_window()
+
+  same(world:rules_for("2"), 1, "rules for workspace 2")
+  same(world:kept(), { "1@eDP-1", "2@eDP-1", "11@DP-1" }, "kept")
+end)
+
+test("unplugging an empty screen releases its kept workspace", function()
+  local world = two_screens()
+
+  world:unplug("DP-1")
+
+  same(world:kept(), { "1@eDP-1" }, "kept")
+end)
+
 -- The binds of fallback.lua and keybinds.lua, by their keys: each one's
 -- description and action. Any `hl.dsp` dispatcher stands for itself, as
 -- { dsp = "focus", args = ... }.
@@ -527,8 +606,14 @@ local function binds()
   local found = {}
   local duplicates = {}
   local gestures = {}
+  local config = {}
   _G.hl = setmetatable({
     dsp = dsp,
+    config = function(settings)
+      for section, values in pairs(settings) do
+        config[section] = values
+      end
+    end,
     gesture = function(options)
       gestures[options.direction] = options
     end,
@@ -543,7 +628,7 @@ local function binds()
   _G.dot = { workspaces = module }
   dofile(repo .. "/config/hypr/fallback.lua")
   dofile(repo .. "/config/hypr/keybinds.lua")
-  return found, duplicates, module, gestures
+  return found, duplicates, module, gestures, config
 end
 
 local function key(name)
@@ -596,12 +681,11 @@ test("the workspace cycling binds walk the focused screen's groups", function()
   same(found[key("SUPER + CTRL + Tab")].action.args.workspace, "previous_per_monitor", "former workspace")
 end)
 
-test("the three-finger swipe walks the focused screen's groups", function()
-  local _, _, _, gestures = binds()
-  for _, direction in ipairs({ "left", "right" }) do
-    same({ gestures[direction].fingers, type(gestures[direction].action) }, { 3, "function" }, direction)
-  end
-  same(gestures.horizontal, nil, "Hyprland's own swipe, which skips empty workspaces")
+test("the three-finger swipe is Hyprland's own, which follows the fingers", function()
+  local _, _, _, gestures, config = binds()
+  same({ gestures.horizontal.fingers, gestures.horizontal.action }, { 3, "workspace" }, "horizontal")
+  same({ gestures.left, gestures.right }, { nil, nil }, "no swipe that switches only once it ends")
+  same(config.gestures.workspace_swipe_create_new, false, "the kept empty workspaces end each group instead")
 end)
 
 test("the group binds are on SUPER + ALT + Tab", function()

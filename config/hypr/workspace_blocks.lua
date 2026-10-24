@@ -1,8 +1,8 @@
 -- The bookkeeping behind per-screen workspaces (`workspaces.lua`): which block
 -- of ids a screen owns, where a workspace joins another screen, the groups a
--- screen shows and how next and previous walk them, and the screens file. It
--- never calls Hyprland, so `test/lua/workspaces_test.lua` runs it under plain
--- Lua.
+-- screen shows and how next and previous walk them, which empty workspaces
+-- Hyprland keeps, and the screens file. It never calls Hyprland, so
+-- `test/lua/workspaces_test.lua` runs it under plain Lua.
 --
 -- Adapted from Omarchy's default/hypr/monitor-workspaces.lua (basecamp/omarchy,
 -- MIT) at 5d8cc3313b2c60786d4e5019a68906873aed36bd.
@@ -151,36 +151,30 @@ function M.adopt_id(block, id, taken)
 end
 
 -- A screen's groups, in the order its bar shows them and next and previous
--- walk them. Its own block comes first, with its first workspace whether it
--- exists or not and its others wherever they are, as SUPER + 1-0 reach them.
--- Then one group per other block with workspaces on this screen, which are
--- those of unplugged screens, ordered by where their screens last sat, left
--- to right, and by block where that is unknown. `workspaces` lists
--- { id, monitor } with the connector it is on, `x_of_block` block -> x.
-function M.groups(own, connector, workspaces, x_of_block)
-  local sets, guests = { [own] = { [M.id_of(own, 1)] = true } }, {}
+-- walk them: block order, which is id order, the order Hyprland's swipe walks
+-- a screen's workspaces in. Its own block is one, with its first workspace
+-- whether it exists or not and its others wherever they are, as SUPER + 1-0
+-- reach them. Each other block with workspaces on this screen is one, those of
+-- unplugged screens waiting here. Only a screen whose own block isn't the
+-- lowest, the external holding the laptop's group while the lid is closed,
+-- sees a waiting group before its own. `workspaces` lists { id, monitor } with
+-- the connector it is on.
+function M.groups(own, connector, workspaces)
+  local sets, order = { [own] = { [M.id_of(own, 1)] = true } }, { own }
   for _, workspace in ipairs(workspaces) do
     local block = M.block_of(workspace.id)
     if block == own or workspace.monitor == connector then
       if not sets[block] then
         sets[block] = {}
-        guests[#guests + 1] = block
+        order[#order + 1] = block
       end
       sets[block][workspace.id] = true
     end
   end
-
-  table.sort(guests, function(left, right)
-    local l, r = x_of_block[left] or math.huge, x_of_block[right] or math.huge
-    if l ~= r then
-      return l < r
-    end
-    return left < right
-  end)
-  table.insert(guests, 1, own)
+  table.sort(order)
 
   local groups = {}
-  for _, block in ipairs(guests) do
+  for _, block in ipairs(order) do
     local ids = {}
     for id in pairs(sets[block]) do
       ids[#ids + 1] = id
@@ -204,36 +198,23 @@ local function find(groups, id)
 end
 
 -- Where next (`direction` 1) or previous (-1) goes from `current`, nil to
--- stay. It walks a group's workspaces in order. From a group's last, next
--- opens one empty workspace after it when the last has windows
--- (`has_windows`), and from an empty last goes to the first of the group on
--- the right, so scrolling never leaves more than one empty workspace behind.
--- From a group's first, previous goes to the last of the group on the left.
--- `taken` is the set of ids in use.
-function M.step(groups, current, direction, has_windows, taken)
+-- stay: the workspace beside it in `groups`, across from one group into the
+-- next. It walks what Hyprland's swipe walks, the empty workspaces `kept()`
+-- keeps included, and like the swipe it never creates one.
+function M.step(groups, current, direction)
   local g, i = find(groups, current)
   if not g then
     return nil
   end
   local ids = groups[g].ids
-  if direction < 0 then
-    if i > 1 then
-      return ids[i - 1]
-    end
-    local left = groups[g - 1]
-    return left and left.ids[#left.ids]
+  if ids[i + direction] then
+    return ids[i + direction]
   end
-  if i < #ids then
-    return ids[i + 1]
+  local beside = groups[g + direction]
+  if not beside then
+    return nil
   end
-  if has_windows then
-    local new = M.append_slot(groups[g].block, taken)
-    if new and new > current then
-      return new
-    end
-  end
-  local right = groups[g + 1]
-  return right and right.ids[1]
+  return direction > 0 and beside.ids[1] or beside.ids[#beside.ids]
 end
 
 -- The first workspace of the group beside the one holding `current`, in
@@ -244,37 +225,84 @@ function M.group_step(groups, current, direction)
   return beside and beside.ids[1]
 end
 
+-- The empty workspaces a block keeps on `connector`, into `result`: its first,
+-- so the swipe reaches it, and the one after its last with windows, where the
+-- swipe opens a new workspace. Nothing after a window on slot 10.
+-- `occupied` is the set of the block's ids with windows.
+local function keep_block(result, block, connector, occupied)
+  local first, last = M.id_of(block, 1), M.id_of(block, M.SLOTS)
+  result[first] = connector
+  local highest = nil
+  for id in pairs(occupied) do
+    if not highest or id > highest then
+      highest = id
+    end
+  end
+  if highest and highest < last then
+    result[highest + 1] = connector
+  end
+end
+
+-- Id -> connector: the workspaces Hyprland keeps even when empty, and the
+-- screen each stays on. Every plugged-in screen keeps its own block's; a block
+-- of an unplugged screen keeps its own on the screen holding its windows,
+-- while it has any. `screens` lists { name, block } for the screens plugged
+-- in, `workspaces` { id, monitor, windows } with the connector each is on.
+function M.kept(screens, workspaces)
+  local owned, occupied, holder = {}, {}, {}
+  for _, screen in ipairs(screens) do
+    owned[screen.block] = screen.name
+  end
+  for _, workspace in ipairs(workspaces) do
+    if (workspace.windows or 0) > 0 then
+      local block = M.block_of(workspace.id)
+      occupied[block] = occupied[block] or {}
+      occupied[block][workspace.id] = true
+      if not holder[block] or workspace.id < holder[block].id then
+        holder[block] = workspace
+      end
+    end
+  end
+
+  local result = {}
+  for block, connector in pairs(owned) do
+    keep_block(result, block, connector, occupied[block] or {})
+  end
+  for block, ids in pairs(occupied) do
+    if not owned[block] and holder[block].monitor then
+      keep_block(result, block, holder[block].monitor, ids)
+    end
+  end
+  return result
+end
+
 -- The screens file: one line per screen ever seen, "block<TAB>connector<TAB>
--- identity<TAB>x", the connector empty while it is unplugged and x where the
--- screen last sat. The bar (`config/quickshell/services/Hypr.qml`) maps its
--- connector to a block with it, and orders the groups by x.
+-- identity", the connector empty while it is unplugged. The bar
+-- (`config/quickshell/services/Hypr.qml`) maps its connector to a block with
+-- it. A fourth column, where the screen last sat, is read past.
 function M.parse_blocks(text)
-  local blocks, current, positions = {}, {}, {}
+  local blocks, current = {}, {}
   for line in text:gmatch("[^\n]+") do
-    local block, connector, identity, x = line:match("^(%d+)\t([^\t]*)\t([^\t]+)\t?(-?%d*)$")
+    local block, connector, identity = line:match("^(%d+)\t([^\t]*)\t([^\t]+)")
     if block then
       blocks[identity] = tonumber(block)
-      positions[identity] = tonumber(x)
       if connector ~= "" then
         current[connector] = identity
       end
     end
   end
-  return blocks, current, positions
+  return blocks, current
 end
 
--- `identities` is connector -> identity for the screens plugged in now,
--- `positions` identity -> x.
-function M.format_blocks(blocks, identities, positions)
+-- `identities` is connector -> identity for the screens plugged in now.
+function M.format_blocks(blocks, identities)
   local connector = {}
   for name, identity in pairs(identities) do
     connector[identity] = name
   end
   local rows = {}
   for identity, block in pairs(blocks) do
-    local x = positions and positions[identity]
-    local line = block .. "\t" .. (connector[identity] or "") .. "\t" .. identity .. (x and "\t" .. x or "")
-    rows[#rows + 1] = { block = block, line = line }
+    rows[#rows + 1] = { block = block, line = block .. "\t" .. (connector[identity] or "") .. "\t" .. identity }
   end
   table.sort(rows, function(left, right) return left.block < right.block end)
   local lines = {}
@@ -282,16 +310,6 @@ function M.format_blocks(blocks, identities, positions)
     lines[#lines + 1] = row.line .. "\n"
   end
   return table.concat(lines)
-end
-
--- Block -> x of the screen that owns it, from identity -> block and
--- identity -> x.
-function M.x_of_block(blocks, positions)
-  local result = {}
-  for identity, block in pairs(blocks) do
-    result[block] = positions[identity]
-  end
-  return result
 end
 
 return M

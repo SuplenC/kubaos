@@ -78,24 +78,33 @@ A screen's workspaces are its group. Unplugging a screen moves its group to
 the primary screen (the laptop panel; with the lid closed, the external
 Hyprland numbered first) under its own numbers, if it had any windows; an
 empty group vanishes. Plugging the screen back returns the group to it. The
-bar shows each group on its own, a thin rule between them, e.g. `1 2 3 | 1 2`: the
-screen's own first, then the waiting groups in the order their screens sat,
-left to right. That order is each screen's `x` when it was last plugged in,
-kept in `workspace-screens`; it holds while the screen is away, and a screen
-never seen there falls back to block order. Block order alone is stable too,
-but it is the order the screens were first seen, which says nothing about
-where they sit.
+bar shows each group on its own, a thin rule between them, e.g. `1 2 3 | 1 2`,
+in block order: the screen's own first, then the waiting groups, each on a
+tint so it reads as borrowed. Block order is id order, the order Hyprland's
+swipe walks a screen's workspaces in, so the one screen that sees a waiting
+group before its own is an external holding the laptop's group (1-10) while
+the lid is closed.
+
+Each group keeps two workspaces even when they are empty, as Hyprland
+persistent workspace rules bound to its screen (`hl.workspace_rule`, set and
+released at runtime by `workspaces.lua`): its first, and one after its last
+workspace with windows. The bar draws that last one as a faint `+` until it is
+shown. Once a window lands on it, the next number is kept in its place and the
+one no longer needed is released. A group full up to 10 keeps no empty one
+after it.
 
 Next and previous (`SUPER + Tab`, `SUPER + CTRL + →/←`, `SUPER + wheel`, the
-three-finger swipe, the bar's wheel) walk the focused screen's groups in that
-order. Within a group they visit every workspace the bar shows, the empty
-first one too. From a group's last, next opens one empty workspace after it
-(when the last has windows), and next again goes to the first of the group on
-the right; from a group's first, previous goes to the last of the group on
-the left. At either end they stay. `SUPER + CTRL + ALT + →/←` jump to the
-first workspace of the next or previous group. `SUPER + 1..0` address the
-focused group: the screen's own, or the waiting group whose workspace it
-shows, so on a waiting group `SUPER + 2` is that group's 2.
+bar's wheel) and the three-finger swipe walk the focused screen's workspaces in
+that order, the kept empty ones too. The swipe is Hyprland's own, so it follows
+the fingers: swipe slowly to peek at the workspace beside. From a group's last
+with windows, next opens the empty one after it, and next again goes to the
+first of the group on the right; from a group's first, previous goes to the
+last of the group on the left. At either end they stay; the swipe never makes a
+workspace (`workspace_swipe_create_new` is off, the kept empty workspace takes
+its place). `SUPER + CTRL + ALT + →/←` jump to the first workspace of the next
+or previous group. `SUPER + 1..0` address the focused group: the screen's own,
+or the waiting group whose workspace it shows, so on a waiting group
+`SUPER + 2` is that group's 2.
 
 No workspace is renumbered when a screen comes or goes. The Quickshell the
 bar runs (v0.3.2) keeps the id a workspace had when it first saw it, so a
