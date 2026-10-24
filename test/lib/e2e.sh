@@ -1015,7 +1015,7 @@ c_menu() {
   menu_step "Forget on Timer leaves a Toast" 'toast ".+"' \
     "$key -k Escape && $key -d 50 timer && sleep 1 && $key -M ctrl -M shift -k BackSpace -m shift -m ctrl" 5 || bad=1
   menu_step "Ctrl+Z undoes it" 'toast ""' "$key -M ctrl -k z -m ctrl" 5 || bad=1
-  menu_step "a date query is answered in the top row" 'frame query="days until christmas" .*top="[0-9]+ days? · until ' \
+  menu_step "a date query is answered in the top row" 'top "[0-9]+ days? · until .* 25 December ' \
     "$key -k Escape && $key -d 50 'days until christmas'" 5 || bad=1
   menu_step "Down past the last row on screen scrolls the selection into view" 'selected row=12 shown=true' \
     "$key -k Escape && $key -d 50 s && sleep 1 && $key -d 60$(printf ' -k Down%.0s' {1..12})" 8 || bad=1
