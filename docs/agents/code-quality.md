@@ -169,6 +169,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **Bindings over imperative updates.** A `readonly property` derived from others, not a handler that sets it; a handler only for a side effect.
 - **A property that needs explaining gets a one-line comment above it**, never trailing.
 - **No magic numbers in layout**: sizes and durations come from the shared settings or a named property.
+- **A search over a list in the shell uses Kotodama's engine, never a hand-rolled filter.** The list's entries are Items of a Kotodama app (an Extension with a word, in `crates/kotodama-kubaos`), and the view embeds a `KotodamaSearch` of its own that enters the app and draws its Results, so typing matches the way the Command menu does, accents, typos and frecency included, and the same list is in the menu. `modules/controlcenter/KeyboardAddView.qml` is the example. A field that parses what is typed (a time, a password) isn't a search and stays as it is.
 
 ## Lua (Hyprland, Neovim)
 

@@ -16,6 +16,8 @@ Before writing or reviewing code in this repo, read `docs/agents/code-quality.md
 
 A new feature ships with its Kotodama integration in the same PR, through the KubaOS Extension (`crates/kotodama-kubaos`, actions in `config/kotodama/kubaos.toml`): Items to run it, or at the very least its settings, so it can be found, run and changed from the menu. A feature with no Item is not done.
 
+In-shell searches over lists use Kotodama's engine, never a hand-rolled filter (see the QML rules in `docs/agents/code-quality.md`).
+
 ## Git
 
 - **Commits**: [Conventional Commits](https://www.conventionalcommits.org/). `<type>(<scope>)?: <description>`, types `feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert`; `!` or a `BREAKING CHANGE:` footer for breaking changes.
