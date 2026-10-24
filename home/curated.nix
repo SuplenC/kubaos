@@ -49,6 +49,8 @@ rec {
   };
   # The date engine behind the clock popup (home/clock.nix).
   kubaos-clock = pkgs.callPackage ../crates/kubaos-clock/package.nix { inherit cargoOutputHashes; };
+  # The system monitor behind the bar's pill and its popup (home/sysmon.nix).
+  kubaos-sysmon = pkgs.callPackage ../crates/kubaos-sysmon/package.nix { inherit cargoOutputHashes; };
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (

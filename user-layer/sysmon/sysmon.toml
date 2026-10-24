@@ -1,0 +1,19 @@
+# Your system monitor, read by `kubaos-sysmon` (crates/kubaos-sysmon) on every
+# change. The Command menu's monitor Items and the bar pill's Hide edit the
+# lines below; a hand edit shows within a few seconds.
+#
+# pill: the bar's pill (default true).
+# style: "numbers" (default), "bars" or "sparklines".
+# metrics: what the pill shows, from cpu, ram, temp, gpu, net and power.
+# alerts: a notification when the machine runs hot, full or drains fast
+# (default true).
+# [thresholds]: where the pill turns red and the alerts fire, in °C, % and W.
+#
+# style = "sparklines"
+# metrics = ["cpu", "ram", "temp"]
+#
+# [thresholds]
+# cpu_temp = 90
+# ram = 90
+# disk = 95
+# battery_draw = 30
