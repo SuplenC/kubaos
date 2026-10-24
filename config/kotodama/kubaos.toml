@@ -313,6 +313,13 @@ icon = "bluetooth"
 keywords = ["bluetooth", "bt", "pair", "keyboard", "headphones", "connect", "scan"]
 run = ["qs", "ipc", "call", "controlcenter", "bluetooth"]
 
+[extensions.kubaos.actions.keyboard-tab]
+title = "Keyboard layouts"
+subtitle = "The control center's Keyboard tab: add, reorder, remove and the Mac accents"
+icon = "input-keyboard"
+keywords = ["keyboard layout", "keymap", "language", "input", "settings"]
+run = ["qs", "ipc", "call", "controlcenter", "keyboard"]
+
 [extensions.kubaos.actions.power-menu]
 title = "Power menu"
 subtitle = "Lock, suspend, log out, reboot or shut down"

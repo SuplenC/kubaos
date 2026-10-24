@@ -7,16 +7,17 @@ import qs.services
 
 // Side sheet on the right edge, from the bar down to the bottom border:
 // header, quick toggles, capture (screenshot, annotate, record, replay),
-// sliders, and tabs for Wi-Fi, Bluetooth, audio
-// output, notification history and keyboard layouts.
+// sliders, the notifications, and tabs for Wi-Fi, Bluetooth, audio output
+// and keyboard layouts.
 // Keys: Tab/Shift+Tab move between controls, h/l switch tabs on the tab bar,
-// 1-5 jump to a tab, j/k move in lists, Esc closes.
+// 1-4 jump to a tab, j/k move in lists, Esc closes.
 Drawer {
     id: root
 
     property int tab: 0
-    // The Keyboard tab, which the keyboard tile's arrow opens.
-    readonly property int keyboardTab: 4
+    // The Keyboard tab, which the keyboard tile's arrow and
+    // `qs ipc call controlcenter keyboard` open.
+    readonly property int keyboardTab: 3
     readonly property bool scanWifi: shown && tab === 0
     readonly property var kanji: ["日", "月", "火", "水", "木", "金", "土"]
 
@@ -43,6 +44,14 @@ Drawer {
 
         function onReveal() {
             root.tab = 1;
+        }
+    }
+
+    Connections {
+        target: Keyboard
+
+        function onReveal() {
+            root.tab = root.keyboardTab;
         }
     }
 
@@ -125,6 +134,10 @@ Drawer {
             Layout.fillWidth: true
         }
 
+        NotificationHistory {
+            Layout.fillWidth: true
+        }
+
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -140,7 +153,8 @@ Drawer {
                     id: tabBar
 
                     Layout.fillWidth: true
-                    labels: ["Wi-Fi", "Bluetooth", "Output", "Notifications", "Keyboard"]
+                    labels: ["Wi-Fi", "Bluetooth", "Output", "Keyboard"]
+                    icons: ["wifi", "bluetooth", "volume_up", "keyboard"]
                     currentIndex: root.tab
                     onPicked: index => root.tab = index
                 }
@@ -156,8 +170,6 @@ Drawer {
                     BluetoothList {}
 
                     OutputList {}
-
-                    NotificationHistory {}
 
                     KeyboardList {}
                 }

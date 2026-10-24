@@ -17,6 +17,11 @@ Scope {
         function bluetooth(): void {
             Bt.show(true);
         }
+
+        // The Keyboard tab: the layouts, "Add a language…" and the Mac accents.
+        function keyboard(): void {
+            Keyboard.show();
+        }
     }
 
     IpcHandler {
