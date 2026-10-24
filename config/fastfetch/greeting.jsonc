@@ -1,0 +1,32 @@
+// The greeting a new Ghostty window shows (home/shell.nix): the クバ mark and
+// a short list, so the prompt isn't kept waiting. Timed in the harness, the
+// modules left out cost the most: gpu 154 ms, packages 25 ms, shell 17 ms,
+// display 9 ms, wm 9 ms, theme 4 ms; each one here takes under 1 ms.
+// `fastfetch` on its own still shows everything (config.jsonc).
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "file",
+    "source": "~/.config/fastfetch/kubaos.txt",
+    "color": { "1": "38;2;255;183;121", "2": "38;2;133;207;255" },
+    "padding": { "right": 2 }
+  },
+  "display": {
+    "color": { "keys": "38;2;255;183;121" }
+  },
+  "modules": [
+    "title",
+    "separator",
+    "os",
+    "host",
+    "kernel",
+    "uptime",
+    "terminal",
+    "cpu",
+    "memory",
+    "disk",
+    "battery",
+    "break",
+    "colors"
+  ]
+}
