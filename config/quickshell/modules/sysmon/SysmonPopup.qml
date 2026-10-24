@@ -307,7 +307,8 @@ Drawer {
                                     id: diskName
 
                                     width: parent.width - diskFree.implicitWidth - Theme.spacing.md
-                                    text: `${disk.modelData.label}  ${disk.modelData.point}`
+                                    // The root and home disks are named by their mount point already.
+                                    text: disk.modelData.label === disk.modelData.point ? disk.modelData.label : `${disk.modelData.label}  ${disk.modelData.point}`
                                     font.weight: Font.Medium
                                     font.pixelSize: Theme.font.sm
                                 }

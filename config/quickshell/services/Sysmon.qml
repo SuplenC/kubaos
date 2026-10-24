@@ -55,7 +55,21 @@ Singleton {
 
     // The last minute of each series, as [t, value] pairs, oldest first. The
     // arrays change in place, so `revision` is what the graphs repaint on.
-    property var history: ({})
+    // Every series exists from the start: a graph binds to its array once,
+    // and a key added later would never reach it.
+    property var history: ({
+            cpu: [],
+            temp: [],
+            ram: [],
+            swap: [],
+            gpu: [],
+            down: [],
+            up: [],
+            net: [],
+            power: [],
+            read: [],
+            write: []
+        })
     property int revision: 0
 
     // The process the popup shows the details of, as `qs ipc call sysmon
@@ -139,7 +153,7 @@ Singleton {
         };
         const since = s.t - root.window;
         for (const key in series) {
-            const points = root.history[key] ?? (root.history[key] = []);
+            const points = root.history[key];
             if (series[key] !== null && series[key] !== undefined)
                 points.push([s.t, series[key]]);
             while (points.length > 0 && points[0][0] < since)
