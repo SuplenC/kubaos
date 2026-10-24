@@ -7,25 +7,23 @@ import qs.components
 import qs.services
 
 // This screen's workspaces in groups, each numbered 1-10 as SUPER + 1-0 reach
-// them. Its own group first: its first workspace always, then those of its own
-// that exist. Then the group of each unplugged screen waiting here, ordered by
-// where those screens last sat, left to right, with a thin rule between groups. The
-// same order as `groups()` in config/hypr/workspace_blocks.lua, which next and
-// previous walk. Scroll to step through them.
+// them, a thin rule between groups. The groups come in block order, which is
+// the order Hyprland's three-finger swipe walks the screen's workspaces in and
+// `groups()` in config/hypr/workspace_blocks.lua, which next and previous
+// walk: the screen's own group first, unless a waiting group has lower numbers
+// (the laptop's, while its lid is closed). Its own group always shows its
+// first workspace. A group of an unplugged screen waiting here sits on a tint,
+// so it reads as borrowed. Scroll to step through them.
 //
-// The group this screen shows ends in a ghost slot, a faint `+` where next
-// creates the new workspace after the group's last; a click goes there. A
-// group with all ten taken has none. Only the shown group has one, on every
-// screen whether focused or not: next, previous and SUPER + 1-0 address the
-// group a screen shows, and a pill that kept its shape as focus moved
-// between screens never shifts the title beside it.
+// Each group keeps one empty workspace after its last with windows
+// (config/hypr/workspaces.lua), where a swipe or next opens a new one. It
+// draws as a faint `+` until it is shown.
 //
-// Every change of shape glides: a new workspace fills the ghost in place and
-// a new ghost grows after it, a workspace that goes away shrinks out, and the
-// cells after it, the gaps between groups and the pill's width follow, so the
-// title beside the pill never jumps. Each cell is one entry of a ListModel kept
-// in step with the groups, so its item lives on and animates instead of being
-// rebuilt.
+// Every change of shape glides: a new workspace grows in place, one that goes
+// away shrinks out, and the cells after it, the gaps between groups and the
+// pill's width follow, so the title beside the pill never jumps. Each cell is
+// one entry of a ListModel kept in step with the groups, so its item lives on
+// and animates instead of being rebuilt.
 //
 // The active indicator stretches toward the new workspace: its leading edge
 // moves fast, the trailing edge follows a little later.
@@ -36,63 +34,59 @@ Pill {
     readonly property HyprlandMonitor monitor: Hyprland.monitorFor(screen)
     readonly property int block: Hypr.blockOfMonitor(monitor)
     readonly property int activeId: monitor?.activeWorkspace?.id ?? 0
-    readonly property bool activeOccupied: (monitor?.activeWorkspace?.toplevels?.values?.length ?? 0) > 0
-    // Lists of ids, one per group.
+    // Lists of ids, one per group, in block order.
     readonly property var groups: {
         const sets = {};
         sets[block] = [block * Hypr.slots + 1];
-        const guests = [];
         for (const workspace of Hyprland.workspaces.values) {
             const id = workspace.id;
             const owner = Hypr.blockOf(id);
             if (id <= 0 || (owner !== block && workspace.monitor?.name !== monitor?.name))
                 continue;
-            if (!sets[owner]) {
-                sets[owner] = [];
-                guests.push(owner);
-            }
+            sets[owner] = sets[owner] ?? [];
             if (!sets[owner].includes(id))
                 sets[owner].push(id);
         }
-        const x = owner => Hypr.positions[owner] ?? Infinity;
-        guests.sort((left, right) => (x(left) - x(right)) || (left - right));
-        return [block].concat(guests).map(owner => sets[owner].sort((a, b) => a - b));
+        return Object.keys(sets).map(owner => parseInt(owner, 10)).sort((a, b) => a - b).map(owner => sets[owner].sort((a, b) => a - b));
     }
     readonly property var groupBlocks: groups.map(group => Hypr.blockOf(group[0]))
-    // The group of the workspace this screen shows. Found by block rather than
-    // by id, so a workspace focused before Hyprland lists it keeps its group.
-    readonly property int activeGroup: Math.max(0, groupBlocks.indexOf(Hypr.blockOf(activeId)))
-    // The workspace the ghost stands for, 0 for none.
-    readonly property int ghostId: {
-        const id = Hypr.appendSlot(groupBlocks[activeGroup], Hyprland.workspaces.values.map(w => w.id));
-        return groups[activeGroup].includes(id) ? 0 : id;
-    }
     // Workspace ids only, in the bar's order: what scrolling steps through.
     readonly property var ids: [].concat(...groups)
-    // What the pill draws, in order: `{ key, kind, workspace }`, `kind` one of
-    // "cell", "ghost" and "gap" (the dot before a group after the first). A
-    // cell and its ghost share a key, so the ghost turns into the cell.
+    // What the pill draws, in order: `{ key, kind, workspace, borrowed, head,
+    // tail }`, `kind` one of "cell", "ghost" (the empty workspace a group
+    // keeps after its last, not shown) and "gap" (the rule before a group
+    // after the first). `head` and `tail` mark a group's first and last cell,
+    // where the tint of a borrowed group rounds off.
     readonly property var entries: {
         const result = [];
         groups.forEach((group, index) => {
+            const borrowed = groupBlocks[index] !== block;
             if (index > 0)
                 result.push({
                     key: `gap${groupBlocks[index]}`,
                     kind: "gap",
-                    workspace: 0
+                    workspace: 0,
+                    borrowed: false,
+                    head: false,
+                    tail: false
                 });
-            const shown = index === activeGroup && ghostId > 0 ? group.concat(ghostId).sort((a, b) => a - b) : group;
-            for (const id of shown)
+            group.forEach((id, at) => {
+                const last = at === group.length - 1;
+                const ghost = last && at > 0 && id !== activeId && !occupied(id);
                 result.push({
                     key: `${id}`,
-                    kind: group.includes(id) ? "cell" : "ghost",
-                    workspace: id
+                    kind: ghost ? "ghost" : "cell",
+                    workspace: id,
+                    borrowed: borrowed,
+                    head: at === 0,
+                    tail: last
                 });
+            });
         });
         return result;
     }
-    // Where the active cell (or the ghost being filled) ends up once every
-    // width has settled, -1 while it isn't drawn.
+    // Where the active cell ends up once every width has settled, -1 while it
+    // isn't drawn.
     readonly property real activeX: {
         let x = 0;
         for (const entry of entries) {
@@ -111,8 +105,14 @@ Pill {
     // moves with the same duration and curve, so it stays on it.
     readonly property int glide: Theme.anim.large
     readonly property real ghostOpacity: 0.45
+    readonly property real borrowedOpacity: 0.6
     readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
+    readonly property var roles: ["kind", "borrowed", "head", "tail"]
     property bool ready: false
+
+    function occupied(id: int): bool {
+        return Hyprland.workspaces.values.some(w => w.id === id && w.toplevels.values.length > 0);
+    }
 
     function widthOf(kind: string): int {
         return kind === "gap" ? groupGap : cell;
@@ -140,17 +140,16 @@ Pill {
                 at++;
             const found = indexOfKey(entry.key);
             if (found < 0) {
-                shapes.insert(at, {
-                    key: entry.key,
-                    kind: entry.kind,
-                    workspace: entry.workspace,
+                shapes.insert(at, Object.assign({
                     leaving: false
-                });
+                }, entry));
             } else {
                 if (found !== at)
                     shapes.move(found, at, 1);
-                if (shapes.get(at).kind !== entry.kind)
-                    shapes.setProperty(at, "kind", entry.kind);
+                for (const role of roles) {
+                    if (shapes.get(at)[role] !== entry[role])
+                        shapes.setProperty(at, role, entry[role]);
+                }
                 if (shapes.get(at).leaving)
                     shapes.setProperty(at, "leaving", false);
             }
@@ -162,15 +161,6 @@ Pill {
         const index = indexOfKey(key);
         if (index >= 0 && shapes.get(index).leaving)
             shapes.remove(index);
-    }
-
-    // The ghost does what next does from the group's last workspace. When the
-    // shown workspace is empty and last, it already is that new workspace.
-    function openGhost(): void {
-        const group = groups[activeGroup];
-        if (!activeOccupied && activeId === group[group.length - 1])
-            return;
-        Hypr.focusOn(monitor, ghostId);
     }
 
     padding: 3
@@ -188,6 +178,46 @@ Pill {
         id: shapes
     }
 
+    // One entry's place in a row, growing in when it appears and shrinking
+    // out when it leaves. The tints and the cells are two rows of these over
+    // the same model, so the indicator can sit between them.
+    component Slot: Item {
+        id: slotItem
+
+        required property string key
+        required property string kind
+        required property bool leaving
+        // False until the item exists, so a new one grows from nothing
+        // rather than appearing at full width.
+        property bool appeared: false
+        readonly property bool present: appeared && !leaving
+
+        Component.onCompleted: appeared = true
+
+        width: present ? root.widthOf(kind) : 0
+        height: root.cell
+        opacity: present ? 1 : 0
+        clip: true
+
+        Behavior on width {
+            enabled: root.ready
+
+            Anim {
+                duration: root.glide
+                easing.bezierCurve: Theme.anim.emphasizedDecel
+            }
+        }
+
+        Behavior on opacity {
+            enabled: root.ready
+
+            Anim {
+                duration: root.glide
+                easing.bezierCurve: Theme.anim.effects
+            }
+        }
+    }
+
     Item {
         id: cells
 
@@ -196,6 +226,33 @@ Pill {
         // Whatever its two edges are animating, the indicator draws on the
         // cells only, never onto the window title beside the pill.
         clip: true
+
+        Row {
+            Repeater {
+                model: shapes
+
+                delegate: Slot {
+                    id: tintSlot
+
+                    required property bool borrowed
+                    required property bool head
+                    required property bool tail
+
+                    // A pill as wide as the group: each cell draws its part,
+                    // reaching past its inner edges into the clip, so only the
+                    // group's two ends round off.
+                    Rectangle {
+                        visible: tintSlot.borrowed
+                        x: tintSlot.head ? 0 : -root.cell / 2
+                        width: root.cell + (tintSlot.head ? 0 : root.cell / 2) + (tintSlot.tail ? 0 : root.cell / 2)
+                        height: root.cell
+                        radius: height / 2
+                        color: Theme.m3secondaryContainer
+                        opacity: root.borrowedOpacity
+                    }
+                }
+            }
+        }
 
         Rectangle {
             id: indicator
@@ -280,47 +337,15 @@ Pill {
             Repeater {
                 model: shapes
 
-                delegate: Item {
+                delegate: Slot {
                     id: shape
 
-                    required property string key
-                    required property string kind
                     required property int workspace
-                    required property bool leaving
                     readonly property bool isGap: kind === "gap"
                     readonly property bool isGhost: kind === "ghost"
                     readonly property int number: Hypr.slotOf(workspace)
                     readonly property bool isActive: !isGap && workspace === root.activeId
-                    readonly property bool occupied: Hyprland.workspaces.values.some(w => w.id === workspace && w.toplevels.values.length > 0)
-                    // False until the item exists, so a new one grows from
-                    // nothing rather than appearing at full width.
-                    property bool appeared: false
-                    readonly property bool present: appeared && !leaving
-
-                    Component.onCompleted: appeared = true
-
-                    width: present ? root.widthOf(kind) : 0
-                    height: root.cell
-                    opacity: present ? 1 : 0
-                    clip: true
-
-                    Behavior on width {
-                        enabled: root.ready
-
-                        Anim {
-                            duration: root.glide
-                            easing.bezierCurve: Theme.anim.emphasizedDecel
-                        }
-                    }
-
-                    Behavior on opacity {
-                        enabled: root.ready
-
-                        Anim {
-                            duration: root.glide
-                            easing.bezierCurve: Theme.anim.effects
-                        }
-                    }
+                    readonly property bool occupied: root.occupied(workspace)
 
                     Timer {
                         running: shape.leaving
@@ -381,7 +406,7 @@ Pill {
                         MouseArea {
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: shape.isGhost ? root.openGhost() : Hypr.focusOn(root.monitor, shape.workspace)
+                            onClicked: Hypr.focusOn(root.monitor, shape.workspace)
                         }
                     }
                 }

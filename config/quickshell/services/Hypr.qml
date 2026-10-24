@@ -8,9 +8,8 @@ import Quickshell.Hyprland
 //
 // Every screen owns a block of ten workspace ids, the laptop panel 1-10, the
 // next screen 11-20 (config/hypr/workspaces.lua). Hyprland keeps which block
-// is whose, and where each screen last sat, in a state file, read here. The
-// bar labels each block's workspaces 1-10 and orders the groups of unplugged
-// screens by where those sat.
+// is whose in a state file, read here. The bar labels each block's workspaces
+// 1-10.
 Singleton {
     id: root
 
@@ -19,7 +18,7 @@ Singleton {
     // The ShellScreen of the monitor Hyprland considers focused.
     readonly property ShellScreen focusedScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
 
-    // The lines "block<TAB>connector<TAB>identity<TAB>x" of the state file, as
+    // The lines "block<TAB>connector<TAB>identity" of the state file, as
     // fields; a screen that is unplugged has an empty connector.
     readonly property var screenLines: screensFile.text().split("\n").map(line => line.split("\t")).filter(fields => fields.length >= 3)
 
@@ -33,39 +32,12 @@ Singleton {
         return next;
     }
 
-    // Block -> x where its screen last sat, for the screens that have one.
-    readonly property var positions: {
-        const next = {};
-        for (const fields of screenLines) {
-            if (fields.length >= 4 && fields[3] !== "")
-                next[parseInt(fields[0], 10)] = parseInt(fields[3], 10);
-        }
-        return next;
-    }
-
     function blockOf(id: int): int {
         return Math.floor((id - 1) / slots);
     }
 
     function slotOf(id: int): int {
         return (id - 1) % slots + 1;
-    }
-
-    // The id next creates after the last workspace of `block`'s group, given
-    // the ids in use: `append_slot` in `config/hypr/workspace_blocks.lua`, which
-    // this mirrors. 0 when all ten are taken.
-    function appendSlot(block: int, taken: var): int {
-        const first = block * slots + 1;
-        const last = first + slots - 1;
-        const own = taken.filter(id => id >= first && id <= last);
-        const highest = Math.max(first - 1, ...own);
-        if (highest < last)
-            return highest + 1;
-        for (let id = first; id <= last; id++) {
-            if (!own.includes(id))
-                return id;
-        }
-        return 0;
     }
 
     // A monitor's block. Until Hyprland has written the file, the block of the
