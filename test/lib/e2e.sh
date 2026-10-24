@@ -341,9 +341,174 @@ c_nvim() {
   done
 }
 
+GHOSTTY_UNIT=$USER_HOME/.config/systemd/user/app-com.mitchellh.ghostty.service
+GHOSTTY_DBUS=$USER_HOME/.local/share/dbus-1/services/com.mitchellh.ghostty.service
+# ghostty_owned: whether a Ghostty instance owns its name on the session bus.
+ghostty_owned() {
+  in_session 'dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus org.freedesktop.DBus.NameHasOwner string:com.mitchellh.ghostty' 2>/dev/null |
+    grep -q 'boolean true'
+}
+# ghostty_wait_file FILE: wait up to 15 s for a window's command to write FILE.
+ghostty_wait_file() {
+  local _
+  for _ in $(seq 150); do
+    [[ -s $1 ]] && return 0
+    sleep 0.1
+  done
+  return 1
+}
 c_ghostty() {
+  local exec_start out bg f="$LOGS/ghostty-window.out" bad=0
   expect_ok "ghostty +validate-config" zrun 'ghostty +validate-config' || return 1
   expect_ok "foot --check-config" zrun 'foot --check-config' || return 1
+
+  grep -qx 'X-RestartIfChanged=false' "$GHOSTTY_UNIT" && grep -qx 'BusName=com.mitchellh.ghostty' "$GHOSTTY_UNIT" &&
+    grep -qx 'WantedBy=graphical-session.target' "$GHOSTTY_UNIT" ||
+    { echo "FAIL the Ghostty unit:"; cat "$GHOSTTY_UNIT"; return 1; }
+  exec_start="$(sed -n 's/^ExecStart=//p' "$GHOSTTY_UNIT")"
+  [[ $exec_start == *' --gtk-single-instance=true --initial-window=false --quit-after-last-window-closed=false' ]] ||
+    { echo "FAIL the unit starts '$exec_start'"; return 1; }
+  grep -qx 'Name=com.mitchellh.ghostty' "$GHOSTTY_DBUS" ||
+    { echo "FAIL no D-Bus file for Ghostty at $GHOSTTY_DBUS"; return 1; }
+  echo "ok   the background Ghostty unit (kept across switches) and its D-Bus file"
+
+  session_start sway 1280x720 1
+  # What autostart.lua hands D-Bus activation on the laptop.
+  in_session 'dbus-update-activation-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR PATH' >/dev/null 2>&1
+  in_session "exec $exec_start >$LOGS/ghostty-bg.log 2>&1" 2>/dev/null &
+  bg=$!
+  for _ in $(seq 100); do ghostty_owned && break; sleep 0.1; done
+  if ghostty_owned; then
+    rm -f "$f"
+    out="$(in_session "cd /tmp && ghostty +new-window --working-directory=\"\$HOME\" -e sh -c 'echo \"\$TERM_PROGRAM \$PWD\" >$f'" 2>&1)"
+    if ghostty_wait_file "$f" && [[ $(<"$f") == "ghostty $USER_HOME" ]]; then
+      echo "ok   +new-window -e runs its command in a window of the running instance, in home"
+    else
+      echo "FAIL +new-window -e: $out; the window wrote '$(cat "$f" 2>/dev/null)'"
+      bad=1
+    fi
+  else
+    echo "FAIL the unit's Ghostty doesn't own com.mitchellh.ghostty:"
+    tail -5 "$LOGS/ghostty-bg.log"
+    bad=1
+  fi
+  { kill "$bg" && wait "$bg"; } 2>/dev/null || true
+  pkill -u "$USER_NAME" -f 'ghostty.*--initial-window=false' 2>/dev/null
+  for _ in $(seq 50); do ghostty_owned || break; sleep 0.1; done
+
+  # With no instance running, D-Bus starts one from the linked file.
+  rm -f "$f"
+  out="$(in_session "ghostty +new-window -e sh -c 'echo started >$f'" 2>&1)"
+  if ghostty_wait_file "$f"; then
+    echo "ok   with the instance gone, +new-window starts one through D-Bus"
+  else
+    echo "FAIL +new-window with no instance: $out"
+    bad=1
+  fi
+  pkill -u "$USER_NAME" -f 'ghostty.*--initial-window=false' 2>/dev/null
+  session_stop
+  # HAZARD: Ghostty's portal queries bus-activate xdg-desktop-portal, and the
+  # bus hands it and anything activated later this session's display. Left
+  # behind, the next Quickshell start in the menu check hangs on its portal
+  # settings call: stop the portal and blank the display the bus hands out.
+  pkill -u "$USER_NAME" -f '/usr/libexec/(xdg-desktop-portal|xdg-permission-store|gvfsd)' 2>/dev/null
+  as_user dbus-update-activation-environment WAYLAND_DISPLAY= >/dev/null 2>&1
+  return "$bad"
+}
+
+# zsh_pty CMD: CMD run by kuba in a pseudo-terminal, stdin passed through, CRs dropped.
+zsh_pty() { as_user script -qec "$1" /dev/null 2>&1 | tr -d '\r'; }
+# The greeting's logo, from branding/fastfetch.txt.
+GREETING_MARK='███▀▀▀▀▀▀▀███'
+# greets ENV...: how many greetings an interactive zsh shows with ENV, in a
+# pty, given the commands on stdin.
+greets() { zsh_pty "env $* zsh -i" | grep -c -- "$GREETING_MARK" || true; }
+# An interactive start's median wall time, in ms. The harness measured 51 ms
+# before the init caches and 40 ms after; 100 ms is the issue's target and
+# leaves room for a loaded machine.
+ZSH_START_BUDGET_MS=100
+c_zsh_start() {
+  local zcache="$USER_HOME/.cache/kubaos/zsh" times median f before after n bad=0
+  # In a pty, so zle is on and fzf and atuin load as they do in a terminal.
+  times="$(zsh_pty "zsh -fc 'zmodload zsh/datetime; repeat 22 { t=\$EPOCHREALTIME; zsh -i -c exit; print \"ms \$(( (EPOCHREALTIME - t) * 1000 ))\" }'" |
+    sed -n 's/^ms //p' | tail -n 20)"
+  median="$(sort -n <<<"$times" | awk '{ a[NR] = $1 } END { printf "%.1f", (a[int((NR + 1) / 2)] + a[int(NR / 2) + 1]) / 2 }')"
+  echo "     zsh -i -c exit, 20 runs (ms): $(sort -n <<<"$times" | awk '{ printf "%.0f ", $1 }')"
+  if awk -v m="$median" -v b="$ZSH_START_BUDGET_MS" 'BEGIN { exit !(m <= b) }'; then
+    echo "ok   interactive zsh starts in $median ms (median), within the $ZSH_START_BUDGET_MS ms budget"
+  else
+    echo "FAIL interactive zsh starts in $median ms (median), over the $ZSH_START_BUDGET_MS ms budget"
+    bad=1
+  fi
+
+  rm -rf "$zcache"
+  zsh_pty 'zsh -i -c exit' >/dev/null
+  for f in fzf atuin direnv zoxide omp zcompdump; do
+    n="$(find "$zcache" -maxdepth 1 -name "$f-*" -size +0 2>/dev/null | wc -l)"
+    ((n >= 1)) || { echo "FAIL no cached $f under ~/.cache/kubaos/zsh after deleting it"; ls -la "$zcache"; bad=1; }
+  done
+  ((bad)) || echo "ok   deleting ~/.cache/kubaos/zsh: the next start writes fzf, atuin, direnv, zoxide, oh-my-posh and the dump again"
+  if ! cmp -s <(as_user "$USER_HOME/.nix-profile/bin/atuin" init zsh --disable-up-arrow) \
+    "$(find "$zcache" -name 'atuin-*.zsh' | head -1)"; then
+    echo "FAIL the cached atuin init isn't what \`atuin init zsh --disable-up-arrow\` prints"
+    bad=1
+  fi
+  before="$(stat -c '%n %Y' "$zcache"/* | sort)"
+  sleep 1.1
+  zsh_pty 'zsh -i -c exit' >/dev/null
+  after="$(stat -c '%n %Y' "$zcache"/* | sort)"
+  if [[ $before == "$after" ]]; then
+    echo "ok   the next start reads the cache and writes nothing"
+  else
+    echo "FAIL a second start rewrote the cache:"
+    diff <(printf '%s\n' "$before") <(printf '%s\n' "$after")
+    bad=1
+  fi
+  f="$(find "$zcache" -name 'zcompdump-*' ! -name '*.zwc' | head -1)"
+  touch -d '2 days ago' "$f"
+  zsh_pty 'zsh -i -c exit' >/dev/null
+  if [[ -n $(find "$f" -mmin -1) ]]; then
+    echo "ok   a completion dump older than a day is rebuilt"
+  else
+    echo "FAIL the day-old completion dump wasn't rebuilt"
+    bad=1
+  fi
+
+  return "$bad"
+}
+
+c_greeting() {
+  local bad=0 out t n
+  n="$(printf 'exit\n' | greets TERM_PROGRAM=ghostty)"
+  [[ $n == 1 ]] || { echo "FAIL a new Ghostty window's shell greets $n times, not once"; bad=1; }
+  out="$(printf 'echo "level=$KUBAOS_GREETING"\nzsh -i\nexit\nexit\n' | zsh_pty 'env TERM_PROGRAM=ghostty zsh -i')"
+  [[ $(grep -c -- "$GREETING_MARK" <<<"$out") == 1 ]] && grep -q 'level=0' <<<"$out" ||
+    { echo "FAIL a shell started inside the window greets again:"; printf '%s\n' "$out" | tail -20; bad=1; }
+  ((bad)) || echo "ok   the greeting shows once in a new Ghostty window's shell, not in a shell started from it"
+  for t in TMUX=/tmp/tmux-1000/default,1,0 NVIM=/run/user/1000/nvim.1.0 SSH_CONNECTION=10.0.0.2 \
+    SSH_TTY=/dev/pts/9 KUBAOS_GREETING=0 TERM_PROGRAM=foot; do
+    n="$(printf 'exit\n' | greets TERM_PROGRAM=ghostty "$t")"
+    [[ $n == 0 ]] || { echo "FAIL greeted with $t"; bad=1; }
+  done
+  n="$(zsh_pty 'env TERM_PROGRAM=ghostty zsh -i -c true' | grep -c -- "$GREETING_MARK" || true)"
+  [[ $n == 0 ]] || { echo "FAIL greeted in zsh -c"; bad=1; }
+  ((bad)) || echo "ok   no greeting under \$TMUX, \$NVIM, SSH, KUBAOS_GREETING=0, another terminal, or zsh -c"
+
+  zrun 'dot-greeting off' && [[ $(zrun 'dot-greeting status') == off ]] ||
+    { echo "FAIL dot-greeting off"; bad=1; }
+  n="$(printf 'exit\n' | greets TERM_PROGRAM=ghostty)"
+  [[ $n == 0 ]] || { echo "FAIL greeted with the setting off"; bad=1; }
+  zrun 'dot-greeting on' && [[ $(zrun 'dot-greeting status') == on ]] ||
+    { echo "FAIL dot-greeting on"; bad=1; }
+  n="$(printf 'exit\n' | greets TERM_PROGRAM=ghostty)"
+  [[ $n == 1 ]] || { echo "FAIL not greeted with the setting back on"; bad=1; }
+  ((bad)) || echo "ok   dot-greeting off and on turn the greeting off and on"
+
+  echo "     what the greeting costs, next to the full fastfetch:"
+  as_user bash -c "cd ~ && ~/.nix-profile/bin/hyperfine -N --warmup 3 --runs 20 -i \
+    '$USER_HOME/.nix-profile/bin/fastfetch --config $USER_HOME/.config/fastfetch/greeting.jsonc' \
+    '$USER_HOME/.nix-profile/bin/fastfetch' 2>&1" | grep -E 'Benchmark|Time|Warning|Error' | sed 's/^/     /'
+  return "$bad"
 }
 
 c_tms() {
@@ -1265,6 +1430,14 @@ TOML
     bad=1
   fi
 
+  out="$(in_session "$query 'Terminal greeting' fastfetch" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  for want in 'Terminal greeting:greeting-on' 'Terminal greeting:greeting-off' 'fastfetch:greeting-off'; do
+    grep -E -- "^${want%%:*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${want#*:}( |$)" ||
+      { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
+  done
+  ((bad)) || echo "ok   the terminal greeting's on and off Items are found"
+
   out="$(in_session "$query Files 'Open folder' 'Files: Downloads' 'Recent files'" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
   for want in 'Files:files' 'Open folder:files-open' 'Files: Downloads:files:download' 'Recent files:files-recent'; do
@@ -2170,7 +2343,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell clock menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell clock menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
