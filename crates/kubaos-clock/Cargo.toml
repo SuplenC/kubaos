@@ -1,0 +1,27 @@
+[package]
+name = "kubaos-clock"
+description = "KubaOS's date engine: date search and maths, the calendar, holidays, world clocks and countdowns"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-clock"
+path = "src/main.rs"
+
+[dependencies]
+# Kotodama's calculator reads dates with jiff too, so the menu and the popup agree on zones and
+# DST. The time zone database is the system's (`/usr/share/zoneinfo`, or `$TZDIR`), never bundled.
+jiff = { version = "0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+# Writes the settings file in place, keeping the user's comments.
+toml_edit = "0.25"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

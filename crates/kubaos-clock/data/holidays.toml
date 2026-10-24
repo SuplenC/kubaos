@@ -1,0 +1,215 @@
+# Public holidays the clock popup and the menu know, offline, as rules that
+# work for any year. `kubaos-clock` embeds this file; a country or a rule of
+# your own goes in ~/.config/kubaos/clock/holidays.toml, in the same shape,
+# and a country there replaces the one here whole.
+#
+# A table a country, by its ISO 3166 code in lowercase. Each day is one of:
+#   date = "MM-DD"                        a fixed date
+#   easter = N                            N days after Western Easter Sunday
+#   month = M, weekday = "monday", nth = N   the Nth weekday of the month; a
+#                                         negative N counts from the end
+# and may take `from` and `until` (years, both counted), and `observed`:
+#   "nearest"     a Saturday is kept on the Friday, a Sunday on the Monday
+#   "substitute"  on a weekend, the next weekday not already a holiday is
+#                 one too (a "substitute day")
+#   "saturday"    a Sunday is kept on the Saturday before
+#
+# National holidays only: regional ones (a German state's, a Spanish
+# region's) are left out, as are one-off days a government adds for a year.
+
+[at]
+name = "Austria"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Epiphany", date = "01-06" },
+  { name = "Easter Monday", easter = 1 },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Ascension Day", easter = 39 },
+  { name = "Whit Monday", easter = 50 },
+  { name = "Corpus Christi", easter = 60 },
+  { name = "Assumption Day", date = "08-15" },
+  { name = "National Day", date = "10-26" },
+  { name = "All Saints' Day", date = "11-01" },
+  { name = "Immaculate Conception", date = "12-08" },
+  { name = "Christmas Day", date = "12-25" },
+  { name = "St. Stephen's Day", date = "12-26" },
+]
+
+[be]
+name = "Belgium"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Easter Monday", easter = 1 },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Ascension Day", easter = 39 },
+  { name = "Whit Monday", easter = 50 },
+  { name = "National Day", date = "07-21" },
+  { name = "Assumption Day", date = "08-15" },
+  { name = "All Saints' Day", date = "11-01" },
+  { name = "Armistice Day", date = "11-11" },
+  { name = "Christmas Day", date = "12-25" },
+]
+
+[cz]
+name = "Czechia"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Good Friday", easter = -2, from = 2016 },
+  { name = "Easter Monday", easter = 1 },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Liberation Day", date = "05-08" },
+  { name = "Saints Cyril and Methodius Day", date = "07-05" },
+  { name = "Jan Hus Day", date = "07-06" },
+  { name = "Statehood Day", date = "09-28" },
+  { name = "Independence Day", date = "10-28" },
+  { name = "Freedom and Democracy Day", date = "11-17" },
+  { name = "Christmas Eve", date = "12-24" },
+  { name = "Christmas Day", date = "12-25" },
+  { name = "St. Stephen's Day", date = "12-26" },
+]
+
+[de]
+name = "Germany"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Good Friday", easter = -2 },
+  { name = "Easter Monday", easter = 1 },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Ascension Day", easter = 39 },
+  { name = "Whit Monday", easter = 50 },
+  { name = "German Unity Day", date = "10-03" },
+  { name = "Christmas Day", date = "12-25" },
+  { name = "Second Day of Christmas", date = "12-26" },
+]
+
+[es]
+name = "Spain"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Epiphany", date = "01-06" },
+  { name = "Good Friday", easter = -2 },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Assumption Day", date = "08-15" },
+  { name = "National Day", date = "10-12" },
+  { name = "All Saints' Day", date = "11-01" },
+  { name = "Constitution Day", date = "12-06" },
+  { name = "Immaculate Conception", date = "12-08" },
+  { name = "Christmas Day", date = "12-25" },
+]
+
+[fr]
+name = "France"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Easter Monday", easter = 1 },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Victory in Europe Day", date = "05-08" },
+  { name = "Ascension Day", easter = 39 },
+  { name = "Whit Monday", easter = 50 },
+  { name = "Bastille Day", date = "07-14" },
+  { name = "Assumption Day", date = "08-15" },
+  { name = "All Saints' Day", date = "11-01" },
+  { name = "Armistice Day", date = "11-11" },
+  { name = "Christmas Day", date = "12-25" },
+]
+
+# England and Wales.
+[gb]
+name = "United Kingdom"
+days = [
+  { name = "New Year's Day", date = "01-01", observed = "substitute" },
+  { name = "Good Friday", easter = -2 },
+  { name = "Easter Monday", easter = 1 },
+  { name = "Early May Bank Holiday", month = 5, weekday = "monday", nth = 1 },
+  { name = "Spring Bank Holiday", month = 5, weekday = "monday", nth = -1 },
+  { name = "Summer Bank Holiday", month = 8, weekday = "monday", nth = -1 },
+  { name = "Christmas Day", date = "12-25", observed = "substitute" },
+  { name = "Boxing Day", date = "12-26", observed = "substitute" },
+]
+
+[it]
+name = "Italy"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Epiphany", date = "01-06" },
+  { name = "Easter Sunday", easter = 0 },
+  { name = "Easter Monday", easter = 1 },
+  { name = "Liberation Day", date = "04-25" },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Republic Day", date = "06-02" },
+  { name = "Assumption Day", date = "08-15" },
+  { name = "St. Francis of Assisi Day", date = "10-04", from = 2026 },
+  { name = "All Saints' Day", date = "11-01" },
+  { name = "Immaculate Conception", date = "12-08" },
+  { name = "Christmas Day", date = "12-25" },
+  { name = "St. Stephen's Day", date = "12-26" },
+]
+
+[nl]
+name = "Netherlands"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Easter Sunday", easter = 0 },
+  { name = "Easter Monday", easter = 1 },
+  { name = "King's Day", date = "04-27", observed = "saturday" },
+  { name = "Liberation Day", date = "05-05" },
+  { name = "Ascension Day", easter = 39 },
+  { name = "Whit Sunday", easter = 49 },
+  { name = "Whit Monday", easter = 50 },
+  { name = "Christmas Day", date = "12-25" },
+  { name = "Second Day of Christmas", date = "12-26" },
+]
+
+[pl]
+name = "Poland"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Epiphany", date = "01-06" },
+  { name = "Easter Sunday", easter = 0 },
+  { name = "Easter Monday", easter = 1 },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Constitution Day", date = "05-03" },
+  { name = "Pentecost", easter = 49 },
+  { name = "Corpus Christi", easter = 60 },
+  { name = "Assumption Day", date = "08-15" },
+  { name = "All Saints' Day", date = "11-01" },
+  { name = "Independence Day", date = "11-11" },
+  { name = "Christmas Eve", date = "12-24", from = 2025 },
+  { name = "Christmas Day", date = "12-25" },
+  { name = "Second Day of Christmas", date = "12-26" },
+]
+
+[pt]
+name = "Portugal"
+days = [
+  { name = "New Year's Day", date = "01-01" },
+  { name = "Good Friday", easter = -2 },
+  { name = "Easter Sunday", easter = 0 },
+  { name = "Freedom Day", date = "04-25" },
+  { name = "Labour Day", date = "05-01" },
+  { name = "Corpus Christi", easter = 60 },
+  { name = "Portugal Day", date = "06-10" },
+  { name = "Assumption Day", date = "08-15" },
+  { name = "Republic Day", date = "10-05" },
+  { name = "All Saints' Day", date = "11-01" },
+  { name = "Restoration of Independence", date = "12-01" },
+  { name = "Immaculate Conception", date = "12-08" },
+  { name = "Christmas Day", date = "12-25" },
+]
+
+# Federal holidays.
+[us]
+name = "United States"
+days = [
+  { name = "New Year's Day", date = "01-01", observed = "nearest" },
+  { name = "Martin Luther King Jr. Day", month = 1, weekday = "monday", nth = 3 },
+  { name = "Presidents' Day", month = 2, weekday = "monday", nth = 3 },
+  { name = "Memorial Day", month = 5, weekday = "monday", nth = -1 },
+  { name = "Juneteenth", date = "06-19", observed = "nearest", from = 2021 },
+  { name = "Independence Day", date = "07-04", observed = "nearest" },
+  { name = "Labor Day", month = 9, weekday = "monday", nth = 1 },
+  { name = "Columbus Day", month = 10, weekday = "monday", nth = 2 },
+  { name = "Veterans Day", date = "11-11", observed = "nearest" },
+  { name = "Thanksgiving", month = 11, weekday = "thursday", nth = 4 },
+  { name = "Christmas Day", date = "12-25", observed = "nearest" },
+]
