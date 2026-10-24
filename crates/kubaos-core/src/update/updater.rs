@@ -29,6 +29,7 @@ use std::fs::TryLockError;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
@@ -78,6 +79,10 @@ pub const MIN_FREE_BYTES: u64 = 3 * 1024 * 1024 * 1024;
 
 /// How many commits of a release the summary lists.
 const LOG_LINES: usize = 20;
+
+/// How often, and how far apart, the update lock is tried before another update counts as running.
+const LOCK_TRIES: u32 = 10;
+const LOCK_WAIT: Duration = Duration::from_millis(20);
 
 /// Writes stdin to the file `$1`, made with its folder, through a temporary file and a rename,
 /// world-readable.
@@ -690,6 +695,15 @@ impl<'a, M: Machine> Updater<'a, M> {
             .write(true)
             .open(&path)
             .map_err(UpdateError::io(&path))?;
+        // A child forked by this process keeps a copy of a just-dropped lock's descriptor until
+        // it execs, and the lock lives as long as any copy does. A short wait outlasts that.
+        for _ in 0..LOCK_TRIES - 1 {
+            match file.try_lock() {
+                Ok(()) => return Ok(file),
+                Err(TryLockError::WouldBlock) => std::thread::sleep(LOCK_WAIT),
+                Err(TryLockError::Error(e)) => return Err(UpdateError::io(&path)(e)),
+            }
+        }
         match file.try_lock() {
             Ok(()) => Ok(file),
             Err(TryLockError::WouldBlock) => Err(UpdateError::Busy),
