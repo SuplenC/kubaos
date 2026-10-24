@@ -118,8 +118,9 @@ RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache
 
 # ---------------------------------------------------------------------------
 # desktop: system/50-hyprland.sh (PPA on amd64, Ubuntu's 0.53 on arm64,
-# autologin, lock-screen PAM), 70-bitwarden.sh (desktop .deb on amd64, bw,
-# pam_u2f lines; the Nix half runs in lib/assemble.sh), 75-yubikey.sh.
+# autologin, lock-screen PAM, keyd for the accents), 70-bitwarden.sh
+# (desktop .deb on amd64, bw, pam_u2f lines; the Nix half runs in
+# lib/assemble.sh), 75-yubikey.sh.
 FROM apps AS desktop
 ARG TARGETARCH
 COPY system/50-hyprland.sh system/70-bitwarden.sh system/75-yubikey.sh /opt/dotfiles/system/
@@ -128,6 +129,9 @@ COPY system/files/pam.d/ /opt/dotfiles/system/files/pam.d/
 COPY system/files/tmpfiles.d/ /opt/dotfiles/system/files/tmpfiles.d/
 COPY system/files/systemd/ /opt/dotfiles/system/files/systemd/
 COPY system/files/udev/ /opt/dotfiles/system/files/udev/
+COPY system/files/keyd/ /opt/dotfiles/system/files/keyd/
+COPY system/files/xkb/ /opt/dotfiles/system/files/xkb/
+COPY system/files/polkit/ /opt/dotfiles/system/files/polkit/
 COPY system/files/hyprland-autostart.zsh /opt/dotfiles/system/files/
 RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=kubaos-image-apt-lists-${TARGETARCH},target=/var/lib/apt/lists,sharing=locked \

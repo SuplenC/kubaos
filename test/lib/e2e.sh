@@ -547,6 +547,99 @@ c_keyboard() {
   rm -f "$file"
   [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; return 1; }
   echo "ok   kubaos keyboard show lists the layouts, the default first"
+  keyboard_changes || return 1
+  mac_accents || return 1
+}
+
+# `kubaos keyboard move` and `list`, with a stand-in localectl that writes the
+# file as localed would: the container has no systemd-localed.
+keyboard_changes() {
+  local dir out
+  dir="$(mktemp -d)"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it,de"\nXKBVARIANT=",intl,"\nXKBOPTIONS="caps:escape"\n' >"$dir/keyboard"
+  install -m 0755 /dev/stdin "$dir/localectl" <<'SH'
+#!/bin/sh
+# localectl set-x11-keymap LAYOUT MODEL VARIANT OPTIONS
+printf 'XKBMODEL="%s"\nXKBLAYOUT="%s"\nXKBVARIANT="%s"\nXKBOPTIONS="%s"\n' "$3" "$2" "$4" "$5" >"$KUBAOS_KEYBOARD_FILE"
+SH
+  chown -R "$USER_NAME:" "$dir"
+  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 1" 2>&1)" ||
+    { echo "FAIL kubaos keyboard move de 1: $out"; rm -rf "$dir"; return 1; }
+  if ! grep -qx 'XKBLAYOUT="de,us,it"' "$dir/keyboard" || ! grep -qx 'XKBVARIANT=",,intl"' "$dir/keyboard" ||
+    ! grep -qx 'XKBOPTIONS="caps:escape"' "$dir/keyboard"; then
+    echo "FAIL kubaos keyboard move de 1 wrote: $(cat "$dir/keyboard")"
+    rm -rf "$dir"
+    return 1
+  fi
+  echo "ok   kubaos keyboard move puts a layout at a place through localectl, the options kept"
+  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 4" 2>&1)" && {
+    echo "FAIL kubaos keyboard move de 4 of 3 succeeded: $out"
+    rm -rf "$dir"
+    return 1
+  }
+  rm -rf "$dir"
+  echo "ok   a move past the last place is refused"
+  out="$(kz "kubaos keyboard list" 2>&1)" || { echo "FAIL kubaos keyboard list: $out"; return 1; }
+  if ! grep -qxP 'fr\tFrench' <<<"$out" || ! grep -qP '^us\(intl\)\t' <<<"$out"; then
+    echo "FAIL kubaos keyboard list lacks fr or us(intl): $(head -5 <<<"$out")"
+    return 1
+  fi
+  echo "ok   kubaos keyboard list names every layout and variant ($(wc -l <<<"$out") of them)"
+}
+
+# The Mac-style accents on Left Alt: keyd's config and the XKB option as
+# system/50-hyprland.sh installed them, the option in a keymap with two
+# layouts and the user's own option, the setting through `kubaos keyboard
+# accents` with a stand-in systemctl, and Hyprland's cheat sheet. Real keys
+# through keyd need /dev/uinput: the laptop checklist covers them.
+mac_accents() {
+  local dir out key keymap
+  cmp -s "$REPO/system/files/keyd/kubaos.conf" /etc/keyd/kubaos.conf ||
+    { echo "FAIL /etc/keyd/kubaos.conf isn't system/files/keyd/kubaos.conf"; return 1; }
+  out="$(keyd.rvaiya list-keys 2>&1)" || { echo "FAIL keyd list-keys: $out"; return 1; }
+  for key in leftalt move edit bassboost question iso setup deletefile closecd; do
+    grep -qx "$key" <<<"$out" || { echo "FAIL keyd knows no key $key"; return 1; }
+  done
+  echo "ok   keyd's config is installed, and keyd knows every key it names"
+  keymap="$(as_user xkbcli compile-keymap --layout fr,ru --options grp:alt_shift_toggle,kubaos:mac-accents 2>&1)" ||
+    { echo "FAIL compiling a keymap with kubaos:mac-accents: $(tail -5 <<<"$keymap")"; return 1; }
+  for key in 'I183>.*dead_acute' 'I184>.*dead_grave' 'I217>.*dead_diaeresis' 'I222>.*dead_circumflex' \
+    'I178>.*dead_tilde' 'I149>.*acute, *grave' 'I154>.*diaeresis, *U02C6' 'I168>.*U02DC' 'ISO_Next_Group'; do
+    grep -qE "$key" <<<"$keymap" || { echo "FAIL the keymap lacks $key"; return 1; }
+  done
+  echo "ok   kubaos:mac-accents joins grp:alt_shift_toggle in a French and Russian keymap"
+
+  dir="$(mktemp -d)"
+  install -m 0755 /dev/stdin "$dir/systemctl" <<'SH'
+#!/bin/sh
+# Answers the unit-file query and logs the rest.
+case "$1" in
+  list-unit-files) echo "keyd.service enabled enabled" ;;
+  *) echo "$*" >>"$(dirname "$0")/calls" ;;
+esac
+SH
+  chown -R "$USER_NAME:" "$dir"
+  out="$(kz "export PATH='$dir':\$PATH XDG_CONFIG_HOME='$dir'; kubaos keyboard accents off && kubaos keyboard accents" 2>&1)" ||
+    { echo "FAIL kubaos keyboard accents off: $out"; rm -rf "$dir"; return 1; }
+  if [[ $(tail -1 <<<"$out") != off ]] || ! grep -qx 'mac_accents = false' "$dir/kubaos/keyboard/keyboard.toml" ||
+    ! grep -qx 'stop --no-ask-password keyd.service' "$dir/calls"; then
+    echo "FAIL accents off: printed $out, wrote $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1), ran $(cat "$dir/calls" 2>&1)"
+    rm -rf "$dir"
+    return 1
+  fi
+  out="$(kz "PATH='$dir':\$PATH XDG_CONFIG_HOME='$dir' kubaos keyboard accents on" 2>&1)" ||
+    { echo "FAIL kubaos keyboard accents on: $out"; rm -rf "$dir"; return 1; }
+  if ! grep -qx 'mac_accents = true' "$dir/kubaos/keyboard/keyboard.toml" ||
+    [[ $(tail -1 "$dir/calls") != 'start --no-ask-password keyd.service' ]]; then
+    echo "FAIL accents on: wrote $(cat "$dir/kubaos/keyboard/keyboard.toml"), ran $(cat "$dir/calls")"
+    rm -rf "$dir"
+    return 1
+  fi
+  rm -rf "$dir"
+  echo "ok   kubaos keyboard accents off and on write the setting and stop and start keyd"
+
+  as_user lua5.5 "$REPO/test/lua/accents_test.lua" "$REPO" || { echo "FAIL test/lua/accents_test.lua"; return 1; }
+  echo "ok   accents.lua: the cheat sheet in a submap, gone with the setting off"
 }
 
 c_quickshell() {
@@ -971,6 +1064,14 @@ TOML
       { echo "FAIL typing '${want%%:keyboard*}' doesn't find kubaos/keyboard${want#*:keyboard}"; bad=1; }
   done
   ((bad)) || echo "ok   the keyboard Items are found: add, set, and one a layout"
+  out="$(in_session "$query 'Mac accents on Left Alt' accents" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  for want in 'Mac accents on Left Alt:mac-accents-on' 'Mac accents on Left Alt:mac-accents-off' \
+    'accents:mac-accents-on' 'accents:mac-accents-off'; do
+    grep -E -- "^${want%%:*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${want#*:}( |$)" ||
+      { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
+  done
+  ((bad)) || echo "ok   the Mac accents Items are found by name and by 'accents'"
   # The next layout is the SUPER + SHIFT + Space bind's Item, from the hyprland Extension, alone.
   if grep -E -- "^next layout[[:blank:]]" <<<"$out" | grep -qE 'kubaos/keyboard-next( |$)'; then
     echo "FAIL the KubaOS Extension sends a next layout Item beside the bind's"

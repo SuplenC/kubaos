@@ -35,7 +35,32 @@ local function system_keyboard(path)
   return kb
 end
 
+-- The Mac-style accents on Left Alt: after Left Alt + e, `, u, i or n, keyd
+-- sends a dead key on a spare keycode, and this XKB option gives those
+-- keycodes their symbols in every layout (system/files/xkb/symbols/kubaos),
+-- so the app composes the accent with the layout's own letter. It joins the options of
+-- /etc/default/keyboard, never replaces them, and only where
+-- system/50-hyprland.sh installed it; elsewhere libxkbcommon would log an
+-- unknown option on every load. It stays while `kubaos keyboard accents off`
+-- has stopped keyd: nothing sends those keycodes then.
+local MAC_ACCENTS = "kubaos:mac-accents"
+
+local function with_mac_accents(options, symbols)
+  local file = io.open(symbols, "r")
+  if not file then
+    return options
+  end
+  file:close()
+  for option in options:gmatch("[^,]+") do
+    if option == MAC_ACCENTS then
+      return options
+    end
+  end
+  return options == "" and MAC_ACCENTS or options .. "," .. MAC_ACCENTS
+end
+
 local kb = system_keyboard("/etc/default/keyboard")
+kb.options = with_mac_accents(kb.options, "/etc/xkb/symbols/kubaos")
 
 hl.config({
   input = {

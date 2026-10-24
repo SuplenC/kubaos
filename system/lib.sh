@@ -376,6 +376,29 @@ hypr_installed() {
     awk -v re="$HYPR_HOLD_RE" '$1 == "installed" && $2 ~ re {print $2}'
 }
 
+# install_mac_accents: the Mac-style accents on Left Alt. After Left Alt + e,
+# `, u, i or n, keyd sends a dead key on a spare keycode and then the next
+# letter (files/keyd/kubaos.conf), the `kubaos:mac-accents` XKB option gives
+# those keycodes their symbols in every layout (files/xkb, which libxkbcommon
+# reads from /etc/xkb), and a polkit rule lets
+# the desktop user start and stop keyd, which `kubaos keyboard accents` does.
+# 50-hyprland.sh runs it, and a migration on machines installed before it.
+install_mac_accents() {
+  local changed=0
+  install_root_file "$FILES_DIR/xkb/rules/evdev" /etc/xkb/rules/evdev 0644
+  install_root_file "$FILES_DIR/xkb/symbols/kubaos" /etc/xkb/symbols/kubaos 0644
+  install_root_file "$FILES_DIR/polkit/50-kubaos-keyd.rules" /etc/polkit-1/rules.d/50-kubaos-keyd.rules 0644
+  same_content "$FILES_DIR/keyd/kubaos.conf" /etc/keyd/kubaos.conf || changed=1
+  # The config goes in first, so keyd starts with it when the package starts it.
+  install_root_file "$FILES_DIR/keyd/kubaos.conf" /etc/keyd/kubaos.conf 0644
+  apt_install keyd
+  sctl enable keyd.service
+  # try-restart: a keyd the user stopped (accents off) stays stopped.
+  if ((changed)) && has_systemd; then
+    sudo_run systemctl try-restart keyd.service
+  fi
+}
+
 common_usage() {
   cat <<EOF
 Common flags:

@@ -95,7 +95,7 @@ unsquashfs -f -d /mnt -processors "$(nproc)" -percentage kubaos-shinjuku-x86_64.
    | `base` | `system/10-strip.sh`, `20-base.sh` for real | `lib.sh`, those scripts, `files/{apt,netplan,logind.conf.d}` |
    | `nix` | Nix from the official installer, with version, URL and sha256 read from `60-nix.sh` | `60-nix.sh` |
    | `apps` | `system/40-apps.sh` (Docker CE; Chrome on amd64) | that script, `files/chrome` |
-   | `desktop` | `50-hyprland.sh`, `70-bitwarden.sh`, `75-yubikey.sh` | those, `files/{getty,pam.d,tmpfiles.d,systemd,udev}`, the autostart snippet |
+   | `desktop` | `50-hyprland.sh`, `70-bitwarden.sh`, `75-yubikey.sh` | those, `files/{getty,pam.d,tmpfiles.d,systemd,udev,keyd,xkb,polkit}`, the autostart snippet |
    | `boot` | `25-boot.sh`: Plymouth with the kubaos theme, the GRUB theme in `/boot/grub/themes/kubaos`, the `10_linux` wrapper. Last, so the splash rebuilds nothing else | that script, `files/{plymouth,grub,fonts,initramfs-tools}` |
 
    apt's `.deb`s and lists sit in BuildKit cache mounts (`kubaos-image-apt-{cache,lists}-<arch>`), so no layer contains apt lists. `/var/lib/apt/extended_states` (what's auto-installed) stays in the image.

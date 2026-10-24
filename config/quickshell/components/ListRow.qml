@@ -131,7 +131,10 @@ Item {
         }
     }
 
+    // Under the row's content, so a button among the trailing items takes
+    // its own clicks; the rest of the row still clicks the row.
     StateLayer {
+        z: -1
         radius: root.radius
         onClicked: root.clicked()
     }

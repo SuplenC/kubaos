@@ -1,0 +1,10 @@
+# Your keyboard, read by `kubaos keyboard accents` at login and by Hyprland
+# (config/hypr/accents.lua). The Command menu's "Mac accents on Left Alt"
+# Items change the line below and apply it at once; after a hand edit,
+# `kubaos keyboard accents apply` and a Hyprland reload.
+#
+# mac_accents: Left Alt + e, `, u, i or n, then a letter, types it with an
+# acute, grave, diaeresis, circumflex or tilde (é à ö ô ñ), as Option does
+# on a Mac; every other Left Alt chord stays Alt. true (default) or false.
+#
+# mac_accents = false

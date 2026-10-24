@@ -66,15 +66,54 @@ fn one_layout_cannot_be_removed() {
     let keyboards = keyboards("us", "");
 
     assert_eq!(titles(&keyboards), ["Keyboard: English (US)", "Keyboard: add a layout"]);
-    assert_eq!(actions(&keyboards, "keyboard:us"), [RUN]);
+    assert_eq!(actions(&keyboards, "keyboard:us"), [RUN], "nor moved");
 }
 
 #[test]
 fn only_a_layout_after_the_first_can_be_made_the_default() {
     let keyboards = keyboards("us,it", "");
 
-    assert_eq!(actions(&keyboards, "keyboard:us"), [RUN, REMOVE]);
-    assert_eq!(actions(&keyboards, "keyboard:it"), [RUN, MAKE_DEFAULT, REMOVE]);
+    assert_eq!(actions(&keyboards, "keyboard:us"), [RUN, MOVE_DOWN, REMOVE]);
+    assert_eq!(actions(&keyboards, "keyboard:it"), [RUN, MAKE_DEFAULT, MOVE_UP, REMOVE]);
+}
+
+#[test]
+fn a_layout_moves_up_unless_first_and_down_unless_last() {
+    let keyboards = keyboards("us,it,de", "");
+
+    assert_eq!(actions(&keyboards, "keyboard:us"), [RUN, MOVE_DOWN, REMOVE]);
+    assert_eq!(
+        actions(&keyboards, "keyboard:it"),
+        [RUN, MAKE_DEFAULT, MOVE_UP, MOVE_DOWN, REMOVE]
+    );
+    assert_eq!(actions(&keyboards, "keyboard:de"), [RUN, MAKE_DEFAULT, MOVE_UP, REMOVE]);
+}
+
+#[test]
+fn moving_up_and_down_launches_kubaos_keyboard_move_with_the_new_place() {
+    let runner = FakeRunner::default();
+    let keyboards = keyboards("us,it,de", "");
+
+    assert_eq!(keyboards.run("keyboard:it", MOVE_UP, &none(), &runner), Ok(Ran::Close));
+    assert_eq!(keyboards.run("keyboard:it", MOVE_DOWN, &none(), &runner), Ok(Ran::Close));
+
+    assert_eq!(launched(&runner), ["kubaos keyboard move it 1", "kubaos keyboard move it 3"]);
+}
+
+#[test]
+fn a_move_past_either_end_is_refused_and_runs_nothing() {
+    let runner = FakeRunner::default();
+    let keyboards = keyboards("us,it", "");
+
+    assert_eq!(
+        keyboards.run("keyboard:us", MOVE_UP, &none(), &runner),
+        Err("`us` is the first keyboard layout already".to_owned())
+    );
+    assert_eq!(
+        keyboards.run("keyboard:it", MOVE_DOWN, &none(), &runner),
+        Err("`it` is the last keyboard layout already".to_owned())
+    );
+    assert!(runner.launched.borrow().is_empty());
 }
 
 #[test]
