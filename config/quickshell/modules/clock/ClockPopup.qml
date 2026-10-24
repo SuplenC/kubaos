@@ -43,7 +43,7 @@ Drawer {
     enterDuration: glide
     enterCurve: arrive
     exitDuration: 120
-    contentWidth: grid.implicitWidth + side.implicitWidth + columnGap + pad * 2
+    contentWidth: grid.implicitWidth + side.width + columnGap + pad * 2
     contentHeight: body.implicitHeight + pad * 2
 
     onShownChanged: Time.seconds = shown
@@ -479,8 +479,7 @@ Drawer {
             Column {
                 id: side
 
-                implicitWidth: 280
-                width: implicitWidth
+                width: 280
                 spacing: Theme.spacing.lg
 
                 // Countdowns: what's left of each, and one to add.
@@ -500,7 +499,7 @@ Drawer {
                             id: countdown
 
                             required property var modelData
-                            readonly property real left: modelData.end - root.now.getTime()
+                            readonly property real remaining: modelData.end - root.now.getTime()
 
                             width: side.width
                             height: 34
@@ -528,7 +527,7 @@ Drawer {
 
                                 StyledText {
                                     width: parent.width
-                                    text: countdown.left > 0 ? `in ${Time.left(countdown.left)} · ${countdown.modelData.at}` : `${countdown.modelData.at} · passed`
+                                    text: countdown.remaining > 0 ? `in ${Time.left(countdown.remaining)} · ${countdown.modelData.at}` : `${countdown.modelData.at} · passed`
                                     font.pixelSize: Theme.font.xs
                                     font.features: Theme.font.tabular
                                     color: Theme.m3onSurfaceVariant

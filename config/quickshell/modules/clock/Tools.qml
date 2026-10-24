@@ -59,9 +59,9 @@ Item {
                 color: Theme.m3surfaceContainerHighest
 
                 Rectangle {
-                    readonly property real left: Time.timerEnd > 0 ? Time.timerEnd - root.now : Time.timerLeft
+                    readonly property real remaining: Time.timerEnd > 0 ? Time.timerEnd - root.now : Time.timerLeft
 
-                    width: parent.width * Math.max(0, Math.min(1, Time.timerTotal > 0 ? left / Time.timerTotal : 0))
+                    width: parent.width * Math.max(0, Math.min(1, Time.timerTotal > 0 ? remaining / Time.timerTotal : 0))
                     height: parent.height
                     radius: 3
                     color: Theme.m3primary

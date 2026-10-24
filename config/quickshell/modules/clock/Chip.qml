@@ -13,7 +13,7 @@ Rectangle {
 
     signal clicked
 
-    implicitWidth: text.implicitWidth + Theme.spacing.md * 2
+    implicitWidth: labelText.implicitWidth + Theme.spacing.md * 2
     implicitHeight: 28
     radius: Theme.rounding.full
     color: selected ? Theme.m3secondaryContainer : Theme.m3surfaceContainerHigh
@@ -23,7 +23,7 @@ Rectangle {
     }
 
     StyledText {
-        id: text
+        id: labelText
 
         anchors.centerIn: parent
         text: root.label
@@ -33,7 +33,7 @@ Rectangle {
     }
 
     StateLayer {
-        id: state
+        id: hover
 
         color: root.selected ? Theme.m3onSecondaryContainer : Theme.m3onSurface
         onClicked: root.clicked()
@@ -41,6 +41,6 @@ Rectangle {
 
     Tooltip {
         text: root.tooltip
-        shown: root.tooltip !== "" && state.containsMouse
+        shown: root.tooltip !== "" && hover.containsMouse
     }
 }
