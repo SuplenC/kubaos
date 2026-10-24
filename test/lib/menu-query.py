@@ -1,11 +1,13 @@
-"""menu-query.py SOCKET [--top] TEXT...: what the Command menu finds for each TEXT.
+"""menu-query.py SOCKET [--top | --app WORD] TEXT...: what the Command menu finds for each TEXT.
 
 A Front end of its own on the Daemon's socket (Kotodama protocol 1.0, JSON):
 for each TEXT it sends a `query` and prints one line, the TEXT, a tab, then
 `<extension>/<item id>` for every Result, best first. With --top, the line is
 the TEXT, then the top Result's `<extension>/<item id>`, title and subtitle,
-tab-separated: what an answer in the top row says. The `kotodama` command
-has no query of its own. Run with `python3 -I`.
+tab-separated: what an answer in the top row says. With --app, it first
+enters the app of WORD from its entry Item, as a user does, and each TEXT is
+searched in that app. The `kotodama` command has no query of its own. Run
+with `python3 -I`.
 """
 
 import json
@@ -45,25 +47,50 @@ class Daemon:
             self.buf += data
 
 
-def main(path, texts, top=False):
+def ask(daemon, text):
+    """The Results the Daemon settles on for `text`."""
+    daemon.send({"query": {"text": text}})
+    results = None
+    while results is None:
+        message = daemon.recv(WAIT)
+        if message is None:
+            sys.exit(f"no results for {text!r}")
+        results = message.get("results")
+    # The list is sent again as slower Extensions answer: take the last
+    # one before the Daemon goes quiet.
+    while (message := daemon.recv(QUIET)) is not None:
+        results = message.get("results", results)
+    return results
+
+
+def enter(daemon, word):
+    """Runs the entry Item of the app of `word`, as a click on it does."""
+    results = ask(daemon, word + " ")
+    entry = next((r for r in results["results"] if r["item"].get("keyword") == word), None)
+    if entry is None:
+        sys.exit(f"no entry Item for the app of {word!r}")
+    item = entry["item"]
+    daemon.send({"run_action": {
+        "result": {"extension": entry["extension"], "id": item["id"]},
+        "shown": results["version"],
+        "action": {"extension": entry["extension"], "id": item["actions"][0]["id"]},
+    }})
+    while (message := daemon.recv(WAIT)) is not None:
+        if (message.get("results") or {}).get("scope"):
+            return
+    sys.exit(f"running {item['id']} entered no app")
+
+
+def main(path, texts, top=False, app=None):
     daemon = Daemon(path)
     daemon.send({"version": 1, "minor": 0, "formats": ["json"]})
     hello = daemon.recv(WAIT)
     if not hello or hello.get("version") != 1:
         sys.exit(f"the Daemon's hello: {hello}")
+    if app:
+        enter(daemon, app)
     for text in texts:
-        daemon.send({"query": {"text": text}})
-        results = None
-        while results is None:
-            message = daemon.recv(WAIT)
-            if message is None:
-                sys.exit(f"no results for {text!r}")
-            results = message.get("results")
-        # The list is sent again as slower Extensions answer: take the last
-        # one before the Daemon goes quiet.
-        while (message := daemon.recv(QUIET)) is not None:
-            results = message.get("results", results)
-        shown = results["results"]
+        shown = ask(daemon, f"{app} {text}" if app else text)["results"]
         if top:
             first = shown[0] if shown else {"extension": "", "item": {"id": "", "title": ""}}
             item = first["item"]
@@ -79,6 +106,9 @@ if __name__ == "__main__":
     top = bool(args) and args[0] == "--top"
     if top:
         args = args[1:]
+    app = None
+    if len(args) > 1 and args[0] == "--app":
+        app, args = args[1], args[2:]
     if not args:
         sys.exit(__doc__)
-    main(sys.argv[1], args, top)
+    main(sys.argv[1], args, top, app)

@@ -832,26 +832,31 @@ kb_probe_wait() {
 }
 
 # The control center's Keyboard tab under a real pointer (a virtual one, as
-# the headless session has none). A double-click on "Add a language…" opens
-# the matches where the row was, so its second click lands on one: that click
-# only picks it, and nothing runs localectl until the Add button is clicked.
-# Regression: #107.
+# the headless session has none), with the Daemon, which "Add a language…"
+# searches through. A double-click on "Add a language…" opens the search and
+# adds nothing. Once the search is in the "Add a keyboard layout" app, a click
+# on its first match only picks it, and the Add button adds it to the user's
+# layouts with no privilege asked.
 keyboard_tab_clicks() {
-  local dir at picked bad=0
+  local dir at picked daemon mine="$USER_HOME/.config/kubaos/keyboard/keyboard.toml" saved bad=0
   pointer_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$dir/keyboard"
-  install -m 0755 /dev/stdin "$dir/localectl" <<SH
-#!/bin/sh
-echo "\$*" >>'$dir/calls'
-SH
   chown -R "$USER_NAME:" "$dir"
+  saved="$dir/keyboard.toml.saved"
+  [[ -f $mine ]] && cp -p "$mine" "$saved"
+  as_user mkdir -p "$(dirname "$mine")"
+  printf 'layouts = ["us", "it"]\n' | as_user tee "$mine" >/dev/null
   session_start sway 1920x1080 1
-  if ! qs_start "PATH=$dir:/usr/local/bin:\$PATH" "KUBAOS_KEYBOARD_FILE=$dir/keyboard" KUBAOS_KEYBOARD_PROBE=1; then
-    echo "FAIL Quickshell didn't load"; tail -30 "$QS_LOG"; session_stop; rm -rf "$dir"; return 1
+  in_session "exec kotodamad >>$LOGS/kotodamad-keyboard.log 2>&1" &
+  daemon=$!
+  if ! qs_start "KUBAOS_KEYBOARD_FILE=$dir/keyboard" KUBAOS_KEYBOARD_PROBE=1; then
+    echo "FAIL Quickshell didn't load"; tail -30 "$QS_LOG"; bad=1
   fi
-  in_session 'qs ipc call controlcenter keyboard' >/dev/null 2>&1
-  kb_probe_wait 'at add-row' || { echo "FAIL qs ipc call controlcenter keyboard showed no \"Add a language…\""; bad=1; }
+  if ((!bad)); then
+    in_session 'qs ipc call controlcenter keyboard' >/dev/null 2>&1
+    kb_probe_wait 'at add-row' || { echo "FAIL qs ipc call controlcenter keyboard showed no \"Add a language…\""; bad=1; }
+  fi
   # The drawer slides in; the probe logs where the row is until it stops.
   sleep 1.5
   at="$(kb_probe_at add-row)"
@@ -859,15 +864,34 @@ SH
   if ((!bad)); then
     in_session "$VP_RUN 1920 1080 move:$at wait:0.3 click wait:0.12 click wait:1" >>"$LOGS/vpointer.log" 2>&1 ||
       { echo "FAIL test/lib/vpointer.py: $(tail -3 "$LOGS/vpointer.log")"; bad=1; }
-    picked="$(grep -o 'keyboard probe: picked .*' "$QS_LOG" | tail -1 | sed 's/.*picked //')"
-    if [[ -s $dir/calls ]]; then
-      echo "FAIL a double-click on \"Add a language…\" ran localectl $(cat "$dir/calls")"; bad=1
-    elif ! grep -q 'keyboard probe: adding true' "$QS_LOG" || [[ -z $picked ]]; then
-      echo "FAIL the double-click at $at didn't open the matches and pick one:"
+    if ! grep -qx 'layouts = \["us", "it"\]' "$mine"; then
+      echo "FAIL a double-click on \"Add a language…\" changed the layouts: $(cat "$mine")"; bad=1
+    elif ! grep -q 'keyboard probe: adding true' "$QS_LOG" || grep -q 'keyboard probe: adding false' "$QS_LOG"; then
+      echo "FAIL the double-click at $at didn't leave the search open:"
       grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
       bad=1
     else
-      echo "ok   a double-click on \"Add a language…\" picks $picked and adds nothing"
+      echo "ok   a double-click on \"Add a language…\" opens the search and adds nothing"
+    fi
+  fi
+
+  if ((!bad)); then
+    if ! kb_probe_wait 'entered true'; then
+      echo "FAIL the search never entered the \"Add a keyboard layout\" app:"
+      grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
+      tail -5 "$LOGS/kotodamad-keyboard.log" | sed 's/^/     /'
+      bad=1
+    else
+      sleep 0.5
+      at="$(kb_probe_at first-match)"
+      in_session "$VP_RUN 1920 1080 move:$at wait:0.2 click wait:0.5" >>"$LOGS/vpointer.log" 2>&1
+      picked="$(grep -o 'keyboard probe: picked .*' "$QS_LOG" | tail -1 | sed 's/.*picked //')"
+      if [[ -z $picked ]] || ! grep -qx 'layouts = \["us", "it"\]' "$mine"; then
+        echo "FAIL a click on the first match at '$at' didn't only pick it: picked '$picked', layouts $(cat "$mine")"
+        bad=1
+      else
+        echo "ok   the search lists the app's layouts, and a click on one picks $picked"
+      fi
     fi
   fi
 
@@ -875,16 +899,17 @@ SH
     sleep 0.5
     at="$(kb_probe_at add-button)"
     in_session "$VP_RUN 1920 1080 move:$at wait:0.2 click wait:0.5" >>"$LOGS/vpointer.log" 2>&1
-    for _ in $(seq 30); do [[ -s $dir/calls ]] && break; sleep 0.1; done
-    if grep -q "^set-x11-keymap us,it,${picked%%(*} " "$dir/calls" 2>/dev/null; then
-      echo "ok   the Add button adds the pick: localectl $(head -1 "$dir/calls")"
+    for _ in $(seq 30); do grep -q "\"$picked\"" "$mine" && break; sleep 0.1; done
+    if grep -qxF "layouts = [\"us\", \"it\", \"$picked\"]" "$mine"; then
+      echo "ok   the Add button adds the pick to the user's layouts, no privilege asked"
     else
-      echo "FAIL the Add button at $at didn't add $picked: localectl ran '$(cat "$dir/calls" 2>&1)'"; bad=1
+      echo "FAIL the Add button at $at didn't add $picked: $(cat "$mine")"; bad=1
     fi
   fi
 
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
-  session_stop
+  menu_stop "$daemon"
+  if [[ -f $saved ]]; then cp -p "$saved" "$mine"; else rm -f "$mine"; fi
   rm -rf "$dir"
   return "$bad"
 }
@@ -1657,6 +1682,22 @@ TOML
       { echo "FAIL typing '${want%%:keyboard*}' doesn't find kubaos/keyboard${want#*:keyboard}"; bad=1; }
   done
   ((bad)) || echo "ok   the keyboard Items are found: add, set, and one a layout"
+  # The "Add a keyboard layout" app (crates/kotodama-kubaos/layouts/): its
+  # entry is found by its word, its layouts only inside it, and the ones in
+  # use aren't offered.
+  out="$(in_session "$query layout Czech" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
+  if ! grep -E '^layout[[:blank:]]' <<<"$out" | grep -qE 'kotodama/app:kubaos-layouts( |$)' ||
+    grep -qE 'kubaos-layouts/' <<<"$out"; then
+    echo "FAIL the layouts app's entry isn't found by 'layout', or its layouts show outside it: $out"; bad=1
+  fi
+  out="$(in_session "$query --app layout czech italian" 2>&1)" || { echo "FAIL entering the layouts app: $out"; bad=1; }
+  if grep -E '^czech[[:blank:]]' <<<"$out" | grep -qE 'kubaos-layouts/layout:cz( |$)' &&
+    grep -E '^italian[[:blank:]]' <<<"$out" | grep -qE 'kubaos-layouts/layout:it\(' &&
+    ! grep -E '^italian[[:blank:]]' <<<"$out" | grep -qE 'kubaos-layouts/layout:it( |$)'; then
+    echo "ok   the layouts app is entered by its word and searches the layouts not in use"
+  else
+    echo "FAIL in the layouts app, czech and italian found: $out"; bad=1
+  fi
   out="$(in_session "$query 'Mac accents on Left Alt' accents" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
   for want in 'Mac accents on Left Alt:mac-accents-on' 'Mac accents on Left Alt:mac-accents-off' \
