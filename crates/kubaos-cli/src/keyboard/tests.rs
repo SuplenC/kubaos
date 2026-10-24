@@ -1,7 +1,23 @@
 use crate::job::chain;
 
+use super::WRITER;
 use super::logged;
+use super::pkexec_args;
 use super::refusal;
+
+#[test]
+fn without_a_terminal_pkexec_leaves_the_asking_to_the_sessions_agent() {
+    let args = pkexec_args(false, ["it", "pc105", "", ""]);
+
+    assert_eq!(args, ["--disable-internal-agent", WRITER, "it", "pc105", "", ""]);
+}
+
+#[test]
+fn in_a_terminal_pkexec_may_ask_there() {
+    let args = pkexec_args(true, ["it", "pc105", "", ""]);
+
+    assert_eq!(args, [WRITER, "it", "pc105", "", ""]);
+}
 
 #[test]
 fn a_polkit_refusal_says_polkit_refused() {
@@ -11,6 +27,16 @@ fn a_polkit_refusal_says_polkit_refused() {
     );
 
     assert_eq!(chain(&e), "polkit refused it");
+}
+
+#[test]
+fn no_agent_to_ask_for_the_password_says_so() {
+    let e = refusal(
+        "Error executing command as another user: No authentication agent found.\n",
+        "exit status: 127",
+    );
+
+    assert_eq!(chain(&e), "no polkit agent is running to ask for the password");
 }
 
 #[test]

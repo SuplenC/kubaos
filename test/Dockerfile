@@ -95,7 +95,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # ---------------------------------------------------------------------------
 # desktop: the system halves of system/50-hyprland.sh (Ubuntu's arm64
 # hyprland 0.53, lock-screen PAM files, unix_chkpwd link, tty1 autologin,
-# keyd and the XKB option of the Mac-style accents) and
+# keyd and the XKB option of the Mac-style accents, the system keyboard
+# writer and its polkit action) and
 # system/70-bitwarden.sh (bw CLI, pam_u2f lines for sudo/sudo-i/polkit-1,
 # qs-lock-u2f). The pam_u2f.so link into /nix is made at test time.
 FROM tooling AS desktop
@@ -108,6 +109,7 @@ COPY system/files/udev/ /opt/dotfiles/system/files/udev/
 COPY system/files/keyd/ /opt/dotfiles/system/files/keyd/
 COPY system/files/xkb/ /opt/dotfiles/system/files/xkb/
 COPY system/files/polkit/ /opt/dotfiles/system/files/polkit/
+COPY system/files/keyboard/ /opt/dotfiles/system/files/keyboard/
 COPY system/files/hyprland-autostart.zsh /opt/dotfiles/system/files/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \

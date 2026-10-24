@@ -53,6 +53,7 @@ use std::env;
 use std::fmt::Display;
 use std::fs;
 use std::io;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitCode;
@@ -300,9 +301,10 @@ fn write_system_default(file: &KeyboardFile, default: &Layout) -> Result<(), Sys
     } else {
         &file.model
     };
+    let fields = [default.layout.as_str(), model, &default.variant, &file.options];
     // stdin stays the caller's: in a terminal, pkexec's text agent asks for the password there.
     let out = Command::new("pkexec")
-        .args([WRITER, &default.layout, model, &default.variant, &file.options])
+        .args(pkexec_args(io::stdin().is_terminal(), fields))
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped())
@@ -316,6 +318,14 @@ fn write_system_default(file: &KeyboardFile, default: &Layout) -> Result<(), Sys
     Err(refusal(&stderr, out.status))
 }
 
+/// pkexec's arguments for the helper and its four `fields`. Without a terminal (the Keyboard tab,
+/// the Command menu) only the session's agent may ask: pkexec's own text agent would fail on the
+/// missing tty with words of its own, where polkit's refusal reads as one.
+fn pkexec_args(terminal: bool, fields: [&str; 4]) -> Vec<&str> {
+    let agent = (!terminal).then_some("--disable-internal-agent");
+    agent.into_iter().chain([WRITER]).chain(fields).collect()
+}
+
 /// Why the system's keyboard wasn't written.
 #[derive(Debug, thiserror::Error)]
 enum SystemError {
@@ -324,6 +334,9 @@ enum SystemError {
     /// No rule let the caller through and no agent asked for a password.
     #[error("polkit refused it")]
     Refused,
+    /// polkit wanted a password and no agent was there to ask for it.
+    #[error("no polkit agent is running to ask for the password")]
+    NoAgent,
     #[error("the password prompt was dismissed")]
     Dismissed,
     /// A machine installed before the helper shipped, until the update's migration installs it.
@@ -340,6 +353,9 @@ struct HelperSaid(String);
 
 /// What pkexec prints when polkit refuses.
 const REFUSED: &str = "Not authorized";
+
+/// What pkexec prints when polkit wants a password and no agent is registered for the session.
+const NO_AGENT: &str = "No authentication agent found";
 
 /// What pkexec prints when the password prompt is dismissed.
 const DISMISSED: &str = "Request dismissed";
@@ -365,6 +381,9 @@ fn refusal(stderr: &str, status: impl Display) -> SystemError {
     let said = |words: &str| said_lines(stderr).any(|line| line.contains(words));
     if said(REFUSED) {
         return SystemError::Refused;
+    }
+    if said(NO_AGENT) {
+        return SystemError::NoAgent;
     }
     if said(DISMISSED) {
         return SystemError::Dismissed;

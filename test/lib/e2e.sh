@@ -732,7 +732,9 @@ c_keyboard() {
 # Ubuntu's own D-Bus policy turns localed's SetX11Keyboard away from everyone,
 # root included, so `kubaos keyboard` never asks localed. A new default goes to
 # /etc/default/keyboard through the root helper under the real pkexec and
-# polkitd: in the container the user has no active session, so polkit refuses.
+# polkitd: in the container the user has no active session, so polkit wants
+# a password, and with no terminal pkexec leaves the asking to an agent the
+# session hasn't got, as on a desktop whose polkit agent isn't running.
 # The user's layouts change all the same; pkexec's words are logged on a line of
 # their own, then the last line, which the Keyboard tab shows, says what the
 # console keeps and why.
@@ -753,11 +755,11 @@ keyboard_refusal() {
     rm -rf "$dir"; return 1
   fi
   rm -rf "$dir"
-  [[ $(tail -1 <<<"$out") == "kubaos: the keyboard layouts changed, but the console and the disk's passphrase prompt still type with us: polkit refused it" ]] ||
+  [[ $(tail -1 <<<"$out") == "kubaos: the keyboard layouts changed, but the console and the disk's passphrase prompt still type with us: no polkit agent is running to ask for the password" ]] ||
     { echo "FAIL a refused pkexec printed: $out"; return 1; }
-  grep -qx "kubaos: pkexec kubaos-keyboard-write failed (exit status: [0-9]*): .*Not authorized.*" <<<"$out" ||
+  grep -qx "kubaos: pkexec kubaos-keyboard-write failed (exit status: [0-9]*): .*No authentication agent found.*" <<<"$out" ||
     { echo "FAIL a refused pkexec logged no line with what it said: $out"; return 1; }
-  echo "ok   a new default polkit refuses still changes the user's layouts, logged with pkexec's words, said in a sentence"
+  echo "ok   a new default no agent can ask for still changes the user's layouts, logged with pkexec's words, said in a sentence"
 }
 
 # The root helper `kubaos keyboard` runs through pkexec, as root on the
