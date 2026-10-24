@@ -75,10 +75,11 @@ c_path() {
 # exists on arm64, resolved in a login shell, with its owner checked.
 NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv eza bat fd rg delta dust dysk
   btop jq yq xh tldr just glow gh fastfetch lazydocker bacon cargo-nextest hyperfine sccache wild
-  oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth ripdrag)
+  oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth
+  kubaos-automount ripdrag)
 APT_TOOLS=(foot fuzzel wl-copy grim slurp playerctl socat qalc notify-send brightnessctl clang mold
   java unzip git ssh secret-tool pamtester pamu2fcfg nmcli wpctl snapper fprintd-verify boltctl
-  powerprofilesctl ddcutil xdg-open hyprlock hypridle)
+  powerprofilesctl ddcutil xdg-open hyprlock hypridle nautilus file-roller 7z unar magick udisksctl)
 # Hyprland comes from the PPA on amd64 and from nixpkgs on arm64, where
 # Ubuntu's is too old for the Lua config (home/desktop.nix).
 if [[ "$(dpkg --print-architecture)" == arm64 ]]; then NIX_TOOLS+=(Hyprland start-hyprland); else APT_TOOLS+=(Hyprland); fi
@@ -919,8 +920,12 @@ title = "Back up harness notes"
 run = ["true"]
 TOML
 
-  # A user folder the Extension sends an Item for.
+  # A user folder the Extension sends an Item for, and a mounted drive, as the
+  # automount service lists it.
   install -d -o "$USER_NAME" -g "$USER_NAME" "$USER_HOME/Downloads"
+  local drives="$RUNTIME_DIR/kubaos-drives"
+  printf '/org/freedesktop/UDisks2/drives/SanDisk_Ultra_1234\tSTICK\t/media/%s/STICK\n' "$USER_NAME" >"$drives"
+  chown "$USER_NAME:" "$drives"
   session_start sway 1280x720 1
   : >"$log"
   chown "$USER_NAME:" "$log"
@@ -984,13 +989,22 @@ TOML
     bad=1
   fi
 
-  out="$(in_session "$query Files 'Open folder' 'Files: Downloads'" 2>&1)" ||
+  out="$(in_session "$query Files 'Open folder' 'Files: Downloads' 'Recent files'" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
-  for want in 'Files:files' 'Open folder:files-open' 'Files: Downloads:files:download'; do
+  for want in 'Files:files' 'Open folder:files-open' 'Files: Downloads:files:download' 'Recent files:files-recent'; do
     grep -E -- "^${want%:files*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/files${want##*:files}( |$)" ||
       { echo "FAIL typing '${want%:files*}' doesn't find kubaos/files${want##*:files}"; bad=1; }
   done
-  ((bad)) || echo "ok   Files, Open folder and one Item a user folder are found"
+  ((bad)) || echo "ok   Files, Open folder, Recent files and one Item a user folder are found"
+
+  out="$(in_session "$query Yazi 'Tidy Downloads' 'Eject STICK' 'eject drive'" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  for want in 'Yazi:yazi' 'Tidy Downloads:tidy-downloads' 'Eject STICK:drive:SanDisk_Ultra_1234' \
+    'eject drive:drive:SanDisk_Ultra_1234'; do
+    grep -E -- "^${want%%:*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${want#*:}( |$)" ||
+      { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
+  done
+  ((bad)) || echo "ok   Yazi, Tidy Downloads and the mounted drive's Eject Item are found"
 
   # localed writes the file through a temporary one and a rename; the Items follow it.
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,de"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb.new"
@@ -1035,6 +1049,7 @@ TOML
   menu_stop "$daemon"
   if [[ -e $saved ]]; then mv "$saved" "$layer"; else rm -f "$layer"; fi
   if [[ -e $kb_saved ]]; then mv "$kb_saved" "$kb"; else rm -f "$kb"; fi
+  rm -f "$drives"
   return "$bad"
 }
 
@@ -1440,12 +1455,12 @@ c_suites() {
 # The user layer (issue #9): test/user-layer-check, which the VM bench also
 # runs on an installed system. Commits to the checkout, so it runs after the
 # other checks but the update ones, which start from a clone of it.
-# The file manager (home/files.nix, crates/kubaos-files): folders open in
-# yazi through xdg-open, and apps' "Show in folder" through
-# org.freedesktop.FileManager1, which the session bus starts on the first
-# call. `ghostty` is a stub on PATH that logs its arguments, so no window
-# opens; the bus gets that PATH for what it starts, as Hyprland's autostart
-# hands it the session's.
+# The file manager (home/files.nix, crates/kubaos-files): Files (Nautilus)
+# is the default for folders and archives, with the viewers KubaOS ships for
+# the rest; "Show in folder" goes to Nautilus's own FileManager1 service, and
+# yazi stays under "Open With" and on its key. Nautilus needs a display to
+# start, so opening a window is checked on the laptop; `ghostty` is a stub on
+# PATH that logs its arguments, so yazi opens no window either.
 files_wait() { # files_wait LOG PATTERN: up to 10 s for a line matching PATTERN
   local _
   for _ in $(seq 50); do
@@ -1456,77 +1471,136 @@ files_wait() { # files_wait LOG PATTERN: up to 10 s for a line matching PATTERN
 }
 
 c_files() {
-  local bad=0 out f stub="$LOGS/files-stub" log="$LOGS/files-ghostty.log" path
+  local bad=0 out f want stub="$LOGS/files-stub" log="$LOGS/files-ghostty.log" path
   local data="$USER_HOME/.local/share" dir="$USER_HOME/Downloads/Two words"
   local bus=(dbus-send --session --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus)
+  local unit="$USER_HOME/.config/systemd/user/kubaos-tidy-downloads.service"
+  local bin="$USER_HOME/.nix-profile/bin/kubaos-files"
 
   for f in applications/kubaos-files.desktop applications/mimeapps.list \
-    dbus-1/services/org.freedesktop.FileManager1.service; do
+    nautilus-python/extensions/ghostty.py nautilus-python/extensions/kubaos.py; do
     [[ -f $data/$f ]] || { echo "FAIL the switch left no ~/.local/share/$f"; bad=1; }
   done
-  out="$(as_user xdg-mime query default inode/directory 2>&1)"
-  if [[ $out == kubaos-files.desktop ]]; then
-    echo "ok   folders open with kubaos-files.desktop"
+  if [[ -e $data/dbus-1/services/org.freedesktop.FileManager1.service ]]; then
+    echo "FAIL a FileManager1 service file in ~/.local/share shadows Nautilus's"
+    bad=1
+  fi
+
+  for want in inode/directory:org.gnome.Nautilus application/zip:org.gnome.Nautilus \
+    application/x-7z-compressed:org.gnome.Nautilus image/png:org.gnome.Loupe image/heic:org.gnome.Loupe \
+    video/mp4:org.gnome.Showtime application/pdf:org.gnome.Papers; do
+    out="$(as_user xdg-mime query default "${want%%:*}" 2>&1)"
+    if [[ $out != "${want#*:}.desktop" ]]; then
+      echo "FAIL xdg-mime's default for ${want%%:*} is '$out', not ${want#*:}.desktop"
+      bad=1
+    elif [[ ! -f /usr/share/applications/$out ]]; then
+      echo "FAIL ${want%%:*} defaults to $out, which apt didn't install"
+      bad=1
+    fi
+  done
+  ((bad)) || echo "ok   folders and archives open in Files, images, video and PDFs in the viewers KubaOS ships"
+  if as_user gio mime inode/directory 2>/dev/null | grep -qx '[[:blank:]]*kubaos-files.desktop'; then
+    echo "ok   yazi is under Open With for folders"
   else
-    echo "FAIL xdg-mime's default for inode/directory is '$out'"
+    echo "FAIL kubaos-files.desktop isn't registered for folders"
+    bad=1
+  fi
+
+  # nautilus-python loads each extension into Nautilus's process; one that
+  # doesn't load takes its right-click actions with it.
+  out="$(as_user /usr/bin/python3 -I -c '
+import sys
+from gi.repository import Nautilus
+for path in sys.argv[1:]:
+    exec(compile(open(path).read(), path, "exec"), {"__name__": path, "__file__": path})
+' "$data/nautilus-python/extensions/ghostty.py" "$data/nautilus-python/extensions/kubaos.py" 2>&1 | grep -v PyGIWarning)" &&
+    [[ -z $out ]] && echo "ok   the Ghostty and KubaOS right-click extensions load" ||
+    { echo "FAIL the right-click extensions don't load: $out"; bad=1; }
+
+  as_user "${bus[@]}" org.freedesktop.DBus.ReloadConfig >/dev/null 2>&1 || true
+  if as_user "${bus[@]}" org.freedesktop.DBus.ListActivatableNames | grep -q '"org.freedesktop.FileManager1"' &&
+    grep -q '^Exec=/usr/bin/nautilus ' /usr/share/dbus-1/services/org.freedesktop.FileManager1.service; then
+    echo "ok   the session bus starts Nautilus for org.freedesktop.FileManager1"
+  else
+    echo "FAIL org.freedesktop.FileManager1 isn't Nautilus's to start"
     bad=1
   fi
 
   install -d -o "$USER_NAME" -g "$USER_NAME" "$stub" "$dir"
-  as_user touch "$dir/report final.pdf"
   printf '#!/bin/sh\nprintf "%%s\\n" "$*" >>%s\n' "$log" >"$stub/ghostty"
   chmod 755 "$stub/ghostty"
   : >"$log"
   chown "$USER_NAME:" "$log"
   path="$stub:$USER_HOME/.nix-profile/bin:/usr/local/bin:/usr/bin:/bin"
-
-  as_user env PATH="$path" WAYLAND_DISPLAY=wayland-stub xdg-open "$dir" >"$LOGS/files-xdg-open.log" 2>&1 || true
+  as_user env PATH="$path" WAYLAND_DISPLAY=wayland-stub "$bin" open "$dir" >"$LOGS/files-yazi.log" 2>&1 || true
   if files_wait "$log" "-e yazi -- $dir"; then
-    echo "ok   xdg-open on a folder opens yazi there"
+    echo "ok   kubaos-files open, the yazi key's command, opens yazi on the folder"
   else
-    echo "FAIL xdg-open '$dir' didn't run ghostty -e yazi on it:"
-    cat "$log" "$LOGS/files-xdg-open.log"
+    echo "FAIL kubaos-files open '$dir' didn't run ghostty -e yazi on it:"
+    cat "$log" "$LOGS/files-yazi.log"
     bad=1
   fi
 
-  # The service file appeared after this bus started; home/files.nix's
-  # activation reloads the bus's config for that, and so does this.
-  as_user "${bus[@]}" org.freedesktop.DBus.ReloadConfig >/dev/null 2>&1 || true
-  as_user "${bus[@]}" org.freedesktop.DBus.UpdateActivationEnvironment \
-    "dict:string:string:PATH,$path,WAYLAND_DISPLAY,wayland-stub" >/dev/null ||
-    { echo "FAIL handing the session bus a PATH"; bad=1; }
-  if as_user "${bus[@]}" org.freedesktop.DBus.ListActivatableNames | grep -q '"org.freedesktop.FileManager1"'; then
-    echo "ok   the session bus can start org.freedesktop.FileManager1"
-  else
-    echo "FAIL org.freedesktop.FileManager1 isn't activatable"
-    bad=1
-  fi
+  # Files that arrived today stay put, and the daily run does nothing with
+  # the setting off. Moving older ones is unit-tested: a file's ctime can't be
+  # set back here. stderr is notify-send's, with no notification server.
+  as_user touch "$USER_HOME/Downloads/report.pdf"
+  out="$(as_user "$bin" tidy --scheduled 2>/dev/null)" && [[ -z $out ]] ||
+    { echo "FAIL the daily tidy with the setting off printed: $out"; bad=1; }
+  out="$(as_user "$bin" tidy 2>/dev/null)" && [[ $out == "0 moved" && -f $USER_HOME/Downloads/report.pdf ]] ||
+    { echo "FAIL tidying Downloads moved today's file, or printed: $out"; bad=1; }
+  as_user "$bin" tidy on >/dev/null && [[ -e $USER_HOME/.config/kubaos/files/tidy-downloads ]] &&
+    as_user "$bin" tidy off >/dev/null && [[ ! -e $USER_HOME/.config/kubaos/files/tidy-downloads ]] ||
+    { echo "FAIL kubaos-files tidy on|off doesn't turn the daily tidy on and off"; bad=1; }
+  grep -qE '^ExecStart=.*/bin/kubaos-files tidy --scheduled$' "$unit" 2>/dev/null &&
+    [[ -e $USER_HOME/.config/systemd/user/timers.target.wants/kubaos-tidy-downloads.timer ]] ||
+    { echo "FAIL the daily timer isn't in place to run kubaos-files tidy --scheduled"; bad=1; }
+  ((bad)) || echo "ok   Tidy Downloads leaves today's files, and the daily timer runs only when it's on"
 
-  out="$(as_user dbus-send --session --print-reply --dest=org.freedesktop.FileManager1 /org/freedesktop/FileManager1 \
-    org.freedesktop.FileManager1.ShowItems "array:string:file://${dir// /%20}/report%20final.pdf" string: 2>&1)" ||
-    { echo "FAIL ShowItems: $out"; bad=1; }
-  if files_wait "$log" "-e yazi -- $dir/report final.pdf"; then
-    echo "ok   ShowItems starts the service and opens yazi on the file"
-  else
-    echo "FAIL ShowItems didn't run ghostty -e yazi on the file:"
-    cat "$log"
-    bad=1
-  fi
-  out="$(as_user dbus-send --session --print-reply --dest=org.freedesktop.FileManager1 /org/freedesktop/FileManager1 \
-    org.freedesktop.FileManager1.ShowFolders "array:string:file://$USER_HOME/Downloads,file://$USER_HOME/gone/x.txt" \
-    string: 2>&1)" || { echo "FAIL ShowFolders: $out"; bad=1; }
-  if files_wait "$log" "-e yazi -- $USER_HOME/Downloads $USER_HOME"; then
-    echo "ok   ShowFolders opens each folder, and a missing path's nearest folder, as tabs"
-  else
-    echo "FAIL ShowFolders didn't open the folders:"
-    cat "$log"
-    bad=1
-  fi
+  rm -rf "$stub" "$dir" "$USER_HOME/Downloads/report.pdf"
+  return "$bad"
+}
 
-  as_user "${bus[@]}" org.freedesktop.DBus.UpdateActivationEnvironment \
-    "dict:string:string:PATH,${path#"$stub:"}" >/dev/null || true
-  pkill -u "$USER_NAME" -f 'kubaos-files serve' || true
-  rm -rf "$stub" "$USER_HOME/Downloads/Two words"
+# The automount for removable drives (home/automount.nix,
+# crates/kubaos-automount). The container has no drives and no udisks2
+# daemon, so mounting and ejecting are checked on the laptop; here the unit,
+# the setting, the eject command's refusal and the photo import.
+c_automount() {
+  local bad=0 out rc
+  local bin="$USER_HOME/.nix-profile/bin/kubaos-automount" flag="$USER_HOME/.config/kubaos/files/no-automount"
+  local unit="$USER_HOME/.config/systemd/user/kubaos-automount.service"
+  local card="$LOGS/automount-card" pictures="$USER_HOME/Pictures"
+
+  grep -qE '^ExecStart=.*/bin/kubaos-automount watch$' "$unit" 2>/dev/null &&
+    echo "ok   the user unit runs kubaos-automount watch" ||
+    { echo "FAIL $unit doesn't run kubaos-automount watch"; bad=1; }
+  [[ -x $bin ]] || { echo "FAIL the switch left no $bin"; return 1; }
+
+  as_user "$bin" off >/dev/null && [[ -e $flag ]] && as_user "$bin" on >/dev/null && [[ ! -e $flag ]] &&
+    echo "ok   kubaos-automount off|on turns mounting off and on" ||
+    { echo "FAIL kubaos-automount off|on doesn't change $flag"; bad=1; }
+  rc=0
+  out="$(as_user "$bin" eject /org/freedesktop/UDisks2/drives/Nothing 2>&1)" || rc=$?
+  ((rc == 1)) && [[ $out == kubaos-automount:* ]] &&
+    echo "ok   ejecting a drive that isn't there fails with the reason in one line" ||
+    { echo "FAIL eject of no drive exited $rc: $out"; bad=1; }
+  rc=0
+  as_user "$bin" mount >/dev/null 2>&1 || rc=$?
+  ((rc == 2)) || { echo "FAIL a usage error exits $rc, not 2"; bad=1; }
+
+  # A card with two photos from July 2024, by mtime as they carry no EXIF.
+  install -d -o "$USER_NAME" -g "$USER_NAME" "$card/DCIM/100CANON"
+  as_user sh -c "printf one >'$card/DCIM/100CANON/IMG_0001.JPG'; printf two >'$card/DCIM/100CANON/IMG_0002.JPG'"
+  as_user touch -d '2024-07-15 12:00:00Z' "$card/DCIM/100CANON/IMG_0001.JPG" "$card/DCIM/100CANON/IMG_0002.JPG"
+  out="$(as_user "$bin" import "$card" 2>&1)" && [[ $out == "2 copied, 0 already there, 0 failed" ]] &&
+    [[ $(cat "$pictures/2024/07/IMG_0002.JPG" 2>/dev/null) == two ]] ||
+    { echo "FAIL importing the card into ~/Pictures/2024/07: $out"; bad=1; }
+  out="$(as_user "$bin" import "$card" 2>&1)" && [[ $out == "0 copied, 2 already there, 0 failed" ]] &&
+    [[ -f $card/DCIM/100CANON/IMG_0001.JPG ]] ||
+    { echo "FAIL a second import copied again, or touched the card: $out"; bad=1; }
+  ((bad)) || echo "ok   Import photos copies a card's DCIM by month, once, and leaves the card as it was"
+
+  rm -rf "$card" "$pictures/2024"
   return "$bad"
 }
 
@@ -1662,9 +1736,9 @@ c_update_edge() {
   # A new kubaos, told apart by its version.
   as_user sed -i 's/^version = "0.1.0"$/version = "0.1.0-harness"/' "$UPD_WORK/Cargo.toml"
   as_user awk -v v='version = "0.1.0-harness"' \
-    'prev ~ /^name = "(kubaos-core|kubaos-cli|kubaos-cursor|kubaos-kobo|kotodama-kubaos|kubaos-files|kubaos-bluetooth)"$/ && /^version = / { $0 = v } { print; prev = $0 }' \
+    'prev ~ /^name = "(kubaos-core|kubaos-cli|kubaos-cursor|kubaos-kobo|kotodama-kubaos|kubaos-files|kubaos-bluetooth|kubaos-automount)"$/ && /^version = / { $0 = v } { print; prev = $0 }' \
     "$UPD_WORK/Cargo.lock" | as_user tee "$UPD_WORK/Cargo.lock.new" >/dev/null && as_user mv "$UPD_WORK/Cargo.lock.new" "$UPD_WORK/Cargo.lock"
-  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 7 ]] ||
+  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 8 ]] ||
     { echo "FAIL bumping the workspace's version in Cargo.lock"; return 1; }
   work add migrations Cargo.toml Cargo.lock && work commit -q -m 'test: a new kubaos, a system and a user migration' &&
     work push -q origin HEAD:main ||
@@ -1798,7 +1872,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos files bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
