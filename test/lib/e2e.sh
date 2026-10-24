@@ -951,7 +951,7 @@ c_quickshell() {
   echo "     environment warnings (services a container doesn't have):"
   qs_env_warnings | cut -c1-120 | sed 's/^/       /'
   
-  for t in session powermenu wallpaper notifications controlcenter recorder clock; do
+  for t in session powermenu wallpaper notifications controlcenter recorder clock sysmon; do
     grep -qE "target $t\b" <<<"$ipc" || { echo "FAIL qs ipc show lacks target $t"; printf '%s\n' "$ipc"; return 1; }
   done
   echo "ok   qs ipc show lists every contract target"
@@ -1006,6 +1006,98 @@ c_clock() {
     bad=1
   fi
   ((bad)) || echo "ok   no QML errors with the popup open"
+  return "$bad"
+}
+
+# The system monitor: kubaos-sysmon reads the container's /proc with no GPU,
+# battery or fan, the shell's stream feeds the pill, the popup opens through
+# the sysmon IPC with the engine sampling in detail, and the pill hides and
+# comes back through the IPC, with no QML errors on the way.
+c_sysmon() {
+  local out bad=0 i
+  out="$(zrun 'kubaos-sysmon sample | jq -r '\''select(.type == "sample" and .cpu.count > 0 and .memory.total > 0 and (.top.cpu | length) > 0) | "\(.cpu.count) cores, RAM \(.memory.percent | floor)%, \(.gpus | length) GPUs, battery \(.battery != null)"'\''' 2>&1)" || true
+  if [[ $out == *" cores, RAM "* ]]; then
+    echo "ok   kubaos-sysmon sample reads the machine: $out"
+  else
+    echo "FAIL kubaos-sysmon sample has no CPU, memory or processes: ${out:0:300}"
+    bad=1
+  fi
+
+  session_start sway 1920x1080 1
+  if ! qs_start; then
+    echo "FAIL Quickshell didn't load its config:"
+    tail -30 "$QS_LOG"
+    session_stop
+    return 1
+  fi
+  for i in $(seq 30); do
+    out="$(in_session 'qs ipc call sysmon status' 2>&1 || true)"
+    [[ $out == *'"sample":true'* && $out == *'"mode":"pill"'* ]] && break
+    sleep 0.2
+  done
+  if [[ $out == *'"available":true'* && $out == *'"sample":true'* && $out == *'"mode":"pill"'* ]]; then
+    echo "ok   the shell's stream samples for the pill: $out"
+  else
+    echo "FAIL no pill samples from the stream: $out"
+    bad=1
+  fi
+  if [[ -s "$(in_session 'printf %s "$XDG_RUNTIME_DIR"')/kubaos-sysmon.json" ]]; then
+    echo "ok   the stream file the menu reads is written"
+  else
+    echo "FAIL no stream file in \$XDG_RUNTIME_DIR"
+    bad=1
+  fi
+
+  in_session 'qs ipc call sysmon toggle' >/dev/null 2>&1
+  for i in $(seq 30); do
+    out="$(in_session 'qs ipc call sysmon status' 2>&1 || true)"
+    [[ $out == *'"open":true'* && $out == *'"detail":true'* ]] && break
+    sleep 0.2
+  done
+  if [[ $out == *'"open":true'* && $out == *'"mode":"popup"'* && $out == *'"detail":true'* ]]; then
+    echo "ok   qs ipc call sysmon toggle opens the popup, sampling in detail"
+  else
+    echo "FAIL the popup isn't open with detailed samples: $out"
+    bad=1
+  fi
+  in_session 'qs ipc call sysmon toggle' >/dev/null 2>&1
+  for i in $(seq 30); do
+    out="$(in_session 'qs ipc call sysmon status' 2>&1 || true)"
+    [[ $out == *'"open":false'* && $out == *'"mode":"pill"'* ]] && break
+    sleep 0.2
+  done
+  [[ $out == *'"open":false'* && $out == *'"mode":"pill"'* ]] && echo "ok   toggling again closes it, back to the pill's pace" ||
+    { echo "FAIL the popup stayed open or the pace stayed fast: $out"; bad=1; }
+
+  in_session 'qs ipc call sysmon pill off' >/dev/null 2>&1
+  for i in $(seq 30); do
+    out="$(in_session 'qs ipc call sysmon status' 2>&1 || true)"
+    [[ $out == *'"pill":false'* ]] && break
+    sleep 0.2
+  done
+  if [[ $out == *'"pill":false'* ]] && grep -qx 'pill = false' "$USER_HOME/.config/kubaos/sysmon/sysmon.toml"; then
+    echo "ok   qs ipc call sysmon pill off hides it and writes sysmon.toml"
+  else
+    echo "FAIL the pill didn't hide: $out"
+    bad=1
+  fi
+  zrun "kubaos-sysmon set pill on" >/dev/null 2>&1
+  for i in $(seq 30); do
+    out="$(in_session 'qs ipc call sysmon status' 2>&1 || true)"
+    [[ $out == *'"pill":true'* ]] && break
+    sleep 0.2
+  done
+  [[ $out == *'"pill":true'* ]] && echo "ok   kubaos-sysmon set pill on, as the menu runs it, shows it again" ||
+    { echo "FAIL the pill stayed hidden after kubaos-sysmon set pill on: $out"; bad=1; }
+
+  out="$(qs_problems)"
+  session_stop
+  if [[ -n $out ]]; then
+    echo "FAIL QML errors/warnings with the monitor ($QS_LOG):"
+    printf '%s\n' "$out" | head -30
+    bad=1
+  fi
+  ((bad)) || echo "ok   no QML errors with the pill and the popup"
   return "$bad"
 }
 
@@ -1470,6 +1562,23 @@ TOML
     echo "ok   'days until christmas' is answered on top: $(cut -f3 <<<"$out"), $(cut -f4 <<<"$out")"
   else
     echo "FAIL 'days until christmas' has no KubaOS answer on top: $out"
+    bad=1
+  fi
+
+  # The system monitor's Items, and `ram` answered on top from /proc by the
+  # Extension, with no shell running to write the stream file.
+  out="$(in_session "$query 'Open system monitor' 'Show/hide the bar pill' 'Pick bar metrics'" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  for want in 'Open system monitor:sysmon-open' 'Show/hide the bar pill:sysmon-pill' 'Pick bar metrics:sysmon-metrics'; do
+    grep -E -- "^${want%%:*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${want#*:}( |$)" ||
+      { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
+  done
+  ((bad)) || echo "ok   Open system monitor, Show/hide the bar pill and Pick bar metrics are found"
+  out="$(in_session "$query --top ram" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
+  if [[ $out == "ram"$'\t'"kubaos/ram"$'\t'"RAM "[0-9]*" %"$'\t'*" used · "* ]]; then
+    echo "ok   'ram' is answered on top: $(cut -f3 <<<"$out"), $(cut -f4 <<<"$out")"
+  else
+    echo "FAIL 'ram' has no KubaOS answer on top: $out"
     bad=1
   fi
 
@@ -2343,7 +2452,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell clock menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shellcheck flake_check quickshell clock sysmon menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
