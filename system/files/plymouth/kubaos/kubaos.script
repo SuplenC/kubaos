@@ -6,6 +6,12 @@
 # few seconds. When the initramfs asks for the disk passphrase, a field shows
 # up under it. Wrong passphrase: the field shakes and says so.
 #
+# On shutdown and reboot (plymouth-poweroff and plymouth-reboot start it in
+# those modes) the same sign plays backwards: lit, then OS, Kuba, the dakuten,
+# バ and ク sputter out, and the dead glass fades into black, in under two
+# seconds. Nothing waits for it: the machine powers off whenever it is ready,
+# mid-animation or not.
+#
 # Installed to /usr/share/plymouth/themes/kubaos by system/25-boot.sh. The
 # sign's layers come from branding/neon.py, the rest from branding/boot.py. Text is drawn by label-freetype with
 # /usr/share/fonts/Plymouth.ttf (Geist), which the initramfs hook provides.
@@ -22,8 +28,7 @@
 
 # --- palette (crates/kubaos-kobo/src/theme.rs) -----------------------------
 # surface_container_lowest #140d07, the colour neon.py cuts the sign out for.
-Window.SetBackgroundTopColor(0.078, 0.051, 0.027);
-Window.SetBackgroundBottomColor(0.078, 0.051, 0.027);
+# set_background() below sets it, and fades it out on the way down.
 
 # on_surface #f0dfd4, on_surface_variant #dac2b1, primary #ffb779, error #ffb4ab.
 text_main.r = 0.941; text_main.g = 0.875; text_main.b = 0.831;
@@ -54,6 +59,15 @@ HUM_LOOP = 120;
 BLINK_AT = 60;
 BLINK[0] = 0.35; BLINK[1] = 1; BLINK[2] = 0.5; BLINK[3] = 1;
 BLINK_FRAMES = 4;
+# Shutting down: the lit sign holds, then a group goes out every OFF_STEP
+# frames, the last first, each with the strike played backwards. Once ク is
+# dark the glass and the background fade to black over DARK_FRAMES.
+OFF_HOLD = 6;
+OFF_STEP = 6;
+for (i = 0; i < GROUPS; i++)
+  OFF_AT[i] = OFF_HOLD + (GROUPS - 1 - i) * OFF_STEP;
+DARK_AT = OFF_AT[0] + STRIKE_FRAMES;
+DARK_FRAMES = 12;
 
 # --- strings -----------------------------------------------------------------
 # Passphrase prompts stay plain and serious (docs/BRAND.md, rule 4).
@@ -66,6 +80,8 @@ WRONG = "Wrong passphrase. Try again.";
 CAPS = "Caps Lock is on.";
 
 # --- state -------------------------------------------------------------------
+mode = Plymouth.GetMode();
+shutting_down = (mode == "shutdown" || mode == "reboot");
 frame = 0;
 scale = 0;              # 1 or 2, set by layout()
 prompt = "none";        # none | password | busy | error-shown
@@ -278,6 +294,8 @@ fun set_prompt_opacity(a)
 # バ's blink in each hum loop.
 fun level(g, f)
 {
+  if (global.shutting_down)
+    return off_level(g, f);
   since = f - STRIKE_AT[g];
   if (since < 0)
     return 0;
@@ -290,6 +308,33 @@ fun level(g, f)
         return BLINK[blink];
     }
   return 1;
+}
+
+# How bright group `g` is at frame `f` on the way down: on, sputtering out,
+# then off for good.
+fun off_level(g, f)
+{
+  since = f - OFF_AT[g];
+  if (since < 0)
+    return 1;
+  if (since < STRIKE_FRAMES)
+    return STRIKE[STRIKE_FRAMES - 1 - since];
+  return 0;
+}
+
+# How far the dead glass and the background have faded on the way down:
+# 0 until ク is out, 1 once the screen is black.
+fun darkness(f)
+{
+  if (!global.shutting_down)
+    return 0;
+  return Math.Clamp((f - DARK_AT) / DARK_FRAMES, 0, 1);
+}
+
+fun set_background(light)
+{
+  Window.SetBackgroundTopColor(0.078 * light, 0.051 * light, 0.027 * light);
+  Window.SetBackgroundBottomColor(0.078 * light, 0.051 * light, 0.027 * light);
 }
 
 # While any group is below full, the dead glass and every group draw as their
@@ -313,8 +358,11 @@ fun draw_sign(f)
         global.spr_group[i].SetOpacity(0);
       return;
     }
+  light = 1 - darkness(f);
   global.spr_lit.SetOpacity(0);
-  global.spr_base.SetOpacity(1);
+  global.spr_base.SetOpacity(light);
+  if (global.shutting_down)
+    set_background(light);
   for (i = 0; i < GROUPS; i++)
     global.spr_group[i].SetOpacity(global.group_level[i]);
 }
@@ -426,6 +474,7 @@ fun on_quit()
   set_prompt_opacity(0);
 }
 
+set_background(1);
 layout();
 Plymouth.SetRefreshFunction(refresh);
 Plymouth.SetDisplayPasswordFunction(on_password);
