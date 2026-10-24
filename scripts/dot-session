@@ -12,6 +12,10 @@
 #   dot-session restart-shell   in the session: restart the default Quickshell
 #                               once the screen is unlocked
 #   dot-session restart-idle    in the session: restart hypridle
+#   dot-session leave logout|reboot|poweroff
+#                               in the session: stop graphical-session.target
+#                               and wait for it, then end the session, reboot
+#                               or power off. The power menu runs it.
 #
 # It only touches what runs: with no Hyprland, no shell or no tmux server there
 # is nothing to do. A Quickshell or hypridle the user stopped stays stopped.
@@ -133,6 +137,19 @@ restart_idle() {
   exec hypridle
 }
 
+# leave ACTION: the session's units (the portals, the polkit agent, Ghostty)
+# stop while Hyprland still answers them, and only then does the session end.
+# Hyprland gone first, they lose the display and die with an error, and the
+# shutdown waits on whatever was still stopping. The stop is bounded: the
+# power menu must work even when a unit won't stop.
+leave() {
+  timeout 15 systemctl --user stop graphical-session.target || true
+  case "$1" in
+    logout) exec loginctl terminate-session "${XDG_SESSION_ID:-}" ;;
+    reboot | poweroff) exec systemctl "$1" ;;
+  esac
+}
+
 case "${1:-}" in
   apply)
     (($# == 3)) || { usage >&2; exit 2; }
@@ -140,6 +157,10 @@ case "${1:-}" in
     ;;
   restart-shell) restart_shell ;;
   restart-idle) restart_idle ;;
+  leave)
+    [[ $# == 2 && $2 =~ ^(logout|reboot|poweroff)$ ]] || { usage >&2; exit 2; }
+    leave "$2"
+    ;;
   -h | --help) usage ;;
   *) usage >&2; exit 2 ;;
 esac

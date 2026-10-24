@@ -127,13 +127,7 @@ Signed-By: $DOCKER_KEYRING"
     sudo_run usermod -aG docker "$TARGET_USER"
     info "log out and back in (or reboot) for the docker group to apply"
   fi
-  if unit_exists docker.service; then
-    if [[ "$(systemctl is-enabled docker.service 2>/dev/null || true)" == enabled ]]; then
-      ok "docker.service enabled"
-    else
-      sctl enable --now docker.service containerd.service
-    fi
-  fi
+  docker_on_demand
   if findmnt -n /var/lib/docker >/dev/null 2>&1; then
     ok "/var/lib/docker is its own mount (kept out of root snapshots)"
   else

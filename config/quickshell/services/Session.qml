@@ -23,16 +23,18 @@ Singleton {
         Quickshell.execDetached(["systemctl", "suspend"]);
     }
 
+    // `dot-session leave` stops the session's services first, while Hyprland
+    // still runs, so they don't hold the shutdown.
     function logout(): void {
-        Quickshell.execDetached(["sh", "-c", 'loginctl terminate-session "$XDG_SESSION_ID"']);
+        Quickshell.execDetached(["dot-session", "leave", "logout"]);
     }
 
     function reboot(): void {
-        Quickshell.execDetached(["systemctl", "reboot"]);
+        Quickshell.execDetached(["dot-session", "leave", "reboot"]);
     }
 
     function poweroff(): void {
-        Quickshell.execDetached(["systemctl", "poweroff"]);
+        Quickshell.execDetached(["dot-session", "leave", "poweroff"]);
     }
 
     PersistentProperties {

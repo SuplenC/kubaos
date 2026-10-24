@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Phase 3: base system. apt packages, NetworkManager instead of networkd,
-# PipeWire, logind lid policy, snapper on / with timers, grub-btrfs.
+# PipeWire, logind lid policy, short stop timeouts and nothing waiting for
+# the network at boot, snapper on / with timers, grub-btrfs.
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -183,6 +184,10 @@ fi
 step "Lid + power key policy: logind drop-in (suspend on battery only)"
 install_root_file "$FILES_DIR/logind.conf.d/lid.conf" /etc/systemd/logind.conf.d/lid.conf 0644
 info "takes effect after the next reboot (restarting logind would end your session)"
+
+# --------------------------------------------------------------------------
+step "Short shutdown and boot: 10 s stop timeouts, no wait for the network, no console palette"
+install_fast_shutdown_boot
 
 # --------------------------------------------------------------------------
 step "Snapper: config \"root\" for /"

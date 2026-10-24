@@ -79,8 +79,12 @@ hl.on("hyprland.start", function()
   end
 end)
 
--- Leaving Hyprland ends the graphical session, so the portals and anything
--- else bound to graphical-session.target stop with it.
+-- Every way out KubaOS offers (`dot-session leave`, the fallback exit bind in
+-- fallback.lua) has already stopped graphical-session.target, while Hyprland
+-- still answered the portals and the polkit agent. This catches the rest (a
+-- SIGTERM, a crash), so the next session starts the target afresh.
+-- HAZARD: keep --no-block. Hyprland's main loop stops here until the command
+-- returns, and a stop that waits for its Wayland clients would wait on it.
 hl.on("hyprland.shutdown", function()
-  os.execute("systemctl --user stop hyprland-session.target")
+  os.execute("systemctl --user --no-block stop graphical-session.target")
 end)

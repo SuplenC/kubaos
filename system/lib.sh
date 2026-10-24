@@ -399,6 +399,65 @@ install_mac_accents() {
   fi
 }
 
+# boot_unit UNIT enable|disable|mask: whether UNIT starts at boot, when it
+# exists. Nothing starts or stops now, so it works offline too (image
+# builds, the test container); the change shows at the next boot.
+boot_unit() {
+  local unit="$1" want="$2" state
+  unit_exists "$unit" || return 0
+  state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
+  case "$want:$state" in
+    enable:enabled | disable:disabled | disable:masked | mask:masked)
+      ok "$unit is $state"
+      return 0
+      ;;
+  esac
+  sudo_run systemctl "$want" "$unit"
+}
+
+# docker_on_demand: Docker starts on its first use, through docker.socket,
+# not at boot. docker.service wants network-online.target, so starting it at
+# boot puts the wait for the network on the way to the desktop. containerd
+# starts with it (docker.service wants it). Containers with a restart policy
+# come back on the first `docker` command, not at boot.
+docker_on_demand() {
+  unit_exists docker.service || return 0
+  install_root_file "$FILES_DIR/systemd/docker.service.d/kubaos-stop.conf" \
+    /etc/systemd/system/docker.service.d/kubaos-stop.conf 0644
+  boot_unit docker.socket enable
+  boot_unit docker.service disable
+  boot_unit containerd.service disable
+  # A Docker running now keeps running; one that isn't answers on the socket
+  # from now on, not from the next boot.
+  if has_systemd && ! systemctl is-active -q docker.socket; then
+    sudo_run systemctl start docker.socket
+  fi
+}
+
+# install_fast_shutdown_boot: what keeps shutdown and boot short. The system
+# and user managers kill a unit 10 s after SIGTERM, not 90 s; Docker starts on
+# demand; NetworkManager-wait-online is off, since nothing on a laptop's way
+# to the desktop needs the network up; Ubuntu's console palette (setvtrgb) is
+# masked, as tty1 shows nothing but Plymouth and Hyprland. 20-base.sh runs
+# it, and a migration on machines installed before it.
+install_fast_shutdown_boot() {
+  local reload=0
+  same_content "$FILES_DIR/systemd/system.conf.d/kubaos-timeouts.conf" \
+    /etc/systemd/system.conf.d/kubaos-timeouts.conf || reload=1
+  install_root_file "$FILES_DIR/systemd/system.conf.d/kubaos-timeouts.conf" \
+    /etc/systemd/system.conf.d/kubaos-timeouts.conf 0644
+  install_root_file "$FILES_DIR/systemd/user.conf.d/kubaos-timeouts.conf" \
+    /etc/systemd/user.conf.d/kubaos-timeouts.conf 0644
+  docker_on_demand
+  boot_unit NetworkManager-wait-online.service disable
+  boot_unit setvtrgb.service mask
+  # A daemon-reload rereads system.conf.d too, so the next shutdown is already
+  # a short one. User managers read user.conf.d when they start, at login.
+  if ((reload)) && has_systemd; then
+    sudo_run systemctl daemon-reload
+  fi
+}
+
 common_usage() {
   cat <<EOF
 Common flags:
