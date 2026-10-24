@@ -26,7 +26,12 @@ background-blur = false
 
 # Hyprland draws no title bar for us anyway; drop the GTK header bar.
 window-decoration = none
-gtk-single-instance = false
+# Windows come from one background instance (home/terminal.nix), which the
+# binds reach with `ghostty +new-window`. A plain `ghostty` joins it too.
+# `detect` gives a launch with arguments (`-e`, `--working-directory`) or
+# from inside a terminal a process of its own, because a running instance
+# would ignore those arguments.
+gtk-single-instance = detect
 
 # Fallback colors if the generated theme file below is missing.
 theme = Monokai Soda
