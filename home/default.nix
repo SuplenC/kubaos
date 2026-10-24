@@ -9,6 +9,7 @@
     ./automount.nix
     ./bluetooth.nix
     ./cli.nix
+    ./clock.nix
     ./dev.nix
     ./desktop.nix
     ./files.nix
