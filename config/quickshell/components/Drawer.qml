@@ -8,7 +8,9 @@ import "drawerpath.js" as DrawerPath
 // item only places and clips the content.
 //
 // Opening animates `progress` 0 -> 1 on the spatial curve (a slight
-// overshoot); closing goes back on emphasized-accelerate, quicker. The body
+// overshoot); closing goes back on emphasized-accelerate, quicker. A panel
+// may take other curves and durations (the clock popup glides, as the
+// Command menu does). The body
 // grows to progress * depth and the content rides on its far edge, so it
 // slides out from under the frame instead of fading in place.
 FocusScope {
@@ -26,6 +28,8 @@ FocusScope {
     property bool animateSize: true               // smooth content size changes while open
     property int enterDuration: Theme.anim.large
     property int exitDuration: Theme.anim.normal
+    property list<real> enterCurve: Theme.anim.spatial
+    property list<real> exitCurve: Theme.anim.emphasizedAccel
     default property alias data: content.data
     // Tooltips of the buttons inside open within this panel's edges.
     readonly property bool keepsTooltips: true
@@ -57,7 +61,7 @@ FocusScope {
         motion.stop();
         motion.to = shown ? 1 : 0;
         motion.duration = shown ? enterDuration : exitDuration;
-        motion.easing.bezierCurve = shown ? Theme.anim.spatial : Theme.anim.emphasizedAccel;
+        motion.easing.bezierCurve = shown ? enterCurve : exitCurve;
         motion.start();
         if (shown) {
             if (takesFocus)

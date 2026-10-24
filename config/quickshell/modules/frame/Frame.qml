@@ -8,6 +8,7 @@ import qs.theme
 import qs.components
 import qs.services
 import qs.modules.bar
+import qs.modules.clock
 import qs.modules.controlcenter
 import qs.modules.notifications
 import qs.modules.osd
@@ -109,7 +110,8 @@ Scope {
             color: Theme.m3scrim
             opacity: ({
                     powermenu: 0.45,
-                    controlcenter: 0.2
+                    controlcenter: 0.2,
+                    clock: 0.2
                 })[root.panel] ?? 0
             visible: opacity > 0
 
@@ -154,6 +156,10 @@ Scope {
 
                 PanelPath {
                     drawer: powerMenu
+                }
+
+                PanelPath {
+                    drawer: clockPopup
                 }
 
                 PanelPath {
@@ -209,6 +215,13 @@ Scope {
 
                 frame: geo
                 shown: root.panel === "controlcenter"
+            }
+
+            ClockPopup {
+                id: clockPopup
+
+                frame: geo
+                shown: root.panel === "clock"
             }
 
             PowerMenu {

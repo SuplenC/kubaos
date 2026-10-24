@@ -53,6 +53,10 @@ Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`hom
 | `qs ipc call controlcenter toggle` | Wi-Fi, Bluetooth, audio, power profile, notification history |
 | `qs ipc call controlcenter bluetooth` | The control center on its Bluetooth tab, searching for devices |
 | `qs ipc call recorder toggle` / `stop` | Record the focused monitor / stop any recording or replay (`dot-hypr-record`) |
+| `qs ipc call clock toggle` / `settings` | The clock popup under the bar's clock / on its settings page |
+| `qs ipc call clock search <text>` | The clock popup with a date search typed in |
+| `qs ipc call clock timer <duration>` / `alarm <time>` / `stopwatch` | Start a timer, set an alarm, start or stop the stopwatch |
+| `qs ipc call clock status` | The engine, timer, stopwatch, alarms and whether the popup is open (JSON) |
 
 All handlers live in `IpcHandlers.qml`. `docs/CONTRACTS.md` is the source of truth.
 
@@ -76,6 +80,8 @@ services/               singletons, no UI
   Panels                which panel is open, and on which screen
   Session               lock state, suspend/logout/reboot/poweroff
   Recorder              screen recording state ($XDG_RUNTIME_DIR/dot-record.json, watched), dot-hypr-record calls
+  Time                  the clock engine (`kubaos-clock serve`, line JSON), clock.toml (watched),
+                        the timer, stopwatch and alarms
 components/             reusable pieces, all built on Theme tokens
   Drawer, drawerpath.js a panel that grows out of a frame edge; its SVG outline
   Anim, CAnim           number/color animations with the shell's curves
@@ -96,6 +102,8 @@ modules/
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu
+  clock/                ClockPopup (the bar clock's popup), MonthGrid (month and year views),
+                        AnalogFace, Tools (timer, stopwatch, alarms), ClockSettings, Chip
   wallpaper/            Wallpaper (background, crossfade, preview), WallpaperPicker,
                         WallpaperSettings (the picker's Settings tab)
   polkit/               Polkit agent + dialog (off by default)
@@ -122,6 +130,7 @@ Every panel works without a mouse. Esc closes it.
 
 - Command menu (SUPER + Space, `kotodama toggle`): type to search apps, projects, scripts and windows, Up/Down to move, Enter to run. A sum typed is answered in the list; Enter copies the answer. SUPER + F1 opens it on the Shortcuts View. Ctrl+K opens the selected row's Actions, Tab enters an app, Esc steps back (the Action panel, a View, the query, then closed), Backspace with nothing typed leaves an app. Wide screens show the selected row in a detail pane: its Actions with their keys, and its hints. `"menuMotion": "fades"` in `~/.config/kubaos/quickshell/settings.json` turns its motion down to fades. Its config is `config/kotodama/kubaos.toml`, with your changes in `~/.config/kubaos/kotodama/user.toml`.
 - Control center: Tab/Shift+Tab move between controls, Enter/Space toggle a tile, h/l or arrows move sliders and tabs, 1-4 jump to a tab, j/k move in lists, Delete dismisses a notification.
+- Clock popup (click the bar's clock): type a date or date maths to search, Enter copies the answer, Ctrl+Enter copies it as ISO. With nothing typed, Left/Right or the wheel change month and T goes to today; clicking the month name opens the year view. Esc leaves the settings page or the year view, then closes.
 - Power menu: h/j/k/l, arrows or Tab, then Enter.
 - Wallpaper picker: h/j/k/l or arrows move (the desktop previews the selection), Tab switches folder, S opens Settings, Enter applies, Esc goes back to the current wallpaper.
 - Wallpaper settings (the picker's last tab): Tab/Shift+Tab or Up/Down between rows, Left/Right change a value (Shift: 10 steps), Home/End to the ends, Space toggles, Enter activates or edits a colour, Delete resets to the default, Esc back to the wallpapers.
