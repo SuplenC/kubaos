@@ -1101,6 +1101,119 @@ c_sysmon() {
   return "$bad"
 }
 
+# toast_wait DESC PATTERN: up to 5 s for the toast probe to log, after line
+# $TOAST_MARK of the log, a line matching PATTERN (ERE).
+toast_wait() {
+  for _ in $(seq 50); do
+    if tail -n +"$TOAST_MARK" "$QS_LOG" | grep -q -E -- "toast probe: .*$2"; then
+      echo "ok   $1"
+      return 0
+    fi
+    sleep 0.1
+  done
+  echo "FAIL $1: the probe logged no /$2/; it logged:"
+  tail -n +"$TOAST_MARK" "$QS_LOG" | grep -o 'toast probe: .*' | tail -3 | sed 's/^/     /'
+  return 1
+}
+
+# toast_overlaps: every probe line where a stack drawing cards meets an open
+# panel's rectangle (empty when none did).
+toast_overlaps() {
+  grep -o 'toast probe: .*' "$QS_LOG" | awk '{
+    np = 0
+    for (i = 3; i <= NF; i++) {
+      split($i, kv, "="); split(kv[2], v, ",")
+      if (kv[1] == "panel") { np++; px[np] = v[1]; py[np] = v[2]; pw[np] = v[3]; ph[np] = v[4] }
+    }
+    for (i = 3; i <= NF; i++) {
+      split($i, kv, "="); split(kv[2], v, ",")
+      if (kv[1] != "stack" || v[2] == 0) continue
+      for (j = 1; j <= np; j++)
+        if (v[3] < px[j] + pw[j] && px[j] < v[3] + v[5] && v[4] < py[j] + ph[j] && py[j] < v[4] + v[6]) { print; next }
+    }
+  }'
+}
+
+# Notification popups and the panels in their corner, through the toast probe
+# (config/quickshell/modules/notifications/ToastProbe.qml), which logs the
+# stacks' and panels' rectangles as they change. A toast on screen when the
+# system monitor opens leaves the corner, one sent while it is open waits, and
+# a critical one shows under the popup; closing it brings all three back to
+# the corner. At no logged frame, the glides included, does a stack drawing
+# cards meet an open panel.
+c_notifications() {
+  local out bad=0 i frames
+  session_start sway 1920x1080 1
+  if ! qs_start KUBAOS_TOAST_PROBE=1; then
+    echo "FAIL Quickshell didn't load its config:"
+    tail -30 "$QS_LOG"
+    session_stop
+    return 1
+  fi
+  sleep 3
+
+  TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
+  in_session "notify-send -t 60000 Earlier 'On screen before the popup opens'" >/dev/null 2>&1
+  toast_wait "a toast shows in the corner" 'stack=top,1,' || bad=1
+
+  TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
+  in_session 'qs ipc call sysmon toggle' >/dev/null 2>&1
+  for i in $(seq 30); do
+    out="$(in_session 'qs ipc call sysmon status' 2>&1 || true)"
+    [[ $out == *'"open":true'* ]] && break
+    sleep 0.2
+  done
+  sleep 1
+  out="$(tail -n +"$TOAST_MARK" "$QS_LOG" | grep -o 'toast probe: panel=.*' | head -1)"
+  if [[ $out == *' stack=top,0,'* ]]; then
+    echo "ok   the system monitor opening sends it away at once"
+  else
+    echo "FAIL the toast was still drawn in the popup's first frame: $out"
+    bad=1
+  fi
+
+  in_session "notify-send -t 60000 Held 'Sent while the popup is open'" >/dev/null 2>&1
+  sleep 1.5
+  out="$(grep -o 'toast probe: .*' "$QS_LOG" | tail -1)"
+  if [[ $out == *panel=*' stack=top,0,'*' stack=right,0,'* ]]; then
+    echo "ok   one sent while the popup is open waits"
+  else
+    echo "FAIL a toast showed with the popup open: $out"
+    bad=1
+  fi
+
+  TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
+  in_session "notify-send -u critical Critical 'Shows under the popup'" >/dev/null 2>&1
+  toast_wait "a critical one shows under the popup" 'panel=.* stack=top,0,.* stack=right,1,' || bad=1
+
+  TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
+  in_session 'qs ipc call sysmon toggle' >/dev/null 2>&1
+  toast_wait "closing the popup brings all three back to the corner" 'stack=top,3,.* stack=right,0,' || bad=1
+
+  out="$(toast_overlaps)"
+  frames="$(grep -c 'toast probe: panel=' "$QS_LOG")"
+  if [[ -n $out ]]; then
+    echo "FAIL a toast drew over an open panel:"
+    head -5 <<<"$out" | sed 's/^/     /'
+    bad=1
+  elif ((frames < 5)); then
+    echo "FAIL the probe logged the popup open in $frames frames only"
+    bad=1
+  else
+    echo "ok   no toast met the popup in any of $frames frames with it on screen"
+  fi
+
+  out="$(qs_problems)"
+  session_stop
+  if [[ -n $out ]]; then
+    echo "FAIL QML errors/warnings with the toasts ($QS_LOG):"
+    printf '%s\n' "$out" | head -30
+    bad=1
+  fi
+  ((bad)) || echo "ok   no QML errors with the toasts and the popup"
+  return "$bad"
+}
+
 # dot-hypr-record's start/stop and state file, with wf-recorder (gsr needs a
 # GPU and KMS), stopped through Quickshell's IPC like the bar's click does.
 c_recorder() {
@@ -2646,7 +2759,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shutdown splash shellcheck flake_check quickshell clock sysmon menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shutdown splash shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
