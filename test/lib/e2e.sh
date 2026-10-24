@@ -548,7 +548,128 @@ c_keyboard() {
   [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; return 1; }
   echo "ok   kubaos keyboard show lists the layouts, the default first"
   keyboard_changes || return 1
+  keyboard_refusal || return 1
   mac_accents || return 1
+  keyboard_tab_clicks || return 1
+}
+
+# A localectl that polkit turned down: `kubaos keyboard` says so in one
+# sentence of its own, not localed's words.
+keyboard_refusal() {
+  local dir out
+  dir="$(mktemp -d)"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us"\nXKBVARIANT=""\nXKBOPTIONS=""\n' >"$dir/keyboard"
+  install -m 0755 /dev/stdin "$dir/localectl" <<'SH'
+#!/bin/sh
+echo 'Failed to set keymap: Access denied' >&2
+exit 1
+SH
+  chown -R "$USER_NAME:" "$dir"
+  out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard add it" 2>&1)" && {
+    echo "FAIL kubaos keyboard add succeeded with localectl refused: $out"
+    rm -rf "$dir"
+    return 1
+  }
+  rm -rf "$dir"
+  [[ $out == "kubaos: the keyboard layouts weren't changed: permission was refused" ]] ||
+    { echo "FAIL a refused localectl printed: $out"; return 1; }
+  echo "ok   a change polkit refuses says so in a sentence, without localectl's words"
+}
+
+# pointer_tools: VP_RUN, the command that drives test/lib/vpointer.py (Python
+# with pywayland, and the two protocols it needs), from the flake's nixpkgs:
+# the roots an earlier run made, or built now.
+pointer_tools() {
+  local roots="$CACHE/roots" sys
+  sys="$(uname -m)-linux"
+  [[ -x $roots/vpointer-python/bin/python3 ]] ||
+    as_user "$NIX_BIN/nix" build --out-link "$roots/vpointer-python" --impure --expr \
+      "(builtins.getFlake \"path:$REPO\").inputs.nixpkgs.legacyPackages.$sys.python3.withPackages (p: [ p.pywayland ])" \
+      >/dev/null 2>&1
+  [[ -f $roots/wayland-scanner/share/wayland/wayland.xml ]] ||
+    as_user "$NIX_BIN/nix" build --out-link "$roots/wayland-scanner" --inputs-from "$REPO" 'nixpkgs#wayland-scanner^out' \
+      >/dev/null 2>&1
+  [[ -d $roots/wlr-protocols ]] ||
+    as_user "$NIX_BIN/nix" build --out-link "$roots/wlr-protocols" --inputs-from "$REPO" nixpkgs#wlr-protocols >/dev/null 2>&1
+  [[ -x $roots/vpointer-python/bin/python3 && -f $roots/wayland-scanner/share/wayland/wayland.xml &&
+    -d $roots/wlr-protocols ]] || return 1
+  VP_RUN="$roots/vpointer-python/bin/python3 -I $REPO/test/lib/vpointer.py \
+$roots/wayland-scanner/share/wayland/wayland.xml \
+$roots/wlr-protocols/share/wlr-protocols/unstable/wlr-virtual-pointer-unstable-v1.xml"
+}
+
+# kb_probe_at NAME: "X,Y", where the keyboard tab's probe last put NAME
+# (config/quickshell/modules/controlcenter/KeyboardList.qml).
+kb_probe_at() {
+  grep -o "keyboard probe: at .*" "$QS_LOG" | tail -1 | grep -oE "$1 x=[0-9]+ y=[0-9]+" |
+    sed -E 's/.* x=([0-9]+) y=([0-9]+)/\1,\2/'
+}
+
+# kb_probe_wait PATTERN: up to 5 s for the probe to log a line matching PATTERN (ERE).
+kb_probe_wait() {
+  for _ in $(seq 50); do
+    grep -qE "keyboard probe: $1" "$QS_LOG" && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+# The control center's Keyboard tab under a real pointer (a virtual one, as
+# the headless session has none). A double-click on "Add a language…" opens
+# the matches where the row was, so its second click lands on one: that click
+# only picks it, and nothing runs localectl until the Add button is clicked.
+# Regression: #107.
+keyboard_tab_clicks() {
+  local dir at picked bad=0
+  pointer_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
+  dir="$(mktemp -d)"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$dir/keyboard"
+  install -m 0755 /dev/stdin "$dir/localectl" <<SH
+#!/bin/sh
+echo "\$*" >>'$dir/calls'
+SH
+  chown -R "$USER_NAME:" "$dir"
+  session_start sway 1920x1080 1
+  if ! qs_start "PATH=$dir:/usr/local/bin:\$PATH" "KUBAOS_KEYBOARD_FILE=$dir/keyboard" KUBAOS_KEYBOARD_PROBE=1; then
+    echo "FAIL Quickshell didn't load"; tail -30 "$QS_LOG"; session_stop; rm -rf "$dir"; return 1
+  fi
+  in_session 'qs ipc call controlcenter keyboard' >/dev/null 2>&1
+  kb_probe_wait 'at add-row' || { echo "FAIL qs ipc call controlcenter keyboard showed no \"Add a language…\""; bad=1; }
+  # The drawer slides in; the probe logs where the row is until it stops.
+  sleep 1.5
+  at="$(kb_probe_at add-row)"
+
+  if ((!bad)); then
+    in_session "$VP_RUN 1920 1080 move:$at wait:0.3 click wait:0.12 click wait:1" >>"$LOGS/vpointer.log" 2>&1 ||
+      { echo "FAIL test/lib/vpointer.py: $(tail -3 "$LOGS/vpointer.log")"; bad=1; }
+    picked="$(grep -o 'keyboard probe: picked .*' "$QS_LOG" | tail -1 | sed 's/.*picked //')"
+    if [[ -s $dir/calls ]]; then
+      echo "FAIL a double-click on \"Add a language…\" ran localectl $(cat "$dir/calls")"; bad=1
+    elif ! grep -q 'keyboard probe: adding true' "$QS_LOG" || [[ -z $picked ]]; then
+      echo "FAIL the double-click at $at didn't open the matches and pick one:"
+      grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
+      bad=1
+    else
+      echo "ok   a double-click on \"Add a language…\" picks $picked and adds nothing"
+    fi
+  fi
+
+  if ((!bad)); then
+    sleep 0.5
+    at="$(kb_probe_at add-button)"
+    in_session "$VP_RUN 1920 1080 move:$at wait:0.2 click wait:0.5" >>"$LOGS/vpointer.log" 2>&1
+    for _ in $(seq 30); do [[ -s $dir/calls ]] && break; sleep 0.1; done
+    if grep -q "^set-x11-keymap us,it,${picked%%(*} " "$dir/calls" 2>/dev/null; then
+      echo "ok   the Add button adds the pick: localectl $(head -1 "$dir/calls")"
+    else
+      echo "FAIL the Add button at $at didn't add $picked: localectl ran '$(cat "$dir/calls" 2>&1)'"; bad=1
+    fi
+  fi
+
+  [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
+  session_stop
+  rm -rf "$dir"
+  return "$bad"
 }
 
 # `kubaos keyboard move` and `list`, with a stand-in localectl that writes the

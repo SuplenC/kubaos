@@ -52,6 +52,7 @@ Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`hom
 | `qs ipc call notifications clear` | Dismiss all notifications |
 | `qs ipc call controlcenter toggle` | Wi-Fi, Bluetooth, audio, power profile, notification history |
 | `qs ipc call controlcenter bluetooth` | The control center on its Bluetooth tab, searching for devices |
+| `qs ipc call controlcenter keyboard` | The control center on its Keyboard tab |
 | `qs ipc call recorder toggle` / `stop` | Record the focused monitor / stop any recording or replay (`dot-hypr-record`) |
 | `qs ipc call clock toggle` / `settings` | The clock popup under the bar's clock / on its settings page |
 | `qs ipc call clock search <text>` | The clock popup with a date search typed in |

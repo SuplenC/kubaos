@@ -18,6 +18,15 @@ Singleton {
     // "US": the layout in use, as the bar shows it.
     readonly property string code: (layouts[active] ?? "").toUpperCase()
 
+    // The control center turns to its Keyboard tab.
+    signal reveal
+
+    // The control center on its Keyboard tab.
+    function show(): void {
+        reveal();
+        Panels.open("controlcenter");
+    }
+
     function next(): void {
         Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", "next"]);
     }
