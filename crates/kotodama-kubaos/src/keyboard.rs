@@ -92,6 +92,11 @@ impl Keyboards {
         }
     }
 
+    /// The layouts, the default first.
+    pub fn layouts(&self) -> &[Layout] {
+        &self.layouts
+    }
+
     /// The Items: each layout, then add. None without a layout, as on a machine KubaOS didn't
     /// install, where `kubaos keyboard` has no file to change.
     pub fn items(&self) -> Vec<Item> {

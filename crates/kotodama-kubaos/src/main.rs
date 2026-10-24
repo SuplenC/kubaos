@@ -1,4 +1,4 @@
-//! The KubaOS Extension's protocol loop: each config the Daemon sends makes
+//! The KubaOS Extension's protocol loop, and with `layouts` the "Add a keyboard layout" app's: each config the Daemon sends makes
 //! the Items over, sending only the ones that changed, and so does each
 //! change the update check writes, each change to the keyboard layouts, to
 //! the wallpaper sets file and to the drives file; each config also reads the
@@ -40,6 +40,7 @@ use kotodama_kubaos::drives::Drives;
 use kotodama_kubaos::extension::Extension;
 use kotodama_kubaos::files::UserFolders;
 use kotodama_kubaos::keyboard::Keyboards;
+use kotodama_kubaos::layouts::LayoutsApp;
 use kotodama_kubaos::run::Programs;
 use kotodama_kubaos::sysmon;
 use kotodama_kubaos::sysmon::Monitor;
@@ -109,7 +110,63 @@ impl Answers {
 }
 
 fn main() -> ExitCode {
+    // The "Add a keyboard layout" app is an Extension of its own, as Kotodama has one app an
+    // Extension; its manifest runs this binary with `layouts`.
+    if std::env::args().nth(1).as_deref() == Some("layouts") {
+        return kotodama_extension::main("kotodama-kubaos-layouts", run_layouts);
+    }
     kotodama_extension::main("kotodama-kubaos", run)
+}
+
+/// The "Add a keyboard layout" app's loop: its Items follow the user's layouts, and each run is
+/// answered with what `kubaos keyboard add` came to.
+fn run_layouts() -> Result<(), Error> {
+    let Connection {
+        mut writer,
+        events,
+        received,
+    } = kotodama_extension::connect::<Own>()?;
+    let lst = std::fs::read_to_string(keyboard::RULES_LST).unwrap_or_default();
+    let keyboard_files = KeyboardFiles::new();
+    let layouts = keyboard_files
+        .as_ref()
+        .map(|files| files.read().layouts().to_vec())
+        .unwrap_or_default();
+    let mut app = LayoutsApp::new(layouts, &lst);
+    let _keyboard_watcher = keyboard_files.and_then(|files| watch_keyboards(files, events));
+    let mut sent = SentItems::default();
+    SentStatus::default().usable(&mut writer)?;
+    let mut configured = false;
+
+    for event in received {
+        match event {
+            Event::Message(ToExtension::Config(_)) => {
+                configured = true;
+                sent.publish(&mut writer, app.items())?;
+            }
+            Event::Own(Own::Keyboards(keyboards)) => {
+                app.set_layouts(keyboards.layouts().to_vec());
+                if configured {
+                    sent.publish(&mut writer, app.items())?;
+                }
+            }
+            Event::Message(ToExtension::RunAction {
+                invocation,
+                action,
+                item,
+                ..
+            }) => {
+                let outcome = match app.run(&item.id, &action, &Programs) {
+                    Ok(_) => Outcome::Close,
+                    Err(message) => Outcome::Failed { message },
+                };
+                writer.send(&FromExtension::ActionDone { invocation, outcome })?;
+            }
+            Event::Own(_) | Event::Message(_) => {}
+            Event::Hangup => break,
+        }
+    }
+    Ok(())
 }
 
 fn run() -> Result<(), Error> {

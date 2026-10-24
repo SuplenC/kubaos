@@ -324,6 +324,19 @@ PanelWindow {
     onSelectedKeyChanged: paneStale = true
     onTypingChanged: catchUp()
 
+    // `kotodama toggle` and `open` that reached another of the shell's searches.
+    Connections {
+        target: MenuRequests
+
+        function onToggleRequested(): void {
+            menu.visible && !closing.running ? menu.hide() : menu.show("");
+        }
+
+        function onOpenRequested(query: string): void {
+            menu.show(query);
+        }
+    }
+
     KotodamaSearch {
         id: search
 
