@@ -33,8 +33,8 @@ set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-BW_DESKTOP_VERSION="2026.10.0"
-BW_DESKTOP_SHA256="fcabfc7da3c327e2625b105e951cee4e60703bb8e256f0aac9cc9bc83ec7063f"   # Bitwarden-2026.10.0-amd64.deb
+BW_DESKTOP_VERSION="2026.10.1"
+BW_DESKTOP_SHA256="02cb6bc6a429d8d0da9fdf9d23739358165cf7b98a245783d6f641526f75b0a7"   # Bitwarden-2026.10.1-amd64.deb
 BW_CLI_VERSION="2026.10.0"
 BW_CLI_SHA256_AMD64="269b67559caab860d1737f7554b32bdb8be9285d5689fee55193c137a0df9973"   # bw-linux-2026.10.0.zip
 BW_CLI_SHA256_ARM64="2fe9d8a18dc4c35ea2f9e3e42a4021f14f129ef47e80b6cea1e3b34176f1583a"   # bw-linux-arm64-2026.10.0.zip

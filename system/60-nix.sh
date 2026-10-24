@@ -22,9 +22,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 # it runs (the script then checks the Nix tarball's own hash). To bump: pick a
 # version from https://releases.nixos.org/?prefix=nix/ and copy its
 # install.sha256.
-NIX_VERSION="2.35.3"
+NIX_VERSION="2.35.4"
 NIX_INSTALL_URL="https://releases.nixos.org/nix/nix-$NIX_VERSION/install"
-NIX_INSTALL_SHA256="69d0fe8fba8fe88f94c98b09964691ac9950abc7ecbf2ba861dc0533cfd901e9"
+NIX_INSTALL_SHA256="118c3dfa04bdc946b3f577365b9a295607142c9b920e2c07b184e266d62b1ee1"
 HM_USER="${USER:-$(id -un)}"
 # Default host: this machine's hostname if the flake knows it, else tuxedo.
 case "$(hostname -s 2>/dev/null || true)" in
