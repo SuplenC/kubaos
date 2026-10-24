@@ -1,8 +1,9 @@
 # The KubaOS Rust workspace: the engine (`kubaos-core`), the `kubaos` CLI
 # (`kubaos-cli`), the recoloured pointer it writes (`kubaos-cursor`), Kōbō
 # (`kubaos-kobo`), its graphical front end, the Command menu's KubaOS
-# Extension (`kotodama-kubaos`), the file manager's glue (`kubaos-files`), and
-# the Bluetooth pairing agent (`kubaos-bluetooth`).
+# Extension (`kotodama-kubaos`), yazi's launcher and the Downloads tidy
+# (`kubaos-files`), the Bluetooth pairing agent (`kubaos-bluetooth`), and the
+# automount for removable drives (`kubaos-automount`).
 [workspace]
 resolver = "3"
 members = [
@@ -13,6 +14,7 @@ members = [
     "crates/kotodama-kubaos",
     "crates/kubaos-files",
     "crates/kubaos-bluetooth",
+    "crates/kubaos-automount",
 ]
 
 [workspace.package]

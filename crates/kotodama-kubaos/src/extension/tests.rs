@@ -209,3 +209,45 @@ fn a_wallpaper_set_item_runs_through_the_extension() {
     assert_eq!(ran, Ok(Ran::KeepOpen));
     assert_eq!(extension.runner.ran(), ["dot-theme show-set japanese"]);
 }
+
+const STICK: &str = "/org/freedesktop/UDisks2/drives/SanDisk_Ultra_1234";
+
+fn with_stick(text: &str) -> Extension<FakeBus, FakeRunner> {
+    let mut extension = configured(text);
+    extension.set_drives(Drives::parse(&format!("{STICK}\tSTICK\t/media/kuba/STICK\n")));
+    extension
+}
+
+#[test]
+fn a_drive_item_comes_last_and_ejects_through_the_extension() {
+    let mut extension = with_stick("");
+
+    let ran = extension.run(
+        drives::EJECT,
+        &item(drives::KIND, "drive:SanDisk_Ultra_1234"),
+        &BTreeMap::new(),
+    );
+
+    assert_eq!(ids(&extension).last().map(String::as_str), Some("drive:SanDisk_Ultra_1234"));
+    assert_eq!(ran, Ok(Ran::Close));
+    assert_eq!(extension.runner.launched.borrow()[0].0, ["kubaos-automount", "eject", STICK]);
+}
+
+#[test]
+fn a_drive_hidden_by_id_is_neither_listed_nor_ejected() {
+    let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
+    // A drive comes and goes, so its id is never a known one; `hide` warns and still takes it
+    // out, as it does a user folder's.
+    let problems = extension.configure(&toml::from_str("hide = [\"drive:SanDisk_Ultra_1234\"]").unwrap());
+    extension.set_drives(Drives::parse(&format!("{STICK}\tSTICK\t/media/kuba/STICK\n")));
+
+    let ran = extension.run(
+        drives::EJECT,
+        &item(drives::KIND, "drive:SanDisk_Ultra_1234"),
+        &BTreeMap::new(),
+    );
+
+    assert!(!ids(&extension).contains(&"drive:SanDisk_Ultra_1234".to_owned()));
+    assert!(ran.is_err());
+    assert_eq!(problems.len(), 1, "{problems:?}");
+}

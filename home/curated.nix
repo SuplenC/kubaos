@@ -36,9 +36,13 @@ rec {
   # The `kubaos` command, so an update's fixes to it arrive with the release
   # (home/updates.nix installs it).
   kubaos = pkgs.callPackage ../crates/kubaos-cli/package.nix { inherit cargoOutputHashes; };
-  # The file manager's glue: the folder handler and "Show in folder"
-  # (home/files.nix).
+  # yazi's launcher and the Downloads tidy (home/files.nix).
   kubaos-files = pkgs.callPackage ../crates/kubaos-files/package.nix { inherit cargoOutputHashes; };
+  # The automount for removable drives, and their Eject and photo import
+  # (home/automount.nix).
+  kubaos-automount = pkgs.callPackage ../crates/kubaos-automount/package.nix {
+    inherit cargoOutputHashes;
+  };
   # The Bluetooth pairing agent the shell pairs through (home/bluetooth.nix).
   kubaos-bluetooth = pkgs.callPackage ../crates/kubaos-bluetooth/package.nix {
     inherit cargoOutputHashes;

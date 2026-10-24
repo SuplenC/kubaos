@@ -17,7 +17,7 @@ use std::path::PathBuf;
 use kotodama_extension::launch;
 
 /// The terminal yazi runs in, and the flag that takes the command to run: the primary terminal
-/// (`docs/CONTRACTS.md`, "Hyprland conventions"), as the SUPER + SHIFT + F bind starts it.
+/// (`docs/CONTRACTS.md`, "Hyprland conventions"), as yazi's SUPER + CTRL + F bind starts it.
 pub const TERMINAL: [&str; 2] = ["ghostty", "-e"];
 
 /// The command line that opens yazi on `entries`.

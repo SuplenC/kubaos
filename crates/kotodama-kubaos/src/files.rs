@@ -1,6 +1,7 @@
-//! The user folders in the menu: one Item each, "Files: Downloads", that opens it in yazi. The
-//! folders are the XDG user folders `xdg-user-dirs` writes to `~/.config/user-dirs.dirs`, or
-//! their English names without the file, and only the ones that exist.
+//! The user folders in the menu: one Item each, "Files: Downloads", that opens it in Files
+//! (Nautilus), or in yazi as its second Action. The folders are the XDG user folders
+//! `xdg-user-dirs` writes to `~/.config/user-dirs.dirs`, or their English names without the file,
+//! and only the ones that exist.
 //!
 //! # Owns
 //!
@@ -8,7 +9,8 @@
 //!
 //! # Not here
 //!
-//! - "Files" and "Open folder…", which are actions in `config/kotodama/kubaos.toml`.
+//! - "Files", "Yazi", "Open folder…" and "Recent files", which are actions in
+//!   `config/kotodama/kubaos.toml`.
 //! - Opening yazi: `crates/kubaos-files`.
 
 use std::fs;
@@ -27,12 +29,16 @@ use crate::toggles::Ran;
 
 /// The Item kind of every folder Item.
 pub const KIND: &str = "kubaos.files";
-/// Opens the folder in yazi.
+/// Opens the folder in Files.
 pub const OPEN: &str = "open";
+/// Opens the folder in yazi.
+pub const YAZI: &str = "yazi";
 /// A folder's Item is this and its key in lower case, `files:download`.
 const PREFIX: &str = "files:";
+/// What opens a folder in Files, a window of its own each time, as `SUPER + SHIFT + F` does.
+const FILE_MANAGER: [&str; 2] = ["nautilus", "--new-window"];
 /// What opens a folder in yazi, in a terminal window: `crates/kubaos-files`.
-const OPENER: &str = "kubaos-files";
+const YAZI_OPENER: [&str; 2] = ["kubaos-files", "open"];
 /// The file `xdg-user-dirs` writes, under the config folder.
 const USER_DIRS: &str = "user-dirs.dirs";
 
@@ -124,18 +130,20 @@ impl UserFolders {
     ///
     /// # Errors
     ///
-    /// When there is no such Item or Action, or `kubaos-files` can't be started.
+    /// When there is no such Item or Action, or Nautilus or `kubaos-files` can't be started.
     pub fn run(&self, id: &str, action: &str, runner: &impl Runner) -> Result<Ran, String> {
         let unknown = || format!("`{id}` has no Action `{action}`");
-        if action != OPEN {
-            return Err(unknown());
-        }
+        let opener = match action {
+            OPEN => FILE_MANAGER,
+            YAZI => YAZI_OPENER,
+            _ => return Err(unknown()),
+        };
         let folder = self
             .folders
             .iter()
             .find(|folder| item_id(folder) == id)
             .ok_or_else(unknown)?;
-        let argv = [OPENER, "open", &folder.path].map(str::to_owned);
+        let argv = [opener[0], opener[1], &folder.path].map(str::to_owned);
         runner
             .launch(&argv, Duration::ZERO)
             .map_err(|err| Chain(&err).to_string())?;
@@ -154,15 +162,15 @@ impl UserFolders {
             kind: ItemKind::Namespaced(NamespacedKind::new(KIND).expect("the Extension's kinds are valid")),
             identity: None,
             title: format!("Files: {name}"),
-            subtitle: Some(format!("{shown} in yazi")),
+            subtitle: Some(shown),
             icon: Some(ICON.to_owned()),
             keyword: None,
-            keywords: [folder.english, "folder", "file manager", "yazi"]
+            keywords: [folder.english, "folder", "file manager", "nautilus", "yazi"]
                 .map(str::to_owned)
                 .to_vec(),
             hidden: false,
             app_only: false,
-            actions: vec![Action::new(OPEN, "Open")],
+            actions: vec![Action::new(OPEN, "Open"), Action::new(YAZI, "Open in yazi")],
         }
     }
 }

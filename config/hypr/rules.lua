@@ -62,6 +62,11 @@ hl.window_rule({ match = { class = "^([Bb]itwarden)$" }, float = true, center = 
 -- window to drag from, not half the screen.
 tag({ class = "^(it\\.catboy\\.ripdrag|ripdrag)$" }, "float-small")
 
+-- Sushi, the preview Files opens on Space: a large centred window over the
+-- folder, closed again with Space. Files's own Properties and Preferences are
+-- libadwaita dialogs inside its window and need no rule.
+tag({ class = "^org\\.gnome\\.NautilusPreviewer$" }, "float-large")
+
 -- Generic small dialogs.
 tag({ class = "^(zenity|yad|org\\.gnome\\.FileRoller|file-roller)$" }, "float-medium")
 tag({ title = "^(.* Properties|File Operation Progress)$" }, "float-small")

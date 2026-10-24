@@ -8,9 +8,18 @@
 # What starts apps with `Terminal=true`; the app's command follows.
 terminal = ["ghostty", "-e"]
 # Desktop ids to leave out, on top of the entries that set NoDisplay or
-# Hidden themselves. kubaos-files is the folder handler's entry (home/files.nix);
-# the KubaOS Extension's "Files" stands in for it.
-hidden = ["qt5ct", "qt6ct", "org.codeberg.dnkl.footclient", "org.codeberg.dnkl.foot-server", "kubaos-files"]
+# Hidden themselves. The KubaOS Extension's "Files" and "Yazi" stand in for
+# Nautilus's entry and kubaos-files, yazi's (home/files.nix); display-im7.q16
+# is ImageMagick's viewer, there for the right-click image actions.
+hidden = [
+  "qt5ct",
+  "qt6ct",
+  "org.codeberg.dnkl.footclient",
+  "org.codeberg.dnkl.foot-server",
+  "kubaos-files",
+  "org.gnome.Nautilus",
+  "display-im7.q16",
+]
 # Display names by desktop id, for entries with clumsy names.
 names = { nvim = "Neovim" }
 
@@ -55,24 +64,79 @@ kind = "scripts"
 # exits, so what it said can be read.
 terminal = ["ghostty", "--wait-after-command=true", "-e"]
 
-# Files: yazi in Ghostty (crates/kubaos-files). The Extension itself sends one
-# Item a user folder that exists, "Files: Downloads" and the like.
+# Files: Nautilus (home/files.nix), and yazi in Ghostty (crates/kubaos-files).
+# The Extension itself sends one Item a user folder that exists, "Files:
+# Downloads" and the like, opening in Files or, as the second Action, yazi;
+# and one "Eject <drive>" Item a mounted removable drive (home/automount.nix).
 
 [extensions.kubaos.actions.files]
 title = "Files"
+subtitle = "Your home folder in Files"
+icon = "system-file-manager"
+keywords = ["file manager", "nautilus", "folders", "explorer", "finder", "home"]
+run = ["nautilus", "--new-window"]
+
+[extensions.kubaos.actions.yazi]
+title = "Yazi"
 subtitle = "Your home folder in yazi. A file manager that never wants the mouse"
 icon = "system-file-manager"
-keywords = ["file manager", "yazi", "folders", "explorer", "finder", "home"]
+keywords = ["file manager", "yazi", "terminal", "folders", "home"]
 run = ["kubaos-files", "open"]
 
 [extensions.kubaos.actions.files-open]
-title = "Open folder…"
+title = "Open folder in yazi…"
 subtitle = "A folder or a file by its path, in yazi"
 icon = "folder-open"
 keywords = ["file manager", "yazi", "go to folder", "path"]
 keyword = "open-folder"
 run = ["kubaos-files", "open", "{path}"]
 arguments = [{ name = "path", placeholder = "~/Projects/kubaos" }]
+
+[extensions.kubaos.actions.files-recent]
+title = "Recent files"
+subtitle = "The files you opened lately, in Files"
+icon = "document-open-recent"
+keywords = ["recent", "recently opened", "history", "file manager"]
+run = ["nautilus", "--new-window", "recent:///"]
+
+# Sorts ~/Downloads into Images, Documents, Archives, Installers, Video and
+# Audio, leaving what arrived in the last day.
+[extensions.kubaos.actions.tidy-downloads]
+title = "Tidy Downloads"
+subtitle = "Sort ~/Downloads into folders by kind, leaving today's files where they are"
+icon = "folder-download"
+keywords = ["downloads", "clean up", "organize", "sort", "tidy"]
+run = ["kubaos-files", "tidy"]
+
+[extensions.kubaos.actions.tidy-downloads-daily-on]
+title = "Tidy Downloads daily"
+subtitle = "Sort ~/Downloads into folders by kind once a day"
+icon = "folder-download"
+keywords = ["downloads", "clean up", "organize", "automatic", "tidy"]
+run = ["kubaos-files", "tidy", "on"]
+
+[extensions.kubaos.actions.tidy-downloads-daily-off]
+title = "Stop tidying Downloads daily"
+subtitle = "~/Downloads stays as you leave it, unless you tidy it from here"
+icon = "folder-download"
+keywords = ["downloads", "clean up", "organize", "automatic", "tidy"]
+run = ["kubaos-files", "tidy", "off"]
+
+# Mounting removable drives as they're plugged in (kubaos-automount); on by
+# default. Eject Items stay either way.
+[extensions.kubaos.actions.automount-on]
+title = "Mount drives when plugged in"
+subtitle = "USB sticks and SD cards mount and open from a notification"
+icon = "drive-removable-media"
+keywords = ["automount", "usb", "sd card", "drive", "mount"]
+run = ["kubaos-automount", "on"]
+
+[extensions.kubaos.actions.automount-off]
+title = "Don't mount drives when plugged in"
+subtitle = "Plugged-in drives wait in the Files sidebar until you click them"
+icon = "drive-removable-media"
+keywords = ["automount", "usb", "sd card", "drive", "mount"]
+run = ["kubaos-automount", "off"]
 
 # Wallpaper and theme (scripts/dot-theme, the shell's picker).
 

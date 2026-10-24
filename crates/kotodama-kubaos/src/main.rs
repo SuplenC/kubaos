@@ -1,14 +1,15 @@
 //! The KubaOS Extension's protocol loop: each config the Daemon sends makes
 //! the Items over, sending only the ones that changed, and so does each
-//! change the update check writes, each change to the keyboard layouts and
-//! each change to the wallpaper sets file; each config also reads the user
-//! folders again; each run is answered with its outcome, after the View it
+//! change the update check writes, each change to the keyboard layouts, to
+//! the wallpaper sets file and to the drives file; each config also reads the
+//! user folders again; each run is answered with its outcome, after the View it
 //! pushes or pops.
 //!
 //! # Owns
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
-//! - Watching the update check's file, `/etc/default/keyboard` and the wallpaper sets file.
+//! - Watching the update check's file, `/etc/default/keyboard`, the wallpaper sets file and the
+//!   drives file.
 //!
 //! # Not here
 //!
@@ -30,6 +31,8 @@ use kotodama_extension::config;
 use kotodama_extension::watch::RecursiveMode;
 use kotodama_extension::watch::Watcher;
 use kotodama_kubaos::bus::SystemBus;
+use kotodama_kubaos::drives;
+use kotodama_kubaos::drives::Drives;
 use kotodama_kubaos::extension::Extension;
 use kotodama_kubaos::files::UserFolders;
 use kotodama_kubaos::keyboard::Keyboards;
@@ -57,6 +60,8 @@ enum Own {
     Keyboards(Keyboards),
     /// The wallpaper sets file changed.
     WallpaperSets(WallpaperSets),
+    /// The drives file changed.
+    Drives(Drives),
 }
 
 fn main() -> ExitCode {
@@ -85,6 +90,11 @@ fn run() -> Result<(), Error> {
         extension.set_wallpaper_sets(WallpaperSets::read(&wallpapers::sets_dir(), file));
     }
     let _sets_watcher = sets_file.and_then(|file| watch_wallpaper_sets(file, events.clone()));
+    let drives_file = drives::file();
+    if let Some(file) = &drives_file {
+        extension.set_drives(Drives::read(file));
+    }
+    let _drives_watcher = drives_file.and_then(|file| watch_drives(file, events.clone()));
     let _watcher = state.and_then(|dir| watch(dir, events));
     let mut configured = false;
 
@@ -105,6 +115,7 @@ fn run() -> Result<(), Error> {
                     Own::Pending(pending) => extension.set_pending(pending),
                     Own::Keyboards(keyboards) => extension.set_keyboards(keyboards),
                     Own::WallpaperSets(sets) => extension.set_wallpaper_sets(sets),
+                    Own::Drives(drives) => extension.set_drives(drives),
                 }
                 if configured {
                     sent.publish(&mut writer, extension.items())?;
@@ -207,6 +218,27 @@ fn watch_wallpaper_sets(file: PathBuf, events: Sender<Event<Own>>) -> Option<Wat
         },
     )
     .map_err(|err| kotodama_extension::log!("not watching the wallpaper sets: {err}"))
+    .ok()?;
+    watcher.watch(vec![dir]);
+    Some(watcher)
+}
+
+/// Watches the drives `file` in `$XDG_RUNTIME_DIR`, sending the drives on each change to it.
+/// Without a watch the Eject Items keep the drives of the start.
+fn watch_drives(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let dir = file.parent()?.to_path_buf();
+    let changed = file.clone();
+    let watcher = Watcher::start(
+        "drives",
+        RecursiveMode::NonRecursive,
+        SETTLE,
+        // The automount service writes the file through a temporary one and a rename.
+        move |event, _| event.paths.contains(&changed),
+        move |_| {
+            let _ = events.send(Event::Own(Own::Drives(Drives::read(&file))));
+        },
+    )
+    .map_err(|err| kotodama_extension::log!("not watching the mounted drives: {err}"))
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)

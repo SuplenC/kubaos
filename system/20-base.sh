@@ -61,6 +61,19 @@ PACKAGES=(
   openjdk-25-jre-headless
   # filesystem + snapshots (grub-btrfs is not packaged, built below)
   btrfs-progs snapper inotify-tools
+  # graphical file manager. Nautilus, with Sushi on space and gvfs for phones,
+  # network shares and admin://; udisks2 is what kubaos-automount talks to.
+  # Image and HEIC/AVIF thumbnails come from glycin, which 26.04's gdk-pixbuf
+  # loads through, and libde265 decodes the HEVC inside an iPhone's HEIC.
+  # papers and gnome-font-viewer bring the PDF and font thumbnailers with the
+  # viewers. File Roller does the extracting, with 7zip and unar for 7z and RAR,
+  # since unrar is non-free. python3-nautilus runs the right-click extensions.
+  # The gstreamer plugins are the codecs Showtime plays with, which
+  # --no-install-recommends would leave out.
+  nautilus gnome-sushi gvfs-backends gvfs-fuse udisks2
+  glycin-thumbnailers libheif-plugin-libde265 ffmpegthumbnailer
+  papers gnome-font-viewer file-roller 7zip unar python3-nautilus
+  loupe showtime gstreamer1.0-plugins-good gstreamer1.0-libav imagemagick
   # fonts
   fonts-noto-core fonts-noto-ui-core fonts-noto-mono fonts-noto-color-emoji fonts-noto-cjk
   # fallback session tools (work without Nix and without the shell)

@@ -2079,6 +2079,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "kubaos-automount"
+version = "0.1.0"
+dependencies = [
+ "async-io",
+ "futures-lite",
+ "kamadak-exif",
+ "kotodama-extension",
+ "tempfile",
+ "thiserror 2.0.21",
+ "zbus",
+]
+
+[[package]]
 name = "kubaos-bluetooth"
 version = "0.1.0"
 dependencies = [
