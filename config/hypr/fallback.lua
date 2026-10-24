@@ -26,4 +26,10 @@ hl.bind("SUPER + ALT + Space", hl.dsp.exec_cmd("pkill -x fuzzel || fuzzel"), { d
 hl.bind("SUPER + W", hl.dsp.window.close(), { description = "Close window" })
 hl.bind("SUPER + SHIFT + CTRL + R", hl.dsp.exec_cmd("hyprctl reload"), { description = "Reload Hyprland config" })
 hl.bind("SUPER + SHIFT + CTRL + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"), { description = "Lock with hyprlock (fallback lock)" })
-hl.bind("SUPER + SHIFT + CTRL + Escape", hl.dsp.exit(), { description = "Exit Hyprland" })
+-- Leaving stops graphical-session.target first and waits for it, while
+-- Hyprland still runs: the portals and the polkit agent then stop cleanly
+-- instead of losing the display and dying with an error. `dot-session leave`
+-- does the same for the power menu; this one needs nothing from Nix.
+hl.bind("SUPER + SHIFT + CTRL + Escape",
+  hl.dsp.exec_cmd("timeout 15 systemctl --user stop graphical-session.target; hyprctl dispatch 'hl.dsp.exit()'"),
+  { description = "Exit Hyprland" })

@@ -47,7 +47,9 @@
   # xdg-desktop-portal refuses to start without it (Requisite=), which leaves
   # Chrome without the portal's dark-mode setting, file chooser and screen
   # sharing. Hyprland's autostart (config/hypr/autostart.lua) starts this
-  # target once the session environment is imported, and stops it on exit.
+  # target once the session environment is imported. Leaving the session
+  # (`dot-session leave`, the fallback exit bind) stops graphical-session.target
+  # and waits for it before Hyprland goes.
   systemd.user.targets.hyprland-session.Unit = {
     Description = "Hyprland session";
     Documentation = [ "man:systemd.special(7)" ];
@@ -55,4 +57,21 @@
     Wants = [ "graphical-session-pre.target" ];
     After = [ "graphical-session-pre.target" ];
   };
+
+  # The portal and the polkit agent are Wayland clients that stop with the
+  # session, before Hyprland goes. Should one hang on its way out, 5 s bound
+  # it, under the 10 s every user unit gets
+  # (`system/files/systemd/user.conf.d`). Drop-ins, so the units stay apt's.
+  xdg.configFile =
+    lib.genAttrs
+      [
+        "systemd/user/xdg-desktop-portal-hyprland.service.d/kubaos-stop.conf"
+        "systemd/user/hyprpolkitagent.service.d/kubaos-stop.conf"
+      ]
+      (_: {
+        text = ''
+          [Service]
+          TimeoutStopSec=5s
+        '';
+      });
 }

@@ -184,6 +184,7 @@ The polkit agent is in-shell but turned off (`Settings.polkitAgent: false`), and
 | `kubaos-clock`, `kubaos-sysmon` | the clock popup's dates, the system monitor's stream | this repo, Nix (`home/clock.nix`, `home/sysmon.nix`) |
 | `btop` | the system monitor's full picture | Nix (`home/cli.nix`) |
 | `dot-hypr-record`, `dot-hypr-screenshot` | recording indicator, capture buttons | this repo |
-| `systemctl`, `loginctl` | power menu | system |
+| `dot-session leave` (then `systemctl`, `loginctl`) | power menu: log out, reboot, shut down | this repo |
+| `systemctl` | power menu: suspend | system |
 | NetworkManager, BlueZ, PipeWire, UPower, power-profiles-daemon | services over D-Bus | apt |
 | Fonts: Geist, M PLUS 1, Material Symbols Rounded, JetBrainsMono Nerd Font | UI, Japanese accents, icons | Nix (`home/desktop.nix`) |
