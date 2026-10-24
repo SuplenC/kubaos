@@ -48,6 +48,10 @@ Scope {
         readonly property bool modal: panel !== ""
         // 1 = frame shown, 0 = retracted (a fullscreen window, no panel open).
         property real reveal: fullscreen && !modal ? 0 : 1
+        readonly property var panels: [controlCenter, clockPopup, sysmonPopup, powerMenu, wallpaperPicker]
+        // The panel on screen (opening, open or closing) that reaches into
+        // the popups' corner column, or null. Popups never draw over it.
+        readonly property Drawer toastCover: panels.find(d => (d.shown || d.active) && d.area.x + d.area.width + Theme.frame.flare > geo.r - popups.contentWidth) ?? null
 
         screen: scope.screen
         color: "transparent"
@@ -177,6 +181,10 @@ Scope {
                 }
 
                 PanelPath {
+                    drawer: popupsBelow
+                }
+
+                PanelPath {
                     drawer: osd
                 }
             }
@@ -206,7 +214,15 @@ Scope {
                 id: popups
 
                 frame: geo
-                shown: Notifs.popups.length > 0 && Hypr.focusedScreen === root.screen && root.panel !== "controlcenter"
+                shown: Notifs.popups.length > 0 && Hypr.focusedScreen === root.screen && !root.toastCover
+                covered: root.toastCover !== null
+            }
+
+            PopupsBelow {
+                id: popupsBelow
+
+                frame: geo
+                cover: root.toastCover
             }
 
             Osd {
@@ -249,6 +265,16 @@ Scope {
 
                 frame: geo
                 shown: root.panel === "wallpaper"
+            }
+
+            // `c_notifications`'s probe (test/lib/e2e.sh), with KUBAOS_TOAST_PROBE=1 only.
+            LazyLoader {
+                active: Quickshell.env("KUBAOS_TOAST_PROBE") === "1"
+
+                ToastProbe {
+                    panels: root.panels
+                    stacks: [popups, popupsBelow]
+                }
             }
         }
     }

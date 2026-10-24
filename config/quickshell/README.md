@@ -17,7 +17,7 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
   | Power menu | Column on the right edge |
   | Wallpaper picker | Rises from the bottom |
   | OSD | Small bar rising from the bottom |
-  | Notifications | Top-right corner |
+  | Notifications | Top-right corner. While a panel reaching into that corner is open (control center, system monitor, power menu, or the clock popup or wallpaper picker on a narrow screen), they wait and come back when it closes; a critical one shows out of the right edge under the panel, or waits too if the panel reaches the bottom |
   | Clock popup | Under the bar's clock |
   | System monitor | Under the bar's right end, by its pill |
 
@@ -110,7 +110,7 @@ modules/
                         ProgressView, DetailView, IntroCard, JobBar, KeyHints, Keycap,
                         Probe (test-only timing and state lines)
   controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history
-  notifications/        Popups, NotificationCard
+  notifications/        Popups (corner), PopupsBelow (critical, under a panel), ToastList, NotificationCard, ToastProbe (tests)
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu

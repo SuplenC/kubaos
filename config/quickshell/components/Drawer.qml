@@ -19,6 +19,8 @@ FocusScope {
     required property QtObject frame            // { l, t, r, b, screen } from Frame.qml
     property string edge: "top"                  // top | bottom | left | right
     property real align: 0.5                     // position along the edge, 0..1 (centered)
+    // Where the body starts along the edge, in place of `align`; NaN leaves it to `align`.
+    property real start: NaN
     property bool flushStart: false              // body touches the perpendicular frame edge at its start
     property bool flushEnd: false                // ... at its end
     property bool shown: false
@@ -40,6 +42,8 @@ FocusScope {
     readonly property real edgeStart: horizontal ? frame.l : frame.t
     readonly property real edgeEnd: horizontal ? frame.r : frame.b
     readonly property real u0: {
+        if (!isNaN(start))
+            return start;
         if (flushStart)
             return edgeStart;
         if (flushEnd)
@@ -52,6 +56,19 @@ FocusScope {
     property real progress: 0
     readonly property real reveal: Math.max(0, depth * progress)
     readonly property bool active: progress > 0.001
+    // The rectangle the body covers once fully open, in window coordinates.
+    readonly property rect area: {
+        if (edge === "top")
+            return Qt.rect(u0, frame.t, u1 - u0, depth);
+        if (edge === "bottom")
+            return Qt.rect(u0, frame.b - depth, u1 - u0, depth);
+        if (edge === "left")
+            return Qt.rect(frame.l, u0, depth, u1 - u0);
+        return Qt.rect(frame.r - depth, u0, depth, u1 - u0);
+    }
+    // Content fades in a beat after the surface starts moving and out
+    // before it has fully retracted.
+    readonly property real contentOpacity: Math.max(0, Math.min(1, (progress - 0.2) / 0.55))
     readonly property string path: active ? DrawerPath.build(frame, edge, u0, u1, reveal, Theme.frame.flare, Theme.frame.panelRounding, flushStart, flushEnd) : ""
 
     // Emitted once the panel starts opening; give keyboard focus here.
@@ -116,8 +133,6 @@ FocusScope {
         y: root.edge === "top" ? root.reveal - root.depth : 0
         width: root.horizontal ? root.u1 - root.u0 : root.depth
         height: root.horizontal ? root.depth : root.u1 - root.u0
-        // Content fades in a beat after the surface starts moving and out
-        // before it has fully retracted.
-        opacity: Math.max(0, Math.min(1, (root.progress - 0.2) / 0.55))
+        opacity: root.contentOpacity
     }
 }
