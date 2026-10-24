@@ -3,8 +3,8 @@
 //! file the install wrote and `kubaos keyboard` changes.
 //!
 //! Switching is `hyprctl switchxkblayout`, at once. A change to the layouts is checked here, so
-//! a refusal reads in the menu, then launched as `kubaos keyboard`, which asks localed (and so
-//! polkit) and reloads Hyprland; the file's change comes back through the watch in `main.rs`.
+//! a refusal reads in the menu, then launched as `kubaos keyboard`, which writes it through pkexec
+//! (and so polkit) and reloads Hyprland; the file's change comes back through the watch in `main.rs`.
 //!
 //! # Owns
 //!

@@ -12,9 +12,12 @@
 //!                                             turn them on or off, or apply the setting
 //!
 //! A layout is spelled `it` or `us(intl)`. A change is checked against xkb's rules list, written
-//! by `localectl set-x11-keymap` (systemd-localed writes `/etc/default/keyboard` on Ubuntu, and
-//! asks polkit, so it runs as the desktop user), then reaches Hyprland with `hyprctl reload`. A
-//! refusal is one line saying what didn't happen and why, which the control center shows as is.
+//! to `/etc/default/keyboard` by a root helper that pkexec runs (polkit decides, so `kubaos` runs
+//! as the desktop user), then reaches Hyprland with `hyprctl reload`. Ubuntu's systemd-localed
+//! can't do the writing: a D-Bus policy shipped with systemd refuses its SetX11Keyboard to
+//! everyone, and Debian's localed no longer writes that file. A refusal is one line saying what
+//! didn't happen and why, which the control center shows as is, after a line with everything
+//! pkexec said.
 //! The Command menu and the control center's keyboard list run these. `KUBAOS_KEYBOARD_FILE`
 //! reads another file instead (the harness).
 //!
@@ -23,15 +26,17 @@
 //! are on and is stopped while they are off (a polkit rule lets the desktop user start and stop
 //! `keyd.service`), and Hyprland reloads, so the Shortcuts View's cheat sheet follows. `apply`
 //! runs at login (`config/hypr/autostart.lua`), as keyd starts with the machine.
-//! Exit codes: 0 ok, 1 `localectl` or `systemctl` failed, 2 usage or a change the rules refuse.
+//! Exit codes: 0 ok, 1 pkexec, the helper or `systemctl` failed, 2 usage or a change the rules
+//! refuse.
 //!
 //! # Owns
 //!
-//! - Telling localed, systemd and Hyprland.
+//! - Running the root helper, and telling systemd and Hyprland.
 //!
 //! # Not here
 //!
 //! - The layouts, the file's fields, the rules and the accents setting: `kubaos_core::keyboard`.
+//! - Writing the file as root: `system/files/keyboard/kubaos-keyboard-write`.
 //! - What keyd does with Left Alt: `system/files/keyd/kubaos.conf`.
 
 use std::env;
@@ -58,8 +63,11 @@ use kubaos_core::keyboard::settings::Settings;
 use crate::job::chain;
 use crate::usage_error;
 
-/// The model localed is given when the file names none: the one the install writes.
+/// The model written when the file names none: the one the install writes.
 const DEFAULT_MODEL: &str = "pc105";
+
+/// The root helper that writes `/etc/default/keyboard`, which `system/50-hyprland.sh` installs.
+const WRITER: &str = "/usr/local/libexec/kubaos-keyboard-write";
 
 /// The unit `system/50-hyprland.sh` installs with keyd.
 const KEYD_UNIT: &str = "keyd.service";
@@ -129,7 +137,7 @@ pub fn main(cmd: KeyboardCmd) -> ExitCode {
         Ok(layouts) => layouts,
         Err(e) => return usage_error(e),
     };
-    if let Err(e) = tell_localed(&file, &layouts) {
+    if let Err(e) = write_layouts(&file, &layouts) {
         eprintln!("kubaos: {}", chain(&e));
         return ExitCode::FAILURE;
     }
@@ -223,12 +231,15 @@ fn tell_keyd(accents: MacAccents) -> Result<(), String> {
     }
 }
 
-/// Writes `layouts` through localed, keeping the file's model and options.
+
+/// Writes `layouts` to `/etc/default/keyboard` through the root helper, keeping the file's model
+/// and options.
 ///
-/// localed asks polkit, which lets an active admin at the machine through
-/// (`system/files/polkit/50-kubaos-keyboard.rules`) and asks anyone else for a password through the
-/// session's agent. localectl's stderr is read rather than passed on, so a refusal is one sentence.
-fn tell_localed(file: &KeyboardFile, layouts: &[Layout]) -> Result<(), LocaledError> {
+/// pkexec asks polkit, which lets an active admin at the machine through
+/// (`system/files/polkit/50-kubaos-keyboard.rules`) and asks anyone else for a password through
+/// the session's agent. Everything pkexec and the helper wrote to stderr is logged on a line of its
+/// own, then read for the refusal, so the last line is one sentence.
+fn write_layouts(file: &KeyboardFile, layouts: &[Layout]) -> Result<(), WriteError> {
     let (layout, variant) = keyboard::to_fields(layouts);
     // No variants at all go as one empty field, as a single layout's do, not as bare commas.
     let variant = if variant.chars().all(|c| c == ',') {
@@ -241,56 +252,73 @@ fn tell_localed(file: &KeyboardFile, layouts: &[Layout]) -> Result<(), LocaledEr
     } else {
         &file.model
     };
-    // stdin stays the caller's: in a terminal, localectl's pkttyagent asks for the password there.
-    let out = Command::new("localectl")
-        .args(["set-x11-keymap", &layout, model, &variant, &file.options])
+    // stdin stays the caller's: in a terminal, pkexec's text agent asks for the password there.
+    let out = Command::new("pkexec")
+        .args([WRITER, &layout, model, &variant, &file.options])
         .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::piped())
         .output()
-        .map_err(LocaledError::Run)?;
+        .map_err(WriteError::Run)?;
     if out.status.success() {
-        Ok(())
-    } else {
-        Err(refusal(&String::from_utf8_lossy(&out.stderr), out.status))
+        return Ok(());
     }
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    eprintln!("kubaos: {}", logged(&stderr, out.status));
+    Err(refusal(&stderr, out.status))
 }
 
-/// Why `localectl set-x11-keymap` failed.
+/// Why writing the layouts failed.
 #[derive(Debug, thiserror::Error)]
-enum LocaledError {
-    #[error("running localectl")]
+enum WriteError {
+    #[error("running pkexec")]
     Run(#[source] io::Error),
     /// polkit said no: no rule let the caller through and no agent asked for a password, or the
     /// prompt was dismissed.
     #[error("the keyboard layouts weren't changed: permission was refused")]
     Denied,
+    /// A machine installed before the helper shipped, until the update's migration installs it.
+    #[error("the keyboard layouts weren't changed: {WRITER} isn't installed; system/50-hyprland.sh installs it")]
+    NoWriter,
     #[error("the keyboard layouts weren't changed")]
-    Refused(#[source] LocalectlSaid),
+    Refused(#[source] HelperSaid),
 }
 
-/// localed's reason for a refusal, without localectl's "Failed to set keymap: ".
+/// The helper's or pkexec's reason for a refusal: the last line it wrote.
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
-struct LocalectlSaid(String);
+struct HelperSaid(String);
 
-/// The `sd_bus_error` messages localectl prints when polkit refuses: EACCES, and a check that
-/// needed a password prompt nobody could show.
-const DENIALS: [&str; 3] = ["Access denied", "Interactive authentication required", "Not authorized"];
+/// What pkexec prints when polkit refuses, and when the password prompt is dismissed.
+const DENIALS: [&str; 2] = ["Not authorized", "Request dismissed"];
 
-/// The error for a failed `localectl set-x11-keymap`, from its stderr and exit status.
-fn refusal(stderr: &str, status: impl Display) -> LocaledError {
-    let said = stderr.lines().map(str::trim).rfind(|line| !line.is_empty()).unwrap_or("");
-    if DENIALS.iter().any(|denial| said.contains(denial)) {
-        return LocaledError::Denied;
+/// What pkexec prints when the program it should run isn't there.
+const NO_PROGRAM: &str = "Cannot run program";
+
+/// The non-empty lines of `stderr`, trimmed.
+fn said_lines(stderr: &str) -> impl Iterator<Item = &str> {
+    stderr.lines().map(str::trim).filter(|line| !line.is_empty())
+}
+
+/// The log line for a failed write: the exit status, then everything pkexec and the helper said,
+/// on one line.
+fn logged(stderr: &str, status: impl Display) -> String {
+    let said: Vec<&str> = said_lines(stderr).collect();
+    format!("pkexec kubaos-keyboard-write failed ({status}): {}", said.join(" / "))
+}
+
+/// The error for a failed write, from pkexec's stderr and exit status.
+fn refusal(stderr: &str, status: impl Display) -> WriteError {
+    if said_lines(stderr).any(|line| DENIALS.iter().any(|denial| line.contains(denial))) {
+        return WriteError::Denied;
     }
-    let reason = said.strip_prefix("Failed to set keymap: ").unwrap_or(said);
-    let reason = if reason.is_empty() {
-        format!("localectl failed ({status})")
-    } else {
-        reason.to_owned()
-    };
-    LocaledError::Refused(LocalectlSaid(reason))
+    if said_lines(stderr).any(|line| line.starts_with(NO_PROGRAM)) {
+        return WriteError::NoWriter;
+    }
+    let reason = said_lines(stderr)
+        .last()
+        .map_or_else(|| format!("pkexec failed ({status})"), str::to_owned);
+    WriteError::Refused(HelperSaid(reason))
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@
 
 -- The keyboard layouts are the system's: /etc/default/keyboard, which the
 -- install writes from Kōbō's Language screen and `kubaos keyboard` rewrites
--- through `localectl set-x11-keymap`. Several layouts are XKB's
+-- (through its root helper, system/files/keyboard). Several layouts are XKB's
 -- comma-separated lists (XKBLAYOUT="us,it", XKBVARIANT=",intl"), which
 -- Hyprland takes as they are, the first the default; SUPER + SHIFT + Space
 -- switches (keybinds.lua). Read on every config load, so after a change

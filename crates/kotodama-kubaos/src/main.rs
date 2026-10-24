@@ -249,7 +249,8 @@ fn watch_keyboards(file: &Path, events: Sender<Event<Own>>) -> Option<Watcher> {
         "keyboard",
         RecursiveMode::NonRecursive,
         SETTLE,
-        // localed writes the file through a temporary one and a rename, as the update check does.
+        // `kubaos keyboard`'s helper writes the file through a temporary one and a rename, as the
+        // update check does.
         move |event, _| event.paths.contains(&changed),
         move |_| {
             let _ = events.send(Event::Own(Own::Keyboards(read_keyboards(&file))));

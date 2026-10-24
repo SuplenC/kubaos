@@ -184,8 +184,8 @@ step "Mac-style accents on Left Alt (keyd, the kubaos:mac-accents XKB option)"
 install_mac_accents
 
 # --------------------------------------------------------------------------
-step "Keyboard layouts changeable by an admin at the machine (polkit, localed)"
-install_root_file "$FILES_DIR/polkit/50-kubaos-keyboard.rules" /etc/polkit-1/rules.d/50-kubaos-keyboard.rules 0644
+step "Keyboard layouts changeable by an admin at the machine (polkit, pkexec)"
+install_keyboard_writer
 
 # --------------------------------------------------------------------------
 step "Snapshot"

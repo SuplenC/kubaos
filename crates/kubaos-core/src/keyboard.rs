@@ -13,7 +13,7 @@
 //! # Not here
 //!
 //! - Writing the file at install: `engine::install`. Changing it on a running system goes
-//!   through `localectl` (`kubaos keyboard`, in the CLI).
+//!   through `kubaos keyboard` (in the CLI) and its root helper, `system/files/keyboard`.
 //! - Hyprland reading it: `config/hypr/input.lua`.
 
 use std::collections::HashMap;
@@ -193,7 +193,7 @@ impl KeyboardFile {
 }
 
 /// The text of `/etc/default/keyboard` for `layouts`, the first the default. console-setup reads
-/// it for the console, which types with the first layout, and systemd-localed for X11 and Wayland.
+/// it for the console, which types with the first layout, and Hyprland (`config/hypr/input.lua`).
 pub fn default_keyboard(layouts: &[Layout]) -> String {
     let (layout, variant) = to_fields(layouts);
     format!(

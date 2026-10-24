@@ -714,31 +714,65 @@ c_keyboard() {
   echo "ok   kubaos keyboard show lists the layouts, the default first"
   keyboard_changes || return 1
   keyboard_refusal || return 1
+  keyboard_writer || return 1
   mac_accents || return 1
   keyboard_tab_clicks || return 1
 }
 
-# A localectl that polkit turned down: `kubaos keyboard` says so in one
-# sentence of its own, not localed's words.
+# A pkexec that polkit turned down: `kubaos keyboard` logs what pkexec said on
+# a line of its own, then says so in one sentence of its own, the last line,
+# which the Keyboard tab shows.
 keyboard_refusal() {
   local dir out
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us"\nXKBVARIANT=""\nXKBOPTIONS=""\n' >"$dir/keyboard"
-  install -m 0755 /dev/stdin "$dir/localectl" <<'SH'
+  install -m 0755 /dev/stdin "$dir/pkexec" <<'SH'
 #!/bin/sh
-echo 'Failed to set keymap: Access denied' >&2
-exit 1
+echo 'Error executing command as another user: Not authorized' >&2
+echo >&2
+echo 'This incident has been reported.' >&2
+exit 127
 SH
   chown -R "$USER_NAME:" "$dir"
   out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard add it" 2>&1)" && {
-    echo "FAIL kubaos keyboard add succeeded with localectl refused: $out"
+    echo "FAIL kubaos keyboard add succeeded with pkexec refused: $out"
     rm -rf "$dir"
     return 1
   }
   rm -rf "$dir"
-  [[ $out == "kubaos: the keyboard layouts weren't changed: permission was refused" ]] ||
-    { echo "FAIL a refused localectl printed: $out"; return 1; }
-  echo "ok   a change polkit refuses says so in a sentence, without localectl's words"
+  [[ $(tail -1 <<<"$out") == "kubaos: the keyboard layouts weren't changed: permission was refused" ]] ||
+    { echo "FAIL a refused pkexec printed: $out"; return 1; }
+  grep -qx "kubaos: pkexec kubaos-keyboard-write failed (exit status: 127): .*Not authorized / This incident has been reported\." <<<"$out" ||
+    { echo "FAIL a refused pkexec logged no line with what it said: $out"; return 1; }
+  echo "ok   a change polkit refuses is logged with pkexec's words, then said in a sentence"
+}
+
+# The root helper `kubaos keyboard` runs through pkexec, as root on the
+# container's /etc/default/keyboard: it writes the four XKB fields, keeps the
+# other lines, and refuses a value that could break out of its quotes.
+keyboard_writer() {
+  local helper="$REPO/system/files/keyboard/kubaos-keyboard-write" kb=/etc/default/keyboard saved bad=0
+  saved="$(mktemp)"
+  [[ -e $kb ]] && cp -p "$kb" "$saved"
+  printf 'XKBMODEL="pc105"\nXKBLAYOUT="us"\nXKBVARIANT=""\nXKBOPTIONS=""\nBACKSPACE="guess"\n' >"$kb"
+  if ! "$helper" us,it pc105 ,intl caps:escape; then
+    echo "FAIL kubaos-keyboard-write us,it pc105 ,intl caps:escape failed"; bad=1
+  elif ! grep -qx 'XKBLAYOUT="us,it"' "$kb" || ! grep -qx 'XKBVARIANT=",intl"' "$kb" ||
+    ! grep -qx 'XKBOPTIONS="caps:escape"' "$kb" || ! grep -qx 'BACKSPACE="guess"' "$kb" ||
+    [[ $(grep -c '^XKBLAYOUT=' "$kb") != 1 || $(stat -c %a "$kb") != 644 ]]; then
+    echo "FAIL kubaos-keyboard-write wrote: $(cat "$kb")"; bad=1
+  else
+    echo "ok   the root helper writes the XKB fields and keeps the other lines"
+  fi
+  if "$helper" 'us"' pc105 '' '' 2>/dev/null || "$helper" "$(printf 'us\nX=1')" pc105 '' '' 2>/dev/null ||
+    ! grep -qx 'XKBLAYOUT="us,it"' "$kb"; then
+    echo "FAIL kubaos-keyboard-write took a quote or a new line: $(cat "$kb")"; bad=1
+  else
+    echo "ok   the root helper refuses a quote or a new line, and leaves the file as it was"
+  fi
+  if [[ -s $saved ]]; then cp -p "$saved" "$kb"; else rm -f "$kb"; fi
+  rm -f "$saved"
+  return "$bad"
 }
 
 # pointer_tools: VP_RUN, the command that drives test/lib/vpointer.py (Python
@@ -837,15 +871,16 @@ SH
   return "$bad"
 }
 
-# `kubaos keyboard move` and `list`, with a stand-in localectl that writes the
-# file as localed would: the container has no systemd-localed.
+# `kubaos keyboard move` and `list`, with a stand-in pkexec that writes the
+# file as the root helper would, without root.
 keyboard_changes() {
   local dir out
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it,de"\nXKBVARIANT=",intl,"\nXKBOPTIONS="caps:escape"\n' >"$dir/keyboard"
-  install -m 0755 /dev/stdin "$dir/localectl" <<'SH'
+  install -m 0755 /dev/stdin "$dir/pkexec" <<'SH'
 #!/bin/sh
-# localectl set-x11-keymap LAYOUT MODEL VARIANT OPTIONS
+# pkexec /usr/local/libexec/kubaos-keyboard-write LAYOUT MODEL VARIANT OPTIONS
+[ "$1" = /usr/local/libexec/kubaos-keyboard-write ] || { echo "pkexec: not the helper: $1" >&2; exit 127; }
 printf 'XKBMODEL="%s"\nXKBLAYOUT="%s"\nXKBVARIANT="%s"\nXKBOPTIONS="%s"\n' "$3" "$2" "$4" "$5" >"$KUBAOS_KEYBOARD_FILE"
 SH
   chown -R "$USER_NAME:" "$dir"
@@ -857,7 +892,7 @@ SH
     rm -rf "$dir"
     return 1
   fi
-  echo "ok   kubaos keyboard move puts a layout at a place through localectl, the options kept"
+  echo "ok   kubaos keyboard move puts a layout at a place through the helper, the options kept"
   out="$(kz "PATH='$dir':\$PATH KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard move de 4" 2>&1)" && {
     echo "FAIL kubaos keyboard move de 4 of 3 succeeded: $out"
     rm -rf "$dir"
@@ -1695,7 +1730,7 @@ TOML
     bad=1
   fi
 
-  # localed writes the file through a temporary one and a rename; the Items follow it.
+  # The helper writes the file through a temporary one and a rename; the Items follow it.
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,de"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb.new"
   mv "$kb.new" "$kb"
   for i in $(seq 20); do
