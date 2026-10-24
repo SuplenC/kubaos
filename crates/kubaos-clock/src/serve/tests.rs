@@ -72,7 +72,11 @@ fn a_broken_settings_file_keeps_the_defaults_and_says_why() {
 
     let state = ask(&mut server, r#"{"id":1,"op":"state"}"#);
 
-    assert!(state["problem"].as_str().is_some_and(|problem| problem.contains("clock settings")));
+    assert!(
+        state["problem"]
+            .as_str()
+            .is_some_and(|problem| problem.contains("clock settings"))
+    );
     assert_eq!(state["settings"]["firstWeekday"], 1);
 }
 
@@ -109,14 +113,20 @@ fn changes_land_in_the_file_and_the_state_comes_back() {
     let state = ask(&mut server, r#"{"id":1,"op":"zone-add","name":"new york"}"#);
     assert_eq!(state["clocks"][0]["name"], "America/New_York");
 
-    let state = ask(&mut server, r#"{"id":2,"op":"countdown-add","name":"Trip","when":"19 dec"}"#);
+    let state = ask(
+        &mut server,
+        r#"{"id":2,"op":"countdown-add","name":"Trip","when":"19 dec"}"#,
+    );
     assert_eq!(state["countdowns"][0]["at"], "2026-12-19");
 
     let state = ask(&mut server, r#"{"id":3,"op":"set","key":"analog","value":"on"}"#);
     assert_eq!(state["settings"]["analog"], true);
 
     let text = fs::read_to_string(dir.path().join(settings::FILE)).expect("the file");
-    assert!(text.contains("America/New_York") && text.contains("2026-12-19"), "{text}");
+    assert!(
+        text.contains("America/New_York") && text.contains("2026-12-19"),
+        "{text}"
+    );
 
     let state = ask(&mut server, r#"{"id":4,"op":"zone-remove","name":"new york"}"#);
     assert_eq!(state["clocks"].as_array().map(Vec::len), Some(0));
@@ -127,7 +137,10 @@ fn a_refused_change_is_an_error_with_its_reason() {
     let (_dir, mut server) = server("");
 
     let zone = ask(&mut server, r#"{"id":1,"op":"zone-add","name":"atlantis"}"#);
-    let countdown = ask(&mut server, r#"{"id":2,"op":"countdown-add","name":"x","when":"days until christmas"}"#);
+    let countdown = ask(
+        &mut server,
+        r#"{"id":2,"op":"countdown-add","name":"x","when":"days until christmas"}"#,
+    );
     let op = ask(&mut server, r#"{"id":3,"op":"dance"}"#);
 
     assert_eq!(zone["error"], "no time zone called \"atlantis\"");
@@ -140,11 +153,18 @@ fn a_refused_change_is_an_error_with_its_reason() {
 fn an_edit_by_hand_is_read_at_the_next_request() {
     let (dir, mut server) = server("analog = false\n");
 
-    fs::write(dir.path().join(settings::FILE), "analog = true\nfirst_weekday = \"sunday\"\n").expect("edit");
+    fs::write(
+        dir.path().join(settings::FILE),
+        "analog = true\nfirst_weekday = \"sunday\"\n",
+    )
+    .expect("edit");
     // The file's time may not move within the filesystem's resolution; a change of size is
     // enough for the test, and a real edit moves the time.
     let filetime = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
-    let file = fs::File::options().write(true).open(dir.path().join(settings::FILE)).expect("open");
+    let file = fs::File::options()
+        .write(true)
+        .open(dir.path().join(settings::FILE))
+        .expect("open");
     file.set_modified(filetime).expect("touch");
 
     let state = ask(&mut server, r#"{"id":1,"op":"state"}"#);

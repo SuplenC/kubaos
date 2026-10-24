@@ -15,8 +15,8 @@
 //!
 //! # Owns
 //!
-//! - The command line and its exit codes: 2 for a usage error, 1 when the engine refused, with
-//!   the reason on stderr, which the menu shows.
+//! - The command line and its exit codes: 2 for a usage error, 1 when the engine refused, with the
+//!   reason on stderr, which the menu shows.
 //!
 //! # Not here
 //!

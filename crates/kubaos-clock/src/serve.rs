@@ -18,8 +18,8 @@
 //!
 //! # Owns
 //!
-//! - The requests and their replies, the settings and holidays the server holds, and the changes
-//!   to the settings the popup and the command line make.
+//! - The requests and their replies, the settings and holidays the server holds, and the changes to
+//!   the settings the popup and the command line make.
 //!
 //! # Not here
 //!
@@ -132,7 +132,10 @@ impl Server {
         let (countries, rules_problem) = settings::countries(dir);
         self.countries = countries;
         self.modified = self.path.as_deref().and_then(modified);
-        let loaded = self.path.as_deref().map_or_else(|| Ok(Settings::default()), Settings::load);
+        let loaded = self
+            .path
+            .as_deref()
+            .map_or_else(|| Ok(Settings::default()), Settings::load);
         let settings_problem = loaded.as_ref().err().map(|err| chain(err));
         self.settings = loaded.unwrap_or_default();
         self.problem = settings_problem.or_else(|| rules_problem.map(|err| chain(&err)));
@@ -143,7 +146,9 @@ impl Server {
             .unwrap_or_default();
     }
 
-    fn reload_if_changed(&mut self) {
+    /// Reads the settings again if the file changed since they were read: the menu's answers ask
+    /// before each query, so a country picked in the popup counts its holidays at once.
+    pub fn refresh(&mut self) {
         if self.path.as_deref().and_then(modified) != self.modified {
             self.reload();
         }
@@ -151,7 +156,7 @@ impl Server {
 
     /// Answers one request line, as of `now`.
     pub fn handle(&mut self, line: &str, now: &Zoned) -> String {
-        self.reload_if_changed();
+        self.refresh();
         let request: Value = match serde_json::from_str(line) {
             Ok(request) => request,
             Err(err) => return json!({ "id": Value::Null, "error": format!("not JSON: {err}") }).to_string(),
@@ -163,15 +168,30 @@ impl Server {
             "query" => Ok(json!({ "answer": self.query(&text("text"), now).map(|answer| answer_json(&answer)) })),
             "month" => Ok(self.month(&request, now)),
             "day" => Ok(self.day(&text("date"), now)),
-            "duration" => {
-                Ok(json!({ "ms": parse::duration(&text("text")).map(|duration| duration.as_millis()) }))
-            }
+            "duration" => Ok(json!({ "ms": parse::duration(&text("text")).map(|duration| duration.as_millis()) })),
             "alarm" => Ok(self.alarm(&text("text"), now)),
-            "zone-add" => self.add_zone(&text("name")).map(drop).map_err(|err| chain(&err)).map(|()| self.state(now)),
-            "zone-remove" => self.remove_zone(&text("name")).map_err(|err| chain(&err)).map(|()| self.state(now)),
-            "countdown-add" => self.add_countdown(&text("name"), &text("when"), now).map(drop).map_err(|err| chain(&err)).map(|()| self.state(now)),
-            "countdown-remove" => self.remove_countdown(&text("name")).map_err(|err| chain(&err)).map(|()| self.state(now)),
-            "set" => self.set(&text("key"), &text("value")).map_err(|err| chain(&err)).map(|()| self.state(now)),
+            "zone-add" => self
+                .add_zone(&text("name"))
+                .map(drop)
+                .map_err(|err| chain(&err))
+                .map(|()| self.state(now)),
+            "zone-remove" => self
+                .remove_zone(&text("name"))
+                .map_err(|err| chain(&err))
+                .map(|()| self.state(now)),
+            "countdown-add" => self
+                .add_countdown(&text("name"), &text("when"), now)
+                .map(drop)
+                .map_err(|err| chain(&err))
+                .map(|()| self.state(now)),
+            "countdown-remove" => self
+                .remove_countdown(&text("name"))
+                .map_err(|err| chain(&err))
+                .map(|()| self.state(now)),
+            "set" => self
+                .set(&text("key"), &text("value"))
+                .map_err(|err| chain(&err))
+                .map(|()| self.state(now)),
             other => Err(format!("no op {other:?}")),
         }
         .unwrap_or_else(|error| json!({ "error": error }));
@@ -199,8 +219,11 @@ impl Server {
                 Some(json!({ "name": countdown.name, "at": countdown.at, "end": end.as_millisecond() }))
             })
             .collect();
-        let countries: Vec<Value> =
-            self.countries.list().map(|(code, name)| json!({ "code": code, "name": name })).collect();
+        let countries: Vec<Value> = self
+            .countries
+            .list()
+            .map(|(code, name)| json!({ "code": code, "name": name }))
+            .collect();
         let first = self.settings.first_weekday;
         json!({
             "settings": {
@@ -264,10 +287,18 @@ impl Server {
         let Ok(date) = date.parse::<Date>() else {
             return json!({ "error": format!("{date:?} isn't a date") });
         };
-        let zones: Vec<_> = self.settings.zones.iter().filter_map(|name| self.zones.get(name)).collect();
+        let zones: Vec<_> = self
+            .settings
+            .zones
+            .iter()
+            .filter_map(|name| self.zones.get(name))
+            .collect();
         let details = calendar::day(date, now, &self.holidays, &zones);
-        let zones: Vec<Value> =
-            details.zones.iter().map(|zone| json!({ "label": zone.label, "time": zone.time })).collect();
+        let zones: Vec<Value> = details
+            .zones
+            .iter()
+            .map(|zone| json!({ "label": zone.label, "time": zone.time }))
+            .collect();
         json!({ "day": {
             "date": date.to_string(),
             "title": details.title,
@@ -320,7 +351,9 @@ impl Server {
         } else {
             self.zones.get(name).map_or_else(|| name.to_owned(), |zone| zone.name)
         };
-        let result = self.path().and_then(|path| settings::remove_zone(path, &name).map_err(CommandError::settings));
+        let result = self
+            .path()
+            .and_then(|path| settings::remove_zone(path, &name).map_err(CommandError::settings));
         self.after(result)
     }
 
@@ -336,7 +369,11 @@ impl Server {
             .moment(when, now)
             .ok_or_else(|| CommandError::NotAMoment(when.to_owned()))
             .and_then(|at| {
-                let name = if name.trim().is_empty() { when.trim() } else { name.trim() };
+                let name = if name.trim().is_empty() {
+                    when.trim()
+                } else {
+                    name.trim()
+                };
                 settings::add_countdown(self.path()?, name, &at).map_err(CommandError::settings)?;
                 Ok(at)
             });
@@ -357,8 +394,9 @@ impl Server {
     ///
     /// As [`settings::remove_countdown`].
     pub fn remove_countdown(&mut self, name: &str) -> Result<(), CommandError> {
-        let result =
-            self.path().and_then(|path| settings::remove_countdown(path, name).map_err(CommandError::settings));
+        let result = self
+            .path()
+            .and_then(|path| settings::remove_countdown(path, name).map_err(CommandError::settings));
         self.after(result)
     }
 

@@ -10,9 +10,7 @@ name = "kubaos-clock"
 path = "src/main.rs"
 
 [dependencies]
-# Kotodama's calculator reads dates with jiff too, so the menu and the popup agree on zones and
-# DST. The time zone database is the system's (`/usr/share/zoneinfo`, or `$TZDIR`), never bundled.
-jiff = { version = "0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo"] }
+jiff.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

@@ -101,11 +101,17 @@ fn named_days_and_the_countrys_holidays_are_dates() {
 #[test]
 fn days_until_and_since_count_whole_days() {
     assert_eq!(title("days until christmas"), "62 days");
-    assert_eq!(detail("days until christmas"), "until Friday 25 December 2026 · 8 weeks 6 days");
+    assert_eq!(
+        detail("days until christmas"),
+        "until Friday 25 December 2026 · 8 weeks 6 days"
+    );
     assert_eq!(title("until christmas"), "62 days");
     assert_eq!(title("days till 1 jan"), "69 days");
     assert_eq!(title("days since 2020-01-01"), "2488 days");
-    assert_eq!(detail("days since 2020-01-01"), "since Wednesday 1 January 2020 · 355 weeks 3 days");
+    assert_eq!(
+        detail("days since 2020-01-01"),
+        "since Wednesday 1 January 2020 · 355 weeks 3 days"
+    );
     assert_eq!(title("weeks until christmas"), "8 weeks 6 days");
     assert_eq!(title("how many days until easter"), "155 days");
     assert_eq!(title("days until tomorrow"), "1 day");
@@ -135,7 +141,11 @@ fn a_range_counts_days_weeks_months_and_working_days() {
         "12 March 2027 to 4 July 2027 · 16 weeks 2 days · 3 months 22 days · 78 working days"
     );
     assert_eq!(title("from 2026-12-21 to 2027-01-08"), "18 days");
-    assert!(detail("2026-12-21 - 2027-01-08").ends_with("· 11 working days"), "{}", detail("2026-12-21 - 2027-01-08"));
+    assert!(
+        detail("2026-12-21 - 2027-01-08").ends_with("· 11 working days"),
+        "{}",
+        detail("2026-12-21 - 2027-01-08")
+    );
     assert_eq!(title("between 1 nov and 30 nov"), "29 days");
 }
 
@@ -164,7 +174,10 @@ fn hours_move_the_clock_across_the_dst_change() {
 #[test]
 fn a_time_in_a_zone_is_shown_here() {
     assert_eq!(title("15:00 tokyo"), "08:00 in Warsaw");
-    assert_eq!(detail("15:00 tokyo"), "15:00 in Tokyo · Saturday 24 October · Warsaw is 7 h behind");
+    assert_eq!(
+        detail("15:00 tokyo"),
+        "15:00 in Tokyo · Saturday 24 October · Warsaw is 7 h behind"
+    );
     assert_eq!(title("3pm Tokyo"), "08:00 in Warsaw");
 }
 
@@ -173,13 +186,19 @@ fn a_time_converts_from_one_zone_to_another() {
     assert_eq!(title("9am NY in Warsaw"), "15:00 in Warsaw");
     assert_eq!(title("9am new york to warsaw"), "15:00 in Warsaw");
     assert_eq!(title("17:00 in new york"), "11:00 in New York");
-    assert_eq!(detail("17:00 in new york"), "17:00 in Warsaw · Saturday 24 October · New York is 6 h behind");
+    assert_eq!(
+        detail("17:00 in new york"),
+        "17:00 in Warsaw · Saturday 24 October · New York is 6 h behind"
+    );
 }
 
 #[test]
 fn a_conversion_past_the_dst_change_lands_on_the_next_day() {
     assert_eq!(title("9pm pt to cet"), "05:00 in CET");
-    assert_eq!(detail("9pm pt to cet"), "21:00 in PT · Sunday 25 October · CET is 8 h ahead");
+    assert_eq!(
+        detail("9pm pt to cet"),
+        "21:00 in PT · Sunday 25 October · CET is 8 h ahead"
+    );
 }
 
 #[test]
@@ -212,7 +231,19 @@ fn an_answer_carries_an_iso_form_and_the_date_to_show() {
 
 #[test]
 fn queries_that_are_not_dates_get_no_answer() {
-    for query in ["", "firefox", "next", "12", "15:00", "volume 40", "days until", "age", "tokyo", "in", "may"] {
+    for query in [
+        "",
+        "firefox",
+        "next",
+        "12",
+        "15:00",
+        "volume 40",
+        "days until",
+        "age",
+        "tokyo",
+        "in",
+        "may",
+    ] {
         assert!(ask(query).is_none(), "{query:?} answered {:?}", ask(query));
     }
 }

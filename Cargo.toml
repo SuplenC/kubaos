@@ -28,6 +28,9 @@ license = "MIT OR Apache-2.0"
 kubaos-core = { path = "crates/kubaos-core" }
 kubaos-cursor = { path = "crates/kubaos-cursor" }
 kubaos-clock = { path = "crates/kubaos-clock" }
+# Kotodama's calculator reads dates with jiff too, so the menu and the popup agree on zones and
+# DST. The time zone database is the system's (`/usr/share/zoneinfo`, or `$TZDIR`), never bundled.
+jiff = { version = "0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.9"

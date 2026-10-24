@@ -6,7 +6,11 @@ use super::Holidays;
 use super::easter;
 
 fn names(holidays: &Holidays, year: i16) -> Vec<(Date, String)> {
-    holidays.in_year(year).into_iter().map(|day| (day.date, day.name)).collect()
+    holidays
+        .in_year(year)
+        .into_iter()
+        .map(|day| (day.date, day.name))
+        .collect()
 }
 
 fn country(code: &str) -> Holidays {
@@ -32,7 +36,11 @@ fn every_bundled_country_parses_and_has_new_years_day() {
     assert!(listed.len() >= 10, "{listed:?}");
     for code in listed {
         let holidays = countries.holidays(code).expect("listed");
-        assert_eq!(holidays.on(date(2026, 1, 1)).as_deref(), Some("New Year's Day"), "{code}");
+        assert_eq!(
+            holidays.on(date(2026, 1, 1)).as_deref(),
+            Some("New Year's Day"),
+            "{code}"
+        );
     }
 }
 
@@ -131,8 +139,14 @@ fn no_country_means_no_holidays() {
 fn a_holiday_is_found_by_name_from_a_day_on() {
     let pl = country("pl");
 
-    assert_eq!(pl.next_named("corpus christi", date(2026, 10, 24)), Some(date(2027, 5, 27)));
-    assert_eq!(pl.next_named("independence day", date(2026, 10, 24)), Some(date(2026, 11, 11)));
+    assert_eq!(
+        pl.next_named("corpus christi", date(2026, 10, 24)),
+        Some(date(2027, 5, 27))
+    );
+    assert_eq!(
+        pl.next_named("independence day", date(2026, 10, 24)),
+        Some(date(2026, 11, 11))
+    );
     assert_eq!(pl.next_named("all saints", date(2026, 10, 24)), Some(date(2026, 11, 1)));
     assert_eq!(pl.next_named("nothing like it", date(2026, 10, 24)), None);
 }

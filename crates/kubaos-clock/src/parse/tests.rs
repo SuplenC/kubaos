@@ -38,7 +38,13 @@ fn spans_read_words_compact_forms_and_articles() {
     assert_eq!((units.hours, units.minutes, used), (1, 30, 1));
 
     let (units, _) = span(&["a", "month"]).expect("a span");
-    assert_eq!(units, Units { months: 1, ..Units::default() });
+    assert_eq!(
+        units,
+        Units {
+            months: 1,
+            ..Units::default()
+        }
+    );
 
     let (units, _) = span(&["3mo"]).expect("a span");
     assert_eq!(units.months, 3);

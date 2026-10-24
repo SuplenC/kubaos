@@ -173,7 +173,9 @@ impl Zones {
     /// The zone the first words of `words` name, and how many words that took: three words at
     /// most, the longest name first, so `new york` wins over `new`.
     pub fn find(&self, words: &[&str]) -> Option<(Zone, usize)> {
-        (1..=words.len().min(3)).rev().find_map(|n| Some((self.get(&words[..n].join(" "))?, n)))
+        (1..=words.len().min(3))
+            .rev()
+            .find_map(|n| Some((self.get(&words[..n].join(" "))?, n)))
     }
 
     /// The zone `tz` as the popup shows it, by its IANA name.
@@ -205,7 +207,10 @@ fn title_case(plain: &str) -> String {
         .split(' ')
         .map(|word| {
             let mut chars = word.chars();
-            chars.next().map(|first| first.to_uppercase().chain(chars).collect()).unwrap_or_default()
+            chars
+                .next()
+                .map(|first| first.to_uppercase().chain(chars).collect())
+                .unwrap_or_default()
         })
         .collect::<Vec<String>>()
         .join(" ")

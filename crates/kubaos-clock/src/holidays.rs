@@ -128,7 +128,9 @@ impl Countries {
 
     /// The countries, as code and name, by code.
     pub fn list(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.countries.iter().map(|(code, country)| (code.as_str(), country.name.as_str()))
+        self.countries
+            .iter()
+            .map(|(code, country)| (code.as_str(), country.name.as_str()))
     }
 
     /// The holidays of the country `code`, in any case.
@@ -175,7 +177,12 @@ impl Holidays {
             .days
             .iter()
             .filter(|rule| rule.from.is_none_or(|from| year >= from) && rule.until.is_none_or(|until| year <= until))
-            .filter_map(|rule| Some(Holiday { date: rule.date_in(year)?, name: rule.name.clone() }))
+            .filter_map(|rule| {
+                Some(Holiday {
+                    date: rule.date_in(year)?,
+                    name: rule.name.clone(),
+                })
+            })
             .collect();
         days.sort_by_key(|day| day.date);
         let mut observed = Vec::new();
@@ -183,7 +190,11 @@ impl Holidays {
             let Some(rule) = country.days.iter().find(|rule| rule.name == day.name) else {
                 continue;
             };
-            let taken = |date: Date| days.iter().chain(&observed).any(|holiday: &Holiday| holiday.date == date);
+            let taken = |date: Date| {
+                days.iter()
+                    .chain(&observed)
+                    .any(|holiday: &Holiday| holiday.date == date)
+            };
             if let Some(extra) = rule.observed_day(day.date, taken) {
                 observed.push(extra);
             }
@@ -238,7 +249,8 @@ impl Holidays {
 impl Rule {
     fn has_shape(&self) -> bool {
         let fixed = self.date.as_deref().is_some_and(|date| month_day(date).is_some());
-        let weekday = self.month.is_some() && self.nth.is_some() && self.weekday.as_deref().and_then(words::weekday).is_some();
+        let weekday =
+            self.month.is_some() && self.nth.is_some() && self.weekday.as_deref().and_then(words::weekday).is_some();
         fixed || self.easter.is_some() || weekday
     }
 
@@ -250,7 +262,10 @@ impl Rule {
             easter(year).checked_add(days.days()).ok()?
         } else {
             let weekday = words::weekday(self.weekday.as_deref()?)?;
-            Date::new(year, self.month?, 1).ok()?.nth_weekday_of_month(self.nth?, weekday).ok()?
+            Date::new(year, self.month?, 1)
+                .ok()?
+                .nth_weekday_of_month(self.nth?, weekday)
+                .ok()?
         };
         Some(match (self.observed, date.weekday()) {
             (Observed::Saturday, Weekday::Sunday) => date.yesterday().ok()?,

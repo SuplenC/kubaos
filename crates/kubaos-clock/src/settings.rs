@@ -245,7 +245,10 @@ fn save(path: &Path, doc: &DocumentMut) -> Result<(), SettingsError> {
 /// A copy of the `zones` array of `doc`, empty if missing; it goes back with `doc["zones"] = …`,
 /// which keeps the key where it was.
 fn zones_array(doc: &DocumentMut) -> toml_edit::Array {
-    doc.get("zones").and_then(toml_edit::Item::as_array).cloned().unwrap_or_default()
+    doc.get("zones")
+        .and_then(toml_edit::Item::as_array)
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// Adds the zone `name` (an IANA name) to the extra clocks; one already there stays as it is.
@@ -296,7 +299,10 @@ pub fn add_countdown(path: &Path, name: &str, at: &str) -> Result<(), SettingsEr
         .and_then(toml_edit::Item::as_array_of_tables)
         .cloned()
         .unwrap_or_default();
-    if let Some(found) = countdowns.iter_mut().find(|table| table.get("name").and_then(toml_edit::Item::as_str) == Some(name)) {
+    if let Some(found) = countdowns
+        .iter_mut()
+        .find(|table| table.get("name").and_then(toml_edit::Item::as_str) == Some(name))
+    {
         found["at"] = value(at);
     } else {
         let mut table = toml_edit::Table::new();
@@ -316,7 +322,10 @@ pub fn add_countdown(path: &Path, name: &str, at: &str) -> Result<(), SettingsEr
 /// the file.
 pub fn remove_countdown(path: &Path, name: &str) -> Result<(), SettingsError> {
     let mut doc = document(path)?;
-    let Some(countdowns) = doc.get_mut("countdowns").and_then(toml_edit::Item::as_array_of_tables_mut) else {
+    let Some(countdowns) = doc
+        .get_mut("countdowns")
+        .and_then(toml_edit::Item::as_array_of_tables_mut)
+    else {
         return Err(SettingsError::NoCountdown(name.to_owned()));
     };
     let before = countdowns.len();
@@ -342,11 +351,18 @@ pub fn remove_countdown(path: &Path, name: &str) -> Result<(), SettingsError> {
 pub fn set(path: &Path, key: &str, setting: &str, countries: &Countries) -> Result<(), SettingsError> {
     let mut doc = document(path)?;
     let current = Settings::parse(&doc.to_string())?;
-    let bad = |key: &'static str| SettingsError::Value { key, value: setting.to_owned() };
+    let bad = |key: &'static str| SettingsError::Value {
+        key,
+        value: setting.to_owned(),
+    };
     match key {
         "holidays" => {
             let code = setting.to_lowercase();
-            let code = if matches!(code.as_str(), "none" | "off" | "") { String::new() } else { code };
+            let code = if matches!(code.as_str(), "none" | "off" | "") {
+                String::new()
+            } else {
+                code
+            };
             if !code.is_empty() && countries.holidays(&code).is_none() {
                 let known: Vec<&str> = countries.list().map(|(code, _)| code).collect();
                 return Err(SettingsError::NoCountry(setting.to_owned(), known.join(", ")));
@@ -367,7 +383,11 @@ pub fn set(path: &Path, key: &str, setting: &str, countries: &Countries) -> Resu
             doc["analog"] = value(on);
         }
         "bar-countdown" | "bar_countdown" => {
-            let name = if matches!(setting, "none" | "off" | "") { "" } else { setting };
+            let name = if matches!(setting, "none" | "off" | "") {
+                ""
+            } else {
+                setting
+            };
             if !name.is_empty() && !current.countdowns.iter().any(|countdown| countdown.name == name) {
                 return Err(SettingsError::NoCountdown(name.to_owned()));
             }

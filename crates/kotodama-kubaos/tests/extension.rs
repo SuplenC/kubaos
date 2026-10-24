@@ -6,6 +6,7 @@ use std::thread;
 use std::time::Duration;
 
 use kotodama_extension::testing::Spawned;
+use kotodama_protocol::Clipboard;
 use kotodama_protocol::FromExtension;
 use kotodama_protocol::ItemKind;
 use kotodama_protocol::ItemRef;
@@ -149,6 +150,64 @@ fn a_run_that_fails_says_why_and_keeps_the_menu_open() {
         extension.outcome(2, |message| matches!(message, FromExtension::PushView(_))),
         Outcome::Failed {
             message: "Type a percentage from 0 to 100, not `loud`".to_owned()
+        }
+    );
+}
+
+#[test]
+fn a_date_query_is_answered_and_its_answer_copies() {
+    let config = tempfile::tempdir().expect("a config folder");
+    let mut extension = Spawned::start(
+        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_CONFIG_HOME", config.path()),
+        WAIT,
+    );
+    extension.status();
+
+    extension.send(ToExtension::LiveQuery {
+        id: 3,
+        query: "days until 2099-01-01".to_owned(),
+        prefix: None,
+    });
+    let FromExtension::LiveResults {
+        live_query,
+        results,
+        done,
+    } = extension.recv()
+    else {
+        panic!("no Live results");
+    };
+    assert_eq!((live_query, done, results.len()), (3, true, 1));
+    assert!(results[0].answer);
+    assert!(results[0].item.title.ends_with(" days"), "{}", results[0].item.title);
+
+    let date = ItemRef {
+        id: "days until 2099-01-01".to_owned(),
+        kind: ItemKind::Namespaced(NamespacedKind::new("kubaos.date").unwrap()),
+    };
+    extension.start_run(1, "copy-iso", date, BTreeMap::new());
+    let Outcome::Copy(Clipboard::Text(iso)) = extension.outcome(1, |_| false) else {
+        panic!("the answer wasn't copied");
+    };
+    assert!(iso.starts_with('P') && iso.ends_with('D'), "{iso}");
+}
+
+#[test]
+fn a_query_that_is_not_a_date_is_answered_with_nothing() {
+    let mut extension = start();
+    extension.status();
+
+    extension.send(ToExtension::LiveQuery {
+        id: 4,
+        query: "next wallpaper".to_owned(),
+        prefix: None,
+    });
+
+    assert_eq!(
+        extension.recv(),
+        FromExtension::LiveResults {
+            live_query: 4,
+            results: vec![],
+            done: true
         }
     );
 }

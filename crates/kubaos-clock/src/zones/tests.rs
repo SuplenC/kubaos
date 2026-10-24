@@ -9,12 +9,21 @@ fn name(zones: &Zones, typed: &str) -> Option<(String, String)> {
 fn a_zone_is_found_by_its_iana_name_its_city_or_an_alias() {
     let zones = Zones::new();
 
-    assert_eq!(name(&zones, "America/New_York"), Some(("America/New_York".into(), "New York".into())));
+    assert_eq!(
+        name(&zones, "America/New_York"),
+        Some(("America/New_York".into(), "New York".into()))
+    );
     assert_eq!(name(&zones, "tokyo"), Some(("Asia/Tokyo".into(), "Tokyo".into())));
-    assert_eq!(name(&zones, "New York"), Some(("America/New_York".into(), "New York".into())));
+    assert_eq!(
+        name(&zones, "New York"),
+        Some(("America/New_York".into(), "New York".into()))
+    );
     assert_eq!(name(&zones, "NY"), Some(("America/New_York".into(), "New York".into())));
     assert_eq!(name(&zones, "krakow"), Some(("Europe/Warsaw".into(), "Krakow".into())));
-    assert_eq!(name(&zones, "san francisco"), Some(("America/Los_Angeles".into(), "San Francisco".into())));
+    assert_eq!(
+        name(&zones, "san francisco"),
+        Some(("America/Los_Angeles".into(), "San Francisco".into()))
+    );
 }
 
 #[test]

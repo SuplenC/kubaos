@@ -173,7 +173,11 @@ fn compared(zone: &Zone, there: &Zoned, here: &Zoned) -> String {
     }
     let hours = words::offset_label(diff.abs());
     let hours = hours.trim_start_matches('+');
-    format!("{} is {hours} {}", zone.label, if diff > 0 { "ahead" } else { "behind" })
+    format!(
+        "{} is {hours} {}",
+        zone.label,
+        if diff > 0 { "ahead" } else { "behind" }
+    )
 }
 
 /// `age 1993-05-12`, `how old is 12 may 1993`.
@@ -186,7 +190,11 @@ fn age(w: &[&str], ctx: &Ctx) -> Option<Answer> {
         return None;
     }
     let lived = birth.until((Unit::Year, ctx.today)).ok()?;
-    let (years, months, days) = (i64::from(lived.get_years()), i64::from(lived.get_months()), i64::from(lived.get_days()));
+    let (years, months, days) = (
+        i64::from(lived.get_years()),
+        i64::from(lived.get_months()),
+        i64::from(lived.get_days()),
+    );
     let mut parts = vec![words::count(years, "year")];
     if months > 0 {
         parts.push(words::count(months, "month"));
@@ -203,7 +211,11 @@ fn age(w: &[&str], ctx: &Ctx) -> Option<Answer> {
     };
     Some(Answer {
         title: words::count(years, "year"),
-        detail: format!("{} · born on {} · {next}", parts.join(" "), words::a_weekday(birth.weekday())),
+        detail: format!(
+            "{} · born on {} · {next}",
+            parts.join(" "),
+            words::a_weekday(birth.weekday())
+        ),
         iso: format!("P{years}Y{months}M{days}D"),
         date: Some(birth),
     })
@@ -218,7 +230,11 @@ fn next_birthday(birth: Date, today: Date) -> Option<Date> {
             .ok()
     };
     let this_year = in_year(today.year())?;
-    if this_year >= today { Some(this_year) } else { in_year(today.year() + 1) }
+    if this_year >= today {
+        Some(this_year)
+    } else {
+        in_year(today.year() + 1)
+    }
 }
 
 /// How a count is shown: in days, in weeks and days, or in the units that fit.
@@ -254,16 +270,29 @@ fn count(w: &[&str], ctx: &Ctx) -> Option<Answer> {
                 CountIn::Weeks => weeks_and_days(days),
                 CountIn::Days | CountIn::Fitting => words::count(days, "day"),
             };
-            let other = if unit == CountIn::Weeks { words::count(days, "day") } else { weeks_and_days(days) };
+            let other = if unit == CountIn::Weeks {
+                words::count(days, "day")
+            } else {
+                weeks_and_days(days)
+            };
             let detail = if days >= 7 || unit == CountIn::Weeks {
                 format!("{toward} {} · {other}", words::long_date(date))
             } else {
                 format!("{toward} {}", words::long_date(date))
             };
-            Some(Answer { title, detail, iso: format!("P{days}D"), date: Some(date) })
+            Some(Answer {
+                title,
+                detail,
+                iso: format!("P{days}D"),
+                date: Some(date),
+            })
         }
         Moment::At(at) => {
-            let (from, to) = if lean == Lean::Next { (ctx.now, &at) } else { (&at, ctx.now) };
+            let (from, to) = if lean == Lean::Next {
+                (ctx.now, &at)
+            } else {
+                (&at, ctx.now)
+            };
             let span = between(from, to)?;
             Some(Answer {
                 title: fitting(&span),
@@ -280,7 +309,11 @@ fn count(w: &[&str], ctx: &Ctx) -> Option<Answer> {
 fn range(w: &[&str], ctx: &Ctx) -> Option<Answer> {
     let (["from" | "between", w @ ..] | w) = w;
     let (start, used) = parse::date(w, ctx.today, Lean::Next, ctx)?;
-    let ["to" | "until" | "till" | "-" | "\u{2013}" | "and" | "through" | "thru", rest @ ..] = &w[used..] else {
+    let [
+        "to" | "until" | "till" | "-" | "\u{2013}" | "and" | "through" | "thru",
+        rest @ ..,
+    ] = &w[used..]
+    else {
         return None;
     };
     let (end, used) = parse::date(rest, start, Lean::Next, ctx)?;
@@ -294,7 +327,10 @@ fn range(w: &[&str], ctx: &Ctx) -> Option<Answer> {
     }
     let months = start.until((Unit::Month, end)).ok()?;
     if months.get_months() > 0 {
-        parts.push(months_and_days(i64::from(months.get_months()), i64::from(months.get_days())));
+        parts.push(months_and_days(
+            i64::from(months.get_months()),
+            i64::from(months.get_days()),
+        ));
     }
     parts.push(words::count(working_days(start, end, ctx.holidays), "working day"));
     Some(Answer {
@@ -426,7 +462,8 @@ fn zoned_answer(at: &Zoned, ctx: &Ctx) -> Answer {
 /// The days, hours and minutes from `from` to `to`, days as the calendar counts them, so a day
 /// across a DST change is still one day.
 fn between(from: &Zoned, to: &Zoned) -> Option<Span> {
-    from.until(ZonedDifference::new(to).largest(Unit::Day).smallest(Unit::Minute)).ok()
+    from.until(ZonedDifference::new(to).largest(Unit::Day).smallest(Unit::Minute))
+        .ok()
 }
 
 /// The whole days from `from` to `to`.
@@ -467,12 +504,20 @@ fn fitting(span: &Span) -> String {
         .filter(|(n, _)| *n != 0)
         .map(|&(n, unit)| words::count(n, unit))
         .collect();
-    if shown.is_empty() { "0 minutes".into() } else { shown.join(" ") }
+    if shown.is_empty() {
+        "0 minutes".into()
+    } else {
+        shown.join(" ")
+    }
 }
 
 fn iso_span(span: &Span) -> String {
     let (days, hours, minutes) = (span.get_days(), span.get_hours(), span.get_minutes());
-    if hours == 0 && minutes == 0 { format!("P{days}D") } else { format!("P{days}DT{hours}H{minutes}M") }
+    if hours == 0 && minutes == 0 {
+        format!("P{days}D")
+    } else {
+        format!("P{days}DT{hours}H{minutes}M")
+    }
 }
 
 fn hh_mm(at: &Zoned) -> String {
@@ -485,7 +530,12 @@ fn iso_zoned(at: &Zoned) -> String {
 
 /// `Saturday 24 October`.
 fn day_month(date: Date) -> String {
-    format!("{} {} {}", words::weekday_name(date.weekday()), date.day(), words::month_name(date.month()))
+    format!(
+        "{} {} {}",
+        words::weekday_name(date.weekday()),
+        date.day(),
+        words::month_name(date.month())
+    )
 }
 
 /// `12 March 2027`.

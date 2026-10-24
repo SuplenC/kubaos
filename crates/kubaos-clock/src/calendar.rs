@@ -67,7 +67,12 @@ pub fn month(year: i16, month: i8, first: Weekday, today: Date, holidays: &Holid
     if start.year() != year {
         off.extend(holidays.in_year(start.year()));
     }
-    off.extend(holidays.in_year(year + 1).into_iter().filter(|day| day.date.month() == 1));
+    off.extend(
+        holidays
+            .in_year(year + 1)
+            .into_iter()
+            .filter(|day| day.date.month() == 1),
+    );
     let mut weeks = Vec::with_capacity(WEEKS);
     let mut day = start;
     for _ in 0..WEEKS {

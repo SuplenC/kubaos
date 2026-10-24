@@ -146,7 +146,10 @@ fn dotted(w: &[&str]) -> Option<(Date, usize)> {
     if parts.next().is_some() || year.len() != 4 {
         return None;
     }
-    Some((Date::new(year.parse().ok()?, month.parse().ok()?, day.parse().ok()?).ok()?, 1))
+    Some((
+        Date::new(year.parse().ok()?, month.parse().ok()?, day.parse().ok()?).ok()?,
+        1,
+    ))
 }
 
 /// `24 dec`, `24th of december 2027`.
@@ -336,23 +339,39 @@ pub(crate) fn time(w: &[&str]) -> Option<(Time, usize)> {
 /// or last time it comes round as `lean` says.
 pub(crate) fn moment(w: &[&str], lean: Lean, ctx: &Ctx) -> Option<ReadMoment> {
     if w.first() == Some(&"now") {
-        return Some(ReadMoment { moment: Moment::At(ctx.now.clone()), used: 1, time_only: false });
+        return Some(ReadMoment {
+            moment: Moment::At(ctx.now.clone()),
+            used: 1,
+            time_only: false,
+        });
     }
     let tz = ctx.now.time_zone().clone();
     if let Some((date, used)) = date(w, ctx.today, lean, ctx) {
         let at = usize::from(w.get(used) == Some(&"at"));
         if let Some((time, more)) = time(&w[used + at..]) {
             let zoned = date.to_datetime(time).to_zoned(tz).ok()?;
-            return Some(ReadMoment { moment: Moment::At(zoned), used: used + at + more, time_only: false });
+            return Some(ReadMoment {
+                moment: Moment::At(zoned),
+                used: used + at + more,
+                time_only: false,
+            });
         }
-        return Some(ReadMoment { moment: Moment::Day(date), used, time_only: false });
+        return Some(ReadMoment {
+            moment: Moment::Day(date),
+            used,
+            time_only: false,
+        });
     }
     let at = usize::from(w.first() == Some(&"at"));
     let (time, used) = time(&w[at..])?;
     let used = used + at;
     if let Some((date, more)) = date(&w[used..], ctx.today, lean, ctx) {
         let zoned = date.to_datetime(time).to_zoned(tz).ok()?;
-        return Some(ReadMoment { moment: Moment::At(zoned), used: used + more, time_only: false });
+        return Some(ReadMoment {
+            moment: Moment::At(zoned),
+            used: used + more,
+            time_only: false,
+        });
     }
     let mut zoned = ctx.today.to_datetime(time).to_zoned(tz).ok()?;
     if lean == Lean::Next && zoned < *ctx.now {
@@ -360,7 +379,11 @@ pub(crate) fn moment(w: &[&str], lean: Lean, ctx: &Ctx) -> Option<ReadMoment> {
     } else if lean == Lean::Last && zoned > *ctx.now {
         zoned = zoned.checked_sub(1.day()).ok()?;
     }
-    Some(ReadMoment { moment: Moment::At(zoned), used, time_only: true })
+    Some(ReadMoment {
+        moment: Moment::At(zoned),
+        used,
+        time_only: true,
+    })
 }
 
 /// A span's parts, as read.
@@ -460,7 +483,9 @@ fn compact(word: &str, units: &mut Units) -> bool {
     let mut rest = word;
     while !rest.is_empty() {
         let digits = rest.find(|c: char| !c.is_ascii_digit()).unwrap_or(rest.len());
-        let letters = rest[digits..].find(|c: char| !c.is_ascii_alphabetic()).map_or(rest.len(), |at| at + digits);
+        let letters = rest[digits..]
+            .find(|c: char| !c.is_ascii_alphabetic())
+            .map_or(rest.len(), |at| at + digits);
         let (Ok(n), unit) = (rest[..digits].parse::<i64>(), &rest[digits..letters]) else {
             return false;
         };
@@ -507,7 +532,12 @@ fn clock_duration(text: &str) -> Option<i64> {
 /// or a moment with a date (`friday 17:00`). Never in the past.
 pub fn alarm(text: &str, now: &Zoned, zones: &Zones) -> Option<Zoned> {
     let holidays = Holidays::none();
-    let ctx = Ctx { now, today: now.date(), holidays: &holidays, zones };
+    let ctx = Ctx {
+        now,
+        today: now.date(),
+        holidays: &holidays,
+        zones,
+    };
     let split = words::split(text);
     let w: Vec<&str> = split.iter().map(String::as_str).collect();
     let read = moment(&w, Lean::Next, &ctx)?;

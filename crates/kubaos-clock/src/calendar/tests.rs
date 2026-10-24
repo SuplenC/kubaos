@@ -32,10 +32,18 @@ fn today_weekends_and_holidays_are_marked() {
     let november = month(2026, 11, Weekday::Monday, date(2026, 11, 11), &pl()).expect("a month");
 
     let days: Vec<&Day> = november.weeks.iter().flat_map(|week| &week.days).collect();
-    let eleventh = days.iter().find(|day| day.date == date(2026, 11, 11)).expect("the 11th");
+    let eleventh = days
+        .iter()
+        .find(|day| day.date == date(2026, 11, 11))
+        .expect("the 11th");
     assert!(eleventh.today);
     assert_eq!(eleventh.holiday.as_deref(), Some("Independence Day"));
-    assert!(days.iter().find(|day| day.date == date(2026, 11, 1)).expect("the 1st").weekend);
+    assert!(
+        days.iter()
+            .find(|day| day.date == date(2026, 11, 1))
+            .expect("the 1st")
+            .weekend
+    );
 }
 
 #[test]
@@ -51,7 +59,11 @@ fn a_sunday_first_month_starts_its_rows_on_sunday() {
 fn a_january_shows_the_new_years_holiday_of_its_own_year() {
     let january = month(2027, 1, Weekday::Monday, date(2026, 10, 24), &pl()).expect("a month");
 
-    let first = january.weeks.iter().flat_map(|week| &week.days).find(|day| day.date == date(2027, 1, 1));
+    let first = january
+        .weeks
+        .iter()
+        .flat_map(|week| &week.days)
+        .find(|day| day.date == date(2027, 1, 1));
     assert_eq!(first.and_then(|day| day.holiday.as_deref()), Some("New Year's Day"));
     assert_eq!(january.weeks[0].number, 53);
 }
@@ -65,12 +77,19 @@ fn today_knows_its_day_and_week_of_the_year() {
 
 #[test]
 fn clocks_give_each_zone_its_offset_and_skip_unknown_names() {
-    let names = vec!["Asia/Tokyo".to_owned(), "America/New_York".to_owned(), "Atlantis".to_owned()];
+    let names = vec![
+        "Asia/Tokyo".to_owned(),
+        "America/New_York".to_owned(),
+        "Atlantis".to_owned(),
+    ];
 
     let clocks = clocks(&names, &Zones::new(), &now());
 
     assert_eq!(clocks.len(), 2);
-    assert_eq!((clocks[0].label.as_str(), clocks[0].offset, clocks[0].relative.as_str()), ("Tokyo", 9 * 3600, "+7 h"));
+    assert_eq!(
+        (clocks[0].label.as_str(), clocks[0].offset, clocks[0].relative.as_str()),
+        ("Tokyo", 9 * 3600, "+7 h")
+    );
     assert_eq!(clocks[1].relative, "\u{2212}6 h");
 }
 

@@ -47,20 +47,35 @@ fn every_key_is_read() {
     assert_eq!(settings.first_weekday, Weekday::Sunday);
     assert!(settings.analog);
     assert_eq!(settings.bar_countdown, "Trip");
-    assert_eq!(settings.countdowns, [Countdown { name: "Trip".into(), at: "2026-12-19".into() }]);
+    assert_eq!(
+        settings.countdowns,
+        [Countdown {
+            name: "Trip".into(),
+            at: "2026-12-19".into()
+        }]
+    );
 }
 
 #[test]
 fn an_unknown_key_or_weekday_is_an_error() {
     assert!(matches!(Settings::parse("colour = 1"), Err(SettingsError::Parse(_))));
-    assert!(matches!(Settings::parse("first_weekday = \"someday\""), Err(SettingsError::Weekday(_))));
+    assert!(matches!(
+        Settings::parse("first_weekday = \"someday\""),
+        Err(SettingsError::Weekday(_))
+    ));
 }
 
 #[test]
 fn an_empty_holiday_setting_means_none_and_a_code_is_kept() {
     let countries = Countries::bundled();
-    let none = Settings { holidays: Some(String::new()), ..Settings::default() };
-    let us = Settings { holidays: Some("US".into()), ..Settings::default() };
+    let none = Settings {
+        holidays: Some(String::new()),
+        ..Settings::default()
+    };
+    let us = Settings {
+        holidays: Some("US".into()),
+        ..Settings::default()
+    };
 
     assert_eq!(none.holiday_country(&countries), None);
     assert_eq!(us.holiday_country(&countries).as_deref(), Some("us"));
@@ -74,7 +89,10 @@ fn adding_a_zone_keeps_the_comments_and_skips_one_already_there() {
     add_zone(&path, "Asia/Tokyo").expect("already there");
 
     let text = fs::read_to_string(&path).expect("read back");
-    assert!(text.contains("# Extra clocks.") && text.contains("# Holidays."), "{text}");
+    assert!(
+        text.contains("# Extra clocks.") && text.contains("# Holidays."),
+        "{text}"
+    );
     assert_eq!(load(&path).zones, ["Asia/Tokyo", "America/New_York"]);
 }
 
@@ -82,7 +100,10 @@ fn adding_a_zone_keeps_the_comments_and_skips_one_already_there() {
 fn a_fifth_zone_is_refused() {
     let (_dir, path) = file("zones = [\"UTC\", \"Asia/Tokyo\", \"Europe/London\", \"America/Denver\"]\n");
 
-    assert!(matches!(add_zone(&path, "America/New_York"), Err(SettingsError::TooManyZones)));
+    assert!(matches!(
+        add_zone(&path, "America/New_York"),
+        Err(SettingsError::TooManyZones)
+    ));
 }
 
 #[test]
@@ -92,7 +113,10 @@ fn removing_a_zone_takes_it_out_and_an_unknown_one_is_an_error() {
     remove_zone(&path, "Asia/Tokyo").expect("removed");
 
     assert!(load(&path).zones.is_empty());
-    assert!(matches!(remove_zone(&path, "Asia/Tokyo"), Err(SettingsError::NoZone(_))));
+    assert!(matches!(
+        remove_zone(&path, "Asia/Tokyo"),
+        Err(SettingsError::NoZone(_))
+    ));
 }
 
 #[test]
@@ -104,7 +128,13 @@ fn a_countdown_is_added_replaced_and_removed_with_the_bar() {
     set(&path, "bar-countdown", "Trip", &Countries::bundled()).expect("in the bar");
 
     let settings = load(&path);
-    assert_eq!(settings.countdowns, [Countdown { name: "Trip".into(), at: "2026-12-20".into() }]);
+    assert_eq!(
+        settings.countdowns,
+        [Countdown {
+            name: "Trip".into(),
+            at: "2026-12-20".into()
+        }]
+    );
     assert_eq!(settings.bar_countdown, "Trip");
 
     remove_countdown(&path, "Trip").expect("removed");
@@ -130,17 +160,32 @@ fn the_plain_settings_take_their_values_and_refuse_others() {
 
     set(&path, "holidays", "none", &countries).expect("none");
     assert_eq!(load(&path).holidays.as_deref(), Some(""));
-    assert!(matches!(set(&path, "holidays", "xx", &countries), Err(SettingsError::NoCountry(..))));
-    assert!(matches!(set(&path, "analog", "maybe", &countries), Err(SettingsError::Value { .. })));
-    assert!(matches!(set(&path, "bar-countdown", "Nope", &countries), Err(SettingsError::NoCountdown(_))));
-    assert!(matches!(set(&path, "colour", "red", &countries), Err(SettingsError::NoSetting(_))));
+    assert!(matches!(
+        set(&path, "holidays", "xx", &countries),
+        Err(SettingsError::NoCountry(..))
+    ));
+    assert!(matches!(
+        set(&path, "analog", "maybe", &countries),
+        Err(SettingsError::Value { .. })
+    ));
+    assert!(matches!(
+        set(&path, "bar-countdown", "Nope", &countries),
+        Err(SettingsError::NoCountdown(_))
+    ));
+    assert!(matches!(
+        set(&path, "colour", "red", &countries),
+        Err(SettingsError::NoSetting(_))
+    ));
 }
 
 #[test]
 fn a_users_holiday_file_beside_the_settings_is_read_and_a_broken_one_reported() {
     let dir = tempfile::tempdir().expect("a temp dir");
-    fs::write(dir.path().join(HOLIDAYS_FILE), "[xx]\nname = \"Mine\"\ndays = [{ name = \"Day\", date = \"10-24\" }]\n")
-        .expect("write");
+    fs::write(
+        dir.path().join(HOLIDAYS_FILE),
+        "[xx]\nname = \"Mine\"\ndays = [{ name = \"Day\", date = \"10-24\" }]\n",
+    )
+    .expect("write");
 
     let (countries, problem) = countries(Some(dir.path()));
 

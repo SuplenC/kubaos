@@ -43,7 +43,10 @@ pub fn weekday(word: &str) -> Option<Weekday> {
     if word.len() < 3 {
         return None;
     }
-    WEEKDAYS.iter().find(|(name, _)| name.starts_with(word)).map(|&(_, weekday)| weekday)
+    WEEKDAYS
+        .iter()
+        .find(|(name, _)| name.starts_with(word))
+        .map(|&(_, weekday)| weekday)
 }
 
 /// A month, 1 to 12, by its name, or the first three letters of it or more (`dec`, `sept`).
@@ -111,7 +114,11 @@ pub fn relative_days(days: i64) -> String {
 
 /// `1 day`, `3 days`.
 pub fn count(n: i64, unit: &str) -> String {
-    if n == 1 { format!("1 {unit}") } else { format!("{n} {unit}s") }
+    if n == 1 {
+        format!("1 {unit}")
+    } else {
+        format!("{n} {unit}s")
+    }
 }
 
 /// `a Thursday`.
@@ -128,7 +135,11 @@ pub fn offset_label(seconds: i32) -> String {
     let sign = if seconds < 0 { '\u{2212}' } else { '+' };
     let minutes = seconds.unsigned_abs() / 60;
     let (hours, minutes) = (minutes / 60, minutes % 60);
-    if minutes == 0 { format!("{sign}{hours} h") } else { format!("{sign}{hours}:{minutes:02} h") }
+    if minutes == 0 {
+        format!("{sign}{hours} h")
+    } else {
+        format!("{sign}{hours}:{minutes:02} h")
+    }
 }
 
 /// The words of a query, in lowercase, with `+` and `-` words of their own except inside an ISO
@@ -151,7 +162,9 @@ pub fn split(query: &str) -> Vec<String> {
             // A sign after a letter belongs to a name; after a digit or a unit, it is an operator.
             let at = rest.char_indices().skip(1).find(|&(at, c)| {
                 (c == '+' || c == '-')
-                    && !(c == '-' && rest[..at].ends_with(|p: char| p.is_alphabetic()) && rest[at + 1..].starts_with(char::is_alphabetic))
+                    && !(c == '-'
+                        && rest[..at].ends_with(|p: char| p.is_alphabetic())
+                        && rest[at + 1..].starts_with(char::is_alphabetic))
             });
             let Some((at, _)) = at else {
                 words.push(rest.to_owned());
@@ -170,7 +183,10 @@ pub fn is_iso_date(word: &str) -> bool {
     bytes.len() == 10
         && bytes[4] == b'-'
         && bytes[7] == b'-'
-        && bytes.iter().enumerate().all(|(at, b)| at == 4 || at == 7 || b.is_ascii_digit())
+        && bytes
+            .iter()
+            .enumerate()
+            .all(|(at, b)| at == 4 || at == 7 || b.is_ascii_digit())
 }
 
 /// `name` in lowercase, with apostrophes and full stops gone and spaces single, for comparing

@@ -2104,8 +2104,10 @@ dependencies = [
 name = "kotodama-kubaos"
 version = "0.1.0"
 dependencies = [
+ "jiff",
  "kotodama-extension",
  "kotodama-protocol",
+ "kubaos-clock",
  "kubaos-core",
  "tempfile",
  "thiserror 2.0.21",
