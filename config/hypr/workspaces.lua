@@ -6,8 +6,9 @@
 -- Hyprland numbers workspaces globally, so each screen owns a block of ten
 -- ids: the laptop panel 1-10, the next screen 11-20, and so on. SUPER + 3 goes
 -- to the third workspace of the focused screen's block, and the bar labels
--- each screen's workspaces 1-10. No workspace is persistent: one appears when
--- it is focused or a window moves to it, and an empty one goes away once left.
+-- each screen's workspaces 1-10. A workspace appears when it is focused or a
+-- window moves to it, and an empty one goes away once left, except the ones
+-- each group keeps (below).
 --
 -- A block belongs to the physical screen, named by its make, model and
 -- serial. The connector and Hyprland's monitor id would both be wrong: a dock
@@ -20,16 +21,22 @@
 -- workspaces to any other screen; reconciling on every monitor change gathers
 -- the group on the primary screen (the laptop panel, else the external
 -- Hyprland numbered first), under its own numbers, and its screen takes it
--- back when it returns. A group with no windows has no workspaces left, so it vanishes.
--- The bar shows a screen's own group, then each one waiting there.
+-- back when it returns. A waiting group with no windows has no workspaces
+-- left, so it vanishes. The bar shows a screen's groups in block order.
 --
 -- HAZARD: no workspace is renumbered on unplug or replug. The bar's
 -- Quickshell (v0.3.2) keeps the id a workspace had when it first saw it, so a
 -- renumbered one shows under its old number and a click on it goes nowhere.
 --
--- Next and previous walk the focused screen's groups in the bar's order
--- (`workspace_blocks.step`). SUPER + 1-0 address the focused group: the
--- screen's own, or the waiting group whose workspace it shows.
+-- The three-finger swipe is Hyprland's own, which follows the fingers. It
+-- walks the workspaces that exist on the screen in id order and never makes
+-- one, so each group keeps two empty ones as persistent workspaces
+-- (`workspace_blocks.kept`): its first, and one after its last with windows,
+-- where a new workspace opens. Once a window lands on that one, the next id
+-- is kept in its place and the old rule is released. Next and previous walk
+-- the same workspaces in the same order (`workspace_blocks.step`). SUPER + 1-0
+-- address the focused group: the screen's own, or the waiting group whose
+-- workspace it shows.
 --
 -- Every action is a function a bind runs, and also an expression the socket
 -- runs: `hyprctl dispatch 'dot.workspaces.focus(3)'` does what SUPER + 3 does.
@@ -74,13 +81,13 @@ local function write(path, text)
   return true
 end
 
--- Identity -> block and identity -> x where the screen last sat, kept across
--- sessions, and connector -> identity for the screens plugged in now.
-local blocks, current, positions = blocks_lib.parse_blocks(read(SCREENS_FILE))
+-- Identity -> block, kept across sessions, and connector -> identity for the
+-- screens plugged in now.
+local blocks, current = blocks_lib.parse_blocks(read(SCREENS_FILE))
 local written = nil
 
 local function save(identities)
-  local text = blocks_lib.format_blocks(blocks, identities, positions)
+  local text = blocks_lib.format_blocks(blocks, identities)
   if text ~= written and write(SCREENS_FILE, text) then
     written = text
   end
@@ -88,6 +95,17 @@ end
 
 local function regular(workspace)
   return workspace and not workspace.special and workspace.id > 0
+end
+
+-- The ids of every regular workspace with windows, as a set.
+local function occupied_ids()
+  local occupied = {}
+  for _, workspace in ipairs(hl.get_workspaces()) do
+    if regular(workspace) and (workspace.windows or 0) > 0 then
+      occupied[workspace.id] = true
+    end
+  end
+  return occupied
 end
 
 -- The ids of every regular workspace, as a set.
@@ -113,14 +131,11 @@ local function connected(gone)
   return blocks_lib.sort_screens(monitors)
 end
 
--- Connector -> block for the screens plugged in now, noting where each sits.
+-- Connector -> block for the screens plugged in now.
 local function assign(monitors)
   local identities = blocks_lib.identities(monitors, current)
   current = identities
   local by_connector = blocks_lib.assign(blocks, monitors, identities)
-  for _, monitor in ipairs(monitors) do
-    positions[identities[monitor.name]] = monitor.x
-  end
   save(identities)
   return by_connector
 end
@@ -167,8 +182,66 @@ local function groups_on(monitor)
       workspaces[#workspaces + 1] = { id = workspace.id, monitor = workspace.monitor and workspace.monitor.name }
     end
   end
-  return blocks_lib.groups(by_connector[monitor.name] or 0, monitor.name, workspaces,
-    blocks_lib.x_of_block(blocks, positions))
+  return blocks_lib.groups(by_connector[monitor.name] or 0, monitor.name, workspaces)
+end
+
+-- Id -> the rule that keeps that workspace, enabled while it is kept, and
+-- id -> the connector it is kept on. A released rule stays here to be enabled
+-- again, so keeping and releasing the same id doesn't pile up rules.
+local rules, kept = {}, {}
+
+local function keep(id, connector)
+  local rule = rules[id]
+  if rule and not rule:is_enabled() then
+    rule:set_enabled(true)
+  end
+  -- Merged into the enabled rule for this workspace, if there is one, so a
+  -- kept workspace moving to another screen changes its rule in place.
+  rules[id] = hl.workspace_rule({ workspace = tostring(id), persistent = true, monitor = connector })
+  kept[id] = connector
+end
+
+local function release(id)
+  -- Hyprland returns no rule when it rejects one, and reports why on screen.
+  if rules[id] then
+    rules[id]:set_enabled(false)
+  end
+  kept[id] = nil
+end
+
+-- Bring Hyprland's persistent workspaces in line with `workspace_blocks.kept`.
+-- `gone` names a screen Hyprland still lists while it reports the removal.
+-- HAZARD: release before keeping. Hyprland moves a persistent workspace to the
+-- screen its rule names, so a rule left naming the screen being removed would
+-- pull its workspace back there.
+local function sync_kept(gone)
+  local screens = {}
+  local by_connector = assign(connected(gone))
+  for connector, block in pairs(by_connector) do
+    screens[#screens + 1] = { name = connector, block = block }
+  end
+  local workspaces = {}
+  for _, workspace in ipairs(hl.get_workspaces()) do
+    if regular(workspace) then
+      workspaces[#workspaces + 1] = {
+        id = workspace.id,
+        monitor = workspace.monitor and workspace.monitor.name,
+        windows = workspace.windows,
+      }
+    end
+  end
+
+  local wanted = blocks_lib.kept(screens, workspaces)
+  for id in pairs(kept) do
+    if not wanted[id] then
+      release(id)
+    end
+  end
+  for id, connector in pairs(wanted) do
+    if kept[id] ~= connector then
+      keep(id, connector)
+    end
+  end
 end
 
 -- The workspace a screen falls back to when what it shows isn't its own: the
@@ -283,7 +356,7 @@ local function scroll(direction, monitor_name)
     if not regular(active) then
       return
     end
-    local id = blocks_lib.step(groups_on(monitor), active.id, direction, (active.windows or 0) > 0, taken_ids())
+    local id = blocks_lib.step(groups_on(monitor), active.id, direction)
     if id then
       go(monitor, id)
     end
@@ -339,8 +412,9 @@ function M.move_window(slot, follow)
   end
 end
 
--- Move the active window to a new workspace after the last of the focused
--- group, and follow it. Does nothing when all ten are taken.
+-- Move the active window to the workspace after the last with windows of the
+-- focused group, the empty one kept there, and follow it. Does nothing when
+-- all ten have windows.
 function M.move_window_to_new()
   return function()
     local monitor = hl.get_active_monitor()
@@ -348,7 +422,7 @@ function M.move_window_to_new()
       return
     end
     local monitors = connected()
-    local id = blocks_lib.append_slot(focused_block(monitor, monitors, assign(monitors)), taken_ids())
+    local id = blocks_lib.append_slot(focused_block(monitor, monitors, assign(monitors)), occupied_ids())
     if id then
       move_active_window(id, true)
     end
@@ -391,6 +465,7 @@ function M.move_to_monitor(direction)
     -- Settling the screen it left can take focus; it belongs with the
     -- workspace that moved.
     hl.dispatch(hl.dsp.focus({ workspace = tostring(moved.id) }))
+    sync_kept()
   end
 end
 
@@ -478,6 +553,7 @@ function M.reconcile(added, gone)
       hl.dispatch(hl.dsp.focus({ monitor = focused_name }))
     end
   end
+  sync_kept(gone)
 end
 
 hl.on("hyprland.start", function()
@@ -495,6 +571,13 @@ end)
 hl.on("monitor.removed", function(monitor)
   M.reconcile(nil, monitor and monitor.name)
 end)
+
+-- A window arriving on a workspace or leaving it moves where its group ends.
+for _, event in ipairs({ "window.open", "window.destroy", "window.move_to_workspace" }) do
+  hl.on(event, function()
+    sync_kept()
+  end)
+end
 
 dot.workspaces = M
 

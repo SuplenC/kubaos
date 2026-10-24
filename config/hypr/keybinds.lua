@@ -135,9 +135,9 @@ end
 ---------------------------------------------------------------------------
 -- Workspaces: each screen has its own 1-10, and the groups of unplugged
 -- screens wait on the primary one (workspaces.lua). Next and previous walk the
--- focused screen's groups as its bar shows them, the empty first workspace
--- included, which Hyprland's `m+1` and its own swipe skip.
--- `previous_per_monitor` stays on the focused screen.
+-- focused screen's groups as its bar shows them and the swipe walks them, the
+-- empty workspaces each group keeps included. `previous_per_monitor` stays on
+-- the focused screen.
 ---------------------------------------------------------------------------
 
 for slot = 1, dot.workspaces.slots do
@@ -159,12 +159,16 @@ bind("SUPER + CTRL + Tab", "Former workspace", hl.dsp.focus({ workspace = "previ
 bind("SUPER + mouse_down", "Next workspace", dot.workspaces.next())
 bind("SUPER + mouse_up", "Previous workspace", dot.workspaces.previous())
 
--- Three fingers swipe through the workspaces as the binds above do. A function
--- runs once the swipe ends, so the workspace switches without following the
--- fingers. Under natural scrolling, fingers moving left bring the next one.
+-- Three fingers swipe through the workspaces with Hyprland's own gesture,
+-- which follows the fingers. It walks the screen's workspaces in id order, the
+-- order the binds above walk, and reaches empty ones because each group keeps
+-- its first and one after its last (workspaces.lua). It never makes one: the
+-- kept empty workspace ends each group, so a swipe past the screen's last
+-- stays. Fingers moving left bring the next one.
 -- https://wiki.hypr.land/configuring/core/binds/gestures/
-hl.gesture({ fingers = 3, direction = "left", action = dot.workspaces.next() })
-hl.gesture({ fingers = 3, direction = "right", action = dot.workspaces.previous() })
+-- https://wiki.hypr.land/configuring/core/config-options/#gestures
+hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
+hl.config({ gestures = { workspace_swipe_create_new = false } })
 
 -- Scratchpad. code:49 is the key left of 1 (backslash on Italian).
 bind("SUPER + S", "Toggle scratchpad", hl.dsp.workspace.toggle_special("scratchpad"))

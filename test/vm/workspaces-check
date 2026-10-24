@@ -127,30 +127,33 @@ for slot in 1 2 3; do
   dispatch "dot.workspaces.focus($slot)"
   open_app
 done
-expect "the second screen has 11 12 13" "$(ids_on "$SECOND")" "11 12 13"
+expect "the second screen has 11 12 13 and the empty 14 it keeps" "$(ids_on "$SECOND")" "11 12 13 14"
 own="$(as_user "$(ids_on "$first")")"
 
 as_user "hyprctl output remove $SECOND" >/dev/null
 wait_for "the second screen goes" 10 "! hyprctl monitors -j | jq -e '.[] | select(.name == \"$SECOND\")'"
-expect "unplugged, its workspaces wait on the first screen under their own numbers" "$(ids_on "$first")" "$own 11 12 13"
+expect "unplugged, its workspaces wait on the first screen under their own numbers" "$(ids_on "$first")" "$own 11 12 13 14"
 "$RUN" shot workspaces-unplugged >/dev/null
 
-# The first screen's own group is its empty 1 and the 4 with the window.
+# The first screen's own group is its empty 1, the 4 with the window and the
+# empty 5 it keeps after it.
 dispatch "hl.dsp.focus({ monitor = \"$first\" })"
 dispatch "dot.workspaces.focus(4)"
 "$RUN" key meta_l-tab
-expect "SUPER + Tab after the group's last opens an empty 5" "$(shown_on "$first")" 5
+expect "SUPER + Tab after the group's last with windows opens the empty 5" "$(shown_on "$first")" 5
 "$RUN" key meta_l-tab
 expect "SUPER + Tab from the empty one goes to the unplugged screen's group" "$(shown_on "$first")" 11
 "$RUN" key meta_l-shift-tab
-expect "SUPER + SHIFT + Tab goes back to the first screen's last" "$(shown_on "$first")" 4
+expect "SUPER + SHIFT + Tab goes back to the first screen's last, the empty 5" "$(shown_on "$first")" 5
+"$RUN" key meta_l-shift-tab
+expect "then to its 4" "$(shown_on "$first")" 4
 "$RUN" key meta_l-shift-tab
 expect "and on to its empty 1" "$(shown_on "$first")" 1
 dispatch "dot.workspaces.focus(4)"
 
 as_user "hyprctl output create headless $SECOND" >/dev/null
 wait_for "the second screen comes back" 10 "hyprctl monitors -j | jq -e '.[] | select(.name == \"$SECOND\")'"
-expect "plugged back, they return as 11 12 13" "$(ids_on "$SECOND")" "11 12 13"
+expect "plugged back, they return as 11 12 13 with the empty 14" "$(ids_on "$SECOND")" "11 12 13 14"
 expect "and the first screen keeps its own" "$(ids_on "$first")" "$own"
 
 # The Command menu runs a bind: the window on the second screen's 11 moves to

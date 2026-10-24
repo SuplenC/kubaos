@@ -92,5 +92,5 @@ hl.config({
   },
 })
 
--- The three-finger swipe through the workspaces is in keybinds.lua, with the
--- binds it shares an action with.
+-- The three-finger swipe through the workspaces, and its gesture settings, are
+-- in keybinds.lua, beside the binds that walk the same workspaces.

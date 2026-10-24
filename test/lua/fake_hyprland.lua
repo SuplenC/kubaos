@@ -1,7 +1,8 @@
 -- A small stand-in for Hyprland's Lua API (`hl`), enough for
 -- `config/hypr/workspaces.lua`: screens, workspaces, windows, focus, the
--- dispatchers that module uses and the events it listens to. Workspaces that
--- are empty and shown nowhere go away, as Hyprland's do. Objects read the
+-- dispatchers that module uses and the events it listens to, and workspace
+-- rules as far as `persistent` and `monitor` go. Workspaces that are empty,
+-- shown nowhere and not persistent go away, as Hyprland's do. Objects read the
 -- world live, as Hyprland's do, so a workspace renumbered keeps its object.
 
 local F = {}
@@ -12,6 +13,7 @@ function F.new()
     monitors = {},
     workspaces = {},
     windows = {},
+    rules = {},
     handlers = {},
     focused = nil,
     next_monitor_id = 0,
@@ -65,11 +67,11 @@ function F:shown(record)
   return false
 end
 
--- Empty workspaces shown nowhere go away.
+-- Empty workspaces shown nowhere go away, unless persistent.
 function F:cleanup()
   local kept = {}
   for _, record in ipairs(self.workspaces) do
-    if self:window_count(record) > 0 or self:shown(record) then
+    if self:window_count(record) > 0 or self:shown(record) or record.persistent then
       kept[#kept + 1] = record
     end
   end
@@ -81,6 +83,65 @@ function F:create(id, monitor)
   self.workspaces[#self.workspaces + 1] = record
   self:fire("workspace.created", self:workspace_object(record))
   return record
+end
+
+-- Hyprland's refresh after a workspace rule changes: each enabled persistent
+-- rule whose screen is plugged in has its workspace there, created or moved,
+-- and every other workspace loses its persistence. Hyprland runs it at the end
+-- of the current event, once a screen being removed is gone; here it runs at
+-- once and passes over that screen.
+function F:refresh()
+  local persistent = {}
+  for _, rule in ipairs(self.rules) do
+    local monitor = rule.enabled and rule.persistent and self:monitor_record(rule.monitor)
+    if monitor and not monitor.removing then
+      local id = tonumber(rule.workspace)
+      local record = self:workspace_record(id) or self:create(id, monitor)
+      if record.monitor ~= monitor then
+        local from = record.monitor
+        record.monitor = monitor
+        if from and from.active == record then
+          self:refill(from)
+        end
+      end
+      persistent[record] = true
+    end
+  end
+  for _, record in ipairs(self.workspaces) do
+    record.persistent = persistent[record] or nil
+  end
+  self:cleanup()
+end
+
+-- `hl.workspace_rule`: merged into the first enabled rule for the same
+-- workspace, as Hyprland's `replaceOrAdd` does, else added.
+function F:workspace_rule(options)
+  local rule = nil
+  for _, candidate in ipairs(self.rules) do
+    if candidate.enabled and candidate.workspace == options.workspace then
+      rule = candidate
+      break
+    end
+  end
+  if not rule then
+    rule = { workspace = options.workspace, enabled = true }
+    self.rules[#self.rules + 1] = rule
+  end
+  if options.monitor then
+    rule.monitor = options.monitor
+  end
+  if options.persistent ~= nil then
+    rule.persistent = options.persistent
+  end
+  self:refresh()
+  local world = self
+  return {
+    set_enabled = function(_, enabled)
+      rule.enabled = enabled
+      world:refresh()
+    end,
+    is_enabled = function() return rule.enabled end,
+  }
 end
 
 function F:lowest_free()
@@ -235,6 +296,7 @@ function F:apply(action)
       self:focus_workspace(id)
     end
     self:cleanup()
+    self:fire("window.move_to_workspace")
   else
     error("the fake has no dispatcher " .. kind)
   end
@@ -253,6 +315,7 @@ function F:api()
       workspace = { move = dsp("workspace.move"), change_id = dsp("workspace.change_id") },
       window = { move = dsp("window.move") },
     },
+    workspace_rule = function(options) return world:workspace_rule(options) end,
     dispatch = function(action)
       if type(action) == "function" then
         action()
@@ -328,6 +391,7 @@ function F:unplug(name, backup_name)
     end
   end
   record.active = nil
+  record.removing = true
   if self.focused == record then
     self.focused = backup
   end
@@ -347,7 +411,20 @@ function F:open_window()
   local window = { address = string.format("0x%x", self.next_window), workspace = self.focused.active }
   self.next_window = self.next_window + 1
   self.windows[#self.windows + 1] = window
+  self:fire("window.open")
   return window
+end
+
+function F:close_window(window)
+  local kept = {}
+  for _, other in ipairs(self.windows) do
+    if other ~= window then
+      kept[#kept + 1] = other
+    end
+  end
+  self.windows = kept
+  self:cleanup()
+  self:fire("window.destroy")
 end
 
 function F:focus_monitor(name)
@@ -369,6 +446,33 @@ end
 function F:shown_on(name)
   local record = self:monitor_record(name)
   return record and record.active and record.active.id
+end
+
+-- The enabled persistent rules, as "id@connector" in id order.
+function F:kept()
+  local rows = {}
+  for _, rule in ipairs(self.rules) do
+    if rule.enabled and rule.persistent then
+      rows[#rows + 1] = { id = tonumber(rule.workspace), text = rule.workspace .. "@" .. rule.monitor }
+    end
+  end
+  table.sort(rows, function(left, right) return left.id < right.id end)
+  local result = {}
+  for _, row in ipairs(rows) do
+    result[#result + 1] = row.text
+  end
+  return result
+end
+
+-- How many rules, enabled or not, name `workspace`.
+function F:rules_for(workspace)
+  local count = 0
+  for _, rule in ipairs(self.rules) do
+    if rule.workspace == workspace then
+      count = count + 1
+    end
+  end
+  return count
 end
 
 return F
