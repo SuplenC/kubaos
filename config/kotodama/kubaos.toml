@@ -653,3 +653,55 @@ subtitle = "Start or stop the stopwatch in the clock popup"
 icon = "alarm-symbolic"
 keywords = ["stopwatch", "lap", "timer", "clock"]
 run = ["qs", "ipc", "call", "clock", "stopwatch"]
+
+# The system monitor (crates/kubaos-sysmon, config/quickshell/modules/sysmon/).
+# `cpu`, `ram` and `battery` get an answer in the top row, and `kill chrome`
+# lists the processes to end or kill, from the Extension itself. The settings
+# Items change ~/.config/kubaos/sysmon/sysmon.toml through `kubaos-sysmon`,
+# which the bar's pill shows within a few seconds; a notification says why
+# when one is refused.
+
+[extensions.kubaos.actions.sysmon-open]
+title = "Open system monitor"
+subtitle = "CPU, memory, GPU, disks, network, battery, fans and the busiest processes"
+icon = "utilities-system-monitor"
+keywords = ["system monitor", "task manager", "activity", "cpu", "ram", "memory", "processes", "temperature"]
+run = ["qs", "ipc", "call", "sysmon", "toggle"]
+
+[extensions.kubaos.actions.sysmon-pill]
+title = "Show/hide the bar pill"
+subtitle = "The system monitor's CPU and memory pill in the bar"
+icon = "utilities-system-monitor"
+keywords = ["system monitor", "bar", "pill", "cpu", "ram", "hide", "show"]
+run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System monitor" -u critical "System monitor" "$out"', "sh", "set", "pill", "toggle"]
+
+[extensions.kubaos.actions.sysmon-metrics]
+title = "Pick bar metrics"
+subtitle = "What the bar's monitor pill shows, in order: cpu, ram, temp, gpu, net, power"
+icon = "utilities-system-monitor"
+keywords = ["system monitor", "bar", "pill", "metrics", "temperature", "network", "battery draw"]
+run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System monitor" -u critical "System monitor" "$out"', "sh", "set", "metrics", "{metrics}"]
+arguments = [{ name = "metrics", placeholder = "cpu ram temp" }]
+
+[extensions.kubaos.actions.sysmon-style]
+title = "Bar monitor style"
+subtitle = "Draw the bar's monitor pill as numbers, bars or sparklines"
+icon = "utilities-system-monitor"
+keywords = ["system monitor", "bar", "pill", "sparklines", "graph"]
+run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System monitor" -u critical "System monitor" "$out"', "sh", "set", "style", "{style}"]
+arguments = [{ name = "style", placeholder = "numbers, bars or sparklines" }]
+
+[extensions.kubaos.actions.sysmon-alerts]
+title = "System monitor alerts"
+subtitle = "Turn on or off the notifications when the machine runs hot, full or drains fast"
+icon = "utilities-system-monitor"
+keywords = ["system monitor", "alerts", "notifications", "temperature", "memory full", "disk full"]
+run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System monitor" -u critical "System monitor" "$out"', "sh", "set", "alerts", "toggle"]
+
+[extensions.kubaos.actions.sysmon-threshold]
+title = "System monitor threshold"
+subtitle = "Where the pill turns red and alerts fire: cpu-temp 85, ram 90, disk 95, battery-draw 30"
+icon = "utilities-system-monitor"
+keywords = ["system monitor", "threshold", "temperature", "alert", "limit"]
+run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System monitor" -u critical "System monitor" "$out"', "sh", "set", "{setting}", "{value}"]
+arguments = [{ name = "setting", placeholder = "cpu-temp, ram, disk or battery-draw" }, { name = "value", placeholder = "85" }]
