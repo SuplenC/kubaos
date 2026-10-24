@@ -202,7 +202,7 @@ lists its flags.
 | `system/25-boot.sh` | boot splash (Plymouth, the passphrase prompt), GRUB theme, "KubaOS Shinjuku" entries, hidden menu | no (next boot shows it) |
 | `system/30-hardware.sh` | TUXEDO repo + `tuxedo-drivers`, MOK, power profiles, dock, fingerprint | **yes** |
 | `system/40-apps.sh` | Docker, Chrome, SentinelOne | log out/in (docker group) |
-| `system/50-hyprland.sh` | Hyprland stack (held), tty1 autologin, lock-screen PAM | no (wait for 60) |
+| `system/50-hyprland.sh` | Hyprland stack (held), tty1 autologin, lock-screen PAM, keyd for the Mac-style accents | no (wait for 60) |
 | `system/60-nix.sh` | Nix, flakes, home-manager switch, Nix GPU setup, zsh login shell | **yes** |
 | `system/65-recorder.sh` | gpu-screen-recorder's KMS helper: root-owned copy with `cap_sys_admin`, runnable only by you, linked into `/run/wrappers/bin` | no |
 | `system/70-bitwarden.sh` | Bitwarden desktop + `bw` CLI, security key (pam_u2f) for sudo, polkit, lock screen | no |
@@ -384,7 +384,11 @@ plus every installed `libhypr*` / `libaquamarine*` library. Writes the getty
 autologin drop-in for tty1 and `/etc/pam.d/qs-lock` + `qs-lock-fingerprint`
 (the Quickshell lock screen runs password and fingerprint in parallel), and
 `/etc/tmpfiles.d/qs-lock-unix-chkpwd.conf`, which links
-`/run/wrappers/bin/unix_chkpwd` to Ubuntu's `/usr/sbin/unix_chkpwd`.
+`/run/wrappers/bin/unix_chkpwd` to Ubuntu's `/usr/sbin/unix_chkpwd`. Installs
+keyd with `/etc/keyd/kubaos.conf`, the `kubaos:mac-accents` XKB option
+(`/etc/xkb/rules/evdev`, `/etc/xkb/symbols/kubaos`) and a polkit rule that
+lets the desktop user start and stop `keyd.service`: the Mac-style accents
+on Left Alt (`install_mac_accents` in `system/lib.sh`).
 
 Why: Quickshell comes from Nix and links Nix's libpam. `pam_unix.so` by name
 then means Nix's module, which runs its helper from the NixOS path
@@ -406,7 +410,8 @@ canonical snippet is `system/files/hyprland-autostart.zsh`.
 
 **Verify:** `apt-mark showhold` lists the hypr packages;
 `Hyprland --version` says 0.56.x;
-`systemctl cat getty@tty1` shows the `--autologin` line.
+`systemctl cat getty@tty1` shows the `--autologin` line;
+`systemctl is-active keyd` says active.
 
 ### 10. `system/60-nix.sh`, then reboot
 
