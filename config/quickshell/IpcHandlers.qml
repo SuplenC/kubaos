@@ -143,6 +143,45 @@ Scope {
     }
 
     IpcHandler {
+        target: "sysmon"
+
+        function toggle(): void {
+            Sysmon.toggle();
+        }
+
+        function open(): void {
+            Sysmon.show();
+        }
+
+        // The popup on process `pid`'s details, with End and Kill.
+        function process(pid: int): void {
+            Sysmon.showProcess(pid);
+        }
+
+        // The bar's pill: on, off or toggle. Remembered in sysmon.toml.
+        function pill(state: string): string {
+            const value = state === "toggle" ? (Sysmon.settings.pill ? "off" : "on") : state;
+            Sysmon.set("pill", value, error => {
+                if (error !== "")
+                    console.warn(`Sysmon: ${error}`);
+            });
+            return value;
+        }
+
+        // What an alert's button asked for: open, process:<pid>,
+        // files:<mount> or power-saver.
+        function act(action: string): void {
+            Sysmon.act(action);
+        }
+
+        // JSON: whether the engine runs, the mode it samples in, the pill's
+        // settings, whether a sample has come and the popup is open.
+        function status(): string {
+            return JSON.stringify(Sysmon.status());
+        }
+    }
+
+    IpcHandler {
         target: "notifications"
 
         function toggleDnd(): void {

@@ -2,7 +2,8 @@ import QtQuick
 import qs.theme
 
 // Rounded container used for bar modules. Children are laid out in a row.
-// Set `interactive` for hover/press feedback plus clicked() and scrolled(steps).
+// Set `interactive` for hover/press feedback plus clicked(), rightClicked()
+// and scrolled(steps).
 Rectangle {
     id: root
 
@@ -17,6 +18,7 @@ Rectangle {
     readonly property bool hovered: stateLayer.containsMouse
 
     signal clicked
+    signal rightClicked
     signal scrolled(int steps)
 
     implicitWidth: row.implicitWidth + padding * 2
@@ -52,7 +54,8 @@ Rectangle {
         id: stateLayer
 
         enabled: root.interactive
-        onClicked: root.clicked()
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: mouse => mouse.button === Qt.RightButton ? root.rightClicked() : root.clicked()
         onWheel: wheel => root.scrolled(wheel.angleDelta.y > 0 ? 1 : -1)
     }
 

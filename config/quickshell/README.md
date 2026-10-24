@@ -18,6 +18,8 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
   | Wallpaper picker | Rises from the bottom |
   | OSD | Small bar rising from the bottom |
   | Notifications | Top-right corner |
+  | Clock popup | Under the bar's clock |
+  | System monitor | Under the bar's right end, by its pill |
 
 - **Density:** sized for Full HD at scale 1 (the laptop runs at 1.5, see `config/hypr/monitors.lua`): a 36 px bar, 13 px body text.
 - **Panels over windows:** only the frame reserves space (the bar's 36 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (power menu 45%, control center 20%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
@@ -58,6 +60,11 @@ Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`hom
 | `qs ipc call clock search <text>` | The clock popup with a date search typed in |
 | `qs ipc call clock timer <duration>` / `alarm <time>` / `stopwatch` | Start a timer, set an alarm, start or stop the stopwatch |
 | `qs ipc call clock status` | The engine, timer, stopwatch, alarms and whether the popup is open (JSON) |
+| `qs ipc call sysmon toggle` / `open` | The system monitor's popup under the bar's pill |
+| `qs ipc call sysmon process <pid>` | The popup on a process's details, with End and Kill |
+| `qs ipc call sysmon pill <on\|off\|toggle>` | The bar's monitor pill, remembered in `sysmon.toml` |
+| `qs ipc call sysmon act <action>` | What an alert's button runs: `open`, `process:<pid>`, `files:<mount>`, `power-saver` |
+| `qs ipc call sysmon status` | The engine, its sampling mode, the pill's settings, whether a sample came, whether the popup is open (JSON) |
 
 All handlers live in `IpcHandlers.qml`. `docs/CONTRACTS.md` is the source of truth.
 
@@ -83,17 +90,21 @@ services/               singletons, no UI
   Recorder              screen recording state ($XDG_RUNTIME_DIR/dot-record.json, watched), dot-hypr-record calls
   Time                  the clock engine (`kubaos-clock serve`, line JSON), clock.toml (watched),
                         the timer, stopwatch and alarms
+  Sysmon                the system monitor's stream (`kubaos-sysmon serve`, line JSON, paced by
+                        the popup and the lock), the graphs' last minute, sysmon.toml (watched),
+                        alerts as notifications
 components/             reusable pieces, all built on Theme tokens
   Drawer, drawerpath.js a panel that grows out of a frame edge; its SVG outline
   Anim, CAnim           number/color animations with the shell's curves
   Pill, IconButton, StateLayer, Tooltip, FocusRing, Elevation
   ListRow, NavList      rows with cascade-in; keyboard list with a sliding highlight
   SearchField, StyledSlider, TabBar, EmptyState, StyledText, Icon, PanelSurface
+  Graph, Meter          a minute's line graph (Canvas); a rounded bar split into parts
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)
-  bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, Status, RecordingIndicator
+  bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, SysmonPill, Status, RecordingIndicator
   menu/                 Menu: the Command menu on KotodamaSearch. MenuLook (sizes for the screen,
                         motion), ResultRow, DetailPane + PaneContent, ActionPanel, FormView,
                         ProgressView, DetailView, IntroCard, JobBar, KeyHints, Keycap,
@@ -105,6 +116,8 @@ modules/
   powermenu/            PowerMenu
   clock/                ClockPopup (the bar clock's popup), MonthGrid (month and year views),
                         AnalogFace, Tools (timer, stopwatch, alarms), ClockSettings, Chip
+  sysmon/               SysmonPopup (the monitor pill's popup), Section, Processes (top five,
+                        details, End and Kill)
   wallpaper/            Wallpaper (background, crossfade, preview), WallpaperPicker,
                         WallpaperSettings (the picker's Settings tab)
   polkit/               Polkit agent + dialog (off by default)
@@ -132,6 +145,7 @@ Every panel works without a mouse. Esc closes it.
 - Command menu (SUPER + Space, `kotodama toggle`): type to search apps, projects, scripts and windows, Up/Down to move, Enter to run. A sum typed is answered in the list; Enter copies the answer. SUPER + F1 opens it on the Shortcuts View. Ctrl+K opens the selected row's Actions, Tab enters an app, Esc steps back (the Action panel, a View, the query, then closed), Backspace with nothing typed leaves an app. Wide screens show the selected row in a detail pane: its Actions with their keys, and its hints. `"menuMotion": "fades"` in `~/.config/kubaos/quickshell/settings.json` turns its motion down to fades. Its config is `config/kotodama/kubaos.toml`, with your changes in `~/.config/kubaos/kotodama/user.toml`.
 - Control center: Tab/Shift+Tab move between controls, Enter/Space toggle a tile, h/l or arrows move sliders and tabs, 1-4 jump to a tab, j/k move in lists, Delete dismisses a notification.
 - Clock popup (click the bar's clock): type a date or date maths to search, Enter copies the answer, Ctrl+Enter copies it as ISO. With nothing typed, Left/Right or the wheel change month and T goes to today; clicking the month name opens the year view. Esc leaves the settings page or the year view, then closes.
+- System monitor (click the bar's monitor pill, right-click it to hide it): click a process for its details, then End or Kill and confirm. Esc closes.
 - Power menu: h/j/k/l, arrows or Tab, then Enter.
 - Wallpaper picker: h/j/k/l or arrows move (the desktop previews the selection), Tab switches folder, S opens Settings, Enter applies, Esc goes back to the current wallpaper.
 - Wallpaper settings (the picker's last tab): Tab/Shift+Tab or Up/Down between rows, Left/Right change a value (Shift: 10 steps), Home/End to the ends, Space toggles, Enter activates or edits a colour, Delete resets to the default, Esc back to the wallpapers.
@@ -167,6 +181,8 @@ The polkit agent is in-shell but turned off (`Settings.polkitAgent: false`), and
 | `kotodama`, `kotodamad` | the Command menu's Daemon and CLI | Nix (`home/menu.nix`) |
 | `brightnessctl` | setting brightness | apt |
 | `dot-theme` | applying a wallpaper | this repo |
+| `kubaos-clock`, `kubaos-sysmon` | the clock popup's dates, the system monitor's stream | this repo, Nix (`home/clock.nix`, `home/sysmon.nix`) |
+| `btop` | the system monitor's full picture | Nix (`home/cli.nix`) |
 | `dot-hypr-record`, `dot-hypr-screenshot` | recording indicator, capture buttons | this repo |
 | `systemctl`, `loginctl` | power menu | system |
 | NetworkManager, BlueZ, PipeWire, UPower, power-profiles-daemon | services over D-Bus | apt |
