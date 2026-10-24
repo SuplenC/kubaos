@@ -83,13 +83,15 @@ Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (arm64 VM, 8 CPUs, 7
 |---|---|
 | `switch` | `system/60-nix.sh` and the lock-screen half of `70-bitwarden.sh` exit 0 |
 | `login_shell` | `zsh -l -i` in a pty prints nothing (no warnings, zoxide doctor quiet); `y`, `eza`, `glow`, the oh-my-posh refresh are functions; atuin owns Ctrl-R; the direnv hook is in; `.zprofile` sources the autostart snippet |
+| `zsh_start` | in a pty, the median of 20 `zsh -i -c exit` stays within 100 ms (the harness measures about 31 ms); deleting `~/.cache/kubaos/zsh` makes the next start write the fzf, atuin, direnv, zoxide and oh-my-posh caches and the dump again, the atuin one byte for byte what atuin prints; a second start writes nothing; a dump older than a day is rebuilt |
+| `greeting` | an interactive zsh with `TERM_PROGRAM=ghostty` greets once, and a shell started in it doesn't; none under `$TMUX`, `$NVIM`, `$SSH_CONNECTION`, `$SSH_TTY`, `KUBAOS_GREETING=0`, another terminal or `zsh -c`; `dot-greeting off` and `on` turn it off and on; prints what the greeting and the full `fastfetch` cost |
 | `path` | `~/.local/bin`, `~/.cargo/bin`, `~/.proto/{shims,bin}`, `~/.nix-profile/bin` on PATH, Nix's before `/usr/bin` |
 | `tools` | every tool in CONTRACTS ("Packages: who installs what") that exists on arm64 resolves, the Nix ones into `~/.nix-profile/bin`, the apt ones into `/usr`, `bw` to `/usr/local/bin`; nvim is 0.12; the login shell is `/usr/bin/zsh` |
 | `links` | every tracked file under `config/` is a store file with the repo's content in a real `~/.config/<app>` directory (except the ones `dot-config` seeds or merges); every `scripts/<file>` resolves into the repo copy; `~/Pictures/wallpapers` is a real folder; scripts are `dot-*`, executable, env shebang, `set -euo pipefail` |
 | `theme` | `dot-theme apply --force`, `set`, `next`, `toggle-folder`; all 21 files in `~/.local/state/theme`, every M3 key in `colors.json`; `apply` with nothing changed is a no-op; the theme links resolve |
 | `tmux` | the real `tmux.conf` loads with the theme and plugins, nothing complains |
 | `nvim` | `Lazy! restore` from the lockfile; Mason tools and treesitter parsers installed (once, cached); starts with the matugen colorscheme; opening Markdown, Nix, shell, Lua and QML files leaves no error in `:messages` |
-| `ghostty` | `ghostty +validate-config`, `foot --check-config` |
+| `ghostty` | `ghostty +validate-config`, `foot --check-config`; the background unit (`X-RestartIfChanged=false`, its flags) and the D-Bus file are in place; under sway, the unit's command owns `com.mitchellh.ghostty` and `ghostty +new-window -e` runs its command in a window of it, in home; with no instance, `+new-window` starts one through D-Bus |
 | `tms` | runs, reads the config seeded from the repo's |
 | `pam` | through Nix's libpam (Nix's pamtester, as kuba, like Quickshell): `qs-lock` takes the right password and refuses a wrong one; `qs-lock-u2f` and `qs-lock-fingerprint` load their modules and fail with no device. Through Ubuntu's (apt pamtester, sudo-rs): `sudo`, `sudo-i`, `polkit-1` carry the pam_u2f line and, with a well-formed mapping for a key that isn't plugged in, fall back to the password; also with no mapping file |
 | `lua` | `luac5.5 -p` on every tracked `.lua` (not the matugen templates) and on the rendered `hypr.lua`, `nvim.lua` |

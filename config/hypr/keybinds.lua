@@ -22,10 +22,12 @@ end
 local locked = { locked = true }
 local locked_repeat = { locked = true, repeating = true }
 
-local terminal = "ghostty"
 local browser = "google-chrome-stable"
+-- A window of Ghostty's background instance running cmd (home/terminal.nix),
+-- or a Ghostty of its own when the instance can't be reached. $HOME, as in
+-- fallback.lua's SUPER + Return.
 local function tui(cmd)
-  return terminal .. " -e " .. cmd
+  return 'ghostty +new-window --working-directory="$HOME" -e ' .. cmd .. " || exec ghostty -e " .. cmd
 end
 
 ---------------------------------------------------------------------------

@@ -138,6 +138,23 @@ icon = "drive-removable-media"
 keywords = ["automount", "usb", "sd card", "drive", "mount"]
 run = ["kubaos-automount", "off"]
 
+# The terminal greeting: fastfetch with the クバ mark in a new Ghostty window
+# (scripts/dot-greeting, home/shell.nix). On by default.
+
+[extensions.kubaos.actions.greeting-on]
+title = "Terminal greeting on"
+subtitle = "A new Ghostty window opens with the logo and the system at a glance"
+icon = "utilities-terminal"
+keywords = ["fastfetch", "terminal", "welcome", "logo", "motd"]
+run = ["dot-greeting", "on"]
+
+[extensions.kubaos.actions.greeting-off]
+title = "Terminal greeting off"
+subtitle = "A new Ghostty window opens straight to the prompt"
+icon = "utilities-terminal"
+keywords = ["fastfetch", "terminal", "welcome", "logo", "motd", "quiet"]
+run = ["dot-greeting", "off"]
+
 # Wallpaper and theme (scripts/dot-theme, the shell's picker).
 
 [extensions.kubaos.actions.theme-next]

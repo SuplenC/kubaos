@@ -4,8 +4,13 @@
 -- config is broken. See docs/CONTRACTS.md "Hyprland conventions".
 
 -- Primary terminal is Ghostty (Nix). If it is not on PATH, fall back to foot.
+-- `+new-window` asks Ghostty's background instance for a window (D-Bus
+-- starts it if needed, home/terminal.nix); when that fails, a Ghostty of
+-- its own. HAZARD: pass $HOME, not `home`: Ghostty 1.3.1's instance takes
+-- `home` from +new-window as a folder relative to its own.
 hl.bind("SUPER + Return",
-  hl.dsp.exec_cmd("command -v ghostty >/dev/null 2>&1 && exec ghostty || exec foot"),
+  hl.dsp.exec_cmd("command -v ghostty >/dev/null 2>&1 && "
+    .. '{ ghostty +new-window --working-directory="$HOME" || exec ghostty; } || exec foot'),
   { description = "Terminal (Ghostty, foot if missing)" })
 hl.bind("SUPER + ALT + Return", hl.dsp.exec_cmd("foot"), { description = "Fallback terminal (foot)" })
 

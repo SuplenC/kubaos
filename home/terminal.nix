@@ -1,8 +1,9 @@
 # Terminal stack: Ghostty (plain terminal), tmux, tms.
 #
 # The configs themselves come from config/{ghostty,tmux,tms} through
-# links.nix. This module only installs packages and generates the tmux plugin
-# loader, so nothing here writes under ~/.config/{tmux,ghostty,tms}.
+# links.nix. This module installs packages, runs Ghostty's background
+# instance and generates the tmux plugin loader, so nothing here writes
+# under ~/.config/{tmux,ghostty,tms}.
 { pkgs, lib, ... }:
 let
   # Replaces TPM. Same plugins as before, minus the ones that only fed the
@@ -23,6 +24,46 @@ in
     # Font used by config/ghostty/config.
     pkgs.nerd-fonts.meslo-lg
   ];
+
+  # One Ghostty in the background, so SUPER + Return and the `tui` binds
+  # (config/hypr) only ask it for a window with `ghostty +new-window`: about
+  # 60 ms to a window in the harness, against 180 ms for a process of its
+  # own. Ghostty's own unit and D-Bus file, with the instance kept running
+  # once its last window closes. The D-Bus file lets `+new-window` start the
+  # unit when it isn't running. Each window's shell sits in a systemd scope
+  # of its own (Ghostty's `linux-cgroup`), so the OOM killer takes one
+  # window, not all of them.
+  #
+  # The windows get the environment systemd --user had when the unit
+  # started: Hyprland's, which autostart.lua imports before it starts
+  # graphical-session.target (SSH_AUTH_SOCK included, home/secrets.nix).
+  # A crash of this one process closes every window.
+  systemd.user.services."app-com.mitchellh.ghostty" = {
+    Unit = {
+      Description = "Ghostty";
+      After = [
+        "graphical-session.target"
+        "dbus.socket"
+      ];
+      Requires = [ "dbus.socket" ];
+      # Its windows belong to this Hyprland: a new session starts a new one.
+      PartOf = [ "graphical-session.target" ];
+      # HAZARD: a switch must not restart it. That would close every
+      # terminal, the one running `kubaos update` included. A new Ghostty
+      # takes over at the next login.
+      X-RestartIfChanged = false;
+    };
+    Service = {
+      Type = "notify-reload";
+      # dot-session's config reload (SIGUSR2) reaches this process too.
+      ReloadSignal = "SIGUSR2";
+      BusName = "com.mitchellh.ghostty";
+      ExecStart = "${lib.getExe pkgs.ghostty} --gtk-single-instance=true --initial-window=false --quit-after-last-window-closed=false";
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
+  xdg.dataFile."dbus-1/services/com.mitchellh.ghostty.service".source =
+    "${pkgs.ghostty}/share/dbus-1/services/com.mitchellh.ghostty.service";
 
   # Sourced at the bottom of config/tmux/tmux.conf (`source-file -q`).
   xdg.configFile."tmux-nix/plugins.conf".text = ''
