@@ -11,7 +11,8 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + Return` | Terminal (Ghostty) |
 | `SUPER + CTRL + Return` | Terminal in tmux session `main` |
 | `SUPER + Space` | Command menu (Kotodama): apps, projects, scripts, windows, binds, KubaOS's actions and the system toggles ("wifi", "volume 40", "next wallpaper"). Type a sum to calculate. It opens on the focused screen |
-| `SUPER + SHIFT + F` | Files: yazi in your home folder |
+| `SUPER + SHIFT + F` | Files (Nautilus) in your home folder |
+| `SUPER + CTRL + F` | yazi in your home folder, in Ghostty |
 | `SUPER + Q` | Close window |
 | `SUPER + h/j/k/l` | Focus the screen left, below, above, right |
 | `SUPER + ←/↓/↑/→` | Focus the window that way. `SUPER + SHIFT + h/j/k/l` moves the window, `SUPER + CTRL + h/j/k/l` resizes it |
@@ -33,16 +34,38 @@ The layouts are the ones you picked in Kōbō, the first the default (`/etc/defa
 
 ## Files
 
-The file manager is [yazi](https://yazi-rs.github.io/), in Ghostty. No Finder, no Nautilus, no mouse required. It opens from:
+The file manager is Files (GNOME's Nautilus), with [yazi](https://yazi-rs.github.io/) in Ghostty a key away for when the mouse is too far. Files opens from:
 
 - `SUPER + SHIFT + F`, or "Files" in the Command menu: your home folder.
-- "Files: Downloads", "Files: Documents" and the rest in the Command menu: each XDG user folder that exists (the ones in `~/.config/user-dirs.dirs`, or the English names without it).
-- "Open folder…" in the Command menu (`open-folder` then the path): any folder, or a file, which opens in its folder with the cursor on it.
-- `xdg-open <folder>`, and every app's "Open folder". The Files desktop entry is KubaOS's default for folders, in `~/.local/share/applications/mimeapps.list`. Set another with `xdg-mime default <app>.desktop inode/directory`, which writes `~/.config/mimeapps.list`, and that one wins.
-- An app's "Show in folder" (Chrome's downloads, VS Code, Telegram): KubaOS answers `org.freedesktop.FileManager1` on the session bus and opens yazi with the file under the cursor. D-Bus starts it on the first click; it quits about ten seconds after the last. A folder it is asked to show opens inside it, since yazi can only point at files. A file that's already gone opens the nearest folder that isn't.
-- `y` in a shell: yazi in that terminal, and when you quit it, the shell `cd`s to where you ended up. Plain `yazi` leaves the shell where it was.
+- "Files: Downloads", "Files: Documents" and the rest in the Command menu: each XDG user folder that exists (the ones in `~/.config/user-dirs.dirs`, or the English names without it). The Item's second Action opens the folder in yazi instead.
+- "Recent files" in the Command menu: what you opened lately.
+- `xdg-open <folder>`, and every app's "Open folder". Files is KubaOS's default for folders, in `~/.local/share/applications/mimeapps.list`. Set another with `xdg-mime default <app>.desktop inode/directory`, which writes `~/.config/mimeapps.list`, and that one wins.
+- An app's "Show in folder" (Chrome's downloads, VS Code, Telegram): Files opens the folder with the file selected.
 
-`kubaos-files open [PATH|URI]...` does all of the above from a terminal: paths, `~`, and `file://` URIs, several at once as tabs.
+In Files:
+
+- `Space` previews the selected file (Sushi): photos, videos, PDFs, text, fonts. `Space` again closes it.
+- Double-clicking an archive (zip, 7z, RAR, tar) extracts it next to itself. "Open With" → File Roller looks inside first.
+- Select several files and press `F2` to rename them in one go: a pattern with a running number, or find and replace in the names.
+- Right-click: "Open in Ghostty" on a folder or the background; "Copy Path" puts the paths of the selection on the clipboard; on images, "Convert Image" to JPG, PNG or WebP and "Resize Image" to half, a quarter or at most 1920 px, each a new file next to the original; on a folder, "Open as Administrator" opens it at `admin://` after a password prompt, for editing what belongs to root; on a camera card's or phone's folder with a `DCIM` folder, "Import Photos" (below).
+- `Ctrl + H` shows hidden files, `Ctrl + L` takes a path, `Ctrl + 1` / `Ctrl + 2` switch list and grid.
+- Thumbnails cover images (HEIC and AVIF too), videos, PDFs and fonts, on network shares and phones as well. Files picks up the wallpaper's colours when it starts.
+
+Images open in Loupe, videos in Showtime, PDFs in Papers.
+
+yazi opens from `SUPER + CTRL + F` or "Yazi" in the Command menu (your home folder), "Open folder in yazi…" (`open-folder` then a path, any folder, or a file, which opens in its folder with the cursor on it), "Open With" → Yazi in Files, or `y` in a shell: yazi in that terminal, and when you quit it, the shell `cd`s to where you ended up. Plain `yazi` leaves the shell where it was. `kubaos-files open [PATH|URI]...` does the same from a terminal: paths, `~`, and `file://` URIs, several at once as tabs.
+
+### Drives and photos
+
+A USB stick or SD card mounts when you plug it in, and a notification offers Open and Eject. Internal disks and drives that are already mounted are left alone; an encrypted drive waits in the Files sidebar, which asks for its passphrase when you click it. "Eject STICK" in the Command menu (type "eject") unmounts a drive and powers it off, so it can be pulled; if a file on it is still open, the notification says so and the drive stays. "Don't mount drives when plugged in" in the Command menu (or `kubaos-automount off`) leaves new drives in the Files sidebar until you click them; "Mount drives when plugged in" turns it back on.
+
+When the drive has a `DCIM` folder (a camera's card, a phone), the notification also offers Import photos: the photos and videos are copied into `~/Pictures/<year>/<month>/` by the date they were taken (from EXIF, else the file's date), and the notification says how many. A file already imported, the same name and size in that month, is skipped, so importing the same card twice copies only what's new. Nothing on the card is ever deleted or changed. A phone over USB shows up in the Files sidebar instead of mounting; right-click its `DCIM` folder for "Import Photos". `kubaos-automount import <folder>` does it from a terminal.
+
+The service is the `kubaos-automount` user unit: `systemctl --user status kubaos-automount`, logs in `journalctl --user -u kubaos-automount`.
+
+### Tidy Downloads
+
+"Tidy Downloads" in the Command menu sorts `~/Downloads` into `Images`, `Documents`, `Archives`, `Installers`, `Video` and `Audio`, by file extension. Files that arrived in the last day stay where they are, as do folders, hidden files and anything it doesn't recognise; a name already taken gets ` (1)`. "Tidy Downloads daily" does it once a day (a user timer, `kubaos-tidy-downloads.timer`); it is off until you turn it on, and "Stop tidying Downloads daily" turns it off again. From a terminal: `kubaos-files tidy`, `kubaos-files tidy on|off`.
 
 | Key in yazi | What |
 |---|---|
@@ -284,7 +307,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-u2f-enroll`, `dot-ssh-sk-new`, and `dot-bw-setup` and `dot-bwenv`, aliases of `kubaos bitwarden` for one release) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `relink.sh`, which `kubaos update` runs, files for `/etc` |
-| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, `kubaos-files`, yazi for `xdg-open` and "Show in folder", and `kubaos-bluetooth`, the Bluetooth pairing agent |
+| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, `kubaos-files`, yazi in a terminal window and the Downloads tidy, `kubaos-bluetooth`, the Bluetooth pairing agent, and `kubaos-automount`, the automount for removable drives and the photo import |
 | `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |
 | `test/` | The Docker test harness (`test/run`) |
 | `docs/` | `PLAN.md` (why), `INSTALL.md` (how), `CONTRACTS.md` and `INSTALL-INTERNALS.md` (interfaces), `SECRETS.md` (Bitwarden, security key), `TESTING.md`, `BRAND.md` (name and voice), `screenshots/` |
