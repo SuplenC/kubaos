@@ -1,0 +1,24 @@
+-- Your Neovim options: ~/.config/kubaos/editor/nvim/options.lua, run after KubaOS's
+-- (~/.config/nvim/lua/config/options.lua) and LazyVim's, so they win. Takes effect in a
+-- new Neovim.
+--
+-- Line numbers relative to the cursor (LazyVim's default, true), or absolute.
+-- vim.opt.relativenumber = true
+--
+-- Lines kept visible above and below the cursor (KubaOS: 10).
+-- vim.opt.scrolloff = 10
+--
+-- Long lines wrap onto the next screen line (LazyVim: false).
+-- vim.opt.wrap = false
+--
+-- Indent width, in spaces (LazyVim: 2).
+-- vim.opt.shiftwidth = 2
+-- vim.opt.tabstop = 2
+--
+-- Format on save (LazyVim: true). `:LazyFormatInfo` shows the formatter per buffer.
+-- vim.g.autoformat = true
+--
+-- Scrolling and window animations (KubaOS turns them off).
+-- vim.g.snacks_animate = false
+--
+-- Full docs: :help option-list, and https://www.lazyvim.org/configuration/general

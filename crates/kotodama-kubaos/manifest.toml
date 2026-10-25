@@ -7,7 +7,7 @@ command = ["./kotodama-kubaos"]
 word = "kubaos"
 title = "KubaOS"
 icon = "preferences-system"
-about = "KubaOS's own actions, the keyboard layouts, and Wi-Fi, Bluetooth, audio, brightness and power profiles, which work with the shell down. Date queries such as `days until christmas` are answered with the clock popup's holidays and zones. `cpu`, `ram` and `battery` are answered from the system monitor, and `kill chrome` or `end slack` finds the processes to stop, each stop confirmed first. Add your own actions and hide these in ~/.config/kubaos/kotodama/user.toml."
+about = "KubaOS's own actions, the keyboard layouts, and Wi-Fi, Bluetooth, audio, brightness and power profiles, which work with the shell down. Date queries such as `days until christmas` are answered with the clock popup's holidays and zones. `cpu`, `ram` and `battery` are answered from the system monitor, and `kill chrome` or `end slack` finds the processes to stop, each stop confirmed first. Add your own actions and hide these in ~/.config/kubaos/menu/kotodama/user.toml."
 examples = [
     { query = "wifi", result = "Turn Wi-Fi on or off" },
     { query = "volume 40", result = "Set the volume to 40%" },

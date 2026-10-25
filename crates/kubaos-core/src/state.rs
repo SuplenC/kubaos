@@ -109,7 +109,7 @@ impl Paths {
 
     /// The user layer, `~/.config/kubaos`.
     pub fn user_layer(&self) -> PathBuf {
-        self.config.join("kubaos")
+        kubaos_user_layer::root(&self.config)
     }
 
     /// The Projects root, `~/Projects`, where scaffolded projects go.

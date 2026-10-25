@@ -1,5 +1,0 @@
-# Your Ghostty settings, loaded after ~/.config/ghostty/config, so they win.
-# Reload: ctrl+shift+, (or restart Ghostty).
-#
-# font-size = 13
-# window-padding-x = 12

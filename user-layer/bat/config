@@ -1,4 +1,0 @@
-# Your bat options, appended to KubaOS's, so they win.
-# dot-config apply (and every update) writes ~/.config/bat/config from both.
-#
-# --tabs=2

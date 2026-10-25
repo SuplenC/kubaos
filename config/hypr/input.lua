@@ -1,8 +1,10 @@
 -- Keyboard and touchpad.
 -- https://wiki.hypr.land/Configuring/Variables/#input
 
+local user_layer = require("user_layer")
+
 -- The keyboard layouts are the user's: `layouts = ["us", "it(intl)"]` in
--- ~/.config/kubaos/keyboard/keyboard.toml, which `kubaos keyboard` writes.
+-- ~/.config/kubaos/desktop/keyboard/keyboard.toml, which `kubaos keyboard` writes.
 -- Until the user has that list they are the system's: /etc/default/keyboard,
 -- which the install writes from Kōbō's Language screen, and whose model and
 -- options always apply. `kubaos keyboard` writes the user's default there as
@@ -42,8 +44,7 @@ end
 -- `layouts = ["us", "it(intl)"]`. Nil without the file or the line, or with
 -- no layout in it.
 local function user_layouts()
-  local config_home = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
-  local file = io.open(config_home .. "/kubaos/keyboard/keyboard.toml", "r")
+  local file = io.open(user_layer.file("keyboard", "keyboard.toml"), "r")
   if not file then
     return nil
   end

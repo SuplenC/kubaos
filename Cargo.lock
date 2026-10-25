@@ -2110,6 +2110,7 @@ dependencies = [
  "kubaos-clock",
  "kubaos-core",
  "kubaos-sysmon",
+ "kubaos-user-layer",
  "tempfile",
  "thiserror 2.0.21",
  "toml 0.9.12+spec-1.1.0",
@@ -2158,6 +2159,7 @@ dependencies = [
  "futures-lite",
  "kamadak-exif",
  "kotodama-extension",
+ "kubaos-user-layer",
  "tempfile",
  "thiserror 2.0.21",
  "zbus",
@@ -2185,6 +2187,7 @@ dependencies = [
  "clap",
  "kubaos-core",
  "kubaos-cursor",
+ "kubaos-user-layer",
  "rustix 1.1.5",
  "serde_json",
  "signal-hook",
@@ -2197,6 +2200,7 @@ name = "kubaos-clock"
 version = "0.1.0"
 dependencies = [
  "jiff",
+ "kubaos-user-layer",
  "serde",
  "serde_json",
  "tempfile",
@@ -2209,6 +2213,7 @@ dependencies = [
 name = "kubaos-core"
 version = "0.1.0"
 dependencies = [
+ "kubaos-user-layer",
  "serde",
  "serde_json",
  "tempfile",
@@ -2234,6 +2239,7 @@ name = "kubaos-files"
 version = "0.1.0"
 dependencies = [
  "kotodama-extension",
+ "kubaos-user-layer",
  "tempfile",
  "thiserror 2.0.21",
 ]
@@ -2257,6 +2263,7 @@ dependencies = [
 name = "kubaos-sysmon"
 version = "0.1.0"
 dependencies = [
+ "kubaos-user-layer",
  "rustix 1.1.5",
  "serde",
  "serde_json",
@@ -2265,6 +2272,10 @@ dependencies = [
  "toml 0.9.12+spec-1.1.0",
  "toml_edit",
 ]
+
+[[package]]
+name = "kubaos-user-layer"
+version = "0.1.0"
 
 [[package]]
 name = "kurbo"

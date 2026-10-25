@@ -1,6 +1,0 @@
-// Your fastfetch settings, merged over KubaOS's: objects merge key by key,
-// anything else (the module list, for one) replaces ours.
-// dot-config apply (and every update) writes ~/.config/fastfetch/config.jsonc from both.
-{
-  // "display": { "separator": " -> " }
-}

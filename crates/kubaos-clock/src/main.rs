@@ -48,7 +48,7 @@ zone       add or remove an extra clock, by city or IANA name (`tokyo`, `America
 countdown  add a countdown to a date or time (`20 dec`, `friday 17:00`), or remove one
 set        holidays CODE|none, first-weekday DAY, analog on|off|toggle, bar-countdown NAME|none
 
-Settings: ~/.config/kubaos/clock/clock.toml";
+Settings: ~/.config/kubaos/desktop/clock/clock.toml";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();

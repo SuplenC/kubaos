@@ -1,3 +1,0 @@
--- Your Neovim keymaps, run after KubaOS's and LazyVim's.
---
--- vim.keymap.set("n", "<C-d>", "<C-d>zz")

@@ -2,6 +2,8 @@
 -- environment, so every process it spawns inherits it. Hyprland also exports
 -- these to systemd --user and D-Bus activation (see autostart.lua).
 
+local user_layer = require("user_layer")
+
 local home = os.getenv("HOME") or ""
 
 -- PATH: dot-* scripts and Nix tools must be reachable from binds even if
@@ -58,15 +60,11 @@ hl.env("_JAVA_AWT_WM_NONREPARENTING", "1")
 
 -- Cursor: KubaOS-Bibata, the recoloured Bibata `kubaos cursor` writes (and
 -- home/theme.nix names for every other client), at the size in the user's
--- ~/.config/kubaos/cursor/cursor.toml, which the Command menu sets. The
+-- ~/.config/kubaos/desktop/cursor/cursor.toml, which the Command menu sets. The
 -- classic style is the same name: its theme inherits Bibata-Modern-Classic.
 do
   local size = "24"
-  local config = os.getenv("XDG_CONFIG_HOME")
-  if not config or config == "" then
-    config = home .. "/.config"
-  end
-  local file = io.open(config .. "/kubaos/cursor/cursor.toml", "r")
+  local file = io.open(user_layer.file("cursor", "cursor.toml"), "r")
   if file then
     for line in file:lines() do
       -- The range `kubaos cursor` takes (crates/kubaos-cursor/src/settings.rs).

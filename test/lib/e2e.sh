@@ -162,7 +162,7 @@ c_theme() {
 # Hyprland here, so `hyprctl setcursor` is left out.
 CUR_ICONS=$USER_HOME/.local/share/icons
 CUR_THEME=$CUR_ICONS/KubaOS-Bibata
-CUR_SETTINGS=$USER_HOME/.config/kubaos/cursor/cursor.toml
+CUR_SETTINGS=$USER_HOME/.config/kubaos/desktop/cursor/cursor.toml
 CUR_PALETTE=$USER_HOME/.local/state/theme/cursor.toml
 # cursor_sizes SIZES: waits up to 60 s for the background render to leave an
 # XCursor theme at SIZES ("24 36 48").
@@ -540,7 +540,7 @@ c_links() {
   # Defaults: every file under config/ is a read-only store file with the
   # repo's content, except the ones dot-config seeds or merges.
   local f n_files=0 layer
-  layer="$(awk '{print $2}' "$USER_HOME/.local/share/kubaos/layer")"
+  layer="$(awk '$1 != "app" {print $2}' "$USER_HOME/.local/share/kubaos/layer")"
   while IFS= read -r f; do
     f="${f#config/}"
     grep -qxF -- "$f" <<<"$layer" && continue
@@ -699,7 +699,7 @@ c_workspaces() {
 }
 
 # Keyboard layouts: config/hypr/input.lua hands Hyprland the user's layouts
-# (~/.config/kubaos/keyboard/keyboard.toml), else every layout in
+# (~/.config/kubaos/desktop/keyboard/keyboard.toml), else every layout in
 # /etc/default/keyboard, and `kubaos keyboard show` reads the same files.
 c_keyboard() {
   as_user lua5.5 "$REPO/test/lua/input_test.lua" "$REPO" || { echo "FAIL test/lua/input_test.lua"; return 1; }
@@ -714,10 +714,10 @@ c_keyboard() {
     { echo "FAIL kubaos keyboard show: $out"; rm -rf "$dir"; return 1; }
   [[ $out == $'us\nit(intl)' ]] || { echo "FAIL kubaos keyboard show printed: $out"; rm -rf "$dir"; return 1; }
   out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard seed && kubaos keyboard seed && kubaos keyboard show" 2>&1)"
-  if [[ $out != $'us\nit(intl)' ]] || ! grep -qx 'layouts = \["us", "it(intl)"\]' "$dir/kubaos/keyboard/keyboard.toml"; then
-    echo "FAIL kubaos keyboard seed: printed $out, wrote $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1)"; rm -rf "$dir"; return 1
+  if [[ $out != $'us\nit(intl)' ]] || ! grep -qx 'layouts = \["us", "it(intl)"\]' "$dir/kubaos/desktop/keyboard/keyboard.toml"; then
+    echo "FAIL kubaos keyboard seed: printed $out, wrote $(cat "$dir/kubaos/desktop/keyboard/keyboard.toml" 2>&1)"; rm -rf "$dir"; return 1
   fi
-  printf 'layouts = ["de"]\n' >"$dir/kubaos/keyboard/keyboard.toml"
+  printf 'layouts = ["de"]\n' >"$dir/kubaos/desktop/keyboard/keyboard.toml"
   out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard seed && kubaos keyboard show" 2>&1)"
   rm -rf "$dir"
   [[ $out == de ]] || { echo "FAIL a user list of their own: kubaos keyboard seed then show printed $out"; return 1; }
@@ -750,8 +750,8 @@ keyboard_refusal() {
   out="$(kz "XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard' kubaos keyboard default it" 2>&1)" && {
     echo "FAIL kubaos keyboard default it succeeded with polkit refusing: $out"; rm -rf "$dir"; return 1
   }
-  if ! grep -qx 'layouts = \["it", "us"\]' "$dir/kubaos/keyboard/keyboard.toml" 2>/dev/null; then
-    echo "FAIL a refused system default left the user's layouts unchanged: $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1)"
+  if ! grep -qx 'layouts = \["it", "us"\]' "$dir/kubaos/desktop/keyboard/keyboard.toml" 2>/dev/null; then
+    echo "FAIL a refused system default left the user's layouts unchanged: $(cat "$dir/kubaos/desktop/keyboard/keyboard.toml" 2>&1)"
     rm -rf "$dir"; return 1
   fi
   rm -rf "$dir"
@@ -840,7 +840,7 @@ kb_probe_wait() {
 # on its first match only picks it, and the Add button adds it to the user's
 # layouts with no privilege asked.
 keyboard_tab_clicks() {
-  local dir at picked daemon mine="$USER_HOME/.config/kubaos/keyboard/keyboard.toml" saved bad=0
+  local dir at picked daemon mine="$USER_HOME/.config/kubaos/desktop/keyboard/keyboard.toml" saved bad=0
   pointer_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$dir/keyboard"
@@ -926,9 +926,9 @@ keyboard_changes() {
   chown -R "$USER_NAME:" "$dir"
   out="$(kz "export XDG_CONFIG_HOME='$dir' KUBAOS_KEYBOARD_FILE='$dir/keyboard'; kubaos keyboard move de 2 && kubaos keyboard add pl" 2>&1)" ||
     { echo "FAIL kubaos keyboard move de 2, add pl: $out"; rm -rf "$dir"; return 1; }
-  if ! grep -qx 'layouts = \["us", "de", "it(intl)", "pl"\]' "$dir/kubaos/keyboard/keyboard.toml" ||
+  if ! grep -qx 'layouts = \["us", "de", "it(intl)", "pl"\]' "$dir/kubaos/desktop/keyboard/keyboard.toml" ||
     ! cmp -s "$dir/keyboard" "$dir/keyboard.before"; then
-    echo "FAIL kubaos keyboard move de 2, add pl wrote $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1), system $(cat "$dir/keyboard")"
+    echo "FAIL kubaos keyboard move de 2, add pl wrote $(cat "$dir/kubaos/desktop/keyboard/keyboard.toml" 2>&1), system $(cat "$dir/keyboard")"
     rm -rf "$dir"
     return 1
   fi
@@ -982,17 +982,17 @@ SH
   chown -R "$USER_NAME:" "$dir"
   out="$(kz "export PATH='$dir':\$PATH XDG_CONFIG_HOME='$dir'; kubaos keyboard accents off && kubaos keyboard accents" 2>&1)" ||
     { echo "FAIL kubaos keyboard accents off: $out"; rm -rf "$dir"; return 1; }
-  if [[ $(tail -1 <<<"$out") != off ]] || ! grep -qx 'mac_accents = false' "$dir/kubaos/keyboard/keyboard.toml" ||
+  if [[ $(tail -1 <<<"$out") != off ]] || ! grep -qx 'mac_accents = false' "$dir/kubaos/desktop/keyboard/keyboard.toml" ||
     ! grep -qx 'stop --no-ask-password keyd.service' "$dir/calls"; then
-    echo "FAIL accents off: printed $out, wrote $(cat "$dir/kubaos/keyboard/keyboard.toml" 2>&1), ran $(cat "$dir/calls" 2>&1)"
+    echo "FAIL accents off: printed $out, wrote $(cat "$dir/kubaos/desktop/keyboard/keyboard.toml" 2>&1), ran $(cat "$dir/calls" 2>&1)"
     rm -rf "$dir"
     return 1
   fi
   out="$(kz "PATH='$dir':\$PATH XDG_CONFIG_HOME='$dir' kubaos keyboard accents on" 2>&1)" ||
     { echo "FAIL kubaos keyboard accents on: $out"; rm -rf "$dir"; return 1; }
-  if ! grep -qx 'mac_accents = true' "$dir/kubaos/keyboard/keyboard.toml" ||
+  if ! grep -qx 'mac_accents = true' "$dir/kubaos/desktop/keyboard/keyboard.toml" ||
     [[ $(tail -1 "$dir/calls") != 'start --no-ask-password keyd.service' ]]; then
-    echo "FAIL accents on: wrote $(cat "$dir/kubaos/keyboard/keyboard.toml"), ran $(cat "$dir/calls")"
+    echo "FAIL accents on: wrote $(cat "$dir/kubaos/desktop/keyboard/keyboard.toml"), ran $(cat "$dir/calls")"
     rm -rf "$dir"
     return 1
   fi
@@ -1150,7 +1150,7 @@ c_sysmon() {
     [[ $out == *'"pill":false'* ]] && break
     sleep 0.2
   done
-  if [[ $out == *'"pill":false'* ]] && grep -qx 'pill = false' "$USER_HOME/.config/kubaos/sysmon/sysmon.toml"; then
+  if [[ $out == *'"pill":false'* ]] && grep -qx 'pill = false' "$USER_HOME/.config/kubaos/desktop/sysmon/sysmon.toml"; then
     echo "ok   qs ipc call sysmon pill off hides it and writes sysmon.toml"
   else
     echo "FAIL the pill didn't hide: $out"
@@ -1604,7 +1604,7 @@ c_menu() {
 # the Daemon's commit (Cargo.lock against flake.lock).
 c_menu_kubaos() {
   local out bad=0 log="$LOGS/kotodamad-kubaos.log" daemon
-  local layer="$USER_HOME/.config/kubaos/kotodama/user.toml" saved="$LOGS/user.toml.saved"
+  local layer="$USER_HOME/.config/kubaos/menu/kotodama/user.toml" saved="$LOGS/user.toml.saved"
   local query="python3 -I $REPO/test/lib/menu-query.py \$XDG_RUNTIME_DIR/kotodama.sock"
 
   out="$(python3 -I - "$REPO/Cargo.lock" "$REPO/flake.lock" <<'PY'
@@ -1834,10 +1834,10 @@ TOML
 }
 
 # Wallpaper sets (issue #16): every set read-only in /usr/share/kubaos/wallpapers,
-# the picker's folders are the chosen ones (~/.config/kubaos/wallpapers/sets,
+# the picker's folders are the chosen ones (~/.config/kubaos/desktop/wallpapers/sets,
 # all of them without the file) plus ~/Pictures/wallpapers, a real folder.
 c_wallpaper_sets() {
-  local sys=/usr/share/kubaos/wallpapers sets="$USER_HOME/.config/kubaos/wallpapers/sets"
+  local sys=/usr/share/kubaos/wallpapers sets="$USER_HOME/.config/kubaos/desktop/wallpapers/sets"
   local own="$USER_HOME/Pictures/wallpapers" st="$USER_HOME/.local/state/theme" got bad=0 wall
   [[ "$(readlink "$sys")" == /nix/store/* ]] && echo "ok   $sys -> $(readlink "$sys")" ||
     { echo "FAIL $sys isn't a link into the store"; return 1; }
@@ -2134,11 +2134,11 @@ c_packages() {
 # in a kubaos built with the test-suite feature) and a user flake under git,
 # so every file kubaos writes into kubaos.d/ must reach git's index for Nix to
 # see it. Add, configure, scaffold and remove it, with a user override in
-# ~/.config/kubaos/nvim/ that must win throughout, and nothing of the Suite
+# ~/.config/kubaos/editor/nvim/ that must win throughout, and nothing of the Suite
 # left in the generation afterwards. Switches run --foreground, as in packages.
 c_suites() {
   local u="$USER_HOME/.config/kubaos/home" layer="$USER_HOME/.config/kubaos" out gen
-  local mine="$USER_HOME/.config/kubaos/nvim/plugins/test-suite.lua"
+  local mine="$USER_HOME/.config/kubaos/editor/nvim/plugins/test-suite.lua"
   local cache="$USER_HOME/.cache/kubaos-test-suite" project="$USER_HOME/Projects/test-suite-demo"
   install_kubaos || return 1
   user_flake "$u" || return 1
@@ -2167,7 +2167,7 @@ c_suites() {
   zrun 'print -r -- $PATH' | tr ':' '\n' | grep -qx "$USER_HOME/.local/share/kubaos-test-suite/bin" ||
     { echo "FAIL the Suite's PATH entry is missing"; return 1; }
   echo "ok   its package, environment variable and PATH entry"
-  [[ -f $mine ]] && grep -q 'created ~/.config/kubaos/nvim/plugins/test-suite.lua' <<<"$out" ||
+  [[ -f $mine ]] && grep -q 'created ~/.config/kubaos/editor/nvim/plugins/test-suite.lua' <<<"$out" ||
     { echo "FAIL the missing user-layer file was not seeded"; printf '%s\n' "$out"; return 1; }
   out="$(opts)"
   [[ $out == "from the test Suite 1" ]] || { echo "FAIL the Suite's Neovim setting: $out"; return 1; }
@@ -2184,7 +2184,7 @@ c_suites() {
     { echo "FAIL kubaos suite configure test"; printf '%s\n' "$out" | tail -20; return 1; }
   [[ $(zrun 'kubaos-test-suite version') == 2 ]] && has_bin kubaos-test-suite-greet ||
     { echo "FAIL configure: not version 2 with kubaos-test-suite-greet"; return 1; }
-  cmp -s "$mine" "$LOGS/suites-mine.lua" && grep -q 'kept ~/.config/kubaos/nvim/plugins/test-suite.lua' <<<"$out" ||
+  cmp -s "$mine" "$LOGS/suites-mine.lua" && grep -q 'kept ~/.config/kubaos/editor/nvim/plugins/test-suite.lua' <<<"$out" ||
     { echo "FAIL configure wrote to the user's file"; printf '%s\n' "$out"; return 1; }
   out="$(opts)"
   [[ $out == "mine 2" ]] || { echo "FAIL after configure: $out (want the user's greeting, the Suite's version 2)"; return 1; }
@@ -2201,7 +2201,7 @@ c_suites() {
     { echo "FAIL kubaos suite remove test"; printf '%s\n' "$out" | tail -20; return 1; }
   grep -qE '^cache ~/.cache/kubaos-test-suite \([0-9.]+ [KMG]?i?B\): kept' <<<"$out" && [[ -s $cache/build.log ]] ||
     { echo "FAIL remove: the cache's size not shown, or the cache not kept"; printf '%s\n' "$out"; return 1; }
-  grep -qx '  ~/.config/kubaos/nvim/plugins/test-suite.lua' <<<"$out" ||
+  grep -qx '  ~/.config/kubaos/editor/nvim/plugins/test-suite.lua' <<<"$out" ||
     { echo "FAIL remove doesn't list the user-layer file that mentions the Suite"; printf '%s\n' "$out"; return 1; }
   cmp -s "$mine" "$LOGS/suites-mine.lua" && [[ -f $project/README.md ]] ||
     { echo "FAIL remove touched the user's file or the project"; return 1; }
@@ -2333,8 +2333,8 @@ for path in sys.argv[1:]:
     { echo "FAIL the daily tidy with the setting off printed: $out"; bad=1; }
   out="$(as_user "$bin" tidy 2>/dev/null)" && [[ $out == "0 moved" && -f $USER_HOME/Downloads/report.pdf ]] ||
     { echo "FAIL tidying Downloads moved today's file, or printed: $out"; bad=1; }
-  as_user "$bin" tidy on >/dev/null && [[ -e $USER_HOME/.config/kubaos/files/tidy-downloads ]] &&
-    as_user "$bin" tidy off >/dev/null && [[ ! -e $USER_HOME/.config/kubaos/files/tidy-downloads ]] ||
+  as_user "$bin" tidy on >/dev/null && [[ -e $USER_HOME/.config/kubaos/desktop/files/tidy-downloads ]] &&
+    as_user "$bin" tidy off >/dev/null && [[ ! -e $USER_HOME/.config/kubaos/desktop/files/tidy-downloads ]] ||
     { echo "FAIL kubaos-files tidy on|off doesn't turn the daily tidy on and off"; bad=1; }
   grep -qE '^ExecStart=.*/bin/kubaos-files tidy --scheduled$' "$unit" 2>/dev/null &&
     [[ -e $USER_HOME/.config/systemd/user/timers.target.wants/kubaos-tidy-downloads.timer ]] ||
@@ -2351,7 +2351,7 @@ for path in sys.argv[1:]:
 # the setting, the eject command's refusal and the photo import.
 c_automount() {
   local bad=0 out rc
-  local bin="$USER_HOME/.nix-profile/bin/kubaos-automount" flag="$USER_HOME/.config/kubaos/files/no-automount"
+  local bin="$USER_HOME/.nix-profile/bin/kubaos-automount" flag="$USER_HOME/.config/kubaos/desktop/files/no-automount"
   local unit="$USER_HOME/.config/systemd/user/kubaos-automount.service"
   local card="$LOGS/automount-card" pictures="$USER_HOME/Pictures"
 
@@ -2447,6 +2447,28 @@ c_bluetooth() {
 
 c_user_layer() {
   zrun "'$REPO/test/user-layer-check' '$REPO'"
+}
+
+# scripts/dot-config on its own, in a scratch home: seeding, the README
+# links, and moving a flat user layer into its groups without losing a file.
+# The Lua side of the same table (config/hypr/user_layer.lua) beside it, and
+# every user-layer path a default names literally, as a file include must,
+# is one the switch created.
+c_dot_config() {
+  local bad=0 path missing=()
+  as_user bash "$REPO/test/dot-config-test" "$REPO" || { echo "FAIL test/dot-config-test"; bad=1; }
+  as_user lua5.5 "$REPO/test/lua/user_layer_test.lua" "$REPO" || { echo "FAIL test/lua/user_layer_test.lua"; bad=1; }
+  while IFS= read -r path; do
+    [[ -e $USER_HOME/.config/kubaos/$path ]] || missing+=("$path")
+  done < <(as_user git -C "$REPO" grep -hoE '[~]/\.config/kubaos/[a-z]+/[a-z]+/[A-Za-z0-9_.-]+' -- \
+    config/foot config/ghostty config/git config/tmux config/hypr/hypridle.conf config/hypr/hyprlock.conf config/fuzzel |
+    sed 's|^~/\.config/kubaos/||' | sort -u)
+  if ((${#missing[@]})); then
+    echo "FAIL the defaults include user files the switch didn't create: ${missing[*]}"; bad=1
+  else
+    echo "ok   every user file a default includes is in the user layer"
+  fi
+  return "$bad"
 }
 
 # kubaos update, the channels and kubaos rollback, through /out/kubaos: a
@@ -2881,7 +2903,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shutdown splash shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shutdown splash shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites dot_config user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

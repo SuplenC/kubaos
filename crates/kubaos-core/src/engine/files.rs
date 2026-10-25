@@ -1,5 +1,9 @@
 //! Text of the files the engine writes into the target. Pure functions.
 
+use std::path::Path;
+
+use kubaos_user_layer::App;
+
 use crate::config::Wallpapers;
 
 /// Btrfs subvolumes, flat under the top level (system/00-btrfs-subvolumes.md),
@@ -212,9 +216,12 @@ pub fn gitconfig(name: &str, email: &str) -> String {
 
 /// The wallpapers the user chose, under the home: the user layer, so
 /// an update never changes it. scripts/dot-theme reads it (`folders`, `wallpapers`).
-pub const WALLPAPER_SETS: &str = ".config/kubaos/wallpapers/sets";
+pub fn wallpaper_sets_path() -> String {
+    let dir = kubaos_user_layer::root(Path::new(".config")).join(App::Wallpapers.relative());
+    format!("{}/sets", dir.display())
+}
 
-/// [`WALLPAPER_SETS`]: one entry per line, the whole sets' ids, then the single wallpapers as
+/// [`wallpaper_sets_path`]: one entry per line, the whole sets' ids, then the single wallpapers as
 /// `<set>/<file>`; `#` comments. `home/theme.nix` seeds the same header.
 pub fn wallpaper_sets(w: &Wallpapers) -> String {
     let mut s = String::from(
@@ -398,7 +405,7 @@ mod tests {
             sets: vec!["shinjuku".into(), "cyberpunk".into()],
             files: vec![],
         };
-        assert_eq!(WALLPAPER_SETS, ".config/kubaos/wallpapers/sets");
+        assert_eq!(wallpaper_sets_path(), ".config/kubaos/desktop/wallpapers/sets");
         assert_eq!(
             wallpaper_sets(&w),
             "# The wallpapers the picker shows (from /usr/share/kubaos/wallpapers), one per line:\n\

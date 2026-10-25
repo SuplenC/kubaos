@@ -1,0 +1,17 @@
+# Your yazi settings: ~/.config/yazi/yazi.toml links to this file,
+# ~/.config/kubaos/tools/yazi/yazi.toml. KubaOS ships only the theme (theme.toml), so
+# every value here is yazi's own default until you change it. Takes effect at the next start.
+#
+# [mgr]
+# # Dotfiles in the listing (`.` toggles them for the session).
+# show_hidden = false
+# # Folders before files.
+# sort_dir_first = true
+# # The order: "alphabetical", "natural", "mtime", "size", "extension" and more.
+# sort_by = "alphabetical"
+# # What shows beside each name: "none", "size", "mtime", "permissions", "owner".
+# linemode = "none"
+# # The widths of the parent, current and preview columns.
+# ratio = [1, 4, 3]
+#
+# Full docs: https://yazi-rs.github.io/docs/configuration/yazi

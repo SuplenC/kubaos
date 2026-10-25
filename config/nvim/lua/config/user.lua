@@ -1,10 +1,19 @@
--- The user layer, ~/.config/kubaos/nvim (docs/CONTRACTS.md, "Defaults and the
--- user layer"). This config is read-only defaults; the user's options,
--- keymaps, autocmds and plugin specs live there and run after ours. So do the
--- files lazy.nvim and LazyVim write: lazy-lock.json and lazyvim.json.
+-- The user layer's Neovim folder, ~/.config/kubaos/editor/nvim
+-- (docs/CONTRACTS.md, "Defaults and the user layer"). This config is
+-- read-only defaults; the user's options, keymaps, autocmds and plugin specs
+-- live there and run after ours. So do the files lazy.nvim and LazyVim write:
+-- lazy-lock.json and lazyvim.json.
 local M = {}
 
-M.dir = (vim.env.XDG_CONFIG_HOME or (vim.env.HOME .. "/.config")) .. "/kubaos/nvim"
+-- Neovim's folder in the user layer, grouped as crates/kubaos-user-layer and
+-- home/user-layer.nix put it; this is Neovim's only copy of the path.
+local FOLDER = "editor/nvim"
+
+local config_home = vim.env.XDG_CONFIG_HOME
+if not config_home or config_home == "" then
+  config_home = vim.env.HOME .. "/.config"
+end
+M.dir = config_home .. "/kubaos/" .. FOLDER
 
 local function load(file)
   local ok, result = pcall(dofile, file)

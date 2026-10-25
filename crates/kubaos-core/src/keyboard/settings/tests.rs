@@ -11,7 +11,7 @@ fn the_accents_are_on_without_a_file_or_a_line() {
 
 #[test]
 fn the_seed_in_the_user_layer_leaves_the_accents_on() {
-    let seed = include_str!("../../../../../user-layer/keyboard/keyboard.toml");
+    let seed = include_str!("../../../../../user-layer/desktop/keyboard/keyboard.toml");
 
     assert_eq!(Settings::parse(seed).unwrap(), Settings::default());
 }
@@ -57,7 +57,7 @@ fn turning_the_accents_off_creates_the_file_and_its_folder() {
 fn the_file_lives_in_the_user_layer() {
     assert_eq!(
         path(Path::new("/home/kuba/.config")),
-        Path::new("/home/kuba/.config/kubaos/keyboard/keyboard.toml")
+        Path::new("/home/kuba/.config/kubaos/desktop/keyboard/keyboard.toml")
     );
 }
 

@@ -14,7 +14,7 @@
 //!                                             turn them on or off, or apply the setting
 //!
 //! A layout is spelled `it` or `us(intl)`. The layouts are the user's: `layouts` in
-//! `~/.config/kubaos/keyboard/keyboard.toml`, which Hyprland reads (`config/hypr/input.lua`).
+//! `~/.config/kubaos/desktop/keyboard/keyboard.toml`, which Hyprland reads (`config/hypr/input.lua`).
 //! Until the user has a list, it is the one in `/etc/default/keyboard`, which the install wrote.
 //! A change is checked against xkb's rules list, written to the user's file and reaches Hyprland
 //! with `hyprctl reload`, with no privilege asked.
@@ -31,7 +31,7 @@
 //! reads another system file instead (the harness).
 //!
 //! The accents are keyd, which `system/50-hyprland.sh` installs and enables. `on` and `off` write
-//! the setting to `~/.config/kubaos/keyboard/keyboard.toml`, then apply it: keyd runs while they
+//! the setting to `~/.config/kubaos/desktop/keyboard/keyboard.toml`, then apply it: keyd runs while they
 //! are on and is stopped while they are off (a polkit rule lets the desktop user start and stop
 //! `keyd.service`), and Hyprland reloads, so the Shortcuts View's cheat sheet follows. `apply`
 //! runs at login (`config/hypr/autostart.lua`), as keyd starts with the machine.

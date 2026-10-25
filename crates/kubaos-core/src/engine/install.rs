@@ -1014,7 +1014,7 @@ impl<'a> Install<'a> {
                 &self.ts(&f),
             ]))?;
         }
-        // ~/.config/kubaos/wallpapers/sets: the wallpapers the picker shows.
+        // The user layer's wallpaper sets: the wallpapers the picker shows.
         // Every set of the payload's unless the user picked; an older payload
         // lists none, and without the file dot-theme shows every set on the
         // machine.
@@ -1028,17 +1028,18 @@ impl<'a> Install<'a> {
             files: Vec::new(),
         });
         if c.wallpapers.is_some() || !wallpapers.sets.is_empty() {
-            let f = format!("{home}/{}", files::WALLPAPER_SETS);
+            let f = format!("{home}/{}", files::wallpaper_sets_path());
             let dir = f.rsplit_once('/').map_or("", |(d, _)| d).to_string();
             self.mkdir(&self.t(&dir))?;
             self.write(&f, &files::wallpaper_sets(&wallpapers), 0o644)?;
-            self.sh(Cmd::new("chown").args([
-                &owner,
-                &self.ts(&format!("{home}/.config")),
-                &self.ts(&format!("{home}/.config/kubaos")),
-                &self.ts(&dir),
-                &self.ts(&f),
-            ]))?;
+            // Every folder from ~/.config down, so none of them is root's.
+            let mut owned: Vec<String> = Path::new(&f)
+                .ancestors()
+                .take_while(|p| p.starts_with(format!("{home}/.config")))
+                .map(|p| self.ts(&p.to_string_lossy()))
+                .collect();
+            owned.reverse();
+            self.sh(Cmd::new("chown").arg(&owner).args(owned))?;
         }
         self.install_keyring(&home, &owner)?;
 

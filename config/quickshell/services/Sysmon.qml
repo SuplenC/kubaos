@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
+import qs.settings
 
 // The system monitor's state: the bar's pill, the popup and the alerts all
 // read the one stream.
@@ -13,12 +14,12 @@ import Quickshell.Services.UPower
 // The shell tells it the pace: every 2 s for the pill, every second while the
 // popup is open, and nothing while the screen is locked or nothing shows. A
 // request is a line of JSON on its stdin; the reply a line with its id. The
-// settings file (~/.config/kubaos/sysmon/sysmon.toml) is watched, so a change
+// settings file (~/.config/kubaos/desktop/sysmon/sysmon.toml) is watched, so a change
 // from the Command menu shows at once.
 Singleton {
     id: root
 
-    readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || `${Quickshell.env("HOME")}/.config`) + "/kubaos/sysmon"
+    readonly property string configDir: UserLayer.dir("sysmon")
     // The graphs' window, in ms.
     readonly property int window: 60000
     readonly property var defaults: ({

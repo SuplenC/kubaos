@@ -1,0 +1,26 @@
+# Your system monitor: ~/.config/kubaos/desktop/sysmon/sysmon.toml, read by `kubaos-sysmon`
+# on every change. The Command menu's monitor Items and the bar pill's Hide edit the lines
+# below, comments kept; a hand edit shows within a few seconds.
+#
+# The pill in the bar (default true). The popup and the menu's answers work without it.
+# pill = true
+#
+# How the pill draws each value: "numbers" (default), "bars" or "sparklines".
+# style = "numbers"
+#
+# What the pill shows, in order, from cpu, ram, temp, gpu, net and power.
+# metrics = ["cpu", "ram"]
+#
+# A notification when the machine runs hot, fills up or drains fast (default true).
+# alerts = true
+#
+# Where the pill turns red and the alerts fire: CPU temperature in °C, RAM and disk use
+# in %, battery draw in W.
+# [thresholds]
+# cpu_temp = 90
+# ram = 90
+# disk = 95
+# battery_draw = 30
+#
+# Full docs: docs/CONTRACTS.md, "Defaults and the user layer"
+# (https://github.com/SuplenC/kubaos/blob/main/docs/CONTRACTS.md).

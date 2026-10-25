@@ -1,8 +1,71 @@
-# user-layer
+# Your KubaOS settings
 
-The starting files of the user layer, `~/.config/kubaos/<app>/`. `dot-config apply`
-copies each one there when it's missing and never touches it again. Updates
-replace the defaults in `config/`; this layer is yours. How each app loads it:
-`docs/CONTRACTS.md`, "Defaults and the user layer".
+This folder, `~/.config/kubaos`, is yours. Updates never write to a file in it. KubaOS's
+defaults load first and these files last, so whatever you set here wins. Each file starts
+with the settings people change most, commented out with KubaOS's value: uncomment a line
+and edit it. Delete a file to get its commented example back at the next update (or run
+`dot-config apply`).
 
-Keep these short: a comment that says where the file goes and one example.
+This README and the one in each group are KubaOS's, kept current by every update; edit
+the other files.
+
+In the Command menu, "Settings folder" opens this folder in Files, and "Settings: Desktop",
+"Settings: Terminal", "Settings: Editor", "Settings: Tools" and "Settings: Menu" open a
+group.
+
+```
+~/.config/kubaos/
+  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ files/ wallpapers/
+  terminal/   ghostty/ foot/ tmux/ zsh/ fastfetch/
+  editor/     nvim/
+  tools/      git/ lazygit/ yazi/ bat/ bacon/ fuzzel/
+  menu/       kotodama/
+  home/       your user flake: your own packages
+```
+
+## Want to change something? Go here
+
+| To change | Edit |
+|---|---|
+| Gaps, borders, rounding, your own key binds | `desktop/hypr/hyprland.lua` |
+| Screen layout, resolution, scale | `desktop/hypr/hyprland.lua` (`hl.monitor`) |
+| Key repeat, pointer speed, touchpad scrolling | `desktop/hypr/hyprland.lua` |
+| When the screen dims, locks or turns off | `desktop/hypr/hypridle.conf` |
+| The fallback lock screen | `desktop/hypr/hyprlock.conf` |
+| Keyboard layouts, Mac-style accents on Left Alt | `desktop/keyboard/keyboard.toml` |
+| Pointer style and size | `desktop/cursor/cursor.toml` |
+| Extra time zones, holidays, first day of the week, countdowns | `desktop/clock/clock.toml` |
+| Your own holiday rules | `desktop/clock/holidays.toml` |
+| The bar's system monitor, its alerts and thresholds | `desktop/sysmon/sysmon.toml` |
+| The Command menu's motion (full or fades only) | `desktop/quickshell/settings.json` |
+| Which wallpaper sets the picker shows | `desktop/wallpapers/sets` |
+| Tidy Downloads daily, automount of drives | `desktop/files/` (flag files `tidy-downloads` and `no-automount`; set them from the Command menu) |
+| Terminal font, size, transparency | `terminal/ghostty/config` |
+| The fallback terminal (foot) | `terminal/foot/foot.ini` |
+| tmux prefix, mouse, status bar | `terminal/tmux/tmux.conf` |
+| Shell aliases, variables, PATH | `terminal/zsh/zshrc` |
+| The greeting in new Ghostty windows | `dot-greeting off` (writes `terminal/zsh/no-greeting`) |
+| What fastfetch shows | `terminal/fastfetch/config.jsonc`, then `dot-config apply` |
+| Neovim options, keymaps, autocmds | `editor/nvim/options.lua`, `keymaps.lua`, `autocmds.lua` |
+| Neovim plugins | `editor/nvim/plugins/*.lua` |
+| LazyVim extras | `:LazyExtras` in Neovim (kept in `editor/nvim/lazyvim.json`) |
+| Plugin versions | `:Lazy update` in Neovim (kept in `editor/nvim/lazy-lock.json`) |
+| git settings and aliases | `tools/git/config` |
+| Global git ignore patterns | `tools/git/ignore`, then `dot-config apply` |
+| lazygit | `tools/lazygit/config.yml` |
+| yazi settings and keys | `tools/yazi/yazi.toml`, `tools/yazi/keymap.toml` |
+| bat theme, style, tabs | `tools/bat/config`, then `dot-config apply` |
+| bacon | `tools/bacon/prefs.toml` |
+| The fallback launcher (fuzzel) | `tools/fuzzel/fuzzel.ini` |
+| Command menu actions, hidden Items, project folders, quicklinks | `menu/kotodama/user.toml` |
+| Your own packages | `kubaos package add <name>`, or `home/home.nix` (your user flake) |
+
+Three files have no include in their app, so `dot-config apply` writes the app's file
+from KubaOS's and yours: `tools/bat/config`, `tools/git/ignore` and
+`terminal/fastfetch/config.jsonc`. Every update runs it; after editing one of them, run
+`dot-config apply` yourself. Every other file applies the way its app reloads its config;
+each file says how.
+
+How each app loads its file: docs/CONTRACTS.md, "Defaults and the user layer"
+(https://github.com/SuplenC/kubaos/blob/main/docs/CONTRACTS.md). KubaOS's defaults, for
+reading: `~/.local/share/kubaos/defaults`.

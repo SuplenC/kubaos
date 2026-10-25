@@ -1,4 +1,4 @@
-//! The cursor settings, in the user layer: `~/.config/kubaos/cursor/cursor.toml`.
+//! The cursor settings, in the user layer: `~/.config/kubaos/desktop/cursor/cursor.toml`.
 //!
 //! ```toml
 //! style = "dark"
@@ -15,7 +15,7 @@
 //! # Not here
 //!
 //! - Applying them: `kubaos-cli`'s `cursor.rs`. The seed with its comments:
-//!   `user-layer/cursor/cursor.toml`.
+//!   `user-layer/desktop/cursor/cursor.toml`.
 
 use std::fmt;
 use std::fs;

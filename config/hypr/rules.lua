@@ -58,7 +58,7 @@ tag({ class = "^(hyprpolkitagent|org\\.hyprland\\.hyprpolkitagent|polkit-gnome-a
 -- (amd64 only, see autostart.lua).
 hl.window_rule({ match = { class = "^([Bb]itwarden)$" }, float = true, center = true, size = { 1100, 750 } })
 
--- ripdrag, the drag source yazi opens (user-layer/yazi/keymap.toml): a small
+-- ripdrag, the drag source yazi opens (user-layer/tools/yazi/keymap.toml): a small
 -- window to drag from, not half the screen.
 tag({ class = "^(it\\.catboy\\.ripdrag|ripdrag)$" }, "float-small")
 

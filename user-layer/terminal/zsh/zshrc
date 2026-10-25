@@ -1,0 +1,20 @@
+# Your zsh settings: ~/.config/kubaos/terminal/zsh/zshrc, sourced near the end of ~/.zshrc,
+# after KubaOS's aliases and tools, so it wins. Takes effect in new shells (or `exec zsh`).
+#
+# Aliases of your own.
+# alias ll='eza -l --git'
+#
+# Read man pages in Neovim.
+# export MANPAGER='nvim +Man!'
+#
+# The editor git, crontab and friends open (KubaOS sets nvim).
+# export EDITOR=nvim
+#
+# The fastfetch greeting in a new Ghostty window: off here for this shell's children, or
+# for good with `dot-greeting off`.
+# export KUBAOS_GREETING=0
+#
+# Your own scripts on PATH (~/.local/bin is on it already).
+# path+=("$HOME/bin")
+#
+# Full docs: man zshall, and docs/USING.md in the KubaOS repo.

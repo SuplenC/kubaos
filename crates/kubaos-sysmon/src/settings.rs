@@ -1,4 +1,4 @@
-//! The system monitor's settings, in the user layer: `~/.config/kubaos/sysmon/sysmon.toml`.
+//! The system monitor's settings, in the user layer: `~/.config/kubaos/desktop/sysmon/sysmon.toml`.
 //!
 //! ```toml
 //! pill = true
@@ -22,14 +22,14 @@
 //!
 //! # Not here
 //!
-//! - The seed with its comments: `user-layer/sysmon/sysmon.toml`.
+//! - The seed with its comments: `user-layer/desktop/sysmon/sysmon.toml`.
 
-use std::env;
 use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+use kubaos_user_layer::App;
 use serde::Deserialize;
 use serde::Serialize;
 use toml_edit::DocumentMut;
@@ -260,13 +260,9 @@ impl Settings {
     }
 }
 
-/// The monitor's folder in the user layer: `$XDG_CONFIG_HOME/kubaos/sysmon`, or `~/.config`'s.
+/// The monitor's folder in the user layer: `~/.config/kubaos/desktop/sysmon`.
 pub fn dir() -> Option<PathBuf> {
-    let config = env::var_os("XDG_CONFIG_HOME")
-        .filter(|dir| !dir.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
-    Some(config.join("kubaos").join("sysmon"))
+    kubaos_user_layer::config_home().map(|config| kubaos_user_layer::dir(&config, App::Sysmon))
 }
 
 /// The settings file as a document to edit, empty when missing.

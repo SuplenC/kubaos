@@ -1,4 +1,0 @@
-# Your global ignore patterns, added after KubaOS's.
-# dot-config apply (and every update) writes ~/.config/git/ignore from both.
-#
-# *.local.md

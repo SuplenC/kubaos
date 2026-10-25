@@ -8,7 +8,7 @@ fn automount_is_on_until_turned_off_and_back_on() {
     assert!(settings.automount());
     settings.set_automount(false).unwrap();
     assert!(!settings.automount());
-    assert!(dir.path().join("kubaos/files/no-automount").exists());
+    assert!(dir.path().join("kubaos/desktop/files/no-automount").exists());
     settings.set_automount(true).unwrap();
     assert!(settings.automount());
 }

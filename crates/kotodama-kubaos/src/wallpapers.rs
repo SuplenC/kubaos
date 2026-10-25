@@ -1,6 +1,6 @@
 //! The wallpaper sets in the menu: one Item a set on this machine, to show it in the wallpaper
 //! picker or hide it from there. What the picker shows is the sets file,
-//! `~/.config/kubaos/wallpapers/sets`: a set's id for all of it, `<set>/<file>` for one of its
+//! `~/.config/kubaos/desktop/wallpapers/sets`: a set's id for all of it, `<set>/<file>` for one of its
 //! wallpapers, and every set without the file.
 //!
 //! A change is checked here, so a refusal reads in the menu, then made by `dot-theme show-set`
@@ -25,6 +25,7 @@ use kotodama_protocol::Action;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemKind;
 use kotodama_protocol::NamespacedKind;
+use kubaos_user_layer::App;
 
 use crate::run::Runner;
 use crate::toggles::Ran;
@@ -41,8 +42,8 @@ const PREFIX: &str = "wallpaper-set:";
 /// Where the sets are, one folder each, when `KUBAOS_WALLPAPERS` doesn't say; `scripts/dot-theme`
 /// reads the same variable.
 pub const DEFAULT_SETS_DIR: &str = "/usr/share/kubaos/wallpapers";
-/// The sets file, under the config folder.
-const SETS_FILE: &str = "kubaos/wallpapers/sets";
+/// The sets file, in the wallpapers' folder of the user layer.
+const SETS_FILE: &str = "sets";
 /// The picker's folder of the user's own wallpapers, which is no set.
 const OWN_FOLDER: &str = "yours";
 
@@ -156,16 +157,9 @@ pub fn sets_dir() -> PathBuf {
         .map_or_else(|| PathBuf::from(DEFAULT_SETS_DIR), PathBuf::from)
 }
 
-/// The sets file, `$XDG_CONFIG_HOME/kubaos/wallpapers/sets` or under `~/.config`.
+/// The sets file, `~/.config/kubaos/desktop/wallpapers/sets`; none without a config home.
 pub fn sets_file() -> Option<PathBuf> {
-    let var = |name| {
-        std::env::var_os(name)
-            .filter(|value| !value.is_empty())
-            .map(PathBuf::from)
-    };
-    var("XDG_CONFIG_HOME")
-        .or_else(|| var("HOME").map(|home| home.join(".config")))
-        .map(|config| config.join(SETS_FILE))
+    kubaos_user_layer::config_home().map(|config| kubaos_user_layer::dir(&config, App::Wallpapers).join(SETS_FILE))
 }
 
 fn actions(shown: Shown) -> Vec<Action> {

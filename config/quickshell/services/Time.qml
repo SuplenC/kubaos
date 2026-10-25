@@ -3,13 +3,14 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import qs.settings
 
 // The clock popup's state, and its timer, stopwatch and alarms.
 //
 // Dates come from `kubaos-clock serve`, one process for the shell's life: a
 // request is a line of JSON on its stdin, the reply a line on its stdout with
 // the request's id. A keystroke in the date search costs a line each way, not
-// a process. The settings file (~/.config/kubaos/clock/clock.toml) is watched,
+// a process. The settings file (~/.config/kubaos/desktop/clock/clock.toml) is watched,
 // so a change from the Command menu shows at once.
 //
 // Timers and alarms live here, in memory: they ring with a notification and
@@ -18,7 +19,7 @@ import Quickshell.Io
 Singleton {
     id: root
 
-    readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || `${Quickshell.env("HOME")}/.config`) + "/kubaos/clock"
+    readonly property string configDir: UserLayer.dir("clock")
     readonly property string sound: (Quickshell.env("XDG_DATA_HOME") || `${Quickshell.env("HOME")}/.local/share`) + "/kubaos/clock/alarm.oga"
 
     // What `{"op":"state"}` answers: settings, today, clocks, countdowns.

@@ -1,6 +1,0 @@
--- Your Neovim autocmds, run after KubaOS's and LazyVim's.
---
--- vim.api.nvim_create_autocmd("FileType", {
---   pattern = "markdown",
---   callback = function() vim.opt_local.wrap = true end,
--- })

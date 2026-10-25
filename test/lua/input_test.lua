@@ -7,6 +7,7 @@
 -- Prints an ok or FAIL line per test and exits 1 when any fails.
 
 local repo = assert(arg[1], "usage: lua5.5 test/lua/input_test.lua REPO")
+package.path = repo .. "/config/hypr/?.lua;" .. package.path
 
 local failed = 0
 
@@ -44,7 +45,7 @@ local function input_for(text, accents, mine)
     if name == "/etc/default/keyboard" then
       return real_open(path, mode)
     end
-    if name:match("/kubaos/keyboard/keyboard%.toml$") then
+    if name:match("/kubaos/desktop/keyboard/keyboard%.toml$") then
       if not mine then
         return nil
       end

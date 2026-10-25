@@ -10,6 +10,7 @@ name = "kubaos-sysmon"
 path = "src/main.rs"
 
 [dependencies]
+kubaos-user-layer.workspace = true
 # Signals, disk space and the page size, as safe calls: the monitor spawns no process to read or
 # to end one.
 rustix = { version = "1", features = ["fs", "param", "process"] }

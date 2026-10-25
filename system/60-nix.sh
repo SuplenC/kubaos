@@ -155,7 +155,7 @@ fi
 
 # --------------------------------------------------------------------------
 # The wallpaper sets, like the PAM link: not tied to DO_SWITCH. Before the
-# switch: its activation seeds ~/.config/kubaos/wallpapers/sets from them.
+# switch: its activation seeds ~/.config/kubaos/desktop/wallpapers/sets from them.
 step "Wallpaper sets ($WALLPAPERS_LINK)"
 if ((DRY_RUN)) || command -v nix >/dev/null; then
   link_wallpapers

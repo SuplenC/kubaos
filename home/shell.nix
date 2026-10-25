@@ -8,7 +8,7 @@
 #   910   fzf (Ctrl-T, Alt-C)
 #   1000  aliases, oh-my-posh
 #   1010  direnv hook, atuin (Ctrl-R)
-#   1900  the user layer's zshrc (~/.config/kubaos/zsh/zshrc)
+#   1900  the user layer's zshrc (~/.config/kubaos/terminal/zsh/zshrc)
 #   1950  the greeting: fastfetch in a new Ghostty window
 #   2000  zoxide as `cd`, last, so `zoxide doctor` stays quiet
 #
@@ -24,6 +24,11 @@
   ...
 }:
 let
+  userLayer = import ./user-layer.nix { configHome = config.xdg.configHome; };
+  # The apps' folders relative to the user layer: zsh reads them under
+  # $XDG_CONFIG_HOME at run time.
+  inherit (userLayer) apps;
+
   # A tool's `init zsh` output is cached in a file named after a hash of the
   # command, store path included, so an update or new flags write a new file
   # and the old one is never read again.
@@ -81,7 +86,7 @@ in
     };
 
     shellAliases = {
-      zshrc = "nvim ~/.config/kubaos/zsh/zshrc";
+      zshrc = "nvim ${userLayer.dir "zsh"}/zshrc";
       wipe = "clear && tmux clear-history";
       nvimconfig = "nvim ~/.config/nvim";
       tma = "tmux attach";
@@ -149,10 +154,10 @@ in
         () {
           local -a lg=("''${XDG_CONFIG_HOME:-$HOME/.config}/lazygit/config.yml")
           [[ -r $_dot_theme/lazygit.yml ]] && lg+=("$_dot_theme/lazygit.yml")
-          [[ -r $_dot_user/lazygit/config.yml ]] && lg+=("$_dot_user/lazygit/config.yml")
+          [[ -r $_dot_user/${apps.lazygit}/config.yml ]] && lg+=("$_dot_user/${apps.lazygit}/config.yml")
           (( $#lg > 1 )) && export LG_CONFIG_FILE="''${(j:,:)lg}"
         }
-        [[ -r $_dot_user/bacon/prefs.toml ]] && export BACON_PREFS="$_dot_user/bacon/prefs.toml"
+        [[ -r $_dot_user/${apps.bacon}/prefs.toml ]] && export BACON_PREFS="$_dot_user/${apps.bacon}/prefs.toml"
         # oh-my-zsh exports LS_COLORS (dircolors) and eza lets it override
         # ~/.config/eza/theme.yml; keep LS_COLORS for ls, fd and completion.
         function eza() { LS_COLORS= command eza "$@"; }
@@ -220,7 +225,7 @@ in
       # The user layer's zshrc, after everything but the greeting and zoxide,
       # so it wins.
       (lib.mkOrder 1900 ''
-        [[ -r $_dot_user/zsh/zshrc ]] && source "$_dot_user/zsh/zshrc"
+        [[ -r $_dot_user/${apps.zsh}/zshrc ]] && source "$_dot_user/${apps.zsh}/zshrc"
       '')
 
       # The greeting: fastfetch with the logo in the shell a new Ghostty
@@ -231,12 +236,12 @@ in
       # Ghostty service, already holds SHLVL=1. So the greeting exports
       # KUBAOS_GREETING=0, and every shell started below it skips. Off for
       # good with `dot-greeting off`, which writes
-      # ~/.config/kubaos/zsh/no-greeting, or with KUBAOS_GREETING=0 in the
+      # ~/.config/kubaos/terminal/zsh/no-greeting, or with KUBAOS_GREETING=0 in the
       # environment or the user layer's zshrc, which runs just before.
       (lib.mkOrder 1950 ''
         if [[ $TERM_PROGRAM == ghostty && -z $ZSH_EXECUTION_STRING && -t 1
           && -z $TMUX$NVIM$SSH_CONNECTION$SSH_TTY && $KUBAOS_GREETING != 0
-          && ! -e $_dot_user/zsh/no-greeting ]]; then
+          && ! -e $_dot_user/${apps.zsh}/no-greeting ]]; then
           export KUBAOS_GREETING=0
           ${lib.getExe pkgs.fastfetch} --config "${config.xdg.configHome}/fastfetch/greeting.jsonc"
         fi

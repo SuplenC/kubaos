@@ -1,0 +1,22 @@
+# Your git settings: ~/.config/kubaos/tools/git/config, the last [include] of
+# ~/.config/git/config, so they win. Your name and email are kept apart, in
+# ~/.config/git-identity/identity.gitconfig (Kōbō's Git screen writes it).
+#
+# Merge instead of rebase on `git pull` (KubaOS rebases).
+# [pull]
+# 	rebase = true
+#
+# Delete local refs to branches the remote deleted, on every fetch (on in KubaOS).
+# [fetch]
+# 	prune = true
+#
+# delta's two columns (KubaOS: side by side); false for one.
+# [delta]
+# 	side-by-side = true
+#
+# Shortcuts of your own.
+# [alias]
+# 	st = status -sb
+# 	lg = log --oneline --graph --decorate
+#
+# Full docs: man git-config (https://git-scm.com/docs/git-config).

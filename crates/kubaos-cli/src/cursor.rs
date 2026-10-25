@@ -48,6 +48,7 @@ use kubaos_cursor::theme;
 use kubaos_cursor::theme::Theme;
 use kubaos_cursor::theme::ThemeError;
 use kubaos_cursor::theme::XcursorOutcome;
+use kubaos_user_layer::App;
 
 use crate::job::chain;
 use crate::usage_error;
@@ -98,7 +99,7 @@ pub fn main(cmd: CursorCmd) -> ExitCode {
 
 /// Where the cursor's inputs and outputs are.
 struct Paths {
-    /// The user's settings, `~/.config/kubaos/cursor/cursor.toml`.
+    /// The user's settings, `~/.config/kubaos/desktop/cursor/cursor.toml`.
     settings: PathBuf,
     /// matugen's palette, next to the other theme outputs `scripts/dot-theme` keeps.
     palette: PathBuf,
@@ -119,7 +120,7 @@ impl Paths {
         let data = xdg("XDG_DATA_HOME", ".local/share");
         let state = home.join(".local/state/theme");
         Ok(Self {
-            settings: config.join("kubaos/cursor/cursor.toml"),
+            settings: kubaos_user_layer::dir(&config, App::Cursor).join("cursor.toml"),
             palette: state.join("cursor.toml"),
             source: env::var_os("KUBAOS_CURSOR_SOURCE")
                 .map_or_else(|| data.join("kubaos/cursor/bibata"), PathBuf::from),

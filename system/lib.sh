@@ -336,7 +336,7 @@ link_pam_fprintd() { link_nix_pam_module fprintd pam_fprintd.so "$PAM_FPRINTD_LI
 link_pam_u2f() { link_nix_pam_module pam_u2f pam_u2f.so "$PAM_U2F_LINK" "$PAM_U2F_GCROOT"; }
 
 # The wallpaper sets (flake input kubaos-wallpapers), read-only for every
-# user. scripts/dot-theme shows the ones in ~/.config/kubaos/wallpapers/sets.
+# user. scripts/dot-theme shows the ones in ~/.config/kubaos/desktop/wallpapers/sets.
 WALLPAPERS_LINK=/usr/share/kubaos/wallpapers
 WALLPAPERS_GCROOT=/nix/var/nix/gcroots/dotfiles-wallpapers
 

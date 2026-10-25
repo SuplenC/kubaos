@@ -42,6 +42,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 
+use kubaos_user_layer::App;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -127,7 +128,9 @@ pub struct Scaffolder {
 /// A user-layer file a Suite creates when it is missing.
 #[derive(Clone, Copy, Debug)]
 pub struct Seed {
-    /// The file, relative to the user layer (`~/.config/kubaos`).
+    /// The app whose folder in the user layer holds the file.
+    pub app: App,
+    /// The file, relative to the app's folder.
     pub path: &'static str,
     /// A comment on how the file is loaded, and a commented example.
     pub contents: &'static str,
@@ -542,7 +545,7 @@ impl Suites {
     fn seed(&self, suite: &Suite) -> Result<Seeded, SuiteError> {
         let mut seeded = Seeded::default();
         for seed in suite.seeds.iter().filter(|seed| is_plain_relative(seed.path)) {
-            let path = self.user_layer.join(seed.path);
+            let path = self.user_layer.join(seed.app.relative()).join(seed.path);
             let seed_err = |source| SuiteError::Seed {
                 path: path.clone(),
                 source,

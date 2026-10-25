@@ -1,0 +1,15 @@
+-- Your Neovim keymaps: ~/.config/kubaos/editor/nvim/keymaps.lua, run after KubaOS's and
+-- LazyVim's, so a key mapped here wins. Takes effect in a new Neovim.
+--
+-- Keep the cursor in the middle of the screen when paging.
+-- vim.keymap.set("n", "<C-d>", "<C-d>zz")
+-- vim.keymap.set("n", "<C-u>", "<C-u>zz")
+--
+-- Leave insert mode with jk.
+-- vim.keymap.set("i", "jk", "<Esc>")
+--
+-- Remove one of LazyVim's keys.
+-- vim.keymap.del("n", "<leader>l")
+--
+-- Full docs: :help vim.keymap.set, and LazyVim's keys at
+-- https://www.lazyvim.org/keymaps (`<leader>sk` searches them).

@@ -1,0 +1,18 @@
+# Your lazygit settings: ~/.config/kubaos/tools/lazygit/config.yml, loaded after KubaOS's
+# and the wallpaper theme's (LG_CONFIG_FILE), so they win. Takes effect at the next start.
+# YAML: each top-level key (gui, os, git) once, with its settings indented under it.
+#
+# gui:
+#   # The changed files as a tree (lazygit's default, true), or a flat list.
+#   showFileTree: true
+#   # Window borders: "rounded" (KubaOS), "single", "double" or "hidden".
+#   border: rounded
+#   # A tip in the status panel at every start (KubaOS: false).
+#   showRandomTip: false
+#
+# os:
+#   # What `e` opens a file in: "nvim-remote" (KubaOS) opens it in the Neovim you started
+#   # lazygit from.
+#   editPreset: "nvim-remote"
+#
+# Full docs: https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md

@@ -43,7 +43,7 @@ settings  the settings, as JSON
 set       pill on|off|toggle, alerts on|off|toggle, style numbers|bars|sparklines,
           metrics cpu ram temp gpu net power (in order), cpu-temp|ram|disk|battery-draw NUMBER
 
-Settings: ~/.config/kubaos/sysmon/sysmon.toml";
+Settings: ~/.config/kubaos/desktop/sysmon/sysmon.toml";
 
 /// How long `sample` waits between its two reads, so CPU use and speeds have ticks to count.
 const SAMPLE_GAP: Duration = Duration::from_millis(500);

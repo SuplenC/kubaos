@@ -25,8 +25,7 @@ require("autostart")
 -- The user layer, last so it wins (docs/CONTRACTS.md, "Defaults and the user
 -- layer"). Not a require: the file isn't on package.path, and an error in it
 -- must not take the rest down. dot-config creates it on install.
-local config_home = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
-local user_file = config_home .. "/kubaos/hypr/hyprland.lua"
+local user_file = require("user_layer").file("hypr", "hyprland.lua")
 local f = io.open(user_file, "r")
 if f then
   f:close()

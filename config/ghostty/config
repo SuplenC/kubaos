@@ -85,4 +85,4 @@ keybind = alt+8=unbind
 keybind = alt+9=unbind
 
 # Your settings, last so they win (~/.config/kubaos, docs/CONTRACTS.md).
-config-file = ?~/.config/kubaos/ghostty/config
+config-file = ?~/.config/kubaos/terminal/ghostty/config

@@ -2,10 +2,11 @@ import QtQuick
 import qs.theme
 import qs.components
 import qs.services
+import qs.settings
 
 // The popup's settings page: holidays, first weekday, analog face, the bar's
 // countdown and the extra clocks. Each change goes through the engine into
-// ~/.config/kubaos/clock/clock.toml, comments kept, and the state it answers
+// ~/.config/kubaos/desktop/clock/clock.toml, comments kept, and the state it answers
 // with redraws the popup.
 Column {
     id: root
@@ -163,7 +164,7 @@ Column {
 
     StyledText {
         width: parent.width
-        text: root.error !== "" ? root.error : Time.problem !== "" ? Time.problem : "Kept in ~/.config/kubaos/clock/clock.toml"
+        text: root.error !== "" ? root.error : Time.problem !== "" ? Time.problem : `Kept in ${UserLayer.shown("clock", "clock.toml")}`
         color: root.error !== "" || Time.problem !== "" ? Theme.m3error : Theme.m3outline
         font.pixelSize: Theme.font.sm
         wrapMode: Text.Wrap

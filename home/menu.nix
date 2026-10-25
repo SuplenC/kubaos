@@ -3,7 +3,7 @@
 #
 # The module installs the command, the Daemon's socket-activated user units
 # and the Bundled extensions turned on here. Its settings are KubaOS's
-# Defaults in config/kotodama/ and the user layer's ~/.config/kubaos/kotodama/
+# Defaults in config/kotodama/ and the user layer's ~/.config/kubaos/menu/kotodama/
 # (home/links.nix), so none are set here and the module writes no config file.
 # The menu itself runs inside KubaOS's own Quickshell (config/quickshell/shell.qml).
 #

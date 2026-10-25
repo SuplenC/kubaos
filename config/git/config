@@ -58,4 +58,4 @@
 
 # Your settings, last so they win (~/.config/kubaos, docs/CONTRACTS.md).
 [include]
-	path = ~/.config/kubaos/git/config
+	path = ~/.config/kubaos/tools/git/config

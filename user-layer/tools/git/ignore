@@ -1,0 +1,16 @@
+# Your global ignore patterns: ~/.config/kubaos/tools/git/ignore, added after KubaOS's.
+# dot-config apply, which every update runs, writes ~/.config/git/ignore from both: run
+# it after editing.
+#
+# Editor and OS clutter.
+# *.swp
+# .DS_Store
+#
+# Notes you keep next to a project but never commit.
+# *.local.md
+#
+# direnv's per-project environment.
+# .envrc
+# .direnv/
+#
+# Full docs: man gitignore (https://git-scm.com/docs/gitignore).

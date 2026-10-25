@@ -6,14 +6,14 @@ import Quickshell.Io
 
 // User-facing knobs. Edit these instead of hunting through modules. The ones
 // read from `user` can be set in the user layer too:
-// ~/.config/kubaos/quickshell/settings.json wins over the defaults here.
+// ~/.config/kubaos/desktop/quickshell/settings.json wins over the defaults here.
 Singleton {
     id: root
 
     readonly property string home: Quickshell.env("HOME")
 
     // The wallpaper picker's tabs are `dot-theme folders`: the sets picked in
-    // ~/.config/kubaos/wallpapers/sets (from this directory), and
+    // ~/.config/kubaos/desktop/wallpapers/sets (from this directory), and
     // ~/Pictures/wallpapers.
     readonly property string wallpaperSets: "/usr/share/kubaos/wallpapers"
     // Moving wallpapers (mp4, webm, mkv, mov next to a <name>.poster.jpg):
@@ -40,7 +40,7 @@ Singleton {
 
     // The Command menu's hidden and renamed apps, and the terminal for apps
     // with Terminal=true, are Kotodama's settings: config/kotodama/kubaos.toml,
-    // and yours in ~/.config/kubaos/kotodama/user.toml.
+    // and yours in ~/.config/kubaos/menu/kotodama/user.toml.
 
     // Lock screen: a FIDO2 security key (qs-lock-u2f, pam_u2f) next to the password.
     // Only runs when /etc/u2f_mappings has a key for you (dot-u2f-enroll). Wants
@@ -73,7 +73,7 @@ Singleton {
     FileView {
         id: userFile
 
-        path: `${Quickshell.env("XDG_CONFIG_HOME") || `${root.home}/.config`}/kubaos/quickshell/settings.json`
+        path: `${UserLayer.dir("quickshell")}/settings.json`
         watchChanges: true
         printErrors: false
         onFileChanged: reload()

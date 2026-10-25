@@ -11,6 +11,9 @@
 //! - What a Suite's fields mean, and everything done with them: `suites.rs`.
 
 #[cfg(any(test, feature = "test-suite"))]
+use kubaos_user_layer::App;
+
+#[cfg(any(test, feature = "test-suite"))]
 use super::Cache;
 #[cfg(any(test, feature = "test-suite"))]
 use super::Extra;
@@ -49,7 +52,8 @@ pub const TEST: Suite = Suite {
         argv: &["kubaos-test-suite", "new", "{path}"],
     }],
     seeds: &[Seed {
-        path: "nvim/plugins/test-suite.lua",
+        app: App::Nvim,
+        path: "plugins/test-suite.lua",
         contents: include_str!("seeds/test-suite.lua"),
     }],
     mentions: &["kubaos-test-suite", "kubaos_test_suite"],
