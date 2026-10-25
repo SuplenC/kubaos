@@ -1,6 +1,6 @@
 # KubaOS plan: TUXEDO InfinityBook Pro 14 Gen10, Ubuntu + Hyprland + own Quickshell
 
-The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTALL-INTERNALS.md`) now does most of these phases in one go, all but the TUXEDO drivers and SentinelOne. The phases still describe what it installs and why. Hardware: Ryzen AI 9 HX 370, 64 GB DDR5, 2 TB WD_Black SN7100, USB4 dock with 2x LG UltraGear 1080p 120 Hz.
+The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTALL-INTERNALS.md`) now does most of these phases in one go, all but the TUXEDO drivers. The phases still describe what it installs and why. Hardware: Ryzen AI 9 HX 370, 64 GB DDR5, 2 TB WD_Black SN7100, USB4 dock with 2x LG UltraGear 1080p 120 Hz.
 
 ## Guiding rules
 
@@ -14,7 +14,7 @@ The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTAL
 
 | Area | Decision |
 |---|---|
-| Distro | Ubuntu Server 26.04 LTS, minimal install (SentinelOne `.deb`, TUXEDO `resolute` repo) |
+| Distro | Ubuntu Server 26.04 LTS, minimal install (TUXEDO `resolute` repo) |
 | Disk | LUKS, password at boot, Btrfs with snapper |
 | Login | Autologin into Hyprland after LUKS unlock |
 | Power | `power-profiles-daemon` + `tuxedo-drivers`, no Control Center |
@@ -38,13 +38,12 @@ The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTAL
 - Put your current configs in one git repo now: `~/.config/{nvim,tmux,tms,ghostty,lazygit,btop,ohmyposh,git,gh}` and `~/.zshrc`. Your tmux config is already a repo, so add it as a subtree or copy it in.
 - Export Arc bookmarks and passwords for Chrome.
 - Note your SSH and GPG keys (move them with a USB stick or password manager, not the cloud).
-- Get the SentinelOne `.deb` and site token from IT.
 - Download Ubuntu Server 26.04 ISO and write it to a USB stick.
-- Optional: run `cargo build --timings` with `RUSTFLAGS="-Zthreads=8" cargo +nightly` on `arms` to have both baselines.
+- Optional: run `cargo build --timings` with `RUSTFLAGS="-Zthreads=8" cargo +nightly` on a large Rust workspace to have both baselines.
 
 ## Phase 1: Install Ubuntu Server
 
-1. In the BIOS (F2 on TUXEDO): check that Secure Boot is on or off as IT wants. `tuxedo-drivers` is DKMS, so with Secure Boot on you'll enroll a MOK key once on the first reboot after installing it.
+1. In the BIOS (F2 on TUXEDO): check that Secure Boot is on or off, as you like. `tuxedo-drivers` is DKMS, so with Secure Boot on you'll enroll a MOK key once on the first reboot after installing it.
 2. Boot the USB with the Ethernet cable plugged in.
 3. Choose **Ubuntu Server (minimized)**.
 4. Storage, custom layout:
@@ -90,15 +89,14 @@ sudo apt install --no-install-recommends \
 - **Rollback** is a manual `@` swap, not `snapper rollback`: Ubuntu's GRUB hardcodes `rootflags=subvol=@`, so changing the default subvolume does nothing. Boot the snapshot from the GRUB "KubaOS snapshots" menu, then follow "Rolling back the system later" in `system/00-btrfs-subvolumes.md`.
 - **Fingerprint:** plug in the USB reader, `fprintd-enroll`, then `pam-auth-update` and tick fingerprint. That covers sudo and polkit. Check first that the reader is on the libfprint supported list.
 
-## Phase 4: Hardware and company software
+## Phase 4: Hardware and apps
 
 - **TUXEDO repo** (`deb.tuxedocomputers.com/ubuntu`, suite `resolute`), then `sudo apt install tuxedo-drivers`. Do not install `tuxedo-control-center`.
 - **Check power profiles:** `cat /sys/firmware/acpi/platform_profile_choices`. If it lists profiles, `powerprofilesctl set performance` changes real CPU limits and you're done. If not, revisit TUXEDO Control Center.
 - **Dock:** plug it into the back USB4 port, `boltctl list`, `boltctl enroll <uuid>`.
-- **SentinelOne:** install the `.deb`, register with the site token. Check it reports healthy before going further, so later problems aren't blamed on the wrong thing.
 - **Docker:** Docker's apt repo, `docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin`, add yourself to the `docker` group.
 - **Chrome:** Google's apt repo, `google-chrome-stable`.
-- `snapper create -d "drivers + company software"`.
+- `snapper create -d "drivers + apps"`.
 
 ## Phase 5: Hyprland
 
@@ -130,7 +128,7 @@ sudo apt-mark hold hyprland xdg-desktop-portal-hyprland hypridle hyprlock hyprpo
 
 ## Phase 6: Nix and home-manager
 
-1. Install Nix multi-user (official installer, `system/60-nix.sh`), flakes enabled. Tell IT the `nix-daemon` exists in case SentinelOne flags it.
+1. Install Nix multi-user (official installer, `system/60-nix.sh`), flakes enabled.
 2. Dotfiles repo layout:
 
 ```
@@ -213,5 +211,4 @@ Weekly or whenever the bar's marker shows: `kubaos update` (or Update KubaOS in 
 - [ ] Both UltraGears at 120 Hz through the dock (`hyprctl monitors`)
 - [ ] Nix GPU wiring: Quickshell and Ghostty render with hardware acceleration
 - [ ] Quickshell PAM: lock screen accepts password and fingerprint
-- [ ] SentinelOne healthy after the first kernel update
-- [ ] `cargo build --timings` on `arms` for the real comparison with the M5 Pro
+- [ ] `cargo build --timings` on a large Rust workspace for the real comparison with the M5 Pro

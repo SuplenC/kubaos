@@ -51,9 +51,9 @@ Keep your vault the way it is. `kubaos bitwarden` reads the whole vault: folders
   | Field | Example | Effect |
   |---|---|---|
   | `hosts` | `github.com` or `build build.example.com` | writes a `Host` block for these patterns (space or comma separated) |
-  | `hostname` | `10.0.0.5` | `HostName` |
+  | `hostname` | `192.0.2.10` | `HostName` |
   | `user` | `git` | `User` |
-  | `port` | `2222` | `Port` |
+  | `port` | `2022` | `Port` |
   | `signing` | boolean `true` | git signs commits with this key. Exactly one in the vault; with two, the summary names both and the older item signs. Text `verify` keeps an old key in `allowed_signers` after a rotation |
   | `emails` | `me@work.com` | extra emails for `allowed_signers` (git's `user.email` is always in) |
   | `file` | `id_work` | name of the `.pub` file, default is the item name in lowercase with dashes |
@@ -75,7 +75,7 @@ Personal/
   gh-token          Login     password=github_pat_...
 Work/
   Work GitHub       SSH key   hosts=github-work  hostname=github.com  user=git
-  Build server      SSH key   hosts="build build.example.com"  hostname=10.0.0.5  user=deploy  port=2222
+  Build server      SSH key   hosts="build build.example.com"  hostname=192.0.2.10  user=deploy  port=2022
 (no folder)
   Old laptop        SSH key   no fields
 env/myapp/
@@ -220,7 +220,7 @@ The desktop app's first login can use the key, the TOTP code, or "Log in with de
 When to use which:
 
 - **Bitwarden-held keys** (the default): they sync to every machine, the desktop agent serves them and asks before each use, and losing a YubiKey doesn't touch them. They're as safe as the vault and the running desktop app.
-- **`-sk` keys**: the private key can't leave the hardware, and every use needs your finger. Use them for the few places where "my finger, here, now" is worth the friction: production, the homelab's root, maybe GitHub. Bitwarden's agent accepts Ed25519 and RSA only, so these go straight from the file with `IdentityAgent none` in their Host block (the script prints it). On your own servers, prefix the `authorized_keys` line with `verify-required` so the server insists on UV too.
+- **`-sk` keys**: the private key can't leave the hardware, and every use needs your finger. Use them for the few places where "my finger, here, now" is worth the friction: production, a server's root, maybe GitHub. Bitwarden's agent accepts Ed25519 and RSA only, so these go straight from the file with `IdentityAgent none` in their Host block (the script prints it). On your own servers, prefix the `authorized_keys` line with `verify-required` so the server insists on UV too.
 
 ## LUKS unlock with the key (optional, not automated)
 

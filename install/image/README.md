@@ -124,7 +124,6 @@ Why not mkosi: it builds Ubuntu images well, but it has no per-step layer cache.
 | `/etc/fstab`, `/etc/crypttab`, `/etc/hostname` (`localhost`), `/etc/hosts` (localhost only) | Depend on the disk and the answers | engine, `configure` step |
 | The snapper config | `snapper create-config` needs the target's btrfs and `/.snapshots` | engine, `snapshot` step |
 | `system/30-hardware.sh` (TUXEDO repo, `tuxedo-drivers` DKMS, MOK, `pam-auth-update --enable fprintd`) | DKMS signs with a MOK key that would otherwise ship in every payload, MOK enrollment needs the firmware, and INSTALL-INTERNALS.md puts TUXEDO drivers in first-boot setup | first-boot setup runs `30-hardware.sh` |
-| SentinelOne | Needs the `.deb` and site token from IT | by hand, `40-apps.sh --s1-deb` |
 | apt lists, `.deb` cache, logs, `/tmp`, `policy-rc.d`, `/.dockerenv`, Docker's `docker-*` apt and dpkg configs | Build artefacts | `apt update` before the first install |
 | `home-manager switch` | Needs the user | engine, `home` step: runs `$home_generation/activate` as the user, through the payload's nix-daemon |
 | The user flake `~/.config/kubaos/home` | Needs the user | engine writes it from `/usr/share/kubaos/user-flake/` and `user-flake.lock` |

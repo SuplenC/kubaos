@@ -58,7 +58,6 @@
   "rustaceanvim": { "branch": "main", "commit": "f2f0c1231a5b019dbc1fd6dafac1751c878925a3" },
   "scretch.nvim": { "branch": "main", "commit": "f29885c2b59021e6d8bdf4537eb93bf7d9368863" },
   "snacks.nvim": { "branch": "main", "commit": "882c996cf28183f4d63640de0b4c02ec886d01f2" },
-  "sonarlint.nvim": { "branch": "main", "commit": "acd09b78969ddc965a7ddf59abb9d9eec5ecd94f" },
   "sonokai": { "branch": "master", "commit": "b023c5280b16fe2366f5e779d8d2756b3e5ee9c3" },
   "telescope.nvim": { "branch": "master", "commit": "40aedd8a68c78a656a10a8d62d80c54af59420fb" },
   "todo-comments.nvim": { "branch": "main", "commit": "31e3c38ce9b29781e4422fc0322eb0a21f4e8668" },

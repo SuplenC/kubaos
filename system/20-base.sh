@@ -57,9 +57,6 @@ PACKAGES=(
   fprintd libpam-fprintd pciutils usbutils
   # build tools (rustup/proto toolchains need these)
   build-essential pkg-config libssl-dev clang mold
-  # Neovim's Mason unpacks with unzip (above); sonarlint-language-server is
-  # Java. 25 is the current LTS and resolute's default-jre-headless.
-  openjdk-25-jre-headless
   # filesystem + snapshots (grub-btrfs is not packaged, built below)
   btrfs-progs snapper inotify-tools
   # graphical file manager. Nautilus, with Sushi on space and gvfs for phones,

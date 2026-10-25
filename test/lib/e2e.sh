@@ -78,7 +78,7 @@ NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv eza bat
   oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth
   kubaos-automount ripdrag)
 APT_TOOLS=(foot fuzzel wl-copy grim slurp playerctl socat qalc notify-send brightnessctl clang mold
-  java unzip git ssh secret-tool pamtester pamu2fcfg nmcli wpctl snapper fprintd-verify boltctl
+  unzip git ssh secret-tool pamtester pamu2fcfg nmcli wpctl snapper fprintd-verify boltctl
   powerprofilesctl ddcutil xdg-open hyprlock hypridle nautilus file-roller 7z unar magick udisksctl)
 # Hyprland comes from the PPA on amd64 and from nixpkgs on arm64, where
 # Ubuntu's is too old for the Lua config (home/desktop.nix).
