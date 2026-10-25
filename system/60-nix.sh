@@ -127,7 +127,6 @@ else
     sctl restart nix-daemon.service
   fi
 fi
-info "nix-daemon runs as a system service: tell IT, in case SentinelOne flags it."
 
 # --------------------------------------------------------------------------
 step "nix-daemon units as real files"

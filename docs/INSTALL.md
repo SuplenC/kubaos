@@ -11,7 +11,6 @@ The stick holds a finished KubaOS: Ubuntu 26.04 after `system/10-strip.sh` throu
 ### What you need
 
 - A USB stick bigger than the ISO. Everything on it gets overwritten.
-- The SentinelOne `.deb` and site token from IT, on a second stick or somewhere you can `curl` from. They're not on the KubaOS stick.
 - Your SSH keys as Bitwarden "SSH key" items, in whatever folders you keep them (`docs/SECRETS.md`, "Vault conventions"). Nothing to copy by hand.
 - An Ethernet cable or a Wi-Fi password. The install doesn't need a network, but the first boot setup does.
 
@@ -32,7 +31,7 @@ The ISO is UEFI only and works with Secure Boot on (Canonical's signed shim, GRU
 
 F2 at power-on opens the TUXEDO BIOS, F7 is the boot menu (choose the USB stick).
 
-Secure Boot: on or off, as IT wants. The stick boots either way. With it on, `tuxedo-drivers` needs a Machine Owner Key enrolled once, after the install (below).
+Secure Boot: on or off, as you like. The stick boots either way. With it on, `tuxedo-drivers` needs a Machine Owner Key enrolled once, after the install (below).
 
 ### The screens
 
@@ -58,7 +57,7 @@ LUKS passphrase, then autologin on tty1 straight into Hyprland. The bar, Ghostty
 
 ### What the stick can't do
 
-A few things need the real hardware, IT's token or you. Do them in this order. Each script is safe to re-run.
+A few things need the real hardware or you. Do them in this order. Each script is safe to re-run.
 
 ```sh
 cd ~/Projects/dotfiles
@@ -68,12 +67,7 @@ system/30-hardware.sh
 sudo reboot          # enroll the MOK on the blue screen if it asked for a password
 system/30-hardware.sh   # second run: confirms modules + power profiles
 
-# 2. SentinelOne (Docker and Chrome are already installed).
-read -rs S1_SITE_TOKEN && export S1_SITE_TOKEN   # paste the token from IT, Enter
-system/40-apps.sh --s1-deb ~/SentinelAgent_linux_x86_64_*.deb
-unset S1_SITE_TOKEN
-
-# 3. Toolchains, outside Nix on purpose.
+# 2. Toolchains, outside Nix on purpose.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 rustup component add rust-analyzer clippy
 bash <(curl -fsSL https://moonrepo.dev/install/proto.sh)
@@ -201,7 +195,7 @@ lists its flags.
 | `system/20-base.sh` | base packages, NetworkManager, PipeWire, lid policy, snapper, grub-btrfs | recommended |
 | `system/25-boot.sh` | boot splash (Plymouth, the passphrase prompt), GRUB theme, "KubaOS Shinjuku" entries, hidden menu | no (next boot shows it) |
 | `system/30-hardware.sh` | TUXEDO repo + `tuxedo-drivers`, MOK, power profiles, dock, fingerprint | **yes** |
-| `system/40-apps.sh` | Docker, Chrome, SentinelOne | log out/in (docker group) |
+| `system/40-apps.sh` | Docker, Chrome | log out/in (docker group) |
 | `system/50-hyprland.sh` | Hyprland stack (held), tty1 autologin, lock-screen PAM, keyd for the Mac-style accents | no (wait for 60) |
 | `system/60-nix.sh` | Nix, flakes, home-manager switch, Nix GPU setup, zsh login shell | **yes** |
 | `system/65-recorder.sh` | gpu-screen-recorder's KMS helper: root-owned copy with `cap_sys_admin`, runnable only by you, linked into `/run/wrappers/bin` | no |
@@ -214,8 +208,6 @@ lists its flags.
 - Ubuntu Server 26.04.1 amd64 ISO from <https://releases.ubuntu.com/26.04/>
   (`ubuntu-26.04.1-live-server-amd64.iso`), written to a USB stick
   (`dd`, balenaEtcher, or Raspberry Pi Imager).
-- The SentinelOne `.deb` and site token from IT, on a second stick or
-  somewhere you can `curl` from.
 - Your SSH keys as Bitwarden "SSH key" items, in whatever folders
   you keep them (`docs/SECRETS.md`, "Vault conventions"). Nothing to
   copy by hand.
@@ -225,7 +217,7 @@ lists its flags.
 
 F2 at power-on opens the TUXEDO BIOS.
 
-- Secure Boot: on or off, as IT wants. **On** works: `tuxedo-drivers` is a
+- Secure Boot: on or off, as you like. **On** works: `tuxedo-drivers` is a
   DKMS module, so `30-hardware.sh` has you enroll a Machine Owner Key (MOK)
   once. On the next reboot a blue "Perform MOK management" screen appears:
   `Enroll MOK` -> `Continue` -> `Yes` -> type the one-time password you chose
@@ -353,24 +345,11 @@ system/30-hardware.sh   # second run: confirms modules + power profiles
 ### 8. `system/40-apps.sh`
 
 ```sh
-read -rs S1_SITE_TOKEN && export S1_SITE_TOKEN   # paste the token from IT, Enter
-system/40-apps.sh --s1-deb ~/SentinelAgent_linux_x86_64_*.deb
-unset S1_SITE_TOKEN
+system/40-apps.sh
 ```
 
-`read -s` keeps the token out of your shell history; the script hands it to
-`sentinelctl` on stdin, so it isn't in sudo's log either.
-
-Without `--s1-deb` it does Docker and Chrome only and prints the SentinelOne
-steps. The registration commands it runs:
-`sentinelctl management token set <token>`, `sentinelctl control start`
-(all under `/opt/sentinelone/bin/`).
-
-**Verify:** `sudo /opt/sentinelone/bin/sentinelctl control status` and
-`... management status`, and the console shows the endpoint healthy **before
-you go on**, so later problems aren't blamed on the wrong thing. Log out and
-in, then `docker run --rm hello-world`. `google-chrome --version`.
-Snapshot "drivers + company software" is taken at the end.
+**Verify:** log out and in, then `docker run --rm hello-world`.
+`google-chrome --version`. Snapshot "drivers + apps" is taken at the end.
 
 ### 9. `system/50-hyprland.sh`
 
@@ -441,8 +420,6 @@ system/60-nix.sh                 # = --user kuba --host tuxedo
    `/etc/tmpfiles.d/non-nixos-gpu.conf`.
 6. `chsh -s /usr/bin/zsh`.
 7. Snapshot "home-manager base".
-
-Tell IT that `nix-daemon` exists, in case SentinelOne flags it.
 
 Reboot. You get: LUKS passphrase -> autologin on tty1 -> Hyprland. Quickshell
 starts from Hyprland's autostart (`qs`, no systemd unit).
@@ -539,7 +516,7 @@ conversion, run the scripts, try the home-manager config `kuba@vm`.
 | Subvolume conversion, snapper, grub-btrfs, rollback drill | `tuxedo-drivers`, power profiles, MOK (TUXEDO repo is amd64 only; the script skips it) |
 | 10-strip, 20-base, NetworkManager, PipeWire | Fingerprint reader, USB4 dock, two external monitors at 120 Hz |
 | Docker (arm64 packages exist) | Chrome (amd64 only, skipped; use Chromium from Nix if needed) |
-| Nix, home-manager `kuba@vm`, GPU wiring via `/run/opengl-driver` with virgl | SentinelOne (use only on the real machine) |
+| Nix, home-manager `kuba@vm`, GPU wiring via `/run/opengl-driver` with virgl | |
 | tty1 autologin -> zsh -> `start-hyprland` | **Hyprland from the PPA** |
 
 **Hyprland in the VM.** `ppa:cppiber/hyprland` builds amd64 binaries only

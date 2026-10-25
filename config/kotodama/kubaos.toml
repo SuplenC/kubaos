@@ -489,7 +489,7 @@ icon = "dialog-password"
 keywords = ["yubikey", "ssh", "ed25519-sk"]
 keyword = "ssh-key"
 run = ["dot-ssh-sk-new", "{name}"]
-arguments = [{ name = "name", placeholder = "homelab" }]
+arguments = [{ name = "name", placeholder = "server" }]
 terminal = true
 
 [extensions.kubaos.actions.bitwarden-setup]

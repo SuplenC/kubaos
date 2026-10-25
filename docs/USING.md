@@ -259,24 +259,24 @@ Cargo appends these flags to the global `-fuse-ld=mold`, and clang's `--ld-path`
 
 Switch for good: set `rustLinker = "wild"` at the top of `home/dev.nix` and `home-manager switch` (`"mold"` to go back). With wild as the default, one build with mold is `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=--ld-path=mold" cargo build` (the last `--ld-path` wins).
 
-Benchmark on `arms`, with a separate target dir per linker so they don't invalidate each other, and without sccache so clean builds aren't served from its cache:
+Benchmark on a project of yours, with a separate target dir per linker so they don't invalidate each other, and without sccache so clean builds aren't served from its cache:
 
 ```sh
-cd ~/Projects/arms
+cd ~/Projects/myapp
 export RUSTC_WRAPPER=   # empty: cargo skips sccache
 wild='CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=--ld-path=wild"'
 
 # Incremental: touch the binary's crate, so the run is mostly linking.
-hyperfine --warmup 2 --runs 10 --prepare 'touch src/backend/rms/src/main.rs' \
-  -n mold 'cargo build -q -p rms --target-dir target/bench-mold' \
-  -n wild "$wild cargo build -q -p rms --target-dir target/bench-wild"
+hyperfine --warmup 2 --runs 10 --prepare 'touch src/main.rs' \
+  -n mold 'cargo build -q -p myapp --target-dir target/bench-mold' \
+  -n wild "$wild cargo build -q -p myapp --target-dir target/bench-wild"
 
 # Clean: everything rebuilt; the linker is a small share of this.
 hyperfine --runs 3 \
   --prepare 'cargo clean -q --target-dir target/bench-mold' \
   --prepare 'cargo clean -q --target-dir target/bench-wild' \
-  -n mold 'cargo build -q -p rms --target-dir target/bench-mold' \
-  -n wild "$wild cargo build -q -p rms --target-dir target/bench-wild"
+  -n mold 'cargo build -q -p myapp --target-dir target/bench-mold' \
+  -n wild "$wild cargo build -q -p myapp --target-dir target/bench-wild"
 
 rm -rf target/bench-mold target/bench-wild
 ```
@@ -334,7 +334,7 @@ Verified in an arm64 `ubuntu:26.04` container (user `kuba`, hostname `vm`, Nix i
 - Quickshell v0.3.2 from Nix loads the full config in headless sway (Mesa llvmpipe OpenGL) with no QML errors, and `qs ipc show` lists every contract target. Every panel, the lock screen and the terminal stack were screenshotted there (`docs/screenshots/README.md`).
 - Screen recording: `dot-hypr-record` start/stop, the state file and the bar indicator (elapsed time, gone on stop), stopped through `qs ipc call recorder stop`, with wf-recorder under headless sway; gsr's failure path without a GPU ("Recording failed" notification, state back to idle); satty opens from `dot-hypr-screenshot edit`. `system/65-recorder.sh` installs the setcap'd helper and is idempotent, but Docker refuses to exec a file capability, so gsr's KMS capture, VA-API encoding, region crop at scale 1.5 and replay need the laptop.
 
-Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland 0.56 from the PPA (amd64 only), the Lua config under a real compositor, GPU wiring (`non-nixos-gpu-setup`), fingerprint reader, tuxedo-drivers and power profiles, USB4 dock with two 120 Hz monitors, SentinelOne, lid and idle behaviour.
+Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland 0.56 from the PPA (amd64 only), the Lua config under a real compositor, GPU wiring (`non-nixos-gpu-setup`), fingerprint reader, tuxedo-drivers and power profiles, USB4 dock with two 120 Hz monitors, lid and idle behaviour.
 
 ## Known limitations
 

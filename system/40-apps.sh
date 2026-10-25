@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Phase 4 (company software + apps): Docker CE from Docker's repo, Google
-# Chrome from Google's repo, SentinelOne from the .deb IT gives you.
+# Phase 4 (apps): Docker CE from Docker's repo, Google Chrome from Google's
+# repo.
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -13,36 +13,21 @@ DOCKER_KEYRING="/etc/apt/keyrings/docker.gpg"
 CHROME_KEY_URL="https://dl.google.com/linux/linux_signing_key.pub"
 CHROME_KEY_FPR="EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
 CHROME_KEYRING="/usr/share/keyrings/google-chrome.gpg"
-SENTINELCTL="/opt/sentinelone/bin/sentinelctl"
-# /opt/sentinelone may not be readable by you, so look through sudo.
-s1_installed() {
-  [[ -e /opt/sentinelone ]] || return 1
-  [[ -x "$SENTINELCTL" ]] || as_root test -x "$SENTINELCTL"
-}
-
-S1_DEB=""
 DO_DOCKER=1 DO_CHROME=1
 
 usage() {
   cat <<EOF
-Usage: $0 [--dry-run] [--s1-deb PATH] [--no-docker] [--no-chrome]
+Usage: $0 [--dry-run] [--no-docker] [--no-chrome]
 
-  --s1-deb PATH   install SentinelOne from this .deb and register it with the
-                  site token in \$S1_SITE_TOKEN (if set; otherwise prints how)
   --no-docker     skip Docker
   --no-chrome     skip Chrome
 $(common_usage)
-
-Example (read -s keeps the token out of your shell history):
-  read -rs S1_SITE_TOKEN && export S1_SITE_TOKEN
-  $0 --s1-deb ~/Downloads/SentinelAgent_linux_x86_64_v25_*.deb
 EOF
 }
 
 while (($#)); do
   case "$1" in
     -n | --dry-run) DRY_RUN=1 ;;
-    --s1-deb) S1_DEB="${2:?--s1-deb needs a path}"; shift ;;
     --no-docker) DO_DOCKER=0 ;;
     --no-chrome) DO_CHROME=0 ;;
     -h | --help) usage; exit 0 ;;
@@ -54,56 +39,6 @@ done
 require_sudo
 apt_install ca-certificates curl gnupg
 [[ -d /etc/apt/keyrings ]] || sudo_run install -d -m 0755 /etc/apt/keyrings
-
-# --------------------------------------------------------------------------
-# install_sentinelone DEB: install the agent .deb, register it with
-# $S1_SITE_TOKEN, start it, show status. Without a token it prints the steps.
-install_sentinelone() {
-  local deb="$1"
-  step "SentinelOne agent"
-  if s1_installed; then
-    ok "agent already installed: $(as_root "$SENTINELCTL" version 2>/dev/null | head -1 || echo "$SENTINELCTL")"
-  else
-    if [[ ! -f "$deb" ]]; then
-      if ((DRY_RUN)); then warn "$deb not found (dry-run, continuing)"; else die "$deb not found"; fi
-    fi
-    # apt (not dpkg -i) so dependencies get resolved.
-    sudo_run apt-get install -y "$(realpath -m "$deb")"
-  fi
-
-  if [[ -z "${S1_SITE_TOKEN:-}" ]]; then
-    warn "S1_SITE_TOKEN is not set, not registering. Do it by hand:"
-    info "  sudo $SENTINELCTL management token set <site-token>"
-    info "  sudo $SENTINELCTL control start"
-    info "  sudo $SENTINELCTL control status"
-    info "  sudo $SENTINELCTL management status   # should show it connected"
-    return 0
-  fi
-
-  local status=""
-  if ((!DRY_RUN)); then status="$(as_root "$SENTINELCTL" management status 2>/dev/null || true)"; fi
-  # -w: "Disconnected" must not count as "connected".
-  if grep -qiwE 'connected|online' <<<"$status"; then
-    ok "agent already registered and connected"
-  else
-    # Keep the token out of logs and sudo's argv (sudo logs the full command
-    # line to the journal): hand it over on stdin, the inner sh passes it on.
-    if ((DRY_RUN)); then
-      info "[dry-run] sudo $SENTINELCTL management token set '***'"
-    else
-      info "+ sudo $SENTINELCTL management token set '***'"
-      # shellcheck disable=SC2016  # $1 and $t expand in the inner sh
-      printf '%s\n' "$S1_SITE_TOKEN" |
-        as_root sh -c 'IFS= read -r t && exec "$1" management token set "$t"' sh "$SENTINELCTL"
-    fi
-    sudo_run "$SENTINELCTL" control start
-  fi
-  if ((!DRY_RUN)); then
-    as_root "$SENTINELCTL" control status 2>/dev/null | sed 's/^/        /' || true
-  fi
-  info "Wait until the console shows the endpoint healthy before going on."
-  info "Tell IT about nix-daemon (system/60-nix.sh) in case it gets flagged."
-}
 
 # --------------------------------------------------------------------------
 if ((DO_DOCKER)); then
@@ -179,20 +114,8 @@ Signed-By: $CHROME_KEYRING"
   sctl start dot-chrome-theme.service
 fi
 
-# --------------------------------------------------------------------------
-if [[ -n "$S1_DEB" ]]; then
-  install_sentinelone "$S1_DEB"
-elif s1_installed; then
-  ok "SentinelOne present ($SENTINELCTL)"
-else
-  step "SentinelOne"
-  info "not installed. Get the .deb and site token from IT, then:"
-  info "  read -rs S1_SITE_TOKEN && export S1_SITE_TOKEN   # paste the token, Enter"
-  info "  $0 --s1-deb /path/to/SentinelAgent_linux_x86_64_*.deb"
-fi
-
 step "Snapshot"
-snap_create "drivers + company software"
+snap_create "drivers + apps"
 
 step "Done"
 info "Check: docker run --rm hello-world (after re-login); google-chrome --version"

@@ -152,7 +152,7 @@ The Docker harness can't boot an ISO. `test/vm/run` (QEMU on HVF, `test/vm/READM
 
 - The GPU: there's no DRM device in Docker Desktop, so sway uses pixman and everything GL is Mesa llvmpipe. 120 Hz smoothness, VA-API, Vulkan and `non-nixos-gpu-setup` against real drivers need the laptop.
 - Real hardware: LUKS + Btrfs subvolumes, snapper and the GRUB rollback drill (the container's `/` is overlayfs, so those steps skip), lid and idle, the USB4 dock and two monitors, Wi-Fi, Bluetooth, audio devices, the fingerprint reader.
-- `system/30-hardware.sh` (TUXEDO repo and `tuxedo-drivers`, amd64 only, plus MOK) and `system/40-apps.sh` (Docker, Chrome amd64-only, SentinelOne). Neither runs in the image.
+- `system/30-hardware.sh` (TUXEDO repo and `tuxedo-drivers`, amd64 only, plus MOK) and `system/40-apps.sh` (Docker, Chrome amd64-only). Neither runs in the image.
 - systemd: no PID 1 systemd, so no units, timers, logind, getty autologin or `systemctl --user`; the harness fakes the bits the tests depend on (above).
 - A real FIDO2 key: PAM is tested with a mapping for a key that isn't there (the fallback path), never with a touch or a fingerprint on the key. `dot-u2f-enroll` isn't exercised.
 - Bitwarden desktop (no arm64 build): its SSH agent and polkit unlock. OpenSSH's agent stands in on the same socket. gh login isn't tested (it would need github.com).

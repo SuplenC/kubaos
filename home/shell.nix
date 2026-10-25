@@ -85,7 +85,6 @@ in
       wipe = "clear && tmux clear-history";
       nvimconfig = "nvim ~/.config/nvim";
       tma = "tmux attach";
-      arms-dump = "sh ~/Scripts/arms_dump.sh";
     };
 
     initContent = lib.mkMerge [

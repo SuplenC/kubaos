@@ -121,32 +121,6 @@ console_title_template = '\{{ .Shell }} in \{{ .Folder }}'
     foreground = 'p:muted'
     template = 'at <p:text>\{{ .CurrentDate | date "15:04" }}</>'
 
-[[tooltips]]
-  type = 'aws'
-  tips = ['aws']
-  style = 'diamond'
-  foreground = 'p:text'
-  background = 'p:surface'
-  leading_diamond = ''
-  trailing_diamond = ''
-  template = '<p:warn></> \{{ .Profile }}\{{ if .Region }}@\{{ .Region }}\{{ end }} '
-
-  [tooltips.properties]
-    display_default = true
-
-[[tooltips]]
-  type = 'az'
-  tips = ['az']
-  style = 'diamond'
-  foreground = 'p:text'
-  background = 'p:surface'
-  leading_diamond = ''
-  trailing_diamond = ''
-  template = '<p:accent2></> \{{ .Name }} '
-
-  [tooltips.properties]
-    display_default = true
-
 [transient_prompt]
   foreground = 'p:accent'
   foreground_templates = ['\{{ if gt .Code 0 }}p:err\{{ end }}']

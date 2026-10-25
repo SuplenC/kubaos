@@ -141,7 +141,7 @@ Expected gain: about 20 to 25% faster incremental debug rebuilds on large binari
 - `home/dev.nix`: in `linuxTarget`, replace `"link-arg=-fuse-ld=mold"` with `"link-arg=--ld-path=${lib.getExe pkgs.wild-unwrapped}"`. Use `wild-unwrapped`, not `wild`: the wrapped variant is a nixpkgs bintools wrapper meant for Nix stdenv, and on Ubuntu the pure binary is what clang should call. Keep `linker = "clang"` (clang from apt).
 - Keep `mold` in `system/20-base.sh` as the fallback. For a one-off build with mold: `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="-C link-arg=-fuse-ld=mold" cargo build`.
 - Update the comment at the top of `home/dev.nix` ("clang and mold come from apt") and add `wild` to the Nix list in `docs/CONTRACTS.md`, "Packages: who installs what" (lead owns that file).
-- Verify on the laptop: `readelf --string-dump .comment target/debug/<bin> | grep -i wild`, then `cargo build --timings` on `arms` with both linkers.
+- Verify on the laptop: `readelf --string-dump .comment target/debug/<bin> | grep -i wild`, then `cargo build --timings` on a large Rust workspace with both linkers.
 
 ### 2. Replace duf with dysk (Switch, low priority)
 
@@ -195,4 +195,4 @@ Gain: syntax-aware diffs on demand; delta stays the pager. Effort: trivial.
 - Any number on the real machine (x86_64 Strix Point): all timings above are arm64 Docker on a Mac, with other containers running.
 - That the TUXEDO's Wi-Fi card is actually an MT7922, and iwd behaviour on it.
 - Which zswap compressors are built in (not modules) in the amd64 Ubuntu 7.0 kernel.
-- Whether wild 0.8.0 (nixpkgs 26.05) handles every crate in `arms`; upstream 0.10.0 is newer and is what its benchmarks use.
+- Whether wild 0.8.0 (nixpkgs 26.05) handles every crate of a large Rust workspace; upstream 0.10.0 is newer and is what its benchmarks use.

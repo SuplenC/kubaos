@@ -10,8 +10,8 @@
 #                                   holds 25 or 100 such keys, by firmware)
 #
 # When to use it instead of a Bitwarden SSH key (docs/SECRETS.md): for the few
-# hosts where "the key must be physically here" matters (production, the
-# homelab's root). Bitwarden keys stay the default: they sync to every machine
+# hosts where "the key must be physically here" matters (production, a
+# server's root). Bitwarden keys stay the default: they sync to every machine
 # and the desktop agent serves them; Bitwarden's agent can't hold -sk keys, so
 # these go straight from the file, without an agent.
 #
