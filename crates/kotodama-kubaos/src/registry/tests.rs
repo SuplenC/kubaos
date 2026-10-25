@@ -323,6 +323,28 @@ fn every_dot_script_kubaos_toml_runs_is_in_scripts() {
     }
 }
 
+#[test]
+fn the_settings_folder_and_every_group_of_it_open_from_the_menu() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let opens: Vec<Vec<String>> = registry
+        .items()
+        .filter_map(|item| registry.command(&item.id, &every_argument(&item)))
+        .map(|command| command.argv)
+        .collect();
+
+    let mut wanted = vec![vec!["dot-config".to_owned(), "open".to_owned()]];
+    for group in kubaos_user_layer::Group::ALL {
+        wanted.push(vec![
+            "dot-config".to_owned(),
+            "open".to_owned(),
+            group.name().to_owned(),
+        ]);
+    }
+    for argv in wanted {
+        assert!(opens.contains(&argv), "no Item runs {argv:?}");
+    }
+}
+
 /// The `[extensions.kubaos]` table of the Defaults.
 fn shipped() -> Table {
     let defaults: Table = toml::from_str(include_str!("../../../../config/kotodama/kubaos.toml")).expect("kubaos.toml");

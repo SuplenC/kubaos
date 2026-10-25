@@ -1676,6 +1676,19 @@ TOML
     echo "ok   the actions the user layer hides aren't found"
   fi
 
+  # The settings folder and each of its groups, by title and by the word "settings".
+  out="$(in_session "$query 'Settings folder' 'Settings: Desktop' 'Settings: Terminal' 'Settings: Editor' 'Settings: Tools' 'Settings: Menu' settings" 2>&1)" ||
+    { echo "FAIL querying the menu: $out"; bad=1; }
+  local typed id
+  for want in 'Settings folder=settings-folder' 'Settings: Desktop=settings-desktop' \
+    'Settings: Terminal=settings-terminal' 'Settings: Editor=settings-editor' \
+    'Settings: Tools=settings-tools' 'Settings: Menu=settings-menu' 'settings=settings-folder'; do
+    typed="${want%%=*}" id="${want#*=}"
+    grep -E -- "^${typed}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${id}( |$)" ||
+      { echo "FAIL typing '$typed' doesn't find kubaos/$id"; bad=1; }
+  done
+  ((bad)) || echo "ok   the settings folder and its five groups are found"
+
   out="$(in_session "$query 'Keyboard: add a layout' 'Keyboard: set layouts' Keyboard 'next layout'" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
   for want in 'Keyboard: add a layout:keyboard-add' \
