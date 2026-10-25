@@ -30,9 +30,9 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + CTRL + Escape` | Lock |
 | `SUPER + ALT + Return` / `SUPER + ALT + Space` | foot and fuzzel: the emergency terminal and app menu, for when the shell is dead |
 
-The layouts are yours, the first the default: the ones you picked in Kōbō to begin with, then whatever you change them to (`layouts` in `~/.config/kubaos/keyboard/keyboard.toml`; `us` if there is nothing at all). The console and the disk passphrase prompt type with the default, from `/etc/default/keyboard`. With two or more, the bar shows the one in use ("US", "IT"); click it, press `SUPER + SHIFT + Space` or pick "Next keyboard layout" in the Command menu for the next. The control center's Keyboard tile switches too, and its arrow opens the Keyboard tab: make a layout the default, move it up or down, remove it, or "Add a language…" from every layout and variant by name. That search is the Command menu's, so a typo or a missing accent still finds the layout ("czeh" finds Czech): a click picks one and the Add button under the list adds it, Enter adds the selected one at once. "Keyboard layouts" in the Command menu opens that tab. The Command menu has each layout ("Keyboard: Italian") to switch to it, make it the default, move it or remove it, plus "Keyboard: add a layout", "Keyboard: set layouts" and the "Add a keyboard layout" app (type `layout`, then Enter) that searches every layout and variant you don't type with yet and adds the one you pick. `kubaos keyboard show|set|add|remove|default|move` does the same from a terminal and reloads Hyprland. Only a new default asks for anything: it goes to the console and the disk prompt through a root helper that pkexec runs, which needs no password for an admin at the machine and may ask anyone else for one. If that's refused, your layouts change anyway and the tab says the console keeps the old default. Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
+The layouts are yours, the first the default: the ones you picked in Kōbō to begin with, then whatever you change them to (`layouts` in `~/.config/kubaos/desktop/keyboard/keyboard.toml`; `us` if there is nothing at all). The console and the disk passphrase prompt type with the default, from `/etc/default/keyboard`. With two or more, the bar shows the one in use ("US", "IT"); click it, press `SUPER + SHIFT + Space` or pick "Next keyboard layout" in the Command menu for the next. The control center's Keyboard tile switches too, and its arrow opens the Keyboard tab: make a layout the default, move it up or down, remove it, or "Add a language…" from every layout and variant by name. That search is the Command menu's, so a typo or a missing accent still finds the layout ("czeh" finds Czech): a click picks one and the Add button under the list adds it, Enter adds the selected one at once. "Keyboard layouts" in the Command menu opens that tab. The Command menu has each layout ("Keyboard: Italian") to switch to it, make it the default, move it or remove it, plus "Keyboard: add a layout", "Keyboard: set layouts" and the "Add a keyboard layout" app (type `layout`, then Enter) that searches every layout and variant you don't type with yet and adds the one you pick. `kubaos keyboard show|set|add|remove|default|move` does the same from a terminal and reloads Hyprland. Only a new default asks for anything: it goes to the console and the disk prompt through a root helper that pkexec runs, which needs no password for an admin at the machine and may ask anyone else for one. If that's refused, your layouts change anyway and the tab says the console keeps the old default. Number keys are bound by keycode, so they're the top-row keys whatever the layout says.
 
-Accents work as Option does on a Mac, whatever the layout: Left Alt + e, then a letter, types it with an acute (é), Left Alt + ` a grave (à), Left Alt + u a diaeresis (ö), Left Alt + i a circumflex (ô) and Left Alt + n a tilde (ñ). Shift with the letter gives the capital, and Space the mark alone. Let go of Alt before the letter. Every other Left Alt chord is plain Alt, ALT + Tab included, and Right Alt is untouched. The Shortcuts View (`SUPER + F1`) lists the chords. Turn them off with "Mac accents on Left Alt: off" in the Command menu or the control center's Keyboard tab (`mac_accents = false` in `~/.config/kubaos/keyboard/keyboard.toml`).
+Accents work as Option does on a Mac, whatever the layout: Left Alt + e, then a letter, types it with an acute (é), Left Alt + ` a grave (à), Left Alt + u a diaeresis (ö), Left Alt + i a circumflex (ô) and Left Alt + n a tilde (ñ). Shift with the letter gives the capital, and Space the mark alone. Let go of Alt before the letter. Every other Left Alt chord is plain Alt, ALT + Tab included, and Right Alt is untouched. The Shortcuts View (`SUPER + F1`) lists the chords. Turn them off with "Mac accents on Left Alt: off" in the Command menu or the control center's Keyboard tab (`mac_accents = false` in `~/.config/kubaos/desktop/keyboard/keyboard.toml`).
 
 ## Files
 
@@ -83,7 +83,7 @@ The service is the `kubaos-automount` user unit: `systemctl --user status kubaos
 
 Image, video and PDF previews show in the right pane: yazi draws them with the kitty graphics protocol, which Ghostty speaks. Inside tmux they pass through as well (`allow-passthrough` in `config/tmux/tmux.conf`).
 
-The drag key lives in your own `~/.config/kubaos/yazi/keymap.toml`, which KubaOS seeds with it: change it or delete it there. yazi reads a single keymap file, so KubaOS can't ship keys of its own beside yours. If your file had its own keys before the drag key existed, the update left it alone; add this yourself:
+The drag key lives in your own `~/.config/kubaos/tools/yazi/keymap.toml`, which KubaOS seeds with it: change it or delete it there. yazi reads a single keymap file, so KubaOS can't ship keys of its own beside yours. If your file had its own keys before the drag key existed, the update left it alone; add this yourself:
 
 ```toml
 [[mgr.prepend_keymap]]
@@ -159,29 +159,43 @@ Your Nix packages move with your flake's nixpkgs; KubaOS's keep their exact stor
 
 ## Make it yours
 
-Don't edit `/usr/share/kubaos` or the files in `~/.config/<app>`. Those are KubaOS's defaults: read-only, and replaced whole by every update. Your changes go in `~/.config/kubaos/<app>/`, which every app loads after ours, so what you set there wins. Updates never write to it. When we change a default you haven't touched, you get the new one; when you've set your own, you keep yours.
+Don't edit `/usr/share/kubaos` or the files in `~/.config/<app>`. Those are KubaOS's defaults: read-only, and replaced whole by every update. Your changes go in `~/.config/kubaos`, which every app loads after ours, so what you set there wins. Updates never write to it. When we change a default you haven't touched, you get the new one; when you've set your own, you keep yours.
 
-Each file starts as a comment and an example:
+The folder is grouped by area, and its `README.md` says where to go for what:
+
+```
+~/.config/kubaos/
+  README.md   want to change X? go here
+  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ files/ wallpapers/
+  terminal/   ghostty/ foot/ tmux/ zsh/ fastfetch/
+  editor/     nvim/
+  tools/      git/ lazygit/ yazi/ bat/ bacon/ fuzzel/
+  menu/       kotodama/
+  home/       your flake
+```
+
+In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop", "Settings: Terminal", "Settings: Editor", "Settings: Tools" and "Settings: Menu" open one group; `dot-config open [group or app]` and `dot-config path [group or app]` do the same from a terminal. Each file starts with the settings people change most, commented out with their defaults, and a link to the app's full docs:
 
 | To change | Edit | Applies |
 |---|---|---|
-| Hyprland: binds, gaps, monitors, rules | `~/.config/kubaos/hypr/hyprland.lua` (same Lua API as `~/.config/hypr/`) | `hyprctl reload` (`SUPER + SHIFT + CTRL + R`) |
-| Idle, lock screen | `~/.config/kubaos/hypr/{hypridle,hyprlock}.conf` | restart hypridle / next lock |
-| Shell aliases, exports | `~/.config/kubaos/zsh/zshrc` | new shell |
-| tmux | `~/.config/kubaos/tmux/tmux.conf` | `tmux source-file ~/.config/tmux/tmux.conf` |
-| Ghostty, foot, fuzzel | `~/.config/kubaos/{ghostty/config,foot/foot.ini,fuzzel/fuzzel.ini}` | reload or new window |
-| git | `~/.config/kubaos/git/config`, `~/.config/kubaos/git/ignore` | at once (`ignore` after `dot-config apply`) |
-| Neovim | `~/.config/kubaos/nvim/{options,keymaps,autocmds}.lua`, `plugins/*.lua`; extras with `:LazyExtras` | restart Neovim |
-| lazygit, bacon, yazi | `~/.config/kubaos/{lazygit/config.yml,bacon/prefs.toml,yazi/yazi.toml,yazi/keymap.toml}` | next start (lazygit and bacon: in a new shell). The yazi keymap starts with KubaOS's drag key ("Files") |
-| bat, fastfetch | `~/.config/kubaos/{bat/config,fastfetch/config.jsonc}` | after `dot-config apply` |
+| Hyprland: binds, gaps, monitors, rules | `~/.config/kubaos/desktop/hypr/hyprland.lua` (same Lua API as `~/.config/hypr/`) | `hyprctl reload` (`SUPER + SHIFT + CTRL + R`) |
+| Idle, lock screen | `~/.config/kubaos/desktop/hypr/{hypridle,hyprlock}.conf` | restart hypridle / next lock |
+| Shell aliases, exports | `~/.config/kubaos/terminal/zsh/zshrc` | new shell |
+| tmux | `~/.config/kubaos/terminal/tmux/tmux.conf` | `tmux source-file ~/.config/tmux/tmux.conf` |
+| Ghostty, foot, fuzzel | `~/.config/kubaos/terminal/{ghostty/config,foot/foot.ini}`, `~/.config/kubaos/tools/fuzzel/fuzzel.ini` | reload or new window |
+| git | `~/.config/kubaos/tools/git/config`, `~/.config/kubaos/tools/git/ignore` | at once (`ignore` after `dot-config apply`) |
+| Neovim | `~/.config/kubaos/editor/nvim/{options,keymaps,autocmds}.lua`, `plugins/*.lua`; extras with `:LazyExtras` | restart Neovim |
+| lazygit, bacon, yazi | `~/.config/kubaos/tools/{lazygit/config.yml,bacon/prefs.toml,yazi/yazi.toml,yazi/keymap.toml}` | next start (lazygit and bacon: in a new shell). The yazi keymap starts with KubaOS's drag key ("Files") |
+| bat, fastfetch | `~/.config/kubaos/tools/bat/config`, `~/.config/kubaos/terminal/fastfetch/config.jsonc` | after `dot-config apply` |
 | btop, tms | `~/.config/btop/btop.conf`, `~/.config/tms/config.toml`: they rewrite their own file, so it's yours as is | next start |
-| Command menu: your own actions, hiding KubaOS's | `~/.config/kubaos/kotodama/user.toml` (below) | on save |
+| Command menu: your own actions, hiding KubaOS's | `~/.config/kubaos/menu/kotodama/user.toml` (below) | on save |
 | Nix packages and home-manager options | `~/.config/kubaos/home/home.nix`, e.g. `home.packages = [ pkgs.hello ];` | `home-manager switch --flake ~/.config/kubaos/home` |
 | A package, without writing Nix | `kubaos package add ripgrep` (`remove`, `list`); `kubaos try cowsay` opens a shell with it and installs nothing | the switch `add` and `remove` queue |
 | A whole language setup (a Suite) | `kubaos suite list`, `kubaos suite add NAME [--version V] [--extra E]`, `configure`, `remove [--purge-caches]`; `kubaos suite new NAME PROJECT` starts a project in `~/Projects` | the switch `add`, `configure` and `remove` queue |
 
 - To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
 - Delete a file in `~/.config/kubaos` to get the example back on the next `dot-config apply` or update.
+- Coming from a release before the groups, the update moves each `~/.config/kubaos/<app>` into its group for you and loses nothing. Where you had edited both the old file and a new one in the group, it keeps the group's and puts yours beside it as `<file>.old`, and says so; merge the two by hand. A user layer under git sees the moves as renames, for you to commit.
 - Quickshell's settings, the colors (matugen) and the prompt (oh-my-posh) can't be overridden yet.
 - Your own wallpapers go in `~/Pictures/wallpapers/`, the picker's last tab; KubaOS's sets are in `/usr/share/kubaos/wallpapers/`.
 - `~/.config/kubaos/home/` is your flake: KubaOS wrote it once, and an update never does again. Put it under git if you like (then `git add` new files of yours before a switch; the `kubaos` command does that for what it writes into `kubaos.d/`).
@@ -205,7 +219,7 @@ Each file starts as a comment and an example:
 
   Keys set under one of KubaOS's ids change only those keys of its action. `terminal = true` runs it in a terminal, and `delay_ms` waits that long first, so the menu is gone before a screenshot. The Extension logs what it can't use, such as an id it doesn't know (`journalctl --user -u kotodamad`).
 - `kubaos package add` records the package in `~/.config/kubaos/home/kubaos.d/packages.toml`, a file the command owns, and switches. Every switch (`kubaos switch`, or one an `add` queued) runs in a systemd user unit, one at a time: closing the terminal doesn't stop it, and `kubaos job list` and `kubaos job follow <id>` show it. The first `add` on an older install adds `kubaos.stateDir = ./kubaos.d;` to your `home.nix`, after backing it up to `~/.local/state/kubaos/backups/home.nix.bak`. If your flake is under git, the command records each file it writes with `git add --intent-to-add` (and drops the ones it deletes from the index), so Nix sees them; it never commits.
-- `kubaos suite add` installs a Suite: its toolchain, environment and editor settings, which load before yours in `~/.config/kubaos/nvim/`, so your settings win. It writes `kubaos.d/suites/<name>.toml` and creates any file of yours it has an example for only if that file is missing. `kubaos suite remove` takes it all away again, shows the size of its caches and keeps them unless you pass `--purge-caches`, lists your files that mention the Suite, and never touches your projects.
+- `kubaos suite add` installs a Suite: its toolchain, environment and editor settings, which load before yours in `~/.config/kubaos/editor/nvim/`, so your settings win. It writes `kubaos.d/suites/<name>.toml` and creates any file of yours it has an example for only if that file is missing. `kubaos suite remove` takes it all away again, shows the size of its caches and keeps them unless you pass `--purge-caches`, lists your files that mention the Suite, and never touches your projects.
 
 ## Hacking on KubaOS
 
@@ -225,10 +239,10 @@ home-manager switch --flake ~/.config/kubaos/home --override-input kubaos git+fi
 | `home-manager switch --flake ~/.config/kubaos/home` | Apply your `home.nix` |
 | `dot-theme set <image>` | Set a wallpaper (an image or a loop) and regenerate colors everywhere |
 | `dot-theme next`, `prev`, `toggle-folder` | Cycle wallpapers (stills and loops), cycle the folders: the sets you picked, your own `~/Pictures/wallpapers` |
-| `~/.config/kubaos/wallpapers/sets` | What the picker shows, one per line: a set's name for all of it, `<set>/<file>` for one wallpaper (every set in `/usr/share/kubaos/wallpapers` without the file). A set a new release brings shows up once you add it. The Command menu has one Item a set ("wallpaper sets", "Wallpaper set: Shinjuku") to show it whole or hide it, through `dot-theme show-set\|hide-set <set>`; the last set in the picker stays. `dot-theme all-sets` (Command menu: Show every wallpaper set) lists every set again |
+| `~/.config/kubaos/desktop/wallpapers/sets` | What the picker shows, one per line: a set's name for all of it, `<set>/<file>` for one wallpaper (every set in `/usr/share/kubaos/wallpapers` without the file). A set a new release brings shows up once you add it. The Command menu has one Item a set ("wallpaper sets", "Wallpaper set: Shinjuku") to show it whole or hide it, through `dot-theme show-set\|hide-set <set>`; the last set in the picker stays. `dot-theme all-sets` (Command menu: Show every wallpaper set) lists every set again |
 | `dot-theme apply [--force]` | Regenerate from the current wallpaper; without `--force` it does nothing when no input changed (login runs it) |
-| `kubaos cursor style dark\|accent\|classic`, `kubaos cursor size <16-96>` | The pointer: dark with a light outline, the wallpaper's accent, or plain Bibata black and white, and its size. Applies at once and is kept in `~/.config/kubaos/cursor/cursor.toml`; the Command menu has both ("cursor") |
-| `kubaos keyboard show`, `kubaos keyboard set us,it(intl)`, `kubaos keyboard add\|remove\|default <layout>`, `kubaos keyboard move <layout> <place>`, `kubaos keyboard list`, `kubaos keyboard accents [on\|off\|apply]` | Your keyboard layouts (`~/.config/kubaos/keyboard/keyboard.toml`), the first the default; Hyprland reloads after a change. A new default also goes to `/etc/default/keyboard` for the console and the disk prompt, through a root helper and pkexec, which may ask for your password. At most 4, and the last one stays; the Command menu has them all ("keyboard"). `list` prints every layout and variant by name; `accents` turns the Mac-style accents on Left Alt on or off |
+| `kubaos cursor style dark\|accent\|classic`, `kubaos cursor size <16-96>` | The pointer: dark with a light outline, the wallpaper's accent, or plain Bibata black and white, and its size. Applies at once and is kept in `~/.config/kubaos/desktop/cursor/cursor.toml`; the Command menu has both ("cursor") |
+| `kubaos keyboard show`, `kubaos keyboard set us,it(intl)`, `kubaos keyboard add\|remove\|default <layout>`, `kubaos keyboard move <layout> <place>`, `kubaos keyboard list`, `kubaos keyboard accents [on\|off\|apply]` | Your keyboard layouts (`~/.config/kubaos/desktop/keyboard/keyboard.toml`), the first the default; Hyprland reloads after a change. A new default also goes to `/etc/default/keyboard` for the console and the disk prompt, through a root helper and pkexec, which may ask for your password. At most 4, and the last one stays; the Command menu has them all ("keyboard"). `list` prints every layout and variant by name; `accents` turns the Mac-style accents on Left Alt on or off |
 | `dot-config apply` | Create missing files in `~/.config/kubaos` and rewrite the merged configs (bat, git ignore, fastfetch) from the defaults plus yours. Every `home-manager switch` runs it |
 | `qs ipc show` | List the Quickshell IPC targets Hyprland binds call |
 | `dot-hypr-record region\|window\|output [--audio] [--mic]` | Start or stop a recording (gpu-screen-recorder, `~/Videos/Recordings`); `replay` keeps the last 30 s, `replay save` writes them. Run `system/65-recorder.sh` once so monitor capture needs no password |
@@ -307,7 +321,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `home/` | home-manager modules: packages, zsh, tmux plugins, GPU wiring, GTK/Qt theme, defaults and the user layer (`links.nix`) |
 | `config/` | The defaults, one dir per app, linked read-only into `~/.config`: `hypr`, `quickshell`, `nvim`, `tmux`, `tms`, `ghostty`, `foot`, `fuzzel`, `matugen`, `ohmyposh`, `lazygit`, `yazi`, `btop`, `bat`, `bacon`, `git` |
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-u2f-enroll`, `dot-ssh-sk-new`, and `dot-bw-setup` and `dot-bwenv`, aliases of `kubaos bitwarden` for one release) |
-| `user-layer/` | The starting files of `~/.config/kubaos`, one commented example per app |
+| `user-layer/` | The starting files of `~/.config/kubaos`, grouped by area: each app's commonly changed settings, commented out with their defaults, and the maps (`README.md`) |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `relink.sh`, which `kubaos update` runs, files for `/etc` |
 | `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, `kubaos-files`, yazi in a terminal window and the Downloads tidy, `kubaos-bluetooth`, the Bluetooth pairing agent, and `kubaos-automount`, the automount for removable drives and the photo import |
 | `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |

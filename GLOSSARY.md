@@ -9,7 +9,7 @@ The configuration KubaOS ships for an app, read-only on the machine and replaced
 _Avoid_: Shipped config, base config
 
 **User layer**:
-The user's own per-app overrides, loaded after the **Defaults** and never written by an update.
+The user's own per-app overrides in `~/.config/kubaos`, grouped by area (desktop, terminal, editor, tools, menu), loaded after the **Defaults** and never written by an update.
 _Avoid_: Local config, overrides
 
 **User flake**:

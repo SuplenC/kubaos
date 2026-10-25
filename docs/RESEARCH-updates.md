@@ -4,7 +4,7 @@ Question (2026-10-18): the ISOs can't go on GitHub Releases as they are (issue #
 
 Sources are linked inline. Repo claims cite `path:line` at commit `bb6ddd9`. Omarchy claims cite its source at `basecamp/omarchy@4e059ac` (2026-10-18). Nix claims cite the manual sources in [NixOS/nix](https://github.com/NixOS/nix/tree/2.35.3) at tag `2.35.3`, the version `system/60-nix.sh:24` installs. home-manager claims cite [`release-26.05` at `ab3823b`](https://github.com/nix-community/home-manager/tree/ab3823b4b24c0c3ca984c1f3ee577fd6d667424c). Cachix CLI claims cite [`cachix/cachix@3349ce7`](https://github.com/cachix/cachix/tree/3349ce74ba77f1382814cf611c6f42484956dc41).
 
-**Built on #9.** [#9](https://github.com/SuplenC/kubaos/issues/9) is implemented (`7bb2d5f`). The checkout's `config/` is now read-only defaults, user changes live in `~/.config/kubaos/<app>/`, and no update writes there. "What #9 built" below has the details. The design here relies on it.
+**Built on #9.** [#9](https://github.com/SuplenC/kubaos/issues/9) is implemented (`7bb2d5f`). The checkout's `config/` is now read-only defaults, user changes live in `~/.config/kubaos/<group>/<app>/`, and no update writes there. "What #9 built" below has the details. The design here relies on it.
 
 ## TL;DR
 
@@ -59,7 +59,7 @@ These replace the earlier open questions.
 ### What #9 built (`7bb2d5f`)
 
 - `config/<app>/` is copied into the store once (`kubaos-defaults`) and each file is linked read-only into a real `~/.config/<app>/` (`home/links.nix:27-30,78-90`). An update replaces the defaults whole. Editing `config/` now takes a `home-manager switch`.
-- The user layer is `~/.config/kubaos/<app>/`, which every app loads last (`docs/CONTRACTS.md:25-32`, per-app table at `:34-52`). `dot-config apply` runs on every switch and creates missing user files from `user-layer/` (`home/links.nix:119-123`, `scripts/dot-config:1-13`). Files that apps rewrite (btop, tms, lazy.nvim's lock) are seeded once, and three files with no include mechanism are merged (`home/links.nix:32-49`).
+- The user layer is `~/.config/kubaos/<group>/<app>/`, which every app loads last (`docs/CONTRACTS.md:25-32`, per-app table at `:34-52`). `dot-config apply` runs on every switch and creates missing user files from `user-layer/` (`home/links.nix:119-123`, `scripts/dot-config:1-13`). Files that apps rewrite (btop, tms, lazy.nvim's lock) are seeded once, and three files with no include mechanism are merged (`home/links.nix:32-49`).
 - The contract for migrations already exists: a migration may change a user file only if it adds to it, is safe to re-run, backs the file up first, and skips any setting the user changed (`docs/CONTRACTS.md:32`).
 - `test/user-layer-check` proves the promise. It fills every user file, commits newer defaults to the checkout, switches, and checks the user's files are byte-identical (`test/user-layer-check:1-17`, `just vm-user-layer`, `justfile:73-75`).
 - Still live-linked into `~/Projects/dotfiles`: every script (`home/links.nix:99-101`, `docs/CONTRACTS.md:62`), the wallpapers (`home/theme.nix:130-131`), and the tty1 Hyprland autostart that `~/.zprofile` sources (`home/shell.nix:138-142`). `dotfilesDir` is hardcoded to that path (`home/default.nix:21`).
@@ -254,7 +254,7 @@ Decision 8 means more than one series can be live at once.
 
 - A separate public repo (for example `SuplenC/kubaos-wallpapers`), one folder per set (today's `wallpapers/cyberpunk`, `japanese`, `shinjuku`), each with its credits. KubaOS takes it as a flake input pinned in KubaOS's own lock, so new wallpapers arrive with a release like any other curated thing.
 - The payload ships every set read-only, for example under `/usr/share/kubaos/wallpapers/<set>/`, so the ISO works offline.
-- The installer gets a wallpaper step: a grid of sets with a preview each, all selected by default. The engine records the choice in the user layer (`~/.config/kubaos/wallpapers/sets`). The picker and `dot-theme`'s folder cycle show the chosen sets plus `~/Pictures/wallpapers/`, which is a real, user-owned directory for the user's own images. That settles where your own wallpapers go.
+- The installer gets a wallpaper step: a grid of sets with a preview each, all selected by default. The engine records the choice in the user layer (`~/.config/kubaos/desktop/wallpapers/sets`). The picker and `dot-theme`'s folder cycle show the chosen sets plus `~/Pictures/wallpapers/`, which is a real, user-owned directory for the user's own images. That settles where your own wallpapers go.
 - Updates follow the user-layer rule: a release can add a new set to `/usr/share`, but it only shows up once it's chosen in settings (or a migration appends it to `sets`, if you want new sets to appear by default). Removing a set from the repo needs care, because someone may have it as their current wallpaper.
 - Unselected sets stay on disk in `/usr/share`. Deleting them would save at most about 1 GB, and they'd come back with the next update anyway.
 
