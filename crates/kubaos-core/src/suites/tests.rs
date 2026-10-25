@@ -3,6 +3,8 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+use kubaos_user_layer::App;
+
 use super::Cache;
 use super::CachePolicy;
 use super::Extra;
@@ -56,7 +58,8 @@ const DEMO: Suite = Suite {
         argv: &["sh", "-c", "mkdir \"$1\" && echo '{name}' >\"$1/NAME\"", "sh", "{path}"],
     }],
     seeds: &[Seed {
-        path: "nvim/plugins/demo.lua",
+        app: App::Nvim,
+        path: "plugins/demo.lua",
         contents: SEED,
     }],
     mentions: &["demo", "demo-ls"],
@@ -247,7 +250,7 @@ fn adding_seeds_a_missing_user_layer_file() {
 
     let added = h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
 
-    let seeded = h.paths.user_layer().join("nvim/plugins/demo.lua");
+    let seeded = h.paths.user_layer().join("editor/nvim/plugins/demo.lua");
     assert_eq!(added.seeds.created, std::slice::from_ref(&seeded));
     assert_eq!(fs::read_to_string(seeded).unwrap(), SEED);
 }
@@ -255,7 +258,7 @@ fn adding_seeds_a_missing_user_layer_file() {
 #[test]
 fn a_user_layer_file_that_exists_is_never_written() {
     let h = home();
-    let mine = h.paths.user_layer().join("nvim/plugins/demo.lua");
+    let mine = h.paths.user_layer().join("editor/nvim/plugins/demo.lua");
     write(&mine, "return { { \"demo-ls\", opts = { mine = true } } }\n");
 
     let added = h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
@@ -281,7 +284,7 @@ fn a_user_layer_file_that_exists_is_never_written() {
 #[test]
 fn a_dangling_link_in_the_user_layer_counts_as_existing() {
     let h = home();
-    let link = h.paths.user_layer().join("nvim/plugins/demo.lua");
+    let link = h.paths.user_layer().join("editor/nvim/plugins/demo.lua");
     fs::create_dir_all(link.parent().unwrap()).unwrap();
     std::os::unix::fs::symlink("/nowhere/demo.lua", &link).unwrap();
 
@@ -332,7 +335,7 @@ fn removing_never_touches_projects_or_the_user_layer() {
     h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
     let project = h.paths.projects_root().join("my-demo/main.demo");
     write(&project, "demo");
-    let mine = h.paths.user_layer().join("nvim/plugins/demo.lua");
+    let mine = h.paths.user_layer().join("editor/nvim/plugins/demo.lua");
     write(&mine, "-- mine, demo\n");
 
     h.suites.remove(&DEMO, CachePolicy::Purge).unwrap();
@@ -375,8 +378,8 @@ fn removing_lists_the_user_layer_files_that_mention_the_suite() {
     let h = home();
     h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
     let layer = h.paths.user_layer();
-    write(&layer.join("zsh/zshrc"), "export PATH=$HOME/demo-ls/bin:$PATH\n");
-    write(&layer.join("git/config"), "[user]\n  name = Demonstration\n");
+    write(&layer.join("terminal/zsh/zshrc"), "export PATH=$HOME/demo-ls/bin:$PATH\n");
+    write(&layer.join("tools/git/config"), "[user]\n  name = Demonstration\n");
     write(
         &layer.join("home/home.nix"),
         "{ pkgs, ... }: { home.packages = [ pkgs.demo ]; }\n",
@@ -388,9 +391,9 @@ fn removing_lists_the_user_layer_files_that_mention_the_suite() {
     assert_eq!(
         removed.mentions,
         [
+            layer.join("editor/nvim/plugins/demo.lua"),
             layer.join("home/home.nix"),
-            layer.join("nvim/plugins/demo.lua"),
-            layer.join("zsh/zshrc"),
+            layer.join("terminal/zsh/zshrc"),
         ]
     );
 }
@@ -399,7 +402,7 @@ fn removing_lists_the_user_layer_files_that_mention_the_suite() {
 fn the_state_directory_is_not_a_mention() {
     let h = home();
     h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
-    fs::remove_file(h.paths.user_layer().join("nvim/plugins/demo.lua")).unwrap();
+    fs::remove_file(h.paths.user_layer().join("editor/nvim/plugins/demo.lua")).unwrap();
 
     let mentions = h.suites.mentions(&DEMO);
 

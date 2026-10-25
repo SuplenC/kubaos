@@ -1,0 +1,9 @@
+[package]
+name = "kubaos-user-layer"
+description = "Where each app's settings live in KubaOS's user layer, ~/.config/kubaos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true

@@ -1,6 +1,0 @@
--- Your Hyprland settings. Loaded after KubaOS's modules, so anything here wins.
--- Same Lua API as ~/.config/hypr/*.lua (the defaults, read-only).
--- Apply: hyprctl reload (SUPER + SHIFT + CTRL + R).
---
--- hl.config({ general = { gaps_out = 12 } })
--- hl.bind("SUPER + B", hl.dsp.exec_cmd("google-chrome"), { description = "Browser" })

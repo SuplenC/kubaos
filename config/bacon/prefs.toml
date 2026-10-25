@@ -1,5 +1,5 @@
 # bacon preferences, KubaOS's defaults (home/links.nix). Yours go in
-# ~/.config/kubaos/bacon/prefs.toml (BACON_PREFS), applied after these.
+# ~/.config/kubaos/tools/bacon/prefs.toml (BACON_PREFS), applied after these.
 #
 # Colors are ANSI palette indices (0-15), so bacon follows the terminal
 # palette, which comes from the wallpaper theme (config/matugen/templates/

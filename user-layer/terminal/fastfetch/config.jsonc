@@ -1,0 +1,14 @@
+// Your fastfetch settings: ~/.config/kubaos/terminal/fastfetch/config.jsonc, merged over
+// KubaOS's (objects key by key; anything else, the module list for one, replaces ours).
+// dot-config apply, which every update runs, writes ~/.config/fastfetch/config.jsonc from
+// both: run it after editing.
+{
+  // What sits between a key and its value (fastfetch's default ": ").
+  // "display": { "separator": ": " },
+
+  // The lines shown, in order. KubaOS shows fastfetch's default list; a shorter one:
+  // "modules": ["title", "separator", "os", "kernel", "uptime", "cpu", "memory", "disk"]
+
+  // Full docs: https://github.com/fastfetch-cli/fastfetch/wiki/Configuration
+  // (`fastfetch --help config`, `fastfetch --list-modules`).
+}

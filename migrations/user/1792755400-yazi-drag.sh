@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # yazi-drag: adds the drag-out key (Ctrl+N, ripdrag) to a yazi keymap.toml
-# made before user-layer/yazi/keymap.toml seeded it. A file made since has it.
+# made before user-layer/tools/yazi/keymap.toml seeded it. A file made since has it.
 # kubaos update runs it once, as the user, after the home-manager switch,
 # under bash -euo pipefail from the new release's checkout (KUBAOS_DIR). Exiting
 # non-zero stops the update; it runs again on the next one, so make it safe to rerun.
@@ -12,7 +12,7 @@
 # shellcheck source=migrations/lib.sh
 source "$KUBAOS_DIR/migrations/lib.sh"
 
-keymap="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/yazi/keymap.toml"
+keymap="$("$KUBAOS_DIR/scripts/dot-config" path yazi)/keymap.toml"
 [[ -f $keymap ]] || exit 0
 
 settings="$(grep -v '^[[:space:]]*#' -- "$keymap" || true)"

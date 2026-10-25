@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # dot-greeting: the fastfetch greeting a new Ghostty window shows
-# (home/shell.nix). On unless ~/.config/kubaos/zsh/no-greeting exists; a
+# (home/shell.nix). On unless ~/.config/kubaos/terminal/zsh/no-greeting exists; a
 # file, so zsh reads the setting with one stat and no parser.
 #
 #   dot-greeting on       show it in every new Ghostty window
@@ -12,7 +12,7 @@
 # setting says. The change applies to windows opened after it.
 set -euo pipefail
 
-off="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/zsh/no-greeting"
+off="$("${BASH_SOURCE[0]%/*}/dot-config" path zsh)/no-greeting"
 
 usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p;}' "$0"; }
 

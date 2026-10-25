@@ -304,8 +304,7 @@ struct KeyboardFiles {
 impl KeyboardFiles {
     /// The files under `XDG_CONFIG_HOME`, else `~/.config`; none without either.
     fn new() -> Option<Self> {
-        let var = |name| std::env::var_os(name).filter(|value| !value.is_empty()).map(PathBuf::from);
-        let config_home = var("XDG_CONFIG_HOME").or_else(|| var("HOME").map(|home| home.join(".config")))?;
+        let config_home = kubaos_user_layer::config_home()?;
         Some(KeyboardFiles {
             mine: keyboard_settings::path(&config_home),
         })

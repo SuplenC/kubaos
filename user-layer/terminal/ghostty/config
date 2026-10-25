@@ -1,0 +1,20 @@
+# Your Ghostty settings: ~/.config/kubaos/terminal/ghostty/config, loaded after
+# ~/.config/ghostty/config, so they win. Reload: ctrl+shift+, (or restart Ghostty).
+#
+# Text size in points. 11 suits Full HD at scale 1 and the laptop panel at 1.5.
+# font-size = 11
+#
+# The font. Any installed one; `ghostty +list-fonts` lists them.
+# font-family = "MesloLGM Nerd Font"
+#
+# Line spacing on top of the font's own.
+# adjust-cell-height = 6%
+#
+# How much of the blurred wallpaper shows through, 0 to 1 (1 is opaque).
+# background-opacity = 0.85
+#
+# Space between the window's edge and the text, in points.
+# window-padding-x = 10
+# window-padding-y = 6
+#
+# Full docs: https://ghostty.org/docs/config/reference (or `ghostty +show-config --default --docs`).

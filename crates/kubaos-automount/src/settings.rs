@@ -1,5 +1,5 @@
 //! Whether drives are mounted when they're plugged in: on, unless the file
-//! `~/.config/kubaos/files/no-automount` exists. A file and not a key in a config file, so the
+//! `~/.config/kubaos/desktop/files/no-automount` exists. A file and not a key in a config file, so the
 //! setting needs no parser and lives in the user layer next to the other Files settings.
 //!
 //! # Owns
@@ -12,10 +12,13 @@
 
 use std::fs;
 use std::io;
+use std::path::Path;
 use std::path::PathBuf;
 
-/// The file that turns automount off, under the config folder.
-const OFF: &str = "kubaos/files/no-automount";
+use kubaos_user_layer::App;
+
+/// The file that turns automount off, in the Files folder of the user layer.
+const OFF: &str = "no-automount";
 
 /// Where the setting is kept.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,22 +29,15 @@ pub struct Settings {
 impl Settings {
     /// The setting under the config folder `config`.
     #[must_use]
-    pub fn new(config: impl Into<PathBuf>) -> Self {
+    pub fn new(config: impl AsRef<Path>) -> Self {
         Settings {
-            off: config.into().join(OFF),
+            off: kubaos_user_layer::dir(config.as_ref(), App::Files).join(OFF),
         }
     }
 
     /// The setting under `XDG_CONFIG_HOME`, else `~/.config`; none without either.
     pub fn from_env() -> Option<Self> {
-        let var = |name| {
-            std::env::var_os(name)
-                .filter(|value| !value.is_empty())
-                .map(PathBuf::from)
-        };
-        var("XDG_CONFIG_HOME")
-            .or_else(|| var("HOME").map(|home| home.join(".config")))
-            .map(Settings::new)
+        kubaos_user_layer::config_home().map(Settings::new)
     }
 
     pub fn automount(&self) -> bool {

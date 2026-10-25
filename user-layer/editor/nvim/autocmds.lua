@@ -1,0 +1,14 @@
+-- Your Neovim autocmds: ~/.config/kubaos/editor/nvim/autocmds.lua, run after KubaOS's and
+-- LazyVim's. Takes effect in a new Neovim.
+--
+-- Wrap long lines in Markdown.
+-- vim.api.nvim_create_autocmd("FileType", {
+--   pattern = "markdown",
+--   callback = function() vim.opt_local.wrap = true end,
+-- })
+--
+-- No spell check in Markdown and text (LazyVim turns it on there).
+-- vim.api.nvim_del_augroup_by_name("lazyvim_wrap_spell")
+--
+-- Full docs: :help autocmd, and LazyVim's own at
+-- https://www.lazyvim.org/configuration/general#auto-commands

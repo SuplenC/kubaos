@@ -3,13 +3,16 @@
 # docs/CONTRACTS.md "Defaults and the user layer"). Run as the user, on an
 # installed system or in the test harness:
 #
-#   1. the install left every user file in ~/.config/kubaos, and the defaults
-#      are read-only store files;
-#   2. it puts a change in every user file;
+#   1. the install left every user file in ~/.config/kubaos, grouped by area,
+#      and the defaults are read-only store files;
+#   2. it puts a change in every user file, then puts the folders back in the
+#      flat layout of older releases, ~/.config/kubaos/<app>, beside a few
+#      untouched examples in the groups, as an update from one finds them;
 #   3. it applies a newer defaults tree: a commit to a KubaOS checkout, then
 #      home-manager switch, which is what an update does;
-#   4. every user file is byte-identical, the new defaults are live, and the
-#      user's values win where both set one.
+#   4. every user file is byte-identical and back in its group, the new
+#      defaults are live, and the user's values win where both set one;
+#   5. the update's migration and another apply change nothing.
 #
 #   test/user-layer-check          an installed system: commits to a clone of
 #                                  /usr/share/kubaos, switches the user flake
@@ -23,6 +26,7 @@ set -euo pipefail
 
 U="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos"
 C="${XDG_CONFIG_HOME:-$HOME/.config}"
+SKEL="${XDG_DATA_HOME:-$HOME/.local/share}/kubaos/skel"
 PATH="$PATH:/nix/var/nix/profiles/default/bin"
 HM_CONFIG="${HM_CONFIG:-$(id -un)@$(hostname -s)}"
 if (($#)); then
@@ -34,12 +38,17 @@ else
   SWITCH=(--flake "$U/home#$HM_CONFIG" --override-input kubaos "git+file://$REPO")
 fi
 
-USER_FILES=(hypr/hyprland.lua hypr/hypridle.conf hypr/hyprlock.conf tmux/tmux.conf git/config git/ignore
-  foot/foot.ini ghostty/config fuzzel/fuzzel.ini nvim/options.lua nvim/keymaps.lua nvim/autocmds.lua
-  nvim/plugins/example.lua nvim/lazy-lock.json nvim/lazyvim.json lazygit/config.yml bacon/prefs.toml
-  bat/config fastfetch/config.jsonc yazi/yazi.toml yazi/keymap.toml zsh/zshrc kotodama/user.toml
-  quickshell/settings.json cursor/cursor.toml keyboard/keyboard.toml clock/clock.toml
-  sysmon/sysmon.toml)
+LAYER_GROUPS=(desktop terminal editor tools menu)
+USER_FILES=(desktop/hypr/hyprland.lua desktop/hypr/hypridle.conf desktop/hypr/hyprlock.conf
+  desktop/quickshell/settings.json desktop/cursor/cursor.toml desktop/keyboard/keyboard.toml
+  desktop/clock/clock.toml desktop/sysmon/sysmon.toml
+  terminal/tmux/tmux.conf terminal/foot/foot.ini terminal/ghostty/config terminal/fastfetch/config.jsonc
+  terminal/zsh/zshrc
+  editor/nvim/options.lua editor/nvim/keymaps.lua editor/nvim/autocmds.lua editor/nvim/plugins/example.lua
+  editor/nvim/lazy-lock.json editor/nvim/lazyvim.json
+  tools/git/config tools/git/ignore tools/fuzzel/fuzzel.ini tools/lazygit/config.yml tools/bacon/prefs.toml
+  tools/bat/config tools/yazi/yazi.toml tools/yazi/keymap.toml
+  menu/kotodama/user.toml)
 # Files the app rewrites itself: copied from the defaults once, then the user's.
 SEEDED=(btop/btop.conf tms/config.toml)
 
@@ -69,38 +78,55 @@ done
 step_done "${#USER_FILES[@]} user files and ${#SEEDED[@]} seeded files exist; defaults are store files"
 
 # 2. The user changes every file.
-add "$U/hypr/hyprland.lua" 'dot.user_probe = true'
-add "$U/hypr/hypridle.conf" '# user probe'
-add "$U/hypr/hyprlock.conf" '# user probe'
-add "$U/tmux/tmux.conf" 'set -g @user_probe mine'
-add "$U/git/config" $'[kubaos]\n\tuserprobe = mine'
-add "$U/git/ignore" '*.userprobe'
-add "$U/foot/foot.ini" $'[main]\npad=3x3'
-add "$U/ghostty/config" 'font-size = 17'
-add "$U/fuzzel/fuzzel.ini" $'[main]\nlines=13'
-add "$U/nvim/options.lua" 'vim.g.user_probe = "mine"'
-add "$U/nvim/keymaps.lua" '-- user probe'
-add "$U/nvim/autocmds.lua" '-- user probe'
-add "$U/nvim/plugins/example.lua" '-- user probe'
-json_add "$U/nvim/lazy-lock.json"
-json_add "$U/nvim/lazyvim.json"
-add "$U/lazygit/config.yml" $'gui:\n  showFileTree: false'
-add "$U/bacon/prefs.toml" 'summary = true'
-add "$U/bat/config" '--tabs=7'
-printf '%s\n' '// mine' '{ "display": { "separator": " => " } }' >"$U/fastfetch/config.jsonc"
-add "$U/yazi/yazi.toml" '# user probe'
-add "$U/yazi/keymap.toml" '# user probe'
-add "$U/zsh/zshrc" "alias userprobe='echo mine'"
-add "$U/kotodama/user.toml" $'[extensions.apps.names]\nnvim = "Mine"'
-printf '%s\n' '// mine' '{ "menuMotion": "fades" }' >"$U/quickshell/settings.json"
-add "$U/cursor/cursor.toml" 'size = 32'
-add "$U/keyboard/keyboard.toml" 'mac_accents = false'
-add "$U/clock/clock.toml" 'analog = true'
-add "$U/sysmon/sysmon.toml" 'style = "bars"'
+add "$U/desktop/hypr/hyprland.lua" 'dot.user_probe = true'
+add "$U/desktop/hypr/hypridle.conf" '# user probe'
+add "$U/desktop/hypr/hyprlock.conf" '# user probe'
+add "$U/terminal/tmux/tmux.conf" 'set -g @user_probe mine'
+add "$U/tools/git/config" $'[kubaos]\n\tuserprobe = mine'
+add "$U/tools/git/ignore" '*.userprobe'
+add "$U/terminal/foot/foot.ini" $'[main]\npad=3x3'
+add "$U/terminal/ghostty/config" 'font-size = 17'
+add "$U/tools/fuzzel/fuzzel.ini" $'[main]\nlines=13'
+add "$U/editor/nvim/options.lua" 'vim.g.user_probe = "mine"'
+add "$U/editor/nvim/keymaps.lua" '-- user probe'
+add "$U/editor/nvim/autocmds.lua" '-- user probe'
+add "$U/editor/nvim/plugins/example.lua" '-- user probe'
+json_add "$U/editor/nvim/lazy-lock.json"
+json_add "$U/editor/nvim/lazyvim.json"
+add "$U/tools/lazygit/config.yml" $'gui:\n  showFileTree: false'
+add "$U/tools/bacon/prefs.toml" 'summary = true'
+add "$U/tools/bat/config" '--tabs=7'
+printf '%s\n' '// mine' '{ "display": { "separator": " => " } }' >"$U/terminal/fastfetch/config.jsonc"
+add "$U/tools/yazi/yazi.toml" '# user probe'
+add "$U/tools/yazi/keymap.toml" '# user probe'
+add "$U/terminal/zsh/zshrc" "alias userprobe='echo mine'"
+add "$U/menu/kotodama/user.toml" $'[extensions.apps.names]\nnvim = "Mine"'
+printf '%s\n' '// mine' '{ "menuMotion": "fades" }' >"$U/desktop/quickshell/settings.json"
+add "$U/desktop/cursor/cursor.toml" 'size = 32'
+add "$U/desktop/keyboard/keyboard.toml" 'mac_accents = false'
+add "$U/desktop/clock/clock.toml" 'analog = true'
+add "$U/desktop/sysmon/sysmon.toml" 'style = "bars"'
 add "$C/btop/btop.conf" 'update_ms = 1717'
 add "$C/tms/config.toml" '# user probe'
 before="$(hashes)"
 step_done "changed $(wc -l <<<"$before") user files"
+
+# The flat layout of older releases: every app's folder straight under the
+# user layer, and no maps. Beside them, two examples as a newer release would
+# have seeded them into the groups, untouched, which give way to the user's.
+for group in "${LAYER_GROUPS[@]}"; do
+  for d in "$U/$group"/*/; do
+    d="${d%/}"
+    [[ -e $d ]] && mv "$d" "$U/${d##*/}"
+  done
+  rm -rf "${U:?}/$group"
+done
+rm -f "$U/README.md"
+install -D -m 644 "$SKEL/desktop/hypr/hypridle.conf" "$U/desktop/hypr/hypridle.conf"
+install -D -m 644 "$SKEL/tools/git/ignore" "$U/tools/git/ignore"
+[[ -f $U/hypr/hyprland.lua && -f $U/nvim/options.lua && -f $U/kotodama/user.toml ]] ||
+  fail "couldn't put the user layer in the flat layout"
+step_done "the user layer is in the flat layout, two untouched examples in the groups"
 
 # 3. A newer defaults tree. New defaults go above the user layer's include,
 # where a real change to an entry file goes; git's also sets a value the
@@ -133,6 +159,18 @@ if [[ $before != "$after" ]]; then
 fi
 step_done "$(wc -l <<<"$after") user files byte-identical after the update"
 
+for d in "$U"/*/; do
+  d="${d%/}" && d="${d##*/}"
+  [[ $d == home || " ${LAYER_GROUPS[*]} " == *" $d "* ]] || fail "$U/$d is left from the flat layout"
+done
+found="$(find "$U" -name '*.old' -o -name '*.old.[0-9]*')"
+[[ -z $found ]] || fail "files kept twice where one was untouched: $found"
+for group in "" "${LAYER_GROUPS[@]}"; do
+  [[ "$(readlink "$U/$group${group:+/}README.md")" == "$SKEL/$group${group:+/}README.md" ]] ||
+    fail "$U/$group${group:+/}README.md isn't the map from the release"
+done
+step_done "every folder is back in its group, the maps beside them"
+
 out="$(tmux -L user-layer-check -f "$C/tmux/tmux.conf" new-session -d -s t &&
   tmux -L user-layer-check show -gv @kubaos_probe; tmux -L user-layer-check show -gv @user_probe
   tmux -L user-layer-check kill-server)" || true
@@ -152,15 +190,37 @@ out="$(nvim --headless +'lua io.write("\nPROBE=", tostring(vim.g.kubaos_probe), 
   tr -d '\r' | sed -n 's/^PROBE=//p')"
 [[ $out == 'new mine' ]] || fail "nvim options: want new/mine, got: $out"
 out="$(zsh -l -i -c 'userprobe; print -r -- "$LG_CONFIG_FILE|$BACON_PREFS"' 2>/dev/null | tr -d '\r')"
-[[ $out == mine$'\n'*",$U/lazygit/config.yml|$U/bacon/prefs.toml" ]] || fail "zsh/lazygit/bacon: $out"
+[[ $out == mine$'\n'*",$U/tools/lazygit/config.yml|$U/tools/bacon/prefs.toml" ]] || fail "zsh/lazygit/bacon: $out"
 out="$(fastfetch --pipe -s title:os 2>&1)" || true
 [[ $out == *' => '* ]] || fail "fastfetch didn't take the user's separator: $out"
-[[ "$(readlink -f "$C/yazi/yazi.toml")" == "$U/yazi/yazi.toml" ]] || fail "$C/yazi/yazi.toml isn't the user's"
+[[ "$(readlink -f "$C/yazi/yazi.toml")" == "$U/tools/yazi/yazi.toml" ]] || fail "$C/yazi/yazi.toml isn't the user's"
 grep -qx 'update_ms = 1717' "$C/btop/btop.conf" || fail "btop lost the user's value"
-[[ "$(readlink -f "$C/kotodama/user.toml")" == "$U/kotodama/user.toml" ]] || fail "$C/kotodama/user.toml isn't the user's"
+[[ "$(readlink -f "$C/kotodama/user.toml")" == "$U/menu/kotodama/user.toml" ]] || fail "$C/kotodama/user.toml isn't the user's"
 out="$(kotodama config 2>&1)" || true
 grep -qE '^skin_tone = "medium"  # .*/kotodama/kubaos\.toml$' <<<"$out" ||
   fail "kotodama config lacks the new default skin_tone: $(grep -m1 skin_tone <<<"$out")"
 grep -qE '^nvim = "Mine"  # .*/kotodama/user\.toml$' <<<"$out" ||
   fail "kotodama config: the user's name for nvim doesn't win: $(grep -m1 '^nvim = ' <<<"$out")"
 step_done "new defaults live, the user's values win"
+
+out="$(kubaos-clock state 2>&1)" || true
+[[ $out == *'"analog":true'* ]] || fail "the clock didn't read the user's analog = true: $out"
+out="$(kubaos-sysmon settings 2>&1)" || true
+[[ $out == *'"style":"bars"'* ]] || fail "the system monitor didn't read the user's style: $out"
+out="$(kubaos cursor show 2>&1)" || true
+[[ $out == *'size=32'* ]] || fail "the cursor didn't read the user's size: $out"
+step_done "the clock, the system monitor and the cursor read the user's files from their groups"
+
+# 5. The update's migration runs after the switch, and the next update's
+# switch runs dot-config again: neither changes a thing.
+tree() { (cd "$U" && find . -path ./home -prune -o \( -type f -o -type l \) -print0 | sort -z | xargs -0 sha256sum); }
+before="$(tree)"
+out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$REPO/migrations/user/1792919877-grouped-user-layer.sh" 2>&1 &&
+  "$REPO/scripts/dot-config" apply 2>&1)" || fail "the migration or dot-config apply: $out"
+[[ -z $out ]] || fail "a second run said something, as if it moved a file: $out"
+after="$(tree)"
+if [[ $before != "$after" ]]; then
+  diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") || true
+  fail "the migration or the second apply changed the user layer"
+fi
+step_done "the migration and a second apply change nothing"

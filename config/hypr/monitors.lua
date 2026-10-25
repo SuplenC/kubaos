@@ -2,7 +2,7 @@
 --
 -- Every screen starts at its preferred mode, placed and scaled by Hyprland.
 -- A real layout (which screen sits where, its refresh rate and scale) is the
--- user's, in ~/.config/kubaos/hypr/hyprland.lua; README.md shows how.
+-- user's, in ~/.config/kubaos/desktop/hypr/hyprland.lua; README.md shows how.
 
 dot.monitors = {
   laptop = "eDP-1",

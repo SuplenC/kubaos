@@ -1,0 +1,18 @@
+# Your bat options: ~/.config/kubaos/tools/bat/config, appended to KubaOS's, so they win.
+# dot-config apply, which every update runs, writes ~/.config/bat/config from both: run
+# it after editing. bat also colours the fzf preview and delta's diffs.
+#
+# The colours: "base16" (KubaOS) follows the terminal's, which follow the wallpaper.
+# `bat --list-themes` lists the rest.
+# --theme=base16
+#
+# What frames the text (KubaOS: numbers,changes,header-filename); "plain" for none.
+# --style=numbers,changes,header-filename
+#
+# Tab width in spaces (bat's default, 4).
+# --tabs=4
+#
+# Long lines: "auto" (bat's default) wraps them, "never" cuts them.
+# --wrap=auto
+#
+# Full docs: man bat (https://github.com/sharkdp/bat#configuration-file).

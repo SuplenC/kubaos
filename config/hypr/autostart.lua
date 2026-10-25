@@ -38,7 +38,7 @@ hl.on("hyprland.start", function()
 
   -- keyd starts with the machine for the Mac-style accents on Left Alt;
   -- this stops it again when the user turned them off
-  -- (~/.config/kubaos/keyboard/keyboard.toml).
+  -- (~/.config/kubaos/desktop/keyboard/keyboard.toml).
   start("kubaos keyboard accents apply")
 
   -- Secrets (Chrome passwords, git credentials via libsecret).

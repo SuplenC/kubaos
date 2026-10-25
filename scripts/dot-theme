@@ -27,7 +27,7 @@ SETS_DIR="${KUBAOS_WALLPAPERS:-/usr/share/kubaos/wallpapers}"
 # of it, <set>/<file> for one of its wallpapers. The install writes it;
 # without it, every set shows. A set a release adds shows up once it's in
 # here, and so does a wallpaper a release adds to a set listed by its id.
-SETS_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/kubaos/wallpapers/sets"
+SETS_FILE="$("${BASH_SOURCE[0]%/*}/dot-config" path wallpapers)/sets"
 # Your own images and videos: a real folder, the last tab.
 WALLS="$HOME/Pictures/wallpapers"
 OWN_FOLDER=yours

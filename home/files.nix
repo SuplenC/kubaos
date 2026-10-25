@@ -9,7 +9,7 @@
 #   Code) is Nautilus's own D-Bus service in /usr/share; KubaOS ships no
 #   service file of its own, which would shadow it from ~/.local/share.
 # - yazi keeps a desktop entry, so it is under "Open With" for any folder;
-#   ripdrag drags files out of it (user-layer/yazi/keymap.toml has the key).
+#   ripdrag drags files out of it (user-layer/tools/yazi/keymap.toml has the key).
 # - The right-click actions are nautilus-python extensions: Ghostty's "Open in
 #   Ghostty" and KubaOS's own, `home/files/kubaos-nautilus.py`.
 # - A daily timer tidies ~/Downloads when the setting is on (`kubaos-files

@@ -2,15 +2,21 @@
 # dot-config: keep the user layer (~/.config/kubaos) in step with the defaults.
 # See docs/CONTRACTS.md, "Defaults and the user layer".
 #
-#   dot-config apply   create the user layer's missing files, seed the files
-#                      apps rewrite, and rewrite the merged files (bat, git
-#                      ignore, fastfetch) from the defaults plus yours. Every
-#                      home-manager switch runs it; run it after editing one
-#                      of the merged files.
-#   dot-config path    print the user layer's directory
+#   dot-config apply             move a flat layout into the groups (relocate),
+#                                create the user layer's missing files, link the
+#                                maps (README.md), seed the files apps rewrite,
+#                                and rewrite the merged files (bat, git ignore,
+#                                fastfetch) from the defaults plus yours. Every
+#                                home-manager switch runs it; run it after
+#                                editing one of the merged files.
+#   dot-config relocate          move each app's folder from ~/.config/kubaos/<app>
+#                                into its group, ~/.config/kubaos/<group>/<app>
+#   dot-config path [APP|GROUP]  print the user layer's folder, or an app's or a
+#                                group's in it
+#   dot-config open [APP|GROUP]  open that folder in Files
 #
-# It never changes a file in the user layer that exists. Delete one to get the
-# commented example back on the next apply.
+# It never changes a file in the user layer that exists, but to move it into
+# its group. Delete one to get the commented example back on the next apply.
 set -euo pipefail
 
 CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}"
@@ -22,9 +28,36 @@ LAYER="$DATA/layer"
 
 die() { printf 'dot-config: %s\n' "$*" >&2; exit 1; }
 say() { printf 'dot-config: %s\n' "$*"; }
+warn() { printf 'dot-config: %s\n' "$*" >&2; }
+shown() { printf '%s' "${1/#$HOME/\~}"; }
 
 usage() {
-  sed -n '2,13s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"
+  sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p;}' "${BASH_SOURCE[0]}"
+}
+
+# Each app's folder in the user layer, from the layer file's `app NAME PATH`
+# lines, which home/links.nix writes from home/user-layer.nix: the one table
+# the shell reads.
+APP_NAMES=()
+APP_PATHS=()
+load_apps() {
+  local kind name path
+  [[ -f $LAYER ]] || die "no layer file in $(shown "$DATA") (run home-manager switch)"
+  while read -r kind name path; do
+    [[ $kind == app ]] || continue
+    APP_NAMES+=("$name")
+    APP_PATHS+=("$path")
+  done <"$LAYER"
+}
+
+# folder_of NAME: an app's folder relative to the user layer, or a group's.
+folder_of() {
+  local i
+  for i in "${!APP_NAMES[@]}"; do
+    [[ ${APP_NAMES[$i]} == "$1" ]] && { printf '%s\n' "${APP_PATHS[$i]}"; return 0; }
+    [[ ${APP_PATHS[$i]%%/*} == "$1" ]] && { printf '%s\n' "$1"; return 0; }
+  done
+  return 1
 }
 
 # copy_new SRC DST: DST = SRC, only when DST doesn't exist (a dangling link
@@ -33,7 +66,18 @@ copy_new() {
   [[ -e $2 ]] && return 0
   [[ -L $2 ]] && rm -f -- "$2"
   install -D -m 0644 -- "$1" "$2"
-  say "created ${2/#$HOME/\~}"
+  say "created $(shown "$2")"
+}
+
+# link_new SRC DST: DST, a link to SRC, only when DST doesn't exist. The maps
+# are KubaOS's and link to the skel's path, which every switch points at the
+# new release, so they're always current and never the user's to merge.
+link_new() {
+  [[ -e $2 ]] && return 0
+  [[ -L $2 ]] && rm -f -- "$2"
+  mkdir -p -- "$(dirname -- "$2")"
+  ln -s -- "$1" "$2"
+  say "created $(shown "$2")"
 }
 
 # replace DST: move DST.new over DST unless they're the same.
@@ -43,32 +87,96 @@ replace() {
     return 0
   fi
   mv -f -- "$1.new" "$1"
-  say "wrote ${1/#$HOME/\~}"
+  say "wrote $(shown "$1")"
 }
 
-# merge_concat FILE: the defaults, then the user's lines.
+# keep_both FILE DST: FILE goes beside DST, which stays, as DST.old (or
+# .old.1, .old.2, ...), and the user hears about it.
+keep_both() {
+  local to="$2.old" n=1
+  while [[ -e $to || -L $to ]]; do
+    to="$2.old.$n"
+    n=$((n + 1))
+  done
+  mv -- "$1" "$to"
+  warn "kept both: $(shown "$2") is yours, and so is $(shown "$to"), from $(shown "$1"); merge them by hand"
+}
+
+# merge_into OLD NEW SEEDS: every file and link under the folder OLD moves to
+# the same place under NEW. Where NEW has one already, the same file is kept
+# once, an untouched seed (the same as under SEEDS) gives way, and two files
+# the user wrote are both kept.
+merge_into() {
+  local old="$1" new="$2" seeds="$3" f rel dst
+  while IFS= read -r -d '' f; do
+    rel="${f#"$old"/}"
+    dst="$new/$rel"
+    if [[ ! -e $dst && ! -L $dst ]]; then
+      mkdir -p -- "$(dirname -- "$dst")"
+      mv -- "$f" "$dst"
+    elif [[ -f $f && -f $dst ]] && cmp -s -- "$f" "$dst"; then
+      rm -f -- "$f"
+    elif [[ -f $seeds/$rel && -f $dst ]] && cmp -s -- "$dst" "$seeds/$rel"; then
+      mv -f -- "$f" "$dst"
+    else
+      keep_both "$f" "$dst"
+    fi
+  done < <(find "$old" -mindepth 1 \( -type f -o -type l \) -print0 | sort -z)
+  find "$old" -depth -type d -empty -delete
+}
+
+# relocate: each app's folder from the flat layout, ~/.config/kubaos/<app>,
+# into its group. A folder with no grouped one yet moves whole (git sees a
+# rename when the user layer is a clone); otherwise file by file (merge_into).
+# Safe to run again: once moved, there's nothing at the flat path.
+relocate() {
+  local i name old new
+  load_apps
+  for i in "${!APP_NAMES[@]}"; do
+    name="${APP_NAMES[$i]}"
+    old="$USER_LAYER/$name"
+    new="$USER_LAYER/${APP_PATHS[$i]}"
+    [[ -e $old || -L $old ]] || continue
+    if [[ ! -e $new && ! -L $new ]]; then
+      mkdir -p -- "$(dirname -- "$new")"
+      mv -- "$old" "$new"
+    elif [[ -d $old && ! -L $old && -d $new ]]; then
+      merge_into "$old" "$new" "$SKEL/${APP_PATHS[$i]}"
+    else
+      keep_both "$old" "$new"
+    fi
+    if [[ -e $old || -L $old ]]; then
+      warn "left $(shown "$old"): it holds something that is neither a file nor a link"
+    else
+      say "moved $(shown "$old") to $(shown "$new")"
+    fi
+  done
+}
+
+# merge_concat FILE USER: the defaults' FILE, then the user's lines from USER,
+# relative to the user layer.
 merge_concat() {
   local out="$CONFIG/$1"
   mkdir -p -- "$(dirname -- "$out")"
   {
     printf '# Written by dot-config from %s and %s. Edit the second.\n' \
-      "${DEFAULTS/#$HOME/\~}/$1" "${USER_LAYER/#$HOME/\~}/$1"
+      "$(shown "$DEFAULTS")/$1" "$(shown "$USER_LAYER")/$2"
     cat -- "$DEFAULTS/$1"
-    if [[ -f $USER_LAYER/$1 ]]; then
+    if [[ -f $USER_LAYER/$2 ]]; then
       printf '\n'
-      cat -- "$USER_LAYER/$1"
+      cat -- "$USER_LAYER/$2"
     fi
   } >"$out.new"
   replace "$out"
 }
 
-# merge_json FILE: the user's JSON (comments allowed) merged over the
-# defaults, objects key by key. Written as plain JSON. A user file that
-# doesn't parse keeps the last merge: a typo must not stop an update.
+# merge_json FILE USER: the user's JSON from USER (comments allowed) merged
+# over the defaults' FILE, objects key by key. Written as plain JSON. A user
+# file that doesn't parse keeps the last merge: a typo must not stop an update.
 merge_json() {
   local out="$CONFIG/$1"
   mkdir -p -- "$(dirname -- "$out")"
-  if ! python3 - "$DEFAULTS/$1" "$USER_LAYER/$1" >"$out.new" <<'PY'; then
+  if ! python3 - "$DEFAULTS/$1" "$USER_LAYER/$2" >"$out.new" <<'PY'; then
 import json, os, sys
 
 def strip_comments(text):
@@ -136,34 +244,64 @@ print()
 PY
     rm -f -- "$out.new"
     printf 'dot-config: %s is not valid JSON; kept the last %s\n' \
-      "${USER_LAYER/#$HOME/\~}/$1" "${out/#$HOME/\~}" >&2
+      "$(shown "$USER_LAYER")/$2" "$(shown "$out")" >&2
     return 0
   fi
   replace "$out"
 }
 
 cmd_apply() {
-  [[ -d $DEFAULTS && -d $SKEL && -f $LAYER ]] ||
-    die "no defaults in ${DATA/#$HOME/\~} (run home-manager switch)"
-  local f kind src dst
-  # The user layer: every missing file from the examples.
+  [[ -d $DEFAULTS && -d $SKEL ]] ||
+    die "no defaults in $(shown "$DATA") (run home-manager switch)"
+  local f rel kind src dst
+  # HAZARD: relocate before seeding. Seeding first would put a seed at the
+  # grouped path of every file the user still has at the flat one.
+  relocate
+  # The user layer: every missing file from the examples, and the maps.
   while IFS= read -r -d '' f; do
-    copy_new "$f" "$USER_LAYER/${f#"$SKEL"/}"
+    rel="${f#"$SKEL"/}"
+    if [[ ${rel##*/} == README.md ]]; then
+      link_new "$f" "$USER_LAYER/$rel"
+    else
+      copy_new "$f" "$USER_LAYER/$rel"
+    fi
   done < <(find -L "$SKEL" -type f -print0 | sort -z)
   while read -r kind src dst; do
     case "$kind" in
       seed) copy_new "$DEFAULTS/$src" "$CONFIG/$dst" ;;
-      concat) merge_concat "$src" ;;
-      json) merge_json "$src" ;;
-      '' | '#'*) ;;
+      concat) merge_concat "$src" "$dst" ;;
+      json) merge_json "$src" "$dst" ;;
+      app | '' | '#'*) ;;
       *) die "unknown entry in $LAYER: $kind" ;;
     esac
   done <"$LAYER"
 }
 
+# cmd_path [NAME]: the user layer, or an app's or a group's folder in it.
+cmd_path() {
+  local rel
+  if [[ -z ${1:-} ]]; then
+    printf '%s\n' "$USER_LAYER"
+    return 0
+  fi
+  load_apps
+  rel="$(folder_of "$1")" || die "no app or group called '$1' (dot-config --help)"
+  printf '%s\n' "$USER_LAYER/$rel"
+}
+
+# cmd_open [NAME]: that folder in Files, made first when it is missing.
+cmd_open() {
+  local dir
+  dir="$(cmd_path "${1:-}")"
+  mkdir -p -- "$dir"
+  exec nautilus --new-window "$dir"
+}
+
 case "${1:-}" in
   apply) cmd_apply ;;
-  path) printf '%s\n' "$USER_LAYER" ;;
+  relocate) relocate ;;
+  path) cmd_path "${2:-}" ;;
+  open) cmd_open "${2:-}" ;;
   -h | --help | help | '') usage ;;
   *) die "unknown command '$1' (dot-config --help)" ;;
 esac

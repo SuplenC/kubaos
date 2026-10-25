@@ -4,7 +4,7 @@
 //! hidden one and a folder stay too.
 //!
 //! It runs from the Command menu, and daily when the setting is on: the file
-//! `~/.config/kubaos/files/tidy-downloads` exists. Off by default.
+//! `~/.config/kubaos/desktop/files/tidy-downloads` exists. Off by default.
 //!
 //! # Owns
 //!
@@ -25,11 +25,13 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
+use kubaos_user_layer::App;
+
 /// How old a file must be to move: a day, so today's downloads stay at hand.
 pub const DEFAULT_MIN_AGE: Duration = Duration::from_hours(24);
 
-/// The file that turns the daily tidy on, under the config folder.
-const ON: &str = "kubaos/files/tidy-downloads";
+/// The file that turns the daily tidy on, in the Files folder of the user layer.
+const ON: &str = "tidy-downloads";
 
 /// A kind of file, and the folder it goes into.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -179,9 +181,9 @@ pub struct Setting {
 impl Setting {
     /// The setting under the config folder `config`.
     #[must_use]
-    pub fn new(config: impl Into<PathBuf>) -> Self {
+    pub fn new(config: impl AsRef<Path>) -> Self {
         Setting {
-            on: config.into().join(ON),
+            on: kubaos_user_layer::dir(config.as_ref(), App::Files).join(ON),
         }
     }
 

@@ -1,0 +1,28 @@
+# Your clock popup: ~/.config/kubaos/desktop/clock/clock.toml, read by `kubaos-clock` on
+# every change. The Command menu's clock Items and the popup's settings page edit the lines
+# below, comments kept; a hand edit shows the next time the popup asks.
+#
+# Extra clocks in the popup, up to four, by city or IANA name (default: none).
+# zones = ["Tokyo", "America/New_York"]
+#
+# Whose public holidays the calendar marks: a country code (pl, de, gb, us, ...), or
+# "none". Without the line, your locale's country. Your own rules go in holidays.toml
+# beside this file, in the shape of `kubaos-clock`'s bundled rules.
+# holidays = "pl"
+#
+# The day each calendar week starts on (default "monday").
+# first_weekday = "monday"
+#
+# An analog face beside the big clock (default false).
+# analog = false
+#
+# A countdown shown next to the bar's clock, by its name (default: none).
+# bar_countdown = "Vacation"
+#
+# Countdowns, each a name and a date or an RFC 3339 time.
+# [[countdowns]]
+# name = "Vacation"
+# at = "2026-12-19"
+#
+# Full docs: docs/CONTRACTS.md, "Defaults and the user layer"
+# (https://github.com/SuplenC/kubaos/blob/main/docs/CONTRACTS.md).

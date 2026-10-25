@@ -6,8 +6,10 @@
 --
 -- They show while the accents are on: keyd installed by
 -- system/50-hyprland.sh, and no `mac_accents = false` in
--- ~/.config/kubaos/keyboard/keyboard.toml. `kubaos keyboard accents on|off`
+-- ~/.config/kubaos/desktop/keyboard/keyboard.toml. `kubaos keyboard accents on|off`
 -- reloads Hyprland, so the sheet follows the setting.
+
+local user_layer = require("user_layer")
 
 local KEYD_CONFIG = "/etc/keyd/kubaos.conf"
 local SUBMAP = "mac-accents"
@@ -34,8 +36,7 @@ end
 -- file says `mac_accents = false`. A comment or a broken file leaves it on,
 -- as the default does.
 local function turned_off()
-  local config_home = os.getenv("XDG_CONFIG_HOME") or ((os.getenv("HOME") or "") .. "/.config")
-  local f = io.open(config_home .. "/kubaos/keyboard/keyboard.toml", "r")
+  local f = io.open(user_layer.file("keyboard", "keyboard.toml"), "r")
   if not f then
     return false
   end

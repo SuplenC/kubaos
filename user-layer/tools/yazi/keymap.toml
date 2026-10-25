@@ -1,0 +1,25 @@
+# Your yazi keys: ~/.config/yazi/keymap.toml links to this file,
+# ~/.config/kubaos/tools/yazi/keymap.toml. yazi reads one keymap file, so KubaOS's own key
+# is written here; it's yours now: change it or delete it.
+#
+# Ctrl+N drags the selected files, or the hovered one, out of yazi: into
+# Chrome, an upload form, anything that takes a drop. ripdrag opens a small
+# window to drag from and closes after the drop.
+[[mgr.prepend_keymap]]
+on = "<C-n>"
+run = 'shell --orphan -- ripdrag --and-exit --all --no-click "$@"'
+desc = "Drag the selected files out"
+
+# Keys of your own go in more [[mgr.prepend_keymap]] tables, which win over yazi's.
+#
+# g then p jumps to ~/Projects.
+# [[mgr.prepend_keymap]]
+# on = ["g", "p"]
+# run = "cd ~/Projects"
+#
+# Ctrl+H shows or hides dotfiles.
+# [[mgr.prepend_keymap]]
+# on = "<C-h>"
+# run = "hidden toggle"
+#
+# Full docs: https://yazi-rs.github.io/docs/configuration/keymap

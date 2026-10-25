@@ -50,7 +50,7 @@ pub struct Dates {
 }
 
 impl Dates {
-    /// Dates read with the clock settings in `dir` (`~/.config/kubaos/clock`).
+    /// Dates read with the clock settings in `dir` (`~/.config/kubaos/desktop/clock`).
     #[must_use]
     pub fn new(dir: Option<PathBuf>) -> Self {
         Dates {

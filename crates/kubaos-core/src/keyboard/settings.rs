@@ -1,4 +1,4 @@
-//! The keyboard settings, in the user layer: `~/.config/kubaos/keyboard/keyboard.toml`.
+//! The keyboard settings, in the user layer: `~/.config/kubaos/desktop/keyboard/keyboard.toml`.
 //!
 //! ```toml
 //! mac_accents = false
@@ -16,7 +16,7 @@
 //! # Not here
 //!
 //! - Applying them (keyd, Hyprland): `kubaos keyboard` in the CLI. The seed with its comments:
-//!   `user-layer/keyboard/keyboard.toml`. Hyprland's own reads of the file:
+//!   `user-layer/desktop/keyboard/keyboard.toml`. Hyprland's own reads of the file:
 //!   `config/hypr/accents.lua` and `config/hypr/input.lua`.
 
 use std::fmt;
@@ -25,6 +25,7 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+use kubaos_user_layer::App;
 use serde::Deserialize;
 
 use super::Layout;
@@ -33,8 +34,8 @@ use super::Layout;
 /// Alt chords they take, and macOS hands have them in their fingers.
 pub const DEFAULT_MAC_ACCENTS: bool = true;
 
-/// The settings file under the config home (`~/.config`).
-const FILE: &str = "kubaos/keyboard/keyboard.toml";
+/// The settings file in the keyboard's folder of the user layer.
+const FILE: &str = "keyboard.toml";
 
 const MAC_ACCENTS: &str = "mac_accents";
 
@@ -42,7 +43,7 @@ const LAYOUTS: &str = "layouts";
 
 /// The settings file for the config home `config_home`, usually `~/.config`.
 pub fn path(config_home: &Path) -> PathBuf {
-    config_home.join(FILE)
+    kubaos_user_layer::dir(config_home, App::Keyboard).join(FILE)
 }
 
 /// The keyboard settings.

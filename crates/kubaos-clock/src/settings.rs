@@ -1,4 +1,4 @@
-//! The clock's settings, in the user layer: `~/.config/kubaos/clock/clock.toml`.
+//! The clock's settings, in the user layer: `~/.config/kubaos/desktop/clock/clock.toml`.
 //!
 //! ```toml
 //! zones = ["America/New_York", "Asia/Tokyo"]
@@ -22,7 +22,7 @@
 //!
 //! # Not here
 //!
-//! - The seed with its comments: `user-layer/clock/clock.toml`. What a countdown's `at` may say:
+//! - The seed with its comments: `user-layer/desktop/clock/clock.toml`. What a countdown's `at` may say:
 //!   [`crate::query`], through `crate::serve`.
 
 use std::env;
@@ -32,6 +32,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use jiff::civil::Weekday;
+use kubaos_user_layer::App;
 use serde::Deserialize;
 use toml_edit::DocumentMut;
 use toml_edit::value;
@@ -194,13 +195,9 @@ fn locale_region() -> Option<String> {
     (region.len() == 2).then(|| region.to_lowercase())
 }
 
-/// The clock's folder in the user layer: `$XDG_CONFIG_HOME/kubaos/clock`, or `~/.config`'s.
+/// The clock's folder in the user layer: `~/.config/kubaos/desktop/clock`.
 pub fn dir() -> Option<PathBuf> {
-    let config = env::var_os("XDG_CONFIG_HOME")
-        .filter(|dir| !dir.is_empty())
-        .map(PathBuf::from)
-        .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
-    Some(config.join("kubaos").join("clock"))
+    kubaos_user_layer::config_home().map(|config| kubaos_user_layer::dir(&config, App::Clock))
 }
 
 /// The settings file.

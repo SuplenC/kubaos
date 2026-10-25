@@ -1,6 +1,6 @@
 # Public holidays the clock popup and the menu know, offline, as rules that
 # work for any year. `kubaos-clock` embeds this file; a country or a rule of
-# your own goes in ~/.config/kubaos/clock/holidays.toml, in the same shape,
+# your own goes in ~/.config/kubaos/desktop/clock/holidays.toml, in the same shape,
 # and a country there replaces the one here whole.
 #
 # A table a country, by its ISO 3166 code in lowercase. Each day is one of:

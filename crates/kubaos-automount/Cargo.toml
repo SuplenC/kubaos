@@ -18,6 +18,7 @@ futures-lite = "2"
 # The photo import's capture dates. Pure Rust; reads JPEG, HEIF, PNG, WebP and TIFF-based raws.
 kamadak-exif = "0.6"
 kotodama-extension.workspace = true
+kubaos-user-layer.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

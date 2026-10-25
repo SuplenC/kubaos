@@ -100,6 +100,7 @@ fn the_daily_tidy_is_off_until_turned_on() {
     assert!(!setting.daily());
     setting.set_daily(true).unwrap();
     assert!(setting.daily());
+    assert!(config.path().join("kubaos/desktop/files/tidy-downloads").exists());
     setting.set_daily(false).unwrap();
     setting.set_daily(false).unwrap();
     assert!(!setting.daily());

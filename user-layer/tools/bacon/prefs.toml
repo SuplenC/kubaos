@@ -1,0 +1,17 @@
+# Your bacon preferences: ~/.config/kubaos/tools/bacon/prefs.toml (BACON_PREFS), applied
+# after KubaOS's, so they win. KubaOS sets only the colours; the rest is bacon's default.
+# Takes effect at the next start.
+#
+# Only the counts of errors and warnings, not the messages (`s` toggles it; default false).
+# summary = false
+#
+# Long lines wrap (`w` toggles it; default true).
+# wrap = true
+#
+# Start in the newest-first order, so the last error is at the top (default false).
+# reverse = false
+#
+# The job bacon runs when started with no argument (default "check").
+# default_job = "check"
+#
+# Full docs: https://dystroy.org/bacon/config/

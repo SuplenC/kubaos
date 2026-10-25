@@ -9,6 +9,7 @@
 }:
 let
   stateDir = "${config.home.homeDirectory}/.local/state/theme";
+  userLayer = import ./user-layer.nix { configHome = config.xdg.configHome; };
   # GTK silently ignores a missing @import, so this is safe before the first run.
   importGenerated = ''
     /* Wallpaper colors from dot-theme (matugen). */
@@ -176,16 +177,19 @@ in
   # Replace the link with the folder; the sets are in /usr/share now, and
   # dot-theme moves a current wallpaper from the old path.
   #
-  # ~/.config/kubaos/wallpapers/sets, when the install didn't write it
+  # ~/.config/kubaos/desktop/wallpapers/sets, when the install didn't write it
   # (a machine from before, or one set up with system/): the sets on disk
   # now, so the ones a later release adds stay opt-in. Never touched again.
-  home.activation.wallpapersFolder = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  # HAZARD: after userLayer, whose dot-config apply moves a flat layout's
+  # wallpapers/sets into its group. Run before it, this would write a second
+  # sets file at the grouped path, and the user's picks would end up beside it.
+  home.activation.wallpapersFolder = lib.hm.dag.entryAfter [ "linkGeneration" "userLayer" ] ''
     walls="${config.home.homeDirectory}/Pictures/wallpapers"
     if [ -L "$walls" ]; then
       run rm "$walls"
     fi
     run mkdir -p "$walls"
-    sets="${config.xdg.configHome}/kubaos/wallpapers/sets"
+    sets="${userLayer.dir "wallpapers"}/sets"
     if [ ! -e "$sets" ] && [ -d /usr/share/kubaos/wallpapers/ ]; then
       run mkdir -p "$(dirname "$sets")"
       if [ -z "''${DRY_RUN:-}" ]; then

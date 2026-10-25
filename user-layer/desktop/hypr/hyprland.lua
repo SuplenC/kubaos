@@ -1,0 +1,26 @@
+-- Your Hyprland settings: ~/.config/kubaos/desktop/hypr/hyprland.lua. Loaded after KubaOS's
+-- modules (~/.config/hypr/*.lua, read-only), so anything here wins. An error here is a
+-- notification; the rest of the config still loads. Apply: hyprctl reload.
+--
+-- The settings people change most, with KubaOS's values. Uncomment and edit.
+--
+-- Space between windows, and between the windows and the shell's frame.
+-- hl.config({ general = { gaps_in = 4, gaps_out = 8, border_size = 2 } })
+--
+-- Corner rounding of every window.
+-- hl.config({ decoration = { rounding = 10 } })
+--
+-- How fast a held key repeats: characters per second, and the delay in ms before it starts.
+-- hl.config({ input = { repeat_rate = 40, repeat_delay = 250 } })
+--
+-- Pointer speed, -1.0 to 1.0, and the touchpad's scroll direction.
+-- hl.config({ input = { sensitivity = 0, touchpad = { natural_scroll = true } } })
+--
+-- A screen at a fixed mode, place and scale. `hyprctl monitors all` lists the descriptions.
+-- hl.monitor({ output = "desc:LG Electronics LG ULTRAGEAR 312NTXX1A234", mode = "2560x1440@143.99", position = "1920x0", scale = 1 })
+--
+-- A key of your own. The description shows in the Shortcuts View (SUPER + F1) and the menu.
+-- hl.bind("SUPER + B", hl.dsp.exec_cmd("google-chrome"), { description = "Browser" })
+--
+-- Full docs: https://wiki.hypr.land/Configuring/ (the Lua API is in /usr/share/hypr/stubs/).
+-- KubaOS's modules and what each sets: ~/.local/share/kubaos/defaults/hypr/README.md.

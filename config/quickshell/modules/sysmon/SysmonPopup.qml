@@ -4,6 +4,7 @@ import qs.theme
 import qs.components
 import qs.services
 import qs.modules.clock
+import qs.settings
 
 // The system monitor's popup, under the bar's pill: CPU, memory and GPUs on
 // the left; network, disks, power and fans on the right; the busiest
@@ -466,7 +467,7 @@ Drawer {
         StyledText {
             visible: Sysmon.problem !== ""
             width: parent.width
-            text: `~/.config/kubaos/sysmon/sysmon.toml: ${Sysmon.problem}`
+            text: `${UserLayer.shown("sysmon", "sysmon.toml")}: ${Sysmon.problem}`
             color: Theme.m3error
             font.pixelSize: Theme.font.sm
             wrapMode: Text.Wrap

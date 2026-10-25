@@ -1824,7 +1824,7 @@ fn wallpapers<'a>(app: &'a App, p: &Palette) -> El<'a> {
         header(
             jp::WALLPAPERS,
             "Wallpapers",
-            "Pick the ones the wallpaper picker shows; a set's name takes all of it. Every one gets installed either way (later: ~/.config/kubaos/wallpapers/sets). Your own images go in ~/Pictures/wallpapers.",
+            "Pick the ones the wallpaper picker shows; a set's name takes all of it. Every one gets installed either way (later: ~/.config/kubaos/desktop/wallpapers/sets). Your own images go in ~/Pictures/wallpapers.",
             p
         ),
         Space::new().height(space::XL),

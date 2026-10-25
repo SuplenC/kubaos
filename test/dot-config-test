@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+# test/dot-config-test: scripts/dot-config against a throwaway home: the user
+# layer's seeds and maps, the move from the flat layout into the groups, and
+# the merged files. Needs nothing installed beyond bash, coreutils, git and
+# python3.
+#
+#   test/dot-config-test REPO
+#
+# Prints an ok or FAIL line per test and exits 1 when any fails.
+# shellcheck disable=SC2329 # The tests are called by name from the list at the end.
+set -euo pipefail
+# A test function stops at its first failed check, inside the command substitution too.
+shopt -s inherit_errexit
+
+REPO="${1:?usage: test/dot-config-test REPO}"
+DOT_CONFIG="$REPO/scripts/dot-config"
+failed=0
+
+# A home with the defaults, the seeds and a layer file as home/links.nix
+# writes them, smaller: three apps in two groups.
+new_home() {
+  H="$(mktemp -d)"
+  U="$H/.config/kubaos"
+  local data="$H/.local/share/kubaos"
+  mkdir -p "$data/defaults/bat" "$data/skel/desktop/clock" "$data/skel/tools/bat" "$data/skel/terminal/zsh"
+  printf '# The map.\n' >"$data/skel/README.md"
+  printf '# The desktop.\n' >"$data/skel/desktop/README.md"
+  printf '# clock seed\n' >"$data/skel/desktop/clock/clock.toml"
+  printf '# bat seed\n' >"$data/skel/tools/bat/config"
+  printf '# zshrc seed\n' >"$data/skel/terminal/zsh/zshrc"
+  printf -- '--theme=ours\n' >"$data/defaults/bat/config"
+  cat >"$data/layer" <<'EOF'
+app clock desktop/clock
+app zsh terminal/zsh
+app bat tools/bat
+concat bat/config tools/bat/config
+EOF
+}
+
+run() { HOME="$H" XDG_CONFIG_HOME="" XDG_DATA_HOME="" bash "$DOT_CONFIG" "$@"; }
+
+# tree: every file under the user layer with its contents, and every link with its target.
+tree() {
+  (cd "$U" && find . \( -type f -o -type l \) | sort | while read -r f; do
+    if [[ -L $f ]]; then printf '%s -> %s\n' "$f" "$(readlink "$f")"; else printf '%s: %s\n' "$f" "$(cat "$f")"; fi
+  done)
+}
+
+test_case() {
+  local name="$1" out rc
+  shift
+  new_home
+  set +e
+  out="$(set -e; "$@" 2>&1)"
+  rc=$?
+  set -e
+  if ((rc == 0)); then
+    echo "ok   $name"
+  else
+    echo "FAIL $name"
+    printf '%s\n' "$out" | sed 's/^/     /'
+    failed=1
+  fi
+  rm -rf "$H"
+}
+
+expect() { # expect WHAT ACTUAL WANT
+  [[ $2 == "$3" ]] || { printf '%s:\n  got:  %q\n  want: %q\n' "$1" "$2" "$3"; return 1; }
+}
+
+a_fresh_home_gets_the_seeds_in_their_groups_and_the_maps_as_links() {
+  run apply >/dev/null
+  expect "clock seed" "$(cat "$U/desktop/clock/clock.toml")" "# clock seed"
+  expect "zshrc seed" "$(cat "$U/terminal/zsh/zshrc")" "# zshrc seed"
+  expect "the map" "$(readlink "$U/README.md")" "$H/.local/share/kubaos/skel/README.md"
+  expect "the group's map" "$(readlink "$U/desktop/README.md")" "$H/.local/share/kubaos/skel/desktop/README.md"
+}
+
+a_readme_of_the_users_own_is_kept() {
+  mkdir -p "$U"
+  printf 'my dotfiles\n' >"$U/README.md"
+  run apply >/dev/null
+  expect "the user's README" "$(cat "$U/README.md")" "my dotfiles"
+  [[ ! -L $U/README.md ]]
+}
+
+the_flat_layout_moves_into_the_groups_with_every_file() {
+  mkdir -p "$U/clock" "$U/zsh" "$U/home"
+  printf 'analog = true\n' >"$U/clock/clock.toml"
+  printf 'mine\n' >"$U/clock/holidays.toml"
+  : >"$U/zsh/no-greeting"
+  printf 'flake\n' >"$U/home/flake.nix"
+  run apply >/dev/null
+  expect "edited clock" "$(cat "$U/desktop/clock/clock.toml")" "analog = true"
+  expect "the user's own file" "$(cat "$U/desktop/clock/holidays.toml")" "mine"
+  [[ -e $U/terminal/zsh/no-greeting ]] || { echo "no-greeting wasn't moved"; return 1; }
+  expect "the user flake stays" "$(cat "$U/home/flake.nix")" "flake"
+  [[ ! -e $U/clock && ! -e $U/zsh ]] || { echo "the flat folders are still there"; ls -la "$U"; return 1; }
+}
+
+an_untouched_seed_in_the_group_gives_way_to_the_users_file() {
+  mkdir -p "$U/clock" "$U/desktop/clock"
+  printf 'analog = true\n' >"$U/clock/clock.toml"
+  printf '# clock seed\n' >"$U/desktop/clock/clock.toml"
+  run apply >/dev/null
+  expect "clock" "$(cat "$U/desktop/clock/clock.toml")" "analog = true"
+  [[ ! -e $U/desktop/clock/clock.toml.old && ! -e $U/clock ]] || { tree; return 1; }
+}
+
+the_same_file_in_both_places_is_kept_once() {
+  mkdir -p "$U/clock" "$U/desktop/clock"
+  printf 'analog = true\n' >"$U/clock/clock.toml"
+  printf 'analog = true\n' >"$U/desktop/clock/clock.toml"
+  run apply >/dev/null
+  expect "clock" "$(cat "$U/desktop/clock/clock.toml")" "analog = true"
+  [[ ! -e $U/desktop/clock/clock.toml.old && ! -e $U/clock ]] || { tree; return 1; }
+}
+
+two_edited_files_are_both_kept_and_reported() {
+  local out
+  mkdir -p "$U/clock" "$U/desktop/clock"
+  printf 'analog = true\n' >"$U/clock/clock.toml"
+  printf 'analog = false\n' >"$U/desktop/clock/clock.toml"
+  out="$(run apply 2>&1)"
+  expect "the grouped file" "$(cat "$U/desktop/clock/clock.toml")" "analog = false"
+  expect "the flat file, beside it" "$(cat "$U/desktop/clock/clock.toml.old")" "analog = true"
+  [[ $out == *"desktop/clock/clock.toml.old"* ]] || { echo "not reported: $out"; return 1; }
+  [[ ! -e $U/clock ]] || { tree; return 1; }
+}
+
+a_second_run_changes_nothing() {
+  local before out
+  mkdir -p "$U/clock" "$U/bat"
+  printf 'analog = true\n' >"$U/clock/clock.toml"
+  printf -- '--tabs=7\n' >"$U/bat/config"
+  run apply >/dev/null
+  before="$(tree)"
+  out="$(run apply)"
+  expect "the second run's output" "$out" ""
+  expect "the tree" "$(tree)" "$before"
+}
+
+the_merged_file_reads_the_users_file_from_its_group() {
+  mkdir -p "$U/tools/bat"
+  printf -- '--tabs=7\n' >"$U/tools/bat/config"
+  run apply >/dev/null
+  if ! grep -qx -- '--theme=ours' "$H/.config/bat/config" || ! grep -qx -- '--tabs=7' "$H/.config/bat/config"; then
+    cat "$H/.config/bat/config"
+    return 1
+  fi
+}
+
+a_flat_link_is_moved_as_a_link() {
+  mkdir -p "$U" "$H/elsewhere"
+  ln -s "$H/elsewhere" "$U/zsh"
+  run apply >/dev/null
+  expect "the link" "$(readlink "$U/terminal/zsh")" "$H/elsewhere"
+}
+
+relocate_alone_moves_and_seeds_nothing() {
+  mkdir -p "$U/clock"
+  printf 'analog = true\n' >"$U/clock/clock.toml"
+  run relocate >/dev/null
+  expect "clock" "$(cat "$U/desktop/clock/clock.toml")" "analog = true"
+  [[ ! -e $U/terminal/zsh/zshrc ]] || { echo "relocate seeded"; return 1; }
+}
+
+a_user_layer_that_is_a_git_clone_moves_without_a_commit() {
+  mkdir -p "$U/clock"
+  printf 'analog = true\n' >"$U/clock/clock.toml"
+  git -C "$U" init -q
+  git -C "$U" add -A
+  git -C "$U" -c user.name=test -c user.email=test@kubaos -c commit.gpgsign=false commit -qm mine
+  run apply >/dev/null
+  expect "commits" "$(git -C "$U" rev-list --count HEAD)" "1"
+  expect "the moved file" "$(cat "$U/desktop/clock/clock.toml")" "analog = true"
+  [[ -d $U/.git && ! -e $U/clock ]] || { tree; return 1; }
+  git -C "$U" status --porcelain | grep -q '^ D clock/clock.toml$' || { git -C "$U" status --porcelain; return 1; }
+}
+
+path_prints_an_apps_folder() {
+  expect "the user layer" "$(run path)" "$U"
+  expect "zsh" "$(run path zsh)" "$U/terminal/zsh"
+  expect "a group" "$(run path desktop)" "$U/desktop"
+  ! run path nothing 2>/dev/null
+}
+
+for t in a_fresh_home_gets_the_seeds_in_their_groups_and_the_maps_as_links a_readme_of_the_users_own_is_kept \
+  the_flat_layout_moves_into_the_groups_with_every_file an_untouched_seed_in_the_group_gives_way_to_the_users_file \
+  the_same_file_in_both_places_is_kept_once two_edited_files_are_both_kept_and_reported a_second_run_changes_nothing \
+  the_merged_file_reads_the_users_file_from_its_group a_flat_link_is_moved_as_a_link \
+  relocate_alone_moves_and_seeds_nothing a_user_layer_that_is_a_git_clone_moves_without_a_commit \
+  path_prints_an_apps_folder; do
+  test_case "${t//_/ }" "$t"
+done
+exit "$failed"

@@ -1,6 +1,6 @@
 # Kotodama, the Command menu: KubaOS's settings. The Daemon merges every
 # *.toml in ~/.config/kotodama in filename order, so user.toml, which links
-# to your ~/.config/kubaos/kotodama/user.toml, wins over this file.
+# to your ~/.config/kubaos/menu/kotodama/user.toml, wins over this file.
 # `kotodama config` prints the merged config and where each value came from;
 # `kotodama config --schema` lists every key.
 
@@ -52,7 +52,7 @@ kind = "scripts"
 [extensions.kubaos]
 # KubaOS's own actions and the system toggles (crates/kotodama-kubaos). Add
 # yours, or change one of these key by key, under
-# [extensions.kubaos.actions.<id>] in ~/.config/kubaos/kotodama/user.toml, and
+# [extensions.kubaos.actions.<id>] in ~/.config/kubaos/menu/kotodama/user.toml, and
 # leave any out, toggles too, with `hide = ["<id>", ...]` there
 # (docs/USING.md). An action takes `title` and `run` (the program, then its
 # arguments, `{name}` filled in from its `arguments`), and may take
@@ -137,6 +137,52 @@ subtitle = "Plugged-in drives wait in the Files sidebar until you click them"
 icon = "drive-removable-media"
 keywords = ["automount", "usb", "sd card", "drive", "mount"]
 run = ["kubaos-automount", "off"]
+
+# Your settings: the user layer, ~/.config/kubaos, in Files, whole or one
+# group at a time (scripts/dot-config open, docs/USING.md). Each folder's
+# README.md says what lives where.
+
+[extensions.kubaos.actions.settings-folder]
+title = "Settings folder"
+subtitle = "Your own settings, ~/.config/kubaos, in Files"
+icon = "folder-open"
+keywords = ["settings", "config", "dotfiles", "user layer", "preferences", "customize"]
+run = ["dot-config", "open"]
+
+[extensions.kubaos.actions.settings-desktop]
+title = "Settings: Desktop"
+subtitle = "Hyprland, the shell, the cursor, the clock, the keyboard and the system monitor, in Files"
+icon = "preferences-desktop"
+keywords = ["settings", "config", "hyprland", "quickshell", "bar", "keyboard", "cursor", "wallpaper"]
+run = ["dot-config", "open", "desktop"]
+
+[extensions.kubaos.actions.settings-terminal]
+title = "Settings: Terminal"
+subtitle = "Ghostty, foot, tmux, zsh and fastfetch, in Files"
+icon = "utilities-terminal"
+keywords = ["settings", "config", "ghostty", "foot", "tmux", "zsh", "shell", "fastfetch"]
+run = ["dot-config", "open", "terminal"]
+
+[extensions.kubaos.actions.settings-editor]
+title = "Settings: Editor"
+subtitle = "Neovim, in Files"
+icon = "accessories-text-editor"
+keywords = ["settings", "config", "neovim", "nvim", "vim", "lazyvim"]
+run = ["dot-config", "open", "editor"]
+
+[extensions.kubaos.actions.settings-tools]
+title = "Settings: Tools"
+subtitle = "git, lazygit, yazi, bat, bacon and fuzzel, in Files"
+icon = "applications-utilities"
+keywords = ["settings", "config", "git", "lazygit", "yazi", "bat", "bacon", "fuzzel"]
+run = ["dot-config", "open", "tools"]
+
+[extensions.kubaos.actions.settings-menu]
+title = "Settings: Menu"
+subtitle = "The Command menu's own settings and your actions, in Files"
+icon = "system-search"
+keywords = ["settings", "config", "kotodama", "command menu", "launcher", "actions"]
+run = ["dot-config", "open", "menu"]
 
 # The terminal greeting: fastfetch with the クバ mark in a new Ghostty window
 # (scripts/dot-greeting, home/shell.nix). On by default.
@@ -226,7 +272,7 @@ keywords = ["video wallpaper", "motion", "still"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "never"]
 
 # The pointer, in the wallpaper's colours (kubaos cursor). Each applies at
-# once and is kept in ~/.config/kubaos/cursor/cursor.toml.
+# once and is kept in ~/.config/kubaos/desktop/cursor/cursor.toml.
 
 [extensions.kubaos.actions.cursor-dark]
 title = "Dark cursor"
@@ -280,7 +326,7 @@ run = ["kubaos", "cursor", "size", "{size}"]
 arguments = [{ name = "size", placeholder = "32" }]
 
 # The keyboard layouts (kubaos keyboard), kept in
-# ~/.config/kubaos/keyboard/keyboard.toml; the default also goes to
+# ~/.config/kubaos/desktop/keyboard/keyboard.toml; the default also goes to
 # /etc/default/keyboard, for the console and the disk unlock. The Extension
 # itself sends one Item a layout and "Keyboard: add a layout"; this one
 # replaces them all. The next layout is the
@@ -297,7 +343,7 @@ arguments = [{ name = "layouts", placeholder = "us,it" }]
 
 # Mac-style accents on Left Alt (kubaos keyboard accents), whatever the
 # layout: Left Alt + e, `, u, i or n, then the letter. Kept in
-# ~/.config/kubaos/keyboard/keyboard.toml; the chords are in the Shortcuts
+# ~/.config/kubaos/desktop/keyboard/keyboard.toml; the chords are in the Shortcuts
 # View (SUPER + F1).
 
 [extensions.kubaos.actions.mac-accents-on]
@@ -549,7 +595,7 @@ terminal = true
 # The clock popup (crates/kubaos-clock, config/quickshell/modules/clock/).
 # Date queries such as `days until christmas` get an answer in the top row
 # from the Extension itself. The settings Items change
-# ~/.config/kubaos/clock/clock.toml through `kubaos-clock`, which the popup
+# ~/.config/kubaos/desktop/clock/clock.toml through `kubaos-clock`, which the popup
 # reads at its next request; a notification says why when one is refused.
 
 [extensions.kubaos.actions.clock-open]
@@ -659,7 +705,7 @@ run = ["qs", "ipc", "call", "clock", "stopwatch"]
 # The system monitor (crates/kubaos-sysmon, config/quickshell/modules/sysmon/).
 # `cpu`, `ram` and `battery` get an answer in the top row, and `kill chrome`
 # lists the processes to end or kill, from the Extension itself. The settings
-# Items change ~/.config/kubaos/sysmon/sysmon.toml through `kubaos-sysmon`,
+# Items change ~/.config/kubaos/desktop/sysmon/sysmon.toml through `kubaos-sysmon`,
 # which the bar's pill shows within a few seconds; a notification says why
 # when one is refused.
 

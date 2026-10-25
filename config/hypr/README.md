@@ -3,7 +3,7 @@
 KubaOS's Hyprland 0.56+ Lua config, plus hypridle and hyprlock (those two still use
 hyprlang `.conf`). These are KubaOS's defaults, linked read-only into
 `~/.config/hypr` by home-manager; editing them here takes a `home-manager switch`.
-Your own settings go in `~/.config/kubaos/hypr/` (`hyprland.lua`, `hypridle.conf`,
+Your own settings go in `~/.config/kubaos/desktop/hypr/` (`hyprland.lua`, `hypridle.conf`,
 `hyprlock.conf`), which load last.
 
 ## Files
@@ -15,7 +15,7 @@ Your own settings go in `~/.config/kubaos/hypr/` (`hyprland.lua`, `hypridle.conf
 | `env.lua` | Environment: PATH, Wayland vars for Qt/GTK/Electron/Chrome, cursor size |
 | `monitors.lua` | Every screen at its preferred mode, placed by Hyprland; the laptop panel off while the lid is closed on a dock. Your own layout: below |
 | `workspaces.lua` | Per-screen workspaces: each screen has its own 1-10 (a block of ten ids, the laptop's first), joins another on unplug and returns on replug. `workspace_blocks.lua` is its bookkeeping, tested by `test/lua/workspaces_test.lua` |
-| `input.lua` | Keyboard layouts from `~/.config/kubaos/keyboard/keyboard.toml`, else `/etc/default/keyboard` (`us` without either), repeat rate, touchpad, gestures, the `kubaos:mac-accents` XKB option |
+| `input.lua` | Keyboard layouts from `~/.config/kubaos/desktop/keyboard/keyboard.toml`, else `/etc/default/keyboard` (`us` without either), repeat rate, touchpad, gestures, the `kubaos:mac-accents` XKB option |
 | `accents.lua` | The Mac-style accents' cheat sheet for the Shortcuts View, while they are on |
 | `looks.lua` | Gaps, borders, rounding, blur, shadows, animations, dwindle, colors. Sizes and curves match the Quickshell tokens (`config/quickshell/theme/Theme.qml`); `rounding = 10` plus the 2 px border makes the window's outer edge concentric with the frame's 20 px corners at `gaps_out = 8` |
 | `colors.lua` | Reads `~/.local/state/theme/hypr.lua`, falls back to built-in colors |
@@ -24,7 +24,7 @@ Your own settings go in `~/.config/kubaos/hypr/` (`hyprland.lua`, `hypridle.conf
 | `autostart.lua` | Session startup; the polkit agent toggle is at the top |
 | `hypridle.conf` | Lock 5 min, screens off 10 min, suspend 30 min on battery only |
 | `hyprlock.conf` | Fallback lock screen, themed, fingerprint enabled |
-| `~/.config/kubaos/hypr/hyprland.lua` | Yours, not in the repo: loaded last (`docs/CONTRACTS.md`, "Defaults and the user layer") |
+| `~/.config/kubaos/desktop/hypr/hyprland.lua` | Yours, not in the repo: loaded last (`docs/CONTRACTS.md`, "Defaults and the user layer") |
 
 Scripts (in `scripts/`, linked to `~/.local/bin`): `dot-hypr-workspaces`
 (event-socket listener, runs `dot-hypr-lid sync` on hotplug), `dot-hypr-lid`
@@ -46,7 +46,7 @@ Scripts (in `scripts/`, linked to `~/.local/bin`): `dot-hypr-workspaces`
 ## Your screens
 
 The defaults place every screen at its preferred mode. Set your own layout in
-`~/.config/kubaos/hypr/hyprland.lua`, one line per screen:
+`~/.config/kubaos/desktop/hypr/hyprland.lua`, one line per screen:
 
 1. Run `hyprctl monitors all`: each screen's `description:` (make, model,
    serial) and `availableModes`.

@@ -1,0 +1,30 @@
+# Your Command menu (Kotodama) settings: ~/.config/kotodama/user.toml links to this file,
+# ~/.config/kubaos/menu/kotodama/user.toml. The Daemon reads it after KubaOS's kubaos.toml
+# and applies a save at once. Tables merge key by key; a list replaces KubaOS's whole.
+#
+# Nicer names for apps, by desktop id (KubaOS: nvim = "Neovim").
+# [extensions.apps]
+# names = { nvim = "Neovim", "google-chrome" = "Chrome" }
+#
+# Hide KubaOS's actions and toggles by id, and add your own actions. The ids are in
+# ~/.local/share/kubaos/defaults/kotodama/kubaos.toml.
+# [extensions.kubaos]
+# hide = ["screenshot-window", "bluetooth"]
+# [extensions.kubaos.actions.notes]
+# title = "Open my notes"
+# run = ["ghostty", "-e", "nvim"]
+#
+# The folders searched for projects and scripts (KubaOS: ~/Projects at depth 1, and
+# ~/Scripts). This list replaces KubaOS's.
+# [[extensions.folders.folders]]
+# path = "~/Projects"
+# kind = "projects"
+# depth = 1
+#
+# A web search under a keyword: type "gh", then your words.
+# [quicklinks.gh]
+# title = "Search GitHub"
+# url = "https://github.com/search?q={query}"
+#
+# Full docs: `kotodama config` prints the merged settings and where each came from;
+# `kotodama config --schema` lists every key. docs/USING.md, "Make it yours".

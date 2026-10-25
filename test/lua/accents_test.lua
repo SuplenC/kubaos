@@ -6,6 +6,7 @@
 -- Prints an ok or FAIL line per test and exits 1 when any fails.
 
 local repo = assert(arg[1], "usage: lua5.5 test/lua/accents_test.lua REPO")
+package.path = repo .. "/config/hypr/?.lua;" .. package.path
 
 local failed = 0
 
@@ -34,7 +35,7 @@ local real_getenv = os.getenv
 local function binds_for(installed, settings)
   local home = os.tmpname()
   os.remove(home)
-  local settings_path = home .. "/kubaos/keyboard/keyboard.toml"
+  local settings_path = home .. "/kubaos/desktop/keyboard/keyboard.toml"
   io.open = function(name, mode)
     if name == "/etc/keyd/kubaos.conf" then
       return installed and real_open(repo .. "/system/files/keyd/kubaos.conf", mode) or nil

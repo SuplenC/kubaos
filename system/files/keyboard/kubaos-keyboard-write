@@ -14,7 +14,7 @@
 # /etc/default/keyboard at all. The file is console-setup's: the console and
 # the initramfs, where the disk's passphrase is typed, read it. `kubaos keyboard`
 # writes the user's default layout here; the full list is the user's
-# (~/.config/kubaos/keyboard/keyboard.toml), and needs no root.
+# (~/.config/kubaos/desktop/keyboard/keyboard.toml), and needs no root.
 #
 # Each field is a comma-separated list of XKB names and may be empty; anything but
 # letters, digits and `_-,:()+.` is refused, so nothing typed can reach the file as

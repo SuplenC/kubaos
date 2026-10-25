@@ -10,7 +10,7 @@ result
 result-*
 .direnv/
 
-# Pre-#9 machine-local Hyprland overrides; now ~/.config/kubaos/hypr/hyprland.lua
+# Pre-#9 machine-local Hyprland overrides; now ~/.config/kubaos/desktop/hypr/hyprland.lua
 config/hypr/local.lua
 
 # Neovim scratch and runtime files (see config/nvim/.gitignore)
