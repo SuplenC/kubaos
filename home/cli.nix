@@ -36,7 +36,8 @@ in
     gh
     fastfetch
     lazydocker
-    # YubiKey C Bio: FIDO2 PIN, fingerprints, `ykman info` (docs/SECRETS.md).
+    # A YubiKey's FIDO2 PIN, fingerprints and `ykman info`; the C Bio is the
+    # tested key (docs/SECRETS.md).
     # From Nix, not apt: apt's yubikey-manager depends on pcscd, which the
     # FIDO Edition never needs (FIDO2 goes over /dev/hidraw). fido2-tools and
     # pamu2fcfg stay apt, next to the libfido2 that Ubuntu's pam_u2f uses.

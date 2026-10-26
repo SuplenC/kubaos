@@ -1,6 +1,6 @@
 # Secrets: Bitwarden and the security key
 
-KubaOS keeps secrets out of files. One Bitwarden account holds my SSH keys, project env secrets and the GitHub CLI token, and the private keys never touch the disk. A YubiKey C Bio (FIDO2 with a fingerprint sensor) stands in for the password at sudo, polkit and the lock screen. The password keeps working everywhere, so a lost key is a bad day, not a lockout.
+KubaOS keeps secrets out of files. One Bitwarden account holds your SSH keys, project env secrets and the GitHub CLI token, and the private keys never touch the disk. A FIDO2 security key with a fingerprint sensor stands in for the password at sudo, polkit and the lock screen; the YubiKey C Bio is the one KubaOS is tested with. The password keeps working everywhere, so a lost key is a bad day, not a lockout.
 
 | Piece | Where it lives | Set up by |
 |---|---|---|
@@ -28,7 +28,7 @@ Installed from the KubaOS stick? Steps 1 and 2 and `system/75-yubikey.sh` are al
    - optional: **Unlock with system authentication**. That's a polkit prompt, and the security key answers it like it answers sudo.
    - optional: **Start to tray icon**, so the login start stays out of the way.
 4. `kubaos bitwarden setup`, or "Set up Bitwarden" in the Command menu (below). The first time it asks for the server (bitwarden.com, bitwarden.eu or your own URL) and how to log in. Then bw asks for the master password and the two-step code. After that it writes the SSH, git, gh and env pieces, checks the agent and prints a summary. Re-running it is safe.
-5. The YubiKey: `system/75-yubikey.sh`, then the order in "YubiKey C Bio" below (PIN, fingerprints, Bitwarden two-step login, `dot-u2f-enroll` for each key).
+5. The security key: `system/75-yubikey.sh`, then the order in "Security keys" below (PIN, fingerprints, Bitwarden two-step login, `dot-u2f-enroll` for each key).
 
 What stays manual, and why: the SSH agent toggle (no supported config switch), the master password and two-step code (typed into bw's own prompt in a terminal; in Kōbō they go to bw in its environment and are forgotten after the run), the touch during enrollment, and the web vault's two-step settings.
 
@@ -60,7 +60,7 @@ Keep your vault the way it is. `kubaos bitwarden` reads the whole vault: folders
 
   The public key goes to `~/.ssh/<file>.pub`. The Host block names that file in `IdentityFile` with `IdentitiesOnly yes`, so ssh asks the agent for that key only. Without `hosts` you get the `.pub` file and no block; the summary lists those keys under "key only", so you can see which ones still want a `hosts` field.
 
-  Field names match whatever their case and surrounding spaces: `HostName`, `hostname` and `hostname ` are the same field. The public key may carry a comment (`ssh-ed25519 AAAA… jakub@macbook`) and a line ending at its very end; the `.pub` gets `bitwarden:<item name>` as its comment instead, and keys are compared without comments.
+  Field names match whatever their case and surrounding spaces: `HostName`, `hostname` and `hostname ` are the same field. The public key may carry a comment (`ssh-ed25519 AAAA… you@old-laptop`) and a line ending at its very end; the `.pub` gets `bitwarden:<item name>` as its comment instead, and keys are compared without comments.
 
   When an item can't be used as it is, the run prints a `!!` line and the summary lists it under "thing(s) need you", each naming the item (name and folder), the field, and the fix in Bitwarden:
 
@@ -79,11 +79,22 @@ Keep your vault the way it is. `kubaos bitwarden` reads the whole vault: folders
   The block for an alias without `hostname` is still written: a name your resolver knows (a LAN name, an `/etc/hosts` entry) works as it is. The warning only fires for a `hosts` entry with no dot, colon or wildcard.
 
   Two items with the same name (a "GitHub" in two folders, say) never share a `.pub`: the older item keeps `~/.ssh/github.pub`, the newer gets `~/.ssh/github-2.pub`, and the summary warns with both items' folders. A `file` field on one of them picks a name of its own and ends the warning.
-- **An item named `gh-token`**, in any folder: a login item whose password is a GitHub token (classic with `repo`, `read:org`, or fine-grained), or an item of any type with a hidden field `token`. Optional field `host` for GitHub Enterprise.
+- **An item named `gh-token`** (or another name, below), in any folder: a login item whose password is a GitHub token (classic with `repo`, `read:org`, or fine-grained), or an item of any type with a hidden field `token`. Optional field `host` for GitHub Enterprise.
 
-Env secrets, one project per folder **`env/<project>`**: every custom field of every item in it becomes a variable. Field name is the variable name, so it must be a shell name (`DATABASE_URL`, not `database-url`). Items elsewhere join a project with a text field `bwenv` = `<project>`; like the SSH key fields, `bwenv` matches whatever its case and surrounding spaces (`BWEnv `). Variable names stay exactly as typed: `Api_Token` and `API_TOKEN` are two variables.
+Env secrets, one project per folder **`env/<project>`** (or another prefix, below): every custom field of every item in it becomes a variable. Field name is the variable name, so it must be a shell name (`DATABASE_URL`, not `database-url`). Items elsewhere join a project with a text field `bwenv` = `<project>`; like the SSH key fields, `bwenv` matches whatever its case and surrounding spaces (`BWEnv `). Variable names stay exactly as typed: `Api_Token` and `API_TOKEN` are two variables.
 
 To keep SSH keys and git signing to some folders, tick them on the Bitwarden card, or list them in `~/.config/dot-bw/config`, comma-separated: `folders=Personal,Work` (`folder=` is read too, its older name). Names match without the spaces around them, in the list and in the vault, so `folders=Personal, Work` finds a folder named `Work `. gh and env still read the whole vault. A listed folder that isn't in the vault gets a warning by name; if none of them is there, `kubaos bitwarden` uses every SSH key in the vault. The directory keeps its old `dot-bw` name, so a machine set up before keeps its settings.
+
+### Other names
+
+`gh-token` and `env/` are defaults. A vault laid out another way names its own in the environment `kubaos bitwarden` and Kōbō run in. Set them in your user flake (`~/.config/kubaos/home/home.nix`), then log out and in, so the Command menu's "Set up Bitwarden" and "Refresh from Bitwarden" get them too:
+
+| Default | Environment variable | Example |
+|---|---|---|
+| the gh token's item, `gh-token` | `KUBAOS_BW_GH_ITEM` | `home.sessionVariables.KUBAOS_BW_GH_ITEM = "GitHub CLI";` |
+| the env folders' prefix, `env/` | `KUBAOS_BW_ENV_PREFIX` | `home.sessionVariables.KUBAOS_BW_ENV_PREFIX = "secrets/";` makes the folders `secrets/<project>` |
+
+An empty value counts as unset. The keyring entries the env cache writes carry `service=dotfiles-env` whatever the prefix: entries a machine already holds keep that service name, so it doesn't change.
 
 Example vault:
 
@@ -120,38 +131,38 @@ Give both items `hosts=github.com` and ssh offers both keys to GitHub, which log
 To log in everywhere with one key and use the others only on their aliases, give the default key `hosts=*`:
 
 ```text
-  Alias2k          SSH key   hosts=*
-  SuplenC          SSH key   hosts=github-suplenc  hostname=github.com
-  JakubWasilczyk   SSH key   hosts=github-jakubwasilczyk  hostname=github.com
+  Everyday         SSH key   hosts=*
+  Personal         SSH key   hosts=github-personal  hostname=github.com
+  Client           SSH key   hosts=github-client  hostname=github.com
 ```
 
 `~/.ssh/config.d/bitwarden` then reads:
 
 ```text
-# SuplenC (no folder) (SHA256:…)
-Host github-suplenc
+# Personal (no folder) (SHA256:…)
+Host github-personal
   HostName github.com
   IdentityAgent /home/you/.bitwarden-ssh-agent.sock
-  IdentityFile /home/you/.ssh/suplenc.pub
+  IdentityFile /home/you/.ssh/personal.pub
   IdentitiesOnly yes
 
-# JakubWasilczyk (no folder) (SHA256:…)
-Host github-jakubwasilczyk
+# Client (no folder) (SHA256:…)
+Host github-client
   HostName github.com
   IdentityAgent /home/you/.bitwarden-ssh-agent.sock
-  IdentityFile /home/you/.ssh/jakubwasilczyk.pub
+  IdentityFile /home/you/.ssh/client.pub
   IdentitiesOnly yes
 
-# Alias2k (no folder) (SHA256:…)
-Host * !github-suplenc !github-jakubwasilczyk
+# Everyday (no folder) (SHA256:…)
+Host * !github-personal !github-client
   IdentityAgent /home/you/.bitwarden-ssh-agent.sock
-  IdentityFile /home/you/.ssh/alias2k.pub
+  IdentityFile /home/you/.ssh/everyday.pub
   IdentitiesOnly yes
 ```
 
-ssh collects `IdentityFile` from every block that matches and offers the keys in file order, so `kubaos bitwarden` writes the blocks with only specific names first and the blocks with a wildcard (`*`, `?`, `!`, `[`) last, each group in vault order. A wildcard block also leaves out every specific name of the other blocks (`!github-suplenc`), so `ssh github-suplenc` offers the SuplenC key alone: with the default key offered second, a SuplenC key GitHub refused would quietly log you in as Alias2k. `github.com` itself, and every other server, gets the Alias2k key.
+ssh collects `IdentityFile` from every block that matches and offers the keys in file order, so `kubaos bitwarden` writes the blocks with only specific names first and the blocks with a wildcard (`*`, `?`, `!`, `[`) last, each group in vault order. A wildcard block also leaves out every specific name of the other blocks (`!github-personal`), so `ssh github-personal` offers the Personal key alone: with the default key offered second, a Personal key GitHub refused would quietly log you in as the Everyday account. `github.com` itself, and every other server, gets the Everyday key.
 
-Leaving the name out drops the wildcard block's other settings for it too: a `user` or `port` on the `hosts=*` item doesn't reach `github-suplenc`, so set them on the alias's item.
+Leaving the name out drops the wildcard block's other settings for it too: a `user` or `port` on the `hosts=*` item doesn't reach `github-personal`, so set them on the alias's item.
 
 ## Daily use
 
@@ -185,13 +196,17 @@ The GNOME keyring: tty autologin means nobody types the login password, so nothi
 
 - **SSH key**: in Bitwarden, create a new SSH key item with the same fields. Change the old item's `signing` to `verify`. Add the new public key on GitHub and servers, then `kubaos bitwarden refresh`. Delete the old item once nothing uses it. Its `.pub` and Host block disappear on the next refresh.
 - **Env secret**: change the field in Bitwarden, then `kubaos bitwarden env pull <project>` and `cd .` (or `direnv reload`).
-- **gh token**: put the new token in `gh-token`, `kubaos bitwarden refresh --only gh`.
+- **gh token**: put the new token in `gh-token` (or the item `KUBAOS_BW_GH_ITEM` names), `kubaos bitwarden refresh --only gh`.
 - **Master password**: change it in the web vault. Nothing here stores it.
 - **Security key**: `dot-u2f-enroll` with the new key, `dot-u2f-enroll --remove N` for the old one, and do the same in the web vault.
 
-## YubiKey C Bio
+## Security keys
 
-The key does FIDO2 and U2F, and the fingerprint on its sensor counts as user verification (UV), the same thing a PIN proves. The FIDO Edition stops there. The Multi-protocol Edition (sold through YubiKey as a Service) adds PIV, a smart card. Everything here uses FIDO2 only, so both editions behave the same. `dot-u2f-enroll --info` prints which edition and firmware you have, from `ykman info`. ykman names them "YubiKey C Bio - FIDO Edition" and "YubiKey C Bio - Multi-protocol Edition".
+Any FIDO2 key works with the PAM lines below: one with a fingerprint sensor through your finger, one without through its PIN (`dot-u2f-enroll --pin`). KubaOS is tested with the YubiKey C Bio, and the rest of this section is about it: its limits, and `ykman`, Yubico's tool, for its PIN and fingerprints. Another make's key does the same steps with its maker's tool.
+
+### YubiKey C Bio
+
+The C Bio does FIDO2 and U2F, and the fingerprint on its sensor counts as user verification (UV), the same thing a PIN proves. The FIDO Edition stops there. The Multi-protocol Edition (sold through YubiKey as a Service) adds PIV, a smart card. Everything here uses FIDO2 only, so both editions behave the same. `dot-u2f-enroll --info` prints which edition and firmware you have, from `ykman info`. ykman names them "YubiKey C Bio - FIDO Edition" and "YubiKey C Bio - Multi-protocol Edition".
 
 Facts from Yubico's Bio documentation that the setup relies on:
 
@@ -269,14 +284,14 @@ Bitwarden's help pages (checked 2026-10) list FIDO2 two-step login for the web v
 
 The desktop app's first login can use the key, the TOTP code, or "Log in with device" (approve it from the phone app). After that, day to day, unlock it with system authentication: the polkit prompt, which your finger answers (table above).
 
-## SSH keys on the YubiKey (optional)
+## SSH keys on the security key (optional)
 
 `dot-ssh-sk-new <name>` creates an `ed25519-sk` key with `-O verify-required`, so every use needs your finger. OpenSSH 10.2 uses the key's built-in UV and asks for the PIN only when that fails. `--resident` also stores the key on the YubiKey (asks for the PIN), so `ssh-keygen -K` can fetch it on a new machine. The Bio holds 25 such keys on firmware 5.5/5.6 and 100 on 5.7+. `~/.ssh/<name>_sk` is a key handle, useless without the key and your finger, so it has no passphrase. Make one per YubiKey (`<name>` and `<name>-backup`) and authorize both.
 
 When to use which:
 
 - **Bitwarden-held keys** (the default): they sync to every machine, the desktop agent serves them and asks before each use, and losing a YubiKey doesn't touch them. They're as safe as the vault and the running desktop app.
-- **`-sk` keys**: the private key can't leave the hardware, and every use needs your finger. Use them for the few places where "my finger, here, now" is worth the friction: production, a server's root, maybe GitHub. Bitwarden's agent accepts Ed25519 and RSA only, so these go straight from the file with `IdentityAgent none` in their Host block (the script prints it). On your own servers, prefix the `authorized_keys` line with `verify-required` so the server insists on UV too.
+- **`-sk` keys**: the private key can't leave the hardware, and every use needs your finger. Use them for the few places where "your finger, here, now" is worth the friction: production, a server's root, maybe GitHub. Bitwarden's agent accepts Ed25519 and RSA only, so these go straight from the file with `IdentityAgent none` in their Host block (the script prints it). On your own servers, prefix the `authorized_keys` line with `verify-required` so the server insists on UV too.
 
 ## LUKS unlock with the key (optional, not automated)
 

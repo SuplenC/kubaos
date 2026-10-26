@@ -2,7 +2,7 @@
 
 Every part of KubaOS is built against these interfaces. If you need to change one, update this file in the same commit.
 
-Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), Ubuntu Server 26.04 LTS minimal, Hyprland 0.56+ (from `ppa:cppiber/hyprland`, Lua config), Quickshell pinned to a tagged release via Nix, standalone home-manager (flake). Full context: `docs/PLAN.md`.
+Reference hardware: the TUXEDO InfinityBook Pro 14 Gen10 (AMD), the machine every release is tested on. Its drivers are the optional apt group `tuxedo`. Ubuntu Server 26.04 LTS minimal, Hyprland 0.56+ (from `ppa:cppiber/hyprland`, Lua config), Quickshell pinned to a tagged release via Nix, standalone home-manager (flake). Full context: `docs/PLAN.md`.
 
 ## Repo location and ownership
 
@@ -31,7 +31,7 @@ Target machine: TUXEDO InfinityBook Pro 14 Gen10 (Ryzen AI 9 HX 370, AMD iGPU), 
 | `home/theme.nix`, `config/matugen/`, `scripts/dot-theme*`, the `kubaos-wallpapers` input | theme | Wallpaper + matugen color pipeline, the wallpaper sets, GTK/Qt/cursor/icons |
 | `system/`, `docs/INSTALL.md` | system | Ubuntu bootstrap scripts and `/etc` files |
 | `Cargo.toml`, `Cargo.lock`, `crates/`, `install/`, `docs/INSTALL-INTERNALS.md` | install | The Rust workspace: the engine (`crates/kubaos-core`), the `kubaos` CLI (`crates/kubaos-cli`), Kōbō (`crates/kubaos-kobo`) and the cursor recolouring library (`crates/kubaos-cursor`, the theme pipeline uses it), but not the menu's `crates/kotodama-kubaos`; the payload build, the live ISO and first-boot setup. `docs/INSTALL-INTERNALS.md` splits it further |
-| `home/secrets.nix`, `crates/kubaos-core/src/bitwarden*`, `crates/kubaos-cli/src/bitwarden.rs`, `scripts/dot-bw*` (aliases), `scripts/dot-u2f-enroll`, `scripts/dot-ssh-sk-new`, `system/70-bitwarden.sh`, `system/75-yubikey.sh`, `system/files/pam.d/`, `docs/SECRETS.md` | secrets | Bitwarden (SSH agent, git signing, gh, project env), the security key (YubiKey C Bio: pam_u2f, ed25519-sk) |
+| `home/secrets.nix`, `crates/kubaos-core/src/bitwarden*`, `crates/kubaos-cli/src/bitwarden.rs`, `scripts/dot-bw*` (aliases), `scripts/dot-u2f-enroll`, `scripts/dot-ssh-sk-new`, `system/70-bitwarden.sh`, `system/75-yubikey.sh`, `system/files/pam.d/`, `docs/SECRETS.md` | secrets | Bitwarden (SSH agent, git signing, gh, project env), the security key (pam_u2f, ed25519-sk; tested with the YubiKey C Bio) |
 | `README.md`, `docs/CONTRACTS.md`, `docs/PLAN.md` | lead | Overview and these contracts |
 
 ## Defaults and the user layer (home/links.nix, scripts/dot-config)
@@ -113,7 +113,7 @@ A Suite (`docs/adr/0002-suites.md`) has two halves. Its metadata is a `kubaos_co
 - **What the module may declare:** packages, `home.sessionVariables`, `home.sessionPath`, and editor settings in the Defaults through `kubaos.nvim.suiteSpecs`, a list of lazy.nvim specs as Lua expressions (a LazyVim language extra is `''{ import = "lazyvim.plugins.extras.lang.go" }''`). `home/suites.nix` writes them to `~/.config/nvim/lua/kubaos/suites.lua`, which `config/nvim/lua/config/lazy.lua` loads after KubaOS's extras and before the user layer's `plugins/*.lua`, so the user's settings win.
 - **The user layer.** A Suite never writes to a user-layer file that exists, a dangling link included. On `add` and `configure` it creates each of its seeds that is missing, with a comment on how it's loaded and a commented example, as `dot-config apply` does.
 - **Removal** takes away everything the module declared, at the next switch. Caches are sized first and kept; `--purge-caches` deletes them (a cache inside the Projects root, or holding it, is never one). The user-layer files that mention the Suite (as a whole word, ignoring case; not `kubaos.d/`, `.git/`, links, or files over 1 MiB) are listed and left alone. Projects are never touched.
-- **Scaffolding.** `kubaos suite new <name> <project>` runs a scaffolder of an installed Suite in the Projects root (`~/Projects`), with `{path}` and `{name}` filled in. It refuses a project folder that exists. `kubaos suite list --json` and `kubaos suite show <name> --json` give a menu the "New <Suite> project" actions of each installed Suite.
+- **Scaffolding.** `kubaos suite new <name> <project>` runs a scaffolder of an installed Suite in the Projects root, with `{path}` and `{name}` filled in. It refuses a project folder that exists. The Projects root is `~/Projects` by default; `KUBAOS_PROJECTS` moves it (an absolute path, or one relative to the home; `crates/kubaos-core/src/state.rs`, `PROJECTS_VAR`), best set in the user flake as `home.sessionVariables.KUBAOS_PROJECTS`. The Command menu's project folders are its own setting (`folders` in `menu/kotodama/user.toml`), so a moved root goes there too. `kubaos suite list --json` and `kubaos suite show <name> --json` give a menu the "New <Suite> project" actions of each installed Suite.
 - **The test Suite**, `test`, is in the catalog only in builds with the `test-suite` feature (the harness's); its module is `home/suites/test.nix`.
 
 ## Updates and migrations (kubaos-core update, kubaos update)
@@ -295,6 +295,7 @@ Volume and brightness keys are bound in Hyprland directly to `wpctl` and `bright
 - git signing: `config/git/config` includes `~/.config/git-bitwarden/signing.gitconfig` (`user.signingKey`, `gpg.format = ssh`, `gpg.ssh.allowedSignersFile`, `commit.gpgSign`), generated by `kubaos bitwarden`. Missing include = unsigned commits.
 - git identity: `config/git/config` includes `~/.config/git-identity/identity.gitconfig` (`[user] name`, `email`), written by Kōbō's Git screen or first-boot setup's Git card. Missing include = git asks for a name at the first commit.
 - Project env: GNOME keyring items with attributes `service=dotfiles-env project=<p> name=<VAR>` and label `dotfiles-env/<p>/<VAR>` (suffix `#base64` when the value is stored base64 because it has a newline or tab). Written by `kubaos bitwarden env pull` (and `kubaos bitwarden setup`), read by `use bwenv <p>` in `.envrc` (`~/.config/direnv/lib/bwenv.sh`, generated by `home/secrets.nix`) through `kubaos bitwarden env export <p>`, NUL-separated `NAME=VALUE` records. The service name keeps its dotfiles-era value: a new one would orphan every entry already stored.
+- Vault names: the gh token comes from the item `gh-token` and a project's env from the folder `env/<p>`. Both are defaults: `KUBAOS_BW_GH_ITEM` names another item and `KUBAOS_BW_ENV_PREFIX` another prefix (`crates/kubaos-core/src/bitwarden/vault.rs`, `Names`), read by `kubaos bitwarden` and Kōbō; an empty value is the default.
 - Secrets never go in argv or files: scripts pass them on stdin; `BW_SESSION` lives only in the running script and its children.
 
 ## Hyprland conventions

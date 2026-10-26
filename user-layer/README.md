@@ -59,6 +59,8 @@ group.
 | The fallback launcher (fuzzel) | `tools/fuzzel/fuzzel.ini` |
 | Command menu actions, hidden Items, project folders, quicklinks | `menu/kotodama/user.toml` |
 | Your own packages | `kubaos package add <name>`, or `home/home.nix` (your user flake) |
+| Where `kubaos suite new` makes projects (`~/Projects`) | `home/home.nix`: `home.sessionVariables.KUBAOS_PROJECTS` |
+| The Bitwarden item and folders gh and project env come from (`gh-token`, `env/<project>`) | `home/home.nix`: `KUBAOS_BW_GH_ITEM`, `KUBAOS_BW_ENV_PREFIX` (docs/SECRETS.md) |
 
 Three files have no include in their app, so `dot-config apply` writes the app's file
 from KubaOS's and yours: `tools/bat/config`, `tools/git/ignore` and

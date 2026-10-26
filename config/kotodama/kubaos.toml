@@ -144,13 +144,14 @@ run = ["kubaos-automount", "off"]
 
 # Your settings: the user layer, ~/.config/kubaos, in Files, whole or one
 # group at a time (scripts/dot-config open, docs/USING.md). Each folder's
-# README.md says what lives where.
+# README.md says what lives where. Its home/ is the user flake, where the
+# settings made by environment variable go (KUBAOS_PROJECTS, KUBAOS_BW_*).
 
 [extensions.kubaos.actions.settings-folder]
 title = "Settings folder"
 subtitle = "Your own settings, ~/.config/kubaos, in Files"
 icon = "folder-open"
-keywords = ["settings", "config", "dotfiles", "user layer", "preferences", "customize"]
+keywords = ["settings", "config", "dotfiles", "user layer", "preferences", "customize", "user flake", "home.nix", "environment variables"]
 run = ["dot-config", "open"]
 
 [extensions.kubaos.actions.settings-desktop]
