@@ -41,7 +41,9 @@ let
     "_kubaos_init ${name}-${key} ${command}";
 
   omp = lib.getExe pkgs.oh-my-posh;
-  ompKey = builtins.substring 0 16 (builtins.hashString "sha256" omp);
+  # The suffix names the script's format (each print given the config), so
+  # scripts cached in an older one are never sourced again.
+  ompKey = builtins.substring 0 16 (builtins.hashString "sha256" "${omp}-print-config");
 in
 {
   home.packages = [ pkgs.oh-my-posh ];
@@ -87,7 +89,8 @@ in
 
     shellAliases = {
       zshrc = "nvim ${userLayer.dir "zsh"}/zshrc";
-      wipe = "clear && tmux clear-history";
+      # Outside tmux there is no history to clear, and no error to show.
+      wipe = "clear && { [[ -z $TMUX ]] || tmux clear-history; }";
       nvimconfig = "nvim ~/.config/nvim";
       tma = "tmux attach";
     };
@@ -188,15 +191,23 @@ in
             return
           fi
           export POSH_SESSION_ID="$(</proc/sys/kernel/random/uuid)"
+          typeset -g _dot_omp_cfg=$cfg
           source "$file"
         }
         # _dot_omp_cache CONFIG FILE: write oh-my-posh's init script for
         # CONFIG to FILE, replacing the one for the config's older mtime.
+        # oh-my-posh keeps the config in a cache under the init's session id,
+        # and every print looks it up there; a fresh id finds nothing and
+        # gets oh-my-posh's default theme. So each print and stream call is
+        # given the config itself, and a script left without it isn't kept.
         function _dot_omp_cache() {
           setopt local_options pipefail
           [[ -d $_kubaos_zsh_cache ]] || mkdir -p -- "$_kubaos_zsh_cache"
           rm -f -- "$_kubaos_zsh_cache"/omp-*-''${1:t:r}-*.zsh(N)
-          ${omp} init zsh --print --config "$1" | sed '/^export POSH_SESSION_ID=/d' >|"$2.$$" &&
+          ${omp} init zsh --print --config "$1" |
+            sed -e '/^export POSH_SESSION_ID=/d' \
+              -e 's/\([$]_omp_executable"\{0,1\} \(print [a-z$]*\|stream\)\)/\1 --config="$_dot_omp_cfg"/' >|"$2.$$" &&
+            grep -q -- '--config="$_dot_omp_cfg"' "$2.$$" &&
             mv -f -- "$2.$$" "$2" || { rm -f -- "$2.$$"; return 1; }
         }
         _dot_omp_init
