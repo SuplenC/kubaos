@@ -55,8 +55,34 @@
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
     in
     {
-      # The curated set (home/curated.nix), from this flake's nixpkgs.
-      packages = forAllSystems (pkgs: import ./home/curated.nix { inherit pkgs inputs; });
+      # The curated set (home/curated.nix), from this flake's nixpkgs, and
+      # `cache`.
+      #
+      # `cache` links every output of the curated set, for the binary cache
+      # workflow (.github/workflows/cache.yml) to build and push. They are the
+      # very derivations a machine's home builds: lib.mkHome takes the curated
+      # set from this flake's lock, whatever the user's nixpkgs, so a pushed
+      # path is the one a machine asks for. Cachix skips what cache.nixos.org
+      # has, which leaves KubaOS's own builds. The debug outputs stay out: no
+      # machine installs them.
+      packages = forAllSystems (
+        pkgs:
+        let
+          curated = import ./home/curated.nix { inherit pkgs inputs; };
+          outputsOf =
+            name: package:
+            map (output: {
+              name = "${name}-${output}";
+              path = package.${output};
+            }) (pkgs.lib.remove "debug" (package.outputs or [ "out" ]));
+        in
+        curated
+        // {
+          cache = pkgs.linkFarm "kubaos-cache" (
+            pkgs.lib.concatLists (pkgs.lib.mapAttrsToList outputsOf curated)
+          );
+        }
+      );
 
       # KubaOS's home, with Kotodama's module (`programs.kotodama`) for the
       # Command menu (home/menu.nix).
@@ -89,7 +115,7 @@
             inherit username;
             # The packages, plus the package set itself for the GPU driver
             # bundle (targets.genericLinux.gpu.packages, home/desktop.nix).
-            kubaosPkgs = self.packages.${system} // {
+            kubaosPkgs = removeAttrs self.packages.${system} [ "cache" ] // {
               nixpkgs = nixpkgs.legacyPackages.${system};
             };
           };
