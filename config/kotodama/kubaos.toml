@@ -334,12 +334,12 @@ arguments = [{ name = "size", placeholder = "32" }]
 
 [extensions.kubaos.actions.keyboard-set]
 title = "Keyboard: set layouts"
-subtitle = "Every layout, comma-separated, the default first: us,it(intl)"
+subtitle = "Every layout, comma-separated, the default first: us,de(nodeadkeys)"
 icon = "input-keyboard"
 keywords = ["keyboard layout", "keymap", "language", "input"]
 keyword = "keyboard-layouts"
 run = ["kubaos", "keyboard", "set", "{layouts}"]
-arguments = [{ name = "layouts", placeholder = "us,it" }]
+arguments = [{ name = "layouts", placeholder = "us,de" }]
 
 # Mac-style accents on Left Alt (kubaos keyboard accents), whatever the
 # layout: Left Alt + e, `, u, i or n, then the letter. Kept in

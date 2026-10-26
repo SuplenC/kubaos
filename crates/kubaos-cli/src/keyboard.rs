@@ -1,7 +1,7 @@
 //! `kubaos keyboard`: the keyboard layouts, the first the default.
 //!
 //!   kubaos keyboard show                      print the layouts, one a line, the default first
-//!   kubaos keyboard set <us,it(intl)>         replace them all
+//!   kubaos keyboard set <us,de(nodeadkeys)>   replace them all
 //!   kubaos keyboard add <layout>              add one at the end
 //!   kubaos keyboard remove <layout>           take one out; the last one stays
 //!   kubaos keyboard default <layout>          move one to the front
@@ -87,7 +87,7 @@ const KEYD_UNIT: &str = "keyd.service";
 pub enum KeyboardCmd {
     /// Print the layouts, one a line, the default first.
     Show,
-    /// Replace the layouts: a comma-separated list, the default first (us,it(intl)).
+    /// Replace the layouts: a comma-separated list, the default first (us,de(nodeadkeys)).
     Set { layouts: String },
     /// Add a layout at the end (it, or us(intl)).
     Add { layout: String },
