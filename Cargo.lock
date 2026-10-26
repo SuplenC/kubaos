@@ -2288,6 +2288,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kubaos-specimen"
+version = "0.1.0"
+dependencies = [
+ "iced",
+ "iced_runtime",
+ "kubaos-ui",
+ "png 0.18.1",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "kubaos-sysmon"
 version = "0.1.0"
 dependencies = [
@@ -2299,6 +2310,23 @@ dependencies = [
  "thiserror 2.0.21",
  "toml 0.9.12+spec-1.1.0",
  "toml_edit",
+]
+
+[[package]]
+name = "kubaos-tokens"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 2.0.21",
+ "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "kubaos-ui"
+version = "0.1.0"
+dependencies = [
+ "iced",
+ "iced_test",
 ]
 
 [[package]]

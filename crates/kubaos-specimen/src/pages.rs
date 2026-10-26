@@ -1,0 +1,73 @@
+//! The specimen's pages, each a header and its sections.
+//!
+//! # Owns
+//!
+//! - Picking the page, and each page's content: [`type_scale`], [`colour`], [`space`],
+//!   [`components`], [`icons`] and [`motion`].
+//!
+//! # Not here
+//!
+//! - The bar above them: [`crate::specimen`].
+
+mod colour;
+mod components;
+pub mod icons;
+mod motion;
+mod space;
+mod type_scale;
+
+use iced::Element;
+use kubaos_ui::Look;
+use kubaos_ui::layout::header;
+use kubaos_ui::layout::stack;
+use kubaos_ui::tokens::Space;
+
+use crate::specimen::Message;
+use crate::specimen::Page;
+use crate::specimen::Specimen;
+
+pub fn view<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
+    let (accent, lede) = match specimen.page {
+        Page::Type => (
+            "書体",
+            "Geist for the interface, Geist Mono for anything typed or read by a machine, M PLUS 1 for \
+             the Japanese accents. Nine sizes; every line height a multiple of 4.",
+        ),
+        Page::Colour => (
+            "色",
+            "Roles, never hex: matugen derives them from the wallpaper. These are the fallback, from \
+             the default wallpaper, with each pair's contrast.",
+        ),
+        Page::Space => (
+            "間隔",
+            "Everything on a 4 px grid, so it lands on whole device pixels at 1, 1.25, 1.5 and 2. \
+             Hairlines are one device pixel; nested corners are concentric.",
+        ),
+        Page::Components => (
+            "部品",
+            "The closed set, every kind and size, resting, focused and disabled.",
+        ),
+        Page::Icons => (
+            "記号",
+            "The same 40 glyphs from Kōbō and the shell in four sets, at the sizes and in the colours \
+             Kōbō draws them. Pick the base of KubaOS Symbols.",
+        ),
+        Page::Motion => (
+            "動き",
+            "Seven durations, six curves. Each animation takes the pair for what it is, never by \
+             feel.",
+        ),
+    };
+    let body = match specimen.page {
+        Page::Type => type_scale::view(look),
+        Page::Colour => colour::view(look),
+        Page::Space => space::view(look),
+        Page::Components => components::view(look),
+        Page::Icons => icons::view(look),
+        Page::Motion => motion::view(look, specimen.seconds, specimen.live),
+    };
+    stack(look, Space::S40)
+        .push(header(look, accent, specimen.page.title(), lede))
+        .push(body)
+        .into()
+}

@@ -1,0 +1,548 @@
+//! The components page: every component of the closed set, each kind and size, resting, focused
+//! and disabled.
+
+use iced::Element;
+use iced::Length;
+use iced::widget;
+use kubaos_ui::Look;
+use kubaos_ui::component::button::ButtonSize;
+use kubaos_ui::component::button::Kind;
+use kubaos_ui::component::button::button;
+use kubaos_ui::component::card::card;
+use kubaos_ui::component::card::choice_card;
+use kubaos_ui::component::check::Tick;
+use kubaos_ui::component::check::checkbox;
+use kubaos_ui::component::check::radio;
+use kubaos_ui::component::chip::ChipKind;
+use kubaos_ui::component::chip::chip;
+use kubaos_ui::component::dialog::Tone;
+use kubaos_ui::component::dialog::dialog;
+use kubaos_ui::component::dialog::scrim;
+use kubaos_ui::component::empty::empty_state;
+use kubaos_ui::component::error::Level;
+use kubaos_ui::component::error::error_block;
+use kubaos_ui::component::error::log;
+use kubaos_ui::component::field::State;
+use kubaos_ui::component::field::field;
+use kubaos_ui::component::field::labelled;
+use kubaos_ui::component::field::note;
+use kubaos_ui::component::list::empty_list;
+use kubaos_ui::component::list::list;
+use kubaos_ui::component::list::list_row;
+use kubaos_ui::component::progress::bar;
+use kubaos_ui::component::progress::spinner;
+use kubaos_ui::component::switch::switch;
+use kubaos_ui::component::toast::toast;
+use kubaos_ui::icon::Icon;
+use kubaos_ui::layout::Extent;
+use kubaos_ui::layout::Gap;
+use kubaos_ui::layout::fill;
+use kubaos_ui::layout::grid;
+use kubaos_ui::layout::row;
+use kubaos_ui::layout::section;
+use kubaos_ui::layout::stack;
+use kubaos_ui::text::text;
+use kubaos_ui::tokens::IconSize;
+use kubaos_ui::tokens::Size;
+use kubaos_ui::tokens::Space;
+use kubaos_ui::tokens::Type;
+
+use crate::specimen::FOCUSED_FIELD;
+use crate::specimen::Message;
+
+pub fn view<'a>(look: &Look) -> Element<'a, Message> {
+    stack(look, Space::S48)
+        .push(section(
+            look,
+            "Buttons",
+            Some("Filled, Tonal, Text and Danger; regular and small; with an icon, focused, disabled."),
+            buttons(look),
+        ))
+        .push(section(
+            look,
+            "Fields",
+            Some("As tall as a regular button. The label's row fits a small button, so fields side by side line up."),
+            fields(look),
+        ))
+        .push(section(look, "Switches, checkboxes and radio buttons", None, toggles(look)))
+        .push(section(
+            look,
+            "Lists",
+            Some("Rows in a well: 16 outside, 4 in, so the rows take 12. The ring goes round the well; the row shows where the keyboard is."),
+            lists(look),
+        ))
+        .push(section(look, "Chips", None, chips(look)))
+        .push(section(
+            look,
+            "Cards",
+            Some("Picked cards take the accent, so their focus ring is the cold one."),
+            cards(look),
+        ))
+        .push(section(look, "Dialogs", Some("A question, and the confirmation before something is destroyed."), dialogs(look)))
+        .push(section(look, "Toasts and progress", None, progress(look)))
+        .push(section(look, "Empty states", None, empties(look)))
+        .push(section(look, "Errors", Some("What broke, what to do next, and the log behind it."), errors(look)))
+        .into()
+}
+
+fn buttons<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let mut rows = stack(look, Space::S16);
+    for kind in Kind::ALL {
+        let label = match kind {
+            Kind::Filled => "Continue",
+            Kind::Tonal => "Save log",
+            Kind::Text => "Back",
+            Kind::Danger => "Erase disk",
+        };
+        let glyph = match kind {
+            Kind::Filled => Icon::ArrowForward,
+            Kind::Tonal => Icon::Save,
+            Kind::Text => Icon::ArrowBack,
+            Kind::Danger => Icon::Warning,
+        };
+        let base = || button::<Message>(label).kind(kind);
+        let with_icon = |b: kubaos_ui::component::button::Button<'a, Message>| {
+            if kind == Kind::Filled {
+                b.trailing_icon(glyph)
+            } else {
+                b.icon(glyph)
+            }
+        };
+        let cells = [
+            base().on_press(Message::Sample).view(look),
+            with_icon(base()).on_press(Message::Sample).view(look),
+            base().on_press(Message::Sample).focused(true).view(look),
+            base().view(look),
+            base().size(ButtonSize::Sm).on_press(Message::Sample).view(look),
+            with_icon(base().size(ButtonSize::Sm))
+                .on_press(Message::Sample)
+                .view(look),
+            base()
+                .size(ButtonSize::Sm)
+                .on_press(Message::Sample)
+                .focused(true)
+                .view(look),
+            base().size(ButtonSize::Sm).view(look),
+        ];
+        rows = rows.push(
+            row(look, Space::S16)
+                .center()
+                .push(
+                    widget::container(text(format!("{kind:?}"), Type::Label, c.on_surface_variant))
+                        .width(Length::Fixed(f32::from(Space::S64.px()))),
+                )
+                .extend(cells),
+        );
+    }
+    let legend = text(
+        "Each row: regular, with an icon, focused, disabled; then the same small.",
+        Type::Small,
+        c.on_surface_variant,
+    );
+    stack(look, Space::S16).push(rows).push(legend).into()
+}
+
+fn fields<'a>(look: &Look) -> Element<'a, Message> {
+    let show = button::<Message>("Show")
+        .kind(Kind::Text)
+        .size(ButtonSize::Sm)
+        .icon(Icon::Visibility)
+        .on_press(Message::Sample)
+        .view(look);
+    grid(look, 3, Space::S24)
+        .push(labelled(
+            look,
+            "Full name",
+            None,
+            field("", "Your name").on_input(|_| Message::Typed).view(look),
+            None,
+        ))
+        .push(labelled(
+            look,
+            "Hostname",
+            None,
+            field("tuxedo", "")
+                .icon(Icon::Computer)
+                .on_input(|_| Message::Typed)
+                .view(look),
+            Some(note(look, "Letters, digits and dashes.", false)),
+        ))
+        .push(labelled(
+            look,
+            "Search",
+            None,
+            field("Shinj", "Search")
+                .icon(Icon::Search)
+                .focused(true)
+                .id(FOCUSED_FIELD)
+                .on_input(|_| Message::Typed)
+                .view(look),
+            Some(note(
+                look,
+                "Focused: the caret, the accent hairline and the ring.",
+                false,
+            )),
+        ))
+        .push(labelled(
+            look,
+            "Password",
+            Some(show),
+            field("hunter2", "").secret().on_input(|_| Message::Typed).view(look),
+            None,
+        ))
+        .push(labelled(
+            look,
+            "Email for git",
+            None,
+            field("not-an-email", "")
+                .icon(Icon::Mail)
+                .state(State::Invalid)
+                .on_input(|_| Message::Typed)
+                .view(look),
+            Some(note(look, "That's not an email. Typo?", true)),
+        ))
+        .push(labelled(
+            look,
+            "User name",
+            None,
+            field("kuba", "").icon(Icon::Lock).state(State::Locked).view(look),
+            Some(note(look, "Set when you installed; read-only here.", false)),
+        ))
+        .into()
+}
+
+fn toggles<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let label = |s: &'static str| text(s, Type::Small, c.on_surface_variant);
+    let switches = row(look, Space::S32)
+        .center()
+        .push(
+            stack(look, Space::S8)
+                .push(switch(look, false, 1.0, Some(Message::Sample), false))
+                .push(label("Off")),
+        )
+        .push(
+            stack(look, Space::S8)
+                .push(switch(look, true, 1.0, Some(Message::Sample), false))
+                .push(label("On")),
+        )
+        .push(
+            stack(look, Space::S8)
+                .push(switch(look, true, 0.5, Some(Message::Sample), false))
+                .push(label("Halfway")),
+        )
+        .push(
+            stack(look, Space::S8)
+                .push(switch(look, true, 1.0, Some(Message::Sample), true))
+                .push(label("Focused")),
+        )
+        .push(
+            stack(look, Space::S8)
+                .push(switch::<Message>(look, false, 1.0, None, false))
+                .push(label("Disabled off")),
+        )
+        .push(
+            stack(look, Space::S8)
+                .push(switch::<Message>(look, true, 1.0, None, false))
+                .push(label("Disabled on")),
+        );
+    let checks = row(look, Space::S32)
+        .center()
+        .push(checkbox(look, "Bluetooth", Tick::Empty, Some(Message::Sample), false))
+        .push(checkbox(
+            look,
+            "Some wallpapers",
+            Tick::Partial,
+            Some(Message::Sample),
+            false,
+        ))
+        .push(checkbox(
+            look,
+            "Encrypt the disk",
+            Tick::Full,
+            Some(Message::Sample),
+            false,
+        ))
+        .push(checkbox(look, "Focused", Tick::Full, Some(Message::Sample), true))
+        .push(checkbox::<Message>(look, "Disabled", Tick::Full, None, false));
+    let radios = row(look, Space::S32)
+        .center()
+        .push(radio(look, "Keep Windows", false, Some(Message::Sample), false))
+        .push(radio(look, "Erase everything", true, Some(Message::Sample), false))
+        .push(radio(look, "Focused", false, Some(Message::Sample), true))
+        .push(radio::<Message>(look, "Disabled", true, None, false));
+    stack(look, Space::S24).push(switches).push(checks).push(radios).into()
+}
+
+fn lists<'a>(look: &Look) -> Element<'a, Message> {
+    let rows = |look: &Look| -> Vec<Element<'a, Message>> {
+        vec![
+            list_row("English (US)")
+                .detail("us")
+                .checked(true)
+                .on_press(Message::Sample)
+                .view(look),
+            list_row("Italian")
+                .detail("it")
+                .checked(false)
+                .selected(true)
+                .on_press(Message::Sample)
+                .view(look),
+            list_row("German")
+                .detail("de")
+                .checked(false)
+                .on_press(Message::Sample)
+                .view(look),
+        ]
+    };
+    let two_line = vec![
+        list_row("Home-5G")
+            .subtitle("Secured · strong")
+            .icon(Icon::Wifi)
+            .selected(true)
+            .on_press(Message::Sample)
+            .view(look),
+        list_row("FRITZ!Box 7590 XL Gästenetz OG")
+            .subtitle("Secured · fair")
+            .icon(Icon::Wifi)
+            .on_press(Message::Sample)
+            .view(look),
+        list_row("Samsung SSD 990 PRO")
+            .subtitle("nvme0n1 · 2 TB · Linux")
+            .icon(Icon::HardDrive)
+            .detail("2 TB")
+            .on_press(Message::Sample)
+            .view(look),
+    ];
+    grid(look, 3, Space::S24)
+        .push(list(look, rows(look), false))
+        .push(list(look, two_line, true))
+        .push(empty_list(look, "Nothing matches. Typo?"))
+        .into()
+}
+
+fn chips<'a>(look: &Look) -> Element<'a, Message> {
+    let mut line = row(look, Space::S8).center();
+    for kind in ChipKind::ALL {
+        let label = match kind {
+            ChipKind::Neutral => "2 TB",
+            ChipKind::Selected => "English (US)",
+            ChipKind::Accent => "Recommended",
+            ChipKind::Cold => "Demo",
+        };
+        line = line.push(chip(look, kind, label, None, None::<Message>));
+    }
+    line = line
+        .push(chip(
+            look,
+            ChipKind::Selected,
+            "Default",
+            Some(Icon::Check),
+            None::<Message>,
+        ))
+        .push(chip(look, ChipKind::Cold, "Demo", Some(Icon::Bolt), None::<Message>))
+        .push(chip(look, ChipKind::Neutral, "Italian", None, Some(Message::Sample)))
+        .push(chip(
+            look,
+            ChipKind::Selected,
+            "English (US)",
+            Some(Icon::Check),
+            Some(Message::Sample),
+        ));
+    line.into()
+}
+
+fn cards<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let mode = |title: &'static str, sub: &'static str| -> Element<'a, Message> {
+        stack(look, Space::S4)
+            .push(text(title, Type::Subheading, c.on_surface))
+            .push(text(sub, Type::Small, c.on_surface_variant))
+            .into()
+    };
+    grid(look, 4, Space::S24)
+        .push(card(
+            look,
+            stack(look, Space::S4)
+                .push(text("Plain card", Type::Subheading, c.on_surface))
+                .push(text(
+                    "The well's surface and a soft hairline, 16 inside.",
+                    Type::Small,
+                    c.on_surface_variant,
+                )),
+        ))
+        .push(choice_card(
+            look,
+            mode("Erase the disk", "Everything on it goes."),
+            true,
+            Some(Message::Sample),
+            false,
+        ))
+        .push(choice_card(
+            look,
+            mode("Install alongside", "Keep Windows, shrink it."),
+            false,
+            Some(Message::Sample),
+            false,
+        ))
+        .push(choice_card(
+            look,
+            mode("Focused, picked", "The cold ring."),
+            true,
+            Some(Message::Sample),
+            true,
+        ))
+        .into()
+}
+
+fn dialogs<'a>(look: &Look) -> Element<'a, Message> {
+    let normal = dialog(
+        look,
+        Tone::Normal,
+        Icon::Power,
+        "Restart now?",
+        "Everything open closes. I'll be back in a few seconds.",
+        Some(button("Cancel").kind(Kind::Text).on_press(Message::Sample).view(look)),
+        [
+            button("Shut down")
+                .kind(Kind::Tonal)
+                .icon(Icon::Power)
+                .on_press(Message::Sample)
+                .view(look),
+            button("Restart")
+                .icon(Icon::Restart)
+                .on_press(Message::Sample)
+                .focused(true)
+                .view(look),
+        ],
+    );
+    let danger = dialog(
+        look,
+        Tone::Danger,
+        Icon::Warning,
+        "Last chance",
+        "Everything on Samsung SSD 990 PRO (nvme0n1, 2 TB) gets erased. There's no undo.",
+        Some(
+            button("Cancel")
+                .kind(Kind::Text)
+                .on_press(Message::Sample)
+                .focused(true)
+                .view(look),
+        ),
+        [button("Erase and install")
+            .kind(Kind::Danger)
+            .icon(Icon::Warning)
+            .on_press(Message::Sample)
+            .view(look)],
+    );
+    let stage = |d: Element<'a, Message>| -> Element<'a, Message> {
+        widget::container(scrim(look, d))
+            .height(Length::Fixed(f32::from(Size::Column.px() / 2 + Space::S64.px())))
+            .into()
+    };
+    grid(look, 2, Space::S24).push(stage(normal)).push(stage(danger)).into()
+}
+
+fn progress<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let toasts = row(look, Space::S16)
+        .center()
+        .push(toast(look, "Copied. Evidence secured.", None))
+        .push(toast(look, "Replay saved.", Some(Icon::CheckCircle)));
+    let bars = stack(look, Space::S16)
+        .push(bar(look, 0.0))
+        .push(bar(look, 0.42))
+        .push(bar(look, 1.0));
+    let spinners = row(look, Space::S24)
+        .center()
+        .extend(
+            IconSize::ALL
+                .into_iter()
+                .take(3)
+                .map(|size| spinner(look, size, 0.7, c.primary)),
+        )
+        .push(text("Poking at the hardware…", Type::Body, c.on_surface_variant));
+    let install = stack(look, Space::S12)
+        .push(
+            row(look, Space::S12)
+                .bottom()
+                .push(text("Installing", Type::Title, c.on_surface))
+                .push(fill())
+                .push(text("42%", Type::Headline, c.on_surface)),
+        )
+        .push(bar(look, 0.42))
+        .push(
+            row(look, Space::S12)
+                .center()
+                .push(text("Unpacking the system", Type::BodyStrong, c.on_surface))
+                .push(text("1.8 / 4.2 GB", Type::Mono, c.primary))
+                .push(fill())
+                .push(text("01:42", Type::Mono, c.on_surface_variant)),
+        );
+    stack(look, Space::S32)
+        .push(toasts)
+        .push(
+            row(look, Space::S48)
+                .push(stack(look, Space::S16).width(Extent::Fill).push(bars).push(spinners))
+                .push(stack(look, Gap::NONE).width(Extent::Fill).push(install)),
+        )
+        .into()
+}
+
+fn empties<'a>(look: &Look) -> Element<'a, Message> {
+    grid(look, 2, Space::S24)
+        .push(card(
+            look,
+            empty_state(
+                look,
+                Icon::Wifi,
+                "No networks",
+                "Nothing in range. Plug in a cable, or skip it.",
+                Some(button("Skip").kind(Kind::Tonal).on_press(Message::Sample).view(look)),
+            ),
+        ))
+        .push(card(
+            look,
+            empty_state(look, Icon::Search, "Nothing matches", "Typo? Try fewer letters.", None),
+        ))
+        .into()
+}
+
+fn errors<'a>(look: &Look) -> Element<'a, Message> {
+    let lines = [
+        (Level::Step, "==> Bootloader"),
+        (Level::Info, "Installing for x86_64-efi platform."),
+        (Level::Debug, "efibootmgr -c -d /dev/nvme0n1 -p 1 -L ubuntu"),
+        (
+            Level::Warn,
+            "warning: the firmware reports Secure Boot's boot order as locked",
+        ),
+        (
+            Level::Error,
+            "grub-install: error: efibootmgr failed to register the boot entry: Operation not permitted.",
+        ),
+    ];
+    stack(look, Space::S16)
+        .push(error_block(
+            look,
+            "efibootmgr failed to register the boot entry: Operation not permitted.",
+            "The firmware refused a new boot entry. Turn off Secure Boot's \"lock boot order\" in the setup menu and try again.",
+        ))
+        .push(error_block(
+            look,
+            "grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ubuntu failed with exit status 1.",
+            "A message this long drops to body size.",
+        ))
+        .push(log(look, &lines, Extent::Fixed(Size::Log)))
+        .push(
+            row(look, Space::S12)
+                .center()
+                .push(button("Back to the review").kind(Kind::Text).icon(Icon::ArrowBack).on_press(Message::Sample).view(look))
+                .push(button("Hide log").kind(Kind::Text).icon(Icon::Terminal).on_press(Message::Sample).view(look))
+                .push(fill())
+                .push(button("Save log").kind(Kind::Tonal).icon(Icon::Save).on_press(Message::Sample).view(look))
+                .push(button("Try again").icon(Icon::Restart).on_press(Message::Sample).focused(true).view(look)),
+        )
+        .into()
+}

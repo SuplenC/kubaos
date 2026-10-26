@@ -1,0 +1,454 @@
+# KubaOS's design tokens: every colour role, length, type style, duration and
+# curve the front ends draw with. Each value lives here once. `kubaos-tokens`
+# checks the rules below and writes the toolkits' copies:
+#
+#   cargo run -p kubaos-tokens -- write    regenerate every output
+#   cargo run -p kubaos-tokens -- check    fail when an output is stale
+#
+# Today the one output is the Rust module of `kubaos-ui`
+# (crates/kubaos-ui/src/tokens.rs). The QML singleton, the matugen templates
+# and the Plymouth and GRUB values come from this same file as their front
+# ends move onto it.
+#
+# Lengths are logical pixels. The supported scales are 1, 1.25, 1.5 and 2, so
+# a length lands on whole device pixels at every one of them only when it is a
+# multiple of 4; the generator refuses anything else. Hairlines are the
+# exception: one device pixel at every scale, whatever that is in logical
+# pixels.
+
+[rules]
+# Every spacing, size, radius, icon size, line height and shadow is a
+# multiple of this.
+grid = 4
+# The only font sizes. A type style with any other size is refused.
+font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48]
+# The scales every length is checked against: `grid` times each one must be a
+# whole number of device pixels.
+scales = [1.0, 1.25, 1.5, 2.0]
+
+# Lines thinner than the grid. Neither is a multiple of 4, so neither is a
+# length: each is drawn as whole device pixels at the scale it shows at.
+[stroke]
+# Dividers, outlines of cards, fields and the switch track: one device pixel
+# at every scale.
+hairline_device_px = 1
+# The focus ring, the spinner's arc and the check mark: 2 logical pixels,
+# rounded half up to whole device pixels (2, 3, 3, 4 at 1, 1.25, 1.5, 2).
+thin = 2
+
+[focus]
+# How far the focus ring's outer edge stands outside the control. The ring is
+# drawn in that band, `stroke.thin` wide at its outer edge, and never takes
+# layout space: focus moving never moves anything else.
+offset = 4
+
+# The spacing scale: gaps, paddings and insets.
+[space]
+values = [4, 8, 12, 16, 20, 24, 32, 40, 48, 64]
+
+# Corner radii, plus `full` for pills. A shape nested in another one with an
+# inset smaller than its parent's radius takes the parent's radius minus the
+# inset, so the corners stay concentric (`kubaos-ui` checks it).
+[radius]
+values = [4, 8, 12, 16, 20, 24]
+full = true
+
+# Icon sizes: the glyph's em box, which its ink sits inside with the font's
+# own margin.
+[icon]
+sizes = [16, 20, 24, 32, 48]
+
+# Fixed dimensions of components, by name.
+[size]
+# Buttons and fields: a small control and a regular one. A field is as tall
+# as a regular button, so the two line up side by side.
+control_sm = 32
+control_md = 40
+# A list row with one line, and with a title over a subtitle.
+row = 44
+row_two_line = 56
+chip = 24
+switch_width = 44
+switch_height = 24
+# The switch's knob off and on: it grows as it turns on, leaving 6 and 4 of
+# track around it.
+switch_knob_off = 12
+switch_knob_on = 16
+# A checkbox's box and a radio button's disc, and the dot of a picked radio
+# button.
+check = 20
+radio_dot = 8
+progress = 8
+dialog = 500
+# The widest a column of text and fields grows.
+column = 560
+# Kōbō's step rail on a wide screen.
+rail = 236
+# A log opened under an error or a progress bar.
+log = 232
+
+# Type families. Nothing else is drawn with.
+[font.family]
+sans = "Geist"
+mono = "Geist Mono"
+jp = "M PLUS 1"
+# KubaOS Symbols, our own icon font.
+icons = "KubaOS Symbols"
+
+# Type styles: size and line height in logical pixels, a weight and a family
+# from above. A single-line control's label takes the control's content box as
+# its line height, so it centres on the grid.
+[type.display]
+size = 48
+line = 56
+weight = "semibold"
+family = "sans"
+use = "The one big line of a full-screen moment: Kōbō's welcome and done screens."
+
+[type.title]
+size = 32
+line = 40
+weight = "semibold"
+family = "sans"
+use = "A screen's or page's title."
+
+[type.headline]
+size = 24
+line = 32
+weight = "semibold"
+family = "sans"
+use = "A dialog's title, a big number."
+
+[type.heading]
+size = 20
+line = 28
+weight = "semibold"
+family = "sans"
+use = "A section's title inside a page."
+
+[type.subheading]
+size = 16
+line = 24
+weight = "semibold"
+family = "sans"
+use = "A card's or an error's first line."
+
+[type.body_large]
+size = 16
+line = 24
+weight = "regular"
+family = "sans"
+use = "A lede under a display line, the text in a field."
+
+[type.body]
+size = 14
+line = 20
+weight = "regular"
+family = "sans"
+use = "Running text, explanations, toasts."
+
+[type.body_strong]
+size = 14
+line = 20
+weight = "medium"
+family = "sans"
+use = "A list row's title, a value next to its label."
+
+[type.button]
+size = 14
+line = 24
+weight = "semibold"
+family = "sans"
+use = "A regular button's label, on a 24 px line so it centres in a 40 px control."
+
+[type.button_small]
+size = 12
+line = 16
+weight = "semibold"
+family = "sans"
+use = "A small button's label, centred in a 32 px control."
+
+[type.label]
+size = 12
+line = 16
+weight = "medium"
+family = "sans"
+use = "A field's label, a chip, a quiet button."
+
+[type.small]
+size = 12
+line = 16
+weight = "regular"
+family = "sans"
+use = "A note under a field, a subtitle under a row's title."
+
+[type.caption]
+size = 11
+line = 16
+weight = "regular"
+family = "sans"
+use = "Key hints, version lines, the smallest print."
+
+[type.accent]
+size = 13
+line = 20
+weight = "medium"
+family = "jp"
+use = "The Japanese accent above a title."
+
+[type.mono]
+size = 12
+line = 16
+weight = "regular"
+family = "mono"
+use = "Logs, device paths, timings, keycaps."
+
+[type.mono_large]
+size = 14
+line = 20
+weight = "regular"
+family = "mono"
+use = "Commands and keys shown as the subject of a line."
+
+# Durations in milliseconds. Every animation picks one of these by what it is,
+# never by feel; the speed setting scales them all, and reduce motion turns
+# anything from `short` up into a `short` fade.
+[duration.instant]
+ms = 0
+use = "Changes that must not lag: the caret, text appearing as it is typed, reduce motion's moves."
+
+[duration.micro]
+ms = 100
+use = "Hover and press state layers, a colour change under the pointer."
+
+[duration.short]
+ms = 200
+use = "A toggle's knob, a checkbox's mark, focus moving, a toast fading in."
+
+[duration.medium]
+ms = 300
+use = "A panel or popup leaving, a log opening, a list reordering, a toast fading out."
+
+[duration.long]
+ms = 500
+use = "A panel or dialog arriving, a page sliding in."
+
+[duration.slow]
+ms = 800
+use = "A wallpaper fading in, the light/dark crossfade."
+
+[duration.scene]
+ms = 1200
+use = "A whole scene changing once: the lock screen lifting, Kōbō's welcome settling."
+
+# Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
+[easing.standard]
+curve = [0.2, 0.0, 0.0, 1.0]
+use = "Small state changes that stay on screen: toggles, colour, focus."
+
+[easing.standard_decel]
+curve = [0.0, 0.0, 0.0, 1.0]
+use = "Something already moving settling in: a list reordering."
+
+[easing.standard_accel]
+curve = [0.3, 0.0, 1.0, 1.0]
+use = "Something small leaving for good: a toast fading out."
+
+[easing.emphasized_decel]
+curve = [0.05, 0.7, 0.1, 1.0]
+use = "Things arriving on screen: panels, dialogs, pages, the log opening."
+
+[easing.emphasized_accel]
+curve = [0.3, 0.0, 0.8, 0.15]
+use = "Things leaving the screen: panels and dialogs closing."
+
+[easing.linear]
+curve = [0.0, 0.0, 1.0, 1.0]
+use = "Progress that tracks a real quantity, and spinners."
+
+# Opacities laid over a colour role.
+[opacity]
+# The state layer: the content colour over a surface, on hover and on press.
+hover = 0.08
+focus = 0.12
+press = 0.14
+# A disabled control's content, and its container.
+disabled_content = 0.38
+disabled_container = 0.10
+# A well's surface over the panel, and a soft hairline.
+well = 0.75
+outline_soft = 0.55
+# A field's placeholder, its selected text's highlight, and a read-only
+# field's outline and surface.
+placeholder = 0.55
+selection = 0.32
+locked = 0.50
+# An accent colour as a faint fill under itself: a tag, a done step.
+tint = 0.16
+# Secondary text on a selected row, over its container.
+subdued = 0.75
+# What darkens the screen behind a dialog.
+scrim = 0.60
+# A dialog's hairline in its tint, for a question and for a danger.
+dialog_edge = 0.25
+danger_edge = 0.60
+# A progress bar's track, and a spinner's faint full ring.
+track = 0.90
+spinner_track = 0.18
+# An error's surface (of the error container) and hairline (of the error).
+error_fill = 0.30
+error_edge = 0.45
+# The log's surface, over the page.
+log = 0.85
+
+# Shadows: offset down and blur in logical pixels, and the shadow's opacity
+# of the `shadow` role.
+[shadow.panel]
+y = 16
+blur = 48
+opacity = 0.55
+
+[shadow.dialog]
+y = 16
+blur = 48
+opacity = 0.60
+
+# The glow under a progress bar's fill, in the fill's own colour.
+[shadow.glow]
+y = 0
+blur = 12
+opacity = 0.55
+
+# Colour roles. At runtime matugen derives them from the wallpaper
+# (`scripts/dot-theme`, `scheme-fidelity`); these are the fallback, matugen's
+# output for the default wallpaper, `shinjuku/kubaos-neon-sign.jpg`, in each
+# mode. Each role names the matugen colour it comes from; a role with no
+# source is ours and keeps its value whatever the wallpaper.
+[color.source]
+primary = "primary"
+on_primary = "on_primary"
+primary_container = "primary_container"
+on_primary_container = "on_primary_container"
+secondary = "secondary"
+on_secondary = "on_secondary"
+secondary_container = "secondary_container"
+on_secondary_container = "on_secondary_container"
+tertiary = "tertiary"
+on_tertiary = "on_tertiary"
+tertiary_container = "tertiary_container"
+on_tertiary_container = "on_tertiary_container"
+# The cold accent, the blue of the sign's dakuten: fidelity's tertiary is the
+# wallpaper's complementary colour, so cold follows it. Used rarely: focus on
+# picked cards, a demo badge.
+cold = "tertiary"
+on_cold = "on_tertiary"
+cold_container = "tertiary_container"
+on_cold_container = "on_tertiary_container"
+error = "error"
+on_error = "on_error"
+error_container = "error_container"
+on_error_container = "on_error_container"
+surface = "surface"
+on_surface = "on_surface"
+surface_variant = "surface_variant"
+on_surface_variant = "on_surface_variant"
+surface_dim = "surface_dim"
+surface_bright = "surface_bright"
+surface_container_lowest = "surface_container_lowest"
+surface_container_low = "surface_container_low"
+surface_container = "surface_container"
+surface_container_high = "surface_container_high"
+surface_container_highest = "surface_container_highest"
+outline = "outline"
+outline_variant = "outline_variant"
+shadow = "shadow"
+scrim = "scrim"
+inverse_surface = "inverse_surface"
+inverse_on_surface = "inverse_on_surface"
+inverse_primary = "inverse_primary"
+# Amber, between fine and the error colour: a reading close to its limit.
+# Material 3 has no such role.
+warning = ""
+
+[color.dark]
+primary = "#ffb779"
+on_primary = "#4c2700"
+primary_container = "#d37b1b"
+on_primary_container = "#000000"
+secondary = "#f2bc8e"
+on_secondary = "#492806"
+secondary_container = "#643e1b"
+on_secondary_container = "#ffd9bb"
+tertiary = "#85cfff"
+on_tertiary = "#00344c"
+tertiary_container = "#0f9ad6"
+on_tertiary_container = "#000000"
+cold = "#85cfff"
+on_cold = "#00344c"
+cold_container = "#0f9ad6"
+on_cold_container = "#000000"
+error = "#ffb4ab"
+on_error = "#690005"
+error_container = "#93000a"
+on_error_container = "#ffdad6"
+surface = "#19120b"
+on_surface = "#f0dfd4"
+surface_variant = "#544436"
+on_surface_variant = "#dac2b1"
+surface_dim = "#19120b"
+surface_bright = "#413730"
+surface_container_lowest = "#140d07"
+surface_container_low = "#221a13"
+surface_container = "#261e17"
+surface_container_high = "#312821"
+surface_container_highest = "#3d332b"
+outline = "#a28d7d"
+outline_variant = "#544436"
+shadow = "#000000"
+scrim = "#000000"
+inverse_surface = "#f0dfd4"
+inverse_on_surface = "#382f27"
+inverse_primary = "#8e4e00"
+warning = "#f2c14e"
+
+[color.light]
+primary = "#8b4c00"
+on_primary = "#ffffff"
+primary_container = "#ae6100"
+on_primary_container = "#ffffff"
+secondary = "#7f5530"
+on_secondary = "#ffffff"
+secondary_container = "#fec798"
+on_secondary_container = "#593513"
+tertiary = "#00628b"
+on_tertiary = "#ffffff"
+tertiary_container = "#007caf"
+on_tertiary_container = "#ffffff"
+cold = "#00628b"
+on_cold = "#ffffff"
+cold_container = "#007caf"
+on_cold_container = "#ffffff"
+error = "#ba1a1a"
+on_error = "#ffffff"
+error_container = "#ffdad6"
+on_error_container = "#410002"
+surface = "#fff8f5"
+on_surface = "#221a13"
+surface_variant = "#f7decc"
+on_surface_variant = "#544436"
+surface_dim = "#e7d7cc"
+surface_bright = "#fff8f5"
+surface_container_lowest = "#ffffff"
+surface_container_low = "#fff1e8"
+surface_container = "#fcebdf"
+surface_container_high = "#f6e5da"
+surface_container_highest = "#f0dfd4"
+outline = "#877364"
+outline_variant = "#dac2b1"
+shadow = "#000000"
+scrim = "#000000"
+inverse_surface = "#382f27"
+inverse_on_surface = "#ffeee2"
+inverse_primary = "#ffb779"
+# Amber dark enough for text on the light surfaces (6.1:1 on `surface`).
+warning = "#7a5900"

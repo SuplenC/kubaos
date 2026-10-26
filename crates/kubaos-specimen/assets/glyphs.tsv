@@ -1,0 +1,43 @@
+# The icon comparison sheet's 40 glyphs: things Kōbō and the shell draw today,
+# by their Material Symbols name, and the closest glyph of each other set.
+# id	material	phosphor	lucide	tabler
+back	arrow_back	arrow-left	arrow-left	arrow-left
+forward	arrow_forward	arrow-right	arrow-right	arrow-right
+chevron	chevron_right	caret-right	chevron-right	chevron-right
+expand	expand_more	caret-down	chevron-down	chevron-down
+close	close	x	x	x
+check	check	check	check	check
+done	check_circle	check-circle	circle-check	circle-check
+add	add	plus	plus	plus
+search	search	magnifying-glass	search	search
+settings	settings	gear	settings	settings
+power	power_settings_new	power	power	power
+restart	restart_alt	arrow-counter-clockwise	rotate-ccw	rotate
+lock	lock	lock	lock	lock
+unlock	lock_open	lock-open	lock-open	lock-open
+key	key	key	key	key
+fingerprint	fingerprint	fingerprint	fingerprint	fingerprint
+wifi	wifi	wifi-high	wifi	wifi
+wifi-off	wifi_off	wifi-slash	wifi-off	wifi-off
+bluetooth	bluetooth	bluetooth	bluetooth	bluetooth
+volume	volume_up	speaker-high	volume-2	volume
+mute	volume_off	speaker-slash	volume-x	volume-off
+light	light_mode	sun	sun	sun
+dark	dark_mode	moon	moon	moon
+bell	notifications	bell	bell	bell
+bell-off	notifications_off	bell-slash	bell-off	bell-off
+bolt	bolt	lightning	zap	bolt
+battery	battery_full	battery-full	battery-full	battery-4
+keyboard	keyboard	keyboard	keyboard	keyboard
+globe	language	globe	globe	world
+terminal	terminal	terminal-window	square-terminal	terminal-2
+code	code	code	code	code
+folder	folder	folder	folder	folder
+disk	hard_drive	hard-drive	hard-drive	server
+download	download	download-simple	download	download
+timer	timer	timer	timer	stopwatch
+clock	schedule	clock	clock	clock
+warning	warning	warning	triangle-alert	alert-triangle
+error	error	warning-circle	circle-alert	alert-circle
+hidden	visibility_off	eye-slash	eye-off	eye-off
+person	person	user	user	user
