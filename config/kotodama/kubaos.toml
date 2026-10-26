@@ -30,8 +30,10 @@ names = { nvim = "Neovim" }
 in_search = true
 
 [extensions.folders]
-# A script's window stays open after it exits, so its output can be read.
-terminal = ["ghostty", "--wait-after-command=true", "-e"]
+# A script's window stays open after it exits, so its output can be read. It
+# floats (dot.float, config/hypr/rules.lua): a quick run shouldn't push the
+# tiled windows around.
+terminal = ["ghostty", "--class=dot.float", "--wait-after-command=true", "-e"]
 # A project opens in its tmux session, the one `tms` opens for it.
 open = ["ghostty", "-e", "tmux", "new-session", "-A", "-s", "{session}", "-c", "{path}"]
 shell = ["ghostty", "--working-directory={path}"]
@@ -61,8 +63,10 @@ kind = "scripts"
 # long, so the menu is off the screen first).
 #
 # What a `terminal = true` action runs in. It stays open once the action
-# exits, so what it said can be read.
-terminal = ["ghostty", "--wait-after-command=true", "-e"]
+# exits, so what it said can be read, and floats (dot.float,
+# config/hypr/rules.lua), since an action is run and closed, and shouldn't
+# push the tiled windows around.
+terminal = ["ghostty", "--class=dot.float", "--wait-after-command=true", "-e"]
 
 # Files: Nautilus (home/files.nix), and yazi in Ghostty (crates/kubaos-files).
 # The Extension itself sends one Item a user folder that exists, "Files:

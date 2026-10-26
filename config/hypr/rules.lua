@@ -33,7 +33,8 @@ tag({ class = "^(com\\.mitchellh\\.ghostty|foot|footclient|org\\.codeberg\\.dnkl
 -- Ghostty scrolls very fast on touchpads under Hyprland (Omarchy uses 0.2).
 hl.window_rule({ match = { class = "^com\\.mitchellh\\.ghostty$" }, scroll_touchpad = 0.3 })
 
--- Small floating TUIs launched by binds with --class=dot.float.
+-- Terminals for a quick run, then closed: the Command menu's actions and
+-- scripts, `kubaos update` from the bar, btop from the system monitor.
 tag({ class = "^dot\\.float$" }, "float-medium")
 
 ---------------------------------------------------------------------------

@@ -451,7 +451,7 @@ Drawer {
                 tooltip: "Open btop"
                 onClicked: {
                     Panels.close();
-                    Quickshell.execDetached(["ghostty", "-e", "btop"]);
+                    Quickshell.execDetached(["ghostty", "--class=dot.float", "-e", "btop"]);
                 }
             }
         }
