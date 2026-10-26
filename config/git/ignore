@@ -1,1 +1,2 @@
-**/.claude/settings.local.json
+# Global git ignore patterns. KubaOS ships none; yours go in
+# ~/.config/kubaos/tools/git/ignore, which dot-config apply adds after this file.

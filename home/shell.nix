@@ -1,4 +1,5 @@
-# zsh, ported from the macOS ~/.zshrc and ~/.zprofile.
+# zsh: KubaOS's shell, with oh-my-zsh, fzf, atuin, direnv, zoxide and the
+# oh-my-posh prompt.
 #
 # programs.zsh writes ~/.zshrc, ~/.zshenv and ~/.zprofile. Order of
 # programs.zsh.initContent (lower runs first):
@@ -87,12 +88,13 @@ in
       '';
     };
 
+    # Your own aliases go in the user layer's zshrc, which `zshrc` opens.
     shellAliases = {
       zshrc = "nvim ${userLayer.dir "zsh"}/zshrc";
-      # Outside tmux there is no history to clear, and no error to show.
+      # `clear` alone leaves tmux's scrollback, so in a tmux pane (every
+      # project the Command menu opens) the old output is still a scroll
+      # away. Outside tmux there is no history to clear, and no error to show.
       wipe = "clear && { [[ -z $TMUX ]] || tmux clear-history; }";
-      nvimconfig = "nvim ~/.config/nvim";
-      tma = "tmux attach";
     };
 
     initContent = lib.mkMerge [
@@ -137,8 +139,6 @@ in
       '')
 
       ''
-        ulimit -n 65536 2>/dev/null
-
         function y() {
           local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
           command yazi "$@" --cwd-file="$tmp"
