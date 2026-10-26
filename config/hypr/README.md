@@ -63,9 +63,10 @@ The defaults place every screen at its preferred mode. Set your own layout in
 
 A line of your own for `eDP-1` replaces the lid rule above it: copy the flag
 check from `monitors.lua` around it, or the panel stays on with the lid
-closed. Workspaces don't depend on any of this: each screen gets its block
-the first time it is seen, by its description, and keeps it
-(`~/.local/state/kubaos/hypr/workspace-screens`).
+closed. Workspaces follow these positions: the leftmost external shows the
+first external group, whatever screen it is (see Workspaces below), so place
+your screens in the order they stand on the desk. Without lines of your own,
+Hyprland places them in connector order.
 
 ## Workspaces
 
@@ -74,16 +75,37 @@ focused screen's, `SUPER + arrows` focus another screen. Hyprland numbers
 workspaces globally, so `workspaces.lua` gives each screen a block of ten ids
 (the laptop panel 1-10, the next screen 11-20) and the bar labels them 1-10.
 
-A screen's workspaces are its group. Unplugging a screen moves its group to
-the primary screen (the laptop panel; with the lid closed, the external
-Hyprland numbered first) under its own numbers, if it had any windows; an
-empty group vanishes. Plugging the screen back returns the group to it. The
-bar shows each group on its own, a thin rule between them, e.g. `1 2 3 | 1 2`,
-in block order: the screen's own first, then the waiting groups, each on a
-tint so it reads as borrowed. Block order is id order, the order Hyprland's
-swipe walks a screen's workspaces in, so the one screen that sees a waiting
-group before its own is an external holding the laptop's group (1-10) while
-the lid is closed.
+A block belongs to a position on the desk, not to a screen. The laptop panel
+is one position; the externals are positions 1, 2 and on, counted left to
+right by where Hyprland places them (top to bottom at the same x). Whatever
+screen stands at position 1 shows position 1's workspaces, so with two
+screens beside the laptop at work and two others at home, carrying the
+laptop from one desk to the other brings the windows along: the left screen
+at home shows what the left one at work did. There is nothing to pair; only
+the order counts, so place the screens in the order they stand (above).
+
+A position's workspaces are its group. When fewer screens are plugged in,
+the group of a position no screen holds waits on the primary screen (the
+laptop panel; with the lid closed, the external Hyprland numbered first)
+under its own numbers, if it had any windows; an empty group vanishes. The
+next screen to take that position takes the group back. A position never seen
+before gets a new group. Unplugging the leftmost of three screens shifts the
+others one position left, and each group goes to the screen now at its
+position. The bar shows each group on its own, a thin rule between them,
+e.g. `1 2 3 | 1 2`, in block order: the screen's own first, then the waiting
+groups, each on a tint so it reads as borrowed. Block order is id order, the
+order Hyprland's swipe walks a screen's workspaces in, so the one screen that
+sees a waiting group before its own is an external holding the laptop's
+group (1-10) while the lid is closed.
+
+Which block each position owns, and the screen there now or last, is in
+`~/.local/state/kubaos/hypr/workspace-screens`. The Command menu lists it:
+type "workspace group" for an Item per position, "Workspace group: position 1
+from the left", with its workspaces and its screen; running it goes there. A
+file from before positions, keyed by screen, is turned into positions on the
+first start: the externals plugged in keep their blocks where they stand, and
+the others' blocks become the positions after them, so no window or workspace
+number moves.
 
 Each group keeps two workspaces even when they are empty, as Hyprland
 persistent workspace rules bound to its screen (`hl.workspace_rule`, set and
@@ -117,7 +139,8 @@ Every action is also an expression for the socket:
 `dot.workspaces.next()`, `previous()`, `next_group()`, `previous_group()`
 (each takes a connector, the focused screen without one). The bar's clicks go
 through `dot.workspaces.go_to(id, "<connector>")`, its wheel through
-`dot.workspaces.next("<connector>")` and `previous`.
+`dot.workspaces.next("<connector>")` and `previous`, and the menu's desk Items
+through `dot.workspaces.go_to_position("1")` (or `"panel"`).
 
 ## Lid
 
