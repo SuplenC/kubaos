@@ -524,6 +524,56 @@ nix_parallel_builds() {
   fi
 }
 
+# nix_conf_has CONF SETTING VALUE: CONF sets SETTING, or its `extra-` form, to
+# a list that holds VALUE.
+nix_conf_has() {
+  local conf="$1" setting="$2" value="$3"
+  [[ -f $conf ]] || return 1
+  # HAZARD: not `grep -q`. It exits at the first match, and the first grep's
+  # SIGPIPE then fails the pipeline under pipefail, as if nothing matched.
+  grep -E "^[[:space:]]*(extra-)?${setting}[[:space:]]*=" "$conf" | grep -wF -- "$value" >/dev/null
+}
+
+# KubaOS's binary cache on Cachix. CI pushes the curated set's own builds to
+# it from every push to main (.github/workflows/cache.yml).
+KUBAOS_CACHE_URL="https://kuba-os.cachix.org"
+KUBAOS_CACHE_KEY="kuba-os.cachix.org-1:BAhDPs8FW+W0SaOzsx7yS9sZmcb6ZjdLc09hBeKXIE0="
+
+# nix_binary_cache: the Nix daemon downloads KubaOS's packages from its
+# binary cache instead of building them (`extra-substituters` and
+# `extra-trusted-public-keys` in /etc/nix/nix.conf). A path the cache doesn't
+# have, such as a release CI is still building, builds on the machine as
+# before. The `extra-` settings add to Nix's own (cache.nixos.org) and to any
+# the user set, so the file's other lines stay; each is written only when the
+# file doesn't name the cache or key already. The daemon takes substituters
+# from this file as they are, so no user needs to be in `trusted-users` (as
+# `cachix use` would want): a trusted user is effectively root. 60-nix.sh runs
+# it, and a migration on machines installed before it.
+nix_binary_cache() {
+  local conf=/etc/nix/nix.conf lines=""
+  nix_conf_has "$conf" substituters "$KUBAOS_CACHE_URL" ||
+    lines+="extra-substituters = $KUBAOS_CACHE_URL\n"
+  nix_conf_has "$conf" trusted-public-keys "$KUBAOS_CACHE_KEY" ||
+    lines+="extra-trusted-public-keys = $KUBAOS_CACHE_KEY\n"
+  if [[ -z $lines ]]; then
+    ok "$conf uses $KUBAOS_CACHE_URL already"
+    return 0
+  fi
+  if ((DRY_RUN)); then
+    lines="${lines%\\n}"
+    info "would append to $conf: ${lines//\\n/; }"
+  else
+    # shellcheck disable=SC2016 # $1 and $2 are the inner shell's arguments.
+    sudo_run sh -c 'printf "\n# KubaOS: its binary cache (nix_binary_cache, system/lib.sh)\n%b" "$1" >>"$2"' \
+      sh "$lines" "$conf"
+  fi
+  # The daemon reads nix.conf when it starts. Its unit kills only the main
+  # process, so builds already running finish.
+  if unit_exists nix-daemon.service && has_systemd; then
+    sctl restart nix-daemon.service
+  fi
+}
+
 # shellcheck source=system/manifest.sh
 source "$SYSTEM_DIR/manifest.sh"
 

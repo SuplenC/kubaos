@@ -54,9 +54,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # ---------------------------------------------------------------------------
 # nix: the official installer exactly as system/60-nix.sh runs it (version,
-# URL and sha256 read from that script), multi-user, flakes on. The flake-
-# dependent half of 60-nix.sh (home-manager switch, PAM module links, GPU
-# setup) runs at test time against the volume, by the real script.
+# URL and sha256 read from that script), multi-user, flakes on, and
+# KubaOS's binary cache, the lines nix_binary_cache (system/lib.sh) writes. The
+# flake-dependent half of 60-nix.sh (home-manager switch, PAM module links,
+# GPU setup) runs at test time against the volume, by the real script.
 FROM base AS nix
 COPY system/60-nix.sh /opt/dotfiles/system/60-nix.sh
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -69,6 +70,8 @@ RUN eval "$(grep -E '^NIX_(VERSION|INSTALL_URL|INSTALL_SHA256)=' /opt/dotfiles/s
  && runuser -u kuba -- sh "$tmp/install" --daemon --yes </dev/null \
  && rm -rf "$tmp" \
  && printf '\n# dotfiles/system/60-nix.sh\nexperimental-features = nix-command flakes\n' >>/etc/nix/nix.conf \
+ && printf '\n# KubaOS: its binary cache (nix_binary_cache, system/lib.sh)\nextra-substituters = %s\nextra-trusted-public-keys = %s\n' \
+      https://kuba-os.cachix.org kuba-os.cachix.org-1:BAhDPs8FW+W0SaOzsx7yS9sZmcb6ZjdLc09hBeKXIE0= >>/etc/nix/nix.conf \
  && /nix/var/nix/profiles/default/bin/nix --version
 
 # ---------------------------------------------------------------------------

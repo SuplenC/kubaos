@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Phase 6: Nix (official multi-user installer), flakes, parallel builds, first home-manager
-# switch for <user>@<host>, nixpkgs' pam_fprintd.so for the Quickshell lock,
-# the wallpaper sets in /usr/share/kubaos/wallpapers, the one-time GPU setup
-# for Nix apps, zsh as login shell.
+# Phase 6: Nix (official multi-user installer), flakes, parallel builds,
+# KubaOS's binary cache, first home-manager switch for <user>@<host>,
+# nixpkgs' pam_fprintd.so for the Quickshell lock, the wallpaper sets in
+# /usr/share/kubaos/wallpapers, the one-time GPU setup for Nix apps, zsh as
+# login shell.
 #
 # Installer choice: the official script from nixos.org (`--daemon`). It
 # installs upstream Nix, the same Nix nixpkgs and home-manager are tested
@@ -130,6 +131,9 @@ fi
 
 step "Parallel builds in /etc/nix/nix.conf"
 nix_parallel_builds
+
+step "KubaOS's binary cache in /etc/nix/nix.conf"
+nix_binary_cache
 
 # --------------------------------------------------------------------------
 step "nix-daemon units as real files"
