@@ -1,11 +1,13 @@
 //! First-boot setup (docs/INSTALL-INTERNALS.md, "First boot"): the things the
 //! payload can't carry because they need the hardware or the person.
 //!
-//! Five cards, each detected from the machine on every start, so re-running
+//! Six cards, each detected from the machine on every start, so re-running
 //! never redoes a finished one: TUXEDO drivers (with the Secure Boot key),
 //! the fingerprint reader, the YubiKey for sudo/polkit/lock screen, the
 //! Bitwarden vault (SSH keys, commit signing, gh, project env through
-//! [`crate::bitwarden`]), and the name and email git commits with.
+//! [`crate::bitwarden`]), the name and email git commits with, and the
+//! phone link ([`kubaos_phone`]), which stays off until the user sets up a
+//! phone here.
 //!
 //! Runs as the desktop user. The few steps that need root go through
 //! `pkexec /usr/lib/kubaos/setup-helper`, a fixed root-owned script with
@@ -29,7 +31,7 @@ pub use crate::engine::runner::{Cmd, Output, Stream};
 use crate::event::Level;
 
 pub use actions::{YKMAN_PREP, git_identity_ok, mok_password_ok, run};
-pub use detect::{card_status, status};
+pub use detect::{card_status, online, status};
 pub use parse::*;
 
 /// Where the engine puts the privileged helper (install/firstboot/).
@@ -46,15 +48,17 @@ pub enum CardId {
     Yubikey,
     Bitwarden,
     Git,
+    Phone,
 }
 
 impl CardId {
-    pub const ALL: [CardId; 5] = [
+    pub const ALL: [CardId; 6] = [
         CardId::Tuxedo,
         CardId::Fingerprint,
         CardId::Yubikey,
         CardId::Bitwarden,
         CardId::Git,
+        CardId::Phone,
     ];
 
     pub fn title(self) -> &'static str {
@@ -64,6 +68,7 @@ impl CardId {
             CardId::Yubikey => "YubiKey",
             CardId::Bitwarden => "Bitwarden",
             CardId::Git => "Git",
+            CardId::Phone => "Your phone",
         }
     }
 
@@ -71,9 +76,10 @@ impl CardId {
         serde_json::from_value(serde_json::Value::String(s.into())).ok()
     }
 
-    /// Needs the internet to do its thing (apt, the vault).
+    /// Needs the internet to do its thing (apt, the vault). The phone needs the local network
+    /// only.
     pub fn needs_network(self) -> bool {
-        !matches!(self, CardId::Yubikey | CardId::Git)
+        !matches!(self, CardId::Yubikey | CardId::Git | CardId::Phone)
     }
 }
 
@@ -169,6 +175,10 @@ pub enum Facts {
         email: Option<String>,
         /// The account's full name (passwd), a guess for `name`.
         full_name: Option<String>,
+    },
+    Phone {
+        /// The phone link as `kubaos-phone status --json` prints it.
+        link: kubaos_phone::Status,
     },
 }
 
@@ -291,6 +301,25 @@ pub struct Inputs {
     /// Log bw out instead of pulling: for another account or another server.
     pub bw_logout: bool,
     pub git: Option<GitIdentity>,
+    /// What the phone card does; turning the link on when `None`.
+    pub phone: Option<PhoneStep>,
+}
+
+/// What a run of the phone card does.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PhoneStep {
+    /// Turn the phone link on: kdeconnectd starts, and phones on the network see the laptop.
+    #[default]
+    On,
+    /// Turn it off: kdeconnectd stops.
+    Off,
+    /// Accept the pairing request of the device with this id.
+    Accept { device: String },
+    /// Put the test text on the clipboard and send it to the phone.
+    Test,
+    /// Read what the phone sent to the clipboard.
+    Check,
 }
 
 /// The name and email git commits with. Not secret.
@@ -326,6 +355,7 @@ impl std::fmt::Debug for Inputs {
             .field("bw_folders", &self.bw_folders)
             .field("bw_logout", &self.bw_logout)
             .field("git", &self.git)
+            .field("phone", &self.phone)
             .finish()
     }
 }
@@ -419,6 +449,8 @@ pub trait Sys {
     }
     /// bw and the files a Bitwarden pull writes.
     fn bitwarden(&mut self) -> &mut dyn crate::bitwarden::Machine;
+    /// KDE Connect, its user unit and the clipboard.
+    fn phone(&mut self) -> &mut dyn kubaos_phone::Link;
 }
 
 /// The real machine.
@@ -426,6 +458,7 @@ pub trait Sys {
 pub struct RealSys {
     runner: crate::engine::runner::SystemRunner,
     bitwarden: crate::bitwarden::Real,
+    phone: kubaos_phone::KdeConnect,
 }
 
 impl RealSys {
@@ -486,6 +519,10 @@ impl Sys for RealSys {
 
     fn bitwarden(&mut self) -> &mut dyn crate::bitwarden::Machine {
         &mut self.bitwarden
+    }
+
+    fn phone(&mut self) -> &mut dyn kubaos_phone::Link {
+        &mut self.phone
     }
 }
 

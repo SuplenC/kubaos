@@ -18,6 +18,7 @@ pub mod switch;
 pub mod update;
 
 pub use config::{InstallConfig, Secrets};
+pub use kubaos_phone as phone;
 pub use event::{Event, Level, StepInfo};
 pub use probe::{Manifest, Probe};
 pub use step::StepId;

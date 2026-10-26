@@ -34,7 +34,7 @@ pub enum SetupCmd {
         #[arg(long, value_enum)]
         demo: Option<DemoMachine>,
     },
-    /// Do one card: tuxedo, fingerprint, yubikey, bitwarden or git.
+    /// Do one card: tuxedo, fingerprint, yubikey, bitwarden, git or phone.
     Run {
         #[arg(value_parser = parse_card)]
         card: CardId,
@@ -52,7 +52,7 @@ pub enum SetupCmd {
 
 fn parse_card(s: &str) -> Result<CardId, String> {
     CardId::parse(s)
-        .ok_or_else(|| format!("unknown card {s}: tuxedo, fingerprint, yubikey, bitwarden, git"))
+        .ok_or_else(|| format!("unknown card {s}: tuxedo, fingerprint, yubikey, bitwarden, git, phone"))
 }
 
 fn machine(d: DemoMachine) -> demo::Machine {

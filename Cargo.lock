@@ -2213,6 +2213,7 @@ dependencies = [
 name = "kubaos-core"
 version = "0.1.0"
 dependencies = [
+ "kubaos-phone",
  "kubaos-user-layer",
  "serde",
  "serde_json",

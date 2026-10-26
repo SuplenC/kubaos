@@ -39,6 +39,7 @@ pub fn card_status(sys: &mut dyn Sys, env: &Env, id: CardId, online: bool) -> Ca
         CardId::Yubikey => yubikey(sys, env),
         CardId::Bitwarden => bitwarden(sys, env),
         CardId::Git => git(sys, env),
+        CardId::Phone => phone(sys),
     };
     if c.state == State::Needed && id.needs_network() && !online && !offline_ok(&c) {
         c.state = State::Waiting;
@@ -471,6 +472,50 @@ fn git(sys: &mut dyn Sys, env: &Env) -> CardStatus {
     }
 }
 
+// ------------------------------------------------------------------- phone
+
+/// The phone link, through [`kubaos_phone::phone::status`]: while it is off, kdeconnectd isn't
+/// asked anything.
+fn phone(sys: &mut dyn Sys) -> CardStatus {
+    phone_card(kubaos_phone::phone::status(sys.phone()))
+}
+
+/// The phone card for the link as it stands.
+pub(super) fn phone_card(link: kubaos_phone::Status) -> CardStatus {
+    let laptop = link.name.as_deref().unwrap_or("this laptop");
+    let (state, summary) = if !link.on {
+        (
+            State::Needed,
+            "Off. Set it up to share the clipboard and files with your phone.".to_string(),
+        )
+    } else if !link.running {
+        (State::Needed, "On, but KDE Connect isn't running.".to_string())
+    } else if let Some(asking) = link.request() {
+        (
+            State::Needed,
+            format!("{} wants to pair. Check the key, then accept.", asking.name),
+        )
+    } else if let Some(phone) = link.paired() {
+        let reach = if phone.reachable { "in reach" } else { "out of reach right now" };
+        let battery = phone
+            .battery
+            .map(|b| format!(", battery {}%", b.charge))
+            .unwrap_or_default();
+        (State::Done, format!("Paired with {}, {reach}{battery}.", phone.name))
+    } else {
+        (
+            State::Waiting,
+            format!("Waiting for your phone: open KDE Connect on it and tap {laptop}."),
+        )
+    };
+    CardStatus {
+        id: CardId::Phone,
+        state,
+        summary,
+        facts: Facts::Phone { link },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::fake::FakeSys;
@@ -751,5 +796,54 @@ mod tests {
         let c = bitwarden(&mut s, &env());
         assert_eq!(c.state, State::Needed);
         assert!(matches!(c.facts, Facts::Bitwarden { email: Some(ref e), .. } if e == "k@x.eu"));
+    }
+
+    fn phone_card(fake: kubaos_phone::fake::Fake) -> CardStatus {
+        let mut s = FakeSys::new();
+        s.phone = fake;
+        card_status(&mut s, &env(), CardId::Phone, false)
+    }
+
+    #[test]
+    fn an_untouched_phone_card_is_off_and_asks_nothing_of_kde_connect() {
+        let c = phone_card(kubaos_phone::fake::Fake {
+            running: true,
+            devices: vec![kubaos_phone::fake::iphone()],
+            ..kubaos_phone::fake::Fake::new()
+        });
+
+        assert_eq!(c.state, State::Needed, "offline makes no difference: {}", c.summary);
+        assert!(c.summary.starts_with("Off."), "{}", c.summary);
+        assert!(matches!(&c.facts, Facts::Phone { link } if !link.running && link.devices.is_empty()));
+    }
+
+    #[test]
+    fn a_phone_card_that_is_on_waits_for_a_phone_then_for_the_user_to_accept() {
+        use kubaos_phone::fake::{Fake, iphone_asking, stranger};
+
+        let down = phone_card(Fake {
+            on: true,
+            ..Fake::new()
+        });
+        assert_eq!(down.state, State::Needed);
+        assert!(down.summary.contains("isn't running"), "{}", down.summary);
+
+        let waiting = phone_card(Fake::running(vec![stranger()]));
+        assert_eq!(waiting.state, State::Waiting);
+        assert!(waiting.summary.contains("tap kubaos"), "{}", waiting.summary);
+
+        let asked = phone_card(Fake::running(vec![stranger(), iphone_asking()]));
+        assert_eq!(asked.state, State::Needed);
+        assert!(asked.summary.starts_with("iPhone wants to pair"), "{}", asked.summary);
+    }
+
+    #[test]
+    fn a_paired_phone_is_done_with_its_reach_and_battery() {
+        use kubaos_phone::fake::{Fake, iphone};
+
+        let c = phone_card(Fake::running(vec![iphone()]));
+
+        assert_eq!(c.state, State::Done);
+        assert_eq!(c.summary, "Paired with iPhone, in reach, battery 82%.");
     }
 }

@@ -131,12 +131,34 @@ pub fn script() -> Vec<Step> {
         Tap(Enter), // last field: Save
         Until("git done", |s| state(s, CardId::Git) == Some(State::Done)),
         Tap(Esc),
+        Tap(Down),
+        Wait(SETTLE),
+        Shot("11-phone-off"),
+        Tap(Enter), // into Your phone: Set up a phone
+        Tap(Enter),
+        Until("pairing request", |s| {
+            s.phone_link().is_some_and(|l| l.request().is_some())
+        }),
+        Wait(SETTLE),
+        Shot("12-phone-pair-request"),
+        Tap(Enter), // Accept the pairing
+        Until("phone paired", |s| state(s, CardId::Phone) == Some(State::Done)),
+        Tap(Enter), // Send a test copy
+        Until("test sent", |s| {
+            s.run
+                .as_ref()
+                .is_some_and(|r| matches!(&r.outcome, Some(Outcome::Done(t)) if t.contains("Paste it")))
+        }),
+        Wait(SETTLE),
+        Shot("13-phone-paired"),
+        Tap(Esc),
+        Tap(Up),
         Tap(Up),
         Tap(Up),
         Tap(Up),
         Tap(Up),
         Wait(SETTLE),
-        Shot("11-all-set"),
+        Shot("14-all-set"),
         Exit,
     ]
 }
@@ -391,6 +413,71 @@ mod tests {
             }
             f => panic!("{f:?}"),
         }
+        let phone = st.card(CardId::Phone).unwrap();
+        assert_eq!(phone.state, State::Done);
+        assert!(phone.summary.contains("Paste it on iPhone"), "{}", phone.summary);
+    }
+
+    fn on_the_phone_card(machine: demo::Machine) -> Setup {
+        let mut s = headless(machine);
+        s.start = Some(CardId::Phone);
+        play(&mut s, vec![Step::Until("status", |s| s.status.is_some())]);
+        s
+    }
+
+    #[test]
+    fn turning_the_phone_link_off_is_done_and_leaves_the_card_to_set_up_again() {
+        let mut s = on_the_phone_card(demo::Machine::Installed);
+        assert!(s.focus_order().contains(&SF::TurnOff));
+
+        let _ = s.update_inner(Message::Setup(crate::setup::Msg::Click(SF::TurnOff)));
+        play(&mut s, vec![Step::Until("off", |s| s.run.as_ref().is_some_and(|r| !r.running()))]);
+
+        let run = s.run.as_ref().unwrap();
+        assert!(matches!(&run.outcome, Some(Outcome::Done(t)) if t.starts_with("Phone link off")), "{:?}", run.outcome);
+        assert_eq!(s.card(CardId::Phone).unwrap().state, State::Needed);
+        assert_eq!(s.primary(), Some(("Set up a phone", crate::setup::Act::Run)));
+        assert!(!s.focus_order().contains(&SF::TurnOff));
+    }
+
+    /// The phone card as it waits for a phone, with the link on and nothing seen yet.
+    fn waiting_phone(s: &mut Setup) {
+        let link = kubaos_core::phone::Status {
+            on: true,
+            running: true,
+            name: Some("kubaos".into()),
+            addresses: vec!["192.168.1.23".into()],
+            devices: vec![],
+        };
+        let st = s.status.as_mut().unwrap();
+        let card = st.cards.iter_mut().find(|c| c.id == CardId::Phone).unwrap();
+        card.state = State::Waiting;
+        card.facts = Facts::Phone { link };
+    }
+
+    #[test]
+    fn the_phone_card_checks_again_on_its_own_while_it_waits() {
+        let mut s = on_the_phone_card(demo::Machine::Vm);
+        waiting_phone(&mut s);
+
+        // The demo's own phone card is off: the poll brings that back in place of the edit.
+        play(&mut s, vec![Step::Until("polled", |s| s.card(CardId::Phone).unwrap().state == State::Needed)]);
+
+        assert!(s.phone_link().is_some_and(|l| !l.on));
+    }
+
+    #[test]
+    fn a_phone_card_waiting_a_while_explains_adding_the_laptop_by_address() {
+        let mut s = on_the_phone_card(demo::Machine::Vm);
+        waiting_phone(&mut s);
+        let now = Instant::now();
+        s.now = now;
+
+        s.phone_waiting_since = Some(now - Duration::from_secs(5));
+        assert!(!s.phone_by_address());
+
+        s.phone_waiting_since = Some(now - Duration::from_secs(31));
+        assert!(s.phone_by_address());
     }
 
     #[test]
