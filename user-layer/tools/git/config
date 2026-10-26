@@ -4,7 +4,7 @@
 #
 # Merge instead of rebase on `git pull` (KubaOS rebases).
 # [pull]
-# 	rebase = true
+# 	rebase = false
 #
 # Delete local refs to branches the remote deleted, on every fetch (on in KubaOS).
 # [fetch]
