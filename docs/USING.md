@@ -236,6 +236,7 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 | A package, without writing Nix | `kubaos package add ripgrep` (`remove`, `list`); `kubaos try cowsay` opens a shell with it and installs nothing | the switch `add` and `remove` queue |
 | A whole language setup (a Suite) | `kubaos suite list`, `kubaos suite add NAME [--version V] [--extra E]`, `configure`, `remove [--purge-caches]`; `kubaos suite new NAME PROJECT` starts a project in `~/Projects` | the switch `add`, `configure` and `remove` queue |
 
+- `~/.zshrc` and the other files home-manager links are read-only, so an installer that offers to "update your profile" fails there. Say no, or pass its flag for that (proto: `bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --no-profile`), and put any lines it wanted in `~/.config/kubaos/terminal/zsh/zshrc`. rustup's, cargo's and proto's PATH entries are already set (`PROTO_HOME` is `~/.local/share/proto`).
 - To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
 - Delete a file in `~/.config/kubaos` to get the example back on the next `dot-config apply` or update.
 - Coming from a release before the groups, the update moves each `~/.config/kubaos/<app>` into its group for you and loses nothing. Where you had edited both the old file and a new one in the group, it keeps the group's and puts yours beside it as `<file>.old`, and says so; merge the two by hand. A user layer under git sees the moves as renames, for you to commit.

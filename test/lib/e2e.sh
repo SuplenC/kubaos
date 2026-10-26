@@ -59,7 +59,7 @@ c_login_shell() {
 c_path() {
   local path_lines h="$USER_HOME" i want prev=-1 idx
   path_lines="$(zlogin 'print -l $path' 2>/dev/null)"
-  for want in "$h/.local/bin" "$h/.cargo/bin" "$h/.proto/shims" "$h/.proto/bin" "$h/.nix-profile/bin" /usr/bin; do
+  for want in "$h/.local/bin" "$h/.cargo/bin" "$h/.local/share/proto/shims" "$h/.local/share/proto/bin" "$h/.nix-profile/bin" /usr/bin; do
     idx="$(grep -nxF -- "$want" <<<"$path_lines" | head -1 | cut -d: -f1)"
     [[ -n $idx ]] || { echo "FAIL PATH lacks $want"; printf '%s\n' "$path_lines"; return 1; }
     echo "ok   PATH[$idx] $want"
