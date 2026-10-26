@@ -6,7 +6,7 @@
 --
 -- Number and punctuation keys use keycodes (code:10 = "1" ... code:19 = "0",
 -- code:20/21 = the two keys right of "0", code:49 = the key left of "1"),
--- so the binds sit on the same physical keys with the Italian layout.
+-- so the binds sit on the same physical keys whatever the layout.
 
 local function bind(keys, description, action, flags)
   local opts = { description = description }
@@ -170,7 +170,7 @@ bind("SUPER + mouse_up", "Previous workspace", dot.workspaces.previous())
 hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 hl.config({ gestures = { workspace_swipe_create_new = false } })
 
--- Scratchpad. code:49 is the key left of 1 (backslash on Italian).
+-- Scratchpad. code:49 is the key left of 1, whatever the layout types there.
 bind("SUPER + S", "Toggle scratchpad", hl.dsp.workspace.toggle_special("scratchpad"))
 bind("SUPER + code:49", "Toggle scratchpad", hl.dsp.workspace.toggle_special("scratchpad"))
 bind("SUPER + ALT + S", "Move window to scratchpad", hl.dsp.window.move({ workspace = "special:scratchpad", follow = false }))
