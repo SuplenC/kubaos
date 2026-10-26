@@ -4,43 +4,11 @@
 # (install/firstboot/kubaos-launcher).
 {
   lib,
-  rustPlatform,
-  # Hashes for Cargo.lock's git crates (home/curated.nix).
-  cargoOutputHashes ? { },
+  buildCrate,
 }:
 
-let
-  root = ../..;
-in
-rustPlatform.buildRustPackage {
+buildCrate "kubaos-cli" {
   pname = "kubaos";
-  version = (lib.importTOML ../../Cargo.toml).workspace.package.version;
-
-  # The workspace and the first-boot files the engine embeds, so a change
-  # elsewhere doesn't rebuild it.
-  src = lib.fileset.toSource {
-    inherit root;
-    fileset = lib.fileset.unions [
-      ../../Cargo.toml
-      ../../Cargo.lock
-      ../../crates
-      ../../install/firstboot
-    ];
-  };
-
-  cargoLock = {
-    lockFile = ../../Cargo.lock;
-    # Kotodama's crates come from git, at the rev in Cargo.lock. One with no
-    # hash in outputHashes is cloned during evaluation.
-    outputHashes = cargoOutputHashes;
-    allowBuiltinFetchGit = true;
-  };
-  cargoBuildFlags = [
-    "-p"
-    "kubaos-cli"
-  ];
-  # Its tests run git, bash and the repo's files outside src; `cargo test` runs them.
-  doCheck = false;
 
   meta = {
     description = "The kubaos command: packages, Suites, switches, KubaOS updates and the pointer";

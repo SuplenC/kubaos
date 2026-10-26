@@ -38,7 +38,9 @@
     },
     "kotodama": {
       "inputs": {
-        "crane": "crane",
+        "crane": [
+          "crane"
+        ],
         "home-manager": [
           "home-manager"
         ],
@@ -117,6 +119,7 @@
     },
     "root": {
       "inputs": {
+        "crane": "crane",
         "home-manager": "home-manager",
         "kotodama": "kotodama",
         "kubaos-wallpapers": "kubaos-wallpapers",
