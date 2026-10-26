@@ -160,6 +160,18 @@ fn edge_update() -> Vec<UpdateEvent> {
             channel: Channel::Edge,
             changes: changes.clone(),
             packages: 12,
+            apt: vec![
+                GroupChange {
+                    group: "files".into(),
+                    installed: vec!["loupe".into(), "showtime".into()],
+                    removed: Vec::new(),
+                },
+                GroupChange {
+                    group: "tools".into(),
+                    installed: vec!["jq".into()],
+                    removed: Vec::new(),
+                },
+            ],
             hyprland_pin: false,
             migrations: vec!["1792765570-backlight-rule.sh".into()],
         }),
@@ -263,6 +275,9 @@ KubaOS update
     9f8e7d6 fix(hypr): keep each screen's workspaces as a group
     d8c8ecf docs: describe workspace groups
   12 apt packages to upgrade
+  New apt packages to install:
+    files: loupe, showtime
+    tools: jq
   System migrations to run: 1792765570-backlight-rule.sh
 
   Update now? [Y/n] y

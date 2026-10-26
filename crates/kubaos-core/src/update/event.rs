@@ -176,6 +176,10 @@ pub struct Preview {
     pub changes: Vec<String>,
     /// The apt packages to upgrade.
     pub packages: usize,
+    /// What the package manifest's phase will install, by group; nothing is removed here, since
+    /// a removal is only known once apt has simulated it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub apt: Vec<GroupChange>,
     /// Whether the Hyprland pin changes.
     pub hyprland_pin: bool,
     /// The system migrations it will run.

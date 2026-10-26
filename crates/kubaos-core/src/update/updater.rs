@@ -71,7 +71,9 @@ use super::record::SystemPaths;
 use super::record::parse_history;
 use super::record::short;
 use super::version::Version;
+use crate::apt::Manifest;
 use crate::apt::ManifestError;
+use crate::apt::manifest::MANIFEST;
 use crate::engine::files::utc_datetime;
 use crate::state::Paths;
 use crate::state::write_atomic;
@@ -876,9 +878,12 @@ impl<'a, M: Machine> Updater<'a, M> {
             channel: self.channel(installed),
             changes: Vec::new(),
             packages: 0,
+            apt: Vec::new(),
             hyprland_pin: false,
             migrations: Vec::new(),
         };
+        // The manifest the phase will read: the release's, once it is checked out.
+        let mut manifest = Manifest::read(&self.sys.manifest()).ok().flatten();
         if let Some(target) = target {
             self.j.step("Reading the release's changes");
             let refs = self.refs();
@@ -899,6 +904,14 @@ impl<'a, M: Machine> Updater<'a, M> {
                 .into_iter()
                 .filter(|name| migrations::stamp_of(name).is_some() && !markers.join(name).exists())
                 .collect();
+            manifest = refs
+                .file_at(&target.commit, MANIFEST)
+                .and_then(|text| Manifest::parse(&text).ok());
+        }
+        if let Some(manifest) = manifest {
+            self.j.step("Listing the package manifest's new packages");
+            // The manifest phase reports its own failures; the preview goes without the list.
+            preview.apt = self.manifest_installs(manifest).unwrap_or_default();
         }
         self.j.step("Counting the apt packages to upgrade");
         let simulated = self
