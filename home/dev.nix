@@ -1,6 +1,6 @@
 # Rust helpers and PATH for tools installed outside Nix (rustup, proto, bun via proto).
 # clang and mold come from apt; wild comes from nixpkgs.
-{ lib, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
   # Linker cargo uses through clang: "mold" (apt, the default) or "wild"
   # (faster relinks, pre-1.0). Change it here, then home-manager switch.
@@ -38,10 +38,15 @@ in
   # spare sets more in the user flake: home.sessionVariables.SCCACHE_CACHE_SIZE.
   home.sessionVariables.SCCACHE_CACHE_SIZE = lib.mkDefault "10G";
 
+  # proto's home, set rather than left to proto: newer versions pick the XDG
+  # data dir when ~/.proto doesn't exist, older ones ~/.proto, and the PATH
+  # below has to name the one it uses.
+  home.sessionVariables.PROTO_HOME = "${config.xdg.dataHome}/proto";
+
   home.sessionPath = [
     "$HOME/.cargo/bin"
-    "$HOME/.proto/shims"
-    "$HOME/.proto/bin"
+    "${config.xdg.dataHome}/proto/shims"
+    "${config.xdg.dataHome}/proto/bin"
     "$HOME/.local/bin"
   ];
 

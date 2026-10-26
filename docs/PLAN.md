@@ -153,7 +153,7 @@ sudo apt-mark hold hyprland xdg-desktop-portal-hyprland hypridle hyprlock hyprpo
 
 **Outside Nix, on purpose:**
 - `rustup` from rustup.rs. Respects `rust-toolchain.toml`. Add `rust-analyzer` and `clippy` components.
-- `proto` from its install script, then `proto install moon` and whatever your projects' `.prototools` pin. home-manager only adds `~/.proto/shims` and `~/.proto/bin` to PATH.
+- `proto` from its install script with `--no-profile` (`~/.zshrc` is home-manager's, read-only), then `proto install moon` and whatever your projects' `.prototools` pin. home-manager sets `PROTO_HOME` to `~/.local/share/proto` and adds its `shims` and `bin` to PATH.
 - Bun through proto, so it matches the team.
 - `make` from `build-essential` (already installed).
 
