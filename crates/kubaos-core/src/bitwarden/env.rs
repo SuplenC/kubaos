@@ -2,8 +2,9 @@
 //! `use bwenv <project>` in an `.envrc` reads them (`home/secrets.nix`) without bw or the
 //! master password.
 //!
-//! In the vault: every custom field of every item in the folder `env/<project>`, plus the items
-//! anywhere with a field `bwenv=<project>`. The field's name is the variable's.
+//! In the vault: every custom field of every item in the folder `env/<project>` (the prefix is
+//! [`vault::Names::env_prefix`]), plus the items anywhere with a field `bwenv=<project>`. The
+//! field's name is the variable's.
 //!
 //! Keyring entries carry the attributes `service=dotfiles-env project=<p> name=<VAR>` and the
 //! label `dotfiles-env/<p>/<VAR>`. A value with a newline or a tab is stored base64 and its
@@ -174,7 +175,7 @@ pub fn export(host: &mut dyn Host, project: &str) -> Result<Vec<(String, Sensiti
 
 /// The projects the vault has: folders `env/<p>`, plus every `bwenv=<p>` field.
 fn in_vault(vault: &Vault) -> BTreeSet<String> {
-    let folders = vault.folders.iter().filter_map(|f| f.name.strip_prefix("env/"));
+    let folders = vault.folders.iter().filter_map(|f| vault.names.project(&f.name));
     let fields = vault.items.iter().flat_map(|i| {
         i.fields
             .iter()
@@ -186,7 +187,7 @@ fn in_vault(vault: &Vault) -> BTreeSet<String> {
 
 /// Replaces a project's keyring entries with its items' custom fields. The count stored.
 fn import_project(host: &mut dyn Host, vault: &Vault, project: &str, p: &mut Progress) -> Result<usize, Error> {
-    let folder = format!("env/{project}");
+    let folder = vault.names.env_folder(project);
     let ids: Vec<&String> = vault
         .folders
         .iter()
@@ -248,7 +249,8 @@ pub fn import(
             continue;
         }
         if !found.contains(project) {
-            p.warn(format!("{project}: no folder env/{project} and no item with bwenv={project} in the vault"));
+            let folder = vault.names.env_folder(project);
+            p.warn(format!("{project}: no folder {folder} and no item with bwenv={project} in the vault"));
             continue;
         }
         let n = import_project(host, vault, project, p)?;
@@ -272,7 +274,8 @@ pub fn setup(m: &mut dyn Machine, vault: &Vault, p: &mut Progress) {
     match import(m, vault, &[], true, p) {
         Err(e) => p.warn(format!("project env import failed: {e} (keyring locked or missing?)")),
         Ok(done) if done.is_empty() => {
-            p.info("no env/<project> folders and no bwenv fields in the vault");
+            let folders = vault.names.env_folder("<project>");
+            p.info(format!("no {folders} folders and no bwenv fields in the vault"));
             p.summary("env    no projects in the vault");
         }
         Ok(done) => {
@@ -282,12 +285,19 @@ pub fn setup(m: &mut dyn Machine, vault: &Vault, p: &mut Progress) {
     }
 }
 
-/// Fetches the projects from the vault and replaces what the keyring holds for them.
+/// Fetches the projects from the vault, finding them by `names`, and replaces what the keyring
+/// holds for them.
 ///
 /// # Errors
 ///
 /// A bad project name, bw failed to read the vault, or the keyring can't be written.
-pub fn pull(m: &mut dyn Machine, session: &Session, projects: &[String], p: &mut Progress) -> Result<(), Error> {
+pub fn pull(
+    m: &mut dyn Machine,
+    session: &Session,
+    names: &vault::Names,
+    projects: &[String],
+    p: &mut Progress,
+) -> Result<(), Error> {
     for project in projects {
         check_project(project)?;
     }
@@ -296,7 +306,7 @@ pub fn pull(m: &mut dyn Machine, session: &Session, projects: &[String], p: &mut
     let folders = m.folders(session).map_err(|e| Error::List("folders", e))?;
     let folders = vault::folders(&folders).map_err(|e| Error::Parse("folders", e))?;
     let items = m.items(session).map_err(|e| Error::List("items", e))?;
-    let vault = Vault::parse(&items, &folders).map_err(|e| Error::Parse("items", e))?;
+    let vault = Vault::parse(&items, &folders, names).map_err(|e| Error::Parse("items", e))?;
     drop(items);
     import(m, &vault, projects, false, p)?;
     Ok(())

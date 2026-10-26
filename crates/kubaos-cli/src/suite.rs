@@ -97,7 +97,8 @@ pub enum SuiteCmd {
         #[command(flatten)]
         mode: SwitchMode,
     },
-    /// Create a project in the Projects root with an installed Suite.
+    /// Create a project in the Projects root (~/Projects, or $KUBAOS_PROJECTS) with an installed
+    /// Suite.
     New {
         name: String,
         project: String,

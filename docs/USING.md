@@ -234,7 +234,7 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 | Command menu: your own actions, hiding KubaOS's | `~/.config/kubaos/menu/kotodama/user.toml` (below) | on save |
 | Nix packages and home-manager options | `~/.config/kubaos/home/home.nix`, e.g. `home.packages = [ pkgs.hello ];` | `home-manager switch --flake ~/.config/kubaos/home` |
 | A package, without writing Nix | `kubaos package add ripgrep` (`remove`, `list`); `kubaos try cowsay` opens a shell with it and installs nothing | the switch `add` and `remove` queue |
-| A whole language setup (a Suite) | `kubaos suite list`, `kubaos suite add NAME [--version V] [--extra E]`, `configure`, `remove [--purge-caches]`; `kubaos suite new NAME PROJECT` starts a project in `~/Projects` | the switch `add`, `configure` and `remove` queue |
+| A whole language setup (a Suite) | `kubaos suite list`, `kubaos suite add NAME [--version V] [--extra E]`, `configure`, `remove [--purge-caches]`; `kubaos suite new NAME PROJECT` starts a project in `~/Projects` (another folder: `home.sessionVariables.KUBAOS_PROJECTS` in `home/home.nix`) | the switch `add`, `configure` and `remove` queue |
 
 - `~/.zshrc` and the other files home-manager links are read-only, so an installer that offers to "update your profile" fails there. Say no, or pass its flag for that (proto: `bash <(curl -fsSL https://moonrepo.dev/install/proto.sh) --no-profile`), and put any lines it wanted in `~/.config/kubaos/terminal/zsh/zshrc`. rustup's, cargo's and proto's PATH entries are already set (`PROTO_HOME` is `~/.local/share/proto`).
 - To see what KubaOS ships for an app, read `~/.local/share/kubaos/defaults/<app>/` (or `config/<app>/` in the repo).
@@ -349,11 +349,11 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 - **Disk:** LUKS2, then btrfs with flat subvolumes (`@ @home @snapshots @log @cache @nix @docker @swap`), snapper with timeline and apt pre/post snapshots, grub-btrfs so snapshots are bootable from GRUB.
 - **Session:** autologin on tty1 after the LUKS unlock, zsh, `start-hyprland`. No display manager.
 - **Compositor:** Hyprland 0.56 from `ppa:cppiber/hyprland`, held in apt, with a Lua config split into files (`config/hypr/`). Dwindle layout, Omarchy 4 keybinds moved to hjkl. hypridle locks after 5 min, turns screens off after 10, and suspends after 30 on battery only.
-- **Shell:** my own, written in QML on Quickshell v0.3.2 (pinned), in the structure of Caelestia: bar, notifications, OSD, control center, power menu, wallpaper picker, lock screen with password, fingerprint and security key in parallel. The Command menu is [Kotodama](https://github.com/SuplenC/kotodama), drawn by the shell in its colors.
+- **Shell:** KubaOS's own, written in QML on Quickshell v0.3.2 (pinned), in the structure of Caelestia: bar, notifications, OSD, control center, power menu, wallpaper picker, lock screen with password, fingerprint and security key in parallel. The Command menu is [Kotodama](https://github.com/SuplenC/kotodama), drawn by the shell in its colors.
 - **User environment:** standalone home-manager (nixos-26.05) owns everything in `$HOME`. KubaOS's configs are read-only links from the store into `~/.config`, and yours live in `~/.config/kubaos` (above, "Make it yours"). Nix apps get the GPU through home-manager's `targets.genericLinux.gpu`.
 - **Theming:** matugen (`scheme-fidelity`) turns the wallpaper into Material 3 colors and renders 22 files in `~/.local/state/theme/` for every consumer, the pointer included: Bibata, recoloured. Geist, M PLUS 1 for the Japanese bits, Material Symbols, Papirus.
 - **Terminal and dev:** Ghostty (foot as the fallback), tmux + tms, Neovim 0.12 (LazyVim), rustup, proto + moon, sccache, clang + mold (wild optional), Docker Engine + lazydocker, Chrome.
-- **Secrets:** Bitwarden desktop's SSH agent (private keys never touch the disk), `bw` for SSH Host blocks, git signing, the gh token and per-project env through direnv. A YubiKey C Bio does sudo, polkit and the lock screen with a fingerprint; the password stays as the fallback.
+- **Secrets:** Bitwarden desktop's SSH agent (private keys never touch the disk), `bw` for SSH Host blocks, git signing, the gh token and per-project env through direnv. A FIDO2 security key with a fingerprint sensor (the YubiKey C Bio is the tested one) does sudo, polkit and the lock screen; the password stays as the fallback.
 - **Hardware:** `tuxedo-drivers` and power-profiles-daemon (no TUXEDO Control Center), fprintd, bolt for the dock.
 - **Install:** Kōbō, an iced app, on a casper live ISO, with the Rust engine (`kubaos-core`, also behind the `kubaos` CLI) running inside it. It unpacks a prebuilt image with `/nix` and the home-manager generation already inside, which is why it needs no network.
 
@@ -392,12 +392,11 @@ Verified in an arm64 `ubuntu:26.04` container (user `kuba`, hostname `vm`, Nix i
 - Quickshell v0.3.2 from Nix loads the full config in headless sway (Mesa llvmpipe OpenGL) with no QML errors, and `qs ipc show` lists every contract target. Every panel, the lock screen and the terminal stack were screenshotted there (`docs/screenshots/README.md`).
 - Screen recording: `dot-hypr-record` start/stop, the state file and the bar indicator (elapsed time, gone on stop), stopped through `qs ipc call recorder stop`, with wf-recorder under headless sway; gsr's failure path without a GPU ("Recording failed" notification, state back to idle); satty opens from `dot-hypr-screenshot edit`. `system/65-recorder.sh` installs the setcap'd helper and is idempotent, but Docker refuses to exec a file capability, so gsr's KMS capture, VA-API encoding, region crop at scale 1.5 and replay need the laptop.
 
-Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland 0.56 from the PPA (amd64 only), the Lua config under a real compositor, GPU wiring (`non-nixos-gpu-setup`), fingerprint reader, tuxedo-drivers and power profiles, USB4 dock with two 120 Hz monitors, lid and idle behaviour.
+Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland 0.56 from the PPA (amd64 only), the Lua config under a real compositor, GPU wiring (`non-nixos-gpu-setup`), fingerprint reader, tuxedo-drivers and power profiles, a dock with external monitors, lid and idle behaviour.
 
 ## Known limitations
 
-- Real 120 Hz smoothness, Hyprland's blur behind the shell and the workspace animations can only be judged on the machine.
-- The monitor descriptions in `config/hypr/monitors.lua` are placeholders until the UltraGears are plugged in once (`hyprctl monitors all`).
+- Smoothness at a high refresh rate, Hyprland's blur behind the shell and the workspace animations can only be judged on the machine.
 - Fingerprint unlock in the Quickshell lock screen is untested: no reader in a container. nixpkgs' `pam_fprintd.so` loads and answers like Ubuntu's does without a reader. It's off now (`Settings.fingerprint`); hyprlock is the fallback.
 - Untested without hardware: a real FIDO2 touch (sudo, polkit, lock screen), Bitwarden desktop's SSH agent and its polkit unlock (amd64 only), and `bw` with real two-step login. `bw` can't do FIDO2 two-step login; `kubaos bitwarden setup --login apikey` is the way in for a key-only account (`docs/SECRETS.md`).
 - The in-shell polkit agent is off; hyprpolkitagent is the agent until the Quickshell one is tested on the machine.

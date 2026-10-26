@@ -46,7 +46,7 @@ Notes:
 
 ## Booting the TUXEDO InfinityBook Pro 14 Gen10
 
-Ryzen AI 9 HX 370, Radeon 890M, 2880x1800 panel.
+The AMD model, with its 2880x1800 panel.
 
 - **Boot menu: F7.** Hold or tap it right after power on, pick the USB stick.
 - **BIOS setup: F2.**

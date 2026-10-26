@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Phase 7b: tools for the YubiKey C Bio (after 70-bitwarden.sh, which puts the
-# key into sudo, polkit and the lock screen).
+# Phase 7b: tools for a FIDO2 security key, tested with the YubiKey C Bio
+# (after 70-bitwarden.sh, which puts the key into sudo, polkit and the lock
+# screen).
 #   - fido2-tools (apt): fido2-token and fido2-assert, from the same libfido2
 #     1.16 that Ubuntu's pam_u2f and pamu2fcfg use, so what they report is
 #     what PAM sees. dot-u2f-enroll needs them.
@@ -18,7 +19,7 @@
 # apt's yubikey-manager depends on pcscd, which the FIDO Edition never needs.
 # Yubico Authenticator (GUI) isn't installed: ykman covers the PIN and the
 # fingerprints, and the app wants pcscd for its main (OATH) screen. For a GUI
-# anyway: nix run nixpkgs#yubioath-flutter. docs/SECRETS.md, "YubiKey C Bio".
+# anyway: nix run nixpkgs#yubioath-flutter. docs/SECRETS.md, "Security keys".
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -108,7 +109,7 @@ done
 # --------------------------------------------------------------------------
 step "Done"
 cat <<EOF
-      As yourself, with the key plugged in (docs/SECRETS.md, "YubiKey C Bio"):
+      As yourself, with the key plugged in (docs/SECRETS.md, "Security keys"):
         1. home-manager switch      ykman (yubikey-manager)
         2. ykman fido access change-pin
         3. ykman fido fingerprints add right-index   (2-3 fingers, one from the other hand)

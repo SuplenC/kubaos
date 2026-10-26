@@ -14,6 +14,65 @@ const SSH_KEY: u8 = 5;
 /// A linked custom field: it points at another field and carries no value of its own.
 const LINKED: u8 = 3;
 
+/// The item gh's token comes from, unless `KUBAOS_BW_GH_ITEM` names another.
+pub const DEFAULT_GH_ITEM: &str = "gh-token";
+/// What a project's env folder starts with, unless `KUBAOS_BW_ENV_PREFIX` says otherwise: `env/`
+/// makes the folder `env/<project>`.
+pub const DEFAULT_ENV_PREFIX: &str = "env/";
+
+/// The names a pull looks for in the vault. Each is a default that a vault laid out another way
+/// overrides through the environment (docs/SECRETS.md).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Names {
+    /// The item holding gh's token.
+    pub gh_item: String,
+    /// What a project's env folder starts with; the rest of its name is the project.
+    pub env_prefix: String,
+}
+
+impl Default for Names {
+    fn default() -> Self {
+        Self {
+            gh_item: DEFAULT_GH_ITEM.to_string(),
+            env_prefix: DEFAULT_ENV_PREFIX.to_string(),
+        }
+    }
+}
+
+impl Names {
+    /// From `KUBAOS_BW_GH_ITEM` and `KUBAOS_BW_ENV_PREFIX`, each falling back to its default.
+    #[must_use]
+    pub fn from_env() -> Self {
+        Self::from_lookup(|var| std::env::var(var).ok())
+    }
+
+    /// From whatever `lookup` gives for the two variables. A blank value counts as unset: an
+    /// empty prefix would make every folder a project.
+    #[must_use]
+    pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Self {
+        let get = |var: &str, default: &str| {
+            lookup(var)
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| default.to_string())
+        };
+        Self {
+            gh_item: get("KUBAOS_BW_GH_ITEM", DEFAULT_GH_ITEM),
+            env_prefix: get("KUBAOS_BW_ENV_PREFIX", DEFAULT_ENV_PREFIX),
+        }
+    }
+
+    /// The project an env folder holds, or `None` for any other folder.
+    pub fn project<'a>(&self, folder: &'a str) -> Option<&'a str> {
+        folder.strip_prefix(self.env_prefix.as_str()).filter(|p| !p.is_empty())
+    }
+
+    /// The env folder of `project`.
+    pub fn env_folder(&self, project: &str) -> String {
+        format!("{}{project}", self.env_prefix)
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Folder {
     /// `None` for bw's "No Folder" entry.
@@ -57,7 +116,7 @@ pub struct Item {
     pub fields: Vec<Field>,
     pub public_key: Option<String>,
     pub fingerprint: Option<String>,
-    /// Only on the item named `gh-token`: its password, else its `token` field.
+    /// Only on the item named [`Names::gh_item`]: its password, else its `token` field.
     pub token: Option<Sensitive>,
 }
 
@@ -94,6 +153,8 @@ impl Item {
 pub struct Vault {
     pub items: Vec<Item>,
     pub folders: Vec<Folder>,
+    /// The names it was read with.
+    pub names: Names,
 }
 
 #[derive(Deserialize)]
@@ -150,8 +211,9 @@ fn tostring(v: serde_json::Value) -> Option<String> {
 }
 
 impl Vault {
-    /// `bw list items`, with the folders' names from `bw list folders`.
-    pub fn parse(items: &str, folders: &[Folder]) -> Result<Vault, serde_json::Error> {
+    /// `bw list items`, with the folders' names from `bw list folders`, taking gh's token from
+    /// the item `names` gives.
+    pub fn parse(items: &str, folders: &[Folder], names: &Names) -> Result<Vault, serde_json::Error> {
         let raw: Vec<RawItem> = serde_json::from_str(items)?;
         let folder_name = |id: &Option<String>| {
             id.as_ref()
@@ -171,7 +233,7 @@ impl Vault {
                         kind: f.kind,
                     })
                     .collect();
-                let token = (r.name == "gh-token")
+                let token = (r.name == names.gh_item)
                     .then(|| {
                         r.login.and_then(|l| l.password).or_else(|| {
                             fields
@@ -203,6 +265,7 @@ impl Vault {
         Ok(Vault {
             items,
             folders: folders.to_vec(),
+            names: names.clone(),
         })
     }
 
@@ -224,7 +287,7 @@ impl Vault {
         keys
     }
 
-    /// The items named `gh-token` that carry a token, in the vault's order.
+    /// The items named [`Names::gh_item`] that carry a token, in the vault's order.
     pub fn gh_tokens(&self) -> Vec<&Item> {
         self.items.iter().filter(|i| i.token.is_some()).collect()
     }

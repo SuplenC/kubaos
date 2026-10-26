@@ -137,6 +137,18 @@ fn paths_name_the_user_layer_the_projects_root_and_the_backups() {
 }
 
 #[test]
+fn the_projects_root_moves_to_an_absolute_path_or_one_under_the_home() {
+    let home = || Paths::from_vars(Some("/home/kuba".into()), None, None).unwrap();
+
+    let absolute = home().with_projects_root("/srv/code");
+    let relative = home().with_projects_root("src");
+
+    assert_eq!(absolute.projects_root(), Path::new("/srv/code"));
+    assert_eq!(relative.projects_root(), Path::new("/home/kuba/src"));
+    assert_eq!(relative.flake(), home().flake());
+}
+
+#[test]
 fn paths_need_a_home() {
     assert!(Paths::from_vars(None, None, None).is_err());
 }

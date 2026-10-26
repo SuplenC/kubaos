@@ -5,9 +5,9 @@
 #   - bw, the official CLI (standalone binary, pinned + sha256-checked) to
 #     /usr/local/bin/bw, for `kubaos bitwarden`
 #   - libsecret-tools (secret-tool) for `kubaos bitwarden env`'s keyring cache
-#   - pam_u2f: a FIDO2 security key (a YubiKey C Bio: your finger on its
-#     sensor) as an alternative to the password for sudo, polkit and the
-#     Quickshell lock screen. The password always keeps working.
+#   - pam_u2f: a FIDO2 security key (tested with the YubiKey C Bio: your
+#     finger on its sensor) as an alternative to the password for sudo,
+#     polkit and the Quickshell lock screen. The password always keeps working.
 #     system/75-yubikey.sh adds the key's tools (fido2-tools, optional pcscd).
 #
 # Then, as yourself: kubaos bitwarden setup (vault -> ssh, git, gh, env) and

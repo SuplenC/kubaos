@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # dot-u2f-enroll: register a FIDO2 security key for sudo, polkit and the lock
-# screen (pam_u2f, set up by system/70-bitwarden.sh). Made for the YubiKey C
-# Bio: the PAM lines demand user verification, so the key wants an enrolled
-# finger, not a touch. Enroll two keys: the second one is your backup. The
-# password keeps working either way.
+# screen (pam_u2f, set up by system/70-bitwarden.sh). The PAM lines demand
+# user verification, so a key with a fingerprint sensor wants an enrolled
+# finger, not a touch; one without takes --pin. Tested with the YubiKey C Bio;
+# other FIDO2 keys go through the same libfido2 calls. Enroll two keys: the
+# second one is your backup. The password keeps working either way.
 #
 #   dot-u2f-enroll              add the key that's plugged in (one key at a time)
 #   dot-u2f-enroll --replace    same, and if this key is enrolled already,
@@ -20,7 +21,8 @@
 #   dot-u2f-enroll --test-lock  try the lock screen's qs-lock-u2f (finger only)
 #
 # Before the first enrollment the key needs a FIDO2 PIN and at least one
-# fingerprint (docs/SECRETS.md, "YubiKey C Bio"):
+# fingerprint (docs/SECRETS.md, "Security keys"; the commands are ykman's, for
+# a YubiKey):
 #   ykman fido access change-pin
 #   ykman fido fingerprints add NAME    (NAME is your label for the finger: right-index, left-thumb)
 #

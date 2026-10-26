@@ -83,7 +83,7 @@ Takeaways: oh-my-zsh costs a few milliseconds once its cache exists, and the who
 | tmux | Keep (user choice) | none tmux-compatible | tmux 3.8 2026-09-09 upstream, nixpkgs 26.05 3.6a | None |
 | Neovim 0.12 + LazyVim | Keep | none | Neovim v0.12.6 2026-10-09; LazyVim v16.0.1 2026-09-08 | None |
 | Completion | Keep | already blink.cmp | `config/nvim/lazy-lock.json` has blink.cmp and no nvim-cmp. blink.cmp commits 2026-10-15 | None |
-| Picker | Keep | already snacks picker | `lazyvim.json` enables `editor.snacks_picker`. telescope.nvim is still installed only because `lua/plugins/jsonfly.lua` and scretch.nvim (`lua/plugins/scratch.lua`) use it; it lazy-loads, so no startup cost. snacks.nvim last release v2.31.0 2026-03-20, last commit 2026-05-25 (slow, but issues are still handled, last closed 2026-10-13) | Optional cleanup only |
+| Picker | Keep | already snacks picker | `lazyvim.json` enables `editor.snacks_picker`. The Defaults don't install telescope.nvim; a user's plugin that needs it brings it, lazy-loaded. snacks.nvim last release v2.31.0 2026-03-20, last commit 2026-05-25 (slow, but issues are still handled, last closed 2026-10-13) | Optional cleanup only |
 | lazy.nvim | Keep | none | v11.17.5 2025-11, last commit 2025-12; quiet but stable and required by LazyVim | None |
 
 ## Rust and dev

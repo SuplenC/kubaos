@@ -51,8 +51,11 @@ pub const SUITES_DIR: &str = "suites";
 /// generation. `home/state.nix` links it as `~/.local/share/kubaos/kubaos.d`.
 pub const GENERATION_COPY: &str = "home-files/.local/share/kubaos/kubaos.d";
 
-/// The Projects root, relative to the home.
+/// The Projects root, relative to the home, unless [`PROJECTS_VAR`] names another.
 pub const PROJECTS_ROOT: &str = "Projects";
+/// The environment variable that moves the Projects root: an absolute path, or one relative to
+/// the home.
+pub const PROJECTS_VAR: &str = "KUBAOS_PROJECTS";
 
 /// Where the user flake, its state directory, the user layer and the switch jobs live for one
 /// user.
@@ -62,6 +65,7 @@ pub struct Paths {
     config: PathBuf,
     flake: PathBuf,
     state: PathBuf,
+    projects: PathBuf,
 }
 
 /// `HOME` is not set, so no path under it can be found.
@@ -70,14 +74,19 @@ pub struct Paths {
 pub struct NoHomeError(());
 
 impl Paths {
-    /// The paths for the current user, from `HOME`, `XDG_CONFIG_HOME` and `XDG_STATE_HOME`.
+    /// The paths for the current user, from `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and
+    /// [`PROJECTS_VAR`].
     ///
     /// # Errors
     ///
     /// [`NoHomeError`] when `HOME` is not set.
     pub fn from_env() -> Result<Self, NoHomeError> {
         let var = |name| std::env::var_os(name).filter(|v| !v.is_empty());
-        Self::from_vars(var("HOME"), var("XDG_CONFIG_HOME"), var("XDG_STATE_HOME"))
+        let paths = Self::from_vars(var("HOME"), var("XDG_CONFIG_HOME"), var("XDG_STATE_HOME"))?;
+        Ok(match var(PROJECTS_VAR) {
+            Some(projects) => paths.with_projects_root(projects),
+            None => paths,
+        })
     }
 
     /// The paths for the given `HOME`, `XDG_CONFIG_HOME` and `XDG_STATE_HOME`, each XDG one
@@ -97,9 +106,17 @@ impl Paths {
         Ok(Self {
             flake: config.join("kubaos/home"),
             state: state.join("kubaos"),
+            projects: home.join(PROJECTS_ROOT),
             config,
             home,
         })
+    }
+
+    /// The same paths with the Projects root at `root`: absolute, or relative to the home.
+    #[must_use]
+    pub fn with_projects_root(mut self, root: impl Into<PathBuf>) -> Self {
+        self.projects = self.home.join(root.into());
+        self
     }
 
     /// The user's home.
@@ -112,9 +129,10 @@ impl Paths {
         kubaos_user_layer::root(&self.config)
     }
 
-    /// The Projects root, `~/Projects`, where scaffolded projects go.
+    /// The Projects root, where scaffolded projects go: `~/Projects` unless [`PROJECTS_VAR`]
+    /// moved it.
     pub fn projects_root(&self) -> PathBuf {
-        self.home.join(PROJECTS_ROOT)
+        self.projects.clone()
     }
 
     /// Where a migration backs up a user file before changing it: KubaOS's state folder, outside

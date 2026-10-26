@@ -16,6 +16,7 @@ pub mod tour;
 mod view;
 
 use std::sync::Arc;
+use std::sync::LazyLock;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
@@ -34,6 +35,10 @@ use crate::edit::{self, Caret, Edit};
 use crate::field::Pointer;
 use crate::theme::motion;
 use backend::SetupBackend;
+
+/// What the vault's project env folders start with. The folder list is drawn every frame, so the
+/// environment is read once.
+static ENV_PREFIX: LazyLock<String> = LazyLock::new(|| kubaos_core::bitwarden::Names::from_env().env_prefix);
 
 /// How often the phone card checks again while it waits: a pairing request shows within this.
 const PHONE_POLL: Duration = Duration::from_secs(2);
@@ -358,15 +363,15 @@ impl Setup {
         }
     }
 
-    /// The vault's folders a person can tick for SSH keys. The `env/` ones hold project
-    /// variables, never SSH keys, so ticking one would only empty the keys.
+    /// The vault's folders a person can tick for SSH keys. The `env/` ones ([`ENV_PREFIX`]) hold
+    /// project variables, never SSH keys, so ticking one would only empty the keys.
     pub fn bw_folders(&self) -> Vec<&str> {
         match self.card(CardId::Bitwarden).map(|c| &c.facts) {
             Some(Facts::Bitwarden { overview, .. }) => overview
                 .folders
                 .iter()
                 .map(String::as_str)
-                .filter(|f| !f.starts_with("env/"))
+                .filter(|f| !f.starts_with(ENV_PREFIX.as_str()))
                 .collect(),
             _ => vec![],
         }

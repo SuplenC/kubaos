@@ -1,4 +1,15 @@
 return {
+  -- The wallpaper theme (~/.local/state/theme/nvim.lua) is the colorscheme,
+  -- falling back to tokyonight without it: lua/config/theme.lua.
+  {
+    "LazyVim/LazyVim",
+    opts = {
+      colorscheme = function()
+        require("config.theme").load()
+      end,
+    },
+  },
+
   -- Builds highlights for the wallpaper theme (lua/config/theme.lua).
   { "nvim-mini/mini.base16", lazy = true },
 

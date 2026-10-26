@@ -1,6 +1,6 @@
 # Installing KubaOS
 
-There are two ways onto the TUXEDO InfinityBook Pro 14 Gen10. The KubaOS stick takes a couple of minutes and a few keyboard-only screens. The hard way, at the end of this file, is a stock Ubuntu Server 26.04 install and nine scripts by hand, which takes an evening and is how KubaOS got built in the first place. Use the stick.
+There are two ways onto your machine. KubaOS is tested on the TUXEDO InfinityBook Pro 14 Gen10, so the firmware keys and drivers below are that laptop's; another machine has its own. The KubaOS stick takes a couple of minutes and a few keyboard-only screens. The hard way, at the end of this file, is a stock Ubuntu Server 26.04 install and nine scripts by hand, which takes an evening and is how KubaOS got built in the first place. Use the stick.
 
 The why is in `docs/PLAN.md`, how the install works inside in `docs/INSTALL-INTERNALS.md`.
 
@@ -29,7 +29,7 @@ The ISO is UEFI only and works with Secure Boot on (Canonical's signed shim, GRU
 
 ### BIOS
 
-F2 at power-on opens the TUXEDO BIOS, F7 is the boot menu (choose the USB stick).
+On the TUXEDO, F2 at power-on opens the BIOS and F7 is the boot menu (choose the USB stick).
 
 Secure Boot: on or off, as you like. The stick boots either way. With it on, `tuxedo-drivers` needs a Machine Owner Key enrolled once, after the install (below).
 
@@ -179,8 +179,8 @@ connections should end in `.yaml`; the installer's file was renamed
 
 How KubaOS was put together before the stick existed, and still the way to
 rebuild it piece by piece or to find out which script broke something.
-TUXEDO InfinityBook Pro 14 Gen10, Ubuntu Server 26.04 LTS ("resolute")
-minimal, LUKS + LVM + Btrfs, Hyprland from `ppa:cppiber/hyprland`, user
+Written on the reference machine, the TUXEDO InfinityBook Pro 14 Gen10:
+Ubuntu Server 26.04 LTS ("resolute") minimal, LUKS + LVM + Btrfs, Hyprland from `ppa:cppiber/hyprland`, user
 environment from home-manager.
 
 Scripts live in `system/`, run in order, as your normal user (they call
@@ -204,7 +204,7 @@ updates follow it; `kubaos packages enable|disable <group>` changes it later.
 | `system/60-nix.sh` | Nix, flakes, home-manager switch, Nix GPU setup, zsh login shell | **yes** |
 | `system/65-recorder.sh` | gpu-screen-recorder's KMS helper: root-owned copy with `cap_sys_admin`, runnable only by you, linked into `/run/wrappers/bin` | no |
 | `system/70-bitwarden.sh` | Bitwarden desktop + `bw` CLI, security key (pam_u2f) for sudo, polkit, lock screen | no |
-| `system/75-yubikey.sh` | YubiKey C Bio tools (`fido2-tools`), udev check, `--piv`: pcscd for the Multi-protocol Edition | no |
+| `system/75-yubikey.sh` | Security key tools (`fido2-tools`), udev check, `--piv`: pcscd for the Multi-protocol Edition | no |
 | `system/relink.sh` | points the wallpaper, PAM and recorder links at the installed release; `kubaos update` runs it | |
 
 ### Before you start (on the Mac)
@@ -219,7 +219,7 @@ updates follow it; `kubaos packages enable|disable <group>` changes it later.
 
 ### 1. BIOS and Secure Boot
 
-F2 at power-on opens the TUXEDO BIOS.
+On the TUXEDO, F2 at power-on opens the BIOS.
 
 - Secure Boot: on or off, as you like. **On** works: `tuxedo-drivers` is a
   DKMS module, so `30-hardware.sh` has you enroll a Machine Owner Key (MOK)
@@ -464,9 +464,10 @@ self-update on Linux). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
 - two lines above `@include common-auth` in `/etc/pam.d/sudo`, `sudo-i` and
   `polkit-1` (polkitd ships its file in `/usr/lib/pam.d`; the copy in `/etc`
   wins), both `auth sufficient pam_u2f.so authfile=/etc/u2f_mappings cue
-  nouserok`: the first with `userverification=1` (your finger on the YubiKey
-  C Bio), the second with `pinverification=1` (the key's PIN, when the finger
-  fails). No key, or no key enrolled, falls through to the password.
+  nouserok`: the first with `userverification=1` (your finger on a key with a
+  fingerprint sensor), the second with `pinverification=1` (the key's PIN,
+  when the finger fails). No key, or no key enrolled, falls through to the
+  password.
   Re-running the script replaces older versions of these lines.
 - `/etc/u2f_mappings`, root:root 0644, filled by `dot-u2f-enroll`.
 - a drop-in for `polkit-agent-helper@.service`, whose sandbox hides
@@ -480,8 +481,8 @@ Then `system/75-yubikey.sh` (add `--piv` for the Multi-protocol Edition's
 smart card; updates keep it). As yourself, in the Hyprland session: open Bitwarden, log in,
 Settings -> enable "SSH agent". Run `kubaos bitwarden setup` (SSH keys, git
 signing, gh, project env). Set the key's PIN and fingerprints with `ykman`, then run
-`dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md`, "YubiKey C
-Bio", has the order.
+`dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md`, "Security
+keys", has the order.
 
 **Verify:** `ssh -T git@github.com` greets you; `git commit` in any repo, then
 `git log --show-signature -1` says "Good git signature"; from a second tty
@@ -503,7 +504,7 @@ subvolume) and `~/.nix-*`, `~/.local/state/nix`.
 
 ### Testing in a VM first (UTM on Apple Silicon)
 
-Worth an evening before the laptop arrives: practice the subvolume
+Worth an evening before installing on hardware: practice the subvolume
 conversion, run the scripts, try the home-manager config `kuba@vm`.
 
 #### Setup
