@@ -72,22 +72,174 @@ pub fn name_files(items: Vec<Item>, p: &mut Progress) -> Vec<Key> {
     keys
 }
 
-/// `ssh-ed25519 AAAA…`, `ssh-rsa …` or `ecdsa-sha2-nistpNNN …`, and nothing else on the line.
-pub fn usable_public_key(k: &str) -> bool {
-    let Some((kind, blob)) = k.split_once(' ') else {
-        return false;
+/// Why an item's public key can't be written to a `.pub` file.
+#[derive(Debug, PartialEq, Eq)]
+pub enum KeyProblem {
+    Empty,
+    /// A newline or another control character, after `before`: a `.pub` file is one line, and
+    /// the same text goes into `allowed_signers`.
+    Control { before: String, newline: bool },
+    /// A type Bitwarden's agent doesn't serve.
+    Kind(String),
+    /// The second word isn't base64, or is missing.
+    Blob,
+}
+
+/// The key of a public key line, `<type> <base64>`, from `<type> <base64> [comment]` with any
+/// run of spaces between the words. The type is `ssh-ed25519`, `ssh-rsa` or
+/// `ecdsa-sha2-nistpNNN`. The comment is dropped: the `.pub` gets a comment of its own, and keys
+/// are compared without one.
+///
+/// # Errors
+///
+/// What is wrong with the line.
+pub fn public_key(k: &str) -> Result<String, KeyProblem> {
+    // A key pasted into Bitwarden often keeps the line ending it was copied with; at the very
+    // end it can't carry anything into ssh_config, so it goes. One mid-line still can.
+    let k = k.trim_end();
+    if let Some((before, newline)) = control(k) {
+        return Err(KeyProblem::Control { before, newline });
+    }
+    let mut words = k.split(' ').filter(|w| !w.is_empty());
+    let Some(kind) = words.next() else {
+        return Err(KeyProblem::Empty);
     };
     let kind_ok = kind == "ssh-ed25519"
         || kind == "ssh-rsa"
         || kind
             .strip_prefix("ecdsa-sha2-nistp")
             .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()));
-    kind_ok && !blob.is_empty() && blob.bytes().all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b))
+    if !kind_ok {
+        return Err(KeyProblem::Kind(kind.to_string()));
+    }
+    let blob = words.next().unwrap_or("");
+    if blob.is_empty() || !blob.bytes().all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(&b)) {
+        return Err(KeyProblem::Blob);
+    }
+    Ok(format!("{kind} {blob}"))
 }
 
-/// The first two words of a `.pub` file: the key without its comment.
+/// The text before the first control character, and whether that character ends a line.
+fn control(s: &str) -> Option<(String, bool)> {
+    let at = s.find(char::is_control)?;
+    let newline = s[at..].starts_with(['\n', '\r']);
+    Some((s[..at].trim().to_string(), newline))
+}
+
+/// The start of a value for a message, short enough for one line of the summary.
+fn preview(s: &str) -> String {
+    const SHOWN: usize = 24;
+    let s = one_line(s);
+    match s.char_indices().nth(SHOWN) {
+        Some((at, _)) => format!("{}…", &s[..at]),
+        None => s,
+    }
+}
+
+/// The warning for a key that gets no `.pub`, with the fix in Bitwarden.
+fn key_warning(label: &str, problem: &KeyProblem) -> String {
+    const SKIPPED: &str = "Skipped: no .pub, no Host block";
+    match problem {
+        KeyProblem::Empty => format!(
+            "{label}: the public key field is empty; in Bitwarden, import the key again or paste its .pub line. {SKIPPED}"
+        ),
+        KeyProblem::Control { before, newline } => {
+            let what = if *newline { "a newline" } else { "a control character" };
+            format!(
+                "{label}: the public key field holds `{}` followed by {what}; in Bitwarden, make the public key \
+                 that one line (or import the key again). {SKIPPED}",
+                preview(before)
+            )
+        }
+        KeyProblem::Kind(kind) => format!(
+            "{label}: the public key is of type `{}`; kubaos bitwarden takes ssh-ed25519, ssh-rsa and \
+             ecdsa-sha2-nistp*. Create an Ed25519 key in Bitwarden instead. {SKIPPED}",
+            preview(kind)
+        ),
+        KeyProblem::Blob => format!(
+            "{label}: the public key's second word isn't base64, so it isn't a key; in Bitwarden, import the key \
+             again or paste its .pub line (`ssh-ed25519 AAAA… comment`). {SKIPPED}"
+        ),
+    }
+}
+
+/// The key of a `.pub` file, without its comment; the file as it is when it holds no key.
 fn key_of(pub_file: &str) -> String {
-    pub_file.split(' ').take(2).collect::<Vec<_>>().join(" ").trim_end().to_string()
+    let line = pub_file.trim_end();
+    public_key(line).unwrap_or_else(|_| line.to_string())
+}
+
+/// The custom fields an SSH key item can carry.
+const KNOWN_FIELDS: [&str; 7] = ["hosts", "hostname", "user", "port", "signing", "emails", "file"];
+
+/// The known field an unknown name was most likely meant to be: a common synonym, or a name
+/// one or two typos away (one for short names, where two would match half the list).
+fn meant_field(name: &str) -> Option<&'static str> {
+    let name = name.trim().to_ascii_lowercase();
+    if KNOWN_FIELDS.contains(&name.as_str()) {
+        return None;
+    }
+    let synonym = match name.as_str() {
+        "username" | "login" => Some("user"),
+        "host_name" | "host-name" | "address" | "server" => Some("hostname"),
+        "email" | "mail" => Some("emails"),
+        "sign" | "signingkey" => Some("signing"),
+        "filename" | "identityfile" => Some("file"),
+        _ => None,
+    };
+    if synonym.is_some() {
+        return synonym;
+    }
+    let most = if name.chars().count() <= 4 { 1 } else { 2 };
+    KNOWN_FIELDS
+        .iter()
+        .map(|k| (distance(&name, k), *k))
+        .filter(|(d, _)| *d <= most)
+        .min_by_key(|(d, _)| *d)
+        .map(|(_, k)| k)
+}
+
+/// The Levenshtein distance: insertions, deletions and substitutions.
+fn distance(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.chars().enumerate() {
+        let mut diag = row[0];
+        row[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let next = (diag + usize::from(ca != *cb)).min(row[j] + 1).min(row[j + 1] + 1);
+            diag = row[j + 1];
+            row[j + 1] = next;
+        }
+    }
+    row[b.len()]
+}
+
+/// Warns about each custom field whose name looks like a misspelt known one.
+fn warn_misspelt_fields(item: &Item, label: &str, p: &mut Progress) {
+    for f in &item.fields {
+        if let Some(known) = meant_field(&f.name) {
+            p.warn(format!(
+                "{label}: kubaos bitwarden reads no field `{}`; in Bitwarden, rename it to `{known}`",
+                preview(f.name.trim())
+            ));
+        }
+    }
+}
+
+/// A Host pattern ssh can't resolve as it stands: no dot or colon, so neither a domain nor an
+/// address, and no wildcard.
+fn bare_alias(host: &str) -> bool {
+    host != "localhost" && !host.contains(['.', ':', '*', '?', '!', '[', '%'])
+}
+
+/// The `hostname` an alias most likely stands for, for the fix in its warning.
+fn likely_hostname(alias: &str) -> &'static str {
+    let alias = alias.to_ascii_lowercase();
+    [("github", "github.com"), ("gitlab", "gitlab.com"), ("bitbucket", "bitbucket.org"), ("codeberg", "codeberg.org")]
+        .into_iter()
+        .find(|(word, _)| alias.contains(word))
+        .map_or("the server's name or address", |(_, host)| host)
 }
 
 /// The values a Host block takes from an item, checked for ssh_config.
@@ -101,18 +253,21 @@ struct HostFields {
 
 /// Why an item gets no Host block.
 enum NoBlock {
-    /// A control character: a newline plus `ProxyCommand` would run commands.
-    Control,
+    /// A control character in a field: a newline plus `ProxyCommand` would run commands.
+    Control { field: &'static str, before: String, newline: bool },
     NoHosts,
-    /// Characters ssh_config can't take safely.
-    Unsafe,
+    /// Characters ssh_config can't take safely in a field, and the ones it takes there.
+    Unsafe { field: &'static str, value: String, allowed: &'static str },
 }
 
 fn host_fields(item: &Item) -> Result<HostFields, NoBlock> {
-    let (hosts, hostname, user, port) = (item.field("hosts"), item.field("hostname"), item.field("user"), item.field("port"));
-    if [hosts, hostname, user, port].iter().any(|v| v.chars().any(char::is_control)) {
-        return Err(NoBlock::Control);
+    let names = ["hosts", "hostname", "user", "port"];
+    for field in names {
+        if let Some((before, newline)) = control(item.field(field)) {
+            return Err(NoBlock::Control { field, before, newline });
+        }
     }
+    let [hosts, hostname, user, port] = names.map(|f| item.field(f).trim());
     let hosts: Vec<String> = hosts
         .split(|c: char| c == ',' || c.is_whitespace())
         .filter(|w| !w.is_empty())
@@ -122,14 +277,18 @@ fn host_fields(item: &Item) -> Result<HostFields, NoBlock> {
         return Err(NoBlock::NoHosts);
     }
     let all = |s: &str, ok: fn(char) -> bool| s.chars().all(ok);
-    let host_ok = hosts
-        .iter()
-        .all(|h| all(h, |c| c.is_ascii_alphanumeric() || "[].*?!_:%-".contains(c)));
-    let hostname_ok = all(hostname, |c| c.is_ascii_alphanumeric() || "._:%-".contains(c));
-    let user_ok = all(user, |c| c.is_ascii_alphanumeric() || "._@-".contains(c));
-    let port_ok = port.is_empty() || (port.len() <= 5 && all(port, |c| c.is_ascii_digit()));
-    if !(host_ok && hostname_ok && user_ok && port_ok) {
-        return Err(NoBlock::Unsafe);
+    let unsafe_in = |field, value: &str, allowed| NoBlock::Unsafe { field, value: value.to_string(), allowed };
+    if let Some(h) = hosts.iter().find(|h| !all(h, |c| c.is_ascii_alphanumeric() || "[].*?!_:%-".contains(c))) {
+        return Err(unsafe_in("hosts", h, "letters, digits and . - _ : % * ? ! [ ]"));
+    }
+    if !all(hostname, |c| c.is_ascii_alphanumeric() || "._:%-".contains(c)) {
+        return Err(unsafe_in("hostname", hostname, "letters, digits and . - _ : %"));
+    }
+    if !all(user, |c| c.is_ascii_alphanumeric() || "._@-".contains(c)) {
+        return Err(unsafe_in("user", user, "letters, digits and . _ @ -"));
+    }
+    if !(port.is_empty() || (port.len() <= 5 && all(port, |c| c.is_ascii_digit()))) {
+        return Err(unsafe_in("port", port, "a number"));
     }
     Ok(HostFields {
         hosts,
@@ -167,13 +326,16 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &mut [Key], scope: &str, 
             fingerprint: fp.clone(),
             ..KeyInfo::default()
         };
-        let public = item.public_key.as_deref().unwrap_or("");
-        if !usable_public_key(public) {
-            p.warn(format!("{label}: no usable public key in the item, skipped"));
-            info.note = Some("no usable public key in the item".into());
-            infos.push(info);
-            continue;
-        }
+        warn_misspelt_fields(item, &label, p);
+        let public = match public_key(item.public_key.as_deref().unwrap_or("")) {
+            Ok(k) => k,
+            Err(problem) => {
+                p.warn(key_warning(&label, &problem));
+                info.note = Some("no usable public key in the item".into());
+                infos.push(info);
+                continue;
+            }
+        };
         let pub_path = paths.ssh.join(format!("{}.pub", key.file));
         // A private key of that name on disk means the name is taken by a real key.
         if m.exists(&paths.ssh.join(&key.file))
@@ -196,11 +358,14 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &mut [Key], scope: &str, 
 
         let fields = match host_fields(item) {
             Ok(f) => f,
-            Err(NoBlock::Control) => {
+            Err(NoBlock::Control { field, before, newline }) => {
+                let what = if newline { "a newline" } else { "a control character" };
                 p.warn(format!(
-                    "{label}: a hosts/hostname/user/port field has a newline or control character; no Host block"
+                    "{label}: the field `{field}` holds `{}` followed by {what}, and ssh_config would read the rest \
+                     as directives; in Bitwarden, make the value one line. No Host block",
+                    preview(&before)
                 ));
-                info.note = Some("a hosts/hostname/user/port field has a control character".into());
+                info.note = Some(format!("the field `{field}` has {what}"));
                 infos.push(info);
                 continue;
             }
@@ -211,15 +376,29 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &mut [Key], scope: &str, 
                 infos.push(info);
                 continue;
             }
-            Err(NoBlock::Unsafe) => {
+            Err(NoBlock::Unsafe { field, value, allowed }) => {
                 p.warn(format!(
-                    "{label}: hosts/hostname/user/port contain characters ssh_config can't take safely; no Host block"
+                    "{label}: the field `{field}` holds `{}`, with characters ssh_config can't take safely \
+                     (it takes {allowed}); fix the value in Bitwarden. No Host block",
+                    preview(&value)
                 ));
-                info.note = Some("hosts/hostname/user/port have characters ssh_config can't take".into());
+                info.note = Some(format!("the field `{field}` has characters ssh_config can't take"));
                 infos.push(info);
                 continue;
             }
         };
+        // Without `HostName`, ssh resolves the alias itself. The block is still written: a name
+        // the resolver knows (a LAN name, an `/etc/hosts` entry) works as it is, and the key and
+        // user apply either way.
+        if fields.hostname.is_empty()
+            && let Some(alias) = fields.hosts.iter().find(|h| bare_alias(h))
+        {
+            p.warn(format!(
+                "{label}: Host {alias} has no `hostname` field, so ssh looks up \"{alias}\" as a server name and \
+                 fails; in Bitwarden, add a custom text field `hostname` = {}",
+                likely_hostname(alias)
+            ));
+        }
         // ssh collects IdentityFile from every matching block, so a host in two items gets
         // both keys offered and the server takes whichever it knows first.
         for h in &fields.hosts {

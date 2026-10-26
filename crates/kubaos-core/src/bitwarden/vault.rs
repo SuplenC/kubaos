@@ -36,6 +36,14 @@ pub struct Field {
     pub kind: u8,
 }
 
+impl Field {
+    /// Whether the field is `name` as people type it in Bitwarden's editor: ssh's own spelling
+    /// is `HostName`, and a trailing space is invisible there.
+    pub fn is(&self, name: &str) -> bool {
+        self.name.trim().eq_ignore_ascii_case(name)
+    }
+}
+
 /// One item, cut down.
 #[derive(Clone)]
 pub struct Item {
@@ -58,13 +66,13 @@ impl Item {
     pub fn field(&self, name: &str) -> &str {
         self.fields
             .iter()
-            .find(|f| f.name == name)
+            .find(|f| f.is(name))
             .and_then(|f| f.value.as_deref())
             .unwrap_or("")
     }
 
     pub fn has_field(&self, name: &str) -> bool {
-        self.fields.iter().any(|f| f.name == name)
+        self.fields.iter().any(|f| f.is(name))
     }
 
     /// The name and the folder, which tell two keys of the same name apart. It goes into
@@ -168,7 +176,7 @@ impl Vault {
                         r.login.and_then(|l| l.password).or_else(|| {
                             fields
                                 .iter()
-                                .find(|f| f.name == "token")
+                                .find(|f| f.is("token"))
                                 .and_then(|f| f.value.clone())
                         })
                     })

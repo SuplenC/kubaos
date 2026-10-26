@@ -281,7 +281,10 @@ fn a_field_smuggling_a_directive_gets_no_host_block() {
     let out = pull_all(&mut m);
 
     assert!(!m.text(SSH_CONFIG).unwrap().contains("ProxyCommand"));
-    assert!(out.warned("Evil (Work): a hosts/hostname/user/port field has a newline or control character; no Host block"));
+    assert!(out.warned(
+        "Evil (Work): the field `hosts` holds `evil` followed by a newline, and ssh_config would read the rest as directives; \
+         in Bitwarden, make the value one line. No Host block"
+    ));
 }
 
 #[test]
@@ -328,8 +331,162 @@ fn a_key_without_a_usable_public_key_is_skipped_with_a_warning() {
 
     let out = pull_all(&mut m);
 
-    assert!(out.warned("Broken (no folder): no usable public key in the item, skipped"));
+    assert!(out.warned(
+        "Broken (no folder): the public key field holds `ssh-ed25519 AAAA` followed by a newline; \
+         in Bitwarden, make the public key that one line (or import the key again). Skipped: no .pub, no Host block"
+    ));
     assert!(m.text("/home/kuba/.ssh/broken.pub").is_none());
+}
+
+fn with_public_key(name: &str, slug: &str, key: &str, fields: serde_json::Value) -> serde_json::Value {
+    let mut item = ssh_item(name, slug, Some("f-work"), 1, fields);
+    item["sshKey"]["publicKey"] = json!(key);
+    item
+}
+
+#[test]
+fn a_public_key_with_a_comment_is_written_without_the_comment() {
+    let item = with_public_key("Mac", "mac", "ssh-ed25519 AAAAmac jakub@macbook", json!([field("hosts", "mac.example")]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert_eq!(m.text("/home/kuba/.ssh/mac.pub"), Some("ssh-ed25519 AAAAmac bitwarden:Mac\n"));
+    assert_eq!(host_blocks(&m), 1);
+    assert!(!out.warned("Mac (Work):"), "{:?}", out.report.warnings);
+}
+
+#[test]
+fn a_public_key_with_runs_of_spaces_is_written_with_single_ones() {
+    let item = with_public_key("Spaced", "spaced", "ssh-ed25519  AAAAspaced  me@host ", json!([]));
+    let mut m = with_items(machine(), &[item]);
+
+    pull_all(&mut m);
+
+    assert_eq!(m.text("/home/kuba/.ssh/spaced.pub"), Some("ssh-ed25519 AAAAspaced bitwarden:Spaced\n"));
+}
+
+#[test]
+fn a_public_key_ending_in_a_line_break_is_written_without_it() {
+    let item = with_public_key("Alias2k", "alias", "ssh-ed25519 AAAAalias me@work\n", json!([field("hosts", "alias.example")]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert_eq!(m.text("/home/kuba/.ssh/alias2k.pub"), Some("ssh-ed25519 AAAAalias bitwarden:Alias2k\n"));
+    assert!(!out.warned("Alias2k (Work):"), "{:?}", out.report.warnings);
+}
+
+#[test]
+fn a_long_public_key_is_shortened_in_the_warning() {
+    let key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGq7\r\nx";
+    let item = with_public_key("Long", "long", key, json!([]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert!(out.warned("Long (Work): the public key field holds `ssh-ed25519 AAAAC3NzaC1l…` followed by a newline"));
+}
+
+#[test]
+fn a_public_key_of_an_unknown_type_names_the_type() {
+    let item = with_public_key("Dss", "dss", "ssh-dss AAAAdss", json!([]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert!(out.warned(
+        "Dss (Work): the public key is of type `ssh-dss`; kubaos bitwarden takes ssh-ed25519, ssh-rsa and ecdsa-sha2-nistp*. \
+         Create an Ed25519 key in Bitwarden instead. Skipped: no .pub, no Host block"
+    ), "{:?}", out.report.warnings);
+}
+
+#[test]
+fn a_signing_key_with_a_comment_signs() {
+    let item = with_public_key("Signer", "signer", "ssh-ed25519 AAAAsigner me@mac", json!([{ "name": "signing", "value": "true", "type": 2 }]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert!(!out.warned("isn't the key of"), "{:?}", out.report.warnings);
+    assert!(m.text(SIGNING).unwrap().contains("signingKey = /home/kuba/.ssh/signer.pub"));
+    assert_eq!(m.text(SIGNERS), Some("k@x.eu namespaces=\"git\" ssh-ed25519 AAAAsigner\n"));
+}
+
+#[test]
+fn a_pub_on_disk_with_another_comment_counts_as_the_same_key() {
+    let mut m = machine()
+        .file("/home/kuba/.ssh/github", "-----BEGIN OPENSSH PRIVATE KEY-----")
+        .file("/home/kuba/.ssh/github.pub", "ssh-ed25519 AAAAgithub me@laptop\n");
+
+    let out = pull_all(&mut m);
+
+    assert!(!out.warned("different key on disk"), "{:?}", out.report.warnings);
+    assert_eq!(m.text("/home/kuba/.ssh/github.pub"), Some("ssh-ed25519 AAAAgithub bitwarden:GitHub\n"));
+}
+
+#[test]
+fn field_names_match_whatever_their_case_and_surrounding_spaces() {
+    let a = ssh_item("A", "a", None, 1, json!([field("Hosts", "a-alias"), field("HostName", "a.example"), field(" User", "git")]));
+    let b = ssh_item("B", "b", None, 2, json!([field("hosts", "b-alias"), field("hostname ", "b.example")]));
+    let mut m = with_items(machine(), &[a, b]);
+
+    let out = pull_all(&mut m);
+
+    let conf = m.text(SSH_CONFIG).unwrap();
+    assert!(conf.contains("Host a-alias\n  HostName a.example\n  User git\n"), "{conf}");
+    assert!(conf.contains("Host b-alias\n  HostName b.example\n"), "{conf}");
+    assert!(!out.warned("A (no folder):") && !out.warned("B (no folder):"), "{:?}", out.report.warnings);
+}
+
+#[test]
+fn an_alias_without_a_hostname_keeps_its_block_and_warns_with_the_fix() {
+    let item = ssh_item("Lavoro GitHub", "lavoro", None, 1, json!([field("hosts", "github-lavoro"), field("user", "git")]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert!(out.warned(
+        "Lavoro GitHub (no folder): Host github-lavoro has no `hostname` field, so ssh looks up \"github-lavoro\" \
+         as a server name and fails; in Bitwarden, add a custom text field `hostname` = github.com"
+    ), "{:?}", out.report.warnings);
+    assert!(m.text(SSH_CONFIG).unwrap().contains("Host github-lavoro\n  User git\n"));
+}
+
+#[test]
+fn a_real_host_name_needs_no_hostname_field() {
+    let mut m = machine();
+
+    let out = pull_all(&mut m);
+
+    assert!(!out.warned("has no `hostname` field"), "{:?}", out.report.warnings);
+}
+
+#[test]
+fn an_unknown_field_close_to_a_known_one_points_to_it() {
+    let item = ssh_item("Typo", "typo", None, 1, json!([field("host", "typo.example"), field("Hostnme", "x"), field("notes2", "y")]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert!(out.warned(
+        "Typo (no folder): kubaos bitwarden reads no field `host`; in Bitwarden, rename it to `hosts`"
+    ), "{:?}", out.report.warnings);
+    assert!(out.warned("Typo (no folder): kubaos bitwarden reads no field `Hostnme`; in Bitwarden, rename it to `hostname`"));
+    assert!(!out.warned("notes2"));
+}
+
+#[test]
+fn a_field_ssh_config_cant_take_is_named_with_its_value() {
+    let item = ssh_item("Spaced user", "su", None, 1, json!([field("hosts", "su.example"), field("user", "a b")]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert!(out.warned(
+        "Spaced user (no folder): the field `user` holds `a b`, with characters ssh_config can't take safely \
+         (it takes letters, digits and . _ @ -); fix the value in Bitwarden. No Host block"
+    ), "{:?}", out.report.warnings);
 }
 
 #[test]
@@ -1044,12 +1201,18 @@ fn slug_makes_a_file_name_from_an_item_name() {
 
 #[test]
 fn a_public_key_is_one_known_type_and_base64() {
-    assert!(ssh::usable_public_key("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+/="));
-    assert!(ssh::usable_public_key("ecdsa-sha2-nistp256 AAAA"));
-    assert!(!ssh::usable_public_key("ssh-ed25519 AAAA comment"));
-    assert!(!ssh::usable_public_key("ssh-dss AAAA"));
-    assert!(!ssh::usable_public_key("ecdsa-sha2-nistp AAAA"));
-    assert!(!ssh::usable_public_key("ssh-ed25519 AAAA\nProxyCommand x"));
+    let key = |k| ssh::public_key(k).ok();
+    assert_eq!(key("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+/=").as_deref(), Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+/="));
+    assert_eq!(key("ecdsa-sha2-nistp256 AAAA").as_deref(), Some("ecdsa-sha2-nistp256 AAAA"));
+    assert_eq!(key("ssh-ed25519 AAAA jakub@macbook pro").as_deref(), Some("ssh-ed25519 AAAA"));
+    assert_eq!(key("ssh-ed25519  AAAA ").as_deref(), Some("ssh-ed25519 AAAA"));
+    assert_eq!(key("ssh-dss AAAA"), None);
+    assert_eq!(key("ecdsa-sha2-nistp AAAA"), None);
+    assert_eq!(key("ssh-ed25519 AA*A"), None);
+    assert_eq!(key("ssh-ed25519"), None);
+    assert_eq!(key("ssh-ed25519 AAAA\nProxyCommand x"), None);
+    assert_eq!(key("ssh-ed25519 AAAA\r\n").as_deref(), Some("ssh-ed25519 AAAA"));
+    assert_eq!(key("ssh-ed25519 AAAA me\tthere"), None);
 }
 
 #[test]
