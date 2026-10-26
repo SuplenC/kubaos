@@ -365,6 +365,16 @@ icon = "input-keyboard"
 keywords = ["accents", "dead keys", "option key", "macos", "diacritics", "keyboard"]
 run = ["kubaos", "keyboard", "accents", "off"]
 
+# The design language: every token and component of kubaos-ui, live
+# (crates/kubaos-specimen, from design/tokens.toml). Tab and the arrows move
+# between its pages, M switches light and dark.
+[extensions.kubaos.actions.design-specimen]
+title = "Design specimen"
+subtitle = "Type, colour, spacing, every component and the icon sets, live"
+icon = "applications-graphics"
+keywords = ["design", "tokens", "components", "icons", "type", "colours", "style guide", "kubaos-ui"]
+run = ["kubaos-specimen"]
+
 # The shell's panels and notifications (config/quickshell/IpcHandlers.qml).
 
 [extensions.kubaos.actions.control-center]
