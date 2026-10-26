@@ -54,7 +54,7 @@ The defaults place every screen at its preferred mode. Set your own layout in
    to any port or dock:
 
    ```lua
-   hl.monitor({ output = "desc:LG Electronics LG ULTRAGEAR 312NTXX1A234", mode = "2560x1440@143.99", position = "1920x0", scale = 1 })
+   hl.monitor({ output = "desc:Dell Inc. DELL U2724D 1A2B3C4", mode = "2560x1440@120", position = "1920x0", scale = 1 })
    ```
 
    `position` is the top-left corner in logical pixels (after scale): a

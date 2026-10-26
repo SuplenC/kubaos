@@ -101,8 +101,8 @@ Singleton {
         readonly property real opacity: 0.94    // frame + panels; Hyprland blurs what shows through
     }
 
-    // Sized for Full HD density: the 1080p externals at scale 1 and the laptop
-    // panel at scale 1.5 (config/hypr/monitors.lua) show the same sizes.
+    // Sized for Full HD density, about 1920 logical pixels across: every
+    // screen whose scale brings it there shows the same sizes.
     readonly property QtObject bar: QtObject {
         readonly property int height: 36
         readonly property int pillHeight: 26

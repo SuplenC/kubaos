@@ -7,10 +7,11 @@ import qs.settings
 // of these lives in Menu.qml and every piece of the menu reads it, so the
 // numbers are set here once.
 //
-// Sizes follow the screen's logical size. A Full HD-density screen (the 1080p
-// externals at scale 1, the laptop's 2880x1800 at 1.5) is the reference, so
-// those show the same menu; smaller screens scale it down a little, larger
-// ones up. Every length lands on whole device pixels at the screen's scale.
+// Sizes follow the screen's logical size. A screen about 1920 logical pixels
+// wide (1080p at scale 1, or a denser panel at the scale that gets it there) is
+// the reference, so those show the same menu; smaller screens scale it down a
+// little, larger ones up. Every length lands on whole device pixels at the
+// screen's scale.
 QtObject {
     id: look
 

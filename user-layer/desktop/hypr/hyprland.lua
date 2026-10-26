@@ -17,7 +17,7 @@
 -- hl.config({ input = { sensitivity = 0, touchpad = { natural_scroll = true } } })
 --
 -- A screen at a fixed mode, place and scale. `hyprctl monitors all` lists the descriptions.
--- hl.monitor({ output = "desc:LG Electronics LG ULTRAGEAR 312NTXX1A234", mode = "2560x1440@143.99", position = "1920x0", scale = 1 })
+-- hl.monitor({ output = "desc:Dell Inc. DELL U2724D 1A2B3C4", mode = "2560x1440@120", position = "1920x0", scale = 1 })
 --
 -- A key of your own. The description shows in the Shortcuts View (SUPER + F1) and the menu.
 -- hl.bind("SUPER + B", hl.dsp.exec_cmd("google-chrome"), { description = "Browser" })
