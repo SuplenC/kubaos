@@ -27,3 +27,6 @@ config/nvim/lazyvim.json.bak
 
 # Cargo build output of the workspace in Cargo.toml
 /target
+
+# Agent worktrees (Claude Code), each a checkout of its own.
+.claude/worktrees/
