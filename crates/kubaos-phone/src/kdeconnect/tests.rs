@@ -5,6 +5,7 @@ use super::parse_addresses;
 use super::parse_battery;
 use super::parse_device;
 use super::parse_ids;
+use super::valid_plugin;
 use crate::device::Battery;
 use crate::link::Action;
 use crate::link::LinkError;
@@ -106,6 +107,15 @@ fn each_action_calls_its_plugin_on_the_devices_object() {
             "file:///home/kuba/a.jpg".into()
         ]
     );
+}
+
+#[test]
+fn only_a_kde_connect_plugin_name_goes_to_set_plugin_enabled() {
+    assert!(valid_plugin("kdeconnect_mousepad"));
+    assert!(valid_plugin("kdeconnect_connectivity_report"));
+    for name in ["mousepad", "kdeconnect_Mouse", "kdeconnect_a b", "kdeconnect_x\" true"] {
+        assert!(!valid_plugin(name), "{name:?}");
+    }
 }
 
 #[test]

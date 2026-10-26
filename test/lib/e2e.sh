@@ -2469,7 +2469,8 @@ c_phone() {
 
   grep -qE '^ExecStart=/nix/store/[^ ]+-kdeconnect-kde-[^/]+/bin/kdeconnectd$' "$unit" 2>/dev/null &&
     grep -qxF "ConditionPathExists=$flag" "$unit" &&
-    echo "ok   the user unit runs kdeconnectd only while $flag exists" ||
+    grep -qE '^ExecStartPost=.*/bin/kubaos-phone restrict$' "$unit" &&
+    echo "ok   the user unit runs kdeconnectd only while $flag exists, and restricts its plugins" ||
     { echo "FAIL $unit doesn't run kdeconnectd behind the flag"; bad=1; }
   [[ -x $bin ]] || { echo "FAIL the switch left no $bin"; return 1; }
 

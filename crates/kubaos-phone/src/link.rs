@@ -99,6 +99,23 @@ pub trait Link {
     /// This laptop's IPv4 addresses on its networks.
     fn addresses(&mut self) -> Vec<String>;
 
+    /// The plugins `device` (an id) supports, each with whether it is turned on for it.
+    ///
+    /// # Errors
+    ///
+    /// When kdeconnectd doesn't answer.
+    fn plugins(&mut self, device: &str) -> Result<Vec<(String, bool)>, LinkError>;
+
+    /// Turns `plugin` on or off for `device`. kdeconnectd keeps it in the device's config.
+    ///
+    /// # Errors
+    ///
+    /// When kdeconnectd refuses or doesn't answer.
+    fn set_plugin(&mut self, device: &str, plugin: &str, on: bool) -> Result<(), LinkError>;
+
+    /// The plugins the user allows on top of the phone link's own.
+    fn extra_plugins(&self) -> Vec<String>;
+
     /// Asks `device` (an id) for `action`.
     ///
     /// # Errors

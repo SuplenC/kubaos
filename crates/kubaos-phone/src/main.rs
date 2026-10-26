@@ -8,13 +8,15 @@
 //! kubaos-phone send-file PATH [PHONE] send a file to the paired phone
 //! kubaos-phone ring [PHONE]           ring the paired phone, even on silent
 //! kubaos-phone unpair [PHONE]         forget the paired phone
+//! kubaos-phone restrict               turn off every plugin the phone link isn't for, on every
+//!                                     device (the user unit runs it as kdeconnectd starts)
 //! ```
 //!
 //! # Owns
 //!
 //! - The command line and its exit codes: 2 for a usage error, 1 when the command failed, with
-//!   the reason and what to do on stderr. Every command but `status` also says how it went in a
-//!   notification, since the menu runs them with no terminal.
+//!   the reason and what to do on stderr. Every command but `status` and `restrict` also says how
+//!   it went in a notification, since the menu runs them with no terminal.
 //!
 //! # Not here
 //!
@@ -41,6 +43,7 @@ usage: kubaos-phone status [--json]
        kubaos-phone send-file PATH [PHONE]
        kubaos-phone ring [PHONE]
        kubaos-phone unpair [PHONE]
+       kubaos-phone restrict
 
 status          on or off, the name phones see this laptop by, and each device KDE Connect knows
 on|off          set up the phone link (KDE Connect starts), or turn it off (it stops)
@@ -48,7 +51,8 @@ accept          accept the pairing request of DEVICE, by its id or name
 send-clipboard  send the laptop's clipboard to the paired phone, or to PHONE
 send-file       send the file PATH to the paired phone, or to PHONE
 ring            ring the paired phone, even when it is on silent
-unpair          forget the paired phone, or PHONE";
+unpair          forget the paired phone, or PHONE
+restrict        turn off every KDE Connect plugin the phone link isn't for, on every device";
 
 const ICON: &str = "phone";
 
@@ -60,6 +64,7 @@ fn main() -> ExitCode {
     let done = match args.as_slice() {
         ["status"] => return show(&phone::status(link), false),
         ["status", "--json"] => return show(&phone::status(link), true),
+        ["restrict"] => return restrict(link),
         ["on"] => phone::turn_on(link).map(|st| on_message(&st)),
         ["off"] => phone::turn_off(link).map(|()| "Phone link off. KDE Connect stopped.".to_string()),
         ["accept", device] => phone::accept(link, device).map(|d| format!("Paired with {}.", d.name)),
@@ -96,6 +101,22 @@ fn main() -> ExitCode {
             let reason = chain(&err);
             eprintln!("kubaos-phone: {reason}\n{}", err.hint());
             notify(&capital(&reason), err.hint());
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// The plugin restriction, quiet but for what it turned off: it runs at every start of the unit.
+fn restrict(link: &mut KdeConnect) -> ExitCode {
+    match phone::restrict(link) {
+        Ok(changed) => {
+            for line in changed {
+                println!("{line}");
+            }
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            eprintln!("kubaos-phone: {}\n{}", chain(&err), err.hint());
             ExitCode::FAILURE
         }
     }

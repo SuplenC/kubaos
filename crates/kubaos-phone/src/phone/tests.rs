@@ -4,6 +4,7 @@ use super::Error;
 use super::TEST_TEXT;
 use super::accept;
 use super::received;
+use super::restrict;
 use super::ring;
 use super::send_clipboard;
 use super::send_file;
@@ -244,6 +245,109 @@ fn a_refusal_from_kdeconnect_keeps_its_reason() {
     assert!(matches!(err, Error::Link(_)), "{err}");
     let cause = std::error::Error::source(&err).map(ToString::to_string).unwrap_or_default();
     assert!(cause.contains("Unknown method ring"), "{cause}");
+}
+
+/// The plugins kdeconnectd 26.08 loads for an iPhone, all on, as a new pairing leaves them.
+fn iphone_plugins(fake: &mut Fake, id: &str) {
+    for plugin in [
+        "kdeconnect_clipboard",
+        "kdeconnect_share",
+        "kdeconnect_ping",
+        "kdeconnect_battery",
+        "kdeconnect_findmyphone",
+        "kdeconnect_findthisdevice",
+        "kdeconnect_mousepad",
+        "kdeconnect_runcommand",
+        "kdeconnect_presenter",
+        "kdeconnect_screensaver_inhibit",
+        "kdeconnect_shareinputdevicesremote",
+    ] {
+        fake.plugins.push((id.to_string(), plugin.to_string(), true));
+    }
+}
+
+fn on_plugins(fake: &Fake, id: &str) -> Vec<String> {
+    fake.plugins
+        .iter()
+        .filter(|(d, _, on)| d == id && *on)
+        .map(|(_, p, _)| p.clone())
+        .collect()
+}
+
+const LINK_PLUGINS: [&str; 6] = [
+    "kdeconnect_clipboard",
+    "kdeconnect_share",
+    "kdeconnect_ping",
+    "kdeconnect_battery",
+    "kdeconnect_findmyphone",
+    "kdeconnect_findthisdevice",
+];
+
+#[test]
+fn restricting_leaves_a_phone_only_the_plugins_the_link_is_for() {
+    let id = iphone().id;
+    let mut fake = Fake::running(vec![iphone()]);
+    iphone_plugins(&mut fake, &id);
+
+    let changed = restrict(&mut fake).expect("restrict the plugins");
+
+    assert_eq!(on_plugins(&fake, &id), LINK_PLUGINS);
+    assert_eq!(changed.len(), 5, "{changed:?}");
+    assert!(changed.iter().any(|c| c == "iPhone: kdeconnect_mousepad off"), "{changed:?}");
+}
+
+#[test]
+fn a_plugin_kubaos_doesnt_know_stays_off_and_one_the_user_allowed_stays_on() {
+    let id = iphone().id;
+    let mut fake = Fake::running(vec![iphone()]);
+    iphone_plugins(&mut fake, &id);
+    fake.plugins.push((id.clone(), "kdeconnect_from_the_future".into(), true));
+    fake.extra = vec!["kdeconnect_mousepad".into()];
+
+    restrict(&mut fake).expect("restrict the plugins");
+
+    let on = on_plugins(&fake, &id);
+    assert!(on.contains(&"kdeconnect_mousepad".to_string()), "{on:?}");
+    assert!(!on.contains(&"kdeconnect_from_the_future".to_string()), "{on:?}");
+}
+
+#[test]
+fn a_plugin_the_user_turned_off_is_left_off() {
+    let id = iphone().id;
+    let mut fake = Fake::running(vec![iphone()]);
+    fake.plugins.push((id.clone(), "kdeconnect_clipboard".into(), false));
+
+    let changed = restrict(&mut fake).expect("restrict the plugins");
+
+    assert_eq!(changed, Vec::<String>::new());
+    assert_eq!(on_plugins(&fake, &id), Vec::<String>::new());
+}
+
+#[test]
+fn turning_on_restricts_every_device_kde_connect_knows() {
+    let id = iphone().id;
+    let mut fake = Fake {
+        devices: vec![iphone(), stranger()],
+        ..Fake::new()
+    };
+    iphone_plugins(&mut fake, &id);
+    iphone_plugins(&mut fake, "site24");
+
+    turn_on(&mut fake).expect("turn the link on");
+
+    assert_eq!(on_plugins(&fake, &id), LINK_PLUGINS);
+    assert_eq!(on_plugins(&fake, "site24"), LINK_PLUGINS);
+}
+
+#[test]
+fn accepting_a_pairing_restricts_the_new_phone() {
+    let id = iphone().id;
+    let mut fake = Fake::running(vec![iphone_asking()]);
+    iphone_plugins(&mut fake, &id);
+
+    accept(&mut fake, &id).expect("accept the iPhone");
+
+    assert_eq!(on_plugins(&fake, &id), LINK_PLUGINS);
 }
 
 #[test]

@@ -20,6 +20,10 @@ pub struct Fake {
     pub addresses: Vec<String>,
     pub devices: Vec<Device>,
     pub clipboard: String,
+    /// (device id, plugin, on): the plugins each device supports.
+    pub plugins: Vec<(String, String, bool)>,
+    /// The plugins the user allows on top of the link's own.
+    pub extra: Vec<String>,
     /// What the next call to kdeconnectd fails with, once.
     pub refuse: Option<String>,
     /// Every change asked of the machine, in order: `start`, `stop`, `on`, `off`, `copy TEXT`,
@@ -38,6 +42,8 @@ impl Default for Fake {
             addresses: vec!["192.168.1.23".into()],
             devices: vec![],
             clipboard: String::new(),
+            plugins: vec![],
+            extra: vec![],
             refuse: None,
             calls: vec![],
         }
@@ -183,6 +189,28 @@ impl Link for Fake {
             Action::SendClipboard | Action::Share(_) | Action::Ring => {}
         }
         Ok(())
+    }
+
+    fn plugins(&mut self, id: &str) -> Result<Vec<(String, bool)>, LinkError> {
+        self.bus()?;
+        Ok(self
+            .plugins
+            .iter()
+            .filter(|(d, _, _)| d == id)
+            .map(|(_, p, on)| (p.clone(), *on))
+            .collect())
+    }
+
+    fn set_plugin(&mut self, id: &str, plugin: &str, on: bool) -> Result<(), LinkError> {
+        self.bus()?;
+        for entry in self.plugins.iter_mut().filter(|(d, p, _)| d == id && p == plugin) {
+            entry.2 = on;
+        }
+        Ok(())
+    }
+
+    fn extra_plugins(&self) -> Vec<String> {
+        self.extra.clone()
     }
 
     fn copy(&mut self, text: &str) -> Result<(), LinkError> {

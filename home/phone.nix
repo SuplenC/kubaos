@@ -42,6 +42,11 @@ in
       Type = "dbus";
       BusName = "org.kde.kdeconnect";
       ExecStart = lib.getExe' kubaosPkgs.kdeconnect-kde "kdeconnectd";
+      # kdeconnectd turns every plugin on for a device it meets, and a newer
+      # KDE Connect brings new ones: each start leaves every device only the
+      # phone link's plugins (crates/kubaos-phone/src/phone.rs, LINK_PLUGINS).
+      # Without the `-`, a failure stops the unit rather than run unrestricted.
+      ExecStartPost = "${lib.getExe kubaosPkgs.kubaos-phone} restrict";
       Restart = "on-failure";
       RestartSec = 2;
     };

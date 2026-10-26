@@ -125,6 +125,34 @@ impl Link for KdeConnect {
         run("busctl", &busctl_owned(device_call(id, action)?)).map(drop)
     }
 
+    fn plugins(&mut self, id: &str) -> Result<Vec<(String, bool)>, LinkError> {
+        let path = device_path(id)?;
+        let props = properties(&path, DEVICE_IFACE)?;
+        let mut plugins = vec![];
+        for name in parse_ids(property(&props, "supportedPlugins").unwrap_or(&Value::Null)) {
+            if !valid_plugin(&name) {
+                continue;
+            }
+            let on = bus_call(&[BUS, &path, DEVICE_IFACE, "isPluginEnabled", "s", &name])?;
+            plugins.push((name, on.as_bool() == Some(true)));
+        }
+        Ok(plugins)
+    }
+
+    fn set_plugin(&mut self, id: &str, plugin: &str, on: bool) -> Result<(), LinkError> {
+        if !valid_plugin(plugin) {
+            return Err(LinkError::Answer(format!("plugin {plugin:?}")));
+        }
+        let path = device_path(id)?;
+        let on = if on { "true" } else { "false" };
+        let args = busctl(&["call", BUS, &path, DEVICE_IFACE, "setPluginEnabled", "sb", plugin, on]);
+        run("busctl", &args).map(drop)
+    }
+
+    fn extra_plugins(&self) -> Vec<String> {
+        self.setting.as_ref().map(Setting::extra_plugins).unwrap_or_default()
+    }
+
     fn copy(&mut self, text: &str) -> Result<(), LinkError> {
         // wl-copy stays behind to serve the clipboard: with a pipe on its output, waiting for the
         // output would wait for the next copy.
@@ -217,6 +245,19 @@ fn device_call(id: &str, action: &Action) -> Result<Vec<String>, LinkError> {
         args.extend(["s".to_string(), arg.clone()]);
     }
     Ok(args)
+}
+
+/// The object path of device `id`.
+fn device_path(id: &str) -> Result<String, LinkError> {
+    if !valid_id(id) {
+        return Err(LinkError::BadId(id.to_string()));
+    }
+    Ok(format!("{DAEMON}/devices/{id}"))
+}
+
+/// Plugin names are `kdeconnect_` and lowercase letters, digits and underscores.
+fn valid_plugin(name: &str) -> bool {
+    name.starts_with("kdeconnect_") && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 /// KDE Connect's ids are an object path's last element: letters, digits and underscores. Anything

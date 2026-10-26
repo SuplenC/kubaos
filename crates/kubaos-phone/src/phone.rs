@@ -33,6 +33,21 @@ pub const TEST_TEXT: &str = "Hello from KubaOS";
 /// second on the laptop; a cold start after a switch takes longer.
 pub const START_WAIT: Duration = Duration::from_secs(10);
 
+/// The KDE Connect plugins a device keeps: what the phone link is for (the clipboard, files and
+/// text both ways, ping, ring the phone or the laptop) and the phone's own reports (battery,
+/// signal). Every other plugin is turned off for every device, the ones a later KDE Connect adds
+/// included: most of them let the phone act on the laptop (remote input, run commands, the
+/// presenter, media control, locking, keeping the screen awake, browsing files).
+pub const LINK_PLUGINS: [&str; 7] = [
+    "kdeconnect_clipboard",
+    "kdeconnect_share",
+    "kdeconnect_ping",
+    "kdeconnect_battery",
+    "kdeconnect_findmyphone",
+    "kdeconnect_findthisdevice",
+    "kdeconnect_connectivity_report",
+];
+
 /// How long an accepted pairing gets to settle into paired.
 pub const PAIR_WAIT: Duration = Duration::from_secs(5);
 
@@ -127,7 +142,33 @@ pub fn turn_on(link: &mut dyn Link) -> Result<Status, Error> {
     if !wait_for(link, START_WAIT, |link| link.running()) {
         return Err(Error::NotStarted);
     }
+    restrict(link)?;
     Ok(status(link))
+}
+
+/// Turns off every plugin outside [`LINK_PLUGINS`] and the user's own list, for every device
+/// KDE Connect knows, paired or asking to be. A plugin the user turned off is left off. kdeconnectd
+/// writes plugins into each device's config as it meets the device, on by default, so this runs
+/// at `on`, around a pairing, and each time the unit starts (`home/phone.nix`).
+///
+/// # Errors
+///
+/// When the link isn't running, or kdeconnectd refuses a change.
+///
+/// Returns what it turned off, as `<device>: <plugin> off`.
+pub fn restrict(link: &mut dyn Link) -> Result<Vec<String>, Error> {
+    let extra = link.extra_plugins();
+    let allowed = |p: &str| LINK_PLUGINS.contains(&p) || extra.iter().any(|e| e == p);
+    let mut changed = vec![];
+    for device in devices(link)? {
+        for (plugin, on) in link.plugins(&device.id).map_err(Error::Link)? {
+            if on && !allowed(&plugin) {
+                link.set_plugin(&device.id, &plugin, false).map_err(Error::Link)?;
+                changed.push(format!("{}: {plugin} off", device.name));
+            }
+        }
+    }
+    Ok(changed)
 }
 
 /// Turns the phone link off and stops kdeconnectd. The setting goes first, so nothing starts it
@@ -154,6 +195,8 @@ pub fn accept(link: &mut dyn Link, id: &str) -> Result<Device, Error> {
     if !device.wants_to_pair {
         return Err(Error::NoRequest(device.name));
     }
+    // Before as well as after: the plugins load the moment the pairing is in.
+    restrict(link)?;
     link.call(id, &Action::Accept).map_err(Error::Link)?;
     let paired = |link: &mut dyn Link| {
         link.devices()
@@ -163,6 +206,7 @@ pub fn accept(link: &mut dyn Link, id: &str) -> Result<Device, Error> {
     if !wait_for(link, PAIR_WAIT, |link| paired(link).is_some()) {
         return Err(Error::NotPaired(device.name));
     }
+    restrict(link)?;
     paired(link).ok_or(Error::NotPaired(device.name))
 }
 

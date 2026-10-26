@@ -762,6 +762,9 @@ fn phone_explain<'a>(s: &Setup, link: &kubaos_core::phone::Status, st: State, p:
                  never lets an app read the clipboard in the background, so it is always by hand."
                     .into(),
                 "Phone to laptop on Android: the same from the app, its quick tile or its notification.".into(),
+                "That's all it can do here: no moving the pointer, typing, running commands or browsing \
+                 the laptop's files. KubaOS keeps those KDE Connect plugins off."
+                    .into(),
                 "Try it: Send a test copy and paste on the phone. Then send something back and press Check what \
                  the phone sent."
                     .into(),
