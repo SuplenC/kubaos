@@ -16,6 +16,14 @@ _Avoid_: Local config, overrides
 The user's own home-manager flake, which takes KubaOS as an input and adds the user's packages.
 _Avoid_: Home config, dotfiles
 
+**Package manifest**:
+The one list of KubaOS's apt packages, `system/packages.toml`, which the install and every update read, so the machine's apt packages follow the release as its Nix packages do.
+_Avoid_: Package list, base packages
+
+**Package group**:
+A named set of the **Package manifest**'s packages for one feature (Docker, the file manager, Hyprland); an optional one the user can turn off or on for good.
+_Avoid_: Feature flag, bundle
+
 **Curated set**:
 The packages KubaOS builds and pins itself, which move only with a KubaOS release.
 _Avoid_: KubaOS packages, pinned packages

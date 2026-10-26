@@ -119,6 +119,8 @@ kubaos rollback                  # undo the last update: KubaOS's release and yo
 kubaos channel                   # which channel this machine follows
 kubaos channel stable            # or edge
 kubaos upgrade                   # stable only: move to the next series (Upgrade to <codename> in the menu)
+kubaos packages status           # KubaOS's apt packages against the release: installed, missing, held, extra
+kubaos packages disable docker   # leave an optional group out for good (enable brings it back)
 ```
 
 An update, in order:
@@ -129,9 +131,10 @@ An update, in order:
 4. Takes a snapper snapshot, copies your `flake.lock` to `~/.local/state/kubaos/locks/`, and adds a line to `/var/lib/kubaos/update-history`.
 5. `apt-get upgrade`, then moves `/usr/share/kubaos`'s `release` branch.
 6. When the release's `system/files/apt/preferences.d/kubaos-hyprland` differs from the installed one (amd64): unholds the Hyprland stack, installs the pinned versions, holds it again.
-7. Runs the release's new system migrations (`migrations/system/`, as root), each once.
-8. `nix flake update --flake ~/.config/kubaos/home`, `system/relink.sh` (the wallpaper, PAM and recorder links), and a switch.
-9. Runs the new user migrations (`migrations/user/`, as you), each once, and writes `/var/lib/kubaos/release`.
+7. Brings the apt packages in line with the release's package manifest, `system/packages.toml` (below): installs what its groups list and the machine lacks, holds the held ones, and removes a package no group lists any more, but only one KubaOS installed and nothing else needs.
+8. Runs the release's new system migrations (`migrations/system/`, as root), each once.
+9. `nix flake update --flake ~/.config/kubaos/home`, `system/relink.sh` (the wallpaper, PAM and recorder links), and a switch.
+10. Runs the new user migrations (`migrations/user/`, as you), each once, and writes `/var/lib/kubaos/release`.
 
 In a terminal each of these phases gets one line: a spinner and the program's latest line while it runs, then a tick, a cross or "skipped", its time and what it did. A warning is one dimmed line under its phase. sudo asks for your password only when its cached one has run out, on a clean line. The programs' own output doesn't scroll past: it goes to a log, `~/.local/state/kubaos/update/<date>-update.log` (the last 10 runs are kept). When a step fails you see its last 20 lines and the log's path. At the end a summary says what moved where, the changes, the packages, the migrations that ran, what the session reloaded, whether you need to log in again or reboot, and how to undo it:
 
@@ -140,12 +143,26 @@ In a terminal each of these phases gets one line: a spinner and the program's la
 
   Updated     Shinjuku 0.1.0 (1a2b3c4) → Shinjuku 0.1.1 (9f8e7d6), edge
   Packages    12 apt packages, Nix inputs nixpkgs
+  Apt         files: installed loupe, showtime
   Migrations  1792765570-backlight-rule.sh
   Next        nothing, it's all running
   Undo        kubaos rollback
 ```
 
 Piped or in a log, the output is plain lines with no colour; `NO_COLOR=1` drops the colour in a terminal too. `--json` (on `update`, `upgrade` and `rollback`) prints one JSON event per line instead, for a program to show; the events are in [`docs/CONTRACTS.md`](CONTRACTS.md), "Updates and migrations". apt runs without questions and keeps your changed files under `/etc`, leaving the package's new version beside each as `.dpkg-dist`.
+
+### KubaOS's apt packages
+
+Every apt package KubaOS installs is listed in one file, `system/packages.toml` in the release, in groups: the base system, the file manager, Hyprland (held), Docker, Chrome, the security key and so on. The install reads it and so does every `kubaos update`, so a package a release adds reaches your machine with that update, as a Nix package does. `/var/lib/kubaos/apt-installed` records what KubaOS installed; a package you installed yourself is never removed, even when a release drops it from the list.
+
+```sh
+kubaos packages status           # each group: installed, missing (the next update installs it), held, or extra
+kubaos packages status --json    # the same for a program
+kubaos packages enable piv       # turn an optional group on: install it, and keep it in every update
+kubaos packages disable docker   # turn it off: remove what KubaOS installed for it, and leave it out
+```
+
+The optional groups are `docker`, `chrome` and `u2f` (on unless you say otherwise), `piv` and `tuxedo` (off until you turn them on; first-boot setup turns `tuxedo` on). What you chose at install (`system/40-apps.sh --no-docker`, `system/75-yubikey.sh --piv`, `system/70-bitwarden.sh --no-u2f`) is kept in `/etc/kubaos/apt-groups`, so no update brings back what you left out. `disable u2f` takes the security key out of sudo, polkit and the lock screen before its packages go. On a machine installed before the record, `disable` names the packages it leaves because KubaOS didn't install them, with the `sudo apt remove` for them. The Command menu has all of it: "KubaOS apt packages", and "Install Docker", "Remove Docker" and the like for each group.
 
 The running desktop follows every switch (`kubaos update`, `kubaos rollback`, a `home-manager switch` of your own) without a new login, and only where the defaults changed: Hyprland reloads, Quickshell restarts (after you unlock, if the screen is locked), hypridle restarts if it was running, Ghostty and tmux reload their config. With no desktop running, a switch from a tty or over ssh leaves that for the next login. New Neovim, lazygit and other terminal app settings apply the next time you start them. The details are in [`docs/CONTRACTS.md`](CONTRACTS.md), "The running session after a switch".
 
@@ -322,7 +339,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `config/` | The defaults, one dir per app, linked read-only into `~/.config`: `hypr`, `quickshell`, `nvim`, `tmux`, `tms`, `ghostty`, `foot`, `fuzzel`, `matugen`, `ohmyposh`, `lazygit`, `yazi`, `btop`, `bat`, `bacon`, `git` |
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-u2f-enroll`, `dot-ssh-sk-new`, and `dot-bw-setup` and `dot-bwenv`, aliases of `kubaos bitwarden` for one release) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, grouped by area: each app's commonly changed settings, commented out with their defaults, and the maps (`README.md`) |
-| `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), `relink.sh`, which `kubaos update` runs, files for `/etc` |
+| `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), the package manifest `packages.toml` and its reader `manifest.sh`, `apt-repo.sh` and `relink.sh`, which `kubaos update` runs, files for `/etc` |
 | `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, `kubaos-files`, yazi in a terminal window and the Downloads tidy, `kubaos-bluetooth`, the Bluetooth pairing agent, and `kubaos-automount`, the automount for removable drives and the photo import |
 | `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |
 | `test/` | The Docker test harness (`test/run`) |

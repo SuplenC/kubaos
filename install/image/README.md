@@ -92,7 +92,7 @@ unsquashfs -f -d /mnt -processors "$(nproc)" -percentage kubaos-shinjuku-x86_64.
    | Stage | Holds | Rebuilt when |
    |---|---|---|
    | `os` | `ubuntu:26.04`, the base and boot packages above, the temporary build user `kuba` (uid 1000, NOPASSWD sudo) | the package list |
-   | `base` | `system/10-strip.sh`, `20-base.sh` for real | `lib.sh`, those scripts, `files/{apt,netplan,logind.conf.d}` |
+   | `base` | `system/10-strip.sh`, `20-base.sh` for real | `lib.sh`, `manifest.sh`, the package manifest `packages.toml`, those scripts, `files/{apt,netplan,logind.conf.d}` |
    | `nix` | Nix from the official installer, with version, URL and sha256 read from `60-nix.sh` | `60-nix.sh` |
    | `apps` | `system/40-apps.sh` (Docker CE; Chrome on amd64) | that script, `files/chrome` |
    | `desktop` | `50-hyprland.sh`, `70-bitwarden.sh`, `75-yubikey.sh` | those, `files/{getty,pam.d,tmpfiles.d,systemd,udev,keyd,xkb,polkit}`, the autostart snippet |

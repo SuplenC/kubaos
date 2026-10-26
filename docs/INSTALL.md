@@ -186,7 +186,11 @@ environment from home-manager.
 Scripts live in `system/`, run in order, as your normal user (they call
 `sudo` themselves). Each is safe to re-run, checks before it changes
 anything, and never reboots. `--dry-run` shows what it would do; `--help`
-lists its flags.
+lists its flags. Their apt packages come from one list, `system/packages.toml`,
+which `kubaos update` reads too. A flag that leaves a group out
+(`40-apps.sh --no-docker`, `--no-chrome`, `70-bitwarden.sh --no-u2f`) or
+adds one (`75-yubikey.sh --piv`) is kept in `/etc/kubaos/apt-groups`, so
+updates follow it; `kubaos packages enable|disable <group>` changes it later.
 
 | Step | What | Reboot after? |
 |---|---|---|
@@ -350,6 +354,8 @@ system/40-apps.sh
 
 **Verify:** log out and in, then `docker run --rm hello-world`.
 `google-chrome --version`. Snapshot "drivers + apps" is taken at the end.
+Without Docker or Chrome: `--no-docker`, `--no-chrome`, which updates keep
+to (`kubaos packages enable docker` brings it back).
 
 ### 9. `system/50-hyprland.sh`
 
@@ -465,7 +471,7 @@ self-update on Linux). Then `libsecret-tools`, `libpam-u2f`, `pamu2fcfg`,
   `/nix/var/nix/gcroots/dotfiles-pam-u2f`.
 
 Then `system/75-yubikey.sh` (add `--piv` for the Multi-protocol Edition's
-smart card). As yourself, in the Hyprland session: open Bitwarden, log in,
+smart card; updates keep it). As yourself, in the Hyprland session: open Bitwarden, log in,
 Settings -> enable "SSH agent". Run `kubaos bitwarden setup` (SSH keys, git
 signing, gh, project env). Set the key's PIN and fingerprints with `ykman`, then run
 `dot-u2f-enroll` for each of your two keys. `docs/SECRETS.md`, "YubiKey C
