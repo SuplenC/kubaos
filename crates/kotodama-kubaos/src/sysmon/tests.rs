@@ -223,7 +223,10 @@ fn ending_signals_every_process_of_that_exact_name() {
     });
 
     assert_eq!(done, Ok(None));
-    assert_eq!(*sent.borrow(), [(300, Signal::End), (301, Signal::End)]);
+    // The processes come in `/proc`'s listing order, which the filesystem decides.
+    let mut sent = sent.into_inner();
+    sent.sort_by_key(|(pid, _)| *pid);
+    assert_eq!(sent, [(300, Signal::End), (301, Signal::End)]);
 }
 
 #[test]
