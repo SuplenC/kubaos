@@ -75,7 +75,7 @@ pub fn checkbox<'a, M: Clone + 'a>(
     };
     let mark: Element<'a, M> = match tick {
         Tick::Empty => widget::Space::new().into(),
-        Tick::Full => icon(Icon::Check, IconSize::S16, dim(c.on_primary)).into(),
+        Tick::Full => icon(look, Icon::Check, IconSize::S16, dim(c.on_primary)),
         Tick::Partial => canvas(Dash {
             color: dim(c.on_primary),
             scale: look.scale,

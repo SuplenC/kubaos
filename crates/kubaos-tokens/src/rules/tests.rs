@@ -264,3 +264,41 @@ fn a_name_that_cant_become_an_identifier_is_refused() {
         }]
     );
 }
+
+#[test]
+fn the_hero_size_is_on_the_list() {
+    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
+
+    assert!(tokens.rules.font_sizes.contains(&64));
+    assert_eq!(tokens.types["hero"].size, 64);
+}
+
+#[test]
+fn a_size_between_display_and_hero_is_refused() {
+    let found = violations(|t| set(t, &["type", "hero"], "size", 56));
+
+    assert_eq!(
+        found,
+        [Violation::OffListFontSize {
+            token: "type.hero".into(),
+            size: 56
+        }]
+    );
+}
+
+#[test]
+fn a_symbol_needs_exactly_one_source() {
+    let found = violations(|t| {
+        let mut both = toml::Table::new();
+        both.insert("tabler".into(), "check".into());
+        both.insert("drawn".into(), "a tick".into());
+        set(t, &["symbols"], "check", toml::Value::Table(both));
+    });
+
+    assert_eq!(
+        found,
+        [Violation::SymbolSource {
+            token: "symbols.check".into()
+        }]
+    );
+}

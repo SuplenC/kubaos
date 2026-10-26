@@ -1,0 +1,20 @@
+<!-- KubaOS Symbols, drawn on Tabler's 24 unit grid: Tabler's Wi-Fi fan at three quarters, with its search badge. -->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+  <path d="M9.5 16l.01 0" />
+  <path d="M7.379 13.879a3 3 0 0 1 4.242 0" />
+  <path d="M5.257 11.757a6 6 0 0 1 8.486 0" />
+  <path d="M3.136 9.636a9 9 0 0 1 12.728 0" />
+  <path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+  <path d="M20.2 20.2l1.8 1.8" />
+</svg>

@@ -60,3 +60,12 @@ fn no_line_of_the_module_passes_the_line_width() {
         assert!(line.chars().count() <= 120, "{line}");
     }
 }
+
+#[test]
+fn every_symbol_names_its_drawing() {
+    let module = module();
+
+    assert!(module.contains("Icon::ArrowBack => include_str!(\"../assets/symbols/arrow_back.svg\"),"));
+    assert!(module.contains("Icon::HardDrive => None,"));
+    assert!(module.contains("Icon::ArrowBack => Some(\"arrow-left\"),"));
+}

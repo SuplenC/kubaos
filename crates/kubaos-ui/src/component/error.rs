@@ -42,7 +42,7 @@ pub fn error_block<'a, M: 'a>(look: &Look, message: &'a str, hint: &'a str) -> E
     widget::container(
         row(look, Space::S16)
             .center()
-            .push(icon(Icon::Error, IconSize::S24, c.error))
+            .push(icon(look, Icon::Error, IconSize::S24, c.error))
             .push(
                 stack(look, Space::S4)
                     .width(Extent::Fill)

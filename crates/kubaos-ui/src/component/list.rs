@@ -136,7 +136,7 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         }
         let mut content = row(look, Space::S12).center();
         if let Some(glyph) = self.icon {
-            content = content.push(icon(glyph, IconSize::S20, main));
+            content = content.push(icon(look, glyph, IconSize::S20, main));
         }
         content = content.push(lines).push(fill());
         if let Some(detail) = self.detail {
@@ -144,7 +144,7 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         }
         if let Some(checked) = self.checked {
             content = content.push(if checked {
-                Element::from(icon(Icon::Check, IconSize::S20, main))
+                Element::from(icon(look, Icon::Check, IconSize::S20, main))
             } else {
                 widget::Space::new()
                     .width(f32::from(IconSize::S20.px()))

@@ -20,12 +20,14 @@ use crate::specimen::Message;
 /// What each style is shown saying: a line it would really carry.
 fn sample(style: Type) -> &'static str {
     match style {
-        Type::Display => "Your machine. Your rules.",
-        Type::Title => "Let's fix this shit.",
+        Type::Hero => "Let's fix this shit.",
+        Type::Display => "Done in 1m 42s.",
+        Type::Title => "Your machine. Your rules.",
         Type::Headline => "Restart now?",
         Type::Heading => "Wi-Fi",
         Type::BodyLarge => "Whatever's on here, it's had its chance.",
         Type::Subheading => "The disk is in use, so nothing got written.",
+        Type::ButtonLarge => "Install",
         Type::Button => "Continue",
         Type::Body => "Installing. Go stare at a wall, it'll be done before you get bored.",
         Type::BodyStrong => "Samsung SSD 990 PRO",

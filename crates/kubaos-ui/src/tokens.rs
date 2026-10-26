@@ -18,7 +18,7 @@
 pub const GRID: u16 = 4;
 
 /// The only font sizes, in logical pixels.
-pub const FONT_SIZES: [u16; 9] = [11, 12, 13, 14, 16, 20, 24, 32, 48];
+pub const FONT_SIZES: [u16; 10] = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64];
 
 /// The display scales every length lands on whole device pixels at.
 pub const SCALES: [f32; 4] = [1.0, 1.25, 1.5, 2.0];
@@ -29,6 +29,10 @@ pub const HAIRLINE_DEVICE_PX: u16 = 1;
 /// The focus ring's, the spinner's and the check mark's stroke in logical pixels, drawn rounded
 /// half up to whole device pixels.
 pub const STROKE_THIN: u16 = 2;
+
+/// A symbol's stroke on its 24 unit grid; drawn scaled to the symbol's size, then rounded half up to
+/// whole device pixels.
+pub const SYMBOL_STROKE: u16 = 2;
 
 /// How far the focus ring's outer edge stands outside its control, in logical pixels.
 pub const FOCUS_OFFSET: u16 = 4;
@@ -157,6 +161,7 @@ pub enum Size {
     Check,
     Chip,
     Column,
+    ControlLg,
     ControlMd,
     ControlSm,
     Dialog,
@@ -174,10 +179,11 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 16] = [
+    pub const ALL: [Size; 17] = [
         Size::Check,
         Size::Chip,
         Size::Column,
+        Size::ControlLg,
         Size::ControlMd,
         Size::ControlSm,
         Size::Dialog,
@@ -199,6 +205,7 @@ impl Size {
             Size::Check => 20,
             Size::Chip => 24,
             Size::Column => 560,
+            Size::ControlLg => 48,
             Size::ControlMd => 40,
             Size::ControlSm => 32,
             Size::Dialog => 500,
@@ -222,16 +229,14 @@ pub enum Family {
     Sans,
     Mono,
     Jp,
-    Icons,
 }
 
 impl Family {
     /// Every family.
-    pub const ALL: [Family; 4] = [
+    pub const ALL: [Family; 3] = [
         Family::Sans,
         Family::Mono,
         Family::Jp,
-        Family::Icons,
     ];
 
     /// The family's name, as its font files spell it.
@@ -240,7 +245,6 @@ impl Family {
             Family::Sans => "Geist",
             Family::Mono => "Geist Mono",
             Family::Jp => "M PLUS 1",
-            Family::Icons => "KubaOS Symbols",
         }
     }
 }
@@ -274,7 +278,9 @@ impl Weight {
 /// A type style: what a piece of text is drawn with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
-    /// The one big line of a full-screen moment: Kōbō's welcome and done screens.
+    /// Kōbō's welcome line and the install percent, and nothing else.
+    Hero,
+    /// The heading of a full-screen moment other than the welcome: Kōbō's done screen.
     Display,
     /// A screen's or page's title.
     Title,
@@ -284,6 +290,8 @@ pub enum Type {
     Heading,
     /// A lede under a display line, the text in a field.
     BodyLarge,
+    /// A large button's label, centred in a 48 px control.
+    ButtonLarge,
     /// A card's or an error's first line.
     Subheading,
     /// A regular button's label, on a 24 px line so it centres in a 40 px control.
@@ -310,12 +318,14 @@ pub enum Type {
 
 impl Type {
     /// Every type style, largest first.
-    pub const ALL: [Type; 16] = [
+    pub const ALL: [Type; 18] = [
+        Type::Hero,
         Type::Display,
         Type::Title,
         Type::Headline,
         Type::Heading,
         Type::BodyLarge,
+        Type::ButtonLarge,
         Type::Subheading,
         Type::Button,
         Type::Body,
@@ -332,11 +342,13 @@ impl Type {
     /// The font size in logical pixels.
     pub const fn size(self) -> u16 {
         match self {
+            Type::Hero => 64,
             Type::Display => 48,
             Type::Title => 32,
             Type::Headline => 24,
             Type::Heading => 20,
             Type::BodyLarge => 16,
+            Type::ButtonLarge => 16,
             Type::Subheading => 16,
             Type::Button => 14,
             Type::Body => 14,
@@ -354,11 +366,13 @@ impl Type {
     /// The line height in logical pixels.
     pub const fn line(self) -> u16 {
         match self {
+            Type::Hero => 72,
             Type::Display => 56,
             Type::Title => 40,
             Type::Headline => 32,
             Type::Heading => 28,
             Type::BodyLarge => 24,
+            Type::ButtonLarge => 24,
             Type::Subheading => 24,
             Type::Button => 24,
             Type::Body => 20,
@@ -376,11 +390,13 @@ impl Type {
     /// The weight.
     pub const fn weight(self) -> Weight {
         match self {
+            Type::Hero => Weight::Semibold,
             Type::Display => Weight::Semibold,
             Type::Title => Weight::Semibold,
             Type::Headline => Weight::Semibold,
             Type::Heading => Weight::Semibold,
             Type::BodyLarge => Weight::Regular,
+            Type::ButtonLarge => Weight::Semibold,
             Type::Subheading => Weight::Semibold,
             Type::Button => Weight::Semibold,
             Type::Body => Weight::Regular,
@@ -398,11 +414,13 @@ impl Type {
     /// The family.
     pub const fn family(self) -> Family {
         match self {
+            Type::Hero => Family::Sans,
             Type::Display => Family::Sans,
             Type::Title => Family::Sans,
             Type::Headline => Family::Sans,
             Type::Heading => Family::Sans,
             Type::BodyLarge => Family::Sans,
+            Type::ButtonLarge => Family::Sans,
             Type::Subheading => Family::Sans,
             Type::Button => Family::Sans,
             Type::Body => Family::Sans,
@@ -856,5 +874,791 @@ pub const fn palette(mode: Mode) -> Palette {
     match mode {
         Mode::Light => LIGHT,
         Mode::Dark => DARK,
+    }
+}
+
+/// A symbol of KubaOS Symbols, by the Material Symbols name it replaces. Its drawing is an SVG on a
+/// 24 unit grid with a 2 unit stroke, in `assets/symbols/`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Icon {
+    /// Tabler's `user-circle`.
+    AccountCircle,
+    /// Tabler's `plus`.
+    Add,
+    /// Tabler's `map-pin-plus`.
+    AddLocationAlt,
+    /// Tabler's `shield-cog`.
+    AdminPanelSettings,
+    /// Tabler's `alarm`.
+    Alarm,
+    /// Tabler's `alarm-plus`.
+    AlarmAdd,
+    /// Tabler's `arrow-left`.
+    ArrowBack,
+    /// Tabler's `arrow-down`.
+    ArrowDownward,
+    /// Tabler's `arrow-right`.
+    ArrowForward,
+    /// Tabler's `arrow-up`.
+    ArrowUpward,
+    /// Tabler's `id-badge-2`.
+    Badge,
+    /// Tabler's `scale`.
+    Balance,
+    /// Tabler's `battery-charging`.
+    BatteryChargingFull,
+    /// Tabler's `battery-4`.
+    BatteryFull,
+    /// Tabler's `moon-stars`.
+    Bedtime,
+    /// Tabler's `bluetooth`.
+    Bluetooth,
+    /// Tabler's `bluetooth-connected`.
+    BluetoothConnected,
+    /// Tabler's `bluetooth-off`.
+    BluetoothDisabled,
+    /// Ours: Tabler's Bluetooth rune at four fifths, with its search badge.
+    BluetoothSearching,
+    /// Tabler's `bolt`.
+    Bolt,
+    /// Tabler's `brightness-up`.
+    BrightnessHigh,
+    /// Tabler's `brightness-down`.
+    BrightnessLow,
+    /// Tabler's `brightness`.
+    BrightnessMedium,
+    /// Tabler's `calculator`.
+    Calculate,
+    /// Tabler's `check`.
+    Check,
+    /// Tabler's `circle-check`.
+    CheckCircle,
+    /// Tabler's `chevron-left`.
+    ChevronLeft,
+    /// Tabler's `chevron-right`.
+    ChevronRight,
+    /// Tabler's `circle`.
+    Circle,
+    /// Tabler's `clear-all`.
+    ClearAll,
+    /// Tabler's `x`.
+    Close,
+    /// Tabler's `code`.
+    Code,
+    /// Tabler's `device-laptop`.
+    Computer,
+    /// Tabler's `clipboard`.
+    ContentPaste,
+    /// Tabler's `moon`.
+    DarkMode,
+    /// Tabler's `package`.
+    DeployedCode,
+    /// Tabler's `device-desktop`.
+    DesktopWindows,
+    /// Tabler's `cpu-2`.
+    DeveloperBoard,
+    /// Tabler's `download`.
+    Download,
+    /// Tabler's `file`.
+    Draft,
+    /// Tabler's `pencil`.
+    Draw,
+    /// Tabler's `leaf`.
+    Eco,
+    /// Tabler's `alert-circle`.
+    Error,
+    /// Tabler's `calendar-event`.
+    Event,
+    /// Tabler's `chevron-up`.
+    ExpandLess,
+    /// Tabler's `chevron-down`.
+    ExpandMore,
+    /// Tabler's `fingerprint`.
+    Fingerprint,
+    /// Tabler's `flag`.
+    Flag,
+    /// Tabler's `folder`.
+    Folder,
+    /// Tabler's `folder-open`.
+    FolderOpen,
+    /// Ours: A drive's case, its board below a line, a slot and a light.
+    HardDrive,
+    /// Tabler's `hourglass-high`.
+    HourglassTop,
+    /// Tabler's `key`.
+    Key,
+    /// Tabler's `keyboard`.
+    Keyboard,
+    /// Tabler's `command`.
+    KeyboardCommandKey,
+    /// Tabler's `option`.
+    KeyboardOptionKey,
+    /// Tabler's `world`.
+    Language,
+    /// Tabler's `sun`.
+    LightMode,
+    /// Tabler's `list-details`.
+    ListAlt,
+    /// Tabler's `lock`.
+    Lock,
+    /// Tabler's `lock-open`.
+    LockOpen,
+    /// Tabler's `logout`.
+    Logout,
+    /// Tabler's `mail`.
+    Mail,
+    /// Tabler's `list-search`.
+    ManageSearch,
+    /// Tabler's `cpu`.
+    Memory,
+    /// Tabler's `device-sd-card`.
+    MemoryAlt,
+    /// Tabler's `propeller`.
+    ModeFan,
+    /// Tabler's `clock-plus`.
+    MoreTime,
+    /// Tabler's `circle-dashed-letter-a`.
+    MotionPhotosAuto,
+    /// Tabler's `circle-dashed-x`.
+    MotionPhotosOff,
+    /// Tabler's `circle-dashed`.
+    MotionPhotosOn,
+    /// Tabler's `player-pause`.
+    MotionPhotosPaused,
+    /// Tabler's `wifi-0`.
+    NetworkWifi1Bar,
+    /// Tabler's `wifi-1`.
+    NetworkWifi2Bar,
+    /// Tabler's `wifi-2`.
+    NetworkWifi3Bar,
+    /// Tabler's `bell`.
+    Notifications,
+    /// Tabler's `bell-off`.
+    NotificationsOff,
+    /// Tabler's `key`.
+    Passkey,
+    /// Tabler's `player-pause`.
+    Pause,
+    /// Tabler's `user`.
+    Person,
+    /// Tabler's `player-play`.
+    PlayArrow,
+    /// Tabler's `power`.
+    PowerSettingsNew,
+    /// Tabler's `loader-2`.
+    ProgressActivity,
+    /// Tabler's `world`.
+    Public,
+    /// Tabler's `pin`.
+    PushPin,
+    /// Tabler's `radar`.
+    Radar,
+    /// Tabler's `circle-dot`.
+    RadioButtonChecked,
+    /// Tabler's `circle`.
+    RadioButtonUnchecked,
+    /// Tabler's `rewind-backward-30`.
+    Replay30,
+    /// Tabler's `rotate`.
+    RestartAlt,
+    /// Tabler's `rocket`.
+    RocketLaunch,
+    /// Tabler's `device-floppy`.
+    Save,
+    /// Tabler's `clock`.
+    Schedule,
+    /// Tabler's `video`.
+    ScreenRecord,
+    /// Tabler's `screenshot`.
+    ScreenshotRegion,
+    /// Tabler's `search`.
+    Search,
+    /// Tabler's `search-off`.
+    SearchOff,
+    /// Tabler's `settings`.
+    Settings,
+    /// Tabler's `settings-bolt`.
+    SettingsPower,
+    /// Tabler's `wifi-off`.
+    SignalWifi0Bar,
+    /// Tabler's `wifi`.
+    SignalWifi4Bar,
+    /// Tabler's `device-speaker`.
+    Speaker,
+    /// Tabler's `devices`.
+    SpeakerGroup,
+    /// Tabler's `star`.
+    Star,
+    /// Tabler's `player-stop`.
+    Stop,
+    /// Tabler's `database`.
+    Storage,
+    /// Tabler's `arrows-sort`.
+    SwapVert,
+    /// Tabler's `download`.
+    SystemUpdateAlt,
+    /// Tabler's `terminal-2`.
+    Terminal,
+    /// Tabler's `temperature`.
+    Thermostat,
+    /// Tabler's `stopwatch`.
+    Timer,
+    /// Tabler's `world-search`.
+    TravelExplore,
+    /// Tabler's `arrow-big-up-lines`.
+    Upgrade,
+    /// Tabler's `eye`.
+    Visibility,
+    /// Tabler's `eye-off`.
+    VisibilityOff,
+    /// Tabler's `volume-2`.
+    VolumeDown,
+    /// Tabler's `volume-3`.
+    VolumeMute,
+    /// Tabler's `volume-off`.
+    VolumeOff,
+    /// Tabler's `volume`.
+    VolumeUp,
+    /// Tabler's `photo`.
+    Wallpaper,
+    /// Tabler's `alert-triangle`.
+    Warning,
+    /// Tabler's `sunset-2`.
+    WbTwilight,
+    /// Tabler's `wifi`.
+    Wifi,
+    /// Ours: Tabler's Wi-Fi fan, smaller, with its search badge.
+    WifiFind,
+    /// Ours: Tabler's Wi-Fi fan, smaller, with its lock badge.
+    WifiLock,
+    /// Tabler's `wifi-off`.
+    WifiOff,
+}
+
+impl Icon {
+    /// Every symbol.
+    pub const ALL: [Icon; 126] = [
+        Icon::AccountCircle,
+        Icon::Add,
+        Icon::AddLocationAlt,
+        Icon::AdminPanelSettings,
+        Icon::Alarm,
+        Icon::AlarmAdd,
+        Icon::ArrowBack,
+        Icon::ArrowDownward,
+        Icon::ArrowForward,
+        Icon::ArrowUpward,
+        Icon::Badge,
+        Icon::Balance,
+        Icon::BatteryChargingFull,
+        Icon::BatteryFull,
+        Icon::Bedtime,
+        Icon::Bluetooth,
+        Icon::BluetoothConnected,
+        Icon::BluetoothDisabled,
+        Icon::BluetoothSearching,
+        Icon::Bolt,
+        Icon::BrightnessHigh,
+        Icon::BrightnessLow,
+        Icon::BrightnessMedium,
+        Icon::Calculate,
+        Icon::Check,
+        Icon::CheckCircle,
+        Icon::ChevronLeft,
+        Icon::ChevronRight,
+        Icon::Circle,
+        Icon::ClearAll,
+        Icon::Close,
+        Icon::Code,
+        Icon::Computer,
+        Icon::ContentPaste,
+        Icon::DarkMode,
+        Icon::DeployedCode,
+        Icon::DesktopWindows,
+        Icon::DeveloperBoard,
+        Icon::Download,
+        Icon::Draft,
+        Icon::Draw,
+        Icon::Eco,
+        Icon::Error,
+        Icon::Event,
+        Icon::ExpandLess,
+        Icon::ExpandMore,
+        Icon::Fingerprint,
+        Icon::Flag,
+        Icon::Folder,
+        Icon::FolderOpen,
+        Icon::HardDrive,
+        Icon::HourglassTop,
+        Icon::Key,
+        Icon::Keyboard,
+        Icon::KeyboardCommandKey,
+        Icon::KeyboardOptionKey,
+        Icon::Language,
+        Icon::LightMode,
+        Icon::ListAlt,
+        Icon::Lock,
+        Icon::LockOpen,
+        Icon::Logout,
+        Icon::Mail,
+        Icon::ManageSearch,
+        Icon::Memory,
+        Icon::MemoryAlt,
+        Icon::ModeFan,
+        Icon::MoreTime,
+        Icon::MotionPhotosAuto,
+        Icon::MotionPhotosOff,
+        Icon::MotionPhotosOn,
+        Icon::MotionPhotosPaused,
+        Icon::NetworkWifi1Bar,
+        Icon::NetworkWifi2Bar,
+        Icon::NetworkWifi3Bar,
+        Icon::Notifications,
+        Icon::NotificationsOff,
+        Icon::Passkey,
+        Icon::Pause,
+        Icon::Person,
+        Icon::PlayArrow,
+        Icon::PowerSettingsNew,
+        Icon::ProgressActivity,
+        Icon::Public,
+        Icon::PushPin,
+        Icon::Radar,
+        Icon::RadioButtonChecked,
+        Icon::RadioButtonUnchecked,
+        Icon::Replay30,
+        Icon::RestartAlt,
+        Icon::RocketLaunch,
+        Icon::Save,
+        Icon::Schedule,
+        Icon::ScreenRecord,
+        Icon::ScreenshotRegion,
+        Icon::Search,
+        Icon::SearchOff,
+        Icon::Settings,
+        Icon::SettingsPower,
+        Icon::SignalWifi0Bar,
+        Icon::SignalWifi4Bar,
+        Icon::Speaker,
+        Icon::SpeakerGroup,
+        Icon::Star,
+        Icon::Stop,
+        Icon::Storage,
+        Icon::SwapVert,
+        Icon::SystemUpdateAlt,
+        Icon::Terminal,
+        Icon::Thermostat,
+        Icon::Timer,
+        Icon::TravelExplore,
+        Icon::Upgrade,
+        Icon::Visibility,
+        Icon::VisibilityOff,
+        Icon::VolumeDown,
+        Icon::VolumeMute,
+        Icon::VolumeOff,
+        Icon::VolumeUp,
+        Icon::Wallpaper,
+        Icon::Warning,
+        Icon::WbTwilight,
+        Icon::Wifi,
+        Icon::WifiFind,
+        Icon::WifiLock,
+        Icon::WifiOff,
+    ];
+
+    /// The symbol's name, the Material Symbols name it replaces.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Icon::AccountCircle => "account_circle",
+            Icon::Add => "add",
+            Icon::AddLocationAlt => "add_location_alt",
+            Icon::AdminPanelSettings => "admin_panel_settings",
+            Icon::Alarm => "alarm",
+            Icon::AlarmAdd => "alarm_add",
+            Icon::ArrowBack => "arrow_back",
+            Icon::ArrowDownward => "arrow_downward",
+            Icon::ArrowForward => "arrow_forward",
+            Icon::ArrowUpward => "arrow_upward",
+            Icon::Badge => "badge",
+            Icon::Balance => "balance",
+            Icon::BatteryChargingFull => "battery_charging_full",
+            Icon::BatteryFull => "battery_full",
+            Icon::Bedtime => "bedtime",
+            Icon::Bluetooth => "bluetooth",
+            Icon::BluetoothConnected => "bluetooth_connected",
+            Icon::BluetoothDisabled => "bluetooth_disabled",
+            Icon::BluetoothSearching => "bluetooth_searching",
+            Icon::Bolt => "bolt",
+            Icon::BrightnessHigh => "brightness_high",
+            Icon::BrightnessLow => "brightness_low",
+            Icon::BrightnessMedium => "brightness_medium",
+            Icon::Calculate => "calculate",
+            Icon::Check => "check",
+            Icon::CheckCircle => "check_circle",
+            Icon::ChevronLeft => "chevron_left",
+            Icon::ChevronRight => "chevron_right",
+            Icon::Circle => "circle",
+            Icon::ClearAll => "clear_all",
+            Icon::Close => "close",
+            Icon::Code => "code",
+            Icon::Computer => "computer",
+            Icon::ContentPaste => "content_paste",
+            Icon::DarkMode => "dark_mode",
+            Icon::DeployedCode => "deployed_code",
+            Icon::DesktopWindows => "desktop_windows",
+            Icon::DeveloperBoard => "developer_board",
+            Icon::Download => "download",
+            Icon::Draft => "draft",
+            Icon::Draw => "draw",
+            Icon::Eco => "eco",
+            Icon::Error => "error",
+            Icon::Event => "event",
+            Icon::ExpandLess => "expand_less",
+            Icon::ExpandMore => "expand_more",
+            Icon::Fingerprint => "fingerprint",
+            Icon::Flag => "flag",
+            Icon::Folder => "folder",
+            Icon::FolderOpen => "folder_open",
+            Icon::HardDrive => "hard_drive",
+            Icon::HourglassTop => "hourglass_top",
+            Icon::Key => "key",
+            Icon::Keyboard => "keyboard",
+            Icon::KeyboardCommandKey => "keyboard_command_key",
+            Icon::KeyboardOptionKey => "keyboard_option_key",
+            Icon::Language => "language",
+            Icon::LightMode => "light_mode",
+            Icon::ListAlt => "list_alt",
+            Icon::Lock => "lock",
+            Icon::LockOpen => "lock_open",
+            Icon::Logout => "logout",
+            Icon::Mail => "mail",
+            Icon::ManageSearch => "manage_search",
+            Icon::Memory => "memory",
+            Icon::MemoryAlt => "memory_alt",
+            Icon::ModeFan => "mode_fan",
+            Icon::MoreTime => "more_time",
+            Icon::MotionPhotosAuto => "motion_photos_auto",
+            Icon::MotionPhotosOff => "motion_photos_off",
+            Icon::MotionPhotosOn => "motion_photos_on",
+            Icon::MotionPhotosPaused => "motion_photos_paused",
+            Icon::NetworkWifi1Bar => "network_wifi_1_bar",
+            Icon::NetworkWifi2Bar => "network_wifi_2_bar",
+            Icon::NetworkWifi3Bar => "network_wifi_3_bar",
+            Icon::Notifications => "notifications",
+            Icon::NotificationsOff => "notifications_off",
+            Icon::Passkey => "passkey",
+            Icon::Pause => "pause",
+            Icon::Person => "person",
+            Icon::PlayArrow => "play_arrow",
+            Icon::PowerSettingsNew => "power_settings_new",
+            Icon::ProgressActivity => "progress_activity",
+            Icon::Public => "public",
+            Icon::PushPin => "push_pin",
+            Icon::Radar => "radar",
+            Icon::RadioButtonChecked => "radio_button_checked",
+            Icon::RadioButtonUnchecked => "radio_button_unchecked",
+            Icon::Replay30 => "replay_30",
+            Icon::RestartAlt => "restart_alt",
+            Icon::RocketLaunch => "rocket_launch",
+            Icon::Save => "save",
+            Icon::Schedule => "schedule",
+            Icon::ScreenRecord => "screen_record",
+            Icon::ScreenshotRegion => "screenshot_region",
+            Icon::Search => "search",
+            Icon::SearchOff => "search_off",
+            Icon::Settings => "settings",
+            Icon::SettingsPower => "settings_power",
+            Icon::SignalWifi0Bar => "signal_wifi_0_bar",
+            Icon::SignalWifi4Bar => "signal_wifi_4_bar",
+            Icon::Speaker => "speaker",
+            Icon::SpeakerGroup => "speaker_group",
+            Icon::Star => "star",
+            Icon::Stop => "stop",
+            Icon::Storage => "storage",
+            Icon::SwapVert => "swap_vert",
+            Icon::SystemUpdateAlt => "system_update_alt",
+            Icon::Terminal => "terminal",
+            Icon::Thermostat => "thermostat",
+            Icon::Timer => "timer",
+            Icon::TravelExplore => "travel_explore",
+            Icon::Upgrade => "upgrade",
+            Icon::Visibility => "visibility",
+            Icon::VisibilityOff => "visibility_off",
+            Icon::VolumeDown => "volume_down",
+            Icon::VolumeMute => "volume_mute",
+            Icon::VolumeOff => "volume_off",
+            Icon::VolumeUp => "volume_up",
+            Icon::Wallpaper => "wallpaper",
+            Icon::Warning => "warning",
+            Icon::WbTwilight => "wb_twilight",
+            Icon::Wifi => "wifi",
+            Icon::WifiFind => "wifi_find",
+            Icon::WifiLock => "wifi_lock",
+            Icon::WifiOff => "wifi_off",
+        }
+    }
+
+    /// The Tabler icon it is, or `None` for one of ours.
+    pub const fn tabler(self) -> Option<&'static str> {
+        match self {
+            Icon::AccountCircle => Some("user-circle"),
+            Icon::Add => Some("plus"),
+            Icon::AddLocationAlt => Some("map-pin-plus"),
+            Icon::AdminPanelSettings => Some("shield-cog"),
+            Icon::Alarm => Some("alarm"),
+            Icon::AlarmAdd => Some("alarm-plus"),
+            Icon::ArrowBack => Some("arrow-left"),
+            Icon::ArrowDownward => Some("arrow-down"),
+            Icon::ArrowForward => Some("arrow-right"),
+            Icon::ArrowUpward => Some("arrow-up"),
+            Icon::Badge => Some("id-badge-2"),
+            Icon::Balance => Some("scale"),
+            Icon::BatteryChargingFull => Some("battery-charging"),
+            Icon::BatteryFull => Some("battery-4"),
+            Icon::Bedtime => Some("moon-stars"),
+            Icon::Bluetooth => Some("bluetooth"),
+            Icon::BluetoothConnected => Some("bluetooth-connected"),
+            Icon::BluetoothDisabled => Some("bluetooth-off"),
+            Icon::BluetoothSearching => None,
+            Icon::Bolt => Some("bolt"),
+            Icon::BrightnessHigh => Some("brightness-up"),
+            Icon::BrightnessLow => Some("brightness-down"),
+            Icon::BrightnessMedium => Some("brightness"),
+            Icon::Calculate => Some("calculator"),
+            Icon::Check => Some("check"),
+            Icon::CheckCircle => Some("circle-check"),
+            Icon::ChevronLeft => Some("chevron-left"),
+            Icon::ChevronRight => Some("chevron-right"),
+            Icon::Circle => Some("circle"),
+            Icon::ClearAll => Some("clear-all"),
+            Icon::Close => Some("x"),
+            Icon::Code => Some("code"),
+            Icon::Computer => Some("device-laptop"),
+            Icon::ContentPaste => Some("clipboard"),
+            Icon::DarkMode => Some("moon"),
+            Icon::DeployedCode => Some("package"),
+            Icon::DesktopWindows => Some("device-desktop"),
+            Icon::DeveloperBoard => Some("cpu-2"),
+            Icon::Download => Some("download"),
+            Icon::Draft => Some("file"),
+            Icon::Draw => Some("pencil"),
+            Icon::Eco => Some("leaf"),
+            Icon::Error => Some("alert-circle"),
+            Icon::Event => Some("calendar-event"),
+            Icon::ExpandLess => Some("chevron-up"),
+            Icon::ExpandMore => Some("chevron-down"),
+            Icon::Fingerprint => Some("fingerprint"),
+            Icon::Flag => Some("flag"),
+            Icon::Folder => Some("folder"),
+            Icon::FolderOpen => Some("folder-open"),
+            Icon::HardDrive => None,
+            Icon::HourglassTop => Some("hourglass-high"),
+            Icon::Key => Some("key"),
+            Icon::Keyboard => Some("keyboard"),
+            Icon::KeyboardCommandKey => Some("command"),
+            Icon::KeyboardOptionKey => Some("option"),
+            Icon::Language => Some("world"),
+            Icon::LightMode => Some("sun"),
+            Icon::ListAlt => Some("list-details"),
+            Icon::Lock => Some("lock"),
+            Icon::LockOpen => Some("lock-open"),
+            Icon::Logout => Some("logout"),
+            Icon::Mail => Some("mail"),
+            Icon::ManageSearch => Some("list-search"),
+            Icon::Memory => Some("cpu"),
+            Icon::MemoryAlt => Some("device-sd-card"),
+            Icon::ModeFan => Some("propeller"),
+            Icon::MoreTime => Some("clock-plus"),
+            Icon::MotionPhotosAuto => Some("circle-dashed-letter-a"),
+            Icon::MotionPhotosOff => Some("circle-dashed-x"),
+            Icon::MotionPhotosOn => Some("circle-dashed"),
+            Icon::MotionPhotosPaused => Some("player-pause"),
+            Icon::NetworkWifi1Bar => Some("wifi-0"),
+            Icon::NetworkWifi2Bar => Some("wifi-1"),
+            Icon::NetworkWifi3Bar => Some("wifi-2"),
+            Icon::Notifications => Some("bell"),
+            Icon::NotificationsOff => Some("bell-off"),
+            Icon::Passkey => Some("key"),
+            Icon::Pause => Some("player-pause"),
+            Icon::Person => Some("user"),
+            Icon::PlayArrow => Some("player-play"),
+            Icon::PowerSettingsNew => Some("power"),
+            Icon::ProgressActivity => Some("loader-2"),
+            Icon::Public => Some("world"),
+            Icon::PushPin => Some("pin"),
+            Icon::Radar => Some("radar"),
+            Icon::RadioButtonChecked => Some("circle-dot"),
+            Icon::RadioButtonUnchecked => Some("circle"),
+            Icon::Replay30 => Some("rewind-backward-30"),
+            Icon::RestartAlt => Some("rotate"),
+            Icon::RocketLaunch => Some("rocket"),
+            Icon::Save => Some("device-floppy"),
+            Icon::Schedule => Some("clock"),
+            Icon::ScreenRecord => Some("video"),
+            Icon::ScreenshotRegion => Some("screenshot"),
+            Icon::Search => Some("search"),
+            Icon::SearchOff => Some("search-off"),
+            Icon::Settings => Some("settings"),
+            Icon::SettingsPower => Some("settings-bolt"),
+            Icon::SignalWifi0Bar => Some("wifi-off"),
+            Icon::SignalWifi4Bar => Some("wifi"),
+            Icon::Speaker => Some("device-speaker"),
+            Icon::SpeakerGroup => Some("devices"),
+            Icon::Star => Some("star"),
+            Icon::Stop => Some("player-stop"),
+            Icon::Storage => Some("database"),
+            Icon::SwapVert => Some("arrows-sort"),
+            Icon::SystemUpdateAlt => Some("download"),
+            Icon::Terminal => Some("terminal-2"),
+            Icon::Thermostat => Some("temperature"),
+            Icon::Timer => Some("stopwatch"),
+            Icon::TravelExplore => Some("world-search"),
+            Icon::Upgrade => Some("arrow-big-up-lines"),
+            Icon::Visibility => Some("eye"),
+            Icon::VisibilityOff => Some("eye-off"),
+            Icon::VolumeDown => Some("volume-2"),
+            Icon::VolumeMute => Some("volume-3"),
+            Icon::VolumeOff => Some("volume-off"),
+            Icon::VolumeUp => Some("volume"),
+            Icon::Wallpaper => Some("photo"),
+            Icon::Warning => Some("alert-triangle"),
+            Icon::WbTwilight => Some("sunset-2"),
+            Icon::Wifi => Some("wifi"),
+            Icon::WifiFind => None,
+            Icon::WifiLock => None,
+            Icon::WifiOff => Some("wifi-off"),
+        }
+    }
+
+    /// The drawing, an SVG whose stroke width is `SYMBOL_STROKE`.
+    pub const fn svg(self) -> &'static str {
+        match self {
+            Icon::AccountCircle => include_str!("../assets/symbols/account_circle.svg"),
+            Icon::Add => include_str!("../assets/symbols/add.svg"),
+            Icon::AddLocationAlt => include_str!("../assets/symbols/add_location_alt.svg"),
+            Icon::AdminPanelSettings => include_str!("../assets/symbols/admin_panel_settings.svg"),
+            Icon::Alarm => include_str!("../assets/symbols/alarm.svg"),
+            Icon::AlarmAdd => include_str!("../assets/symbols/alarm_add.svg"),
+            Icon::ArrowBack => include_str!("../assets/symbols/arrow_back.svg"),
+            Icon::ArrowDownward => include_str!("../assets/symbols/arrow_downward.svg"),
+            Icon::ArrowForward => include_str!("../assets/symbols/arrow_forward.svg"),
+            Icon::ArrowUpward => include_str!("../assets/symbols/arrow_upward.svg"),
+            Icon::Badge => include_str!("../assets/symbols/badge.svg"),
+            Icon::Balance => include_str!("../assets/symbols/balance.svg"),
+            Icon::BatteryChargingFull => include_str!("../assets/symbols/battery_charging_full.svg"),
+            Icon::BatteryFull => include_str!("../assets/symbols/battery_full.svg"),
+            Icon::Bedtime => include_str!("../assets/symbols/bedtime.svg"),
+            Icon::Bluetooth => include_str!("../assets/symbols/bluetooth.svg"),
+            Icon::BluetoothConnected => include_str!("../assets/symbols/bluetooth_connected.svg"),
+            Icon::BluetoothDisabled => include_str!("../assets/symbols/bluetooth_disabled.svg"),
+            Icon::BluetoothSearching => include_str!("../assets/symbols/bluetooth_searching.svg"),
+            Icon::Bolt => include_str!("../assets/symbols/bolt.svg"),
+            Icon::BrightnessHigh => include_str!("../assets/symbols/brightness_high.svg"),
+            Icon::BrightnessLow => include_str!("../assets/symbols/brightness_low.svg"),
+            Icon::BrightnessMedium => include_str!("../assets/symbols/brightness_medium.svg"),
+            Icon::Calculate => include_str!("../assets/symbols/calculate.svg"),
+            Icon::Check => include_str!("../assets/symbols/check.svg"),
+            Icon::CheckCircle => include_str!("../assets/symbols/check_circle.svg"),
+            Icon::ChevronLeft => include_str!("../assets/symbols/chevron_left.svg"),
+            Icon::ChevronRight => include_str!("../assets/symbols/chevron_right.svg"),
+            Icon::Circle => include_str!("../assets/symbols/circle.svg"),
+            Icon::ClearAll => include_str!("../assets/symbols/clear_all.svg"),
+            Icon::Close => include_str!("../assets/symbols/close.svg"),
+            Icon::Code => include_str!("../assets/symbols/code.svg"),
+            Icon::Computer => include_str!("../assets/symbols/computer.svg"),
+            Icon::ContentPaste => include_str!("../assets/symbols/content_paste.svg"),
+            Icon::DarkMode => include_str!("../assets/symbols/dark_mode.svg"),
+            Icon::DeployedCode => include_str!("../assets/symbols/deployed_code.svg"),
+            Icon::DesktopWindows => include_str!("../assets/symbols/desktop_windows.svg"),
+            Icon::DeveloperBoard => include_str!("../assets/symbols/developer_board.svg"),
+            Icon::Download => include_str!("../assets/symbols/download.svg"),
+            Icon::Draft => include_str!("../assets/symbols/draft.svg"),
+            Icon::Draw => include_str!("../assets/symbols/draw.svg"),
+            Icon::Eco => include_str!("../assets/symbols/eco.svg"),
+            Icon::Error => include_str!("../assets/symbols/error.svg"),
+            Icon::Event => include_str!("../assets/symbols/event.svg"),
+            Icon::ExpandLess => include_str!("../assets/symbols/expand_less.svg"),
+            Icon::ExpandMore => include_str!("../assets/symbols/expand_more.svg"),
+            Icon::Fingerprint => include_str!("../assets/symbols/fingerprint.svg"),
+            Icon::Flag => include_str!("../assets/symbols/flag.svg"),
+            Icon::Folder => include_str!("../assets/symbols/folder.svg"),
+            Icon::FolderOpen => include_str!("../assets/symbols/folder_open.svg"),
+            Icon::HardDrive => include_str!("../assets/symbols/hard_drive.svg"),
+            Icon::HourglassTop => include_str!("../assets/symbols/hourglass_top.svg"),
+            Icon::Key => include_str!("../assets/symbols/key.svg"),
+            Icon::Keyboard => include_str!("../assets/symbols/keyboard.svg"),
+            Icon::KeyboardCommandKey => include_str!("../assets/symbols/keyboard_command_key.svg"),
+            Icon::KeyboardOptionKey => include_str!("../assets/symbols/keyboard_option_key.svg"),
+            Icon::Language => include_str!("../assets/symbols/language.svg"),
+            Icon::LightMode => include_str!("../assets/symbols/light_mode.svg"),
+            Icon::ListAlt => include_str!("../assets/symbols/list_alt.svg"),
+            Icon::Lock => include_str!("../assets/symbols/lock.svg"),
+            Icon::LockOpen => include_str!("../assets/symbols/lock_open.svg"),
+            Icon::Logout => include_str!("../assets/symbols/logout.svg"),
+            Icon::Mail => include_str!("../assets/symbols/mail.svg"),
+            Icon::ManageSearch => include_str!("../assets/symbols/manage_search.svg"),
+            Icon::Memory => include_str!("../assets/symbols/memory.svg"),
+            Icon::MemoryAlt => include_str!("../assets/symbols/memory_alt.svg"),
+            Icon::ModeFan => include_str!("../assets/symbols/mode_fan.svg"),
+            Icon::MoreTime => include_str!("../assets/symbols/more_time.svg"),
+            Icon::MotionPhotosAuto => include_str!("../assets/symbols/motion_photos_auto.svg"),
+            Icon::MotionPhotosOff => include_str!("../assets/symbols/motion_photos_off.svg"),
+            Icon::MotionPhotosOn => include_str!("../assets/symbols/motion_photos_on.svg"),
+            Icon::MotionPhotosPaused => include_str!("../assets/symbols/motion_photos_paused.svg"),
+            Icon::NetworkWifi1Bar => include_str!("../assets/symbols/network_wifi_1_bar.svg"),
+            Icon::NetworkWifi2Bar => include_str!("../assets/symbols/network_wifi_2_bar.svg"),
+            Icon::NetworkWifi3Bar => include_str!("../assets/symbols/network_wifi_3_bar.svg"),
+            Icon::Notifications => include_str!("../assets/symbols/notifications.svg"),
+            Icon::NotificationsOff => include_str!("../assets/symbols/notifications_off.svg"),
+            Icon::Passkey => include_str!("../assets/symbols/passkey.svg"),
+            Icon::Pause => include_str!("../assets/symbols/pause.svg"),
+            Icon::Person => include_str!("../assets/symbols/person.svg"),
+            Icon::PlayArrow => include_str!("../assets/symbols/play_arrow.svg"),
+            Icon::PowerSettingsNew => include_str!("../assets/symbols/power_settings_new.svg"),
+            Icon::ProgressActivity => include_str!("../assets/symbols/progress_activity.svg"),
+            Icon::Public => include_str!("../assets/symbols/public.svg"),
+            Icon::PushPin => include_str!("../assets/symbols/push_pin.svg"),
+            Icon::Radar => include_str!("../assets/symbols/radar.svg"),
+            Icon::RadioButtonChecked => include_str!("../assets/symbols/radio_button_checked.svg"),
+            Icon::RadioButtonUnchecked => include_str!("../assets/symbols/radio_button_unchecked.svg"),
+            Icon::Replay30 => include_str!("../assets/symbols/replay_30.svg"),
+            Icon::RestartAlt => include_str!("../assets/symbols/restart_alt.svg"),
+            Icon::RocketLaunch => include_str!("../assets/symbols/rocket_launch.svg"),
+            Icon::Save => include_str!("../assets/symbols/save.svg"),
+            Icon::Schedule => include_str!("../assets/symbols/schedule.svg"),
+            Icon::ScreenRecord => include_str!("../assets/symbols/screen_record.svg"),
+            Icon::ScreenshotRegion => include_str!("../assets/symbols/screenshot_region.svg"),
+            Icon::Search => include_str!("../assets/symbols/search.svg"),
+            Icon::SearchOff => include_str!("../assets/symbols/search_off.svg"),
+            Icon::Settings => include_str!("../assets/symbols/settings.svg"),
+            Icon::SettingsPower => include_str!("../assets/symbols/settings_power.svg"),
+            Icon::SignalWifi0Bar => include_str!("../assets/symbols/signal_wifi_0_bar.svg"),
+            Icon::SignalWifi4Bar => include_str!("../assets/symbols/signal_wifi_4_bar.svg"),
+            Icon::Speaker => include_str!("../assets/symbols/speaker.svg"),
+            Icon::SpeakerGroup => include_str!("../assets/symbols/speaker_group.svg"),
+            Icon::Star => include_str!("../assets/symbols/star.svg"),
+            Icon::Stop => include_str!("../assets/symbols/stop.svg"),
+            Icon::Storage => include_str!("../assets/symbols/storage.svg"),
+            Icon::SwapVert => include_str!("../assets/symbols/swap_vert.svg"),
+            Icon::SystemUpdateAlt => include_str!("../assets/symbols/system_update_alt.svg"),
+            Icon::Terminal => include_str!("../assets/symbols/terminal.svg"),
+            Icon::Thermostat => include_str!("../assets/symbols/thermostat.svg"),
+            Icon::Timer => include_str!("../assets/symbols/timer.svg"),
+            Icon::TravelExplore => include_str!("../assets/symbols/travel_explore.svg"),
+            Icon::Upgrade => include_str!("../assets/symbols/upgrade.svg"),
+            Icon::Visibility => include_str!("../assets/symbols/visibility.svg"),
+            Icon::VisibilityOff => include_str!("../assets/symbols/visibility_off.svg"),
+            Icon::VolumeDown => include_str!("../assets/symbols/volume_down.svg"),
+            Icon::VolumeMute => include_str!("../assets/symbols/volume_mute.svg"),
+            Icon::VolumeOff => include_str!("../assets/symbols/volume_off.svg"),
+            Icon::VolumeUp => include_str!("../assets/symbols/volume_up.svg"),
+            Icon::Wallpaper => include_str!("../assets/symbols/wallpaper.svg"),
+            Icon::Warning => include_str!("../assets/symbols/warning.svg"),
+            Icon::WbTwilight => include_str!("../assets/symbols/wb_twilight.svg"),
+            Icon::Wifi => include_str!("../assets/symbols/wifi.svg"),
+            Icon::WifiFind => include_str!("../assets/symbols/wifi_find.svg"),
+            Icon::WifiLock => include_str!("../assets/symbols/wifi_lock.svg"),
+            Icon::WifiOff => include_str!("../assets/symbols/wifi_off.svg"),
+        }
     }
 }

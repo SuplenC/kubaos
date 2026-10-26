@@ -14,6 +14,7 @@ use crate::color;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
 use crate::icon::Icon;
+use crate::icon::icon;
 use crate::layout::Gap;
 use crate::layout::Inset;
 use crate::layout::fill;
@@ -21,15 +22,14 @@ use crate::layout::row;
 use crate::layout::stack;
 use crate::look::Look;
 use crate::look::radius;
+use crate::snap::centre;
 use crate::text;
-use crate::tokens::Family;
 use crate::tokens::IconSize;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
 use crate::tokens::Space;
 use crate::tokens::Type;
-use crate::tokens::Weight;
 
 /// How a field shows its value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,25 +159,23 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
                 selection: color::alpha(c.primary, Opacity::Selection.value()),
             }
         };
-        // A 24 px line and 8 above and below: as tall as a regular button.
+        // A 24 px line and 8 above and below: as tall as a regular button. With an icon, the text
+        // starts past it: 12 in, the icon, then 8.
         let style_type = Type::BodyLarge;
+        let icon_px = IconSize::S20.px();
+        let left = if self.icon.is_some() {
+            f32::from(Space::S12.px() + icon_px + Space::S8.px())
+        } else {
+            f32::from(Space::S12.px())
+        };
         let mut input = widget::text_input(self.placeholder, self.value)
             .font(text::font(style_type))
             .size(f32::from(style_type.size()))
             .line_height(text::line_height(style_type))
-            .padding(Inset::xy(Space::S12, Space::S8).padding())
+            .padding(Inset::xy(Space::S12, Space::S8).padding().left(left))
             .width(Length::Fill)
             .secure(self.secret)
             .style(style);
-        if let Some(glyph) = self.icon {
-            input = input.icon(text_input::Icon {
-                font: text::family_font(Family::Icons, Weight::Regular),
-                code_point: glyph.glyph(),
-                size: Some(f32::from(IconSize::S20.px()).into()),
-                spacing: f32::from(Space::S8.px()),
-                side: text_input::Side::Left,
-            });
-        }
         if let Some(id) = self.id {
             input = input.id(id);
         }
@@ -186,7 +184,20 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
         {
             input = input.on_input(on_input);
         }
-        focus_ring(look, input, Radius::R12, focused, RingColor::Accent)
+        let Some(glyph) = self.icon else {
+            return focus_ring(look, input, Radius::R12, focused, RingColor::Accent);
+        };
+        // The icon is drawn over the field, in a box 12 wider than itself on each side, so it
+        // centres on the field's height on a whole device pixel.
+        let well = f32::from(Space::S12.px() * 2 + icon_px);
+        let mark = widget::container(centre(
+            look.scale,
+            icon(look, glyph, IconSize::S20, c.on_surface_variant),
+        ))
+        .width(well)
+        .height(Length::Fill);
+        let field = widget::Stack::with_children([input.into(), mark.into()]);
+        focus_ring(look, field, Radius::R12, focused, RingColor::Accent)
     }
 }
 

@@ -1,135 +1,92 @@
-//! Icons from KubaOS Symbols, at a size from the scale.
+//! KubaOS Symbols: Tabler's outline icons, and our own drawn on their grid, as SVGs drawn with a
+//! stroke of whole device pixels.
 //!
-//! The bundled font is Kōbō's subset of Material Symbols Rounded under our name, until the base of
-//! KubaOS Symbols is picked from the specimen's comparison sheet; [`Icon`] is the font's interface,
-//! so the components keep their names when the glyphs change.
+//! An icon font can't keep a stroke whole: its 2 unit stroke is 1.33 px at 16 and 1.67 px at 20,
+//! between device pixels, so every line blurs. Each symbol here is drawn from its SVG with the
+//! stroke set for the size and the scale it shows at: 2 units scaled to the size, then rounded half
+//! up to whole device pixels ([`device_stroke`]).
+//!
+//! | size | 1x | 1.25x | 1.5x | 2x |
+//! |---|---|---|---|---|
+//! | 16 | 1 | 2 | 2 | 3 |
+//! | 20 | 2 | 2 | 3 | 3 |
+//! | 24 | 2 | 3 | 3 | 4 |
+//! | 32 | 3 | 3 | 4 | 5 |
+//! | 48 | 4 | 5 | 6 | 8 |
 //!
 //! # Owns
 //!
-//! - [`Icon`] and its codepoints, and [`icon`], a glyph in a square box of its size.
+//! - [`icon`], a symbol in a square box of its size, and its stroke at a scale.
 //!
 //! # Not here
 //!
-//! - The font file: `assets/fonts/KubaOSSymbols-subset.ttf`, cut by `assets/make-fonts.sh`.
+//! - The list of symbols and where each drawing comes from: `design/tokens.toml`, `[symbols]`,
+//!   generated into [`crate::tokens::Icon`]. The drawings: `assets/symbols/`.
+
+use std::collections::HashMap;
+use std::sync::LazyLock;
+use std::sync::Mutex;
 
 use iced::Color;
+use iced::Element;
 use iced::Length;
-use iced::alignment;
 use iced::widget;
+use iced::widget::svg;
 
-use crate::text;
-use crate::tokens::Family;
+use crate::look::Look;
+use crate::scale::Scale;
+use crate::tokens;
+pub use crate::tokens::Icon;
 use crate::tokens::IconSize;
-use crate::tokens::Weight;
 
-/// A glyph of KubaOS Symbols.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Icon {
-    ArrowBack,
-    ArrowForward,
-    Bolt,
-    Check,
-    CheckCircle,
-    ChevronRight,
-    Close,
-    Code,
-    Computer,
-    Download,
-    Error,
-    ExpandLess,
-    ExpandMore,
-    HardDrive,
-    Key,
-    Keyboard,
-    Language,
-    Lock,
-    LockOpen,
-    Mail,
-    Person,
-    Power,
-    Restart,
-    Rocket,
-    Save,
-    Schedule,
-    Search,
-    Storage,
-    Terminal,
-    Timer,
-    Visibility,
-    VisibilityOff,
-    Wallpaper,
-    Warning,
-    Wifi,
-    WifiOff,
-}
+/// The grid every symbol is drawn on, in units.
+const GRID: f32 = 24.0;
 
-impl Icon {
-    /// The glyph's character in the bundled subset.
-    pub fn glyph(self) -> char {
-        // The subset's own codepoints, from the Google Fonts API that cut it; some differ from the
-        // full Material Symbols font's.
-        let codepoint: u32 = match self {
-            Icon::ArrowBack => 0xe5c4,
-            Icon::ArrowForward => 0xe5c8,
-            Icon::Bolt => 0xea0b,
-            Icon::Check => 0xe668,
-            Icon::CheckCircle => 0xf0be,
-            Icon::ChevronRight => 0xe5cc,
-            Icon::Close => 0xe5cd,
-            Icon::Code => 0xe86f,
-            Icon::Computer => 0xe31e,
-            Icon::Download => 0xf090,
-            Icon::Error => 0xf8b6,
-            Icon::ExpandLess => 0xe5ce,
-            Icon::ExpandMore => 0xe5cf,
-            Icon::HardDrive => 0xf80e,
-            Icon::Key => 0xe73c,
-            Icon::Keyboard => 0xe312,
-            Icon::Language => 0xea07,
-            Icon::Lock => 0xe899,
-            Icon::LockOpen => 0xe898,
-            Icon::Mail => 0xe159,
-            Icon::Person => 0xf0d3,
-            Icon::Power => 0xf8c7,
-            Icon::Restart => 0xf053,
-            Icon::Rocket => 0xeb9b,
-            Icon::Save => 0xe161,
-            Icon::Schedule => 0xefd6,
-            Icon::Search => 0xef7a,
-            Icon::Storage => 0xe1db,
-            Icon::Terminal => 0xeb8e,
-            Icon::Timer => 0xe425,
-            Icon::Visibility => 0xe8f4,
-            Icon::VisibilityOff => 0xe8f5,
-            Icon::Wallpaper => 0xe1bc,
-            Icon::Warning => 0xf083,
-            Icon::Wifi => 0xe63e,
-            Icon::WifiOff => 0xe648,
-        };
-        char::from_u32(codepoint).unwrap_or(char::REPLACEMENT_CHARACTER)
-    }
-}
+/// The stroke the drawings are written with, as their SVG spells it.
+const WRITTEN_STROKE: &str = "stroke-width=\"2\"";
 
-/// `icon` at `size`, coloured `color`, centred in a square box as wide and tall as `size`.
-pub fn icon<'a>(icon: Icon, size: IconSize, color: Color) -> widget::Text<'a> {
-    glyph(
-        icon.glyph(),
-        text::family_font(Family::Icons, Weight::Regular),
-        size,
-        color,
-    )
-}
-
-/// The character `c` of an icon font, centred in a square box of `size`.
-pub fn glyph<'a>(c: char, font: iced::Font, size: IconSize, color: Color) -> widget::Text<'a> {
+/// `glyph` at `size`, in `color`, in a square box as wide and tall as `size`.
+pub fn icon<'a, M: 'a>(look: &Look, glyph: Icon, size: IconSize, color: Color) -> Element<'a, M> {
     let px = f32::from(size.px());
-    widget::text(c.to_string())
-        .font(font)
-        .size(px)
-        .line_height(widget::text::LineHeight::Absolute(px.into()))
+    let grid_stroke = device_stroke(size, look.scale) / look.scale.factor() * GRID / px;
+    // The colour filter keeps only the colour's channels; its alpha goes to the opacity, so a
+    // disabled or fading icon dims like its label.
+    let opaque = Color { a: 1.0, ..color };
+    widget::svg(handle(glyph, grid_stroke))
         .width(Length::Fixed(px))
         .height(Length::Fixed(px))
-        .align_x(alignment::Horizontal::Center)
-        .align_y(alignment::Vertical::Center)
-        .color(color)
+        .opacity(color.a)
+        .style(move |_theme, _status| svg::Style { color: Some(opaque) })
+        .into()
 }
+
+/// The stroke of a symbol at `size`, in device pixels at `scale`: the 2 unit stroke scaled to the
+/// size, rounded half up to a whole device pixel, never under one.
+pub fn device_stroke(size: IconSize, scale: Scale) -> f32 {
+    let logical = f32::from(tokens::SYMBOL_STROKE) * f32::from(size.px()) / GRID;
+    scale.to_device(scale.stroke(logical))
+}
+
+/// `glyph`'s SVG with its stroke set to `grid_stroke` units.
+pub fn drawing(glyph: Icon, grid_stroke: f32) -> String {
+    glyph
+        .svg()
+        .replace(WRITTEN_STROKE, &format!("stroke-width=\"{grid_stroke}\""))
+}
+
+/// Each drawing at each stroke, made once: a handle made from bytes is hashed and decoded again
+/// every time, and a view asks for the same few on every frame.
+static HANDLES: LazyLock<Mutex<HashMap<(Icon, u32), svg::Handle>>> = LazyLock::new(Mutex::default);
+
+fn handle(glyph: Icon, grid_stroke: f32) -> svg::Handle {
+    // Thousandths of a unit tell every stroke at the supported sizes and scales apart.
+    let key = (glyph, (grid_stroke * 1000.0).round() as u32);
+    let mut handles = HANDLES.lock().expect("symbol handle cache poisoned");
+    handles
+        .entry(key)
+        .or_insert_with(|| svg::Handle::from_memory(drawing(glyph, grid_stroke).into_bytes()))
+        .clone()
+}
+
+#[cfg(test)]
+mod tests;

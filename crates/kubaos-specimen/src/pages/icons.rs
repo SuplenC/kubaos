@@ -1,14 +1,20 @@
-//! The icon comparison sheet: the same 40 glyphs from Material Symbols Rounded, Phosphor, Lucide
-//! and Tabler, at Kōbō's sizes and in its colours, side by side, then a few in context.
+//! The icons page: KubaOS Symbols, every one at the sizes Kōbō draws them with the stroke each
+//! scale gets, then the comparison sheet that picked Tabler as their base, kept as a record: the same
+//! 40 glyphs from Material Symbols Rounded, Phosphor, Lucide and Tabler, side by side and in context.
 
 use iced::Background;
 use iced::Border;
 use iced::Element;
 use iced::Font;
+use iced::Length;
+use iced::alignment;
 use iced::widget;
 use iced::widget::container;
 use kubaos_ui::Look;
-use kubaos_ui::icon::glyph;
+use kubaos_ui::Scale;
+use kubaos_ui::icon::Icon;
+use kubaos_ui::icon::device_stroke;
+use kubaos_ui::icon::icon;
 use kubaos_ui::layout::Gap;
 use kubaos_ui::layout::Inset;
 use kubaos_ui::layout::fill;
@@ -93,7 +99,129 @@ fn glyphs() -> Vec<Glyph> {
 /// The sizes Kōbō draws icons at, on the grid.
 const SIZES: [IconSize; 3] = [IconSize::S16, IconSize::S20, IconSize::S24];
 
+/// The character `ch` of a comparison set's font, centred in a square box of `size`.
+fn glyph<'a>(ch: char, font: Font, size: IconSize, color: iced::Color) -> Element<'a, Message> {
+    let px = f32::from(size.px());
+    widget::text(ch.to_string())
+        .font(font)
+        .size(px)
+        .line_height(widget::text::LineHeight::Absolute(px.into()))
+        .width(Length::Fixed(px))
+        .height(Length::Fixed(px))
+        .align_x(alignment::Horizontal::Center)
+        .align_y(alignment::Vertical::Center)
+        .color(color)
+        .into()
+}
+
 pub fn view<'a>(look: &Look) -> Element<'a, Message> {
+    stack(look, Space::S48)
+        .push(section(
+            look,
+            "KubaOS Symbols",
+            Some(
+                "Decided: Tabler's outline icons are the base. Each symbol is named for the Material \
+                 Symbol it replaces; the four Tabler lacks are drawn on its grid, with its stroke and \
+                 caps, and marked ours.",
+            ),
+            symbols(look),
+        ))
+        .push(section(
+            look,
+            "Drawn by us",
+            Some("The four Tabler lacks, at 48 beside the Tabler symbols they borrow from: same grid, stroke, caps and badges."),
+            drawn(look),
+        ))
+        .push(section(
+            look,
+            "The stroke at each size",
+            Some(
+                "2 units on the 24 grid, scaled to the size and rounded half up to whole device \
+                 pixels, so no symbol has a soft line. Device pixels:",
+            ),
+            strokes(look),
+        ))
+        .push(comparison(look))
+        .into()
+}
+
+/// Every symbol at 16, 20 and 24, with its name, and its Tabler name or "ours".
+fn symbols<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    grid(look, 4, Space::S16)
+        .extend(Icon::ALL.into_iter().map(|glyph| {
+            let source = glyph.tabler().unwrap_or("ours");
+            let tone = if glyph.tabler().is_some() {
+                c.on_surface_variant
+            } else {
+                c.cold
+            };
+            let mut sizes = row(look, Space::S8).bottom();
+            for size in SIZES {
+                sizes = sizes.push(icon(look, glyph, size, c.on_surface));
+            }
+            row(look, Space::S12)
+                .center()
+                .push(sizes)
+                .push(
+                    stack(look, Gap::NONE)
+                        .push(text(glyph.name(), Type::Mono, c.on_surface))
+                        .push(text(source, Type::Mono, tone)),
+                )
+                .into()
+        }))
+        .into()
+}
+
+/// Each of our drawings at 48, then the Tabler symbols it borrows its parts from.
+fn drawn<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let families = [
+        (Icon::HardDrive, [Icon::Storage, Icon::DeployedCode]),
+        (Icon::WifiLock, [Icon::Wifi, Icon::Lock]),
+        (Icon::WifiFind, [Icon::Wifi, Icon::Search]),
+        (Icon::BluetoothSearching, [Icon::Bluetooth, Icon::Search]),
+    ];
+    grid(look, 4, Space::S24)
+        .extend(families.into_iter().map(|(ours, relatives)| {
+            let mut line = row(look, Space::S16).push(icon(look, ours, IconSize::S48, c.on_surface));
+            for relative in relatives {
+                line = line.push(icon(look, relative, IconSize::S48, c.on_surface_variant));
+            }
+            stack(look, Space::S8)
+                .push(line)
+                .push(text(ours.name(), Type::Mono, c.cold))
+                .into()
+        }))
+        .into()
+}
+
+/// The device pixels of the stroke at every size and supported scale.
+fn strokes<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let mut table = split(look, &[1, 1, 1, 1, 1], Space::S8)
+        .push(text("size", Type::Label, c.on_surface_variant))
+        .extend(
+            Scale::SUPPORTED
+                .map(|scale| text(format!("{}×", scale.factor()), Type::Label, c.on_surface_variant).into()),
+        );
+    for size in IconSize::ALL {
+        table = table.push(text(format!("{}", size.px()), Type::Mono, c.on_surface));
+        for scale in Scale::SUPPORTED {
+            table = table.push(text(
+                format!("{}", device_stroke(size, scale)),
+                Type::Mono,
+                c.on_surface,
+            ));
+        }
+    }
+    widget::container(table)
+        .width(f32::from(kubaos_ui::tokens::Size::Column.px()))
+        .into()
+}
+
+/// The comparison that picked Tabler, as Kuba saw it.
+fn comparison<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
     let glyphs = glyphs();
     let half = glyphs.len().div_ceil(2);
@@ -144,8 +272,11 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
     stack(look, Space::S48)
         .push(section(
             look,
-            "The sets",
-            Some("Each set at 16, 20 and 24, in on_surface. Ids are Kōbō's and the shell's uses."),
+            "The comparison, a record",
+            Some(
+                "The sheet the base was picked from: each set at 16, 20 and 24 from its own font, in \
+                 on_surface. Ids are Kōbō's and the shell's uses. Tabler was picked.",
+            ),
             stack(look, Space::S24).push(notes).push(sheet),
         ))
         .push(section(

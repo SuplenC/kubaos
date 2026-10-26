@@ -26,7 +26,7 @@ pub fn empty_state<'a, M: 'a>(
     let c = look.colors;
     let line = |content: Element<'a, M>| centre_x(look.scale, content);
     let mut column = stack(look, Gap::NONE)
-        .push(line(icon(glyph, IconSize::S32, c.on_surface_variant).into()))
+        .push(line(icon(look, glyph, IconSize::S32, c.on_surface_variant)))
         .push(gap(Space::S12))
         .push(line(text(title, Type::Subheading, c.on_surface).into()))
         .push(gap(Space::S4))

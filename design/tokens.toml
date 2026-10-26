@@ -6,7 +6,7 @@
 #   cargo run -p kubaos-tokens -- check    fail when an output is stale
 #
 # Today the one output is the Rust module of `kubaos-ui`
-# (crates/kubaos-ui/src/tokens.rs). The QML singleton, the matugen templates
+# (crates/kubaos-ui/src/tokens.rs), symbols included. The QML singleton, the matugen templates
 # and the Plymouth and GRUB values come from this same file as their front
 # ends move onto it.
 #
@@ -20,8 +20,9 @@
 # Every spacing, size, radius, icon size, line height and shadow is a
 # multiple of this.
 grid = 4
-# The only font sizes. A type style with any other size is refused.
-font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48]
+# The only font sizes. A type style with any other size is refused. 64 is the
+# hero's alone.
+font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64]
 # The scales every length is checked against: `grid` times each one must be a
 # whole number of device pixels.
 scales = [1.0, 1.25, 1.5, 2.0]
@@ -35,6 +36,10 @@ hairline_device_px = 1
 # The focus ring, the spinner's arc and the check mark: 2 logical pixels,
 # rounded half up to whole device pixels (2, 3, 3, 4 at 1, 1.25, 1.5, 2).
 thin = 2
+# A symbol's stroke on its 24 unit grid: 2 at 24 px. At another size it
+# scales with the symbol, then rounds half up to whole device pixels, so a
+# symbol is never drawn with a fractional stroke.
+symbol = 2
 
 [focus]
 # How far the focus ring's outer edge stands outside the control. The ring is
@@ -53,17 +58,19 @@ values = [4, 8, 12, 16, 20, 24, 32, 40, 48, 64]
 values = [4, 8, 12, 16, 20, 24]
 full = true
 
-# Icon sizes: the glyph's em box, which its ink sits inside with the font's
-# own margin.
+# Icon sizes: the symbol's box, its 24 unit grid scaled to it. The drawing
+# keeps 2 units clear inside, Tabler's margin.
 [icon]
 sizes = [16, 20, 24, 32, 48]
 
 # Fixed dimensions of components, by name.
 [size]
-# Buttons and fields: a small control and a regular one. A field is as tall
-# as a regular button, so the two line up side by side.
+# Buttons and fields: small, regular and large. A field is as tall as a
+# regular button, so the two line up side by side. Large is the one main
+# action of a big page (Kōbō's Install).
 control_sm = 32
 control_md = 40
+control_lg = 48
 # A list row with one line, and with a title over a subtitle.
 row = 44
 row_two_line = 56
@@ -87,23 +94,28 @@ rail = 236
 # A log opened under an error or a progress bar.
 log = 232
 
-# Type families. Nothing else is drawn with.
+# Type families. Nothing else draws text; symbols are drawn, see [symbols].
 [font.family]
 sans = "Geist"
 mono = "Geist Mono"
 jp = "M PLUS 1"
-# KubaOS Symbols, our own icon font.
-icons = "KubaOS Symbols"
 
 # Type styles: size and line height in logical pixels, a weight and a family
 # from above. A single-line control's label takes the control's content box as
 # its line height, so it centres on the grid.
+[type.hero]
+size = 64
+line = 72
+weight = "semibold"
+family = "sans"
+use = "Kōbō's welcome line and the install percent, and nothing else."
+
 [type.display]
 size = 48
 line = 56
 weight = "semibold"
 family = "sans"
-use = "The one big line of a full-screen moment: Kōbō's welcome and done screens."
+use = "The heading of a full-screen moment other than the welcome: Kōbō's done screen."
 
 [type.title]
 size = 32
@@ -160,6 +172,13 @@ line = 24
 weight = "semibold"
 family = "sans"
 use = "A regular button's label, on a 24 px line so it centres in a 40 px control."
+
+[type.button_large]
+size = 16
+line = 24
+weight = "semibold"
+family = "sans"
+use = "A large button's label, centred in a 48 px control."
 
 [type.button_small]
 size = 12
@@ -452,3 +471,136 @@ inverse_on_surface = "#ffeee2"
 inverse_primary = "#ffb779"
 # Amber dark enough for text on the light surfaces (6.1:1 on `surface`).
 warning = "#7a5900"
+
+# KubaOS Symbols: every symbol Kōbō and the shell draw, by the Material
+# Symbols name it replaces. Each is Tabler's outline icon of that name
+# (@tabler/icons 3.49.0, MIT; crates/kubaos-ui/assets/make-symbols.sh fetches
+# them), or `drawn`: ours, for what Tabler lacks, on its 24 unit grid with
+# its 2 unit stroke and round caps and joins, in crates/kubaos-ui/assets/symbols/.
+[symbols]
+account_circle = { tabler = "user-circle" }
+add = { tabler = "plus" }
+add_location_alt = { tabler = "map-pin-plus" }
+admin_panel_settings = { tabler = "shield-cog" }
+alarm = { tabler = "alarm" }
+alarm_add = { tabler = "alarm-plus" }
+arrow_back = { tabler = "arrow-left" }
+arrow_downward = { tabler = "arrow-down" }
+arrow_forward = { tabler = "arrow-right" }
+arrow_upward = { tabler = "arrow-up" }
+badge = { tabler = "id-badge-2" }
+balance = { tabler = "scale" }
+battery_charging_full = { tabler = "battery-charging" }
+battery_full = { tabler = "battery-4" }
+bedtime = { tabler = "moon-stars" }
+bluetooth = { tabler = "bluetooth" }
+bluetooth_connected = { tabler = "bluetooth-connected" }
+bluetooth_disabled = { tabler = "bluetooth-off" }
+bluetooth_searching = { drawn = "Tabler's Bluetooth rune at four fifths, with its search badge" }
+bolt = { tabler = "bolt" }
+brightness_high = { tabler = "brightness-up" }
+brightness_low = { tabler = "brightness-down" }
+brightness_medium = { tabler = "brightness" }
+calculate = { tabler = "calculator" }
+check = { tabler = "check" }
+check_circle = { tabler = "circle-check" }
+chevron_left = { tabler = "chevron-left" }
+chevron_right = { tabler = "chevron-right" }
+circle = { tabler = "circle" }
+clear_all = { tabler = "clear-all" }
+close = { tabler = "x" }
+code = { tabler = "code" }
+computer = { tabler = "device-laptop" }
+content_paste = { tabler = "clipboard" }
+dark_mode = { tabler = "moon" }
+deployed_code = { tabler = "package" }
+desktop_windows = { tabler = "device-desktop" }
+developer_board = { tabler = "cpu-2" }
+download = { tabler = "download" }
+draft = { tabler = "file" }
+draw = { tabler = "pencil" }
+eco = { tabler = "leaf" }
+error = { tabler = "alert-circle" }
+event = { tabler = "calendar-event" }
+expand_less = { tabler = "chevron-up" }
+expand_more = { tabler = "chevron-down" }
+fingerprint = { tabler = "fingerprint" }
+flag = { tabler = "flag" }
+folder = { tabler = "folder" }
+folder_open = { tabler = "folder-open" }
+hard_drive = { drawn = "A drive's case, its board below a line, a slot and a light" }
+hourglass_top = { tabler = "hourglass-high" }
+key = { tabler = "key" }
+keyboard = { tabler = "keyboard" }
+keyboard_command_key = { tabler = "command" }
+keyboard_option_key = { tabler = "option" }
+language = { tabler = "world" }
+light_mode = { tabler = "sun" }
+list_alt = { tabler = "list-details" }
+lock = { tabler = "lock" }
+lock_open = { tabler = "lock-open" }
+logout = { tabler = "logout" }
+mail = { tabler = "mail" }
+manage_search = { tabler = "list-search" }
+memory = { tabler = "cpu" }
+memory_alt = { tabler = "device-sd-card" }
+mode_fan = { tabler = "propeller" }
+more_time = { tabler = "clock-plus" }
+motion_photos_auto = { tabler = "circle-dashed-letter-a" }
+motion_photos_off = { tabler = "circle-dashed-x" }
+motion_photos_on = { tabler = "circle-dashed" }
+motion_photos_paused = { tabler = "player-pause" }
+network_wifi_1_bar = { tabler = "wifi-0" }
+network_wifi_2_bar = { tabler = "wifi-1" }
+network_wifi_3_bar = { tabler = "wifi-2" }
+notifications = { tabler = "bell" }
+notifications_off = { tabler = "bell-off" }
+passkey = { tabler = "key" }
+pause = { tabler = "player-pause" }
+person = { tabler = "user" }
+play_arrow = { tabler = "player-play" }
+power_settings_new = { tabler = "power" }
+progress_activity = { tabler = "loader-2" }
+public = { tabler = "world" }
+push_pin = { tabler = "pin" }
+radar = { tabler = "radar" }
+radio_button_checked = { tabler = "circle-dot" }
+radio_button_unchecked = { tabler = "circle" }
+replay_30 = { tabler = "rewind-backward-30" }
+restart_alt = { tabler = "rotate" }
+rocket_launch = { tabler = "rocket" }
+save = { tabler = "device-floppy" }
+schedule = { tabler = "clock" }
+screen_record = { tabler = "video" }
+screenshot_region = { tabler = "screenshot" }
+search = { tabler = "search" }
+search_off = { tabler = "search-off" }
+settings = { tabler = "settings" }
+settings_power = { tabler = "settings-bolt" }
+signal_wifi_0_bar = { tabler = "wifi-off" }
+signal_wifi_4_bar = { tabler = "wifi" }
+speaker = { tabler = "device-speaker" }
+speaker_group = { tabler = "devices" }
+star = { tabler = "star" }
+stop = { tabler = "player-stop" }
+storage = { tabler = "database" }
+swap_vert = { tabler = "arrows-sort" }
+system_update_alt = { tabler = "download" }
+terminal = { tabler = "terminal-2" }
+thermostat = { tabler = "temperature" }
+timer = { tabler = "stopwatch" }
+travel_explore = { tabler = "world-search" }
+upgrade = { tabler = "arrow-big-up-lines" }
+visibility = { tabler = "eye" }
+visibility_off = { tabler = "eye-off" }
+volume_down = { tabler = "volume-2" }
+volume_mute = { tabler = "volume-3" }
+volume_off = { tabler = "volume-off" }
+volume_up = { tabler = "volume" }
+wallpaper = { tabler = "photo" }
+warning = { tabler = "alert-triangle" }
+wb_twilight = { tabler = "sunset-2" }
+wifi = { tabler = "wifi" }
+wifi_find = { drawn = "Tabler's Wi-Fi fan, smaller, with its search badge" }
+wifi_lock = { drawn = "Tabler's Wi-Fi fan, smaller, with its lock badge" }
+wifi_off = { tabler = "wifi-off" }

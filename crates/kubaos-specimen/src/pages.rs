@@ -31,7 +31,7 @@ pub fn view<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         Page::Type => (
             "書体",
             "Geist for the interface, Geist Mono for anything typed or read by a machine, M PLUS 1 for \
-             the Japanese accents. Nine sizes; every line height a multiple of 4.",
+             the Japanese accents. Ten sizes, 64 for the hero alone; every line height a multiple of 4.",
         ),
         Page::Colour => (
             "色",
@@ -45,12 +45,12 @@ pub fn view<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         ),
         Page::Components => (
             "部品",
-            "The closed set, every kind and size, resting, focused and disabled.",
+            "The closed set: every kind and size, resting, hovered, pressed, focused and disabled.",
         ),
         Page::Icons => (
             "記号",
-            "The same 40 glyphs from Kōbō and the shell in four sets, at the sizes and in the colours \
-             Kōbō draws them. Pick the base of KubaOS Symbols.",
+            "KubaOS Symbols: Tabler's outline icons, and four of ours where Tabler has none, drawn \
+             with a stroke of whole device pixels. The comparison that picked Tabler follows.",
         ),
         Page::Motion => (
             "動き",

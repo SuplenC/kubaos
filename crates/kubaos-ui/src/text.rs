@@ -21,7 +21,7 @@ use crate::tokens::Family;
 use crate::tokens::Type;
 use crate::tokens::Weight;
 
-/// Every font the type styles and icons use, for `iced::Settings::fonts`. An app loads them at
+/// Every font the type styles use, for `iced::Settings::fonts`. An app loads them at
 /// start, so it draws the same on a machine with none installed.
 pub const FONTS: &[&[u8]] = &[
     include_bytes!("../assets/fonts/Geist-Regular.ttf"),
@@ -30,7 +30,6 @@ pub const FONTS: &[&[u8]] = &[
     include_bytes!("../assets/fonts/GeistMono-Regular.ttf"),
     include_bytes!("../assets/fonts/GeistMono-Medium.ttf"),
     include_bytes!("../assets/fonts/MPLUS1-subset.ttf"),
-    include_bytes!("../assets/fonts/KubaOSSymbols-subset.ttf"),
 ];
 
 /// The font of `family` at `weight`.

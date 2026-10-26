@@ -35,6 +35,7 @@ impl Target for RustModule {
         motion(&mut out, tokens);
         surfaces(&mut out, tokens);
         colors(&mut out, tokens);
+        symbols(&mut out, tokens);
         out.text
     }
 }
@@ -142,6 +143,10 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
     out.line("/// The focus ring's, the spinner's and the check mark's stroke in logical pixels, drawn rounded");
     out.line("/// half up to whole device pixels.");
     out.line(format!("pub const STROKE_THIN: u16 = {};", tokens.stroke.thin));
+    out.blank();
+    out.line("/// A symbol's stroke on its 24 unit grid; drawn scaled to the symbol's size, then rounded half up to");
+    out.line("/// whole device pixels.");
+    out.line(format!("pub const SYMBOL_STROKE: u16 = {};", tokens.stroke.symbol));
     out.blank();
     out.line("/// How far the focus ring's outer edge stands outside its control, in logical pixels.");
     out.line(format!("pub const FOCUS_OFFSET: u16 = {};", tokens.focus.offset));
@@ -380,7 +385,6 @@ fn family_variant(family: Family) -> &'static str {
         Family::Sans => "Sans",
         Family::Mono => "Mono",
         Family::Jp => "Jp",
-        Family::Icons => "Icons",
     }
 }
 
@@ -551,6 +555,66 @@ fn palette(out: &mut Writer, name: &str, doc: &str, roles: &BTreeMap<String, Rgb
         ));
     }
     out.line("};");
+}
+
+fn symbols(out: &mut Writer, tokens: &Tokens) {
+    out.blank();
+    out.line("/// A symbol of KubaOS Symbols, by the Material Symbols name it replaces. Its drawing is an SVG on a");
+    out.line("/// 24 unit grid with a 2 unit stroke, in `assets/symbols/`.");
+    out.line("#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]");
+    out.line("pub enum Icon {");
+    for (name, symbol) in &tokens.symbols {
+        match (&symbol.tabler, &symbol.drawn) {
+            (Some(tabler), _) => out.line(format!("    /// Tabler's `{tabler}`.")),
+            (None, Some(drawn)) => out.doc("    ", &format!("Ours: {drawn}.")),
+            (None, None) => {}
+        }
+        out.line(format!("    {},", camel(name)));
+    }
+    out.line("}");
+    out.blank();
+    out.line("impl Icon {");
+    out.line("    /// Every symbol.");
+    out.line(format!("    pub const ALL: [Icon; {}] = [", tokens.symbols.len()));
+    for name in tokens.symbols.keys() {
+        out.line(format!("        Icon::{},", camel(name)));
+    }
+    out.line("    ];");
+    out.blank();
+    out.line("    /// The symbol's name, the Material Symbols name it replaces.");
+    out.line("    pub const fn name(self) -> &'static str {");
+    out.line("        match self {");
+    for name in tokens.symbols.keys() {
+        out.line(format!("            Icon::{} => {name:?},", camel(name)));
+    }
+    out.line("        }");
+    out.line("    }");
+    out.blank();
+    out.line("    /// The Tabler icon it is, or `None` for one of ours.");
+    out.line("    pub const fn tabler(self) -> Option<&'static str> {");
+    out.line("        match self {");
+    for (name, symbol) in &tokens.symbols {
+        let value = symbol
+            .tabler
+            .as_ref()
+            .map_or_else(|| "None".to_string(), |t| format!("Some({t:?})"));
+        out.line(format!("            Icon::{} => {value},", camel(name)));
+    }
+    out.line("        }");
+    out.line("    }");
+    out.blank();
+    out.line("    /// The drawing, an SVG whose stroke width is `SYMBOL_STROKE`.");
+    out.line("    pub const fn svg(self) -> &'static str {");
+    out.line("        match self {");
+    for name in tokens.symbols.keys() {
+        out.line(format!(
+            "            Icon::{} => include_str!(\"../assets/symbols/{name}.svg\"),",
+            camel(name)
+        ));
+    }
+    out.line("        }");
+    out.line("    }");
+    out.line("}");
 }
 
 #[cfg(test)]

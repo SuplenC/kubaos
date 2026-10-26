@@ -10,8 +10,7 @@
 # - Geist and Geist Mono 1.8.1 (SIL OFL 1.1): the weights the type styles use.
 # - M PLUS 1 Medium (SIL OFL 1.1): a subset with only the characters of `jp`
 #   below, the Japanese accents the apps show.
-# - KubaOS Symbols: Kōbō's Material Symbols Rounded subset (Apache 2.0),
-#   until the icon base is picked from the specimen's comparison sheet.
+# KubaOS Symbols are drawings, not a font: make-symbols.sh fetches them.
 set -euo pipefail
 cd "$(dirname "$0")/fonts"
 repo=$(git rev-parse --show-toplevel)
@@ -42,6 +41,3 @@ nix shell --inputs-from "$repo" nixpkgs#python3Packages.fonttools -c \
   --text="$jp" --layout-features='*' --output-file=MPLUS1-subset.ttf
 curl -fsSL -o MPLUS1-OFL.txt https://raw.githubusercontent.com/google/fonts/main/ofl/mplus1/OFL.txt
 
-kobo="$repo/crates/kubaos-kobo/assets/fonts"
-cp "$kobo/MaterialSymbolsRounded-subset.ttf" KubaOSSymbols-subset.ttf
-cp "$kobo/MaterialSymbols-LICENSE.txt" KubaOSSymbols-LICENSE.txt

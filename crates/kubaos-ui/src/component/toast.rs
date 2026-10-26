@@ -26,7 +26,7 @@ pub fn toast<'a, M: 'a>(look: &Look, message: &'a str, leading: Option<Icon>) ->
     let (fill, content) = (c.on_surface, c.surface);
     let mut line = row(look, Space::S12).center();
     if let Some(glyph) = leading {
-        line = line.push(icon(glyph, IconSize::S20, content));
+        line = line.push(icon(look, glyph, IconSize::S20, content));
     }
     line = line.push(text(message, Type::Body, content));
     let surface = widget::container(line)

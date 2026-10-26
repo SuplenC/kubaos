@@ -36,6 +36,8 @@ pub struct Tokens {
     pub opacity: BTreeMap<String, f32>,
     pub shadow: BTreeMap<String, Shadow>,
     pub color: Colors,
+    /// KubaOS Symbols, by the Material Symbols name each replaces.
+    pub symbols: BTreeMap<String, Symbol>,
 }
 
 /// The rules every other value is checked against.
@@ -57,6 +59,8 @@ pub struct Stroke {
     pub hairline_device_px: u16,
     /// Logical pixels, rounded half up to whole device pixels at each scale.
     pub thin: u16,
+    /// A symbol's stroke on its 24 unit grid.
+    pub symbol: u16,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -100,7 +104,6 @@ pub struct Families {
     pub sans: String,
     pub mono: String,
     pub jp: String,
-    pub icons: String,
 }
 
 impl Families {
@@ -110,7 +113,6 @@ impl Families {
             Family::Sans => &self.sans,
             Family::Mono => &self.mono,
             Family::Jp => &self.jp,
-            Family::Icons => &self.icons,
         }
     }
 }
@@ -121,11 +123,10 @@ pub enum Family {
     Sans,
     Mono,
     Jp,
-    Icons,
 }
 
 impl Family {
-    pub const ALL: [Family; 4] = [Family::Sans, Family::Mono, Family::Jp, Family::Icons];
+    pub const ALL: [Family; 3] = [Family::Sans, Family::Mono, Family::Jp];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
@@ -176,6 +177,14 @@ pub struct Shadow {
     pub y: u16,
     pub blur: u16,
     pub opacity: f32,
+}
+
+/// Where a symbol's drawing comes from: Tabler's outline icon of a name, or our own, described.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Symbol {
+    pub tabler: Option<String>,
+    pub drawn: Option<String>,
 }
 
 /// The colour roles: where each comes from at runtime, and its fallback in each mode.

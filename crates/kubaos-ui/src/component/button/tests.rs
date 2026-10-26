@@ -7,7 +7,9 @@ use iced_test::simulator::Simulator;
 
 use super::ButtonSize;
 use super::Kind;
+use super::Preview;
 use super::button;
+use super::icon_button;
 use crate::component::field::field;
 use crate::icon::Icon;
 use crate::look::Look;
@@ -77,4 +79,47 @@ fn a_field_is_as_tall_as_a_regular_button() {
     let field = bounds(field::<()>("Kuba", "Your name").icon(Icon::Person).view(&look()));
 
     assert!((field.height - 40.0).abs() < 1e-4, "{field:?}");
+}
+
+#[test]
+fn a_large_button_is_forty_eight_tall() {
+    for kind in Kind::ALL {
+        let lg = bounds(
+            button("Install")
+                .kind(kind)
+                .size(ButtonSize::Lg)
+                .trailing_icon(Icon::ArrowForward)
+                .on_press(())
+                .view(&look()),
+        );
+
+        assert!((lg.height - 48.0).abs() < 1e-4, "{kind:?} lg {lg:?}");
+    }
+}
+
+#[test]
+fn an_icon_button_is_a_circle_as_tall_as_a_label_button_of_its_size() {
+    for size in ButtonSize::ALL {
+        for kind in Kind::ALL {
+            let labelled = bounds(button("Save").kind(kind).size(size).on_press(()).view(&look()));
+            let alone = bounds(
+                icon_button(Icon::Save, "Save")
+                    .kind(kind)
+                    .size(size)
+                    .on_press(())
+                    .view(&look()),
+            );
+
+            assert!((alone.height - labelled.height).abs() < 1e-4, "{kind:?} {size:?}");
+            assert!((alone.width - alone.height).abs() < 1e-4, "{kind:?} {size:?} {alone:?}");
+        }
+    }
+}
+
+#[test]
+fn a_preview_never_moves_or_resizes_a_button() {
+    let resting = bounds(button("Continue").on_press(()).view(&look()));
+    let hovered = bounds(button("Continue").on_press(()).preview(Preview::Hovered).view(&look()));
+
+    assert_eq!(resting, hovered);
 }

@@ -38,7 +38,8 @@ pub mod text;
 #[rustfmt::skip]
 #[expect(
     clippy::match_same_arms,
-    reason = "generated: one arm per token, even where two tokens share a value"
+    clippy::too_many_lines,
+    reason = "generated: one arm per token, even where two share a value, and one per symbol"
 )]
 pub mod tokens;
 

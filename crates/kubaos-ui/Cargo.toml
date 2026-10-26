@@ -6,10 +6,10 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-# Kōbō's iced and features, less the image and SVG widgets it draws its wallpaper and logo with:
-# canvas for the switch and the spinner, advanced for the focus ring's and the grid's own widgets,
-# and crisp, which snaps quads to device pixels in the wgpu renderer. winit needs a windowing
-# feature to build at all.
+# Kōbō's iced and features, less the image widget it draws its wallpaper with: svg for KubaOS
+# Symbols, canvas for the switch and the spinner, advanced for the focus ring's and the grid's own
+# widgets, and crisp, which snaps quads to device pixels in the wgpu renderer. winit needs a
+# windowing feature to build at all.
 iced = { version = "0.14", default-features = false, features = [
   "wgpu",
   "tiny-skia",
@@ -19,6 +19,7 @@ iced = { version = "0.14", default-features = false, features = [
   "x11",
   "wayland",
   "canvas",
+  "svg",
   "advanced",
 ] }
 

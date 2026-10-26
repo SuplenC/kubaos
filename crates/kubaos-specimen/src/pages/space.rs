@@ -124,14 +124,15 @@ fn icons<'a>(look: &Look) -> Element<'a, Message> {
     row(look, Space::S32)
         .bottom()
         .extend(IconSize::ALL.map(|size| {
-            let boxed = widget::container(icon(Icon::Wifi, size, c.on_surface)).style(move |_theme| container::Style {
-                border: Border {
-                    color: edge,
-                    width: hairline,
-                    radius: 0.0.into(),
-                },
-                ..container::Style::default()
-            });
+            let boxed =
+                widget::container(icon(look, Icon::Wifi, size, c.on_surface)).style(move |_theme| container::Style {
+                    border: Border {
+                        color: edge,
+                        width: hairline,
+                        radius: 0.0.into(),
+                    },
+                    ..container::Style::default()
+                });
             stack(look, Space::S8)
                 .push(boxed)
                 .push(text(format!("{}", size.px()), Type::Mono, c.on_surface_variant))

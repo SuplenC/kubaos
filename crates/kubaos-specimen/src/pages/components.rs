@@ -7,7 +7,9 @@ use iced::widget;
 use kubaos_ui::Look;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
+use kubaos_ui::component::button::Preview;
 use kubaos_ui::component::button::button;
+use kubaos_ui::component::button::icon_button;
 use kubaos_ui::component::card::card;
 use kubaos_ui::component::card::choice_card;
 use kubaos_ui::component::check::Tick;
@@ -40,6 +42,7 @@ use kubaos_ui::layout::fill;
 use kubaos_ui::layout::grid;
 use kubaos_ui::layout::row;
 use kubaos_ui::layout::section;
+use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
 use kubaos_ui::text::text;
 use kubaos_ui::tokens::IconSize;
@@ -55,8 +58,14 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Buttons",
-            Some("Filled, Tonal, Text and Danger; regular and small; with an icon, focused, disabled."),
+            Some("Filled, Tonal, Text and Danger, in small, regular and large, each resting, hovered, pressed, focused and disabled."),
             buttons(look),
+        ))
+        .push(section(
+            look,
+            "Icon buttons",
+            Some("Circles as tall as the label buttons of each size. The label is required: it shows in a hint on hover and while focused."),
+            icon_buttons(look),
         ))
         .push(section(
             look,
@@ -85,62 +94,120 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .into()
 }
 
+/// The states a button is shown in, left to right.
+const STATES: [&str; 5] = ["Resting", "Hovered", "Pressed", "Focused", "Disabled"];
+
+fn size_name(size: ButtonSize) -> String {
+    let height = match size {
+        ButtonSize::Sm => Size::ControlSm,
+        ButtonSize::Md => Size::ControlMd,
+        ButtonSize::Lg => Size::ControlLg,
+    };
+    format!("{size:?} · {}", height.px())
+}
+
+/// A label button of `kind` and `size` in the `state`th of [`STATES`].
+fn button_in<'a>(look: &Look, kind: Kind, size: ButtonSize, state: usize) -> Element<'a, Message> {
+    let (label, glyph) = match kind {
+        Kind::Filled => ("Continue", Icon::ArrowForward),
+        Kind::Tonal => ("Save log", Icon::Save),
+        Kind::Text => ("Back", Icon::ArrowBack),
+        Kind::Danger => ("Erase disk", Icon::Warning),
+    };
+    let b = button::<Message>(label).kind(kind).size(size);
+    let b = if kind == Kind::Filled {
+        b.trailing_icon(glyph)
+    } else {
+        b.icon(glyph)
+    };
+    match state {
+        0 => b.on_press(Message::Sample),
+        1 => b.on_press(Message::Sample).preview(Preview::Hovered),
+        2 => b.on_press(Message::Sample).preview(Preview::Pressed),
+        3 => b.on_press(Message::Sample).focused(true),
+        _ => b,
+    }
+    .view(look)
+}
+
+/// An icon button of `kind` and `size` in the `state`th of [`STATES`].
+fn icon_button_in<'a>(look: &Look, kind: Kind, size: ButtonSize, state: usize) -> Element<'a, Message> {
+    let (glyph, label) = match kind {
+        Kind::Filled => (Icon::ArrowForward, "Continue"),
+        Kind::Tonal => (Icon::Settings, "Settings"),
+        Kind::Text => (Icon::Close, "Close"),
+        Kind::Danger => (Icon::PowerSettingsNew, "Shut down"),
+    };
+    let b = icon_button::<Message>(glyph, label).kind(kind).size(size);
+    match state {
+        0 => b.on_press(Message::Sample),
+        1 => b.on_press(Message::Sample).preview(Preview::Hovered),
+        2 => b.on_press(Message::Sample).preview(Preview::Pressed),
+        3 => b.on_press(Message::Sample).focused(true),
+        _ => b,
+    }
+    .view(look)
+}
+
+/// The states' names over a table's columns, after the kinds' column.
+fn state_heads<'a>(look: &Look) -> Vec<Element<'a, Message>> {
+    let c = look.colors;
+    std::iter::once(text("", Type::Label, c.on_surface_variant).into())
+        .chain(STATES.map(|state| text(state, Type::Label, c.on_surface_variant).into()))
+        .collect()
+}
+
 fn buttons<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
-    let mut rows = stack(look, Space::S16);
-    for kind in Kind::ALL {
-        let label = match kind {
-            Kind::Filled => "Continue",
-            Kind::Tonal => "Save log",
-            Kind::Text => "Back",
-            Kind::Danger => "Erase disk",
-        };
-        let glyph = match kind {
-            Kind::Filled => Icon::ArrowForward,
-            Kind::Tonal => Icon::Save,
-            Kind::Text => Icon::ArrowBack,
-            Kind::Danger => Icon::Warning,
-        };
-        let base = || button::<Message>(label).kind(kind);
-        let with_icon = |b: kubaos_ui::component::button::Button<'a, Message>| {
-            if kind == Kind::Filled {
-                b.trailing_icon(glyph)
-            } else {
-                b.icon(glyph)
+    let mut sizes = stack(look, Space::S32);
+    for size in ButtonSize::ALL {
+        let mut table = split(look, &[1, 2, 2, 2, 2, 2], Space::S16)
+            .center()
+            .extend(state_heads(look));
+        for kind in Kind::ALL {
+            table = table.push(text(format!("{kind:?}"), Type::Label, c.on_surface_variant));
+            for state in 0..STATES.len() {
+                table = table.push(button_in(look, kind, size, state));
             }
-        };
-        let cells = [
-            base().on_press(Message::Sample).view(look),
-            with_icon(base()).on_press(Message::Sample).view(look),
-            base().on_press(Message::Sample).focused(true).view(look),
-            base().view(look),
-            base().size(ButtonSize::Sm).on_press(Message::Sample).view(look),
-            with_icon(base().size(ButtonSize::Sm))
-                .on_press(Message::Sample)
-                .view(look),
-            base()
-                .size(ButtonSize::Sm)
-                .on_press(Message::Sample)
-                .focused(true)
-                .view(look),
-            base().size(ButtonSize::Sm).view(look),
-        ];
-        rows = rows.push(
-            row(look, Space::S16)
-                .center()
-                .push(
-                    widget::container(text(format!("{kind:?}"), Type::Label, c.on_surface_variant))
-                        .width(Length::Fixed(f32::from(Space::S64.px()))),
-                )
-                .extend(cells),
+        }
+        sizes = sizes.push(
+            stack(look, Space::S12)
+                .push(text(size_name(size), Type::Subheading, c.on_surface))
+                .push(table),
         );
     }
-    let legend = text(
-        "Each row: regular, with an icon, focused, disabled; then the same small.",
-        Type::Small,
-        c.on_surface_variant,
-    );
-    stack(look, Space::S16).push(rows).push(legend).into()
+    sizes.into()
+}
+
+fn icon_buttons<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let mut sizes = stack(look, Space::S32);
+    for size in ButtonSize::ALL {
+        // Rows 40 apart, so a focused button's hint has room under it. The columns are the label
+        // buttons' above.
+        let mut rows = stack(look, Space::S40).push(
+            split(look, &[1, 2, 2, 2, 2, 2], Space::S16)
+                .center()
+                .extend(state_heads(look)),
+        );
+        for kind in Kind::ALL {
+            let mut line = split(look, &[1, 2, 2, 2, 2, 2], Space::S16).center().push(text(
+                format!("{kind:?}"),
+                Type::Label,
+                c.on_surface_variant,
+            ));
+            for state in 0..STATES.len() {
+                line = line.push(icon_button_in(look, kind, size, state));
+            }
+            rows = rows.push(line);
+        }
+        sizes = sizes.push(
+            stack(look, Space::S12)
+                .push(text(size_name(size), Type::Subheading, c.on_surface))
+                .push(rows),
+        );
+    }
+    sizes.into()
 }
 
 fn fields<'a>(look: &Look) -> Element<'a, Message> {
@@ -400,18 +467,18 @@ fn dialogs<'a>(look: &Look) -> Element<'a, Message> {
     let normal = dialog(
         look,
         Tone::Normal,
-        Icon::Power,
+        Icon::PowerSettingsNew,
         "Restart now?",
         "Everything open closes. I'll be back in a few seconds.",
         Some(button("Cancel").kind(Kind::Text).on_press(Message::Sample).view(look)),
         [
             button("Shut down")
                 .kind(Kind::Tonal)
-                .icon(Icon::Power)
+                .icon(Icon::PowerSettingsNew)
                 .on_press(Message::Sample)
                 .view(look),
             button("Restart")
-                .icon(Icon::Restart)
+                .icon(Icon::RestartAlt)
                 .on_press(Message::Sample)
                 .focused(true)
                 .view(look),
@@ -469,7 +536,7 @@ fn progress<'a>(look: &Look) -> Element<'a, Message> {
                 .bottom()
                 .push(text("Installing", Type::Title, c.on_surface))
                 .push(fill())
-                .push(text("42%", Type::Headline, c.on_surface)),
+                .push(text("42%", Type::Hero, c.on_surface)),
         )
         .push(bar(look, 0.42))
         .push(
@@ -542,7 +609,7 @@ fn errors<'a>(look: &Look) -> Element<'a, Message> {
                 .push(button("Hide log").kind(Kind::Text).icon(Icon::Terminal).on_press(Message::Sample).view(look))
                 .push(fill())
                 .push(button("Save log").kind(Kind::Tonal).icon(Icon::Save).on_press(Message::Sample).view(look))
-                .push(button("Try again").icon(Icon::Restart).on_press(Message::Sample).focused(true).view(look)),
+                .push(button("Try again").icon(Icon::RestartAlt).on_press(Message::Sample).focused(true).view(look)),
         )
         .into()
 }

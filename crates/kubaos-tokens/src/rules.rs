@@ -38,6 +38,8 @@ pub enum Violation {
     OpacityOutOfRange { token: String, value: f32 },
     /// A colour role missing from one of `source`, `dark` and `light`.
     RoleMissing { role: String, table: &'static str },
+    /// A symbol that names both a Tabler icon and a drawing of ours, or neither.
+    SymbolSource { token: String },
 }
 
 impl fmt::Display for Violation {
@@ -71,6 +73,9 @@ impl fmt::Display for Violation {
             Violation::RoleMissing { role, table } => {
                 write!(f, "colour role {role} is missing from color.{table}")
             }
+            Violation::SymbolSource { token } => {
+                write!(f, "{token} needs exactly one of `tabler` and `drawn`")
+            }
         }
     }
 }
@@ -83,6 +88,7 @@ pub fn check(tokens: &Tokens) -> Vec<Violation> {
     check_types(tokens, &mut found);
     check_motion(tokens, &mut found);
     check_colors(tokens, &mut found);
+    check_symbols(tokens, &mut found);
     found
 }
 
@@ -208,9 +214,19 @@ fn check_colors(tokens: &Tokens, found: &mut Vec<Violation>) {
     }
 }
 
+fn check_symbols(tokens: &Tokens, found: &mut Vec<Violation>) {
+    for (name, symbol) in &tokens.symbols {
+        if symbol.tabler.is_some() == symbol.drawn.is_some() {
+            found.push(Violation::SymbolSource {
+                token: format!("symbols.{name}"),
+            });
+        }
+    }
+}
+
 /// Every name that becomes an identifier in an output, as `table.name`.
 fn names(tokens: &Tokens) -> Vec<String> {
-    let tables: [(&str, Vec<&String>); 7] = [
+    let tables: [(&str, Vec<&String>); 8] = [
         ("size", tokens.size.keys().collect()),
         ("type", tokens.types.keys().collect()),
         ("duration", tokens.duration.keys().collect()),
@@ -218,6 +234,7 @@ fn names(tokens: &Tokens) -> Vec<String> {
         ("opacity", tokens.opacity.keys().collect()),
         ("shadow", tokens.shadow.keys().collect()),
         ("color", tokens.color.source.keys().collect()),
+        ("symbols", tokens.symbols.keys().collect()),
     ];
     tables
         .into_iter()

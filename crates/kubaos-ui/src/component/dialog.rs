@@ -69,7 +69,7 @@ pub fn dialog<'a, M: 'a>(
         .push(
             row(look, Space::S12)
                 .center()
-                .push(icon(glyph, IconSize::S24, tint))
+                .push(icon(look, glyph, IconSize::S24, tint))
                 .push(text(title, Type::Headline, c.on_surface)),
         )
         .push(gap(Space::S12))
