@@ -410,7 +410,10 @@ system/60-nix.sh                 # = --user kuba --host tuxedo
    and sha256 at the top of the script, checked before it runs). Why not
    Determinate's: since early 2026 it installs Determinate Nix only; the
    official script gives upstream Nix, which nixpkgs and home-manager target.
-2. Adds `experimental-features = nix-command flakes` to `/etc/nix/nix.conf`.
+2. Adds `experimental-features = nix-command flakes` to `/etc/nix/nix.conf`,
+   and `max-jobs = auto` unless the file sets `max-jobs` already, so the
+   daemon runs builds side by side (`cores` stays at its default: each build
+   may use every core).
 3. First home-manager switch using the home-manager the flake pins
    (release-26.05), same as
    `nix run home-manager/release-26.05 -- switch --flake ~/Projects/dotfiles#kuba@tuxedo`.

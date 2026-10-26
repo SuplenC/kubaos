@@ -496,6 +496,34 @@ install_shutdown_splash() {
   boot_unit kubaos-shutdown-splash.service enable
 }
 
+# nix_parallel_builds: the Nix daemon runs as many builds at once as the
+# machine has cores (`max-jobs = auto` in /etc/nix/nix.conf), where Nix's
+# default is one. A release rebuilds KubaOS's crates, nine small builds that
+# one at a time leave most cores idle. `cores` keeps its default, every core
+# for each build: the builds that need them (Kōbō's dependencies, the crates
+# that compile kubaos-core) are the longest, and the rest finish in seconds.
+# On 24 cores, capping it at 8 made a release's crates 11% slower (60 s
+# against 54 s) and a Cargo.lock change 10% slower (224 s against 203 s). A
+# max-jobs line already in the file is the user's and stays. 60-nix.sh runs
+# it, and a migration on machines installed before it.
+nix_parallel_builds() {
+  local conf=/etc/nix/nix.conf
+  if [[ -f $conf ]] && grep -Eq '^[[:space:]]*max-jobs[[:space:]]*=' "$conf"; then
+    ok "$conf sets max-jobs already"
+    return 0
+  fi
+  if ((DRY_RUN)); then
+    info "would append to $conf: max-jobs = auto"
+  else
+    sudo_run sh -c 'printf "\n# KubaOS: builds side by side (nix_parallel_builds, system/lib.sh)\nmax-jobs = auto\n" >> /etc/nix/nix.conf'
+  fi
+  # The daemon reads nix.conf when it starts. Its unit kills only the main
+  # process, so builds already running finish.
+  if unit_exists nix-daemon.service && has_systemd; then
+    sctl restart nix-daemon.service
+  fi
+}
+
 # shellcheck source=system/manifest.sh
 source "$SYSTEM_DIR/manifest.sh"
 
