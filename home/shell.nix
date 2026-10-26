@@ -170,28 +170,30 @@ in
         }
 
         # oh-my-posh: themed config from dot-theme if present, else the static
-        # one. `dot-theme set` rewrites ohmyposh.toml; _dot_omp_init runs
-        # before each prompt and re-inits oh-my-posh when the file's mtime
-        # changed, so open shells pick up the new colors at their next prompt
-        # (one stat per prompt, no fork). The init script is cached by
+        # one. The init runs once per shell. Run again, it wraps the Space and
+        # Backspace widgets a second time, around zsh-autosuggestions' own
+        # wrappers, and the two then call each other until zsh stops at
+        # FUNCNEST. It needn't run again: each print is given the config
+        # (_dot_omp_cache) and reads it afresh, so `dot-theme set` shows at the
+        # next prompt. The hook before each prompt only switches to the themed
+        # config once dot-theme has written it. The init script is cached by
         # oh-my-posh store path, config file and mtime, less the line that
         # exports the session id, which must differ from shell to shell.
         zmodload -F zsh/stat b:zstat
-        typeset -g _dot_omp_mtime=""
         function _dot_omp_init() {
           local cfg="$_dot_theme/ohmyposh.toml"
-          local -a st
           [[ -r $cfg ]] || cfg="$HOME/.config/ohmyposh/config.toml"
+          typeset -g _dot_omp_cfg=$cfg
+          (( ''${+_dot_omp_ready} )) && return
+          typeset -g _dot_omp_ready=1
+          local -a st
           zstat -A st +mtime -- "$cfg" 2>/dev/null || st=(0)
-          [[ "$cfg:$st[1]" == "$_dot_omp_mtime" ]] && return
-          _dot_omp_mtime="$cfg:$st[1]"
           local file="$_kubaos_zsh_cache/omp-${ompKey}-''${cfg:t:r}-$st[1].zsh"
           if [[ ! -s $file ]] && ! _dot_omp_cache "$cfg" "$file"; then
             eval "$(${omp} init zsh --config "$cfg")"
             return
           fi
           export POSH_SESSION_ID="$(</proc/sys/kernel/random/uuid)"
-          typeset -g _dot_omp_cfg=$cfg
           source "$file"
         }
         # _dot_omp_cache CONFIG FILE: write oh-my-posh's init script for
