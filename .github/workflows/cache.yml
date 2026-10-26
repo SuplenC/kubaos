@@ -1,0 +1,69 @@
+# KubaOS's binary cache: builds what a machine's home builds from KubaOS's
+# flake and pushes it to Cachix (kuba-os.cachix.org), so `kubaos update`
+# downloads KubaOS's packages instead of building them. Machines read the
+# cache through /etc/nix/nix.conf (nix_binary_cache in system/lib.sh); one
+# that updates before this has finished builds as before.
+#
+# It builds `packages.<system>.cache` (flake.nix): every output of the
+# curated set, from KubaOS's own nixpkgs. lib.mkHome takes the curated set
+# from that same lock, whatever the user's nixpkgs, so these are the very
+# derivations a machine's home-manager switch asks for. `cachix push` pushes
+# their runtime closure and skips what cache.nixos.org has, which leaves
+# KubaOS's crates, Kotodama, Quickshell and the overridden packages. The
+# build-time paths (the crates' dependency builds, vendored sources) stay out:
+# a machine needs them only when it builds, and they would fill the cache's
+# 5 GB.
+#
+# Actions are pinned to a commit, with the release in the comment beside it.
+name: Binary cache
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  cache:
+    name: cache (${{ matrix.system }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: x86_64-linux
+            runner: ubuntu-latest
+          - system: aarch64-linux
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    steps:
+      # The runner image's preinstalled SDKs leave too little of the disk for
+      # Qt, KDE and the crates' builds in the Nix store.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+        with:
+          extra_nix_config: |
+            max-jobs = auto
+
+      # Pulls from the cache, so a push that changes one crate builds only
+      # that crate. It pushes nothing itself: the push step below names what
+      # to push, where the action's default would push every path it built.
+      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: kuba-os
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          skipPush: true
+
+      - name: Build
+        run: nix build --print-build-logs --out-link result ".#packages.${{ matrix.system }}.cache"
+
+      - name: Push
+        if: github.event_name == 'push'
+        run: cachix push kuba-os "$(readlink -f result)"

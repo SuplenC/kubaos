@@ -20,7 +20,7 @@ Concretely:
 3. **Split apt the same way.** Ubuntu updates flow as usual. The Hyprland stack is held, and the release carries an exact `Pin: version` file for it. Only a KubaOS patch moves that pin.
 4. **`kubaos update` and `kubaos upgrade`.** `update` always updates packages (apt, plus `nix flake update` of your flake), and it also applies a newer *patch* release of your current codename if there is one. `upgrade` is the deliberate step to the next codename, like Ubuntu's `do-release-upgrade` versus `apt upgrade`.
 5. **Notification.** A daily user timer runs `git ls-remote --tags`. A new patch gets one quiet notification. A new codename gets one notification that points to the release notes and `kubaos upgrade`. Package updates never notify.
-6. **Binary cache now, from the Mac.** A public Cachix cache (free tier, 5 GB) signed with our own key. `just cache-push <arch>` runs after `just payload <arch>` in the same Docker store volume. Its public key goes into `/etc/nix/nix.conf` in the payload. The cache only works because of point 2. Curated packages build against KubaOS's pinned nixpkgs, so every machine asks for the same store paths.
+6. **Binary cache now, from CI.** A public Cachix cache, `kuba-os` (free tier, 5 GB), signed by Cachix. A GitHub Actions workflow builds the curated set on every push to `main`, for both architectures, and pushes it ([#10](https://github.com/SuplenC/kubaos/issues/10); this replaced the Mac push planned first, see "Binary cache"). Its public key goes into `/etc/nix/nix.conf` on machines and in the payload. The cache only works because of point 2. Curated packages build against KubaOS's pinned nixpkgs, so every machine asks for the same store paths.
 7. **ISOs** go to Cloudflare R2 when hosting happens. The GitHub Release stays the index. Not urgent while the audience is you and a few others.
 
 ## Decisions (2026-10-18)
@@ -32,7 +32,7 @@ These replace the earlier open questions.
 3. **Hyprland.** Each release pins the version it was tested with. Hyprland upgrades ship only in KubaOS patch releases. `update.sh --hyprland` goes away.
 4. **CI and ISO hosting.** Planned, not yet. Builds and signing stay on the Mac for now. "When CI comes" lists what changes.
 5. **Ordinary packages are not gated by releases.** A new neovim must not wait for a KubaOS release. Only system-level and KubaOS-curated things go through the KubaOS channel. `kubaos update` still runs the normal package updates on demand. This overturns the earlier "the tag's `flake.lock` is the pin for everyone" design. See "Splitting the Nix pin".
-6. **Binary cache now, without CI.** See "Binary cache".
+6. **Binary cache now, without CI.** See "Binary cache". Superseded by #10: CI pushes the cache, from the first workflow the repo has.
 7. **Local edits vs upstream** (decided earlier): user changes live in a layer updates never write to. Implemented in #9.
 8. **Old series keep getting patches.** After Akihabara ships, Shinjuku still gets patch releases, mostly security fixes. `kubaos upgrade` stays optional. See "Maintenance branches".
 9. **No domain on Cloudflare yet.** Until there is one, ISOs go out as split parts on the GitHub Release (or by hand), and the Nix cache stays on Cachix.
@@ -385,7 +385,9 @@ extra-trusted-public-keys = kubaos.cachix.org-1:<public key>
 
 The `extra-` prefix appends to the default list (`doc/manual/source/command-ref/conf-file-prefix.md:48-54`). Nix only accepts a substituted path signed by a key in `trusted-public-keys` while `require-sigs` is on (the default) (`src/libstore/include/nix/store/globals.hh:243-288`). A substituter a *client* passes is used only if it's in `trusted-substituters` or the user is in `trusted-users` (`worker-settings.hh:287-305`). Adding a user to `trusted-users` "is essentially equivalent to giving that user root access" (`src/nix/unix/daemon.cc:62-72`). So: daemon config, no `trusted-users`, no `cachix use` as the user, and no flake `nixConfig`.
 
-**Do this now, from the Mac:**
+**What shipped instead (#10).** No Mac push and no signing key of our own. The cache is `kuba-os`, signed by Cachix (`kuba-os.cachix.org-1:BAhDPs8FW+W0SaOzsx7yS9sZmcb6ZjdLc09hBeKXIE0=`). `.github/workflows/cache.yml` runs on every push to `main`, on `ubuntu-latest` (x86_64) and `ubuntu-24.04-arm` (aarch64). It builds `packages.<system>.cache`, a `linkFarm` of every output of the curated set but the debug ones, and runs `cachix push kuba-os` on the result, with the write token in the repo secret `CACHIX_AUTH_TOKEN`. The push takes the runtime closure and skips what cache.nixos.org has. Measured on x86_64 at `cb23baa`: a 667-path closure, of which 28 paths, 242 MiB of NAR, aren't upstream (Papirus cyan 139 MiB, Kōbō 34 MiB, `quickshell-wrapped` 11 MiB, kotodama-core 10 MiB, the rest KubaOS's and Kotodama's other crates). A release that changes only KubaOS's code adds the changed crates, a few MiB each. `nix_binary_cache` (`system/lib.sh`) writes the two `nix.conf` lines from `system/60-nix.sh` and the `binary-cache` system migration, and both Dockerfiles write them too. The drvPaths match: on the laptop, the user flake (`lib.mkHome` with the user's nixpkgs, KubaOS pointed at the checkout) and the repo flake give the same drvPath and outPath for every curated output, and each one CI builds is in the home generation's build closure, the PAM-only `fprintd` and `pam_u2f` aside.
+
+The Mac plan, kept for the record:
 
 1. Create a public Cachix cache `kubaos` with your own signing key. Run `cachix generate-keypair kubaos` in a throwaway container, for example `docker run --rm -it -e CACHIX_AUTH_TOKEN nixos/nix nix run nixpkgs#cachix -- generate-keypair kubaos`. Store the secret key and a write-only per-cache token in Bitwarden. Commit the public key to `system/files/nix/kubaos-cache.conf`.
 2. Add `just cache-push <arch>`. After `just payload <arch>`, start a container on the same store volume (`dotinstall-image-nix-<arch>-<nix version>`, `installer/image/build:62-64`, `--platform linux/<darch>`) with `CACHIX_AUTH_TOKEN` and `CACHIX_SIGNING_KEY` taken from `bw get` on the Mac. Push what `nix build --print-out-paths` prints for the curated package outputs. Until the split lands, push the generation's `quickshell-wrapped`, `ukiyo`, and `papirus-icon-theme` paths. Cachix skips what cache.nixos.org has.
@@ -400,7 +402,7 @@ Short version. A GitHub Actions workflow builds the payloads and ISOs from a pus
 
 ### Changes this implies, in order
 
-1. **Cache now.** Cachix cache, `just cache-push`, the `nix.conf` lines in `60-nix.sh` and both Dockerfiles, and `update.sh --switch-only`.
+1. **Cache now.** Cachix cache, pushed by CI (`.github/workflows/cache.yml`, #10), the `nix.conf` lines in `60-nix.sh`, a system migration and both Dockerfiles.
 2. `VERSION` and `CODENAME` files, read in the three places. Pin ukiyo.
 3. **The flake split.** `lib.mkHome`, `homeModules.default`, `packages.<system>` for the curated set, `kubaosPkgs` in `home/desktop.nix`, `home/ukiyo.nix`, `home/shell.nix`, `home/theme.nix`, the GPU bundle, the PAM `--inputs-from`. A user flake template. The engine writes it instead of committing `home/username` (`install.rs:1254-1270`). Scripts, wallpapers, and the autostart snippet come from the store, and `dotfilesDir` goes away. `/usr/share/kubaos` with `origin`, a `release` branch, and `safe.directory`. Update `docs/CONTRACTS.md:9-12,62`, `docs/INSTALLER.md:108,115-123,199`, `docs/USING.md:27-73`, and PLAN rules 1 and 4 (`docs/PLAN.md:7,10`).
 4. `migrations/` and the runner, plus engine markers at install.

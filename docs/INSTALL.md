@@ -413,7 +413,9 @@ system/60-nix.sh                 # = --user kuba --host tuxedo
 2. Adds `experimental-features = nix-command flakes` to `/etc/nix/nix.conf`,
    and `max-jobs = auto` unless the file sets `max-jobs` already, so the
    daemon runs builds side by side (`cores` stays at its default: each build
-   may use every core).
+   may use every core), and KubaOS's binary cache (`extra-substituters =
+   https://kuba-os.cachix.org` and its `extra-trusted-public-keys`), so the
+   daemon downloads the KubaOS packages CI built instead of building them.
 3. First home-manager switch using the home-manager the flake pins
    (release-26.05), same as
    `nix run home-manager/release-26.05 -- switch --flake ~/Projects/dotfiles#kuba@tuxedo`.

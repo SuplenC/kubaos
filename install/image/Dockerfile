@@ -73,8 +73,10 @@ RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache
 
 # ---------------------------------------------------------------------------
 # nix: the official installer exactly as system/60-nix.sh runs it (version,
-# URL and sha256 read from that script), multi-user, flakes on. The half of
-# 60-nix.sh that needs the flake runs in lib/assemble.sh.
+# URL and sha256 read from that script), multi-user, flakes on, and
+# KubaOS's binary cache, the lines nix_binary_cache (system/lib.sh) writes, so
+# the payload's build downloads KubaOS's packages too. The half of 60-nix.sh
+# that needs the flake runs in lib/assemble.sh.
 FROM base AS nix
 ARG TARGETARCH
 COPY system/60-nix.sh /opt/dotfiles/system/60-nix.sh
@@ -105,6 +107,8 @@ RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache
     fi \
  && rm -rf "$tmp" \
  && printf '\n# dotfiles/system/60-nix.sh\nexperimental-features = nix-command flakes\n' >>/etc/nix/nix.conf \
+ && printf '\n# KubaOS: its binary cache (nix_binary_cache, system/lib.sh)\nextra-substituters = %s\nextra-trusted-public-keys = %s\n' \
+      https://kuba-os.cachix.org kuba-os.cachix.org-1:BAhDPs8FW+W0SaOzsx7yS9sZmcb6ZjdLc09hBeKXIE0= >>/etc/nix/nix.conf \
  && /nix/var/nix/profiles/default/bin/nix --version
 
 # ---------------------------------------------------------------------------
