@@ -298,6 +298,66 @@ fn host_fields(item: &Item) -> Result<HostFields, NoBlock> {
     })
 }
 
+/// A Host block to write: the item it comes from and its checked fields.
+struct Block {
+    label: String,
+    fingerprint: String,
+    fields: HostFields,
+    pub_path: std::path::PathBuf,
+}
+
+impl Block {
+    fn has_wildcard(&self) -> bool {
+        self.fields.hosts.iter().any(|h| wildcard(h))
+    }
+}
+
+/// A Host pattern that can match more than one name, or that leaves names out.
+fn wildcard(host: &str) -> bool {
+    host.contains(['*', '?', '!', '['])
+}
+
+/// The text of the Host blocks: those with only specific patterns first, then those with a
+/// wildcard, each group in vault order.
+///
+/// ssh takes `IdentityFile` from every block that matches, in file order, so a `Host *` block
+/// written first has its key offered first on every alias, and a server that knows both keys
+/// (GitHub with two accounts) logs in as the default one. A wildcard block also leaves out every
+/// other block's specific hosts with `!host`, so an alias offers its own key alone: offered
+/// second, the default key would still log in as the wrong account whenever the alias's own key
+/// is refused.
+fn host_blocks(blocks: &[Block], sock: &str) -> String {
+    let (specific, wild): (Vec<&Block>, Vec<&Block>) = blocks.iter().partition(|b| !b.has_wildcard());
+    let mut conf = String::new();
+    for block in specific.into_iter().chain(wild) {
+        let mut patterns = block.fields.hosts.clone();
+        if block.has_wildcard() {
+            let others = blocks.iter().filter(|b| !std::ptr::eq(*b, block));
+            for host in others.flat_map(|b| &b.fields.hosts).filter(|h| !wildcard(h)) {
+                let left_out = format!("!{host}");
+                if !block.fields.hosts.contains(host) && !patterns.contains(&left_out) {
+                    patterns.push(left_out);
+                }
+            }
+        }
+        let f = &block.fields;
+        let mut lines = vec![
+            format!("# {} ({})", block.label, block.fingerprint),
+            format!("Host {}", patterns.join(" ")),
+        ];
+        for (k, v) in [("HostName", &f.hostname), ("User", &f.user), ("Port", &f.port)] {
+            if !v.is_empty() {
+                lines.push(format!("  {k} {v}"));
+            }
+        }
+        lines.push(format!("  IdentityAgent {sock}"));
+        lines.push(format!("  IdentityFile {}", block.pub_path.display()));
+        lines.push("  IdentitiesOnly yes\n\n".to_owned());
+        conf.push_str(&lines.join("\n"));
+    }
+    conf
+}
+
 /// Writes the `.pub` files and the Host blocks, removes the `.pub` files of keys gone from the
 /// vault, and says which key got what.
 ///
@@ -310,7 +370,7 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &mut [Key], scope: &str, 
         m.mkdir(&dir, 0o700).map_err(|e| Error::write(&dir, e))?;
     }
     let sock = paths.agent.display().to_string();
-    let mut conf = String::new();
+    let mut blocks = vec![];
     let mut written = vec![];
     let mut with_block = vec![];
     let mut key_only = vec![];
@@ -412,23 +472,14 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &mut [Key], scope: &str, 
                 }
             }
         }
-        let hosts = fields.hosts.join(" ");
-        conf.push_str(&format!("# {label} ({fp})\nHost {hosts}\n"));
-        for (k, v) in [("HostName", &fields.hostname), ("User", &fields.user), ("Port", &fields.port)] {
-            if !v.is_empty() {
-                conf.push_str(&format!("  {k} {v}\n"));
-            }
-        }
-        conf.push_str(&format!(
-            "  IdentityAgent {sock}\n  IdentityFile {}\n  IdentitiesOnly yes\n\n",
-            pub_path.display()
-        ));
-        p.info(format!("Host {hosts}"));
-        with_block.push(label);
-        info.hosts = fields.hosts;
+        p.info(format!("Host {}", fields.hosts.join(" ")));
+        info.hosts.clone_from(&fields.hosts);
         info.block = true;
         infos.push(info);
+        blocks.push(Block { label: label.clone(), fingerprint: fp, fields, pub_path });
+        with_block.push(label);
     }
+    let conf = host_blocks(&blocks, &sock);
 
     let config = paths.ssh_config();
     let text = format!(

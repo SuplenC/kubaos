@@ -323,6 +323,76 @@ fn a_host_in_two_items_warns_that_ssh_offers_both_keys() {
     ));
 }
 
+/// One default key for every server, and two GitHub accounts on aliases, in the order a vault
+/// lists them: the default first.
+fn default_and_aliases() -> Vec<serde_json::Value> {
+    vec![
+        ssh_item("Alias2k", "alias2k", None, 1, json!([field("hosts", "*")])),
+        ssh_item(
+            "SuplenC",
+            "suplenc",
+            None,
+            2,
+            json!([field("hosts", "github-suplenc"), field("hostname", "github.com")]),
+        ),
+        ssh_item(
+            "JakubWasilczyk",
+            "jakubwasilczyk",
+            None,
+            3,
+            json!([field("hosts", "github-jakubwasilczyk"), field("hostname", "github.com")]),
+        ),
+    ]
+}
+
+fn host_lines(m: &Fake) -> Vec<String> {
+    m.text(SSH_CONFIG).unwrap().lines().filter(|l| l.starts_with("Host ")).map(str::to_string).collect()
+}
+
+#[test]
+fn blocks_with_a_wildcard_come_after_every_specific_block_in_vault_order() {
+    let mut items = default_and_aliases();
+    items.insert(1, ssh_item("Lab", "lab", None, 4, json!([field("hosts", "*.lab lab-?")])));
+    let mut m = with_items(machine(), &items);
+
+    pull_all(&mut m);
+
+    let hosts = host_lines(&m);
+    assert_eq!(hosts.len(), 4, "{hosts:?}");
+    assert_eq!(hosts[0], "Host github-suplenc");
+    assert_eq!(hosts[1], "Host github-jakubwasilczyk");
+    assert!(hosts[2].starts_with("Host * "), "{hosts:?}");
+    assert!(hosts[3].starts_with("Host *.lab lab-? "), "{hosts:?}");
+}
+
+#[test]
+fn an_alias_offers_only_its_own_key_not_the_default_one_too() {
+    let mut m = with_items(machine(), &default_and_aliases());
+
+    pull_all(&mut m);
+
+    let conf = m.text(SSH_CONFIG).unwrap();
+    assert!(
+        conf.contains(
+            "# Alias2k (no folder) (SHA256:alias2k)\nHost * !github-suplenc !github-jakubwasilczyk\n  \
+             IdentityAgent /home/kuba/.bitwarden-ssh-agent.sock\n  IdentityFile /home/kuba/.ssh/alias2k.pub\n"
+        ),
+        "{conf}"
+    );
+    assert!(conf.contains("Host github-suplenc\n  HostName github.com\n"), "{conf}");
+}
+
+#[test]
+fn a_wildcard_block_leaves_out_only_the_other_blocks_hosts() {
+    let mixed = ssh_item("Mixed", "mixed", None, 1, json!([field("hosts", "* jump-box")]));
+    let alias = ssh_item("Alias", "alias", None, 2, json!([field("hosts", "github-a"), field("hostname", "github.com")]));
+    let mut m = with_items(machine(), &[mixed, alias]);
+
+    pull_all(&mut m);
+
+    assert_eq!(host_lines(&m), ["Host github-a", "Host * jump-box !github-a"]);
+}
+
 #[test]
 fn a_key_without_a_usable_public_key_is_skipped_with_a_warning() {
     let mut bad = ssh_item("Broken", "broken", None, 1, json!([]));

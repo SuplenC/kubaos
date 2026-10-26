@@ -113,6 +113,44 @@ git remote set-url origin git@github-work:my-company/app.git   # a clone you alr
 
 Give both items `hosts=github.com` and ssh offers both keys to GitHub, which logs you in as whichever account it checks first. `kubaos bitwarden` warns when two items share a host.
 
+### One default key, others on aliases
+
+To log in everywhere with one key and use the others only on their aliases, give the default key `hosts=*`:
+
+```text
+  Alias2k          SSH key   hosts=*
+  SuplenC          SSH key   hosts=github-suplenc  hostname=github.com
+  JakubWasilczyk   SSH key   hosts=github-jakubwasilczyk  hostname=github.com
+```
+
+`~/.ssh/config.d/bitwarden` then reads:
+
+```text
+# SuplenC (no folder) (SHA256:…)
+Host github-suplenc
+  HostName github.com
+  IdentityAgent /home/you/.bitwarden-ssh-agent.sock
+  IdentityFile /home/you/.ssh/suplenc.pub
+  IdentitiesOnly yes
+
+# JakubWasilczyk (no folder) (SHA256:…)
+Host github-jakubwasilczyk
+  HostName github.com
+  IdentityAgent /home/you/.bitwarden-ssh-agent.sock
+  IdentityFile /home/you/.ssh/jakubwasilczyk.pub
+  IdentitiesOnly yes
+
+# Alias2k (no folder) (SHA256:…)
+Host * !github-suplenc !github-jakubwasilczyk
+  IdentityAgent /home/you/.bitwarden-ssh-agent.sock
+  IdentityFile /home/you/.ssh/alias2k.pub
+  IdentitiesOnly yes
+```
+
+ssh collects `IdentityFile` from every block that matches and offers the keys in file order, so `kubaos bitwarden` writes the blocks with only specific names first and the blocks with a wildcard (`*`, `?`, `!`, `[`) last, each group in vault order. A wildcard block also leaves out every specific name of the other blocks (`!github-suplenc`), so `ssh github-suplenc` offers the SuplenC key alone: with the default key offered second, a SuplenC key GitHub refused would quietly log you in as Alias2k. `github.com` itself, and every other server, gets the Alias2k key.
+
+Leaving the name out drops the wildcard block's other settings for it too: a `user` or `port` on the `hosts=*` item doesn't reach `github-suplenc`, so set them on the alias's item.
+
 ## Daily use
 
 ```sh
