@@ -10,7 +10,8 @@
 //! kubaos-clock countdown add NAME WHEN...  a countdown to a date or time (`20 dec`, `friday 17:00`)
 //! kubaos-clock countdown remove NAME
 //! kubaos-clock set KEY VALUE               holidays CODE|none, first-weekday DAY, analog on|off|toggle,
-//!                                          bar-countdown NAME|none
+//!                                          bar-countdown NAME|none, time-format 24h|12h|locale,
+//!                                          date-order day-month|month-day|locale
 //! ```
 //!
 //! # Owns
@@ -46,7 +47,8 @@ eval       what a date query comes to (`days until christmas`, `15:00 tokyo`)
 state      the popup's state: settings, clocks, countdowns, as JSON
 zone       add or remove an extra clock, by city or IANA name (`tokyo`, `America/New_York`)
 countdown  add a countdown to a date or time (`20 dec`, `friday 17:00`), or remove one
-set        holidays CODE|none, first-weekday DAY, analog on|off|toggle, bar-countdown NAME|none
+set        holidays CODE|none, first-weekday DAY, analog on|off|toggle, bar-countdown NAME|none,
+           time-format 24h|12h|locale, date-order day-month|month-day|locale
 
 Settings: ~/.config/kubaos/desktop/clock/clock.toml";
 

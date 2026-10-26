@@ -6,6 +6,8 @@
 //! first_weekday = "monday"
 //! analog = false
 //! bar_countdown = "Vacation"
+//! time_format = "24h"
+//! date_order = "day-month"
 //!
 //! [[countdowns]]
 //! name = "Vacation"
@@ -47,6 +49,60 @@ pub const MAX_ZONES: usize = 4;
 /// The first day of the week by default: ISO 8601's, and most of Europe's.
 pub const DEFAULT_FIRST_WEEKDAY: Weekday = Weekday::Monday;
 
+/// How the shell writes the time. Without one, the locale's, as Qt reads `LC_TIME`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TimeFormat {
+    /// `14:05`.
+    TwentyFourHour,
+    /// `2:05 PM`.
+    TwelveHour,
+}
+
+impl TimeFormat {
+    fn parse(text: &str) -> Option<Self> {
+        match text {
+            "24h" | "24" => Some(TimeFormat::TwentyFourHour),
+            "12h" | "12" => Some(TimeFormat::TwelveHour),
+            _ => None,
+        }
+    }
+
+    /// The name in the file and in the popup's state.
+    pub fn name(self) -> &'static str {
+        match self {
+            TimeFormat::TwentyFourHour => "24h",
+            TimeFormat::TwelveHour => "12h",
+        }
+    }
+}
+
+/// Whether the shell writes the day or the month first. Without one, the locale's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DateOrder {
+    /// `Monday, 26 October`.
+    DayMonth,
+    /// `Monday, October 26`.
+    MonthDay,
+}
+
+impl DateOrder {
+    fn parse(text: &str) -> Option<Self> {
+        match text {
+            "day-month" | "day" => Some(DateOrder::DayMonth),
+            "month-day" | "month" => Some(DateOrder::MonthDay),
+            _ => None,
+        }
+    }
+
+    /// The name in the file and in the popup's state.
+    pub fn name(self) -> &'static str {
+        match self {
+            DateOrder::DayMonth => "day-month",
+            DateOrder::MonthDay => "month-day",
+        }
+    }
+}
+
 /// A date or moment counted down to.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -69,6 +125,10 @@ pub struct Settings {
     /// The countdown shown next to the bar's clock, by name; `""` for none.
     pub bar_countdown: String,
     pub countdowns: Vec<Countdown>,
+    /// `None` for the locale's.
+    pub time_format: Option<TimeFormat>,
+    /// `None` for the locale's.
+    pub date_order: Option<DateOrder>,
 }
 
 impl Default for Settings {
@@ -80,6 +140,8 @@ impl Default for Settings {
             analog: false,
             bar_countdown: String::new(),
             countdowns: Vec::new(),
+            time_format: None,
+            date_order: None,
         }
     }
 }
@@ -98,6 +160,8 @@ struct SettingsToml {
     bar_countdown: String,
     #[serde(default)]
     countdowns: Vec<Countdown>,
+    time_format: Option<String>,
+    date_order: Option<String>,
 }
 
 /// Why the settings couldn't be read or changed.
@@ -123,7 +187,7 @@ pub enum SettingsError {
     NoCountry(String, String),
     #[error("{key} can't be {value:?}")]
     Value { key: &'static str, value: String },
-    #[error("no setting {0:?}; one of holidays, first-weekday, analog, bar-countdown")]
+    #[error("no setting {0:?}; one of holidays, first-weekday, analog, bar-countdown, time-format, date-order")]
     NoSetting(String),
 }
 
@@ -143,13 +207,32 @@ impl Settings {
     /// # Errors
     ///
     /// [`SettingsError::Parse`] for malformed TOML or an unknown key, [`SettingsError::Weekday`]
-    /// for a `first_weekday` that isn't one.
+    /// for a `first_weekday` that isn't one, [`SettingsError::Value`] for a `time_format` or
+    /// `date_order` it doesn't know.
     pub fn parse(text: &str) -> Result<Self, SettingsError> {
         let read: SettingsToml = toml::from_str(text).map_err(SettingsError::Parse)?;
         let first_weekday = match read.first_weekday {
             Some(name) => words::weekday(&name.to_lowercase()).ok_or(SettingsError::Weekday(name))?,
             None => DEFAULT_FIRST_WEEKDAY,
         };
+        let time_format = read
+            .time_format
+            .map(|text| {
+                TimeFormat::parse(&text).ok_or(SettingsError::Value {
+                    key: "time_format",
+                    value: text,
+                })
+            })
+            .transpose()?;
+        let date_order = read
+            .date_order
+            .map(|text| {
+                DateOrder::parse(&text).ok_or(SettingsError::Value {
+                    key: "date_order",
+                    value: text,
+                })
+            })
+            .transpose()?;
         Ok(Settings {
             zones: read.zones,
             holidays: read.holidays,
@@ -157,6 +240,8 @@ impl Settings {
             analog: read.analog,
             bar_countdown: read.bar_countdown,
             countdowns: read.countdowns,
+            time_format,
+            date_order,
         })
     }
 
@@ -338,7 +423,8 @@ pub fn remove_countdown(path: &Path, name: &str) -> Result<(), SettingsError> {
 
 /// Sets one of the plain settings by the name the command line and the menu use:
 /// `holidays` (a country code, or `none`), `first-weekday`, `analog` (`on`, `off` or `toggle`),
-/// `bar-countdown` (a countdown's name, or `none`).
+/// `bar-countdown` (a countdown's name, or `none`), `time-format` (`24h`, `12h`, or `locale`, which
+/// takes the line out) and `date-order` (`day-month`, `month-day` or `locale`).
 ///
 /// # Errors
 ///
@@ -389,6 +475,22 @@ pub fn set(path: &Path, key: &str, setting: &str, countries: &Countries) -> Resu
                 return Err(SettingsError::NoCountdown(name.to_owned()));
             }
             doc["bar_countdown"] = value(name);
+        }
+        "time-format" | "time_format" => {
+            if setting == "locale" {
+                doc.remove("time_format");
+            } else {
+                let format = TimeFormat::parse(setting).ok_or_else(|| bad("time-format"))?;
+                doc["time_format"] = value(format.name());
+            }
+        }
+        "date-order" | "date_order" => {
+            if setting == "locale" {
+                doc.remove("date_order");
+            } else {
+                let order = DateOrder::parse(setting).ok_or_else(|| bad("date-order"))?;
+                doc["date_order"] = value(order.name());
+            }
         }
         _ => return Err(SettingsError::NoSetting(key.to_owned())),
     }

@@ -16,6 +16,14 @@
 # An analog face beside the big clock (default false).
 # analog = false
 #
+# How the bar, the lock screen, the control center and the popup write the time: "24h"
+# (14:05) or "12h" (2:05 PM). Without the line, your locale's (LC_TIME).
+# time_format = "24h"
+#
+# Whether dates put the day or the month first: "day-month" (Monday, 26 October) or
+# "month-day" (Monday, October 26). Without the line, your locale's.
+# date_order = "day-month"
+#
 # A countdown shown next to the bar's clock, by its name (default: none).
 # bar_countdown = "Vacation"
 #

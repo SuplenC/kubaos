@@ -233,7 +233,7 @@ Drawer {
                     StyledText {
                         id: hhmm
 
-                        text: Qt.formatDateTime(root.now, "HH:mm")
+                        text: Qt.formatDateTime(root.now, Time.clockFormat)
                         font.pixelSize: 56
                         font.weight: Font.Light
                         font.features: Theme.font.tabular
@@ -241,7 +241,7 @@ Drawer {
 
                     StyledText {
                         anchors.baseline: hhmm.baseline
-                        text: Qt.formatDateTime(root.now, "ss")
+                        text: Qt.formatDateTime(root.now, Time.twelveHour ? "ss AP" : "ss")
                         font.pixelSize: Theme.font.xxl
                         font.weight: Font.Light
                         font.features: Theme.font.tabular
@@ -264,7 +264,7 @@ Drawer {
 
                     StyledText {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: Qt.formatDateTime(root.now, "dddd d MMMM yyyy")
+                        text: Qt.formatDateTime(root.now, Time.fullDateFormat)
                         font.pixelSize: Theme.font.lg
                     }
                 }
@@ -334,7 +334,7 @@ Drawer {
                             }
 
                             StyledText {
-                                text: Qt.formatDateTime(zone.there, "HH:mm")
+                                text: Qt.formatDateTime(zone.there, Time.timeFormat)
                                 font.weight: Font.DemiBold
                                 font.features: Theme.font.tabular
                             }

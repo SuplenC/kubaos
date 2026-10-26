@@ -124,7 +124,7 @@ WlSessionLockSurface {
                 id: time
 
                 anchors.centerIn: parent
-                text: Qt.formatDateTime(clock.date, "HH:mm")
+                text: Qt.formatDateTime(clock.date, Time.timeFormat)
                 color: Theme.m3onSurface
                 font.family: Theme.font.sans
                 font.pixelSize: Theme.font.display
@@ -146,7 +146,7 @@ WlSessionLockSurface {
 
         StyledText {
             Layout.alignment: Qt.AlignHCenter
-            text: Qt.formatDateTime(clock.date, "dddd, d MMMM")
+            text: Qt.formatDateTime(clock.date, Time.dateFormat)
             font.pixelSize: Theme.font.xl
             color: Theme.m3onSurfaceVariant
         }

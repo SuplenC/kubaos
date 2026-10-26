@@ -56,6 +56,8 @@ fn the_state_has_the_settings_clocks_today_and_countdowns() {
 
     assert_eq!(state["settings"]["firstWeekday"], 1);
     assert_eq!(state["settings"]["barCountdown"], "Trip");
+    assert_eq!(state["settings"]["timeFormat"], "");
+    assert_eq!(state["settings"]["dateOrder"], "");
     assert_eq!(state["country"], "Poland");
     assert_eq!(state["here"]["label"], "Warsaw");
     assert_eq!(state["today"]["dayOfYear"], 297);
@@ -121,6 +123,12 @@ fn changes_land_in_the_file_and_the_state_comes_back() {
 
     let state = ask(&mut server, r#"{"id":3,"op":"set","key":"analog","value":"on"}"#);
     assert_eq!(state["settings"]["analog"], true);
+
+    let state = ask(&mut server, r#"{"id":5,"op":"set","key":"time-format","value":"24h"}"#);
+    assert_eq!(state["settings"]["timeFormat"], "24h");
+
+    let state = ask(&mut server, r#"{"id":6,"op":"set","key":"date-order","value":"day-month"}"#);
+    assert_eq!(state["settings"]["dateOrder"], "day-month");
 
     let text = fs::read_to_string(dir.path().join(settings::FILE)).expect("the file");
     assert!(

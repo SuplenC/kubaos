@@ -113,7 +113,7 @@ Scope {
                 if (error !== "")
                     Time.notify("No timer", error);
                 else
-                    Time.notify("Timer", `${Time.left(Time.timerTotal)}, rings at ${Qt.formatDateTime(new Date(Time.timerEnd), "HH:mm")}`);
+                    Time.notify("Timer", `${Time.left(Time.timerTotal)}, rings at ${Qt.formatDateTime(new Date(Time.timerEnd), Time.timeFormat)}`);
             });
         }
 
