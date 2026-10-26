@@ -47,7 +47,7 @@ install_dir() {
 
 # --------------------------------------------------------------------------
 step "Plymouth (script module, freetype labels; no pango, no extra fonts)"
-apt_install plymouth plymouth-label-ft
+group_install boot
 
 step "Plymouth theme kubaos -> $PLY_THEME_DIR"
 install_dir "$FILES_DIR/plymouth/kubaos" "$PLY_THEME_DIR"

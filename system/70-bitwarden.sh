@@ -62,7 +62,7 @@ U2F_LINES=(
 )
 POLKIT_DROPIN=/etc/systemd/system/polkit-agent-helper@.service.d/u2f.conf
 
-DO_DESKTOP=1 DO_CLI=1 DO_U2F=1 REMOVE_U2F=0 CHECK_ONLY=0
+DO_DESKTOP=1 DO_CLI=1 DO_U2F=1 NO_U2F=0 REMOVE_U2F=0 CHECK_ONLY=0
 
 usage() {
   cat <<EOF
@@ -70,10 +70,15 @@ Usage: $0 [--dry-run] [--no-desktop] [--no-cli] [--no-u2f] [--remove-u2f] [--che
 
   --no-desktop      skip the Bitwarden desktop app
   --no-cli          skip the bw CLI
-  --no-u2f          skip pam_u2f (packages, PAM lines, lock screen service)
+  --no-u2f          leave pam_u2f out (packages, PAM lines, lock screen service),
+                    now and in every kubaos update
   --remove-u2f      take the security-key lines out of /etc/pam.d/{sudo,sudo-i,polkit-1}
-                    and remove the polkit drop-in (keeps $U2F_MAPPINGS)
+                    and remove the polkit drop-in (keeps $U2F_MAPPINGS); leaves it
+                    out from now on too
   --check-updates   only report newer desktop/CLI releases on GitHub, change nothing
+
+kubaos packages enable u2f turns the security key back on.
+
 $(common_usage)
 EOF
 }
@@ -83,7 +88,7 @@ while (($#)); do
     -n | --dry-run) DRY_RUN=1 ;;
     --no-desktop) DO_DESKTOP=0 ;;
     --no-cli) DO_CLI=0 ;;
-    --no-u2f) DO_U2F=0 ;;
+    --no-u2f) NO_U2F=1 ;;
     --remove-u2f) REMOVE_U2F=1 ;;
     --check-updates) CHECK_ONLY=1 ;;
     -h | --help) usage; exit 0 ;;
@@ -136,6 +141,8 @@ if ((CHECK_ONLY)); then
 fi
 
 require_sudo
+if ((NO_U2F || REMOVE_U2F)); then choice_set u2f off; fi
+group_enabled u2f || DO_U2F=0
 
 # fetch_verified URL SHA256 DEST: download to DEST, refuse anything that
 # doesn't match the pinned hash.
@@ -150,10 +157,10 @@ fetch_verified() {
 }
 
 # --------------------------------------------------------------------------
-pkgs=(ca-certificates curl unzip libsecret-tools)
-((DO_U2F && !REMOVE_U2F)) && pkgs+=(libpam-u2f pamu2fcfg pamtester)   # pamtester: docs/SECRETS.md, Troubleshooting
+groups=(bitwarden)
+((DO_U2F && !REMOVE_U2F)) && groups+=(u2f)
 step "Packages"
-apt_install "${pkgs[@]}"
+group_install "${groups[@]}"
 
 # --------------------------------------------------------------------------
 if ((DO_DESKTOP && !REMOVE_U2F)); then

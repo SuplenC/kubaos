@@ -15,7 +15,8 @@
 //! - The Bitwarden vault (`bitwarden`): `bitwarden.rs`.
 //! - The recoloured pointer (`cursor`): `cursor.rs`.
 //! - The keyboard layouts (`keyboard`): `keyboard.rs`.
-//! - Packages (`package`, `try`): `package.rs`.
+//! - Packages from nixpkgs (`package`, `try`): `package.rs`.
+//! - KubaOS's apt packages (`packages`): `apt.rs`.
 //! - Suites (`suite`): `suite.rs`.
 //! - Switch jobs (`switch`, `job`): `job.rs`.
 //! - Updates (`update`, `upgrade`, `rollback`, `channel`): `update.rs`.
@@ -30,6 +31,7 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 
+mod apt;
 mod bitwarden;
 mod cursor;
 mod install;
@@ -69,6 +71,11 @@ enum Cmd {
     Package {
         #[command(subcommand)]
         cmd: package::PackageCmd,
+    },
+    /// KubaOS's apt packages: how they compare with the release, and the optional groups.
+    Packages {
+        #[command(subcommand)]
+        cmd: apt::PackagesCmd,
     },
     /// Suites: a whole programming setup, recorded in kubaos.d/ and installed by a switch.
     Suite {
@@ -126,6 +133,7 @@ fn main() -> ExitCode {
         Cmd::Setup { cmd } => setup::main(cmd),
         Cmd::Bitwarden { cmd } => bitwarden::main(cmd),
         Cmd::Package { cmd } => package::main(cmd),
+        Cmd::Packages { cmd } => apt::main(cmd),
         Cmd::Suite { cmd } => suite::main(cmd),
         Cmd::Try { name } => package::try_main(&name),
         Cmd::Switch { mode } => match kubaos_core::state::Paths::from_env() {

@@ -59,7 +59,7 @@ WORKDIR /opt/dotfiles
 # base: system/10-strip.sh and system/20-base.sh for real.
 FROM os AS base
 ARG TARGETARCH
-COPY system/lib.sh system/10-strip.sh system/20-base.sh /opt/dotfiles/system/
+COPY system/lib.sh system/manifest.sh system/packages.toml system/10-strip.sh system/20-base.sh /opt/dotfiles/system/
 COPY system/files/apt/ /opt/dotfiles/system/files/apt/
 COPY system/files/netplan/ /opt/dotfiles/system/files/netplan/
 COPY system/files/logind.conf.d/ /opt/dotfiles/system/files/logind.conf.d/

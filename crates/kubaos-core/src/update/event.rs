@@ -42,6 +42,9 @@ pub enum Command {
     Upgrade,
     Rollback,
     Check,
+    /// `kubaos packages enable|disable`: an optional group of the package manifest turned on or
+    /// off.
+    Packages,
 }
 
 impl Command {
@@ -52,6 +55,7 @@ impl Command {
             Self::Upgrade => "upgrade",
             Self::Rollback => "rollback",
             Self::Check => "check",
+            Self::Packages => "packages",
         }
     }
 }
@@ -76,6 +80,8 @@ pub enum Phase {
     Release,
     /// Installing the release's Hyprland pin.
     Hyprland,
+    /// Bringing the apt packages in line with the release's package manifest.
+    Manifest,
     /// The release's new system migrations, as root.
     SystemMigrations,
     /// `nix flake update` of the user flake.
@@ -98,6 +104,7 @@ impl Phase {
             Self::SystemPackages => "System packages",
             Self::Release => "Release",
             Self::Hyprland => "Hyprland pin",
+            Self::Manifest => "Package manifest",
             Self::SystemMigrations => "System migrations",
             Self::Inputs => "Nix inputs",
             Self::Home => "Home",
@@ -175,7 +182,19 @@ pub struct Preview {
     pub migrations: Vec<String>,
 }
 
-/// What a finished update, upgrade or rollback did.
+/// What the package manifest's phase changed in one group.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupChange {
+    pub group: String,
+    /// The packages it installed, which KubaOS now records as its own.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub installed: Vec<String>,
+    /// The packages it removed: KubaOS installed them, and no group wants them now.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub removed: Vec<String>,
+}
+
+/// What a finished update, upgrade, rollback or `kubaos packages enable|disable` did.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Summary {
     pub command: Command,
@@ -186,6 +205,9 @@ pub struct Summary {
     pub changes: Vec<String>,
     /// The apt packages upgraded.
     pub packages: usize,
+    /// What the package manifest's phase installed and removed, by group.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub apt: Vec<GroupChange>,
     /// The user flake's inputs `nix flake update` moved.
     pub inputs: Vec<String>,
     /// The migrations that ran, system ones first.

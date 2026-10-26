@@ -53,6 +53,104 @@ struct Fake {
     password_stale: bool,
     authenticated: usize,
     free: u64,
+    /// When set, apt, dpkg and apt-mark answer from it and change it, as on a machine.
+    dpkg: Option<FakeDpkg>,
+}
+
+/// A machine's packages, for the package manifest's tests.
+#[derive(Default)]
+struct FakeDpkg {
+    /// Installed packages and whether each is held.
+    installed: BTreeMap<String, bool>,
+    /// Held packages that aren't installed.
+    held_missing: Vec<String>,
+    /// Packages apt has no install candidate for.
+    unavailable: Vec<String>,
+    /// What removing a package takes along with it.
+    takes: BTreeMap<String, Vec<String>>,
+}
+
+impl FakeDpkg {
+    fn with(installed: &[&str]) -> Self {
+        Self {
+            installed: installed.iter().map(|p| ((*p).to_owned(), false)).collect(),
+            ..Self::default()
+        }
+    }
+
+    /// The packages an apt-get or apt-mark command line names.
+    fn names(cmd: &Cmd) -> Vec<String> {
+        cmd.argv()[1..]
+            .iter()
+            .map(|a| a.to_string_lossy().into_owned())
+            .filter(|a| !a.starts_with('-') && !a.contains("::"))
+            .filter(|a| !matches!(a.as_str(), "install" | "remove" | "hold" | "unhold" | "showhold" | "policy"))
+            .map(|a| a.split('=').next().unwrap_or_default().to_owned())
+            .collect()
+    }
+
+    /// The answer to `cmd` when it is one this machine knows, changing it as apt would.
+    fn answer(&mut self, cmd: &Cmd) -> Option<String> {
+        let args: Vec<String> = cmd.argv().iter().map(|a| a.to_string_lossy().into_owned()).collect();
+        let has = |word: &str| args.iter().any(|a| a == word);
+        let names = Self::names(cmd);
+        match cmd.program().as_str() {
+            "dpkg-query" if has("${db:Status-Status} ${db:Status-Want} ${Package} ${Version}\n") => {
+                let mut out: String = self
+                    .installed
+                    .iter()
+                    .map(|(p, held)| format!("installed {} {p} 1.0\n", if *held { "hold" } else { "install" }))
+                    .collect();
+                out.extend(self.held_missing.iter().map(|p| format!("not-installed hold {p} \n")));
+                Some(out)
+            }
+            "apt-cache" => Some(
+                names
+                    .iter()
+                    .filter(|p| !self.unavailable.contains(p))
+                    .map(|p| format!("{p}:\n  Installed: (none)\n  Candidate: 1.0\n"))
+                    .collect(),
+            ),
+            "apt-get" if has("-s") && has("remove") => Some(
+                names
+                    .iter()
+                    .flat_map(|p| std::iter::once(p.clone()).chain(self.takes.get(p).cloned().unwrap_or_default()))
+                    .map(|p| format!("Remv {p} [1.0]\n"))
+                    .collect(),
+            ),
+            "apt-get" if has("install") => {
+                for p in names {
+                    self.held_missing.retain(|h| *h != p);
+                    self.installed.entry(p).or_insert(false);
+                }
+                Some(String::new())
+            }
+            "apt-get" if has("remove") => {
+                for p in names {
+                    self.installed.remove(&p);
+                }
+                Some(String::new())
+            }
+            "apt-mark" if has("hold") => {
+                for p in names {
+                    if let Some(held) = self.installed.get_mut(&p) {
+                        *held = true;
+                    }
+                }
+                Some(String::new())
+            }
+            "apt-mark" if has("unhold") => {
+                for p in names {
+                    self.held_missing.retain(|h| *h != p);
+                    if let Some(held) = self.installed.get_mut(&p) {
+                        *held = false;
+                    }
+                }
+                Some(String::new())
+            }
+            _ => None,
+        }
+    }
 }
 
 impl Fake {
@@ -72,6 +170,7 @@ impl Fake {
             password_stale: false,
             authenticated: 0,
             free: u64::MAX,
+            dpkg: None,
         }
     }
 
@@ -127,6 +226,9 @@ impl Fake {
             stdout,
             stderr: String::new(),
         };
+        if let Some(out) = self.dpkg.as_mut().and_then(|d| d.answer(cmd)) {
+            return Ok(canned(out));
+        }
         Ok(match cmd.program().as_str() {
             "git" | "bash" | "sh" => Self::exec(cmd)?,
             program => match self.canned.get(program) {
@@ -876,3 +978,5 @@ fn the_channel_file_overrides_the_record() {
     let updater = w.updater(&mut m);
     assert_eq!(updater.channel(&w.installed()), Channel::Edge);
 }
+
+mod manifest;

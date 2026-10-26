@@ -11,9 +11,6 @@ set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-TUXEDO_KEY_URL="https://deb.tuxedocomputers.com/0x54840598.pub.asc"
-TUXEDO_KEY_FPR="E5D0C320BBCE8D21CDF60DD5120ED28D54840598"
-TUXEDO_KEYRING="/etc/apt/keyrings/tuxedo.gpg"
 ENABLE_FPRINT_PAM=1
 ONLY="tuxedo,mok,power,dock,fingerprint"
 MOK_PW_STDIN=0 MOK_PW=""
@@ -54,57 +51,53 @@ fi
 # A fresh KubaOS install has no apt lists (the payload ships without them):
 # fetch them, but only when something is actually missing, so the parts
 # that are already installed work offline.
-apt_install_fresh() {
+fresh_lists() {
   local p
   for p in "$@"; do
     if ! pkg_installed "$p"; then
       compgen -G '/var/lib/apt/lists/*_Packages' >/dev/null || apt_update
-      break
+      return 0
     fi
   done
+}
+apt_install_fresh() {
+  fresh_lists "$@"
   apt_install "$@"
+}
+group_install_fresh() {
+  local packages
+  mapfile -t packages < <(group_packages "$@")
+  fresh_lists "${packages[@]}"
+  group_install "$@"
 }
 
 require_sudo
-apt_install_fresh ca-certificates curl gnupg
+group_install_fresh tools
 
 # --------------------------------------------------------------------------
-HAVE_TUXEDO=0
-is_amd64 && HAVE_TUXEDO=1
 if want tuxedo; then
-step "TUXEDO apt repository (resolute)"
-if ! is_amd64; then
-  warn "architecture $(arch): TUXEDO publishes amd64/i386 only, skipping repo and drivers (VM?)"
-else
-  [[ -d /etc/apt/keyrings ]] || sudo_run install -d -m 0755 /etc/apt/keyrings
-  fetch_key "$TUXEDO_KEY_URL" "$TUXEDO_KEYRING" "$TUXEDO_KEY_FPR"
-  add_apt_source tuxedo "Types: deb
-URIs: https://deb.tuxedocomputers.com/ubuntu
-Suites: resolute
-Components: main
-Architectures: amd64
-Signed-By: $TUXEDO_KEYRING"
-  apt_update_if_dirty
-fi
-
-# --------------------------------------------------------------------------
-step "Kernel headers + DKMS (tuxedo-drivers is a DKMS package)"
-headers=(dkms mokutil)
+step "Kernel headers (tuxedo-drivers is a DKMS package)"
+headers=()
 kver="$(uname -r)"
 if in_container; then
   info "container: running kernel $kver isn't Ubuntu's, skipping kernel headers"
 else
+  # The headers follow the running kernel, so they aren't in the manifest.
   pkg_has_candidate "linux-headers-$kver" && headers+=("linux-headers-$kver")
   # keep headers coming for future kernels of the installed flavour
   pkg_installed linux-image-generic && headers+=(linux-headers-generic)
   pkg_installed linux-image-generic-hwe-26.04 && headers+=(linux-headers-generic-hwe-26.04)
 fi
-apt_install_fresh "${headers[@]}"
+((${#headers[@]} == 0)) || apt_install_fresh "${headers[@]}"
 
 # --------------------------------------------------------------------------
-if ((HAVE_TUXEDO)); then
-  step "tuxedo-drivers (NOT tuxedo-control-center)"
-  apt_install_fresh tuxedo-drivers udev-hid-bpf
+step "TUXEDO apt repository, DKMS and tuxedo-drivers (NOT tuxedo-control-center)"
+if ! is_amd64; then
+  warn "architecture $(arch): TUXEDO publishes amd64/i386 only, skipping repo and drivers (VM?)"
+else
+  # Setting up the drivers turns the tuxedo group on, so kubaos update keeps them.
+  choice_set tuxedo on
+  group_install_fresh tuxedo
   if pkg_installed tuxedo-control-center; then
     warn "tuxedo-control-center is installed; KubaOS uses power-profiles-daemon instead"
   fi
@@ -184,7 +177,7 @@ fi
 # --------------------------------------------------------------------------
 if want dock; then
 step "USB4 / Thunderbolt dock (bolt)"
-apt_install_fresh bolt
+group_install_fresh dock
 if command -v boltctl >/dev/null && has_systemd; then
   boltctl list 2>/dev/null | sed 's/^/        /' || true
 fi
@@ -196,7 +189,7 @@ fi
 # --------------------------------------------------------------------------
 if want fingerprint; then
 step "Fingerprint reader (fprintd)"
-apt_install_fresh fprintd libpam-fprintd
+group_install_fresh fingerprint
 if command -v lsusb >/dev/null; then
   lsusb 2>/dev/null | grep -iE 'finger|goodix|synaptics|elan|egis|focal|upek|validity' | sed 's/^/        reader? /' || info "no obvious fingerprint reader on USB (plug it in?)"
 fi

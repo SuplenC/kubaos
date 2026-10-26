@@ -7,6 +7,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use kubaos_core::update::event::Command;
+use kubaos_core::update::event::GroupChange;
 use kubaos_core::update::event::Outcome;
 use kubaos_core::update::event::Phase;
 use kubaos_core::update::event::Preview;
@@ -180,6 +181,9 @@ fn edge_update() -> Vec<UpdateEvent> {
         finished(Phase::SystemPackages, 42_300, Some("12 packages")),
         UpdateEvent::PhaseStarted { phase: Phase::Release },
         finished(Phase::Release, 110, Some("release is at 9f8e7d6")),
+        UpdateEvent::PhaseStarted { phase: Phase::Manifest },
+        step("Installing loupe, showtime"),
+        finished(Phase::Manifest, 5_400, Some("2 installed, 1 removed")),
         UpdateEvent::PhaseStarted {
             phase: Phase::SystemMigrations,
         },
@@ -200,6 +204,18 @@ fn edge_update() -> Vec<UpdateEvent> {
             channel: Channel::Edge,
             changes,
             packages: 12,
+            apt: vec![
+                GroupChange {
+                    group: "files".into(),
+                    installed: vec!["loupe".into(), "showtime".into()],
+                    removed: Vec::new(),
+                },
+                GroupChange {
+                    group: "tools".into(),
+                    installed: Vec::new(),
+                    removed: vec!["old-tool".into()],
+                },
+            ],
             inputs: vec!["nixpkgs".into()],
             migrations: vec!["1792765570-backlight-rule.sh".into()],
             reloaded: vec!["reloaded Hyprland".into(), "restarting Quickshell".into()],
@@ -253,6 +269,7 @@ KubaOS update
   ✓ Snapshot            0.8s  before kubaos update 2026-10-23 09:14:03 (0.1.0 → 0.1.1)
   ✓ System packages      42s  12 packages
   ✓ Release             0.1s  release is at 9f8e7d6
+  ✓ Package manifest    5.4s  2 installed, 1 removed
   ✓ System migrations   0.3s  1 migration ran
   ✓ Nix inputs           18s  nixpkgs
   ✓ Home               1m05s  reloaded Hyprland, restarting Quickshell
@@ -261,6 +278,8 @@ KubaOS update
   Changes     fix(hypr): keep each screen's workspaces as a group
               docs: describe workspace groups
   Packages    12 apt packages, Nix inputs nixpkgs
+  Apt         files: installed loupe, showtime
+              tools: removed old-tool
   Migrations  1792765570-backlight-rule.sh
   Session     reloaded Hyprland, restarting Quickshell
   Next        nothing, it's all running
@@ -414,6 +433,37 @@ fn a_skipped_phase_says_why_and_a_needed_reboot_is_the_next_step() {
         "  – Hyprland pin        0.0s  skipped: Hyprland comes from KubaOS's nixpkgs on this architecture"
     ));
     assert!(shown.contains("  Next        reboot: an updated package asks for it"));
+}
+
+#[test]
+fn turning_a_group_off_ends_on_what_it_changed_in_apt() {
+    let (mut quiet, quiet_out) = screen(Style::PLAIN, 100);
+    let (mut screen, out) = screen(Style::PLAIN, 100);
+    let Some(UpdateEvent::Summary(mut summary)) = edge_update().pop() else {
+        panic!("the update ends on its summary");
+    };
+    summary.command = Command::Packages;
+    summary.apt = vec![GroupChange {
+        group: "u2f".into(),
+        installed: Vec::new(),
+        removed: vec!["libpam-u2f".into(), "pamu2fcfg".into()],
+    }];
+    let started = UpdateEvent::Started {
+        command: Command::Packages,
+        log: None,
+    };
+    let mut unchanged = summary.clone();
+    unchanged.apt.clear();
+
+    play(&mut screen, &out, &[started, UpdateEvent::Summary(summary)]);
+    play(&mut quiet, &quiet_out, &[UpdateEvent::Summary(unchanged)]);
+
+    assert_eq!(
+        terminal(&out.bytes()),
+        "KubaOS packages\n\n\n  Apt         u2f: removed libpam-u2f, pamu2fcfg\n  \
+         Log         ~/.local/state/kubaos/update/2026-10-23T09-14-03-update.log"
+    );
+    assert!(terminal(&quiet_out.bytes()).contains("  Apt         nothing changed\n"));
 }
 
 #[test]

@@ -2489,7 +2489,9 @@ c_dot_config() {
 # `release` branch for /usr/share/kubaos (the real one, the wallpaper link,
 # is put aside and back by c_rollback), and a user flake on that release like
 # the installer's. apt-get is a shim that logs what it was asked, so nothing
-# is downloaded or installed; the container has no snapper. The three checks
+# is downloaded or installed, and apt-cache one that has a candidate for every
+# package; the container has no snapper. Docker and Chrome are turned off, so
+# the package manifest's sync sets up no vendor repo. The three checks
 # run in this order, each from where the last left the machine.
 UPD_KUBAOS=/usr/share/kubaos
 UPD_SAVED=/usr/share/kubaos.harness-saved
@@ -2517,6 +2519,9 @@ update_setup() {
   printf '#!/bin/sh\necho "$*" >>%s/apt-get.log\n' "$LOGS" >/usr/local/bin/apt-get
   chmod 0755 /usr/local/bin/apt-get
   ln -sfn /usr/local/bin/apt-get /usr/local/sbin/apt-get
+  printf '#!/bin/sh\n[ "$1" = policy ] || exit 0\nshift\nfor p; do printf "%%s:\\n  Candidate: 1.0\\n" "$p"; done\n' \
+    >/usr/local/bin/apt-cache
+  chmod 0755 /usr/local/bin/apt-cache
   rm -rf "$UPD_ORIGIN" "$UPD_WORK" /var/lib/kubaos /etc/kubaos /usr/share/kubaos-keys /usr/bin/kubaos \
     "$UPD_SYSTEM_LOG" "$UPD_USER_LOG" "$UPD_STATE/migrations" "$UPD_STATE/locks" \
     "$UPD_STATE/update-available" "$UPD_STATE/notified"
@@ -2525,6 +2530,8 @@ update_setup() {
     git config --system --get-all safe.directory | grep -qxF -- "$dir" ||
       git config --system --add safe.directory "$dir"
   done
+  install -d /etc/kubaos /var/lib/kubaos
+  printf 'docker=off\nchrome=off\n' >/etc/kubaos/apt-groups
   as_user git clone -q --bare "$REPO" "$UPD_ORIGIN" || { echo "FAIL cloning the repo copy as origin"; return 1; }
   as_user git clone -q "$UPD_ORIGIN" "$UPD_WORK" || { echo "FAIL cloning origin to work in"; return 1; }
   if [[ -e $UPD_KUBAOS && ! -e $UPD_SAVED ]]; then mv "$UPD_KUBAOS" "$UPD_SAVED"; fi
@@ -2559,7 +2566,14 @@ c_update_edge() {
     "$UPD_WORK/Cargo.lock" | as_user tee "$UPD_WORK/Cargo.lock.new" >/dev/null && as_user mv "$UPD_WORK/Cargo.lock.new" "$UPD_WORK/Cargo.lock"
   [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 8 ]] ||
     { echo "FAIL bumping the workspace's version in Cargo.lock"; return 1; }
-  work add migrations Cargo.toml Cargo.lock && work commit -q -m 'test: a new kubaos, a system and a user migration' &&
+  # A package new to the manifest, and the record of a machine where KubaOS
+  # installed sway, which no group lists, and zsh, which one does.
+  as_user sed -i 's/^packages = \["zsh"\]$/packages = ["zsh", "kubaos-harness-pkg"]/' "$UPD_WORK/system/packages.toml"
+  grep -q '"kubaos-harness-pkg"' "$UPD_WORK/system/packages.toml" ||
+    { echo "FAIL adding a package to the manifest"; return 1; }
+  printf 'sway\tharness\nzsh\tshell\n' >/var/lib/kubaos/apt-installed
+  work add migrations system/packages.toml Cargo.toml Cargo.lock &&
+    work commit -q -m 'test: a new kubaos, a system and a user migration, a package' &&
     work push -q origin HEAD:main ||
     { echo "FAIL pushing a commit to origin/main"; return 1; }
   head="$(work rev-parse HEAD)"
@@ -2590,6 +2604,7 @@ c_update_edge() {
   grep -q '^upgrade --with-new-pkgs -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold$' \
     "$LOGS/apt-get.log" || { echo "FAIL apt-get upgrade never ran, or not keeping changed config files"; return 1; }
   echo "ok   kubaos update on edge: release at main's head, both migrations ran once, the record, history and lock follow"
+  apt_manifest_followed || return 1
 
   # Off a terminal: plain lines, and the programs' output in the run's log.
   ! grep -q $'\e' <<<"$out" || { echo "FAIL escape codes in the update's output off a terminal"; return 1; }
@@ -2617,6 +2632,42 @@ c_update_edge() {
   [[ $(lines "$UPD_SYSTEM_LOG") == 1 && $(lines "$UPD_USER_LOG") == 1 ]] ||
     { echo "FAIL a migration ran again"; return 1; }
   echo "ok   kubaos update --json again: one JSON event a line, only packages, no migration runs twice"
+}
+
+# apt_manifest_followed: after c_update_edge's update, the package added to
+# the manifest was installed, with no migration; sway, which KubaOS installed
+# and no group lists, was removed, and nothing else; and `kubaos packages
+# status` says what dpkg says.
+apt_manifest_followed() {
+  local out bad
+  # The updater's own install, which keeps changed config files; the
+  # package-manifest migration's group_install runs too, without them.
+  grep -qE '^install -y --no-install-recommends -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold .*kubaos-harness-pkg( |$)' \
+    "$LOGS/apt-get.log" || { echo "FAIL kubaos update didn't install the package added to the manifest:"; cat "$LOGS/apt-get.log"; return 1; }
+  [[ $(grep -c '^remove ' "$LOGS/apt-get.log") == 1 ]] &&
+    grep -qE '^remove -y -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold sway$' "$LOGS/apt-get.log" ||
+    { echo "FAIL removing only sway, which KubaOS installed and no group lists:"; grep remove "$LOGS/apt-get.log"; return 1; }
+  ! grep -q '^sway' /var/lib/kubaos/apt-installed && grep -q "^zsh"$'\t'"shell$" /var/lib/kubaos/apt-installed ||
+    { echo "FAIL /var/lib/kubaos/apt-installed after the update:"; cat /var/lib/kubaos/apt-installed; return 1; }
+  echo "ok   kubaos update installs a package added to the manifest and removes one only KubaOS installed and dropped"
+
+  out="$(kz 'kubaos packages status --json' 2>&1)" ||
+    { echo "FAIL kubaos packages status --json"; printf '%s\n' "$out" | tail -10; return 1; }
+  bad="$(jq -r '.groups[].packages[] | "\(.name) \(.state)"' <<<"$out" | while read -r p state; do
+    d="$(dpkg-query -W -f='${db:Status-Status}' "$p" 2>/dev/null || true)"
+    held=no
+    apt-mark showhold 2>/dev/null | grep -qx "$p" && held=yes
+    case "$state:$d:$held" in
+      installed:installed:no | held:installed:yes) ;;
+      missing:installed:* | unavailable:installed:* | skipped:installed:*) echo "$p $state, dpkg $d" ;;
+      missing:* | unavailable:* | skipped:*) ;;
+      *) echo "$p $state, dpkg $d, held $held" ;;
+    esac
+  done)"
+  [[ -z $bad ]] || { echo "FAIL kubaos packages status disagrees with dpkg:"; printf '%s\n' "$bad"; return 1; }
+  [[ $(jq -r '.groups[] | select(.name == "shell") | .packages[] | select(.name == "kubaos-harness-pkg") | .state' <<<"$out") == missing ]] ||
+    { echo "FAIL the package the shim didn't install isn't missing in the status"; return 1; }
+  echo "ok   kubaos packages status matches dpkg for every package of the manifest"
 }
 
 c_update_stable() {
@@ -2904,7 +2955,7 @@ subprocess.Popen(["plymouthd", "--no-daemon", "--mode=" + sys.argv[1], "--kernel
 
 # update_restore: the machine as before the update checks.
 update_restore() {
-  rm -f /usr/local/bin/apt-get /usr/local/sbin/apt-get /usr/bin/kubaos "$UPD_READY"
+  rm -f /usr/local/bin/apt-get /usr/local/sbin/apt-get /usr/local/bin/apt-cache /usr/bin/kubaos "$UPD_READY"
   git config --system --unset gpg.ssh.program || true
   if [[ -e $UPD_SAVED ]]; then rm -rf "$UPD_KUBAOS" && mv "$UPD_SAVED" "$UPD_KUBAOS"; fi
 }

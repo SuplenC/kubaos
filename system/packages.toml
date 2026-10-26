@@ -1,0 +1,250 @@
+# KubaOS's apt packages, by group. The system scripts install their groups
+# from here (`group_install` in `system/manifest.sh`), and every `kubaos
+# update` installs what an active group lists and the machine lacks, so a
+# package added here reaches every machine with no migration. A package
+# dropped from every group is removed by the next update, but only when
+# KubaOS installed it (`/var/lib/kubaos/apt-installed`) and nothing else on
+# the machine needs it. `kubaos packages status` shows how the machine
+# compares; docs/CONTRACTS.md, "The package manifest", has the whole contract.
+#
+# A [group.<name>] takes:
+#   summary   what the group is for, as `kubaos packages status` shows it
+#   packages  the apt packages, installed with --no-install-recommends
+#   arch      "amd64": only on that architecture
+#   repo      the [repo.<name>] its packages come from
+#   hold      true: apt-mark hold, so apt never moves them
+#   if_available  true: a package without an install candidate is skipped
+#   optional  "on" or "off": the user can turn the group off or on
+#             (`kubaos packages enable|disable`, or the scripts' flags), and
+#             this is what it is until they do
+#   when_on, when_off  the script, with its arguments, that sets up or takes
+#             down what the group needs beyond its packages, when the user
+#             turns it on or off
+#
+# A [repo.<name>] is a vendor's apt repository. Its sources file is
+# `system/files/apt/sources.list.d/<name>.sources` (`@ARCH@` becomes the
+# machine's architecture), signed by the key at `key_url`, which must have
+# exactly the primary key `fingerprint`, stored in `keyring`.
+#
+# Keep to this much TOML: tables, strings without escapes, true and false,
+# and arrays of strings. The scripts read it with awk.
+
+# ---------------------------------------------------------------------------
+# Vendor repositories
+
+[repo.docker]
+key_url = "https://download.docker.com/linux/ubuntu/gpg"
+fingerprint = "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
+keyring = "/etc/apt/keyrings/docker.gpg"
+
+# Chrome's own postinst writes google-chrome.sources with exactly this key
+# path and URI; the same values mean it won't fight the file.
+[repo.google-chrome]
+key_url = "https://dl.google.com/linux/linux_signing_key.pub"
+fingerprint = "EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
+keyring = "/usr/share/keyrings/google-chrome.gpg"
+
+# ppa:cppiber/hyprland, the Launchpad PPA of Constantin Piber.
+[repo.cppiber-hyprland]
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0xA54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"
+fingerprint = "A54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"
+keyring = "/etc/apt/keyrings/cppiber-hyprland.gpg"
+
+[repo.tuxedo]
+key_url = "https://deb.tuxedocomputers.com/0x54840598.pub.asc"
+fingerprint = "E5D0C320BBCE8D21CDF60DD5120ED28D54840598"
+keyring = "/etc/apt/keyrings/tuxedo.gpg"
+
+# ---------------------------------------------------------------------------
+# The base system (system/20-base.sh)
+
+# openssh-client is for git over SSH: on a minimized server only cloud-init
+# pulled it in, and 10-strip.sh purges that.
+[group.tools]
+summary = "What the system scripts themselves use"
+packages = ["ca-certificates", "curl", "gnupg", "unzip", "git", "openssh-client"]
+
+[group.network]
+summary = "NetworkManager and Wi-Fi"
+packages = ["network-manager", "wpasupplicant", "iw"]
+
+[group.audio]
+summary = "PipeWire and Bluetooth"
+packages = [
+  "pipewire", "pipewire-pulse", "pipewire-alsa", "pipewire-audio", "wireplumber",
+  "libspa-0.2-bluetooth", "bluez", "rtkit",
+]
+
+[group.session]
+summary = "Session plumbing: D-Bus, polkit, XWayland, portals, the keyring"
+packages = [
+  "dbus-user-session", "xdg-user-dirs", "xdg-utils", "polkitd", "pkexec",
+  "xwayland", "qt6-wayland", "qtwayland5",
+  "xdg-desktop-portal", "xdg-desktop-portal-gtk",
+  "gnome-keyring", "libsecret-1-0",
+]
+
+# mesa-libgallium carries the VA-API drivers in 26.04; the old
+# mesa-va-drivers package no longer exists.
+[group.graphics]
+summary = "Firmware and Mesa"
+packages = [
+  "linux-firmware", "firmware-sof-signed",
+  "mesa-vulkan-drivers", "mesa-libgallium", "libgl1-mesa-dri", "libegl-mesa0", "vainfo", "mesa-utils",
+  "fwupd",
+]
+
+[group.microcode]
+summary = "AMD CPU microcode"
+arch = "amd64"
+packages = ["amd64-microcode"]
+
+[group.laptop]
+summary = "Laptop hardware: backlight, monitors over DDC, power profiles"
+packages = ["brightnessctl", "ddcutil", "upower", "power-profiles-daemon", "pciutils", "usbutils"]
+
+[group.dock]
+summary = "USB4 and Thunderbolt docks (bolt)"
+packages = ["bolt"]
+
+[group.fingerprint]
+summary = "The fingerprint reader (fprintd)"
+packages = ["fprintd", "libpam-fprintd"]
+
+# rustup and proto toolchains need these.
+[group.build]
+summary = "Build tools"
+packages = ["build-essential", "pkg-config", "libssl-dev", "clang", "mold"]
+
+# grub-btrfs is not packaged for resolute; 20-base.sh builds it.
+[group.snapshots]
+summary = "btrfs and snapper"
+packages = ["btrfs-progs", "snapper", "inotify-tools"]
+
+# Nautilus, with Sushi on space and gvfs for phones, network shares and
+# admin://; udisks2 is what kubaos-automount talks to. Image and HEIC/AVIF
+# thumbnails come from glycin, which 26.04's gdk-pixbuf loads through, and
+# libde265 decodes the HEVC inside an iPhone's HEIC. papers and
+# gnome-font-viewer bring the PDF and font thumbnailers with the viewers. File
+# Roller does the extracting, with 7zip and unar for 7z and RAR, since unrar
+# is non-free. python3-nautilus runs the right-click extensions. The gstreamer
+# plugins are the codecs Showtime plays with, which --no-install-recommends
+# would leave out.
+[group.files]
+summary = "The file manager, its thumbnailers and viewers"
+packages = [
+  "nautilus", "gnome-sushi", "gvfs-backends", "gvfs-fuse", "udisks2",
+  "glycin-thumbnailers", "libheif-plugin-libde265", "ffmpegthumbnailer",
+  "papers", "gnome-font-viewer", "file-roller", "7zip", "unar", "python3-nautilus",
+  "loupe", "showtime", "gstreamer1.0-plugins-good", "gstreamer1.0-libav", "imagemagick",
+]
+
+[group.fonts]
+summary = "Noto fonts"
+packages = ["fonts-noto-core", "fonts-noto-ui-core", "fonts-noto-mono", "fonts-noto-color-emoji", "fonts-noto-cjk"]
+
+# They work without Nix and without the shell.
+[group.fallback]
+summary = "The fallback session's tools, and the runtime helpers of the binds"
+packages = ["foot", "fuzzel", "wl-clipboard", "grim", "slurp", "playerctl", "socat", "qalc", "libnotify-bin"]
+
+# Its config comes from home-manager.
+[group.shell]
+summary = "The login shell"
+packages = ["zsh"]
+
+# ---------------------------------------------------------------------------
+# The other scripts
+
+[group.upgrades]
+summary = "Ubuntu's security updates (system/10-strip.sh)"
+packages = ["unattended-upgrades"]
+
+[group.boot]
+summary = "The boot splash (system/25-boot.sh)"
+packages = ["plymouth", "plymouth-label-ft"]
+
+# DKMS builds tuxedo-drivers; mokutil enrolls its signing key. The kernel
+# headers follow the running kernel, so 30-hardware.sh picks them.
+[group.tuxedo]
+summary = "TUXEDO's drivers (system/30-hardware.sh), set up at first boot"
+arch = "amd64"
+repo = "tuxedo"
+optional = "off"
+when_on = ["system/30-hardware.sh", "--only", "tuxedo"]
+packages = ["dkms", "mokutil", "tuxedo-drivers", "udev-hid-bpf"]
+
+[group.docker]
+summary = "Docker CE (system/40-apps.sh)"
+repo = "docker"
+optional = "on"
+when_on = ["system/40-apps.sh"]
+packages = ["docker-ce", "docker-ce-cli", "containerd.io", "docker-buildx-plugin", "docker-compose-plugin"]
+
+[group.chrome]
+summary = "Google Chrome (system/40-apps.sh)"
+arch = "amd64"
+repo = "google-chrome"
+optional = "on"
+when_on = ["system/40-apps.sh"]
+packages = ["google-chrome-stable"]
+
+[group.hyprland]
+summary = "Hyprland from ppa:cppiber/hyprland, held (system/50-hyprland.sh)"
+arch = "amd64"
+repo = "cppiber-hyprland"
+hold = true
+packages = [
+  "hyprland", "hyprland-guiutils", "xdg-desktop-portal-hyprland",
+  "hypridle", "hyprlock", "hyprpolkitagent", "hyprpicker",
+]
+
+# The PPA has no arm64 builds, so arm64 takes what Ubuntu has, which
+# predates the Lua config; the session runs nixpkgs' Hyprland there
+# (home/desktop.nix).
+[group.hyprland-ubuntu]
+summary = "Ubuntu's own Hyprland where the PPA has none, held (system/50-hyprland.sh)"
+arch = "arm64"
+hold = true
+if_available = true
+packages = [
+  "hyprland", "hyprland-guiutils", "xdg-desktop-portal-hyprland",
+  "hypridle", "hyprlock", "hyprpolkitagent", "hyprpicker",
+]
+
+[group.accents]
+summary = "keyd, for the Mac-style accents on Left Alt (system/50-hyprland.sh)"
+packages = ["keyd"]
+
+[group.nix]
+summary = "What the Nix installer needs (system/60-nix.sh)"
+packages = ["curl", "xz-utils"]
+
+[group.recorder]
+summary = "setcap for the screen recorder's helper (system/65-recorder.sh)"
+packages = ["libcap2-bin"]
+
+[group.bitwarden]
+summary = "Bitwarden's helpers: unzip for bw, secret-tool (system/70-bitwarden.sh)"
+packages = ["ca-certificates", "curl", "unzip", "libsecret-tools"]
+
+# pamtester is for docs/SECRETS.md, "Troubleshooting".
+[group.u2f]
+summary = "A security key for sudo, polkit and the lock screen (system/70-bitwarden.sh)"
+optional = "on"
+when_on = ["system/70-bitwarden.sh", "--no-desktop", "--no-cli"]
+when_off = ["system/70-bitwarden.sh", "--remove-u2f"]
+packages = ["libpam-u2f", "pamu2fcfg", "pamtester"]
+
+# fido2-tools comes from the same libfido2 Ubuntu's pam_u2f uses, so what it
+# reports is what PAM sees.
+[group.yubikey]
+summary = "The YubiKey's FIDO2 tools (system/75-yubikey.sh)"
+packages = ["fido2-tools"]
+
+# Socket-activated: pcscd only runs while something talks to a card.
+[group.piv]
+summary = "PIV, the smart card of the YubiKey Multi-protocol Edition (system/75-yubikey.sh)"
+optional = "off"
+when_on = ["system/75-yubikey.sh"]
+packages = ["pcscd", "pcsc-tools"]

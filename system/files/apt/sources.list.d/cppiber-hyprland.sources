@@ -1,0 +1,5 @@
+Types: deb
+URIs: https://ppa.launchpadcontent.net/cppiber/hyprland/ubuntu
+Suites: resolute
+Components: main
+Signed-By: /etc/apt/keyrings/cppiber-hyprland.gpg

@@ -1,6 +1,6 @@
-//! What `kubaos update`, `upgrade`, `rollback` and `channel` show: the updater's events
-//! (`kubaos_core::update::event`) as a live view on a terminal, as plain lines elsewhere, or as
-//! JSON lines with `--json`.
+//! What `kubaos update`, `upgrade`, `rollback`, `channel` and `packages enable|disable` show: the
+//! updater's events (`kubaos_core::update::event`) as a live view on a terminal, as plain lines
+//! elsewhere, or as JSON lines with `--json`.
 //!
 //! The live view keeps one area at the bottom of the terminal: the running phase with a spinner,
 //! and under it the last line its program printed. Everything else (a finished phase, a warning,
@@ -29,6 +29,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use kubaos_core::update::event::Command;
+use kubaos_core::update::event::GroupChange;
 use kubaos_core::update::event::Outcome;
 use kubaos_core::update::event::Phase;
 use kubaos_core::update::event::Preview;
@@ -259,6 +260,13 @@ impl Text {
         let s = self.style;
         let row = |label: &str, value: &str| format!("  {}{value}\n", s.dim(&format!("{label:<LABEL_WIDTH$}")));
         let mut out = String::from("\n");
+        if summary.command == Command::Packages {
+            out.push_str(&self.apt_rows(&summary.apt, "nothing changed"));
+            if let Some(log) = &summary.log {
+                out.push_str(&row("Log", &self.path(log)));
+            }
+            return out;
+        }
         let moved = summary.from.commit != summary.to.commit;
         let release = if moved {
             format!(
@@ -274,7 +282,7 @@ impl Text {
             (_, false) => "KubaOS",
             (Command::Upgrade, true) => "Upgraded",
             (Command::Rollback, true) => "Rolled back",
-            (Command::Update | Command::Check, true) => "Updated",
+            (Command::Update | Command::Check | Command::Packages, true) => "Updated",
         };
         out.push_str(&row(label, &release));
         if !summary.changes.is_empty() {
@@ -299,6 +307,9 @@ impl Text {
                 packages.push_str(&format!(", Nix inputs {}", summary.inputs.join(", ")));
             }
             out.push_str(&row("Packages", &packages));
+            if !summary.apt.is_empty() {
+                out.push_str(&self.apt_rows(&summary.apt, ""));
+            }
         }
         if !summary.migrations.is_empty() {
             out.push_str(&row("Migrations", &summary.migrations.join(", ")));
@@ -321,6 +332,29 @@ impl Text {
         }
         if let Some(log) = &summary.log {
             out.push_str(&row("Log", &self.path(log)));
+        }
+        out
+    }
+
+    /// The summary's `Apt` rows: one line a group the package manifest's phase changed, or
+    /// `none` when it changed nothing.
+    fn apt_rows(&self, apt: &[GroupChange], none: &str) -> String {
+        let s = self.style;
+        let indent = " ".repeat(LABEL_WIDTH + 2);
+        let mut lines = apt.iter().map(|change| {
+            let mut parts = Vec::new();
+            if !change.installed.is_empty() {
+                parts.push(format!("installed {}", change.installed.join(", ")));
+            }
+            if !change.removed.is_empty() {
+                parts.push(format!("removed {}", change.removed.join(", ")));
+            }
+            format!("{}: {}", change.group, parts.join("; "))
+        });
+        let first = lines.next().unwrap_or_else(|| none.to_owned());
+        let mut out = format!("  {}{first}\n", s.dim(&format!("{:<LABEL_WIDTH$}", "Apt")));
+        for line in lines {
+            out.push_str(&format!("{indent}{line}\n"));
         }
         out
     }

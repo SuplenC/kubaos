@@ -154,6 +154,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **Errors go to stderr with a non-zero exit**; usage errors exit 2.
 - **A script that changes the system takes `--dry-run` and `--help`**, as `system/*.sh` do through `system/lib.sh`.
 - **A script grows into a function once it repeats**; a script past a few hundred lines with real logic is a candidate for the Rust engine.
+- **An apt package goes in the package manifest, `system/packages.toml`**, in the group of the feature that needs it (a new group when none fits, `optional` when the user may leave it out), and the script installs it with `group_install <group>`, never with an `apt_install` list of its own. Every `kubaos update` installs what the manifest adds, so a PR that adds a package writes no migration for it; migrations are for config. A vendor repository is a `[repo.<name>]` with its key's fingerprint and a sources file in `system/files/apt/sources.list.d/`. `docs/CONTRACTS.md`, "The package manifest", has the rest.
 
 ## Nix
 

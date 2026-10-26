@@ -124,6 +124,26 @@ impl SystemPaths {
     pub fn apt_pin(&self) -> PathBuf {
         self.join(APT_PIN)
     }
+
+    /// The checked-out release's package manifest.
+    pub fn manifest(&self) -> PathBuf {
+        self.checkout().join(crate::apt::manifest::MANIFEST)
+    }
+
+    /// The checked-out release's script that sets up a vendor apt repository.
+    pub fn apt_repo_script(&self) -> PathBuf {
+        self.checkout().join("system/apt-repo.sh")
+    }
+
+    /// `/etc/kubaos/apt-groups`, the user's choices of optional package groups.
+    pub fn apt_choices(&self) -> PathBuf {
+        self.join(crate::apt::choices::CHOICES)
+    }
+
+    /// `/var/lib/kubaos/apt-installed`, the packages KubaOS installed.
+    pub fn apt_record(&self) -> PathBuf {
+        self.join(crate::apt::record::RECORD)
+    }
 }
 
 /// Which releases a machine follows.

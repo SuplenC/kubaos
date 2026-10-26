@@ -39,7 +39,7 @@ use crate::job;
 use crate::job::SwitchIn;
 use crate::usage_error;
 
-mod render;
+pub(crate) mod render;
 mod system;
 
 use render::Mode;
@@ -103,7 +103,7 @@ fn confirm(yes: bool) -> Confirm {
 }
 
 /// The user's paths and the machine, or the exit code of why there are none.
-fn machine(place: SwitchIn) -> Result<(Paths, System), ExitCode> {
+pub(crate) fn machine(place: SwitchIn) -> Result<(Paths, System), ExitCode> {
     if rustix::process::geteuid().is_root() {
         return Err(usage_error(UpdateError::Root));
     }

@@ -3,7 +3,8 @@
 //!
 //! The machine's KubaOS is the root-owned checkout `/usr/share/kubaos`; its `release` branch is
 //! what the user flake builds. An update fetches `origin`, lets the channel's release policy pick
-//! the commit `release` moves to, upgrades apt, runs the system migrations not run yet, updates
+//! the commit `release` moves to, upgrades apt, brings the apt packages in line with the release's
+//! package manifest (`crate::apt`), runs the system migrations not run yet, updates
 //! and switches the user flake, then runs the user migrations. `/var/lib/kubaos/release` records
 //! what is installed and `update-history` what each update changed, which `rollback` undoes.
 //!

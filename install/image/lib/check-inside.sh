@@ -240,6 +240,9 @@ a="$(in_root dpkg --audit 2>&1)"
 for p in linux-generic cryptsetup-initramfs btrfs-progs snapper network-manager docker-ce hyprland hypridle hyprlock; do
   grep -q "^installed $p " "$P/packages.txt" && ok "$p $(awk -v p="$p" '$2 == p {print $3}' "$P/packages.txt")" || fail "$p not installed"
 done
+# kubaos update removes a package the manifest drops only when this record has it.
+check "/var/lib/kubaos/apt-installed records what the scripts installed (nautilus, group files)" \
+  grep -q "^nautilus"$'\t'"files$" "$R/var/lib/kubaos/apt-installed"
 K=/usr/share/kubaos
 check "KubaOS checkout at $K, on release" eq "$(in_root git -C "$K" symbolic-ref --short HEAD)" release
 check "  origin is GitHub" eq "$(in_root git -C "$K" remote get-url origin)" https://github.com/SuplenC/kubaos.git

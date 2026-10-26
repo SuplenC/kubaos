@@ -404,7 +404,7 @@ install_mac_accents() {
   same_content "$FILES_DIR/keyd/kubaos.conf" /etc/keyd/kubaos.conf || changed=1
   # The config goes in first, so keyd starts with it when the package starts it.
   install_root_file "$FILES_DIR/keyd/kubaos.conf" /etc/keyd/kubaos.conf 0644
-  apt_install keyd
+  group_install accents
   sctl enable keyd.service
   # try-restart: a keyd the user stopped (accents off) stays stopped.
   if ((changed)) && has_systemd; then
@@ -495,6 +495,9 @@ install_shutdown_splash() {
   fi
   boot_unit kubaos-shutdown-splash.service enable
 }
+
+# shellcheck source=system/manifest.sh
+source "$SYSTEM_DIR/manifest.sh"
 
 common_usage() {
   cat <<EOF
