@@ -67,6 +67,8 @@ rec {
   kubaos-sysmon = callCrate ../crates/kubaos-sysmon/package.nix;
   # The idle settings, Keep awake and the scheduled power actions (home/idle.nix).
   kubaos-idle = callCrate ../crates/kubaos-idle/package.nix;
+  # The design specimen, the Command menu's "Design specimen" (home/desktop.nix).
+  kubaos-specimen = callCrate ../crates/kubaos-specimen/package.nix;
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (
