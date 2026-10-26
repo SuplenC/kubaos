@@ -203,15 +203,27 @@ end
 -- doesn't pile up rules.
 local rules, kept = {}, {}
 
+local function release(id)
+  -- Hyprland returns no rule when it rejects one, and reports why on screen.
+  local rule = rules[id] and rules[id][kept[id]]
+  if rule then
+    rule:set_enabled(false)
+  end
+  kept[id] = nil
+end
+
 local function keep(id, connector)
   rules[id] = rules[id] or {}
-  local from = kept[id]
   local rule = rules[id][connector]
-  if not from and rule then
-    -- HAZARD: only a released rule naming this same screen is enabled again.
+  if rule then
+    -- HAZARD: a released rule is only enabled again for the screen it names.
     -- Enabling one naming another would move the workspace there first.
+    if kept[id] then
+      release(id)
+    end
     rule:set_enabled(true)
   else
+    local from = kept[id]
     -- Merged into the enabled rule for this workspace, if there is one, so a
     -- kept workspace moving to another screen changes its rule in place.
     rule = hl.workspace_rule({ workspace = tostring(id), persistent = true, monitor = connector })
@@ -221,15 +233,6 @@ local function keep(id, connector)
     rules[id][connector] = rule
   end
   kept[id] = connector
-end
-
-local function release(id)
-  -- Hyprland returns no rule when it rejects one, and reports why on screen.
-  local rule = rules[id] and rules[id][kept[id]]
-  if rule then
-    rule:set_enabled(false)
-  end
-  kept[id] = nil
 end
 
 -- Bring Hyprland's persistent workspaces in line with `workspace_blocks.kept`.
