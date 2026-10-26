@@ -10,7 +10,7 @@ use super::Progress;
 use super::list;
 use super::ssh::Key;
 use super::ssh::on_disk;
-use super::ssh::usable_public_key;
+use super::ssh::public_key;
 use super::ssh::write_if_changed;
 use super::vault::Item;
 
@@ -60,7 +60,7 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &[Key], scope: &str, p: &
     let mut marked: Vec<String> = vec![];
     for key in keys.iter().filter(|k| k.item.has_field("signing")) {
         let item: &Item = &key.item;
-        let Some(public) = item.public_key.as_deref().filter(|k| usable_public_key(k)) else {
+        let Some(public) = item.public_key.as_deref().and_then(|k| public_key(k).ok()) else {
             continue;
         };
         let v = item.field("signing");
@@ -89,7 +89,7 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &[Key], scope: &str, p: &
         ));
     }
     let pub_path = paths.ssh.join(format!("{}.pub", sign.file));
-    if on_disk(m, &pub_path).as_deref() != sign.item.public_key.as_deref() {
+    if on_disk(m, &pub_path) != sign.item.public_key.as_deref().and_then(|k| public_key(k).ok()) {
         p.warn(format!("~/.ssh/{}.pub isn't the key of {name} (run with ssh too)", sign.file));
         return Ok(());
     }

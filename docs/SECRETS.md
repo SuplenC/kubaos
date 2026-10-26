@@ -60,6 +60,22 @@ Keep your vault the way it is. `kubaos bitwarden` reads the whole vault: folders
 
   The public key goes to `~/.ssh/<file>.pub`. The Host block names that file in `IdentityFile` with `IdentitiesOnly yes`, so ssh asks the agent for that key only. Without `hosts` you get the `.pub` file and no block; the summary lists those keys under "key only", so you can see which ones still want a `hosts` field.
 
+  Field names match whatever their case and surrounding spaces: `HostName`, `hostname` and `hostname ` are the same field. The public key may carry a comment (`ssh-ed25519 AAAA… jakub@macbook`); the `.pub` gets `bitwarden:<item name>` as its comment instead, and keys are compared without comments.
+
+  When an item can't be used as it is, the run prints a `!!` line and the summary lists it under "thing(s) need you", each naming the item (name and folder), the field, and the fix in Bitwarden:
+
+  | Message (shortened) | Result | Fix in Bitwarden |
+  |---|---|---|
+  | `` the public key field holds `ssh-ed25519 AAAA…` followed by a newline `` | no `.pub`, no Host block | make the public key one line, or import the key again |
+  | `` the public key is of type `ssh-dss` `` | no `.pub`, no Host block | create an Ed25519 key |
+  | `the public key's second word isn't base64` / `the public key field is empty` | no `.pub`, no Host block | import the key again |
+  | `` Host github-work has no `hostname` field `` | the block is written without `HostName` | add a custom text field `hostname` = `github.com` |
+  | `` the field `hosts` holds `x` followed by a newline `` | no Host block | make the value one line |
+  | `` the field `user` holds `a b`, with characters ssh_config can't take safely `` | no Host block | fix the value |
+  | `` kubaos bitwarden reads no field `host`; … rename it to `hosts` `` | the field is ignored | rename the field |
+
+  The block for an alias without `hostname` is still written: a name your resolver knows (a LAN name, an `/etc/hosts` entry) works as it is. The warning only fires for a `hosts` entry with no dot, colon or wildcard.
+
   Two items with the same name (a "GitHub" in two folders, say) never share a `.pub`: the older item keeps `~/.ssh/github.pub`, the newer gets `~/.ssh/github-2.pub`, and the summary warns with both items' folders. A `file` field on one of them picks a name of its own and ends the warning.
 - **An item named `gh-token`**, in any folder: a login item whose password is a GitHub token (classic with `repo`, `read:org`, or fine-grained), or an item of any type with a hidden field `token`. Optional field `host` for GitHub Enterprise.
 
