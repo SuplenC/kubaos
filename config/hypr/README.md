@@ -22,7 +22,7 @@ Your own settings go in `~/.config/kubaos/desktop/hypr/` (`hyprland.lua`, `hypri
 | `rules.lua` | Window rules (floating dialogs, PiP, Chrome, terminals) and layer rules, including Quickshell's (`qs-frame` blurred with `ignore_alpha`, no Hyprland animation on the shell's own layers) |
 | `keybinds.lua` | Everything else, ported from Omarchy 4. `SUPER + F1` lists them all in the Command menu |
 | `autostart.lua` | Session startup; the polkit agent toggle is at the top |
-| `hypridle.conf` | Lock 5 min, screens off 10 min, suspend 30 min on battery only |
+| `hypridle.conf` | hypridle's `general` block; the listeners (lock 5 min, screens off 10 min, suspend 30 min on battery only by default) come from the idle settings through `kubaos-idle` (`crates/kubaos-idle`) |
 | `hyprlock.conf` | Fallback lock screen, themed, fingerprint enabled |
 | `~/.config/kubaos/desktop/hypr/hyprland.lua` | Yours, not in the repo: loaded last (`docs/CONTRACTS.md`, "Defaults and the user layer") |
 
@@ -39,8 +39,9 @@ Scripts (in `scripts/`, linked to `~/.local/bin`): `dot-hypr-workspaces`
   applying: `Hyprland --verify-config`.
 - Colors only: `hyprctl eval 'dot.reload_colors()'` (what `dot-theme` should
   call after writing `hypr.lua`; `hyprctl reload` also works).
-- hypridle: `pkill hypridle; hypridle &` (or toggle twice with
-  `SUPER + CTRL + I`). hyprlock reads its config on every start.
+- hypridle: `kubaos-idle apply` writes the listeners again and restarts it
+  in the session (`dot-session start-idle`). hyprlock reads its config on
+  every start.
 - Poke at the live Lua state: `hyprctl repl`.
 
 ## Your screens
@@ -149,7 +150,10 @@ only when another monitor is active, via a flag file in
 `$XDG_RUNTIME_DIR/dot-hypr/` that `monitors.lua` reads, then `hyprctl reload`.
 If the switch has another name on this machine, check `hyprctl devices` and
 fix the two binds at the bottom of `keybinds.lua`. Suspend on lid close is
-logind's job (battery only), configured in `system/`.
+logind's job (battery only), configured in `system/`, while the idle
+settings' `lid` says the same. When it says anything else, `kubaos-idle`
+holds the lid away from logind for the session and the close bind's
+`kubaos-idle lid closed` does it; docked, it does nothing.
 
 ## Editor support
 

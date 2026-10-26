@@ -15,7 +15,7 @@ group.
 
 ```
 ~/.config/kubaos/
-  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ files/ wallpapers/
+  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ idle/ files/ wallpapers/
   terminal/   ghostty/ foot/ tmux/ zsh/ fastfetch/
   editor/     nvim/
   tools/      git/ lazygit/ yazi/ bat/ bacon/ fuzzel/
@@ -30,7 +30,8 @@ group.
 | Gaps, borders, rounding, your own key binds | `desktop/hypr/hyprland.lua` |
 | Screen layout, resolution, scale | `desktop/hypr/hyprland.lua` (`hl.monitor`) |
 | Key repeat, pointer speed, touchpad scrolling | `desktop/hypr/hyprland.lua` |
-| When the screen dims, locks or turns off | `desktop/hypr/hypridle.conf` |
+| When the screen locks, turns off or suspends, on battery and plugged in; what closing the lid does | `desktop/idle/idle.toml`, or "Lock after…", "Screens off after…", "Suspend after…", "When the lid closes…" in the Command menu |
+| Dimming the screen, or idle listeners of your own | `desktop/hypr/hypridle.conf` |
 | The fallback lock screen | `desktop/hypr/hyprlock.conf` |
 | Keyboard layouts, Mac-style accents on Left Alt | `desktop/keyboard/keyboard.toml` |
 | Pointer style and size | `desktop/cursor/cursor.toml` |
