@@ -367,17 +367,14 @@ fn a_public_key_with_runs_of_spaces_is_written_with_single_ones() {
 }
 
 #[test]
-fn a_public_key_followed_by_a_newline_is_skipped_with_the_fix() {
-    let item = with_public_key("Alias2k", "alias", "ssh-ed25519 AAAAalias\n", json!([field("hosts", "alias.example")]));
+fn a_public_key_ending_in_a_line_break_is_written_without_it() {
+    let item = with_public_key("Alias2k", "alias", "ssh-ed25519 AAAAalias me@work\n", json!([field("hosts", "alias.example")]));
     let mut m = with_items(machine(), &[item]);
 
     let out = pull_all(&mut m);
 
-    assert!(out.warned(
-        "Alias2k (Work): the public key field holds `ssh-ed25519 AAAAalias` followed by a newline; \
-         in Bitwarden, make the public key that one line (or import the key again). Skipped: no .pub, no Host block"
-    ), "{:?}", out.report.warnings);
-    assert!(m.text("/home/kuba/.ssh/alias2k.pub").is_none());
+    assert_eq!(m.text("/home/kuba/.ssh/alias2k.pub"), Some("ssh-ed25519 AAAAalias bitwarden:Alias2k\n"));
+    assert!(!out.warned("Alias2k (Work):"), "{:?}", out.report.warnings);
 }
 
 #[test]
@@ -1214,7 +1211,7 @@ fn a_public_key_is_one_known_type_and_base64() {
     assert_eq!(key("ssh-ed25519 AA*A"), None);
     assert_eq!(key("ssh-ed25519"), None);
     assert_eq!(key("ssh-ed25519 AAAA\nProxyCommand x"), None);
-    assert_eq!(key("ssh-ed25519 AAAA\n"), None);
+    assert_eq!(key("ssh-ed25519 AAAA\r\n").as_deref(), Some("ssh-ed25519 AAAA"));
     assert_eq!(key("ssh-ed25519 AAAA me\tthere"), None);
 }
 

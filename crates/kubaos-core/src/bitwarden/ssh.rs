@@ -94,6 +94,9 @@ pub enum KeyProblem {
 ///
 /// What is wrong with the line.
 pub fn public_key(k: &str) -> Result<String, KeyProblem> {
+    // A key pasted into Bitwarden often keeps the line ending it was copied with; at the very
+    // end it can't carry anything into ssh_config, so it goes. One mid-line still can.
+    let k = k.trim_end();
     if let Some((before, newline)) = control(k) {
         return Err(KeyProblem::Control { before, newline });
     }
