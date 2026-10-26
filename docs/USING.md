@@ -108,6 +108,28 @@ The codes come from KubaOS's pairing agent, the `kubaos-bluetooth` user service:
 
 When the adapter is off, the tab has a power button. When it is blocked (airplane mode), it says to run `rfkill unblock bluetooth`. When bluetoothd stops answering (it can after a pairing that hung), the tab says "Bluetooth isn't responding": run `sudo systemctl restart bluetooth`.
 
+## Your phone
+
+The phone link shares the clipboard and files between the laptop and your phone (iPhone, iPad or Android) through KDE Connect. It is off until you set it up: until then nothing on the laptop listens for phones or announces itself on the network.
+
+"Set up a phone" in the Command menu opens Kōbō's "Your phone" card (the first-boot setup has it too):
+
+1. Get KDE Connect on the phone: the App Store on iPhone and iPad, Google Play or F-Droid on Android. Same Wi-Fi as the laptop.
+2. "Set up a phone" on the card. KDE Connect starts, and the card says what name the laptop shows up as.
+3. In the phone's app, tap the laptop, then Request pairing. The card shows the request within a few seconds, with a key: check the phone shows the same one, then "Accept the pairing". Other KDE Connect devices on the network can show up and ask too; accept only the phone in your hand.
+4. "Send a test copy", then paste on the phone. Then copy something on the phone, send it (below), and "Check what the phone sent".
+
+What works each way:
+
+- **Laptop to phone.** Copy on the laptop and it is on the phone's clipboard, on iPhone and Android alike. "Send a file to the phone…" in the Command menu sends a file by its path; "Send the clipboard to the phone" sends it again by hand.
+- **Phone to laptop, iPhone.** Always by hand: open KDE Connect and tap Send Clipboard, or share to KDE Connect from any app (a photo, a link, text). iOS doesn't let an app read the clipboard in the background, so it never syncs on its own.
+- **Phone to laptop, Android.** From the app, its quick tile or its notification. Android 10 and later keep apps from reading the clipboard in the background too, so it is by hand there as well.
+- "Ring the phone" rings it even on silent. "Unpair the phone" forgets it. "Phone link status" (or `kubaos-phone status`) shows the name, the addresses and the paired phone with its battery. "Turn the phone link off" stops KDE Connect; setting a phone up again turns it back on, and the pairing is kept.
+
+On a company or hotel network the phone may not see the laptop: some networks block discovery, and the app sometimes needs a restart before it looks again. After 30 s without a phone the card shows the laptop's address: in the phone's app, add the laptop by IP with it. KubaOS turns no firewall on; with one, KDE Connect needs TCP and UDP 1714-1764 and mDNS open on the local network.
+
+The daemon is the `kubaos-phone` user unit: `systemctl --user status kubaos-phone`, logs in `journalctl --user -u kubaos-phone`. The switch is the file `~/.config/kubaos/desktop/phone/phone-link`.
+
 ## Updating and rolling back
 
 Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run `kubaos update`, or pick Update KubaOS in the menu (`SUPER + Space`), which opens a floating terminal running it. A daily timer runs `kubaos update --check`: it only looks. When there is something new it sends one notification, puts a marker in the bar, and the menu's Update KubaOS says what is waiting.
@@ -342,7 +364,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 | `scripts/` | `dot-*` commands, linked to `~/.local/bin` (`dot-theme`, `dot-config`, `dot-hypr-*` including screenshots and `dot-hypr-record`, `dot-u2f-enroll`, `dot-ssh-sk-new`, and `dot-bw-setup` and `dot-bwenv`, aliases of `kubaos bitwarden` for one release) |
 | `user-layer/` | The starting files of `~/.config/kubaos`, grouped by area: each app's commonly changed settings, commented out with their defaults, and the maps (`README.md`) |
 | `system/` | Ubuntu bootstrap scripts (`10-strip.sh` to `75-yubikey.sh`), the package manifest `packages.toml` and its reader `manifest.sh`, `apt-repo.sh` and `relink.sh`, which `kubaos update` runs, files for `/etc` |
-| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, `kubaos-files`, yazi in a terminal window and the Downloads tidy, `kubaos-bluetooth`, the Bluetooth pairing agent, and `kubaos-automount`, the automount for removable drives and the photo import |
+| `crates/` | The Rust workspace (root `Cargo.toml`): `kubaos-core`, the engine, `kubaos-cli`, the `kubaos` command, `kubaos-kobo`, Kōbō, `kubaos-cursor`, the pointer recoloured from the wallpaper, `kotodama-kubaos`, the Command menu's KubaOS actions and system toggles, `kubaos-files`, yazi in a terminal window and the Downloads tidy, `kubaos-bluetooth`, the Bluetooth pairing agent, `kubaos-automount`, the automount for removable drives and the photo import, and `kubaos-phone`, the phone link through KDE Connect |
 | `install/` | Putting KubaOS on a machine: the payload build, the live ISO, the first-boot files and the engine's end-to-end test |
 | `test/` | The Docker test harness (`test/run`) |
 | `docs/` | `PLAN.md` (why), `INSTALL.md` (how), `CONTRACTS.md` and `INSTALL-INTERNALS.md` (interfaces), `SECRETS.md` (Bitwarden, security key), `TESTING.md`, `BRAND.md` (name and voice), `screenshots/` |

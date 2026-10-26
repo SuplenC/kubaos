@@ -91,3 +91,9 @@ _Avoid_: Slot, monitor index, pairing
 **Workspace group**:
 A **Desk position**'s workspaces 1-10, a block of Hyprland ids owned by that position whatever screen stands there; while no screen holds the position its group waits on the primary screen under the same numbers, shown apart in the bar.
 _Avoid_: Group (Hyprland's tabbed windows), merged workspaces, guests
+
+## Devices
+
+**Phone link**:
+KubaOS's link between the laptop and the user's phone through KDE Connect: the clipboard and files both ways, and ringing the phone. Off until the user sets up a phone; nothing listens for phones until then.
+_Avoid_: KDE Connect (as the feature's name), phone sync
