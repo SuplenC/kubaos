@@ -107,7 +107,7 @@ impl Link for KdeConnect {
         let ids = parse_ids(&bus_call(&[BUS, DAEMON, DAEMON_IFACE, "devices", "bb", "false", "false"])?);
         let mut devices = Vec::with_capacity(ids.len());
         for id in ids {
-            // A device that went away between the two calls is no longer there to list.
+            // A device gone between the two calls is left out.
             if let Ok(device) = device(&id) {
                 devices.push(device);
             }

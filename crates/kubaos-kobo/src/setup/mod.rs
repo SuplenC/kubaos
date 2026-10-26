@@ -871,8 +871,8 @@ impl Setup {
             (false, Some(_)) => self.phone_waiting_since = None,
             _ => {}
         }
-        if self.phone_rx.is_none() && self.polls_phone() && now.saturating_duration_since(self.phone_polled) >= PHONE_POLL
-        {
+        let due = now.saturating_duration_since(self.phone_polled) >= PHONE_POLL;
+        if due && self.phone_rx.is_none() && self.polls_phone() {
             self.phone_polled = now;
             let (tx, rx) = mpsc::channel();
             let b = Arc::clone(&self.backend);
