@@ -10,9 +10,11 @@
 # [fetch]
 # 	prune = true
 #
-# delta's two columns (KubaOS: side by side); false for one.
+# delta's two columns, old and new side by side, for a terminal around 200 columns wide
+# (KubaOS shows one), wrapping a long line over up to 3 rows.
 # [delta]
 # 	side-by-side = true
+# 	wrap-max-lines = 3
 #
 # Shortcuts of your own.
 # [alias]

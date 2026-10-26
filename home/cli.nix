@@ -55,10 +55,6 @@ in
     delta = {
       navigate = true;
       line-numbers = true;
-      # Two columns fit at Full HD density (about 210 columns full width);
-      # delta wraps long lines instead of cutting them.
-      side-by-side = true;
-      wrap-max-lines = 3;
     };
   };
 

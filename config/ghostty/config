@@ -7,8 +7,10 @@ window-padding-balance = true
 window-step-resize = false
 window-padding-color = extend
 
-# Sized for Full HD density: 1080p externals at scale 1 and the laptop panel
-# at scale 1.5 (config/hypr/monitors.lua) show the same text size.
+# In points, which Ghostty multiplies by each screen's scale, so the text keeps
+# its size on any screen whose scale matches its density (Hyprland picks it,
+# config/hypr/monitors.lua). 11 is compact: about 210 columns across a screen
+# 1920 logical pixels wide, two tmux panes of code side by side.
 font-size = 11
 font-family = "MesloLGM Nerd Font"
 # A little more line spacing than the font's own; easier to scan code.

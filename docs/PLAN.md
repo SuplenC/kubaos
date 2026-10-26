@@ -160,7 +160,7 @@ sudo apt-mark hold hyprland xdg-desktop-portal-hyprland hypridle hyprlock hyprpo
 
 **`~/.cargo/config.toml`** (managed by home-manager):
 - `linker = "clang"` with `-C link-arg=-fuse-ld=mold` for `x86_64-unknown-linux-gnu`; wild instead is one switch in `home/dev.nix` (`rustLinker`, see README "Rust")
-- `rustc-wrapper = "sccache"`, `SCCACHE_CACHE_SIZE=50G`
+- `rustc-wrapper = "sccache"`, `SCCACHE_CACHE_SIZE=10G` (sccache's own default; more in the user flake)
 
 ## Phase 7: Port zsh, tmux, tms, nvim
 
