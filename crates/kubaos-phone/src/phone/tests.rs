@@ -11,6 +11,7 @@ use super::send_test;
 use super::status;
 use super::turn_off;
 use super::turn_on;
+use super::typed_path;
 use super::unpair;
 use crate::device::Device;
 use crate::fake::Fake;
@@ -243,4 +244,14 @@ fn a_refusal_from_kdeconnect_keeps_its_reason() {
     assert!(matches!(err, Error::Link(_)), "{err}");
     let cause = std::error::Error::source(&err).map(ToString::to_string).unwrap_or_default();
     assert!(cause.contains("Unknown method ring"), "{cause}");
+}
+
+#[test]
+fn a_typed_path_starting_with_a_tilde_is_under_home() {
+    let home = Some(Path::new("/home/kuba"));
+
+    assert_eq!(typed_path("~/Downloads/a.jpg", home), Path::new("/home/kuba/Downloads/a.jpg"));
+    assert_eq!(typed_path("~", home), Path::new("/home/kuba"));
+    assert_eq!(typed_path("/tmp/~a", home), Path::new("/tmp/~a"));
+    assert_eq!(typed_path("~/a.jpg", None), Path::new("~/a.jpg"));
 }

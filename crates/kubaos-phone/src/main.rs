@@ -23,6 +23,7 @@
 #![forbid(unsafe_code)]
 
 use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 use std::process::ExitCode;
 
@@ -66,8 +67,9 @@ fn main() -> ExitCode {
             phone::send_clipboard(link, rest.first().copied()).map(|d| format!("Clipboard sent to {}.", d.name))
         }
         ["send-file", path, rest @ ..] if rest.len() <= 1 => {
-            let path = Path::new(path);
-            phone::send_file(link, rest.first().copied(), path).map(|d| sent_file(path, &d))
+            let home = std::env::var_os("HOME").map(PathBuf::from);
+            let path = phone::typed_path(path, home.as_deref());
+            phone::send_file(link, rest.first().copied(), &path).map(|d| sent_file(&path, &d))
         }
         ["ring", rest @ ..] if rest.len() <= 1 => {
             phone::ring(link, rest.first().copied()).map(|d| format!("Ringing {}.", d.name))

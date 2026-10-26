@@ -236,6 +236,16 @@ pub fn received(link: &mut dyn Link) -> Result<String, Error> {
     Ok(text.to_string())
 }
 
+/// `arg` as a path, `~` and `~/…` under `home`. The Command menu passes what was typed, with no
+/// shell to expand it.
+pub fn typed_path(arg: &str, home: Option<&Path>) -> PathBuf {
+    match (arg, home) {
+        ("~", Some(home)) => home.to_path_buf(),
+        (_, Some(home)) if arg.starts_with("~/") => home.join(&arg[2..]),
+        _ => PathBuf::from(arg),
+    }
+}
+
 fn send(link: &mut dyn Link, wanted: Option<&str>, action: &Action) -> Result<Device, Error> {
     let phone = reachable(link, wanted)?;
     link.call(&phone.id, action).map_err(Error::Link)?;

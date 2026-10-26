@@ -7,7 +7,8 @@
 //!
 //! # Owns
 //!
-//! - The bus names, object paths and methods of kdeconnectd 26.08, and reading its answers.
+//! - The bus names, object paths and methods of kdeconnectd (26.04, the release's, and 26.08),
+//!   and reading its answers.
 //!
 //! # Not here
 //!
