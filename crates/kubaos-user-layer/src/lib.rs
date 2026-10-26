@@ -65,6 +65,8 @@ pub enum App {
     Clock,
     Keyboard,
     Sysmon,
+    /// When the screen locks, turns off and suspends, and what the lid does.
+    Idle,
     /// The file manager's switches: Tidy Downloads, the automount.
     Files,
     /// The wallpaper sets the picker shows.
@@ -87,13 +89,14 @@ pub enum App {
 }
 
 impl App {
-    pub const ALL: [App; 22] = [
+    pub const ALL: [App; 23] = [
         App::Hypr,
         App::Quickshell,
         App::Cursor,
         App::Clock,
         App::Keyboard,
         App::Sysmon,
+        App::Idle,
         App::Files,
         App::Wallpapers,
         App::Phone,
@@ -121,6 +124,7 @@ impl App {
             App::Clock => "clock",
             App::Keyboard => "keyboard",
             App::Sysmon => "sysmon",
+            App::Idle => "idle",
             App::Files => "files",
             App::Wallpapers => "wallpapers",
             App::Phone => "phone",
@@ -148,6 +152,7 @@ impl App {
             | App::Clock
             | App::Keyboard
             | App::Sysmon
+            | App::Idle
             | App::Files
             | App::Wallpapers
             | App::Phone => Group::Desktop,

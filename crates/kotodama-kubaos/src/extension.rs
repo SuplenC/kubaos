@@ -7,13 +7,14 @@
 //! - Which Items there are under the current config, `hide` applied, and what the update check
 //!   changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position or a drive.
+//!   user folder, a desk position, a drive or an idle setting.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
 //!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
-//!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`].
+//!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`]. The
+//!   idle settings: [`crate::idle`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -30,6 +31,7 @@ use crate::drives;
 use crate::drives::Drives;
 use crate::files;
 use crate::files::UserFolders;
+use crate::idle;
 use crate::keyboard;
 use crate::keyboard::Keyboards;
 use crate::registry;
@@ -76,7 +78,11 @@ impl<B: Bus, R: Runner> Extension<B, R> {
     /// Takes the Extension's config table, as the Daemon sends it; what is
     /// wrong with it comes back, one problem a line.
     pub fn configure(&mut self, config: &Table) -> Vec<String> {
-        let reserved: Vec<&str> = toggles::ids().into_iter().chain(keyboard::ids()).collect();
+        let reserved: Vec<&str> = toggles::ids()
+            .into_iter()
+            .chain(keyboard::ids())
+            .chain(idle::ids())
+            .collect();
         let (registry, problems) = Registry::from_config(config, &reserved);
         self.registry = registry;
         problems
@@ -112,9 +118,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.desk = desk;
     }
 
-    /// The Items to index: the actions, the toggles, the keyboard Items, the wallpaper sets, the
-    /// user folders, the desk positions and the drives `hide` leaves in, the update actions as the
-    /// update check has them.
+    /// The Items to index: the actions, the toggles, the idle settings, the keyboard Items, the
+    /// wallpaper sets, the user folders, the desk positions and the drives `hide` leaves in, the
+    /// update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -145,10 +151,12 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .items()
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
+        let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
         self.registry
             .items()
             .filter_map(|item| self.pending.apply(item))
             .chain(toggles)
+            .chain(idle)
             .chain(keyboards)
             .chain(wallpapers)
             .chain(folders)
@@ -185,9 +193,21 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             files::KIND if !self.registry.hides(&item.id) => self.folders.run(&item.id, action, &self.runner),
             desk::KIND if !self.registry.hides(&item.id) => self.desk.run(&item.id, action, &self.runner),
             drives::KIND if !self.registry.hides(&item.id) => self.drives.run(&item.id, action, &self.runner),
+            idle::KIND if action == idle::CHOOSE && !self.registry.hides(&item.id) => {
+                idle::run(&item.id, arguments, &idle_settings(), &self.runner)
+            }
+            idle::CHOICE_KIND => idle::choose(&item.id, action, &self.runner),
             _ => Err(unknown()),
         }
     }
+}
+
+/// The idle settings as the file has them now, which a choice list marks; read at each list, not
+/// watched, as only the list shows them. A file that doesn't read marks KubaOS's defaults.
+fn idle_settings() -> kubaos_idle::settings::Settings {
+    kubaos_idle::settings::path()
+        .and_then(|path| kubaos_idle::settings::Settings::load(&path).ok())
+        .unwrap_or_default()
 }
 
 #[cfg(test)]

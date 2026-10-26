@@ -18,6 +18,7 @@ let
       "clock"
       "keyboard"
       "sysmon"
+      "idle"
       "files"
       "wallpapers"
       "phone"

@@ -8,6 +8,7 @@
 //!
 //! - The registry, the toggles, the keyboard layouts, the wallpaper sets, the user folders, the
 //!   mounted drives, the workspace groups by desk position, and what each of their Actions runs.
+//! - The idle settings' Items and their choice lists.
 //! - The date answers, from the clock popup's engine.
 //! - The monitor answers (`cpu`, `ram`, `battery`) and the process search, from the system
 //!   monitor.
@@ -27,6 +28,7 @@ pub mod desk;
 pub mod drives;
 pub mod extension;
 pub mod files;
+pub mod idle;
 pub mod keyboard;
 pub mod layouts;
 pub mod registry;

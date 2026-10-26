@@ -41,7 +41,7 @@ fi
 LAYER_GROUPS=(desktop terminal editor tools menu)
 USER_FILES=(desktop/hypr/hyprland.lua desktop/hypr/hypridle.conf desktop/hypr/hyprlock.conf
   desktop/quickshell/settings.json desktop/cursor/cursor.toml desktop/keyboard/keyboard.toml
-  desktop/clock/clock.toml desktop/sysmon/sysmon.toml
+  desktop/clock/clock.toml desktop/sysmon/sysmon.toml desktop/idle/idle.toml
   terminal/tmux/tmux.conf terminal/foot/foot.ini terminal/ghostty/config terminal/fastfetch/config.jsonc
   terminal/zsh/zshrc
   editor/nvim/options.lua editor/nvim/keymaps.lua editor/nvim/autocmds.lua editor/nvim/plugins/example.lua
@@ -106,6 +106,7 @@ add "$U/desktop/cursor/cursor.toml" 'size = 32'
 add "$U/desktop/keyboard/keyboard.toml" 'mac_accents = false'
 add "$U/desktop/clock/clock.toml" 'analog = true'
 add "$U/desktop/sysmon/sysmon.toml" 'style = "bars"'
+add "$U/desktop/idle/idle.toml" $'[battery]\nlock = "2m"'
 add "$C/btop/btop.conf" 'update_ms = 1717'
 add "$C/tms/config.toml" '# user probe'
 before="$(hashes)"
@@ -209,7 +210,11 @@ out="$(kubaos-sysmon settings 2>&1)" || true
 [[ $out == *'"style":"bars"'* ]] || fail "the system monitor didn't read the user's style: $out"
 out="$(kubaos cursor show 2>&1)" || true
 [[ $out == *'size=32'* ]] || fail "the cursor didn't read the user's size: $out"
-step_done "the clock, the system monitor and the cursor read the user's files from their groups"
+out="$(kubaos-idle status 2>&1)" || true
+[[ $out == *'Lock after 2 min idle on battery, 5 min plugged in'* ]] || fail "kubaos-idle didn't read the user's lock: $out"
+grep -qx '    timeout = 120' "$HOME/.local/state/kubaos/idle/hypridle.conf" ||
+  fail "the switch didn't write hypridle's listeners from the user's idle.toml"
+step_done "the clock, the system monitor, the cursor and idle read the user's files from their groups"
 
 # 5. The update's migration runs after the switch, and the next update's
 # switch runs dot-config again: neither changes a thing.
