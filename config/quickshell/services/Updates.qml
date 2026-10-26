@@ -21,7 +21,7 @@ Singleton {
 
     // In a terminal, so sudo's prompt and apt's output stay visible.
     function run(command: string): void {
-        Quickshell.execDetached(["ghostty", "--wait-after-command=true", "-e", "kubaos", command]);
+        Quickshell.execDetached(["ghostty", "--class=dot.float", "--wait-after-command=true", "-e", "kubaos", command]);
     }
 
     function parse(text: string): var {
