@@ -22,7 +22,7 @@
 # Before the first enrollment the key needs a FIDO2 PIN and at least one
 # fingerprint (docs/SECRETS.md, "YubiKey C Bio"):
 #   ykman fido access change-pin
-#   ykman fido fingerprints add right-index
+#   ykman fido fingerprints add NAME    (NAME is your label for the finger: right-index, left-thumb)
 #
 # Keys live in /etc/u2f_mappings, root:root 0644. Writing it needs sudo: a
 # file you could edit as yourself would let any process running as you add
@@ -208,7 +208,7 @@ cmd_add() {
     if opt uv; then
       MODE=verification
     elif has_opt bioEnroll; then
-      die "no fingerprint on this key yet: ykman fido fingerprints add right-index  (enroll 2-3 fingers, one from the other hand)"
+      die "no fingerprint on this key yet: ykman fido fingerprints add NAME, where NAME labels the finger  (enroll 2-3 fingers, one from the other hand)"
     else
       die "this key has no fingerprint reader. Enroll it with --pin (sudo and polkit ask for its PIN; the lock screen skips it)"
     fi

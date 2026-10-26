@@ -195,7 +195,7 @@ if command -v lsusb >/dev/null; then
 fi
 info "Check the reader's USB id against https://fprint.freedesktop.org/supported-devices.html"
 info "Enroll (interactive, as yourself, not root):"
-info "  fprintd-enroll -f right-index-finger"
+info "  fprintd-enroll    (fprintd's default finger is the right index; -f left-thumb and so on for another)"
 info "  fprintd-verify"
 
 pam_mod=""

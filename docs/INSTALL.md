@@ -342,7 +342,8 @@ system/30-hardware.sh   # second run: confirms modules + power profiles
   `sudo boltctl enroll --policy auto <uuid>`.
 - Fingerprint: check the reader's USB id (`lsusb`) on
   <https://fprint.freedesktop.org/supported-devices.html>, then
-  `fprintd-enroll -f right-index-finger` and `fprintd-verify`. The script
+  `fprintd-enroll` (the right index finger unless `-f` names another, as
+  `-f left-thumb`) and `fprintd-verify`. The script
   already ran `pam-auth-update --enable fprintd`, so `sudo -k; sudo true`
   asks for the finger first (10 s, then password).
 
