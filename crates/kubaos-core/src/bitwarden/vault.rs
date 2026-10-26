@@ -85,7 +85,7 @@ impl Item {
     pub fn env_fields(&self) -> impl Iterator<Item = (&str, &str)> {
         self.fields
             .iter()
-            .filter(|f| f.name != "bwenv" && f.kind != LINKED)
+            .filter(|f| !f.is("bwenv") && f.kind != LINKED)
             .filter_map(|f| Some((f.name.as_str(), f.value.as_deref()?)))
     }
 }
@@ -240,13 +240,16 @@ pub struct Filter {
 impl Filter {
     /// The ids of the listed folders. A listed folder the vault lacks gets a warning; with none
     /// of them there, the whole vault is used.
+    ///
+    /// Names match without the spaces around them, on either side: a trailing space is
+    /// invisible in Bitwarden's editor and in the config.
     pub fn pick(folders: &[Folder], wanted: &[String], p: &mut Progress) -> Filter {
         let mut ids = vec![];
         let mut found = vec![];
-        for name in wanted {
+        for name in wanted.iter().map(|n| n.trim()) {
             let matching: Vec<String> = folders
                 .iter()
-                .filter(|f| &f.name == name)
+                .filter(|f| f.name.trim() == name)
                 .filter_map(|f| f.id.clone())
                 .collect();
             if matching.is_empty() {
@@ -255,7 +258,7 @@ impl Filter {
                     one_line(name)
                 ));
             } else {
-                found.push(name.clone());
+                found.push(name.to_string());
                 ids.extend(matching);
             }
         }

@@ -178,7 +178,7 @@ fn in_vault(vault: &Vault) -> BTreeSet<String> {
     let fields = vault.items.iter().flat_map(|i| {
         i.fields
             .iter()
-            .filter(|f| f.name == "bwenv")
+            .filter(|f| f.is("bwenv"))
             .filter_map(|f| f.value.as_deref())
     });
     folders.chain(fields).map(str::to_string).collect()
@@ -195,7 +195,7 @@ fn import_project(host: &mut dyn Host, vault: &Vault, project: &str, p: &mut Pro
         .collect();
     let items = vault.items.iter().filter(|i| {
         i.folder_id.as_ref().is_some_and(|f| ids.contains(&f))
-            || i.fields.iter().any(|f| f.name == "bwenv" && f.value.as_deref() == Some(project))
+            || i.fields.iter().any(|f| f.is("bwenv") && f.value.as_deref() == Some(project))
     });
     let mut vars: Vec<(&str, &str)> = vec![];
     let mut skipped: Vec<&str> = vec![];

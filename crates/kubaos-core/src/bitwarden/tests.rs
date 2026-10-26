@@ -643,6 +643,31 @@ fn a_folder_the_vault_lacks_falls_back_to_the_whole_vault() {
 }
 
 #[test]
+fn a_folder_matches_whatever_spaces_surround_its_name_in_the_vault() {
+    let folders = json!([{ "id": "f-personal", "name": "Personal" }, { "id": "f-work", "name": " Work " }]).to_string();
+    let mut m = machine().vault(&folders, &json!(items()).to_string()).file(CONFIG, "folders=Work\n");
+
+    let out = pull_parts(&mut m, ssh_only());
+
+    assert!(!out.warned("no folder"), "{:?}", out.report.warnings);
+    assert!(out.text().contains("3 SSH key(s) in the folder \"Work\""), "{}", out.text());
+}
+
+#[test]
+fn a_listed_folder_matches_whatever_spaces_surround_it_in_the_list() {
+    let folders = vault::folders(&folders()).unwrap();
+    let mut filter = None;
+
+    let (out, _) = run(|p| {
+        filter = Some(vault::Filter::pick(&folders, &[" Work ".into()], p));
+        Ok(())
+    });
+
+    assert!(!out.warned("no folder"), "{:?}", out.report.warnings);
+    assert_eq!(filter.unwrap().ids, ["f-work"]);
+}
+
+#[test]
 fn set_folders_writes_the_list_and_an_empty_one_means_the_whole_vault() {
     let mut m = machine().file(CONFIG, "server=a\nfolder=Work\n");
 
@@ -759,6 +784,31 @@ fn a_pull_puts_every_project_in_the_keyring_and_multi_line_values_go_base64() {
     assert!(vars.contains(&("API_TOKEN".into(), "tok-7c1f".into())));
     assert!(vars.contains(&("EXTRA_VAR".into(), "extra-value".into())));
     assert!(vars.contains(&("DATABASE_URL".into(), "postgres://demo:pw@db:5432/demo".into())));
+}
+
+#[test]
+fn a_bwenv_field_counts_whatever_its_case_and_surrounding_spaces() {
+    let item = json!({
+        "id": "i-loose", "type": 2, "name": "loose env", "folderId": null, "notes": null,
+        "fields": [
+            { "name": " BWEnv ", "value": "loose", "type": 0 },
+            { "name": "Api_Token", "value": "tok-loose", "type": 1 },
+            { "name": "API_TOKEN", "value": "tok-upper", "type": 1 },
+        ],
+    });
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert!(out.report.summary.contains(&"env    2 project(s) in the keyring: demo loose".to_string()), "{}", out.text());
+    assert!(!out.warned("skipped fields"), "{:?}", out.report.warnings);
+    let mut vars: Vec<(String, String)> =
+        env::export(&mut m, "loose").unwrap().into_iter().map(|(n, v)| (n, v.0)).collect();
+    vars.sort();
+    assert_eq!(
+        vars,
+        [("API_TOKEN".to_string(), "tok-upper".to_string()), ("Api_Token".to_string(), "tok-loose".to_string())]
+    );
 }
 
 #[test]
