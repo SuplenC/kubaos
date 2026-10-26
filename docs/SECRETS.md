@@ -74,6 +74,8 @@ Keep your vault the way it is. `kubaos bitwarden` reads the whole vault: folders
   | `` the field `user` holds `a b`, with characters ssh_config can't take safely `` | no Host block | fix the value |
   | `` kubaos bitwarden reads no field `host`; … rename it to `hosts` `` | the field is ignored | rename the field |
 
+  When the signing key's `.pub` on disk isn't the vault's key, git signing is left as it was and the warning says why and what fixes it: the file is missing or from an older pull (`kubaos bitwarden refresh --only ssh,git` writes it), it belongs to a private key of the same name in `~/.ssh` (a `file` field on the item gives the vault's key a name of its own), or the item's public key can't be used (fix it in Bitwarden).
+
   The block for an alias without `hostname` is still written: a name your resolver knows (a LAN name, an `/etc/hosts` entry) works as it is. The warning only fires for a `hosts` entry with no dot, colon or wildcard.
 
   Two items with the same name (a "GitHub" in two folders, say) never share a `.pub`: the older item keeps `~/.ssh/github.pub`, the newer gets `~/.ssh/github-2.pub`, and the summary warns with both items' folders. A `file` field on one of them picks a name of its own and ends the warning.

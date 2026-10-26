@@ -478,7 +478,7 @@ fn a_signing_key_with_a_comment_signs() {
 
     let out = pull_all(&mut m);
 
-    assert!(!out.warned("isn't the key of"), "{:?}", out.report.warnings);
+    assert!(!out.warned("signing is left as it was"), "{:?}", out.report.warnings);
     assert!(m.text(SIGNING).unwrap().contains("signingKey = /home/kuba/.ssh/signer.pub"));
     assert_eq!(m.text(SIGNERS), Some("k@x.eu namespaces=\"git\" ssh-ed25519 AAAAsigner\n"));
 }
@@ -719,6 +719,62 @@ fn with_two_signing_keys_the_oldest_signs_and_the_other_is_named() {
     let signers = m.text(SIGNERS).unwrap();
     assert!(signers.contains("k@x.eu namespaces=\"git\" ssh-ed25519 AAAAretired\n"));
     assert!(signers.contains("other@x.eu namespaces=\"git\" ssh-ed25519 AAAAnew\n"));
+}
+
+#[test]
+fn a_signing_key_whose_pub_belongs_to_a_private_key_on_disk_says_to_give_it_a_file_name() {
+    let mut m = machine()
+        .file("/home/kuba/.ssh/github", "-----BEGIN OPENSSH PRIVATE KEY-----")
+        .file("/home/kuba/.ssh/github.pub", "ssh-ed25519 AAAAmine me@laptop\n");
+
+    let out = pull_all(&mut m);
+
+    assert!(out.warned(
+        "GitHub (Personal) has signing=true, but ~/.ssh/github.pub belongs to the private key ~/.ssh/github on disk \
+         and holds another key, so signing is left as it was; in Bitwarden, add a text field `file` = \
+         `github-bitwarden` to GitHub (Personal), then run `kubaos bitwarden refresh --only ssh,git`"
+    ), "{:?}", out.report.warnings);
+    assert!(m.text(SIGNING).is_none());
+}
+
+#[test]
+fn git_alone_with_an_older_pub_says_to_pull_ssh_too() {
+    let mut m = machine().file("/home/kuba/.ssh/github.pub", "ssh-ed25519 AAAAold bitwarden:GitHub\n");
+
+    let out = pull_parts(&mut m, Parts::parse("git").unwrap());
+
+    assert!(out.warned(
+        "GitHub (Personal) has signing=true, but ~/.ssh/github.pub holds another key, from an older pull, so signing \
+         is left as it was; run `kubaos bitwarden refresh --only ssh,git` to write the vault's key"
+    ), "{:?}", out.report.warnings);
+    assert!(m.text(SIGNING).is_none());
+}
+
+#[test]
+fn git_alone_without_the_pub_says_to_pull_ssh_too() {
+    let mut m = machine();
+
+    let out = pull_parts(&mut m, Parts::parse("git").unwrap());
+
+    assert!(out.warned(
+        "GitHub (Personal) has signing=true, but ~/.ssh/github.pub isn't on disk, so signing is left as it was; \
+         run `kubaos bitwarden refresh --only ssh,git` to write it"
+    ), "{:?}", out.report.warnings);
+    assert!(m.text(SIGNING).is_none());
+}
+
+#[test]
+fn a_signing_key_with_an_unusable_public_key_signs_nothing_and_says_to_fix_it() {
+    let item = with_public_key("Dss", "dss", "ssh-dss AAAAdss", json!([{ "name": "signing", "value": "true", "type": 2 }]));
+    let mut m = with_items(machine(), &[item]);
+
+    let out = pull_all(&mut m);
+
+    assert!(out.warned(
+        "Dss (Work) has signing=true, but its public key can't be used (see its warning), so signing is left \
+         as it was; fix the public key in Bitwarden, then run `kubaos bitwarden refresh --only ssh,git`"
+    ), "{:?}", out.report.warnings);
+    assert!(m.text(SIGNING).is_none());
 }
 
 #[test]

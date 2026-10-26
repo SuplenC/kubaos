@@ -48,6 +48,35 @@ pub fn mark_signing(infos: &mut [KeyInfo], keys: &[Key]) {
     }
 }
 
+/// Why git can't sign with the signing key's `.pub` as it is on disk, and the fix; `None` when
+/// the file holds the vault's key.
+fn pub_mismatch(m: &mut dyn Machine, paths: &Paths, sign: &Key) -> Option<String> {
+    const LEFT: &str = "so signing is left as it was";
+    const REFRESH: &str = "kubaos bitwarden refresh --only ssh,git";
+    let file = &sign.file;
+    let Some(want) = sign.item.public_key.as_deref().and_then(|k| public_key(k).ok()) else {
+        return Some(format!(
+            "its public key can't be used (see its warning), {LEFT}; fix the public key in Bitwarden, then run `{REFRESH}`"
+        ));
+    };
+    let pub_path = paths.ssh.join(format!("{file}.pub"));
+    let have = on_disk(m, &pub_path);
+    match have {
+        Some(have) if have == want => None,
+        None => Some(format!("~/.ssh/{file}.pub isn't on disk, {LEFT}; run `{REFRESH}` to write it")),
+        // The SSH step never replaces the `.pub` of a private key on disk, so a refresh alone
+        // doesn't fix this one.
+        Some(_) if m.exists(&paths.ssh.join(file)) => Some(format!(
+            "~/.ssh/{file}.pub belongs to the private key ~/.ssh/{file} on disk and holds another key, {LEFT}; \
+             in Bitwarden, add a text field `file` = `{file}-bitwarden` to {}, then run `{REFRESH}`",
+            sign.item.label()
+        )),
+        Some(_) => Some(format!(
+            "~/.ssh/{file}.pub holds another key, from an older pull, {LEFT}; run `{REFRESH}` to write the vault's key"
+        )),
+    }
+}
+
 /// Writes `signing.gitconfig` and `allowed_signers`, or removes the first when no key signs.
 ///
 /// # Errors
@@ -89,8 +118,8 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &[Key], scope: &str, p: &
         ));
     }
     let pub_path = paths.ssh.join(format!("{}.pub", sign.file));
-    if on_disk(m, &pub_path) != sign.item.public_key.as_deref().and_then(|k| public_key(k).ok()) {
-        p.warn(format!("~/.ssh/{}.pub isn't the key of {name} (run with ssh too)", sign.file));
+    if let Some(problem) = pub_mismatch(m, paths, sign) {
+        p.warn(format!("{name} has signing=true, but {problem}"));
         return Ok(());
     }
     if allowed.is_empty() {
