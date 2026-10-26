@@ -308,7 +308,9 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "kotodama"
-    WlrLayershell.keyboardFocus: visible && !closing.running ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    // Held only while the pointer is on the menu's screen, so the other
+    // screens stay usable while it is open.
+    WlrLayershell.keyboardFocus: visible && !closing.running && Hypr.focusedScreen === screen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
     // However the window opened, the Daemon is told, so the Empty query it
     // shows is ranked for this time of day.
