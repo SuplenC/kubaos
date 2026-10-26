@@ -562,6 +562,65 @@ keywords = ["vault", "secrets", "ssh keys", "bwenv"]
 run = ["kubaos", "bitwarden", "refresh"]
 terminal = true
 
+# The phone link: the clipboard and files shared with your phone through KDE
+# Connect (home/phone.nix, crates/kubaos-phone). It is off until "Set up a
+# phone", which opens Kōbō's "Your phone" card (kubaos-setup --card): the app
+# to get on the phone, the pairing, and a copy test both ways. The others say
+# how it went in a notification, and why when they can't.
+
+[extensions.kubaos.actions.phone-setup]
+title = "Set up a phone"
+subtitle = "Pair an iPhone or Android with KDE Connect: the clipboard and files, both ways"
+icon = "phone"
+keywords = ["kde connect", "kdeconnect", "iphone", "android", "pair", "phone link", "clipboard", "turn on"]
+run = ["kubaos-setup", "--card", "phone"]
+
+[extensions.kubaos.actions.phone-off]
+title = "Turn the phone link off"
+subtitle = "KDE Connect stops: nothing listens for phones until you set one up again"
+icon = "phone"
+keywords = ["kde connect", "kdeconnect", "phone link", "disable", "stop"]
+run = ["kubaos-phone", "off"]
+
+[extensions.kubaos.actions.phone-clipboard]
+title = "Send the clipboard to the phone"
+subtitle = "What you copied here, on the phone's clipboard"
+icon = "edit-paste"
+keywords = ["kde connect", "iphone", "android", "copy", "paste", "clipboard"]
+run = ["kubaos-phone", "send-clipboard"]
+
+[extensions.kubaos.actions.phone-file]
+title = "Send a file to the phone…"
+subtitle = "A file by its path, to the paired phone"
+icon = "document-send"
+keywords = ["kde connect", "iphone", "android", "share", "photo", "transfer", "airdrop"]
+keyword = "send-file"
+run = ["kubaos-phone", "send-file", "{path}"]
+arguments = [{ name = "path", placeholder = "~/Downloads/photo.jpg" }]
+
+[extensions.kubaos.actions.phone-ring]
+title = "Ring the phone"
+subtitle = "Find it under the cushions: it rings even on silent"
+icon = "audio-volume-high"
+keywords = ["kde connect", "find my phone", "iphone", "android", "lost"]
+run = ["kubaos-phone", "ring"]
+
+[extensions.kubaos.actions.phone-status]
+title = "Phone link status"
+subtitle = "On or off, the name phones see, and the paired phone"
+icon = "phone"
+keywords = ["kde connect", "kdeconnect", "iphone", "android", "battery", "paired"]
+run = ["kubaos-phone", "status"]
+terminal = true
+
+[extensions.kubaos.actions.phone-unpair]
+title = "Unpair the phone"
+subtitle = "The laptop forgets it; Set up a phone pairs one again"
+icon = "list-remove"
+keywords = ["kde connect", "kdeconnect", "iphone", "android", "forget", "remove"]
+run = ["kubaos-phone", "unpair"]
+confirm = true
+
 # Updates (kubaos update). They run in a terminal, where sudo asks and apt
 # and the switch show what they do. The daily check fills in what is
 # waiting: "Update KubaOS" names it, and the upgrade is listed only while a

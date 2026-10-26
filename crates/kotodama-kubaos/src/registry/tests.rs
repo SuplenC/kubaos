@@ -345,6 +345,27 @@ fn the_settings_folder_and_every_group_of_it_open_from_the_menu() {
     }
 }
 
+#[test]
+fn the_phone_link_is_set_up_used_and_turned_off_from_the_menu() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let runs: Vec<Vec<String>> = registry
+        .items()
+        .filter_map(|item| registry.command(&item.id, &every_argument(&item)))
+        .map(|command| command.argv)
+        .collect();
+
+    for wanted in [
+        &["kubaos-setup", "--card", "phone"][..],
+        &["kubaos-phone", "off"],
+        &["kubaos-phone", "send-clipboard"],
+        &["kubaos-phone", "send-file", "x"],
+        &["kubaos-phone", "ring"],
+        &["kubaos-phone", "unpair"],
+    ] {
+        assert!(runs.iter().any(|argv| argv == wanted), "no Item runs {wanted:?}");
+    }
+}
+
 /// The `[extensions.kubaos]` table of the Defaults.
 fn shipped() -> Table {
     let defaults: Table = toml::from_str(include_str!("../../../../config/kotodama/kubaos.toml")).expect("kubaos.toml");

@@ -4,8 +4,9 @@
 # and everything else from the user's nixpkgs (lib.mkHome in flake.nix).
 #
 # Curated means built from source outside nixpkgs, loaded into a curated
-# process (Quickshell's Qt plugins, the lock screen's PAM modules), or given
-# privileges by system/ (gsr-kms-server).
+# process (Quickshell's Qt plugins, the lock screen's PAM modules), given
+# privileges by system/ (gsr-kms-server), or driven by a curated program
+# through an interface that changes between its releases (kdeconnect-kde).
 { pkgs, inputs }:
 let
   inherit (pkgs.stdenv.hostPlatform) system;
@@ -43,6 +44,11 @@ rec {
   kubaos-automount = pkgs.callPackage ../crates/kubaos-automount/package.nix {
     inherit cargoOutputHashes;
   };
+  # The phone link's command (home/phone.nix).
+  kubaos-phone = pkgs.callPackage ../crates/kubaos-phone/package.nix { inherit cargoOutputHashes; };
+  # The phone link's daemon. Pinned with the release: kubaos-phone speaks
+  # kdeconnectd's D-Bus interface, which can change between KDE Gear releases.
+  inherit (pkgs.kdePackages) kdeconnect-kde;
   # The Bluetooth pairing agent the shell pairs through (home/bluetooth.nix).
   kubaos-bluetooth = pkgs.callPackage ../crates/kubaos-bluetooth/package.nix {
     inherit cargoOutputHashes;
