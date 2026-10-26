@@ -50,11 +50,11 @@ end
 
 local real_getenv = os.getenv
 
--- A fresh state directory and a fresh copy of the module on a new fake.
-local function session()
+-- A new fake on a fresh state directory, without the module.
+local function bare()
   local dir = os.tmpname()
   os.remove(dir)
-  assert(os.execute("mkdir -p '" .. dir .. "'"))
+  assert(os.execute("mkdir -p '" .. dir .. "/kubaos/hypr'"))
   os.getenv = function(key)
     if key == "XDG_STATE_HOME" then
       return dir
@@ -64,10 +64,15 @@ local function session()
   local world = Fake.new()
   _G.hl = world.hl
   _G.dot = {}
-  package.loaded.workspaces = nil
-  local module = require("workspaces")
   world.state = dir .. "/kubaos/hypr"
-  return world, module
+  return world
+end
+
+-- A fresh state directory and a fresh copy of the module on a new fake.
+local function session()
+  local world = bare()
+  package.loaded.workspaces = nil
+  return world, require("workspaces")
 end
 
 -- The module again on the same world and state, as a config reload makes it.
@@ -84,8 +89,16 @@ local function read(path)
   return text
 end
 
+local function write(path, text)
+  local file = assert(io.open(path, "w"))
+  file:write(text)
+  file:close()
+end
+
 local LG_A = "LG Electronics LG ULTRAGEAR 312NTAB1A234"
 local LG_B = "LG Electronics LG ULTRAGEAR 312NTAB1A999"
+local LG_C = "LG Electronics LG ULTRAGEAR+ 000NTAB0C000"
+local BENQ = "BNQ BenQ GW2480 ET00000000SL0"
 local PANEL = "BOE 0x0BCA"
 
 -- The laptop and one external at login.
@@ -149,16 +162,60 @@ test("a joining workspace keeps its slot when it is free", function()
   same(blocks.adopt_id(1, 3, set({ 11, 13 })), 12, "slot taken")
 end)
 
-test("the screens file reads back what it wrote", function()
-  local text = blocks.format_blocks({ [PANEL] = 0, [LG_A] = 1, [LG_B] = 2 }, { ["eDP-1"] = PANEL, ["DP-3"] = LG_A })
-  same(text, "0\teDP-1\t" .. PANEL .. "\n1\tDP-3\t" .. LG_A .. "\n2\t\t" .. LG_B .. "\n", "text")
-  local parsed, current = blocks.parse_blocks(text)
-  same({ parsed[PANEL], parsed[LG_A], parsed[LG_B], current["DP-3"] }, { 0, 1, 2, LG_A }, "parsed")
+test("externals count from the leftmost, wherever the panel sits", function()
+  local positions = blocks.positions({
+    { name = "eDP-1", id = 0, x = 4480, y = 0 },
+    { name = "DP-8", id = 1, x = 2560, y = 0 },
+    { name = "DP-9", id = 2, x = 640, y = 0 },
+  })
+  same({ positions["eDP-1"], positions["DP-9"], positions["DP-8"] }, { "panel", "1", "2" }, "positions")
 end)
 
-test("a screens file with the position column it once had still reads", function()
-  local parsed, current = blocks.parse_blocks("0\teDP-1\t" .. PANEL .. "\t0\n1\t\t" .. LG_A .. "\t1920\n")
-  same({ parsed[PANEL], parsed[LG_A], current["eDP-1"] }, { 0, 1, PANEL }, "parsed")
+test("externals stacked at the same x count from the top", function()
+  local positions = blocks.positions({ { name = "DP-1", id = 0, x = 0, y = 1440 }, { name = "DP-2", id = 1, x = 0, y = 0 } })
+  same({ positions["DP-2"], positions["DP-1"] }, { "1", "2" }, "positions")
+end)
+
+test("the screens file reads back what it wrote", function()
+  local places, seen = { panel = 0, ["1"] = 1, ["2"] = 2 }, { panel = PANEL, ["1"] = LG_A, ["2"] = LG_B }
+  local text = blocks.format_places(places, seen, { ["eDP-1"] = "panel", ["DP-3"] = "1" })
+  same(text, "0\teDP-1\tpanel\t" .. PANEL .. "\n1\tDP-3\t1\t" .. LG_A .. "\n2\t\t2\t" .. LG_B .. "\n", "text")
+  local parsed, parsed_seen, legacy = blocks.parse_places(text)
+  same({ parsed.panel, parsed["1"], parsed["2"], parsed_seen["2"], legacy }, { 0, 1, 2, LG_B, nil }, "parsed")
+end)
+
+-- The file of a laptop that knew its screens by make and serial: the panel,
+-- two home screens unplugged, and the two work screens plugged in, the one on
+-- DP-9 to the left.
+local SCREENS_BY_SERIAL = "0\teDP-1\t" .. PANEL .. "\n1\t\t" .. LG_C .. "\n2\t\t" .. BENQ
+  .. "\n3\tDP-8\t" .. LG_A .. "\n4\tDP-9\t" .. LG_B .. "\n"
+
+test("a screens file keyed by screen is read as one to migrate", function()
+  local places, _, legacy = blocks.parse_places(SCREENS_BY_SERIAL)
+  same({ next(places), #legacy, legacy[5].block, legacy[5].identity }, { nil, 5, 4, LG_B }, "legacy")
+end)
+
+test("migrating, the plugged-in externals take the positions they stand at and the rest follow", function()
+  local _, _, legacy = blocks.parse_places(SCREENS_BY_SERIAL)
+  local places, seen = blocks.migrate(legacy, {
+    { name = "eDP-1", id = 0, x = 4480, y = 0, description = PANEL },
+    { name = "DP-8", id = 1, x = 2560, y = 0, description = LG_A },
+    { name = "DP-9", id = 2, x = 640, y = 0, description = LG_B },
+  })
+  same({ places.panel, places["1"], places["2"], places["3"], places["4"] }, { 0, 4, 3, 1, 2 }, "places")
+  same({ seen["1"], seen["3"], seen["4"] }, { LG_B, LG_C, BENQ }, "seen")
+end)
+
+test("migrating, unplugged screens follow in the order they last sat", function()
+  local _, _, legacy = blocks.parse_places("0\teDP-1\t" .. PANEL .. "\t0\n1\t\t" .. LG_A .. "\t3840\n2\t\t" .. LG_B .. "\t1920\n")
+  local places = blocks.migrate(legacy, { { name = "eDP-1", id = 0, x = 0, y = 0, description = PANEL } })
+  same({ places.panel, places["1"], places["2"] }, { 0, 2, 1 }, "places")
+end)
+
+test("migrating with the lid closed, the row last on the panel's connector stays the panel's", function()
+  local _, _, legacy = blocks.parse_places("0\teDP-1\t" .. PANEL .. "\n1\tDP-1\t" .. LG_A .. "\n")
+  local places = blocks.migrate(legacy, { { name = "DP-1", id = 1, x = 0, y = 0, description = LG_A } })
+  same({ places.panel, places["1"] }, { 0, 1 }, "places")
 end)
 
 -- The groups of `groups()` as lists of ids, for comparing.
@@ -288,9 +345,9 @@ test("at login each screen shows its own workspace 1", function()
   same(world:ids_on("DP-1"), { 11 }, "the number Hyprland gave DP-1 is gone")
 end)
 
-test("the screens file names each screen's block and connector", function()
+test("the screens file names each position's block, connector and screen", function()
   local world = two_screens()
-  same(read(world.state .. "/workspace-screens"), "0\teDP-1\t" .. PANEL .. "\n1\tDP-1\t" .. LG_A .. "\n", "file")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. PANEL .. "\n1\tDP-1\t1\t" .. LG_A .. "\n", "file")
 end)
 
 test("SUPER + 2 opens the focused screen's own workspace 2", function()
@@ -358,6 +415,18 @@ test("SUPER + SHIFT + CTRL + Right moves the window after the screen's last work
   same(world:shown_on("eDP-1"), 4, "followed")
 end)
 
+-- Opens a window on each of the first `count` workspaces of a screen's group,
+-- and returns them.
+local function fill(world, module, name, count)
+  local windows = {}
+  world:focus_monitor(name)
+  for slot = 1, count do
+    run(module.focus(slot))
+    windows[slot] = world:open_window()
+  end
+  return windows
+end
+
 -- Three workspaces with a window each on DP-1, two on the laptop.
 local function busy()
   local world, module = two_screens()
@@ -385,13 +454,14 @@ test("unplugging a screen moves its group to the laptop under its own numbers", 
 end)
 
 test("an unplugged screen's group goes to the laptop even when Hyprland puts it on another external", function()
-  local world = busy()
+  local world, module = busy()
   world:plug("DP-2", LG_B, 3840)
+  fill(world, module, "DP-2", 2)
 
-  world:unplug("DP-1", "DP-2")
+  world:unplug("DP-2", "DP-1")
 
-  same(world:ids_on("eDP-1"), { 1, 2, 3, 11, 12, 13, 14 }, "laptop")
-  same(world:ids_on("DP-2"), { 21 }, "the other external keeps its own")
+  same(world:ids_on("eDP-1"), { 1, 2, 3, 21, 22, 23 }, "laptop")
+  same(world:ids_on("DP-1"), { 11, 12, 13, 14 }, "the other external keeps its own")
 end)
 
 test("an unplugged screen with no windows leaves no group behind", function()
@@ -422,7 +492,7 @@ test("a config reload between unplug and replug keeps the record", function()
   same(world:ids_on("DP-1"), { 11, 12, 13, 14 }, "external")
 end)
 
-test("a second external gets the next block and keeps it across plugs", function()
+test("a second external gets the next block and its position keeps it across plugs", function()
   local world, module = two_screens()
   world:plug("DP-2", LG_B, 3840)
   world:focus_monitor("DP-2")
@@ -432,8 +502,9 @@ test("a second external gets the next block and keeps it across plugs", function
 
   world:unplug("DP-1")
   world:unplug("DP-2")
-  world:plug("DP-5", LG_B, 1920)
-  same(world:shown_on("DP-5"), 21, "same block on another connector")
+  world:plug("DP-5", LG_A, 1920)
+  world:plug("DP-6", LG_B, 3840)
+  same(world:shown_on("DP-6"), 21, "same block at the same position, on another connector")
 end)
 
 test("closing the lid moves the laptop's group to the external and opening it brings it back", function()
@@ -445,6 +516,224 @@ test("closing the lid moves the laptop's group to the external and opening it br
   world:plug("eDP-1", PANEL, 0)
   same(world:ids_on("eDP-1"), { 1, 2, 3 }, "laptop")
   same(world:ids_on("DP-1"), { 11, 12, 13, 14 }, "external")
+end)
+
+-- The laptop on the left and two externals beside it, with windows on each.
+local function work_desk()
+  local world, module = session()
+  world:plug("eDP-1", PANEL, 0)
+  world:plug("DP-1", LG_A, 1920)
+  world:plug("DP-2", LG_B, 4480)
+  world:fire("hyprland.start")
+  fill(world, module, "eDP-1", 1)
+  local left = fill(world, module, "DP-1", 2)
+  local centre = fill(world, module, "DP-2", 1)
+  return world, module, left, centre
+end
+
+local function on_screen(windows)
+  local names = {}
+  for _, window in ipairs(windows) do
+    names[#names + 1] = window.workspace.monitor.name
+  end
+  return names
+end
+
+test("the home desk takes the work desk's groups by position, and the windows with them", function()
+  local world, _, left, centre = work_desk()
+  world:unplug("DP-1")
+  world:unplug("DP-2")
+
+  world:plug("HDMI-A-1", BENQ, 1920)
+  world:plug("DP-3", LG_C, 4480)
+
+  same(world:ids_on("HDMI-A-1"), { 11, 12, 13 }, "the left screen")
+  same(world:ids_on("DP-3"), { 21, 22 }, "the centre screen")
+  same(world:ids_on("eDP-1"), { 1, 2 }, "the laptop")
+  same(on_screen(left), { "HDMI-A-1", "HDMI-A-1" }, "the left group's windows")
+  same(on_screen(centre), { "DP-3" }, "the centre group's windows")
+  same(world.renumbered, 0, "renumbered")
+end)
+
+test("the home desk plugged in centre first ends with each group at its position", function()
+  local world, _, left, centre = work_desk()
+  world:unplug("DP-1")
+  world:unplug("DP-2")
+
+  world:plug("DP-3", LG_C, 4480)
+  world:plug("HDMI-A-1", BENQ, 1920)
+
+  same(world:ids_on("HDMI-A-1"), { 11, 12, 13 }, "the left screen")
+  same(world:ids_on("DP-3"), { 21, 22 }, "the centre screen")
+  same({ blocks.block_of(world:shown_on("HDMI-A-1")), blocks.block_of(world:shown_on("DP-3")) }, { 1, 2 }, "each shows its group")
+  same(on_screen(left), { "HDMI-A-1", "HDMI-A-1" }, "the left group's windows")
+  same(on_screen(centre), { "DP-3" }, "the centre group's windows")
+  same(world.renumbered, 0, "renumbered")
+end)
+
+-- Three externals beside the laptop, with a window on each.
+local function three_externals()
+  local world, module = session()
+  world:plug("eDP-1", PANEL, 0)
+  world:plug("DP-1", LG_A, 1920)
+  world:plug("DP-2", LG_B, 3840)
+  world:plug("DP-3", LG_C, 5760)
+  world:fire("hyprland.start")
+  for _, name in ipairs({ "DP-1", "DP-2", "DP-3" }) do
+    fill(world, module, name, 1)
+  end
+  return world, module
+end
+
+test("from three externals to two, the third position's group waits on the laptop", function()
+  local world = three_externals()
+
+  world:unplug("DP-3")
+
+  same(world:ids_on("eDP-1"), { 1, 31, 32 }, "the laptop")
+  same({ world:ids_on("DP-1"), world:ids_on("DP-2") }, { { 11, 12 }, { 21, 22 } }, "the externals keep theirs")
+end)
+
+test("unplugging the leftmost of three, each group goes to the screen now at its position", function()
+  local world = three_externals()
+
+  world:unplug("DP-1")
+
+  same(world:ids_on("DP-2"), { 11, 12 }, "now the leftmost")
+  same(world:ids_on("DP-3"), { 21, 22 }, "now the second")
+  same(world:ids_on("eDP-1"), { 1, 31, 32 }, "the third waits on the laptop")
+  same(world.renumbered, 0, "renumbered")
+end)
+
+test("from two externals to three, a position never seen gets a fresh group", function()
+  local world = work_desk()
+
+  world:plug("DP-3", LG_C, 7040)
+
+  same(world:shown_on("DP-3"), 31, "shown")
+  same({ world:ids_on("DP-1"), world:ids_on("DP-2") }, { { 11, 12, 13 }, { 21, 22 } }, "the others keep theirs")
+end)
+
+test("from two externals to three, a third position seen before takes its group back", function()
+  local world = three_externals()
+  world:unplug("DP-3")
+
+  world:plug("HDMI-A-1", BENQ, 5760)
+
+  same(world:ids_on("HDMI-A-1"), { 31, 32 }, "the third")
+  same(world:ids_on("eDP-1"), { 1 }, "the laptop")
+end)
+
+test("a screen plugged in left of the others takes position 1's group and shifts the rest right", function()
+  local world, module = session()
+  world:plug("eDP-1", PANEL, 0)
+  world:plug("DP-1", LG_A, 3840)
+  world:plug("DP-2", LG_B, 5760)
+  world:fire("hyprland.start")
+  fill(world, module, "DP-1", 1)
+  fill(world, module, "DP-2", 1)
+
+  world:plug("HDMI-A-1", BENQ, 1920)
+
+  same(world:ids_on("HDMI-A-1"), { 11, 12 }, "the new leftmost")
+  same(world:ids_on("DP-1"), { 21, 22 }, "the second")
+  same(world:shown_on("DP-2"), 31, "the third, fresh")
+  same(world.renumbered, 0, "renumbered")
+end)
+
+test("closing the lid at a desk leaves each external its group, and opening it brings the laptop's back", function()
+  local world = work_desk()
+
+  world:unplug("eDP-1")
+  same(world:ids_on("DP-1"), { 1, 2, 11, 12, 13 }, "the laptop's group waits on the first external")
+  same(world:ids_on("DP-2"), { 21, 22 }, "the other keeps its own")
+
+  world:plug("eDP-1", PANEL, 0)
+  same({ world:ids_on("eDP-1"), world:ids_on("DP-1"), world:ids_on("DP-2") }, { { 1, 2 }, { 11, 12, 13 }, { 21, 22 } }, "back")
+end)
+
+test("going to a desk position focuses the screen standing there", function()
+  local world, module = work_desk()
+  world:focus_monitor("eDP-1")
+
+  run(module.go_to_position("2"))
+
+  same(world.focused.name, "DP-2", "focus")
+end)
+
+test("going to a desk position no screen holds shows its waiting group", function()
+  local world, module = work_desk()
+  world:unplug("DP-2")
+  world:focus_monitor("eDP-1")
+
+  run(module.go_to_position("2"))
+
+  same(world:shown_on("eDP-1"), 21, "shown")
+end)
+
+test("going to a desk position with nothing there does nothing", function()
+  local world, module = work_desk()
+  world:focus_monitor("eDP-1")
+
+  run(module.go_to_position("7"))
+
+  same({ world.focused.name, world:shown_on("eDP-1") }, { "eDP-1", 1 }, "unchanged")
+end)
+
+-- The laptop at work, the panel right of DP-8 and DP-9, before the module
+-- reads a screens file keyed by screen: windows on the panel's 1 and on the
+-- home desk's 11 waiting there, on DP-8's 31 and DP-9's 41 and 42.
+local function before_migrating()
+  local world = bare()
+  world:plug("eDP-1", PANEL, 4480)
+  world:plug("DP-8", LG_A, 2560)
+  world:plug("DP-9", LG_B, 640)
+  local windows = {}
+  for _, place in ipairs({ { "eDP-1", 1 }, { "eDP-1", 11 }, { "DP-8", 31 }, { "DP-9", 41 }, { "DP-9", 42 } }) do
+    world:focus_monitor(place[1])
+    world:focus_workspace(place[2])
+    windows[#windows + 1] = world:open_window()
+  end
+  for _, place in ipairs({ { "eDP-1", 1 }, { "DP-8", 31 }, { "DP-9", 41 } }) do
+    world:focus_monitor(place[1])
+    world:focus_workspace(place[2])
+  end
+  write(world.state .. "/workspace-screens", SCREENS_BY_SERIAL)
+  return world, windows
+end
+
+local function load_after_update(world)
+  package.loaded.workspaces = nil
+  local module = require("workspaces")
+  world:fire("config.reloaded")
+  return module
+end
+
+test("migrating a screens file moves no window and renumbers no workspace", function()
+  local world, windows = before_migrating()
+
+  load_after_update(world)
+
+  same(on_screen(windows), { "eDP-1", "eDP-1", "DP-8", "DP-9", "DP-9" }, "the windows")
+  same({ world:ids_on("eDP-1"), world:ids_on("DP-8"), world:ids_on("DP-9") }, { { 1, 2, 11, 12 }, { 31, 32 }, { 41, 42, 43 } }, "ids")
+  same({ world:shown_on("eDP-1"), world:shown_on("DP-8"), world:shown_on("DP-9") }, { 1, 31, 41 }, "shown")
+  same(world.renumbered, 0, "renumbered")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. PANEL .. "\n1\t\t3\t" .. LG_C .. "\n2\t\t4\t" .. BENQ
+    .. "\n3\tDP-8\t2\t" .. LG_A .. "\n4\tDP-9\t1\t" .. LG_B .. "\n", "file")
+end)
+
+test("after migrating, the home desk takes the work desk's groups by position", function()
+  local world, windows = before_migrating()
+  load_after_update(world)
+  world:unplug("DP-8")
+  world:unplug("DP-9")
+
+  world:plug("DP-1", BENQ, 0)
+  world:plug("DP-2", LG_C, 1920)
+
+  same(on_screen(windows), { "eDP-1", "eDP-1", "DP-2", "DP-1", "DP-1" }, "the windows")
+  same({ blocks.block_of(world:shown_on("DP-1")), blocks.block_of(world:shown_on("DP-2")) }, { 4, 3 }, "each shows its group")
+  same(world.renumbered, 0, "renumbered")
 end)
 
 -- Regression: an empty workspace 1, once left, was out of reach of every
@@ -510,9 +799,9 @@ test("the groups of two unplugged screens come in block order, not where the scr
   run(module.focus(1))
 
   run(module.next_group())
-  same(world:shown_on("eDP-1"), 11, "DP-1's block first, though it sat on the right")
+  same(world:shown_on("eDP-1"), 11, "block 1 first, position 1's")
   run(module.next_group())
-  same(world:shown_on("eDP-1"), 21, "then DP-2's")
+  same(world:shown_on("eDP-1"), 21, "then position 2's")
   run(module.next_group())
   same(world:shown_on("eDP-1"), 21, "the last group stays")
   run(module.previous_group())

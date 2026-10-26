@@ -251,3 +251,19 @@ fn a_drive_hidden_by_id_is_neither_listed_nor_ejected() {
     assert!(ran.is_err());
     assert_eq!(problems.len(), 1, "{problems:?}");
 }
+
+#[test]
+fn a_desk_item_comes_before_the_drives_and_goes_to_its_group_through_the_extension() {
+    let mut extension = with_stick("");
+    extension.set_desk(Desk::parse("1\tDP-1\t1\tLG ULTRAGEAR\n"));
+
+    let ran = extension.run(desk::SHOW, &item(desk::KIND, "desk:1"), &BTreeMap::new());
+
+    let ids = ids(&extension);
+    assert_eq!(&ids[ids.len() - 2..], ["desk:1", "drive:SanDisk_Ultra_1234"]);
+    assert_eq!(ran, Ok(Ran::Close));
+    assert_eq!(
+        extension.runner.launched.borrow()[0].0,
+        ["hyprctl", "dispatch", "dot.workspaces.go_to_position(\"1\")"]
+    );
+}

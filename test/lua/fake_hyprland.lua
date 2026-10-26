@@ -163,6 +163,7 @@ function F:monitor_object(record)
       if key == "description" then return record.description end
       if key == "id" then return record.id end
       if key == "x" then return record.x end
+      if key == "y" then return record.y end
       if key == "is_mirror" then return false end
       if key == "focused" then return world.focused == record end
       if key == "active_workspace" then return world:workspace_object(record.active) end
@@ -363,10 +364,10 @@ end
 
 -- What the tests drive: plugging screens in and out, and opening windows.
 
--- A screen arrives on a workspace under the lowest free number, as Hyprland
--- puts it, then `monitor.added` fires.
-function F:plug(name, description, x)
-  local record = { name = name, description = description, id = self.next_monitor_id, x = x or 0 }
+-- A screen arrives at `x`, `y` on a workspace under the lowest free number, as
+-- Hyprland puts it, then `monitor.added` fires.
+function F:plug(name, description, x, y)
+  local record = { name = name, description = description, id = self.next_monitor_id, x = x or 0, y = y or 0 }
   self.next_monitor_id = self.next_monitor_id + 1
   self.monitors[#self.monitors + 1] = record
   record.active = self:create(self:lowest_free(), record)

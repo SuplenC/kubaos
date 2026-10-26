@@ -1,8 +1,8 @@
 //! The KubaOS Extension's protocol loop, and with `layouts` the "Add a keyboard layout" app's: each config the Daemon sends makes
 //! the Items over, sending only the ones that changed, and so does each
 //! change the update check writes, each change to the keyboard layouts, to
-//! the wallpaper sets file and to the drives file; each config also reads the
-//! user folders again; each run is answered with its outcome, after the View it
+//! the wallpaper sets file, to Hyprland's screens file and to the drives file;
+//! each config also reads the user folders again; each run is answered with its outcome, after the View it
 //! pushes or pops. Each Live query is answered at once, with a monitor answer,
 //! processes to stop, a date answer, or nothing.
 //!
@@ -10,7 +10,7 @@
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
 //! - Watching the update check's file, the keyboard settings and `/etc/default/keyboard`, the
-//!   wallpaper sets file and the drives file.
+//!   wallpaper sets file, Hyprland's screens file and the drives file.
 //!
 //! # Not here
 //!
@@ -35,6 +35,8 @@ use kotodama_extension::watch::Watcher;
 use kotodama_kubaos::bus::SystemBus;
 use kotodama_kubaos::clock;
 use kotodama_kubaos::clock::Dates;
+use kotodama_kubaos::desk;
+use kotodama_kubaos::desk::Desk;
 use kotodama_kubaos::drives;
 use kotodama_kubaos::drives::Drives;
 use kotodama_kubaos::extension::Extension;
@@ -75,6 +77,8 @@ enum Own {
     WallpaperSets(WallpaperSets),
     /// The drives file changed.
     Drives(Drives),
+    /// Hyprland's screens file changed.
+    Desk(Desk),
 }
 
 /// What answers Live queries: the system monitor, then the dates.
@@ -202,6 +206,7 @@ fn run() -> Result<(), Error> {
         extension.set_drives(Drives::read(file));
     }
     let _drives_watcher = drives_file.and_then(|file| watch_drives(file, events.clone()));
+    let _desk_watcher = read_desk(&mut extension, events.clone());
     let _watcher = state.and_then(|dir| watch(dir, events));
     let mut configured = false;
 
@@ -223,6 +228,7 @@ fn run() -> Result<(), Error> {
                     Own::Keyboards(keyboards) => extension.set_keyboards(keyboards),
                     Own::WallpaperSets(sets) => extension.set_wallpaper_sets(sets),
                     Own::Drives(drives) => extension.set_drives(drives),
+                    Own::Desk(desk) => extension.set_desk(desk),
                 }
                 if configured {
                     sent.publish(&mut writer, extension.items())?;
@@ -389,6 +395,38 @@ fn watch_drives(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
         },
     )
     .map_err(|err| kotodama_extension::log!("not watching the mounted drives: {err}"))
+    .ok()?;
+    watcher.watch(vec![dir]);
+    Some(watcher)
+}
+
+/// Gives `extension` the desk positions in Hyprland's screens file, and watches it.
+fn read_desk(extension: &mut Extension<SystemBus, Programs>, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let file = desk::file()?;
+    extension.set_desk(Desk::read(&file));
+    watch_desk(file, events)
+}
+
+/// Watches the folder of Hyprland's screens `file`, sending the desk positions on each change to
+/// it. Without a watch the desk Items keep the positions of the start.
+fn watch_desk(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let dir = file.parent()?.to_path_buf();
+    // Hyprland writes the file on its first monitor change; the folder waits for it till then.
+    let _ = std::fs::create_dir_all(&dir);
+    // The events name the real path, behind any symlink on the way.
+    let dir = dir.canonicalize().unwrap_or(dir);
+    let changed = dir.join(file.file_name()?);
+    let watcher = Watcher::start(
+        "desk",
+        RecursiveMode::NonRecursive,
+        SETTLE,
+        // `config/hypr/workspaces.lua` writes the file in place, so its last write settles it.
+        move |event, _| event.paths.contains(&changed),
+        move |_| {
+            let _ = events.send(Event::Own(Own::Desk(Desk::read(&file))));
+        },
+    )
+    .map_err(|err| kotodama_extension::log!("not watching the desk positions: {err}"))
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)

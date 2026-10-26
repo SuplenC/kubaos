@@ -420,6 +420,11 @@ icon = "preferences-desktop-screensaver"
 keywords = ["hypridle", "caffeine", "keep awake", "auto lock"]
 run = ["sh", "-c", "pkill -x hypridle && hyprctl notify -1 3000 'rgb(ffb4ab)' 'Idle off: no auto-lock or suspend' || { hyprctl notify -1 3000 'rgb(c2c1ff)' 'Idle on'; exec hypridle; }"]
 
+# Workspace groups follow the desk position (config/hypr/workspaces.lua). The
+# Extension itself sends one Item a position, "Workspace group: position 1
+# from the left", naming its workspaces and the screen standing there, from
+# Hyprland's screens file; it goes to that group. Hide them by id, `desk:1`.
+
 # Screenshots and recording (scripts/dot-hypr-screenshot, dot-hypr-record).
 # Each waits for the menu to leave the screen.
 

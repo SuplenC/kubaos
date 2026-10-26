@@ -84,6 +84,10 @@ _Avoid_: Bin folder, snippets
 
 ## Screens
 
+**Desk position**:
+Where a screen stands on the desk: the laptop panel, or the externals counted 1, 2 and on from the left by Hyprland's layout. A **Workspace group** belongs to a desk position, so any screen standing at position 1 shows position 1's group.
+_Avoid_: Slot, monitor index, pairing
+
 **Workspace group**:
-One screen's workspaces 1-10, a block of Hyprland ids owned by that physical screen; while the screen is unplugged its group waits on the primary screen under the same numbers, shown apart in the bar.
+A **Desk position**'s workspaces 1-10, a block of Hyprland ids owned by that position whatever screen stands there; while no screen holds the position its group waits on the primary screen under the same numbers, shown apart in the bar.
 _Avoid_: Group (Hyprland's tabbed windows), merged workspaces, guests

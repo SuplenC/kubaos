@@ -1,8 +1,9 @@
--- The bookkeeping behind per-screen workspaces (`workspaces.lua`): which block
--- of ids a screen owns, where a workspace joins another screen, the groups a
--- screen shows and how next and previous walk them, which empty workspaces
--- Hyprland keeps, and the screens file. It never calls Hyprland, so
--- `test/lua/workspaces_test.lua` runs it under plain Lua.
+-- The bookkeeping behind per-screen workspaces (`workspaces.lua`): where each
+-- screen stands on the desk and which block of ids that position owns, where a
+-- workspace joins another screen, the groups a screen shows and how next and
+-- previous walk them, which empty workspaces Hyprland keeps, and the screens
+-- file. It never calls Hyprland, so `test/lua/workspaces_test.lua` runs it
+-- under plain Lua.
 --
 -- Adapted from Omarchy's default/hypr/monitor-workspaces.lua (basecamp/omarchy,
 -- MIT) at 5d8cc3313b2c60786d4e5019a68906873aed36bd.
@@ -43,16 +44,45 @@ function M.sort_screens(monitors)
   return sorted
 end
 
+-- Connector -> position: "panel" for the laptop panel, and "1", "2" and on for
+-- the externals, counted left to right by where Hyprland's layout puts them
+-- (top to bottom at the same x). Where the panel sits doesn't count.
+function M.positions(monitors)
+  local positions, externals = {}, {}
+  for _, monitor in ipairs(monitors) do
+    if internal(monitor.name) then
+      positions[monitor.name] = "panel"
+    else
+      externals[#externals + 1] = monitor
+    end
+  end
+  table.sort(externals, function(left, right)
+    if left.x ~= right.x then
+      return left.x < right.x
+    end
+    if left.y ~= right.y then
+      return left.y < right.y
+    end
+    return left.id < right.id
+  end)
+  for index, monitor in ipairs(externals) do
+    positions[monitor.name] = tostring(index)
+  end
+  return positions
+end
+
+-- A screen as people know it: its description, which is its make, model and
+-- serial, or its connector when it reports none.
 local function described(monitor)
   local description = monitor.description or ""
   return description ~= "" and description or monitor.name
 end
 
--- Connector -> identity: the screen's description, which is its make, model
--- and serial. Two screens that report the same, such as a pair without
--- serials, get " #2" in connector order when they first appear, and each keeps
--- its identity (from `current`, connector -> identity) while it stays plugged
--- in, so unplugging one of the pair doesn't hand its block to the other.
+-- Connector -> identity: the screen's description. Two screens that report the
+-- same, such as a pair without serials, get " #2" in connector order, and each
+-- keeps its identity (from `current`, connector -> identity) while it stays
+-- plugged in. Only `migrate()` uses it, to find the rows of a screens file
+-- keyed by screen.
 function M.identities(monitors, current)
   local identities, taken = {}, {}
 
@@ -85,7 +115,7 @@ function M.identities(monitors, current)
   return identities
 end
 
--- The lowest block no identity in `blocks` (identity -> block) owns.
+-- The lowest block no position in `blocks` (position -> block) owns.
 function M.free_block(blocks)
   local taken = {}
   for _, block in pairs(blocks) do
@@ -99,15 +129,18 @@ function M.free_block(blocks)
 end
 
 -- Connector -> block for `monitors` (in `sort_screens` order), giving a free
--- block to each identity seen for the first time. Adds those to `blocks`.
-function M.assign(blocks, monitors, identities)
+-- block to each position seen for the first time and adding it to `blocks`
+-- (position -> block). `positions` is connector -> position; `seen`, position
+-- -> screen, takes the screen now at each.
+function M.assign(blocks, seen, monitors, positions)
   local by_connector = {}
   for _, monitor in ipairs(monitors) do
-    local identity = identities[monitor.name]
-    if not blocks[identity] then
-      blocks[identity] = M.free_block(blocks)
+    local position = positions[monitor.name]
+    if not blocks[position] then
+      blocks[position] = M.free_block(blocks)
     end
-    by_connector[monitor.name] = blocks[identity]
+    seen[position] = described(monitor)
+    by_connector[monitor.name] = blocks[position]
   end
   return by_connector
 end
@@ -155,7 +188,7 @@ end
 -- a screen's workspaces in. Its own block is one, with its first workspace
 -- whether it exists or not and its others wherever they are, as SUPER + 1-0
 -- reach them. Each other block with workspaces on this screen is one, those of
--- unplugged screens waiting here. Only a screen whose own block isn't the
+-- positions no screen holds waiting here. Only a screen whose own block isn't the
 -- lowest, the external holding the laptop's group while the lid is closed,
 -- sees a waiting group before its own. `workspaces` lists { id, monitor } with
 -- the connector it is on.
@@ -245,7 +278,7 @@ end
 
 -- Id -> connector: the workspaces Hyprland keeps even when empty, and the
 -- screen each stays on. Every plugged-in screen keeps its own block's; a block
--- of an unplugged screen keeps its own on the screen holding its windows,
+-- of a position no screen holds keeps its own on the screen holding its windows,
 -- while it has any. `screens` lists { name, block } for the screens plugged
 -- in, `workspaces` { id, monitor, windows } with the connector each is on.
 function M.kept(screens, workspaces)
@@ -276,33 +309,125 @@ function M.kept(screens, workspaces)
   return result
 end
 
--- The screens file: one line per screen ever seen, "block<TAB>connector<TAB>
--- identity", the connector empty while it is unplugged. The bar
+local function split(line)
+  local fields, start = {}, 1
+  while true do
+    local tab = line:find("\t", start, true)
+    if not tab then
+      fields[#fields + 1] = line:sub(start)
+      return fields
+    end
+    fields[#fields + 1] = line:sub(start, tab - 1)
+    start = tab + 1
+  end
+end
+
+local function is_position(field)
+  return field == "panel" or field:match("^%d+$") ~= nil
+end
+
+-- The screens file: one line per position ever seen, "block<TAB>connector<TAB>
+-- position<TAB>screen": the connector of the screen at the position now, empty
+-- while there is none, and the screen there now or last. The bar
 -- (`config/quickshell/services/Hypr.qml`) maps its connector to a block with
--- it. A fourth column, where the screen last sat, is read past.
-function M.parse_blocks(text)
-  local blocks, current = {}, {}
+-- the first two columns.
+--
+-- Returns position -> block and position -> screen. A file keyed by screen,
+-- "block<TAB>connector<TAB>identity" with an optional fourth column where the
+-- screen last sat, comes back as its rows, { block, connector, identity, x },
+-- for `migrate()`.
+function M.parse_places(text)
+  local places, seen, legacy = {}, {}, {}
   for line in text:gmatch("[^\n]+") do
-    local block, connector, identity = line:match("^(%d+)\t([^\t]*)\t([^\t]+)")
-    if block then
-      blocks[identity] = tonumber(block)
-      if connector ~= "" then
-        current[connector] = identity
+    local fields = split(line)
+    local block = fields[1]:match("^%d+$") and tonumber(fields[1])
+    local third = fields[3] or ""
+    if block and is_position(third) then
+      places[third] = block
+      seen[third] = fields[4] or ""
+    elseif block and third ~= "" then
+      legacy[#legacy + 1] = { block = block, connector = fields[2], identity = third, x = tonumber(fields[4] or "") }
+    end
+  end
+  if next(places) or #legacy == 0 then
+    legacy = nil
+  end
+  return places, seen, legacy
+end
+
+-- The rows of a screens file keyed by screen as positions, moving no
+-- workspace: the panel keeps its block, each external plugged in keeps its own
+-- at the position it stands at now, and the blocks of the screens not plugged
+-- in take the positions after those, in the order they last sat, else in block
+-- order. With the lid closed, the panel's row is the one last seen on an
+-- internal connector. Returns position -> block and position -> screen.
+function M.migrate(rows, monitors)
+  local current, by_identity = {}, {}
+  for _, row in ipairs(rows) do
+    by_identity[row.identity] = row
+    if row.connector ~= "" then
+      current[row.connector] = row.identity
+    end
+  end
+  local identities = M.identities(monitors, current)
+  local positions = M.positions(monitors)
+  local places, seen, claimed = {}, {}, {}
+
+  local function take(position, row)
+    if row and not claimed[row] then
+      places[position] = row.block
+      seen[position] = row.identity
+      claimed[row] = true
+    end
+  end
+
+  local panel_plugged, last = false, 0
+  for _, monitor in ipairs(monitors) do
+    local position = positions[monitor.name]
+    take(position, by_identity[identities[monitor.name]])
+    if position == "panel" then
+      panel_plugged = true
+    else
+      last = math.max(last, tonumber(position))
+    end
+  end
+  if not panel_plugged then
+    for _, row in ipairs(rows) do
+      if internal(row.connector) then
+        take("panel", row)
       end
     end
   end
-  return blocks, current
+
+  local rest = {}
+  for _, row in ipairs(rows) do
+    if not claimed[row] then
+      rest[#rest + 1] = row
+    end
+  end
+  table.sort(rest, function(left, right)
+    local l, r = left.x or math.huge, right.x or math.huge
+    if l ~= r then
+      return l < r
+    end
+    return left.block < right.block
+  end)
+  for index, row in ipairs(rest) do
+    take(tostring(last + index), row)
+  end
+  return places, seen
 end
 
--- `identities` is connector -> identity for the screens plugged in now.
-function M.format_blocks(blocks, identities)
+-- `positions` is connector -> position for the screens plugged in now.
+function M.format_places(places, seen, positions)
   local connector = {}
-  for name, identity in pairs(identities) do
-    connector[identity] = name
+  for name, position in pairs(positions) do
+    connector[position] = name
   end
   local rows = {}
-  for identity, block in pairs(blocks) do
-    rows[#rows + 1] = { block = block, line = block .. "\t" .. (connector[identity] or "") .. "\t" .. identity }
+  for position, block in pairs(places) do
+    local line = block .. "\t" .. (connector[position] or "") .. "\t" .. position .. "\t" .. (seen[position] or "")
+    rows[#rows + 1] = { block = block, line = line }
   end
   table.sort(rows, function(left, right) return left.block < right.block end)
   local lines = {}
