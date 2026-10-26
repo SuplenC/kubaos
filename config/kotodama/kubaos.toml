@@ -592,6 +592,104 @@ run = ["kubaos", "channel", "{channel}"]
 arguments = [{ name = "channel", placeholder = "stable or edge" }]
 terminal = true
 
+# KubaOS's apt packages (`kubaos packages`, system/packages.toml): how the
+# machine compares with the release, and the optional groups turned on or off
+# for good, which every update then follows. They run in a terminal, where
+# sudo asks and apt shows what it does.
+
+[extensions.kubaos.actions.packages-status]
+title = "KubaOS apt packages"
+subtitle = "Each group's packages: installed, missing, held, or extra and on the way out"
+icon = "system-software-install"
+keywords = ["apt", "packages", "manifest", "installed", "missing", "debian", "ubuntu"]
+run = ["kubaos", "packages", "status"]
+terminal = true
+
+[extensions.kubaos.actions.packages-docker-on]
+title = "Install Docker"
+subtitle = "Docker CE from Docker's repo, kept by every update"
+icon = "list-add"
+keywords = ["docker", "containers", "apt", "packages", "enable"]
+run = ["kubaos", "packages", "enable", "docker"]
+terminal = true
+
+[extensions.kubaos.actions.packages-docker-off]
+title = "Remove Docker"
+subtitle = "Docker CE goes, and no update brings it back"
+icon = "list-remove"
+keywords = ["docker", "containers", "apt", "packages", "disable", "uninstall"]
+run = ["kubaos", "packages", "disable", "docker"]
+terminal = true
+confirm = true
+
+[extensions.kubaos.actions.packages-chrome-on]
+title = "Install Google Chrome"
+subtitle = "From Google's repo, kept by every update (amd64)"
+icon = "list-add"
+keywords = ["chrome", "browser", "google", "apt", "packages", "enable"]
+run = ["kubaos", "packages", "enable", "chrome"]
+terminal = true
+
+[extensions.kubaos.actions.packages-chrome-off]
+title = "Remove Google Chrome"
+subtitle = "Chrome goes, and no update brings it back"
+icon = "list-remove"
+keywords = ["chrome", "browser", "google", "apt", "packages", "disable", "uninstall"]
+run = ["kubaos", "packages", "disable", "chrome"]
+terminal = true
+confirm = true
+
+[extensions.kubaos.actions.packages-u2f-on]
+title = "Use a security key for sudo"
+subtitle = "pam_u2f for sudo, polkit and the lock screen; the password stays"
+icon = "dialog-password"
+keywords = ["yubikey", "u2f", "fido2", "security key", "pam", "enable"]
+run = ["kubaos", "packages", "enable", "u2f"]
+terminal = true
+
+[extensions.kubaos.actions.packages-u2f-off]
+title = "Stop using a security key for sudo"
+subtitle = "Takes pam_u2f out of sudo, polkit and the lock screen, then its packages"
+icon = "dialog-password"
+keywords = ["yubikey", "u2f", "fido2", "security key", "pam", "disable"]
+run = ["kubaos", "packages", "disable", "u2f"]
+terminal = true
+confirm = true
+
+[extensions.kubaos.actions.packages-piv-on]
+title = "Install PIV smart card support"
+subtitle = "pcscd and pcsc-tools, for the YubiKey Multi-protocol Edition"
+icon = "list-add"
+keywords = ["yubikey", "piv", "smart card", "pcscd", "enable"]
+run = ["kubaos", "packages", "enable", "piv"]
+terminal = true
+
+[extensions.kubaos.actions.packages-piv-off]
+title = "Remove PIV smart card support"
+subtitle = "pcscd and pcsc-tools go, and no update brings them back"
+icon = "list-remove"
+keywords = ["yubikey", "piv", "smart card", "pcscd", "disable"]
+run = ["kubaos", "packages", "disable", "piv"]
+terminal = true
+confirm = true
+
+[extensions.kubaos.actions.packages-tuxedo-on]
+title = "Install TUXEDO's drivers"
+subtitle = "tuxedo-drivers from TUXEDO's repo, for an InfinityBook (amd64)"
+icon = "list-add"
+keywords = ["tuxedo", "drivers", "dkms", "laptop", "enable"]
+run = ["kubaos", "packages", "enable", "tuxedo"]
+terminal = true
+
+[extensions.kubaos.actions.packages-tuxedo-off]
+title = "Remove TUXEDO's drivers"
+subtitle = "tuxedo-drivers and DKMS go, and no update brings them back"
+icon = "list-remove"
+keywords = ["tuxedo", "drivers", "dkms", "laptop", "disable"]
+run = ["kubaos", "packages", "disable", "tuxedo"]
+terminal = true
+confirm = true
+
 # The clock popup (crates/kubaos-clock, config/quickshell/modules/clock/).
 # Date queries such as `days until christmas` get an answer in the top row
 # from the Extension itself. The settings Items change

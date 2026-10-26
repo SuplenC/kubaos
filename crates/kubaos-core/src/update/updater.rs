@@ -4,9 +4,9 @@
 //! An update, in order: the lock and a free-space check; fetching `origin` into the checkout,
 //! which is the network check; the release policy's pick; showing it and asking; a snapper
 //! snapshot, the user's `flake.lock` saved and the update recorded in the history; apt; moving
-//! `release`; the Hyprland pin and the system migrations; `nix flake update` of the user flake;
-//! relinking what `system/` took from KubaOS's nixpkgs; the switch; the Bitwarden check; the user
-//! migrations; and the new release record. Packages first, then migrations, which are written
+//! `release`; the Hyprland pin, the package manifest and the system migrations; `nix flake update`
+//! of the user flake; relinking what `system/` took from KubaOS's nixpkgs; the switch; the
+//! Bitwarden check; the user migrations; and the new release record. Packages first, then migrations, which are written
 //! against the new packages.
 //!
 //! Each stage is a [`Phase`] of the progress stream (`event.rs`). Programs run with their output
@@ -20,6 +20,8 @@
 //!
 //! - Which release to move to: `policy.rs`. The files' formats: `record.rs`, `notice.rs`.
 //! - Running programs and the switch: `machine.rs` and `switch.rs`.
+//! - The package manifest's phase, its status and `kubaos packages enable|disable`:
+//!   `updater/manifest.rs`.
 //! - The events and the log: `event.rs` and `journal.rs`.
 
 use std::collections::BTreeSet;
@@ -69,6 +71,7 @@ use super::record::SystemPaths;
 use super::record::parse_history;
 use super::record::short;
 use super::version::Version;
+use crate::apt::ManifestError;
 use crate::engine::files::utc_datetime;
 use crate::state::Paths;
 use crate::state::write_atomic;
@@ -157,6 +160,18 @@ pub enum UpdateError {
     /// No newer series is out.
     #[error("no newer KubaOS release to upgrade to")]
     NoUpgrade,
+    /// The release's package manifest can't be read.
+    #[error("reading the package manifest")]
+    Manifest(#[source] ManifestError),
+    /// The checked-out release has no package manifest.
+    #[error("no package manifest at {}", path.display())]
+    NoManifest { path: PathBuf },
+    /// The manifest has no group of that name.
+    #[error("the package manifest has no group {name}")]
+    NoGroup { name: String },
+    /// The group isn't one the user may turn on or off.
+    #[error("{name} is part of KubaOS: it can't be turned on or off")]
+    NotOptional { name: String },
 }
 
 impl UpdateError {
@@ -438,6 +453,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             channel: rolled_back.channel,
             changes: Vec::new(),
             packages: 0,
+            apt: Vec::new(),
             inputs: Vec::new(),
             migrations: Vec::new(),
             reloaded: self.j.reloaded.clone(),
@@ -795,6 +811,13 @@ impl<'a, M: Machine> Updater<'a, M> {
         let mut relogin = false;
         if !opts.packages_only {
             relogin = self.apply_hyprland_pin()?;
+        }
+        let apt = if self.sys.manifest().is_file() {
+            self.phase(Phase::Manifest, |u| u.sync_manifest(None))?
+        } else {
+            Vec::new()
+        };
+        if !opts.packages_only {
             migrations.extend(self.run_system_migrations()?);
         }
         self.phase(Phase::Inputs, |u| u.update_inputs(&flake))?;
@@ -828,6 +851,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             channel: now.channel,
             changes,
             packages,
+            apt,
             inputs: self.j.inputs.clone(),
             migrations,
             reloaded: self.j.reloaded.clone(),
@@ -1309,6 +1333,8 @@ fn write_user(path: &Path, text: &str) -> Result<(), UpdateError> {
     }
     write_atomic(path, text).map_err(UpdateError::io(path))
 }
+
+mod manifest;
 
 #[cfg(test)]
 mod tests;
