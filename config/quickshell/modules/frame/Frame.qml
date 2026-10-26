@@ -64,7 +64,10 @@ Scope {
         }
         WlrLayershell.namespace: "qs-frame"
         WlrLayershell.layer: fullscreen && modal ? WlrLayer.Overlay : WlrLayer.Top
-        WlrLayershell.keyboardFocus: modal ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+        // The panel holds the keyboard only while the pointer is on its
+        // screen: an exclusive layer keeps Hyprland from focusing anything
+        // else, so holding it everywhere left the other screens dead.
+        WlrLayershell.keyboardFocus: modal && Hypr.focusedScreen === screen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
         // Clicks reach the frame, the bar and the notification popups; with a
         // panel open, the whole screen (a click outside closes it).
