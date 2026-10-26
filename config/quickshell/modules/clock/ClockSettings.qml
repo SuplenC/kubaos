@@ -4,8 +4,8 @@ import qs.components
 import qs.services
 import qs.settings
 
-// The popup's settings page: holidays, first weekday, analog face, the bar's
-// countdown and the extra clocks. Each change goes through the engine into
+// The popup's settings page: holidays, first weekday, time format, date order,
+// analog face, the bar's countdown and the extra clocks. Each change goes through the engine into
 // ~/.config/kubaos/desktop/clock/clock.toml, comments kept, and the state it answers
 // with redraws the popup.
 Column {
@@ -67,6 +67,61 @@ Column {
                     selected: root.settings.firstWeekday === index + 1
                     onClicked: root.set("first-weekday", modelData)
                 }
+            }
+        }
+    }
+
+    Section {
+        title: "Time format"
+        note: "How the bar, the lock screen and this popup write the time"
+
+        Row {
+            spacing: Theme.spacing.xs
+
+            Chip {
+                label: "Locale"
+                tooltip: `Your locale's: ${Time.twelveHourByLocale ? "12-hour" : "24-hour"}`
+                selected: !root.settings.timeFormat
+                onClicked: root.set("time-format", "locale")
+            }
+
+            Chip {
+                label: "24-hour"
+                selected: root.settings.timeFormat === "24h"
+                onClicked: root.set("time-format", "24h")
+            }
+
+            Chip {
+                label: "12-hour"
+                selected: root.settings.timeFormat === "12h"
+                onClicked: root.set("time-format", "12h")
+            }
+        }
+    }
+
+    Section {
+        title: "Date order"
+
+        Row {
+            spacing: Theme.spacing.xs
+
+            Chip {
+                label: "Locale"
+                tooltip: `Your locale's: ${Time.dayFirstByLocale ? "day first" : "month first"}`
+                selected: !root.settings.dateOrder
+                onClicked: root.set("date-order", "locale")
+            }
+
+            Chip {
+                label: "Day first"
+                selected: root.settings.dateOrder === "day-month"
+                onClicked: root.set("date-order", "day-month")
+            }
+
+            Chip {
+                label: "Month first"
+                selected: root.settings.dateOrder === "month-day"
+                onClicked: root.set("date-order", "month-day")
             }
         }
     }
