@@ -652,6 +652,34 @@ test("closing the lid at a desk leaves each external its group, and opening it b
   same({ world:ids_on("eDP-1"), world:ids_on("DP-1"), world:ids_on("DP-2") }, { { 1, 2 }, { 11, 12, 13 }, { 21, 22 } }, "back")
 end)
 
+test("going to a desk position focuses the screen standing there", function()
+  local world, module = work_desk()
+  world:focus_monitor("eDP-1")
+
+  run(module.go_to_position("2"))
+
+  same(world.focused.name, "DP-2", "focus")
+end)
+
+test("going to a desk position no screen holds shows its waiting group", function()
+  local world, module = work_desk()
+  world:unplug("DP-2")
+  world:focus_monitor("eDP-1")
+
+  run(module.go_to_position("2"))
+
+  same(world:shown_on("eDP-1"), 21, "shown")
+end)
+
+test("going to a desk position with nothing there does nothing", function()
+  local world, module = work_desk()
+  world:focus_monitor("eDP-1")
+
+  run(module.go_to_position("7"))
+
+  same({ world.focused.name, world:shown_on("eDP-1") }, { "eDP-1", 1 }, "unchanged")
+end)
+
 -- The laptop at work, the panel right of DP-8 and DP-9, before the module
 -- reads a screens file keyed by screen: windows on the panel's 1 and on the
 -- home desk's 11 waiting there, on DP-8's 31 and DP-9's 41 and 42.

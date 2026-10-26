@@ -12,8 +12,8 @@ import qs.services
 // `groups()` in config/hypr/workspace_blocks.lua, which next and previous
 // walk: the screen's own group first, unless a waiting group has lower numbers
 // (the laptop's, while its lid is closed). Its own group always shows its
-// first workspace. A group of an unplugged screen waiting here sits on a tint,
-// so it reads as borrowed. Scroll to step through them.
+// first workspace. The group of a desk position no screen holds, waiting
+// here, sits on a tint, so it reads as borrowed. Scroll to step through them.
 //
 // Each group keeps one empty workspace after its last with windows
 // (config/hypr/workspaces.lua), where a swipe or next opens a new one. It

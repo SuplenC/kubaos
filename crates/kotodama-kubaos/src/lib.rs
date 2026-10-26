@@ -7,7 +7,7 @@
 //! # Owns
 //!
 //! - The registry, the toggles, the keyboard layouts, the wallpaper sets, the user folders, the
-//!   mounted drives, and what each of their Actions runs.
+//!   mounted drives, the workspace groups by desk position, and what each of their Actions runs.
 //! - The date answers, from the clock popup's engine.
 //! - The monitor answers (`cpu`, `ram`, `battery`) and the process search, from the system
 //!   monitor.
@@ -23,6 +23,7 @@
 pub mod audio;
 pub mod bus;
 pub mod clock;
+pub mod desk;
 pub mod drives;
 pub mod extension;
 pub mod files;

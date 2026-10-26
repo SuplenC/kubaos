@@ -7,13 +7,13 @@
 //! - Which Items there are under the current config, `hide` applied, and what the update check
 //!   changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder or a drive.
+//!   user folder, a desk position or a drive.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
 //!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
-//!   [`crate::files`]. The drives: [`crate::drives`].
+//!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -24,6 +24,8 @@ use kotodama_protocol::ItemRef;
 use kotodama_protocol::Table;
 
 use crate::bus::Bus;
+use crate::desk;
+use crate::desk::Desk;
 use crate::drives;
 use crate::drives::Drives;
 use crate::files;
@@ -49,6 +51,7 @@ pub struct Extension<B, R> {
     keyboards: Keyboards,
     wallpapers: WallpaperSets,
     folders: UserFolders,
+    desk: Desk,
     drives: Drives,
     bus: B,
     runner: R,
@@ -63,6 +66,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             keyboards: Keyboards::default(),
             wallpapers: WallpaperSets::default(),
             folders: UserFolders::default(),
+            desk: Desk::default(),
             drives: Drives::default(),
             bus,
             runner,
@@ -103,9 +107,14 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.drives = drives;
     }
 
+    /// Takes the desk positions, as Hyprland's screens file now lists them.
+    pub fn set_desk(&mut self, desk: Desk) {
+        self.desk = desk;
+    }
+
     /// The Items to index: the actions, the toggles, the keyboard Items, the wallpaper sets, the
-    /// user folders and the drives `hide` leaves in, the update actions as the update check has
-    /// them.
+    /// user folders, the desk positions and the drives `hide` leaves in, the update actions as the
+    /// update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -126,6 +135,11 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .items()
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
+        let desk = self
+            .desk
+            .items()
+            .into_iter()
+            .filter(|item| !self.registry.hides(&item.id));
         let drives = self
             .drives
             .items()
@@ -138,6 +152,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .chain(keyboards)
             .chain(wallpapers)
             .chain(folders)
+            .chain(desk)
             .chain(drives)
     }
 
@@ -168,6 +183,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             }
             wallpapers::KIND if !self.registry.hides(&item.id) => self.wallpapers.run(&item.id, action, &self.runner),
             files::KIND if !self.registry.hides(&item.id) => self.folders.run(&item.id, action, &self.runner),
+            desk::KIND if !self.registry.hides(&item.id) => self.desk.run(&item.id, action, &self.runner),
             drives::KIND if !self.registry.hides(&item.id) => self.drives.run(&item.id, action, &self.runner),
             _ => Err(unknown()),
         }

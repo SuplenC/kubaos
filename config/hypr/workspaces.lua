@@ -390,6 +390,33 @@ function M.go_to(id, monitor_name)
   end)
 end
 
+-- Go to the group of a desk position, "panel" or "1", "2" and on: focus the
+-- screen standing there, else show the lowest workspace of its group where it
+-- waits. The Command menu's desk Items run it.
+function M.go_to_position(position)
+  return function()
+    local monitors = connected()
+    assign(monitors)
+    local positions = blocks_lib.positions(monitors)
+    for _, monitor in ipairs(monitors) do
+      if positions[monitor.name] == position then
+        hl.dispatch(hl.dsp.focus({ monitor = monitor.name }))
+        return
+      end
+    end
+    local block = places[position]
+    local lowest = nil
+    for _, workspace in ipairs(hl.get_workspaces()) do
+      if block and regular(workspace) and block_of(workspace.id) == block and (not lowest or workspace.id < lowest) then
+        lowest = workspace.id
+      end
+    end
+    if lowest then
+      hl.dispatch(hl.dsp.focus({ workspace = tostring(lowest) }))
+    end
+  end
+end
+
 -- Next or previous workspace through a screen's groups (`direction` 1 or -1).
 local function scroll(direction, monitor_name)
   return on_monitor(monitor_name, function(monitor)

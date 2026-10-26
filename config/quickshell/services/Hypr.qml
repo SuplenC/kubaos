@@ -6,10 +6,10 @@ import Quickshell.Hyprland
 
 // Small helpers on top of the Hyprland IPC, and each screen's workspaces.
 //
-// Every screen owns a block of ten workspace ids, the laptop panel 1-10, the
-// next screen 11-20 (config/hypr/workspaces.lua). Hyprland keeps which block
-// is whose in a state file, read here. The bar labels each block's workspaces
-// 1-10.
+// Every position on the desk owns a block of ten workspace ids, the laptop
+// panel 1-10, the next 11-20, and a screen shows the block of the position it
+// stands at (config/hypr/workspaces.lua). Hyprland keeps which block is whose
+// in a state file, read here. The bar labels each block's workspaces 1-10.
 Singleton {
     id: root
 
@@ -18,8 +18,8 @@ Singleton {
     // The ShellScreen of the monitor Hyprland considers focused.
     readonly property ShellScreen focusedScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
 
-    // The lines "block<TAB>connector<TAB>identity" of the state file, as
-    // fields; a screen that is unplugged has an empty connector.
+    // The lines "block<TAB>connector<TAB>position<TAB>screen" of the state
+    // file, as fields; a position no screen holds has an empty connector.
     readonly property var screenLines: screensFile.text().split("\n").map(line => line.split("\t")).filter(fields => fields.length >= 3)
 
     // Connector -> block.
