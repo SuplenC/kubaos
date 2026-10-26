@@ -23,10 +23,10 @@
 
     # Fonts for the shell (config/quickshell/theme/Theme.qml): Geist for the
     # interface, M PLUS 1 for Japanese accents, Material Symbols for icons.
-    # geist-font carries Geist Mono too, the design language's monospace
-    # (design/tokens.toml); its Nerd Font is the one terminals get the
-    # prompt's and the file managers' glyphs from once they move onto it.
-    pkgs.geist-font
+    # Geist and Geist Mono are curated, at the release the iced apps embed;
+    # Geist Mono's Nerd Font is the one terminals get the prompt's and the
+    # file managers' glyphs from once they move onto it.
+    kubaosPkgs.geist-font
     pkgs.nerd-fonts.geist-mono
     pkgs.mplus-outline-fonts.githubRelease
     pkgs.material-symbols

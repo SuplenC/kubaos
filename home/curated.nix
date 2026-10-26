@@ -70,6 +70,30 @@ rec {
   # The design specimen, the Command menu's "Design specimen" (home/desktop.nix).
   kubaos-specimen = callCrate ../crates/kubaos-specimen/package.nix;
 
+  # Geist and Geist Mono, the system's interface and monospace fonts, at the
+  # release kubaos-ui embeds (crates/kubaos-ui/assets/make-fonts.sh), so the
+  # shell and the iced apps draw the same letters. nixpkgs trails it. Only
+  # the static TTFs: the OTFs and variable fonts would list every family twice
+  # in fontconfig, and Geist Pixel isn't ours.
+  geist-font = pkgs.stdenvNoCC.mkDerivation (finalAttrs: {
+    pname = "geist-font";
+    version = "1.8.1";
+    src = pkgs.fetchzip {
+      url = "https://github.com/vercel/geist-font/releases/download/v${finalAttrs.version}/geist-font-v${finalAttrs.version}.zip";
+      hash = "sha256-5iMNUydI611EARjQ9jYWZdastq5m2dalGTWAvGU82vU=";
+    };
+    installPhase = ''
+      runHook preInstall
+      install -Dm444 -t $out/share/fonts/truetype Geist/ttf/*.ttf GeistMono/ttf/*.ttf
+      runHook postInstall
+    '';
+    meta = {
+      inherit (pkgs.geist-font.meta) homepage license;
+      description = "Geist and Geist Mono, KubaOS's interface and monospace fonts";
+      platforms = lib.platforms.all;
+    };
+  });
+
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (
     with pkgs.qt6;
