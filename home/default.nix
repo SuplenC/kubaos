@@ -13,6 +13,7 @@
     ./dev.nix
     ./desktop.nix
     ./files.nix
+    ./idle.nix
     ./menu.nix
     ./phone.nix
     ./secrets.nix

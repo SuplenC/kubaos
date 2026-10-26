@@ -72,6 +72,7 @@ let
       "kubaos-bluetooth"
       "kubaos-clock"
       "kubaos-sysmon"
+      "kubaos-idle"
     ];
     # Kōbō's iced and wgpu are most of its dependencies and no other crate
     # uses them. Apart, they build beside the tools' dependencies when

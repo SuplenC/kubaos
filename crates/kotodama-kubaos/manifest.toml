@@ -12,6 +12,7 @@ examples = [
     { query = "wifi", result = "Turn Wi-Fi on or off" },
     { query = "volume 40", result = "Set the volume to 40%" },
     { query = "next wallpaper", result = "The next wallpaper, and its colors" },
+    { query = "lock-after 2m", result = "Lock after 2 min idle, on battery and plugged in" },
     { query = "days until christmas", result = "The days left, as the clock popup counts them" },
     { query = "ram", result = "How full the memory is, and what holds it" },
     { query = "kill chrome", result = "End or kill every chrome process, once you confirm" },

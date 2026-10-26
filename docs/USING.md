@@ -132,6 +132,20 @@ On a company or hotel network the phone may not see the laptop: some networks bl
 
 The daemon is the `kubaos-phone` user unit: `systemctl --user status kubaos-phone`, logs in `journalctl --user -u kubaos-phone`. The switch is the file `~/.config/kubaos/desktop/phone/phone-link`.
 
+## Idle, Keep awake and the lid
+
+Out of the box the screen locks after 5 minutes idle, the screens go off after 10, and the laptop suspends after 30 on battery and never plugged in. Closing the lid suspends on battery and does nothing plugged in or docked (a dock, or a second screen connected).
+
+Change any of it from the Command menu: "Lock after…", "Screens off after…", "Suspend after…" and "When the lid closes…". Enter lists the usual choices with the ones in use marked; Enter on a choice sets it on battery and plugged in, and its other Actions (Ctrl+K) set one of them. Or type a time after the word: `lock-after 2m`, `screens-off-after 1h30m`, `suspend-after never ac`, `lid lock battery`. A time is what the clock's timer takes (`90s`, `2m`, `1h30m`, `5h`, a number alone in minutes) or `never`; a trailing `battery` or `ac` sets that power source alone, both otherwise. The lock and screens off take 30 s at the least, suspend a minute, and a day at most; a toast says what changed ("Lock after 15 min idle on battery, 30 min plugged in") or why it was refused. The file is `~/.config/kubaos/desktop/idle/idle.toml`; after a hand edit run `kubaos-idle apply`. "Idle: KubaOS defaults" puts it all back. `kubaos-idle status` prints what is set.
+
+If you change the power source while idle, the other source's time takes over within a minute: unplugging a laptop that has been idle longer than its battery time locks or suspends it then.
+
+The lid setting works without root: while it differs from what logind does, your session holds the lid away from logind and does it itself, and logind's own rule comes back when you log out. Docked, closing the lid never does anything.
+
+**Keep awake** (`SUPER + CTRL + I`, or "Keep awake for 1 hour", "for 2 hours", "for…", "until turned off" in the Command menu) holds the auto-lock, screens off and suspend off. It ends by itself when its time is up, says so, and shows a cup in the bar while on; click the cup or run "Stop keeping awake" to end it sooner. Closing the lid and locking by hand still work.
+
+**Lock, suspend, shut down or reboot in… / at…** do it once, whether you're working or not: `lock-in 10m`, `lock-at 20:00`, `suspend-at 23:00`, `shutdown-at friday 17:00`, `reboot-in 5m` (an "at" is the next time it comes round). Shut down and reboot ask you to confirm first, and close the session the way the power menu does; a suspend locks first. Toasts warn a minute and 10 s before, each with a Cancel button, the bar counts down with the action's icon, and Keep awake doesn't stop any of them: you asked for it. One at a time, whichever it is; a new one replaces the old, and the toast says what it replaced. "Cancel scheduled action", Cancel on a warning, or a click on the countdown cancels it. They are systemd user timers: `systemctl --user list-timers 'kubaos-scheduled*'`.
+
 ## Updating and rolling back
 
 Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run `kubaos update`, or pick Update KubaOS in the menu (`SUPER + Space`), which opens a floating terminal running it. A daily timer runs `kubaos update --check`: it only looks. When there is something new it sends one notification, puts a marker in the bar, and the menu's Update KubaOS says what is waiting.
@@ -209,7 +223,7 @@ The folder is grouped by area, and its `README.md` says where to go for what:
 ```
 ~/.config/kubaos/
   README.md   want to change X? go here
-  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ files/ wallpapers/
+  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ idle/ files/ wallpapers/
   terminal/   ghostty/ foot/ tmux/ zsh/ fastfetch/
   editor/     nvim/
   tools/      git/ lazygit/ yazi/ bat/ bacon/ fuzzel/
@@ -222,7 +236,8 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 | To change | Edit | Applies |
 |---|---|---|
 | Hyprland: binds, gaps, monitors, rules | `~/.config/kubaos/desktop/hypr/hyprland.lua` (same Lua API as `~/.config/hypr/`) | `hyprctl reload` (`SUPER + SHIFT + CTRL + R`) |
-| Idle, lock screen | `~/.config/kubaos/desktop/hypr/{hypridle,hyprlock}.conf` | restart hypridle / next lock |
+| Idle times and the lid | `~/.config/kubaos/desktop/idle/idle.toml`, or the Command menu ("Idle, Keep awake and the lid" above) | at once from the menu; `kubaos-idle apply` after a hand edit |
+| Idle listeners of your own, lock screen | `~/.config/kubaos/desktop/hypr/{hypridle,hyprlock}.conf` | `kubaos-idle apply` / next lock |
 | Shell aliases, exports | `~/.config/kubaos/terminal/zsh/zshrc` | new shell |
 | tmux | `~/.config/kubaos/terminal/tmux/tmux.conf` | `tmux source-file ~/.config/tmux/tmux.conf` |
 | Ghostty, foot, fuzzel | `~/.config/kubaos/terminal/{ghostty/config,foot/foot.ini}`, `~/.config/kubaos/tools/fuzzel/fuzzel.ini` | reload or new window |
@@ -348,7 +363,7 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 - **Base:** Ubuntu Server 26.04 LTS ("resolute"), minimal, with snapd, cloud-init and the Ubuntu Pro adverts ripped out. apt owns the system: kernel, firmware, drivers, Hyprland, PAM, Docker, Chrome. `/etc/os-release` says KubaOS where a person reads it and stays Ubuntu where apt and install scripts look.
 - **Disk:** LUKS2, then btrfs with flat subvolumes (`@ @home @snapshots @log @cache @nix @docker @swap`), snapper with timeline and apt pre/post snapshots, grub-btrfs so snapshots are bootable from GRUB.
 - **Session:** autologin on tty1 after the LUKS unlock, zsh, `start-hyprland`. No display manager.
-- **Compositor:** Hyprland 0.56 from `ppa:cppiber/hyprland`, held in apt, with a Lua config split into files (`config/hypr/`). Dwindle layout, Omarchy 4 keybinds moved to hjkl. hypridle locks after 5 min, turns screens off after 10, and suspends after 30 on battery only.
+- **Compositor:** Hyprland 0.56 from `ppa:cppiber/hyprland`, held in apt, with a Lua config split into files (`config/hypr/`). Dwindle layout, Omarchy 4 keybinds moved to hjkl. hypridle locks after 5 min, turns screens off after 10, and suspends after 30 on battery only, unless you change them (`kubaos-idle`).
 - **Shell:** KubaOS's own, written in QML on Quickshell v0.3.2 (pinned), in the structure of Caelestia: bar, notifications, OSD, control center, power menu, wallpaper picker, lock screen with password, fingerprint and security key in parallel. The Command menu is [Kotodama](https://github.com/SuplenC/kotodama), drawn by the shell in its colors.
 - **User environment:** standalone home-manager (nixos-26.05) owns everything in `$HOME`. KubaOS's configs are read-only links from the store into `~/.config`, and yours live in `~/.config/kubaos` (above, "Make it yours"). Nix apps get the GPU through home-manager's `targets.genericLinux.gpu`.
 - **Theming:** matugen (`scheme-fidelity`) turns the wallpaper into Material 3 colors and renders 22 files in `~/.local/state/theme/` for every consumer, the pointer included: Bibata, recoloured. Geist, M PLUS 1 for the Japanese bits, Material Symbols, Papirus.

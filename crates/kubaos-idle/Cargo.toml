@@ -1,0 +1,29 @@
+[package]
+name = "kubaos-idle"
+description = "KubaOS's idle settings: when the screen locks, turns off and suspends, what the lid does, and Keep awake"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-idle"
+path = "src/main.rs"
+
+[dependencies]
+# Reads durations and times of day as the clock's timers and alarms do, and the clock's time
+# format for the toasts.
+kubaos-clock.workspace = true
+kubaos-user-layer.workspace = true
+jiff.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+# Writes the settings file in place, keeping the user's comments.
+toml_edit = "0.25"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

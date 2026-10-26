@@ -11,7 +11,9 @@
 #                               reload Ghostty or tmux. Home activation runs it.
 #   dot-session restart-shell   in the session: restart the default Quickshell
 #                               once the screen is unlocked
-#   dot-session restart-idle    in the session: restart hypridle
+#   dot-session restart-idle    in the session: restart hypridle, if it runs
+#   dot-session start-idle      in the session: restart hypridle, or start it if it
+#                               isn't running. `kubaos-idle` runs it after a change
 #   dot-session leave logout|reboot|poweroff
 #                               in the session: stop graphical-session.target
 #                               and wait for it, then end the session, reboot
@@ -137,6 +139,13 @@ restart_idle() {
   exec hypridle
 }
 
+start_idle() {
+  if pkill -u "$(id -u)" -x hypridle; then
+    wait_gone pgrep -u "$(id -u)" -x hypridle
+  fi
+  exec hypridle
+}
+
 # leave ACTION: the session's units (the portals, the polkit agent, Ghostty)
 # stop while Hyprland still answers them, and only then does the session end.
 # Hyprland gone first, they lose the display and die with an error, and the
@@ -157,6 +166,7 @@ case "${1:-}" in
     ;;
   restart-shell) restart_shell ;;
   restart-idle) restart_idle ;;
+  start-idle) start_idle ;;
   leave)
     [[ $# == 2 && $2 =~ ^(logout|reboot|poweroff)$ ]] || { usage >&2; exit 2; }
     leave "$2"

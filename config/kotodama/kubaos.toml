@@ -418,12 +418,153 @@ icon = "view-refresh"
 keywords = ["shell", "bar", "reload"]
 run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
 
+# Idle (crates/kubaos-idle). "Lock after…", "Screens off after…", "Suspend
+# after…" and "When the lid closes…" are the Extension's own Items: Enter
+# lists the usual choices, each for both power sources or one (Ctrl+K), or
+# type a time after the word, `lock-after 2m`, `suspend-after 1h30m ac`,
+# `screens-off-after never battery`. They write
+# ~/.config/kubaos/desktop/idle/idle.toml through `kubaos-idle set`, which
+# restarts hypridle and says what changed in a toast.
+#
+# Keep awake: nothing locks, goes dark or suspends by itself for a while, as
+# a logind idle inhibitor hypridle honours; the bar shows it while on. The
+# `idle` id is the old "Toggle idle", so a `hide` of it still works.
+
 [extensions.kubaos.actions.idle]
-title = "Toggle idle (lock/suspend)"
-subtitle = "Stop or start the auto-lock, screen-off and suspend"
+title = "Keep awake until turned off"
+subtitle = "No auto-lock, screens off or suspend till you stop it (SUPER + CTRL + I)"
 icon = "preferences-desktop-screensaver"
-keywords = ["hypridle", "caffeine", "keep awake", "auto lock"]
-run = ["sh", "-c", "pkill -x hypridle && hyprctl notify -1 3000 'rgb(ffb4ab)' 'Idle off: no auto-lock or suspend' || { hyprctl notify -1 3000 'rgb(c2c1ff)' 'Idle on'; exec hypridle; }"]
+keywords = ["caffeine", "keep awake", "no sleep", "hypridle", "auto lock", "toggle idle"]
+run = ["kubaos-idle", "awake", "on"]
+
+[extensions.kubaos.actions.keep-awake-1h]
+title = "Keep awake for 1 hour"
+subtitle = "No auto-lock, screens off or suspend for an hour, then as before"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep", "presentation"]
+run = ["kubaos-idle", "awake", "1h"]
+
+[extensions.kubaos.actions.keep-awake-2h]
+title = "Keep awake for 2 hours"
+subtitle = "No auto-lock, screens off or suspend for two hours, then as before"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep", "movie"]
+run = ["kubaos-idle", "awake", "2h"]
+
+[extensions.kubaos.actions.keep-awake-for]
+title = "Keep awake for…"
+subtitle = "As long as you say: 30m, 3h, 1h30m"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "no sleep"]
+keyword = "keep-awake"
+run = ["kubaos-idle", "awake", "for", "{duration}"]
+arguments = [{ name = "duration", placeholder = "30m" }]
+
+[extensions.kubaos.actions.keep-awake-off]
+title = "Stop keeping awake"
+subtitle = "Lock, screens off and suspend after a time idle again"
+icon = "preferences-desktop-screensaver"
+keywords = ["caffeine", "keep awake", "auto lock", "idle"]
+run = ["kubaos-idle", "awake", "off"]
+
+[extensions.kubaos.actions.idle-reset]
+title = "Idle: KubaOS defaults"
+subtitle = "Lock 5 min, screens off 10 min, suspend 30 min on battery only; the lid suspends on battery"
+icon = "preferences-desktop-screensaver"
+keywords = ["idle settings", "reset", "lock", "suspend", "lid", "hypridle"]
+run = ["kubaos-idle", "reset"]
+confirm = true
+
+# A lock, suspend, shut down or reboot once, at a time, whether you're idle or
+# not (systemd user timers, `systemctl --user list-timers 'kubaos-scheduled*'`).
+# One at a time, whichever it is: a new one replaces it and says what it
+# replaced. Toasts a minute and 10 s before, with Cancel; the bar counts down
+# with the action's icon. Keep awake doesn't hold any of them back. Shut down
+# and reboot leave through `dot-session leave`, as the power menu does.
+
+[extensions.kubaos.actions.lock-in]
+title = "Lock in…"
+subtitle = "Lock the screen once after a while, even if you're working: 10m, 1h30m"
+icon = "system-lock-screen"
+keywords = ["lock later", "lock timer", "scheduled lock", "parental"]
+keyword = "lock-in"
+run = ["kubaos-idle", "schedule", "lock", "in", "{duration}"]
+arguments = [{ name = "duration", placeholder = "10m" }]
+
+[extensions.kubaos.actions.lock-at]
+title = "Lock at…"
+subtitle = "Lock the screen once at a time, even if you're working: 20:00, 9pm, friday 17:00"
+icon = "system-lock-screen"
+keywords = ["lock later", "lock timer", "scheduled lock", "bedtime"]
+keyword = "lock-at"
+run = ["kubaos-idle", "schedule", "lock", "at", "{time}"]
+arguments = [{ name = "time", placeholder = "20:00" }]
+
+[extensions.kubaos.actions.suspend-in]
+title = "Suspend in…"
+subtitle = "Suspend once after a while, locked first: 30m, 1h30m"
+icon = "system-suspend"
+keywords = ["sleep timer", "suspend later", "scheduled suspend"]
+keyword = "suspend-in"
+run = ["kubaos-idle", "schedule", "suspend", "in", "{duration}"]
+arguments = [{ name = "duration", placeholder = "30m" }]
+
+[extensions.kubaos.actions.suspend-at]
+title = "Suspend at…"
+subtitle = "Suspend once at a time, locked first: 23:00, friday 18:00"
+icon = "system-suspend"
+keywords = ["sleep timer", "suspend later", "scheduled suspend", "bedtime"]
+keyword = "suspend-at"
+run = ["kubaos-idle", "schedule", "suspend", "at", "{time}"]
+arguments = [{ name = "time", placeholder = "23:00" }]
+
+[extensions.kubaos.actions.shutdown-in]
+title = "Shut down in…"
+subtitle = "Power off once after a while, the session closed cleanly first: 30m, 2h"
+icon = "system-shutdown"
+keywords = ["power off later", "shutdown timer", "sleep timer", "scheduled shutdown"]
+keyword = "shutdown-in"
+run = ["kubaos-idle", "schedule", "shutdown", "in", "{duration}"]
+arguments = [{ name = "duration", placeholder = "30m" }]
+confirm = true
+
+[extensions.kubaos.actions.shutdown-at]
+title = "Shut down at…"
+subtitle = "Power off once at a time, the session closed cleanly first: 23:00, friday 18:00"
+icon = "system-shutdown"
+keywords = ["power off later", "shutdown timer", "scheduled shutdown"]
+keyword = "shutdown-at"
+run = ["kubaos-idle", "schedule", "shutdown", "at", "{time}"]
+arguments = [{ name = "time", placeholder = "23:00" }]
+confirm = true
+
+[extensions.kubaos.actions.reboot-in]
+title = "Reboot in…"
+subtitle = "Restart once after a while, the session closed cleanly first: 10m, 1h"
+icon = "system-reboot"
+keywords = ["restart later", "reboot timer", "scheduled reboot"]
+keyword = "reboot-in"
+run = ["kubaos-idle", "schedule", "reboot", "in", "{duration}"]
+arguments = [{ name = "duration", placeholder = "10m" }]
+confirm = true
+
+[extensions.kubaos.actions.reboot-at]
+title = "Reboot at…"
+subtitle = "Restart once at a time, the session closed cleanly first: 03:00, sunday 4am"
+icon = "system-reboot"
+keywords = ["restart later", "reboot timer", "scheduled reboot"]
+keyword = "reboot-at"
+run = ["kubaos-idle", "schedule", "reboot", "at", "{time}"]
+arguments = [{ name = "time", placeholder = "03:00" }]
+confirm = true
+
+# `lock-cancel` cancels whichever action is scheduled, the lock included.
+[extensions.kubaos.actions.lock-cancel]
+title = "Cancel scheduled action"
+subtitle = "The lock, suspend, shut down or reboot you scheduled doesn't come"
+icon = "system-lock-screen"
+keywords = ["scheduled lock", "scheduled shutdown", "scheduled reboot", "scheduled suspend", "cancel", "stop", "timer"]
+run = ["kubaos-idle", "schedule", "cancel"]
 
 # Workspace groups follow the desk position (config/hypr/workspaces.lua). The
 # Extension itself sends one Item a position, "Workspace group: position 1

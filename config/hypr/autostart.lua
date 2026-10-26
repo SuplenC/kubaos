@@ -64,8 +64,12 @@ hl.on("hyprland.start", function()
   -- Desktop shell (bar, Command menu, notifications, OSD, lock, wallpaper).
   start("qs")
 
-  -- Idle: lock 5 min, screens off 10 min, suspend 30 min on battery.
-  start("hypridle")
+  -- Idle: lock 5 min, screens off 10 min, suspend 30 min on battery, or the
+  -- user's idle settings. `kubaos-idle session` writes hypridle's listeners
+  -- from them, holds the lid when its setting isn't logind's, then becomes
+  -- hypridle. Without kubaos-idle, plain hypridle, on the last listeners
+  -- written.
+  start("command -v kubaos-idle >/dev/null && exec kubaos-idle session || exec hypridle")
 
   -- Runs `dot-hypr-lid sync` at login and on every monitor hotplug, so the
   -- laptop panel comes back when the last external goes with the lid closed.

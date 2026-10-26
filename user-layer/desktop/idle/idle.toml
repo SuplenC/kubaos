@@ -1,0 +1,32 @@
+# Your idle settings: ~/.config/kubaos/desktop/idle/idle.toml. When the screen locks, the
+# screens go off and the laptop suspends after a time idle, on battery and plugged in, and what
+# closing the lid does. The Command menu's "Lock after…", "Screens off after…", "Suspend
+# after…" and "When the lid closes…" write the lines below, comments kept, and apply at once.
+# After a hand edit, run `kubaos-idle apply`.
+#
+# A wait is a duration, "90s", "2m", "1h30m", "5h", or "never" (a number alone is minutes).
+# The lock and screens off take 30 s at the least, suspend 1 min; a day at the most.
+#
+# On battery (KubaOS's values):
+# [battery]
+# lock = "5m"
+# screens_off = "10m"
+# suspend = "30m"
+# lid = "suspend"
+#
+# Plugged in. Suspend never, so builds and downloads go on at a desk:
+# [ac]
+# lock = "5m"
+# screens_off = "10m"
+# suspend = "never"
+# lid = "nothing"
+#
+# `lid` is "suspend", "lock" or "nothing". Docked, or with a second screen connected, closing
+# the lid never does anything. Outside your session logind does what the lid did before
+# (/etc/systemd/logind.conf.d/lid.conf): suspend on battery, nothing plugged in.
+#
+# Keep awake (Command menu, or SUPER + CTRL + I) holds all of this off for a while; a lock
+# you schedule with "Lock in…" or "Lock at…" still comes.
+#
+# Full docs: docs/CONTRACTS.md, "Defaults and the user layer"
+# (https://github.com/SuplenC/kubaos/blob/main/docs/CONTRACTS.md).

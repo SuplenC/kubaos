@@ -26,11 +26,16 @@ fn ids(extension: &Extension<FakeBus, FakeRunner>) -> Vec<String> {
     extension.items().map(|item| item.id).collect()
 }
 
+/// The Items the Extension always sends, in order: the toggles, then the idle settings.
+fn always() -> Vec<&'static str> {
+    toggles::ids().into_iter().chain(crate::idle::ids()).collect()
+}
+
 #[test]
-fn without_a_config_there_are_the_toggles() {
+fn without_a_config_there_are_the_toggles_and_the_idle_settings() {
     let extension = Extension::new(FakeBus::default(), FakeRunner::default());
 
-    assert_eq!(ids(&extension), toggles::ids());
+    assert_eq!(ids(&extension), always());
 }
 
 #[test]
@@ -38,7 +43,7 @@ fn the_actions_come_before_the_toggles() {
     let extension = configured("[actions.mine]\ntitle = \"Mine\"\nrun = [\"true\"]");
 
     assert_eq!(ids(&extension).first().map(String::as_str), Some("mine"));
-    assert_eq!(ids(&extension).len(), toggles::ids().len() + 1);
+    assert_eq!(ids(&extension).len(), always().len() + 1);
 }
 
 #[test]
@@ -117,11 +122,8 @@ fn the_keyboard_items_come_after_the_toggles() {
 
     let ids = ids(&extension);
 
-    assert_eq!(ids[..toggles::ids().len()], toggles::ids());
-    assert_eq!(
-        ids[toggles::ids().len()..],
-        ["keyboard:us", "keyboard:it", "keyboard-add"]
-    );
+    assert_eq!(ids[..always().len()], always());
+    assert_eq!(ids[always().len()..], ["keyboard:us", "keyboard:it", "keyboard-add"]);
 }
 
 #[test]
@@ -186,7 +188,7 @@ fn the_wallpaper_set_items_come_after_the_keyboard_items() {
     let ids = ids(&extension);
 
     assert_eq!(
-        ids[toggles::ids().len()..],
+        ids[always().len()..],
         [
             "keyboard:us",
             "keyboard-add",
