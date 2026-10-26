@@ -12,8 +12,8 @@
 use super::detect;
 use super::parse::*;
 use super::{
-    BwLogin, BwMethod, CardId, Cmd, Env, Facts, Inputs, MokState, PromptKind, SetupEvent, Stream,
-    Sys,
+    BwLogin, BwMethod, CardId, Cmd, Env, Facts, Inputs, MokState, PhoneStep, PromptKind, SetupEvent,
+    Stream, Sys,
 };
 use crate::bitwarden;
 use crate::bitwarden::FormMethod;
@@ -170,18 +170,23 @@ pub fn run(
         card,
         emit,
     };
-    let r = match card {
-        CardId::Tuxedo => tuxedo(&mut ctx, inputs),
-        CardId::Fingerprint => fingerprint(&mut ctx, inputs),
-        CardId::Yubikey => yubikey(&mut ctx),
-        CardId::Bitwarden => bitwarden(&mut ctx, inputs),
-        CardId::Git => git(&mut ctx, inputs),
+    // A run may finish with words of its own for the card, in place of its detected summary.
+    let r: R<Option<String>> = match card {
+        CardId::Tuxedo => tuxedo(&mut ctx, inputs).map(|()| None),
+        CardId::Fingerprint => fingerprint(&mut ctx, inputs).map(|()| None),
+        CardId::Yubikey => yubikey(&mut ctx).map(|()| None),
+        CardId::Bitwarden => bitwarden(&mut ctx, inputs).map(|()| None),
+        CardId::Git => git(&mut ctx, inputs).map(|()| None),
+        CardId::Phone => phone(&mut ctx, inputs),
     };
     let Ctx { sys, emit, .. } = ctx;
     match r {
-        Ok(()) => {
+        Ok(said) => {
             let online = detect::online(sys);
-            let status = detect::card_status(sys, env, card, online);
+            let mut status = detect::card_status(sys, env, card, online);
+            if let Some(said) = said {
+                status.summary = said;
+            }
             emit(SetupEvent::Finished { card, status });
             true
         }
@@ -630,10 +635,71 @@ fn git(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
     Ok(())
 }
 
+// ------------------------------------------------------------------- phone
+
+/// The phone card's step, through [`kubaos_phone::phone`]. The test and the check finish with what
+/// they found, which the card shows in place of its summary.
+fn phone(ctx: &mut Ctx, inputs: &Inputs) -> R<Option<String>> {
+    use kubaos_phone::phone as link;
+    match inputs.phone.clone().unwrap_or_default() {
+        PhoneStep::On => {
+            ctx.prompt(PromptKind::Wait, "Starting KDE Connect…", None);
+            let st = link::turn_on(ctx.sys.phone()).map_err(phone_failure)?;
+            let name = st.name.unwrap_or_else(|| "this laptop".into());
+            ctx.log(Level::Info, format!("ok  KDE Connect runs; phones see this laptop as {name}"));
+            Ok(None)
+        }
+        PhoneStep::Off => {
+            link::turn_off(ctx.sys.phone()).map_err(phone_failure)?;
+            ctx.log(Level::Info, "ok  phone link off, KDE Connect stopped");
+            Ok(None)
+        }
+        PhoneStep::Accept { device } => {
+            ctx.prompt(PromptKind::Wait, "Pairing…", None);
+            let phone = link::accept(ctx.sys.phone(), &device).map_err(phone_failure)?;
+            ctx.log(Level::Info, format!("ok  paired with {}", phone.name));
+            Ok(None)
+        }
+        PhoneStep::Test => {
+            let phone = link::send_test(ctx.sys.phone()).map_err(phone_failure)?;
+            ctx.log(Level::Info, format!("ok  clipboard sent to {}", phone.name));
+            Ok(Some(format!(
+                "Sent “{}”. Paste it on {}: that's what should show up.",
+                kubaos_phone::TEST_TEXT,
+                phone.name
+            )))
+        }
+        PhoneStep::Check => {
+            let text = link::received(ctx.sys.phone()).map_err(phone_failure)?;
+            Ok(Some(format!("The laptop got “{}” from the phone.", gist(&text))))
+        }
+    }
+}
+
+/// The first line of `text`, cut to what fits on the card.
+fn gist(text: &str) -> String {
+    const MAX: usize = 60;
+    let line = text.lines().next().unwrap_or_default();
+    if line.chars().count() <= MAX && !text.contains('\n') {
+        return line.to_string();
+    }
+    let cut: String = line.chars().take(MAX).collect();
+    format!("{}…", cut.trim_end())
+}
+
+/// What stopped the phone card, with its cause and what to do.
+fn phone_failure(e: kubaos_phone::Error) -> Fail {
+    let error = match std::error::Error::source(&e) {
+        Some(cause) => format!("{e}: {cause}"),
+        None => e.to_string(),
+    };
+    fail(error, e.hint())
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::fake::FakeSys;
-    use super::super::{GitIdentity, State};
+    use super::super::{CardStatus, GitIdentity, PhoneStep, State};
     use super::*;
     use crate::bitwarden::Login;
     use crate::bitwarden::fake::Fake;
@@ -1075,5 +1141,94 @@ mod tests {
             e => panic!("{e:?}"),
         }
         assert!(!s.ran_any("pamu2fcfg"));
+    }
+
+    fn phone(fake: kubaos_phone::fake::Fake, step: Option<PhoneStep>) -> (FakeSys, bool, Vec<SetupEvent>) {
+        let mut s = FakeSys::new();
+        s.phone = fake;
+        let inputs = Inputs {
+            phone: step,
+            ..Inputs::default()
+        };
+        let (ok, evs) = go(&mut s, CardId::Phone, &inputs);
+        (s, ok, evs)
+    }
+
+    fn finished(evs: &[SetupEvent]) -> &CardStatus {
+        match evs.last() {
+            Some(SetupEvent::Finished { status, .. }) => status,
+            e => panic!("{e:?}"),
+        }
+    }
+
+    #[test]
+    fn setting_up_the_phone_turns_the_link_on_and_waits_for_a_phone() {
+        let (s, ok, evs) = phone(kubaos_phone::fake::Fake::new(), None);
+
+        assert!(ok, "{}", all_text(&evs));
+        assert_eq!(s.phone.calls, ["on", "start"]);
+        assert_eq!(finished(&evs).state, State::Waiting);
+    }
+
+    #[test]
+    fn accepting_pairs_the_phone_that_asked() {
+        let id = kubaos_phone::fake::iphone().id;
+        let fake = kubaos_phone::fake::Fake::running(vec![kubaos_phone::fake::iphone_asking()]);
+
+        let (s, ok, evs) = phone(fake, Some(PhoneStep::Accept { device: id.clone() }));
+
+        assert!(ok, "{}", all_text(&evs));
+        assert_eq!(s.phone.calls, [format!("Accept {id}")]);
+        assert_eq!(finished(&evs).summary, "Paired with iPhone, in reach.");
+    }
+
+    #[test]
+    fn the_test_copy_says_what_to_paste_on_the_phone() {
+        let fake = kubaos_phone::fake::Fake::running(vec![kubaos_phone::fake::iphone()]);
+
+        let (s, ok, evs) = phone(fake, Some(PhoneStep::Test));
+
+        assert!(ok, "{}", all_text(&evs));
+        assert_eq!(s.phone.clipboard, kubaos_phone::TEST_TEXT);
+        let done = finished(&evs);
+        assert_eq!(done.state, State::Done);
+        assert!(done.summary.contains("Paste it on iPhone"), "{}", done.summary);
+        assert!(done.summary.contains(kubaos_phone::TEST_TEXT), "{}", done.summary);
+    }
+
+    #[test]
+    fn what_the_phone_sent_shows_on_the_card() {
+        let mut fake = kubaos_phone::fake::Fake::running(vec![kubaos_phone::fake::iphone()]);
+        fake.clipboard = "sent from the phone".into();
+
+        let (_, ok, evs) = phone(fake, Some(PhoneStep::Check));
+
+        assert!(ok, "{}", all_text(&evs));
+        assert!(finished(&evs).summary.contains("“sent from the phone”"), "{}", finished(&evs).summary);
+    }
+
+    #[test]
+    fn with_nothing_from_the_phone_yet_the_card_says_how_to_send_it() {
+        let mut fake = kubaos_phone::fake::Fake::running(vec![kubaos_phone::fake::iphone()]);
+        fake.clipboard = kubaos_phone::TEST_TEXT.into();
+
+        let (_, ok, evs) = phone(fake, Some(PhoneStep::Check));
+
+        assert!(!ok);
+        match evs.last() {
+            Some(SetupEvent::Failed { hint: Some(h), .. }) => assert!(h.contains("Send clipboard"), "{h}"),
+            e => panic!("{e:?}"),
+        }
+    }
+
+    #[test]
+    fn turning_the_phone_link_off_stops_kde_connect_and_leaves_the_card_to_do() {
+        let fake = kubaos_phone::fake::Fake::running(vec![kubaos_phone::fake::iphone()]);
+
+        let (s, ok, evs) = phone(fake, Some(PhoneStep::Off));
+
+        assert!(ok, "{}", all_text(&evs));
+        assert_eq!(s.phone.calls, ["off", "stop"]);
+        assert_eq!(finished(&evs).state, State::Needed);
     }
 }

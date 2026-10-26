@@ -1,6 +1,6 @@
 //! A made-up machine for work on Kōbō and screenshots: a TUXEDO with Secure Boot
-//! on, a fingerprint reader, a YubiKey plugged in, Bitwarden logged out and
-//! no git identity.
+//! on, a fingerprint reader, a YubiKey plugged in, Bitwarden logged out, no git
+//! identity and the phone link off. Turned on, an iPhone asks to pair at once.
 //! Actions play the real event shapes with fake timings and flip the card.
 
 use std::sync::Mutex;
@@ -8,12 +8,15 @@ use std::thread::sleep;
 use std::time::Duration;
 
 use super::{
-    BwMethod, CardId, CardStatus, Facts, Inputs, MokState, PromptKind, SetupEvent, State, Status,
+    BwMethod, CardId, CardStatus, Facts, Inputs, MokState, PhoneStep, PromptKind, SetupEvent, State,
+    Status,
 };
 use crate::bitwarden::Agent;
 use crate::bitwarden::KeyInfo;
 use crate::bitwarden::Overview;
 use crate::event::Level;
+use crate::phone::Battery;
+use crate::phone::Device;
 
 /// Which machine the demo pretends to be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -363,6 +366,60 @@ impl Demo {
                     *e = Some(email);
                 }
             }
+            CardId::Phone => {
+                let Facts::Phone { link } = &next.facts else {
+                    emit(fail("no phone facts", "The demo machine has none."));
+                    return false;
+                };
+                let mut link = link.clone();
+                let mut said = None;
+                match inputs.phone.clone().unwrap_or_default() {
+                    PhoneStep::On => {
+                        emit(p(PromptKind::Wait, "Starting KDE Connect…", None));
+                        self.wait(900);
+                        emit(log("ok  KDE Connect runs; phones see this laptop as kubaos"));
+                        link.on = true;
+                        link.running = true;
+                        link.addresses = vec!["192.168.1.23".into()];
+                        link.devices = vec![demo_stranger(), demo_iphone(false)];
+                    }
+                    PhoneStep::Off => {
+                        emit(log("ok  phone link off, KDE Connect stopped"));
+                        link = crate::phone::Status {
+                            name: link.name,
+                            ..crate::phone::Status::default()
+                        };
+                    }
+                    PhoneStep::Accept { device } => {
+                        let Some(asking) = link.devices.iter_mut().find(|d| d.id == device && d.wants_to_pair) else {
+                            emit(fail(
+                                &format!("{device} isn't asking to pair"),
+                                "In the phone's KDE Connect app, tap this laptop, then Request pairing.",
+                            ));
+                            return false;
+                        };
+                        emit(p(PromptKind::Wait, "Pairing…", None));
+                        self.wait(700);
+                        *asking = demo_iphone(true);
+                        emit(log("ok  paired with iPhone"));
+                    }
+                    PhoneStep::Test => {
+                        self.wait(400);
+                        emit(log("ok  clipboard sent to iPhone"));
+                        said = Some(format!(
+                            "Sent “{}”. Paste it on iPhone: that's what should show up.",
+                            crate::phone::TEST_TEXT
+                        ));
+                    }
+                    PhoneStep::Check => {
+                        said = Some("The laptop got “Hi from the phone” from the phone.".to_string());
+                    }
+                }
+                next = super::detect::phone_card(link);
+                if let Some(said) = said {
+                    next.summary = said;
+                }
+            }
         }
         self.finish(card, next, emit)
     }
@@ -378,6 +435,46 @@ impl Demo {
         emit(SetupEvent::Finished { card, status: next });
         true
     }
+}
+
+/// The demo iPhone: asking to pair, or paired and in reach.
+fn demo_iphone(paired: bool) -> Device {
+    Device {
+        id: "897224eb_f278_4be9_bd3f_f76230491def".into(),
+        name: "iPhone".into(),
+        kind: "phone".into(),
+        paired,
+        reachable: true,
+        wants_to_pair: !paired,
+        verification_key: Some("807704F2".into()),
+        battery: paired.then_some(Battery {
+            charge: 82,
+            charging: false,
+        }),
+    }
+}
+
+/// Someone else's computer on the same network, the way an office's shows up.
+fn demo_stranger() -> Device {
+    Device {
+        id: "site24".into(),
+        name: "site24".into(),
+        kind: "desktop".into(),
+        reachable: true,
+        ..Device::default()
+    }
+}
+
+/// The phone card with the link off, or on with the demo iPhone paired.
+fn demo_phone(paired: bool) -> CardStatus {
+    let link = crate::phone::Status {
+        on: paired,
+        running: paired,
+        name: Some("kubaos".into()),
+        addresses: if paired { vec!["192.168.1.23".into()] } else { vec![] },
+        devices: if paired { vec![demo_iphone(true)] } else { vec![] },
+    };
+    super::detect::phone_card(link)
 }
 
 /// The demo vault's SSH keys, as a pull from `folders` (none: the whole vault) leaves them: the
@@ -489,6 +586,7 @@ fn initial(machine: Machine) -> Status {
             },
             bitwarden,
             git,
+            demo_phone(false),
         ],
         Machine::Vm => vec![
             absent(
@@ -528,6 +626,7 @@ fn initial(machine: Machine) -> Status {
             },
             bitwarden,
             git,
+            demo_phone(false),
         ],
         Machine::Installed => installed(),
     };
@@ -608,6 +707,7 @@ fn installed() -> Vec<CardStatus> {
                 full_name: Some("Kuba Example".into()),
             },
         ),
+        demo_phone(true),
     ]
 }
 
@@ -638,6 +738,14 @@ mod tests {
         for c in CardId::ALL {
             assert!(d.run(c, &inputs, &mut |_| {}), "{c:?}");
         }
+        assert_eq!(d.status().card(CardId::Phone).unwrap().state, State::Needed, "the iPhone asks to pair");
+        let accept = Inputs {
+            phone: Some(PhoneStep::Accept {
+                device: demo_iphone(true).id,
+            }),
+            ..Default::default()
+        };
+        assert!(d.run(CardId::Phone, &accept, &mut |_| {}));
         let s = d.status();
         assert!(s.settled());
         assert!(s.reboot_pending());

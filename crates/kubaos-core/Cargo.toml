@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+kubaos-phone.workspace = true
 kubaos-user-layer.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -16,4 +17,5 @@ thiserror.workspace = true
 test-suite = []
 
 [dev-dependencies]
+kubaos-phone = { workspace = true, features = ["fake"] }
 tempfile.workspace = true

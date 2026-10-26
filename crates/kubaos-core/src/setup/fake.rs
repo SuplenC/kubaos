@@ -20,6 +20,8 @@ pub struct FakeSys {
     pub creates: Vec<(String, String)>,
     /// The Bitwarden card's machine: bw, its files and the keyring.
     pub bw: crate::bitwarden::fake::Fake,
+    /// The phone card's machine: KDE Connect, its unit and the clipboard.
+    pub phone: kubaos_phone::fake::Fake,
 }
 
 impl FakeSys {
@@ -130,5 +132,9 @@ impl Sys for FakeSys {
 
     fn bitwarden(&mut self) -> &mut dyn crate::bitwarden::Machine {
         &mut self.bw
+    }
+
+    fn phone(&mut self) -> &mut dyn kubaos_phone::Link {
+        &mut self.phone
     }
 }

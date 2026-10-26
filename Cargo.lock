@@ -2213,6 +2213,7 @@ dependencies = [
 name = "kubaos-core"
 version = "0.1.0"
 dependencies = [
+ "kubaos-phone",
  "kubaos-user-layer",
  "serde",
  "serde_json",
@@ -2257,6 +2258,17 @@ dependencies = [
  "signal-hook",
  "tempfile",
  "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
+name = "kubaos-phone"
+version = "0.1.0"
+dependencies = [
+ "kubaos-user-layer",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

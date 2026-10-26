@@ -3,7 +3,8 @@
 # (`kubaos-kobo`), its graphical front end, the Command menu's KubaOS
 # Extension (`kotodama-kubaos`), yazi's launcher and the Downloads tidy
 # (`kubaos-files`), the Bluetooth pairing agent (`kubaos-bluetooth`), the
-# automount for removable drives (`kubaos-automount`), the date engine
+# automount for removable drives (`kubaos-automount`), the phone link
+# through KDE Connect (`kubaos-phone`), the date engine
 # behind the clock popup and the menu's date answers (`kubaos-clock`), and the
 # system monitor behind the bar's pill, its popup and the menu's `cpu`, `ram`
 # and `battery` answers (`kubaos-sysmon`), and where each app's settings live
@@ -19,6 +20,7 @@ members = [
     "crates/kubaos-files",
     "crates/kubaos-bluetooth",
     "crates/kubaos-automount",
+    "crates/kubaos-phone",
     "crates/kubaos-clock",
     "crates/kubaos-sysmon",
     "crates/kubaos-user-layer",
@@ -33,6 +35,7 @@ license = "MIT OR Apache-2.0"
 kubaos-core = { path = "crates/kubaos-core" }
 kubaos-cursor = { path = "crates/kubaos-cursor" }
 kubaos-clock = { path = "crates/kubaos-clock" }
+kubaos-phone = { path = "crates/kubaos-phone" }
 kubaos-sysmon = { path = "crates/kubaos-sysmon" }
 kubaos-user-layer = { path = "crates/kubaos-user-layer" }
 # Kotodama's calculator reads dates with jiff too, so the menu and the popup agree on zones and

@@ -20,6 +20,7 @@ let
       "sysmon"
       "files"
       "wallpapers"
+      "phone"
     ];
     terminal = [
       "ghostty"

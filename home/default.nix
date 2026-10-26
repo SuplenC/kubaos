@@ -14,6 +14,7 @@
     ./desktop.nix
     ./files.nix
     ./menu.nix
+    ./phone.nix
     ./secrets.nix
     ./session.nix
     ./shell.nix

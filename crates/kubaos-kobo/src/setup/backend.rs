@@ -3,12 +3,14 @@
 
 use std::process::{Command, Stdio};
 
-use kubaos_core::setup::{self, CardId, Env, Inputs, RealSys, SetupEvent, Status, demo};
+use kubaos_core::setup::{self, CardId, CardStatus, Env, Inputs, RealSys, SetupEvent, Status, demo};
 
 pub trait SetupBackend: Send + Sync {
     /// Detects every card. Slow-ish (bw status takes a second or three):
     /// the app calls it on a worker thread.
     fn status(&self) -> Status;
+    /// Detects one card again.
+    fn card(&self, id: CardId) -> CardStatus;
     fn run(&self, card: CardId, inputs: &Inputs, emit: &mut dyn FnMut(SetupEvent));
     /// Writes the marker, so setup stays closed at the next login.
     fn finish(&self) -> Result<(), String>;
@@ -39,6 +41,13 @@ impl Real {
 impl SetupBackend for Real {
     fn status(&self) -> Status {
         setup::status(&mut RealSys::new(), &self.env)
+    }
+
+    fn card(&self, id: CardId) -> CardStatus {
+        let sys = &mut RealSys::new();
+        // The phone card polls every few seconds and needs no internet: no nmcli for it.
+        let online = !id.needs_network() || setup::online(sys);
+        setup::card_status(sys, &self.env, id, online)
     }
 
     fn run(&self, card: CardId, inputs: &Inputs, emit: &mut dyn FnMut(SetupEvent)) {
@@ -131,6 +140,11 @@ impl SetupBackend for Demo {
         // Detection takes a moment on the real thing too.
         std::thread::sleep(std::time::Duration::from_millis(300).div_f32(self.demo.speed));
         self.demo.status()
+    }
+
+    fn card(&self, id: CardId) -> CardStatus {
+        let status = self.demo.status();
+        status.card(id).cloned().expect("the demo has every card")
     }
 
     fn run(&self, card: CardId, inputs: &Inputs, emit: &mut dyn FnMut(SetupEvent)) {

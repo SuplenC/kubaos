@@ -69,6 +69,8 @@ pub enum App {
     Files,
     /// The wallpaper sets the picker shows.
     Wallpapers,
+    /// The phone link's switch.
+    Phone,
     Ghostty,
     Foot,
     Tmux,
@@ -85,7 +87,7 @@ pub enum App {
 }
 
 impl App {
-    pub const ALL: [App; 21] = [
+    pub const ALL: [App; 22] = [
         App::Hypr,
         App::Quickshell,
         App::Cursor,
@@ -94,6 +96,7 @@ impl App {
         App::Sysmon,
         App::Files,
         App::Wallpapers,
+        App::Phone,
         App::Ghostty,
         App::Foot,
         App::Tmux,
@@ -120,6 +123,7 @@ impl App {
             App::Sysmon => "sysmon",
             App::Files => "files",
             App::Wallpapers => "wallpapers",
+            App::Phone => "phone",
             App::Ghostty => "ghostty",
             App::Foot => "foot",
             App::Tmux => "tmux",
@@ -145,7 +149,8 @@ impl App {
             | App::Keyboard
             | App::Sysmon
             | App::Files
-            | App::Wallpapers => Group::Desktop,
+            | App::Wallpapers
+            | App::Phone => Group::Desktop,
             App::Ghostty | App::Foot | App::Tmux | App::Zsh | App::Fastfetch => Group::Terminal,
             App::Nvim => Group::Editor,
             App::Git | App::Lazygit | App::Yazi | App::Bat | App::Bacon | App::Fuzzel => Group::Tools,

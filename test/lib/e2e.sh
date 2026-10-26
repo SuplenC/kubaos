@@ -76,7 +76,7 @@ c_path() {
 NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv eza bat fd rg delta dust dysk
   btop jq yq xh tldr just glow gh fastfetch lazydocker bacon cargo-nextest hyperfine sccache wild
   oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth
-  kubaos-automount ripdrag)
+  kubaos-automount kubaos-phone ripdrag)
 APT_TOOLS=(foot fuzzel wl-copy grim slurp playerctl socat qalc notify-send brightnessctl clang mold
   unzip git ssh secret-tool pamtester pamu2fcfg nmcli wpctl snapper fprintd-verify boltctl
   powerprofilesctl ddcutil xdg-open hyprlock hypridle nautilus file-roller 7z unar magick udisksctl)
@@ -2458,6 +2458,56 @@ c_bluetooth() {
   return "$bad"
 }
 
+# The phone link (home/phone.nix, crates/kubaos-phone). No phone and no
+# systemd user manager here, so pairing and sending are checked on the laptop;
+# here the unit behind its flag, that nothing of KDE Connect's sits where a bus
+# or a session would start it, and the command's opt-in.
+c_phone() {
+  local bad=0 out rc f
+  local bin="$USER_HOME/.nix-profile/bin/kubaos-phone" flag="$USER_HOME/.config/kubaos/desktop/phone/phone-link"
+  local unit="$USER_HOME/.config/systemd/user/kubaos-phone.service"
+
+  grep -qE '^ExecStart=/nix/store/[^ ]+-kdeconnect-kde-[^/]+/bin/kdeconnectd$' "$unit" 2>/dev/null &&
+    grep -qxF "ConditionPathExists=$flag" "$unit" &&
+    grep -qE '^ExecStartPost=.*/bin/kubaos-phone restrict$' "$unit" &&
+    echo "ok   the user unit runs kdeconnectd only while $flag exists, and restricts its plugins" ||
+    { echo "FAIL $unit doesn't run kdeconnectd behind the flag"; bad=1; }
+  [[ -x $bin ]] || { echo "FAIL the switch left no $bin"; return 1; }
+
+  for f in "$USER_HOME/.nix-profile/bin/kdeconnectd" "$USER_HOME/.nix-profile/bin/kdeconnect-cli" \
+    "$USER_HOME/.nix-profile/share/dbus-1/services/org.kde.kdeconnect.service" \
+    "$USER_HOME/.local/share/dbus-1/services/org.kde.kdeconnect.service" \
+    "$USER_HOME/.nix-profile/etc/xdg/autostart/org.kde.kdeconnect.daemon.desktop" \
+    "$USER_HOME/.config/autostart/org.kde.kdeconnect.daemon.desktop"; do
+    [[ -e $f ]] && { echo "FAIL $f could start KDE Connect behind the flag"; bad=1; }
+  done
+  ((bad)) || echo "ok   no activation file, autostart entry or command of KDE Connect's in the home"
+
+  rm -f "$flag"
+  out="$(as_user "$bin" status --json 2>&1)"
+  [[ $out == *'"on": false'* && $out == *'"running": false'* && $out == *'"devices": []'* ]] &&
+    echo "ok   status says off, and lists nothing" ||
+    { echo "FAIL status with the link off printed: $out"; bad=1; }
+  rc=0
+  out="$(as_user "$bin" ring 2>&1)" || rc=$?
+  ((rc == 1)) && [[ $out == "kubaos-phone: the phone link is off"* ]] &&
+    echo "ok   ringing with the link off fails, saying it's off" ||
+    { echo "FAIL ring with the link off exited $rc: $out"; bad=1; }
+
+  # With no user manager, starting the unit fails; the flag still follows on and off.
+  as_user "$bin" on >/dev/null 2>&1
+  [[ -e $flag ]] || { echo "FAIL kubaos-phone on left no $flag"; bad=1; }
+  as_user "$bin" off >/dev/null 2>&1
+  [[ -e $flag ]] && { echo "FAIL kubaos-phone off left $flag"; bad=1; }
+  rc=0
+  as_user "$bin" pair >/dev/null 2>&1 || rc=$?
+  ((rc == 2)) || { echo "FAIL a usage error exits $rc, not 2"; bad=1; }
+  ((bad)) || echo "ok   kubaos-phone on|off writes and removes the flag, and a usage error exits 2"
+
+  rm -f "$flag"
+  return "$bad"
+}
+
 c_user_layer() {
   zrun "'$REPO/test/user-layer-check' '$REPO'"
 }
@@ -2967,7 +3017,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shutdown splash shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth recorder session_reload wallpaper_sets wallpaper_video packages suites dot_config user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shutdown splash shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites dot_config user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

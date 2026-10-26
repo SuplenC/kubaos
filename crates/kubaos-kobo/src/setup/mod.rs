@@ -7,6 +7,9 @@
 //! re-running never redoes a finished one. Keyboard first, like the
 //! install screens: Up/Down pick a card, Enter or Tab go into it, Esc comes back,
 //! Space toggles, Left/Right switch choices.
+//!
+//! The phone card checks again on its own while it waits for a phone, since the
+//! pairing request arrives from the phone, not from a key pressed here.
 
 pub mod backend;
 pub mod tour;
@@ -19,8 +22,9 @@ use std::time::{Duration, Instant};
 use iced::{Size, Subscription, Task, event, window};
 use kubaos_core::Level;
 use kubaos_core::setup::{
-    BwLogin, BwMethod, CardId, CardStatus, Facts, GitIdentity, Inputs, MokState, PromptKind,
-    SetupEvent, State, Status, YKMAN_PREP, git_identity_ok, mok_password_ok, next_finger,
+    BwLogin, BwMethod, CardId, CardStatus, Facts, GitIdentity, Inputs, MokState, PhoneStep,
+    PromptKind, SetupEvent, State, Status, YKMAN_PREP, git_identity_ok, mok_password_ok,
+    next_finger,
 };
 
 pub use view::view;
@@ -30,6 +34,14 @@ use crate::edit::{self, Caret, Edit};
 use crate::field::Pointer;
 use crate::theme::motion;
 use backend::SetupBackend;
+
+/// How often the phone card checks again while it waits: a pairing request shows within this.
+const PHONE_POLL: Duration = Duration::from_secs(2);
+
+/// How long the phone card waits for a phone before it explains adding the laptop by address.
+/// The laptop shows up in the phone's app within seconds on a home network; one that blocks
+/// discovery never shows it.
+const BY_ADDRESS_AFTER: Duration = Duration::from_secs(30);
 
 /// Everything that can have focus on the setup screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +60,8 @@ pub enum SF {
     /// The vault's folders, one ticked or not under a cursor.
     Folders,
     LogOut,
+    /// The phone card's way out: the link off, KDE Connect stopped.
+    TurnOff,
     GitName,
     GitEmail,
     ShowSecrets,
@@ -151,6 +165,13 @@ pub enum Act {
     Terminal,
     Recheck,
     LogOut,
+    /// Accept the pairing request the phone card shows.
+    Accept,
+    /// The test copy to the phone.
+    Test,
+    /// What the phone sent back.
+    Check,
+    TurnOff,
 }
 
 #[derive(Debug, Clone)]
@@ -169,8 +190,9 @@ pub struct Run {
     pub prompt_at: Instant,
     pub log: Vec<(Level, String)>,
     pub outcome: Option<Outcome>,
-    /// A log out, which leaves its card to do on purpose.
-    pub logout: bool,
+    /// A run that leaves its card to do on purpose (a log out, the phone link off), with what
+    /// to say once it's done.
+    pub undo: Option<&'static str>,
 }
 
 impl Run {
@@ -208,6 +230,11 @@ pub struct Setup {
     pub tour: Option<tour::Tour>,
     /// The card to open on, instead of the first that wants something.
     pub start: Option<CardId>,
+    /// The phone card detected again, while it waits for a phone.
+    phone_rx: Option<mpsc::Receiver<CardStatus>>,
+    phone_polled: Instant,
+    /// Since when the phone card has waited for a phone, for the by-address help.
+    pub phone_waiting_since: Option<Instant>,
 }
 
 impl Setup {
@@ -248,6 +275,9 @@ impl Setup {
             size: Size::new(1280.0, 800.0),
             tour: None,
             start: None,
+            phone_rx: None,
+            phone_polled: now,
+            phone_waiting_since: None,
         };
         s.detect();
         s
@@ -376,11 +406,49 @@ impl Setup {
         }
     }
 
+    /// The phone link as the phone card last saw it.
+    pub fn phone_link(&self) -> Option<&kubaos_core::phone::Status> {
+        match self.card(CardId::Phone).map(|c| &c.facts) {
+            Some(Facts::Phone { link }) => Some(link),
+            _ => None,
+        }
+    }
+
+    /// The phone card offers to turn the link off once it is on.
+    pub fn can_turn_off(&self) -> bool {
+        self.sel == CardId::Phone && self.phone_link().is_some_and(|l| l.on)
+    }
+
+    /// The phone card waits on the phone: for a pairing request, or for the user to accept one
+    /// (the phone may withdraw it).
+    fn polls_phone(&self) -> bool {
+        self.sel == CardId::Phone
+            && !self.running()
+            && !self.detecting()
+            && self.phone_link().is_some_and(|l| l.on && l.running)
+            && self.card(CardId::Phone).is_some_and(|c| c.state.open())
+    }
+
+    /// No phone has shown up for a while: the network may block discovery.
+    pub fn phone_by_address(&self) -> bool {
+        self.phone_waiting_since
+            .is_some_and(|since| self.now.saturating_duration_since(since) >= BY_ADDRESS_AFTER)
+    }
+
     /// The selected card's main button.
     pub fn primary(&self) -> Option<(&'static str, Act)> {
         let c = self.selected()?;
         let s = c.state;
+        let phone = self.phone_link();
         let r = match (c.id, s) {
+            (CardId::Phone, State::Needed) if phone.is_some_and(|l| l.request().is_some()) => {
+                ("Accept the pairing", Act::Accept)
+            }
+            (CardId::Phone, State::Needed) if phone.is_some_and(|l| l.on) => {
+                ("Start KDE Connect again", Act::Run)
+            }
+            (CardId::Phone, State::Needed) => ("Set up a phone", Act::Run),
+            (CardId::Phone, State::Done) => ("Send a test copy", Act::Test),
             (_, State::Waiting) => ("Check again", Act::Recheck),
             (CardId::Tuxedo, State::Needed) => {
                 let drivers = matches!(c.facts, Facts::Tuxedo { drivers: true, .. });
@@ -414,6 +482,7 @@ impl Setup {
             (CardId::Yubikey, State::Needed | State::Done) => Some(("Check again", Act::Recheck)),
             (CardId::Bitwarden, State::Done) => Some(("Pull again", Act::Run)),
             (CardId::Git, State::Done) => Some(("Save changes", Act::Run)),
+            (CardId::Phone, State::Done) => Some(("Check what the phone sent", Act::Check)),
             _ => None,
         }
     }
@@ -473,6 +542,9 @@ impl Setup {
         }
         if self.can_log_out() {
             v.push(SF::LogOut);
+        }
+        if self.can_turn_off() {
+            v.push(SF::TurnOff);
         }
         if self.status.is_some() {
             v.push(SF::Skip);
@@ -566,6 +638,7 @@ impl Setup {
                     email: f.git_email.trim().to_string(),
                 })
             }
+            CardId::Phone => i.phone = Some(PhoneStep::On),
             _ => {}
         }
         i
@@ -638,6 +711,8 @@ impl Setup {
                 .flash
                 .is_some_and(|f| t - f < Duration::from_millis(900))
             || self.tour.is_some()
+            || self.phone_rx.is_some()
+            || self.polls_phone()
     }
 
     pub fn update(&mut self, msg: Message) -> Task<Message> {
@@ -765,6 +840,7 @@ impl Setup {
                 }
             }
         }
+        self.poll_phone(now);
         if self
             .toast
             .as_ref()
@@ -773,6 +849,38 @@ impl Setup {
             self.toast = None;
         }
         Task::none()
+    }
+
+    /// Detects the phone card again every [`PHONE_POLL`] while it waits on the phone, and keeps
+    /// the time it has waited for one.
+    fn poll_phone(&mut self, now: Instant) {
+        if let Some(rx) = &self.phone_rx
+            && let Ok(card) = rx.try_recv()
+        {
+            self.phone_rx = None;
+            if !self.running()
+                && let Some(st) = &mut self.status
+                && let Some(c) = st.cards.iter_mut().find(|c| c.id == CardId::Phone)
+            {
+                *c = card;
+            }
+        }
+        let waiting = self.card(CardId::Phone).is_some_and(|c| c.state == State::Waiting);
+        match (waiting, self.phone_waiting_since) {
+            (true, None) => self.phone_waiting_since = Some(now),
+            (false, Some(_)) => self.phone_waiting_since = None,
+            _ => {}
+        }
+        let due = now.saturating_duration_since(self.phone_polled) >= PHONE_POLL;
+        if due && self.phone_rx.is_none() && self.polls_phone() {
+            self.phone_polled = now;
+            let (tx, rx) = mpsc::channel();
+            let b = Arc::clone(&self.backend);
+            std::thread::spawn(move || {
+                let _ = tx.send(b.card(CardId::Phone));
+            });
+            self.phone_rx = Some(rx);
+        }
     }
 
     fn on_event(&mut self, e: SetupEvent) {
@@ -787,11 +895,9 @@ impl Setup {
                 run.prompt_at = now;
             }
             SetupEvent::Log { level, line, .. } => run.log.push((level, line)),
-            // Logged out: the card is to do again on purpose, with the login form back.
-            SetupEvent::Finished { status, .. } if run.logout => {
-                run.outcome = Some(Outcome::Done(
-                    "Logged out. Log in again, to this server or another.".into(),
-                ));
+            // Logged out, or the phone link off: the card is to do again on purpose.
+            SetupEvent::Finished { status, .. } if run.undo.is_some() => {
+                run.outcome = Some(Outcome::Done(run.undo.unwrap_or_default().into()));
                 run.prompt = None;
                 if let Some(st) = &mut self.status
                     && let Some(c) = st.cards.iter_mut().find(|c| c.id == status.id)
@@ -803,7 +909,7 @@ impl Setup {
             }
             // A run that left its card still to do didn't work, whatever it exited with:
             // showing "Done." over a cleared form would ask for the same thing again in silence.
-            SetupEvent::Finished { status, .. } if status.state == State::Needed => {
+            SetupEvent::Finished { status, .. } if left_to_do(&status) => {
                 run.outcome = Some(Outcome::Failed {
                     error: "it ran, but this still isn't done".into(),
                     hint: Some(format!("{} The log has what it said.", status.summary)),
@@ -860,7 +966,7 @@ impl Setup {
             return Task::none();
         }
         let inputs = self.inputs();
-        self.spawn(inputs, false)
+        self.spawn(inputs, None)
     }
 
     /// Logs out of Bitwarden: no form needed, the session goes with it.
@@ -873,10 +979,23 @@ impl Setup {
             bw_logout: true,
             ..Inputs::default()
         };
-        self.spawn(inputs, true)
+        self.spawn(inputs, Some("Logged out. Log in again, to this server or another."))
     }
 
-    fn spawn(&mut self, inputs: Inputs, logout: bool) -> Task<Message> {
+    /// One step of the phone card that needs no form.
+    fn phone_step(&mut self, step: PhoneStep, undo: Option<&'static str>) -> Task<Message> {
+        if self.running() {
+            self.flash = Some(Instant::now());
+            return Task::none();
+        }
+        let inputs = Inputs {
+            phone: Some(step),
+            ..Inputs::default()
+        };
+        self.spawn(inputs, undo)
+    }
+
+    fn spawn(&mut self, inputs: Inputs, undo: Option<&'static str>) -> Task<Message> {
         let card = self.sel;
         let (tx, rx) = mpsc::channel();
         let b = self.backend.clone();
@@ -886,13 +1005,15 @@ impl Setup {
             });
         });
         self.run_rx = Some(rx);
+        // A phone card detected before this run would land after it, stale.
+        self.phone_rx = None;
         self.run = Some(Run {
             card,
             prompt: None,
             prompt_at: Instant::now(),
             log: vec![],
             outcome: None,
-            logout,
+            undo,
         });
         self.log_open = false;
         self.now = Instant::now();
@@ -903,6 +1024,18 @@ impl Setup {
         match a {
             Act::Run => self.start(),
             Act::LogOut => self.log_out(),
+            Act::Accept => {
+                let Some(device) = self.phone_link().and_then(|l| l.request()).map(|d| d.id.clone()) else {
+                    return Task::none();
+                };
+                self.phone_step(PhoneStep::Accept { device }, None)
+            }
+            Act::Test => self.phone_step(PhoneStep::Test, None),
+            Act::Check => self.phone_step(PhoneStep::Check, None),
+            Act::TurnOff => self.phone_step(
+                PhoneStep::Off,
+                Some("Phone link off. KDE Connect stopped; set a phone up again any time."),
+            ),
             Act::Recheck => {
                 if !self.detecting() && !self.running() {
                     self.detect();
@@ -1030,6 +1163,7 @@ impl Setup {
                 Task::none()
             }
             SF::LogOut => self.act(Act::LogOut),
+            SF::TurnOff => self.act(Act::TurnOff),
             SF::Folders => {
                 if let Some(name) = self.bw_folders().get(self.form.folder_at).map(|f| f.to_string()) {
                     self.toggle_folder(&name);
@@ -1285,4 +1419,10 @@ impl Setup {
             _ => "",
         }
     }
+}
+
+/// A run that left its card still to do didn't work, whatever it exited with. The phone card is
+/// the exception once its link runs: what is left (accepting a pairing) is up to the phone.
+fn left_to_do(status: &CardStatus) -> bool {
+    status.state == State::Needed && !matches!(&status.facts, Facts::Phone { link } if link.running)
 }
