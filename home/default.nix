@@ -17,6 +17,7 @@
     ./phone.nix
     ./secrets.nix
     ./session.nix
+    ./setup.nix
     ./shell.nix
     ./state.nix
     ./suites.nix

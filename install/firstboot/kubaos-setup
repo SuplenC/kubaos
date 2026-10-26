@@ -1,4 +1,18 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # KubaOS first-boot setup, any time: TUXEDO drivers, fingerprint, YubiKey,
-# Bitwarden. Each card is checked fresh, so finished ones stay finished.
-exec /usr/bin/kobo --setup "$@"
+# Bitwarden, git and the phone. Each card is checked fresh, so finished ones
+# stay finished. Arguments go to `kobo --setup` (`--card phone`).
+#
+# It runs the user's `kobo`, the one home-manager installs from the release
+# with every switch, so a new card reaches the machine with the update that
+# carries it. Without one (a home not switched yet) it runs the build the
+# install copied to /usr/bin/kobo.
+set -euo pipefail
+
+for kobo in "${HOME:-/nonexistent}/.nix-profile/bin/kobo" /usr/bin/kobo; do
+  if [[ -x $kobo ]]; then
+    exec "$kobo" --setup "$@"
+  fi
+done
+echo "kubaos-setup: no kobo in ~/.nix-profile/bin or /usr/bin; run home-manager switch" >&2
+exit 127

@@ -46,6 +46,9 @@ rec {
   # The `kubaos` command, so an update's fixes to it arrive with the release
   # (home/updates.nix installs it).
   kubaos = callCrate ../crates/kubaos-cli/package.nix;
+  # Kōbō, for first-boot setup (home/setup.nix), so a new setup card arrives
+  # with the release, as `kubaos` does.
+  kubaos-kobo = callCrate ../crates/kubaos-kobo/package.nix;
   # yazi's launcher and the Downloads tidy (home/files.nix).
   kubaos-files = callCrate ../crates/kubaos-files/package.nix;
   # The automount for removable drives, and their Eject and photo import

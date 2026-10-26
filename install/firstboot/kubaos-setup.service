@@ -10,7 +10,8 @@ After=graphical-session.target
 
 [Service]
 Type=exec
-ExecStart=/usr/bin/kobo --setup --first-boot
+# kubaos-setup runs the home's kobo, from the release, and the install's without one.
+ExecStart=/usr/bin/kubaos-setup --first-boot
 Restart=no
 
 [Install]
