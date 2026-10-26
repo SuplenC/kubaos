@@ -63,6 +63,8 @@ COPY system/lib.sh system/manifest.sh system/packages.toml system/10-strip.sh sy
 COPY system/files/apt/ /opt/dotfiles/system/files/apt/
 COPY system/files/netplan/ /opt/dotfiles/system/files/netplan/
 COPY system/files/logind.conf.d/ /opt/dotfiles/system/files/logind.conf.d/
+COPY system/files/systemd/system.conf.d/ /opt/dotfiles/system/files/systemd/system.conf.d/
+COPY system/files/systemd/user.conf.d/ /opt/dotfiles/system/files/systemd/user.conf.d/
 RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=kubaos-image-apt-lists-${TARGETARCH},target=/var/lib/apt/lists,sharing=locked \
     apt-get update \
@@ -111,6 +113,7 @@ FROM nix AS apps
 ARG TARGETARCH
 COPY system/40-apps.sh /opt/dotfiles/system/
 COPY system/files/chrome/ /opt/dotfiles/system/files/chrome/
+COPY system/files/systemd/docker.service.d/ /opt/dotfiles/system/files/systemd/docker.service.d/
 RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=kubaos-image-apt-lists-${TARGETARCH},target=/var/lib/apt/lists,sharing=locked \
     apt-get update \
