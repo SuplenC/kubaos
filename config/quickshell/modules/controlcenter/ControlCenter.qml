@@ -79,7 +79,7 @@ Drawer {
                     spacing: Theme.spacing.sm
 
                     StyledText {
-                        text: Qt.formatDateTime(clock.date, "HH:mm")
+                        text: Qt.formatDateTime(clock.date, Time.timeFormat)
                         font.pixelSize: Theme.font.xxl + 6
                         font.weight: Font.DemiBold
                         font.features: Theme.font.tabular
@@ -98,7 +98,7 @@ Drawer {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: Qt.formatDateTime(clock.date, "dddd, d MMMM") + (Battery.available ? `  ·  ${Math.round(Battery.percentage * 100)}% ${Battery.timeLeft}` : "")
+                    text: Qt.formatDateTime(clock.date, Time.dateFormat) + (Battery.available ? `  ·  ${Math.round(Battery.percentage * 100)}% ${Battery.timeLeft}` : "")
                     color: Theme.m3onSurfaceVariant
                 }
             }

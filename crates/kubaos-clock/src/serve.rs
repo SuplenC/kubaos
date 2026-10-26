@@ -49,8 +49,10 @@ use crate::query;
 use crate::query::Answer;
 use crate::query::Context;
 use crate::settings;
+use crate::settings::DateOrder;
 use crate::settings::Settings;
 use crate::settings::SettingsError;
+use crate::settings::TimeFormat;
 use crate::words;
 use crate::zones::Zones;
 
@@ -233,6 +235,8 @@ impl Server {
                 "firstWeekdayName": words::weekday_name(first),
                 "analog": self.settings.analog,
                 "barCountdown": self.settings.bar_countdown,
+                "timeFormat": self.settings.time_format.map_or("", TimeFormat::name),
+                "dateOrder": self.settings.date_order.map_or("", DateOrder::name),
             },
             "country": self.holidays.country(),
             "here": { "label": Zones::of(now.time_zone()).label, "offset": now.offset().seconds() },

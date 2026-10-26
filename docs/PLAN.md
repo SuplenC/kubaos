@@ -1,6 +1,6 @@
 # KubaOS plan: TUXEDO InfinityBook Pro 14 Gen10, Ubuntu + Hyprland + own Quickshell
 
-The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTALL-INTERNALS.md`) now does most of these phases in one go, all but the TUXEDO drivers. The phases still describe what it installs and why. Hardware: Ryzen AI 9 HX 370, 64 GB DDR5, 2 TB WD_Black SN7100, USB4 dock with 2x LG UltraGear 1080p 120 Hz.
+The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTALL-INTERNALS.md`) now does most of these phases in one go, all but the TUXEDO drivers. The phases still describe what it installs and why. Reference hardware: the TUXEDO InfinityBook Pro 14 Gen10, with external screens on a USB4 dock.
 
 ## Guiding rules
 
@@ -36,7 +36,6 @@ The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTAL
 ## Phase 0: Before the laptop arrives (on the Mac)
 
 - Put your current configs in one git repo now: `~/.config/{nvim,tmux,tms,ghostty,lazygit,btop,ohmyposh,git,gh}` and `~/.zshrc`. Your tmux config is already a repo, so add it as a subtree or copy it in.
-- Export Arc bookmarks and passwords for Chrome.
 - Note your SSH and GPG keys (move them with a USB stick or password manager, not the cloud).
 - Download Ubuntu Server 26.04 ISO and write it to a USB stick.
 - Optional: run `cargo build --timings` with `RUSTFLAGS="-Zthreads=8" cargo +nightly` on a large Rust workspace to have both baselines.
@@ -111,7 +110,7 @@ sudo apt-mark hold hyprland xdg-desktop-portal-hyprland hypridle hyprlock hyprpo
 **Autologin:** a systemd drop-in for `getty@tty1` with `--autologin <user>`. `~/.zprofile` (home-manager) sources `system/files/hyprland-autostart.zsh` last, which execs `start-hyprland` on tty1 (the PPA ships no uwsm). `touch ~/.config/hypr/no-autostart` disables it.
 
 **Lua config** in `~/Projects/dotfiles/config/hypr/`, split into files:
-- `monitors.lua`: laptop panel, the two UltraGears at 1920x1080@120, positions
+- `monitors.lua`: every screen at its preferred mode, placed and scaled by Hyprland; a layout of your own goes in the user layer's `hyprland.lua`
 - `workspaces.lua`: per-screen workspaces, 1-10 on each screen
 - `keybinds.lua`: ported from Omarchy 4 (already Lua), window focus on `SUPER+hjkl`, screen focus on `SUPER+arrows`, move window `SUPER+SHIFT+hjkl`, resize `SUPER+CTRL+hjkl`, workspaces `SUPER+1..0`
 - `fallback.lua`: `SUPER+ALT+Return` foot and `SUPER+ALT+Space` fuzzel, always bound, so you can work with the shell dead
@@ -160,7 +159,7 @@ sudo apt-mark hold hyprland xdg-desktop-portal-hyprland hypridle hyprlock hyprpo
 
 **`~/.cargo/config.toml`** (managed by home-manager):
 - `linker = "clang"` with `-C link-arg=-fuse-ld=mold` for `x86_64-unknown-linux-gnu`; wild instead is one switch in `home/dev.nix` (`rustLinker`, see README "Rust")
-- `rustc-wrapper = "sccache"`, `SCCACHE_CACHE_SIZE=50G`
+- `rustc-wrapper = "sccache"`, `SCCACHE_CACHE_SIZE=10G` (sccache's own default; more in the user flake)
 
 ## Phase 7: Port zsh, tmux, tms, nvim
 
@@ -208,7 +207,7 @@ Weekly or whenever the bar's marker shows: `kubaos update` (or Update KubaOS in 
 - [ ] Btrfs subvolume conversion done and the manual `@` swap rollback tested once
 - [ ] `platform_profile` exposed by `tuxedo-drivers`
 - [ ] USB fingerprint reader works with `fprintd`
-- [ ] Both UltraGears at 120 Hz through the dock (`hyprctl monitors`)
+- [ ] Every screen on the dock at its preferred mode (`hyprctl monitors`)
 - [ ] Nix GPU wiring: Quickshell and Ghostty render with hardware acceleration
 - [ ] Quickshell PAM: lock screen accepts password and fingerprint
-- [ ] `cargo build --timings` on a large Rust workspace for the real comparison with the M5 Pro
+- [ ] `cargo build --timings` on a large Rust workspace for the real comparison with the Mac

@@ -31,6 +31,18 @@ Singleton {
     // The engine is running; false where kubaos-clock isn't installed.
     readonly property bool available: engine.running
 
+    // How the shell writes times and dates: the clock settings' `time_format`
+    // and `date_order`, else the locale's, which Qt reads from LC_TIME. Until
+    // the engine answers, the locale's.
+    readonly property bool twelveHour: settings.timeFormat ? settings.timeFormat === "12h" : root.localeTwelveHour(Qt.locale().timeFormat(Locale.ShortFormat))
+    readonly property bool dayFirst: settings.dateOrder ? settings.dateOrder === "day-month" : root.localeDayFirst(Qt.locale().dateFormat(Locale.LongFormat))
+    // Hours and minutes alone, for a face that puts the seconds or AM/PM apart.
+    readonly property string clockFormat: twelveHour ? "h:mm" : "HH:mm"
+    readonly property string timeFormat: twelveHour ? "h:mm AP" : "HH:mm"
+    readonly property string shortDateFormat: dayFirst ? "ddd d MMM" : "ddd MMM d"
+    readonly property string dateFormat: dayFirst ? "dddd, d MMMM" : "dddd, MMMM d"
+    readonly property string fullDateFormat: dayFirst ? "dddd, d MMMM yyyy" : "dddd, MMMM d, yyyy"
+
     // The bar's countdown, if the settings name one that exists.
     readonly property var barCountdown: (state.countdowns ?? []).find(c => c.name === settings.barCountdown) ?? null
 
@@ -115,6 +127,25 @@ Singleton {
     }
 
     // "12 d 4 h", "3 h 20 min", "4 min 10 s": what's left of `ms`, two units.
+    // A Qt date or time format without its quoted literals, whose letters
+    // would read as fields: es writes "d 'de' MMMM".
+    function fields(format: string): string {
+        return format.replace(/'[^']*'/g, "");
+    }
+
+    // The locale's short time format has an AM/PM field.
+    function localeTwelveHour(format: string): bool {
+        return /a/i.test(root.fields(format));
+    }
+
+    // The locale's long date format puts the day of the month before the
+    // month; the weekday's name (ddd, dddd) doesn't count.
+    function localeDayFirst(format: string): bool {
+        const plain = root.fields(format).replace(/d{3,}/g, "");
+        const day = plain.indexOf("d"), month = plain.indexOf("M");
+        return day >= 0 && (month < 0 || day < month);
+    }
+
     function left(ms: real): string {
         const s = Math.max(0, Math.round(ms / 1000));
         const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);

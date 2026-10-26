@@ -3,13 +3,13 @@
 
 local user_layer = require("user_layer")
 
--- The keyboard layouts are the user's: `layouts = ["us", "it(intl)"]` in
+-- The keyboard layouts are the user's: `layouts = ["us", "de(nodeadkeys)"]` in
 -- ~/.config/kubaos/desktop/keyboard/keyboard.toml, which `kubaos keyboard` writes.
 -- Until the user has that list they are the system's: /etc/default/keyboard,
 -- which the install writes from Kōbō's Language screen, and whose model and
 -- options always apply. `kubaos keyboard` writes the user's default there as
 -- well, for the console and the disk unlock. Several layouts reach Hyprland
--- as XKB's comma-separated lists (us,it and ,intl), the first the default;
+-- as XKB's comma-separated lists (us,de and ,nodeadkeys), the first the default;
 -- SUPER + SHIFT + Space switches (keybinds.lua). Read on every config load, so
 -- after a change `hyprctl reload` picks them up. Without either file (a
 -- hand-install that never set one), or without a layout in them, the US
@@ -41,7 +41,7 @@ local function system_keyboard(path)
 end
 
 -- The user's list as kubaos_core::keyboard::settings writes it, on one line:
--- `layouts = ["us", "it(intl)"]`. Nil without the file or the line, or with
+-- `layouts = ["us", "de(nodeadkeys)"]`. Nil without the file or the line, or with
 -- no layout in it.
 local function user_layouts()
   local file = io.open(user_layer.file("keyboard", "keyboard.toml"), "r")

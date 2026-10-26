@@ -38,6 +38,9 @@ const HEADROOM: u64 = 8_000_000_000;
 /// What a hostname may be: one RFC 1123 label, as
 /// `kubaos_core::engine::validate::valid_hostname` checks it.
 pub const HOSTNAME_RULE: &str = "Lowercase a-z, 0-9 and -, up to 63, with no - at either end.";
+/// The time zone the Timezone screen starts on. The live system runs on UTC and knows nothing of
+/// where it is, so no city is a better guess for everyone; the user types theirs.
+pub const DEFAULT_TIMEZONE: &str = "UTC";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiskMode {
@@ -98,7 +101,7 @@ impl Form {
         let mut f = Self {
             locale: pick(&probe.locales, "en_US.UTF-8"),
             keymaps: vec![pick(&probe.keymaps, "us")],
-            timezone: pick(&probe.timezones, "Europe/Rome"),
+            timezone: pick(&probe.timezones, DEFAULT_TIMEZONE),
             username: manifest.map(|m| m.username.clone()).unwrap_or_default(),
             hostname: manifest.map(|m| m.hostname.clone()).unwrap_or_default(),
             encrypt: true,
@@ -528,7 +531,7 @@ mod tests {
     fn defaults_from_demo_probe() {
         let p = demo_probe();
         let f = Form::new(&p);
-        assert_eq!(f.timezone, "Europe/Rome");
+        assert_eq!(f.timezone, "UTC", "no one's zone until they pick theirs");
         assert_eq!(f.username, "kuba");
         assert_eq!(f.hostname, "tuxedo", "the payload's");
         assert_eq!(f.disk.as_deref(), Some("/dev/nvme0n1"));

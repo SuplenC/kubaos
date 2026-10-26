@@ -12,7 +12,7 @@
 # as `kubaos keyboard list` prints them. Without the line, the ones the install wrote to
 # /etc/default/keyboard. The console and the disk's passphrase prompt type with the
 # default; `kubaos keyboard` writes it there too, and a hand edit here doesn't.
-# layouts = ["us", "it(intl)"]
+# layouts = ["us", "de(nodeadkeys)"]
 #
 # Full docs: docs/USING.md, "Keys that matter", and docs/CONTRACTS.md, "Defaults and the
 # user layer" (https://github.com/SuplenC/kubaos/blob/main/docs/CONTRACTS.md).

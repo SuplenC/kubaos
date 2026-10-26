@@ -197,3 +197,56 @@ fn a_users_holiday_file_beside_the_settings_is_read_and_a_broken_one_reported() 
     assert!(problem.is_some());
     assert!(countries.holidays("pl").is_some());
 }
+
+#[test]
+fn the_time_format_and_date_order_follow_the_locale_until_set() {
+    let settings = Settings::parse("").expect("parses");
+
+    assert_eq!(settings.time_format, None);
+    assert_eq!(settings.date_order, None);
+
+    let settings = Settings::parse("time_format = \"24h\"\ndate_order = \"day-month\"\n").expect("parses");
+
+    assert_eq!(settings.time_format, Some(TimeFormat::TwentyFourHour));
+    assert_eq!(settings.date_order, Some(DateOrder::DayMonth));
+}
+
+#[test]
+fn a_time_format_or_date_order_it_does_not_know_is_an_error() {
+    assert!(matches!(
+        Settings::parse("time_format = \"HH:mm\""),
+        Err(SettingsError::Value { key: "time_format", .. })
+    ));
+    assert!(matches!(
+        Settings::parse("date_order = \"year-first\""),
+        Err(SettingsError::Value { key: "date_order", .. })
+    ));
+}
+
+#[test]
+fn the_time_format_and_date_order_are_set_and_given_back_to_the_locale() {
+    let (_dir, path) = file(SEED);
+    let countries = Countries::bundled();
+
+    set(&path, "time-format", "12h", &countries).expect("12-hour");
+    set(&path, "date-order", "month-day", &countries).expect("month first");
+
+    let settings = load(&path);
+    assert_eq!(settings.time_format, Some(TimeFormat::TwelveHour));
+    assert_eq!(settings.date_order, Some(DateOrder::MonthDay));
+
+    set(&path, "time-format", "locale", &countries).expect("the locale's");
+    set(&path, "date-order", "locale", &countries).expect("the locale's");
+
+    let text = fs::read_to_string(&path).expect("read back");
+    assert!(!text.contains("time_format") && !text.contains("date_order"), "{text}");
+    assert!(text.contains("# Holidays."), "{text}");
+    assert!(matches!(
+        set(&path, "time-format", "25h", &countries),
+        Err(SettingsError::Value { .. })
+    ));
+    assert!(matches!(
+        set(&path, "date-order", "sideways", &countries),
+        Err(SettingsError::Value { .. })
+    ));
+}

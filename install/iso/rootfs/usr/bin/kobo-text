@@ -95,7 +95,7 @@ ask lang "Locale" "en_US.UTF-8"
 # Comma-separated, the default first; a variant goes in brackets, us(intl). The
 # engine checks the names against xkb when it validates.
 while :; do
-  ask kb "Keyboard layouts your fingers actually know, the default first (us,it)" "us"
+  ask kb "Keyboard layouts your fingers actually know, the default first (us,de)" "us"
   kb="${kb// /}"
   IFS=, read -r -a kbs <<<"$kb"
   ok=true
@@ -103,7 +103,7 @@ while :; do
     [[ $k =~ ^[a-z0-9_-]+(\([A-Za-z0-9_-]+\))?$ ]] || ok=false
   done
   ((${#kbs[@]} >= 1 && ${#kbs[@]} <= 4)) && $ok && break
-  echo "One to four layouts, comma-separated, like us,it or us(intl). Again."
+  echo "One to four layouts, comma-separated, like us,de or us(intl). Again."
 done
 kb_layouts=""
 kb_variants=""
@@ -113,7 +113,9 @@ for k in "${kbs[@]}"; do
   kb_layouts+="${kb_layouts:+, }$(toml_str "${k%%(*}")"
   kb_variants+="${kb_variants:+, }$(toml_str "$variant")"
 done
-ask tz "Timezone" "Europe/Rome"
+# UTC, as in Kōbō (DEFAULT_TIMEZONE in crates/kubaos-kobo/src/model.rs): the live system
+# has no idea where it is.
+ask tz "Timezone, like Europe/Berlin or America/New_York" "UTC"
 ask gitname "Git name" "$full"
 ask gitemail "Git email" ""
 ask enc "Encrypt the disk? (y/n)" "y"

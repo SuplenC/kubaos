@@ -23,7 +23,7 @@ DEMO=$USER_HOME/Projects/demo
 TOKEN_VALUE='tok-7c1f'\''"$(touch /tmp/pwned)`id`;|&'
 PEM_VALUE=$'-----BEGIN TEST KEY-----\nMIIBmarker9d2e\nline-two\n-----END TEST KEY-----'
 # The vault's SSH keys, by key file name under $SEED_DIR/keys.
-SSH_KEYS=(github work homelab dup evil)
+SSH_KEYS=(github work build dup evil)
 
 # bw_env CMD...: as kuba, login-like env plus the session bus and the CA.
 bw_env() {
@@ -76,7 +76,7 @@ c_bw_seed() {
   # A second GitHub account: its own Host alias for the same server.
   item="$(ssh_item 'Work GitHub' work "$work" '[{"name":"hosts","value":"github-work","type":0},{"name":"hostname","value":"github.com","type":0},{"name":"user","value":"git","type":0}]')"
   create item "$item" >/dev/null
-  item="$(ssh_item 'Homelab server' homelab "" '[{"name":"hosts","value":"homelab nas.lan","type":0},{"name":"hostname","value":"10.0.0.5","type":0},{"name":"user","value":"kuba","type":0},{"name":"port","value":"2222","type":0}]')"
+  item="$(ssh_item 'Build server' build "" '[{"name":"hosts","value":"build build.example.com","type":0},{"name":"hostname","value":"192.0.2.10","type":0},{"name":"user","value":"deploy","type":0},{"name":"port","value":"2022","type":0}]')"
   create item "$item" >/dev/null
   # The same name as the first GitHub item, created later in another folder, no hosts field.
   item="$(ssh_item GitHub dup "$work" '[]')"
@@ -167,7 +167,7 @@ EOF
   # shellcheck disable=SC2088 # kubaos prints ~ for $HOME.
   grep -qF '~/.ssh/github.pub is taken by "GitHub" (Personal): "GitHub" (Work) gets ~/.ssh/github-2.pub' "$log.txt" ||
     { echo "FAIL no warning naming the two keys called GitHub"; return 1; }
-  grep -qF 'Host blocks: GitHub (Personal), Work GitHub (Work), Homelab server (no folder)' "$log.txt" ||
+  grep -qF 'Host blocks: GitHub (Personal), Work GitHub (Work), Build server (no folder)' "$log.txt" ||
     { echo "FAIL summary doesn't name the keys with a Host block"; return 1; }
   grep -qF "key only: GitHub (Work). A 'hosts' field" "$log.txt" ||
     { echo "FAIL summary doesn't name the key without hosts, or the hint"; return 1; }
@@ -176,7 +176,7 @@ EOF
 
 c_bw_files() {
   local h=$USER_HOME bad=0 out
-  for f in .ssh/github.pub .ssh/github-2.pub .ssh/work-github.pub .ssh/homelab-server.pub .ssh/config.d/bitwarden \
+  for f in .ssh/github.pub .ssh/github-2.pub .ssh/work-github.pub .ssh/build-server.pub .ssh/config.d/bitwarden \
     .config/git-bitwarden/signing.gitconfig .config/git-bitwarden/allowed_signers .config/dot-bw/config; do
     [[ -f $h/$f ]] && echo "ok   ~/$f" || { echo "FAIL missing ~/$f"; bad=1; }
   done
@@ -197,9 +197,9 @@ c_bw_files() {
     grep -qx "identityfile $h/.ssh/work-github.pub" <<<"$out" && [[ "$(grep -c '^identityfile ' <<<"$out")" == 1 ]] &&
     echo "ok   ssh -G github-work: the second GitHub account, github.com with work-github.pub only" ||
     { echo "FAIL ssh -G github-work"; bad=1; }
-  out="$(bzsh 'ssh -G nas.lan')"
-  grep -qx 'hostname 10.0.0.5' <<<"$out" && grep -qx 'port 2222' <<<"$out" &&
-    echo "ok   ssh -G nas.lan (an item in no folder): 10.0.0.5:2222" || { echo "FAIL ssh -G nas.lan"; bad=1; }
+  out="$(bzsh 'ssh -G build.example.com')"
+  grep -qx 'hostname 192.0.2.10' <<<"$out" && grep -qx 'port 2022' <<<"$out" &&
+    echo "ok   ssh -G build.example.com (an item in no folder): 192.0.2.10:2022" || { echo "FAIL ssh -G build.example.com"; bad=1; }
   # Signed commit, verified through allowed_signers.
   out="$(bzsh 'rm -rf /tmp/signtest && git init -q /tmp/signtest && cd /tmp/signtest &&
     git commit -q --allow-empty -m signed && git log --show-signature -1' 2>&1)"
@@ -232,7 +232,7 @@ c_bw_folder() {
 
   printf 'folder=Work\n' | as_user tee -a "$conf" >/dev/null
   out="$(refresh_ssh)"
-  grep -qF '3 SSH key(s) in the folder "Work"' <<<"$out" && [[ ! -e $h/.ssh/homelab-server.pub ]] &&
+  grep -qF '3 SSH key(s) in the folder "Work"' <<<"$out" && [[ ! -e $h/.ssh/build-server.pub ]] &&
     same_key "$h/.ssh/github.pub" dup && same_key "$h/.ssh/work-github.pub" work &&
     [[ "$(grep -c '^Host ' "$h/.ssh/config.d/bitwarden")" == 1 ]] &&
     echo "ok   folder=Work: only Work's keys, its GitHub alone is github.pub, one Host block" ||
@@ -242,7 +242,7 @@ c_bw_folder() {
   printf 'folders=Personal, Work,Archive\n' | as_user tee -a "$conf" >/dev/null
   out="$(refresh_ssh)"
   grep -qF 'no folder "Archive" in the vault' <<<"$out" &&
-    grep -qF '4 SSH key(s) in the folders "Personal", "Work"' <<<"$out" && [[ ! -e $h/.ssh/homelab-server.pub ]] &&
+    grep -qF '4 SSH key(s) in the folders "Personal", "Work"' <<<"$out" && [[ ! -e $h/.ssh/build-server.pub ]] &&
     same_key "$h/.ssh/github.pub" github && same_key "$h/.ssh/github-2.pub" dup &&
     [[ "$(grep -c '^Host ' "$h/.ssh/config.d/bitwarden")" == 2 ]] &&
     echo "ok   folders=Personal, Work,Archive: a warning for Archive, the keys of both others, two Host blocks" ||
@@ -253,7 +253,7 @@ c_bw_folder() {
   out="$(refresh_ssh)"
   grep -qF 'no folder "dotfiles" in the vault' <<<"$out" && grep -qF 'none of the folders' <<<"$out" &&
     grep -qF '5 SSH key(s) in your vault' <<<"$out" &&
-    same_key "$h/.ssh/github.pub" github && same_key "$h/.ssh/github-2.pub" dup && [[ -f $h/.ssh/homelab-server.pub ]] &&
+    same_key "$h/.ssh/github.pub" github && same_key "$h/.ssh/github-2.pub" dup && [[ -f $h/.ssh/build-server.pub ]] &&
     [[ "$(grep -c '^Host ' "$h/.ssh/config.d/bitwarden")" == 3 ]] &&
     echo "ok   folder=dotfiles, missing from the vault: a warning, then every SSH key in the vault" ||
     { echo "FAIL folder=dotfiles missing"; printf '%s\n' "$out" | tail -20; bad=1; }

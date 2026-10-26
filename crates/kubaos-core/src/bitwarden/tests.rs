@@ -70,15 +70,15 @@ fn items() -> Vec<serde_json::Value> {
             json!([field("hosts", "github-work"), field("hostname", "github.com"), field("user", "git")]),
         ),
         ssh_item(
-            "Homelab server",
-            "homelab",
+            "Build server",
+            "build",
             None,
             3,
             json!([
-                field("hosts", "homelab nas.lan"),
-                field("hostname", "10.0.0.5"),
-                field("user", "kuba"),
-                field("port", "2222"),
+                field("hosts", "build build.example.com"),
+                field("hostname", "192.0.2.10"),
+                field("user", "deploy"),
+                field("port", "2022"),
             ]),
         ),
         ssh_item("GitHub", "dup", Some("f-work"), 4, json!([])),
@@ -128,7 +128,7 @@ fn machine() -> Fake {
         .answer(
             "timeout 20 ssh-add -l -E sha256",
             0,
-            &agent_lists(&["github", "work", "homelab", "dup", "evil"]),
+            &agent_lists(&["github", "work", "build", "dup", "evil"]),
         )
         .answer("git -C / config --get user.email", 0, "k@x.eu\n")
         .answer("git -C / config --get-all include.path", 0, "~/.config/git-bitwarden/signing.gitconfig\n")
@@ -214,7 +214,7 @@ fn a_pull_takes_every_ssh_key_in_the_vault_whatever_its_folder() {
         ("github.pub", "github"),
         ("github-2.pub", "dup"),
         ("work-github.pub", "work"),
-        ("homelab-server.pub", "homelab"),
+        ("build-server.pub", "build"),
         ("evil.pub", "evil"),
     ] {
         assert_eq!(public_key(&m, file), Some(format!("ssh-ed25519 AAAA{key}")), "{file}");
@@ -248,7 +248,7 @@ fn the_summary_names_the_keys_with_a_host_block_and_the_keys_without() {
 
     let summary = &out.report.summary;
     assert!(summary.contains(&"ssh    5 public key(s), 3 Host block(s) in ~/.ssh/config.d/bitwarden".to_string()));
-    assert!(summary.contains(&"       Host blocks: GitHub (Personal), Work GitHub (Work), Homelab server (no folder)".to_string()));
+    assert!(summary.contains(&"       Host blocks: GitHub (Personal), Work GitHub (Work), Build server (no folder)".to_string()));
     assert!(summary.contains(
         &"       key only: GitHub (Work). A 'hosts' field (hosts=example.com) gives a key its Host block".to_string()
     ));
@@ -269,7 +269,7 @@ fn each_host_block_names_the_agent_and_only_its_own_public_key() {
     ));
     assert!(conf.contains("Host github-work\n  HostName github.com\n  User git\n"));
     assert!(conf.contains(
-        "# Homelab server (no folder) (SHA256:homelab)\nHost homelab nas.lan\n  HostName 10.0.0.5\n  User kuba\n  Port 2222\n"
+        "# Build server (no folder) (SHA256:build)\nHost build build.example.com\n  HostName 192.0.2.10\n  User deploy\n  Port 2022\n"
     ));
     assert_eq!(host_blocks(&m), 3);
 }
@@ -378,12 +378,12 @@ fn folder_work_takes_only_works_keys_and_its_github_alone_is_github_pub() {
     let out = pull_parts(&mut m, ssh_only());
 
     assert!(out.text().contains("3 SSH key(s) in the folder \"Work\""), "{}", out.text());
-    assert!(m.text("/home/kuba/.ssh/homelab-server.pub").is_none());
+    assert!(m.text("/home/kuba/.ssh/build-server.pub").is_none());
     assert!(m.text("/home/kuba/.ssh/github-2.pub").is_none());
     assert_eq!(public_key(&m, "github.pub").as_deref(), Some("ssh-ed25519 AAAAdup"));
     assert_eq!(public_key(&m, "work-github.pub").as_deref(), Some("ssh-ed25519 AAAAwork"));
     assert_eq!(host_blocks(&m), 1);
-    assert!(out.text().contains("removed ~/.ssh/homelab-server.pub (no longer in the vault)"));
+    assert!(out.text().contains("removed ~/.ssh/build-server.pub (no longer in the vault)"));
     assert!(m.text(SSH_CONFIG).unwrap().contains("SSH keys in the folder \"Work\""));
 }
 
@@ -395,7 +395,7 @@ fn folders_lists_several_and_warns_about_the_one_the_vault_lacks() {
 
     assert!(out.warned("no folder \"Archive\" in the vault (folders= in ~/.config/dot-bw/config)"));
     assert!(out.text().contains("4 SSH key(s) in the folders \"Personal\", \"Work\""));
-    assert!(m.text("/home/kuba/.ssh/homelab-server.pub").is_none());
+    assert!(m.text("/home/kuba/.ssh/build-server.pub").is_none());
     assert_eq!(public_key(&m, "github.pub").as_deref(), Some("ssh-ed25519 AAAAgithub"));
     assert_eq!(public_key(&m, "github-2.pub").as_deref(), Some("ssh-ed25519 AAAAdup"));
     assert_eq!(host_blocks(&m), 2);
@@ -679,7 +679,7 @@ fn check_asks_the_agent_about_the_keys_on_disk_without_bw() {
         ("github", "github"),
         ("github-2", "dup"),
         ("work-github", "work"),
-        ("homelab-server", "homelab"),
+        ("build-server", "build"),
         ("evil", "evil"),
     ] {
         m = m.answer(
@@ -1037,7 +1037,7 @@ fn parts_parse_the_list_and_refuse_a_stranger() {
 fn slug_makes_a_file_name_from_an_item_name() {
     assert_eq!(ssh::slug("GitHub (work)"), "github-work");
     assert_eq!(ssh::slug("Work GitHub"), "work-github");
-    assert_eq!(ssh::slug("..Homelab  server!"), "homelab-server");
+    assert_eq!(ssh::slug("..Build  server!"), "build-server");
     assert_eq!(ssh::slug("Zażółć"), "za");
     assert_eq!(ssh::slug("!!!"), "key");
 }

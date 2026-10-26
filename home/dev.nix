@@ -34,7 +34,9 @@ in
     wild-unwrapped
   ];
 
-  home.sessionVariables.SCCACHE_CACHE_SIZE = "50G";
+  # sccache's own default, small enough for any disk. A machine with room to
+  # spare sets more in the user flake: home.sessionVariables.SCCACHE_CACHE_SIZE.
+  home.sessionVariables.SCCACHE_CACHE_SIZE = lib.mkDefault "10G";
 
   home.sessionPath = [
     "$HOME/.cargo/bin"

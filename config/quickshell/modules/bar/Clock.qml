@@ -15,7 +15,7 @@ Pill {
 
     interactive: true
     spacing: Theme.spacing.sm
-    tooltip: Qt.formatDateTime(clock.date, "dddd, d MMMM yyyy")
+    tooltip: Qt.formatDateTime(clock.date, Time.fullDateFormat)
     onClicked: Panels.toggle("clock")
 
     SystemClock {
@@ -36,13 +36,13 @@ Pill {
 
     StyledText {
         anchors.verticalCenter: parent.verticalCenter
-        text: Qt.formatDateTime(clock.date, "ddd d MMM")
+        text: Qt.formatDateTime(clock.date, Time.shortDateFormat)
         color: Theme.m3onSurfaceVariant
     }
 
     StyledText {
         anchors.verticalCenter: parent.verticalCenter
-        text: Qt.formatDateTime(clock.date, "HH:mm")
+        text: Qt.formatDateTime(clock.date, Time.timeFormat)
         font.weight: Font.DemiBold
         font.features: Theme.font.tabular
     }
