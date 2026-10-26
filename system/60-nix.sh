@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Phase 6: Nix (official multi-user installer), flakes, first home-manager
+# Phase 6: Nix (official multi-user installer), flakes, parallel builds, first home-manager
 # switch for <user>@<host>, nixpkgs' pam_fprintd.so for the Quickshell lock,
 # the wallpaper sets in /usr/share/kubaos/wallpapers, the one-time GPU setup
 # for Nix apps, zsh as login shell.
@@ -127,6 +127,9 @@ else
     sctl restart nix-daemon.service
   fi
 fi
+
+step "Parallel builds in /etc/nix/nix.conf"
+nix_parallel_builds
 
 # --------------------------------------------------------------------------
 step "nix-daemon units as real files"

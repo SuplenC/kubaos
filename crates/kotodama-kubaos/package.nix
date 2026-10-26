@@ -6,43 +6,11 @@
 {
   lib,
   stdenv,
-  rustPlatform,
-  # Hashes for Cargo.lock's git crates (home/curated.nix).
-  cargoOutputHashes ? { },
+  buildCrate,
 }:
 
-let
-  root = ../..;
-in
-rustPlatform.buildRustPackage {
+buildCrate "kotodama-kubaos" {
   pname = "kotodama-kubaos";
-  version = (lib.importTOML ../../Cargo.toml).workspace.package.version;
-
-  # The workspace, and the first-boot files kubaos-core embeds (the keyboard
-  # layouts come from it), so a change elsewhere doesn't rebuild it.
-  src = lib.fileset.toSource {
-    inherit root;
-    fileset = lib.fileset.unions [
-      ../../Cargo.toml
-      ../../Cargo.lock
-      ../../crates
-      ../../install/firstboot
-    ];
-  };
-
-  cargoLock = {
-    lockFile = ../../Cargo.lock;
-    # Kotodama's crates come from git, at the rev in Cargo.lock. One with no
-    # hash in outputHashes is cloned during evaluation.
-    outputHashes = cargoOutputHashes;
-    allowBuiltinFetchGit = true;
-  };
-  cargoBuildFlags = [
-    "-p"
-    "kotodama-kubaos"
-  ];
-  # Its tests read config/ and scripts/, outside src; `cargo test` runs them.
-  doCheck = false;
 
   postInstall = ''
     dir=$out/share/kotodama/extensions/kubaos

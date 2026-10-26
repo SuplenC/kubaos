@@ -82,7 +82,8 @@ impl Install<'_> {
             self.sh(cmd)?;
         }
         // A launcher, not the binary: every switch installs the release's `kubaos` in the home,
-        // and the launcher runs that one, so a new kubaos needs no copy here.
+        // and the launcher runs that one, so a new kubaos needs no copy here. `kubaos-setup`
+        // does the same for `kobo`, with this copy of it as the fallback.
         self.write("/usr/bin/kubaos", LAUNCHER, 0o755)?;
         self.write("/usr/lib/kubaos/setup-helper", HELPER, 0o755)?;
         self.write("/usr/bin/kubaos-setup", WRAPPER, 0o755)?;
@@ -114,9 +115,10 @@ mod tests {
         assert!(HELPER.contains(&format!("{}/system", crate::setup::SYSTEM_KUBAOS)));
         assert!(POLICY.contains("/usr/lib/kubaos/setup-helper"));
         assert!(POLICY.contains(crate::setup::HELPER));
-        assert!(UNIT.contains("ExecStart=/usr/bin/kobo --setup --first-boot"));
+        assert!(UNIT.contains("ExecStart=/usr/bin/kubaos-setup --first-boot"));
         assert!(UNIT.contains("ConditionPathExists=!%S/kubaos/setup-done"));
-        assert!(WRAPPER.contains("kobo --setup"));
+        assert!(WRAPPER.contains("/.nix-profile/bin/kobo\" /usr/bin/kobo;"));
+        assert!(WRAPPER.contains("exec \"$kobo\" --setup \"$@\""));
         assert!(DESKTOP.contains("Exec=kubaos-setup"));
         assert!(LAUNCHER.contains("/.nix-profile/bin/kubaos"));
         assert!(LAUNCHER.contains(INSTALLED_KUBAOS));

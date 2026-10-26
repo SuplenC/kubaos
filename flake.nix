@@ -33,7 +33,11 @@
       url = "github:SuplenC/kotodama/main";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.home-manager.follows = "home-manager";
+      inputs.crane.follows = "crane";
     };
+
+    # Builds KubaOS's crates (crates/workspace.nix), and Kotodama's.
+    crane.url = "github:ipetkov/crane";
   };
 
   outputs =
