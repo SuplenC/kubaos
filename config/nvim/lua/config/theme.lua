@@ -4,12 +4,13 @@
 -- returns a table of Material 3 colors ({ primary = "#rrggbb", surface = ..., ... }).
 -- We map those roles onto a base16 palette and apply it with mini.base16 as the
 -- "matugen" colorscheme (colors/matugen.lua). The file is watched and re-applied
--- on change; `:ThemeReload` does it by hand. Without the file we fall back to the
--- previous colorscheme.
+-- on change; `:ThemeReload` does it by hand. Without the file the colorscheme is
+-- M.fallback, LazyVim's own tokyonight. A plugin spec in the user layer can set
+-- `require("config.theme").fallback` to another installed colorscheme.
 
 local M = {}
 
-M.fallback = "monokai-v2"
+M.fallback = "tokyonight"
 
 local state_home = vim.env.XDG_STATE_HOME
 if not state_home or state_home == "" then
