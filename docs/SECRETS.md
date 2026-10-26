@@ -74,14 +74,16 @@ Keep your vault the way it is. `kubaos bitwarden` reads the whole vault: folders
   | `` the field `user` holds `a b`, with characters ssh_config can't take safely `` | no Host block | fix the value |
   | `` kubaos bitwarden reads no field `host`; … rename it to `hosts` `` | the field is ignored | rename the field |
 
+  When the signing key's `.pub` on disk isn't the vault's key, git signing is left as it was and the warning says why and what fixes it: the file is missing or from an older pull (`kubaos bitwarden refresh --only ssh,git` writes it), it belongs to a private key of the same name in `~/.ssh` (a `file` field on the item gives the vault's key a name of its own), or the item's public key can't be used (fix it in Bitwarden).
+
   The block for an alias without `hostname` is still written: a name your resolver knows (a LAN name, an `/etc/hosts` entry) works as it is. The warning only fires for a `hosts` entry with no dot, colon or wildcard.
 
   Two items with the same name (a "GitHub" in two folders, say) never share a `.pub`: the older item keeps `~/.ssh/github.pub`, the newer gets `~/.ssh/github-2.pub`, and the summary warns with both items' folders. A `file` field on one of them picks a name of its own and ends the warning.
 - **An item named `gh-token`**, in any folder: a login item whose password is a GitHub token (classic with `repo`, `read:org`, or fine-grained), or an item of any type with a hidden field `token`. Optional field `host` for GitHub Enterprise.
 
-Env secrets, one project per folder **`env/<project>`**: every custom field of every item in it becomes a variable. Field name is the variable name, so it must be a shell name (`DATABASE_URL`, not `database-url`). Items elsewhere join a project with a text field `bwenv` = `<project>`.
+Env secrets, one project per folder **`env/<project>`**: every custom field of every item in it becomes a variable. Field name is the variable name, so it must be a shell name (`DATABASE_URL`, not `database-url`). Items elsewhere join a project with a text field `bwenv` = `<project>`; like the SSH key fields, `bwenv` matches whatever its case and surrounding spaces (`BWEnv `). Variable names stay exactly as typed: `Api_Token` and `API_TOKEN` are two variables.
 
-To keep SSH keys and git signing to some folders, tick them on the Bitwarden card, or list them in `~/.config/dot-bw/config`, comma-separated: `folders=Personal,Work` (`folder=` is read too, its older name). gh and env still read the whole vault. A listed folder that isn't in the vault gets a warning by name; if none of them is there, `kubaos bitwarden` uses every SSH key in the vault. The directory keeps its old `dot-bw` name, so a machine set up before keeps its settings.
+To keep SSH keys and git signing to some folders, tick them on the Bitwarden card, or list them in `~/.config/dot-bw/config`, comma-separated: `folders=Personal,Work` (`folder=` is read too, its older name). Names match without the spaces around them, in the list and in the vault, so `folders=Personal, Work` finds a folder named `Work `. gh and env still read the whole vault. A listed folder that isn't in the vault gets a warning by name; if none of them is there, `kubaos bitwarden` uses every SSH key in the vault. The directory keeps its old `dot-bw` name, so a machine set up before keeps its settings.
 
 Example vault:
 
@@ -112,6 +114,44 @@ git remote set-url origin git@github-work:my-company/app.git   # a clone you alr
 ```
 
 Give both items `hosts=github.com` and ssh offers both keys to GitHub, which logs you in as whichever account it checks first. `kubaos bitwarden` warns when two items share a host.
+
+### One default key, others on aliases
+
+To log in everywhere with one key and use the others only on their aliases, give the default key `hosts=*`:
+
+```text
+  Alias2k          SSH key   hosts=*
+  SuplenC          SSH key   hosts=github-suplenc  hostname=github.com
+  JakubWasilczyk   SSH key   hosts=github-jakubwasilczyk  hostname=github.com
+```
+
+`~/.ssh/config.d/bitwarden` then reads:
+
+```text
+# SuplenC (no folder) (SHA256:…)
+Host github-suplenc
+  HostName github.com
+  IdentityAgent /home/you/.bitwarden-ssh-agent.sock
+  IdentityFile /home/you/.ssh/suplenc.pub
+  IdentitiesOnly yes
+
+# JakubWasilczyk (no folder) (SHA256:…)
+Host github-jakubwasilczyk
+  HostName github.com
+  IdentityAgent /home/you/.bitwarden-ssh-agent.sock
+  IdentityFile /home/you/.ssh/jakubwasilczyk.pub
+  IdentitiesOnly yes
+
+# Alias2k (no folder) (SHA256:…)
+Host * !github-suplenc !github-jakubwasilczyk
+  IdentityAgent /home/you/.bitwarden-ssh-agent.sock
+  IdentityFile /home/you/.ssh/alias2k.pub
+  IdentitiesOnly yes
+```
+
+ssh collects `IdentityFile` from every block that matches and offers the keys in file order, so `kubaos bitwarden` writes the blocks with only specific names first and the blocks with a wildcard (`*`, `?`, `!`, `[`) last, each group in vault order. A wildcard block also leaves out every specific name of the other blocks (`!github-suplenc`), so `ssh github-suplenc` offers the SuplenC key alone: with the default key offered second, a SuplenC key GitHub refused would quietly log you in as Alias2k. `github.com` itself, and every other server, gets the Alias2k key.
+
+Leaving the name out drops the wildcard block's other settings for it too: a `user` or `port` on the `hosts=*` item doesn't reach `github-suplenc`, so set them on the alias's item.
 
 ## Daily use
 

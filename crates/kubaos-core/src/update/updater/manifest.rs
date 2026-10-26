@@ -229,6 +229,11 @@ impl<M: Machine> Updater<'_, M> {
         let Some(manifest) = Manifest::read(&self.sys.manifest()).map_err(UpdateError::Manifest)? else {
             return Ok(None);
         };
+        self.apt_state_of(manifest).map(Some)
+    }
+
+    /// The facts a sync under `manifest` would read.
+    fn apt_state_of(&mut self, manifest: Manifest) -> Result<AptState, UpdateError> {
         let choices = Choices::parse(&read_or_empty(&self.sys.apt_choices())?);
         let record = Record::parse(&read_or_empty(&self.sys.apt_record())?);
         let arch = self
@@ -237,13 +242,32 @@ impl<M: Machine> Updater<'_, M> {
             .trim()
             .to_owned();
         let dpkg = self.dpkg()?;
-        Ok(Some(AptState {
+        Ok(AptState {
             manifest,
             choices,
             record,
             arch,
             dpkg,
-        }))
+        })
+    }
+
+    /// What a sync under `manifest` would install, by group, for the preview, which comes before
+    /// the release is checked out. A package apt has no candidate for is left out, as the sync
+    /// leaves it, unless its group has a vendor repository: the sync sets that up first, so apt
+    /// can't see the package yet.
+    pub(super) fn manifest_installs(&mut self, manifest: Manifest) -> Result<Vec<GroupChange>, UpdateError> {
+        let state = self.apt_state_of(manifest)?;
+        let wants = plan::missing(&state.facts());
+        let packages: Vec<String> = wants.iter().map(|w| w.package.clone()).collect();
+        let candidates = self.candidates(&packages);
+        let mut changes = Changes::default();
+        for want in wants {
+            let from_repo = state.manifest.group(&want.group).is_some_and(|g| g.repo.is_some());
+            if from_repo || candidates.contains(&want.package) {
+                changes.entry(&want.group).installed.push(want.package);
+            }
+        }
+        Ok(changes.into_vec())
     }
 
     fn dpkg(&mut self) -> Result<Dpkg, UpdateError> {

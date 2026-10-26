@@ -246,6 +246,12 @@ impl Text {
             out.push_str(&format!("    {} {subject}\n", s.dim(hash)));
         }
         out.push_str(&format!("  {} to upgrade\n", count(preview.packages, "apt package")));
+        if !preview.apt.is_empty() {
+            out.push_str("  New apt packages to install:\n");
+            for change in &preview.apt {
+                out.push_str(&format!("    {}: {}\n", change.group, change.installed.join(", ")));
+            }
+        }
         if preview.hyprland_pin {
             out.push_str("  The Hyprland pin changes: Hyprland is installed at the release's versions.\n");
         }

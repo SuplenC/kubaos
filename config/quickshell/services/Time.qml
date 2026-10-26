@@ -34,8 +34,10 @@ Singleton {
     // How the shell writes times and dates: the clock settings' `time_format`
     // and `date_order`, else the locale's, which Qt reads from LC_TIME. Until
     // the engine answers, the locale's.
-    readonly property bool twelveHour: settings.timeFormat ? settings.timeFormat === "12h" : root.localeTwelveHour(Qt.locale().timeFormat(Locale.ShortFormat))
-    readonly property bool dayFirst: settings.dateOrder ? settings.dateOrder === "day-month" : root.localeDayFirst(Qt.locale().dateFormat(Locale.LongFormat))
+    readonly property bool twelveHourByLocale: root.localeTwelveHour(Qt.locale().timeFormat(Locale.ShortFormat))
+    readonly property bool dayFirstByLocale: root.localeDayFirst(Qt.locale().dateFormat(Locale.LongFormat))
+    readonly property bool twelveHour: settings.timeFormat ? settings.timeFormat === "12h" : twelveHourByLocale
+    readonly property bool dayFirst: settings.dateOrder ? settings.dateOrder === "day-month" : dayFirstByLocale
     // Hours and minutes alone, for a face that puts the seconds or AM/PM apart.
     readonly property string clockFormat: twelveHour ? "h:mm" : "HH:mm"
     readonly property string timeFormat: twelveHour ? "h:mm AP" : "HH:mm"

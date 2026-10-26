@@ -14,6 +14,7 @@ use crate::apt::Switch;
 use crate::apt::plan::PackageState;
 use crate::update::UpdateError;
 use crate::update::event::GroupChange;
+use crate::update::event::Preview;
 use crate::update::event::Phase;
 use crate::update::event::UpdateEvent;
 use crate::update::record::Channel;
@@ -411,4 +412,49 @@ fn a_release_without_a_manifest_has_no_status() {
     let err = w.updater(&mut fake(&[])).package_status().unwrap_err();
 
     assert!(matches!(err, UpdateError::NoManifest { .. }));
+}
+
+fn preview(events: &[UpdateEvent]) -> &Preview {
+    events
+        .iter()
+        .find_map(|e| match e {
+            UpdateEvent::Preview(preview) => Some(preview),
+            _ => None,
+        })
+        .expect("a preview")
+}
+
+#[test]
+fn the_preview_lists_what_the_manifest_phase_will_install_by_group() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[(MANIFEST, &manifest(&["curl", "git", "gone-upstream"]))], true);
+    let mut m = fake(&["curl", "libpam-u2f"]);
+    // apt sees docker-ce only once the phase has set up docker's repository.
+    m.dpkg.as_mut().unwrap().unavailable.extend(["gone-upstream".into(), "docker-ce".into()]);
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert_eq!(
+        preview(&events).apt,
+        [change("docker", &["docker-ce"], &[]), change("tools", &["git"], &[])]
+    );
+}
+
+#[test]
+fn a_packages_only_preview_lists_the_installed_releases_manifest() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[(MANIFEST, &manifest(&["curl"]))], true);
+    let mut first = fake(&["docker-ce", "libpam-u2f"]);
+    let mut events = Vec::new();
+    w.reporting(&mut first, &mut events).update(yes()).unwrap();
+    assert_eq!(preview(&events).apt, [change("tools", &["curl"], &[])]);
+    w.push(&[(MANIFEST, &manifest(&["curl", "jq"]))], true);
+    let mut m = Fake::new();
+    m.dpkg = first.dpkg.take();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes().packages_only()).unwrap();
+
+    assert!(preview(&events).apt.is_empty(), "jq is in the next release, not this one");
 }
