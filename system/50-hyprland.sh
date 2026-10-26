@@ -9,12 +9,6 @@ set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-PPA_URI="https://ppa.launchpadcontent.net/cppiber/hyprland/ubuntu"
-PPA_KEY_FPR="A54D23B62FF3FCC76EFF71E8FDBAAA1CF0CCF48E"   # Launchpad PPA for Constantin Piber
-PPA_KEY_URL="https://keyserver.ubuntu.com/pks/lookup?op=get&options=mr&search=0x$PPA_KEY_FPR"
-PPA_KEYRING="/etc/apt/keyrings/cppiber-hyprland.gpg"
-
-HYPR_PACKAGES=(hyprland hyprland-guiutils xdg-desktop-portal-hyprland hypridle hyprlock hyprpolkitagent hyprpicker)
 AUTOLOGIN=1
 
 usage() {
@@ -39,61 +33,32 @@ while (($#)); do
 done
 
 require_sudo
-apt_install ca-certificates curl gnupg
+group_install tools
 
 # --------------------------------------------------------------------------
-step "Hyprland PPA (ppa:cppiber/hyprland, suite resolute)"
-if is_amd64; then
-  # deb822 file written directly: no software-properties-common needed.
-  [[ -d /etc/apt/keyrings ]] || sudo_run install -d -m 0755 /etc/apt/keyrings
-  fetch_key "$PPA_KEY_URL" "$PPA_KEYRING" "$PPA_KEY_FPR"
-  add_apt_source cppiber-hyprland "Types: deb
-URIs: $PPA_URI
-Suites: resolute
-Components: main
-Signed-By: $PPA_KEYRING"
-  apt_update_if_dirty
-else
-  # Checked 2026-10: the PPA builds only arch:all packages for arm64.
-  warn "$(arch): the PPA has no $(arch) binaries. Using Ubuntu's own hyprland"
-  warn "(0.53.x in resolute). It predates the Lua config (0.55+), so the"
-  warn "session runs nixpkgs' Hyprland from home-manager instead (home/desktop.nix)."
-  # hyprland-guiutils only exists in the PPA.
-  pkgs=()
-  for p in "${HYPR_PACKAGES[@]}"; do
-    if pkg_has_candidate "$p"; then pkgs+=("$p"); else warn "no $p for $(arch), skipping it"; fi
-  done
-  HYPR_PACKAGES=("${pkgs[@]}")
+# The PPA's build on amd64 (group hyprland). The PPA has no arm64 binaries
+# (checked 2026-10: it builds only arch:all packages for arm64), so arm64
+# takes Ubuntu's own (group hyprland-ubuntu), 0.53.x in resolute, which
+# predates the Lua config (0.55+).
+step "Install the Hyprland stack, held"
+if ! is_amd64; then
+  warn "$(arch): the PPA has no $(arch) binaries. Using Ubuntu's own hyprland;"
+  warn "the session runs nixpkgs' Hyprland from home-manager instead (home/desktop.nix)."
 fi
+group_install hyprland hyprland-ubuntu
 
-step "Install the Hyprland stack"
-held=()
-mapfile -t held < <(apt-mark showhold 2>/dev/null)
-need_unhold=()
-for p in "${HYPR_PACKAGES[@]}"; do
-  if ! pkg_installed "$p" && printf '%s\n' "${held[@]}" | grep -qx "$p"; then need_unhold+=("$p"); fi
-done
-((${#need_unhold[@]})) && sudo_run apt-mark unhold "${need_unhold[@]}"
-apt_install "${HYPR_PACKAGES[@]}"
-
-step "Hold Hyprland and its hypr* libraries"
-# Hold the top-level packages plus every installed hypr/aquamarine library, so
-# a same-soname library bump can't slip in under a held compositor.
-to_hold=("${HYPR_PACKAGES[@]}")
-while IFS= read -r p; do
-  to_hold+=("$p")
-done < <(hypr_installed)
-mapfile -t to_hold < <(printf '%s\n' "${to_hold[@]}" | sort -u)
+step "Hold the hypr* libraries too"
+# Every installed hypr/aquamarine library, so a same-soname library bump
+# can't slip in under a held compositor.
 mapfile -t held < <(apt-mark showhold 2>/dev/null)
 missing_hold=()
-for p in "${to_hold[@]}"; do
-  pkg_installed "$p" || { ((DRY_RUN)) && missing_hold+=("$p"); continue; }
+while IFS= read -r p; do
   printf '%s\n' "${held[@]}" | grep -qx "$p" || missing_hold+=("$p")
-done
+done < <(hypr_installed)
 if ((${#missing_hold[@]})); then
   sudo_run apt-mark hold "${missing_hold[@]}"
 else
-  ok "already held: ${to_hold[*]}"
+  ok "the hypr* libraries are held"
 fi
 if command -v Hyprland >/dev/null; then
   info "installed: $(Hyprland --version 2>/dev/null | head -1 || dpkg-query -W -f='${Version}' hyprland)"

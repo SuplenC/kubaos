@@ -96,7 +96,7 @@ step "Install Nix $NIX_VERSION (official installer, multi-user daemon)"
 if [[ -x "$NIX_BIN/nix" ]]; then
   ok "Nix present: $("$NIX_BIN/nix" --version)"
 else
-  apt_install curl xz-utils
+  group_install nix
   if ((DRY_RUN)); then
     run curl --proto '=https' --tlsv1.2 -fsSL "$NIX_INSTALL_URL" -o "<tmp>/install"
     info "would check sha256 $NIX_INSTALL_SHA256, then:"

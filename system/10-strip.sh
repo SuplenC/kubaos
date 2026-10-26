@@ -128,7 +128,7 @@ if unit_exists motd-news.timer; then
 fi
 
 step "Keep unattended-upgrades (security updates only, Ubuntu default)"
-apt_install unattended-upgrades
+group_install upgrades
 write_root_file /etc/apt/apt.conf.d/20auto-upgrades 0644 <<'EOF'
 APT::Periodic::Update-Package-Lists "1";
 APT::Periodic::Unattended-Upgrade "1";

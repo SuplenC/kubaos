@@ -40,7 +40,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
  && echo 'kuba ALL=(ALL:ALL) NOPASSWD: ALL' >/etc/sudoers.d/kuba \
  && chmod 0440 /etc/sudoers.d/kuba
 
-COPY system/lib.sh system/10-strip.sh system/20-base.sh /opt/dotfiles/system/
+COPY system/lib.sh system/manifest.sh system/packages.toml system/10-strip.sh system/20-base.sh /opt/dotfiles/system/
 COPY system/files/apt/ /opt/dotfiles/system/files/apt/
 COPY system/files/netplan/ /opt/dotfiles/system/files/netplan/
 COPY system/files/logind.conf.d/ /opt/dotfiles/system/files/logind.conf.d/

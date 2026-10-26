@@ -59,7 +59,7 @@ if ((REMOVE)); then
 fi
 
 step "Packages"
-apt_install libcap2-bin # setcap, getcap
+group_install recorder
 
 step "gsr-kms-server with CAP_SYS_ADMIN"
 command -v nix >/dev/null || ((DRY_RUN)) || die "nix not found: run system/60-nix.sh first"

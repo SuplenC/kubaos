@@ -33,59 +33,17 @@ done
 
 require_sudo
 
-PACKAGES=(
-  # tools the scripts themselves use (openssh-client for git over SSH: on a
-  # minimized server only cloud-init pulled it in, and 10-strip purges that)
-  ca-certificates curl gnupg unzip git openssh-client
-  # network
-  network-manager wpasupplicant iw
-  # audio + bluetooth
-  pipewire pipewire-pulse pipewire-alsa pipewire-audio wireplumber
-  libspa-0.2-bluetooth bluez rtkit
-  # session plumbing
-  dbus-user-session xdg-user-dirs xdg-utils polkitd pkexec
-  xwayland qt6-wayland qtwayland5
-  xdg-desktop-portal xdg-desktop-portal-gtk
-  gnome-keyring libsecret-1-0
-  # firmware + graphics (mesa-libgallium includes the VA-API drivers in 26.04;
-  # the old mesa-va-drivers package no longer exists)
-  linux-firmware firmware-sof-signed
-  mesa-vulkan-drivers mesa-libgallium libgl1-mesa-dri libegl-mesa0 vainfo mesa-utils
-  fwupd
-  # laptop hardware
-  bolt brightnessctl ddcutil upower power-profiles-daemon
-  fprintd libpam-fprintd pciutils usbutils
-  # build tools (rustup/proto toolchains need these)
-  build-essential pkg-config libssl-dev clang mold
-  # filesystem + snapshots (grub-btrfs is not packaged, built below)
-  btrfs-progs snapper inotify-tools
-  # graphical file manager. Nautilus, with Sushi on space and gvfs for phones,
-  # network shares and admin://; udisks2 is what kubaos-automount talks to.
-  # Image and HEIC/AVIF thumbnails come from glycin, which 26.04's gdk-pixbuf
-  # loads through, and libde265 decodes the HEVC inside an iPhone's HEIC.
-  # papers and gnome-font-viewer bring the PDF and font thumbnailers with the
-  # viewers. File Roller does the extracting, with 7zip and unar for 7z and RAR,
-  # since unrar is non-free. python3-nautilus runs the right-click extensions.
-  # The gstreamer plugins are the codecs Showtime plays with, which
-  # --no-install-recommends would leave out.
-  nautilus gnome-sushi gvfs-backends gvfs-fuse udisks2
-  glycin-thumbnailers libheif-plugin-libde265 ffmpegthumbnailer
-  papers gnome-font-viewer file-roller 7zip unar python3-nautilus
-  loupe showtime gstreamer1.0-plugins-good gstreamer1.0-libav imagemagick
-  # fonts
-  fonts-noto-core fonts-noto-ui-core fonts-noto-mono fonts-noto-color-emoji fonts-noto-cjk
-  # fallback session tools (work without Nix and without the shell)
-  foot fuzzel wl-clipboard grim slurp playerctl socat qalc libnotify-bin
-  # login shell (config comes from home-manager)
-  zsh
+# The base system's groups of system/packages.toml.
+BASE_GROUPS=(
+  tools network audio session graphics microcode laptop dock fingerprint
+  build snapshots files fonts fallback shell
 )
-is_amd64 && PACKAGES+=(amd64-microcode)
 
 step "apt update"
 apt_update
 
-step "Install base packages (--no-install-recommends)"
-apt_install "${PACKAGES[@]}"
+step "Install base packages (--no-install-recommends, system/packages.toml)"
+group_install "${BASE_GROUPS[@]}"
 
 # --------------------------------------------------------------------------
 step "Network: netplan renders through NetworkManager"

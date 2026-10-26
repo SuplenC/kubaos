@@ -1,26 +1,22 @@
 #!/usr/bin/env bash
 # Phase 4 (apps): Docker CE from Docker's repo, Google Chrome from Google's
-# repo.
+# repo. Both are optional groups of system/packages.toml: --no-docker and
+# --no-chrome turn them off for good, so kubaos update leaves them out too,
+# and `kubaos packages enable docker|chrome` turns them on again.
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-DOCKER_KEY_URL="https://download.docker.com/linux/ubuntu/gpg"
-DOCKER_KEY_FPR="9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
-DOCKER_KEYRING="/etc/apt/keyrings/docker.gpg"
-# Chrome's own postinst writes google-chrome.sources with exactly this key
-# path and URI; using the same values means it won't fight our file.
-CHROME_KEY_URL="https://dl.google.com/linux/linux_signing_key.pub"
-CHROME_KEY_FPR="EB4C1BFD4F042F6DDDCCEC917721F63BD38B4796"
-CHROME_KEYRING="/usr/share/keyrings/google-chrome.gpg"
-DO_DOCKER=1 DO_CHROME=1
+DO_DOCKER=1 DO_CHROME=1 NO_DOCKER=0 NO_CHROME=0
+group_enabled docker || DO_DOCKER=0
+group_enabled chrome || DO_CHROME=0
 
 usage() {
   cat <<EOF
 Usage: $0 [--dry-run] [--no-docker] [--no-chrome]
 
-  --no-docker     skip Docker
-  --no-chrome     skip Chrome
+  --no-docker     leave Docker out, now and in every kubaos update
+  --no-chrome     leave Chrome out, now and in every kubaos update
 $(common_usage)
 EOF
 }
@@ -28,8 +24,8 @@ EOF
 while (($#)); do
   case "$1" in
     -n | --dry-run) DRY_RUN=1 ;;
-    --no-docker) DO_DOCKER=0 ;;
-    --no-chrome) DO_CHROME=0 ;;
+    --no-docker) DO_DOCKER=0 NO_DOCKER=1 ;;
+    --no-chrome) DO_CHROME=0 NO_CHROME=1 ;;
     -h | --help) usage; exit 0 ;;
     *) die "unknown argument: $1 (see --help)" ;;
   esac
@@ -37,23 +33,16 @@ while (($#)); do
 done
 
 require_sudo
-apt_install ca-certificates curl gnupg
-[[ -d /etc/apt/keyrings ]] || sudo_run install -d -m 0755 /etc/apt/keyrings
+if ((NO_DOCKER)); then choice_set docker off; fi
+if ((NO_CHROME)); then choice_set chrome off; fi
+group_install tools
 
 # --------------------------------------------------------------------------
 if ((DO_DOCKER)); then
   step "Docker CE from download.docker.com (suite resolute)"
   # Docker's install guide: remove distro packages that conflict.
   apt_purge docker.io docker-compose docker-compose-v2 docker-doc podman-docker containerd runc
-  fetch_key "$DOCKER_KEY_URL" "$DOCKER_KEYRING" "$DOCKER_KEY_FPR"
-  add_apt_source docker "Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: resolute
-Components: stable
-Architectures: $(arch)
-Signed-By: $DOCKER_KEYRING"
-  apt_update_if_dirty
-  apt_install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  group_install docker
 
   if id -nG "$TARGET_USER" 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
     ok "$TARGET_USER is in the docker group"
@@ -76,24 +65,11 @@ if ((DO_CHROME)); then
   if ! is_amd64; then
     warn "Chrome is amd64 only; skipping on $(arch)"
   else
-    fetch_key "$CHROME_KEY_URL" "$CHROME_KEYRING" "$CHROME_KEY_FPR"
     # Remove the legacy .list Chrome used to write, to avoid duplicate sources.
     if [[ -f /etc/apt/sources.list.d/google-chrome.list ]]; then
       sudo_run rm -f /etc/apt/sources.list.d/google-chrome.list
     fi
-    want="### THIS FILE IS AUTOMATICALLY CONFIGURED ###
-# Changes to this file will not be preserved.
-# This file will not be recreated if removed.
-X-Repolib-Name: Google Chrome
-Types: deb
-URIs: https://dl.google.com/linux/chrome-stable/deb/
-Suites: stable
-Components: main
-Architectures: amd64
-Signed-By: $CHROME_KEYRING"
-    add_apt_source google-chrome "$want"
-    apt_update_if_dirty
-    apt_install google-chrome-stable
+    group_install chrome
   fi
 
   # Theme color from the wallpaper (system/files/chrome/dot-chrome-theme):

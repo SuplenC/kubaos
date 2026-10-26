@@ -8,9 +8,11 @@
 #     tokens ID_SECURITY_TOKEN, 70-uaccess.rules gives the seat user an ACL on
 #     /dev/hidraw*. libu2f-udev is gone in 26.04; nothing else is needed.
 #   - --piv: pcscd + pcsc-tools for the Multi-protocol Edition's PIV (smart
-#     card). Off by default: the FIDO Edition has no smart card, and FIDO2
-#     goes over hidraw without pcscd. pcscd is socket-activated and exits when
-#     idle (--auto-exit), so it only runs while something talks to a card.
+#     card), the optional group piv of system/packages.toml. Off by default:
+#     the FIDO Edition has no smart card, and FIDO2 goes over hidraw without
+#     pcscd. pcscd is socket-activated and exits when idle (--auto-exit), so
+#     it only runs while something talks to a card. --piv and --no-piv are
+#     kept, so kubaos update follows them.
 #
 # ykman (yubikey-manager) comes from home-manager (home/cli.nix), not apt:
 # apt's yubikey-manager depends on pcscd, which the FIDO Edition never needs.
@@ -21,13 +23,15 @@ set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-DO_PIV=0
+PIV_CHOICE=""
 
 usage() {
   cat <<EOF
-Usage: $0 [--dry-run] [--piv]
+Usage: $0 [--dry-run] [--piv | --no-piv]
 
-  --piv   also install pcscd and pcsc-tools (Multi-protocol Edition: PIV / smart card)
+  --piv      also install pcscd and pcsc-tools (Multi-protocol Edition: PIV / smart card),
+             now and in every kubaos update
+  --no-piv   leave them out from now on (kubaos packages disable piv removes them)
 $(common_usage)
 EOF
 }
@@ -35,7 +39,8 @@ EOF
 while (($#)); do
   case "$1" in
     -n | --dry-run) DRY_RUN=1 ;;
-    --piv) DO_PIV=1 ;;
+    --piv) PIV_CHOICE=on ;;
+    --no-piv) PIV_CHOICE=off ;;
     -h | --help) usage; exit 0 ;;
     *) die "unknown argument: $1 (see --help)" ;;
   esac
@@ -45,11 +50,10 @@ done
 require_sudo
 
 # --------------------------------------------------------------------------
-pkgs=(fido2-tools)
-((DO_PIV)) && pkgs+=(pcscd pcsc-tools)
+[[ -z "$PIV_CHOICE" ]] || choice_set piv "$PIV_CHOICE"
 step "Packages"
-apt_install "${pkgs[@]}"
-if ((DO_PIV)); then
+group_install yubikey piv
+if group_wanted piv; then
   # The socket, not the service: pcscd starts on the first client.
   sctl enable --now pcscd.socket
 fi
@@ -81,7 +85,7 @@ for d in /sys/bus/usb/devices/*; do
   done
   if ((ccid)); then
     ok "$product ($(cat "$d/idProduct")): FIDO + smart card (PIV)"
-    if ((!DO_PIV)) && ! pkg_installed pcscd; then
+    if ! group_wanted piv && ! pkg_installed pcscd; then
       info "For PIV (certificates, smart-card login): $0 --piv"
     fi
   else
