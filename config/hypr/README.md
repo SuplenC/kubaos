@@ -70,7 +70,7 @@ the first time it is seen, by its description, and keeps it
 ## Workspaces
 
 Each screen has workspaces 1-10 of its own: `SUPER + 1..0` go to the
-focused screen's, `SUPER + H/J/K/L` focus another screen. Hyprland numbers
+focused screen's, `SUPER + arrows` focus another screen. Hyprland numbers
 workspaces globally, so `workspaces.lua` gives each screen a block of ten ids
 (the laptop panel 1-10, the next screen 11-20) and the bar labels them 1-10.
 

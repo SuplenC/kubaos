@@ -1,5 +1,5 @@
 -- Keybinds, ported from Omarchy 4 ("Quattro", default/hypr/bindings/*.lua)
--- with screen focus on hjkl (docs/CONTRACTS.md) and apps adapted to this
+-- with window focus on hjkl (docs/CONTRACTS.md) and apps adapted to this
 -- setup. Each description is the bind's title in the Command menu, which
 -- finds it by typing what it does; SUPER + F1 lists them all in its Shortcuts
 -- View. The terminal, the menu and the survival binds live in fallback.lua.
@@ -79,8 +79,8 @@ bind("SUPER + O", "Pop window out (float and pin)", function()
   end
 end)
 
--- Screens on hjkl, windows on the arrows (docs/CONTRACTS.md). Moving and
--- resizing keep hjkl under SHIFT and CTRL.
+-- Windows on hjkl, screens on the arrows (docs/CONTRACTS.md): focus, move
+-- (SHIFT) and resize (CTRL) all act on the window under the same keys.
 local dirs = {
   { key = "H", arrow = "Left", dir = "l", dx = -50, dy = 0, name = "left" },
   { key = "J", arrow = "Down", dir = "d", dx = 0, dy = 50, name = "down" },
@@ -88,8 +88,8 @@ local dirs = {
   { key = "L", arrow = "Right", dir = "r", dx = 50, dy = 0, name = "right" },
 }
 for _, d in ipairs(dirs) do
-  bind("SUPER + " .. d.key, "Focus screen " .. d.name, hl.dsp.focus({ monitor = d.dir }))
-  bind("SUPER + " .. d.arrow, "Focus window " .. d.name, hl.dsp.focus({ direction = d.dir }))
+  bind("SUPER + " .. d.key, "Focus window " .. d.name, hl.dsp.focus({ direction = d.dir }))
+  bind("SUPER + " .. d.arrow, "Focus screen " .. d.name, hl.dsp.focus({ monitor = d.dir }))
   bind("SUPER + SHIFT + " .. d.key, "Move window " .. d.name, hl.dsp.window.move({ direction = d.dir }))
   bind("SUPER + SHIFT + " .. d.arrow, "Swap window " .. d.name, hl.dsp.window.swap({ direction = d.dir }))
   bind("SUPER + CTRL + " .. d.key, "Resize window " .. d.name,

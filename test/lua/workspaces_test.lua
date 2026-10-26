@@ -651,15 +651,15 @@ test("SUPER + 1-0 and their SHIFT and SHIFT + ALT forms reach the screen's works
   end
 end)
 
-test("SUPER + hjkl focus the screens and the arrows the windows", function()
+test("SUPER + hjkl focus the windows and the arrows the screens", function()
   local found = binds()
   local names = { H = "left", J = "down", K = "up", L = "right" }
   local arrows = { H = "Left", J = "Down", K = "Up", L = "Right" }
   for letter, name in pairs(names) do
-    local screen = found[key("SUPER + " .. letter)]
-    same({ screen.description, screen.action.dsp, screen.action.args.monitor }, { "Focus screen " .. name, "focus", name:sub(1, 1) }, letter)
-    local window = found[key("SUPER + " .. arrows[letter])]
-    same({ window.description, window.action.args.direction }, { "Focus window " .. name, name:sub(1, 1) }, arrows[letter])
+    local window = found[key("SUPER + " .. letter)]
+    same({ window.description, window.action.args.direction }, { "Focus window " .. name, name:sub(1, 1) }, letter)
+    local screen = found[key("SUPER + " .. arrows[letter])]
+    same({ screen.description, screen.action.dsp, screen.action.args.monitor }, { "Focus screen " .. name, "focus", name:sub(1, 1) }, arrows[letter])
   end
 end)
 

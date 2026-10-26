@@ -20,7 +20,7 @@ The plan KubaOS was built from, as of 2026-10-15. The KubaOS stick (`docs/INSTAL
 | Power | `power-profiles-daemon` + `tuxedo-drivers`, no Control Center |
 | Fingerprint | USB reader for lock screen, sudo, polkit |
 | Compositor | Hyprland 0.56+ (PPA), Lua config, dwindle, Omarchy 4 keybinds with hjkl |
-| Workspaces | Per screen, 1-10 each (Omarchy's block of ten ids per screen, known by make, model and serial); on unplug they join the remaining screen after its own, on replug they return. `SUPER+hjkl` focuses screens (#41) |
+| Workspaces | Per screen, 1-10 each (Omarchy's block of ten ids per screen, known by make, model and serial); on unplug they join the remaining screen after its own, on replug they return. `SUPER+arrows` focus screens (#41) |
 | Shell | Your own Quickshell config, Caelestia-inspired, Quickshell pinned via Nix to a tagged release |
 | Theme | Material You colors from wallpaper (`matugen`), Japanese and Cyberpunk wallpaper folders with a toggle |
 | Idle | Lock 5 min, screens off 10 min. Battery: suspend 30 min and on lid close. AC: never suspend |
@@ -113,7 +113,7 @@ sudo apt-mark hold hyprland xdg-desktop-portal-hyprland hypridle hyprlock hyprpo
 **Lua config** in `~/Projects/dotfiles/config/hypr/`, split into files:
 - `monitors.lua`: laptop panel, the two UltraGears at 1920x1080@120, positions
 - `workspaces.lua`: per-screen workspaces, 1-10 on each screen
-- `keybinds.lua`: ported from Omarchy 4 (already Lua), screen focus on `SUPER+hjkl`, window focus on `SUPER+arrows`, move window `SUPER+SHIFT+hjkl`, resize `SUPER+CTRL+hjkl`, workspaces `SUPER+1..0`
+- `keybinds.lua`: ported from Omarchy 4 (already Lua), window focus on `SUPER+hjkl`, screen focus on `SUPER+arrows`, move window `SUPER+SHIFT+hjkl`, resize `SUPER+CTRL+hjkl`, workspaces `SUPER+1..0`
 - `fallback.lua`: `SUPER+ALT+Return` foot and `SUPER+ALT+Space` fuzzel, always bound, so you can work with the shell dead
 - `autostart.lua`: starts your shell, `hypridle`, the lid sync on hotplug
 

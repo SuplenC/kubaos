@@ -14,8 +14,8 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + SHIFT + F` | Files (Nautilus) in your home folder |
 | `SUPER + CTRL + F` | yazi in your home folder, in Ghostty |
 | `SUPER + Q` | Close window |
-| `SUPER + h/j/k/l` | Focus the screen left, below, above, right |
-| `SUPER + ←/↓/↑/→` | Focus the window that way. `SUPER + SHIFT + h/j/k/l` moves the window, `SUPER + CTRL + h/j/k/l` resizes it |
+| `SUPER + h/j/k/l` | Focus the window left, below, above, right. `+ SHIFT` moves the window, `+ CTRL` resizes it |
+| `SUPER + ←/↓/↑/→` | Focus the screen that way |
 | `SUPER + 1..0` | Workspace 1-10 of the focused screen, or of the unplugged screen's group it shows. `+ SHIFT` takes the window along, `+ SHIFT + ALT` sends it without following |
 | `SUPER + SHIFT + CTRL + →` | Move the window to a new workspace after the group's last |
 | `SUPER + Tab` / `SUPER + CTRL + →/←` | Next / previous workspace on the focused screen, through the groups of unplugged screens waiting there, as the three-finger swipe does (`+ SHIFT` on Tab for previous); `SUPER + CTRL + Tab` its former one |
