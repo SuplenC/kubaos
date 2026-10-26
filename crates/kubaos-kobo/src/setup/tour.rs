@@ -440,6 +440,34 @@ mod tests {
         assert!(!s.focus_order().contains(&SF::TurnOff));
     }
 
+    #[test]
+    fn a_pairing_request_draws_its_key_the_accept_button_and_the_way_out() {
+        use iced_test::simulator::Simulator;
+        let mut s = on_the_phone_card(demo::Machine::Tuxedo);
+        let _ = s.update_inner(Message::Setup(crate::setup::Msg::Click(SF::Primary)));
+        play(
+            &mut s,
+            vec![Step::Until("pairing request", |s| {
+                s.phone_link().is_some_and(|l| l.request().is_some()) && !s.running()
+            })],
+        );
+
+        let mut ui = Simulator::with_size(iced::Settings::default(), iced::Size::new(1280.0, 800.0), crate::setup::view(&s));
+
+        ui.find("The phone shows a key too. It must be the same: 807704F2.").expect("the key");
+        ui.find("Also on this network: site24. Not yours? Leave them be.").expect("the stranger");
+        ui.click("Accept the pairing").expect("the accept button");
+        ui.click("Turn the phone link off").expect("the way out");
+        let clicks: Vec<SF> = ui
+            .into_messages()
+            .filter_map(|m| match m {
+                Message::Setup(crate::setup::Msg::Click(f)) => Some(f),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(clicks, [SF::Primary, SF::TurnOff]);
+    }
+
     /// The phone card as it waits for a phone, with the link on and nothing seen yet.
     fn waiting_phone(s: &mut Setup) {
         let link = kubaos_core::phone::Status {
