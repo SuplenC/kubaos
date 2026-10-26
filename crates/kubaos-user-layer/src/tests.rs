@@ -29,6 +29,7 @@ fn an_app_lives_in_its_group_under_its_own_name() {
     assert_eq!(App::Nvim.relative(), Path::new("editor/nvim"));
     assert_eq!(App::Yazi.relative(), Path::new("tools/yazi"));
     assert_eq!(App::Kotodama.relative(), Path::new("menu/kotodama"));
+    assert_eq!(App::Phone.relative(), Path::new("desktop/phone"));
 }
 
 #[test]

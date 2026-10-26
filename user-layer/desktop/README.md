@@ -1,7 +1,7 @@
 # desktop/
 
 The desktop: Hyprland, the shell (bar, popups, Command menu look), keyboard, pointer,
-clock, system monitor, files and wallpapers.
+clock, system monitor, files, wallpapers and the phone link.
 
 | Folder | Files | What they change | Applies |
 |---|---|---|---|
@@ -14,6 +14,7 @@ clock, system monitor, files and wallpapers.
 | `keyboard/` | `keyboard.toml` | Layouts, Mac-style accents on Left Alt | at once from the menu; `kubaos keyboard accents apply` and `hyprctl reload` after a hand edit |
 | `sysmon/` | `sysmon.toml` | The bar's monitor pill, its style, metrics, alerts and thresholds | within a few seconds |
 | `files/` | `tidy-downloads`, `no-automount` | Flag files, no contents: one turns on the daily Tidy Downloads, the other turns off mounting drives as they're plugged in. Set them from the Command menu | at once |
+| `phone/` | `phone-link` | A flag file, no contents: the phone link is on and KDE Connect runs. "Set up a phone" in the Command menu writes it, "Turn the phone link off" removes it | at once from the menu; the next login after a hand edit |
 | `wallpapers/` | `sets` | The wallpaper sets the picker shows, one per line. The install writes it | the picker's next look |
 
 The Command menu's "Settings: Desktop" opens this folder in Files.

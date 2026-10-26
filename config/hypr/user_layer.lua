@@ -18,6 +18,7 @@ M.apps = {
   sysmon = "desktop/sysmon",
   files = "desktop/files",
   wallpapers = "desktop/wallpapers",
+  phone = "desktop/phone",
   ghostty = "terminal/ghostty",
   foot = "terminal/foot",
   tmux = "terminal/tmux",

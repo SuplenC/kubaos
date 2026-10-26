@@ -2260,6 +2260,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kubaos-phone"
+version = "0.1.0"
+dependencies = [
+ "kubaos-user-layer",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "kubaos-sysmon"
 version = "0.1.0"
 dependencies = [
