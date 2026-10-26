@@ -13,7 +13,7 @@
 //!
 //! - The settings file and its changes ([`settings`]), the words the toasts say ([`words`]),
 //!   hypridle's listeners ([`hypridle`]), the lid's decision ([`lid`]), Keep awake's state
-//!   ([`awake`]) and the scheduled lock's ([`schedule`]).
+//!   ([`awake`]) and the scheduled action's ([`schedule`]).
 //! - What they read from the machine: the power source, logind's lid and dock, the session
 //!   ([`machine`]).
 //!

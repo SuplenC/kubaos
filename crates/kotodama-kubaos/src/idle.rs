@@ -12,7 +12,7 @@
 //!
 //! # Not here
 //!
-//! - The settings, their limits and their words: `kubaos_idle`. Keep awake and the scheduled lock:
+//! - The settings, their limits and their words: `kubaos_idle`. Keep awake and the scheduled actions:
 //!   actions of the registry (`config/kotodama/kubaos.toml`).
 
 use std::collections::BTreeMap;

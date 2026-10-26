@@ -89,8 +89,8 @@ services/               singletons, no UI
   MenuRequests          `kotodama toggle` / `open` an embedded KotodamaSearch got, handed on to the Command menu
   Session               lock state, suspend/logout/reboot/poweroff
   Recorder              screen recording state ($XDG_RUNTIME_DIR/dot-record.json, watched), dot-hypr-record calls
-  Idle                  Keep awake and the scheduled lock ($XDG_RUNTIME_DIR/kubaos-keep-awake.json,
-                        kubaos-scheduled-lock.json, watched), kubaos-idle calls
+  Idle                  Keep awake and the scheduled action ($XDG_RUNTIME_DIR/kubaos-keep-awake.json,
+                        kubaos-scheduled.json, watched), kubaos-idle calls
   Time                  the clock engine (`kubaos-clock serve`, line JSON), clock.toml (watched),
                         the timer, stopwatch and alarms
   Sysmon                the system monitor's stream (`kubaos-sysmon serve`, line JSON, paced by
@@ -187,7 +187,7 @@ The polkit agent is in-shell but turned off (`Settings.polkitAgent: false`), and
 | `brightnessctl` | setting brightness | apt |
 | `dot-theme` | applying a wallpaper | this repo |
 | `kubaos-clock`, `kubaos-sysmon` | the clock popup's dates, the system monitor's stream | this repo, Nix (`home/clock.nix`, `home/sysmon.nix`) |
-| `kubaos-idle` | stopping Keep awake, cancelling a scheduled lock (the bar's marker) | this repo, Nix (`home/idle.nix`) |
+| `kubaos-idle` | stopping Keep awake, cancelling a scheduled action (the bar's marker) | this repo, Nix (`home/idle.nix`) |
 | `btop` | the system monitor's full picture | Nix (`home/cli.nix`) |
 | `dot-hypr-record`, `dot-hypr-screenshot` | recording indicator, capture buttons | this repo |
 | `dot-session leave` (then `systemctl`, `loginctl`) | power menu: log out, reboot, shut down | this repo |

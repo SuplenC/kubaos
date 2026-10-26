@@ -65,7 +65,7 @@ rec {
   kubaos-clock = callCrate ../crates/kubaos-clock/package.nix;
   # The system monitor behind the bar's pill and its popup (home/sysmon.nix).
   kubaos-sysmon = callCrate ../crates/kubaos-sysmon/package.nix;
-  # The idle settings, Keep awake and the scheduled lock (home/idle.nix).
+  # The idle settings, Keep awake and the scheduled power actions (home/idle.nix).
   kubaos-idle = callCrate ../crates/kubaos-idle/package.nix;
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.

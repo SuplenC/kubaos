@@ -144,7 +144,7 @@ The lid setting works without root: while it differs from what logind does, your
 
 **Keep awake** (`SUPER + CTRL + I`, or "Keep awake for 1 hour", "for 2 hours", "for…", "until turned off" in the Command menu) holds the auto-lock, screens off and suspend off. It ends by itself when its time is up, says so, and shows a cup in the bar while on; click the cup or run "Stop keeping awake" to end it sooner. Closing the lid and locking by hand still work.
 
-**Lock in… / Lock at…** lock the screen once, whether you're working or not: `lock-in 10m`, `lock-at 20:00`, `lock-at friday 17:00` (the next time it comes round). Toasts warn a minute and 10 s before, the bar counts down, and Keep awake doesn't stop it: you asked for it. One at a time; a new one replaces the old, and the toast says so. "Cancel scheduled lock", or a click on the countdown, cancels it. They are systemd user timers: `systemctl --user list-timers 'kubaos-scheduled-lock*'`.
+**Lock, suspend, shut down or reboot in… / at…** do it once, whether you're working or not: `lock-in 10m`, `lock-at 20:00`, `suspend-at 23:00`, `shutdown-at friday 17:00`, `reboot-in 5m` (an "at" is the next time it comes round). Shut down and reboot ask you to confirm first, and close the session the way the power menu does; a suspend locks first. Toasts warn a minute and 10 s before, each with a Cancel button, the bar counts down with the action's icon, and Keep awake doesn't stop any of them: you asked for it. One at a time, whichever it is; a new one replaces the old, and the toast says what it replaced. "Cancel scheduled action", Cancel on a warning, or a click on the countdown cancels it. They are systemd user timers: `systemctl --user list-timers 'kubaos-scheduled*'`.
 
 ## Updating and rolling back
 

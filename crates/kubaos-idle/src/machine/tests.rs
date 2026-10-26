@@ -86,6 +86,8 @@ fn any_hyprland_counts_whichever_instance_runs() {
     }
 
     assert!(!any_hyprland_runs(runtime.path(), proc.path()));
+    assert_eq!(running_hyprland(runtime.path(), proc.path()), None);
     fs::create_dir(proc.path().join("200")).expect("the new pid");
     assert!(any_hyprland_runs(runtime.path(), proc.path()));
+    assert_eq!(running_hyprland(runtime.path(), proc.path()).as_deref(), Some("new"));
 }

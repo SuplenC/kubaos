@@ -8,7 +8,7 @@
 # behind the clock popup and the menu's date answers (`kubaos-clock`), and the
 # system monitor behind the bar's pill, its popup and the menu's `cpu`, `ram`
 # and `battery` answers (`kubaos-sysmon`), the idle settings, Keep awake and the
-# scheduled lock (`kubaos-idle`), and where each app's settings live in the
+# scheduled power actions (`kubaos-idle`), and where each app's settings live in the
 # user layer (`kubaos-user-layer`).
 [workspace]
 resolver = "3"

@@ -72,12 +72,17 @@ pub fn hyprland_lock(runtime: &Path, signature: &str) -> PathBuf {
 /// tell. The holders follow any, not the one they were started in: a program started from the
 /// menu may carry the signature of a Hyprland that has since restarted.
 pub fn any_hyprland_runs(runtime: &Path, proc: &Path) -> bool {
-    let Ok(instances) = fs::read_dir(runtime.join("hypr")) else {
-        return false;
-    };
+    running_hyprland(runtime, proc).is_some()
+}
+
+/// The instance signature of a Hyprland of this user that runs, to send it a dispatch with
+/// `hyprctl -i`. A user has one session, so one runs; a crashed one left behind doesn't count.
+pub fn running_hyprland(runtime: &Path, proc: &Path) -> Option<String> {
+    let instances = fs::read_dir(runtime.join("hypr")).ok()?;
     instances
         .flatten()
-        .any(|instance| hyprland_runs(&instance.path().join("hyprland.lock"), proc))
+        .find(|instance| hyprland_runs(&instance.path().join("hyprland.lock"), proc))
+        .map(|instance| instance.file_name().to_string_lossy().into_owned())
 }
 
 /// Whether the Hyprland with the lock file `lock` runs: its first line is Hyprland's pid, which

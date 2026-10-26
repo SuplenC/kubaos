@@ -1,8 +1,8 @@
-//! `kubaos-idle`: the idle settings, Keep awake and the scheduled lock, from the Command menu,
-//! the keybinds and a terminal.
+//! `kubaos-idle`: the idle settings, Keep awake and the scheduled lock, suspend, shut down or
+//! reboot, from the Command menu, the keybinds and a terminal.
 //!
 //! ```text
-//! kubaos-idle status                        every setting, Keep awake and a scheduled lock
+//! kubaos-idle status                        every setting, Keep awake and a scheduled action
 //! kubaos-idle set lock|screens-off|suspend WAIT [battery|ac]
 //!                                           after how long idle: 90s, 2m, 1h30m or never; both
 //!                                           power sources unless one is named
@@ -10,9 +10,10 @@
 //! kubaos-idle reset                         KubaOS's defaults again
 //! kubaos-idle apply                         put a hand edit of the file to work
 //! kubaos-idle awake DURATION|on|off|toggle  Keep awake for 1h, until turned off, or no more
-//! kubaos-idle lock in DURATION | at TIME | cancel
-//!                                           lock once at a time, idle or not: 10m, 20:00,
-//!                                           friday 17:00
+//! kubaos-idle schedule lock|suspend|shutdown|reboot in DURATION | at TIME
+//!                                           once at a time, idle or not: 10m, 20:00,
+//!                                           friday 17:00; `lock in|at` is short for the lock
+//! kubaos-idle schedule cancel               (or `lock cancel`) whichever is scheduled
 //! kubaos-idle write                         hypridle's listeners alone (home activation)
 //! kubaos-idle session                       at login: the listeners, the lid, then exec hypridle
 //! kubaos-idle lid closed                    Hyprland's lid bind
@@ -57,6 +58,7 @@ use kubaos_idle::lid;
 use kubaos_idle::machine;
 use kubaos_idle::machine::LidState;
 use kubaos_idle::schedule;
+use kubaos_idle::schedule::Action;
 use kubaos_idle::settings;
 use kubaos_idle::settings::LidAction;
 use kubaos_idle::settings::Settings;
@@ -71,7 +73,8 @@ usage: kubaos-idle status
        kubaos-idle set lid suspend|lock|nothing [battery|ac]
        kubaos-idle reset | apply
        kubaos-idle awake DURATION|on|off|toggle
-       kubaos-idle lock in DURATION | at TIME | cancel
+       kubaos-idle schedule lock|suspend|shutdown|reboot in DURATION | at TIME
+       kubaos-idle schedule cancel
        kubaos-idle write | session | lid closed
 
 set     after how long idle the screen locks, the screens go off, or it suspends: 90s, 2m,
@@ -82,8 +85,9 @@ reset   KubaOS's defaults: lock 5 min, screens off 10 min, suspend 30 min on bat
 apply   put a hand edit of the settings file to work
 awake   Keep awake: nothing locks, turns off or suspends by itself, for a while (1h, 2h) or until
         turned off
-lock    lock once, idle or not, in a while (10m) or at a time (20:00, friday 17:00); one at a
-        time, a new one replaces it. Keep awake doesn't hold it back
+schedule  lock, suspend, shut down or reboot once, idle or not, in a while (10m) or at a time
+        (20:00, friday 17:00); one at a time, a new one replaces it. Keep awake doesn't hold it
+        back. `lock in|at|cancel` is short for `schedule lock in|at` and `schedule cancel`
 write   write hypridle's listeners; session: at login, then exec hypridle
 lid     closed: what Hyprland's lid bind runs
 
@@ -94,7 +98,7 @@ Settings: ~/.config/kubaos/desktop/idle/idle.toml";
 enum Toast {
     Idle,
     KeepAwake,
-    ScheduledLock,
+    Scheduled(Action),
 }
 
 impl Toast {
@@ -102,14 +106,20 @@ impl Toast {
         match self {
             Toast::Idle => "Idle",
             Toast::KeepAwake => "Keep awake",
-            Toast::ScheduledLock => "Scheduled lock",
+            Toast::Scheduled(Action::Lock) => "Scheduled lock",
+            Toast::Scheduled(Action::Suspend) => "Scheduled suspend",
+            Toast::Scheduled(Action::Shutdown) => "Scheduled shut down",
+            Toast::Scheduled(Action::Reboot) => "Scheduled reboot",
         }
     }
 
     fn icon(self) -> &'static str {
         match self {
             Toast::Idle | Toast::KeepAwake => "preferences-desktop-screensaver",
-            Toast::ScheduledLock => "system-lock-screen",
+            Toast::Scheduled(Action::Lock) => "system-lock-screen",
+            Toast::Scheduled(Action::Suspend) => "system-suspend",
+            Toast::Scheduled(Action::Shutdown) => "system-shutdown",
+            Toast::Scheduled(Action::Reboot) => "system-reboot",
         }
     }
 }
@@ -135,11 +145,24 @@ fn main() -> ExitCode {
         ["awake", "for", rest @ ..] | ["awake", rest @ ..] if !rest.is_empty() => {
             report(Toast::KeepAwake, awake_for(&rest.join(" ")))
         }
-        ["lock", "in", rest @ ..] if !rest.is_empty() => report(Toast::ScheduledLock, lock_in(&rest.join(" "))),
-        ["lock", "at", rest @ ..] if !rest.is_empty() => report(Toast::ScheduledLock, lock_at(&rest.join(" "))),
-        ["lock", "cancel"] => report(Toast::ScheduledLock, lock_cancel()),
-        ["lock", "now"] => report(Toast::ScheduledLock, lock_now()),
-        ["lock", "warn", secs] => report(Toast::ScheduledLock, lock_warn(secs)),
+        ["schedule" | "lock", "cancel"] => report(Toast::Scheduled(Action::Lock), schedule_cancel()),
+        ["schedule", "fire", action, at] => report(Toast::Idle, schedule_fire(action, at)),
+        ["schedule", "warn", secs, action, at] => report(Toast::Idle, schedule_warn(secs, action, at)),
+        ["schedule", action, when, rest @ ..] | [action @ "lock", when, rest @ ..] if !rest.is_empty() => {
+            let Some(action) = Action::from_name(action) else {
+                eprintln!("{USAGE}");
+                return ExitCode::from(2);
+            };
+            let typed = rest.join(" ");
+            match *when {
+                "in" => report(Toast::Scheduled(action), schedule_in(action, &typed)),
+                "at" => report(Toast::Scheduled(action), schedule_at(action, &typed)),
+                _ => {
+                    eprintln!("{USAGE}");
+                    ExitCode::from(2)
+                }
+            }
+        }
         ["lid", "closed"] => report(Toast::Idle, lid_closed()),
         ["lid", "hold"] => report(Toast::Idle, lid_hold()),
         ["-h" | "--help" | "help"] => {
@@ -240,13 +263,17 @@ fn status() {
             );
         }
     }
-    let lock = runtime
+    let scheduled = runtime
         .as_deref()
         .map(schedule::path)
         .map(|path| schedule::State::read(&path))
         .unwrap_or_default();
-    if lock.pending(now.timestamp().as_second()) {
-        println!("Scheduled lock: {}", words::time_of_day(&at(lock.at), &now, format));
+    if scheduled.pending(now.timestamp().as_second()) {
+        println!(
+            "Scheduled {}: {}",
+            scheduled.action.noun(),
+            words::time_of_day(&at(scheduled.at), &now, format)
+        );
     }
 }
 
@@ -654,56 +681,57 @@ fn awake_hold(until: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn lock_in(typed: &str) -> Result<(), String> {
+fn schedule_in(action: Action, typed: &str) -> Result<(), String> {
     let now = Zoned::now();
-    let at = schedule::lock_in(typed, &now)
-        .ok_or_else(|| format!("`{typed}` isn't a time to wait: try 10m, 1h30m or 90s"))?;
-    schedule_lock(&at, &now)
+    let at =
+        schedule::after(typed, &now).ok_or_else(|| format!("`{typed}` isn't a time to wait: try 10m, 1h30m or 90s"))?;
+    schedule_action(action, &at, &now)
 }
 
-fn lock_at(typed: &str) -> Result<(), String> {
+fn schedule_at(action: Action, typed: &str) -> Result<(), String> {
     let now = Zoned::now();
-    let at = schedule::lock_at(typed, &now)
+    let at = schedule::at_time(typed, &now)
         .ok_or_else(|| format!("`{typed}` isn't a time to come: try 20:00, 9pm or friday 17:00"))?;
-    schedule_lock(&at, &now)
+    schedule_action(action, &at, &now)
 }
 
-/// Schedules the lock at `at` in place of any before it, and says when.
-fn schedule_lock(at: &Zoned, now: &Zoned) -> Result<(), String> {
+/// Schedules `action` at `at` in place of whatever was scheduled before, and says when, and what
+/// it replaced.
+fn schedule_action(action: Action, at: &Zoned, now: &Zoned) -> Result<(), String> {
     let path = schedule::path(&runtime()?);
     let before = schedule::State::read(&path);
     stop_units(&schedule::timers());
-    for timer in schedule::plan(at, now, &this_program()) {
+    for timer in schedule::plan(action, at, now, &this_program()) {
         let argv = timer.systemd_run();
         if let Err(message) = run(Command::new(&argv[0]).args(&argv[1..])) {
             stop_units(&schedule::timers());
             let _ = schedule::State::default().write(&path);
-            return Err(format!("Couldn't schedule the lock: {message}"));
+            return Err(format!("Couldn't schedule the {}: {message}", action.noun()));
         }
     }
-    schedule::State {
-        at: at.timestamp().as_second(),
-    }
-    .write(&path)
-    .map_err(|err| format!("Couldn't write {}: {err}", path.display()))?;
+    schedule::State::new(action, at.timestamp().as_second())
+        .write(&path)
+        .map_err(|err| format!("Couldn't write {}: {err}", path.display()))?;
     let format = clock_format();
     let mut body = format!(
-        "Locks {}, in {}, even if you're working or Keep awake is on.",
+        "{} {}, in {}, even if you're working or Keep awake is on.",
+        action.does(),
         words::when(at, now, format),
         words::left(now.duration_until(at).as_secs())
     );
     if before.pending(now.timestamp().as_second()) {
         let _ = write!(
             body,
-            " It replaces the lock {}.",
+            " It replaces the {} {}.",
+            before.action.noun(),
             words::when(&self::at(before.at), now, format)
         );
     }
-    say(Toast::ScheduledLock, &body);
+    say(Toast::Scheduled(action), &body);
     Ok(())
 }
 
-fn lock_cancel() -> Result<(), String> {
+fn schedule_cancel() -> Result<(), String> {
     let path = schedule::path(&runtime()?);
     let before = schedule::State::read(&path);
     stop_units(&schedule::timers());
@@ -713,34 +741,79 @@ fn lock_cancel() -> Result<(), String> {
     let now = Zoned::now();
     if before.pending(now.timestamp().as_second()) {
         say(
-            Toast::ScheduledLock,
+            Toast::Scheduled(before.action),
             &format!(
-                "The lock {} is cancelled.",
+                "The {} {} is cancelled.",
+                before.action.noun(),
                 words::when(&at(before.at), &now, clock_format())
             ),
         );
     } else {
-        say(Toast::ScheduledLock, "No lock was scheduled.");
+        say(Toast::Scheduled(Action::Lock), "Nothing was scheduled.");
     }
     Ok(())
 }
 
-fn lock_now() -> Result<(), String> {
-    let _ = schedule::State::default().write(&schedule::path(&runtime()?));
-    lock_session()
+/// The action's own command, `action` and `at` as its timer names them. It runs only while the
+/// state still says so, and in the Hyprland session through `hyprctl dispatch`, as a keybind's
+/// would: a transient unit isn't in the session, which polkit asks of a suspend or a power off.
+fn schedule_fire(action: &str, at: &str) -> Result<(), String> {
+    let (action, at) = timer_words(action, at)?;
+    let path = schedule::path(&runtime()?);
+    if !schedule::State::read(&path).is(action, at) {
+        return Ok(());
+    }
+    let _ = schedule::State::default().write(&path);
+    let session =
+        kubaos_idle::runtime_dir().and_then(|runtime| machine::running_hyprland(&runtime, Path::new("/proc")));
+    let Some(signature) = session else {
+        // No session to run it in: the lock names the user's session, the rest ask logind as is.
+        return match action {
+            Action::Lock => lock_session(),
+            _ => run(Command::new(action.command()[0]).args(&action.command()[1..])),
+        };
+    };
+    let exec = format!("hl.dsp.exec_cmd([[{}]])", action.command().join(" "));
+    run(Command::new("hyprctl").args(["-i", &signature, "dispatch", &exec]))
 }
 
-fn lock_warn(secs: &str) -> Result<(), String> {
+/// A heads-up `secs` before `action` at `at`, with a Cancel button. It waits for the toast, so a
+/// click on Cancel cancels the action, unless another has replaced it since.
+fn schedule_warn(secs: &str, action: &str, at: &str) -> Result<(), String> {
     let secs: u32 = secs
         .parse()
         .map_err(|_| format!("`{secs}` isn't a number of seconds"))?;
-    notify(
-        Toast::ScheduledLock,
-        &format!(
-            "Locking in {}. To stop it, run \"Cancel scheduled lock\" in the Command menu.",
-            words::wait(Wait::from_secs(secs))
-        ),
-        secs <= 10,
+    let (action, at) = timer_words(action, at)?;
+    let path = schedule::path(&runtime()?);
+    if !schedule::State::read(&path).is(action, at) {
+        return Ok(());
+    }
+    let toast = Toast::Scheduled(action);
+    let body = format!(
+        "{} in {}. Cancel to stop it, or \"Cancel scheduled action\" in the Command menu.",
+        action.doing(),
+        words::wait(Wait::from_secs(secs))
     );
+    let mut command = Command::new("notify-send");
+    command.args(["-a", toast.app(), "-i", toast.icon(), "--action=cancel=Cancel"]);
+    if secs <= 10 || matches!(action, Action::Shutdown | Action::Reboot) {
+        command.args(["-u", "critical"]);
+    }
+    let clicked = command
+        .args([toast.app(), body.as_str()])
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .is_ok_and(|output| String::from_utf8_lossy(&output.stdout).trim() == "cancel");
+    if clicked && schedule::State::read(&path).is(action, at) {
+        schedule_cancel()?;
+    }
     Ok(())
+}
+
+/// The action and the time its timer was made with.
+fn timer_words(action: &str, at: &str) -> Result<(Action, i64), String> {
+    let action = Action::from_name(action).ok_or_else(|| format!("`{action}` isn't a scheduled action"))?;
+    let at = at.parse().map_err(|_| format!("`{at}` isn't a time in seconds"))?;
+    Ok((action, at))
 }

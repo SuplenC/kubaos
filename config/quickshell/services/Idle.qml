@@ -4,9 +4,10 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Keep awake and the scheduled lock, from the files `kubaos-idle` writes in
-// $XDG_RUNTIME_DIR (crates/kubaos-idle: kubaos-keep-awake.json,
-// kubaos-scheduled-lock.json, each replaced whole on every change). Watched,
+// Keep awake and the scheduled action (lock, suspend, shut down or reboot),
+// from the files `kubaos-idle` writes in $XDG_RUNTIME_DIR (crates/kubaos-idle:
+// kubaos-keep-awake.json, kubaos-scheduled.json, each replaced whole on every
+// change). Watched,
 // never polled; the clock only ticks while either is on. Both outlive a shell
 // restart: the files and the systemd user units behind them are kubaos-idle's.
 Singleton {
@@ -14,7 +15,7 @@ Singleton {
 
     readonly property string runtime: Quickshell.env("XDG_RUNTIME_DIR")
     property var keepAwakeInfo: ({})
-    property var lockInfo: ({})
+    property var scheduledInfo: ({})
 
     // Seconds since the epoch, to the second while anything counts down.
     readonly property int now: Math.floor(clock.date.getTime() / 1000)
@@ -23,10 +24,23 @@ Singleton {
     readonly property int keepAwakeUntil: keepAwakeInfo.until ?? 0
     readonly property bool keepAwake: (keepAwakeInfo.active ?? false) && (keepAwakeUntil === 0 || keepAwakeUntil > now)
 
-    // When the scheduled lock comes, in seconds since the epoch.
-    readonly property int lockAt: lockInfo.at ?? 0
-    readonly property bool lockPending: lockAt > now
-    readonly property int lockLeft: lockPending ? lockAt - now : 0
+    // The scheduled action: "lock", "suspend", "shutdown" or "reboot", and when
+    // it comes, in seconds since the epoch.
+    readonly property string scheduled: scheduledInfo.action ?? "lock"
+    readonly property int scheduledAt: scheduledInfo.at ?? 0
+    readonly property bool scheduledPending: scheduledAt > now
+    readonly property int scheduledLeft: scheduledPending ? scheduledAt - now : 0
+    // Its icon and its name, for the bar.
+    readonly property string scheduledIcon: ({
+            suspend: "bedtime",
+            shutdown: "power_settings_new",
+            reboot: "restart_alt"
+        })[scheduled] ?? "lock_clock"
+    readonly property string scheduledNoun: ({
+            suspend: "Suspending",
+            shutdown: "Shutting down",
+            reboot: "Rebooting"
+        })[scheduled] ?? "Locking"
 
     // "4:59" under an hour, "1:05:00" over, "2 d" from two days.
     function countdown(seconds: int): string {
@@ -41,18 +55,18 @@ Singleton {
         Quickshell.execDetached(["kubaos-idle", "awake", "off"]);
     }
 
-    function cancelLock(): void {
-        Quickshell.execDetached(["kubaos-idle", "lock", "cancel"]);
+    function cancelScheduled(): void {
+        Quickshell.execDetached(["kubaos-idle", "schedule", "cancel"]);
     }
 
     SystemClock {
         id: clock
 
-        // On while either could be on, so `keepAwake` and `lockPending` turn
+        // On while either could be on, so `keepAwake` and `scheduledPending` turn
         // false on time, not at the next file change. Seconds only for the
-        // lock's countdown; Keep awake shows no time in the bar.
-        enabled: (root.keepAwakeInfo.active ?? false) || root.lockAt > 0
-        precision: root.lockAt > 0 ? SystemClock.Seconds : SystemClock.Minutes
+        // countdown; Keep awake shows no time in the bar.
+        enabled: (root.keepAwakeInfo.active ?? false) || root.scheduledAt > 0
+        precision: root.scheduledAt > 0 ? SystemClock.Seconds : SystemClock.Minutes
     }
 
     FileView {
@@ -72,16 +86,16 @@ Singleton {
     }
 
     FileView {
-        id: lockFile
+        id: scheduledFile
 
-        path: `${root.runtime}/kubaos-scheduled-lock.json`
+        path: `${root.runtime}/kubaos-scheduled.json`
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
-        onLoaded: root.lockInfo = root.parse(text())
+        onLoaded: root.scheduledInfo = root.parse(text())
         onLoadFailed: {
-            root.lockInfo = {};
-            lockCreator.running = true;
+            root.scheduledInfo = {};
+            scheduledCreator.running = true;
         }
     }
 
@@ -101,9 +115,9 @@ Singleton {
     }
 
     Process {
-        id: lockCreator
+        id: scheduledCreator
 
-        command: ["sh", "-c", '[ -e "$1" ] || printf \'{"at":0}\\n\' > "$1"', "sh", lockFile.path]
-        onExited: lockFile.reload()
+        command: ["sh", "-c", '[ -e "$1" ] || printf \'{"at":0,"action":"lock"}\\n\' > "$1"', "sh", scheduledFile.path]
+        onExited: scheduledFile.reload()
     }
 }
