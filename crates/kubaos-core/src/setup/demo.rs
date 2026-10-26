@@ -399,7 +399,7 @@ fn demo_keys(folders: &[String]) -> Vec<KeyInfo> {
             ..key("GitHub", "Personal", "github", &["github.com"])
         },
         key("Work GitHub", "Work", "work-github", &["github-work"]),
-        key("Homelab server", "no folder", "homelab-server", &["homelab", "nas.lan"]),
+        key("Build server", "no folder", "build-server", &["build", "build.example.com"]),
         key("GitHub", "Work", "github-2", &[]),
     ];
     let mut keys: Vec<KeyInfo> = all

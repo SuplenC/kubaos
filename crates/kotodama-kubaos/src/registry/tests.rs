@@ -230,14 +230,14 @@ fn arguments_fill_their_placeholders() {
 
     let item = registry.items().next().expect("an item");
     let command = registry
-        .command("ssh-key", &arguments(&[("name", "homelab")]))
+        .command("ssh-key", &arguments(&[("name", "server")]))
         .expect("a command");
 
     assert_eq!(item.keyword.as_deref(), Some("ssh-key"));
     assert_eq!(item.actions[0].arguments[0].name, "name");
     assert_eq!(item.actions[0].arguments[0].placeholder.as_deref(), Some("github"));
     assert!(!item.actions[0].arguments[0].optional);
-    assert_eq!(command.argv, ["dot-ssh-sk-new", "homelab", "--comment=homelab@kubaos"]);
+    assert_eq!(command.argv, ["dot-ssh-sk-new", "server", "--comment=server@kubaos"]);
 }
 
 #[test]
