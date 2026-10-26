@@ -97,8 +97,8 @@ end
 
 local LG_A = "LG Electronics LG ULTRAGEAR 312NTAB1A234"
 local LG_B = "LG Electronics LG ULTRAGEAR 312NTAB1A999"
-local LG_C = "LG Electronics LG ULTRAGEAR+ 510NTCZN7787"
-local BENQ = "BNQ ZOWIE XL LCD G4L01663SL0"
+local LG_C = "LG Electronics LG ULTRAGEAR+ 000NTAB0C000"
+local BENQ = "BNQ BenQ GW2480 ET00000000SL0"
 local PANEL = "BOE 0x0BCA"
 
 -- The laptop and one external at login.

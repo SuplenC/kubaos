@@ -5,9 +5,9 @@ use super::*;
 use crate::fake::FakeRunner;
 
 const SCREENS: &str = "0\teDP-1\tpanel\tBOE 0x0BCA\n\
-                       1\t\t3\tBNQ ZOWIE XL LCD G4L01663SL0\n\
-                       3\tDP-8\t2\tLG ULTRAGEAR 0x000105E4\n\
-                       4\tDP-9\t1\tLG ULTRAGEAR 0x000105C4\n";
+                       1\t\t3\tBNQ BenQ GW2480 ET00000000SL0\n\
+                       3\tDP-8\t2\tDell Inc. DELL U2724D 1A2B3C4\n\
+                       4\tDP-9\t1\tDell Inc. DELL U2724D 5D6E7F8\n";
 
 fn titles(desk: &Desk) -> Vec<String> {
     desk.items().into_iter().map(|item| item.title).collect()
@@ -42,7 +42,7 @@ fn an_item_names_its_workspaces_and_the_screen_standing_there() {
     );
     assert_eq!(
         items[1].subtitle.as_deref(),
-        Some("Workspaces 41-50, on LG ULTRAGEAR 0x000105C4 (DP-9)")
+        Some("Workspaces 41-50, on Dell Inc. DELL U2724D 5D6E7F8 (DP-9)")
     );
 }
 
@@ -52,13 +52,13 @@ fn a_position_no_screen_holds_says_its_group_waits_and_where_it_was_last() {
 
     assert_eq!(
         items[3].subtitle.as_deref(),
-        Some("Workspaces 11-20, waiting for a screen here; last on BNQ ZOWIE XL LCD G4L01663SL0")
+        Some("Workspaces 11-20, waiting for a screen here; last on BNQ BenQ GW2480 ET00000000SL0")
     );
 }
 
 #[test]
 fn a_file_keyed_by_screen_gives_no_items_until_hyprland_migrates_it() {
-    let desk = Desk::parse("0\teDP-1\tBOE 0x0BCA\n1\t\tLG ULTRAGEAR 0x000105C4\n");
+    let desk = Desk::parse("0\teDP-1\tBOE 0x0BCA\n1\t\tDell Inc. DELL U2724D 5D6E7F8\n");
 
     assert!(desk.items().is_empty());
 }
