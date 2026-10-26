@@ -1,4 +1,5 @@
-//! gh: the token from the item named `gh-token` into gh's own keyring entry.
+//! gh: the token from the item named `gh-token` ([`super::vault::Names::gh_item`]) into gh's own
+//! keyring entry.
 
 use super::Cmd;
 use super::Machine;
@@ -6,9 +7,10 @@ use super::Progress;
 use super::vault::Vault;
 
 pub fn apply(m: &mut dyn Machine, vault: &Vault, p: &mut Progress) {
+    let item = &vault.names.gh_item;
     let tokens = vault.gh_tokens();
     if tokens.len() > 1 {
-        p.warn("more than one item \"gh-token\" in the vault; gh gets the first");
+        p.warn(format!("more than one item \"{item}\" in the vault; gh gets the first"));
     }
     let host = tokens
         .first()
@@ -20,8 +22,8 @@ pub fn apply(m: &mut dyn Machine, vault: &Vault, p: &mut Progress) {
 
     p.step("gh: token from the vault into the system keyring");
     let Some(token) = token.filter(|t| !t.0.is_empty()) else {
-        p.info("no item \"gh-token\" in the vault; skipped (gh auth login works by hand too)");
-        p.summary("gh     no gh-token item, skipped");
+        p.info(format!("no item \"{item}\" in the vault; skipped (gh auth login works by hand too)"));
+        p.summary(format!("gh     no {item} item, skipped"));
         return;
     };
     if !m.has("gh") {

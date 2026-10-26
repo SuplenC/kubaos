@@ -4,6 +4,7 @@
 //! A pull reads the whole vault once and writes what the session needs from it: every SSH key
 //! item's public half and Host block, commit signing with the key marked `signing=true`, the
 //! `gh-token` item into gh's keyring entry, and every project's env into the GNOME keyring.
+//! Those two names, and the `env/` before each project's folder, are defaults ([`Names`]).
 //! `folders=` in the config narrows the SSH keys to some folders.
 //!
 //! Private keys never leave the vault and nothing secret is written to disk or logged. The
@@ -57,6 +58,9 @@ pub use login::NoTerminal;
 pub use login::login;
 pub use login::logout;
 pub use real::Real;
+pub use vault::DEFAULT_ENV_PREFIX;
+pub use vault::DEFAULT_GH_ITEM;
+pub use vault::Names;
 pub use vault::scope;
 
 /// The session `bw unlock` or `bw login` hands out. It unlocks the whole vault, so it stays in
@@ -221,10 +225,13 @@ pub struct Paths {
     pub agent: PathBuf,
     /// `SSH_AUTH_SOCK` as this process got it.
     pub auth_sock: Option<String>,
+    /// Where in the vault gh's token and the project env are.
+    pub names: Names,
 }
 
 impl Paths {
-    /// From the environment: `HOME`, the XDG directories, `BITWARDEN_SSH_AUTH_SOCK`.
+    /// From the environment: `HOME`, the XDG directories, `BITWARDEN_SSH_AUTH_SOCK`, and the
+    /// vault's names ([`Names::from_env`]).
     #[must_use]
     pub fn from_env() -> Self {
         let home = std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from);
@@ -238,10 +245,14 @@ impl Paths {
         let agent = std::env::var_os("BITWARDEN_SSH_AUTH_SOCK")
             .map_or_else(|| home.join(".bitwarden-ssh-agent.sock"), PathBuf::from);
         let auth_sock = std::env::var("SSH_AUTH_SOCK").ok();
-        Self::new(&home, &config, &state, agent, auth_sock)
+        Self {
+            names: Names::from_env(),
+            ..Self::new(&home, &config, &state, agent, auth_sock)
+        }
     }
 
-    /// Under `home`, with the default XDG directories: what the tests use.
+    /// Under `home`, with the default XDG directories and the vault's default names: what the
+    /// tests use.
     #[must_use]
     pub fn under(home: &Path) -> Self {
         let agent = home.join(".bitwarden-ssh-agent.sock");
@@ -258,6 +269,7 @@ impl Paths {
             ssh: home.join(".ssh"),
             agent,
             auth_sock,
+            names: Names::default(),
         }
     }
 
@@ -545,7 +557,7 @@ pub fn pull(m: &mut dyn Machine, paths: &Paths, session: &Session, parts: Parts,
     let config = Config::read(m, paths);
     let filter = vault::Filter::pick(&folders, &config.folders(), p);
     let items = m.items(session).map_err(|e| Error::List("items", e))?;
-    let vault = vault::Vault::parse(&items, &folders).map_err(|e| Error::Parse("items", e))?;
+    let vault = vault::Vault::parse(&items, &folders, &paths.names).map_err(|e| Error::Parse("items", e))?;
     drop(items);
     let keys = vault.ssh_keys(&filter);
     p.ok(format!("{} items, {} SSH key(s) in {}", vault.len(), keys.len(), filter.scope));

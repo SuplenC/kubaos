@@ -361,5 +361,5 @@ fn env_pull(c: &Colours, m: &mut Real, projects: &[String]) -> Result<(), Error>
     };
     let mut emit = |l: &Line| c.print(l);
     let mut p = Progress::new(&mut emit);
-    env::pull(m, &session, projects, &mut p)
+    env::pull(m, &session, &bitwarden::Names::from_env(), projects, &mut p)
 }

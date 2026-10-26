@@ -901,7 +901,7 @@ fn a_project_gone_from_the_vault_leaves_the_keyring_on_the_next_pull() {
 fn env_pull_fetches_only_the_projects_asked_for() {
     let mut m = machine();
 
-    let (out, r) = run(|p| env::pull(&mut m, &Session::new(SESSION), &["demo".into(), "nope".into()], p));
+    let (out, r) = run(|p| env::pull(&mut m, &Session::new(SESSION), &Names::default(), &["demo".into(), "nope".into()], p));
 
     r.unwrap();
     assert!(out.warned("nope: no folder env/nope and no item with bwenv=nope in the vault"));
@@ -913,7 +913,7 @@ fn env_pull_fetches_only_the_projects_asked_for() {
 fn a_bad_project_name_is_refused_before_anything_runs() {
     let mut m = machine();
 
-    let (_, r) = run(|p| env::pull(&mut m, &Session::new(SESSION), &["../x".into()], p));
+    let (_, r) = run(|p| env::pull(&mut m, &Session::new(SESSION), &Names::default(), &["../x".into()], p));
 
     assert!(matches!(r, Err(Error::Project(_))));
     assert!(m.bw.is_empty());
@@ -934,6 +934,78 @@ fn list_shows_names_only_and_clear_forgets_a_project() {
     env::clear(&mut m, Some("demo"));
     assert!(env::projects(&mut m).unwrap().is_empty());
     assert!(env::export(&mut m, "demo").unwrap().is_empty());
+}
+
+#[test]
+fn the_vault_names_default_to_gh_token_and_env_and_the_environment_overrides_them() {
+    let none = Names::from_lookup(|_| None);
+    let blank = Names::from_lookup(|_| Some("  ".into()));
+    let set = Names::from_lookup(|var| match var {
+        "KUBAOS_BW_GH_ITEM" => Some("GitHub CLI".into()),
+        "KUBAOS_BW_ENV_PREFIX" => Some("secrets/".into()),
+        _ => None,
+    });
+
+    assert_eq!(none, Names::default());
+    assert_eq!((none.gh_item.as_str(), none.env_prefix.as_str()), ("gh-token", "env/"));
+    assert_eq!(blank, Names::default());
+    assert_eq!((set.gh_item.as_str(), set.env_prefix.as_str()), ("GitHub CLI", "secrets/"));
+    assert_eq!(set.project("secrets/demo"), Some("demo"));
+    assert_eq!(set.project("env/demo"), None);
+    assert_eq!(set.project("secrets/"), None);
+}
+
+#[test]
+fn a_pull_finds_gh_and_the_projects_under_the_names_it_is_given() {
+    let folders = json!([
+        { "id": "f-env", "name": "env/old" },
+        { "id": "f-secrets", "name": "secrets/demo" },
+    ])
+    .to_string();
+    let items = json!([
+        {
+            "id": "i-demo", "type": 2, "name": "demo env", "folderId": "f-secrets", "notes": null,
+            "fields": [{ "name": "API_TOKEN", "value": "tok-7c1f", "type": 1 }],
+        },
+        {
+            "id": "i-old", "type": 2, "name": "old env", "folderId": "f-env", "notes": null,
+            "fields": [{ "name": "OLD", "value": "1", "type": 1 }],
+        },
+        {
+            "id": "i-gh", "type": 1, "name": "GitHub CLI", "folderId": null,
+            "login": { "username": "kuba", "password": "tok-gh-99" },
+        },
+    ])
+    .to_string();
+    let mut m = machine().vault(&folders, &items);
+    let mut paths = paths();
+    paths.names = Names {
+        gh_item: "GitHub CLI".into(),
+        env_prefix: "secrets/".into(),
+    };
+
+    let (out, r) = run(|p| pull(&mut m, &paths, &Session::new(SESSION), Parts::ALL, p));
+
+    r.expect("pull");
+    assert!(out.report.summary.contains(&"env    1 project(s) in the keyring: demo".to_string()), "{}", out.text());
+    assert_eq!(env::projects(&mut m).unwrap(), ["demo"]);
+    let login = m.ran.iter().find(|c| c.args.starts_with(&["auth".into(), "login".into()])).unwrap();
+    assert_eq!(login.stdin.as_ref().map(|s| s.0.as_str()), Some("tok-gh-99"));
+}
+
+#[test]
+fn a_project_asked_for_by_name_says_which_folder_it_looked_for() {
+    let mut m = machine();
+    let names = Names {
+        gh_item: DEFAULT_GH_ITEM.into(),
+        env_prefix: "secrets/".into(),
+    };
+
+    let (out, r) = run(|p| env::pull(&mut m, &Session::new(SESSION), &names, &["demo".into(), "nope".into()], p));
+
+    r.unwrap();
+    assert!(out.warned("nope: no folder secrets/nope and no item with bwenv=nope in the vault"));
+    assert!(out.text().contains("demo                 1 variable(s)"), "{}", out.text());
 }
 
 #[test]
