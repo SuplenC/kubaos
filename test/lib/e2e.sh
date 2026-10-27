@@ -1604,7 +1604,7 @@ c_menu() {
   return "$bad"
 }
 
-# The KubaOS Extension (issue #29, crates/kotodama-kubaos): it runs under the
+# The KubaOS Extension (crates/kotodama-kubaos): it runs under the
 # Daemon and its Items are found by typing, with the user layer's action shown
 # and the ones it hides gone. test/lib/menu-query.py is the Front end, since
 # the `kotodama` command can't query. The Extension's Kotodama crates must be
@@ -1853,7 +1853,7 @@ TOML
   return "$bad"
 }
 
-# Wallpaper sets (issue #16): every set read-only in /usr/share/kubaos/wallpapers,
+# Wallpaper sets: every set read-only in /usr/share/kubaos/wallpapers,
 # the picker's folders are the chosen ones (~/.config/kubaos/desktop/wallpapers/sets,
 # all of them without the file) plus ~/Pictures/wallpapers, a real folder.
 c_wallpaper_sets() {
@@ -2061,7 +2061,7 @@ has_bin() { [[ -x $USER_HOME/.nix-profile/bin/$1 ]]; }
 # Suite, and not the home's.
 kz() { zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; PATH=/usr/local/bin:\$PATH; $1"; }
 
-# The state directory and switch jobs (issue #20), through the kubaos binary
+# The state directory and switch jobs, through the kubaos binary
 # test/run built (/out/kubaos) and a user flake like the installer's, with the
 # repo copy as KubaOS and KubaOS's own locked nixpkgs as the user's, so
 # nothing is downloaded but the packages. The packages are ones the home
@@ -2150,7 +2150,7 @@ c_packages() {
   echo "ok   kubaos switch after deleting the Suite file: hello gone"
 }
 
-# The Suite framework (issue #21), through the test Suite (home/suites/test.nix,
+# The Suite framework, through the test Suite (home/suites/test.nix,
 # in a kubaos built with the test-suite feature) and a user flake under git,
 # so every file kubaos writes into kubaos.d/ must reach git's index for Nix to
 # see it. Add, configure, scaffold and remove it, with a user override in
@@ -2252,7 +2252,104 @@ c_suites() {
   rm -rf "$mine" "$project" "$u/.git"
 }
 
-# The user layer (issue #9): test/user-layer-check, which the VM bench also
+# Project pins: `kubaos pin` and the `use suite` direnv function
+# (config/direnv/lib/suite.sh), with the test Suite installed at version 1 and
+# folders under ~/Projects/acme pinned to others. Version 3 is in no
+# generation, so its first use fetches it into the store. Each cd is in an
+# interactive zsh, whose direnv hook loads the folder as a terminal would.
+c_pins() {
+  local u="$USER_HOME/.config/kubaos/home" acme="$USER_HOME/Projects/acme" out entry drv3 out3
+  local typo="$USER_HOME/Projects/typo"
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$acme" "$typo"
+  as_user install -d "$acme/old-app/src" "$acme/new-app" "$acme/other-app" "$typo"
+  # at DIR: direnv's log and `V=<kubaos-test-suite version>` in DIR, then `H=<…>` back in the home.
+  at() {
+    zsh_pty "zsh -l -i -c 'cd $1; print -r -- V=\$(kubaos-test-suite version); cd; print -r -- H=\$(kubaos-test-suite version)'"
+  }
+  # version_at DIR: kubaos-test-suite's version in DIR.
+  version_at() { at "$1" | sed -n 's/^V=//p'; }
+
+  out="$(kz 'kubaos suite add test --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite add test"; printf '%s\n' "$out" | tail -20; return 1; }
+  entry="$USER_HOME/.local/share/kubaos/toolchains/test/3"
+  { IFS= read -r drv3 && IFS= read -r out3; } <"$entry" && [[ $drv3 == /nix/store/*.drv!bin && $out3 == /nix/store/*-bin ]] ||
+    { echo "FAIL no toolchain entry for the test Suite's version 3 at $entry"; return 1; }
+  "$NIX_BIN/nix-store" --delete "$out3" >/dev/null 2>&1 || true
+  [[ ! -e $out3 ]] || { echo "FAIL $out3 is still in the store, so version 3 can't show a first fetch"; return 1; }
+  [[ -e ${drv3%!bin} ]] || { echo "FAIL the generation doesn't keep ${drv3%!bin}"; return 1; }
+  echo "ok   the test Suite installed at 1; version 3 has a toolchain entry for its bin output, its derivation kept, the output not in the store"
+
+  out="$(kz "kubaos pin test 3 $acme" 2>&1)" || { echo "FAIL kubaos pin test 3"; printf '%s\n' "$out"; return 1; }
+  [[ $(cat "$acme/.envrc") == 'use suite test 3' ]] && grep -q 'fetches it the first time' <<<"$out" ||
+    { echo "FAIL kubaos pin wrote:"; cat "$acme/.envrc"; printf '%s\n' "$out"; return 1; }
+  out="$(kz "kubaos pins $acme/old-app/src" 2>&1)"
+  grep -qF 'test 3  from ~/Projects/acme/.envrc  (installed: 1; fetched on first use)' <<<"$out" ||
+    { echo "FAIL kubaos pins below the pin:"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos pin test 3 ~/Projects/acme: the .envrc line, and kubaos pins sees it two folders down"
+
+  out="$(at "$acme/old-app/src")"
+  [[ $(sed -n 's/^V=//p' <<<"$out") == 3 && $(sed -n 's/^H=//p' <<<"$out") == 1 ]] ||
+    { echo "FAIL cd ~/Projects/acme/old-app/src should give 3, the home 1:"; printf '%s\n' "$out"; return 1; }
+  grep -q 'fetching test 3 into the Nix store' <<<"$out" && [[ -e $out3 ]] ||
+    { echo "FAIL version 3 was not fetched on first use"; printf '%s\n' "$out"; return 1; }
+  local roots="$acme/.direnv/suites/test" inode
+  [[ $(readlink "$roots/3-bin") == "$out3" ]] ||
+    { echo "FAIL no GC root ~/Projects/acme/.direnv/suites/test/3-bin for version 3"; ls -la "$roots" 2>&1; return 1; }
+  echo "ok   cd ~/Projects/acme/old-app/src: version 3, fetched into the store on first use and kept by a GC root; leaving gives 1 back"
+  # nix-store --add-root replaces the link, so an unchanged inode means the load realised nothing.
+  inode="$(stat -c %i "$roots/3-bin")"
+  out="$(at "$acme/old-app")"
+  [[ $(sed -n 's/^V=//p' <<<"$out") == 3 && $(stat -c %i "$roots/3-bin") == "$inode" ]] ||
+    { echo "FAIL the second cd should use version 3 as it is, realising nothing"; printf '%s\n' "$out"; return 1; }
+  echo "ok   the next cd uses it as it is, without asking Nix"
+
+  kz "kubaos pin test 2 $acme" >/dev/null 2>&1 && [[ $(version_at "$acme/old-app") == 2 && $(ls "$roots") == 2-bin ]] ||
+    { echo "FAIL re-pinning to 2 should leave only the 2-bin root"; ls -la "$roots"; return 1; }
+  kz "kubaos pin test 3 $acme" >/dev/null 2>&1 && [[ $(version_at "$acme/old-app") == 3 && $(ls "$roots") == 3-bin ]] ||
+    { echo "FAIL re-pinning to 3 should leave only the 3-bin root"; ls -la "$roots"; return 1; }
+  echo "ok   re-pinning drops the old version's GC root"
+
+  printf 'source_up\n' | as_user tee "$acme/new-app/.envrc" >/dev/null
+  out="$(kz "kubaos pin test 2 $acme/new-app" 2>&1)" || { echo "FAIL kubaos pin test 2"; printf '%s\n' "$out"; return 1; }
+  [[ $(version_at "$acme/new-app") == 2 ]] || { echo "FAIL the nearer pin (2) doesn't win in new-app"; at "$acme/new-app"; return 1; }
+  printf 'export OTHER=1\n' | as_user tee "$acme/other-app/.envrc" >/dev/null
+  zrun "direnv allow $acme/other-app" >/dev/null 2>&1
+  out="$(kz "kubaos pins $acme/other-app" 2>&1)"
+  [[ $(version_at "$acme/other-app") == 1 ]] && grep -qF "doesn't reach here: ~/Projects/acme/other-app/.envrc has no \`source_up\`" <<<"$out" ||
+    { echo "FAIL other-app's .envrc without source_up: want 1, said so by kubaos pins"; printf '%s\n' "$out"; return 1; }
+  out="$(kz 'kubaos pins --all' 2>&1)"
+  # shellcheck disable=SC2088 # kubaos prints paths under the home with a literal ~.
+  grep -qF '~/Projects/acme  test 3' <<<"$out" && grep -qF '~/Projects/acme/new-app  test 2' <<<"$out" ||
+    { echo "FAIL kubaos pins --all:"; printf '%s\n' "$out"; return 1; }
+  echo "ok   nested: new-app's own pin (2, after source_up) wins; other-app's .envrc without source_up keeps 1, and kubaos pins says why"
+
+  printf 'use suite test 9\n' | as_user tee "$typo/.envrc" >/dev/null
+  zrun "direnv allow $typo" >/dev/null 2>&1
+  out="$(at "$typo")"
+  grep -qF 'the test Suite has no version 9 (it has: 1, 2, 3)' <<<"$out" && [[ $(sed -n 's/^V=//p' <<<"$out") == 1 ]] ||
+    { echo "FAIL use suite test 9 should say which versions there are and leave 1"; printf '%s\n' "$out"; return 1; }
+  echo "ok   use suite test 9: the versions there are, and the installed one stays"
+  # The entry appearing while a shell is in the folder, as a switch would add it, reloads it.
+  out="$(zsh_pty "zsh -l -i -c 'cd $typo; cp $USER_HOME/.local/share/kubaos/toolchains/test/3 $USER_HOME/.local/share/kubaos/toolchains/test/9; _direnv_hook; print -r -- V=\$(kubaos-test-suite version)'")"
+  rm -f "$USER_HOME/.local/share/kubaos/toolchains/test/9"
+  [[ $(sed -n 's/^V=//p' <<<"$out") == 3 ]] ||
+    { echo "FAIL a shell in the folder should reload once the entry for 9 appears"; printf '%s\n' "$out"; return 1; }
+  echo "ok   a shell already in the folder reloads when the missing entry appears"
+
+  out="$(kz "kubaos unpin test $acme" 2>&1)" || { echo "FAIL kubaos unpin"; printf '%s\n' "$out"; return 1; }
+  [[ ! -e $acme/.envrc && ! -e $acme/.direnv && $(version_at "$acme/old-app") == 1 && $(version_at "$acme/new-app") == 2 ]] ||
+    { echo "FAIL after unpin: want no ~/Projects/acme/.envrc nor .direnv, 1 in old-app, 2 in new-app"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos unpin test ~/Projects/acme: the .envrc and its GC roots gone, old-app back to 1, new-app keeps its own 2"
+
+  rm -rf "$acme" "$typo"
+  out="$(kz 'kubaos suite remove test --foreground' 2>&1)" ||
+    { echo "FAIL kubaos suite remove test"; printf '%s\n' "$out" | tail -20; return 1; }
+}
+
+# The user layer: test/user-layer-check, which the VM bench also
 # runs on an installed system. Commits to the checkout, so it runs after the
 # other checks but the update ones, which start from a clone of it.
 # The file manager (home/files.nix, crates/kubaos-files): Files (Nautilus)
@@ -3058,7 +3155,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites dot_config user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites pins dot_config user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

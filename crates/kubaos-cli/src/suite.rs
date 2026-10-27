@@ -182,7 +182,7 @@ pub fn main(cmd: SuiteCmd) -> ExitCode {
 }
 
 /// Runs `then` with the Suite called `name`, or reports that there is none.
-fn with_suite(name: &str, then: impl FnOnce(&'static Suite) -> ExitCode) -> ExitCode {
+pub(crate) fn with_suite(name: &str, then: impl FnOnce(&'static Suite) -> ExitCode) -> ExitCode {
     if let Some(suite) = catalog::find(name) {
         return then(suite);
     }
@@ -469,7 +469,7 @@ fn human_bytes(bytes: u64) -> String {
 }
 
 /// `path` with the home shown as `~`.
-fn tilde(paths: &Paths, path: &Path) -> String {
+pub(crate) fn tilde(paths: &Paths, path: &Path) -> String {
     match path.strip_prefix(paths.home()) {
         Ok(rest) => format!("~/{}", rest.display()),
         Err(_) => path.display().to_string(),

@@ -825,6 +825,44 @@ run = ["kubaos", "channel", "{channel}"]
 arguments = [{ name = "channel", placeholder = "stable or edge" }]
 terminal = true
 
+# Project pins (`kubaos pin`, crates/kubaos-core/src/pins.rs): a Suite
+# version for a folder and everything below it, as `use suite NAME VERSION`
+# in its .envrc. They run in a terminal, which says what the pin changes and
+# whether the version is fetched on the first cd. A typed folder may start
+# with ~.
+
+[extensions.kubaos.actions.pin]
+title = "Pin a Suite version…"
+subtitle = "This folder uses Node 18: a version for a folder and everything in it"
+icon = "view-pin"
+keywords = ["project pin", "suite", "version", "envrc", "direnv", "legacy", "nvm", "toolchain"]
+keyword = "pin"
+run = ["kubaos", "pin", "{suite}", "{version}", "{folder}"]
+arguments = [
+  { name = "suite", placeholder = "node" },
+  { name = "version", placeholder = "18" },
+  { name = "folder", placeholder = "~/Projects/acme" },
+]
+terminal = true
+
+[extensions.kubaos.actions.unpin]
+title = "Unpin a Suite version…"
+subtitle = "The folder goes back to the installed version"
+icon = "list-remove"
+keywords = ["project pin", "suite", "version", "envrc", "direnv", "remove"]
+keyword = "unpin"
+run = ["kubaos", "unpin", "{suite}", "{folder}"]
+arguments = [{ name = "suite", placeholder = "node" }, { name = "folder", placeholder = "~/Projects/acme" }]
+terminal = true
+
+[extensions.kubaos.actions.pins]
+title = "Project pins"
+subtitle = "Every pinned Suite version under ~/Projects, and whether it's in the store yet"
+icon = "view-pin"
+keywords = ["project pin", "suite", "version", "envrc", "direnv", "list"]
+run = ["kubaos", "pins", "--all"]
+terminal = true
+
 # KubaOS's apt packages (`kubaos packages`, system/packages.toml): how the
 # machine compares with the release, and the optional groups turned on or off
 # for good, which every update then follows. They run in a terminal, where
