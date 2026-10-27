@@ -94,7 +94,7 @@ pub enum App {
 }
 
 impl App {
-    pub const ALL: [App; 24] = [
+    pub const ALL: [App; 25] = [
         App::Hypr,
         App::Quickshell,
         App::Cursor,
