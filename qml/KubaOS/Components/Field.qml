@@ -35,7 +35,7 @@ FocusScope {
     readonly property bool locked: root.status === "Locked"
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     // Where the text starts: 12 in, or past the icon and 8 more.
-    readonly property real textStart: root.icon === "" ? Tokens.space.s12 : Tokens.space.s12 + Tokens.icon.s20 + Tokens.space.s8
+    readonly property real textStart: root.icon === "" ? Tokens.space.s12 : Tokens.space.s12 + Tokens.type.body_large.icon + Tokens.space.s8
     readonly property var probe: ({
             role: "component",
             name: "Field",
@@ -89,14 +89,14 @@ FocusScope {
             })
 
         visible: root.icon !== ""
-        width: Tokens.space.s12 * 2 + Tokens.icon.s20
+        width: Tokens.space.s12 * 2 + Tokens.type.body_large.icon
         height: root.height
 
         K.Icon {
             x: Tokens.space.s12
-            y: K.Look.snap((root.height - Tokens.icon.s20) / 2, root.dpr)
+            y: K.Look.snap((root.height - Tokens.type.body_large.icon) / 2, root.dpr)
             name: root.icon
-            size: Tokens.icon.s20
+            size: Tokens.type.body_large.icon
             color: Tokens.color.on_surface_variant
         }
     }

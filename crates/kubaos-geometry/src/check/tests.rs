@@ -14,6 +14,7 @@ fn rules() -> Rules {
     Rules {
         grid: 4.0,
         spacing: vec![4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 32.0, 40.0, 48.0, 64.0],
+        container: vec![(0.0, 16.0), (640.0, 24.0), (1024.0, 32.0)],
     }
 }
 
@@ -336,6 +337,45 @@ fn light_and_dark_frames_with_different_boxes_are_reported() {
         rules_broken(&[frame("dark", 1.0, dark), frame("light", 1.0, light)]),
         [Rule::ModeInvariant]
     );
+}
+
+/// A `Container` `width` wide holding one child inset by `left` and `top`, `content_width` wide.
+fn container(width: f32, left: f32, top: f32, content_width: f32) -> Node {
+    let child = stack(0.0, Align::Start, rect(left, top, content_width, 40.0), vec![]);
+    with(
+        Node::new(
+            Role::Component {
+                name: "Container".to_owned(),
+                variant: String::new(),
+                fixed: Fixed::HOLDS,
+            },
+            rect(0.0, 0.0, width, 40.0 + 2.0 * top),
+        ),
+        vec![child],
+    )
+}
+
+#[test]
+fn a_container_padded_by_its_widths_step_passes() {
+    for (width, padding) in [(384.0, 16.0), (800.0, 24.0), (1200.0, 32.0)] {
+        let root = container(width, padding, padding, width - 2.0 * padding);
+
+        assert_eq!(rules_broken(&[frame("dark", 1.0, root)]), [] as [Rule; 0], "{width}");
+    }
+}
+
+#[test]
+fn a_container_padded_more_than_its_step_is_reported() {
+    let root = container(384.0, 24.0, 16.0, 384.0 - 48.0);
+
+    assert_eq!(rules_broken(&[frame("dark", 1.0, root)]), [Rule::ContainerPadding]);
+}
+
+#[test]
+fn content_running_into_a_containers_far_padding_is_reported() {
+    let root = container(384.0, 16.0, 16.0, 384.0 - 16.0);
+
+    assert_eq!(rules_broken(&[frame("dark", 1.0, root)]), [Rule::ContainerPadding]);
 }
 
 #[test]

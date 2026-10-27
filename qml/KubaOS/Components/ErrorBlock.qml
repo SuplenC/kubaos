@@ -57,7 +57,7 @@ Item {
 
             K.Icon {
                 name: "error"
-                size: Tokens.icon.s24
+                size: Tokens.type.subheading.icon
                 color: Tokens.color.error
             }
 

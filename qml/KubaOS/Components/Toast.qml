@@ -60,7 +60,7 @@ Item {
         K.Icon {
             visible: root.icon !== ""
             name: root.icon
-            size: Tokens.icon.s20
+            size: Tokens.type.body.icon
             color: Tokens.color.surface
         }
 

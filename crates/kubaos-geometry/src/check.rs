@@ -24,6 +24,9 @@ const EPSILON: f32 = 1e-2;
 /// pixels leaves half of one on a side.
 const HALF_PIXEL: f32 = 0.5;
 
+/// The components whose content sits the container padding in: [`Rule::ContainerPadding`].
+const CONTAINERS: [&str; 2] = ["Page", "Container"];
+
 /// Every broken rule in `frames`, frame by frame, then the rules across frames ([`Rule::Identical`]
 /// and [`Rule::ModeInvariant`]).
 pub fn check(frames: &[Frame], rules: &Rules) -> Vec<Finding> {
@@ -91,7 +94,20 @@ impl Walk<'_> {
         match &node.role {
             Role::Layout { axis, gap, align } => self.layout(node, *axis, *gap, *align, path),
             Role::Grid { columns, gap, align } => self.grid(node, *columns, *gap, *align, path),
-            Role::Component { name, variant, fixed } => self.instances.push(Instance {
+            Role::Component { name, .. } if CONTAINERS.contains(&name.as_str()) => {
+                self.container_padding(node, path);
+                self.instance(node, path);
+            }
+            Role::Component { .. } => self.instance(node, path),
+            _ => {}
+        }
+        self.icons_centred(node, path);
+        self.descend(node, path, ancestors);
+    }
+
+    fn instance(&mut self, node: &Node, path: &[String]) {
+        if let Role::Component { name, variant, fixed } = &node.role {
+            self.instances.push(Instance {
                 frame: self.frame.name(),
                 scale: self.frame.scale,
                 path: path_text(path, &node.role),
@@ -100,11 +116,58 @@ impl Walk<'_> {
                 fixed: *fixed,
                 bounds: node.bounds,
                 parts: parts(node, *fixed, self.frame.scale),
-            }),
-            _ => {}
+            });
         }
-        self.icons_centred(node, path);
+    }
 
+    /// A page's or a container's content: as far in as the container padding for its width at
+    /// its left and top, and no nearer its right and bottom edges than that. Plain boxes the
+    /// size of the container are looked through, since a toolkit may wrap the content in one.
+    fn container_padding(&mut self, node: &Node, path: &[String]) {
+        let mut inner = node;
+        while let [only] = inner.children.as_slice()
+            && only.role == Role::Box
+            && only.bounds == node.bounds
+        {
+            inner = only;
+        }
+        let mut content = inner.children.iter().map(|child| child.bounds);
+        let Some(first) = content.next() else {
+            return;
+        };
+        let united = content.fold(first, |a, b| {
+            let (x, y) = (a.x.min(b.x), a.y.min(b.y));
+            Rect {
+                x,
+                y,
+                width: a.right().max(b.right()) - x,
+                height: a.bottom().max(b.bottom()) - y,
+            }
+        });
+        let b = node.bounds;
+        let padding = self.rules.container_padding(b.width);
+        let mut off = Vec::new();
+        for (edge, inset) in [("left", united.x - b.x), ("top", united.y - b.y)] {
+            if !self.same(inset, padding) {
+                off.push(format!("{edge} {inset}"));
+            }
+        }
+        for (edge, inset) in [("right", b.right() - united.right()), ("bottom", b.bottom() - united.bottom())] {
+            if self.device(padding - inset) >= EPSILON {
+                off.push(format!("{edge} {inset}"));
+            }
+        }
+        if !off.is_empty() {
+            let message = format!(
+                "{b} insets its content {}; {} wide, its padding is {padding}",
+                off.join(", "),
+                b.width
+            );
+            self.report(Rule::ContainerPadding, path, &node.role, message);
+        }
+    }
+
+    fn descend(&mut self, node: &Node, path: &mut Vec<String>, ancestors: &mut Vec<Ancestor>) {
         let label = node.role.label();
         ancestors.push(Ancestor {
             label: label.clone(),

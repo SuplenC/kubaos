@@ -25,7 +25,6 @@ use crate::snap::snap;
 use crate::text::text;
 use crate::tokens::Duration;
 use crate::tokens::Easing;
-use crate::tokens::IconSize;
 use crate::tokens::Radius;
 use crate::tokens::Space;
 use crate::tokens::Type;
@@ -37,7 +36,7 @@ pub fn toast<'a, M: 'a>(look: &Look, message: &'a str, leading: Option<Icon>) ->
     let (fill, content) = (c.on_surface, c.surface);
     let mut line = row(look, Space::S12).center();
     if let Some(glyph) = leading {
-        line = line.push(icon(look, glyph, IconSize::S20, content));
+        line = line.push(icon(look, glyph, Type::Body.icon(), content));
     }
     line = line.push(text(message, Type::Body, content));
     let surface = widget::container(line)

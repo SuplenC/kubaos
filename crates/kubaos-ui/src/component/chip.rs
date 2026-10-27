@@ -23,7 +23,6 @@ use crate::look::radius;
 use crate::probe;
 use crate::probe::Fixed;
 use crate::text::text;
-use crate::tokens::IconSize;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
@@ -87,11 +86,11 @@ pub fn chip<'a, M: Clone + 'a>(
     };
     let mut body = row(look, Space::S4).center();
     if let Some(glyph) = leading {
-        body = body.push(icon(look, glyph, IconSize::S16, content));
+        body = body.push(icon(look, glyph, Type::Label.icon(), content));
     }
     body = body.push(text(label, Type::Label, content));
     if let Some(on_remove) = on_remove {
-        let close = widget::button(icon(look, Icon::Close, IconSize::S16, content))
+        let close = widget::button(icon(look, Icon::Close, Type::Label.icon(), content))
             .padding(Inset::all(Space::S4).padding())
             .on_press(on_remove)
             .style(move |_theme: &Theme, _status| widget::button::Style {

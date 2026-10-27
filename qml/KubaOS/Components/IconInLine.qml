@@ -7,7 +7,7 @@ Item {
     id: root
 
     property string name
-    property int size: Tokens.icon.s20
+    property int size: Tokens.type.button.icon
     property int line: Tokens.type.button.line
     property color color: Tokens.color.on_surface
 

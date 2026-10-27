@@ -100,7 +100,7 @@ fn metrics(size: ButtonSize) -> Metrics {
         ButtonSize::Sm => Metrics {
             height: Size::ControlSm,
             label: Type::ButtonSmall,
-            icon: IconSize::S16,
+            icon: Type::ButtonSmall.icon(),
             gap: Space::S4,
             padding: Space::S12,
             text_padding: Space::S12,
@@ -108,7 +108,7 @@ fn metrics(size: ButtonSize) -> Metrics {
         ButtonSize::Md => Metrics {
             height: Size::ControlMd,
             label: Type::Button,
-            icon: IconSize::S20,
+            icon: Type::Button.icon(),
             gap: Space::S8,
             padding: Space::S24,
             text_padding: Space::S12,
@@ -116,7 +116,7 @@ fn metrics(size: ButtonSize) -> Metrics {
         ButtonSize::Lg => Metrics {
             height: Size::ControlLg,
             label: Type::ButtonLarge,
-            icon: IconSize::S24,
+            icon: Type::ButtonLarge.icon(),
             gap: Space::S8,
             padding: Space::S32,
             text_padding: Space::S16,

@@ -69,7 +69,7 @@ K.Pressable {
         K.Icon {
             visible: root.icon !== ""
             name: root.icon
-            size: Tokens.icon.s20
+            size: Tokens.type.body_strong.icon
             color: root.main
         }
 
@@ -113,13 +113,13 @@ K.Pressable {
 
         Item {
             visible: root.checkable
-            implicitWidth: Tokens.icon.s20
-            implicitHeight: Tokens.icon.s20
+            implicitWidth: Tokens.type.body_strong.icon
+            implicitHeight: Tokens.type.body_strong.icon
 
             K.Icon {
                 visible: root.checked
                 name: "check"
-                size: Tokens.icon.s20
+                size: Tokens.type.body_strong.icon
                 color: root.main
             }
         }

@@ -26,7 +26,6 @@ use crate::probe;
 use crate::probe::Fixed;
 use crate::snap::centre;
 use crate::text::text;
-use crate::tokens::IconSize;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Shadow as ShadowToken;
@@ -128,7 +127,7 @@ fn compose<'a, M: 'a>(
         .push(
             row(look, Space::S12)
                 .center()
-                .push(icon(look, glyph, IconSize::S24, tint))
+                .push(icon(look, glyph, Type::Headline.icon(), tint))
                 .push(text(title, Type::Headline, c.on_surface)),
         )
         .push(gap(Space::S12))

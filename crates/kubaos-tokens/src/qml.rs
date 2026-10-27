@@ -276,6 +276,45 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             out.line(format!("        readonly property int {name}: {value}"));
         }
     });
+    let container = &tokens.container;
+    let list = |values: &[u16]| values.iter().map(u16::to_string).collect::<Vec<_>>().join(", ");
+    out.group(
+        "    ",
+        Some(
+            "A page's or a panel's padding by its width: each padding applies from its width up. Tailwind's container on its default breakpoints; `padding(width)` picks one.",
+        ),
+        "container",
+        |out| {
+            out.line(format!(
+                "        readonly property list<int> from: [{}]",
+                list(&container.from)
+            ));
+            out.line(format!(
+                "        readonly property list<int> padding: [{}]",
+                list(&container.padding)
+            ));
+        },
+    );
+    out.blank();
+    out.line("    // The container's padding at `width`: the padding of the widest step `width` reaches.");
+    out.line("    function containerPadding(width: real): int {");
+    out.line("        let padding = tokens.container.padding[0];");
+    out.line("        for (let i = 0; i < tokens.container.from.length; i++) {");
+    out.line("            if (width >= tokens.container.from[i])");
+    out.line("                padding = tokens.container.padding[i];");
+    out.line("        }");
+    out.line("        return padding;");
+    out.line("    }");
+    out.group(
+        "    ",
+        Some("Aspect ratios, width to height, a picture's box keeps before and after it loads."),
+        "aspect",
+        |out| {
+            for (name, [w, h]) in &tokens.aspect {
+                out.line(format!("        readonly property list<int> {name}: [{w}, {h}]"));
+            }
+        },
+    );
 }
 
 fn weight_value(weight: Weight) -> u16 {
@@ -344,6 +383,7 @@ fn types(out: &mut Writer, tokens: &Tokens) {
                 out.line(format!("            readonly property string name: {name:?}"));
                 out.line(format!("            readonly property int size: {}", style.size));
                 out.line(format!("            readonly property int line: {}", style.line));
+                out.line(format!("            readonly property int icon: {}", style.icon));
                 out.line(format!(
                     "            readonly property int weight: {}",
                     weight_value(style.weight)

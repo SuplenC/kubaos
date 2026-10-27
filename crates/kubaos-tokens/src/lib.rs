@@ -20,6 +20,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod contrast;
 pub mod model;
 pub mod qml;
 pub mod rules;

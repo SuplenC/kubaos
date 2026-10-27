@@ -54,7 +54,7 @@ fn type_styles_carry_their_size_line_weight_and_family() {
     let body = singleton
         .find("readonly property QtObject body: QtObject {")
         .expect("body");
-    let style = &singleton[body..body + 300];
+    let style = &singleton[body..body + 360];
     assert!(style.contains("size: 14"));
     assert!(style.contains("line: 20"));
     assert!(style.contains("weight: 400"));

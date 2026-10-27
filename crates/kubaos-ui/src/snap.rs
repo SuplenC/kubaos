@@ -238,7 +238,14 @@ impl<M> Widget<M, Theme, Renderer> for Centre<'_, M> {
         );
         let size = node.size();
         let height = if self.vertical { room.height } else { size.height };
-        let x = self.scale.snap((room.width - size.width) / 2.0).max(0.0);
+        // Across, as a stack centres its children: ties go down, as `Stack` in QML puts them.
+        let spare = room.width - size.width;
+        let x = if self.vertical {
+            self.scale.snap(spare / 2.0)
+        } else {
+            self.scale.centre(spare)
+        }
+        .max(0.0);
         let y = if self.vertical {
             self.scale.snap((room.height - size.height) / 2.0).max(0.0)
         } else {

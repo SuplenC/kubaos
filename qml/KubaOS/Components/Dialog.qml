@@ -157,7 +157,7 @@ FocusScope {
 
                 K.Icon {
                     name: root.danger ? "warning" : root.icon
-                    size: Tokens.icon.s24
+                    size: Tokens.type.headline.icon
                     color: root.tint
                 }
 

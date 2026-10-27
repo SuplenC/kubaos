@@ -34,7 +34,7 @@ K.Layout {
         const cross = fills ? across : widest;
         let y = root.topPadding;
         for (const kid of kids) {
-            kid.x = root.leftPadding + (root.centred ? Math.max(K.Look.snap((cross - kid.width) / 2, dpr), 0) : 0);
+            kid.x = root.leftPadding + (root.centred ? Math.max(K.Look.centre(cross - kid.width, dpr), 0) : 0);
             kid.y = y;
             y += kid.height + root.gap;
         }

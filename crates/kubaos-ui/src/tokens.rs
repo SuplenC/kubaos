@@ -161,6 +161,7 @@ pub enum Size {
     ControlMd,
     ControlSm,
     Dialog,
+    Keycap,
     Log,
     Panel,
     Progress,
@@ -182,7 +183,7 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 25] = [
+    pub const ALL: [Size; 26] = [
         Size::Bar,
         Size::Check,
         Size::Chip,
@@ -191,6 +192,7 @@ impl Size {
         Size::ControlMd,
         Size::ControlSm,
         Size::Dialog,
+        Size::Keycap,
         Size::Log,
         Size::Panel,
         Size::Progress,
@@ -221,6 +223,7 @@ impl Size {
             Size::ControlMd => 40,
             Size::ControlSm => 32,
             Size::Dialog => 500,
+            Size::Keycap => 20,
             Size::Log => 232,
             Size::Panel => 384,
             Size::Progress => 8,
@@ -238,6 +241,30 @@ impl Size {
             Size::SwitchWidth => 44,
             Size::ThumbnailHeight => 160,
             Size::ThumbnailWidth => 256,
+        }
+    }
+}
+
+/// A page's or a panel's padding by its width: `(from, padding)`, each padding applying from its
+/// width up, in logical pixels. Tailwind's container on its default breakpoints.
+pub const CONTAINER: [(u16, Space); 3] = [(0, Space::S16), (640, Space::S24), (1024, Space::S32)];
+
+/// An aspect ratio a picture's box keeps before and after it loads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Aspect {
+    Wallpaper,
+}
+
+impl Aspect {
+    /// Every aspect.
+    pub const ALL: [Aspect; 1] = [
+        Aspect::Wallpaper,
+    ];
+
+    /// Width to height.
+    pub const fn ratio(self) -> [u16; 2] {
+        match self {
+            Aspect::Wallpaper => [16, 10],
         }
     }
 }
@@ -337,13 +364,15 @@ pub enum Type {
     Mono,
     /// A note under a field, a subtitle under a row's title.
     Small,
-    /// Key hints, version lines, the smallest print.
+    /// The key on a keycap, on the keycap's 20 px line so it centres in it.
+    Keycap,
+    /// Version lines, what a key hint's key does, the smallest print.
     Caption,
 }
 
 impl Type {
     /// Every type style, largest first.
-    pub const ALL: [Type; 19] = [
+    pub const ALL: [Type; 20] = [
         Type::Hero,
         Type::HeroNumber,
         Type::Display,
@@ -362,6 +391,7 @@ impl Type {
         Type::Label,
         Type::Mono,
         Type::Small,
+        Type::Keycap,
         Type::Caption,
     ];
 
@@ -386,6 +416,7 @@ impl Type {
             Type::Label => 12,
             Type::Mono => 12,
             Type::Small => 12,
+            Type::Keycap => 11,
             Type::Caption => 11,
         }
     }
@@ -411,7 +442,35 @@ impl Type {
             Type::Label => 16,
             Type::Mono => 16,
             Type::Small => 16,
+            Type::Keycap => 20,
             Type::Caption => 16,
+        }
+    }
+
+    /// The icon that sits beside the style on its line: a component takes its icon's size from
+    /// here.
+    pub const fn icon(self) -> IconSize {
+        match self {
+            Type::Hero => IconSize::S48,
+            Type::HeroNumber => IconSize::S48,
+            Type::Display => IconSize::S48,
+            Type::Title => IconSize::S32,
+            Type::Headline => IconSize::S32,
+            Type::Heading => IconSize::S24,
+            Type::BodyLarge => IconSize::S20,
+            Type::ButtonLarge => IconSize::S24,
+            Type::Subheading => IconSize::S24,
+            Type::Button => IconSize::S20,
+            Type::Body => IconSize::S20,
+            Type::BodyStrong => IconSize::S20,
+            Type::MonoLarge => IconSize::S20,
+            Type::Accent => IconSize::S16,
+            Type::ButtonSmall => IconSize::S16,
+            Type::Label => IconSize::S16,
+            Type::Mono => IconSize::S16,
+            Type::Small => IconSize::S16,
+            Type::Keycap => IconSize::S16,
+            Type::Caption => IconSize::S16,
         }
     }
 
@@ -436,6 +495,7 @@ impl Type {
             Type::Label => Weight::Medium,
             Type::Mono => Weight::Regular,
             Type::Small => Weight::Regular,
+            Type::Keycap => Weight::Medium,
             Type::Caption => Weight::Regular,
         }
     }
@@ -461,6 +521,7 @@ impl Type {
             Type::Label => Family::Sans,
             Type::Mono => Family::Mono,
             Type::Small => Family::Sans,
+            Type::Keycap => Family::Mono,
             Type::Caption => Family::Sans,
         }
     }
@@ -629,12 +690,12 @@ impl Opacity {
             Opacity::Log => 0.85,
             Opacity::OutlineSoft => 0.55,
             Opacity::PanelScrim => 0.2,
-            Opacity::Placeholder => 0.55,
+            Opacity::Placeholder => 0.8,
             Opacity::Press => 0.14,
             Opacity::Scrim => 0.6,
             Opacity::Selection => 0.32,
             Opacity::SpinnerTrack => 0.18,
-            Opacity::Subdued => 0.75,
+            Opacity::Subdued => 0.85,
             Opacity::Tint => 0.16,
             Opacity::Track => 0.9,
             Opacity::Well => 0.75,
@@ -918,6 +979,392 @@ pub const fn palette(mode: Mode) -> Palette {
         Mode::Dark => DARK,
     }
 }
+
+/// A colour role, by name, for the contrast pairs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Role {
+    Cold,
+    ColdContainer,
+    Error,
+    ErrorContainer,
+    InverseOnSurface,
+    InversePrimary,
+    InverseSurface,
+    OnCold,
+    OnColdContainer,
+    OnError,
+    OnErrorContainer,
+    OnPrimary,
+    OnPrimaryContainer,
+    OnSecondary,
+    OnSecondaryContainer,
+    OnSurface,
+    OnSurfaceVariant,
+    OnTertiary,
+    OnTertiaryContainer,
+    Outline,
+    OutlineVariant,
+    Primary,
+    PrimaryContainer,
+    Scrim,
+    Secondary,
+    SecondaryContainer,
+    Shadow,
+    Surface,
+    SurfaceBright,
+    SurfaceContainer,
+    SurfaceContainerHigh,
+    SurfaceContainerHighest,
+    SurfaceContainerLow,
+    SurfaceContainerLowest,
+    SurfaceDim,
+    SurfaceVariant,
+    Tertiary,
+    TertiaryContainer,
+    Warning,
+}
+
+impl Role {
+    /// The role's colour in `palette`.
+    pub const fn of<C: Copy>(self, palette: &Palette<C>) -> C {
+        match self {
+            Role::Cold => palette.cold,
+            Role::ColdContainer => palette.cold_container,
+            Role::Error => palette.error,
+            Role::ErrorContainer => palette.error_container,
+            Role::InverseOnSurface => palette.inverse_on_surface,
+            Role::InversePrimary => palette.inverse_primary,
+            Role::InverseSurface => palette.inverse_surface,
+            Role::OnCold => palette.on_cold,
+            Role::OnColdContainer => palette.on_cold_container,
+            Role::OnError => palette.on_error,
+            Role::OnErrorContainer => palette.on_error_container,
+            Role::OnPrimary => palette.on_primary,
+            Role::OnPrimaryContainer => palette.on_primary_container,
+            Role::OnSecondary => palette.on_secondary,
+            Role::OnSecondaryContainer => palette.on_secondary_container,
+            Role::OnSurface => palette.on_surface,
+            Role::OnSurfaceVariant => palette.on_surface_variant,
+            Role::OnTertiary => palette.on_tertiary,
+            Role::OnTertiaryContainer => palette.on_tertiary_container,
+            Role::Outline => palette.outline,
+            Role::OutlineVariant => palette.outline_variant,
+            Role::Primary => palette.primary,
+            Role::PrimaryContainer => palette.primary_container,
+            Role::Scrim => palette.scrim,
+            Role::Secondary => palette.secondary,
+            Role::SecondaryContainer => palette.secondary_container,
+            Role::Shadow => palette.shadow,
+            Role::Surface => palette.surface,
+            Role::SurfaceBright => palette.surface_bright,
+            Role::SurfaceContainer => palette.surface_container,
+            Role::SurfaceContainerHigh => palette.surface_container_high,
+            Role::SurfaceContainerHighest => palette.surface_container_highest,
+            Role::SurfaceContainerLow => palette.surface_container_low,
+            Role::SurfaceContainerLowest => palette.surface_container_lowest,
+            Role::SurfaceDim => palette.surface_dim,
+            Role::SurfaceVariant => palette.surface_variant,
+            Role::Tertiary => palette.tertiary,
+            Role::TertiaryContainer => palette.tertiary_container,
+            Role::Warning => palette.warning,
+        }
+    }
+
+    /// The role's name in `design/tokens.toml`.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Role::Cold => "cold",
+            Role::ColdContainer => "cold_container",
+            Role::Error => "error",
+            Role::ErrorContainer => "error_container",
+            Role::InverseOnSurface => "inverse_on_surface",
+            Role::InversePrimary => "inverse_primary",
+            Role::InverseSurface => "inverse_surface",
+            Role::OnCold => "on_cold",
+            Role::OnColdContainer => "on_cold_container",
+            Role::OnError => "on_error",
+            Role::OnErrorContainer => "on_error_container",
+            Role::OnPrimary => "on_primary",
+            Role::OnPrimaryContainer => "on_primary_container",
+            Role::OnSecondary => "on_secondary",
+            Role::OnSecondaryContainer => "on_secondary_container",
+            Role::OnSurface => "on_surface",
+            Role::OnSurfaceVariant => "on_surface_variant",
+            Role::OnTertiary => "on_tertiary",
+            Role::OnTertiaryContainer => "on_tertiary_container",
+            Role::Outline => "outline",
+            Role::OutlineVariant => "outline_variant",
+            Role::Primary => "primary",
+            Role::PrimaryContainer => "primary_container",
+            Role::Scrim => "scrim",
+            Role::Secondary => "secondary",
+            Role::SecondaryContainer => "secondary_container",
+            Role::Shadow => "shadow",
+            Role::Surface => "surface",
+            Role::SurfaceBright => "surface_bright",
+            Role::SurfaceContainer => "surface_container",
+            Role::SurfaceContainerHigh => "surface_container_high",
+            Role::SurfaceContainerHighest => "surface_container_highest",
+            Role::SurfaceContainerLow => "surface_container_low",
+            Role::SurfaceContainerLowest => "surface_container_lowest",
+            Role::SurfaceDim => "surface_dim",
+            Role::SurfaceVariant => "surface_variant",
+            Role::Tertiary => "tertiary",
+            Role::TertiaryContainer => "tertiary_container",
+            Role::Warning => "warning",
+        }
+    }
+}
+
+/// The contrast a pair needs, by what the foreground is (WCAG 2.1 AA).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Need {
+    /// Body text and labels: 4.5:1.
+    Text,
+    /// Text of 24 px and up, or 19 px semibold and up: 3:1.
+    LargeText,
+    /// Icons, outlines and controls that carry meaning: 3:1.
+    Graphic,
+}
+
+/// A foreground role drawn on a background role, at an opacity or opaque.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ContrastPair {
+    pub fg: Role,
+    pub bg: Role,
+    pub need: Need,
+    pub opacity: Option<Opacity>,
+    /// Where the pair is drawn.
+    pub purpose: &'static str,
+}
+
+/// Every foreground role the front ends draw on a background role, and the contrast it needs.
+pub const CONTRAST: [ContrastPair; 32] = [
+    ContrastPair {
+        fg: Role::OnSurface,
+        bg: Role::Surface,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Text on a page or a panel",
+    },
+    ContrastPair {
+        fg: Role::OnSurface,
+        bg: Role::SurfaceContainerLow,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A row's title in a well",
+    },
+    ContrastPair {
+        fg: Role::OnSurface,
+        bg: Role::SurfaceContainerHighest,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Text on the highest container",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::Surface,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Secondary text, a key hint's label",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerLow,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A row's subtitle in a well",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainer,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Secondary text on a container",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Secondary text on a card",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerHighest,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A keycap's key",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::Surface,
+        need: Need::Text,
+        opacity: Some(Opacity::Placeholder),
+        purpose: "A field's placeholder",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::Surface,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Accent text: an accent line, a detail, a Text button",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::SurfaceContainerLow,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Accent text in a well",
+    },
+    ContrastPair {
+        fg: Role::OnPrimary,
+        bg: Role::Primary,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A Filled button's label, today in the calendar",
+    },
+    ContrastPair {
+        fg: Role::OnPrimary,
+        bg: Role::Primary,
+        need: Need::Text,
+        opacity: Some(Opacity::Subdued),
+        purpose: "Secondary text on a checked tile",
+    },
+    ContrastPair {
+        fg: Role::OnPrimaryContainer,
+        bg: Role::PrimaryContainer,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Text on the primary container",
+    },
+    ContrastPair {
+        fg: Role::OnSecondaryContainer,
+        bg: Role::SecondaryContainer,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A Tonal button, a selected row's title",
+    },
+    ContrastPair {
+        fg: Role::OnSecondaryContainer,
+        bg: Role::SecondaryContainer,
+        need: Need::Text,
+        opacity: Some(Opacity::Subdued),
+        purpose: "A selected row's subtitle",
+    },
+    ContrastPair {
+        fg: Role::OnError,
+        bg: Role::Error,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A Danger button's label",
+    },
+    ContrastPair {
+        fg: Role::OnError,
+        bg: Role::Error,
+        need: Need::Text,
+        opacity: Some(Opacity::Subdued),
+        purpose: "A selected danger row's subtitle",
+    },
+    ContrastPair {
+        fg: Role::Error,
+        bg: Role::Surface,
+        need: Need::Text,
+        opacity: None,
+        purpose: "An invalid field's note, a failure",
+    },
+    ContrastPair {
+        fg: Role::OnErrorContainer,
+        bg: Role::ErrorContainer,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A critical notification",
+    },
+    ContrastPair {
+        fg: Role::OnErrorContainer,
+        bg: Role::ErrorContainer,
+        need: Need::Text,
+        opacity: Some(Opacity::Subdued),
+        purpose: "A critical notification's body",
+    },
+    ContrastPair {
+        fg: Role::Cold,
+        bg: Role::Surface,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A holiday in the calendar, a cold chip's label",
+    },
+    ContrastPair {
+        fg: Role::OnCold,
+        bg: Role::Cold,
+        need: Need::Text,
+        opacity: None,
+        purpose: "Text on the cold accent",
+    },
+    ContrastPair {
+        fg: Role::Warning,
+        bg: Role::Surface,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A reading close to its limit",
+    },
+    ContrastPair {
+        fg: Role::Surface,
+        bg: Role::OnSurface,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A toast, a hint's bubble: the inverse colours",
+    },
+    ContrastPair {
+        fg: Role::OnSurface,
+        bg: Role::Surface,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "An icon, the wordmark of the logo",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::Surface,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A muted icon",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::Surface,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The focus ring, a switch that is on, the mark of the logo",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::SurfaceContainerHighest,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A slider's or a progress bar's fill on its track",
+    },
+    ContrastPair {
+        fg: Role::Cold,
+        bg: Role::Surface,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The cold focus ring, the logo's dakuten",
+    },
+    ContrastPair {
+        fg: Role::Outline,
+        bg: Role::Surface,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A field's, a checkbox's or a switch's outline",
+    },
+    ContrastPair {
+        fg: Role::Outline,
+        bg: Role::SurfaceContainerHighest,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "An outline on the highest container",
+    },
+];
 
 /// A symbol of KubaOS Symbols, by the Material Symbols name it replaces. Its drawing is an SVG on a
 /// 24 unit grid with a 2 unit stroke, in `assets/symbols/`.

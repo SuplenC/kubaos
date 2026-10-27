@@ -260,6 +260,21 @@ pub struct Rules {
     pub grid: f32,
     /// The gaps a layout may use, besides none.
     pub spacing: Vec<f32>,
+    /// A page's or a container's padding by its width: `(from, padding)` in logical pixels, each
+    /// padding applying from its width up, smallest width first.
+    pub container: Vec<(f32, f32)>,
+}
+
+impl Rules {
+    /// The container padding at `width`: the padding of the widest step `width` reaches.
+    pub fn container_padding(&self, width: f32) -> f32 {
+        self.container
+            .iter()
+            .rev()
+            .find(|&&(from, _)| width >= from)
+            .or(self.container.first())
+            .map_or(0.0, |&(_, padding)| padding)
+    }
 }
 
 /// A rule of the geometry check.
@@ -280,12 +295,15 @@ pub enum Rule {
     ClippedText,
     /// An icon centred in its slot, to the nearest device pixel.
     IconCentre,
+    /// A page's or a container's content inset by exactly the container padding for its width,
+    /// and never into it.
+    ContainerPadding,
     /// A page's light and dark frames with the same boxes.
     ModeInvariant,
 }
 
 impl Rule {
-    pub const ALL: [Rule; 8] = [
+    pub const ALL: [Rule; 9] = [
         Rule::DeviceGrid,
         Rule::ScaleGrid,
         Rule::SiblingGap,
@@ -293,6 +311,7 @@ impl Rule {
         Rule::Identical,
         Rule::ClippedText,
         Rule::IconCentre,
+        Rule::ContainerPadding,
         Rule::ModeInvariant,
     ];
 
@@ -306,6 +325,7 @@ impl Rule {
             Rule::Identical => "identical",
             Rule::ClippedText => "clipped-text",
             Rule::IconCentre => "icon-centre",
+            Rule::ContainerPadding => "container-padding",
             Rule::ModeInvariant => "mode-invariant",
         }
     }

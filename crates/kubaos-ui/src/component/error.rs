@@ -21,7 +21,6 @@ use crate::look::radius;
 use crate::probe;
 use crate::probe::Fixed;
 use crate::text::text;
-use crate::tokens::IconSize;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Space;
@@ -47,7 +46,7 @@ pub fn error_block<'a, M: 'a>(
     let view: Element<'a, M> = widget::container(
         row(look, Space::S16)
             .center()
-            .push(icon(look, Icon::Error, IconSize::S24, c.error))
+            .push(icon(look, Icon::Error, Type::Subheading.icon(), c.error))
             .push(
                 stack(look, Space::S4)
                     .width(Extent::Fill)

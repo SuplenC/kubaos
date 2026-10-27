@@ -36,7 +36,6 @@ use crate::probe::Fixed;
 use crate::snap::centre_x;
 use crate::text::line;
 use crate::text::text;
-use crate::tokens::IconSize;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
@@ -198,7 +197,7 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         // does.
         let mut content = row(look, Space::S12).center().width(Extent::Fill).height(Extent::Fill);
         if let Some(glyph) = self.icon {
-            content = content.push(icon(look, glyph, IconSize::S20, main));
+            content = content.push(icon(look, glyph, Type::BodyStrong.icon(), main));
         }
         content = content.push(words);
         for (kind, label) in self.chips {
@@ -209,11 +208,11 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         }
         if let Some(checked) = self.checked {
             content = content.push(if checked {
-                Element::from(icon(look, Icon::Check, IconSize::S20, main))
+                Element::from(icon(look, Icon::Check, Type::BodyStrong.icon(), main))
             } else {
                 widget::Space::new()
-                    .width(f32::from(IconSize::S20.px()))
-                    .height(f32::from(IconSize::S20.px()))
+                    .width(f32::from(Type::BodyStrong.icon().px()))
+                    .height(f32::from(Type::BodyStrong.icon().px()))
                     .into()
             });
         }

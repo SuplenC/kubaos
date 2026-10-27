@@ -47,6 +47,14 @@ QtObject {
         return Math.round(v * dpr) / dpr;
     }
 
+    // Half of `spare` logical pixels on a whole device pixel at `dpr`: how far in a box is
+    // centred. An odd number of spare device pixels leaves the extra one after the box.
+    // HAZARD: half of an odd count is a tie, which float error breaks either way; ties round down,
+    // a hair under, as `kubaos-ui`'s `Scale::centre` does, so both toolkits pick the same pixel.
+    function centre(spare: real, dpr: real): real {
+        return Math.round(spare * dpr / 2 - 1e-3) / dpr;
+    }
+
     // `v` logical pixels moved up to the next whole device pixel at `dpr`. A hair under a whole
     // pixel is that pixel: float error must not add a row.
     function snapUp(v: real, dpr: real): real {

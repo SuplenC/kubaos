@@ -15,6 +15,7 @@ Slot 1.0 Slot.qml
 Fill 1.0 Fill.qml
 Gap 1.0 Gap.qml
 Page 1.0 Page.qml
+Container 1.0 Container.qml
 Header 1.0 Header.qml
 Section 1.0 Section.qml
 Divider 1.0 Divider.qml
@@ -23,6 +24,8 @@ StateLayer 1.0 StateLayer.qml
 Pressable 1.0 Pressable.qml
 IconInLine 1.0 IconInLine.qml
 Hint 1.0 Hint.qml
+Keycap 1.0 Keycap.qml
+KeyHints 1.0 KeyHints.qml
 Button 1.0 Button.qml
 IconButton 1.0 IconButton.qml
 Field 1.0 Field.qml
@@ -46,3 +49,4 @@ Spinner 1.0 Spinner.qml
 EmptyState 1.0 EmptyState.qml
 ErrorBlock 1.0 ErrorBlock.qml
 Log 1.0 Log.qml
+Media 1.0 Media.qml

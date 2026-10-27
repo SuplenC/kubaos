@@ -83,12 +83,29 @@ pub fn slider<'a, M: 'a>(
     on_change: Option<Box<dyn Fn(Value) -> M + 'a>>,
     focused: bool,
 ) -> Element<'a, M> {
+    slider_in(look, value, on_change, focused, false)
+}
+
+/// [`slider`] drawn as while a press holds it, its fill lit: the specimen's view of the state.
+pub fn slider_held<'a, M: 'a>(look: &Look, value: Value, on_change: Option<Box<dyn Fn(Value) -> M + 'a>>) -> Element<'a, M> {
+    slider_in(look, value, on_change, false, true)
+}
+
+fn slider_in<'a, M: 'a>(
+    look: &Look,
+    value: Value,
+    on_change: Option<Box<dyn Fn(Value) -> M + 'a>>,
+    focused: bool,
+    held: bool,
+) -> Element<'a, M> {
     let stepped = matches!(value, Value::Stop { count, .. } if count > 1);
     let track = canvas(Track {
         value,
         on_change,
         colors: look.colors,
+        bright: look.bright(),
         scale: look.scale,
+        held,
     })
     .width(Length::Fill)
     .height(f32::from(Size::Slider.px()));
@@ -101,7 +118,11 @@ struct Track<'a, M> {
     value: Value,
     on_change: Option<Box<dyn Fn(Value) -> M + 'a>>,
     colors: Colors,
+    /// What the fill brightens toward under the pointer and while held: [`Look::bright`].
+    bright: Color,
     scale: Scale,
+    /// Drawn as held whatever the pointer does.
+    held: bool,
 }
 
 /// A press held on the slider: the value under the pointer.
@@ -186,14 +207,25 @@ impl<M> canvas::Program<M> for Track<'_, M> {
             &Path::rounded_rectangle(Point::new(0.0, rail_y), IcedSize::new(width, rail), (rail / 2.0).into()),
             color::alpha(track, dim),
         );
+        let layer = if !enabled {
+            0.0
+        } else if held.0.is_some() || self.held {
+            Opacity::Press.value()
+        } else if cursor.is_over(bounds) {
+            Opacity::Hover.value()
+        } else {
+            0.0
+        };
         let thumb_x = snap(travel * shown.fraction());
+        // The fill takes the state layer too, toward the palette's bright end: it lights up while
+        // pressed or dragged, as a progress bar's fill glows.
         frame.fill(
             &Path::rounded_rectangle(
                 Point::new(0.0, rail_y),
                 IcedSize::new(thumb_x + thumb / 2.0, rail),
                 (rail / 2.0).into(),
             ),
-            color::alpha(c.primary, dim),
+            color::alpha(color::mix(c.primary, self.bright, layer), dim),
         );
         if let Value::Stop { index, count } = shown
             && count > 1
@@ -210,15 +242,6 @@ impl<M> canvas::Program<M> for Track<'_, M> {
         }
         let thumb_y = snap((height - thumb) / 2.0);
         let centre = Point::new(thumb_x + thumb / 2.0, thumb_y + thumb / 2.0);
-        let layer = if !enabled {
-            0.0
-        } else if held.0.is_some() {
-            Opacity::Press.value()
-        } else if cursor.is_over(bounds) {
-            Opacity::Hover.value()
-        } else {
-            0.0
-        };
         let fill: Color = color::mix(
             c.primary,
             Color {
