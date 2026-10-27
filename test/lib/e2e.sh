@@ -698,6 +698,13 @@ c_workspaces() {
   echo "ok   per-screen workspaces: blocks, slots, joining on unplug and returning on replug"
 }
 
+# The power stops' laptop panel (config/hypr/monitors.lua): the stop's refresh
+# rate and VRR on the panel's own rule, against a stand-in for `hl`.
+c_power() {
+  as_user lua5.5 "$REPO/test/lua/power_panel_test.lua" "$REPO" || { echo "FAIL test/lua/power_panel_test.lua"; return 1; }
+  echo "ok   power stops: the panel's rate and VRR on its own rule, no other screen touched"
+}
+
 # Keyboard layouts: config/hypr/input.lua hands Hyprland the user's layouts
 # (~/.config/kubaos/desktop/keyboard/keyboard.toml), else every layout in
 # /etc/default/keyboard, and `kubaos keyboard show` reads the same files.
@@ -3017,7 +3024,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces keyboard shutdown splash shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites dot_config user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites dot_config user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
