@@ -623,7 +623,6 @@ Drawer {
             color: K.Tokens.color.error
         }
     }
-    }
 
     // Where a style's baseline sits in its line box: the box centres the font's height.
     function baselineOf(metrics: FontMetrics, style: QtObject): real {
