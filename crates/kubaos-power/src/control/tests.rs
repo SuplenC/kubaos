@@ -146,7 +146,10 @@ fn our_own_profile_change_coming_back_is_not_taken_for_an_outside_one() {
     let mut control = on(Source::Ac, Memory::default());
 
     control.handle(Input::Set(Stop::MaxPerformance));
-    let effects = control.handle(Input::Profile(Profile::Performance));
+    let effects = control.handle(Input::Profile {
+        profile: Profile::Performance,
+        held: false,
+    });
 
     assert_eq!(control.stop(), Stop::MaxPerformance);
     assert_eq!(effects, []);
@@ -158,8 +161,14 @@ fn quick_steps_through_profiles_come_back_in_order_and_change_nothing() {
 
     control.handle(Input::Set(Stop::Performance));
     control.handle(Input::Set(Stop::PowerSaver));
-    let first = control.handle(Input::Profile(Profile::Performance));
-    let second = control.handle(Input::Profile(Profile::PowerSaver));
+    let first = control.handle(Input::Profile {
+        profile: Profile::Performance,
+        held: false,
+    });
+    let second = control.handle(Input::Profile {
+        profile: Profile::PowerSaver,
+        held: false,
+    });
 
     assert_eq!((first, second), (vec![], vec![]));
     assert_eq!(control.stop(), Stop::PowerSaver);
@@ -173,7 +182,10 @@ fn a_profile_changed_from_outside_moves_the_slider_to_its_stop_as_the_sources_ch
     };
     let mut control = on(Source::Ac, memory);
 
-    let effects = control.handle(Input::Profile(Profile::PowerSaver));
+    let effects = control.handle(Input::Profile {
+        profile: Profile::PowerSaver,
+        held: false,
+    });
 
     assert_eq!(control.stop(), Stop::PowerSaver);
     assert_eq!(applied(&effects), [Stop::PowerSaver]);
@@ -188,7 +200,10 @@ fn an_outside_profile_that_fits_the_stop_leaves_super_saver_alone() {
     };
     let mut control = on(Source::Battery, memory);
 
-    let effects = control.handle(Input::Profile(Profile::PowerSaver));
+    let effects = control.handle(Input::Profile {
+        profile: Profile::PowerSaver,
+        held: false,
+    });
 
     assert_eq!(control.stop(), Stop::SuperSaver);
     assert_eq!(effects, []);
@@ -392,4 +407,52 @@ fn a_bouncing_dock_switches_nothing_and_a_steady_change_switches_once() {
     );
     assert_eq!(settle.due(start + SETTLE), Some(Source::Battery));
     assert_eq!(settle.due(start + SETTLE * 2), None);
+}
+
+#[test]
+fn a_programs_hold_is_followed_but_never_remembered_and_its_end_returns_to_the_sources_stop() {
+    let memory = Memory {
+        battery: Stop::SuperSaver,
+        ..Memory::default()
+    };
+    let mut control = on(Source::Battery, memory);
+
+    let held = control.handle(Input::Profile {
+        profile: Profile::Performance,
+        held: true,
+    });
+
+    assert_eq!(control.stop(), Stop::Performance);
+    assert_eq!(applied(&held), [Stop::Performance]);
+    assert_eq!(remembered(&held).map(|memory| memory.battery), Some(Stop::SuperSaver));
+
+    let released = control.handle(Input::Profile {
+        profile: Profile::PowerSaver,
+        held: false,
+    });
+
+    assert_eq!(control.stop(), Stop::SuperSaver);
+    assert_eq!(applied(&released), [Stop::SuperSaver]);
+    assert_eq!(
+        remembered(&released).map(|memory| memory.battery),
+        Some(Stop::SuperSaver)
+    );
+}
+
+#[test]
+fn a_burst_of_device_events_is_checked_once_after_it_goes_quiet() {
+    let start = Instant::now();
+    let mut recheck = Recheck::default();
+
+    recheck.ask(start);
+    recheck.ask(start + Duration::from_millis(600));
+    assert!(!recheck.due(start + Duration::from_millis(1200)));
+    assert_eq!(
+        recheck.wait(start + Duration::from_millis(1200)),
+        Some(Duration::from_millis(400))
+    );
+
+    assert!(recheck.due(start + Duration::from_millis(1600)));
+    assert!(!recheck.due(start + Duration::from_secs(5)));
+    assert_eq!(recheck.wait(start), None);
 }

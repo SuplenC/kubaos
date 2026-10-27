@@ -54,6 +54,7 @@ use kubaos_power::control::Control;
 use kubaos_power::control::Drop;
 use kubaos_power::control::Effect;
 use kubaos_power::control::Input;
+use kubaos_power::control::Recheck;
 use kubaos_power::control::Settle;
 use kubaos_power::control::Toast;
 use kubaos_power::live;
@@ -101,6 +102,8 @@ Settings: ~/.config/kubaos/desktop/power/power.toml";
 
 /// The root helper `system/files/power/kubaos-power-write`, which `system/30-hardware.sh` installs.
 const HELPER: &str = "/usr/local/libexec/kubaos-power-write";
+/// Ubuntu's pkexec, by path: polkit's own, never one earlier on the PATH.
+const PKEXEC: &str = "/usr/bin/pkexec";
 const UPOWER_SERVICE: &str = "org.freedesktop.UPower";
 const UPOWER_PATH: &str = "/org/freedesktop/UPower";
 const DISPLAY_DEVICE: &str = "/org/freedesktop/UPower/devices/DisplayDevice";
@@ -414,8 +417,11 @@ enum Event {
         on_battery: bool,
         percent: Option<f64>,
     },
-    Profile(Profile),
+    /// power-profiles-daemon's profile, and whether a program holds it.
+    Profile(Profile, bool),
     OnBattery(bool),
+    /// A GPU, a screen or a USB device came, went or changed (udev).
+    Devices,
     Percent(f64),
     /// A line on the socket, and where its answer goes.
     Ask(String, Sender<String>),
@@ -432,6 +438,7 @@ fn serve() -> Result<(), String> {
         zbus::blocking::Connection::system().map_err(|err| format!("connecting to the system bus: {}", chain(&err)))?;
     let (events, received) = mpsc::channel();
     follow_bus(&bus, &events)?;
+    follow_devices(events.clone());
     listen(&runtime, events.clone())?;
     let mut service = Service::new(bus, runtime, events);
     service.run(&received)
@@ -470,7 +477,7 @@ fn follow_bus(bus: &zbus::blocking::Connection, events: &Sender<Event>) -> Resul
             };
             if last != Some(profile) {
                 last = Some(profile);
-                let _ = sent.send(Event::Profile(profile));
+                let _ = sent.send(Event::Profile(profile, holds(&ppd)));
             }
         }
         let _ = sent.send(Event::Lost("power-profiles-daemon".to_owned()));
@@ -498,6 +505,38 @@ fn follow_bus(bus: &zbus::blocking::Connection, events: &Sender<Event>) -> Resul
         }
     });
     Ok(())
+}
+
+/// Whether a program holds power-profiles-daemon's profile (`ActiveProfileHolds`, GameMode's and
+/// the like); an answer that doesn't read counts as none.
+fn holds(ppd: &zbus::blocking::Proxy<'static>) -> bool {
+    ppd.get_property::<zbus::zvariant::OwnedValue>("ActiveProfileHolds")
+        .is_ok_and(|holds| matches!(&*holds, zbus::zvariant::Value::Array(array) if !array.is_empty()))
+}
+
+/// Follows udev's events for GPUs, screens and USB devices through `udevadm monitor`, so a device
+/// plugged in gets the stop's settings, and the GPU's level is put back after
+/// power-profiles-daemon resets it on a screen's arrival. Without `udevadm` the stop's settings
+/// reach new devices at the next stop.
+fn follow_devices(events: Sender<Event>) {
+    thread::spawn(move || {
+        let child = Command::new("udevadm")
+            .args(["monitor", "--udev", "--subsystem-match=drm", "--subsystem-match=usb"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn();
+        let Some(stdout) = child.ok().and_then(|mut child| child.stdout.take()) else {
+            eprintln!("kubaos-power: couldn't follow udev; new devices get the stop's settings at the next stop");
+            return;
+        };
+        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+            let words: Vec<&str> = line.split_whitespace().collect();
+            if words.first() == Some(&"UDEV") && matches!(words.get(2), Some(&("add" | "change" | "bind"))) {
+                let _ = events.send(Event::Devices);
+            }
+        }
+    });
 }
 
 /// Answers the socket: a line in, the loop's answer out.
@@ -541,6 +580,7 @@ struct Service {
     settings: Settings,
     control: Option<Control>,
     settle: Settle,
+    recheck: Recheck,
     /// The panel file's text last asked of Hyprland.
     panel: Option<String>,
     /// The helper is missing or refused; said once, not at every stop.
@@ -566,6 +606,7 @@ impl Service {
             settings,
             control: None,
             settle: Settle::default(),
+            recheck: Recheck::default(),
             panel: None,
             helper_said: false,
         }
@@ -573,7 +614,12 @@ impl Service {
 
     fn run(&mut self, received: &mpsc::Receiver<Event>) -> Result<(), String> {
         loop {
-            let wait = self.settle.wait(Instant::now()).unwrap_or(Duration::from_secs(3600));
+            let now = Instant::now();
+            let wait = [self.settle.wait(now), self.recheck.wait(now)]
+                .into_iter()
+                .flatten()
+                .min()
+                .unwrap_or(Duration::from_secs(3600));
             match received.recv_timeout(wait) {
                 Ok(Event::Lost(what)) => return Err(format!("lost {what} on the system bus")),
                 Ok(event) => self.hear(event),
@@ -582,6 +628,9 @@ impl Service {
             }
             if let Some(source) = self.settle.due(Instant::now()) {
                 self.input(Input::Source(source));
+            }
+            if self.recheck.due(Instant::now()) {
+                self.write_plan();
             }
         }
     }
@@ -605,7 +654,12 @@ impl Service {
                 self.panel = None;
                 self.act(effects.into_iter().chain(more).collect());
             }
-            Event::Profile(profile) => self.input(Input::Profile(profile)),
+            Event::Profile(profile, held) => {
+                self.input(Input::Profile { profile, held });
+                // ppd rewrites the GPU's level and the CPU's boost on every profile it activates.
+                self.recheck.ask(Instant::now());
+            }
+            Event::Devices => self.recheck.ask(Instant::now()),
             Event::OnBattery(on_battery) => {
                 if let Some(control) = &self.control {
                     self.settle
@@ -695,6 +749,14 @@ impl Service {
         self.publish();
         self.apply_panel(&plan);
         Self::quiet(plan.quiet_background);
+        self.write_plan();
+    }
+
+    /// The stop's writes that the machine lacks now: all of them at a stop, the ones a new device
+    /// or power-profiles-daemon undid on a recheck.
+    fn write_plan(&mut self) {
+        let Some(control) = &self.control else { return };
+        let plan = Plan::for_stop(control.stop(), &self.settings);
         let writes = writes::for_plan(&plan, &self.settings, &self.machine, &live::wifi_power_save);
         if !writes.is_empty() {
             self.write(&writes);
@@ -771,7 +833,7 @@ impl Service {
             }
             return;
         }
-        let output = Command::new("pkexec")
+        let output = Command::new(PKEXEC)
             .arg("--disable-internal-agent")
             .arg(HELPER)
             .args(writes.iter().map(writes::Write::arg))

@@ -35,8 +35,9 @@ pub const SETTLE: Duration = Duration::from_secs(3);
 pub enum Input {
     /// The user picked a stop: the slider, the Command menu, the command line.
     Set(Stop),
-    /// power-profiles-daemon's profile changed.
-    Profile(Profile),
+    /// power-profiles-daemon's profile changed; `held` while a program holds it there (ppd's
+    /// `ActiveProfileHolds`: GameMode, a video call).
+    Profile { profile: Profile, held: bool },
     /// The power source changed, and held for [`SETTLE`].
     Source(Source),
     /// The battery's charge, in percent.
@@ -169,7 +170,7 @@ impl Control {
                 self.go(stop, &mut effects);
                 effects.push(Effect::Remember(self.memory));
             }
-            Input::Profile(profile) => self.profile(profile, &mut effects),
+            Input::Profile { profile, held } => self.profile(profile, held, &mut effects),
             Input::Source(source) => {
                 if source == self.source {
                     return effects;
@@ -207,8 +208,11 @@ impl Control {
     }
 
     /// A profile change from power-profiles-daemon: ours coming back, or one from outside, which
-    /// the slider follows to the stop named like it, as the source's choice.
-    fn profile(&mut self, profile: Profile, effects: &mut Vec<Effect>) {
+    /// the slider follows. A profile set from outside is the source's choice, the stop named like
+    /// it. A program's hold is followed but never remembered, and its end, which ppd marks by going
+    /// back to the profile before it, returns to the source's own stop (Super Saver, not Power
+    /// Saver).
+    fn profile(&mut self, profile: Profile, held: bool, effects: &mut Vec<Effect>) {
         if let Some(at) = self.asked.iter().position(|&asked| asked == profile) {
             self.asked.drain(..=at);
             return;
@@ -217,12 +221,19 @@ impl Control {
         if profile == self.stop.profile() {
             return;
         }
-        let stop = Stop::from_profile(profile);
-        if self.below_drop() {
-            self.memory.undone = true;
+        let remembered = self.memory.stop_for(self.source);
+        let stop = if profile == remembered.profile() {
+            remembered
+        } else {
+            Stop::from_profile(profile)
+        };
+        if !held {
+            if self.below_drop() {
+                self.memory.undone = true;
+            }
+            self.memory.dropped_from = None;
+            self.memory.choose(self.source, stop);
         }
-        self.memory.dropped_from = None;
-        self.memory.choose(self.source, stop);
         self.stop = stop;
         effects.push(Effect::Apply(stop));
         self.memory.last = Some((self.source, stop));
@@ -272,6 +283,41 @@ impl Control {
             percent: self.drop.percent,
         }));
         true
+    }
+}
+
+/// How long the machine's devices settle before the stop's writes are checked again: a dock's
+/// replug or a screen's arrival is a burst of uevents, and power-profiles-daemon puts the GPU back
+/// to `auto` on each.
+pub const RECHECK: Duration = Duration::from_secs(1);
+
+/// A check of the stop's writes, after devices came or power-profiles-daemon acted: once the burst
+/// of events has been quiet for [`RECHECK`].
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Recheck {
+    due: Option<Instant>,
+}
+
+impl Recheck {
+    /// Something changed at `now`.
+    pub fn ask(&mut self, now: Instant) {
+        self.due = Some(now + RECHECK);
+    }
+
+    /// Whether the check is due by `now`, once.
+    pub fn due(&mut self, now: Instant) -> bool {
+        match self.due {
+            Some(due) if now >= due => {
+                self.due = None;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// How long until it is due, `None` when nothing waits.
+    pub fn wait(&self, now: Instant) -> Option<Duration> {
+        self.due.map(|due| due.saturating_duration_since(now))
     }
 }
 
