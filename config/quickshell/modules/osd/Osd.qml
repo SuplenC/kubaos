@@ -1,7 +1,6 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -31,8 +30,9 @@ Drawer {
     takesFocus: false
     animateSize: false
     shown: visibleNow && Hypr.focusedScreen === screen
-    contentWidth: 320
-    contentHeight: 60
+    // A narrow strip, as wide as the side column the power menu takes.
+    contentWidth: K.Tokens.size.rail
+    contentHeight: row.implicitHeight
 
     Timer {
         interval: 2000
@@ -67,56 +67,49 @@ Drawer {
         }
     }
 
-    RowLayout {
-        anchors.fill: parent
-        anchors.leftMargin: Theme.spacing.xl
-        anchors.rightMargin: Theme.spacing.xl
-        spacing: Theme.spacing.md
+    K.Row {
+        id: row
 
-        Icon {
+        width: parent.width
+        fill: true
+        gap: K.Tokens.space.s12
+        align: "centre"
+        leftPadding: K.Tokens.space.s16
+        rightPadding: K.Tokens.space.s16
+        topPadding: K.Tokens.space.s16
+        bottomPadding: K.Tokens.space.s16
+
+        K.Icon {
             name: root.icon
-            size: 22
-            filled: true
-            color: Theme.m3primary
+            size: K.Tokens.icon.s24
+            color: K.Tokens.color.primary
         }
 
-        Rectangle {
-            Layout.fillWidth: true
-            implicitHeight: 8
-            radius: 4
-            color: Theme.m3surfaceContainerHighest
-
-            Rectangle {
-                width: Math.max(parent.height, parent.width * Math.min(1, root.value))
-                height: parent.height
-                radius: 4
-                color: Theme.m3primary
-
-                Behavior on width {
-                    Anim {
-                        duration: Theme.anim.small
-                        easing.bezierCurve: Theme.anim.emphasizedDecel
-                    }
-                }
-            }
+        K.ProgressBar {
+            value: root.value
         }
 
-        // As wide as "100" in this font, so the bar keeps one length and the
+        // As wide as "100", the number right-aligned in it, so the bar keeps one length and the
         // number never runs past the panel.
-        StyledText {
-            id: percent
+        Item {
+            implicitWidth: widest.implicitWidth
+            implicitHeight: percent.implicitHeight
 
-            Layout.preferredWidth: Math.ceil(widest.advanceWidth)
-            horizontalAlignment: Text.AlignRight
-            text: Math.round(root.value * 100)
-            font.weight: Font.DemiBold
-            font.features: Theme.font.tabular
-
-            TextMetrics {
+            K.Text {
                 id: widest
 
-                font: percent.font
+                visible: false
                 text: "100"
+                style: K.Tokens.type.body_strong
+            }
+
+            K.Text {
+                id: percent
+
+                x: parent.width - percent.width
+                text: `${Math.round(root.value * 100)}`
+                style: K.Tokens.type.body_strong
+                color: K.Tokens.color.on_surface
             }
         }
     }

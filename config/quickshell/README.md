@@ -156,6 +156,7 @@ Every panel works without a mouse. Esc closes it.
 - Wallpaper picker: h/j/k/l or arrows move (the desktop previews the selection), Tab switches folder, S opens Settings, Enter applies, Esc goes back to the current wallpaper.
 - Wallpaper settings (the picker's last tab): Tab/Shift+Tab or Up/Down between rows, Left/Right change a value (Shift: 10 steps), Home/End to the ends, Space toggles, Enter activates or edits a colour, Delete resets to the default, Esc back to the wallpapers.
 - Lock screen: type the password and press Enter. Esc clears the field.
+- Polkit prompt: type the password and press Enter. Tab reaches Cancel and Authenticate; Esc cancels.
 
 ## Theme
 

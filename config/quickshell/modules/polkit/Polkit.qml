@@ -1,18 +1,33 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Polkit
-import qs.theme
-import qs.components
+import KubaOS.Components as K
 import qs.services
 
 // Polkit authentication agent and its dialog. Loaded only when
 // Settings.polkitAgent is true; otherwise hyprpolkitagent handles requests.
+// The keyboard starts in the field; Enter answers, Esc (or Cancel) cancels.
 Scope {
     id: root
 
     readonly property AuthFlow flow: agent.flow
+    // What PAM asks for, without the colon it ends its prompt with: "Password".
+    readonly property string asked: (root.flow?.inputPrompt ?? "").replace(/:\s*$/, "") || "Password"
+    readonly property string who: root.flow?.selectedIdentity?.displayName ?? ""
+    // "Password for Kuba" reads; "Verification code for Kuba" doesn't, so any other prompt shows as
+    // PAM wrote it, and who it is for goes under the body.
+    readonly property bool forWho: root.who !== "" && root.asked.toLowerCase() === "password"
+    readonly property bool invalid: (root.flow?.failed ?? false) || (root.flow?.supplementaryIsError ?? false)
+
+    function respond(): void {
+        if (!root.flow?.isResponseRequired)
+            return;
+        root.flow.submit(field.text);
+        field.text = "";
+        // Authenticate pressed from the keyboard holds the focus; a retry is typed in the field.
+        field.forceActiveFocus();
+    }
 
     PolkitAgent {
         id: agent
@@ -34,89 +49,46 @@ Scope {
         WlrLayershell.namespace: "qs-polkit"
         onVisibleChanged: if (visible) {
             field.text = "";
-            field.focusInput();
+            field.forceActiveFocus();
         }
 
-        Rectangle {
+        K.Scrim {
             anchors.fill: parent
-            color: Theme.m3scrim
-            opacity: 0.45
-        }
 
-        Elevation {
-            target: dialog
-            level: 4
-        }
-
-        PanelSurface {
-            id: dialog
-
-            anchors.centerIn: parent
-            width: 440
-            height: column.implicitHeight + Theme.spacing.xl * 2
-
-            ColumnLayout {
-                id: column
-
-                anchors.fill: parent
-                anchors.margins: Theme.spacing.xl
-                spacing: Theme.spacing.md
-
-                Icon {
-                    name: "admin_panel_settings"
-                    size: 32
-                    color: Theme.m3primary
+            K.Dialog {
+                icon: "admin_panel_settings"
+                title: "Authentication required"
+                body: {
+                    const message = root.flow?.message ?? "";
+                    return root.forWho || root.who === "" ? message : `${message}\nAs ${root.who}`;
                 }
-
-                StyledText {
-                    text: "Authentication required"
-                    font.pixelSize: Theme.font.xl
+                onDismissed: root.flow?.cancelAuthenticationRequest()
+                dismiss: K.Button {
+                    text: "Cancel"
+                    kind: "Text"
+                    onActivated: root.flow?.cancelAuthenticationRequest()
                 }
-
-                StyledText {
-                    Layout.fillWidth: true
-                    text: root.flow?.message ?? ""
-                    wrapMode: Text.Wrap
-                    color: Theme.m3onSurfaceVariant
-                }
-
-                StyledText {
-                    Layout.fillWidth: true
-                    text: `As ${root.flow?.selectedIdentity?.displayName ?? ""}`
-                    font.pixelSize: Theme.font.sm
-                    color: Theme.m3outline
-                }
-
-                SearchField {
-                    id: field
-
-                    Layout.fillWidth: true
-                    icon: "key"
-                    echoMode: root.flow?.responseVisible ? TextInput.Normal : TextInput.Password
-                    placeholder: root.flow?.inputPrompt || "Password"
-                    catchEscape: true
-                    onEscaped: root.flow?.cancelAuthenticationRequest()
-                    onAccepted: {
-                        if (!root.flow?.isResponseRequired)
-                            return;
-                        root.flow.submit(text);
-                        text = "";
+                actions: [
+                    K.Button {
+                        text: "Authenticate"
+                        enabled: root.flow?.isResponseRequired ?? false
+                        onActivated: root.respond()
                     }
-                }
+                ]
 
-                StyledText {
-                    Layout.fillWidth: true
-                    visible: text !== ""
-                    text: root.flow?.failed ? "That didn't work. Fat fingers? Try again" : root.flow?.supplementaryMessage ?? ""
-                    wrapMode: Text.Wrap
-                    color: root.flow?.failed || root.flow?.supplementaryIsError ? Theme.m3error : Theme.m3onSurfaceVariant
-                }
+                K.Labelled {
+                    label: root.forWho ? `${root.asked} for ${root.who}` : root.asked
+                    note: root.flow?.failed ? "That didn't work. Fat fingers? Try again." : root.flow?.supplementaryMessage ?? ""
+                    invalid: root.invalid
 
-                StyledText {
-                    Layout.alignment: Qt.AlignRight
-                    text: "Enter authenticate · Esc cancel"
-                    color: Theme.m3outline
-                    font.pixelSize: Theme.font.sm
+                    K.Field {
+                        id: field
+
+                        icon: "key"
+                        secret: !(root.flow?.responseVisible ?? false)
+                        status: root.invalid ? "Invalid" : "Normal"
+                        onAccepted: root.respond()
+                    }
                 }
             }
         }

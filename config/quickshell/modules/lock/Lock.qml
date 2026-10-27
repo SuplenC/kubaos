@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import qs.theme
+import KubaOS.Components as K
 import qs.services
 
 // Session lock (ext-session-lock). Locked through Session.lock(), which the
@@ -22,10 +22,12 @@ Scope {
         }
     }
 
+    // As long as the surfaces take to leave (LockSurface's `enter`), so the desktop shows as
+    // they finish.
     Timer {
         id: release
 
-        interval: Theme.anim.normal
+        interval: K.Tokens.duration.medium
         onTriggered: {
             Session.unlock();
             root.unlocking = false;

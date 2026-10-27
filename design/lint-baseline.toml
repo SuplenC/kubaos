@@ -149,11 +149,6 @@ size = 2
 ["config/quickshell/modules/frame/Frame.qml"]
 size = 2
 
-["config/quickshell/modules/lock/LockSurface.qml"]
-size = 7
-duration = 3
-font = 5
-
 ["config/quickshell/modules/menu/ActionPanel.qml"]
 size = 1
 font = 1
@@ -211,19 +206,6 @@ size = 2
 
 ["config/quickshell/modules/notifications/PopupsBelow.qml"]
 size = 2
-
-["config/quickshell/modules/osd/Osd.qml"]
-size = 5
-radius = 2
-font = 1
-
-["config/quickshell/modules/polkit/Polkit.qml"]
-size = 2
-
-["config/quickshell/modules/powermenu/PowerMenu.qml"]
-size = 2
-radius = 1
-font = 1
 
 ["config/quickshell/modules/sysmon/Processes.qml"]
 size = 1
