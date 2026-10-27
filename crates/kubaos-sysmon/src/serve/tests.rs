@@ -64,6 +64,18 @@ fn the_popup_mode_samples_in_detail_with_processes() {
 }
 
 #[test]
+fn the_quiet_mode_samples_the_pill_every_10_seconds() {
+    let machine = Machine::laptop();
+    let (_dir, mut server) = server(&machine);
+
+    let (reply, next) = ask(&mut server, r#"{"id":1,"op":"mode","mode":"quiet"}"#);
+
+    assert_eq!(reply["mode"], "quiet");
+    assert_eq!(next, Next::Now);
+    assert_eq!(server.mode().interval(), Some(std::time::Duration::from_secs(10)));
+}
+
+#[test]
 fn pausing_stops_the_pace_and_resuming_starts_the_counters_afresh() {
     let machine = Machine::laptop();
     let (_dir, mut server) = server(&machine);

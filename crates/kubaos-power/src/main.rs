@@ -471,7 +471,13 @@ fn laptop_panel() -> Option<(f64, bool)> {
 
 /// Whether the Wi-Fi `interface` saves power, as `iw` says; it needs no root to ask.
 fn wifi_power_save(interface: &str) -> Option<bool> {
-    let output = Command::new("iw")
+    // `iw` is in /usr/sbin, which a user's PATH may leave out.
+    let iw = if Path::new("/usr/sbin/iw").exists() {
+        "/usr/sbin/iw"
+    } else {
+        "iw"
+    };
+    let output = Command::new(iw)
         .args(["dev", interface, "get", "power_save"])
         .stdin(Stdio::null())
         .stderr(Stdio::null())

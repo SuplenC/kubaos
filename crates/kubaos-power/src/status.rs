@@ -99,7 +99,12 @@ pub fn rows(plan: &Plan, settings: &Settings, machine: &Machine, live: &Live) ->
         cpu_cap(plan, &policies),
         compare("Firmware profile", firmware(plan), machine.platform_profile()),
         row("Fans", "the firmware's, by its profile", None, None),
-        row("Scheduler", scheduler(plan.scheduler), None, None),
+        row(
+            "Scheduler",
+            scheduler(plan.scheduler),
+            Some("none runs yet".to_owned()),
+            None,
+        ),
     ];
     let gpus = machine.gpus();
     rows.push(compare(
@@ -173,10 +178,10 @@ fn firmware(plan: &Plan) -> &'static str {
 
 fn scheduler(scheduler: Scheduler) -> &'static str {
     match scheduler {
-        Scheduler::PowersaveFewestCores => "powersave on the fewest cores, once a scheduler runs",
-        Scheduler::Powersave => "powersave, once a scheduler runs",
-        Scheduler::Autopilot => "autopilot, once a scheduler runs",
-        Scheduler::Performance => "performance, once a scheduler runs",
+        Scheduler::PowersaveFewestCores => "powersave on the fewest cores",
+        Scheduler::Powersave => "powersave",
+        Scheduler::Autopilot => "autopilot",
+        Scheduler::Performance => "performance",
     }
 }
 
