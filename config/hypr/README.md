@@ -68,7 +68,7 @@ closed. Workspaces follow these positions: the leftmost external shows the
 first external group, whatever screen it is (see Workspaces below), so place
 your screens in the order they stand on the desk. Without lines of your own,
 Hyprland places them in connector order. Or pin each screen to its group
-(Workspace groups, below), and the layout no longer decides.
+(Workspace groups, below), and the layout doesn't decide.
 
 ## Workspaces
 
