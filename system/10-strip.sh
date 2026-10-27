@@ -127,14 +127,8 @@ if unit_exists motd-news.timer; then
   fi
 fi
 
-step "Keep unattended-upgrades (security updates only, Ubuntu default)"
-group_install upgrades
-write_root_file /etc/apt/apt.conf.d/20auto-upgrades 0644 <<'EOF'
-APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Unattended-Upgrade "1";
-EOF
-info "origins stay as shipped in /etc/apt/apt.conf.d/50unattended-upgrades (security only)."
-info "held packages (Hyprland) are never touched by unattended-upgrades."
+step "Retire Ubuntu's updaters (only kubaos update runs apt)"
+retire_ubuntu_updaters
 
 step "Done"
 info "Next: system/20-base.sh"

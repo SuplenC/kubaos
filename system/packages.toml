@@ -156,10 +156,6 @@ packages = ["zsh"]
 # ---------------------------------------------------------------------------
 # The other scripts
 
-[group.upgrades]
-summary = "Ubuntu's security updates (system/10-strip.sh)"
-packages = ["unattended-upgrades"]
-
 [group.boot]
 summary = "The boot splash (system/25-boot.sh)"
 packages = ["plymouth", "plymouth-label-ft"]

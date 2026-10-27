@@ -195,7 +195,7 @@ updates follow it; `kubaos packages enable|disable <group>` changes it later.
 | Step | What | Reboot after? |
 |---|---|---|
 | `system/00-btrfs-subvolumes.md` | manual, from the USB: `@`, `@home`, ... | yes (part of it) |
-| `system/10-strip.sh` | purge snapd, cloud-init, multipath, lxd-installer, ModemManager; Pro adverts off | no |
+| `system/10-strip.sh` | purge snapd, cloud-init, multipath, lxd-installer, ModemManager; Pro adverts off; unattended-upgrades and apt-daily masked | no |
 | `system/20-base.sh` | base packages, NetworkManager, PipeWire, lid policy, snapper, grub-btrfs | recommended |
 | `system/25-boot.sh` | boot splash (Plymouth, the passphrase prompt), GRUB theme, "KubaOS Shinjuku" entries, hidden menu | no (next boot shows it) |
 | `system/30-hardware.sh` | TUXEDO repo + `tuxedo-drivers`, MOK, power profiles, dock, fingerprint | **yes** |
@@ -283,7 +283,7 @@ lvm2, ...) as manually installed, so `--auto-remove` doesn't take it along.
 
 **Verify:** `snap` is gone (`command -v snap` prints nothing),
 `apt-cache policy snapd` shows `Candidate: (none)`, `pro config show apt_news`
-is `False`, `systemctl status unattended-upgrades` is active.
+is `False`, and `systemctl is-enabled apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service` prints `masked` three times: only `kubaos update` runs apt.
 
 ### 6. `system/20-base.sh`
 

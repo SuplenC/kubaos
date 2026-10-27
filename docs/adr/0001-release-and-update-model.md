@@ -10,7 +10,7 @@ KubaOS ships as an ISO, but an installed machine never downloads the ISO again, 
 
 **Two kinds of change, two speeds.**
 
-- Ordinary packages (Ubuntu's apt packages, everything from nixpkgs like Neovim, anything the user adds) update whenever the user runs `kubaos update`. No KubaOS release gates them. Ubuntu security updates keep installing automatically through unattended-upgrades; everything else waits for `kubaos update`.
+- Ordinary packages (Ubuntu's apt packages, everything from nixpkgs like Neovim, anything the user adds) update whenever the user runs `kubaos update`. No KubaOS release gates them. Ubuntu security updates wait for `kubaos update` too: unattended-upgrades and the apt-daily timers are retired, so nothing runs apt in the background, and the daily check notifies when security updates are pending.
 - KubaOS-curated things (Hyprland, Quickshell, ukiyo, home-manager, the cyan Papirus icons, the lock screen's PAM modules, the GPU driver bundle, the `config/` defaults, the scripts, migrations, installer and first-boot bits) move only with a KubaOS release.
 
 **Versions.** `VERSION` and `CODENAME` files at the repo root. A release is a signed annotated tag `vX.Y.Z`, signed with the SSH key already used for commits. Patch releases (`Z`) keep the codename and the NixOS, home-manager and Ubuntu base. Minor or major releases get the next codename.

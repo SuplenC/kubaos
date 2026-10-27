@@ -514,6 +514,34 @@ install_fast_shutdown_boot() {
   fi
 }
 
+# retire_ubuntu_updaters: nothing but `kubaos update` runs apt. unattended-upgrades and the
+# apt-daily timers refresh lists and install packages in the background, where they can hold the
+# dpkg lock while an update runs, wake the machine and use the network and battery. Their timers
+# and unattended-upgrades.service stop now; the units are disabled and masked, so a package
+# upgrade can't enable them again; apt's periodic jobs are set to 0. A service that is running
+# is left to finish. 10-strip.sh runs it, and a migration on machines installed before it.
+retire_ubuntu_updaters() {
+  local unit
+  install_root_file "$FILES_DIR/apt/apt.conf.d/99kubaos-no-periodic" \
+    /etc/apt/apt.conf.d/99kubaos-no-periodic 0644
+  for unit in apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service \
+    apt-daily.service apt-daily-upgrade.service; do
+    if [[ "$(systemctl is-enabled "$unit" 2>/dev/null || true)" == masked ]]; then
+      ok "$unit is masked"
+      continue
+    fi
+    case "$unit" in
+      *.timer | unattended-upgrades.service)
+        if has_systemd && systemctl is-active -q "$unit"; then
+          sudo_run systemctl stop "$unit"
+        fi
+        ;;
+    esac
+    sudo_run systemctl disable "$unit" || true
+    sudo_run systemctl mask "$unit"
+  done
+}
+
 # install_shutdown_splash: the splash on poweroff and reboot shows every time
 # and gets to play out. Plymouth's shutdown units start once the sessions
 # have ended, so Hyprland no longer holds the screen, and
