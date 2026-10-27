@@ -79,7 +79,8 @@ settings/Settings.qml   user knobs: wallpaper folders, wallpaper motion, lock lo
 services/               singletons, no UI
   Audio                 PipeWire default sink, volume, output list
   Brightness            /sys/class/backlight (watched) + brightnessctl
-  Battery, Profiles     UPower battery, power-profiles-daemon
+  Battery               UPower battery
+  Power                 the power stops, from kubaos-power's file (power-profiles-daemon's profile without it)
   Net, Bt               NetworkManager and BlueZ via Quickshell.Networking / .Bluetooth, pairing through kubaos-bluetooth
   Notifs                notification server, popups, history, DND
   Wallpapers            current wallpaper, picker preview, folder listing (stills, videos, posters), `dot-theme set`

@@ -4,7 +4,7 @@ import qs.theme
 import qs.components
 import qs.services
 
-// Volume (with mute) and screen brightness.
+// Volume (with mute), screen brightness and the power stops.
 ColumnLayout {
     spacing: Theme.spacing.sm
 
@@ -37,5 +37,11 @@ ColumnLayout {
         icon: Brightness.icon
         value: Brightness.value
         onMoved: v => Brightness.set(v)
+    }
+
+    PowerSlider {
+        Layout.fillWidth: true
+        // Ends where the brightness slider does, beside the mute button.
+        Layout.rightMargin: mute.width + Theme.spacing.sm
     }
 }

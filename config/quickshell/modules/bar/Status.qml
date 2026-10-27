@@ -27,7 +27,7 @@ Pill {
     }
 
     StatusIcon {
-        name: Profiles.icon
+        name: Power.icon
     }
 
     StatusIcon {

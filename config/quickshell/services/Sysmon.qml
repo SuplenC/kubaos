@@ -3,7 +3,6 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
-import Quickshell.Services.UPower
 import qs.settings
 
 // The system monitor's state: the bar's pill, the popup and the alerts all
@@ -51,7 +50,9 @@ Singleton {
             return "paused";
         if (open)
             return "popup";
-        return settings.pill || settings.alerts ? "pill" : "paused";
+        if (!settings.pill && !settings.alerts)
+            return "paused";
+        return Power.quiet ? "quiet" : "pill";
     }
 
     // The last minute of each series, as [t, value] pairs, oldest first. The
@@ -239,7 +240,7 @@ Singleton {
         else if (action.startsWith("files:"))
             Quickshell.execDetached(["xdg-open", action.slice(6)]);
         else if (action === "power-saver")
-            Profiles.set(PowerProfile.PowerSaver);
+            Power.setId("power-saver");
         else
             show();
     }
