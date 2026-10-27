@@ -82,4 +82,17 @@ Singleton {
         printErrors: false
         onFileChanged: reload()
     }
+
+    // Quickshell (v0.3.2) keeps the id a workspace had when it first saw it,
+    // so a renumbered workspace would stay in the bar under its old number
+    // beside its new one. Reading them again on `changeworkspaceid` keeps the
+    // bar on Hyprland's ids.
+    Connections {
+        target: Hyprland
+
+        function onRawEvent(event: HyprlandEvent): void {
+            if (event.name === "changeworkspaceid")
+                Hyprland.refreshWorkspaces();
+        }
+    }
 }
