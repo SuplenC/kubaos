@@ -1,6 +1,6 @@
 import QtQuick
 import QtMultimedia
-import qs.theme
+import KubaOS.Components as K
 import qs.services
 
 // One wallpaper, cropped to fill: a still, or a video looping over its
@@ -49,10 +49,11 @@ Item {
         sourceSize: root.sourceSize
     }
 
+    // A beat after the video has faded back to the poster.
     Timer {
         id: release
 
-        interval: Theme.anim.slow + 100
+        interval: K.Tokens.duration.slow + K.Tokens.duration.micro
         onTriggered: loader.active = false
     }
 
@@ -78,9 +79,10 @@ Item {
             clip: true
 
             Behavior on opacity {
-                Anim {
-                    duration: Theme.anim.slow
-                    easing.bezierCurve: Theme.anim.effects
+                NumberAnimation {
+                    duration: K.Tokens.duration.slow
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: K.Tokens.easing.standard
                 }
             }
 

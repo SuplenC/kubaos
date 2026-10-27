@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import qs.theme
+import KubaOS.Components as K
 
 // Exclusive zones for the frame: one empty, click-through window per edge,
 // so tiled windows sit inside the frame. Kept apart from Frame.qml so that
@@ -14,7 +14,9 @@ Scope {
     component Edge: PanelWindow {
         screen: root.screen
         color: "transparent"
+        // design-allow(size): a layer surface can't be empty; this one only reserves its zone.
         implicitWidth: 1
+        // design-allow(size): a layer surface can't be empty; this one only reserves its zone.
         implicitHeight: 1
         mask: Region {}
         WlrLayershell.namespace: "qs-exclusion"
@@ -25,27 +27,27 @@ Scope {
         anchors.top: true
         anchors.left: true
         anchors.right: true
-        exclusiveZone: Theme.bar.height
+        exclusiveZone: K.Tokens.size.bar
     }
 
     Edge {
         anchors.bottom: true
         anchors.left: true
         anchors.right: true
-        exclusiveZone: Theme.frame.thickness
+        exclusiveZone: K.Tokens.space.s8
     }
 
     Edge {
         anchors.left: true
         anchors.top: true
         anchors.bottom: true
-        exclusiveZone: Theme.frame.thickness
+        exclusiveZone: K.Tokens.space.s8
     }
 
     Edge {
         anchors.right: true
         anchors.top: true
         anchors.bottom: true
-        exclusiveZone: Theme.frame.thickness
+        exclusiveZone: K.Tokens.space.s8
     }
 }

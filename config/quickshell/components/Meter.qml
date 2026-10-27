@@ -1,17 +1,21 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 
-// A rounded bar split into parts, each a 0..1 share and a colour: memory as
-// used and cache, a disk as used, a core as busy. What is left is the track.
+// A bar split into parts, each a 0..1 share and a colour: memory as used and
+// cache, a disk as used, a core as busy. What is left is the track. It has a
+// progress bar's look: 8 tall, a pill, the track in the progress bar's colour.
 Rectangle {
     id: root
 
     // [{ value, color }], left to right.
     property var parts: []
+    // Whether it takes the room a `K.Row` or `K.Stack` gives it.
+    property bool fillWidth: false
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
-    implicitHeight: Theme.spacing.xs + 2
-    radius: height / 2
-    color: Theme.m3surfaceContainerHighest
+    implicitHeight: K.Tokens.size.progress
+    radius: K.Tokens.radius.full
+    color: K.Look.alpha(K.Tokens.color.surface_container_highest, K.Tokens.opacity.track)
 
     // Each part is drawn from the left edge to the end of its share, the
     // last first, so every part keeps the rounded ends of the bar.
@@ -27,16 +31,18 @@ Rectangle {
         Rectangle {
             required property var modelData
 
-            width: root.width * modelData.end
+            width: K.Look.snapUp(root.width * modelData.end, root.dpr)
             height: root.height
-            radius: root.radius
+            radius: K.Tokens.radius.full
             color: modelData.color
             visible: width > 0
 
+            // A reading moves the fill over `short`, as a progress bar follows its work.
             Behavior on width {
-                Anim {
-                    duration: Theme.anim.normal
-                    easing.bezierCurve: Theme.anim.standard
+                NumberAnimation {
+                    duration: K.Tokens.duration.short
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: K.Tokens.easing.linear
                 }
             }
         }

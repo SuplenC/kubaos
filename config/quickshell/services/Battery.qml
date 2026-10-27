@@ -15,7 +15,8 @@ Singleton {
             return "battery_charging_full";
         if (percentage > 0.95)
             return "battery_full";
-        return `battery_${Math.min(6, Math.floor(percentage * 7))}_bar`;
+        // KubaOS Symbols draw the battery in four levels short of full.
+        return `battery_${Math.min(3, Math.floor(percentage * 4))}_bar`;
     }
     readonly property string timeLeft: {
         const seconds = charging ? device?.timeToFull : device?.timeToEmpty;

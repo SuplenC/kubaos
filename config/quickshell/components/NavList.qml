@@ -1,12 +1,12 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 
 // ListView driven from the keyboard, with the keys of docs/DESIGN.md ("The keyboard"): the arrows
 // along it, h j k l, Ctrl+j/k, Ctrl+n/p, Home and End, Page Up and Page Down, and Enter once per
 // press. Plain letters are skipped when `vimKeys` is false, and Home and End when `fieldKeys` is
 // true: a text field that forwards its keys here keeps both.
-// The selection is a highlight that slides between rows. playEnter() makes
-// the rows cascade in (ListRow reads enterSerial).
+// Its rows are `K.ListRow`s 4 apart, as in a `K.List` well; the current row shows itself selected
+// while `highlightShown`, by `selected: ListView.isCurrentItem && ListView.view.highlightShown`.
 ListView {
     id: root
 
@@ -14,53 +14,26 @@ ListView {
     property bool vimKeys: true
     // Whether a text field forwards its keys here, which keeps Home and End for its caret.
     property bool fieldKeys: false
+    // Whether the current row shows as selected: while the list has the keyboard, as a rule.
     property bool highlightShown: true
-    property int enterSerial: 0
 
     signal activated(int index)
-
-    function playEnter(): void {
-        enterSerial++;
-    }
 
     clip: true
     activeFocusOnTab: true
     boundsBehavior: Flickable.StopAtBounds
-    highlightFollowsCurrentItem: false
-    spacing: Theme.spacing.xxs
+    spacing: K.Tokens.space.s4
 
-    highlight: Rectangle {
-        width: root.width
-        height: root.currentItem?.height ?? 0
-        y: root.currentItem?.y ?? 0
-        radius: Theme.rounding.md
-        color: Theme.m3secondaryContainer
-        opacity: root.highlightShown && root.count > 0 ? 1 : 0
-
-        Behavior on y {
-            Anim {
-                duration: Theme.anim.small
-                easing.bezierCurve: Theme.anim.emphasizedDecel
-            }
-        }
-
-        Behavior on opacity {
-            Anim {
-                duration: Theme.anim.fast
-            }
-        }
-    }
-
-    // HAZARD: no `add` transition on opacity; rows fade themselves in (ListRow, on `ListView.onAdd`).
-    // A model change that reaches a row mid-fade cancels the view's transition and leaves the
-    // opacity where the fade was. While a Wi-Fi scan re-sorts the list that strands rows
-    // near-invisible, as gaps.
+    // HAZARD: no `add` transition on opacity; a new row shows at once. A model change that reaches
+    // a row mid-fade cancels the view's transition and leaves the opacity where the fade was. While
+    // a Wi-Fi scan re-sorts the list that strands rows near-invisible, as gaps.
     // https://doc.qt.io/qt-6/qml-qtquick-viewtransition.html#handling-interrupted-animations
     displaced: Transition {
-        Anim {
+        NumberAnimation {
             property: "y"
-            duration: Theme.anim.small
-            easing.bezierCurve: Theme.anim.emphasizedDecel
+            duration: K.Tokens.duration.medium
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: K.Tokens.easing.standard_decel
         }
     }
 
