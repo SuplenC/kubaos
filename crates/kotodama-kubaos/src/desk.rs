@@ -13,6 +13,7 @@
 //! - Writing the file, its format, and which group goes where: `config/hypr/workspaces.lua` and
 //!   `config/hypr/workspace_blocks.lua`.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -81,6 +82,7 @@ impl Desk {
     /// before Hyprland repaired it can name a screen at a position and again waiting at another,
     /// or name a position twice; the first line for a position stands.
     pub fn parse(text: &str) -> Self {
+        let mut positions = HashSet::new();
         let mut places: Vec<Place> = text
             .lines()
             .filter_map(|line| {
@@ -89,7 +91,7 @@ impl Desk {
                 let connector = fields.next()?.to_owned();
                 let position = fields.next().filter(|position| is_position(position))?.to_owned();
                 let screen = fields.next().unwrap_or_default().to_owned();
-                Some(Place {
+                positions.insert(position.clone()).then_some(Place {
                     position,
                     block,
                     connector,
@@ -97,7 +99,6 @@ impl Desk {
                 })
             })
             .collect();
-        places.dedup_by(|later, earlier| later.position == earlier.position);
         places.sort_by_key(Place::order);
         let present: Vec<String> = places
             .iter()

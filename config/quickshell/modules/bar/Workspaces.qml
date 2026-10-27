@@ -41,7 +41,7 @@ Pill {
         for (const workspace of Hyprland.workspaces.values) {
             const id = workspace.id;
             const owner = Hypr.blockOf(id);
-            if (id <= 0 || (owner !== block && workspace.monitor?.name !== monitor?.name))
+            if (id <= 0 || Hypr.isStale(id) || (owner !== block && workspace.monitor?.name !== monitor?.name))
                 continue;
             sets[owner] = sets[owner] ?? [];
             if (!sets[owner].includes(id))

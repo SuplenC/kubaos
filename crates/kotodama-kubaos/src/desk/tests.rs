@@ -149,3 +149,12 @@ fn a_position_named_twice_keeps_its_first_line() {
     assert_eq!(items.len(), 2);
     assert_eq!(items[1].subtitle.as_deref(), Some("Workspaces 31-40, on A (DP-1)"));
 }
+
+#[test]
+fn a_position_named_twice_apart_keeps_its_first_line() {
+    let items = Desk::parse("3\tDP-1\t1\tA\n1\t\t2\tB\n5\tDP-2\t1\tC\n").items();
+
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].subtitle.as_deref(), Some("Workspaces 31-40, on A (DP-1)"));
+    assert_eq!(items[1].id, "desk:2");
+}

@@ -822,24 +822,33 @@ end
 -- left group, because the reconcile ran while the LG still sat at 0,0.
 test("the BenQ, then the LG arriving at 0,0 before it is arranged, end with each group at its position", function()
   local world = kuba_undocked()
-  local real_open, written_with = io.open, nil
-  io.open = function(path, mode)
-    if mode == "w" and path:find(world.state, 1, true) then
-      written_with = world:ids_on("DP-2")
-    end
-    return real_open(path, mode)
-  end
-
   world:attach("DP-2", BNQ_K)
   world:arrange("DP-2", 0, 360)
   world:settle()
+  local file = world.state .. "/workspace-screens"
+  local real_open, real_rename = io.open, os.rename
+  local written_with, opened, renamed = nil, {}, {}
+  io.open = function(path, mode)
+    if mode == "w" and path:find(world.state, 1, true) then
+      written_with = world:ids_on("HDMI-A-1")
+      opened[#opened + 1] = path
+    end
+    return real_open(path, mode)
+  end
+  os.rename = function(from, to)
+    renamed[#renamed + 1] = { from, to }
+    return real_rename(from, to)
+  end
+
   world:attach("HDMI-A-1", LG_K)
   world:arrange("HDMI-A-1", 1920, 0)
   world:settle()
 
-  io.open = real_open
+  io.open, os.rename = real_open, real_rename
   kuba_docked(world)
-  same(written_with, { 41, 42, 43 }, "the file is written once the workspaces have moved")
+  same(written_with, { 31, 32, 33, 34, 35 }, "the file is written once the workspaces have moved")
+  same(opened, { file .. ".tmp" }, "written to a temp file beside it")
+  same(renamed, { { file .. ".tmp", file } }, "then renamed over it")
 end)
 
 test("the LG first, then the BenQ, end the same", function()
@@ -877,14 +886,72 @@ end)
 test("a screen missing from the list while another arrives keeps its group", function()
   local world = kuba_undocked()
   world:plug("DP-2", BNQ_K, 0, 360)
+  local before = read(world.state .. "/workspace-screens")
   world.hidden["DP-2"] = true
 
   world:attach("HDMI-A-1", LG_K)
+  world:arrange("HDMI-A-1", 1920, 0)
+  world:tick()
+  same(world:ids_on("DP-2"), { 41, 42, 43 }, "the missing screen keeps its group while the wait goes on")
+  same(read(world.state .. "/workspace-screens"), before, "and the file is untouched")
   world.hidden["DP-2"] = nil
+  world:tick()
+
+  kuba_docked(world)
+end)
+
+test("a screen missing from the list for good is reconciled without it after the retries", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world.hidden["DP-2"] = true
+
+  world:attach("HDMI-A-1", LG_K)
   world:arrange("HDMI-A-1", 1920, 0)
   world:settle()
 
+  same(world:ids_on("HDMI-A-1"), { 41, 42, 43 }, "the only external left is position 1")
+end)
+
+-- Regression: the left screen's removal was reconciled at once, so the centre
+-- screen shifted to position 1 and took the left group for a moment, and
+-- every workspace moved twice.
+test("the dock's screens going one at a time move each group once, to the laptop", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  world.moves = 0
+
+  world:detach("DP-2", "HDMI-A-1")
+  same(world.moves, 0, "nothing moves on the first removal")
+  world:detach("HDMI-A-1")
+  same(world.moves, 0, "nor on the second")
+  world:settle()
+
+  same(world:ids_on("eDP-1"), { 1, 2, 3, 31, 32, 33, 34, 35, 41, 42, 43 }, "both groups wait on the laptop")
+  same(world.moves, 0, "where Hyprland's own backup put them; nothing moves again")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. CSOT .. "\n3\t\t2\t" .. LG_K .. "\n4\t\t1\t" .. BNQ_K .. "\n", "each position remembers its own screen")
+
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
   kuba_docked(world)
+end)
+
+test("Hyprland's fallback output holds no position and writes no row", function()
+  local world, module = two_screens()
+  world:open_window()
+  world:unplug("eDP-1")
+  local before = read(world.state .. "/workspace-screens")
+
+  world:attach("FALLBACK", "")
+  world:detach("DP-1")
+  world:settle()
+  same(read(world.state .. "/workspace-screens"), before, "the file is untouched")
+  same(module.workspace_id(hl.get_monitor("FALLBACK"), 2), 2, "the fallback addresses the panel's group")
+
+  world:plug("eDP-1", PANEL, 0, 0)
+  world:unplug("FALLBACK")
+  same(world:ids_on("eDP-1"), { 1, 2 }, "the panel takes its group back")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. PANEL .. "\n1\t\t1\t" .. LG_A .. "\n", "and the file names no fallback")
 end)
 
 -- Regression: a window opening re-assigned the positions and pulled 41 to

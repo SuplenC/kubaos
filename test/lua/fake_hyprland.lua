@@ -394,17 +394,25 @@ end
 
 -- What the tests drive: plugging screens in and out, and opening windows.
 
--- Every timer due fires, in the order they were set, those set while firing
--- included.
-function F:settle()
-  local index = 1
-  while index <= #self.timers do
+-- The timers due now fire, in the order they were set; one set while firing
+-- waits for the next tick.
+function F:tick()
+  local due = #self.timers
+  for index = 1, due do
     local timer = self.timers[index]
     if timer.enabled and not timer.fired then
       timer.fired = true
       timer.callback()
     end
-    index = index + 1
+  end
+end
+
+-- Every timer due fires, those set while firing included.
+function F:settle()
+  local fired = 0
+  while fired < #self.timers do
+    fired = #self.timers
+    self:tick()
   end
 end
 
@@ -437,8 +445,8 @@ end
 
 -- Hyprland moves the screen's workspaces to the first other screen in its
 -- list (`backup` names another), then fires `monitor.removed` while it still
--- lists the screen.
-function F:unplug(name, backup_name)
+-- lists the screen, and takes it off the list.
+function F:detach(name, backup_name)
   local record = self:monitor_record(name)
   local backup = backup_name and self:monitor_record(backup_name)
   for _, other in ipairs(self.monitors) do
@@ -465,6 +473,11 @@ function F:unplug(name, backup_name)
     end
   end
   self.monitors = kept
+end
+
+-- A screen unplugged, with the time to settle.
+function F:unplug(name, backup_name)
+  self:detach(name, backup_name)
   self:settle()
 end
 

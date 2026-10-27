@@ -112,10 +112,12 @@ window or workspace number moves. A file naming a screen at a position and
 again waiting at another repairs itself: the waiting row goes once its block
 has no windows.
 
-Hyprland reports a screen before it arranges the layout, so `workspaces.lua`
-waits for the layout to hold still (250 ms, restarted by each layout change)
-and then reconciles once, whether the dock brought one screen or two; a window
-opening or closing never changes which screen owns which block. The screens
+Hyprland reports a screen before it arranges the layout, and a dock's screens
+come and go one at a time, so `workspaces.lua` waits for the layout to hold
+still (250 ms, restarted by each arrival, removal and layout change) and then
+reconciles once, whether the dock brought or took one screen or two; a window
+opening or closing never changes which screen owns which block. The output
+Hyprland adds while no screen is plugged in (`FALLBACK`) holds no position. The screens
 file is written after the workspaces have moved, whole, so the bar never maps
 a screen to a block before the block is there.
 

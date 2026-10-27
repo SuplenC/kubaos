@@ -31,11 +31,12 @@
 --
 -- Hyprland reports a screen's arrival before it arranges the layout, so the
 -- screen still sits at 0,0 and its position can't be read yet; a dock brings
--- two screens a moment apart, and while one arrives the other can be missing
--- from the list. So an arrival only starts a short wait, restarted by every
--- layout change, and the reconcile runs once the layout has held still. The
--- mapping it computes, screen -> block, is the only one there is until the
--- next reconcile: a window opening or closing never recomputes positions.
+-- two screens a moment apart, and takes them away the same way, and while
+-- one arrives the other can be missing from the list. So an arrival or a
+-- removal only starts a short wait, restarted by every layout change, and
+-- the reconcile runs once the layout has held still. The mapping it
+-- computes, screen -> block, is the only one there is until the next
+-- reconcile: a window opening or closing never recomputes positions.
 --
 -- HAZARD: no workspace is renumbered on unplug or replug. The bar keys its
 -- cells by id, so a renumbered workspace would leave and grow back in another
@@ -157,12 +158,15 @@ local function busy_blocks()
   return busy
 end
 
--- The screens that show workspaces of their own, in block order. `gone` names
--- one Hyprland still lists while it reports the screen's removal.
-local function connected(gone)
+-- The output Hyprland adds while no real screen is plugged in (the lid closed
+-- and the dock pulled), which holds no position.
+local FALLBACK = "FALLBACK"
+
+-- The screens that show workspaces of their own, in block order.
+local function connected()
   local monitors = {}
   for _, monitor in ipairs(hl.get_monitors()) do
-    if not monitor.is_mirror and monitor.name ~= gone then
+    if not monitor.is_mirror and monitor.name ~= FALLBACK then
       monitors[#monitors + 1] = monitor
     end
   end
@@ -171,8 +175,8 @@ end
 
 -- The screens plugged in now and the block each was last mapped to; a screen
 -- that arrived since the last reconcile has none yet.
-local function mapping(gone)
-  local monitors = connected(gone)
+local function mapping()
+  local monitors = connected()
   local by_connector = {}
   for _, monitor in ipairs(monitors) do
     by_connector[monitor.name] = current[monitor.name]
@@ -246,8 +250,11 @@ end
 
 -- Keep workspace `id` on `connector`; `present` is the set of connectors
 -- plugged in. Hyprland merges `hl.workspace_rule` into the enabled rule for
--- the workspace, if there is one, and its refresh then moves the workspace to
--- the screen the rule names.
+-- the workspace, if there is one. It applies the rules on the next turn of
+-- its event loop, after the handler that changed them, so only the rules as
+-- they stand at the end of a handler count; it then creates or moves each
+-- persistent workspace to the screen its rule names, and passes over a rule
+-- naming a screen it can't find.
 local function keep(id, connector, present)
   local held = rules[id] or {}
   rules[id] = held
@@ -260,8 +267,7 @@ local function keep(id, connector, present)
     -- Enabling one naming another screen would move the workspace there.
     held[connector]:set_enabled(true)
   else
-    -- A released rule naming a screen that is gone can be enabled, since
-    -- Hyprland passes over a rule whose screen it can't find, and then merged
+    -- A released rule naming a screen that is gone can be enabled and merged
     -- into, so the workspace keeps one rule.
     local stale = nil
     for name in pairs(held) do
@@ -289,9 +295,9 @@ end
 
 -- Bring Hyprland's persistent workspaces in line with `workspace_blocks.kept`
 -- for `monitors` mapped by `by_connector`.
--- HAZARD: release before keeping. Hyprland moves a persistent workspace to the
--- screen its rule names, so a rule left naming a screen a workspace is leaving
--- would pull it back there.
+-- HAZARD: release before keeping. Once the handler ends Hyprland moves every
+-- persistent workspace to the screen its rule names, so a rule left naming a
+-- screen a workspace is leaving would pull it back there.
 local function sync_kept_on(monitors, by_connector)
   local screens = {}
   for _, monitor in ipairs(monitors) do
@@ -332,11 +338,11 @@ end
 
 -- Point the rule of each kept workspace whose group is about to change screens
 -- at the screen it is going to: the one now at its position, or the primary
--- screen to wait there. Hyprland's refresh moves it there at once.
--- HAZARD: run it before any workspace moves. Every rule change makes Hyprland
--- apply every enabled rule again, so a rule still naming the old screen would
--- pull a workspace already moved back there. Before the moves, each old rule
--- names the screen its workspace is still on, or one that is gone.
+-- screen to wait there, so that when Hyprland applies the rules after this
+-- handler, each names the screen the workspace is on by then.
+-- HAZARD: every kept workspace that moves needs its rule pointed at where it
+-- goes, in the same handler as the move. A rule still naming the old screen
+-- would pull the workspace back there once the handler ends.
 local function repoint_moving(monitors, by_connector)
   local connector_of = {}
   for connector, block in pairs(by_connector) do
@@ -609,10 +615,10 @@ end
 
 -- Put every workspace whose screen is plugged in back on it, and every screen
 -- on a workspace of its own. `added` is the set of screens that just arrived,
--- which leave whatever Hyprland put them on; `gone` names one being removed.
-function M.reconcile(added, gone)
+-- which leave whatever Hyprland put them on.
+function M.reconcile(added)
   added = added or {}
-  local monitors = connected(gone)
+  local monitors = connected()
   if #monitors == 0 then
     return
   end
@@ -714,7 +720,7 @@ function M.reconcile(added, gone)
   if changed then
     if focused_window and hl.get_window("address:" .. focused_window.address) then
       hl.dispatch(hl.dsp.focus({ window = "address:" .. focused_window.address }))
-    elseif focused_name and focused_name ~= gone and hl.get_monitor(focused_name) then
+    elseif focused_name and hl.get_monitor(focused_name) then
       hl.dispatch(hl.dsp.focus({ monitor = focused_name }))
     end
   end
@@ -801,16 +807,12 @@ hl.on("monitor.layout_changed", function()
   settle_later()
 end)
 
--- Hyprland has moved the screen's workspaces elsewhere by now, so the
--- reconcile runs at once, unless screens are still arriving: then it waits
--- with them, and by the time it runs the screen is off the list.
+-- A dock's two screens go one at a time, like they come. Reconciling on the
+-- first removal would shift the other screen's position for a moment and move
+-- every group twice, so a removal waits like an arrival; by the time the
+-- reconcile runs the screen is off the list.
 hl.on("monitor.removed", function(monitor)
-  local name = monitor and monitor.name
-  if pending then
-    settle_later(nil, name)
-  else
-    M.reconcile(nil, name)
-  end
+  settle_later(nil, monitor and monitor.name)
 end)
 
 -- A window arriving on a workspace or leaving it moves where its group ends.
