@@ -2238,6 +2238,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "kubaos-design"
+version = "0.1.0"
+dependencies = [
+ "kubaos-geometry",
+ "kubaos-tokens",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "toml 0.9.12+spec-1.1.0",
+]
+
+[[package]]
 name = "kubaos-files"
 version = "0.1.0"
 dependencies = [
@@ -2245,6 +2258,14 @@ dependencies = [
  "kubaos-user-layer",
  "tempfile",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "kubaos-geometry"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
