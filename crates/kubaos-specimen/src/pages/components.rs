@@ -19,6 +19,7 @@ use kubaos_ui::component::chip::ChipKind;
 use kubaos_ui::component::chip::chip;
 use kubaos_ui::component::dialog::Tone;
 use kubaos_ui::component::dialog::dialog;
+use kubaos_ui::component::dialog::prompt;
 use kubaos_ui::component::dialog::scrim;
 use kubaos_ui::component::empty::empty_state;
 use kubaos_ui::component::error::Level;
@@ -87,7 +88,12 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             Some("Picked cards take the accent, so their focus ring is the cold one."),
             cards(look),
         ))
-        .push(section(look, "Dialogs", Some("A question, and the confirmation before something is destroyed."), dialogs(look)))
+        .push(section(
+            look,
+            "Dialogs",
+            Some("A question, the confirmation before something is destroyed, and a prompt for what only you can type."),
+            dialogs(look),
+        ))
         .push(section(look, "Toasts and progress", None, progress(look)))
         .push(section(look, "Empty states", None, empties(look)))
         .push(section(look, "Errors", Some("What broke, what to do next, and the log behind it."), errors(look)))
@@ -382,10 +388,23 @@ fn lists<'a>(look: &Look) -> Element<'a, Message> {
             .on_press(Message::Sample)
             .view(look),
     ];
+    let power = vec![
+        list_row("Reboot")
+            .icon(Icon::RestartAlt)
+            .on_press(Message::Sample)
+            .view(look),
+        list_row("Shut down")
+            .icon(Icon::PowerSettingsNew)
+            .danger()
+            .selected(true)
+            .on_press(Message::Sample)
+            .view(look),
+    ];
     grid(look, 3, Space::S24)
         .push(list(look, rows(look), false))
         .push(list(look, two_line, true))
         .push(empty_list(look, "Nothing matches. Typo?"))
+        .push(list(look, power, false))
         .into()
 }
 
@@ -503,12 +522,37 @@ fn dialogs<'a>(look: &Look) -> Element<'a, Message> {
             .on_press(Message::Sample)
             .view(look)],
     );
+    let asking = prompt(
+        look,
+        Icon::AdminPanelSettings,
+        "Authentication required",
+        "Installing btop needs your password.",
+        labelled(
+            look,
+            "Password for Kuba",
+            None,
+            field("hunter", "")
+                .icon(Icon::Key)
+                .secret()
+                .state(State::Invalid)
+                .on_input(|_| Message::Typed)
+                .on_submit(Message::Sample)
+                .view(look),
+            Some(note(look, "That didn't work. Fat fingers? Try again.", true)),
+        ),
+        Some(button("Cancel").kind(Kind::Text).on_press(Message::Sample).view(look)),
+        [button("Authenticate").on_press(Message::Sample).view(look)],
+    );
     let stage = |d: Element<'a, Message>| -> Element<'a, Message> {
         widget::container(scrim(look, d))
             .height(Length::Fixed(f32::from(Size::Column.px() / 2 + Space::S64.px())))
             .into()
     };
-    grid(look, 2, Space::S24).push(stage(normal)).push(stage(danger)).into()
+    grid(look, 2, Space::S24)
+        .push(stage(normal))
+        .push(stage(danger))
+        .push(stage(asking))
+        .into()
 }
 
 fn progress<'a>(look: &Look) -> Element<'a, Message> {

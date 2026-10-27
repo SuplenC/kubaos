@@ -448,6 +448,20 @@ K.Stack {
                         K.EmptyList {
                             text: "Nothing matches. Typo?"
                         }
+
+                        K.List {
+                            K.ListRow {
+                                title: "Reboot"
+                                icon: "restart_alt"
+                            }
+
+                            K.ListRow {
+                                title: "Shut down"
+                                icon: "power_settings_new"
+                                danger: true
+                                selected: true
+                            }
+                        }
                     }
                 }
 
@@ -548,7 +562,7 @@ K.Stack {
 
                 K.Section {
                     title: "Dialogs"
-                    description: "A question, and the confirmation before something is destroyed."
+                    description: "A question, the confirmation before something is destroyed, and a prompt for what only you can type."
 
                     K.Grid {
                         columns: 2
@@ -604,6 +618,40 @@ K.Stack {
                                         icon: "warning"
                                     }
                                 ]
+                            }
+                        }
+
+                        K.Scrim {
+                            implicitHeight: K.Tokens.size.column / 2 + K.Tokens.space.s64
+
+                            K.Dialog {
+                                // A picture of a dialog: it leaves the keyboard where it is.
+                                takesFocus: false
+                                icon: "admin_panel_settings"
+                                title: "Authentication required"
+                                body: "Installing btop needs your password."
+                                dismiss: K.Button {
+                                    text: "Cancel"
+                                    kind: "Text"
+                                }
+                                actions: [
+                                    K.Button {
+                                        text: "Authenticate"
+                                    }
+                                ]
+
+                                K.Labelled {
+                                    label: "Password for Kuba"
+                                    note: "That didn't work. Fat fingers? Try again."
+                                    invalid: true
+
+                                    K.Field {
+                                        text: "hunter"
+                                        icon: "key"
+                                        secret: true
+                                        status: "Invalid"
+                                    }
+                                }
                             }
                         }
                     }

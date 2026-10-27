@@ -54,6 +54,7 @@ pub struct Field<'a, M> {
     focused: bool,
     id: Option<widget::Id>,
     on_input: Option<Box<dyn Fn(String) -> M + 'a>>,
+    on_submit: Option<M>,
 }
 
 impl<M> fmt::Debug for Field<'_, M> {
@@ -80,6 +81,7 @@ pub fn field<'a, M>(value: &'a str, placeholder: &'a str) -> Field<'a, M> {
         focused: false,
         id: None,
         on_input: None,
+        on_submit: None,
     }
 }
 
@@ -122,6 +124,15 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
     pub fn on_input(self, on_input: impl Fn(String) -> M + 'a) -> Self {
         Field {
             on_input: Some(Box::new(on_input)),
+            ..self
+        }
+    }
+
+    /// What Enter in the field sends: what was typed is done, as the action it answers would do.
+    #[must_use]
+    pub fn on_submit(self, on_submit: M) -> Self {
+        Field {
+            on_submit: Some(on_submit),
             ..self
         }
     }
@@ -186,6 +197,11 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
             && let Some(on_input) = self.on_input
         {
             input = input.on_input(on_input);
+        }
+        if self.state != State::Locked
+            && let Some(on_submit) = self.on_submit
+        {
+            input = input.on_submit(on_submit);
         }
         let Some(glyph) = self.icon else {
             let view: Element<'a, M> = focus_ring(look, input, Radius::Control, focused, RingColor::Accent);

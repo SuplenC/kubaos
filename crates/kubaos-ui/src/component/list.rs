@@ -55,6 +55,7 @@ pub struct ListRow<'a, M> {
     detail: Option<&'a str>,
     icon: Option<Icon>,
     selected: bool,
+    danger: bool,
     checked: Option<bool>,
     on_press: Option<M>,
 }
@@ -67,6 +68,7 @@ pub fn list_row<M>(title: &str) -> ListRow<'_, M> {
         detail: None,
         icon: None,
         selected: false,
+        danger: false,
         checked: None,
         on_press: None,
     }
@@ -105,6 +107,13 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         ListRow { selected, ..self }
     }
 
+    /// A row whose action can't be taken back (Shut down): selected, it takes the error colour
+    /// instead of the secondary container.
+    #[must_use]
+    pub fn danger(self) -> Self {
+        ListRow { danger: true, ..self }
+    }
+
     /// A check mark at the end when picked; the room for it is kept when not, so the rows' ends
     /// line up.
     #[must_use]
@@ -131,7 +140,13 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         };
         let variant = [lines, if self.icon.is_some() { "icon" } else { "" }, ""];
         let c = look.colors;
-        let (fill_colour, main, muted) = if self.selected {
+        let (fill_colour, main, muted) = if self.selected && self.danger {
+            (
+                Some(c.error),
+                c.on_error,
+                color::alpha(c.on_error, Opacity::Subdued.value()),
+            )
+        } else if self.selected {
             (
                 Some(c.secondary_container),
                 c.on_secondary_container,

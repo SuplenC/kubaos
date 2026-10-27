@@ -8,6 +8,8 @@ K.Stack {
 
     property string text
     property bool invalid: false
+    // Lines centred on one another, under a centred field (the lock screen's); left otherwise.
+    property bool centred: false
 
     probe: ({
             role: "component",
@@ -23,5 +25,6 @@ K.Stack {
         text: root.text
         style: Tokens.type.small
         color: root.invalid ? Tokens.color.error : Tokens.color.on_surface_variant
+        horizontalAlignment: root.centred ? Text.AlignHCenter : Text.AlignLeft
     }
 }

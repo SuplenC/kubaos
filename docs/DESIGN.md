@@ -303,7 +303,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 | Name | Rust | What |
 |---|---|---|
 | `List` | `list::list` | Rows in a well: the surface radius (24), padding 12, rows 4 apart, so the rows take 24 − 12 = 12, the control radius (concentric). The focus ring goes round the well; the row shows where the keyboard is. |
-| `ListRow` | `list::list_row(title)` | 44 tall with one line (`row`), 56 with a subtitle (`row_two_line`). Padding 12, a 20 icon, the title in `body_strong`, subtitle in `small`, a detail in `mono` at the end, an optional check whose room is kept when unchecked so row ends line up. The selected row takes `secondary_container`. |
+| `ListRow` | `list::list_row(title)` | 44 tall with one line (`row`), 56 with a subtitle (`row_two_line`). Padding 12, a 20 icon, the title in `body_strong`, subtitle in `small`, a detail in `mono` at the end, an optional check whose room is kept when unchecked so row ends line up. The selected row takes `secondary_container`, or `error` on a row whose action can't be taken back (Shut down). |
 | `EmptyList` | `list::empty_list` | The well with nothing in it: one centred line. |
 | `Chip` | `chip::chip` | A short fact or pick, 24 tall (`chip`) at the control radius, 12, which on a chip is a pill, `label` type, an optional 16 icon 4 from the label, an optional close. Its left side pads 12, or 8 with an icon; its right pads 12, or nothing when the close button (a 24 circle) ends it. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview). |
 | `Card` | `card::card` | A surface inside the page: the well's surface, a soft hairline, the surface radius (24), 16 inside. |
@@ -313,7 +313,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 
 | Name | Rust | What |
 |---|---|---|
-| `Dialog` | `dialog::dialog` | A question over a dimmed screen: one width (500, `dialog`), padding 32, the surface radius (24), the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under it, the buttons 32 under that: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. |
+| `Dialog` | `dialog::dialog`, `dialog::prompt` | A question over a dimmed screen: one width (500, `dialog`), padding 32, the surface radius (24), the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under it, the buttons 32 under the last: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. A prompt asks for something only the user can type (a password): a `Normal` dialog with a `Labelled` field 16 under the body, Enter in the field doing what its action does. In QML it is a `Dialog` with the field as its child. |
 | `Scrim` | `dialog::scrim` | Everything behind a dialog, dimmed (`opacity.scrim`). |
 | `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, the surface radius (24), which on one line is a pill. It arrives over `short` and leaves over `medium` (`standard_accel`). *Not enforced yet in iced: lands in #148 (`toast` is static today).* |
 | `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work over `short` on the `linear` curve. *Not enforced yet in iced: lands in #148 (the bar jumps today).* |
@@ -358,7 +358,7 @@ A new surface implements the whole map, not the keys it happens to need. Today n
 - **Always visible.** The focused control draws the focus ring: 4 outside the control (`focus.offset`), concentric (the control's radius plus 4), its outer stroke `stroke.thin` rounded to whole device pixels. It is the accent, or the cold accent on a `ChoiceCard`, where the accent already means picked.
 - **Focus never moves layout.** The ring takes no space; a focused control is the same box as a resting one. The geometry check compares them.
 - **One place at a time.** The app owns where focus is and passes it to components as a flag; a list shows its focused row by its own selection, and the ring goes round the list.
-- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it, onto its last action unless it names another (a `Danger` dialog starts on Cancel); closing it puts focus back where it was, and Esc closes it as its dismiss button does. *Not enforced yet in iced: lands in #148.*
+- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it, onto its last action unless it names another (a `Danger` dialog starts on Cancel, a prompt in its field); Tab goes round its field and buttons and never leaves it; closing it puts focus back where it was, and Esc closes it as its dismiss button does. *Not enforced yet in iced: lands in #148.*
 - Focus moves over `short` with `standard`: the ring fades out of one control and into the next. *Not enforced yet in iced: lands in #148; the ring jumps there today.*
 
 ### Scaling

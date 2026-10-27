@@ -5,7 +5,7 @@ import KubaOS.Components as K
 // 12 inside, a 20 icon, the title in `body_strong`, the subtitle in `small`, a detail in `mono` at
 // the end, and an optional check whose room is kept when unchecked, so the rows' ends line up.
 // Its corners are concentric inside the list's well. The selected row takes the secondary
-// container.
+// container, or the error colour on a row whose action can't be taken back (`danger`).
 K.Pressable {
     id: root
 
@@ -16,13 +16,16 @@ K.Pressable {
     property string icon: ""
     // The row the keyboard is on, or the one picked in a list of one.
     property bool selected: false
+    // Its action can't be taken back (Shut down).
+    property bool danger: false
     // Whether the row shows a check at its end, and whether it is ticked.
     property bool checkable: false
     property bool checked: false
 
     readonly property bool fillWidth: true
-    readonly property color main: root.selected ? Tokens.color.on_secondary_container : Tokens.color.on_surface
-    readonly property color muted: root.selected ? K.Look.alpha(Tokens.color.on_secondary_container, Tokens.opacity.subdued) : Tokens.color.on_surface_variant
+    readonly property color onFill: root.danger ? Tokens.color.on_error : Tokens.color.on_secondary_container
+    readonly property color main: root.selected ? root.onFill : Tokens.color.on_surface
+    readonly property color muted: root.selected ? K.Look.alpha(root.onFill, Tokens.opacity.subdued) : Tokens.color.on_surface_variant
     readonly property var probe: ({
             role: "component",
             name: "ListRow",
@@ -40,7 +43,7 @@ K.Pressable {
     Rectangle {
         anchors.fill: parent
         radius: K.Look.nested(Tokens.radius.surface, Tokens.space.s12)
-        color: root.selected ? Tokens.color.secondary_container : "transparent"
+        color: !root.selected ? "transparent" : root.danger ? Tokens.color.error : Tokens.color.secondary_container
 
         K.StateLayer {
             radius: parent.radius
