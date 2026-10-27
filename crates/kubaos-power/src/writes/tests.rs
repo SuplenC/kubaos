@@ -322,3 +322,44 @@ fn a_knob_the_helper_cant_read_fails_alone_and_the_rest_are_written() {
     assert!(said.contains("couldn't read"), "{said}");
     assert_eq!(root.read("sys/module/pcie_aspm/parameters/policy"), "powersave");
 }
+
+#[test]
+fn the_helper_names_the_knobs_it_couldnt_set_on_stdout() {
+    let root = FakeRoot::laptop();
+    let script = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../system/files/power/kubaos-power-write"
+    );
+
+    let output = std::process::Command::new("bash")
+        .arg(script)
+        .args(["aspm=turbo", "gpu-dpm=card1:low", "fans=max"])
+        .env("KUBAOS_POWER_ROOT", root.dir.path())
+        .output()
+        .expect("run the helper");
+
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "failed aspm=turbo\nfailed fans=max\n"
+    );
+    assert_eq!(output.status.code(), Some(1));
+}
+
+#[test]
+fn a_refused_knob_is_left_alone_until_the_stop_changes() {
+    let root = FakeRoot::laptop();
+    let plan = Plan::for_stop(Stop::SuperSaver, &Settings::default());
+    let writes = || for_plan(&plan, &Settings::default(), &root.machine(), &|_| Some(true));
+    let mut refused = Refused::default();
+
+    refused.record("failed aspm=powersupersave\nfailed aspm=powersupersave\n");
+
+    let left: Vec<String> = refused.filter(writes()).iter().map(Write::arg).collect();
+    assert!(!left.contains(&"aspm=powersupersave".to_owned()), "{left:?}");
+    assert!(left.contains(&"gpu-dpm=card1:low".to_owned()));
+    assert_eq!(refused.args(), ["aspm=powersupersave"]);
+
+    refused.clear();
+    let again: Vec<String> = refused.filter(writes()).iter().map(Write::arg).collect();
+    assert!(again.contains(&"aspm=powersupersave".to_owned()));
+}

@@ -95,6 +95,15 @@ pub fn read(settings: &Settings, problem: Option<&str>, machine: &Machine) -> No
     {
         let _ = write!(header, " (the low-battery drop, from {from})");
     }
+    if let Some(refused) = published.as_ref().map(|published| &published.refused)
+        && !refused.is_empty()
+    {
+        let _ = write!(
+            header,
+            "\nThe kernel refused {}; asked again at the next stop",
+            refused.join(", ")
+        );
+    }
     if let Some(problem) = problem {
         let _ = write!(header, "\n{problem}; KubaOS's defaults apply");
     }

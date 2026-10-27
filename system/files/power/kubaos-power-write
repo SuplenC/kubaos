@@ -26,8 +26,8 @@
 # exist where the kernel lists it, and a value already in place is left alone.
 # Input and security devices (a HID or smart card interface, Yubico's vendor
 # id) and audio devices are never set to autosuspend, whatever it is asked.
-# A knob that fails is said on stderr and the rest still run; the exit is 1
-# when any failed, 2 for a usage error.
+# A knob that fails is said on stderr, named on stdout (`failed KNOB=VALUE`),
+# and the rest still run; the exit is 1 when any failed, 2 for a usage error.
 set -euo pipefail
 
 # KUBAOS_POWER_ROOT points the writes at a fake /sys (the tests,
@@ -167,8 +167,12 @@ for arg in "$@"; do
   [[ $arg == *=* ]] || { usage >&2; exit 2; }
 done
 
+# Each knob that fails is named on stdout as `failed KNOB=VALUE`, so the
+# service leaves it alone until the stop changes.
 for arg in "$@"; do
   value="${arg#*=}"
+  failed_before="$failed"
+  failed=0
   case "${arg%%=*}" in
     cpu-max) cpu_max "$value" ;;
     gpu-dpm) gpu_dpm "$value" ;;
@@ -180,5 +184,7 @@ for arg in "$@"; do
     charge-end) charge_end "$value" ;;
     *) fail "${arg%%=*} isn't a knob" ;;
   esac
+  ((failed)) && printf 'failed %s\n' "$arg"
+  ((failed_before)) && failed=1
 done
 exit "$failed"

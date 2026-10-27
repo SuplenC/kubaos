@@ -585,6 +585,8 @@ struct Service {
     panel: Option<String>,
     /// The helper is missing or refused; said once, not at every stop.
     helper_said: bool,
+    /// The knobs the kernel refused for the stop in use.
+    refused: writes::Refused,
 }
 
 impl Service {
@@ -609,6 +611,7 @@ impl Service {
             recheck: Recheck::default(),
             panel: None,
             helper_said: false,
+            refused: writes::Refused::default(),
         }
     }
 
@@ -746,6 +749,8 @@ impl Service {
     /// Puts every row of `stop` to work: what shows first (the shell, the panel), then the rest.
     fn apply(&mut self, stop: Stop) {
         let plan = Plan::for_stop(stop, &self.settings);
+        // A new stop, or new settings, asks the kernel again.
+        self.refused.clear();
         self.publish();
         self.apply_panel(&plan);
         Self::quiet(plan.quiet_background);
@@ -757,7 +762,12 @@ impl Service {
     fn write_plan(&mut self) {
         let Some(control) = &self.control else { return };
         let plan = Plan::for_stop(control.stop(), &self.settings);
-        let writes = writes::for_plan(&plan, &self.settings, &self.machine, &live::wifi_power_save);
+        let writes = self.refused.filter(writes::for_plan(
+            &plan,
+            &self.settings,
+            &self.machine,
+            &live::wifi_power_save,
+        ));
         if !writes.is_empty() {
             self.write(&writes);
         }
@@ -846,6 +856,8 @@ impl Service {
                 for line in said.lines().filter(|line| !line.trim().is_empty()) {
                     eprintln!("kubaos-power: {line}");
                 }
+                self.refused.record(&String::from_utf8_lossy(&output.stdout));
+                self.publish();
             }
             Err(err) => eprintln!("kubaos-power: couldn't run pkexec: {err}"),
         }
@@ -878,7 +890,8 @@ impl Service {
     fn publish(&self) {
         let Some(control) = &self.control else { return };
         let quiet = Plan::for_stop(control.stop(), &self.settings).quiet_background;
-        let published = Published::new(control.stop(), control.source(), control.dropped_from(), quiet);
+        let mut published = Published::new(control.stop(), control.source(), control.dropped_from(), quiet);
+        published.refused = self.refused.args().to_vec();
         let path = self.runtime.join(runtime::FILE);
         if Published::load(&path).as_ref() == Some(&published) {
             return;

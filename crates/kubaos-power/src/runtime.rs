@@ -46,6 +46,9 @@ pub struct Published {
     /// The service's process.
     #[serde(default)]
     pub pid: u32,
+    /// The knobs the kernel refused for this stop, as the helper's arguments: `aspm=powersupersave`.
+    #[serde(default)]
+    pub refused: Vec<String>,
 }
 
 impl Published {
@@ -58,6 +61,7 @@ impl Published {
             dropped_from: dropped_from.map(|stop| stop.id().to_owned()),
             quiet,
             pid: std::process::id(),
+            refused: Vec::new(),
         }
     }
 

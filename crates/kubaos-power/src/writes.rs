@@ -74,6 +74,46 @@ impl Write {
     }
 }
 
+/// The knobs the kernel refused for the stop in use, which the service leaves alone until the stop
+/// changes: firmware that keeps ASPM for itself refuses every policy, and asking again at each
+/// recheck would run pkexec for nothing.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Refused {
+    args: Vec<String>,
+}
+
+impl Refused {
+    /// Takes the helper's stdout, whose `failed KNOB=VALUE` lines name the knobs it couldn't set.
+    pub fn record(&mut self, helper_stdout: &str) {
+        for arg in helper_stdout
+            .lines()
+            .filter_map(|line| line.trim().strip_prefix("failed "))
+        {
+            if !self.args.iter().any(|known| known == arg) {
+                self.args.push(arg.to_owned());
+            }
+        }
+    }
+
+    /// Forgets them, for a new stop or new settings.
+    pub fn clear(&mut self) {
+        self.args.clear();
+    }
+
+    /// `writes` without the refused ones.
+    pub fn filter(&self, writes: Vec<Write>) -> Vec<Write> {
+        writes
+            .into_iter()
+            .filter(|write| !self.args.contains(&write.arg()))
+            .collect()
+    }
+
+    /// The refused knobs, as the helper's arguments.
+    pub fn args(&self) -> &[String] {
+        &self.args
+    }
+}
+
 /// Whether `device` autosuspends under `plan`: never an input device or one on the user's skip
 /// list, whatever the stop.
 pub fn autosuspends(device: &UsbDevice, plan: &Plan, settings: &Settings) -> bool {

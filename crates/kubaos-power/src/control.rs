@@ -290,18 +290,24 @@ impl Control {
 /// replug or a screen's arrival is a burst of uevents, and power-profiles-daemon puts the GPU back
 /// to `auto` on each.
 pub const RECHECK: Duration = Duration::from_secs(1);
+/// The longest a recheck waits from the first event, however many follow: a device that sends
+/// events nonstop can't put it off for ever.
+pub const RECHECK_AT_MOST: Duration = Duration::from_secs(5);
 
 /// A check of the stop's writes, after devices came or power-profiles-daemon acted: once the burst
-/// of events has been quiet for [`RECHECK`].
+/// of events has been quiet for [`RECHECK`], or [`RECHECK_AT_MOST`] after its first event.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Recheck {
     due: Option<Instant>,
+    /// The first event of the burst.
+    since: Option<Instant>,
 }
 
 impl Recheck {
     /// Something changed at `now`.
     pub fn ask(&mut self, now: Instant) {
-        self.due = Some(now + RECHECK);
+        let since = *self.since.get_or_insert(now);
+        self.due = Some((now + RECHECK).min(since + RECHECK_AT_MOST));
     }
 
     /// Whether the check is due by `now`, once.
@@ -309,6 +315,7 @@ impl Recheck {
         match self.due {
             Some(due) if now >= due => {
                 self.due = None;
+                self.since = None;
                 true
             }
             _ => false,

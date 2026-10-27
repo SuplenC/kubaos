@@ -456,3 +456,20 @@ fn a_burst_of_device_events_is_checked_once_after_it_goes_quiet() {
     assert!(!recheck.due(start + Duration::from_secs(5)));
     assert_eq!(recheck.wait(start), None);
 }
+
+#[test]
+fn a_device_that_never_goes_quiet_is_checked_after_5_seconds_at_most() {
+    let start = Instant::now();
+    let mut recheck = Recheck::default();
+    let mut checked = Vec::new();
+
+    for tenth in 0..120u32 {
+        let now = start + Duration::from_millis(u64::from(tenth) * 100);
+        if recheck.due(now) {
+            checked.push(tenth);
+        }
+        recheck.ask(now);
+    }
+
+    assert_eq!(checked, [50, 100]);
+}
