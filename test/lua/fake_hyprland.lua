@@ -9,7 +9,8 @@
 -- A screen arrives as Hyprland brings one: `monitor.added` fires while it
 -- still sits at 0,0, the layout is arranged afterwards and
 -- `monitor.layout_changed` fires, and timers run only when the test lets
--- them (`settle()`). `events` lists the socket events a move or a renumber
+-- them (`settle()`). Focus moving to a screen fires `monitor.focused`, as
+-- Hyprland's does. `events` lists the socket events a move or a renumber
 -- would send the bar, in order.
 
 local F = {}
@@ -56,6 +57,17 @@ end
 function F:fire(event, ...)
   for _, handler in ipairs(self.handlers[event] or {}) do
     handler(...)
+  end
+end
+
+-- Focus moves to a screen, and `monitor.focused` fires when it is another.
+function F:set_focused(record)
+  if record == self.focused then
+    return
+  end
+  self.focused = record
+  if record then
+    self:fire("monitor.focused", self:monitor_object(record))
   end
 end
 
@@ -259,7 +271,7 @@ end
 function F:focus_workspace(id)
   local record = self:workspace_record(id)
   if record then
-    self.focused = record.monitor
+    self:set_focused(record.monitor)
   else
     record = self:create(id, self.focused)
   end
@@ -283,14 +295,14 @@ function F:apply(action)
   local kind, args = action.kind, action.args
   if kind == "focus" then
     if args.monitor then
-      self.focused = self:select_monitor(args.monitor) or self.focused
+      self:set_focused(self:select_monitor(args.monitor) or self.focused)
     elseif args.workspace then
       self:focus_workspace(tonumber(args.workspace))
     elseif args.window then
       local address = args.window:gsub("^address:", "")
       for _, window in ipairs(self.windows) do
         if window.address == address then
-          self.focused = window.workspace.monitor
+          self:set_focused(window.workspace.monitor)
           window.workspace.monitor.active = window.workspace
         end
       end
@@ -449,7 +461,8 @@ end
 
 -- Hyprland moves the screen's workspaces to the first other screen in its
 -- list (`backup` names another), and when the screen had focus, shows the
--- workspace it showed on the backup; then fires `monitor.removed` while it
+-- workspace it showed on the backup and focuses the backup, with the
+-- screen's own view already cleared; then fires `monitor.removed` while it
 -- still lists the screen, and takes it off the list.
 function F:detach(name, backup_name)
   local record = self:monitor_record(name)
@@ -470,7 +483,7 @@ function F:detach(name, backup_name)
   record.active = nil
   record.removing = true
   if self.focused == record then
-    self.focused = backup
+    self:set_focused(backup)
   end
   self:cleanup()
   self:fire("monitor.removed", self:monitor_object(record))
@@ -521,7 +534,7 @@ function F:close_window(window)
 end
 
 function F:focus_monitor(name)
-  self.focused = self:monitor_record(name)
+  self:set_focused(self:monitor_record(name))
 end
 
 -- The ids on a screen, in order.

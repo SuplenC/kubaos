@@ -955,6 +955,45 @@ test("unplugging the focused screen leaves the screen Hyprland backs up to on it
   same(world:ids_on("eDP-1"), { 1, 2, 3, 31, 32, 33, 34, 35 }, "the group waits on the laptop")
 end)
 
+-- Regression: the panel was sent to its workspace 1 whenever any screen
+-- went, though Hyprland changes its view only when the screen that went had
+-- focus.
+test("unplugging an unfocused screen leaves the panel on the empty workspace it chose", function()
+  local world, module = two_screens()
+  world:open_window()
+  run(module.focus(5))
+
+  world:detach("DP-1")
+  same(world:shown_on("eDP-1"), 5, "still there")
+  world:settle()
+  same(world:shown_on("eDP-1"), 5, "and after the wait")
+end)
+
+test("unplugging an unfocused screen leaves the panel on the guest it chose", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(1))
+  world:open_window()
+  run(module.go_to(11, "eDP-1"))
+
+  world:detach("DP-1")
+  same(world:shown_on("eDP-1"), 11, "still there")
+  world:settle()
+  same(world:shown_on("eDP-1"), 11, "and after the wait")
+end)
+
+test("focus moved from a screen by hand doesn't count as the move its removal makes", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  world:focus_monitor("eDP-1")
+  world:open_window()
+  run(module.focus(5))
+
+  world:detach("DP-1")
+
+  same(world:shown_on("eDP-1"), 5, "still there")
+end)
+
 test("moving a workspace to a screen that arrived within the wait joins that screen's block", function()
   local world, module = two_screens()
   world:focus_monitor("DP-1")

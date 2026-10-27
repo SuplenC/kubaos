@@ -823,27 +823,36 @@ hl.on("monitor.layout_changed", function()
   settle_later()
 end)
 
--- Hyprland has moved the screen's workspaces to another screen by now, and
--- when the screen had focus, shows the workspace it showed on that screen,
--- which has the focus now, or the empty one it parked the gone screen on.
--- That screen goes back to one of its own at once, before anything is drawn,
--- rather than switching twice in view. A waiting group's workspace it showed
--- by choice is not of the gone screen's block and has windows, and stays.
-local function leave_foreign(gone)
-  local block = current[gone]
-  local monitors, by_connector = mapping()
-  for _, monitor in ipairs(monitors) do
-    local own = by_connector[monitor.name]
-    local active = monitor.active_workspace
-    if monitor.name ~= gone and own and monitor.focused and regular(active) then
-      local empty = (active.windows or 0) == 0
-      local foreign = block_of(active.id) ~= own
-      local brought = foreign and (block == nil or block_of(active.id) == block or empty)
-      local parked = empty and not kept[active.id]
-      if brought or parked then
-        show(monitor, home(monitor, own))
-      end
-    end
+-- The screen focus left as it was being removed, from the `monitor.focused`
+-- Hyprland sends for the screen it backs up to, before `monitor.removed`:
+-- only then does it show what the removed screen showed on the backup. A
+-- screen being removed is still listed but has no workspace in view any
+-- more, which tells that focus move from one the user made.
+local focused_name, left_on_removal = nil, nil
+
+hl.on("monitor.focused", function(monitor)
+  local previous = focused_name
+  focused_name = monitor and monitor.name
+  local record = previous and previous ~= focused_name and hl.get_monitor(previous)
+  left_on_removal = record and not record.active_workspace and previous or nil
+end)
+
+-- Hyprland has moved the removed screen's workspaces to `backup` by now and,
+-- as the removed screen had focus, shows there the workspace it showed, or
+-- an empty one it parked it on. The backup goes back to one of its own at
+-- once, before anything is drawn, rather than switching twice in view.
+local function leave_foreign(backup)
+  local _, by_connector = mapping()
+  local monitor = hl.get_monitor(backup)
+  local own = monitor and by_connector[backup]
+  local active = own and monitor.active_workspace
+  if not regular(active) then
+    return
+  end
+  local foreign = block_of(active.id) ~= own
+  local parked = (active.windows or 0) == 0 and not kept[active.id]
+  if foreign or parked then
+    show(monitor, home(monitor, own))
   end
 end
 
@@ -853,9 +862,10 @@ end
 -- reconcile runs the screen is off the list.
 hl.on("monitor.removed", function(monitor)
   local name = monitor and monitor.name
-  if name then
-    leave_foreign(name)
+  if name and left_on_removal == name then
+    leave_foreign(focused_name)
   end
+  left_on_removal = nil
   settle_later(nil, name)
 end)
 

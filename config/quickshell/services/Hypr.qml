@@ -112,7 +112,9 @@ Singleton {
                 // Should it not, the windows' read makes the object with no id
                 // yet, and the workspaces' read, served next, gives it one.
                 // The move names no active workspace for the screen it lands
-                // on, so the screens are read again too.
+                // on, so the screens are read again too. A read still in
+                // flight drops the new one; then the first's reply, served
+                // after the move's event, has what it needs.
                 Hyprland.refreshToplevels();
                 Hyprland.refreshWorkspaces();
                 Hyprland.refreshMonitors();
