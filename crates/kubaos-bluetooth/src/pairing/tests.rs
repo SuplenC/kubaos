@@ -158,7 +158,7 @@ fn a_second_pairing_of_the_same_device_waits_for_the_first() {
     let device = keyboard().path;
     hub.begin_pairing(&device);
     future::block_on(pairing.pair(&device));
-    assert!(bluez.calls().is_empty());
+    assert_eq!(bluez.calls(), [] as [std::string::String; 0]);
 }
 
 #[test]

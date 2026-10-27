@@ -80,7 +80,7 @@ fn a_set_listed_whole_is_whole_whatever_else_is_picked() {
 fn without_sets_on_disk_there_are_no_items() {
     let sets = WallpaperSets::parse(Vec::new(), Some("shinjuku\n"));
 
-    assert!(sets.items().is_empty());
+    assert_eq!(sets.items(), [] as [kotodama_protocol::Item; 0]);
 }
 
 #[test]
@@ -110,7 +110,7 @@ fn the_last_set_in_the_picker_is_not_hidden() {
     let ran = sets.run("wallpaper-set:japanese", HIDE, &runner);
 
     assert_eq!(ran, Err("At least one wallpaper set stays in the picker. Nice try".to_owned()));
-    assert!(runner.ran().is_empty());
+    assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -122,7 +122,7 @@ fn an_action_the_set_does_not_offer_is_refused() {
     assert!(sets.run("wallpaper-set:japanese", HIDE, &runner).is_err());
     assert!(sets.run("wallpaper-set:gone", SHOW, &runner).is_err());
     assert!(sets.run("shinjuku", SHOW, &runner).is_err());
-    assert!(runner.ran().is_empty());
+    assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }
 
 #[test]

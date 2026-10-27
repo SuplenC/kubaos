@@ -81,7 +81,7 @@ fn a_hidden_toggle_does_not_run() {
     let ran = extension.run(toggles::RUN, &item(toggles::KIND, "mute"), &BTreeMap::new());
 
     assert!(ran.is_err());
-    assert!(extension.runner.ran().is_empty());
+    assert_eq!(extension.runner.ran(), [] as [std::string::String; 0]);
 }
 
 #[test]

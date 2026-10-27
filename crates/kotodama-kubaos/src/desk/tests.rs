@@ -66,15 +66,14 @@ fn a_position_no_screen_holds_says_its_group_waits_and_where_it_was_last() {
 fn a_file_keyed_by_screen_gives_no_items_until_hyprland_migrates_it() {
     let desk = Desk::parse("0\teDP-1\tBOE 0x0BCA\n1\t\tDell Inc. DELL U2724D 5D6E7F8\n");
 
-    assert!(desk.items().is_empty());
+    assert_eq!(desk.items(), [] as [kotodama_protocol::Item; 0]);
 }
 
 #[test]
 fn no_screens_file_means_no_items() {
-    assert!(
+    assert_eq!(
         Desk::read(Path::new("/nonexistent/workspace-screens"))
-            .items()
-            .is_empty()
+            .items(), [] as [kotodama_protocol::Item; 0]
     );
 }
 

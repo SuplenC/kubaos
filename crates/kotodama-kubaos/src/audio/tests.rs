@@ -82,5 +82,5 @@ fn the_inputs_are_the_audio_sources_never_the_cameras() {
 
 #[test]
 fn no_pipewire_lists_no_devices() {
-    assert!(devices("", Direction::Output).is_empty());
+    assert_eq!(devices("", Direction::Output), [] as [super::Device; 0]);
 }

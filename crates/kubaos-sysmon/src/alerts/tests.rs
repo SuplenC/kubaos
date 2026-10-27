@@ -38,8 +38,8 @@ fn a_hot_cpu_fires_after_thirty_seconds_and_names_the_busiest_process() {
     let before = alerts.check(&hot(95.0), &thresholds, HOT_FOR_MS - 1);
     let after = alerts.check(&hot(95.4), &thresholds, HOT_FOR_MS);
 
-    assert!(at_start.is_empty());
-    assert!(before.is_empty());
+    assert_eq!(at_start, [] as [super::Alert; 0]);
+    assert_eq!(before, [] as [super::Alert; 0]);
     assert_eq!(after.len(), 1);
     assert_eq!(after[0].title, "CPU at 95 °C for 30 s");
     assert_eq!(after[0].body, "cc1plus uses 42 % of the CPU");
@@ -56,7 +56,7 @@ fn cooling_down_in_between_starts_the_wait_again() {
     alerts.check(&hot(60.0), &thresholds, 20_000);
     let fired = alerts.check(&hot(95.0), &thresholds, 35_000);
 
-    assert!(fired.is_empty());
+    assert_eq!(fired, [] as [super::Alert; 0]);
 }
 
 #[test]
@@ -72,8 +72,8 @@ fn an_alert_fires_once_while_its_condition_holds_and_again_only_after_a_rest() {
     let too_soon = alerts.check(&hot(95.0), &thresholds, HOT_FOR_MS * 2 + 62_000);
     let rested = alerts.check(&hot(95.0), &thresholds, HOT_FOR_MS + REPEAT_AFTER_MS);
 
-    assert!(still.is_empty());
-    assert!(too_soon.is_empty());
+    assert_eq!(still, [] as [super::Alert; 0]);
+    assert_eq!(too_soon, [] as [super::Alert; 0]);
     assert_eq!(rested.len(), 1);
 }
 
@@ -174,7 +174,7 @@ fn charging_at_a_high_rate_is_no_alert() {
 
     alerts.check(&sample, &Thresholds::default(), 0);
 
-    assert!(alerts.check(&sample, &Thresholds::default(), 60_000).is_empty());
+    assert_eq!(alerts.check(&sample, &Thresholds::default(), 60_000), [] as [super::Alert; 0]);
 }
 
 #[test]

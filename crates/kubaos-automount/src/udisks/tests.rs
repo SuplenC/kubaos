@@ -103,5 +103,5 @@ fn an_fstab_entry_marks_the_block_configured() {
 
     let block = &snapshot.blocks[0];
     assert!(block.configured);
-    assert!(block.mount_points.is_empty());
+    assert_eq!(block.mount_points, [] as [std::path::PathBuf; 0]);
 }

@@ -88,41 +88,41 @@ impl Bluez for FakeBluez {
         }
     }
 
-    async fn cancel_pairing(&self, device: &str) -> Result<(), BluezError> {
+    fn cancel_pairing(&self, device: &str) -> impl Future<Output = Result<(), BluezError>> {
         self.log("CancelPairing", device);
-        self.cancel.clone()
+        std::future::ready(self.cancel.clone())
     }
 
-    async fn set_trusted(&self, device: &str) -> Result<(), BluezError> {
+    fn set_trusted(&self, device: &str) -> impl Future<Output = Result<(), BluezError>> {
         self.log("Trust", device);
-        Ok(())
+        std::future::ready(Ok(()))
     }
 
-    async fn connect(&self, device: &str) -> Result<(), BluezError> {
+    fn connect(&self, device: &str) -> impl Future<Output = Result<(), BluezError>> {
         self.log("Connect", device);
-        Ok(())
+        std::future::ready(Ok(()))
     }
 
-    async fn paired(&self, device: &str) -> Result<bool, BluezError> {
+    fn paired(&self, device: &str) -> impl Future<Output = Result<bool, BluezError>> {
         self.log("Paired?", device);
-        Ok(self.paired)
+        std::future::ready(Ok(self.paired))
     }
 
-    async fn remove(&self, device: &str) -> Result<(), BluezError> {
+    fn remove(&self, device: &str) -> impl Future<Output = Result<(), BluezError>> {
         self.log("RemoveDevice", device);
-        Ok(())
+        std::future::ready(Ok(()))
     }
 
-    async fn start_discovery(&self, adapter: &str) -> Result<(), BluezError> {
+    fn start_discovery(&self, adapter: &str) -> impl Future<Output = Result<(), BluezError>> {
         self.log("StartDiscovery", adapter);
-        self.start.lock().unwrap().pop_front().unwrap_or(Ok(()))
+        std::future::ready(self.start.lock().unwrap().pop_front().unwrap_or(Ok(())))
     }
 
-    async fn stop_discovery(&self, adapter: &str) -> Result<(), BluezError> {
+    fn stop_discovery(&self, adapter: &str) -> impl Future<Output = Result<(), BluezError>> {
         self.log("StopDiscovery", adapter);
-        Err(BluezError::new(
+        std::future::ready(Err(BluezError::new(
             "org.bluez.Error.Failed",
             "No discovery started",
-        ))
+        )))
     }
 }

@@ -589,7 +589,7 @@ mod tests {
         // Not in any table: built from the parts.
         assert_eq!(locale_name("pl_SE.UTF-8"), "Polish (Sweden)");
         assert_eq!(locale_name("xx_YY.UTF-8"), "XX (YY)");
-        for (code, _) in tables().locales.iter() {
+        for code in tables().locales.keys() {
             assert!(!locale_name(code).is_empty());
         }
     }

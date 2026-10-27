@@ -69,7 +69,7 @@ fn no_sensor_is_no_temperature() {
     let sensors = Sensors::discover(root.path());
 
     assert_eq!(sensors.cpu_temperature(), None);
-    assert!(sensors.fans().is_empty());
+    assert_eq!(sensors.fans(), [] as [super::Fan; 0]);
 }
 
 #[test]

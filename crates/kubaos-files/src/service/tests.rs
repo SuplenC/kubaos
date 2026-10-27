@@ -13,7 +13,7 @@ fn a_downloaded_file_is_revealed_and_a_folder_opened_with_escapes_undone() {
     let entries = entries([format!("{base}/my%20report.pdf").as_str(), base.as_str()], &resolver);
 
     assert_eq!(entries.paths, [file, dir.path().to_path_buf()]);
-    assert!(entries.refused.is_empty());
+    assert_eq!(entries.refused, [] as [entry::EntryError; 0]);
 }
 
 #[test]

@@ -95,5 +95,5 @@ fn the_clock_falls_back_to_the_starred_dpm_level() {
 fn no_drm_folder_is_no_gpu() {
     let root = tempfile::tempdir().expect("a temp dir");
 
-    assert!(Gpus::discover(root.path()).read().is_empty());
+    assert_eq!(Gpus::discover(root.path()).read(), [] as [super::Gpu; 0]);
 }

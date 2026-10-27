@@ -138,7 +138,7 @@ fn the_users_layouts_win_over_the_systems_file() {
 fn without_the_file_there_are_no_keyboard_items() {
     let keyboards = Keyboards::parse("", LST);
 
-    assert!(titles(&keyboards).is_empty());
+    assert_eq!(titles(&keyboards), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -178,7 +178,7 @@ fn make_default_and_remove_launch_kubaos_keyboard() {
         launched(&runner),
         ["kubaos keyboard default it", "kubaos keyboard remove de"]
     );
-    assert!(runner.ran().is_empty());
+    assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -230,7 +230,7 @@ fn a_layout_that_is_gone_is_refused() {
     let ran = keyboards("us,it", "").run("keyboard:de", RUN, &none(), &runner);
 
     assert_eq!(ran, Err("`de` isn't one of the keyboard layouts".to_owned()));
-    assert!(runner.ran().is_empty());
+    assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }
 
 #[test]

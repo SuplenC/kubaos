@@ -37,9 +37,9 @@ fn a_light_sample_has_what_the_pill_and_the_alerts_need() {
     assert_eq!(sample.uptime, 3725);
     assert_eq!(sample.kernel, "6.17.0-5-generic");
     // The popup's extras are left out.
-    assert!(sample.cpu.cores.is_empty());
+    assert_eq!(sample.cpu.cores, [] as [f32; 0]);
     assert_eq!(sample.cpu.mhz, None);
-    assert!(sample.fans.is_empty());
+    assert_eq!(sample.fans, [] as [crate::hwmon::Fan; 0]);
     assert_eq!(sample.net.address, None);
     assert!(sample.top.is_none());
 }
@@ -109,7 +109,7 @@ fn a_machine_with_nothing_readable_still_samples() {
 
     assert_eq!(sample.cpu.count, 0);
     assert!(sample.memory.is_none());
-    assert!(sample.gpus.is_empty());
+    assert_eq!(sample.gpus, [] as [crate::gpu::Gpu; 0]);
     assert!(sample.battery.is_none());
     assert_eq!(sample.net.interface, None);
     assert!(sample.top.is_some_and(|top| top.cpu.is_empty()));

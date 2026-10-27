@@ -132,7 +132,7 @@ fn no_country_means_no_holidays() {
     let none = Holidays::none();
 
     assert_eq!(none.on(date(2026, 12, 25)), None);
-    assert!(none.in_year(2026).is_empty());
+    assert_eq!(none.in_year(2026), [] as [super::Holiday; 0]);
 }
 
 #[test]

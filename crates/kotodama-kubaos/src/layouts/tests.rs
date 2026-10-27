@@ -65,5 +65,5 @@ fn an_unknown_item_or_action_is_refused_and_runs_nothing() {
 
     assert!(app(&["us"]).run("keyboard-add", ADD, &runner).is_err());
     assert!(app(&["us"]).run("layout:it", "remove", &runner).is_err());
-    assert!(runner.ran().is_empty());
+    assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }

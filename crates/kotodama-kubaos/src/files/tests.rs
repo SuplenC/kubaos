@@ -53,7 +53,7 @@ fn a_folder_set_to_the_home_is_turned_off() {
 fn a_folder_user_dirs_leaves_out_is_no_item() {
     let folders = UserFolders::parse(Path::new(HOME), Some(""), every_folder_exists);
 
-    assert!(folders.items().is_empty());
+    assert_eq!(folders.items(), [] as [kotodama_protocol::Item; 0]);
 }
 
 #[test]

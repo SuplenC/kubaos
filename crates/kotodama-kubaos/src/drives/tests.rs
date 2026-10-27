@@ -29,12 +29,12 @@ fn each_mounted_drive_is_an_eject_item() {
 fn a_line_missing_its_name_or_mount_points_is_skipped() {
     let drives = Drives::parse(&format!("{STICK}\tPHOTOS\n{STICK}\t\t/media/x\nnot a path\tX\t/media/y\n\n"));
 
-    assert!(drives.items().is_empty());
+    assert_eq!(drives.items(), [] as [kotodama_protocol::Item; 0]);
 }
 
 #[test]
 fn no_drives_file_means_no_items() {
-    assert!(Drives::read(Path::new("/nonexistent/kubaos-drives")).items().is_empty());
+    assert_eq!(Drives::read(Path::new("/nonexistent/kubaos-drives")).items(), [] as [kotodama_protocol::Item; 0]);
 }
 
 #[test]

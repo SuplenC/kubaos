@@ -17,5 +17,5 @@ fn the_children_are_the_inner_nodes() {
 
 #[test]
 fn an_object_without_children_has_none() {
-    assert!(child_nodes("<node><interface name=\"a.b\"/></node>").is_empty());
+    assert_eq!(child_nodes("<node><interface name=\"a.b\"/></node>"), [] as [std::string::String; 0]);
 }

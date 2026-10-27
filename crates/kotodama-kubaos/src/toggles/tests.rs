@@ -43,7 +43,7 @@ fn every_toggle_is_an_item_of_its_own_id() {
         let item = toggle.item();
         assert_eq!(Toggle::from_id(&item.id), Some(toggle));
         assert_eq!(item.kind.name(), KIND);
-        assert!(!item.actions.is_empty());
+        assert_ne!(item.actions, [] as [kotodama_protocol::Action; 0]);
     }
 }
 
@@ -165,7 +165,7 @@ fn a_volume_out_of_range_runs_nothing() {
         .unwrap_err();
 
     assert_eq!(err, "Type a percentage from 0 to 100, not `140`");
-    assert!(runner.ran().is_empty());
+    assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }
 
 #[test]
@@ -260,5 +260,5 @@ fn a_device_id_that_is_no_device_runs_nothing() {
     assert!(use_device("audio-input:@DEFAULT@", &runner).is_err());
     assert!(use_device("wifi:1", &runner).is_err());
     assert!(use_device("54", &runner).is_err());
-    assert!(runner.ran().is_empty());
+    assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }
