@@ -17,24 +17,12 @@ space = 1
 size = 1
 radius = 1
 
-["config/quickshell/components/Graph.qml"]
-size = 1
-
 ["config/quickshell/components/Icon.qml"]
 size = 1
 
 ["config/quickshell/components/IconButton.qml"]
 size = 2
 radius = 1
-
-["config/quickshell/components/ListRow.qml"]
-space = 1
-size = 7
-duration = 1
-font = 1
-
-["config/quickshell/components/Meter.qml"]
-size = 1
 
 ["config/quickshell/components/PanelSurface.qml"]
 size = 1
@@ -44,149 +32,10 @@ radius = 1
 size = 3
 radius = 1
 
-["config/quickshell/components/StyledSlider.qml"]
-size = 5
-
-["config/quickshell/components/TabBar.qml"]
-size = 2
-font = 1
-
 ["config/quickshell/components/Tooltip.qml"]
 size = 1
 radius = 1
 font = 1
-
-["config/quickshell/modules/bar/ActiveWindow.qml"]
-font = 1
-
-["config/quickshell/modules/bar/Clock.qml"]
-font = 2
-
-["config/quickshell/modules/bar/KeyboardLayout.qml"]
-font = 1
-
-["config/quickshell/modules/bar/RecordingIndicator.qml"]
-size = 3
-radius = 1
-font = 1
-
-["config/quickshell/modules/bar/Status.qml"]
-space = 2
-font = 1
-
-["config/quickshell/modules/bar/SysmonPill.qml"]
-size = 2
-font = 3
-
-["config/quickshell/modules/bar/Workspaces.qml"]
-space = 1
-size = 1
-font = 3
-
-["config/quickshell/modules/clock/AnalogFace.qml"]
-size = 15
-radius = 1
-
-["config/quickshell/modules/clock/Chip.qml"]
-size = 1
-font = 1
-
-["config/quickshell/modules/clock/ClockPopup.qml"]
-size = 7
-radius = 1
-duration = 2
-font = 9
-
-["config/quickshell/modules/clock/ClockSettings.qml"]
-size = 2
-font = 1
-
-["config/quickshell/modules/clock/MonthGrid.qml"]
-space = 1
-size = 14
-radius = 1
-font = 4
-
-["config/quickshell/modules/clock/Tools.qml"]
-size = 8
-radius = 2
-duration = 1
-font = 4
-
-["config/quickshell/modules/controlcenter/CaptureRow.qml"]
-radius = 1
-font = 1
-
-["config/quickshell/modules/controlcenter/ControlCenter.qml"]
-size = 1
-radius = 1
-font = 3
-
-["config/quickshell/modules/controlcenter/KeyboardAddView.qml"]
-size = 2
-font = 2
-
-["config/quickshell/modules/controlcenter/KeyboardList.qml"]
-size = 4
-
-["config/quickshell/modules/controlcenter/NotificationHistory.qml"]
-size = 3
-radius = 1
-font = 1
-
-["config/quickshell/modules/controlcenter/QuickTile.qml"]
-space = 1
-size = 3
-radius = 2
-font = 1
-
-["config/quickshell/modules/controlcenter/WifiList.qml"]
-size = 1
-
-["config/quickshell/modules/frame/Exclusions.qml"]
-size = 2
-
-["config/quickshell/modules/frame/Frame.qml"]
-size = 2
-
-["config/quickshell/modules/notifications/NotificationCard.qml"]
-space = 1
-size = 9
-radius = 2
-font = 3
-
-["config/quickshell/modules/notifications/Popups.qml"]
-size = 2
-
-["config/quickshell/modules/notifications/PopupsBelow.qml"]
-size = 2
-
-["config/quickshell/modules/sysmon/Processes.qml"]
-size = 1
-radius = 1
-font = 4
-
-["config/quickshell/modules/sysmon/Section.qml"]
-font = 2
-
-["config/quickshell/modules/sysmon/SysmonPopup.qml"]
-size = 7
-duration = 2
-font = 2
-
-["config/quickshell/modules/wallpaper/WallpaperPicker.qml"]
-space = 1
-size = 13
-radius = 5
-font = 2
-
-["config/quickshell/modules/wallpaper/WallpaperSettings.qml"]
-size = 2
-radius = 1
-font = 2
-
-["config/quickshell/theme/Theme.qml"]
-size = 2
 
 ["crates/kubaos-kobo/src/app.rs"]
 duration = 2

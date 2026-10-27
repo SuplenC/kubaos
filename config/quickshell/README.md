@@ -6,8 +6,9 @@ KubaOS's desktop shell: my own, for Hyprland, written in QML on [Quickshell](htt
 
 Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dots/shell). Every screen gets a frame: the bar along the top and a thin border on the other three edges, with rounded inner corners. Panels are not floating cards. They grow out of the frame's edges and meet it through concave fillets, so the frame and every open panel read as one surface with one soft shadow. The colors come from the wallpaper (matugen, `scheme-fidelity`), which keeps the photo's own neon hue in the accents: amber and cyan on the Shinjuku street, violet and gold at purple hour.
 
-- **Type:** Geist for the interface, with tabular figures for anything that ticks. M PLUS 1 for the few Japanese accents: the weekday kanji next to the bar clock, 曜日 in the control center, and 東京 on the lock screen. Material Symbols Rounded for icons, whose `FILL` axis animates on toggles.
-- **Motion:** Material 3 curves (`Theme.anim`). Things that appear use the "spatial" curve, which decelerates in with a slight overshoot (450 ms). Things that leave accelerate out, quicker (300 ms). Opening a panel animates its depth, and the content rides on its leading edge, so it slides out from under the frame instead of fading in place. List rows cascade in (22 ms stagger). Selection highlights, tab indicators and the workspace indicator slide. The workspace indicator stretches: its leading edge moves first and the trailing edge follows. The workspace pill changes shape in a glide, never a jump: the group the screen shows ends in a faint `+`, the ghost slot where next creates a new workspace (a click does the same; none once the group has all ten). A new workspace fills it in place and a new ghost grows after it, a workspace that goes away shrinks out, and the cells, the gaps between groups, the pill's width and the window title beside it follow. The Command menu moves on the design tokens, one step quicker than a panel (docs/DESIGN.md, "Motion"): the window arrives over `short` and leaves over `micro`, a View slides in over `medium`, and the highlight glides between rows over `short`. What a keystroke changes shows at once, never animated, so typing never waits on a frame.
+- **Look:** `docs/DESIGN.md`. The bar, the frame, the panels, the control center, the notifications, the popups, the Command menu, the lock screen, the OSD, the power menu and the polkit prompt are built from `KubaOS.Components` and its tokens alone (`import KubaOS.Components as K`); `just design-check` holds them to it.
+- **Type:** the type styles of `docs/DESIGN.md`: Geist for the interface, Geist Mono for numbers that tick (Geist's figures are proportional, so a ticking Geist number would jitter), M PLUS 1 for the few Japanese accents: the weekday kanji next to the bar clock, 曜日 in the control center, and 東京 on the lock screen. Icons are KubaOS Symbols, drawn outlines.
+- **Motion:** the duration and curve tokens. A panel arrives over `long` (500 ms) on emphasized decelerate and leaves over `medium` (300 ms) on emphasized accelerate. Opening a panel animates its depth, and the content rides on its leading edge, so it slides out from under the frame instead of fading in place. The workspace indicator stretches: its leading edge moves first and the trailing edge follows. The workspace pill changes shape in a glide, never a jump: the group the screen shows ends in a faint `+`, the ghost slot where next creates a new workspace (a click does the same; none once the group has all ten). A new workspace fills it in place and a new ghost grows after it, a workspace that goes away shrinks out, and the cells, the gaps between groups, the pill's width and the window title beside it follow. The Command menu moves on the design tokens, one step quicker than a panel (docs/DESIGN.md, "Motion"): the window arrives over `short` and leaves over `micro`, a View slides in over `medium`, and the highlight glides between rows over `short`. What a keystroke changes shows at once, never animated, so typing never waits on a frame.
 - **Placement:**
 
   | Panel | Position |
@@ -21,9 +22,9 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
   | Clock popup | Under the bar's clock |
   | System monitor | Under the bar's right end, by its pill |
 
-- **Density:** sized for Full HD at scale 1 (the laptop runs at 1.5, see `config/hypr/monitors.lua`): a 36 px bar, 13 px body text.
-- **Panels over windows:** only the frame reserves space (the bar's 36 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (power menu 45%, control center 20%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
-- **Glass:** the frame is drawn at 94% opacity. Hyprland blurs what shows through (`qs-frame` layer rule, `ignore_alpha 0.5`, so the shadow is not blurred).
+- **Density:** sized for Full HD at scale 1 (the laptop runs at 1.5, see `config/hypr/monitors.lua`): a 40 px bar (`size.bar`) of 32 px pills, 14 px body text.
+- **Panels over windows:** only the frame reserves space (the bar's 40 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (`opacity.panel_scrim`, 20%; the power menu as a dialog does, `opacity.scrim`, 60%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
+- **Glass:** the frame is drawn at 94% opacity (`opacity.frame`). Hyprland blurs what shows through (`qs-frame` layer rule, `ignore_alpha 0.5`, so the shadow is not blurred).
 
 The design was studied from Caelestia's source and README: its frame and drawer structure, Material 3 roles and motion tokens. No code comes from it (Caelestia is GPL-3.0); everything here was written from scratch, and the panel shapes are built differently (an SVG path per panel, see `components/drawerpath.js`).
 
@@ -73,8 +74,8 @@ All handlers live in `IpcHandlers.qml`. `docs/CONTRACTS.md` is the source of tru
 ```
 shell.qml               entry point: per screen a Wallpaper and a Frame; Lock, polkit, IPC once
 IpcHandlers.qml         qs ipc targets
-theme/Theme.qml         the design tokens (KubaOS.Components' Tokens) by the shell's names, colors.json
-                        fed to them, and the frame's and bar's measures
+theme/Theme.qml         colors.json fed to the design tokens, and the tokens by the older names the
+                        Command menu and the lock still read
 settings/Settings.qml   user knobs: wallpaper folders, wallpaper motion, lock loop, kanji workspaces, security key, fingerprint, polkit
 services/               singletons, no UI
   Audio                 PipeWire default sink, volume, output list
@@ -97,14 +98,17 @@ services/               singletons, no UI
   Sysmon                the system monitor's stream (`kubaos-sysmon serve`, line JSON, paced by
                         the popup and the lock), the graphs' last minute, sysmon.toml (watched),
                         alerts as notifications
-components/             reusable pieces, all built on Theme tokens
+components/             blocks composed from KubaOS.Components
   Drawer, drawerpath.js a panel that grows out of a frame edge; its SVG outline
-  Anim, CAnim           number/color animations with the shell's curves
-  Pill, IconButton, StateLayer, Tooltip, FocusRing, Elevation
-  ListRow, NavList      rows with cascade-in; keyboard list with a sliding highlight
-  SearchField, StyledSlider, TabBar, EmptyState, StyledText, Icon, PanelSurface
-  Graph, Meter          a minute's line graph (Canvas); a rounded bar split into parts
+  Pill                  the bar's pill: a row of content, hover, click, right-click and wheel
+  NavList               the keyboard list over K.ListRow rows
+  Tabs                  small buttons as tabs, one Tab stop
+  PowerSlider           the power stops on a K.Slider
+  Graph, Meter          a minute's line graph (Canvas); a bar split into parts
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
+  Anim, CAnim, IconButton, StateLayer, Tooltip, FocusRing, Elevation, SearchField, EmptyState,
+  StyledText, Icon, PanelSurface
+                        the older pieces on Theme, which the Command menu and the lock still use
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)
@@ -115,14 +119,15 @@ modules/
                         ActionPanel, FormView, ProgressView, DetailView, IntroCard, Label (text that
                         changes with every key), words.js (glyphs, kinds, shortcuts),
                         Probe (test-only timing and state lines)
-  controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history,
+  controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a Well, history,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)
   notifications/        Popups (corner), PopupsBelow (critical, under a panel), ToastList, NotificationCard, ToastProbe (tests)
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu
   clock/                ClockPopup (the bar clock's popup), MonthGrid (month and year views),
-                        AnalogFace, Tools (timer, stopwatch, alarms), ClockSettings, Chip
+                        AnalogFace, Tools (timer, stopwatch, alarms), ClockSettings, Chip,
+                        Figure (a ticking number in a box as wide as its widest digits)
   sysmon/               SysmonPopup (the monitor pill's popup), Section, Processes (top five,
                         details, End and Kill)
   wallpaper/            Wallpaper (background, crossfade, preview), WallpaperPicker,
@@ -161,7 +166,7 @@ Every panel works without a mouse. Esc closes it.
 
 ## Theme
 
-The values come from the design tokens (`design/tokens.toml`, `docs/DESIGN.md`) through `KubaOS.Components`, the QML component library in `qml/KubaOS/Components`: its generated `Tokens` singleton holds every colour role, length, type style and duration. `Theme.qml` gives those values the names the shell's components read, and keeps the few the shell has no token for yet (the frame's and bar's measures, and older spacing, radii and motion, marked `TODO(#150)`). New code takes `Tokens` and the library's components (`import KubaOS.Components as K`), not `Theme`.
+The values come from the design tokens (`design/tokens.toml`, `docs/DESIGN.md`) through `KubaOS.Components`, the QML component library in `qml/KubaOS/Components`: its generated `Tokens` singleton holds every colour role, length, type style and duration. The bar, the frame, the panels, the control center, the notifications, the clock, the system monitor and the wallpaper picker read them directly (`import KubaOS.Components as K`). `Theme.qml` gives those values the names the older components read, and keeps the older spacing, radii and motion the Command menu and the lock still draw with (marked `TODO(#149)` and `TODO(#151)`). New code takes `Tokens` and the library's components, not `Theme`.
 
 `Theme.qml` watches `~/.local/state/theme/colors.json` (written by `dot-theme`/matugen) and hands it to `Tokens.matugen`, so the roles follow the wallpaper live; colors crossfade where components animate them. If the file is missing, the roles fall back to the tokens' own palette (`[color.dark]` and `[color.light]`, matugen's output for the default wallpaper). Color roles are exposed as `Theme.m3<role>` (`Theme.m3primary`, `Theme.m3onSurface`, ...). The `m3` prefix is needed because QML reads any property named `on<Something>` as a signal handler.
 
@@ -169,7 +174,7 @@ The values come from the design tokens (`design/tokens.toml`, `docs/DESIGN.md`) 
 
 ## Adding a module
 
-1. Create `modules/<name>/<Name>.qml`. For a bar item, start from `Pill`. For a panel, start from `Drawer { edge: "top" | "bottom" | "left" | "right" }`. Set `contentWidth`/`contentHeight` from your content's implicit size; `align`, `flushStart`/`flushEnd` place it along the edge. Use only `Theme` tokens for sizes, colors and motion.
+1. Create `modules/<name>/<Name>.qml`. For a bar item, start from `Pill`. For a panel, start from `Drawer { edge: "top" | "bottom" | "left" | "right" }`. Set `contentWidth`/`contentHeight` from your content's implicit size; `align`, `flushStart`/`flushEnd` place it along the edge. Use only `KubaOS.Components` and its `Tokens` for sizes, colours and motion (`docs/DESIGN.md`).
 2. Put data and side effects in a singleton under `services/` (`pragma Singleton` + `Singleton {}`), so UI files only bind to it.
 3. Add it to `modules/frame/Frame.qml`, with `frame: geo` and `shown: root.panel === "<name>"`, and add a `PanelPath { drawer: <id> }` to the background `Shape`. Or add it to `Bar.qml`.
 4. If Hyprland should open it, add an `IpcHandler` to `IpcHandlers.qml` that calls `Panels.toggle("<name>")`, and add the row to `docs/CONTRACTS.md`.

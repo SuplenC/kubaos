@@ -6,15 +6,16 @@ import Quickshell.Io
 import KubaOS.Components as K
 
 // The shell's theme. The values come from the design tokens, `KubaOS.Components`' `Tokens`
-// (generated from design/tokens.toml); this file gives them the names the shell's components read,
-// and owns two things of the shell's own: feeding the colours matugen derived from the wallpaper
-// (~/.local/state/theme/colors.json, written by `dot-theme`, reloaded when it changes) to the
-// tokens, and the frame's and bar's measures. Roles are prefixed with m3 (m3primary,
-// m3onSurface, ...) because QML reads any property named on<Something> as a signal handler.
+// (generated from design/tokens.toml); this file gives them the names the shell's older components
+// read, and feeds the tokens the colours matugen derived from the wallpaper
+// (~/.local/state/theme/colors.json, written by `dot-theme`, reloaded when it changes). Roles are
+// prefixed with m3 (m3primary, m3onSurface, ...) because QML reads any property named
+// on<Something> as a signal handler. New code reads `KubaOS.Components` directly.
 //
-// TODO(#150): drop the values below that have no token (the spacing, radii, type sizes and motion
-// the shell predates the tokens with) as each front end moves onto `KubaOS.Components`; until
-// it does, they keep the shell as it looks.
+// TODO(#149): drop the values below that have no token (the spacing, radii, type sizes and motion
+// the shell predates the tokens with) once the Command menu reads `KubaOS.Components`; until then
+// they keep it as it looks.
+// TODO(#151): the same for the lock screen, the OSD, the power menu and the polkit prompt.
 Singleton {
     id: root
 
@@ -66,21 +67,17 @@ Singleton {
     }
 
     readonly property QtObject spacing: QtObject {
-        readonly property int xxs: 2
         readonly property int xs: K.Tokens.space.s4
         readonly property int sm: K.Tokens.space.s8
         readonly property int md: K.Tokens.space.s12
         readonly property int lg: K.Tokens.space.s16
         readonly property int xl: K.Tokens.space.s20
-        readonly property int xxl: 28
         readonly property int xxxl: K.Tokens.space.s40
     }
 
-    // Corner radii. The design language's are roles (docs/DESIGN.md, "Space and shape"): small
-    // (xs), control (md), surface (the frame, panels) and full; any other radius comes from
-    // nesting. sm, lg, xl and xxl predate the roles.
+    // Corner radii. The design language's are roles (docs/DESIGN.md, "Space and shape"): control
+    // (md) and full; any other radius comes from nesting. sm, lg, xl and xxl predate the roles.
     readonly property QtObject rounding: QtObject {
-        readonly property int xs: K.Tokens.radius.small
         readonly property int sm: 8
         readonly property int md: K.Tokens.radius.control
         readonly property int lg: 16
@@ -89,31 +86,10 @@ Singleton {
         readonly property int full: K.Tokens.radius.full
     }
 
-    // The screen frame: bar on top, a thin border on the other three edges, rounded inner corners.
-    // Panels grow out of it (modules/frame/). It is as thick as the gap round a window, and a
-    // surface, as the panels are.
+    // The frame's surface, which the Command menu's window matches.
     readonly property QtObject frame: QtObject {
-        readonly property int thickness: K.Tokens.space.s8
-        readonly property int rounding: K.Tokens.radius.surface
         readonly property int panelRounding: K.Tokens.radius.surface
-        // The concave fillet where a panel meets the frame.
-        readonly property int flare: 20
-        // The frame's and panels' opacity; Hyprland blurs what shows through.
-        readonly property real opacity: 0.94
-    }
-
-    // Sized for Full HD density, about 1920 logical pixels across: every screen whose scale
-    // brings it there shows the same sizes.
-    readonly property QtObject bar: QtObject {
-        readonly property int height: 36
-        readonly property int pillHeight: 26
-        readonly property int icon: K.Tokens.icon.s16
-        // The left and right inset of the bar's content.
-        readonly property int padding: K.Tokens.space.s8
-        // The workspace numbers and the group names beside them.
-        readonly property int cellFont: 12
-        // The widest a group's name draws before it elides.
-        readonly property int groupNameMax: 96
+        readonly property real opacity: K.Tokens.opacity.frame
     }
 
     // Typography. Geist for the interface (tabular figures for anything that ticks), M PLUS 1 for
@@ -123,12 +99,10 @@ Singleton {
         readonly property string mono: "JetBrainsMono Nerd Font"
         readonly property string jp: K.Tokens.font.jp
         readonly property string icons: "Material Symbols Rounded"
-        readonly property int xs: 10
         readonly property int sm: 11
         readonly property int md: 13
         readonly property int lg: 14
         readonly property int xl: 18
-        readonly property int xxl: 24
         readonly property int display: 116
         readonly property var tabular: ({
                 tnum: 1
@@ -149,13 +123,8 @@ Singleton {
         readonly property int large: 450
         // The wallpaper's crossfade, the lock screen.
         readonly property int slow: 600
-        // The delay between items of a staggered list.
-        readonly property int stagger: 22
 
         readonly property list<real> standard: K.Tokens.easing.standard
-        readonly property list<real> standardAccel: K.Tokens.easing.standard_accel
-        readonly property list<real> standardDecel: K.Tokens.easing.standard_decel
-        readonly property list<real> emphasized: [0.05, 0, 2 / 15, 0.06, 1 / 6, 0.4, 5 / 24, 0.82, 0.25, 1, 1, 1]
         readonly property list<real> emphasizedAccel: K.Tokens.easing.emphasized_accel
         readonly property list<real> emphasizedDecel: K.Tokens.easing.emphasized_decel
         readonly property list<real> spatial: [0.38, 1.21, 0.22, 1, 1, 1]
@@ -166,14 +135,11 @@ Singleton {
     // Elevation for floating surfaces (RectangularShadow in components/Elevation).
     readonly property QtObject elevation: QtObject {
         readonly property real opacity: 0.65
-        // The shadow under the frame and its panels.
-        readonly property int frameBlur: 28
     }
 
     // The opacity of the hover, focus and press layer drawn on interactive surfaces.
     readonly property QtObject state: QtObject {
         readonly property real hover: K.Tokens.opacity.hover
-        readonly property real focus: K.Tokens.opacity.focus
         readonly property real press: K.Tokens.opacity.press
     }
 
