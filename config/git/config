@@ -56,6 +56,12 @@
 [include]
 	path = ~/.local/state/theme/delta.gitconfig
 
+# The Proxy's http.proxy, written by `kubaos-proxy on` and removed by
+# `kubaos-proxy off` (crates/kubaos-proxy). Git skips a missing include, so
+# with the Proxy off git goes direct.
+[include]
+	path = ~/.local/state/kubaos-proxy/proxy.gitconfig
+
 # Your settings, last so they win (~/.config/kubaos, docs/CONTRACTS.md).
 [include]
 	path = ~/.config/kubaos/tools/git/config

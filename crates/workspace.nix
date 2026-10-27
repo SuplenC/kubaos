@@ -75,6 +75,7 @@ let
       "kubaos-sysmon"
       "kubaos-idle"
       "kubaos-power"
+      "kubaos-proxy"
     ];
     # iced and wgpu are most of these crates' dependencies and no tool uses
     # them. Apart, they build beside the tools' dependencies when Cargo.lock

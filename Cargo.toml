@@ -32,6 +32,7 @@ members = [
     "crates/kubaos-user-layer",
     "crates/kubaos-idle",
     "crates/kubaos-power",
+    "crates/kubaos-proxy",
     "crates/kubaos-tokens",
     "crates/kubaos-ui",
     "crates/kubaos-specimen",
@@ -50,6 +51,7 @@ kubaos-cursor = { path = "crates/kubaos-cursor" }
 kubaos-clock = { path = "crates/kubaos-clock" }
 kubaos-idle = { path = "crates/kubaos-idle" }
 kubaos-power = { path = "crates/kubaos-power" }
+kubaos-proxy = { path = "crates/kubaos-proxy" }
 kubaos-phone = { path = "crates/kubaos-phone" }
 kubaos-sysmon = { path = "crates/kubaos-sysmon" }
 kubaos-user-layer = { path = "crates/kubaos-user-layer" }

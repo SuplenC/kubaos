@@ -380,6 +380,29 @@ fn project_pins_are_set_removed_and_listed_from_the_menu() {
     assert_eq!(tail(&pins.argv, 3), ["kubaos", "pins", "--all"]);
 }
 
+#[test]
+fn the_proxy_is_switched_imported_and_set_from_the_menu() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let runs: Vec<Vec<String>> = registry
+        .items()
+        .filter_map(|item| registry.command(&item.id, &every_argument(&item)))
+        .map(|command| command.argv)
+        .collect();
+
+    for wanted in [
+        &["kubaos-proxy", "on"][..],
+        &["kubaos-proxy", "off"],
+        &["kubaos-proxy", "import", "x"],
+    ] {
+        assert!(runs.iter().any(|argv| tail(argv, wanted.len()) == wanted), "no Item runs {wanted:?}");
+    }
+    assert!(
+        runs.iter()
+            .any(|argv| argv.last().is_some_and(|script| script.contains("dot-config path network"))),
+        "no Item opens proxy.toml"
+    );
+}
+
 /// The `[extensions.kubaos]` table of the Defaults.
 fn shipped() -> Table {
     let defaults: Table = toml::from_str(include_str!("../../../../config/kotodama/kubaos.toml")).expect("kubaos.toml");

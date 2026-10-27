@@ -19,6 +19,7 @@ Singleton {
             quickshell: "desktop/quickshell",
             clock: "desktop/clock",
             sysmon: "desktop/sysmon",
+            network: "desktop/network",
             workspaces: "desktop/workspaces"
         })
 

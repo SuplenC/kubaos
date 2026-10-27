@@ -15,6 +15,7 @@
     ./files.nix
     ./idle.nix
     ./power.nix
+    ./proxy.nix
     ./menu.nix
     ./phone.nix
     ./pins.nix

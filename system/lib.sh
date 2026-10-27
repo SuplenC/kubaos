@@ -432,6 +432,21 @@ install_power_helper() {
   fi
 }
 
+# install_proxy_helper: what the Proxy (crates/kubaos-proxy) needs as root.
+# The helper that puts the work network's system-wide parts in place (apt's,
+# Docker's, Nix's and Chrome's proxy, the company CA, the kill switch), and
+# the same script as kubaos-proxy-pin, which pins the proxy and the CA the
+# first may put in place; the polkit actions pkexec runs them under, and the
+# rule that lets an admin at the machine apply what is pinned without a
+# password (pinning always asks for it). 20-base.sh runs it, and a migration
+# on machines installed before it.
+install_proxy_helper() {
+  install_root_file "$FILES_DIR/proxy/kubaos-proxy-write" /usr/local/libexec/kubaos-proxy-write 0755
+  install_root_file "$FILES_DIR/proxy/kubaos-proxy-write" /usr/local/libexec/kubaos-proxy-pin 0755
+  install_root_file "$FILES_DIR/polkit/org.kubaos.proxy.policy" /usr/share/polkit-1/actions/org.kubaos.proxy.policy 0644
+  install_root_file "$FILES_DIR/polkit/50-kubaos-proxy.rules" /etc/polkit-1/rules.d/50-kubaos-proxy.rules 0644
+}
+
 # install_scx: the CPU scheduler the power stops can run (crates/kubaos-power,
 # `scheduler = "lavd"` in power.toml). scx_lavd from KUBAOS_DIR's curated set
 # (`.#scx-lavd`, home/curated.nix), pinned with SCX_GCROOT and linked where

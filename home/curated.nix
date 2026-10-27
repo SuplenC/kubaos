@@ -51,6 +51,8 @@ rec {
   kubaos-idle = callCrate ../crates/kubaos-idle/package.nix;
   # The power stops' service and command (home/power.nix).
   kubaos-power = callCrate ../crates/kubaos-power/package.nix;
+  # The Proxy's command and service, the work network's switch (home/proxy.nix).
+  kubaos-proxy = callCrate ../crates/kubaos-proxy/package.nix;
   # The design specimen, the Command menu's "Design specimen" (home/desktop.nix).
   kubaos-specimen = callCrate ../crates/kubaos-specimen/package.nix;
 

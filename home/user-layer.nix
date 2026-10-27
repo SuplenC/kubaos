@@ -23,6 +23,7 @@ let
       "files"
       "wallpapers"
       "phone"
+      "network"
       "workspaces"
     ];
     terminal = [

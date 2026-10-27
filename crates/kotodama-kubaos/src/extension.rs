@@ -7,8 +7,8 @@
 //! - Which Items there are under the current config, `hide` applied, and what the update check
 //!   changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position, a drive, an idle setting, the power stop's status or the CPU
-//!   scheduler's.
+//!   user folder, a desk position, a drive, an idle setting, the power stop's status, the CPU
+//!   scheduler's or the Proxy's.
 //!
 //! # Not here
 //!
@@ -16,7 +16,7 @@
 //!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
 //!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`]. The
 //!   idle settings: [`crate::idle`]. The power stop's status and the CPU scheduler's:
-//!   [`crate::power`].
+//!   [`crate::power`]. The Proxy's status: [`crate::proxy`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -40,6 +40,7 @@ use crate::idle;
 use crate::keyboard;
 use crate::keyboard::Keyboards;
 use crate::power;
+use crate::proxy;
 use crate::registry;
 use crate::registry::Registry;
 use crate::run::Runner;
@@ -89,6 +90,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .chain(keyboard::ids())
             .chain(idle::ids())
             .chain(power::ids())
+            .chain(proxy::ids())
             .collect();
         let (registry, problems) = Registry::from_config(config, &reserved);
         self.registry = registry;
@@ -125,8 +127,8 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.desk = desk;
     }
 
-    /// The Items to index: the actions, the toggles, the idle settings, the power stop's and the CPU
-    /// scheduler's status, the keyboard Items, the wallpaper sets, the user folders, the desk
+    /// The Items to index: the actions, the toggles, the idle settings, the power stop's, the CPU
+    /// scheduler's and the Proxy's status, the keyboard Items, the wallpaper sets, the user folders, the desk
     /// positions and the drives `hide` leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
@@ -159,7 +161,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
-        let power = [power::item(), power::scheduler_item()]
+        let power = [power::item(), power::scheduler_item(), proxy::item()]
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
         self.registry
@@ -217,6 +219,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
                     &settings,
                     &Machine::real(),
                 ))))
+            }
+            proxy::KIND if action == proxy::SHOW && !self.registry.hides(&item.id) => {
+                Ok(Ran::Push(proxy::view(&proxy::now())))
             }
             _ => Err(unknown()),
         }

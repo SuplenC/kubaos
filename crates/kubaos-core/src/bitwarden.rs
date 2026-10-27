@@ -26,7 +26,7 @@
 //! - The first-boot card, its form and its events: `crate::setup` (`setup/actions.rs`).
 
 pub mod agent;
-mod base64;
+pub mod base64;
 mod config;
 pub mod env;
 #[cfg(test)]

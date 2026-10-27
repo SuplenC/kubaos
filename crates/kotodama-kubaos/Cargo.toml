@@ -13,6 +13,7 @@ kubaos-clock.workspace = true
 kubaos-core.workspace = true
 kubaos-idle.workspace = true
 kubaos-power.workspace = true
+kubaos-proxy.workspace = true
 kubaos-sysmon.workspace = true
 kubaos-user-layer.workspace = true
 thiserror.workspace = true

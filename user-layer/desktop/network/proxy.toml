@@ -1,0 +1,40 @@
+# Your Proxy: ~/.config/kubaos/desktop/network/proxy.toml. One switch for the work network, the
+# Proxy tile in the control center, `kubaos proxy on|off` or the Command menu's "Proxy on" and
+# "Proxy off", takes every part below up together or none. Each part is optional and stays off
+# until it is set here. Nothing switches on by itself at login. `kubaos proxy status` shows each
+# part and whether it is up; a change here takes effect at the next `kubaos proxy on`.
+#
+# The tunnel: IT's WireGuard config. `kubaos proxy import FILE` (or "Import WireGuard config" in
+# the Command menu) puts its keys in your Bitwarden vault and the GNOME keyring, writes the rest
+# beside this file as wireguard.conf, and sets `conf` below. AllowedIPs = 0.0.0.0/0 or ::/0 make it
+# a full tunnel; anything else is a split tunnel, which carries only those ranges.
+[tunnel]
+# conf = "wireguard.conf"
+#
+# A full tunnel blocks everything that would leave outside it while it is up (the kill switch).
+# Turn it off to reach printers and the like on the network you're on:
+# kill_switch = true
+#
+# The vault item that holds the tunnel's keys; `kubaos proxy pull` copies them to the keyring
+# again on a new machine:
+# vault_item = "kubaos-proxy"
+
+# The work DNS servers, and the domains they answer for; every other name goes to your network's
+# own resolver. The DNS line of the WireGuard config counts too. They need the tunnel:
+[dns]
+# servers = ["10.0.0.53"]
+# domains = ["corp.example.com"]
+
+# The HTTP proxy, for the session, GNOME (and so browsers), Chrome, apt, Docker (daemon and
+# client), Nix and git. No user or password in it: they would end up in files any program can
+# read. A PAC file is for GNOME and Chrome only; the rest use `proxy`. localhost, 127.0.0.1 and
+# ::1 never go through it:
+[http]
+# proxy = "http://proxy.corp.example.com:3128"
+# pac = "http://wpad.corp.example.com/proxy.pac"
+# no_proxy = [".corp.example.com", "10.0.0.0/8"]
+
+# The company's root certificate, a PEM file beside this one or a path from ~: in the system's
+# trust store (and so Nix's) and Chrome's while the Proxy is on:
+[ca]
+# file = "company-ca.crt"

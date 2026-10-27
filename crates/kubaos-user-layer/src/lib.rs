@@ -76,6 +76,8 @@ pub enum App {
     Wallpapers,
     /// The phone link's switch.
     Phone,
+    /// The Proxy's profile: the work network's tunnel, DNS, HTTP proxy and company CA.
+    Network,
     /// The workspace groups: which screens are pinned to which group.
     Workspaces,
     Ghostty,
@@ -94,7 +96,7 @@ pub enum App {
 }
 
 impl App {
-    pub const ALL: [App; 25] = [
+    pub const ALL: [App; 26] = [
         App::Hypr,
         App::Quickshell,
         App::Cursor,
@@ -106,6 +108,7 @@ impl App {
         App::Files,
         App::Wallpapers,
         App::Phone,
+        App::Network,
         App::Workspaces,
         App::Ghostty,
         App::Foot,
@@ -136,6 +139,7 @@ impl App {
             App::Files => "files",
             App::Wallpapers => "wallpapers",
             App::Phone => "phone",
+            App::Network => "network",
             App::Workspaces => "workspaces",
             App::Ghostty => "ghostty",
             App::Foot => "foot",
@@ -166,6 +170,7 @@ impl App {
             | App::Files
             | App::Wallpapers
             | App::Phone
+            | App::Network
             | App::Workspaces => Group::Desktop,
             App::Ghostty | App::Foot | App::Tmux | App::Zsh | App::Fastfetch => Group::Terminal,
             App::Nvim => Group::Editor,

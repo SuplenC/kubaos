@@ -98,6 +98,12 @@ _Avoid_: Group (Hyprland's tabbed windows), merged workspaces, guests
 KubaOS's link between the laptop and the user's phone through KDE Connect: the clipboard and files both ways, and ringing the phone. Off until the user sets up a phone; nothing listens for phones until then.
 _Avoid_: KDE Connect (as the feature's name), phone sync
 
+## Network
+
+**Proxy**:
+KubaOS's one switch for the work network: a profile of up to four parts (IT's WireGuard tunnel, the work DNS, an HTTP proxy or PAC file, the company's root certificate), which go up together or not at all and never on by themselves.
+_Avoid_: VPN (the tunnel is one part), work mode
+
 ## Power
 
 **Power stop**:
