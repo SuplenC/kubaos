@@ -95,10 +95,13 @@ pub fn for_plan(
 ) -> Vec<Write> {
     let mut writes = Vec::new();
     let policies = machine.policies();
+    // The kernel keeps a cap above a policy's top at the top, so that counts as in place.
     let capped = |khz: u32| {
-        policies
-            .iter()
-            .any(|policy| policy.max_khz.is_some_and(|max| max != khz))
+        policies.iter().any(|policy| {
+            policy
+                .max_khz
+                .is_some_and(|max| max != policy.top_khz.map_or(khz, |top| khz.min(top)))
+        })
     };
     let cpu_max = match plan.cpu_max_mhz {
         Some(mhz) => capped(mhz * 1000).then_some(Write::CpuMax(Some(mhz * 1000))),

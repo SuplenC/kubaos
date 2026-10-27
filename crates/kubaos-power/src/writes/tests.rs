@@ -255,3 +255,13 @@ fn the_helper_without_arguments_is_a_usage_error() {
 
     assert_eq!(status.code(), Some(2));
 }
+
+#[test]
+fn a_cap_above_the_cpus_top_counts_as_in_place() {
+    let root = FakeRoot::laptop();
+    let settings = Settings::parse("[super-saver]\ncpu_max_mhz = 3000\n").expect("parses");
+
+    let args = args(Stop::SuperSaver, &settings, &root, Some(true));
+
+    assert!(!args.iter().any(|arg| arg.starts_with("cpu-max")), "{args:?}");
+}
