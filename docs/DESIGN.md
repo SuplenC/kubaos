@@ -10,7 +10,7 @@ Three files hold the design, each owning one thing:
 | `docs/DESIGN.md` (this file) | The rules and their reasons: which value is for what, the components, the keyboard, focus, scaling. |
 | `docs/BRAND.md` | The words: name, voice, and how errors and buttons read. |
 
-A rule marked *Not enforced yet: lands in #N* is decided but not built: no code follows it today, and issue #N builds it. Every other rule here is what the code does.
+A rule marked *Not enforced yet* is decided but not built: no code follows it today. The marker names the issue that builds it, or says that none does yet. Every other rule here is what the code does.
 
 Values below are shown so this file reads on its own. Each one names its token, and the token wins: when they disagree, `design/tokens.toml` is right and this file is stale.
 
@@ -149,10 +149,10 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `linear` | 0, 0, 1, 1 | Progress that tracks a real quantity, and spinners. |
 
 - **Arriving is slower than leaving** (`long` in, `medium` out): you look at what arrives, and what leaves is already done with.
-- **Speed** 0.5× to 2× divides every duration (`kubaos_ui::motion::Motion`).
-- **Reduce motion** caps every duration at `short` and turns moves into fades, or into nothing.
+- **Speed** 0.5× to 2× divides every duration (`kubaos_ui::motion::Motion`). *Not enforced yet: lands in #154, the setting; `Motion` applies it once there is one.*
+- **Reduce motion** caps every duration at `short` and turns moves into fades, or into nothing. *Not enforced yet: lands in #154, the setting; `Motion` caps the durations once there is one.*
 - **What never animates:** typed text and the caret (`instant`), layout around focus (the ring is outside layout), a window's size or place, and anything while the user drags it.
-- **Full refresh rate, always.** An animation that drops a frame is a bug, measured with the frame times, not judged by eye.
+- **Full refresh rate, always.** An animation that drops a frame is a bug, measured with the frame times, not judged by eye. *Not enforced yet: nothing measures frame times today, and no issue builds it yet.*
 
 ## Iconography
 
@@ -392,15 +392,15 @@ Three checks keep every front end on this file. The first two run in `cargo test
 |---|---|
 | `colour` | A hex colour string; `Qt.rgba`, `Qt.hsla` and friends; a named colour (`"white"`) bound to a colour; iced's `Color::from_rgb*` with numbers, `Color::WHITE`, `color!`, a `Color { r, g, b, a }` literal. `"transparent"` and a colour converted from a token pass. |
 | `space` | A number in a gap, padding, margin or inset: QML's `spacing`, `*Margin`, `padding`; iced's `.padding(`, `.spacing(`, `Padding`. |
-| `size` | A number in a width, height, position, stroke or icon size: QML's `width`, `implicitHeight`, `Layout.preferred*`, `border.width`; iced's `.width(`, `Length::Fixed(`, `Length::from(`, `Size::new(`, `Pixels(`, `Pixels::from(`, `40.0.into()` in those places. A window's size (`size:`, `min_size`, `with_size(`) and a canvas program's own coordinates aren't layout and pass. |
+| `size` | A number in a width, height, position, stroke or icon size: QML's `width`, `implicitHeight`, `Layout.preferred*`, `border.width`; iced's `.width(`, `Length::Fixed(`, `Length::from(`, `Size::new(`, `Pixels(`, `Pixels::from(`, `40.0.into()` in those places. A size given to iced's window API (`window::Settings`, `min_size`, `max_size`, `with_size(`) is the window's, not layout, and passes. Any other window size, or a canvas program's coordinates in units of its own size, carries a marker. |
 | `radius` | A number in a corner radius. |
-| `duration` | A number in QML's `duration` or `…Duration`; iced's `Duration::from_millis(`, `Duration::new(` and friends when they are motion: in a `mod motion`, or on a line about an animation (`DURATION`, `fade`, `.duration(`), and no longer than the longest duration token. A timeout, a poll, a caret's blink or a double-press window is behaviour, not motion. |
+| `duration` | A number in QML's `duration` or `…Duration`; iced's `Duration::from_millis(`, `Duration::new(` and friends, up to the longest duration token (`scene`, 1200 ms): any of them could be motion, whatever it is called. A longer one can't, and passes. A shorter timeout, poll or caret blink is behaviour, not motion, and carries a `design-allow(duration)` marker saying so. |
 | `font` | A family named in a string, a pixel or point size, a weight named in place (`Font.Medium`), a line height, letter spacing, in a binding or a `Qt.font({ … })`. |
 | `component` | A toolkit's own control where the library has the component: Qt Quick Controls' `Button`, `TextField`, `Switch` and the rest, in a file that imports them; iced's `button`, `text_input`, `text`, `checkbox`, `row`, `column`, `row!`. `kubaos-ui` and `KubaOS.Components` themselves may build on them. |
 
-**A custom number property** set to a literal counts where it is used: `property int rowH: 44` bound to a `height`, alone or in a sum, is a size, whatever it is called. One that only scales something (`parent.width * remaining`) is a factor, not a length.
+**A custom number property** set to a literal counts where it is used: `property int rowH: 44` bound to a `height`, alone or in a sum, is a size, whatever it is called. One that only scales something (`parent.width * remaining`) is a factor, not a length. A property used only inside a product (`cell: 40` read only as `cell * 7`) is missed: the rule can't tell a length times a count from a factor. Fixing one of these files finds it.
 
-Zero is never a literal, and neither is halving or doubling a token (`/ 2` for a centre or a pill's radius, `Theme.spacing.md * 2` for both sides). Comments and strings that aren't colours or families are never read.
+Zero is never a literal, and neither is halving or doubling a token (`/ 2` for a centre or a pill's radius, `Theme.spacing.md * 2` for both sides), or a whole count of a named length (`cell * 7` for seven columns). A count of a number (`24 * 7`) is still a literal. Comments and strings that aren't colours or families are never read.
 
 **The baseline.** The front ends that predate this file break these rules hundreds of times, until their alignment issues (#148 to #153) fix them. `design/lint-baseline.toml` holds how many violations of each rule each file may still have:
 
