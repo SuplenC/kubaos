@@ -423,7 +423,7 @@ config/quickshell/modules/osd/Osd.qml: 3 radius violation(s), the baseline allow
   config/quickshell/modules/osd/Osd.qml:36:13: radius: `radius: 6`
   config/quickshell/modules/osd/Osd.qml:87:21: radius: `radius: 4`
   config/quickshell/modules/osd/Osd.qml:93:25: radius: `radius: 4`
-kubaos-design lint: 166 file(s), 807 violation(s), 806 in the baseline: FAILED
+kubaos-design lint: 166 file(s), 806 violation(s), 805 in the baseline: FAILED
 ```
 
 **A justified literal** carries a marker on its own line right above it, in the file's line comment, naming the rule and the reason:
