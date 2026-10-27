@@ -437,3 +437,6 @@ fn rectangle(r: Rect) -> Rectangle {
         height: r.height,
     }
 }
+
+#[cfg(test)]
+mod tests;

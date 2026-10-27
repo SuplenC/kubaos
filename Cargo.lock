@@ -2350,6 +2350,7 @@ name = "kubaos-ui"
 version = "0.1.0"
 dependencies = [
  "iced",
+ "iced_runtime",
  "iced_test",
  "kubaos-geometry",
 ]

@@ -27,6 +27,8 @@ iced = { version = "0.14", default-features = false, features = [
 [dev-dependencies]
 # Lays views out headlessly, so the layout primitives' boxes can be measured.
 iced_test = "0.14"
+# Runs an operation over a laid-out view, so the probes' tree can be read.
+iced_runtime = "0.14"
 
 [lints]
 workspace = true

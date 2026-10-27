@@ -188,7 +188,8 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
             input = input.on_input(on_input);
         }
         let Some(glyph) = self.icon else {
-            return focus_ring(look, input, Radius::R12, focused, RingColor::Accent);
+            let view: Element<'a, M> = focus_ring(look, input, Radius::R12, focused, RingColor::Accent);
+            return probe::component("Field", variant, Fixed::HEIGHT, view);
         };
         // The icon is drawn over the field, in a box 12 wider than itself on each side, so it
         // centres on the field's height on a whole device pixel.
