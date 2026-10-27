@@ -28,6 +28,7 @@ pub mod migrations;
 pub mod notice;
 pub mod policy;
 pub mod record;
+pub mod security;
 pub mod version;
 
 mod updater;

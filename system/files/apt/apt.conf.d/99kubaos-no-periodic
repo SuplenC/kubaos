@@ -1,0 +1,10 @@
+// Installed to /etc/apt/apt.conf.d/99kubaos-no-periodic by `retire_ubuntu_updaters` in
+// `system/lib.sh`. Only `kubaos update` runs apt: no list refresh, download, unattended upgrade
+// or cleanup on a timer. It sorts after Ubuntu's `20auto-upgrades`, so its zeros win, and it
+// keeps `apt.systemd.daily` idle if a package ever starts the apt-daily timers again.
+APT::Periodic::Enable "0";
+APT::Periodic::Update-Package-Lists "0";
+APT::Periodic::Download-Upgradeable-Packages "0";
+APT::Periodic::Unattended-Upgrade "0";
+APT::Periodic::AutocleanInterval "0";
+APT::Periodic::CleanInterval "0";

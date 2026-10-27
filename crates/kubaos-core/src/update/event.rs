@@ -284,6 +284,9 @@ pub enum UpdateEvent {
         update: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         upgrade: Option<String>,
+        /// How many apt packages from a security pocket `kubaos update` would upgrade.
+        #[serde(default, skip_serializing_if = "count_is_zero")]
+        apt_security: usize,
     },
     /// Last event of an update, upgrade or rollback that went through.
     Summary(Summary),
@@ -338,6 +341,12 @@ pub fn chain(e: &dyn Error) -> String {
         source = cause.source();
     }
     text
+}
+
+/// For `skip_serializing_if`: a count that is zero leaves its key out of the JSON.
+#[expect(clippy::trivially_copy_pass_by_ref, reason = "serde passes the field by reference")]
+fn count_is_zero(n: &usize) -> bool {
+    *n == 0
 }
 
 #[cfg(test)]

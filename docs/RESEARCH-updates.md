@@ -1,5 +1,7 @@
 # Research: coordinating ISO releases and in-system updates
 
+> **2026-10-27:** unattended-upgrades and the apt-daily timers are retired: nothing runs apt but `kubaos update`, and the daily check notifies about pending apt security updates. Where this research says unattended-upgrades installs security updates, that no longer holds; see "Ubuntu's own updaters are retired" in `docs/CONTRACTS.md`.
+
 Question (2026-10-18): the ISOs can't go on GitHub Releases as they are (issue #7). Beyond that, how should KubaOS coordinate the ISO releases with updates that run on an installed machine?
 
 Sources are linked inline. Repo claims cite `path:line` at commit `bb6ddd9`. Omarchy claims cite its source at `basecamp/omarchy@4e059ac` (2026-10-18). Nix claims cite the manual sources in [NixOS/nix](https://github.com/NixOS/nix/tree/2.35.3) at tag `2.35.3`, the version `system/60-nix.sh:24` installs. home-manager claims cite [`release-26.05` at `ab3823b`](https://github.com/nix-community/home-manager/tree/ab3823b4b24c0c3ca984c1f3ee577fd6d667424c). Cachix CLI claims cite [`cachix/cachix@3349ce7`](https://github.com/cachix/cachix/tree/3349ce74ba77f1382814cf611c6f42484956dc41).

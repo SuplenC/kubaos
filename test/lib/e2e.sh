@@ -2905,6 +2905,40 @@ fast_boot_state() {
   echo "ok   Docker starts from its socket, nothing waits for the network, setvtrgb is masked"
 }
 
+# Ubuntu's updaters off: the retire-ubuntu-updaters system migration on a machine
+# as an older install left it (the apt-daily timers enabled, apt's periodic jobs
+# on) masks them and sets the jobs to 0, and a second run changes nothing.
+c_updaters() {
+  local mig out unit state
+  mig="$(ls "$REPO"/migrations/system/*-retire-ubuntu-updaters.sh)"
+  rm -f /etc/apt/apt.conf.d/99kubaos-no-periodic
+  for unit in apt-daily.timer apt-daily-upgrade.timer; do
+    systemctl unmask "$unit" >/dev/null 2>&1
+    systemctl enable "$unit" >/dev/null 2>&1 || { echo "FAIL could not enable $unit first"; return 1; }
+  done
+  printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' >/etc/apt/apt.conf.d/20auto-upgrades
+
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig:"; echo "$out" | tail; return 1; }
+  for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service \
+    unattended-upgrades.service; do
+    systemctl cat "$unit" >/dev/null 2>&1 || [[ $unit != unattended-upgrades.service ]] || continue
+    state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
+    [[ $state == masked ]] || { echo "FAIL $unit is $state, not masked"; return 1; }
+  done
+  cmp -s "$REPO/system/files/apt/apt.conf.d/99kubaos-no-periodic" /etc/apt/apt.conf.d/99kubaos-no-periodic ||
+    { echo "FAIL the migration didn't install 99kubaos-no-periodic"; return 1; }
+  [[ $(apt-config shell v APT::Periodic::Update-Package-Lists) == "v='0'" &&
+    $(apt-config shell v APT::Periodic::Unattended-Upgrade) == "v='0'" ]] ||
+    { echo "FAIL apt still has a periodic job on"; return 1; }
+
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig, run again:"; echo "$out" | tail; return 1; }
+  if grep -E '^\s+\+ |creating|replacing' <<<"$out"; then
+    echo "FAIL the migration changed something on its second run (above)"
+    return 1
+  fi
+  echo "ok   the retire-ubuntu-updaters migration: the apt-daily timers and unattended-upgrades masked, apt's periodic jobs 0, a second run changes nothing"
+}
+
 # The boot splash under Xvfb (Plymouth's X11 renderer), in each mode the
 # machine runs it in: on boot the sign comes on and stays lit; on shutdown
 # and reboot (the modes plymouth-poweroff and plymouth-reboot use) it starts
@@ -3024,7 +3058,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites dot_config user_layer update_edge update_stable rollback; do
+  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites dot_config user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

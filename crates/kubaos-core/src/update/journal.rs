@@ -334,8 +334,12 @@ fn log_text(event: &UpdateEvent) -> Option<String> {
             let detail = detail.as_ref().map(|d| format!(": {d}")).unwrap_or_default();
             format!("== {} {word} in {:.1}s{detail}", phase.title(), *elapsed_ms as f64 / 1000.0)
         }
-        UpdateEvent::Available { update, upgrade } => format!(
-            "available: update {}, upgrade {}",
+        UpdateEvent::Available {
+            update,
+            upgrade,
+            apt_security,
+        } => format!(
+            "available: update {}, upgrade {}, {apt_security} apt security",
             update.as_deref().unwrap_or("none"),
             upgrade.as_deref().unwrap_or("none")
         ),

@@ -17,7 +17,9 @@ Singleton {
     // "0.2.0": the next series, which only kubaos upgrade installs.
     readonly property string upgrade: info.upgrade ?? ""
     readonly property string upgradeCodename: info["upgrade-codename"] ?? ""
-    readonly property bool available: update !== "" || upgrade !== ""
+    // How many apt packages from a security pocket kubaos update would upgrade.
+    readonly property int aptSecurity: Number(info["apt-security"] ?? 0)
+    readonly property bool available: update !== "" || upgrade !== "" || aptSecurity > 0
 
     // In a terminal, so sudo's prompt and apt's output stay visible.
     function run(command: string): void {

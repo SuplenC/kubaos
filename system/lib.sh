@@ -514,6 +514,46 @@ install_fast_shutdown_boot() {
   fi
 }
 
+# file_locked FILE: whether a process holds a lock on FILE, from the kernel's lock table. It is
+# read-only and sees flock and fcntl locks alike; unattended-upgrade takes an fcntl one, which
+# `flock -n` on the file would not notice.
+file_locked() {
+  local inode
+  [[ -e "$1" ]] || return 1
+  inode="$(stat -c %i -- "$1")"
+  grep -q ":$inode " /proc/locks
+}
+
+# retire_ubuntu_updaters: nothing but `kubaos update` runs apt. unattended-upgrades and the
+# apt-daily timers refresh lists and install packages in the background, where they can hold the
+# dpkg lock while an update runs, wake the machine and use the network and battery. Their timers
+# and unattended-upgrades.service stop now; the units are disabled and masked, so a package
+# upgrade can't enable them again; apt's periodic jobs are set to 0.
+#
+# Stopping unattended-upgrades.service sends SIGTERM to an upgrade that is running, which stops
+# it gracefully, and the stop blocks until it has, up to 30 minutes. So the stop is skipped while
+# /var/run/unattended-upgrades.lock is held; the disable and mask still apply, and it does not
+# start again. apt-daily's services are never stopped: a run in progress finishes.
+# 10-strip.sh runs it, and a migration on machines installed before it.
+retire_ubuntu_updaters() {
+  local unit
+  install_root_file "$FILES_DIR/apt/apt.conf.d/99kubaos-no-periodic" \
+    /etc/apt/apt.conf.d/99kubaos-no-periodic 0644
+  for unit in apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service; do
+    has_systemd && systemctl is-active -q "$unit" || continue
+    if [[ "$unit" == unattended-upgrades.service ]] && file_locked /var/run/unattended-upgrades.lock; then
+      info "an unattended upgrade is running: $unit is only disabled and masked, not stopped"
+    else
+      sudo_run systemctl stop "$unit"
+    fi
+  done
+  for unit in apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service \
+    apt-daily.service apt-daily-upgrade.service; do
+    boot_unit "$unit" disable
+    boot_unit "$unit" mask
+  done
+}
+
 # install_shutdown_splash: the splash on poweroff and reboot shows every time
 # and gets to play out. Plymouth's shutdown units start once the sessions
 # have ended, so Hyprland no longer holds the screen, and

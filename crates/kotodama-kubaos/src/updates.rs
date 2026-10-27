@@ -4,6 +4,7 @@
 //! (`kubaos_core::update::notice` owns the format).
 //!
 //! - `update` puts what `kubaos update` would install in its subtitle.
+//! - `apt-security` adds how many apt security updates wait to that subtitle.
 //! - `upgrade` is listed only when a next series is out, titled with its codename.
 //!
 //! # Owns
@@ -36,6 +37,8 @@ pub struct Pending {
     /// The next series' version, "0.2.0".
     upgrade: Option<String>,
     upgrade_codename: Option<String>,
+    /// How many apt packages from a security pocket `kubaos update` would upgrade.
+    apt_security: usize,
 }
 
 impl Pending {
@@ -59,6 +62,7 @@ impl Pending {
             update: get("update"),
             upgrade: get("upgrade"),
             upgrade_codename: get("upgrade-codename"),
+            apt_security: get("apt-security").and_then(|n| n.parse().ok()).unwrap_or(0),
         }
     }
 
@@ -67,9 +71,12 @@ impl Pending {
     pub fn apply(&self, mut item: Item) -> Option<Item> {
         match item.id.as_str() {
             UPDATE => {
-                if let Some(update) = &self.update {
-                    item.subtitle = Some(format!("KubaOS {update} is ready. Update when you feel like it"));
-                }
+                item.subtitle = match (&self.update, self.apt_security) {
+                    (Some(update), 0) => Some(format!("KubaOS {update} is ready. Update when you feel like it")),
+                    (Some(update), n) => Some(format!("KubaOS {update} is ready, {}", security_words(n))),
+                    (None, 0) => item.subtitle,
+                    (None, n) => Some(format!("Packages are due: {}", security_words(n))),
+                };
                 Some(item)
             }
             UPGRADE => {
@@ -97,6 +104,12 @@ pub fn state_dir() -> Option<PathBuf> {
     var("XDG_STATE_HOME")
         .or_else(|| var("HOME").map(|home| home.join(".local/state")))
         .map(|state| state.join("kubaos"))
+}
+
+/// "1 apt security update waiting", "3 apt security updates waiting".
+fn security_words(n: usize) -> String {
+    let noun = if n == 1 { "update" } else { "updates" };
+    format!("{n} apt security {noun} waiting")
 }
 
 fn capitalise(word: &str) -> String {

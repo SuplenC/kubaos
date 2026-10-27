@@ -61,7 +61,7 @@ sudo rm -rf /etc/cloud /var/lib/cloud ~/snap
 ```
 
 - Disable the Ubuntu Pro adverts: `sudo pro config set apt_news=false` and disable `motd-news`.
-- Keep `unattended-upgrades` (security updates only).
+- Retire `unattended-upgrades` and the `apt-daily` timers (masked): `kubaos update` owns updates, and its daily check notifies about pending apt security updates.
 
 ## Phase 3: Base system, network, audio, plumbing
 
