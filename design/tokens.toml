@@ -566,6 +566,7 @@ manage_search = { tabler = "list-search" }
 memory = { tabler = "cpu" }
 memory_alt = { tabler = "device-sd-card" }
 mode_fan = { tabler = "propeller" }
+mood = { tabler = "mood-smile" }
 more_time = { tabler = "clock-plus" }
 motion_photos_auto = { tabler = "circle-dashed-letter-a" }
 motion_photos_off = { tabler = "circle-dashed-x" }
