@@ -1022,6 +1022,8 @@ pub enum Icon {
     MemoryAlt,
     /// Tabler's `propeller`.
     ModeFan,
+    /// Tabler's `mood-smile`.
+    Mood,
     /// Tabler's `clock-plus`.
     MoreTime,
     /// Tabler's `circle-dashed-letter-a`.
@@ -1144,7 +1146,7 @@ pub enum Icon {
 
 impl Icon {
     /// Every symbol.
-    pub const ALL: [Icon; 126] = [
+    pub const ALL: [Icon; 127] = [
         Icon::AccountCircle,
         Icon::Add,
         Icon::AddLocationAlt,
@@ -1212,6 +1214,7 @@ impl Icon {
         Icon::Memory,
         Icon::MemoryAlt,
         Icon::ModeFan,
+        Icon::Mood,
         Icon::MoreTime,
         Icon::MotionPhotosAuto,
         Icon::MotionPhotosOff,
@@ -1343,6 +1346,7 @@ impl Icon {
             Icon::Memory => "memory",
             Icon::MemoryAlt => "memory_alt",
             Icon::ModeFan => "mode_fan",
+            Icon::Mood => "mood",
             Icon::MoreTime => "more_time",
             Icon::MotionPhotosAuto => "motion_photos_auto",
             Icon::MotionPhotosOff => "motion_photos_off",
@@ -1475,6 +1479,7 @@ impl Icon {
             Icon::Memory => Some("cpu"),
             Icon::MemoryAlt => Some("device-sd-card"),
             Icon::ModeFan => Some("propeller"),
+            Icon::Mood => Some("mood-smile"),
             Icon::MoreTime => Some("clock-plus"),
             Icon::MotionPhotosAuto => Some("circle-dashed-letter-a"),
             Icon::MotionPhotosOff => Some("circle-dashed-x"),
@@ -1607,6 +1612,7 @@ impl Icon {
             Icon::Memory => include_str!("../assets/symbols/memory.svg"),
             Icon::MemoryAlt => include_str!("../assets/symbols/memory_alt.svg"),
             Icon::ModeFan => include_str!("../assets/symbols/mode_fan.svg"),
+            Icon::Mood => include_str!("../assets/symbols/mood.svg"),
             Icon::MoreTime => include_str!("../assets/symbols/more_time.svg"),
             Icon::MotionPhotosAuto => include_str!("../assets/symbols/motion_photos_auto.svg"),
             Icon::MotionPhotosOff => include_str!("../assets/symbols/motion_photos_off.svg"),

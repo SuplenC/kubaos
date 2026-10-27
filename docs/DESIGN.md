@@ -169,6 +169,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `linear` | 0, 0, 1, 1 | Progress that tracks a real quantity, and spinners. |
 
 - **Arriving is slower than leaving** (`long` in, `medium` out): you look at what arrives, and what leaves is already done with.
+- **A surface a key summons to act and go is one step quicker**: the Command menu arrives over `short` and leaves over `micro`, its Action panel the same, and its Views slide in over `medium`. A key opens and closes it many times an hour, and what it runs waits for it to be gone, so a panel's `long` and `medium` would be felt on every run.
 - **Speed** 0.5× to 2× divides every duration (`kubaos_ui::motion::Motion`). *Not enforced yet: lands in #154, the setting; `Motion` applies it once there is one.*
 - **Reduce motion** caps every duration at `short` and turns moves into fades, or into nothing. *Not enforced yet: lands in #154, the setting; `Motion` caps the durations once there is one.*
 - **What never animates:** typed text and the caret (`instant`), layout around focus (the ring is outside layout), a window's size or place, and anything while the user drags it.

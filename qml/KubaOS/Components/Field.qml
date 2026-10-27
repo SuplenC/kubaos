@@ -12,8 +12,12 @@ FocusScope {
 
     // Enter in the field: what was typed is done.
     signal accepted
+    // A key pressed while the field has the keyboard, before the field takes it: accept it to keep
+    // it from the text, as a search box over a list does with its arrows and Ctrl keys.
+    signal keyPressed(var event)
 
     property alias text: input.text
+    property alias cursorPosition: input.cursorPosition
     property string placeholder
     // A symbol inside the field, before the text, or none.
     property string icon: ""
@@ -119,10 +123,14 @@ FocusScope {
         font.preferShaping: false
         font.hintingPreference: Font.PreferNoHinting
         onAccepted: root.accepted()
+        Keys.onPressed: event => {
+            event.accepted = false;
+            root.keyPressed(event);
+        }
 
         Text {
             anchors.fill: parent
-            visible: input.text === ""
+            visible: input.text === "" && input.preeditText === ""
             text: root.placeholder
             verticalAlignment: Text.AlignVCenter
             color: K.Look.alpha(Tokens.color.on_surface_variant, Tokens.opacity.placeholder)

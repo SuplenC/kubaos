@@ -11,6 +11,8 @@ Item {
     property string text
     property string icon: ""
     property bool shown: true
+    // The widest the toast may be; past it, its line wraps.
+    property real room: Infinity
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property var probe: ({
@@ -51,6 +53,7 @@ Item {
 
         x: Tokens.space.s16
         y: Tokens.space.s12
+        room: root.room - Tokens.space.s16 * 2
         gap: Tokens.space.s12
         align: "centre"
 

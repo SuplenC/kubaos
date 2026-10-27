@@ -2,60 +2,93 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import Kotodama
+import KubaOS.Components as K
 import qs.theme
-import qs.components
 import qs.services
+import qs.settings
 
-// The Command menu: KubaOS's own front end on Kotodama's `KotodamaSearch`, in
-// Kōbō's look. A search box over the Daemon's Results, a detail pane beside
-// them when the screen has room, the Views Extensions push, the jobs they
-// run, and each Result's Action panel. Kotodama's `KotodamaMenu.qml` handles
-// the same calls; this file follows it call for call.
+// The Command menu: KubaOS's own front end on Kotodama's `KotodamaSearch`, built from
+// `KubaOS.Components`. A search field over the Daemon's Results, a detail pane beside them when
+// the screen has room, the Views Extensions push, the jobs they run, and each Result's Action
+// panel. Kotodama's `KotodamaMenu.qml` handles the same calls; this file follows it call for call.
 //
-// `kotodama toggle` (SUPER + Space, config/hypr/fallback.lua) opens it
-// through the Daemon, so it has no IPC target of its own. Hyprland blurs what
-// shows through its translucent panel (the `kotodama` layer,
-// config/hypr/rules.lua), and leaves its motion to it.
+// `kotodama toggle` (SUPER + Space, config/hypr/fallback.lua) opens it through the Daemon, so it
+// has no IPC target of its own. Hyprland blurs what shows through its translucent panel (the
+// `kotodama` layer, config/hypr/rules.lua), and leaves its motion to it.
 //
-// Speed comes first: a keystroke's Results reach the screen in the frame they
-// arrive. Nothing waits on an animation, the rows are cheap (ResultRow.qml),
-// and the detail pane updates only once a frame with the Results is on
-// screen and typing has paused.
+// Speed comes first: a keystroke's Results reach the screen in the frame they arrive. Nothing waits
+// on an animation, the rows are cheap (ResultRow.qml), and the detail pane updates only once a
+// frame with the Results is on screen and typing has paused. The panel's frame (the field, the
+// footer, the cards) is the library's components on its layout primitives, laid out while the menu
+// is built; what changes with every key is in `Label`s on token arithmetic, which costs a keystroke
+// nothing to lay out.
 PanelWindow {
     id: menu
 
-    // It opens on the focused screen, and stays there while it is open, even
-    // when the pointer crosses to another screen and takes the focus with it.
+    // It opens on the focused screen, and stays there while it is open, even when the pointer
+    // crosses to another screen and takes the focus with it.
     Binding on screen {
         value: Hypr.focusedScreen
         when: !menu.visible
         restoreMode: Binding.RestoreNone
     }
 
-    readonly property MenuLook look: MenuLook {
-        screen: menu.screen
-    }
-    // The search under a name its children's own `search` properties don't
-    // shadow.
+    // The search under a name its children's own `search` properties don't shadow.
     readonly property KotodamaSearch engine: search
     readonly property string placeholder: "Search apps, projects and windows. Sums work too"
 
+    // The panel's measures on the screen it opens on. Every one is a token or a whole count of
+    // one, so the panel's edges land on the 4 px grid, and so on whole device pixels at every
+    // supported scale.
+    readonly property int screenWidth: menu.screen?.width ?? 0
+    readonly property int screenHeight: menu.screen?.height ?? 0
+    readonly property real dpr: menu.screen?.devicePixelRatio ?? 1
+    // The panel's padding, and the room between its parts: the field, the body and the footer, the
+    // list and the pane. Rows 12 in nest their corners in the panel's.
+    readonly property int gap: K.Tokens.space.s12
+    // Half the screen's width, from one column to two.
+    readonly property int panelWidth: Math.max(K.Tokens.size.column, Math.min(K.Tokens.size.column * 2, menu.onGrid(menu.screenWidth / 2)))
+    // The detail pane shows on a panel as wide as a dialog beside a rail: a 1536 wide screen (1080p
+    // at 1.25) has it, a 1280 wide one doesn't. It takes two fifths of the room, a rail at the
+    // least.
+    readonly property bool paneFits: menu.panelWidth >= K.Tokens.size.dialog + K.Tokens.size.rail
+    readonly property real paneShare: 0.4
+    readonly property int paneWidth: menu.paneFits ? Math.max(K.Tokens.size.rail, menu.onGrid((menu.panelWidth - menu.gap * 3) * menu.paneShare)) : 0
+    // A row and the gap under it.
+    readonly property int pitch: K.Tokens.size.row_two_line + K.Tokens.space.s4
+    // Everything but the body: the gaps round the field, the body and the footer (the footer's
+    // divider sits in one), and the field and the footer themselves.
+    readonly property int chrome: menu.gap * 5 + K.Tokens.size.control_md + K.Tokens.size.control_sm
+    // Rows fill about two thirds of the screen's height: a taller screen shows more of them. Eight
+    // at the least, the e2e harness's 1280×800 included.
+    readonly property int rows: Math.max(menu.minRows, Math.min(menu.maxRows, Math.floor((menu.screenHeight * 0.64 - menu.chrome) / menu.pitch)))
+    readonly property int minRows: 8
+    readonly property int maxRows: 14
+    readonly property int bodyHeight: menu.rows * menu.pitch - K.Tokens.space.s4
+    readonly property int panelHeight: menu.chrome + menu.bodyHeight
+    // Two fifths of the height it leaves free above it, as the screen's optical centre.
+    readonly property int top: menu.onGrid((menu.screenHeight - menu.panelHeight) * 0.4)
+
+    // Whether things may move, not only fade.
+    readonly property bool moves: Settings.menuMotion !== "fades"
+    // How far the window drops in as it opens, and a View slides as it is pushed or popped.
+    readonly property int openTravel: menu.moves ? K.Tokens.space.s8 : 0
+    readonly property int viewTravel: menu.moves ? K.Tokens.space.s24 : 0
+
     // Why the last Action failed, until the next Action or opening.
     property string failure: ""
-    // The top View's kind (`list`, `form`, `detail` or `progress`), or empty
-    // at the search.
+    // The top View's kind (`list`, `form`, `detail` or `progress`), or empty at the search.
     readonly property string kind: search.view.kind ?? ""
     // Whether the body is a list: the Results, or a list View's Items.
     readonly property bool listing: kind === "" || kind === "list"
-    readonly property bool paneShown: look.paneFits && listing
+    readonly property bool paneShown: menu.paneFits && listing
     // The Action panel of the selected row while Ctrl+K shows it: each entry
     // `{title, group, shortcut}`, as `KotodamaSearch.actions` gives them.
     property var actions: []
     readonly property bool actionsOpen: actions.length > 0
-    // The keys the selected row takes, for the footer when there is no pane
-    // to show them. Reading the row's markup and unavailable makes them
-    // follow a new Result in the same place, not only a move of the
-    // selection.
+    // The keys the selected row takes, for the footer when there is no pane to show them. Reading
+    // the row's markup and unavailable makes them follow a new Result in the same place, not only a
+    // move of the selection.
     readonly property string hints: {
         const row = list.currentItem;
         if (menu.paneShown || !row || !menu.listing)
@@ -80,8 +113,7 @@ PanelWindow {
         return paneShown ? `↑↓ Select · ⌃K Actions · ${escapeHint}` : hints;
     }
 
-    // The selected row, by what it is: a new key is a new selection, which
-    // the pane crossfades to.
+    // The selected row, by what it is: a new key is a new selection, which the pane crossfades to.
     readonly property string selectedKey: {
         const row = list.currentItem;
         return row && menu.listing ? `${row.extension}\n${row.title}\n${row.subtitle}` : "";
@@ -93,20 +125,24 @@ PanelWindow {
 
     // 0 hidden, 1 open; the window fades and drops in between.
     property real openness: 0
-    // How far the body has yet to slide, and how faded it still is, after a
-    // View was pushed or popped.
+    // How far the body has yet to slide, and how faded it still is, after a View was pushed or
+    // popped.
     property real slide: 0
     property real settle: 1
     property int lastDepth: 0
-    // Results a keystroke changed show at once. While any animation runs,
-    // each frame waits on the screen's next refresh, so the rows and the
-    // highlight move only for changes nobody typed, and the pane catches up
-    // when typing pauses: a glide after the last key.
+    // Results a keystroke changed show at once. While any animation runs, each frame waits on the
+    // screen's next refresh, so the rows and the highlight move only for changes nobody typed, and
+    // the pane catches up when typing pauses: the selection's glide after the last key.
     readonly property bool typing: keystroke.running
 
-    // The Daemon types or pastes once the window is gone and focus is back
-    // where the user came from, so it is told only after the window unmaps.
+    // The Daemon types or pastes once the window is gone and focus is back where the user came
+    // from, so it is told only after the window unmaps.
     property bool closeAsked: false
+
+    // `v` down to the 4 px grid.
+    function onGrid(v: real): int {
+        return Math.floor(v / K.Tokens.rules.grid) * K.Tokens.rules.grid;
+    }
 
     function show(query: string): void {
         menu.failure = "";
@@ -126,8 +162,8 @@ PanelWindow {
         menu.focusView();
     }
 
-    // Closing pops no View: Extensions aren't told the user left one, so their
-    // jobs keep running, and the menu opens again where it was. Only Esc pops.
+    // Closing pops no View: Extensions aren't told the user left one, so their jobs keep running,
+    // and the menu opens again where it was. Only Esc pops.
     function hide(): void {
         menu.actions = [];
         search.cancelConfirm();
@@ -137,8 +173,8 @@ PanelWindow {
         closing.restart();
     }
 
-    // Gives keys to the top View: the search box, a list's filter, the first
-    // field of a form, or the menu itself for a detail or a progress View.
+    // Gives keys to the top View: the search field, a list's filter, the first field of a form,
+    // or the menu itself for a detail or a progress View.
     function focusView(): void {
         if (menu.actionsOpen)
             actionPanel.forceActiveFocus();
@@ -200,21 +236,19 @@ PanelWindow {
         };
     }
 
-    // Ctrl and no other modifier: the menu's own Ctrl keys leave Ctrl+Shift+K
-    // and the like to the Actions' key bindings.
+    // Ctrl and no other modifier: the menu's own Ctrl keys leave Ctrl+Shift+K and the like to the
+    // Actions' key bindings.
     function ctrlOnly(event: KeyEvent): bool {
         return (event.modifiers & (Qt.ControlModifier | Qt.ShiftModifier | Qt.AltModifier | Qt.MetaModifier)) === Qt.ControlModifier;
     }
 
-    // Whether `event` is a modifier pressed on its own, as on the way to a
-    // key binding.
+    // Whether `event` is a modifier pressed on its own, as on the way to a key binding.
     function modifierAlone(event: KeyEvent): bool {
         return [Qt.Key_Shift, Qt.Key_Control, Qt.Key_Alt, Qt.Key_Meta, Qt.Key_Super_L, Qt.Key_Super_R].includes(event.key);
     }
 
-    // While the Toast shows, its key undoes what it offers to, whatever has
-    // the keys; otherwise the key is the text box's own undo. True if
-    // `event` was it.
+    // While the Toast shows, its key undoes what it offers to, whatever has the keys; otherwise
+    // the key is the text field's own undo. True if `event` was it.
     function undoKey(event: KeyEvent): bool {
         if (search.toast === "" || !search.isUndoKey(event.key, event.modifiers))
             return false;
@@ -228,8 +262,8 @@ PanelWindow {
         const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter;
         if (menu.undoKey(event))
             return true;
-        // An Action that asks first waits in the footer: Enter runs it, Esc
-        // drops it, and any other key drops it and does what it does.
+        // An Action that asks first waits in the footer: Enter runs it, Esc drops it, and any
+        // other key drops it and does what it does.
         if (search.confirming !== "" && !menu.modifierAlone(event)) {
             if (enter) {
                 menu.failure = "";
@@ -241,10 +275,9 @@ PanelWindow {
                 return true;
         }
         if (event.key === Qt.Key_Escape) {
-            // One rule everywhere, so Esc never throws away more than the
-            // user can see: it clears the text if there is any, else pops
-            // the View, else leaves the app for the whole search, else
-            // closes the menu.
+            // One rule everywhere, so Esc never throws away more than the user can see: it clears
+            // the text if there is any, else pops the View, else leaves the app for the whole
+            // search, else closes the menu.
             if (menu.kind === "list" && filter.text !== "")
                 filter.text = "";
             else if (menu.kind === "" && input.text !== "")
@@ -285,9 +318,9 @@ PanelWindow {
         } else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_P)) {
             list.decrementCurrentIndex();
         } else if (event.key === Qt.Key_PageDown) {
-            list.currentIndex = Math.min(list.count - 1, list.currentIndex + menu.look.rows);
+            list.currentIndex = Math.min(list.count - 1, list.currentIndex + menu.rows);
         } else if (event.key === Qt.Key_PageUp) {
-            list.currentIndex = Math.max(0, list.currentIndex - menu.look.rows);
+            list.currentIndex = Math.max(0, list.currentIndex - menu.rows);
         } else if ((event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) && search.runShortcut(list.currentIndex, event.key, event.modifiers)) {
             menu.failure = "";
         } else {
@@ -299,21 +332,21 @@ PanelWindow {
     visible: false
     // Anchored at the top only, so the compositor centres it horizontally.
     anchors.top: true
-    margins.top: look.top
-    // The surface keeps one size for the screen, so typing never waits on a
-    // resize, and nothing jumps as Results, the pane or a status come and go.
-    implicitWidth: look.width
-    implicitHeight: look.height
+    margins.top: menu.top
+    // The surface keeps one size for the screen, so typing never waits on a resize, and nothing
+    // jumps as Results, the pane or a status come and go.
+    implicitWidth: menu.panelWidth
+    implicitHeight: menu.panelHeight
     exclusionMode: ExclusionMode.Ignore
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "kotodama"
-    // Held only while the pointer is on the menu's screen, so the other
-    // screens stay usable while it is open.
+    // Held only while the pointer is on the menu's screen, so the other screens stay usable while
+    // it is open.
     WlrLayershell.keyboardFocus: visible && !closing.running && Hypr.focusedScreen === screen ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
 
-    // However the window opened, the Daemon is told, so the Empty query it
-    // shows is ranked for this time of day.
+    // However the window opened, the Daemon is told, so the Empty query it shows is ranked for
+    // this time of day.
     onVisibleChanged: {
         if (visible)
             search.shown();
@@ -342,7 +375,7 @@ PanelWindow {
     KotodamaSearch {
         id: search
 
-        highlightColor: Theme.m3primary
+        highlightColor: K.Tokens.color.primary
         onOpenRequested: (query, view) => menu.show(query)
         onToggleRequested: menu.visible && !closing.running ? menu.hide() : menu.show("")
         onCloseRequested: {
@@ -354,15 +387,15 @@ PanelWindow {
             }
         }
         onActionFailed: message => menu.failure = message
-        // The box shows the rest of the query once it is in an app,
-        // or what the Daemon typed. The cursor keeps its place from the end.
+        // The field shows the rest of the query once it is in an app, or what the Daemon typed.
+        // The cursor keeps its place from the end.
         onQueryReplaced: text => {
             const fromEnd = input.text.length - input.cursorPosition;
             input.text = text;
             input.cursorPosition = Math.max(0, text.length - fromEnd);
         }
-        // A list View's rows changed: its selected Item is at `row`, or the
-        // top row is selected, as in the search, if it went away.
+        // A list View's rows changed: its selected Item is at `row`, or the top row is selected,
+        // as in the search, if it went away.
         onSelectRow: row => {
             list.currentIndex = row;
             follow.stop();
@@ -377,14 +410,14 @@ PanelWindow {
             list.currentIndex = 0;
             follow.stop();
             list.positionViewAtBeginning();
-            viewMove.from = search.depth > menu.lastDepth ? menu.look.motion.viewTravel : -menu.look.motion.viewTravel;
+            viewMove.from = search.depth > menu.lastDepth ? menu.viewTravel : -menu.viewTravel;
             menu.lastDepth = search.depth;
             if (menu.visible)
                 viewIn.restart();
         }
-        // A View that is pushed, popped or changed takes the keys; one whose
-        // job progressed keeps them where they are. A list's filter shows
-        // what was typed into it, which is nothing for a new one.
+        // A View that is pushed, popped or changed takes the keys; one whose job progressed keeps
+        // them where they are. A list's filter shows what was typed into it, which is nothing for
+        // a new one.
         onViewChanged: {
             const typed = search.view.filter ?? "";
             if (filter.text !== typed)
@@ -397,18 +430,20 @@ PanelWindow {
     Timer {
         id: keystroke
 
-        interval: menu.look.motion.glide
+        interval: K.Tokens.duration.short
     }
 
+    // The Command menu's motion is one step quicker than a panel's (docs/DESIGN.md, "Motion"):
+    // a key opens and closes it many times an hour, and what it runs waits for it to go.
     NumberAnimation {
         id: opening
 
         target: menu
         property: "openness"
         to: 1
-        duration: menu.look.motion.open
+        duration: K.Tokens.duration.short
         easing.type: Easing.BezierSpline
-        easing.bezierCurve: menu.look.motion.arrive
+        easing.bezierCurve: K.Tokens.easing.emphasized_decel
     }
 
     NumberAnimation {
@@ -417,14 +452,14 @@ PanelWindow {
         target: menu
         property: "openness"
         to: 0
-        duration: menu.look.motion.close
+        duration: K.Tokens.duration.micro
         easing.type: Easing.BezierSpline
-        easing.bezierCurve: menu.look.motion.leave
+        easing.bezierCurve: K.Tokens.easing.emphasized_accel
         onFinished: menu.visible = false
     }
 
-    // The body arrives readable: it starts part faded, so a pushed list's
-    // rows show in the View's first frame.
+    // The body arrives readable: it starts part faded, so a pushed list's rows show in the View's
+    // first frame.
     ParallelAnimation {
         id: viewIn
 
@@ -434,9 +469,9 @@ PanelWindow {
             target: menu
             property: "slide"
             to: 0
-            duration: menu.look.motion.glide
+            duration: K.Tokens.duration.medium
             easing.type: Easing.BezierSpline
-            easing.bezierCurve: menu.look.motion.arrive
+            easing.bezierCurve: K.Tokens.easing.emphasized_decel
         }
 
         NumberAnimation {
@@ -444,9 +479,9 @@ PanelWindow {
             property: "settle"
             from: 0.4
             to: 1
-            duration: menu.look.motion.glide
+            duration: K.Tokens.duration.medium
             easing.type: Easing.BezierSpline
-            easing.bezierCurve: menu.look.motion.effects
+            easing.bezierCurve: K.Tokens.easing.emphasized_decel
         }
     }
 
@@ -456,240 +491,181 @@ PanelWindow {
         anchors.fill: parent
         opacity: menu.openness
         transform: Translate {
-            y: (menu.openness - 1) * menu.look.motion.openTravel
+            y: menu.openTravel * menu.openness - menu.openTravel
         }
 
+        // The panel: a surface of the frame's glass, which Hyprland blurs behind, in a hairline.
         Rectangle {
             anchors.fill: parent
-            radius: menu.look.radius
-            color: Theme.alpha(Theme.m3surface, Theme.frame.opacity)
-            border.width: 1
-            border.color: Theme.alpha(Theme.m3outlineVariant, 0.55)
+            radius: K.Tokens.radius.surface
+            color: K.Look.alpha(K.Tokens.color.surface, Theme.frame.opacity)
+            border.width: K.Look.hairline(menu.dpr)
+            border.color: K.Look.alpha(K.Tokens.color.outline_variant, K.Tokens.opacity.outline_soft)
         }
 
-        Item {
-            id: header
+        // The field, and the jobs still running under it.
+        K.Stack {
+            id: head
 
-            width: parent.width
-            height: menu.look.headerHeight
+            x: menu.gap
+            y: menu.gap
+            width: panel.width - menu.gap * 2
+            fill: true
+            gap: menu.gap
 
-            // A magnifier at the search, an arrow back in a View.
-            Icon {
-                id: lead
+            // Back out of a View; the app the search is in, such as Emoji, with the field holding
+            // what follows the app's word; the field, a list View's filter, or another View's
+            // title.
+            K.Row {
+                id: header
 
-                x: menu.look.pad
-                anchors.verticalCenter: parent.verticalCenter
-                name: search.depth > 0 ? "arrow_back" : "search"
-                size: menu.look.leadIcon
-                color: search.depth > 0 ? Theme.m3onSurface : Theme.m3primary
+                fill: true
+                fixedHeight: K.Tokens.size.control_md
+                gap: K.Tokens.space.s8
+                align: "centre"
 
-                MouseArea {
-                    anchors.fill: parent
-                    anchors.margins: -menu.look.gap
-                    enabled: search.depth > 0
-                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                    onClicked: search.popView()
+                K.IconButton {
+                    visible: search.depth > 0
+                    icon: "arrow_back"
+                    label: "Back"
+                    kind: "Text"
+                    activeFocusOnTab: false
+                    onActivated: search.popView()
                 }
-            }
 
-            // The app the search is in, such as Emoji: the box holds what
-            // follows the app's word.
-            Rectangle {
-                id: chip
-
-                objectName: "scope"
-                x: lead.x + lead.width + menu.look.inset
-                anchors.verticalCenter: parent.verticalCenter
-                visible: menu.kind === "" && search.scope !== ""
-                width: visible ? menu.look.snap(chipLabel.implicitWidth + 2 * menu.look.inset) : 0
-                height: menu.look.chipHeight
-                radius: height / 2
-                color: Theme.m3secondaryContainer
-
-                StyledText {
-                    id: chipLabel
-
-                    anchors.centerIn: parent
+                K.Chip {
+                    objectName: "scope"
+                    visible: menu.kind === "" && search.scope !== ""
                     text: search.scope
-                    color: Theme.m3onSecondaryContainer
-                    font.pixelSize: menu.look.font.title
-                    font.weight: Font.Medium
-                }
-            }
-
-            TextInput {
-                id: input
-
-                anchors.fill: parent
-                anchors.leftMargin: (chip.visible ? chip.x + chip.width : lead.x + lead.width) + menu.look.inset
-                anchors.rightMargin: menu.look.pad
-                visible: menu.kind === ""
-                verticalAlignment: TextInput.AlignVCenter
-                clip: true
-                color: Theme.m3onSurface
-                selectionColor: Theme.m3primary
-                selectedTextColor: Theme.m3onPrimary
-                renderType: Text.NativeRendering
-                font.family: Theme.font.sans
-                font.pixelSize: menu.look.font.query
-                focus: true
-                onTextChanged: {
-                    keystroke.restart();
-                    menu.paneTyped = true;
-                    search.query = text;
-                    list.currentIndex = 0;
-                    list.positionViewAtBeginning();
+                    kind: "Selected"
                 }
 
-                StyledText {
-                    anchors.fill: parent
-                    visible: input.text === "" && !input.preeditText
-                    text: search.scope !== "" ? `Search ${search.scope}` : menu.placeholder
-                    color: Theme.alpha(Theme.m3onSurfaceVariant, 0.8)
-                    font.pixelSize: menu.look.font.query
+                K.Field {
+                    id: input
+
+                    visible: menu.kind === ""
+                    icon: "search"
+                    placeholder: search.scope !== "" ? `Search ${search.scope}` : menu.placeholder
+                    focus: true
+                    onTextChanged: {
+                        keystroke.restart();
+                        menu.paneTyped = true;
+                        search.query = text;
+                        list.currentIndex = 0;
+                        list.positionViewAtBeginning();
+                    }
+                    // Backspace with nothing typed in an app leaves it: the whole search again,
+                    // with the app's word typed.
+                    onKeyPressed: event => {
+                        if (event.key === Qt.Key_Backspace && input.text === "" && search.leaveScope())
+                            event.accepted = true;
+                        else
+                            event.accepted = menu.key(event);
+                    }
                 }
 
-                // Backspace with nothing typed in an app leaves it: the whole
-                // search again, with the app's word typed.
-                Keys.onPressed: event => {
-                    if (event.key === Qt.Key_Backspace && input.text === "" && search.leaveScope())
-                        event.accepted = true;
-                    else
-                        event.accepted = menu.key(event);
-                }
-            }
+                // A list View's filter, with the View's title until something is typed. The
+                // Daemon matches what is typed as it does the search, so the rows narrow as they
+                // would there. The selection stays where it is until the matches come; see
+                // onSelectRow.
+                K.Field {
+                    id: filter
 
-            // A list View's filter, with the View's title until something is
-            // typed. The Daemon matches what is typed as it does the search,
-            // so the rows narrow as they would there.
-            TextInput {
-                id: filter
-
-                anchors.fill: parent
-                anchors.leftMargin: lead.x + lead.width + menu.look.inset
-                anchors.rightMargin: menu.look.pad
-                visible: menu.kind === "list"
-                verticalAlignment: TextInput.AlignVCenter
-                clip: true
-                color: Theme.m3onSurface
-                selectionColor: Theme.m3primary
-                selectedTextColor: Theme.m3onPrimary
-                renderType: Text.NativeRendering
-                font.family: Theme.font.sans
-                font.pixelSize: menu.look.font.query
-                // The selection stays where it is until the matches come;
-                // see onSelectRow.
-                onTextChanged: {
-                    keystroke.restart();
-                    menu.paneTyped = true;
-                    search.filter(text);
+                    visible: menu.kind === "list"
+                    icon: "search"
+                    placeholder: search.view.title ?? ""
+                    onTextChanged: {
+                        keystroke.restart();
+                        menu.paneTyped = true;
+                        search.filter(text);
+                    }
+                    onKeyPressed: event => event.accepted = menu.key(event)
                 }
 
-                StyledText {
-                    anchors.fill: parent
-                    visible: filter.text === "" && !filter.preeditText
+                // It takes the rest of the row, and a long one ends in an ellipsis.
+                Label {
+                    readonly property bool fillWidth: true
+
+                    visible: !menu.listing
                     text: search.view.title ?? ""
-                    color: Theme.alpha(Theme.m3onSurfaceVariant, 0.8)
-                    font.pixelSize: menu.look.font.query
+                    type: K.Tokens.type.subheading
                 }
-
-                Keys.onPressed: event => event.accepted = menu.key(event)
             }
 
-            // The title of any other View stands where the search box was.
-            StyledText {
-                anchors.fill: parent
-                anchors.leftMargin: lead.x + lead.width + menu.look.inset
-                anchors.rightMargin: menu.look.pad
-                visible: !menu.listing
-                text: search.view.title ?? ""
-                font.pixelSize: menu.look.font.query
-                font.weight: Font.Medium
-            }
+            // The jobs still running: each one's state, its title and what it last said, and its
+            // bar while it knows how far it has got.
+            K.Stack {
+                visible: menu.kind !== "progress" && search.jobs.length > 0
+                fill: true
+                gap: K.Tokens.space.s8
 
-            // Takes the keys of a View with nothing to type into.
-            Item {
-                id: viewKeys
+                Repeater {
+                    model: search.jobs
 
-                Keys.onPressed: event => event.accepted = menu.key(event)
-            }
-        }
+                    K.Grid {
+                        id: running
 
-        Rectangle {
-            id: headerRule
+                        required property var modelData
+                        readonly property bool failed: modelData.state === "failed"
+                        readonly property bool succeeded: modelData.state === "succeeded"
+                        readonly property bool known: modelData.progress >= 0
 
-            y: header.height
-            width: parent.width
-            height: 1
-            color: Theme.alpha(Theme.m3outlineVariant, 0.55)
-        }
+                        weights: [3, 1]
+                        gap: K.Tokens.space.s12
+                        centred: true
 
-        // The jobs still running, under the search box.
-        Column {
-            id: jobs
+                        K.Row {
+                            gap: K.Tokens.space.s8
+                            align: "centre"
 
-            y: headerRule.y + 1
-            width: parent.width
-            visible: menu.kind !== "progress" && search.jobs.length > 0
-            height: visible ? implicitHeight : 0
-            topPadding: menu.look.nudge
-            bottomPadding: menu.look.nudge
+                            // Only a job that can't tell how far it has got spins: a running
+                            // animation makes every frame wait on the screen's refresh, typing's
+                            // included.
+                            K.Spinner {
+                                visible: !running.failed && !running.succeeded && !running.known
+                                running: menu.moves && menu.visible
+                                size: K.Tokens.icon.s16
+                            }
 
-            Repeater {
-                model: search.jobs
+                            K.Icon {
+                                visible: running.failed || running.succeeded || running.known
+                                name: running.failed ? "error" : running.succeeded ? "check_circle" : "hourglass_top"
+                                size: K.Tokens.icon.s16
+                                color: running.failed ? K.Tokens.color.error : K.Tokens.color.primary
+                            }
 
-                Item {
-                    id: running
+                            K.Text {
+                                text: running.modelData.title + (running.modelData.message !== "" ? ` · ${running.modelData.message}` : "")
+                                style: K.Tokens.type.small
+                                color: running.failed ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
+                            }
+                        }
 
-                    required property var modelData
-
-                    width: jobs.width
-                    height: menu.look.jobHeight
-
-                    Icon {
-                        id: jobIcon
-
-                        x: menu.look.pad
-                        anchors.verticalCenter: parent.verticalCenter
-                        name: running.modelData.state === "failed" ? "error" : running.modelData.state === "succeeded" ? "check_circle" : "progress_activity"
-                        size: menu.look.jobIcon
-                        color: running.modelData.state === "failed" ? Theme.m3error : Theme.m3primary
-                    }
-
-                    StyledText {
-                        anchors.left: jobIcon.right
-                        anchors.leftMargin: menu.look.gap
-                        anchors.right: jobBar.left
-                        anchors.rightMargin: menu.look.inset
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: running.modelData.title + (running.modelData.message !== "" ? ` · ${running.modelData.message}` : "")
-                        color: Theme.m3onSurfaceVariant
-                        font.pixelSize: menu.look.font.small
-                    }
-
-                    JobBar {
-                        id: jobBar
-
-                        anchors.right: parent.right
-                        anchors.rightMargin: menu.look.pad
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: parent.width / 4
-                        look: menu.look
-                        progress: running.modelData.progress
-                        failed: running.modelData.state === "failed"
+                        K.ProgressBar {
+                            visible: !running.failed && running.modelData.progress >= 0
+                            value: running.modelData.progress
+                        }
                     }
                 }
             }
         }
 
-        // Results and list Views, the pane, or the other Views. It slides as
-        // a View is pushed or popped.
+        // Takes the keys of a View with nothing to type into.
+        Item {
+            id: viewKeys
+
+            Keys.onPressed: event => event.accepted = menu.key(event)
+        }
+
+        // Results and list Views, the pane, or the other Views. It slides as a View is pushed or
+        // popped.
         Item {
             id: body
 
-            y: jobs.y + jobs.height
-            width: parent.width
-            height: menu.look.bodyHeight - jobs.height
+            x: menu.gap
+            y: head.y + head.height + menu.gap
+            width: panel.width - menu.gap * 2
+            height: footer.y - menu.gap * 2 - y
             opacity: menu.settle
             transform: Translate {
                 x: menu.slide
@@ -698,21 +674,17 @@ PanelWindow {
             Item {
                 id: listArea
 
-                width: parent.width - (menu.paneShown ? menu.look.paneWidth : 0)
+                width: parent.width - (menu.paneShown ? menu.paneWidth + menu.gap : 0)
                 height: parent.height
                 visible: menu.listing
 
-                // An app's intro card, before anything is typed in it. It
-                // comes with the app's first Results, so the first frame in
-                // the app shows it.
+                // An app's intro card, before anything is typed in it. It comes with the app's
+                // first Results, so the first frame in the app shows it.
                 IntroCard {
                     id: intro
 
                     objectName: "intro"
-                    x: menu.look.inset
-                    y: menu.look.inset
-                    width: parent.width - 2 * menu.look.inset
-                    look: menu.look
+                    width: parent.width
                     visible: menu.kind === "" && search.introAbout !== ""
                     note: search.introNote
                     about: search.introAbout
@@ -722,15 +694,14 @@ PanelWindow {
                 ListView {
                     id: list
 
-                    x: menu.look.inset
-                    y: intro.visible ? intro.y + intro.height + menu.look.gap : menu.look.inset
-                    width: parent.width - 2 * menu.look.inset
-                    height: parent.height - y - menu.look.inset
+                    y: intro.visible ? intro.height + menu.gap : 0
+                    width: parent.width
+                    height: parent.height - y
                     clip: true
                     model: search
-                    // Pooled rows and the remove transition together leave
-                    // removed rows on screen, so rows aren't reused; at
-                    // fourteen rows at most, making them is cheap.
+                    spacing: K.Tokens.space.s4
+                    // Pooled rows and the remove transition together leave removed rows on screen,
+                    // so rows aren't reused; at fourteen rows at most, making them is cheap.
                     reuseItems: false
                     boundsBehavior: Flickable.StopAtBounds
                     highlightFollowsCurrentItem: false
@@ -738,33 +709,31 @@ PanelWindow {
                         if (currentIndex < 0 && count > 0)
                             currentIndex = 0;
                     }
-                    // A list View's filter keeps the selected Item selected. In
-                    // the search, moving off the top row stops Late Results
-                    // reranking the rows.
+                    // A list View's filter keeps the selected Item selected. In the search, moving
+                    // off the top row stops Late Results reranking the rows.
                     onCurrentIndexChanged: {
                         search.select(currentIndex);
                         reveal(currentIndex);
                     }
 
-                    // The view scrolls to keep the selection on screen. With
-                    // the highlight not following the current row, ListView
-                    // no longer does that itself, so it is done here, on the
-                    // selection's glide. Rows are all one height.
+                    // The view scrolls to keep the selection on screen. With the highlight not
+                    // following the current row, ListView doesn't do that itself, so it is
+                    // done here, on the selection's glide. Rows are all one height.
                     function reveal(index: int): void {
                         if (index < 0)
                             return;
-                        const row = menu.look.rowHeight;
-                        const top = originY + index * row;
+                        const top = originY + index * menu.pitch;
+                        const bottom = top + K.Tokens.size.row_two_line;
                         let to = contentY;
                         if (top < contentY)
                             to = top;
-                        else if (top + row > contentY + height)
-                            to = top + row - height;
+                        else if (bottom > contentY + height)
+                            to = bottom - height;
                         to = Math.max(originY, Math.min(to, originY + contentHeight - height));
                         follow.stop();
                         if (to === contentY)
                             return;
-                        if (menu.look.motion.moves && !menu.typing && menu.visible) {
+                        if (menu.moves && !menu.typing && menu.visible) {
                             follow.to = to;
                             follow.start();
                         } else {
@@ -773,33 +742,31 @@ PanelWindow {
                     }
 
                     // The selected row is wholly in view, for the probe.
-                    readonly property bool currentShown: currentIndex >= 0 && originY + currentIndex * menu.look.rowHeight >= contentY - 0.5 && originY + (currentIndex + 1) * menu.look.rowHeight <= contentY + height + 0.5
+                    readonly property bool currentShown: currentIndex >= 0 && originY + currentIndex * menu.pitch >= contentY - 0.5 && originY + currentIndex * menu.pitch + K.Tokens.size.row_two_line <= contentY + height + 0.5
 
                     NumberAnimation {
                         id: follow
 
                         target: list
                         property: "contentY"
-                        duration: menu.look.motion.glide
+                        duration: K.Tokens.duration.short
                         easing.type: Easing.BezierSpline
-                        easing.bezierCurve: menu.look.motion.arrive
+                        easing.bezierCurve: K.Tokens.easing.standard
                     }
 
-                    // Once the rerank after a keystroke is over, Late Results
-                    // go below the rows on screen, so the Daemon is told which
-                    // those are.
-                    readonly property int firstRow: Math.floor(contentY / menu.look.rowHeight)
-                    onFirstRowChanged: search.viewport(firstRow, menu.look.rows)
+                    // Once the rerank after a keystroke is over, Late Results go below the rows on
+                    // screen, so the Daemon is told which those are.
+                    readonly property int firstRow: Math.floor(contentY / menu.pitch)
+                    onFirstRowChanged: search.viewport(firstRow, menu.rows)
 
-                    // Where the pointer last was in the window, or null before
-                    // it has been over a row since the menu opened.
+                    // Where the pointer last was in the window, or null before it has been over a
+                    // row since the menu opened.
                     property var pointer: null
 
-                    // Only a pointer that moved picks a row. A window that maps
-                    // under a resting pointer gets a pointer-enter, and Qt
-                    // resends hover when rows move under a still pointer:
-                    // either would otherwise take the selection off the top
-                    // row the user is typing for.
+                    // Only a pointer that moved picks a row. A window that maps under a resting
+                    // pointer gets a pointer-enter, and Qt resends hover when rows move under a
+                    // still pointer: either would otherwise take the selection off the top row
+                    // the user is typing for.
                     function hover(index: int, area: Item, x: real, y: real): void {
                         const at = area.mapToItem(null, x, y);
                         const moved = list.pointer !== null && (at.x !== list.pointer.x || at.y !== list.pointer.y);
@@ -808,84 +775,84 @@ PanelWindow {
                             list.currentIndex = index;
                     }
 
-                    // The selection slides between rows on Kōbō's glide. It
-                    // never holds rows back: they are in place at once.
+                    // The selection slides between rows as focus moves. It never holds rows back:
+                    // they are in place at once. Its corners nest in the panel's, 12 in.
                     highlight: Rectangle {
                         width: list.width
-                        height: menu.look.rowHeight
+                        height: K.Tokens.size.row_two_line
                         y: list.currentItem?.y ?? 0
-                        radius: menu.look.rowRadius
-                        color: Theme.m3secondaryContainer
+                        radius: K.Look.nested(K.Tokens.radius.surface, menu.gap)
+                        color: K.Tokens.color.secondary_container
                         visible: list.count > 0
 
                         Behavior on y {
-                            enabled: menu.look.motion.moves && !menu.typing
+                            enabled: menu.moves && !menu.typing
+
                             NumberAnimation {
-                                duration: menu.look.motion.glide
+                                duration: K.Tokens.duration.short
                                 easing.type: Easing.BezierSpline
-                                easing.bezierCurve: menu.look.motion.arrive
+                                easing.bezierCurve: K.Tokens.easing.standard
                             }
                         }
                     }
 
-                    // Rows ease in and out as the Results change, but for a
-                    // keystroke (`typing`). A row's opacity on its own is
-                    // cheap; no row gets a layer.
+                    // Rows fade in and out as the Results change, but for a keystroke (`typing`).
+                    // A row's opacity on its own is cheap; no row gets a layer.
                     add: Transition {
                         enabled: !menu.typing
+
                         NumberAnimation {
                             property: "opacity"
                             from: 0
                             to: 1
-                            duration: menu.look.motion.fade
+                            duration: K.Tokens.duration.short
                             easing.type: Easing.BezierSpline
-                            easing.bezierCurve: menu.look.motion.effects
+                            easing.bezierCurve: K.Tokens.easing.standard
                         }
                     }
                     remove: Transition {
                         enabled: !menu.typing
+
                         NumberAnimation {
                             property: "opacity"
                             to: 0
-                            duration: menu.look.motion.fade
+                            duration: K.Tokens.duration.short
                             easing.type: Easing.BezierSpline
-                            easing.bezierCurve: menu.look.motion.effects
+                            easing.bezierCurve: K.Tokens.easing.standard_accel
                         }
                     }
                     displaced: Transition {
-                        enabled: menu.look.motion.moves && !menu.typing
+                        enabled: menu.moves && !menu.typing
+
                         NumberAnimation {
                             property: "y"
-                            duration: menu.look.motion.glide
+                            duration: K.Tokens.duration.medium
                             easing.type: Easing.BezierSpline
-                            easing.bezierCurve: menu.look.motion.arrive
+                            easing.bezierCurve: K.Tokens.easing.standard_decel
                         }
                         // A row displaced mid-fade comes back whole.
                         NumberAnimation {
                             property: "opacity"
                             to: 1
-                            duration: menu.look.motion.fade
+                            duration: K.Tokens.duration.short
                         }
                     }
-                    // A Result that moves mid-fade comes back whole too: with
-                    // no `move` transition the view cancels the fade where it
-                    // is. Moved rows still jump to their place.
+                    // A Result that moves mid-fade comes back whole too: with no `move` transition
+                    // the view cancels the fade where it is. Moved rows still jump to their place.
                     move: Transition {
                         NumberAnimation {
                             property: "opacity"
                             to: 1
-                            duration: menu.look.motion.fade
+                            duration: K.Tokens.duration.short
                         }
                     }
 
-                    // A run names the Results of the last frame on screen, so
-                    // the Daemon refuses a Late Result the user hasn't seen
-                    // yet. afterAnimating comes on this thread just before the
-                    // frame takes the model; frameSwapped comes queued from the
-                    // render thread, after Results that arrived since may have
-                    // changed it. The pane catches up on the selection once a
-                    // frame with the Results is out and typing has paused, so
-                    // it never holds a keystroke's Results back.
+                    // A run names the Results of the last frame on screen, so the Daemon refuses a
+                    // Late Result the user hasn't seen yet. afterAnimating comes on this thread
+                    // just before the frame takes the model; frameSwapped comes queued from the
+                    // render thread, after Results that arrived since may have changed it. The
+                    // pane catches up on the selection once a frame with the Results is out and
+                    // typing has paused, so it never holds a keystroke's Results back.
                     Connections {
                         target: list.Window.window
 
@@ -902,7 +869,6 @@ PanelWindow {
                     delegate: ResultRow {
                         id: row
 
-                        look: menu.look
                         onPointed: (x, y) => list.hover(row.index, row, x, y)
                         onPicked: {
                             menu.failure = "";
@@ -911,11 +877,17 @@ PanelWindow {
                     }
                 }
 
-                EmptyState {
-                    anchors.centerIn: list
-                    visible: list.count === 0
+                // Laid out once, while the menu is built, and shown by its opacity, so showing it
+                // never waits on a layout pass.
+                K.EmptyState {
+                    readonly property bool typed: (menu.kind === "list" ? filter.text : input.text) !== ""
+
+                    y: list.y + K.Look.snap((list.height - implicitHeight) / 2, menu.dpr)
+                    width: list.width
+                    opacity: list.count === 0 ? 1 : 0
                     icon: "search_off"
-                    text: (menu.kind === "list" ? filter.text : input.text) !== "" ? "No results" : "Nothing here yet"
+                    title: typed ? "No results" : "Nothing here yet"
+                    body: typed ? "Nothing matches that. Fewer letters, or check the spelling." : "This list is empty. Come back when it isn't."
                 }
             }
 
@@ -923,9 +895,8 @@ PanelWindow {
                 id: pane
 
                 x: parent.width - width
-                width: menu.look.paneWidth
+                width: menu.paneWidth
                 height: parent.height
-                look: menu.look
                 visible: menu.paneShown
             }
 
@@ -935,7 +906,6 @@ PanelWindow {
                 anchors.fill: parent
                 active: menu.kind === "form"
                 sourceComponent: FormView {
-                    look: menu.look
                     search: menu.engine
                     keys: event => menu.key(event)
                     fields: search.view.fields ?? []
@@ -955,7 +925,6 @@ PanelWindow {
                 anchors.fill: parent
                 active: menu.kind === "detail"
                 sourceComponent: DetailView {
-                    look: menu.look
                     markdown: search.view.markdown ?? ""
                     metadata: search.view.metadata ?? []
                 }
@@ -965,162 +934,152 @@ PanelWindow {
                 anchors.fill: parent
                 active: menu.kind === "progress"
                 sourceComponent: ProgressView {
-                    look: menu.look
                     job: search.view.job ?? ({})
+                    moves: menu.moves
                 }
             }
         }
 
-        Rectangle {
-            id: footerRule
+        // What Forget or "Clear history" just did, and the key that undoes it, over the bottom of
+        // the list. It never takes the keys or the selection, and goes when the Daemon withdraws
+        // it, once the change is undone or too old to be.
+        K.Toast {
+            id: toast
 
-            y: footer.y - 1
-            width: parent.width
-            height: 1
-            color: Theme.alpha(Theme.m3outlineVariant, 0.55)
+            // The last Toast's words, kept while it fades out.
+            property string said: ""
+
+            x: K.Look.snap((panel.width - width) / 2, menu.dpr)
+            y: footerRule.y - menu.gap - height
+            room: panel.width - menu.gap * 2
+            shown: footer.status === "" && search.toast !== ""
+            text: `${toast.said}. ⌃Z undoes it.`
+
+            Connections {
+                target: search
+
+                function onToastChanged(): void {
+                    if (search.toast !== "")
+                        toast.said = search.toast;
+                }
+            }
         }
 
-        // The footer: what the user should know now (an Action asking first,
-        // why one failed, the Toast, Extensions that are down), else the keys
-        // the menu takes; and on the right, while the Daemon knows of any,
-        // how many problems there are, which a click lists.
+        K.Divider {
+            id: footerRule
+
+            // A gap under the body, inside the gap over the footer, so the panel stays a whole
+            // number of pixels tall.
+            y: footer.y - menu.gap
+            width: panel.width
+        }
+
+        // The footer: what the user should know now (an Action asking first, why one failed,
+        // Extensions that are down), else the keys the menu takes; and on the right, while the
+        // Daemon knows of any, how many problems there are, which a click lists.
         Item {
             id: footer
 
-            y: parent.height - height
-            width: parent.width
-            height: menu.look.footerHeight
-
             readonly property string status: search.confirming !== "" ? search.confirming : menu.failure !== "" ? menu.failure : ""
-            // A confirmation reads `Power Off? ↵ Confirm · Esc Cancel`: the
-            // question, then its keys.
+            // A confirmation reads `Power Off? ↵ Confirm · Esc Cancel`: the question, then its
+            // keys.
             readonly property int asks: search.confirming.lastIndexOf("? ") + 1
+            // Where the left side's words end: before the problems, 12 clear.
+            readonly property real room: problems.visible ? problems.x - K.Tokens.space.s12 : footer.width
 
-            StyledText {
-                anchors.left: parent.left
-                anchors.leftMargin: menu.look.pad
-                anchors.right: problems.left
-                anchors.rightMargin: menu.look.inset
-                anchors.verticalCenter: parent.verticalCenter
-                visible: search.confirming === "" && (menu.failure !== "" || search.toast === "" && search.down.length > 0)
+            x: menu.gap
+            y: panel.height - menu.gap - height
+            width: panel.width - menu.gap * 2
+            height: K.Tokens.size.control_sm
+
+            Label {
+                width: footer.room
+                height: parent.height
+                visible: search.confirming === "" && (menu.failure !== "" || search.down.length > 0)
+                type: K.Tokens.type.small
                 text: menu.failure !== "" ? menu.failure : `Unavailable: ${search.down.join(", ")}`
-                color: menu.failure !== "" ? Theme.m3error : Theme.m3onSurfaceVariant
-                font.pixelSize: menu.look.font.small
+                color: menu.failure !== "" ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
             }
 
-            Row {
-                anchors.left: parent.left
-                anchors.leftMargin: menu.look.pad
-                anchors.verticalCenter: parent.verticalCenter
+            Label {
+                id: question
+
+                width: Math.min(K.Look.snapUp(implicitWidth, menu.dpr), footer.room)
+                height: parent.height
                 visible: search.confirming !== ""
-                spacing: menu.look.inset
-
-                StyledText {
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: search.confirming.slice(0, footer.asks)
-                    color: Theme.m3error
-                    font.pixelSize: menu.look.font.small
-                    font.weight: Font.Medium
-                }
-
-                KeyHints {
-                    anchors.verticalCenter: parent.verticalCenter
-                    look: menu.look
-                    tint: Theme.m3error
-                    text: search.confirming.slice(footer.asks + 1)
-                }
+                type: K.Tokens.type.label
+                text: search.confirming.slice(0, footer.asks)
+                color: K.Tokens.color.error
             }
 
-            // The Toast: what Forget or "Clear history" just did, and the key
-            // that undoes it. It never takes the keys or the selection, and
-            // goes when the Daemon withdraws it, once the change is undone or
-            // too old to be.
-            Row {
-                anchors.left: parent.left
-                anchors.leftMargin: menu.look.pad
-                anchors.verticalCenter: parent.verticalCenter
-                visible: footer.status === "" && search.toast !== ""
-                spacing: menu.look.inset
-
-                StyledText {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: Math.min(implicitWidth, footer.width / 2)
-                    text: search.toast
-                    font.pixelSize: menu.look.font.small
-                }
-
-                KeyHints {
-                    anchors.verticalCenter: parent.verticalCenter
-                    look: menu.look
-                    tint: Theme.m3primary
-                    text: "⌃Z Undo"
-                }
+            Label {
+                x: question.width + K.Tokens.space.s12
+                width: footer.room - x
+                height: parent.height
+                visible: search.confirming !== ""
+                type: K.Tokens.type.caption
+                text: search.confirming.slice(footer.asks + 1)
+                color: K.Tokens.color.error
             }
 
-            KeyHints {
-                anchors.left: parent.left
-                anchors.leftMargin: menu.look.pad
-                anchors.right: problems.left
-                anchors.rightMargin: menu.look.inset
-                anchors.verticalCenter: parent.verticalCenter
-                visible: footer.status === "" && search.toast === "" && search.down.length === 0
-                look: menu.look
+            Label {
+                width: footer.room
+                height: parent.height
+                visible: footer.status === "" && search.down.length === 0
+                type: K.Tokens.type.caption
                 text: menu.footerHints
+                color: K.Tokens.color.on_surface_variant
             }
 
-            StyledText {
+            K.Button {
                 id: problems
 
-                anchors.right: parent.right
-                anchors.rightMargin: visible ? menu.look.pad : 0
-                anchors.verticalCenter: parent.verticalCenter
-                width: visible ? implicitWidth : 0
+                x: footer.width - width
                 visible: search.problems > 0
                 text: search.problems === 1 ? "1 problem" : `${search.problems} problems`
-                color: Theme.m3error
-                font.pixelSize: menu.look.font.small
-                font.weight: Font.Medium
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: search.showProblems()
-                }
+                kind: "Text"
+                size: "Sm"
+                activeFocusOnTab: false
+                onActivated: search.showProblems()
             }
         }
 
-        // The Action panel: Ctrl+K lists the selected Result's Actions over
-        // the bottom right of the list. Up and Down choose, Enter runs, Esc
-        // or Ctrl+K closes it.
+        // The Action panel: Ctrl+K lists the selected Result's Actions over the bottom right of
+        // the list. Up and Down choose, Enter runs, Esc or Ctrl+K closes it. It arrives and goes as
+        // the window does.
         ActionPanel {
             id: actionPanel
 
             property int row: 0
 
-            x: parent.width - width - menu.look.inset
-            y: footerRule.y - height - menu.look.inset
-            width: Math.min(menu.look.actionPanelWidth, parent.width / 2)
-            look: menu.look
+            x: panel.width - width - menu.gap
+            y: footerRule.y - height - menu.gap
+            width: menu.onGrid(panel.width / 2)
             actions: menu.actions
             visible: opacity > 0
             opacity: menu.actionsOpen ? 1 : 0
             transform: Translate {
-                y: menu.actionsOpen ? 0 : menu.look.motion.openTravel
+                y: menu.actionsOpen ? 0 : menu.openTravel
+
                 Behavior on y {
+                    id: drop
+
                     NumberAnimation {
-                        duration: menu.look.motion.fade
+                        duration: drop.targetValue === 0 ? K.Tokens.duration.short : K.Tokens.duration.micro
                         easing.type: Easing.BezierSpline
-                        easing.bezierCurve: menu.look.motion.arrive
+                        easing.bezierCurve: drop.targetValue === 0 ? K.Tokens.easing.emphasized_decel : K.Tokens.easing.emphasized_accel
                     }
                 }
             }
             onPicked: n => menu.runAction(n)
 
             Behavior on opacity {
+                id: fade
+
                 NumberAnimation {
-                    duration: menu.look.motion.fade
+                    duration: fade.targetValue > 0 ? K.Tokens.duration.short : K.Tokens.duration.micro
                     easing.type: Easing.BezierSpline
-                    easing.bezierCurve: menu.look.motion.effects
+                    easing.bezierCurve: fade.targetValue > 0 ? K.Tokens.easing.emphasized_decel : K.Tokens.easing.emphasized_accel
                 }
             }
 
@@ -1153,8 +1112,8 @@ PanelWindow {
         Probe {
             search: menu.engine
             item: panel
-            menuWidth: menu.look.width
-            rows: menu.look.rows
+            menuWidth: menu.panelWidth
+            rows: menu.rows
             pane: menu.paneShown
             actions: menu.actions.length
             listed: list.count

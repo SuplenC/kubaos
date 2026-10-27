@@ -21,7 +21,7 @@ QtObject {
     required property Item item
     // What the menu itself knows, for its layout line; the defaults leave
     // them out.
-    property real menuWidth: -1
+    property real menuWidth: NaN
     property int rows: -1
     property bool pane: false
     property int actions: 0
@@ -58,7 +58,7 @@ QtObject {
     }
 
     function layout(): void {
-        if (menuWidth >= 0)
+        if (!isNaN(menuWidth))
             log(`layout width=${Math.round(menuWidth)} rows=${rows} pane=${pane}`);
     }
 

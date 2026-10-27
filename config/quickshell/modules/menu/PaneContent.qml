@@ -1,150 +1,124 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
-import qs.theme
-import qs.components
+import KubaOS.Components as K
+import "words.js" as Words
 
-// What the detail pane shows of one row: its icon, title, subtitle and kind,
-// its Action panel with each Action's shortcut, and the keys it takes.
-// `entry` is what DetailPane hands it; see `Menu.qml`'s `paneEntry`.
+// What the detail pane shows of one row: its icon, title, subtitle and kind, its Action panel with
+// each Action's keys, and the keys the row takes. `entry` is what DetailPane hands it; see
+// `Menu.qml`'s `paneEntry`.
+//
+// It changes with every move of the selection, so it is set in `Label`s on Qt's positioners, as
+// the rows are: arrowing down the list at key repeat redraws it thirty times a second.
 Item {
     id: content
 
-    property MenuLook look
     property var entry: null
     readonly property bool runs: (entry?.unavailable ?? "") === ""
     readonly property string iconSource: {
         const icon = entry?.icon ?? "";
         return icon === "" ? "" : icon.startsWith("/") ? `file://${icon}` : Quickshell.iconPath(icon, true);
     }
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+    readonly property real dim: content.runs ? 1 : K.Tokens.opacity.disabled_content
 
     Column {
         id: top
 
-        x: content.look.pad
-        y: content.look.pad
-        width: content.width - 2 * content.look.pad
-        spacing: content.look.nudge
+        width: content.width
 
-        Rectangle {
-            width: content.look.paneIconBox
-            height: width
-            radius: content.look.rowRadius
-            color: Theme.m3surfaceContainerHigh
+        // A page's one big symbol: the app's icon, or its Extension's.
+        Item {
+            width: K.Tokens.icon.s48
+            height: K.Tokens.icon.s48
 
             IconImage {
                 id: image
 
-                anchors.centerIn: parent
-                implicitSize: content.look.paneIcon
+                anchors.fill: parent
+                implicitSize: K.Tokens.icon.s48
                 visible: content.iconSource !== ""
                 asynchronous: true
                 source: content.iconSource
-                opacity: content.runs ? 1 : 0.4
+                opacity: content.dim
             }
 
-            Icon {
-                anchors.centerIn: parent
+            K.Icon {
                 visible: !image.visible
-                name: content.look.glyph(content.entry?.extension ?? "")
-                size: content.look.paneGlyph
-                color: Theme.m3primary
+                name: Words.glyph(content.entry?.extension ?? "")
+                size: K.Tokens.icon.s48
+                color: K.Look.alpha(K.Tokens.color.primary, content.dim)
             }
         }
 
         Item {
-            width: 1
-            height: content.look.inset
+            height: K.Tokens.space.s16
         }
 
-        StyledText {
+        Label {
             width: parent.width
             text: content.entry?.title ?? ""
+            type: K.Tokens.type.heading
             wrapMode: Text.Wrap
             maximumLineCount: 3
-            verticalAlignment: Text.AlignTop
-            font.pixelSize: content.look.font.heading
-            font.weight: Font.Medium
         }
 
-        StyledText {
+        Item {
+            height: K.Tokens.space.s4
+        }
+
+        Label {
             width: parent.width
             visible: text !== ""
             text: content.entry?.subtitle ?? ""
+            type: K.Tokens.type.body
             wrapMode: Text.Wrap
             maximumLineCount: 4
-            verticalAlignment: Text.AlignTop
-            color: Theme.m3onSurfaceVariant
-            font.pixelSize: content.look.font.body
+            color: K.Tokens.color.on_surface_variant
         }
 
-        StyledText {
+        Label {
             width: parent.width
             visible: !content.runs
             text: content.entry?.unavailable ?? ""
+            type: K.Tokens.type.body
             wrapMode: Text.Wrap
             maximumLineCount: 3
-            verticalAlignment: Text.AlignTop
-            color: Theme.m3error
-            font.pixelSize: content.look.font.body
+            color: K.Tokens.color.error
         }
 
         Item {
-            width: 1
-            height: content.look.gap
+            height: K.Tokens.space.s8
         }
 
         // The kind, and the Alias the query named it by.
-        Row {
-            spacing: content.look.gap
-
-            Repeater {
-                model: [content.look.kindLabel(content.entry?.extension ?? ""), content.entry?.alias ?? ""].filter(label => label !== "")
-
-                Rectangle {
-                    required property string modelData
-
-                    // A long Alias elides inside the pane.
-                    width: Math.min(content.look.snap(label.implicitWidth + 2 * content.look.badgePad), top.width)
-                    height: content.look.badgeHeight
-                    radius: height / 2
-                    color: Theme.m3secondaryContainer
-
-                    StyledText {
-                        id: label
-
-                        anchors.centerIn: parent
-                        width: Math.min(implicitWidth, parent.width - 2 * content.look.badgePad)
-                        text: parent.modelData
-                        color: Theme.m3onSecondaryContainer
-                        font.pixelSize: content.look.font.small
-                        font.weight: Font.Medium
-                    }
-                }
-            }
+        Label {
+            width: parent.width
+            text: [Words.kindLabel(content.entry?.extension ?? ""), content.entry?.alias ?? ""].filter(word => word !== "").join(" · ")
+            type: K.Tokens.type.label
+            color: K.Tokens.color.on_surface_variant
         }
     }
 
-    // The Action panel as Ctrl+K lists it: the Item's own Actions, then the
-    // Contributed ones under the Extension offering each.
+    // The Action panel as Ctrl+K lists it: the Item's own Actions, then the Contributed ones
+    // under the Extension offering each.
     Column {
         id: actions
 
-        x: content.look.pad
         anchors.top: top.bottom
-        anchors.topMargin: content.look.pad
+        anchors.topMargin: K.Tokens.space.s24
         anchors.bottom: keys.top
-        anchors.bottomMargin: content.look.inset
-        width: top.width
+        anchors.bottomMargin: K.Tokens.space.s16
+        width: content.width
         clip: true
         visible: (content.entry?.actions ?? []).length > 0
+        spacing: K.Tokens.space.s8
 
-        StyledText {
-            height: content.look.labelHeight
+        Label {
+            width: parent.width
             text: "Actions"
-            color: Theme.m3onSurfaceVariant
-            font.pixelSize: content.look.font.small
-            font.weight: Font.Medium
+            type: K.Tokens.type.label
+            color: K.Tokens.color.on_surface_variant
         }
 
         Repeater {
@@ -158,53 +132,50 @@ Item {
                 readonly property bool heading: modelData.group !== "" && (index === 0 || content.entry.actions[index - 1].group !== modelData.group)
 
                 width: actions.width
+                spacing: K.Tokens.space.s8
 
-                StyledText {
+                Label {
+                    width: parent.width
+                    height: K.Tokens.space.s8 + K.Tokens.type.label.line
                     visible: action.heading
-                    height: visible ? content.look.headingHeight : 0
                     verticalAlignment: Text.AlignBottom
-                    bottomPadding: content.look.nudge
-                    text: content.look.kindLabel(action.modelData.group)
-                    color: Theme.m3onSurfaceVariant
-                    font.pixelSize: content.look.font.small
+                    text: Words.kindLabel(action.modelData.group)
+                    type: K.Tokens.type.label
+                    color: K.Tokens.color.on_surface_variant
                 }
 
                 Item {
                     width: parent.width
-                    height: content.look.actionHeight
+                    height: K.Tokens.type.body.line
 
-                    StyledText {
-                        anchors.left: parent.left
-                        anchors.right: shortcut.left
-                        anchors.rightMargin: content.look.gap
-                        anchors.verticalCenter: parent.verticalCenter
+                    Label {
+                        width: shortcut.x - K.Tokens.space.s8
+                        height: parent.height
                         text: action.modelData.title
-                        color: action.index === 0 ? Theme.m3onSurface : Theme.m3onSurfaceVariant
-                        font.pixelSize: content.look.font.body
+                        color: action.index === 0 ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
                     }
 
-                    Keycap {
+                    Label {
                         id: shortcut
 
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        look: content.look
-                        visible: key !== ""
-                        key: action.index === 0 ? "↵" : content.look.shortcutLabel(action.modelData.shortcut)
+                        x: parent.width - K.Look.snapUp(implicitWidth, content.dpr)
+                        height: parent.height
+                        type: K.Tokens.type.mono
+                        text: action.index === 0 ? "↵" : Words.shortcutLabel(action.modelData.shortcut)
+                        color: K.Tokens.color.on_surface_variant
                     }
                 }
             }
         }
     }
 
-    KeyHints {
+    Label {
         id: keys
 
-        x: content.look.pad
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: content.look.pad
-        width: top.width
-        look: content.look
+        width: content.width
+        type: K.Tokens.type.caption
         text: content.entry?.hints ?? ""
+        color: K.Tokens.color.on_surface_variant
     }
 }
