@@ -1,5 +1,5 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -22,7 +22,7 @@ FocusScope {
     ]
     property int current: 0
 
-    implicitHeight: column.implicitHeight + Theme.spacing.lg
+    implicitHeight: column.implicitHeight + K.Tokens.space.s16
 
     function move(delta: int): void {
         const n = rows.length;
@@ -33,13 +33,13 @@ FocusScope {
         return repeater.count > i ? repeater.itemAt(i)?.item ?? null : null;
     }
 
-    // Keep the focused row on screen, with a row of air around it.
+    // Keep the focused row on screen, with air around it.
     function reveal(): void {
         const it = repeater.itemAt(current);
         if (!it)
             return;
-        const top = it.y - Theme.spacing.xxl;
-        const bottom = it.y + it.height + Theme.spacing.xxl;
+        const top = it.y - K.Tokens.space.s32;
+        const bottom = it.y + it.height + K.Tokens.space.s32;
         if (top < flick.contentY)
             flick.contentY = Math.max(0, top);
         else if (bottom > flick.contentY + flick.height)
@@ -69,24 +69,29 @@ FocusScope {
 
         anchors.fill: parent
         contentWidth: width
-        contentHeight: column.implicitHeight + Theme.spacing.lg
+        contentHeight: column.implicitHeight + K.Tokens.space.s16
         clip: true
         boundsBehavior: Flickable.StopAtBounds
 
         Behavior on contentY {
             enabled: !flick.moving
 
-            Anim {
-                duration: Theme.anim.normal
-                easing.bezierCurve: Theme.anim.standard
+            NumberAnimation {
+                duration: K.Tokens.duration.medium
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.standard
             }
         }
 
+        // The rows stand off the flickable's edges by the focus ring's band, so the ring shows
+        // whole inside the clip.
         Column {
             id: column
 
-            width: flick.width - Theme.spacing.md
-            spacing: Theme.spacing.xxs
+            x: K.Tokens.focus.offset
+            y: K.Tokens.focus.offset
+            width: flick.width - K.Tokens.focus.offset * 2
+            spacing: K.Tokens.space.s4
 
             Repeater {
                 id: repeater
@@ -111,7 +116,7 @@ FocusScope {
     // --- rows ---------------------------------------------------------------
 
     // A focusable row: label and help on the left, the control on the right,
-    // a focus ring while it's the current one.
+    // the focus ring while it's the current one.
     component SettingRow: Rectangle {
         id: row
 
@@ -121,6 +126,7 @@ FocusScope {
         default property alias control: controlSlot.data
         readonly property bool current: root.current === rowIndex
         readonly property bool focused: current && root.activeFocus
+        readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
         // Key -> handled? Overridden per kind.
         property var handler: (key, shift) => false
@@ -128,16 +134,21 @@ FocusScope {
             return handler(key, shift);
         }
 
-        implicitHeight: Math.max(52, texts.implicitHeight + Theme.spacing.md * 2)
-        radius: Theme.rounding.md
-        color: current ? Theme.m3surfaceContainerHigh : "transparent"
+        implicitHeight: Math.max(K.Tokens.size.row_two_line, line.implicitHeight + K.Tokens.space.s12 * 2)
+        radius: K.Tokens.radius.control
+        color: current ? K.Tokens.color.surface_container_high : "transparent"
 
         Behavior on color {
-            CAnim {}
+            ColorAnimation {
+                duration: K.Tokens.duration.micro
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.standard
+            }
         }
 
-        FocusRing {
+        K.FocusRing {
             shown: row.focused
+            controlRadius: K.Tokens.radius.control
         }
 
         MouseArea {
@@ -148,43 +159,36 @@ FocusScope {
             }
         }
 
-        Column {
-            id: texts
+        K.Row {
+            id: line
 
-            anchors.left: parent.left
-            anchors.leftMargin: Theme.spacing.lg
-            anchors.right: controlSlot.left
-            anchors.rightMargin: Theme.spacing.lg
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.spacing.xxs
+            x: K.Tokens.space.s16
+            y: K.Look.snap((row.height - line.implicitHeight) / 2, row.dpr)
+            width: row.width - K.Tokens.space.s16 - K.Tokens.space.s12
+            gap: K.Tokens.space.s16
+            align: "centre"
 
-            StyledText {
-                width: parent.width
-                text: row.label
-                font.weight: Font.Medium
-                color: Theme.m3onSurface
+            K.Stack {
+                fill: true
+                gap: K.Tokens.space.s4
+
+                K.Text {
+                    text: row.label
+                    style: K.Tokens.type.body_strong
+                }
+
+                K.Text {
+                    visible: text !== ""
+                    text: row.help
+                    style: K.Tokens.type.small
+                    color: K.Tokens.color.on_surface_variant
+                    maximumLines: row.current ? 3 : 1
+                }
             }
 
-            StyledText {
-                width: parent.width
-                visible: text !== ""
-                text: row.help
-                font.pixelSize: Theme.font.sm
-                color: Theme.m3onSurfaceVariant
-                elide: row.current ? Text.ElideNone : Text.ElideRight
-                wrapMode: row.current ? Text.WordWrap : Text.NoWrap
-                maximumLineCount: row.current ? 3 : 1
+            K.Slot {
+                id: controlSlot
             }
-        }
-
-        Item {
-            id: controlSlot
-
-            anchors.right: parent.right
-            anchors.rightMargin: Theme.spacing.md
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.round(row.width * 0.5)
-            height: childrenRect.height
         }
     }
 
@@ -207,61 +211,14 @@ FocusScope {
                 return true;
             }
 
-            Segmented {
-                anchors.right: parent.right
-                options: ["always", "ac", "never"]
+            // Clicks pick; the keys are the row's, so the tabs are no stop of their own.
+            Tabs {
+                readonly property list<string> options: ["always", "ac", "never"]
+
                 labels: ["Always", "On AC", "Never"]
-                value: Motion.mode
-                onPicked: v => Motion.setMode(v)
-            }
-        }
-    }
-
-    // Pills side by side, the selected one filled. Clicks pick; keys are
-    // the row's.
-    component Segmented: Row {
-        id: seg
-
-        property list<string> options
-        property list<string> labels
-        property string value
-
-        signal picked(string value)
-
-        spacing: Theme.spacing.xxs
-
-        Repeater {
-            model: seg.options
-
-            delegate: Rectangle {
-                id: pill
-
-                required property string modelData
-                required property int index
-                readonly property bool selected: seg.value === modelData
-
-                implicitWidth: label.implicitWidth + Theme.spacing.lg * 2
-                implicitHeight: 28
-                radius: 14
-                color: selected ? Theme.m3secondaryContainer : Theme.m3surfaceContainerHighest
-
-                Behavior on color {
-                    CAnim {}
-                }
-
-                StyledText {
-                    id: label
-
-                    anchors.centerIn: parent
-                    text: seg.labels[pill.index] ?? pill.modelData
-                    font.pixelSize: Theme.font.sm
-                    font.weight: pill.selected ? Font.DemiBold : Font.Normal
-                    color: pill.selected ? Theme.m3onSecondaryContainer : Theme.m3onSurfaceVariant
-                }
-
-                StateLayer {
-                    onClicked: seg.picked(pill.modelData)
-                }
+                currentIndex: options.indexOf(Motion.mode)
+                activeFocusOnTab: false
+                onPicked: index => Motion.setMode(options[index])
             }
         }
     }

@@ -1,63 +1,52 @@
 import QtQuick
-import qs.theme
-import qs.components
+import KubaOS.Components as K
 
 // One part of the system monitor's popup: an icon and a title, the headline
-// reading on the right, and what it holds below.
-Column {
+// reading on the right, and what it holds below, 4 apart.
+K.Stack {
     id: root
 
     property string icon
     property string title
     property string value
-    property color valueColor: Theme.m3onSurface
+    property color valueColor: K.Tokens.color.on_surface
     default property alias body: content.data
 
-    spacing: Theme.spacing.sm
+    fill: true
+    gap: K.Tokens.space.s8
 
-    Item {
-        width: parent.width
-        height: Math.max(heading.implicitHeight, reading.implicitHeight)
+    K.Row {
+        fill: true
+        gap: K.Tokens.space.s8
+        align: "centre"
 
-        Row {
-            id: heading
-
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.spacing.sm
-
-            Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: root.icon
-                size: Theme.font.xl
-                color: Theme.m3primary
-            }
-
-            StyledText {
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.title
-                font.weight: Font.DemiBold
-            }
+        K.Icon {
+            name: root.icon
+            size: K.Tokens.icon.s20
+            color: K.Tokens.color.primary
         }
 
-        StyledText {
-            id: reading
+        K.Text {
+            text: root.title
+            style: K.Tokens.type.body_strong
+        }
 
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, parent.width - heading.width - Theme.spacing.md)
-            horizontalAlignment: Text.AlignRight
+        K.Fill {
+        }
+
+        // The reading ticks, so it is in mono: its width holds still.
+        K.Text {
+            visible: root.value !== ""
             text: root.value
+            style: K.Tokens.type.mono_large
             color: root.valueColor
-            font.pixelSize: Theme.font.lg
-            font.weight: Font.DemiBold
-            font.features: Theme.font.tabular
         }
     }
 
-    Column {
+    K.Stack {
         id: content
 
-        width: parent.width
-        spacing: Theme.spacing.xs
+        fill: true
+        gap: K.Tokens.space.s4
     }
 }

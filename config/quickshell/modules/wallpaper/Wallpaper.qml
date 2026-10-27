@@ -1,7 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -26,7 +26,7 @@ PanelWindow {
         right: true
     }
     exclusionMode: ExclusionMode.Ignore
-    color: Theme.m3surface
+    color: K.Tokens.color.surface
     WlrLayershell.layer: WlrLayer.Background
     WlrLayershell.namespace: "qs-wallpaper"
 
@@ -56,9 +56,10 @@ PanelWindow {
             root.front = this
 
         Behavior on opacity {
-            Anim {
-                duration: Theme.anim.slow
-                easing.bezierCurve: Theme.anim.effects
+            NumberAnimation {
+                duration: K.Tokens.duration.slow
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.standard
             }
         }
     }

@@ -1,13 +1,12 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
-import qs.modules.clock
 
 // The five busiest processes, by CPU or by memory. A click shows one's
 // details, with End (it may save and quit) and Kill (it stops at once), each
 // asking first.
-Column {
+K.Stack {
     id: root
 
     property string order: "cpu"
@@ -17,15 +16,17 @@ Column {
     property string confirming: ""
     property string error: ""
     readonly property var list: Sysmon.sample?.top?.[order] ?? []
-    readonly property int rowHeight: 30
 
-    spacing: Theme.spacing.sm
+    fill: true
+    gap: K.Tokens.space.s8
 
     // Shows process `pid`; one that has exited says so.
     function show(pid: int): void {
         confirming = "";
         error = "";
-        Sysmon.request("process", { pid: pid }, reply => {
+        Sysmon.request("process", {
+            pid: pid
+        }, reply => {
             root.details = reply.process ?? null;
             root.error = reply.error ?? "";
         });
@@ -48,205 +49,167 @@ Column {
         });
     }
 
-    Item {
-        width: parent.width
-        height: orderChips.height
+    // `text` padded at the start to `width` characters with no-break spaces, so the numbers of
+    // every row end in one column in mono.
+    function padded(text: string, width: int): string {
+        return " ".repeat(Math.max(0, width - text.length)) + text;
+    }
 
-        Row {
-            anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.spacing.sm
+    K.Row {
+        fill: true
+        gap: K.Tokens.space.s8
+        align: "centre"
 
-            Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "list_alt"
-                size: Theme.font.xl
-                color: Theme.m3primary
-            }
-
-            StyledText {
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Processes"
-                font.weight: Font.DemiBold
-            }
+        K.Icon {
+            name: "list_alt"
+            size: K.Tokens.icon.s20
+            color: K.Tokens.color.primary
         }
 
-        Row {
-            id: orderChips
+        K.Text {
+            text: "Processes"
+            style: K.Tokens.type.body_strong
+        }
 
-            anchors.right: parent.right
-            spacing: Theme.spacing.xs
+        K.Fill {
+        }
 
-            Chip {
-                label: "CPU"
-                selected: root.order === "cpu"
-                onClicked: root.order = "cpu"
-            }
+        // The order is picked with the pointer only, as before: it is no stop for Tab.
+        Tabs {
+            labels: ["CPU", "Memory"]
+            currentIndex: root.order === "cpu" ? 0 : 1
+            activeFocusOnTab: false
+            onPicked: index => root.order = index === 0 ? "cpu" : "memory"
+        }
+    }
 
-            Chip {
-                label: "Memory"
-                selected: root.order === "memory"
-                onClicked: root.order = "memory"
+    // The rows sit on the popup's own surface, 4 apart as in a list's well: a well round them
+    // would take the room of a sixth row from a popup that already reaches far down the screen.
+    K.Stack {
+        visible: root.list.length > 0
+        fill: true
+        gap: K.Tokens.space.s4
+
+        Repeater {
+            model: root.list
+
+            K.ListRow {
+                required property var modelData
+
+                title: modelData.name
+                // The column it is ordered by first.
+                detail: {
+                    const cpu = root.padded(`${modelData.cpu.toFixed(1)}%`, 6);
+                    const memory = root.padded(Sysmon.bytes(modelData.memory), 8);
+                    return root.order === "cpu" ? `${cpu}  ${memory}` : `${memory}  ${cpu}`;
+                }
+                selected: root.details?.pid === modelData.pid
+                onActivated: selected ? root.clear() : root.show(modelData.pid)
             }
         }
     }
 
-    Repeater {
-        model: root.list
-
-        Rectangle {
-            id: row
-
-            required property var modelData
-            readonly property bool picked: root.details?.pid === modelData.pid
-
-            width: root.width
-            height: root.rowHeight
-            radius: Theme.rounding.sm
-            color: picked ? Theme.m3secondaryContainer : "transparent"
-
-            StyledText {
-                anchors.left: parent.left
-                anchors.leftMargin: Theme.spacing.sm
-                anchors.right: cpuText.left
-                anchors.rightMargin: Theme.spacing.md
-                anchors.verticalCenter: parent.verticalCenter
-                text: row.modelData.name
-                font.weight: Font.Medium
-                color: row.picked ? Theme.m3onSecondaryContainer : Theme.m3onSurface
-            }
-
-            StyledText {
-                id: cpuText
-
-                anchors.right: memoryText.left
-                anchors.verticalCenter: parent.verticalCenter
-                width: Theme.spacing.xxxl + Theme.spacing.lg
-                horizontalAlignment: Text.AlignRight
-                text: `${row.modelData.cpu.toFixed(1)}%`
-                font.features: Theme.font.tabular
-                color: root.order === "cpu" ? Theme.m3onSurface : Theme.m3onSurfaceVariant
-            }
-
-            StyledText {
-                id: memoryText
-
-                anchors.right: parent.right
-                anchors.rightMargin: Theme.spacing.sm
-                anchors.verticalCenter: parent.verticalCenter
-                width: Theme.spacing.xxxl * 2
-                horizontalAlignment: Text.AlignRight
-                text: Sysmon.bytes(row.modelData.memory)
-                font.features: Theme.font.tabular
-                color: root.order === "memory" ? Theme.m3onSurface : Theme.m3onSurfaceVariant
-            }
-
-            StateLayer {
-                onClicked: row.picked ? root.clear() : root.show(row.modelData.pid)
-            }
-        }
-    }
-
-    StyledText {
+    K.EmptyList {
         visible: root.list.length === 0
-        width: parent.width
         text: Sysmon.sample?.detail ? "No processes to show" : "Counting…"
-        color: Theme.m3outline
-        font.pixelSize: Theme.font.sm
     }
 
     // The picked process: what it runs, whose it is, and End or Kill.
-    Rectangle {
+    K.Card {
         visible: root.details !== null
-        width: parent.width
-        height: detailsColumn.implicitHeight + Theme.spacing.md * 2
-        radius: Theme.rounding.md
-        color: Theme.m3surfaceContainer
 
-        Column {
-            id: detailsColumn
+        K.Stack {
+            fill: true
+            gap: K.Tokens.space.s4
 
-            x: Theme.spacing.md
-            y: Theme.spacing.md
-            width: parent.width - Theme.spacing.md * 2
-            spacing: Theme.spacing.xs
-
-            StyledText {
-                width: parent.width
+            K.Text {
                 text: root.details ? `${root.details.name} · pid ${root.details.pid}` : ""
-                font.weight: Font.DemiBold
+                style: K.Tokens.type.body_strong
             }
 
-            StyledText {
-                width: parent.width
+            K.Text {
                 text: root.details?.command ?? ""
-                font.family: Theme.font.mono
-                font.pixelSize: Theme.font.sm
-                color: Theme.m3onSurfaceVariant
-                wrapMode: Text.WrapAnywhere
-                maximumLineCount: 2
+                style: K.Tokens.type.mono
+                color: K.Tokens.color.on_surface_variant
+                maximumLines: 2
             }
 
-            StyledText {
-                width: parent.width
+            K.Text {
                 text: root.details ? [root.details.user, root.details.state, `${root.details.threads} threads`, Sysmon.bytes(root.details.memory), root.details.started ? `since ${Qt.formatDateTime(new Date(root.details.started * 1000), "ddd HH:mm")}` : "", `parent ${root.details.parent}`].filter(Boolean).join(" · ") : ""
-                font.pixelSize: Theme.font.sm
-                font.features: Theme.font.tabular
-                color: Theme.m3onSurfaceVariant
+                style: K.Tokens.type.small
+                color: K.Tokens.color.on_surface_variant
             }
 
-            Item {
-                width: parent.width
-                height: Theme.spacing.xs
+            K.Gap {
+                space: K.Tokens.space.s8
             }
 
-            Row {
+            K.Row {
                 visible: root.confirming === ""
-                spacing: Theme.spacing.sm
+                gap: K.Tokens.space.s8
+                align: "centre"
 
-                Chip {
-                    label: "End"
-                    tooltip: "Ask it to quit; it may save its work first"
-                    onClicked: root.confirming = "term"
+                K.Button {
+                    text: "End"
+                    kind: "Tonal"
+                    size: "Sm"
+                    activeFocusOnTab: false
+                    onActivated: root.confirming = "term"
+
+                    K.Hint {
+                        text: "Ask it to quit; it may save its work first"
+                        shown: parent.pointerOver
+                    }
                 }
 
-                Chip {
-                    label: "Kill"
-                    tooltip: "Stop it at once; unsaved work is lost"
-                    onClicked: root.confirming = "kill"
+                K.Button {
+                    text: "Kill"
+                    kind: "Text"
+                    size: "Sm"
+                    activeFocusOnTab: false
+                    onActivated: root.confirming = "kill"
+
+                    K.Hint {
+                        text: "Stop it at once; unsaved work is lost"
+                        shown: parent.pointerOver
+                    }
                 }
             }
 
-            Row {
+            K.Row {
                 visible: root.confirming !== ""
-                spacing: Theme.spacing.sm
+                gap: K.Tokens.space.s8
+                align: "centre"
 
-                StyledText {
-                    anchors.verticalCenter: parent.verticalCenter
+                K.Text {
                     text: root.details ? `${root.confirming === "kill" ? "Kill" : "End"} ${root.details.name}?` : ""
-                    font.weight: Font.Medium
-                    color: root.confirming === "kill" ? Theme.m3error : Theme.m3onSurface
+                    style: K.Tokens.type.body_strong
+                    color: root.confirming === "kill" ? K.Tokens.color.error : K.Tokens.color.on_surface
                 }
 
-                Chip {
-                    label: "Cancel"
-                    onClicked: root.confirming = ""
+                K.Button {
+                    text: "Cancel"
+                    kind: "Text"
+                    size: "Sm"
+                    activeFocusOnTab: false
+                    onActivated: root.confirming = ""
                 }
 
-                Chip {
-                    label: root.confirming === "kill" ? "Kill" : "End"
-                    selected: true
-                    onClicked: root.stop()
+                K.Button {
+                    text: root.confirming === "kill" ? "Kill" : "End"
+                    kind: root.confirming === "kill" ? "Danger" : "Filled"
+                    size: "Sm"
+                    activeFocusOnTab: false
+                    onActivated: root.stop()
                 }
             }
         }
     }
 
-    StyledText {
+    K.Text {
         visible: root.error !== ""
-        width: parent.width
         text: root.error
-        color: Theme.m3error
-        font.pixelSize: Theme.font.sm
-        wrapMode: Text.Wrap
+        style: K.Tokens.type.small
+        color: K.Tokens.color.error
     }
 }
