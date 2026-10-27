@@ -16,6 +16,7 @@
 //!
 //! - The frame's shape ([`Frame`], [`Node`], [`Role`]), the rules ([`Rule`], [`Rules`]) and
 //!   checking frames against them ([`check`]).
+//! - Holding one page from two toolkits to the same boxes ([`parity`]).
 //!
 //! # Not here
 //!
@@ -25,6 +26,7 @@
 #![forbid(unsafe_code)]
 
 mod check;
+pub mod parity;
 
 use std::fmt;
 

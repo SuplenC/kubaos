@@ -50,10 +50,19 @@ test:
     test/run e2e
     install/test/engine-e2e
 
-# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, then every specimen page at every scale, light and dark, held to the geometry rules. `just test` runs both as cargo tests; `nix flake check` runs them too.
-design-check:
+# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced. `just test` runs the first two as cargo tests; `nix flake check` runs all three.
+design-check: && design-parity
     cargo run -q -p kubaos-design -- lint
     cargo run -q -p kubaos-specimen -- check
+
+# The components page drawn with KubaOS.Components, laid out headless by Qt (qml-specimen, from the flake) and held to the iced page's boxes, node for node, at every scale, light and dark. The flake sees the files git knows about: `git add` a new QML file first, or it is left out of the page.
+design-parity:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    frames="$(mktemp -d)"
+    trap 'rm -rf "$frames"' EXIT
+    nix run .#checks.{{host}}-linux.qml-specimen -- frames "$frames" >/dev/null
+    cargo run -q -p kubaos-specimen -- parity "$frames"
 
 # After fixing literal design values: lower design/lint-baseline.toml to what the lint finds. It never raises a count.
 design-baseline:

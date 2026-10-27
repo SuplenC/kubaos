@@ -6,7 +6,7 @@ Three files hold the design, each owning one thing:
 
 | File | Owns |
 |---|---|
-| `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols. `kubaos-tokens` checks its rules and writes each toolkit's copy. |
+| `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols. `kubaos-tokens` checks its rules and writes each toolkit's copy: `kubaos-ui`'s `tokens.rs`, and `Tokens.qml` and `Symbols.qml` in `KubaOS.Components`. |
 | `docs/DESIGN.md` (this file) | The rules and their reasons: which value is for what, the components, the keyboard, focus, scaling. |
 | `docs/BRAND.md` | The words: name, voice, and how errors and buttons read. |
 
@@ -204,12 +204,12 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 
 ![Every component, every kind, size and state, dark](../design/specimen/components-dark-1x.png)
 
-*The button and icon-button matrices first (kind × size × resting, hovered, pressed, focused, disabled), then fields, switches, checkboxes and radios, lists, chips, cards, dialogs, toasts and progress, empty states and errors with a log. Light: [components-light-1x.png](../design/specimen/components-light-1x.png).*
+*The button and icon-button matrices first (kind × size × resting, hovered, pressed, focused, disabled), then fields, switches, checkboxes and radios, lists, chips, cards, dialogs, toasts and progress, empty states and errors with a log. Light: [components-light-1x.png](../design/specimen/components-light-1x.png). The same page drawn with `KubaOS.Components`: [1×](../design/specimen/qml/components-dark-1x.png) and [1.5×](../design/specimen/qml/components-dark-1.5x.png), dark.*
 
 Two libraries implement one spec, with the same names:
 
 - **`kubaos-ui`** (Rust, iced): Kōbō, Screens, the updater, a future Settings app. `crates/kubaos-ui`.
-- **`KubaOS.Components`** (QML): the shell and the Command menu. Built in #147 to match the specimen.
+- **`KubaOS.Components`** (QML): the shell and the Command menu. `qml/KubaOS/Components`, on Quickshell's import path (`home/curated.nix`), so `import KubaOS.Components as K`. Its values are the generated `Tokens` singleton, by their names in `design/tokens.toml` (`Tokens.size.control_md`, `Tokens.color.on_primary`); `Look` nests corners, blends colours and puts lengths on device pixels. The layout primitives (`Page`, `Stack`, `Row`, `Grid`, `Fill`, `Gap`…) lay out as iced's do, so a page built from them is the iced page's boxes; `qml/specimen/` is the components page drawn with it, held to the iced one by the parity check (see "Checks").
 
 **The shared name** of each component is the PascalCase of its `kubaos-ui` constructor (`icon_button` is `IconButton`); `progress::bar` is `ProgressBar`. The QML type has that name, and the geometry check reports components by it. A front end uses only these; a raw toolkit widget (iced's `button`, Qt Quick Controls' `Button`) in an app is a lint failure.
 
@@ -238,7 +238,7 @@ Each component reports its shared name, its variant (the words below that apply,
 
 The set is **closed**. Every component takes the look (colours, mode, scale) and tokens, never a length, colour or duration of its own. A new kind, size or component changes this file first, then both libraries. **Composed blocks** (a settings row with a switch, a Wi-Fi row with its lock) are built from these, shadcn-style, in the app or the library, and add no new look.
 
-Every interactive component has these states, shown in the specimen: **resting, hovered, pressed, focused, disabled**. Hover and press lay a state layer of the content colour over the fill (`opacity.hover` 0.08, `opacity.press` 0.14). The layer fades in and out over `micro`. *Not enforced yet: lands in #147 (QML) and #148 (iced; `kubaos-ui` switches it at once today).* Focus is the focus ring. Disabled dims the content to 0.38 and the container to 0.10 and takes no input.
+Every interactive component has these states, shown in the specimen: **resting, hovered, pressed, focused, disabled**. Hover and press lay a state layer of the content colour over the fill (`opacity.hover` 0.08, `opacity.press` 0.14). The layer fades in and out over `micro`. *Not enforced yet in iced: lands in #148 (`kubaos-ui` switches it at once today).* Focus is the focus ring. Disabled dims the content to 0.38 and the container to 0.10 and takes no input.
 
 ### Layout
 
@@ -315,8 +315,8 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 |---|---|---|
 | `Dialog` | `dialog::dialog` | A question over a dimmed screen: one width (500, `dialog`), padding 32, the surface radius (24), the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under it, the buttons 32 under that: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. |
 | `Scrim` | `dialog::scrim` | Everything behind a dialog, dimmed (`opacity.scrim`). |
-| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, the surface radius (24), which on one line is a pill. It arrives over `short` and leaves over `medium`. *Not enforced yet: lands in #147 and #148 (`toast` is static today).* |
-| `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work on the `linear` curve. *Not enforced yet: lands in #147 and #148 (the bar jumps today).* |
+| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, the surface radius (24), which on one line is a pill. It arrives over `short` and leaves over `medium` (`standard_accel`). *Not enforced yet in iced: lands in #148 (`toast` is static today).* |
+| `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work over `short` on the `linear` curve. *Not enforced yet in iced: lands in #148 (the bar jumps today).* |
 | `Spinner` | `progress::spinner` | Work that doesn't know: an icon size (16, 20 or 24 beside text; 32 and 48 for a page's one spinner), a thin arc over a faint full ring. The caller passes the time; the arc turns and breathes with it. |
 | `EmptyState` | `empty::empty_state` | A place with nothing in it, centred: a 32 icon, 12 below it a `subheading` title, 4 below that a `body` line saying what to do, and 16 below that an optional action. Never a bare "No items". |
 | `ErrorBlock` | `error::error_block` | What broke and what to do next: a 24 error icon, 16 from the message in `subheading` (`body_strong` past 90 characters, since a whole command line in 16 px semibold is a wall), the hint in `body` 4 under it, on the error container with an error hairline, the surface radius (24), padding 20. |
@@ -351,15 +351,15 @@ Everything works from the keyboard, in every app, the same way. Shortcuts are on
 A new surface implements the whole map, not the keys it happens to need. Today neither front end has all of it:
 
 - **Kōbō** (`translate` in `crates/kubaos-kobo/src/app.rs`): Tab and Shift+Tab, the arrows, Home and End, Page Up and Page Down, Enter once per press, Space, Esc. Not yet: Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K and h j k l; they land in #148.
-- **The shell's lists** (`config/quickshell/components/NavList.qml`): ↑ ↓, Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K, j and k where a list takes them, Enter. Not yet: Home, End, Page Up, Page Down, h and l; they land in #147.
+- **The shell's lists** (`config/quickshell/components/NavList.qml`): ↑ ↓, Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K, j and k, Home and End, Page Up and Page Down, Enter once per press; in a list laid out across, ← → and h and l. Plain letters and Home and End stay the field's where a text field forwards its keys to the list. `KubaOS.Components` presses a focused control with Enter or Space, once per press.
 
 ### Focus
 
 - **Always visible.** The focused control draws the focus ring: 4 outside the control (`focus.offset`), concentric (the control's radius plus 4), its outer stroke `stroke.thin` rounded to whole device pixels. It is the accent, or the cold accent on a `ChoiceCard`, where the accent already means picked.
 - **Focus never moves layout.** The ring takes no space; a focused control is the same box as a resting one. The geometry check compares them.
 - **One place at a time.** The app owns where focus is and passes it to components as a flag; a list shows its focused row by its own selection, and the ring goes round the list.
-- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it; closing it puts focus back where it was. *Not enforced yet: lands in #147 (QML) and #148 (iced).*
-- Focus moves over `short` with `standard`. *Not enforced yet: lands in #147 (QML) and #148 (iced); the ring jumps today.*
+- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it, onto its last action unless it names another (a `Danger` dialog starts on Cancel); closing it puts focus back where it was, and Esc closes it as its dismiss button does. *Not enforced yet in iced: lands in #148.*
+- Focus moves over `short` with `standard`: the ring fades out of one control and into the next. *Not enforced yet in iced: lands in #148; the ring jumps there today.*
 
 ### Scaling
 
@@ -407,7 +407,7 @@ Three checks keep every front end on this file. The first two run in `cargo test
 
 ### The lint
 
-`kubaos-design lint` reads every `.qml` file and the sources of every Rust crate that depends on iced. It skips their tests, the files `kubaos-tokens` generates, and `config/quickshell/theme/Theme.qml`, the shell's hand-written token file until #147 generates its replacement: those are where the values belong. Each rule fails on a value written out where a token belongs:
+`kubaos-design lint` reads every `.qml` file and the sources of every Rust crate that depends on iced. It skips their tests and the files `kubaos-tokens` generates: those are where the values belong. Each rule fails on a value written out where a token belongs:
 
 | Rule | Fails on |
 |---|---|
@@ -482,7 +482,7 @@ That run is iced centring a row's children by half a device pixel at 1.25, befor
 
 **Optically centred** is two things. A symbol's box is centred in its slot to the device pixel, which the check measures. Its drawing is optically centred in that box by Tabler's grid, which the four we drew follow and the icons page shows beside their relatives.
 
-**Other toolkits.** The checker reads boxes, not widgets, so the shell feeds it the same way (#147): `KubaOS.Components` dumps each page's item tree as a frame, and `kubaos-design geometry FRAME.json…` checks the frames together. A frame is JSON:
+**Other toolkits.** The checker reads boxes, not widgets, so any toolkit feeds it the same way: each `KubaOS.Components` item says what it is (its `probe`), the QML specimen prints the page's item tree as a frame, and `kubaos-design geometry FRAME.json…` checks any frames together. A frame is JSON:
 
 ```json
 {
@@ -503,11 +503,30 @@ That run is iced centring a row's children by half a device pixel at 1.25, befor
 }
 ```
 
-Bounds are logical pixels from the page's top left. The roles are `box` (a toolkit's container that claims nothing), `layout` (`axis` `x` or `y`, `gap`, `align` `start`, `centre` or `end`: a `RowLayout`, a `ColumnLayout`), `grid` (`columns`, `gap`, `align`), `component` (the shared `name`, the `variant`'s words, which measures are `fixed`), `text` (`content`, and `natural`: the size its laid-out text needs, `implicitWidth` and `implicitHeight` in QML), `icon` (`name`), and `spacer` (`fill`). A component's name and variant are this file's, so a `Button` in QML and one in iced are held to the same measures. That same dump answers #147's cross-toolkit test: the iced and the QML frame of a component must match.
+Bounds are logical pixels from the page's top left. The roles are `box` (a toolkit's container that claims nothing), `layout` (`axis` `x` or `y`, `gap`, `align` `start`, `centre` or `end`: a `RowLayout`, a `ColumnLayout`), `grid` (`columns`, `gap`, `align`), `component` (the shared `name`, the `variant`'s words, which measures are `fixed`), `text` (`content`, and `natural`: the size its laid-out text needs, `implicitWidth` and `implicitHeight` in QML), `icon` (`name`), and `spacer` (`fill`). A component's name and variant are this file's, so a `Button` in QML and one in iced are held to the same measures.
+
+**Parity.** The two libraries implement one spec, so the components page drawn with each is one frame. `qml-specimen` lays `qml/specimen/` out headless with Qt's own `qml` runtime, the Qt Quickshell loads, at 1, 1.25, 1.5 and 2, light and dark, with `kubaos-ui`'s fonts and no others. `kubaos-specimen parity DIR` then holds each QML frame to the geometry rules above and to the iced page's frame, node for node: the same role, name, variant, words and symbol in the same order, every box within a hundredth of a device pixel, and every text's natural size within a hundredth of a logical pixel, since a fraction there is a device pixel somewhere else. Plain boxes are left out: each toolkit wraps content in containers of its own, and they claim nothing. Parity is layout only: it compares where each box is and what it says it is, never how it is drawn, so a colour, radius, stroke, opacity or shadow that differs passes it; the screenshots below are where those show. `just design-check` runs it after the lint and the geometry check, and `nix flake check` as `design-parity`; it is no cargo test, because it needs Qt.
+
+```text
+$ just design-parity
+kubaos-specimen parity: 8 frame(s), 0 difference(s), 0 finding(s)
+```
+
+A difference names the frame, the node's box in each toolkit, and where it sits in the iced page; ten are listed per frame, and the count says how many there are:
+
+```text
+components-light-2x parity: Text "1.8 / 4.2 GB" is 64.5×16 at (825.5, 4414.5) in QML and 86.5×16 at (825.5, 4414.5) in iced
+    at Stack > Page > Stack > Stack > Section > Stack > Stack > Row > Stack > Stack > Row > Text "1.8 / 4.2 GB"
+kubaos-specimen parity: 8 frame(s), 144 difference(s), 0 finding(s)
+```
+
+That run is Qt drawing `mono` text in a proportional font from the desktop's own font directories, before `qml-specimen` was given `kubaos-ui`'s fonts alone.
+
+The QML shots come from the same runner, `nix run .#checks.x86_64-linux.qml-specimen -- shots DIR`. Headless, Qt draws with its software renderer, which leaves `RectangularShadow` out: the dialogs' shadow and the progress bar's glow are missing from these shots.
 
 ### Screenshot diffs
 
-The specimen's 1× shots are checked in under `design/specimen/`. A PR that changes how anything looks regenerates them with `kubaos-specimen shots DIR` and commits the ones that changed, so the change shows in review as an image diff. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues.
+The specimen's 1× shots are checked in under `design/specimen/`, and the QML components page's 1× and 1.5× dark under `design/specimen/qml/`. A PR that changes how anything looks regenerates them with `kubaos-specimen shots DIR` and `qml-specimen shots DIR` and commits the ones that changed, so the change shows in review as an image diff. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues.
 
 ## Changing the design
 

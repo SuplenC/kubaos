@@ -141,14 +141,14 @@
           "kuba@vm" = home "aarch64-linux";
         };
 
-      # The design checks (crates/checks.nix): the lint and the specimen's
-      # geometry, run by `nix flake check`.
+      # The design checks (crates/checks.nix): the lint, the specimen's
+      # geometry and QML's parity with it, run by `nix flake check`.
       checks = forAllSystems (
         pkgs:
         import ./crates/checks.nix {
           inherit pkgs inputs;
           src = self;
-          inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) kubaos-specimen;
+          inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) kubaos-specimen kubaos-components;
         }
       );
 
