@@ -21,7 +21,7 @@
 # multiple of this.
 grid = 4
 # The only font sizes. A type style with any other size is refused. 64 is the
-# hero's alone.
+# hero's alone: semibold for words, light for numbers.
 font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64]
 # The scales every length is checked against: `grid` times each one must be a
 # whole number of device pixels.
@@ -108,7 +108,14 @@ size = 64
 line = 72
 weight = "semibold"
 family = "sans"
-use = "Kōbō's welcome line and the install percent, and nothing else."
+use = "Words at the hero size: Kōbō's welcome line, and nothing else."
+
+[type.hero_number]
+size = 64
+line = 72
+weight = "light"
+family = "sans"
+use = "Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the clock."
 
 [type.display]
 size = 48
@@ -496,7 +503,7 @@ bedtime = { tabler = "moon-stars" }
 bluetooth = { tabler = "bluetooth" }
 bluetooth_connected = { tabler = "bluetooth-connected" }
 bluetooth_disabled = { tabler = "bluetooth-off" }
-bluetooth_searching = { drawn = "Tabler's Bluetooth rune at four fifths, with its search badge" }
+bluetooth_searching = { drawn = "Tabler's bluetooth-x, a magnifier where its x is" }
 bolt = { tabler = "bolt" }
 brightness_high = { tabler = "brightness-up" }
 brightness_low = { tabler = "brightness-down" }
@@ -528,7 +535,7 @@ fingerprint = { tabler = "fingerprint" }
 flag = { tabler = "flag" }
 folder = { tabler = "folder" }
 folder_open = { tabler = "folder-open" }
-hard_drive = { drawn = "A drive's case, its board below a line, a slot and a light" }
+hard_drive = { drawn = "A drive's case in server-2's proportions, its board below a line, server-2's light and slot" }
 hourglass_top = { tabler = "hourglass-high" }
 key = { tabler = "key" }
 keyboard = { tabler = "keyboard" }
@@ -601,6 +608,6 @@ wallpaper = { tabler = "photo" }
 warning = { tabler = "alert-triangle" }
 wb_twilight = { tabler = "sunset-2" }
 wifi = { tabler = "wifi" }
-wifi_find = { drawn = "Tabler's Wi-Fi fan, smaller, with its search badge" }
-wifi_lock = { drawn = "Tabler's Wi-Fi fan, smaller, with its lock badge" }
+wifi_find = { drawn = "Tabler's Wi-Fi fan at full size, stopped 2 units clear of its search badge" }
+wifi_lock = { drawn = "Tabler's Wi-Fi fan at full size, stopped 2 units clear of its lock badge" }
 wifi_off = { tabler = "wifi-off" }

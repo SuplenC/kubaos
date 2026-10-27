@@ -27,7 +27,7 @@ jp+="書体間隔色部品動き記号見本"
 curl -fsSL -o "$tmp/geist.zip" "$geist_url"
 echo "$geist_sha256  $tmp/geist.zip" | sha256sum -c --quiet
 unzip -qo "$tmp/geist.zip" -d "$tmp/geist"
-for w in Regular Medium SemiBold; do
+for w in Light Regular Medium SemiBold; do
   cp "$tmp/geist/geist-font/Geist/ttf/Geist-$w.ttf" .
 done
 for w in Regular Medium; do

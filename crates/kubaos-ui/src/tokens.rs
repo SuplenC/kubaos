@@ -252,6 +252,7 @@ impl Family {
 /// A font weight.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Weight {
+    Light,
     Regular,
     Medium,
     Semibold,
@@ -259,7 +260,8 @@ pub enum Weight {
 
 impl Weight {
     /// Every weight.
-    pub const ALL: [Weight; 3] = [
+    pub const ALL: [Weight; 4] = [
+        Weight::Light,
         Weight::Regular,
         Weight::Medium,
         Weight::Semibold,
@@ -268,6 +270,7 @@ impl Weight {
     /// The weight on CSS's 100 to 900 scale.
     pub const fn value(self) -> u16 {
         match self {
+            Weight::Light => 300,
             Weight::Regular => 400,
             Weight::Medium => 500,
             Weight::Semibold => 600,
@@ -278,8 +281,11 @@ impl Weight {
 /// A type style: what a piece of text is drawn with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
-    /// Kōbō's welcome line and the install percent, and nothing else.
+    /// Words at the hero size: Kōbō's welcome line, and nothing else.
     Hero,
+    /// Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the
+    /// clock.
+    HeroNumber,
     /// The heading of a full-screen moment other than the welcome: Kōbō's done screen.
     Display,
     /// A screen's or page's title.
@@ -318,8 +324,9 @@ pub enum Type {
 
 impl Type {
     /// Every type style, largest first.
-    pub const ALL: [Type; 18] = [
+    pub const ALL: [Type; 19] = [
         Type::Hero,
+        Type::HeroNumber,
         Type::Display,
         Type::Title,
         Type::Headline,
@@ -343,6 +350,7 @@ impl Type {
     pub const fn size(self) -> u16 {
         match self {
             Type::Hero => 64,
+            Type::HeroNumber => 64,
             Type::Display => 48,
             Type::Title => 32,
             Type::Headline => 24,
@@ -367,6 +375,7 @@ impl Type {
     pub const fn line(self) -> u16 {
         match self {
             Type::Hero => 72,
+            Type::HeroNumber => 72,
             Type::Display => 56,
             Type::Title => 40,
             Type::Headline => 32,
@@ -391,6 +400,7 @@ impl Type {
     pub const fn weight(self) -> Weight {
         match self {
             Type::Hero => Weight::Semibold,
+            Type::HeroNumber => Weight::Light,
             Type::Display => Weight::Semibold,
             Type::Title => Weight::Semibold,
             Type::Headline => Weight::Semibold,
@@ -415,6 +425,7 @@ impl Type {
     pub const fn family(self) -> Family {
         match self {
             Type::Hero => Family::Sans,
+            Type::HeroNumber => Family::Sans,
             Type::Display => Family::Sans,
             Type::Title => Family::Sans,
             Type::Headline => Family::Sans,
@@ -917,7 +928,7 @@ pub enum Icon {
     BluetoothConnected,
     /// Tabler's `bluetooth-off`.
     BluetoothDisabled,
-    /// Ours: Tabler's Bluetooth rune at four fifths, with its search badge.
+    /// Ours: Tabler's bluetooth-x, a magnifier where its x is.
     BluetoothSearching,
     /// Tabler's `bolt`.
     Bolt,
@@ -981,7 +992,8 @@ pub enum Icon {
     Folder,
     /// Tabler's `folder-open`.
     FolderOpen,
-    /// Ours: A drive's case, its board below a line, a slot and a light.
+    /// Ours: A drive's case in server-2's proportions, its board below a line, server-2's light and
+    /// slot.
     HardDrive,
     /// Tabler's `hourglass-high`.
     HourglassTop,
@@ -1127,9 +1139,9 @@ pub enum Icon {
     WbTwilight,
     /// Tabler's `wifi`.
     Wifi,
-    /// Ours: Tabler's Wi-Fi fan, smaller, with its search badge.
+    /// Ours: Tabler's Wi-Fi fan at full size, stopped 2 units clear of its search badge.
     WifiFind,
-    /// Ours: Tabler's Wi-Fi fan, smaller, with its lock badge.
+    /// Ours: Tabler's Wi-Fi fan at full size, stopped 2 units clear of its lock badge.
     WifiLock,
     /// Tabler's `wifi-off`.
     WifiOff,

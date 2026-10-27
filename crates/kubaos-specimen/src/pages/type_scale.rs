@@ -21,6 +21,7 @@ use crate::specimen::Message;
 fn sample(style: Type) -> &'static str {
     match style {
         Type::Hero => "Let's fix this shit.",
+        Type::HeroNumber => "42%  09:41",
         Type::Display => "Done in 1m 42s.",
         Type::Title => "Your machine. Your rules.",
         Type::Headline => "Restart now?",
@@ -43,6 +44,7 @@ fn sample(style: Type) -> &'static str {
 
 fn weight(w: Weight) -> &'static str {
     match w {
+        Weight::Light => "light",
         Weight::Regular => "regular",
         Weight::Medium => "medium",
         Weight::Semibold => "semibold",

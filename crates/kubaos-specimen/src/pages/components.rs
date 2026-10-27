@@ -536,7 +536,7 @@ fn progress<'a>(look: &Look) -> Element<'a, Message> {
                 .bottom()
                 .push(text("Installing", Type::Title, c.on_surface))
                 .push(fill())
-                .push(text("42%", Type::Hero, c.on_surface)),
+                .push(text("42%", Type::HeroNumber, c.on_surface)),
         )
         .push(bar(look, 0.42))
         .push(

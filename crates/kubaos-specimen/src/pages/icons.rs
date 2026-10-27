@@ -129,7 +129,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Drawn by us",
-            Some("The four Tabler lacks, at 48 beside the Tabler symbols they borrow from: same grid, stroke, caps and badges."),
+            Some("The four Tabler lacks, each above the Tabler symbols it borrows from, in the same colour at every size: the same grid, stroke, caps and badges, and the same ink density."),
             drawn(look),
         ))
         .push(section(
@@ -173,7 +173,8 @@ fn symbols<'a>(look: &Look) -> Element<'a, Message> {
         .into()
 }
 
-/// Each of our drawings at 48, then the Tabler symbols it borrows its parts from.
+/// Each of our drawings beside the Tabler symbols it borrows its parts from, all in one colour, at
+/// every size: the screenshots at 1, 1.5 and 2 show them at every scale too.
 fn drawn<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
     let families = [
@@ -182,18 +183,26 @@ fn drawn<'a>(look: &Look) -> Element<'a, Message> {
         (Icon::WifiFind, [Icon::Wifi, Icon::Search]),
         (Icon::BluetoothSearching, [Icon::Bluetooth, Icon::Search]),
     ];
-    grid(look, 4, Space::S24)
-        .extend(families.into_iter().map(|(ours, relatives)| {
-            let mut line = row(look, Space::S16).push(icon(look, ours, IconSize::S48, c.on_surface));
-            for relative in relatives {
-                line = line.push(icon(look, relative, IconSize::S48, c.on_surface_variant));
+    let sizes = [IconSize::S16, IconSize::S20, IconSize::S24, IconSize::S48];
+    let mut table = split(look, &[2, 1, 1, 1, 2], Space::S16)
+        .center()
+        .push(text("", Type::Label, c.on_surface_variant))
+        .extend(sizes.map(|size| text(format!("{}", size.px()), Type::Label, c.on_surface_variant).into()));
+    for (ours, relatives) in families {
+        for glyph in std::iter::once(ours).chain(relatives) {
+            let tone = if glyph == ours { c.cold } else { c.on_surface_variant };
+            let source = glyph.tabler().unwrap_or("ours");
+            table = table.push(
+                stack(look, Gap::NONE)
+                    .push(text(glyph.name(), Type::Mono, c.on_surface))
+                    .push(text(source, Type::Mono, tone)),
+            );
+            for size in sizes {
+                table = table.push(icon(look, glyph, size, c.on_surface));
             }
-            stack(look, Space::S8)
-                .push(line)
-                .push(text(ours.name(), Type::Mono, c.cold))
-                .into()
-        }))
-        .into()
+        }
+    }
+    table.into()
 }
 
 /// The device pixels of the stroke at every size and supported scale.

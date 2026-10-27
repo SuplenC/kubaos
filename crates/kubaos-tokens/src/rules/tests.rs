@@ -302,3 +302,15 @@ fn a_symbol_needs_exactly_one_source() {
         }]
     );
 }
+
+#[test]
+fn numbers_take_the_hero_size_in_light() {
+    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
+
+    let number = &tokens.types["hero_number"];
+    assert_eq!(
+        (number.size, number.line),
+        (tokens.types["hero"].size, tokens.types["hero"].line)
+    );
+    assert_eq!(number.weight, crate::model::Weight::Light);
+}

@@ -132,13 +132,14 @@ impl Family {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Weight {
+    Light,
     Regular,
     Medium,
     Semibold,
 }
 
 impl Weight {
-    pub const ALL: [Weight; 3] = [Weight::Regular, Weight::Medium, Weight::Semibold];
+    pub const ALL: [Weight; 4] = [Weight::Light, Weight::Regular, Weight::Medium, Weight::Semibold];
 }
 
 /// A type style: what a piece of text is drawn with.

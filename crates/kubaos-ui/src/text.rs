@@ -24,6 +24,7 @@ use crate::tokens::Weight;
 /// Every font the type styles use, for `iced::Settings::fonts`. An app loads them at
 /// start, so it draws the same on a machine with none installed.
 pub const FONTS: &[&[u8]] = &[
+    include_bytes!("../assets/fonts/Geist-Light.ttf"),
     include_bytes!("../assets/fonts/Geist-Regular.ttf"),
     include_bytes!("../assets/fonts/Geist-Medium.ttf"),
     include_bytes!("../assets/fonts/Geist-SemiBold.ttf"),
@@ -37,6 +38,7 @@ pub fn family_font(family: Family, weight: Weight) -> Font {
     Font {
         family: font::Family::Name(family.name()),
         weight: match weight {
+            Weight::Light => font::Weight::Light,
             Weight::Regular => font::Weight::Normal,
             Weight::Medium => font::Weight::Medium,
             Weight::Semibold => font::Weight::Semibold,

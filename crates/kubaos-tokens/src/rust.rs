@@ -320,6 +320,7 @@ fn types(out: &mut Writer, tokens: &Tokens) {
                 .iter()
                 .map(|&weight| {
                     let (variant, value) = match weight {
+                        Weight::Light => ("Light", 300),
                         Weight::Regular => ("Regular", 400),
                         Weight::Medium => ("Medium", 500),
                         Weight::Semibold => ("Semibold", 600),
@@ -390,6 +391,7 @@ fn family_variant(family: Family) -> &'static str {
 
 fn weight_variant(weight: Weight) -> &'static str {
     match weight {
+        Weight::Light => "Light",
         Weight::Regular => "Regular",
         Weight::Medium => "Medium",
         Weight::Semibold => "Semibold",
