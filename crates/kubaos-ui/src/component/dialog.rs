@@ -1,4 +1,5 @@
-//! Dialogs: a question over a dimmed screen, and the confirmation before a destructive action.
+//! Dialogs: a question over a dimmed screen, the confirmation before a destructive action, and a
+//! prompt that asks for something to be typed.
 
 use iced::Background;
 use iced::Border;
@@ -63,6 +64,50 @@ pub fn dialog<'a, M: 'a>(
     dismiss: Option<Element<'a, M>>,
     actions: impl IntoIterator<Item = Element<'a, M>>,
 ) -> Element<'a, M> {
+    compose(look, tone, glyph, title, body, None, dismiss, actions)
+}
+
+/// A dialog that asks for something to be typed: `dialog` in the `Normal` tone with `control` (a
+/// labelled field) 16 under the body and 32 above the buttons. A prompt never destroys anything;
+/// its action uses what was typed, and the field's `on_submit` sends the same message, so Enter in
+/// the field does what the action does.
+pub fn prompt<'a, M: 'a>(
+    look: &Look,
+    glyph: Icon,
+    title: &'a str,
+    body: &'a str,
+    control: impl Into<Element<'a, M>>,
+    dismiss: Option<Element<'a, M>>,
+    actions: impl IntoIterator<Item = Element<'a, M>>,
+) -> Element<'a, M> {
+    compose(
+        look,
+        Tone::Normal,
+        glyph,
+        title,
+        body,
+        Some(control.into()),
+        dismiss,
+        actions,
+    )
+}
+
+/// The dialog `dialog` and `prompt` draw: the head, the body, what it asks for if anything, then
+/// the buttons.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "a dialog's parts, each an argument as `dialog` takes them, plus what it asks for"
+)]
+fn compose<'a, M: 'a>(
+    look: &Look,
+    tone: Tone,
+    glyph: Icon,
+    title: &'a str,
+    body: &'a str,
+    control: Option<Element<'a, M>>,
+    dismiss: Option<Element<'a, M>>,
+    actions: impl IntoIterator<Item = Element<'a, M>>,
+) -> Element<'a, M> {
     let variant = [tone.name(), "", ""];
     let c = look.colors;
     let (tint, glyph, edge) = match tone {
@@ -78,7 +123,7 @@ pub fn dialog<'a, M: 'a>(
         buttons = buttons.push(dismiss);
     }
     buttons = buttons.push(fill()).extend(actions);
-    let content = stack(look, Gap::NONE)
+    let mut content = stack(look, Gap::NONE)
         .push(
             row(look, Space::S12)
                 .center()
@@ -86,9 +131,11 @@ pub fn dialog<'a, M: 'a>(
                 .push(text(title, Type::Headline, c.on_surface)),
         )
         .push(gap(Space::S12))
-        .push(text(body, Type::Body, c.on_surface_variant))
-        .push(gap(Space::S32))
-        .push(buttons);
+        .push(text(body, Type::Body, c.on_surface_variant));
+    if let Some(control) = control {
+        content = content.push(gap(Space::S16)).push(control);
+    }
+    let content = content.push(gap(Space::S32)).push(buttons);
     let surface = c.surface_container_high;
     let shadow = c.shadow;
     let hairline = look.hairline();

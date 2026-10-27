@@ -6,10 +6,12 @@ import KubaOS.Components as K
 // surface radius, the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under them,
 // the buttons 32 under that: the dismiss button (Cancel) on the left, the actions on the right,
 // the one Enter presses last. A `Danger` dialog shows the warning sign and the error colour.
+// Children are what it asks for (a labelled field), 16 under the body: `kubaos-ui`'s
+// `dialog::prompt`.
 //
 // Opening it (making it visible, or loading it visible) moves focus into it, onto `initialFocus`;
-// closing it puts focus back where it was. Tab and Shift+Tab go round its buttons and never leave
-// it. Esc dismisses it, as its dismiss button does.
+// closing it puts focus back where it was. Tab and Shift+Tab go round what it asks for and its
+// buttons, and never leave it. Esc dismisses it, as its dismiss button does.
 FocusScope {
     id: root
 
@@ -25,8 +27,11 @@ FocusScope {
     property Item dismiss: null
     // The buttons on the right, the one Enter presses last.
     property list<Item> actions
-    // What the keyboard starts on: the last action, unless set.
-    property Item initialFocus: root.actions.length > 0 ? root.actions[root.actions.length - 1] : root.dismiss
+    // What it asks for, between the body and the buttons, or nothing.
+    default property alias content: asked.data
+    // What the keyboard starts on, unless set: the first control of what it asks for (a prompt's
+    // field), else the last action.
+    property Item initialFocus: root.tabStops(asked)[0] ?? (root.actions.length > 0 ? root.actions[root.actions.length - 1] : root.dismiss)
     // What had the keyboard before it opened, given back when it closes.
     property Item returnFocus: null
     // Whether opening it takes the keyboard. Off only for a picture of a dialog, as in the
@@ -63,14 +68,29 @@ FocusScope {
             root.forceActiveFocus();
     }
 
-    // Moves the keyboard `step` buttons along, round from the last to the first and back.
+    // The controls inside `item` that Tab stops on, in reading order.
+    function tabStops(item: Item): var {
+        const stops = [];
+        for (const kid of item.children) {
+            if (!kid.visible || !kid.enabled)
+                continue;
+            if (kid.activeFocusOnTab)
+                stops.push(kid);
+            else
+                stops.push(...root.tabStops(kid));
+        }
+        return stops;
+    }
+
+    // Moves the keyboard `step` controls along, from what it asks for to the buttons, round from
+    // the last to the first and back.
     function cycle(step: int): void {
-        const buttons = [root.dismiss, ...root.actions].filter(item => item && item.visible && item.enabled);
-        if (buttons.length === 0)
+        const stops = [...root.tabStops(asked), root.dismiss, ...root.actions].filter(item => item && item.visible && item.enabled);
+        if (stops.length === 0)
             return;
-        const at = buttons.findIndex(item => item.activeFocus);
-        const next = at < 0 ? 0 : (at + step + buttons.length) % buttons.length;
-        buttons[next].forceActiveFocus(step > 0 ? Qt.TabFocusReason : Qt.BacktabFocusReason);
+        const at = stops.findIndex(item => item.activeFocus);
+        const next = at < 0 ? 0 : (at + step + stops.length) % stops.length;
+        stops[next].forceActiveFocus(step > 0 ? Qt.TabFocusReason : Qt.BacktabFocusReason);
     }
 
     function giveFocusBack(): void {
@@ -156,6 +176,17 @@ FocusScope {
                 text: root.body
                 style: Tokens.type.body
                 color: Tokens.color.on_surface_variant
+            }
+
+            K.Gap {
+                visible: asked.children.length > 0
+                space: Tokens.space.s16
+            }
+
+            K.Slot {
+                id: asked
+
+                visible: asked.children.length > 0
             }
 
             K.Gap {

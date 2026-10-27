@@ -10,6 +10,9 @@ import KubaOS.Components as K
 FocusScope {
     id: root
 
+    // Enter in the field: what was typed is done.
+    signal accepted
+
     property alias text: input.text
     property string placeholder
     // A symbol inside the field, before the text, or none.
@@ -103,6 +106,8 @@ FocusScope {
         enabled: !root.locked
         clip: true
         echoMode: root.secret ? TextInput.Password : TextInput.Normal
+        // iced's bullet; Qt's default is the heavier black circle.
+        passwordCharacter: "•"
         verticalAlignment: TextInput.AlignVCenter
         color: root.locked ? Tokens.color.on_surface_variant : Tokens.color.on_surface
         selectionColor: K.Look.alpha(Tokens.color.primary, Tokens.opacity.selection)
@@ -113,6 +118,7 @@ FocusScope {
         font.kerning: false
         font.preferShaping: false
         font.hintingPreference: Font.PreferNoHinting
+        onAccepted: root.accepted()
 
         Text {
             anchors.fill: parent
