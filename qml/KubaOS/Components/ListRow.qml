@@ -29,7 +29,7 @@ K.Pressable {
     readonly property bool fillWidth: true
     readonly property color onFill: root.danger ? Tokens.color.on_error : Tokens.color.on_secondary_container
     readonly property color main: root.selected ? root.onFill : Tokens.color.on_surface
-    readonly property color muted: root.selected ? K.Look.alpha(root.onFill, Tokens.opacity.subdued) : Tokens.color.on_surface_variant
+    readonly property color muted: root.selected ? K.Look.alpha(root.onFill, Tokens.opacity.subdued_text) : Tokens.color.on_surface_variant
     readonly property var probe: ({
             role: "component",
             name: "ListRow",

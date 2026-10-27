@@ -6,7 +6,8 @@ import KubaOS.Components as K
 //
 // The hints are `hints`, a list of `[combination, what]` pairs, or `text` in the form Kotodama
 // and the menu write them, `↵ Open · Tab Enter app · ⌃K Actions`: each part's first word the
-// combination, the rest what it does. A combination is written `Ctrl+K`, a `+` alone the plus key.
+// combination, the rest what it does. A combination is written `Ctrl+K`; each of its keys is a
+// keycap of its own, and so is each modifier or arrow glyph written together (`⌃K`, `↑↓`).
 Item {
     id: root
 
@@ -36,9 +37,28 @@ Item {
         });
     }
 
-    // The keys of `combination`.
+    // The keys of `combination`, one keycap each, as `keycap::keys` splits them.
     function keys(combination: string): var {
-        return combination === "+" ? ["+"] : combination.split("+").filter(key => key !== "");
+        if (combination === "+")
+            return ["+"];
+        const glyphs = "⌃⇧⌥⌘↑↓←→↵⌫⌦";
+        const found = [];
+        for (const part of combination.split(/[+\s]/)) {
+            let word = "";
+            for (const c of part) {
+                if (glyphs.includes(c)) {
+                    if (word !== "")
+                        found.push(word);
+                    found.push(c);
+                    word = "";
+                } else {
+                    word += c;
+                }
+            }
+            if (word !== "")
+                found.push(word);
+        }
+        return found;
     }
 
     implicitWidth: line.implicitWidth
@@ -50,13 +70,17 @@ Item {
         gap: Tokens.space.s16
         align: "centre"
 
+        // By count, not by the pairs themselves: a new text with as many hints keeps the same
+        // delegates and only rebinds their words, rather than making them all again.
         Repeater {
-            model: root.shown
+            model: root.shown.length
 
             K.Row {
                 id: hint
 
-                required property var modelData
+                required property int index
+                readonly property var pair: root.shown[hint.index] ?? ["", ""]
+                readonly property var caps: root.keys(hint.pair[0])
 
                 gap: Tokens.space.s8
                 align: "centre"
@@ -66,19 +90,19 @@ Item {
                     align: "centre"
 
                     Repeater {
-                        model: root.keys(hint.modelData[0])
+                        model: hint.caps.length
 
                         K.Keycap {
-                            required property string modelData
+                            required property int index
 
-                            key: modelData
+                            key: hint.caps[index] ?? ""
                         }
                     }
                 }
 
                 K.Text {
-                    visible: hint.modelData[1] !== ""
-                    text: hint.modelData[1]
+                    visible: hint.pair[1] !== ""
+                    text: hint.pair[1]
                     style: Tokens.type.caption
                     color: root.color
                 }

@@ -29,9 +29,19 @@ fn bounds(element: Element<'_, ()>) -> Rectangle {
 
 #[test]
 fn a_combination_is_split_into_its_keys() {
-    assert_eq!(keys("Ctrl+K").collect::<Vec<_>>(), ["Ctrl", "K"]);
-    assert_eq!(keys("Esc").collect::<Vec<_>>(), ["Esc"]);
-    assert_eq!(keys("+").collect::<Vec<_>>(), ["+"]);
+    assert_eq!(keys("Ctrl+K"), ["Ctrl", "K"]);
+    assert_eq!(keys("Esc"), ["Esc"]);
+    assert_eq!(keys("+"), ["+"]);
+    assert_eq!(keys("Shift+Space"), ["Shift", "Space"]);
+}
+
+#[test]
+fn glyphs_written_together_are_a_key_each() {
+    assert_eq!(keys("⌃K"), ["⌃", "K"]);
+    assert_eq!(keys("⌃⇧⌫"), ["⌃", "⇧", "⌫"]);
+    assert_eq!(keys("↑↓"), ["↑", "↓"]);
+    assert_eq!(keys("← ↑ ↓ →"), ["←", "↑", "↓", "→"]);
+    assert_eq!(keys("A–Z"), ["A–Z"]);
 }
 
 #[test]

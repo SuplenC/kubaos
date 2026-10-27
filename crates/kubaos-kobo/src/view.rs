@@ -1126,7 +1126,7 @@ fn mode_card<'a>(
     let (main, muted) = if picked {
         (
             c.on_secondary_container,
-            color::alpha(c.on_secondary_container, Opacity::Subdued.value()),
+            color::alpha(c.on_secondary_container, Opacity::SubduedText.value()),
         )
     } else {
         (c.on_surface, c.on_surface_variant)
@@ -2064,7 +2064,7 @@ fn welcome<'a>(app: &'a App, look: &Look) -> El<'a> {
             .push(spinner(look, IconSize::S20, seconds, c.primary))
             .push(text("Poking at the hardware…", Type::Body, c.on_surface_variant))
             .into(),
-        ProbeState::Failed(e) => refused(format!("Couldn't read this machine: {e}. Enter tries again.")),
+        ProbeState::Failed(e) => refused(format!("Couldn't read this machine: {e}.")),
         ProbeState::Ready(pr) if pr.payload.is_none() => refused(
             "No system image on this stick, so I've got nothing to install. Rebuild the ISO and flash it again.".into(),
         ),

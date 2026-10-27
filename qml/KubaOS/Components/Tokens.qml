@@ -416,12 +416,14 @@ QtObject {
         readonly property real log: 0.85
         readonly property real outline_soft: 0.55
         readonly property real panel_scrim: 0.2
-        readonly property real placeholder: 0.8
+        readonly property real placeholder: 0.55
+        readonly property real placeholder_text: 0.8
         readonly property real press: 0.14
         readonly property real scrim: 0.6
         readonly property real selection: 0.32
         readonly property real spinner_track: 0.18
-        readonly property real subdued: 0.85
+        readonly property real subdued: 0.75
+        readonly property real subdued_text: 0.85
         readonly property real tint: 0.16
         readonly property real track: 0.9
         readonly property real well: 0.75

@@ -45,9 +45,10 @@ use crate::probe::Fixed;
 use crate::scale::Scale;
 pub use crate::tokens::Aspect;
 
-/// `picture` filling a box as wide as the room and as tall as `aspect` makes it, cut to cover it,
-/// with `corner`'s radius; without a picture yet, the box holds the placeholder, the high
-/// container. Its height lands on a whole device pixel, so what follows it does too.
+/// `picture` filling a box as wide as the room (a thumbnail's width where the room has no end) and
+/// as tall as `aspect` makes it, cut to cover it, with `corner`'s radius; without a picture yet,
+/// the box holds the placeholder, the high container. Its height lands on a whole device pixel, so
+/// what follows it does too.
 pub fn media<'a, M: 'a>(
     look: &Look,
     picture: Option<image::Handle>,
@@ -109,7 +110,14 @@ impl<M> Widget<M, Theme, Renderer> for Framed<'_, M> {
     }
 
     fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
-        let width = limits.width(Length::Fill).max().width;
+        // In a parent with no end across (a shrinking row, a sideways scroll) the room is
+        // infinite, and so would the height be: the box then takes a thumbnail's width.
+        let room = limits.width(Length::Fill).max().width;
+        let width = if room.is_finite() {
+            room
+        } else {
+            f32::from(crate::tokens::Size::ThumbnailWidth.px())
+        };
         let size = Size::new(width, height(width, self.aspect, self.scale));
         let node =
             self.content

@@ -183,6 +183,14 @@ fn check_contrast(tokens: &Tokens, found: &mut Vec<Violation>) {
             });
         }
     }
+    for name in &tokens.contrast.decorative {
+        if !tokens.color.source.contains_key(name) {
+            found.push(Violation::UnknownInPair {
+                token: "contrast.decorative".into(),
+                name: name.clone(),
+            });
+        }
+    }
     for reading in crate::contrast::readings(tokens) {
         if let Some(ratio) = reading.ratio
             && !reading.holds()

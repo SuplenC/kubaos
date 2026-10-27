@@ -155,25 +155,35 @@ Item {
                         color: action.index === 0 ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
                     }
 
-                    // The Action's key as a keycap, as tall as the title's line, at the row's end.
-                    K.Keycap {
+                    // The Action's keys as keycaps, as tall as the title's line, at the row's end.
+                    Row {
                         id: shortcut
 
+                        readonly property var keys: action.index === 0 ? ["↵"] : Words.shortcutKeys(action.modelData.shortcut)
+
                         x: parent.width - width
-                        width: implicitWidth
-                        height: implicitHeight
-                        visible: key !== ""
-                        key: action.index === 0 ? "↵" : Words.shortcutLabel(action.modelData.shortcut)
+                        spacing: K.Tokens.space.s4
+
+                        Repeater {
+                            model: shortcut.keys.length
+
+                            Keycap {
+                                required property int index
+
+                                key: shortcut.keys[index] ?? ""
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    K.KeyHints {
+    KeyHints {
         id: keys
 
         anchors.bottom: parent.bottom
+        room: content.width
         text: content.entry?.hints ?? ""
     }
 }

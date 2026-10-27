@@ -133,10 +133,11 @@ scrollbar = 4
 # so a one-letter key is square.
 keycap = 20
 
-# A page's or a panel's body: its padding on every side, by how wide it is.
+# A page's or a panel's body: its padding on every side, by its own width.
 # Tailwind's container, `px-4 sm:px-6 lg:px-8`, on Tailwind's default
 # breakpoints: 16 under 640 (`sm`), 24 from 640, 32 from 1024 (`lg`). A
-# panel of the shell (384) takes 16, a dialog's body 16, Kōbō's panel 32.
+# panel of the shell (384) takes 16; Kōbō's content pane, 32 on a 1080p
+# screen and 24 on a 1280 px one.
 # https://tailwindcss.com/docs/responsive-design
 [container]
 # The width, in logical pixels, each padding applies from.
@@ -394,17 +395,23 @@ disabled_container = 0.10
 # A well's surface over the panel, and a soft hairline.
 well = 0.75
 outline_soft = 0.55
-# A field's placeholder, its selected text's highlight, and a read-only
-# field's outline and surface. A placeholder is text, so it keeps 4.5:1 (see
-# `[contrast]`); it reads as a hint by its muted role, not by fading out.
-placeholder = 0.80
+# A shape that is only a suggestion of one: a workspace's ghost, a scroller
+# at rest under the pointer. Its selected text's highlight, and a read-only
+# field's outline and surface.
+placeholder = 0.55
 selection = 0.32
 locked = 0.50
+# A field's placeholder text. It is text, so it keeps 4.5:1 (see
+# `[contrast]`): it reads as a hint by its muted role, not by fading out.
+placeholder_text = 0.80
 # An accent colour as a faint fill under itself: a tag, a done step.
 tint = 0.16
-# Secondary text on a selected row, over its container: as low as keeps
-# 4.5:1 on every container a row is selected in, in both modes.
-subdued = 0.85
+# A picture that sits back while another is picked: the wallpaper picker's
+# thumbnails not under the keyboard.
+subdued = 0.75
+# Secondary text on a selected row or a checked tile, over its container: as
+# low as keeps 4.5:1 on every container a row is selected in, in both modes.
+subdued_text = 0.85
 # What darkens the screen behind a dialog.
 scrim = 0.60
 # A dialog's hairline in its tint, for a question and for a danger.
@@ -603,19 +610,19 @@ pairs = [
   { fg = "on_surface_variant", bg = "surface_container", need = "text", use = "Secondary text on a container" },
   { fg = "on_surface_variant", bg = "surface_container_high", need = "text", use = "Secondary text on a card" },
   { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", use = "A keycap's key" },
-  { fg = "on_surface_variant", bg = "surface", need = "text", opacity = "placeholder", use = "A field's placeholder" },
+  { fg = "on_surface_variant", bg = "surface", need = "text", opacity = "placeholder_text", use = "A field's placeholder" },
   { fg = "primary", bg = "surface", need = "text", use = "Accent text: an accent line, a detail, a Text button" },
   { fg = "primary", bg = "surface_container_low", need = "text", use = "Accent text in a well" },
   { fg = "on_primary", bg = "primary", need = "text", use = "A Filled button's label, today in the calendar" },
-  { fg = "on_primary", bg = "primary", need = "text", opacity = "subdued", use = "Secondary text on a checked tile" },
+  { fg = "on_primary", bg = "primary", need = "text", opacity = "subdued_text", use = "Secondary text on a checked tile" },
   { fg = "on_primary_container", bg = "primary_container", need = "text", use = "Text on the primary container" },
   { fg = "on_secondary_container", bg = "secondary_container", need = "text", use = "A Tonal button, a selected row's title" },
-  { fg = "on_secondary_container", bg = "secondary_container", need = "text", opacity = "subdued", use = "A selected row's subtitle" },
+  { fg = "on_secondary_container", bg = "secondary_container", need = "text", opacity = "subdued_text", use = "A selected row's subtitle" },
   { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label" },
-  { fg = "on_error", bg = "error", need = "text", opacity = "subdued", use = "A selected danger row's subtitle" },
+  { fg = "on_error", bg = "error", need = "text", opacity = "subdued_text", use = "A selected danger row's subtitle" },
   { fg = "error", bg = "surface", need = "text", use = "An invalid field's note, a failure" },
   { fg = "on_error_container", bg = "error_container", need = "text", use = "A critical notification" },
-  { fg = "on_error_container", bg = "error_container", need = "text", opacity = "subdued", use = "A critical notification's body" },
+  { fg = "on_error_container", bg = "error_container", need = "text", opacity = "subdued_text", use = "A critical notification's body" },
   { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },
   { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent" },
   { fg = "warning", bg = "surface", need = "text", use = "A reading close to its limit" },
@@ -627,7 +634,18 @@ pairs = [
   { fg = "cold", bg = "surface", need = "graphic", use = "The cold focus ring, the logo's dakuten" },
   { fg = "outline", bg = "surface", need = "graphic", use = "A field's, a checkbox's or a switch's outline" },
   { fg = "outline", bg = "surface_container_highest", need = "graphic", use = "An outline on the highest container" },
+  { fg = "on_surface", bg = "surface_container", need = "text", use = "A pill of the bar" },
+  { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title in the Action panel, a chip" },
+  { fg = "tertiary", bg = "surface", need = "text", use = "The clock's Copied line" },
+  { fg = "on_surface", bg = "surface_container_lowest", need = "text", use = "The lock screen before its wallpaper loads" },
 ]
+# Roles a front end draws only as decoration, with no text or meaning drawn on
+# them: no pair is needed. `outline_variant`, dividers and soft edges;
+# `secondary`, a faint tint under a group of workspaces; `shadow` and `scrim`;
+# `cold_container` and `surface_bright`, the segments of Kōbō's partition bar,
+# which its legend names. `kubaos-design contrast` fails on a role drawn with
+# that is in no pair and not here.
+decorative = ["cold_container", "outline_variant", "scrim", "secondary", "shadow", "surface_bright"]
 
 # KubaOS Symbols: every symbol Kōbō and the shell draw, by the Material
 # Symbols name it replaces. Each is Tabler's outline icon of that name

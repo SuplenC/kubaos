@@ -1,7 +1,7 @@
 //! Keycaps and key hints: a key drawn as a key, and a line of keys with what each does.
 //!
-//! A key hint was a key's name in mono beside a caption, text on text; a keycap gives the key its
-//! own fill and edge, so the eye finds the keys first and reads what they do after.
+//! A keycap gives the key its own fill and edge, so a hint is never text on text: the eye finds
+//! the keys first and reads what they do after.
 //!
 //! # Owns
 //!
@@ -67,15 +67,38 @@ pub fn keycap<'a, M: 'a>(look: &Look, key: &'a str) -> Element<'a, M> {
     probe::component("Keycap", ["", "", ""], Fixed::HEIGHT, face)
 }
 
-/// The keys of a combination, `Ctrl+K` as `Ctrl` and `K`; a `+` alone is the plus key.
-pub fn keys(combination: &str) -> impl Iterator<Item = &str> {
-    let whole = (combination == "+").then_some(combination);
-    let parts = (combination != "+").then(|| combination.split('+').filter(|part| !part.is_empty()));
-    whole.into_iter().chain(parts.into_iter().flatten())
+/// The symbols that are a key each even when written together: the modifiers' and the arrows'
+/// glyphs, Return, Backspace and Delete. `⌃K` is two keys, `↑↓` two.
+const GLYPHS: [char; 11] = ['⌃', '⇧', '⌥', '⌘', '↑', '↓', '←', '→', '↵', '⌫', '⌦'];
+
+/// The keys of a combination, one keycap each: `Ctrl+K` is `Ctrl` and `K`, `⌃K` is `⌃` and `K`,
+/// `← →` is `←` and `→`; a `+` alone is the plus key.
+pub fn keys(combination: &str) -> Vec<&str> {
+    if combination == "+" {
+        return vec![combination];
+    }
+    let mut found = Vec::new();
+    for part in combination.split(|c: char| c == '+' || c.is_whitespace()) {
+        let mut word = 0;
+        for (at, c) in part.char_indices() {
+            if GLYPHS.contains(&c) {
+                if word < at {
+                    found.push(&part[word..at]);
+                }
+                found.push(&part[at..at + c.len_utf8()]);
+                word = at + c.len_utf8();
+            }
+        }
+        if word < part.len() {
+            found.push(&part[word..]);
+        }
+    }
+    found
 }
 
 /// Key hints side by side, 16 apart: each combination's keys as keycaps 4 apart, then what it does
-/// in a `caption` line 8 after them, when it says. A combination is written `Ctrl+K`.
+/// in a `caption` line 8 after them, when it says. A combination is written `Ctrl+K`, and
+/// each of its keys is a keycap of its own ([`keys`]).
 pub fn key_hints<'a, M: 'a>(look: &Look, hints: &[(&'a str, &'a str)]) -> Element<'a, M> {
     let c = look.colors;
     let line = row(look, Space::S16)
@@ -83,7 +106,7 @@ pub fn key_hints<'a, M: 'a>(look: &Look, hints: &[(&'a str, &'a str)]) -> Elemen
         .extend(hints.iter().map(|&(combination, what)| {
             let caps = row(look, Space::S4)
                 .center()
-                .extend(keys(combination).map(|key| keycap(look, key)));
+                .extend(keys(combination).into_iter().map(|key| keycap(look, key)));
             let hint = row(look, Space::S8).center().push(caps);
             if what.is_empty() {
                 hint.into()

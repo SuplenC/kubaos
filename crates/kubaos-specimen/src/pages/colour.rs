@@ -103,9 +103,9 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         let fg = color::alpha(pair.fg.of(&c), pair.opacity.map_or(1.0, Opacity::value));
         let need = Contrast::from(pair.need);
         let ratio = color::pair_ratio(&pair, &c);
-        let at = pair.opacity.map_or_else(String::new, |opacity| {
-            format!(" at {}", format!("{opacity:?}").to_lowercase())
-        });
+        let at = pair
+            .opacity
+            .map_or_else(String::new, |opacity| format!(" at {}", opacity.name()));
         let (fg_name, bg_name) = (pair.fg.name(), pair.bg.name());
         let verdict = if ratio >= need.minimum() {
             format!("{ratio:.1}:1, needs {}:1", need.minimum())

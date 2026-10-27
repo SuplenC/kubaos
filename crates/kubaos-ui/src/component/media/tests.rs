@@ -62,3 +62,44 @@ fn the_box_ends_on_a_device_pixel_at_every_scale() {
         assert!(scale.is_whole(frame.height), "{scale:?}: {frame:?}");
     }
 }
+
+/// Where the box after `media` in a column 256 wide is laid out.
+fn next_in_column(media: Element<'_, ()>) -> Rectangle {
+    let next = widget::container(widget::Space::new().width(10).height(10)).id("next");
+    let column = widget::column![media, next].width(256.0);
+    let mut ui = Simulator::with_size(iced::Settings::default(), Size::new(800.0, 800.0), column);
+    ui.find(selector::id("next")).expect("next").bounds()
+}
+
+#[test]
+fn what_follows_the_picture_stays_put_when_it_loads() {
+    for scale in Scale::SUPPORTED {
+        let look = Look::new(Mode::Dark, scale);
+
+        let before = next_in_column(media(&look, None, Aspect::Wallpaper, Radius::Control));
+        let after = next_in_column(media(&look, Some(square_picture()), Aspect::Wallpaper, Radius::Control));
+
+        assert_eq!(before, after, "{scale:?}");
+    }
+}
+
+#[test]
+fn a_box_with_no_end_across_takes_a_thumbnails_width() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let row: widget::Row<'_, ()> =
+        widget::row![widget::container(media(&look, None, Aspect::Wallpaper, Radius::Control)).id("probe")];
+    let mut ui = Simulator::with_size(
+        iced::Settings::default(),
+        Size::new(800.0, 800.0),
+        widget::scrollable(row).direction(widget::scrollable::Direction::Horizontal(
+            widget::scrollable::Scrollbar::default(),
+        )),
+    );
+
+    let frame = ui.find(selector::id("probe")).expect("probe").bounds();
+
+    assert!(
+        frame.height.is_finite() && (frame.height - 160.0).abs() < 1e-4,
+        "{frame:?}"
+    );
+}

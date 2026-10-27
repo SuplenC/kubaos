@@ -28,6 +28,7 @@ use kubaos_ui::component::keycap::key_hints;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::Extent;
 use kubaos_ui::layout::Gap;
+use kubaos_ui::layout::Inset;
 use kubaos_ui::layout::container;
 use kubaos_ui::layout::divider;
 use kubaos_ui::layout::fill;
@@ -166,15 +167,20 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         Mode::Dark => (Mode::Light, Icon::LightMode, "Light mode"),
         Mode::Light => (Mode::Dark, Icon::DarkMode, "Dark mode"),
     };
-    // A toolbar band: its content and the container padding, as the page under it is padded.
+    // A toolbar band: the container padding at the sides, as the page under it, and a small
+    // control's room above and below.
     container(
         row(look, Space::S16)
             .center()
+            .padding(Inset::y(Space::S16))
             .width(Extent::Fill)
             .push(text("KubaOS design specimen", Type::Subheading, c.on_surface))
             .push(tabs)
             .push(fill())
-            .push(key_hints(look, &[("Tab", "pages"), ("M", "mode")]))
+            .push(key_hints(
+                look,
+                &[("Tab", "next page"), ("← →", "pages"), ("M", "mode")],
+            ))
             .push(chip(look, ChipKind::Neutral, scale, None, None, None::<Message>))
             .push(
                 icon_button(glyph, label)

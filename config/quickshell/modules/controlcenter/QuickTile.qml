@@ -18,7 +18,7 @@ K.Pressable {
 
     readonly property bool fillWidth: true
     readonly property color content: root.checked ? K.Tokens.color.on_primary : K.Tokens.color.on_surface
-    readonly property color muted: root.checked ? K.Look.alpha(K.Tokens.color.on_primary, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
+    readonly property color muted: root.checked ? K.Look.alpha(K.Tokens.color.on_primary, K.Tokens.opacity.subdued_text) : K.Tokens.color.on_surface_variant
     // Where the words end: before the arrow and its inset, or the tile's own inset.
     readonly property real end: root.expandable ? arrow.width + K.Tokens.space.s12 * 2 : K.Tokens.space.s12
 

@@ -239,6 +239,8 @@ impl<M> Widget<M, Theme, Renderer> for Centre<'_, M> {
         let size = node.size();
         let height = if self.vertical { room.height } else { size.height };
         // Across, as a stack centres its children: ties go down, as `Stack` in QML puts them.
+        // Centred both ways (an icon in its slot, a dialog on its scrim) keeps the nearest pixel,
+        // as QML's `IconInLine` and `Dialog` do, and the parity check holds the two together.
         let spare = room.width - size.width;
         let x = if self.vertical {
             self.scale.snap(spare / 2.0)

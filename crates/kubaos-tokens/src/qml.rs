@@ -62,6 +62,7 @@ impl Target for QmlTokens {
         out.line("    property var matugen: null");
         rules(&mut out, tokens);
         lengths(&mut out, tokens);
+        container(&mut out, tokens);
         types(&mut out, tokens);
         motion(&mut out, tokens);
         surfaces(&mut out, tokens);
@@ -281,6 +282,10 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             out.line(format!("        readonly property int {name}: {value}"));
         }
     });
+}
+
+/// The container's padding by width, and the aspect ratios.
+fn container(out: &mut Writer, tokens: &Tokens) {
     let container = &tokens.container;
     let list = |values: &[u16]| values.iter().map(u16::to_string).collect::<Vec<_>>().join(", ");
     out.group(

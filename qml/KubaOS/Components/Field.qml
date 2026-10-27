@@ -138,7 +138,7 @@ FocusScope {
             visible: input.text === "" && input.preeditText === ""
             text: root.placeholder
             verticalAlignment: Text.AlignVCenter
-            color: K.Look.alpha(Tokens.color.on_surface_variant, Tokens.opacity.placeholder)
+            color: K.Look.alpha(Tokens.color.on_surface_variant, Tokens.opacity.placeholder_text)
             font: input.font
         }
     }

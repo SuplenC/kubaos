@@ -32,9 +32,10 @@ Item {
     readonly property string iconSource: icon === "" ? "" : icon.startsWith("/") ? `file://${icon}` : Quickshell.iconPath(icon, true)
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property color main: row.selected ? K.Tokens.color.on_secondary_container : K.Tokens.color.on_surface
-    readonly property color muted: row.selected ? K.Look.alpha(K.Tokens.color.on_secondary_container, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
+    readonly property color muted: row.selected ? K.Look.alpha(K.Tokens.color.on_secondary_container, K.Tokens.opacity.subdued_text) : K.Tokens.color.on_surface_variant
     readonly property real dim: row.runs ? 1 : K.Tokens.opacity.disabled_content
-    // Where the words start: past the icon and the gap after it.
+    // Where the words start: past the icon and the gap after it. Every row is 56 tall, a title
+    // alone included, so every icon is the two-line one and the words start in one column.
     readonly property int textStart: K.Tokens.space.s12 * 2 + K.Tokens.icon.two_line
     readonly property bool twoLine: subtitleLine.text !== ""
 

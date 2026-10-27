@@ -381,13 +381,13 @@ fn the_containers_steps_start_at_no_width() {
 
 #[test]
 fn a_pair_under_its_contrast_minimum_is_refused() {
-    let found = violations(|t| set(t, &["opacity"], "subdued", 0.5));
+    let found = violations(|t| set(t, &["opacity"], "subdued_text", 0.5));
 
     assert!(
         found.iter().any(|v| matches!(
             v,
             Violation::LowContrast { token, mode: "light", .. }
-                if token == "contrast on_secondary_container at subdued on secondary_container"
+                if token == "contrast on_secondary_container at subdued_text on secondary_container"
         )),
         "{found:?}"
     );

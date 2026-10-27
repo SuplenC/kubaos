@@ -24,8 +24,10 @@ pub enum Mode {
 }
 
 impl Mode {
+    /// Both palettes, dark first.
     pub const ALL: [Mode; 2] = [Mode::Dark, Mode::Light];
 
+    /// The palette's table in `[color]`: `dark` or `light`.
     pub fn name(self) -> &'static str {
         match self {
             Mode::Dark => "dark",
@@ -37,7 +39,9 @@ impl Mode {
 /// One pair's contrast in one mode.
 #[derive(Debug, Clone)]
 pub struct Reading<'a> {
+    /// The pair as `[contrast]` lists it.
     pub pair: &'a ContrastPair,
+    /// The palette it was read in.
     pub mode: Mode,
     /// The ratio, 1 to 21, or `None` when a role or the opacity the pair names doesn't exist.
     pub ratio: Option<f32>,
@@ -76,24 +80,25 @@ fn ratio_of(pair: &ContrastPair, palette: &BTreeMap<String, Rgb>, opacity: &BTre
         Some(name) => *opacity.get(name)?,
         None => 1.0,
     };
-    Some(ratio(over(fg, bg, alpha), linear(bg)))
+    Some(ratio(over(fg, bg, alpha), channels(bg)))
 }
 
-/// A colour as linear channels, 0 to 1.
-type Linear = [f32; 3];
+/// A colour's sRGB channels, 0 to 1, as written: gamma encoded, so blending them is what the
+/// toolkits do, and [`luminance`] linearises them.
+pub type Srgb = [f32; 3];
 
-fn linear(c: Rgb) -> Linear {
+fn channels(c: Rgb) -> Srgb {
     [c.r, c.g, c.b].map(|v| f32::from(v) / 255.0)
 }
 
 /// `fg` at `alpha` over the opaque `bg`: what the eye sees, blended in sRGB as the toolkits blend.
-fn over(fg: Rgb, bg: Rgb, alpha: f32) -> Linear {
-    let (f, b) = (linear(fg), linear(bg));
+fn over(fg: Rgb, bg: Rgb, alpha: f32) -> Srgb {
+    let (f, b) = (channels(fg), channels(bg));
     [0, 1, 2].map(|i| b[i] + (f[i] - b[i]) * alpha)
 }
 
 /// WCAG 2.1's relative luminance of an sRGB colour.
-fn luminance(c: Linear) -> f32 {
+fn luminance(c: Srgb) -> f32 {
     let channel = |v: f32| {
         if v <= 0.040_45 {
             v / 12.92
@@ -105,7 +110,7 @@ fn luminance(c: Linear) -> f32 {
 }
 
 /// WCAG 2.1's contrast ratio of two opaque colours, 1 to 21.
-pub fn ratio(a: Linear, b: Linear) -> f32 {
+pub fn ratio(a: Srgb, b: Srgb) -> f32 {
     let (la, lb) = (luminance(a), luminance(b));
     let (light, dark) = if la > lb { (la, lb) } else { (lb, la) };
     (light + 0.05) / (dark + 0.05)

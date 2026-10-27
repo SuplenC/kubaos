@@ -367,11 +367,17 @@ Item {
             K.ListRow {
                 icon: "keyboard_option_key"
                 title: "Mac accents on Left Alt"
-                subtitle: root.accents ? "On · Left Alt + e, then e: é" : "Off"
+                subtitle: root.accents ? "On" : "Off"
                 checkable: true
                 checked: root.accents
                 onActivated: root.changeOnClick(["accents", root.accents ? "off" : "on"])
             }
+        }
+
+        // How the accents are typed, while they are on.
+        K.KeyHints {
+            visible: root.accents
+            hints: [["Left Alt+E", "then E: é"]]
         }
 
         K.Text {

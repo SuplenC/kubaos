@@ -82,7 +82,7 @@ pub fn hint_column<'a>(look: &Look, hints: &[(&'a str, &'a str)]) -> El<'a> {
             .push(
                 row(look, Space::S4)
                     .center()
-                    .extend(keys(combination).map(|key| keycap(look, key))),
+                    .extend(keys(combination).into_iter().map(|key| keycap(look, key))),
             )
             .push(text(what, Type::Caption, c.on_surface_variant));
     }

@@ -67,6 +67,9 @@ Pill {
                 // the bar's own symbols are; the layer exists only while it is.
                 layer.enabled: reader.faint
                 layer.effect: MultiEffect {
+                    // Colourising keeps the drawing's lightness, so a dark icon is first lifted to
+                    // white (in light, pressed to black), then takes the content colour.
+                    brightness: K.Tokens.mode === "light" ? -1 : 1
                     colorization: 1
                     colorizationColor: K.Tokens.color.on_surface
                 }
@@ -79,6 +82,19 @@ Pill {
                 id: reader
 
                 property bool faint: false
+                // The icon whose pixels are loaded, unloaded when the next one arrives, so an app
+                // that changes its icon often doesn't fill the cache.
+                property url loaded: ""
+
+                // Loads `source`, keeping the last reading until its pixels are in: the layer
+                // doesn't flicker off and on with every update of the icon.
+                function read(source: url): void {
+                    if (reader.loaded.toString() !== "")
+                        reader.unloadImage(reader.loaded);
+                    reader.loaded = source;
+                    if (source.toString() !== "")
+                        reader.loadImage(source);
+                }
 
                 width: K.Tokens.icon.s16
                 height: K.Tokens.icon.s16
@@ -87,10 +103,9 @@ Pill {
                 onPaint: {
                     const ctx = getContext("2d");
                     ctx.clearRect(0, 0, width, height);
-                    const source = entry.modelData.icon;
-                    if (!isImageLoaded(source))
+                    if (!isImageLoaded(reader.loaded))
                         return;
-                    ctx.drawImage(source, 0, 0, width, height);
+                    ctx.drawImage(reader.loaded, 0, 0, width, height);
                     reader.faint = root.faint(ctx.getImageData(0, 0, width, height).data);
                 }
 
@@ -98,12 +113,11 @@ Pill {
                     target: entry.modelData
 
                     function onIconChanged(): void {
-                        reader.faint = false;
-                        reader.loadImage(entry.modelData.icon);
+                        reader.read(entry.modelData.icon);
                     }
                 }
 
-                Component.onCompleted: loadImage(entry.modelData.icon)
+                Component.onCompleted: reader.read(entry.modelData.icon)
             }
 
             MouseArea {

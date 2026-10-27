@@ -1011,20 +1011,15 @@ PanelWindow {
                 color: K.Tokens.color.error
             }
 
-            // The keys, as keycaps: the confirmation's after its question, else the menu's own. Cut
-            // at the room the problems leave, as a line of text is.
-            Item {
+            // The keys, as keycaps: the confirmation's after its question, else the menu's own. A
+            // hint the room the problems leave can't hold is left out whole.
+            KeyHints {
                 x: search.confirming !== "" ? question.width + K.Tokens.space.s12 : 0
-                width: footer.room - x
-                height: parent.height
+                y: K.Look.snap((parent.height - height) / 2, menu.dpr)
+                room: footer.room - x
                 visible: search.confirming !== "" || footer.status === "" && search.down.length === 0
-                clip: true
-
-                K.KeyHints {
-                    y: K.Look.snap((parent.height - height) / 2, menu.dpr)
-                    text: search.confirming !== "" ? search.confirming.slice(footer.asks + 1) : menu.footerHints
-                    color: search.confirming !== "" ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
-                }
+                text: search.confirming !== "" ? search.confirming.slice(footer.asks + 1) : menu.footerHints
+                color: search.confirming !== "" ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
             }
 
             K.Button {

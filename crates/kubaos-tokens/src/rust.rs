@@ -388,9 +388,13 @@ fn contrast(out: &mut Writer, tokens: &Tokens) {
     out.line("/// A foreground role drawn on a background role, at an opacity or opaque.");
     out.line("#[derive(Debug, Clone, Copy, PartialEq)]");
     out.line("pub struct ContrastPair {");
+    out.line("    /// The role drawn on top: text, an icon, an outline.");
     out.line("    pub fg: Role,");
+    out.line("    /// The role it is drawn on.");
     out.line("    pub bg: Role,");
+    out.line("    /// The contrast it needs.");
     out.line("    pub need: Need,");
+    out.line("    /// The opacity the foreground is drawn at, or opaque.");
     out.line("    pub opacity: Option<Opacity>,");
     out.line("    /// Where the pair is drawn.");
     out.line("    pub purpose: &'static str,");
@@ -593,6 +597,17 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
             ty: "f32",
         },
     );
+    out.blank();
+    out.line("impl Opacity {");
+    out.line("    /// The opacity's name in `design/tokens.toml`.");
+    out.line("    pub const fn name(self) -> &'static str {");
+    out.line("        match self {");
+    for name in tokens.opacity.keys() {
+        out.line(format!("            Opacity::{} => {name:?},", camel(name)));
+    }
+    out.line("        }");
+    out.line("    }");
+    out.line("}");
     out.blank();
     out.line("/// A shadow: offset down and blur in logical pixels, and its opacity.");
     out.line("#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]");

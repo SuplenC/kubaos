@@ -7,8 +7,9 @@
 //!
 //! # Owns
 //!
-//! - The lint ([`lint`]) and its baseline ([`baseline`]), and reading geometry frames from files
-//!   with the tokens' rules ([`geometry`]).
+//! - The lint ([`lint`]) and its baseline ([`baseline`]), reading geometry frames from files
+//!   with the tokens' rules ([`geometry`]), and the roles drawn that no contrast pair covers
+//!   ([`contrast`]).
 //!
 //! # Not here
 //!
@@ -18,6 +19,7 @@
 #![forbid(unsafe_code)]
 
 pub mod baseline;
+pub mod contrast;
 pub mod geometry;
 pub mod lint;
 

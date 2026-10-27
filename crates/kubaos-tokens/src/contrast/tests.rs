@@ -42,5 +42,5 @@ fn a_foreground_faded_toward_its_background_loses_contrast() {
             .expect("the pair is listed")
     };
 
-    assert!(of(Some("subdued")) < of(None));
+    assert!(of(Some("subdued_text")) < of(None));
 }

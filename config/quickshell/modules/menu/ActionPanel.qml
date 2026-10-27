@@ -79,16 +79,25 @@ Rectangle {
                         color: entry.main
                     }
 
-                    // The Action's key as a keycap, centred down the row at its end.
-                    K.Keycap {
+                    // The Action's keys as keycaps, centred down the row at its end.
+                    Row {
                         id: shortcut
+
+                        readonly property var keys: entry.index === 0 ? ["↵"] : Words.shortcutKeys(entry.modelData.shortcut)
 
                         x: parent.width - K.Tokens.space.s12 - width
                         y: K.Look.snap((parent.height - height) / 2, panel.dpr)
-                        width: implicitWidth
-                        height: implicitHeight
-                        visible: key !== ""
-                        key: entry.index === 0 ? "↵" : Words.shortcutLabel(entry.modelData.shortcut)
+                        spacing: K.Tokens.space.s4
+
+                        Repeater {
+                            model: shortcut.keys.length
+
+                            Keycap {
+                                required property int index
+
+                                key: shortcut.keys[index] ?? ""
+                            }
+                        }
                     }
 
                     MouseArea {

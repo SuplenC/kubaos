@@ -548,7 +548,7 @@ impl<M> Widget<M, Theme, Renderer> for Input<'_, M> {
                 renderer.fill_paragraph(
                     state.placeholder.raw(),
                     Point::new(room.x, room.y),
-                    color::alpha(c.on_surface_variant, Opacity::Placeholder.value()),
+                    color::alpha(c.on_surface_variant, Opacity::PlaceholderText.value()),
                     clip,
                 );
             } else {

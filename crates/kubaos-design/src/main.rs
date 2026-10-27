@@ -215,7 +215,14 @@ fn contrast(root: &Path) -> Result<bool, Error> {
             pair.purpose
         );
     }
-    let passed = readings.iter().all(kubaos_tokens::contrast::Reading::holds);
+    let unlisted = kubaos_design::contrast::unlisted(root, &tokens)?;
+    for role in &unlisted {
+        eprintln!(
+            "{}: draws `{}`, which no pair in [contrast] covers; add its pair, or list it as decorative",
+            role.at, role.role
+        );
+    }
+    let passed = unlisted.is_empty() && readings.iter().all(kubaos_tokens::contrast::Reading::holds);
     eprintln!(
         "kubaos-design contrast: {} pair(s) in 2 modes: {}",
         tokens.contrast.pairs.len(),

@@ -1,9 +1,10 @@
 import QtQuick
 import KubaOS.Components as K
 
-// A panel's or a page's body: its content the container padding in on every side, by the width
-// it is given (Tailwind's container: 16 under 640, 24 from 640, 32 from 1024), as tall as the
-// content. `kubaos-ui`'s `layout::container`. The body of every panel that isn't a whole `Page`.
+// A panel's body or a toolbar band: its content the container padding in at the sides, by the
+// width it is given (Tailwind's container, `px-4 sm:px-6 lg:px-8`: 16 under 640, 24 from 640, 32
+// from 1024), as tall as the content, which keeps its own spacing above and below.
+// `kubaos-ui`'s `layout::container`.
 Item {
     id: root
 
@@ -11,6 +12,7 @@ Item {
     property alias room: slot.room
 
     readonly property bool fillWidth: true
+    // The padding at the sides, by the container's width.
     readonly property int padding: Tokens.containerPadding(root.width)
     readonly property var probe: ({
             role: "component",
@@ -37,7 +39,5 @@ Item {
         fill: true
         leftPadding: root.padding
         rightPadding: root.padding
-        topPadding: root.padding
-        bottomPadding: root.padding
     }
 }

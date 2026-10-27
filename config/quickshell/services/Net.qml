@@ -41,7 +41,8 @@ Singleton {
         return percent > 5 ? 1 : 0;
     }
 
-    // Material Symbols has a wedge per bar count; the two ends carry different prefixes.
+    // KubaOS Symbols has a wedge per bar count, named as Material Symbols named them; the two ends
+    // carry different prefixes.
     function strengthIcon(strength: real): string {
         const n = bars(strength);
         if (n === 0)

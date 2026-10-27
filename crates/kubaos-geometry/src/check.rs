@@ -120,9 +120,10 @@ impl Walk<'_> {
         }
     }
 
-    /// A page's or a container's content: as far in as the container padding for its width at
-    /// its left and top, and no nearer its right and bottom edges than that. Plain boxes the
-    /// size of the container are looked through, since a toolkit may wrap the content in one.
+    /// A page's or a container's content: as far in as the container padding for its width at its
+    /// left, and no nearer its right edge than that. The padding is the sides' alone; above and
+    /// below, the content keeps its own spacing. Plain boxes the size of the container are looked
+    /// through, since a toolkit may wrap the content in one.
     fn container_padding(&mut self, node: &Node, path: &[String]) {
         let mut inner = node;
         while let [only] = inner.children.as_slice()
@@ -131,34 +132,22 @@ impl Walk<'_> {
         {
             inner = only;
         }
-        let mut content = inner.children.iter().map(|child| child.bounds);
-        let Some(first) = content.next() else {
+        let Some(left) = inner.children.iter().map(|child| child.bounds.x).reduce(f32::min) else {
             return;
         };
-        let united = content.fold(first, |a, b| {
-            let (x, y) = (a.x.min(b.x), a.y.min(b.y));
-            Rect {
-                x,
-                y,
-                width: a.right().max(b.right()) - x,
-                height: a.bottom().max(b.bottom()) - y,
-            }
-        });
+        let right = inner
+            .children
+            .iter()
+            .map(|child| child.bounds.right())
+            .fold(left, f32::max);
         let b = node.bounds;
         let padding = self.rules.container_padding(b.width);
         let mut off = Vec::new();
-        for (edge, inset) in [("left", united.x - b.x), ("top", united.y - b.y)] {
-            if !self.same(inset, padding) {
-                off.push(format!("{edge} {inset}"));
-            }
+        if !self.same(left - b.x, padding) {
+            off.push(format!("left {}", left - b.x));
         }
-        for (edge, inset) in [
-            ("right", b.right() - united.right()),
-            ("bottom", b.bottom() - united.bottom()),
-        ] {
-            if self.device(padding - inset) >= EPSILON {
-                off.push(format!("{edge} {inset}"));
-            }
+        if self.device(padding - (b.right() - right)) >= EPSILON {
+            off.push(format!("right {}", b.right() - right));
         }
         if !off.is_empty() {
             let message = format!(

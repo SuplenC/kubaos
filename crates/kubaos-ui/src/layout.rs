@@ -424,8 +424,9 @@ pub fn gap<'a, M: 'a>(space: Space) -> Element<'a, M> {
     probe(Tag::Spacer { fill: false }, widget::Space::new().width(px).height(px))
 }
 
-/// A whole page: the surface, with `content` the container padding in on every side
-/// ([`container_padding`]), filling the room both ways.
+/// A whole page: the surface, with `content` the container padding in at the sides
+/// ([`container_padding`]), 32 below the page's top and 24 above its foot, where the footer's
+/// buttons sit (Kōbō's panel), filling the room both ways.
 pub fn page<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Element<'a, M> {
     page_over(content, Some(look.colors.surface))
 }
@@ -440,24 +441,28 @@ fn page_over<'a, M: 'a>(content: impl Into<Element<'a, M>>, surface: Option<iced
     let view = Element::new(Container {
         content: content.into(),
         height: Length::Fill,
+        top: Space::S32.into(),
+        bottom: Space::S24.into(),
         surface,
     });
     probe::component("Page", ["", "", ""], Fixed::HOLDS, view)
 }
 
-/// A panel's or a page's body: `content` the container padding in on every side, as wide as the
-/// room and as tall as the content. The body of every panel that isn't a whole [`page`].
+/// A panel's body or a toolbar band: `content` the container padding in at the sides, as wide as
+/// the room and as tall as the content. Above and below, the content keeps its own spacing.
 pub fn container<'a, M: 'a>(content: impl Into<Element<'a, M>>) -> Element<'a, M> {
     let view = Element::new(Container {
         content: content.into(),
         height: Length::Shrink,
+        top: Gap::NONE,
+        bottom: Gap::NONE,
         surface: None,
     });
     probe::component("Container", ["", "", ""], Fixed::HOLDS, view)
 }
 
-/// The padding of a page or a panel's body `width` wide, on every side: Tailwind's container, 16
-/// under 640, 24 from 640, 32 from 1024 (`tokens::CONTAINER`).
+/// The padding at the sides of a page or a panel's body `width` wide: Tailwind's container
+/// (`px-4 sm:px-6 lg:px-8`), 16 under 640, 24 from 640, 32 from 1024 (`tokens::CONTAINER`).
 pub fn container_padding(width: f32) -> Space {
     tokens::CONTAINER
         .iter()
@@ -466,10 +471,12 @@ pub fn container_padding(width: f32) -> Space {
         .map_or(tokens::CONTAINER[0].1, |&(_, padding)| padding)
 }
 
-/// Content padded by [`container_padding`] for the width it is given.
+/// Content padded at the sides by [`container_padding`] for the width it is given.
 struct Container<'a, M> {
     content: Element<'a, M>,
     height: Length,
+    top: Gap,
+    bottom: Gap,
     surface: Option<iced::Color>,
 }
 
@@ -493,7 +500,13 @@ impl<M> iced::advanced::Widget<M, iced::Theme, iced::Renderer> for Container<'_,
         limits: &advanced::layout::Limits,
     ) -> advanced::layout::Node {
         let width = limits.width(Length::Fill).max().width;
-        let padding = Padding::new(f32::from(container_padding(width).px()));
+        let side = f32::from(container_padding(width).px());
+        let padding = Padding {
+            top: self.top.px(),
+            right: side,
+            bottom: self.bottom.px(),
+            left: side,
+        };
         let content = &mut self.content;
         advanced::layout::padded(limits, Length::Fill, self.height, padding, |limits| {
             content.as_widget_mut().layout(&mut tree.children[0], renderer, limits)

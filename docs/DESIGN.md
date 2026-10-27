@@ -44,11 +44,10 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 - **Cold accent** (`cold`, from matugen's tertiary): the blue of the sign's dakuten. With `scheme-fidelity` tertiary is the wallpaper's complement, so cold follows the wallpaper. Use it rarely: the focus ring on picked cards, where the accent already means picked, and a demo or preview badge. It is never a second primary. It is configurable: the complement is the default, and the user may pick another. *Not enforced yet: lands in #154.*
 - **Warning** is ours (Material 3 has none): amber between fine and the error colour, for a reading close to its limit. It keeps its value whatever the wallpaper; the light one is dark enough for text on light surfaces.
 - **Contrast minimums** (WCAG 2.1 AA, `kubaos_ui::color::Contrast`): 4.5:1 for body text and labels; 3:1 for large text (24 px and up, or 19 px semibold and up) and for icons, outlines and other shapes that carry meaning. Decoration (a divider, a well's edge, a disabled control) carries no meaning and has no minimum, as WCAG exempts it.
-- **Every pair is listed and checked.** `[contrast]` in the tokens lists every foreground role the front ends draw on a background role, at the opacity it is drawn at, with what it needs and where it is drawn. `kubaos-tokens` refuses a pair under its minimum in either fallback palette, `kubaos-ui`'s tests hold it, and `kubaos-design contrast` lists every pair with its ratio (see "Checks"). A new pairing adds its line there in the PR that draws it. The fixes that held: a placeholder is text, so `placeholder` is 0.80, not 0.55 (2.8:1 in light); a selected row's subtitle is `subdued` 0.85, not 0.75 (4.0:1 in light); `outline` is a graphic's colour, never text's (4.3:1 on light `surface`), so a key hint's words are `on_surface_variant`.
+- **Every pair is listed and checked.** `[contrast]` in the tokens lists every foreground role the front ends draw on a background role, at the opacity it is drawn at, with what it needs and where it is drawn. `kubaos-tokens` refuses a pair under its minimum in either fallback palette, `kubaos-ui`'s tests hold it, and `kubaos-design contrast` lists every pair with its ratio (see "Checks"). A new pairing adds its line there in the PR that draws it. The fixes that held: a field's placeholder is text, so it takes `placeholder_text`, 0.80, not the 0.55 of `placeholder`, which a ghost shape keeps (2.8:1 in light); a selected row's subtitle takes `subdued_text`, 0.85, not the 0.75 of `subdued`, which a thumbnail sitting back keeps (4.0:1 in light); `outline` is a graphic's colour, never text's (4.3:1 on light `surface`), so a key hint's words are `on_surface_variant`.
 - **Pictures carry their own contrast.** The logo's wordmark is drawn in `on_surface` and its mark in `primary` and `cold`, so it reads on either mode's surface; the photo of the neon sign is only ever shown over the dark backdrop. An app's icon in the tray is a picture too: one drawn dark on the dark bar is lifted to the content colour (see "Iconography").
-- **Custom colours** break no minimum: a custom colour that does is refused, not drawn. *Not enforced yet: lands in #154.*
 - **Opacities** come from `[opacity]`: the state layer (hover 0.08, focus 0.12, press 0.14), disabled content 0.38 and container 0.10, the scrim, tints, the glass of a panel over a blurred wallpaper (`glass`, 0.80) and the backdrop that turns a wallpaper toward the surface behind full-screen text (`backdrop`, 0.90, fading to nothing away from the words: Kōbō's welcome and done screens, the lock screen), at which every text role keeps 4.5:1 over any wallpaper, black or white. A component never picks its own alpha. The shell's frame and its panels are glass (`frame`, 0.94, which Hyprland blurs behind), and an open panel dims the desktop less than a dialog does (`panel_scrim`, 0.20).
-- **Custom colours:** a seed colour, overrides of single roles, and presets (KubaOS neon among them). The contrast minimums hold for all of them. *Not enforced yet: lands in #154.*
+- **Custom colours:** a seed colour, overrides of single roles, and presets (KubaOS neon among them). The contrast minimums hold for all of them: a custom colour that breaks one is refused, not drawn. *Not enforced yet: lands in #154.*
 
 ### Light and dark
 
@@ -115,7 +114,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | 32 | `headline`, `title` |
 | 48 | `display`, `hero`, `hero_number` |
 
-- **The box is about 1.4 times the font size**, so a symbol's ink (its box less Tabler's 2 unit margin) stands a little taller than the letters' capitals, and its stroke reads as heavy as their stems.
+- **The box is one or two icon sizes above the font size**, so a symbol's ink (its box less Tabler's 2 unit margin) stands a little taller than the letters' capitals, and its stroke reads as heavy as their stems. A semibold style takes a step more than a regular one of its size, since its stems are heavier: at 16, `subheading` and `button_large` take 24, `body_large` 20.
 - **Never taller than the line**: `kubaos-tokens` refuses an icon taller than its style's line, so an icon never makes a line taller and a row with one is as tall as a row without.
 - **Crisp at every scale**: the sizes are the icon sizes, so the stroke is whole device pixels at 1, 1.25, 1.5 and 2 (the table in "Iconography").
 - **Beside two lines**, a title over a subtitle (`body_strong` over `small`, a 40 block), the icon spans both: 24 (`icon.two_line`). A two-line `ListRow` and the Command menu's rows take it, so an app's icon reads at the size of the words beside it.
@@ -146,22 +145,24 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 
 ### The container
 
-Every page and every panel's body is padded by the container, so the body is always spaced out the same way: `Page` (a whole page on the surface) and `Container` (a panel's body, a toolbar band) put their content the container padding in on every side.
+Every page and every panel's body is padded by the container at its sides, so the body is always spaced out the same way: `Page` (a whole page on the surface) and `Container` (a panel's body, a toolbar band) put their content the container padding in at the left and the right.
 
-- **The padding is Tailwind's container** (`px-4 sm:px-6 lg:px-8`) on Tailwind's default breakpoints: 16 under 640, 24 from 640, 32 from 1024 (`[container]`). It goes by the container's own width, not the screen's, so a 384 panel takes 16 on any screen and Kōbō's content pane beside its rail takes 32 on a 1080p screen and 24 on a 1280 one.
+- **The padding is Tailwind's container** (`px-4 sm:px-6 lg:px-8`) on Tailwind's default breakpoints: 16 under 640, 24 from 640, 32 from 1024 (`[container]`). It goes by the container's own width, not the screen's, so a 384 panel takes 16 on any screen and Kōbō's content pane beside its rail takes 32 on a 1080p screen and 24 on a 1280 one. A panel as wide as its content takes the padding its padded width reaches (`Tokens.containerPaddingAround`).
+- **Sides only, as Tailwind's is.** Above and below, the content keeps the spacing steps it is laid out with at its natural height: a `Page` 32 below its top and 24 above its foot, where a footer's buttons sit; a toolbar band a small control's 16 above and below; a panel its own step (the system monitor 24, the clock 20, the control center 16).
 - **On the 4 px grid**: every padding is a spacing step and every breakpoint a multiple of 4, which `kubaos-tokens` checks.
 - **A container inside a container** doesn't pad again: a card or a list inside a page keeps its own padding (16, 12), and the page's padding is the only one around them.
+- **A panel whose body is something else keeps that thing's own padding**: one list (the power menu's rows and Kōbō's rail, 12 in so their corners are concentric with the panel's), a dialog (polkit, 32), a stack of cards (the notification popups, 8 in), the OSD's one bar.
 - The geometry check's `container-padding` rule holds every `Page` and `Container` to it (see "Checks").
 
 ### No wasted space
 
 Dense, never cramped (principle 8): room that holds nothing is a bug, as an edge off the device grid is.
 
-- **Bands are their content plus the container padding.** A footer, a toolbar or a header band is as tall as what is in it and the container padding around it, and no taller: the specimen's bar is a 32 control and 32 above and below at 1024 and up.
+- **Bands are their content and a step of space.** A footer, a toolbar or a header band is as tall as what is in it and one spacing step above and below, and no taller: the specimen's bar is a 32 control with 16 above and below.
 - **No side gutter past the container padding.** Content runs to the container padding at either side; it may stop short (a column of text at `column`, 560), but nothing pads it in further.
 - **Rows are their type's natural height**: a `ListRow` is 44 (`row`) or 56 (`row_two_line`), a line of text its style's line. A row taller than that holds air.
 - **A page's or a panel's content runs out where it ends.** A panel that scrolls shows no "more content" strip besides its scroll; a panel shows all of its content or scrolls, never both.
-- The `container-padding` rule fails a page or a container whose content sits further in than its padding at the top or the left, or runs into it at the right or the bottom. An empty band is measured by eye in the shots: a band's height can't be told from a deliberate gap by the boxes alone, so no rule judges it.
+- The `container-padding` rule fails a page or a container whose content sits further in than its padding at the left, or runs into it at the right. An empty band is measured by eye in the shots: a band's height can't be told from a deliberate gap by the boxes alone, so no rule judges it.
 
 ### Radii by role
 
@@ -294,8 +295,8 @@ Every interactive component has these states, shown in the specimen: **resting, 
 
 | Name | Rust | What |
 |---|---|---|
-| `Page` | `layout::page` | A whole page on the surface, its content the container padding in on every side (see "The container"). |
-| `Container` | `layout::container` | A panel's body or a toolbar band: its content the container padding in on every side, as tall as the content. |
+| `Page` | `layout::page` | A whole page on the surface, its content the container padding in at the sides, 32 below the top and 24 above the foot (see "The container"). |
+| `Container` | `layout::container` | A panel's body or a toolbar band: its content the container padding in at the sides, as tall as the content, which keeps its own spacing above and below. |
 | `Header` | `layout::header` | A page's Japanese accent (`accent`), title (`title`), and one lede line (`body`) 8 below. |
 | `Section` | `layout::section` | A titled part of a page: `heading`, an optional `body` line 4 under it, the content 16 below. |
 | `Stack` | `layout::stack` | Children one above the other, a spacing token apart; start-aligned, or centred on whole device pixels. |
@@ -347,9 +348,9 @@ Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so 
 | Name | Rust | QML | What |
 |---|---|---|---|
 | `Keycap` | `keycap::keycap(look, key)` | `Keycap` | A key drawn as a key: 20 tall (`keycap`), as a line of body text, so it sits inline with body and caption text without making the line taller. The `keycap` type (Geist Mono 11, medium) in `on_surface_variant` on `surface_container_highest`, a hairline edge in `outline_variant` with a second hairline at the bottom, so the key stands on the page, the small radius (4), 4 either side of the key and never narrower than tall, so a one-letter key is square. |
-| `KeyHints` | `keycap::key_hints(look, hints)` | `KeyHints` | Keys and what each does, side by side, 16 apart: a combination's keys as keycaps 4 apart (`Ctrl+K` is `Ctrl` and `K`, a `+` alone the plus key), then what it does in `caption`, `on_surface_variant`, 8 after them. QML also reads Kotodama's form, `↵ Open · Tab Enter app · ⌃K Actions`. |
+| `KeyHints` | `keycap::key_hints(look, hints)` | `KeyHints` | Keys and what each does, side by side, 16 apart: a combination's keys as keycaps 4 apart, one keycap per key (`Ctrl+K` is `Ctrl` and `K`; a modifier's or an arrow's glyph is a key of its own however it is written, so `⌃K` is `⌃` and `K` and `← →` two arrows; a `+` alone is the plus key), then what it does in `caption`, `on_surface_variant`, 8 after them. QML also reads Kotodama's form, `↵ Open · Tab Enter app · ⌃K Actions`. The Command menu draws the same boxes with its own fast text (`modules/menu/Keycap.qml`, `KeyHints.qml`), since its keystroke path can't afford the library's measured text. |
 
-- **A key hint is never text on text.** Every key named on screen is a `Keycap`: the Command menu's footer, its Action panel and its detail pane, Kōbō's footer and its screens, the lock screen, the panels, the wallpaper picker, the clock, polkit. The key stands out as a key, so the eye finds it first and reads what it does after.
+- **A key hint is never text on text.** Every key named on screen is a `Keycap`: the Command menu's footer, its Action panel and its detail pane, Kōbō's rail, footers and screens, the control center's Bluetooth and keyboard sections, the wallpaper picker, the clock. The one exception is a `Hint` bubble, a single line of `label` text, which names a key in words (the keyboard layout pill's "SUPER+SHIFT+Space"). The key stands out as a key, so the eye finds it first and reads what it does after.
 - **Inline with text**: a keycap in a sentence ("Press `Space` to pick") sits in a row centred on the line, 4 from the words.
 
 ### Inputs
@@ -376,7 +377,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 | `Chip` | `chip::chip` | A short fact or pick, 24 tall (`chip`) at the control radius, 12, which on a chip is a pill, `label` type, an optional 16 icon 4 from the label, an optional close. A pick may also be pressed, with the state layer: Kōbō's picked layouts, where a press makes one the default. Its left side pads 12, or 8 with an icon; its right pads 12, or nothing when the close button (a 24 circle) ends it. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview). |
 | `Card` | `card::card` | A surface inside the page: the well's surface, a soft hairline, the surface radius (24), 16 inside. |
 | `ChoiceCard` | `card::choice_card` | One of a few cards to pick from, at the surface radius (24). Picked: `secondary_container` and an accent hairline. Its focus ring is cold, since the accent already means picked. |
-| `Media` | `media::media(look, picture, aspect, corner)` | A picture in a box as wide as its room and as tall as an `[aspect]` token makes it, on a whole device pixel, cut to cover the box at its corner. Until the picture has loaded the box holds the placeholder, `surface_container_high`, so the box is the same before and after the load and nothing around it moves (`kubaos-ui` tests it). In QML the picture is `source`, or content laid in the box that says when it is `ready` (a video). Kōbō's wallpaper cards and the shell's wallpaper picker show their pictures in one. |
+| `Media` | `media::media(look, picture, aspect, corner)` | A picture in a box as wide as its room and as tall as an `[aspect]` token makes it, on a whole device pixel, cut to cover the box at its corner. Until the picture has loaded the box holds the placeholder, `surface_container_high`, so the box is the same before and after the load and nothing around it moves (`kubaos-ui` tests it). In QML the picture is `source`, or content laid over the placeholder to fill the box (a video, a picture that clips itself), which fades in over it. Kōbō's wallpaper cards and the shell's wallpaper picker show their pictures in one. |
 
 **A list in a well, a group in a card, the panel's own controls bare.** One rule for what a section's content sits in, so a panel doesn't put one list in a box and the next on the panel:
 
@@ -389,7 +390,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 
 | Name | Rust | What |
 |---|---|---|
-| `Dialog` | `dialog::dialog`, `dialog::prompt` | A question over a dimmed screen: one width (500, `dialog`), padding 32, the surface radius (24), the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under it, the buttons 32 under the last: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. A prompt asks for something only the user can type (a password): a `Normal` dialog with a `Labelled` field 16 under the body, Enter in the field doing what its action does. In QML it is a `Dialog` with the field as its child. |
+| `Dialog` | `dialog::dialog`, `dialog::prompt` | A question over a dimmed screen: one width (500, `dialog`), padding 32, the surface radius (24), the dialog shadow. A 32 icon (`headline`'s) and a `headline` title, the `body` 12 under it, the buttons 32 under the last: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. A prompt asks for something only the user can type (a password): a `Normal` dialog with a `Labelled` field 16 under the body, Enter in the field doing what its action does. In QML it is a `Dialog` with the field as its child. |
 | `Scrim` | `dialog::scrim` | Everything behind a dialog, dimmed (`opacity.scrim`). |
 | `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, the surface radius (24), which on one line is a pill. It arrives over `short`, rising 32 into place as it fades in (`emphasized_decel`), stays 3.6 s, and leaves over `medium`, fading out (`standard_accel`): `toast::toast_at` draws it at an age. |
 | `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work over `short` on the `linear` curve; a bar that shows up already part full starts there. A fraction the app already times against the clock (how long a button has been held) is drawn as given (`progress::timed_bar`), with no easing to trail behind it. |
@@ -487,13 +488,21 @@ Every pair in `[contrast]` (see "Colour"), in both fallback palettes, holds its 
 
 ```text
 $ cargo run -p kubaos-design -- contrast
-dark  on_secondary_container at subdued on secondary_container: 5.64:1, needs 4.5:1 (A selected row's subtitle)
-light on_secondary_container at subdued on secondary_container: 5.03:1, needs 4.5:1 (A selected row's subtitle)
+dark  on_secondary_container at subdued_text on secondary_container: 5.63:1, needs 4.5:1 (A selected row's subtitle)
+light on_secondary_container at subdued_text on secondary_container: 5.04:1, needs 4.5:1 (A selected row's subtitle)
 …
-kubaos-design contrast: 32 pair(s) in 2 modes: ok
+kubaos-design contrast: 36 pair(s) in 2 modes: ok
 ```
 
-A pair under its minimum fails with the ratio it has: `contrast on_secondary_container at subdued on secondary_container is 4.00:1 in light, under its 4.5:1` was the selected row's subtitle at a `subdued` of 0.75. Matugen's colours from a wallpaper aren't checked yet; the fallback palettes are matugen's for the default wallpaper, so a pairing that fails there fails on the desktop too.
+A pair under its minimum fails with the ratio it has: `contrast on_secondary_container at subdued on secondary_container is 4.00:1 in light, under its 4.5:1` was the selected row's subtitle at the 0.75 it shared with the thumbnails, before it had `subdued_text`.
+
+The list must also be complete. `kubaos-design contrast` reads every file the lint reads and finds each role named as a colour (`Tokens.color.<role>` in QML, `c.<role>` or `colors.<role>` in Rust); a role in no pair, as foreground or background, and not in `[contrast] decorative`, fails with where it is drawn:
+
+```text
+config/quickshell/modules/lock/LockSurface.qml:28: draws `surface_container_lowest`, which no pair in [contrast] covers; add its pair, or list it as decorative
+```
+
+It knows which roles are drawn, not which is drawn on which: a role already in one pair can be drawn on a background no pair names, which review still catches. Matugen's colours from a wallpaper aren't checked yet; the fallback palettes are matugen's for the default wallpaper, so a pairing that fails there fails on the desktop too.
 
 ### The lint
 
@@ -559,7 +568,7 @@ A marker sits on the line directly above the code it allows, with no other comme
 | `identical` | Two instances of one component and variant (`Button`, `Filled Md`) differ in a measure the component fixes (a button's height, an icon button's both), at any scale, or place their icons and label differently along it. A component that holds content (a card, a choice card, a page, a section: "holds content" in the table) holds whatever the app puts in it, so where its parts sit is the content's and isn't compared; it says so in its probe (`fixed.holds`). Focused, hovered and disabled are the same variant, so focus moving anything fails here. |
 | `clipped-text` | A text needs more room than its box, or a text or icon sticks out of a box around it. |
 | `icon-centre` | An icon alone in its slot, or in a centred row, is more than half a device pixel off the slot's centre. |
-| `container-padding` | A `Page`'s or a `Container`'s content isn't the container padding for its width in at the left and the top, or runs into that padding at the right or the bottom (see "The container"). |
+| `container-padding` | A `Page`'s or a `Container`'s content isn't the container padding for its width in at the left, or runs into that padding at the right (see "The container"). |
 | `mode-invariant` | A page's light frame has other boxes than its dark one. Words may differ; where each box sits may not. |
 
 ```text

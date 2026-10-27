@@ -34,7 +34,7 @@ K.Pressable {
         return n.appIcon ? Quickshell.iconPath(n.appIcon, true) : "";
     }
     readonly property color fg: critical ? K.Tokens.color.on_error_container : K.Tokens.color.on_surface
-    readonly property color fgMuted: critical ? K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
+    readonly property color fgMuted: critical ? K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued_text) : K.Tokens.color.on_surface_variant
     // In the control center's well: one of its rows, so 12 in from its surface.
     property bool inWell: false
     readonly property real radius: K.Look.nested(K.Tokens.radius.surface, root.inWell ? K.Tokens.space.s12 : K.Tokens.space.s8)

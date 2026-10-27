@@ -636,11 +636,13 @@ pub enum Opacity {
     OutlineSoft,
     PanelScrim,
     Placeholder,
+    PlaceholderText,
     Press,
     Scrim,
     Selection,
     SpinnerTrack,
     Subdued,
+    SubduedText,
     Tint,
     Track,
     Well,
@@ -648,7 +650,7 @@ pub enum Opacity {
 
 impl Opacity {
     /// Every opacity.
-    pub const ALL: [Opacity; 24] = [
+    pub const ALL: [Opacity; 26] = [
         Opacity::Backdrop,
         Opacity::DangerEdge,
         Opacity::DialogEdge,
@@ -665,11 +667,13 @@ impl Opacity {
         Opacity::OutlineSoft,
         Opacity::PanelScrim,
         Opacity::Placeholder,
+        Opacity::PlaceholderText,
         Opacity::Press,
         Opacity::Scrim,
         Opacity::Selection,
         Opacity::SpinnerTrack,
         Opacity::Subdued,
+        Opacity::SubduedText,
         Opacity::Tint,
         Opacity::Track,
         Opacity::Well,
@@ -693,15 +697,51 @@ impl Opacity {
             Opacity::Log => 0.85,
             Opacity::OutlineSoft => 0.55,
             Opacity::PanelScrim => 0.2,
-            Opacity::Placeholder => 0.8,
+            Opacity::Placeholder => 0.55,
+            Opacity::PlaceholderText => 0.8,
             Opacity::Press => 0.14,
             Opacity::Scrim => 0.6,
             Opacity::Selection => 0.32,
             Opacity::SpinnerTrack => 0.18,
-            Opacity::Subdued => 0.85,
+            Opacity::Subdued => 0.75,
+            Opacity::SubduedText => 0.85,
             Opacity::Tint => 0.16,
             Opacity::Track => 0.9,
             Opacity::Well => 0.75,
+        }
+    }
+}
+
+impl Opacity {
+    /// The opacity's name in `design/tokens.toml`.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Opacity::Backdrop => "backdrop",
+            Opacity::DangerEdge => "danger_edge",
+            Opacity::DialogEdge => "dialog_edge",
+            Opacity::DisabledContainer => "disabled_container",
+            Opacity::DisabledContent => "disabled_content",
+            Opacity::ErrorEdge => "error_edge",
+            Opacity::ErrorFill => "error_fill",
+            Opacity::Focus => "focus",
+            Opacity::Frame => "frame",
+            Opacity::Glass => "glass",
+            Opacity::Hover => "hover",
+            Opacity::Locked => "locked",
+            Opacity::Log => "log",
+            Opacity::OutlineSoft => "outline_soft",
+            Opacity::PanelScrim => "panel_scrim",
+            Opacity::Placeholder => "placeholder",
+            Opacity::PlaceholderText => "placeholder_text",
+            Opacity::Press => "press",
+            Opacity::Scrim => "scrim",
+            Opacity::Selection => "selection",
+            Opacity::SpinnerTrack => "spinner_track",
+            Opacity::Subdued => "subdued",
+            Opacity::SubduedText => "subdued_text",
+            Opacity::Tint => "tint",
+            Opacity::Track => "track",
+            Opacity::Well => "well",
         }
     }
 }
@@ -1133,16 +1173,20 @@ pub enum Need {
 /// A foreground role drawn on a background role, at an opacity or opaque.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ContrastPair {
+    /// The role drawn on top: text, an icon, an outline.
     pub fg: Role,
+    /// The role it is drawn on.
     pub bg: Role,
+    /// The contrast it needs.
     pub need: Need,
+    /// The opacity the foreground is drawn at, or opaque.
     pub opacity: Option<Opacity>,
     /// Where the pair is drawn.
     pub purpose: &'static str,
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 32] = [
+pub const CONTRAST: [ContrastPair; 36] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1203,7 +1247,7 @@ pub const CONTRAST: [ContrastPair; 32] = [
         fg: Role::OnSurfaceVariant,
         bg: Role::Surface,
         need: Need::Text,
-        opacity: Some(Opacity::Placeholder),
+        opacity: Some(Opacity::PlaceholderText),
         purpose: "A field's placeholder",
     },
     ContrastPair {
@@ -1231,7 +1275,7 @@ pub const CONTRAST: [ContrastPair; 32] = [
         fg: Role::OnPrimary,
         bg: Role::Primary,
         need: Need::Text,
-        opacity: Some(Opacity::Subdued),
+        opacity: Some(Opacity::SubduedText),
         purpose: "Secondary text on a checked tile",
     },
     ContrastPair {
@@ -1252,7 +1296,7 @@ pub const CONTRAST: [ContrastPair; 32] = [
         fg: Role::OnSecondaryContainer,
         bg: Role::SecondaryContainer,
         need: Need::Text,
-        opacity: Some(Opacity::Subdued),
+        opacity: Some(Opacity::SubduedText),
         purpose: "A selected row's subtitle",
     },
     ContrastPair {
@@ -1266,7 +1310,7 @@ pub const CONTRAST: [ContrastPair; 32] = [
         fg: Role::OnError,
         bg: Role::Error,
         need: Need::Text,
-        opacity: Some(Opacity::Subdued),
+        opacity: Some(Opacity::SubduedText),
         purpose: "A selected danger row's subtitle",
     },
     ContrastPair {
@@ -1287,7 +1331,7 @@ pub const CONTRAST: [ContrastPair; 32] = [
         fg: Role::OnErrorContainer,
         bg: Role::ErrorContainer,
         need: Need::Text,
-        opacity: Some(Opacity::Subdued),
+        opacity: Some(Opacity::SubduedText),
         purpose: "A critical notification's body",
     },
     ContrastPair {
@@ -1366,6 +1410,34 @@ pub const CONTRAST: [ContrastPair; 32] = [
         need: Need::Graphic,
         opacity: None,
         purpose: "An outline on the highest container",
+    },
+    ContrastPair {
+        fg: Role::OnSurface,
+        bg: Role::SurfaceContainer,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A pill of the bar",
+    },
+    ContrastPair {
+        fg: Role::OnSurface,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Text,
+        opacity: None,
+        purpose: "An Action's title in the Action panel, a chip",
+    },
+    ContrastPair {
+        fg: Role::Tertiary,
+        bg: Role::Surface,
+        need: Need::Text,
+        opacity: None,
+        purpose: "The clock's Copied line",
+    },
+    ContrastPair {
+        fg: Role::OnSurface,
+        bg: Role::SurfaceContainerLowest,
+        need: Need::Text,
+        opacity: None,
+        purpose: "The lock screen before its wallpaper loads",
     },
 ];
 

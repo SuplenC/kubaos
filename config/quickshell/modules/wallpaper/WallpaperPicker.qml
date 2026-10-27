@@ -25,9 +25,11 @@ Drawer {
     readonly property string folder: folders[settingsOpen ? lastFolder : folderIndex]?.name ?? ""
     readonly property var images: Wallpapers.images[folder] ?? []
     readonly property real dpr: frame.screen?.devicePixelRatio ?? 1
-    // The container padding round the thumbnails or the tabs and key hints, whichever is wider;
-    // the screen's width's own when they would take more than it has.
-    readonly property int pad: {
+    // Above and below the header and the thumbnails.
+    readonly property int pad: K.Tokens.space.s24
+    // At the sides, the container padding round the thumbnails or the tabs and key hints,
+    // whichever is wider; the screen's width's own when they would take more than it has.
+    readonly property int side: {
         const inner = Math.max(gridWidth, headerWidth);
         const around = K.Tokens.containerPaddingAround(inner);
         return inner + around * 2 > widest ? K.Tokens.containerPadding(widest) : around;
@@ -56,7 +58,7 @@ Drawer {
     edge: "bottom"
     // As wide as the thumbnails or the tabs and key hints above them,
     // whichever is wider, and never wider than the screen.
-    contentWidth: Math.min(Math.max(gridWidth, headerWidth) + pad * 2, widest)
+    contentWidth: Math.min(Math.max(gridWidth, headerWidth) + side * 2, widest)
     contentHeight: pad + header.implicitHeight + K.Tokens.space.s16 + (settingsOpen ? Math.min(Math.max(cellHeight, settings.implicitHeight), (frame.b - frame.t) * settingsShare) : rows * cellHeight) + pad
     onOpened: {
         Wallpapers.refresh();
@@ -117,9 +119,9 @@ Drawer {
     K.Row {
         id: header
 
-        x: root.pad
+        x: root.side
         y: root.pad
-        width: root.contentWidth - root.pad * 2
+        width: root.contentWidth - root.side * 2
         gap: K.Tokens.space.s16
         align: "centre"
 
@@ -146,9 +148,9 @@ Drawer {
     WallpaperSettings {
         id: settings
 
-        x: root.pad
+        x: root.side
         y: header.y + header.height + K.Tokens.space.s16
-        width: root.contentWidth - root.pad * 2
+        width: root.contentWidth - root.side * 2
         height: root.contentHeight - y - root.pad
         visible: root.settingsOpen
         onBack: root.pick(root.lastFolder)

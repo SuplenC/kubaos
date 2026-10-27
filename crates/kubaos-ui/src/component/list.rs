@@ -171,13 +171,13 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
             (
                 Some(c.error),
                 c.on_error,
-                color::alpha(c.on_error, Opacity::Subdued.value()),
+                color::alpha(c.on_error, Opacity::SubduedText.value()),
             )
         } else if self.selected {
             (
                 Some(c.secondary_container),
                 c.on_secondary_container,
-                color::alpha(c.on_secondary_container, Opacity::Subdued.value()),
+                color::alpha(c.on_secondary_container, Opacity::SubduedText.value()),
             )
         } else {
             (None, c.on_surface, c.on_surface_variant)

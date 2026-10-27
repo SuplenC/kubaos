@@ -33,12 +33,15 @@ K.Stack {
     }
 
     // The bar above the page: the pages, then the mode and the scale it is shown at. A toolbar
-    // band: its content and the container padding, as the page under it is padded.
+    // band: the container padding at the sides, as the page under it, and a small control's room
+    // above and below.
     K.Container {
         K.Row {
             gap: K.Tokens.space.s16
             align: "centre"
             fill: true
+            topPadding: K.Tokens.space.s16
+            bottomPadding: K.Tokens.space.s16
 
             K.Text {
                 text: "KubaOS design specimen"
@@ -66,7 +69,7 @@ K.Stack {
             }
 
             K.KeyHints {
-                hints: [["Tab", "pages"], ["M", "mode"]]
+                hints: [["Tab", "next page"], ["← →", "pages"], ["M", "mode"]]
             }
 
             K.Chip {

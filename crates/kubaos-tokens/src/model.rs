@@ -117,6 +117,8 @@ pub struct Container {
 #[serde(deny_unknown_fields)]
 pub struct ContrastPairs {
     pub pairs: Vec<ContrastPair>,
+    /// Roles drawn only as decoration, which carries no meaning and needs no contrast.
+    pub decorative: Vec<String>,
 }
 
 /// One foreground role on one background role.
