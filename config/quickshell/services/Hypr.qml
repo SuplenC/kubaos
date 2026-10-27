@@ -5,7 +5,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import qs.settings
-import qs.theme
+import KubaOS.Components as K
 
 // Small helpers on top of the Hyprland IPC, and each screen's workspaces.
 //
@@ -115,7 +115,7 @@ Singleton {
     Timer {
         id: groupsSaved
 
-        interval: Theme.anim.small
+        interval: K.Tokens.duration.short
         onTriggered: {
             if (Hyprland.usingLua)
                 Hyprland.dispatch("dot.workspaces.reload_groups()");

@@ -1,10 +1,9 @@
 -- Look and feel: gaps, borders, rounding, blur, shadows, animations, layout.
 -- Colors come from colors.lua (matugen output with fallbacks).
 --
--- Sizes and motion follow the Quickshell design tokens
--- (config/quickshell/theme/Theme.qml): the shell draws an 8 px frame with
--- 24 px inner corners, the surface radius, and reserves it as exclusive
--- zones. Windows sit gaps_out (8) inside it, measured to the outside of the
+-- Sizes and motion follow the design tokens (design/tokens.toml): the shell
+-- draws an 8 px frame with 24 px inner corners, the surface radius, and
+-- reserves it as exclusive zones. Windows sit gaps_out (8) inside it, measured to the outside of the
 -- 2 px border, and Hyprland rounds that outer edge with rounding +
 -- border_size. Concentric with the frame means 24 - 8 = 16 for the outer
 -- edge, so rounding = 14
@@ -106,9 +105,8 @@ hl.config({
   },
 })
 
--- Animations, on the shell's Material 3 curves (Theme.anim) so windows and
--- panels move alike: things that appear decelerate in with a slight
--- overshoot ("spatial"), things that leave accelerate out, quicker.
+-- Animations, on Material 3 curves: things that appear decelerate in with a
+-- slight overshoot ("spatial"), things that leave accelerate out, quicker.
 -- speed is in deciseconds (4 = 400 ms). The shell's own layers have no_anim
 -- (rules.lua): Quickshell animates them itself.
 hl.curve("spatial", { type = "bezier", points = { { 0.38, 1.21 }, { 0.22, 1 } } })

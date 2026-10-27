@@ -6,37 +6,6 @@
 # `just design-baseline` writes the lower count here. Nothing writes a higher one: a new
 # violation is fixed, or allowed in place with a `design-allow(rule): reason` marker.
 
-["config/quickshell/components/Elevation.qml"]
-size = 1
-
-["config/quickshell/components/EmptyState.qml"]
-size = 1
-
-["config/quickshell/components/FocusRing.qml"]
-space = 1
-size = 1
-radius = 1
-
-["config/quickshell/components/Icon.qml"]
-size = 1
-
-["config/quickshell/components/IconButton.qml"]
-size = 2
-radius = 1
-
-["config/quickshell/components/PanelSurface.qml"]
-size = 1
-radius = 1
-
-["config/quickshell/components/SearchField.qml"]
-size = 3
-radius = 1
-
-["config/quickshell/components/Tooltip.qml"]
-size = 1
-radius = 1
-font = 1
-
 ["crates/kubaos-kobo/src/app.rs"]
 duration = 2
 
