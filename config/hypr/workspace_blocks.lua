@@ -44,38 +44,75 @@ function M.sort_screens(monitors)
   return sorted
 end
 
--- Connector -> position: "panel" for the laptop panel, and "1", "2" and on for
--- the externals, counted left to right by where Hyprland's layout puts them
--- (top to bottom at the same x). Where the panel sits doesn't count.
-function M.positions(monitors)
-  local positions, externals = {}, {}
-  for _, monitor in ipairs(monitors) do
-    if internal(monitor.name) then
-      positions[monitor.name] = "panel"
-    else
-      externals[#externals + 1] = monitor
-    end
-  end
-  table.sort(externals, function(left, right)
-    if left.x ~= right.x then
-      return left.x < right.x
-    end
-    if left.y ~= right.y then
-      return left.y < right.y
-    end
-    return left.id < right.id
-  end)
-  for index, monitor in ipairs(externals) do
-    positions[monitor.name] = tostring(index)
-  end
-  return positions
-end
-
 -- A screen as people know it: its description, which is its make, model and
 -- serial, or its connector when it reports none.
 local function described(monitor)
   local description = monitor.description or ""
   return description ~= "" and description or monitor.name
+end
+
+-- Left to right by where Hyprland's layout puts them, top to bottom at the
+-- same x.
+local function by_layout(left, right)
+  if left.x ~= right.x then
+    return left.x < right.x
+  end
+  if left.y ~= right.y then
+    return left.y < right.y
+  end
+  return left.id < right.id
+end
+
+-- Connector -> position: "panel" for the laptop panel, and "1", "2" and on for
+-- the externals. A screen pinned to a group (`groups`, as `parse_groups`
+-- returns them) stands at the group's number; when two of a group's screens
+-- are plugged in, the first listed wins and the other counts as unpinned, the
+-- panel included, whose unpinned place is "panel". The unpinned externals
+-- take the positions left, counted left to right by where Hyprland's layout
+-- puts them (top to bottom at the same x), and never the number of a group
+-- that pins a screen, plugged in or not. Where the panel sits doesn't count.
+function M.positions(monitors, groups)
+  local ordered = {}
+  for _, monitor in ipairs(monitors) do
+    ordered[#ordered + 1] = monitor
+  end
+  table.sort(ordered, by_layout)
+
+  local positions, pinned = {}, {}
+  for _, group in ipairs(groups or {}) do
+    local position = tostring(group.number)
+    if #group.screens > 0 then
+      pinned[position] = true
+    end
+    local winner = nil
+    for _, screen in ipairs(group.screens) do
+      for _, monitor in ipairs(ordered) do
+        if not positions[monitor.name] and described(monitor) == screen then
+          winner = monitor
+          break
+        end
+      end
+      if winner then
+        break
+      end
+    end
+    if winner then
+      positions[winner.name] = position
+    end
+  end
+
+  local count = 0
+  for _, monitor in ipairs(ordered) do
+    if not positions[monitor.name] and internal(monitor.name) then
+      positions[monitor.name] = "panel"
+    elseif not positions[monitor.name] then
+      repeat
+        count = count + 1
+      until not pinned[tostring(count)]
+      positions[monitor.name] = tostring(count)
+    end
+  end
+  return positions
 end
 
 -- Connector -> identity: the screen's description. Two screens that report the
@@ -138,8 +175,22 @@ end
 -- (position -> block). `positions` is connector -> position; `seen`, position
 -- -> screen, takes the screen now at each. A block in `busy` (a set) still
 -- holds a window, so a new position passes over it: a block set free by
--- `heal()` may keep windows waiting until the user moves them.
+-- `heal()` may keep windows waiting until the user moves them. The panel
+-- standing at a group's position leaves the panel's position with no screen;
+-- it still gets its block first, 1-10 when free, so the panel's own group is
+-- there to wait and to come back to.
 function M.assign(blocks, seen, monitors, positions, busy)
+  for _, monitor in ipairs(monitors) do
+    if internal(monitor.name) and positions[monitor.name] ~= "panel" and not blocks.panel then
+      local taken = {}
+      for _, block in pairs(blocks) do
+        taken[block] = true
+      end
+      blocks.panel = taken[0] and lowest_free(taken) or 0
+      seen.panel = seen.panel or described(monitor)
+    end
+  end
+
   local by_connector = {}
   local ordered = {}
   for _, monitor in ipairs(monitors) do
@@ -178,7 +229,8 @@ end
 -- never a second one waiting elsewhere; a row the old migration invented for
 -- it goes, and so does the row of the position it shifted from. While the
 -- block still has windows they wait as a group, reachable by the position's
--- Item, and the row stays until they are gone.
+-- Item, and the row stays until they are gone. The panel's position is never
+-- a ghost: the panel standing at a group's position comes back to it.
 function M.heal(places, seen, held, busy)
   local holding = {}
   for position in pairs(held) do
@@ -187,7 +239,7 @@ function M.heal(places, seen, held, busy)
     end
   end
   for position, block in pairs(places) do
-    if not held[position] and holding[seen[position] or ""] and not busy[block] then
+    if position ~= "panel" and not held[position] and holding[seen[position] or ""] and not busy[block] then
       places[position], seen[position] = nil, nil
     end
   end
@@ -375,8 +427,9 @@ local function is_position(field)
 end
 
 -- The screens file: one line per position ever seen, "block<TAB>connector<TAB>
--- position<TAB>screen": the connector of the screen at the position now, empty
--- while there is none, and the screen there now or last. The bar
+-- position<TAB>screen", and "<TAB>name" for a group with a name: the
+-- connector of the screen at the position now, empty while there is none,
+-- and the screen there now or last. The bar
 -- (`config/quickshell/services/Hypr.qml`) maps its connector to a block with
 -- the first two columns.
 --
@@ -432,9 +485,10 @@ end
 -- position, as groups the bar shows, since a position invented for them would
 -- contradict the one they stand at when they come back. With the lid closed,
 -- the panel's row is the one last seen on an internal connector, else the one
--- owning block 0, which the panel always claimed first. Returns position ->
--- block and position -> screen.
-function M.migrate(rows, monitors)
+-- owning block 0, which the panel always claimed first. `groups` pins screens
+-- as `positions()` takes them. Returns position -> block and position ->
+-- screen.
+function M.migrate(rows, monitors, groups)
   local current, by_identity = {}, {}
   for _, row in ipairs(rows) do
     by_identity[row.identity] = row
@@ -443,7 +497,7 @@ function M.migrate(rows, monitors)
     end
   end
   local identities = M.identities(monitors, current)
-  local positions = M.positions(monitors)
+  local positions = M.positions(monitors, groups)
   local places, seen, claimed, held = {}, {}, {}, {}
 
   local function take(position, row)
@@ -496,8 +550,261 @@ function M.migrate(rows, monitors)
   return places, seen
 end
 
--- `positions` is connector -> position for the screens plugged in now.
-function M.format_places(places, seen, positions)
+-- The workspace groups file, `desktop/workspaces/groups.toml` in the user
+-- layer: a table a group, numbered from 1, with an optional `name` and the
+-- `screens` pinned to it by description, the first listed first.
+--
+--   [group.1]
+--   name = "Left"
+--   screens = ["BNQ ZOWIE XL LCD G4L01663SL0", "Dell Inc. DELL U2724D 5D6E7F8"]
+--
+-- Returns the groups in number order, { number, name, screens }, or nil and
+-- what is wrong, with the line it is on. It reads the TOML such a file needs:
+-- comments, `[group.N]` tables, and strings and lists of strings. Anything
+-- else, a key it doesn't know, or a screen in two groups is a mistake, so a
+-- typo never pins a screen somewhere unexpected.
+function M.parse_groups(text)
+  local at, line = 1, 1
+
+  local function fail(message)
+    error({ problem = "line " .. line .. ": " .. message }, 0)
+  end
+
+  local function peek()
+    return text:sub(at, at)
+  end
+
+  -- Spaces and comments; line ends too with `lines`.
+  local function skip(lines)
+    while at <= #text do
+      local char = peek()
+      if char == " " or char == "\t" or char == "\r" then
+        at = at + 1
+      elseif char == "#" then
+        at = text:find("\n", at, true) or #text + 1
+      elseif char == "\n" and lines then
+        at, line = at + 1, line + 1
+      else
+        return
+      end
+    end
+  end
+
+  local escapes = { b = "\b", t = "\t", n = "\n", f = "\f", r = "\r", ['"'] = '"', ["\\"] = "\\" }
+
+  local function basic_string()
+    if text:sub(at, at + 2) == '"""' then
+      fail("a string over several lines; write it on one")
+    end
+    at = at + 1
+    local parts = {}
+    while true do
+      local stop = text:find('["\\\n]', at)
+      if not stop or text:sub(stop, stop) == "\n" then
+        fail("a string with no closing quote")
+      end
+      parts[#parts + 1] = text:sub(at, stop - 1)
+      at = stop + 1
+      if text:sub(stop, stop) == '"' then
+        return table.concat(parts)
+      end
+      local escape = text:sub(at, at)
+      if escapes[escape] then
+        parts[#parts + 1] = escapes[escape]
+        at = at + 1
+      elseif escape == "u" or escape == "U" then
+        local digits = escape == "u" and 4 or 8
+        local hex = text:sub(at + 1, at + digits)
+        local code = #hex == digits and hex:match("^%x+$") and tonumber(hex, 16)
+        if not code or code > 0x10FFFF then
+          fail("a broken \\" .. escape .. " escape")
+        end
+        parts[#parts + 1] = utf8.char(code)
+        at = at + 1 + digits
+      else
+        fail("an escape TOML doesn't know, \\" .. escape)
+      end
+    end
+  end
+
+  local function literal_string()
+    if text:sub(at, at + 2) == "'''" then
+      fail("a string over several lines; write it on one")
+    end
+    local stop = text:find("['\n]", at + 1)
+    if not stop or text:sub(stop, stop) == "\n" then
+      fail("a string with no closing quote")
+    end
+    local value = text:sub(at + 1, stop - 1)
+    at = stop + 1
+    return value
+  end
+
+  local function key()
+    local char = peek()
+    if char == '"' then
+      return basic_string()
+    elseif char == "'" then
+      return literal_string()
+    end
+    local bare = text:match("^[%w_-]+", at)
+    if not bare then
+      fail("a name was expected")
+    end
+    at = at + #bare
+    return bare
+  end
+
+  -- `a.b.c` as written, and its parts.
+  local function dotted_key()
+    local keys = { key() }
+    skip(false)
+    while peek() == "." do
+      at = at + 1
+      skip(false)
+      keys[#keys + 1] = key()
+      skip(false)
+    end
+    return table.concat(keys, "."), keys
+  end
+
+  local function value()
+    local char = peek()
+    if char == '"' then
+      return basic_string()
+    elseif char == "'" then
+      return literal_string()
+    elseif char ~= "[" then
+      fail("a value this file doesn't take; names and screens are text in quotes")
+    end
+    at = at + 1
+    local list = {}
+    while true do
+      skip(true)
+      if peek() == "]" then
+        at = at + 1
+        return list
+      end
+      local entry = value()
+      if type(entry) ~= "string" then
+        fail("a list in a list")
+      end
+      list[#list + 1] = entry
+      skip(true)
+      if peek() == "," then
+        at = at + 1
+      elseif peek() ~= "]" then
+        fail("a comma or ] was expected in the list")
+      end
+    end
+  end
+
+  local function line_end()
+    skip(false)
+    if peek() == "\n" then
+      at, line = at + 1, line + 1
+    elseif peek() ~= "" then
+      fail("more on the line after its value")
+    end
+  end
+
+  local groups, numbers, group = {}, {}, nil
+
+  local function header()
+    if text:sub(at, at + 1) == "[[" then
+      fail("[[...]] makes a list; a group is [group.1], [group.2] and on")
+    end
+    at = at + 1
+    skip(false)
+    local name, keys = dotted_key()
+    if peek() ~= "]" then
+      fail("[" .. name .. " has no closing ]")
+    end
+    at = at + 1
+    local number = #keys == 2 and keys[1] == "group" and keys[2]:match("^%d+$") and tonumber(keys[2])
+    if not number or number < 1 then
+      fail("[" .. name .. "] isn't a group; groups are [group.1], [group.2] and on")
+    elseif numbers[number] then
+      fail("[group." .. number .. "] twice")
+    end
+    group = { number = number, screens = {}, set = {} }
+    numbers[number] = group
+    groups[#groups + 1] = group
+  end
+
+  local function setting()
+    local name = dotted_key()
+    if peek() ~= "=" then
+      fail("`" .. name .. "` needs = and a value")
+    end
+    at = at + 1
+    skip(false)
+    local written = value()
+    if not group then
+      fail("`" .. name .. "` before any group; settings go under [group.1], [group.2] and on")
+    elseif name ~= "name" and name ~= "screens" then
+      fail("`" .. name .. "` isn't a setting of a group: name or screens")
+    elseif group.set[name] then
+      fail("`" .. name .. "` twice in [group." .. group.number .. "]")
+    elseif name == "name" and type(written) ~= "string" then
+      fail("a group's name is text in quotes")
+    elseif name == "screens" and type(written) ~= "table" then
+      fail('screens is a list: ["make model serial", ...]')
+    end
+    group.set[name] = true
+    if name == "name" then
+      local trimmed = written:match("^%s*(.-)%s*$")
+      group.name = trimmed ~= "" and trimmed or nil
+    else
+      group.screens = written
+    end
+  end
+
+  local function read()
+    while true do
+      skip(true)
+      if at > #text then
+        return
+      end
+      if peek() == "[" then
+        header()
+      else
+        setting()
+      end
+      line_end()
+    end
+  end
+
+  local ok, err = pcall(read)
+  if not ok then
+    return nil, type(err) == "table" and err.problem or tostring(err)
+  end
+
+  table.sort(groups, function(left, right) return left.number < right.number end)
+  local pinned_to = {}
+  for _, entry in ipairs(groups) do
+    entry.set = nil
+    for index, screen in ipairs(entry.screens) do
+      screen = screen:match("^%s*(.-)%s*$")
+      entry.screens[index] = screen
+      if screen == "" then
+        return nil, "group " .. entry.number .. " lists an empty screen"
+      elseif pinned_to[screen] == entry.number then
+        return nil, "group " .. entry.number .. " lists " .. screen .. " twice"
+      elseif pinned_to[screen] then
+        return nil, screen .. " is in group " .. pinned_to[screen] .. " and group " .. entry.number
+          .. "; a screen is pinned to one group"
+      end
+      pinned_to[screen] = entry.number
+    end
+  end
+  return groups
+end
+
+-- `positions` is connector -> position for the screens plugged in now, and
+-- `names` position -> the name of its group, written as a fifth column on the
+-- rows of a group with one.
+function M.format_places(places, seen, positions, names)
   local connector = {}
   for name, position in pairs(positions) do
     connector[position] = name
@@ -505,6 +812,10 @@ function M.format_places(places, seen, positions)
   local rows = {}
   for position, block in pairs(places) do
     local line = block .. "\t" .. (connector[position] or "") .. "\t" .. position .. "\t" .. (seen[position] or "")
+    local name = names and names[position]
+    if name then
+      line = line .. "\t" .. name:gsub("%c", " ")
+    end
     rows[#rows + 1] = { block = block, line = line }
   end
   table.sort(rows, function(left, right) return left.block < right.block end)

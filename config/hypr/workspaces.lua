@@ -20,6 +20,16 @@
 -- Position -> block lives in a state file, with the screen each position last
 -- had, and the bar reads the same file to know which block is a screen's own.
 --
+-- The user can pin screens to a group, by description, in the user layer's
+-- `desktop/workspaces/groups.toml`: a pinned screen stands at its group's
+-- number wherever the layout puts it, the first listed winning when two of a
+-- group's screens are plugged in, and the unpinned externals take the numbers
+-- left, left to right, never one a group pins. The panel pinned to a group
+-- shows that group, and its own 1-10 waits on the primary screen, itself,
+-- like any group without a screen; with the lid closed it is not plugged in
+-- as far as groups go. The file is read at load and again on
+-- `reload_groups()`; one that doesn't read is a toast and pins nothing.
+--
 -- A position's block is its *group*. When a screen goes, Hyprland moves its
 -- workspaces to any other screen; reconciling on every monitor change sends
 -- each group to the screen now at its position, and gathers the group of a
@@ -61,6 +71,7 @@
 -- The `hl.*` API: /usr/share/hypr/stubs/, https://wiki.hypr.land/Configuring/
 
 local blocks_lib = require("workspace_blocks")
+local user_layer = require("user_layer")
 
 local SLOTS = blocks_lib.SLOTS
 local block_of = blocks_lib.block_of
@@ -79,6 +90,7 @@ local function state_dir()
 end
 
 local SCREENS_FILE = state_dir() .. "/workspace-screens"
+local GROUPS_FILE = user_layer.file("workspaces", "groups.toml")
 
 local M = { slots = SLOTS }
 
@@ -115,8 +127,53 @@ end
 local places, seen, legacy = blocks_lib.parse_places(read(SCREENS_FILE))
 local written = nil
 
+-- The workspace groups the user pinned screens to (`workspace_blocks.
+-- parse_groups`), and the text they were read from. A file that doesn't
+-- read pins nothing, so every screen stands where it would without one.
+local groups, groups_text = {}, nil
+
+-- Says once what is wrong with the groups file, in a toast: the last problem
+-- shown is kept in `dot`, which outlives a config reload, so a lid change or
+-- `hyprctl reload` doesn't show it again.
+local function warn(problem)
+  if dot.workspace_groups_problem == problem then
+    return
+  end
+  dot.workspace_groups_problem = problem
+  if problem then
+    local body = ("In groups.toml, %s. Until it's fixed, no screen is pinned: they take their places left to right.")
+      :format(problem)
+    hl.exec_cmd("notify-send -a 'Workspace groups' -i video-display -u critical 'Workspace groups' '"
+      .. body:gsub("'", "'\\''") .. "'")
+  end
+end
+
+-- Reads the groups file again; true when its text changed.
+local function read_groups()
+  local text = read(GROUPS_FILE)
+  if text == groups_text then
+    return false
+  end
+  groups_text = text
+  local parsed, problem = blocks_lib.parse_groups(text)
+  groups = parsed or {}
+  warn(problem)
+  return true
+end
+
+read_groups()
+
+-- Position -> the name of its group.
+local function group_names()
+  local names = {}
+  for _, group in ipairs(groups) do
+    names[tostring(group.number)] = group.name
+  end
+  return names
+end
+
 local function save(positions)
-  local text = blocks_lib.format_places(places, seen, positions)
+  local text = blocks_lib.format_places(places, seen, positions, group_names())
   if text ~= written and write(SCREENS_FILE, text) then
     written = text
   end
@@ -461,7 +518,7 @@ end
 function M.go_to_position(position)
   return function()
     local monitors = connected()
-    local positions = blocks_lib.positions(monitors)
+    local positions = blocks_lib.positions(monitors, groups)
     for _, monitor in ipairs(monitors) do
       if positions[monitor.name] == position then
         hl.dispatch(hl.dsp.focus({ monitor = monitor.name }))
@@ -630,10 +687,10 @@ function M.reconcile(added)
   end
 
   if legacy then
-    places, seen = blocks_lib.migrate(legacy, monitors)
+    places, seen = blocks_lib.migrate(legacy, monitors, groups)
     legacy = nil
   end
-  local positions = blocks_lib.positions(monitors)
+  local positions = blocks_lib.positions(monitors, groups)
   local busy = busy_blocks()
   local by_connector = blocks_lib.assign(places, seen, monitors, positions, busy)
   local held = {}
@@ -784,6 +841,19 @@ function M.flush()
   if pending then
     generation = generation + 1
     settled()
+  end
+end
+
+-- Read the workspace groups file again and put each group on the screen it
+-- pins now: the bar runs it when the file changes
+-- (`config/quickshell/services/Hypr.qml`). A file that reads the same moves
+-- nothing, and a wait for the layout in progress reconciles with the new
+-- groups when it ends.
+function M.reload_groups()
+  return function()
+    if read_groups() and not pending then
+      M.reconcile()
+    end
   end
 end
 

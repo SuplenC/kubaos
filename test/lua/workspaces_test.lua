@@ -50,14 +50,16 @@ end
 
 local real_getenv = os.getenv
 
--- A new fake on a fresh state directory, without the module.
+-- A new fake on a fresh state directory and user layer, without the module.
 local function bare()
   local dir = os.tmpname()
   os.remove(dir)
-  assert(os.execute("mkdir -p '" .. dir .. "/kubaos/hypr'"))
+  assert(os.execute("mkdir -p '" .. dir .. "/kubaos/hypr' '" .. dir .. "/config/kubaos/desktop/workspaces'"))
   os.getenv = function(key)
     if key == "XDG_STATE_HOME" then
       return dir
+    elseif key == "XDG_CONFIG_HOME" then
+      return dir .. "/config"
     end
     return real_getenv(key)
   end
@@ -65,6 +67,7 @@ local function bare()
   _G.hl = world.hl
   _G.dot = {}
   world.state = dir .. "/kubaos/hypr"
+  world.groups = dir .. "/config/kubaos/desktop/workspaces/groups.toml"
   return world
 end
 
@@ -260,6 +263,174 @@ test("migrating with the lid closed, the row last on the panel's connector stays
   local _, _, legacy = blocks.parse_places("0\teDP-1\t" .. PANEL .. "\n1\tDP-1\t" .. LG_A .. "\n")
   local places = blocks.migrate(legacy, { { name = "DP-1", id = 1, x = 0, y = 0, description = LG_A } })
   same({ places.panel, places["1"] }, { 0, 1 }, "places")
+end)
+
+-- The workspace groups file and the screens it pins.
+
+-- What `parse_groups` read, as "number name: screen, screen" lines.
+local function groups_read(text)
+  local groups, problem = blocks.parse_groups(text)
+  assert(groups, problem)
+  local lines = {}
+  for _, group in ipairs(groups) do
+    lines[#lines + 1] = group.number .. " " .. tostring(group.name) .. ": " .. table.concat(group.screens, ", ")
+  end
+  return lines
+end
+
+local function problem_of(text)
+  local groups, problem = blocks.parse_groups(text)
+  assert(not groups, "read as groups")
+  return problem
+end
+
+test("the groups file reads each group's number, name and screens, first listed first", function()
+  local text = table.concat({
+    "# Pinned screens.",
+    "[group.2]  # the centre",
+    'name = "Centre"',
+    "screens = [",
+    '  "LG Electronics LG ULTRAGEAR+ 510NTCZN7787",  # home',
+    "  'Dell Inc. DELL U2724D 1A2B3C4', # work",
+    "]",
+    "",
+    '[group."1"]',
+    'name = "  Left\\u00e9 "',
+    'screens = ["BNQ ZOWIE XL LCD G4L01663SL0"]',
+    "[group.3]",
+    'screens = []',
+    "[group.4]",
+    'name = ""',
+  }, "\n")
+
+  same(groups_read(text), {
+    "1 Lefté: BNQ ZOWIE XL LCD G4L01663SL0",
+    "2 Centre: LG Electronics LG ULTRAGEAR+ 510NTCZN7787, Dell Inc. DELL U2724D 1A2B3C4",
+    "3 nil: ",
+    "4 nil: ",
+  }, "groups")
+end)
+
+test("the seed pins nothing, and its example, uncommented, reads", function()
+  local seed = read(repo .. "/user-layer/desktop/workspaces/groups.toml")
+  local example = seed:gsub("\n# (%[group)", "\n%1"):gsub("\n# (name =)", "\n%1"):gsub("\n# (screens =)", "\n%1")
+
+  same(groups_read(seed), {}, "seed")
+  same(groups_read(example), {
+    "1 Left: BNQ ZOWIE XL LCD G4L01663SL0, Dell Inc. DELL U2724D 5D6E7F8",
+    "2 Centre: LG Electronics LG ULTRAGEAR+ 510NTCZN7787, Dell Inc. DELL U2724D 1A2B3C4",
+  }, "example")
+end)
+
+test("an empty groups file, or one of comments only, pins nothing", function()
+  same(groups_read(""), {}, "empty")
+  same(groups_read("# [group.1]\n# screens = [\"A\"]\n\n"), {}, "comments")
+end)
+
+test("a groups file that doesn't read says what is wrong and on which line", function()
+  same(problem_of('[group.1]\nscreen = ["A"]\n'), "line 2: `screen` isn't a setting of a group: name or screens", "unknown key")
+  same(problem_of('[groups.1]\n'), "line 1: [groups.1] isn't a group; groups are [group.1], [group.2] and on", "table")
+  same(problem_of('[group.0]\n'), "line 1: [group.0] isn't a group; groups are [group.1], [group.2] and on", "zero")
+  same(problem_of('[[group]]\n'), "line 1: [[...]] makes a list; a group is [group.1], [group.2] and on", "array of tables")
+  same(problem_of('screens = ["A"]\n'), "line 1: `screens` before any group; settings go under [group.1], [group.2] and on", "no group")
+  same(problem_of('[group.1]\nname = 3\n'), "line 2: a value this file doesn't take; names and screens are text in quotes", "number")
+  same(problem_of('[group.1]\nname = "Left\n'), "line 2: a string with no closing quote", "open string")
+  same(problem_of('[group.1]\nscreens = "A"\n'), 'line 2: screens is a list: ["make model serial", ...]', "not a list")
+  same(problem_of('[group.1]\nscreens = ["A" "B"]\n'), "line 2: a comma or ] was expected in the list", "no comma")
+  same(problem_of('[group.1]\nname = "A" name = "B"\n'), "line 2: more on the line after its value", "two on a line")
+  same(problem_of('[group.1]\n[group.1]\n'), "line 2: [group.1] twice", "group twice")
+  same(problem_of('[group.1]\nname = "A"\nname = "B"\n'), "line 3: `name` twice in [group.1]", "key twice")
+end)
+
+test("a screen pinned to two groups, or twice to one, is a mistake", function()
+  same(problem_of('[group.1]\nscreens = ["A"]\n[group.2]\nscreens = ["B", " A "]\n'),
+    "A is in group 1 and group 2; a screen is pinned to one group", "two groups")
+  same(problem_of('[group.1]\nscreens = ["A", "A"]\n'), "group 1 lists A twice", "twice")
+  same(problem_of('[group.1]\nscreens = [" "]\n'), "group 1 lists an empty screen", "empty")
+end)
+
+-- The screens of `positions()` in a row: { name, description, x }.
+local function row_of(...)
+  local monitors = {}
+  for index, screen in ipairs({ ... }) do
+    monitors[#monitors + 1] = { name = screen[1], description = screen[2], id = index - 1, x = screen[3], y = 0 }
+  end
+  return monitors
+end
+
+local function pinned(...)
+  local groups = {}
+  for _, spec in ipairs({ ... }) do
+    groups[#groups + 1] = { number = spec[1], screens = { table.unpack(spec, 2) } }
+  end
+  return groups
+end
+
+local function positions_of(monitors, groups, ...)
+  local positions = blocks.positions(monitors, groups)
+  local result = {}
+  for _, name in ipairs({ ... }) do
+    result[#result + 1] = positions[name]
+  end
+  return result
+end
+
+test("a pinned screen stands at its group's number wherever the layout puts it", function()
+  local monitors = row_of({ "DP-8", LG_A, 0 }, { "DP-9", LG_B, 2560 }, { "eDP-1", PANEL, 4480 })
+
+  same(positions_of(monitors, pinned({ 1, LG_B }), "DP-9", "DP-8", "eDP-1"), { "1", "2", "panel" }, "positions")
+end)
+
+test("an unpinned screen never takes the number of a group whose screen is absent", function()
+  local monitors = row_of({ "DP-1", LG_A, 0 }, { "DP-2", LG_B, 1920 })
+
+  same(positions_of(monitors, pinned({ 1, BENQ }), "DP-1", "DP-2"), { "2", "3" }, "positions")
+end)
+
+test("of two screens of one group plugged in, the first listed wins and the other takes a free number", function()
+  local monitors = row_of({ "DP-1", LG_A, 0 }, { "DP-2", BENQ, 1920 }, { "DP-3", LG_C, 3840 })
+
+  same(positions_of(monitors, pinned({ 1, BENQ, LG_A }, { 2, LG_C }), "DP-2", "DP-3", "DP-1"), { "1", "2", "3" }, "positions")
+end)
+
+test("a group with no screens, only a name, pins nothing", function()
+  local monitors = row_of({ "DP-1", LG_A, 0 })
+
+  same(positions_of(monitors, { { number = 1, name = "Left", screens = {} } }, "DP-1"), { "1" }, "positions")
+end)
+
+test("the panel pinned to a group stands at its number until a screen listed before it is plugged in", function()
+  local alone = row_of({ "eDP-1", PANEL, 0 })
+  local docked = row_of({ "eDP-1", PANEL, 0 }, { "DP-1", LG_A, 1920 })
+
+  same(positions_of(alone, pinned({ 2, LG_A, PANEL }), "eDP-1"), { "2" }, "alone")
+  same(positions_of(docked, pinned({ 2, LG_A, PANEL }), "eDP-1", "DP-1"), { "panel", "2" }, "docked")
+  same(positions_of(docked, pinned({ 2, PANEL, LG_A }), "eDP-1", "DP-1"), { "2", "1" }, "listed first")
+end)
+
+test("the panel standing at a group's number keeps 1-10 for its own group", function()
+  local places, seen = {}, {}
+  local monitors = row_of({ "eDP-1", PANEL, 0 })
+
+  local by_connector = blocks.assign(places, seen, monitors, { ["eDP-1"] = "2" }, {})
+
+  same({ places.panel, places["2"], by_connector["eDP-1"], seen.panel }, { 0, 1, 1, PANEL }, "blocks")
+end)
+
+test("the panel's position is never dropped as a ghost while the panel stands elsewhere", function()
+  local places, seen = { panel = 0, ["2"] = 1 }, { panel = PANEL, ["2"] = PANEL }
+
+  blocks.heal(places, seen, { ["2"] = true }, {})
+
+  same(places.panel, 0, "kept")
+end)
+
+test("a group's name goes in a fifth column of its rows", function()
+  local text = blocks.format_places({ panel = 0, ["1"] = 1 }, { panel = PANEL, ["1"] = LG_A }, { ["DP-1"] = "1" },
+    { ["1"] = "Left\tside" })
+
+  same(text, "0\t\tpanel\t" .. PANEL .. "\n1\tDP-1\t1\t" .. LG_A .. "\tLeft side\n", "text")
+  same(blocks.parse_places(text)["1"], 1, "read back")
 end)
 
 -- The groups of `groups()` as lists of ids, for comparing.
@@ -1321,6 +1492,262 @@ test("unplugging an empty screen releases its kept workspace", function()
   world:unplug("DP-1")
 
   same(world:kept(), { "1@eDP-1" }, "kept")
+end)
+
+-- Workspace groups on the fake Hyprland. Kuba's work desk: two Dells, the
+-- left one on DP-9 and the centre one on DP-8.
+local DELL_L = "Dell Inc. DELL U2724D 5D6E7F8"
+local DELL_C = "Dell Inc. DELL U2724D 1A2B3C4"
+local KUBA_GROUPS = '[group.1]\nname = "Left"\nscreens = ["' .. BNQ_K .. '", "' .. DELL_L .. '"]\n\n'
+  .. '[group.2]\nname = "Centre"\nscreens = ["' .. LG_K .. '", "' .. DELL_C .. '"]\n'
+
+-- A fresh state, the groups file `text`, and the module loaded on them.
+local function grouped(text)
+  local world = bare()
+  write(world.groups, text)
+  package.loaded.workspaces = nil
+  return world, require("workspaces")
+end
+
+-- Kuba at home with `text` as his groups file: two windows on the BenQ's
+-- group and one on the LG's.
+local function home_grouped(text)
+  local world, module = grouped(text)
+  world:plug("eDP-1", CSOT, 4480, 240)
+  world:fire("hyprland.start")
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  local left = fill(world, module, "DP-2", 2)
+  local centre = fill(world, module, "HDMI-A-1", 1)
+  world:unplug("DP-2")
+  world:unplug("HDMI-A-1")
+  return world, module, left, centre
+end
+
+-- The work desk as Hyprland places it with no layout of Kuba's: in connector
+-- order, the centre Dell (DP-8) leftmost.
+local function work_grouped_ends_right(world, left, centre)
+  same(world:ids_on("DP-9"), { 11, 12, 13 }, "the left Dell shows the Left group")
+  same(world:ids_on("DP-8"), { 21, 22 }, "the centre Dell shows the Centre group")
+  same({ world:shown_on("DP-9"), world:shown_on("DP-8") }, { 11, 21 }, "each on its first")
+  same(on_screen(left), { "DP-9", "DP-9" }, "the Left group's windows")
+  same(on_screen(centre), { "DP-8" }, "the Centre group's windows")
+  same(world.renumbered, 0, "renumbered")
+end
+
+test("pinned screens take their groups whatever the layout, the centre one plugged in first", function()
+  local world, _, left, centre = home_grouped(KUBA_GROUPS)
+
+  world:plug("DP-8", DELL_C, 0, 0)
+  world:plug("DP-9", DELL_L, 2560, 0)
+
+  work_grouped_ends_right(world, left, centre)
+end)
+
+test("pinned screens take their groups whatever the layout, the left one plugged in first", function()
+  local world, _, left, centre = home_grouped(KUBA_GROUPS)
+
+  world:attach("DP-9", DELL_L)
+  world:arrange("DP-9", 0, 0)
+  world:settle()
+  world:attach("DP-8", DELL_C)
+  world:arrange("DP-8", 0, 0)
+  world:arrange("DP-9", 2560, 0)
+  world:settle()
+
+  work_grouped_ends_right(world, left, centre)
+end)
+
+test("pinned screens plugged in together reconcile once, each group moving once", function()
+  local world, _, left, centre = home_grouped(KUBA_GROUPS)
+  world.moves = 0
+
+  world:attach("DP-9", DELL_L)
+  world:attach("DP-8", DELL_C)
+  world:arrange("DP-8", 0, 0)
+  world:arrange("DP-9", 2560, 0)
+  same(world.moves, 0, "nothing moved before the layout settled")
+  world:settle()
+
+  work_grouped_ends_right(world, left, centre)
+  same(world.moves, 5, "the three workspaces with windows and the empty one each group keeps after them")
+end)
+
+test("the screens file names each group beside its rows", function()
+  local world = home_grouped(KUBA_GROUPS)
+
+  world:plug("DP-8", DELL_C, 0, 0)
+  world:plug("DP-9", DELL_L, 2560, 0)
+
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. CSOT .. "\n1\tDP-9\t1\t" .. DELL_L
+    .. "\tLeft\n2\tDP-8\t2\t" .. DELL_C .. "\tCentre\n", "file")
+end)
+
+test("in a clash the first listed takes the group and the other the next number no group pins", function()
+  local world, _, left = home_grouped(KUBA_GROUPS)
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+
+  world:plug("DP-9", DELL_L, 3840, 0)
+
+  same(world:ids_on("DP-2"), { 11, 12, 13 }, "the BenQ, listed first, keeps the Left group")
+  same(world:shown_on("DP-9"), 31, "the left Dell gets a group of its own, position 3")
+  same(on_screen(left), { "DP-2", "DP-2" }, "the Left group's windows")
+
+  world:unplug("DP-2")
+
+  same(world:ids_on("DP-9"), { 11, 12, 13 }, "with the BenQ gone, the left Dell takes the Left group")
+  same(on_screen(left), { "DP-9", "DP-9" }, "and its windows")
+end)
+
+test("unpinned screens fill the numbers left to right around a pinned one, and keep theirs while it is away", function()
+  local world, module = grouped('[group.2]\nscreens = ["' .. LG_K .. '"]\n')
+  world:plug("eDP-1", CSOT, 5760, 0)
+  world:fire("hyprland.start")
+  world:plug("DP-1", LG_A, 0, 0)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  world:plug("DP-3", LG_B, 3840, 0)
+  same({ world:shown_on("DP-1"), world:shown_on("HDMI-A-1"), world:shown_on("DP-3") }, { 11, 21, 31 }, "1, 2, 3")
+  local centre = fill(world, module, "HDMI-A-1", 1)
+  local right = fill(world, module, "DP-3", 1)
+
+  world:unplug("HDMI-A-1")
+
+  same(world:ids_on("DP-3"), { 31, 32 }, "the right screen keeps position 3's group, never taking 2")
+  same(on_screen(right), { "DP-3" }, "and its windows")
+  same(on_screen(centre), { "eDP-1" }, "the pinned group's windows wait on the laptop")
+  same(world:ids_on("DP-1"), { 11 }, "the left screen keeps its own")
+end)
+
+test("the panel pinned after an external shows the group with the lid open, and its own 1-10 waits on it", function()
+  local world, module = grouped('[group.2]\nscreens = ["' .. LG_K .. '", "' .. CSOT .. '"]\n')
+  world:plug("eDP-1", CSOT, 1920, 0)
+  world:fire("hyprland.start")
+  same(world:shown_on("eDP-1"), 11, "the panel shows group 2, block 1; 1-10 stays the panel's")
+  local mine = fill(world, module, "eDP-1", 1)
+  local own = world:window_on(1, "eDP-1")
+
+  world:plug("HDMI-A-1", LG_K, 0, 0)
+  same(world:ids_on("HDMI-A-1"), { 11, 12 }, "docked, the LG listed first takes group 2")
+  same({ world:ids_on("eDP-1"), world:shown_on("eDP-1") }, { { 1, 2 }, 1 }, "and the panel its own 1-10")
+
+  world:unplug("eDP-1")
+  same(world:ids_on("HDMI-A-1"), { 1, 2, 11, 12 }, "the lid closed, 1-10 waits on the LG")
+
+  world:plug("eDP-1", CSOT, 1920, 0)
+  same({ world:ids_on("eDP-1"), world:ids_on("HDMI-A-1") }, { { 1, 2 }, { 11, 12 } }, "the lid open again")
+
+  world:unplug("HDMI-A-1")
+  same(world:ids_on("eDP-1"), { 1, 2, 11, 12 }, "undocked, the panel shows group 2 again beside its own")
+  same(on_screen({ mine[1], own }), { "eDP-1", "eDP-1" }, "the windows")
+  same(read(world.state .. "/workspace-screens"), "0\t\tpanel\t" .. CSOT .. "\n1\teDP-1\t2\t" .. CSOT .. "\n",
+    "the panel's row keeps 1-10 while the panel stands at 2")
+  same(world.renumbered, 0, "renumbered")
+end)
+
+test("the panel pinned first holds its group with the lid open, and the lid closed hands it to the next listed", function()
+  local world, module = grouped('[group.1]\nscreens = ["' .. CSOT .. '", "' .. BNQ_K .. '"]\n[group.2]\nscreens = ["'
+    .. LG_K .. '"]\n')
+  world:plug("eDP-1", CSOT, 4480, 240)
+  world:fire("hyprland.start")
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  same({ world:shown_on("eDP-1"), world:shown_on("HDMI-A-1"), world:shown_on("DP-2") }, { 11, 31, 21 },
+    "the panel group 1, the LG group 2, the BenQ position 3")
+  local first = fill(world, module, "eDP-1", 1)
+  local benq = fill(world, module, "DP-2", 1)
+  local lg = fill(world, module, "HDMI-A-1", 1)
+  local own = world:window_on(1, "eDP-1")
+
+  world:unplug("eDP-1")
+
+  same(world:ids_on("DP-2"), { 1, 2, 11, 12, 21, 22 }, "the lid closed, the BenQ takes group 1, 1-10 and its own wait there")
+  same(world:ids_on("HDMI-A-1"), { 31, 32 }, "the LG keeps group 2")
+  same(on_screen({ first[1], benq[1], lg[1], own }), { "DP-2", "DP-2", "HDMI-A-1", "DP-2" }, "the windows")
+  same(world:shown_on("DP-2"), 21, "the BenQ still shows what it showed, now waiting there")
+
+  world:plug("eDP-1", CSOT, 4480, 240)
+
+  same({ world:ids_on("eDP-1"), world:ids_on("DP-2"), world:ids_on("HDMI-A-1") }, { { 1, 2, 11, 12 }, { 21, 22 }, { 31, 32 } },
+    "the lid open, each back")
+  same(world:shown_on("eDP-1"), 11, "the panel shows group 1 again")
+  same(world.renumbered, 0, "renumbered")
+end)
+
+test("a groups file edited while the screens are plugged in moves each group to the screen it pins at once", function()
+  local world, module = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  world.moves = 0
+
+  write(world.groups, '[group.1]\nname = "Main"\nscreens = ["' .. LG_K .. '"]\n')
+  run(module.reload_groups())
+
+  same(world:ids_on("HDMI-A-1"), { 41, 42, 43 }, "the LG pinned to 1 takes its group")
+  same(world:ids_on("DP-2"), { 31, 32, 33, 34, 35 }, "the BenQ, unpinned, takes 2")
+  same({ world:shown_on("HDMI-A-1"), world:shown_on("DP-2") }, { 41, 31 }, "each on its first")
+  same(world.renumbered, 0, "renumbered")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. CSOT .. "\n3\tDP-2\t2\t" .. BNQ_K
+    .. "\n4\tHDMI-A-1\t1\t" .. LG_K .. "\tMain\n", "the file")
+  same(world:kept(), { "1@eDP-1", "3@eDP-1", "31@DP-2", "35@DP-2", "41@HDMI-A-1", "43@HDMI-A-1" }, "kept")
+  same(world:rules_for("41") + world:rules_for("31"), 2, "one rule per kept workspace")
+
+  world.moves = 0
+  run(module.reload_groups())
+  same(world.moves, 0, "the same file again moves nothing")
+end)
+
+test("a groups file edited while a screen arrives is applied once the layout settles", function()
+  local world, module = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:attach("HDMI-A-1", LG_K)
+  world:arrange("HDMI-A-1", 1920, 0)
+  world.moves = 0
+
+  write(world.groups, '[group.2]\nscreens = ["' .. BNQ_K .. '"]\n')
+  run(module.reload_groups())
+  same(world.moves, 0, "nothing moves before the layout settles")
+  world:settle()
+
+  same(world:ids_on("DP-2"), { 31, 32, 33, 34, 35 }, "the BenQ pinned to 2")
+  same(world:ids_on("HDMI-A-1"), { 41, 42, 43 }, "the LG, unpinned, at 1")
+end)
+
+test("a groups file that doesn't read is one toast and pins nothing, until it is fixed", function()
+  local world, module = grouped('[group.1]\nscreens = ["' .. LG_A .. '"]\n[group.2]\nscreen = ["' .. LG_B .. '"]\n')
+  world:plug("eDP-1", PANEL, 0, 0)
+  world:fire("hyprland.start")
+  world:plug("DP-1", LG_B, 1920, 0)
+  world:plug("DP-2", LG_A, 3840, 0)
+
+  same({ world:shown_on("DP-1"), world:shown_on("DP-2") }, { 11, 21 }, "left to right, as without the file")
+  same(#world.commands, 1, "one toast")
+  assert(world.commands[1]:find("^notify%-send ") and world.commands[1]:find("line 4: `screen`", 1, true),
+    world.commands[1])
+
+  module = reload(world)
+  world:fire("config.reloaded")
+  same(#world.commands, 1, "a config reload doesn't say it again")
+
+  write(world.groups, '[group.1]\nscreens = ["' .. LG_A .. '"]\n')
+  run(module.reload_groups())
+  same({ world:shown_on("DP-2"), world:shown_on("DP-1") }, { 11, 21 }, "fixed, the pin applies at once")
+
+  write(world.groups, "[group.1\n")
+  run(module.reload_groups())
+  same({ world:shown_on("DP-1"), world:shown_on("DP-2") }, { 11, 21 }, "broken again, left to right")
+  same(#world.commands, 2, "and a toast again")
+end)
+
+test("going to a pinned group's position focuses the screen pinned there", function()
+  local world, module = home_grouped(KUBA_GROUPS)
+  world:plug("DP-8", DELL_C, 0, 0)
+  world:plug("DP-9", DELL_L, 2560, 0)
+  world:focus_monitor("eDP-1")
+
+  run(module.go_to_position("1"))
+
+  same(world.focused.name, "DP-9", "focus")
 end)
 
 -- The binds of fallback.lua and keybinds.lua, by their keys: each one's

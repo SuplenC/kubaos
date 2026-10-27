@@ -1,0 +1,32 @@
+# Your workspace groups: ~/.config/kubaos/desktop/workspaces/groups.toml. Pin a screen to a
+# group and it shows that group's workspaces the moment it is plugged in, whatever port it is
+# on and wherever Hyprland places it. Applies at once when you save.
+#
+# The Command menu writes this file too, comments kept: "Pin <screen> to group N",
+# "Unpin <screen>" and "Name group N…". "Workspace group" lists where each group is.
+#
+# Without a pin, the laptop panel shows workspaces 1-10 and the other screens take groups
+# 1, 2 and on from the left, by where Hyprland places them. A group pins screens by their
+# description: make, model and serial, as `hyprctl monitors all` prints it. List the screens
+# of every desk in one group, and each desk's screen gets that group:
+#
+# [group.1]
+# name = "Left"
+# screens = ["BNQ ZOWIE XL LCD G4L01663SL0", "Dell Inc. DELL U2724D 5D6E7F8"]
+#
+# [group.2]
+# name = "Centre"
+# screens = ["LG Electronics LG ULTRAGEAR+ 510NTCZN7787", "Dell Inc. DELL U2724D 1A2B3C4"]
+#
+# - Two screens of one group plugged in together: the first listed wins; the other takes the
+#   next group no screen is pinned to, as screens without a pin do.
+# - Screens without a pin take the groups left over, left to right, and never one a group
+#   pins, even while its screen is away.
+# - `name` is optional; the Command menu and the bar show it.
+# - The laptop panel can be pinned too. With the lid open it shows the group while no screen
+#   listed before it is plugged in, and its own 1-10 waits on it, tinted in the bar. With the
+#   lid closed it counts as unplugged: the next listed screen takes the group, else the group
+#   waits on the first screen, beside 1-10.
+#
+# A mistake in this file shows a notification, and no screen is pinned until it is fixed.
+# More: config/hypr/README.md in KubaOS, "Workspace groups".

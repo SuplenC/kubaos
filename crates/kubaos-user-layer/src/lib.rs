@@ -73,6 +73,8 @@ pub enum App {
     Wallpapers,
     /// The phone link's switch.
     Phone,
+    /// The workspace groups: which screens are pinned to which group.
+    Workspaces,
     Ghostty,
     Foot,
     Tmux,
@@ -89,7 +91,7 @@ pub enum App {
 }
 
 impl App {
-    pub const ALL: [App; 23] = [
+    pub const ALL: [App; 24] = [
         App::Hypr,
         App::Quickshell,
         App::Cursor,
@@ -100,6 +102,7 @@ impl App {
         App::Files,
         App::Wallpapers,
         App::Phone,
+        App::Workspaces,
         App::Ghostty,
         App::Foot,
         App::Tmux,
@@ -128,6 +131,7 @@ impl App {
             App::Files => "files",
             App::Wallpapers => "wallpapers",
             App::Phone => "phone",
+            App::Workspaces => "workspaces",
             App::Ghostty => "ghostty",
             App::Foot => "foot",
             App::Tmux => "tmux",
@@ -155,7 +159,8 @@ impl App {
             | App::Idle
             | App::Files
             | App::Wallpapers
-            | App::Phone => Group::Desktop,
+            | App::Phone
+            | App::Workspaces => Group::Desktop,
             App::Ghostty | App::Foot | App::Tmux | App::Zsh | App::Fastfetch => Group::Terminal,
             App::Nvim => Group::Editor,
             App::Git | App::Lazygit | App::Yazi | App::Bat | App::Bacon | App::Fuzzel => Group::Tools,

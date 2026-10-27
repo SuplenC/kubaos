@@ -20,6 +20,7 @@ M.apps = {
   files = "desktop/files",
   wallpapers = "desktop/wallpapers",
   phone = "desktop/phone",
+  workspaces = "desktop/workspaces",
   ghostty = "terminal/ghostty",
   foot = "terminal/foot",
   tmux = "terminal/tmux",

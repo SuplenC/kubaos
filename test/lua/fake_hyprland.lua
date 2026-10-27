@@ -11,7 +11,7 @@
 -- `monitor.layout_changed` fires, and timers run only when the test lets
 -- them (`settle()`). Focus moving to a screen fires `monitor.focused`, as
 -- Hyprland's does. `events` lists the socket events a move or a renumber
--- would send the bar, in order.
+-- would send the bar, in order, and `commands` what `hl.exec_cmd` ran.
 
 local F = {}
 F.__index = F
@@ -31,6 +31,7 @@ function F.new()
     renumbered = 0,
     moves = 0,
     events = {},
+    commands = {},
   }, F)
   world.hl = world:api()
   return world
@@ -361,6 +362,7 @@ function F:api()
     },
     workspace_rule = function(options) return world:workspace_rule(options) end,
     timer = function(callback, options) return world:timer(callback, options) end,
+    exec_cmd = function(command) world.commands[#world.commands + 1] = command end,
     dispatch = function(action)
       if type(action) == "function" then
         action()
