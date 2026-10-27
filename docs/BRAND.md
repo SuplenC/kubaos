@@ -1,6 +1,6 @@
-# KubaOS: name, look, voice
+# KubaOS: name and voice
 
-Every user-facing string, doc and image follows this file. Agents: read it before you write a single word somebody will see.
+Every user-facing string, doc and image follows this file. Agents: read it before you write a single word somebody will see. How things look and behave (colour, type, space, motion, icons, components, the keyboard) is [DESIGN.md](DESIGN.md).
 
 ## Name
 
@@ -92,4 +92,4 @@ Examples:
 
 ## Keyboard first
 
-KubaOS is used from the keyboard, and so is Kōbō. Everything you can do with the mouse, you can do with keys: a visible focus ring, Tab and Shift+Tab, arrows in lists and choices, Space to toggle, Enter to go on, Esc to go back. Shortcuts are on screen where they're needed. The mouse works, but you never need it.
+KubaOS is used from the keyboard, and so is Kōbō. The keyboard map every app shares, the focus ring and the rest of the behaviour are in [DESIGN.md](DESIGN.md), "Behaviour".
