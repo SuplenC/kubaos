@@ -79,8 +79,11 @@ Singleton {
         readonly property int xxxl: 40
     }
 
-    // Corner radii. Nested shapes step down one size per level of padding,
-    // so corners stay concentric (frame 20 -> panel content 16 -> rows 12).
+    // Corner radii. The design language's are roles (docs/DESIGN.md, "Space
+    // and shape"): small 4 (xs), control 12 (md), surface 24 (the frame,
+    // panels) and full; any other radius comes from nesting. sm, lg, xl and
+    // xxl predate the roles and are moved onto them with the shell's
+    // alignment.
     readonly property QtObject rounding: QtObject {
         readonly property int xs: 4
         readonly property int sm: 8
@@ -95,7 +98,7 @@ Singleton {
     // rounded inner corners. Panels grow out of it (modules/frame/).
     readonly property QtObject frame: QtObject {
         readonly property int thickness: 8
-        readonly property int rounding: 20      // inner corners of the frame
+        readonly property int rounding: 24      // inner corners of the frame: a surface
         readonly property int panelRounding: 24 // outer corners of panels
         readonly property int flare: 20         // concave fillet where a panel meets the frame
         readonly property real opacity: 0.94    // frame + panels; Hyprland blurs what shows through

@@ -16,6 +16,7 @@
 //!   ([`color`]), motion ([`motion`]), type ([`text`]) and icons ([`icon`]).
 //! - Layout on the grid ([`layout`], [`grid`]), the focus ring ([`focus`]) and the components
 //!   ([`component`]).
+//! - What each box is, for the geometry check ([`probe`]).
 //!
 //! # Not here
 //!
@@ -32,6 +33,7 @@ pub mod icon;
 pub mod layout;
 pub mod look;
 pub mod motion;
+pub mod probe;
 pub mod scale;
 pub mod snap;
 pub mod text;

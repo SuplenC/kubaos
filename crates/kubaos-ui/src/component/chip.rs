@@ -1,4 +1,4 @@
-//! Chips: a short fact or a pick, in a pill.
+//! Chips: a short fact or a pick, at the control radius, which on a chip's 24 is a pill.
 
 use iced::Background;
 use iced::Border;
@@ -20,6 +20,8 @@ use crate::layout::Inset;
 use crate::layout::row;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::text::text;
 use crate::tokens::IconSize;
 use crate::tokens::Opacity;
@@ -43,6 +45,16 @@ pub enum ChipKind {
 
 impl ChipKind {
     pub const ALL: [ChipKind; 4] = [ChipKind::Neutral, ChipKind::Selected, ChipKind::Accent, ChipKind::Cold];
+
+    /// The kind's name in the spec.
+    pub fn name(self) -> &'static str {
+        match self {
+            ChipKind::Neutral => "Neutral",
+            ChipKind::Selected => "Selected",
+            ChipKind::Accent => "Accent",
+            ChipKind::Cold => "Cold",
+        }
+    }
 }
 
 /// A chip reading `label`, with an optional leading icon, and a close button sending `on_remove`
@@ -54,6 +66,9 @@ pub fn chip<'a, M: Clone + 'a>(
     leading: Option<Icon>,
     on_remove: Option<M>,
 ) -> Element<'a, M> {
+    let with_icon = if leading.is_some() { "icon" } else { "" };
+    let removable = if on_remove.is_some() { "removable" } else { "" };
+    let variant = [kind.name(), with_icon, removable];
     let c = look.colors;
     let (fill, content) = match kind {
         ChipKind::Neutral => (c.surface_container_high, c.on_surface),
@@ -61,8 +76,8 @@ pub fn chip<'a, M: Clone + 'a>(
         ChipKind::Accent => (color::alpha(c.primary, Opacity::Tint.value()), c.primary),
         ChipKind::Cold => (color::alpha(c.cold, Opacity::Tint.value()), c.cold),
     };
-    // The label starts where the pill's curve ends; an icon sits closer in. The close button is a
-    // circle as tall as the chip, so its hover layer shares the pill's curve at the end.
+    // The label starts where the chip's curve ends; an icon sits closer in. The close button is a
+    // circle as tall as the chip, so its hover layer shares the chip's curve at the end.
     let left = if leading.is_some() { Space::S8 } else { Space::S12 };
     let right = if on_remove.is_some() {
         Gap::NONE
@@ -87,15 +102,16 @@ pub fn chip<'a, M: Clone + 'a>(
             });
         body = body.push(close);
     }
-    widget::container(row(look, Gap::NONE).center().push(body))
+    let view: Element<'a, M> = widget::container(row(look, Gap::NONE).center().push(body))
         .height(Length::Fixed(f32::from(Size::Chip.px())))
         .center_y(Length::Fixed(f32::from(Size::Chip.px())))
         .padding(Inset::NONE.left(left).right(right).padding())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(fill)),
-            border: Border::default().rounded(radius(Radius::Full)),
+            border: Border::default().rounded(radius(Radius::Control)),
             text_color: Some(Color { a: 1.0, ..content }),
             ..container::Style::default()
         })
-        .into()
+        .into();
+    probe::component("Chip", variant, Fixed::HEIGHT, view)
 }

@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+kubaos-geometry.workspace = true
 # Kōbō's iced and features, less the image widget it draws its wallpaper with: svg for KubaOS
 # Symbols, canvas for the switch and the spinner, advanced for the focus ring's and the grid's own
 # widgets, and crisp, which snaps quads to device pixels in the wgpu renderer. winit needs a
@@ -26,6 +27,8 @@ iced = { version = "0.14", default-features = false, features = [
 [dev-dependencies]
 # Lays views out headlessly, so the layout primitives' boxes can be measured.
 iced_test = "0.14"
+# Runs an operation over a laid-out view, so the probes' tree can be read.
+iced_runtime = "0.14"
 
 [lints]
 workspace = true

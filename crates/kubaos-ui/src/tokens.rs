@@ -26,8 +26,8 @@ pub const SCALES: [f32; 4] = [1.0, 1.25, 1.5, 2.0];
 /// A hairline's width in device pixels, at every scale.
 pub const HAIRLINE_DEVICE_PX: u16 = 1;
 
-/// The focus ring's, the spinner's and the check mark's stroke in logical pixels, drawn rounded
-/// half up to whole device pixels.
+/// The stroke of the focus ring, the spinner and a partial checkbox's dash, in logical pixels,
+/// drawn rounded half up to whole device pixels.
 pub const STROKE_THIN: u16 = 2;
 
 /// A symbol's stroke on its 24 unit grid; drawn scaled to the symbol's size, then rounded half up to
@@ -84,40 +84,35 @@ impl Space {
     }
 }
 
-/// A corner radius.
+/// A corner radius, by the role of the shape it rounds. A radius between them is derived by
+/// nesting, never picked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Radius {
-    R4,
-    R8,
-    R12,
-    R16,
-    R20,
-    R24,
+    /// Marks inside controls: the checkbox, a hint, focus details, inline tags.
+    Small,
+    /// Everything clicked or typed in: buttons, fields, list rows, menu items, chips.
+    Control,
+    /// Everything that holds content: cards, dialogs, popups, panels, list wells.
+    Surface,
     /// Half the shape's shorter side: a pill, or a circle.
     Full,
 }
 
 impl Radius {
     /// Every radius.
-    pub const ALL: [Radius; 7] = [
-        Radius::R4,
-        Radius::R8,
-        Radius::R12,
-        Radius::R16,
-        Radius::R20,
-        Radius::R24,
+    pub const ALL: [Radius; 4] = [
+        Radius::Small,
+        Radius::Control,
+        Radius::Surface,
         Radius::Full,
     ];
 
     /// The radius in logical pixels, or `None` for [`Radius::Full`], which depends on the shape.
     pub const fn px(self) -> Option<u16> {
         match self {
-            Radius::R4 => Some(4),
-            Radius::R8 => Some(8),
-            Radius::R12 => Some(12),
-            Radius::R16 => Some(16),
-            Radius::R20 => Some(20),
-            Radius::R24 => Some(24),
+            Radius::Small => Some(4),
+            Radius::Control => Some(12),
+            Radius::Surface => Some(24),
             Radius::Full => None,
         }
     }

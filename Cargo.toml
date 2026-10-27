@@ -11,7 +11,9 @@
 # scheduled power actions (`kubaos-idle`), where each app's settings live in the
 # user layer (`kubaos-user-layer`), and the design language: the tokens'
 # generator (`kubaos-tokens`), the iced components every Rust front end draws
-# with (`kubaos-ui`) and the specimen that shows them (`kubaos-specimen`).
+# with (`kubaos-ui`), the specimen that shows them (`kubaos-specimen`), and the design checks:
+# the geometry rules any toolkit's boxes are held to (`kubaos-geometry`) and the `kubaos-design`
+# command, which lints UI code for literal design values and checks geometry dumps.
 [workspace]
 resolver = "3"
 members = [
@@ -31,6 +33,8 @@ members = [
     "crates/kubaos-tokens",
     "crates/kubaos-ui",
     "crates/kubaos-specimen",
+    "crates/kubaos-geometry",
+    "crates/kubaos-design",
 ]
 
 [workspace.package]
@@ -47,6 +51,8 @@ kubaos-phone = { path = "crates/kubaos-phone" }
 kubaos-sysmon = { path = "crates/kubaos-sysmon" }
 kubaos-user-layer = { path = "crates/kubaos-user-layer" }
 kubaos-ui = { path = "crates/kubaos-ui" }
+kubaos-geometry = { path = "crates/kubaos-geometry" }
+kubaos-tokens = { path = "crates/kubaos-tokens" }
 # Kotodama's calculator reads dates with jiff too, so the menu and the popup agree on zones and
 # DST. The time zone database is the system's (`/usr/share/zoneinfo`, or `$TZDIR`), never bundled.
 jiff = { version = "0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo"] }

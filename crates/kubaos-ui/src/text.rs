@@ -10,6 +10,7 @@
 //! - The styles' values: [`crate::tokens`]. Icons: [`crate::icon`].
 
 use iced::Color;
+use iced::Element;
 use iced::Font;
 use iced::Pixels;
 use iced::font;
@@ -17,6 +18,8 @@ use iced::widget;
 use iced::widget::text::IntoFragment;
 use iced::widget::text::LineHeight;
 
+use crate::probe::Tag;
+use crate::probe::probe;
 use crate::tokens::Family;
 use crate::tokens::Type;
 use crate::tokens::Weight;
@@ -58,12 +61,13 @@ pub fn default_font() -> Font {
 }
 
 /// `content` in `style`, coloured `color`, on the style's line height.
-pub fn text<'a>(content: impl IntoFragment<'a>, style: Type, color: Color) -> widget::Text<'a> {
-    widget::text(content)
+pub fn text<'a, M: 'a>(content: impl IntoFragment<'a>, style: Type, color: Color) -> Element<'a, M> {
+    let shaped = widget::text(content)
         .font(font(style))
         .size(f32::from(style.size()))
         .line_height(line_height(style))
-        .color(color)
+        .color(color);
+    probe(Tag::Text, shaped)
 }
 
 /// A type style's line height, in absolute pixels so it stays on the grid.

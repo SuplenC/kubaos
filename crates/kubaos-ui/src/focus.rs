@@ -38,12 +38,12 @@ use iced::advanced::renderer;
 use iced::advanced::widget::Operation;
 use iced::advanced::widget::Tree;
 
+use crate::look::Corner;
 use crate::look::Look;
 use crate::look::ring_radius;
 use crate::scale::Scale;
 use crate::snap::snapped;
 use crate::tokens;
-use crate::tokens::Radius;
 
 /// Which colour the ring takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,7 +59,7 @@ pub enum RingColor {
 pub fn focus_ring<'a, M: 'a>(
     look: &Look,
     content: impl Into<Element<'a, M>>,
-    radius: Radius,
+    radius: impl Into<Corner>,
     focused: bool,
     color: RingColor,
 ) -> Element<'a, M> {
@@ -70,7 +70,7 @@ pub fn focus_ring<'a, M: 'a>(
     Element::new(Ring {
         content: content.into(),
         color: focused.then_some(tint),
-        radius,
+        radius: radius.into(),
         width: look.scale.thin(),
         scale: look.scale,
     })
@@ -85,7 +85,7 @@ struct Ring<'a, M> {
     content: Element<'a, M>,
     /// Some while focused.
     color: Option<Color>,
-    radius: Radius,
+    radius: Corner,
     /// The ring's stroke in logical pixels, whole device pixels at the scale.
     width: f32,
     /// The control's box is rounded up to it, so the ring around it lands on device pixels too.

@@ -3,10 +3,11 @@
 --
 -- Sizes and motion follow the Quickshell design tokens
 -- (config/quickshell/theme/Theme.qml): the shell draws an 8 px frame with
--- 20 px inner corners and reserves it as exclusive zones. Windows sit
--- gaps_out (8) inside it, measured to the outside of the 2 px border, and
--- Hyprland rounds that outer edge with rounding + border_size. Concentric
--- with the frame means 20 - 8 = 12 for the outer edge, so rounding = 10
+-- 24 px inner corners, the surface radius, and reserves it as exclusive
+-- zones. Windows sit gaps_out (8) inside it, measured to the outside of the
+-- 2 px border, and Hyprland rounds that outer edge with rounding +
+-- border_size. Concentric with the frame means 24 - 8 = 16 for the outer
+-- edge, so rounding = 14
 -- (OUTERROUND in Hyprland 0.56.2 src/render/decorations/CHyprBorderDecoration.cpp).
 
 local colors = require("colors")
@@ -25,7 +26,7 @@ hl.config({
   },
 
   decoration = {
-    rounding = 10, -- + border_size 2 = 12 on the outer edge, see the top
+    rounding = 14, -- + border_size 2 = 16 on the outer edge, see the top
     rounding_power = 2,
     dim_inactive = false,
     active_opacity = 1.0,

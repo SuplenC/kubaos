@@ -115,11 +115,15 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         }
     };
     on_grid("focus.offset".into(), tokens.focus.offset);
-    for (table, values) in [
-        ("space", &tokens.space.values),
-        ("radius", &tokens.radius.values),
-        ("icon", &tokens.icon.sizes),
+    let radius = &tokens.radius;
+    for (role, value) in [
+        ("small", radius.small),
+        ("control", radius.control),
+        ("surface", radius.surface),
     ] {
+        on_grid(format!("radius.{role}"), value);
+    }
+    for (table, values) in [("space", &tokens.space.values), ("icon", &tokens.icon.sizes)] {
         for &value in values {
             on_grid(format!("{table} {value}"), value);
         }
@@ -135,9 +139,10 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         on_grid(format!("type.{name}.line"), style.line);
     }
 
+    let roles = [radius.small, radius.control, radius.surface];
     for (table, values) in [
         ("space.values", &tokens.space.values),
-        ("radius.values", &tokens.radius.values),
+        ("radius.small, control, surface", &roles.to_vec()),
         ("icon.sizes", &tokens.icon.sizes),
         ("rules.font_sizes", &tokens.rules.font_sizes),
     ] {

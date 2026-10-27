@@ -34,6 +34,8 @@ use iced::widget;
 use iced::widget::svg;
 
 use crate::look::Look;
+use crate::probe::Tag;
+use crate::probe::probe;
 use crate::scale::Scale;
 use crate::tokens;
 pub use crate::tokens::Icon;
@@ -52,12 +54,12 @@ pub fn icon<'a, M: 'a>(look: &Look, glyph: Icon, size: IconSize, color: Color) -
     // The colour filter keeps only the colour's channels; its alpha goes to the opacity, so a
     // disabled or fading icon dims like its label.
     let opaque = Color { a: 1.0, ..color };
-    widget::svg(handle(glyph, grid_stroke))
+    let drawn = widget::svg(handle(glyph, grid_stroke))
         .width(Length::Fixed(px))
         .height(Length::Fixed(px))
         .opacity(color.a)
-        .style(move |_theme, _status| svg::Style { color: Some(opaque) })
-        .into()
+        .style(move |_theme, _status| svg::Style { color: Some(opaque) });
+    probe(Tag::Icon(glyph.name()), drawn)
 }
 
 /// The stroke of a symbol at `size`, in device pixels at `scale`: the 2 unit stroke scaled to the

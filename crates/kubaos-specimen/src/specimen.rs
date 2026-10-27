@@ -20,8 +20,10 @@ use kubaos_ui::color;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::button;
+use kubaos_ui::component::button::icon_button;
 use kubaos_ui::component::chip::ChipKind;
 use kubaos_ui::component::chip::chip;
+use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::Extent;
 use kubaos_ui::layout::Gap;
 use kubaos_ui::layout::Inset;
@@ -161,14 +163,11 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
                 .view(look),
         );
     }
-    let mode = match specimen.mode {
-        Mode::Dark => "Dark",
-        Mode::Light => "Light",
-    };
-    let state = format!("{mode} · {}×", specimen.scale.factor());
-    let other = match specimen.mode {
-        Mode::Dark => (Mode::Light, "Light"),
-        Mode::Light => (Mode::Dark, "Dark"),
+    // The bar is the same size in both modes: switching modes changes colours, never geometry.
+    let scale = format!("{}×", specimen.scale.factor());
+    let (other, glyph, label) = match specimen.mode {
+        Mode::Dark => (Mode::Light, Icon::LightMode, "Light mode"),
+        Mode::Light => (Mode::Dark, Icon::DarkMode, "Dark mode"),
     };
     row(look, Space::S16)
         .center()
@@ -178,12 +177,12 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         .push(tabs)
         .push(fill())
         .push(text("Tab, ← → pages · M mode", Type::Caption, c.on_surface_variant))
-        .push(chip(look, ChipKind::Neutral, state, None, None::<Message>))
+        .push(chip(look, ChipKind::Neutral, scale, None, None::<Message>))
         .push(
-            button(other.1)
+            icon_button(glyph, label)
                 .kind(Kind::Text)
                 .size(ButtonSize::Sm)
-                .on_press(Message::Mode(other.0))
+                .on_press(Message::Mode(other))
                 .view(look),
         )
         .into()

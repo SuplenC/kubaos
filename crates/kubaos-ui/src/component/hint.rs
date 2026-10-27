@@ -44,7 +44,7 @@ pub fn hint<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>, label: &
         .padding(Inset::xy(Space::S8, Space::S4).padding())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(c.on_surface)),
-            border: Border::default().rounded(radius(Radius::R4)),
+            border: Border::default().rounded(radius(Radius::Small)),
             ..container::Style::default()
         });
     Element::new(Hint {

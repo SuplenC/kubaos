@@ -20,6 +20,8 @@ use crate::color::Colors;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
 use crate::look::Look;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
@@ -49,7 +51,8 @@ pub fn switch<'a, M: Clone + 'a>(
             background: None,
             ..widget::button::Style::default()
         });
-    focus_ring(look, pressable, Radius::Full, focused, RingColor::Accent)
+    let view: Element<'a, M> = focus_ring(look, pressable, Radius::Full, focused, RingColor::Accent);
+    probe::component("Switch", ["", "", ""], Fixed::BOTH, view)
 }
 
 struct Knob {

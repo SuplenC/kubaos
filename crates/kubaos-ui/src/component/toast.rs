@@ -12,6 +12,8 @@ use crate::layout::Inset;
 use crate::layout::row;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::snap::snap;
 use crate::text::text;
 use crate::tokens::IconSize;
@@ -33,8 +35,9 @@ pub fn toast<'a, M: 'a>(look: &Look, message: &'a str, leading: Option<Icon>) ->
         .padding(Inset::xy(Space::S16, Space::S12).padding())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(fill)),
-            border: Border::default().rounded(radius(Radius::R12)),
+            border: Border::default().rounded(radius(Radius::Surface)),
             ..container::Style::default()
         });
-    snap(look.scale, surface)
+    let view: Element<'a, M> = snap(look.scale, surface);
+    probe::component("Toast", ["", "", ""], Fixed::NONE, view)
 }

@@ -9,6 +9,8 @@ use crate::layout::Gap;
 use crate::layout::gap;
 use crate::layout::stack;
 use crate::look::Look;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::snap::centre_x;
 use crate::text::text;
 use crate::tokens::IconSize;
@@ -28,11 +30,12 @@ pub fn empty_state<'a, M: 'a>(
     let mut column = stack(look, Gap::NONE)
         .push(line(icon(look, glyph, IconSize::S32, c.on_surface_variant)))
         .push(gap(Space::S12))
-        .push(line(text(title, Type::Subheading, c.on_surface).into()))
+        .push(line(text(title, Type::Subheading, c.on_surface)))
         .push(gap(Space::S4))
-        .push(line(text(body, Type::Body, c.on_surface_variant).into()));
+        .push(line(text(body, Type::Body, c.on_surface_variant)));
     if let Some(action) = action {
         column = column.push(gap(Space::S16)).push(line(action));
     }
-    column.width(Extent::Fill).into()
+    let view: Element<'a, M> = column.width(Extent::Fill).into();
+    probe::component("EmptyState", ["", "", ""], Fixed::NONE, view)
 }

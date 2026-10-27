@@ -879,8 +879,11 @@ impl<Message> canvas::Program<Message> for PlayBadge {
         // The triangle's centroid sits a little right of the disc's centre, so it looks centred.
         let s = r * 0.42;
         let tri = Path::new(|b| {
+            // design-allow(size): corners in units of the triangle's `s`.
             b.move_to(Point::new(c.x - s * 0.7, c.y - s));
+            // design-allow(size): corners in units of the triangle's `s`.
             b.line_to(Point::new(c.x + s * 1.1, c.y));
+            // design-allow(size): corners in units of the triangle's `s`.
             b.line_to(Point::new(c.x - s * 0.7, c.y + s));
             b.close();
         });

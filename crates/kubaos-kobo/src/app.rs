@@ -419,6 +419,7 @@ impl App {
             now,
             epoch: now,
             window: None,
+            // design-allow(size): the window's opening size, not layout.
             size: Size::new(1280.0, 800.0),
             wallpaper: None,
             glass: None,
@@ -992,6 +993,7 @@ impl App {
     fn tick(&mut self, now: Instant) -> Task<Message> {
         let dt = now
             .saturating_duration_since(self.last_tick)
+            // design-allow(duration): caps one frame's step; not a motion.
             .min(Duration::from_millis(100));
         self.last_tick = now;
         self.now = now;

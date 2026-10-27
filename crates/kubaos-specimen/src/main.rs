@@ -3,20 +3,23 @@
 //! ```text
 //! kubaos-specimen                  the live specimen, in a window
 //! kubaos-specimen shots DIR        every page, light and dark, at 1, 1.25, 1.5 and 2, as PNG in DIR
+//! kubaos-specimen check [DIR]      the same pages held to the geometry rules; DIR gets their frames
 //! ```
 //!
 //! # Owns
 //!
 //! - The command line and its exit codes: 2 for a usage error, 1 when the window or a screenshot
-//!   fails.
+//!   fails, or a page breaks a geometry rule.
 //!
 //! # Not here
 //!
-//! - The window: [`app`]. The screenshots: [`shot`]. The pages: [`pages`].
+//! - The window: [`app`]. The screenshots: [`shot`]. The geometry check: [`geometry`]. The pages:
+//!   [`pages`].
 
 #![forbid(unsafe_code)]
 
 mod app;
+mod geometry;
 mod pages;
 mod shot;
 mod specimen;
@@ -35,19 +38,23 @@ use crate::specimen::Specimen;
 const USAGE: &str = "\
 usage: kubaos-specimen
        kubaos-specimen shots DIR
+       kubaos-specimen check [DIR]
 
 With no arguments, the live specimen opens in a window: Tab or the arrows move between pages,
 M switches light and dark, Esc closes it.
 
 shots  every page in light and dark at 1, 1.25, 1.5 and 2, as PNG files in DIR,
        named PAGE-MODE-SCALE.png (type-dark-1.25x.png), each listing the boxes whose
-       edges fall between device pixels";
+       edges fall between device pixels
+check  the same pages, light and dark at every scale, held to the geometry rules (docs/DESIGN.md,
+       \"Checks\"); exit 1 on any finding. With DIR, each page's frame is written there as
+       PAGE-MODE-SCALE.json, the input `kubaos-design geometry` reads";
 
 /// How many of a screenshot's off-grid boxes are listed; the count says how many there are.
 const AUDIT_SHOWN: usize = 5;
 
 /// The width the screenshots are laid out at, in logical pixels: Kōbō's panel on a 1366 px laptop.
-const SHOT_WIDTH: f32 = 1280.0;
+pub const SHOT_WIDTH: f32 = 1280.0;
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -60,6 +67,8 @@ fn main() -> ExitCode {
             }
         },
         ["shots", dir] => shots(Path::new(dir)),
+        ["check"] => check(None),
+        ["check", dir] => check(Some(Path::new(dir))),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
@@ -83,10 +92,7 @@ fn shots(dir: &Path) -> ExitCode {
                     seconds: 0.0,
                     live: false,
                 };
-                let mode_name = match mode {
-                    Mode::Dark => "dark",
-                    Mode::Light => "light",
-                };
+                let mode_name = shot::mode_name(mode);
                 let path = dir.join(format!("{}-{mode_name}-{}x.png", page.slug(), scale.factor()));
                 let result = shot::render(&specimen, SHOT_WIDTH)
                     .and_then(|image| shot::write_png(&path, &image).map(|()| image.off_grid));
@@ -107,4 +113,45 @@ fn shots(dir: &Path) -> ExitCode {
         }
     }
     ExitCode::SUCCESS
+}
+
+fn check(dir: Option<&Path>) -> ExitCode {
+    shot::load_fonts();
+    let frames = match geometry::frames() {
+        Ok(frames) => frames,
+        Err(err) => {
+            eprintln!("kubaos-specimen: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+    if let Some(dir) = dir
+        && let Err(err) = write_frames(dir, &frames)
+    {
+        eprintln!("kubaos-specimen: writing the frames to {}: {err}", dir.display());
+        return ExitCode::FAILURE;
+    }
+    let findings = kubaos_geometry::check(&frames, &geometry::rules());
+    for finding in &findings {
+        println!("{finding}");
+    }
+    eprintln!(
+        "kubaos-specimen check: {} frame(s), {} finding(s)",
+        frames.len(),
+        findings.len()
+    );
+    if findings.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+/// Each frame as `PAGE-MODE-SCALE.json` in `dir`.
+fn write_frames(dir: &Path, frames: &[kubaos_geometry::Frame]) -> std::io::Result<()> {
+    fs::create_dir_all(dir)?;
+    for frame in frames {
+        let json = serde_json::to_string(frame).map_err(std::io::Error::other)?;
+        fs::write(dir.join(format!("{}.json", frame.name())), json)?;
+    }
+    Ok(())
 }

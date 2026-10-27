@@ -124,6 +124,7 @@ fn gallery() {
     };
     let dir = std::path::PathBuf::from(dir);
     std::fs::create_dir_all(&dir).unwrap();
+    // design-allow(size): the windows the gallery shoots at.
     for size in [Size::new(1024.0, 768.0), Size::new(1280.0, 800.0)] {
         // Welcome: refused (no image), probe failed.
         let mut p = demo_probe();

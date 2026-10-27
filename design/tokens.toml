@@ -33,8 +33,10 @@ scales = [1.0, 1.25, 1.5, 2.0]
 # Dividers, outlines of cards, fields and the switch track: one device pixel
 # at every scale.
 hairline_device_px = 1
-# The focus ring, the spinner's arc and the check mark: 2 logical pixels,
-# rounded half up to whole device pixels (2, 3, 3, 4 at 1, 1.25, 1.5, 2).
+# The focus ring, the spinner's arc and a partial checkbox's dash: 2 logical
+# pixels, rounded half up to whole device pixels (2, 3, 3, 4 at 1, 1.25, 1.5,
+# 2). A tick is the `check` symbol, drawn with the symbol stroke below like
+# every other icon.
 thin = 2
 # A symbol's stroke on its 24 unit grid: 2 at 24 px. At another size it
 # scales with the symbol, then rounds half up to whole device pixels, so a
@@ -51,11 +53,22 @@ offset = 4
 [space]
 values = [4, 8, 12, 16, 20, 24, 32, 40, 48, 64]
 
-# Corner radii, plus `full` for pills. A shape nested in another one with an
-# inset smaller than its parent's radius takes the parent's radius minus the
-# inset, so the corners stay concentric (`kubaos-ui` checks it).
+# Corner radii, by role: every chosen radius says what the shape is. There
+# are three, plus `full`. Any other radius is derived, never picked: a shape
+# that fills another less an inset takes the outer radius minus the inset, so
+# the corners share a centre (`kubaos_ui::look::nested`, which refuses a
+# nesting that doesn't resolve). A surface's content 8 in takes 16; 12 in, 12.
 [radius]
-values = [4, 8, 12, 16, 20, 24]
+# Marks inside controls: the checkbox, a hint, focus details, inline tags.
+small = 4
+# Everything you click or type in: buttons, fields, list rows, menu items,
+# chips.
+control = 12
+# Everything that holds content: cards, dialogs, popups, panels, list wells,
+# the screen frame.
+surface = 24
+# Pills and circles: switches, icon buttons, the slider's thumb, avatars,
+# badges.
 full = true
 
 # Icon sizes: the symbol's box, its 24 unit grid scaled to it. The drawing

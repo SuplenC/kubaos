@@ -2,8 +2,8 @@
 //!
 //! # Owns
 //!
-//! - [`Look`], and the radius arithmetic shared by nested shapes: [`radius`], [`concentric`] and
-//!   [`ring_radius`].
+//! - [`Look`], and corners: [`Corner`], a role's or one derived by nesting ([`nested`],
+//!   [`concentric`]), in pixels ([`radius`]), and the focus ring's around one ([`ring_radius`]).
 //!
 //! # Not here
 //!
@@ -68,26 +68,70 @@ impl Look {
 /// A pill's radius: larger than any shape, which the renderer clamps to half its shorter side.
 const PILL: f32 = 4096.0;
 
-/// `r` in logical pixels.
-pub fn radius(r: Radius) -> f32 {
-    r.px().map_or(PILL, f32::from)
-}
+/// A corner as drawn: a [`Radius`] role's, or one derived from a role by [`nested`]. A component
+/// never names a number for its corners; a corner that isn't a role comes out of nesting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Corner(Option<u16>);
 
-/// The radius of a shape nested `inset` inside a shape of radius `outer`, so their corners share a
-/// centre: `outer` minus `inset`. `None` when that is no radius on the scale, so the nesting is
-/// either too deep for concentric corners or off the scale.
-pub fn concentric(outer: Radius, inset: Space) -> Option<Radius> {
-    if outer == Radius::Full {
-        return Some(Radius::Full);
+impl Corner {
+    /// The corner's radius in logical pixels, or `None` for a pill.
+    pub const fn px(self) -> Option<u16> {
+        self.0
     }
-    let inner = outer.px()?.checked_sub(inset.px())?;
-    Radius::ALL.into_iter().find(|r| r.px() == Some(inner))
 }
 
-/// The radius of the focus ring's outer edge around a control of radius `control`: concentric with
-/// it, [`tokens::FOCUS_OFFSET`] further out.
-pub fn ring_radius(control: Radius) -> f32 {
-    control.px().map_or(PILL, |r| f32::from(r + tokens::FOCUS_OFFSET))
+impl Radius {
+    /// The role's corner.
+    pub const fn corner(self) -> Corner {
+        Corner(self.px())
+    }
+}
+
+impl From<Radius> for Corner {
+    fn from(role: Radius) -> Self {
+        role.corner()
+    }
+}
+
+/// `corner`'s radius in logical pixels.
+pub fn radius(corner: impl Into<Corner>) -> f32 {
+    corner.into().px().map_or(PILL, f32::from)
+}
+
+/// The corner of a shape that fills one with corner `outer` less `inset` on every side, so their
+/// corners share a centre: `outer` minus `inset`. A pill in a pill is a pill. `None` when the inset
+/// reaches the outer radius: nothing is left to round, and the shapes can't be concentric.
+pub const fn concentric(outer: Corner, inset: Space) -> Option<Corner> {
+    let Some(outer_px) = outer.px() else {
+        return Some(outer);
+    };
+    let inset = inset.px();
+    if inset >= outer_px {
+        return None;
+    }
+    Some(Corner(Some(outer_px - inset)))
+}
+
+/// [`concentric`] for a nesting that must resolve: in a `const`, a nesting that doesn't stops the
+/// build.
+///
+/// # Panics
+///
+/// When `inset` reaches `outer`'s radius. In a `const` that is a compile error.
+pub const fn nested(outer: Corner, inset: Space) -> Corner {
+    match concentric(outer, inset) {
+        Some(inner) => inner,
+        None => panic!("the inset reaches the outer radius: the corners can't be concentric"),
+    }
+}
+
+/// The radius of the focus ring's outer edge around a control with corner `control`: concentric
+/// with it, [`tokens::FOCUS_OFFSET`] further out.
+pub fn ring_radius(control: impl Into<Corner>) -> f32 {
+    control
+        .into()
+        .px()
+        .map_or(PILL, |r| f32::from(r + tokens::FOCUS_OFFSET))
 }
 
 #[cfg(test)]

@@ -77,7 +77,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Lists",
-            Some("Rows in a well: 16 outside, 4 in, so the rows take 12. The ring goes round the well; the row shows where the keyboard is."),
+            Some("Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The ring goes round the well; the row shows where the keyboard is."),
             lists(look),
         ))
         .push(section(look, "Chips", None, chips(look)))
@@ -152,8 +152,8 @@ fn icon_button_in<'a>(look: &Look, kind: Kind, size: ButtonSize, state: usize) -
 /// The states' names over a table's columns, after the kinds' column.
 fn state_heads<'a>(look: &Look) -> Vec<Element<'a, Message>> {
     let c = look.colors;
-    std::iter::once(text("", Type::Label, c.on_surface_variant).into())
-        .chain(STATES.map(|state| text(state, Type::Label, c.on_surface_variant).into()))
+    std::iter::once(text("", Type::Label, c.on_surface_variant))
+        .chain(STATES.map(|state| text(state, Type::Label, c.on_surface_variant)))
         .collect()
 }
 

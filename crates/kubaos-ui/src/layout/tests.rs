@@ -79,3 +79,22 @@ fn a_stack_puts_its_gap_between_children_and_its_inset_around_them() {
     assert!((a.x - 16.0).abs() < 1e-4 && (a.y - 16.0).abs() < 1e-4, "{a:?}");
     assert!((b.y - 48.0).abs() < 1e-4, "{b:?}");
 }
+
+#[test]
+fn a_centred_row_puts_each_child_on_a_whole_device_pixel() {
+    let look = &Look::new(Mode::Dark, Scale::X1_25);
+    let tall = widget::container::<(), _, _>(widget::Space::new())
+        .width(Length::Fixed(40.0))
+        .height(Length::Fixed(40.0));
+    let short = widget::container(widget::Space::new())
+        .width(Length::Fixed(40.0))
+        .height(Length::Fixed(18.0))
+        .id("short");
+    let view = row(look, Space::S8).center().push(tall).push(short);
+    let mut ui = Simulator::with_size(settings(), Size::new(400.0, 100.0), view);
+
+    let short = ui.find(selector::id("short")).expect("short").bounds();
+
+    assert!(Scale::X1_25.is_whole(short.y), "{short:?}");
+    assert!((short.y - 11.2).abs() < 1e-4, "{short:?}");
+}

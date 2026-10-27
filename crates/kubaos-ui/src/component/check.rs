@@ -22,6 +22,8 @@ use crate::icon::icon;
 use crate::layout::row;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::scale::Scale;
 use crate::snap::centre;
 use crate::text::text;
@@ -86,18 +88,20 @@ pub fn checkbox<'a, M: Clone + 'a>(
     };
     let side = f32::from(Size::Check.px());
     let hairline = look.hairline();
-    let shape = widget::container(mark)
-        .center(side)
+    let shape = widget::container(centre(look.scale, mark))
+        .width(side)
+        .height(side)
         .style(move |_theme| container::Style {
             background: Some(Background::Color(dim(fill))),
             border: Border {
                 color: edge.map_or(Color::TRANSPARENT, dim),
                 width: if edge.is_some() { hairline } else { 0.0 },
-                radius: radius(Radius::R4).into(),
+                radius: radius(Radius::Small).into(),
             },
             ..container::Style::default()
         });
-    labelled(look, shape, Radius::R4, label, on_toggle, focused)
+    let view: Element<'a, M> = labelled(look, shape, Radius::Small, label, on_toggle, focused);
+    probe::component("Checkbox", ["", "", ""], Fixed::HEIGHT, view)
 }
 
 /// A radio button reading `label`, one of a group of which exactly one is picked.
@@ -150,7 +154,8 @@ pub fn radio<'a, M: Clone + 'a>(
             },
             ..container::Style::default()
         });
-    labelled(look, shape, Radius::Full, label, on_pick, focused)
+    let view: Element<'a, M> = labelled(look, shape, Radius::Full, label, on_pick, focused);
+    probe::component("Radio", ["", "", ""], Fixed::HEIGHT, view)
 }
 
 /// `shape` with the focus ring, then `label`, all one press target.

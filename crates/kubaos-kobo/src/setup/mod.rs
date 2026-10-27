@@ -277,6 +277,7 @@ impl Setup {
             epoch: now,
             changed: now,
             window: None,
+            // design-allow(size): the window's opening size, not layout.
             size: Size::new(1280.0, 800.0),
             tour: None,
             start: None,

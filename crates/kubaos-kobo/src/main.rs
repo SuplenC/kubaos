@@ -75,6 +75,7 @@ fn parse() -> Result<Args, String> {
         first_boot: false,
         card: None,
         demo_machine: kubaos_core::setup::demo::Machine::Tuxedo,
+        // design-allow(size): the window's opening size; tiling sets the real one.
         size: Size::new(1280.0, 800.0),
         scale: None,
         tour: None,

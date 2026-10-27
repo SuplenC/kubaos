@@ -54,21 +54,25 @@ struct Set {
 const SETS: [Set; 4] = [
     Set {
         name: "Material Symbols Rounded",
+        // design-allow(font): the comparison sheet draws the icon fonts KubaOS Symbols was picked from.
         font: Font::with_name("Specimen Material Symbols"),
         note: "Kōbō's today: weight 400, 24 optical size, outlined.",
     },
     Set {
         name: "Phosphor",
+        // design-allow(font): the comparison sheet draws the icon fonts KubaOS Symbols was picked from.
         font: Font::with_name("Specimen Phosphor"),
         note: "Regular weight: a 1.5 px stroke at 24.",
     },
     Set {
         name: "Lucide",
+        // design-allow(font): the comparison sheet draws the icon fonts KubaOS Symbols was picked from.
         font: Font::with_name("Specimen Lucide"),
         note: "A 2 px stroke at 24, round caps.",
     },
     Set {
         name: "Tabler",
+        // design-allow(font): the comparison sheet draws the icon fonts KubaOS Symbols was picked from.
         font: Font::with_name("Specimen Tabler"),
         note: "The 2 px stroke at 24, round caps.",
     },
@@ -102,6 +106,7 @@ const SIZES: [IconSize; 3] = [IconSize::S16, IconSize::S20, IconSize::S24];
 /// The character `ch` of a comparison set's font, centred in a square box of `size`.
 fn glyph<'a>(ch: char, font: Font, size: IconSize, color: iced::Color) -> Element<'a, Message> {
     let px = f32::from(size.px());
+    // design-allow(component): a glyph of an icon font, which no type style draws.
     widget::text(ch.to_string())
         .font(font)
         .size(px)
@@ -187,7 +192,7 @@ fn drawn<'a>(look: &Look) -> Element<'a, Message> {
     let mut table = split(look, &[2, 1, 1, 1, 2], Space::S16)
         .center()
         .push(text("", Type::Label, c.on_surface_variant))
-        .extend(sizes.map(|size| text(format!("{}", size.px()), Type::Label, c.on_surface_variant).into()));
+        .extend(sizes.map(|size| text(format!("{}", size.px()), Type::Label, c.on_surface_variant)));
     for (ours, relatives) in families {
         for glyph in std::iter::once(ours).chain(relatives) {
             let tone = if glyph == ours { c.cold } else { c.on_surface_variant };
@@ -210,10 +215,7 @@ fn strokes<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
     let mut table = split(look, &[1, 1, 1, 1, 1], Space::S8)
         .push(text("size", Type::Label, c.on_surface_variant))
-        .extend(
-            Scale::SUPPORTED
-                .map(|scale| text(format!("{}×", scale.factor()), Type::Label, c.on_surface_variant).into()),
-        );
+        .extend(Scale::SUPPORTED.map(|scale| text(format!("{}×", scale.factor()), Type::Label, c.on_surface_variant)));
     for size in IconSize::ALL {
         table = table.push(text(format!("{}", size.px()), Type::Mono, c.on_surface));
         for scale in Scale::SUPPORTED {
@@ -235,7 +237,8 @@ fn comparison<'a>(look: &Look) -> Element<'a, Message> {
     let glyphs = glyphs();
     let half = glyphs.len().div_ceil(2);
     let column = |part: &[Glyph]| -> Element<'a, Message> {
-        let mut table = split(look, &[2, 3, 3, 3, 3], Space::S12)
+        // The names column fits the longest glyph name, `fingerprint`, in Geist Mono.
+        let mut table = split(look, &[5, 6, 6, 6, 6], Space::S12)
             .center()
             .push(text("", Type::Label, c.on_surface_variant))
             .extend(SETS.iter().map(|set| {
@@ -244,7 +247,6 @@ fn comparison<'a>(look: &Look) -> Element<'a, Message> {
                     Type::Label,
                     c.on_surface_variant,
                 )
-                .into()
             }));
         for g in part {
             table = table.push(text(g.id, Type::Mono, c.on_surface_variant));
@@ -326,7 +328,7 @@ fn in_context<'a>(look: &Look, glyphs: &[Glyph], i: usize) -> Element<'a, Messag
     .padding(Inset::x(Space::S12).padding())
     .style(move |_theme| container::Style {
         background: Some(Background::Color(c.secondary_container)),
-        border: Border::default().rounded(radius(Radius::R12)),
+        border: Border::default().rounded(radius(Radius::Control)),
         ..container::Style::default()
     });
     let next = widget::container(

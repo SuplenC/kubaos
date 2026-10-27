@@ -17,7 +17,7 @@ Your own settings go in `~/.config/kubaos/desktop/hypr/` (`hyprland.lua`, `hypri
 | `workspaces.lua` | Per-screen workspaces: each screen has its own 1-10 (a block of ten ids, the laptop's first), joins another on unplug and returns on replug, and the screens pinned to a group in `~/.config/kubaos/desktop/workspaces/groups.toml`. `workspace_blocks.lua` is its bookkeeping, tested by `test/lua/workspaces_test.lua` |
 | `input.lua` | Keyboard layouts from `~/.config/kubaos/desktop/keyboard/keyboard.toml`, else `/etc/default/keyboard` (`us` without either), repeat rate, touchpad, gestures, the `kubaos:mac-accents` XKB option |
 | `accents.lua` | The Mac-style accents' cheat sheet for the Shortcuts View, while they are on |
-| `looks.lua` | Gaps, borders, rounding, blur, shadows, animations, dwindle, colors. Sizes and curves match the Quickshell tokens (`config/quickshell/theme/Theme.qml`); `rounding = 10` plus the 2 px border makes the window's outer edge concentric with the frame's 20 px corners at `gaps_out = 8` |
+| `looks.lua` | Gaps, borders, rounding, blur, shadows, animations, dwindle, colors. Sizes and curves match the Quickshell tokens (`config/quickshell/theme/Theme.qml`); `rounding = 14` plus the 2 px border makes the window's outer edge concentric with the frame's 24 px corners (the surface radius) at `gaps_out = 8` |
 | `colors.lua` | Reads `~/.local/state/theme/hypr.lua`, falls back to built-in colors |
 | `rules.lua` | Window rules (floating dialogs, PiP, Chrome, terminals) and layer rules, including Quickshell's (`qs-frame` blurred with `ignore_alpha`, no Hyprland animation on the shell's own layers) |
 | `keybinds.lua` | Everything else, ported from Omarchy 4. `SUPER + F1` lists them all in the Command menu |

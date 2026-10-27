@@ -83,6 +83,11 @@ let
       "kubaos-kobo"
       "kubaos-specimen"
     ];
+    # The design lint, which the flake's checks build (crates/checks.nix) and
+    # no machine installs.
+    checks = [
+      "kubaos-design"
+    ];
   };
   groupOf =
     crate:

@@ -22,6 +22,8 @@ use crate::layout::row;
 use crate::layout::stack;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::snap::centre;
 use crate::text;
 use crate::tokens::IconSize;
@@ -125,6 +127,7 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
     }
 
     pub fn view(self, look: &Look) -> Element<'a, M> {
+        let variant = [if self.icon.is_some() { "icon" } else { "" }, "", ""];
         let c = look.colors;
         let hairline = look.hairline();
         let focused = self.focused && self.state != State::Locked;
@@ -151,7 +154,7 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
                 border: Border {
                     color: edge,
                     width: hairline,
-                    radius: radius(Radius::R12).into(),
+                    radius: radius(Radius::Control).into(),
                 },
                 icon: c.on_surface_variant,
                 placeholder: color::alpha(c.on_surface_variant, Opacity::Placeholder.value()),
@@ -185,7 +188,8 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
             input = input.on_input(on_input);
         }
         let Some(glyph) = self.icon else {
-            return focus_ring(look, input, Radius::R12, focused, RingColor::Accent);
+            let view: Element<'a, M> = focus_ring(look, input, Radius::Control, focused, RingColor::Accent);
+            return probe::component("Field", variant, Fixed::HEIGHT, view);
         };
         // The icon is drawn over the field, in a box 12 wider than itself on each side, so it
         // centres on the field's height on a whole device pixel.
@@ -197,7 +201,8 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
         .width(well)
         .height(Length::Fill);
         let field = widget::Stack::with_children([input.into(), mark.into()]);
-        focus_ring(look, field, Radius::R12, focused, RingColor::Accent)
+        let view: Element<'a, M> = focus_ring(look, field, Radius::Control, focused, RingColor::Accent);
+        probe::component("Field", variant, Fixed::HEIGHT, view)
     }
 }
 
@@ -224,16 +229,17 @@ pub fn labelled<'a, M: 'a>(
     if let Some(note) = note {
         column = column.push(note);
     }
-    column.into()
+    let view: Element<'a, M> = column.into();
+    probe::component("Labelled", ["", "", ""], Fixed::NONE, view)
 }
 
 /// A note under a field: `message` in the error colour when `invalid`, otherwise muted.
 pub fn note<'a, M: 'a>(look: &Look, message: &'a str, invalid: bool) -> Element<'a, M> {
     let c = look.colors;
-    text::text(
+    let view: Element<'a, M> = text::text(
         message,
         Type::Small,
         if invalid { c.error } else { c.on_surface_variant },
-    )
-    .into()
+    );
+    probe::component("Note", ["", "", ""], Fixed::NONE, view)
 }
