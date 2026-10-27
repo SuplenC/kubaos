@@ -17,6 +17,8 @@ use crate::layout::row;
 use crate::layout::stack;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::text::text;
 use crate::tokens::IconSize;
 use crate::tokens::Opacity;
@@ -31,15 +33,12 @@ const LONG_MESSAGE: usize = 90;
 /// The error: `message`, what broke, and under it `hint`, the next thing to try.
 pub fn error_block<'a, M: 'a>(look: &Look, message: &'a str, hint: &'a str) -> Element<'a, M> {
     let c = look.colors;
-    let style = if message.chars().count() > LONG_MESSAGE {
-        Type::BodyStrong
-    } else {
-        Type::Subheading
-    };
+    let long = message.chars().count() > LONG_MESSAGE;
+    let style = if long { Type::BodyStrong } else { Type::Subheading };
     let fill = color::alpha(c.error_container, Opacity::ErrorFill.value());
     let edge = color::alpha(c.error, Opacity::ErrorEdge.value());
     let hairline = look.hairline();
-    widget::container(
+    let view: Element<'a, M> = widget::container(
         row(look, Space::S16)
             .center()
             .push(icon(look, Icon::Error, IconSize::S24, c.error))
@@ -61,7 +60,13 @@ pub fn error_block<'a, M: 'a>(look: &Look, message: &'a str, hint: &'a str) -> E
         },
         ..container::Style::default()
     })
-    .into()
+    .into();
+    probe::component(
+        "ErrorBlock",
+        [if long { "long" } else { "" }, "", ""],
+        Fixed::NONE,
+        view,
+    )
 }
 
 /// How loud a log line is.
@@ -86,12 +91,12 @@ pub fn log<'a, M: 'a>(look: &Look, lines: &[(Level, &'a str)], height: Extent) -
             Level::Info => c.on_surface,
             Level::Debug => c.on_surface_variant,
         };
-        text(line, Type::Mono, colour).into()
+        text(line, Type::Mono, colour)
     });
     let fill = color::alpha(c.surface_container_lowest, Opacity::Log.value());
     let edge = look.outline_soft();
     let hairline = look.hairline();
-    widget::container(
+    let view: Element<'a, M> = widget::container(
         widget::scrollable(stack(look, Gap::NONE).extend(rows))
             .anchor_bottom()
             .width(Length::Fill)
@@ -109,5 +114,6 @@ pub fn log<'a, M: 'a>(look: &Look, lines: &[(Level, &'a str)], height: Extent) -
         },
         ..container::Style::default()
     })
-    .into()
+    .into();
+    probe::component("Log", ["", "", ""], Fixed::NONE, view)
 }

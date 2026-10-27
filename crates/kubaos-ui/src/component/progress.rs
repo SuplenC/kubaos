@@ -26,6 +26,8 @@ use crate::layout::Gap;
 use crate::layout::row;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::tokens::IconSize;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
@@ -63,28 +65,31 @@ pub fn bar<'a, M: 'a>(look: &Look, fraction: f32) -> Element<'a, M> {
     if filled < PARTS {
         parts = parts.push(widget::Space::new().width(Length::FillPortion(PARTS - filled)));
     }
-    widget::container(parts)
+    let view: Element<'a, M> = widget::container(parts)
         .width(Length::Fill)
         .style(move |_theme| container::Style {
             background: Some(Background::Color(track)),
             border: Border::default().rounded(radius(Radius::Full)),
             ..container::Style::default()
         })
-        .into()
+        .into();
+    probe::component("ProgressBar", ["", "", ""], Fixed::HEIGHT, view)
 }
 
 /// A spinner `size` across, `seconds` into its turn: an arc that turns and breathes over a faint
 /// full ring, so its shortest arc still reads as a spinner.
 pub fn spinner<'a, M: 'a>(look: &Look, size: IconSize, seconds: f32, color: Color) -> Element<'a, M> {
+    let variant = [size_name(size), "", ""];
     let px = f32::from(size.px());
-    canvas(Spinner {
+    let view: Element<'a, M> = canvas(Spinner {
         seconds,
         color,
         width: look.scale.thin(),
     })
     .width(px)
     .height(px)
-    .into()
+    .into();
+    probe::component("Spinner", variant, Fixed::BOTH, view)
 }
 
 struct Spinner {
@@ -133,5 +138,16 @@ impl<M> canvas::Program<M> for Spinner {
                 .with_line_cap(canvas::LineCap::Round),
         );
         vec![frame.into_geometry()]
+    }
+}
+
+/// A spinner's size as its variant's name.
+fn size_name(size: IconSize) -> &'static str {
+    match size {
+        IconSize::S16 => "16",
+        IconSize::S20 => "20",
+        IconSize::S24 => "24",
+        IconSize::S32 => "32",
+        IconSize::S48 => "48",
     }
 }

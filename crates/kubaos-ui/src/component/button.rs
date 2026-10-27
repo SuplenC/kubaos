@@ -19,6 +19,8 @@ use crate::layout::Inset;
 use crate::layout::row;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::snap::centre;
 use crate::text::text;
 use crate::tokens::IconSize;
@@ -43,6 +45,16 @@ pub enum Kind {
 
 impl Kind {
     pub const ALL: [Kind; 4] = [Kind::Filled, Kind::Tonal, Kind::Text, Kind::Danger];
+
+    /// The kind's name in the spec.
+    pub fn name(self) -> &'static str {
+        match self {
+            Kind::Filled => "Filled",
+            Kind::Tonal => "Tonal",
+            Kind::Text => "Text",
+            Kind::Danger => "Danger",
+        }
+    }
 }
 
 /// How big a button is. A label's button and an icon's are the same height at each size.
@@ -58,6 +70,15 @@ pub enum ButtonSize {
 
 impl ButtonSize {
     pub const ALL: [ButtonSize; 3] = [ButtonSize::Sm, ButtonSize::Md, ButtonSize::Lg];
+
+    /// The size's name in the spec.
+    pub fn name(self) -> &'static str {
+        match self {
+            ButtonSize::Sm => "Sm",
+            ButtonSize::Md => "Md",
+            ButtonSize::Lg => "Lg",
+        }
+    }
 }
 
 /// A size's measures, all from the scale.
@@ -251,6 +272,12 @@ impl<'a, M: Clone + 'a> Button<'a, M> {
     }
 
     pub fn view(self, look: &Look) -> Element<'a, M> {
+        let placement = match (self.icon, self.trailing) {
+            (None, _) => "",
+            (Some(_), false) => "leading-icon",
+            (Some(_), true) => "trailing-icon",
+        };
+        let variant = [self.kind.name(), self.size.name(), placement];
         let m = metrics(self.size);
         let enabled = self.on_press.is_some();
         let (fill, content, shown) = colours(look, self.kind, enabled);
@@ -282,7 +309,8 @@ impl<'a, M: Clone + 'a> Button<'a, M> {
             })
             .on_press_maybe(self.on_press)
             .style(pill(fill, content, shown, enabled, self.preview));
-        focus_ring(look, pressable, Radius::Full, self.focused, RingColor::Accent)
+        let view: Element<'a, M> = focus_ring(look, pressable, Radius::Full, self.focused, RingColor::Accent);
+        probe::component("Button", variant, Fixed::HEIGHT, view)
     }
 }
 
@@ -356,6 +384,7 @@ impl<'a, M: Clone + 'a> IconButton<'a, M> {
     }
 
     pub fn view(self, look: &Look) -> Element<'a, M> {
+        let variant = [self.kind.name(), self.size.name(), ""];
         let m = metrics(self.size);
         let enabled = self.on_press.is_some();
         let (fill, content, shown) = colours(look, self.kind, enabled);
@@ -367,7 +396,8 @@ impl<'a, M: Clone + 'a> IconButton<'a, M> {
             .on_press_maybe(self.on_press)
             .style(pill(fill, content, shown, enabled, self.preview));
         let ringed = focus_ring(look, pressable, Radius::Full, self.focused, RingColor::Accent);
-        hint(look, ringed, self.label, self.focused)
+        let view: Element<'a, M> = hint(look, ringed, self.label, self.focused);
+        probe::component("IconButton", variant, Fixed::BOTH, view)
     }
 }
 

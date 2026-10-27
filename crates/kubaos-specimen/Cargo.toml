@@ -10,6 +10,7 @@ name = "kubaos-specimen"
 path = "src/main.rs"
 
 [dependencies]
+kubaos-geometry.workspace = true
 kubaos-ui.workspace = true
 # Kōbō's iced and features, so the two share one build of their dependencies.
 iced = { version = "0.14", default-features = false, features = [
@@ -29,6 +30,7 @@ iced = { version = "0.14", default-features = false, features = [
 # any scale, then written as PNG.
 iced_runtime = "0.14"
 png = "0.18"
+serde_json.workspace = true
 thiserror.workspace = true
 
 [lints]

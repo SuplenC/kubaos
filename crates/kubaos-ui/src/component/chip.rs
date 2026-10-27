@@ -20,6 +20,8 @@ use crate::layout::Inset;
 use crate::layout::row;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::text::text;
 use crate::tokens::IconSize;
 use crate::tokens::Opacity;
@@ -43,6 +45,16 @@ pub enum ChipKind {
 
 impl ChipKind {
     pub const ALL: [ChipKind; 4] = [ChipKind::Neutral, ChipKind::Selected, ChipKind::Accent, ChipKind::Cold];
+
+    /// The kind's name in the spec.
+    pub fn name(self) -> &'static str {
+        match self {
+            ChipKind::Neutral => "Neutral",
+            ChipKind::Selected => "Selected",
+            ChipKind::Accent => "Accent",
+            ChipKind::Cold => "Cold",
+        }
+    }
 }
 
 /// A chip reading `label`, with an optional leading icon, and a close button sending `on_remove`
@@ -54,6 +66,9 @@ pub fn chip<'a, M: Clone + 'a>(
     leading: Option<Icon>,
     on_remove: Option<M>,
 ) -> Element<'a, M> {
+    let with_icon = if leading.is_some() { "icon" } else { "" };
+    let removable = if on_remove.is_some() { "removable" } else { "" };
+    let variant = [kind.name(), with_icon, removable];
     let c = look.colors;
     let (fill, content) = match kind {
         ChipKind::Neutral => (c.surface_container_high, c.on_surface),
@@ -87,7 +102,7 @@ pub fn chip<'a, M: Clone + 'a>(
             });
         body = body.push(close);
     }
-    widget::container(row(look, Gap::NONE).center().push(body))
+    let view: Element<'a, M> = widget::container(row(look, Gap::NONE).center().push(body))
         .height(Length::Fixed(f32::from(Size::Chip.px())))
         .center_y(Length::Fixed(f32::from(Size::Chip.px())))
         .padding(Inset::NONE.left(left).right(right).padding())
@@ -97,5 +112,6 @@ pub fn chip<'a, M: Clone + 'a>(
             text_color: Some(Color { a: 1.0, ..content }),
             ..container::Style::default()
         })
-        .into()
+        .into();
+    probe::component("Chip", variant, Fixed::HEIGHT, view)
 }

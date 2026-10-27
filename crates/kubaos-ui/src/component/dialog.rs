@@ -20,6 +20,8 @@ use crate::layout::row;
 use crate::layout::stack;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe;
+use crate::probe::Fixed;
 use crate::snap::centre;
 use crate::text::text;
 use crate::tokens::IconSize;
@@ -39,6 +41,16 @@ pub enum Tone {
     Danger,
 }
 
+impl Tone {
+    /// The tone's name in the spec.
+    pub fn name(self) -> &'static str {
+        match self {
+            Tone::Normal => "Normal",
+            Tone::Danger => "Danger",
+        }
+    }
+}
+
 /// A dialog: `glyph` and `title` on the first line, `body` under them, then the buttons. A
 /// dangerous one shows the warning sign instead of `glyph`. `dismiss` is the button on the left
 /// that backs out (Cancel); `actions` sit on the right, the one Enter presses last.
@@ -51,6 +63,7 @@ pub fn dialog<'a, M: 'a>(
     dismiss: Option<Element<'a, M>>,
     actions: impl IntoIterator<Item = Element<'a, M>>,
 ) -> Element<'a, M> {
+    let variant = [tone.name(), "", ""];
     let c = look.colors;
     let (tint, glyph, edge) = match tone {
         Tone::Normal => (c.primary, glyph, color::alpha(c.primary, Opacity::DialogEdge.value())),
@@ -79,7 +92,7 @@ pub fn dialog<'a, M: 'a>(
     let surface = c.surface_container_high;
     let shadow = c.shadow;
     let hairline = look.hairline();
-    widget::container(content)
+    let view: Element<'a, M> = widget::container(content)
         .width(Length::Fixed(f32::from(Size::Dialog.px())))
         .padding(Inset::all(Space::S32).padding())
         .style(move |_theme| container::Style {
@@ -96,7 +109,16 @@ pub fn dialog<'a, M: 'a>(
             },
             ..container::Style::default()
         })
-        .into()
+        .into();
+    probe::component(
+        "Dialog",
+        variant,
+        Fixed {
+            width: true,
+            height: false,
+        },
+        view,
+    )
 }
 
 /// `dialog` centred over the screen, everything behind it dimmed.

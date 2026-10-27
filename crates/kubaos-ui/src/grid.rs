@@ -36,6 +36,9 @@ use iced::advanced::renderer;
 use iced::advanced::widget::Operation;
 use iced::advanced::widget::Tree;
 
+use crate::probe::Align;
+use crate::probe::Tag;
+use crate::probe::probe;
 use crate::scale::Scale;
 use crate::snap::snapped;
 use crate::tokens::Space;
@@ -191,7 +194,12 @@ impl<M> Widget<M, Theme, Renderer> for Grid<'_, M> {
         operation.container(None, layout.bounds());
         operation.traverse(&mut |operation| {
             for ((child, state), layout) in self.children.iter_mut().zip(&mut tree.children).zip(layout.children()) {
-                child.as_widget_mut().operate(state, layout, renderer, operation);
+                // Each cell is reported even when its content reports nothing (a canvas, an image),
+                // so the geometry check counts the cells into their columns.
+                operation.container(None, layout.bounds());
+                operation.traverse(&mut |operation| {
+                    child.as_widget_mut().operate(state, layout, renderer, operation);
+                });
             }
         });
     }
@@ -266,7 +274,12 @@ impl<M> Widget<M, Theme, Renderer> for Grid<'_, M> {
 
 impl<'a, M: 'a> From<Grid<'a, M>> for Element<'a, M> {
     fn from(grid: Grid<'a, M>) -> Self {
-        Element::new(grid)
+        let tag = Tag::Grid {
+            columns: grid.weights.len() as u16,
+            gap: f32::from(grid.gap.px()),
+            align: if grid.centred { Align::Centre } else { Align::Start },
+        };
+        probe(tag, Element::new(grid))
     }
 }
 

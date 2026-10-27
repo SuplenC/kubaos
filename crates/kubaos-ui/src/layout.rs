@@ -23,8 +23,15 @@ use iced::widget::container;
 
 use crate::grid::Grid;
 use crate::look::Look;
+use crate::probe;
+use crate::probe::Align;
+use crate::probe::Axis;
+use crate::probe::Fixed;
+use crate::probe::Tag;
+use crate::probe::probe;
 use crate::scale::Scale;
 use crate::snap::centre_x;
+use crate::snap::placed;
 use crate::snap::snap;
 use crate::text::text;
 use crate::tokens::Size;
@@ -172,9 +179,12 @@ impl Extent {
 /// Children side by side, `gap` apart, each box rounded up to whole device pixels at `look`'s
 /// scale, so every child starts on one.
 pub fn row<'a, M: 'a>(look: &Look, gap: impl Into<Gap>) -> Row<'a, M> {
+    let gap = gap.into();
     Row {
-        inner: widget::Row::new().spacing(gap.into().px()),
+        inner: widget::Row::new().spacing(gap.px()),
         scale: look.scale,
+        gap,
+        align: Align::Start,
     }
 }
 
@@ -182,6 +192,9 @@ pub fn row<'a, M: 'a>(look: &Look, gap: impl Into<Gap>) -> Row<'a, M> {
 pub struct Row<'a, M> {
     inner: widget::Row<'a, M>,
     scale: Scale,
+    gap: Gap,
+    /// How the children line up down the row, for the geometry check.
+    align: Align,
 }
 
 impl<M> fmt::Debug for Row<'_, M> {
@@ -213,6 +226,7 @@ impl<'a, M: 'a> Row<'a, M> {
     pub fn center(self) -> Self {
         Row {
             inner: self.inner.align_y(Alignment::Center),
+            align: Align::Centre,
             ..self
         }
     }
@@ -222,6 +236,7 @@ impl<'a, M: 'a> Row<'a, M> {
     pub fn bottom(self) -> Self {
         Row {
             inner: self.inner.align_y(Alignment::End),
+            align: Align::End,
             ..self
         }
     }
@@ -253,7 +268,12 @@ impl<'a, M: 'a> Row<'a, M> {
 
 impl<'a, M: 'a> From<Row<'a, M>> for Element<'a, M> {
     fn from(row: Row<'a, M>) -> Self {
-        row.inner.into()
+        let tag = Tag::Layout {
+            axis: Axis::X,
+            gap: row.gap.px(),
+            align: row.align,
+        };
+        probe(tag, placed(row.scale, row.inner))
     }
 }
 
@@ -366,7 +386,12 @@ impl<'a, M: 'a> From<Stack<'a, M>> for Element<'a, M> {
         if let Some(height) = height {
             column = column.height(height.length());
         }
-        column.into()
+        let tag = Tag::Layout {
+            axis: Axis::Y,
+            gap: gap.px(),
+            align: if centred { Align::Centre } else { Align::Start },
+        };
+        probe(tag, column)
     }
 }
 
@@ -385,13 +410,13 @@ pub fn split<'a, M: 'a>(look: &Look, weights: &[u16], gap: Space) -> Grid<'a, M>
 /// Room that grows across a row, pushing what follows to its far end. It never grows down, so the
 /// row stays as tall as its content.
 pub fn fill<'a, M: 'a>() -> Element<'a, M> {
-    widget::Space::new().width(Length::Fill).into()
+    probe(Tag::Spacer { fill: true }, widget::Space::new().width(Length::Fill))
 }
 
 /// Empty room of `space` both ways.
 pub fn gap<'a, M: 'a>(space: Space) -> Element<'a, M> {
     let px = f32::from(space.px());
-    widget::Space::new().width(px).height(px).into()
+    probe(Tag::Spacer { fill: false }, widget::Space::new().width(px).height(px))
 }
 
 /// A whole page: the surface, with the page's insets around `content`.
@@ -400,7 +425,7 @@ pub fn gap<'a, M: 'a>(space: Space) -> Element<'a, M> {
 /// footer's buttons sit.
 pub fn page<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Element<'a, M> {
     let surface = look.colors.surface;
-    widget::container(content)
+    let view: Element<'a, M> = widget::container(content)
         .width(Length::Fill)
         .height(Length::Fill)
         .padding(Inset::x(Space::S40).top(Space::S32).bottom(Space::S24).padding())
@@ -408,18 +433,20 @@ pub fn page<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Eleme
             background: Some(Background::Color(surface)),
             ..container::Style::default()
         })
-        .into()
+        .into();
+    probe::component("Page", ["", "", ""], Fixed::NONE, view)
 }
 
 /// A page's header: the Japanese accent, the title, and one line of explanation under it.
 pub fn header<'a, M: 'a>(look: &Look, accent: &'a str, title: &'a str, lede: &'a str) -> Element<'a, M> {
     let c = &look.colors;
-    stack(look, Gap::NONE)
+    let view: Element<'a, M> = stack(look, Gap::NONE)
         .push(text(accent, Type::Accent, c.primary))
         .push(text(title, Type::Title, c.on_surface))
         .push(gap(Space::S8))
         .push(text(lede, Type::Body, c.on_surface_variant))
-        .into()
+        .into();
+    probe::component("Header", ["", "", ""], Fixed::NONE, view)
 }
 
 /// A titled part of a page: the title, an optional line under it, then `content` below.
@@ -434,17 +461,19 @@ pub fn section<'a, M: 'a>(
     if let Some(description) = description {
         head = head.push(text(description, Type::Body, c.on_surface_variant));
     }
-    stack(look, Space::S16).push(head).push(content).into()
+    let view: Element<'a, M> = stack(look, Space::S16).push(head).push(content).into();
+    probe::component("Section", ["", "", ""], Fixed::NONE, view)
 }
 
 /// A hairline across the width, in the soft outline colour.
 pub fn divider<'a, M: 'a>(look: &Look) -> Element<'a, M> {
     let soft = look.outline_soft();
-    widget::container(widget::Space::new())
+    let view: Element<'a, M> = widget::container(widget::Space::new())
         .width(Length::Fill)
         .height(look.hairline())
         .style(move |_theme| container::Style::default().background(soft))
-        .into()
+        .into();
+    probe::component("Divider", ["", "", ""], Fixed::NONE, view)
 }
 
 #[cfg(test)]

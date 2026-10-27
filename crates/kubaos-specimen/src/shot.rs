@@ -8,6 +8,8 @@
 //!
 //! - Rendering a [`Specimen`] to pixels ([`render`]), writing them as PNG ([`write_png`]), and the
 //!   fonts both the window and the screenshots load ([`fonts`]).
+//! - Laying a [`Specimen`] out as a geometry frame ([`frame`]), which `kubaos-specimen check` and
+//!   the tests hold to the design language's rules.
 //!
 //! # Not here
 //!
@@ -37,12 +39,16 @@ use iced::mouse;
 use iced::window;
 use iced_runtime::UserInterface;
 use iced_runtime::user_interface;
+use kubaos_geometry::Frame;
 use kubaos_ui::Look;
+use kubaos_ui::Mode;
 use kubaos_ui::Scale;
+use kubaos_ui::probe::Collect;
 use kubaos_ui::tokens::Type;
 
 use crate::pages::icons;
 use crate::specimen;
+use crate::specimen::Message;
 use crate::specimen::Specimen;
 
 /// Every font the specimen draws with: kubaos-ui's, then the four icon sets of the comparison sheet.
@@ -69,6 +75,8 @@ pub struct Shot {
 pub enum Error {
     #[error("starting the tiny-skia renderer")]
     Renderer,
+    #[error("the page reported no boxes to check")]
+    Empty,
     #[error("writing {}", path.display())]
     Write {
         path: std::path::PathBuf,
@@ -97,29 +105,10 @@ pub fn load_fonts() {
 ///
 /// [`Error::Renderer`] when the tiny-skia renderer can't start.
 pub fn render(specimen: &Specimen, width: f32) -> Result<Shot, Error> {
-    let mut renderer = iced::futures::executor::block_on(<Renderer as Headless>::new(
-        kubaos_ui::text::default_font(),
-        Pixels(f32::from(Type::Body.size())),
-        Some("tiny-skia"),
-    ))
-    .ok_or(Error::Renderer)?;
+    let mut renderer = headless()?;
     let look = Look::new(specimen.mode, specimen.scale);
     let factor = specimen.scale.factor();
-
-    let mut ui = UserInterface::build(
-        specimen::view(specimen),
-        Size::new(width, MEASURE_HEIGHT),
-        user_interface::Cache::default(),
-        &mut renderer,
-    );
-    let mut root = Find::new(specimen::ROOT);
-    ui.operate(&renderer, &mut root);
-    let height = root.bounds.map_or(MEASURE_HEIGHT, |b| b.height);
-
-    // Whole device pixels both ways; the page is laid out at what they come to in logical pixels.
-    let physical = Size::new((width * factor).round() as u32, (height * factor).ceil() as u32);
-    let logical = Size::new(physical.width as f32 / factor, physical.height as f32 / factor);
-    let mut ui = ui.relayout(logical, &mut renderer);
+    let (mut ui, physical) = lay_out(specimen, width, &mut renderer);
     let mut audit = Audit {
         scale: specimen.scale,
         off_grid: Vec::new(),
@@ -151,6 +140,69 @@ pub fn render(specimen: &Specimen, width: f32) -> Result<Shot, Error> {
         height: physical.height,
         off_grid: audit.off_grid,
     })
+}
+
+/// `specimen` laid out `width` logical pixels wide, as the geometry check reads it: every box and
+/// the role its probe gives it.
+///
+/// # Errors
+///
+/// [`Error::Renderer`] when the tiny-skia renderer can't start, [`Error::Empty`] when the page
+/// reports no boxes.
+pub fn frame(specimen: &Specimen, width: f32) -> Result<Frame, Error> {
+    let mut renderer = headless()?;
+    let (mut ui, _) = lay_out(specimen, width, &mut renderer);
+    let mut collect = Collect::new();
+    ui.operate(&renderer, &mut collect);
+    let root = collect.into_tree().ok_or(Error::Empty)?;
+    Ok(Frame {
+        page: specimen.page.slug().to_owned(),
+        mode: mode_name(specimen.mode).to_owned(),
+        scale: specimen.scale.factor(),
+        root,
+    })
+}
+
+/// A mode's name in file and frame names.
+pub fn mode_name(mode: Mode) -> &'static str {
+    match mode {
+        Mode::Dark => "dark",
+        Mode::Light => "light",
+    }
+}
+
+/// The renderer screenshots draw with: tiny-skia, on the CPU, with no window.
+fn headless() -> Result<Renderer, Error> {
+    iced::futures::executor::block_on(<Renderer as Headless>::new(
+        kubaos_ui::text::default_font(),
+        Pixels(f32::from(Type::Body.size())),
+        Some("tiny-skia"),
+    ))
+    .ok_or(Error::Renderer)
+}
+
+/// `specimen` laid out `width` wide and as tall as its page, both on whole device pixels, and that
+/// size in device pixels.
+fn lay_out<'a>(
+    specimen: &'a Specimen,
+    width: f32,
+    renderer: &mut Renderer,
+) -> (UserInterface<'a, Message, Theme, Renderer>, Size<u32>) {
+    let factor = specimen.scale.factor();
+    let mut ui = UserInterface::build(
+        specimen::view(specimen),
+        Size::new(width, MEASURE_HEIGHT),
+        user_interface::Cache::default(),
+        renderer,
+    );
+    let mut root = Find::new(specimen::ROOT);
+    ui.operate(renderer, &mut root);
+    let height = root.bounds.map_or(MEASURE_HEIGHT, |b| b.height);
+
+    // Whole device pixels both ways; the page is laid out at what they come to in logical pixels.
+    let physical = Size::new((width * factor).round() as u32, (height * factor).ceil() as u32);
+    let logical = Size::new(physical.width as f32 / factor, physical.height as f32 / factor);
+    (ui.relayout(logical, renderer), physical)
 }
 
 /// Writes `shot` to `path` as an RGBA PNG.

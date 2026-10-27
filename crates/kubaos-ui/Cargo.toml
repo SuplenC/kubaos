@@ -6,6 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+kubaos-geometry.workspace = true
 # Kōbō's iced and features, less the image widget it draws its wallpaper with: svg for KubaOS
 # Symbols, canvas for the switch and the spinner, advanced for the focus ring's and the grid's own
 # widgets, and crisp, which snaps quads to device pixels in the wgpu renderer. winit needs a

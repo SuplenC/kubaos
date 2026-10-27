@@ -152,8 +152,8 @@ fn icon_button_in<'a>(look: &Look, kind: Kind, size: ButtonSize, state: usize) -
 /// The states' names over a table's columns, after the kinds' column.
 fn state_heads<'a>(look: &Look) -> Vec<Element<'a, Message>> {
     let c = look.colors;
-    std::iter::once(text("", Type::Label, c.on_surface_variant).into())
-        .chain(STATES.map(|state| text(state, Type::Label, c.on_surface_variant).into()))
+    std::iter::once(text("", Type::Label, c.on_surface_variant))
+        .chain(STATES.map(|state| text(state, Type::Label, c.on_surface_variant)))
         .collect()
 }
 
