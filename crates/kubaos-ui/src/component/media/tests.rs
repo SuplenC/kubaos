@@ -46,7 +46,10 @@ fn the_box_keeps_its_aspect() {
 
     let frame = bounds(media(&look, None, Aspect::Wallpaper, Radius::Control), 256.0);
 
-    assert!((frame.width - 256.0).abs() < 1e-4 && (frame.height - 160.0).abs() < 1e-4, "{frame:?}");
+    assert!(
+        (frame.width - 256.0).abs() < 1e-4 && (frame.height - 160.0).abs() < 1e-4,
+        "{frame:?}"
+    );
 }
 
 #[test]

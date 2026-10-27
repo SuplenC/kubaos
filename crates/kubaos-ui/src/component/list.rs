@@ -36,6 +36,7 @@ use crate::probe::Fixed;
 use crate::snap::centre_x;
 use crate::text::line;
 use crate::text::text;
+use crate::tokens;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
@@ -181,11 +182,8 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         } else {
             (None, c.on_surface, c.on_surface_variant)
         };
-        let height = if self.subtitle.is_some() {
-            Size::RowTwoLine
-        } else {
-            Size::Row
-        };
+        let two_line = self.subtitle.is_some();
+        let height = if two_line { Size::RowTwoLine } else { Size::Row };
         let mut words = stack(look, Space::S4)
             .width(Extent::Fill)
             .push(line(self.title, Type::BodyStrong, main));
@@ -197,7 +195,13 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         // does.
         let mut content = row(look, Space::S12).center().width(Extent::Fill).height(Extent::Fill);
         if let Some(glyph) = self.icon {
-            content = content.push(icon(look, glyph, Type::BodyStrong.icon(), main));
+            // Beside a title over a subtitle, the icon spans both lines.
+            let size = if two_line {
+                tokens::TWO_LINE_ICON
+            } else {
+                Type::BodyStrong.icon()
+            };
+            content = content.push(icon(look, glyph, size, main));
         }
         content = content.push(words);
         for (kind, label) in self.chips {

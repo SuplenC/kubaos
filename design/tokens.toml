@@ -76,6 +76,10 @@ full = true
 # keeps 2 units clear inside, Tabler's margin.
 [icon]
 sizes = [16, 20, 24, 32, 48]
+# A row's icon beside a title over a subtitle (`body_strong` over `small`, a
+# 40 block): it spans both lines, a step up from the title's own 20, so an
+# app's icon in the Command menu reads at the size of the two lines beside it.
+two_line = 24
 
 # Fixed dimensions of components, by name.
 [size]
@@ -423,8 +427,10 @@ panel_scrim = 0.20
 # A panel's surface over the blurred wallpaper it floats on, so the photo shows through as
 # glass: Kōbō's panel.
 glass = 0.80
-# The darkest the wallpaper is dimmed behind full-screen text, so the words read over any photo:
-# Kōbō's welcome and done screens, from the text's side.
+# The furthest the wallpaper is turned toward the surface behind full-screen text, so the words
+# read over any photo: at 0.90 every text role keeps 4.5:1 over pure black in light and pure
+# white in dark. Kōbō's welcome and done screens, from the text's side; the lock screen, behind
+# its words.
 backdrop = 0.90
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity

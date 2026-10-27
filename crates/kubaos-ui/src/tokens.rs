@@ -150,6 +150,9 @@ impl IconSize {
     }
 }
 
+/// A row's icon beside a title over a subtitle: it spans both lines.
+pub const TWO_LINE_ICON: IconSize = IconSize::S24;
+
 /// A fixed dimension of a component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Size {

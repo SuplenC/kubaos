@@ -269,6 +269,11 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             for v in &tokens.icon.sizes {
                 out.line(format!("        readonly property int s{v}: {v}"));
             }
+            out.line("        // A row's icon beside a title over a subtitle: it spans both lines.");
+            out.line(format!(
+                "        readonly property int two_line: {}",
+                tokens.icon.two_line
+            ));
         },
     );
     out.group("    ", Some("Fixed dimensions of components."), "size", |out| {
@@ -304,6 +309,17 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
     out.line("                padding = tokens.container.padding[i];");
     out.line("        }");
     out.line("        return padding;");
+    out.line("    }");
+    out.blank();
+    out.line("    // The padding of a container as wide as `content` and its own padding: a panel that takes its");
+    out.line("    // content's width. The widest step the padded width reaches, so the padding is the one");
+    out.line("    // `containerPadding` gives the panel's own width.");
+    out.line("    function containerPaddingAround(content: real): int {");
+    out.line("        for (let i = tokens.container.from.length - 1; i > 0; i--) {");
+    out.line("            if (content + tokens.container.padding[i] * 2 >= tokens.container.from[i])");
+    out.line("                return tokens.container.padding[i];");
+    out.line("        }");
+    out.line("        return tokens.container.padding[0];");
     out.line("    }");
     out.group(
         "    ",

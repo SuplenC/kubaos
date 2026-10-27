@@ -87,7 +87,11 @@ pub fn slider<'a, M: 'a>(
 }
 
 /// [`slider`] drawn as while a press holds it, its fill lit: the specimen's view of the state.
-pub fn slider_held<'a, M: 'a>(look: &Look, value: Value, on_change: Option<Box<dyn Fn(Value) -> M + 'a>>) -> Element<'a, M> {
+pub fn slider_held<'a, M: 'a>(
+    look: &Look,
+    value: Value,
+    on_change: Option<Box<dyn Fn(Value) -> M + 'a>>,
+) -> Element<'a, M> {
     slider_in(look, value, on_change, false, true)
 }
 

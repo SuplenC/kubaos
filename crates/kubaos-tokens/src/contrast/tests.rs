@@ -34,7 +34,9 @@ fn a_foreground_faded_toward_its_background_loses_contrast() {
         found
             .iter()
             .find(|r| {
-                r.pair.fg == "on_secondary_container" && r.pair.opacity.as_deref() == opacity && r.mode.name() == "light"
+                r.pair.fg == "on_secondary_container"
+                    && r.pair.opacity.as_deref() == opacity
+                    && r.mode.name() == "light"
             })
             .and_then(|r| r.ratio)
             .expect("the pair is listed")

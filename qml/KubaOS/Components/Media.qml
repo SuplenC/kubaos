@@ -7,8 +7,7 @@ import KubaOS.Components as K
 // loaded; until it has, the box holds the placeholder, the high container.
 //
 // The picture is `source`, cut to cover the box at `radius`; or the content put in it, laid over
-// the placeholder to fill it (a video, a picture that clips itself), which says it has loaded
-// through `ready`.
+// the placeholder to fill it (a video, a picture that clips itself, fading in over it).
 Item {
     id: root
 
@@ -16,9 +15,10 @@ Item {
     property list<int> aspect: Tokens.aspect.wallpaper
     property url source: ""
     property int radius: Tokens.radius.control
-    // Whether the picture is in: the source's, or the content's when it sets this.
-    property bool ready: picture.status === Image.Ready
     default property alias content: slot.data
+
+    // Whether `source` has loaded, and covers the placeholder.
+    readonly property bool ready: picture.status === Image.Ready
 
     readonly property bool fillWidth: true
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1

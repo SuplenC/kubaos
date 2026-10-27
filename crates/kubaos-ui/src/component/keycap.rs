@@ -78,17 +78,19 @@ pub fn keys(combination: &str) -> impl Iterator<Item = &str> {
 /// in a `caption` line 8 after them, when it says. A combination is written `Ctrl+K`.
 pub fn key_hints<'a, M: 'a>(look: &Look, hints: &[(&'a str, &'a str)]) -> Element<'a, M> {
     let c = look.colors;
-    let line = row(look, Space::S16).center().extend(hints.iter().map(|&(combination, what)| {
-        let caps = row(look, Space::S4)
-            .center()
-            .extend(keys(combination).map(|key| keycap(look, key)));
-        let hint = row(look, Space::S8).center().push(caps);
-        if what.is_empty() {
-            hint.into()
-        } else {
-            hint.push(text(what, Type::Caption, c.on_surface_variant)).into()
-        }
-    }));
+    let line = row(look, Space::S16)
+        .center()
+        .extend(hints.iter().map(|&(combination, what)| {
+            let caps = row(look, Space::S4)
+                .center()
+                .extend(keys(combination).map(|key| keycap(look, key)));
+            let hint = row(look, Space::S8).center().push(caps);
+            if what.is_empty() {
+                hint.into()
+            } else {
+                hint.push(text(what, Type::Caption, c.on_surface_variant)).into()
+            }
+        }));
     probe::component("KeyHints", ["", "", ""], Fixed::NONE, line)
 }
 
@@ -114,12 +116,14 @@ impl<M> Widget<M, Theme, Renderer> for Face<'_, M> {
         IcedSize::new(Length::Shrink, Length::Shrink)
     }
 
-    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
+    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, _limits: &layout::Limits) -> layout::Node {
         let side = f32::from(Size::Keycap.px());
+        // A key is one word that never wraps: it takes the width it needs, whatever the room.
+        let unbounded = layout::Limits::new(IcedSize::ZERO, IcedSize::new(f32::INFINITY, side));
         let node = self
             .content
             .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, &limits.loose());
+            .layout(&mut tree.children[0], renderer, &unbounded);
         let inner = node.size();
         let width = self.scale.snap_up(inner.width).max(side);
         let x = self.scale.snap((width - inner.width) / 2.0);

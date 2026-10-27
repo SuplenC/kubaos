@@ -288,6 +288,12 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             ty: "u16",
         },
     );
+    out.blank();
+    out.line("/// A row's icon beside a title over a subtitle: it spans both lines.");
+    out.line(format!(
+        "pub const TWO_LINE_ICON: IconSize = IconSize::S{};",
+        tokens.icon.two_line
+    ));
     scale(
         out,
         &Scale {

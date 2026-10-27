@@ -188,7 +188,10 @@ fn contrast(root: &Path) -> Result<bool, Error> {
             for violation in &violations {
                 eprintln!("{violation}");
             }
-            eprintln!("kubaos-design contrast: the tokens break {} rule(s): FAILED", violations.len());
+            eprintln!(
+                "kubaos-design contrast: the tokens break {} rule(s): FAILED",
+                violations.len()
+            );
             return Ok(false);
         }
         Err(err) => return Err(Error::Tokens(err)),

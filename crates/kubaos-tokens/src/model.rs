@@ -98,6 +98,8 @@ pub struct Radii {
 #[serde(deny_unknown_fields)]
 pub struct IconSizes {
     pub sizes: Vec<u16>,
+    /// A row's icon beside a title over a subtitle: one of `sizes`.
+    pub two_line: u16,
 }
 
 /// A page's or a panel's padding by its width: each padding applies from its width up.

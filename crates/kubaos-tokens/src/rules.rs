@@ -172,7 +172,9 @@ fn check_contrast(tokens: &Tokens, found: &mut Vec<Violation>) {
         format!("contrast {}{at} on {}", pair.fg, pair.bg)
     };
     for pair in &tokens.contrast.pairs {
-        let roles = [&pair.fg, &pair.bg].into_iter().filter(|role| !tokens.color.source.contains_key(*role));
+        let roles = [&pair.fg, &pair.bg]
+            .into_iter()
+            .filter(|role| !tokens.color.source.contains_key(*role));
         let opacity = pair.opacity.iter().filter(|name| !tokens.opacity.contains_key(*name));
         for name in roles.chain(opacity) {
             found.push(Violation::UnknownInPair {
@@ -272,6 +274,12 @@ fn check_opacity(token: String, value: f32, found: &mut Vec<Violation>) {
 }
 
 fn check_types(tokens: &Tokens, found: &mut Vec<Violation>) {
+    if !tokens.icon.sizes.contains(&tokens.icon.two_line) {
+        found.push(Violation::IconNotASize {
+            token: "icon.two_line".into(),
+            icon: tokens.icon.two_line,
+        });
+    }
     for (name, style) in &tokens.types {
         let token = format!("type.{name}");
         if !tokens.icon.sizes.contains(&style.icon) {

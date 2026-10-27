@@ -7,8 +7,8 @@ use iced::Element;
 use iced::Length;
 use iced::widget;
 use iced::widget::image;
-use kubaos_ui::Mode;
 use kubaos_ui::Look;
+use kubaos_ui::Mode;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::Preview;
@@ -522,8 +522,14 @@ fn keycaps<'a>(look: &Look) -> Element<'a, Message> {
         .push(text("to drop it.", Type::Body, c.on_surface));
     stack(look, Space::S16)
         .push(caps)
-        .push(key_hints(look, &[("Enter", "continue"), ("Ctrl+K", "actions"), ("Esc", "back")]))
-        .push(key_hints(look, &[("↵", "Open"), ("Tab", "Enter app"), ("Ctrl+K", "Actions")]))
+        .push(key_hints(
+            look,
+            &[("Enter", "continue"), ("Ctrl+K", "actions"), ("Esc", "back")],
+        ))
+        .push(key_hints(
+            look,
+            &[("↵", "Open"), ("Tab", "Enter app"), ("Ctrl+K", "Actions")],
+        ))
         .push(inline)
         .into()
 }

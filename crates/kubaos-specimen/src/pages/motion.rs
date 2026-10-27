@@ -19,6 +19,7 @@ use kubaos_ui::color;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::button;
+use kubaos_ui::component::keycap::keycap;
 use kubaos_ui::component::progress::timed_bar;
 use kubaos_ui::component::switch::switch;
 use kubaos_ui::component::toast::DEFAULT_STAY;
@@ -229,7 +230,12 @@ fn held<'a>(look: &Look) -> Element<'a, Message> {
                         .on_hold(Message::Sample, Message::Sample)
                         .view(look),
                 )
-                .push(text("or hold Enter", Type::Caption, look.colors.outline)),
+                .push(
+                    row(look, Space::S4)
+                        .center()
+                        .push(text("or hold", Type::Caption, look.colors.on_surface_variant))
+                        .push(keycap(look, "Enter")),
+                ),
         )
         .push(grid(look, 9, Space::S16).extend(times.map(|t| timed_bar(look, t))))
         .into()

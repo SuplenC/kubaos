@@ -55,25 +55,24 @@ pub fn media<'a, M: 'a>(
     corner: impl Into<Corner>,
 ) -> Element<'a, M> {
     let corner = radius(corner);
-    let inner: Element<'a, M> = match picture {
-        Some(handle) => widget::image(handle)
+    let placeholder = look.colors.surface_container_high;
+    let inner: Element<'a, M> = if let Some(handle) = picture {
+        widget::image(handle)
             .content_fit(ContentFit::Cover)
             .width(Length::Fill)
             .height(Length::Fill)
             .border_radius(corner)
-            .into(),
-        None => {
-            let placeholder = look.colors.surface_container_high;
-            widget::container(widget::Space::new())
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .style(move |_theme| container::Style {
-                    background: Some(Background::Color(placeholder)),
-                    border: iced::Border::default().rounded(corner),
-                    ..container::Style::default()
-                })
-                .into()
-        }
+            .into()
+    } else {
+        widget::container(widget::Space::new())
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(move |_theme| container::Style {
+                background: Some(Background::Color(placeholder)),
+                border: iced::Border::default().rounded(corner),
+                ..container::Style::default()
+            })
+            .into()
     };
     let view = Element::new(Framed {
         content: inner,
@@ -112,10 +111,10 @@ impl<M> Widget<M, Theme, Renderer> for Framed<'_, M> {
     fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         let width = limits.width(Length::Fill).max().width;
         let size = Size::new(width, height(width, self.aspect, self.scale));
-        let node = self
-            .content
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, &layout::Limits::new(size, size));
+        let node =
+            self.content
+                .as_widget_mut()
+                .layout(&mut tree.children[0], renderer, &layout::Limits::new(size, size));
         layout::Node::with_children(size, vec![node])
     }
 

@@ -152,7 +152,10 @@ impl Walk<'_> {
                 off.push(format!("{edge} {inset}"));
             }
         }
-        for (edge, inset) in [("right", b.right() - united.right()), ("bottom", b.bottom() - united.bottom())] {
+        for (edge, inset) in [
+            ("right", b.right() - united.right()),
+            ("bottom", b.bottom() - united.bottom()),
+        ] {
             if self.device(padding - inset) >= EPSILON {
                 off.push(format!("{edge} {inset}"));
             }

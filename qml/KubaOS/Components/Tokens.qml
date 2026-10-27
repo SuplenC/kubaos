@@ -77,6 +77,8 @@ QtObject {
         readonly property int s24: 24
         readonly property int s32: 32
         readonly property int s48: 48
+        // A row's icon beside a title over a subtitle: it spans both lines.
+        readonly property int two_line: 24
     }
 
     // Fixed dimensions of components.
@@ -124,6 +126,17 @@ QtObject {
                 padding = tokens.container.padding[i];
         }
         return padding;
+    }
+
+    // The padding of a container as wide as `content` and its own padding: a panel that takes its
+    // content's width. The widest step the padded width reaches, so the padding is the one
+    // `containerPadding` gives the panel's own width.
+    function containerPaddingAround(content: real): int {
+        for (let i = tokens.container.from.length - 1; i > 0; i--) {
+            if (content + tokens.container.padding[i] * 2 >= tokens.container.from[i])
+                return tokens.container.padding[i];
+        }
+        return tokens.container.padding[0];
     }
 
     // Aspect ratios, width to height, a picture's box keeps before and after it loads.

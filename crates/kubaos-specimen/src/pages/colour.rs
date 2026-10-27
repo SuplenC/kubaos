@@ -20,6 +20,8 @@ use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
 use kubaos_ui::look::radius;
 use kubaos_ui::text::text;
+use kubaos_ui::tokens;
+use kubaos_ui::tokens::Opacity;
 use kubaos_ui::tokens::Radius;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
@@ -95,34 +97,17 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             )
             .into()
     }));
-    let pairs = [
-        ("on_surface", c.on_surface, "surface", c.surface, Contrast::Text),
-        (
-            "on_surface_variant",
-            c.on_surface_variant,
-            "surface_container",
-            c.surface_container,
-            Contrast::Text,
-        ),
-        ("primary", c.primary, "surface", c.surface, Contrast::Text),
-        ("on_primary", c.on_primary, "primary", c.primary, Contrast::Text),
-        (
-            "on_secondary_container",
-            c.on_secondary_container,
-            "secondary_container",
-            c.secondary_container,
-            Contrast::Text,
-        ),
-        ("cold", c.cold, "surface", c.surface, Contrast::Text),
-        ("warning", c.warning, "surface", c.surface, Contrast::Text),
-        ("error", c.error, "surface", c.surface, Contrast::Text),
-        ("on_error", c.on_error, "error", c.error, Contrast::Text),
-        ("outline", c.outline, "surface", c.surface, Contrast::Graphic),
-    ];
     let mut table = split(look, &[1, 2, 2], Space::S8).center();
-    for (fg_name, fg, bg_name, bg, need) in pairs {
-        let ratio = color::contrast_ratio(color::over(fg, bg), bg);
-        let verdict = if need.holds(fg, bg) {
+    for pair in tokens::CONTRAST {
+        let bg = pair.bg.of(&c);
+        let fg = color::alpha(pair.fg.of(&c), pair.opacity.map_or(1.0, Opacity::value));
+        let need = Contrast::from(pair.need);
+        let ratio = color::pair_ratio(&pair, &c);
+        let at = pair.opacity.map_or_else(String::new, |opacity| {
+            format!(" at {}", format!("{opacity:?}").to_lowercase())
+        });
+        let (fg_name, bg_name) = (pair.fg.name(), pair.bg.name());
+        let verdict = if ratio >= need.minimum() {
             format!("{ratio:.1}:1, needs {}:1", need.minimum())
         } else {
             format!("{ratio:.1}:1, FAILS {}:1", need.minimum())
@@ -140,7 +125,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             });
         table = table
             .push(row(look, Gap::NONE).push(sample))
-            .push(text(format!("{fg_name} on {bg_name}"), Type::Body, c.on_surface))
+            .push(text(format!("{fg_name}{at} on {bg_name}"), Type::Body, c.on_surface))
             .push(text(verdict, Type::Mono, c.on_surface_variant));
     }
     stack(look, Space::S48)
@@ -153,7 +138,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Pairs",
-            Some("WCAG 2.1: 4.5:1 for text, 3:1 for outlines and icons. The tests hold every pair."),
+            Some("Every pair the tokens list, each at the opacity it is drawn at. WCAG 2.1 AA: 4.5:1 for text, 3:1 for large text, outlines and icons; the tokens refuse a pair under its minimum."),
             table,
         ))
         .into()
