@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import KubaOS.Components as K
 import qs.theme
 import qs.settings
 
@@ -48,14 +49,14 @@ QtObject {
     readonly property real headerHeight: px(56)
     readonly property real footerHeight: px(36)
     readonly property real rowHeight: px(48)
-    readonly property real iconSize: px(32)
+    readonly property real iconSize: px(K.Tokens.icon.s32)
     // A row's icon and badge from its ends. The selection's corners curve in
     // `rowRadius`; an icon at that distance sits on the curve and reads
     // off-centre, so it stands a third further in.
     readonly property real rowPad: px(Theme.spacing.lg)
     readonly property real smallRowHeight: px(36)
     readonly property real jobHeight: px(28)
-    readonly property real fieldHeight: px(40)
+    readonly property real fieldHeight: px(K.Tokens.size.control_md)
 
     // Smaller steps of Theme's spacing, and two off its scale where the
     // menu's denser rows need them: a keycap from its label, one hint or
@@ -81,7 +82,7 @@ QtObject {
     // Icons beside the rows' 32: the header's, a job's, the pane's and its
     // box, a progress View's, an intro example's arrow, a button's.
     readonly property real leadIcon: px(22)
-    readonly property real jobIcon: px(16)
+    readonly property real jobIcon: px(K.Tokens.icon.s16)
     readonly property real paneIconBox: px(56)
     readonly property real paneIcon: px(40)
     readonly property real paneGlyph: px(28)
@@ -94,13 +95,13 @@ QtObject {
     readonly property real progressBarHeight: px(6)
 
     // A form's or a progress View's column, and a detail View's labels.
-    readonly property real columnWidth: px(560)
+    readonly property real columnWidth: px(K.Tokens.size.column)
     readonly property real labelWidth: px(120)
 
     // A checkbox, drawn as Kōbō's switch: its track, and its knob off and
     // on.
     readonly property real switchWidth: px(40)
-    readonly property real switchHeight: px(24)
+    readonly property real switchHeight: px(K.Tokens.size.switch_height)
     readonly property real knobOff: px(Theme.spacing.md)
     readonly property real knobOn: px(Theme.spacing.lg)
 

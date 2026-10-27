@@ -183,7 +183,7 @@ size = 7
 font = 4
 
 ["config/quickshell/modules/menu/MenuLook.qml"]
-size = 29
+size = 25
 radius = 3
 
 ["config/quickshell/modules/menu/PaneContent.qml"]
@@ -248,6 +248,9 @@ font = 2
 size = 2
 radius = 1
 font = 2
+
+["config/quickshell/theme/Theme.qml"]
+size = 2
 
 ["crates/kubaos-kobo/src/app.rs"]
 duration = 2

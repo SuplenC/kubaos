@@ -73,8 +73,8 @@ All handlers live in `IpcHandlers.qml`. `docs/CONTRACTS.md` is the source of tru
 ```
 shell.qml               entry point: per screen a Wallpaper and a Frame; Lock, polkit, IPC once
 IpcHandlers.qml         qs ipc targets
-theme/Theme.qml         design tokens: M3 colors (from colors.json), spacing, rounding, frame,
-                        bar, type, motion curves and durations, elevation, state layers
+theme/Theme.qml         the design tokens (KubaOS.Components' Tokens) by the shell's names, colors.json
+                        fed to them, and the frame's and bar's measures
 settings/Settings.qml   user knobs: wallpaper folders, wallpaper motion, lock loop, kanji workspaces, security key, fingerprint, polkit
 services/               singletons, no UI
   Audio                 PipeWire default sink, volume, output list
@@ -159,7 +159,11 @@ Every panel works without a mouse. Esc closes it.
 
 ## Theme
 
-`Theme.qml` watches `~/.local/state/theme/colors.json` (written by `dot-theme`/matugen) and updates live; colors crossfade where components animate them. If the file is missing it falls back to the default wallpaper's palette (the same as `config/matugen/default-colors.json`). Color roles are exposed as `Theme.m3<role>` (`Theme.m3primary`, `Theme.m3onSurface`, ...). The `m3` prefix is needed because QML reads any property named `on<Something>` as a signal handler.
+The values come from the design tokens (`design/tokens.toml`, `docs/DESIGN.md`) through `KubaOS.Components`, the QML component library in `qml/KubaOS/Components`: its generated `Tokens` singleton holds every colour role, length, type style and duration. `Theme.qml` gives those values the names the shell's components read, and keeps the few the shell has no token for yet (the frame's and bar's measures, and older spacing, radii and motion, marked `TODO(#150)`). New code takes `Tokens` and the library's components (`import KubaOS.Components as K`), not `Theme`.
+
+`Theme.qml` watches `~/.local/state/theme/colors.json` (written by `dot-theme`/matugen) and hands it to `Tokens.matugen`, so the roles follow the wallpaper live; colors crossfade where components animate them. If the file is missing, the roles fall back to the tokens' own palette (`[color.dark]` and `[color.light]`, matugen's output for the default wallpaper). Color roles are exposed as `Theme.m3<role>` (`Theme.m3primary`, `Theme.m3onSurface`, ...). The `m3` prefix is needed because QML reads any property named `on<Something>` as a signal handler.
+
+`KubaOS.Components` reaches Quickshell as a QML module (`qml/package.nix`, added to Quickshell's `withModules` in `home/curated.nix`), so the shell uses the library of the release its home was built from. `QML_IMPORT_PATH` can't put a clone's `qml/` in front of it: Quickshell's Nix wrapper puts its own modules ahead of any import path you set. To try changes to the library in the shell, switch your home onto the clone (`docs/USING.md`, "Hacking on KubaOS"), which builds the library from it, then run the clone's shell with `qs -p` as above; repeat the switch after each change to the library. `nix run .#checks.x86_64-linux.qml-specimen -- shots DIR` draws the clone's components page without touching the shell, and `just design-parity` holds it to iced's. After a change to `design/tokens.toml`, regenerate `Tokens.qml` with `cargo run -p kubaos-tokens -- write`.
 
 ## Adding a module
 
