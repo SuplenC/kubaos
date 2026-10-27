@@ -982,6 +982,19 @@ test("unplugging an unfocused screen leaves the panel on the guest it chose", fu
   same(world:shown_on("eDP-1"), 11, "and after the wait")
 end)
 
+test("after a config reload, unplugging the focused screen still leaves the backup on its own at once", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(2))
+  world:open_window()
+  reload(world)
+  world:fire("config.reloaded")
+
+  world:detach("DP-1")
+
+  same(world:shown_on("eDP-1"), 1, "home at once")
+end)
+
 test("focus moved from a screen by hand doesn't count as the move its removal makes", function()
   local world, module = two_screens()
   world:focus_monitor("DP-1")

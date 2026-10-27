@@ -807,11 +807,34 @@ settle_later = function(added, removed)
   end, { timeout = SETTLE_MS, type = "oneshot" })
 end
 
+-- The screen focus left as it was being removed, from the `monitor.focused`
+-- Hyprland sends for the screen it backs up to, before `monitor.removed`:
+-- only then does it show what the removed screen showed on the backup. A
+-- screen being removed is still listed but has no workspace in view any
+-- more, which tells that focus move from one the user made. The name is
+-- read at load, since the module starts afresh on every config reload.
+local focused_name, left_on_removal = nil, nil
+
+local function read_focused()
+  local monitor = hl.get_active_monitor()
+  focused_name = monitor and monitor.name
+end
+
+read_focused()
+
+hl.on("monitor.focused", function(monitor)
+  local previous = focused_name
+  focused_name = monitor and monitor.name
+  local record = previous and previous ~= focused_name and hl.get_monitor(previous)
+  left_on_removal = record and not record.active_workspace and previous or nil
+end)
+
 hl.on("hyprland.start", function()
   M.reconcile()
 end)
 
 hl.on("config.reloaded", function()
+  read_focused()
   M.reconcile()
 end)
 
@@ -821,20 +844,6 @@ end)
 
 hl.on("monitor.layout_changed", function()
   settle_later()
-end)
-
--- The screen focus left as it was being removed, from the `monitor.focused`
--- Hyprland sends for the screen it backs up to, before `monitor.removed`:
--- only then does it show what the removed screen showed on the backup. A
--- screen being removed is still listed but has no workspace in view any
--- more, which tells that focus move from one the user made.
-local focused_name, left_on_removal = nil, nil
-
-hl.on("monitor.focused", function(monitor)
-  local previous = focused_name
-  focused_name = monitor and monitor.name
-  local record = previous and previous ~= focused_name and hl.get_monitor(previous)
-  left_on_removal = record and not record.active_workspace and previous or nil
 end)
 
 -- Hyprland has moved the removed screen's workspaces to `backup` by now and,
