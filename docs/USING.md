@@ -148,6 +148,42 @@ The lid setting works without root: while it differs from what logind does, your
 
 **Lock, suspend, shut down or reboot in… / at…** do it once, whether you're working or not: `lock-in 10m`, `lock-at 20:00`, `suspend-at 23:00`, `shutdown-at friday 17:00`, `reboot-in 5m` (an "at" is the next time it comes round). Shut down and reboot ask you to confirm first, and close the session the way the power menu does; a suspend locks first. Toasts warn a minute and 10 s before, each with a Cancel button, the bar counts down with the action's icon, and Keep awake doesn't stop any of them: you asked for it. One at a time, whichever it is; a new one replaces the old, and the toast says what it replaced. "Cancel scheduled action", Cancel on a warning, or a click on the countdown cancels it. They are systemd user timers: `systemctl --user list-timers 'kubaos-scheduled*'`.
 
+## Power
+
+The control center's power slider has five stops: **Super Saver · Power Saver · Balanced · Performance · Max Performance**. Drag it (the stop under the pointer shows in the track and is picked when you let go), click it, scroll it a notch at a time, or focus it and press Left and Right. The bar's power icon shows the stop: a moon, a leaf, scales, a bolt, a rocket. The Command menu has an Item for each stop too ("Super Saver", "Max Performance", …), and `kubaos power set balanced` does it from a terminal.
+
+Each stop sets every layer of the machine at once:
+
+| | Super Saver | Power Saver | Balanced | Performance | Max Performance |
+|---|---|---|---|---|---|
+| power-profiles-daemon | power-saver | power-saver | balanced | performance | performance |
+| CPU energy preference, boost | power, off | power, off | balance, on | performance, on | performance, on |
+| CPU clock cap | 1.6 GHz | none | none | none | none |
+| Firmware profile (power limit, fans) | low-power | low-power | balanced | performance | performance |
+| GPU (amdgpu DPM) | low | low | auto | auto | high |
+| Laptop panel | 60 Hz | native rate with VRR | native rate with VRR | native rate | native rate |
+| Panel power saving | strong | medium | off | off | off |
+| PCIe ASPM | powersupersave | powersupersave | default | performance | performance |
+| USB autosuspend | on | on | on | on | off |
+| Wi-Fi power saving | on | on | on | off | off |
+| Background work | indexer paused, monitor every 10 s | the same | normal | normal | normal |
+
+Input devices (keyboards, mice, security keys) and headsets are never autosuspended, in any stop. External screens are never touched, and switching never moves or rescales anything. "Power: what this stop does" in the Command menu, or `kubaos power status`, lists every row as the machine has it right now, marks what disagrees, and says which rows this machine has no knob for. Other tools that switch power-profiles-daemon (`powerprofilesctl`, GNOME's settings) move the slider to the stop named like their profile.
+
+**Battery and plugged in each remember their stop.** Pick Super Saver on battery and Performance at the desk, and unplugging goes back to Super Saver, plugging in back to Performance, with a quiet toast naming the stop. Until you pick, battery is Power Saver and plugged in is Balanced. A dock that drops power for a moment doesn't swing the stop: the source has to hold for 3 seconds.
+
+**Low battery.** At 20 % on battery the stop drops to Power Saver, with a toast whose Undo puts back the stop you had; the drop isn't remembered as your battery stop, and plugging in ends it. "Low battery: drop to Super Saver", "Low battery: don't drop" and "Low battery drop at…" (`low-battery 15`) change it.
+
+**Charge limit.** "Charge limit: 80 %", "90 %" and "full" in the Command menu, or `kubaos power charge-limit 80`, stop the battery charging there: kinder to it on a laptop that lives on a desk. TUXEDO laptops do it through their charging profile, others through the kernel's `charge_control_end_threshold` when the battery has one.
+
+**Colour-accurate work.** The saver stops turn on AMD's panel power saving, which dims the backlight and lifts the contrast to match. "Panel power saving off" keeps true colours in every stop; "Panel power saving on" brings it back.
+
+**Measuring.** Unplug, pick a stop, leave the machine as it is, and run "Measure power draw" (`kubaos power measure`, 2 minutes; `--seconds 300` for longer). It prints the battery's average draw and what woke the machine most (interrupts and processes, per second), and saves the report in `~/.local/state/kubaos/power/measure/`.
+
+The settings are `~/.config/kubaos/desktop/power/power.toml`: the panel per stop (`60hz`, `vrr` or `native`), Super Saver's clock cap, the USB devices to keep awake, the charge limit and the low-battery drop. After a hand edit run `kubaos power apply`. The stop each power source remembers is in `~/.local/state/kubaos/power/stops.json`. If your own Hyprland rule for `eDP-1` sets its mode, the stop's rate and VRR still apply on top of it, keeping your position and scale.
+
+Super Saver's 60 Hz needs amdgpu's FreeSync video modes, which the update turns on for the next boot; until you reboot, Super Saver keeps the panel at its native rate with VRR, so the switch never blanks the screen, and `kubaos power status` says so.
+
 ## Updating and rolling back
 
 Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. unattended-upgrades only installs Ubuntu security updates. Everything else waits until you run `kubaos update`, or pick Update KubaOS in the menu (`SUPER + Space`), which opens a floating terminal running it. A daily timer runs `kubaos update --check`: it only looks. When there is something new it sends one notification, puts a marker in the bar, and the menu's Update KubaOS says what is waiting.
@@ -225,7 +261,7 @@ The folder is grouped by area, and its `README.md` says where to go for what:
 ```
 ~/.config/kubaos/
   README.md   want to change X? go here
-  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ idle/ files/ wallpapers/
+  desktop/    hypr/ quickshell/ cursor/ clock/ keyboard/ sysmon/ idle/ power/ files/ wallpapers/
   terminal/   ghostty/ foot/ tmux/ zsh/ fastfetch/
   editor/     nvim/
   tools/      git/ lazygit/ yazi/ bat/ bacon/ fuzzel/
@@ -239,6 +275,7 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 |---|---|---|
 | Hyprland: binds, gaps, monitors, rules | `~/.config/kubaos/desktop/hypr/hyprland.lua` (same Lua API as `~/.config/hypr/`) | `hyprctl reload` (`SUPER + SHIFT + CTRL + R`) |
 | Idle times and the lid | `~/.config/kubaos/desktop/idle/idle.toml`, or the Command menu ("Idle, Keep awake and the lid" above) | at once from the menu; `kubaos-idle apply` after a hand edit |
+| The power stops: the panel per stop, USB devices kept awake, the charge limit, the low-battery drop | `~/.config/kubaos/desktop/power/power.toml`, or the Command menu ("Power" above) | at once from the menu; `kubaos power apply` after a hand edit |
 | Idle listeners of your own, lock screen | `~/.config/kubaos/desktop/hypr/{hypridle,hyprlock}.conf` | `kubaos-idle apply` / next lock |
 | Shell aliases, exports | `~/.config/kubaos/terminal/zsh/zshrc` | new shell |
 | tmux | `~/.config/kubaos/terminal/tmux/tmux.conf` | `tmux source-file ~/.config/tmux/tmux.conf` |
@@ -260,7 +297,7 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 - Quickshell's settings, the colors (matugen) and the prompt (oh-my-posh) can't be overridden yet.
 - Your own wallpapers go in `~/Pictures/wallpapers/`, the picker's last tab; KubaOS's sets are in `/usr/share/kubaos/wallpapers/`.
 - `~/.config/kubaos/home/` is your flake: KubaOS wrote it once, and an update never does again. Put it under git if you like (then `git add` new files of yours before a switch; the `kubaos` command does that for what it writes into `kubaos.d/`).
-- The Command menu's KubaOS actions and toggles are listed in `~/.local/share/kubaos/defaults/kotodama/kubaos.toml`, each under `[extensions.kubaos.actions.<id>]`. Add your own in `user.toml` the same way, and hide any of KubaOS's, actions or toggles (`wifi`, `bluetooth`, `volume`, `brightness`, `power-saver` and so on), by id:
+- The Command menu's KubaOS actions and toggles are listed in `~/.local/share/kubaos/defaults/kotodama/kubaos.toml`, each under `[extensions.kubaos.actions.<id>]`. Add your own in `user.toml` the same way, and hide any of KubaOS's, actions or toggles (`wifi`, `bluetooth`, `volume`, `brightness`, `power-saver`, `power-status` and so on), by id:
 
   ```toml
   [extensions.kubaos]

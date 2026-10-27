@@ -97,3 +97,9 @@ _Avoid_: Group (Hyprland's tabbed windows), merged workspaces, guests
 **Phone link**:
 KubaOS's link between the laptop and the user's phone through KDE Connect: the clipboard and files both ways, and ringing the phone. Off until the user sets up a phone; nothing listens for phones until then.
 _Avoid_: KDE Connect (as the feature's name), phone sync
+
+## Power
+
+**Power stop**:
+One of the five fixed positions of the power slider, Super Saver, Power Saver, Balanced, Performance and Max Performance, each defined across every layer of the machine on top of one of power-profiles-daemon's three profiles. Each power source (battery, plugged in) remembers the stop last picked on it.
+_Avoid_: Power profile (power-profiles-daemon's own three), power mode, power plan
