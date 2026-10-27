@@ -15,8 +15,8 @@ import KubaOS.Components as K
 // and about 850 ms, doubling at every level. `qml-specimen` fails when a pass arranges more than
 // twice per layout.
 //
-// A layout that changes lays out again before its window draws the next frame (`FrameQueue`), so
-// a page shown, pushed or changed is drawn laid out from its first frame.
+// A layout that changes lays out again before its window syncs and draws the next frame
+// (`FrameQueue`), so a page shown, pushed or changed is drawn laid out from its first frame.
 Item {
     id: root
 

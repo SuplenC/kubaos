@@ -3,9 +3,11 @@ pragma Singleton
 import QtQuick
 
 // The layouts that changed since their window's last frame, laid out as that window starts its
-// next one, before it polishes and draws: a layout shown, resized or given new children is drawn
+// next one, before it syncs and draws: a layout shown, resized or given new children is drawn
 // laid out in its first frame, never one frame late. `Layout` queues itself here as well as with
 // `Qt.callLater`, which runs before the next frame on some platforms and after it on others.
+// `afterAnimating` comes after the frame's polish, so a Qt positioner or view a flush resizes
+// polishes on the next frame; bind such an item to the layout's size, not to a polish of its own.
 QtObject {
     id: queue
 
@@ -33,9 +35,13 @@ QtObject {
 
     // Lays out every layout waiting, and those that laying them out makes wait, until none does.
     function flush(): void {
-        for (const window of queue.windows)
-            window.afterAnimating.disconnect(queue.flush);
+        const windows = queue.windows;
         queue.windows = [];
+        // A window can be gone by now: Quickshell deletes a layer window each time it hides.
+        for (const window of windows) {
+            if (window && window.afterAnimating)
+                window.afterAnimating.disconnect(queue.flush);
+        }
         queue.flushing = true;
         const times = new Map();
         while (queue.waiting.length > 0) {
