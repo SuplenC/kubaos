@@ -51,6 +51,7 @@ use kotodama_kubaos::updates;
 use kotodama_kubaos::updates::Pending;
 use kotodama_kubaos::wallpapers;
 use kotodama_kubaos::wallpapers::WallpaperSets;
+use kotodama_kubaos::watched;
 use kotodama_protocol::Clipboard;
 use kotodama_protocol::Error;
 use kotodama_protocol::FromExtension;
@@ -290,7 +291,7 @@ fn watch(dir: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
         RecursiveMode::NonRecursive,
         SETTLE,
         // The check writes through a temporary file and a rename onto `file`.
-        move |event, _| event.paths.contains(&changed),
+        move |event, _| watched::changes(event, &changed),
         move |_| {
             let _ = events.send(Event::Own(Own::Pending(Pending::read(&file))));
         },
@@ -343,7 +344,7 @@ fn watch_keyboards(files: KeyboardFiles, events: Sender<Event<Own>>) -> Option<W
         SETTLE,
         // `kubaos keyboard` writes the settings, and its helper the system's file, through a
         // temporary file and a rename, as the update check does.
-        move |event, _| event.paths.iter().any(|path| *path == mine || *path == system),
+        move |event, _| watched::changes(event, &mine) || watched::changes(event, &system),
         move |_| {
             let _ = events.send(Event::Own(Own::Keyboards(files.read())));
         },
@@ -367,7 +368,7 @@ fn watch_wallpaper_sets(file: PathBuf, events: Sender<Event<Own>>) -> Option<Wat
         RecursiveMode::NonRecursive,
         SETTLE,
         // `dot-theme` writes the file through a temporary one and a rename.
-        move |event, _| event.paths.contains(&changed),
+        move |event, _| watched::changes(event, &changed),
         move |_| {
             let sets = WallpaperSets::read(&wallpapers::sets_dir(), &file);
             let _ = events.send(Event::Own(Own::WallpaperSets(sets)));
@@ -389,7 +390,7 @@ fn watch_drives(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
         RecursiveMode::NonRecursive,
         SETTLE,
         // The automount service writes the file through a temporary one and a rename.
-        move |event, _| event.paths.contains(&changed),
+        move |event, _| watched::changes(event, &changed),
         move |_| {
             let _ = events.send(Event::Own(Own::Drives(Drives::read(&file))));
         },
@@ -421,7 +422,7 @@ fn watch_desk(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
         RecursiveMode::NonRecursive,
         SETTLE,
         // `config/hypr/workspaces.lua` writes the file in place, so its last write settles it.
-        move |event, _| event.paths.contains(&changed),
+        move |event, _| watched::changes(event, &changed),
         move |_| {
             let _ = events.send(Event::Own(Own::Desk(Desk::read(&file))));
         },

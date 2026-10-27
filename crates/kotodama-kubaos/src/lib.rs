@@ -12,6 +12,7 @@
 //! - The date answers, from the clock popup's engine.
 //! - The monitor answers (`cpu`, `ram`, `battery`) and the process search, from the system
 //!   monitor.
+//! - Which events of the files it watches are changes: `watched`.
 //!
 //! # Not here
 //!
@@ -37,6 +38,7 @@ pub mod run;
 pub mod toggles;
 pub mod updates;
 pub mod wallpapers;
+pub mod watched;
 
 #[cfg(test)]
 mod fake;
