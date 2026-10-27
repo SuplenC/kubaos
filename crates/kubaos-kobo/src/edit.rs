@@ -1,48 +1,11 @@
-//! One-line text editing: a caret, a selection, and the keys a text field
-//! is expected to understand. Pure, so it's tested without a window.
+//! One-line text editing: the keys a text field is expected to understand,
+//! applied to its value and its `Caret` (`kubaos-ui`'s, which the field
+//! draws). Pure, so it's tested without a window.
 //!
 //! Positions are in `char`s, not bytes. Kōbō draws secrets as one bullet
 //! per char, so a position means the same thing in the value and on screen.
 
-/// Caret and selection in the focused field. `anchor == pos` means no
-/// selection; otherwise the selection runs between them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Caret {
-    pub pos: usize,
-    pub anchor: usize,
-}
-
-impl Caret {
-    pub fn at(pos: usize) -> Self {
-        Self { pos, anchor: pos }
-    }
-
-    /// Everything selected, caret at the end.
-    pub fn all(value: &str) -> Self {
-        Self {
-            pos: value.chars().count(),
-            anchor: 0,
-        }
-    }
-
-    pub fn has_selection(self) -> bool {
-        self.pos != self.anchor
-    }
-
-    /// Selection as `start..end`, in chars.
-    pub fn range(self) -> (usize, usize) {
-        (self.pos.min(self.anchor), self.pos.max(self.anchor))
-    }
-
-    /// Clamped to the value's length (the value can change under us).
-    pub fn clamp(self, value: &str) -> Self {
-        let n = value.chars().count();
-        Self {
-            pos: self.pos.min(n),
-            anchor: self.anchor.min(n),
-        }
-    }
-}
+pub use kubaos_ui::component::field::Caret;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Edit {

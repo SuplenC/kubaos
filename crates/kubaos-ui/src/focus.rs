@@ -7,13 +7,15 @@
 //!
 //! # Owns
 //!
-//! - [`focus_ring`], and the ring's geometry at a scale ([`ring_bounds`]).
+//! - [`focus_ring`], and the ring's geometry at a scale ([`ring_bounds`]). Focus moving fades the
+//!   ring out of one control and into the next over [`Duration::Short`], on [`Easing::Standard`].
 //!
 //! # Not here
 //!
 //! - Which control has focus: the app, which moves it with Tab and the arrows.
 
 use std::slice;
+use std::time::Instant;
 
 use iced::Background;
 use iced::Border;
@@ -37,13 +39,18 @@ use iced::advanced::overlay;
 use iced::advanced::renderer;
 use iced::advanced::widget::Operation;
 use iced::advanced::widget::Tree;
+use iced::advanced::widget::tree;
 
+use crate::color;
 use crate::look::Corner;
 use crate::look::Look;
 use crate::look::ring_radius;
+use crate::motion::Tween;
 use crate::scale::Scale;
 use crate::snap::snapped;
 use crate::tokens;
+use crate::tokens::Duration;
+use crate::tokens::Easing;
 
 /// Which colour the ring takes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,7 +76,8 @@ pub fn focus_ring<'a, M: 'a>(
     };
     Element::new(Ring {
         content: content.into(),
-        color: focused.then_some(tint),
+        color: tint,
+        focused,
         radius: radius.into(),
         width: look.scale.thin(),
         scale: look.scale,
@@ -83,8 +91,8 @@ pub fn ring_bounds(bounds: Rectangle) -> Rectangle {
 
 struct Ring<'a, M> {
     content: Element<'a, M>,
-    /// Some while focused.
-    color: Option<Color>,
+    color: Color,
+    focused: bool,
     radius: Corner,
     /// The ring's stroke in logical pixels, whole device pixels at the scale.
     width: f32,
@@ -92,12 +100,31 @@ struct Ring<'a, M> {
     scale: Scale,
 }
 
+/// How much of the ring shows, 0 to 1, fading as focus comes and goes.
+struct Shown(Tween);
+
+impl<M> Ring<'_, M> {
+    fn shown(&self) -> f32 {
+        if self.focused { 1.0 } else { 0.0 }
+    }
+}
+
 impl<M> Widget<M, Theme, Renderer> for Ring<'_, M> {
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<Shown>()
+    }
+
+    fn state(&self) -> tree::State {
+        // A control that is focused when it first shows has its ring at once: nothing moved.
+        tree::State::new(Shown(Tween::new(self.shown(), Duration::Short, Easing::Standard)))
+    }
+
     fn children(&self) -> Vec<Tree> {
         vec![Tree::new(&self.content)]
     }
 
     fn diff(&self, tree: &mut Tree) {
+        tree.state.downcast_mut::<Shown>().0.to(self.shown(), Instant::now());
         tree.diff_children(slice::from_ref(&self.content));
     }
 
@@ -139,6 +166,11 @@ impl<M> Widget<M, Theme, Renderer> for Ring<'_, M> {
         shell: &mut Shell<'_, M>,
         viewport: &Rectangle,
     ) {
+        if let Event::Window(iced::window::Event::RedrawRequested(now)) = event
+            && tree.state.downcast_ref::<Shown>().0.moving(*now)
+        {
+            shell.request_redraw();
+        }
         if let Some(content) = layout.children().next() {
             self.content.as_widget_mut().update(
                 &mut tree.children[0],
@@ -186,9 +218,11 @@ impl<M> Widget<M, Theme, Renderer> for Ring<'_, M> {
                 .as_widget()
                 .draw(&tree.children[0], renderer, theme, style, content, cursor, viewport);
         }
-        let Some(color) = self.color else {
+        let shown = tree.state.downcast_ref::<Shown>().0.value(Instant::now());
+        if shown <= 0.0 {
             return;
-        };
+        }
+        let color = color::alpha(self.color, shown);
         renderer.fill_quad(
             renderer::Quad {
                 bounds: ring_bounds(layout.bounds()),

@@ -168,6 +168,7 @@ pub enum Size {
     Rail,
     Row,
     RowTwoLine,
+    Scrollbar,
     Slider,
     SliderStop,
     SliderThumb,
@@ -181,7 +182,7 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 24] = [
+    pub const ALL: [Size; 25] = [
         Size::Bar,
         Size::Check,
         Size::Chip,
@@ -197,6 +198,7 @@ impl Size {
         Size::Rail,
         Size::Row,
         Size::RowTwoLine,
+        Size::Scrollbar,
         Size::Slider,
         Size::SliderStop,
         Size::SliderThumb,
@@ -226,6 +228,7 @@ impl Size {
             Size::Rail => 236,
             Size::Row => 44,
             Size::RowTwoLine => 56,
+            Size::Scrollbar => 4,
             Size::Slider => 24,
             Size::SliderStop => 4,
             Size::SliderThumb => 16,
@@ -553,6 +556,7 @@ impl Easing {
 /// An opacity laid over a colour role.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Opacity {
+    Backdrop,
     DangerEdge,
     DialogEdge,
     DisabledContainer,
@@ -561,6 +565,7 @@ pub enum Opacity {
     ErrorFill,
     Focus,
     Frame,
+    Glass,
     Hover,
     Locked,
     Log,
@@ -579,7 +584,8 @@ pub enum Opacity {
 
 impl Opacity {
     /// Every opacity.
-    pub const ALL: [Opacity; 22] = [
+    pub const ALL: [Opacity; 24] = [
+        Opacity::Backdrop,
         Opacity::DangerEdge,
         Opacity::DialogEdge,
         Opacity::DisabledContainer,
@@ -588,6 +594,7 @@ impl Opacity {
         Opacity::ErrorFill,
         Opacity::Focus,
         Opacity::Frame,
+        Opacity::Glass,
         Opacity::Hover,
         Opacity::Locked,
         Opacity::Log,
@@ -607,6 +614,7 @@ impl Opacity {
     /// The opacity, 0 to 1.
     pub const fn value(self) -> f32 {
         match self {
+            Opacity::Backdrop => 0.9,
             Opacity::DangerEdge => 0.6,
             Opacity::DialogEdge => 0.25,
             Opacity::DisabledContainer => 0.1,
@@ -615,6 +623,7 @@ impl Opacity {
             Opacity::ErrorFill => 0.3,
             Opacity::Focus => 0.12,
             Opacity::Frame => 0.94,
+            Opacity::Glass => 0.8,
             Opacity::Hover => 0.08,
             Opacity::Locked => 0.5,
             Opacity::Log => 0.85,

@@ -2,8 +2,9 @@ import QtQuick
 import KubaOS.Components as K
 
 // One row of a list: `kubaos-ui`'s `list::list_row`. 44 tall with one line, 56 with a subtitle;
-// 12 inside, a 20 icon, the title in `body_strong`, the subtitle in `small`, a detail in `mono` at
-// the end, and an optional check whose room is kept when unchecked, so the rows' ends line up.
+// 12 inside, a 20 icon, the title in `body_strong`, the subtitle in `small`, chips and a detail in
+// `mono` at the end, and an optional check whose room is kept when unchecked, so the rows' ends
+// line up. Each part is centred on the row's whole height, so a chip moves nothing else.
 // Its corners are concentric inside the list's well. The selected row takes the secondary
 // container, or the error colour on a row whose action can't be taken back (`danger`).
 K.Pressable {
@@ -13,6 +14,8 @@ K.Pressable {
     property string subtitle
     // A short fact at the row's end, in mono: a device path, a size, a code.
     property string detail
+    // Chips near the row's end, as `{ kind, text }`: facts that matter at a glance (Default).
+    property var chips: []
     property string icon: ""
     // The row the keyboard is on, or the one picked in a list of one.
     property bool selected: false
@@ -58,8 +61,8 @@ K.Pressable {
         id: line
 
         x: Tokens.space.s12
-        y: K.Look.snap((root.height - line.implicitHeight) / 2, line.dpr)
         width: root.width - Tokens.space.s12 * 2
+        fixedHeight: root.height
         gap: Tokens.space.s12
         align: "centre"
 
@@ -71,6 +74,7 @@ K.Pressable {
         }
 
         K.Stack {
+            fill: true
             gap: Tokens.space.s4
 
             K.Text {
@@ -89,7 +93,15 @@ K.Pressable {
             }
         }
 
-        K.Fill {
+        Repeater {
+            model: root.chips
+
+            K.Chip {
+                required property var modelData
+
+                kind: modelData.kind
+                text: modelData.text
+            }
         }
 
         K.Text {

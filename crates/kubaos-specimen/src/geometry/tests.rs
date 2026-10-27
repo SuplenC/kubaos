@@ -74,8 +74,10 @@ fn documented_variants() -> BTreeMap<String, (BTreeSet<String>, Fixed)> {
             "width" => Fixed {
                 width: true,
                 height: false,
+                holds: false,
             },
             "none" => Fixed::NONE,
+            "none, holds content" => Fixed::HOLDS,
             other => panic!("{other:?} isn't a fixed measure"),
         };
         let words: BTreeSet<String> = backticked(cells[2]).into_iter().collect();

@@ -19,27 +19,24 @@ mod backend;
 mod battery;
 mod data;
 mod edit;
-mod elide;
-mod field;
-#[cfg(test)]
-mod gallery;
-mod grid;
 mod model;
 mod pointer;
 mod progress;
 mod reveal;
 mod setup;
+#[cfg(test)]
+mod shots;
 mod theme;
 mod thumbs;
 mod tour;
+mod ui;
 mod view;
-mod widgets;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use iced::{Size, Theme, window};
+use iced::{Size, window};
 use kubaos_core::StepId;
 
 use crate::app::{App, Options};
@@ -180,7 +177,7 @@ fn main() -> ExitCode {
     )
     .title(|app: &App| format!("Kōbō · KubaOS {}", app.codename()))
     .subscription(App::subscription)
-    .theme(|_: &App| Theme::custom("dotfiles", theme::iced_palette()))
+    .theme(|app: &App| ui::theme(&app.look()))
     .window(window::Settings {
         size: args.size,
         min_size: Some(Size::new(900.0, 600.0)),
@@ -190,9 +187,9 @@ fn main() -> ExitCode {
         ..window::Settings::default()
     })
     .scale_factor(|app: &App| app.ui_scale)
-    .default_font(theme::SANS)
+    .default_font(kubaos_ui::text::default_font())
     .antialiasing(true);
-    for f in theme::FONTS {
+    for f in kubaos_ui::text::FONTS {
         app = app.font(*f);
     }
     match app.run() {
@@ -246,18 +243,25 @@ fn run_setup(args: Args) -> ExitCode {
         settings.platform_specific.application_id = "kobo".into();
     }
     let mut app = iced::application(
-        move || setup::Setup::new(backend.clone(), tour.lock().ok().and_then(|mut t| t.take()), card),
+        move || {
+            setup::Setup::new(
+                backend.clone(),
+                tour.lock().ok().and_then(|mut t| t.take()),
+                card,
+                scale.unwrap_or(1.0),
+            )
+        },
         setup::Setup::update,
         setup::view,
     )
     .title("Kōbō · Setup")
     .subscription(setup::Setup::subscription)
-    .theme(|_: &setup::Setup| Theme::custom("dotfiles", theme::iced_palette()))
+    .theme(|s: &setup::Setup| ui::theme(&s.look()))
     .window(settings)
     .scale_factor(move |_| scale.unwrap_or(1.0))
-    .default_font(theme::SANS)
+    .default_font(kubaos_ui::text::default_font())
     .antialiasing(true);
-    for f in theme::FONTS {
+    for f in kubaos_ui::text::FONTS {
         app = app.font(*f);
     }
     match app.run() {

@@ -1,6 +1,7 @@
 use std::time;
 
 use super::Motion;
+use super::Tween;
 use super::ease;
 use crate::tokens::Duration;
 use crate::tokens::Easing;
@@ -93,4 +94,32 @@ fn durations_grow_from_instant_to_scene() {
     .map(Duration::ms);
 
     assert_eq!(ms, [0, 100, 200, 300, 500, 800, 1200]);
+}
+
+#[test]
+fn a_tween_moves_from_where_it_is_to_each_new_value() {
+    let start = std::time::Instant::now();
+    let mut tween = Tween::new(0.0, Duration::Short, Easing::Linear);
+    tween.to(1.0, start);
+    let half = start + time::Duration::from_millis(100);
+
+    assert!((tween.value(half) - 0.5).abs() < 1e-3);
+    assert!(tween.moving(half));
+    tween.to(0.0, half);
+    assert!((tween.value(half) - 0.5).abs() < 1e-3);
+    let done = half + time::Duration::from_millis(200);
+    assert!(tween.value(done).abs() < 1e-6);
+    assert!(!tween.moving(done));
+}
+
+#[test]
+fn the_same_target_again_restarts_nothing() {
+    let start = std::time::Instant::now();
+    let mut tween = Tween::new(0.0, Duration::Short, Easing::Linear);
+    tween.to(1.0, start);
+    let later = start + time::Duration::from_millis(100);
+
+    tween.to(1.0, later);
+
+    assert!((tween.value(later) - 0.5).abs() < 1e-3);
 }

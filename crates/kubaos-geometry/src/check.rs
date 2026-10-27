@@ -75,8 +75,16 @@ struct Walk<'a> {
     instances: &'a mut Vec<Instance>,
 }
 
+/// A box around the node being checked, as a finding names it.
+struct Ancestor {
+    label: String,
+    bounds: Rect,
+    /// Whether its content scrolls in it.
+    scrolls: bool,
+}
+
 impl Walk<'_> {
-    fn node(&mut self, node: &Node, path: &mut Vec<String>, ancestors: &mut Vec<(String, Rect)>) {
+    fn node(&mut self, node: &Node, path: &mut Vec<String>, ancestors: &mut Vec<Ancestor>) {
         self.device_grid(node, path);
         self.scale_grid(node, path);
         self.fits(node, path, ancestors);
@@ -98,7 +106,11 @@ impl Walk<'_> {
         self.icons_centred(node, path);
 
         let label = node.role.label();
-        ancestors.push((label.clone(), node.bounds));
+        ancestors.push(Ancestor {
+            label: label.clone(),
+            bounds: node.bounds,
+            scrolls: node.role == Role::Scroll,
+        });
         for (index, child) in node.children.iter().enumerate() {
             let segment = !matches!(node.role, Role::Box);
             if segment {
@@ -196,7 +208,7 @@ impl Walk<'_> {
     }
 
     /// Text that fits its box, and text and icons inside every box around them.
-    fn fits(&mut self, node: &Node, path: &[String], ancestors: &[(String, Rect)]) {
+    fn fits(&mut self, node: &Node, path: &[String], ancestors: &[Ancestor]) {
         let b = node.bounds;
         if let Role::Text { natural, .. } = &node.role
             && (self.device(natural.width - b.width) >= EPSILON || self.device(natural.height - b.height) >= EPSILON)
@@ -211,11 +223,16 @@ impl Walk<'_> {
         if !matches!(node.role, Role::Text { .. } | Role::Icon { .. }) {
             return;
         }
-        let outside = ancestors.iter().rev().find(|(_, a)| {
-            self.device(a.x - b.x) >= EPSILON
-                || self.device(a.y - b.y) >= EPSILON
-                || self.device(b.right() - a.right()) >= EPSILON
-                || self.device(b.bottom() - a.bottom()) >= EPSILON
+        // From the nearest scroll out, the content may run above or below the boxes around it:
+        // that is scrolling, not clipping. Scrolls only scroll down, so across it still clips.
+        let mut scrolled = false;
+        let outside = ancestors.iter().rev().find_map(|ancestor| {
+            let a = ancestor.bounds;
+            let across = self.device(a.x - b.x) >= EPSILON || self.device(b.right() - a.right()) >= EPSILON;
+            let down = self.device(a.y - b.y) >= EPSILON || self.device(b.bottom() - a.bottom()) >= EPSILON;
+            scrolled |= ancestor.scrolls;
+            let clipped = across || (down && !scrolled);
+            clipped.then_some((&ancestor.label, a))
         });
         if let Some((label, a)) = outside {
             let message = format!("{b} sticks out of its {label}, {a}");
@@ -279,8 +296,8 @@ impl Walk<'_> {
         }
     }
 
-    /// `nodes` sharing a start, centre or end on `axis`, as `align` says. Centres may differ by half
-    /// a device pixel, where centring on whole pixels had an odd one to share.
+    /// `nodes` sharing a start, centre or end on `axis`, as `align` says. Centres may differ by
+    /// half a device pixel, where centring on whole pixels had an odd one to share.
     fn lined_up(&mut self, nodes: &[&Node], axis: Axis, align: Align, path: &[String], role: &Role, what: &str) {
         let Some(first) = nodes.first() else {
             return;
@@ -433,7 +450,8 @@ fn identical(instances: &[Instance], findings: &mut Vec<Finding>) {
                 .iter()
                 .find(|other| same_scale(other.scale, instance.scale))
                 .unwrap_or(&first);
-            if !same_parts(&instance.parts, &reference.parts) {
+            // A card or a page holds whatever the app puts in it, so its parts are the content's.
+            if !first.fixed.holds && !same_parts(&instance.parts, &reference.parts) {
                 differences.push(format!(
                     "places its parts at {}, where {} has {}",
                     describe(&instance.parts),

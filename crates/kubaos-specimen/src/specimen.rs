@@ -6,7 +6,8 @@
 //!
 //! # Not here
 //!
-//! - Each page's content: [`crate::pages`]. The window: [`crate::app`]. Screenshots: [`crate::shot`].
+//! - Each page's content: [`crate::pages`]. The window: [`crate::app`]. Screenshots:
+//!   [`crate::shot`].
 
 use iced::Background;
 use iced::Border;
@@ -116,12 +117,7 @@ pub enum Message {
     Key(iced::keyboard::Event),
     /// A press on a sample: the components look enabled, and nothing happens.
     Sample,
-    /// Typing in a sample field, which keeps its sample text.
-    Typed,
 }
-
-/// The id of the field the specimen shows focused, so its caret shows.
-pub const FOCUSED_FIELD: &str = "specimen-focused-field";
 
 /// The id of the specimen's whole content, which a screenshot measures.
 pub const ROOT: &str = "specimen-root";
@@ -177,7 +173,7 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         .push(tabs)
         .push(fill())
         .push(text("Tab, ← → pages · M mode", Type::Caption, c.on_surface_variant))
-        .push(chip(look, ChipKind::Neutral, scale, None, None::<Message>))
+        .push(chip(look, ChipKind::Neutral, scale, None, None, None::<Message>))
         .push(
             icon_button(glyph, label)
                 .kind(Kind::Text)

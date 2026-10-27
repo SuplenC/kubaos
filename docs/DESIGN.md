@@ -31,7 +31,7 @@ In priority order: when two conflict, the higher one wins.
 
 ## Reference look
 
-Kōbō is the reference. Kuba designed it; the shell's look was inherited from someone else's config. Every front end aligns towards Kōbō, and Kōbō's own drift (off-grid paddings, hand-made buttons) was fixed first, in `kubaos-ui`. When a shell surface and Kōbō disagree on something this file doesn't settle, Kōbō is right until this file says otherwise.
+Kōbō is the reference. Kuba designed it; the shell's look was inherited from someone else's config. Every front end aligns towards Kōbō. Its look became `kubaos-ui`, its own drift (off-grid paddings, hand-made buttons) fixed on the way, and Kōbō is now built from `kubaos-ui` alone: every install and setup screen is the components below, held to the geometry check at every scale, light and dark (see "Checks"). When a shell surface and Kōbō disagree on something this file doesn't settle, Kōbō is right until this file says otherwise.
 
 ## Colour
 
@@ -44,7 +44,7 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 - **Cold accent** (`cold`, from matugen's tertiary): the blue of the sign's dakuten. With `scheme-fidelity` tertiary is the wallpaper's complement, so cold follows the wallpaper. Use it rarely: the focus ring on picked cards, where the accent already means picked, and a demo or preview badge. It is never a second primary. It is configurable: the complement is the default, and the user may pick another. *Not enforced yet: lands in #154.*
 - **Warning** is ours (Material 3 has none): amber between fine and the error colour, for a reading close to its limit. It keeps its value whatever the wallpaper; the light one is dark enough for text on light surfaces.
 - **Contrast minimums** (WCAG 2.1, `kubaos_ui::color::Contrast`): 4.5:1 for body text and labels; 3:1 for large text (24 px and up, or 19 px semibold and up) and for icons, outlines and other shapes that carry meaning. `kubaos-ui`'s tests hold every pair in both fallback palettes. A custom colour that breaks a minimum is refused, not drawn. *Not enforced yet: lands in #154.*
-- **Opacities** come from `[opacity]`: the state layer (hover 0.08, focus 0.12, press 0.14), disabled content 0.38 and container 0.10, the scrim, tints. A component never picks its own alpha. The shell's frame and its panels are glass (`frame`, 0.94, which Hyprland blurs behind), and an open panel dims the desktop less than a dialog does (`panel_scrim`, 0.20).
+- **Opacities** come from `[opacity]`: the state layer (hover 0.08, focus 0.12, press 0.14), disabled content 0.38 and container 0.10, the scrim, tints, the glass of a panel over a blurred wallpaper (`glass`, 0.80) and the backdrop that dims a wallpaper behind full-screen text (`backdrop`, 0.90, fading to nothing across the screen). A component never picks its own alpha. The shell's frame and its panels are glass (`frame`, 0.94, which Hyprland blurs behind), and an open panel dims the desktop less than a dialog does (`panel_scrim`, 0.20).
 - **Custom colours:** a seed colour, overrides of single roles, and presets (KubaOS neon among them). The contrast minimums hold for all of them. *Not enforced yet: lands in #154.*
 
 ### Light and dark
@@ -112,7 +112,7 @@ A single-line control's label takes the control's content box as its line height
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; column 560; rail 236; log 232; the shell's panel 384 and bar 40 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40 |
 
 - **Boxes land on device pixels.** Lengths on the grid do so by themselves. A box sized by its text (a label, a chip, a toast) is a fraction of a pixel wide; `kubaos-ui` rounds every such box up to the next device pixel (`snap`), and centring rounds its offset to a whole one (`centre`). A grid splits its width in device pixels, so its columns differ by one device pixel at most (`grid`).
 - **Hairlines are one device pixel** at every scale (`stroke.hairline_device_px`): dividers, card, field and well outlines, the switch track. They are the one length not on the grid.
@@ -234,13 +234,15 @@ Each component reports its shared name, its variant (the words below that apply,
 | `ProgressBar` | none | height | full |
 | `Dialog` | tone `Normal`, `Danger` | width | surface |
 | `ErrorBlock` | `long` | none | surface |
-| `List`, `EmptyList`, `Card`, `ChoiceCard`, `Toast`, `Log` | none | none | surface |
-| `Page`, `Header`, `Section`, `Divider`, `Labelled`, `Note`, `EmptyState` | none | none | none |
+| `List`, `EmptyList`, `Toast`, `Log` | none | none | surface |
+| `Card`, `ChoiceCard` | none | none, holds content | surface |
+| `Page`, `Section` | none | none, holds content | none |
+| `Header`, `Divider`, `Labelled`, `Note`, `EmptyState` | none | none | none |
 <!-- variants:end -->
 
 The set is **closed**. Every component takes the look (colours, mode, scale) and tokens, never a length, colour or duration of its own. A new kind, size or component changes this file first, then both libraries. **Composed blocks** (a settings row with a switch, a Wi-Fi row with its lock) are built from these, shadcn-style, in the app or the library, and add no new look.
 
-Every interactive component has these states, shown in the specimen: **resting, hovered, pressed, focused, disabled**. Hover and press lay a state layer of the content colour over the fill (`opacity.hover` 0.08, `opacity.press` 0.14). The layer fades in and out over `micro`. *Not enforced yet in iced: lands in #148 (`kubaos-ui` switches it at once today).* Focus is the focus ring. Disabled dims the content to 0.38 and the container to 0.10 and takes no input.
+Every interactive component has these states, shown in the specimen: **resting, hovered, pressed, focused, disabled**. Hover and press lay a state layer of the content colour over the fill (`opacity.hover` 0.08, `opacity.press` 0.14). The layer fades in and out over `micro`. Focus is the focus ring. Disabled dims the content to 0.38 and the container to 0.10 and takes no input.
 
 ### Layout
 
@@ -256,8 +258,12 @@ Every interactive component has these states, shown in the specimen: **resting, 
 | `Divider` | `layout::divider` | A hairline across, in the soft outline. |
 | `Fill` | `layout::fill` | Room that pushes what follows to the row's far end. |
 | `Gap` | `layout::gap` | Empty room of one spacing token, where a stack needs one larger step. |
+| `Flow` | `layout::flow` | Children side by side, a spacing token apart both ways, a new line started where the next doesn't fit: chips, tags, checkboxes. Its lines tell the geometry check nothing; each child still says what it is. |
+| `Scroll` | `layout::scroll` | A page's content taller than its room. The thumb is 4 wide (`scrollbar`), 4 in from the edge, a pill in the outline variant (the outline while the pointer is on it), floating over the content so it takes no width: content that runs to the edge leaves 16 on its right. A scroll clips, and the focus ring stands 4 outside its control, so a page's scroll scrolls a box 4 larger than itself on every side with its content 4 in: the content lines up with what is around it, and every ring inside shows whole. |
 
-Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so a view built from these can't leave the scale. Text in a type style is `Text` (`text::text`); a symbol is `Icon` (`icon::icon`). In the shell, where a window's title or a notification's body must keep to its lines, QML's `Text` takes `maximumLines`: the last line it keeps ends in an ellipsis at its room.
+A `Grid` row is as tall as its tallest child, and a child that fills its height is stretched to the row, so cards side by side end together (`card::card_sized`). Rows may all be as tall as the tallest (`uniform_rows`): Kōbō's four summary cards are one size. A grid can fill all the height there is (`fill_height`), sharing it between its rows: columns of lists that run to the page's foot; in a scroll, where the height has no end, each row keeps its own. `layout::page_clear` is a `Page` with nothing behind it, over a surface of its own (Kōbō's glass panel, a pane beside a rail).
+
+Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so a view built from these can't leave the scale. Text in a type style is `Text` (`text::text`); a symbol is `Icon` (`icon::icon`). Text in a box of fixed height (a row's title, a card's name) is one line that ends in an ellipsis where it doesn't fit (`text::line`), so a long name never wraps out of its box. In the shell, where a window's title or a notification's body must keep to its lines, QML's `Text` takes `maximumLines`: the last line it keeps ends in an ellipsis at its room.
 
 ### Buttons
 
@@ -285,13 +291,14 @@ Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so 
 | `Lg` | 48 (`control_lg`) | `button_large` | 24 | 8 | 32 (16) | The one main action of a big page: Kōbō's Install. |
 
 - A label button has the control radius, 12; an icon button is a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon sits in a box the label's line tall, centred on a device pixel, so an icon never changes a button's height.
+- **A held button** (`Button::on_hold`) is pressed for a while instead of clicked: the press going down and coming up (or the pointer leaving) are the app's to time, and a `timed_bar` beside it shows how far along the hold is. It is for the one action of a screen that destroys what was there, where a dialog would only ask the same question again: Kōbō's Install, held for 1.1 s with the mouse or Enter.
 - **`IconButton` is a circle as tall as the label button of its size** (32, 40, 48), in all four kinds. **Its label is a required argument.** It is the accessible name, and shows in a `Hint` while the pointer is over it or the keyboard is on it: a bubble in the inverse colours, `label` type, padding 8 × 4, the small radius (4), centred under the control 4 below its focus ring (8 below the control). An icon alone says nothing out loud, so an icon button can't be built without its label.
 
 ### Inputs
 
 | Name | Rust | What |
 |---|---|---|
-| `Field` | `field::field(value, placeholder)` | One line of text, 40 tall (`control_md`), the control radius (12), a hairline outline plus the focus ring. `body_large` text. An optional 20 icon leads it, the text starting at 40. A placeholder is a hint, never a value that looks typed. States: normal, `Invalid` (error colour, the reason in the note), `Locked` (read-only, dimmed, never focused). Passwords show bullets. |
+| `Field` | `field::field(value, placeholder)` | One line of text, 40 tall (`control_md`), the control radius (12), a hairline outline plus the focus ring. `body_large` text. An optional 20 icon leads it, the text starting at 40. A placeholder is a hint, never a value that looks typed. States: normal, `Invalid` (error colour, the reason in the note), `Locked` (read-only, dimmed, never focused). Passwords show one bullet per character. The app owns the value and its editing: it keeps the `Caret` (where it is, what is selected), turns keys into edits, and gives the field both; the field draws the selection and a caret the thin stroke wide that blinks (solid for 530 ms after it moves, so it never hides while you type), scrolls the text sideways to keep the caret in view, and turns presses and drags into `Pointer`s. Real keys, a scripted tour and the tests all edit through the same code. |
 | `Labelled` | `field::labelled` | A control under its `label`-type label, with an optional small action at the label's right (Show, a small button) and an optional note under it. The label row is 32 tall whether or not it has an action, so fields side by side line up. |
 | `Note` | `field::note` | The `small` line under a field: muted, or the error colour when invalid. |
 | `Switch` | `switch::switch` | On or off, 44 × 24, the knob 12 off and 16 on, a hairline track. It takes effect at once; Space, Enter or a click toggles. |
@@ -306,9 +313,9 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 | Name | Rust | What |
 |---|---|---|
 | `List` | `list::list` | Rows in a well: the surface radius (24), padding 12, rows 4 apart, so the rows take 24 − 12 = 12, the control radius (concentric). The focus ring goes round the well; the row shows where the keyboard is. |
-| `ListRow` | `list::list_row(title)` | 44 tall with one line (`row`), 56 with a subtitle (`row_two_line`). Padding 12, a 20 icon, the title in `body_strong`, subtitle in `small`, a detail in `mono` at the end, an optional check whose room is kept when unchecked so row ends line up. The selected row takes `secondary_container`, or `error` on a row whose action can't be taken back (Shut down). |
+| `ListRow` | `list::list_row(title)` | 44 tall with one line (`row`), 56 with a subtitle (`row_two_line`). Padding 12, a 20 icon, the title in `body_strong`, subtitle in `small`, each one line that ends in an ellipsis; chips near the end for facts that matter at a glance (Default, Too small, To do), a detail in `mono` at the end, an optional check whose room is kept when unchecked so row ends line up. Each part is centred on the row's whole height, so a chip moves nothing else. The selected row takes `secondary_container`, or `error` on a row whose action can't be taken back (Shut down). A list taller than its room scrolls inside its well (`list::scrolling_list`), its thumb in the well's padding. |
 | `EmptyList` | `list::empty_list` | The well with nothing in it: one centred line. |
-| `Chip` | `chip::chip` | A short fact or pick, 24 tall (`chip`) at the control radius, 12, which on a chip is a pill, `label` type, an optional 16 icon 4 from the label, an optional close. Its left side pads 12, or 8 with an icon; its right pads 12, or nothing when the close button (a 24 circle) ends it. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview). |
+| `Chip` | `chip::chip` | A short fact or pick, 24 tall (`chip`) at the control radius, 12, which on a chip is a pill, `label` type, an optional 16 icon 4 from the label, an optional close. A pick may also be pressed, with the state layer: Kōbō's picked layouts, where a press makes one the default. Its left side pads 12, or 8 with an icon; its right pads 12, or nothing when the close button (a 24 circle) ends it. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview). |
 | `Card` | `card::card` | A surface inside the page: the well's surface, a soft hairline, the surface radius (24), 16 inside. |
 | `ChoiceCard` | `card::choice_card` | One of a few cards to pick from, at the surface radius (24). Picked: `secondary_container` and an accent hairline. Its focus ring is cold, since the accent already means picked. |
 
@@ -318,8 +325,8 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 |---|---|---|
 | `Dialog` | `dialog::dialog`, `dialog::prompt` | A question over a dimmed screen: one width (500, `dialog`), padding 32, the surface radius (24), the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under it, the buttons 32 under the last: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. A prompt asks for something only the user can type (a password): a `Normal` dialog with a `Labelled` field 16 under the body, Enter in the field doing what its action does. In QML it is a `Dialog` with the field as its child. |
 | `Scrim` | `dialog::scrim` | Everything behind a dialog, dimmed (`opacity.scrim`). |
-| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, the surface radius (24), which on one line is a pill. It arrives over `short` and leaves over `medium` (`standard_accel`). *Not enforced yet in iced: lands in #148 (`toast` is static today).* |
-| `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work over `short` on the `linear` curve. *Not enforced yet in iced: lands in #148 (the bar jumps today).* |
+| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, the surface radius (24), which on one line is a pill. It arrives over `short`, rising 32 into place as it fades in (`emphasized_decel`), stays 3.6 s, and leaves over `medium`, fading out (`standard_accel`): `toast::toast_at` draws it at an age. |
+| `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work over `short` on the `linear` curve; a bar that shows up already part full starts there. A fraction the app already times against the clock (how long a button has been held) is drawn as given (`progress::timed_bar`), with no easing to trail behind it. |
 | `Spinner` | `progress::spinner` | Work that doesn't know: an icon size (16, 20 or 24 beside text; 32 and 48 for a page's one spinner), a thin arc over a faint full ring. The caller passes the time; the arc turns and breathes with it. |
 | `EmptyState` | `empty::empty_state` | A place with nothing in it, centred: a 32 icon, 12 below it a `subheading` title, 4 below that a `body` line saying what to do, and 16 below that an optional action. Never a bare "No items". |
 | `ErrorBlock` | `error::error_block` | What broke and what to do next: a 24 error icon, 16 from the message in `subheading` (`body_strong` past 90 characters, since a whole command line in 16 px semibold is a wall), the hint in `body` 4 under it, on the error container with an error hairline, the surface radius (24), padding 20. |
@@ -328,7 +335,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 
 Rules the feedback components carry:
 
-- **Destructive actions confirm.** Erasing, deleting or overwriting asks first in a `Dialog` with tone `Danger` and a `Danger` button naming the action ("Erase and install"), with Cancel as the dismiss button. The sentence naming what goes is exact and calm (`docs/BRAND.md`, rule 4).
+- **Destructive actions confirm.** Erasing, deleting or overwriting asks first in a `Dialog` with tone `Danger` and a `Danger` button naming the action ("Erase and install"), with Cancel as the dismiss button. Where the destruction is the screen's whole point and the screen already says exactly what goes (Kōbō's Last chance), a held `Danger` button confirms instead: no dialog asks the same question twice. The sentence naming what goes is exact and calm (`docs/BRAND.md`, rule 4).
 - **Errors carry a hint and a log.** An `ErrorBlock` says what broke and the next action; the `Log` behind it holds the detail, with a way to save it. An error with no next action isn't finished.
 - **One `Filled` button per screen**, so the next step is never in doubt.
 
@@ -353,7 +360,7 @@ Everything works from the keyboard, in every app, the same way. Shortcuts are on
 
 A new surface implements the whole map, not the keys it happens to need. Today neither front end has all of it:
 
-- **Kōbō** (`translate` in `crates/kubaos-kobo/src/app.rs`): Tab and Shift+Tab, the arrows, Home and End, Page Up and Page Down, Enter once per press, Space, Esc. Not yet: Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K and h j k l; they land in #148.
+- **Kōbō** (`translate` in `crates/kubaos-kobo/src/app.rs`): Tab and Shift+Tab, the arrows, Ctrl+N, Ctrl+P, Ctrl+J and Ctrl+K (in its search fields too), h j k l where no field takes the letters (on the Language and Time zone screens, typing goes to the search), Home and End, Page Up and Page Down, Enter once per press, Space, Esc.
 - **The shell's lists** (`config/quickshell/components/NavList.qml`): ↑ ↓, Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K, j and k, Home and End, Page Up and Page Down, Enter once per press; in a list laid out across, ← → and h and l. Plain letters and Home and End stay the field's where a text field forwards its keys to the list. `KubaOS.Components` presses a focused control with Enter or Space, once per press.
 
 ### Focus
@@ -361,8 +368,8 @@ A new surface implements the whole map, not the keys it happens to need. Today n
 - **Always visible.** The focused control draws the focus ring: 4 outside the control (`focus.offset`), concentric (the control's radius plus 4), its outer stroke `stroke.thin` rounded to whole device pixels. It is the accent, or the cold accent on a `ChoiceCard`, where the accent already means picked.
 - **Focus never moves layout.** The ring takes no space; a focused control is the same box as a resting one. The geometry check compares them.
 - **One place at a time.** The app owns where focus is and passes it to components as a flag; a list shows its focused row by its own selection, and the ring goes round the list.
-- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it, onto its last action unless it names another (a `Danger` dialog starts on Cancel, a prompt in its field); Tab goes round its field and buttons and never leaves it; closing it puts focus back where it was, and Esc closes it as its dismiss button does. *Not enforced yet in iced: lands in #148.*
-- Focus moves over `short` with `standard`: the ring fades out of one control and into the next. *Not enforced yet in iced: lands in #148; the ring jumps there today.*
+- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it, onto its last action unless it names another (a `Danger` dialog starts on Cancel, a prompt in its field); Tab goes round its field and buttons and never leaves it; closing it puts focus back where it was, and Esc closes it as its dismiss button does. The app owns focus, so it does this: Kōbō's power menu names Cancel, so Enter twice in a row never takes the machine down.
+- Focus moves over `short` with `standard`: the ring fades out of one control and into the next.
 
 ### Scaling
 
@@ -469,7 +476,7 @@ A marker sits on the line directly above the code it allows, with no other comme
 | `scale-grid` | A component's fixed width or height isn't a multiple of 4, a layout's gap isn't on the spacing scale, an icon's box isn't square or on the grid. |
 | `sibling-gap` | Two children of a row, stack or grid aren't exactly the layout's gap apart. |
 | `alignment` | Children of a stack don't share their left edge, or their centre when centred; children of a row don't share their top, centre or bottom; a grid's cells leave their column or row. Centres may differ by half a device pixel, where an odd one had to go to a side. |
-| `identical` | Two instances of one component and variant (`Button`, `Filled Md`) differ in a measure the component fixes (a button's height, an icon button's both), at any scale, or place their icons and label differently along it. Focused, hovered and disabled are the same variant, so focus moving anything fails here. |
+| `identical` | Two instances of one component and variant (`Button`, `Filled Md`) differ in a measure the component fixes (a button's height, an icon button's both), at any scale, or place their icons and label differently along it. A component that holds content (a card, a choice card, a page, a section: "holds content" in the table) holds whatever the app puts in it, so where its parts sit is the content's and isn't compared; it says so in its probe (`fixed.holds`). Focused, hovered and disabled are the same variant, so focus moving anything fails here. |
 | `clipped-text` | A text needs more room than its box, or a text or icon sticks out of a box around it. |
 | `icon-centre` | An icon alone in its slot, or in a centred row, is more than half a device pixel off the slot's centre. |
 | `mode-invariant` | A page's light frame has other boxes than its dark one. Words may differ; where each box sits may not. |
@@ -482,6 +489,8 @@ kubaos-specimen check: 48 frame(s), 120 finding(s)
 ```
 
 That run is iced centring a row's children by half a device pixel at 1.25, before `kubaos-ui` moved them onto whole ones. `kubaos-specimen check DIR` also writes each frame to `DIR` as JSON.
+
+**Kōbō's screens** are held to the same rules: `every_screen_keeps_to_the_grid` (`crates/kubaos-kobo/src/shots.rs`, a cargo test) walks the install and setup tours and the states they never reach, and lays every stop out at 1, 1.25, 1.5 and 2, light and dark.
 
 **Optically centred** is two things. A symbol's box is centred in its slot to the device pixel, which the check measures. Its drawing is optically centred in that box by Tabler's grid, which the four we drew follow and the icons page shows beside their relatives.
 
@@ -506,7 +515,7 @@ That run is iced centring a row's children by half a device pixel at 1.25, befor
 }
 ```
 
-Bounds are logical pixels from the page's top left. The roles are `box` (a toolkit's container that claims nothing), `layout` (`axis` `x` or `y`, `gap`, `align` `start`, `centre` or `end`: a `RowLayout`, a `ColumnLayout`), `grid` (`columns`, `gap`, `align`), `component` (the shared `name`, the `variant`'s words, which measures are `fixed`), `text` (`content`, and `natural`: the size its laid-out text needs, `implicitWidth` and `implicitHeight` in QML), `icon` (`name`), and `spacer` (`fill`). A component's name and variant are this file's, so a `Button` in QML and one in iced are held to the same measures.
+Bounds are logical pixels from the page's top left. The roles are `box` (a toolkit's container that claims nothing), `scroll` (a box its content scrolls in: text and icons past it are scrolled out of view, not clipped, so they are held to the boxes inside it only), `layout` (`axis` `x` or `y`, `gap`, `align` `start`, `centre` or `end`: a `RowLayout`, a `ColumnLayout`), `grid` (`columns`, `gap`, `align`), `component` (the shared `name`, the `variant`'s words, which measures are `fixed`), `text` (`content`, and `natural`: the size its laid-out text needs, `implicitWidth` and `implicitHeight` in QML), `icon` (`name`), and `spacer` (`fill`). A component's name and variant are this file's, so a `Button` in QML and one in iced are held to the same measures.
 
 **Parity.** The two libraries implement one spec, so the components page drawn with each is one frame. `qml-specimen` lays `qml/specimen/` out headless with Qt's own `qml` runtime, the Qt Quickshell loads, at 1, 1.25, 1.5 and 2, light and dark, with `kubaos-ui`'s fonts and no others. `kubaos-specimen parity DIR` then holds each QML frame to the geometry rules above and to the iced page's frame, node for node: the same role, name, variant, words and symbol in the same order, every box within a hundredth of a device pixel, and every text's natural size within a hundredth of a logical pixel, since a fraction there is a device pixel somewhere else. Plain boxes are left out: each toolkit wraps content in containers of its own, and they claim nothing. Parity is layout only: it compares where each box is and what it says it is, never how it is drawn, so a colour, radius, stroke, opacity or shadow that differs passes it; the screenshots below are where those show. `just design-check` runs it after the lint and the geometry check, and `nix flake check` as `design-parity`; it is no cargo test, because it needs Qt.
 
@@ -529,7 +538,7 @@ The QML shots come from the same runner, `nix run .#checks.x86_64-linux.qml-spec
 
 ### Screenshot diffs
 
-The specimen's 1× shots are checked in under `design/specimen/`, and the QML components page's 1× and 1.5× dark under `design/specimen/qml/`. A PR that changes how anything looks regenerates them with `kubaos-specimen shots DIR` and `qml-specimen shots DIR` and commits the ones that changed, so the change shows in review as an image diff. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues.
+The specimen's 1× shots are checked in under `design/specimen/`, and the QML components page's 1× and 1.5× dark under `design/specimen/qml/`. A PR that changes how anything looks regenerates them with `kubaos-specimen shots DIR` and `qml-specimen shots DIR` and commits the ones that changed, so the change shows in review as an image diff. Kōbō's tour screens, 1× light and dark, are under `design/kobo/`, from `KOBO_SHOTS=DIR cargo test -p kubaos-kobo --release shots -- --ignored`, which draws every screen at every scale. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues.
 
 ## Changing the design
 

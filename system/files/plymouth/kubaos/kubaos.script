@@ -27,7 +27,7 @@
 #   message           "cryptsetup: ERROR: cryptroot: cryptsetup failed, bad password or options?"
 #   message           "cryptsetup: cryptroot: set up successfully"
 
-# --- palette (crates/kubaos-kobo/src/theme.rs) -----------------------------
+# --- palette (design/tokens.toml, [color.dark]) ----------------------------
 # surface_container_lowest #140d07, the colour neon.py cuts the sign out for.
 # set_background() below sets it, and fades it out on the way down.
 

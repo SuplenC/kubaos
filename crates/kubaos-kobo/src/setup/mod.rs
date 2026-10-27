@@ -1,6 +1,6 @@
 //! `kobo --setup`: first-boot setup on the installed system
 //! (docs/INSTALL-INTERNALS.md, "First boot"). Its own iced application, sharing the
-//! install screens' theme, widgets, key translation and message type.
+//! install screens' look and blocks (`kubaos-ui`, `ui.rs`), key translation and message type.
 //!
 //! A checklist: the cards on the left, the selected one on the right. Each
 //! card is detected fresh on every start (`kubaos_core::setup`), so
@@ -31,9 +31,14 @@ use kubaos_core::setup::{
 pub use view::view;
 
 use crate::app::{Key, Message};
-use crate::edit::{self, Caret, Edit};
-use crate::field::Pointer;
-use crate::theme::motion;
+use crate::edit::{self, Edit};
+use kubaos_ui::Look;
+use kubaos_ui::Mode;
+use kubaos_ui::component::field::Caret;
+use kubaos_ui::component::field::Pointer;
+use kubaos_ui::component::toast;
+use kubaos_ui::motion::Motion;
+use kubaos_ui::tokens;
 use backend::SetupBackend;
 
 /// What the vault's project env folders start with. The folder list is drawn every frame, so the
@@ -47,6 +52,9 @@ const PHONE_POLL: Duration = Duration::from_secs(2);
 /// The laptop shows up in the phone's app within seconds on a home network; one that blocks
 /// discovery never shows it.
 const BY_ADDRESS_AFTER: Duration = Duration::from_secs(30);
+
+/// How long a blocker stays in the accent after Enter on a button that can't go yet.
+pub const FLASH: Duration = Duration::from_millis(tokens::Duration::Slow.ms() as u64);
 
 /// Everything that can have focus on the setup screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,6 +119,10 @@ pub enum Msg {
     Pick(CardId),
     /// A click on one of the vault's folders.
     Folder(String),
+    /// A click on one of the servers.
+    Server(Server),
+    /// A click on one of the two-step login methods.
+    Method(BwMethod),
     CloseRequested,
 }
 
@@ -232,6 +244,12 @@ pub struct Setup {
     pub changed: Instant,
     pub window: Option<window::Id>,
     pub size: Size,
+    /// `--scale`, on top of the display's own.
+    pub ui_scale: f32,
+    /// The display's own scale: with `ui_scale`, the device pixels the views snap to.
+    pub system_scale: f32,
+    /// Light or dark: dark, as on the live ISO; the screenshots draw both.
+    pub mode: Mode,
     pub tour: Option<tour::Tour>,
     /// The card to open on, instead of the first that wants something.
     pub start: Option<CardId>,
@@ -243,14 +261,21 @@ pub struct Setup {
 }
 
 impl Setup {
+    /// The look every view draws with: the mode, at the display's scale times the UI's.
+    pub fn look(&self) -> Look {
+        crate::ui::look(self.mode, self.system_scale * self.ui_scale)
+    }
+
     pub fn new(
         backend: Arc<dyn SetupBackend>,
         tour: Option<tour::Tour>,
         start: Option<CardId>,
+        scale: f32,
     ) -> (Self, Task<Message>) {
         let mut s = Self::headless(backend);
         s.tour = tour;
         s.start = start;
+        s.ui_scale = scale;
         (s, window::oldest().map(Message::Window))
     }
 
@@ -279,6 +304,9 @@ impl Setup {
             window: None,
             // design-allow(size): the window's opening size, not layout.
             size: Size::new(1280.0, 800.0),
+            ui_scale: 1.0,
+            system_scale: 1.0,
+            mode: Mode::Dark,
             tour: None,
             start: None,
             phone_rx: None,
@@ -711,11 +739,11 @@ impl Setup {
         self.status_rx.is_some()
             || self.run_rx.is_some()
             || self.running()
-            || t - self.changed < motion::LARGE
+            || t - self.changed < Motion::default().duration(tokens::Duration::Long)
             || self.toast.is_some()
             || self
                 .flash
-                .is_some_and(|f| t - f < Duration::from_millis(900))
+                .is_some_and(|f| t - f < FLASH)
             || self.tour.is_some()
             || self.phone_rx.is_some()
             || self.polls_phone()
@@ -735,12 +763,19 @@ impl Setup {
             Message::Window(id) => {
                 self.window = id;
                 match id {
-                    Some(id) => window::size(id).map(Message::Resized),
+                    Some(id) => Task::batch([
+                        window::size(id).map(Message::Resized),
+                        window::scale_factor(id).map(Message::Rescaled),
+                    ]),
                     None => Task::none(),
                 }
             }
             Message::Resized(s) => {
                 self.size = s;
+                Task::none()
+            }
+            Message::Rescaled(scale) => {
+                self.system_scale = scale;
                 Task::none()
             }
             Message::Key(k) => {
@@ -787,6 +822,16 @@ impl Setup {
                     self.form.folder_at = i;
                 }
                 self.toggle_folder(&name);
+                Task::none()
+            }
+            Message::Setup(Msg::Server(server)) => {
+                self.set_focus(Some(SF::Server));
+                self.form.server = server;
+                Task::none()
+            }
+            Message::Setup(Msg::Method(method)) => {
+                self.set_focus(Some(SF::Method));
+                self.form.method = method;
                 Task::none()
             }
             Message::Setup(Msg::Pick(id)) => {
@@ -850,7 +895,7 @@ impl Setup {
         if self
             .toast
             .as_ref()
-            .is_some_and(|(_, at)| now - *at > Duration::from_secs(4))
+            .is_some_and(|(_, at)| now - *at > toast::life(toast::DEFAULT_STAY))
         {
             self.toast = None;
         }

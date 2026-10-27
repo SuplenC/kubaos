@@ -471,6 +471,7 @@ K.Stack {
                         K.List {
                             K.ListRow {
                                 title: "English (US)"
+                                chips: [{ kind: "Accent", text: "Default" }]
                                 detail: "us"
                                 checkable: true
                                 checked: true
@@ -574,6 +575,7 @@ K.Stack {
 
                         K.Chip {
                             text: "Italian"
+                            pressable: true
                             removable: true
                         }
 

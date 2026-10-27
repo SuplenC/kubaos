@@ -2,8 +2,8 @@
 //!
 //! Keyboard first (docs/BRAND.md): the app owns focus. Every screen has an
 //! ordered list of focus targets (`App::focus_order`); Tab moves through it,
-//! and keys act on whatever has focus. Text fields are our own (`field.rs`
-//! draws, `edit.rs` edits), so typing goes through `App::key` too. That keeps
+//! and keys act on whatever has focus. Text fields are `kubaos-ui`'s, which draw
+//! and leave the editing to the app (`edit.rs`), so typing goes through `App::key` too. That keeps
 //! one code path for real keys and the synthetic ones the key tour and the
 //! tests send.
 //!
@@ -26,15 +26,23 @@ use iced::keyboard::{self, key::Named};
 use iced::widget::{image, operation};
 use iced::{Size, Subscription, Task, event, window};
 use kubaos_core::Probe;
+use kubaos_ui::Look;
+use kubaos_ui::Mode;
+use kubaos_ui::Scale;
+use kubaos_ui::component::field::Caret;
+use kubaos_ui::component::field::Pointer;
+use kubaos_ui::component::toast;
+use kubaos_ui::motion::Motion;
+use kubaos_ui::tokens;
+use kubaos_ui::tokens::Easing;
 
 use crate::backend::{Backend, RunMsg};
 use crate::battery;
 use crate::battery::Battery;
-use crate::edit::{self, Caret, Edit};
-use crate::field::Pointer;
+use crate::edit::{self, Edit};
 use crate::model::{DiskExt, DiskMode, Form};
 use crate::progress::{Install, Outcome};
-use crate::theme::{self, motion};
+use crate::theme;
 use crate::tour::Tour;
 
 /// Shown when the manifest doesn't name the release.
@@ -179,6 +187,7 @@ pub mod ids {
     pub const SUMMARY_ACCOUNT: &str = "summary-account";
     pub const SUMMARY_DISK: &str = "summary-disk";
     pub const SUMMARY_SYSTEM: &str = "summary-system";
+    pub const SUMMARY_SCROLL: &str = "summary-scroll";
 }
 
 /// Which list the arrow keys move in.
@@ -242,6 +251,8 @@ pub enum Message {
     Tick(Instant),
     Window(Option<window::Id>),
     Resized(Size),
+    /// The display's own scale, under the UI's: on its first frame, and when it moves to another.
+    Rescaled(f32),
     Key(Key),
     /// The mouse moved or clicked: show the pointer again.
     PointerMoved,
@@ -295,10 +306,11 @@ pub struct Options {
     pub scale: Option<f32>,
 }
 
-/// How long the reason a screen can't continue stays highlighted.
-pub const NUDGE: Duration = Duration::from_millis(1200);
+/// How long the reason a screen can't continue takes to fade back from the error colour.
+pub const NUDGE: Duration = Duration::from_millis(tokens::Duration::Slow.ms() as u64);
 
 /// How long the Summary's button (or Enter) must be held.
+// design-allow(duration): how long a press must last before it erases a disk, a safety, not motion.
 pub const HOLD: Duration = Duration::from_millis(1100);
 
 /// How long a stopping install gets to unwind before the machine goes down anyway. A command that
@@ -360,6 +372,11 @@ pub struct App {
     pub nudged: Option<Instant>,
     /// UI scale on top of the system's (see `auto_scale`).
     pub ui_scale: f32,
+    /// The display's own scale, under `ui_scale`: the two together are the device pixels per
+    /// logical pixel that the views snap to.
+    pub system_scale: f32,
+    /// Light or dark. Dark on the live ISO; the screenshots draw both.
+    pub mode: Mode,
     fixed_scale: Option<f32>,
     /// The switch that last flipped, and when (its knob slides).
     pub switched: Option<(F, Instant)>,
@@ -436,6 +453,8 @@ impl App {
             caret: Caret::default(),
             switched: None,
             ui_scale: 1.0,
+            system_scale: 1.0,
+            mode: Mode::Dark,
             fixed_scale: None,
             nudged: None,
             pointer_idle: false,
@@ -644,22 +663,30 @@ impl App {
         r.err()
     }
 
+    /// The look every view draws with: the mode, at the display's scale times the UI's.
+    pub fn look(&self) -> Look {
+        crate::ui::look(self.mode, self.system_scale * self.ui_scale)
+    }
+
+    /// How far the screen has arrived, 0 to 1: a page slides in over `long`.
     pub fn fade(&self) -> f32 {
-        let t = (self.now - self.transition.0).as_secs_f32() / motion::LARGE.as_secs_f32();
-        motion::bezier(motion::EMPHASIZED_DECEL, t)
+        Motion::default().progress(tokens::Duration::Long, Easing::EmphasizedDecel, self.now - self.transition.0)
     }
 
     pub fn animating(&self) -> bool {
         let t = self.now;
-        t - self.transition.0 < motion::LARGE
+        let motion = Motion::default();
+        t - self.transition.0 < motion.duration(tokens::Duration::Long)
             || self.hold.is_some()
-            || t - self.log_open.1 < motion::NORMAL
-            || self.switched.is_some_and(|(_, at)| t - at < motion::SWITCH)
+            || t - self.log_open.1 < motion.duration(tokens::Duration::Medium)
+            || self
+                .switched
+                .is_some_and(|(_, at)| t - at < motion.duration(tokens::Duration::Short))
             || self.nudged.is_some_and(|at| t - at < NUDGE)
             || self
                 .wallpaper
                 .as_ref()
-                .is_some_and(|(_, at)| t - *at < motion::SLOW)
+                .is_some_and(|(_, at)| t - *at < motion.duration(tokens::Duration::Slow))
             || self.toast.is_some()
             || self.probe_rx.is_some()
             || self.run_rx.is_some()
@@ -753,12 +780,12 @@ impl App {
         });
         self.run_rx = Some(rx);
         self.install = Some(Install::new(Instant::now()));
-        self.log_open = (false, self.now - motion::NORMAL);
+        self.log_open = (false, self.now - Motion::default().duration(tokens::Duration::Medium));
         self.go(Screen::Installing)
     }
 
     /// Decodes the wallpaper and glass right away (tests and the state
-    /// gallery, which have no event loop to do it in the background).
+    /// screenshots, which have no event loop to do it in the background).
     #[cfg(test)]
     pub fn load_images_now(&mut self, size: Size) {
         let img = ::image::load_from_memory(theme::WALLPAPER)
@@ -772,7 +799,7 @@ impl App {
         self.ensure_glass();
     }
 
-    /// Decodes the wallpaper thumbnails from `payload_dir` right away (the gallery).
+    /// Decodes the wallpaper thumbnails from `payload_dir` right away (the screenshots).
     #[cfg(test)]
     pub fn load_thumbs_now(&mut self) {
         let sets = self.wallpaper_sets().to_vec();
@@ -781,7 +808,7 @@ impl App {
         }
     }
 
-    /// Pretends the probe already answered (tests and the gallery).
+    /// Pretends the probe already answered (tests and the screenshots).
     #[cfg(test)]
     pub fn set_probe(&mut self, p: Result<Probe, String>) {
         self.probe_rx = None;
@@ -802,7 +829,7 @@ impl App {
             return;
         }
         let Some(src) = &self.blur_src else { return };
-        let r = crate::view::panel_rect(self.size);
+        let r = crate::view::panel_rect(self.size, self.look().scale);
         let (iw, ih) = (src.width() as f32, src.height() as f32);
         let s = (self.size.width / iw).max(self.size.height / ih);
         let ox = (iw * s - self.size.width) / 2.0;
@@ -829,7 +856,10 @@ impl App {
             Message::Window(id) => {
                 self.window = id;
                 match id {
-                    Some(id) => window::size(id).map(Message::Resized),
+                    Some(id) => Task::batch([
+                        window::size(id).map(Message::Resized),
+                        window::scale_factor(id).map(Message::Rescaled),
+                    ]),
                     None => Task::none(),
                 }
             }
@@ -840,6 +870,10 @@ impl App {
                 self.ui_scale = self.fixed_scale.unwrap_or_else(|| auto_scale(base));
                 self.size = Size::new(base.width / self.ui_scale, base.height / self.ui_scale);
                 self.ensure_glass();
+                Task::none()
+            }
+            Message::Rescaled(scale) => {
+                self.system_scale = scale;
                 Task::none()
             }
             Message::Wallpaper(h) => {
@@ -1047,7 +1081,7 @@ impl App {
         if self
             .toast
             .as_ref()
-            .is_some_and(|(_, at)| now - *at > Duration::from_secs(4))
+            .is_some_and(|(_, at)| now - *at > toast::life(toast::DEFAULT_STAY))
         {
             self.toast = None;
         }
@@ -1319,8 +1353,7 @@ impl App {
     pub fn switch_progress(&self, f: F) -> f32 {
         match self.switched {
             Some((g, at)) if g == f => {
-                let t = (self.now - at).as_secs_f32() / motion::SWITCH.as_secs_f32();
-                motion::bezier(motion::STANDARD, t)
+                Motion::default().progress(tokens::Duration::Short, Easing::Standard, self.now - at)
             }
             _ => 1.0,
         }
@@ -1526,7 +1559,8 @@ impl App {
                             self.set_focus(Some(f));
                             self.caret = Caret::at(self.field_value(f).chars().count());
                         }
-                        None => return Task::none(),
+                        // Where no field takes the letters, h j k l move as the arrows do.
+                        None => return vim_arrow(&t).map_or_else(Task::none, |k| self.key(k)),
                     }
                 }
                 self.type_text(&t);
@@ -1897,9 +1931,11 @@ impl App {
             (List::Wifi, Some(c)) => items.iter().position(|x| x == c)? + 1,
             (_, cur) => items.iter().position(|x| Some(x) == cur.as_ref())?,
         };
-        let row = crate::widgets::ROW_HEIGHT + crate::widgets::ROW_GAP;
-        let top = i as f32 * row;
-        let bottom = top + crate::widgets::ROW_HEIGHT;
+        // Rows are a row tall and a gap apart, after the well's padding, which scrolls with them.
+        let height = f32::from(tokens::Size::Row.px());
+        let row = height + f32::from(tokens::Space::S4.px());
+        let top = f32::from(tokens::Space::S12.px()) + i as f32 * row;
+        let bottom = top + height;
         let y = match self.viewports.get(id) {
             Some(&(off, h)) if h > row => {
                 if top < off {
@@ -2008,9 +2044,33 @@ fn battery_watch(watch: &BatteryWatch) -> iced::futures::channel::mpsc::Receiver
     rx
 }
 
+/// The UI scale for a window `window` big: the largest supported scale at which the window still
+/// holds the 1280 × 800 the screens are laid out for, so every length lands on device pixels.
 pub fn auto_scale(window: Size) -> f32 {
-    let s = (window.width / 1280.0).min(window.height / 800.0);
-    ((s * 4.0).floor() / 4.0).clamp(1.0, 3.0)
+    let fits = (window.width / 1280.0).min(window.height / 800.0);
+    Scale::SUPPORTED
+        .iter()
+        .rev()
+        .map(|s| s.factor())
+        .find(|&factor| factor <= fits)
+        .unwrap_or(1.0)
+}
+
+/// h j k l as the arrows, for a list or grid with no field taking the keys.
+fn vim_arrow(text: &str) -> Option<Key> {
+    match text {
+        "h" => Some(Key::Left {
+            word: false,
+            shift: false,
+        }),
+        "j" => Some(Key::Down),
+        "k" => Some(Key::Up),
+        "l" => Some(Key::Right {
+            word: false,
+            shift: false,
+        }),
+        _ => None,
+    }
 }
 
 /// Moves each scrollable to its vertical offset.
@@ -2029,6 +2089,10 @@ fn scroll_lists(scrolls: impl IntoIterator<Item = (&'static str, f32)>) -> Task<
 /// iced keyboard event -> our `Key`. The window subscription and the key
 /// tour both go through here.
 pub fn on_event(ev: iced::Event, _status: event::Status, _w: window::Id) -> Option<Message> {
+    // The window moved to a display of another scale: the views snap to its device pixels.
+    if let iced::Event::Window(window::Event::Rescaled(scale)) = ev {
+        return Some(Message::Rescaled(scale));
+    }
     let iced::Event::Keyboard(k) = ev else {
         return None;
     };
@@ -2085,6 +2149,8 @@ pub fn translate(k: &keyboard::Event) -> Option<Key> {
                     _ => None,
                 },
                 keyboard::Key::Character(c) if ctrl => match c {
+                    "n" | "N" | "j" | "J" => Some(Key::Down),
+                    "p" | "P" | "k" | "K" => Some(Key::Up),
                     "a" | "A" => Some(Key::SelectAll),
                     "c" | "C" => Some(Key::Copy),
                     "x" | "X" => Some(Key::Cut),
@@ -2140,6 +2206,8 @@ fn decoded_thumbs(
     crate::thumbs::decode(payload, std::path::Path::new(crate::thumbs::ORIGINALS), set)
         .into_iter()
         .map(|(key, img)| {
+            // Every card's picture is the same shape, so the cards are all one height.
+            let img = crate::thumbs::cropped(&img);
             let (w, h) = img.dimensions();
             (key, image::Handle::from_rgba(w, h, img.into_raw()))
         })

@@ -9,8 +9,14 @@ fn scale_fits_the_output() {
     assert_eq!(at(1440.0, 900.0), 1.0);
     assert_eq!(at(1920.0, 1080.0), 1.25);
     assert_eq!(at(1920.0, 1200.0), 1.5);
-    assert_eq!(at(2880.0, 1800.0), 2.25);
-    assert_eq!(at(3840.0, 2160.0), 2.5);
+}
+
+#[test]
+fn a_big_output_gets_the_largest_supported_scale() {
+    let at = |w, h| auto_scale(Size::new(w, h));
+
+    assert_eq!(at(2880.0, 1800.0), 2.0);
+    assert_eq!(at(3840.0, 2160.0), 2.0);
 }
 
 fn app_with_every_keymap() -> App {
@@ -26,13 +32,11 @@ fn app_with_every_keymap() -> App {
 }
 
 fn shows_row(y: f32, row: usize) {
-    let pitch = crate::widgets::ROW_HEIGHT + crate::widgets::ROW_GAP;
-    let top = row as f32 * pitch;
+    let height = f32::from(tokens::Size::Row.px());
+    let pitch = height + f32::from(tokens::Space::S4.px());
+    let top = f32::from(tokens::Space::S12.px()) + row as f32 * pitch;
     assert!(y <= top, "row {row} at {top} starts above the offset {y}");
-    assert!(
-        top + crate::widgets::ROW_HEIGHT <= y + 4.0 * pitch,
-        "row {row} at {top} is below offset {y}"
-    );
+    assert!(top + height <= y + 4.0 * pitch, "row {row} at {top} is below offset {y}");
 }
 
 #[test]
@@ -654,7 +658,7 @@ fn the_demo_backend_has_a_battery_to_show() {
     assert_eq!(demo.battery(), Some(crate::backend::DEMO_BATTERY));
 }
 
-/// The sizes Kōbō lays out at: the gallery's, and what `auto_scale` leaves of larger outputs.
+/// The sizes Kōbō lays out at: the screenshots', and what `auto_scale` leaves of larger outputs.
 const LAYOUT_SIZES: [(f32, f32); 5] = [
     (1024.0, 768.0),
     (1280.0, 720.0),
@@ -688,8 +692,9 @@ fn last_chance_shows_its_cards_as_an_even_two_by_two_grid() {
             .map(|id| ui.find(Id::new(id)).expect("a summary card").bounds())
             .collect();
 
+        // Columns split the width in device pixels, so they may differ by one.
         for card in &b {
-            assert_eq!(card.width, b[0].width, "at {w}x{h}");
+            assert!((card.width - b[0].width).abs() <= 1.0, "at {w}x{h}");
             assert_eq!(card.height, b[0].height, "at {w}x{h}");
         }
         assert_eq!(b[0].y, b[1].y, "at {w}x{h}");

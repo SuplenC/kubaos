@@ -28,11 +28,10 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 PLY = REPO / "system/files/plymouth/kubaos"
 GRUB = REPO / "system/files/grub/kubaos"
-GUI_FONTS = REPO / "crates/kubaos-kobo/assets/fonts"
+GUI_FONTS = REPO / "crates/kubaos-ui/assets/fonts"
 FONTS = REPO / "system/files/fonts"
 
-# Roles from config/matugen/default-colors.json, as in
-# crates/kubaos-kobo/src/theme.rs.
+# Roles from config/matugen/default-colors.json, as in design/tokens.toml.
 AMBER = "#ffb779"  # primary
 ERROR = "#ffb4ab"  # error
 FIELD = "#261e17"  # surface_container
@@ -121,9 +120,10 @@ def grub() -> None:
 
 
 def fonts() -> None:
+    # JetBrains Mono, the boot's monospace, is kept in FONTS itself: no front end
+    # carries a copy to take it from.
     FONTS.mkdir(parents=True, exist_ok=True)
-    for f in ("Geist-Regular.ttf", "Geist-Medium.ttf", "Geist-OFL.txt",
-              "JetBrainsMono-Regular.ttf", "JetBrainsMono-OFL.txt"):
+    for f in ("Geist-Regular.ttf", "Geist-Medium.ttf", "Geist-OFL.txt"):
         shutil.copy(GUI_FONTS / f, FONTS / f)
 
 

@@ -62,7 +62,7 @@ impl App {
                 self.specimen.seconds = now.saturating_duration_since(self.started).as_secs_f32();
             }
             Message::Key(event) => return self.key(&event),
-            Message::Sample | Message::Typed => {}
+            Message::Sample => {}
         }
         Task::none()
     }

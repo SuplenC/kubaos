@@ -8,12 +8,14 @@ use std::time::{Duration, Instant};
 use iced::advanced::widget::{Id, Operation, operation};
 use iced::{Rectangle, Vector};
 
-use crate::theme::motion;
+use kubaos_ui::motion::ease;
+use kubaos_ui::tokens;
+use kubaos_ui::tokens::Easing;
 
-/// How long the glide takes.
-pub const DURATION: Duration = Duration::from_millis(220);
+/// How long the glide takes: focus moving.
+pub const DURATION: Duration = Duration::from_millis(tokens::Duration::Short.ms() as u64);
 /// Space kept between the control and the viewport's edge.
-pub const MARGIN: f32 = 24.0;
+pub const MARGIN: f32 = tokens::Space::S24.px() as f32;
 
 /// Where the scrollable is and where the control sits in its content.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -62,7 +64,7 @@ impl Glide {
     /// The offset at `now`, and whether the glide is over.
     pub fn at(&self, now: Instant) -> (f32, bool) {
         let t = now.saturating_duration_since(self.at).as_secs_f32() / DURATION.as_secs_f32();
-        let e = motion::bezier(motion::EMPHASIZED_DECEL, t.min(1.0));
+        let e = ease(Easing::EmphasizedDecel, t.min(1.0));
         (self.from + (self.to - self.from) * e, t >= 1.0)
     }
 }

@@ -96,6 +96,7 @@ QtObject {
         readonly property int rail: 236
         readonly property int row: 44
         readonly property int row_two_line: 56
+        readonly property int scrollbar: 4
         readonly property int slider: 24
         readonly property int slider_stop: 4
         readonly property int slider_thumb: 16
@@ -335,6 +336,7 @@ QtObject {
 
     // Opacities laid over a colour role, 0 to 1.
     readonly property QtObject opacity: QtObject {
+        readonly property real backdrop: 0.9
         readonly property real danger_edge: 0.6
         readonly property real dialog_edge: 0.25
         readonly property real disabled_container: 0.1
@@ -343,6 +345,7 @@ QtObject {
         readonly property real error_fill: 0.3
         readonly property real focus: 0.12
         readonly property real frame: 0.94
+        readonly property real glass: 0.8
         readonly property real hover: 0.08
         readonly property real locked: 0.5
         readonly property real log: 0.85

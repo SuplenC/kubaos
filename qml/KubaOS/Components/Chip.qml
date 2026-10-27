@@ -4,10 +4,12 @@ import KubaOS.Components as K
 // A short fact or pick, 24 tall at the control radius, which on a chip is a pill: `kubaos-ui`'s
 // `chip::chip`. The label starts where the curve ends; an icon sits closer in. A removable chip
 // ends in a close button, a circle as tall as the chip, so its hover layer shares the chip's curve.
+// A pressable chip takes a press of its own (a pick made the default), with the state layer.
 Item {
     id: root
 
     signal removed
+    signal activated
 
     property string text
     // `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters) or
@@ -17,6 +19,8 @@ Item {
     property string icon: ""
     // Whether it ends in a close button that sends `removed`.
     property bool removable: false
+    // Whether a press on it sends `activated`.
+    property bool pressable: false
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property var colours: {
@@ -51,6 +55,19 @@ Item {
         anchors.fill: parent
         radius: Tokens.radius.control
         color: root.colours[0]
+    }
+
+    K.Pressable {
+        anchors.fill: parent
+        visible: root.pressable
+        onActivated: root.activated()
+
+        K.StateLayer {
+            radius: Tokens.radius.control
+            content: root.colours[1]
+            hovered: parent.hovered
+            pressed: parent.down
+        }
     }
 
     K.Row {

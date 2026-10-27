@@ -55,9 +55,10 @@ struct Flat<'a> {
     path: String,
 }
 
-/// Every node of `node` but the plain boxes, in order, each with its depth among the kept ones.
+/// Every node of `node` but the plain boxes and scrolls (each toolkit scrolls in its own), in
+/// order, each with its depth among the kept ones.
 fn flatten<'a>(node: &'a Node, depth: usize, path: &str, into: &mut Vec<Flat<'a>>) {
-    if node.role == Role::Box {
+    if matches!(node.role, Role::Box | Role::Scroll) {
         for child in &node.children {
             flatten(child, depth, path, into);
         }

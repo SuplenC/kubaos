@@ -51,7 +51,7 @@ PYTHONPATH=$(echo "$fonttools"/lib/python3*/site-packages) "$python/bin/python3"
   "$tmp/lucide/package/font/lucide.ttf" "$tmp/lucide/package/font/lucide.css" \
   "$tmp/tabler/package/dist/fonts/tabler-icons.ttf" "$tmp/tabler/package/dist/tabler-icons.css"
 
-cp "$repo/crates/kubaos-kobo/assets/fonts/MaterialSymbols-LICENSE.txt" icons/material-LICENSE.txt
+curl -fsSL -o icons/material-LICENSE.txt "https://raw.githubusercontent.com/google/material-design-icons/$material_rev/LICENSE"
 cp "$tmp/phosphor/package/LICENSE" icons/phosphor-LICENSE.txt
 cp "$tmp/lucide/package/LICENSE" icons/lucide-LICENSE.txt
 cp "$tmp/tabler/package/LICENSE" icons/tabler-LICENSE.txt

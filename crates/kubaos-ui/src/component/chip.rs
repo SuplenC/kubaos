@@ -12,7 +12,7 @@ use iced::widget::container;
 use iced::widget::text::IntoFragment;
 
 use crate::color;
-use crate::component::state_layer;
+use crate::component::layered;
 use crate::icon::Icon;
 use crate::icon::icon;
 use crate::layout::Gap;
@@ -57,13 +57,14 @@ impl ChipKind {
     }
 }
 
-/// A chip reading `label`, with an optional leading icon, and a close button sending `on_remove`
-/// when there is one.
+/// A chip reading `label`, with an optional leading icon. Pressing it sends `on_press` when there
+/// is one (a pick made the default), and its close button sends `on_remove` when there is one.
 pub fn chip<'a, M: Clone + 'a>(
     look: &Look,
     kind: ChipKind,
     label: impl IntoFragment<'a>,
     leading: Option<Icon>,
+    on_press: Option<M>,
     on_remove: Option<M>,
 ) -> Element<'a, M> {
     let with_icon = if leading.is_some() { "icon" } else { "" };
@@ -93,16 +94,16 @@ pub fn chip<'a, M: Clone + 'a>(
         let close = widget::button(icon(look, Icon::Close, IconSize::S16, content))
             .padding(Inset::all(Space::S4).padding())
             .on_press(on_remove)
-            .style(move |_theme: &Theme, status| widget::button::Style {
-                background: state_layer(None, content, status),
+            .style(move |_theme: &Theme, _status| widget::button::Style {
+                background: None,
                 text_color: content,
                 border: Border::default().rounded(radius(Radius::Full)),
                 shadow: Shadow::default(),
                 snap: true,
             });
-        body = body.push(close);
+        body = body.push(layered(close, Radius::Full, content, true, None));
     }
-    let view: Element<'a, M> = widget::container(row(look, Gap::NONE).center().push(body))
+    let face = widget::container(row(look, Gap::NONE).center().push(body))
         .height(Length::Fixed(f32::from(Size::Chip.px())))
         .center_y(Length::Fixed(f32::from(Size::Chip.px())))
         .padding(Inset::NONE.left(left).right(right).padding())
@@ -111,7 +112,17 @@ pub fn chip<'a, M: Clone + 'a>(
             border: Border::default().rounded(radius(Radius::Control)),
             text_color: Some(Color { a: 1.0, ..content }),
             ..container::Style::default()
-        })
-        .into();
+        });
+    let Some(on_press) = on_press else {
+        return probe::component("Chip", variant, Fixed::HEIGHT, face);
+    };
+    let pressable = widget::button(face)
+        .padding(0)
+        .on_press(on_press)
+        .style(|_theme: &Theme, _status| widget::button::Style {
+            background: None,
+            ..widget::button::Style::default()
+        });
+    let view = layered(pressable, Radius::Control, content, true, None);
     probe::component("Chip", variant, Fixed::HEIGHT, view)
 }

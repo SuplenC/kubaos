@@ -20,6 +20,7 @@ use iced::Length;
 use iced::Padding;
 use iced::widget;
 use iced::widget::container;
+use iced::widget::text::IntoFragment;
 
 use crate::grid::Grid;
 use crate::look::Look;
@@ -30,6 +31,8 @@ use crate::probe::Fixed;
 use crate::probe::Tag;
 use crate::probe::probe;
 use crate::scale::Scale;
+pub use crate::scroll::Scroll;
+pub use crate::scroll::scroll;
 use crate::snap::centre_x;
 use crate::snap::placed;
 use crate::snap::snap;
@@ -424,21 +427,56 @@ pub fn gap<'a, M: 'a>(space: Space) -> Element<'a, M> {
 /// The insets are Kōbō's panel content, on the grid: 40 at the sides, 32 above, 24 below, where the
 /// footer's buttons sit.
 pub fn page<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Element<'a, M> {
-    let surface = look.colors.surface;
+    page_over(content, Some(look.colors.surface))
+}
+
+/// [`page`] with the page's insets and nothing behind it, over a surface of its own: Kōbō's glass
+/// panel, a pane beside a rail.
+pub fn page_clear<'a, M: 'a>(content: impl Into<Element<'a, M>>) -> Element<'a, M> {
+    page_over(content, None)
+}
+
+fn page_over<'a, M: 'a>(content: impl Into<Element<'a, M>>, surface: Option<iced::Color>) -> Element<'a, M> {
     let view: Element<'a, M> = widget::container(content)
         .width(Length::Fill)
         .height(Length::Fill)
-        .padding(Inset::x(Space::S40).top(Space::S32).bottom(Space::S24).padding())
+        .padding(PAGE_INSET.padding())
         .style(move |_theme| container::Style {
-            background: Some(Background::Color(surface)),
+            background: surface.map(Background::Color),
             ..container::Style::default()
         })
         .into();
-    probe::component("Page", ["", "", ""], Fixed::NONE, view)
+    probe::component("Page", ["", "", ""], Fixed::HOLDS, view)
+}
+
+/// A page's insets: 40 at the sides, 32 above, 24 below.
+pub const PAGE_INSET: Inset = Inset {
+    top: Gap(Some(Space::S32)),
+    right: Gap(Some(Space::S40)),
+    bottom: Gap(Some(Space::S24)),
+    left: Gap(Some(Space::S40)),
+};
+
+/// `children` side by side, `gap` apart both ways, a new line started where the next one doesn't
+/// fit: chips, tags. Each box is rounded up to whole device pixels, so every child starts on one.
+/// The lines tell the geometry check nothing; each child still says what it is.
+pub fn flow<'a, M: 'a>(look: &Look, gap: Space, children: impl IntoIterator<Item = Element<'a, M>>) -> Element<'a, M> {
+    let scale = look.scale;
+    let px = f32::from(gap.px());
+    widget::Row::with_children(children.into_iter().map(|child| snap(scale, child)))
+        .spacing(px)
+        .wrap()
+        .vertical_spacing(px)
+        .into()
 }
 
 /// A page's header: the Japanese accent, the title, and one line of explanation under it.
-pub fn header<'a, M: 'a>(look: &Look, accent: &'a str, title: &'a str, lede: &'a str) -> Element<'a, M> {
+pub fn header<'a, M: 'a>(
+    look: &Look,
+    accent: impl IntoFragment<'a>,
+    title: impl IntoFragment<'a>,
+    lede: impl IntoFragment<'a>,
+) -> Element<'a, M> {
     let c = &look.colors;
     let view: Element<'a, M> = stack(look, Gap::NONE)
         .push(text(accent, Type::Accent, c.primary))
@@ -462,7 +500,7 @@ pub fn section<'a, M: 'a>(
         head = head.push(text(description, Type::Body, c.on_surface_variant));
     }
     let view: Element<'a, M> = stack(look, Space::S16).push(head).push(content).into();
-    probe::component("Section", ["", "", ""], Fixed::NONE, view)
+    probe::component("Section", ["", "", ""], Fixed::HOLDS, view)
 }
 
 /// A hairline across the width, in the soft outline colour.

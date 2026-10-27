@@ -3,7 +3,8 @@
 //! # Owns
 //!
 //! Finding each wallpaper's thumbnail and decoding it: the payload's small JPEG, else the
-//! original shrunk to [`WIDTH`], else nothing (the screen draws a placeholder).
+//! original shrunk to [`WIDTH`], else nothing (the screen draws a placeholder). [`cropped`] cuts
+//! one to [`SHAPE`], so the cards they sit on are all one height.
 //!
 //! # Not here
 //!
@@ -22,6 +23,9 @@ use crate::model;
 /// The width of a thumbnail: the payload's are made at it (`assemble.sh`, `THUMB_WIDTH`), and an
 /// original is shrunk to it.
 pub const WIDTH: u32 = 480;
+
+/// The shape every thumbnail is cropped to, as a width and a height in pixels: a screen's 16:10.
+pub const SHAPE: (u32, u32) = (16, 10);
 
 /// Where an installed system keeps the originals. The live ISO has none: they're in the
 /// squashfs, which isn't mounted before the install.
@@ -43,6 +47,18 @@ pub fn decode(payload: &Path, originals: &Path, set: &WallpaperSet) -> Vec<(Stri
             Some((model::wallpaper_key(set, f), img.to_rgba8()))
         })
         .collect()
+}
+
+/// `img` cut about its middle to [`SHAPE`]: the wider side trimmed evenly at both ends.
+pub fn cropped(img: &RgbaImage) -> RgbaImage {
+    let (w, h) = img.dimensions();
+    let (sw, sh) = SHAPE;
+    let (width, height) = if u64::from(w) * u64::from(sh) > u64::from(h) * u64::from(sw) {
+        (h * sw / sh, h)
+    } else {
+        (w, w * sh / sw)
+    };
+    image::imageops::crop_imm(img, (w - width) / 2, (h - height) / 2, width.max(1), height.max(1)).to_image()
 }
 
 /// Where a wallpaper's picture may be, best first: its thumbnail, then the original (a video's
