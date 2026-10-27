@@ -70,6 +70,7 @@ use super::record::RecordError;
 use super::record::SystemPaths;
 use super::record::parse_history;
 use super::record::short;
+use super::security;
 use super::version::Version;
 use crate::apt::Manifest;
 use crate::apt::ManifestError;
@@ -509,13 +510,14 @@ impl<'a, M: Machine> Updater<'a, M> {
     fn try_check(&mut self) -> Result<Available, UpdateError> {
         let installed = self.phase(Phase::Checking, Self::checked_installed)?;
         let channel = self.channel(&installed);
-        let refs = self.phase(Phase::Fetching, |u| {
+        let (refs, apt_security) = self.phase(Phase::Fetching, |u| {
             let local = u.refs();
             let url = local.origin_url().ok_or_else(|| UpdateError::NoRelease {
                 path: u.sys.checkout(),
             })?;
             u.j.step(format!("git ls-remote {url}"));
-            RemoteRefs::fetch(&url, local).map_err(|e| UpdateError::Policy(PolicyError::Refs(e)))
+            let refs = RemoteRefs::fetch(&url, local).map_err(|e| UpdateError::Policy(PolicyError::Refs(e)))?;
+            Ok((refs, u.pending_apt_security()))
         })?;
         let pick = self.phase(Phase::Verifying, |u| {
             let pick = policy::for_channel(channel)
@@ -524,7 +526,8 @@ impl<'a, M: Machine> Updater<'a, M> {
             u.j.detail(pick_detail(&pick));
             Ok(pick)
         })?;
-        let available = Available::from_pick(&pick);
+        let mut available = Available::from_pick(&pick);
+        available.apt_security = apt_security;
         self.write_available(&available)?;
         let notified_path = self.user.notified();
         let mut notified = parse_notified(&read_or_empty(&notified_path)?);
@@ -542,8 +545,40 @@ impl<'a, M: Machine> Updater<'a, M> {
         self.j.emit(&UpdateEvent::Available {
             update: available.update.as_ref().map(upgrade_name),
             upgrade: available.upgrade.as_ref().map(upgrade_name),
+            apt_security: available.apt_security.len(),
         });
         Ok(available)
+    }
+
+    /// The apt packages from a security pocket that `kubaos update` would upgrade, counted as
+    /// the user against lists of the check's own (`security.rs`): the system's lists are only
+    /// refreshed by `kubaos update`. When apt can't say (offline, a failed refresh) the previous
+    /// check's answer stands, so a flaky network neither drops the marker nor notifies twice.
+    fn pending_apt_security(&mut self) -> Vec<String> {
+        let dir = self.user.apt_lists();
+        let options = security::apt_options(&dir);
+        self.j.step("Counting the apt security updates");
+        let counted = security::apt_dirs(&dir)
+            .iter()
+            .try_for_each(fs::create_dir_all)
+            .map_err(|e| e.to_string())
+            .and_then(|()| {
+                let refresh = Cmd::user("apt-get").args(&options).args(["update", "-q"]);
+                self.quiet(&refresh).map_err(|e| chain(&e))
+            })
+            .and_then(|_| {
+                let simulate = Cmd::user("apt-get")
+                    .args(&options)
+                    .args(["-s", "-q", "upgrade", "--with-new-pkgs"]);
+                self.quiet(&simulate).map_err(|e| chain(&e))
+            });
+        match counted {
+            Ok(simulated) => security::pending(&simulated),
+            Err(e) => {
+                self.j.warn(format!("counting the apt security updates: {e}"));
+                Available::apt_security_of(&read_or_empty(&self.user.update_available()).unwrap_or_default())
+            }
+        }
     }
 
     /// The release the machine runs: its record, or, on a machine whose install wrote none, what
@@ -1252,6 +1287,7 @@ impl<'a, M: Machine> Updater<'a, M> {
                 label: version.to_string(),
                 version: Some(version),
             }),
+            apt_security: Vec::new(),
         };
         self.write_available(&kept)
     }

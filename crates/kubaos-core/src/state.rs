@@ -187,6 +187,12 @@ impl Paths {
         self.state.join("update-available")
     }
 
+    /// The package lists the daily check keeps to count pending apt security updates
+    /// (`update::security`); the next check rebuilds them when removed.
+    pub fn apt_lists(&self) -> PathBuf {
+        self.state.join("apt")
+    }
+
     /// The updates the daily check notified, one per line.
     pub fn notified(&self) -> PathBuf {
         self.state.join("notified")

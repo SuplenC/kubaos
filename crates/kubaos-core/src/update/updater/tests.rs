@@ -934,7 +934,7 @@ fn the_daily_check_writes_what_is_available_and_notifies_once() {
         phases(&events),
         [Phase::Checking, Phase::Fetching, Phase::Verifying]
     );
-    assert!(matches!(events.last(), Some(UpdateEvent::Available { update: Some(u), upgrade: None }) if u.contains(&head[..7])));
+    assert!(matches!(events.last(), Some(UpdateEvent::Available { update: Some(u), upgrade: None, .. }) if u.contains(&head[..7])));
     assert!(!w.user.update_logs().exists(), "a check keeps no log");
     let text = fs::read_to_string(w.user.update_available()).unwrap();
     assert!(text.contains(&format!("update-commit={head}")));
@@ -951,6 +951,50 @@ fn the_daily_check_writes_what_is_available_and_notifies_once() {
     assert!(available.is_empty());
     assert_eq!(fs::read_to_string(w.user.update_available()).unwrap(), "");
     assert!(after.ran.iter().all(|line| !line.starts_with("sudo")));
+}
+
+#[test]
+fn the_daily_check_counts_apt_security_updates_as_the_user_on_lists_of_its_own() {
+    let w = World::new(Channel::Edge, true);
+    let mut m = Fake::new();
+    m.canned.insert(
+        "apt-get",
+        Ok("Inst openssl [1] (2 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64])\n".to_owned()),
+    );
+
+    let available = w.updater(&mut m).check().unwrap();
+
+    assert_eq!(available.apt_security, ["openssl=2"]);
+    let text = fs::read_to_string(w.user.update_available()).unwrap();
+    assert!(text.contains("apt-security=1\napt-security-packages=openssl=2\n"));
+    let lists = w.user.apt_lists();
+    assert!(m.ran.iter().any(|line| line.starts_with("apt-get -o Dir::State=")
+        && line.contains(&*lists.to_string_lossy())
+        && line.ends_with(" update -q")));
+    assert!(m.ran.iter().all(|line| !line.starts_with("sudo")));
+    assert_eq!(m.ran("notify-send"), 1);
+
+    w.updater(&mut Fake::new()).update(yes()).unwrap();
+    assert_eq!(fs::read_to_string(w.user.update_available()).unwrap(), "");
+}
+
+#[test]
+fn a_check_apt_cannot_answer_keeps_the_last_count_and_warns() {
+    let w = World::new(Channel::Edge, true);
+    fs::create_dir_all(w.user.update_available().parent().unwrap()).unwrap();
+    fs::write(
+        w.user.update_available(),
+        "apt-security=1\napt-security-packages=openssl=2\n",
+    )
+    .unwrap();
+    let mut m = Fake::new();
+    m.failing.push("apt-get");
+    let mut events = Vec::new();
+
+    let available = w.reporting(&mut m, &mut events).check().unwrap();
+
+    assert_eq!(available.apt_security, ["openssl=2"]);
+    assert!(warnings(&events).iter().any(|text| text.contains("apt security updates")));
 }
 
 #[test]

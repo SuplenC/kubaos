@@ -194,7 +194,11 @@ impl Text {
             UpdateEvent::Note { text } => format!("    {text}\n"),
             UpdateEvent::Warning { text } => format!("    {} {}\n", s.yellow("!"), s.dim(text)),
             UpdateEvent::Preview(preview) => self.preview(preview),
-            UpdateEvent::Available { update, upgrade } => available(update.as_deref(), upgrade.as_deref()),
+            UpdateEvent::Available {
+                update,
+                upgrade,
+                apt_security,
+            } => available(update.as_deref(), upgrade.as_deref(), *apt_security),
             UpdateEvent::Summary(summary) => self.summary(summary),
             UpdateEvent::Declined => "\n  Nothing changed.\n".to_owned(),
             UpdateEvent::Failed { error, output, log, .. } => self.failed(error, output, log.as_deref()),
@@ -393,7 +397,7 @@ fn heading(command: Command) -> String {
     }
 }
 
-fn available(update: Option<&str>, upgrade: Option<&str>) -> String {
+fn available(update: Option<&str>, upgrade: Option<&str>, apt_security: usize) -> String {
     let mut out = String::from("\n");
     if let Some(update) = update {
         out.push_str(&format!("  KubaOS {update} is ready: kubaos update\n"));
@@ -401,7 +405,10 @@ fn available(update: Option<&str>, upgrade: Option<&str>) -> String {
     if let Some(upgrade) = upgrade {
         out.push_str(&format!("  KubaOS {upgrade} is out: kubaos upgrade\n"));
     }
-    if update.is_none() && upgrade.is_none() {
+    if apt_security > 0 {
+        out.push_str(&format!("  {} waiting: kubaos update\n", count(apt_security, "apt security update")));
+    }
+    if update.is_none() && upgrade.is_none() && apt_security == 0 {
         out.push_str("  Nothing new: KubaOS is up to date.\n");
     }
     out

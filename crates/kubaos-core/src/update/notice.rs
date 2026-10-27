@@ -9,10 +9,13 @@
 //! upgrade=0.2.0
 //! upgrade-codename=akihabara
 //! upgrade-commit=5e6f…
+//! apt-security=2
+//! apt-security-packages=openssl=3.0.13-0ubuntu3.5,linux-image-6.8.0-60-generic=6.8.0-60.63
 //! ```
 //!
 //! `update` is what `kubaos update` would install, `upgrade` the next series `kubaos upgrade`
-//! would. The Command menu's KubaOS Extension reads the same keys (`crates/kotodama-kubaos`).
+//! would, and `apt-security` how many apt packages from a security pocket `kubaos update` would
+//! upgrade (`security.rs`). The Command menu's KubaOS Extension reads the same keys (`crates/kotodama-kubaos`).
 //! `~/.local/state/kubaos/notified` lists one `update <commit>` or `upgrade <commit>` per line, so
 //! each is notified once.
 //!
@@ -36,6 +39,8 @@ use super::record::capitalise;
 pub struct Available {
     pub update: Option<Target>,
     pub upgrade: Option<Target>,
+    /// The apt packages from a security pocket waiting to be upgraded, as `name=version`.
+    pub apt_security: Vec<String>,
 }
 
 impl Available {
@@ -45,12 +50,13 @@ impl Available {
         Self {
             update: pick.update.clone(),
             upgrade: pick.upgrade.clone(),
+            apt_security: Vec::new(),
         }
     }
 
     /// Whether there is nothing to install.
     pub fn is_empty(&self) -> bool {
-        self.update.is_none() && self.upgrade.is_none()
+        self.update.is_none() && self.upgrade.is_none() && self.apt_security.is_empty()
     }
 
     /// The file's text.
@@ -65,7 +71,23 @@ impl Available {
                 let _ = writeln!(text, "{key}-codename={codename}");
             }
         }
+        if !self.apt_security.is_empty() {
+            let _ = write!(
+                text,
+                "apt-security={}\napt-security-packages={}\n",
+                self.apt_security.len(),
+                self.apt_security.join(",")
+            );
+        }
         text
+    }
+
+    /// The packages on the `apt-security-packages` line of the file's text.
+    pub fn apt_security_of(text: &str) -> Vec<String> {
+        text.lines()
+            .find_map(|line| line.strip_prefix("apt-security-packages="))
+            .map(|packages| packages.split(',').map(str::to_owned).collect())
+            .unwrap_or_default()
     }
 
     /// The notifications to send for it, as (key in `notified`, text), skipping those in
@@ -92,6 +114,13 @@ impl Available {
                 None => format!("KubaOS {} is out. kubaos upgrade when you're ready, I'll wait.", target.label),
             };
             out.push((format!("upgrade {}", target.commit), text));
+        }
+        if !self.apt_security.is_empty() {
+            let text = match self.apt_security.len() {
+                1 => "1 apt security update is waiting. kubaos update brings it.".to_owned(),
+                n => format!("{n} apt security updates are waiting. kubaos update brings them."),
+            };
+            out.push((format!("apt-security {}", self.apt_security.join(",")), text));
         }
         out.retain(|(key, _)| !notified.contains(key));
         out

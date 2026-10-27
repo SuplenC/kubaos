@@ -76,3 +76,18 @@ fn a_missing_file_is_nothing_pending() {
 
     assert_eq!(Pending::read(&dir.path().join("update-available")), Pending::default());
 }
+
+#[test]
+fn pending_apt_security_updates_show_in_the_update_subtitle_with_or_without_a_release() {
+    let both = Pending::parse("update=0.1.1\nupdate-commit=aa\napt-security=2\napt-security-packages=a=1,b=2\n");
+    let only = Pending::parse("apt-security=1\napt-security-packages=a=1\n");
+
+    let with_release = both.apply(item(UPDATE, "Update KubaOS")).and_then(|i| i.subtitle);
+    let alone = only.apply(item(UPDATE, "Update KubaOS")).and_then(|i| i.subtitle);
+
+    assert_eq!(
+        with_release.as_deref(),
+        Some("KubaOS 0.1.1 is ready, 2 apt security updates waiting")
+    );
+    assert_eq!(alone.as_deref(), Some("Packages are due: 1 apt security update waiting"));
+}
