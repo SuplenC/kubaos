@@ -1,5 +1,5 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -8,21 +8,18 @@ Pill {
     id: root
 
     interactive: true
-    spacing: Theme.spacing.sm + 2
     tooltip: [Net.wired ? "Wired" : Net.active?.name ?? (Net.wifiEnabled ? "Wi-Fi not connected" : "Wi-Fi off"), `Volume ${Audio.muted ? "muted" : Math.round(Audio.volume * 100) + "%"}`, Battery.available ? `Battery ${Math.round(Battery.percentage * 100)}%` : ""].filter(Boolean).join("  ·  ")
     onClicked: Panels.toggle("controlcenter")
     onScrolled: steps => Audio.setVolume(Audio.volume + steps * 0.05)
 
-    component StatusIcon: Icon {
-        anchors.verticalCenter: parent?.verticalCenter
-        size: Theme.bar.icon
-        color: Theme.m3onSurfaceVariant
+    component StatusIcon: K.Icon {
+        size: K.Tokens.icon.s16
+        color: K.Tokens.color.on_surface_variant
     }
 
     StatusIcon {
         name: Notifs.dnd ? "notifications_off" : "notifications"
-        filled: Notifs.count > 0
-        color: Notifs.count > 0 ? Theme.m3tertiary : Theme.m3onSurfaceVariant
+        color: Notifs.count > 0 ? K.Tokens.color.tertiary : K.Tokens.color.on_surface_variant
         visible: Notifs.dnd || Notifs.count > 0
     }
 
@@ -43,22 +40,20 @@ Pill {
         name: Audio.icon
     }
 
-    Row {
-        anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
+    K.Row {
         visible: Battery.available
+        gap: K.Tokens.space.s4
+        align: "centre"
 
         StatusIcon {
             name: Battery.icon
-            rotation: 90
-            color: Battery.low ? Theme.m3error : Battery.charging ? Theme.m3primary : Theme.m3onSurfaceVariant
+            color: Battery.low ? K.Tokens.color.error : Battery.charging ? K.Tokens.color.primary : K.Tokens.color.on_surface_variant
         }
 
-        StyledText {
-            anchors.verticalCenter: parent.verticalCenter
+        K.Text {
             text: `${Math.round(Battery.percentage * 100)}%`
-            font.weight: Font.Medium
-            font.features: Theme.font.tabular
+            style: K.Tokens.type.mono
+            color: K.Tokens.color.on_surface
         }
     }
 }

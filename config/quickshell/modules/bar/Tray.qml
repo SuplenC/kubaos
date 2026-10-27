@@ -2,18 +2,20 @@ import QtQuick
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Services.SystemTray
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 
-// StatusNotifierItem tray. Left click activates, middle click secondary action,
-// right click (or left on menu-only items) opens the app's menu.
+// StatusNotifierItem tray. Left click activates, middle click secondary action, right click (or
+// left on menu-only items) opens the app's menu. Each app's icon sits in a circle as tall as a
+// chip, which takes the state layer under the pointer, 4 in from the pill's curve.
 Pill {
     id: root
 
     required property QsWindow window
 
     visible: SystemTray.items.values.length > 0
-    spacing: Theme.spacing.sm
+    padding: K.Tokens.space.s4
+    spacing: 0
 
     Repeater {
         model: SystemTray.items
@@ -23,20 +25,19 @@ Pill {
 
             required property SystemTrayItem modelData
 
-            anchors.verticalCenter: parent?.verticalCenter
-            width: Theme.bar.icon
-            height: Theme.bar.icon
-            scale: mouse.pressed ? 0.85 : mouse.containsMouse ? 1.1 : 1
+            implicitWidth: K.Tokens.size.chip
+            implicitHeight: K.Tokens.size.chip
 
-            Behavior on scale {
-                Anim {
-                    duration: Theme.anim.small
-                    easing.bezierCurve: Theme.anim.spatialFast
-                }
+            K.StateLayer {
+                radius: K.Tokens.radius.full
+                hovered: mouse.containsMouse
+                pressed: mouse.pressed
             }
 
             IconImage {
-                anchors.fill: parent
+                x: (K.Tokens.size.chip - K.Tokens.icon.s16) / 2
+                y: (K.Tokens.size.chip - K.Tokens.icon.s16) / 2
+                implicitSize: K.Tokens.icon.s16
                 source: entry.modelData.icon
                 asynchronous: true
             }
@@ -48,6 +49,7 @@ Pill {
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
                 cursorShape: Qt.PointingHandCursor
+                // A wheel's notch is 120 (Qt's QWheelEvent::angleDelta).
                 onWheel: wheel => entry.modelData.scroll(wheel.angleDelta.y / 120, false)
                 onClicked: mouse => {
                     const item = entry.modelData;
@@ -56,13 +58,13 @@ Pill {
                     } else if (mouse.button === Qt.LeftButton && !item.onlyMenu) {
                         item.activate();
                     } else if (item.hasMenu) {
-                        const pos = entry.mapToItem(null, 0, entry.height + Theme.spacing.md);
+                        const pos = entry.mapToItem(null, 0, entry.height + K.Tokens.space.s12);
                         item.display(root.window, pos.x, pos.y);
                     }
                 }
             }
 
-            Tooltip {
+            K.Hint {
                 text: entry.modelData.tooltipTitle || entry.modelData.title
                 shown: text !== "" && mouse.containsMouse
             }

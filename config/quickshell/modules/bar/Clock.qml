@@ -1,12 +1,12 @@
 import QtQuick
 import Quickshell
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
-// Date and time. The weekday's kanji (月 火 水 木 金 土 日) leads as a small
-// accent; the countdown the clock settings pin follows the time. Click opens
-// the clock popup under it.
+// Date and time. The weekday's kanji (月 火 水 木 金 土 日) leads as a small accent; the countdown
+// the clock settings pin follows the time. The time is in mono, whose figures are all one width,
+// so the pill keeps its width as the minutes turn. Click opens the clock popup under it.
 Pill {
     id: root
 
@@ -14,7 +14,6 @@ Pill {
     readonly property var countdown: Time.barCountdown
 
     interactive: true
-    spacing: Theme.spacing.sm
     tooltip: Qt.formatDateTime(clock.date, Time.fullDateFormat)
     onClicked: Panels.toggle("clock")
 
@@ -24,35 +23,29 @@ Pill {
         precision: SystemClock.Minutes
     }
 
-    Text {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Text {
         text: root.kanji[clock.date.getDay()]
-        color: Theme.m3tertiary
-        font.family: Theme.font.jp
-        font.pixelSize: Theme.font.md
-        font.weight: Font.Bold
-        renderType: Text.NativeRendering
+        style: K.Tokens.type.accent
+        color: K.Tokens.color.tertiary
     }
 
-    StyledText {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Text {
         text: Qt.formatDateTime(clock.date, Time.shortDateFormat)
-        color: Theme.m3onSurfaceVariant
+        style: K.Tokens.type.body
+        color: K.Tokens.color.on_surface_variant
     }
 
-    StyledText {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Text {
         text: Qt.formatDateTime(clock.date, Time.timeFormat)
-        font.weight: Font.DemiBold
-        font.features: Theme.font.tabular
+        style: K.Tokens.type.mono_large
+        color: K.Tokens.color.on_surface
     }
 
     // "Vacation 12 d 4 h": to the minute, as the clock beside it.
-    StyledText {
+    K.Text {
         visible: root.countdown !== null && root.countdown.end > clock.date.getTime()
-        anchors.verticalCenter: parent.verticalCenter
         text: root.countdown ? `${root.countdown.name} ${Time.left(root.countdown.end - clock.date.getTime()).replace(/ \d+ s$/, "")}` : ""
-        color: Theme.m3tertiary
-        font.features: Theme.font.tabular
+        style: K.Tokens.type.body
+        color: K.Tokens.color.tertiary
     }
 }

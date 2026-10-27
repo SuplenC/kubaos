@@ -1,5 +1,5 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -10,13 +10,12 @@ Pill {
 
     visible: Keyboard.several
     interactive: true
-    padding: Theme.spacing.sm
     tooltip: `Typing with ${Keyboard.code}. Click or SUPER+SHIFT+Space for the next layout`
     onClicked: Keyboard.next()
 
-    StyledText {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Text {
         text: Keyboard.code
-        font.weight: Font.DemiBold
+        style: K.Tokens.type.button_small
+        color: K.Tokens.color.on_surface
     }
 }
