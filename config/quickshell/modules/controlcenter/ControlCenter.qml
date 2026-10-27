@@ -1,14 +1,13 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
 // Side sheet on the right edge, from the bar down to the bottom border:
 // header, quick toggles, capture (screenshot, annotate, record, replay),
 // sliders, the notifications, and tabs for Wi-Fi, Bluetooth, audio output
-// and keyboard layouts.
+// and keyboard layouts, whose list takes the room left at the bottom.
 // Keys: Tab/Shift+Tab move between controls, h/l switch tabs on the tab bar,
 // 1-4 jump to a tab, j/k move in lists, Esc closes.
 Drawer {
@@ -24,7 +23,7 @@ Drawer {
     edge: "right"
     flushStart: true
     flushEnd: true
-    contentWidth: 384
+    contentWidth: K.Tokens.size.panel
     onOpened: toggles.focusFirst()
     onScanWifiChanged: Net.setScanning(scanWifi)
     onShownChanged: if (!shown)
@@ -61,118 +60,101 @@ Drawer {
         precision: SystemClock.Minutes
     }
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: Theme.spacing.xl
-        anchors.topMargin: Theme.spacing.lg
-        spacing: Theme.spacing.lg
+    K.Stack {
+        id: top
 
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Theme.spacing.sm
+        x: K.Tokens.space.s16
+        y: K.Tokens.space.s16
+        width: root.contentWidth - K.Tokens.space.s16 * 2
+        room: width
+        fill: true
+        gap: K.Tokens.space.s16
 
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 0
+        K.Row {
+            fill: true
+            gap: K.Tokens.space.s8
+            align: "centre"
 
-                RowLayout {
-                    spacing: Theme.spacing.sm
-
-                    StyledText {
-                        text: Qt.formatDateTime(clock.date, Time.timeFormat)
-                        font.pixelSize: Theme.font.xxl + 6
-                        font.weight: Font.DemiBold
-                        font.features: Theme.font.tabular
-                    }
-
-                    Text {
-                        Layout.alignment: Qt.AlignBaseline
-                        text: `${root.kanji[clock.date.getDay()]}曜日`
-                        color: Theme.m3tertiary
-                        font.family: Theme.font.jp
-                        font.pixelSize: Theme.font.lg
-                        font.weight: Font.Medium
-                        renderType: Text.NativeRendering
-                    }
-                }
-
-                StyledText {
-                    Layout.fillWidth: true
-                    text: Qt.formatDateTime(clock.date, Time.dateFormat) + (Battery.available ? `  ·  ${Math.round(Battery.percentage * 100)}% ${Battery.timeLeft}` : "")
-                    color: Theme.m3onSurfaceVariant
-                }
+            // The weekday's kanji above the time, as a page's accent sits above its title.
+            K.Header {
+                accent: `${root.kanji[clock.date.getDay()]}曜日`
+                title: Qt.formatDateTime(clock.date, Time.timeFormat)
+                lede: Qt.formatDateTime(clock.date, Time.dateFormat) + (Battery.available ? ` · ${Math.round(Battery.percentage * 100)}% ${Battery.timeLeft}` : "")
             }
 
-            IconButton {
+            K.Fill {
+            }
+
+            K.IconButton {
                 icon: "wallpaper"
-                tooltip: "Wallpaper"
-                baseColor: Theme.m3surfaceContainerHigh
-                onClicked: Panels.open("wallpaper")
+                label: "Wallpaper"
+                kind: "Tonal"
+                onActivated: Panels.open("wallpaper")
             }
 
-            IconButton {
+            K.IconButton {
                 icon: "power_settings_new"
-                tooltip: "Power"
-                baseColor: Theme.m3surfaceContainerHigh
-                tint: Theme.m3error
-                onClicked: Panels.open("powermenu")
+                label: "Power"
+                kind: "Tonal"
+                onActivated: Panels.open("powermenu")
             }
         }
 
         QuickToggles {
             id: toggles
 
-            Layout.fillWidth: true
             onKeyboardExpanded: root.tab = root.keyboardTab
         }
 
         CaptureRow {
-            Layout.fillWidth: true
         }
 
         Sliders {
-            Layout.fillWidth: true
         }
 
         NotificationHistory {
-            Layout.fillWidth: true
+        }
+    }
+
+    // The tabs and their list, in the room the sections above leave.
+    Item {
+        x: top.x
+        y: top.y + top.height + K.Tokens.space.s16
+        width: top.width
+        height: Math.max(0, root.height - y - K.Tokens.space.s16)
+
+        Tabs {
+            id: tabBar
+
+            room: parent.width
+            labels: ["Wi-Fi", "Bluetooth", "Output", "Keyboard"]
+            currentIndex: root.tab
+            onPicked: index => root.tab = index
         }
 
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            radius: Theme.rounding.xl
-            color: Theme.m3surfaceContainer
+        Item {
+            y: tabBar.height + K.Tokens.space.s12
+            width: parent.width
+            height: Math.max(0, parent.height - y)
 
-            ColumnLayout {
+            WifiList {
                 anchors.fill: parent
-                anchors.margins: Theme.spacing.sm
-                spacing: Theme.spacing.sm
+                visible: root.tab === 0
+            }
 
-                TabBar {
-                    id: tabBar
+            BluetoothList {
+                anchors.fill: parent
+                visible: root.tab === 1
+            }
 
-                    Layout.fillWidth: true
-                    labels: ["Wi-Fi", "Bluetooth", "Output", "Keyboard"]
-                    icons: ["wifi", "bluetooth", "volume_up", "keyboard"]
-                    currentIndex: root.tab
-                    onPicked: index => root.tab = index
-                }
+            OutputList {
+                anchors.fill: parent
+                visible: root.tab === 2
+            }
 
-                StackLayout {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Layout.margins: Theme.spacing.xs
-                    currentIndex: root.tab
-
-                    WifiList {}
-
-                    BluetoothList {}
-
-                    OutputList {}
-
-                    KeyboardList {}
-                }
+            KeyboardList {
+                anchors.fill: parent
+                visible: root.tab === 3
             }
         }
     }

@@ -1,13 +1,12 @@
 import QtQuick
-import QtQuick.Layouts
-import qs.theme
-import qs.components
+import KubaOS.Components as K
 import qs.services
 
 // The Proxy tile's detail, under the tiles while its arrow is open: the
 // state, the tunnel's endpoint, when it last received, its last handshake
-// and the bytes moved, read live while it shows (services/Proxy.qml).
-Rectangle {
+// and the bytes moved, read live while it shows (services/Proxy.qml). The
+// values tick while it shows, so they are mono and keep their width.
+K.Card {
     id: root
 
     readonly property var rows: {
@@ -43,43 +42,41 @@ Rectangle {
         return list;
     }
 
-    implicitHeight: column.implicitHeight + Theme.spacing.md * 2
-    radius: Theme.rounding.md
-    color: Theme.m3surfaceContainerHigh
-
     Component.onCompleted: Proxy.live = visible
     onVisibleChanged: Proxy.live = visible
     Component.onDestruction: Proxy.live = false
 
-    ColumnLayout {
-        id: column
+    K.Stack {
+        fill: true
+        gap: K.Tokens.space.s4
 
-        anchors.fill: parent
-        anchors.margins: Theme.spacing.md
-        spacing: Theme.spacing.xs
-
+        // By count, so a row lives on while its value ticks instead of being made again each
+        // second.
         Repeater {
-            model: root.rows
+            model: root.rows.length
 
-            RowLayout {
-                required property var modelData
+            K.Row {
+                required property int index
+                readonly property var modelData: root.rows[index] ?? ({})
 
-                Layout.fillWidth: true
-                spacing: Theme.spacing.md
+                fill: true
+                gap: K.Tokens.space.s12
+                align: "centre"
 
-                StyledText {
-                    text: modelData.label
-                    font.pixelSize: Theme.font.sm
-                    color: Theme.m3onSurfaceVariant
+                K.Text {
+                    text: modelData.label ?? ""
+                    style: K.Tokens.type.small
+                    color: K.Tokens.color.on_surface_variant
                 }
 
-                StyledText {
-                    Layout.fillWidth: true
-                    horizontalAlignment: Text.AlignRight
-                    elide: Text.ElideMiddle
-                    text: modelData.value
-                    font.pixelSize: Theme.font.sm
-                    font.features: Theme.font.tabular
+                K.Fill {
+                }
+
+                K.Text {
+                    text: modelData.value ?? ""
+                    style: K.Tokens.type.mono
+                    color: K.Tokens.color.on_surface
+                    maximumLines: 1
                 }
             }
         }

@@ -1,47 +1,75 @@
 import QtQuick
-import QtQuick.Layouts
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
-// Volume (with mute), screen brightness and the power stops.
-ColumnLayout {
-    spacing: Theme.spacing.sm
+// Volume (with mute), screen brightness and the power stops. Each slider ends where the power
+// stop's name begins, so the three tracks are one length.
+K.Stack {
+    id: root
 
-    RowLayout {
-        spacing: Theme.spacing.sm
+    // The room after each track: the power stop's widest name, or the mute button if wider.
+    readonly property real end: Math.max(power.widest, mute.implicitWidth)
 
-        StyledSlider {
-            Layout.fillWidth: true
-            icon: Audio.icon
+    fill: true
+    gap: K.Tokens.space.s8
+
+    K.Row {
+        fill: true
+        gap: K.Tokens.space.s12
+        align: "centre"
+
+        K.Icon {
+            name: Audio.icon
+            size: K.Tokens.icon.s20
+            color: K.Tokens.color.on_surface_variant
+        }
+
+        K.Slider {
             value: Audio.muted ? 0 : Audio.volume
+            Accessible.name: "Volume"
             onMoved: v => Audio.setVolume(v)
         }
 
-        IconButton {
-            id: mute
+        Item {
+            implicitWidth: root.end
+            implicitHeight: mute.implicitHeight
 
-            icon: Audio.muted ? "volume_off" : "volume_up"
-            tooltip: Audio.muted ? "Unmute" : "Mute"
-            baseColor: Theme.m3surfaceContainerHigh
-            toggled: Audio.muted
-            onClicked: Audio.toggleMute()
+            K.IconButton {
+                id: mute
+
+                icon: Audio.muted ? "volume_off" : "volume_up"
+                label: Audio.muted ? "Unmute" : "Mute"
+                kind: Audio.muted ? "Filled" : "Tonal"
+                size: "Sm"
+                onActivated: Audio.toggleMute()
+            }
         }
     }
 
-    StyledSlider {
-        Layout.fillWidth: true
-        // Ends where the volume slider does, beside the mute button.
-        Layout.rightMargin: mute.width + Theme.spacing.sm
+    K.Row {
         visible: Brightness.available
-        icon: Brightness.icon
-        value: Brightness.value
-        onMoved: v => Brightness.set(v)
+        fill: true
+        gap: K.Tokens.space.s12
+        align: "centre"
+        rightPadding: root.end + K.Tokens.space.s12
+
+        K.Icon {
+            name: Brightness.icon
+            size: K.Tokens.icon.s20
+            color: K.Tokens.color.on_surface_variant
+        }
+
+        K.Slider {
+            value: Brightness.value
+            Accessible.name: "Brightness"
+            onMoved: v => Brightness.set(v)
+        }
     }
 
     PowerSlider {
-        Layout.fillWidth: true
-        // Ends where the brightness slider does, beside the mute button.
-        Layout.rightMargin: mute.width + Theme.spacing.sm
+        id: power
+
+        fill: true
     }
 }

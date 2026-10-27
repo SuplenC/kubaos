@@ -1,19 +1,17 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Networking
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
 // Nearby Wi-Fi networks. Enter connects; secured networks without saved
 // credentials (or whose saved ones were rejected) ask for a password below.
-ColumnLayout {
+// The connected one carries the check; whether one is secured is its subtitle.
+Item {
     id: root
 
     property var pending: null
-
-    spacing: Theme.spacing.sm
 
     function choose(network): void {
         if (network.connected)
@@ -27,7 +25,7 @@ ColumnLayout {
     function askPassword(network): void {
         pending = network;
         password.text = "";
-        password.focusInput();
+        password.forceActiveFocus();
     }
 
     function statusText(network): string {
@@ -40,79 +38,83 @@ ColumnLayout {
         return Net.isSecured(network) ? "Secured" : "Open";
     }
 
-    NavList {
-        id: list
+    function backToList(): void {
+        root.pending = null;
+        list.forceActiveFocus();
+    }
 
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        visible: count > 0
-        model: ScriptModel {
-            values: Net.networks
-        }
-        highlightShown: activeFocus
-        onActivated: index => root.choose(Net.networks[index])
+    Well {
+        id: well
 
-        delegate: ListRow {
-            id: row
+        width: root.width
+        height: root.height - (password.visible ? password.height + K.Tokens.space.s12 : 0)
+        focused: list.activeFocus
 
-            required property var modelData
-            required property int index
+        NavList {
+            id: list
 
-            width: ListView.view.width
-            icon: Net.strengthIcon(modelData.signalStrength)
-            title: modelData.name
-            subtitle: root.statusText(modelData)
-            active: modelData.connected
-            current: ListView.isCurrentItem && ListView.view.activeFocus
-            onClicked: root.choose(modelData)
-
-            Icon {
-                name: "lock"
-                size: 16
-                visible: Net.isSecured(row.modelData)
-                color: Theme.m3outline
+            anchors.fill: parent
+            visible: count > 0
+            model: ScriptModel {
+                values: Net.networks
             }
+            highlightShown: activeFocus
+            onActivated: index => root.choose(Net.networks[index])
 
-            Connections {
-                target: row.modelData
+            delegate: K.ListRow {
+                id: row
 
-                function onConnectionFailed(reason) {
-                    if (reason === ConnectionFailReason.NoSecrets)
-                        root.askPassword(row.modelData);
+                required property var modelData
+                required property int index
+
+                width: ListView.view.width
+                icon: Net.strengthIcon(modelData.signalStrength)
+                title: modelData.name
+                subtitle: root.statusText(modelData)
+                checkable: true
+                checked: modelData.connected
+                selected: ListView.isCurrentItem && ListView.view.highlightShown
+                onActivated: root.choose(modelData)
+
+                Connections {
+                    target: row.modelData
+
+                    function onConnectionFailed(reason) {
+                        if (reason === ConnectionFailReason.NoSecrets)
+                            root.askPassword(row.modelData);
+                    }
                 }
             }
         }
-    }
 
-    Item {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        visible: list.count === 0
-
-        EmptyState {
-            anchors.centerIn: parent
+        K.EmptyState {
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width
+            room: parent.width
+            visible: list.count === 0
             icon: Net.wifiEnabled ? "wifi_find" : "wifi_off"
-            text: Net.wifiEnabled ? "Scanning…" : "Wi-Fi is off"
+            title: Net.wifiEnabled ? "Scanning…" : "Wi-Fi is off"
+            body: Net.wifiEnabled ? "Networks show up here as they're found." : "The Wi-Fi tile turns it on."
         }
     }
 
-    SearchField {
+    K.Field {
         id: password
 
-        Layout.fillWidth: true
+        y: root.height - height
+        width: root.width
         visible: root.pending !== null
         icon: "key"
-        echoMode: TextInput.Password
+        secret: true
         placeholder: `Password for ${root.pending?.name ?? ""}`
-        catchEscape: true
-        onEscaped: {
-            root.pending = null;
-            list.forceActiveFocus();
-        }
-        onAccepted: {
+        Keys.onEscapePressed: root.backToList()
+        Keys.onReturnPressed: {
             root.pending.connectWithPsk(text);
-            root.pending = null;
-            list.forceActiveFocus();
+            root.backToList();
+        }
+        Keys.onEnterPressed: {
+            root.pending.connectWithPsk(text);
+            root.backToList();
         }
     }
 }
