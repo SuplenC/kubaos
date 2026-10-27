@@ -14,6 +14,9 @@ import KubaOS.Components as K
 // in about 15 ms; laying each child out again after setting its width took 48,955 arrangements
 // and about 850 ms, doubling at every level. `qml-specimen` fails when a pass arranges more than
 // twice per layout.
+//
+// A layout that changes lays out again before its window draws the next frame (`FrameQueue`), so
+// a page shown, pushed or changed is drawn laid out from its first frame.
 Item {
     id: root
 
@@ -47,6 +50,8 @@ Item {
         // Which children it arranged, as their indices, so a child shown or hidden that changes
         // nothing costs nothing.
         property string kids: ""
+        // Whether it waits in `FrameQueue` for its window's next frame.
+        property bool queued: false
     }
 
     // Places `kids`, sets their sizes, and the layout's implicit size.
@@ -122,6 +127,7 @@ Item {
     function schedule(): void {
         root.laid.dirty = true;
         Qt.callLater(root.relayout);
+        K.FrameQueue.add(root, root.Window.window);
     }
 
     // A child shown or hidden: laid out again only when that changes which children are laid out.
