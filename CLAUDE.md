@@ -14,7 +14,7 @@ Before writing or reviewing code in this repo, read `docs/agents/code-quality.md
 
 ## Design
 
-Any UI, in any toolkit, follows `docs/DESIGN.md`: tokens and the shared components only, never a literal colour, size, spacing, radius, duration or font. `just design-check` passes (the rules are in `docs/agents/code-quality.md`, "Design").
+Any UI, in any toolkit, follows `docs/DESIGN.md`: tokens and the shared components only, never a literal colour, size, spacing, radius, duration or font. `just design-check` passes (the rules are in `docs/agents/code-quality.md`, "Design"). Before a UI change reaches Kuba, review its rendered screenshots against `docs/agents/design-review.md`, his recurring review points.
 
 ## Every feature reaches the Command menu
 
