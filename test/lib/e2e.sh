@@ -2914,12 +2914,14 @@ c_updaters() {
   rm -f /etc/apt/apt.conf.d/99kubaos-no-periodic
   for unit in apt-daily.timer apt-daily-upgrade.timer; do
     systemctl unmask "$unit" >/dev/null 2>&1
-    systemctl enable "$unit" >/dev/null 2>&1
+    systemctl enable "$unit" >/dev/null 2>&1 || { echo "FAIL could not enable $unit first"; return 1; }
   done
+  printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' >/etc/apt/apt.conf.d/20auto-upgrades
 
   out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig:"; echo "$out" | tail; return 1; }
   for unit in apt-daily.timer apt-daily-upgrade.timer apt-daily.service apt-daily-upgrade.service \
     unattended-upgrades.service; do
+    systemctl cat "$unit" >/dev/null 2>&1 || [[ $unit != unattended-upgrades.service ]] || continue
     state="$(systemctl is-enabled "$unit" 2>/dev/null || true)"
     [[ $state == masked ]] || { echo "FAIL $unit is $state, not masked"; return 1; }
   done

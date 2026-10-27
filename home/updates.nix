@@ -19,7 +19,7 @@
 
   systemd.user.services.kubaos-update-check = {
     Unit = {
-      Description = "Check for a new KubaOS release";
+      Description = "Check for a new KubaOS release and pending apt security updates";
       # A machine set up by hand has no KubaOS checkout to update.
       ConditionPathExists = "/usr/share/kubaos/.git";
       After = [ "network-online.target" ];
@@ -31,7 +31,7 @@
   };
 
   systemd.user.timers.kubaos-update-check = {
-    Unit.Description = "Check for a new KubaOS release daily";
+    Unit.Description = "Check for a new KubaOS release and pending apt security updates daily";
     Timer = {
       OnCalendar = "daily";
       Persistent = true;

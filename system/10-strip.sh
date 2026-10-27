@@ -2,8 +2,8 @@
 # Phase 2: strip the server parts. Purges snapd, cloud-init, multipath-tools,
 # lxd-installer and ModemManager (and with them the ubuntu-server*
 # metapackages, after marking their other dependencies manual), pins snapd out
-# for good, silences the Ubuntu Pro adverts (apt news, ESM hints, motd news),
-# keeps unattended-upgrades.
+# for good, silences the Ubuntu Pro adverts (apt news, ESM hints, motd news) and
+# retires unattended-upgrades and the apt-daily timers: `kubaos update` owns updates.
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

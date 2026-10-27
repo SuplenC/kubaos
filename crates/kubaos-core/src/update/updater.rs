@@ -70,7 +70,9 @@ use super::record::RecordError;
 use super::record::SystemPaths;
 use super::record::parse_history;
 use super::record::short;
+use super::notice::APT_SECURITY_KEY;
 use super::security;
+use super::security::CountError;
 use super::version::Version;
 use crate::apt::Manifest;
 use crate::apt::ManifestError;
@@ -510,14 +512,14 @@ impl<'a, M: Machine> Updater<'a, M> {
     fn try_check(&mut self) -> Result<Available, UpdateError> {
         let installed = self.phase(Phase::Checking, Self::checked_installed)?;
         let channel = self.channel(&installed);
-        let (refs, apt_security) = self.phase(Phase::Fetching, |u| {
+        let (refs, refreshed) = self.phase(Phase::Fetching, |u| {
             let local = u.refs();
             let url = local.origin_url().ok_or_else(|| UpdateError::NoRelease {
                 path: u.sys.checkout(),
             })?;
             u.j.step(format!("git ls-remote {url}"));
             let refs = RemoteRefs::fetch(&url, local).map_err(|e| UpdateError::Policy(PolicyError::Refs(e)))?;
-            Ok((refs, u.pending_apt_security()))
+            Ok((refs, u.refresh_apt_lists()))
         })?;
         let pick = self.phase(Phase::Verifying, |u| {
             let pick = policy::for_channel(channel)
@@ -526,22 +528,20 @@ impl<'a, M: Machine> Updater<'a, M> {
             u.j.detail(pick_detail(&pick));
             Ok(pick)
         })?;
-        let mut available = Available::from_pick(&pick);
-        available.apt_security = apt_security;
-        self.write_available(&available)?;
-        let notified_path = self.user.notified();
-        let mut notified = parse_notified(&read_or_empty(&notified_path)?);
-        for (key, text) in available.notifications(&notified.clone()) {
-            let cmd = Cmd::user("notify-send").args(["--app-name=KubaOS", "--urgency=low", "KubaOS", &text]);
-            match self.quiet(&cmd) {
-                Ok(_) => {
-                    notified.insert(key);
-                }
-                Err(e) => self.j.warn(format!("notifying: {e}")),
+        // The update's lock is held from counting to writing: an update that finishes in between
+        // would otherwise have its cleared count written back.
+        let _lock = match self.lock() {
+            Ok(lock) => lock,
+            Err(UpdateError::Busy) => {
+                self.j.note("An update is running: the check leaves update-available to it");
+                return Ok(Available::default());
             }
-        }
-        let text: String = notified.iter().flat_map(|key| [key.as_str(), "\n"]).collect();
-        write_user(&notified_path, &text)?;
+            Err(e) => return Err(e),
+        };
+        let mut available = Available::from_pick(&pick);
+        available.apt_security = self.apt_security_after(refreshed)?;
+        self.write_available(&available)?;
+        self.notify(&available)?;
         self.j.emit(&UpdateEvent::Available {
             update: available.update.as_ref().map(upgrade_name),
             upgrade: available.upgrade.as_ref().map(upgrade_name),
@@ -550,35 +550,82 @@ impl<'a, M: Machine> Updater<'a, M> {
         Ok(available)
     }
 
-    /// The apt packages from a security pocket that `kubaos update` would upgrade, counted as
-    /// the user against lists of the check's own (`security.rs`): the system's lists are only
-    /// refreshed by `kubaos update`. When apt can't say (offline, a failed refresh) the previous
-    /// check's answer stands, so a flaky network neither drops the marker nor notifies twice.
-    fn pending_apt_security(&mut self) -> Vec<String> {
-        let dir = self.user.apt_lists();
-        let options = security::apt_options(&dir);
-        self.j.step("Counting the apt security updates");
-        let counted = security::apt_dirs(&dir)
-            .iter()
-            .try_for_each(fs::create_dir_all)
-            .map_err(|e| e.to_string())
-            .and_then(|()| {
-                let refresh = Cmd::user("apt-get").args(&options).args(["update", "-q"]);
-                self.quiet(&refresh).map_err(|e| chain(&e))
-            })
-            .and_then(|_| {
-                let simulate = Cmd::user("apt-get")
-                    .args(&options)
-                    .args(["-s", "-q", "upgrade", "--with-new-pkgs"]);
-                self.quiet(&simulate).map_err(|e| chain(&e))
-            });
-        match counted {
-            Ok(simulated) => security::pending(&simulated),
-            Err(e) => {
-                self.j.warn(format!("counting the apt security updates: {e}"));
-                Available::apt_security_of(&read_or_empty(&self.user.update_available()).unwrap_or_default())
+    /// Sends the notifications `available` has not sent yet, and forgets the apt security ones
+    /// that are no longer pending so `notified` stays as small as the pending set.
+    fn notify(&mut self, available: &Available) -> Result<(), UpdateError> {
+        let notified_path = self.user.notified();
+        let mut notified = parse_notified(&read_or_empty(&notified_path)?);
+        for (key, text) in available.notifications(&notified.clone()) {
+            let cmd = Cmd::user("notify-send").args(["--app-name=KubaOS", "--urgency=low", "KubaOS", &text]);
+            match self.quiet(&cmd) {
+                Ok(_) if key.starts_with(APT_SECURITY_KEY) => notified.extend(available.apt_security_keys()),
+                Ok(_) => {
+                    notified.insert(key);
+                }
+                Err(e) => self.j.warn(format!("notifying: {e}")),
             }
         }
+        let pending = available.apt_security_keys();
+        notified.retain(|key| !key.starts_with(APT_SECURITY_KEY) || pending.contains(key));
+        let text: String = notified.iter().flat_map(|key| [key.as_str(), "\n"]).collect();
+        write_user(&notified_path, &text)
+    }
+
+    /// Refreshes the check's own apt lists as the user (`security.rs`): the system's are only
+    /// refreshed by `kubaos update`. `--error-on=any` makes a list that failed to download fail
+    /// the refresh, where apt would exit 0 and go on with the old one.
+    fn refresh_apt_lists(&mut self) -> Result<(), CountError> {
+        let dir = self.user.apt_lists();
+        self.j.step("Refreshing the check's apt package lists");
+        for path in security::apt_dirs(&dir) {
+            fs::create_dir_all(&path).map_err(CountError::dir(&path))?;
+        }
+        let refresh = Cmd::user("apt-get")
+            .args(security::apt_options(&dir))
+            .args(["update", "-q", "--error-on=any"]);
+        self.quiet(&refresh).map(drop).map_err(CountError::Refresh)
+    }
+
+    /// The apt packages `kubaos update` would upgrade from a security pocket. When the lists
+    /// couldn't be refreshed or apt can't say, the previous check's answer stands, with a
+    /// warning, so a flaky network neither drops the marker nor notifies twice.
+    fn apt_security_after(&mut self, refreshed: Result<(), CountError>) -> Result<Vec<String>, UpdateError> {
+        let counted = match refreshed {
+            Ok(()) => self.count_apt_security(),
+            Err(e) => Err(e),
+        };
+        match counted {
+            Ok(pending) => Ok(pending),
+            Err(e) => {
+                self.j.warn(format!("counting the apt security updates: {}", chain(&e)));
+                let text = read_or_empty(&self.user.update_available())?;
+                Ok(Available::apt_security_of(&text))
+            }
+        }
+    }
+
+    /// Simulates the upgrade against the check's lists, then asks `apt-cache policy` about the
+    /// candidates from `-updates` alone: one may carry a security fix newer than the installed
+    /// version while being newer than the fix itself.
+    fn count_apt_security(&mut self) -> Result<Vec<String>, CountError> {
+        let options = security::apt_options(&self.user.apt_lists());
+        self.j.step("Counting the apt security updates");
+        let simulate = Cmd::user("apt-get")
+            .args(&options)
+            .args(["-s", "-q", "upgrade", "--with-new-pkgs"]);
+        let candidates = security::candidates(&self.quiet(&simulate).map_err(CountError::Simulate)?);
+        let others: Vec<&str> = candidates
+            .iter()
+            .filter(|c| !c.security)
+            .map(|c| c.name.as_str())
+            .collect();
+        let newer = if others.is_empty() {
+            BTreeSet::new()
+        } else {
+            let policy = Cmd::user("apt-cache").args(&options).arg("policy").args(others);
+            security::with_newer_security(&self.quiet(&policy).map_err(CountError::Policy)?)
+        };
+        Ok(security::pending(&candidates, &newer))
     }
 
     /// The release the machine runs: its record, or, on a machine whose install wrote none, what

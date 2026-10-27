@@ -34,6 +34,9 @@ use super::policy::Pick;
 use super::policy::Target;
 use super::record::capitalise;
 
+/// What each `notified` key for a pending apt security package starts with.
+pub const APT_SECURITY_KEY: &str = "apt-security ";
+
 /// What is available to install.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Available {
@@ -82,6 +85,14 @@ impl Available {
         text
     }
 
+    /// The `notified` key of each pending apt security package: `apt-security name=version`.
+    pub fn apt_security_keys(&self) -> BTreeSet<String> {
+        self.apt_security
+            .iter()
+            .map(|package| format!("{APT_SECURITY_KEY}{package}"))
+            .collect()
+    }
+
     /// The packages on the `apt-security-packages` line of the file's text.
     pub fn apt_security_of(text: &str) -> Vec<String> {
         text.lines()
@@ -115,12 +126,14 @@ impl Available {
             };
             out.push((format!("upgrade {}", target.commit), text));
         }
-        if !self.apt_security.is_empty() {
+        // One notification when the set gains a package not notified yet, not whenever it changes:
+        // installing some of the packages must not announce the rest again.
+        if let Some(new) = self.apt_security_keys().into_iter().find(|key| !notified.contains(key)) {
             let text = match self.apt_security.len() {
                 1 => "1 apt security update is waiting. kubaos update brings it.".to_owned(),
                 n => format!("{n} apt security updates are waiting. kubaos update brings them."),
             };
-            out.push((format!("apt-security {}", self.apt_security.join(",")), text));
+            out.push((new, text));
         }
         out.retain(|(key, _)| !notified.contains(key));
         out

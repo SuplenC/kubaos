@@ -71,25 +71,43 @@ fn an_update_notification_names_the_release() {
 }
 
 #[test]
-fn pending_apt_security_updates_are_in_the_file_and_notified_once_per_set() {
+fn pending_apt_security_updates_are_in_the_file_and_notified_once() {
     let available = Available {
-        apt_security: vec!["openssl=3.0.13".into(), "linux-image=6.8".into()],
+        apt_security: vec!["linux-image=6.8".into(), "openssl=3.0.13".into()],
         ..Available::default()
     };
 
     let text = available.to_text();
     let first = available.notifications(&parse_notified(""));
-    let again = available.notifications(&parse_notified("apt-security openssl=3.0.13,linux-image=6.8\n"));
+    let again = available.notifications(&parse_notified(
+        "apt-security linux-image=6.8\napt-security openssl=3.0.13\n",
+    ));
 
-    assert_eq!(text, "apt-security=2\napt-security-packages=openssl=3.0.13,linux-image=6.8\n");
+    assert_eq!(text, "apt-security=2\napt-security-packages=linux-image=6.8,openssl=3.0.13\n");
     assert_eq!(Available::apt_security_of(&text), available.apt_security);
     assert!(!available.is_empty());
     assert_eq!(
         first,
         [(
-            "apt-security openssl=3.0.13,linux-image=6.8".to_owned(),
+            "apt-security linux-image=6.8".to_owned(),
             "2 apt security updates are waiting. kubaos update brings them.".to_owned()
         )]
     );
     assert!(again.is_empty());
+}
+
+#[test]
+fn a_smaller_set_is_not_notified_again_but_a_new_package_is() {
+    let smaller = Available {
+        apt_security: vec!["openssl=3.0.13".into()],
+        ..Available::default()
+    };
+    let grown = Available {
+        apt_security: vec!["curl=8.5".into(), "openssl=3.0.13".into()],
+        ..Available::default()
+    };
+    let notified = parse_notified("apt-security linux-image=6.8\napt-security openssl=3.0.13\n");
+
+    assert!(smaller.notifications(&notified).is_empty());
+    assert_eq!(grown.notifications(&notified)[0].0, "apt-security curl=8.5");
 }
