@@ -44,6 +44,13 @@ fail() {
   failed=1
 }
 
+# read_value FILE: FILE's contents on stdout, exit 1 when it can't be read.
+# Each knob reads through it in a command substitution, which `set -e`
+# doesn't stop at, so a file the kernel refuses to read fails that knob alone.
+read_value() {
+  cat -- "$1" 2>/dev/null
+}
+
 # put FILE VALUE: writes VALUE to FILE when it holds something else.
 put() {
   local file="$1" value="$2" now
@@ -51,7 +58,7 @@ put() {
     fail "$file isn't there"
     return
   fi
-  now="$(<"$file")"
+  now="$(read_value "$file")" || { fail "couldn't read $file"; return 0; }
   [[ $now == "$value" ]] && return
   if ! printf '%s' "$value" 2>/dev/null >"$file"; then
     fail "the kernel refused $value for $file"
@@ -65,7 +72,9 @@ cpu_max() {
   for policy in "$SYS"/devices/system/cpu/cpufreq/policy*; do
     [[ -e $policy/scaling_max_freq ]] || continue
     want="$value"
-    [[ $want == max ]] && want="$(<"$policy/cpuinfo_max_freq")"
+    if [[ $want == max ]]; then
+      want="$(read_value "$policy/cpuinfo_max_freq")" || { fail "couldn't read $policy/cpuinfo_max_freq"; continue; }
+    fi
     put "$policy/scaling_max_freq" "$want"
   done
 }
@@ -84,21 +93,25 @@ panel_power() {
 }
 
 aspm() {
-  local policy="$1" file="$SYS/module/pcie_aspm/parameters/policy"
+  local policy="$1" file="$SYS/module/pcie_aspm/parameters/policy" now
   [[ $policy =~ ^(default|performance|powersave|powersupersave)$ ]] || { fail "aspm=$policy isn't a policy"; return; }
   [[ -e $file ]] || { fail "$file isn't there"; return; }
+  now="$(read_value "$file")" || { fail "couldn't read $file"; return 0; }
   # The kernel shows every policy with the one in use in brackets.
-  [[ " $(<"$file") " == *" [$policy] "* ]] && return
+  [[ " $now " == *" [$policy] "* ]] && return
   printf '%s' "$policy" 2>/dev/null >"$file" || fail "the kernel refused ASPM policy $policy (the firmware may keep ASPM for itself)"
 }
 
-# never_suspended DIR: a device with an input, security or audio interface.
+# never_suspended DIR: a device with an input, security or audio interface. A
+# device it can't read counts as one: it stays awake.
 never_suspended() {
-  local dir="$1" class
-  [[ $(<"$dir/idVendor") == 1050 ]] && return 0
+  local dir="$1" class vendor
+  vendor="$(read_value "$dir/idVendor")" || return 0
+  [[ $vendor == 1050 ]] && return 0
   for class in "$dir"/*:*/bInterfaceClass; do
     [[ -e $class ]] || continue
-    case "$(<"$class")" in
+    class="$(read_value "$class")" || return 0
+    case "$class" in
       03 | 0b | 01) return 0 ;;
     esac
   done

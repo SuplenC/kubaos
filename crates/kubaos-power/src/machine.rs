@@ -64,7 +64,29 @@ impl UsbDevice {
                 .iter()
                 .any(|class| NEVER_SUSPENDED_CLASSES.contains(&class.as_str()))
     }
+
+    /// Whether it stays awake in every stop: an input device, a printer, or a network adapter, whose
+    /// link drops and renegotiates when it suspends, as a dock's Ethernet does.
+    pub fn kept_awake(&self) -> bool {
+        self.is_input()
+            || self
+                .classes
+                .iter()
+                .any(|class| KEPT_AWAKE_CLASSES.contains(&class.as_str()))
+            || (self.vendor.eq_ignore_ascii_case(REALTEK)
+                && REALTEK_ETHERNET
+                    .iter()
+                    .any(|product| self.product.eq_ignore_ascii_case(product)))
+    }
 }
+
+/// The interface classes of printers (07) and network adapters (02, CDC), kept awake.
+pub const KEPT_AWAKE_CLASSES: [&str; 2] = ["07", "02"];
+/// Realtek's USB vendor id. Its Ethernet adapters (the r8152 driver's, in most docks) show a
+/// vendor class, not CDC's.
+pub const REALTEK: &str = "0bda";
+/// The products of Realtek's USB Ethernet adapters.
+pub const REALTEK_ETHERNET: [&str; 6] = ["8050", "8152", "8153", "8155", "8156", "8157"];
 
 /// How the charge is limited on this machine.
 #[derive(Clone, Debug, PartialEq, Eq)]

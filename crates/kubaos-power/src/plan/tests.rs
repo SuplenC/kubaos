@@ -106,7 +106,7 @@ fn links_and_radios_save_up_to_balanced_and_stay_awake_above() {
         rows,
         [
             (Aspm::PowerSuperSave, true, true),
-            (Aspm::PowerSuperSave, true, true),
+            (Aspm::PowerSave, true, true),
             (Aspm::Default, true, true),
             (Aspm::Performance, true, false),
             (Aspm::Performance, false, false),

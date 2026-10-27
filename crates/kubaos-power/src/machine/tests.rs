@@ -39,18 +39,24 @@ fn the_aspm_policy_in_use_is_the_bracketed_one() {
 }
 
 #[test]
-fn hubs_are_left_out_and_input_devices_are_known() {
+fn hubs_are_left_out_and_input_devices_and_the_dock_lan_are_known() {
     let root = FakeRoot::laptop();
 
     let devices = root.machine().usb_devices();
 
-    let names: Vec<(&str, bool)> = devices
+    let names: Vec<(&str, bool, bool)> = devices
         .iter()
-        .map(|device| (device.name.as_str(), device.is_input()))
+        .map(|device| (device.name.as_str(), device.is_input(), device.kept_awake()))
         .collect();
     assert_eq!(
         names,
-        [("1-1", false), ("3-2", true), ("7-1.1.3", true), ("8-1.1.2", false)]
+        [
+            ("1-1", false, false),
+            ("1-3", false, false),
+            ("3-2", true, true),
+            ("7-1.1.3", true, true),
+            ("8-1.1.2", false, true)
+        ]
     );
 }
 

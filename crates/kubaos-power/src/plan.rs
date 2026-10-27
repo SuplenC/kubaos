@@ -10,7 +10,7 @@
 //! GPU DPM          low           low           auto          auto          high
 //! panel            60 Hz         VRR           VRR           native        native
 //! panel saving     3             2             0             0             0
-//! ASPM             powersupersave              default       performance   performance
+//! ASPM             powersupersave powersave   default       performance   performance
 //! USB autosuspend  on            on            on            on            off
 //! Wi-Fi saving     on            on            on            off           off
 //! background       paused        paused        normal        normal        normal
@@ -80,6 +80,10 @@ impl GpuDpm {
 pub enum Aspm {
     Default,
     Performance,
+    /// L0s and L1.
+    PowerSave,
+    /// L1 substates too, the deepest: the NVMe and the Wi-Fi card sleep hardest, and the ones known
+    /// to drop off the bus do it here.
     PowerSuperSave,
 }
 
@@ -88,8 +92,16 @@ impl Aspm {
         match self {
             Aspm::Default => "default",
             Aspm::Performance => "performance",
+            Aspm::PowerSave => "powersave",
             Aspm::PowerSuperSave => "powersupersave",
         }
+    }
+
+    pub const ALL: [Aspm; 4] = [Aspm::Default, Aspm::Performance, Aspm::PowerSave, Aspm::PowerSuperSave];
+
+    /// The policy named `name`.
+    pub fn from_name(name: &str) -> Option<Aspm> {
+        Aspm::ALL.into_iter().find(|aspm| aspm.name() == name)
     }
 }
 
@@ -166,7 +178,7 @@ impl Plan {
             gpu_dpm: GpuDpm::Auto,
             panel: Panel::of(own.panel),
             panel_power_saving: 0,
-            aspm: Aspm::Default,
+            aspm: own.aspm,
             usb_autosuspend: true,
             wifi_power_save: true,
             quiet_background: false,
@@ -178,7 +190,6 @@ impl Plan {
                 scheduler: Scheduler::PowersaveFewestCores,
                 gpu_dpm: GpuDpm::Low,
                 panel_power_saving: saving(3),
-                aspm: Aspm::PowerSuperSave,
                 quiet_background: true,
                 ..base
             },
@@ -188,7 +199,6 @@ impl Plan {
                 scheduler: Scheduler::Powersave,
                 gpu_dpm: GpuDpm::Low,
                 panel_power_saving: saving(2),
-                aspm: Aspm::PowerSuperSave,
                 quiet_background: true,
                 ..base
             },
@@ -196,7 +206,6 @@ impl Plan {
             Stop::Performance => Plan {
                 epp: Epp::Performance,
                 scheduler: Scheduler::Performance,
-                aspm: Aspm::Performance,
                 wifi_power_save: false,
                 ..base
             },
@@ -204,7 +213,6 @@ impl Plan {
                 epp: Epp::Performance,
                 scheduler: Scheduler::Performance,
                 gpu_dpm: GpuDpm::High,
-                aspm: Aspm::Performance,
                 usb_autosuspend: false,
                 wifi_power_save: false,
                 ..base

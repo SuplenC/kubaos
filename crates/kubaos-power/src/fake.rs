@@ -22,7 +22,7 @@ impl FakeRoot {
 
     /// The reference laptop as it stood on 2026-10-27, on battery in Power Saver: two CPU
     /// policies, amdgpu's card1 with eDP-1, ASPM at `default`, a webcam, a Logitech receiver, an
-    /// Ethernet adapter, a hub and a security key, Wi-Fi, TUXEDO's charging profile and a battery
+    /// Ethernet adapter, a card reader, a hub and a security key, Wi-Fi, TUXEDO's charging profile and a battery
     /// drawing 16.8 W.
     pub fn laptop() -> FakeRoot {
         let root = FakeRoot::empty();
@@ -44,6 +44,7 @@ impl FakeRoot {
             "[default] performance powersave powersupersave",
         );
         root.usb("1-1", "2b7e", "c906", &["0e", "0e"], "auto", "FHD WebCam");
+        root.usb("1-3", "0bda", "0177", &["08"], "on", "Card Reader");
         root.usb("7-1", "2109", "2822", &["09"], "auto", "USB2.0 Hub");
         root.usb("7-1.1.3", "046d", "c547", &["03", "03"], "on", "USB Receiver");
         root.usb("8-1.1.2", "0bda", "8153", &["ff"], "on", "USB 10/100/1000 LAN");

@@ -26,22 +26,30 @@
 # skip = ["046d:c547"]
 #
 # What the laptop panel does in a stop: "60hz", "vrr" (its native rate, refreshing slower while
-# nothing moves) or "native". External screens are never touched. KubaOS's choice per stop:
+# nothing moves) or "native". External screens are never touched. `aspm` is the PCIe link power
+# policy: "default", "performance", "powersave" or "powersupersave". The last sleeps the SSD and
+# the Wi-Fi card hardest, and some drop off the bus there; if one does (`journalctl -k` shows nvme
+# or Wi-Fi resets), use "powersave" in Super Saver too. KubaOS's choice per stop:
 # [super-saver]
 # panel = "60hz"
+# aspm = "powersupersave"
 # cpu_max_mhz = 1600     # the CPU's clock cap; 0 for none
 #
 # [power-saver]
 # panel = "vrr"
+# aspm = "powersave"
 #
 # [balanced]
 # panel = "vrr"
+# aspm = "default"
 #
 # [performance]
 # panel = "native"
+# aspm = "performance"
 #
 # [max-performance]
 # panel = "native"
+# aspm = "performance"
 #
 # Full docs: docs/USING.md, "Power", and docs/CONTRACTS.md, "Defaults and the user layer"
 # (https://github.com/SuplenC/kubaos/blob/main/docs/USING.md).

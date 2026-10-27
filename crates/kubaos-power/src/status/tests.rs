@@ -96,7 +96,7 @@ fn the_usb_row_names_the_devices_kept_awake() {
     let usb = find(&rows, "USB autosuspend");
     assert_eq!(
         usb.now.as_deref(),
-        Some("1 of 4 devices; never: YubiKey FIDO+CCID, USB Receiver")
+        Some("1 of 5 devices; never: YubiKey FIDO+CCID, USB Receiver, USB 10/100/1000 LAN")
     );
     assert_eq!(usb.agrees, Some(false));
 }

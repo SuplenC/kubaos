@@ -11,6 +11,7 @@
 //!
 //! [super-saver]
 //! panel = "60hz"                # "60hz", "vrr" or "native"
+//! aspm = "powersupersave"       # "default", "performance", "powersave" or "powersupersave"
 //! cpu_max_mhz = 1600            # 0 for no cap
 //! ```
 //!
@@ -36,6 +37,7 @@ use serde::Deserialize;
 use toml_edit::DocumentMut;
 use toml_edit::value;
 
+use crate::plan::Aspm;
 use crate::stop::Stop;
 
 /// The settings file in the power folder of the user layer.
@@ -134,6 +136,10 @@ impl PanelMode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StopSettings {
     pub panel: PanelMode,
+    /// The PCIe ASPM policy. Only Super Saver goes to `powersupersave` by default: its L1
+    /// substates are where an NVMe or a Wi-Fi card drops off the bus, and a dropped NVMe turns
+    /// the encrypted root read-only.
+    pub aspm: Aspm,
     /// The CPU's clock cap in MHz, `None` for none.
     pub cpu_max_mhz: Option<u32>,
 }
@@ -171,14 +177,22 @@ fn default_stop(stop: Stop) -> StopSettings {
     match stop {
         Stop::SuperSaver => StopSettings {
             panel: PanelMode::Fixed60,
+            aspm: Aspm::PowerSuperSave,
             cpu_max_mhz: Some(DEFAULT_SUPER_SAVER_MHZ),
         },
-        Stop::PowerSaver | Stop::Balanced => StopSettings {
+        Stop::PowerSaver => StopSettings {
             panel: PanelMode::Vrr,
+            aspm: Aspm::PowerSave,
+            cpu_max_mhz: None,
+        },
+        Stop::Balanced => StopSettings {
+            panel: PanelMode::Vrr,
+            aspm: Aspm::Default,
             cpu_max_mhz: None,
         },
         Stop::Performance | Stop::MaxPerformance => StopSettings {
             panel: PanelMode::Native,
+            aspm: Aspm::Performance,
             cpu_max_mhz: None,
         },
     }
@@ -232,6 +246,7 @@ struct UsbToml {
 #[serde(deny_unknown_fields)]
 struct StopToml {
     panel: Option<String>,
+    aspm: Option<String>,
     cpu_max_mhz: Option<i64>,
 }
 
@@ -276,6 +291,8 @@ pub enum SettingsError {
     NotAUsbId(String),
     #[error("`{0}` isn't a panel mode: 60hz, vrr or native")]
     NotAPanelMode(String),
+    #[error("`{0}` isn't a PCIe ASPM policy: default, performance, powersave or powersupersave")]
+    NotAnAspm(String),
     #[error("a clock cap of {0} MHz is out of range: from 400 to 10000, or 0 for none")]
     NotAClock(i64),
     #[error("in [{stop}]")]
@@ -349,6 +366,9 @@ impl Settings {
             };
             if let Some(panel) = table.panel {
                 own.panel = PanelMode::from_name(&panel).ok_or_else(|| in_stop(SettingsError::NotAPanelMode(panel)))?;
+            }
+            if let Some(aspm) = table.aspm {
+                own.aspm = Aspm::from_name(&aspm).ok_or_else(|| in_stop(SettingsError::NotAnAspm(aspm)))?;
             }
             if let Some(mhz) = table.cpu_max_mhz {
                 own.cpu_max_mhz = match u32::try_from(mhz) {

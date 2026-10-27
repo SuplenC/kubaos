@@ -78,7 +78,7 @@ impl Write {
 /// list, whatever the stop.
 pub fn autosuspends(device: &UsbDevice, plan: &Plan, settings: &Settings) -> bool {
     plan.usb_autosuspend
-        && !device.is_input()
+        && !device.kept_awake()
         && !settings
             .usb_skip
             .iter()

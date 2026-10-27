@@ -17,4 +17,4 @@ source "$KUBAOS_DIR/system/lib.sh"
 
 kubaos_backup /etc/polkit-1/rules.d/50-kubaos-power.rules
 kubaos_backup /etc/modprobe.d/kubaos-amdgpu.conf
-install_power_helper
+install_power_helper --actions

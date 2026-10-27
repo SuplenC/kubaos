@@ -37,7 +37,7 @@ fn the_defaults_drop_to_power_saver_at_20_and_charge_full() {
 fn every_key_reads() {
     let settings = Settings::parse(
         "panel_power_saving = false\ncharge_limit = 80\nlow_battery = 15\nlow_battery_stop = \"super-saver\"\n\
-         [usb]\nskip = [\"046D:C547\", \"1050:*\"]\n[super-saver]\npanel = \"vrr\"\ncpu_max_mhz = 1400\n",
+         [usb]\nskip = [\"046D:C547\", \"1050:*\"]\n[super-saver]\npanel = \"vrr\"\ncpu_max_mhz = 1400\naspm = \"powersave\"\n",
     )
     .expect("parses");
 
@@ -52,6 +52,7 @@ fn every_key_reads() {
         settings.stop(Stop::SuperSaver),
         StopSettings {
             panel: PanelMode::Vrr,
+            aspm: Aspm::PowerSave,
             cpu_max_mhz: Some(1400)
         }
     );
@@ -73,6 +74,7 @@ fn values_out_of_range_are_refused_and_say_why() {
     assert!(refused("[usb]\nskip = [\"keyboard\"]").starts_with("`keyboard` isn't a USB device"));
     assert_eq!(refused("[balanced]\npanel = \"30hz\""), "in [balanced]");
     assert!(matches!(Settings::parse("turbo = true"), Err(SettingsError::Parse(_))));
+    assert_eq!(refused("[power-saver]\naspm = \"l3\""), "in [power-saver]");
 }
 
 #[test]
