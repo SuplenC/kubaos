@@ -366,6 +366,20 @@ fn the_phone_link_is_set_up_used_and_turned_off_from_the_menu() {
     }
 }
 
+#[test]
+fn project_pins_are_set_removed_and_listed_from_the_menu() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let given = arguments(&[("suite", "node"), ("version", "18"), ("folder", "~/Projects/acme")]);
+
+    let pin = registry.command("pin", &given).expect("a pin action");
+    let unpin = registry.command("unpin", &given).expect("an unpin action");
+    let pins = registry.command("pins", &given).expect("a pins action");
+
+    assert_eq!(tail(&pin.argv, 5), ["kubaos", "pin", "node", "18", "~/Projects/acme"]);
+    assert_eq!(tail(&unpin.argv, 4), ["kubaos", "unpin", "node", "~/Projects/acme"]);
+    assert_eq!(tail(&pins.argv, 3), ["kubaos", "pins", "--all"]);
+}
+
 /// The `[extensions.kubaos]` table of the Defaults.
 fn shipped() -> Table {
     let defaults: Table = toml::from_str(include_str!("../../../../config/kotodama/kubaos.toml")).expect("kubaos.toml");
@@ -376,6 +390,11 @@ fn shipped() -> Table {
         panic!("kubaos.toml has no [extensions.kubaos]");
     };
     kubaos.clone()
+}
+
+/// The last `n` words of `argv`: what an action runs, after the terminal it runs in.
+fn tail(argv: &[String], n: usize) -> &[String] {
+    &argv[argv.len().saturating_sub(n)..]
 }
 
 fn every_argument(item: &Item) -> BTreeMap<String, String> {
