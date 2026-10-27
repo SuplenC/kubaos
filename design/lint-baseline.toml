@@ -149,52 +149,6 @@ size = 2
 ["config/quickshell/modules/frame/Frame.qml"]
 size = 2
 
-["config/quickshell/modules/menu/ActionPanel.qml"]
-size = 1
-font = 1
-
-["config/quickshell/modules/menu/DetailPane.qml"]
-size = 1
-
-["config/quickshell/modules/menu/DetailView.qml"]
-size = 1
-
-["config/quickshell/modules/menu/FormView.qml"]
-size = 2
-font = 2
-
-["config/quickshell/modules/menu/IntroCard.qml"]
-size = 1
-
-["config/quickshell/modules/menu/JobBar.qml"]
-size = 2
-
-["config/quickshell/modules/menu/Keycap.qml"]
-size = 1
-font = 1
-
-["config/quickshell/modules/menu/Menu.qml"]
-size = 7
-font = 4
-
-["config/quickshell/modules/menu/MenuLook.qml"]
-size = 25
-radius = 3
-
-["config/quickshell/modules/menu/PaneContent.qml"]
-size = 2
-font = 3
-
-["config/quickshell/modules/menu/Probe.qml"]
-size = 1
-
-["config/quickshell/modules/menu/ProgressView.qml"]
-font = 1
-
-["config/quickshell/modules/menu/ResultRow.qml"]
-size = 2
-font = 1
-
 ["config/quickshell/modules/notifications/NotificationCard.qml"]
 space = 1
 size = 9

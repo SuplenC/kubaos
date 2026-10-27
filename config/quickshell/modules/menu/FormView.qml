@@ -1,17 +1,17 @@
 import QtQuick
 import Kotodama
-import qs.theme
-import qs.components
+import KubaOS.Components as K
 
-// A form View: each field's label above its control, Kōbō's way (`field` in
-// crates/kubaos-kobo/src/widgets.rs), and the submit button. Tab and
-// Shift+Tab (or Down and Up) move between fields, Space ticks a checkbox,
-// Left and Right choose an option, Enter submits; the menu's own keys come
-// first, through `keys`.
+// A form View, in a column: each field under its label, Kōbō's way, and the submit button at the
+// end. Tab and Shift+Tab (or Down and Up) move between fields, Space ticks a checkbox, Left and
+// Right pick an option, Enter submits from anywhere; the menu's own keys come first, through
+// `keys`.
+//
+// A checkbox or a select keeps the keyboard on an item of its own, which draws its focus on the
+// control: the library's controls press on Enter, and here Enter submits.
 FocusScope {
     id: form
 
-    property MenuLook look
     required property KotodamaSearch search
     // The menu's keys, `Menu.qml`'s `key(event)`: true if it took the event.
     property var keys: event => false
@@ -20,6 +20,8 @@ FocusScope {
     property string submitLabel: ""
     // The field that has the keys.
     property int current: 0
+
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
     signal submitted
 
@@ -35,104 +37,135 @@ FocusScope {
         return true;
     }
 
-    Column {
+    K.Stack {
         id: column
 
-        width: Math.min(parent.width - 2 * form.look.pad, form.look.columnWidth)
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: form.look.pad
-        spacing: form.look.apart
+        x: K.Look.snap((form.width - width) / 2, form.dpr)
+        width: Math.min(form.width, K.Tokens.size.column)
+        fill: true
+        gap: K.Tokens.space.s24
 
-        Repeater {
-            id: repeater
+        K.Stack {
+            fill: true
+            gap: K.Tokens.space.s16
 
-            model: form.fields
+            Repeater {
+                id: repeater
 
-            Column {
-                id: field
+                model: form.fields
 
-                required property int index
-                required property var modelData
-                readonly property bool current: typed.activeFocus || toggle.activeFocus || choice.activeFocus
+                K.Stack {
+                    id: field
 
-                function take(): void {
-                    const kind = modelData.kind;
-                    (kind === "checkbox" ? toggle : kind === "select" ? choice : typed).forceActiveFocus();
-                }
+                    required property int index
+                    required property var modelData
+                    readonly property string kind: modelData.kind
+                    readonly property bool current: typed.activeFocus || toggle.activeFocus || choice.activeFocus
 
-                width: column.width
-                spacing: form.look.tight
-                onCurrentChanged: {
-                    if (current)
-                        form.current = index;
-                }
-
-                StyledText {
-                    width: parent.width
-                    text: field.modelData.label
-                    color: field.current ? Theme.m3primary : Theme.m3onSurfaceVariant
-                    font.pixelSize: form.look.font.small
-                    font.weight: Font.Medium
-                }
-
-                Rectangle {
-                    id: box
-
-                    width: parent.width
-                    height: form.look.fieldHeight
-                    radius: form.look.rowRadius
-                    color: Theme.m3surfaceContainerHigh
-                    border.width: 1
-                    border.color: Theme.alpha(Theme.m3outlineVariant, 0.8)
-
-                    // Kōbō's focus ring: 2 px of primary, 3 px outside.
-                    FocusRing {
-                        shown: field.current
+                    function take(): void {
+                        (field.kind === "checkbox" ? toggle : field.kind === "select" ? choice : typed).forceActiveFocus();
                     }
 
-                    TextInput {
-                        id: typed
+                    fill: true
+                    onCurrentChanged: {
+                        if (current)
+                            form.current = index;
+                    }
 
-                        anchors.fill: parent
-                        anchors.leftMargin: form.look.inset
-                        anchors.rightMargin: form.look.inset
-                        visible: field.modelData.kind === "text"
-                        verticalAlignment: TextInput.AlignVCenter
-                        clip: true
-                        color: Theme.m3onSurface
-                        selectionColor: Theme.m3primary
-                        selectedTextColor: Theme.m3onPrimary
-                        renderType: Text.NativeRendering
-                        font.family: Theme.font.sans
-                        font.pixelSize: form.look.font.title
-                        passwordCharacter: "•"
-                        echoMode: field.modelData.secret ? TextInput.Password : TextInput.Normal
-                        Component.onCompleted: {
-                            if (field.modelData.kind === "text")
-                                text = field.modelData.value;
+                    K.Labelled {
+                        visible: field.kind !== "checkbox"
+                        label: field.modelData.label
+
+                        K.Field {
+                            id: typed
+
+                            visible: field.kind === "text"
+                            placeholder: field.modelData.placeholder ?? ""
+                            secret: field.modelData.secret === true
+                            Component.onCompleted: {
+                                if (field.kind === "text")
+                                    text = field.modelData.value;
+                            }
+                            onTextChanged: form.search.setText(field.index, text)
+                            onKeyPressed: event => event.accepted = form.keys(event)
                         }
-                        onTextChanged: form.search.setText(field.index, text)
-                        Keys.onPressed: event => event.accepted = form.keys(event)
 
-                        StyledText {
-                            anchors.fill: parent
-                            visible: typed.text === "" && !typed.preeditText
-                            text: field.modelData.placeholder
-                            color: Theme.alpha(Theme.m3onSurfaceVariant, 0.7)
-                            font.pixelSize: form.look.font.title
+                        // A select: one radio per option, Left and Right step through them.
+                        Item {
+                            id: choice
+
+                            readonly property var options: field.modelData.options ?? []
+                            property int chosen: Math.max(0, options.findIndex(option => option.value === field.modelData.value))
+                            readonly property bool fillWidth: true
+
+                            function step(by: int): void {
+                                if (options.length > 0)
+                                    choice.pick((chosen + by + options.length) % options.length);
+                            }
+
+                            function pick(n: int): void {
+                                chosen = n;
+                                form.search.setText(field.index, options[n].value);
+                            }
+
+                            function relayout(): void {
+                                radios.relayout();
+                            }
+
+                            visible: field.kind === "select"
+                            implicitHeight: radios.implicitHeight
+                            Keys.onPressed: event => {
+                                const by = event.key === Qt.Key_Right ? 1 : event.key === Qt.Key_Left ? -1 : 0;
+                                if (form.keys(event)) {
+                                    event.accepted = true;
+                                } else if (by !== 0) {
+                                    choice.step(by);
+                                    event.accepted = true;
+                                }
+                            }
+
+                            K.Grid {
+                                id: radios
+
+                                width: choice.width
+                                columns: 3
+                                gap: K.Tokens.space.s12
+
+                                Repeater {
+                                    model: choice.options
+
+                                    K.Radio {
+                                        required property int index
+                                        required property var modelData
+
+                                        text: modelData.label
+                                        checked: index === choice.chosen
+                                        focused: choice.activeFocus && checked
+                                        activeFocusOnTab: false
+                                        onPicked: {
+                                            choice.forceActiveFocus();
+                                            choice.pick(index);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
-                    // A checkbox, drawn as Kōbō's switch.
+                    // A checkbox: Space ticks it.
                     Item {
                         id: toggle
 
                         property bool checked: field.modelData.value === true
 
-                        anchors.fill: parent
-                        anchors.leftMargin: form.look.inset
-                        anchors.rightMargin: form.look.inset
-                        visible: field.modelData.kind === "checkbox"
+                        function flip(): void {
+                            checked = !checked;
+                            form.search.setChecked(field.index, checked);
+                        }
+
+                        visible: field.kind === "checkbox"
+                        implicitWidth: box.implicitWidth
+                        implicitHeight: box.implicitHeight
                         Keys.onPressed: event => {
                             if (form.keys(event)) {
                                 event.accepted = true;
@@ -142,169 +175,33 @@ FocusScope {
                             }
                         }
 
-                        function flip(): void {
-                            checked = !checked;
-                            form.search.setChecked(field.index, checked);
-                        }
+                        K.Checkbox {
+                            id: box
 
-                        StyledText {
-                            anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: toggle.checked ? "On" : "Off"
-                            font.pixelSize: form.look.font.title
-                        }
-
-                        Rectangle {
-                            id: track
-
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: form.look.switchWidth
-                            height: form.look.switchHeight
-                            radius: height / 2
-                            color: toggle.checked ? Theme.m3primary : Theme.m3surfaceContainerHighest
-                            border.width: toggle.checked ? 0 : 2
-                            border.color: Theme.m3outline
-
-                            Rectangle {
-                                width: toggle.checked ? form.look.knobOn : form.look.knobOff
-                                height: width
-                                radius: width / 2
-                                anchors.verticalCenter: parent.verticalCenter
-                                x: toggle.checked ? track.width - width - form.look.nudge : form.look.tight
-                                color: toggle.checked ? Theme.m3onPrimary : Theme.m3outline
-
-                                Behavior on x {
-                                    enabled: form.look.motion.moves
-                                    NumberAnimation {
-                                        duration: form.look.motion.glide
-                                        easing.type: Easing.BezierSpline
-                                        easing.bezierCurve: form.look.motion.arrive
-                                    }
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: {
+                            text: field.modelData.label
+                            tick: toggle.checked ? "Full" : "Empty"
+                            focused: toggle.activeFocus
+                            activeFocusOnTab: false
+                            onToggled: {
                                 toggle.forceActiveFocus();
                                 toggle.flip();
                             }
                         }
                     }
-
-                    // A select: Left and Right step through the options.
-                    Item {
-                        id: choice
-
-                        readonly property var options: field.modelData.options ?? []
-                        property int chosen: Math.max(0, options.findIndex(option => option.value === field.modelData.value))
-
-                        function step(by: int): void {
-                            if (options.length === 0)
-                                return;
-                            chosen = (chosen + by + options.length) % options.length;
-                            form.search.setText(field.index, options[chosen].value);
-                        }
-
-                        anchors.fill: parent
-                        anchors.leftMargin: form.look.inset
-                        anchors.rightMargin: form.look.tight
-                        visible: field.modelData.kind === "select"
-                        Keys.onPressed: event => {
-                            const by = event.key === Qt.Key_Right ? 1 : event.key === Qt.Key_Left ? -1 : 0;
-                            if (form.keys(event)) {
-                                event.accepted = true;
-                            } else if (by !== 0) {
-                                choice.step(by);
-                                event.accepted = true;
-                            }
-                        }
-
-                        StyledText {
-                            anchors.left: parent.left
-                            anchors.right: arrows.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: choice.options.length > 0 ? choice.options[choice.chosen].label : ""
-                            font.pixelSize: form.look.font.title
-                        }
-
-                        Row {
-                            id: arrows
-
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            IconButton {
-                                size: form.look.controlSize
-                                icon: "chevron_left"
-                                onClicked: {
-                                    choice.forceActiveFocus();
-                                    choice.step(-1);
-                                }
-                            }
-
-                            IconButton {
-                                size: form.look.controlSize
-                                icon: "chevron_right"
-                                onClicked: {
-                                    choice.forceActiveFocus();
-                                    choice.step(1);
-                                }
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        visible: !field.current && field.modelData.kind !== "checkbox"
-                        onClicked: field.take()
-                    }
                 }
             }
         }
 
-        Item {
-            width: parent.width
-            height: submit.height + form.look.tight
+        K.Row {
+            fill: true
 
-            Rectangle {
-                id: submit
+            K.Fill {}
 
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
-                width: form.look.snap(submitRow.implicitWidth + 2 * form.look.pad)
-                height: form.look.fieldHeight
-                radius: height / 2
-                color: Theme.m3primary
-
-                Row {
-                    id: submitRow
-
-                    anchors.centerIn: parent
-                    spacing: form.look.gap
-
-                    StyledText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: form.submitLabel
-                        color: Theme.m3onPrimary
-                        font.pixelSize: form.look.font.title
-                        font.weight: Font.Medium
-                    }
-
-                    Keycap {
-                        anchors.verticalCenter: parent.verticalCenter
-                        look: form.look
-                        tint: Theme.m3onPrimary
-                        key: "↵"
-                    }
-                }
-
-                StateLayer {
-                    color: Theme.m3onPrimary
-                    onClicked: form.submitted()
-                }
+            K.Button {
+                text: form.submitLabel
+                kind: "Filled"
+                activeFocusOnTab: false
+                onActivated: form.submitted()
             }
         }
     }

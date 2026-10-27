@@ -7,12 +7,12 @@ KubaOS's desktop shell: my own, for Hyprland, written in QML on [Quickshell](htt
 Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dots/shell). Every screen gets a frame: the bar along the top and a thin border on the other three edges, with rounded inner corners. Panels are not floating cards. They grow out of the frame's edges and meet it through concave fillets, so the frame and every open panel read as one surface with one soft shadow. The colors come from the wallpaper (matugen, `scheme-fidelity`), which keeps the photo's own neon hue in the accents: amber and cyan on the Shinjuku street, violet and gold at purple hour.
 
 - **Type:** Geist for the interface, with tabular figures for anything that ticks. M PLUS 1 for the few Japanese accents: the weekday kanji next to the bar clock, 曜日 in the control center, and 東京 on the lock screen. Material Symbols Rounded for icons, whose `FILL` axis animates on toggles.
-- **Motion:** Material 3 curves (`Theme.anim`). Things that appear use the "spatial" curve, which decelerates in with a slight overshoot (450 ms). Things that leave accelerate out, quicker (300 ms). Opening a panel animates its depth, and the content rides on its leading edge, so it slides out from under the frame instead of fading in place. List rows cascade in (22 ms stagger). Selection highlights, tab indicators and the workspace indicator slide. The workspace indicator stretches: its leading edge moves first and the trailing edge follows. The workspace pill changes shape in a glide, never a jump: the group the screen shows ends in a faint `+`, the ghost slot where next creates a new workspace (a click does the same; none once the group has all ten). A new workspace fills it in place and a new ghost grows after it, a workspace that goes away shrinks out, and the cells, the gaps between groups, the pill's width and the window title beside it follow. The Command menu has its own, quicker set (`motion` in `modules/menu/MenuLook.qml`, after Kōbō's `reveal.rs`): a 220 ms glide for the highlight, moving rows and Views sliding in, 120 ms fades, 220 ms in and 120 ms out for the window. What a keystroke changes shows at once, never animated, so typing never waits on a frame.
+- **Motion:** Material 3 curves (`Theme.anim`). Things that appear use the "spatial" curve, which decelerates in with a slight overshoot (450 ms). Things that leave accelerate out, quicker (300 ms). Opening a panel animates its depth, and the content rides on its leading edge, so it slides out from under the frame instead of fading in place. List rows cascade in (22 ms stagger). Selection highlights, tab indicators and the workspace indicator slide. The workspace indicator stretches: its leading edge moves first and the trailing edge follows. The workspace pill changes shape in a glide, never a jump: the group the screen shows ends in a faint `+`, the ghost slot where next creates a new workspace (a click does the same; none once the group has all ten). A new workspace fills it in place and a new ghost grows after it, a workspace that goes away shrinks out, and the cells, the gaps between groups, the pill's width and the window title beside it follow. The Command menu moves on the design tokens, one step quicker than a panel (docs/DESIGN.md, "Motion"): the window arrives over `short` and leaves over `micro`, a View slides in over `medium`, and the highlight glides between rows over `short`. What a keystroke changes shows at once, never animated, so typing never waits on a frame.
 - **Placement:**
 
   | Panel | Position |
   |---|---|
-  | Command menu (Kotodama) | Its own window on the focused screen, centred, with two fifths of the free height above it. Its width, rows and type follow the screen; on screens at least 1560 logical pixels wide it has a detail pane |
+  | Command menu (Kotodama) | Its own window on the focused screen, centred, with two fifths of the free height above it. Its width and rows follow the screen; on screens at least 1472 logical pixels wide it has a detail pane |
   | Control center | Side sheet on the right |
   | Power menu | Column on the right edge |
   | Wallpaper picker | Rises from the bottom |
@@ -110,9 +110,10 @@ modules/
                         Exclusions (exclusive zones as four empty windows)
   bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, SysmonPill, Status, RecordingIndicator,
                         IdleIndicator
-  menu/                 Menu: the Command menu on KotodamaSearch. MenuLook (sizes for the screen,
-                        motion), ResultRow, DetailPane + PaneContent, ActionPanel, FormView,
-                        ProgressView, DetailView, IntroCard, JobBar, KeyHints, Keycap,
+  menu/                 Menu: the Command menu on KotodamaSearch, built from KubaOS.Components (its
+                        sizes for the screen, its motion). ResultRow, DetailPane + PaneContent,
+                        ActionPanel, FormView, ProgressView, DetailView, IntroCard, Label (text that
+                        changes with every key), words.js (glyphs, kinds, shortcuts),
                         Probe (test-only timing and state lines)
   controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists, history,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)

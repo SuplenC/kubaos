@@ -1,13 +1,17 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
-import qs.theme
-import qs.components
+import KubaOS.Components as K
+import "words.js" as Words
 
-// One row of the Results or of a list View: the Item's icon, its title with
-// the matched characters lit, its subtitle, and the Alias the query named it
-// by. The list draws the selection behind it. Cheap on purpose, since every
-// keystroke rewrites the rows: no layouts, layers or effects.
+// One row of the Results or of a list View, as `K.ListRow` draws a two-line row: 56 tall, 12 in,
+// a 20 icon, the title in `body_strong` with the matched characters lit, the subtitle in `small`,
+// and the Alias the query named it by as the row's mono detail at its end. The list draws the
+// selection behind it, so it can slide.
+//
+// HAZARD: no layout primitives and no `K.Text` in here. Every keystroke makes up to fourteen of
+// these, and fourteen `K.ListRow`s took 15 ms to make against 0.9 ms for these, most of a frame at
+// 60 Hz. Every box is a token or a sum of them instead, so the row lands on the same pixels.
 Item {
     id: row
 
@@ -17,100 +21,89 @@ Item {
     required property string subtitle
     required property string icon
     required property string extension
-    // The Alias the query named this Result by, drawn as a badge; empty for
-    // none.
+    // The Alias the query named this Result by; empty for none.
     required property string alias
-    // Why the Result can't run, shown in place of its subtitle; the row is
-    // greyed out. Empty when it can run.
+    // Why the Result can't run, shown in place of its subtitle, with the rest of the row dimmed.
+    // Empty when it can run.
     required property string unavailable
 
-    property MenuLook look
-    readonly property bool current: ListView.isCurrentItem
+    readonly property bool selected: ListView.isCurrentItem
     readonly property bool runs: unavailable === ""
     readonly property string iconSource: icon === "" ? "" : icon.startsWith("/") ? `file://${icon}` : Quickshell.iconPath(icon, true)
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+    readonly property color main: row.selected ? K.Tokens.color.on_secondary_container : K.Tokens.color.on_surface
+    readonly property color muted: row.selected ? K.Look.alpha(K.Tokens.color.on_secondary_container, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
+    readonly property real dim: row.runs ? 1 : K.Tokens.opacity.disabled_content
+    // Where the words start: past the icon and the gap after it.
+    readonly property int textStart: K.Tokens.space.s12 * 2 + K.Tokens.icon.s20
+    readonly property bool twoLine: subtitleLine.text !== ""
 
     // The pointer moved over the row at (x, y) in the row, or clicked it.
     signal pointed(real x, real y)
     signal picked
 
     width: ListView.view.width
-    height: look.rowHeight
+    height: K.Tokens.size.row_two_line
 
     IconImage {
         id: image
 
-        x: row.look.rowPad
-        y: row.look.snap((row.height - height) / 2)
-        implicitSize: row.look.iconSize
+        x: K.Tokens.space.s12
+        y: (row.height - K.Tokens.icon.s20) / 2
+        implicitSize: K.Tokens.icon.s20
         visible: row.iconSource !== ""
         asynchronous: true
         source: row.iconSource
-        opacity: row.runs ? 1 : 0.4
+        opacity: row.dim
     }
 
-    // Items without an icon of their own, such as a sum or a bind, show
-    // their Extension's glyph.
-    Icon {
-        anchors.centerIn: image
+    // Items without an icon of their own, such as a sum or a bind, show their Extension's symbol.
+    K.Icon {
+        x: K.Tokens.space.s12
+        y: (row.height - K.Tokens.icon.s20) / 2
         visible: !image.visible
-        name: row.look.glyph(row.extension)
-        size: Math.round(row.look.iconSize * 0.7)
-        color: row.current ? Theme.m3onSecondaryContainer : Theme.m3onSurfaceVariant
-        opacity: row.runs ? 1 : 0.4
+        name: Words.glyph(row.extension)
+        size: K.Tokens.icon.s20
+        color: K.Look.alpha(row.main, row.dim)
     }
 
-    Rectangle {
-        id: badge
+    // Title and subtitle, 4 apart, centred down the row; a title alone sits in the middle.
+    Label {
+        id: titleLine
 
-        anchors.right: parent.right
-        anchors.rightMargin: row.look.rowPad
-        y: row.look.snap((row.height - height) / 2)
+        x: row.textStart
+        y: row.twoLine ? (row.height - K.Tokens.type.body_strong.line - K.Tokens.space.s4 - K.Tokens.type.small.line) / 2 : (row.height - K.Tokens.type.body_strong.line) / 2
+        width: (detail.visible ? detail.x - K.Tokens.space.s12 : row.width - K.Tokens.space.s12) - row.textStart
+        height: K.Tokens.type.body_strong.line
+        type: K.Tokens.type.body_strong
+        text: row.markup
+        textFormat: Text.StyledText
+        color: K.Look.alpha(row.main, row.dim)
+    }
+
+    Label {
+        id: subtitleLine
+
+        x: row.textStart
+        y: titleLine.y + K.Tokens.type.body_strong.line + K.Tokens.space.s4
+        width: titleLine.width
+        height: K.Tokens.type.small.line
+        visible: text !== ""
+        type: K.Tokens.type.small
+        text: row.runs ? row.subtitle : row.unavailable
+        color: row.muted
+    }
+
+    Label {
+        id: detail
+
+        x: row.width - K.Tokens.space.s12 - K.Look.snapUp(implicitWidth, row.dpr)
+        y: (row.height - K.Tokens.type.mono.line) / 2
+        height: K.Tokens.type.mono.line
         visible: row.alias !== ""
-        width: visible ? row.look.snap(badgeText.implicitWidth + 2 * row.look.gap) : 0
-        height: row.look.snap(badgeText.implicitHeight + row.look.nudge)
-        radius: height / 2
-        color: "transparent"
-        border.width: 1
-        border.color: row.current ? Theme.alpha(Theme.m3onSecondaryContainer, 0.4) : Theme.m3outlineVariant
-
-        StyledText {
-            id: badgeText
-
-            anchors.centerIn: parent
-            text: row.alias
-            color: row.current ? Theme.m3onSecondaryContainer : Theme.m3onSurfaceVariant
-            font.pixelSize: row.look.font.small
-        }
-    }
-
-    Column {
-        anchors.left: image.right
-        anchors.leftMargin: row.look.inset
-        anchors.right: badge.left
-        anchors.rightMargin: badge.visible ? row.look.gap : 0
-        anchors.verticalCenter: parent.verticalCenter
-
-        Text {
-            width: parent.width
-            text: row.markup
-            textFormat: Text.StyledText
-            renderType: Text.NativeRendering
-            elide: Text.ElideRight
-            maximumLineCount: 1
-            color: !row.runs ? Theme.m3onSurfaceVariant : row.current ? Theme.m3onSecondaryContainer : Theme.m3onSurface
-            opacity: row.runs ? 1 : 0.6
-            font.family: Theme.font.sans
-            font.pixelSize: row.look.font.title
-            font.weight: row.current ? Font.Medium : Font.Normal
-        }
-
-        StyledText {
-            width: parent.width
-            visible: text !== ""
-            text: row.runs ? row.subtitle : row.unavailable
-            color: row.current ? Theme.alpha(Theme.m3onSecondaryContainer, 0.75) : Theme.m3onSurfaceVariant
-            font.pixelSize: row.look.font.small
-        }
+        type: K.Tokens.type.mono
+        text: row.alias
+        color: row.muted
     }
 
     MouseArea {

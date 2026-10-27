@@ -1,34 +1,40 @@
 import QtQuick
-import qs.theme
-import qs.components
+import KubaOS.Components as K
+import "words.js" as Words
 
-// The Action panel, Ctrl+K: the selected row's Actions, the Item's own first,
-// then the Contributed ones under the Extension offering each, with their
-// shortcuts. Menu.qml gives it the keys; the pointer picks too.
+// The Action panel, Ctrl+K: the selected row's Actions, the Item's own first, then the Contributed
+// ones under the Extension offering each, with their keys. A popup surface over the list, its
+// entries one-line rows 4 apart and 12 in, so their corners nest in its own. Menu.qml gives it the
+// keys; the pointer picks too.
+//
+// Its rows are drawn as `ResultRow` draws one, for the same reason: Ctrl+K opens it at once.
 Rectangle {
     id: panel
 
-    property MenuLook look
     // Each `{title, group, shortcut}`, as `KotodamaSearch.actions` gives them.
     property var actions: []
     // The entry Enter runs.
     property int current: 0
 
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+    readonly property int rowRadius: K.Look.nested(K.Tokens.radius.surface, K.Tokens.space.s12)
+
     // The pointer chose entry `n`.
     signal picked(int n)
 
-    implicitHeight: entries.implicitHeight + 2 * look.gap
-    radius: look.cardRadius
-    color: Theme.m3surfaceContainerHigh
-    border.width: 1
-    border.color: Theme.alpha(Theme.m3outlineVariant, 0.8)
+    implicitHeight: entries.implicitHeight + K.Tokens.space.s12 * 2
+    radius: K.Tokens.radius.surface
+    color: K.Tokens.color.surface_container_high
+    border.width: K.Look.hairline(panel.dpr)
+    border.color: K.Look.alpha(K.Tokens.color.outline_variant, K.Tokens.opacity.outline_soft)
 
     Column {
         id: entries
 
-        x: panel.look.gap
-        y: panel.look.gap
-        width: panel.width - 2 * panel.look.gap
+        x: K.Tokens.space.s12
+        y: K.Tokens.space.s12
+        width: panel.width - K.Tokens.space.s12 * 2
+        spacing: K.Tokens.space.s4
 
         Repeater {
             model: panel.actions
@@ -40,48 +46,49 @@ Rectangle {
                 required property var modelData
                 readonly property bool heading: modelData.group !== "" && (index === 0 || panel.actions[index - 1].group !== modelData.group)
                 readonly property bool current: index === panel.current
+                readonly property color main: entry.current ? K.Tokens.color.on_secondary_container : K.Tokens.color.on_surface
+                readonly property color muted: entry.current ? K.Look.alpha(K.Tokens.color.on_secondary_container, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
 
                 width: entries.width
+                spacing: K.Tokens.space.s4
 
-                StyledText {
+                // An Extension's name over its Contributed actions, 8 under the row above.
+                Label {
+                    x: K.Tokens.space.s12
+                    width: parent.width - K.Tokens.space.s12 * 2
+                    height: K.Tokens.space.s8 + K.Tokens.type.label.line
                     visible: entry.heading
-                    height: visible ? panel.look.headingHeight : 0
-                    leftPadding: panel.look.inset
-                    bottomPadding: panel.look.nudge
                     verticalAlignment: Text.AlignBottom
-                    text: panel.look.kindLabel(entry.modelData.group)
-                    color: Theme.m3onSurfaceVariant
-                    font.pixelSize: panel.look.font.small
-                    font.weight: Font.Medium
+                    type: K.Tokens.type.label
+                    text: Words.kindLabel(entry.modelData.group)
+                    color: K.Tokens.color.on_surface_variant
                 }
 
                 Rectangle {
                     width: parent.width
-                    height: panel.look.smallRowHeight
-                    radius: panel.look.itemRadius
-                    color: entry.current ? Theme.m3secondaryContainer : "transparent"
+                    height: K.Tokens.size.row
+                    radius: panel.rowRadius
+                    color: entry.current ? K.Tokens.color.secondary_container : "transparent"
 
-                    StyledText {
-                        anchors.left: parent.left
-                        anchors.leftMargin: panel.look.inset
-                        anchors.right: shortcut.left
-                        anchors.rightMargin: panel.look.gap
-                        anchors.verticalCenter: parent.verticalCenter
+                    Label {
+                        x: K.Tokens.space.s12
+                        y: (parent.height - height) / 2
+                        width: shortcut.x - K.Tokens.space.s12 * 2
+                        height: K.Tokens.type.body_strong.line
+                        type: K.Tokens.type.body_strong
                         text: entry.modelData.title
-                        color: entry.current ? Theme.m3onSecondaryContainer : Theme.m3onSurface
-                        font.pixelSize: panel.look.font.title
+                        color: entry.main
                     }
 
-                    Keycap {
+                    Label {
                         id: shortcut
 
-                        anchors.right: parent.right
-                        anchors.rightMargin: panel.look.inset
-                        anchors.verticalCenter: parent.verticalCenter
-                        look: panel.look
-                        visible: key !== ""
-                        tint: entry.current ? Theme.m3onSecondaryContainer : Theme.m3onSurfaceVariant
-                        key: entry.index === 0 ? "↵" : panel.look.shortcutLabel(entry.modelData.shortcut)
+                        x: parent.width - K.Tokens.space.s12 - K.Look.snapUp(implicitWidth, panel.dpr)
+                        y: (parent.height - height) / 2
+                        height: K.Tokens.type.mono.line
+                        type: K.Tokens.type.mono
+                        text: entry.index === 0 ? "↵" : Words.shortcutLabel(entry.modelData.shortcut)
+                        color: entry.muted
                     }
 
                     MouseArea {
