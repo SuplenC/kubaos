@@ -189,6 +189,19 @@ icon = "system-search"
 keywords = ["settings", "config", "kotodama", "command menu", "launcher", "actions"]
 run = ["dot-config", "open", "menu"]
 
+# Workspace groups (config/hypr/README.md, "Workspace groups"): the screens
+# pinned to each group, in ~/.config/kubaos/desktop/workspaces/groups.toml,
+# which applies as it is saved. The Extension itself sends "Workspace group 1"
+# and the like a desk position, "Pin <screen> to group N" for each screen
+# plugged in, "Unpin <screen>" and "Name group N…"; this one opens the file.
+
+[extensions.kubaos.actions.workspace-groups-settings]
+title = "Open workspace groups settings"
+subtitle = "Which screens are pinned to which workspace group, and the groups' names, in Neovim"
+icon = "video-display"
+keywords = ["settings", "config", "workspace group", "pin screen", "monitor", "display", "desk", "groups.toml"]
+run = ["sh", "-c", 'dir="$(dot-config path workspaces)" && mkdir -p "$dir" && exec ghostty -e nvim "$dir/groups.toml"']
+
 # The terminal greeting: fastfetch with the クバ mark in a new Ghostty window
 # (scripts/dot-greeting, home/shell.nix). On by default.
 

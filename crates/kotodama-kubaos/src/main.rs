@@ -401,34 +401,62 @@ fn watch_drives(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
     Some(watcher)
 }
 
-/// Gives `extension` the desk positions in Hyprland's screens file, and watches it.
+/// Gives `extension` the desk positions in Hyprland's screens file and the user's workspace
+/// groups, and watches both.
 fn read_desk(extension: &mut Extension<SystemBus, Programs>, events: Sender<Event<Own>>) -> Option<Watcher> {
-    let file = desk::file()?;
-    extension.set_desk(Desk::read(&file));
-    watch_desk(file, events)
+    let files = DeskFiles {
+        screens: desk::file()?,
+        groups: desk::groups::path(),
+    };
+    extension.set_desk(files.read());
+    watch_desk(files, events)
 }
 
-/// Watches the folder of Hyprland's screens `file`, sending the desk positions on each change to
-/// it. Without a watch the desk Items keep the positions of the start.
-fn watch_desk(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
-    let dir = file.parent()?.to_path_buf();
-    // Hyprland writes the file on its first monitor change; the folder waits for it till then.
-    let _ = std::fs::create_dir_all(&dir);
-    // The events name the real path, behind any symlink on the way.
-    let dir = dir.canonicalize().unwrap_or(dir);
-    let changed = dir.join(file.file_name()?);
+/// Where the desk Items come from: Hyprland's screens file and the user's workspace groups.
+#[derive(Clone)]
+struct DeskFiles {
+    screens: PathBuf,
+    groups: Option<PathBuf>,
+}
+
+impl DeskFiles {
+    fn read(&self) -> Desk {
+        let desk = Desk::read(&self.screens);
+        match &self.groups {
+            Some(groups) => desk.with_groups_file(groups.clone()),
+            None => desk,
+        }
+    }
+}
+
+/// Watches the folders of the screens file and of the groups file, sending the desk on each change
+/// to either. Without a watch the desk Items keep what the files said at the start.
+fn watch_desk(files: DeskFiles, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let mut dirs = Vec::new();
+    let mut changed = Vec::new();
+    for file in std::iter::once(&files.screens).chain(&files.groups) {
+        let dir = file.parent()?.to_path_buf();
+        // Hyprland writes the screens file on its first monitor change, and `dot-config apply`
+        // seeds the groups file; each folder waits for its file till then.
+        let _ = std::fs::create_dir_all(&dir);
+        // The events name the real path, behind any symlink on the way.
+        let dir = dir.canonicalize().unwrap_or(dir);
+        changed.push(dir.join(file.file_name()?));
+        dirs.push(dir);
+    }
     let watcher = Watcher::start(
         "desk",
         RecursiveMode::NonRecursive,
         SETTLE,
-        // `config/hypr/workspaces.lua` writes the file in place, so its last write settles it.
-        move |event, _| watched::changes(event, &changed),
+        // `config/hypr/workspaces.lua` and the menu's own edits write through a temporary file and
+        // a rename onto the file.
+        move |event, _| changed.iter().any(|file| watched::changes(event, file)),
         move |_| {
-            let _ = events.send(Event::Own(Own::Desk(Desk::read(&file))));
+            let _ = events.send(Event::Own(Own::Desk(files.read())));
         },
     )
     .map_err(|err| kotodama_extension::log!("not watching the desk positions: {err}"))
     .ok()?;
-    watcher.watch(vec![dir]);
+    watcher.watch(dirs);
     Some(watcher)
 }

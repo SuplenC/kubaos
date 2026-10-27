@@ -13,7 +13,9 @@ import qs.services
 // walk: the screen's own group first, unless a waiting group has lower numbers
 // (the laptop's, while its lid is closed). Its own group always shows its
 // first workspace. The group of a desk position no screen holds, waiting
-// here, sits on a tint, so it reads as borrowed. Scroll to step through them.
+// here, sits on a tint, so it reads as borrowed, and starts with its name
+// when the user gave it one (the workspace groups file). Scroll to step
+// through them.
 //
 // Each group keeps one empty workspace after its last with windows
 // (config/hypr/workspaces.lua), where a swipe or next opens a new one. It
@@ -53,14 +55,16 @@ Pill {
     // Workspace ids only, in the bar's order: what scrolling steps through.
     readonly property var ids: [].concat(...groups)
     // What the pill draws, in order: `{ key, kind, workspace, borrowed, head,
-    // tail }`, `kind` one of "cell", "ghost" (the empty workspace a group
-    // keeps after its last, not shown) and "gap" (the rule before a group
-    // after the first). `head` and `tail` mark a group's first and last cell,
-    // where the tint of a borrowed group rounds off.
+    // tail, label }`, `kind` one of "cell", "ghost" (the empty workspace a
+    // group keeps after its last, not shown), "gap" (the rule before a group
+    // after the first) and "label" (a borrowed group's name, before its
+    // cells). `head` and `tail` mark a group's first and last entry, where
+    // the tint of a borrowed group rounds off.
     readonly property var entries: {
         const result = [];
         groups.forEach((group, index) => {
             const borrowed = groupBlocks[index] !== block;
+            const name = borrowed ? Hypr.names[groupBlocks[index]] ?? "" : "";
             if (index > 0)
                 result.push({
                     key: `gap${groupBlocks[index]}`,
@@ -68,7 +72,18 @@ Pill {
                     workspace: 0,
                     borrowed: false,
                     head: false,
-                    tail: false
+                    tail: false,
+                    label: ""
+                });
+            if (name !== "")
+                result.push({
+                    key: `label${groupBlocks[index]}`,
+                    kind: "label",
+                    workspace: group[0],
+                    borrowed: true,
+                    head: true,
+                    tail: false,
+                    label: name
                 });
             group.forEach((id, at) => {
                 const last = at === group.length - 1;
@@ -78,8 +93,9 @@ Pill {
                     kind: ghost ? "ghost" : "cell",
                     workspace: id,
                     borrowed: borrowed,
-                    head: at === 0,
-                    tail: last
+                    head: at === 0 && name === "",
+                    tail: last,
+                    label: ""
                 });
             });
         });
@@ -90,9 +106,9 @@ Pill {
     readonly property real activeX: {
         let x = 0;
         for (const entry of entries) {
-            if (entry.kind !== "gap" && entry.workspace === activeId)
+            if ((entry.kind === "cell" || entry.kind === "ghost") && entry.workspace === activeId)
                 return x;
-            x += widthOf(entry.kind);
+            x += widthOf(entry.kind, entry.label, entry.workspace);
         }
         return -1;
     }
@@ -107,7 +123,7 @@ Pill {
     readonly property real ghostOpacity: 0.45
     readonly property real borrowedOpacity: 0.6
     readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
-    readonly property var roles: ["kind", "borrowed", "head", "tail"]
+    readonly property var roles: ["kind", "borrowed", "head", "tail", "label"]
     property bool ready: false
 
     // By each window's own workspace, not a workspace's list of windows: a
@@ -117,7 +133,35 @@ Pill {
         return Hyprland.toplevels.values.some(t => t.workspace?.id === id);
     }
 
-    function widthOf(kind: string): int {
+    // What the cell of workspace `id` draws: its number, or its kanji.
+    function numberText(id: int): string {
+        const slot = Hypr.slotOf(id);
+        return Settings.workspaceKanji ? kanji[slot - 1] : `${slot}`;
+    }
+
+    // The room the cell of workspace `id` leaves before its number, which it
+    // centres, unrounded.
+    function numberRoom(id: int): real {
+        return (cell - numberMetrics.advanceWidth(numberText(id))) / 2;
+    }
+
+    // Where a group's name starts: as far from the tint's rounded end as the
+    // number of the group's first cell, `first`, is from the name's end.
+    function labelInset(first: int): int {
+        return Math.round(numberRoom(first));
+    }
+
+    // How wide a group's name draws, elided past `groupNameMax`.
+    function labelWidth(label: string): real {
+        return Math.min(labelMetrics.advanceWidth(label), Theme.bar.groupNameMax);
+    }
+
+    // An entry's width. A name's entry is its inset, the name, and the inset
+    // again less the room its first cell leaves before the number, so the
+    // name sits as far from the number after it as from the tint's end.
+    function widthOf(kind: string, label: string, first: int): int {
+        if (kind === "label")
+            return Math.round(2 * labelInset(first) + labelWidth(label) - numberRoom(first));
         return kind === "gap" ? groupGap : cell;
     }
 
@@ -181,6 +225,26 @@ Pill {
         id: shapes
     }
 
+    // Measures a group's name with the font it is drawn in.
+    FontMetrics {
+        id: labelMetrics
+
+        font.family: Theme.font.sans
+        font.pixelSize: Theme.bar.cellFont
+        font.weight: Font.Medium
+    }
+
+    // Measures a cell's number as a waiting group's first cell draws it: in
+    // a group of windows, bold.
+    FontMetrics {
+        id: numberMetrics
+
+        font.family: Settings.workspaceKanji ? Theme.font.jp : Theme.font.sans
+        font.pixelSize: Theme.bar.cellFont
+        font.weight: Font.DemiBold
+        font.features: Theme.font.tabular
+    }
+
     // One entry's place in a row, growing in when it appears and shrinking
     // out when it leaves. The tints and the cells are two rows of these over
     // the same model, so the indicator can sit between them.
@@ -189,6 +253,8 @@ Pill {
 
         required property string key
         required property string kind
+        required property string label
+        required property int workspace
         required property bool leaving
         // False until the item exists, so a new one grows from nothing
         // rather than appearing at full width.
@@ -197,7 +263,7 @@ Pill {
 
         Component.onCompleted: appeared = true
 
-        width: present ? root.widthOf(kind) : 0
+        width: present ? root.widthOf(kind, label, workspace) : 0
         height: root.cell
         opacity: present ? 1 : 0
         clip: true
@@ -241,13 +307,13 @@ Pill {
                     required property bool head
                     required property bool tail
 
-                    // A pill as wide as the group: each cell draws its part,
+                    // A pill as wide as the group: each entry draws its part,
                     // reaching past its inner edges into the clip, so only the
                     // group's two ends round off.
                     Rectangle {
                         visible: tintSlot.borrowed
                         x: tintSlot.head ? 0 : -root.cell / 2
-                        width: root.cell + (tintSlot.head ? 0 : root.cell / 2) + (tintSlot.tail ? 0 : root.cell / 2)
+                        width: root.widthOf(tintSlot.kind, tintSlot.label, tintSlot.workspace) + (tintSlot.head ? 0 : root.cell / 2) + (tintSlot.tail ? 0 : root.cell / 2)
                         height: root.cell
                         radius: height / 2
                         color: Theme.m3secondaryContainer
@@ -343,11 +409,10 @@ Pill {
                 delegate: Slot {
                     id: shape
 
-                    required property int workspace
                     readonly property bool isGap: kind === "gap"
                     readonly property bool isGhost: kind === "ghost"
-                    readonly property int number: Hypr.slotOf(workspace)
-                    readonly property bool isActive: !isGap && workspace === root.activeId
+                    readonly property bool isLabel: kind === "label"
+                    readonly property bool isActive: !isGap && !isLabel && workspace === root.activeId
                     readonly property bool occupied: root.occupied(workspace)
 
                     Timer {
@@ -364,17 +429,38 @@ Pill {
                         color: Theme.m3outlineVariant
                     }
 
+                    Text {
+                        visible: shape.isLabel
+                        x: root.labelInset(shape.workspace)
+                        width: Math.ceil(root.labelWidth(shape.label))
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: shape.label
+                        elide: Text.ElideRight
+                        font: labelMetrics.font
+                        renderType: Text.NativeRendering
+                        color: Theme.m3onSecondaryContainer
+                    }
+
+                    // The name goes to its group's first workspace, as its
+                    // first cell does.
+                    MouseArea {
+                        visible: shape.isLabel
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Hypr.focusOn(root.monitor, shape.workspace)
+                    }
+
                     Item {
-                        visible: !shape.isGap
+                        visible: !shape.isGap && !shape.isLabel
                         anchors.horizontalCenter: parent.horizontalCenter
                         width: root.cell
                         height: root.cell
 
                         Text {
                             anchors.centerIn: parent
-                            text: Settings.workspaceKanji ? root.kanji[shape.number - 1] : shape.number
+                            text: root.numberText(shape.workspace)
                             font.family: Settings.workspaceKanji ? Theme.font.jp : Theme.font.sans
-                            font.pixelSize: Theme.font.sm + 1
+                            font.pixelSize: Theme.bar.cellFont
                             font.weight: shape.isActive || shape.occupied ? Font.DemiBold : Font.Medium
                             font.features: Theme.font.tabular
                             renderType: Text.NativeRendering

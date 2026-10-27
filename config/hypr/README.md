@@ -14,7 +14,7 @@ Your own settings go in `~/.config/kubaos/desktop/hypr/` (`hyprland.lua`, `hypri
 | `fallback.lua` | Binds that never depend on Quickshell or Nix (loaded first) |
 | `env.lua` | Environment: PATH, Wayland vars for Qt/GTK/Electron/Chrome, cursor size |
 | `monitors.lua` | Every screen at its preferred mode, placed by Hyprland; the laptop panel off while the lid is closed on a dock. Your own layout: below |
-| `workspaces.lua` | Per-screen workspaces: each screen has its own 1-10 (a block of ten ids, the laptop's first), joins another on unplug and returns on replug. `workspace_blocks.lua` is its bookkeeping, tested by `test/lua/workspaces_test.lua` |
+| `workspaces.lua` | Per-screen workspaces: each screen has its own 1-10 (a block of ten ids, the laptop's first), joins another on unplug and returns on replug, and the screens pinned to a group in `~/.config/kubaos/desktop/workspaces/groups.toml`. `workspace_blocks.lua` is its bookkeeping, tested by `test/lua/workspaces_test.lua` |
 | `input.lua` | Keyboard layouts from `~/.config/kubaos/desktop/keyboard/keyboard.toml`, else `/etc/default/keyboard` (`us` without either), repeat rate, touchpad, gestures, the `kubaos:mac-accents` XKB option |
 | `accents.lua` | The Mac-style accents' cheat sheet for the Shortcuts View, while they are on |
 | `looks.lua` | Gaps, borders, rounding, blur, shadows, animations, dwindle, colors. Sizes and curves match the Quickshell tokens (`config/quickshell/theme/Theme.qml`); `rounding = 10` plus the 2 px border makes the window's outer edge concentric with the frame's 20 px corners at `gaps_out = 8` |
@@ -67,7 +67,8 @@ check from `monitors.lua` around it, or the panel stays on with the lid
 closed. Workspaces follow these positions: the leftmost external shows the
 first external group, whatever screen it is (see Workspaces below), so place
 your screens in the order they stand on the desk. Without lines of your own,
-Hyprland places them in connector order.
+Hyprland places them in connector order. Or pin each screen to its group
+(Workspace groups, below), and the layout no longer decides.
 
 ## Workspaces
 
@@ -82,8 +83,9 @@ right by where Hyprland places them (top to bottom at the same x). Whatever
 screen stands at position 1 shows position 1's workspaces, so with two
 screens beside the laptop at work and two others at home, carrying the
 laptop from one desk to the other brings the windows along: the left screen
-at home shows what the left one at work did. There is nothing to pair; only
-the order counts, so place the screens in the order they stand (above).
+at home shows what the left one at work did. Without pins (below) there is
+nothing to pair; only the order counts, so place the screens in the order
+they stand (above).
 
 A position's workspaces are its group. When fewer screens are plugged in,
 the group of a position no screen holds waits on the primary screen (the
@@ -100,10 +102,11 @@ sees a waiting group before its own is an external holding the laptop's
 group (1-10) while the lid is closed.
 
 Which block each position owns, and the screen there now or last, is in
-`~/.local/state/kubaos/hypr/workspace-screens`. The Command menu lists it:
-type "workspace group" for an Item per position, "Workspace group: position 1
-from the left", with its workspaces and its screen; running it goes there, or
-opens the group's first workspace when it has none. A file from before
+`~/.local/state/kubaos/hypr/workspace-screens`, with the group's name, if it
+has one, in a fifth column. The Command menu lists it: type "workspace
+group" for an Item per position, "Workspace group 1" ("Workspace group 1:
+Left" once named), with its workspaces and its screen; running it goes
+there, or opens the group's first workspace when it has none. A file from before
 positions, keyed by screen, is turned into positions on the first start: the
 externals plugged in keep their blocks where they stand, the screens not
 plugged in take the positions before the first one held, in the order they
@@ -154,7 +157,81 @@ Every action is also an expression for the socket:
 (each takes a connector, the focused screen without one). The bar's clicks go
 through `dot.workspaces.go_to(id, "<connector>")`, its wheel through
 `dot.workspaces.next("<connector>")` and `previous`, and the menu's desk Items
-through `dot.workspaces.go_to_position("1")` (or `"panel"`).
+through `dot.workspaces.go_to_position("1")` (or `"panel"`). The bar runs
+`dot.workspaces.reload_groups()` when the groups file changes.
+
+### Workspace groups: pinning a screen
+
+To give a screen its group whatever the layout, the port or the order the
+screens come up in, pin it in
+`~/.config/kubaos/desktop/workspaces/groups.toml`, by its description (make,
+model and serial, as `hyprctl monitors all` prints it). A table a group,
+numbered as the positions are; `name` is optional:
+
+```toml
+[group.1]
+name = "Left"
+screens = ["BNQ ZOWIE XL LCD G4L01663SL0", "Dell Inc. DELL U2724D 5D6E7F8"]
+
+[group.2]
+name = "Centre"
+screens = ["LG Electronics LG ULTRAGEAR+ 510NTCZN7787", "Dell Inc. DELL U2724D 1A2B3C4"]
+```
+
+- A pinned screen stands at its group's number, wherever Hyprland places it.
+- Two screens of one group plugged in together: the first listed wins. The
+  other counts as unpinned.
+- Unpinned screens take the numbers left over, left to right, and never one
+  a group pins, even while that group's screens are away: its windows wait
+  on the primary screen for one of them.
+- Two screens that report the same description (a pair without serials)
+  can't be pinned apart: a pin naming that description goes to the leftmost
+  of them, and the other counts as unpinned. The Command menu offers no Pin
+  Item for either.
+- The name shows in the Command menu's desk Items and in the bar, at the
+  start of the group's tint while it waits on another screen.
+
+The laptop panel can be pinned too. By default it stands at its own place
+and shows 1-10, which stays its block whatever it shows:
+
+- **Lid open.** The panel is a screen like the others. Pinned to group N, it
+  shows group N while no screen listed before it in N is plugged in, and its
+  own 1-10 waits on it (the primary screen) like any group without a screen,
+  tinted in the bar, before group N. Once a screen listed before it is
+  plugged in, that screen takes group N and the panel is back on 1-10. A
+  screen listed after the panel counts as unpinned while the panel is open.
+- **Lid closed.** Hyprland turns the panel off (`dot-hypr-lid`), so it
+  holds no group: group N goes to the next screen listed in it that is
+  plugged in, else waits on the primary screen, the external Hyprland
+  numbered first, beside 1-10, which waits there as it always does with the
+  lid closed. Opening the lid gives the panel group N back.
+
+So with `screens = ["LG Electronics …", "China Star … MNE007ZA3-2"]` the
+panel shows the centre group on the road and the LG shows it at home; with
+the panel first, the panel keeps the group at the desk while open, and the
+external takes it when the lid closes.
+
+The file applies as it is saved: the bar watches it and, once it has held
+still for a moment, runs `dot.workspaces.reload_groups()`, which reads it
+again and moves each group to the screen it now pins, the same as a
+hotplug, at once or once a layout change in progress settles. The Command
+menu's edits run it themselves too, so they apply with the shell down; a
+file read twice moves nothing the second time. An editor saving by rename
+leaves the file missing for an instant: a read that finds it missing when
+it was there reads again after the wait, and only a file still missing then
+pins nothing. Hyprland also reads it whenever its config loads.
+
+A file that doesn't read (a key it doesn't know, a screen in two groups,
+anything but `[group.N]` tables of `name` and `screens` as one-line
+strings) pins nothing until it is fixed: every screen takes its place left
+to right. A notification says what is wrong, and where. At login Hyprland
+reads the file before the shell, the notification server, is up, so the
+notification is tried once a second for a minute until it shows, and only
+a problem shown is not shown again after a config reload.
+
+In the Command menu, "Pin <screen> to group N" (for each screen plugged in,
+to each group and to a new one), "Unpin <screen>" and "Name group N…" write
+the file, keeping its comments; "Open workspace groups settings" opens it.
 
 ## Lid
 

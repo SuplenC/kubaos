@@ -191,7 +191,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             }
             wallpapers::KIND if !self.registry.hides(&item.id) => self.wallpapers.run(&item.id, action, &self.runner),
             files::KIND if !self.registry.hides(&item.id) => self.folders.run(&item.id, action, &self.runner),
-            desk::KIND if !self.registry.hides(&item.id) => self.desk.run(&item.id, action, &self.runner),
+            desk::KIND if !self.registry.hides(&item.id) => self.desk.run(&item.id, action, arguments, &self.runner),
             drives::KIND if !self.registry.hides(&item.id) => self.drives.run(&item.id, action, &self.runner),
             idle::KIND if action == idle::CHOOSE && !self.registry.hides(&item.id) => {
                 idle::run(&item.id, arguments, &idle_settings(), &self.runner)

@@ -1,8 +1,11 @@
 pragma Singleton
 
+import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import qs.settings
+import qs.theme
 
 // Small helpers on top of the Hyprland IPC, and each screen's workspaces.
 //
@@ -19,7 +22,8 @@ Singleton {
     readonly property ShellScreen focusedScreen: Quickshell.screens.find(s => s.name === Hyprland.focusedMonitor?.name) ?? Quickshell.screens[0] ?? null
 
     // The lines "block<TAB>connector<TAB>position<TAB>screen" of the state
-    // file, as fields; a position no screen holds has an empty connector.
+    // file, and "<TAB>name" for a group the user named, as fields; a
+    // position no screen holds has an empty connector.
     readonly property var screenLines: screensFile.text().split("\n").map(line => line.split("\t")).filter(fields => fields.length >= 3)
 
     // Connector -> block.
@@ -28,6 +32,16 @@ Singleton {
         for (const fields of screenLines) {
             if (fields[1] !== "")
                 next[fields[1]] = parseInt(fields[0], 10);
+        }
+        return next;
+    }
+
+    // Block -> the name the user gave its group, for the groups that have one.
+    readonly property var names: {
+        const next = {};
+        for (const fields of screenLines) {
+            if ((fields[4] ?? "") !== "")
+                next[parseInt(fields[0], 10)] = fields[4];
         }
         return next;
     }
@@ -81,6 +95,31 @@ Singleton {
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
+    }
+
+    // The workspace groups the user pinned screens to. Hyprland reads the
+    // file when its config loads; a hand edit is passed on as it is saved,
+    // with no reload. Hyprland reads the file itself and moves nothing when
+    // its text is the same, so the Command menu's edits, which tell Hyprland
+    // themselves, are harmless to pass on again.
+    FileView {
+        path: `${UserLayer.dir("workspaces")}/groups.toml`
+        watchChanges: true
+        printErrors: false
+        onFileChanged: groupsSaved.restart()
+    }
+
+    // An editor saving by rename moves the file away, then writes a new one
+    // in its place, and each step is a change; the last one is passed on,
+    // once the file is back.
+    Timer {
+        id: groupsSaved
+
+        interval: Theme.anim.small
+        onTriggered: {
+            if (Hyprland.usingLua)
+                Hyprland.dispatch("dot.workspaces.reload_groups()");
+        }
     }
 
     // The ids Hyprland has renumbered away from (`changeworkspaceid`, which

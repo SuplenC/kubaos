@@ -22,6 +22,7 @@ let
       "files"
       "wallpapers"
       "phone"
+      "workspaces"
     ];
     terminal = [
       "ghostty"

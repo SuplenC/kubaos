@@ -1,0 +1,10 @@
+[group.2]  # the centre
+name = "Centre"
+screens = [
+  "LG Electronics LG ULTRAGEAR+ 510NTCZN7787",  # home
+  'Dell Inc. DELL U2724D 1A2B3C4', # work
+]
+
+[group."1"]
+name = "Left\u00e9"
+screens = ["BNQ ZOWIE XL LCD G4L01663SL0"]

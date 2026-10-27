@@ -42,6 +42,7 @@ LAYER_GROUPS=(desktop terminal editor tools menu)
 USER_FILES=(desktop/hypr/hyprland.lua desktop/hypr/hypridle.conf desktop/hypr/hyprlock.conf
   desktop/quickshell/settings.json desktop/cursor/cursor.toml desktop/keyboard/keyboard.toml
   desktop/clock/clock.toml desktop/sysmon/sysmon.toml desktop/idle/idle.toml
+  desktop/workspaces/groups.toml
   terminal/tmux/tmux.conf terminal/foot/foot.ini terminal/ghostty/config terminal/fastfetch/config.jsonc
   terminal/zsh/zshrc
   editor/nvim/options.lua editor/nvim/keymaps.lua editor/nvim/autocmds.lua editor/nvim/plugins/example.lua
@@ -107,6 +108,7 @@ add "$U/desktop/keyboard/keyboard.toml" 'mac_accents = false'
 add "$U/desktop/clock/clock.toml" 'analog = true'
 add "$U/desktop/sysmon/sysmon.toml" 'style = "bars"'
 add "$U/desktop/idle/idle.toml" $'[battery]\nlock = "2m"'
+add "$U/desktop/workspaces/groups.toml" '# user probe'
 add "$C/btop/btop.conf" 'update_ms = 1717'
 add "$C/tms/config.toml" '# user probe'
 before="$(hashes)"
