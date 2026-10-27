@@ -112,7 +112,7 @@ fn removing_a_zone_takes_it_out_and_an_unknown_one_is_an_error() {
 
     remove_zone(&path, "Asia/Tokyo").expect("removed");
 
-    assert!(load(&path).zones.is_empty());
+    assert_eq!(load(&path).zones, [] as [std::string::String; 0]);
     assert!(matches!(
         remove_zone(&path, "Asia/Tokyo"),
         Err(SettingsError::NoZone(_))
@@ -140,7 +140,7 @@ fn a_countdown_is_added_replaced_and_removed_with_the_bar() {
     remove_countdown(&path, "Trip").expect("removed");
 
     let settings = load(&path);
-    assert!(settings.countdowns.is_empty());
+    assert_eq!(settings.countdowns, [] as [super::Countdown; 0]);
     assert_eq!(settings.bar_countdown, "");
 }
 

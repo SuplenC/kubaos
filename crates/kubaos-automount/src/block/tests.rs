@@ -177,7 +177,7 @@ fn a_drive_with_no_label_is_named_by_its_vendor_and_model() {
 fn a_removable_drive_with_nothing_mounted_is_not_offered() {
     let blocks = [partition("sdb1", STICK)];
 
-    assert!(mounted_drives(&blocks, &[stick()]).is_empty());
+    assert_eq!(mounted_drives(&blocks, &[stick()]), [] as [super::MountedDrive; 0]);
 }
 
 #[test]

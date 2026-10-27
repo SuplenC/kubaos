@@ -197,10 +197,10 @@ fn other_queries_are_left_to_the_search() {
     process(dir.path(), 300, "chrome", 1000);
     let mut monitor = Monitor::new(dir.path(), None);
 
-    assert!(monitor.live("firefox", NOW).is_empty());
-    assert!(monitor.live("kill", NOW).is_empty());
-    assert!(monitor.live("kill zzz", NOW).is_empty());
-    assert!(monitor.live("cpus are fast", NOW).is_empty());
+    assert_eq!(monitor.live("firefox", NOW), [] as [kotodama_protocol::LiveResult; 0]);
+    assert_eq!(monitor.live("kill", NOW), [] as [kotodama_protocol::LiveResult; 0]);
+    assert_eq!(monitor.live("kill zzz", NOW), [] as [kotodama_protocol::LiveResult; 0]);
+    assert_eq!(monitor.live("cpus are fast", NOW), [] as [kotodama_protocol::LiveResult; 0]);
 }
 
 #[test]

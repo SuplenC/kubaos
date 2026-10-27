@@ -34,8 +34,10 @@ impl Drawing {
         resvg::render(&self.0, transform, &mut pixmap.as_mut());
         pixmap
             .data()
-            .chunks_exact(4)
-            .map(|rgba| u32::from_be_bytes([rgba[3], rgba[0], rgba[1], rgba[2]]))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|&[r, g, b, a]| u32::from_be_bytes([a, r, g, b]))
             .collect()
     }
 }

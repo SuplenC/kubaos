@@ -123,7 +123,7 @@ fn processes_are_found_by_name_and_grouped() {
     assert_eq!(groups[0].pids, [100, 101]);
     assert_eq!(groups[0].memory, 5000);
     assert_eq!(groups[1].name, "chrome_crashpad");
-    assert!(find(&list, "nothing").is_empty());
+    assert_eq!(find(&list, "nothing"), [] as [super::Group; 0]);
 }
 
 #[test]
