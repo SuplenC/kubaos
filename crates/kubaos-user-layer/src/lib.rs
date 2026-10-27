@@ -67,6 +67,9 @@ pub enum App {
     Sysmon,
     /// When the screen locks, turns off and suspends, and what the lid does.
     Idle,
+    /// The power stops' settings: the laptop panel per stop, the USB skip list, the charge limit
+    /// and the low-battery drop.
+    Power,
     /// The file manager's switches: Tidy Downloads, the automount.
     Files,
     /// The wallpaper sets the picker shows.
@@ -99,6 +102,7 @@ impl App {
         App::Keyboard,
         App::Sysmon,
         App::Idle,
+        App::Power,
         App::Files,
         App::Wallpapers,
         App::Phone,
@@ -128,6 +132,7 @@ impl App {
             App::Keyboard => "keyboard",
             App::Sysmon => "sysmon",
             App::Idle => "idle",
+            App::Power => "power",
             App::Files => "files",
             App::Wallpapers => "wallpapers",
             App::Phone => "phone",
@@ -157,6 +162,7 @@ impl App {
             | App::Keyboard
             | App::Sysmon
             | App::Idle
+            | App::Power
             | App::Files
             | App::Wallpapers
             | App::Phone

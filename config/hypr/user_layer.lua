@@ -17,6 +17,7 @@ M.apps = {
   keyboard = "desktop/keyboard",
   sysmon = "desktop/sysmon",
   idle = "desktop/idle",
+  power = "desktop/power",
   files = "desktop/files",
   wallpapers = "desktop/wallpapers",
   phone = "desktop/phone",

@@ -389,6 +389,37 @@ install_keyboard_writer() {
   install_root_file "$FILES_DIR/polkit/50-kubaos-keyboard.rules" /etc/polkit-1/rules.d/50-kubaos-keyboard.rules 0644
 }
 
+# install_power_helper: what the power stops (crates/kubaos-power) need as
+# root. The helper that writes their knobs in /sys, the polkit action pkexec
+# runs it under and the rule that lets an admin through without a password;
+# amdgpu's FreeSync video modes, so the laptop panel drops to 60 Hz without a
+# modeset (the initramfs carries modprobe.d, so it is rebuilt when the file
+# changes); and power-profiles-daemon's GPU action, so its power-saver profile
+# runs the GPU low for every tool that switches it. Its panel action stays off:
+# it rewrites the panel's power saving at every battery percent, and the stops
+# own that knob. 30-hardware.sh runs it, and a migration on machines installed
+# before it.
+install_power_helper() {
+  local changed=0
+  install_root_file "$FILES_DIR/power/kubaos-power-write" /usr/local/libexec/kubaos-power-write 0755
+  install_root_file "$FILES_DIR/polkit/org.kubaos.power.policy" /usr/share/polkit-1/actions/org.kubaos.power.policy 0644
+  install_root_file "$FILES_DIR/polkit/50-kubaos-power.rules" /etc/polkit-1/rules.d/50-kubaos-power.rules 0644
+  same_content "$FILES_DIR/modprobe.d/kubaos-amdgpu.conf" /etc/modprobe.d/kubaos-amdgpu.conf || changed=1
+  install_root_file "$FILES_DIR/modprobe.d/kubaos-amdgpu.conf" /etc/modprobe.d/kubaos-amdgpu.conf 0644
+  if ((changed)) && ! in_container && command -v update-initramfs >/dev/null; then
+    info "rebuilding the initramfs for amdgpu's FreeSync video modes (takes effect at the next boot)"
+    sudo_run update-initramfs -u
+  fi
+  if command -v powerprofilesctl >/dev/null && has_systemd; then
+    if powerprofilesctl list-actions 2>/dev/null | grep -q '^Name: amdgpu_dpm$'; then
+      sudo_run powerprofilesctl configure-action amdgpu_dpm --enable
+    fi
+    if powerprofilesctl list-actions 2>/dev/null | grep -q '^Name: amdgpu_panel_power$'; then
+      sudo_run powerprofilesctl configure-action amdgpu_panel_power --disable
+    fi
+  fi
+}
+
 # install_mac_accents: the Mac-style accents on Left Alt. After Left Alt + e,
 # `, u, i or n, keyd sends a dead key on a spare keycode and then the next
 # letter (files/keyd/kubaos.conf), the `kubaos:mac-accents` XKB option gives
