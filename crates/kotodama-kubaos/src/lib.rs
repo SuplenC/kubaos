@@ -9,6 +9,7 @@
 //!   mounted drives, the workspace groups by desk position, and what each of their Actions runs.
 //! - The idle settings' Items and their choice lists.
 //! - "Power: what this stop does", the power stop's layers read live.
+//! - "Proxy status", the work network's parts and its tunnel read live.
 //! - The date answers, from the clock popup's engine.
 //! - The monitor answers (`cpu`, `ram`, `battery`) and the process search, from the system
 //!   monitor.
@@ -33,6 +34,7 @@ pub mod idle;
 pub mod keyboard;
 pub mod layouts;
 pub mod power;
+pub mod proxy;
 pub mod registry;
 pub mod sysmon;
 pub mod run;

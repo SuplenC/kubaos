@@ -17,6 +17,7 @@
 //! - The keyboard layouts (`keyboard`): `keyboard.rs`.
 //! - Packages from nixpkgs (`package`, `try`): `package.rs`.
 //! - The power stops (`power`): `power.rs`, which runs `kubaos-power`.
+//! - The work network's switch (`proxy`): `proxy.rs`, which runs `kubaos-proxy`.
 //! - KubaOS's apt packages (`packages`): `apt.rs`.
 //! - Suites (`suite`): `suite.rs`.
 //! - Project pins (`pin`, `unpin`, `pins`): `pin.rs`.
@@ -42,6 +43,7 @@ mod keyboard;
 mod package;
 mod pin;
 mod power;
+mod proxy;
 mod setup;
 mod suite;
 mod update;
@@ -130,6 +132,13 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// The Proxy, one switch for the work network: on, off, status, or import IT's WireGuard config.
+    #[command(disable_help_flag = true)]
+    Proxy {
+        /// `on`, `off`, `status [--json] [--live]`, `import FILE`, `pull`
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 /// How a command prints its events: JSON lines for a front end to parse, or text for a human.
@@ -169,5 +178,6 @@ fn main() -> ExitCode {
         Cmd::Cursor { cmd } => cursor::main(cmd),
         Cmd::Keyboard { cmd } => keyboard::main(cmd),
         Cmd::Power { args } => power::main(&args),
+        Cmd::Proxy { args } => proxy::main(&args),
     }
 }

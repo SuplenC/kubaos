@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Phase 3: base system. apt packages, NetworkManager instead of networkd,
-# PipeWire, logind lid policy, short stop timeouts and nothing waiting for
+# Phase 3: base system. apt packages, NetworkManager instead of networkd, the
+# Proxy's root helper, PipeWire, logind lid policy, short stop timeouts and nothing waiting for
 # the network at boot, snapper on / with timers, grub-btrfs.
 set -euo pipefail
 # shellcheck source=system/lib.sh
@@ -35,7 +35,7 @@ require_sudo
 
 # The base system's groups of system/packages.toml.
 BASE_GROUPS=(
-  tools network audio session graphics microcode laptop dock fingerprint
+  tools network proxy audio session graphics microcode laptop dock fingerprint
   build snapshots files fonts fallback shell
 )
 
@@ -100,6 +100,10 @@ if unit_exists systemd-networkd-wait-online.service; then
   fi
 fi
 info "Wi-Fi: nmtui (or: nmcli device wifi connect <SSID> --ask), then unplug the cable."
+
+# --------------------------------------------------------------------------
+step "Proxy: the work network's root helper (polkit, pkexec)"
+install_proxy_helper
 
 # --------------------------------------------------------------------------
 step "Audio: PipeWire user services (global enable for all users)"

@@ -9,6 +9,7 @@
 #   910   fzf (Ctrl-T, Alt-C)
 #   1000  aliases, oh-my-posh
 #   1010  direnv hook, atuin (Ctrl-R)
+#   1890  the Proxy's variables, while it is on
 #   1900  the user layer's zshrc (~/.config/kubaos/terminal/zsh/zshrc)
 #   1950  the greeting: fastfetch in a new Ghostty window
 #   2000  zoxide as `cd`, last, so `zoxide doctor` stays quiet
@@ -233,6 +234,13 @@ in
             ++ config.programs.atuin.flags
           )}
         fi
+      '')
+
+      # The Proxy's http_proxy and the like, which `kubaos-proxy on` writes
+      # and `off` removes (crates/kubaos-proxy). A shell started before the
+      # switch keeps what it had.
+      (lib.mkOrder 1890 ''
+        [[ -r $XDG_RUNTIME_DIR/kubaos-proxy/env ]] && source "$XDG_RUNTIME_DIR/kubaos-proxy/env"
       '')
 
       # The user layer's zshrc, after everything but the greeting and zoxide,

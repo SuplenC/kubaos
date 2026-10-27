@@ -51,6 +51,8 @@ Item {
 
         IdleIndicator {}
 
+        ProxyIndicator {}
+
         KeyboardLayout {}
 
         UpdateIndicator {}

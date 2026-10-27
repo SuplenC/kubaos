@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+  The Proxy's system-wide parts (apt's, Docker's, Nix's and Chrome's proxy,
+  the company CA in the trust store, the kill switch, the tunnel's handshake):
+  what `pkexec` asks before it runs the helpers (system/files/proxy/) for
+  `kubaos-proxy on|off|status`.
+
+  org.kubaos.proxy.write, /usr/local/libexec/kubaos-proxy-write, puts in
+  place only the proxy and the CA an admin pinned, and takes any part away:
+  an admin at the machine needs no password for it (50-kubaos-proxy.rules).
+  org.kubaos.proxy.pin, /usr/local/libexec/kubaos-proxy-pin, pins them: a
+  trusted root and a proxy see all of the machine's traffic, so it asks for
+  an admin's password every time, and no rule lets anything past it.
+
+  Installed in /usr/share/polkit-1/actions/ by install_proxy_helper
+  (system/lib.sh).
+-->
+<policyconfig>
+  <vendor>KubaOS</vendor>
+  <action id="org.kubaos.proxy.write">
+    <description>Switch the work network's system settings</description>
+    <message>Authentication is required to change the system's proxy, its trusted certificates and the firewall for the work network.</message>
+    <icon_name>network-vpn</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/kubaos-proxy-write</annotate>
+  </action>
+  <action id="org.kubaos.proxy.pin">
+    <description>Trust the work network's proxy and certificate</description>
+    <message>Authentication is required to let the work network's proxy and its root certificate see all of this machine's traffic.</message>
+    <icon_name>network-vpn</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/kubaos-proxy-pin</annotate>
+  </action>
+</policyconfig>

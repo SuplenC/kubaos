@@ -1,0 +1,25 @@
+// Lets an admin at the machine switch the work network's system-wide parts
+// without a password: `kubaos-proxy on|off` (crates/kubaos-proxy) runs
+// /usr/local/libexec/kubaos-proxy-write through pkexec (action
+// org.kubaos.proxy.write, org.kubaos.proxy.policy) from the control center,
+// the Command menu and its session service after a resume, which have no
+// agent able to ask. A process of the user manager counts as the user's
+// local, active session: polkit falls back to the user's display session
+// (sd_uid_get_display) for a process outside any session. The helper writes
+// only its own files (an apt config, two systemd drop-ins, Chrome policies,
+// one certificate), each value checked against its own pattern, and one
+// nftables table of its own; and it puts in place only the proxy, its PAC
+// file and the CA an admin pinned in /etc/kubaos/proxy-pins, so a program
+// running as the user can't send the machine's traffic anywhere else or
+// make it trust another root. Pinning (org.kubaos.proxy.pin) has no rule
+// here: it asks for the password every time.
+// Installed as /etc/polkit-1/rules.d/50-kubaos-proxy.rules by
+// install_proxy_helper (system/lib.sh).
+// https://www.freedesktop.org/software/polkit/docs/latest/polkit.8.html
+polkit.addRule(function (action, subject) {
+  if (action.id == "org.kubaos.proxy.write" &&
+      subject.local && subject.active &&
+      (subject.isInGroup("sudo") || subject.isInGroup("admin"))) {
+    return polkit.Result.YES;
+  }
+});

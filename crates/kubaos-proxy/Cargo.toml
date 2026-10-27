@@ -1,0 +1,33 @@
+[package]
+name = "kubaos-proxy"
+description = "KubaOS's Proxy: one switch for the work network, its WireGuard tunnel, DNS, HTTP proxy and company CA"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-proxy"
+path = "src/main.rs"
+
+[dependencies]
+# The vault (`bw`), the keyring (`secret-tool`) and running programs with a secret on stdin.
+kubaos-core.workspace = true
+kubaos-user-layer.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+# The service's log, on stderr, which the journal keeps with each line's priority.
+log = "0.4"
+toml.workspace = true
+# Writes the tunnel's file name into proxy.toml in place, keeping the user's comments.
+toml_edit = "0.25"
+# NetworkManager and logind on the system bus. nmcli can't set a WireGuard connection's peers,
+# and the tunnel's keys go to NetworkManager in the call, never through a file. The blocking API
+# keeps the service a plain loop.
+zbus = { version = "5", default-features = false, features = ["async-io", "blocking-api"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

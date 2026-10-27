@@ -189,6 +189,37 @@ The settings are `~/.config/kubaos/desktop/power/power.toml`: the panel per stop
 
 Super Saver's 60 Hz needs amdgpu's FreeSync video modes, which the update turns on for the next boot; until you reboot, Super Saver keeps the panel at its native rate with VRR, so the switch never blanks the screen, and `kubaos power status` says so. The panel's VRR starts at the next login after the update.
 
+## The work network (Proxy)
+
+The Proxy is one switch for the work network: IT's WireGuard tunnel, the work DNS, the company's HTTP proxy and its root certificate, all up together or none. It replaces the WireGuard app. Each part is optional, and nothing switches on by itself: a login starts with it off.
+
+**Set it up.** Get the WireGuard config from IT (a `.conf` file), then run "Import WireGuard config…" in the Command menu, or in a terminal:
+
+```sh
+kubaos proxy import ~/Downloads/work.conf
+```
+
+bw asks for the master password (unless `BW_SESSION` is exported). The private key and the preshared key go to your Bitwarden vault, in a secure note named `kubaos-proxy`, and to the GNOME keyring, which the switch reads them from; the rest of the config is written, without its keys, beside your profile as `wireguard.conf`. The import says whether it is a split tunnel (only IT's ranges go through it) or a full one (`AllowedIPs = 0.0.0.0/0` or `::/0`: everything does). You can delete the `.conf` IT sent afterwards. On a new machine, `kubaos proxy pull` copies the keys from the vault to the keyring again.
+
+The rest is in your profile, `~/.config/kubaos/desktop/network/proxy.toml` ("Open proxy settings" in the Command menu): the work DNS servers and the domains they answer for (the config's `DNS =` line counts too), the proxy (`http://proxy.corp.example.com:3128`, no user or password) or a PAC file, what goes around it (`no_proxy`), and the company's root certificate (a PEM file beside it). A change takes effect at the next "Proxy on".
+
+**Switch it.** The Proxy tile in the control center (it shows once the profile has a part), "Proxy on" and "Proxy off" in the Command menu, or `kubaos proxy on` and `off`. The first "Proxy on" asks for your password once, to trust the proxy and the company CA (a program running as you can't make the machine trust another or send its traffic elsewhere without it); it asks again only when you change them in the profile. A part that fails takes the others down with it, and a notification says which and why. While it is on, the bar shows a locked globe; the tile's arrow shows the endpoint, when the tunnel last received, the last handshake and the bytes moved, and "Proxy status" in the Command menu (`kubaos proxy status --live`) shows them too.
+
+What each part reaches:
+
+| Part | Where it goes |
+|---|---|
+| Tunnel | a NetworkManager connection, `wg-kubaos`, made at each "Proxy on" and gone at "Proxy off"; its keys are never written to disk |
+| Kill switch | a full tunnel only (`kill_switch = false` in the profile turns it off): while it is up, nothing leaves but through the tunnel, DNS lookups included, so a LAN printer is out of reach too |
+| Work DNS | systemd-resolved, on the tunnel's link: only the work domains go to the work servers, every other name to your network's own; a full tunnel sends every name to the work servers |
+| HTTP proxy | new shells and services (`http_proxy` and the like), GNOME's proxy setting and Chrome's policy (so browsers follow), apt, Docker (the daemon and `docker build`/`run`), Nix's daemon, and git; "Proxy off" puts back the GNOME, Docker and session proxy you had before |
+| PAC file | GNOME and Chrome only; the rest need the proxy itself |
+| Company CA | the system's trust store, which curl, git, Nix, Docker's daemon and most tools read, and Chrome's policy |
+
+A terminal or an app already open keeps what it had; open a new one. Docker's and Nix's daemons restart when the proxy changes, and Docker's when the CA does, so running containers stop. While the Proxy is on, apt, Docker and Nix reach the internet through the work proxy: turn it off away from work, or they won't reach anything.
+
+After the laptop sleeps, or when the tunnel drops while it is awake, the tunnel comes back by itself once the network is up. If it can't, everything goes off but the kill switch, which keeps blocking what would leave outside the tunnel: a notification says so, the next change of network tries again, and "Proxy off" lifts it. Without a kill switch, everything goes off. The service is the `kubaos-proxy` user unit: `journalctl --user -u kubaos-proxy`.
+
 ## Updating and rolling back
 
 Nothing updates by surprise. No popups, no "restart to finish installing", no "Later" button. Hyprland and its libraries are held in apt. Your Nix packages are pinned in your flake's lock (`~/.config/kubaos/home/flake.lock`). KubaOS's own (Quickshell, home-manager, the icons, the lock screen's PAM modules, the recorder, the GPU drivers) are pinned in KubaOS's lock and move only with a KubaOS release. Ubuntu's own updaters (unattended-upgrades and the apt-daily timers) are off: nothing runs apt but `kubaos update`, security updates included. It waits until you run it, or pick Update KubaOS in the menu (`SUPER + Space`), which opens a floating terminal running it. A daily timer runs `kubaos update --check`: it only looks, as you, never as root. When there is something new, a release or apt security updates, it sends one notification and puts a marker in the bar (a click runs `kubaos update`), and the menu's Update KubaOS says what is waiting.

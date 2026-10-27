@@ -1,0 +1,464 @@
+#!/usr/bin/env bash
+# kubaos-proxy-write: puts the Proxy's system-wide parts in place and takes them away, as root.
+# Installed twice: as kubaos-proxy-write, which applies only what an admin pinned, and as
+# kubaos-proxy-pin, which pins it and always asks for an admin's password.
+#
+#   kubaos-proxy-write PART=VALUE...
+#   kubaos-proxy-write off
+#   kubaos-proxy-write stats
+#   kubaos-proxy-pin ca=-|none proxy=URL|none no-proxy=NO_PROXY pac=URL|none
+#   kubaos-proxy-write --help
+#
+# kubaos-proxy-write's parts:
+#
+#   killswitch=on|off              the nftables table inet kubaos_proxy: while on, nothing leaves
+#                                  but through the tunnel (wg-kubaos), the tunnel's own packets,
+#                                  DHCP, IPv6 neighbour discovery, and container bridges
+#   ca=-|off                       the company's root certificate, one PEM certificate on stdin:
+#                                  in the system's trust store (update-ca-certificates, which Nix
+#                                  reads too) and Chrome's policy (CACertificates); a running
+#                                  Docker daemon restarts, since it reads the roots once
+#   apt=URL|off                    apt's proxy (/etc/apt/apt.conf.d/80kubaos-proxy)
+#   docker=URL|NO_PROXY, docker=off
+#                                  the Docker daemon's proxy, a drop-in; a running daemon restarts
+#   nix=URL|NO_PROXY, nix=off      nix-daemon's proxy, a drop-in; a running daemon restarts
+#   chrome=proxy|URL|NO_PROXY, chrome=pac|URL, chrome=off
+#                                  Chrome's proxy policy (ProxySettings)
+#   off                            every part off
+#   stats                          the tunnel's latest handshake with each peer, from wg:
+#                                  `PUBLIC-KEY EPOCH` lines
+#
+# URL is http:// or https://, a host and a port, nothing else: no user, password or path.
+# NO_PROXY is hosts, domains and ranges joined by commas.
+#
+# The pins: a CA and a proxy put in place as root redirect and read every program's traffic, so
+# kubaos-proxy-write, which polkit lets an admin at the machine run without a password, puts in
+# place only the CA (by its SHA-256 fingerprint), the proxy, its NO_PROXY and the PAC file pinned
+# in /etc/kubaos/proxy-pins. kubaos-proxy-pin writes that file, under its own polkit action, which
+# asks for the password every time. The kill switch, every `off` and `stats` need no pin.
+#
+# The Proxy (`kubaos-proxy on|off`, crates/kubaos-proxy) runs them through pkexec (polkit actions
+# org.kubaos.proxy.write and org.kubaos.proxy.pin, system/files/polkit/), pinning when the
+# write helper says a value isn't pinned. Installed in /usr/local/libexec by install_proxy_helper
+# (system/lib.sh), root-owned, since pkexec runs them as root.
+#
+# It is the line between the user and root, so it trusts nothing it is given: every part's value
+# must match its own pattern, and be pinned, before any part goes anywhere; a certificate is read
+# by openssl and written as openssl writes it back; every file it writes is one of its own, whole
+# or not at all, and a file whose part failed after it was written goes again, so the next run
+# writes it anew. Parts are put in place in the order given, and it stops at the first that
+# fails; each one done is named on stdout (`done PART=VALUE`), so the caller can take them away
+# again. `off` goes on past a part that fails. A failure is said on stderr; the exit is 1 when a
+# part failed, 2 for a usage error, 3 when a value isn't pinned (nothing was changed).
+set -euo pipefail
+# A caller that stops reading must not stop it half way: its writes to stdout fail instead.
+trap '' PIPE
+
+# KUBAOS_PROXY_ROOT points the writes at a fake / (the tests,
+# crates/kubaos-proxy/tests/helper.rs). pkexec clears the environment, so it never reaches a run
+# from the Proxy.
+ROOT="${KUBAOS_PROXY_ROOT:-}"
+# The tunnel's interface and the mark of its own packets, as crates/kubaos-proxy/src/tunnel.rs
+# gives them to NetworkManager. Keep the three the same.
+INTERFACE=wg-kubaos
+FWMARK=0x6b6f
+TABLE=kubaos_proxy
+PINS="$ROOT/etc/kubaos/proxy-pins"
+APT_CONF="$ROOT/etc/apt/apt.conf.d/80kubaos-proxy"
+CA_DIR="$ROOT/usr/local/share/ca-certificates/kubaos-proxy"
+CA_FILE="$CA_DIR/company.crt"
+CHROME_DIR="$ROOT/etc/opt/chrome/policies/managed"
+CHROME_PROXY="$CHROME_DIR/kubaos-proxy.json"
+CHROME_CA="$CHROME_DIR/kubaos-proxy-ca.json"
+UNITS="$ROOT/etc/systemd/system"
+# Larger than any root certificate: stdin is cut there.
+MAX_CA_BYTES=65536
+
+URL_RE='^https?://([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]+\]):[0-9]{1,5}$'
+NO_PROXY_RE='^[A-Za-z0-9.:/*_-]+(,[A-Za-z0-9.:/*_-]+)*$'
+PAC_RE='^https?://[A-Za-z0-9._~:/?#@!$&()*+,;=%-]+$'
+
+# The certificate given on stdin, as openssl writes it back, and its fingerprint.
+CA_PEM=""
+CA_FP=""
+# A CA changed: Docker's daemon restarts once every part is done.
+docker_roots_changed=0
+
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+
+fail() {
+  echo "${0##*/}: $1" >&2
+  return 1
+}
+
+# die CODE MESSAGE: says MESSAGE and exits with CODE.
+die() {
+  echo "${0##*/}: $2" >&2
+  exit "$1"
+}
+
+say() {
+  printf '%s\n' "$1" 2>/dev/null || true
+}
+
+url_ok() {
+  local url="$1" port
+  [[ $url =~ $URL_RE ]] || return 1
+  port="${url##*:}"
+  ((10#$port >= 1 && 10#$port <= 65535))
+}
+
+no_proxy_ok() {
+  [[ -z $1 || $1 =~ $NO_PROXY_RE ]]
+}
+
+pac_ok() {
+  [[ $1 =~ $PAC_RE && ${#1} -le 2048 ]]
+}
+
+# put FILE MODE: stdin into FILE, whole or not at all.
+put() {
+  local file="$1" mode="$2" tmp
+  mkdir -p -- "${file%/*}" || return 1
+  tmp="$(mktemp "${file%/*}/.kubaos-proxy.XXXXXX")" || return 1
+  if ! { cat >"$tmp" && chmod "$mode" -- "$tmp" && mv -f -- "$tmp" "$file"; }; then
+    rm -f -- "$tmp"
+    return 1
+  fi
+}
+
+# same FILE TEXT: FILE holds TEXT already.
+same() {
+  [[ -e $1 && "$(cat -- "$1" 2>/dev/null)" == "$2" ]]
+}
+
+# unit_known NAME: systemd has the unit NAME, from a package or the admin.
+unit_known() {
+  local dir
+  for dir in "$ROOT/etc/systemd/system" "$ROOT/usr/lib/systemd/system" "$ROOT/lib/systemd/system"; do
+    [[ -e $dir/$1 ]] && return 0
+  done
+  return 1
+}
+
+# read_ca: the certificate on stdin into CA_PEM and its SHA-256 fingerprint into CA_FP. openssl
+# writes the certificate back as it read it, so nothing but one certificate in PEM goes on,
+# whatever else stdin held.
+read_ca() {
+  CA_PEM="$(head -c "$MAX_CA_BYTES" | openssl x509 -outform PEM 2>/dev/null)" ||
+    { fail "stdin isn't a PEM certificate"; return; }
+  CA_FP="$(openssl x509 -noout -fingerprint -sha256 <<<"$CA_PEM" 2>/dev/null)" ||
+    { fail "openssl couldn't read the certificate"; return; }
+  CA_FP="${CA_FP#*=}"
+  CA_FP="${CA_FP//:/}"
+  [[ $CA_FP =~ ^[0-9A-F]{64}$ ]] || fail "openssl gave no fingerprint"
+}
+
+# pinned KEY: the value pinned for KEY, nothing without one.
+pinned() {
+  local key value
+  [[ -r $PINS ]] || return 0
+  while IFS='=' read -r key value; do
+    if [[ $key == "$1" ]]; then
+      printf '%s' "$value"
+      return 0
+    fi
+  done <"$PINS"
+}
+
+# valid PART=VALUE: the value matches its part's pattern.
+valid() {
+  local name="${1%%=*}" value="${1#*=}" url no_proxy
+  [[ $value == off ]] && [[ $name =~ ^(killswitch|ca|apt|docker|nix|chrome)$ ]] && return 0
+  case "$name" in
+    killswitch) [[ $value == on ]] || fail "killswitch=$value isn't on or off" ;;
+    ca) [[ $value == - ]] || fail "ca=$value isn't - (the certificate on stdin) or off" ;;
+    apt) url_ok "$value" || fail "apt=$value isn't a proxy (http://host:port)" ;;
+    docker | nix)
+      [[ $value == *"|"* ]] || { fail "$name=$value isn't URL|NO_PROXY"; return; }
+      url="${value%%|*}"
+      no_proxy="${value#*|}"
+      url_ok "$url" || { fail "$name=$value: $url isn't a proxy (http://host:port)"; return; }
+      no_proxy_ok "$no_proxy" || fail "$name=$value: $no_proxy isn't a no_proxy list"
+      ;;
+    chrome)
+      case "$value" in
+        proxy\|*\|*)
+          value="${value#proxy|}"
+          url="${value%%|*}"
+          no_proxy="${value#*|}"
+          url_ok "$url" || { fail "chrome: $url isn't a proxy (http://host:port)"; return; }
+          no_proxy_ok "$no_proxy" || fail "chrome: $no_proxy isn't a no_proxy list"
+          ;;
+        pac\|*) pac_ok "${value#pac|}" || fail "chrome: ${value#pac|} isn't a PAC file's address" ;;
+        *) fail "chrome=$value isn't proxy|URL|NO_PROXY, pac|URL or off" ;;
+      esac
+      ;;
+    *) fail "$name isn't a part" ;;
+  esac
+}
+
+# is_pinned PART=VALUE: an admin pinned the value, or it needs no pin.
+is_pinned() {
+  local name="${1%%=*}" value="${1#*=}" proxy no_proxy
+  [[ $value == off || $name == killswitch ]] && return 0
+  proxy="$(pinned proxy)"
+  no_proxy="$(pinned no_proxy)"
+  case "$name" in
+    ca) [[ -n $CA_FP && "$(pinned ca)" == "$CA_FP" ]] ;;
+    apt) [[ $proxy != none && $value == "$proxy" ]] ;;
+    docker | nix) [[ $proxy != none && $value == "$proxy|$no_proxy" ]] ;;
+    chrome)
+      [[ ($proxy != none && $value == "proxy|$proxy|$no_proxy") ||
+        ("$(pinned pac)" != none && $value == "pac|$(pinned pac)") ]]
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+# restart_if_running NAME: picks up a changed drop-in or trust store.
+restart_if_running() {
+  systemctl daemon-reload && systemctl try-restart "$1"
+}
+
+killswitch() {
+  case "$1" in
+    on)
+      # HAZARD: keep this one nft run. The empty table and its delete make it replace the table in
+      # one transaction whether or not it was there; split in two, traffic would leak in between,
+      # and the delete would fail when the table isn't there yet.
+      nft -f - <<EOF || fail "nft refused the kill switch"
+table inet $TABLE
+delete table inet $TABLE
+table inet $TABLE {
+  chain output {
+    type filter hook output priority filter; policy accept;
+    oifname "lo" accept
+    oifname "$INTERFACE" accept
+    meta mark $FWMARK accept
+    oifname { "docker0", "virbr0" } accept
+    oifname "br-*" accept
+    oifname "veth*" accept
+    udp sport 68 udp dport 67 accept
+    udp sport 546 udp dport 547 accept
+    icmpv6 type { nd-router-solicit, nd-neighbor-solicit, nd-neighbor-advert } accept
+    meta l4proto tcp reject with tcp reset
+    reject with icmpx admin-prohibited
+  }
+  chain forward {
+    type filter hook forward priority filter; policy accept;
+    oifname "$INTERFACE" accept
+    iifname "$INTERFACE" accept
+    oifname { "docker0", "virbr0" } accept
+    oifname "br-*" accept
+    oifname "veth*" accept
+    reject with icmpx admin-prohibited
+  }
+}
+EOF
+      ;;
+    off)
+      if nft list table inet "$TABLE" >/dev/null 2>&1; then
+        nft delete table inet "$TABLE" || fail "nft couldn't take the kill switch away"
+      fi
+      ;;
+  esac
+}
+
+# ca_gone: the CA out of the trust store, for `off` and for a CA that failed half way.
+ca_gone() {
+  rm -f -- "$CA_FILE" && update-ca-certificates --fresh >/dev/null
+}
+
+ca() {
+  local der
+  if [[ $1 == off ]]; then
+    rm -f -- "$CHROME_CA" || { fail "couldn't remove $CHROME_CA"; return; }
+    [[ -e $CA_FILE ]] || return 0
+    ca_gone || { fail "update-ca-certificates failed"; return; }
+    docker_roots_changed=1
+    return
+  fi
+  der="$(openssl x509 -outform DER <<<"$CA_PEM" | base64 -w0)" || { fail "openssl couldn't read the certificate"; return; }
+  [[ $der =~ ^[A-Za-z0-9+/=]+$ ]] || { fail "openssl gave no certificate"; return; }
+  if ! same "$CA_FILE" "$CA_PEM"; then
+    put "$CA_FILE" 0644 <<<"$CA_PEM" || { fail "couldn't write $CA_FILE"; return; }
+    if ! update-ca-certificates >/dev/null; then
+      ca_gone || true
+      fail "update-ca-certificates failed"
+      return
+    fi
+    docker_roots_changed=1
+  fi
+  put "$CHROME_CA" 0644 <<<"{\"CACertificates\": [\"$der\"]}" || fail "couldn't write $CHROME_CA"
+}
+
+apt_proxy() {
+  local url="$1" text
+  if [[ $url == off ]]; then
+    rm -f -- "$APT_CONF" || fail "couldn't remove $APT_CONF"
+    return
+  fi
+  text="// Written by kubaos-proxy-write while the Proxy is on; it goes when the Proxy goes off.
+Acquire::http::Proxy \"$url\";
+Acquire::https::Proxy \"$url\";"
+  same "$APT_CONF" "$text" && return
+  put "$APT_CONF" 0644 <<<"$text" || fail "couldn't write $APT_CONF"
+}
+
+# daemon_proxy UNIT VALUE: a drop-in with the proxy for UNIT, which restarts if it runs. A
+# drop-in whose restart failed goes again, so the next run writes it and restarts anew.
+daemon_proxy() {
+  local unit="$1" value="$2" url no_proxy text
+  local dropin="$UNITS/$unit.d/kubaos-proxy.conf"
+  if [[ $value == off ]]; then
+    [[ -e $dropin ]] || return 0
+    rm -f -- "$dropin" || { fail "couldn't remove $dropin"; return; }
+    restart_if_running "$unit" || fail "systemd couldn't restart $unit"
+    return
+  fi
+  url="${value%%|*}"
+  no_proxy="${value#*|}"
+  unit_known "$unit" || return 0
+  text="# Written by kubaos-proxy-write while the Proxy is on; it goes when the Proxy goes off.
+[Service]
+Environment=\"HTTP_PROXY=$url\" \"HTTPS_PROXY=$url\" \"NO_PROXY=$no_proxy\"
+Environment=\"http_proxy=$url\" \"https_proxy=$url\" \"no_proxy=$no_proxy\""
+  same "$dropin" "$text" && return
+  put "$dropin" 0644 <<<"$text" || { fail "couldn't write $dropin"; return; }
+  if ! restart_if_running "$unit"; then
+    rm -f -- "$dropin"
+    systemctl daemon-reload || true
+    fail "systemd couldn't restart $unit"
+    return
+  fi
+  [[ $unit == docker.service ]] && docker_roots_changed=0
+  return 0
+}
+
+chrome() {
+  local value="$1" url no_proxy text
+  if [[ $value == off ]]; then
+    rm -f -- "$CHROME_PROXY" || fail "couldn't remove $CHROME_PROXY"
+    return
+  fi
+  if [[ $value == pac\|* ]]; then
+    text="{\"ProxySettings\": {\"ProxyMode\": \"pac_script\", \"ProxyPacUrl\": \"${value#pac|}\"}}"
+  else
+    value="${value#proxy|}"
+    url="${value%%|*}"
+    no_proxy="${value#*|}"
+    text="{\"ProxySettings\": {\"ProxyMode\": \"fixed_servers\", \"ProxyServer\": \"$url\", \"ProxyBypassList\": \"$no_proxy\"}}"
+  fi
+  same "$CHROME_PROXY" "$text" && return
+  put "$CHROME_PROXY" 0644 <<<"$text" || fail "couldn't write $CHROME_PROXY"
+}
+
+# docker_roots: a running Docker daemon reads the trust store once, at its start.
+docker_roots() {
+  ((docker_roots_changed)) || return 0
+  docker_roots_changed=0
+  unit_known docker.service || return 0
+  systemctl try-restart docker.service && return 0
+  [[ -n $CA_PEM ]] && { ca_gone || true; }
+  fail "systemd couldn't restart docker.service for the new CA"
+}
+
+stats() {
+  command -v wg >/dev/null || { fail "wg isn't installed (wireguard-tools, kubaos update installs it)"; return; }
+  wg show "$INTERFACE" latest-handshakes || fail "wg can't read $INTERFACE"
+}
+
+# part PART=VALUE: puts one valid, pinned part in place, or takes it away.
+part() {
+  local name="${1%%=*}" value="${1#*=}"
+  case "$name" in
+    killswitch) killswitch "$value" ;;
+    ca) ca "$value" ;;
+    apt) apt_proxy "$value" ;;
+    docker) daemon_proxy docker.service "$value" ;;
+    nix) daemon_proxy nix-daemon.service "$value" ;;
+    chrome) chrome "$value" ;;
+  esac
+}
+
+# pin ARG...: writes the pins, every one of them, after checking each.
+pin() {
+  local arg key value seen=" " ca="" proxy="" no_proxy="" pac="" text
+  for arg in "$@"; do
+    [[ $arg == *=* ]] || { usage >&2; exit 2; }
+    key="${arg%%=*}"
+    value="${arg#*=}"
+    [[ $seen != *" $key "* ]] || die 2 "$key is there twice"
+    seen+="$key "
+    case "$key" in
+      ca)
+        case "$value" in
+          -) read_ca || exit 1; ca="$CA_FP" ;;
+          none) ca=none ;;
+          *) die 1 "ca=$value isn't - (the certificate on stdin) or none" ;;
+        esac
+        ;;
+      proxy) [[ $value == none ]] || url_ok "$value" || die 1 "proxy=$value isn't a proxy (http://host:port)"; proxy="$value" ;;
+      no-proxy) no_proxy_ok "$value" || die 1 "no-proxy=$value isn't a no_proxy list"; no_proxy="$value" ;;
+      pac) [[ $value == none ]] || pac_ok "$value" || die 1 "pac=$value isn't a PAC file's address"; pac="$value" ;;
+      *) die 2 "$key isn't a pin" ;;
+    esac
+  done
+  [[ $seen == " ca proxy no-proxy pac " ]] || die 2 "pin ca, proxy, no-proxy and pac, in that order"
+  text="# Pinned by an admin through kubaos-proxy-pin: what kubaos-proxy-write puts in place
+# without a password. The Proxy pins again, asking for the password, when its profile changes.
+ca=$ca
+proxy=$proxy
+no_proxy=$no_proxy
+pac=$pac"
+  same "$PINS" "$text" && exit 0
+  put "$PINS" 0644 <<<"$text" || die 1 "couldn't write $PINS"
+}
+
+if [[ ${1:-} == --help || ${1:-} == -h ]]; then
+  usage
+  exit 0
+fi
+if (($# == 0)); then
+  usage >&2
+  exit 2
+fi
+if [[ ${0##*/} == kubaos-proxy-pin ]]; then
+  pin "$@"
+  exit 0
+fi
+if [[ $1 == stats ]]; then
+  (($# == 1)) || { usage >&2; exit 2; }
+  stats || exit 1
+  exit 0
+fi
+if [[ $1 == off ]]; then
+  (($# == 1)) || { usage >&2; exit 2; }
+  failed=0
+  for arg in killswitch=off ca=off apt=off docker=off nix=off chrome=off; do
+    if part "$arg"; then say "done $arg"; else failed=1; fi
+  done
+  docker_roots || failed=1
+  exit "$failed"
+fi
+stdin_taken=0
+for arg in "$@"; do
+  [[ $arg == *=* ]] || { usage >&2; exit 2; }
+  if [[ $arg == ca=- ]]; then
+    ((!stdin_taken)) || die 2 "ca=- is there twice"
+    stdin_taken=1
+  fi
+done
+for arg in "$@"; do
+  valid "$arg" || exit 1
+done
+((stdin_taken)) && { read_ca || exit 1; }
+for arg in "$@"; do
+  is_pinned "$arg" || die 3 "$arg isn't what an admin pinned: kubaos-proxy-pin pins it"
+done
+for arg in "$@"; do
+  part "$arg" || exit 1
+  say "done $arg"
+done
+docker_roots || exit 1

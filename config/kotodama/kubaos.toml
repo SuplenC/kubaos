@@ -786,6 +786,46 @@ keywords = ["kde connect", "kdeconnect", "iphone", "android", "forget", "remove"
 run = ["kubaos-phone", "unpair"]
 confirm = true
 
+# The Proxy: one switch for the work network (crates/kubaos-proxy,
+# home/proxy.nix). IT's WireGuard tunnel, the work DNS, the HTTP proxy and the
+# company CA, as ~/.config/kubaos/desktop/network/proxy.toml names them, go up
+# together or not at all; the control center's Proxy tile is the same switch.
+# On and off say a failure in a notification. "Proxy status" is the
+# Extension's own Item (`proxy-status`): each part, and the tunnel's endpoint,
+# last handshake and bytes moved, read live. The import runs in a terminal,
+# where bw asks for the master password to put the keys in the vault.
+
+[extensions.kubaos.actions.proxy-on]
+title = "Proxy on"
+subtitle = "The work network: the tunnel, work DNS, the HTTP proxy and the company CA, all together"
+icon = "network-vpn"
+keywords = ["vpn", "wireguard", "work network", "connect", "tunnel", "proxy", "office"]
+run = ["kubaos-proxy", "on"]
+
+[extensions.kubaos.actions.proxy-off]
+title = "Proxy off"
+subtitle = "Every part of the work network down again, the kill switch too"
+icon = "network-vpn-disconnected"
+keywords = ["vpn", "wireguard", "work network", "disconnect", "tunnel", "proxy", "office"]
+run = ["kubaos-proxy", "off"]
+
+[extensions.kubaos.actions.proxy-import]
+title = "Import WireGuard config…"
+subtitle = "IT's .conf: its keys go to your Bitwarden vault, the rest beside proxy.toml"
+icon = "document-import"
+keywords = ["vpn", "wireguard", "conf", "work network", "tunnel", "import", "proxy"]
+keyword = "wireguard"
+run = ["kubaos-proxy", "import", "{path}"]
+arguments = [{ name = "path", placeholder = "~/Downloads/work.conf" }]
+terminal = true
+
+[extensions.kubaos.actions.proxy-settings]
+title = "Open proxy settings"
+subtitle = "proxy.toml: the tunnel, work DNS, the HTTP proxy and the company CA, in Neovim"
+icon = "preferences-system-network"
+keywords = ["settings", "config", "proxy", "vpn", "wireguard", "dns", "pac", "certificate", "ca", "proxy.toml"]
+run = ["sh", "-c", 'dir="$(dot-config path network)" && mkdir -p "$dir" && exec ghostty -e nvim "$dir/proxy.toml"']
+
 # Updates (kubaos update). They run in a terminal, where sudo asks and apt
 # and the switch show what they do. The daily check fills in what is
 # waiting: "Update KubaOS" names it, and the upgrade is listed only while a

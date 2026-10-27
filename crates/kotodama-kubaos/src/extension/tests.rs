@@ -27,12 +27,13 @@ fn ids(extension: &Extension<FakeBus, FakeRunner>) -> Vec<String> {
 }
 
 /// The Items the Extension always sends, in order: the toggles, the idle settings, then the
-/// power stop's status.
+/// power stop's status and the Proxy's.
 fn always() -> Vec<&'static str> {
     toggles::ids()
         .into_iter()
         .chain(crate::idle::ids())
         .chain(crate::power::ids())
+        .chain(crate::proxy::ids())
         .collect()
 }
 
@@ -56,6 +57,14 @@ fn hide_takes_out_the_power_status_too() {
     let extension = configured(r#"hide = ["power-status"]"#);
 
     assert!(!ids(&extension).contains(&"power-status".to_owned()));
+}
+
+#[test]
+fn hide_takes_out_the_proxy_status_too() {
+    let extension = configured(r#"hide = ["proxy-status"]"#);
+
+    assert!(!ids(&extension).contains(&"proxy-status".to_owned()));
+    assert!(ids(&extension).contains(&"power-status".to_owned()));
 }
 
 #[test]
