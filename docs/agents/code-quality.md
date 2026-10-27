@@ -4,7 +4,7 @@ How KubaOS's code is written. The rules come from Kotodama's guide (`SuplenC/kot
 
 New code follows every rule here. Older code is brought in line where you touch it: edit the lines you change in the new style, without restyling the rest of the file in the same PR. A restyle of a whole file or crate is its own PR.
 
-No tool checks these rules yet, apart from `shellcheck` in the shell harness (`test/lib/e2e.sh`) and `nix fmt`. The reviewer checks the rest.
+Tools check some of these rules: `shellcheck` in the shell harness (`test/lib/e2e.sh`), `nix fmt`, clippy, and the design checks (`just design-check`, below). The reviewer checks the rest.
 
 ## Comments, in every language
 
@@ -169,8 +169,19 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **A file opens with a comment on what it owns** when the file name doesn't say it.
 - **Bindings over imperative updates.** A `readonly property` derived from others, not a handler that sets it; a handler only for a side effect.
 - **A property that needs explaining gets a one-line comment above it**, never trailing.
-- **No magic numbers in layout**: sizes and durations come from the shared settings or a named property.
+- **No magic numbers in layout**: colours, sizes, spacing, radii, durations and fonts come from the tokens, as "Design" below says. A named property holding a literal (`property int iconSize: 22`) is still a literal.
 - **A search over a list in the shell uses Kotodama's engine, never a hand-rolled filter.** The list's entries are Items of a Kotodama app (an Extension with a word, in `crates/kotodama-kubaos`), and the view embeds a `KotodamaSearch` of its own that enters the app and draws its Results, so typing matches the way the Command menu does, accents, typos and frecency included, and the same list is in the menu. `modules/controlcenter/KeyboardAddView.qml` is the example. A field that parses what is typed (a time, a password) isn't a search and stays as it is.
+
+## Design
+
+Every surface a person sees follows `docs/DESIGN.md`, in every toolkit. Read it before writing or reviewing UI code.
+
+- **Values come from the tokens**, never written out: a colour is a role, a length a `Space`, `Size` or `Radius` token, text a type style, motion a duration and a curve. In Rust that is `kubaos_ui::tokens`; in QML, the generated token singleton (`Theme.qml` until #147 replaces it). A value the tokens lack is added to `design/tokens.toml` first, with its reason, and then used. Source: kubaos.
+- **Components come from the libraries**: `kubaos-ui` in iced, `KubaOS.Components` in QML, by their shared names. An app composes them into blocks; it never builds a button out of a toolkit's own. A new kind, size or component changes `docs/DESIGN.md` first. Source: kubaos.
+- **Layout goes through the primitives** (`page`, `stack`, `row`, `grid`, `split` in `kubaos-ui`), which keep boxes on device pixels and tell the geometry check what each box is. A new widget in `kubaos-ui` wraps its output in `probe::component` with its shared name, variant and fixed measures. Source: kubaos.
+- **The design lint** (`kubaos-design lint`) fails on a literal design value or a toolkit control in QML or Rust UI code. `design/lint-baseline.toml` holds what the older front ends still have, per file and rule, and only shrinks: a file over its count fails, and a file under it fails until `just design-baseline` lowers the count in the same PR. Touching a baselined file, fix the violations in the lines you change, as with every rule here. Source: kubaos.
+- **A justified literal** (a value that isn't a design value: a protocol's size, a font in the specimen's comparison sheet) carries a marker on its own line above it, naming the rule and the reason: `// design-allow(size): the tray icon's size is the StatusNotifierItem spec's.` The reason is required; a marker that allows nothing fails. Source: kubaos.
+- **The geometry check** (`kubaos-specimen check`) holds every specimen page to the grid at 1, 1.25, 1.5 and 2, light and dark. A change to `kubaos-ui` or the specimen passes it, and a change to how anything looks commits the regenerated `design/specimen/` shots. `just design-check` runs the lint and the geometry check; `cargo test --workspace` and `nix flake check` run both. Source: kubaos.
 
 ## Lua (Hyprland, Neovim)
 

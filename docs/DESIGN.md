@@ -328,6 +328,20 @@ Kōbō implements this map in `crates/kubaos-kobo/src/app.rs` (`translate`), the
 - **A notification** only when the user is elsewhere, or the news outlives the view that started it: a download finished, an update is ready, the battery is low. It is worth an interruption, or it isn't sent.
 - **Never both** for one event. The same fact twice is noise.
 
+## Settings
+
+- **Every setting is a Command menu Item**, and is written to the User layer, so it can be found, changed and kept like any other. A feature ships with its Items (`CLAUDE.md`).
+- **A Settings panel in the shell** groups them: Appearance, Displays, Keyboard, Phone, Updates and the rest (#154). It may become an app of its own later, on `kubaos-ui`.
+
+## Terminals, boot and the rest
+
+What can't use the libraries still follows the tokens as far as it can go:
+
+- **The terminals** (Ghostty, foot, tmux, Neovim, btop, lazygit, bat, fuzzel, oh-my-posh, fastfetch) take the colour roles through matugen templates generated from `design/tokens.toml`, Geist Mono as their font, and KubaOS Symbols' glyphs where they draw icons (#152).
+- **Plymouth and GRUB** are always dark and take their values from the tokens (#153). The splash is the neon sign (`docs/BRAND.md`, "Boot").
+- **The cursor** is recoloured from the palette (`kubaos-cursor`).
+- **GTK and Qt apps** get the colour roles and an icon theme close to KubaOS Symbols (#152).
+
 ## Writing
 
 The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a person reads. What it means for UI copy:
@@ -341,7 +355,109 @@ The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a pers
 
 ## Checks
 
-<!-- CHECKS: written by the parent -->
+Three checks keep every front end on this file. The first two run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`; a PR that fails either isn't done.
+
+### The lint
+
+`kubaos-design lint` reads every `.qml` file and the sources of every Rust crate that depends on iced. It skips their tests and the files `kubaos-tokens` generates, which are where the values belong. Each rule fails on a value written out where a token belongs:
+
+| Rule | Fails on |
+|---|---|
+| `colour` | A hex colour string; `Qt.rgba`, `Qt.hsla` and friends; a named colour (`"white"`) bound to a colour; iced's `Color::from_rgb*` with numbers, `Color::WHITE`, `color!`, a `Color { r, g, b, a }` literal. `"transparent"` and a colour converted from a token pass. |
+| `space` | A number in a gap, padding, margin or inset: QML's `spacing`, `*Margin`, `padding`; iced's `.padding(`, `.spacing(`, `Padding`. |
+| `size` | A number in a width, height, position, stroke or icon size: QML's `width`, `implicitHeight`, `Layout.preferred*`, `border.width`, a custom `int` or `real` property named `…Size`, `…Width`; iced's `.width(`, `Length::Fixed(`, `Size::new(`, `Pixels(`. |
+| `radius` | A number in a corner radius. |
+| `duration` | A number in QML's `duration`; iced's `Duration::from_millis(` and friends, up to the longest duration token. A longer one is a timeout or a poll, not motion. |
+| `font` | A family named in a string, a pixel or point size, a weight named in place (`Font.Medium`), a line height, letter spacing. |
+| `component` | A toolkit's own control where the library has the component: Qt Quick Controls' `Button`, `TextField`, `Switch` and the rest, in a file that imports them; iced's `button`, `text_input`, `text`, `checkbox`, `row`, `column`, `row!`. `kubaos-ui` and `KubaOS.Components` themselves may build on them. |
+
+Zero is never a literal, and neither is halving or doubling a token (`/ 2` for a centre or a pill's radius, `Theme.spacing.md * 2` for both sides). Comments and strings that aren't colours or families are never read.
+
+**The baseline.** The front ends that predate this file break these rules hundreds of times, until their alignment issues (#148 to #153) fix them. `design/lint-baseline.toml` holds how many violations of each rule each file may still have:
+
+```toml
+["config/quickshell/modules/osd/Osd.qml"]
+size = 5
+radius = 2
+font = 1
+```
+
+It only shrinks:
+
+- **A file over its count fails**, and the lint lists every violation of that rule in the file, since any of them may be the new one.
+- **A file under its count fails too**, until `just design-baseline` writes the lower count, so a fix can't be quietly undone later.
+- **No command raises a count.** A file gaining one is a hand edit to the baseline, which a reviewer sees and refuses.
+
+```text
+$ just design-check
+config/quickshell/modules/osd/Osd.qml: 3 radius violation(s), the baseline allows 2; fix the new one, or mark it `// design-allow(radius): why`
+  config/quickshell/modules/osd/Osd.qml:36:13: radius: `radius: 6`
+  config/quickshell/modules/osd/Osd.qml:87:21: radius: `radius: 4`
+  config/quickshell/modules/osd/Osd.qml:93:25: radius: `radius: 4`
+kubaos-design lint: 167 file(s), 874 violation(s), 873 in the baseline: FAILED
+```
+
+**A justified literal** carries a marker on its own line right above it, in the file's line comment, naming the rule and the reason:
+
+```qml
+// design-allow(size): the tray icon's size is the StatusNotifierItem spec's, not ours.
+implicitSize: 22
+```
+
+A marker allows its rules on the next code line only, and must say why after the colon. A marker with no reason, an unknown rule, or nothing below it to allow fails the lint, so markers can't pile up unread. A marker is for a value that isn't a design value (a protocol's size, an icon font in the specimen's comparison sheet). A design value that has no token gets a token.
+
+### The geometry check
+
+`kubaos-specimen check` lays every page of the specimen out at 1, 1.25, 1.5 and 2, light and dark: 48 frames. A frame is the page's boxes, each with what it is, as `kubaos-ui`'s probes report them. Every layout primitive, component, text and icon wraps itself in a probe that lays out and draws exactly as its content. The rules (`kubaos-geometry`):
+
+| Rule | Fails when |
+|---|---|
+| `device-grid` | An edge falls between device pixels. For a text, only where it starts counts. |
+| `scale-grid` | A component's fixed width or height isn't a multiple of 4, a layout's gap isn't on the spacing scale, an icon's box isn't square or on the grid. |
+| `sibling-gap` | Two children of a row, stack or grid aren't exactly the layout's gap apart. |
+| `alignment` | Children of a stack don't share their left edge, or their centre when centred; children of a row don't share their top, centre or bottom; a grid's cells leave their column or row. Centres may differ by half a device pixel, where an odd one had to go to a side. |
+| `identical` | Two instances of one component and variant (`Button`, `Filled Md`) differ in a measure the component fixes (a button's height, an icon button's both), at any scale, or place their icons and label differently along it. Focused, hovered and disabled are the same variant, so focus moving anything fails here. |
+| `clipped-text` | A text needs more room than its box, or a text or icon sticks out of a box around it. |
+| `icon-centre` | An icon alone in its slot, or in a centred row, is more than half a device pixel off the slot's centre. |
+| `mode-invariant` | A page's light frame has other boxes than its dark one. Words may differ; where each box sits may not. |
+
+```text
+$ cargo run -p kubaos-specimen -- check
+space-dark-1.25x device-grid: 28.8×16 at (66.4, 294.8) has edges between device pixels: top 368.5
+    at Stack[2] > Page[0] > Stack[1] > Stack[0] > Section[0] > Stack[1] > Grid[0] > Row[1] > Text "4 px"
+kubaos-specimen check: 48 frame(s), 120 finding(s)
+```
+
+That run is iced centring a row's children by half a device pixel at 1.25, before `kubaos-ui` moved them onto whole ones. `kubaos-specimen check DIR` also writes each frame to `DIR` as JSON.
+
+**Optically centred** is two things. A symbol's box is centred in its slot to the device pixel, which the check measures. Its drawing is optically centred in that box by Tabler's grid, which the four we drew follow and the icons page shows beside their relatives.
+
+**Other toolkits.** The checker reads boxes, not widgets, so the shell feeds it the same way (#147): `KubaOS.Components` dumps each page's item tree as a frame, and `kubaos-design geometry FRAME.json…` checks the frames together. A frame is JSON:
+
+```json
+{
+  "page": "osd", "mode": "dark", "scale": 1.25,
+  "root": {
+    "role": "layout", "axis": "x", "gap": 8, "align": "centre",
+    "bounds": { "x": 0, "y": 0, "width": 96, "height": 40 },
+    "children": [
+      { "role": "component", "name": "IconButton", "variant": "Text Md",
+        "fixed": { "width": true, "height": true },
+        "bounds": { "x": 0, "y": 0, "width": 40, "height": 40 },
+        "children": [
+          { "role": "icon", "name": "volume_up",
+            "bounds": { "x": 10, "y": 10, "width": 20, "height": 20 } }
+        ] }
+    ]
+  }
+}
+```
+
+Bounds are logical pixels from the page's top left. The roles are `box` (a toolkit's container that claims nothing), `layout` (`axis` `x` or `y`, `gap`, `align` `start`, `centre` or `end`: a `RowLayout`, a `ColumnLayout`), `grid` (`columns`, `gap`, `align`), `component` (the shared `name`, the `variant`'s words, which measures are `fixed`), `text` (`content`, and `natural`: the size its laid-out text needs, `implicitWidth` and `implicitHeight` in QML), `icon` (`name`), and `spacer` (`fill`). A component's name and variant are this file's, so a `Button` in QML and one in iced are held to the same measures. That same dump answers #147's cross-toolkit test: the iced and the QML frame of a component must match.
+
+### Screenshot diffs
+
+The specimen's 1× shots are checked in under `design/specimen/`. A PR that changes how anything looks regenerates them with `kubaos-specimen shots DIR` and commits the ones that changed, so the change shows in review as an image diff. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues.
 
 ## Changing the design
 

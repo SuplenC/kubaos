@@ -12,6 +12,10 @@ Personal Ubuntu + Nix + Hyprland OS. Recipes live in `justfile`; docs in `docs/`
 
 Before writing or reviewing code in this repo, read `docs/agents/code-quality.md`: the comment rules for every language, then the Rust, shell, Nix, QML and Lua rules. New code follows them; older code is brought in line where it is touched. Code comments carry the why, never an issue or ADR number; those belong in the issue and the PR.
 
+## Design
+
+Any UI, in any toolkit, follows `docs/DESIGN.md`: tokens and the shared components only, never a literal colour, size, spacing, radius, duration or font. `just design-check` passes (the rules are in `docs/agents/code-quality.md`, "Design").
+
 ## Every feature reaches the Command menu
 
 A new feature ships with its Kotodama integration in the same PR, through the KubaOS Extension (`crates/kotodama-kubaos`, actions in `config/kotodama/kubaos.toml`): Items to run it, or at the very least its settings, so it can be found, run and changed from the menu. A feature with no Item is not done.
