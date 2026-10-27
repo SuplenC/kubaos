@@ -108,7 +108,7 @@ Pill {
         for (const entry of entries) {
             if ((entry.kind === "cell" || entry.kind === "ghost") && entry.workspace === activeId)
                 return x;
-            x += widthOf(entry.kind, entry.label);
+            x += widthOf(entry.kind, entry.label, entry.workspace);
         }
         return -1;
     }
@@ -124,9 +124,6 @@ Pill {
     readonly property real borrowedOpacity: 0.6
     readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
     readonly property var roles: ["kind", "borrowed", "head", "tail", "label"]
-    // Room before a group's name, so it clears the tint's rounded end; the
-    // cell after it centres its number, which leaves as much room after.
-    readonly property int labelInset: Theme.spacing.sm
     property bool ready: false
 
     // By each window's own workspace, not a workspace's list of windows: a
@@ -136,9 +133,35 @@ Pill {
         return Hyprland.toplevels.values.some(t => t.workspace?.id === id);
     }
 
-    function widthOf(kind: string, label: string): int {
+    // What the cell of workspace `id` draws: its number, or its kanji.
+    function numberText(id: int): string {
+        const slot = Hypr.slotOf(id);
+        return Settings.workspaceKanji ? kanji[slot - 1] : `${slot}`;
+    }
+
+    // The room the cell of workspace `id` leaves before its number, which it
+    // centres, unrounded.
+    function numberRoom(id: int): real {
+        return (cell - numberMetrics.advanceWidth(numberText(id))) / 2;
+    }
+
+    // Where a group's name starts: as far from the tint's rounded end as the
+    // number of the group's first cell, `first`, is from the name's end.
+    function labelInset(first: int): int {
+        return Math.round(numberRoom(first));
+    }
+
+    // How wide a group's name draws, elided past `groupNameMax`.
+    function labelWidth(label: string): real {
+        return Math.min(labelMetrics.advanceWidth(label), Theme.bar.groupNameMax);
+    }
+
+    // An entry's width. A name's entry is its inset, the name, and the inset
+    // again less the room its first cell leaves before the number, so the
+    // name sits as far from the number after it as from the tint's end.
+    function widthOf(kind: string, label: string, first: int): int {
         if (kind === "label")
-            return labelInset + Math.ceil(labelMetrics.advanceWidth(label));
+            return Math.round(2 * labelInset(first) + labelWidth(label) - numberRoom(first));
         return kind === "gap" ? groupGap : cell;
     }
 
@@ -207,8 +230,19 @@ Pill {
         id: labelMetrics
 
         font.family: Theme.font.sans
-        font.pixelSize: Theme.font.sm
+        font.pixelSize: Theme.bar.cellFont
         font.weight: Font.Medium
+    }
+
+    // Measures a cell's number as a waiting group's first cell draws it: in
+    // a group of windows, bold.
+    FontMetrics {
+        id: numberMetrics
+
+        font.family: Settings.workspaceKanji ? Theme.font.jp : Theme.font.sans
+        font.pixelSize: Theme.bar.cellFont
+        font.weight: Font.DemiBold
+        font.features: Theme.font.tabular
     }
 
     // One entry's place in a row, growing in when it appears and shrinking
@@ -220,6 +254,7 @@ Pill {
         required property string key
         required property string kind
         required property string label
+        required property int workspace
         required property bool leaving
         // False until the item exists, so a new one grows from nothing
         // rather than appearing at full width.
@@ -228,7 +263,7 @@ Pill {
 
         Component.onCompleted: appeared = true
 
-        width: present ? root.widthOf(kind, label) : 0
+        width: present ? root.widthOf(kind, label, workspace) : 0
         height: root.cell
         opacity: present ? 1 : 0
         clip: true
@@ -278,7 +313,7 @@ Pill {
                     Rectangle {
                         visible: tintSlot.borrowed
                         x: tintSlot.head ? 0 : -root.cell / 2
-                        width: root.widthOf(tintSlot.kind, tintSlot.label) + (tintSlot.head ? 0 : root.cell / 2) + (tintSlot.tail ? 0 : root.cell / 2)
+                        width: root.widthOf(tintSlot.kind, tintSlot.label, tintSlot.workspace) + (tintSlot.head ? 0 : root.cell / 2) + (tintSlot.tail ? 0 : root.cell / 2)
                         height: root.cell
                         radius: height / 2
                         color: Theme.m3secondaryContainer
@@ -374,11 +409,9 @@ Pill {
                 delegate: Slot {
                     id: shape
 
-                    required property int workspace
                     readonly property bool isGap: kind === "gap"
                     readonly property bool isGhost: kind === "ghost"
                     readonly property bool isLabel: kind === "label"
-                    readonly property int number: Hypr.slotOf(workspace)
                     readonly property bool isActive: !isGap && !isLabel && workspace === root.activeId
                     readonly property bool occupied: root.occupied(workspace)
 
@@ -398,9 +431,11 @@ Pill {
 
                     Text {
                         visible: shape.isLabel
-                        x: root.labelInset
+                        x: root.labelInset(shape.workspace)
+                        width: Math.ceil(root.labelWidth(shape.label))
                         anchors.verticalCenter: parent.verticalCenter
                         text: shape.label
+                        elide: Text.ElideRight
                         font: labelMetrics.font
                         renderType: Text.NativeRendering
                         color: Theme.m3onSecondaryContainer
@@ -423,9 +458,9 @@ Pill {
 
                         Text {
                             anchors.centerIn: parent
-                            text: Settings.workspaceKanji ? root.kanji[shape.number - 1] : shape.number
+                            text: root.numberText(shape.workspace)
                             font.family: Settings.workspaceKanji ? Theme.font.jp : Theme.font.sans
-                            font.pixelSize: Theme.font.sm + 1
+                            font.pixelSize: Theme.bar.cellFont
                             font.weight: shape.isActive || shape.occupied ? Font.DemiBold : Font.Medium
                             font.features: Theme.font.tabular
                             renderType: Text.NativeRendering

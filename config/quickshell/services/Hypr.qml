@@ -1,9 +1,11 @@
 pragma Singleton
 
+import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
 import qs.settings
+import qs.theme
 
 // Small helpers on top of the Hyprland IPC, and each screen's workspaces.
 //
@@ -96,14 +98,25 @@ Singleton {
     }
 
     // The workspace groups the user pinned screens to. Hyprland reads the
-    // file when its config loads; a change is passed on at once, so a hand
-    // edit or the Command menu's pin applies with no reload. Hyprland reads
-    // the file itself and moves nothing when its text is the same.
+    // file when its config loads; a hand edit is passed on as it is saved,
+    // with no reload. Hyprland reads the file itself and moves nothing when
+    // its text is the same, so the Command menu's edits, which tell Hyprland
+    // themselves, are harmless to pass on again.
     FileView {
         path: `${UserLayer.dir("workspaces")}/groups.toml`
         watchChanges: true
         printErrors: false
-        onFileChanged: {
+        onFileChanged: groupsSaved.restart()
+    }
+
+    // An editor saving by rename moves the file away, then writes a new one
+    // in its place, and each step is a change; the last one is passed on,
+    // once the file is back.
+    Timer {
+        id: groupsSaved
+
+        interval: Theme.anim.small
+        onTriggered: {
             if (Hyprland.usingLua)
                 Hyprland.dispatch("dot.workspaces.reload_groups()");
         }

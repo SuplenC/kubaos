@@ -108,6 +108,8 @@ Singleton {
         readonly property int pillHeight: 26
         readonly property int icon: 16
         readonly property int padding: 8        // left/right inset of the bar content
+        readonly property int cellFont: 12      // the workspace numbers and the group names beside them
+        readonly property int groupNameMax: 96  // widest a group's name draws before it elides
     }
 
     // Typography. Geist for the interface (tabular figures for anything that
