@@ -584,6 +584,13 @@ function M.move_to_monitor(direction)
 
     local id = workspace.id
     local from = hl.get_active_monitor()
+    -- A screen that arrived within the wait has no block yet; by the time a
+    -- key reaches it, Hyprland has arranged it, so the wait ends here. Should
+    -- the layout still look mid-change, the workspace moves as a guest and
+    -- the reconcile sends it home.
+    if not current[target.name] then
+      M.flush()
+    end
     local monitors, by_connector = mapping()
     local block = by_connector[target.name]
     -- Renumbered before it moves, so the move names the new id: the bar's
@@ -658,11 +665,13 @@ function M.reconcile(added)
       local active = monitor.active_workspace
       local own = regular(active) and block_of(active.id) == block and active.id == shown[monitor.name]
         and not added[monitor.name]
-      -- A workspace of a position no screen holds stays in view where it was put,
-      -- unless this screen has only just arrived on it. An empty one is only
-      -- the number Hyprland starts a screen on.
+      -- A workspace of a position no screen holds stays in view where it was
+      -- put, when it was in view before this reconcile and the screen hasn't
+      -- only just arrived on it; one a move of this reconcile brought into
+      -- view gives way, and an empty one is only the number Hyprland starts a
+      -- screen on.
       local guest = regular(active) and not owner(active.id, monitors, by_connector) and not added[monitor.name]
-        and (active.windows or 0) > 0
+        and active.id == shown[monitor.name] and (active.windows or 0) > 0
       if not own and not guest then
         local id = home(monitor, block)
         if id ~= (regular(active) and active.id) then
@@ -770,6 +779,14 @@ local function settled()
   M.reconcile(wait.added)
 end
 
+-- End a pending wait now.
+function M.flush()
+  if pending then
+    generation = generation + 1
+    settled()
+  end
+end
+
 -- Reconcile once the layout has held still for `SETTLE_MS`; `added` names a
 -- screen that just arrived, `removed` one that just went.
 settle_later = function(added, removed)
@@ -806,12 +823,40 @@ hl.on("monitor.layout_changed", function()
   settle_later()
 end)
 
+-- Hyprland has moved the screen's workspaces to another screen by now, and
+-- when the screen had focus, shows the workspace it showed on that screen,
+-- which has the focus now, or the empty one it parked the gone screen on.
+-- That screen goes back to one of its own at once, before anything is drawn,
+-- rather than switching twice in view. A waiting group's workspace it showed
+-- by choice is not of the gone screen's block and has windows, and stays.
+local function leave_foreign(gone)
+  local block = current[gone]
+  local monitors, by_connector = mapping()
+  for _, monitor in ipairs(monitors) do
+    local own = by_connector[monitor.name]
+    local active = monitor.active_workspace
+    if monitor.name ~= gone and own and monitor.focused and regular(active) then
+      local empty = (active.windows or 0) == 0
+      local foreign = block_of(active.id) ~= own
+      local brought = foreign and (block == nil or block_of(active.id) == block or empty)
+      local parked = empty and not kept[active.id]
+      if brought or parked then
+        show(monitor, home(monitor, own))
+      end
+    end
+  end
+end
+
 -- A dock's two screens go one at a time, like they come. Reconciling on the
 -- first removal would shift the other screen's position for a moment and move
 -- every group twice, so a removal waits like an arrival; by the time the
 -- reconcile runs the screen is off the list.
 hl.on("monitor.removed", function(monitor)
-  settle_later(nil, monitor and monitor.name)
+  local name = monitor and monitor.name
+  if name then
+    leave_foreign(name)
+  end
+  settle_later(nil, name)
 end)
 
 -- A window arriving on a workspace or leaving it moves where its group ends.

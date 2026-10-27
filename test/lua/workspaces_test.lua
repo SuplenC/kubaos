@@ -936,6 +936,40 @@ test("the dock's screens going one at a time move each group once, to the laptop
   kuba_docked(world)
 end)
 
+-- Regression: Hyprland shows the unplugged screen's workspace on the screen
+-- it backs up to when the unplugged one had focus, and the reconcile put the
+-- backup screen back on its own only after the wait: two switches in view.
+test("unplugging the focused screen leaves the screen Hyprland backs up to on its own workspace at once", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  world:focus_monitor("HDMI-A-1")
+  world.moves = 0
+
+  world:detach("HDMI-A-1", "DP-2")
+
+  same({ world:shown_on("DP-2"), world:shown_on("eDP-1") }, { 41, 1 }, "each on its own, before the wait")
+  same(world.moves, 0, "and nothing moved")
+  world:settle()
+  same({ world:shown_on("DP-2"), world:shown_on("eDP-1") }, { 41, 1 }, "and after it")
+  same(world:ids_on("eDP-1"), { 1, 2, 3, 31, 32, 33, 34, 35 }, "the group waits on the laptop")
+end)
+
+test("moving a workspace to a screen that arrived within the wait joins that screen's block", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(2))
+  local window = world:open_window()
+  world:attach("DP-2", LG_B)
+  world:arrange("DP-2", 3840, 0)
+
+  run(module.move_to_monitor("r"))
+
+  same({ window.workspace.id, window.workspace.monitor.name }, { 22, "DP-2" }, "joined the new screen's block")
+  world:settle()
+  same({ window.workspace.id, window.workspace.monitor.name, world:shown_on("DP-2") }, { 22, "DP-2", 22 }, "and stays")
+end)
+
 test("Hyprland's fallback output holds no position and writes no row", function()
   local world, module = two_screens()
   world:open_window()
@@ -946,7 +980,7 @@ test("Hyprland's fallback output holds no position and writes no row", function(
   world:detach("DP-1")
   world:settle()
   same(read(world.state .. "/workspace-screens"), before, "the file is untouched")
-  same(module.workspace_id(hl.get_monitor("FALLBACK"), 2), 2, "the fallback addresses the panel's group")
+  same(module.workspace_id(hl.get_monitor("FALLBACK"), 2), 12, "unmapped, the fallback addresses the group it shows")
 
   world:plug("eDP-1", PANEL, 0, 0)
   world:unplug("FALLBACK")

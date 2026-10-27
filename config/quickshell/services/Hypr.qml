@@ -109,7 +109,13 @@ Singleton {
                 root.staleIds = next;
                 // The windows stay on the old id's object until read again;
                 // the reply comes after the move that creates the new id's.
+                // Should it not, the windows' read makes the object with no id
+                // yet, and the workspaces' read, served next, gives it one.
+                // The move names no active workspace for the screen it lands
+                // on, so the screens are read again too.
                 Hyprland.refreshToplevels();
+                Hyprland.refreshWorkspaces();
+                Hyprland.refreshMonitors();
             } else if (event.name === "createworkspacev2") {
                 const id = parseInt(event.parse(2)[0], 10);
                 if (root.staleIds[id] === true) {

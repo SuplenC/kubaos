@@ -448,8 +448,9 @@ function F:plug(name, description, x, y)
 end
 
 -- Hyprland moves the screen's workspaces to the first other screen in its
--- list (`backup` names another), then fires `monitor.removed` while it still
--- lists the screen, and takes it off the list.
+-- list (`backup` names another), and when the screen had focus, shows the
+-- workspace it showed on the backup; then fires `monitor.removed` while it
+-- still lists the screen, and takes it off the list.
 function F:detach(name, backup_name)
   local record = self:monitor_record(name)
   local backup = backup_name and self:monitor_record(backup_name)
@@ -462,6 +463,9 @@ function F:detach(name, backup_name)
     if workspace.monitor == record then
       workspace.monitor = backup
     end
+  end
+  if self.focused == record and record.active and backup then
+    backup.active = record.active
   end
   record.active = nil
   record.removing = true
