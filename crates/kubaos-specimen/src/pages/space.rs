@@ -22,7 +22,7 @@ use kubaos_ui::layout::row;
 use kubaos_ui::layout::section;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
-use kubaos_ui::look::concentric;
+use kubaos_ui::look::nested;
 use kubaos_ui::look::radius;
 use kubaos_ui::snap::snap;
 use kubaos_ui::text::text;
@@ -35,6 +35,10 @@ use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
 use crate::specimen::Message;
+
+/// The concentric sample's corners: a 24 dialog holds 16 eight in, which holds 12 four in.
+const IN_DIALOG: Radius = nested(Radius::R24, Space::S8);
+const IN_WELL: Radius = nested(IN_DIALOG, Space::S4);
 
 /// A plain filled box, `width` by `height` logical pixels.
 fn block<'a>(width: Length, height: f32, fill: Color, corner: Radius) -> Element<'a, Message> {
@@ -226,8 +230,7 @@ fn nesting<'a>(look: &Look) -> Element<'a, Message> {
             })
             .into()
     };
-    let r16 = concentric(Radius::R24, Space::S8).unwrap_or(Radius::R16);
-    let r12 = concentric(r16, Space::S4).unwrap_or(Radius::R12);
+    let (r16, r12) = (IN_DIALOG, IN_WELL);
     let core = widget::container(snap(look.scale, text("12", Type::Mono, c.on_primary)))
         .padding(Inset::xy(Space::S32, Space::S12).padding())
         .style(move |_theme| container::Style {

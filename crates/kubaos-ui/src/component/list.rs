@@ -23,7 +23,7 @@ use crate::layout::fill;
 use crate::layout::row;
 use crate::layout::stack;
 use crate::look::Look;
-use crate::look::concentric;
+use crate::look::nested;
 use crate::look::radius;
 use crate::probe;
 use crate::probe::Fixed;
@@ -40,6 +40,8 @@ use crate::tokens::Type;
 const WELL_RADIUS: Radius = Radius::R16;
 /// The well's padding, and the gap between its rows.
 const WELL_INSET: Space = Space::S4;
+/// The rows' corners, concentric inside the well; a well and inset that can't be stop the build.
+const ROW_RADIUS: Radius = nested(WELL_RADIUS, WELL_INSET);
 
 /// One row of a list, built up then drawn with [`ListRow::view`].
 #[derive(Debug)]
@@ -161,7 +163,7 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
                     .into()
             });
         }
-        let corner = concentric(WELL_RADIUS, WELL_INSET).unwrap_or(Radius::R12);
+        let corner = ROW_RADIUS;
         let on_surface = c.on_surface;
         let view: Element<'a, M> = widget::button(
             widget::container(content)

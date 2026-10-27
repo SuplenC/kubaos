@@ -76,12 +76,39 @@ pub fn radius(r: Radius) -> f32 {
 /// The radius of a shape nested `inset` inside a shape of radius `outer`, so their corners share a
 /// centre: `outer` minus `inset`. `None` when that is no radius on the scale, so the nesting is
 /// either too deep for concentric corners or off the scale.
-pub fn concentric(outer: Radius, inset: Space) -> Option<Radius> {
-    if outer == Radius::Full {
+pub const fn concentric(outer: Radius, inset: Space) -> Option<Radius> {
+    if matches!(outer, Radius::Full) {
         return Some(Radius::Full);
     }
-    let inner = outer.px()?.checked_sub(inset.px())?;
-    Radius::ALL.into_iter().find(|r| r.px() == Some(inner))
+    let Some(outer_px) = outer.px() else {
+        return None;
+    };
+    let Some(inner) = outer_px.checked_sub(inset.px()) else {
+        return None;
+    };
+    let mut at = 0;
+    while at < Radius::ALL.len() {
+        if let Some(px) = Radius::ALL[at].px()
+            && px == inner
+        {
+            return Some(Radius::ALL[at]);
+        }
+        at += 1;
+    }
+    None
+}
+
+/// [`concentric`] for a nesting that must be: in a `const`, a nesting off the radius scale stops
+/// the build.
+///
+/// # Panics
+///
+/// When `outer` minus `inset` is no radius on the scale. In a `const` that is a compile error.
+pub const fn nested(outer: Radius, inset: Space) -> Radius {
+    match concentric(outer, inset) {
+        Some(inner) => inner,
+        None => panic!("the nested shape's radius is off the radius scale: the corners can't be concentric"),
+    }
 }
 
 /// The radius of the focus ring's outer edge around a control of radius `control`: concentric with
