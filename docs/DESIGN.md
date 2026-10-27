@@ -10,6 +10,8 @@ Three files hold the design, each owning one thing:
 | `docs/DESIGN.md` (this file) | The rules and their reasons: which value is for what, the components, the keyboard, focus, scaling. |
 | `docs/BRAND.md` | The words: name, voice, and how errors and buttons read. |
 
+A rule marked *Not enforced yet: lands in #N* is decided but not built: no code follows it today, and issue #N builds it. Every other rule here is what the code does.
+
 Values below are shown so this file reads on its own. Each one names its token, and the token wins: when they disagree, `design/tokens.toml` is right and this file is stale.
 
 The pictures are the specimen, `kubaos-specimen`, which draws every token and component with `kubaos-ui`. The 1× shots are checked in under `design/specimen/`; `kubaos-specimen shots DIR` renders all of them at 1, 1.25, 1.5 and 2, light and dark. The Command menu's "Design specimen" Item opens it live.
@@ -39,17 +41,17 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 - **Roles, never hex.** Code names a role (`primary`, `on_surface`, `surface_container_high`, `error`, `cold`, `warning`), never a colour. The roles are Material 3's, plus `cold` and `warning`. The palette changes with the wallpaper, so a hex value in a component is wrong the moment the wallpaper changes.
 - **Matugen derives them from the wallpaper** (`scripts/dot-theme`, `scheme-fidelity`). `[color.source]` in the tokens names the matugen colour each role comes from. `[color.dark]` and `[color.light]` are the fallback: matugen's output for the default wallpaper, used until a theme exists and in the specimen.
-- **Cold accent** (`cold`, from matugen's tertiary): the blue of the sign's dakuten. With `scheme-fidelity` tertiary is the wallpaper's complement, so cold follows the wallpaper. Use it rarely: the focus ring on picked cards, where the accent already means picked, and a demo or preview badge. It is never a second primary.
+- **Cold accent** (`cold`, from matugen's tertiary): the blue of the sign's dakuten. With `scheme-fidelity` tertiary is the wallpaper's complement, so cold follows the wallpaper. Use it rarely: the focus ring on picked cards, where the accent already means picked, and a demo or preview badge. It is never a second primary. It is configurable: the complement is the default, and the user may pick another. *Not enforced yet: lands in #154.*
 - **Warning** is ours (Material 3 has none): amber between fine and the error colour, for a reading close to its limit. It keeps its value whatever the wallpaper; the light one is dark enough for text on light surfaces.
-- **Contrast minimums** (WCAG 2.1, `kubaos_ui::color::Contrast`): 4.5:1 for body text and labels; 3:1 for large text (24 px and up, or 19 px semibold and up) and for icons, outlines and other shapes that carry meaning. `kubaos-ui`'s tests hold every pair in both fallback palettes. A custom colour that breaks a minimum is refused, not drawn.
+- **Contrast minimums** (WCAG 2.1, `kubaos_ui::color::Contrast`): 4.5:1 for body text and labels; 3:1 for large text (24 px and up, or 19 px semibold and up) and for icons, outlines and other shapes that carry meaning. `kubaos-ui`'s tests hold every pair in both fallback palettes. A custom colour that breaks a minimum is refused, not drawn. *Not enforced yet: lands in #154.*
 - **Opacities** come from `[opacity]`: the state layer (hover 0.08, focus 0.12, press 0.14), disabled content 0.38 and container 0.10, the scrim, tints. A component never picks its own alpha.
-- **Custom colours:** a seed colour, overrides of single roles, and presets (KubaOS neon among them). The contrast minimums hold for all of them.
+- **Custom colours:** a seed colour, overrides of single roles, and presets (KubaOS neon among them). The contrast minimums hold for all of them. *Not enforced yet: lands in #154.*
 
 ### Light and dark
 
-- Both ship in v1. Dark is the default. The switch is manual, with an optional sunset and sunrise schedule.
-- Each mode has its own wallpaper: a pair the user picks, or one image for both.
-- The switch crossfades by default (`slow`, 800 ms), or wipes, or is instant, as the user sets it.
+- Both ship in v1. Dark is the default. The switch is manual, with an optional sunset and sunrise schedule. *Not enforced yet: lands in #154.*
+- Each mode has its own wallpaper: a pair the user picks, or one image for both. *Not enforced yet: lands in #154.*
+- The switch crossfades by default (`slow`, 800 ms), or wipes, or is instant, as the user sets it. *Not enforced yet: lands in #154.*
 - Plymouth and GRUB are always dark. Kōbō is dark on the live ISO.
 - Geometry never changes with the mode: the light and dark shots of a page are the same boxes, and the geometry check holds them to it.
 
@@ -115,7 +117,7 @@ A single-line control's label takes the control's content box as its line height
 - **Boxes land on device pixels.** Lengths on the grid do so by themselves. A box sized by its text (a label, a chip, a toast) is a fraction of a pixel wide; `kubaos-ui` rounds every such box up to the next device pixel (`snap`), and centring rounds its offset to a whole one (`centre`). A grid splits its width in device pixels, so its columns differ by one device pixel at most (`grid`).
 - **Concentric corners.** A shape nested inside another with an inset smaller than the parent's radius takes the parent's radius minus the inset: a 24 dialog with 8 inside holds 16; a 16 list well with 4 of padding holds 12 rows. `kubaos_ui::look::concentric` computes it; a result off the radius scale means the nesting is wrong. The frame around the windows follows the same rule.
 - **Hairlines are one device pixel** at every scale (`stroke.hairline_device_px`): dividers, card, field and well outlines, the switch track. They are the one length not on the grid.
-- **The thin stroke** (`stroke.thin`, 2) is the focus ring's, the spinner's and the check mark's. It is drawn as whole device pixels, rounded half up: 2, 3, 3, 4 at 1, 1.25, 1.5, 2.
+- **The thin stroke** (`stroke.thin`, 2) is the focus ring's, the spinner's and a partial checkbox's dash. It is drawn as whole device pixels, rounded half up: 2, 3, 3, 4 at 1, 1.25, 1.5, 2. A tick (a full checkbox, a checked `ListRow`) is the `check` symbol, drawn with the symbol stroke like every other icon (see "Iconography"), so it matches the icons beside it.
 - **The focus ring stands outside its control** (`focus.offset`, 4) and takes no layout space: focus moving never moves anything, and a focusable control's edge lines up with a plain one's. Its radius is the control's plus 4, concentric. A parent that clips (a scrolled list) pads 4 so the ring shows whole.
 - **Elevation is two shadows** (`[shadow]`): `panel` and `dialog`, both 16 down and 48 blur in the `shadow` role, plus `glow` under a progress bar's fill in the fill's own colour. Nothing else casts a shadow; a surface sits higher by its container role (`surface_container` up to `surface_container_highest`), not by a stronger shadow.
 
@@ -174,7 +176,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 - **Sizes** are `[icon]`: 16, 20, 24, 32, 48. A symbol sits in a square box of its size, its ink 2 units clear inside, Tabler's margin. 16 beside small text and in chips, 20 in rows, fields and regular buttons, 24 in large buttons, dialogs and errors, 32 in empty states, 48 for a page's one big symbol.
 - **Colour** is a role. An icon's alpha becomes the SVG's opacity, so a disabled icon dims like its label.
 - **Optically centred.** A symbol's box is centred in its slot on a whole device pixel; the drawing's own optical centre is Tabler's grid, which ours follow.
-- **Apps show as uniform tiles** in our UI: the app's icon on a tile of one size and radius, so a list of apps reads as one set, whatever each vendor drew.
+- **Apps show as uniform tiles** in our UI: the app's icon on a tile of one size and radius, so a list of apps reads as one set, whatever each vendor drew. *Not enforced yet: lands in #93.*
 - **The logo** is two things, as `docs/BRAND.md` says: the neon sign photo wherever it shows large (boot splash, GRUB, Kōbō, the README), and the vector クバ mark at small sizes (icons, tray, fastfetch). The neon sign is never redrawn as a symbol, and the mark is never used large.
 - **The system icon theme** for GTK and Qt apps replaces Papirus with the theme closest to this look, picked in #152.
 
@@ -191,9 +193,31 @@ Two libraries implement one spec, with the same names:
 
 **The shared name** of each component is the PascalCase of its `kubaos-ui` constructor (`icon_button` is `IconButton`); `progress::bar` is `ProgressBar`. The QML type has that name, and the geometry check reports components by it. A front end uses only these; a raw toolkit widget (iced's `button`, Qt Quick Controls' `Button`) in an app is a lint failure.
 
+### What the geometry check compares
+
+Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
+
+<!-- variants:start -->
+| Name | Variant words | Fixed |
+|---|---|---|
+| `Button` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg`; `leading-icon` or `trailing-icon` | height |
+| `IconButton` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg` | both |
+| `Chip` | kind `Neutral`, `Selected`, `Accent`, `Cold`; `icon`; `removable` | height |
+| `ListRow` | `one-line` or `two-line`; `icon` | height |
+| `Field` | `icon` | height |
+| `Spinner` | size `16`, `20`, `24`, `32`, `48` | both |
+| `Switch` | none | both |
+| `Checkbox` | none | height |
+| `Radio` | none | height |
+| `ProgressBar` | none | height |
+| `Dialog` | tone `Normal`, `Danger` | width |
+| `ErrorBlock` | `long` | none |
+| `Page`, `Header`, `Section`, `Divider`, `Labelled`, `Note`, `List`, `EmptyList`, `Card`, `ChoiceCard`, `Toast`, `EmptyState`, `Log` | none | none |
+<!-- variants:end -->
+
 The set is **closed**. Every component takes the look (colours, mode, scale) and tokens, never a length, colour or duration of its own. A new kind, size or component changes this file first, then both libraries. **Composed blocks** (a settings row with a switch, a Wi-Fi row with its lock) are built from these, shadcn-style, in the app or the library, and add no new look.
 
-Every interactive component has these states, shown in the specimen: **resting, hovered, pressed, focused, disabled**. Hover and press lay a state layer of the content colour over the fill (`opacity.hover` 0.08, `opacity.press` 0.14, over `micro`). Focus is the focus ring. Disabled dims the content to 0.38 and the container to 0.10 and takes no input.
+Every interactive component has these states, shown in the specimen: **resting, hovered, pressed, focused, disabled**. Hover and press lay a state layer of the content colour over the fill (`opacity.hover` 0.08, `opacity.press` 0.14). The layer fades in and out over `micro`. *Not enforced yet: lands in #147 (QML) and #148 (iced; `kubaos-ui` switches it at once today).* Focus is the focus ring. Disabled dims the content to 0.38 and the container to 0.10 and takes no input.
 
 ### Layout
 
@@ -238,7 +262,7 @@ Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so 
 | `Lg` | 48 (`control_lg`) | `button_large` | 24 | 8 | 32 (16) | The one main action of a big page: Kōbō's Install. |
 
 - Every button is a pill (`radius.full`). An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon sits in a box the label's line tall, centred on a device pixel, so an icon never changes a button's height.
-- **`IconButton` is a circle as tall as the label button of its size** (32, 40, 48), in all four kinds. **Its label is a required argument.** It is the accessible name, and shows in a `Hint` (a small bubble under the control in the inverse colours, `label` type, radius 4) while the pointer is over it or the keyboard is on it. An icon alone says nothing out loud, so an icon button can't be built without its label.
+- **`IconButton` is a circle as tall as the label button of its size** (32, 40, 48), in all four kinds. **Its label is a required argument.** It is the accessible name, and shows in a `Hint` while the pointer is over it or the keyboard is on it: a bubble in the inverse colours, `label` type, padding 8 × 4, radius 4, centred under the control 4 below its focus ring (8 below the control). An icon alone says nothing out loud, so an icon button can't be built without its label.
 
 ### Inputs
 
@@ -260,7 +284,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 | `List` | `list::list` | Rows in a well: radius 16, padding 4, rows 4 apart, so the rows take radius 12 (concentric). The focus ring goes round the well; the row shows where the keyboard is. |
 | `ListRow` | `list::list_row(title)` | 44 tall with one line (`row`), 56 with a subtitle (`row_two_line`). Padding 12, a 20 icon, the title in `body_strong`, subtitle in `small`, a detail in `mono` at the end, an optional check whose room is kept when unchecked so row ends line up. The selected row takes `secondary_container`. |
 | `EmptyList` | `list::empty_list` | The well with nothing in it: one centred line. |
-| `Chip` | `chip::chip` | A short fact or pick in a pill, 24 tall (`chip`), `label` type, an optional 16 icon, an optional close. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview). |
+| `Chip` | `chip::chip` | A short fact or pick in a pill, 24 tall (`chip`), `label` type, an optional 16 icon 4 from the label, an optional close. Its left side pads 12, or 8 with an icon; its right pads 12, or nothing when the close button (a 24 circle) ends it. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview). |
 | `Card` | `card::card` | A surface inside the page: the well's surface, a soft hairline, radius 16, 16 inside. |
 | `ChoiceCard` | `card::choice_card` | One of a few cards to pick from. Picked: `secondary_container` and an accent hairline. Its focus ring is cold, since the accent already means picked. |
 
@@ -270,12 +294,12 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 |---|---|---|
 | `Dialog` | `dialog::dialog` | A question over a dimmed screen: one width (500, `dialog`), padding 32, radius 24, the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under it, the buttons 32 under that: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. |
 | `Scrim` | `dialog::scrim` | Everything behind a dialog, dimmed (`opacity.scrim`). |
-| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon, padding 16 × 12, radius 12. It arrives over `short` and leaves over `medium`. |
-| `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour, `linear`. |
-| `Spinner` | `progress::spinner` | Work that doesn't know: 16, 20 or 24, a thin arc over a faint full ring. |
-| `EmptyState` | `empty::empty_state` | A place with nothing in it: a 32 icon, a `subheading` title, a `body` line saying what to do, an optional action. Never a bare "No items". |
-| `ErrorBlock` | `error::error_block` | What broke and what to do next: a 24 error icon, the message in `subheading` (`body_strong` when long), the hint in `body`, on the error container with an error hairline, radius 16, padding 20. |
-| `Log` | `error::log` | The log behind an error or a progress bar, `mono`, newest line at the bottom, 232 tall (`log`), opened on demand. |
+| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, radius 12. It arrives over `short` and leaves over `medium`. *Not enforced yet: lands in #147 and #148 (`toast` is static today).* |
+| `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work on the `linear` curve. *Not enforced yet: lands in #147 and #148 (the bar jumps today).* |
+| `Spinner` | `progress::spinner` | Work that doesn't know: an icon size (16, 20 or 24 beside text; 32 and 48 for a page's one spinner), a thin arc over a faint full ring. The caller passes the time; the arc turns and breathes with it. |
+| `EmptyState` | `empty::empty_state` | A place with nothing in it, centred: a 32 icon, 12 below it a `subheading` title, 4 below that a `body` line saying what to do, and 16 below that an optional action. Never a bare "No items". |
+| `ErrorBlock` | `error::error_block` | What broke and what to do next: a 24 error icon, 16 from the message in `subheading` (`body_strong` past 90 characters, since a whole command line in 16 px semibold is a wall), the hint in `body` 4 under it, on the error container with an error hairline, radius 16, padding 20. |
+| `Log` | `error::log` | The log behind an error or a progress bar, `mono`, newest line at the bottom, opened on demand. The caller sets its height as an `Extent`; `log` (232) is the size the specimen and Kōbō use. |
 | `FocusRing` | `focus::focus_ring` | The ring every focusable component draws (see "Focus"). An app never draws its own. |
 
 Rules the feedback components carry:
@@ -303,15 +327,18 @@ Everything works from the keyboard, in every app, the same way. Shortcuts are on
 | Space | Toggle the focused switch, checkbox or radio; press the focused button. In a text field, a space. |
 | Esc | Go back one step: close the popup, the dialog (as its dismiss button), the panel, the menu. Never destroys anything. |
 
-Kōbō implements this map in `crates/kubaos-kobo/src/app.rs` (`translate`), the shell's lists in `config/quickshell/components/NavList.qml`. A new surface implements the whole map, not the keys it happens to need.
+A new surface implements the whole map, not the keys it happens to need. Today neither front end has all of it:
+
+- **Kōbō** (`translate` in `crates/kubaos-kobo/src/app.rs`): Tab and Shift+Tab, the arrows, Home and End, Page Up and Page Down, Enter once per press, Space, Esc. Not yet: Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K and h j k l; they land in #148.
+- **The shell's lists** (`config/quickshell/components/NavList.qml`): ↑ ↓, Ctrl+N, Ctrl+P, Ctrl+J, Ctrl+K, j and k where a list takes them, Enter. Not yet: Home, End, Page Up, Page Down, h and l; they land in #147.
 
 ### Focus
 
 - **Always visible.** The focused control draws the focus ring: 4 outside the control (`focus.offset`), concentric (the control's radius plus 4), its outer stroke `stroke.thin` rounded to whole device pixels. It is the accent, or the cold accent on a `ChoiceCard`, where the accent already means picked.
 - **Focus never moves layout.** The ring takes no space; a focused control is the same box as a resting one. The geometry check compares them.
 - **One place at a time.** The app owns where focus is and passes it to components as a flag; a list shows its focused row by its own selection, and the ring goes round the list.
-- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it; closing it puts focus back where it was.
-- Focus moves over `short` with `standard`.
+- **Focus starts on the first thing to do**: the field to type in, or the `Filled` button. Opening a dialog moves focus into it; closing it puts focus back where it was. *Not enforced yet: lands in #147 (QML) and #148 (iced).*
+- Focus moves over `short` with `standard`. *Not enforced yet: lands in #147 (QML) and #148 (iced); the ring jumps today.*
 
 ### Scaling
 
@@ -359,17 +386,19 @@ Three checks keep every front end on this file. The first two run in `cargo test
 
 ### The lint
 
-`kubaos-design lint` reads every `.qml` file and the sources of every Rust crate that depends on iced. It skips their tests and the files `kubaos-tokens` generates, which are where the values belong. Each rule fails on a value written out where a token belongs:
+`kubaos-design lint` reads every `.qml` file and the sources of every Rust crate that depends on iced. It skips their tests, the files `kubaos-tokens` generates, and `config/quickshell/theme/Theme.qml`, the shell's hand-written token file until #147 generates its replacement: those are where the values belong. Each rule fails on a value written out where a token belongs:
 
 | Rule | Fails on |
 |---|---|
 | `colour` | A hex colour string; `Qt.rgba`, `Qt.hsla` and friends; a named colour (`"white"`) bound to a colour; iced's `Color::from_rgb*` with numbers, `Color::WHITE`, `color!`, a `Color { r, g, b, a }` literal. `"transparent"` and a colour converted from a token pass. |
 | `space` | A number in a gap, padding, margin or inset: QML's `spacing`, `*Margin`, `padding`; iced's `.padding(`, `.spacing(`, `Padding`. |
-| `size` | A number in a width, height, position, stroke or icon size: QML's `width`, `implicitHeight`, `Layout.preferred*`, `border.width`, a custom `int` or `real` property named `…Size`, `…Width`; iced's `.width(`, `Length::Fixed(`, `Size::new(`, `Pixels(`. |
+| `size` | A number in a width, height, position, stroke or icon size: QML's `width`, `implicitHeight`, `Layout.preferred*`, `border.width`; iced's `.width(`, `Length::Fixed(`, `Length::from(`, `Size::new(`, `Pixels(`, `Pixels::from(`, `40.0.into()` in those places. A window's size (`size:`, `min_size`, `with_size(`) and a canvas program's own coordinates aren't layout and pass. |
 | `radius` | A number in a corner radius. |
-| `duration` | A number in QML's `duration`; iced's `Duration::from_millis(` and friends, up to the longest duration token. A longer one is a timeout or a poll, not motion. |
-| `font` | A family named in a string, a pixel or point size, a weight named in place (`Font.Medium`), a line height, letter spacing. |
+| `duration` | A number in QML's `duration` or `…Duration`; iced's `Duration::from_millis(`, `Duration::new(` and friends when they are motion: in a `mod motion`, or on a line about an animation (`DURATION`, `fade`, `.duration(`), and no longer than the longest duration token. A timeout, a poll, a caret's blink or a double-press window is behaviour, not motion. |
+| `font` | A family named in a string, a pixel or point size, a weight named in place (`Font.Medium`), a line height, letter spacing, in a binding or a `Qt.font({ … })`. |
 | `component` | A toolkit's own control where the library has the component: Qt Quick Controls' `Button`, `TextField`, `Switch` and the rest, in a file that imports them; iced's `button`, `text_input`, `text`, `checkbox`, `row`, `column`, `row!`. `kubaos-ui` and `KubaOS.Components` themselves may build on them. |
+
+**A custom number property** set to a literal counts where it is used: `property int rowH: 44` bound to a `height`, alone or in a sum, is a size, whatever it is called. One that only scales something (`parent.width * remaining`) is a factor, not a length.
 
 Zero is never a literal, and neither is halving or doubling a token (`/ 2` for a centre or a pill's radius, `Theme.spacing.md * 2` for both sides). Comments and strings that aren't colours or families are never read.
 
@@ -386,7 +415,7 @@ It only shrinks:
 
 - **A file over its count fails**, and the lint lists every violation of that rule in the file, since any of them may be the new one.
 - **A file under its count fails too**, until `just design-baseline` writes the lower count, so a fix can't be quietly undone later.
-- **No command raises a count.** A file gaining one is a hand edit to the baseline, which a reviewer sees and refuses.
+- **No command raises a count.** `kubaos-design baseline --init` writes the first baseline only when git has never had the file, so deleting it and starting again fails too. A count going up is a hand edit to the baseline, which a reviewer sees and refuses unless the lint's rules changed in the same PR.
 
 ```text
 $ just design-check
@@ -394,7 +423,7 @@ config/quickshell/modules/osd/Osd.qml: 3 radius violation(s), the baseline allow
   config/quickshell/modules/osd/Osd.qml:36:13: radius: `radius: 6`
   config/quickshell/modules/osd/Osd.qml:87:21: radius: `radius: 4`
   config/quickshell/modules/osd/Osd.qml:93:25: radius: `radius: 4`
-kubaos-design lint: 167 file(s), 874 violation(s), 873 in the baseline: FAILED
+kubaos-design lint: 166 file(s), 807 violation(s), 806 in the baseline: FAILED
 ```
 
 **A justified literal** carries a marker on its own line right above it, in the file's line comment, naming the rule and the reason:
@@ -404,7 +433,7 @@ kubaos-design lint: 167 file(s), 874 violation(s), 873 in the baseline: FAILED
 implicitSize: 22
 ```
 
-A marker allows its rules on the next code line only, and must say why after the colon. A marker with no reason, an unknown rule, or nothing below it to allow fails the lint, so markers can't pile up unread. A marker is for a value that isn't a design value (a protocol's size, an icon font in the specimen's comparison sheet). A design value that has no token gets a token.
+A marker sits on the line directly above the code it allows, with no other comment between, and allows the rules it names on that one line. It must say why after the colon. A marker with no reason, an unknown rule, or nothing below it to allow fails the lint, so markers can't pile up unread. A marker is for a value that isn't a design value (a protocol's size, an icon font in the specimen's comparison sheet). A design value that has no token gets a token.
 
 ### The geometry check
 

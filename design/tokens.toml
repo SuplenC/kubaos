@@ -33,8 +33,10 @@ scales = [1.0, 1.25, 1.5, 2.0]
 # Dividers, outlines of cards, fields and the switch track: one device pixel
 # at every scale.
 hairline_device_px = 1
-# The focus ring, the spinner's arc and the check mark: 2 logical pixels,
-# rounded half up to whole device pixels (2, 3, 3, 4 at 1, 1.25, 1.5, 2).
+# The focus ring, the spinner's arc and a partial checkbox's dash: 2 logical
+# pixels, rounded half up to whole device pixels (2, 3, 3, 4 at 1, 1.25, 1.5,
+# 2). A tick is the `check` symbol, drawn with the symbol stroke below like
+# every other icon.
 thin = 2
 # A symbol's stroke on its 24 unit grid: 2 at 24 px. At another size it
 # scales with the symbol, then rounds half up to whole device pixels, so a

@@ -140,8 +140,8 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
         tokens.stroke.hairline_device_px
     ));
     out.blank();
-    out.line("/// The focus ring's, the spinner's and the check mark's stroke in logical pixels, drawn rounded");
-    out.line("/// half up to whole device pixels.");
+    out.line("/// The stroke of the focus ring, the spinner and a partial checkbox's dash, in logical pixels,");
+    out.line("/// drawn rounded half up to whole device pixels.");
     out.line(format!("pub const STROKE_THIN: u16 = {};", tokens.stroke.thin));
     out.blank();
     out.line("/// A symbol's stroke on its 24 unit grid; drawn scaled to the symbol's size, then rounded half up to");

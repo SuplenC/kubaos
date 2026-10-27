@@ -26,8 +26,8 @@ pub const SCALES: [f32; 4] = [1.0, 1.25, 1.5, 2.0];
 /// A hairline's width in device pixels, at every scale.
 pub const HAIRLINE_DEVICE_PX: u16 = 1;
 
-/// The focus ring's, the spinner's and the check mark's stroke in logical pixels, drawn rounded
-/// half up to whole device pixels.
+/// The stroke of the focus ring, the spinner and a partial checkbox's dash, in logical pixels,
+/// drawn rounded half up to whole device pixels.
 pub const STROKE_THIN: u16 = 2;
 
 /// A symbol's stroke on its 24 unit grid; drawn scaled to the symbol's size, then rounded half up to
