@@ -110,16 +110,36 @@ A single-line control's label takes the control's content box as its line height
 | Scale | Tokens |
 |---|---|
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
-| Radii (`[radius]`) | 4, 8, 12, 16, 20, 24, and `full` for pills and circles |
+| Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
 | Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; switch 44 × 24, knob 12 off, 16 on; check 20, radio dot 8; progress 8; dialog 500; column 560; rail 236; log 232 |
 
 - **Boxes land on device pixels.** Lengths on the grid do so by themselves. A box sized by its text (a label, a chip, a toast) is a fraction of a pixel wide; `kubaos-ui` rounds every such box up to the next device pixel (`snap`), and centring rounds its offset to a whole one (`centre`). A grid splits its width in device pixels, so its columns differ by one device pixel at most (`grid`).
-- **Concentric corners.** A shape nested inside another with an inset smaller than the parent's radius takes the parent's radius minus the inset: a 24 dialog with 8 inside holds 16; a 16 list well with 4 of padding holds 12 rows. `kubaos_ui::look::concentric` computes it; a result off the radius scale means the nesting is wrong. The frame around the windows follows the same rule.
 - **Hairlines are one device pixel** at every scale (`stroke.hairline_device_px`): dividers, card, field and well outlines, the switch track. They are the one length not on the grid.
 - **The thin stroke** (`stroke.thin`, 2) is the focus ring's, the spinner's and a partial checkbox's dash. It is drawn as whole device pixels, rounded half up: 2, 3, 3, 4 at 1, 1.25, 1.5, 2. A tick (a full checkbox, a checked `ListRow`) is the `check` symbol, drawn with the symbol stroke like every other icon (see "Iconography"), so it matches the icons beside it.
 - **The focus ring stands outside its control** (`focus.offset`, 4) and takes no layout space: focus moving never moves anything, and a focusable control's edge lines up with a plain one's. Its radius is the control's plus 4, concentric. A parent that clips (a scrolled list) pads 4 so the ring shows whole.
 - **Elevation is two shadows** (`[shadow]`): `panel` and `dialog`, both 16 down and 48 blur in the `shadow` role, plus `glow` under a progress bar's fill in the fill's own colour. Nothing else casts a shadow; a surface sits higher by its container role (`surface_container` up to `surface_container_highest`), not by a stronger shadow.
+
+### Radii by role
+
+Every radius means something: what the shape is. There are three, plus full, and a component takes the one its role names. A radius that isn't a role only ever comes out of nesting.
+
+| Role | `Radius` | px | For |
+|---|---|---|---|
+| Small | `Small` | 4 | Marks inside controls: the checkbox, a hint, focus details, inline tags. |
+| Control | `Control` | 12 | Everything you click or type in: buttons, fields, list rows, menu items, chips. |
+| Surface | `Surface` | 24 | Everything that holds content: cards, dialogs, popups, toasts, panels, list wells, the screen frame. |
+| Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, the slider's thumb, avatars, badges. |
+
+- **Nesting is derived, never picked.** A shape that fills another less an inset takes the outer radius minus the inset, so both corners share a centre: `nested(outer, inset)`, which refuses an inset that reaches the outer radius (in a `const`, that stops the build). A pill in a pill is a pill.
+- **Worked examples:**
+  - A list well is a surface, 24, with 12 inside: its rows take 24 − 12 = 12, the control radius, so a row is both concentric and a control.
+  - A card filling a surface 8 in takes 24 − 8 = 16; 12 in, 12; 4 in from that 16, 12.
+  - The screen frame is a surface, 24. A window sits 8 inside it, so the window's outer edge is 24 − 8 = 16: Hyprland's `rounding = 14` plus its 2 px border.
+  - The focus ring stands 4 outside its control, so its radius is the control's plus 4: 16 around a button, 28 around a card. A pill's ring is a pill.
+- **8, 16 and 20 aren't choices.** They appear only where nesting produces them. A control placed inside content (a button in a card, a field in a dialog) isn't filling its parent, so it keeps its role; nesting is for a shape that fills one less an inset.
+- **Why roles:** six radii with no reason to pick one over another meant every surface picked its own, and nothing told a 16 card from a 16 button. A role says what the shape is, so the same thing has the same corner everywhere, and a corner that differs says it is a different thing.
+- The lint fails on a radius written as a number, a shell radius that isn't a role (`Theme.rounding.lg`), and a radius derived by hand (`outer - inset`); see "Checks".
 
 ## Motion
 
@@ -195,24 +215,25 @@ Two libraries implement one spec, with the same names:
 
 ### What the geometry check compares
 
-Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
+Each component reports its shared name, its variant (the words below that apply, in this order, joined by spaces) and the measures it fixes. The corner column is its radius role; the `Hint`, which isn't probed, is small. The `identical` rule holds every instance of one name and variant to the same fixed measures, at every scale, with its icons and label in the same place along them. A measure a component doesn't fix follows its content or its parent. `KubaOS.Components` reports the same names, words and measures. `kubaos-specimen`'s tests fail when this table and the code disagree.
 
 <!-- variants:start -->
-| Name | Variant words | Fixed |
-|---|---|---|
-| `Button` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg`; `leading-icon` or `trailing-icon` | height |
-| `IconButton` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg` | both |
-| `Chip` | kind `Neutral`, `Selected`, `Accent`, `Cold`; `icon`; `removable` | height |
-| `ListRow` | `one-line` or `two-line`; `icon` | height |
-| `Field` | `icon` | height |
-| `Spinner` | size `16`, `20`, `24`, `32`, `48` | both |
-| `Switch` | none | both |
-| `Checkbox` | none | height |
-| `Radio` | none | height |
-| `ProgressBar` | none | height |
-| `Dialog` | tone `Normal`, `Danger` | width |
-| `ErrorBlock` | `long` | none |
-| `Page`, `Header`, `Section`, `Divider`, `Labelled`, `Note`, `List`, `EmptyList`, `Card`, `ChoiceCard`, `Toast`, `EmptyState`, `Log` | none | none |
+| Name | Variant words | Fixed | Corner |
+|---|---|---|---|
+| `Button` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg`; `leading-icon` or `trailing-icon` | height | control |
+| `IconButton` | kind `Filled`, `Tonal`, `Text`, `Danger`; size `Sm`, `Md`, `Lg` | both | full |
+| `Chip` | kind `Neutral`, `Selected`, `Accent`, `Cold`; `icon`; `removable` | height | control |
+| `ListRow` | `one-line` or `two-line`; `icon` | height | control, nested 12 in a surface |
+| `Field` | `icon` | height | control |
+| `Spinner` | size `16`, `20`, `24`, `32`, `48` | both | none |
+| `Switch` | none | both | full |
+| `Checkbox` | none | height | small |
+| `Radio` | none | height | full |
+| `ProgressBar` | none | height | full |
+| `Dialog` | tone `Normal`, `Danger` | width | surface |
+| `ErrorBlock` | `long` | none | surface |
+| `List`, `EmptyList`, `Card`, `ChoiceCard`, `Toast`, `Log` | none | none | surface |
+| `Page`, `Header`, `Section`, `Divider`, `Labelled`, `Note`, `EmptyState` | none | none | none |
 <!-- variants:end -->
 
 The set is **closed**. Every component takes the look (colours, mode, scale) and tokens, never a length, colour or duration of its own. A new kind, size or component changes this file first, then both libraries. **Composed blocks** (a settings row with a switch, a Wi-Fi row with its lock) are built from these, shadcn-style, in the app or the library, and add no new look.
@@ -261,18 +282,18 @@ Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so 
 | `Md` | 40 (`control_md`) | `button` | 20 | 8 | 24 (12) | A screen's own actions; as tall as a field. |
 | `Lg` | 48 (`control_lg`) | `button_large` | 24 | 8 | 32 (16) | The one main action of a big page: Kōbō's Install. |
 
-- Every button is a pill (`radius.full`). An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon sits in a box the label's line tall, centred on a device pixel, so an icon never changes a button's height.
-- **`IconButton` is a circle as tall as the label button of its size** (32, 40, 48), in all four kinds. **Its label is a required argument.** It is the accessible name, and shows in a `Hint` while the pointer is over it or the keyboard is on it: a bubble in the inverse colours, `label` type, padding 8 × 4, radius 4, centred under the control 4 below its focus ring (8 below the control). An icon alone says nothing out loud, so an icon button can't be built without its label.
+- A label button has the control radius, 12; an icon button is a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon sits in a box the label's line tall, centred on a device pixel, so an icon never changes a button's height.
+- **`IconButton` is a circle as tall as the label button of its size** (32, 40, 48), in all four kinds. **Its label is a required argument.** It is the accessible name, and shows in a `Hint` while the pointer is over it or the keyboard is on it: a bubble in the inverse colours, `label` type, padding 8 × 4, the small radius (4), centred under the control 4 below its focus ring (8 below the control). An icon alone says nothing out loud, so an icon button can't be built without its label.
 
 ### Inputs
 
 | Name | Rust | What |
 |---|---|---|
-| `Field` | `field::field(value, placeholder)` | One line of text, 40 tall (`control_md`), radius 12, a hairline outline plus the focus ring. `body_large` text. An optional 20 icon leads it, the text starting at 40. A placeholder is a hint, never a value that looks typed. States: normal, `Invalid` (error colour, the reason in the note), `Locked` (read-only, dimmed, never focused). Passwords show bullets. |
+| `Field` | `field::field(value, placeholder)` | One line of text, 40 tall (`control_md`), the control radius (12), a hairline outline plus the focus ring. `body_large` text. An optional 20 icon leads it, the text starting at 40. A placeholder is a hint, never a value that looks typed. States: normal, `Invalid` (error colour, the reason in the note), `Locked` (read-only, dimmed, never focused). Passwords show bullets. |
 | `Labelled` | `field::labelled` | A control under its `label`-type label, with an optional small action at the label's right (Show, a small button) and an optional note under it. The label row is 32 tall whether or not it has an action, so fields side by side line up. |
 | `Note` | `field::note` | The `small` line under a field: muted, or the error colour when invalid. |
 | `Switch` | `switch::switch` | On or off, 44 × 24, the knob 12 off and 16 on, a hairline track. It takes effect at once; Space, Enter or a click toggles. |
-| `Checkbox` | `check::checkbox` | Square, 20, a hairline edge. Empty, partial (a dash, for some of a group) or full. For several independent picks that apply together. |
+| `Checkbox` | `check::checkbox` | Square, 20, the small radius (4), a hairline edge. Empty, partial (a dash, for some of a group) or full. For several independent picks that apply together. |
 | `Radio` | `check::radio` | A 20 disc with an 8 dot. One of a group, exactly one picked. |
 
 A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's Items, never a hand-rolled filter: see the QML rules in `docs/agents/code-quality.md`. A field that parses what is typed (a time, a password) isn't a search.
@@ -281,25 +302,25 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 
 | Name | Rust | What |
 |---|---|---|
-| `List` | `list::list` | Rows in a well: radius 16, padding 4, rows 4 apart, so the rows take radius 12 (concentric). The focus ring goes round the well; the row shows where the keyboard is. |
+| `List` | `list::list` | Rows in a well: the surface radius (24), padding 12, rows 4 apart, so the rows take 24 − 12 = 12, the control radius (concentric). The focus ring goes round the well; the row shows where the keyboard is. |
 | `ListRow` | `list::list_row(title)` | 44 tall with one line (`row`), 56 with a subtitle (`row_two_line`). Padding 12, a 20 icon, the title in `body_strong`, subtitle in `small`, a detail in `mono` at the end, an optional check whose room is kept when unchecked so row ends line up. The selected row takes `secondary_container`. |
 | `EmptyList` | `list::empty_list` | The well with nothing in it: one centred line. |
-| `Chip` | `chip::chip` | A short fact or pick in a pill, 24 tall (`chip`), `label` type, an optional 16 icon 4 from the label, an optional close. Its left side pads 12, or 8 with an icon; its right pads 12, or nothing when the close button (a 24 circle) ends it. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview). |
-| `Card` | `card::card` | A surface inside the page: the well's surface, a soft hairline, radius 16, 16 inside. |
-| `ChoiceCard` | `card::choice_card` | One of a few cards to pick from. Picked: `secondary_container` and an accent hairline. Its focus ring is cold, since the accent already means picked. |
+| `Chip` | `chip::chip` | A short fact or pick, 24 tall (`chip`) at the control radius, 12, which on a chip is a pill, `label` type, an optional 16 icon 4 from the label, an optional close. Its left side pads 12, or 8 with an icon; its right pads 12, or nothing when the close button (a 24 circle) ends it. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview). |
+| `Card` | `card::card` | A surface inside the page: the well's surface, a soft hairline, the surface radius (24), 16 inside. |
+| `ChoiceCard` | `card::choice_card` | One of a few cards to pick from, at the surface radius (24). Picked: `secondary_container` and an accent hairline. Its focus ring is cold, since the accent already means picked. |
 
 ### Feedback
 
 | Name | Rust | What |
 |---|---|---|
-| `Dialog` | `dialog::dialog` | A question over a dimmed screen: one width (500, `dialog`), padding 32, radius 24, the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under it, the buttons 32 under that: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. |
+| `Dialog` | `dialog::dialog` | A question over a dimmed screen: one width (500, `dialog`), padding 32, the surface radius (24), the dialog shadow. A 24 icon and a `headline` title, the `body` 12 under it, the buttons 32 under that: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. |
 | `Scrim` | `dialog::scrim` | Everything behind a dialog, dimmed (`opacity.scrim`). |
-| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, radius 12. It arrives over `short` and leaves over `medium`. *Not enforced yet: lands in #147 and #148 (`toast` is static today).* |
+| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, the surface radius (24), which on one line is a pill. It arrives over `short` and leaves over `medium`. *Not enforced yet: lands in #147 and #148 (`toast` is static today).* |
 | `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work on the `linear` curve. *Not enforced yet: lands in #147 and #148 (the bar jumps today).* |
 | `Spinner` | `progress::spinner` | Work that doesn't know: an icon size (16, 20 or 24 beside text; 32 and 48 for a page's one spinner), a thin arc over a faint full ring. The caller passes the time; the arc turns and breathes with it. |
 | `EmptyState` | `empty::empty_state` | A place with nothing in it, centred: a 32 icon, 12 below it a `subheading` title, 4 below that a `body` line saying what to do, and 16 below that an optional action. Never a bare "No items". |
-| `ErrorBlock` | `error::error_block` | What broke and what to do next: a 24 error icon, 16 from the message in `subheading` (`body_strong` past 90 characters, since a whole command line in 16 px semibold is a wall), the hint in `body` 4 under it, on the error container with an error hairline, radius 16, padding 20. |
-| `Log` | `error::log` | The log behind an error or a progress bar, `mono`, newest line at the bottom, opened on demand. The caller sets its height as an `Extent`; `log` (232) is the size the specimen and Kōbō use. |
+| `ErrorBlock` | `error::error_block` | What broke and what to do next: a 24 error icon, 16 from the message in `subheading` (`body_strong` past 90 characters, since a whole command line in 16 px semibold is a wall), the hint in `body` 4 under it, on the error container with an error hairline, the surface radius (24), padding 20. |
+| `Log` | `error::log` | The log behind an error or a progress bar, `mono`, newest line at the bottom, opened on demand. The surface radius (24). The caller sets its height as an `Extent`; `log` (232) is the size the specimen and Kōbō use. |
 | `FocusRing` | `focus::focus_ring` | The ring every focusable component draws (see "Focus"). An app never draws its own. |
 
 Rules the feedback components carry:
@@ -393,7 +414,7 @@ Three checks keep every front end on this file. The first two run in `cargo test
 | `colour` | A hex colour string; `Qt.rgba`, `Qt.hsla` and friends; a named colour (`"white"`) bound to a colour; iced's `Color::from_rgb*` with numbers, `Color::WHITE`, `color!`, a `Color { r, g, b, a }` literal. `"transparent"` and a colour converted from a token pass. |
 | `space` | A number in a gap, padding, margin or inset: QML's `spacing`, `*Margin`, `padding`; iced's `.padding(`, `.spacing(`, `Padding`. |
 | `size` | A number in a width, height, position, stroke or icon size: QML's `width`, `implicitHeight`, `Layout.preferred*`, `border.width`; iced's `.width(`, `Length::Fixed(`, `Length::from(`, `Size::new(`, `Pixels(`, `Pixels::from(`, `40.0.into()` in those places. A size given to iced's window API (`window::Settings`, `min_size`, `max_size`, `with_size(`) is the window's, not layout, and passes. Any other window size, or a canvas program's coordinates in units of its own size, carries a marker. |
-| `radius` | A number in a corner radius. |
+| `radius` | A number in a corner radius; a shell radius that isn't a role (`Theme.rounding.lg`, 16); a radius derived by hand (`outer - inset`), which `nested()` computes instead. The finding names the roles. |
 | `duration` | A number in QML's `duration` or `…Duration`; iced's `Duration::from_millis(`, `Duration::new(` and friends, up to the longest duration token (`scene`, 1200 ms): any of them could be motion, whatever it is called. A longer one can't, and passes. A shorter timeout, poll or caret blink is behaviour, not motion, and carries a `design-allow(duration)` marker saying so. |
 | `font` | A family named in a string, a pixel or point size, a weight named in place (`Font.Medium`), a line height, letter spacing, in a binding or a `Qt.font({ … })`. |
 | `component` | A toolkit's own control where the library has the component: Qt Quick Controls' `Button`, `TextField`, `Switch` and the rest, in a file that imports them; iced's `button`, `text_input`, `text`, `checkbox`, `row`, `column`, `row!`. `kubaos-ui` and `KubaOS.Components` themselves may build on them. |
@@ -420,10 +441,10 @@ It only shrinks:
 ```text
 $ just design-check
 config/quickshell/modules/osd/Osd.qml: 3 radius violation(s), the baseline allows 2; fix the new one, or mark it `// design-allow(radius): why`
-  config/quickshell/modules/osd/Osd.qml:36:13: radius: `radius: 6`
-  config/quickshell/modules/osd/Osd.qml:87:21: radius: `radius: 4`
-  config/quickshell/modules/osd/Osd.qml:93:25: radius: `radius: 4`
-kubaos-design lint: 166 file(s), 806 violation(s), 805 in the baseline: FAILED
+  config/quickshell/modules/osd/Osd.qml:36:13: radius: `radius: 6`; a radius is a role (small 4, control 12, surface 24, full) or comes from nested()
+  config/quickshell/modules/osd/Osd.qml:87:21: radius: `radius: 4`; a radius is a role (small 4, control 12, surface 24, full) or comes from nested()
+  config/quickshell/modules/osd/Osd.qml:93:25: radius: `radius: 4`; a radius is a role (small 4, control 12, surface 24, full) or comes from nested()
+kubaos-design lint: 166 file(s), 820 violation(s), 819 in the baseline: FAILED
 ```
 
 **A justified literal** carries a marker on its own line right above it, in the file's line comment, naming the rule and the reason:
