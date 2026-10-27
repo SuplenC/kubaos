@@ -1,0 +1,104 @@
+import QtQuick
+import KubaOS.Components as K
+
+// A short fact or pick, 24 tall at the control radius, which on a chip is a pill: `kubaos-ui`'s
+// `chip::chip`. The label starts where the curve ends; an icon sits closer in. A removable chip
+// ends in a close button, a circle as tall as the chip, so its hover layer shares the chip's curve.
+Item {
+    id: root
+
+    signal removed
+
+    property string text
+    // `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters) or
+    // `Cold` (rarely: a demo, a preview).
+    property string kind: "Neutral"
+    // A symbol before the label, or none.
+    property string icon: ""
+    // Whether it ends in a close button that sends `removed`.
+    property bool removable: false
+
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+    readonly property var colours: {
+        const c = Tokens.color;
+        switch (root.kind) {
+        case "Selected":
+            return [c.secondary_container, c.on_secondary_container];
+        case "Accent":
+            return [K.Look.alpha(c.primary, Tokens.opacity.tint), c.primary];
+        case "Cold":
+            return [K.Look.alpha(c.cold, Tokens.opacity.tint), c.cold];
+        default:
+            return [c.surface_container_high, c.on_surface];
+        }
+    }
+    readonly property real leftPadding: root.icon === "" ? Tokens.space.s12 : Tokens.space.s8
+    readonly property real rightPadding: root.removable ? 0 : Tokens.space.s12
+    readonly property var probe: ({
+            role: "component",
+            name: "Chip",
+            variant: [root.kind, root.icon === "" ? "" : "icon", root.removable ? "removable" : ""].filter(word => word !== "").join(" "),
+            fixed: {
+                width: false,
+                height: true
+            }
+        })
+
+    implicitWidth: K.Look.snapUp(root.leftPadding + outer.implicitWidth + root.rightPadding, root.dpr)
+    implicitHeight: Tokens.size.chip
+
+    Rectangle {
+        anchors.fill: parent
+        radius: Tokens.radius.control
+        color: root.colours[0]
+    }
+
+    K.Row {
+        id: outer
+
+        x: root.leftPadding
+        y: K.Look.snap((Tokens.size.chip - outer.implicitHeight) / 2, root.dpr)
+        align: "centre"
+
+        K.Row {
+            gap: Tokens.space.s4
+            align: "centre"
+
+            K.Icon {
+                visible: root.icon !== ""
+                name: root.icon
+                size: Tokens.icon.s16
+                color: root.colours[1]
+            }
+
+            K.Text {
+                text: root.text
+                style: Tokens.type.label
+                color: root.colours[1]
+            }
+
+            K.Pressable {
+                visible: root.removable
+                implicitWidth: Tokens.size.chip
+                implicitHeight: Tokens.size.chip
+                Accessible.name: qsTr("Remove")
+                onActivated: root.removed()
+
+                K.StateLayer {
+                    radius: Tokens.radius.full
+                    content: root.colours[1]
+                    hovered: parent.hovered
+                    pressed: parent.down
+                }
+
+                K.Icon {
+                    x: Tokens.space.s4
+                    y: Tokens.space.s4
+                    name: "close"
+                    size: Tokens.icon.s16
+                    color: root.colours[1]
+                }
+            }
+        }
+    }
+}

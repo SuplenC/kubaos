@@ -302,16 +302,27 @@ fn rust_a_widget_built_through_its_module_path_or_imported_in_a_block_is_found()
 }
 
 #[test]
-fn the_shells_hand_written_token_file_is_not_linted() {
+fn the_generated_qml_tokens_are_not_linted_and_the_shells_theme_is() {
     let dir = tempfile::tempdir().unwrap();
+    let module = dir.path().join("qml/KubaOS/Components");
     let theme = dir.path().join("config/quickshell/theme");
+    std::fs::create_dir_all(&module).unwrap();
     std::fs::create_dir_all(&theme).unwrap();
+    std::fs::write(
+        module.join("Tokens.qml"),
+        "QtObject {\n    readonly property int s4: 4\n}\n",
+    )
+    .unwrap();
     std::fs::write(theme.join("Theme.qml"), "Item {\n    radius: 8\n}\n").unwrap();
     std::fs::create_dir_all(dir.path().join("crates")).unwrap();
 
-    let files = super::files(dir.path()).unwrap();
+    let files: Vec<String> = super::files(dir.path())
+        .unwrap()
+        .into_iter()
+        .map(|(path, _)| path)
+        .collect();
 
-    assert_eq!(files, []);
+    assert_eq!(files, ["config/quickshell/theme/Theme.qml"]);
 }
 
 #[test]

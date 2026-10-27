@@ -78,6 +78,10 @@ rec {
     };
   });
 
+  # `KubaOS.Components`, the QML component library (qml/): the shell and the
+  # Command menu draw with it.
+  kubaos-components = pkgs.callPackage ../qml/package.nix { };
+
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (
     with pkgs.qt6;
@@ -87,6 +91,8 @@ rec {
       qtimageformats # webp, avif, tiff wallpapers
       # `import Kotodama`, the Command menu in config/quickshell/shell.qml.
       kotodama.qml
+      # `import KubaOS.Components`.
+      kubaos-components
     ]
   );
   # The qtct platform theme plugins Quickshell loads: its Qt, not the user's.

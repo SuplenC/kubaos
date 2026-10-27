@@ -3,7 +3,9 @@
 //!
 //! ```text
 //! design/tokens.toml ─▶ parse ─▶ rules::check ─▶ Tokens ─▶ Target::render ─▶ crates/kubaos-ui/src/tokens.rs
-//!                                                                         └▶ (QML, matugen, boot: to come)
+//!                                                                         ├▶ qml/KubaOS/Components/Tokens.qml
+//!                                                                         ├▶ qml/KubaOS/Components/Symbols.qml
+//!                                                                         └▶ (matugen, boot: to come)
 //! ```
 //!
 //! # Owns
@@ -13,11 +15,13 @@
 //!
 //! # Not here
 //!
-//! - The values: `design/tokens.toml`. Using them in iced: `kubaos-ui`.
+//! - The values: `design/tokens.toml`. Using them in iced: `kubaos-ui`; in QML,
+//!   `KubaOS.Components`.
 
 #![forbid(unsafe_code)]
 
 pub mod model;
+pub mod qml;
 pub mod rules;
 pub mod rust;
 pub mod target;

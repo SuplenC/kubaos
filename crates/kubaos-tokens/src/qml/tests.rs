@@ -1,0 +1,101 @@
+use std::path::Path;
+use std::path::PathBuf;
+
+use super::QmlSymbols;
+use super::QmlTokens;
+use super::minify;
+use super::recolourable;
+use crate::Target;
+
+const TOKENS: &str = include_str!("../../../../design/tokens.toml");
+
+fn root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn render(target: &dyn Target) -> String {
+    target
+        .render(&crate::parse(TOKENS).expect("the repo's tokens hold"), &root())
+        .expect("render the file")
+}
+
+#[test]
+fn names_stay_as_the_tokens_spell_them() {
+    let singleton = render(&QmlTokens);
+
+    assert!(singleton.contains("readonly property int control_md: 40"));
+    assert!(singleton.contains("readonly property color on_primary: tokens.role(\"on_primary\")"));
+    assert!(singleton.contains("readonly property real disabled_content: 0.38"));
+}
+
+#[test]
+fn radii_are_the_roles_and_a_pill() {
+    let singleton = render(&QmlTokens);
+
+    for role in [
+        "readonly property int small: 4",
+        "readonly property int control: 12",
+        "readonly property int surface: 24",
+        "readonly property int full: 4096",
+    ] {
+        assert!(singleton.contains(role), "{role}");
+    }
+}
+
+#[test]
+fn curves_end_at_one_one_for_bezier_splines() {
+    assert!(render(&QmlTokens).contains("readonly property list<real> emphasized_decel: [0.05, 0.7, 0.1, 1, 1, 1]"));
+}
+
+#[test]
+fn type_styles_carry_their_size_line_weight_and_family() {
+    let singleton = render(&QmlTokens);
+
+    let body = singleton
+        .find("readonly property QtObject body: QtObject {")
+        .expect("body");
+    let style = &singleton[body..body + 300];
+    assert!(style.contains("size: 14"));
+    assert!(style.contains("line: 20"));
+    assert!(style.contains("weight: 400"));
+    assert!(style.contains("family: \"Geist\""));
+}
+
+#[test]
+fn both_fallback_palettes_are_written() {
+    let singleton = render(&QmlTokens);
+
+    assert!(singleton.contains("primary: \"#ffb779\""));
+    assert!(singleton.contains("primary: \"#8b4c00\""));
+}
+
+#[test]
+fn every_symbol_is_one_line_of_svg() {
+    let symbols = render(&QmlSymbols);
+
+    let check = symbols
+        .lines()
+        .find(|line| line.trim_start().starts_with("check: "))
+        .expect("check");
+    assert!(check.contains("stroke-width=\\\"2\\\""));
+    assert!(check.contains("currentColor"));
+    assert!(!check.contains("class="));
+}
+
+#[test]
+fn minifying_drops_comments_class_names_and_runs_of_space() {
+    let svg = "<!-- ours -->\n<svg\n  class=\"icon\"\n  fill=\"none\"\n>\n  <path d=\"M0 0\" />\n</svg>\n";
+
+    assert_eq!(minify(svg), "<svg fill=\"none\"><path d=\"M0 0\" /></svg>");
+}
+
+#[test]
+fn a_drawing_without_exactly_one_stroke_and_one_colour_is_refused() {
+    let one = r#"<svg stroke="currentColor" stroke-width="2"><path d="M1 1"/></svg>"#;
+    let two_colours = r#"<svg stroke="currentColor" stroke-width="2"><path fill="currentColor"/></svg>"#;
+    let no_stroke = r#"<svg stroke="currentColor"><path d="M1 1"/></svg>"#;
+
+    assert!(recolourable(one).is_ok());
+    assert!(recolourable(two_colours).is_err());
+    assert!(recolourable(no_stroke).is_err());
+}

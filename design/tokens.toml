@@ -5,10 +5,11 @@
 #   cargo run -p kubaos-tokens -- write    regenerate every output
 #   cargo run -p kubaos-tokens -- check    fail when an output is stale
 #
-# Today the one output is the Rust module of `kubaos-ui`
-# (crates/kubaos-ui/src/tokens.rs), symbols included. The QML singleton, the matugen templates
-# and the Plymouth and GRUB values come from this same file as their front
-# ends move onto it.
+# The outputs are the Rust module of `kubaos-ui` (crates/kubaos-ui/src/tokens.rs)
+# and the `Tokens` and `Symbols` singletons of `KubaOS.Components`
+# (qml/KubaOS/Components/Tokens.qml and Symbols.qml). The matugen templates and
+# the Plymouth and GRUB values come from this same file as their front ends move
+# onto it.
 #
 # Lengths are logical pixels. The supported scales are 1, 1.25, 1.5 and 2, so
 # a length lands on whole device pixels at every one of them only when it is a

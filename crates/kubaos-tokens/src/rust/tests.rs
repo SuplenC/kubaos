@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::camel;
 use super::wrap;
 use crate::Target;
@@ -6,7 +8,10 @@ use crate::rust::RustModule;
 const TOKENS: &str = include_str!("../../../../design/tokens.toml");
 
 fn module() -> String {
-    RustModule.render(&crate::parse(TOKENS).expect("the repo's tokens hold"))
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    RustModule
+        .render(&crate::parse(TOKENS).expect("the repo's tokens hold"), &root)
+        .expect("render the module")
 }
 
 #[test]

@@ -6,8 +6,7 @@
 //!
 //! - **QML:** every `.qml` file in the repo.
 //! - **Rust:** the sources of every crate that depends on iced, less their tests.
-//! - **Never:** the files `kubaos-tokens` generates and the hand-written token files
-//!   ([`TOKEN_SOURCES`]), which are where the values belong.
+//! - **Never:** the files `kubaos-tokens` generates, which are where the values belong.
 //!
 //! A justified literal carries a marker on the line directly above it, naming the rule and the
 //! reason; it allows those rules on that one line:
@@ -162,11 +161,6 @@ pub const MARKER: &str = "design-allow(";
 /// Directories never scanned: build outputs, other checkouts, dependencies.
 const SKIPPED_DIRS: &[&str] = &[".git", "target", "node_modules", ".claude", "out", "iso", "result"];
 
-/// Hand-written token files, which hold the values a toolkit's code reads until `kubaos-tokens`
-/// generates that toolkit's copy. Like the generated files, they are where the values belong.
-// TODO(#147): drop Theme.qml once the generated QML singleton replaces it.
-pub const TOKEN_SOURCES: &[&str] = &["config/quickshell/theme/Theme.qml"];
-
 /// The QML module directory of the component library: `KubaOS.Components`. Files in it build
 /// components out of Qt's controls, so the component rule spares them.
 pub const QML_LIBRARY: &str = "KubaOS/Components/";
@@ -194,7 +188,7 @@ pub fn files(root: &Path) -> Result<Vec<(String, Language)>, Error> {
             }
         }
     }
-    found.retain(|(path, _)| !generated.contains(path.as_str()) && !TOKEN_SOURCES.contains(&path.as_str()));
+    found.retain(|(path, _)| !generated.contains(path.as_str()));
     found.sort();
     Ok(found)
 }

@@ -4,6 +4,7 @@
 //! kubaos-specimen                  the live specimen, in a window
 //! kubaos-specimen shots DIR        every page, light and dark, at 1, 1.25, 1.5 and 2, as PNG in DIR
 //! kubaos-specimen check [DIR]      the same pages held to the geometry rules; DIR gets their frames
+//! kubaos-specimen parity DIR       the QML specimen's frames in DIR held to the components page's
 //! ```
 //!
 //! # Owns
@@ -13,8 +14,8 @@
 //!
 //! # Not here
 //!
-//! - The window: [`app`]. The screenshots: [`shot`]. The geometry check: [`geometry`]. The pages:
-//!   [`pages`].
+//! - The window: [`app`]. The screenshots: [`shot`]. The geometry check and parity with QML:
+//!   [`geometry`]. The pages: [`pages`].
 
 #![forbid(unsafe_code)]
 
@@ -39,6 +40,7 @@ const USAGE: &str = "\
 usage: kubaos-specimen
        kubaos-specimen shots DIR
        kubaos-specimen check [DIR]
+       kubaos-specimen parity DIR
 
 With no arguments, the live specimen opens in a window: Tab or the arrows move between pages,
 M switches light and dark, Esc closes it.
@@ -48,7 +50,10 @@ shots  every page in light and dark at 1, 1.25, 1.5 and 2, as PNG files in DIR,
        edges fall between device pixels
 check  the same pages, light and dark at every scale, held to the geometry rules (docs/DESIGN.md,
        \"Checks\"); exit 1 on any finding. With DIR, each page's frame is written there as
-       PAGE-MODE-SCALE.json, the input `kubaos-design geometry` reads";
+       PAGE-MODE-SCALE.json, the input `kubaos-design geometry` reads
+parity the components page as `KubaOS.Components` draws it (qml/specimen/), read from DIR as
+       components-MODE-SCALEx.json for both modes at every scale: each frame held to the geometry
+       rules and to the iced page's boxes, node for node; exit 1 on any difference";
 
 /// How many of a screenshot's off-grid boxes are listed; the count says how many there are.
 const AUDIT_SHOWN: usize = 5;
@@ -69,6 +74,7 @@ fn main() -> ExitCode {
         ["shots", dir] => shots(Path::new(dir)),
         ["check"] => check(None),
         ["check", dir] => check(Some(Path::new(dir))),
+        ["parity", dir] => parity(Path::new(dir)),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
@@ -143,6 +149,30 @@ fn check(dir: Option<&Path>) -> ExitCode {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
+    }
+}
+
+fn parity(dir: &Path) -> ExitCode {
+    shot::load_fonts();
+    match geometry::parity(dir) {
+        Ok(report) => {
+            for line in &report.lines {
+                println!("{line}");
+            }
+            eprintln!(
+                "kubaos-specimen parity: {} frame(s), {} difference(s), {} finding(s)",
+                report.frames, report.differences, report.findings
+            );
+            if report.differences == 0 && report.findings == 0 {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
+        Err(err) => {
+            eprintln!("kubaos-specimen: {err}");
+            ExitCode::FAILURE
+        }
     }
 }
 

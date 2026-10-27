@@ -119,6 +119,7 @@ ColumnLayout {
         Layout.fillHeight: true
         visible: view.entered && count > 0
         vimKeys: false
+        fieldKeys: true
         model: view.entered ? engine : null
         onActivated: index => view.addAtOnce(view.spellingAt(index))
         // The Add bar takes its room from the list as it shows; the pick stays in view.
