@@ -8,7 +8,7 @@ import qs.theme
 // With `stops` (two or more), it snaps: the fill ends at one of the stops,
 // a dot marks each stop ahead of it, and `labels` names the stop in the
 // track. A drag shows the stop under the pointer and picks it on release;
-// a click, a key (Left/Right, h/l) or a wheel notch picks at once. Each pick
+// a click, a key (Left/Right, h/l, Home/End) or a wheel notch picks at once. Each pick
 // is reported through stepped(index), and `index` stays bound to the
 // service's.
 Item {
@@ -50,13 +50,18 @@ Item {
             stepped(clamped);
     }
 
-    // The stop nearest the pointer at `x`, along the travel of the fill's end.
+    // The stop whose fill ends nearest the pointer at `x`; the icon's circle is the first.
     function stopAt(x: real): int {
         const travel = width - height;
-        return travel > 0 ? Math.round((x - height / 2) / travel * last) : index;
+        return travel > 0 ? Math.round((x - height) / travel * last) : index;
     }
 
     Keys.onPressed: event => {
+        if (stepping && (event.key === Qt.Key_Home || event.key === Qt.Key_End)) {
+            step(event.key === Qt.Key_Home ? 0 : last);
+            event.accepted = true;
+            return;
+        }
         const back = event.key === Qt.Key_Left || event.key === Qt.Key_H;
         const forward = event.key === Qt.Key_Right || event.key === Qt.Key_L;
         if (!back && !forward)
@@ -76,7 +81,7 @@ Item {
         color: Theme.m3surfaceContainerHighest
 
         // A dot at each stop the fill hasn't reached, centred where the handle
-        // stands at that stop.
+        // stands at that stop, but never under the stop's name.
         Repeater {
             model: root.stepping ? root.stops : 0
 
@@ -89,7 +94,7 @@ Item {
                 height: root.tickSize
                 radius: root.tickSize / 2
                 color: Theme.m3onSurfaceVariant
-                visible: index > root.shownIndex
+                visible: index > root.shownIndex && (!label.visible || label.inside || x + width + Theme.spacing.sm <= label.x)
             }
         }
 
