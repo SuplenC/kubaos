@@ -13,6 +13,7 @@ fn violation(path: &str, line: usize, rule: Rule) -> Violation {
         column: 5,
         rule,
         what: "size: 22".to_owned(),
+        note: None,
     }
 }
 

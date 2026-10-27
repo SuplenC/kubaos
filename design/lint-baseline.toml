@@ -38,6 +38,7 @@ size = 1
 
 ["config/quickshell/components/PanelSurface.qml"]
 size = 1
+radius = 1
 
 ["config/quickshell/components/SearchField.qml"]
 size = 3
@@ -53,6 +54,7 @@ font = 1
 
 ["config/quickshell/components/Tooltip.qml"]
 size = 1
+radius = 1
 font = 1
 
 ["config/quickshell/modules/bar/ActiveWindow.qml"]
@@ -92,6 +94,7 @@ font = 1
 
 ["config/quickshell/modules/clock/ClockPopup.qml"]
 size = 7
+radius = 1
 duration = 2
 font = 9
 
@@ -112,10 +115,12 @@ duration = 1
 font = 4
 
 ["config/quickshell/modules/controlcenter/CaptureRow.qml"]
+radius = 1
 font = 1
 
 ["config/quickshell/modules/controlcenter/ControlCenter.qml"]
 size = 1
+radius = 1
 font = 3
 
 ["config/quickshell/modules/controlcenter/KeyboardAddView.qml"]
@@ -127,11 +132,13 @@ size = 4
 
 ["config/quickshell/modules/controlcenter/NotificationHistory.qml"]
 size = 3
+radius = 1
 font = 1
 
 ["config/quickshell/modules/controlcenter/QuickTile.qml"]
 space = 1
 size = 3
+radius = 2
 font = 1
 
 ["config/quickshell/modules/controlcenter/WifiList.qml"]
@@ -178,7 +185,7 @@ font = 4
 
 ["config/quickshell/modules/menu/MenuLook.qml"]
 size = 29
-radius = 2
+radius = 3
 
 ["config/quickshell/modules/menu/PaneContent.qml"]
 size = 2
@@ -197,7 +204,7 @@ font = 1
 ["config/quickshell/modules/notifications/NotificationCard.qml"]
 space = 1
 size = 9
-radius = 1
+radius = 2
 font = 3
 
 ["config/quickshell/modules/notifications/Popups.qml"]
@@ -216,10 +223,12 @@ size = 2
 
 ["config/quickshell/modules/powermenu/PowerMenu.qml"]
 size = 2
+radius = 1
 font = 1
 
 ["config/quickshell/modules/sysmon/Processes.qml"]
 size = 1
+radius = 1
 font = 4
 
 ["config/quickshell/modules/sysmon/Section.qml"]
@@ -233,7 +242,7 @@ font = 2
 ["config/quickshell/modules/wallpaper/WallpaperPicker.qml"]
 space = 1
 size = 13
-radius = 3
+radius = 5
 font = 2
 
 ["config/quickshell/modules/wallpaper/WallpaperSettings.qml"]

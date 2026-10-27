@@ -12,6 +12,8 @@
 //! - **Component:** Qt Quick Controls' own controls, in a file that imports them, where
 //!   `KubaOS.Components` has the component.
 
+use std::collections::BTreeMap;
+
 use crate::lint::Hit;
 use crate::lint::Rule;
 use crate::lint::source;
@@ -154,9 +156,12 @@ fn imports_controls(lines: &[Line]) -> bool {
 }
 
 /// Each line's hits.
-pub fn hits(lines: &[Line]) -> Vec<Vec<Hit>> {
+pub fn hits(lines: &[Line], non_role_radii: &BTreeMap<String, u16>) -> Vec<Vec<Hit>> {
     let controls = imports_controls(lines);
-    let mut hits: Vec<Vec<Hit>> = lines.iter().map(|line| line_hits(line, controls)).collect();
+    let mut hits: Vec<Vec<Hit>> = lines
+        .iter()
+        .map(|line| line_hits(line, controls, non_role_radii))
+        .collect();
     for (index, hit) in used_as_design_values(lines) {
         if !hits[index].iter().any(|h| h.column == hit.column) {
             hits[index].push(hit);
@@ -272,7 +277,7 @@ fn font_object_hits(line: &Line, hits: &mut Vec<Hit>) {
     }
 }
 
-fn line_hits(line: &Line, controls: bool) -> Vec<Hit> {
+fn line_hits(line: &Line, controls: bool, non_role_radii: &BTreeMap<String, u16>) -> Vec<Hit> {
     let mut hits = Vec::new();
     font_object_hits(line, &mut hits);
     let bare = line.bare.as_str();
@@ -354,6 +359,9 @@ fn line_hits(line: &Line, controls: bool) -> Vec<Hit> {
     let Some(rule) = rule else {
         return hits;
     };
+    if rule == Rule::Radius {
+        radius_hits(name, value, value_at, non_role_radii, &mut hits);
+    }
     for number in source::numbers(value) {
         if number.value == 0.0 || source::is_halving(value, number) || within_colour_call(value, number.column) {
             continue;
@@ -379,4 +387,35 @@ fn within_colour_call(value: &str, at: usize) -> bool {
         .iter()
         .filter_map(|call| before.rfind(call))
         .any(|start| !before[start..].contains(')'))
+}
+
+/// A radius that isn't a role: one picked from the shell's tokens by a name whose value is no role
+/// (`Theme.rounding.lg`, 16), or one derived by hand (`Theme.rounding.xl - Theme.spacing.sm`),
+/// which `nested()` computes instead.
+fn radius_hits(name: &str, value: &str, value_at: usize, non_role_radii: &BTreeMap<String, u16>, hits: &mut Vec<Hit>) {
+    const PICKED: &str = "Theme.rounding.";
+    for (at, _) in value.match_indices(PICKED) {
+        let picked: String = value[at + PICKED.len()..]
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        if let Some(px) = non_role_radii.get(&picked) {
+            hits.push(Hit {
+                column: value_at + value[..at].chars().count(),
+                rule: Rule::Radius,
+                what: format!("{name}: {PICKED}{picked} ({px})"),
+            });
+        }
+    }
+    let derived = value.match_indices('-').any(|(at, _)| {
+        let before = value[..at].trim_end();
+        before.ends_with(|c: char| c.is_alphanumeric() || c == ')' || c == '_')
+    });
+    if derived {
+        hits.push(Hit {
+            column: value_at + value.chars().take_while(|c| c.is_whitespace()).count(),
+            rule: Rule::Radius,
+            what: format!("{name}: {}", value.trim()),
+        });
+    }
 }

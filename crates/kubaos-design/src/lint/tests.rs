@@ -1,9 +1,17 @@
+use super::Context;
 use super::Rule;
 use super::scan_text;
 use super::source::Language;
 
-/// The longest duration token, `scene`.
-const SCENE_MS: u32 = 1200;
+/// The tokens' context: `scene`, the longest duration, 1200 ms; the radius roles; and a shell
+/// radius that isn't one, `Theme.rounding.lg`, 16.
+fn context() -> Context {
+    Context {
+        longest_ms: 1200,
+        roles: "small 4, control 12, surface 24, full".to_owned(),
+        non_role_radii: [("lg".to_owned(), 16)].into_iter().collect(),
+    }
+}
 
 fn qml(text: &str) -> Vec<(usize, Rule, String)> {
     found("config/quickshell/modules/x/X.qml", text, Language::Qml)
@@ -14,7 +22,7 @@ fn rust(text: &str) -> Vec<(usize, Rule, String)> {
 }
 
 fn found(path: &str, text: &str, language: Language) -> Vec<(usize, Rule, String)> {
-    let (violations, bad) = scan_text(path, text, language, SCENE_MS);
+    let (violations, bad) = scan_text(path, text, language, &context());
     assert!(bad.is_empty(), "{bad:?}");
     violations.into_iter().map(|v| (v.line, v.rule, v.what)).collect()
 }
@@ -91,7 +99,7 @@ fn the_component_library_may_build_on_qt_controls() {
         "config/quickshell/KubaOS/Components/Button.qml",
         text,
         Language::Qml,
-        SCENE_MS,
+        &context(),
     );
 
     assert_eq!(violations, []);
@@ -195,7 +203,7 @@ fn a_marker_without_a_reason_or_with_nothing_to_allow_is_bad() {
     let unknown = "Item {\n    // design-allow(pixels): why.\n    implicitSize: 22\n}\n";
 
     for text in [no_reason, nothing, unknown] {
-        let (_, bad) = scan_text("X.qml", text, Language::Qml, SCENE_MS);
+        let (_, bad) = scan_text("X.qml", text, Language::Qml, &context());
         assert_eq!(bad.len(), 1, "{text}: {bad:?}");
     }
 }
@@ -231,7 +239,7 @@ fn a_marker_only_allows_the_line_directly_below_it() {
     let text = "Item {\n    // design-allow(size): the tray's icon size is the StatusNotifierItem spec's.\n    \
                 // The icon.\n    implicitSize: 22\n}\n";
 
-    let (violations, bad) = scan_text("X.qml", text, Language::Qml, SCENE_MS);
+    let (violations, bad) = scan_text("X.qml", text, Language::Qml, &context());
 
     assert_eq!(violations.len(), 1, "{violations:?}");
     assert_eq!(bad.len(), 1, "{bad:?}");
@@ -368,4 +376,37 @@ fn a_whole_count_of_a_named_length_is_not_a_literal_and_a_count_of_a_number_is()
     let found: Vec<(usize, String)> = qml(text).into_iter().map(|(line, _, what)| (line, what)).collect();
 
     assert_eq!(found, [(4, "width: 24".to_owned()), (4, "width: 7".to_owned())]);
+}
+
+#[test]
+fn qml_a_radius_picked_from_the_shell_tokens_must_be_a_role() {
+    let text = "Item {\n    radius: Theme.rounding.lg\n    Rectangle { radius: Theme.rounding.md }\n}\n";
+
+    let found: Vec<(usize, Rule)> = qml(text).into_iter().map(|(line, rule, _)| (line, rule)).collect();
+
+    assert_eq!(found, [(2, Rule::Radius)]);
+}
+
+#[test]
+fn a_radius_derived_by_hand_is_found_in_qml_and_rust() {
+    let qml_text = "Item {\n    radius: Theme.rounding.md - Theme.spacing.xs\n    radius: height / 2\n}\n";
+    let rust_text = "fn v() {\n    let b = Border::default().rounded(outer - inset);\n    \
+                     let s = Style { radius: (r - 4.0).into(), ..x };\n}\n";
+
+    let qml_found: Vec<usize> = qml(qml_text).into_iter().map(|(line, _, _)| line).collect();
+    let rust_found: Vec<(usize, Rule)> = rust(rust_text)
+        .into_iter()
+        .map(|(line, rule, _)| (line, rule))
+        .collect();
+
+    assert_eq!(qml_found, [2]);
+    assert_eq!(rust_found, [(2, Rule::Radius), (3, Rule::Radius)]);
+}
+
+#[test]
+fn a_radius_finding_names_the_roles() {
+    let (violations, _) = scan_text("X.qml", "Item {\n    radius: 8\n}\n", Language::Qml, &context());
+
+    let message = violations[0].to_string();
+    assert!(message.contains("small 4, control 12, surface 24, full"), "{message}");
 }

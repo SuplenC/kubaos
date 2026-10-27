@@ -28,6 +28,7 @@ pub mod qml;
 pub mod rust;
 pub mod source;
 
+use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fs;
@@ -104,6 +105,8 @@ pub struct Violation {
     pub rule: Rule,
     /// What was found: `size 22`, `#1e1e2e`, `iced::widget::button`.
     pub what: String,
+    /// What the rule wants instead, where the finding alone doesn't say: the radius roles.
+    pub note: Option<String>,
 }
 
 impl fmt::Display for Violation {
@@ -112,7 +115,11 @@ impl fmt::Display for Violation {
             f,
             "{}:{}:{}: {}: `{}`",
             self.path, self.line, self.column, self.rule, self.what
-        )
+        )?;
+        match &self.note {
+            Some(note) => write!(f, "; {note}"),
+            None => Ok(()),
+        }
     }
 }
 
@@ -250,13 +257,12 @@ fn walk(dir: &Path, extension: &str) -> Result<Vec<String>, Error> {
 ///
 /// When the tokens or a file can't be read.
 pub fn scan(root: &Path) -> Result<Scan, Error> {
-    let tokens = kubaos_tokens::load(root).map_err(Error::Tokens)?;
-    let longest_ms = tokens.duration.values().map(|d| d.ms).max().unwrap_or(0);
+    let context = Context::load(root)?;
     let mut scan = Scan::default();
     for (path, language) in files(root)? {
         let absolute = root.join(&path);
         let text = fs::read_to_string(&absolute).map_err(|source| Error::read(&absolute, source))?;
-        let (violations, bad_markers) = scan_text(&path, &text, language, longest_ms);
+        let (violations, bad_markers) = scan_text(&path, &text, language, &context);
         scan.violations.extend(violations);
         scan.bad_markers.extend(bad_markers);
         scan.files.insert(path);
@@ -264,17 +270,85 @@ pub fn scan(root: &Path) -> Result<Scan, Error> {
     Ok(scan)
 }
 
-/// The violations and bad markers in one file's `text`; `path` is where it is, relative to the root,
-/// and `longest_ms` the longest duration token.
-pub fn scan_text(path: &str, text: &str, language: Language, longest_ms: u32) -> (Vec<Violation>, Vec<BadMarker>) {
+/// What the rules read from the tokens.
+#[derive(Debug, Clone, Default)]
+pub struct Context {
+    /// The longest duration token, in milliseconds: a longer duration can't be motion.
+    pub longest_ms: u32,
+    /// The radius roles as a finding names them: `small 4, control 12, surface 24, full`.
+    pub roles: String,
+    /// The shell token file's radii that aren't roles, by name: `lg` is `Theme.rounding.lg`, 16.
+    pub non_role_radii: BTreeMap<String, u16>,
+}
+
+impl Context {
+    /// The context of the repo at `root`: its tokens, and the shell's token file's radii.
+    ///
+    /// # Errors
+    ///
+    /// When the tokens can't be loaded, or the shell's token file exists and can't be read.
+    pub fn load(root: &Path) -> Result<Context, Error> {
+        let tokens = kubaos_tokens::load(root).map_err(Error::Tokens)?;
+        let r = &tokens.radius;
+        let roles = [r.small, r.control, r.surface];
+        let theme_path = root.join(SHELL_THEME);
+        let theme = match fs::read_to_string(&theme_path) {
+            Ok(text) => text,
+            Err(err) if err.kind() == io::ErrorKind::NotFound => String::new(),
+            Err(source) => return Err(Error::read(&theme_path, source)),
+        };
+        let non_role_radii = shell_radii(&theme)
+            .into_iter()
+            .filter(|(_, px)| !roles.contains(px) && *px < SHELL_FULL)
+            .collect();
+        Ok(Context {
+            longest_ms: tokens.duration.values().map(|d| d.ms).max().unwrap_or(0),
+            roles: format!(
+                "small {}, control {}, surface {}{}",
+                r.small,
+                r.control,
+                r.surface,
+                if r.full { ", full" } else { "" }
+            ),
+            non_role_radii,
+        })
+    }
+}
+
+/// The shell's hand-written token file, whose radii the QML rules check against the roles.
+const SHELL_THEME: &str = "config/quickshell/theme/Theme.qml";
+
+/// The radius the shell's token file writes for a pill: any length past every shape.
+const SHELL_FULL: u16 = 1000;
+
+/// The radii in the `rounding` object of the shell's token file, by name.
+fn shell_radii(theme: &str) -> Vec<(String, u16)> {
+    let Some(start) = theme.find("property QtObject rounding") else {
+        return Vec::new();
+    };
+    let block = &theme[start..];
+    let block = &block[..block.find('}').unwrap_or(block.len())];
+    block
+        .lines()
+        .filter_map(|line| {
+            let declaration = line.trim().strip_prefix("readonly property int ")?;
+            let (name, value) = declaration.split_once(':')?;
+            let value = value.split("//").next()?.trim().parse().ok()?;
+            Some((name.trim().to_owned(), value))
+        })
+        .collect()
+}
+
+/// The violations and bad markers in one file's `text`; `path` is where it is, relative to the root.
+pub fn scan_text(path: &str, text: &str, language: Language, context: &Context) -> (Vec<Violation>, Vec<BadMarker>) {
     let lines = source::lines(text, language);
     let in_library = match language {
         Language::Qml => path.contains(QML_LIBRARY),
         Language::Rust => path.starts_with(RUST_LIBRARY),
     };
     let hits: Vec<Vec<Hit>> = match language {
-        Language::Qml => qml::hits(&lines),
-        Language::Rust => rust::hits(&lines, longest_ms),
+        Language::Qml => qml::hits(&lines, &context.non_role_radii),
+        Language::Rust => rust::hits(&lines, context.longest_ms),
     };
     let mut violations = Vec::new();
     let mut bad_markers = Vec::new();
@@ -300,6 +374,8 @@ pub fn scan_text(path: &str, text: &str, language: Language, longest_ms: u32) ->
                 column: hit.column + 1,
                 rule: hit.rule,
                 what: hit.what.clone(),
+                note: (hit.rule == Rule::Radius && !context.roles.is_empty())
+                    .then(|| format!("a radius is a role ({}) or comes from nested()", context.roles)),
             });
         }
     }

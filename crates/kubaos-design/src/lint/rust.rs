@@ -232,6 +232,7 @@ fn line_hits(line: &Line, longest_ms: u32) -> Vec<Hit> {
             }
         }
     }
+    derived_radius_hits(bare, &mut hits);
     component_hits(bare, &mut hits);
     hits.sort_by_key(|hit| hit.column);
     // One number inside two matched calls (`.padding(Padding::new(8))`) is one literal.
@@ -388,4 +389,29 @@ fn imported_widgets(tree: &str) -> Vec<&str> {
         }
     }
     found
+}
+
+/// A corner derived by hand (`.rounded(r - inset)`, `radius: (outer - 4.0).into()`), which
+/// `kubaos_ui::look::nested` computes instead, refusing a nesting that doesn't resolve.
+fn derived_radius_hits(bare: &str, hits: &mut Vec<Hit>) {
+    for call in [".rounded(", "radius:"] {
+        for (byte, _) in bare.match_indices(call) {
+            if call == "radius:" && (!word_starts(bare, byte) || bare[byte + call.len()..].starts_with(':')) {
+                continue;
+            }
+            let open = byte + call.len();
+            let end = if call == "radius:" {
+                open + bare[open..].find([',', '}', ';']).unwrap_or(bare.len() - open)
+            } else {
+                source::close(bare, open)
+            };
+            if bare[open..end].contains(" - ") {
+                hits.push(Hit {
+                    column: bare[..byte].chars().count(),
+                    rule: Rule::Radius,
+                    what: format!("{} {}", call.trim_end_matches(['(', ':']), bare[open..end].trim()),
+                });
+            }
+        }
+    }
 }
