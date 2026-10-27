@@ -3,11 +3,12 @@
 //!
 //! ```json
 //! {"stop":"super-saver","index":0,"title":"Super Saver","source":"battery",
-//!  "dropped_from":null,"quiet":true}
+//!  "dropped_from":null,"quiet":true,"pid":4242}
 //! ```
 //!
 //! `config/quickshell/services/Power.qml` watches the file: the slider, the bar's icon, and the
-//! system monitor's slower pace while `quiet`. A missing file means no service runs.
+//! system monitor's slower pace while `quiet`. A missing file means no service runs, and so does a
+//! `pid` that is no longer the service's: the file of one killed outright stays behind.
 //!
 //! # Owns
 //!
@@ -42,6 +43,9 @@ pub struct Published {
     pub dropped_from: Option<String>,
     /// Background work waits: the system monitor samples less often.
     pub quiet: bool,
+    /// The service's process.
+    #[serde(default)]
+    pub pid: u32,
 }
 
 impl Published {
@@ -53,6 +57,7 @@ impl Published {
             source: source.key().to_owned(),
             dropped_from: dropped_from.map(|stop| stop.id().to_owned()),
             quiet,
+            pid: std::process::id(),
         }
     }
 

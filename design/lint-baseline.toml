@@ -45,8 +45,7 @@ size = 3
 radius = 1
 
 ["config/quickshell/components/StyledSlider.qml"]
-size = 6
-radius = 1
+size = 5
 
 ["config/quickshell/components/TabBar.qml"]
 size = 2

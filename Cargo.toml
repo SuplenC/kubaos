@@ -8,11 +8,11 @@
 # behind the clock popup and the menu's date answers (`kubaos-clock`), and the
 # system monitor behind the bar's pill, its popup and the menu's `cpu`, `ram`
 # and `battery` answers (`kubaos-sysmon`), the idle settings, Keep awake and the
-# scheduled power actions (`kubaos-idle`), the power stops (`kubaos-power`), where
-# each app's settings live in the
-# user layer (`kubaos-user-layer`), and the design language: the tokens'
-# generator (`kubaos-tokens`), the iced components every Rust front end draws
-# with (`kubaos-ui`), the specimen that shows them (`kubaos-specimen`), and the design checks:
+# scheduled power actions (`kubaos-idle`), the power stops (`kubaos-power`),
+# where each app's settings live in the user layer (`kubaos-user-layer`), and
+# the design language: the tokens' generator (`kubaos-tokens`), the iced
+# components every Rust front end draws with (`kubaos-ui`), the specimen that
+# shows them (`kubaos-specimen`), and the design checks:
 # the geometry rules any toolkit's boxes are held to (`kubaos-geometry`) and the `kubaos-design`
 # command, which lints UI code for literal design values and checks geometry dumps.
 [workspace]

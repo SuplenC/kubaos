@@ -49,7 +49,10 @@ Singleton {
     // none: the slider shows the pick at once, and a step on the way doesn't
     // pull it back.
     property int pending: -1
-    readonly property bool service: published !== null
+    // The process that wrote the file still runs: a service killed outright
+    // leaves its file behind, which then says nothing true.
+    property bool alive: false
+    readonly property bool service: published !== null && alive
     readonly property int profileIndex: PowerProfiles.profile === PowerProfile.PowerSaver ? 1 : PowerProfiles.profile === PowerProfile.Performance ? 3 : 2
     readonly property int index: pending >= 0 ? pending : service ? published.index : profileIndex
     readonly property string title: stops[index].title
@@ -96,10 +99,23 @@ Singleton {
             } catch (e) {
                 root.published = null;
             }
+            process.reload();
             if (root.published?.index === root.pending)
                 root.pending = -1;
         }
         onLoadFailed: root.published = null
+    }
+
+    // The writer's name, from /proc: `kubaos-power` while it runs.
+    FileView {
+        id: process
+
+        path: root.published?.pid ? `/proc/${root.published.pid}/comm` : ""
+        // Read at once, so the slider never shows the stale fallback for a frame.
+        blockLoading: true
+        printErrors: false
+        onLoaded: root.alive = text().trim() === "kubaos-power"
+        onLoadFailed: root.alive = false
     }
 
     // A file that isn't there can't be watched: the service starts beside
@@ -108,7 +124,16 @@ Singleton {
     Timer {
         interval: 2000
         repeat: true
-        running: !root.service
+        running: root.published === null
         onTriggered: file.reload()
+    }
+
+    // A dead writer leaves no event behind, so its name is asked again now
+    // and then while the file stands: one small read.
+    Timer {
+        interval: 10000
+        repeat: true
+        running: root.published !== null
+        onTriggered: process.reload()
     }
 }

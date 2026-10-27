@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Window
 import qs.theme
 
 // Horizontal slider for values in 0..1, a filled pill with the icon inside.
@@ -8,9 +9,10 @@ import qs.theme
 // With `stops` (two or more), it snaps: the fill ends at one of the stops,
 // a dot marks each stop ahead of it, and `labels` names the stop in the
 // track. A drag shows the stop under the pointer and picks it on release;
-// a click, a key (Left/Right, h/l, Home/End) or a wheel notch picks at once. Each pick
-// is reported through stepped(index), and `index` stays bound to the
-// service's.
+// a click, a key (Left/Right, h/l, Home/End) or a wheel notch picks at
+// once. Each pick is reported through stepped(index), and `index` stays bound
+// to the service's. Every edge it places lands on a device pixel at the
+// screen's scale (docs/DESIGN.md, "Boxes land on device pixels").
 Item {
     id: root
 
@@ -28,17 +30,28 @@ Item {
     // The fill's share of the track, from the circle around the icon (0) to
     // the whole track (1).
     readonly property real shown: stepping ? shownIndex / last : Math.min(1, value)
-    // The fill's width once it settles, which the label's place follows from
-    // the start of a glide, so the label never jumps halfway.
-    readonly property real fillTarget: stepping ? Math.round(height + (width - height) * shown) : Math.max(height, width * shown)
+    // Device pixels a logical one: 1.5 on the laptop panel.
+    readonly property real dpr: Screen.devicePixelRatio > 0 ? Screen.devicePixelRatio : 1
+    // The fill's width once it settles, which the label's place and the dots
+    // follow from the start of a glide, so neither jumps halfway.
+    readonly property real fillTarget: stepping ? snap(height + (width - height) * shown) : Math.max(height, width * shown)
     // A stop's dot.
     readonly property int tickSize: Theme.spacing.xs
+    // Where the stop's name settles: in the empty track after the fill while
+    // it fits there, else inside the fill before the handle.
+    readonly property bool labelInside: width - fillTarget < label.implicitWidth + Theme.spacing.lg * 2
+    readonly property real labelX: snap(labelInside ? fillTarget - Theme.spacing.sm - handle.width - Theme.spacing.md - label.implicitWidth : width - Theme.spacing.lg - label.implicitWidth)
 
     signal moved(real value)
     signal stepped(int index)
 
     implicitHeight: 36
     activeFocusOnTab: true
+
+    // `v` on the nearest device pixel.
+    function snap(v: real): real {
+        return Math.round(v * dpr) / dpr;
+    }
 
     function request(v: real): void {
         moved(Math.max(0, Math.min(1, v)));
@@ -88,13 +101,13 @@ Item {
             Rectangle {
                 required property int index
 
-                x: Math.round(track.height + (track.width - track.height) * index / root.last - Theme.spacing.sm - (handle.width + root.tickSize) / 2)
+                x: root.snap(track.height + (track.width - track.height) * index / root.last - Theme.spacing.sm - (handle.width + root.tickSize) / 2)
                 anchors.verticalCenter: parent.verticalCenter
                 width: root.tickSize
                 height: root.tickSize
                 radius: root.tickSize / 2
                 color: Theme.m3onSurfaceVariant
-                visible: index > root.shownIndex && (!label.visible || label.inside || x + width + Theme.spacing.sm <= label.x)
+                visible: index > root.shownIndex && (!label.visible || root.labelInside || x + width + Theme.spacing.sm <= root.labelX)
             }
         }
 
@@ -125,7 +138,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: 3
                 height: parent.height * (drag.pressed ? 0.6 : 0.4)
-                radius: 2
+                radius: width / 2
                 color: Theme.m3onPrimary
                 opacity: fill.width > fill.height * 1.6 ? 0.8 : 0
 
@@ -147,21 +160,17 @@ Item {
             filled: true
         }
 
-        // The stop's name: in the empty track after the fill while it fits
-        // there, else inside the fill before the handle, so it never crosses
-        // the fill's edge.
+        // The stop's name, never across the fill's edge. Inside the fill it
+        // glides with it, on device pixels so the text stays crisp.
         StyledText {
             id: label
-
-            readonly property bool inside: track.width - root.fillTarget < implicitWidth + Theme.spacing.lg * 2
 
             visible: root.stepping && text !== ""
             // The track's height, centred by the text's own alignment.
             height: parent.height
-            // Whole pixels, so the text stays crisp while it glides with the fill.
-            x: Math.round(inside ? fill.width - Theme.spacing.sm - handle.width - Theme.spacing.md - width : track.width - Theme.spacing.lg - width)
+            x: root.labelInside ? root.snap(fill.width - Theme.spacing.sm - handle.width - Theme.spacing.md - width) : root.labelX
             text: root.labels[root.shownIndex] ?? ""
-            color: inside ? Theme.m3onPrimary : Theme.m3onSurfaceVariant
+            color: root.labelInside ? Theme.m3onPrimary : Theme.m3onSurfaceVariant
         }
 
         FocusRing {
