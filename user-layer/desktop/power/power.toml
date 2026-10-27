@@ -1,0 +1,55 @@
+# Your power settings: ~/.config/kubaos/desktop/power/power.toml. The power slider's five
+# stops (Super Saver, Power Saver, Balanced, Performance, Max Performance), the charge limit and
+# the low-battery drop. The Command menu's power Items write the lines below, comments kept, and
+# apply at once. After a hand edit, run `kubaos power apply`. `kubaos power status` shows what the
+# stop you're on does, row by row.
+#
+# The stop itself isn't here: each power source remembers the stop you last chose on it, in
+# ~/.local/state/kubaos/power/stops.json.
+#
+# AMD's panel power saving dims the backlight and lifts the contrast to match, in Super Saver and
+# Power Saver. Turn it off for colour-accurate work:
+# panel_power_saving = true
+#
+# How far the battery charges: 80, 90 or 100. 80 for a laptop that lives plugged in:
+# charge_limit = 100
+#
+# At this battery level, on battery, the stop drops to Power Saver, with an Undo; "super-saver"
+# drops further, "off" leaves the stop where you put it:
+# low_battery = 20
+# low_battery_stop = "power-saver"
+#
+# Input devices (keyboards, mice, security keys) and headsets are never autosuspended. Keep other
+# USB devices awake too, by vendor:product as `lsusb` shows them, or vendor:* for any of a
+# vendor's:
+# [usb]
+# skip = ["046d:c547"]
+#
+# What the laptop panel does in a stop: "60hz", "vrr" (its native rate, refreshing slower while
+# nothing moves) or "native". External screens are never touched. `aspm` is the PCIe link power
+# policy: "default", "performance", "powersave" or "powersupersave". The last sleeps the SSD and
+# the Wi-Fi card hardest, and some drop off the bus there; if one does (`journalctl -k` shows nvme
+# or Wi-Fi resets), use "powersave" in Super Saver too. KubaOS's choice per stop:
+# [super-saver]
+# panel = "60hz"
+# aspm = "powersupersave"
+# cpu_max_mhz = 1600     # the CPU's clock cap; 0 for none
+#
+# [power-saver]
+# panel = "vrr"
+# aspm = "powersave"
+#
+# [balanced]
+# panel = "vrr"
+# aspm = "default"
+#
+# [performance]
+# panel = "native"
+# aspm = "performance"
+#
+# [max-performance]
+# panel = "native"
+# aspm = "performance"
+#
+# Full docs: docs/USING.md, "Power", and docs/CONTRACTS.md, "Defaults and the user layer"
+# (https://github.com/SuplenC/kubaos/blob/main/docs/USING.md).

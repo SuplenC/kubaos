@@ -1,0 +1,190 @@
+#!/usr/bin/env bash
+# kubaos-power-write: writes the power stops' knobs in /sys, as root.
+#
+#   kubaos-power-write KNOB=VALUE...
+#   kubaos-power-write --help
+#
+#   cpu-max=KHZ|max                    every CPU policy's scaling_max_freq; max is the CPU's top
+#   gpu-dpm=CARD:low|auto|high         amdgpu's power_dpm_force_performance_level
+#   panel-power=CONNECTOR:0-4          amdgpu's panel_power_savings on a laptop panel
+#   aspm=default|performance|powersave|powersupersave
+#                                      the PCIe ASPM policy
+#   usb=DEVICE:auto|on                 a USB device's autosuspend (power/control)
+#   wifi=INTERFACE:on|off              a Wi-Fi interface's power saving (iw)
+#   charge-profile=high_capacity|balanced|stationary
+#                                      TUXEDO's charging profile
+#   charge-end=BATTERY:50-100          a battery's charge_control_end_threshold
+#
+# The power service (`kubaos-power serve`, crates/kubaos-power) runs it through
+# pkexec (polkit action org.kubaos.power.write, system/files/polkit/), with
+# only the knobs that differ from what the stop wants. Installed as
+# /usr/local/libexec/kubaos-power-write by system/30-hardware.sh, root-owned,
+# since pkexec runs it as root.
+#
+# It is the line between the user and root, so it trusts nothing it is given:
+# each knob's name and value must match its own pattern, each device must
+# exist where the kernel lists it, and a value already in place is left alone.
+# Input and security devices (a HID or smart card interface, Yubico's vendor
+# id) and audio devices are never set to autosuspend, whatever it is asked.
+# A knob that fails is said on stderr, named on stdout (`failed KNOB=VALUE`),
+# and the rest still run; the exit is 1 when any failed, 2 for a usage error.
+set -euo pipefail
+
+# KUBAOS_POWER_ROOT points the writes at a fake /sys (the tests,
+# crates/kubaos-power/src/writes/tests.rs). pkexec clears the environment, so it
+# never reaches a run from the service.
+ROOT="${KUBAOS_POWER_ROOT:-}"
+SYS="$ROOT/sys"
+
+usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
+
+failed=0
+fail() {
+  echo "kubaos-power-write: $1" >&2
+  failed=1
+}
+
+# read_value FILE: FILE's contents on stdout, exit 1 when it can't be read.
+# Each knob reads through it in a command substitution, which `set -e`
+# doesn't stop at, so a file the kernel refuses to read fails that knob alone.
+read_value() {
+  cat -- "$1" 2>/dev/null
+}
+
+# put FILE VALUE: writes VALUE to FILE when it holds something else.
+put() {
+  local file="$1" value="$2" now
+  if [[ ! -e $file ]]; then
+    fail "$file isn't there"
+    return
+  fi
+  now="$(read_value "$file")" || { fail "couldn't read $file"; return 0; }
+  [[ $now == "$value" ]] && return
+  if ! printf '%s' "$value" 2>/dev/null >"$file"; then
+    fail "the kernel refused $value for $file"
+  fi
+}
+
+cpu_max() {
+  local value="$1" policy want
+  [[ $value == max || ($value =~ ^[0-9]{6,8}$ && $value -ge 400000 && $value -le 10000000) ]] ||
+    { fail "cpu-max=$value isn't a clock in kHz or max"; return; }
+  for policy in "$SYS"/devices/system/cpu/cpufreq/policy*; do
+    [[ -e $policy/scaling_max_freq ]] || continue
+    want="$value"
+    if [[ $want == max ]]; then
+      want="$(read_value "$policy/cpuinfo_max_freq")" || { fail "couldn't read $policy/cpuinfo_max_freq"; continue; }
+    fi
+    put "$policy/scaling_max_freq" "$want"
+  done
+}
+
+gpu_dpm() {
+  local card="${1%%:*}" level="${1#*:}"
+  [[ $card =~ ^card[0-9]+$ && $level =~ ^(low|auto|high)$ ]] || { fail "gpu-dpm=$1 isn't a card and a level"; return; }
+  put "$SYS/class/drm/$card/device/power_dpm_force_performance_level" "$level"
+}
+
+panel_power() {
+  local connector="${1%%:*}" level="${1#*:}"
+  [[ $connector =~ ^card[0-9]+-eDP-[0-9]+$ && $level =~ ^[0-4]$ ]] ||
+    { fail "panel-power=$1 isn't a laptop panel and a level"; return; }
+  put "$SYS/class/drm/$connector/amdgpu/panel_power_savings" "$level"
+}
+
+aspm() {
+  local policy="$1" file="$SYS/module/pcie_aspm/parameters/policy" now
+  [[ $policy =~ ^(default|performance|powersave|powersupersave)$ ]] || { fail "aspm=$policy isn't a policy"; return; }
+  [[ -e $file ]] || { fail "$file isn't there"; return; }
+  now="$(read_value "$file")" || { fail "couldn't read $file"; return 0; }
+  # The kernel shows every policy with the one in use in brackets.
+  [[ " $now " == *" [$policy] "* ]] && return
+  printf '%s' "$policy" 2>/dev/null >"$file" || fail "the kernel refused ASPM policy $policy (the firmware may keep ASPM for itself)"
+}
+
+# never_suspended DIR: a device with an input, security or audio interface. A
+# device it can't read counts as one: it stays awake.
+never_suspended() {
+  local dir="$1" class vendor
+  vendor="$(read_value "$dir/idVendor")" || return 0
+  [[ $vendor == 1050 ]] && return 0
+  for class in "$dir"/*:*/bInterfaceClass; do
+    [[ -e $class ]] || continue
+    class="$(read_value "$class")" || return 0
+    case "$class" in
+      03 | 0b | 01) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+usb() {
+  local device="${1%%:*}" control="${1#*:}" dir
+  [[ $device =~ ^[0-9]+-[0-9]+(\.[0-9]+)*$ && $control =~ ^(auto|on)$ ]] ||
+    { fail "usb=$1 isn't a device and auto or on"; return; }
+  dir="$SYS/bus/usb/devices/$device"
+  [[ -e $dir/idVendor ]] || { fail "there's no USB device $device"; return; }
+  if [[ $control == auto ]] && never_suspended "$dir"; then
+    fail "USB device $device is an input, security or audio device, never autosuspended"
+    return
+  fi
+  put "$dir/power/control" "$control"
+}
+
+wifi() {
+  local interface="${1%%:*}" state="${1#*:}" now
+  [[ $interface =~ ^[A-Za-z0-9_.-]{1,15}$ && $state =~ ^(on|off)$ ]] ||
+    { fail "wifi=$1 isn't an interface and on or off"; return; }
+  [[ -d $SYS/class/net/$interface/wireless ]] || { fail "$interface isn't a Wi-Fi interface"; return; }
+  command -v iw >/dev/null || { fail "iw isn't installed"; return; }
+  now="$(iw dev "$interface" get power_save 2>/dev/null || true)"
+  [[ $now == "Power save: $state" ]] && return
+  iw dev "$interface" set power_save "$state" 2>/dev/null || fail "$interface refused power saving $state"
+}
+
+charge_profile() {
+  local profile="$1"
+  [[ $profile =~ ^(high_capacity|balanced|stationary)$ ]] || { fail "charge-profile=$profile isn't a profile"; return; }
+  put "$SYS/devices/platform/tuxedo_keyboard/charging_profile/charging_profile" "$profile"
+}
+
+charge_end() {
+  local battery="${1%%:*}" percent="${1#*:}"
+  [[ $battery =~ ^BAT[0-9A-Za-z]{0,4}$ && $percent =~ ^[0-9]{2,3}$ && $percent -ge 50 && $percent -le 100 ]] ||
+    { fail "charge-end=$1 isn't a battery and a percentage from 50 to 100"; return; }
+  put "$SYS/class/power_supply/$battery/charge_control_end_threshold" "$percent"
+}
+
+if [[ ${1:-} == --help || ${1:-} == -h ]]; then
+  usage
+  exit 0
+fi
+if (($# == 0)); then
+  usage >&2
+  exit 2
+fi
+for arg in "$@"; do
+  [[ $arg == *=* ]] || { usage >&2; exit 2; }
+done
+
+# Each knob that fails is named on stdout as `failed KNOB=VALUE`, so the
+# service leaves it alone until the stop changes.
+for arg in "$@"; do
+  value="${arg#*=}"
+  failed_before="$failed"
+  failed=0
+  case "${arg%%=*}" in
+    cpu-max) cpu_max "$value" ;;
+    gpu-dpm) gpu_dpm "$value" ;;
+    panel-power) panel_power "$value" ;;
+    aspm) aspm "$value" ;;
+    usb) usb "$value" ;;
+    wifi) wifi "$value" ;;
+    charge-profile) charge_profile "$value" ;;
+    charge-end) charge_end "$value" ;;
+    *) fail "${arg%%=*} isn't a knob" ;;
+  esac
+  ((failed)) && printf 'failed %s\n' "$arg"
+  ((failed_before)) && failed=1
+done
+exit "$failed"

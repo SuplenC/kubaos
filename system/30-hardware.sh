@@ -172,6 +172,9 @@ fi
 if command -v powerprofilesctl >/dev/null && has_systemd; then
   powerprofilesctl list 2>/dev/null | sed 's/^/        /' || true
 fi
+
+step "Power stops: the root helper, its polkit rule, amdgpu's FreeSync video modes"
+install_power_helper
 fi
 
 # --------------------------------------------------------------------------

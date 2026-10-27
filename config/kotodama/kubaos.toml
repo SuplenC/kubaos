@@ -1100,3 +1100,138 @@ icon = "utilities-system-monitor"
 keywords = ["system monitor", "threshold", "temperature", "alert", "limit"]
 run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System monitor" -u critical "System monitor" "$out"', "sh", "set", "{setting}", "{value}"]
 arguments = [{ name = "setting", placeholder = "cpu-temp, ram, disk or battery-draw" }, { name = "value", placeholder = "85" }]
+
+# The power stops (crates/kubaos-power): Super Saver, Power Saver, Balanced,
+# Performance and Max Performance, the control center's slider. A stop picked
+# here is remembered for the power source you're on, battery or plugged in;
+# unplugging or plugging in moves to the stop last used on the new source.
+# The ids of the middle three are the old power profile toggles', so a `hide`
+# of them still works. "Power: what this stop does" is the Extension's own
+# Item (`power-status`): every layer of the stop, as the machine has it now.
+# The settings Items write ~/.config/kubaos/desktop/power/power.toml through
+# `kubaos-power`, which puts them to work at once and says so in a toast.
+
+[extensions.kubaos.actions.super-saver]
+title = "Super Saver"
+subtitle = "Power stop: the least power. 60 Hz, a capped CPU, background work paused. Remembered for the power source you're on"
+icon = "power-profile-power-saver"
+keywords = ["power stop", "power profile", "battery", "eco", "power saving", "max battery", "low power"]
+run = ["kubaos-power", "set", "super-saver"]
+
+[extensions.kubaos.actions.power-saver]
+title = "Power Saver"
+subtitle = "Power stop: longer battery, no CPU boost, background work paused. Remembered for the power source you're on"
+icon = "power-profile-power-saver"
+keywords = ["power stop", "power profile", "battery", "eco", "power saving"]
+run = ["kubaos-power", "set", "power-saver"]
+
+[extensions.kubaos.actions.balanced]
+title = "Balanced"
+subtitle = "Power stop: the default, boring and fine. Remembered for the power source you're on"
+icon = "power-profile-balanced"
+keywords = ["power stop", "power profile", "balanced power", "normal"]
+run = ["kubaos-power", "set", "balanced"]
+
+[extensions.kubaos.actions.performance]
+title = "Performance"
+subtitle = "Power stop: faster, hotter, the panel at full rate. Remembered for the power source you're on"
+icon = "power-profile-performance"
+keywords = ["power stop", "power profile", "fast", "turbo"]
+run = ["kubaos-power", "set", "performance"]
+
+[extensions.kubaos.actions.max-performance]
+title = "Max Performance"
+subtitle = "Power stop: everything awake, the GPU at its peak, and the battery can go to hell. Remembered for the power source you're on"
+icon = "power-profile-performance"
+keywords = ["power stop", "power profile", "fast", "turbo", "gaming", "full power", "max power"]
+run = ["kubaos-power", "set", "max-performance"]
+
+[extensions.kubaos.actions.power-undo]
+title = "Undo the low-battery drop"
+subtitle = "Back to the stop you had on battery, until you plug in"
+icon = "battery-caution"
+keywords = ["power stop", "low battery", "undo", "power saver"]
+run = ["kubaos-power", "undo"]
+
+[extensions.kubaos.actions.low-battery-power-saver]
+title = "Low battery: drop to Power Saver"
+subtitle = "At the low-battery level (20 %) on battery, the stop drops to Power Saver with an Undo; it isn't remembered as your battery stop"
+icon = "battery-caution"
+keywords = ["power stop", "low battery", "battery saver", "automatic", "20 percent"]
+run = ["kubaos-power", "low-battery", "power-saver"]
+
+[extensions.kubaos.actions.low-battery-super-saver]
+title = "Low battery: drop to Super Saver"
+subtitle = "At the low-battery level (20 %) on battery, the stop drops all the way to Super Saver, with an Undo"
+icon = "battery-caution"
+keywords = ["power stop", "low battery", "battery saver", "automatic"]
+run = ["kubaos-power", "low-battery", "super-saver"]
+
+[extensions.kubaos.actions.low-battery-off]
+title = "Low battery: don't drop"
+subtitle = "The stop stays where you put it, however low the battery goes"
+icon = "battery-caution"
+keywords = ["power stop", "low battery", "battery saver", "automatic", "off"]
+run = ["kubaos-power", "low-battery", "off"]
+
+[extensions.kubaos.actions.low-battery-level]
+title = "Low battery drop at…"
+subtitle = "The battery level the stop drops at, from 5 to 50 %"
+icon = "battery-caution"
+keywords = ["power stop", "low battery", "threshold", "percent"]
+keyword = "low-battery"
+run = ["kubaos-power", "low-battery", "{percent}"]
+arguments = [{ name = "percent", placeholder = "20" }]
+
+[extensions.kubaos.actions.panel-power-saving-off]
+title = "Panel power saving off"
+subtitle = "True colours in every stop, for colour-accurate work: the saver stops leave the panel's backlight alone"
+icon = "video-display"
+keywords = ["panel power saving", "abm", "colour accurate", "color accurate", "photo editing", "backlight"]
+run = ["kubaos-power", "panel-power-saving", "off"]
+
+[extensions.kubaos.actions.panel-power-saving-on]
+title = "Panel power saving on"
+subtitle = "Super Saver and Power Saver dim the backlight and lift the contrast to match, for longer battery"
+icon = "video-display"
+keywords = ["panel power saving", "abm", "backlight", "battery"]
+run = ["kubaos-power", "panel-power-saving", "on"]
+
+[extensions.kubaos.actions.charge-limit-80]
+title = "Charge limit: 80 %"
+subtitle = "The battery stops charging at 80 %: kinder to it on a laptop that lives plugged in"
+icon = "battery-good-charging"
+keywords = ["charge limit", "battery health", "charging", "80 percent", "stationary"]
+run = ["kubaos-power", "charge-limit", "80"]
+
+[extensions.kubaos.actions.charge-limit-90]
+title = "Charge limit: 90 %"
+subtitle = "The battery stops charging at 90 %"
+icon = "battery-good-charging"
+keywords = ["charge limit", "battery health", "charging", "90 percent"]
+run = ["kubaos-power", "charge-limit", "90"]
+
+[extensions.kubaos.actions.charge-limit-100]
+title = "Charge limit: full"
+subtitle = "The battery charges to 100 %, for a day away from the desk"
+icon = "battery-full-charging"
+keywords = ["charge limit", "battery", "charging", "full charge", "100 percent"]
+run = ["kubaos-power", "charge-limit", "100"]
+
+[extensions.kubaos.actions.power-measure]
+title = "Measure power draw"
+subtitle = "The battery's average draw over 2 minutes and what woke the machine most, as a report. Unplug first"
+icon = "utilities-system-monitor"
+keywords = ["power draw", "battery drain", "watts", "wakeups", "powertop", "measure"]
+terminal = true
+run = ["kubaos", "power", "measure"]
+
+[extensions.kubaos.actions.power-measure-for]
+title = "Measure power draw for…"
+subtitle = "As long as you say, in seconds: 60, 300"
+icon = "utilities-system-monitor"
+keywords = ["power draw", "battery drain", "watts", "wakeups", "measure"]
+keyword = "measure-power"
+terminal = true
+run = ["kubaos", "power", "measure", "--seconds", "{seconds}"]
+arguments = [{ name = "seconds", placeholder = "300" }]

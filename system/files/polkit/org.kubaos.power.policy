@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!--
+  The power stops' knobs in /sys (the CPU's clock cap, the GPU's DPM level,
+  the panel's power saving, PCIe ASPM, USB autosuspend, Wi-Fi power saving,
+  the charge limit): what `pkexec` asks before it runs
+  /usr/local/libexec/kubaos-power-write (system/files/power/) for the power
+  service, `kubaos-power serve`. An admin needs no password
+  (50-kubaos-power.rules); anyone else is asked for an admin's.
+  Installed in /usr/share/polkit-1/actions/ by system/30-hardware.sh.
+-->
+<policyconfig>
+  <vendor>KubaOS</vendor>
+  <action id="org.kubaos.power.write">
+    <description>Change the power settings of the hardware</description>
+    <message>Authentication is required to change the power settings of the processor, the screen and the devices.</message>
+    <icon_name>battery</icon_name>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/local/libexec/kubaos-power-write</annotate>
+  </action>
+</policyconfig>

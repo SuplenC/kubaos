@@ -1,11 +1,10 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Services.UPower
 import qs.theme
 import qs.services
 
-// Wi-Fi, Bluetooth, do-not-disturb, power profile, wallpaper motion and
-// keyboard layout tiles.
+// Wi-Fi, Bluetooth, do-not-disturb, wallpaper motion and keyboard layout
+// tiles. The power stops are a slider (Sliders.qml).
 GridLayout {
     id: root
 
@@ -49,15 +48,6 @@ GridLayout {
         onClicked: Notifs.toggleDnd()
     }
 
-    QuickTile {
-        Layout.fillWidth: true
-        icon: Profiles.icon
-        title: "Power profile"
-        subtitle: Profiles.nameFor(Profiles.current)
-        checked: Profiles.current !== PowerProfile.Balanced
-        onClicked: Profiles.cycle()
-    }
-
     // Always -> On AC -> Never. Remembered across restarts (services/Motion.qml).
     QuickTile {
         Layout.fillWidth: true
@@ -69,9 +59,11 @@ GridLayout {
     }
 
     // The layout in use; a click switches to the next, as the bar's pill does.
-    // The arrow lists them, to add, remove, reorder or pick the default.
+    // The arrow lists them, to add, remove, reorder or pick the default. The
+    // fifth tile, across both columns, so the grid has no hole.
     QuickTile {
         Layout.fillWidth: true
+        Layout.columnSpan: 2
         icon: "keyboard"
         title: "Keyboard"
         subtitle: Keyboard.several ? `${Keyboard.code} · ${Keyboard.active + 1} of ${Keyboard.layouts.length}` : Keyboard.code || "Layouts"

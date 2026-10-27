@@ -1,2 +1,2 @@
 # Names, not code: rustdoc may write them without backticks.
-doc-valid-idents = ["KubaOS", "PipeWire", "NetworkManager", "BlueZ", "XCursor", "XWayland", ".."]
+doc-valid-idents = ["KubaOS", "PipeWire", "NetworkManager", "BlueZ", "XCursor", "XWayland", "UPower", "PCIe", "YubiKey", "NVMe", "GameMode", ".."]

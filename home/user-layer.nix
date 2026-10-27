@@ -19,6 +19,7 @@ let
       "keyboard"
       "sysmon"
       "idle"
+      "power"
       "files"
       "wallpapers"
       "phone"

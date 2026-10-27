@@ -16,6 +16,7 @@
 //! - The recoloured pointer (`cursor`): `cursor.rs`.
 //! - The keyboard layouts (`keyboard`): `keyboard.rs`.
 //! - Packages from nixpkgs (`package`, `try`): `package.rs`.
+//! - The power stops (`power`): `power.rs`, which runs `kubaos-power`.
 //! - KubaOS's apt packages (`packages`): `apt.rs`.
 //! - Suites (`suite`): `suite.rs`.
 //! - Switch jobs (`switch`, `job`): `job.rs`.
@@ -38,6 +39,7 @@ mod install;
 mod job;
 mod keyboard;
 mod package;
+mod power;
 mod setup;
 mod suite;
 mod update;
@@ -112,6 +114,13 @@ enum Cmd {
         #[command(subcommand)]
         cmd: keyboard::KeyboardCmd,
     },
+    /// The power stops, Super Saver to Max Performance: set one, see what it does, measure it.
+    #[command(disable_help_flag = true)]
+    Power {
+        /// `set STOP`, `status`, `measure [--seconds N]`, `undo`, `charge-limit 80|90|100`, …
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 /// How a command prints its events: JSON lines for a front end to parse, or text for a human.
@@ -147,5 +156,6 @@ fn main() -> ExitCode {
         Cmd::Channel(args) => update::channel(&args),
         Cmd::Cursor { cmd } => cursor::main(cmd),
         Cmd::Keyboard { cmd } => keyboard::main(cmd),
+        Cmd::Power { args } => power::main(&args),
     }
 }

@@ -35,3 +35,7 @@ if f then
     hl.exec_cmd("notify-send -u critical 'You broke your Hyprland config' '" .. msg .. "'")
   end
 end
+
+-- The power stop's refresh rate and VRR on the laptop panel, over the panel's
+-- rule from the user layer too (monitors.lua), so a reload keeps the stop.
+pcall(dot.power_panel)

@@ -1,7 +1,7 @@
 # desktop/
 
 The desktop: Hyprland, the shell (bar, popups, Command menu look), keyboard, pointer,
-clock, system monitor, idle, files, wallpapers, the phone link and the workspace groups.
+clock, system monitor, idle, the power stops, files, wallpapers, the phone link and the workspace groups.
 
 | Folder | Files | What they change | Applies |
 |---|---|---|---|
@@ -14,6 +14,7 @@ clock, system monitor, idle, files, wallpapers, the phone link and the workspace
 | `keyboard/` | `keyboard.toml` | Layouts, Mac-style accents on Left Alt | at once from the menu; `kubaos keyboard accents apply` and `hyprctl reload` after a hand edit |
 | `sysmon/` | `sysmon.toml` | The bar's monitor pill, its style, metrics, alerts and thresholds | within a few seconds |
 | `idle/` | `idle.toml` | After how long idle the screen locks, the screens go off and it suspends, on battery and plugged in, and what closing the lid does. The Command menu's "Lock after…", "Screens off after…", "Suspend after…" and "When the lid closes…" write it | at once from the menu; `kubaos-idle apply` after a hand edit |
+| `power/` | `power.toml` | The power stops: what the laptop panel does in each, Super Saver's clock cap, USB devices kept awake, the charge limit and the low-battery drop. The Command menu's power Items write it | at once from the menu; `kubaos power apply` after a hand edit |
 | `files/` | `tidy-downloads`, `no-automount` | Flag files, no contents: one turns on the daily Tidy Downloads, the other turns off mounting drives as they're plugged in. Set them from the Command menu | at once |
 | `phone/` | `phone-link` | A flag file, no contents: the phone link is on and KDE Connect runs. "Set up a phone" in the Command menu writes it, "Turn the phone link off" removes it | at once from the menu; the next login after a hand edit |
 | | `plugins` | KDE Connect plugins a paired phone may use beyond the phone link's own, one name a line (`kdeconnect_mousepad`); every other one stays off | the next start of the phone link |

@@ -3,7 +3,8 @@
 //! lives as long as the shell, so a sample costs reading files, not starting a process.
 //!
 //! ```text
-//! out: {"type":"sample","t":...,"cpu":{...},...}          every 2 s (pill), 1 s (popup), none (paused)
+//! out: {"type":"sample","t":...,"cpu":{...},...}          every 2 s (pill), 10 s (quiet), 1 s (popup),
+//!                                                         none (paused)
 //!      {"type":"alert","id":"memory","title":...}         when an alert fires
 //! in:  {"id":1,"op":"mode","mode":"popup"}                {"id":1,"mode":"popup"}
 //!      {"id":2,"op":"process","pid":4242}                 {"id":2,"process":{...}}
@@ -53,6 +54,9 @@ use crate::settings::Settings;
 
 /// The pill's pace: fresh enough for a number in the bar, slow enough to cost nothing.
 pub const PILL_INTERVAL: Duration = Duration::from_secs(2);
+/// The pill's pace in a power saver stop, whose background work waits: a number in the bar may lag
+/// a few seconds, and five times fewer samples wake the CPU five times less.
+pub const QUIET_INTERVAL: Duration = Duration::from_secs(10);
 /// The popup's pace, for its graphs.
 pub const POPUP_INTERVAL: Duration = Duration::from_secs(1);
 /// How soon after a restart of the counters the first sample comes: enough ticks for a usage.
@@ -66,6 +70,8 @@ pub enum Mode {
     /// Light samples for the bar's pill and the alerts.
     #[default]
     Pill,
+    /// The pill's samples at a slower pace, while a power saver stop holds background work back.
+    Quiet,
     /// Detailed samples with processes, for the open popup.
     Popup,
     /// None: the screen is locked, or nothing shows them.
@@ -76,6 +82,7 @@ impl Mode {
     fn parse(name: &str) -> Option<Self> {
         match name {
             "pill" => Some(Mode::Pill),
+            "quiet" => Some(Mode::Quiet),
             "popup" => Some(Mode::Popup),
             "paused" => Some(Mode::Paused),
             _ => None,
@@ -85,6 +92,7 @@ impl Mode {
     fn name(self) -> &'static str {
         match self {
             Mode::Pill => "pill",
+            Mode::Quiet => "quiet",
             Mode::Popup => "popup",
             Mode::Paused => "paused",
         }
@@ -94,6 +102,7 @@ impl Mode {
     pub fn interval(self) -> Option<Duration> {
         match self {
             Mode::Pill => Some(PILL_INTERVAL),
+            Mode::Quiet => Some(QUIET_INTERVAL),
             Mode::Popup => Some(POPUP_INTERVAL),
             Mode::Paused => None,
         }
@@ -262,7 +271,7 @@ impl Server {
                 self.sampler.baseline(now, true);
                 Next::Soon
             }
-            (_, Mode::Pill) => Next::Now,
+            (_, Mode::Pill | Mode::Quiet) => Next::Now,
         }
     }
 }

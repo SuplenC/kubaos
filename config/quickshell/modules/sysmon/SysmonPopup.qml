@@ -388,20 +388,8 @@ Drawer {
                         text: "No battery: on mains power"
                     }
 
-                    Row {
-                        spacing: Theme.spacing.xs
-
-                        Repeater {
-                            model: Profiles.available
-
-                            Chip {
-                                required property int modelData
-
-                                label: Profiles.nameFor(modelData)
-                                selected: Profiles.current === modelData
-                                onClicked: Profiles.set(modelData)
-                            }
-                        }
+                    PowerSlider {
+                        width: parent.width
                     }
                 }
 

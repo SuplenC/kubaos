@@ -13,7 +13,7 @@ Your own settings go in `~/.config/kubaos/desktop/hypr/` (`hyprland.lua`, `hypri
 | `hyprland.lua` | Entry point, `require`s the modules below in order |
 | `fallback.lua` | Binds that never depend on Quickshell or Nix (loaded first) |
 | `env.lua` | Environment: PATH, Wayland vars for Qt/GTK/Electron/Chrome, cursor size |
-| `monitors.lua` | Every screen at its preferred mode, placed by Hyprland; the laptop panel off while the lid is closed on a dock. Your own layout: below |
+| `monitors.lua` | Every screen at its preferred mode, placed by Hyprland; the laptop panel off while the lid is closed on a dock, and its refresh rate and VRR as the power stop sets them (`dot.power_panel()`, over your own panel rule too, keeping its position and scale). Your own layout: below |
 | `workspaces.lua` | Per-screen workspaces: each screen has its own 1-10 (a block of ten ids, the laptop's first), joins another on unplug and returns on replug, and the screens pinned to a group in `~/.config/kubaos/desktop/workspaces/groups.toml`. `workspace_blocks.lua` is its bookkeeping, tested by `test/lua/workspaces_test.lua` |
 | `input.lua` | Keyboard layouts from `~/.config/kubaos/desktop/keyboard/keyboard.toml`, else `/etc/default/keyboard` (`us` without either), repeat rate, touchpad, gestures, the `kubaos:mac-accents` XKB option |
 | `accents.lua` | The Mac-style accents' cheat sheet for the Shortcuts View, while they are on |

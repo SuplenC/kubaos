@@ -1,0 +1,20 @@
+// Lets an admin at the machine change the power stops' hardware knobs without
+// a password: the power service (`kubaos-power serve`, a systemd user unit)
+// runs /usr/local/libexec/kubaos-power-write through pkexec (action
+// org.kubaos.power.write, org.kubaos.power.policy) at every stop, every plug
+// and unplug, and at login. It runs without an agent able to ask, so with no
+// rule pkexec would answer "Not authorized" with no prompt at all. A process
+// of the user manager counts as the user's local, active session: polkit
+// falls back to the user's display session (sd_uid_get_display) for a process
+// outside any session. The helper writes only the knobs it knows, to values
+// it checks itself, and never makes an input device autosuspend.
+// Installed as /etc/polkit-1/rules.d/50-kubaos-power.rules by
+// system/30-hardware.sh.
+// https://www.freedesktop.org/software/polkit/docs/latest/polkit.8.html
+polkit.addRule(function (action, subject) {
+  if (action.id == "org.kubaos.power.write" &&
+      subject.local && subject.active &&
+      (subject.isInGroup("sudo") || subject.isInGroup("admin"))) {
+    return polkit.Result.YES;
+  }
+});

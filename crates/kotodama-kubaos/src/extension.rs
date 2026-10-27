@@ -7,14 +7,14 @@
 //! - Which Items there are under the current config, `hide` applied, and what the update check
 //!   changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position, a drive or an idle setting.
+//!   user folder, a desk position, a drive, an idle setting or the power stop's status.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
 //!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
 //!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`]. The
-//!   idle settings: [`crate::idle`].
+//!   idle settings: [`crate::idle`]. The power stop's status: [`crate::power`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -23,6 +23,9 @@ use kotodama_extension::Chain;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemRef;
 use kotodama_protocol::Table;
+use kubaos_power::live::Now;
+use kubaos_power::machine::Machine;
+use kubaos_power::settings::Settings as PowerSettings;
 
 use crate::bus::Bus;
 use crate::desk;
@@ -34,6 +37,7 @@ use crate::files::UserFolders;
 use crate::idle;
 use crate::keyboard;
 use crate::keyboard::Keyboards;
+use crate::power;
 use crate::registry;
 use crate::registry::Registry;
 use crate::run::Runner;
@@ -82,6 +86,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .chain(keyboard::ids())
             .chain(idle::ids())
+            .chain(power::ids())
             .collect();
         let (registry, problems) = Registry::from_config(config, &reserved);
         self.registry = registry;
@@ -118,9 +123,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.desk = desk;
     }
 
-    /// The Items to index: the actions, the toggles, the idle settings, the keyboard Items, the
-    /// wallpaper sets, the user folders, the desk positions and the drives `hide` leaves in, the
-    /// update actions as the update check has them.
+    /// The Items to index: the actions, the toggles, the idle settings, the power stop's status,
+    /// the keyboard Items, the wallpaper sets, the user folders, the desk positions and the drives
+    /// `hide` leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -152,11 +157,13 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
+        let power = Some(power::item()).filter(|item| !self.registry.hides(&item.id));
         self.registry
             .items()
             .filter_map(|item| self.pending.apply(item))
             .chain(toggles)
             .chain(idle)
+            .chain(power)
             .chain(keyboards)
             .chain(wallpapers)
             .chain(folders)
@@ -197,6 +204,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
                 idle::run(&item.id, arguments, &idle_settings(), &self.runner)
             }
             idle::CHOICE_KIND => idle::choose(&item.id, action, &self.runner),
+            power::KIND if action == power::SHOW && !self.registry.hides(&item.id) => {
+                Ok(Ran::Push(power::view(&power_now())))
+            }
             _ => Err(unknown()),
         }
     }
@@ -208,6 +218,17 @@ fn idle_settings() -> kubaos_idle::settings::Settings {
     kubaos_idle::settings::path()
         .and_then(|path| kubaos_idle::settings::Settings::load(&path).ok())
         .unwrap_or_default()
+}
+
+/// The power stop now, under the settings as the file has them; a file that doesn't read is
+/// KubaOS's defaults, and the View's title says why.
+fn power_now() -> Now {
+    let (settings, problem) = match kubaos_power::settings::path().map(|path| PowerSettings::load(&path)) {
+        Some(Ok(settings)) => (settings, None),
+        Some(Err(err)) => (PowerSettings::default(), Some(Chain(&err).to_string())),
+        None => (PowerSettings::default(), None),
+    };
+    kubaos_power::live::read(&settings, problem.as_deref(), &Machine::real())
 }
 
 #[cfg(test)]

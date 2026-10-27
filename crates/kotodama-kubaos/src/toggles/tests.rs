@@ -116,17 +116,6 @@ fn bluetooth_without_an_adapter_says_so() {
 }
 
 #[test]
-fn a_power_profile_becomes_the_active_one() {
-    let mut bus = FakeBus::default();
-
-    Toggle::PowerSaver
-        .run(RUN, &none(), &mut bus, &FakeRunner::default())
-        .unwrap();
-
-    assert_eq!(bus.strings[&key(&POWER_PROFILE)], "power-saver");
-}
-
-#[test]
 fn mute_toggles_the_default_sink() {
     let runner = FakeRunner::default();
 

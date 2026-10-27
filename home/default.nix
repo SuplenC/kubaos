@@ -14,6 +14,7 @@
     ./desktop.nix
     ./files.nix
     ./idle.nix
+    ./power.nix
     ./menu.nix
     ./phone.nix
     ./secrets.nix
