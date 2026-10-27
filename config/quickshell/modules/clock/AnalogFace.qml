@@ -1,15 +1,17 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 
 // An analog face in the theme's colours: twelve ticks, hour and minute hands
 // in the primary roles, the second hand in tertiary. Rectangles turned about
-// the centre, so a tick redraws three items and runs no script.
+// the centre, so a tick redraws three items and runs no script. The quarter
+// ticks are a thin stroke, the others a hairline, both on whole device pixels.
 Item {
     id: root
 
     required property date time
-    property real size: 112
+    property int size: K.Tokens.icon.s48 * 2
 
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property real hours: time.getHours() % 12 + time.getMinutes() / 60
     readonly property real minutes: time.getMinutes() + time.getSeconds() / 60
 
@@ -18,10 +20,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: width / 2
-        color: Theme.m3surfaceContainerHigh
-        border.width: 1
-        border.color: Theme.m3outlineVariant
+        radius: K.Tokens.radius.full
+        color: K.Tokens.color.surface_container_high
+        border.width: K.Look.hairline(root.dpr)
+        border.color: K.Tokens.color.outline_variant
     }
 
     Repeater {
@@ -29,50 +31,52 @@ Item {
 
         Item {
             required property int index
+            readonly property bool quarter: index % 3 === 0
 
             anchors.fill: parent
             rotation: index * 30
 
             Rectangle {
                 x: (root.size - width) / 2
-                y: 6
-                width: index % 3 === 0 ? 3 : 2
-                height: index % 3 === 0 ? 9 : 5
-                radius: width / 2
-                color: index % 3 === 0 ? Theme.m3onSurfaceVariant : Theme.m3outline
+                y: K.Tokens.space.s4
+                width: parent.quarter ? K.Look.thin(root.dpr) : K.Look.hairline(root.dpr)
+                height: parent.quarter ? K.Tokens.space.s8 : K.Tokens.space.s4
+                radius: K.Tokens.radius.full
+                color: parent.quarter ? K.Tokens.color.on_surface_variant : K.Tokens.color.outline
             }
         }
     }
 
     Hand {
         length: root.size * 0.27
-        thickness: 4
-        color: Theme.m3primary
+        thickness: K.Tokens.space.s4
+        color: K.Tokens.color.primary
         angle: root.hours * 30
     }
 
     Hand {
         length: root.size * 0.38
-        thickness: 3
-        color: Theme.m3onSurface
+        thickness: K.Look.thin(root.dpr)
+        color: K.Tokens.color.on_surface
         angle: root.minutes * 6
     }
 
     Hand {
         length: root.size * 0.42
-        thickness: 1.5
-        color: Theme.m3tertiary
+        thickness: K.Look.hairline(root.dpr)
+        color: K.Tokens.color.tertiary
         angle: root.time.getSeconds() * 6
     }
 
     Rectangle {
         anchors.centerIn: parent
-        width: 8
-        height: 8
-        radius: 4
-        color: Theme.m3tertiary
+        width: K.Tokens.space.s8
+        height: K.Tokens.space.s8
+        radius: K.Tokens.radius.full
+        color: K.Tokens.color.tertiary
     }
 
+    // A hand from the centre out to `length`, reaching a little past the centre behind it.
     component Hand: Item {
         id: hand
 
@@ -88,8 +92,8 @@ Item {
             x: (root.size - width) / 2
             y: root.size / 2 - hand.length
             width: hand.thickness
-            height: hand.length + 6
-            radius: width / 2
+            height: hand.length + K.Tokens.space.s4
+            radius: K.Tokens.radius.full
             color: hand.color
             antialiasing: true
         }

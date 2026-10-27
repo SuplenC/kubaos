@@ -1,5 +1,5 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -13,13 +13,11 @@ import qs.services
 // Enter copies the answer, or the picked day; Ctrl+Enter its ISO form. Esc
 // clears the search, leaves the year or the settings, then closes.
 //
-// It glides in as the Command menu does (Kōbō's 220 ms on emphasized
-// decelerate), and so do the months and the year view inside it.
+// It arrives and leaves as every panel does. Its columns are the month, a
+// regular control a day, and the rail's width for countdowns and the tools.
 Drawer {
     id: root
 
-    readonly property int glide: 220
-    readonly property list<real> arrive: Theme.anim.emphasizedDecel
     readonly property var kanji: ["日", "月", "火", "水", "木", "金", "土"]
 
     property string page: "main"
@@ -31,19 +29,20 @@ Drawer {
     property int querySeq: 0
     property string countdownError: ""
     property string copied: ""
+    // The search's text before its last change: a `t` typed into an empty search also goes to
+    // today.
+    property string lastQuery: ""
 
     readonly property date now: Time.now
     readonly property var today: Time.state.today ?? null
     readonly property bool analog: !!Time.settings.analog
-    readonly property int columnGap: Theme.spacing.xl
-    readonly property int pad: Theme.spacing.xl
+    readonly property int columnGap: K.Tokens.space.s20
+    readonly property int pad: K.Tokens.space.s20
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
     edge: "top"
     align: 0.5
-    enterDuration: glide
-    enterCurve: arrive
-    exitDuration: 120
-    contentWidth: grid.implicitWidth + side.width + columnGap + pad * 2
+    contentWidth: grid.implicitWidth + K.Tokens.size.rail + columnGap + pad * 2
     contentHeight: body.implicitHeight + pad * 2
 
     onShownChanged: Time.seconds = shown
@@ -51,7 +50,7 @@ Drawer {
     Keys.onEscapePressed: event => {
         if (page === "settings") {
             page = "main";
-            search.focusInput();
+            search.forceActiveFocus();
         } else if (grid.yearView) {
             grid.yearView = false;
         } else {
@@ -65,7 +64,7 @@ Drawer {
         grid.yearView = false;
         goToday(false);
         apply();
-        search.focusInput();
+        search.forceActiveFocus();
     }
 
     // What `qs ipc call clock ...` asked for: a page, a tool, a search.
@@ -197,155 +196,156 @@ Drawer {
         onTriggered: root.copied = ""
     }
 
-    Column {
+    K.Stack {
         id: body
 
         x: root.pad
         y: root.pad
         width: root.contentWidth - root.pad * 2
-        spacing: Theme.spacing.lg
+        room: width
+        fill: true
+        gap: K.Tokens.space.s16
 
         // The time, the date, the week and the day of the year.
-        Item {
-            width: parent.width
-            height: Math.max(time.height, root.analog ? face.height : 0)
+        K.Row {
+            fill: true
 
-            AnalogFace {
-                id: face
+            K.Row {
+                gap: K.Tokens.space.s20
+                align: "centre"
 
-                visible: root.analog
-                time: root.now
-                size: 96
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            Column {
-                id: time
-
-                anchors.left: root.analog ? face.right : parent.left
-                anchors.leftMargin: root.analog ? Theme.spacing.xl : 0
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.spacing.xxs
-
-                Row {
-                    spacing: Theme.spacing.md
-
-                    StyledText {
-                        id: hhmm
-
-                        text: Qt.formatDateTime(root.now, Time.clockFormat)
-                        font.pixelSize: 56
-                        font.weight: Font.Light
-                        font.features: Theme.font.tabular
-                    }
-
-                    StyledText {
-                        anchors.baseline: hhmm.baseline
-                        text: Qt.formatDateTime(root.now, Time.twelveHour ? "ss AP" : "ss")
-                        font.pixelSize: Theme.font.xxl
-                        font.weight: Font.Light
-                        font.features: Theme.font.tabular
-                        color: Theme.m3onSurfaceVariant
-                    }
+                AnalogFace {
+                    visible: root.analog
+                    time: root.now
                 }
 
-                Row {
-                    spacing: Theme.spacing.sm
+                K.Stack {
+                    gap: K.Tokens.space.s4
 
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root.kanji[root.now.getDay()]
-                        color: Theme.m3tertiary
-                        font.family: Theme.font.jp
-                        font.pixelSize: Theme.font.xl
-                        font.weight: Font.Bold
-                        renderType: Text.NativeRendering
+                    K.Row {
+                        gap: K.Tokens.space.s12
+
+                        // It changes once a minute, so it keeps its own width; the seconds hold
+                        // still beside it in between.
+                        K.Text {
+                            id: hhmm
+
+                            text: Qt.formatDateTime(root.now, Time.clockFormat)
+                            style: K.Tokens.type.hero_number
+                        }
+
+                        // The seconds on the time's baseline.
+                        Item {
+                            implicitWidth: ss.implicitWidth
+                            implicitHeight: hhmm.implicitHeight
+
+                            Figure {
+                                id: ss
+
+                                y: K.Look.snap(root.baselineOf(heroMetrics, K.Tokens.type.hero_number) - root.baselineOf(secondsMetrics, K.Tokens.type.headline), root.dpr)
+                                text: Qt.formatDateTime(root.now, Time.twelveHour ? "ss AP" : "ss")
+                                style: K.Tokens.type.headline
+                                color: K.Tokens.color.on_surface_variant
+                            }
+                        }
                     }
 
-                    StyledText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: Qt.formatDateTime(root.now, Time.fullDateFormat)
-                        font.pixelSize: Theme.font.lg
-                    }
-                }
+                    K.Row {
+                        gap: K.Tokens.space.s8
+                        align: "centre"
 
-                StyledText {
-                    text: root.today ? `Day ${root.today.dayOfYear} · Week ${root.today.week}` : ""
-                    font.pixelSize: Theme.font.sm
-                    font.features: Theme.font.tabular
-                    color: Theme.m3onSurfaceVariant
+                        K.Text {
+                            text: root.kanji[root.now.getDay()]
+                            style: K.Tokens.type.accent
+                            color: K.Tokens.color.tertiary
+                        }
+
+                        K.Text {
+                            text: Qt.formatDateTime(root.now, Time.fullDateFormat)
+                            style: K.Tokens.type.body_large
+                        }
+                    }
+
+                    K.Text {
+                        text: root.today ? `Day ${root.today.dayOfYear} · Week ${root.today.week}` : ""
+                        style: K.Tokens.type.small
+                        color: K.Tokens.color.on_surface_variant
+                    }
                 }
             }
 
-            IconButton {
-                anchors.right: parent.right
-                anchors.top: parent.top
+            K.Fill {}
+
+            K.IconButton {
                 icon: root.page === "settings" ? "close" : "settings"
-                toggled: root.page === "settings"
-                tooltip: root.page === "settings" ? "Back" : "Calendar settings"
-                onClicked: {
+                label: root.page === "settings" ? qsTr("Back") : qsTr("Calendar settings")
+                kind: root.page === "settings" ? "Filled" : "Text"
+                onActivated: {
                     root.page = root.page === "settings" ? "main" : "settings";
                     if (root.page === "main")
-                        search.focusInput();
+                        search.forceActiveFocus();
                 }
             }
         }
 
         // The extra clocks: the time there, how far off, day or night.
         Flow {
+            readonly property bool fillWidth: true
+
             visible: (Time.state.clocks ?? []).length > 0 && root.page === "main"
-            width: parent.width
-            spacing: Theme.spacing.sm
+            spacing: K.Tokens.space.s8
 
             Repeater {
                 model: Time.state.clocks ?? []
 
-                Rectangle {
+                Item {
                     id: zone
 
                     required property var modelData
                     readonly property date there: new Date(root.now.getTime() + (modelData.offset - (Time.state.here?.offset ?? 0)) * 1000)
 
-                    width: zoneRow.implicitWidth + Theme.spacing.md * 2
-                    height: 40
-                    radius: Theme.rounding.md
-                    color: Theme.m3surfaceContainer
+                    implicitWidth: zoneRow.implicitWidth + K.Tokens.space.s12 * 2
+                    implicitHeight: K.Tokens.size.control_md
+                    width: implicitWidth
+                    height: implicitHeight
 
-                    Row {
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: K.Tokens.radius.control
+                        color: K.Tokens.color.surface_container
+                    }
+
+                    K.Row {
                         id: zoneRow
 
-                        anchors.centerIn: parent
-                        spacing: Theme.spacing.sm
+                        x: K.Tokens.space.s12
+                        y: K.Look.snap((K.Tokens.size.control_md - implicitHeight) / 2, root.dpr)
+                        gap: K.Tokens.space.s8
+                        align: "centre"
 
-                        Icon {
-                            anchors.verticalCenter: parent.verticalCenter
+                        K.Icon {
                             name: root.daylight(zone.there.getHours())
-                            size: 18
-                            color: name === "light_mode" ? Theme.m3primary : Theme.m3tertiary
+                            size: K.Tokens.icon.s20
+                            color: name === "light_mode" ? K.Tokens.color.primary : K.Tokens.color.tertiary
                         }
 
-                        Column {
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            StyledText {
+                        K.Stack {
+                            K.Text {
                                 text: zone.modelData.label
-                                font.pixelSize: Theme.font.xs
-                                color: Theme.m3onSurfaceVariant
+                                style: K.Tokens.type.caption
+                                color: K.Tokens.color.on_surface_variant
                             }
 
-                            StyledText {
+                            Figure {
                                 text: Qt.formatDateTime(zone.there, Time.timeFormat)
-                                font.weight: Font.DemiBold
-                                font.features: Theme.font.tabular
+                                style: K.Tokens.type.body_strong
                             }
                         }
 
-                        StyledText {
-                            anchors.verticalCenter: parent.verticalCenter
+                        K.Text {
                             text: zone.modelData.relative
-                            font.pixelSize: Theme.font.sm
-                            font.features: Theme.font.tabular
-                            color: Theme.m3outline
+                            style: K.Tokens.type.small
+                            color: K.Tokens.color.outline
                         }
                     }
                 }
@@ -353,84 +353,105 @@ Drawer {
         }
 
         // The date search, and what it comes to.
-        Column {
+        K.Stack {
             visible: root.page === "main"
-            width: parent.width
-            spacing: Theme.spacing.sm
+            fill: true
+            gap: K.Tokens.space.s8
 
-            SearchField {
+            // Keys it lets through: months and today while it's empty, the copies always, and
+            // Esc clearing what was typed before it closes anything.
+            K.Field {
                 id: search
 
-                width: parent.width
                 icon: "event"
                 placeholder: "next friday, days until christmas, 12 mar to 4 jul, 15:00 tokyo"
-                catchEscape: text !== ""
-                forwardTo: [keys]
-                onTextChanged: root.ask(text)
-                onEscaped: text = ""
+                onTextChanged: {
+                    if (root.lastQuery === "" && text.toLowerCase() === "t") {
+                        grid.yearView = false;
+                        root.goToday(true);
+                    }
+                    root.lastQuery = text;
+                    root.ask(text);
+                }
+                Keys.onEscapePressed: event => {
+                    event.accepted = search.text !== "";
+                    if (event.accepted)
+                        search.text = "";
+                }
+                Keys.onPressed: event => {
+                    const empty = search.text === "";
+                    const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        root.copy(ctrl);
+                        event.accepted = true;
+                    } else if (empty && event.key === Qt.Key_Left) {
+                        root.move(grid.yearView ? -12 : -1);
+                        event.accepted = true;
+                    } else if (empty && event.key === Qt.Key_Right) {
+                        root.move(grid.yearView ? 12 : 1);
+                        event.accepted = true;
+                    }
+                }
             }
 
-            Rectangle {
-                width: parent.width
-                height: root.answer ? answerColumn.implicitHeight + Theme.spacing.md * 2 : 0
-                radius: Theme.rounding.lg
-                color: Theme.m3surfaceContainer
-                clip: true
-                visible: height > 0
+            // What the search comes to, opening as a log does.
+            Item {
+                readonly property bool fillWidth: true
 
-                Behavior on height {
-                    Anim {
-                        duration: root.glide
-                        easing.bezierCurve: root.arrive
+                implicitHeight: root.answer ? answerCard.implicitHeight : 0
+                visible: implicitHeight > 0
+                clip: true
+
+                Behavior on implicitHeight {
+                    NumberAnimation {
+                        duration: K.Tokens.duration.long
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: K.Tokens.easing.emphasized_decel
                     }
                 }
 
-                Column {
-                    id: answerColumn
+                K.Card {
+                    id: answerCard
 
-                    x: Theme.spacing.lg
-                    y: Theme.spacing.md
-                    width: parent.width - Theme.spacing.lg * 2
-                    spacing: Theme.spacing.xxs
+                    width: parent.width
 
-                    StyledText {
-                        width: parent.width
-                        text: root.answer?.title ?? ""
-                        font.pixelSize: Theme.font.xl
-                        font.weight: Font.DemiBold
-                        color: Theme.m3primary
-                    }
+                    K.Stack {
+                        fill: true
+                        gap: K.Tokens.space.s4
 
-                    StyledText {
-                        width: parent.width
-                        text: root.answer?.detail ?? ""
-                        wrapMode: Text.Wrap
-                        color: Theme.m3onSurfaceVariant
-                    }
+                        K.Text {
+                            text: root.answer?.title ?? ""
+                            style: K.Tokens.type.heading
+                            color: K.Tokens.color.primary
+                        }
 
-                    StyledText {
-                        width: parent.width
-                        text: root.copied !== "" ? `Copied ${root.copied}` : "Enter copies · Ctrl+Enter copies ISO"
-                        font.pixelSize: Theme.font.xs
-                        color: root.copied !== "" ? Theme.m3tertiary : Theme.m3outline
+                        K.Text {
+                            text: root.answer?.detail ?? ""
+                            style: K.Tokens.type.body
+                            color: K.Tokens.color.on_surface_variant
+                        }
+
+                        K.Text {
+                            text: root.copied !== "" ? `Copied ${root.copied}` : "Enter copies · Ctrl+Enter copies ISO"
+                            style: K.Tokens.type.caption
+                            color: root.copied !== "" ? K.Tokens.color.tertiary : K.Tokens.color.outline
+                        }
                     }
                 }
             }
         }
 
         // The month and the picked day; countdowns and the tools beside.
-        Row {
+        K.Row {
             visible: root.page === "main"
-            spacing: root.columnGap
+            gap: root.columnGap
 
-            Column {
-                spacing: Theme.spacing.md
+            K.Stack {
+                gap: K.Tokens.space.s12
 
                 MonthGrid {
                     id: grid
 
-                    glide: root.glide
-                    arrive: root.arrive
                     selected: root.selected
                     onPicked: date => root.land(date)
                     onMoved: months => root.move(months)
@@ -438,179 +459,176 @@ Drawer {
                 }
 
                 // The picked day: how far, its weekday and week, its holiday,
-                // and the extra clocks' times at noon here.
-                Column {
-                    width: grid.width
-                    spacing: Theme.spacing.xxs
+                // and the extra clocks' times at noon here. As wide as the month above
+                // it, which the stack around it would otherwise widen to the words.
+                Item {
                     visible: root.day !== null
+                    implicitWidth: grid.implicitWidth
+                    implicitHeight: dayDetails.implicitHeight
 
-                    StyledText {
-                        width: parent.width
-                        text: root.day?.title ?? ""
-                        font.weight: Font.DemiBold
-                    }
+                    K.Stack {
+                        id: dayDetails
 
-                    StyledText {
                         width: parent.width
-                        text: root.day?.detail ?? ""
-                        font.pixelSize: Theme.font.sm
-                        color: Theme.m3onSurfaceVariant
-                    }
+                        room: grid.implicitWidth
+                        gap: K.Tokens.space.s4
 
-                    StyledText {
-                        visible: !!root.day?.holiday
-                        width: parent.width
-                        text: root.day?.holiday ?? ""
-                        font.pixelSize: Theme.font.sm
-                        color: Theme.m3tertiary
-                    }
+                        K.Text {
+                            text: root.day?.title ?? ""
+                            style: K.Tokens.type.body_strong
+                        }
 
-                    StyledText {
-                        visible: (root.day?.zones ?? []).length > 0
-                        width: parent.width
-                        text: (root.day?.zones ?? []).map(z => `${z.label} ${z.time}`).join("  ·  ")
-                        font.pixelSize: Theme.font.sm
-                        font.features: Theme.font.tabular
-                        color: Theme.m3outline
+                        K.Text {
+                            text: root.day?.detail ?? ""
+                            style: K.Tokens.type.small
+                            color: K.Tokens.color.on_surface_variant
+                        }
+
+                        K.Text {
+                            visible: !!root.day?.holiday
+                            text: root.day?.holiday ?? ""
+                            style: K.Tokens.type.small
+                            color: K.Tokens.color.tertiary
+                        }
+
+                        K.Text {
+                            visible: (root.day?.zones ?? []).length > 0
+                            text: (root.day?.zones ?? []).map(z => `${z.label} ${z.time}`).join("  ·  ")
+                            style: K.Tokens.type.small
+                            color: K.Tokens.color.outline
+                        }
                     }
                 }
             }
 
-            Column {
+            K.Stack {
                 id: side
 
-                width: 280
-                spacing: Theme.spacing.lg
+                room: K.Tokens.size.rail
+                gap: K.Tokens.space.s16
 
                 // Countdowns: what's left of each, and one to add.
-                Column {
-                    width: parent.width
-                    spacing: Theme.spacing.sm
+                K.Stack {
+                    room: K.Tokens.size.rail
+                    gap: K.Tokens.space.s8
 
-                    StyledText {
+                    K.Text {
                         text: "Countdowns"
-                        font.weight: Font.DemiBold
+                        style: K.Tokens.type.body_strong
                     }
 
                     Repeater {
                         model: Time.state.countdowns ?? []
 
-                        Item {
+                        K.Row {
                             id: countdown
 
                             required property var modelData
                             readonly property real remaining: modelData.end - root.now.getTime()
 
-                            width: side.width
-                            height: 34
+                            fill: true
+                            gap: K.Tokens.space.s8
+                            align: "centre"
 
-                            Icon {
-                                id: hourglass
-
-                                anchors.verticalCenter: parent.verticalCenter
+                            K.Icon {
                                 name: Time.settings.barCountdown === countdown.modelData.name ? "push_pin" : "hourglass_top"
-                                size: 18
-                                color: Theme.m3tertiary
+                                size: K.Tokens.icon.s20
+                                color: K.Tokens.color.tertiary
                             }
 
-                            Column {
-                                anchors.left: hourglass.right
-                                anchors.leftMargin: Theme.spacing.sm
-                                anchors.right: removeCountdown.left
-                                anchors.verticalCenter: parent.verticalCenter
+                            Item {
+                                readonly property bool fillWidth: true
 
-                                StyledText {
-                                    width: parent.width
-                                    text: countdown.modelData.name
-                                    font.weight: Font.Medium
-                                }
+                                implicitHeight: countdownWords.implicitHeight
 
-                                StyledText {
+                                K.Stack {
+                                    id: countdownWords
+
                                     width: parent.width
-                                    text: countdown.remaining > 0 ? `in ${Time.left(countdown.remaining)} · ${countdown.modelData.at}` : `${countdown.modelData.at} · passed`
-                                    font.pixelSize: Theme.font.xs
-                                    font.features: Theme.font.tabular
-                                    color: Theme.m3onSurfaceVariant
+                                    room: parent.width
+                                    fill: true
+
+                                    K.Text {
+                                        text: countdown.modelData.name
+                                        style: K.Tokens.type.body_strong
+                                        maximumLines: 1
+                                    }
+
+                                    K.Text {
+                                        text: countdown.remaining > 0 ? `in ${Time.left(countdown.remaining)} · ${countdown.modelData.at}` : `${countdown.modelData.at} · passed`
+                                        style: K.Tokens.type.caption
+                                        color: K.Tokens.color.on_surface_variant
+                                        maximumLines: 1
+                                    }
                                 }
                             }
 
-                            IconButton {
-                                id: removeCountdown
-
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
+                            K.IconButton {
                                 icon: "close"
-                                size: 26
-                                tooltip: "Remove"
-                                onClicked: Time.change("countdown-remove", { name: countdown.modelData.name }, error => root.countdownError = error)
+                                label: qsTr("Remove")
+                                kind: "Text"
+                                size: "Sm"
+                                onActivated: Time.change("countdown-remove", {
+                                    name: countdown.modelData.name
+                                }, error => root.countdownError = error)
                             }
                         }
                     }
 
-                    SearchField {
+                    K.Field {
                         id: countdownField
 
-                        width: parent.width
                         icon: "more_time"
                         placeholder: "Vacation: 19 dec"
-                        catchEscape: true
-                        onEscaped: text = ""
-                        onAccepted: root.addCountdown(text)
+                        Keys.onEscapePressed: countdownField.text = ""
+                        Keys.onReturnPressed: root.addCountdown(countdownField.text)
+                        Keys.onEnterPressed: root.addCountdown(countdownField.text)
                     }
 
-                    StyledText {
+                    K.Text {
                         visible: root.countdownError !== ""
-                        width: parent.width
                         text: root.countdownError
-                        color: Theme.m3error
-                        font.pixelSize: Theme.font.sm
-                        wrapMode: Text.Wrap
+                        style: K.Tokens.type.small
+                        color: K.Tokens.color.error
                     }
                 }
 
                 Tools {
                     id: tools
-
-                    width: parent.width
                 }
             }
         }
 
         ClockSettings {
             visible: root.page === "settings"
-            width: parent.width
         }
 
-        StyledText {
+        K.Text {
             visible: !Time.available
-            width: parent.width
             text: "kubaos-clock isn't running: the calendar and the search need it"
-            color: Theme.m3error
-            font.pixelSize: Theme.font.sm
+            style: K.Tokens.type.small
+            color: K.Tokens.color.error
         }
     }
 
-    // Keys the search passes on: months and today while it's empty, the
-    // copies always.
-    Item {
-        id: keys
+    // Where a style's baseline sits in its line box: the box centres the font's height.
+    function baselineOf(metrics: FontMetrics, style: QtObject): real {
+        return (style.line - metrics.height) / 2 + metrics.ascent;
+    }
 
-        Keys.onPressed: event => {
-            const empty = search.text === "";
-            const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                root.copy(ctrl);
-                event.accepted = true;
-            } else if (empty && event.key === Qt.Key_Left) {
-                root.move(grid.yearView ? -12 : -1);
-                event.accepted = true;
-            } else if (empty && event.key === Qt.Key_Right) {
-                root.move(grid.yearView ? 12 : 1);
-                event.accepted = true;
-            } else if (empty && event.key === Qt.Key_T && !ctrl) {
-                grid.yearView = false;
-                root.goToday(true);
-            }
-        }
+    FontMetrics {
+        id: heroMetrics
+
+        font.family: K.Tokens.type.hero_number.family
+        font.weight: K.Tokens.type.hero_number.weight
+        font.pixelSize: K.Tokens.type.hero_number.size
+    }
+
+    FontMetrics {
+        id: secondsMetrics
+
+        font.family: K.Tokens.type.headline.family
+        font.weight: K.Tokens.type.headline.weight
+        font.pixelSize: K.Tokens.type.headline.size
     }
 }

@@ -1,6 +1,5 @@
 import QtQuick
-import qs.theme
-import qs.components
+import KubaOS.Components as K
 import qs.services
 import qs.settings
 
@@ -8,14 +7,15 @@ import qs.settings
 // analog face, the bar's countdown and the extra clocks. Each change goes through the engine into
 // ~/.config/kubaos/desktop/clock/clock.toml, comments kept, and the state it answers
 // with redraws the popup.
-Column {
+K.Stack {
     id: root
 
     property string error: ""
     readonly property var settings: Time.settings
     readonly property var weekdays: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
-    spacing: Theme.spacing.lg
+    fill: true
+    gap: K.Tokens.space.s16
 
     function set(key: string, value: string): void {
         Time.change("set", { key: key, value: value }, error => root.error = error);
@@ -26,8 +26,9 @@ Column {
         note: Time.state.country ? `Marked in the calendar and left out of working days: ${Time.state.country}` : "None marked"
 
         Flow {
-            width: parent.width
-            spacing: Theme.spacing.xs
+            readonly property bool fillWidth: true
+
+            spacing: K.Tokens.space.s4
 
             Chip {
                 label: "None"
@@ -53,8 +54,8 @@ Column {
     Section {
         title: "First day of the week"
 
-        Row {
-            spacing: Theme.spacing.xs
+        K.Row {
+            gap: K.Tokens.space.s4
 
             Repeater {
                 model: root.weekdays
@@ -75,8 +76,8 @@ Column {
         title: "Time format"
         note: "How the bar, the lock screen and this popup write the time"
 
-        Row {
-            spacing: Theme.spacing.xs
+        K.Row {
+            gap: K.Tokens.space.s4
 
             Chip {
                 label: "Locale"
@@ -102,8 +103,8 @@ Column {
     Section {
         title: "Date order"
 
-        Row {
-            spacing: Theme.spacing.xs
+        K.Row {
+            gap: K.Tokens.space.s4
 
             Chip {
                 label: "Locale"
@@ -129,8 +130,8 @@ Column {
     Section {
         title: "Analog face"
 
-        Row {
-            spacing: Theme.spacing.xs
+        K.Row {
+            gap: K.Tokens.space.s4
 
             Chip {
                 label: "Off"
@@ -150,8 +151,9 @@ Column {
         title: "Countdown in the bar"
 
         Flow {
-            width: parent.width
-            spacing: Theme.spacing.xs
+            readonly property bool fillWidth: true
+
+            spacing: K.Tokens.space.s4
 
             Chip {
                 label: "None"
@@ -180,70 +182,92 @@ Column {
         Repeater {
             model: Time.state.clocks ?? []
 
-            Item {
+            K.Row {
                 required property var modelData
 
-                width: parent.width
-                height: 28
+                fill: true
+                align: "centre"
 
-                StyledText {
-                    anchors.verticalCenter: parent.verticalCenter
+                K.Text {
                     text: `${modelData.label}  ·  ${modelData.name}`
+                    style: K.Tokens.type.body
                 }
 
-                IconButton {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
+                K.Fill {}
+
+                K.IconButton {
                     icon: "close"
-                    size: 26
-                    tooltip: "Remove"
-                    onClicked: Time.change("zone-remove", { name: modelData.name }, error => root.error = error)
+                    label: qsTr("Remove")
+                    kind: "Text"
+                    size: "Sm"
+                    onActivated: Time.change("zone-remove", {
+                        name: modelData.name
+                    }, error => root.error = error)
                 }
             }
         }
 
-        SearchField {
+        K.Field {
+            id: zoneField
+
             visible: (Time.state.clocks ?? []).length < 4
-            width: parent.width
             icon: "add_location_alt"
             placeholder: "Tokyo, New York, America/Chicago"
-            catchEscape: true
-            onEscaped: text = ""
-            onAccepted: Time.change("zone-add", { name: text }, error => {
-                root.error = error;
-                if (error === "")
-                    text = "";
-            })
+            Keys.onEscapePressed: zoneField.text = ""
+            Keys.onReturnPressed: root.addZone()
+            Keys.onEnterPressed: root.addZone()
         }
     }
 
-    StyledText {
-        width: parent.width
+    K.Text {
         text: root.error !== "" ? root.error : Time.problem !== "" ? Time.problem : `Kept in ${UserLayer.shown("clock", "clock.toml")}`
-        color: root.error !== "" || Time.problem !== "" ? Theme.m3error : Theme.m3outline
-        font.pixelSize: Theme.font.sm
-        wrapMode: Text.Wrap
+        style: K.Tokens.type.small
+        color: root.error !== "" || Time.problem !== "" ? K.Tokens.color.error : K.Tokens.color.outline
     }
 
-    component Section: Column {
+    function addZone(): void {
+        Time.change("zone-add", {
+            name: zoneField.text
+        }, error => {
+            root.error = error;
+            if (error === "")
+                zoneField.text = "";
+        });
+    }
+
+    // A setting: its title, an optional note under it, and its choices.
+    component Section: K.Stack {
+        id: section
+
         property string title
         property string note
+        default property alias choices: choices.data
 
-        width: root.width
-        spacing: Theme.spacing.sm
+        fill: true
+        gap: K.Tokens.space.s8
 
-        StyledText {
-            text: parent.title
-            font.weight: Font.DemiBold
-            color: Theme.m3onSurface
+        K.Stack {
+            fill: true
+            gap: K.Tokens.space.s4
+
+            K.Text {
+                text: section.title
+                style: K.Tokens.type.body_strong
+            }
+
+            K.Text {
+                visible: section.note !== ""
+                text: section.note
+                style: K.Tokens.type.small
+                color: K.Tokens.color.on_surface_variant
+            }
         }
 
-        StyledText {
-            visible: parent.note !== ""
-            width: parent.width
-            text: parent.note
-            font.pixelSize: Theme.font.sm
-            color: Theme.m3onSurfaceVariant
+        K.Stack {
+            id: choices
+
+            fill: true
+            gap: K.Tokens.space.s8
         }
     }
 }

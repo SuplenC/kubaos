@@ -1,6 +1,6 @@
 import QtQuick
 import Quickshell
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -14,15 +14,15 @@ import qs.services
 Drawer {
     id: root
 
-    readonly property int padding: Theme.spacing.sm
+    readonly property int padding: K.Tokens.space.s8
     property bool covered: false
     readonly property int drawn: list.drawn
 
     edge: "top"
     flushEnd: true
     takesFocus: false
-    contentWidth: 380
-    contentHeight: Math.max(list.contentHeight, 1) + padding * 2
+    contentWidth: K.Tokens.size.panel
+    contentHeight: Math.max(list.contentHeight, 0) + padding * 2
 
     ToastList {
         id: list
