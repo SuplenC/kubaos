@@ -3,7 +3,8 @@
 //! iced reports a laid-out view's boxes through an [`Operation`], but only as containers and text:
 //! it can't say that a container is a button, that a row's gap is 8, or how wide a text wants to
 //! be. Every layout primitive, component, text and icon of this crate wraps itself in a probe that
-//! adds that, at no cost when no check runs: a probe lays out and draws exactly as its content.
+//! adds that. A probe lays out and draws exactly as its content, one call deeper, and allocates
+//! nothing until an operation walks the tree.
 //!
 //! [`Collect`] walks a view's operations and builds the [`kubaos_geometry::Node`] tree the check
 //! reads. A widget iced reports without a probe (a toolkit's own container) shows as a box that
