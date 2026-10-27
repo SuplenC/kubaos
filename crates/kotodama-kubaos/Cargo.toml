@@ -15,6 +15,8 @@ kubaos-idle.workspace = true
 kubaos-sysmon.workspace = true
 kubaos-user-layer.workspace = true
 thiserror.workspace = true
+# Edits the workspace groups file in place, keeping the user's comments.
+toml_edit = "0.25"
 
 [dev-dependencies]
 kotodama-extension = { workspace = true, features = ["testing"] }
