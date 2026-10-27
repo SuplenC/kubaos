@@ -18,7 +18,8 @@ Singleton {
     readonly property var apps: ({
             quickshell: "desktop/quickshell",
             clock: "desktop/clock",
-            sysmon: "desktop/sysmon"
+            sysmon: "desktop/sysmon",
+            workspaces: "desktop/workspaces"
         })
 
     // dir("clock"): the app's folder.
