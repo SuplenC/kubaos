@@ -4,12 +4,14 @@
 //!
 //! - Evaluating an [`Easing`] curve, and the speed and reduce-motion settings applied to a
 //!   [`Duration`].
+//! - [`Tween`]: a value a widget keeps in its state, moving to each new one its view gives it.
 //!
 //! # Not here
 //!
 //! - Which duration and curve an animation takes: their docs in [`crate::tokens`].
 
 use std::time;
+use std::time::Instant;
 
 use crate::tokens::Duration;
 use crate::tokens::Easing;
@@ -112,6 +114,58 @@ pub fn ease(easing: Easing, x: f32) -> f32 {
         t = f32::midpoint(lo, hi);
     }
     bezier(y1, y2, t)
+}
+
+/// A value moving to the last one it was given, over a duration and a curve: what a widget keeps
+/// in its state so that a change in its view animates instead of jumping.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Tween {
+    from: f32,
+    to: f32,
+    at: Instant,
+    duration: Duration,
+    easing: Easing,
+}
+
+impl Tween {
+    /// Resting at `value`, moving over `duration` on `easing` when it is next given another.
+    pub fn new(value: f32, duration: Duration, easing: Easing) -> Tween {
+        Tween {
+            from: value,
+            to: value,
+            at: Instant::now(),
+            duration,
+            easing,
+        }
+    }
+
+    /// Moves to `to` from wherever it is at `now`. The same target again changes nothing, so a view
+    /// can give its value on every frame.
+    pub fn to(&mut self, to: f32, now: Instant) {
+        if (to - self.to).abs() <= f32::EPSILON {
+            return;
+        }
+        self.from = self.value(now);
+        self.to = to;
+        self.at = now;
+    }
+
+    /// Where it ends up.
+    pub fn target(&self) -> f32 {
+        self.to
+    }
+
+    /// Where it is at `now`.
+    pub fn value(&self, now: Instant) -> f32 {
+        let t = Motion::default().progress(self.duration, self.easing, now.saturating_duration_since(self.at));
+        self.from + (self.to - self.from) * t
+    }
+
+    /// Whether it is still on its way at `now`.
+    pub fn moving(&self, now: Instant) -> bool {
+        now.saturating_duration_since(self.at) < Motion::default().duration(self.duration)
+            && (self.to - self.from).abs() > f32::EPSILON
+    }
 }
 
 #[cfg(test)]

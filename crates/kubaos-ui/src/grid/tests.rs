@@ -9,6 +9,7 @@ use super::columns;
 use crate::look::Look;
 use crate::scale::Scale;
 use crate::tokens::Mode;
+use crate::tokens::Size as SizeToken;
 use crate::tokens::Space;
 
 fn device(span: Span, scale: Scale) -> (f32, f32) {
@@ -95,4 +96,79 @@ fn the_grid_places_its_children_on_its_columns() {
     assert!((b.x - spans[1].x).abs() < 1e-4 && (b.width - spans[1].width).abs() < 1e-4);
     // The second row starts a whole device pixel past the first's 30, plus the gap.
     assert!((d.y - (Scale::X1_25.snap_up(30.0) + 16.0)).abs() < 1e-4, "{d:?}");
+}
+
+/// The bounds of the widget with id `id` in `view`, laid out in a window of `room`.
+fn bounds_in(view: Element<'_, ()>, room: Size, id: &'static str) -> iced::Rectangle {
+    let mut ui = Simulator::with_size(iced::Settings::default(), room, view);
+    ui.find(selector::id(id)).expect("the probed widget").bounds()
+}
+
+#[test]
+fn a_child_that_fills_its_height_is_stretched_to_its_row() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let tall = widget::container(widget::Space::new()).height(f32::from(SizeToken::Dialog.px()));
+    let short = widget::container(widget::Space::new())
+        .id(widget::Id::new("short"))
+        .height(iced::Length::Fill);
+    let view: Element<'_, ()> = crate::layout::grid(&look, 2, Space::S16).push(tall).push(short).into();
+
+    let short = bounds_in(view, Size::new(800.0, 2000.0), "short");
+
+    assert_eq!(short.height, f32::from(SizeToken::Dialog.px()));
+}
+
+#[test]
+fn a_grid_that_fills_its_height_gives_its_row_all_of_it() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let cell = widget::container(widget::Space::new())
+        .id(widget::Id::new("cell"))
+        .height(iced::Length::Fill);
+    let view: Element<'_, ()> = crate::layout::grid(&look, 2, Space::S16)
+        .fill_height()
+        .push(cell)
+        .push(widget::Space::new())
+        .into();
+
+    let cell = bounds_in(view, Size::new(800.0, 600.0), "cell");
+
+    assert_eq!(cell.height, 600.0);
+}
+
+#[test]
+fn uniform_rows_are_all_as_tall_as_the_tallest() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let card = |id: &'static str, height: f32| -> Element<'_, ()> {
+        widget::container(widget::Space::new().height(height))
+            .id(widget::Id::new(id))
+            .height(iced::Length::Fill)
+            .into()
+    };
+    let view: Element<'_, ()> = crate::layout::grid(&look, 2, Space::S16)
+        .uniform_rows()
+        .push(card("a", 40.0))
+        .push(card("b", 40.0))
+        .push(card("c", 80.0))
+        .push(card("d", 20.0))
+        .into();
+    let mut ui = Simulator::with_size(iced::Settings::default(), Size::new(800.0, 2000.0), view);
+
+    let heights = ["a", "b", "c", "d"].map(|id| ui.find(selector::id(id)).expect("a card").bounds().height);
+
+    assert_eq!(heights, [80.0; 4]);
+}
+
+#[test]
+fn a_grid_that_fills_its_height_in_a_scroll_keeps_each_rows_own_height() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let cell = widget::container(widget::Space::new().height(40.0)).id(widget::Id::new("cell"));
+    let grid = crate::layout::grid(&look, 2, Space::S16)
+        .fill_height()
+        .push(cell)
+        .push(widget::Space::new());
+    let view: Element<'_, ()> = widget::scrollable(grid).into();
+
+    let cell = bounds_in(view, Size::new(800.0, 600.0), "cell");
+
+    assert_eq!(cell.height, 40.0);
 }

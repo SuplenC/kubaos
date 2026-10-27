@@ -13,6 +13,7 @@ use iced::mouse;
 use iced::widget;
 use iced::widget::canvas;
 use iced::widget::container;
+use iced::widget::text::IntoFragment;
 
 use crate::color;
 use crate::focus::RingColor;
@@ -57,7 +58,7 @@ impl Tick {
 /// A checkbox reading `label`. Space or a click sends `on_toggle`; without one it is disabled.
 pub fn checkbox<'a, M: Clone + 'a>(
     look: &Look,
-    label: &'a str,
+    label: impl IntoFragment<'a>,
     tick: Tick,
     on_toggle: Option<M>,
     focused: bool,
@@ -107,7 +108,7 @@ pub fn checkbox<'a, M: Clone + 'a>(
 /// A radio button reading `label`, one of a group of which exactly one is picked.
 pub fn radio<'a, M: Clone + 'a>(
     look: &Look,
-    label: &'a str,
+    label: impl IntoFragment<'a>,
     picked: bool,
     on_pick: Option<M>,
     focused: bool,
@@ -163,7 +164,7 @@ fn labelled<'a, M: Clone + 'a>(
     look: &Look,
     shape: impl Into<Element<'a, M>>,
     shape_radius: Radius,
-    label: &'a str,
+    label: impl IntoFragment<'a>,
     on_press: Option<M>,
     focused: bool,
 ) -> Element<'a, M> {
@@ -213,3 +214,6 @@ impl<M> canvas::Program<M> for Dash {
         vec![frame.into_geometry()]
     }
 }
+
+#[cfg(test)]
+mod tests;

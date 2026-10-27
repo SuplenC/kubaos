@@ -10,13 +10,18 @@ use iced::widget;
 use iced::widget::container;
 use kubaos_ui::Look;
 use kubaos_ui::color;
+use kubaos_ui::component::chip::ChipKind;
+use kubaos_ui::component::chip::chip;
+use kubaos_ui::component::list::list_row;
+use kubaos_ui::component::list::scrolling_list;
 use kubaos_ui::focus::RingColor;
 use kubaos_ui::focus::focus_ring;
 use kubaos_ui::grid::columns;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::icon::icon;
-
+use kubaos_ui::layout::Extent;
 use kubaos_ui::layout::Inset;
+use kubaos_ui::layout::flow;
 use kubaos_ui::layout::grid;
 use kubaos_ui::layout::row;
 use kubaos_ui::layout::section;
@@ -93,6 +98,44 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             Some("A grid splits its width in device pixels: columns differ by one device pixel at most and every edge is sharp."),
             columns_demo(look),
         ))
+        .push(section(
+            look,
+            "Scroll and flow",
+            Some("A list taller than its well scrolls in it, the 4 px thumb in the well's padding; a title too long for its row ends in an ellipsis. Chips flow onto a new line where the next doesn't fit."),
+            scroll_demo(look),
+        ))
+        .into()
+}
+
+fn scroll_demo<'a>(look: &Look) -> Element<'a, Message> {
+    let titles = [
+        "English (US)",
+        "FRITZ!Box 7590 XL Gästenetz OG, on the second floor, behind the kitchen",
+        "Italian",
+        "German",
+        "Japanese",
+        "Polish",
+        "French",
+        "Spanish",
+    ];
+    let rows = titles
+        .iter()
+        .map(|&title| list_row(title).detail("ab").on_press(Message::Sample).view(look))
+        .collect::<Vec<_>>();
+    let chips = [
+        "English (US)",
+        "Italian",
+        "German",
+        "Japanese",
+        "Polish",
+        "French",
+        "Spanish",
+        "Portuguese (Brazil)",
+    ]
+    .map(|label| chip(look, ChipKind::Neutral, label, None, None, None::<Message>));
+    grid(look, 2, Space::S24)
+        .push(scrolling_list(rows, false).height(Extent::Fixed(Size::Log)).view(look))
+        .push(flow(look, Space::S8, chips))
         .into()
 }
 

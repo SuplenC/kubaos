@@ -1,8 +1,8 @@
 //! KubaOS's geometry check: the boxes of a rendered page, from any toolkit, held to the design
 //! language's grid (`docs/DESIGN.md`, "Checks").
 //!
-//! A toolkit lays a page out at a scale and describes it as a [`Frame`]: a tree of [`Node`]s, each a
-//! box in logical pixels and the [`Role`] it plays (a row of the layout, a component, a text, an
+//! A toolkit lays a page out at a scale and describes it as a [`Frame`]: a tree of [`Node`]s, each
+//! a box in logical pixels and the [`Role`] it plays (a row of the layout, a component, a text, an
 //! icon). [`check`] reads only that tree, so iced (through `kubaos-ui`'s probes) and QML (through a
 //! dump of its item tree as JSON) are judged by the same rules:
 //!
@@ -30,10 +30,9 @@ pub mod parity;
 
 use std::fmt;
 
+pub use check::check;
 use serde::Deserialize;
 use serde::Serialize;
-
-pub use check::check;
 
 /// One page laid out at one scale and mode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -83,6 +82,9 @@ pub enum Role {
     /// A box that claims nothing: a toolkit's own container. Its edges are checked, its children's
     /// placement is not.
     Box,
+    /// A box its content scrolls in. Content that runs past it is scrolled out of view, not
+    /// clipped, so the text and icons inside are held to the boxes inside it only.
+    Scroll,
     /// Children one after another along `axis`, `gap` apart, lined up across it by `align`: the
     /// spec's Row and Stack, QML's `RowLayout` and `ColumnLayout`.
     Layout { axis: Axis, gap: f32, align: Align },
@@ -108,6 +110,7 @@ impl Role {
     fn label(&self) -> String {
         match self {
             Role::Box => "Box".to_owned(),
+            Role::Scroll => "Scroll".to_owned(),
             Role::Layout { axis: Axis::X, .. } => "Row".to_owned(),
             Role::Layout { axis: Axis::Y, .. } => "Stack".to_owned(),
             Role::Grid { .. } => "Grid".to_owned(),
@@ -153,20 +156,42 @@ pub enum Align {
 pub struct Fixed {
     pub width: bool,
     pub height: bool,
+    /// It holds whatever the app puts in it (a card, a page), so where its parts sit is the
+    /// content's, not its own.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub holds: bool,
+}
+
+/// For serde: a flag left out of a frame when it is off.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
+fn is_false(flag: &bool) -> bool {
+    !*flag
 }
 
 impl Fixed {
     pub const BOTH: Fixed = Fixed {
         width: true,
         height: true,
+        holds: false,
     };
     pub const HEIGHT: Fixed = Fixed {
         width: false,
         height: true,
+        holds: false,
     };
     pub const NONE: Fixed = Fixed {
         width: false,
         height: false,
+        holds: false,
+    };
+    /// No measure of its own, and whatever the app puts in it: a card, a page.
+    pub const HOLDS: Fixed = Fixed {
+        width: false,
+        height: false,
+        holds: true,
     };
 }
 
@@ -248,8 +273,8 @@ pub enum Rule {
     SiblingGap,
     /// Siblings lined up across their layout, and grid cells in their columns and rows.
     Alignment,
-    /// Every instance of a component and variant the same size, with its icons and label in the same
-    /// place.
+    /// Every instance of a component and variant the same size, with its icons and label in the
+    /// same place.
     Identical,
     /// Text that fits its box, and boxes that stay inside their parents.
     ClippedText,

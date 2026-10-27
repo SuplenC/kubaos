@@ -16,7 +16,8 @@ K.Stack {
             variant: "",
             fixed: {
                 width: false,
-                height: false
+                height: false,
+                holds: true
             }
         })
 

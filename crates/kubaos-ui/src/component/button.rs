@@ -1,5 +1,6 @@
 //! Buttons: four kinds in three sizes, with a label or with an icon alone.
 
+use iced::Background;
 use iced::Border;
 use iced::Color;
 use iced::Element;
@@ -9,8 +10,9 @@ use iced::Theme;
 use iced::widget;
 
 use crate::color;
+use crate::component::Pin;
 use crate::component::hint::hint;
-use crate::component::state_layer;
+use crate::component::layered;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
 use crate::icon::Icon;
@@ -148,29 +150,28 @@ fn colours(look: &Look, kind: Kind, enabled: bool) -> (Option<Color>, Color, Col
     }
 }
 
-/// A button's style with `corner`, with the state layer for the status iced reports or the one
-/// `preview` pins.
+impl Preview {
+    fn pin(self) -> Pin {
+        match self {
+            Preview::Hovered => Pin::Hovered,
+            Preview::Pressed => Pin::Pressed,
+        }
+    }
+}
+
+/// A button's style with `corner`: its fill, whatever the pointer does. The state layer goes over
+/// it ([`layered`]).
 fn face(
     corner: Radius,
     fill: Option<Color>,
-    content: Color,
     shown: Color,
-    enabled: bool,
-    preview: Option<Preview>,
 ) -> impl Fn(&Theme, widget::button::Status) -> widget::button::Style {
-    move |_theme, status| {
-        let status = match preview {
-            Some(Preview::Hovered) if enabled => widget::button::Status::Hovered,
-            Some(Preview::Pressed) if enabled => widget::button::Status::Pressed,
-            _ => status,
-        };
-        widget::button::Style {
-            background: state_layer(fill, content, status),
-            text_color: shown,
-            border: Border::default().rounded(radius(corner)),
-            shadow: Shadow::default(),
-            snap: true,
-        }
+    move |_theme, _status| widget::button::Style {
+        background: fill.map(Background::Color),
+        text_color: shown,
+        border: Border::default().rounded(radius(corner)),
+        shadow: Shadow::default(),
+        snap: true,
     }
 }
 
@@ -192,6 +193,8 @@ pub struct Button<'a, M> {
     icon: Option<Icon>,
     trailing: bool,
     on_press: Option<M>,
+    /// Sent when a press goes down, and when it comes up or the pointer leaves.
+    hold: Option<(M, M)>,
     focused: bool,
     preview: Option<Preview>,
 }
@@ -205,6 +208,7 @@ pub fn button<M>(label: &str) -> Button<'_, M> {
         icon: None,
         trailing: false,
         on_press: None,
+        hold: None,
         focused: false,
         preview: None,
     }
@@ -258,6 +262,17 @@ impl<'a, M: Clone + 'a> Button<'a, M> {
         }
     }
 
+    /// A button that is held instead of clicked: `start` when the pointer presses it, `end` when
+    /// the press comes up or the pointer leaves it. The app times the hold, and says how far along
+    /// it is beside the button: Kōbō's Install.
+    #[must_use]
+    pub fn on_hold(self, start: M, end: M) -> Self {
+        Button {
+            hold: Some((start, end)),
+            ..self
+        }
+    }
+
     /// Whether the keyboard is on it.
     #[must_use]
     pub fn focused(self, focused: bool) -> Self {
@@ -281,7 +296,7 @@ impl<'a, M: Clone + 'a> Button<'a, M> {
         };
         let variant = [self.kind.name(), self.size.name(), placement];
         let m = metrics(self.size);
-        let enabled = self.on_press.is_some();
+        let enabled = self.on_press.is_some() || self.hold.is_some();
         let (fill, content, shown) = colours(look, self.kind, enabled);
         let padding = if self.kind == Kind::Text {
             m.text_padding
@@ -289,7 +304,8 @@ impl<'a, M: Clone + 'a> Button<'a, M> {
             m.padding
         };
         let line = m.label.line();
-        // The label's line box fills the control's content height, so the label centres on the grid.
+        // The label's line box fills the control's content height, so the label centres on the
+        // grid.
         let pad_y = (m.height.px() - line) / 2;
         let label = text(self.label, m.label, shown);
         let mut content_row = row(look, m.gap);
@@ -302,15 +318,48 @@ impl<'a, M: Clone + 'a> Button<'a, M> {
                 .push(label)
                 .push(icon_in_line(look, glyph, m.icon, line, shown)),
         };
-        let pressable = widget::button(content_row)
-            .height(Length::Fixed(f32::from(m.height.px())))
-            .padding(iced::Padding {
-                top: f32::from(pad_y),
-                bottom: f32::from(pad_y),
-                ..Inset::x(padding).padding()
-            })
-            .on_press_maybe(self.on_press)
-            .style(face(Radius::Control, fill, content, shown, enabled, self.preview));
+        let inset = iced::Padding {
+            top: f32::from(pad_y),
+            bottom: f32::from(pad_y),
+            ..Inset::x(padding).padding()
+        };
+        let height = Length::Fixed(f32::from(m.height.px()));
+        let pressable: Element<'a, M> = match self.hold {
+            Some((start, end)) => {
+                let style = face(Radius::Control, fill, shown);
+                let held = widget::container(content_row)
+                    .height(height)
+                    .padding(inset)
+                    .style(move |theme| {
+                        let face = style(theme, widget::button::Status::Active);
+                        widget::container::Style {
+                            background: face.background,
+                            border: face.border,
+                            text_color: Some(face.text_color),
+                            ..widget::container::Style::default()
+                        }
+                    });
+                widget::mouse_area(held)
+                    .on_press(start)
+                    .on_release(end.clone())
+                    .on_exit(end)
+                    .interaction(iced::mouse::Interaction::Pointer)
+                    .into()
+            }
+            None => widget::button(content_row)
+                .height(height)
+                .padding(inset)
+                .on_press_maybe(self.on_press)
+                .style(face(Radius::Control, fill, shown))
+                .into(),
+        };
+        let pressable = layered(
+            pressable,
+            Radius::Control,
+            content,
+            enabled,
+            self.preview.map(Preview::pin),
+        );
         let view: Element<'a, M> = focus_ring(look, pressable, Radius::Control, self.focused, RingColor::Accent);
         probe::component("Button", variant, Fixed::HEIGHT, view)
     }
@@ -396,7 +445,14 @@ impl<'a, M: Clone + 'a> IconButton<'a, M> {
             .height(side)
             .padding(0)
             .on_press_maybe(self.on_press)
-            .style(face(Radius::Full, fill, content, shown, enabled, self.preview));
+            .style(face(Radius::Full, fill, shown));
+        let pressable = layered(
+            pressable,
+            Radius::Full,
+            content,
+            enabled,
+            self.preview.map(Preview::pin),
+        );
         let ringed = focus_ring(look, pressable, Radius::Full, self.focused, RingColor::Accent);
         let view: Element<'a, M> = hint(look, ringed, self.label, self.focused);
         probe::component("IconButton", variant, Fixed::BOTH, view)

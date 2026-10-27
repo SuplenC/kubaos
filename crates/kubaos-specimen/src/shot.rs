@@ -34,7 +34,6 @@ use iced::advanced::renderer;
 use iced::advanced::renderer::Headless;
 use iced::advanced::widget::Id;
 use iced::advanced::widget::Operation;
-use iced::advanced::widget::operation::focusable;
 use iced::mouse;
 use iced::window;
 use iced_runtime::UserInterface;
@@ -51,7 +50,8 @@ use crate::specimen;
 use crate::specimen::Message;
 use crate::specimen::Specimen;
 
-/// Every font the specimen draws with: kubaos-ui's, then the four icon sets of the comparison sheet.
+/// Every font the specimen draws with: kubaos-ui's, then the four icon sets of the comparison
+/// sheet.
 pub fn fonts() -> impl Iterator<Item = &'static [u8]> {
     kubaos_ui::text::FONTS.iter().copied().chain(icons::FONTS)
 }
@@ -115,8 +115,6 @@ pub fn render(specimen: &Specimen, width: f32) -> Result<Shot, Error> {
     };
     ui.operate(&renderer, &mut audit);
 
-    let mut focus = focusable::focus(Id::new(specimen::FOCUSED_FIELD));
-    ui.operate(&renderer, &mut focus);
     let mut messages = Vec::new();
     let _ = ui.update(
         &[Event::Window(window::Event::RedrawRequested(Instant::now()))],

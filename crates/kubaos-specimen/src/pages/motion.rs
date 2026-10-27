@@ -16,13 +16,20 @@ use iced::widget::canvas::Path;
 use iced::widget::canvas::Stroke;
 use kubaos_ui::Look;
 use kubaos_ui::color;
+use kubaos_ui::component::button::ButtonSize;
+use kubaos_ui::component::button::Kind;
+use kubaos_ui::component::button::button;
+use kubaos_ui::component::progress::timed_bar;
 use kubaos_ui::component::switch::switch;
-use kubaos_ui::component::toast::toast;
+use kubaos_ui::component::toast::DEFAULT_STAY;
+use kubaos_ui::component::toast::toast_at;
+use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::grid;
 use kubaos_ui::layout::row;
 use kubaos_ui::layout::section;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
+use kubaos_ui::motion::Motion;
 use kubaos_ui::motion::ease;
 use kubaos_ui::snap::centre_x;
 use kubaos_ui::text::text;
@@ -99,6 +106,12 @@ pub fn view<'a>(look: &Look, seconds: f32, live: bool) -> Element<'a, Message> {
             Some("A switch turning on (short, standard) and a toast arriving (short, emphasized decel), at the nine frames."),
             frames(look),
         ))
+        .push(section(
+            look,
+            "Held",
+            Some("A button held instead of clicked, Kōbō's Install: the bar beside it fills as the hold goes on, here at its nine frames."),
+            held(look),
+        ))
         .into()
 }
 
@@ -106,7 +119,8 @@ fn durations<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
     let mut table = split(look, &[1, 2, 2], Space::S12).center();
     for duration in DURATIONS {
-        // 32 px a 100 ms: every duration is a whole number of hundreds, so every bar is on the grid.
+        // 32 px a 100 ms: every duration is a whole number of hundreds, so every bar is on the
+        // grid.
         let width = (duration.ms() / 100 * u32::from(Space::S32.px())) as f32;
         table = table
             .push(
@@ -191,17 +205,34 @@ fn frames<'a>(look: &Look) -> Element<'a, Message> {
             ))
             .into()
     }));
+    let arriving = Motion::default().duration(Duration::Short);
     let toasts = grid(look, 9, Space::S16).extend(times.map(|t| {
-        let p = ease(Easing::EmphasizedDecel, t);
-        let faded = look.faded(p);
-        // The toast rises the 32 px it travels as it fades in, a whole device pixel each frame so its
-        // edges stay sharp while it moves.
-        let rise = look.scale.snap((1.0 - p) * f32::from(Space::S32.px()));
-        let lifted = widget::container(toast(&faded, "Copied.", None))
-            .padding(iced::Padding::ZERO.top(rise).bottom(f32::from(Space::S32.px()) - rise));
-        centre_x(look.scale, lifted)
+        centre_x(
+            look.scale,
+            toast_at(look, "Copied.", None, arriving.mul_f32(t), DEFAULT_STAY),
+        )
     }));
     stack(look, Space::S24).push(switches).push(toasts).into()
+}
+
+fn held<'a>(look: &Look) -> Element<'a, Message> {
+    let times = (0..FRAMES).map(|i| i as f32 / (FRAMES - 1) as f32);
+    stack(look, Space::S24)
+        .push(
+            row(look, Space::S16)
+                .center()
+                .push(
+                    button("Keep holding…")
+                        .kind(Kind::Danger)
+                        .size(ButtonSize::Lg)
+                        .icon(Icon::Download)
+                        .on_hold(Message::Sample, Message::Sample)
+                        .view(look),
+                )
+                .push(text("or hold Enter", Type::Caption, look.colors.outline)),
+        )
+        .push(grid(look, 9, Space::S16).extend(times.map(|t| timed_bar(look, t))))
+        .into()
 }
 
 /// An easing curve plotted: time across, distance up, with the diagonal for reference.

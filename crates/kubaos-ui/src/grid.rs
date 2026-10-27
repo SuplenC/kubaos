@@ -56,9 +56,9 @@ pub fn columns(width: f32, count: u16, gap: Space, scale: Scale) -> Vec<Span> {
     weighted(width, &vec![1; usize::from(count.max(1))], gap, scale)
 }
 
-/// Columns of a grid `width` logical pixels wide, `gap` apart, at `scale`, each as wide as its share
-/// of `weights`. Every edge is on a whole device pixel; each width is within one device pixel of its
-/// exact share.
+/// Columns of a grid `width` logical pixels wide, `gap` apart, at `scale`, each as wide as its
+/// share of `weights`. Every edge is on a whole device pixel; each width is within one device pixel
+/// of its exact share.
 pub fn weighted(width: f32, weights: &[u16], gap: Space, scale: Scale) -> Vec<Span> {
     let weights: Vec<u32> = if weights.is_empty() {
         vec![1]
@@ -92,13 +92,19 @@ pub fn weighted(width: f32, weights: &[u16], gap: Space, scale: Scale) -> Vec<Sp
 }
 
 /// Children in columns, row by row, each at most its column's width and its box rounded up to whole
-/// device pixels. Each row is as tall as its tallest child.
+/// device pixels. Each row is as tall as its tallest child, and a child whose height is `Fill` is
+/// stretched to it, so cards side by side end together.
 pub struct Grid<'a, M> {
     children: Vec<Element<'a, M>>,
     weights: Vec<u16>,
     gap: Space,
     scale: Scale,
     centred: bool,
+    /// `Fill`: the rows share all the height there is, instead of each being as tall as its tallest
+    /// child.
+    fill_height: bool,
+    /// Every row as tall as the tallest, so cards in two rows end up one size.
+    uniform: bool,
 }
 
 impl<M> fmt::Debug for Grid<'_, M> {
@@ -109,6 +115,8 @@ impl<M> fmt::Debug for Grid<'_, M> {
             .field("gap", &self.gap)
             .field("scale", &self.scale)
             .field("centred", &self.centred)
+            .field("fill_height", &self.fill_height)
+            .field("uniform", &self.uniform)
             .finish()
     }
 }
@@ -123,6 +131,24 @@ impl<'a, M: 'a> Grid<'a, M> {
             gap,
             scale,
             centred: false,
+            fill_height: false,
+            uniform: false,
+        }
+    }
+
+    /// Every row as tall as the tallest row: a grid of cards that are all one size, whichever row
+    /// holds the most.
+    #[must_use]
+    pub fn uniform_rows(self) -> Self {
+        Grid { uniform: true, ..self }
+    }
+
+    /// All the height there is, shared by the rows: columns of lists that run to the page's end.
+    #[must_use]
+    pub fn fill_height(self) -> Self {
+        Grid {
+            fill_height: true,
+            ..self
         }
     }
 
@@ -155,7 +181,10 @@ impl<M> Widget<M, Theme, Renderer> for Grid<'_, M> {
     }
 
     fn size(&self) -> Size<Length> {
-        Size::new(Length::Fill, Length::Shrink)
+        Size::new(
+            Length::Fill,
+            if self.fill_height { Length::Fill } else { Length::Shrink },
+        )
     }
 
     fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
@@ -165,26 +194,54 @@ impl<M> Widget<M, Theme, Renderer> for Grid<'_, M> {
         let mut nodes = Vec::with_capacity(self.children.len());
         let mut y = 0.0;
         let mut rows = self.children.iter_mut().zip(&mut tree.children).collect::<Vec<_>>();
-        for (index, cells) in rows.chunks_mut(spans.len()).enumerate() {
-            if index > 0 {
-                y += gap;
-            }
+        let count = rows.chunks(spans.len()).count();
+        // A row's share of the height when the grid fills it. Inside a scroll the height is
+        // unbounded, and each row keeps the height it needs instead.
+        let room = limits.max().height;
+        let share = (self.fill_height && room.is_finite()).then(|| {
+            let gaps = gap * count.saturating_sub(1) as f32;
+            self.scale.snap((room - gaps).max(0.0) / count.max(1) as f32)
+        });
+        // Measuring compresses the height, so a `Fill` child reports its content's height instead
+        // of the infinite height a scrolled page offers.
+        let mut heights = Vec::with_capacity(count);
+        for cells in rows.chunks_mut(spans.len()) {
             let mut height: f32 = 0.0;
-            let first = nodes.len();
             for ((child, state), span) in cells.iter_mut().zip(&spans) {
-                let cell = layout::Limits::new(Size::ZERO, Size::new(span.width, f32::INFINITY));
-                let node = snapped(self.scale, &child.as_widget_mut().layout(state, renderer, &cell))
-                    .move_to(Point::new(span.x, y));
+                let cell = layout::Limits::with_compression(
+                    Size::ZERO,
+                    Size::new(span.width, share.unwrap_or(f32::INFINITY)),
+                    Size::new(false, true),
+                );
+                let node = snapped(self.scale, &child.as_widget_mut().layout(state, renderer, &cell));
                 height = height.max(node.size().height);
                 nodes.push(node);
             }
-            let height = self.scale.snap_up(height);
-            if self.centred {
-                for node in &mut nodes[first..] {
-                    let down = self.scale.snap((height - node.size().height) / 2.0);
-                    node.translate_mut(iced::Vector::new(0.0, down));
-                }
+            heights.push(share.unwrap_or_else(|| self.scale.snap_up(height)));
+        }
+        if self.uniform {
+            let tallest = heights.iter().copied().fold(0.0, f32::max);
+            heights.fill(tallest);
+        }
+        let mut first = 0;
+        for ((index, cells), height) in rows.chunks_mut(spans.len()).enumerate().zip(heights) {
+            if index > 0 {
+                y += gap;
             }
+            let placed = &mut nodes[first..first + cells.len()];
+            for (((child, state), span), node) in cells.iter_mut().zip(&spans).zip(placed.iter_mut()) {
+                if child.as_widget().size().height.is_fill() {
+                    let exact = layout::Limits::new(Size::new(0.0, height), Size::new(span.width, height));
+                    *node = snapped(self.scale, &child.as_widget_mut().layout(state, renderer, &exact));
+                }
+                let down = if self.centred {
+                    self.scale.snap((height - node.size().height) / 2.0)
+                } else {
+                    0.0
+                };
+                node.move_to_mut(Point::new(span.x, y + down));
+            }
+            first += cells.len();
             y += height;
         }
         layout::Node::with_children(Size::new(width, y), nodes)

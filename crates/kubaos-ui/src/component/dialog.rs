@@ -9,6 +9,7 @@ use iced::Shadow;
 use iced::Vector;
 use iced::widget;
 use iced::widget::container;
+use iced::widget::text::IntoFragment;
 
 use crate::color;
 use crate::icon::Icon;
@@ -59,8 +60,8 @@ pub fn dialog<'a, M: 'a>(
     look: &Look,
     tone: Tone,
     glyph: Icon,
-    title: &'a str,
-    body: &'a str,
+    title: impl IntoFragment<'a>,
+    body: impl IntoFragment<'a>,
     dismiss: Option<Element<'a, M>>,
     actions: impl IntoIterator<Item = Element<'a, M>>,
 ) -> Element<'a, M> {
@@ -69,13 +70,13 @@ pub fn dialog<'a, M: 'a>(
 
 /// A dialog that asks for something to be typed: `dialog` in the `Normal` tone with `control` (a
 /// labelled field) 16 under the body and 32 above the buttons. A prompt never destroys anything;
-/// its action uses what was typed, and the field's `on_submit` sends the same message, so Enter in
-/// the field does what the action does.
+/// its action uses what was typed. The app owns the field's keys, so it sends the action's message
+/// on Enter in the field too: Enter does what the action does.
 pub fn prompt<'a, M: 'a>(
     look: &Look,
     glyph: Icon,
-    title: &'a str,
-    body: &'a str,
+    title: impl IntoFragment<'a>,
+    body: impl IntoFragment<'a>,
     control: impl Into<Element<'a, M>>,
     dismiss: Option<Element<'a, M>>,
     actions: impl IntoIterator<Item = Element<'a, M>>,
@@ -102,8 +103,8 @@ fn compose<'a, M: 'a>(
     look: &Look,
     tone: Tone,
     glyph: Icon,
-    title: &'a str,
-    body: &'a str,
+    title: impl IntoFragment<'a>,
+    body: impl IntoFragment<'a>,
     control: Option<Element<'a, M>>,
     dismiss: Option<Element<'a, M>>,
     actions: impl IntoIterator<Item = Element<'a, M>>,
@@ -163,6 +164,7 @@ fn compose<'a, M: 'a>(
         Fixed {
             width: true,
             height: false,
+            holds: false,
         },
         view,
     )

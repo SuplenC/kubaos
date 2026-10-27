@@ -6,6 +6,7 @@ use iced::Element;
 use iced::Length;
 use iced::widget;
 use iced::widget::container;
+use iced::widget::text::IntoFragment;
 
 use crate::color;
 use crate::icon::Icon;
@@ -31,8 +32,13 @@ use crate::tokens::Type;
 const LONG_MESSAGE: usize = 90;
 
 /// The error: `message`, what broke, and under it `hint`, the next thing to try.
-pub fn error_block<'a, M: 'a>(look: &Look, message: &'a str, hint: &'a str) -> Element<'a, M> {
+pub fn error_block<'a, M: 'a>(
+    look: &Look,
+    message: impl IntoFragment<'a>,
+    hint: impl IntoFragment<'a>,
+) -> Element<'a, M> {
     let c = look.colors;
+    let message = message.into_fragment();
     let long = message.chars().count() > LONG_MESSAGE;
     let style = if long { Type::BodyStrong } else { Type::Subheading };
     let fill = color::alpha(c.error_container, Opacity::ErrorFill.value());
@@ -97,7 +103,7 @@ pub fn log<'a, M: 'a>(look: &Look, lines: &[(Level, &'a str)], height: Extent) -
     let edge = look.outline_soft();
     let hairline = look.hairline();
     let view: Element<'a, M> = widget::container(
-        widget::scrollable(stack(look, Gap::NONE).extend(rows))
+        crate::scroll::styled(look, stack(look, Gap::NONE).extend(rows))
             .anchor_bottom()
             .width(Length::Fill)
             .height(Length::Fill),

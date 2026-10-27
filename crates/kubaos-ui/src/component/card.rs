@@ -12,6 +12,7 @@ use iced::widget::container;
 use crate::color;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
+use crate::layout::Extent;
 use crate::layout::Inset;
 use crate::look::Look;
 use crate::look::radius;
@@ -25,6 +26,12 @@ const CARD_RADIUS: Radius = Radius::Surface;
 
 /// A plain card around `content`: the well's surface and soft hairline, 16 inside.
 pub fn card<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Element<'a, M> {
+    card_sized(look, content, Extent::Shrink)
+}
+
+/// [`card`], `height` tall: `Fill` stretches it to its row in a grid, so cards side by side end
+/// together.
+pub fn card_sized<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>, height: Extent) -> Element<'a, M> {
     let c = look.colors;
     let surface = color::alpha(c.surface_container_low, Opacity::Well.value());
     let edge = look.outline_soft();
@@ -32,6 +39,7 @@ pub fn card<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Eleme
     let view: Element<'a, M> = widget::container(content)
         .padding(Inset::all(Space::S16).padding())
         .width(Length::Fill)
+        .height(height.length())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(surface)),
             border: Border {
@@ -42,7 +50,7 @@ pub fn card<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Eleme
             ..container::Style::default()
         })
         .into();
-    probe::component("Card", ["", "", ""], Fixed::NONE, view)
+    probe::component("Card", ["", "", ""], Fixed::HOLDS, view)
 }
 
 /// One of a few cards to pick from. The picked one takes the secondary container and an accent
@@ -82,5 +90,5 @@ pub fn choice_card<'a, M: Clone + 'a>(
             }
         });
     let view: Element<'a, M> = focus_ring(look, pressable, CARD_RADIUS, focused, RingColor::Cold);
-    probe::component("ChoiceCard", ["", "", ""], Fixed::NONE, view)
+    probe::component("ChoiceCard", ["", "", ""], Fixed::HOLDS, view)
 }

@@ -121,6 +121,9 @@ thumbnail_height = 160
 slider = 24
 slider_thumb = 16
 slider_stop = 4
+# A scrollbar's thumb, a pill: thin, since the keyboard and the wheel do the scrolling and the
+# thumb only says where you are.
+scrollbar = 4
 
 # Type families. Nothing else draws text; symbols are drawn, see [symbols].
 [font.family]
@@ -360,6 +363,12 @@ frame = 0.94
 # What darkens the desktop behind an open panel, lighter than a dialog's scrim:
 # a panel sits beside the windows rather than over a question.
 panel_scrim = 0.20
+# A panel's surface over the blurred wallpaper it floats on, so the photo shows through as
+# glass: Kōbō's panel.
+glass = 0.80
+# The darkest the wallpaper is dimmed behind full-screen text, so the words read over any photo:
+# Kōbō's welcome and done screens, from the text's side.
+backdrop = 0.90
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.

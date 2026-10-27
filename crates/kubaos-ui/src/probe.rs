@@ -48,6 +48,8 @@ use kubaos_geometry::Node;
 use kubaos_geometry::Rect;
 pub use kubaos_geometry::Role;
 
+use crate::text::LineState;
+
 /// What a probe says its content is. Built with every view, so it holds no allocation; the
 /// [`Role`] is made from it only when an operation asks.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -219,10 +221,13 @@ type Paragraph = <Renderer as iced::advanced::text::Renderer>::Paragraph;
 
 /// The size a text widget's shaped paragraph needs, from its state; its box's when it has none.
 fn natural(tree: &Tree, bounds: Rectangle) -> kubaos_geometry::Size {
-    let needed = tree
-        .state
-        .downcast_ref::<iced::widget::text::State<Paragraph>>()
-        .min_bounds();
+    let needed = if tree.tag == tree::Tag::of::<LineState>() {
+        tree.state.downcast_ref::<LineState>().min_bounds()
+    } else {
+        tree.state
+            .downcast_ref::<iced::widget::text::State<Paragraph>>()
+            .min_bounds()
+    };
     let (width, height) = if needed.width > 0.0 || needed.height > 0.0 {
         (needed.width, needed.height)
     } else {
@@ -399,7 +404,7 @@ impl Operation for Collect {
         _translation: Vector,
         _state: &mut dyn Scrollable,
     ) {
-        self.report(Role::Box, bounds, false);
+        self.report(Role::Scroll, bounds, false);
     }
 
     fn text(&mut self, _id: Option<&Id>, bounds: Rectangle, text: &str) {

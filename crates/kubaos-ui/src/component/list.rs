@@ -1,9 +1,11 @@
 //! List rows, and the well a list sits in.
 //!
 //! The well is a surface (24) with 12 inside, so the rows inside take 24 - 12 = 12, the control
-//! radius: concentric with the well, and the radius of everything clicked.
+//! radius: concentric with the well, and the radius of everything clicked. A list taller than its
+//! room scrolls inside the well, its thumb in the well's padding at the right.
 
-use iced::Alignment;
+use std::fmt;
+
 use iced::Background;
 use iced::Border;
 use iced::Element;
@@ -14,13 +16,15 @@ use iced::widget;
 use iced::widget::container;
 
 use crate::color;
-use crate::component::state_layer;
+use crate::component::chip::ChipKind;
+use crate::component::chip::chip;
+use crate::component::layered;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
 use crate::icon::Icon;
 use crate::icon::icon;
+use crate::layout::Extent;
 use crate::layout::Inset;
-use crate::layout::fill;
 use crate::layout::row;
 use crate::layout::stack;
 use crate::look::Corner;
@@ -30,6 +34,7 @@ use crate::look::radius;
 use crate::probe;
 use crate::probe::Fixed;
 use crate::snap::centre_x;
+use crate::text::line;
 use crate::text::text;
 use crate::tokens::IconSize;
 use crate::tokens::Opacity;
@@ -50,45 +55,50 @@ const ROW_RADIUS: Corner = nested(WELL_RADIUS.corner(), WELL_INSET);
 /// One row of a list, built up then drawn with [`ListRow::view`].
 #[derive(Debug)]
 pub struct ListRow<'a, M> {
-    title: &'a str,
-    subtitle: Option<&'a str>,
-    detail: Option<&'a str>,
+    title: String,
+    subtitle: Option<String>,
+    detail: Option<String>,
     icon: Option<Icon>,
+    chips: Vec<(ChipKind, String)>,
     selected: bool,
     danger: bool,
     checked: Option<bool>,
     on_press: Option<M>,
+    _text: std::marker::PhantomData<&'a str>,
 }
 
-/// A row reading `title`.
-pub fn list_row<M>(title: &str) -> ListRow<'_, M> {
+/// A row reading `title`. Its lines stay one line each, ending in an ellipsis where they don't fit,
+/// so every row of a kind is as tall as the others.
+pub fn list_row<'a, M>(title: impl Into<String>) -> ListRow<'a, M> {
     ListRow {
-        title,
+        title: title.into(),
         subtitle: None,
         detail: None,
         icon: None,
+        chips: Vec::new(),
         selected: false,
         danger: false,
         checked: None,
         on_press: None,
+        _text: std::marker::PhantomData,
     }
 }
 
 impl<'a, M: Clone + 'a> ListRow<'a, M> {
     /// A second line under the title: the row is two lines tall.
     #[must_use]
-    pub fn subtitle(self, subtitle: &'a str) -> Self {
+    pub fn subtitle(self, subtitle: impl Into<String>) -> Self {
         ListRow {
-            subtitle: Some(subtitle),
+            subtitle: Some(subtitle.into()),
             ..self
         }
     }
 
     /// A short fact at the row's end, in mono: a device path, a size, a code.
     #[must_use]
-    pub fn detail(self, detail: &'a str) -> Self {
+    pub fn detail(self, detail: impl Into<String>) -> Self {
         ListRow {
-            detail: Some(detail),
+            detail: Some(detail.into()),
             ..self
         }
     }
@@ -99,6 +109,14 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
             icon: Some(icon),
             ..self
         }
+    }
+
+    /// A chip near the row's end, after the chips before it: a fact about the row that matters at
+    /// a glance (Default, Too small, Done).
+    #[must_use]
+    pub fn chip(mut self, kind: ChipKind, label: impl Into<String>) -> Self {
+        self.chips.push((kind, label.into()));
+        self
     }
 
     /// The row the keyboard is on, or the one picked in a list of one.
@@ -132,6 +150,15 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         }
     }
 
+    /// `message` when there is one; a row without one takes no press.
+    #[must_use]
+    pub fn on_press_maybe(self, message: Option<M>) -> Self {
+        ListRow {
+            on_press: message,
+            ..self
+        }
+    }
+
     pub fn view(self, look: &Look) -> Element<'a, M> {
         let lines = if self.subtitle.is_some() {
             "two-line"
@@ -160,15 +187,23 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         } else {
             Size::Row
         };
-        let mut lines = stack(look, Space::S4).push(text(self.title, Type::BodyStrong, main));
+        let mut words = stack(look, Space::S4)
+            .width(Extent::Fill)
+            .push(line(self.title, Type::BodyStrong, main));
         if let Some(subtitle) = self.subtitle {
-            lines = lines.push(text(subtitle, Type::Small, muted));
+            words = words.push(line(subtitle, Type::Small, muted));
         }
-        let mut content = row(look, Space::S12).center();
+        // Each part centred on the row's whole height, on a whole device pixel, so a chip that
+        // makes one row's parts taller moves none of the others: the title sits where every row's
+        // does.
+        let mut content = row(look, Space::S12).center().width(Extent::Fill).height(Extent::Fill);
         if let Some(glyph) = self.icon {
             content = content.push(icon(look, glyph, IconSize::S20, main));
         }
-        content = content.push(lines).push(fill());
+        content = content.push(words);
+        for (kind, label) in self.chips {
+            content = content.push(chip(look, kind, label, None, None, None));
+        }
         if let Some(detail) = self.detail {
             content = content.push(text(detail, Type::Mono, muted));
         }
@@ -182,25 +217,20 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
                     .into()
             });
         }
-        let corner = ROW_RADIUS;
-        let on_surface = c.on_surface;
-        let view: Element<'a, M> = widget::button(
-            widget::container(content)
-                .height(Length::Fill)
-                .align_y(Alignment::Center),
-        )
-        .width(Length::Fill)
-        .height(f32::from(height.px()))
-        .padding(Inset::x(Space::S12).padding())
-        .on_press_maybe(self.on_press)
-        .style(move |_theme: &Theme, status| widget::button::Style {
-            background: state_layer(fill_colour, on_surface, status),
-            text_color: main,
-            border: Border::default().rounded(radius(corner)),
-            shadow: Shadow::default(),
-            snap: true,
-        })
-        .into();
+        let enabled = self.on_press.is_some();
+        let pressable = widget::button(content)
+            .width(Length::Fill)
+            .height(f32::from(height.px()))
+            .padding(Inset::x(Space::S12).padding())
+            .on_press_maybe(self.on_press)
+            .style(move |_theme: &Theme, _status| widget::button::Style {
+                background: fill_colour.map(Background::Color),
+                text_color: main,
+                border: Border::default().rounded(radius(ROW_RADIUS)),
+                shadow: Shadow::default(),
+                snap: true,
+            });
+        let view = layered(pressable, ROW_RADIUS, c.on_surface, enabled, None);
         probe::component("ListRow", variant, Fixed::HEIGHT, view)
     }
 }
@@ -208,13 +238,103 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
 /// `rows` in a well, the focus ring around it while the list has the keyboard. The rows show
 /// which one the keyboard is on themselves.
 pub fn list<'a, M: 'a>(look: &Look, rows: impl IntoIterator<Item = Element<'a, M>>, focused: bool) -> Element<'a, M> {
+    well(
+        look,
+        stack(look, ROW_GAP).extend(rows),
+        Inset::all(WELL_INSET),
+        Extent::Shrink,
+        focused,
+    )
+}
+
+/// A list whose rows scroll inside its well, built up then drawn with [`ScrollingList::view`].
+pub struct ScrollingList<'a, M> {
+    rows: Vec<Element<'a, M>>,
+    focused: bool,
+    height: Extent,
+    id: Option<widget::Id>,
+    on_scroll: Option<Box<dyn Fn(widget::scrollable::Viewport) -> M + 'a>>,
+}
+
+impl<M> fmt::Debug for ScrollingList<'_, M> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ScrollingList")
+            .field("rows", &self.rows.len())
+            .field("focused", &self.focused)
+            .field("height", &self.height)
+            .finish_non_exhaustive()
+    }
+}
+
+/// `rows` in a well as [`list`] has them, scrolled inside it when they are taller than its room.
+pub fn scrolling_list<'a, M: 'a>(
+    rows: impl IntoIterator<Item = Element<'a, M>>,
+    focused: bool,
+) -> ScrollingList<'a, M> {
+    ScrollingList {
+        rows: rows.into_iter().collect(),
+        focused,
+        height: Extent::Fill,
+        id: None,
+        on_scroll: None,
+    }
+}
+
+impl<'a, M: 'a> ScrollingList<'a, M> {
+    /// How tall the well is; all the room there is unless set.
+    #[must_use]
+    pub fn height(self, height: Extent) -> Self {
+        ScrollingList { height, ..self }
+    }
+
+    /// The id the app scrolls the rows by.
+    #[must_use]
+    pub fn id(self, id: impl Into<widget::Id>) -> Self {
+        ScrollingList {
+            id: Some(id.into()),
+            ..self
+        }
+    }
+
+    /// `on_scroll` with where the rows are scrolled to, each time they move.
+    #[must_use]
+    pub fn on_scroll(self, on_scroll: impl Fn(widget::scrollable::Viewport) -> M + 'a) -> Self {
+        ScrollingList {
+            on_scroll: Some(Box::new(on_scroll)),
+            ..self
+        }
+    }
+
+    pub fn view(self, look: &Look) -> Element<'a, M> {
+        let rows = stack(look, ROW_GAP).extend(self.rows).padding(Inset::all(WELL_INSET));
+        let mut scrolled = crate::scroll::flush(look, rows).height(Extent::Fill);
+        if let Some(id) = self.id {
+            scrolled = scrolled.id(id);
+        }
+        if let Some(on_scroll) = self.on_scroll {
+            scrolled = scrolled.on_scroll(on_scroll);
+        }
+        well(look, scrolled, Inset::NONE, self.height, self.focused)
+    }
+}
+
+/// `content` in the list's well, `inset` inside it and `height` tall, the ring around it while
+/// `focused`.
+fn well<'a, M: 'a>(
+    look: &Look,
+    content: impl Into<Element<'a, M>>,
+    inset: Inset,
+    height: Extent,
+    focused: bool,
+) -> Element<'a, M> {
     let c = look.colors;
     let surface = color::alpha(c.surface_container_low, Opacity::Well.value());
     let edge = look.outline_soft();
     let hairline = look.hairline();
-    let well = widget::container(stack(look, ROW_GAP).extend(rows))
-        .padding(Inset::all(WELL_INSET).padding())
+    let well = widget::container(content)
+        .padding(inset.padding())
         .width(Length::Fill)
+        .height(height.length())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(surface)),
             border: Border {

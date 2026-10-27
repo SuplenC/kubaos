@@ -195,6 +195,42 @@ fn two_buttons_of_one_variant_at_different_heights_are_not_identical() {
 }
 
 #[test]
+fn cards_holding_different_content_are_still_identical() {
+    assert_eq!(two_holding("Card", Fixed::HOLDS), [] as [Rule; 0]);
+}
+
+#[test]
+fn two_toasts_with_their_text_set_differently_are_not_identical() {
+    assert_eq!(two_holding("Toast", Fixed::NONE), [Rule::Identical]);
+}
+
+/// The rules broken by two `name`s fixing `fixed`, one with a 24 tall line in it and one with 16.
+fn two_holding(name: &str, fixed: Fixed) -> Vec<Rule> {
+    let holder = |y: f32, content: Node| {
+        with(
+            Node::new(
+                Role::Component {
+                    name: name.to_owned(),
+                    variant: String::new(),
+                    fixed,
+                },
+                rect(0.0, y, 200.0, 60.0),
+            ),
+            vec![content],
+        )
+    };
+    let line = |height: f32, y: f32| text("Disk", Size { width: 40.0, height }, rect(16.0, y, 40.0, height));
+    let (big, small) = (line(24.0, 16.0), line(16.0, 84.0));
+    let root = stack(
+        8.0,
+        Align::Start,
+        rect(0.0, 0.0, 200.0, 128.0),
+        vec![holder(0.0, big), holder(68.0, small)],
+    );
+    rules_broken(&[frame("dark", 1.0, root)])
+}
+
+#[test]
 fn a_label_lower_in_one_button_than_another_is_not_identical() {
     let labelled = |y: f32, label_y: f32| {
         with(
@@ -245,6 +281,34 @@ fn text_sticking_out_of_its_parent_is_clipped() {
     );
 
     assert_eq!(rules_broken(&[frame("dark", 1.0, root)]), [Rule::ClippedText]);
+}
+
+#[test]
+fn text_scrolled_past_its_scroll_is_not_clipped_but_past_a_box_inside_it_is() {
+    let natural = Size {
+        width: 60.0,
+        height: 20.0,
+    };
+    let line = |y: f32| text("Install", natural, rect(0.0, y, 60.0, 20.0));
+    let scrolled = with(
+        Node::new(Role::Scroll, rect(0.0, 0.0, 100.0, 40.0)),
+        vec![with(
+            Node::new(Role::Box, rect(0.0, 0.0, 100.0, 80.0)),
+            vec![line(0.0), line(60.0)],
+        )],
+    );
+    let boxed = with(
+        Node::new(Role::Scroll, rect(0.0, 0.0, 100.0, 40.0)),
+        vec![with(Node::new(Role::Box, rect(0.0, 0.0, 48.0, 80.0)), vec![line(0.0)])],
+    );
+    let too_wide = with(
+        Node::new(Role::Scroll, rect(0.0, 0.0, 40.0, 40.0)),
+        vec![with(Node::new(Role::Box, rect(0.0, 0.0, 100.0, 80.0)), vec![line(0.0)])],
+    );
+
+    assert_eq!(rules_broken(&[frame("dark", 1.0, scrolled)]), [] as [Rule; 0]);
+    assert_eq!(rules_broken(&[frame("dark", 1.0, boxed)]), [Rule::ClippedText]);
+    assert_eq!(rules_broken(&[frame("dark", 1.0, too_wide)]), [Rule::ClippedText]);
 }
 
 #[test]

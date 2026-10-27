@@ -25,6 +25,7 @@ use kubaos_ui::component::empty::empty_state;
 use kubaos_ui::component::error::Level;
 use kubaos_ui::component::error::error_block;
 use kubaos_ui::component::error::log;
+use kubaos_ui::component::field::Caret;
 use kubaos_ui::component::field::State;
 use kubaos_ui::component::field::field;
 use kubaos_ui::component::field::labelled;
@@ -53,7 +54,6 @@ use kubaos_ui::tokens::Size;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
-use crate::specimen::FOCUSED_FIELD;
 use crate::specimen::Message;
 
 pub fn view<'a>(look: &Look) -> Element<'a, Message> {
@@ -236,17 +236,14 @@ fn fields<'a>(look: &Look) -> Element<'a, Message> {
             look,
             "Full name",
             None,
-            field("", "Your name").on_input(|_| Message::Typed).view(look),
+            field("", "Your name").view(look),
             None,
         ))
         .push(labelled(
             look,
             "Hostname",
             None,
-            field("tuxedo", "")
-                .icon(Icon::Computer)
-                .on_input(|_| Message::Typed)
-                .view(look),
+            field("tuxedo", "").icon(Icon::Computer).view(look),
             Some(note(look, "Letters, digits and dashes.", false)),
         ))
         .push(labelled(
@@ -255,9 +252,7 @@ fn fields<'a>(look: &Look) -> Element<'a, Message> {
             None,
             field("Shinj", "Search")
                 .icon(Icon::Search)
-                .focused(true)
-                .id(FOCUSED_FIELD)
-                .on_input(|_| Message::Typed)
+                .caret(Caret::at("Shinj".chars().count()))
                 .view(look),
             Some(note(
                 look,
@@ -269,7 +264,7 @@ fn fields<'a>(look: &Look) -> Element<'a, Message> {
             look,
             "Password",
             Some(show),
-            field("hunter2", "").secret().on_input(|_| Message::Typed).view(look),
+            field("hunter2", "").secret().view(look),
             None,
         ))
         .push(labelled(
@@ -279,7 +274,6 @@ fn fields<'a>(look: &Look) -> Element<'a, Message> {
             field("not-an-email", "")
                 .icon(Icon::Mail)
                 .state(State::Invalid)
-                .on_input(|_| Message::Typed)
                 .view(look),
             Some(note(look, "That's not an email. Typo?", true)),
         ))
@@ -378,6 +372,7 @@ fn lists<'a>(look: &Look) -> Element<'a, Message> {
     let rows = |look: &Look| -> Vec<Element<'a, Message>> {
         vec![
             list_row("English (US)")
+                .chip(ChipKind::Accent, "Default")
                 .detail("us")
                 .checked(true)
                 .on_press(Message::Sample)
@@ -443,7 +438,7 @@ fn chips<'a>(look: &Look) -> Element<'a, Message> {
             ChipKind::Accent => "Recommended",
             ChipKind::Cold => "Demo",
         };
-        line = line.push(chip(look, kind, label, None, None::<Message>));
+        line = line.push(chip(look, kind, label, None, None, None::<Message>));
     }
     line = line
         .push(chip(
@@ -451,15 +446,31 @@ fn chips<'a>(look: &Look) -> Element<'a, Message> {
             ChipKind::Selected,
             "Default",
             Some(Icon::Check),
+            None,
             None::<Message>,
         ))
-        .push(chip(look, ChipKind::Cold, "Demo", Some(Icon::Bolt), None::<Message>))
-        .push(chip(look, ChipKind::Neutral, "Italian", None, Some(Message::Sample)))
+        .push(chip(
+            look,
+            ChipKind::Cold,
+            "Demo",
+            Some(Icon::Bolt),
+            None,
+            None::<Message>,
+        ))
+        .push(chip(
+            look,
+            ChipKind::Neutral,
+            "Italian",
+            None,
+            Some(Message::Sample),
+            Some(Message::Sample),
+        ))
         .push(chip(
             look,
             ChipKind::Selected,
             "English (US)",
             Some(Icon::Check),
+            None,
             Some(Message::Sample),
         ));
     line.into()
@@ -561,8 +572,6 @@ fn dialogs<'a>(look: &Look) -> Element<'a, Message> {
                 .icon(Icon::Key)
                 .secret()
                 .state(State::Invalid)
-                .on_input(|_| Message::Typed)
-                .on_submit(Message::Sample)
                 .view(look),
             Some(note(look, "That didn't work. Fat fingers? Try again.", true)),
         ),
