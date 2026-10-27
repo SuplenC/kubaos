@@ -4,7 +4,7 @@
 <!--
   The power stops' knobs in /sys (the CPU's clock cap, the GPU's DPM level,
   the panel's power saving, PCIe ASPM, USB autosuspend, Wi-Fi power saving,
-  the charge limit): what `pkexec` asks before it runs
+  the charge limit, the CPU scheduler): what `pkexec` asks before it runs
   /usr/local/libexec/kubaos-power-write (system/files/power/) for the power
   service, `kubaos-power serve`. An admin needs no password
   (50-kubaos-power.rules); anyone else is asked for an admin's.
@@ -14,7 +14,7 @@
   <vendor>KubaOS</vendor>
   <action id="org.kubaos.power.write">
     <description>Change the power settings of the hardware</description>
-    <message>Authentication is required to change the power settings of the processor, the screen and the devices.</message>
+    <message>Authentication is required to change the power settings of the processor, its scheduler, the screen and the devices.</message>
     <icon_name>battery</icon_name>
     <defaults>
       <allow_any>auth_admin</allow_any>

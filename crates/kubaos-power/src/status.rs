@@ -18,7 +18,8 @@ use crate::machine::Machine;
 use crate::panel::Target;
 use crate::plan::Epp;
 use crate::plan::Plan;
-use crate::plan::Scheduler;
+use crate::scheduler;
+use crate::scheduler::UnitState;
 use crate::settings::Settings;
 use crate::stop::Source;
 use crate::writes;
@@ -47,6 +48,10 @@ pub struct Live {
     pub wifi: Vec<(String, Option<bool>)>,
     /// Whether the file indexer is held paused, `None` without one.
     pub indexer_paused: Option<bool>,
+    /// The scheduler's unit as systemd tells it, `None` when it can't be asked.
+    pub scheduler_unit: Option<UnitState>,
+    /// LAVD's last exit message, from the journal.
+    pub scheduler_exit: Option<String>,
 }
 
 fn row(name: &'static str, wanted: impl Into<String>, now: Option<String>, agrees: Option<bool>) -> Row {
@@ -99,12 +104,7 @@ pub fn rows(plan: &Plan, settings: &Settings, machine: &Machine, live: &Live) ->
         cpu_cap(plan, &policies),
         compare("Firmware profile", firmware(plan), machine.platform_profile()),
         row("Fans", "the firmware's, by its profile", None, None),
-        row(
-            "Scheduler",
-            scheduler(plan.scheduler),
-            Some("none runs yet".to_owned()),
-            None,
-        ),
+        scheduler_row(plan, machine, live),
     ];
     let gpus = machine.gpus();
     rows.push(compare(
@@ -176,13 +176,14 @@ fn firmware(plan: &Plan) -> &'static str {
     }
 }
 
-fn scheduler(scheduler: Scheduler) -> &'static str {
-    match scheduler {
-        Scheduler::PowersaveFewestCores => "powersave on the fewest cores",
-        Scheduler::Powersave => "powersave",
-        Scheduler::Autopilot => "autopilot",
-        Scheduler::Performance => "performance",
-    }
+fn scheduler_row(plan: &Plan, machine: &Machine, live: &Live) -> Row {
+    let report = scheduler::report(
+        plan,
+        machine,
+        live.scheduler_unit.as_ref(),
+        live.scheduler_exit.as_deref(),
+    );
+    scheduler::row(plan, &report)
 }
 
 fn panel(target: Target, now: Option<(f64, bool)>) -> Row {

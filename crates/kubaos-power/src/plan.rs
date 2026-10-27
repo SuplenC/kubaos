@@ -6,7 +6,7 @@
 //! EPP, boost       ppd's own: power / off, power / off, balance_* / on, performance / on
 //! clock cap        1.6 GHz       none          none          none          none
 //! platform         ppd's own: low-power, low-power, balanced, performance, performance
-//! scheduler        powersave+    powersave     autopilot     performance   performance
+//! LAVD (when on)   powersave+    powersave     autopilot     performance   performance
 //! GPU DPM          low           low           auto          auto          high
 //! panel            60 Hz         VRR           VRR           native        native
 //! panel saving     3             2             0             0             0
@@ -20,7 +20,9 @@
 //! clock and the firmware's platform profile), and sets them again when the power source
 //! changes; [`Plan`] says what to expect of them, for `status`, and the service writes the rest
 //! after ppd, so its values are the last word. The user's settings change the panel and the clock
-//! cap per stop, and panel power saving everywhere.
+//! cap per stop, and panel power saving and the CPU scheduler everywhere: LAVD runs only when the
+//! settings turn it on, and then in the stop's mode (`powersave+` packs the work on the fewest,
+//! most efficient cores).
 //!
 //! # Owns
 //!
@@ -31,6 +33,7 @@
 //! - Which files and devices a row writes on this machine: [`crate::writes`]. Reading them back:
 //!   [`crate::status`].
 
+use crate::settings::CpuScheduler;
 use crate::settings::PanelMode;
 use crate::settings::Settings;
 use crate::stop::Profile;
@@ -46,14 +49,27 @@ pub enum Epp {
     Performance,
 }
 
-/// A stop's wish for the CPU scheduler (`scx_lavd`'s modes). Nothing applies it yet: it is the
-/// seam a scheduler service reads.
+/// The CPU scheduler a stop runs.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scheduler {
-    /// Power saving on the fewest cores.
+    /// Linux's own, EEVDF: the settings leave LAVD off.
+    Kernel,
+    /// scx_lavd through sched_ext, in a mode of its own.
+    Lavd(LavdMode),
+}
+
+/// scx_lavd's modes, as its command line names them; [`crate::scheduler`] turns one into the
+/// command line on this machine.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LavdMode {
+    /// `--powersave` with the efficient cores first, each core's threads together, so the work
+    /// packs onto the fewest cores.
     PowersaveFewestCores,
+    /// `--powersave`: core compaction, in LAVD's own order.
     Powersave,
+    /// `--autopilot`: LAVD picks powersave, balanced or performance by the load.
     Autopilot,
+    /// `--performance`: every core, no compaction.
     Performance,
 }
 
@@ -168,13 +184,17 @@ impl Plan {
         let saving = |level| {
             if settings.panel_power_saving { level } else { 0 }
         };
+        let lavd = |mode| match settings.scheduler {
+            CpuScheduler::Kernel => Scheduler::Kernel,
+            CpuScheduler::Lavd => Scheduler::Lavd(mode),
+        };
         let base = Plan {
             stop,
             profile: stop.profile(),
             epp: Epp::Balance,
             boost: true,
             cpu_max_mhz: own.cpu_max_mhz,
-            scheduler: Scheduler::Autopilot,
+            scheduler: lavd(LavdMode::Autopilot),
             gpu_dpm: GpuDpm::Auto,
             panel: Panel::of(own.panel),
             panel_power_saving: 0,
@@ -187,7 +207,7 @@ impl Plan {
             Stop::SuperSaver => Plan {
                 epp: Epp::Power,
                 boost: false,
-                scheduler: Scheduler::PowersaveFewestCores,
+                scheduler: lavd(LavdMode::PowersaveFewestCores),
                 gpu_dpm: GpuDpm::Low,
                 panel_power_saving: saving(3),
                 quiet_background: true,
@@ -196,7 +216,7 @@ impl Plan {
             Stop::PowerSaver => Plan {
                 epp: Epp::Power,
                 boost: false,
-                scheduler: Scheduler::Powersave,
+                scheduler: lavd(LavdMode::Powersave),
                 gpu_dpm: GpuDpm::Low,
                 panel_power_saving: saving(2),
                 quiet_background: true,
@@ -205,13 +225,13 @@ impl Plan {
             Stop::Balanced => base,
             Stop::Performance => Plan {
                 epp: Epp::Performance,
-                scheduler: Scheduler::Performance,
+                scheduler: lavd(LavdMode::Performance),
                 wifi_power_save: false,
                 ..base
             },
             Stop::MaxPerformance => Plan {
                 epp: Epp::Performance,
-                scheduler: Scheduler::Performance,
+                scheduler: lavd(LavdMode::Performance),
                 gpu_dpm: GpuDpm::High,
                 usb_autosuspend: false,
                 wifi_power_save: false,

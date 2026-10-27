@@ -104,6 +104,18 @@ rec {
   # The lock screen's PAM modules (system/lib.sh, link_nix_pam_module), which
   # load into Quickshell next to Nix's libpam.
   inherit (pkgs) fprintd pam_u2f;
+
+  # The CPU scheduler the power stops can run through sched_ext, as root
+  # (system/lib.sh, install_scx; kubaos-scx.service). Only scx_lavd out of
+  # scx.rustscheds: the copy keeps its libraries and lets the other twenty
+  # schedulers go, a 32 MiB binary to keep instead of 281 MiB of them.
+  scx-lavd = pkgs.runCommand "scx-lavd-${pkgs.scx.rustscheds.version}" {
+    meta = {
+      inherit (pkgs.scx.rustscheds.meta) homepage license platforms;
+      description = "scx_lavd, the latency-aware sched_ext scheduler, alone";
+      mainProgram = "scx_lavd";
+    };
+  } "install -Dm755 ${pkgs.scx.rustscheds}/bin/scx_lavd $out/bin/scx_lavd";
 }
 # aarch64 is the VM, where Hyprland comes from nixpkgs (home/desktop.nix).
 // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isAarch64 { inherit (pkgs) hyprland; }

@@ -1107,7 +1107,9 @@ arguments = [{ name = "setting", placeholder = "cpu-temp, ram, disk or battery-d
 # unplugging or plugging in moves to the stop last used on the new source.
 # The ids of the middle three are the old power profile toggles', so a `hide`
 # of them still works. "Power: what this stop does" is the Extension's own
-# Item (`power-status`): every layer of the stop, as the machine has it now.
+# Item (`power-status`): every layer of the stop, as the machine has it now;
+# so is "CPU scheduler: status" (`cpu-scheduler-status`): which scheduler
+# runs, Linux's own or LAVD, and why.
 # The settings Items write ~/.config/kubaos/desktop/power/power.toml through
 # `kubaos-power`, which puts them to work at once and says so in a toast.
 
@@ -1235,3 +1237,17 @@ keyword = "measure-power"
 terminal = true
 run = ["kubaos", "power", "measure", "--seconds", "{seconds}"]
 arguments = [{ name = "seconds", placeholder = "300" }]
+
+[extensions.kubaos.actions.cpu-scheduler-lavd-on]
+title = "CPU scheduler: LAVD on"
+subtitle = "scx_lavd puts input, the compositor and audio first, in each power stop's mode. If it fails, Linux's own scheduler takes over by itself"
+icon = "cpu"
+keywords = ["cpu scheduler", "lavd", "scx", "sched_ext", "sched ext", "latency", "responsiveness", "on"]
+run = ["kubaos-power", "scheduler", "on"]
+
+[extensions.kubaos.actions.cpu-scheduler-lavd-off]
+title = "CPU scheduler: LAVD off"
+subtitle = "Linux's own scheduler (EEVDF), as the kernel ships it"
+icon = "cpu"
+keywords = ["cpu scheduler", "lavd", "scx", "sched_ext", "eevdf", "default scheduler", "off"]
+run = ["kubaos-power", "scheduler", "off"]

@@ -7,14 +7,16 @@
 //! - Which Items there are under the current config, `hide` applied, and what the update check
 //!   changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position, a drive, an idle setting or the power stop's status.
+//!   user folder, a desk position, a drive, an idle setting, the power stop's status or the CPU
+//!   scheduler's.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
 //!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
 //!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`]. The
-//!   idle settings: [`crate::idle`]. The power stop's status: [`crate::power`].
+//!   idle settings: [`crate::idle`]. The power stop's status and the CPU scheduler's:
+//!   [`crate::power`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -123,9 +125,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.desk = desk;
     }
 
-    /// The Items to index: the actions, the toggles, the idle settings, the power stop's status,
-    /// the keyboard Items, the wallpaper sets, the user folders, the desk positions and the drives
-    /// `hide` leaves in, the update actions as the update check has them.
+    /// The Items to index: the actions, the toggles, the idle settings, the power stop's and the CPU
+    /// scheduler's status, the keyboard Items, the wallpaper sets, the user folders, the desk
+    /// positions and the drives `hide` leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -157,7 +159,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
-        let power = Some(power::item()).filter(|item| !self.registry.hides(&item.id));
+        let power = [power::item(), power::scheduler_item()]
+            .into_iter()
+            .filter(|item| !self.registry.hides(&item.id));
         self.registry
             .items()
             .filter_map(|item| self.pending.apply(item))
@@ -207,6 +211,13 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             power::KIND if action == power::SHOW && !self.registry.hides(&item.id) => {
                 Ok(Ran::Push(power::view(&power_now())))
             }
+            power::SCHEDULER_KIND if action == power::SHOW && !self.registry.hides(&item.id) => {
+                let (settings, _) = power_settings();
+                Ok(Ran::Push(power::scheduler_view(&kubaos_power::live::scheduler(
+                    &settings,
+                    &Machine::real(),
+                ))))
+            }
             _ => Err(unknown()),
         }
     }
@@ -223,12 +234,17 @@ fn idle_settings() -> kubaos_idle::settings::Settings {
 /// The power stop now, under the settings as the file has them; a file that doesn't read is
 /// KubaOS's defaults, and the View's title says why.
 fn power_now() -> Now {
-    let (settings, problem) = match kubaos_power::settings::path().map(|path| PowerSettings::load(&path)) {
+    let (settings, problem) = power_settings();
+    kubaos_power::live::read(&settings, problem.as_deref(), &Machine::real())
+}
+
+/// The power settings as the file has them, or KubaOS's defaults and why.
+fn power_settings() -> (PowerSettings, Option<String>) {
+    match kubaos_power::settings::path().map(|path| PowerSettings::load(&path)) {
         Some(Ok(settings)) => (settings, None),
         Some(Err(err)) => (PowerSettings::default(), Some(Chain(&err).to_string())),
         None => (PowerSettings::default(), None),
-    };
-    kubaos_power::live::read(&settings, problem.as_deref(), &Machine::real())
+    }
 }
 
 #[cfg(test)]

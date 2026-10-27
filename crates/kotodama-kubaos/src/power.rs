@@ -1,15 +1,17 @@
 //! "Power: what this stop does" in the menu: the stop now, with every layer it sets as a row,
-//! what it wants and what the machine says, read live when the Item runs.
+//! what it wants and what the machine says, read live when the Item runs. "CPU scheduler: status"
+//! beside it: which scheduler runs, why, and what is behind it.
 //!
 //! # Owns
 //!
-//! - The Item and its View.
+//! - The two Items and their Views.
 //!
 //! # Not here
 //!
-//! - The rows: `kubaos_power::status`, read by `kubaos_power::live`. The stops' own Items, the
-//!   charge limit, the low-battery drop and the measurement: actions of the registry
-//!   (`config/kotodama/kubaos.toml`), which run `kubaos-power`.
+//! - The rows: `kubaos_power::status`, read by `kubaos_power::live`; the scheduler's report:
+//!   `kubaos_power::scheduler`. The stops' own Items, the charge limit, the low-battery drop, LAVD
+//!   on and off and the measurement: actions of the registry (`config/kotodama/kubaos.toml`),
+//!   which run `kubaos-power`.
 
 use kotodama_protocol::Action;
 use kotodama_protocol::Item;
@@ -18,6 +20,7 @@ use kotodama_protocol::NamespacedKind;
 use kotodama_protocol::View;
 use kotodama_protocol::ViewContent;
 use kubaos_power::live::Now;
+use kubaos_power::scheduler::Report;
 use kubaos_power::status::Row;
 
 /// The Item kind of "Power: what this stop does".
@@ -26,10 +29,15 @@ pub const KIND: &str = "kubaos.power";
 pub const ROW_KIND: &str = "kubaos.power-row";
 /// The Item's id, which `hide` names it by.
 pub const ID: &str = "power-status";
-/// Its one Action.
+/// The one Action of either Item.
 pub const SHOW: &str = "show";
+/// The Item kind of "CPU scheduler: status".
+pub const SCHEDULER_KIND: &str = "kubaos.cpu-scheduler";
+/// Its id, which `hide` names it by.
+pub const SCHEDULER_ID: &str = "cpu-scheduler-status";
 
 const ICON: &str = "battery";
+const SCHEDULER_ICON: &str = "cpu";
 
 /// The Item.
 pub fn item() -> Item {
@@ -60,9 +68,72 @@ pub fn item() -> Item {
     }
 }
 
+/// "CPU scheduler: status".
+pub fn scheduler_item() -> Item {
+    Item {
+        id: SCHEDULER_ID.to_owned(),
+        kind: kind(SCHEDULER_KIND),
+        identity: None,
+        title: "CPU scheduler: status".to_owned(),
+        subtitle: Some("Which CPU scheduler runs, Linux's own or LAVD, and why".to_owned()),
+        icon: Some(SCHEDULER_ICON.to_owned()),
+        keyword: None,
+        keywords: [
+            "cpu scheduler",
+            "scheduler status",
+            "lavd",
+            "scx",
+            "sched_ext",
+            "sched ext",
+            "eevdf",
+            "power stop",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        hidden: false,
+        app_only: false,
+        actions: vec![Action::new(SHOW, "Show")],
+    }
+}
+
 /// Every id of an Item this module sends, which no action of the registry may take.
-pub fn ids() -> [&'static str; 1] {
-    [ID]
+pub fn ids() -> [&'static str; 2] {
+    [ID, SCHEDULER_ID]
+}
+
+/// The View of the scheduler's `report`: which runs, with why under it, then the details, a line
+/// each.
+pub fn scheduler_view(report: &Report) -> View {
+    let row = |id: String, title: String, subtitle: Option<String>| Item {
+        id,
+        kind: kind(ROW_KIND),
+        identity: None,
+        title,
+        subtitle,
+        icon: Some(SCHEDULER_ICON.to_owned()),
+        keyword: None,
+        keywords: Vec::new(),
+        hidden: false,
+        app_only: false,
+        actions: Vec::new(),
+    };
+    let running = row(
+        format!("{SCHEDULER_ID}:running"),
+        format!("Running: {}", report.running),
+        Some(report.why.clone()),
+    );
+    let details = report
+        .details
+        .iter()
+        .map(|(label, value)| row(format!("{SCHEDULER_ID}:{label}"), format!("{label}: {value}"), None));
+    View {
+        id: SCHEDULER_ID.to_owned(),
+        title: "CPU scheduler".to_owned(),
+        content: ViewContent::List {
+            items: std::iter::once(running).chain(details).collect(),
+            filters_itself: false,
+        },
+    }
 }
 
 /// The View of `now`: a row a layer, what it wants as the title and what the machine says as the

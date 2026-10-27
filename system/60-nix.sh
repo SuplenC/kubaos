@@ -204,6 +204,16 @@ else
 fi
 
 # --------------------------------------------------------------------------
+# The CPU scheduler the power stops can run (kubaos-scx.service), installed
+# and left off until the user turns it on. Not tied to DO_SWITCH either.
+step "scx_lavd for the power stops ($SCX_LINK)"
+if ((DRY_RUN)) || command -v nix >/dev/null; then
+  install_scx
+else
+  warn "nix not found; skipping"
+fi
+
+# --------------------------------------------------------------------------
 # setup_nix_gpu: home-manager's targets.genericLinux.gpu (home/desktop.nix)
 # builds a driver bundle and ships `non-nixos-gpu-setup`. Run once as root; it
 # writes /etc/tmpfiles.d/non-nixos-gpu.conf so /run/opengl-driver points at

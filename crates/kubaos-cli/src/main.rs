@@ -117,7 +117,8 @@ enum Cmd {
     /// The power stops, Super Saver to Max Performance: set one, see what it does, measure it.
     #[command(disable_help_flag = true)]
     Power {
-        /// `set STOP`, `status`, `measure [--seconds N]`, `undo`, `charge-limit 80|90|100`, …
+        /// `set STOP`, `status`, `measure [--seconds N]`, `undo`, `charge-limit 80|90|100`,
+        /// `scheduler [on|off|status]`, …
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },

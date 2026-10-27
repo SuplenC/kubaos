@@ -5,6 +5,7 @@
 //! charge_limit = 100            # 80, 90 or 100
 //! low_battery = 20              # the drop's level, in percent
 //! low_battery_stop = "power-saver"   # "super-saver", or "off" for no drop
+//! scheduler = "kernel"          # "lavd": scx_lavd through sched_ext, its mode the stop's
 //!
 //! [usb]
 //! skip = ["046d:c547", "1050:*"]
@@ -104,6 +105,35 @@ impl ChargeLimit {
     }
 }
 
+/// Which CPU scheduler runs: Linux's own, or scx_lavd through sched_ext.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CpuScheduler {
+    /// The kernel's own, EEVDF.
+    Kernel,
+    /// scx_lavd, in the stop's mode.
+    Lavd,
+}
+
+impl CpuScheduler {
+    pub const ALL: [CpuScheduler; 2] = [CpuScheduler::Kernel, CpuScheduler::Lavd];
+
+    /// Its name in the file.
+    pub fn name(self) -> &'static str {
+        match self {
+            CpuScheduler::Kernel => "kernel",
+            CpuScheduler::Lavd => "lavd",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<CpuScheduler> {
+        CpuScheduler::ALL.into_iter().find(|scheduler| scheduler.name() == name)
+    }
+}
+
+/// The kernel's own scheduler, until LAVD's numbers against it on the reference laptop (frame
+/// times under a full build, input latency, build time, battery draw) say otherwise.
+pub const DEFAULT_CPU_SCHEDULER: CpuScheduler = CpuScheduler::Kernel;
+
 /// What the laptop panel does in a stop.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PanelMode {
@@ -156,6 +186,8 @@ pub struct Settings {
     pub low_battery_stop: Option<Stop>,
     /// USB devices never autosuspended, beyond the input devices, which never are.
     pub usb_skip: Vec<UsbId>,
+    /// The CPU scheduler every stop runs, LAVD in the stop's mode or the kernel's own.
+    pub scheduler: CpuScheduler,
     stops: [StopSettings; 5],
 }
 
@@ -167,6 +199,7 @@ impl Default for Settings {
             low_battery: DEFAULT_LOW_BATTERY,
             low_battery_stop: Some(DEFAULT_LOW_BATTERY_STOP),
             usb_skip: Vec::new(),
+            scheduler: DEFAULT_CPU_SCHEDULER,
             stops: Stop::ALL.map(default_stop),
         }
     }
@@ -257,6 +290,7 @@ struct SettingsToml {
     charge_limit: Option<i64>,
     low_battery: Option<i64>,
     low_battery_stop: Option<String>,
+    scheduler: Option<String>,
     #[serde(default)]
     usb: UsbToml,
     #[serde(rename = "super-saver")]
@@ -289,6 +323,8 @@ pub enum SettingsError {
     NotALowBatteryStop(String),
     #[error("`{0}` isn't a USB device: write it as vendor:product, 046d:c547, or 1050:* for any of a vendor's")]
     NotAUsbId(String),
+    #[error("`{0}` isn't a CPU scheduler: kernel or lavd")]
+    NotAScheduler(String),
     #[error("`{0}` isn't a panel mode: 60hz, vrr or native")]
     NotAPanelMode(String),
     #[error("`{0}` isn't a PCIe ASPM policy: default, performance, powersave or powersupersave")]
@@ -343,6 +379,9 @@ impl Settings {
         }
         if let Some(stop) = read.low_battery_stop {
             settings.low_battery_stop = parse_low_battery_stop(&stop)?;
+        }
+        if let Some(scheduler) = read.scheduler {
+            settings.scheduler = CpuScheduler::from_name(&scheduler).ok_or(SettingsError::NotAScheduler(scheduler))?;
         }
         settings.usb_skip = read
             .usb
@@ -459,6 +498,21 @@ pub fn set_low_battery(path: &Path, percent: u8) -> Result<Settings, SettingsErr
         return Err(SettingsError::NotALowBattery(i64::from(percent)));
     }
     edit(path, |doc| doc["low_battery"] = value(i64::from(percent)))
+}
+
+/// Sets which CPU scheduler runs. The kernel's, the default, removes the key: a release from
+/// before the key refuses a file that has it, so a rollback would lose every power setting.
+///
+/// # Errors
+///
+/// As reading and writing the file.
+pub fn set_scheduler(path: &Path, scheduler: CpuScheduler) -> Result<Settings, SettingsError> {
+    edit(path, |doc| match scheduler {
+        CpuScheduler::Kernel => {
+            doc.remove("scheduler");
+        }
+        CpuScheduler::Lavd => doc["scheduler"] = value(scheduler.name()),
+    })
 }
 
 /// Sets what the laptop panel does in `stop`.

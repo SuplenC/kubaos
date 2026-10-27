@@ -1,11 +1,12 @@
 //! What `status` asks outside `/sys`: power-profiles-daemon's profile, Hyprland's laptop panel,
-//! `iw`'s Wi-Fi power saving, the indexer's pause, and the stop the service published. The
-//! command line and the Command menu's "Power: what this stop does" both read it here.
+//! `iw`'s Wi-Fi power saving, the indexer's pause, the scheduler's unit and its journal, and the
+//! stop the service published. The command line and the Command menu's "Power: what this stop
+//! does" and "CPU scheduler: status" read it here.
 //!
 //! # Owns
 //!
-//! - [`read`], and the questions it asks: [`profile`], [`laptop_panel`], [`wifi_power_save`],
-//!   [`indexer_paused`].
+//! - [`read`] and [`scheduler`], and the questions they ask: [`profile`], [`laptop_panel`],
+//!   [`wifi_power_save`], [`indexer_paused`], [`scheduler_unit`], [`lavd_exit`].
 //!
 //! # Not here
 //!
@@ -22,6 +23,8 @@ use crate::machine::Machine;
 use crate::plan::Plan;
 use crate::runtime;
 use crate::runtime::Published;
+use crate::scheduler;
+use crate::scheduler::UnitState;
 use crate::settings::Settings;
 use crate::status;
 use crate::status::Live;
@@ -51,11 +54,7 @@ pub struct Now {
 pub fn read(settings: &Settings, problem: Option<&str>, machine: &Machine) -> Now {
     let profile = profile();
     let published = runtime::file().and_then(|file| Published::load(&file));
-    let stop = published
-        .as_ref()
-        .and_then(Published::current)
-        .or_else(|| profile.map(Stop::from_profile))
-        .unwrap_or(Stop::Balanced);
+    let stop = stop_now(published.as_ref(), profile);
     let source = published
         .as_ref()
         .and_then(|published| match published.source.as_str() {
@@ -81,6 +80,8 @@ pub fn read(settings: &Settings, problem: Option<&str>, machine: &Machine) -> No
             })
             .collect(),
         indexer_paused: indexer_paused(),
+        scheduler_unit: scheduler_unit(),
+        scheduler_exit: lavd_exit(),
     };
     let mut header = format!("Power: {stop}");
     if let Some(source) = source {
@@ -95,9 +96,13 @@ pub fn read(settings: &Settings, problem: Option<&str>, machine: &Machine) -> No
     {
         let _ = write!(header, " (the low-battery drop, from {from})");
     }
-    if let Some(refused) = published.as_ref().map(|published| &published.refused)
-        && !refused.is_empty()
-    {
+    // The scheduler's own row says why LAVD didn't start.
+    let refused: Vec<&str> = published
+        .iter()
+        .flat_map(|published| published.refused.iter().map(String::as_str))
+        .filter(|arg| !arg.starts_with("scheduler="))
+        .collect();
+    if !refused.is_empty() {
         let _ = write!(
             header,
             "\nThe kernel refused {}; asked again at the next stop",
@@ -113,6 +118,62 @@ pub fn read(settings: &Settings, problem: Option<&str>, machine: &Machine) -> No
         header,
         rows: status::rows(&plan, settings, machine, &live),
     }
+}
+
+/// The stop the service published, else the one power-profiles-daemon's profile is named after.
+fn stop_now(published: Option<&Published>, profile: Option<Profile>) -> Stop {
+    published
+        .and_then(Published::current)
+        .or_else(|| profile.map(Stop::from_profile))
+        .unwrap_or(Stop::Balanced)
+}
+
+/// Which CPU scheduler runs and why, for the stop now under `settings`.
+pub fn scheduler(settings: &Settings, machine: &Machine) -> scheduler::Report {
+    let published = runtime::file().and_then(|file| Published::load(&file));
+    let profile = if published.is_some() { None } else { profile() };
+    let plan = Plan::for_stop(stop_now(published.as_ref(), profile), settings);
+    scheduler::report(&plan, machine, scheduler_unit().as_ref(), lavd_exit().as_deref())
+}
+
+/// The scheduler's unit, from `systemctl show`, which needs no root; `None` when systemctl can't
+/// be run.
+pub fn scheduler_unit() -> Option<UnitState> {
+    let output = Command::new("systemctl")
+        .args([
+            "show",
+            scheduler::UNIT,
+            "--property=LoadState,ActiveState,SubState,Result,NRestarts",
+        ])
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| UnitState::parse(&String::from_utf8_lossy(&output.stdout)))
+}
+
+/// scx_lavd's last exit message this boot (`EXIT: runtime error (…)`), which it prints when the
+/// kernel ejects it; `None` when there is none or the journal can't be read (reading the system
+/// journal takes the `adm` or `systemd-journal` group).
+pub fn lavd_exit() -> Option<String> {
+    let output = Command::new("journalctl")
+        .args([
+            "--boot",
+            "--unit",
+            scheduler::UNIT,
+            "--output=cat",
+            "--lines=200",
+            "--quiet",
+            "--no-pager",
+        ])
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    scheduler::last_exit(&String::from_utf8_lossy(&output.stdout))
 }
 
 /// power-profiles-daemon's profile, `None` when it can't be asked.

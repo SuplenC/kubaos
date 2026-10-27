@@ -115,6 +115,29 @@ fn every_change_lands_in_the_file() {
 }
 
 #[test]
+fn lavd_is_off_until_the_user_turns_it_on() {
+    let (_dir, path) = file("# Measured first.\ncharge_limit = 100\n");
+
+    let on = set_scheduler(&path, CpuScheduler::Lavd).expect("on");
+    let text = fs::read_to_string(&path).expect("read");
+    let off = set_scheduler(&path, CpuScheduler::Kernel).expect("off");
+    let after = fs::read_to_string(&path).expect("read");
+
+    assert_eq!(Settings::default().scheduler, CpuScheduler::Kernel);
+    assert_eq!(on.scheduler, CpuScheduler::Lavd);
+    assert_eq!(text, "# Measured first.\ncharge_limit = 100\nscheduler = \"lavd\"\n");
+    assert_eq!(off.scheduler, CpuScheduler::Kernel);
+    assert_eq!(after, "# Measured first.\ncharge_limit = 100\n");
+}
+
+#[test]
+fn a_scheduler_that_isnt_one_is_refused() {
+    let refused = Settings::parse("scheduler = \"bpfland\"").expect_err("refused");
+
+    assert_eq!(refused.to_string(), "`bpfland` isn't a CPU scheduler: kernel or lavd");
+}
+
+#[test]
 fn a_broken_file_is_left_as_it_is() {
     let (_dir, path) = file("charge_limit = 85\n");
 

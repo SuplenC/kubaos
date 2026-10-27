@@ -59,6 +59,14 @@ fn hide_takes_out_the_power_status_too() {
 }
 
 #[test]
+fn hide_takes_out_the_cpu_scheduler_status_alone() {
+    let extension = configured(r#"hide = ["cpu-scheduler-status"]"#);
+
+    assert!(!ids(&extension).contains(&"cpu-scheduler-status".to_owned()));
+    assert!(ids(&extension).contains(&"power-status".to_owned()));
+}
+
+#[test]
 fn hide_takes_out_a_toggle_too() {
     let extension = configured(r#"hide = ["bluetooth"]"#);
 

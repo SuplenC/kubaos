@@ -7,7 +7,8 @@
 // of the user manager counts as the user's local, active session: polkit
 // falls back to the user's display session (sd_uid_get_display) for a process
 // outside any session. The helper writes only the knobs it knows, to values
-// it checks itself, and never makes an input device autosuspend.
+// it checks itself, never makes an input device autosuspend, and starts and
+// stops one unit only, kubaos-scx.service, the CPU scheduler.
 // Installed as /etc/polkit-1/rules.d/50-kubaos-power.rules by
 // system/30-hardware.sh.
 // https://www.freedesktop.org/software/polkit/docs/latest/polkit.8.html

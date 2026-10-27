@@ -5,7 +5,8 @@
 //! # Owns
 //!
 //! - [`Machine`]: finding the CPU's policies, the GPUs, the laptop panels, the PCIe ASPM policy,
-//!   the USB devices, the Wi-Fi interfaces, the charge limit and the battery, and reading each.
+//!   the USB devices, the Wi-Fi interfaces, the charge limit and the battery, and reading each;
+//!   the CPUs' cores and how fast each can go, sched_ext's state, and the scheduler's files.
 //!
 //! # Not here
 //!
@@ -118,6 +119,40 @@ pub struct BatteryNow {
 
 /// The TUXEDO platform device's charging profile.
 const TUXEDO_CHARGING: &str = "sys/devices/platform/tuxedo_keyboard/charging_profile/charging_profile";
+
+/// An online CPU, a hardware thread.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Cpu {
+    pub id: u32,
+    /// The highest performance it reaches, in CPPC's units (`amd_pstate_highest_perf`, else ACPI
+    /// CPPC's `highest_perf`), which stay put whether boost is on or off: on a Ryzen AI 9 HX 370
+    /// about 200 for a Zen 5 core and 125 for a Zen 5c one.
+    pub highest_perf: Option<u32>,
+    /// The threads of its core, itself among them: `thread_siblings_list`.
+    pub siblings: Vec<u32>,
+}
+
+/// sched_ext, the kernel's scheduler class run by a BPF program.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SchedExt {
+    /// `disabled`, `enabling`, `enabled` or `disabling`.
+    pub state: String,
+    /// The BPF scheduler's name while one runs: `lavd_1.1.2_…`.
+    pub ops: Option<String>,
+}
+
+impl SchedExt {
+    /// Whether scx_lavd is the scheduler in charge.
+    pub fn runs_lavd(&self) -> bool {
+        self.state == "enabled" && self.ops.as_deref().is_some_and(|ops| ops.starts_with("lavd"))
+    }
+}
+
+/// Where the root helper keeps the scheduler's command line, for `kubaos-scx.service`'s
+/// `EnvironmentFile`: there while LAVD is on, so a boot starts it in the last stop's mode.
+pub const LAVD_ENV: &str = "var/lib/kubaos/scx-lavd.env";
+/// scx_lavd, linked to KubaOS's build by `install_scx` (`system/lib.sh`).
+pub const LAVD_BIN: &str = "usr/local/libexec/kubaos-scx-lavd";
 
 impl Machine {
     /// The real machine.
@@ -289,6 +324,63 @@ impl Machine {
         )
     }
 
+    /// The online CPUs, by id.
+    pub fn cpus(&self) -> Vec<Cpu> {
+        let dir = "sys/devices/system/cpu";
+        self.list(dir, |name| {
+            name.strip_prefix("cpu")
+                .is_some_and(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
+        })
+        .into_iter()
+        // cpu0 has no `online` file on most machines: it can't go offline.
+        .filter(|name| {
+            self.read_at(&format!("{dir}/{name}/online"))
+                .is_none_or(|online| online == "1")
+        })
+        .filter_map(|name| {
+            let at = |file: &str| self.read_at(&format!("{dir}/{name}/{file}"));
+            let id = name.strip_prefix("cpu")?.parse().ok()?;
+            let highest_perf = at("cpufreq/amd_pstate_highest_perf")
+                .or_else(|| at("acpi_cppc/highest_perf"))
+                .and_then(|perf| perf.parse().ok());
+            let siblings = at("topology/thread_siblings_list")
+                .map(|list| cpu_list(&list))
+                .filter(|list| !list.is_empty())
+                .unwrap_or_else(|| vec![id]);
+            Some(Cpu {
+                id,
+                highest_perf,
+                siblings,
+            })
+        })
+        .collect()
+    }
+
+    /// sched_ext's state; `None` on a kernel without it.
+    pub fn sched_ext(&self) -> Option<SchedExt> {
+        let state = self.read_at("sys/kernel/sched_ext/state")?;
+        Some(SchedExt {
+            state,
+            ops: self
+                .read_at("sys/kernel/sched_ext/root/ops")
+                .filter(|ops| !ops.is_empty()),
+        })
+    }
+
+    /// The mode the root helper last asked of scx_lavd, as its `scheduler=` value
+    /// (`powersave:4,16`); `None` while LAVD is off.
+    pub fn lavd_asked(&self) -> Option<String> {
+        self.read_at(LAVD_ENV)?
+            .lines()
+            .find_map(|line| line.strip_prefix("KUBAOS_SCHEDULER="))
+            .map(str::to_owned)
+    }
+
+    /// Whether scx_lavd is installed.
+    pub fn has_lavd(&self) -> bool {
+        self.path(LAVD_BIN).exists()
+    }
+
     fn batteries(&self) -> Vec<String> {
         self.list("sys/class/power_supply", |_| true)
             .into_iter()
@@ -357,6 +449,22 @@ impl Machine {
 /// The file at `path`, trimmed; `None` when it can't be read.
 fn read(path: &Path) -> Option<String> {
     fs::read_to_string(path).ok().map(|text| text.trim().to_owned())
+}
+
+/// The CPUs of a kernel CPU list, `0-3,12` or `4,16`; a part that doesn't read is left out.
+fn cpu_list(list: &str) -> Vec<u32> {
+    let mut cpus = Vec::new();
+    for part in list.split(',').map(str::trim).filter(|part| !part.is_empty()) {
+        match part.split_once('-') {
+            Some((from, to)) => {
+                if let (Ok(from), Ok(to)) = (from.parse::<u32>(), to.parse::<u32>()) {
+                    cpus.extend(from..=to);
+                }
+            }
+            None => cpus.extend(part.parse::<u32>().ok()),
+        }
+    }
+    cpus
 }
 
 /// `card1`, not `card1-eDP-1` or `renderD128`.

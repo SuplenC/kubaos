@@ -13,7 +13,8 @@
 //! # Not here
 //!
 //! - The rows' values: [`crate::plan`]. The panel's refresh rate and VRR, which Hyprland sets:
-//!   [`crate::panel`].
+//!   [`crate::panel`]. When the scheduler is written, which a recheck never does:
+//!   [`crate::scheduler::writes`].
 
 use crate::machine::ChargeKnob;
 use crate::machine::Machine;
@@ -49,6 +50,9 @@ pub enum Write {
         battery: String,
         percent: u8,
     },
+    /// The CPU scheduler: scx_lavd in a mode (`powersave:4,16`, [`crate::scheduler::asked`]),
+    /// `off` for the kernel's own, or `reset` to let a LAVD that kept crashing start again.
+    Scheduler(String),
 }
 
 impl Write {
@@ -70,6 +74,7 @@ impl Write {
             }
             Write::TuxedoCharge(profile) => format!("charge-profile={profile}"),
             Write::ChargeEnd { battery, percent } => format!("charge-end={battery}:{percent}"),
+            Write::Scheduler(value) => format!("scheduler={value}"),
         }
     }
 }

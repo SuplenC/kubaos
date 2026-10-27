@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Points what system/ took from KubaOS's nixpkgs at the release now checked
-# out: the wallpaper sets, the lock screen's PAM modules and the recorder's
-# KMS helper (system/lib.sh). kubaos update and kubaos rollback run it after
-# moving the release, before the home-manager switch: dot-theme reads the
-# wallpaper link, and the helper must speak the new gsr's protocol. Each link
-# is a no-op when it already points at the release's build.
+# out: the wallpaper sets, the lock screen's PAM modules, the recorder's KMS
+# helper and scx_lavd with its unit (system/lib.sh). kubaos update and kubaos
+# rollback run it after moving the release, before the home-manager switch:
+# dot-theme reads the wallpaper link, and the helper must speak the new gsr's
+# protocol. Each link is a no-op when it already points at the release's build.
 set -euo pipefail
 # shellcheck source=system/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -13,8 +13,9 @@ usage() {
   cat <<EOF
 Usage: $0 [--dry-run]
 
-Relinks the wallpaper sets, pam_fprintd.so, pam_u2f.so (when it is linked)
-and the gsr-kms-server helper (when it is installed) to $KUBAOS_DIR.
+Relinks the wallpaper sets, pam_fprintd.so, pam_u2f.so (when it is linked),
+the gsr-kms-server helper (when it is installed) and scx_lavd with
+kubaos-scx.service to $KUBAOS_DIR.
 $(common_usage)
 EOF
 }
@@ -41,6 +42,7 @@ step "Relinking to $KUBAOS_DIR"
 link_wallpapers
 link_pam_fprintd
 if [[ -L "$PAM_U2F_LINK" ]] || ((DRY_RUN)); then link_pam_u2f; fi
+install_scx
 if [[ -e /usr/local/libexec/dotfiles/gsr-kms-server ]]; then
   rec_args=()
   ((DRY_RUN)) && rec_args+=(--dry-run)

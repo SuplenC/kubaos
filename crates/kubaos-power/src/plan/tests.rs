@@ -122,18 +122,32 @@ fn background_work_waits_only_in_the_saver_stops() {
 }
 
 #[test]
-fn the_scheduler_seam_names_a_mode_for_every_stop() {
-    let modes: Vec<Scheduler> = Stop::ALL.into_iter().map(|stop| plan(stop).scheduler).collect();
+fn with_lavd_on_every_stop_runs_it_in_a_mode_of_its_own() {
+    let settings = Settings::parse("scheduler = \"lavd\"\n").expect("parses");
+
+    let modes: Vec<Scheduler> = Stop::ALL
+        .into_iter()
+        .map(|stop| Plan::for_stop(stop, &settings).scheduler)
+        .collect();
 
     assert_eq!(
         modes,
         [
-            Scheduler::PowersaveFewestCores,
-            Scheduler::Powersave,
-            Scheduler::Autopilot,
-            Scheduler::Performance,
-            Scheduler::Performance
+            Scheduler::Lavd(LavdMode::PowersaveFewestCores),
+            Scheduler::Lavd(LavdMode::Powersave),
+            Scheduler::Lavd(LavdMode::Autopilot),
+            Scheduler::Lavd(LavdMode::Performance),
+            Scheduler::Lavd(LavdMode::Performance)
         ]
+    );
+}
+
+#[test]
+fn by_default_every_stop_runs_the_kernels_own_scheduler() {
+    assert!(
+        Stop::ALL
+            .into_iter()
+            .all(|stop| plan(stop).scheduler == Scheduler::Kernel)
     );
 }
 

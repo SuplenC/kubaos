@@ -12,6 +12,7 @@
 //! kubaos-power low-battery power-saver|super-saver|off|PERCENT
 //! kubaos-power panel STOP 60hz|vrr|native what the laptop panel does in a stop
 //! kubaos-power apply                      put a hand edit of power.toml to work
+//! kubaos-power scheduler [on|off]         which CPU scheduler runs and why; LAVD on or off
 //! ```
 //!
 //! A change to the settings says what it came to on stdout and in a toast, and the service puts
@@ -19,8 +20,9 @@
 //!
 //! # Owns
 //!
-//! - The command line, the service's loop and threads (the bus, the socket, the toasts), and doing
-//!   what [`Control`] decides: power-profiles-daemon, the root helper, Hyprland, the indexer.
+//! - The command line, the service's loop and threads (the bus, the scheduler's unit, the socket,
+//!   the toasts), and doing what [`Control`] decides: power-profiles-daemon, the root helper,
+//!   Hyprland, the indexer.
 //!
 //! # Not here
 //!
@@ -69,8 +71,11 @@ use kubaos_power::panel;
 use kubaos_power::plan::Plan;
 use kubaos_power::runtime;
 use kubaos_power::runtime::Published;
+use kubaos_power::scheduler;
+use kubaos_power::scheduler::UnitState;
 use kubaos_power::settings;
 use kubaos_power::settings::ChargeLimit;
+use kubaos_power::settings::CpuScheduler;
 use kubaos_power::settings::PanelMode;
 use kubaos_power::settings::Settings;
 use kubaos_power::status;
@@ -87,6 +92,7 @@ usage: kubaos power set super-saver|power-saver|balanced|performance|max-perform
        kubaos power charge-limit 80|90|100
        kubaos power low-battery power-saver|super-saver|off|PERCENT
        kubaos power panel STOP 60hz|vrr|native
+       kubaos power scheduler [on|off]
 
 set       move the power slider to a stop; each power source remembers its own
 undo      undo the low-battery drop
@@ -97,6 +103,8 @@ charge-limit        how far the battery charges, in percent
 low-battery         where the stop drops at the low-battery level, or that level in percent
 panel     the laptop panel in a stop: 60 Hz, the native rate with VRR, or native
 apply     put a hand edit of the settings file to work
+scheduler which CPU scheduler runs and why; on runs LAVD (sched_ext) in each stop's mode, off
+          leaves Linux's own (EEVDF)
 
 Settings: ~/.config/kubaos/desktop/power/power.toml";
 
@@ -107,6 +115,7 @@ const PKEXEC: &str = "/usr/bin/pkexec";
 const UPOWER_SERVICE: &str = "org.freedesktop.UPower";
 const UPOWER_PATH: &str = "/org/freedesktop/UPower";
 const DISPLAY_DEVICE: &str = "/org/freedesktop/UPower/devices/DisplayDevice";
+const SYSTEMD: &str = "org.freedesktop.systemd1";
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
@@ -144,6 +153,12 @@ fn main() -> ExitCode {
         ["low-battery", what] => report_said(low_battery(what)),
         ["panel", stop, mode] => report_said(set_panel(stop, mode)),
         ["apply"] => report_said(apply_file()),
+        ["scheduler"] | ["scheduler", "status"] => {
+            let (settings, _) = load_settings();
+            print!("{}", scheduler::text(&live::scheduler(&settings, &Machine::real())));
+            ExitCode::SUCCESS
+        }
+        ["scheduler", on @ ("on" | "off")] => report_said(set_scheduler(*on == "on")),
         ["-h" | "--help" | "help"] => {
             println!("{USAGE}");
             ExitCode::SUCCESS
@@ -350,6 +365,29 @@ fn set_panel(stop: &str, mode: &str) -> Result<String, String> {
     )
 }
 
+/// Turns LAVD on or off. On also lets a LAVD that crashed until systemd gave up on it start again.
+fn set_scheduler(on: bool) -> Result<String, String> {
+    let choice = if on { CpuScheduler::Lavd } else { CpuScheduler::Kernel };
+    settings::set_scheduler(&settings_path()?, choice).map_err(|err| chain(&err))?;
+    let asked = ask(if on { "retry-scheduler" } else { "reload" });
+    let machine = Machine::real();
+    let said = match (on, machine.sched_ext().is_some(), machine.has_lavd()) {
+        (false, ..) => "LAVD is off: Linux's own scheduler (EEVDF) runs.".to_owned(),
+        (true, false, _) => "LAVD is on, but this kernel has no sched_ext, so Linux's own scheduler stays.".to_owned(),
+        (true, true, false) => "LAVD is on, but scx_lavd isn't installed yet: `kubaos update` installs it.".to_owned(),
+        (true, true, true) => "LAVD is on, in each stop's mode. If it fails, the kernel goes back to its own \
+                               scheduler by itself; `kubaos power scheduler` says which runs and why."
+            .to_owned(),
+    };
+    match asked {
+        Ok(_) => Ok(said),
+        Err(problem) if problem.starts_with("the power service isn't running") => {
+            Ok(format!("{said} It takes effect when the power service runs."))
+        }
+        Err(problem) => Err(problem),
+    }
+}
+
 fn apply_file() -> Result<String, String> {
     Settings::load(&settings_path()?).map_err(|err| chain(&err))?;
     ask("reload")?;
@@ -423,6 +461,8 @@ enum Event {
     /// A GPU, a screen or a USB device came, went or changed (udev).
     Devices,
     Percent(f64),
+    /// The scheduler's unit changed state.
+    Scheduler(UnitState),
     /// A line on the socket, and where its answer goes.
     Ask(String, Sender<String>),
     Undo,
@@ -439,6 +479,7 @@ fn serve() -> Result<(), String> {
     let (events, received) = mpsc::channel();
     follow_bus(&bus, &events)?;
     follow_devices(events.clone());
+    follow_scheduler(&bus, events.clone());
     listen(&runtime, events.clone())?;
     let mut service = Service::new(bus, runtime, events);
     service.run(&received)
@@ -539,6 +580,64 @@ fn follow_devices(events: Sender<Event>) {
     });
 }
 
+/// Follows the scheduler's unit on systemd's bus, so the service hears the moment LAVD falls back
+/// to the kernel's scheduler: its state at the start, then at every change. Without the bus,
+/// `status` still says it.
+fn follow_scheduler(bus: &zbus::blocking::Connection, events: Sender<Event>) {
+    let bus = bus.clone();
+    thread::spawn(move || {
+        let follow = || -> zbus::Result<()> {
+            let manager = zbus::blocking::Proxy::new(
+                &bus,
+                SYSTEMD,
+                "/org/freedesktop/systemd1",
+                "org.freedesktop.systemd1.Manager",
+            )?;
+            // systemd sends its units' changes only while some client is subscribed.
+            manager.call_method("Subscribe", &())?;
+            let properties =
+                zbus::blocking::Proxy::new(&bus, SYSTEMD, scheduler::UNIT_PATH, "org.freedesktop.DBus.Properties")?;
+            let changes = properties.receive_signal("PropertiesChanged")?;
+            let _ = events.send(Event::Scheduler(unit_state(&properties)));
+            for _ in changes {
+                let _ = events.send(Event::Scheduler(unit_state(&properties)));
+            }
+            Ok(())
+        };
+        if let Err(err) = follow() {
+            eprintln!(
+                "kubaos-power: couldn't follow {} ({}); LAVD's fallbacks show in status only",
+                scheduler::UNIT,
+                chain(&err)
+            );
+        }
+    });
+}
+
+/// The scheduler's unit as systemd has it now, read through `properties`, its
+/// `org.freedesktop.DBus.Properties`; a property that doesn't read stays empty.
+fn unit_state(properties: &zbus::blocking::Proxy<'_>) -> UnitState {
+    let get = |interface: &str, name: &str| {
+        properties
+            .call::<_, _, zbus::zvariant::OwnedValue>("Get", &(interface, name))
+            .ok()
+    };
+    let text = |interface: &str, name: &str| {
+        get(interface, name)
+            .and_then(|value| String::try_from(value).ok())
+            .unwrap_or_default()
+    };
+    UnitState {
+        load: text("org.freedesktop.systemd1.Unit", "LoadState"),
+        active: text("org.freedesktop.systemd1.Unit", "ActiveState"),
+        sub: text("org.freedesktop.systemd1.Unit", "SubState"),
+        result: text("org.freedesktop.systemd1.Service", "Result"),
+        restarts: get("org.freedesktop.systemd1.Service", "NRestarts")
+            .and_then(|value| u32::try_from(value).ok())
+            .unwrap_or(0),
+    }
+}
+
 /// Answers the socket: a line in, the loop's answer out.
 fn listen(runtime: &Path, events: Sender<Event>) -> Result<(), String> {
     let path = runtime.join(runtime::SOCKET);
@@ -587,6 +686,10 @@ struct Service {
     helper_said: bool,
     /// The knobs the kernel refused for the stop in use.
     refused: writes::Refused,
+    /// The scheduler's unit as last heard.
+    scheduler_unit: Option<UnitState>,
+    /// LAVD was just turned on: the next stop's writes let a LAVD that kept crashing start again.
+    retry_scheduler: bool,
 }
 
 impl Service {
@@ -612,6 +715,8 @@ impl Service {
             panel: None,
             helper_said: false,
             refused: writes::Refused::default(),
+            scheduler_unit: None,
+            retry_scheduler: false,
         }
     }
 
@@ -633,7 +738,7 @@ impl Service {
                 self.input(Input::Source(source));
             }
             if self.recheck.due(Instant::now()) {
-                self.write_plan();
+                self.write_plan(false);
             }
         }
     }
@@ -670,6 +775,7 @@ impl Service {
                 }
             }
             Event::Percent(percent) => self.input(Input::Percent(percent)),
+            Event::Scheduler(now) => self.scheduler_changed(now),
             Event::Undo => self.input(Input::Undo),
             Event::Ask(line, reply) => {
                 let answer = self.ask(&line);
@@ -699,12 +805,13 @@ impl Service {
                     "ok There's no low-battery drop to undo".to_owned()
                 }
             }
-            ["reload"] => {
+            [line @ ("reload" | "retry-scheduler")] => {
                 let (settings, problem) = load_settings();
                 if let Some(problem) = problem {
                     return format!("error {problem}");
                 }
                 self.settings = settings;
+                self.retry_scheduler = *line == "retry-scheduler";
                 if let Some(control) = &mut self.control {
                     control.set_drop(drop_of(&self.settings));
                     let stop = control.stop();
@@ -754,20 +861,43 @@ impl Service {
         self.publish();
         self.apply_panel(&plan);
         Self::quiet(plan.quiet_background);
-        self.write_plan();
+        self.write_plan(true);
     }
 
-    /// The stop's writes that the machine lacks now: all of them at a stop, the ones a new device
-    /// or power-profiles-daemon undid on a recheck.
-    fn write_plan(&mut self) {
-        let Some(control) = &self.control else { return };
-        let plan = Plan::for_stop(control.stop(), &self.settings);
-        let writes = self.refused.filter(writes::for_plan(
-            &plan,
-            &self.settings,
-            &self.machine,
-            &live::wifi_power_save,
-        ));
+    /// Hears the scheduler's unit change, and says when LAVD fell back to the kernel's scheduler:
+    /// in the journal, and in a toast.
+    fn scheduler_changed(&mut self, now: UnitState) {
+        let before = self.scheduler_unit.take();
+        let fallback = if self.settings.scheduler == CpuScheduler::Lavd {
+            scheduler::fallback(before.as_ref(), &now)
+        } else {
+            None
+        };
+        if let Some(fallback) = fallback {
+            let (title, body, urgency) = fallback.toast();
+            eprintln!(
+                "kubaos-power: LAVD fell back to the kernel's scheduler ({}): {body}",
+                now.words()
+            );
+            thread::spawn(move || notify(title, &body, urgency, None));
+        }
+        self.scheduler_unit = Some(now);
+    }
+
+    /// The stop's writes that the machine lacks now: all of them at a stop (`at_stop`), the
+    /// scheduler last, as restarting it takes longest; on a recheck, the ones a new device or
+    /// power-profiles-daemon undid, never the scheduler.
+    fn write_plan(&mut self, at_stop: bool) {
+        let Some(stop) = self.control.as_ref().map(Control::stop) else {
+            return;
+        };
+        let plan = Plan::for_stop(stop, &self.settings);
+        let mut writes = writes::for_plan(&plan, &self.settings, &self.machine, &live::wifi_power_save);
+        if at_stop {
+            let retry = std::mem::take(&mut self.retry_scheduler);
+            writes.extend(scheduler::writes(&plan, &self.machine, retry));
+        }
+        let writes = self.refused.filter(writes);
         if !writes.is_empty() {
             self.write(&writes);
         }
