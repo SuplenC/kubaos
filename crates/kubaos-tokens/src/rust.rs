@@ -10,6 +10,8 @@
 //! - Turning the tokens into iced values (colours, fonts, pixels at a scale): `kubaos-ui`.
 
 use std::collections::BTreeMap;
+use std::io;
+use std::path::Path;
 
 use crate::model::Family;
 use crate::model::Rgb;
@@ -26,7 +28,7 @@ impl Target for RustModule {
         "crates/kubaos-ui/src/tokens.rs"
     }
 
-    fn render(&self, tokens: &Tokens) -> String {
+    fn render(&self, tokens: &Tokens, _root: &Path) -> io::Result<String> {
         let mut out = Writer::default();
         header(&mut out);
         rules(&mut out, tokens);
@@ -36,7 +38,7 @@ impl Target for RustModule {
         surfaces(&mut out, tokens);
         colors(&mut out, tokens);
         symbols(&mut out, tokens);
-        out.text
+        Ok(out.text)
     }
 }
 
@@ -64,7 +66,7 @@ impl Writer {
 }
 
 /// `text` in lines of at most `width` characters, broken at spaces.
-fn wrap(text: &str, width: usize) -> Vec<String> {
+pub(crate) fn wrap(text: &str, width: usize) -> Vec<String> {
     let mut lines: Vec<String> = Vec::new();
     for word in text.split_whitespace() {
         match lines.last_mut() {
@@ -79,7 +81,7 @@ fn wrap(text: &str, width: usize) -> Vec<String> {
 }
 
 /// `body_large` as `BodyLarge`.
-fn camel(name: &str) -> String {
+pub(crate) fn camel(name: &str) -> String {
     name.split('_')
         .map(|word| {
             let mut chars = word.chars();
