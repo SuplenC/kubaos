@@ -102,11 +102,22 @@ group (1-10) while the lid is closed.
 Which block each position owns, and the screen there now or last, is in
 `~/.local/state/kubaos/hypr/workspace-screens`. The Command menu lists it:
 type "workspace group" for an Item per position, "Workspace group: position 1
-from the left", with its workspaces and its screen; running it goes there. A
-file from before positions, keyed by screen, is turned into positions on the
-first start: the externals plugged in keep their blocks where they stand, and
-the others' blocks become the positions after them, so no window or workspace
-number moves.
+from the left", with its workspaces and its screen; running it goes there, or
+opens the group's first workspace when it has none. A file from before
+positions, keyed by screen, is turned into positions on the first start: the
+externals plugged in keep their blocks where they stand, the screens not
+plugged in take the positions before the first one held, in the order they
+last sat, and any block left over waits as a group with no position, so no
+window or workspace number moves. A file naming a screen at a position and
+again waiting at another repairs itself: the waiting row goes once its block
+has no windows.
+
+Hyprland reports a screen before it arranges the layout, so `workspaces.lua`
+waits for the layout to hold still (250 ms, restarted by each layout change)
+and then reconciles once, whether the dock brought one screen or two; a window
+opening or closing never changes which screen owns which block. The screens
+file is written after the workspaces have moved, whole, so the bar never maps
+a screen to a block before the block is there.
 
 Each group keeps two workspaces even when they are empty, as Hyprland
 persistent workspace rules bound to its screen (`hl.workspace_rule`, set and

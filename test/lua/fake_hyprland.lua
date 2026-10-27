@@ -1,9 +1,15 @@
 -- A small stand-in for Hyprland's Lua API (`hl`), enough for
 -- `config/hypr/workspaces.lua`: screens, workspaces, windows, focus, the
--- dispatchers that module uses and the events it listens to, and workspace
--- rules as far as `persistent` and `monitor` go. Workspaces that are empty,
--- shown nowhere and not persistent go away, as Hyprland's do. Objects read the
--- world live, as Hyprland's do, so a workspace renumbered keeps its object.
+-- dispatchers that module uses and the events it listens to, one-shot timers,
+-- and workspace rules as far as `persistent` and `monitor` go. Workspaces
+-- that are empty, shown nowhere and not persistent go away, as Hyprland's do.
+-- Objects read the world live, as Hyprland's do, so a workspace renumbered
+-- keeps its object.
+--
+-- A screen arrives as Hyprland brings one: `monitor.added` fires while it
+-- still sits at 0,0, the layout is arranged afterwards and
+-- `monitor.layout_changed` fires, and timers run only when the test lets
+-- them (`settle()`).
 
 local F = {}
 F.__index = F
@@ -15,10 +21,13 @@ function F.new()
     windows = {},
     rules = {},
     handlers = {},
+    timers = {},
+    hidden = {},
     focused = nil,
     next_monitor_id = 0,
     next_window = 1,
     renumbered = 0,
+    moves = 0,
   }, F)
   world.hl = world:api()
   return world
@@ -100,6 +109,7 @@ function F:refresh()
       if record.monitor ~= monitor then
         local from = record.monitor
         record.monitor = monitor
+        self.moves = self.moves + 1
         if from and from.active == record then
           self:refill(from)
         end
@@ -144,6 +154,17 @@ function F:workspace_rule(options)
   }
 end
 
+-- `hl.timer`: a one-shot timer the test fires with `settle()`.
+function F:timer(callback, options)
+  local timer = { callback = callback, timeout = options.timeout, enabled = true, fired = false }
+  self.timers[#self.timers + 1] = timer
+  return {
+    set_enabled = function(_, enabled) timer.enabled = enabled end,
+    is_enabled = function() return timer.enabled end,
+    set_timeout = function(_, timeout) timer.timeout = timeout end,
+  }
+end
+
 function F:lowest_free()
   local id = 1
   while self:workspace_record(id) do
@@ -171,6 +192,9 @@ function F:monitor_object(record)
         return function(_, options)
           local target = world:workspace_record(tonumber(options.workspace))
           if target then
+            if target.monitor ~= record then
+              world.moves = world.moves + 1
+            end
             target.monitor = record
             record.active = target
             world:cleanup()
@@ -273,6 +297,9 @@ function F:apply(action)
     local record = args.workspace and self:workspace_record(tonumber(args.workspace)) or self.focused.active
     local target = self:select_monitor(args.monitor)
     local from = record.monitor
+    if from ~= target then
+      self.moves = self.moves + 1
+    end
     record.monitor = target
     target.active = record
     if from.active == record then
@@ -317,6 +344,7 @@ function F:api()
       window = { move = dsp("window.move") },
     },
     workspace_rule = function(options) return world:workspace_rule(options) end,
+    timer = function(callback, options) return world:timer(callback, options) end,
     dispatch = function(action)
       if type(action) == "function" then
         action()
@@ -331,7 +359,9 @@ function F:api()
     get_monitors = function()
       local objects = {}
       for _, record in ipairs(world.monitors) do
-        objects[#objects + 1] = world:monitor_object(record)
+        if not world.hidden[record.name] then
+          objects[#objects + 1] = world:monitor_object(record)
+        end
       end
       return objects
     end,
@@ -364,15 +394,45 @@ end
 
 -- What the tests drive: plugging screens in and out, and opening windows.
 
--- A screen arrives at `x`, `y` on a workspace under the lowest free number, as
--- Hyprland puts it, then `monitor.added` fires.
-function F:plug(name, description, x, y)
-  local record = { name = name, description = description, id = self.next_monitor_id, x = x or 0, y = y or 0 }
+-- Every timer due fires, in the order they were set, those set while firing
+-- included.
+function F:settle()
+  local index = 1
+  while index <= #self.timers do
+    local timer = self.timers[index]
+    if timer.enabled and not timer.fired then
+      timer.fired = true
+      timer.callback()
+    end
+    index = index + 1
+  end
+end
+
+-- A screen arrives at 0,0 on a workspace under the lowest free number, as
+-- Hyprland puts it, and `monitor.added` fires before the layout is arranged.
+function F:attach(name, description)
+  local record = { name = name, description = description, id = self.next_monitor_id, x = 0, y = 0 }
   self.next_monitor_id = self.next_monitor_id + 1
   self.monitors[#self.monitors + 1] = record
   record.active = self:create(self:lowest_free(), record)
   self.focused = self.focused or record
   self:fire("monitor.added", self:monitor_object(record))
+  return record
+end
+
+-- Hyprland's arrange: the screen takes its place and `monitor.layout_changed`
+-- fires.
+function F:arrange(name, x, y)
+  local record = self:monitor_record(name)
+  record.x, record.y = x or 0, y or 0
+  self:fire("monitor.layout_changed")
+end
+
+-- A screen plugged in and arranged at `x`, `y`, with the time to settle.
+function F:plug(name, description, x, y)
+  self:attach(name, description)
+  self:arrange(name, x, y)
+  self:settle()
 end
 
 -- Hyprland moves the screen's workspaces to the first other screen in its
@@ -405,6 +465,7 @@ function F:unplug(name, backup_name)
     end
   end
   self.monitors = kept
+  self:settle()
 end
 
 -- A window on the focused screen's shown workspace, focused.
@@ -413,6 +474,16 @@ function F:open_window()
   self.next_window = self.next_window + 1
   self.windows[#self.windows + 1] = window
   self:fire("window.open")
+  return window
+end
+
+-- A window on workspace `id`, created on `monitor_name` if it doesn't exist,
+-- without an event: a window that was there before the module loaded.
+function F:window_on(id, monitor_name)
+  local record = self:workspace_record(id) or self:create(id, self:monitor_record(monitor_name))
+  local window = { address = string.format("0x%x", self.next_window), workspace = record }
+  self.next_window = self.next_window + 1
+  self.windows[#self.windows + 1] = window
   return window
 end
 
@@ -474,6 +545,27 @@ function F:rules_for(workspace)
     end
   end
   return count
+end
+
+-- Every rule, enabled or not, as "id@connector" in id order, "(off)" after a
+-- disabled one.
+function F:all_rules()
+  local rows = {}
+  for _, rule in ipairs(self.rules) do
+    local text = rule.workspace .. "@" .. tostring(rule.monitor) .. (rule.enabled and "" or "(off)")
+    rows[#rows + 1] = { id = tonumber(rule.workspace), text = text }
+  end
+  table.sort(rows, function(left, right)
+    if left.id ~= right.id then
+      return left.id < right.id
+    end
+    return left.text < right.text
+  end)
+  local result = {}
+  for _, row in ipairs(rows) do
+    result[#result + 1] = row.text
+  end
+  return result
 end
 
 return F
