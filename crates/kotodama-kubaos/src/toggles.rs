@@ -1,8 +1,7 @@
 //! The system toggles: Wi-Fi and Bluetooth over D-Bus (NetworkManager and
-//! BlueZ), audio through `wpctl`, brightness through `brightnessctl`, and the
-//! power profile over D-Bus (power-profiles-daemon). Each talks to the
-//! service or program itself, never to the shell, so it works with
-//! Quickshell down; the shell sees the change as it would any other.
+//! BlueZ), audio through `wpctl` and brightness through `brightnessctl`. Each
+//! talks to the service or program itself, never to the shell, so it works
+//! with Quickshell down; the shell sees the change as it would any other.
 //!
 //! # Owns
 //!
@@ -13,7 +12,8 @@
 //!
 //! - Calling D-Bus: [`crate::bus`]. Running programs: [`crate::run`].
 //! - Power and session (power off, reboot, suspend, lock, log out): Kotodama's Bundled `system`
-//!   Extension.
+//!   Extension. The power stops: actions of the registry (`config/kotodama/kubaos.toml`) and
+//!   [`crate::power`].
 
 use std::collections::BTreeMap;
 
@@ -63,15 +63,6 @@ const WIFI: Property = Property {
 const BLUEZ: &str = "org.bluez";
 const BLUEZ_ROOT: &str = "/org/bluez";
 
-/// power-profiles-daemon's name since 0.20; `net.hadess.PowerProfiles` is the
-/// old one, kept for older clients.
-const POWER_PROFILE: Property = Property {
-    service: "org.freedesktop.UPower.PowerProfiles",
-    path: "/org/freedesktop/UPower/PowerProfiles",
-    interface: "org.freedesktop.UPower.PowerProfiles",
-    name: "ActiveProfile",
-};
-
 /// One system toggle.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Toggle {
@@ -87,9 +78,6 @@ pub enum Toggle {
     BrightnessUp,
     BrightnessDown,
     Brightness,
-    PowerSaver,
-    Balanced,
-    Performance,
 }
 
 /// What running a toggle came to.
@@ -107,7 +95,7 @@ pub enum Ran {
 
 impl Toggle {
     /// Every one, in the order the Items are sent.
-    pub const ALL: [Toggle; 15] = [
+    pub const ALL: [Toggle; 12] = [
         Toggle::Wifi,
         Toggle::Bluetooth,
         Toggle::Mute,
@@ -120,9 +108,6 @@ impl Toggle {
         Toggle::BrightnessUp,
         Toggle::BrightnessDown,
         Toggle::Brightness,
-        Toggle::PowerSaver,
-        Toggle::Balanced,
-        Toggle::Performance,
     ];
 
     /// Its Item's id, which `hide` names it by.
@@ -140,9 +125,6 @@ impl Toggle {
             Toggle::BrightnessUp => "brightness-up",
             Toggle::BrightnessDown => "brightness-down",
             Toggle::Brightness => "brightness",
-            Toggle::PowerSaver => "power-saver",
-            Toggle::Balanced => "balanced",
-            Toggle::Performance => "performance",
         }
     }
 
@@ -165,9 +147,6 @@ impl Toggle {
             Toggle::BrightnessUp => "Brightness up",
             Toggle::BrightnessDown => "Brightness down",
             Toggle::Brightness => "Set brightness",
-            Toggle::PowerSaver => "Power saver",
-            Toggle::Balanced => "Balanced power",
-            Toggle::Performance => "Performance",
         }
     }
 
@@ -185,9 +164,6 @@ impl Toggle {
             Toggle::BrightnessUp => "Raise the screen's brightness by 5%",
             Toggle::BrightnessDown => "Lower the screen's brightness by 5%",
             Toggle::Brightness => "Set the screen's brightness, from 1 to 100%",
-            Toggle::PowerSaver => "Power profile: longer battery, slower",
-            Toggle::Balanced => "Power profile: the default, boring and fine",
-            Toggle::Performance => "Power profile: faster, hotter, and the battery can go to hell",
         }
     }
 
@@ -200,7 +176,6 @@ impl Toggle {
             Toggle::MuteMicrophone | Toggle::AudioInput => "audio-input-microphone",
             Toggle::AudioOutput => "audio-speakers",
             Toggle::BrightnessUp | Toggle::BrightnessDown | Toggle::Brightness => "display-brightness",
-            Toggle::PowerSaver | Toggle::Balanced | Toggle::Performance => "power-profile-balanced",
         }
     }
 
@@ -219,9 +194,6 @@ impl Toggle {
             Toggle::BrightnessUp => &["brighter", "screen", "backlight"],
             Toggle::BrightnessDown => &["darker", "dim", "screen", "backlight"],
             Toggle::Brightness => &["screen", "backlight", "dim"],
-            Toggle::PowerSaver => &["power profile", "battery", "eco", "power saving"],
-            Toggle::Balanced => &["power profile", "balanced"],
-            Toggle::Performance => &["power profile", "fast", "turbo"],
         }
     }
 
@@ -302,9 +274,6 @@ impl Toggle {
             Toggle::BrightnessUp => brightnessctl(runner, &format!("{STEP}+"), Ran::KeepOpen),
             Toggle::BrightnessDown => brightnessctl(runner, &format!("{STEP}-"), Ran::KeepOpen),
             Toggle::Brightness => brightnessctl(runner, &format!("{}%", percent(arguments, 1)?), Ran::Close),
-            Toggle::PowerSaver => power_profile(bus, "power-saver"),
-            Toggle::Balanced => power_profile(bus, "balanced"),
-            Toggle::Performance => power_profile(bus, "performance"),
         }
     }
 }
@@ -366,12 +335,6 @@ fn adapter(bus: &mut impl Bus) -> Result<String, String> {
         .find(|child| child.starts_with("hci"))
         .map(|adapter| format!("{BLUEZ_ROOT}/{adapter}"))
         .ok_or_else(|| "There's no Bluetooth adapter, so there's nothing to turn on".to_owned())
-}
-
-fn power_profile(bus: &mut impl Bus, profile: &str) -> Result<Ran, String> {
-    bus.set_string(&POWER_PROFILE, profile)
-        .map_err(|err| format!("Couldn't switch to the {profile} profile: {}", Chain(&err)))?;
-    Ok(Ran::Close)
 }
 
 /// The `percent` Argument, from `min` to 100, written with or without `%`.

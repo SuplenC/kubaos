@@ -2110,6 +2110,7 @@ dependencies = [
  "kubaos-clock",
  "kubaos-core",
  "kubaos-idle",
+ "kubaos-power",
  "kubaos-sysmon",
  "kubaos-user-layer",
  "tempfile",

@@ -30,7 +30,6 @@
 
 use std::env;
 use std::error::Error;
-use std::fmt::Write as _;
 use std::fs;
 use std::io::BufRead;
 use std::io::BufReader;
@@ -57,6 +56,10 @@ use kubaos_power::control::Effect;
 use kubaos_power::control::Input;
 use kubaos_power::control::Settle;
 use kubaos_power::control::Toast;
+use kubaos_power::live;
+use kubaos_power::live::PPD_PATH;
+use kubaos_power::live::PPD_SERVICE;
+use kubaos_power::live::QUIET_UNIT;
 use kubaos_power::machine::Machine;
 use kubaos_power::measure;
 use kubaos_power::memory;
@@ -70,12 +73,10 @@ use kubaos_power::settings::ChargeLimit;
 use kubaos_power::settings::PanelMode;
 use kubaos_power::settings::Settings;
 use kubaos_power::status;
-use kubaos_power::status::Live;
 use kubaos_power::stop::Profile;
 use kubaos_power::stop::Source;
 use kubaos_power::stop::Stop;
 use kubaos_power::writes;
-use serde_json::Value;
 
 const USAGE: &str = "\
 usage: kubaos power set super-saver|power-saver|balanced|performance|max-performance
@@ -100,11 +101,6 @@ Settings: ~/.config/kubaos/desktop/power/power.toml";
 
 /// The root helper `system/files/power/kubaos-power-write`, which `system/30-hardware.sh` installs.
 const HELPER: &str = "/usr/local/libexec/kubaos-power-write";
-/// The transient user unit that holds the file indexer paused.
-const QUIET_UNIT: &str = "kubaos-power-quiet";
-
-const PPD_SERVICE: &str = "org.freedesktop.UPower.PowerProfiles";
-const PPD_PATH: &str = "/org/freedesktop/UPower/PowerProfiles";
 const UPOWER_SERVICE: &str = "org.freedesktop.UPower";
 const UPOWER_PATH: &str = "/org/freedesktop/UPower";
 const DISPLAY_DEVICE: &str = "/org/freedesktop/UPower/devices/DisplayDevice";
@@ -359,79 +355,20 @@ fn apply_file() -> Result<String, String> {
 
 // ----- status and measure -----------------------------------------------------------------------
 
-/// The stop now: the service's, else the one power-profiles-daemon's profile is named like.
-fn current_stop(profile: Option<Profile>) -> (Stop, Option<Published>) {
-    let published = runtime::file().and_then(|file| Published::load(&file));
-    let stop = published
-        .as_ref()
-        .and_then(Published::current)
-        .or_else(|| profile.map(Stop::from_profile))
-        .unwrap_or(Stop::Balanced);
-    (stop, published)
-}
-
 fn status() {
     let (settings, problem) = load_settings();
-    let machine = Machine::real();
-    let profile = zbus::blocking::Connection::system()
-        .ok()
-        .and_then(|bus| get_profile(&bus).ok());
-    let (stop, published) = current_stop(profile);
-    let source = published
-        .as_ref()
-        .and_then(|published| match published.source.as_str() {
-            "battery" => Some(Source::Battery),
-            "ac" => Some(Source::Ac),
-            _ => None,
-        })
-        .or_else(|| {
-            machine
-                .battery()
-                .map(|battery| Source::from_on_battery(battery.discharging))
-        });
-    let live = Live {
-        profile: profile.map(|profile| profile.name().to_owned()),
-        source,
-        panel: laptop_panel(),
-        wifi: machine
-            .wifi()
-            .into_iter()
-            .map(|interface| {
-                let on = wifi_power_save(&interface);
-                (interface, on)
-            })
-            .collect(),
-        indexer_paused: localsearch().then(|| unit_active(QUIET_UNIT)),
-    };
-    let plan = Plan::for_stop(stop, &settings);
-    let mut header = format!("Power: {stop}");
-    if let Some(source) = source {
-        let _ = write!(header, ", {}", source.words());
-    }
-    if published.is_none() {
-        header.push_str(" (the power service isn't running: only power-profiles-daemon's rows apply)");
-    }
-    if let Some(from) = published
-        .as_ref()
-        .and_then(|published| Stop::from_id(published.dropped_from.as_deref()?))
-    {
-        let _ = write!(header, " (the low-battery drop, from {from})");
-    }
-    if let Some(problem) = problem {
-        let _ = write!(header, "\n{problem}; KubaOS's defaults apply");
-    }
-    print!(
-        "{}",
-        status::text(&header, &status::rows(&plan, &settings, &machine, &live))
-    );
+    let now = live::read(&settings, problem.as_deref(), &Machine::real());
+    print!("{}", status::text(&now.header, &now.rows));
 }
 
 fn measure(seconds: u64) {
     let machine = Machine::real();
-    let profile = zbus::blocking::Connection::system()
-        .ok()
-        .and_then(|bus| get_profile(&bus).ok());
-    let (stop, _) = current_stop(profile);
+    let stop = runtime::file()
+        .and_then(|file| Published::load(&file))
+        .as_ref()
+        .and_then(Published::current)
+        .or_else(|| live::profile().map(Stop::from_profile))
+        .unwrap_or(Stop::Balanced);
     eprintln!("Measuring {stop} for {seconds} s. Leave the machine as it is…");
     let report = measure::run(
         &machine,
@@ -454,71 +391,10 @@ fn measure(seconds: u64) {
     }
 }
 
-/// The laptop panel's refresh rate and VRR, as Hyprland says.
-fn laptop_panel() -> Option<(f64, bool)> {
-    let output = Command::new("hyprctl")
-        .args(["-j", "monitors"])
-        .stdin(Stdio::null())
-        .output()
-        .ok()?;
-    let monitors: Value = serde_json::from_slice(&output.stdout).ok()?;
-    let panel = monitors
-        .as_array()?
-        .iter()
-        .find(|monitor| monitor["name"].as_str().is_some_and(|name| name.starts_with("eDP-")))?;
-    Some((panel["refreshRate"].as_f64()?, panel["vrr"].as_bool()?))
-}
-
-/// Whether the Wi-Fi `interface` saves power, as `iw` says; it needs no root to ask.
-fn wifi_power_save(interface: &str) -> Option<bool> {
-    // `iw` is in /usr/sbin, which a user's PATH may leave out.
-    let iw = if Path::new("/usr/sbin/iw").exists() {
-        "/usr/sbin/iw"
-    } else {
-        "iw"
-    };
-    let output = Command::new(iw)
-        .args(["dev", interface, "get", "power_save"])
-        .stdin(Stdio::null())
-        .stderr(Stdio::null())
-        .output()
-        .ok()?;
-    match String::from_utf8_lossy(&output.stdout).trim() {
-        "Power save: on" => Some(true),
-        "Power save: off" => Some(false),
-        _ => None,
-    }
-}
-
-fn localsearch() -> bool {
-    Command::new("sh")
-        .args(["-c", "command -v localsearch"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
-fn unit_active(unit: &str) -> bool {
-    Command::new("systemctl")
-        .args(["--user", "is-active", "--quiet", &format!("{unit}.service")])
-        .stdin(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success())
-}
-
 // ----- The bus ----------------------------------------------------------------------------------
 
 fn ppd(bus: &zbus::blocking::Connection) -> zbus::Result<zbus::blocking::Proxy<'static>> {
     zbus::blocking::Proxy::new(bus, PPD_SERVICE, PPD_PATH, PPD_SERVICE)
-}
-
-fn get_profile(bus: &zbus::blocking::Connection) -> Result<Profile, String> {
-    let name: String = ppd(bus)
-        .and_then(|proxy| proxy.get_property("ActiveProfile"))
-        .map_err(|err| format!("asking power-profiles-daemon: {}", chain(&err)))?;
-    Profile::from_name(&name)
-        .ok_or_else(|| format!("power-profiles-daemon is on `{name}`, a profile KubaOS doesn't know"))
 }
 
 fn set_profile(bus: &zbus::blocking::Connection, profile: Profile) -> Result<(), String> {
@@ -819,7 +695,7 @@ impl Service {
         self.publish();
         self.apply_panel(&plan);
         Self::quiet(plan.quiet_background);
-        let writes = writes::for_plan(&plan, &self.settings, &self.machine, &wifi_power_save);
+        let writes = writes::for_plan(&plan, &self.settings, &self.machine, &live::wifi_power_save);
         if !writes.is_empty() {
             self.write(&writes);
         }
@@ -856,10 +732,10 @@ impl Service {
     /// Holds the file indexer paused while `quiet`, through `localsearch inhibit` in a transient
     /// unit, so stopping the unit lets it go and a crash of this service doesn't leave it paused.
     fn quiet(quiet: bool) {
-        if !localsearch() {
+        if !live::has_indexer() {
             return;
         }
-        let held = unit_active(QUIET_UNIT);
+        let held = live::unit_active(QUIET_UNIT);
         if quiet && !held {
             let _ = Command::new("systemd-run")
                 .args([

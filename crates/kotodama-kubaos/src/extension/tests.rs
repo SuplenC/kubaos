@@ -26,13 +26,18 @@ fn ids(extension: &Extension<FakeBus, FakeRunner>) -> Vec<String> {
     extension.items().map(|item| item.id).collect()
 }
 
-/// The Items the Extension always sends, in order: the toggles, then the idle settings.
+/// The Items the Extension always sends, in order: the toggles, the idle settings, then the
+/// power stop's status.
 fn always() -> Vec<&'static str> {
-    toggles::ids().into_iter().chain(crate::idle::ids()).collect()
+    toggles::ids()
+        .into_iter()
+        .chain(crate::idle::ids())
+        .chain(crate::power::ids())
+        .collect()
 }
 
 #[test]
-fn without_a_config_there_are_the_toggles_and_the_idle_settings() {
+fn without_a_config_there_are_the_toggles_the_idle_settings_and_the_power_status() {
     let extension = Extension::new(FakeBus::default(), FakeRunner::default());
 
     assert_eq!(ids(&extension), always());
@@ -44,6 +49,13 @@ fn the_actions_come_before_the_toggles() {
 
     assert_eq!(ids(&extension).first().map(String::as_str), Some("mine"));
     assert_eq!(ids(&extension).len(), always().len() + 1);
+}
+
+#[test]
+fn hide_takes_out_the_power_status_too() {
+    let extension = configured(r#"hide = ["power-status"]"#);
+
+    assert!(!ids(&extension).contains(&"power-status".to_owned()));
 }
 
 #[test]
