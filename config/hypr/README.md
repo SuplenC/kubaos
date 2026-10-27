@@ -184,6 +184,10 @@ screens = ["LG Electronics LG ULTRAGEAR+ 510NTCZN7787", "Dell Inc. DELL U2724D 1
 - Unpinned screens take the numbers left over, left to right, and never one
   a group pins, even while that group's screens are away: its windows wait
   on the primary screen for one of them.
+- Two screens that report the same description (a pair without serials)
+  can't be pinned apart: a pin naming that description goes to the leftmost
+  of them, and the other counts as unpinned. The Command menu offers no Pin
+  Item for either.
 - The name shows in the Command menu's desk Items and in the bar, at the
   start of the group's tint while it waits on another screen.
 
@@ -207,14 +211,23 @@ panel shows the centre group on the road and the LG shows it at home; with
 the panel first, the panel keeps the group at the desk while open, and the
 external takes it when the lid closes.
 
-The file applies as it is saved: the bar watches it and runs
-`dot.workspaces.reload_groups()`, which reads it again and moves each group
-to the screen it now pins, the same as a hotplug, at once or once a layout
-change in progress settles. Hyprland also reads it whenever its config
-loads. A file that doesn't read (a key it doesn't know, a screen in two
-groups, anything but `[group.N]` tables of `name` and `screens`) shows one
-notification saying what is wrong, and where, and pins nothing until it is
-fixed: every screen takes its place left to right.
+The file applies as it is saved: the bar watches it and, once it has held
+still for a moment, runs `dot.workspaces.reload_groups()`, which reads it
+again and moves each group to the screen it now pins, the same as a
+hotplug, at once or once a layout change in progress settles. The Command
+menu's edits run it themselves too, so they apply with the shell down; a
+file read twice moves nothing the second time. An editor saving by rename
+leaves the file missing for an instant: a read that finds it missing when
+it was there reads again after the wait, and only a file still missing then
+pins nothing. Hyprland also reads it whenever its config loads.
+
+A file that doesn't read (a key it doesn't know, a screen in two groups,
+anything but `[group.N]` tables of `name` and `screens` as one-line
+strings) pins nothing until it is fixed: every screen takes its place left
+to right. A notification says what is wrong, and where. At login Hyprland
+reads the file before the shell, the notification server, is up, so the
+notification is tried once a second for a minute until it shows, and only
+a problem shown is not shown again after a config reload.
 
 In the Command menu, "Pin <screen> to group N" (for each screen plugged in,
 to each group and to a new one), "Unpin <screen>" and "Name group N…" write
