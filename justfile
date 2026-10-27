@@ -50,6 +50,15 @@ test:
     test/run e2e
     install/test/engine-e2e
 
+# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, then every specimen page at every scale, light and dark, held to the geometry rules. `just test` runs both as cargo tests; `nix flake check` runs them too.
+design-check:
+    cargo run -q -p kubaos-design -- lint
+    cargo run -q -p kubaos-specimen -- check
+
+# After fixing literal design values: lower design/lint-baseline.toml to what the lint finds. It never raises a count.
+design-baseline:
+    cargo run -q -p kubaos-design -- baseline
+
 # Boot the newest ISO for <arch> in QEMU (test/vm/run boot-iso). Add --gui for a window.
 vm arch=host *flags="":
     test/vm/run boot-iso --arch {{arch}} {{flags}}

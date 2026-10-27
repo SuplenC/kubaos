@@ -11,28 +11,10 @@
 let
   inherit (pkgs.stdenv.hostPlatform) system;
   inherit (pkgs) lib;
-  # Kotodama's crates in Cargo.lock come from git, at the rev of the
-  # `kotodama` input. With the input's hash, crane fetches them as a
-  # fixed-output derivation, which evaluates without the network. Without
-  # it, it falls back to builtins.fetchGit, which clones during evaluation:
-  # the machine's home then can't evaluate offline (home-manager switch, the
-  # installer's build for a username other than the payload's).
-  # HAZARD: only the source at the input's own rev gets the hash. Crates at
-  # another rev are cloned during evaluation, with the network.
-  kotodamaSource = "git+https://github.com/SuplenC/kotodama?rev=${inputs.kotodama.rev}#${inputs.kotodama.rev}";
-  cargoOutputHashes = {
-    ${kotodamaSource} = inputs.kotodama.narHash;
-  };
 
   # KubaOS's own crates, on one shared build of their dependencies
-  # (crates/workspace.nix).
-  inherit
-    (pkgs.callPackage ../crates/workspace.nix {
-      craneLib = inputs.crane.mkLib pkgs;
-      inherit cargoOutputHashes;
-    })
-    buildCrate
-    ;
+  # (crates/workspace.nix, through crates/build.nix).
+  buildCrate = import ../crates/build.nix { inherit pkgs inputs; };
   callCrate = path: pkgs.callPackage path { inherit buildCrate; };
 in
 rec {

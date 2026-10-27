@@ -141,6 +141,17 @@
           "kuba@vm" = home "aarch64-linux";
         };
 
+      # The design checks (crates/checks.nix): the lint and the specimen's
+      # geometry, run by `nix flake check`.
+      checks = forAllSystems (
+        pkgs:
+        import ./crates/checks.nix {
+          inherit pkgs inputs;
+          src = self;
+          inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) kubaos-specimen;
+        }
+      );
+
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);
 
       devShells = forAllSystems (pkgs: {
