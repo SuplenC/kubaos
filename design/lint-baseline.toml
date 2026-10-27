@@ -92,7 +92,7 @@ font = 1
 
 ["config/quickshell/modules/clock/ClockPopup.qml"]
 size = 7
-duration = 1
+duration = 2
 font = 9
 
 ["config/quickshell/modules/clock/ClockSettings.qml"]
@@ -101,7 +101,7 @@ font = 1
 
 ["config/quickshell/modules/clock/MonthGrid.qml"]
 space = 1
-size = 15
+size = 17
 radius = 1
 font = 4
 
@@ -215,7 +215,7 @@ font = 1
 size = 2
 
 ["config/quickshell/modules/powermenu/PowerMenu.qml"]
-size = 1
+size = 2
 font = 1
 
 ["config/quickshell/modules/sysmon/Processes.qml"]
@@ -226,8 +226,8 @@ font = 4
 font = 2
 
 ["config/quickshell/modules/sysmon/SysmonPopup.qml"]
-size = 6
-duration = 1
+size = 7
+duration = 2
 font = 2
 
 ["config/quickshell/modules/wallpaper/WallpaperPicker.qml"]
@@ -241,47 +241,23 @@ size = 2
 radius = 1
 font = 2
 
-["config/quickshell/theme/Theme.qml"]
-colour = 38
-space = 1
-size = 3
-
-["crates/kubaos-kobo/src/app.rs"]
-size = 2
-duration = 3
-
-["crates/kubaos-kobo/src/backend.rs"]
-duration = 1
-
 ["crates/kubaos-kobo/src/field.rs"]
 size = 1
 radius = 2
-duration = 1
 
 ["crates/kubaos-kobo/src/gallery.rs"]
 space = 4
-size = 7
+size = 1
 font = 1
 component = 6
 
-["crates/kubaos-kobo/src/main.rs"]
-size = 6
-
 ["crates/kubaos-kobo/src/reveal.rs"]
-duration = 1
-
-["crates/kubaos-kobo/src/setup/backend.rs"]
-duration = 1
-
-["crates/kubaos-kobo/src/setup/mod.rs"]
-size = 2
 duration = 1
 
 ["crates/kubaos-kobo/src/setup/view.rs"]
 space = 45
 size = 17
 radius = 1
-duration = 1
 font = 9
 component = 43
 
@@ -300,7 +276,7 @@ component = 106
 
 ["crates/kubaos-kobo/src/widgets.rs"]
 space = 24
-size = 24
+size = 17
 radius = 4
 font = 3
 component = 19

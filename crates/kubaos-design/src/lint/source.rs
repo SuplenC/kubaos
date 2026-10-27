@@ -272,3 +272,21 @@ pub fn is_hex_colour(text: &str) -> bool {
     text.strip_prefix('#')
         .is_some_and(|hex| matches!(hex.len(), 3 | 4 | 6 | 8) && hex.chars().all(|c| c.is_ascii_hexdigit()))
 }
+
+/// The byte where the bracket opened just before byte `open` of `bare` closes, or the line's end.
+pub fn close(bare: &str, open: usize) -> usize {
+    let mut depth = 1;
+    for (offset, c) in bare[open..].char_indices() {
+        match c {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return open + offset;
+                }
+            }
+            _ => {}
+        }
+    }
+    bare.len()
+}

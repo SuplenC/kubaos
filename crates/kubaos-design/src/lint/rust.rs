@@ -5,8 +5,12 @@
 //! - **Space, size, radius, font:** a number other than 0 in the arguments of iced's layout calls
 //!   (`.padding(`, `.spacing(`, `.width(`, `Length::Fixed(`, `Pixels(`, `.rounded(`, `.size(`…) or
 //!   bound to a field that holds one (`width: 1.0`, `radius: 8.0.into()`). Halving (`/ 2.0`) is a
-//!   derivation, not a literal.
-//! - **Duration:** a number in `Duration::from_millis(` and its siblings.
+//!   derivation, not a literal. A window's size (`size:`, `min_size`, `with_size(`) is the
+//!   compositor's to change, and a canvas program draws in its own coordinates; neither is layout.
+//! - **Duration:** a number in `Duration::from_millis(` and its siblings, when it is motion: on a
+//!   line about an animation (`DURATION`, `fade`, `.duration(`) or in a `mod motion`, and no longer
+//!   than the longest duration token. A timeout, a poll, a caret's blink or a double-press window
+//!   is behaviour, not motion.
 //! - **Font:** a family named in `Font::with_name(` or `Family::Name(`.
 //! - **Component:** iced's own controls and layout (`widget::button`, `text_input`, `row!`), which
 //!   `kubaos-ui` wraps on the grid. Containers, scrolling, canvas and images have no library
@@ -32,7 +36,11 @@ const CALLS: &[(&str, Rule)] = &[
     ("Vector::new(", Rule::Size),
     ("Point::new(", Rule::Size),
     ("Pixels(", Rule::Size),
+    ("Length::from(", Rule::Size),
+    ("Pixels::from(", Rule::Size),
     (".rounded(", Rule::Radius),
+    ("border::rounded(", Rule::Radius),
+    ("border::radius(", Rule::Radius),
     ("Radius::new(", Rule::Radius),
     ("radius::Radius::from(", Rule::Radius),
     (".size(", Rule::Font),
@@ -44,7 +52,36 @@ const CALLS: &[(&str, Rule)] = &[
     ("Duration::from_secs_f32(", Rule::Duration),
     ("Duration::from_secs_f64(", Rule::Duration),
     ("Duration::from_micros(", Rule::Duration),
+    ("Duration::new(", Rule::Duration),
 ];
+
+/// Calls that place a point or size, which a canvas program draws in its own coordinates.
+const GEOMETRY_CALLS: &[&str] = &["Size::new(", "Vector::new(", "Point::new("];
+
+/// Words on a line that make a duration on it motion.
+const MOTION_WORDS: &[&str] = &[
+    "duration",
+    "motion",
+    "anim",
+    "fade",
+    "slide",
+    "glide",
+    "transition",
+    "eas",
+    "reveal",
+];
+
+/// Words on a line that make a size on it a window's.
+const WINDOW_WORDS: &[&str] = &["min_size", "max_size", "with_size(", "window", "for size in"];
+
+/// What the block a line sits in is, for the rules that depend on it.
+#[derive(Debug, Clone, Copy, Default)]
+struct Context {
+    /// In a `mod` named for motion.
+    motion: bool,
+    /// In an `impl` of a canvas `Program`.
+    canvas: bool,
+}
 
 /// Struct fields whose number is a design value.
 const FIELDS: &[(&str, Rule)] = &[
@@ -115,22 +152,74 @@ const MACROS: &[&str] = &["column!", "row!", "text!", "rich_text!"];
 pub fn hits(lines: &[Line], longest_ms: u32) -> Vec<Vec<Hit>> {
     let mut out = Vec::with_capacity(lines.len());
     let mut in_tests = false;
+    let mut depth: i64 = 0;
+    // The blocks the line is in that change the rules, with the depth each opened at.
+    let mut scopes: Vec<(Context, i64)> = Vec::new();
     for (index, line) in lines.iter().enumerate() {
         let opens_tests = line.bare.trim() == "#[cfg(test)]"
             && lines
                 .get(index + 1)
                 .is_some_and(|next| next.bare.trim_start().starts_with("mod ") && next.bare.trim_end().ends_with('{'));
         in_tests |= opens_tests;
+        if let Some(opened) = opens_scope(&line.bare) {
+            scopes.push((opened, depth));
+        }
+        let context = scopes.iter().fold(Context::default(), |all, (c, _)| Context {
+            motion: all.motion || c.motion,
+            canvas: all.canvas || c.canvas,
+        });
         out.push(if in_tests {
             Vec::new()
         } else {
-            line_hits(line, longest_ms)
+            line_hits(line, longest_ms, context)
         });
+        depth += line.bare.matches('{').count() as i64 - line.bare.matches('}').count() as i64;
+        while scopes.last().is_some_and(|&(_, opened_at)| depth <= opened_at) {
+            scopes.pop();
+        }
     }
     out
 }
 
-fn line_hits(line: &Line, longest_ms: u32) -> Vec<Hit> {
+/// The context a line's block gives the lines in it: `mod motion {`, `impl canvas::Program<M> for X {`.
+fn opens_scope(bare: &str) -> Option<Context> {
+    let trimmed = bare.trim();
+    if !trimmed.ends_with('{') {
+        return None;
+    }
+    let words: Vec<&str> = trimmed.split_whitespace().collect();
+    let module = words
+        .iter()
+        .position(|w| *w == "mod")
+        .and_then(|at| words.get(at + 1))
+        .map(|name| name.to_ascii_lowercase());
+    if module.is_some_and(|name| MOTION_WORDS.iter().any(|w| name.contains(w))) {
+        return Some(Context {
+            motion: true,
+            canvas: false,
+        });
+    }
+    let canvas = trimmed.starts_with("impl") && trimmed.contains("Program<") && trimmed.contains(" for ");
+    canvas.then_some(Context {
+        motion: false,
+        canvas: true,
+    })
+}
+
+/// Whether `bare` sets a field named `size` (`size: Size::new(…)`), as window settings do; the
+/// `Size::` path itself isn't one.
+fn has_size_field(bare: &str) -> bool {
+    bare.match_indices("size:")
+        .any(|(at, _)| word_starts(bare, at) && !bare[at + "size:".len()..].starts_with(':'))
+}
+
+/// Whether `bare` speaks of an animation, the `Duration` type's own name aside.
+fn is_about_motion(bare: &str) -> bool {
+    let lower = bare.replace("Duration", "").to_ascii_lowercase();
+    MOTION_WORDS.iter().any(|w| lower.contains(w))
+}
+
+fn line_hits(line: &Line, longest_ms: u32, context: Context) -> Vec<Hit> {
     let bare = line.bare.as_str();
     let mut hits = Vec::new();
     let column_of = |byte: usize| bare[..byte].chars().count();
@@ -146,8 +235,8 @@ fn line_hits(line: &Line, longest_ms: u32) -> Vec<Hit> {
     for call in COLOUR_CALLS {
         for (byte, _) in bare.match_indices(call) {
             // `Color::from_rgb8(c.r, c.g, c.b)` converts a token's colour; only numbers make one up.
-            let made_up =
-                !call.ends_with('(') || !source::numbers(&bare[byte..close(bare, byte + call.len())]).is_empty();
+            let made_up = !call.ends_with('(')
+                || !source::numbers(&bare[byte..source::close(bare, byte + call.len())]).is_empty();
             if word_starts(bare, byte) && made_up {
                 hits.push(Hit {
                     column: column_of(byte),
@@ -180,7 +269,7 @@ fn line_hits(line: &Line, longest_ms: u32) -> Vec<Hit> {
         .iter()
         .flat_map(|call| {
             bare.match_indices(call)
-                .map(|(byte, _)| (byte, close(bare, byte + call.len())))
+                .map(|(byte, _)| (byte, source::close(bare, byte + call.len())))
         })
         .collect();
     for (call, rule) in CALLS {
@@ -189,8 +278,16 @@ fn line_hits(line: &Line, longest_ms: u32) -> Vec<Hit> {
                 continue;
             }
             let open = byte + call.len();
-            let end = close(bare, open);
-            if *rule == Rule::Duration && !is_motion(&bare[open..end], call, longest_ms) {
+            let end = source::close(bare, open);
+            let motion = context.motion || is_about_motion(bare);
+            if *rule == Rule::Duration && !(motion && is_motion(&bare[open..end], call, longest_ms)) {
+                continue;
+            }
+            let geometry = GEOMETRY_CALLS.contains(call);
+            let lower = bare.to_ascii_lowercase();
+            let window =
+                *call == "Size::new(" && (WINDOW_WORDS.iter().any(|w| lower.contains(w)) || has_size_field(bare));
+            if geometry && (context.canvas || window) {
                 continue;
             }
             literal_hits(
@@ -232,15 +329,18 @@ fn is_motion(argument: &str, call: &str, longest_ms: u32) -> bool {
     if !argument.starts_with(|c: char| c.is_ascii_digit()) {
         return false;
     }
-    let Some(number) = source::numbers(argument).first().copied() else {
+    let numbers = source::numbers(argument);
+    let Some(first) = numbers.first() else {
         return false;
     };
-    let per_ms = match call {
-        "Duration::from_millis(" => 1.0,
-        "Duration::from_micros(" => 0.001,
-        _ => 1000.0,
+    let ms = match call {
+        "Duration::from_millis(" => first.value,
+        "Duration::from_micros(" => first.value / 1000.0,
+        // `Duration::new(secs, nanos)`.
+        "Duration::new(" => first.value * 1000.0 + numbers.get(1).map_or(0.0, |nanos| nanos.value / 1e6),
+        _ => first.value * 1000.0,
     };
-    number.value * per_ms <= f64::from(longest_ms)
+    ms <= f64::from(longest_ms)
 }
 
 /// The numbers other than 0 between bytes `open` and `end` of `bare`, as hits of `rule`.
@@ -273,24 +373,6 @@ fn literal_hits(
     }
 }
 
-/// The byte where the parenthesis opened before `open` closes, or the line's end.
-fn close(bare: &str, open: usize) -> usize {
-    let mut depth = 1;
-    for (offset, c) in bare[open..].char_indices() {
-        match c {
-            '(' | '[' | '{' => depth += 1,
-            ')' | ']' | '}' => {
-                depth -= 1;
-                if depth == 0 {
-                    return open + offset;
-                }
-            }
-            _ => {}
-        }
-    }
-    bare.len()
-}
-
 /// Whether byte `at` of `bare` starts a word: no name or path continues into it.
 fn word_starts(bare: &str, at: usize) -> bool {
     bare[..at]
@@ -313,20 +395,13 @@ fn colour_literal(bare: &str) -> Option<usize> {
 /// built by path (`widget::button(`, `widget::Row::new(`), or built with a macro (`row![`). A path
 /// to a style or status type (`widget::button::Style`) builds nothing.
 fn component_hits(bare: &str, hits: &mut Vec<Hit>) {
-    let trimmed = bare.trim_start();
-    let indent = bare.len() - trimmed.len();
-    if let Some(imported) = trimmed.strip_prefix("use iced::widget::") {
-        let names = imported.trim_end().trim_end_matches(';');
-        let names = names.trim_start_matches('{').trim_end_matches('}');
-        for name in names.split(',').map(str::trim) {
-            let name = name.split(" as ").next().unwrap_or(name).trim();
-            if WIDGETS.contains(&name) {
-                hits.push(Hit {
-                    column: indent,
-                    rule: Rule::Component,
-                    what: format!("iced::widget::{name}"),
-                });
-            }
+    if let Some(at) = bare.find("use iced::").filter(|&at| word_starts(bare, at)) {
+        for name in imported_widgets(&bare[at + "use iced::".len()..]) {
+            hits.push(Hit {
+                column: bare[..at].chars().count(),
+                rule: Rule::Component,
+                what: format!("iced::widget::{name}"),
+            });
         }
         return;
     }
@@ -334,6 +409,8 @@ fn component_hits(bare: &str, hits: &mut Vec<Hit>) {
         let rest = &bare[byte + "widget::".len()..];
         let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
         let after = &rest[name.len()..];
+        // `widget::row::Row::new(` builds the same as `widget::Row::new(`.
+        let after = type_path(after);
         let built = after.starts_with('(')
             || ["::new(", "::with_children(", "::from_vec("]
                 .iter()
@@ -359,4 +436,39 @@ fn component_hits(bare: &str, hits: &mut Vec<Hit>) {
             }
         }
     }
+}
+
+/// `after` past a path to a module's type (`::Row` in `row::Row::new(`), so what follows is the call.
+fn type_path(after: &str) -> &str {
+    let Some(rest) = after.strip_prefix("::") else {
+        return after;
+    };
+    let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
+    if name.chars().next().is_some_and(char::is_uppercase) && rest[name.len()..].starts_with("::") {
+        &rest[name.len()..]
+    } else {
+        after
+    }
+}
+
+/// The widgets `kubaos-ui` replaces among what a `use iced::…` imports: `widget::button;`,
+/// `widget::{row, text}`, `{Element, widget::{checkbox}}`. A path into a widget's module
+/// (`widget::text::LineHeight`) imports a type, not the widget.
+fn imported_widgets(tree: &str) -> Vec<&str> {
+    let mut found = Vec::new();
+    for (at, _) in tree.match_indices("widget::") {
+        let rest = &tree[at + "widget::".len()..];
+        let names: Vec<&str> = if let Some(group) = rest.strip_prefix('{') {
+            group[..group.find('}').unwrap_or(group.len())].split(',').collect()
+        } else {
+            vec![rest.split([';', ',', '}']).next().unwrap_or(rest)]
+        };
+        for name in names {
+            let name = name.split(" as ").next().unwrap_or(name).trim();
+            if WIDGETS.contains(&name) {
+                found.push(name);
+            }
+        }
+    }
+    found
 }

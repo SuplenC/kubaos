@@ -20,6 +20,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::path::Path;
+use std::process::Command;
 
 use crate::Error;
 use crate::lint::Rule;
@@ -249,6 +250,26 @@ pub fn shrink(scan: &Scan, baseline: &Baseline) -> Result<Baseline, Error> {
         }
     }
     Ok(Baseline { files })
+}
+
+/// Whether git has ever had the baseline in the history of the repo at `root`. The first baseline
+/// may be written only when it hasn't: a deleted one would otherwise come back at today's counts.
+///
+/// # Errors
+///
+/// [`Error::History`] when git can't be run or `root` isn't a git checkout, so the history is
+/// unknown.
+pub fn in_history(root: &Path) -> Result<bool, Error> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["log", "--all", "--format=%H", "-1", "--", BASELINE_PATH])
+        .output()
+        .map_err(|source| Error::History(Some(source)))?;
+    if !output.status.success() {
+        return Err(Error::History(None));
+    }
+    Ok(!output.stdout.trim_ascii().is_empty())
 }
 
 #[cfg(test)]

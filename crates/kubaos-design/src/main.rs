@@ -4,7 +4,7 @@
 //! kubaos-design lint [--root DIR]            exit 1 when a file is over or under its baseline
 //! kubaos-design lint --all [--root DIR]      every violation, the baselined ones included
 //! kubaos-design baseline [--root DIR]        shrink the baseline to what the lint finds
-//! kubaos-design baseline --init [--root DIR] write the first baseline, when there is none
+//! kubaos-design baseline --init [--root DIR] write the first baseline, when git never had one
 //! kubaos-design geometry FILE… [--root DIR]  exit 1 when a frame breaks a geometry rule
 //! ```
 //!
@@ -40,7 +40,7 @@ lint      literal colours, sizes, spacing, radii, durations and fonts, and the t
           controls, in QML and Rust UI code; fail when a file has more or fewer than
           design/lint-baseline.toml allows. --all lists every one, the baselined included
 baseline  lower design/lint-baseline.toml to what the lint finds; it never raises a count.
-          --init writes it from what the lint finds, only when there is none
+          --init writes it from what the lint finds, only when git has never had one
 geometry  check frames (JSON, one or an array per file) against the geometry rules
 
 DIR is the repo's root; by default the nearest directory up from here holding design/tokens.toml.";
@@ -150,6 +150,13 @@ fn init(root: &Path) -> Result<bool, Error> {
     if root.join(baseline::BASELINE_PATH).exists() {
         eprintln!(
             "kubaos-design baseline: {} exists, and only shrinks; `kubaos-design baseline` shrinks it",
+            baseline::BASELINE_PATH
+        );
+        return Ok(false);
+    }
+    if baseline::in_history(root)? {
+        eprintln!(
+            "kubaos-design baseline: git has had {}, so it only shrinks; restore it with `git checkout`",
             baseline::BASELINE_PATH
         );
         return Ok(false);

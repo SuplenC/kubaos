@@ -5,7 +5,10 @@
 //! - **Space, size, radius, duration, font:** a number other than 0 in the binding of a property
 //!   that holds one ([`category`]), or in a custom `int` or `real` property named for one
 //!   (`iconSize`, `cardRadius`). Halving (`/ 2`) is a derivation, not a literal.
-//! - **Font:** a family named in a string, and a weight named in place (`Font.Medium`).
+//! - **Font:** a family named in a string, and a weight named in place (`Font.Medium`), in a
+//!   binding or in a `Qt.font({ … })`.
+//! - **A custom number property** set to a literal counts where it is used: `property int rowH: 44`
+//!   bound to a `height` is a size, whatever the property is called.
 //! - **Component:** Qt Quick Controls' own controls, in a file that imports them, where
 //!   `KubaOS.Components` has the component.
 
@@ -153,11 +156,122 @@ fn imports_controls(lines: &[Line]) -> bool {
 /// Each line's hits.
 pub fn hits(lines: &[Line]) -> Vec<Vec<Hit>> {
     let controls = imports_controls(lines);
-    lines.iter().map(|line| line_hits(line, controls)).collect()
+    let mut hits: Vec<Vec<Hit>> = lines.iter().map(|line| line_hits(line, controls)).collect();
+    for (index, hit) in used_as_design_values(lines) {
+        if !hits[index].iter().any(|h| h.column == hit.column) {
+            hits[index].push(hit);
+        }
+    }
+    hits
+}
+
+/// A custom number property set to a literal (`property int rowH: 44`), counted by where it is
+/// used: bound as a length (alone or in a sum) to a size, a gap, a radius, a duration or a font
+/// size anywhere in the file, the literal is that design value, whatever the property's name.
+fn used_as_design_values(lines: &[Line]) -> Vec<(usize, Hit)> {
+    let mut declared = Vec::new();
+    for (index, line) in lines.iter().enumerate() {
+        let Some((declaration, name, value_at)) = binding(&line.bare) else {
+            continue;
+        };
+        let numeric = ["int ", "real ", "double "].iter().any(|t| declaration.contains(t));
+        let value = &line.bare[source::byte_index(&line.bare, value_at)..];
+        let literal = value.trim();
+        let number = source::numbers(literal).first().copied();
+        let only_a_number = number.is_some_and(|n| n.column == 0 && n.end == literal.chars().count() && n.value != 0.0);
+        if numeric && only_a_number {
+            let column = value_at + value.chars().take_while(|c| c.is_whitespace()).count();
+            declared.push((index, name.to_owned(), column, literal.to_owned()));
+        }
+    }
+    let mut found = Vec::new();
+    for (index, name, column, literal) in declared {
+        let rule = lines.iter().find_map(|line| {
+            let (declaration, bound, value_at) = binding(&line.bare)?;
+            let rule = if declaration.is_empty() { category(bound) } else { None }?;
+            let value = &line.bare[source::byte_index(&line.bare, value_at)..];
+            // A factor (`(1 - enter) * 10`, `parent.width * remaining`) scales a value; a length is
+            // used as one, alone or in a sum.
+            let as_length = !value.contains(['*', '/']);
+            (as_length && mentions(value, &name)).then_some(rule)
+        });
+        if let Some(rule) = rule {
+            found.push((
+                index,
+                Hit {
+                    column,
+                    rule,
+                    what: format!("{name}: {literal}"),
+                },
+            ));
+        }
+    }
+    found
+}
+
+/// Whether `code` names `name` as a whole word: `rowH`, `root.rowH`, never `rowHeight`.
+fn mentions(code: &str, name: &str) -> bool {
+    code.match_indices(name).any(|(at, _)| {
+        let before = code[..at].chars().next_back();
+        let after = code[at + name.len()..].chars().next();
+        let joined = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+        !joined(before) && !joined(after)
+    })
+}
+
+/// `Qt.font({ family: "…", pixelSize: 13, weight: Font.Medium })`: the font written in place.
+fn font_object_hits(line: &Line, hits: &mut Vec<Hit>) {
+    let bare = line.bare.as_str();
+    for (at, call) in bare.match_indices("Qt.font(") {
+        let open = at + call.len();
+        let end = source::close(bare, open);
+        let span = &bare[open..end];
+        let column_of = |byte: usize| bare[..byte].chars().count();
+        for key in ["pixelSize:", "pointSize:", "letterSpacing:", "wordSpacing:"] {
+            for (offset, _) in span.match_indices(key) {
+                let start = open + offset + key.len();
+                let value = &bare[start..end];
+                let value = &value[..value.find([',', '}']).unwrap_or(value.len())];
+                for number in source::numbers(value).into_iter().filter(|n| n.value != 0.0) {
+                    let literal: String = value
+                        .chars()
+                        .skip(number.column)
+                        .take(number.end - number.column)
+                        .collect();
+                    hits.push(Hit {
+                        column: column_of(start + source::byte_index(value, number.column)),
+                        rule: Rule::Font,
+                        what: format!("Qt.font {} {literal}", key.trim_end_matches(':')),
+                    });
+                }
+            }
+        }
+        if let Some(offset) = span.find("weight:")
+            && span[offset..].contains("Font.")
+        {
+            hits.push(Hit {
+                column: column_of(open + offset),
+                rule: Rule::Font,
+                what: "Qt.font weight".to_owned(),
+            });
+        }
+        if let Some(offset) = span.find("family:") {
+            let after = column_of(open + offset);
+            let before_end = column_of(end);
+            if let Some((column, content)) = line.strings.iter().find(|(c, _)| *c > after && *c < before_end) {
+                hits.push(Hit {
+                    column: *column,
+                    rule: Rule::Font,
+                    what: format!("Qt.font family \"{content}\""),
+                });
+            }
+        }
+    }
 }
 
 fn line_hits(line: &Line, controls: bool) -> Vec<Hit> {
     let mut hits = Vec::new();
+    font_object_hits(line, &mut hits);
     let bare = line.bare.as_str();
     for (column, content) in &line.strings {
         if source::is_hex_colour(content) {

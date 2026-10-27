@@ -6,9 +6,11 @@
 //!
 //! - **QML:** every `.qml` file in the repo.
 //! - **Rust:** the sources of every crate that depends on iced, less their tests.
-//! - **Never:** the files `kubaos-tokens` generates, which are where the values belong.
+//! - **Never:** the files `kubaos-tokens` generates and the hand-written token files
+//!   ([`TOKEN_SOURCES`]), which are where the values belong.
 //!
-//! A justified literal carries a marker on the line above it, naming the rule and the reason:
+//! A justified literal carries a marker on the line directly above it, naming the rule and the
+//! reason; it allows those rules on that one line:
 //!
 //! ```text
 //! // design-allow(size): the tray icon's size is the StatusNotifierItem spec's, not ours.
@@ -153,6 +155,11 @@ pub const MARKER: &str = "design-allow(";
 /// Directories never scanned: build outputs, other checkouts, dependencies.
 const SKIPPED_DIRS: &[&str] = &[".git", "target", "node_modules", ".claude", "out", "iso", "result"];
 
+/// Hand-written token files, which hold the values a toolkit's code reads until `kubaos-tokens`
+/// generates that toolkit's copy. Like the generated files, they are where the values belong.
+// TODO(#147): drop Theme.qml once the generated QML singleton replaces it.
+pub const TOKEN_SOURCES: &[&str] = &["config/quickshell/theme/Theme.qml"];
+
 /// The QML module directory of the component library: `KubaOS.Components`. Files in it build
 /// components out of Qt's controls, so the component rule spares them.
 pub const QML_LIBRARY: &str = "KubaOS/Components/";
@@ -175,12 +182,12 @@ pub fn files(root: &Path) -> Result<Vec<(String, Language)>, Error> {
         for path in walk(&root.join(&krate).join("src"), "rs")? {
             let path = format!("{krate}/src/{path}");
             let is_test = path.ends_with("/tests.rs") || path.contains("/tests/");
-            if !is_test && !generated.contains(path.as_str()) {
+            if !is_test {
                 found.push((path, Language::Rust));
             }
         }
     }
-    found.retain(|(path, _)| !generated.contains(path.as_str()));
+    found.retain(|(path, _)| !generated.contains(path.as_str()) && !TOKEN_SOURCES.contains(&path.as_str()));
     found.sort();
     Ok(found)
 }
@@ -278,10 +285,10 @@ pub fn scan_text(path: &str, text: &str, language: Language, longest_ms: u32) ->
             if in_library && hit.rule == Rule::Component {
                 continue;
             }
-            let allowed_by = markers_above(&lines, line.number).find(|number| {
+            let allowed_by = marker_line(line.number).filter(|above| {
                 markers
                     .iter()
-                    .any(|(at, rules)| at == number && rules.contains(&hit.rule))
+                    .any(|(at, rules)| at == above && rules.contains(&hit.rule))
             });
             if let Some(at) = allowed_by {
                 used.insert((at, hit.rule));
@@ -311,14 +318,9 @@ pub fn scan_text(path: &str, text: &str, language: Language, longest_ms: u32) ->
     (violations, bad_markers)
 }
 
-/// The numbers of the comment lines right above line `number`, nearest first: the comment block a
-/// marker for that line sits in.
-fn markers_above(lines: &[Line], number: usize) -> impl Iterator<Item = usize> + '_ {
-    lines[..number - 1]
-        .iter()
-        .rev()
-        .take_while(|line| line.is_comment_only() && !line.comment.is_empty())
-        .map(|line| line.number)
+/// The number of the line directly above line `number`, where a marker for it sits.
+fn marker_line(number: usize) -> Option<usize> {
+    number.checked_sub(1).filter(|&above| above >= 1)
 }
 
 /// Every marker in `lines`, by line, with the rules it names. A marker without a known rule or a

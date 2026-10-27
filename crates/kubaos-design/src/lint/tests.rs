@@ -137,7 +137,7 @@ fn rust_tokens_and_zero_are_not_literals() {
 #[test]
 fn rust_colours_durations_and_fonts_are_found() {
     let text = "fn look() {\n    let a = Color::from_rgb8(0x1e, 0x1e, 0x2e);\n    \
-                let t = Duration::from_millis(180);\n    let f = Font::with_name(\"JetBrains Mono\");\n    \
+                let fade = Duration::from_millis(180);\n    let f = Font::with_name(\"JetBrains Mono\");\n    \
                 let c = Color { r: 1.0, g: 0.5, b: 0.0, a: 1.0 };\n}\n";
 
     let rules: Vec<Rule> = rust(text).into_iter().map(|(_, rule, _)| rule).collect();
@@ -221,9 +221,120 @@ fn a_string_compared_in_a_colour_binding_is_not_a_colour() {
 fn rust_timeouts_and_conversions_are_not_durations_or_colours() {
     let text = "fn f() {\n    const GRACE: Duration = Duration::from_secs(30);\n    \
                 let d = Duration::from_micros((ms * 1000.0).round() as u64);\n    \
-                let c = Color::from_rgb8(c.r, c.g, c.b);\n    const BLINK: Duration = Duration::from_millis(530);\n}\n";
+                let c = Color::from_rgb8(c.r, c.g, c.b);\n}\n";
 
-    let found: Vec<(usize, Rule)> = rust(text).into_iter().map(|(line, rule, _)| (line, rule)).collect();
+    assert_eq!(rust(text), []);
+}
 
-    assert_eq!(found, [(5, Rule::Duration)]);
+#[test]
+fn a_marker_only_allows_the_line_directly_below_it() {
+    let text = "Item {\n    // design-allow(size): the tray's icon size is the StatusNotifierItem spec's.\n    \
+                // The icon.\n    implicitSize: 22\n}\n";
+
+    let (violations, bad) = scan_text("X.qml", text, Language::Qml, SCENE_MS);
+
+    assert_eq!(violations.len(), 1, "{violations:?}");
+    assert_eq!(bad.len(), 1, "{bad:?}");
+}
+
+#[test]
+fn qml_fonts_written_in_a_font_object_are_found() {
+    let text = "Text {\n    font: Qt.font({ family: \"Inter\", pixelSize: 13, weight: Font.Medium })\n}\n";
+
+    let rules: Vec<Rule> = qml(text).into_iter().map(|(_, rule, _)| rule).collect();
+
+    assert_eq!(rules, [Rule::Font, Rule::Font, Rule::Font]);
+}
+
+#[test]
+fn qml_a_number_property_used_as_a_size_is_a_size_whatever_its_name() {
+    let text = "Item {\n    property int rowH: 44\n    property int count: 3\n    property real enter: 1\n    \
+                height: root.rowH + Theme.spacing.sm\n    y: enter * Theme.spacing.sm\n    \
+                Repeater { model: count }\n}\n";
+
+    let found: Vec<(usize, Rule)> = qml(text).into_iter().map(|(line, rule, _)| (line, rule)).collect();
+
+    assert_eq!(found, [(2, Rule::Size)]);
+}
+
+#[test]
+fn rust_free_radius_functions_and_conversions_are_found() {
+    let text = "fn v() {\n    let b = iced::border::rounded(8);\n    let w = Length::from(40.0);\n    \
+                let p = Pixels::from(16.0);\n    x.width(40.0.into());\n}\n";
+
+    let rules: Vec<Rule> = rust(text).into_iter().map(|(_, rule, _)| rule).collect();
+
+    assert_eq!(rules, [Rule::Radius, Rule::Size, Rule::Size, Rule::Size]);
+}
+
+#[test]
+fn rust_a_duration_built_from_seconds_and_nanoseconds_is_found() {
+    let text = "fn f() {\n    const FADE: Duration = Duration::new(0, 200_000_000);\n}\n";
+
+    let rules: Vec<Rule> = rust(text).into_iter().map(|(_, rule, _)| rule).collect();
+
+    assert_eq!(rules, [Rule::Duration]);
+}
+
+#[test]
+fn rust_polls_timeouts_blinks_and_press_windows_are_not_motion() {
+    let text = "fn f() {\n    match rx.recv_timeout(Duration::from_millis(20)) {}\n    \
+                let double = t - f < Duration::from_millis(900);\n    \
+                pub const BLINK: Duration = Duration::from_millis(530);\n    \
+                let dt = (now - last).min(Duration::from_millis(100));\n}\n";
+
+    assert_eq!(rust(text), []);
+}
+
+#[test]
+fn rust_durations_in_a_motion_module_or_about_an_animation_are_motion() {
+    let text = "pub mod motion {\n    pub const SWITCH: Duration = Duration::from_millis(180);\n}\n\
+                pub const DURATION: Duration = Duration::from_millis(220);\nconst GRACE: Duration = Duration::from_millis(300);\n";
+
+    let lines: Vec<usize> = rust(text).into_iter().map(|(line, _, _)| line).collect();
+
+    assert_eq!(lines, [2, 4]);
+}
+
+#[test]
+fn rust_window_sizes_and_canvas_coordinates_are_not_layout() {
+    let text = "fn s() {\n    let a = Args { size: Size::new(1280.0, 800.0) };\n    \
+                let w = window::Settings { min_size: Some(Size::new(900.0, 600.0)), ..x };\n}\n\
+                impl<M> canvas::Program<M> for Knob {\n    fn draw(&self) {\n        \
+                let p = Path::rounded_rectangle(Point::new(0.75, 0.75), Size::new(w - 1.5, h - 1.5), r);\n    }\n}\n\
+                const BODY: Size = Size::new(22.0, 12.0);\n";
+
+    let lines: Vec<usize> = rust(text).into_iter().map(|(line, _, _)| line).collect();
+
+    assert_eq!(lines, [10, 10]);
+}
+
+#[test]
+fn rust_a_widget_built_through_its_module_path_or_imported_in_a_block_is_found() {
+    let text = "fn v() {\n    let r = iced::widget::row::Row::new();\n    { use iced::widget::checkbox; }\n    \
+                use iced::{Element, widget::{toggler, container}};\n    use iced::widget::text::LineHeight;\n}\n";
+
+    let found: Vec<(usize, String)> = rust(text).into_iter().map(|(line, _, what)| (line, what)).collect();
+
+    assert_eq!(
+        found,
+        [
+            (2, "iced::widget::row".to_owned()),
+            (3, "iced::widget::checkbox".to_owned()),
+            (4, "iced::widget::toggler".to_owned())
+        ]
+    );
+}
+
+#[test]
+fn the_shells_hand_written_token_file_is_not_linted() {
+    let dir = tempfile::tempdir().unwrap();
+    let theme = dir.path().join("config/quickshell/theme");
+    std::fs::create_dir_all(&theme).unwrap();
+    std::fs::write(theme.join("Theme.qml"), "Item {\n    radius: 8\n}\n").unwrap();
+    std::fs::create_dir_all(dir.path().join("crates")).unwrap();
+
+    let files = super::files(dir.path()).unwrap();
+
+    assert_eq!(files, []);
 }
