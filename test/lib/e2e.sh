@@ -1604,7 +1604,7 @@ c_menu() {
   return "$bad"
 }
 
-# The KubaOS Extension (issue #29, crates/kotodama-kubaos): it runs under the
+# The KubaOS Extension (crates/kotodama-kubaos): it runs under the
 # Daemon and its Items are found by typing, with the user layer's action shown
 # and the ones it hides gone. test/lib/menu-query.py is the Front end, since
 # the `kotodama` command can't query. The Extension's Kotodama crates must be
@@ -1853,7 +1853,7 @@ TOML
   return "$bad"
 }
 
-# Wallpaper sets (issue #16): every set read-only in /usr/share/kubaos/wallpapers,
+# Wallpaper sets: every set read-only in /usr/share/kubaos/wallpapers,
 # the picker's folders are the chosen ones (~/.config/kubaos/desktop/wallpapers/sets,
 # all of them without the file) plus ~/Pictures/wallpapers, a real folder.
 c_wallpaper_sets() {
@@ -2061,7 +2061,7 @@ has_bin() { [[ -x $USER_HOME/.nix-profile/bin/$1 ]]; }
 # Suite, and not the home's.
 kz() { zrun ". /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh; PATH=/usr/local/bin:\$PATH; $1"; }
 
-# The state directory and switch jobs (issue #20), through the kubaos binary
+# The state directory and switch jobs, through the kubaos binary
 # test/run built (/out/kubaos) and a user flake like the installer's, with the
 # repo copy as KubaOS and KubaOS's own locked nixpkgs as the user's, so
 # nothing is downloaded but the packages. The packages are ones the home
@@ -2150,7 +2150,7 @@ c_packages() {
   echo "ok   kubaos switch after deleting the Suite file: hello gone"
 }
 
-# The Suite framework (issue #21), through the test Suite (home/suites/test.nix,
+# The Suite framework, through the test Suite (home/suites/test.nix,
 # in a kubaos built with the test-suite feature) and a user flake under git,
 # so every file kubaos writes into kubaos.d/ must reach git's index for Nix to
 # see it. Add, configure, scaffold and remove it, with a user override in
@@ -2252,7 +2252,7 @@ c_suites() {
   rm -rf "$mine" "$project" "$u/.git"
 }
 
-# The user layer (issue #9): test/user-layer-check, which the VM bench also
+# The user layer: test/user-layer-check, which the VM bench also
 # runs on an installed system. Commits to the checkout, so it runs after the
 # other checks but the update ones, which start from a clone of it.
 # The file manager (home/files.nix, crates/kubaos-files): Files (Nautilus)
