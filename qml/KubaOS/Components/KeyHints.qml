@@ -7,7 +7,8 @@ import KubaOS.Components as K
 // The hints are `hints`, a list of `[combination, what]` pairs, or `text` in the form Kotodama
 // and the menu write them, `↵ Open · Tab Enter app · ⌃K Actions`: each part's first word the
 // combination, the rest what it does. A combination is written `Ctrl+K`; each of its keys is a
-// keycap of its own, and so is each modifier or arrow glyph written together (`⌃K`, `↑↓`).
+// keycap of its own, and so is each modifier or arrow glyph written together (`⌃K`, `↑↓`);
+// only `+` parts the rest, so `Left Alt` is one key.
 Item {
     id: root
 
@@ -43,20 +44,23 @@ Item {
             return ["+"];
         const glyphs = "⌃⇧⌥⌘↑↓←→↵⌫⌦";
         const found = [];
-        for (const part of combination.split(/[+\s]/)) {
+        for (const part of combination.split("+")) {
             let word = "";
+            const push = text => {
+                const trimmed = text.trim();
+                if (trimmed !== "")
+                    found.push(trimmed);
+            };
             for (const c of part) {
                 if (glyphs.includes(c)) {
-                    if (word !== "")
-                        found.push(word);
-                    found.push(c);
+                    push(word);
+                    push(c);
                     word = "";
                 } else {
                     word += c;
                 }
             }
-            if (word !== "")
-                found.push(word);
+            push(word);
         }
         return found;
     }

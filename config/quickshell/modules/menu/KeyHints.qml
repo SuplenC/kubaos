@@ -8,7 +8,10 @@ import "words.js" as Words
 //
 // HAZARD: no `K.Text` and no layout primitives in here, and the delegates go by count: a keystroke
 // that moves the selection changes the footer's and the pane's hints, and the menu must answer on
-// the next frame. Measured headless at 1x, 70 keystrokes over 14 rows, keystroke to frame: MEASURE.
+// the next frame. Measured headless at 1x (offscreen, 3 runs), on a key that changes the footer's
+// hints: dispatch 1.5-1.8 ms against 0.7-0.8 ms for the same hints as a plain line of text,
+// keystroke to frame 6.4-6.6 ms against 6.2-6.3 ms. Built from `K.Keycap` and `K.KeyHints`,
+// dispatch takes 2-3 ms more again.
 Item {
     id: root
 

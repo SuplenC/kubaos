@@ -68,25 +68,28 @@ function shortcutKeys(shortcut) {
 const glyphKeys = "⌃⇧⌥⌘↑↓←→↵⌫⌦";
 
 // The keys of a hint's combination, one keycap each: `⌃K` is `⌃` and `K`, `↑↓` is `↑` and `↓`,
-// `Ctrl+K` is `Ctrl` and `K`; a `+` alone is the plus key.
+// `Ctrl+K` is `Ctrl` and `K`, `Left Alt` one key; a `+` alone is the plus key.
 function hintKeys(combination) {
     if (combination === "+")
         return ["+"];
     const found = [];
-    for (const part of combination.split(/[+\s]/)) {
+    for (const part of combination.split("+")) {
         let word = "";
+        const push = text => {
+            const trimmed = text.trim();
+            if (trimmed !== "")
+                found.push(trimmed);
+        };
         for (const c of part) {
             if (glyphKeys.includes(c)) {
-                if (word !== "")
-                    found.push(word);
-                found.push(c);
+                push(word);
+                push(c);
                 word = "";
             } else {
                 word += c;
             }
         }
-        if (word !== "")
-            found.push(word);
+        push(word);
     }
     return found;
 }

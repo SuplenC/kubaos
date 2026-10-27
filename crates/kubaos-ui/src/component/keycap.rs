@@ -72,26 +72,28 @@ pub fn keycap<'a, M: 'a>(look: &Look, key: &'a str) -> Element<'a, M> {
 const GLYPHS: [char; 11] = ['⌃', '⇧', '⌥', '⌘', '↑', '↓', '←', '→', '↵', '⌫', '⌦'];
 
 /// The keys of a combination, one keycap each: `Ctrl+K` is `Ctrl` and `K`, `⌃K` is `⌃` and `K`,
-/// `← →` is `←` and `→`; a `+` alone is the plus key.
-pub fn keys(combination: &str) -> Vec<&str> {
+/// `← →` is `←` and `→`, and `Left Alt` is one key; a `+` alone is the plus key.
+pub fn keys<'a>(combination: &'a str) -> Vec<&'a str> {
     if combination == "+" {
         return vec![combination];
     }
     let mut found = Vec::new();
-    for part in combination.split(|c: char| c == '+' || c.is_whitespace()) {
+    let mut push = |word: &'a str| {
+        let word = word.trim();
+        if !word.is_empty() {
+            found.push(word);
+        }
+    };
+    for part in combination.split('+') {
         let mut word = 0;
         for (at, c) in part.char_indices() {
             if GLYPHS.contains(&c) {
-                if word < at {
-                    found.push(&part[word..at]);
-                }
-                found.push(&part[at..at + c.len_utf8()]);
+                push(&part[word..at]);
+                push(&part[at..at + c.len_utf8()]);
                 word = at + c.len_utf8();
             }
         }
-        if word < part.len() {
-            found.push(&part[word..]);
-        }
+        push(&part[word..]);
     }
     found
 }

@@ -403,7 +403,9 @@ Drawer {
                     readonly property bool fillWidth: true
 
                     implicitHeight: root.answer ? answerCard.implicitHeight : 0
-                    visible: implicitHeight > 0
+                    // Shown from the answer, not from its height: a hidden layout never measures,
+                    // so a height read while hidden stays 0. It stays shown while it closes.
+                    visible: !!root.answer || implicitHeight > 0
                     clip: true
 
                     Behavior on implicitHeight {

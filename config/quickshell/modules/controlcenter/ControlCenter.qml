@@ -139,28 +139,36 @@ Drawer {
             onPicked: index => root.tab = index
         }
 
+        // Clipped a focus ring's width outside the tab's room: a list taller than the room
+        // the sections leave on a short screen is cut there, rather than drawn over them.
         Item {
-            y: tabBar.height + K.Tokens.space.s12
-            width: parent.width
-            height: Math.max(0, parent.height - y)
+            x: -K.Tokens.focus.offset
+            y: tabBar.height + K.Tokens.space.s12 - K.Tokens.focus.offset
+            width: parent.width + K.Tokens.focus.offset * 2
+            height: Math.max(0, parent.height - y + K.Tokens.focus.offset)
+            clip: true
 
             WifiList {
                 anchors.fill: parent
+                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 0
             }
 
             BluetoothList {
                 anchors.fill: parent
+                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 1
             }
 
             OutputList {
                 anchors.fill: parent
+                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 2
             }
 
             KeyboardList {
                 anchors.fill: parent
+                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 3
             }
         }

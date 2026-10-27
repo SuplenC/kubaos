@@ -45,6 +45,11 @@ fn glyphs_written_together_are_a_key_each() {
 }
 
 #[test]
+fn a_key_of_several_words_is_one_key() {
+    assert_eq!(keys("Left Alt+E"), ["Left Alt", "E"]);
+}
+
+#[test]
 fn a_keycap_is_as_tall_as_a_line_of_body_text_at_every_scale() {
     for scale in Scale::SUPPORTED {
         let look = Look::new(Mode::Dark, scale);

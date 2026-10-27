@@ -58,20 +58,45 @@ Pill {
             }
 
             IconImage {
+                id: glyph
+
                 x: (K.Tokens.size.chip - K.Tokens.icon.s16) / 2
                 y: (K.Tokens.size.chip - K.Tokens.icon.s16) / 2
                 implicitSize: K.Tokens.icon.s16
                 source: entry.modelData.icon
                 asynchronous: true
-                // A grey icon that would vanish into the bar is drawn in the content colour, as
-                // the bar's own symbols are; the layer exists only while it is.
+                visible: !reader.faint
+                // A texture for the ink below to take its shape from, only while it is faint.
                 layer.enabled: reader.faint
-                layer.effect: MultiEffect {
-                    // Colourising keeps the drawing's lightness, so a dark icon is first lifted to
-                    // white (in light, pressed to black), then takes the content colour.
-                    brightness: K.Tokens.mode === "light" ? -1 : 1
-                    colorization: 1
-                    colorizationColor: K.Tokens.color.on_surface
+            }
+
+            // A grey icon that would vanish into the bar is drawn in the content colour exactly, as
+            // the bar's own symbols are: the colour, in the icon's shape. A colourising effect
+            // keeps the drawing's own lightness, so it can't land on the colour. None of this
+            // exists while the icon reads on its own.
+            Loader {
+                x: glyph.x
+                y: glyph.y
+                width: glyph.width
+                height: glyph.height
+                active: reader.faint
+
+                sourceComponent: MultiEffect {
+                    source: ink
+                    maskEnabled: true
+                    maskSource: glyph
+                    maskThresholdMin: 0
+                    maskSpreadAtMin: 1
+
+                    Rectangle {
+                        id: ink
+
+                        width: glyph.width
+                        height: glyph.height
+                        visible: false
+                        layer.enabled: true
+                        color: K.Tokens.color.on_surface
+                    }
                 }
             }
 
