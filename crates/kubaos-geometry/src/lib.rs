@@ -88,7 +88,11 @@ pub enum Role {
     Grid { columns: u16, gap: f32, align: Align },
     /// A component of the spec, by its shared name (`Button`, `IconButton`, `ListRow`) and variant
     /// (`Filled Md`). Every instance of one name and variant has the same `fixed` measures.
-    Component { name: String, variant: String, fixed: Fixed },
+    Component {
+        name: String,
+        variant: String,
+        fixed: Fixed,
+    },
     /// Text whose laid-out size is `natural`; it is clipped when that doesn't fit the box.
     Text { content: String, natural: Size },
     /// A symbol, by name, in a square box of its size.

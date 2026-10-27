@@ -71,7 +71,12 @@ fn text(content: &str, natural: Size, bounds: Rect) -> Node {
 }
 
 fn icon(bounds: Rect) -> Node {
-    Node::new(Role::Icon { name: "search".to_owned() }, bounds)
+    Node::new(
+        Role::Icon {
+            name: "search".to_owned(),
+        },
+        bounds,
+    )
 }
 
 fn rules_broken(frames: &[Frame]) -> Vec<Rule> {
@@ -90,7 +95,10 @@ fn a_page_on_the_grid_passes_every_rule() {
         ],
     );
 
-    let findings = check(&[frame("dark", 1.25, root.clone()), frame("light", 1.25, root)], &rules());
+    let findings = check(
+        &[frame("dark", 1.25, root.clone()), frame("light", 1.25, root)],
+        &rules(),
+    );
 
     assert!(findings.is_empty(), "{findings:#?}");
 }
@@ -106,7 +114,7 @@ fn an_edge_between_device_pixels_is_off_the_device_grid() {
 fn a_whole_device_pixel_at_one_and_a_quarter_is_on_the_device_grid() {
     let root = Node::new(Role::Box, rect(0.8, 0.0, 100.0, 40.0));
 
-    assert!(rules_broken(&[frame("dark", 1.25, root)]).is_empty());
+    assert_eq!(rules_broken(&[frame("dark", 1.25, root)]), [] as [Rule; 0]);
 }
 
 #[test]
@@ -248,8 +256,11 @@ fn an_icon_a_pixel_off_its_slots_centre_is_reported_and_half_a_pixel_is_not() {
         )
     };
 
-    assert_eq!(rules_broken(&[frame("dark", 1.0, slot(40.0, 11.0))]), [Rule::IconCentre]);
-    assert!(rules_broken(&[frame("dark", 1.0, slot(41.0, 10.0))]).is_empty());
+    assert_eq!(
+        rules_broken(&[frame("dark", 1.0, slot(40.0, 11.0))]),
+        [Rule::IconCentre]
+    );
+    assert_eq!(rules_broken(&[frame("dark", 1.0, slot(41.0, 10.0))]), [] as [Rule; 0]);
 }
 
 #[test]

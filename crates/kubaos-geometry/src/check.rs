@@ -60,10 +60,10 @@ struct Instance {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Part {
     what: &'static str,
-    /// From the component's left edge when its width is fixed; otherwise from the nearer side,
-    /// negative from the right, so a trailing icon is placed by the right edge.
-    x: i64,
-    y: i64,
+    /// From the component's left edge, when the component fixes its width.
+    x: Option<i64>,
+    /// From the component's top edge, when the component fixes its height.
+    y: Option<i64>,
     width: Option<i64>,
     height: i64,
 }
@@ -83,11 +83,7 @@ impl Walk<'_> {
         match &node.role {
             Role::Layout { axis, gap, align } => self.layout(node, *axis, *gap, *align, path),
             Role::Grid { columns, gap, align } => self.grid(node, *columns, *gap, *align, path),
-            Role::Component {
-                name,
-                variant,
-                fixed,
-            } => self.instances.push(Instance {
+            Role::Component { name, variant, fixed } => self.instances.push(Instance {
                 frame: self.frame.name(),
                 scale: self.frame.scale,
                 path: path_text(path, &node.role),
@@ -116,11 +112,11 @@ impl Walk<'_> {
         ancestors.pop();
     }
 
-    fn report(&mut self, rule: Rule, path: &[String], role: &Role, message: String) {
+    fn report(&mut self, rule: Rule, path: &[String], at: &Role, message: String) {
         self.findings.push(Finding {
             frame: self.frame.name(),
             rule,
-            path: path_text(path, role),
+            path: path_text(path, at),
             message,
         });
     }
@@ -144,8 +140,12 @@ impl Walk<'_> {
     }
 
     /// Every edge on a whole device pixel. A text's far edges are where its letters end, which the
-    /// box it sits in rounds, so only where it starts counts.
+    /// box it sits in rounds, so only where it starts counts. A spacer draws nothing, so it has no
+    /// edges to land.
     fn device_grid(&mut self, node: &Node, path: &[String]) {
+        if matches!(node.role, Role::Spacer { .. }) {
+            return;
+        }
         let b = node.bounds;
         let mut edges = vec![("left", b.x), ("top", b.y)];
         if !matches!(node.role, Role::Text { .. }) {
@@ -185,10 +185,9 @@ impl Walk<'_> {
             Role::Icon { .. } if !self.on_grid(b.width) => {
                 Some(format!("icon size {} isn't a multiple of {grid}", b.width))
             }
-            Role::Spacer { fill: false } if !self.on_grid(b.width) || !self.on_grid(b.height) => Some(format!(
-                "gap {}×{} isn't a multiple of {grid}",
-                b.width, b.height
-            )),
+            Role::Spacer { fill: false } if !self.on_grid(b.width) || !self.on_grid(b.height) => {
+                Some(format!("gap {}×{} isn't a multiple of {grid}", b.width, b.height))
+            }
             _ => None,
         };
         if let Some(message) = message {
@@ -253,7 +252,14 @@ impl Walk<'_> {
         let rows: Vec<&[Node]> = node.children.chunks(columns).collect();
         for column in 0..columns {
             let cells: Vec<&Node> = rows.iter().filter_map(|row| row.get(column)).collect();
-            self.lined_up(&cells, Axis::X, Align::Start, path, &node.role, &format!("column {column}"));
+            self.lined_up(
+                &cells,
+                Axis::X,
+                Align::Start,
+                path,
+                &node.role,
+                &format!("column {column}"),
+            );
         }
         for (index, row) in rows.iter().enumerate() {
             let cells: Vec<&Node> = row.iter().collect();
@@ -263,7 +269,11 @@ impl Walk<'_> {
             let bottom = pair[0].iter().map(|c| c.bounds.bottom()).fold(f32::MIN, f32::max);
             let top = pair[1].iter().map(|c| c.bounds.y).fold(f32::MAX, f32::min);
             if !self.same(top - bottom, gap) {
-                let message = format!("rows {index} and {} are {} apart; the grid's gap is {gap}", index + 1, top - bottom);
+                let message = format!(
+                    "rows {index} and {} are {} apart; the grid's gap is {gap}",
+                    index + 1,
+                    top - bottom
+                );
                 self.report(Rule::SiblingGap, path, &node.role, message);
             }
         }
@@ -286,7 +296,7 @@ impl Walk<'_> {
         };
         let edge = match (axis, align) {
             (Axis::X, Align::Start) => "left edge",
-            (Axis::X, Align::Centre) | (Axis::Y, Align::Centre) => "centre",
+            (Axis::X | Axis::Y, Align::Centre) => "centre",
             (Axis::X, Align::End) => "right edge",
             (Axis::Y, Align::Start) => "top",
             (Axis::Y, Align::End) => "bottom",
@@ -343,6 +353,11 @@ impl Walk<'_> {
     }
 }
 
+/// Whether two frames are at one scale. Scales are the few the tokens list, never computed.
+fn same_scale(a: f32, b: f32) -> bool {
+    (a - b).abs() < f32::EPSILON
+}
+
 fn path_text(path: &[String], role: &Role) -> String {
     let mut segments = path.to_vec();
     segments.push(role.label());
@@ -354,24 +369,10 @@ fn path_text(path: &[String], role: &Role) -> String {
 fn parts(node: &Node, fixed: Fixed, scale: f32) -> Vec<Part> {
     let device = |v: f32| (v * scale).round() as i64;
     let b = node.bounds;
-    let x_of = |r: Rect| {
-        if fixed.width {
-            device(r.x - b.x)
-        } else {
-            let left = r.x - b.x;
-            let right = b.right() - r.right();
-            if left <= right { device(left) } else { -device(right) }
-        }
-    };
-    let y_of = |r: Rect| {
-        if fixed.height {
-            device(r.y - b.y)
-        } else {
-            let top = r.y - b.y;
-            let bottom = b.bottom() - r.bottom();
-            if top <= bottom { device(top) } else { -device(bottom) }
-        }
-    };
+    // Along a measure the component doesn't fix, where a part sits is its content's doing (an icon
+    // centred beside two lines or three), so only the fixed measures place parts.
+    let x_of = |r: Rect| fixed.width.then(|| device(r.x - b.x));
+    let y_of = |r: Rect| fixed.height.then(|| device(r.y - b.y));
     let mut found = Vec::new();
     let mut text_seen = false;
     let mut pending: Vec<&Node> = node.children.iter().rev().collect();
@@ -422,12 +423,17 @@ fn identical(instances: &[Instance], findings: &mut Vec<Finding>) {
             if first.fixed.width && (instance.bounds.width - first.bounds.width).abs() * instance.scale >= EPSILON {
                 differences.push(format!("is {} wide, not {}", instance.bounds.width, first.bounds.width));
             }
-            if first.fixed.height && (instance.bounds.height - first.bounds.height).abs() * instance.scale >= EPSILON
-            {
-                differences.push(format!("is {} tall, not {}", instance.bounds.height, first.bounds.height));
+            if first.fixed.height && (instance.bounds.height - first.bounds.height).abs() * instance.scale >= EPSILON {
+                differences.push(format!(
+                    "is {} tall, not {}",
+                    instance.bounds.height, first.bounds.height
+                ));
             }
-            let reference = group.iter().find(|other| other.scale == instance.scale).unwrap_or(&first);
-            if instance.parts != reference.parts {
+            let reference = group
+                .iter()
+                .find(|other| same_scale(other.scale, instance.scale))
+                .unwrap_or(&first);
+            if !same_parts(&instance.parts, &reference.parts) {
                 differences.push(format!(
                     "places its icons and label at {:?}, where {} has {:?}",
                     instance.parts, reference.path, reference.parts
@@ -451,9 +457,34 @@ fn identical(instances: &[Instance], findings: &mut Vec<Finding>) {
     }
 }
 
-/// A frame's boxes in order, each with its role's label.
+/// Whether two instances place their parts alike. What an instance shows is its content's to
+/// decide (a ticked checkbox has a tick, an empty one none), so labels are compared when both have
+/// one, and icons when both have as many.
+fn same_parts(a: &[Part], b: &[Part]) -> bool {
+    let of = |parts: &[Part], what: &str| parts.iter().filter(|p| p.what == what).cloned().collect::<Vec<_>>();
+    let (text_a, text_b) = (of(a, "text"), of(b, "text"));
+    let (icons_a, icons_b) = (of(a, "icon"), of(b, "icon"));
+    let texts_alike = text_a.is_empty() || text_b.is_empty() || text_a == text_b;
+    let icons_alike = icons_a.len() != icons_b.len() || icons_a == icons_b;
+    texts_alike && icons_alike
+}
+
+/// A frame's boxes in order, each with its role's label. A text's words and an icon's symbol are
+/// content, which a mode may change (a contrast ratio, a switch naming the other mode), so they
+/// are left out, and with them the width the words take; where the text sits still counts.
 fn flatten(node: &Node, into: &mut Vec<(String, Rect)>) {
-    into.push((node.role.label(), node.bounds));
+    let (label, bounds) = match node.role {
+        Role::Text { .. } => (
+            "Text".to_owned(),
+            Rect {
+                width: 0.0,
+                ..node.bounds
+            },
+        ),
+        Role::Icon { .. } => ("Icon".to_owned(), node.bounds),
+        _ => (node.role.label(), node.bounds),
+    };
+    into.push((label, bounds));
     for child in &node.children {
         flatten(child, into);
     }
@@ -465,7 +496,7 @@ fn mode_invariant(frames: &[Frame], findings: &mut Vec<Finding>) {
     for (index, frame) in frames.iter().enumerate() {
         let Some(other) = frames[..index]
             .iter()
-            .find(|o| o.page == frame.page && o.scale == frame.scale && o.mode != frame.mode)
+            .find(|o| o.page == frame.page && same_scale(o.scale, frame.scale) && o.mode != frame.mode)
         else {
             continue;
         };

@@ -106,7 +106,11 @@ pub struct Violation {
 
 impl fmt::Display for Violation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}:{}: {}: {}", self.path, self.line, self.column, self.rule, self.what)
+        write!(
+            f,
+            "{}:{}:{}: {}: {}",
+            self.path, self.line, self.column, self.rule, self.what
+        )
     }
 }
 
@@ -274,8 +278,11 @@ pub fn scan_text(path: &str, text: &str, language: Language, longest_ms: u32) ->
             if in_library && hit.rule == Rule::Component {
                 continue;
             }
-            let allowed_by = markers_above(&lines, line.number)
-                .find(|number| markers.iter().any(|(at, rules)| at == number && rules.contains(&hit.rule)));
+            let allowed_by = markers_above(&lines, line.number).find(|number| {
+                markers
+                    .iter()
+                    .any(|(at, rules)| at == number && rules.contains(&hit.rule))
+            });
             if let Some(at) = allowed_by {
                 used.insert((at, hit.rule));
                 continue;

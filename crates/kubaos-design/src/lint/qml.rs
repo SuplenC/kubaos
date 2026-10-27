@@ -44,8 +44,11 @@ fn category(property: &str) -> Option<Rule> {
     let last = property.rsplit('.').next().unwrap_or(property);
     let lower = last.to_ascii_lowercase();
     if property.starts_with("font.") {
-        return matches!(last, "pixelSize" | "pointSize" | "weight" | "letterSpacing" | "wordSpacing")
-            .then_some(Rule::Font);
+        return matches!(
+            last,
+            "pixelSize" | "pointSize" | "weight" | "letterSpacing" | "wordSpacing"
+        )
+        .then_some(Rule::Font);
     }
     if matches!(last, "lineHeight") {
         return Some(Rule::Font);
@@ -56,8 +59,12 @@ fn category(property: &str) -> Option<Rule> {
     if lower.ends_with("radius") && !lower.contains("blur") {
         return Some(Rule::Radius);
     }
-    if lower.ends_with("spacing") || lower.ends_with("padding") || lower.ends_with("margin") || lower.ends_with("margins")
-        || lower.ends_with("inset") || lower == "gap"
+    if lower.ends_with("spacing")
+        || lower.ends_with("padding")
+        || lower.ends_with("margin")
+        || lower.ends_with("margins")
+        || lower.ends_with("inset")
+        || lower == "gap"
     {
         return Some(Rule::Space);
     }
@@ -102,9 +109,15 @@ fn custom_category(declaration: &str, name: &str) -> Option<Rule> {
         Some(Rule::Duration)
     } else if lower.ends_with("radius") {
         Some(Rule::Radius)
-    } else if ["spacing", "padding", "margin", "gap", "inset"].iter().any(|w| lower.ends_with(w)) {
+    } else if ["spacing", "padding", "margin", "gap", "inset"]
+        .iter()
+        .any(|w| lower.ends_with(w))
+    {
         Some(Rule::Space)
-    } else if ["size", "width", "height", "thickness", "stroke"].iter().any(|w| lower.ends_with(w)) {
+    } else if ["size", "width", "height", "thickness", "stroke"]
+        .iter()
+        .any(|w| lower.ends_with(w))
+    {
         Some(Rule::Size)
     } else {
         None
@@ -132,7 +145,9 @@ fn binding(bare: &str) -> Option<(&str, &str, usize)> {
 
 /// Whether the file imports Qt Quick Controls.
 fn imports_controls(lines: &[Line]) -> bool {
-    lines.iter().any(|line| line.bare.trim_start().starts_with("import QtQuick.Controls"))
+    lines
+        .iter()
+        .any(|line| line.bare.trim_start().starts_with("import QtQuick.Controls"))
 }
 
 /// Each line's hits.
@@ -164,10 +179,11 @@ fn line_hits(line: &Line, controls: bool) -> Vec<Hit> {
     }
     if controls {
         let trimmed = bare.trim_start();
-        if let Some(name) = CONTROLS
-            .iter()
-            .find(|name| trimmed.strip_prefix(**name).is_some_and(|rest| rest.trim_start().starts_with('{')))
-        {
+        if let Some(name) = CONTROLS.iter().find(|name| {
+            trimmed
+                .strip_prefix(**name)
+                .is_some_and(|rest| rest.trim_start().starts_with('{'))
+        }) {
             hits.push(Hit {
                 column: bare.len() - trimmed.len(),
                 rule: Rule::Component,
@@ -184,14 +200,13 @@ fn line_hits(line: &Line, controls: bool) -> Vec<Hit> {
     } else {
         custom_category(declaration, name)
     };
-    if name == "font.family" || name.ends_with(".family") {
-        if let Some((column, content)) = line.strings.iter().find(|(c, _)| *c >= value_at) {
-            hits.push(Hit {
-                column: *column,
-                rule: Rule::Font,
-                what: format!("{name}: \"{content}\""),
-            });
-        }
+    let family = name == "font.family" || name.ends_with(".family");
+    if family && let Some((column, content)) = line.strings.iter().find(|(c, _)| *c >= value_at) {
+        hits.push(Hit {
+            column: *column,
+            rule: Rule::Font,
+            what: format!("{name}: \"{content}\""),
+        });
     }
     if name == "font.weight" && value.contains("Font.") {
         hits.push(Hit {
@@ -226,7 +241,11 @@ fn line_hits(line: &Line, controls: bool) -> Vec<Hit> {
         if number.value == 0.0 || source::is_halving(value, number) || within_colour_call(value, number.column) {
             continue;
         }
-        let literal: String = value.chars().skip(number.column).take(number.end - number.column).collect();
+        let literal: String = value
+            .chars()
+            .skip(number.column)
+            .take(number.end - number.column)
+            .collect();
         hits.push(Hit {
             column: value_at + number.column,
             rule,

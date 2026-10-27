@@ -26,7 +26,10 @@ fn qml_literal_sizes_spacing_radii_and_durations_are_found() {
 
     let rules: Vec<Rule> = qml(text).into_iter().map(|(_, rule, _)| rule).collect();
 
-    assert_eq!(rules, [Rule::Size, Rule::Space, Rule::Radius, Rule::Duration, Rule::Space]);
+    assert_eq!(
+        rules,
+        [Rule::Size, Rule::Space, Rule::Radius, Rule::Duration, Rule::Space]
+    );
 }
 
 #[test]
@@ -44,11 +47,10 @@ fn qml_colours_in_hex_channels_and_names_are_found_and_transparent_is_not() {
 
     let found = qml(text);
 
-    assert_eq!(found.iter().map(|(line, rule, _)| (*line, *rule)).collect::<Vec<_>>(), [
-        (2, Rule::Colour),
-        (3, Rule::Colour),
-        (4, Rule::Colour)
-    ]);
+    assert_eq!(
+        found.iter().map(|(line, rule, _)| (*line, *rule)).collect::<Vec<_>>(),
+        [(2, Rule::Colour), (3, Rule::Colour), (4, Rule::Colour)]
+    );
 }
 
 #[test]
@@ -72,26 +74,33 @@ fn qml_custom_number_properties_named_for_a_size_are_found() {
 
 #[test]
 fn qml_controls_are_stray_components_only_where_qt_quick_controls_is_imported() {
-    let with_controls = "import QtQuick\nimport QtQuick.Controls\n\nItem {\n    Button {\n        text: \"Go\"\n    }\n}\n";
+    let with_controls =
+        "import QtQuick\nimport QtQuick.Controls\n\nItem {\n    Button {\n        text: \"Go\"\n    }\n}\n";
     let without = "import QtQuick\nimport qs.components\n\nItem {\n    Button {\n    }\n}\n";
 
     assert_eq!(qml(with_controls).len(), 1);
     assert_eq!(qml(with_controls)[0].1, Rule::Component);
-    assert!(qml(without).is_empty());
+    assert_eq!(qml(without), []);
 }
 
 #[test]
 fn the_component_library_may_build_on_qt_controls() {
     let text = "import QtQuick.Controls\n\nButton {\n}\n";
 
-    let (violations, _) = scan_text("config/quickshell/KubaOS/Components/Button.qml", text, Language::Qml, SCENE_MS);
+    let (violations, _) = scan_text(
+        "config/quickshell/KubaOS/Components/Button.qml",
+        text,
+        Language::Qml,
+        SCENE_MS,
+    );
 
-    assert!(violations.is_empty());
+    assert_eq!(violations, []);
 }
 
 #[test]
 fn literals_in_comments_and_unrelated_strings_are_ignored() {
-    let text = "Item {\n    // width: 40 was too wide\n    /* radius: 8 */\n    property string label: \"width: 40\"\n}\n";
+    let text =
+        "Item {\n    // width: 40 was too wide\n    /* radius: 8 */\n    property string label: \"width: 40\"\n}\n";
 
     assert!(qml(text).is_empty(), "{:?}", qml(text));
 }
@@ -104,14 +113,17 @@ fn rust_literal_layout_values_are_found() {
 
     let found: Vec<(usize, Rule)> = rust(text).into_iter().map(|(line, rule, _)| (line, rule)).collect();
 
-    assert_eq!(found, [
-        (2, Rule::Space),
-        (2, Rule::Space),
-        (2, Rule::Size),
-        (3, Rule::Size),
-        (3, Rule::Radius),
-        (4, Rule::Font)
-    ]);
+    assert_eq!(
+        found,
+        [
+            (2, Rule::Space),
+            (2, Rule::Space),
+            (2, Rule::Size),
+            (3, Rule::Size),
+            (3, Rule::Radius),
+            (4, Rule::Font)
+        ]
+    );
 }
 
 #[test]
@@ -147,20 +159,23 @@ fn rust_icedss_own_controls_are_stray_components_and_their_style_types_are_not()
         })
         .collect();
 
-    assert_eq!(found, [
-        (1, "iced::widget::button".to_owned()),
-        (2, "iced::widget::row".to_owned()),
-        (2, "iced::widget::text_input".to_owned()),
-        (4, "iced::widget::button".to_owned()),
-        (5, "column!".to_owned())
-    ]);
+    assert_eq!(
+        found,
+        [
+            (1, "iced::widget::button".to_owned()),
+            (2, "iced::widget::row".to_owned()),
+            (2, "iced::widget::text_input".to_owned()),
+            (4, "iced::widget::button".to_owned()),
+            (5, "column!".to_owned())
+        ]
+    );
 }
 
 #[test]
 fn rust_inline_tests_are_not_scanned() {
     let text = "fn a() {}\n\n#[cfg(test)]\nmod tests {\n    fn b() { x.width(40.0); }\n}\n";
 
-    assert!(rust(text).is_empty());
+    assert_eq!(rust(text), []);
 }
 
 #[test]
@@ -187,7 +202,8 @@ fn a_marker_without_a_reason_or_with_nothing_to_allow_is_bad() {
 
 #[test]
 fn padding_on_both_sides_of_a_token_is_not_a_literal_and_a_ratio_is() {
-    let text = "Item {\n    implicitWidth: label.implicitWidth + Theme.spacing.md * 2\n    y: target.y + level * 0.6\n}\n";
+    let text =
+        "Item {\n    implicitWidth: label.implicitWidth + Theme.spacing.md * 2\n    y: target.y + level * 0.6\n}\n";
 
     let lines: Vec<usize> = qml(text).into_iter().map(|(line, _, _)| line).collect();
 

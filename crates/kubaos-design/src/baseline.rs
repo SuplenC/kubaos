@@ -16,6 +16,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -155,9 +156,9 @@ impl Baseline {
             if counts.is_empty() {
                 continue;
             }
-            text.push_str(&format!("\n[{path:?}]\n"));
+            let _ = write!(text, "\n[{path:?}]\n");
             for (rule, count) in counts {
-                text.push_str(&format!("{rule} = {count}\n"));
+                let _ = writeln!(text, "{rule} = {count}");
             }
         }
         text
@@ -174,7 +175,11 @@ impl Baseline {
     }
 
     fn allowed(&self, path: &str, rule: Rule) -> usize {
-        self.files.get(path).and_then(|rules| rules.get(&rule)).copied().unwrap_or(0)
+        self.files
+            .get(path)
+            .and_then(|rules| rules.get(&rule))
+            .copied()
+            .unwrap_or(0)
     }
 }
 
@@ -182,7 +187,10 @@ impl Baseline {
 pub fn compare<'a>(scan: &'a Scan, baseline: &Baseline) -> Vec<Problem<'a>> {
     let mut by_file: BTreeMap<(&str, Rule), Vec<&Violation>> = BTreeMap::new();
     for violation in &scan.violations {
-        by_file.entry((violation.path.as_str(), violation.rule)).or_default().push(violation);
+        by_file
+            .entry((violation.path.as_str(), violation.rule))
+            .or_default()
+            .push(violation);
     }
     let mut problems = Vec::new();
     for (&(path, rule), found) in &by_file {

@@ -121,7 +121,11 @@ pub fn hits(lines: &[Line], longest_ms: u32) -> Vec<Vec<Hit>> {
                 .get(index + 1)
                 .is_some_and(|next| next.bare.trim_start().starts_with("mod ") && next.bare.trim_end().ends_with('{'));
         in_tests |= opens_tests;
-        out.push(if in_tests { Vec::new() } else { line_hits(line, longest_ms) });
+        out.push(if in_tests {
+            Vec::new()
+        } else {
+            line_hits(line, longest_ms)
+        });
     }
     out
 }
@@ -167,14 +171,17 @@ fn line_hits(line: &Line, longest_ms: u32) -> Vec<Hit> {
                 hits.push(Hit {
                     column: *column,
                     rule: Rule::Font,
-                    what: format!("{}\"{content}\")", call),
+                    what: format!("{call}\"{content}\")"),
                 });
             }
         }
     }
     let colour_spans: Vec<(usize, usize)> = COLOUR_CALLS
         .iter()
-        .flat_map(|call| bare.match_indices(call).map(|(byte, _)| (byte, close(bare, byte + call.len()))))
+        .flat_map(|call| {
+            bare.match_indices(call)
+                .map(|(byte, _)| (byte, close(bare, byte + call.len())))
+        })
         .collect();
     for (call, rule) in CALLS {
         for (byte, _) in bare.match_indices(call) {
@@ -186,7 +193,15 @@ fn line_hits(line: &Line, longest_ms: u32) -> Vec<Hit> {
             if *rule == Rule::Duration && !is_motion(&bare[open..end], call, longest_ms) {
                 continue;
             }
-            literal_hits(bare, open, end, *rule, call.trim_end_matches('('), &colour_spans, &mut hits);
+            literal_hits(
+                bare,
+                open,
+                end,
+                *rule,
+                call.trim_end_matches('('),
+                &colour_spans,
+                &mut hits,
+            );
         }
     }
     for (field, rule) in FIELDS {
@@ -245,7 +260,11 @@ fn literal_hits(
         if number.value == 0.0 || source::is_halving(span, number) || in_colour {
             continue;
         }
-        let literal: String = span.chars().skip(number.column).take(number.end - number.column).collect();
+        let literal: String = span
+            .chars()
+            .skip(number.column)
+            .take(number.end - number.column)
+            .collect();
         hits.push(Hit {
             column: bare[..byte].chars().count(),
             rule,
@@ -315,7 +334,10 @@ fn component_hits(bare: &str, hits: &mut Vec<Hit>) {
         let rest = &bare[byte + "widget::".len()..];
         let name: String = rest.chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
         let after = &rest[name.len()..];
-        let built = after.starts_with('(') || ["::new(", "::with_children(", "::from_vec("].iter().any(|c| after.starts_with(c));
+        let built = after.starts_with('(')
+            || ["::new(", "::with_children(", "::from_vec("]
+                .iter()
+                .any(|c| after.starts_with(c));
         let is_iced = bare[..byte].ends_with("iced::") || word_starts(bare, byte);
         if is_iced && built && WIDGETS.contains(&name.as_str()) {
             hits.push(Hit {

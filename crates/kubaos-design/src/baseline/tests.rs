@@ -29,9 +29,12 @@ fn baseline(text: &str) -> Baseline {
 
 #[test]
 fn a_file_at_its_count_passes() {
-    let found = scan(vec![violation("A.qml", 3, Rule::Size), violation("A.qml", 9, Rule::Size)]);
+    let found = scan(vec![
+        violation("A.qml", 3, Rule::Size),
+        violation("A.qml", 9, Rule::Size),
+    ]);
 
-    assert!(compare(&found, &baseline("[\"A.qml\"]\nsize = 2\n")).is_empty());
+    assert_eq!(compare(&found, &baseline("[\"A.qml\"]\nsize = 2\n")), []);
 }
 
 #[test]
@@ -46,7 +49,14 @@ fn a_new_violation_puts_its_file_over_and_lists_every_one_of_its_rule() {
 
     assert_eq!(problems.len(), 2);
     assert!(matches!(&problems[0], Problem::Over { path: "A.qml", found, .. } if found.len() == 2));
-    assert!(matches!(&problems[1], Problem::Over { path: "B.qml", allowed: 0, .. }));
+    assert!(matches!(
+        &problems[1],
+        Problem::Over {
+            path: "B.qml",
+            allowed: 0,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -59,12 +69,15 @@ fn a_fixed_violation_leaves_the_baseline_stale_until_it_shrinks() {
 
     assert_eq!(problems.len(), 2, "{problems:?}");
     assert_eq!(after, baseline("[\"A.qml\"]\nsize = 1\n"));
-    assert!(compare(&found, &after).is_empty());
+    assert_eq!(compare(&found, &after), []);
 }
 
 #[test]
 fn shrinking_refuses_a_file_over_its_count() {
-    let found = scan(vec![violation("A.qml", 3, Rule::Size), violation("A.qml", 4, Rule::Size)]);
+    let found = scan(vec![
+        violation("A.qml", 3, Rule::Size),
+        violation("A.qml", 4, Rule::Size),
+    ]);
 
     assert!(shrink(&found, &baseline("[\"A.qml\"]\nsize = 1\n")).is_err());
 }

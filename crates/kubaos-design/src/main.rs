@@ -20,6 +20,7 @@
 #![forbid(unsafe_code)]
 
 use std::env;
+use std::fmt::Write as _;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -56,7 +57,10 @@ fn main() -> ExitCode {
         None => find_root(),
     };
     let Some(root) = root else {
-        eprintln!("kubaos-design: no {} here or in any parent; pass --root", kubaos_tokens::TOKENS_PATH);
+        eprintln!(
+            "kubaos-design: no {} here or in any parent; pass --root",
+            kubaos_tokens::TOKENS_PATH
+        );
         return ExitCode::from(2);
     };
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -87,7 +91,7 @@ fn report(err: &Error) {
     let mut message = format!("kubaos-design: {err}");
     let mut source = std::error::Error::source(err);
     while let Some(cause) = source {
-        message.push_str(&format!(": {cause}"));
+        let _ = write!(message, ": {cause}");
         source = cause.source();
     }
     eprintln!("{message}");

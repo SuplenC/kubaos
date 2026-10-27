@@ -107,7 +107,11 @@ pub fn lines(text: &str, language: Language) -> Vec<Line> {
                     if c == '*' && next == Some('/') {
                         line.bare.push(' ');
                         line.comment.push('/');
-                        state = if depth == 1 { State::Code } else { State::BlockComment(depth - 1) };
+                        state = if depth == 1 {
+                            State::Code
+                        } else {
+                            State::BlockComment(depth - 1)
+                        };
                         i += 2;
                         continue;
                     } else if language == Language::Rust && c == '/' && next == Some('*') {
@@ -175,10 +179,7 @@ fn raw_string_start(chars: &[char], at: usize, language: Language) -> Option<usi
 /// lifetime's quote.
 fn char_literal_length(chars: &[char], at: usize) -> usize {
     match chars.get(at + 1) {
-        Some('\\') => chars[at + 2..]
-            .iter()
-            .position(|&c| c == '\'')
-            .map_or(1, |end| end + 3),
+        Some('\\') => chars[at + 2..].iter().position(|&c| c == '\'').map_or(1, |end| end + 3),
         Some(_) if chars.get(at + 2) == Some(&'\'') => 3,
         _ => 1,
     }
@@ -249,6 +250,10 @@ pub fn numbers(code: &str) -> Vec<Number> {
 
 /// Whether `number` only halves or doubles something: `/ 2` (centring, a pill's radius), `* 2` and
 /// `2 *` (a padding on both sides), `* 0.5`. Those derive from a token, they don't add a length.
+#[expect(
+    clippy::float_cmp,
+    reason = "a literal as written is compared with the literals 2 and 0.5"
+)]
 pub fn is_halving(code: &str, number: Number) -> bool {
     let before = code[..byte_index(code, number.column)].trim_end();
     let after = code[byte_index(code, number.end)..].trim_start();
