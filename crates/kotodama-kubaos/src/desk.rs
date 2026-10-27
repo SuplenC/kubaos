@@ -76,6 +76,10 @@ impl Desk {
     /// The positions in the file's text: a line each, its block, the connector of the screen
     /// there, the position and the screen, split by tabs. A line of a file keyed by screen, which
     /// Hyprland migrates on its next start, is skipped.
+    ///
+    /// A screen gets one Item: the position it stands at, else the first it waited at. A file from
+    /// before Hyprland repaired it can name a screen at a position and again waiting at another,
+    /// or name a position twice; the first line for a position stands.
     pub fn parse(text: &str) -> Self {
         let mut places: Vec<Place> = text
             .lines()
@@ -93,7 +97,21 @@ impl Desk {
                 })
             })
             .collect();
+        places.dedup_by(|later, earlier| later.position == earlier.position);
         places.sort_by_key(Place::order);
+        let present: Vec<String> = places
+            .iter()
+            .filter(|place| !place.connector.is_empty())
+            .map(|place| place.screen.clone())
+            .collect();
+        let mut listed: Vec<String> = Vec::new();
+        places.retain(|place| {
+            if place.connector.is_empty() && (present.contains(&place.screen) || listed.contains(&place.screen)) {
+                return false;
+            }
+            listed.push(place.screen.clone());
+            true
+        });
         Desk { places }
     }
 

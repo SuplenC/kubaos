@@ -102,3 +102,50 @@ fn an_unknown_position_or_action_is_refused() {
     assert!(Desk::parse(SCREENS).run("desk:1", "unplug", &runner).is_err());
     assert!(runner.launched.borrow().is_empty());
 }
+
+// The file Kuba's laptop had: each external named at the position it stands at and again waiting
+// at a position the old migration invented for it.
+const DOUBLED: &str = "0\teDP-1\tpanel\tCSOT MNE007ZA3-2\n\
+                       1\t\t3\tLG ULTRAGEAR+ 510NTCZN7787\n\
+                       2\t\t4\tBNQ ZOWIE XL G4L01663SL0\n\
+                       3\tHDMI-A-1\t2\tLG ULTRAGEAR+ 510NTCZN7787\n\
+                       4\tDP-2\t1\tBNQ ZOWIE XL G4L01663SL0\n";
+
+#[test]
+fn a_screen_standing_at_a_position_gets_no_waiting_item_elsewhere() {
+    let desk = Desk::parse(DOUBLED);
+
+    assert_eq!(
+        titles(&desk),
+        [
+            "Workspace group: laptop panel",
+            "Workspace group: position 1 from the left",
+            "Workspace group: position 2 from the left",
+        ]
+    );
+    assert_eq!(
+        desk.items()[1].subtitle.as_deref(),
+        Some("Workspaces 41-50, on BNQ ZOWIE XL G4L01663SL0 (DP-2)")
+    );
+}
+
+#[test]
+fn a_screen_waiting_at_two_positions_gets_one_item_the_first_from_the_left() {
+    let desk = Desk::parse("0\teDP-1\tpanel\tBOE 0x0BCA\n1\t\t4\tDell U2724D 1A2B3C4\n2\t\t2\tDell U2724D 1A2B3C4\n");
+
+    assert_eq!(
+        titles(&desk),
+        [
+            "Workspace group: laptop panel",
+            "Workspace group: position 2 from the left",
+        ]
+    );
+}
+
+#[test]
+fn a_position_named_twice_keeps_its_first_line() {
+    let items = Desk::parse("0\teDP-1\tpanel\tBOE 0x0BCA\n3\tDP-1\t1\tA\n5\tDP-2\t1\tB\n").items();
+
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[1].subtitle.as_deref(), Some("Workspaces 31-40, on A (DP-1)"));
+}
