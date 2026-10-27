@@ -1,7 +1,7 @@
 # desktop/
 
 The desktop: Hyprland, the shell (bar, popups, Command menu look), keyboard, pointer,
-clock, system monitor, idle, files, wallpapers and the phone link.
+clock, system monitor, idle, files, wallpapers, the phone link and the workspace groups.
 
 | Folder | Files | What they change | Applies |
 |---|---|---|---|
@@ -18,5 +18,6 @@ clock, system monitor, idle, files, wallpapers and the phone link.
 | `phone/` | `phone-link` | A flag file, no contents: the phone link is on and KDE Connect runs. "Set up a phone" in the Command menu writes it, "Turn the phone link off" removes it | at once from the menu; the next login after a hand edit |
 | | `plugins` | KDE Connect plugins a paired phone may use beyond the phone link's own, one name a line (`kdeconnect_mousepad`); every other one stays off | the next start of the phone link |
 | `wallpapers/` | `sets` | The wallpaper sets the picker shows, one per line. The install writes it | the picker's next look |
+| `workspaces/` | `groups.toml` | Which screens are pinned to which workspace group, by description, and the groups' names: a pinned screen shows its group wherever it is plugged in. Two of a group's screens plugged in: the first listed wins. Screens without a pin take the groups left over, left to right, never one a group pins. The laptop panel can be pinned too (with the lid closed it holds no group). The Command menu's "Pin <screen> to group N", "Unpin <screen>" and "Name group N…" write it; a mistake is a notification, and no screen is pinned until it is fixed | at once, as it is saved |
 
 The Command menu's "Settings: Desktop" opens this folder in Files.
