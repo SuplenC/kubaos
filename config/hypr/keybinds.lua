@@ -49,7 +49,6 @@ bind("SUPER + F1", "Keyboard shortcuts", "kotodama open --view hyprland/shortcut
 -- Windows
 ---------------------------------------------------------------------------
 
-bind("SUPER + Q", "Close window", hl.dsp.window.close())
 bind("CTRL + ALT + Delete", "Close all windows", function()
   for _, w in ipairs(hl.get_windows()) do
     hl.dispatch(hl.dsp.window.close({ window = "address:" .. w.address }))

@@ -23,7 +23,7 @@ hl.bind("SUPER + Space",
 hl.bind("SUPER + ALT + Space", hl.dsp.exec_cmd("pkill -x fuzzel || fuzzel"), { description = "Fallback launcher (fuzzel)" })
 
 -- Survival kit: close, reload, lock without the shell, leave.
-hl.bind("SUPER + W", hl.dsp.window.close(), { description = "Close window" })
+hl.bind("SUPER + Q", hl.dsp.window.close(), { description = "Close window" })
 hl.bind("SUPER + SHIFT + CTRL + R", hl.dsp.exec_cmd("hyprctl reload"), { description = "Reload Hyprland config" })
 hl.bind("SUPER + SHIFT + CTRL + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"), { description = "Lock with hyprlock (fallback lock)" })
 -- Leaving stops graphical-session.target first and waits for it, while
