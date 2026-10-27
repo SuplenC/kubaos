@@ -56,8 +56,8 @@ PanelWindow {
     readonly property int paneWidth: menu.paneFits ? Math.max(K.Tokens.size.rail, menu.onGrid((menu.panelWidth - menu.gap * 3) * menu.paneShare)) : 0
     // A row and the gap under it.
     readonly property int pitch: K.Tokens.size.row_two_line + K.Tokens.space.s4
-    // Everything but the body and the footer's divider: the gaps round the field, the body and the
-    // footer, and the field and the footer themselves.
+    // Everything but the body: the gaps round the field, the body and the footer (the footer's
+    // divider sits in one), and the field and the footer themselves.
     readonly property int chrome: menu.gap * 5 + K.Tokens.size.control_md + K.Tokens.size.control_sm
     // Rows fill about two thirds of the screen's height: a taller screen shows more of them. Eight
     // at the least, the e2e harness's 1280×800 included.
@@ -65,7 +65,7 @@ PanelWindow {
     readonly property int minRows: 8
     readonly property int maxRows: 14
     readonly property int bodyHeight: menu.rows * menu.pitch - K.Tokens.space.s4
-    readonly property real panelHeight: menu.chrome + menu.bodyHeight + K.Look.hairline(menu.dpr)
+    readonly property int panelHeight: menu.chrome + menu.bodyHeight
     // Two fifths of the height it leaves free above it, as the screen's optical centre.
     readonly property int top: menu.onGrid((menu.screenHeight - menu.panelHeight) * 0.4)
 
@@ -608,6 +608,7 @@ PanelWindow {
                         required property var modelData
                         readonly property bool failed: modelData.state === "failed"
                         readonly property bool succeeded: modelData.state === "succeeded"
+                        readonly property bool known: modelData.progress >= 0
 
                         weights: [3, 1]
                         gap: K.Tokens.space.s12
@@ -617,14 +618,18 @@ PanelWindow {
                             gap: K.Tokens.space.s8
                             align: "centre"
 
+                            // Only a job that can't tell how far it has got spins: a running
+                            // animation makes every frame wait on the screen's refresh, typing's
+                            // included.
                             K.Spinner {
-                                visible: !running.failed && !running.succeeded
+                                visible: !running.failed && !running.succeeded && !running.known
+                                running: menu.moves && menu.visible
                                 size: K.Tokens.icon.s16
                             }
 
                             K.Icon {
-                                visible: running.failed || running.succeeded
-                                name: running.failed ? "error" : "check_circle"
+                                visible: running.failed || running.succeeded || running.known
+                                name: running.failed ? "error" : running.succeeded ? "check_circle" : "hourglass_top"
                                 size: K.Tokens.icon.s16
                                 color: running.failed ? K.Tokens.color.error : K.Tokens.color.primary
                             }
@@ -660,7 +665,7 @@ PanelWindow {
             x: menu.gap
             y: head.y + head.height + menu.gap
             width: panel.width - menu.gap * 2
-            height: footerRule.y - menu.gap - y
+            height: footer.y - menu.gap * 2 - y
             opacity: menu.settle
             transform: Translate {
                 x: menu.slide
@@ -712,7 +717,7 @@ PanelWindow {
                     }
 
                     // The view scrolls to keep the selection on screen. With the highlight not
-                    // following the current row, ListView no longer does that itself, so it is
+                    // following the current row, ListView doesn't do that itself, so it is
                     // done here, on the selection's glide. Rows are all one height.
                     function reveal(index: int): void {
                         if (index < 0)
@@ -930,6 +935,7 @@ PanelWindow {
                 active: menu.kind === "progress"
                 sourceComponent: ProgressView {
                     job: search.view.job ?? ({})
+                    moves: menu.moves
                 }
             }
         }
@@ -945,6 +951,7 @@ PanelWindow {
 
             x: K.Look.snap((panel.width - width) / 2, menu.dpr)
             y: footerRule.y - menu.gap - height
+            room: panel.width - menu.gap * 2
             shown: footer.status === "" && search.toast !== ""
             text: `${toast.said}. ⌃Z undoes it.`
 
@@ -961,7 +968,9 @@ PanelWindow {
         K.Divider {
             id: footerRule
 
-            y: footer.y - menu.gap - height
+            // A gap under the body, inside the gap over the footer, so the panel stays a whole
+            // number of pixels tall.
+            y: footer.y - menu.gap
             width: panel.width
         }
 

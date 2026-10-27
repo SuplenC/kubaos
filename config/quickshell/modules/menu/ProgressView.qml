@@ -8,6 +8,8 @@ Item {
 
     // `{title, state, progress, message}`, as `KotodamaSearch.jobs` lists them.
     property var job: ({})
+    // Whether things may move: `Settings.menuMotion`, as Menu.qml reads it.
+    property bool moves: true
     readonly property bool failed: job.state === "failed"
     readonly property bool succeeded: job.state === "succeeded"
     readonly property bool known: view.succeeded || (job.progress ?? -1) >= 0
@@ -23,14 +25,17 @@ Item {
         centred: true
         gap: K.Tokens.space.s16
 
+        // Only a job that can't tell how far it has got spins: a running animation makes every
+        // frame wait on the screen's refresh.
         K.Spinner {
-            visible: !view.failed && !view.succeeded
+            visible: !view.failed && !view.known
+            running: view.moves && view.visible
             size: K.Tokens.icon.s48
         }
 
         K.Icon {
-            visible: view.failed || view.succeeded
-            name: view.failed ? "error" : "check_circle"
+            visible: view.failed || view.known
+            name: view.failed ? "error" : view.succeeded ? "check_circle" : "hourglass_top"
             size: K.Tokens.icon.s48
             color: view.failed ? K.Tokens.color.error : K.Tokens.color.primary
         }
