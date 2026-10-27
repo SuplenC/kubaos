@@ -40,12 +40,12 @@ Drawer {
     // Above and below the body; at its sides, the container padding round the month and the
     // rail beside it.
     readonly property int pad: K.Tokens.space.s20
-    readonly property int side: K.Tokens.containerPaddingAround(grid.implicitWidth + K.Tokens.size.rail + columnGap)
+    readonly property int bodyInset: K.Tokens.containerPaddingAround(grid.implicitWidth + K.Tokens.size.rail + columnGap)
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
     edge: "top"
     align: 0.5
-    contentWidth: grid.implicitWidth + K.Tokens.size.rail + columnGap + side * 2
+    contentWidth: grid.implicitWidth + K.Tokens.size.rail + columnGap + bodyInset * 2
     contentHeight: body.implicitHeight + pad * 2
 
     onShownChanged: Time.seconds = shown
@@ -200,13 +200,13 @@ Drawer {
     }
 
     // The body: the container padding round it at the sides, `pad` above and below. A panel
-    // as wide as its content, so the padding comes from the content's width (`side`).
+    // as wide as its content, so the padding comes from the content's width (`bodyInset`).
     K.Stack {
         id: body
 
-        x: root.side
+        x: root.bodyInset
         y: root.pad
-        width: root.contentWidth - root.side * 2
+        width: root.contentWidth - root.bodyInset * 2
         room: width
         fill: true
         gap: K.Tokens.space.s16

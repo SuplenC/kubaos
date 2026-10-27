@@ -29,7 +29,7 @@ Drawer {
     readonly property int pad: K.Tokens.space.s24
     // At the sides, the container padding round the thumbnails or the tabs and key hints,
     // whichever is wider; the screen's width's own when they would take more than it has.
-    readonly property int side: {
+    readonly property int bodyInset: {
         const inner = Math.max(gridWidth, headerWidth);
         const around = K.Tokens.containerPaddingAround(inner);
         return inner + around * 2 > widest ? K.Tokens.containerPadding(widest) : around;
@@ -58,7 +58,7 @@ Drawer {
     edge: "bottom"
     // As wide as the thumbnails or the tabs and key hints above them,
     // whichever is wider, and never wider than the screen.
-    contentWidth: Math.min(Math.max(gridWidth, headerWidth) + side * 2, widest)
+    contentWidth: Math.min(Math.max(gridWidth, headerWidth) + bodyInset * 2, widest)
     contentHeight: pad + header.implicitHeight + K.Tokens.space.s16 + (settingsOpen ? Math.min(Math.max(cellHeight, settings.implicitHeight), (frame.b - frame.t) * settingsShare) : rows * cellHeight) + pad
     onOpened: {
         Wallpapers.refresh();
@@ -119,9 +119,9 @@ Drawer {
     K.Row {
         id: header
 
-        x: root.side
+        x: root.bodyInset
         y: root.pad
-        width: root.contentWidth - root.side * 2
+        width: root.contentWidth - root.bodyInset * 2
         gap: K.Tokens.space.s16
         align: "centre"
 
@@ -148,9 +148,9 @@ Drawer {
     WallpaperSettings {
         id: settings
 
-        x: root.side
+        x: root.bodyInset
         y: header.y + header.height + K.Tokens.space.s16
-        width: root.contentWidth - root.side * 2
+        width: root.contentWidth - root.bodyInset * 2
         height: root.contentHeight - y - root.pad
         visible: root.settingsOpen
         onBack: root.pick(root.lastFolder)
