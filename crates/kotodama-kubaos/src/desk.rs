@@ -196,6 +196,7 @@ impl Desk {
             _ => return Err(unknown()),
         };
         edited.map_err(|err| Chain(&err).to_string())?;
+        reload_groups(runner);
         Ok(Ran::Close)
     }
 
@@ -210,6 +211,25 @@ impl Desk {
             targets.extend(self.group_targets(groups));
         }
         targets
+    }
+
+    /// Whether the screen at `place` is plugged in and can be pinned. A pin names a description,
+    /// so two screens reporting the same one, a pair without serials, can't be pinned apart:
+    /// neither gets a Pin Item, and nor does an identity Hyprland numbered to tell them apart
+    /// (`Generic Monitor #2`), which no screen reports.
+    fn pinnable(&self, place: &Place) -> bool {
+        let twin = |screen: &str| {
+            self.places
+                .iter()
+                .filter(|other| !other.connector.is_empty() && other.screen == screen)
+                .count()
+                > 1
+        };
+        let numbered = place
+            .screen
+            .rsplit_once(" #")
+            .is_some_and(|(_, count)| !count.is_empty() && count.bytes().all(|byte| byte.is_ascii_digit()));
+        !place.connector.is_empty() && !numbered && !twin(&place.screen)
     }
 
     /// The pin, unpin and name Items for the screens plugged in and the groups in `groups` or on
@@ -232,7 +252,7 @@ impl Desk {
         let new = numbers.last().map_or(1, |last| last + 1);
 
         let mut targets = Vec::new();
-        for place in self.places.iter().filter(|place| !place.connector.is_empty()) {
+        for place in self.places.iter().filter(|place| self.pinnable(place)) {
             for number in numbers.iter().copied().chain([new]) {
                 if pinned.get(place.screen.as_str()) == Some(&number) {
                     continue;
@@ -281,6 +301,21 @@ fn show(position: &str, runner: &impl Runner) -> Result<Ran, String> {
         .launch(&argv, Duration::ZERO)
         .map_err(|err| Chain(&err).to_string())?;
     Ok(Ran::Close)
+}
+
+/// Asks Hyprland to read the groups file again, so an edit from the menu applies even while the
+/// shell, which watches the file for hand edits, is down. Hyprland moves nothing for a file it has
+/// read already, so the shell's own reload after this one is harmless. The edit is saved either
+/// way, so a `hyprctl` that can't start is logged, not shown as the Action failing.
+fn reload_groups(runner: &impl Runner) {
+    let argv = [
+        "hyprctl".to_owned(),
+        "dispatch".to_owned(),
+        "dot.workspaces.reload_groups()".to_owned(),
+    ];
+    if let Err(err) = runner.launch(&argv, Duration::ZERO) {
+        kotodama_extension::log!("telling Hyprland of the new workspace groups: {}", Chain(&err));
+    }
 }
 
 fn is_position(field: &str) -> bool {

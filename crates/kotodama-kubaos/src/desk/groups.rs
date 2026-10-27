@@ -16,8 +16,8 @@
 //! # Not here
 //!
 //! - Where each group goes, and reading the file in the session: `parse_groups` and `positions`
-//!   in `config/hypr/workspace_blocks.lua`. Hyprland is told of a change by the bar, which
-//!   watches the file (`config/quickshell/services/Hypr.qml`).
+//!   in `config/hypr/workspace_blocks.lua`. Telling Hyprland of an edit: [`crate::desk`] after
+//!   each one, and the bar for hand edits (`config/quickshell/services/Hypr.qml`).
 //! - The menu's Items: [`crate::desk`].
 
 use std::collections::BTreeMap;
@@ -179,21 +179,29 @@ fn invalid(problem: impl Into<String>) -> GroupsError {
 /// The groups `doc` holds, held to what `parse_groups` in `config/hypr/workspace_blocks.lua`
 /// takes.
 fn groups(doc: &DocumentMut) -> Result<Vec<Group>, GroupsError> {
-    let mut groups = Vec::new();
+    let mut groups: Vec<Group> = Vec::new();
     for (key, item) in doc.iter() {
-        let Some(parent) = item.as_table().filter(|table| key == GROUP && table.is_implicit()) else {
+        let Some(parent) = item
+            .as_table()
+            .filter(|table| key == GROUP && table.is_implicit() && !table.is_dotted())
+        else {
             return Err(invalid(format!(
                 "`{key}` isn't a group; groups are [group.1], [group.2] and on"
             )));
         };
         for (number, item) in parent {
-            let number = number
-                .parse::<u32>()
-                .ok()
+            // Digits only, as Hyprland reads them: `+1` is no group, and `01` is group 1.
+            let number = Some(number)
+                .filter(|number| !number.is_empty() && number.bytes().all(|byte| byte.is_ascii_digit()))
+                .and_then(|number| number.parse::<u32>().ok())
                 .filter(|number| *number >= 1)
                 .ok_or_else(|| invalid(format!("[group.{number}] isn't a group; groups count from 1")))?;
+            if groups.iter().any(|group| group.number == number) {
+                return Err(invalid(format!("[group.{number}] twice")));
+            }
             let table = item
                 .as_table()
+                .filter(|table| !table.is_dotted())
                 .ok_or_else(|| invalid(format!("group {number} isn't a [group.{number}] table")))?;
             groups.push(group(number, table)?);
         }
@@ -233,8 +241,9 @@ fn group(number: u32, table: &Table) -> Result<Group, GroupsError> {
         match key {
             NAME => {
                 let name = item
-                    .as_str()
-                    .ok_or_else(|| invalid(format!("group {number}'s name isn't text in quotes")))?;
+                    .as_value()
+                    .and_then(plain_string)
+                    .ok_or_else(|| invalid(format!("group {number}'s name isn't text in quotes on one line")))?;
                 let name = name.trim();
                 group.name = (!name.is_empty()).then(|| name.to_owned());
             }
@@ -243,9 +252,11 @@ fn group(number: u32, table: &Table) -> Result<Group, GroupsError> {
                     .as_array()
                     .ok_or_else(|| invalid(format!("group {number}'s screens aren't a list")))?;
                 for screen in list {
-                    let screen = screen
-                        .as_str()
-                        .ok_or_else(|| invalid(format!("group {number} lists a screen that isn't text in quotes")))?;
+                    let screen = plain_string(screen).ok_or_else(|| {
+                        invalid(format!(
+                            "group {number} lists a screen that isn't text in quotes on one line"
+                        ))
+                    })?;
                     group.screens.push(screen.trim().to_owned());
                 }
             }
@@ -255,6 +266,31 @@ fn group(number: u32, table: &Table) -> Result<Group, GroupsError> {
         }
     }
     Ok(group)
+}
+
+/// The text of `value` when it is a string Hyprland reads too: on one line, with only the escapes
+/// `\b \t \n \f \r \" \\ \uXXXX \UXXXXXXXX`. TOML 1.1's `\e` and `\xHH`, and strings over several
+/// lines, are left out.
+fn plain_string(value: &Value) -> Option<&str> {
+    let Value::String(formatted) = value else {
+        return None;
+    };
+    let text = formatted.value().as_str();
+    let Some(raw) = formatted.as_repr().and_then(|repr| repr.as_raw().as_str()) else {
+        return Some(text);
+    };
+    if raw.starts_with("\"\"\"") || raw.starts_with("'''") {
+        return None;
+    }
+    if raw.starts_with('"') {
+        let mut chars = raw.chars();
+        while let Some(char) = chars.next() {
+            if char == '\\' && !matches!(chars.next(), Some('b' | 't' | 'n' | 'f' | 'r' | '"' | '\\' | 'u' | 'U')) {
+                return None;
+            }
+        }
+    }
+    Some(text)
 }
 
 /// Takes `screen` out of the list of every group.

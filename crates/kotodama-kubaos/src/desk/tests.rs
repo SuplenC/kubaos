@@ -273,7 +273,67 @@ fn pinning_from_the_menu_writes_the_groups_file_and_closes_it() {
         fs::read_to_string(&file).unwrap(),
         format!("{HOME_GROUPS}\n[group.2]\nscreens = [\"LG ULTRAGEAR+ 510NTCZN7787\"]\n")
     );
+    assert_eq!(launched(&runner), [RELOAD]);
+}
+
+const RELOAD: [&str; 3] = ["hyprctl", "dispatch", "dot.workspaces.reload_groups()"];
+
+fn launched(runner: &FakeRunner) -> Vec<Vec<String>> {
+    runner.launched.borrow().iter().map(|(argv, _)| argv.clone()).collect()
+}
+
+// Regression: with the shell down, a pin from the menu waited for the next `hyprctl reload`.
+#[test]
+fn every_edit_from_the_menu_tells_hyprland_itself() {
+    let (_dir, _file, desk) = home();
+    let runner = FakeRunner::default();
+    let named = BTreeMap::from([(NAME_ARGUMENT.to_owned(), "Centre".to_owned())]);
+
+    desk.run("desk-name:2", NAME, &named, &runner).unwrap();
+    desk.run("desk-unpin:BNQ ZOWIE XL G4L01663SL0", UNPIN, &no_arguments(), &runner)
+        .unwrap();
+
+    assert_eq!(launched(&runner), [RELOAD, RELOAD]);
+}
+
+#[test]
+fn an_edit_refused_tells_hyprland_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join(groups::FILE);
+    fs::write(&file, "[group.1]\nscreens = [\"A\"]\n").unwrap();
+    let desk = Desk::parse(HOME).with_groups_file(file.clone());
+    fs::write(&file, "[group.1]\nscreen = []\n").unwrap();
+    let runner = FakeRunner::default();
+
+    assert!(desk.run("desk-name:1", NAME, &no_arguments(), &runner).is_err());
     assert!(runner.launched.borrow().is_empty());
+}
+
+// Two screens with no serial report one description, and a pin names a description, so it can't
+// tell them apart.
+#[test]
+fn twins_reporting_one_description_get_no_pin_items() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join(groups::FILE);
+    fs::write(&file, "").unwrap();
+    let twins = "0\teDP-1\tpanel\tCSOT MNE007ZA3-2\n1\tDP-1\t1\tGeneric Monitor\n2\tDP-2\t2\tGeneric Monitor\n\
+                 3\tDP-3\t3\tGeneric Monitor #2\n";
+
+    let desk = Desk::parse(twins).with_groups_file(file);
+
+    let pins: Vec<String> = ids(&desk)
+        .into_iter()
+        .filter(|id| id.starts_with("desk-pin:"))
+        .collect();
+    assert_eq!(
+        pins,
+        [
+            "desk-pin:1:CSOT MNE007ZA3-2",
+            "desk-pin:2:CSOT MNE007ZA3-2",
+            "desk-pin:3:CSOT MNE007ZA3-2",
+            "desk-pin:4:CSOT MNE007ZA3-2"
+        ]
+    );
 }
 
 #[test]

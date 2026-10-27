@@ -80,6 +80,39 @@ fn a_file_hyprland_refuses_is_refused() {
     assert!(matches!(parse("[group.1"), Err(GroupsError::Toml(_))));
 }
 
+/// The groups files in `test/fixtures/workspace-groups/<kind>`, which `parse_groups` in
+/// `config/hypr/workspace_blocks.lua` holds to the same verdicts (`test/lua/workspaces_test.lua`).
+fn fixtures(kind: &str) -> Vec<(String, String)> {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test/fixtures/workspace-groups")
+        .join(kind);
+    let mut found: Vec<(String, String)> = fs::read_dir(&dir)
+        .expect("read the fixtures")
+        .map(|entry| {
+            let path = entry.expect("a fixture").path();
+            let text = fs::read_to_string(&path).expect("read a fixture");
+            (path.file_name().unwrap().to_string_lossy().into_owned(), text)
+        })
+        .collect();
+    found.sort();
+    assert!(!found.is_empty(), "no fixtures in {}", dir.display());
+    found
+}
+
+#[test]
+fn every_groups_file_hyprland_takes_the_menu_takes() {
+    for (name, text) in fixtures("valid") {
+        assert!(parse(&text).is_ok(), "{name}: {:?}", parse(&text));
+    }
+}
+
+#[test]
+fn every_groups_file_hyprland_refuses_the_menu_refuses() {
+    for (name, text) in fixtures("invalid") {
+        assert!(parse(&text).is_err(), "{name} was read");
+    }
+}
+
 #[test]
 fn no_file_is_no_groups() {
     assert_eq!(read(Path::new("/nonexistent/groups.toml")).unwrap(), []);
