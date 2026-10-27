@@ -195,15 +195,59 @@ test("a screens file keyed by screen is read as one to migrate", function()
   same({ next(places), #legacy, legacy[5].block, legacy[5].identity }, { nil, 5, 4, LG_B }, "legacy")
 end)
 
-test("migrating, the plugged-in externals take the positions they stand at and the rest follow", function()
+test("migrating, the plugged-in externals take the positions they stand at and the unplugged get no position", function()
   local _, _, legacy = blocks.parse_places(SCREENS_BY_SERIAL)
   local places, seen = blocks.migrate(legacy, {
     { name = "eDP-1", id = 0, x = 4480, y = 0, description = PANEL },
     { name = "DP-8", id = 1, x = 2560, y = 0, description = LG_A },
     { name = "DP-9", id = 2, x = 640, y = 0, description = LG_B },
   })
-  same({ places.panel, places["1"], places["2"], places["3"], places["4"] }, { 0, 4, 3, 1, 2 }, "places")
-  same({ seen["1"], seen["3"], seen["4"] }, { LG_B, LG_C, BENQ }, "seen")
+  same({ places.panel, places["1"], places["2"], places["3"], places["4"] }, { 0, 4, 3, nil, nil }, "places")
+  same({ seen["1"], seen["2"] }, { LG_B, LG_A }, "seen")
+end)
+
+test("migrating, unplugged screens take the positions before the first a plugged screen holds", function()
+  local _, _, legacy = blocks.parse_places("0\teDP-1\t" .. PANEL .. "\n1\t\t" .. LG_C .. "\n2\tDP-1\t" .. LG_A .. "\n3\t\t" .. BENQ .. "\n")
+  local places = blocks.migrate(legacy, {
+    { name = "eDP-1", id = 0, x = 0, y = 0, description = PANEL },
+    { name = "DP-1", id = 1, x = 3840, y = 0, description = LG_A },
+  })
+  same({ places.panel, places["1"], places["2"], places["3"] }, { 0, 2, nil, nil }, "places")
+end)
+
+test("migrating with the lid closed, a panel row written with the lid closed is found by its block", function()
+  local _, _, legacy = blocks.parse_places("0\t\t" .. PANEL .. "\n1\tDP-1\t" .. LG_A .. "\n")
+  local places, seen = blocks.migrate(legacy, { { name = "DP-1", id = 1, x = 0, y = 0, description = LG_A } })
+  same({ places.panel, places["1"], seen.panel }, { 0, 1, PANEL }, "places")
+end)
+
+test("a screens file naming a position twice keeps its first row", function()
+  local places, seen = blocks.parse_places("3\tDP-1\t1\tA\n5\tDP-2\t1\tB\n")
+  same({ places["1"], seen["1"], places["2"] }, { 3, "A", nil }, "places")
+end)
+
+test("a screens file giving two positions one block keeps the row of the screen plugged in", function()
+  local places = blocks.parse_places("5\t\t1\tA\n5\tDP-2\t2\tB\n5\t\t3\tC\n")
+  same({ places["1"], places["2"], places["3"] }, { nil, 5, nil }, "places")
+end)
+
+test("a position whose screen stands at another is a ghost, dropped once its block is empty", function()
+  local places = { panel = 0, ["1"] = 4, ["2"] = 3, ["3"] = 1, ["4"] = 2 }
+  local seen = { panel = PANEL, ["1"] = BENQ, ["2"] = LG_A, ["3"] = LG_A, ["4"] = BENQ }
+
+  blocks.heal(places, seen, { ["1"] = true, ["2"] = true, panel = true }, { [2] = true })
+
+  same({ places.panel, places["1"], places["2"], places["3"], places["4"] }, { 0, 4, 3, nil, 2 }, "places")
+  same({ seen["3"], seen["4"] }, { nil, BENQ }, "seen")
+end)
+
+test("a position never seen gets a block no position owns and no workspace lives in", function()
+  local places, seen = { panel = 0, ["1"] = 3 }, { panel = PANEL, ["1"] = LG_A }
+  local monitors = { { name = "eDP-1", id = 0, description = PANEL }, { name = "DP-1", id = 1, description = LG_A }, { name = "DP-2", id = 2, description = LG_B } }
+
+  local by_connector = blocks.assign(places, seen, monitors, { ["eDP-1"] = "panel", ["DP-1"] = "1", ["DP-2"] = "2" }, { [1] = true })
+
+  same(by_connector["DP-2"], 2, "block")
 end)
 
 test("migrating, unplugged screens follow in the order they last sat", function()
@@ -718,8 +762,7 @@ test("migrating a screens file moves no window and renumbers no workspace", func
   same({ world:ids_on("eDP-1"), world:ids_on("DP-8"), world:ids_on("DP-9") }, { { 1, 2, 11, 12 }, { 31, 32 }, { 41, 42, 43 } }, "ids")
   same({ world:shown_on("eDP-1"), world:shown_on("DP-8"), world:shown_on("DP-9") }, { 1, 31, 41 }, "shown")
   same(world.renumbered, 0, "renumbered")
-  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. PANEL .. "\n1\t\t3\t" .. LG_C .. "\n2\t\t4\t" .. BENQ
-    .. "\n3\tDP-8\t2\t" .. LG_A .. "\n4\tDP-9\t1\t" .. LG_B .. "\n", "file")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. PANEL .. "\n3\tDP-8\t2\t" .. LG_A .. "\n4\tDP-9\t1\t" .. LG_B .. "\n", "file")
 end)
 
 test("after migrating, the home desk takes the work desk's groups by position", function()
@@ -734,6 +777,406 @@ test("after migrating, the home desk takes the work desk's groups by position", 
   same(on_screen(windows), { "eDP-1", "eDP-1", "DP-2", "DP-1", "DP-1" }, "the windows")
   same({ blocks.block_of(world:shown_on("DP-1")), blocks.block_of(world:shown_on("DP-2")) }, { 4, 3 }, "each shows its group")
   same(world.renumbered, 0, "renumbered")
+end)
+
+-- Kuba's desk: the panel on the right, the BenQ on the left and the LG in the
+-- centre, and the screens file his laptop had, where each external's own
+-- block waits at a position it never stood at (3 and 4) beside the position it
+-- holds. `ghosts` adds windows to those waiting blocks.
+local CSOT = "China Star Optoelectronics Technology Co. Ltd MNE007ZA3-2"
+local LG_K = "LG Electronics LG ULTRAGEAR+ 510NTCZN7787"
+local BNQ_K = "BNQ ZOWIE XL LCD G4L01663SL0"
+local KUBA_FILE = "0\teDP-1\tpanel\t" .. CSOT .. "\n1\t\t3\t" .. LG_K .. "\n2\t\t4\t" .. BNQ_K
+  .. "\n3\tHDMI-A-1\t2\t" .. LG_K .. "\n4\tDP-2\t1\t" .. BNQ_K .. "\n"
+local KUBA_HEALED = "0\teDP-1\tpanel\t" .. CSOT .. "\n3\tHDMI-A-1\t2\t" .. LG_K .. "\n4\tDP-2\t1\t" .. BNQ_K .. "\n"
+
+-- The laptop alone with the two groups waiting on it, as before the dock.
+local function kuba_undocked(ghosts)
+  local world = bare()
+  write(world.state .. "/workspace-screens", KUBA_FILE)
+  package.loaded.workspaces = nil
+  local module = require("workspaces")
+  world:plug("eDP-1", CSOT, 4480, 240)
+  world:fire("hyprland.start")
+  local ids = { 2, 31, 32, 33, 34, 41, 42 }
+  for _, id in ipairs(ghosts or {}) do
+    ids[#ids + 1] = id
+  end
+  for _, id in ipairs(ids) do
+    world:window_on(id, "eDP-1")
+  end
+  world:open_window()
+  return world, module
+end
+
+local function kuba_docked(world)
+  same(world:ids_on("DP-2"), { 41, 42, 43 }, "the left screen")
+  same(world:ids_on("HDMI-A-1"), { 31, 32, 33, 34, 35 }, "the centre screen")
+  same(world:ids_on("eDP-1"), { 1, 2, 3 }, "the laptop")
+  same({ world:shown_on("DP-2"), world:shown_on("HDMI-A-1") }, { 41, 31 }, "each shows its own")
+  same(world.renumbered, 0, "renumbered")
+  same(read(world.state .. "/workspace-screens"), KUBA_HEALED, "the file")
+end
+
+-- Regression: the centre group showed on the right and the centre screen the
+-- left group, because the reconcile ran while the LG still sat at 0,0.
+test("the BenQ, then the LG arriving at 0,0 before it is arranged, end with each group at its position", function()
+  local world = kuba_undocked()
+  world:attach("DP-2", BNQ_K)
+  world:arrange("DP-2", 0, 360)
+  world:settle()
+  local file = world.state .. "/workspace-screens"
+  local real_open, real_rename = io.open, os.rename
+  local written_with, opened, renamed = nil, {}, {}
+  io.open = function(path, mode)
+    if mode == "w" and path:find(world.state, 1, true) then
+      written_with = world:ids_on("HDMI-A-1")
+      opened[#opened + 1] = path
+    end
+    return real_open(path, mode)
+  end
+  os.rename = function(from, to)
+    renamed[#renamed + 1] = { from, to }
+    return real_rename(from, to)
+  end
+
+  world:attach("HDMI-A-1", LG_K)
+  world:arrange("HDMI-A-1", 1920, 0)
+  world:settle()
+
+  io.open, os.rename = real_open, real_rename
+  kuba_docked(world)
+  same(written_with, { 31, 32, 33, 34, 35 }, "the file is written once the workspaces have moved")
+  same(opened, { file .. ".tmp" }, "written to a temp file beside it")
+  same(renamed, { { file .. ".tmp", file } }, "then renamed over it")
+end)
+
+test("the LG first, then the BenQ, end the same", function()
+  local world = kuba_undocked()
+
+  world:attach("HDMI-A-1", LG_K)
+  world:arrange("HDMI-A-1", 1920, 0)
+  world:settle()
+  world:attach("DP-2", BNQ_K)
+  world:arrange("DP-2", 0, 360)
+  world:settle()
+
+  kuba_docked(world)
+end)
+
+test("both screens together move nothing until the layout has settled, then reconcile once", function()
+  local world = kuba_undocked()
+  local before = read(world.state .. "/workspace-screens")
+
+  world:attach("DP-2", BNQ_K)
+  world:attach("HDMI-A-1", LG_K)
+  world:arrange("DP-2", 0, 360)
+  world:arrange("HDMI-A-1", 1920, 0)
+  same(world.moves, 0, "nothing moved before the layout settled")
+  same(read(world.state .. "/workspace-screens"), before, "the file is untouched before the layout settled")
+
+  world:settle()
+
+  kuba_docked(world)
+  same(world.moves, 8, "each of the eight waiting workspaces moved once")
+end)
+
+-- Regression: Hyprland listed the BenQ nowhere while it reported the LG's
+-- arrival, so the BenQ lost its group and was left on the panel's 4.
+test("a screen missing from the list while another arrives keeps its group", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  local before = read(world.state .. "/workspace-screens")
+  world.hidden["DP-2"] = true
+
+  world:attach("HDMI-A-1", LG_K)
+  world:arrange("HDMI-A-1", 1920, 0)
+  world:tick()
+  same(world:ids_on("DP-2"), { 41, 42, 43 }, "the missing screen keeps its group while the wait goes on")
+  same(read(world.state .. "/workspace-screens"), before, "and the file is untouched")
+  world.hidden["DP-2"] = nil
+  world:tick()
+
+  kuba_docked(world)
+end)
+
+test("a screen missing from the list for good is reconciled without it after the retries", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world.hidden["DP-2"] = true
+
+  world:attach("HDMI-A-1", LG_K)
+  world:arrange("HDMI-A-1", 1920, 0)
+  world:settle()
+
+  same(world:ids_on("HDMI-A-1"), { 41, 42, 43 }, "the only external left is position 1")
+end)
+
+-- Regression: the left screen's removal was reconciled at once, so the centre
+-- screen shifted to position 1 and took the left group for a moment, and
+-- every workspace moved twice.
+test("the dock's screens going one at a time move each group once, to the laptop", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  world.moves = 0
+
+  world:detach("DP-2", "HDMI-A-1")
+  same(world.moves, 0, "nothing moves on the first removal")
+  world:detach("HDMI-A-1")
+  same(world.moves, 0, "nor on the second")
+  world:settle()
+
+  same(world:ids_on("eDP-1"), { 1, 2, 3, 31, 32, 33, 34, 35, 41, 42, 43 }, "both groups wait on the laptop")
+  same(world.moves, 0, "where Hyprland's own backup put them; nothing moves again")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. CSOT .. "\n3\t\t2\t" .. LG_K .. "\n4\t\t1\t" .. BNQ_K .. "\n", "each position remembers its own screen")
+
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  kuba_docked(world)
+end)
+
+-- Regression: Hyprland shows the unplugged screen's workspace on the screen
+-- it backs up to when the unplugged one had focus, and the reconcile put the
+-- backup screen back on its own only after the wait: two switches in view.
+test("unplugging the focused screen leaves the screen Hyprland backs up to on its own workspace at once", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  world:focus_monitor("HDMI-A-1")
+  world.moves = 0
+
+  world:detach("HDMI-A-1", "DP-2")
+
+  same({ world:shown_on("DP-2"), world:shown_on("eDP-1") }, { 41, 1 }, "each on its own, before the wait")
+  same(world.moves, 0, "and nothing moved")
+  world:settle()
+  same({ world:shown_on("DP-2"), world:shown_on("eDP-1") }, { 41, 1 }, "and after it")
+  same(world:ids_on("eDP-1"), { 1, 2, 3, 31, 32, 33, 34, 35 }, "the group waits on the laptop")
+end)
+
+-- Regression: the panel was sent to its workspace 1 whenever any screen
+-- went, though Hyprland changes its view only when the screen that went had
+-- focus.
+test("unplugging an unfocused screen leaves the panel on the empty workspace it chose", function()
+  local world, module = two_screens()
+  world:open_window()
+  run(module.focus(5))
+
+  world:detach("DP-1")
+  same(world:shown_on("eDP-1"), 5, "still there")
+  world:settle()
+  same(world:shown_on("eDP-1"), 5, "and after the wait")
+end)
+
+test("unplugging an unfocused screen leaves the panel on the guest it chose", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(1))
+  world:open_window()
+  run(module.go_to(11, "eDP-1"))
+
+  world:detach("DP-1")
+  same(world:shown_on("eDP-1"), 11, "still there")
+  world:settle()
+  same(world:shown_on("eDP-1"), 11, "and after the wait")
+end)
+
+test("after a config reload, unplugging the focused screen still leaves the backup on its own at once", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(2))
+  world:open_window()
+  reload(world)
+  world:fire("config.reloaded")
+
+  world:detach("DP-1")
+
+  same(world:shown_on("eDP-1"), 1, "home at once")
+end)
+
+test("focus moved from a screen by hand doesn't count as the move its removal makes", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  world:focus_monitor("eDP-1")
+  world:open_window()
+  run(module.focus(5))
+
+  world:detach("DP-1")
+
+  same(world:shown_on("eDP-1"), 5, "still there")
+end)
+
+test("moving a workspace to a screen that arrived within the wait joins that screen's block", function()
+  local world, module = two_screens()
+  world:focus_monitor("DP-1")
+  run(module.focus(2))
+  local window = world:open_window()
+  world:attach("DP-2", LG_B)
+  world:arrange("DP-2", 3840, 0)
+
+  run(module.move_to_monitor("r"))
+
+  same({ window.workspace.id, window.workspace.monitor.name }, { 22, "DP-2" }, "joined the new screen's block")
+  world:settle()
+  same({ window.workspace.id, window.workspace.monitor.name, world:shown_on("DP-2") }, { 22, "DP-2", 22 }, "and stays")
+end)
+
+test("Hyprland's fallback output holds no position and writes no row", function()
+  local world, module = two_screens()
+  world:open_window()
+  world:unplug("eDP-1")
+  local before = read(world.state .. "/workspace-screens")
+
+  world:attach("FALLBACK", "")
+  world:detach("DP-1")
+  world:settle()
+  same(read(world.state .. "/workspace-screens"), before, "the file is untouched")
+  same(module.workspace_id(hl.get_monitor("FALLBACK"), 2), 12, "unmapped, the fallback addresses the group it shows")
+
+  world:plug("eDP-1", PANEL, 0, 0)
+  world:unplug("FALLBACK")
+  same(world:ids_on("eDP-1"), { 1, 2 }, "the panel takes its group back")
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. PANEL .. "\n1\t\t1\t" .. LG_A .. "\n", "and the file names no fallback")
+end)
+
+-- Regression: a window opening re-assigned the positions and pulled 41 to
+-- the left screen beside the centre group.
+test("a window opening while a screen is unarranged changes no mapping", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:attach("HDMI-A-1", LG_K)
+  local before = read(world.state .. "/workspace-screens")
+
+  world:focus_monitor("eDP-1")
+  world:open_window()
+
+  same(read(world.state .. "/workspace-screens"), before, "the file")
+  same(world:ids_on("DP-2"), { 41, 42, 43 }, "the left screen keeps its group")
+  world:arrange("HDMI-A-1", 1920, 0)
+  world:settle()
+  kuba_docked(world)
+end)
+
+test("unplugging both and plugging them back leaves one rule per kept workspace", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+
+  world:unplug("HDMI-A-1")
+  world:unplug("DP-2")
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+
+  kuba_docked(world)
+  same(world:kept(), { "1@eDP-1", "3@eDP-1", "31@HDMI-A-1", "35@HDMI-A-1", "41@DP-2", "43@DP-2" }, "kept")
+  same(world:all_rules(), { "1@eDP-1", "3@eDP-1", "31@HDMI-A-1", "35@HDMI-A-1", "41@DP-2", "43@DP-2" }, "no rule piles up")
+end)
+
+test("a screen that arrives on a parked number of another group ends on its own", function()
+  local world = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:focus_monitor("DP-2")
+  world:focus_workspace(4)
+
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+
+  kuba_docked(world)
+end)
+
+test("a ghost position with windows keeps its row, and they wait on the laptop as a group", function()
+  local world = kuba_undocked({ 11, 12 })
+
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. CSOT .. "\n1\t\t3\t" .. LG_K
+    .. "\n3\tHDMI-A-1\t2\t" .. LG_K .. "\n4\tDP-2\t1\t" .. BNQ_K .. "\n", "the file")
+  same(world:ids_on("eDP-1"), { 1, 2, 3, 11, 12, 13 }, "the windows wait on the laptop")
+  same(world:ids_on("HDMI-A-1"), { 31, 32, 33, 34, 35 }, "the centre screen")
+
+  for _, window in ipairs(world.windows) do
+    if window.workspace.id == 11 or window.workspace.id == 12 then
+      world:close_window(window)
+    end
+  end
+  world:unplug("DP-2")
+  world:plug("DP-2", BNQ_K, 0, 360)
+  same(read(world.state .. "/workspace-screens"), KUBA_HEALED, "the row goes once the block is empty")
+end)
+
+-- The legacy file Kuba's laptop wrote at home, then the work desk, then home.
+test("migrating a file that knows only the home screens gives the work desk fresh groups and no ghost", function()
+  local world = bare()
+  world:plug("eDP-1", CSOT, 4480, 0)
+  world:plug("DP-8", "Work A", 2560, 0)
+  world:plug("DP-9", "Work B", 640, 0)
+  world:window_on(11, "eDP-1")
+  write(world.state .. "/workspace-screens", "0\teDP-1\t" .. CSOT .. "\n1\t\t" .. LG_K .. "\n2\t\t" .. BNQ_K .. "\n")
+
+  load_after_update(world)
+
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. CSOT .. "\n2\tDP-9\t1\tWork B\n3\tDP-8\t2\tWork A\n", "at work")
+  same(world:ids_on("eDP-1"), { 1, 11, 12 }, "the home windows wait on the laptop")
+
+  world:unplug("DP-8")
+  world:unplug("DP-9")
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+
+  same(read(world.state .. "/workspace-screens"), "0\teDP-1\tpanel\t" .. CSOT .. "\n2\tDP-2\t1\t" .. BNQ_K .. "\n3\tHDMI-A-1\t2\t" .. LG_K .. "\n", "at home")
+  same({ world:shown_on("DP-2"), world:shown_on("HDMI-A-1") }, { 21, 31 }, "each shows its position's group")
+end)
+
+test("a legacy file written with the lid closed keeps the panel's block for the panel", function()
+  local world = bare()
+  world:plug("DP-1", LG_A, 0, 0)
+  write(world.state .. "/workspace-screens", "0\t\t" .. PANEL .. "\n1\tDP-1\t" .. LG_A .. "\n")
+
+  load_after_update(world)
+  world:plug("eDP-1", PANEL, 1920, 0)
+
+  same({ world:shown_on("eDP-1"), world:shown_on("DP-1") }, { 1, 11 }, "shown")
+end)
+
+test("going to a desk position whose group has no workspace opens its first", function()
+  local world, module = work_desk()
+  world:unplug("DP-2")
+  world:focus_monitor("DP-1")
+  world:close_window(world.windows[#world.windows])
+  world:focus_monitor("DP-1")
+
+  run(module.go_to_position("2"))
+
+  same({ world.focused.name, world:shown_on("eDP-1") }, { "eDP-1", 21 }, "shown on the primary screen")
+end)
+
+-- Regression: the move named the old id and the renumber came after, so the
+-- bar, which keys a workspace by the first id it hears, never saw the new one.
+test("moving a workspace to another screen renumbers it into that block before it moves", function()
+  local world, module = two_screens()
+  run(module.focus(2))
+  local window = world:open_window()
+  world.events = {}
+
+  run(module.move_to_monitor("r"))
+
+  same(world.events, { "changeworkspaceid>>2,12", "moveworkspacev2>>12,12,DP-1" }, "the move names the new id")
+  same({ window.workspace.id, world:shown_on("DP-1"), world.focused.name }, { 12, 12, "DP-1" }, "joined and shown")
+  same(world:ids_on("eDP-1"), { 1 }, "the laptop keeps its first")
+  same(world:kept(), { "1@eDP-1", "11@DP-1", "13@DP-1" }, "kept")
+end)
+
+test("moving a workspace to a screen whose block is full keeps its number", function()
+  local world, module = two_screens()
+  fill(world, module, "DP-1", 10)
+  world:focus_monitor("eDP-1")
+  run(module.focus(2))
+  local window = world:open_window()
+
+  run(module.move_to_monitor("r"))
+
+  same({ window.workspace.id, window.workspace.monitor.name, world.renumbered }, { 2, "DP-1", 0 }, "a guest")
 end)
 
 -- Regression: an empty workspace 1, once left, was out of reach of every

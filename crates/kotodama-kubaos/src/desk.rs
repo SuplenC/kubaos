@@ -13,6 +13,7 @@
 //! - Writing the file, its format, and which group goes where: `config/hypr/workspaces.lua` and
 //!   `config/hypr/workspace_blocks.lua`.
 
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
@@ -76,7 +77,12 @@ impl Desk {
     /// The positions in the file's text: a line each, its block, the connector of the screen
     /// there, the position and the screen, split by tabs. A line of a file keyed by screen, which
     /// Hyprland migrates on its next start, is skipped.
+    ///
+    /// A screen gets one Item: the position it stands at, else the first it waited at. A file from
+    /// before Hyprland repaired it can name a screen at a position and again waiting at another,
+    /// or name a position twice; the first line for a position stands.
     pub fn parse(text: &str) -> Self {
+        let mut positions = HashSet::new();
         let mut places: Vec<Place> = text
             .lines()
             .filter_map(|line| {
@@ -85,7 +91,7 @@ impl Desk {
                 let connector = fields.next()?.to_owned();
                 let position = fields.next().filter(|position| is_position(position))?.to_owned();
                 let screen = fields.next().unwrap_or_default().to_owned();
-                Some(Place {
+                positions.insert(position.clone()).then_some(Place {
                     position,
                     block,
                     connector,
@@ -94,6 +100,19 @@ impl Desk {
             })
             .collect();
         places.sort_by_key(Place::order);
+        let present: Vec<String> = places
+            .iter()
+            .filter(|place| !place.connector.is_empty())
+            .map(|place| place.screen.clone())
+            .collect();
+        let mut listed: Vec<String> = Vec::new();
+        places.retain(|place| {
+            if place.connector.is_empty() && (present.contains(&place.screen) || listed.contains(&place.screen)) {
+                return false;
+            }
+            listed.push(place.screen.clone());
+            true
+        });
         Desk { places }
     }
 

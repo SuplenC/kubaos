@@ -115,12 +115,8 @@ function M.identities(monitors, current)
   return identities
 end
 
--- The lowest block no position in `blocks` (position -> block) owns.
-function M.free_block(blocks)
-  local taken = {}
-  for _, block in pairs(blocks) do
-    taken[block] = true
-  end
+-- The lowest block not in the set `taken`.
+local function lowest_free(taken)
   local block = 0
   while taken[block] do
     block = block + 1
@@ -128,21 +124,73 @@ function M.free_block(blocks)
   return block
 end
 
+-- The lowest block no position in `blocks` (position -> block) owns.
+function M.free_block(blocks)
+  local taken = {}
+  for _, block in pairs(blocks) do
+    taken[block] = true
+  end
+  return lowest_free(taken)
+end
+
 -- Connector -> block for `monitors` (in `sort_screens` order), giving a free
 -- block to each position seen for the first time and adding it to `blocks`
 -- (position -> block). `positions` is connector -> position; `seen`, position
--- -> screen, takes the screen now at each.
-function M.assign(blocks, seen, monitors, positions)
+-- -> screen, takes the screen now at each. A block in `busy` (a set) still
+-- holds a window, so a new position passes over it: a block set free by
+-- `heal()` may keep windows waiting until the user moves them.
+function M.assign(blocks, seen, monitors, positions, busy)
   local by_connector = {}
+  local ordered = {}
   for _, monitor in ipairs(monitors) do
+    ordered[#ordered + 1] = monitor
+  end
+  -- Fresh blocks go out in position order, so the leftmost gets the lowest.
+  table.sort(ordered, function(left, right)
+    local l, r = positions[left.name], positions[right.name]
+    if (l == "panel") ~= (r == "panel") then
+      return l == "panel"
+    end
+    return (tonumber(l) or 0) < (tonumber(r) or 0)
+  end)
+  for _, monitor in ipairs(ordered) do
     local position = positions[monitor.name]
     if not blocks[position] then
-      blocks[position] = M.free_block(blocks)
+      local taken = {}
+      for _, block in pairs(blocks) do
+        taken[block] = true
+      end
+      for block in pairs(busy or {}) do
+        taken[block] = true
+      end
+      blocks[position] = lowest_free(taken)
     end
     seen[position] = described(monitor)
     by_connector[monitor.name] = blocks[position]
   end
   return by_connector
+end
+
+-- Drops from `places` and `seen` every ghost: a position no screen holds
+-- (`held` is the set of positions with a screen) whose last screen stands at a
+-- held position now, once its block has no windows (`busy` is the set of
+-- blocks with one). A screen owns the block of the position it stands at,
+-- never a second one waiting elsewhere; a row the old migration invented for
+-- it goes, and so does the row of the position it shifted from. While the
+-- block still has windows they wait as a group, reachable by the position's
+-- Item, and the row stays until they are gone.
+function M.heal(places, seen, held, busy)
+  local holding = {}
+  for position in pairs(held) do
+    if seen[position] then
+      holding[seen[position]] = position
+    end
+  end
+  for position, block in pairs(places) do
+    if not held[position] and holding[seen[position] or ""] and not busy[block] then
+      places[position], seen[position] = nil, nil
+    end
+  end
 end
 
 -- Where a screen's workspaces go after its own: the id after the highest in
@@ -336,18 +384,38 @@ end
 -- "block<TAB>connector<TAB>identity" with an optional fourth column where the
 -- screen last sat, comes back as its rows, { block, connector, identity, x },
 -- for `migrate()`.
+--
+-- A damaged file is repaired the same way every time: of two rows for one
+-- position the first stands, and of two positions owning one block the one
+-- with a screen plugged in, else the first; the position that lost its block
+-- is forgotten and gets a fresh one when a screen stands there again.
 function M.parse_places(text)
-  local places, seen, legacy = {}, {}, {}
+  local rows, legacy = {}, {}
   for line in text:gmatch("[^\n]+") do
     local fields = split(line)
     local block = fields[1]:match("^%d+$") and tonumber(fields[1])
     local third = fields[3] or ""
     if block and is_position(third) then
-      places[third] = block
-      seen[third] = fields[4] or ""
+      rows[#rows + 1] = { block = block, connector = fields[2], position = third, screen = fields[4] or "" }
     elseif block and third ~= "" then
       legacy[#legacy + 1] = { block = block, connector = fields[2], identity = third, x = tonumber(fields[4] or "") }
     end
+  end
+
+  local first_of, owner_of = {}, {}
+  for _, row in ipairs(rows) do
+    if not first_of[row.position] then
+      first_of[row.position] = row
+      local owner = owner_of[row.block]
+      if not owner or (owner.connector == "" and row.connector ~= "") then
+        owner_of[row.block] = row
+      end
+    end
+  end
+  local places, seen = {}, {}
+  for _, row in pairs(owner_of) do
+    places[row.position] = row.block
+    seen[row.position] = row.screen
   end
   if next(places) or #legacy == 0 then
     legacy = nil
@@ -358,9 +426,14 @@ end
 -- The rows of a screens file keyed by screen as positions, moving no
 -- workspace: the panel keeps its block, each external plugged in keeps its own
 -- at the position it stands at now, and the blocks of the screens not plugged
--- in take the positions after those, in the order they last sat, else in block
--- order. With the lid closed, the panel's row is the one last seen on an
--- internal connector. Returns position -> block and position -> screen.
+-- in take the positions 1, 2 and on, in the order they last sat, else in
+-- block order, up to the first position a plugged-in screen holds. A position
+-- a screen holds is never given away; the blocks left over wait with no
+-- position, as groups the bar shows, since a position invented for them would
+-- contradict the one they stand at when they come back. With the lid closed,
+-- the panel's row is the one last seen on an internal connector, else the one
+-- owning block 0, which the panel always claimed first. Returns position ->
+-- block and position -> screen.
 function M.migrate(rows, monitors)
   local current, by_identity = {}, {}
   for _, row in ipairs(rows) do
@@ -371,7 +444,7 @@ function M.migrate(rows, monitors)
   end
   local identities = M.identities(monitors, current)
   local positions = M.positions(monitors)
-  local places, seen, claimed = {}, {}, {}
+  local places, seen, claimed, held = {}, {}, {}, {}
 
   local function take(position, row)
     if row and not claimed[row] then
@@ -381,21 +454,22 @@ function M.migrate(rows, monitors)
     end
   end
 
-  local panel_plugged, last = false, 0
   for _, monitor in ipairs(monitors) do
     local position = positions[monitor.name]
+    held[position] = true
     take(position, by_identity[identities[monitor.name]])
-    if position == "panel" then
-      panel_plugged = true
-    else
-      last = math.max(last, tonumber(position))
-    end
   end
-  if not panel_plugged then
+  if not held.panel then
+    local fallback = nil
     for _, row in ipairs(rows) do
       if internal(row.connector) then
         take("panel", row)
+      elseif row.block == 0 and not claimed[row] then
+        fallback = row
       end
+    end
+    if not places.panel then
+      take("panel", fallback)
     end
   end
 
@@ -413,7 +487,11 @@ function M.migrate(rows, monitors)
     return left.block < right.block
   end)
   for index, row in ipairs(rest) do
-    take(tostring(last + index), row)
+    local position = tostring(index)
+    if held[position] then
+      break
+    end
+    take(position, row)
   end
   return places, seen
 end

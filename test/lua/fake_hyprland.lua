@@ -1,9 +1,17 @@
 -- A small stand-in for Hyprland's Lua API (`hl`), enough for
 -- `config/hypr/workspaces.lua`: screens, workspaces, windows, focus, the
--- dispatchers that module uses and the events it listens to, and workspace
--- rules as far as `persistent` and `monitor` go. Workspaces that are empty,
--- shown nowhere and not persistent go away, as Hyprland's do. Objects read the
--- world live, as Hyprland's do, so a workspace renumbered keeps its object.
+-- dispatchers that module uses and the events it listens to, one-shot timers,
+-- and workspace rules as far as `persistent` and `monitor` go. Workspaces
+-- that are empty, shown nowhere and not persistent go away, as Hyprland's do.
+-- Objects read the world live, as Hyprland's do, so a workspace renumbered
+-- keeps its object.
+--
+-- A screen arrives as Hyprland brings one: `monitor.added` fires while it
+-- still sits at 0,0, the layout is arranged afterwards and
+-- `monitor.layout_changed` fires, and timers run only when the test lets
+-- them (`settle()`). Focus moving to a screen fires `monitor.focused`, as
+-- Hyprland's does. `events` lists the socket events a move or a renumber
+-- would send the bar, in order.
 
 local F = {}
 F.__index = F
@@ -15,10 +23,14 @@ function F.new()
     windows = {},
     rules = {},
     handlers = {},
+    timers = {},
+    hidden = {},
     focused = nil,
     next_monitor_id = 0,
     next_window = 1,
     renumbered = 0,
+    moves = 0,
+    events = {},
   }, F)
   world.hl = world:api()
   return world
@@ -45,6 +57,17 @@ end
 function F:fire(event, ...)
   for _, handler in ipairs(self.handlers[event] or {}) do
     handler(...)
+  end
+end
+
+-- Focus moves to a screen, and `monitor.focused` fires when it is another.
+function F:set_focused(record)
+  if record == self.focused then
+    return
+  end
+  self.focused = record
+  if record then
+    self:fire("monitor.focused", self:monitor_object(record))
   end
 end
 
@@ -100,6 +123,7 @@ function F:refresh()
       if record.monitor ~= monitor then
         local from = record.monitor
         record.monitor = monitor
+        self.moves = self.moves + 1
         if from and from.active == record then
           self:refill(from)
         end
@@ -144,6 +168,17 @@ function F:workspace_rule(options)
   }
 end
 
+-- `hl.timer`: a one-shot timer the test fires with `settle()`.
+function F:timer(callback, options)
+  local timer = { callback = callback, timeout = options.timeout, enabled = true, fired = false }
+  self.timers[#self.timers + 1] = timer
+  return {
+    set_enabled = function(_, enabled) timer.enabled = enabled end,
+    is_enabled = function() return timer.enabled end,
+    set_timeout = function(_, timeout) timer.timeout = timeout end,
+  }
+end
+
 function F:lowest_free()
   local id = 1
   while self:workspace_record(id) do
@@ -171,6 +206,9 @@ function F:monitor_object(record)
         return function(_, options)
           local target = world:workspace_record(tonumber(options.workspace))
           if target then
+            if target.monitor ~= record then
+              world.moves = world.moves + 1
+            end
             target.monitor = record
             record.active = target
             world:cleanup()
@@ -233,7 +271,7 @@ end
 function F:focus_workspace(id)
   local record = self:workspace_record(id)
   if record then
-    self.focused = record.monitor
+    self:set_focused(record.monitor)
   else
     record = self:create(id, self.focused)
   end
@@ -257,14 +295,14 @@ function F:apply(action)
   local kind, args = action.kind, action.args
   if kind == "focus" then
     if args.monitor then
-      self.focused = self:select_monitor(args.monitor) or self.focused
+      self:set_focused(self:select_monitor(args.monitor) or self.focused)
     elseif args.workspace then
       self:focus_workspace(tonumber(args.workspace))
     elseif args.window then
       local address = args.window:gsub("^address:", "")
       for _, window in ipairs(self.windows) do
         if window.address == address then
-          self.focused = window.workspace.monitor
+          self:set_focused(window.workspace.monitor)
           window.workspace.monitor.active = window.workspace
         end
       end
@@ -273,6 +311,10 @@ function F:apply(action)
     local record = args.workspace and self:workspace_record(tonumber(args.workspace)) or self.focused.active
     local target = self:select_monitor(args.monitor)
     local from = record.monitor
+    if from ~= target then
+      self.moves = self.moves + 1
+    end
+    self.events[#self.events + 1] = "moveworkspacev2>>" .. record.id .. "," .. record.id .. "," .. target.name
     record.monitor = target
     target.active = record
     if from.active == record then
@@ -282,6 +324,7 @@ function F:apply(action)
   elseif kind == "workspace.change_id" then
     local record = self:workspace_record(tonumber(args.workspace))
     assert(record and not self:workspace_record(args.id), "change_id onto a taken id")
+    self.events[#self.events + 1] = "changeworkspaceid>>" .. record.id .. "," .. args.id
     record.id = args.id
     self.renumbered = self.renumbered + 1
   elseif kind == "window.move" then
@@ -317,6 +360,7 @@ function F:api()
       window = { move = dsp("window.move") },
     },
     workspace_rule = function(options) return world:workspace_rule(options) end,
+    timer = function(callback, options) return world:timer(callback, options) end,
     dispatch = function(action)
       if type(action) == "function" then
         action()
@@ -331,7 +375,9 @@ function F:api()
     get_monitors = function()
       local objects = {}
       for _, record in ipairs(world.monitors) do
-        objects[#objects + 1] = world:monitor_object(record)
+        if not world.hidden[record.name] then
+          objects[#objects + 1] = world:monitor_object(record)
+        end
       end
       return objects
     end,
@@ -364,21 +410,61 @@ end
 
 -- What the tests drive: plugging screens in and out, and opening windows.
 
--- A screen arrives at `x`, `y` on a workspace under the lowest free number, as
--- Hyprland puts it, then `monitor.added` fires.
-function F:plug(name, description, x, y)
-  local record = { name = name, description = description, id = self.next_monitor_id, x = x or 0, y = y or 0 }
+-- The timers due now fire, in the order they were set; one set while firing
+-- waits for the next tick.
+function F:tick()
+  local due = #self.timers
+  for index = 1, due do
+    local timer = self.timers[index]
+    if timer.enabled and not timer.fired then
+      timer.fired = true
+      timer.callback()
+    end
+  end
+end
+
+-- Every timer due fires, those set while firing included.
+function F:settle()
+  local fired = 0
+  while fired < #self.timers do
+    fired = #self.timers
+    self:tick()
+  end
+end
+
+-- A screen arrives at 0,0 on a workspace under the lowest free number, as
+-- Hyprland puts it, and `monitor.added` fires before the layout is arranged.
+function F:attach(name, description)
+  local record = { name = name, description = description, id = self.next_monitor_id, x = 0, y = 0 }
   self.next_monitor_id = self.next_monitor_id + 1
   self.monitors[#self.monitors + 1] = record
   record.active = self:create(self:lowest_free(), record)
   self.focused = self.focused or record
   self:fire("monitor.added", self:monitor_object(record))
+  return record
+end
+
+-- Hyprland's arrange: the screen takes its place and `monitor.layout_changed`
+-- fires.
+function F:arrange(name, x, y)
+  local record = self:monitor_record(name)
+  record.x, record.y = x or 0, y or 0
+  self:fire("monitor.layout_changed")
+end
+
+-- A screen plugged in and arranged at `x`, `y`, with the time to settle.
+function F:plug(name, description, x, y)
+  self:attach(name, description)
+  self:arrange(name, x, y)
+  self:settle()
 end
 
 -- Hyprland moves the screen's workspaces to the first other screen in its
--- list (`backup` names another), then fires `monitor.removed` while it still
--- lists the screen.
-function F:unplug(name, backup_name)
+-- list (`backup` names another), and when the screen had focus, shows the
+-- workspace it showed on the backup and focuses the backup, with the
+-- screen's own view already cleared; then fires `monitor.removed` while it
+-- still lists the screen, and takes it off the list.
+function F:detach(name, backup_name)
   local record = self:monitor_record(name)
   local backup = backup_name and self:monitor_record(backup_name)
   for _, other in ipairs(self.monitors) do
@@ -391,10 +477,13 @@ function F:unplug(name, backup_name)
       workspace.monitor = backup
     end
   end
+  if self.focused == record and record.active and backup then
+    backup.active = record.active
+  end
   record.active = nil
   record.removing = true
   if self.focused == record then
-    self.focused = backup
+    self:set_focused(backup)
   end
   self:cleanup()
   self:fire("monitor.removed", self:monitor_object(record))
@@ -407,12 +496,28 @@ function F:unplug(name, backup_name)
   self.monitors = kept
 end
 
+-- A screen unplugged, with the time to settle.
+function F:unplug(name, backup_name)
+  self:detach(name, backup_name)
+  self:settle()
+end
+
 -- A window on the focused screen's shown workspace, focused.
 function F:open_window()
   local window = { address = string.format("0x%x", self.next_window), workspace = self.focused.active }
   self.next_window = self.next_window + 1
   self.windows[#self.windows + 1] = window
   self:fire("window.open")
+  return window
+end
+
+-- A window on workspace `id`, created on `monitor_name` if it doesn't exist,
+-- without an event: a window that was there before the module loaded.
+function F:window_on(id, monitor_name)
+  local record = self:workspace_record(id) or self:create(id, self:monitor_record(monitor_name))
+  local window = { address = string.format("0x%x", self.next_window), workspace = record }
+  self.next_window = self.next_window + 1
+  self.windows[#self.windows + 1] = window
   return window
 end
 
@@ -429,7 +534,7 @@ function F:close_window(window)
 end
 
 function F:focus_monitor(name)
-  self.focused = self:monitor_record(name)
+  self:set_focused(self:monitor_record(name))
 end
 
 -- The ids on a screen, in order.
@@ -474,6 +579,27 @@ function F:rules_for(workspace)
     end
   end
   return count
+end
+
+-- Every rule, enabled or not, as "id@connector" in id order, "(off)" after a
+-- disabled one.
+function F:all_rules()
+  local rows = {}
+  for _, rule in ipairs(self.rules) do
+    local text = rule.workspace .. "@" .. tostring(rule.monitor) .. (rule.enabled and "" or "(off)")
+    rows[#rows + 1] = { id = tonumber(rule.workspace), text = text }
+  end
+  table.sort(rows, function(left, right)
+    if left.id ~= right.id then
+      return left.id < right.id
+    end
+    return left.text < right.text
+  end)
+  local result = {}
+  for _, row in ipairs(rows) do
+    result[#result + 1] = row.text
+  end
+  return result
 end
 
 return F

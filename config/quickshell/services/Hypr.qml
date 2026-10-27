@@ -82,4 +82,53 @@ Singleton {
         printErrors: false
         onFileChanged: reload()
     }
+
+    // The ids Hyprland has renumbered away from (`changeworkspaceid`, which
+    // `dot.workspaces.move_to_monitor` causes), as a set. Quickshell (v0.3.2)
+    // keys a workspace by the id it first saw and never changes it, so the
+    // object under the old id stays in `Hyprland.workspaces`, with its old
+    // monitor and its windows, until a config reload reads the list afresh;
+    // the new id gets an object with the move that follows the renumber,
+    // which names it. The bar leaves these out. An old id comes back when
+    // Hyprland creates a workspace under it again, since Quickshell then
+    // reuses the object; its monitor is read again then, as the object still
+    // carries the old one.
+    property var staleIds: ({})
+
+    function isStale(id: int): bool {
+        return staleIds[id] === true;
+    }
+
+    Connections {
+        target: Hyprland
+
+        function onRawEvent(event: HyprlandEvent): void {
+            if (event.name === "changeworkspaceid") {
+                const next = Object.assign({}, root.staleIds);
+                next[parseInt(event.parse(2)[0], 10)] = true;
+                root.staleIds = next;
+                // The windows stay on the old id's object until read again;
+                // the reply comes after the move that creates the new id's.
+                // Should it not, the windows' read makes the object with no id
+                // yet, and the workspaces' read, served next, gives it one.
+                // The move names no active workspace for the screen it lands
+                // on, so the screens are read again too. A read still in
+                // flight drops the new one; then the first's reply, served
+                // after the move's event, has what it needs.
+                Hyprland.refreshToplevels();
+                Hyprland.refreshWorkspaces();
+                Hyprland.refreshMonitors();
+            } else if (event.name === "createworkspacev2") {
+                const id = parseInt(event.parse(2)[0], 10);
+                if (root.staleIds[id] === true) {
+                    const next = Object.assign({}, root.staleIds);
+                    delete next[id];
+                    root.staleIds = next;
+                    Hyprland.refreshWorkspaces();
+                }
+            } else if (event.name === "configreloaded" && Object.keys(root.staleIds).length > 0) {
+                root.staleIds = {};
+            }
+        }
+    }
 }
