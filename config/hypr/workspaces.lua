@@ -94,14 +94,19 @@ local GROUPS_FILE = user_layer.file("workspaces", "groups.toml")
 
 local M = { slots = SLOTS }
 
-local function read(path)
+-- The file's text; nil when it is missing.
+local function read_file(path)
   local file = io.open(path, "r")
   if not file then
-    return ""
+    return nil
   end
   local text = file:read("a") or ""
   file:close()
   return text
+end
+
+local function read(path)
+  return read_file(path) or ""
 end
 
 -- Written whole or not at all: the bar reads the file on every change, and a
@@ -132,32 +137,72 @@ local written = nil
 -- read pins nothing, so every screen stands where it would without one.
 local groups, groups_text = {}, nil
 
--- Says once what is wrong with the groups file, in a toast: the last problem
--- shown is kept in `dot`, which outlives a config reload, so a lid change or
--- `hyprctl reload` doesn't show it again.
+-- How long, in seconds, a toast about the groups file is tried again until
+-- the shell shows it.
+local TOAST_TRIES = 60
+
+-- Says what is wrong with the groups file, in a toast. At login Hyprland
+-- loads its config before the shell, which is the notification server, is up,
+-- so a shell tries `notify-send` once a second until it shows, then calls
+-- `problem_shown()` with the toast's token. Only then is the problem kept as
+-- shown, in `dot`, which outlives a config reload, so a lid change or
+-- `hyprctl reload` doesn't show it again; one still being tried isn't tried
+-- twice.
 local function warn(problem)
-  if dot.workspace_groups_problem == problem then
+  if not problem then
+    dot.workspace_groups_problem, dot.workspace_groups_toasting = nil, nil
     return
   end
-  dot.workspace_groups_problem = problem
-  if problem then
-    local body = ("In groups.toml, %s. Until it's fixed, no screen is pinned: they take their places left to right.")
-      :format(problem)
-    hl.exec_cmd("notify-send -a 'Workspace groups' -i video-display -u critical 'Workspace groups' '"
-      .. body:gsub("'", "'\\''") .. "'")
+  local toasting = dot.workspace_groups_toasting
+  if dot.workspace_groups_problem == problem
+    or (toasting and toasting.problem == problem and os.time() < toasting.expires) then
+    return
+  end
+  local token = (dot.workspace_groups_token or 0) + 1
+  dot.workspace_groups_token = token
+  dot.workspace_groups_toasting = { problem = problem, token = token, expires = os.time() + TOAST_TRIES }
+  local body = ("In groups.toml, %s. Until it's fixed, no screen is pinned: they take their places left to right.")
+    :format(problem)
+  local toast = "notify-send -a 'Workspace groups' -i video-display -u critical 'Workspace groups' '"
+    .. body:gsub("'", "'\\''") .. "'"
+  hl.exec_cmd(("for try in $(seq %d); do %s && exec hyprctl dispatch 'dot.workspaces.problem_shown(%d)'; sleep 1; done")
+    :format(TOAST_TRIES, toast, token))
+end
+
+-- The shell showed the toast with `token`, so its problem counts as shown.
+function M.problem_shown(token)
+  return function()
+    local toasting = dot.workspace_groups_toasting
+    if toasting and toasting.token == token then
+      dot.workspace_groups_problem, dot.workspace_groups_toasting = toasting.problem, nil
+    end
   end
 end
 
--- Reads the groups file again; true when its text changed.
-local function read_groups()
-  local text = read(GROUPS_FILE)
-  if text == groups_text then
-    return false
-  end
+local function apply_groups(text)
   groups_text = text
   local parsed, problem = blocks_lib.parse_groups(text)
   groups = parsed or {}
   warn(problem)
+end
+
+-- Reads the groups file again: true when its text changed, false when not,
+-- and nil when it is missing but was there a moment ago. An editor saving by
+-- rename (nvim's default) moves the file away and writes a new one in its
+-- place, so a read in between finds nothing; taking that as "no pins" would
+-- move every pinned group for a moment and back. The caller reads again
+-- after the wait instead (`recheck_groups`); a file really deleted pins
+-- nothing then.
+local function read_groups()
+  local text = read_file(GROUPS_FILE)
+  if not text and (groups_text or "") ~= "" then
+    return nil
+  end
+  text = text or ""
+  if text == groups_text then
+    return false
+  end
+  apply_groups(text)
   return true
 end
 
@@ -844,6 +889,28 @@ function M.flush()
   end
 end
 
+-- A read of the groups file that found it missing a moment after it was
+-- there is done again once `SETTLE_MS` have passed; a later one supersedes
+-- it through `recheck`.
+local recheck = 0
+
+local function recheck_groups()
+  recheck = recheck + 1
+  local mine = recheck
+  hl.timer(function()
+    if mine ~= recheck then
+      return
+    end
+    local text = read(GROUPS_FILE)
+    if text ~= groups_text then
+      apply_groups(text)
+      if not pending then
+        M.reconcile()
+      end
+    end
+  end, { timeout = SETTLE_MS, type = "oneshot" })
+end
+
 -- Read the workspace groups file again and put each group on the screen it
 -- pins now: the bar runs it when the file changes
 -- (`config/quickshell/services/Hypr.qml`). A file that reads the same moves
@@ -851,7 +918,10 @@ end
 -- groups when it ends.
 function M.reload_groups()
   return function()
-    if read_groups() and not pending then
+    local changed = read_groups()
+    if changed == nil then
+      recheck_groups()
+    elseif changed and not pending then
       M.reconcile()
     end
   end

@@ -322,6 +322,34 @@ test("the seed pins nothing, and its example, uncommented, reads", function()
   }, "example")
 end)
 
+-- The groups files in test/fixtures/workspace-groups/`kind`, which the menu's
+-- reader (crates/kotodama-kubaos/src/desk/groups/tests.rs) holds to the same
+-- verdicts, as { name, text }.
+local function group_fixtures(kind)
+  local dir = repo .. "/test/fixtures/workspace-groups/" .. kind
+  local list = assert(io.popen("ls '" .. dir .. "'"))
+  local found = {}
+  for name in list:lines() do
+    found[#found + 1] = { name = name, text = read(dir .. "/" .. name) }
+  end
+  list:close()
+  assert(#found > 0, "no fixtures in " .. dir)
+  return found
+end
+
+test("every groups file the menu takes, Hyprland takes", function()
+  for _, fixture in ipairs(group_fixtures("valid")) do
+    local groups, problem = blocks.parse_groups(fixture.text)
+    assert(groups, fixture.name .. ": " .. tostring(problem))
+  end
+end)
+
+test("every groups file the menu refuses, Hyprland refuses", function()
+  for _, fixture in ipairs(group_fixtures("invalid")) do
+    assert(not blocks.parse_groups(fixture.text), fixture.name .. " was read")
+  end
+end)
+
 test("an empty groups file, or one of comments only, pins nothing", function()
   same(groups_read(""), {}, "empty")
   same(groups_read("# [group.1]\n# screens = [\"A\"]\n\n"), {}, "comments")
@@ -391,6 +419,12 @@ test("of two screens of one group plugged in, the first listed wins and the othe
   local monitors = row_of({ "DP-1", LG_A, 0 }, { "DP-2", BENQ, 1920 }, { "DP-3", LG_C, 3840 })
 
   same(positions_of(monitors, pinned({ 1, BENQ, LG_A }, { 2, LG_C }), "DP-2", "DP-3", "DP-1"), { "1", "2", "3" }, "positions")
+end)
+
+test("of two screens reporting one description, the pin goes to the leftmost", function()
+  local monitors = row_of({ "DP-1", LG_A, 1920 }, { "DP-2", LG_A, 0 })
+
+  same(positions_of(monitors, pinned({ 2, LG_A }), "DP-2", "DP-1"), { "2", "1" }, "positions")
 end)
 
 test("a group with no screens, only a name, pins nothing", function()
@@ -1722,12 +1756,13 @@ test("a groups file that doesn't read is one toast and pins nothing, until it is
 
   same({ world:shown_on("DP-1"), world:shown_on("DP-2") }, { 11, 21 }, "left to right, as without the file")
   same(#world.commands, 1, "one toast")
-  assert(world.commands[1]:find("^notify%-send ") and world.commands[1]:find("line 4: `screen`", 1, true),
+  assert(world.commands[1]:find("notify-send -a", 1, true) and world.commands[1]:find("line 4: `screen`", 1, true),
     world.commands[1])
 
+  run(module.problem_shown(1))
   module = reload(world)
   world:fire("config.reloaded")
-  same(#world.commands, 1, "a config reload doesn't say it again")
+  same(#world.commands, 1, "once shown, a config reload doesn't say it again")
 
   write(world.groups, '[group.1]\nscreens = ["' .. LG_A .. '"]\n')
   run(module.reload_groups())
@@ -1737,6 +1772,59 @@ test("a groups file that doesn't read is one toast and pins nothing, until it is
   run(module.reload_groups())
   same({ world:shown_on("DP-1"), world:shown_on("DP-2") }, { 11, 21 }, "broken again, left to right")
   same(#world.commands, 2, "and a toast again")
+end)
+
+-- Regression: at login the toast was sent before the shell, the notification
+-- server, was up, and then counted as shown for good.
+test("a broken groups file at login is toasted until the shell shows it, and only then counts as shown", function()
+  local world, module = grouped("[group.1]\nscreen = []\n")
+
+  same(#world.commands, 1, "one toast")
+  assert(world.commands[1]:find("for try in $(seq 60); do notify-send -a", 1, true), world.commands[1])
+  assert(world.commands[1]:find("&& exec hyprctl dispatch 'dot.workspaces.problem_shown(1)'; sleep 1; done", 1, true),
+    world.commands[1])
+  module = reload(world)
+  world:fire("config.reloaded")
+  same(#world.commands, 1, "a reload while it is still being tried doesn't try twice")
+
+  dot.workspace_groups_toasting.expires = 0
+  module = reload(world)
+  world:fire("config.reloaded")
+  same(#world.commands, 2, "once the tries ran out unshown, the next load tries again")
+  assert(world.commands[2]:find("problem_shown(2)", 1, true), world.commands[2])
+
+  run(module.problem_shown(1))
+  same(dot.workspace_groups_problem, nil, "a stale token counts for nothing")
+  run(module.problem_shown(2))
+  module = reload(world)
+  world:fire("config.reloaded")
+  same(#world.commands, 2, "shown, it isn't said again")
+end)
+
+-- Regression: nvim saves by moving the file away and writing a new one, and
+-- the read in between unpinned every screen for a moment.
+test("a groups file missing for a moment, as an editor saves it, moves nothing", function()
+  local world, module = kuba_undocked()
+  world:plug("DP-2", BNQ_K, 0, 360)
+  world:plug("HDMI-A-1", LG_K, 1920, 0)
+  local text = '[group.1]\nscreens = ["' .. LG_K .. '"]\n'
+  write(world.groups, text)
+  run(module.reload_groups())
+  world.moves = 0
+
+  os.remove(world.groups)
+  run(module.reload_groups())
+  same(world.moves, 0, "nothing moves while the file is missing")
+  write(world.groups, text)
+  run(module.reload_groups())
+  world:settle()
+  same(world.moves, 0, "nor once it is back as it was")
+  same(world:ids_on("HDMI-A-1"), { 41, 42, 43 }, "the LG keeps group 1")
+
+  os.remove(world.groups)
+  run(module.reload_groups())
+  world:settle()
+  same(world:ids_on("DP-2"), { 41, 42, 43 }, "still missing after the wait, nothing is pinned")
 end)
 
 test("going to a pinned group's position focuses the screen pinned there", function()

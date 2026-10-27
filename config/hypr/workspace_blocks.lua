@@ -87,7 +87,7 @@ function M.positions(monitors, groups)
     local winner = nil
     for _, screen in ipairs(group.screens) do
       for _, monitor in ipairs(ordered) do
-        if not positions[monitor.name] and described(monitor) == screen then
+        if described(monitor) == screen then
           winner = monitor
           break
         end
