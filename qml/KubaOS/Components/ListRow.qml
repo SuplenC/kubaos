@@ -1,0 +1,110 @@
+import QtQuick
+import KubaOS.Components as K
+
+// One row of a list: `kubaos-ui`'s `list::list_row`. 44 tall with one line, 56 with a subtitle;
+// 12 inside, a 20 icon, the title in `body_strong`, the subtitle in `small`, a detail in `mono` at
+// the end, and an optional check whose room is kept when unchecked, so the rows' ends line up.
+// Its corners are concentric inside the list's well. The selected row takes the secondary
+// container.
+K.Pressable {
+    id: root
+
+    property string title
+    property string subtitle
+    // A short fact at the row's end, in mono: a device path, a size, a code.
+    property string detail
+    property string icon: ""
+    // The row the keyboard is on, or the one picked in a list of one.
+    property bool selected: false
+    // Whether the row shows a check at its end, and whether it is ticked.
+    property bool checkable: false
+    property bool checked: false
+
+    readonly property bool fillWidth: true
+    readonly property color main: root.selected ? Tokens.color.on_secondary_container : Tokens.color.on_surface
+    readonly property color muted: root.selected ? K.Look.alpha(Tokens.color.on_secondary_container, Tokens.opacity.subdued) : Tokens.color.on_surface_variant
+    readonly property var probe: ({
+            role: "component",
+            name: "ListRow",
+            variant: [root.subtitle === "" ? "one-line" : "two-line", root.icon === "" ? "" : "icon"].filter(word => word !== "").join(" "),
+            fixed: {
+                width: false,
+                height: true
+            }
+        })
+
+    implicitHeight: root.subtitle === "" ? Tokens.size.row : Tokens.size.row_two_line
+    // The list's well shows where the keyboard is; a row draws no ring of its own.
+    activeFocusOnTab: false
+
+    Rectangle {
+        anchors.fill: parent
+        radius: K.Look.nested(Tokens.radius.surface, Tokens.space.s12)
+        color: root.selected ? Tokens.color.secondary_container : "transparent"
+
+        K.StateLayer {
+            radius: parent.radius
+            content: Tokens.color.on_surface
+            active: root.enabled
+            hovered: root.hovered
+            pressed: root.down
+        }
+    }
+
+    K.Row {
+        id: line
+
+        x: Tokens.space.s12
+        y: K.Look.snap((root.height - line.implicitHeight) / 2, line.dpr)
+        width: root.width - Tokens.space.s12 * 2
+        gap: Tokens.space.s12
+        align: "centre"
+
+        K.Icon {
+            visible: root.icon !== ""
+            name: root.icon
+            size: Tokens.icon.s20
+            color: root.main
+        }
+
+        K.Stack {
+            gap: Tokens.space.s4
+
+            K.Text {
+                text: root.title
+                style: Tokens.type.body_strong
+                color: root.main
+            }
+
+            K.Text {
+                visible: root.subtitle !== ""
+                text: root.subtitle
+                style: Tokens.type.small
+                color: root.muted
+            }
+        }
+
+        K.Fill {
+        }
+
+        K.Text {
+            visible: root.detail !== ""
+            text: root.detail
+            style: Tokens.type.mono
+            color: root.muted
+        }
+
+        Item {
+            visible: root.checkable
+            implicitWidth: Tokens.icon.s20
+            implicitHeight: Tokens.icon.s20
+
+            K.Icon {
+                visible: root.checked
+                name: "check"
+                size: Tokens.icon.s20
+                color: root.main
+            }
+        }
+    }
+}
