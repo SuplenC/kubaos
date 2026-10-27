@@ -55,6 +55,18 @@ pub fn media<'a, M: 'a>(
     aspect: Aspect,
     corner: impl Into<Corner>,
 ) -> Element<'a, M> {
+    media_under(look, picture, aspect, corner, [])
+}
+
+/// [`media`] with `over` laid over the picture, each filling the box: a name on a scrim, a chip
+/// in a corner. They are the box's own, so they never move it either.
+pub fn media_under<'a, M: 'a>(
+    look: &Look,
+    picture: Option<image::Handle>,
+    aspect: Aspect,
+    corner: impl Into<Corner>,
+    over: impl IntoIterator<Item = Element<'a, M>>,
+) -> Element<'a, M> {
     let corner = radius(corner);
     let placeholder = look.colors.surface_container_high;
     let inner: Element<'a, M> = if let Some(handle) = picture {
@@ -75,8 +87,11 @@ pub fn media<'a, M: 'a>(
             })
             .into()
     };
+    let layers = widget::Stack::with_children(std::iter::once(inner).chain(over))
+        .width(Length::Fill)
+        .height(Length::Fill);
     let view = Element::new(Framed {
-        content: inner,
+        content: layers.into(),
         aspect,
         scale: look.scale,
     });

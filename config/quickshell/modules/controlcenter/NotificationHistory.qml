@@ -71,6 +71,9 @@ K.Stack {
             id: list
 
             anchors.fill: parent
+            // The well's padding above the first row and below the last, scrolled with them.
+            topMargin: K.Tokens.space.s12
+            bottomMargin: K.Tokens.space.s12
             spacing: K.Tokens.space.s4
             highlightShown: false
             model: ScriptModel {

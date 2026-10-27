@@ -41,6 +41,8 @@ use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
 use kubaos_ui::component::media::Aspect;
 use kubaos_ui::component::media::media;
+use kubaos_ui::component::picture::NamePlace;
+use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::progress::spinner;
 use kubaos_ui::component::slider::Value;
@@ -115,7 +117,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Media",
-            Some("Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, then the picture."),
+            Some("Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then two pictures to pick, picked with its name under it and focused with its name over its foot."),
             media_samples(look),
         ))
         .push(section(
@@ -558,7 +560,22 @@ fn media_samples<'a>(look: &Look) -> Element<'a, Message> {
     let picture = PICTURES[usize::from(look.mode == Mode::Light)].clone();
     grid(look, 4, Space::S16)
         .push(media(look, None, Aspect::Wallpaper, Radius::Control))
-        .push(media(look, Some(picture), Aspect::Wallpaper, Radius::Control))
+        .push(media(look, Some(picture.clone()), Aspect::Wallpaper, Radius::Control))
+        .push(
+            picture_choice(Some(picture.clone()), Aspect::Wallpaper, "Shinjuku, night")
+                .picked(true)
+                .mark(Icon::Check, "Current")
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(
+            picture_choice(Some(picture), Aspect::Wallpaper, "Golden Gai")
+                .name(NamePlace::Over)
+                .badge(Icon::PlayArrow, "Video")
+                .focused(true)
+                .on_press(Message::Sample)
+                .view(look),
+        )
         .into()
 }
 

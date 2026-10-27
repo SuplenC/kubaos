@@ -711,7 +711,7 @@ K.Stack {
 
                 K.Section {
                     title: "Media"
-                    description: "Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, then the picture."
+                    description: "Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then two pictures to pick, picked with its name under it and focused with its name over its foot."
 
                     K.Grid {
                         columns: 4
@@ -722,6 +722,23 @@ K.Stack {
 
                         K.Media {
                             source: root.picture
+                        }
+
+                        K.PictureChoice {
+                            source: root.picture
+                            name: "Shinjuku, night"
+                            picked: true
+                            markIcon: "check"
+                            markText: "Current"
+                        }
+
+                        K.PictureChoice {
+                            source: root.picture
+                            name: "Golden Gai"
+                            namePlace: "over"
+                            badgeIcon: "play_arrow"
+                            badgeText: "Video"
+                            focused: true
                         }
                     }
                 }

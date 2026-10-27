@@ -58,7 +58,8 @@ use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
 use kubaos_ui::component::list::scrolling_list;
 use kubaos_ui::component::media::Aspect;
-use kubaos_ui::component::media::media;
+use kubaos_ui::component::picture::NamePlace;
+use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::spinner;
 use kubaos_ui::component::progress::timed_bar;
 use kubaos_ui::component::switch::switch;
@@ -77,7 +78,6 @@ use kubaos_ui::layout::row;
 use kubaos_ui::layout::scroll;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
-use kubaos_ui::look::nested;
 use kubaos_ui::look::radius;
 use kubaos_ui::motion::Motion;
 use kubaos_ui::motion::ease;
@@ -1462,46 +1462,29 @@ fn wallpaper_set_header<'a>(app: &'a App, s: usize, set: &'a kubaos_core::probe:
     .into()
 }
 
-/// A wallpaper as a card to pick: the picture at the card's inner corners, in a box of the
-/// wallpaper's aspect that holds a placeholder until the thumbnail is decoded (or for good, when
-/// it can't be), so the cards never jump; then whether it's picked (and a play symbol for a video)
-/// beside its name.
+/// A wallpaper to pick: the picture over the whole tile, its name over its foot; picked, the ring
+/// and a check. Its box keeps the wallpaper's aspect until the thumbnail is decoded (or for good,
+/// when it can't be), so the grid never jumps.
 fn wallpaper_card<'a>(app: &'a App, s: usize, i: usize, look: &Look) -> El<'a> {
-    let c = look.colors;
     let set = &app.wallpaper_sets()[s];
     let file = &set.files[i];
-    let on = app.form.wallpaper_on(set, file);
     let f = F::Wallpaper(s, i);
-    let picture = media(
-        look,
+    let mut tile = picture_choice(
         app.thumbs.get(&model::wallpaper_key(set, file)).cloned(),
         Aspect::Wallpaper,
-        nested(Radius::Surface.corner(), Space::S16),
-    );
-    let (main, muted) = if on {
-        (c.on_secondary_container, c.on_secondary_container)
-    } else {
-        (c.on_surface, c.on_surface_variant)
-    };
-    let mut name = row(look, Space::S8).center().push(icon(
-        look,
-        if on { Icon::CheckCircle } else { Icon::Circle },
-        IconSize::S16,
-        muted,
-    ));
+        wallpaper_label(&file.name),
+    )
+    .name(NamePlace::Over)
+    .picked(app.form.wallpaper_on(set, file))
+    .mark(Icon::Check, "Picked")
+    .focused(app.is_focused(f))
+    .on_press(Message::Click(f));
     if file.is_video() {
-        name = name.push(icon(look, Icon::PlayArrow, IconSize::S16, muted));
+        tile = tile.badge(Icon::PlayArrow, "Video");
     }
-    name = name.push(line(wallpaper_label(&file.name), Type::Small, main));
-    widget::container(choice_card(
-        look,
-        stack(look, Space::S12).push(picture).push(name),
-        on,
-        Some(Message::Click(f)),
-        app.is_focused(f),
-    ))
-    .id(wallpaper_item(f).unwrap_or_default())
-    .into()
+    widget::container(tile.view(look))
+        .id(wallpaper_item(f).unwrap_or_default())
+        .into()
 }
 
 /// A card on Last chance, as tall as the one beside it.

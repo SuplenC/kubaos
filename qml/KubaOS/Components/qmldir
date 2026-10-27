@@ -49,4 +49,5 @@ Spinner 1.0 Spinner.qml
 EmptyState 1.0 EmptyState.qml
 ErrorBlock 1.0 ErrorBlock.qml
 Log 1.0 Log.qml
+PictureChoice 1.0 PictureChoice.qml
 Media 1.0 Media.qml

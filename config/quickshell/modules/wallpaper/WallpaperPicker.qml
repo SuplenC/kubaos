@@ -166,7 +166,10 @@ Drawer {
         width: root.columns * root.cellWidth
         height: root.rows * root.cellHeight
         visible: !root.settingsOpen
+        // Cut at its own whole rows, the focus ring's band included, and scrolled a row at a time, so
+        // no tile is ever cut through.
         clip: true
+        snapMode: GridView.SnapToRow
         cellWidth: root.cellWidth
         cellHeight: root.cellHeight
         boundsBehavior: Flickable.StopAtBounds
@@ -211,10 +214,11 @@ Drawer {
             width: grid.cellWidth
             height: grid.cellHeight
 
-            // A picture you pick: the control radius, the selection the focus ring round it. Its
-            // box is the wallpaper's aspect from the first frame, the placeholder in it until the
-            // picture or the video's poster fades in over it.
-            K.Media {
+            // A picture to pick, the whole tile: the applied one ringed and marked Current, the
+            // keyboard's the ring (cold on the applied one), the name under it. Its box is the
+            // wallpaper's aspect from the first frame, the placeholder in it until the picture or
+            // the video's poster fades in over it.
+            K.PictureChoice {
                 id: picture
 
                 x: root.ring
@@ -222,7 +226,15 @@ Drawer {
                 width: root.thumbWidth
                 height: implicitHeight
                 aspect: K.Tokens.aspect.wallpaper
-                radius: K.Tokens.radius.control
+                name: Wallpapers.label(cell.modelData)
+                picked: cell.applied
+                markIcon: "check"
+                markText: "Current"
+                focused: cell.isCurrent
+                // This one moves: playing, or held on its poster.
+                badgeIcon: thumb.moving ? "motion_photos_on" : "motion_photos_paused"
+                badgeText: thumb.video ? (thumb.moving ? "Playing" : "Video") : ""
+                onActivated: root.apply(cell.index)
 
                 ClippingRectangle {
                     anchors.fill: parent
@@ -236,8 +248,8 @@ Drawer {
                         path: cell.modelData
                         // Decode at the size it is shown, in device pixels: crisp and cheap.
                         sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
-                        playing: root.shown && (cell.isCurrent || tap.containsMouse) && Motion.mode !== "never"
-                        // The ones not picked sit back, as secondary content does.
+                        playing: root.shown && (cell.isCurrent || picture.hovered) && Motion.mode !== "never"
+                        // The ones not under the keyboard sit back, as secondary content does.
                         opacity: ready ? (cell.isCurrent ? 1 : K.Tokens.opacity.subdued) : 0
 
                         Behavior on opacity {
@@ -248,61 +260,7 @@ Drawer {
                             }
                         }
                     }
-
-                    // This one moves: playing, or held on its poster.
-                    K.Chip {
-                        anchors.left: parent.left
-                        anchors.bottom: parent.bottom
-                        anchors.margins: K.Tokens.space.s8
-                        visible: thumb.video
-                        icon: thumb.moving ? "motion_photos_on" : "motion_photos_paused"
-                        text: thumb.moving ? "Playing" : "Video"
-                    }
-
-                    K.Chip {
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: K.Tokens.space.s8
-                        visible: cell.applied
-                        kind: "Selected"
-                        icon: "check"
-                        text: "Current"
-                    }
-
-                    K.StateLayer {
-                        hovered: tap.containsMouse
-                        pressed: tap.pressed
-                        content: K.Tokens.color.on_surface
-                    }
-
-                    MouseArea {
-                        id: tap
-
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.apply(cell.index)
-                    }
                 }
-            }
-
-            K.FocusRing {
-                x: picture.x - K.Tokens.focus.offset
-                y: picture.y - K.Tokens.focus.offset
-                width: picture.width + K.Tokens.focus.offset * 2
-                height: picture.height + K.Tokens.focus.offset * 2
-                shown: cell.isCurrent
-                controlRadius: K.Tokens.radius.control
-            }
-
-            K.Text {
-                x: picture.x + K.Look.snap((root.thumbWidth - implicitWidth) / 2, root.dpr)
-                y: picture.y + root.thumbHeight + K.Tokens.space.s8
-                room: root.thumbWidth
-                maximumLines: 1
-                text: Wallpapers.label(cell.modelData)
-                style: K.Tokens.type.small
-                color: cell.isCurrent ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
             }
         }
 
