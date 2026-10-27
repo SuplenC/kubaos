@@ -1,0 +1,213 @@
+//! List rows, and the well a list sits in.
+//!
+//! The well's corners are 16 and its padding 4, so the rows inside take 12: concentric.
+
+use iced::Alignment;
+use iced::Background;
+use iced::Border;
+use iced::Element;
+use iced::Length;
+use iced::Shadow;
+use iced::Theme;
+use iced::widget;
+use iced::widget::container;
+
+use crate::color;
+use crate::component::state_layer;
+use crate::focus::RingColor;
+use crate::focus::focus_ring;
+use crate::icon::Icon;
+use crate::icon::icon;
+use crate::layout::Inset;
+use crate::layout::fill;
+use crate::layout::row;
+use crate::layout::stack;
+use crate::look::Look;
+use crate::look::concentric;
+use crate::look::radius;
+use crate::text::text;
+use crate::tokens::IconSize;
+use crate::tokens::Opacity;
+use crate::tokens::Radius;
+use crate::tokens::Size;
+use crate::tokens::Space;
+use crate::tokens::Type;
+
+/// The well's corners.
+const WELL_RADIUS: Radius = Radius::R16;
+/// The well's padding, and the gap between its rows.
+const WELL_INSET: Space = Space::S4;
+
+/// One row of a list, built up then drawn with [`ListRow::view`].
+#[derive(Debug)]
+pub struct ListRow<'a, M> {
+    title: &'a str,
+    subtitle: Option<&'a str>,
+    detail: Option<&'a str>,
+    icon: Option<Icon>,
+    selected: bool,
+    checked: Option<bool>,
+    on_press: Option<M>,
+}
+
+/// A row reading `title`.
+pub fn list_row<M>(title: &str) -> ListRow<'_, M> {
+    ListRow {
+        title,
+        subtitle: None,
+        detail: None,
+        icon: None,
+        selected: false,
+        checked: None,
+        on_press: None,
+    }
+}
+
+impl<'a, M: Clone + 'a> ListRow<'a, M> {
+    /// A second line under the title: the row is two lines tall.
+    #[must_use]
+    pub fn subtitle(self, subtitle: &'a str) -> Self {
+        ListRow {
+            subtitle: Some(subtitle),
+            ..self
+        }
+    }
+
+    /// A short fact at the row's end, in mono: a device path, a size, a code.
+    #[must_use]
+    pub fn detail(self, detail: &'a str) -> Self {
+        ListRow {
+            detail: Some(detail),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn icon(self, icon: Icon) -> Self {
+        ListRow {
+            icon: Some(icon),
+            ..self
+        }
+    }
+
+    /// The row the keyboard is on, or the one picked in a list of one.
+    #[must_use]
+    pub fn selected(self, selected: bool) -> Self {
+        ListRow { selected, ..self }
+    }
+
+    /// A check mark at the end when picked; the room for it is kept when not, so the rows' ends
+    /// line up.
+    #[must_use]
+    pub fn checked(self, checked: bool) -> Self {
+        ListRow {
+            checked: Some(checked),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn on_press(self, message: M) -> Self {
+        ListRow {
+            on_press: Some(message),
+            ..self
+        }
+    }
+
+    pub fn view(self, look: &Look) -> Element<'a, M> {
+        let c = look.colors;
+        let (fill_colour, main, muted) = if self.selected {
+            (
+                Some(c.secondary_container),
+                c.on_secondary_container,
+                color::alpha(c.on_secondary_container, Opacity::Subdued.value()),
+            )
+        } else {
+            (None, c.on_surface, c.on_surface_variant)
+        };
+        let height = if self.subtitle.is_some() {
+            Size::RowTwoLine
+        } else {
+            Size::Row
+        };
+        let mut lines = stack(look, Space::S4).push(text(self.title, Type::BodyStrong, main));
+        if let Some(subtitle) = self.subtitle {
+            lines = lines.push(text(subtitle, Type::Small, muted));
+        }
+        let mut content = row(look, Space::S12).center();
+        if let Some(glyph) = self.icon {
+            content = content.push(icon(look, glyph, IconSize::S20, main));
+        }
+        content = content.push(lines).push(fill());
+        if let Some(detail) = self.detail {
+            content = content.push(text(detail, Type::Mono, muted));
+        }
+        if let Some(checked) = self.checked {
+            content = content.push(if checked {
+                Element::from(icon(look, Icon::Check, IconSize::S20, main))
+            } else {
+                widget::Space::new()
+                    .width(f32::from(IconSize::S20.px()))
+                    .height(f32::from(IconSize::S20.px()))
+                    .into()
+            });
+        }
+        let corner = concentric(WELL_RADIUS, WELL_INSET).unwrap_or(Radius::R12);
+        let on_surface = c.on_surface;
+        widget::button(
+            widget::container(content)
+                .height(Length::Fill)
+                .align_y(Alignment::Center),
+        )
+        .width(Length::Fill)
+        .height(f32::from(height.px()))
+        .padding(Inset::x(Space::S12).padding())
+        .on_press_maybe(self.on_press)
+        .style(move |_theme: &Theme, status| widget::button::Style {
+            background: state_layer(fill_colour, on_surface, status),
+            text_color: main,
+            border: Border::default().rounded(radius(corner)),
+            shadow: Shadow::default(),
+            snap: true,
+        })
+        .into()
+    }
+}
+
+/// `rows` in a well, the focus ring around it while the list has the keyboard. The rows show
+/// which one the keyboard is on themselves.
+pub fn list<'a, M: 'a>(look: &Look, rows: impl IntoIterator<Item = Element<'a, M>>, focused: bool) -> Element<'a, M> {
+    let c = look.colors;
+    let surface = color::alpha(c.surface_container_low, Opacity::Well.value());
+    let edge = look.outline_soft();
+    let hairline = look.hairline();
+    let well = widget::container(stack(look, WELL_INSET).extend(rows))
+        .padding(Inset::all(WELL_INSET).padding())
+        .width(Length::Fill)
+        .style(move |_theme| container::Style {
+            background: Some(Background::Color(surface)),
+            border: Border {
+                color: edge,
+                width: hairline,
+                radius: radius(WELL_RADIUS).into(),
+            },
+            ..container::Style::default()
+        });
+    focus_ring(look, well, WELL_RADIUS, focused, RingColor::Accent)
+}
+
+/// The well with nothing in it: `message`, centred.
+pub fn empty_list<'a, M: 'a>(look: &Look, message: &'a str) -> Element<'a, M> {
+    let c = look.colors;
+    list(
+        look,
+        [widget::container(text(message, Type::Body, c.on_surface_variant))
+            .center_x(Length::Fill)
+            .padding(Inset::y(Space::S12).padding())
+            .into()],
+        false,
+    )
+}
+
+#[cfg(test)]
+mod tests;

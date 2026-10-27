@@ -1,0 +1,224 @@
+//! The specimen's state and its view: a bar with the pages, then the page.
+//!
+//! # Owns
+//!
+//! - [`Specimen`], what is shown ([`Page`], mode, scale, the motion clock), and [`view`].
+//!
+//! # Not here
+//!
+//! - Each page's content: [`crate::pages`]. The window: [`crate::app`]. Screenshots: [`crate::shot`].
+
+use iced::Background;
+use iced::Border;
+use iced::Element;
+use iced::Length;
+use iced::widget;
+use kubaos_ui::Look;
+use kubaos_ui::Mode;
+use kubaos_ui::Scale;
+use kubaos_ui::color;
+use kubaos_ui::component::button::ButtonSize;
+use kubaos_ui::component::button::Kind;
+use kubaos_ui::component::button::button;
+use kubaos_ui::component::chip::ChipKind;
+use kubaos_ui::component::chip::chip;
+use kubaos_ui::layout::Extent;
+use kubaos_ui::layout::Gap;
+use kubaos_ui::layout::Inset;
+use kubaos_ui::layout::divider;
+use kubaos_ui::layout::fill;
+use kubaos_ui::layout::page;
+use kubaos_ui::layout::row;
+use kubaos_ui::layout::stack;
+use kubaos_ui::look::radius;
+use kubaos_ui::text::text;
+use kubaos_ui::tokens::Opacity;
+use kubaos_ui::tokens::Radius;
+use kubaos_ui::tokens::Space;
+use kubaos_ui::tokens::Type;
+
+use crate::pages;
+
+/// A page of the specimen.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Page {
+    Type,
+    Colour,
+    Space,
+    Components,
+    Icons,
+    Motion,
+}
+
+impl Page {
+    pub const ALL: [Page; 6] = [
+        Page::Type,
+        Page::Colour,
+        Page::Space,
+        Page::Components,
+        Page::Icons,
+        Page::Motion,
+    ];
+
+    pub fn title(self) -> &'static str {
+        match self {
+            Page::Type => "Type",
+            Page::Colour => "Colour",
+            Page::Space => "Space and shape",
+            Page::Components => "Components",
+            Page::Icons => "Icons",
+            Page::Motion => "Motion",
+        }
+    }
+
+    /// The page's name in file names.
+    pub fn slug(self) -> &'static str {
+        match self {
+            Page::Type => "type",
+            Page::Colour => "colour",
+            Page::Space => "space",
+            Page::Components => "components",
+            Page::Icons => "icons",
+            Page::Motion => "motion",
+        }
+    }
+
+    /// The page after this one, wrapping round; `back` goes the other way.
+    pub fn step(self, back: bool) -> Page {
+        let at = Page::ALL.iter().position(|&p| p == self).unwrap_or(0);
+        let n = Page::ALL.len();
+        Page::ALL[if back { (at + n - 1) % n } else { (at + 1) % n }]
+    }
+}
+
+/// What the specimen shows.
+#[derive(Debug, Clone, Copy)]
+pub struct Specimen {
+    pub page: Page,
+    pub mode: Mode,
+    /// The scale the page is judged at: the window's in the live specimen, the shot's otherwise.
+    pub scale: Scale,
+    /// Seconds on the motion samples' clock.
+    pub seconds: f32,
+    /// In a window: the page scrolls. In a screenshot it is laid out whole.
+    pub live: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum Message {
+    Page(Page),
+    Mode(Mode),
+    /// The window's display scale changed.
+    Scaled(f32),
+    Frame(std::time::Instant),
+    Key(iced::keyboard::Event),
+    /// A press on a sample: the components look enabled, and nothing happens.
+    Sample,
+    /// Typing in a sample field, which keeps its sample text.
+    Typed,
+}
+
+/// The id of the field the specimen shows focused, so its caret shows.
+pub const FOCUSED_FIELD: &str = "specimen-focused-field";
+
+/// The id of the specimen's whole content, which a screenshot measures.
+pub const ROOT: &str = "specimen-root";
+
+pub fn view(specimen: &Specimen) -> Element<'_, Message> {
+    let look = Look::new(specimen.mode, specimen.scale);
+    let content = pages::view(specimen, &look);
+    let body: Element<'_, Message> = if specimen.live {
+        widget::scrollable(page(&look, content))
+            .height(Length::Fill)
+            .style(move |_theme, status| scroller(&look, status))
+            .into()
+    } else {
+        page(&look, content)
+    };
+    let whole = stack(&look, Gap::NONE)
+        .push(bar(specimen, &look))
+        .push(divider(&look))
+        .push(body);
+    widget::container(whole)
+        .id(ROOT)
+        .width(Length::Fill)
+        .height(if specimen.live { Length::Fill } else { Length::Shrink })
+        .style(move |_theme| widget::container::Style::default().background(look.colors.surface))
+        .into()
+}
+
+/// The bar above the page: the pages, then the mode and the scale it is shown at.
+fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let mut tabs = row(look, Space::S4).center();
+    for page in Page::ALL {
+        let kind = if page == specimen.page { Kind::Tonal } else { Kind::Text };
+        tabs = tabs.push(
+            button(page.title())
+                .kind(kind)
+                .size(ButtonSize::Sm)
+                .on_press(Message::Page(page))
+                .view(look),
+        );
+    }
+    let mode = match specimen.mode {
+        Mode::Dark => "Dark",
+        Mode::Light => "Light",
+    };
+    let state = format!("{mode} · {}×", specimen.scale.factor());
+    let other = match specimen.mode {
+        Mode::Dark => (Mode::Light, "Light"),
+        Mode::Light => (Mode::Dark, "Dark"),
+    };
+    row(look, Space::S16)
+        .center()
+        .padding(Inset::x(Space::S40).top(Space::S16).bottom(Space::S16))
+        .width(Extent::Fill)
+        .push(text("KubaOS design specimen", Type::Subheading, c.on_surface))
+        .push(tabs)
+        .push(fill())
+        .push(text("Tab, ← → pages · M mode", Type::Caption, c.on_surface_variant))
+        .push(chip(look, ChipKind::Neutral, state, None, None::<Message>))
+        .push(
+            button(other.1)
+                .kind(Kind::Text)
+                .size(ButtonSize::Sm)
+                .on_press(Message::Mode(other.0))
+                .view(look),
+        )
+        .into()
+}
+
+/// Kōbō's scroller: no rail, a thin pill in the muted text colour, stronger under the pointer.
+fn scroller(look: &Look, status: widget::scrollable::Status) -> widget::scrollable::Style {
+    let c = look.colors;
+    let hot = matches!(
+        status,
+        widget::scrollable::Status::Hovered { .. } | widget::scrollable::Status::Dragged { .. }
+    );
+    let strength = if hot {
+        Opacity::Placeholder.value()
+    } else {
+        Opacity::DisabledContent.value()
+    };
+    let rail = widget::scrollable::Rail {
+        background: None,
+        border: Border::default(),
+        scroller: widget::scrollable::Scroller {
+            background: Background::Color(color::alpha(c.on_surface_variant, strength)),
+            border: Border::default().rounded(radius(Radius::Full)),
+        },
+    };
+    widget::scrollable::Style {
+        container: widget::container::Style::default(),
+        vertical_rail: rail,
+        horizontal_rail: rail,
+        gap: None,
+        auto_scroll: widget::scrollable::AutoScroll {
+            background: Background::Color(c.surface_container_high),
+            border: Border::default().rounded(radius(Radius::Full)),
+            shadow: iced::Shadow::default(),
+            icon: c.on_surface,
+        },
+    }
+}

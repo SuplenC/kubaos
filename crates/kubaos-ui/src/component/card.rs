@@ -1,0 +1,82 @@
+//! Cards: a surface inside the page, plain or one of a few to pick from.
+
+use iced::Background;
+use iced::Border;
+use iced::Element;
+use iced::Length;
+use iced::Shadow;
+use iced::Theme;
+use iced::widget;
+use iced::widget::container;
+
+use crate::color;
+use crate::focus::RingColor;
+use crate::focus::focus_ring;
+use crate::layout::Inset;
+use crate::look::Look;
+use crate::look::radius;
+use crate::tokens::Opacity;
+use crate::tokens::Radius;
+use crate::tokens::Space;
+
+const CARD_RADIUS: Radius = Radius::R16;
+
+/// A plain card around `content`: the well's surface and soft hairline, 16 inside.
+pub fn card<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Element<'a, M> {
+    let c = look.colors;
+    let surface = color::alpha(c.surface_container_low, Opacity::Well.value());
+    let edge = look.outline_soft();
+    let hairline = look.hairline();
+    widget::container(content)
+        .padding(Inset::all(Space::S16).padding())
+        .width(Length::Fill)
+        .style(move |_theme| container::Style {
+            background: Some(Background::Color(surface)),
+            border: Border {
+                color: edge,
+                width: hairline,
+                radius: radius(CARD_RADIUS).into(),
+            },
+            ..container::Style::default()
+        })
+        .into()
+}
+
+/// One of a few cards to pick from. The picked one takes the secondary container and an accent
+/// hairline; focus is the cold ring, since the accent already means picked here.
+pub fn choice_card<'a, M: Clone + 'a>(
+    look: &Look,
+    content: impl Into<Element<'a, M>>,
+    picked: bool,
+    on_pick: Option<M>,
+    focused: bool,
+) -> Element<'a, M> {
+    let c = look.colors;
+    let hairline = look.hairline();
+    let enabled = on_pick.is_some();
+    let pressable = widget::button(content)
+        .width(Length::Fill)
+        .padding(Inset::all(Space::S16).padding())
+        .on_press_maybe(on_pick)
+        .style(move |_theme: &Theme, status| {
+            let fill = if picked {
+                c.secondary_container
+            } else if enabled && matches!(status, widget::button::Status::Hovered) {
+                color::mix(c.surface_container_low, c.on_surface, Opacity::Hover.value())
+            } else {
+                color::alpha(c.surface_container_low, Opacity::Well.value())
+            };
+            widget::button::Style {
+                background: Some(Background::Color(fill)),
+                text_color: c.on_surface,
+                border: Border {
+                    color: if picked { c.primary } else { c.outline_variant },
+                    width: hairline,
+                    radius: radius(CARD_RADIUS).into(),
+                },
+                shadow: Shadow::default(),
+                snap: true,
+            }
+        });
+    focus_ring(look, pressable, CARD_RADIUS, focused, RingColor::Cold)
+}

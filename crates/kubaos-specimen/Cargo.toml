@@ -1,0 +1,35 @@
+[package]
+name = "kubaos-specimen"
+description = "KubaOS's design specimen: every token and component of kubaos-ui, live or as screenshots"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "kubaos-specimen"
+path = "src/main.rs"
+
+[dependencies]
+kubaos-ui.workspace = true
+# Kōbō's iced and features, so the two share one build of their dependencies.
+iced = { version = "0.14", default-features = false, features = [
+  "wgpu",
+  "tiny-skia",
+  "crisp",
+  "web-colors",
+  "thread-pool",
+  "x11",
+  "wayland",
+  "image",
+  "canvas",
+  "svg",
+  "advanced",
+] }
+# The screenshots: a user interface laid out and drawn without a window, by the tiny-skia renderer at
+# any scale, then written as PNG.
+iced_runtime = "0.14"
+png = "0.18"
+thiserror.workspace = true
+
+[lints]
+workspace = true

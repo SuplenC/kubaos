@@ -8,8 +8,10 @@
 # behind the clock popup and the menu's date answers (`kubaos-clock`), and the
 # system monitor behind the bar's pill, its popup and the menu's `cpu`, `ram`
 # and `battery` answers (`kubaos-sysmon`), the idle settings, Keep awake and the
-# scheduled power actions (`kubaos-idle`), and where each app's settings live in the
-# user layer (`kubaos-user-layer`).
+# scheduled power actions (`kubaos-idle`), where each app's settings live in the
+# user layer (`kubaos-user-layer`), and the design language: the tokens'
+# generator (`kubaos-tokens`), the iced components every Rust front end draws
+# with (`kubaos-ui`) and the specimen that shows them (`kubaos-specimen`).
 [workspace]
 resolver = "3"
 members = [
@@ -26,6 +28,9 @@ members = [
     "crates/kubaos-sysmon",
     "crates/kubaos-user-layer",
     "crates/kubaos-idle",
+    "crates/kubaos-tokens",
+    "crates/kubaos-ui",
+    "crates/kubaos-specimen",
 ]
 
 [workspace.package]
@@ -41,6 +46,7 @@ kubaos-idle = { path = "crates/kubaos-idle" }
 kubaos-phone = { path = "crates/kubaos-phone" }
 kubaos-sysmon = { path = "crates/kubaos-sysmon" }
 kubaos-user-layer = { path = "crates/kubaos-user-layer" }
+kubaos-ui = { path = "crates/kubaos-ui" }
 # Kotodama's calculator reads dates with jiff too, so the menu and the popup agree on zones and
 # DST. The time zone database is the system's (`/usr/share/zoneinfo`, or `$TZDIR`), never bundled.
 jiff = { version = "0.2.38", default-features = false, features = ["std", "tz-system", "tzdb-zoneinfo"] }

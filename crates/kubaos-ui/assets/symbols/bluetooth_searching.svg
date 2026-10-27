@@ -1,0 +1,18 @@
+<!-- KubaOS Symbols, drawn on Tabler's 24 unit grid: Tabler's bluetooth-x at full size, its upper-right arm cut the same way, with a magnifier where its x is, 2 units clear of the rune. -->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="24"
+  height="24"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+  <path d="M7 8l10 8l-5 4v-16" />
+  <path d="M13 11.198l-6 4.802" />
+  <path d="M15 7.5a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0 -5 0" />
+  <path d="M19.3 9.3l1.7 1.7" />
+</svg>

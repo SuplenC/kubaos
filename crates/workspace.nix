@@ -2,7 +2,8 @@
 # makes the package of one crate, with crane.
 #
 # Every package builds on a shared derivation of the workspace's dependencies
-# (crane's buildDepsOnly, one for the command-line tools and one for Kōbō),
+# (crane's buildDepsOnly, one for the command-line tools and one for the iced
+# apps, Kōbō and the design specimen),
 # which changes only with Cargo.lock and the crates' manifests. An update that changes KubaOS's code compiles that
 # code alone. A package's source is its own crate and the workspace crates it
 # depends on, so a change to one crate rebuilds only the packages built from
@@ -74,10 +75,14 @@ let
       "kubaos-sysmon"
       "kubaos-idle"
     ];
-    # Kōbō's iced and wgpu are most of its dependencies and no other crate
-    # uses them. Apart, they build beside the tools' dependencies when
-    # Cargo.lock changes, instead of before every tool.
-    kobo = [ "kubaos-kobo" ];
+    # iced and wgpu are most of these crates' dependencies and no tool uses
+    # them. Apart, they build beside the tools' dependencies when Cargo.lock
+    # changes, instead of before every tool. Kōbō and the design specimen ask
+    # iced for the same features, so one build of it serves both.
+    iced = [
+      "kubaos-kobo"
+      "kubaos-specimen"
+    ];
   };
   groupOf =
     crate:
