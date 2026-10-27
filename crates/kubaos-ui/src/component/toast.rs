@@ -35,7 +35,7 @@ pub fn toast<'a, M: 'a>(look: &Look, message: &'a str, leading: Option<Icon>) ->
         .padding(Inset::xy(Space::S16, Space::S12).padding())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(fill)),
-            border: Border::default().rounded(radius(Radius::R12)),
+            border: Border::default().rounded(radius(Radius::Surface)),
             ..container::Style::default()
         });
     let view: Element<'a, M> = snap(look.scale, surface);

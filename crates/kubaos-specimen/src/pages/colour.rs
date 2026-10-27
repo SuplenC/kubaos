@@ -82,7 +82,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
                 border: Border {
                     color: edge,
                     width: hairline,
-                    radius: radius(Radius::R12).into(),
+                    radius: radius(Radius::Small).into(),
                 },
                 ..container::Style::default()
             });
@@ -134,7 +134,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
                 border: Border {
                     color: edge,
                     width: hairline,
-                    radius: radius(Radius::R8).into(),
+                    radius: radius(Radius::Small).into(),
                 },
                 ..container::Style::default()
             });

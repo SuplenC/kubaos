@@ -1,6 +1,7 @@
 //! List rows, and the well a list sits in.
 //!
-//! The well's corners are 16 and its padding 4, so the rows inside take 12: concentric.
+//! The well is a surface (24) with 12 inside, so the rows inside take 24 - 12 = 12, the control
+//! radius: concentric with the well, and the radius of everything clicked.
 
 use iced::Alignment;
 use iced::Background;
@@ -22,6 +23,7 @@ use crate::layout::Inset;
 use crate::layout::fill;
 use crate::layout::row;
 use crate::layout::stack;
+use crate::look::Corner;
 use crate::look::Look;
 use crate::look::nested;
 use crate::look::radius;
@@ -36,12 +38,14 @@ use crate::tokens::Size;
 use crate::tokens::Space;
 use crate::tokens::Type;
 
-/// The well's corners.
-const WELL_RADIUS: Radius = Radius::R16;
-/// The well's padding, and the gap between its rows.
-const WELL_INSET: Space = Space::S4;
+/// The well's corners: it holds content.
+const WELL_RADIUS: Radius = Radius::Surface;
+/// The well's padding.
+const WELL_INSET: Space = Space::S12;
+/// The gap between rows.
+const ROW_GAP: Space = Space::S4;
 /// The rows' corners, concentric inside the well; a well and inset that can't be stop the build.
-const ROW_RADIUS: Radius = nested(WELL_RADIUS, WELL_INSET);
+const ROW_RADIUS: Corner = nested(WELL_RADIUS.corner(), WELL_INSET);
 
 /// One row of a list, built up then drawn with [`ListRow::view`].
 #[derive(Debug)]
@@ -193,7 +197,7 @@ pub fn list<'a, M: 'a>(look: &Look, rows: impl IntoIterator<Item = Element<'a, M
     let surface = color::alpha(c.surface_container_low, Opacity::Well.value());
     let edge = look.outline_soft();
     let hairline = look.hairline();
-    let well = widget::container(stack(look, WELL_INSET).extend(rows))
+    let well = widget::container(stack(look, ROW_GAP).extend(rows))
         .padding(Inset::all(WELL_INSET).padding())
         .width(Length::Fill)
         .style(move |_theme| container::Style {

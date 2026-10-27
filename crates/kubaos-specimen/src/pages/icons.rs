@@ -328,7 +328,7 @@ fn in_context<'a>(look: &Look, glyphs: &[Glyph], i: usize) -> Element<'a, Messag
     .padding(Inset::x(Space::S12).padding())
     .style(move |_theme| container::Style {
         background: Some(Background::Color(c.secondary_container)),
-        border: Border::default().rounded(radius(Radius::R12)),
+        border: Border::default().rounded(radius(Radius::Control)),
         ..container::Style::default()
     });
     let next = widget::container(

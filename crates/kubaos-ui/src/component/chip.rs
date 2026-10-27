@@ -1,4 +1,4 @@
-//! Chips: a short fact or a pick, in a pill.
+//! Chips: a short fact or a pick, at the control radius, which on a chip's 24 is a pill.
 
 use iced::Background;
 use iced::Border;
@@ -76,8 +76,8 @@ pub fn chip<'a, M: Clone + 'a>(
         ChipKind::Accent => (color::alpha(c.primary, Opacity::Tint.value()), c.primary),
         ChipKind::Cold => (color::alpha(c.cold, Opacity::Tint.value()), c.cold),
     };
-    // The label starts where the pill's curve ends; an icon sits closer in. The close button is a
-    // circle as tall as the chip, so its hover layer shares the pill's curve at the end.
+    // The label starts where the chip's curve ends; an icon sits closer in. The close button is a
+    // circle as tall as the chip, so its hover layer shares the chip's curve at the end.
     let left = if leading.is_some() { Space::S8 } else { Space::S12 };
     let right = if on_remove.is_some() {
         Gap::NONE
@@ -108,7 +108,7 @@ pub fn chip<'a, M: Clone + 'a>(
         .padding(Inset::NONE.left(left).right(right).padding())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(fill)),
-            border: Border::default().rounded(radius(Radius::Full)),
+            border: Border::default().rounded(radius(Radius::Control)),
             text_color: Some(Color { a: 1.0, ..content }),
             ..container::Style::default()
         })

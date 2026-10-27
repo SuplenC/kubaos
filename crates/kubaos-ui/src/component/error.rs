@@ -56,7 +56,7 @@ pub fn error_block<'a, M: 'a>(look: &Look, message: &'a str, hint: &'a str) -> E
         border: Border {
             color: edge,
             width: hairline,
-            radius: radius(Radius::R16).into(),
+            radius: radius(Radius::Surface).into(),
         },
         ..container::Style::default()
     })
@@ -110,7 +110,7 @@ pub fn log<'a, M: 'a>(look: &Look, lines: &[(Level, &'a str)], height: Extent) -
         border: Border {
             color: edge,
             width: hairline,
-            radius: radius(Radius::R12).into(),
+            radius: radius(Radius::Surface).into(),
         },
         ..container::Style::default()
     })

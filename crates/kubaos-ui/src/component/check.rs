@@ -96,11 +96,11 @@ pub fn checkbox<'a, M: Clone + 'a>(
             border: Border {
                 color: edge.map_or(Color::TRANSPARENT, dim),
                 width: if edge.is_some() { hairline } else { 0.0 },
-                radius: radius(Radius::R4).into(),
+                radius: radius(Radius::Small).into(),
             },
             ..container::Style::default()
         });
-    let view: Element<'a, M> = labelled(look, shape, Radius::R4, label, on_toggle, focused);
+    let view: Element<'a, M> = labelled(look, shape, Radius::Small, label, on_toggle, focused);
     probe::component("Checkbox", ["", "", ""], Fixed::HEIGHT, view)
 }
 

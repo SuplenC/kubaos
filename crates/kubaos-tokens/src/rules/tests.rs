@@ -53,17 +53,36 @@ fn a_spacing_step_off_the_grid_is_refused() {
 }
 
 #[test]
-fn a_radius_off_the_grid_is_refused() {
-    let found = violations(|t| set(t, &["radius"], "values", vec![4, 6, 8]));
+fn a_radius_role_off_the_grid_is_refused() {
+    let found = violations(|t| set(t, &["radius"], "control", 10));
 
     assert_eq!(
         found,
         [Violation::OffGrid {
-            token: "radius 6".into(),
-            value: 6,
+            token: "radius.control".into(),
+            value: 10,
             grid: 4
         }]
     );
+}
+
+#[test]
+fn radius_roles_grow_from_small_to_surface() {
+    let found = violations(|t| set(t, &["radius"], "control", 28));
+
+    assert_eq!(
+        found,
+        [Violation::NotAscending {
+            token: "radius.small, control, surface".into()
+        }]
+    );
+}
+
+#[test]
+fn a_radius_beside_the_roles_is_refused() {
+    let found = tokens_with(|t| set(t, &["radius"], "values", vec![8, 16]));
+
+    assert!(matches!(found, Err(Error::Parse(_))), "{found:?}");
 }
 
 #[test]

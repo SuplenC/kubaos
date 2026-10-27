@@ -21,7 +21,7 @@ use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Space;
 
-const CARD_RADIUS: Radius = Radius::R16;
+const CARD_RADIUS: Radius = Radius::Surface;
 
 /// A plain card around `content`: the well's surface and soft hairline, 16 inside.
 pub fn card<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Element<'a, M> {

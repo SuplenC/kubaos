@@ -84,40 +84,35 @@ impl Space {
     }
 }
 
-/// A corner radius.
+/// A corner radius, by the role of the shape it rounds. A radius between them is derived by
+/// nesting, never picked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Radius {
-    R4,
-    R8,
-    R12,
-    R16,
-    R20,
-    R24,
+    /// Marks inside controls: the checkbox, a hint, focus details, inline tags.
+    Small,
+    /// Everything clicked or typed in: buttons, fields, list rows, menu items, chips.
+    Control,
+    /// Everything that holds content: cards, dialogs, popups, panels, list wells.
+    Surface,
     /// Half the shape's shorter side: a pill, or a circle.
     Full,
 }
 
 impl Radius {
     /// Every radius.
-    pub const ALL: [Radius; 7] = [
-        Radius::R4,
-        Radius::R8,
-        Radius::R12,
-        Radius::R16,
-        Radius::R20,
-        Radius::R24,
+    pub const ALL: [Radius; 4] = [
+        Radius::Small,
+        Radius::Control,
+        Radius::Surface,
         Radius::Full,
     ];
 
     /// The radius in logical pixels, or `None` for [`Radius::Full`], which depends on the shape.
     pub const fn px(self) -> Option<u16> {
         match self {
-            Radius::R4 => Some(4),
-            Radius::R8 => Some(8),
-            Radius::R12 => Some(12),
-            Radius::R16 => Some(16),
-            Radius::R20 => Some(20),
-            Radius::R24 => Some(24),
+            Radius::Small => Some(4),
+            Radius::Control => Some(12),
+            Radius::Surface => Some(24),
             Radius::Full => None,
         }
     }

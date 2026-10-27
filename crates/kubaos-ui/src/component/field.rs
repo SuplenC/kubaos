@@ -154,7 +154,7 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
                 border: Border {
                     color: edge,
                     width: hairline,
-                    radius: radius(Radius::R12).into(),
+                    radius: radius(Radius::Control).into(),
                 },
                 icon: c.on_surface_variant,
                 placeholder: color::alpha(c.on_surface_variant, Opacity::Placeholder.value()),
@@ -188,7 +188,7 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
             input = input.on_input(on_input);
         }
         let Some(glyph) = self.icon else {
-            let view: Element<'a, M> = focus_ring(look, input, Radius::R12, focused, RingColor::Accent);
+            let view: Element<'a, M> = focus_ring(look, input, Radius::Control, focused, RingColor::Accent);
             return probe::component("Field", variant, Fixed::HEIGHT, view);
         };
         // The icon is drawn over the field, in a box 12 wider than itself on each side, so it
@@ -201,7 +201,7 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
         .width(well)
         .height(Length::Fill);
         let field = widget::Stack::with_children([input.into(), mark.into()]);
-        let view: Element<'a, M> = focus_ring(look, field, Radius::R12, focused, RingColor::Accent);
+        let view: Element<'a, M> = focus_ring(look, field, Radius::Control, focused, RingColor::Accent);
         probe::component("Field", variant, Fixed::HEIGHT, view)
     }
 }

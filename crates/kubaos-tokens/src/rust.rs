@@ -232,12 +232,24 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             ty: "u16",
         },
     );
-    let mut radii: Vec<(String, Option<String>, String)> = tokens
-        .radius
-        .values
-        .iter()
-        .map(|v| (format!("R{v}"), None, format!("Some({v})")))
-        .collect();
+    let r = &tokens.radius;
+    let mut radii: Vec<(String, Option<String>, String)> = vec![
+        (
+            "Small".into(),
+            Some("Marks inside controls: the checkbox, a hint, focus details, inline tags.".into()),
+            format!("Some({})", r.small),
+        ),
+        (
+            "Control".into(),
+            Some("Everything clicked or typed in: buttons, fields, list rows, menu items, chips.".into()),
+            format!("Some({})", r.control),
+        ),
+        (
+            "Surface".into(),
+            Some("Everything that holds content: cards, dialogs, popups, panels, list wells.".into()),
+            format!("Some({})", r.surface),
+        ),
+    ];
     if tokens.radius.full {
         radii.push((
             "Full".into(),
@@ -248,7 +260,7 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
     scale(
         out,
         &Scale {
-            doc: "A corner radius.",
+            doc: "A corner radius, by the role of the shape it rounds. A radius between them is derived by nesting, never picked.",
             name: "Radius",
             variants: radii,
             getter_doc: "The radius in logical pixels, or `None` for [`Radius::Full`], which depends on the shape.",

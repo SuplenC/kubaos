@@ -22,6 +22,7 @@ use kubaos_ui::layout::row;
 use kubaos_ui::layout::section;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
+use kubaos_ui::look::Corner;
 use kubaos_ui::look::nested;
 use kubaos_ui::look::radius;
 use kubaos_ui::snap::snap;
@@ -36,9 +37,9 @@ use kubaos_ui::tokens::Type;
 
 use crate::specimen::Message;
 
-/// The concentric sample's corners: a 24 dialog holds 16 eight in, which holds 12 four in.
-const IN_DIALOG: Radius = nested(Radius::R24, Space::S8);
-const IN_WELL: Radius = nested(IN_DIALOG, Space::S4);
+/// The concentric sample's corners: a surface (24) holds 16 eight in, which holds 12 four in.
+const IN_SURFACE: Corner = nested(Radius::Surface.corner(), Space::S8);
+const IN_INNER: Corner = nested(IN_SURFACE, Space::S4);
 
 /// A plain filled box, `width` by `height` logical pixels.
 fn block<'a>(width: Length, height: f32, fill: Color, corner: Radius) -> Element<'a, Message> {
@@ -66,7 +67,12 @@ fn name<'a>(look: &Look, label: String, value: String) -> Element<'a, Message> {
 pub fn view<'a>(look: &Look) -> Element<'a, Message> {
     stack(look, Space::S48)
         .push(section(look, "Spacing", Some("Gaps, paddings and insets."), spacing(look)))
-        .push(section(look, "Radii", Some("Corners, and full for pills."), radii(look)))
+        .push(section(
+            look,
+            "Radii",
+            Some("Three roles and full: small marks, controls, surfaces. Any other radius comes from nesting."),
+            radii(look),
+        ))
         .push(section(look, "Icon sizes", Some("The em box; the glyph's ink sits inside its own margin."), icons(look)))
         .push(section(look, "Component sizes", None, sizes(look)))
         .push(section(
@@ -100,7 +106,7 @@ fn spacing<'a>(look: &Look) -> Element<'a, Message> {
                 Length::Fixed(f32::from(space.px())),
                 f32::from(Space::S16.px()),
                 fill,
-                Radius::R4,
+                Radius::Small,
             ));
     }
     table.into()
@@ -155,7 +161,7 @@ fn sizes<'a>(look: &Look) -> Element<'a, Message> {
                 Length::Fixed(f32::from(size.px())),
                 f32::from(Space::S16.px()),
                 fill,
-                Radius::R4,
+                Radius::Small,
             ));
     }
     table.into()
@@ -176,21 +182,21 @@ fn strokes<'a>(look: &Look) -> Element<'a, Message> {
         .padding(Inset::xy(Space::S16, Space::S8).padding())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(c.surface_container_high)),
-            border: Border::default().rounded(radius(Radius::R12)),
+            border: Border::default().rounded(radius(Radius::Control)),
             ..container::Style::default()
         });
     let rings = row(look, Space::S32)
-        .push(focus_ring(look, target, Radius::R12, true, RingColor::Accent))
+        .push(focus_ring(look, target, Radius::Control, true, RingColor::Accent))
         .push(focus_ring(
             look,
             widget::container(text("Picked card", Type::Body, c.on_surface))
                 .padding(Inset::xy(Space::S16, Space::S8).padding())
                 .style(move |_theme| container::Style {
                     background: Some(Background::Color(c.secondary_container)),
-                    border: Border::default().rounded(radius(Radius::R16)),
+                    border: Border::default().rounded(radius(Radius::Surface)),
                     ..container::Style::default()
                 }),
-            Radius::R16,
+            Radius::Surface,
             true,
             RingColor::Cold,
         ));
@@ -219,7 +225,7 @@ fn strokes<'a>(look: &Look) -> Element<'a, Message> {
 
 fn nesting<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
-    let shape = |content: Element<'a, Message>, corner: Radius, inset: Space, fill: Color| -> Element<'a, Message> {
+    let shape = |content: Element<'a, Message>, corner: Corner, inset: Space, fill: Color| -> Element<'a, Message> {
         let content = snap(look.scale, content);
         widget::container(content)
             .padding(Inset::all(inset).padding())
@@ -230,7 +236,7 @@ fn nesting<'a>(look: &Look) -> Element<'a, Message> {
             })
             .into()
     };
-    let (r16, r12) = (IN_DIALOG, IN_WELL);
+    let (r16, r12) = (IN_SURFACE, IN_INNER);
     let core = widget::container(snap(look.scale, text("12", Type::Mono, c.on_primary)))
         .padding(Inset::xy(Space::S32, Space::S12).padding())
         .style(move |_theme| container::Style {
@@ -239,12 +245,17 @@ fn nesting<'a>(look: &Look) -> Element<'a, Message> {
             ..container::Style::default()
         });
     let middle = shape(core.into(), r16, Space::S4, c.surface_container_highest);
-    let outer = shape(middle, Radius::R24, Space::S8, c.surface_container_high);
+    let outer = shape(middle, Radius::Surface.corner(), Space::S8, c.surface_container_high);
     row(look, Space::S32)
         .center()
         .push(outer)
         .push(text(
-            format!("Radius::R24 → {r16:?} → {r12:?}"),
+            format!(
+                "Surface {} → nested 8 in: {} → nested 4 in: {}",
+                radius(Radius::Surface),
+                radius(r16),
+                radius(r12)
+            ),
             Type::Mono,
             c.on_surface_variant,
         ))
@@ -260,7 +271,7 @@ fn columns_demo<'a>(look: &Look) -> Element<'a, Message> {
             .width(Length::Fill)
             .style(move |_theme| container::Style {
                 background: Some(Background::Color(fill)),
-                border: Border::default().rounded(radius(Radius::R8)),
+                border: Border::default().rounded(radius(Radius::Small)),
                 ..container::Style::default()
             })
             .into()

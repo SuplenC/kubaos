@@ -33,7 +33,7 @@ use crate::tokens::Type;
 /// What a button is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
-    /// The accent pill: the one thing to do next on a screen.
+    /// The accent fill: the one thing to do next on a screen.
     Filled,
     /// The secondary container: an alternative to the filled one.
     Tonal,
@@ -148,8 +148,10 @@ fn colours(look: &Look, kind: Kind, enabled: bool) -> (Option<Color>, Color, Col
     }
 }
 
-/// The pill's style, with the state layer for the status iced reports or the one `preview` pins.
-fn pill(
+/// A button's style with `corner`, with the state layer for the status iced reports or the one
+/// `preview` pins.
+fn face(
+    corner: Radius,
     fill: Option<Color>,
     content: Color,
     shown: Color,
@@ -165,7 +167,7 @@ fn pill(
         widget::button::Style {
             background: state_layer(fill, content, status),
             text_color: shown,
-            border: Border::default().rounded(radius(Radius::Full)),
+            border: Border::default().rounded(radius(corner)),
             shadow: Shadow::default(),
             snap: true,
         }
@@ -308,8 +310,8 @@ impl<'a, M: Clone + 'a> Button<'a, M> {
                 ..Inset::x(padding).padding()
             })
             .on_press_maybe(self.on_press)
-            .style(pill(fill, content, shown, enabled, self.preview));
-        let view: Element<'a, M> = focus_ring(look, pressable, Radius::Full, self.focused, RingColor::Accent);
+            .style(face(Radius::Control, fill, content, shown, enabled, self.preview));
+        let view: Element<'a, M> = focus_ring(look, pressable, Radius::Control, self.focused, RingColor::Accent);
         probe::component("Button", variant, Fixed::HEIGHT, view)
     }
 }
@@ -394,7 +396,7 @@ impl<'a, M: Clone + 'a> IconButton<'a, M> {
             .height(side)
             .padding(0)
             .on_press_maybe(self.on_press)
-            .style(pill(fill, content, shown, enabled, self.preview));
+            .style(face(Radius::Full, fill, content, shown, enabled, self.preview));
         let ringed = focus_ring(look, pressable, Radius::Full, self.focused, RingColor::Accent);
         let view: Element<'a, M> = hint(look, ringed, self.label, self.focused);
         probe::component("IconButton", variant, Fixed::BOTH, view)

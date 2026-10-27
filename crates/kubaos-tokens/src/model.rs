@@ -80,7 +80,12 @@ pub struct Steps {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Radii {
-    pub values: Vec<u16>,
+    /// Marks inside controls.
+    pub small: u16,
+    /// Everything clicked or typed in.
+    pub control: u16,
+    /// Everything that holds content.
+    pub surface: u16,
     /// Whether there is a pill radius, half the shape's shorter side.
     pub full: bool,
 }

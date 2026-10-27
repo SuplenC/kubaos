@@ -33,6 +33,20 @@ fn every_spacing_step_is_a_variant_with_its_value() {
 }
 
 #[test]
+fn radii_are_roles_not_numbers() {
+    let module = module();
+
+    for role in [
+        "Radius::Small => Some(4),",
+        "Radius::Control => Some(12),",
+        "Radius::Surface => Some(24),",
+    ] {
+        assert!(module.contains(role), "{role}");
+    }
+    assert!(!module.contains("Radius::R"));
+}
+
+#[test]
 fn the_pill_radius_has_no_fixed_length() {
     assert!(module().contains("Radius::Full => None,"));
 }

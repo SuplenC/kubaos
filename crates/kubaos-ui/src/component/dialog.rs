@@ -100,7 +100,7 @@ pub fn dialog<'a, M: 'a>(
             border: Border {
                 color: edge,
                 width: hairline,
-                radius: radius(Radius::R24).into(),
+                radius: radius(Radius::Surface).into(),
             },
             shadow: Shadow {
                 color: color::alpha(shadow, ShadowToken::Dialog.opacity()),
