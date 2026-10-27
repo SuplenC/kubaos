@@ -39,6 +39,7 @@ use iced_runtime::UserInterface;
 use iced_runtime::user_interface;
 use kubaos_ui::Look;
 use kubaos_ui::Scale;
+use kubaos_ui::tokens::Type;
 
 use crate::pages::icons;
 use crate::specimen;
@@ -98,7 +99,7 @@ pub fn load_fonts() {
 pub fn render(specimen: &Specimen, width: f32) -> Result<Shot, Error> {
     let mut renderer = iced::futures::executor::block_on(<Renderer as Headless>::new(
         kubaos_ui::text::default_font(),
-        Pixels(14.0),
+        Pixels(f32::from(Type::Body.size())),
         Some("tiny-skia"),
     ))
     .ok_or(Error::Renderer)?;

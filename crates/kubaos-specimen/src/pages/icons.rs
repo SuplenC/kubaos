@@ -54,21 +54,25 @@ struct Set {
 const SETS: [Set; 4] = [
     Set {
         name: "Material Symbols Rounded",
+        // design-allow(font): the comparison sheet draws the icon fonts KubaOS Symbols was picked from.
         font: Font::with_name("Specimen Material Symbols"),
         note: "Kōbō's today: weight 400, 24 optical size, outlined.",
     },
     Set {
         name: "Phosphor",
+        // design-allow(font): the comparison sheet draws the icon fonts KubaOS Symbols was picked from.
         font: Font::with_name("Specimen Phosphor"),
         note: "Regular weight: a 1.5 px stroke at 24.",
     },
     Set {
         name: "Lucide",
+        // design-allow(font): the comparison sheet draws the icon fonts KubaOS Symbols was picked from.
         font: Font::with_name("Specimen Lucide"),
         note: "A 2 px stroke at 24, round caps.",
     },
     Set {
         name: "Tabler",
+        // design-allow(font): the comparison sheet draws the icon fonts KubaOS Symbols was picked from.
         font: Font::with_name("Specimen Tabler"),
         note: "The 2 px stroke at 24, round caps.",
     },
@@ -102,6 +106,7 @@ const SIZES: [IconSize; 3] = [IconSize::S16, IconSize::S20, IconSize::S24];
 /// The character `ch` of a comparison set's font, centred in a square box of `size`.
 fn glyph<'a>(ch: char, font: Font, size: IconSize, color: iced::Color) -> Element<'a, Message> {
     let px = f32::from(size.px());
+    // design-allow(component): a glyph of an icon font, which no type style draws.
     widget::text(ch.to_string())
         .font(font)
         .size(px)
