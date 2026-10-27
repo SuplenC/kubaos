@@ -175,11 +175,13 @@ pub enum Size {
     SwitchKnobOff,
     SwitchKnobOn,
     SwitchWidth,
+    ThumbnailHeight,
+    ThumbnailWidth,
 }
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 22] = [
+    pub const ALL: [Size; 24] = [
         Size::Bar,
         Size::Check,
         Size::Chip,
@@ -202,6 +204,8 @@ impl Size {
         Size::SwitchKnobOff,
         Size::SwitchKnobOn,
         Size::SwitchWidth,
+        Size::ThumbnailHeight,
+        Size::ThumbnailWidth,
     ];
 
     /// The dimension in logical pixels.
@@ -229,6 +233,8 @@ impl Size {
             Size::SwitchKnobOff => 12,
             Size::SwitchKnobOn => 16,
             Size::SwitchWidth => 44,
+            Size::ThumbnailHeight => 160,
+            Size::ThumbnailWidth => 256,
         }
     }
 }

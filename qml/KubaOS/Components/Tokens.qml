@@ -103,6 +103,8 @@ QtObject {
         readonly property int switch_knob_off: 12
         readonly property int switch_knob_on: 16
         readonly property int switch_width: 44
+        readonly property int thumbnail_height: 160
+        readonly property int thumbnail_width: 256
     }
 
     // Type families, by the role they play.

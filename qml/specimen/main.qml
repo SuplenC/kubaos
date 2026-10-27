@@ -151,7 +151,9 @@ Window {
                 Qt.quit();
                 return;
             }
-            page.grabToImage(result => {
+            // The window's whole content: hints float over the page on it, as iced's overlay
+            // does.
+            window.contentItem.grabToImage(result => {
                 result.saveToFile(window.shot);
                 Qt.quit();
             });

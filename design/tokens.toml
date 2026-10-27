@@ -113,6 +113,9 @@ panel = 384
 # The shell's bar along the top of every screen: a small control (32) with 4
 # above and below, so its pills and buttons centre on whole device pixels.
 bar = 40
+# A wallpaper's thumbnail in the shell's picker, 16:10 as the screens are.
+thumbnail_width = 256
+thumbnail_height = 160
 # A slider: its thumb's room, the thumb, and the mark of each stop on a slider
 # that snaps to stops. The track is a progress bar's.
 slider = 24

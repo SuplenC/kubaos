@@ -49,19 +49,23 @@ Item {
         return metrics.advanceWidth(words) / root.precision;
     }
 
-    // `lines` cut to `maximumLines`: the last one kept takes every word after it, ellipsised at
-    // `room` when drawn.
+    // `lines` cut to `maximumLines`: the last one kept takes every word after it, and each is
+    // ellipsised at `room` when drawn.
     function clamped(lines: var): var {
         const most = root.maximumLines;
-        if (most <= 0 || lines.length <= most)
+        if (most <= 0)
             return lines;
-        const rest = lines.slice(most - 1).map(line => line.text).join(" ");
-        return lines.slice(0, most - 1).concat([
-            {
-                text: rest,
-                width: Math.min(root.advance(rest), root.room)
-            }
-        ]);
+        const kept = lines.slice(0, most);
+        if (lines.length > most)
+            kept[most - 1] = {
+                text: lines.slice(most - 1).map(line => line.text).join(" "),
+                width: NaN
+            };
+        // A last line wider than the room, one long word included, is cut at it.
+        return kept.map(line => ({
+                    text: line.text,
+                    width: Math.min(isNaN(line.width) ? root.advance(line.text) : line.width, root.room)
+                }));
     }
 
     // `text` in lines no wider than `room`, broken at spaces: each line takes words while they
@@ -120,6 +124,11 @@ Item {
         font.kerning: root.shaped
         font.preferShaping: root.shaped
         font.hintingPreference: Font.PreferNoHinting
+        // Drawn by the font engine, not as distance fields, which a text that changes every
+        // second (the bar's readings) pays for on each change: over 30 s of the bar's sysmon and
+        // recording ticks, 0.47 CPU s this way against 0.57 with Qt's own rendering (0.44 for the
+        // shell's text before it moved here).
+        renderType: Text.NativeRendering
         lineHeightMode: Text.FixedHeight
         lineHeight: root.style.line
         verticalAlignment: Text.AlignVCenter

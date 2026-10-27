@@ -27,6 +27,9 @@ FocusScope {
     property string status: "Normal"
     // Whether the keyboard is on it; Qt's focus by default, or the app's where it owns focus.
     property bool focused: input.activeFocus
+    // Items that see each key before the text does: a list under a search, which takes the
+    // arrows, Ctrl+J/K/N/P and Enter.
+    property list<Item> forwardTo
 
     readonly property bool fillWidth: true
     readonly property bool locked: root.status === "Locked"
@@ -123,6 +126,8 @@ FocusScope {
         font.preferShaping: false
         font.hintingPreference: Font.PreferNoHinting
         onAccepted: root.accepted()
+        // The `forwardTo` items see a key first, then a `keyPressed` handler, then the text.
+        Keys.forwardTo: root.forwardTo
         Keys.onPressed: event => {
             event.accepted = false;
             root.keyPressed(event);
