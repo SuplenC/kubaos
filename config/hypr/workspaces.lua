@@ -40,7 +40,10 @@
 --
 -- HAZARD: no workspace is renumbered on unplug or replug. The bar keys its
 -- cells by id, so a renumbered workspace would leave and grow back in another
--- place; a group moves whole under its own numbers instead.
+-- place; a group moves whole under its own numbers instead. The one renumber,
+-- a workspace sent to another screen (`move_to_monitor`), happens before the
+-- move, so the move is the first event naming the new id; the bar's
+-- Quickshell keys a workspace by that and never changes it.
 --
 -- The three-finger swipe is Hyprland's own, which follows the fingers. It
 -- walks the workspaces that exist on the screen in id order and never makes
@@ -410,16 +413,6 @@ local function reclaim(monitor, id)
   settle(away, mapping())
 end
 
--- Renumber a workspace into a block. False when all ten slots are taken.
-local function adopt(workspace, block)
-  local id = blocks_lib.adopt_id(block, workspace.id, taken_ids())
-  if not id then
-    return false
-  end
-  renumber(workspace, id)
-  return true
-end
-
 local function target_monitor(name)
   if name then
     return hl.get_monitor(name)
@@ -591,17 +584,23 @@ function M.move_to_monitor(direction)
 
     local id = workspace.id
     local from = hl.get_active_monitor()
-    hl.dispatch(hl.dsp.workspace.move({ monitor = target.name }))
+    local monitors, by_connector = mapping()
+    local block = by_connector[target.name]
+    -- Renumbered before it moves, so the move names the new id: the bar's
+    -- Quickshell keys a workspace by the first id an event names for it, and
+    -- a move naming the old id would leave it there for good.
+    if block and block_of(id) ~= block then
+      local wanted = blocks_lib.adopt_id(block, id, taken_ids())
+      if wanted then
+        renumber(workspace, wanted)
+        id = wanted
+      end
+    end
+    hl.dispatch(hl.dsp.workspace.move({ workspace = tostring(id), monitor = target.name }))
 
     local moved = hl.get_workspace(id)
     if not moved or not moved.monitor or (from and moved.monitor.name == from.name) then
       return
-    end
-
-    local monitors, by_connector = mapping()
-    local block = by_connector[moved.monitor.name]
-    if block and block_of(id) ~= block then
-      adopt(moved, block)
     end
     if from then
       settle(from, monitors, by_connector)

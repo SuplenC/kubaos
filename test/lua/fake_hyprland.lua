@@ -9,7 +9,8 @@
 -- A screen arrives as Hyprland brings one: `monitor.added` fires while it
 -- still sits at 0,0, the layout is arranged afterwards and
 -- `monitor.layout_changed` fires, and timers run only when the test lets
--- them (`settle()`).
+-- them (`settle()`). `events` lists the socket events a move or a renumber
+-- would send the bar, in order.
 
 local F = {}
 F.__index = F
@@ -28,6 +29,7 @@ function F.new()
     next_window = 1,
     renumbered = 0,
     moves = 0,
+    events = {},
   }, F)
   world.hl = world:api()
   return world
@@ -300,6 +302,7 @@ function F:apply(action)
     if from ~= target then
       self.moves = self.moves + 1
     end
+    self.events[#self.events + 1] = "moveworkspacev2>>" .. record.id .. "," .. record.id .. "," .. target.name
     record.monitor = target
     target.active = record
     if from.active == record then
@@ -309,6 +312,7 @@ function F:apply(action)
   elseif kind == "workspace.change_id" then
     local record = self:workspace_record(tonumber(args.workspace))
     assert(record and not self:workspace_record(args.id), "change_id onto a taken id")
+    self.events[#self.events + 1] = "changeworkspaceid>>" .. record.id .. "," .. args.id
     record.id = args.id
     self.renumbered = self.renumbered + 1
   elseif kind == "window.move" then

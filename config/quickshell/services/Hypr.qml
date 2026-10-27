@@ -87,10 +87,12 @@ Singleton {
     // `dot.workspaces.move_to_monitor` causes), as a set. Quickshell (v0.3.2)
     // keys a workspace by the id it first saw and never changes it, so the
     // object under the old id stays in `Hyprland.workspaces`, with its old
-    // monitor, until a config reload reads the list afresh; the new id gets an
-    // object with the next event naming it. The bar leaves these out. An old
-    // id comes back when Hyprland creates a workspace under it again, since
-    // Quickshell then reuses the object.
+    // monitor and its windows, until a config reload reads the list afresh;
+    // the new id gets an object with the move that follows the renumber,
+    // which names it. The bar leaves these out. An old id comes back when
+    // Hyprland creates a workspace under it again, since Quickshell then
+    // reuses the object; its monitor is read again then, as the object still
+    // carries the old one.
     property var staleIds: ({})
 
     function isStale(id: int): bool {
@@ -105,12 +107,16 @@ Singleton {
                 const next = Object.assign({}, root.staleIds);
                 next[parseInt(event.parse(2)[0], 10)] = true;
                 root.staleIds = next;
+                // The windows stay on the old id's object until read again;
+                // the reply comes after the move that creates the new id's.
+                Hyprland.refreshToplevels();
             } else if (event.name === "createworkspacev2") {
                 const id = parseInt(event.parse(2)[0], 10);
                 if (root.staleIds[id] === true) {
                     const next = Object.assign({}, root.staleIds);
                     delete next[id];
                     root.staleIds = next;
+                    Hyprland.refreshWorkspaces();
                 }
             } else if (event.name === "configreloaded" && Object.keys(root.staleIds).length > 0) {
                 root.staleIds = {};

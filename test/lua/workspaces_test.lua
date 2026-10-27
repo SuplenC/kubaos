@@ -1065,6 +1065,34 @@ test("going to a desk position whose group has no workspace opens its first", fu
   same({ world.focused.name, world:shown_on("eDP-1") }, { "eDP-1", 21 }, "shown on the primary screen")
 end)
 
+-- Regression: the move named the old id and the renumber came after, so the
+-- bar, which keys a workspace by the first id it hears, never saw the new one.
+test("moving a workspace to another screen renumbers it into that block before it moves", function()
+  local world, module = two_screens()
+  run(module.focus(2))
+  local window = world:open_window()
+  world.events = {}
+
+  run(module.move_to_monitor("r"))
+
+  same(world.events, { "changeworkspaceid>>2,12", "moveworkspacev2>>12,12,DP-1" }, "the move names the new id")
+  same({ window.workspace.id, world:shown_on("DP-1"), world.focused.name }, { 12, 12, "DP-1" }, "joined and shown")
+  same(world:ids_on("eDP-1"), { 1 }, "the laptop keeps its first")
+  same(world:kept(), { "1@eDP-1", "11@DP-1", "13@DP-1" }, "kept")
+end)
+
+test("moving a workspace to a screen whose block is full keeps its number", function()
+  local world, module = two_screens()
+  fill(world, module, "DP-1", 10)
+  world:focus_monitor("eDP-1")
+  run(module.focus(2))
+  local window = world:open_window()
+
+  run(module.move_to_monitor("r"))
+
+  same({ window.workspace.id, window.workspace.monitor.name, world.renumbered }, { 2, "DP-1", 0 }, "a guest")
+end)
+
 -- Regression: an empty workspace 1, once left, was out of reach of every
 -- "previous workspace" but SUPER + 1.
 test("previous reaches an empty workspace 1 again", function()
