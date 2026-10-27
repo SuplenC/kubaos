@@ -5,12 +5,11 @@
 //! - **Space, size, radius, font:** a number other than 0 in the arguments of iced's layout calls
 //!   (`.padding(`, `.spacing(`, `.width(`, `Length::Fixed(`, `Pixels(`, `.rounded(`, `.size(`…) or
 //!   bound to a field that holds one (`width: 1.0`, `radius: 8.0.into()`). Halving (`/ 2.0`) is a
-//!   derivation, not a literal. A window's size (`size:`, `min_size`, `with_size(`) is the
-//!   compositor's to change, and a canvas program draws in its own coordinates; neither is layout.
-//! - **Duration:** a number in `Duration::from_millis(` and its siblings, when it is motion: on a
-//!   line about an animation (`DURATION`, `fade`, `.duration(`) or in a `mod motion`, and no longer
-//!   than the longest duration token. A timeout, a poll, a caret's blink or a double-press window
-//!   is behaviour, not motion.
+//!   derivation, not a literal. A size given to iced's window API (`window::Settings`, `min_size`,
+//!   `max_size`, `with_size(`) is the compositor's to change, not layout.
+//! - **Duration:** a number in `Duration::from_millis(` and its siblings, up to the longest
+//!   duration token; a longer one can't be motion. A shorter timeout, poll or blink carries a
+//!   `design-allow(duration)` marker saying so.
 //! - **Font:** a family named in `Font::with_name(` or `Family::Name(`.
 //! - **Component:** iced's own controls and layout (`widget::button`, `text_input`, `row!`), which
 //!   `kubaos-ui` wraps on the grid. Containers, scrolling, canvas and images have no library
@@ -55,33 +54,8 @@ const CALLS: &[(&str, Rule)] = &[
     ("Duration::new(", Rule::Duration),
 ];
 
-/// Calls that place a point or size, which a canvas program draws in its own coordinates.
-const GEOMETRY_CALLS: &[&str] = &["Size::new(", "Vector::new(", "Point::new("];
-
-/// Words on a line that make a duration on it motion.
-const MOTION_WORDS: &[&str] = &[
-    "duration",
-    "motion",
-    "anim",
-    "fade",
-    "slide",
-    "glide",
-    "transition",
-    "eas",
-    "reveal",
-];
-
-/// Words on a line that make a size on it a window's.
-const WINDOW_WORDS: &[&str] = &["min_size", "max_size", "with_size(", "window", "for size in"];
-
-/// What the block a line sits in is, for the rules that depend on it.
-#[derive(Debug, Clone, Copy, Default)]
-struct Context {
-    /// In a `mod` named for motion.
-    motion: bool,
-    /// In an `impl` of a canvas `Program`.
-    canvas: bool,
-}
+/// iced's window API: a size given to it is the window's, not layout.
+const WINDOW_API: &[&str] = &["window::Settings", "min_size", "max_size", "with_size("];
 
 /// Struct fields whose number is a design value.
 const FIELDS: &[(&str, Rule)] = &[
@@ -152,74 +126,22 @@ const MACROS: &[&str] = &["column!", "row!", "text!", "rich_text!"];
 pub fn hits(lines: &[Line], longest_ms: u32) -> Vec<Vec<Hit>> {
     let mut out = Vec::with_capacity(lines.len());
     let mut in_tests = false;
-    let mut depth: i64 = 0;
-    // The blocks the line is in that change the rules, with the depth each opened at.
-    let mut scopes: Vec<(Context, i64)> = Vec::new();
     for (index, line) in lines.iter().enumerate() {
         let opens_tests = line.bare.trim() == "#[cfg(test)]"
             && lines
                 .get(index + 1)
                 .is_some_and(|next| next.bare.trim_start().starts_with("mod ") && next.bare.trim_end().ends_with('{'));
         in_tests |= opens_tests;
-        if let Some(opened) = opens_scope(&line.bare) {
-            scopes.push((opened, depth));
-        }
-        let context = scopes.iter().fold(Context::default(), |all, (c, _)| Context {
-            motion: all.motion || c.motion,
-            canvas: all.canvas || c.canvas,
-        });
         out.push(if in_tests {
             Vec::new()
         } else {
-            line_hits(line, longest_ms, context)
+            line_hits(line, longest_ms)
         });
-        depth += line.bare.matches('{').count() as i64 - line.bare.matches('}').count() as i64;
-        while scopes.last().is_some_and(|&(_, opened_at)| depth <= opened_at) {
-            scopes.pop();
-        }
     }
     out
 }
 
-/// The context a line's block gives the lines in it: `mod motion {`, `impl canvas::Program<M> for X {`.
-fn opens_scope(bare: &str) -> Option<Context> {
-    let trimmed = bare.trim();
-    if !trimmed.ends_with('{') {
-        return None;
-    }
-    let words: Vec<&str> = trimmed.split_whitespace().collect();
-    let module = words
-        .iter()
-        .position(|w| *w == "mod")
-        .and_then(|at| words.get(at + 1))
-        .map(|name| name.to_ascii_lowercase());
-    if module.is_some_and(|name| MOTION_WORDS.iter().any(|w| name.contains(w))) {
-        return Some(Context {
-            motion: true,
-            canvas: false,
-        });
-    }
-    let canvas = trimmed.starts_with("impl") && trimmed.contains("Program<") && trimmed.contains(" for ");
-    canvas.then_some(Context {
-        motion: false,
-        canvas: true,
-    })
-}
-
-/// Whether `bare` sets a field named `size` (`size: Size::new(…)`), as window settings do; the
-/// `Size::` path itself isn't one.
-fn has_size_field(bare: &str) -> bool {
-    bare.match_indices("size:")
-        .any(|(at, _)| word_starts(bare, at) && !bare[at + "size:".len()..].starts_with(':'))
-}
-
-/// Whether `bare` speaks of an animation, the `Duration` type's own name aside.
-fn is_about_motion(bare: &str) -> bool {
-    let lower = bare.replace("Duration", "").to_ascii_lowercase();
-    MOTION_WORDS.iter().any(|w| lower.contains(w))
-}
-
-fn line_hits(line: &Line, longest_ms: u32, context: Context) -> Vec<Hit> {
+fn line_hits(line: &Line, longest_ms: u32) -> Vec<Hit> {
     let bare = line.bare.as_str();
     let mut hits = Vec::new();
     let column_of = |byte: usize| bare[..byte].chars().count();
@@ -279,15 +201,10 @@ fn line_hits(line: &Line, longest_ms: u32, context: Context) -> Vec<Hit> {
             }
             let open = byte + call.len();
             let end = source::close(bare, open);
-            let motion = context.motion || is_about_motion(bare);
-            if *rule == Rule::Duration && !(motion && is_motion(&bare[open..end], call, longest_ms)) {
+            if *rule == Rule::Duration && !is_motion(&bare[open..end], call, longest_ms) {
                 continue;
             }
-            let geometry = GEOMETRY_CALLS.contains(call);
-            let lower = bare.to_ascii_lowercase();
-            let window =
-                *call == "Size::new(" && (WINDOW_WORDS.iter().any(|w| lower.contains(w)) || has_size_field(bare));
-            if geometry && (context.canvas || window) {
+            if *call == "Size::new(" && WINDOW_API.iter().any(|api| bare.contains(api)) {
                 continue;
             }
             literal_hits(

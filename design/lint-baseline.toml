@@ -29,7 +29,7 @@ radius = 1
 
 ["config/quickshell/components/ListRow.qml"]
 space = 1
-size = 8
+size = 7
 duration = 1
 font = 1
 
@@ -101,7 +101,7 @@ font = 1
 
 ["config/quickshell/modules/clock/MonthGrid.qml"]
 space = 1
-size = 17
+size = 14
 radius = 1
 font = 4
 
@@ -144,7 +144,7 @@ size = 2
 size = 2
 
 ["config/quickshell/modules/lock/LockSurface.qml"]
-size = 8
+size = 7
 duration = 3
 font = 5
 
@@ -232,7 +232,7 @@ font = 2
 
 ["config/quickshell/modules/wallpaper/WallpaperPicker.qml"]
 space = 1
-size = 14
+size = 13
 radius = 3
 font = 2
 
@@ -240,6 +240,9 @@ font = 2
 size = 2
 radius = 1
 font = 2
+
+["crates/kubaos-kobo/src/app.rs"]
+duration = 2
 
 ["crates/kubaos-kobo/src/field.rs"]
 size = 1
@@ -254,10 +257,14 @@ component = 6
 ["crates/kubaos-kobo/src/reveal.rs"]
 duration = 1
 
+["crates/kubaos-kobo/src/setup/mod.rs"]
+duration = 1
+
 ["crates/kubaos-kobo/src/setup/view.rs"]
 space = 45
-size = 17
+size = 16
 radius = 1
+duration = 1
 font = 9
 component = 43
 
@@ -269,14 +276,14 @@ font = 4
 ["crates/kubaos-kobo/src/view.rs"]
 colour = 5
 space = 64
-size = 65
+size = 63
 radius = 3
 font = 14
 component = 106
 
 ["crates/kubaos-kobo/src/widgets.rs"]
 space = 24
-size = 17
+size = 21
 radius = 4
 font = 3
 component = 19

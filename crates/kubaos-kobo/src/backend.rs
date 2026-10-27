@@ -377,6 +377,7 @@ impl Backend for Demo {
                 }));
                 break;
             }
+            // design-allow(duration): how long one poll of the engine's channel waits; not motion.
             match rx.recv_timeout(Duration::from_millis(20)) {
                 Ok(ev) => {
                     if let Event::StepStarted { id } = ev {

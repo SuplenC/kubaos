@@ -138,6 +138,7 @@ pub struct Demo {
 impl SetupBackend for Demo {
     fn status(&self) -> Status {
         // Detection takes a moment on the real thing too.
+        // design-allow(duration): the demo's stand-in for a real detection's wait; not motion.
         std::thread::sleep(std::time::Duration::from_millis(300).div_f32(self.demo.speed));
         self.demo.status()
     }

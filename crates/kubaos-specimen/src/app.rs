@@ -29,6 +29,7 @@ use crate::specimen::Page;
 use crate::specimen::Specimen;
 
 /// The window's size when it opens: wide enough for the pages' four columns.
+// design-allow(size): the window's opening size; tiling sets the real one.
 const WINDOW: Size = Size::new(1280.0, 900.0);
 
 struct App {

@@ -177,8 +177,11 @@ fn used_as_design_values(lines: &[Line]) -> Vec<(usize, Hit)> {
         let numeric = ["int ", "real ", "double "].iter().any(|t| declaration.contains(t));
         let value = &line.bare[source::byte_index(&line.bare, value_at)..];
         let literal = value.trim();
-        let number = source::numbers(literal).first().copied();
-        let only_a_number = number.is_some_and(|n| n.column == 0 && n.end == literal.chars().count() && n.value != 0.0);
+        // A negative literal (`-4`) is a number too; its sign comes before the digits.
+        let unsigned = literal.strip_prefix('-').map_or(literal, str::trim_start);
+        let number = source::numbers(unsigned).first().copied();
+        let only_a_number =
+            number.is_some_and(|n| n.column == 0 && n.end == unsigned.chars().count() && n.value != 0.0);
         if numeric && only_a_number {
             let column = value_at + value.chars().take_while(|c| c.is_whitespace()).count();
             declared.push((index, name.to_owned(), column, literal.to_owned()));

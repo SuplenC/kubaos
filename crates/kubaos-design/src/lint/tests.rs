@@ -277,39 +277,6 @@ fn rust_a_duration_built_from_seconds_and_nanoseconds_is_found() {
 }
 
 #[test]
-fn rust_polls_timeouts_blinks_and_press_windows_are_not_motion() {
-    let text = "fn f() {\n    match rx.recv_timeout(Duration::from_millis(20)) {}\n    \
-                let double = t - f < Duration::from_millis(900);\n    \
-                pub const BLINK: Duration = Duration::from_millis(530);\n    \
-                let dt = (now - last).min(Duration::from_millis(100));\n}\n";
-
-    assert_eq!(rust(text), []);
-}
-
-#[test]
-fn rust_durations_in_a_motion_module_or_about_an_animation_are_motion() {
-    let text = "pub mod motion {\n    pub const SWITCH: Duration = Duration::from_millis(180);\n}\n\
-                pub const DURATION: Duration = Duration::from_millis(220);\nconst GRACE: Duration = Duration::from_millis(300);\n";
-
-    let lines: Vec<usize> = rust(text).into_iter().map(|(line, _, _)| line).collect();
-
-    assert_eq!(lines, [2, 4]);
-}
-
-#[test]
-fn rust_window_sizes_and_canvas_coordinates_are_not_layout() {
-    let text = "fn s() {\n    let a = Args { size: Size::new(1280.0, 800.0) };\n    \
-                let w = window::Settings { min_size: Some(Size::new(900.0, 600.0)), ..x };\n}\n\
-                impl<M> canvas::Program<M> for Knob {\n    fn draw(&self) {\n        \
-                let p = Path::rounded_rectangle(Point::new(0.75, 0.75), Size::new(w - 1.5, h - 1.5), r);\n    }\n}\n\
-                const BODY: Size = Size::new(22.0, 12.0);\n";
-
-    let lines: Vec<usize> = rust(text).into_iter().map(|(line, _, _)| line).collect();
-
-    assert_eq!(lines, [10, 10]);
-}
-
-#[test]
 fn rust_a_widget_built_through_its_module_path_or_imported_in_a_block_is_found() {
     let text = "fn v() {\n    let r = iced::widget::row::Row::new();\n    { use iced::widget::checkbox; }\n    \
                 use iced::{Element, widget::{toggler, container}};\n    use iced::widget::text::LineHeight;\n}\n";
@@ -337,4 +304,68 @@ fn the_shells_hand_written_token_file_is_not_linted() {
     let files = super::files(dir.path()).unwrap();
 
     assert_eq!(files, []);
+}
+
+#[test]
+fn rust_every_duration_an_animation_could_take_is_found_whatever_its_name() {
+    let text = "fn f() {\n    const SWITCH_KNOB: Duration = Duration::from_millis(180);\n    \
+                const HOVER: Duration = Duration::from_millis(100);\n    \
+                let t = Duration::from_millis(250);\n    self.progress.animate(t);\n    \
+                const NUDGE: Duration = Duration::from_millis(1200);\n    \
+                const LEASE: Duration = Duration::from_millis(5000);\n}\n";
+
+    let lines: Vec<usize> = rust(text).into_iter().map(|(line, _, _)| line).collect();
+
+    assert_eq!(lines, [2, 3, 4, 6]);
+}
+
+#[test]
+fn rust_a_poll_or_a_blink_passes_only_with_its_marker() {
+    let text = "fn f() {\n    // design-allow(duration): a poll of the backend's channel, not motion.\n    \
+                match rx.recv_timeout(Duration::from_millis(20)) {}\n    \
+                pub const BLINK: Duration = Duration::from_millis(530);\n}\n";
+
+    let lines: Vec<usize> = rust(text).into_iter().map(|(line, _, _)| line).collect();
+
+    assert_eq!(lines, [4]);
+}
+
+#[test]
+fn rust_only_sizes_given_to_the_window_api_are_the_windows() {
+    let text = "fn s() {\n    let w = window::Settings { size: Size::new(1280.0, 800.0), ..x };\n    \
+                let m = Some(Size::new(900.0, 600.0)).map(|s| min_size(s));\n    \
+                let i = Icon { size: Size::new(20.0, 20.0) };\n    \
+                let window_icon = Size::new(22.0, 22.0);\n}\n";
+
+    let lines: Vec<usize> = rust(text).into_iter().map(|(line, _, _)| line).collect();
+
+    assert_eq!(lines, [4, 4, 5, 5]);
+}
+
+#[test]
+fn rust_a_canvas_programs_coordinates_count_like_any_other() {
+    let text = "impl<M> canvas::Program<M> for Knob {\n    fn draw(&self) {\n        \
+                let p = Path::rounded_rectangle(Point::new(0.75, 0.75), Size::new(w - 1.5, h - 1.5), r);\n    }\n}\n";
+
+    let lines: Vec<usize> = rust(text).into_iter().map(|(line, _, _)| line).collect();
+
+    assert_eq!(lines, [3, 3, 3, 3]);
+}
+
+#[test]
+fn qml_a_negative_number_property_used_as_a_position_is_found() {
+    let text = "Item {\n    property int shift: -4\n    x: shift\n}\n";
+
+    let found: Vec<(usize, Rule)> = qml(text).into_iter().map(|(line, rule, _)| (line, rule)).collect();
+
+    assert_eq!(found, [(2, Rule::Size)]);
+}
+
+#[test]
+fn a_whole_count_of_a_named_length_is_not_a_literal_and_a_count_of_a_number_is() {
+    let text = "Item {\n    implicitWidth: cell * 7\n    implicitHeight: 3 * row.height\n    width: 24 * 7\n}\n";
+
+    let found: Vec<(usize, String)> = qml(text).into_iter().map(|(line, _, what)| (line, what)).collect();
+
+    assert_eq!(found, [(4, "width: 24".to_owned()), (4, "width: 7".to_owned())]);
 }

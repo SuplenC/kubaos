@@ -248,8 +248,9 @@ pub fn numbers(code: &str) -> Vec<Number> {
     found
 }
 
-/// Whether `number` only halves or doubles something: `/ 2` (centring, a pill's radius), `* 2` and
-/// `2 *` (a padding on both sides), `* 0.5`. Those derive from a token, they don't add a length.
+/// Whether `number` only derives a value from a token rather than adding one: `/ 2` (centring, a
+/// pill's radius), `* 2` and `2 *` (a padding on both sides), `* 0.5`, and a whole count times a
+/// name (`cell * 7`, seven columns of a cell). A count times a number is still a literal length.
 #[expect(
     clippy::float_cmp,
     reason = "a literal as written is compared with the literals 2 and 0.5"
@@ -258,8 +259,27 @@ pub fn is_halving(code: &str, number: Number) -> bool {
     let before = code[..byte_index(code, number.column)].trim_end();
     let after = code[byte_index(code, number.end)..].trim_start();
     let operand_of = |op: char| before.ends_with(op);
-    (number.value == 2.0 && (operand_of('/') || operand_of('*') || after.starts_with('*')))
-        || (number.value == 0.5 && operand_of('*'))
+    let halving = (number.value == 2.0 && (operand_of('/') || operand_of('*') || after.starts_with('*')))
+        || (number.value == 0.5 && operand_of('*'));
+    halving || is_count(before, after, number)
+}
+
+/// Whether `number`, a whole number, multiplies a name: `cell * 7`, `3 * row.height`.
+fn is_count(before: &str, after: &str, number: Number) -> bool {
+    if number.value.fract() != 0.0 {
+        return false;
+    }
+    let names_a_value = |token: &str| {
+        token
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_alphabetic() || c == '_' || c == ')' || c == '(')
+    };
+    let left = before
+        .strip_suffix('*')
+        .map(|rest| rest.trim_end().chars().rev().collect::<String>());
+    let right = after.strip_prefix('*').map(str::trim_start);
+    left.is_some_and(|l| names_a_value(&l)) || right.is_some_and(names_a_value)
 }
 
 /// The byte index of character `column` in `text`.

@@ -32,6 +32,7 @@ pub enum Pointer {
 }
 
 /// The caret blinks with this half-period, and stays solid while typing.
+// design-allow(duration): the caret's blink is behaviour, not motion.
 pub const BLINK: Duration = Duration::from_millis(530);
 const PAD_X: f32 = 14.0;
 const PAD_Y: f32 = 11.0;
