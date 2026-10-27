@@ -18,7 +18,7 @@ fn the_repo_holds_to_its_lint_baseline() {
 
     assert!(
         problems.is_empty() && markers.is_empty(),
-        "the design lint (`just design-lint`) fails:\n{}\n{}",
+        "the design lint (`just design-check`) fails:\n{}\n{}",
         problems.join("\n"),
         markers.join("\n")
     );

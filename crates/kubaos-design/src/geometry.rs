@@ -18,7 +18,6 @@ use std::path::Path;
 use kubaos_geometry::Finding;
 use kubaos_geometry::Frame;
 use kubaos_geometry::Rules;
-use serde::Deserialize;
 
 use crate::Error;
 
@@ -35,13 +34,6 @@ pub fn rules(root: &Path) -> Result<Rules, Error> {
     })
 }
 
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum OneOrMany {
-    One(Box<Frame>),
-    Many(Vec<Frame>),
-}
-
 /// The frames in each of `paths`, checked together, so a component is held identical across them.
 ///
 /// # Errors
@@ -51,13 +43,17 @@ pub fn check_files(paths: &[&Path], rules: &Rules) -> Result<Vec<Finding>, Error
     let mut frames = Vec::new();
     for path in paths {
         let text = fs::read_to_string(path).map_err(|source| Error::read(path, source))?;
-        let read: OneOrMany = serde_json::from_str(&text).map_err(|source| Error::Frames {
+        let frames_error = |source| Error::Frames {
             path: path.to_path_buf(),
             source,
-        })?;
-        match read {
-            OneOrMany::One(frame) => frames.push(*frame),
-            OneOrMany::Many(many) => frames.extend(many),
+        };
+        // A file holds one frame or an array of them. serde's untagged enums can't read a frame,
+        // whose role is a flattened tagged enum, so the shape is told apart by hand.
+        let value: serde_json::Value = serde_json::from_str(&text).map_err(frames_error)?;
+        if value.is_array() {
+            frames.extend(serde_json::from_value::<Vec<Frame>>(value).map_err(frames_error)?);
+        } else {
+            frames.push(serde_json::from_value::<Frame>(value).map_err(frames_error)?);
         }
     }
     Ok(kubaos_geometry::check(&frames, rules))

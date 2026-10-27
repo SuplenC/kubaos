@@ -108,7 +108,7 @@ impl fmt::Display for Violation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}:{}:{}: {}: {}",
+            "{}:{}:{}: {}: `{}`",
             self.path, self.line, self.column, self.rule, self.what
         )
     }

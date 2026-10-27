@@ -435,8 +435,10 @@ fn identical(instances: &[Instance], findings: &mut Vec<Finding>) {
                 .unwrap_or(&first);
             if !same_parts(&instance.parts, &reference.parts) {
                 differences.push(format!(
-                    "places its icons and label at {:?}, where {} has {:?}",
-                    instance.parts, reference.path, reference.parts
+                    "places its parts at {}, where {} has {}",
+                    describe(&instance.parts),
+                    reference.path,
+                    describe(&reference.parts)
                 ));
             }
             if !differences.is_empty() {
@@ -454,6 +456,28 @@ fn identical(instances: &[Instance], findings: &mut Vec<Finding>) {
                 });
             }
         }
+    }
+}
+
+/// Parts as a finding shows them, in device pixels: `icon 25×25 at (13, 13), text 30 tall at y 10`.
+fn describe(parts: &[Part]) -> String {
+    let at = |x: Option<i64>, y: Option<i64>| match (x, y) {
+        (Some(x), Some(y)) => format!(" at ({x}, {y})"),
+        (Some(x), None) => format!(" at x {x}"),
+        (None, Some(y)) => format!(" at y {y}"),
+        (None, None) => String::new(),
+    };
+    let shown: Vec<String> = parts
+        .iter()
+        .map(|p| match p.width {
+            Some(width) => format!("{} {width}×{}{}", p.what, p.height, at(p.x, p.y)),
+            None => format!("{} {} tall{}", p.what, p.height, at(p.x, p.y)),
+        })
+        .collect();
+    if shown.is_empty() {
+        "none".to_owned()
+    } else {
+        format!("{} (device px)", shown.join(", "))
     }
 }
 
