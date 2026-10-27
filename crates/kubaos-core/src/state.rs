@@ -65,6 +65,7 @@ pub struct Paths {
     config: PathBuf,
     flake: PathBuf,
     state: PathBuf,
+    data: PathBuf,
     projects: PathBuf,
 }
 
@@ -74,15 +75,18 @@ pub struct Paths {
 pub struct NoHomeError(());
 
 impl Paths {
-    /// The paths for the current user, from `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME` and
-    /// [`PROJECTS_VAR`].
+    /// The paths for the current user, from `HOME`, `XDG_CONFIG_HOME`, `XDG_STATE_HOME`,
+    /// `XDG_DATA_HOME` and [`PROJECTS_VAR`].
     ///
     /// # Errors
     ///
     /// [`NoHomeError`] when `HOME` is not set.
     pub fn from_env() -> Result<Self, NoHomeError> {
         let var = |name| std::env::var_os(name).filter(|v| !v.is_empty());
-        let paths = Self::from_vars(var("HOME"), var("XDG_CONFIG_HOME"), var("XDG_STATE_HOME"))?;
+        let mut paths = Self::from_vars(var("HOME"), var("XDG_CONFIG_HOME"), var("XDG_STATE_HOME"))?;
+        if let Some(data) = var("XDG_DATA_HOME") {
+            paths = paths.with_data_home(data);
+        }
         Ok(match var(PROJECTS_VAR) {
             Some(projects) => paths.with_projects_root(projects),
             None => paths,
@@ -90,7 +94,7 @@ impl Paths {
     }
 
     /// The paths for the given `HOME`, `XDG_CONFIG_HOME` and `XDG_STATE_HOME`, each XDG one
-    /// falling back to its default under the home.
+    /// falling back to its default under the home, and `XDG_DATA_HOME` at its default.
     ///
     /// # Errors
     ///
@@ -106,6 +110,7 @@ impl Paths {
         Ok(Self {
             flake: config.join("kubaos/home"),
             state: state.join("kubaos"),
+            data: home.join(".local/share"),
             projects: home.join(PROJECTS_ROOT),
             config,
             home,
@@ -116,6 +121,13 @@ impl Paths {
     #[must_use]
     pub fn with_projects_root(mut self, root: impl Into<PathBuf>) -> Self {
         self.projects = self.home.join(root.into());
+        self
+    }
+
+    /// The same paths with `XDG_DATA_HOME` at `data`.
+    #[must_use]
+    pub fn with_data_home(mut self, data: impl Into<PathBuf>) -> Self {
+        self.data = data.into();
         self
     }
 
@@ -139,6 +151,12 @@ impl Paths {
     /// the user flake, so a backup never becomes part of the flake's source.
     pub fn backups(&self) -> PathBuf {
         self.state.join("backups")
+    }
+
+    /// The toolchain of every Suite version a Project pin can name, one file per version at
+    /// `<suite>/<version>`, `~/.local/share/kubaos/toolchains`. `home/pins.nix` writes them.
+    pub fn toolchains(&self) -> PathBuf {
+        self.data.join("kubaos/toolchains")
     }
 
     /// The user flake, `~/.config/kubaos/home`.

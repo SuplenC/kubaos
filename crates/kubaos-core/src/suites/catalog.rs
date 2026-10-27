@@ -29,13 +29,14 @@ use super::Toolchain;
 pub const SHIPPED: &[Suite] = &[];
 
 /// A Suite with one of everything, for the test harness and the unit tests. Its Nix module is
-/// `home/suites/test.nix`.
+/// `home/suites/test.nix`. Version 3 is never installed by a check, so a Project pin of it shows
+/// a toolchain fetched on first use.
 #[cfg(any(test, feature = "test-suite"))]
 pub const TEST: Suite = Suite {
     name: "test",
     title: "Test",
     description: "KubaOS's own test Suite: a script, an environment variable, a PATH entry and a Neovim setting.",
-    versions: &["1", "2"],
+    versions: &["1", "2", "3"],
     extras: &[Extra {
         name: "greeting",
         description: "Adds kubaos-test-suite-greet.",

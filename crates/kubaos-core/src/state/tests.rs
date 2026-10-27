@@ -149,6 +149,19 @@ fn the_projects_root_moves_to_an_absolute_path_or_one_under_the_home() {
 }
 
 #[test]
+fn the_suite_toolchains_live_in_the_data_home() {
+    let home = || Paths::from_vars(Some("/home/kuba".into()), None, None).unwrap();
+
+    let moved = home().with_data_home("/data");
+
+    assert_eq!(
+        home().toolchains(),
+        Path::new("/home/kuba/.local/share/kubaos/toolchains")
+    );
+    assert_eq!(moved.toolchains(), Path::new("/data/kubaos/toolchains"));
+}
+
+#[test]
 fn paths_need_a_home() {
     assert!(Paths::from_vars(None, None, None).is_err());
 }

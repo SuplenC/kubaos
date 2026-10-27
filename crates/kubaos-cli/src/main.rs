@@ -19,6 +19,7 @@
 //! - The power stops (`power`): `power.rs`, which runs `kubaos-power`.
 //! - KubaOS's apt packages (`packages`): `apt.rs`.
 //! - Suites (`suite`): `suite.rs`.
+//! - Project pins (`pin`, `unpin`, `pins`): `pin.rs`.
 //! - Switch jobs (`switch`, `job`): `job.rs`.
 //! - Updates (`update`, `upgrade`, `rollback`, `channel`): `update.rs`.
 //! - The work itself: the `kubaos-core` crate.
@@ -39,6 +40,7 @@ mod install;
 mod job;
 mod keyboard;
 mod package;
+mod pin;
 mod power;
 mod setup;
 mod suite;
@@ -84,6 +86,12 @@ enum Cmd {
         #[command(subcommand)]
         cmd: suite::SuiteCmd,
     },
+    /// Pin a Suite version for a folder and everything below it, in its .envrc.
+    Pin(pin::PinArgs),
+    /// Remove a folder's pin of a Suite.
+    Unpin(pin::UnpinArgs),
+    /// The Project pins in effect in a folder, or every one under the Projects root.
+    Pins(pin::PinsArgs),
     /// Open a shell with a package from your nixpkgs, installing nothing.
     Try { name: String },
     /// Switch your home to the user flake, as a queued job.
@@ -145,6 +153,9 @@ fn main() -> ExitCode {
         Cmd::Package { cmd } => package::main(cmd),
         Cmd::Packages { cmd } => apt::main(cmd),
         Cmd::Suite { cmd } => suite::main(cmd),
+        Cmd::Pin(args) => pin::pin(&args),
+        Cmd::Unpin(args) => pin::unpin(&args),
+        Cmd::Pins(args) => pin::list(&args),
         Cmd::Try { name } => package::try_main(&name),
         Cmd::Switch { mode } => match kubaos_core::state::Paths::from_env() {
             Ok(paths) => job::switch(&paths, mode),
