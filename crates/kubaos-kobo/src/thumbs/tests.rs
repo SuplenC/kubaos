@@ -83,3 +83,12 @@ fn a_wallpaper_with_no_picture_anywhere_is_left_out() {
     let keys: Vec<&str> = got.iter().map(|(k, _)| k.as_str()).collect();
     assert_eq!(keys, ["shinjuku/b.jpg"]);
 }
+
+#[test]
+fn a_thumbnail_is_cut_about_its_middle_to_the_cards_shape() {
+    let wide = RgbaImage::new(480, 200);
+    let tall = RgbaImage::new(320, 480);
+
+    assert_eq!(super::cropped(&wide).dimensions(), (320, 200));
+    assert_eq!(super::cropped(&tall).dimensions(), (320, 200));
+}

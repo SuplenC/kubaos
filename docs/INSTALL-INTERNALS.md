@@ -220,7 +220,7 @@ grub-btrfs titles the snapshot entries by date and description (`GRUB_BTRFS_TITL
 
 ## First boot (firstboot)
 
-What the payload can't carry, because it needs the hardware or the person, happens at the first login: a checklist of six cards in the install screens' look. `kobo --setup` is a separate iced application in the same crate. It shares `theme.rs`, `widgets.rs`, the key translation and `app::Message` (one variant, `Message::Setup`). The logic is in `kubaos_core::setup`, and `kubaos setup` runs the same code headless with JSON events.
+What the payload can't carry, because it needs the hardware or the person, happens at the first login: a checklist of six cards in the install screens' look. `kobo --setup` is a separate iced application in the same crate. It shares the install screens' look (`kubaos-ui`, and Kōbō's own blocks in `ui.rs`), the key translation and `app::Message` (one variant, `Message::Setup`). The logic is in `kubaos_core::setup`, and `kubaos setup` runs the same code headless with JSON events.
 
 | Card | Shown when | Done when | What it does |
 |---|---|---|---|

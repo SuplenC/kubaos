@@ -597,7 +597,7 @@ const DEMO_WALLPAPERS: [(&str, &[&str]); 3] = [
 ];
 
 /// A set with its thumbnails where a payload has them. The demo has no payload dir, so they're
-/// placeholders unless the app is pointed at one (`App::payload_dir`, the gallery's `GALLERY_PAYLOAD`).
+/// placeholders unless the app is pointed at one (`App::payload_dir`, the screenshots' `GALLERY_PAYLOAD`).
 fn demo_wallpaper_set(id: &str, names: &[&str]) -> WallpaperSet {
     let files: Vec<WallpaperFile> = names
         .iter()
