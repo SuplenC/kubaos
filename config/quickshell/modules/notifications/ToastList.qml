@@ -1,10 +1,11 @@
 import QtQuick
 import Quickshell
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 
 // The cards of a toast stack (`Popups.qml`, `PopupsBelow.qml`). New cards
-// slide in from the right, gone ones slide out, and the rest close up.
+// slide in from the right as a panel arrives, gone ones slide out as one
+// leaves, and the rest close up as a list reorders.
 ListView {
     id: list
 
@@ -17,44 +18,49 @@ ListView {
 
     height: contentHeight
     interactive: false
-    spacing: Theme.spacing.sm
+    spacing: K.Tokens.space.s8
     model: ScriptModel {
         values: list.notifications
     }
 
     add: Transition {
         ParallelAnimation {
-            Anim {
+            NumberAnimation {
                 property: "x"
-                from: 80
+                from: K.Tokens.space.s64
                 to: 0
-                duration: Theme.anim.large
-                easing.bezierCurve: Theme.anim.emphasizedDecel
+                duration: K.Tokens.duration.long
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.emphasized_decel
             }
 
-            Anim {
+            NumberAnimation {
                 property: "opacity"
                 from: 0
                 to: 1
-                duration: Theme.anim.small
-                easing.bezierCurve: Theme.anim.effects
+                duration: K.Tokens.duration.short
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.standard
             }
         }
     }
 
     remove: Transition {
         ParallelAnimation {
-            Anim {
+            NumberAnimation {
                 property: "x"
-                to: 120
-                duration: Theme.anim.normal
-                easing.bezierCurve: Theme.anim.emphasizedAccel
+                to: K.Tokens.space.s64 * 2
+                duration: K.Tokens.duration.medium
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.emphasized_accel
             }
 
-            Anim {
+            NumberAnimation {
                 property: "opacity"
                 to: 0
-                duration: Theme.anim.small
+                duration: K.Tokens.duration.medium
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.standard_accel
             }
         }
     }
@@ -62,24 +68,27 @@ ListView {
     // A card displaced mid-slide-in finishes the slide and the fade, or it stays faded and
     // off to the side (see `components/NavList.qml`).
     displaced: Transition {
-        Anim {
+        NumberAnimation {
             property: "y"
-            duration: Theme.anim.large
-            easing.bezierCurve: Theme.anim.spatial
+            duration: K.Tokens.duration.medium
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: K.Tokens.easing.standard_decel
         }
 
-        Anim {
+        NumberAnimation {
             property: "x"
             to: 0
-            duration: Theme.anim.large
-            easing.bezierCurve: Theme.anim.emphasizedDecel
+            duration: K.Tokens.duration.long
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: K.Tokens.easing.emphasized_decel
         }
 
-        Anim {
+        NumberAnimation {
             property: "opacity"
             to: 1
-            duration: Theme.anim.small
-            easing.bezierCurve: Theme.anim.effects
+            duration: K.Tokens.duration.short
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: K.Tokens.easing.standard
         }
     }
 

@@ -19,6 +19,9 @@ Item {
     property real room: Infinity
     // How the lines sit across the box: `Text.AlignLeft`, or `Text.AlignHCenter`.
     property int horizontalAlignment: Text.AlignLeft
+    // The most lines it takes, 0 for as many as the words need. Past them, the last line ends in
+    // an ellipsis where it reaches `room`: a window's title, a notification's body.
+    property int maximumLines: 0
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     // How much larger than the style the advances are measured, so Qt's rounding of each one to
@@ -27,7 +30,7 @@ Item {
     // Whether the text is shaped: iced shapes anything but plain ASCII.
     readonly property bool shaped: /[^\x00-\x7f]/.test(root.text)
     // Each line's words and its width in logical pixels.
-    readonly property var lines: root.layOut(root.text, root.room, metrics.font)
+    readonly property var lines: root.clamped(root.layOut(root.text, root.room, metrics.font))
     readonly property real naturalWidth: root.lines.reduce((widest, line) => Math.max(widest, line.width), 0)
     readonly property real naturalHeight: root.lines.length * root.style.line
     readonly property var probe: ({
@@ -44,6 +47,25 @@ Item {
 
     function advance(words: string): real {
         return metrics.advanceWidth(words) / root.precision;
+    }
+
+    // `lines` cut to `maximumLines`: the last one kept takes every word after it, and each is
+    // ellipsised at `room` when drawn.
+    function clamped(lines: var): var {
+        const most = root.maximumLines;
+        if (most <= 0)
+            return lines;
+        const kept = lines.slice(0, most);
+        if (lines.length > most)
+            kept[most - 1] = {
+                text: lines.slice(most - 1).map(line => line.text).join(" "),
+                width: NaN
+            };
+        // A last line wider than the room, one long word included, is cut at it.
+        return kept.map(line => ({
+                    text: line.text,
+                    width: Math.min(isNaN(line.width) ? root.advance(line.text) : line.width, root.room)
+                }));
     }
 
     // `text` in lines no wider than `room`, broken at spaces: each line takes words while they
@@ -91,12 +113,22 @@ Item {
         text: root.lines.map(line => line.text).join("\n")
         color: root.color
         horizontalAlignment: root.horizontalAlignment
+        // The lines laid out above already fit the room but the last kept, which Qt wraps and cuts
+        // at the ellipsis.
+        wrapMode: root.maximumLines > 0 ? Text.Wrap : Text.NoWrap
+        maximumLineCount: root.maximumLines > 0 ? root.maximumLines : Number.MAX_SAFE_INTEGER
+        elide: root.maximumLines > 0 ? Text.ElideRight : Text.ElideNone
         font.family: root.style.family
         font.weight: root.style.weight
         font.pixelSize: root.style.size
         font.kerning: root.shaped
         font.preferShaping: root.shaped
         font.hintingPreference: Font.PreferNoHinting
+        // Drawn by the font engine, not as distance fields, which a text that changes every
+        // second (the bar's readings) pays for on each change: over 30 s of the bar's sysmon and
+        // recording ticks, 0.47 CPU s this way against 0.57 with Qt's own rendering (0.44 for the
+        // shell's text before it moved here).
+        renderType: Text.NativeRendering
         lineHeightMode: Text.FixedHeight
         lineHeight: root.style.line
         verticalAlignment: Text.AlignVCenter

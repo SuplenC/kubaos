@@ -76,6 +76,7 @@ K.Pressable {
             K.Text {
                 text: root.title
                 style: Tokens.type.body_strong
+                maximumLines: 1
                 color: root.main
             }
 
@@ -83,6 +84,7 @@ K.Pressable {
                 visible: root.subtitle !== ""
                 text: root.subtitle
                 style: Tokens.type.small
+                maximumLines: 1
                 color: root.muted
             }
         }

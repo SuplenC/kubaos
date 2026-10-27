@@ -1,9 +1,8 @@
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
-import qs.theme
+import KubaOS.Components as K
 import qs.settings
-import qs.components
 import qs.services
 
 // This screen's workspaces in groups, each numbered 1-10 as SUPER + 1-0 reach
@@ -29,7 +28,11 @@ import qs.services
 //
 // The active indicator stretches toward the new workspace: its leading edge
 // moves fast, the trailing edge follows a little later.
-Pill {
+//
+// It draws its own pill, as tall as the bar's other pills, rather than being
+// a `Pill`: the cells glide their widths every frame, and a positioner
+// follows them without running script.
+Item {
     id: root
 
     required property ShellScreen screen
@@ -113,15 +116,17 @@ Pill {
         return -1;
     }
     readonly property int slot: Math.max(0, ids.indexOf(activeId))
-    readonly property int cell: Theme.bar.pillHeight - 6
-    readonly property int groupGap: Theme.spacing.md
-    // A thin rule between groups, not a dot: a dot reads as a notification.
-    readonly property int separator: Math.round(cell * 0.5)
+    readonly property int cell: K.Tokens.size.chip
+    readonly property int groupGap: K.Tokens.space.s12
+    // A thin rule between groups, half a cell tall, not a dot: a dot reads
+    // as a notification.
+    readonly property real separator: root.cell / 2
     // How long a change of shape takes. The indicator follows a cell that
     // moves with the same duration and curve, so it stays on it.
-    readonly property int glide: Theme.anim.large
-    readonly property real ghostOpacity: 0.45
-    readonly property real borrowedOpacity: 0.6
+    readonly property int glide: K.Tokens.duration.long
+    // The widest a group's name draws before it elides: a short word.
+    readonly property real groupNameMax: K.Tokens.space.s48 * 2
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
     readonly property var roles: ["kind", "borrowed", "head", "tail", "label"]
     property bool ready: false
@@ -153,7 +158,7 @@ Pill {
 
     // How wide a group's name draws, elided past `groupNameMax`.
     function labelWidth(label: string): real {
-        return Math.min(labelMetrics.advanceWidth(label), Theme.bar.groupNameMax);
+        return Math.min(labelMetrics.advanceWidth(label), root.groupNameMax);
     }
 
     // An entry's width. A name's entry is its inset, the name, and the inset
@@ -210,11 +215,17 @@ Pill {
             shapes.remove(index);
     }
 
-    padding: 3
-    spacing: 0
-    interactive: true
-    animatesWidth: false
-    onScrolled: steps => Hypr.step(monitor, steps > 0 ? -1 : 1, ids[(slot - steps + ids.length) % ids.length])
+    // The style a cell's number is drawn in: semibold in a workspace with
+    // windows or the shown one, medium in an empty one; for kanji, the
+    // Japanese accent's.
+    function numberStyle(strong: bool): QtObject {
+        if (Settings.workspaceKanji)
+            return K.Tokens.type.accent;
+        return strong ? K.Tokens.type.button_small : K.Tokens.type.label;
+    }
+
+    implicitWidth: cells.implicitWidth + K.Tokens.space.s4 * 2
+    implicitHeight: K.Tokens.size.control_sm
     onEntriesChanged: sync()
     Component.onCompleted: {
         sync();
@@ -225,24 +236,52 @@ Pill {
         id: shapes
     }
 
-    // Measures a group's name with the font it is drawn in.
+    // Measures a group's name in the style it is drawn in, unhinted and
+    // unkerned as `K.Text` draws plain text, so the two agree.
     FontMetrics {
         id: labelMetrics
 
-        font.family: Theme.font.sans
-        font.pixelSize: Theme.bar.cellFont
-        font.weight: Font.Medium
+        font.family: K.Tokens.type.label.family
+        font.weight: K.Tokens.type.label.weight
+        font.pixelSize: K.Tokens.type.label.size
+        font.kerning: false
+        font.preferShaping: false
+        font.hintingPreference: Font.PreferNoHinting
     }
 
     // Measures a cell's number as a waiting group's first cell draws it: in
-    // a group of windows, bold.
+    // a group of windows, semibold.
     FontMetrics {
         id: numberMetrics
 
-        font.family: Settings.workspaceKanji ? Theme.font.jp : Theme.font.sans
-        font.pixelSize: Theme.bar.cellFont
-        font.weight: Font.DemiBold
-        font.features: Theme.font.tabular
+        font.family: root.numberStyle(true).family
+        font.weight: root.numberStyle(true).weight
+        font.pixelSize: root.numberStyle(true).size
+        font.kerning: false
+        font.preferShaping: false
+        font.hintingPreference: Font.PreferNoHinting
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: K.Tokens.radius.full
+        color: K.Tokens.color.surface_container
+
+        K.StateLayer {
+            radius: parent.radius
+            hovered: hover.hovered
+        }
+    }
+
+    HoverHandler {
+        id: hover
+    }
+
+    WheelHandler {
+        onWheel: event => {
+            const steps = event.angleDelta.y > 0 ? 1 : -1;
+            Hypr.step(root.monitor, -steps, root.ids[(root.slot - steps + root.ids.length) % root.ids.length]);
+        }
     }
 
     // One entry's place in a row, growing in when it appears and shrinking
@@ -271,18 +310,20 @@ Pill {
         Behavior on width {
             enabled: root.ready
 
-            Anim {
+            NumberAnimation {
                 duration: root.glide
-                easing.bezierCurve: Theme.anim.emphasizedDecel
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.emphasized_decel
             }
         }
 
         Behavior on opacity {
             enabled: root.ready
 
-            Anim {
+            NumberAnimation {
                 duration: root.glide
-                easing.bezierCurve: Theme.anim.effects
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.standard
             }
         }
     }
@@ -290,6 +331,10 @@ Pill {
     Item {
         id: cells
 
+        x: K.Tokens.space.s4
+        y: K.Tokens.space.s4
+        width: row.implicitWidth
+        height: root.cell
         implicitWidth: row.implicitWidth
         implicitHeight: root.cell
         // Whatever its two edges are animating, the indicator draws on the
@@ -309,15 +354,15 @@ Pill {
 
                     // A pill as wide as the group: each entry draws its part,
                     // reaching past its inner edges into the clip, so only the
-                    // group's two ends round off.
+                    // group's two ends round off. A faint tint of the
+                    // secondary colour, so the group reads as borrowed.
                     Rectangle {
                         visible: tintSlot.borrowed
                         x: tintSlot.head ? 0 : -root.cell / 2
                         width: root.widthOf(tintSlot.kind, tintSlot.label, tintSlot.workspace) + (tintSlot.head ? 0 : root.cell / 2) + (tintSlot.tail ? 0 : root.cell / 2)
                         height: root.cell
-                        radius: height / 2
-                        color: Theme.m3secondaryContainer
-                        opacity: root.borrowedOpacity
+                        radius: K.Tokens.radius.full
+                        color: K.Look.alpha(K.Tokens.color.secondary, K.Tokens.opacity.tint)
                     }
                 }
             }
@@ -332,8 +377,8 @@ Pill {
             property real end: root.cell
             property int lastId: 0
             property bool ready: false
-            property int lead: Theme.anim.normal
-            property int trail: Theme.anim.large
+            property int lead: K.Tokens.duration.medium
+            property int trail: K.Tokens.duration.long
 
             // Both edges come from the target. Under its Behavior, `start`
             // still reads the old value right after it is set, and an end
@@ -362,8 +407,8 @@ Pill {
             x: Math.max(0, start)
             width: Math.max(0, Math.min(end, cells.width) - x)
             height: root.cell
-            radius: height / 2
-            color: Theme.m3primary
+            radius: K.Tokens.radius.full
+            color: K.Tokens.color.primary
 
             // Deferred, so a change of the active id and of the layout in the
             // same turn place the indicator once, from both.
@@ -382,20 +427,22 @@ Pill {
             Behavior on start {
                 enabled: indicator.ready
 
-                Anim {
+                NumberAnimation {
                     id: startAnim
 
-                    easing.bezierCurve: Theme.anim.emphasizedDecel
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: K.Tokens.easing.emphasized_decel
                 }
             }
 
             Behavior on end {
                 enabled: indicator.ready
 
-                Anim {
+                NumberAnimation {
                     id: endAnim
 
-                    easing.bezierCurve: Theme.anim.emphasizedDecel
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: K.Tokens.easing.emphasized_decel
                 }
             }
         }
@@ -423,22 +470,22 @@ Pill {
 
                     Rectangle {
                         visible: shape.isGap
-                        anchors.centerIn: parent
-                        width: 1
+                        x: K.Look.snap((root.groupGap - width) / 2, root.dpr)
+                        y: K.Look.snap((root.cell - root.separator) / 2, root.dpr)
+                        width: K.Look.hairline(root.dpr)
                         height: root.separator
-                        color: Theme.m3outlineVariant
+                        color: K.Tokens.color.outline_variant
                     }
 
-                    Text {
+                    K.Text {
                         visible: shape.isLabel
                         x: root.labelInset(shape.workspace)
-                        width: Math.ceil(root.labelWidth(shape.label))
-                        anchors.verticalCenter: parent.verticalCenter
+                        y: K.Look.snap((root.cell - height) / 2, root.dpr)
+                        width: Math.min(implicitWidth, K.Look.snapUp(root.groupNameMax, root.dpr))
                         text: shape.label
-                        elide: Text.ElideRight
-                        font: labelMetrics.font
-                        renderType: Text.NativeRendering
-                        color: Theme.m3onSecondaryContainer
+                        style: K.Tokens.type.label
+                        color: K.Tokens.color.secondary
+                        maximumLines: 1
                     }
 
                     // The name goes to its group's first workspace, as its
@@ -452,42 +499,51 @@ Pill {
 
                     Item {
                         visible: !shape.isGap && !shape.isLabel
-                        anchors.horizontalCenter: parent.horizontalCenter
                         width: root.cell
                         height: root.cell
 
-                        Text {
-                            anchors.centerIn: parent
+                        K.Text {
+                            id: number
+
+                            x: K.Look.snap((root.cell - number.width) / 2, root.dpr)
+                            y: K.Look.snap((root.cell - number.height) / 2, root.dpr)
                             text: root.numberText(shape.workspace)
-                            font.family: Settings.workspaceKanji ? Theme.font.jp : Theme.font.sans
-                            font.pixelSize: Theme.bar.cellFont
-                            font.weight: shape.isActive || shape.occupied ? Font.DemiBold : Font.Medium
-                            font.features: Theme.font.tabular
-                            renderType: Text.NativeRendering
-                            color: shape.isActive ? Theme.m3onPrimary : shape.occupied ? Theme.m3onSurface : Theme.m3outline
+                            style: root.numberStyle(shape.isActive || shape.occupied)
+                            color: shape.isActive ? K.Tokens.color.on_primary : shape.occupied ? K.Tokens.color.on_surface : K.Tokens.color.outline
                             opacity: shape.isGhost ? 0 : 1
 
                             Behavior on color {
-                                CAnim {}
+                                ColorAnimation {
+                                    duration: K.Tokens.duration.short
+                                    easing.type: Easing.BezierSpline
+                                    easing.bezierCurve: K.Tokens.easing.standard
+                                }
                             }
 
                             Behavior on opacity {
-                                Anim {
-                                    easing.bezierCurve: Theme.anim.effects
+                                NumberAnimation {
+                                    duration: K.Tokens.duration.short
+                                    easing.type: Easing.BezierSpline
+                                    easing.bezierCurve: K.Tokens.easing.standard
                                 }
                             }
                         }
 
-                        Icon {
-                            anchors.centerIn: parent
+                        // The ghost: a faint `+`, the placeholder of the
+                        // workspace next opens.
+                        K.Icon {
+                            x: K.Look.snap((root.cell - K.Tokens.icon.s16) / 2, root.dpr)
+                            y: K.Look.snap((root.cell - K.Tokens.icon.s16) / 2, root.dpr)
                             name: "add"
-                            size: Theme.font.md
-                            color: Theme.m3outline
-                            opacity: shape.isGhost ? root.ghostOpacity : 0
+                            size: K.Tokens.icon.s16
+                            color: K.Tokens.color.outline
+                            opacity: shape.isGhost ? K.Tokens.opacity.placeholder : 0
 
                             Behavior on opacity {
-                                Anim {
-                                    easing.bezierCurve: Theme.anim.effects
+                                NumberAnimation {
+                                    duration: K.Tokens.duration.short
+                                    easing.type: Easing.BezierSpline
+                                    easing.bezierCurve: K.Tokens.easing.standard
                                 }
                             }
                         }

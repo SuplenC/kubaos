@@ -1,13 +1,11 @@
 import QtQuick
-import QtQuick.Layouts
-import qs.theme
-import qs.components
+import KubaOS.Components as K
 
-// Toggle tile: icon, title and a status line. Enter or Space activates.
-// On, it fills with primary and its corners round further (M3 shape morph).
-// With `expandable`, an arrow at its end opens the tile's list (expanded());
-// Right does too, from the keyboard.
-Rectangle {
+// A toggle tile: a symbol, a title and a status line, as tall as a two-line list row and with a
+// control's corners, since it is clicked. On, it fills with the primary colour. Enter, Space or a
+// click toggles it (`activated`). With `expandable`, an arrow at its end opens the tile's list
+// (`expanded`); Right does too, from the keyboard.
+K.Pressable {
     id: root
 
     property string icon
@@ -16,89 +14,96 @@ Rectangle {
     property bool checked: false
     property bool expandable: false
 
-    signal clicked
     signal expanded
 
-    implicitHeight: 58
-    radius: stateLayer.pressed ? Theme.rounding.md : checked ? Theme.rounding.xxl : Theme.rounding.lg
-    color: checked ? Theme.m3primary : Theme.m3surfaceContainerHigh
-    activeFocusOnTab: true
+    readonly property bool fillWidth: true
+    readonly property color content: root.checked ? K.Tokens.color.on_primary : K.Tokens.color.on_surface
+    readonly property color muted: root.checked ? K.Look.alpha(K.Tokens.color.on_primary, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
+    // Where the words end: before the arrow and its inset, or the tile's own inset.
+    readonly property real end: root.expandable ? arrow.width + K.Tokens.space.s12 * 2 : K.Tokens.space.s12
 
-    Keys.onReturnPressed: clicked()
-    Keys.onEnterPressed: clicked()
-    Keys.onSpacePressed: clicked()
+    implicitHeight: K.Tokens.size.row_two_line
+    Accessible.name: root.title
+    Accessible.role: Accessible.CheckBox
+    Accessible.checked: root.checked
     Keys.onRightPressed: event => {
-        event.accepted = expandable;
-        if (expandable)
-            expanded();
+        event.accepted = root.expandable;
+        if (root.expandable)
+            root.expanded();
     }
 
-    Behavior on color {
-        CAnim {}
-    }
-
-    Behavior on radius {
-        Anim {
-            duration: Theme.anim.large
-            easing.bezierCurve: Theme.anim.spatial
-        }
-    }
-
-    RowLayout {
+    Rectangle {
         anchors.fill: parent
-        anchors.leftMargin: Theme.spacing.lg
-        anchors.rightMargin: root.expandable ? arrow.width + Theme.spacing.xs * 2 : Theme.spacing.md
-        spacing: Theme.spacing.md
+        radius: K.Tokens.radius.control
+        color: root.checked ? K.Tokens.color.primary : K.Tokens.color.surface_container_high
 
-        Icon {
+        Behavior on color {
+            ColorAnimation {
+                duration: K.Tokens.duration.short
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: K.Tokens.easing.standard
+            }
+        }
+
+        K.StateLayer {
+            radius: parent.radius
+            content: root.content
+            hovered: root.hovered && !arrow.hovered
+            pressed: root.down
+        }
+    }
+
+    K.Row {
+        id: line
+
+        x: K.Tokens.space.s12
+        y: K.Look.snap((root.height - line.implicitHeight) / 2, line.dpr)
+        room: Math.max(0, root.width - K.Tokens.space.s12 - root.end)
+        gap: K.Tokens.space.s12
+        align: "centre"
+
+        K.Icon {
             name: root.icon
-            size: 22
-            filled: root.checked
-            color: root.checked ? Theme.m3onPrimary : Theme.m3onSurfaceVariant
+            size: K.Tokens.icon.s20
+            color: root.checked ? root.content : K.Tokens.color.on_surface_variant
         }
 
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 1
+        K.Stack {
+            gap: K.Tokens.space.s4
 
-            StyledText {
-                Layout.fillWidth: true
+            K.Text {
                 text: root.title
-                font.weight: Font.DemiBold
-                color: root.checked ? Theme.m3onPrimary : Theme.m3onSurface
+                style: K.Tokens.type.body_strong
+                color: root.content
+                maximumLines: 1
             }
 
-            StyledText {
-                Layout.fillWidth: true
+            K.Text {
                 text: root.subtitle
-                font.pixelSize: Theme.font.sm
-                color: root.checked ? Theme.alpha(Theme.m3onPrimary, 0.8) : Theme.m3onSurfaceVariant
+                style: K.Tokens.type.small
+                color: root.muted
+                maximumLines: 1
             }
         }
     }
 
-    StateLayer {
-        id: stateLayer
-
-        color: root.checked ? Theme.m3onPrimary : Theme.m3onSurface
-        onClicked: root.clicked()
-    }
-
-    // After the StateLayer, so its clicks reach it and not the tile.
-    IconButton {
+    K.IconButton {
         id: arrow
 
-        anchors.right: parent.right
-        anchors.rightMargin: Theme.spacing.xs
-        anchors.verticalCenter: parent.verticalCenter
+        x: root.width - width - K.Tokens.space.s12
+        y: K.Look.snap((root.height - height) / 2, line.dpr)
         visible: root.expandable
         activeFocusOnTab: false
-        size: 32
         icon: "chevron_right"
-        tooltip: `${root.title} settings`
-        tint: root.checked ? Theme.m3onPrimary : Theme.m3onSurfaceVariant
-        onClicked: root.expanded()
+        label: `${root.title} settings`
+        // Tonal reads on the tile on and off alike; a text button vanishes into the primary fill.
+        kind: "Tonal"
+        size: "Sm"
+        onActivated: root.expanded()
     }
 
-    FocusRing {}
+    K.FocusRing {
+        shown: root.focused && root.enabled
+        controlRadius: K.Tokens.radius.control
+    }
 }

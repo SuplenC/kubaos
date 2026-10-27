@@ -1,17 +1,19 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Services.Notifications
-import qs.theme
+import KubaOS.Components as K
 import qs.settings
-import qs.components
 import qs.services
 
 // One notification. As a popup it hides itself after the timeout (paused on
 // hover; a thin line along the bottom shows the time left). In the control
 // center history it stays until dismissed.
-Rectangle {
+//
+// It fills its stack 8 in from the panel's edge, so its corners are the
+// panel's surface radius nested 8 in. A click opens what it is about; the
+// dismiss button and the actions take their own clicks.
+K.Pressable {
     id: root
 
     required property Notification notification
@@ -30,168 +32,199 @@ Rectangle {
             return `file://${n.appIcon}`;
         return n.appIcon ? Quickshell.iconPath(n.appIcon, true) : "";
     }
-    readonly property color fg: critical ? Theme.m3onErrorContainer : Theme.m3onSurface
-    readonly property color fgMuted: critical ? Theme.alpha(Theme.m3onErrorContainer, 0.8) : Theme.m3onSurfaceVariant
-
-    implicitHeight: layout.implicitHeight + Theme.spacing.md * 2
-    radius: Theme.rounding.lg
-    color: critical ? Theme.m3errorContainer : popup ? Theme.m3surfaceContainer : Theme.m3surfaceContainerHigh
-    border.width: selected ? 2 : 0
-    border.color: Theme.m3primary
-    clip: true
+    readonly property color fg: critical ? K.Tokens.color.on_error_container : K.Tokens.color.on_surface
+    readonly property color fgMuted: critical ? K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
+    readonly property real radius: K.Look.nested(K.Tokens.radius.surface, K.Tokens.space.s8)
+    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+    readonly property bool imageShown: root.iconSource !== "" && image.status === Image.Ready
 
     // Time left before the popup hides (1 -> 0); paused while hovered.
     property real remaining: 1
 
+    // Where a header text sits: centred on the dismiss button, on a whole device pixel.
+    function headerLine(text: Item): real {
+        return K.Tokens.space.s12 + K.Look.snap((K.Tokens.size.control_sm - text.implicitHeight) / 2, root.dpr);
+    }
+
+    // Every height here is a binding, never a layout pass: a list places the cards after this one
+    // by its height as it arrives, and doesn't move them for a change while they slide in.
+    implicitHeight: K.Look.snapUp(K.Tokens.space.s12 * 2 + Math.max(K.Tokens.size.control_md, K.Tokens.size.control_sm + words.height), root.dpr)
+    activeFocusOnTab: false
+    onActivated: Notifs.activate(root.notification)
+
     NumberAnimation on remaining {
         running: root.popup && !root.critical
-        paused: running && stateLayer.containsMouse
+        paused: running && root.pointerOver
         from: 1
         to: 0
         duration: root.timeout
         onFinished: Notifs.hidePopup(root.notification)
     }
 
-    StateLayer {
-        id: stateLayer
+    Rectangle {
+        anchors.fill: parent
+        radius: root.radius
+        color: root.critical ? K.Tokens.color.error_container : root.popup ? K.Tokens.color.surface_container : K.Tokens.color.surface_container_high
 
-        onClicked: Notifs.activate(root.notification)
+        K.StateLayer {
+            radius: parent.radius
+            content: root.fg
+            hovered: root.hovered
+            pressed: root.down
+        }
     }
 
-    RowLayout {
-        id: layout
+    // The app's icon or the notification's image on a tile, or a bell.
+    Item {
+        id: tile
 
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: Theme.spacing.md
-        spacing: Theme.spacing.md
+        x: K.Tokens.space.s12
+        y: K.Tokens.space.s12
+        width: K.Tokens.size.control_md
+        height: K.Tokens.size.control_md
 
         Rectangle {
-            Layout.alignment: Qt.AlignTop
-            implicitWidth: 40
-            implicitHeight: 40
-            radius: Theme.rounding.md
-            color: root.critical ? Theme.m3error : Theme.m3secondaryContainer
+            anchors.fill: parent
+            radius: K.Tokens.radius.control
+            color: root.critical ? K.Tokens.color.error : K.Tokens.color.secondary_container
+        }
 
-            ClippingRectangle {
+        ClippingRectangle {
+            anchors.fill: parent
+            radius: K.Tokens.radius.control
+            color: "transparent"
+            visible: root.imageShown
+
+            Image {
+                id: image
+
                 anchors.fill: parent
-                radius: parent.radius
-                color: "transparent"
-                visible: root.iconSource !== "" && image.status === Image.Ready
-
-                Image {
-                    id: image
-
-                    anchors.fill: parent
-                    source: root.iconSource
-                    fillMode: Image.PreserveAspectCrop
-                    sourceSize: Qt.size(96, 96)
-                    asynchronous: true
-                    smooth: true
-                    mipmap: true
-                }
-            }
-
-            Icon {
-                anchors.centerIn: parent
-                visible: !(root.iconSource !== "" && image.status === Image.Ready)
-                name: root.critical ? "warning" : "notifications"
-                filled: true
-                color: root.critical ? Theme.m3onError : Theme.m3onSecondaryContainer
+                source: root.iconSource
+                fillMode: Image.PreserveAspectCrop
+                sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
+                asynchronous: true
+                smooth: true
+                mipmap: true
             }
         }
 
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 2
+        K.Icon {
+            x: K.Look.snap((K.Tokens.size.control_md - size) / 2, root.dpr)
+            y: K.Look.snap((K.Tokens.size.control_md - size) / 2, root.dpr)
+            visible: !root.imageShown
+            name: root.critical ? "warning" : "notifications"
+            size: K.Tokens.icon.s20
+            color: root.critical ? K.Tokens.color.on_error : K.Tokens.color.on_secondary_container
+        }
+    }
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Theme.spacing.xs
+    // The header, a small control tall: the summary, the app's name and the dismiss button.
+    K.IconButton {
+        id: dismiss
 
-                StyledText {
-                    Layout.fillWidth: true
-                    text: root.notification?.summary ?? ""
-                    font.weight: Font.DemiBold
-                    color: root.fg
-                }
+        x: root.width - K.Tokens.space.s12 - width
+        y: K.Tokens.space.s12
+        icon: "close"
+        label: qsTr("Dismiss")
+        kind: "Text"
+        size: "Sm"
+        activeFocusOnTab: false
+        onActivated: root.notification.dismiss()
+    }
 
-                StyledText {
-                    text: root.notification?.appName ?? ""
-                    font.pixelSize: Theme.font.xs
-                    color: root.fgMuted
-                    Layout.maximumWidth: 120
-                }
+    K.Text {
+        id: app
 
-                IconButton {
-                    icon: "close"
-                    size: 22
-                    tint: root.fgMuted
+        x: dismiss.x - K.Tokens.space.s8 - width
+        y: root.headerLine(app)
+        room: words.width / 2
+        text: root.notification?.appName ?? ""
+        style: K.Tokens.type.caption
+        color: root.fgMuted
+        maximumLines: 1
+    }
+
+    K.Text {
+        id: summary
+
+        x: words.x
+        y: root.headerLine(summary)
+        width: Math.max(0, app.x - K.Tokens.space.s8 - x)
+        room: width
+        text: root.notification?.summary ?? ""
+        style: K.Tokens.type.body_strong
+        color: root.fg
+        maximumLines: 1
+    }
+
+    // Under the header, beside the tile: the body, then the actions.
+    Item {
+        id: words
+
+        readonly property real bodyHeight: body.text !== "" ? K.Tokens.space.s4 + body.implicitHeight : 0
+        // `body` as plain words. A notification's body may carry the spec's small set of markup
+        // (bold, italics, links, line breaks, entities), which a type style draws as written.
+        // https://specifications.freedesktop.org/notification-spec/latest/markup.html
+        function plain(body: string): string {
+            return body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, "&");
+        }
+
+        readonly property real actionsHeight: actions.count > 0 ? K.Tokens.space.s12 + K.Tokens.size.control_sm : 0
+
+        x: tile.x + tile.width + K.Tokens.space.s12
+        y: K.Tokens.space.s12 + K.Tokens.size.control_sm
+        width: Math.max(0, root.width - K.Tokens.space.s12 - x)
+        height: words.bodyHeight + words.actionsHeight
+
+        K.Text {
+            id: body
+
+            y: K.Tokens.space.s4
+            visible: text !== ""
+            room: words.width
+            text: words.plain(root.notification?.body ?? "")
+            style: K.Tokens.type.body
+            color: root.fgMuted
+            maximumLines: root.popup ? 3 : 6
+        }
+
+        K.Row {
+            y: words.bodyHeight + K.Tokens.space.s12
+            visible: actions.count > 0
+            gap: K.Tokens.space.s8
+
+            Repeater {
+                id: actions
+
+                model: root.notification?.actions.filter(a => a.identifier !== "default") ?? []
+
+                delegate: K.Button {
+                    required property NotificationAction modelData
+
+                    text: modelData.text
+                    kind: root.critical ? "Danger" : "Tonal"
+                    size: "Sm"
                     activeFocusOnTab: false
-                    onClicked: root.notification.dismiss()
-                }
-            }
-
-            StyledText {
-                Layout.fillWidth: true
-                visible: text !== ""
-                text: root.notification?.body ?? ""
-                textFormat: Text.StyledText
-                wrapMode: Text.Wrap
-                maximumLineCount: root.popup ? 3 : 6
-                color: root.fgMuted
-                lineHeight: 1.1
-            }
-
-            Flow {
-                Layout.fillWidth: true
-                Layout.topMargin: Theme.spacing.sm
-                spacing: Theme.spacing.xs
-                visible: actions.count > 0
-
-                Repeater {
-                    id: actions
-
-                    model: root.notification?.actions.filter(a => a.identifier !== "default") ?? []
-
-                    delegate: Rectangle {
-                        id: action
-
-                        required property NotificationAction modelData
-
-                        implicitWidth: actionLabel.implicitWidth + Theme.spacing.lg * 2
-                        implicitHeight: 30
-                        radius: Theme.rounding.full
-                        color: root.critical ? Theme.m3error : Theme.m3secondaryContainer
-
-                        StyledText {
-                            id: actionLabel
-
-                            anchors.centerIn: parent
-                            text: action.modelData.text
-                            color: root.critical ? Theme.m3onError : Theme.m3onSecondaryContainer
-                            font.pixelSize: Theme.font.sm
-                            font.weight: Font.Medium
-                        }
-
-                        StateLayer {
-                            onClicked: action.modelData.invoke()
-                        }
-                    }
+                    onActivated: modelData.invoke()
                 }
             }
         }
     }
 
+    // The time left, a thin line along the bottom inside the padding, on whole device pixels so it
+    // repaints only when it loses one.
     Rectangle {
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.leftMargin: Theme.spacing.md
-        height: 2
-        radius: 1
-        width: (parent.width - Theme.spacing.md * 2) * root.remaining
-        color: Theme.alpha(Theme.m3primary, 0.6)
+        x: K.Tokens.space.s12
+        y: root.height - height
+        width: K.Look.snap((root.width - K.Tokens.space.s12 * 2) * root.remaining, root.dpr)
+        height: K.Look.thin(root.dpr)
+        radius: K.Tokens.radius.full
+        color: K.Tokens.color.primary
         visible: root.popup && !root.critical
+    }
+
+    K.FocusRing {
+        shown: root.selected
+        controlRadius: root.radius
     }
 }

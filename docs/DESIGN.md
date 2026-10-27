@@ -44,7 +44,7 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 - **Cold accent** (`cold`, from matugen's tertiary): the blue of the sign's dakuten. With `scheme-fidelity` tertiary is the wallpaper's complement, so cold follows the wallpaper. Use it rarely: the focus ring on picked cards, where the accent already means picked, and a demo or preview badge. It is never a second primary. It is configurable: the complement is the default, and the user may pick another. *Not enforced yet: lands in #154.*
 - **Warning** is ours (Material 3 has none): amber between fine and the error colour, for a reading close to its limit. It keeps its value whatever the wallpaper; the light one is dark enough for text on light surfaces.
 - **Contrast minimums** (WCAG 2.1, `kubaos_ui::color::Contrast`): 4.5:1 for body text and labels; 3:1 for large text (24 px and up, or 19 px semibold and up) and for icons, outlines and other shapes that carry meaning. `kubaos-ui`'s tests hold every pair in both fallback palettes. A custom colour that breaks a minimum is refused, not drawn. *Not enforced yet: lands in #154.*
-- **Opacities** come from `[opacity]`: the state layer (hover 0.08, focus 0.12, press 0.14), disabled content 0.38 and container 0.10, the scrim, tints. A component never picks its own alpha.
+- **Opacities** come from `[opacity]`: the state layer (hover 0.08, focus 0.12, press 0.14), disabled content 0.38 and container 0.10, the scrim, tints. A component never picks its own alpha. The shell's frame and its panels are glass (`frame`, 0.94, which Hyprland blurs behind), and an open panel dims the desktop less than a dialog does (`panel_scrim`, 0.20).
 - **Custom colours:** a seed colour, overrides of single roles, and presets (KubaOS neon among them). The contrast minimums hold for all of them. *Not enforced yet: lands in #154.*
 
 ### Light and dark
@@ -112,7 +112,7 @@ A single-line control's label takes the control's content box as its line height
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; switch 44 × 24, knob 12 off, 16 on; check 20, radio dot 8; progress 8; dialog 500; column 560; rail 236; log 232 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; column 560; rail 236; log 232; the shell's panel 384 and bar 40 |
 
 - **Boxes land on device pixels.** Lengths on the grid do so by themselves. A box sized by its text (a label, a chip, a toast) is a fraction of a pixel wide; `kubaos-ui` rounds every such box up to the next device pixel (`snap`), and centring rounds its offset to a whole one (`centre`). A grid splits its width in device pixels, so its columns differ by one device pixel at most (`grid`).
 - **Hairlines are one device pixel** at every scale (`stroke.hairline_device_px`): dividers, card, field and well outlines, the switch track. They are the one length not on the grid.
@@ -228,6 +228,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Field` | `icon` | height | control |
 | `Spinner` | size `16`, `20`, `24`, `32`, `48` | both | none |
 | `Switch` | none | both | full |
+| `Slider` | `stepped` | height | full |
 | `Checkbox` | none | height | small |
 | `Radio` | none | height | full |
 | `ProgressBar` | none | height | full |
@@ -256,7 +257,7 @@ Every interactive component has these states, shown in the specimen: **resting, 
 | `Fill` | `layout::fill` | Room that pushes what follows to the row's far end. |
 | `Gap` | `layout::gap` | Empty room of one spacing token, where a stack needs one larger step. |
 
-Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so a view built from these can't leave the scale. Text in a type style is `Text` (`text::text`); a symbol is `Icon` (`icon::icon`).
+Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so a view built from these can't leave the scale. Text in a type style is `Text` (`text::text`); a symbol is `Icon` (`icon::icon`). In the shell, where a window's title or a notification's body must keep to its lines, QML's `Text` takes `maximumLines`: the last line it keeps ends in an ellipsis at its room.
 
 ### Buttons
 
@@ -296,6 +297,7 @@ Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so 
 | `Switch` | `switch::switch` | On or off, 44 × 24, the knob 12 off and 16 on, a hairline track. It takes effect at once; Space, Enter or a click toggles. |
 | `Checkbox` | `check::checkbox` | Square, 20, the small radius (4), a hairline edge. Empty, partial (a dash, for some of a group) or full. For several independent picks that apply together. |
 | `Radio` | `check::radio` | A 20 disc with an 8 dot. One of a group, exactly one picked. |
+| `Slider` | `slider::slider` | A value from 0 to 1, or one of a few stops (`stepped`), 24 tall: a progress bar's track filled up to a 16 thumb, a stop mark (4) on each stop the fill hasn't reached, and the focus ring a pill round it all. A drag follows the pointer; on a slider with stops it shows the stop under the pointer and picks it on release. Left and Right step by a twentieth or a stop, Home and End go to the ends. It takes effect as it moves, so it carries a live value: volume, brightness, a power stop. |
 
 A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's Items, never a hand-rolled filter: see the QML rules in `docs/agents/code-quality.md`. A field that parses what is typed (a time, a password) isn't a search.
 

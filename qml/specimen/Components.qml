@@ -392,6 +392,75 @@ K.Stack {
                 }
 
                 K.Section {
+                    title: "Sliders"
+                    description: "A progress bar's track filled up to the thumb. One with stops marks those ahead and snaps to them."
+
+                    K.Grid {
+                        columns: 4
+                        gap: K.Tokens.space.s32
+
+                        Repeater {
+                            model: [
+                                {
+                                    label: "Volume, 62%",
+                                    value: 0.62,
+                                    stops: 0,
+                                    index: 0,
+                                    focused: false,
+                                    enabled: true
+                                },
+                                {
+                                    label: "Five stops",
+                                    value: 0,
+                                    stops: 5,
+                                    index: 2,
+                                    focused: false,
+                                    enabled: true
+                                },
+                                {
+                                    label: "Focused",
+                                    value: 0.3,
+                                    stops: 0,
+                                    index: 0,
+                                    focused: true,
+                                    enabled: true
+                                },
+                                {
+                                    label: "Disabled",
+                                    value: 0.3,
+                                    stops: 0,
+                                    index: 0,
+                                    focused: false,
+                                    enabled: false
+                                }
+                            ]
+
+                            K.Stack {
+                                id: slid
+
+                                required property var modelData
+
+                                gap: K.Tokens.space.s8
+
+                                K.Slider {
+                                    value: slid.modelData.value
+                                    stops: slid.modelData.stops
+                                    index: slid.modelData.index
+                                    focused: slid.modelData.focused
+                                    enabled: slid.modelData.enabled
+                                }
+
+                                K.Text {
+                                    text: slid.modelData.label
+                                    style: K.Tokens.type.small
+                                    color: K.Tokens.color.on_surface_variant
+                                }
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
                     title: "Lists"
                     description: "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The ring goes round the well; the row shows where the keyboard is."
 

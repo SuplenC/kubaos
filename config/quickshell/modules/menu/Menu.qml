@@ -3,7 +3,6 @@ import Quickshell
 import Quickshell.Wayland
 import Kotodama
 import KubaOS.Components as K
-import qs.theme
 import qs.services
 import qs.settings
 
@@ -498,7 +497,7 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent
             radius: K.Tokens.radius.surface
-            color: K.Look.alpha(K.Tokens.color.surface, Theme.frame.opacity)
+            color: K.Look.alpha(K.Tokens.color.surface, K.Tokens.opacity.frame)
             border.width: K.Look.hairline(menu.dpr)
             border.color: K.Look.alpha(K.Tokens.color.outline_variant, K.Tokens.opacity.outline_soft)
         }

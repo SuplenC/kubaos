@@ -1,5 +1,5 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -12,28 +12,24 @@ Pill {
 
     visible: Recorder.active
     interactive: true
-    spacing: Theme.spacing.sm
-    color: Theme.m3errorContainer
+    color: K.Tokens.color.error_container
+    ink: K.Tokens.color.on_error_container
     tooltip: Recorder.replay ? "Replay buffer on: SUPER+SHIFT+P saves the last 30 s. Click to turn off" : "Recording. Click to stop"
     onClicked: Recorder.stop()
 
+    // The radio button's dot: the same mark of something on.
     Rectangle {
-        id: dot
-
-        anchors.verticalCenter: parent.verticalCenter
-        width: 8
-        height: 8
-        radius: 4
-        color: Recorder.replay ? "transparent" : Theme.m3error
-        border.width: Recorder.replay ? 2 : 0
-        border.color: Theme.m3error
+        implicitWidth: K.Tokens.size.radio_dot
+        implicitHeight: K.Tokens.size.radio_dot
+        radius: K.Tokens.radius.full
+        color: Recorder.replay ? "transparent" : K.Tokens.color.error
+        border.width: Recorder.replay ? K.Look.thin(root.dpr) : 0
+        border.color: K.Tokens.color.error
     }
 
-    StyledText {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Text {
         text: Recorder.replay ? "Replay 30 s" : Recorder.elapsedText
-        color: Theme.m3onErrorContainer
-        font.weight: Font.Medium
-        font.features: Theme.font.tabular
+        style: K.Tokens.type.mono
+        color: K.Tokens.color.on_error_container
     }
 }

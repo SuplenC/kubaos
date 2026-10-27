@@ -4,7 +4,7 @@ import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 import qs.modules.bar
@@ -51,7 +51,7 @@ Scope {
         readonly property var panels: [controlCenter, clockPopup, sysmonPopup, powerMenu, wallpaperPicker]
         // The panel on screen (opening, open or closing) that reaches into
         // the popups' corner column, or null. Popups never draw over it.
-        readonly property Drawer toastCover: panels.find(d => (d.shown || d.active) && d.area.x + d.area.width + Theme.frame.flare > geo.r - popups.contentWidth) ?? null
+        readonly property Drawer toastCover: panels.find(d => (d.shown || d.active) && d.area.x + d.area.width + K.Tokens.radius.surface > geo.r - popups.contentWidth) ?? null
 
         screen: scope.screen
         color: "transparent"
@@ -91,10 +91,16 @@ Scope {
             }
         }
 
+        // The frame comes back as a panel arrives and retracts as one leaves. HAZARD: pick the
+        // timing from where it is going, not from `fullscreen`: the animation starts before
+        // bindings on it update.
         Behavior on reveal {
-            Anim {
-                duration: Theme.anim.normal
-                easing.bezierCurve: Theme.anim.emphasized
+            id: revealing
+
+            NumberAnimation {
+                duration: revealing.targetValue > 0 ? K.Tokens.duration.long : K.Tokens.duration.medium
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: revealing.targetValue > 0 ? K.Tokens.easing.emphasized_decel : K.Tokens.easing.emphasized_accel
             }
         }
 
@@ -102,32 +108,34 @@ Scope {
         QtObject {
             id: geo
 
-            readonly property real l: Theme.frame.thickness * root.reveal
-            readonly property real t: Theme.bar.height * root.reveal
-            readonly property real r: root.width - Theme.frame.thickness * root.reveal
-            readonly property real b: root.height - Theme.frame.thickness * root.reveal
+            readonly property real l: K.Tokens.space.s8 * root.reveal
+            readonly property real t: K.Tokens.size.bar * root.reveal
+            readonly property real r: root.width - K.Tokens.space.s8 * root.reveal
+            readonly property real b: root.height - K.Tokens.space.s8 * root.reveal
             readonly property ShellScreen screen: root.screen
         }
 
         // Dims the desktop behind modal panels. Panels float over the tiled
         // windows (no exclusive zone, so nothing reflows when one opens); the
         // scrim keeps a window's text from reading as part of the panel.
-        // The wallpaper picker stays undimmed: the desktop is its preview.
+        // The wallpaper picker stays undimmed: the desktop is its preview. The power menu asks
+        // what to do with the session, so it dims as a dialog does.
         Rectangle {
             anchors.fill: parent
-            color: Theme.m3scrim
+            color: K.Tokens.color.scrim
             opacity: ({
-                    powermenu: 0.45,
-                    controlcenter: 0.2,
-                    clock: 0.2,
-                    sysmon: 0.2
+                    powermenu: K.Tokens.opacity.scrim,
+                    controlcenter: K.Tokens.opacity.panel_scrim,
+                    clock: K.Tokens.opacity.panel_scrim,
+                    sysmon: K.Tokens.opacity.panel_scrim
                 })[root.panel] ?? 0
             visible: opacity > 0
 
             Behavior on opacity {
-                Anim {
-                    duration: Theme.anim.normal
-                    easing.bezierCurve: Theme.anim.effects
+                NumberAnimation {
+                    duration: K.Tokens.duration.medium
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: K.Tokens.easing.standard
                 }
             }
         }
@@ -136,13 +144,14 @@ Scope {
             id: background
 
             anchors.fill: parent
-            opacity: Theme.frame.opacity
+            opacity: K.Tokens.opacity.frame
             layer.enabled: true
             layer.effect: MultiEffect {
                 shadowEnabled: true
-                shadowColor: Theme.alpha(Theme.m3shadow, Theme.elevation.opacity)
+                shadowColor: K.Look.alpha(K.Tokens.color.shadow, K.Tokens.shadow.panel.opacity)
                 shadowBlur: 1
-                blurMax: Theme.elevation.frameBlur
+                blurMax: K.Tokens.shadow.panel.blur
+                shadowVerticalOffset: K.Tokens.shadow.panel.y
             }
 
             Shape {
@@ -150,12 +159,13 @@ Scope {
                 preferredRendererType: Shape.CurveRenderer
 
                 ShapePath {
-                    fillColor: Theme.m3surface
+                    fillColor: K.Tokens.color.surface
+                    // design-allow(size): -1 is ShapePath's "no stroke", not a width.
                     strokeWidth: -1
                     fillRule: ShapePath.OddEvenFill
 
                     PathSvg {
-                        path: DrawerPath.frame(root.width, root.height, geo, Theme.frame.rounding * root.reveal)
+                        path: DrawerPath.frame(root.width, root.height, geo, K.Tokens.radius.surface * root.reveal)
                     }
                 }
 
@@ -200,9 +210,9 @@ Scope {
         }
 
         Bar {
-            y: geo.t - Theme.bar.height
+            y: geo.t - K.Tokens.size.bar
             width: root.width
-            height: Theme.bar.height
+            height: K.Tokens.size.bar
             screen: root.screen
             window: root
             opacity: root.reveal
@@ -285,7 +295,8 @@ Scope {
     component PanelPath: ShapePath {
         required property Drawer drawer
 
-        fillColor: Theme.m3surface
+        fillColor: K.Tokens.color.surface
+        // design-allow(size): -1 is ShapePath's "no stroke", not a width.
         strokeWidth: -1
 
         PathSvg {

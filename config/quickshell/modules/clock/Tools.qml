@@ -1,119 +1,107 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
 // Timer, stopwatch and alarms, on tabs. They run in the Time service, so
 // they keep going and ring with the popup closed.
+//
+// The tabs share one height, the tallest any of them gets (the alarms' field
+// over three alarms), so switching tabs never moves the popup.
 Item {
     id: root
 
     property int tab: 0
     property string error: ""
     readonly property real now: Time.now.getTime()
+    readonly property int pageHeight: K.Tokens.size.control_md + (K.Tokens.size.control_sm + K.Tokens.space.s8) * 3
 
-    implicitWidth: 280
-    implicitHeight: tabs.height + Theme.spacing.md + 150
+    implicitWidth: K.Tokens.size.rail
+    implicitHeight: page.y + page.height + (root.error !== "" ? K.Tokens.space.s8 + errorText.implicitHeight : 0)
 
     function show(index: int): void {
         tab = index;
         error = "";
     }
 
-    TabBar {
+    Tabs {
         id: tabs
 
-        width: parent.width
         labels: ["Timer", "Stopwatch", "Alarm"]
         currentIndex: root.tab
         onPicked: index => root.show(index)
     }
 
     Item {
-        y: tabs.height + Theme.spacing.md
+        id: page
+
+        y: tabs.implicitHeight + K.Tokens.space.s12
         width: parent.width
-        height: 150
+        height: root.pageHeight
 
         // Timer: what's left and its bar while set, else a duration to start.
-        Column {
-            anchors.fill: parent
-            spacing: Theme.spacing.sm
+        K.Stack {
+            width: parent.width
+            room: width
+            fill: true
+            gap: K.Tokens.space.s8
             visible: root.tab === 0
 
-            StyledText {
+            K.Stack {
                 visible: Time.timerSet
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                text: Time.face(Time.timerEnd > 0 ? Time.timerEnd - root.now : Time.timerLeft, false)
-                font.pixelSize: 40
-                font.weight: Font.Light
-                font.features: Theme.font.tabular
-                color: Time.timerEnd > 0 ? Theme.m3onSurface : Theme.m3onSurfaceVariant
+                centred: true
+
+                Figure {
+                    text: Time.face(Time.timerEnd > 0 ? Time.timerEnd - root.now : Time.timerLeft, false)
+                    style: K.Tokens.type.headline
+                    color: Time.timerEnd > 0 ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
+                }
             }
 
-            Rectangle {
+            K.ProgressBar {
+                readonly property real remaining: Time.timerEnd > 0 ? Time.timerEnd - root.now : Time.timerLeft
+
                 visible: Time.timerSet
-                width: parent.width
-                height: 6
-                radius: 3
-                color: Theme.m3surfaceContainerHighest
+                value: Time.timerTotal > 0 ? remaining / Time.timerTotal : 0
+            }
 
-                Rectangle {
-                    readonly property real remaining: Time.timerEnd > 0 ? Time.timerEnd - root.now : Time.timerLeft
+            K.Stack {
+                visible: Time.timerSet
+                centred: true
 
-                    width: parent.width * Math.max(0, Math.min(1, Time.timerTotal > 0 ? remaining / Time.timerTotal : 0))
-                    height: parent.height
-                    radius: 3
-                    color: Theme.m3primary
+                K.Row {
+                    gap: K.Tokens.space.s8
 
-                    Behavior on width {
-                        Anim {
-                            duration: 1000
-                            easing.type: Easing.Linear
-                        }
+                    K.IconButton {
+                        icon: Time.timerEnd > 0 ? "pause" : "play_arrow"
+                        label: Time.timerEnd > 0 ? qsTr("Pause") : qsTr("Resume")
+                        kind: "Filled"
+                        onActivated: Time.pauseTimer()
+                    }
+
+                    K.IconButton {
+                        icon: "close"
+                        label: qsTr("Cancel")
+                        kind: "Tonal"
+                        onActivated: Time.cancelTimer()
                     }
                 }
             }
 
-            Row {
-                visible: Time.timerSet
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.spacing.sm
-
-                IconButton {
-                    icon: Time.timerEnd > 0 ? "pause" : "play_arrow"
-                    toggled: true
-                    tooltip: Time.timerEnd > 0 ? "Pause" : "Resume"
-                    onClicked: Time.pauseTimer()
-                }
-
-                IconButton {
-                    icon: "close"
-                    baseColor: Theme.m3surfaceContainerHigh
-                    tooltip: "Cancel"
-                    onClicked: Time.cancelTimer()
-                }
-            }
-
-            SearchField {
+            K.Field {
                 id: timerField
 
                 visible: !Time.timerSet
-                width: parent.width
                 icon: "timer"
                 placeholder: "25m, 1h30m, 90 seconds"
-                catchEscape: true
-                onEscaped: text = ""
-                onAccepted: Time.startTimer(text, error => {
-                    root.error = error;
-                    if (error === "")
-                        text = "";
-                })
+                Keys.onEscapePressed: timerField.text = ""
+                Keys.onReturnPressed: root.startTimer()
+                Keys.onEnterPressed: root.startTimer()
             }
 
-            Row {
+            K.Row {
                 visible: !Time.timerSet
-                spacing: Theme.spacing.sm
+                gap: K.Tokens.space.s8
 
                 Repeater {
                     model: ["5m", "10m", "25m", "1h"]
@@ -129,140 +117,145 @@ Item {
         }
 
         // Stopwatch: the time, start/stop, lap and reset, the last laps.
-        Column {
-            anchors.fill: parent
-            spacing: Theme.spacing.sm
+        K.Stack {
+            width: parent.width
+            room: width
+            fill: true
+            gap: K.Tokens.space.s8
+            centred: true
             visible: root.tab === 1
 
-            StyledText {
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
+            Figure {
                 text: Time.face(Time.stopwatchElapsed(root.now), false)
-                font.pixelSize: 40
-                font.weight: Font.Light
-                font.features: Theme.font.tabular
+                style: K.Tokens.type.headline
+                color: K.Tokens.color.on_surface
             }
 
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.spacing.sm
+            K.Row {
+                gap: K.Tokens.space.s8
 
-                IconButton {
+                K.IconButton {
                     icon: Time.stopwatchRunning ? "pause" : "play_arrow"
-                    toggled: true
-                    tooltip: Time.stopwatchRunning ? "Stop" : "Start"
-                    onClicked: Time.toggleStopwatch()
+                    label: Time.stopwatchRunning ? qsTr("Stop") : qsTr("Start")
+                    kind: "Filled"
+                    onActivated: Time.toggleStopwatch()
                 }
 
-                IconButton {
+                K.IconButton {
                     icon: "flag"
-                    baseColor: Theme.m3surfaceContainerHigh
-                    tooltip: "Lap"
-                    onClicked: Time.lap()
+                    label: qsTr("Lap")
+                    kind: "Tonal"
+                    onActivated: Time.lap()
                 }
 
-                IconButton {
+                K.IconButton {
                     icon: "restart_alt"
-                    baseColor: Theme.m3surfaceContainerHigh
-                    tooltip: "Reset"
-                    onClicked: Time.resetStopwatch()
+                    label: qsTr("Reset")
+                    kind: "Tonal"
+                    onActivated: Time.resetStopwatch()
                 }
             }
 
             Repeater {
                 model: Time.laps.slice(0, 2)
 
-                StyledText {
+                Figure {
                     required property real modelData
                     required property int index
 
-                    width: parent.width
-                    horizontalAlignment: Text.AlignHCenter
                     text: `Lap ${Time.laps.length - index}  ${Time.face(modelData, false)}`
-                    font.pixelSize: Theme.font.sm
-                    font.features: Theme.font.tabular
-                    color: Theme.m3onSurfaceVariant
+                    style: K.Tokens.type.small
+                    color: K.Tokens.color.on_surface_variant
                 }
             }
         }
 
         // Alarms: a time to add, and the ones set.
-        Column {
-            anchors.fill: parent
-            spacing: Theme.spacing.sm
+        K.Stack {
+            width: parent.width
+            room: width
+            fill: true
+            gap: K.Tokens.space.s8
             visible: root.tab === 2
 
-            SearchField {
-                width: parent.width
+            K.Field {
+                id: alarmField
+
                 icon: "alarm_add"
                 placeholder: "7:30, 6pm, friday 17:00"
-                catchEscape: true
-                onEscaped: text = ""
-                onAccepted: Time.addAlarm(text, error => {
-                    root.error = error;
-                    if (error === "")
-                        text = "";
-                })
+                Keys.onEscapePressed: alarmField.text = ""
+                Keys.onReturnPressed: root.addAlarm()
+                Keys.onEnterPressed: root.addAlarm()
             }
 
-            StyledText {
+            K.Text {
                 visible: Time.alarms.length === 0
-                width: parent.width
                 text: "No alarms set"
-                color: Theme.m3outline
-                font.pixelSize: Theme.font.sm
+                style: K.Tokens.type.small
+                color: K.Tokens.color.outline
             }
 
             Repeater {
                 model: Time.alarms.slice(0, 3)
 
-                Item {
+                K.Row {
                     required property var modelData
                     required property int index
 
-                    width: parent.width
-                    height: 28
+                    fill: true
+                    gap: K.Tokens.space.s8
+                    align: "centre"
 
-                    Icon {
-                        id: bell
-
-                        anchors.verticalCenter: parent.verticalCenter
+                    K.Icon {
                         name: "alarm"
-                        size: 18
-                        color: Theme.m3tertiary
+                        size: K.Tokens.icon.s20
+                        color: K.Tokens.color.tertiary
                     }
 
-                    StyledText {
-                        anchors.left: bell.right
-                        anchors.leftMargin: Theme.spacing.sm
-                        anchors.right: remove.left
-                        anchors.verticalCenter: parent.verticalCenter
+                    K.Text {
                         text: modelData.label
+                        style: K.Tokens.type.body
                     }
 
-                    IconButton {
-                        id: remove
+                    K.Fill {}
 
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
+                    K.IconButton {
                         icon: "close"
-                        size: 26
-                        tooltip: "Remove"
-                        onClicked: Time.removeAlarm(index)
+                        label: qsTr("Remove")
+                        kind: "Text"
+                        size: "Sm"
+                        onActivated: Time.removeAlarm(index)
                     }
                 }
             }
         }
     }
 
-    StyledText {
+    K.Text {
+        id: errorText
+
         visible: root.error !== ""
-        anchors.bottom: parent.bottom
-        width: parent.width
+        y: page.y + page.height + K.Tokens.space.s8
+        room: root.width
         text: root.error
-        color: Theme.m3error
-        font.pixelSize: Theme.font.sm
-        wrapMode: Text.Wrap
-        maximumLineCount: 2
+        style: K.Tokens.type.small
+        color: K.Tokens.color.error
+        maximumLines: 2
+    }
+
+    function startTimer(): void {
+        Time.startTimer(timerField.text, error => {
+            root.error = error;
+            if (error === "")
+                timerField.text = "";
+        });
+    }
+
+    function addAlarm(): void {
+        Time.addAlarm(alarmField.text, error => {
+            root.error = error;
+            if (error === "")
+                alarmField.text = "";
+        });
     }
 }

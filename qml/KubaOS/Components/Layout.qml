@@ -44,6 +44,11 @@ Item {
         // Whether a child, the children or the padding changed since. The width, room and scale
         // it arranged at are kept below and compared instead.
         property bool dirty: true
+        // Whether the layout is complete. HAZARD: a Repeater or a view making the layout's
+        // delegate adds its children before the delegate is complete, and the handler for them
+        // then runs with no context (`Array` undefined); the layout watches its children once it
+        // is complete instead.
+        property bool completed: false
         property real width: NaN
         property real room: NaN
         property real dpr: NaN
@@ -125,6 +130,8 @@ Item {
     }
 
     function schedule(): void {
+        if (!root)
+            return;
         root.laid.dirty = true;
         Qt.callLater(root.relayout);
         K.FrameQueue.add(root, root.Window.window);
@@ -133,7 +140,8 @@ Item {
     // A child shown or hidden: laid out again only when that changes which children are laid out.
     // Hiding an ancestor hides every child at once and changes nothing here.
     function kidShownOrHidden(): void {
-        if (!root.visible)
+        // A child's change can arrive while this layout is being torn down, when `root` is gone.
+        if (!root || !root.visible)
             return;
         if (root.indices(root.managed()) !== root.laid.kids)
             root.schedule();
@@ -159,7 +167,8 @@ Item {
             kid.visibleChanged.disconnect(root.kidShownOrHidden);
     }
 
-    onChildrenChanged: {
+    // Watches the children added since it last looked, and stops watching the ones gone.
+    function track(): void {
         const kids = Array.from(root.children);
         for (const kid of root.watched.filter(kid => !kids.includes(kid)))
             root.watch(kid, false);
@@ -167,6 +176,11 @@ Item {
             root.watch(kid, true);
         root.watched = kids;
         root.schedule();
+    }
+
+    onChildrenChanged: {
+        if (root.laid.completed)
+            root.track();
     }
     Component.onDestruction: {
         for (const kid of root.watched)
@@ -187,5 +201,8 @@ Item {
     onRightPaddingChanged: root.schedule()
     onTopPaddingChanged: root.schedule()
     onBottomPaddingChanged: root.schedule()
-    Component.onCompleted: root.schedule()
+    Component.onCompleted: {
+        root.laid.completed = true;
+        root.track();
+    }
 }

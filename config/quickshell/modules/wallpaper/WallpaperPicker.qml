@@ -1,7 +1,6 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell.Widgets
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -26,22 +25,31 @@ Drawer {
     readonly property string folder: folders[settingsOpen ? lastFolder : folderIndex]?.name ?? ""
     readonly property var images: Wallpapers.images[folder] ?? []
     readonly property real dpr: frame.screen?.devicePixelRatio ?? 1
+    readonly property int pad: K.Tokens.space.s24
     // Up to four per row; fewer images make a narrower panel (it morphs when
     // switching folders).
-    readonly property int columns: Math.max(2, Math.min(4, images.length))
-    readonly property real thumbWidth: 248
-    readonly property real thumbHeight: Math.round(thumbWidth * 10 / 16)
-    readonly property real cellWidth: thumbWidth + Theme.spacing.md
-    readonly property real cellHeight: thumbHeight + 34
+    readonly property int mostColumns: 4
+    readonly property int columns: Math.max(2, Math.min(mostColumns, images.length))
+    // The most of the screen's height the settings take before they scroll.
+    readonly property real settingsShare: 0.7
+    // 16:10 thumbnails, 256 by 160: both on the grid, so their edges land on device pixels at
+    // every scale.
+    readonly property real thumbWidth: K.Tokens.size.thumbnail_width
+    readonly property real thumbHeight: K.Tokens.size.thumbnail_height
+    // The focus ring's band round each thumbnail, inside its cell so the grid's clip never cuts it.
+    readonly property real ring: K.Tokens.focus.offset
+    readonly property real cellWidth: thumbWidth + ring * 2
+    readonly property real cellHeight: ring + thumbHeight + K.Tokens.space.s8 + K.Tokens.type.small.line + K.Tokens.space.s8
     readonly property int rows: Math.max(1, Math.min(2, Math.ceil(images.length / columns)))
-    // The thumbnails without the last cell's gap.
-    readonly property real gridWidth: (settingsOpen ? 4 : columns) * cellWidth - Theme.spacing.md
+    // The thumbnails, from the first's left edge to the last's right.
+    readonly property real gridWidth: (settingsOpen ? mostColumns : columns) * cellWidth - ring * 2
+    readonly property real headerWidth: tabs.implicitWidth + K.Tokens.space.s16 * 2 + hints.implicitWidth
 
     edge: "bottom"
     // As wide as the thumbnails or the tabs and key hints above them,
     // whichever is wider, and never wider than the screen.
-    contentWidth: Math.min(Math.max(gridWidth, header.implicitWidth) + Theme.spacing.xl * 2, frame.r - frame.l - Theme.frame.flare * 2)
-    contentHeight: header.implicitHeight + (settingsOpen ? Math.min(Math.max(cellHeight, settings.implicitHeight), (frame.b - frame.t) * 0.7) : rows * cellHeight) + Theme.spacing.lg * 2 + Theme.spacing.md
+    contentWidth: Math.min(Math.max(gridWidth, headerWidth) + pad * 2, frame.r - frame.l - K.Tokens.radius.surface * 2)
+    contentHeight: pad + header.implicitHeight + K.Tokens.space.s16 + (settingsOpen ? Math.min(Math.max(cellHeight, settings.implicitHeight), (frame.b - frame.t) * settingsShare) : rows * cellHeight) + pad
     onOpened: {
         Wallpapers.refresh();
         const current = Wallpapers.folderOf(Wallpapers.current);
@@ -97,248 +105,199 @@ Drawer {
         }
     }
 
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.leftMargin: Theme.spacing.xl
-        anchors.rightMargin: Theme.spacing.xl
-        anchors.topMargin: Theme.spacing.lg
-        anchors.bottomMargin: Theme.spacing.lg
-        spacing: Theme.spacing.md
+    // The folders' tabs, and the keys in a caption line at the far end, as every screen shows them.
+    K.Row {
+        id: header
 
-        RowLayout {
-            id: header
+        x: root.pad
+        y: root.pad
+        width: root.contentWidth - root.pad * 2
+        gap: K.Tokens.space.s16
+        align: "centre"
 
-            Layout.fillWidth: true
-            spacing: Theme.spacing.sm
+        // Picked with the pointer; Tab and Shift+Tab in the grid switch folders.
+        Tabs {
+            id: tabs
 
-            // Gives up padding, then elides, on a screen too narrow for the
-            // whole header.
-            TabBar {
-                Layout.fillWidth: true
-                Layout.maximumWidth: implicitWidth
-                labels: [...root.folders.map(f => `${f.name.charAt(0).toUpperCase()}${f.name.slice(1).replace(/-/g, " ")}  ${(Wallpapers.images[f.name] ?? []).length}`), "Settings"]
-                currentIndex: root.folderIndex
-                activeFocusOnTab: false
-                onPicked: index => root.pick(index)
-            }
+            labels: [...root.folders.map(f => `${f.name.charAt(0).toUpperCase()}${f.name.slice(1).replace(/-/g, " ")} ${(Wallpapers.images[f.name] ?? []).length}`), "Settings"]
+            currentIndex: root.folderIndex
+            activeFocusOnTab: false
+            onPicked: index => root.pick(index)
+        }
 
-            Item {
-                Layout.fillWidth: true
-            }
+        K.Fill {
+        }
 
-            Repeater {
-                model: root.settingsOpen ? [["←→", "change"], ["Esc", "back"]] : [["Tab", "folder"], ["S", "settings"], ["Enter", "apply"], ["Esc", "close"]]
+        K.Text {
+            id: hints
 
-                delegate: Row {
-                    required property var modelData
+            text: root.settingsOpen ? "←→ change · Esc back" : "Tab folder · S settings · Enter apply · Esc close"
+            style: K.Tokens.type.caption
+            color: K.Tokens.color.on_surface_variant
+            maximumLines: 1
+        }
+    }
 
-                    spacing: Theme.spacing.xs
+    WallpaperSettings {
+        id: settings
 
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        implicitWidth: key.implicitWidth + Theme.spacing.sm * 2
-                        implicitHeight: 20
-                        radius: Theme.rounding.xs
-                        color: Theme.m3surfaceContainerHigh
+        x: root.pad
+        y: header.y + header.height + K.Tokens.space.s16
+        width: root.contentWidth - root.pad * 2
+        height: root.contentHeight - y - root.pad
+        visible: root.settingsOpen
+        onBack: root.pick(root.lastFolder)
+    }
 
-                        StyledText {
-                            id: key
+    GridView {
+        id: grid
 
-                            anchors.centerIn: parent
-                            text: modelData[0]
-                            font.pixelSize: Theme.font.xs
-                            font.weight: Font.DemiBold
-                            color: Theme.m3onSurfaceVariant
+        // Exactly `columns` cells wide, centred, so the thumbnails sit in the middle when the
+        // header makes the panel wider than they are.
+        x: K.Look.snap((root.contentWidth - width) / 2, root.dpr)
+        y: header.y + header.height + K.Tokens.space.s16 - root.ring
+        width: root.columns * root.cellWidth
+        height: root.rows * root.cellHeight
+        visible: !root.settingsOpen
+        clip: true
+        cellWidth: root.cellWidth
+        cellHeight: root.cellHeight
+        boundsBehavior: Flickable.StopAtBounds
+        highlightMoveDuration: K.Tokens.duration.medium
+        highlightFollowsCurrentItem: true
+        keyNavigationWraps: true
+        model: root.images
+        onCurrentIndexChanged: if (root.shown)
+            previewDelay.restart()
+
+        Keys.onPressed: event => {
+            const k = event.key;
+            if (k === Qt.Key_H)
+                moveCurrentIndexLeft();
+            else if (k === Qt.Key_L)
+                moveCurrentIndexRight();
+            else if (k === Qt.Key_J)
+                moveCurrentIndexDown();
+            else if (k === Qt.Key_K)
+                moveCurrentIndexUp();
+            else if (k === Qt.Key_Tab)
+                root.switchFolder(1);
+            else if (k === Qt.Key_S)
+                root.pick(root.settingsIndex);
+            else if (k === Qt.Key_Backtab)
+                root.switchFolder(-1);
+            else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && count > 0)
+                root.apply(currentIndex);
+            else
+                return;
+            event.accepted = true;
+        }
+
+        delegate: Item {
+            id: cell
+
+            required property string modelData
+            required property int index
+            readonly property bool isCurrent: GridView.isCurrentItem
+            readonly property bool applied: modelData === Wallpapers.current
+
+            width: grid.cellWidth
+            height: grid.cellHeight
+
+            // A picture you pick: the control radius, the selection the focus ring round it.
+            ClippingRectangle {
+                id: picture
+
+                x: root.ring
+                y: root.ring
+                width: root.thumbWidth
+                height: root.thumbHeight
+                radius: K.Tokens.radius.control
+                color: K.Tokens.color.surface_container_high
+
+                WallpaperView {
+                    id: thumb
+
+                    anchors.fill: parent
+                    path: cell.modelData
+                    // Decode at the size it is shown, in device pixels: crisp and cheap.
+                    sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
+                    playing: root.shown && (cell.isCurrent || tap.containsMouse) && Motion.mode !== "never"
+                    // The ones not picked sit back, as secondary content does.
+                    opacity: ready ? (cell.isCurrent ? 1 : K.Tokens.opacity.subdued) : 0
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: K.Tokens.duration.short
+                            easing.type: Easing.BezierSpline
+                            easing.bezierCurve: K.Tokens.easing.standard
                         }
                     }
-
-                    StyledText {
-                        anchors.verticalCenter: parent.verticalCenter
-                        rightPadding: Theme.spacing.sm
-                        text: modelData[1]
-                        font.pixelSize: Theme.font.sm
-                        color: Theme.m3outline
-                    }
                 }
+
+                // This one moves: playing, or held on its poster.
+                K.Chip {
+                    anchors.left: parent.left
+                    anchors.bottom: parent.bottom
+                    anchors.margins: K.Tokens.space.s8
+                    visible: thumb.video
+                    icon: thumb.moving ? "motion_photos_on" : "motion_photos_paused"
+                    text: thumb.moving ? "Playing" : "Video"
+                }
+
+                K.Chip {
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.margins: K.Tokens.space.s8
+                    visible: cell.applied
+                    kind: "Selected"
+                    icon: "check"
+                    text: "Current"
+                }
+
+                K.StateLayer {
+                    hovered: tap.containsMouse
+                    pressed: tap.pressed
+                    content: K.Tokens.color.on_surface
+                }
+
+                MouseArea {
+                    id: tap
+
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.apply(cell.index)
+                }
+            }
+
+            K.FocusRing {
+                x: picture.x - K.Tokens.focus.offset
+                y: picture.y - K.Tokens.focus.offset
+                width: picture.width + K.Tokens.focus.offset * 2
+                height: picture.height + K.Tokens.focus.offset * 2
+                shown: cell.isCurrent
+                controlRadius: K.Tokens.radius.control
+            }
+
+            K.Text {
+                x: picture.x + K.Look.snap((root.thumbWidth - implicitWidth) / 2, root.dpr)
+                y: picture.y + root.thumbHeight + K.Tokens.space.s8
+                room: root.thumbWidth
+                maximumLines: 1
+                text: Wallpapers.label(cell.modelData)
+                style: K.Tokens.type.small
+                color: cell.isCurrent ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
             }
         }
 
-        WallpaperSettings {
-            id: settings
-
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            visible: root.settingsOpen
-            onBack: root.pick(root.lastFolder)
-        }
-
-        GridView {
-            id: grid
-
-            // Exactly `columns` cells wide; each cell carries its own right gap,
-            // which the left margin matches so the thumbnails sit centred when
-            // the header makes the panel wider than they are.
-            Layout.preferredWidth: root.columns * root.cellWidth
-            Layout.leftMargin: Theme.spacing.md
-            Layout.alignment: Qt.AlignHCenter
-            Layout.fillHeight: true
-            visible: !root.settingsOpen
-            clip: true
-            cellWidth: root.cellWidth
-            cellHeight: root.cellHeight
-            boundsBehavior: Flickable.StopAtBounds
-            highlightMoveDuration: Theme.anim.normal
-            highlightFollowsCurrentItem: true
-            keyNavigationWraps: true
-            model: root.images
-            onCurrentIndexChanged: if (root.shown)
-                previewDelay.restart()
-
-            Keys.onPressed: event => {
-                const k = event.key;
-                if (k === Qt.Key_H)
-                    moveCurrentIndexLeft();
-                else if (k === Qt.Key_L)
-                    moveCurrentIndexRight();
-                else if (k === Qt.Key_J)
-                    moveCurrentIndexDown();
-                else if (k === Qt.Key_K)
-                    moveCurrentIndexUp();
-                else if (k === Qt.Key_Tab)
-                    root.switchFolder(1);
-                else if (k === Qt.Key_S)
-                    root.pick(root.settingsIndex);
-                else if (k === Qt.Key_Backtab)
-                    root.switchFolder(-1);
-                else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && count > 0)
-                    root.apply(currentIndex);
-                else
-                    return;
-                event.accepted = true;
-            }
-
-            delegate: Item {
-                id: cell
-
-                required property string modelData
-                required property int index
-                readonly property bool isCurrent: GridView.isCurrentItem
-                readonly property bool applied: modelData === Wallpapers.current
-
-                width: grid.cellWidth
-                height: grid.cellHeight
-
-                Rectangle {
-                    id: frameRect
-
-                    width: root.thumbWidth
-                    height: root.thumbHeight
-                    radius: Theme.rounding.lg + 3
-                    color: "transparent"
-                    border.width: 2
-                    border.color: cell.isCurrent ? Theme.m3primary : "transparent"
-                    scale: cell.isCurrent ? 1 : 0.94
-
-                    Behavior on scale {
-                        Anim {
-                            duration: Theme.anim.large
-                            easing.bezierCurve: Theme.anim.spatial
-                        }
-                    }
-
-                    Behavior on border.color {
-                        CAnim {}
-                    }
-
-                    ClippingRectangle {
-                        anchors.fill: parent
-                        anchors.margins: 4
-                        radius: Theme.rounding.lg
-                        color: Theme.m3surfaceContainerHigh
-
-                        WallpaperView {
-                            id: thumb
-
-                            anchors.fill: parent
-                            path: cell.modelData
-                            // Decode at the size it is shown, in device pixels: crisp and cheap.
-                            sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
-                            playing: root.shown && (cell.isCurrent || tap.containsMouse) && Motion.mode !== "never"
-                            opacity: ready ? (cell.isCurrent ? 1 : 0.7) : 0
-
-                            Behavior on opacity {
-                                Anim {
-                                    duration: Theme.anim.normal
-                                    easing.bezierCurve: Theme.anim.effects
-                                }
-                            }
-                        }
-
-                        // Motion badge: this one moves.
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.bottom: parent.bottom
-                            anchors.margins: Theme.spacing.sm
-                            width: 26
-                            height: 26
-                            radius: 13
-                            color: Theme.alpha(Theme.m3surfaceContainerHighest, 0.85)
-                            visible: thumb.video
-
-                            Icon {
-                                anchors.centerIn: parent
-                                name: thumb.moving ? "motion_photos_on" : "motion_photos_paused"
-                                size: 18
-                                color: Theme.m3primary
-                            }
-                        }
-
-                        Rectangle {
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: Theme.spacing.sm
-                            width: 26
-                            height: 26
-                            radius: 13
-                            color: Theme.m3primary
-                            visible: cell.applied
-
-                            Icon {
-                                anchors.centerIn: parent
-                                name: "check"
-                                size: 18
-                                color: Theme.m3onPrimary
-                            }
-                        }
-
-                        StateLayer {
-                            id: tap
-
-                            color: Theme.m3onSurface
-                            onClicked: root.apply(cell.index)
-                        }
-                    }
-                }
-
-                StyledText {
-                    anchors.top: frameRect.bottom
-                    anchors.topMargin: Theme.spacing.xs
-                    anchors.horizontalCenter: frameRect.horizontalCenter
-                    width: root.thumbWidth - Theme.spacing.md
-                    horizontalAlignment: Text.AlignHCenter
-                    text: Wallpapers.label(cell.modelData)
-                    color: cell.isCurrent ? Theme.m3onSurface : Theme.m3onSurfaceVariant
-                    font.pixelSize: Theme.font.sm
-                    font.weight: cell.isCurrent ? Font.Medium : Font.Normal
-                }
-            }
-
-            StyledText {
-                anchors.centerIn: parent
-                visible: grid.count === 0
-                text: `Nothing in ${root.folders[root.folderIndex]?.dir || root.folder}. Drop some images or videos in.`
-                color: Theme.m3onSurfaceVariant
-            }
+        K.EmptyState {
+            anchors.centerIn: parent
+            width: parent.width
+            visible: grid.count === 0
+            icon: "wallpaper"
+            title: "Nothing here yet"
+            body: `Drop some images or videos in ${root.folders[root.folderIndex]?.dir || root.folder}.`
         }
     }
 }

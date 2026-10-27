@@ -1,16 +1,16 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
-// The Proxy, while it is on: a locked globe, with the tunnel's endpoint in
-// the tooltip. Click opens the control center, where its tile switches it off.
+// The Proxy, while it is on: a locked shield, with the tunnel's endpoint in the hint. Click opens
+// the control center, where its tile switches it off.
 Pill {
     id: root
 
     visible: Proxy.on
     interactive: true
-    padding: Theme.spacing.sm
+    padding: K.Tokens.space.s8
     tooltip: {
         const parts = ["Proxy on"];
         if (Proxy.endpoint !== "")
@@ -19,10 +19,9 @@ Pill {
     }
     onClicked: Panels.open("controlcenter")
 
-    Icon {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Icon {
         name: "vpn_lock"
-        size: Theme.bar.icon
-        color: Theme.m3tertiary
+        size: K.Tokens.icon.s16
+        color: K.Tokens.color.tertiary
     }
 }

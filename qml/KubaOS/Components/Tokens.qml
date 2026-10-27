@@ -81,6 +81,7 @@ QtObject {
 
     // Fixed dimensions of components.
     readonly property QtObject size: QtObject {
+        readonly property int bar: 40
         readonly property int check: 20
         readonly property int chip: 24
         readonly property int column: 560
@@ -89,15 +90,21 @@ QtObject {
         readonly property int control_sm: 32
         readonly property int dialog: 500
         readonly property int log: 232
+        readonly property int panel: 384
         readonly property int progress: 8
         readonly property int radio_dot: 8
         readonly property int rail: 236
         readonly property int row: 44
         readonly property int row_two_line: 56
+        readonly property int slider: 24
+        readonly property int slider_stop: 4
+        readonly property int slider_thumb: 16
         readonly property int switch_height: 24
         readonly property int switch_knob_off: 12
         readonly property int switch_knob_on: 16
         readonly property int switch_width: 44
+        readonly property int thumbnail_height: 160
+        readonly property int thumbnail_width: 256
     }
 
     // Type families, by the role they play.
@@ -335,10 +342,12 @@ QtObject {
         readonly property real error_edge: 0.45
         readonly property real error_fill: 0.3
         readonly property real focus: 0.12
+        readonly property real frame: 0.94
         readonly property real hover: 0.08
         readonly property real locked: 0.5
         readonly property real log: 0.85
         readonly property real outline_soft: 0.55
+        readonly property real panel_scrim: 0.2
         readonly property real placeholder: 0.55
         readonly property real press: 0.14
         readonly property real scrim: 0.6

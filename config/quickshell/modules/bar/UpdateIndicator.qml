@@ -1,5 +1,5 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
@@ -14,14 +14,13 @@ Pill {
 
     visible: Updates.available
     interactive: true
-    padding: Theme.spacing.sm
+    padding: K.Tokens.space.s8
     tooltip: onlyUpgrade ? `KubaOS ${Updates.upgradeCodename || Updates.upgrade} is out. Click and I'll run kubaos upgrade` : securityWaiting ? `${Updates.aptSecurity} security ${Updates.aptSecurity === 1 ? "update is" : "updates are"} waiting. Click and I'll run kubaos update. Or don't, I'm not your mum` : `KubaOS ${Updates.update} is ready. Click and I'll run kubaos update. Or don't, I'm not your mum`
     onClicked: Updates.run(onlyUpgrade ? "upgrade" : "update")
 
-    Icon {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Icon {
         name: "system_update_alt"
-        size: Theme.bar.icon
-        color: Theme.m3tertiary
+        size: K.Tokens.icon.s16
+        color: K.Tokens.color.tertiary
     }
 }

@@ -35,7 +35,7 @@ Singleton {
             suspend: "bedtime",
             shutdown: "power_settings_new",
             reboot: "restart_alt"
-        })[scheduled] ?? "lock_clock"
+        })[scheduled] ?? "schedule"
     readonly property string scheduledNoun: ({
             suspend: "Suspending",
             shutdown: "Shutting down",

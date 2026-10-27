@@ -1,7 +1,6 @@
 import QtQuick
-import QtQuick.Layouts
+import KubaOS.Components as K
 import Kotodama
-import qs.theme
 import qs.components
 import qs.services
 
@@ -16,7 +15,7 @@ import qs.services
 // says it was shown, answers a close at once, and hands `kotodama toggle` and
 // `open` on to the menu (services/MenuRequests.qml) in case the Daemon took it
 // for the menu.
-ColumnLayout {
+Item {
     id: view
 
     // The app's title and word, as its manifest names them.
@@ -40,8 +39,6 @@ ColumnLayout {
     signal addAtOnce(string spelling)
     signal cancelled
     signal failed(string message)
-
-    spacing: Theme.spacing.sm
 
     function spellingAt(row: int): string {
         return engine.data(engine.index(row, 0), subtitleRole) ?? "";
@@ -79,7 +76,7 @@ ColumnLayout {
 
     Component.onCompleted: {
         send();
-        search.focusInput();
+        search.forceActiveFocus();
     }
 
     onPickedChanged: if (picked)
@@ -88,7 +85,7 @@ ColumnLayout {
     KotodamaSearch {
         id: engine
 
-        highlightColor: Theme.m3primary
+        highlightColor: K.Tokens.color.primary
         onRowsInserted: view.enterApp()
         onModelReset: view.enterApp()
         onScopeChanged: view.send()
@@ -98,136 +95,121 @@ ColumnLayout {
         onActionFailed: message => view.failed(message)
     }
 
-    SearchField {
+    K.Field {
         id: search
 
-        Layout.fillWidth: true
+        width: view.width
+        icon: "search"
         placeholder: "Search languages and layouts"
-        catchEscape: true
+        // The list sees each key first and takes the ones it moves by, Ctrl+K among them, before
+        // the text would delete to the line's end; Esc goes back to the layouts.
         forwardTo: [matchList]
-        onEscaped: view.cancelled()
+        Keys.onEscapePressed: view.cancelled()
         onTextChanged: {
             view.picked = null;
             view.send();
         }
     }
 
-    NavList {
-        id: matchList
+    Well {
+        y: search.height + K.Tokens.space.s12
+        width: view.width
+        height: Math.max(0, (confirm.visible ? confirm.y - K.Tokens.space.s12 : view.height) - y)
+        focused: matchList.activeFocus
 
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        visible: view.entered && count > 0
-        vimKeys: false
-        fieldKeys: true
-        model: view.entered ? engine : null
-        onActivated: index => view.addAtOnce(view.spellingAt(index))
-        // The Add bar takes its room from the list as it shows; the pick stays in view.
-        onHeightChanged: if (view.picked)
-            positionViewAtIndex(currentIndex, ListView.Contain)
-        // New Results select their top row, as the Command menu does.
-        onCountChanged: currentIndex = 0
+        NavList {
+            id: matchList
 
-        // The roles by `model`, as ListRow has a title and a subtitle of its own.
-        delegate: ListRow {
-            id: row
+            anchors.fill: parent
+            visible: view.entered && count > 0
+            vimKeys: false
+            fieldKeys: true
+            model: view.entered ? engine : null
+            onActivated: index => view.addAtOnce(view.spellingAt(index))
+            // The Add bar takes its room from the list as it shows; the pick stays in view.
+            onHeightChanged: if (view.picked)
+                positionViewAtIndex(currentIndex, ListView.Contain)
+            // New Results select their top row, as the Command menu does.
+            onCountChanged: currentIndex = 0
 
-            required property var model
-            required property int index
-            readonly property string spelling: model.subtitle ?? ""
+            // The roles by `model`, as K.ListRow has a title and a subtitle of its own.
+            delegate: K.ListRow {
+                id: row
 
-            width: ListView.view.width
-            title: model.title ?? ""
-            subtitle: spelling
-            current: ListView.isCurrentItem
-            active: view.picked?.spelling === spelling
-            onClicked: {
-                ListView.view.currentIndex = index;
-                view.picked = {
-                    spelling: row.spelling,
-                    name: row.title
-                };
+                required property var model
+                required property int index
+                readonly property string spelling: model.subtitle ?? ""
+
+                width: ListView.view.width
+                title: model.title ?? ""
+                subtitle: spelling
+                selected: ListView.isCurrentItem
+                checkable: true
+                checked: view.picked?.spelling === spelling
+                onActivated: {
+                    ListView.view.currentIndex = index;
+                    view.picked = {
+                        spelling: row.spelling,
+                        name: row.title
+                    };
+                }
             }
+        }
+
+        // While there is nothing to list: why.
+        K.EmptyState {
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width
+            room: parent.width
+            visible: !matchList.visible
+            icon: !engine.connected ? "error" : !view.entered ? "search" : "search_off"
+            title: !engine.connected ? "Nothing to search" : !view.entered ? "Searching…" : "No match"
+            body: !engine.connected ? "The Command menu's search (kotodamad) isn't running." : !view.entered ? "The layouts show up here." : `No layout matches “${search.text.trim()}”.`
         }
     }
 
-    // While there is nothing to list: why.
-    StyledText {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        visible: !matchList.visible
-        verticalAlignment: Text.AlignTop
-        wrapMode: Text.Wrap
-        color: Theme.m3onSurfaceVariant
-        text: !engine.connected ? "The Command menu's search (kotodamad) isn't running, so there is nothing to search." : !view.entered ? "Searching…" : `No layout matches “${search.text.trim()}”.`
-    }
-
     // The picked layout and the button that adds it.
-    Rectangle {
-        Layout.fillWidth: true
+    K.Row {
+        id: confirm
+
+        y: view.height - height
+        width: view.width
+        room: view.width
         visible: view.picked !== null
-        implicitHeight: confirm.implicitHeight + Theme.spacing.sm * 2
-        radius: Theme.rounding.md
-        color: Theme.m3secondaryContainer
+        fill: true
+        gap: K.Tokens.space.s8
+        align: "centre"
 
-        RowLayout {
-            id: confirm
+        // Takes the room the buttons leave.
+        K.Stack {
+            fill: true
 
-            anchors.fill: parent
-            anchors.leftMargin: Theme.spacing.md
-            anchors.rightMargin: Theme.spacing.sm
-            spacing: Theme.spacing.sm
-
-            StyledText {
-                Layout.fillWidth: true
+            K.Text {
                 text: `Add ${view.picked?.name ?? ""}`
-                color: Theme.m3onSecondaryContainer
-                font.weight: Font.Medium
-                elide: Text.ElideRight
+                style: K.Tokens.type.body_strong
+                maximumLines: 1
+            }
+        }
+
+        K.Button {
+            text: "Cancel"
+            kind: "Text"
+            size: "Sm"
+            onActivated: view.picked = null
+        }
+
+        K.Button {
+            id: addButton
+
+            function press(): void {
+                if (view.picked)
+                    view.add(view.picked.spelling);
             }
 
-            IconButton {
-                size: 30
-                icon: "close"
-                tooltip: "Cancel"
-                tint: Theme.m3onSecondaryContainer
-                onClicked: view.picked = null
-            }
-
-            Rectangle {
-                id: addButton
-
-                readonly property real radius: Theme.rounding.full
-
-                function press(): void {
-                    if (view.picked)
-                        view.add(view.picked.spelling);
-                }
-
-                implicitWidth: addLabel.implicitWidth + Theme.spacing.lg * 2
-                implicitHeight: 32
-                color: Theme.m3primary
-                activeFocusOnTab: true
-                Keys.onReturnPressed: press()
-                Keys.onEnterPressed: press()
-                Keys.onSpacePressed: press()
-
-                StyledText {
-                    id: addLabel
-
-                    anchors.centerIn: parent
-                    text: "Add"
-                    color: Theme.m3onPrimary
-                    font.weight: Font.Medium
-                }
-
-                StateLayer {
-                    color: Theme.m3onPrimary
-                    onClicked: addButton.press()
-                }
-
-                FocusRing {}
-            }
+            text: "Add"
+            kind: "Filled"
+            size: "Sm"
+            onActivated: press()
         }
     }
 }

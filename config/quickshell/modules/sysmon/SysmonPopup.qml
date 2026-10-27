@@ -1,44 +1,30 @@
 import QtQuick
 import Quickshell
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
-import qs.modules.clock
 import qs.settings
 
 // The system monitor's popup, under the bar's pill: CPU, memory and GPUs on
 // the left; network, disks, power and fans on the right; the busiest
 // processes below, and uptime, kernel and btop at the foot. While it is open
 // the engine samples every second. A sensor, GPU, battery or fan the machine
-// lacks leaves its line or part out.
-//
-// It glides in as the clock popup does (Kōbō's 220 ms on emphasized
-// decelerate).
+// lacks leaves its line or part out. It is two panels wide.
 Drawer {
     id: root
 
-    readonly property int glide: 220
-    readonly property list<real> arrive: Theme.anim.emphasizedDecel
-    readonly property int pad: Theme.spacing.xl
-    readonly property int gap: Theme.spacing.xxl
-    readonly property int column: 340
-    readonly property int graphHeight: 52
-    readonly property int coreHeight: 22
-    readonly property int buttonSize: 30
+    readonly property int pad: K.Tokens.space.s24
     readonly property var s: Sysmon.sample
     readonly property var th: Sysmon.thresholds
 
     // The colour of a reading's colour step (Sysmon.level).
     function tint(level: int, fine: color): color {
-        return level === 2 ? Theme.m3error : level === 1 ? Theme.warning : fine;
+        return level === 2 ? K.Tokens.color.error : level === 1 ? K.Tokens.color.warning : fine;
     }
 
     edge: "top"
     align: 1
-    enterDuration: glide
-    enterCurve: arrive
-    exitDuration: 120
-    contentWidth: column * 2 + gap + pad * 2
+    contentWidth: K.Tokens.size.panel * 2
     contentHeight: body.implicitHeight + pad * 2
 
     onOpened: {
@@ -59,76 +45,110 @@ Drawer {
         }
     }
 
-    component Line: StyledText {
-        width: parent?.width ?? 0
-        font.pixelSize: Theme.font.sm
-        font.features: Theme.font.tabular
-        color: Theme.m3onSurfaceVariant
+    // A line of readings under a section's headline. In mono: the numbers in it tick, and their
+    // widths hold still.
+    component Line: K.Text {
+        style: K.Tokens.type.mono
+        color: K.Tokens.color.on_surface_variant
     }
 
-    Column {
+    // A thing's name with its reading at the end of the row, the reading in its colour step.
+    component Named: K.Row {
+        id: named
+
+        property string name
+        property string reading
+        property color fine: K.Tokens.color.on_surface
+        property int level: 0
+        readonly property color readingColor: named.level === 2 ? K.Tokens.color.error : named.level === 1 ? K.Tokens.color.warning : named.fine
+
+        fill: true
+        gap: K.Tokens.space.s12
+        align: "centre"
+
+        K.Text {
+            text: named.name
+            style: K.Tokens.type.label
+            maximumLines: 1
+        }
+
+        K.Fill {
+        }
+
+        K.Text {
+            text: named.reading
+            style: K.Tokens.type.mono
+            color: named.readingColor
+        }
+    }
+
+    K.Stack {
         id: body
 
         x: root.pad
         y: root.pad
         width: root.contentWidth - root.pad * 2
-        spacing: Theme.spacing.xl
+        room: width
+        fill: true
+        gap: K.Tokens.space.s20
 
-        Row {
-            spacing: root.gap
+        K.Grid {
+            columns: 2
+            gap: K.Tokens.space.s20
 
-            Column {
-                width: root.column
-                spacing: Theme.spacing.xl
+            K.Stack {
+                fill: true
+                gap: K.Tokens.space.s20
 
                 Section {
-                    width: parent.width
                     icon: "memory"
                     title: "CPU"
                     value: Sysmon.percent(root.s?.cpu?.usage)
-                    valueColor: root.tint(Sysmon.tempLevel, Theme.m3onSurface)
+                    valueColor: root.tint(Sysmon.tempLevel, K.Tokens.color.on_surface)
 
                     Graph {
-                        width: parent.width
-                        height: root.graphHeight
+                        fillWidth: true
+                        implicitHeight: K.Tokens.space.s48
                         points: Sysmon.history.cpu ?? []
                         revision: Sysmon.revision
-                        color: root.tint(Sysmon.tempLevel, Theme.m3primary)
+                        color: root.tint(Sysmon.tempLevel, K.Tokens.color.primary)
                     }
 
-                    // One bar a core, filled from the bottom.
-                    Row {
+                    // One bar a core, filled from the bottom, the width split in device pixels.
+                    K.Grid {
                         id: cores
 
                         readonly property var list: root.s?.cpu?.cores ?? []
 
                         visible: list.length > 0
-                        width: parent.width
-                        height: root.coreHeight
-                        spacing: Theme.spacing.xxs
+                        columns: Math.max(1, list.length)
+                        gap: K.Tokens.space.s4
 
                         Repeater {
                             model: cores.list
 
                             Rectangle {
                                 required property real modelData
+                                readonly property bool fillWidth: true
+                                // How busy the core is, 0 to 1, from its percent.
+                                readonly property real busy: Math.min(1, modelData / 100)
 
-                                width: (cores.width - cores.spacing * (cores.list.length - 1)) / cores.list.length
-                                height: cores.height
-                                radius: Theme.rounding.xs / 2
-                                color: Theme.m3surfaceContainerHighest
+                                implicitHeight: K.Tokens.space.s24
+                                radius: K.Tokens.radius.small
+                                color: K.Look.alpha(K.Tokens.color.surface_container_highest, K.Tokens.opacity.track)
 
                                 Rectangle {
                                     anchors.bottom: parent.bottom
                                     width: parent.width
-                                    height: parent.height * Math.min(1, parent.modelData / 100)
+                                    height: K.Look.snapUp(parent.height * parent.busy, cores.dpr)
                                     radius: parent.radius
-                                    color: Theme.m3primary
+                                    color: K.Tokens.color.primary
 
                                     Behavior on height {
-                                        Anim {
-                                            duration: Theme.anim.normal
-                                            easing.bezierCurve: Theme.anim.standard
+                                        NumberAnimation {
+                                            duration: K.Tokens.duration.short
+                                            easing.type: Easing.BezierSpline
+                                            easing.bezierCurve: K.Tokens.easing.linear
                                         }
                                     }
                                 }
@@ -143,29 +163,28 @@ Drawer {
                     Line {
                         visible: root.s?.cpu?.temp != null
                         text: root.s?.cpu?.temp != null ? `${Math.round(root.s.cpu.temp)} °C` : ""
-                        color: root.tint(Sysmon.tempLevel, Theme.m3onSurfaceVariant)
+                        color: root.tint(Sysmon.tempLevel, K.Tokens.color.on_surface_variant)
                     }
                 }
 
                 Section {
-                    width: parent.width
                     icon: "memory_alt"
                     title: "Memory"
                     value: Sysmon.percent(root.s?.memory?.percent)
-                    valueColor: root.tint(Sysmon.ramLevel, Theme.m3onSurface)
+                    valueColor: root.tint(Sysmon.ramLevel, K.Tokens.color.on_surface)
 
                     Meter {
                         readonly property real total: Math.max(1, root.s?.memory?.total ?? 1)
 
-                        width: parent.width
+                        fillWidth: true
                         parts: [
                             {
                                 value: (root.s?.memory?.used ?? 0) / total,
-                                color: root.tint(Sysmon.ramLevel, Theme.m3primary)
+                                color: root.tint(Sysmon.ramLevel, K.Tokens.color.primary)
                             },
                             {
                                 value: (root.s?.memory?.cache ?? 0) / total,
-                                color: Theme.m3tertiary
+                                color: K.Tokens.color.tertiary
                             }
                         ]
                     }
@@ -175,20 +194,20 @@ Drawer {
                     }
 
                     Graph {
-                        width: parent.width
-                        height: root.graphHeight
+                        fillWidth: true
+                        implicitHeight: K.Tokens.space.s48
                         points: Sysmon.history.ram ?? []
                         revision: Sysmon.revision
-                        color: root.tint(Sysmon.ramLevel, Theme.m3primary)
+                        color: root.tint(Sysmon.ramLevel, K.Tokens.color.primary)
                     }
 
                     Meter {
                         visible: (root.s?.memory?.swapTotal ?? 0) > 0
-                        width: parent.width
+                        fillWidth: true
                         parts: [
                             {
                                 value: (root.s?.memory?.swapUsed ?? 0) / Math.max(1, root.s?.memory?.swapTotal ?? 1),
-                                color: Theme.m3secondary
+                                color: K.Tokens.color.secondary
                             }
                         ]
                     }
@@ -201,7 +220,6 @@ Drawer {
 
                 Section {
                     visible: (root.s?.gpus ?? []).length > 0
-                    width: parent.width
                     icon: "developer_board"
                     title: "GPU"
                     value: Sysmon.percent(root.s?.gpus?.[0]?.usage)
@@ -209,42 +227,27 @@ Drawer {
                     Repeater {
                         model: root.s?.gpus ?? []
 
-                        Column {
+                        K.Stack {
                             id: gpu
 
                             required property var modelData
 
-                            width: parent.width
-                            spacing: Theme.spacing.xs
+                            fill: true
+                            gap: K.Tokens.space.s4
 
-                            Item {
-                                width: parent.width
-                                height: gpuName.implicitHeight
-
-                                StyledText {
-                                    id: gpuName
-
-                                    text: `${gpu.modelData.vendor}${gpu.modelData.discrete ? " · discrete" : ""}`
-                                    font.weight: Font.Medium
-                                    font.pixelSize: Theme.font.sm
-                                }
-
-                                StyledText {
-                                    anchors.right: parent.right
-                                    text: !gpu.modelData.active ? "Asleep" : Sysmon.percent(gpu.modelData.usage)
-                                    font.pixelSize: Theme.font.sm
-                                    font.features: Theme.font.tabular
-                                    color: gpu.modelData.active ? Theme.m3onSurface : Theme.m3outline
-                                }
+                            Named {
+                                name: `${gpu.modelData.vendor}${gpu.modelData.discrete ? " · discrete" : ""}`
+                                reading: !gpu.modelData.active ? "Asleep" : Sysmon.percent(gpu.modelData.usage)
+                                fine: gpu.modelData.active ? K.Tokens.color.on_surface : K.Tokens.color.outline
                             }
 
                             Meter {
                                 visible: gpu.modelData.active && gpu.modelData.usage != null
-                                width: parent.width
+                                fillWidth: true
                                 parts: [
                                     {
                                         value: (gpu.modelData.usage ?? 0) / 100,
-                                        color: Theme.m3primary
+                                        color: K.Tokens.color.primary
                                     }
                                 ]
                             }
@@ -258,19 +261,18 @@ Drawer {
                 }
             }
 
-            Column {
-                width: root.column
-                spacing: Theme.spacing.xl
+            K.Stack {
+                fill: true
+                gap: K.Tokens.space.s20
 
                 Section {
-                    width: parent.width
                     icon: "swap_vert"
                     title: "Network"
                     value: root.s?.net?.down != null ? `↓ ${Sysmon.rate(root.s.net.down)}  ↑ ${Sysmon.rate(root.s.net.up ?? 0)}` : ""
 
                     Graph {
-                        width: parent.width
-                        height: root.graphHeight
+                        fillWidth: true
+                        implicitHeight: K.Tokens.space.s48
                         points: Sysmon.history.down ?? []
                         second: Sysmon.history.up ?? []
                         revision: Sysmon.revision
@@ -283,7 +285,6 @@ Drawer {
                 }
 
                 Section {
-                    width: parent.width
                     icon: "hard_drive"
                     title: "Disks"
                     value: root.s?.io ? `R ${Sysmon.rate(root.s.io.read)}  W ${Sysmon.rate(root.s.io.write)}` : ""
@@ -291,46 +292,29 @@ Drawer {
                     Repeater {
                         model: root.s?.disks ?? []
 
-                        Column {
+                        K.Stack {
                             id: disk
 
                             required property var modelData
                             readonly property int level: Sysmon.level(modelData.percent, root.th.disk, 5)
 
-                            width: parent.width
-                            spacing: Theme.spacing.xs
+                            fill: true
+                            gap: K.Tokens.space.s4
 
-                            Item {
-                                width: parent.width
-                                height: diskName.implicitHeight
-
-                                StyledText {
-                                    id: diskName
-
-                                    width: parent.width - diskFree.implicitWidth - Theme.spacing.md
-                                    // The root and home disks are named by their mount point already.
-                                    text: disk.modelData.label === disk.modelData.point ? disk.modelData.label : `${disk.modelData.label}  ${disk.modelData.point}`
-                                    font.weight: Font.Medium
-                                    font.pixelSize: Theme.font.sm
-                                }
-
-                                StyledText {
-                                    id: diskFree
-
-                                    anchors.right: parent.right
-                                    text: `${Sysmon.bytes(disk.modelData.free)} free of ${Sysmon.bytes(disk.modelData.total)}`
-                                    font.pixelSize: Theme.font.sm
-                                    font.features: Theme.font.tabular
-                                    color: root.tint(disk.level, Theme.m3onSurfaceVariant)
-                                }
+                            Named {
+                                // The root and home disks are named by their mount point already.
+                                name: disk.modelData.label === disk.modelData.point ? disk.modelData.label : `${disk.modelData.label}  ${disk.modelData.point}`
+                                reading: `${Sysmon.bytes(disk.modelData.free)} free of ${Sysmon.bytes(disk.modelData.total)}`
+                                fine: K.Tokens.color.on_surface_variant
+                                level: disk.level
                             }
 
                             Meter {
-                                width: parent.width
+                                fillWidth: true
                                 parts: [
                                     {
                                         value: disk.modelData.percent / 100,
-                                        color: root.tint(disk.level, Theme.m3primary)
+                                        color: root.tint(disk.level, K.Tokens.color.primary)
                                     }
                                 ]
                             }
@@ -350,18 +334,17 @@ Drawer {
                 }
 
                 Section {
-                    width: parent.width
                     icon: "bolt"
                     title: "Power"
                     value: root.s?.battery ? `${Math.round(root.s.battery.percent)}%` : ""
 
                     Meter {
                         visible: root.s?.battery != null
-                        width: parent.width
+                        fillWidth: true
                         parts: [
                             {
                                 value: (root.s?.battery?.percent ?? 0) / 100,
-                                color: (root.s?.battery?.percent ?? 100) < 15 ? Theme.m3error : Theme.m3primary
+                                color: (root.s?.battery?.percent ?? 100) < 15 ? K.Tokens.color.error : K.Tokens.color.primary
                             }
                         ]
                     }
@@ -375,7 +358,7 @@ Drawer {
                             const left = b.secondsLeft ? `${Sysmon.duration(b.secondsLeft)} to ${b.status === "Charging" ? "full" : "empty"}` : "";
                             return [b.status, b.watts != null ? `${b.watts.toFixed(1)} W` : "", left].filter(Boolean).join(" · ");
                         }
-                        color: root.tint(Sysmon.level(root.s?.battery?.watts, root.th.batteryDraw, 5), Theme.m3onSurfaceVariant)
+                        color: root.tint(Sysmon.level(root.s?.battery?.watts, root.th.batteryDraw, 5), K.Tokens.color.on_surface_variant)
                     }
 
                     Line {
@@ -389,13 +372,11 @@ Drawer {
                     }
 
                     PowerSlider {
-                        width: parent.width
                     }
                 }
 
                 Section {
                     visible: (root.s?.fans ?? []).length > 0
-                    width: parent.width
                     icon: "mode_fan"
                     title: "Fans"
 
@@ -414,51 +395,45 @@ Drawer {
 
         Processes {
             id: processes
-
-            width: parent.width
         }
 
         // Uptime, the kernel, and btop for the full picture.
-        Item {
-            width: parent.width
-            height: btop.height
+        K.Row {
+            fill: true
+            gap: K.Tokens.space.s12
+            align: "centre"
 
             Line {
-                anchors.verticalCenter: parent.verticalCenter
-                width: parent.width - btop.width - Theme.spacing.md
                 text: root.s ? `Up ${Sysmon.duration(root.s.uptime)} · Linux ${root.s.kernel}` : ""
             }
 
-            IconButton {
-                id: btop
+            K.Fill {
+            }
 
-                anchors.right: parent.right
+            K.IconButton {
                 icon: "terminal"
-                size: root.buttonSize
-                baseColor: Theme.m3surfaceContainer
-                tooltip: "Open btop"
-                onClicked: {
+                label: "Open btop"
+                kind: "Tonal"
+                size: "Sm"
+                onActivated: {
                     Panels.close();
                     Quickshell.execDetached(["ghostty", "--class=dot.float", "-e", "btop"]);
                 }
             }
         }
 
-        StyledText {
+        K.Text {
             visible: !Sysmon.available
-            width: parent.width
             text: "kubaos-sysmon isn't running: the monitor needs it"
-            color: Theme.m3error
-            font.pixelSize: Theme.font.sm
+            style: K.Tokens.type.small
+            color: K.Tokens.color.error
         }
 
-        StyledText {
+        K.Text {
             visible: Sysmon.problem !== ""
-            width: parent.width
             text: `${UserLayer.shown("sysmon", "sysmon.toml")}: ${Sysmon.problem}`
-            color: Theme.m3error
-            font.pixelSize: Theme.font.sm
-            wrapMode: Text.Wrap
+            style: K.Tokens.type.small
+            color: K.Tokens.color.error
         }
     }
 }

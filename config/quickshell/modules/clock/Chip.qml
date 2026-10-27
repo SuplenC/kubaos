@@ -1,10 +1,11 @@
 import QtQuick
-import qs.theme
-import qs.components
+import KubaOS.Components as K
 
-// A small rounded choice: a timer preset, a country, a weekday. `selected`
-// fills it with the secondary container, as the tab indicator is.
-Rectangle {
+// A small choice you click: a timer preset, a country, a weekday. A chip, `Selected` when picked
+// and `Neutral` otherwise, that takes a click; its `tooltip` names it in a hint while the pointer
+// is over it. Like the chips it replaces, it is no stop for Tab: the field or the row beside it
+// is.
+K.Pressable {
     id: root
 
     property string label
@@ -13,34 +14,29 @@ Rectangle {
 
     signal clicked
 
-    implicitWidth: labelText.implicitWidth + Theme.spacing.md * 2
-    implicitHeight: 28
-    radius: Theme.rounding.full
-    color: selected ? Theme.m3secondaryContainer : Theme.m3surfaceContainerHigh
+    // Above its neighbours while its hint shows, so the chips after it don't paint over the hint.
+    z: root.pointerOver ? 1 : 0
+    implicitWidth: chip.implicitWidth
+    implicitHeight: chip.implicitHeight
+    activeFocusOnTab: false
+    onActivated: root.clicked()
 
-    Behavior on color {
-        CAnim {}
-    }
+    K.Chip {
+        id: chip
 
-    StyledText {
-        id: labelText
-
-        anchors.centerIn: parent
         text: root.label
-        font.pixelSize: Theme.font.sm
-        font.weight: root.selected ? Font.DemiBold : Font.Medium
-        color: root.selected ? Theme.m3onSecondaryContainer : Theme.m3onSurfaceVariant
+        kind: root.selected ? "Selected" : "Neutral"
     }
 
-    StateLayer {
-        id: hover
-
-        color: root.selected ? Theme.m3onSecondaryContainer : Theme.m3onSurface
-        onClicked: root.clicked()
+    K.StateLayer {
+        radius: K.Tokens.radius.control
+        content: root.selected ? K.Tokens.color.on_secondary_container : K.Tokens.color.on_surface
+        hovered: root.hovered
+        pressed: root.down
     }
 
-    Tooltip {
+    K.Hint {
         text: root.tooltip
-        shown: root.tooltip !== "" && hover.containsMouse
+        shown: root.tooltip !== "" && root.pointerOver
     }
 }

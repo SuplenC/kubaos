@@ -153,6 +153,7 @@ impl IconSize {
 /// A fixed dimension of a component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Size {
+    Bar,
     Check,
     Chip,
     Column,
@@ -161,20 +162,27 @@ pub enum Size {
     ControlSm,
     Dialog,
     Log,
+    Panel,
     Progress,
     RadioDot,
     Rail,
     Row,
     RowTwoLine,
+    Slider,
+    SliderStop,
+    SliderThumb,
     SwitchHeight,
     SwitchKnobOff,
     SwitchKnobOn,
     SwitchWidth,
+    ThumbnailHeight,
+    ThumbnailWidth,
 }
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 17] = [
+    pub const ALL: [Size; 24] = [
+        Size::Bar,
         Size::Check,
         Size::Chip,
         Size::Column,
@@ -183,20 +191,27 @@ impl Size {
         Size::ControlSm,
         Size::Dialog,
         Size::Log,
+        Size::Panel,
         Size::Progress,
         Size::RadioDot,
         Size::Rail,
         Size::Row,
         Size::RowTwoLine,
+        Size::Slider,
+        Size::SliderStop,
+        Size::SliderThumb,
         Size::SwitchHeight,
         Size::SwitchKnobOff,
         Size::SwitchKnobOn,
         Size::SwitchWidth,
+        Size::ThumbnailHeight,
+        Size::ThumbnailWidth,
     ];
 
     /// The dimension in logical pixels.
     pub const fn px(self) -> u16 {
         match self {
+            Size::Bar => 40,
             Size::Check => 20,
             Size::Chip => 24,
             Size::Column => 560,
@@ -205,15 +220,21 @@ impl Size {
             Size::ControlSm => 32,
             Size::Dialog => 500,
             Size::Log => 232,
+            Size::Panel => 384,
             Size::Progress => 8,
             Size::RadioDot => 8,
             Size::Rail => 236,
             Size::Row => 44,
             Size::RowTwoLine => 56,
+            Size::Slider => 24,
+            Size::SliderStop => 4,
+            Size::SliderThumb => 16,
             Size::SwitchHeight => 24,
             Size::SwitchKnobOff => 12,
             Size::SwitchKnobOn => 16,
             Size::SwitchWidth => 44,
+            Size::ThumbnailHeight => 160,
+            Size::ThumbnailWidth => 256,
         }
     }
 }
@@ -539,10 +560,12 @@ pub enum Opacity {
     ErrorEdge,
     ErrorFill,
     Focus,
+    Frame,
     Hover,
     Locked,
     Log,
     OutlineSoft,
+    PanelScrim,
     Placeholder,
     Press,
     Scrim,
@@ -556,7 +579,7 @@ pub enum Opacity {
 
 impl Opacity {
     /// Every opacity.
-    pub const ALL: [Opacity; 20] = [
+    pub const ALL: [Opacity; 22] = [
         Opacity::DangerEdge,
         Opacity::DialogEdge,
         Opacity::DisabledContainer,
@@ -564,10 +587,12 @@ impl Opacity {
         Opacity::ErrorEdge,
         Opacity::ErrorFill,
         Opacity::Focus,
+        Opacity::Frame,
         Opacity::Hover,
         Opacity::Locked,
         Opacity::Log,
         Opacity::OutlineSoft,
+        Opacity::PanelScrim,
         Opacity::Placeholder,
         Opacity::Press,
         Opacity::Scrim,
@@ -589,10 +614,12 @@ impl Opacity {
             Opacity::ErrorEdge => 0.45,
             Opacity::ErrorFill => 0.3,
             Opacity::Focus => 0.12,
+            Opacity::Frame => 0.94,
             Opacity::Hover => 0.08,
             Opacity::Locked => 0.5,
             Opacity::Log => 0.85,
             Opacity::OutlineSoft => 0.55,
+            Opacity::PanelScrim => 0.2,
             Opacity::Placeholder => 0.55,
             Opacity::Press => 0.14,
             Opacity::Scrim => 0.6,
@@ -911,6 +938,14 @@ pub enum Icon {
     Badge,
     /// Tabler's `scale`.
     Balance,
+    /// Tabler's `battery`.
+    Battery0Bar,
+    /// Tabler's `battery-1`.
+    Battery1Bar,
+    /// Tabler's `battery-2`.
+    Battery2Bar,
+    /// Tabler's `battery-3`.
+    Battery3Bar,
     /// Tabler's `battery-charging`.
     BatteryChargingFull,
     /// Tabler's `battery-4`.
@@ -951,6 +986,8 @@ pub enum Icon {
     Close,
     /// Tabler's `code`.
     Code,
+    /// Tabler's `coffee`.
+    Coffee,
     /// Tabler's `device-laptop`.
     Computer,
     /// Tabler's `clipboard`.
@@ -1000,6 +1037,8 @@ pub enum Icon {
     KeyboardCommandKey,
     /// Tabler's `option`.
     KeyboardOptionKey,
+    /// Tabler's `network`.
+    Lan,
     /// Tabler's `world`.
     Language,
     /// Tabler's `sun`.
@@ -1128,6 +1167,8 @@ pub enum Icon {
     VolumeOff,
     /// Tabler's `volume`.
     VolumeUp,
+    /// Tabler's `shield-lock`.
+    VpnLock,
     /// Tabler's `photo`.
     Wallpaper,
     /// Tabler's `alert-triangle`.
@@ -1146,7 +1187,7 @@ pub enum Icon {
 
 impl Icon {
     /// Every symbol.
-    pub const ALL: [Icon; 127] = [
+    pub const ALL: [Icon; 134] = [
         Icon::AccountCircle,
         Icon::Add,
         Icon::AddLocationAlt,
@@ -1159,6 +1200,10 @@ impl Icon {
         Icon::ArrowUpward,
         Icon::Badge,
         Icon::Balance,
+        Icon::Battery0Bar,
+        Icon::Battery1Bar,
+        Icon::Battery2Bar,
+        Icon::Battery3Bar,
         Icon::BatteryChargingFull,
         Icon::BatteryFull,
         Icon::Bedtime,
@@ -1179,6 +1224,7 @@ impl Icon {
         Icon::ClearAll,
         Icon::Close,
         Icon::Code,
+        Icon::Coffee,
         Icon::Computer,
         Icon::ContentPaste,
         Icon::DarkMode,
@@ -1203,6 +1249,7 @@ impl Icon {
         Icon::Keyboard,
         Icon::KeyboardCommandKey,
         Icon::KeyboardOptionKey,
+        Icon::Lan,
         Icon::Language,
         Icon::LightMode,
         Icon::ListAlt,
@@ -1267,6 +1314,7 @@ impl Icon {
         Icon::VolumeMute,
         Icon::VolumeOff,
         Icon::VolumeUp,
+        Icon::VpnLock,
         Icon::Wallpaper,
         Icon::Warning,
         Icon::WbTwilight,
@@ -1291,6 +1339,10 @@ impl Icon {
             Icon::ArrowUpward => "arrow_upward",
             Icon::Badge => "badge",
             Icon::Balance => "balance",
+            Icon::Battery0Bar => "battery_0_bar",
+            Icon::Battery1Bar => "battery_1_bar",
+            Icon::Battery2Bar => "battery_2_bar",
+            Icon::Battery3Bar => "battery_3_bar",
             Icon::BatteryChargingFull => "battery_charging_full",
             Icon::BatteryFull => "battery_full",
             Icon::Bedtime => "bedtime",
@@ -1311,6 +1363,7 @@ impl Icon {
             Icon::ClearAll => "clear_all",
             Icon::Close => "close",
             Icon::Code => "code",
+            Icon::Coffee => "coffee",
             Icon::Computer => "computer",
             Icon::ContentPaste => "content_paste",
             Icon::DarkMode => "dark_mode",
@@ -1335,6 +1388,7 @@ impl Icon {
             Icon::Keyboard => "keyboard",
             Icon::KeyboardCommandKey => "keyboard_command_key",
             Icon::KeyboardOptionKey => "keyboard_option_key",
+            Icon::Lan => "lan",
             Icon::Language => "language",
             Icon::LightMode => "light_mode",
             Icon::ListAlt => "list_alt",
@@ -1399,6 +1453,7 @@ impl Icon {
             Icon::VolumeMute => "volume_mute",
             Icon::VolumeOff => "volume_off",
             Icon::VolumeUp => "volume_up",
+            Icon::VpnLock => "vpn_lock",
             Icon::Wallpaper => "wallpaper",
             Icon::Warning => "warning",
             Icon::WbTwilight => "wb_twilight",
@@ -1424,6 +1479,10 @@ impl Icon {
             Icon::ArrowUpward => Some("arrow-up"),
             Icon::Badge => Some("id-badge-2"),
             Icon::Balance => Some("scale"),
+            Icon::Battery0Bar => Some("battery"),
+            Icon::Battery1Bar => Some("battery-1"),
+            Icon::Battery2Bar => Some("battery-2"),
+            Icon::Battery3Bar => Some("battery-3"),
             Icon::BatteryChargingFull => Some("battery-charging"),
             Icon::BatteryFull => Some("battery-4"),
             Icon::Bedtime => Some("moon-stars"),
@@ -1444,6 +1503,7 @@ impl Icon {
             Icon::ClearAll => Some("clear-all"),
             Icon::Close => Some("x"),
             Icon::Code => Some("code"),
+            Icon::Coffee => Some("coffee"),
             Icon::Computer => Some("device-laptop"),
             Icon::ContentPaste => Some("clipboard"),
             Icon::DarkMode => Some("moon"),
@@ -1468,6 +1528,7 @@ impl Icon {
             Icon::Keyboard => Some("keyboard"),
             Icon::KeyboardCommandKey => Some("command"),
             Icon::KeyboardOptionKey => Some("option"),
+            Icon::Lan => Some("network"),
             Icon::Language => Some("world"),
             Icon::LightMode => Some("sun"),
             Icon::ListAlt => Some("list-details"),
@@ -1532,6 +1593,7 @@ impl Icon {
             Icon::VolumeMute => Some("volume-3"),
             Icon::VolumeOff => Some("volume-off"),
             Icon::VolumeUp => Some("volume"),
+            Icon::VpnLock => Some("shield-lock"),
             Icon::Wallpaper => Some("photo"),
             Icon::Warning => Some("alert-triangle"),
             Icon::WbTwilight => Some("sunset-2"),
@@ -1557,6 +1619,10 @@ impl Icon {
             Icon::ArrowUpward => include_str!("../assets/symbols/arrow_upward.svg"),
             Icon::Badge => include_str!("../assets/symbols/badge.svg"),
             Icon::Balance => include_str!("../assets/symbols/balance.svg"),
+            Icon::Battery0Bar => include_str!("../assets/symbols/battery_0_bar.svg"),
+            Icon::Battery1Bar => include_str!("../assets/symbols/battery_1_bar.svg"),
+            Icon::Battery2Bar => include_str!("../assets/symbols/battery_2_bar.svg"),
+            Icon::Battery3Bar => include_str!("../assets/symbols/battery_3_bar.svg"),
             Icon::BatteryChargingFull => include_str!("../assets/symbols/battery_charging_full.svg"),
             Icon::BatteryFull => include_str!("../assets/symbols/battery_full.svg"),
             Icon::Bedtime => include_str!("../assets/symbols/bedtime.svg"),
@@ -1577,6 +1643,7 @@ impl Icon {
             Icon::ClearAll => include_str!("../assets/symbols/clear_all.svg"),
             Icon::Close => include_str!("../assets/symbols/close.svg"),
             Icon::Code => include_str!("../assets/symbols/code.svg"),
+            Icon::Coffee => include_str!("../assets/symbols/coffee.svg"),
             Icon::Computer => include_str!("../assets/symbols/computer.svg"),
             Icon::ContentPaste => include_str!("../assets/symbols/content_paste.svg"),
             Icon::DarkMode => include_str!("../assets/symbols/dark_mode.svg"),
@@ -1601,6 +1668,7 @@ impl Icon {
             Icon::Keyboard => include_str!("../assets/symbols/keyboard.svg"),
             Icon::KeyboardCommandKey => include_str!("../assets/symbols/keyboard_command_key.svg"),
             Icon::KeyboardOptionKey => include_str!("../assets/symbols/keyboard_option_key.svg"),
+            Icon::Lan => include_str!("../assets/symbols/lan.svg"),
             Icon::Language => include_str!("../assets/symbols/language.svg"),
             Icon::LightMode => include_str!("../assets/symbols/light_mode.svg"),
             Icon::ListAlt => include_str!("../assets/symbols/list_alt.svg"),
@@ -1665,6 +1733,7 @@ impl Icon {
             Icon::VolumeMute => include_str!("../assets/symbols/volume_mute.svg"),
             Icon::VolumeOff => include_str!("../assets/symbols/volume_off.svg"),
             Icon::VolumeUp => include_str!("../assets/symbols/volume_up.svg"),
+            Icon::VpnLock => include_str!("../assets/symbols/vpn_lock.svg"),
             Icon::Wallpaper => include_str!("../assets/symbols/wallpaper.svg"),
             Icon::Warning => include_str!("../assets/symbols/warning.svg"),
             Icon::WbTwilight => include_str!("../assets/symbols/wb_twilight.svg"),

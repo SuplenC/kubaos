@@ -1,19 +1,18 @@
 import QtQuick
-import qs.theme
+import KubaOS.Components as K
 import qs.components
 import qs.services
 
 // Keep awake and a scheduled action, while either is on: a cup, and the
-// action's icon (lock, suspend, power, restart) with the time left. Click
-// stops Keep awake, or cancels the action when only that is on. Theme tokens
-// only; the bar's look is about to change.
+// action's icon (suspend, power, restart, or a clock) with the time left. Click
+// stops Keep awake, or cancels the action when only that is on.
 Pill {
     id: root
 
     visible: Idle.keepAwake || Idle.scheduledPending
     interactive: true
-    padding: Theme.spacing.sm
-    spacing: Theme.spacing.xs
+    padding: Idle.scheduledPending ? K.Tokens.space.s12 : K.Tokens.space.s8
+    spacing: K.Tokens.space.s4
     tooltip: {
         const parts = [];
         if (Idle.keepAwake)
@@ -25,26 +24,24 @@ Pill {
     }
     onClicked: Idle.keepAwake ? Idle.stopKeepAwake() : Idle.cancelScheduled()
 
-    Icon {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Icon {
         visible: Idle.keepAwake
         name: "coffee"
-        size: Theme.bar.icon
-        color: Theme.m3tertiary
+        size: K.Tokens.icon.s16
+        color: K.Tokens.color.tertiary
     }
 
-    Icon {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Icon {
         visible: Idle.scheduledPending
         name: Idle.scheduledIcon
-        size: Theme.bar.icon
-        color: Theme.m3tertiary
+        size: K.Tokens.icon.s16
+        color: K.Tokens.color.tertiary
     }
 
-    StyledText {
-        anchors.verticalCenter: parent.verticalCenter
+    K.Text {
         visible: Idle.scheduledPending
         text: Idle.countdown(Idle.scheduledLeft)
-        font.features: Theme.font.tabular
+        style: K.Tokens.type.mono
+        color: K.Tokens.color.on_surface
     }
 }
