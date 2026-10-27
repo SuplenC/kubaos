@@ -444,7 +444,7 @@ config/quickshell/modules/osd/Osd.qml: 3 radius violation(s), the baseline allow
   config/quickshell/modules/osd/Osd.qml:36:13: radius: `radius: 6`; a radius is a role (small 4, control 12, surface 24, full) or comes from nested()
   config/quickshell/modules/osd/Osd.qml:87:21: radius: `radius: 4`; a radius is a role (small 4, control 12, surface 24, full) or comes from nested()
   config/quickshell/modules/osd/Osd.qml:93:25: radius: `radius: 4`; a radius is a role (small 4, control 12, surface 24, full) or comes from nested()
-kubaos-design lint: 166 file(s), 820 violation(s), 819 in the baseline: FAILED
+kubaos-design lint: 166 file(s), 821 violation(s), 820 in the baseline: FAILED
 ```
 
 **A justified literal** carries a marker on its own line right above it, in the file's line comment, naming the rule and the reason:

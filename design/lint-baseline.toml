@@ -82,7 +82,7 @@ font = 3
 ["config/quickshell/modules/bar/Workspaces.qml"]
 space = 1
 size = 1
-font = 2
+font = 3
 
 ["config/quickshell/modules/clock/AnalogFace.qml"]
 size = 15
