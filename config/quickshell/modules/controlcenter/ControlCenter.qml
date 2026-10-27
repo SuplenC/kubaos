@@ -60,7 +60,8 @@ Drawer {
         precision: SystemClock.Minutes
     }
 
-    // The panel's body, the container padding in: the sections, then the tabs in what is left.
+    // The panel's body, the container padding in at the sides and 16 above and below: the
+    // sections, then the tabs in what is left.
     K.Container {
         id: body
 
@@ -71,6 +72,8 @@ Drawer {
 
             fill: true
             gap: K.Tokens.space.s16
+            topPadding: K.Tokens.space.s16
+            bottomPadding: K.Tokens.space.s16
 
             K.Row {
                 fill: true
@@ -125,7 +128,7 @@ Drawer {
         x: body.padding
         y: body.height
         width: root.contentWidth - body.padding * 2
-        height: Math.max(0, root.height - y - body.padding)
+        height: Math.max(0, root.height - y - K.Tokens.space.s16)
 
         Tabs {
             id: tabBar
