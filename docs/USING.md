@@ -163,12 +163,12 @@ Each stop sets every layer of the machine at once:
 | GPU (amdgpu DPM) | low | low | auto | auto | high |
 | Laptop panel | 60 Hz | native rate with VRR | native rate with VRR | native rate | native rate |
 | Panel power saving | strong | medium | off | off | off |
-| PCIe ASPM | powersupersave | powersupersave | default | performance | performance |
+| PCIe ASPM | powersupersave | powersave | default | performance | performance |
 | USB autosuspend | on | on | on | on | off |
 | Wi-Fi power saving | on | on | on | off | off |
 | Background work | indexer paused, monitor every 10 s | the same | normal | normal | normal |
 
-Input devices (keyboards, mice, security keys) and headsets are never autosuspended, in any stop. External screens are never touched, and switching never moves or rescales anything. "Power: what this stop does" in the Command menu, or `kubaos power status`, lists every row as the machine has it right now, marks what disagrees, and says which rows this machine has no knob for. Other tools that switch power-profiles-daemon (`powerprofilesctl`, GNOME's settings) move the slider to the stop named like their profile.
+Input devices (keyboards, mice, security keys), headsets, printers and network adapters (a dock's Ethernet) are never autosuspended, in any stop; a device plugged in takes the stop's settings within a second. External screens are never touched, and switching never moves or rescales anything. "Power: what this stop does" in the Command menu, or `kubaos power status`, lists every row as the machine has it right now, marks what disagrees, and says which rows this machine has no knob for. Other tools that switch power-profiles-daemon (`powerprofilesctl`, GNOME's settings) move the slider to the stop named like their profile. A program that holds a profile for a while (GameMode) moves it too, without changing the stop your power source remembers, and its end puts back your stop.
 
 **Battery and plugged in each remember their stop.** Pick Super Saver on battery and Performance at the desk, and unplugging goes back to Super Saver, plugging in back to Performance, with a quiet toast naming the stop. Until you pick, battery is Power Saver and plugged in is Balanced. A dock that drops power for a moment doesn't swing the stop: the source has to hold for 3 seconds.
 
@@ -180,9 +180,9 @@ Input devices (keyboards, mice, security keys) and headsets are never autosuspen
 
 **Measuring.** Unplug, pick a stop, leave the machine as it is, and run "Measure power draw" (`kubaos power measure`, 2 minutes; `--seconds 300` for longer). It prints the battery's average draw and what woke the machine most (interrupts and processes, per second), and saves the report in `~/.local/state/kubaos/power/measure/`.
 
-The settings are `~/.config/kubaos/desktop/power/power.toml`: the panel per stop (`60hz`, `vrr` or `native`), Super Saver's clock cap, the USB devices to keep awake, the charge limit and the low-battery drop. After a hand edit run `kubaos power apply`. The stop each power source remembers is in `~/.local/state/kubaos/power/stops.json`. If your own Hyprland rule for `eDP-1` sets its mode, the stop's rate and VRR still apply on top of it, keeping your position and scale.
+The settings are `~/.config/kubaos/desktop/power/power.toml`: the panel per stop (`60hz`, `vrr` or `native`), Super Saver's clock cap, the USB devices to keep awake, the charge limit and the low-battery drop. After a hand edit run `kubaos power apply`. The stop each power source remembers is in `~/.local/state/kubaos/power/stops.json`. If your own Hyprland rule for `eDP-1` sets its mode, the stop's rate still applies on top of it, keeping your position and scale. The panel's VRR is Hyprland's `misc:vrr`, which the stops own; an external screen's VRR is its own rule's `vrr` (`vrr = 1` to have it), off otherwise. Each stop's PCIe ASPM policy is `aspm` there too: Super Saver's `powersupersave` sleeps the SSD and the Wi-Fi card hardest, and some drop off the bus there (`journalctl -k` shows nvme or Wi-Fi resets); if yours do, set Super Saver's to `powersave`.
 
-Super Saver's 60 Hz needs amdgpu's FreeSync video modes, which the update turns on for the next boot; until you reboot, Super Saver keeps the panel at its native rate with VRR, so the switch never blanks the screen, and `kubaos power status` says so.
+Super Saver's 60 Hz needs amdgpu's FreeSync video modes, which the update turns on for the next boot; until you reboot, Super Saver keeps the panel at its native rate with VRR, so the switch never blanks the screen, and `kubaos power status` says so. The panel's VRR starts at the next login after the update.
 
 ## Updating and rolling back
 
