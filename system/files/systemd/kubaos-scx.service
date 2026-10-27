@@ -1,0 +1,42 @@
+# KubaOS: installed to /etc/systemd/system by install_scx (system/lib.sh), and
+# enabled, started, restarted and stopped only by the power stops' root helper
+# (/usr/local/libexec/kubaos-power-write, `scheduler=`), when LAVD is turned on
+# in power.toml. Off by default.
+#
+# scx_lavd loads a BPF scheduler into the kernel's sched_ext class, which then
+# schedules every task. Its mode is the power stop's, on its command line,
+# which the helper writes to /var/lib/kubaos/scx-lavd.env; a new mode is a
+# restart, and the kernel runs its own scheduler (EEVDF) for that moment. When
+# the BPF scheduler errors or stalls the kernel ejects it and goes back to
+# EEVDF by itself; scx_lavd then exits with an error and this unit starts it
+# again after 2 s, twice at most in 5 minutes. A third crash leaves the unit
+# failed and the machine on EEVDF until LAVD is turned on again
+# (`scheduler=reset`) or the next boot. The power service toasts both.
+#
+# SysRq-S (Alt+SysRq+S) also hands the machine back to EEVDF; scx_lavd exits
+# cleanly then, and the unit stays stopped until the next stop.
+#
+# https://github.com/sched-ext/scx/tree/main/scheds/rust/scx_lavd
+# https://docs.kernel.org/scheduler/sched-ext.html
+[Unit]
+Description=KubaOS CPU scheduler: scx_lavd through sched_ext
+Documentation=https://github.com/sched-ext/scx/tree/main/scheds/rust/scx_lavd
+ConditionPathIsDirectory=/sys/kernel/sched_ext
+ConditionPathExists=/var/lib/kubaos/scx-lavd.env
+StartLimitIntervalSec=5min
+StartLimitBurst=3
+
+[Service]
+Type=simple
+EnvironmentFile=/var/lib/kubaos/scx-lavd.env
+# HAZARD: $LAVD_ARGS stays unbraced, which systemd splits into words.
+# ${LAVD_ARGS} would pass the whole line as one argument, which scx_lavd refuses.
+ExecStart=/usr/local/libexec/kubaos-scx-lavd $LAVD_ARGS
+Restart=on-failure
+RestartSec=2
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -9,6 +9,8 @@ fn live() -> Live {
         panel: Some((120.0, false)),
         wifi: vec![("wlp99s0".to_owned(), Some(true))],
         indexer_paused: Some(false),
+        scheduler_unit: None,
+        scheduler_exit: None,
     }
 }
 
@@ -35,6 +37,30 @@ fn power_saver_on_the_laptop_today_shows_what_ppd_did_and_what_is_missing() {
     assert_eq!(panel.agrees, Some(false));
     assert_eq!(find(&rows, "Background work").agrees, Some(false));
     assert_eq!(find(&rows, "Charge limit").agrees, Some(true));
+    let scheduler = find(&rows, "CPU scheduler");
+    assert_eq!(scheduler.now.as_deref(), Some("Linux's own (EEVDF)"));
+    assert_eq!(scheduler.agrees, Some(true));
+}
+
+#[test]
+fn the_scheduler_row_says_lavd_fell_back_and_why() {
+    let root = FakeRoot::laptop();
+    root.install_lavd();
+    let settings = Settings::parse("scheduler = \"lavd\"\n").expect("parses");
+    let plan = Plan::for_stop(Stop::PowerSaver, &settings);
+    let mut live = live();
+    live.scheduler_unit = Some(crate::scheduler::UnitState::parse(
+        "LoadState=loaded\nActiveState=failed\nSubState=failed\nResult=start-limit-hit\nNRestarts=2\n",
+    ));
+    live.scheduler_exit = Some("EXIT: runtime error (watchdog)".to_owned());
+
+    let rows = rows(&plan, &settings, &root.machine(), &live);
+    let text = text("Power: Power Saver", &rows);
+
+    let scheduler = find(&rows, "CPU scheduler");
+    assert_eq!(scheduler.wanted, "LAVD, powersave");
+    assert_eq!(scheduler.agrees, Some(false));
+    assert!(text.contains("LAVD crashed until systemd stopped restarting it (EXIT: runtime error (watchdog))"));
 }
 
 #[test]

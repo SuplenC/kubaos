@@ -19,6 +19,13 @@
 # low_battery = 20
 # low_battery_stop = "power-saver"
 #
+# The CPU scheduler: "kernel" (Linux's own, EEVDF) or "lavd" (scx_lavd through sched_ext, which
+# puts input, the compositor and audio first, in a mode that follows the stop: powersave on the
+# fewest cores in Super Saver, powersave in Power Saver, autopilot in Balanced, performance above).
+# If LAVD fails, the kernel goes back to its own by itself. `kubaos power scheduler` says which
+# runs and why:
+# scheduler = "kernel"
+#
 # Input devices (keyboards, mice, security keys) and headsets are never autosuspended. Keep other
 # USB devices awake too, by vendor:product as `lsusb` shows them, or vendor:* for any of a
 # vendor's:

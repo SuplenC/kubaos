@@ -432,6 +432,49 @@ install_power_helper() {
   fi
 }
 
+# install_scx: the CPU scheduler the power stops can run (crates/kubaos-power,
+# `scheduler = "lavd"` in power.toml). scx_lavd from KUBAOS_DIR's curated set
+# (`.#scx-lavd`, home/curated.nix), pinned with SCX_GCROOT and linked where
+# kubaos-scx.service runs it as root, and the unit itself. It never enables or
+# starts the unit: LAVD is off until the user turns it on, and then the power
+# stops' root helper does. A LAVD running on an older build or unit file is
+# restarted on the new one. 60-nix.sh and relink.sh (every update and rollback) run it.
+SCX_LINK=/usr/local/libexec/kubaos-scx-lavd
+SCX_GCROOT=/nix/var/nix/gcroots/dotfiles-scx-lavd
+install_scx() {
+  local out bin changed=0
+  same_content "$FILES_DIR/systemd/kubaos-scx.service" /etc/systemd/system/kubaos-scx.service || changed=1
+  install_root_file "$FILES_DIR/systemd/kubaos-scx.service" /etc/systemd/system/kubaos-scx.service 0644
+  if ((changed)) && has_systemd; then
+    sudo_run systemctl daemon-reload
+  fi
+  if ((DRY_RUN)); then
+    run nix build --no-link --print-out-paths "$KUBAOS_DIR#scx-lavd"
+    sudo_run ln -sfn "<scx-lavd store path>" "$SCX_GCROOT"
+    sudo_run ln -sfn "<scx-lavd store path>/bin/scx_lavd" "$SCX_LINK"
+    return 0
+  fi
+  out="$(nix build --no-link --print-out-paths "$KUBAOS_DIR#scx-lavd")" || die "nix build .#scx-lavd failed"
+  bin="$out/bin/scx_lavd"
+  [[ -x "$bin" ]] || die "no scx_lavd in $out"
+  if [[ "$(readlink "$SCX_GCROOT" 2>/dev/null)" == "$out" && "$(readlink "$SCX_LINK" 2>/dev/null)" == "$bin" ]]; then
+    ok "$SCX_LINK -> $bin"
+  else
+    # GC root first, so the store path can't be collected while the link points at it.
+    sudo_run ln -sfn "$out" "$SCX_GCROOT"
+    sudo_run install -d -m 0755 "$(dirname "$SCX_LINK")"
+    sudo_run ln -sfn "$bin" "$SCX_LINK"
+    changed=1
+  fi
+  if ((changed)) && has_systemd && systemctl is-active --quiet kubaos-scx.service; then
+    # HAZARD: flush the start counter first, as the root helper does. A LAVD
+    # that crashed and came back within StartLimitIntervalSec would otherwise
+    # hit StartLimitBurst on this restart and be left failed.
+    sudo_run systemctl reset-failed kubaos-scx.service
+    sudo_run systemctl restart kubaos-scx.service
+  fi
+}
+
 # install_mac_accents: the Mac-style accents on Left Alt. After Left Alt + e,
 # `, u, i or n, keyd sends a dead key on a spare keycode and then the next
 # letter (files/keyd/kubaos.conf), the `kubaos:mac-accents` XKB option gives

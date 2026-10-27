@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# kubaos-power-write: writes the power stops' knobs in /sys, as root.
+# kubaos-power-write: writes the power stops' knobs in /sys, and runs their CPU
+# scheduler, as root.
 #
 #   kubaos-power-write KNOB=VALUE...
 #   kubaos-power-write --help
@@ -14,6 +15,14 @@
 #   charge-profile=high_capacity|balanced|stationary
 #                                      TUXEDO's charging profile
 #   charge-end=BATTERY:50-100          a battery's charge_control_end_threshold
+#   scheduler=powersave[:CPUS]|autopilot|performance
+#                                      scx_lavd in that mode (CPUS: its order for
+#                                      core compaction, 4,16,5,17), through
+#                                      kubaos-scx.service, enabled for the next boot
+#   scheduler=off                      the kernel's own scheduler: the unit
+#                                      stopped and disabled
+#   scheduler=reset                    lets a LAVD that crashed until systemd gave
+#                                      up on it start again
 #
 # The power service (`kubaos-power serve`, crates/kubaos-power) runs it through
 # pkexec (polkit action org.kubaos.power.write, system/files/polkit/), with
@@ -35,6 +44,12 @@ set -euo pipefail
 # never reaches a run from the service.
 ROOT="${KUBAOS_POWER_ROOT:-}"
 SYS="$ROOT/sys"
+# The CPU scheduler: scx_lavd as KubaOS links it (install_scx, system/lib.sh),
+# run by its unit with the command line in LAVD_ENV, which is there only while
+# LAVD is on. The power service reads it back: keep it world-readable.
+SCX_UNIT=kubaos-scx.service
+LAVD="$ROOT/usr/local/libexec/kubaos-scx-lavd"
+LAVD_ENV="$ROOT/var/lib/kubaos/scx-lavd.env"
 
 usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
 
@@ -155,6 +170,95 @@ charge_end() {
   put "$SYS/class/power_supply/$battery/charge_control_end_threshold" "$percent"
 }
 
+# unit_is active|enabled|failed: whether the scheduler's unit is.
+unit_is() {
+  systemctl "is-$1" --quiet "$SCX_UNIT" 2>/dev/null
+}
+
+scheduler_off() {
+  if [[ -e $LAVD_ENV ]]; then
+    rm -f -- "$LAVD_ENV" || fail "couldn't remove $LAVD_ENV"
+  fi
+  if unit_is enabled || unit_is active; then
+    systemctl disable --now --quiet "$SCX_UNIT" 2>/dev/null || fail "systemd couldn't stop $SCX_UNIT"
+  fi
+  if unit_is failed; then
+    systemctl reset-failed "$SCX_UNIT" 2>/dev/null || fail "systemd couldn't reset $SCX_UNIT"
+  fi
+}
+
+# scheduler VALUE: puts scx_lavd's command line in LAVD_ENV and runs it. A
+# new mode restarts it: the kernel runs its own scheduler for that moment.
+# A unit that crashed until systemd gave up is left failed, its new mode
+# kept for the next start, until `scheduler=reset` (LAVD turned on again),
+# so no stop or device event can start a crash loop over.
+scheduler() {
+  local value="$1" mode cpus="" cpu args text changed=0 seen="," list
+  case "$value" in
+    off)
+      scheduler_off
+      return
+      ;;
+    reset)
+      if unit_is failed; then
+        systemctl reset-failed "$SCX_UNIT" 2>/dev/null || fail "systemd couldn't reset $SCX_UNIT"
+      fi
+      return
+      ;;
+  esac
+  mode="${value%%:*}"
+  [[ $value == *:* ]] && cpus="${value#*:}"
+  [[ $mode =~ ^(powersave|autopilot|performance)$ ]] || { fail "scheduler=$value isn't a mode"; return; }
+  if [[ $value == *:* ]]; then
+    [[ $mode == powersave && $cpus =~ ^[0-9]{1,4}(,[0-9]{1,4}){0,1023}$ ]] ||
+      { fail "scheduler=$value isn't powersave and a list of CPUs"; return; }
+    IFS=, read -ra list <<<"$cpus"
+    for cpu in "${list[@]}"; do
+      [[ -d $SYS/devices/system/cpu/cpu$cpu ]] || { fail "there's no CPU $cpu"; return; }
+      [[ $seen != *",$cpu,"* ]] || { fail "CPU $cpu is in scheduler=$value twice"; return; }
+      seen+="$cpu,"
+    done
+  fi
+  [[ -d $SYS/kernel/sched_ext ]] || { fail "this kernel has no sched_ext"; return; }
+  [[ -x $LAVD ]] || { fail "scx_lavd isn't installed (kubaos update installs it)"; return; }
+  args="--$mode"
+  [[ -n $cpus ]] && args+=" --cpu-pref-order $cpus"
+  text="# Written by kubaos-power-write: scx_lavd's mode for $SCX_UNIT, the power stop's.
+KUBAOS_SCHEDULER=$value
+LAVD_ARGS=$args"
+  if [[ "$(read_value "$LAVD_ENV" || true)" != "$text" ]]; then
+    if ! { mkdir -p -- "${LAVD_ENV%/*}" && printf '%s\n' "$text" >"$LAVD_ENV.new" &&
+      chmod 0644 -- "$LAVD_ENV.new" && mv -f -- "$LAVD_ENV.new" "$LAVD_ENV"; } 2>/dev/null; then
+      fail "couldn't write $LAVD_ENV"
+      return
+    fi
+    changed=1
+  fi
+  if unit_is failed; then
+    fail "LAVD crashed until systemd stopped restarting it; turning LAVD on again starts it (scheduler=reset)"
+    return
+  fi
+  if ! unit_is enabled && ! systemctl enable --quiet "$SCX_UNIT" 2>/dev/null; then
+    fail "systemd couldn't enable $SCX_UNIT"
+    return
+  fi
+  unit_is active && ((!changed)) && return
+  # HAZARD: leave a unit waiting to restart after a crash alone when the mode
+  # is the same. The start below flushes its start counter, so stops during a
+  # crash loop would grant it fresh restarts and it would never give up.
+  [[ "$(systemctl show --property=SubState --value "$SCX_UNIT" 2>/dev/null)" == auto-restart ]] &&
+    ((!changed)) && return
+  # HAZARD: flush the unit's start counter first. Starts asked here count
+  # against StartLimitBurst like the restarts after a crash, so a few stops in
+  # a row would otherwise leave LAVD failed with nothing wrong with it.
+  systemctl reset-failed "$SCX_UNIT" 2>/dev/null || true
+  if unit_is active; then
+    systemctl restart "$SCX_UNIT" 2>/dev/null || fail "systemd couldn't restart $SCX_UNIT"
+  else
+    systemctl start "$SCX_UNIT" 2>/dev/null || fail "systemd couldn't start $SCX_UNIT"
+  fi
+}
+
 if [[ ${1:-} == --help || ${1:-} == -h ]]; then
   usage
   exit 0
@@ -182,6 +286,7 @@ for arg in "$@"; do
     wifi) wifi "$value" ;;
     charge-profile) charge_profile "$value" ;;
     charge-end) charge_end "$value" ;;
+    scheduler) scheduler "$value" ;;
     *) fail "${arg%%=*} isn't a knob" ;;
   esac
   ((failed)) && printf 'failed %s\n' "$arg"

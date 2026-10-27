@@ -23,9 +23,11 @@ impl FakeRoot {
     /// The reference laptop as it stood on 2026-10-27, on battery in Power Saver: two CPU
     /// policies, amdgpu's card1 with eDP-1, ASPM at `default`, a webcam, a Logitech receiver, an
     /// Ethernet adapter, a card reader, a hub and a security key, Wi-Fi, TUXEDO's charging profile and a battery
-    /// drawing 16.8 W.
+    /// drawing 16.8 W. Its 24 CPUs are the Ryzen AI 9 HX 370's, and sched_ext is there, disabled.
     pub fn laptop() -> FakeRoot {
         let root = FakeRoot::empty();
+        root.hx370();
+        root.write("sys/kernel/sched_ext/state", "disabled");
         for policy in ["policy0", "policy1", "policy10"] {
             let dir = format!("sys/devices/system/cpu/cpufreq/{policy}");
             root.write(&format!("{dir}/energy_performance_preference"), "power");
@@ -66,6 +68,43 @@ impl FakeRoot {
         root.write("sys/class/power_supply/hidpp_battery_5/scope", "Device");
         root.write("sys/module/amdgpu/parameters/freesync_video", "1");
         root
+    }
+
+    /// The Ryzen AI 9 HX 370's CPUs as the kernel lists them: 4 Zen 5 cores (CPUs 0-3, their
+    /// second threads 12-15, `amd_pstate_highest_perf` 196) and 8 Zen 5c cores (4-11 and 16-23,
+    /// 125). cpu0 has no `online` file, as on the machine.
+    pub fn hx370(&self) {
+        for cpu in 0..24_u32 {
+            let dir = format!("sys/devices/system/cpu/cpu{cpu}");
+            let core = cpu % 12;
+            let perf = if core < 4 { "196" } else { "125" };
+            self.write(&format!("{dir}/cpufreq/amd_pstate_highest_perf"), perf);
+            self.write(
+                &format!("{dir}/topology/thread_siblings_list"),
+                &format!("{core},{}", core + 12),
+            );
+            if cpu > 0 {
+                self.write(&format!("{dir}/online"), "1");
+            }
+        }
+        self.dir_at("sys/devices/system/cpu/cpufreq");
+        self.dir_at("sys/devices/system/cpu/cpuidle");
+    }
+
+    /// sched_ext running `ops`, as while a BPF scheduler is loaded.
+    pub fn sched_ext_running(&self, ops: &str) {
+        self.write("sys/kernel/sched_ext/state", "enabled");
+        self.write("sys/kernel/sched_ext/root/ops", ops);
+    }
+
+    /// scx_lavd installed where `install_scx` links it.
+    pub fn install_lavd(&self) {
+        let path = self.path(crate::machine::LAVD_BIN);
+        fs::create_dir_all(path.parent().expect("a parent")).expect("mkdir");
+        fs::write(&path, "#!/bin/sh\n").expect("write a fake scx_lavd");
+        let mut permissions = fs::metadata(&path).expect("stat").permissions();
+        std::os::unix::fs::PermissionsExt::set_mode(&mut permissions, 0o755);
+        fs::set_permissions(&path, permissions).expect("chmod");
     }
 
     pub fn machine(&self) -> Machine {
