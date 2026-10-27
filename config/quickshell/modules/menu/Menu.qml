@@ -1011,23 +1011,20 @@ PanelWindow {
                 color: K.Tokens.color.error
             }
 
-            Label {
-                x: question.width + K.Tokens.space.s12
+            // The keys, as keycaps: the confirmation's after its question, else the menu's own. Cut
+            // at the room the problems leave, as a line of text is.
+            Item {
+                x: search.confirming !== "" ? question.width + K.Tokens.space.s12 : 0
                 width: footer.room - x
                 height: parent.height
-                visible: search.confirming !== ""
-                type: K.Tokens.type.caption
-                text: search.confirming.slice(footer.asks + 1)
-                color: K.Tokens.color.error
-            }
+                visible: search.confirming !== "" || footer.status === "" && search.down.length === 0
+                clip: true
 
-            Label {
-                width: footer.room
-                height: parent.height
-                visible: footer.status === "" && search.down.length === 0
-                type: K.Tokens.type.caption
-                text: menu.footerHints
-                color: K.Tokens.color.on_surface_variant
+                K.KeyHints {
+                    y: K.Look.snap((parent.height - height) / 2, menu.dpr)
+                    text: search.confirming !== "" ? search.confirming.slice(footer.asks + 1) : menu.footerHints
+                    color: search.confirming !== "" ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
+                }
             }
 
             K.Button {

@@ -13,7 +13,8 @@ import qs.settings
 Drawer {
     id: root
 
-    readonly property int pad: K.Tokens.space.s24
+    // The container padding of the panel's width.
+    readonly property int pad: K.Tokens.containerPadding(contentWidth)
     readonly property var s: Sysmon.sample
     readonly property var th: Sysmon.thresholds
 
@@ -238,7 +239,7 @@ Drawer {
                             Named {
                                 name: `${gpu.modelData.vendor}${gpu.modelData.discrete ? " · discrete" : ""}`
                                 reading: !gpu.modelData.active ? "Asleep" : Sysmon.percent(gpu.modelData.usage)
-                                fine: gpu.modelData.active ? K.Tokens.color.on_surface : K.Tokens.color.outline
+                                fine: gpu.modelData.active ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
                             }
 
                             Meter {

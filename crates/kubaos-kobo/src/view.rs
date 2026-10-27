@@ -53,9 +53,12 @@ use kubaos_ui::component::field::State;
 use kubaos_ui::component::field::field;
 use kubaos_ui::component::field::labelled;
 use kubaos_ui::component::field::note;
+use kubaos_ui::component::keycap::keycap;
 use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
 use kubaos_ui::component::list::scrolling_list;
+use kubaos_ui::component::media::Aspect;
+use kubaos_ui::component::media::media;
 use kubaos_ui::component::progress::spinner;
 use kubaos_ui::component::progress::timed_bar;
 use kubaos_ui::component::switch::switch;
@@ -83,12 +86,16 @@ use kubaos_ui::text::text;
 use kubaos_ui::tokens;
 use kubaos_ui::tokens::Easing;
 use kubaos_ui::tokens::IconSize;
+use kubaos_ui::tokens::Mode;
 use kubaos_ui::tokens::Opacity;
 use kubaos_ui::tokens::Radius;
+use kubaos_ui::tokens::Rgb;
+use kubaos_ui::tokens::Role;
 use kubaos_ui::tokens::Shadow as ShadowToken;
 use kubaos_ui::tokens::Size;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
+use kubaos_ui::tokens::palette;
 
 use crate::app::App;
 use crate::app::F;
@@ -221,14 +228,35 @@ fn background<'a>(app: &'a App, look: &Look) -> El<'a> {
 
 /// クバ beside "KubaOS", the mark a symbol tall and the wordmark a line of title text.
 fn lockup<'a>(look: &Look) -> El<'a> {
+    let (mark, word) = LOGO[usize::from(look.mode == Mode::Light)].clone();
     // The mark's drawing keeps room for its glow, so it is the larger box of the two.
-    let mark = svg(svg::Handle::from_memory(theme::LOGO_MARK))
+    let mark = svg(mark)
         .width(f32::from(IconSize::S32.px()))
         .height(f32::from(IconSize::S32.px()));
-    let word = svg(svg::Handle::from_memory(theme::LOGO_WORDMARK))
-        .height(f32::from(IconSize::S24.px()))
-        .width(Length::Shrink);
+    let word = svg(word).height(f32::from(IconSize::S24.px())).width(Length::Shrink);
     row(look, Gap::NONE).center().push(mark).push(word).into()
+}
+
+/// The mark's and the wordmark's handles in dark and in light, made once, as the sign's is.
+static LOGO: LazyLock<[(svg::Handle, svg::Handle); 2]> = LazyLock::new(|| [Mode::Dark, Mode::Light].map(logo_in));
+
+/// The logo's drawings in `mode`'s colours. They are written in the dark palette's `on_surface`
+/// (the wordmark's "Kuba"), `primary` (the mark, "OS") and `cold` (the dakuten); in light those
+/// would be pale on the pale surface, under 1.2:1, so each takes the light palette's role.
+fn logo_in(mode: Mode) -> (svg::Handle, svg::Handle) {
+    let handle = |drawing: &[u8]| svg::Handle::from_memory(logo_drawing(drawing, mode).into_bytes());
+    (handle(theme::LOGO_MARK), handle(theme::LOGO_WORDMARK))
+}
+
+/// A logo drawing's SVG with its dark palette roles swapped for `mode`'s.
+fn logo_drawing(drawing: &[u8], mode: Mode) -> String {
+    let (written, shown) = (palette(Mode::Dark), palette(mode));
+    let hex = |c: Rgb| format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b);
+    let mut text = String::from_utf8_lossy(drawing).into_owned();
+    for role in [Role::OnSurface, Role::Primary, Role::Cold] {
+        text = text.replace(&hex(role.of(&written)), &hex(role.of(&shown)));
+    }
+    text
 }
 
 /// The neon sign's handle, made once: a handle made from bytes gets a new id every time, so one
@@ -346,7 +374,7 @@ fn rail<'a>(app: &'a App, look: &Look) -> El<'a> {
     let brand = stack(look, Space::S4).padding(inside).push(lockup(look)).push(text(
         format!("Kōbō · {} {version}", app.codename()),
         Type::Caption,
-        c.outline,
+        c.on_surface_variant,
     ));
     let hints = ui::hint_column(look, &hints(app));
     let footer = row(look, Space::S8)
@@ -370,7 +398,9 @@ fn rail<'a>(app: &'a App, look: &Look) -> El<'a> {
             .push(gap(Space::S16))
             .push(footer),
     )
-    .padding(Inset::xy(Space::S12, Space::S24).padding())
+    // 12 at the sides, the rows' corners concentric with the rail's; 16 above and below, the
+    // container padding at its width, so its ends hold no more air than a panel's.
+    .padding(Inset::xy(Space::S12, Space::S16).padding())
     .width(f32::from(Size::Rail.px()))
     .height(Length::Fill)
     .style(move |_theme| container::Style {
@@ -401,7 +431,7 @@ pub fn hints(app: &App) -> Vec<(&'static str, &'static str)> {
             ("A–Z", "search"),
             ("↑ ↓", "move"),
             ("Space", "pick a layout"),
-            ("Shift Space", "make it the default"),
+            ("Shift+Space", "make it the default"),
             ("Tab", "next field"),
         ]),
         Screen::Language | Screen::Timezone => {
@@ -613,13 +643,20 @@ fn keymap_chips<'a>(app: &'a App, look: &Look) -> El<'a> {
         )
     });
     let hint = if keymaps.len() > 1 {
-        "The first is the default. Click one to make it the default."
+        text(
+            "The first is the default. Click one to make it the default.",
+            Type::Caption,
+            look.colors.on_surface_variant,
+        )
     } else {
-        "Space picks more. Shift+Space makes one the default."
+        ui::hint_row(
+            look,
+            &[("Space", "picks more"), ("Shift+Space", "makes one the default")],
+        )
     };
     stack(look, Space::S8)
         .push(flow(look, Space::S8, chips))
-        .push(text(hint, Type::Caption, look.colors.on_surface_variant))
+        .push(hint)
         .into()
 }
 
@@ -721,7 +758,7 @@ fn timezone<'a>(app: &'a App, look: &Look) -> El<'a> {
                 c.on_surface_variant,
             ))
             .push(gap(Space::S8))
-            .push(text(app.form.timezone.clone(), Type::Mono, c.outline)),
+            .push(text(app.form.timezone.clone(), Type::Mono, c.on_surface_variant)),
         Extent::Fill,
     );
     let search = stack(look, Space::S8)
@@ -1282,7 +1319,7 @@ fn git<'a>(app: &'a App, look: &Look) -> El<'a> {
     let preview = card(
         look,
         stack(look, Space::S4)
-            .push(text("~/.gitconfig", Type::Mono, c.outline))
+            .push(text("~/.gitconfig", Type::Mono, c.on_surface_variant))
             .push(gap(Space::S4))
             .push(text("[user]", Type::MonoLarge, c.primary))
             .push(entry("    name", format!(" = {name}")))
@@ -1425,30 +1462,22 @@ fn wallpaper_set_header<'a>(app: &'a App, s: usize, set: &'a kubaos_core::probe:
     .into()
 }
 
-/// A wallpaper's picture where its thumbnail hasn't been decoded (or can't be): the card's own
-/// surface, at the thumbnails' shape so the cards don't jump when it arrives.
-static NO_PICTURE: LazyLock<image::Handle> = LazyLock::new(|| {
-    let (width, height) = crate::thumbs::SHAPE;
-    image::Handle::from_rgba(width, height, vec![0; (width * height * 4) as usize])
-});
-
-/// A wallpaper as a card to pick: the picture at the card's inner corners, then whether it's picked
-/// (and a play symbol for a video) beside its name.
+/// A wallpaper as a card to pick: the picture at the card's inner corners, in a box of the
+/// wallpaper's aspect that holds a placeholder until the thumbnail is decoded (or for good, when
+/// it can't be), so the cards never jump; then whether it's picked (and a play symbol for a video)
+/// beside its name.
 fn wallpaper_card<'a>(app: &'a App, s: usize, i: usize, look: &Look) -> El<'a> {
     let c = look.colors;
     let set = &app.wallpaper_sets()[s];
     let file = &set.files[i];
     let on = app.form.wallpaper_on(set, file);
     let f = F::Wallpaper(s, i);
-    let handle = app
-        .thumbs
-        .get(&model::wallpaper_key(set, file))
-        .cloned()
-        .unwrap_or_else(|| NO_PICTURE.clone());
-    let picture = image(handle)
-        .content_fit(ContentFit::Cover)
-        .width(Length::Fill)
-        .border_radius(radius(nested(Radius::Surface.corner(), Space::S16)));
+    let picture = media(
+        look,
+        app.thumbs.get(&model::wallpaper_key(set, file)).cloned(),
+        Aspect::Wallpaper,
+        nested(Radius::Surface.corner(), Space::S16),
+    );
     let (main, muted) = if on {
         (c.on_secondary_container, c.on_secondary_container)
     } else {
@@ -1714,7 +1743,12 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
                 .focused(app.is_focused(F::Hold))
                 .view(look),
         )
-        .push(text("or hold Enter", Type::Caption, c.outline));
+        .push(
+            row(look, Space::S4)
+                .center()
+                .push(text("or hold", Type::Caption, c.on_surface_variant))
+                .push(keycap(look, "Enter")),
+        );
     // The hold fills the bar along the card's foot as it goes.
     card(
         look,
@@ -2117,7 +2151,7 @@ fn welcome<'a>(app: &'a App, look: &Look) -> El<'a> {
         .push(gap(Space::S40))
         .push(row(look, Space::S20).center().push(action).push(status))
         .push(gap(Space::S16))
-        .push(widget::container(ui::hint_row(look, &keys)).height(f32::from(Type::Caption.line())))
+        .push(ui::hint_row(look, &keys))
         .push(gap(Space::S32))
         .push(row(look, Space::S8).center().extend(meta))
         .into()
@@ -2323,3 +2357,6 @@ fn power_menu<'a>(app: &'a App, look: &Look) -> El<'a> {
     }
     widget::opaque(area)
 }
+
+#[cfg(test)]
+mod tests;

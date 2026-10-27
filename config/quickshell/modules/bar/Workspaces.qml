@@ -509,7 +509,7 @@ Item {
                             y: K.Look.snap((root.cell - number.height) / 2, root.dpr)
                             text: root.numberText(shape.workspace)
                             style: root.numberStyle(shape.isActive || shape.occupied)
-                            color: shape.isActive ? K.Tokens.color.on_primary : shape.occupied ? K.Tokens.color.on_surface : K.Tokens.color.outline
+                            color: shape.isActive ? K.Tokens.color.on_primary : shape.occupied ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
                             opacity: shape.isGhost ? 0 : 1
 
                             Behavior on color {

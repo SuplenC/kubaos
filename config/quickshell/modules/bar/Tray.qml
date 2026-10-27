@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Services.SystemTray
@@ -12,6 +13,28 @@ Pill {
     id: root
 
     required property QsWindow window
+
+    // Whether an icon's RGBA `pixels` are grey and under an icon's 3:1 on the bar's surface: their
+    // opaque pixels' average, with little colour in it. A coloured icon's average can be dull
+    // while its pixels aren't, so colour rules it out.
+    function faint(pixels: var): bool {
+        let r = 0, g = 0, b = 0, count = 0, spread = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+            if (pixels[i + 3] < 128)
+                continue;
+            r += pixels[i];
+            g += pixels[i + 1];
+            b += pixels[i + 2];
+            spread += Math.max(pixels[i], pixels[i + 1], pixels[i + 2]) - Math.min(pixels[i], pixels[i + 1], pixels[i + 2]);
+            count += 1;
+        }
+        if (count === 0)
+            return false;
+        // design-allow(colour): the average measured from an app's own pixels, not a colour we draw.
+        const average = Qt.rgba(r / count / 255, g / count / 255, b / count / 255, 1);
+        const grey = spread / count / 255 < 0.2;
+        return grey && K.Look.contrast(average, K.Tokens.color.surface) < 3;
+    }
 
     visible: SystemTray.items.values.length > 0
     padding: K.Tokens.space.s4
@@ -40,6 +63,47 @@ Pill {
                 implicitSize: K.Tokens.icon.s16
                 source: entry.modelData.icon
                 asynchronous: true
+                // A grey icon that would vanish into the bar is drawn in the content colour, as
+                // the bar's own symbols are; the layer exists only while it is.
+                layer.enabled: reader.faint
+                layer.effect: MultiEffect {
+                    colorization: 1
+                    colorizationColor: K.Tokens.color.on_surface
+                }
+            }
+
+            // Reads the icon's pixels once each time it changes, never per frame: whether the app
+            // drew it grey and close to the bar's own surface (a GTK symbolic icon, drawn dark for
+            // a light theme), under the 3:1 an icon needs. A coloured icon keeps its colours.
+            Canvas {
+                id: reader
+
+                property bool faint: false
+
+                width: K.Tokens.icon.s16
+                height: K.Tokens.icon.s16
+                opacity: 0
+                onImageLoaded: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d");
+                    ctx.clearRect(0, 0, width, height);
+                    const source = entry.modelData.icon;
+                    if (!isImageLoaded(source))
+                        return;
+                    ctx.drawImage(source, 0, 0, width, height);
+                    reader.faint = root.faint(ctx.getImageData(0, 0, width, height).data);
+                }
+
+                Connections {
+                    target: entry.modelData
+
+                    function onIconChanged(): void {
+                        reader.faint = false;
+                        reader.loadImage(entry.modelData.icon);
+                    }
+                }
+
+                Component.onCompleted: loadImage(entry.modelData.icon)
             }
 
             MouseArea {

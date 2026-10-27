@@ -5,9 +5,9 @@ import KubaOS.Components as K
 import "words.js" as Words
 
 // One row of the Results or of a list View, as `K.ListRow` draws a two-line row: 56 tall, 12 in,
-// a 20 icon, the title in `body_strong` with the matched characters lit, the subtitle in `small`,
-// and the Alias the query named it by as the row's mono detail at its end. The list draws the
-// selection behind it, so it can slide.
+// a 24 icon spanning both lines (`icon.two_line`), the title in `body_strong` with the matched
+// characters lit, the subtitle in `small`, and the Alias the query named it by as the row's mono
+// detail at its end. The list draws the selection behind it, so it can slide.
 //
 // HAZARD: no layout primitives and no `K.Text` in here. Every keystroke makes up to fourteen of
 // these, and fourteen `K.ListRow`s took 15 ms to make against 0.9 ms for these, most of a frame at
@@ -35,7 +35,7 @@ Item {
     readonly property color muted: row.selected ? K.Look.alpha(K.Tokens.color.on_secondary_container, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
     readonly property real dim: row.runs ? 1 : K.Tokens.opacity.disabled_content
     // Where the words start: past the icon and the gap after it.
-    readonly property int textStart: K.Tokens.space.s12 * 2 + K.Tokens.icon.s20
+    readonly property int textStart: K.Tokens.space.s12 * 2 + K.Tokens.icon.two_line
     readonly property bool twoLine: subtitleLine.text !== ""
 
     // The pointer moved over the row at (x, y) in the row, or clicked it.
@@ -49,8 +49,8 @@ Item {
         id: image
 
         x: K.Tokens.space.s12
-        y: (row.height - K.Tokens.icon.s20) / 2
-        implicitSize: K.Tokens.icon.s20
+        y: (row.height - K.Tokens.icon.two_line) / 2
+        implicitSize: K.Tokens.icon.two_line
         visible: row.iconSource !== ""
         asynchronous: true
         source: row.iconSource
@@ -60,10 +60,10 @@ Item {
     // Items without an icon of their own, such as a sum or a bind, show their Extension's symbol.
     K.Icon {
         x: K.Tokens.space.s12
-        y: (row.height - K.Tokens.icon.s20) / 2
+        y: (row.height - K.Tokens.icon.two_line) / 2
         visible: !image.visible
         name: Words.glyph(row.extension)
-        size: K.Tokens.icon.s20
+        size: K.Tokens.icon.two_line
         color: K.Look.alpha(row.main, row.dim)
     }
 

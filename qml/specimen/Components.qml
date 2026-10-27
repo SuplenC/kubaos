@@ -62,7 +62,8 @@ K.Stack {
                 }
             }
 
-            K.Fill {}
+            K.Fill {
+            }
 
             K.KeyHints {
                 hints: [["Tab", "pages"], ["M", "mode"]]
@@ -81,7 +82,8 @@ K.Stack {
         }
     }
 
-    K.Divider {}
+    K.Divider {
+    }
 
     K.Page {
         K.Stack {
@@ -157,7 +159,8 @@ K.Stack {
                                         gap: K.Tokens.space.s16
                                         centred: true
 
-                                        StateHeads {}
+                                        StateHeads {
+                                        }
                                     }
 
                                     Repeater {
@@ -483,12 +486,7 @@ K.Stack {
                         K.List {
                             K.ListRow {
                                 title: "English (US)"
-                                chips: [
-                                    {
-                                        kind: "Accent",
-                                        text: "Default"
-                                    }
-                                ]
+                                chips: [{ kind: "Accent", text: "Default" }]
                                 detail: "us"
                                 checkable: true
                                 checked: true
@@ -716,7 +714,8 @@ K.Stack {
                         columns: 4
                         gap: K.Tokens.space.s16
 
-                        K.Media {}
+                        K.Media {
+                        }
 
                         K.Media {
                             source: root.picture
@@ -902,7 +901,8 @@ K.Stack {
                                             style: K.Tokens.type.title
                                         }
 
-                                        K.Fill {}
+                                        K.Fill {
+                                        }
 
                                         K.Text {
                                             text: "42%"
@@ -929,7 +929,8 @@ K.Stack {
                                             color: K.Tokens.color.primary
                                         }
 
-                                        K.Fill {}
+                                        K.Fill {
+                                        }
 
                                         K.Text {
                                             text: "01:42"
@@ -1032,7 +1033,8 @@ K.Stack {
                                 icon: "terminal"
                             }
 
-                            K.Fill {}
+                            K.Fill {
+                            }
 
                             K.Button {
                                 text: "Save log"
@@ -1087,7 +1089,8 @@ K.Stack {
         gap: K.Tokens.space.s16
         centred: true
 
-        StateHeads {}
+        StateHeads {
+        }
 
         Repeater {
             model: root.kinds.length * (root.stateNames.length + 1)

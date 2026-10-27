@@ -21,15 +21,17 @@
   home.packages = [
     kubaosPkgs.quickshell
 
-    # Fonts for the shell (config/quickshell/theme/Theme.qml): Geist for the
-    # interface, M PLUS 1 for Japanese accents, Material Symbols for icons.
-    # Geist and Geist Mono are curated, at the release the iced apps embed;
-    # Geist Mono's Nerd Font is the one terminals get the prompt's and the
-    # file managers' glyphs from once they move onto it.
+    # Fonts for the shell, whose type styles are `design/tokens.toml`'s
+    # `[font.family]`: Geist and Geist Mono for the interface, M PLUS 1 for
+    # the Japanese accents. Its icons are KubaOS Symbols, SVGs in
+    # `KubaOS.Components`, so no icon font. Geist and Geist Mono are curated,
+    # at the release the iced apps embed; Geist Mono's Nerd Font is the one
+    # terminals get the prompt's and the file managers' glyphs from once they
+    # move onto it. JetBrains Mono's Nerd Font is GTK's and Qt's monospace
+    # font until then (`home/theme.nix`).
     kubaosPkgs.geist-font
     pkgs.nerd-fonts.geist-mono
     pkgs.mplus-outline-fonts.githubRelease
-    pkgs.material-symbols
     pkgs.nerd-fonts.jetbrains-mono
     pkgs.nerd-fonts.caskaydia-cove
 

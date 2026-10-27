@@ -37,7 +37,8 @@ Drawer {
     readonly property var today: Time.state.today ?? null
     readonly property bool analog: !!Time.settings.analog
     readonly property int columnGap: K.Tokens.space.s20
-    readonly property int pad: K.Tokens.space.s20
+    // The container padding round the month and the rail beside it.
+    readonly property int pad: K.Tokens.containerPaddingAround(grid.implicitWidth + K.Tokens.size.rail + columnGap)
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
     edge: "top"
@@ -345,7 +346,7 @@ Drawer {
                         K.Text {
                             text: zone.modelData.relative
                             style: K.Tokens.type.small
-                            color: K.Tokens.color.outline
+                            color: K.Tokens.color.on_surface_variant
                         }
                     }
                 }
@@ -432,9 +433,15 @@ Drawer {
                         }
 
                         K.Text {
-                            text: root.copied !== "" ? `Copied ${root.copied}` : "Enter copies · Ctrl+Enter copies ISO"
+                            visible: root.copied !== ""
+                            text: `Copied ${root.copied}`
                             style: K.Tokens.type.caption
-                            color: root.copied !== "" ? K.Tokens.color.tertiary : K.Tokens.color.outline
+                            color: K.Tokens.color.tertiary
+                        }
+
+                        K.KeyHints {
+                            visible: root.copied === ""
+                            hints: [["Enter", "copies"], ["Ctrl+Enter", "copies ISO"]]
                         }
                     }
                 }
@@ -495,7 +502,7 @@ Drawer {
                             visible: (root.day?.zones ?? []).length > 0
                             text: (root.day?.zones ?? []).map(z => `${z.label} ${z.time}`).join("  ·  ")
                             style: K.Tokens.type.small
-                            color: K.Tokens.color.outline
+                            color: K.Tokens.color.on_surface_variant
                         }
                     }
                 }

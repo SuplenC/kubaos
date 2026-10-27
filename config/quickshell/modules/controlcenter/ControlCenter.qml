@@ -60,68 +60,72 @@ Drawer {
         precision: SystemClock.Minutes
     }
 
-    K.Stack {
-        id: top
+    // The panel's body, the container padding in: the sections, then the tabs in what is left.
+    K.Container {
+        id: body
 
-        x: K.Tokens.space.s16
-        y: K.Tokens.space.s16
-        width: root.contentWidth - K.Tokens.space.s16 * 2
-        room: width
-        fill: true
-        gap: K.Tokens.space.s16
+        width: root.contentWidth
 
-        K.Row {
+        K.Stack {
+            id: top
+
             fill: true
-            gap: K.Tokens.space.s8
-            align: "centre"
+            gap: K.Tokens.space.s16
 
-            // The weekday's kanji above the time, as a page's accent sits above its title.
-            K.Header {
-                accent: `${root.kanji[clock.date.getDay()]}曜日`
-                title: Qt.formatDateTime(clock.date, Time.timeFormat)
-                lede: Qt.formatDateTime(clock.date, Time.dateFormat) + (Battery.available ? ` · ${Math.round(Battery.percentage * 100)}% ${Battery.timeLeft}` : "")
+            K.Row {
+                fill: true
+                gap: K.Tokens.space.s8
+                align: "centre"
+
+                // The weekday's kanji above the time, as a page's accent sits above its title.
+                K.Header {
+                    accent: `${root.kanji[clock.date.getDay()]}曜日`
+                    title: Qt.formatDateTime(clock.date, Time.timeFormat)
+                    lede: Qt.formatDateTime(clock.date, Time.dateFormat) + (Battery.available ? ` · ${Math.round(Battery.percentage * 100)}% ${Battery.timeLeft}` : "")
+                }
+
+                K.Fill {
+                }
+
+                K.IconButton {
+                    icon: "wallpaper"
+                    label: "Wallpaper"
+                    kind: "Tonal"
+                    onActivated: Panels.open("wallpaper")
+                }
+
+                K.IconButton {
+                    icon: "power_settings_new"
+                    label: "Power"
+                    kind: "Tonal"
+                    onActivated: Panels.open("powermenu")
+                }
             }
 
-            K.Fill {
+            QuickToggles {
+                id: toggles
+
+                onKeyboardExpanded: root.tab = root.keyboardTab
             }
 
-            K.IconButton {
-                icon: "wallpaper"
-                label: "Wallpaper"
-                kind: "Tonal"
-                onActivated: Panels.open("wallpaper")
+            CaptureRow {
             }
 
-            K.IconButton {
-                icon: "power_settings_new"
-                label: "Power"
-                kind: "Tonal"
-                onActivated: Panels.open("powermenu")
+            Sliders {
             }
-        }
 
-        QuickToggles {
-            id: toggles
-
-            onKeyboardExpanded: root.tab = root.keyboardTab
-        }
-
-        CaptureRow {
-        }
-
-        Sliders {
-        }
-
-        NotificationHistory {
+            NotificationHistory {
+            }
         }
     }
 
-    // The tabs and their list, in the room the sections above leave.
+    // The tabs and their list, in the room the sections above leave, the container padding in
+    // from the panel's edges.
     Item {
-        x: top.x
-        y: top.y + top.height + K.Tokens.space.s16
-        width: top.width
-        height: Math.max(0, root.height - y - K.Tokens.space.s16)
+        x: body.padding
+        y: body.height
+        width: root.contentWidth - body.padding * 2
+        height: Math.max(0, root.height - y - body.padding)
 
         Tabs {
             id: tabBar

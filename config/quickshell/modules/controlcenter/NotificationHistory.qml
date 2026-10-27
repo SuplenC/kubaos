@@ -61,17 +61,17 @@ K.Stack {
         }
     }
 
-    Item {
-        readonly property bool fillWidth: true
-
+    // A list of like items, so in a well, as Wi-Fi's networks and the Bluetooth devices are.
+    Well {
         visible: list.count > 0
-        implicitHeight: Math.min(list.contentHeight, root.maxListHeight)
+        implicitHeight: Math.min(list.contentHeight, root.maxListHeight) + K.Tokens.space.s12 * 2
+        focused: list.activeFocus
 
         NavList {
             id: list
 
             anchors.fill: parent
-            spacing: K.Tokens.space.s8
+            spacing: K.Tokens.space.s4
             highlightShown: false
             model: ScriptModel {
                 values: Notifs.history
@@ -84,6 +84,7 @@ K.Stack {
 
                 width: ListView.view.width
                 notification: modelData
+                inWell: true
                 selected: ListView.isCurrentItem && ListView.view.activeFocus
             }
         }

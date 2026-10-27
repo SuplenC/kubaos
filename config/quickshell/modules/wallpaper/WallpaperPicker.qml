@@ -25,7 +25,15 @@ Drawer {
     readonly property string folder: folders[settingsOpen ? lastFolder : folderIndex]?.name ?? ""
     readonly property var images: Wallpapers.images[folder] ?? []
     readonly property real dpr: frame.screen?.devicePixelRatio ?? 1
-    readonly property int pad: K.Tokens.space.s24
+    // The container padding round the thumbnails or the tabs and key hints, whichever is wider;
+    // the screen's width's own when they would take more than it has.
+    readonly property int pad: {
+        const inner = Math.max(gridWidth, headerWidth);
+        const around = K.Tokens.containerPaddingAround(inner);
+        return inner + around * 2 > widest ? K.Tokens.containerPadding(widest) : around;
+    }
+    // The widest the panel grows: the screen between its frame's corners.
+    readonly property real widest: frame.r - frame.l - K.Tokens.radius.surface * 2
     // Up to four per row; fewer images make a narrower panel (it morphs when
     // switching folders).
     readonly property int mostColumns: 4
@@ -48,7 +56,7 @@ Drawer {
     edge: "bottom"
     // As wide as the thumbnails or the tabs and key hints above them,
     // whichever is wider, and never wider than the screen.
-    contentWidth: Math.min(Math.max(gridWidth, headerWidth) + pad * 2, frame.r - frame.l - K.Tokens.radius.surface * 2)
+    contentWidth: Math.min(Math.max(gridWidth, headerWidth) + pad * 2, widest)
     contentHeight: pad + header.implicitHeight + K.Tokens.space.s16 + (settingsOpen ? Math.min(Math.max(cellHeight, settings.implicitHeight), (frame.b - frame.t) * settingsShare) : rows * cellHeight) + pad
     onOpened: {
         Wallpapers.refresh();
@@ -105,7 +113,7 @@ Drawer {
         }
     }
 
-    // The folders' tabs, and the keys in a caption line at the far end, as every screen shows them.
+    // The folders' tabs, and the keys as key hints at the far end, as every screen shows them.
     K.Row {
         id: header
 
@@ -128,13 +136,10 @@ Drawer {
         K.Fill {
         }
 
-        K.Text {
+        K.KeyHints {
             id: hints
 
-            text: root.settingsOpen ? "←→ change · Esc back" : "Tab folder · S settings · Enter apply · Esc close"
-            style: K.Tokens.type.caption
-            color: K.Tokens.color.on_surface_variant
-            maximumLines: 1
+            hints: root.settingsOpen ? [["← →", "change"], ["Esc", "back"]] : [["Tab", "folder"], ["S", "settings"], ["Enter", "apply"], ["Esc", "close"]]
         }
     }
 
@@ -204,70 +209,78 @@ Drawer {
             width: grid.cellWidth
             height: grid.cellHeight
 
-            // A picture you pick: the control radius, the selection the focus ring round it.
-            ClippingRectangle {
+            // A picture you pick: the control radius, the selection the focus ring round it. Its
+            // box is the wallpaper's aspect from the first frame, the placeholder in it until the
+            // picture or the video's poster fades in over it.
+            K.Media {
                 id: picture
 
                 x: root.ring
                 y: root.ring
                 width: root.thumbWidth
-                height: root.thumbHeight
+                height: implicitHeight
+                aspect: K.Tokens.aspect.wallpaper
                 radius: K.Tokens.radius.control
-                color: K.Tokens.color.surface_container_high
 
-                WallpaperView {
-                    id: thumb
-
+                ClippingRectangle {
                     anchors.fill: parent
-                    path: cell.modelData
-                    // Decode at the size it is shown, in device pixels: crisp and cheap.
-                    sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
-                    playing: root.shown && (cell.isCurrent || tap.containsMouse) && Motion.mode !== "never"
-                    // The ones not picked sit back, as secondary content does.
-                    opacity: ready ? (cell.isCurrent ? 1 : K.Tokens.opacity.subdued) : 0
+                    radius: K.Tokens.radius.control
+                    color: "transparent"
 
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: K.Tokens.duration.short
-                            easing.type: Easing.BezierSpline
-                            easing.bezierCurve: K.Tokens.easing.standard
+                    WallpaperView {
+                        id: thumb
+
+                        anchors.fill: parent
+                        path: cell.modelData
+                        // Decode at the size it is shown, in device pixels: crisp and cheap.
+                        sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
+                        playing: root.shown && (cell.isCurrent || tap.containsMouse) && Motion.mode !== "never"
+                        // The ones not picked sit back, as secondary content does.
+                        opacity: ready ? (cell.isCurrent ? 1 : K.Tokens.opacity.subdued) : 0
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: K.Tokens.duration.short
+                                easing.type: Easing.BezierSpline
+                                easing.bezierCurve: K.Tokens.easing.standard
+                            }
                         }
                     }
-                }
 
-                // This one moves: playing, or held on its poster.
-                K.Chip {
-                    anchors.left: parent.left
-                    anchors.bottom: parent.bottom
-                    anchors.margins: K.Tokens.space.s8
-                    visible: thumb.video
-                    icon: thumb.moving ? "motion_photos_on" : "motion_photos_paused"
-                    text: thumb.moving ? "Playing" : "Video"
-                }
+                    // This one moves: playing, or held on its poster.
+                    K.Chip {
+                        anchors.left: parent.left
+                        anchors.bottom: parent.bottom
+                        anchors.margins: K.Tokens.space.s8
+                        visible: thumb.video
+                        icon: thumb.moving ? "motion_photos_on" : "motion_photos_paused"
+                        text: thumb.moving ? "Playing" : "Video"
+                    }
 
-                K.Chip {
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    anchors.margins: K.Tokens.space.s8
-                    visible: cell.applied
-                    kind: "Selected"
-                    icon: "check"
-                    text: "Current"
-                }
+                    K.Chip {
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: K.Tokens.space.s8
+                        visible: cell.applied
+                        kind: "Selected"
+                        icon: "check"
+                        text: "Current"
+                    }
 
-                K.StateLayer {
-                    hovered: tap.containsMouse
-                    pressed: tap.pressed
-                    content: K.Tokens.color.on_surface
-                }
+                    K.StateLayer {
+                        hovered: tap.containsMouse
+                        pressed: tap.pressed
+                        content: K.Tokens.color.on_surface
+                    }
 
-                MouseArea {
-                    id: tap
+                    MouseArea {
+                        id: tap
 
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.apply(cell.index)
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.apply(cell.index)
+                    }
                 }
             }
 
