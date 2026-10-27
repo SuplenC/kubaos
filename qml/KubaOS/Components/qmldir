@@ -29,6 +29,7 @@ Field 1.0 Field.qml
 Labelled 1.0 Labelled.qml
 Note 1.0 Note.qml
 Switch 1.0 Switch.qml
+Slider 1.0 Slider.qml
 Checkbox 1.0 Checkbox.qml
 Radio 1.0 Radio.qml
 ListRow 1.0 ListRow.qml

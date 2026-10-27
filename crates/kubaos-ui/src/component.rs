@@ -6,8 +6,8 @@
 //! # Owns
 //!
 //! - Buttons with a label or an icon alone ([`button`]) and the hint naming an icon button
-//!   ([`hint`]), the text field ([`field`]), the switch ([`switch`]), checkboxes and radio
-//!   buttons ([`check`]), list rows and their well ([`list`]), chips ([`chip`]), cards ([`card`]),
+//!   ([`hint`]), the text field ([`field`]), the switch ([`switch`]), the slider ([`slider`]),
+//!   checkboxes and radio buttons ([`check`]), list rows and their well ([`list`]), chips ([`chip`]), cards ([`card`]),
 //!   dialogs ([`dialog`]), toasts ([`toast`]), progress ([`progress`]), empty states ([`empty`]),
 //!   errors with a hint and a log ([`error`]).
 //!
@@ -26,6 +26,7 @@ pub mod field;
 pub mod hint;
 pub mod list;
 pub mod progress;
+pub mod slider;
 pub mod switch;
 pub mod toast;
 

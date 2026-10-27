@@ -107,6 +107,17 @@ column = 560
 rail = 236
 # A log opened under an error or a progress bar.
 log = 232
+# A panel of the shell, and a notification beside one: the control center's
+# side sheet, the cards of the notification stack.
+panel = 384
+# The shell's bar along the top of every screen: a small control (32) with 4
+# above and below, so its pills and buttons centre on whole device pixels.
+bar = 40
+# A slider: its thumb's room, the thumb, and the mark of each stop on a slider
+# that snaps to stops. The track is a progress bar's.
+slider = 24
+slider_thumb = 16
+slider_stop = 4
 
 # Type families. Nothing else draws text; symbols are drawn, see [symbols].
 [font.family]
@@ -340,6 +351,12 @@ error_fill = 0.30
 error_edge = 0.45
 # The log's surface, over the page.
 log = 0.85
+# The shell's frame and the panels growing out of it: glass, which Hyprland
+# blurs what shows through.
+frame = 0.94
+# What darkens the desktop behind an open panel, lighter than a dialog's scrim:
+# a panel sits beside the windows rather than over a question.
+panel_scrim = 0.20
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.
@@ -511,6 +528,10 @@ arrow_forward = { tabler = "arrow-right" }
 arrow_upward = { tabler = "arrow-up" }
 badge = { tabler = "id-badge-2" }
 balance = { tabler = "scale" }
+battery_0_bar = { tabler = "battery" }
+battery_1_bar = { tabler = "battery-1" }
+battery_2_bar = { tabler = "battery-2" }
+battery_3_bar = { tabler = "battery-3" }
 battery_charging_full = { tabler = "battery-charging" }
 battery_full = { tabler = "battery-4" }
 bedtime = { tabler = "moon-stars" }
@@ -531,6 +552,7 @@ circle = { tabler = "circle" }
 clear_all = { tabler = "clear-all" }
 close = { tabler = "x" }
 code = { tabler = "code" }
+coffee = { tabler = "coffee" }
 computer = { tabler = "device-laptop" }
 content_paste = { tabler = "clipboard" }
 dark_mode = { tabler = "moon" }
@@ -555,6 +577,7 @@ key = { tabler = "key" }
 keyboard = { tabler = "keyboard" }
 keyboard_command_key = { tabler = "command" }
 keyboard_option_key = { tabler = "option" }
+lan = { tabler = "network" }
 language = { tabler = "world" }
 light_mode = { tabler = "sun" }
 list_alt = { tabler = "list-details" }
@@ -619,6 +642,7 @@ volume_down = { tabler = "volume-2" }
 volume_mute = { tabler = "volume-3" }
 volume_off = { tabler = "volume-off" }
 volume_up = { tabler = "volume" }
+vpn_lock = { tabler = "shield-lock" }
 wallpaper = { tabler = "photo" }
 warning = { tabler = "alert-triangle" }
 wb_twilight = { tabler = "sunset-2" }

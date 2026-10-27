@@ -34,6 +34,8 @@ use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::progress::spinner;
+use kubaos_ui::component::slider::Value;
+use kubaos_ui::component::slider::slider;
 use kubaos_ui::component::switch::switch;
 use kubaos_ui::component::toast::toast;
 use kubaos_ui::icon::Icon;
@@ -75,6 +77,12 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             fields(look),
         ))
         .push(section(look, "Switches, checkboxes and radio buttons", None, toggles(look)))
+        .push(section(
+            look,
+            "Sliders",
+            Some("A progress bar's track filled up to the thumb. One with stops marks those ahead and snaps to them."),
+            sliders(look),
+        ))
         .push(section(
             look,
             "Lists",
@@ -346,6 +354,24 @@ fn toggles<'a>(look: &Look) -> Element<'a, Message> {
         .push(radio(look, "Focused", false, Some(Message::Sample), true))
         .push(radio::<Message>(look, "Disabled", true, None, false));
     stack(look, Space::S24).push(switches).push(checks).push(radios).into()
+}
+
+fn sliders<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let sample = |value: Value, enabled: bool, focused: bool, label: &'static str| -> Element<'a, Message> {
+        let on_change: Option<Box<dyn Fn(Value) -> Message>> =
+            enabled.then(|| Box::new(|_| Message::Sample) as Box<dyn Fn(Value) -> Message>);
+        stack(look, Space::S8)
+            .push(slider(look, value, on_change, focused))
+            .push(text(label, Type::Small, c.on_surface_variant))
+            .into()
+    };
+    grid(look, 4, Space::S32)
+        .push(sample(Value::Continuous(0.62), true, false, "Volume, 62%"))
+        .push(sample(Value::Stop { index: 2, count: 5 }, true, false, "Five stops"))
+        .push(sample(Value::Continuous(0.3), true, true, "Focused"))
+        .push(sample(Value::Continuous(0.3), false, false, "Disabled"))
+        .into()
 }
 
 fn lists<'a>(look: &Look) -> Element<'a, Message> {
