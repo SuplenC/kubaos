@@ -17,8 +17,6 @@
 //!   `scripts/dot-theme`.
 //! - Installing Bibata-Modern-Classic and pinning the sources: `home/theme.nix`.
 
-#![forbid(unsafe_code)]
-
 pub mod colors;
 #[cfg(test)]
 mod fixture;

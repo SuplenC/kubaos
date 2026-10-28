@@ -105,6 +105,10 @@ fn bounds_in(view: Element<'_, ()>, room: Size, id: &'static str) -> iced::Recta
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "Layout puts boxes on whole device pixels, so the sizes are exact: any difference is the bug."
+)]
 fn a_child_that_fills_its_height_is_stretched_to_its_row() {
     let look = Look::new(Mode::Dark, Scale::X1);
     let tall = widget::container(widget::Space::new()).height(f32::from(SizeToken::Dialog.px()));
@@ -119,6 +123,10 @@ fn a_child_that_fills_its_height_is_stretched_to_its_row() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "Layout puts boxes on whole device pixels, so the sizes are exact: any difference is the bug."
+)]
 fn a_grid_that_fills_its_height_gives_its_row_all_of_it() {
     let look = Look::new(Mode::Dark, Scale::X1);
     let cell = widget::container(widget::Space::new())
@@ -136,6 +144,10 @@ fn a_grid_that_fills_its_height_gives_its_row_all_of_it() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "Layout puts boxes on whole device pixels, so the sizes are exact: any difference is the bug."
+)]
 fn uniform_rows_are_all_as_tall_as_the_tallest() {
     let look = Look::new(Mode::Dark, Scale::X1);
     let card = |id: &'static str, height: f32| -> Element<'_, ()> {
@@ -159,6 +171,10 @@ fn uniform_rows_are_all_as_tall_as_the_tallest() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "Layout puts boxes on whole device pixels, so the sizes are exact: any difference is the bug."
+)]
 fn a_grid_that_fills_its_height_in_a_scroll_keeps_each_rows_own_height() {
     let look = Look::new(Mode::Dark, Scale::X1);
     let cell = widget::container(widget::Space::new().height(40.0)).id(widget::Id::new("cell"));

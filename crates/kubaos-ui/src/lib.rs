@@ -23,8 +23,6 @@
 //! - The values: `design/tokens.toml`. The shell's and the menu's components: `KubaOS.Components`
 //!   in QML, from the same tokens.
 
-#![forbid(unsafe_code)]
-
 pub mod color;
 pub mod component;
 pub mod focus;

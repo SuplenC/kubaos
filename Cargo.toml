@@ -77,12 +77,14 @@ tempfile = "3"
 kotodama-extension = { git = "https://github.com/SuplenC/kotodama", rev = "e2fbb7cff91bdac4cabb628350b005f992d186d1" }
 kotodama-protocol = { git = "https://github.com/SuplenC/kotodama", rev = "e2fbb7cff91bdac4cabb628350b005f992d186d1" }
 
-# The lints of docs/agents/code-quality.md. A crate opts in with
-# `[lints] workspace = true` as part of its own restyle; until then, new
-# modules follow them by hand. Run clippy with -D warnings, so every warning
-# here fails a crate that opted in.
+# The lints of docs/agents/code-quality.md, which every crate takes with
+# `[lints] workspace = true`. `just lint` runs clippy with -D warnings, so
+# every warning here fails it, in two passes: the code, then every target
+# with `-A clippy::unwrap_used`. `just check` runs it with the rest of a PR's
+# checks.
 [workspace.lints.rust]
 missing_debug_implementations = "warn"
+unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
@@ -103,11 +105,17 @@ cast_sign_loss = "allow"
 # clippy's `allow-unwrap-in-tests` spares only `#[test]` functions and
 # `#[cfg(test)]` modules, not an integration test's helpers.
 allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
 clone_on_ref_ptr = "warn"
 dbg_macro = "warn"
 manual_let_else = "warn"
 mod_module_files = "warn"
+print_stderr = "warn"
+print_stdout = "warn"
 return_self_not_must_use = "warn"
+todo = "warn"
+undocumented_unsafe_blocks = "warn"
+unimplemented = "warn"
 unwrap_used = "warn"
 
 # iced's software renderer, with images placed in floats and clipped to their own rounded bounds,

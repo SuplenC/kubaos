@@ -15,8 +15,6 @@
 //! - The seeds, `user-layer/` in the repo, which the tests hold this table to.
 //! - Reading or writing an app's settings: the app's own crate.
 
-#![forbid(unsafe_code)]
-
 use std::env;
 use std::ffi::OsString;
 use std::path::Path;

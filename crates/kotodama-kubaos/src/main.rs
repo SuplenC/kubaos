@@ -16,8 +16,6 @@
 //!
 //! - The Items and the runs: the library's modules.
 
-#![forbid(unsafe_code)]
-
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;

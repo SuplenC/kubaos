@@ -32,6 +32,10 @@ fn a_selection_runs_from_its_lower_end_to_its_higher() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "Layout puts boxes on whole device pixels, so the sizes are exact: any difference is the bug."
+)]
 fn a_field_is_as_tall_as_a_regular_control_whatever_its_room() {
     let look = Look::new(Mode::Dark, Scale::X1);
     for room in [Size::new(400.0, 100.0), Size::new(1600.0, 900.0)] {

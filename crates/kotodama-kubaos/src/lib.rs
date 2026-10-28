@@ -20,8 +20,6 @@
 //! - Power and session: Kotodama's Bundled `system` Extension.
 //! - Hyprland's binds, which reach the search through the Bundled `hyprland` Extension.
 
-#![forbid(unsafe_code)]
-
 pub mod audio;
 pub mod bus;
 pub mod clock;

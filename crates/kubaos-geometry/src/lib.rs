@@ -23,8 +23,6 @@
 //! - Laying a page out and describing it: `kubaos-ui`'s `probe` module for iced, and
 //!   `kubaos-specimen check` for the specimen's pages.
 
-#![forbid(unsafe_code)]
-
 mod check;
 pub mod parity;
 
