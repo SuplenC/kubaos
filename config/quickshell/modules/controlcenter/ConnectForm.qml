@@ -77,6 +77,7 @@ FocusScope {
         }
 
         K.Text {
+            room: form.width
             text: root.title
             style: K.Tokens.type.headline
             maximumLines: 1
@@ -99,6 +100,7 @@ FocusScope {
             }
 
             K.Text {
+                room: form.width - (root.subtitleIcon === "" ? 0 : K.Tokens.type.small.icon + K.Tokens.space.s4)
                 text: root.subtitle
                 style: K.Tokens.type.small
                 color: K.Tokens.color.on_surface_variant

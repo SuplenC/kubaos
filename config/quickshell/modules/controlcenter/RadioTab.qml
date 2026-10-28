@@ -32,12 +32,13 @@ Item {
         return index >= 0 && index < list.count ? list.model.get(index) : null;
     }
 
+    // The keyboard goes into the form as it opens, and back onto the list as it closes. The form
+    // is disabled as it closes, which takes its focus first, so whether it had it can't be asked.
     onFormOpenChanged: {
-        if (root.formOpen) {
+        if (root.formOpen)
             form.begin();
-        } else if (form.activeFocus) {
+        else if (root.visible)
             list.forceActiveFocus();
-        }
     }
 
     Well {
@@ -90,71 +91,100 @@ Item {
 
                 rowHeight: live.kind === "label" ? live.labelRoom + K.Tokens.type.label.line : live.kind === "note" ? K.Tokens.size.row : K.Tokens.size.row_two_line
 
-                K.ListRow {
-                    id: row
-
-                    visible: live.kind === "row"
+                // Only what the row's kind shows is made: a scan's update makes and drops rows
+                // while the tab shows.
+                Loader {
                     width: live.width
                     height: live.rowHeight
-                    title: live.title
-                    subtitle: live.subtitle
-                    subtitleIcon: live.subtitleIcon
-                    icon: live.icon
-                    tile: true
-                    accent: live.accent
-                    checkable: true
-                    checked: live.checked
-                    selected: live.current && list.highlightShown
-                    onActivated: root.picked(live.key)
+                    sourceComponent: ({
+                            row: deviceRow,
+                            label: sectionLabel,
+                            skeleton: skeletonRow,
+                            note: noteLine
+                        })[live.kind] ?? null
                 }
 
-                // Over the check's room, which a row that can be forgotten keeps empty.
-                K.IconButton {
-                    id: forget
+                Component {
+                    id: deviceRow
 
-                    x: row.width - K.Tokens.space.s12 - K.Tokens.type.body_strong.icon / 2 - width / 2
-                    y: (row.height - height) / 2
-                    visible: live.kind === "row" && live.forgettable && opacity > 0
-                    opacity: row.hovered || forget.hovered || row.selected ? 1 : 0
-                    icon: "close"
-                    label: "Forget"
-                    kind: "Text"
-                    size: "Sm"
-                    onActivated: root.forgot(live.key)
+                    K.ListRow {
+                        id: row
 
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: K.Tokens.duration.micro
+                        title: live.title
+                        subtitle: live.subtitle
+                        subtitleIcon: live.subtitleIcon
+                        icon: live.icon
+                        tile: true
+                        accent: live.accent
+                        checkable: true
+                        checked: live.checked
+                        selected: live.current && list.highlightShown
+                        onActivated: root.picked(live.key)
+
+                        // Over the check's room, which a row that can be forgotten keeps empty.
+                        Loader {
+                            active: live.forgettable
+                            x: row.width - K.Tokens.space.s12 - K.Tokens.type.body_strong.icon / 2 - width / 2
+                            y: (row.height - height) / 2
+
+                            sourceComponent: K.IconButton {
+                                id: forget
+
+                                visible: opacity > 0
+                                opacity: row.hovered || forget.hovered || row.selected ? 1 : 0
+                                icon: "close"
+                                label: "Forget"
+                                kind: "Text"
+                                size: "Sm"
+                                onActivated: root.forgot(live.key)
+
+                                Behavior on opacity {
+                                    NumberAnimation {
+                                        duration: K.Tokens.duration.micro
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
-                K.Text {
-                    visible: live.kind === "label"
-                    x: K.Tokens.space.s12
-                    y: live.labelRoom
-                    text: live.title
-                    style: K.Tokens.type.label
-                    color: K.Tokens.color.on_surface_variant
+                Component {
+                    id: sectionLabel
+
+                    Item {
+                        K.Text {
+                            x: K.Tokens.space.s12
+                            y: live.labelRoom
+                            text: live.title
+                            style: K.Tokens.type.label
+                            color: K.Tokens.color.on_surface_variant
+                        }
+                    }
                 }
 
-                SkeletonRow {
-                    visible: live.kind === "skeleton"
-                    width: live.width
-                    height: live.rowHeight
-                    share: live.index % 2 ? 0.45 : 0.7
+                Component {
+                    id: skeletonRow
+
+                    SkeletonRow {
+                        share: live.index % 2 ? 0.45 : 0.7
+                    }
                 }
 
-                K.Text {
-                    visible: live.kind === "note"
-                    x: K.Tokens.space.s12
-                    y: (live.rowHeight - height) / 2
-                    width: live.width - K.Tokens.space.s12 * 2
-                    room: width
-                    maximumLines: 1
-                    text: live.title
-                    style: K.Tokens.type.body
-                    color: live.failed ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
+                Component {
+                    id: noteLine
+
+                    Item {
+                        K.Text {
+                            x: K.Tokens.space.s12
+                            y: (parent.height - height) / 2
+                            width: parent.width - K.Tokens.space.s12 * 2
+                            room: width
+                            maximumLines: 1
+                            text: live.title
+                            style: K.Tokens.type.body
+                            color: live.failed ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
+                        }
+                    }
                 }
             }
         }

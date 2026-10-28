@@ -9,12 +9,18 @@ import "../../services/radios.js" as Radios
 // connects or disconnects on a press; a nearby one opens the connection form, which pairs it and
 // shows what the pairing agent asks: a code to type on the device or to check, or a PIN or
 // passkey to type here. A pairing the device starts opens the form too.
+//
+// The form holds its device by object path, not the device itself: BlueZ drops a device it no
+// longer hears, and the form then says so instead of calling into it.
 RadioTab {
     id: root
 
-    // The device the form is for, or null while the list shows.
-    property var pending: null
-    readonly property var prompt: root.pending && Bt.prompt?.device === root.pending.dbusPath ? Bt.prompt : null
+    // The object path and name of the device the form is for; the path is empty while the list
+    // shows.
+    property string pendingPath: ""
+    property string pendingName: ""
+    readonly property var pending: root.pendingPath === "" ? null : root.find(root.pendingPath)
+    readonly property var prompt: root.pendingPath !== "" && Bt.prompt?.device === root.pendingPath ? Bt.prompt : null
     readonly property string kind: root.prompt?.kind ?? ""
     readonly property bool pairing: root.pending !== null && Bt.isPairing(root.pending)
     readonly property string failure: root.pending ? (Bt.pairError(root.pending) || Bt.problem) : ""
@@ -85,11 +91,13 @@ RadioTab {
         case "pin-code":
             return "Type its PIN";
         }
-        const distance = root.pending ? Radios.distance(Bt.rssi[root.pending.dbusPath]) : "";
+        const distance = Radios.distance(Bt.rssi[root.pendingPath]);
         return distance === "" ? "Not paired" : `Not paired · ${distance}`;
     }
 
     function formStatus(): string {
+        if (root.pending === null)
+            return "Out of range";
         if (root.failure !== "")
             return root.failure;
         if ((root.prompt?.entered ?? null) !== null)
@@ -97,8 +105,14 @@ RadioTab {
         return root.pairing && root.prompt === null ? "Pairing…" : "";
     }
 
+    function open(device): void {
+        Bt.problem = "";
+        root.pendingName = device.name;
+        root.pendingPath = device.dbusPath;
+    }
+
     function close(): void {
-        root.pending = null;
+        root.pendingPath = "";
     }
 
     rows: {
@@ -121,25 +135,25 @@ RadioTab {
         }
         return out;
     }
-    formOpen: root.pending !== null
+    formOpen: root.pendingPath !== ""
     off: !Bt.available || !Bt.enabled
     offIcon: "bluetooth_disabled"
     offTitle: !Bt.available ? "No Bluetooth adapter" : Bt.blocked ? "Bluetooth is blocked" : "Bluetooth is off"
     offBody: !Bt.available ? "Nothing to pair with on this machine." : Bt.blocked ? Bt.blockedText : Bt.problem || "Turn it on to find devices."
     offAction: Bt.available && !Bt.blocked ? turnOn : null
 
-    form.icon: root.pending ? Radios.deviceSymbol(root.pending.icon) : ""
-    form.title: root.pending?.name ?? ""
+    form.icon: root.pending ? Radios.deviceSymbol(root.pending.icon) : "bluetooth"
+    form.title: root.pendingName
     form.subtitle: root.formLine()
     form.ask: root.kind === "passkey" || root.kind === "pin-code" ? "field" : (root.prompt?.code ?? "") !== "" ? "code" : ""
     form.placeholder: root.kind === "passkey" ? "Six digits" : "The PIN"
     form.code: root.grouped(root.prompt?.code ?? "")
     form.status: root.formStatus()
-    form.failed: root.failure !== ""
+    form.failed: root.pending === null || root.failure !== ""
     form.action: "Pair"
     // Pair starts the pairing, or says yes to what the agent asks; a code shown to type on the
     // device waits on the device.
-    form.ready: root.prompt ? !root.kind.startsWith("display") : !root.pairing
+    form.ready: root.pending !== null && (root.prompt ? !root.kind.startsWith("display") : !root.pairing)
 
     // A prompt that asks for a PIN or passkey puts the keyboard in its field.
     onKindChanged: if (root.formOpen)
@@ -151,7 +165,7 @@ RadioTab {
         if (device.paired)
             Bt.activate(device);
         else
-            root.pending = device;
+            root.open(device);
     }
     onForgot: key => root.find(key)?.forget()
 
@@ -172,7 +186,7 @@ RadioTab {
         function onPromptIdChanged(): void {
             const device = Bt.prompt ? root.find(Bt.prompt.device) : null;
             if (device)
-                root.pending = device;
+                root.open(device);
         }
     }
 
@@ -192,14 +206,14 @@ RadioTab {
         function onSubmitted(value: string): void {
             if (root.prompt)
                 Bt.answer(true, value);
-            else
+            else if (root.pending)
                 Bt.activate(root.pending);
         }
 
         function onCancelled(): void {
             if (root.prompt)
                 Bt.answer(false, "");
-            else if (root.pairing)
+            else if (root.pairing && root.pending)
                 Bt.activate(root.pending);
             root.close();
         }

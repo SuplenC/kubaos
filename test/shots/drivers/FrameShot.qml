@@ -162,7 +162,7 @@ QtObject {
             }
             const jbl = Bt.devices.find(device => device.name === "JBL Flip 6");
             if (driver.state === "wifi-form" || driver.state === "wifi-error") {
-                wifi.open(Net.networks.find(network => network.name === "Omoide Yokocho"), driver.state === "wifi-error" ? "Wrong password" : "");
+                wifi.open("Omoide Yokocho", driver.state === "wifi-error" ? "Wrong password" : "");
                 typing.start();
             }
             if (driver.state === "wifi-scan") {
@@ -176,7 +176,7 @@ QtObject {
                 holdLeave.start();
             }
             if (driver.state === "bluetooth-form")
-                bluetooth.pending = jbl;
+                bluetooth.open(jbl);
             if (driver.state === "bluetooth-code") {
                 Bt.pairing = [jbl.dbusPath];
                 Bt.prompt = {
@@ -219,16 +219,19 @@ QtObject {
         }
     }
 
-    // The leaving row held about half-way out, watched for as the view removes it on its next
-    // frame, which llvmpipe can take a while to draw.
+    // The leaving row held half-way out, watched for as the view removes it on its next frame,
+    // which llvmpipe can take a while to draw.
     property int leaveWatch: 0
     property Timer holdLeave: Timer {
         interval: 16
         repeat: true
         onTriggered: {
             const row = driver.find(driver.window.contentItem, it => it.leaving === true);
-            if (row && row.grow <= 0.6) {
+            if (row) {
+                // Held where the leave is half done, whenever the watch first saw it.
                 row.leaveAnimation.pause();
+                row.grow = 0.5;
+                row.opacity = 0.5;
                 stop();
             } else if (++driver.leaveWatch > 200) {
                 console.warn("shot: no leaving row found");

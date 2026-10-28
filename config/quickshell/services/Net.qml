@@ -21,6 +21,8 @@ Singleton {
     readonly property var active: networks.find(n => n.connected) ?? null
     // The band the network in use is on (5 GHz), or empty while that isn't known.
     property string band: ""
+    // Whether the Wi-Fi tab has NetworkManager scanning.
+    readonly property bool scanning: wifiDevice?.scannerEnabled ?? false
     readonly property string icon: {
         if (wired)
             return "lan";
@@ -85,12 +87,19 @@ Singleton {
     }
 
     // Quickshell's networks carry no frequency: `nmcli` reads the one in use, read-only, without a
-    // rescan, each time it changes.
-    onActiveChanged: {
-        root.band = "";
+    // rescan, each time it changes, and after each scan, which sees a roam between bands.
+    function readBand(): void {
+        frequency.running = false;
         if (root.active)
             frequency.running = true;
     }
+
+    onActiveChanged: {
+        root.band = "";
+        root.readBand();
+    }
+    onScanningChanged: if (!root.scanning)
+        root.readBand()
 
     Process {
         id: frequency

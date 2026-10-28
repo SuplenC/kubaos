@@ -431,7 +431,7 @@ use = "A panel or dialog arriving, a page sliding in."
 
 [duration.slow]
 ms = 800
-use = "A wallpaper fading in, the light/dark crossfade."
+use = "A wallpaper fading in, the light/dark crossfade, a live list's new row fading in."
 
 [duration.scene]
 ms = 1200

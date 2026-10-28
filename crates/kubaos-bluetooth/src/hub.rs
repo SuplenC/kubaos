@@ -19,6 +19,11 @@ use crate::state::Prompt;
 use crate::state::Sink;
 use crate::state::State;
 
+/// How far a device's RSSI moves, in dBm, from one advertisement to the next while it stays put.
+/// A change under it is noise: publishing it would rewrite the state file many times a second
+/// during a scan, and the shell orders devices only by steps of 15 dBm.
+pub const RSSI_JITTER: i16 = 6;
+
 /// The user's answer to a prompt.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Answer {
@@ -227,10 +232,14 @@ impl<S: Sink> Hub<S> {
         });
     }
 
-    /// Records that `device` was heard at `rssi` dBm.
+    /// Records that `device` was heard at `rssi` dBm, unless that is within [`RSSI_JITTER`] of what
+    /// was last recorded.
     pub fn heard(&self, device: &str, rssi: i16) {
         self.change(|inner| {
-            inner.state.rssi.insert(device.to_owned(), rssi);
+            let last = inner.state.rssi.get(device).copied();
+            if last.is_none_or(|last| (rssi - last).abs() >= RSSI_JITTER) {
+                inner.state.rssi.insert(device.to_owned(), rssi);
+            }
         });
     }
 

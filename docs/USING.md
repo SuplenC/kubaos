@@ -104,7 +104,7 @@ A press on a known network connects to it; the × that shows under the pointer, 
 
 ## Bluetooth
 
-"Pair a Bluetooth device" in the Command menu, or `SUPER + CTRL + B`, opens the control center's Bluetooth tab. Paired devices are under Known, the connected ones first and checked, with their battery; devices in range are under Nearby, nearest first ("Very close", "Nearby", "Far"). While the tab shows it searches for devices for 10 seconds about once a minute. A press on a known device connects or disconnects it; the × under the pointer, or Delete, forgets one that isn't connected.
+"Pair a Bluetooth device" in the Command menu, or `SUPER + CTRL + B`, opens the control center's Bluetooth tab. Paired devices are under Known, the connected ones first and checked, with their battery; devices in range are under Nearby, nearest first ("Very close", "Nearby", "Far"). While the tab shows it searches for devices for 20 seconds every 45, often enough that a device in range never drops off the list between searches. A press on a known device connects or disconnects it; the × under the pointer, or Delete, forgets one that isn't connected.
 
 Put a new device in pairing mode, then pick it under Nearby: the list turns into its form, and Pair (or Enter) starts pairing. Then:
 

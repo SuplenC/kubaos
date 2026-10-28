@@ -627,7 +627,7 @@ pub enum Duration {
     Medium,
     /// A panel or dialog arriving, a page sliding in.
     Long,
-    /// A wallpaper fading in, the light/dark crossfade.
+    /// A wallpaper fading in, the light/dark crossfade, a live list's new row fading in.
     Slow,
     /// A whole scene changing once: the lock screen lifting, Kōbō's welcome settling.
     Scene,

@@ -449,7 +449,7 @@ QtObject {
         readonly property int medium: 300
         // A panel or dialog arriving, a page sliding in.
         readonly property int long: 500
-        // A wallpaper fading in, the light/dark crossfade.
+        // A wallpaper fading in, the light/dark crossfade, a live list's new row fading in.
         readonly property int slow: 800
         // A whole scene changing once: the lock screen lifting, Kōbō's welcome settling.
         readonly property int scene: 1200

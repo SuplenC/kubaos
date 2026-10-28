@@ -23,7 +23,15 @@ K.Sheet {
     flushStart: true
     flushEnd: true
     contentWidth: K.Tokens.size.panel
-    onOpened: toggles.focusFirst()
+    // Onto the tab's connection form when one is open (a pairing the device started), else the
+    // first quick toggle.
+    onOpened: {
+        const radio = [wifi, bluetooth][root.tab];
+        if (radio?.formOpen)
+            radio.form.focusFirst();
+        else
+            toggles.focusFirst();
+    }
 
     Keys.onPressed: event => {
         const n = event.key - Qt.Key_1;
@@ -51,10 +59,12 @@ K.Sheet {
         }
     }
 
-    // Each radio scans only while its tab shows, not while its connection form does: Wi-Fi about
-    // every 30 s, Bluetooth a short discovery about once a minute, which also refreshes the
-    // batteries. NetworkManager's scan takes a few seconds; a discovery 10 s finds what is in
-    // pairing mode nearby.
+    // Each radio scans only while its tab shows. Wi-Fi scans about every 30 s, for a few seconds,
+    // as long as NetworkManager's scan takes, and not while its form connects. Bluetooth discovers
+    // for 20 s every 45 s, and goes on while its form shows, so the device being paired stays.
+    // HAZARD: BlueZ forgets a device it hasn't heard for 30 s (`TemporaryTimeout`); a gap between
+    // discoveries longer than that empties Nearby before the next one and fills it again, every
+    // time.
     ScanPulse {
         active: root.shown && root.tab === 0 && Net.wifiEnabled && !wifi.formOpen
         every: 30000
@@ -63,9 +73,9 @@ K.Sheet {
     }
 
     ScanPulse {
-        active: root.shown && root.tab === 1 && Bt.enabled && !bluetooth.formOpen
-        every: 60000
-        window: 10000
+        active: root.shown && root.tab === 1 && Bt.enabled
+        every: 45000
+        window: 20000
         onScanningChanged: Bt.setScanning(scanning)
     }
 

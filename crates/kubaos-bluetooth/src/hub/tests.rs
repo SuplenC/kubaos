@@ -98,12 +98,13 @@ fn losing_the_agent_closes_the_prompt() {
 }
 
 #[test]
-fn a_signal_heard_is_published_once_per_change() {
+fn a_signal_is_published_when_it_moves_past_the_jitter() {
     let hub = Hub::new(Recorder::default());
     let path = keyboard().path;
 
     hub.heard(&path, -60);
     hub.heard(&path, -60);
+    hub.heard(&path, -63);
     hub.heard(&path, -72);
 
     let heard: Vec<_> = hub

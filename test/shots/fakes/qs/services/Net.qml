@@ -17,6 +17,7 @@ QtObject {
     readonly property var nearby: networks.filter(n => !n.known).sort((a, b) => (bars(b.signalStrength) - bars(a.signalStrength)) || a.name.localeCompare(b.name))
     readonly property var active: networks.find(n => n.connected) ?? null
     property string band: "5 GHz"
+    property bool scanning: false
     readonly property bool wired: false
     property bool wifiEnabled: true
     readonly property string icon: wired ? "lan" : !wifiEnabled ? "wifi_off" : !active ? "signal_wifi_0_bar" : strengthIcon(active.signalStrength)
@@ -56,6 +57,7 @@ QtObject {
     }
 
     function setScanning(on: bool): void {
+        root.scanning = on;
     }
 
     function show(): void {
