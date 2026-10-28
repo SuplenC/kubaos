@@ -46,6 +46,17 @@ Singleton {
         return next;
     }
 
+    // Whether a screen is being shared, as Hyprland's last `screencast` event said: on as a client
+    // (Meet, Discord, OBS) starts taking frames of a screen or a window, off as it stops. Unknown
+    // at start, so off until the next share starts.
+    // https://wiki.hypr.land/IPC/#events-list
+    property bool sharing: false
+
+    // Whether a window is really fullscreen on a workspace a screen shows: Hyprland's fullscreen
+    // mode 2, never a maximised window (mode 1), which a workspace's `hasFullscreen` counts too.
+    // The mode is the client list's, read again on every `fullscreen` event.
+    readonly property bool fullscreen: Hyprland.toplevels.values.some(t => (t.workspace?.active ?? false) && ((t.lastIpcObject?.fullscreen ?? 0) & 2) !== 0)
+
     function blockOf(id: int): int {
         return Math.floor((id - 1) / slots);
     }
@@ -166,7 +177,11 @@ Singleton {
         target: Hyprland
 
         function onRawEvent(event: HyprlandEvent): void {
-            if (event.name === "moveworkspacev2") {
+            if (event.name === "screencast") {
+                root.sharing = event.parse(2)[0] === "1";
+            } else if (event.name === "fullscreen") {
+                Hyprland.refreshToplevels();
+            } else if (event.name === "moveworkspacev2") {
                 const fields = event.parse(3);
                 const next = Object.assign({}, root.movedTo);
                 next[parseInt(fields[0], 10)] = fields[2];
