@@ -4,19 +4,20 @@
 //!
 //! # Owns
 //!
-//! - Which Items there are under the current config, `hide` applied, and what the update check
-//!   changes in the update actions.
+//! - Which Items there are under the current config, `hide` and the states applied, and what the
+//!   update check changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
 //!   user folder, a desk position, a drive, an idle setting, a shell setting, the power stop's
 //!   status, the CPU scheduler's or the Proxy's.
 //!
 //! # Not here
 //!
-//! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
-//!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
-//!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`]. The idle
-//!   settings: [`crate::idle`]. The shell's settings: [`crate::shell`]. The power stop's status and
-//!   the CPU scheduler's: [`crate::power`]. The Proxy's status: [`crate::proxy`].
+//! - Reading the config: [`crate::registry`]. Reading the states: [`crate::states`]. The toggles:
+//!   [`crate::toggles`]. The keyboard layouts: [`crate::keyboard`]. The wallpaper sets:
+//!   [`crate::wallpapers`]. The user folders: [`crate::files`]. The desk positions:
+//!   [`crate::desk`]. The drives: [`crate::drives`]. The idle settings: [`crate::idle`]. The
+//!   shell's settings: [`crate::shell`]. The power stop's status and the CPU scheduler's:
+//!   [`crate::power`]. The Proxy's status: [`crate::proxy`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -45,6 +46,7 @@ use crate::registry;
 use crate::registry::Registry;
 use crate::run::Runner;
 use crate::shell;
+use crate::states::States;
 use crate::toggles;
 use crate::toggles::Ran;
 use crate::toggles::Toggle;
@@ -63,6 +65,7 @@ pub struct Extension<B, R> {
     folders: UserFolders,
     desk: Desk,
     drives: Drives,
+    states: States,
     bus: B,
     runner: R,
 }
@@ -78,6 +81,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             folders: UserFolders::default(),
             desk: Desk::default(),
             drives: Drives::default(),
+            states: States::default(),
             bus,
             runner,
         }
@@ -129,10 +133,15 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.desk = desk;
     }
 
-    /// The Items to index: the actions, the toggles, the idle settings, the shell's, the power
-    /// stop's, the CPU scheduler's and the Proxy's status, the keyboard Items, the wallpaper
-    /// sets, the user folders, the desk positions and the drives `hide` leaves in, the update
-    /// actions as the update check has them.
+    /// Takes the states the actions are shown in, as their files now have them.
+    pub fn set_states(&mut self, states: States) {
+        self.states = states;
+    }
+
+    /// The Items to index: the actions the states show, the toggles, the idle settings, the
+    /// shell's, the power stop's, the CPU scheduler's and the Proxy's status, the keyboard
+    /// Items, the wallpaper sets, the user folders, the desk positions and the drives `hide`
+    /// leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -169,7 +178,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
         self.registry
-            .items()
+            .items(&self.states)
             .filter_map(|item| self.pending.apply(item))
             .chain(toggles)
             .chain(idle)

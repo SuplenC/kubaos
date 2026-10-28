@@ -1825,6 +1825,26 @@ TOML
   local drives="$RUNTIME_DIR/kubaos-drives"
   printf '/org/freedesktop/UDisks2/drives/SanDisk_Ultra_1234\tSTICK\t/media/%s/STICK\n' "$USER_NAME" >"$drives"
   chown "$USER_NAME:" "$drives"
+
+  # Google Chrome installed: its desktop entry, as the Apps Extension finds it, and its package
+  # group on. The terminal greeting on. The pairs' halves follow these files.
+  local groups=/etc/kubaos/apt-groups groups_saved="$LOGS/apt-groups.saved"
+  local chrome="$USER_HOME/.local/share/applications/google-chrome.desktop" chrome_saved="$LOGS/google-chrome.desktop.saved"
+  local no_greeting="$USER_HOME/.config/kubaos/terminal/zsh/no-greeting" greeting_was_off=0
+  local kbset="$USER_HOME/.config/kubaos/desktop/keyboard/keyboard.toml" kbset_saved="$LOGS/keyboard.toml.saved"
+  [[ -e $groups ]] && cp -p "$groups" "$groups_saved"
+  [[ -e $chrome ]] && cp -p "$chrome" "$chrome_saved"
+  [[ -e $no_greeting ]] && greeting_was_off=1
+  install -D -m 644 /dev/stdin "$groups" <<<'chrome=on'
+  install -d -o "$USER_NAME" -g "$USER_NAME" "${chrome%/*}"
+  install -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/stdin "$chrome" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Google Chrome
+GenericName=Web Browser
+Exec=true %U
+DESKTOP
+  rm -f "$no_greeting"
   session_start sway 1280x720 1
   : >"$log"
   chown "$USER_NAME:" "$log"
@@ -1842,6 +1862,36 @@ TOML
     echo "ok   the Extension runs under the Daemon: Wi-Fi is found (${i}s)"
   else
     echo "FAIL the Wi-Fi toggle isn't found: $out"
+    bad=1
+  fi
+
+  # Typing "chrome" with Chrome installed lists the app first, its removal below it, and no
+  # install. Turning the group off swaps the pair, through the choices file alone.
+  local ranked
+  # The wait above is for the KubaOS Extension; the Apps Extension may still be scanning.
+  for i in $(seq 20); do
+    ranked=" $(in_session "$query chrome" 2>&1 | cut -f2 || true) "
+    [[ $ranked == " apps/google-chrome "* ]] && break
+    sleep 1
+  done
+  if [[ $ranked == " apps/google-chrome "* && $ranked == *" kubaos/packages-chrome-off "* &&
+    $ranked != *" kubaos/packages-chrome-on "* ]]; then
+    echo "ok   typing 'chrome' lists the Chrome app first, then its removal, and no install:$ranked"
+  else
+    echo "FAIL typing 'chrome' with Chrome installed lists:$ranked"
+    bad=1
+  fi
+  printf 'chrome=off\n' >"$groups.new"
+  mv "$groups.new" "$groups"
+  for i in $(seq 20); do
+    ranked=" $(in_session "$query chrome" 2>&1 | cut -f2 || true) "
+    [[ $ranked == *" kubaos/packages-chrome-on "* && $ranked != *" kubaos/packages-chrome-off "* ]] && break
+    sleep 1
+  done
+  if [[ $ranked == *" kubaos/packages-chrome-on "* && $ranked != *" kubaos/packages-chrome-off "* ]]; then
+    echo "ok   with the chrome group off, Install Google Chrome is listed instead of Remove (${i}s)"
+  else
+    echo "FAIL with the chrome group off, typing 'chrome' lists:$ranked"
     bad=1
   fi
 
@@ -1899,14 +1949,30 @@ TOML
   else
     echo "FAIL in the layouts app, czech and italian found: $out"; bad=1
   fi
-  out="$(in_session "$query 'Mac accents on Left Alt' accents" 2>&1)" ||
-    { echo "FAIL querying the menu: $out"; bad=1; }
-  for want in 'Mac accents on Left Alt:mac-accents-on' 'Mac accents on Left Alt:mac-accents-off' \
-    'accents:mac-accents-on' 'accents:mac-accents-off'; do
-    grep -E -- "^${want%%:*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${want#*:}( |$)" ||
-      { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
+  # The accents' pair follows the keyboard settings: with them off, then on, typing either name
+  # finds only the half that applies.
+  local accents shown hidden found
+  [[ -e $kbset ]] && cp -p "$kbset" "$kbset_saved"
+  install -d -o "$USER_NAME" -g "$USER_NAME" "${kbset%/*}"
+  for accents in false true; do
+    shown=mac-accents-on hidden=mac-accents-off
+    [[ $accents == true ]] && shown=mac-accents-off hidden=mac-accents-on
+    { grep -vE '^[[:blank:]]*mac_accents[[:blank:]]*=' "$kbset_saved" 2>/dev/null || true; echo "mac_accents = $accents"; } >"$kbset.new"
+    chown "$USER_NAME:" "$kbset.new"
+    mv "$kbset.new" "$kbset"
+    for i in $(seq 20); do
+      out="$(in_session "$query 'Mac accents on Left Alt' accents" 2>&1 || true)"
+      found="$(grep -cE "kubaos/${shown}( |\$)" <<<"$out" || true)"
+      [[ $found == 2 ]] && ! grep -qE "kubaos/${hidden}( |\$)" <<<"$out" && break
+      sleep 1
+    done
+    if [[ $found == 2 ]] && ! grep -qE "kubaos/${hidden}( |\$)" <<<"$out"; then
+      echo "ok   with mac_accents = $accents, typing 'Mac accents on Left Alt' or 'accents' finds $shown alone (${i}s)"
+    else
+      echo "FAIL with mac_accents = $accents, typing the accents' names finds: $out"
+      bad=1
+    fi
   done
-  ((bad)) || echo "ok   the Mac accents Items are found by name and by 'accents'"
   # The next layout is the SUPER + SHIFT + Space bind's Item, from the hyprland Extension, alone.
   if grep -E -- "^next layout[[:blank:]]" <<<"$out" | grep -qE 'kubaos/keyboard-next( |$)'; then
     echo "FAIL the KubaOS Extension sends a next layout Item beside the bind's"
@@ -1927,11 +1993,27 @@ TOML
 
   out="$(in_session "$query 'Terminal greeting' fastfetch" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
-  for want in 'Terminal greeting:greeting-on' 'Terminal greeting:greeting-off' 'fastfetch:greeting-off'; do
+  for want in 'Terminal greeting:greeting-off' 'fastfetch:greeting-off'; do
     grep -E -- "^${want%%:*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${want#*:}( |$)" ||
       { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
   done
-  ((bad)) || echo "ok   the terminal greeting's on and off Items are found"
+  if grep -qE 'kubaos/greeting-on( |$)' <<<"$out"; then
+    echo "FAIL the greeting is on, and 'Terminal greeting on' is listed"
+    bad=1
+  fi
+  ((bad)) || echo "ok   with the greeting on, only 'Terminal greeting off' is found"
+  install -D -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/null "$no_greeting"
+  for i in $(seq 20); do
+    out="$(in_session "$query 'Terminal greeting'" 2>&1 || true)"
+    grep -qE 'kubaos/greeting-on( |$)' <<<"$out" && ! grep -qE 'kubaos/greeting-off( |$)' <<<"$out" && break
+    sleep 1
+  done
+  if grep -qE 'kubaos/greeting-on( |$)' <<<"$out" && ! grep -qE 'kubaos/greeting-off( |$)' <<<"$out"; then
+    echo "ok   turning the greeting off lists 'Terminal greeting on' in its place (${i}s)"
+  else
+    echo "FAIL the greeting's pair didn't follow its file: $out"
+    bad=1
+  fi
 
   out="$(in_session "$query Files 'Open folder' 'Files: Downloads' 'Recent files'" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
@@ -2028,6 +2110,10 @@ TOML
   menu_stop "$daemon"
   if [[ -e $saved ]]; then mv "$saved" "$layer"; else rm -f "$layer"; fi
   if [[ -e $kb_saved ]]; then mv "$kb_saved" "$kb"; else rm -f "$kb"; fi
+  if [[ -e $groups_saved ]]; then mv "$groups_saved" "$groups"; else rm -f "$groups"; fi
+  if [[ -e $chrome_saved ]]; then mv "$chrome_saved" "$chrome"; else rm -f "$chrome"; fi
+  if [[ -e $kbset_saved ]]; then mv "$kbset_saved" "$kbset"; else rm -f "$kbset"; fi
+  ((greeting_was_off)) || rm -f "$no_greeting"
   rm -f "$drives"
   return "$bad"
 }

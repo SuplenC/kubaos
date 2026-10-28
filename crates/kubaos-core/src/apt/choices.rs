@@ -95,6 +95,11 @@ impl Choices {
         self.0.get(group).copied()
     }
 
+    /// The groups the user decided, sorted, each with its switch.
+    pub fn iter(&self) -> impl Iterator<Item = (&str, Switch)> {
+        self.0.iter().map(|(name, switch)| (name.as_str(), *switch))
+    }
+
     /// Records `switch` for `group`.
     pub fn set(&mut self, group: impl Into<String>, switch: Switch) {
         self.0.insert(group.into(), switch);

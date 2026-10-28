@@ -1,16 +1,16 @@
 //! The KubaOS Extension's protocol loop, and with `layouts` the "Add a keyboard layout" app's: each
 //! config the Daemon sends makes the Items over, sending only the ones that changed, and so does
-//! each change the update check writes, each change to the keyboard layouts, to
-//! the wallpaper sets file, to Hyprland's screens file and to the drives file;
-//! each config also reads the user folders again; each run is answered with its outcome, after the
-//! View it pushes or pops. Each Live query is answered at once, with a monitor answer,
-//! processes to stop, a date answer, or nothing.
+//! each change the update check writes, each change to the keyboard layouts, to the wallpaper sets
+//! file, to Hyprland's screens file, to the drives file and to a file a state of the actions is
+//! read from; each config also reads the user folders and the states again; each run is answered
+//! with its outcome, after the View it pushes or pops. Each Live query is answered at once, with a
+//! monitor answer, processes to stop, a date answer, or nothing.
 //!
 //! # Owns
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
 //! - Watching the update check's file, the keyboard settings and `/etc/default/keyboard`, the
-//!   wallpaper sets file, Hyprland's screens file and the drives file.
+//!   wallpaper sets file, Hyprland's screens file, the drives file and the states' files.
 //!
 //! # Not here
 //!
@@ -42,6 +42,8 @@ use kotodama_kubaos::files::UserFolders;
 use kotodama_kubaos::keyboard::Keyboards;
 use kotodama_kubaos::layouts::LayoutsApp;
 use kotodama_kubaos::run::Programs;
+use kotodama_kubaos::states::Places;
+use kotodama_kubaos::states::States;
 use kotodama_kubaos::sysmon;
 use kotodama_kubaos::sysmon::Monitor;
 use kotodama_kubaos::toggles::Ran;
@@ -78,6 +80,8 @@ enum Own {
     Drives(Drives),
     /// Hyprland's screens file changed.
     Desk(Desk),
+    /// A file a state is read from changed.
+    States(States),
 }
 
 /// What answers Live queries: the system monitor, then the dates.
@@ -206,6 +210,7 @@ fn run() -> Result<(), Error> {
     }
     let _drives_watcher = drives_file.and_then(|file| watch_drives(file, events.clone()));
     let _desk_watcher = read_desk(&mut extension, events.clone());
+    let (places, _states_watcher) = read_states(&mut extension, events.clone());
     let _watcher = state.and_then(|dir| watch(dir, events));
     let mut configured = false;
 
@@ -215,9 +220,7 @@ fn run() -> Result<(), Error> {
                 for problem in extension.configure(&table) {
                     config::warn(problem);
                 }
-                // The user folders are read again with each config, not watched: they change
-                // rarely, and a folder made since shows up at the next reload.
-                extension.set_user_folders(UserFolders::from_env());
+                read_again(&mut extension, &places);
                 configured = true;
                 sent.publish(&mut writer, extension.items())?;
             }
@@ -228,6 +231,7 @@ fn run() -> Result<(), Error> {
                     Own::WallpaperSets(sets) => extension.set_wallpaper_sets(sets),
                     Own::Drives(drives) => extension.set_drives(drives),
                     Own::Desk(desk) => extension.set_desk(desk),
+                    Own::States(states) => extension.set_states(states),
                 }
                 if configured {
                     sent.publish(&mut writer, extension.items())?;
@@ -454,6 +458,59 @@ fn watch_desk(files: DeskFiles, events: Sender<Event<Own>>) -> Option<Watcher> {
         },
     )
     .map_err(|err| kotodama_extension::log!("not watching the desk positions: {err}"))
+    .ok()?;
+    watcher.watch(dirs);
+    Some(watcher)
+}
+
+/// Reads again what each config does: the user folders, which aren't watched, as they change
+/// rarely and a folder made since shows up at the next reload; and the states, so a reload brings
+/// them back in step when their watch couldn't start.
+fn read_again(extension: &mut Extension<SystemBus, Programs>, places: &Places) {
+    extension.set_user_folders(UserFolders::from_env());
+    extension.set_states(States::read(places));
+}
+
+/// Gives `extension` the states of this machine and session, and watches their files.
+fn read_states(
+    extension: &mut Extension<SystemBus, Programs>,
+    events: Sender<Event<Own>>,
+) -> (Places, Option<Watcher>) {
+    let places = Places::from_env();
+    extension.set_states(States::read(&places));
+    let watcher = watch_states(places.clone(), events);
+    (places, watcher)
+}
+
+/// Watches the folders of every file a state is read from, sending the states on each change to
+/// one. A folder that isn't there yet is watched once it is. Without a watch the actions keep the
+/// states of the start, until the next config.
+fn watch_states(places: Places, events: Sender<Event<Own>>) -> Option<Watcher> {
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    let mut changed = Vec::new();
+    for file in places.files() {
+        let (Some(dir), Some(name)) = (file.parent(), file.file_name()) else {
+            continue;
+        };
+        // The events name the real path, behind any symlink on the way.
+        let dir = dir.canonicalize().unwrap_or_else(|_| dir.to_path_buf());
+        changed.push(dir.join(name));
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
+    let watcher = Watcher::start(
+        "states",
+        RecursiveMode::NonRecursive,
+        SETTLE,
+        // Most of the files are written through a temporary one and a rename, and the flag files
+        // are made and removed: each is a change of the file itself.
+        move |event, _| changed.iter().any(|file| watched::changes(event, file)),
+        move |_| {
+            let _ = events.send(Event::Own(Own::States(States::read(&places))));
+        },
+    )
+    .map_err(|err| kotodama_extension::log!("not watching the states of the actions: {err}"))
     .ok()?;
     watcher.watch(dirs);
     Some(watcher)

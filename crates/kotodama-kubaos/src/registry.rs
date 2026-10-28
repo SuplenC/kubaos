@@ -15,16 +15,25 @@
 //! run = ["dot-ssh-sk-new", "{name}"]
 //! arguments = [{ name = "name", placeholder = "github" }]
 //! terminal = true
+//!
+//! [extensions.kubaos.actions.packages-chrome-off]
+//! title = "Remove Google Chrome"
+//! run = ["kubaos", "packages", "disable", "chrome"]
+//! shown_when = { state = "packages.chrome", is = true }
 //! ```
+//!
+//! `shown_when` sends an action only while the state it names reads as `is`, or as anything but
+//! `is_not`, so of an on/off pair only the half that applies shows. While the state can't be read
+//! the action shows all the same.
 //!
 //! # Owns
 //!
 //! - Reading the table, and what is wrong with it, as problems in words for the user.
-//! - The actions' Items, and the command each one runs.
+//! - The actions' Items, which of them the states show, and the command each one runs.
 //!
 //! # Not here
 //!
-//! - Starting the command: [`crate::run`].
+//! - Starting the command: [`crate::run`]. Reading the states: [`crate::states`].
 //! - The system toggles, whose ids an action may not take: [`crate::toggles`].
 
 use std::collections::BTreeMap;
@@ -39,6 +48,11 @@ use kotodama_protocol::ItemKind;
 use kotodama_protocol::NamespacedKind;
 use kotodama_protocol::Table;
 use kotodama_protocol::Value;
+
+use crate::states;
+use crate::states::Reading;
+use crate::states::States;
+use crate::states::Values;
 
 /// The Item kind of every action.
 pub const KIND: &str = "kubaos.action";
@@ -60,7 +74,11 @@ const ACTION_KEYS: &[&str] = &[
     "terminal",
     "confirm",
     "delay_ms",
+    "shown_when",
 ];
+
+/// The keys `shown_when` may hold.
+const SHOWN_WHEN_KEYS: &[&str] = &["state", "is", "is_not"];
 
 /// KubaOS's actions and the user's, as the config table has them.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -85,6 +103,16 @@ struct Entry {
     terminal: bool,
     confirm: bool,
     delay: Duration,
+    shown_when: Option<ShownWhen>,
+}
+
+/// The state an action is shown in.
+#[derive(Clone, Debug, PartialEq)]
+struct ShownWhen {
+    state: String,
+    reading: Reading,
+    /// Whether it shows while the state reads as `reading` (`is`), or while it doesn't (`is_not`).
+    equal: bool,
 }
 
 /// What an action runs.
@@ -163,9 +191,12 @@ impl Registry {
         self.hide.contains(id)
     }
 
-    /// The Items of the actions `hide` leaves in.
-    pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
-        self.actions.iter().map(Entry::item)
+    /// The Items of the actions `hide` leaves in that show in `states`.
+    pub fn items<'a>(&'a self, states: &'a States) -> impl Iterator<Item = Item> + 'a {
+        self.actions
+            .iter()
+            .filter(|entry| entry.shown_when.as_ref().is_none_or(|when| when.shows(states)))
+            .map(Entry::item)
     }
 
     /// What the action `id` runs with `arguments`; `None` for an id that is
@@ -225,6 +256,7 @@ impl Entry {
             terminal: boolean(table, "terminal")?,
             confirm: boolean(table, "confirm")?,
             delay,
+            shown_when: table.get("shown_when").map(ShownWhen::from_value).transpose()?,
         })
     }
 
@@ -244,6 +276,46 @@ impl Entry {
             app_only: false,
             actions: vec![action],
         }
+    }
+}
+
+impl ShownWhen {
+    fn from_value(value: &Value) -> Result<ShownWhen, String> {
+        let Value::Table(table) = value else {
+            return Err("`shown_when` should be a table of `state` and `is` or `is_not`".to_owned());
+        };
+        if let Some(key) = table.keys().find(|key| !SHOWN_WHEN_KEYS.contains(&key.as_str())) {
+            return Err(format!("`{key}` isn't a setting of `shown_when`"));
+        }
+        let state = string(table, "state")
+            .map_err(|_| "`shown_when`'s `state` should be a string".to_owned())?
+            .ok_or("`shown_when` needs a `state`")?;
+        let (key, value, equal) = match (table.get("is"), table.get("is_not")) {
+            (Some(value), None) => ("is", value, true),
+            (None, Some(value)) => ("is_not", value, false),
+            _ => return Err("`shown_when` needs one of `is` and `is_not`".to_owned()),
+        };
+        let reading = match value {
+            Value::Bool(on) => Reading::Bool(*on),
+            Value::String(word) => Reading::Word(word.clone()),
+            _ => return Err(format!("`shown_when`'s `{key}` should be true, false or a string")),
+        };
+        let values =
+            states::values(&state).ok_or_else(|| format!("`shown_when` names `{state}`, which is no state"))?;
+        if !values.allow(&reading) {
+            return Err(match values {
+                Values::Bool => format!("`shown_when`: `{state}` is true or false"),
+                Values::Words(words) => format!("`shown_when`: `{state}` is one of `{}`", words.join("`, `")),
+            });
+        }
+        Ok(ShownWhen { state, reading, equal })
+    }
+
+    /// Whether the action shows in `states`: always while its state can't be read.
+    fn shows(&self, states: &States) -> bool {
+        states
+            .get(&self.state)
+            .is_none_or(|reading| (*reading == self.reading) == self.equal)
     }
 }
 

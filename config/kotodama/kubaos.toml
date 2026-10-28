@@ -59,8 +59,25 @@ kind = "scripts"
 # (docs/USING.md). An action takes `title` and `run` (the program, then its
 # arguments, `{name}` filled in from its `arguments`), and may take
 # `subtitle`, `icon`, `keywords`, `keyword`, `terminal = true` (runs it in
-# `terminal` below), `confirm = true` (asks first) and `delay_ms` (waits that
-# long, so the menu is off the screen first).
+# `terminal` below), `confirm = true` (asks first), `delay_ms` (waits that
+# long, so the menu is off the screen first) and `shown_when` (listed only in
+# that state, below).
+#
+# `shown_when = { state = "<state>", is = <value> }` lists an action only
+# while the state reads as the value, and `is_not` only while it doesn't, so
+# of an on/off pair only the half that applies shows. The Extension reads the
+# states from their files and reads them again when one changes
+# (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
+# `files.tidy-daily`, `files.automount`, `terminal.greeting`,
+# `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy` and
+# `power.panel-power-saving`, true or false; `power.scheduler` ("kernel",
+# "lavd") and `power.low-battery` ("power-saver", "super-saver", "off"). While
+# a state can't be read, the action shows.
+#
+# A keyword the query equals ranks an action with the exact titles, above an
+# app whose name only has the query as a word. So an action about an app
+# (installing or removing it) leaves the app's name out of its keywords: its
+# title already has it, and the app ranks first.
 #
 # What a `terminal = true` action runs in. It stays open once the action
 # exits, so what it said can be read, and floats (dot.float,
@@ -118,6 +135,7 @@ subtitle = "Sort ~/Downloads into folders by kind once a day"
 icon = "folder-download"
 keywords = ["downloads", "clean up", "organize", "automatic", "tidy"]
 run = ["kubaos-files", "tidy", "on"]
+shown_when = { state = "files.tidy-daily", is = false }
 
 [extensions.kubaos.actions.tidy-downloads-daily-off]
 title = "Stop tidying Downloads daily"
@@ -125,6 +143,7 @@ subtitle = "~/Downloads stays as you leave it, unless you tidy it from here"
 icon = "folder-download"
 keywords = ["downloads", "clean up", "organize", "automatic", "tidy"]
 run = ["kubaos-files", "tidy", "off"]
+shown_when = { state = "files.tidy-daily", is = true }
 
 # Mounting removable drives as they're plugged in (kubaos-automount); on by
 # default. Eject Items stay either way.
@@ -134,6 +153,7 @@ subtitle = "USB sticks and SD cards mount and open from a notification"
 icon = "drive-removable-media"
 keywords = ["automount", "usb", "sd card", "drive", "mount"]
 run = ["kubaos-automount", "on"]
+shown_when = { state = "files.automount", is = false }
 
 [extensions.kubaos.actions.automount-off]
 title = "Don't mount drives when plugged in"
@@ -141,6 +161,7 @@ subtitle = "Plugged-in drives wait in the Files sidebar until you click them"
 icon = "drive-removable-media"
 keywords = ["automount", "usb", "sd card", "drive", "mount"]
 run = ["kubaos-automount", "off"]
+shown_when = { state = "files.automount", is = true }
 
 # Your settings: the user layer, ~/.config/kubaos, in Files, whole or one
 # group at a time (scripts/dot-config open, docs/USING.md). Each folder's
@@ -211,6 +232,7 @@ subtitle = "A new Ghostty window opens with the logo and the system at a glance"
 icon = "utilities-terminal"
 keywords = ["fastfetch", "terminal", "welcome", "logo", "motd"]
 run = ["dot-greeting", "on"]
+shown_when = { state = "terminal.greeting", is = false }
 
 [extensions.kubaos.actions.greeting-off]
 title = "Terminal greeting off"
@@ -218,6 +240,7 @@ subtitle = "A new Ghostty window opens straight to the prompt"
 icon = "utilities-terminal"
 keywords = ["fastfetch", "terminal", "welcome", "logo", "motd", "quiet"]
 run = ["dot-greeting", "off"]
+shown_when = { state = "terminal.greeting", is = true }
 
 # Wallpaper and theme (scripts/dot-theme, the shell's picker).
 
@@ -370,6 +393,7 @@ subtitle = "Left Alt + e, then e, is é. Also ` à, u ö, i ô and n ñ"
 icon = "input-keyboard"
 keywords = ["accents", "dead keys", "option key", "macos", "diacritics", "keyboard"]
 run = ["kubaos", "keyboard", "accents", "on"]
+shown_when = { state = "keyboard.mac-accents", is = false }
 
 [extensions.kubaos.actions.mac-accents-off]
 title = "Mac accents on Left Alt: off"
@@ -377,6 +401,7 @@ subtitle = "Left Alt is plain Alt again, e, `, u, i and n too"
 icon = "input-keyboard"
 keywords = ["accents", "dead keys", "option key", "macos", "diacritics", "keyboard"]
 run = ["kubaos", "keyboard", "accents", "off"]
+shown_when = { state = "keyboard.mac-accents", is = true }
 
 # The design language: every token and component of kubaos-ui, live
 # (crates/kubaos-specimen, from design/tokens.toml). Tab and the arrows move
@@ -505,6 +530,7 @@ subtitle = "Lock, screens off and suspend after a time idle again"
 icon = "preferences-desktop-screensaver"
 keywords = ["caffeine", "keep awake", "auto lock", "idle"]
 run = ["kubaos-idle", "awake", "off"]
+shown_when = { state = "idle.keep-awake", is = true }
 
 [extensions.kubaos.actions.idle-reset]
 title = "Idle: KubaOS defaults"
@@ -762,6 +788,7 @@ subtitle = "KDE Connect stops: nothing listens for phones until you set one up a
 icon = "phone"
 keywords = ["kde connect", "kdeconnect", "phone link", "disable", "stop"]
 run = ["kubaos-phone", "off"]
+shown_when = { state = "phone.link", is = true }
 
 [extensions.kubaos.actions.phone-clipboard]
 title = "Send the clipboard to the phone"
@@ -817,6 +844,7 @@ subtitle = "The work network: the tunnel, work DNS, the HTTP proxy and the compa
 icon = "network-vpn"
 keywords = ["vpn", "wireguard", "work network", "connect", "tunnel", "proxy", "office"]
 run = ["kubaos-proxy", "on"]
+shown_when = { state = "proxy", is = false }
 
 [extensions.kubaos.actions.proxy-off]
 title = "Proxy off"
@@ -824,6 +852,7 @@ subtitle = "Every part of the work network down again, the kill switch too"
 icon = "network-vpn-disconnected"
 keywords = ["vpn", "wireguard", "work network", "disconnect", "tunnel", "proxy", "office"]
 run = ["kubaos-proxy", "off"]
+shown_when = { state = "proxy", is = true }
 
 [extensions.kubaos.actions.proxy-import]
 title = "Import WireGuard config…"
@@ -939,32 +968,36 @@ icon = "list-add"
 keywords = ["docker", "containers", "apt", "packages", "enable"]
 run = ["kubaos", "packages", "enable", "docker"]
 terminal = true
+shown_when = { state = "packages.docker", is = false }
 
 [extensions.kubaos.actions.packages-docker-off]
 title = "Remove Docker"
 subtitle = "Docker CE goes, and no update brings it back"
 icon = "list-remove"
-keywords = ["docker", "containers", "apt", "packages", "disable", "uninstall"]
+keywords = ["containers", "apt", "packages", "disable", "uninstall"]
 run = ["kubaos", "packages", "disable", "docker"]
 terminal = true
 confirm = true
+shown_when = { state = "packages.docker", is = true }
 
 [extensions.kubaos.actions.packages-chrome-on]
 title = "Install Google Chrome"
-subtitle = "From Google's repo, kept by every update (amd64)"
+subtitle = "The web browser, from Google's repo, kept by every update (amd64)"
 icon = "list-add"
-keywords = ["chrome", "browser", "google", "apt", "packages", "enable"]
+keywords = ["apt", "packages", "enable"]
 run = ["kubaos", "packages", "enable", "chrome"]
 terminal = true
+shown_when = { state = "packages.chrome", is = false }
 
 [extensions.kubaos.actions.packages-chrome-off]
 title = "Remove Google Chrome"
 subtitle = "Chrome goes, and no update brings it back"
 icon = "list-remove"
-keywords = ["chrome", "browser", "google", "apt", "packages", "disable", "uninstall"]
+keywords = ["apt", "packages", "disable", "uninstall"]
 run = ["kubaos", "packages", "disable", "chrome"]
 terminal = true
 confirm = true
+shown_when = { state = "packages.chrome", is = true }
 
 [extensions.kubaos.actions.packages-u2f-on]
 title = "Use a security key for sudo"
@@ -973,15 +1006,17 @@ icon = "dialog-password"
 keywords = ["yubikey", "u2f", "fido2", "security key", "pam", "enable"]
 run = ["kubaos", "packages", "enable", "u2f"]
 terminal = true
+shown_when = { state = "packages.u2f", is = false }
 
 [extensions.kubaos.actions.packages-u2f-off]
 title = "Stop using a security key for sudo"
 subtitle = "Takes pam_u2f out of sudo, polkit and the lock screen, then its packages"
 icon = "dialog-password"
-keywords = ["yubikey", "u2f", "fido2", "security key", "pam", "disable"]
+keywords = ["yubikey", "u2f", "fido2", "pam", "disable"]
 run = ["kubaos", "packages", "disable", "u2f"]
 terminal = true
 confirm = true
+shown_when = { state = "packages.u2f", is = true }
 
 [extensions.kubaos.actions.packages-piv-on]
 title = "Install PIV smart card support"
@@ -990,15 +1025,17 @@ icon = "list-add"
 keywords = ["yubikey", "piv", "smart card", "pcscd", "enable"]
 run = ["kubaos", "packages", "enable", "piv"]
 terminal = true
+shown_when = { state = "packages.piv", is = false }
 
 [extensions.kubaos.actions.packages-piv-off]
 title = "Remove PIV smart card support"
 subtitle = "pcscd and pcsc-tools go, and no update brings them back"
 icon = "list-remove"
-keywords = ["yubikey", "piv", "smart card", "pcscd", "disable"]
+keywords = ["yubikey", "pcscd", "disable"]
 run = ["kubaos", "packages", "disable", "piv"]
 terminal = true
 confirm = true
+shown_when = { state = "packages.piv", is = true }
 
 [extensions.kubaos.actions.packages-tuxedo-on]
 title = "Install TUXEDO's drivers"
@@ -1007,15 +1044,17 @@ icon = "list-add"
 keywords = ["tuxedo", "drivers", "dkms", "laptop", "enable"]
 run = ["kubaos", "packages", "enable", "tuxedo"]
 terminal = true
+shown_when = { state = "packages.tuxedo", is = false }
 
 [extensions.kubaos.actions.packages-tuxedo-off]
 title = "Remove TUXEDO's drivers"
 subtitle = "tuxedo-drivers and DKMS go, and no update brings them back"
 icon = "list-remove"
-keywords = ["tuxedo", "drivers", "dkms", "laptop", "disable"]
+keywords = ["dkms", "laptop", "disable"]
 run = ["kubaos", "packages", "disable", "tuxedo"]
 terminal = true
 confirm = true
+shown_when = { state = "packages.tuxedo", is = true }
 
 # The clock popup (crates/kubaos-clock, config/quickshell/modules/clock/).
 # Date queries such as `days until christmas` get an answer in the top row
@@ -1255,6 +1294,7 @@ subtitle = "At the low-battery level (20 %) on battery, the stop drops to Power 
 icon = "battery-caution"
 keywords = ["power stop", "low battery", "battery saver", "automatic", "20 percent"]
 run = ["kubaos-power", "low-battery", "power-saver"]
+shown_when = { state = "power.low-battery", is_not = "power-saver" }
 
 [extensions.kubaos.actions.low-battery-super-saver]
 title = "Low battery: drop to Super Saver"
@@ -1262,6 +1302,7 @@ subtitle = "At the low-battery level (20 %) on battery, the stop drops all the w
 icon = "battery-caution"
 keywords = ["power stop", "low battery", "battery saver", "automatic"]
 run = ["kubaos-power", "low-battery", "super-saver"]
+shown_when = { state = "power.low-battery", is_not = "super-saver" }
 
 [extensions.kubaos.actions.low-battery-off]
 title = "Low battery: don't drop"
@@ -1269,6 +1310,7 @@ subtitle = "The stop stays where you put it, however low the battery goes"
 icon = "battery-caution"
 keywords = ["power stop", "low battery", "battery saver", "automatic", "off"]
 run = ["kubaos-power", "low-battery", "off"]
+shown_when = { state = "power.low-battery", is_not = "off" }
 
 [extensions.kubaos.actions.low-battery-level]
 title = "Low battery drop at…"
@@ -1285,6 +1327,7 @@ subtitle = "True colours in every stop, for colour-accurate work: the saver stop
 icon = "video-display"
 keywords = ["panel power saving", "abm", "colour accurate", "color accurate", "photo editing", "backlight"]
 run = ["kubaos-power", "panel-power-saving", "off"]
+shown_when = { state = "power.panel-power-saving", is = true }
 
 [extensions.kubaos.actions.panel-power-saving-on]
 title = "Panel power saving on"
@@ -1292,6 +1335,7 @@ subtitle = "Super Saver and Power Saver dim the backlight and lift the contrast 
 icon = "video-display"
 keywords = ["panel power saving", "abm", "backlight", "battery"]
 run = ["kubaos-power", "panel-power-saving", "on"]
+shown_when = { state = "power.panel-power-saving", is = false }
 
 [extensions.kubaos.actions.charge-limit-80]
 title = "Charge limit: 80 %"
@@ -1338,6 +1382,7 @@ subtitle = "scx_lavd puts input, the compositor and audio first, in each power s
 icon = "cpu"
 keywords = ["cpu scheduler", "lavd", "scx", "sched_ext", "sched ext", "latency", "responsiveness", "on"]
 run = ["kubaos-power", "scheduler", "on"]
+shown_when = { state = "power.scheduler", is_not = "lavd" }
 
 [extensions.kubaos.actions.cpu-scheduler-lavd-off]
 title = "CPU scheduler: LAVD off"
@@ -1345,3 +1390,4 @@ subtitle = "Linux's own scheduler (EEVDF), as the kernel ships it"
 icon = "cpu"
 keywords = ["cpu scheduler", "lavd", "scx", "sched_ext", "eevdf", "default scheduler", "off"]
 run = ["kubaos-power", "scheduler", "off"]
+shown_when = { state = "power.scheduler", is = "lavd" }
