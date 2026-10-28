@@ -1,0 +1,18 @@
+# What each surface is drawn from, for `shots` without surfaces: a change to a file under any of a
+# surface's paths renders it. One per line, `SURFACE PATH...`; `*` is every shell surface, and kobo
+# and specimen are the iced renderers'. The services are stand-ins (fakes/qs/services), so a change
+# to config/quickshell/services renders nothing.
+*              qml/KubaOS config/quickshell/components config/quickshell/theme test/shots flake.lock
+bar            config/quickshell/modules/bar config/quickshell/modules/frame
+controlcenter  config/quickshell/modules/controlcenter config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar
+clock          config/quickshell/modules/clock config/quickshell/modules/frame config/quickshell/modules/bar
+sysmon         config/quickshell/modules/sysmon config/quickshell/modules/frame config/quickshell/modules/bar
+wallpaper      config/quickshell/modules/wallpaper config/quickshell/modules/clock config/quickshell/modules/frame
+powermenu      config/quickshell/modules/powermenu config/quickshell/modules/frame config/quickshell/modules/bar
+osd            config/quickshell/modules/osd config/quickshell/modules/frame
+notifications  config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar
+lock           config/quickshell/modules/lock
+polkit         config/quickshell/modules/polkit
+menu           config/quickshell/modules/menu
+kobo           crates/kubaos-kobo crates/kubaos-ui crates/kubaos-core design/tokens.toml
+specimen       crates/kubaos-specimen crates/kubaos-ui qml/KubaOS qml/specimen design/tokens.toml

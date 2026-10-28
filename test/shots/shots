@@ -1,0 +1,487 @@
+#!/usr/bin/env bash
+# shots: before/after screenshots of the shell, Kōbō and the specimen, paired and diffed, for a
+# design PR. Run it through `just shots` (`nix run .#shots`), which pins the shell's renderer: Qt,
+# sway, Mesa, ImageMagick and the fonts. Kōbō and the specimen build with the cargo and nix on
+# your PATH. docs/agents/design-pr-loop.md has the loop it serves.
+#
+#   shots [SURFACE...] [--scales 1,1.5] [--modes dark] [--ref REV] [--full] [--jobs N]
+#         [--threshold PX]
+#                          renders AFTER (the working tree; for the shell, untracked files too) and BEFORE
+#                          (the merge base with REV, default origin/main), and writes the pairs
+#                          and changed.txt
+#   shots kobo [FLAGS]     the same for Kōbō's screens (its `shots` test tour)
+#   shots specimen [FLAGS] the same for the specimen pages (kubaos-specimen and qml-specimen)
+#   shots publish BRANCH   pushes changed.txt's pairs to the image-only BRANCH and prints the
+#                          Markdown table for the PR body
+#   shots self-test        checks a render can't reach the desktop session
+#
+# Without SURFACE it renders the surfaces whose files changed against REV (`surfaces`), at 1× and
+# 1.5×, dark. `--full` makes it 1, 1.25, 1.5 and 2, light and dark, unless --scales or --modes
+# say otherwise. SURFACE is a surface in `scenarios` (controlcenter, menu, lock, ...), kobo or
+# specimen. Kōbō's and the specimen's renderers draw every scale and mode; the rest are dropped.
+#
+# Output, in test/out/shots/ (emptied on each run):
+# - after/ and before/: the shots;
+# - pairs/: before left, after right, cropped round the surface, at device pixels;
+# - changed.txt: the pairs whose size changed, or where more than PX logical pixels (default 32;
+#   a text caret's blink is about 20) differ by more than 0.5% in a channel;
+# - warnings.txt: the QML warnings of the AFTER side, also printed; logs/.
+#
+# BEFORE shots are cached in ~/.cache/kubaos/shots/<rev>/ and reused while the rev, this harness
+# and its pinned tools are the same. Every render runs in its own headless sway, on its own
+# runtime dir, from an emptied environment; it never starts Quickshell and never touches the
+# session.
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+repo=$(git -C "$here" rev-parse --show-toplevel)
+out=$repo/test/out/shots
+cache=${XDG_CACHE_HOME:-$HOME/.cache}/kubaos/shots
+# Scratch space on disk, not /tmp: a tmpfs every agent shares, which Kōbō's full tour filled.
+export TMPDIR=$cache/tmp
+mkdir -p "$TMPDIR"
+
+die() {
+  echo "shots: $*" >&2
+  exit 1
+}
+
+usage() {
+  sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//' >&2
+  exit "${1:-2}"
+}
+
+need_env() {
+  [[ -n ${KUBAOS_SHOTS_QML:-} ]] || die "run me through \`just shots\` (nix run .#shots), which pins Qt, sway and the fonts"
+}
+
+# isolated SCALE CMD...: runs CMD in a private headless sway with one 1600×1000 logical output at
+# SCALE, from an emptied environment: only the pinned tools, a private home and runtime dir, and
+# that sway's session. Nothing of the desktop's (WAYLAND_DISPLAY, HYPRLAND_INSTANCE_SIGNATURE,
+# QS_*, DISPLAY) reaches it. The sway and the runtime dir go when it ends, however it ends.
+isolated() (
+  scale=$1
+  shift
+  rt=$(mktemp -d "$TMPDIR/kubaos-shots.XXXXXX")
+  sway=
+  trap 'if [[ -n $sway ]]; then kill "$sway" 2>/dev/null; wait "$sway" 2>/dev/null; fi; rm -rf "$rt"' EXIT
+  trap 'exit 130' INT TERM
+  px=$(awk -v s="$scale" 'BEGIN { printf "%dx%d", 1600 * s, 1000 * s }')
+  printf '%s\n' "output HEADLESS-1 resolution $px scale $scale" 'default_border none' \
+    'default_floating_border none' 'for_window [app_id=".*"] floating enable' >"$rt/config"
+  clean=(
+    env -i
+    HOME="$rt" PATH="$KUBAOS_SHOTS_PATH" LANG=en_US.UTF-8 TZ=UTC
+    XDG_RUNTIME_DIR="$rt" XDG_CACHE_HOME="$cache/xdg"
+    FONTCONFIG_FILE="$KUBAOS_SHOTS_FONTS"
+    LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe
+    # One raster thread per render: llvmpipe otherwise starts one per core in each of them, and
+    # a render per core then starves the others.
+    LP_NUM_THREADS=1
+    __EGL_VENDOR_LIBRARY_FILENAMES="$KUBAOS_SHOTS_EGL_VENDOR" LIBGL_DRIVERS_PATH="$KUBAOS_SHOTS_DRI"
+  )
+  "${clean[@]}" WLR_BACKENDS=headless WLR_RENDERER=pixman WLR_LIBINPUT_NO_DEVICES=1 \
+    "$KUBAOS_SHOTS_SWAY" -c "$rt/config" >"$rt/sway.log" 2>&1 &
+  sway=$!
+  # A sway per core starts at once, so its socket can take seconds to appear.
+  for _ in $(seq 400); do
+    [[ -S $rt/wayland-1 ]] && break
+    sleep 0.05
+  done
+  if [[ ! -S $rt/wayland-1 ]]; then
+    echo "shots: the private sway didn't start:" >&2
+    cat "$rt/sway.log" >&2
+    exit 1
+  fi
+  # HAZARD: animations advance by the clock, not by frames. Driven by the frames a busy machine's
+  # sway presents, a panel was still opening when the shot was taken, and two runs differed.
+  "${clean[@]}" WAYLAND_DISPLAY="$rt/wayland-1" QT_QPA_PLATFORM=wayland \
+    QSG_RENDER_LOOP=basic QSG_USE_SIMPLE_ANIMATION_DRIVER=1 \
+    QT_WAYLAND_DISABLE_WINDOWDECORATION=1 QT_FORCE_STDERR_LOGGING=1 \
+    QT_PLUGIN_PATH="$KUBAOS_SHOTS_QT_PLUGINS" NIXPKGS_QT6_QML_IMPORT_PATH="$KUBAOS_SHOTS_QML_IMPORTS:${IMPORTS:-}" \
+    "$@"
+)
+
+# render STAGE NAME DRIVER MODE SCALE PNG LOG [ARG...]: one shot with the staged tree STAGE. PNG
+# appears only when the driver finished it: a cached BEFORE is never half a shot, and two runs
+# drawing the same file never mix.
+render() {
+  local stage=$1 name=$2 driver=$3 mode=$4 scale=$5 png=$6 log=$7
+  shift 7
+  local part=${png%.png}.$$.part.png
+  mkdir -p "$(dirname "$png")" "$(dirname "$log")"
+  if IMPORTS=$stage/imports isolated "$scale" timeout 60 "$KUBAOS_SHOTS_QML" \
+    "$stage/drivers/$driver.qml" -- "$mode" "$part" "$@" >"$log" 2>&1 &&
+    [[ -s $part ]] && grep -q '^qml: shot ' "$log"; then
+    mv -f "$part" "$png"
+  else
+    rm -f "$part"
+    echo "shots: $name ($mode, ${scale}x) wasn't drawn: $log" >&2
+  fi
+}
+
+# The scenarios of the given surfaces, as `NAME SURFACE DRIVER CROP ARG...` lines.
+scenarios_of() {
+  local s
+  for s in "$@"; do
+    awk -v s="$s" '$1 !~ /^#/ && NF >= 4 && $2 == s' "$here/scenarios"
+  done
+}
+
+shell_surfaces() {
+  awk '$1 !~ /^#/ && NF >= 4 { print $2 }' "$here/scenarios" | sort -u
+}
+
+# The surfaces whose files differ between BASE and the working tree, untracked files included. A
+# rename counts at both paths.
+changed_surfaces() {
+  local base=$1 files
+  files=$(
+    git -C "$repo" diff --no-renames --name-only "$base"
+    git -C "$repo" ls-files --others --exclude-standard
+  )
+  awk -v files="$files" -v all="$(shell_surfaces | tr '\n' ' ')" '
+    BEGIN { n = split(files, f, "\n") }
+    $1 ~ /^#/ || NF < 2 { next }
+    {
+      hit = 0
+      for (i = 2; i <= NF; i++)
+        for (j = 1; j <= n; j++)
+          if (f[j] == $i || index(f[j], $i "/") == 1) hit = 1
+      if (!hit) next
+      if ($1 == "*") { m = split(all, a, " "); for (k = 1; k <= m; k++) print a[k] }
+      else print $1
+    }' "$here/surfaces" | sort -u
+}
+
+# A short hash of the harness and the store paths of its pinned tools (Qt, sway, the fonts, the
+# wallpapers): BEFORE shots taken with anything else aren't reused.
+harness_hash() {
+  (
+    cd "$repo"
+    find test/shots -type f -print0 | sort -z | xargs -0 sha256sum
+    env | grep '^KUBAOS_SHOTS_' | sort
+  ) | sha256sum | cut -c1-12
+}
+
+# extract REV DIR [PATH...]: the files of REV (all, or PATHs) in DIR, with fresh mtimes, so a
+# cargo build there never takes an older build's output as current. It extracts beside DIR and
+# moves it in, so a run reading DIR never sees it half written.
+extract() {
+  local rev=$1 dir=$2
+  shift 2
+  [[ -d $dir ]] && return
+  local tmp
+  tmp=$(mktemp -d "$(dirname "$dir")/.extract.XXXXXX")
+  git -C "$repo" archive "$rev" "$@" | tar -x -m -C "$tmp"
+  mv -T "$tmp" "$dir" 2>/dev/null || rm -rf "$tmp"
+}
+
+# shell_side SIDE TREE DIR: stages TREE and plans every render of SIDE into DIR, skipping the
+# shots DIR already has.
+shell_side() {
+  local side=$1 tree=$2 dir=$3 stage
+  stage=$work/stage-$side
+  python3 -I "$here/stage.py" "$tree" "$here" "$stage" "$KUBAOS_SHOTS_WALLPAPERS" "$KUBAOS_SHOTS_ICONS"
+  local name driver crop mode scale args
+  while read -r name _ driver crop args; do
+    for mode in "${modes[@]}"; do
+      for scale in "${scales[@]}"; do
+        local file=$name-$mode-${scale}x
+        [[ -s $dir/$file.png ]] && continue
+        # shellcheck disable=SC2086 # ARGs are words, split on purpose.
+        printf '%q ' render "$stage" "$name" "$driver" "$mode" "$scale" "$dir/$file.png" "$dir/logs/$file.log" $args
+        echo
+      done
+    done
+  done < <(scenarios_of "${shell[@]}") >>"$work/jobs"
+}
+
+run_jobs() {
+  [[ -s $work/jobs ]] || return 0
+  echo "shots: $(wc -l <"$work/jobs") renders on $jobs cores" >&2
+  export -f isolated render
+  export KUBAOS_SHOTS_QML KUBAOS_SHOTS_SWAY KUBAOS_SHOTS_PATH KUBAOS_SHOTS_FONTS KUBAOS_SHOTS_QT_PLUGINS \
+    KUBAOS_SHOTS_QML_IMPORTS KUBAOS_SHOTS_EGL_VENDOR KUBAOS_SHOTS_DRI cache TMPDIR
+  # A render that fails says so and leaves no file; the pairs show what is missing.
+  # shellcheck disable=SC2016 # $1 is the job line, expanded by the inner bash.
+  xargs -r -P "$jobs" -d '\n' -n 1 bash -c 'eval "$1"' _ <"$work/jobs" || true
+}
+
+# iced_tour WHAT TREE DIR CMD...: runs CMD in TREE (it writes its PNGs to $raw), then copies them
+# into DIR as WHAT-*.png and marks DIR done for WHAT. A failed tour leaves no mark and no files.
+iced_tour() {
+  local what=$1 tree=$2 dir=$3
+  shift 3
+  [[ -e $dir/.$what-done ]] && return
+  # `side` and `raw` are iced's.
+  echo "shots: $what, $side" >&2
+  local log=$out/logs/$what-$side.log
+  rm -rf "$raw"
+  mkdir -p "$raw" "$dir"
+  (cd "$tree" && "$@") >"$log" 2>&1 || die "$what failed: $log"
+  local f
+  shopt -s nullglob
+  for f in "$raw"/*/*.png; do cp "$f" "$dir/$(basename "$(dirname "$f")")-$(basename "$f")"; done
+  shopt -u nullglob
+  touch "$dir/.$what-done"
+}
+
+# iced SIDE TREE DIR: Kōbō's or the specimen's shots of TREE into DIR. The BEFORE side builds in
+# a target dir of its own, shared across revs.
+iced() {
+  local side=$1 tree=$2 dir=$3 run=(env)
+  [[ $side == before ]] && run=(env CARGO_TARGET_DIR="$cache/target")
+  raw=$work/raw
+  mkdir -p "$out/logs"
+  if [[ " ${iced_surfaces[*]} " == *" kobo "* ]]; then
+    iced_tour kobo "$tree" "$dir" "${run[@]}" KOBO_SHOTS="$raw/kobo" \
+      cargo test -q -p kubaos-kobo --release shots -- --ignored
+  fi
+  if [[ " ${iced_surfaces[*]} " == *" specimen "* ]]; then
+    local flake
+    # The working tree as a git flake: a path flake would copy target/ into the store. Like
+    # `just design-parity`, it leaves out QML git doesn't know yet. BEFORE is a plain extracted
+    # tree, a path flake.
+    flake=$tree#checks.$(nix eval --impure --raw --expr builtins.currentSystem).qml-specimen
+    [[ $side == before ]] && flake=path:$flake
+    # shellcheck disable=SC2016 # The script's arguments are expanded by the inner bash.
+    iced_tour specimen "$tree" "$dir" bash -c '"${@:2}" cargo run -q --release -p kubaos-specimen -- shots "$0/specimen" &&
+      nix run "$1" -- shots "$0/qml-specimen"' "$raw" "$flake" "${run[@]}"
+  fi
+}
+
+# Whether FILE (NAME-MODE-SCALEx.png) is in the planned modes and scales.
+planned() {
+  local f=${1%.png} m s
+  s=${f##*-}
+  s=${s%x}
+  f=${f%-*}
+  m=${f##*-}
+  [[ " ${modes[*]} " == *" $m "* && " ${scales[*]} " == *" $s "* ]]
+}
+
+# The crop of shot FILE in logical pixels, or - for the whole image.
+crop_of() {
+  local name=${1%-*-*x.png}
+  awk -v n="$name" '$1 == n { print $4; found = 1 } END { if (!found) print "-" }' "$here/scenarios"
+}
+
+# pair FILE: before|after into pairs/FILE, and its line in changed.txt when they differ.
+pair() {
+  local file=$1 b=$out/before/$1 a=$out/after/$1 scale crop gap diff tmp
+  [[ -s $a ]] || return 0
+  scale=${file%x.png}
+  scale=${scale##*-}
+  crop=$(crop_of "$file")
+  tmp=$(mktemp -d)
+  if [[ $crop != - ]]; then
+    local g
+    g=$(awk -v s="$scale" -v c="$crop" 'BEGIN { split(c, v, ","); printf "%dx%d+%d+%d", v[3] * s, v[4] * s, v[1] * s, v[2] * s }')
+    magick "$a" -crop "$g" +repage "$tmp/a.png"
+    [[ -s $b ]] && magick "$b" -crop "$g" +repage "$tmp/b.png"
+  else
+    cp "$a" "$tmp/a.png"
+    [[ -s $b ]] && cp "$b" "$tmp/b.png"
+  fi
+  gap=$(awk -v s="$scale" 'BEGIN { printf "%d", 16 * s }')
+  if [[ -s $b ]]; then
+    if [[ $(magick identify -format %wx%h "$tmp/b.png") != "$(magick identify -format %wx%h "$tmp/a.png")" ]]; then
+      diff=size
+    else
+      # The pixels where any channel differs by more than 0.5%, each counted once.
+      diff=$(magick "$tmp/b.png" "$tmp/a.png" -compose difference -composite -alpha off -separate \
+        -evaluate-sequence max -threshold 0.5% -format '%[fx:round(mean * w * h)]' info:)
+    fi
+    magick "$tmp/b.png" -size "${gap}x1" xc:none "$tmp/a.png" -background none -gravity north +append \
+      -define png:compression-level=9 "$out/pairs/$file"
+  else
+    diff=new
+    magick "$tmp/a.png" -define png:compression-level=9 "$out/pairs/$file"
+  fi
+  rm -rf "$tmp"
+  # The threshold is in logical pixels, so it covers a blinking caret at every scale.
+  if [[ $diff == size || $diff == new ]] || awk -v d="$diff" -v t="$threshold" -v s="$scale" 'BEGIN { exit !(d > t * s * s) }'; then
+    echo "$file $diff"
+  fi
+}
+
+# The AFTER side's QML warnings, less what the harness itself prints, with staged paths shown as
+# the repo's.
+warnings() {
+  cat "$out"/after/logs/*.log 2>/dev/null |
+    grep -v -E '^qml: (shot |(exec|panels|hyprland|notification|session|polkit): )|libEGL|MESA|qt\.scenegraph|qt\.rhi|^ *$' |
+    sed -E -e 's#file://[^ ]*/stage-after/imports/qs/modules/#config/quickshell/modules/#g' \
+      -e 's#file://[^ ]*/stage-after/imports/qs/(components|theme)/#config/quickshell/\1/#g' \
+      -e 's#file://[^ ]*/stage-after/imports/KubaOS/#qml/KubaOS/#g' \
+      -e 's#file://[^ ]*/stage-after/#test/shots/#g' -e 's/_QMLTYPE_[0-9]+(_QML_[0-9]+)?//g; s/\(0x[0-9a-f]+\)//g' |
+    sort | uniq -c | sort -rn || true
+}
+
+self_test() {
+  need_env
+  local report
+  # shellcheck disable=SC2016 # The command is expanded inside the render.
+  report=$(
+    WAYLAND_DISPLAY=wayland-1 HYPRLAND_INSTANCE_SIGNATURE=live DISPLAY=:0 QS_CONFIG_PATH=/live \
+      QS_NO_RELOAD_POPUP=1 isolated 1 sh -c 'env; for c in qs quickshell; do command -v "$c" >/dev/null && echo "FOUND=$c"; done; true'
+  )
+  local bad=0
+  if grep -E '^(HYPRLAND_INSTANCE_SIGNATURE|DISPLAY|QS_[A-Z_]*|SWAYSOCK|DBUS_SESSION_BUS_ADDRESS)=' <<<"$report"; then
+    bad=1
+  fi
+  local rt way home
+  rt=$(sed -n 's/^XDG_RUNTIME_DIR=//p' <<<"$report")
+  way=$(sed -n 's/^WAYLAND_DISPLAY=//p' <<<"$report")
+  home=$(sed -n 's/^HOME=//p' <<<"$report")
+  [[ $rt == "$TMPDIR"/kubaos-shots.* ]] || { echo "runtime dir is $rt" >&2; bad=1; }
+  [[ $way == "$rt/wayland-1" ]] || { echo "WAYLAND_DISPLAY is $way" >&2; bad=1; }
+  [[ $home == "$rt" ]] || { echo "HOME is $home" >&2; bad=1; }
+  [[ ! -e $rt ]] || { echo "the private runtime dir $rt was left behind" >&2; bad=1; }
+  if grep '^FOUND=' <<<"$report"; then
+    echo "a render can start Quickshell" >&2
+    bad=1
+  fi
+  ((bad == 0)) || die "self-test failed"
+  echo "shots: self-test passed: no session variable of the desktop reaches a render, its home, runtime dir and sway are its own and removed after, and neither qs nor quickshell is on its PATH"
+}
+
+publish() {
+  local branch=${1:-}
+  [[ -n $branch ]] || usage
+  [[ -s $out/changed.txt ]] || die "no changed pairs in $out/changed.txt: nothing to publish"
+  local slug
+  # Any remote form: https, git@github.com:, or an SSH host alias (git@github-me:owner/repo.git).
+  slug=$(git -C "$repo" remote get-url origin | sed -E 's#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#')
+  local index parent=() tree commit file
+  index=$(mktemp)
+  rm -f "$index"
+  if git -C "$repo" fetch -q origin "refs/heads/$branch" 2>/dev/null; then
+    parent=(-p "$(git -C "$repo" rev-parse FETCH_HEAD)")
+  fi
+  while read -r file _; do
+    local blob
+    blob=$(git -C "$repo" hash-object -w "$out/pairs/$file")
+    GIT_INDEX_FILE=$index git -C "$repo" update-index --add --cacheinfo "100644,$blob,$file"
+  done <"$out/changed.txt"
+  tree=$(GIT_INDEX_FILE=$index git -C "$repo" write-tree)
+  rm -f "$index"
+  commit=$(git -C "$repo" commit-tree "$tree" "${parent[@]}" -m "shots: $(git -C "$repo" rev-parse --short HEAD) against $(cat "$out/base")")
+  git -C "$repo" push -q origin "$commit:refs/heads/$branch"
+  echo "| Shot | Before · After |"
+  echo "|---|---|"
+  while read -r file _; do
+    echo "| \`${file%.png}\` | ![${file%.png}](https://raw.githubusercontent.com/$slug/$commit/$file) |"
+  done <"$out/changed.txt"
+}
+
+main() {
+  local -a picked=() scales=() modes=()
+  local ref=origin/main full=0
+  jobs=$(nproc)
+  threshold=32
+  case ${1:-} in
+  -h | --help) usage 0 ;;
+  publish)
+    shift
+    publish "$@"
+    return
+    ;;
+  self-test)
+    self_test
+    return
+    ;;
+  esac
+  while (($# > 0)); do
+    case $1 in
+    --scales | --modes | --ref | --jobs | --threshold) (($# >= 2)) || usage ;;
+    esac
+    case $1 in
+    --scales) IFS=, read -r -a scales <<<"$2" && shift ;;
+    --modes) IFS=, read -r -a modes <<<"$2" && shift ;;
+    --ref) ref=$2 && shift ;;
+    --jobs) jobs=$2 && shift ;;
+    --threshold) threshold=$2 && shift ;;
+    --full) full=1 ;;
+    -h | --help) usage 0 ;;
+    -*) usage ;;
+    *) picked+=("$1") ;;
+    esac
+    shift
+  done
+  if ((full)); then
+    ((${#scales[@]})) || scales=(1 1.25 1.5 2)
+    ((${#modes[@]})) || modes=(dark light)
+  fi
+  ((${#scales[@]})) || scales=(1 1.5)
+  ((${#modes[@]})) || modes=(dark)
+  need_env
+
+  local base
+  base=$(git -C "$repo" merge-base "$ref" HEAD) || die "no merge base with $ref"
+  ((${#picked[@]})) || mapfile -t picked < <(changed_surfaces "$base")
+  ((${#picked[@]})) || {
+    echo "shots: nothing drawn changed against $ref"
+    return
+  }
+  local all
+  all=$(shell_surfaces | tr '\n' ' ')
+  shell=() iced_surfaces=()
+  local s
+  for s in "${picked[@]}"; do
+    case $s in
+    kobo | specimen) iced_surfaces+=("$s") ;;
+    *)
+      [[ " $all " == *" $s "* ]] || die "no surface $s: one of ${all}kobo specimen"
+      shell+=("$s")
+      ;;
+    esac
+  done
+
+  local before_dir
+  before_dir=$cache/$base/$(harness_hash)
+  rm -rf "$out"
+  mkdir -p "$out/pairs" "$out/after/logs" "$before_dir/logs"
+  ln -s "$before_dir" "$out/before"
+  git -C "$repo" rev-parse --short "$base" >"$out/base"
+  work=$(mktemp -d)
+  trap 'rm -rf "$work"' EXIT
+  : >"$work/jobs"
+
+  echo "shots: ${picked[*]} at ${scales[*]}, ${modes[*]}; before is $(cat "$out/base") ($ref), after the working tree" >&2
+  local started=$SECONDS
+  if ((${#shell[@]})); then
+    extract "$base" "$cache/$base/src" config/quickshell qml
+    shell_side after "$repo" "$out/after"
+    shell_side before "$cache/$base/src" "$before_dir"
+    run_jobs
+  fi
+  if ((${#iced_surfaces[@]})); then
+    # Kōbō's and the specimen's BEFORE depend on the rev alone, not on this harness: they are
+    # kept apart, so a change here doesn't rebuild them, and linked into BEFORE.
+    local iced_before=$cache/$base/iced
+    extract "$base" "$cache/$base/tree"
+    iced after "$repo" "$out/after"
+    iced before "$cache/$base/tree" "$iced_before"
+    local f
+    shopt -s nullglob
+    for f in "$iced_before"/*.png; do ln -sf "$f" "$before_dir/$(basename "$f")"; done
+    shopt -u nullglob
+  fi
+
+  local files=()
+  mapfile -t files < <(cd "$out/after" && for f in *.png; do [[ -e $f ]] && planned "$f" && echo "$f"; done)
+  export -f pair crop_of
+  export out here threshold
+  # shellcheck disable=SC2016 # $1 is the file, expanded by the inner bash.
+  printf '%s\n' "${files[@]}" | xargs -r -d '\n' -P "$jobs" -n 1 bash -c 'pair "$1"' _ | sort >"$out/changed.txt"
+
+  warnings >"$out/warnings.txt"
+  if [[ -s $out/warnings.txt ]]; then
+    echo "shots: QML warnings, after:" >&2
+    cat "$out/warnings.txt" >&2
+  fi
+  echo "shots: ${#files[@]} pairs in ${out#"$repo"/}/pairs, $(wc -l <"$out/changed.txt") changed (changed.txt), $((SECONDS - started)) s"
+}
+
+main "$@"

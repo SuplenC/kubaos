@@ -1,0 +1,29 @@
+# Every shell shot `test/shots/shots` takes, one per line:
+#
+#   NAME  SURFACE  DRIVER  CROP  [ARG...]
+#
+# NAME names the files (NAME-MODE-SCALEx.png). SURFACE is what `shots SURFACE` and the change
+# detection in `surfaces` pick by. DRIVER is a file in drivers/, run with `-- MODE OUT ARG...`.
+# CROP is the part of the 1600×1000 logical screen the pair shows, `X,Y,W,H` in logical pixels,
+# or `-` for the whole window.
+bar                      bar            FrameShot   900,0,700,40      bar
+controlcenter            controlcenter  FrameShot   1176,0,424,1000   controlcenter
+controlcenter-bluetooth  controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth
+controlcenter-passkey    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-code
+controlcenter-keyboard   controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard
+clock                    clock          FrameShot   400,0,800,800     clock answer
+sysmon                   sysmon         FrameShot   760,0,840,900     sysmon
+sysmon-process           sysmon         FrameShot   760,0,840,900     sysmon process
+wallpaper                wallpaper      FrameShot   200,440,1200,560  wallpaper
+wallpaper-settings       wallpaper      FrameShot   200,440,1200,560  wallpaper settings
+powermenu                powermenu      FrameShot   1160,260,440,480  powermenu
+osd                      osd            FrameShot   560,760,480,240   osd volume
+osd-brightness           osd            FrameShot   560,760,480,240   osd brightness
+notifications            notifications  FrameShot   1120,0,480,420    notifications
+lock                     lock           LockShot    -
+lock-error               lock           LockShot    -                 error
+lock-key                 lock           LockShot    -                 waiting
+polkit                   polkit         PolkitShot  -
+polkit-failed            polkit         PolkitShot  -                 failed
+menu                     menu           MenuShot    -                 typed
+menu-actions             menu           MenuShot    -                 actions

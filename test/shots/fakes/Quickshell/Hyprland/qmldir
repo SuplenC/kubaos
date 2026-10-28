@@ -1,0 +1,6 @@
+module Quickshell.Hyprland
+singleton Hyprland 1.0 Hyprland.qml
+HyprlandMonitor 1.0 HyprlandMonitor.qml
+HyprlandWorkspace 1.0 HyprlandWorkspace.qml
+HyprlandToplevel 1.0 HyprlandToplevel.qml
+GlobalShortcut 1.0 GlobalShortcut.qml
