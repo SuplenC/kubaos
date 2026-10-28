@@ -50,9 +50,10 @@ QtObject {
         return outer - inset;
     }
 
-    // The radius of the focus ring's outer edge around a control with corner `control`.
-    function ringRadius(control: int): int {
-        return control >= Tokens.radius.full ? control : control + Tokens.focus.offset;
+    // The radius of a shape `by` logical pixels outside one with corner `inner` on every side,
+    // concentric with it: a glow's ring around its control. A pill around a pill is a pill.
+    function outset(inner: int, by: real): real {
+        return inner >= Tokens.radius.full ? inner : inner + by;
     }
 
     // `v` logical pixels moved to the nearest device pixel at `dpr`.
@@ -84,7 +85,7 @@ QtObject {
         return Math.max(1, Math.round(logical * dpr)) / dpr;
     }
 
-    // The thin stroke of the focus ring, the spinner and the partial checkbox's dash.
+    // The thin stroke of the spinner, a field's caret and the partial checkbox's dash.
     function thin(dpr: real): real {
         return stroke(Tokens.stroke.thin, dpr);
     }

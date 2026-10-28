@@ -3,7 +3,7 @@ import KubaOS.Components as K
 
 // A value from 0 to 1, or one of a few stops, picked along a track: `kubaos-ui`'s
 // `slider::slider`. 24 tall: a progress bar's track, filled up to a 16 thumb, a pill and a circle;
-// the focus ring is a pill round it all. A slider with stops marks each one the fill hasn't
+// the focus tube is a pill on its box's edge. A slider with stops marks each one the fill hasn't
 // reached and snaps to them.
 //
 // It only reports what the user does, through `moved` and `stepped`, so `value` and `index` can

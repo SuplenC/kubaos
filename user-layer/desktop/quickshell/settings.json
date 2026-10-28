@@ -1,8 +1,14 @@
 // Your Quickshell settings: ~/.config/kubaos/desktop/quickshell/settings.json, over
 // KubaOS's (~/.local/share/kubaos/defaults/quickshell/settings/Settings.qml).
-// JSON, with whole-line // comments. The shell reads it again as soon as it changes.
+// JSON, with whole-line // comments: settings are separated by commas. The shell
+// reads it again as soon as it changes.
 {
   // The Command menu's motion: "full" (default), or "fades" for fades alone, with
   // nothing sliding or moving.
   // "menuMotion": "full"
+
+  // The focus tube strikes on as focus arrives, as the neon sign does: true
+  // (default), or false for a plain fade. "Focus stutter" in the Command menu
+  // turns it on and off.
+  // "focusStutter": true
 }

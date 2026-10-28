@@ -41,7 +41,7 @@ use crate::tokens::Space;
 use crate::tokens::Type;
 
 /// `content` under a header reading `title`, shown while `open`, in line with the title. A press on
-/// the header sends `on_toggle`; while it has the keyboard (`focused`) the ring goes round the
+/// the header sends `on_toggle`; while it has the keyboard (`focused`) the focus tube lights the
 /// header.
 pub fn collapsible<'a, M: Clone + 'a>(
     look: &Look,

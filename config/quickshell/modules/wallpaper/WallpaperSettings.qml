@@ -82,8 +82,8 @@ FocusScope {
             }
         }
 
-        // The rows stand off the flickable's edges by the focus ring's band, so the ring shows
-        // whole inside the clip.
+        // The rows stand off the flickable's edges by `focus.offset`; the clip cuts a focused
+        // row's glow past that.
         Column {
             id: column
 
@@ -115,7 +115,7 @@ FocusScope {
     // --- rows ---------------------------------------------------------------
 
     // A focusable row: label and help on the left, the control on the right,
-    // the focus ring while it's the current one.
+    // the focus tube while it's the current one.
     component SettingRow: Rectangle {
         id: row
 

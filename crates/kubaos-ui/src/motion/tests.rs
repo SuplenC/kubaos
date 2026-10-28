@@ -123,3 +123,30 @@ fn the_same_target_again_restarts_nothing() {
 
     assert!((tween.value(later) - 0.5).abs() < 1e-3);
 }
+
+#[test]
+fn a_tube_strikes_through_the_neon_steps_then_stays_lit() {
+    let motion = Motion::default();
+    let step = time::Duration::from_millis(30);
+
+    let seen: Vec<f32> = (0..10).map(|i| motion.strike(step * i + step / 2)).collect();
+
+    assert_eq!(seen, crate::tokens::NEON_STRIKE.to_vec());
+    assert!((motion.strike(time::Duration::from_millis(300)) - 1.0).abs() < f32::EPSILON);
+}
+
+#[test]
+fn the_stutter_is_on_by_default() {
+    assert!(Motion::default().strikes());
+}
+
+#[test]
+fn the_stutter_can_be_turned_off() {
+    assert!(!Motion::default().no_stutter().strikes());
+    assert!(Motion::default().no_stutter().stutter().strikes());
+}
+
+#[test]
+fn reduced_motion_turns_the_stutter_off() {
+    assert!(!Motion::default().reduced().strikes());
+}

@@ -24,6 +24,7 @@ use crate::color;
 use crate::component::layered;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
+use crate::focus::focus_ring_on_fill;
 use crate::icon::Icon;
 use crate::icon::icon;
 use crate::layout::Extent;
@@ -105,7 +106,7 @@ impl<M: Clone> Tile<M> {
         }
     }
 
-    /// Whether the keyboard is on it: the focus ring goes round it.
+    /// Whether the keyboard is on it: the focus tube lights its edge.
     #[must_use]
     pub fn focused(self, focused: bool) -> Self {
         Tile { focused, ..self }
@@ -178,7 +179,12 @@ impl<M: Clone> Tile<M> {
                 .padding(Inset::NONE.right(Space::S12).padding());
             tile = widget::Stack::with_children([tile, over.into()]).into();
         }
-        let view: Element<'a, M> = focus_ring(look, tile, CORNER, self.focused, RingColor::Accent);
+        let ring = if self.checked && enabled {
+            focus_ring_on_fill
+        } else {
+            focus_ring
+        };
+        let view: Element<'a, M> = ring(look, tile, CORNER, self.focused, RingColor::Accent);
         probe::component(
             "Tile",
             [if detail { "detail" } else { "" }, "", ""],

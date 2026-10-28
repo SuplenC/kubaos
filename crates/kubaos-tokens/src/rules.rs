@@ -323,6 +323,12 @@ fn check_rules(tokens: &Tokens, found: &mut Vec<Violation>) {
                 scale,
             });
         }
+        if (tokens.focus.tube * scale).round() < 1.0 {
+            found.push(Violation::StrokeUnderDevicePixel {
+                token: "focus.tube".into(),
+                scale,
+            });
+        }
     }
 }
 
@@ -334,6 +340,8 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         }
     };
     on_grid("focus.offset".into(), tokens.focus.offset);
+    on_grid("focus.near".into(), tokens.focus.near);
+    on_grid("focus.far".into(), tokens.focus.far);
     let radius = &tokens.radius;
     for (role, value) in [
         ("small", radius.small),
@@ -378,6 +386,13 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     }
     for (name, &value) in &tokens.opacity {
         check_opacity(format!("opacity.{name}"), value, found);
+    }
+    check_opacity("focus.near_opacity".into(), tokens.focus.near_opacity, found);
+    check_opacity("focus.far_opacity".into(), tokens.focus.far_opacity, found);
+    if tokens.focus.near >= tokens.focus.far {
+        found.push(Violation::NotAscending {
+            token: "focus.near, focus.far".into(),
+        });
     }
 }
 

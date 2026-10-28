@@ -1485,7 +1485,7 @@ fn wallpaper_set_header<'a>(app: &'a App, s: usize, set: &'a kubaos_core::probe:
     .into()
 }
 
-/// A wallpaper to pick: the picture over the whole tile, its name over its foot; picked, the ring
+/// A wallpaper to pick: the picture over the whole tile, its name over its foot; picked, the tube
 /// and a check. Its box keeps the wallpaper's aspect until the thumbnail is decoded (or for good,
 /// when it can't be), so the grid never jumps.
 fn wallpaper_card<'a>(app: &'a App, s: usize, i: usize, look: &Look) -> El<'a> {

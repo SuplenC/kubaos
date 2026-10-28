@@ -11,6 +11,7 @@ QtObject {
     readonly property int screenOffAfter: 600
     readonly property bool workspaceKanji: false
     readonly property string menuMotion: "full"
+    readonly property bool focusStutter: true
     readonly property bool u2f: true
     readonly property bool fingerprint: false
     readonly property bool polkitAgent: true

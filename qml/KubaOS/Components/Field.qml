@@ -2,8 +2,8 @@ import QtQuick
 import KubaOS.Components as K
 
 // One line of text: `kubaos-ui`'s `field::field`. As tall as a regular button, the control
-// radius, a hairline plus the focus ring, `body_large` text. An optional 20 icon leads it, the
-// text starting past it. A placeholder is a hint, never a value that looks typed.
+// radius, a hairline the focus tube takes over, `body_large` text. An optional 20 icon leads it,
+// the text starting past it. A placeholder is a hint, never a value that looks typed.
 //
 // States: `Normal`; `Invalid`, in the error colour with the reason in the note under it; and
 // `Locked`, read-only, dimmed and never focused.
@@ -152,6 +152,7 @@ FocusScope {
 
     K.FocusRing {
         shown: root.focused && !root.locked
+        error: root.status === "Invalid"
         controlRadius: Tokens.radius.control
     }
 }

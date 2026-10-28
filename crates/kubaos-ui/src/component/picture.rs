@@ -1,8 +1,8 @@
 //! A picture to pick: a wallpaper in Kōbō's grid or the shell's picker.
 //!
 //! The picture covers the whole tile, edge to edge in the tile's own rounded shape, with no frame
-//! round it, so it shows as large as the tile allows. What is picked shows by the ring round the
-//! tile and a mark over the picture (a check, "Current"), which each use names; the name sits
+//! round it, so it shows as large as the tile allows. What is picked shows by the focus tube on
+//! its edge and a mark over the picture (a check, "Current"), which each use names; the name sits
 //! under the picture or over its foot.
 //!
 //! # Owns
@@ -80,8 +80,8 @@ pub struct PictureChoice<'a, M> {
 }
 
 /// `picture` (or its placeholder until it loads) as a tile to pick, at `aspect`, named `name`
-/// under it. Picked, it shows its mark and the ring; the keyboard on it shows the ring too, cold
-/// when it is picked, since the accent already means picked.
+/// under it. Picked, it shows its mark and the focus tube; the keyboard on it lights the tube too,
+/// cold when it is picked, since the accent already means picked.
 pub fn picture_choice<'a, M>(
     picture: Option<image::Handle>,
     aspect: Aspect,
@@ -212,7 +212,7 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
                 snap: true,
             });
         let tile = layered(pressable, CORNER, content, enabled, None);
-        // The ring says picked, or where the keyboard is; on a picked tile the keyboard's is cold.
+        // The tube says picked, or where the keyboard is; on a picked tile the keyboard's is cold.
         let ring = if self.picked && self.focused {
             RingColor::Cold
         } else {

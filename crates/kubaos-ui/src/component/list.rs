@@ -238,7 +238,7 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
     }
 }
 
-/// `rows` in a well, the focus ring around it while the list has the keyboard. The rows show
+/// `rows` in a well, its edge lit as the focus tube while the list has the keyboard. The rows show
 /// which one the keyboard is on themselves.
 pub fn list<'a, M: 'a>(look: &Look, rows: impl IntoIterator<Item = Element<'a, M>>, focused: bool) -> Element<'a, M> {
     well(
@@ -321,8 +321,8 @@ impl<'a, M: 'a> ScrollingList<'a, M> {
     }
 }
 
-/// `content` in the list's well, `inset` inside it and `height` tall, the ring around it while
-/// `focused`.
+/// `content` in the list's well, `inset` inside it and `height` tall, its edge lit as the focus
+/// tube while `focused`.
 fn well<'a, M: 'a>(
     look: &Look,
     content: impl Into<Element<'a, M>>,

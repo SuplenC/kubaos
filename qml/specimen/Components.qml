@@ -279,7 +279,7 @@ K.Stack {
 
                         K.Labelled {
                             label: "Search"
-                            note: "Focused: the caret, the accent hairline and the ring."
+                            note: "Focused: the caret, and the tube on its own edge."
 
                             K.Field {
                                 text: "Shinj"
@@ -701,7 +701,7 @@ K.Stack {
 
                 K.Section {
                     title: "Lists"
-                    description: "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The ring goes round the well; the row shows where the keyboard is."
+                    description: "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is."
 
                     K.Grid {
                         columns: 3
@@ -894,7 +894,7 @@ K.Stack {
 
                 K.Section {
                     title: "Cards"
-                    description: "Picked cards take the accent, so their focus ring is the cold one."
+                    description: "Picked cards take the accent, so their focus tube is the cold one."
 
                     K.Grid {
                         columns: 4
@@ -929,7 +929,7 @@ K.Stack {
 
                             CardText {
                                 title: "Focused, picked"
-                                body: "The cold ring."
+                                body: "The cold tube."
                             }
                         }
                     }

@@ -14,7 +14,7 @@
 //!
 //! - The tokens as Rust ([`tokens`], generated), display scales ([`scale`]), colours and contrast
 //!   ([`color`]), motion ([`motion`]), type ([`text`]) and icons ([`icon`]).
-//! - Layout on the grid ([`layout`], [`grid`], [`scroll`]), the focus ring ([`focus`]) and the
+//! - Layout on the grid ([`layout`], [`grid`], [`scroll`]), the focus tube ([`focus`]) and the
 //!   components ([`component`]).
 //! - What each box is, for the geometry check ([`probe`]).
 //!

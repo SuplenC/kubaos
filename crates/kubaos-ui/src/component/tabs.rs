@@ -66,7 +66,7 @@ pub fn tabs<'a, 'c, M, F: Fn(usize) -> M>(choices: &'c [Tab<'a>], picked: usize,
 }
 
 impl<'a, M: Clone + 'a, F: Fn(usize) -> M> Tabs<'a, '_, F> {
-    /// Whether the row has the keyboard: the focus ring goes round the picked one.
+    /// Whether the row has the keyboard: the focus tube lights the picked one.
     #[must_use]
     pub fn focused(self, focused: bool) -> Self {
         Tabs { focused, ..self }

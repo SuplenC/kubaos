@@ -144,16 +144,45 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
         tokens.stroke.hairline_device_px
     ));
     out.blank();
-    out.line("/// The stroke of the focus ring, the spinner and a partial checkbox's dash, in logical pixels,");
+    out.line("/// The stroke of the spinner, a field's caret and a partial checkbox's dash, in logical pixels,");
     out.line("/// drawn rounded half up to whole device pixels.");
     out.line(format!("pub const STROKE_THIN: u16 = {};", tokens.stroke.thin));
     out.blank();
     out.line("/// A symbol's stroke on its 24 unit grid; drawn scaled to the symbol's size, then rounded half up to");
     out.line("/// whole device pixels.");
     out.line(format!("pub const SYMBOL_STROKE: u16 = {};", tokens.stroke.symbol));
+    let focus = &tokens.focus;
     out.blank();
-    out.line("/// How far the focus ring's outer edge stands outside its control, in logical pixels.");
-    out.line(format!("pub const FOCUS_OFFSET: u16 = {};", tokens.focus.offset));
+    out.line("/// The focus tube's width on its control's edge, in logical pixels, drawn rounded half up to whole");
+    out.line("/// device pixels.");
+    out.line(format!("pub const FOCUS_TUBE: f32 = {:?};", focus.tube));
+    out.blank();
+    out.line("/// The focus tube's near glow: its reach outside the tube in logical pixels, and its opacity at the");
+    out.line("/// tube.");
+    out.line(format!("pub const FOCUS_NEAR: u16 = {};", focus.near));
+    out.line(format!("pub const FOCUS_NEAR_OPACITY: f32 = {:?};", focus.near_opacity));
+    out.blank();
+    out.line("/// The focus tube's far, faint glow: its reach and its opacity at the tube.");
+    out.line(format!("pub const FOCUS_FAR: u16 = {};", focus.far));
+    out.line(format!("pub const FOCUS_FAR_OPACITY: f32 = {:?};", focus.far_opacity));
+    out.blank();
+    out.line("/// The band a page's scroll reaches past its box on every side, its content that far in, so the");
+    out.line("/// content lines up with what is around the scroll and a focused control at its edge keeps that");
+    out.line("/// much of its glow, in logical pixels.");
+    out.line(format!("pub const FOCUS_OFFSET: u16 = {};", focus.offset));
+    out.blank();
+    out.line("/// A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.");
+    out.line(format!(
+        "pub const NEON_STRIKE: [f32; {}] = [{}];",
+        tokens.neon.strike.len(),
+        tokens
+            .neon
+            .strike
+            .iter()
+            .map(|v| format!("{v:?}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
 }
 
 fn join(values: &[u16]) -> String {

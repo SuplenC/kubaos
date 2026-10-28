@@ -19,7 +19,7 @@
 //!
 //! # Not here
 //!
-//! - The focus ring: [`crate::focus`]. Layout: [`crate::layout`].
+//! - The focus tube: [`crate::focus`]. Layout: [`crate::layout`].
 
 pub mod avatar;
 pub mod banner;

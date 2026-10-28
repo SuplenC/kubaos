@@ -390,7 +390,8 @@ pub struct App {
     /// Light or dark. Dark on the live ISO; the screenshots draw both.
     pub mode: Mode,
     /// How things move: the tokens' durations, until Kōbō reads the speed and reduce-motion
-    /// settings. The done screen's sequence follows it; the shots draw it reduced too.
+    /// settings. The done screen's sequence and the focus tube follow it; the shots draw it reduced
+    /// too.
     pub motion: Motion,
     fixed_scale: Option<f32>,
     /// The switch that last flipped, and when (its knob slides).
@@ -673,9 +674,10 @@ impl App {
         r.err()
     }
 
-    /// The look every view draws with: the mode, at the display's scale times the UI's.
+    /// The look every view draws with: the mode, at the display's scale times the UI's, moving as
+    /// `motion` says.
     pub fn look(&self) -> Look {
-        crate::ui::look(self.mode, self.system_scale * self.ui_scale)
+        crate::ui::look(self.mode, self.system_scale * self.ui_scale).with_motion(self.motion)
     }
 
     /// How far the screen has arrived, 0 to 1: a page slides in over `long`.

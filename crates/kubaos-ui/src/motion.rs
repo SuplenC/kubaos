@@ -4,6 +4,7 @@
 //!
 //! - Evaluating an [`Easing`] curve, and the speed and reduce-motion settings applied to a
 //!   [`Duration`].
+//! - A neon tube striking ([`Motion::strike`]), and the stutter setting that turns it off.
 //! - [`Tween`]: a value a widget keeps in its state, moving to each new one its view gives it.
 //!
 //! # Not here
@@ -13,6 +14,7 @@
 use std::time;
 use std::time::Instant;
 
+use crate::tokens;
 use crate::tokens::Duration;
 use crate::tokens::Easing;
 
@@ -23,16 +25,22 @@ pub struct Motion {
     speed: f32,
     /// Moves become short fades, or nothing.
     reduced: bool,
+    /// The focus tube strikes on as focus arrives, as a neon sign does.
+    stutter: bool,
 }
 
 /// Speed 1: the durations as the tokens give them.
 pub const DEFAULT_SPEED: f32 = 1.0;
+
+/// The focus tube strikes on: it is the sign's own flicker, and the user may turn it off.
+pub const DEFAULT_STUTTER: bool = true;
 
 impl Default for Motion {
     fn default() -> Self {
         Motion {
             speed: DEFAULT_SPEED,
             reduced: false,
+            stutter: DEFAULT_STUTTER,
         }
     }
 }
@@ -61,6 +69,35 @@ impl Motion {
 
     pub fn is_reduced(self) -> bool {
         self.reduced
+    }
+
+    /// The focus tube strikes on as focus arrives.
+    #[must_use]
+    pub fn stutter(self) -> Self {
+        Motion { stutter: true, ..self }
+    }
+
+    /// The focus tube fades in as focus arrives.
+    #[must_use]
+    pub fn no_stutter(self) -> Self {
+        Motion { stutter: false, ..self }
+    }
+
+    /// Whether a tube strikes on: the stutter is on and motion isn't reduced.
+    pub fn strikes(self) -> bool {
+        self.stutter && !self.reduced
+    }
+
+    /// A tube's brightness, 0 to 1, `elapsed` after it starts striking: through
+    /// [`tokens::NEON_STRIKE`]'s even steps over [`Duration::Medium`], then lit.
+    pub fn strike(self, elapsed: time::Duration) -> f32 {
+        let total = self.duration(Duration::Medium).as_secs_f32();
+        let steps = tokens::NEON_STRIKE.len();
+        if total <= 0.0 || elapsed.as_secs_f32() >= total {
+            return 1.0;
+        }
+        let step = (elapsed.as_secs_f32() / total * steps as f32) as usize;
+        tokens::NEON_STRIKE[step.min(steps - 1)]
     }
 
     /// How long `duration` runs under these settings. With reduced motion anything longer than

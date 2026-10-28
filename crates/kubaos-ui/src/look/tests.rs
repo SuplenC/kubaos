@@ -1,8 +1,8 @@
 use super::Corner;
 use super::concentric;
 use super::nested;
+use super::outset;
 use super::radius;
-use super::ring_radius;
 use crate::tokens::Radius;
 use crate::tokens::Space;
 
@@ -43,15 +43,15 @@ fn nesting_twice_takes_both_insets() {
 }
 
 #[test]
-fn the_focus_ring_is_concentric_with_its_control() {
-    assert!((ring_radius(Radius::Control) - 16.0).abs() < f32::EPSILON);
-    assert!((ring_radius(Radius::Surface) - 28.0).abs() < f32::EPSILON);
+fn a_shape_around_a_control_is_concentric_with_it() {
+    assert!((outset(Radius::Control, 4.0) - 16.0).abs() < f32::EPSILON);
+    assert!((outset(Radius::Surface, 0.5) - 24.5).abs() < f32::EPSILON);
 }
 
 #[test]
 fn a_pill_is_rounder_than_any_shape() {
     assert!(radius(Radius::Full) > 1000.0);
-    assert!(ring_radius(Radius::Full) > 1000.0);
+    assert!(outset(Radius::Full, 20.0) > 1000.0);
 }
 
 #[test]

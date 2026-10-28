@@ -215,7 +215,7 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
         ));
         out.comment(
             "        ",
-            "The focus ring's, the spinner's and a partial checkbox's stroke in logical pixels, drawn rounded half up to whole device pixels.",
+            "The spinner's, a field's caret's and a partial checkbox's stroke in logical pixels, drawn rounded half up to whole device pixels.",
         );
         out.line(format!("        readonly property int thin: {}", stroke.thin));
         out.comment(
@@ -224,9 +224,43 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
         );
         out.line(format!("        readonly property int symbol: {}", stroke.symbol));
     });
-    out.group("    ", None, "focus", |out| {
-        out.line("        // How far the focus ring's outer edge stands outside its control, in logical pixels.");
-        out.line(format!("        readonly property int offset: {}", tokens.focus.offset));
+    let focus = &tokens.focus;
+    out.group(
+        "    ",
+        Some("The neon focus: the focused control's edge lit as a tube, its glow outside it."),
+        "focus",
+        |out| {
+            out.comment(
+                "        ",
+                "The tube's width on the control's edge in logical pixels, drawn rounded half up to whole device pixels.",
+            );
+            out.line(format!("        readonly property real tube: {}", number(focus.tube)));
+            out.line("        // The near glow's reach outside the tube in logical pixels, and its opacity at the tube.");
+            out.line(format!("        readonly property int near: {}", focus.near));
+            out.line(format!(
+                "        readonly property real near_opacity: {}",
+                number(focus.near_opacity)
+            ));
+            out.line("        // The far, faint glow's reach and its opacity at the tube.");
+            out.line(format!("        readonly property int far: {}", focus.far));
+            out.line(format!(
+                "        readonly property real far_opacity: {}",
+                number(focus.far_opacity)
+            ));
+            out.comment(
+                "        ",
+                "The band a page's scroll reaches past its box on every side, its content that far in, so the content lines up with what is around the scroll and a focused control at its edge keeps that much of its glow, in logical pixels.",
+            );
+            out.line(format!("        readonly property int offset: {}", focus.offset));
+        },
+    );
+    out.group("    ", None, "neon", |out| {
+        out.line("        // A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.");
+        let steps: Vec<String> = tokens.neon.strike.iter().map(|&v| number(v)).collect();
+        out.line(format!(
+            "        readonly property list<real> strike: [{}]",
+            steps.join(", ")
+        ));
     });
 }
 

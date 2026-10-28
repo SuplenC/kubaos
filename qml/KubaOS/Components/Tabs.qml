@@ -5,7 +5,7 @@ import KubaOS.Components as K
 // The picked one is tonal and the rest text, 4 apart, each with an optional symbol before its
 // label. The same row is a setting's segmented control (Always, On AC, Never). The owner keeps the
 // state: bind `currentIndex`, handle `picked()`. The row is one stop for Tab; Left and Right, or
-// h and l, pick the neighbouring choice, and the focus ring goes round the picked one.
+// h and l, pick the neighbouring choice, and the focus tube lights the picked one.
 Item {
     id: root
 

@@ -77,7 +77,7 @@ impl<M: Clone> Select<M> {
         Select { open, ..self }
     }
 
-    /// Whether the keyboard is on it: the focus ring goes round it.
+    /// Whether the keyboard is on it: the focus tube lights its edge.
     #[must_use]
     pub fn focused(self, focused: bool) -> Self {
         Select { focused, ..self }

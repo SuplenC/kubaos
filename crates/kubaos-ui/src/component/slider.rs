@@ -76,7 +76,7 @@ impl Value {
 /// stops marks each one the fill hasn't reached. A press or a drag on it sends `on_change` with
 /// the value under the pointer, at once for a continuous slider and on release for one with stops,
 /// which shows the stop under the pointer while it is held; without `on_change` it is disabled.
-/// Its focus ring is a pill round it all.
+/// Its focus tube is a pill on its box's edge.
 pub fn slider<'a, M: 'a>(
     look: &Look,
     value: Value,
