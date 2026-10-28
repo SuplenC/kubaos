@@ -4,14 +4,14 @@
 //! The tube is drawn on the control's edge, inside its box and over its outline, so there is only
 //! ever one line and nothing dark between the tube and the glow. The glow fades out from the tube
 //! over [`tokens::FOCUS_NEAR`] and, faintly, [`tokens::FOCUS_FAR`]. Neither takes layout space:
-//! focus moving never moves anything. A glow reaches only as far as the room its control has
-//! before whatever clips it (a scroll, a list, the window), so it is never cut; a container that
-//! clips keeps [`tokens::FOCUS_OFFSET`] of room around its content.
+//! focus moving never moves anything. Focus is a state of the control, drawn as part of it: the
+//! glow is always its full size, clipped by whatever clips the control (a scroll, a list, a well)
+//! and covered by whatever is drawn over the control.
 //!
 //! # Owns
 //!
-//! - [`focus_ring`], the glow's opacity out from the tube ([`glow`], [`rings`]) and its room
-//!   ([`room`]), and how the tube lights ([`Light`]): it strikes on as focus arrives, as the neon
+//! - [`focus_ring`] and [`focus_ring_on_fill`], the glow's opacity out from the tube ([`glow`],
+//!   [`rings`]), and how the tube lights ([`Light`]): it strikes on as focus arrives, as the neon
 //!   sign does, unless the stutter is off or motion is reduced, when it fades in over
 //!   [`Duration::Short`]; it fades out over the same as focus leaves.
 //!
@@ -79,29 +79,59 @@ pub fn focus_ring<'a, M: 'a>(
     focused: bool,
     color: RingColor,
 ) -> Element<'a, M> {
+    ring(look, content.into(), radius.into(), focused, color, None)
+}
+
+/// [`focus_ring`] for a control filled with the focus colour (a `Filled` button, a tile that is
+/// on), whose own edge can't show a tube of that colour: the fill is the tube, and the tube's hot
+/// core (`primary_core`, `cold_core`) rides just outside it, [`Scale::thin`] wide, with the glow
+/// beyond.
+pub fn focus_ring_on_fill<'a, M: 'a>(
+    look: &Look,
+    content: impl Into<Element<'a, M>>,
+    radius: impl Into<Corner>,
+    focused: bool,
+    color: RingColor,
+) -> Element<'a, M> {
+    let core = match color {
+        RingColor::Accent => look.colors.primary_core,
+        RingColor::Cold => look.colors.cold_core,
+        RingColor::Error => look.colors.error,
+    };
+    ring(look, content.into(), radius.into(), focused, color, Some(core))
+}
+
+fn ring<'a, M: 'a>(
+    look: &Look,
+    content: Element<'a, M>,
+    radius: Corner,
+    focused: bool,
+    color: RingColor,
+    core: Option<Color>,
+) -> Element<'a, M> {
     let tint = match color {
         RingColor::Accent => look.colors.primary,
         RingColor::Cold => look.colors.cold,
         RingColor::Error => look.colors.error,
     };
     Element::new(Ring {
-        content: content.into(),
+        content,
         color: tint,
+        core,
         focused,
-        radius: radius.into(),
+        radius,
         tube: look.scale.stroke(tokens::FOCUS_TUBE),
+        thin: look.scale.thin(),
         scale: look.scale,
         motion: look.motion,
     })
 }
 
-/// The glow's opacity `d` logical pixels outside the tube, for a control with `room` logical
-/// pixels before whatever clips it: the near glow and the far one, each fading from its opacity at
-/// the tube to nothing at its reach, or at the room where that is closer.
-pub fn glow(d: f32, room: f32) -> f32 {
-    let room = room.max(0.0);
+/// The glow's opacity `d` logical pixels outside the tube: the near glow and the far one, each
+/// fading from its opacity at the tube to nothing at its reach.
+pub fn glow(d: f32) -> f32 {
     let fade = |reach: u16, opacity: f32| {
-        let reach = f32::from(reach).min(room);
+        let reach = f32::from(reach);
         if d >= reach {
             return 0.0;
         }
@@ -112,20 +142,19 @@ pub fn glow(d: f32, room: f32) -> f32 {
     1.0 - (1.0 - near) * (1.0 - far)
 }
 
-/// The glow at `scale` with `room` before the clip, as bands that all start at the control's edge
+/// The glow at `scale`, as bands that all start at the control's edge
 /// and reach a device pixel further out each: each band's reach, in logical pixels outside the
 /// control, and its opacity. Laid over one another they make [`glow`] at the middle of every device
 /// pixel out. Bands, not rings side by side, so no two edges meet along a curve: each one's outer
 /// edge is smoothed once, with every wider band whole under it, and the corners show no seams.
-pub fn rings(scale: Scale, room: f32) -> impl Iterator<Item = (f32, f32)> {
-    let reach = f32::from(tokens::FOCUS_FAR).min(room.max(0.0));
+pub fn rings(scale: Scale) -> impl Iterator<Item = (f32, f32)> {
     let hairline = scale.hairline();
-    let count = (reach * scale.factor() - 1e-3).ceil().max(0.0) as u16;
+    let count = (f32::from(tokens::FOCUS_FAR) * scale.factor() - 1e-3).ceil().max(0.0) as u16;
     let at = move |i: u16| {
         if i >= count {
             return 0.0;
         }
-        glow(hairline * (f32::from(i) + 0.5), room)
+        glow(hairline * (f32::from(i) + 0.5))
     };
     (0..count).map(move |i| {
         // Every band out to this one covers this device pixel, so this one adds what takes the
@@ -133,16 +162,6 @@ pub fn rings(scale: Scale, room: f32) -> impl Iterator<Item = (f32, f32)> {
         let opacity = 1.0 - (1.0 - at(i)) / (1.0 - at(i + 1));
         (hairline * (f32::from(i) + 1.0), opacity)
     })
-}
-
-/// How far `bounds` stand inside `clip` at their nearest side, in logical pixels: the room a glow
-/// has before it would be cut. Negative when the control runs past the clip.
-pub fn room(bounds: Rectangle, clip: Rectangle) -> f32 {
-    let left = bounds.x - clip.x;
-    let top = bounds.y - clip.y;
-    let right = clip.x + clip.width - (bounds.x + bounds.width);
-    let bottom = clip.y + clip.height - (bounds.y + bounds.height);
-    left.min(top).min(right).min(bottom)
 }
 
 /// How brightly the tube and its glow show, 0 to 1, as focus comes and goes.
@@ -206,10 +225,14 @@ impl Light {
 struct Ring<'a, M> {
     content: Element<'a, M>,
     color: Color,
+    /// On a control filled with the focus colour: the core's colour, drawn just outside the fill.
+    core: Option<Color>,
     focused: bool,
     radius: Corner,
     /// The tube's width in logical pixels, whole device pixels at the scale.
     tube: f32,
+    /// The core's width outside a fill, in logical pixels.
+    thin: f32,
     /// The control's box is rounded up to it, so the tube on its edge and every ring of the glow
     /// land on device pixels too.
     scale: Scale,
@@ -331,15 +354,17 @@ impl<M> Widget<M, Theme, Renderer> for Ring<'_, M> {
             return;
         }
         let bounds = layout.bounds();
-        let corner = radius(self.radius);
-        for (out, opacity) in rings(self.scale, room(bounds, *viewport)) {
+        // On a fill the glow starts outside the core, so it is laid out from there.
+        let inset = if self.core.is_some() { self.thin } else { 0.0 };
+        let edge = bounds.expand(inset);
+        for (out, opacity) in rings(self.scale) {
             renderer.fill_quad(
                 renderer::Quad {
-                    bounds: bounds.expand(out),
+                    bounds: edge.expand(out),
                     border: Border {
                         color: color::alpha(self.color, opacity * lit),
                         width: out,
-                        radius: outset(self.radius, out).into(),
+                        radius: outset(self.radius, inset + out).into(),
                     },
                     snap: true,
                     ..renderer::Quad::default()
@@ -347,12 +372,17 @@ impl<M> Widget<M, Theme, Renderer> for Ring<'_, M> {
                 Background::Color(Color::TRANSPARENT),
             );
         }
+        let (tube, color, corner) = match self.core {
+            Some(core) => (edge, core, outset(self.radius, inset)),
+            None => (bounds, self.color, radius(self.radius)),
+        };
+        let width = if self.core.is_some() { self.thin } else { self.tube };
         renderer.fill_quad(
             renderer::Quad {
-                bounds,
+                bounds: tube,
                 border: Border {
-                    color: color::alpha(self.color, lit),
-                    width: self.tube,
+                    color: color::alpha(color, lit),
+                    width,
                     radius: corner.into(),
                 },
                 snap: true,

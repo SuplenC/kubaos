@@ -166,8 +166,9 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
     out.line(format!("pub const FOCUS_FAR: u16 = {};", focus.far));
     out.line(format!("pub const FOCUS_FAR_OPACITY: f32 = {:?};", focus.far_opacity));
     out.blank();
-    out.line("/// The room a container that clips keeps around its content, in logical pixels: a focus glow is");
-    out.line("/// never narrower than this.");
+    out.line("/// The band a page's scroll reaches past its box on every side, its content that far in, so the");
+    out.line("/// content lines up with what is around the scroll and a focused control at its edge keeps that");
+    out.line("/// much of its glow, in logical pixels.");
     out.line(format!("pub const FOCUS_OFFSET: u16 = {};", focus.offset));
     out.blank();
     out.line("/// A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.");

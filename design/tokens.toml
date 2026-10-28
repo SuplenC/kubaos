@@ -63,9 +63,10 @@ near = 8
 near_opacity = 0.45
 far = 20
 far_opacity = 0.14
-# The room a container that clips (a scroll, a list) keeps around its content.
-# A glow reaches only as far as the room it has before the clip, so it is
-# never cut, and is never narrower than this.
+# The band a page's scroll reaches past its box on every side, its content
+# that far in: the content lines up with what is around the scroll, and a
+# focused control at its edge keeps that much of its glow. The glow is part
+# of its control, so whatever clips the control clips it too.
 offset = 4
 
 # The spacing scale: gaps, paddings and insets.
@@ -774,7 +775,8 @@ pairs = [
 # `secondary`, a faint tint under a group of workspaces; `shadow` and `scrim`;
 # `cold_container` and `surface_bright`, the segments of Kōbō's partition bar,
 # which its legend names; `primary_core` and `cold_core`, the hot middle of a
-# neon tube, drawn on the tube. `kubaos-design contrast` fails on a role drawn with
+# neon tube, drawn on the tube, and the focus core outside a filled control,
+# beside the fill it lights. `kubaos-design contrast` fails on a role drawn with
 # that is in no pair and not here.
 decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", "scrim", "secondary", "shadow", "surface_bright"]
 

@@ -79,6 +79,7 @@ K.Pressable {
 
     K.FocusRing {
         shown: root.focused && root.enabled
+        filled: root.kind === "Filled"
         controlRadius: Tokens.radius.control
     }
 }

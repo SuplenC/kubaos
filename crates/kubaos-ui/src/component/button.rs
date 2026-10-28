@@ -15,6 +15,7 @@ use crate::component::hint::hint;
 use crate::component::layered;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
+use crate::focus::focus_ring_on_fill;
 use crate::icon::Icon;
 use crate::icon::icon;
 use crate::layout::Inset;
@@ -360,7 +361,12 @@ impl<'a, M: Clone + 'a> Button<'a, M> {
             enabled,
             self.preview.map(Preview::pin),
         );
-        let view: Element<'a, M> = focus_ring(look, pressable, Radius::Control, self.focused, RingColor::Accent);
+        let ringed = if self.kind == Kind::Filled {
+            focus_ring_on_fill
+        } else {
+            focus_ring
+        };
+        let view: Element<'a, M> = ringed(look, pressable, Radius::Control, self.focused, RingColor::Accent);
         probe::component("Button", variant, Fixed::HEIGHT, view)
     }
 }
@@ -453,7 +459,12 @@ impl<'a, M: Clone + 'a> IconButton<'a, M> {
             enabled,
             self.preview.map(Preview::pin),
         );
-        let ringed = focus_ring(look, pressable, Radius::Full, self.focused, RingColor::Accent);
+        let ring = if self.kind == Kind::Filled {
+            focus_ring_on_fill
+        } else {
+            focus_ring
+        };
+        let ringed = ring(look, pressable, Radius::Full, self.focused, RingColor::Accent);
         let view: Element<'a, M> = hint(look, ringed, self.label, self.focused);
         probe::component("IconButton", variant, Fixed::BOTH, view)
     }

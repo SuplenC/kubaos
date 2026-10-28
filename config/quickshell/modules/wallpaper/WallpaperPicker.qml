@@ -46,7 +46,7 @@ K.Sheet {
     // every scale.
     readonly property real thumbWidth: K.Tokens.size.thumbnail_width
     readonly property real thumbHeight: K.Tokens.size.thumbnail_height
-    // The band `focus.offset` round each thumbnail, inside its cell: a focused one's glow has that.
+    // The band `focus.offset` round each thumbnail, inside its cell; the grid's clip cuts a glow past it.
     readonly property real ring: K.Tokens.focus.offset
     readonly property real cellWidth: thumbWidth + ring * 2
     readonly property real cellHeight: ring + thumbHeight + K.Tokens.space.s8 + K.Tokens.type.small.line + K.Tokens.space.s8
@@ -166,7 +166,7 @@ K.Sheet {
         width: root.columns * root.cellWidth
         height: root.rows * root.cellHeight
         visible: !root.settingsOpen
-        // Cut at its own whole rows, the glow's band included, and scrolled a row at a time, so
+        // Cut at its own whole rows, the band included, and scrolled a row at a time, so
         // no tile is ever cut through.
         clip: true
         snapMode: GridView.SnapToRow

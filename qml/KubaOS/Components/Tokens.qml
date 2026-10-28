@@ -49,8 +49,9 @@ QtObject {
         // The far, faint glow's reach and its opacity at the tube.
         readonly property int far: 20
         readonly property real far_opacity: 0.14
-        // The room a container that clips keeps around its content, in logical pixels: a focus glow
-        // is never narrower than this.
+        // The band a page's scroll reaches past its box on every side, its content that far in, so
+        // the content lines up with what is around the scroll and a focused control at its edge
+        // keeps that much of its glow, in logical pixels.
         readonly property int offset: 4
     }
 

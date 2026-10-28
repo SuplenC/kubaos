@@ -1,14 +1,9 @@
 use std::time::Duration;
 use std::time::Instant;
 
-use iced::Point;
-use iced::Rectangle;
-use iced::Size;
-
 use super::Light;
 use super::glow;
 use super::rings;
-use super::room;
 use crate::motion::Motion;
 use crate::scale::Scale;
 use crate::tokens;
@@ -18,7 +13,7 @@ const FAR: f32 = tokens::FOCUS_FAR as f32;
 
 #[test]
 fn the_glow_starts_at_both_glows_opacities_together() {
-    let at_tube = glow(0.0, FAR);
+    let at_tube = glow(0.0);
 
     let both = 1.0 - (1.0 - tokens::FOCUS_NEAR_OPACITY) * (1.0 - tokens::FOCUS_FAR_OPACITY);
     assert!((at_tube - both).abs() < 1e-6);
@@ -26,38 +21,29 @@ fn the_glow_starts_at_both_glows_opacities_together() {
 
 #[test]
 fn the_glow_fades_out_to_nothing_at_its_reach() {
-    let mut last = glow(0.0, FAR);
+    let mut last = glow(0.0);
     for i in 1..=80 {
         let d = FAR * i as f32 / 80.0;
-        let a = glow(d, FAR);
+        let a = glow(d);
         assert!(a <= last, "the glow brightens at {d}");
         last = a;
     }
 
-    assert!(glow(FAR, FAR).abs() < f32::EPSILON);
+    assert!(glow(FAR).abs() < f32::EPSILON);
 }
 
 #[test]
 fn past_the_near_reach_only_the_far_glow_shows() {
-    let a = glow(NEAR, FAR);
+    let a = glow(NEAR);
 
     let far = tokens::FOCUS_FAR_OPACITY * (1.0 - NEAR / FAR).powi(2);
     assert!((a - far).abs() < 1e-6);
 }
 
 #[test]
-fn the_glow_ends_where_the_clip_is_closer() {
-    let room = f32::from(tokens::FOCUS_OFFSET);
-
-    assert!(glow(room - 0.5, room) > 0.0);
-    assert!(glow(room, room).abs() < f32::EPSILON);
-    assert!(glow(0.0, 0.0).abs() < f32::EPSILON);
-}
-
-#[test]
 fn the_glow_is_one_band_a_device_pixel_further_out_to_its_reach() {
     for scale in Scale::SUPPORTED {
-        let drawn: Vec<(f32, f32)> = rings(scale, FAR).collect();
+        let drawn: Vec<(f32, f32)> = rings(scale).collect();
 
         let hairline = scale.hairline();
         assert_eq!(drawn.len(), (FAR * scale.factor()).round() as usize, "at {scale:?}");
@@ -70,29 +56,15 @@ fn the_glow_is_one_band_a_device_pixel_further_out_to_its_reach() {
 #[test]
 fn the_bands_laid_over_one_another_make_the_glow() {
     for scale in Scale::SUPPORTED {
-        let drawn: Vec<(f32, f32)> = rings(scale, FAR).collect();
+        let drawn: Vec<(f32, f32)> = rings(scale).collect();
 
         let hairline = scale.hairline();
         for i in 0..drawn.len() {
             let clear: f32 = drawn[i..].iter().map(|&(_, opacity)| 1.0 - opacity).product();
-            let wanted = glow(hairline * (i as f32 + 0.5), FAR);
+            let wanted = glow(hairline * (i as f32 + 0.5));
             assert!((1.0 - clear - wanted).abs() < 1e-5, "at {scale:?}, pixel {i}");
         }
     }
-}
-
-#[test]
-fn a_glow_with_no_room_draws_nothing() {
-    assert_eq!(rings(Scale::X1, 0.0).count(), 0);
-    assert_eq!(rings(Scale::X1, -3.0).count(), 0);
-}
-
-#[test]
-fn the_room_is_the_nearest_side_to_the_clip() {
-    let clip = Rectangle::new(Point::new(0.0, 0.0), Size::new(100.0, 50.0));
-    let control = Rectangle::new(Point::new(4.0, 30.0), Size::new(60.0, 12.0));
-
-    assert!((room(control, clip) - 4.0).abs() < f32::EPSILON);
 }
 
 #[test]

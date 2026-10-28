@@ -82,8 +82,8 @@ FocusScope {
             }
         }
 
-        // The rows stand off the flickable's edges by `focus.offset`, so a focused row's glow
-        // shows that far inside the clip.
+        // The rows stand off the flickable's edges by `focus.offset`; the clip cuts a focused
+        // row's glow past that.
         Column {
             id: column
 

@@ -1,9 +1,9 @@
 //! Scrolling: content taller than its room, with a thin thumb that only says where you are.
 //!
-//! A scroll clips what it scrolls, and a focused control's glow reaches only as far as the room it
-//! has before the clip. A page's scroll therefore scrolls a box [`tokens::FOCUS_OFFSET`] larger
-//! than itself on every side, with its content that band in: the content lines up with what is
-//! around the scroll, and a control at its edge still glows that far.
+//! A scroll clips what it scrolls, a focused control's glow included. A page's scroll scrolls a box
+//! [`tokens::FOCUS_OFFSET`] larger than itself on every side, with its content that band in: the
+//! content lines up with what is around the scroll, and a focused control at its edge keeps that
+//! much of its glow.
 //!
 //! # Owns
 //!

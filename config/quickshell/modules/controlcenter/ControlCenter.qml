@@ -138,9 +138,9 @@ K.Sheet {
             onPicked: index => root.tab = index
         }
 
-        // Clipped `focus.offset` outside the tab's room, so a focused control's glow has that: a
-        // list taller than the room the sections leave on a short screen is cut there, rather than
-        // drawn over them.
+        // Clipped `focus.offset` outside the tab's room: a list taller than the room the sections
+        // leave on a short screen is cut there, rather than drawn over them, a focused control's
+        // glow with it.
         Item {
             x: -K.Tokens.focus.offset
             y: tabBar.height + K.Tokens.space.s12 - K.Tokens.focus.offset
