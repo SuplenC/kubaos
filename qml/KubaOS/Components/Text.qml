@@ -30,13 +30,14 @@ Item {
     // Whether the text is shaped: iced shapes anything but plain ASCII.
     readonly property bool shaped: /[^\x00-\x7f]/.test(root.text)
     // Each line's words and its width in logical pixels.
-    // Each line's words and its width, before `maximumLines` cuts them.
+    // The words in lines as they wrap in `room`, before `maximumLines` cuts them.
     readonly property var laid: root.layOut(root.text, root.room, metrics.font)
     readonly property var lines: root.clamped(root.laid)
-    // Whether `maximumLines` cuts anything: more lines than it keeps, or a line wider than the
-    // room. Only then does Qt draw the lines with an ellipsis: Qt measures each line a hair wider
-    // than the advances it is laid out by, and would cut a word that fits.
-    readonly property bool cut: root.maximumLines > 0 && (root.laid.length > root.maximumLines || root.laid.some(line => line.width > root.room))
+    // Whether `maximumLines` cuts the words: more lines than it keeps, or one wider than the room or
+    // than a box its owner made narrower.
+    // HAZARD: wrap and elide only then. Qt wraps a line laid out exactly as wide as its own
+    // advance onto a second line now and then, and a kept line count of one drops what moved.
+    readonly property bool cut: root.maximumLines > 0 && (root.laid.length > root.maximumLines || root.laid.some(line => line.width > Math.min(root.room, root.width + 1e-3)))
     readonly property real naturalWidth: root.lines.reduce((widest, line) => Math.max(widest, line.width), 0)
     readonly property real naturalHeight: root.lines.length * root.style.line
     readonly property var probe: ({
@@ -120,7 +121,7 @@ Item {
         color: root.color
         horizontalAlignment: root.horizontalAlignment
         // The lines laid out above already fit the room but the last kept, which Qt wraps and cuts
-        // at the ellipsis when it was cut.
+        // at the ellipsis.
         wrapMode: root.cut ? Text.Wrap : Text.NoWrap
         maximumLineCount: root.cut ? root.maximumLines : Number.MAX_SAFE_INTEGER
         elide: root.cut ? Text.ElideRight : Text.ElideNone
