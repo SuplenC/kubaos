@@ -4,7 +4,7 @@
 //! `every_screen_keeps_to_the_grid` holds every one of them to the design language's geometry
 //! rules (docs/DESIGN.md, "The geometry check"), as `kubaos-specimen check` holds the specimen.
 //!
-//!   KOBO_SHOTS=DIR cargo test -p kubaos-kobo --release shots -- --ignored
+//!   `KOBO_SHOTS=DIR cargo test -p kubaos-kobo --release shots -- --ignored`
 //!
 //! draws them too, with iced's tiny-skia renderer, as `SCREEN-MODE-SCALEx.png` in DIR.
 //! `GALLERY_PAYLOAD` names a payload directory with the wallpaper thumbnails
@@ -136,7 +136,7 @@ fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>
             image::ExtendedColorType::Rgba8,
         )
         .expect("write the screenshot");
-        eprintln!("shots: {}", path.display());
+        say(&format!("shots: {}", path.display()));
     }
     Frame {
         page: page.to_owned(),
@@ -149,22 +149,34 @@ fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>
 /// Every running animation finished, and the clock where the shots read it.
 fn settle_app(app: &mut App) {
     let now = Instant::now();
-    let held = app.hold.map(|at| app.now - at);
+    let held = app.hold.map(|at| app.now.saturating_duration_since(at));
     app.now = now;
-    app.transition.0 = now - Duration::from_secs(5);
-    app.log_open.1 = now - Duration::from_secs(5);
+    app.transition.0 = ago(now, Duration::from_secs(5));
+    app.log_open.1 = ago(now, Duration::from_secs(5));
     app.switched = None;
     app.nudged = None;
-    app.hold = held.map(|held| now - held);
+    app.hold = held.map(|held| ago(now, held));
     if let Some((_, at)) = &mut app.wallpaper {
-        *at = now - Duration::from_secs(5);
+        *at = ago(now, Duration::from_secs(5));
     }
+}
+
+/// A line for whoever ran the shots from a terminal: where a shot went, or how to ask for them.
+#[expect(clippy::print_stderr, reason = "the shots are run by hand, from a terminal")]
+fn say(line: &str) {
+    eprintln!("{line}");
+}
+
+/// `by` before `now`.
+fn ago(now: Instant, by: Duration) -> Instant {
+    now.checked_sub(by)
+        .expect("the monotonic clock has run longer than the shots look back")
 }
 
 fn settle_setup(s: &mut Setup) {
     let now = Instant::now();
     s.now = now;
-    s.changed = now - Duration::from_secs(5);
+    s.changed = ago(now, Duration::from_secs(5));
 }
 
 fn take_app(out: &mut Out, name: &str, app: &mut App) {
@@ -208,7 +220,7 @@ fn take_setup(out: &mut Out, name: &str, s: &mut Setup) {
 }
 
 fn wait_until<T>(state: &mut T, what: &str, done: impl Fn(&T) -> bool, tick: impl Fn(&mut T)) {
-    let deadline = Instant::now() + Duration::from_secs(120);
+    let deadline = Instant::now() + Duration::from_mins(2);
     while !done(state) {
         assert!(Instant::now() < deadline, "stuck waiting for {what}");
         tick(state);
@@ -348,7 +360,7 @@ fn hard_probe() -> Probe {
 /// An install that has planned its steps and started `at`, `ago` back.
 fn install_at(at: StepId, ago: Duration) -> Install {
     let now = Instant::now();
-    let mut install = Install::new(now - ago);
+    let mut install = Install::new(self::ago(now, ago));
     install.apply(
         &EngineEvent::Plan {
             steps: StepId::ALL.iter().map(|s| s.info()).collect(),
@@ -446,7 +458,7 @@ fn install_states(out: &mut Out) {
     let _ = app.go(Screen::Failed);
     take_app(out, "failed-long", &mut app);
     // Halfway through its stay: arrived, not yet leaving.
-    let shown = Instant::now() - kubaos_ui::component::toast::DEFAULT_STAY / 2;
+    let shown = ago(Instant::now(), kubaos_ui::component::toast::DEFAULT_STAY / 2);
     app.toast = Some(("Log saved to /root/kubaos-install.log.".into(), shown));
     take_app(out, "failed-log-saved", &mut app);
 }
@@ -497,7 +509,7 @@ fn every_screen_keeps_to_the_grid() {
 #[ignore = "writes screenshots: KOBO_SHOTS=DIR"]
 fn shots() {
     let Some(dir) = std::env::var_os("KOBO_SHOTS") else {
-        eprintln!("set KOBO_SHOTS=DIR");
+        say("set KOBO_SHOTS=DIR");
         return;
     };
     let dir = PathBuf::from(dir);

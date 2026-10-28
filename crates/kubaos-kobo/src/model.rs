@@ -429,7 +429,7 @@ pub trait DiskExt {
 
 /// Smallest disk (or free region) KubaOS fits in.
 pub fn needed(probe: &Probe) -> u64 {
-    probe.payload.as_ref().map(|m| m.installed_bytes).unwrap_or(0) + HEADROOM
+    probe.payload.as_ref().map_or(0, |m| m.installed_bytes) + HEADROOM
 }
 
 impl DiskExt for DiskInfo {

@@ -415,7 +415,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(backend: Arc<dyn Backend>, opts: Options) -> (Self, Task<Message>) {
+    pub fn new(backend: Arc<dyn Backend>, opts: &Options) -> (Self, Task<Message>) {
         let mut app = Self::headless(backend);
         app.blur_src = decode_blur();
         app.tour = opts.tour.clone().map(|d| Tour::new(d, opts.tour_pace));
@@ -433,7 +433,7 @@ impl App {
     pub fn headless(backend: Arc<dyn Backend>) -> Self {
         let now = Instant::now();
         let (tx, rx) = mpsc::channel();
-        let b = backend.clone();
+        let b = Arc::clone(&backend);
         std::thread::spawn(move || {
             let _ = tx.send(b.probe());
         });
@@ -780,7 +780,7 @@ impl App {
         }
         let config = self.form.to_config(probe);
         let secrets = self.form.to_secrets();
-        let backend = self.backend.clone();
+        let backend = Arc::clone(&self.backend);
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
             backend.run(&config, &secrets, &mut |m| {
@@ -789,7 +789,12 @@ impl App {
         });
         self.run_rx = Some(rx);
         self.install = Some(Install::new(Instant::now()));
-        self.log_open = (false, self.now - Motion::default().duration(tokens::Duration::Medium));
+        // The log starts closed, its close already over, so nothing animates.
+        let closed_at = self
+            .now
+            .checked_sub(Motion::default().duration(tokens::Duration::Medium))
+            .unwrap_or(self.now);
+        self.log_open = (false, closed_at);
         self.go(Screen::Installing)
     }
 
@@ -801,7 +806,12 @@ impl App {
             .expect("wallpaper")
             .to_rgba8();
         let h = image::Handle::from_rgba(img.width(), img.height(), img.into_raw());
-        self.wallpaper = Some((h, self.epoch - Duration::from_secs(5)));
+        self.wallpaper = Some((
+            h,
+            self.epoch
+                .checked_sub(Duration::from_secs(5))
+                .expect("the clock is past 5 s"),
+        ));
         self.blur_src = decode_blur();
         self.size = size;
         self.glass = None;
@@ -838,15 +848,15 @@ impl App {
             return;
         }
         let Some(src) = &self.blur_src else { return };
-        let r = crate::view::panel_rect(self.size, self.look().scale);
+        let panel = crate::view::panel_rect(self.size, self.look().scale);
         let (iw, ih) = (src.width() as f32, src.height() as f32);
-        let s = (self.size.width / iw).max(self.size.height / ih);
-        let ox = (iw * s - self.size.width) / 2.0;
-        let oy = (ih * s - self.size.height) / 2.0;
-        let x = ((r.x + ox) / s).max(0.0) as u32;
-        let y = ((r.y + oy) / s).max(0.0) as u32;
-        let w = ((r.width / s) as u32).clamp(1, src.width() - x);
-        let h = ((r.height / s) as u32).clamp(1, src.height() - y);
+        let zoom = (self.size.width / iw).max(self.size.height / ih);
+        let ox = (iw * zoom - self.size.width) / 2.0;
+        let oy = (ih * zoom - self.size.height) / 2.0;
+        let x = ((panel.x + ox) / zoom).max(0.0) as u32;
+        let y = ((panel.y + oy) / zoom).max(0.0) as u32;
+        let w = ((panel.width / zoom) as u32).clamp(1, src.width() - x);
+        let h = ((panel.height / zoom) as u32).clamp(1, src.height() - y);
         let crop = ::image::imageops::crop_imm(src, x, y, w, h).to_image();
         self.glass = Some((self.size, image::Handle::from_rgba(w, h, crop.into_raw())));
     }
@@ -859,6 +869,10 @@ impl App {
         task
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "One arm per message, each a few lines: the app's dispatch, read in one place."
+    )]
     pub(crate) fn update_inner(&mut self, msg: Message) -> Task<Message> {
         match msg {
             Message::Tick(now) => self.tick(now),
@@ -906,7 +920,7 @@ impl App {
                 self.type_text(&s.replace(['\n', '\r'], ""));
                 self.scroll_to_selection()
             }
-            Message::Pasted(None) => Task::none(),
+            Message::Pasted(None) | Message::ShutDown(_, Ok(())) | Message::Setup(_) => Task::none(),
             Message::Click(f) if self.power.is_some() && !f.in_power_menu() => Task::none(),
             Message::Click(f) => {
                 self.set_focus(Some(f));
@@ -922,15 +936,11 @@ impl App {
                 }
                 let value = self.field_value(f);
                 self.caret = match ptr {
-                    Pointer::Press { pos, extend: true } => Caret {
+                    Pointer::Press { pos, extend: true } | Pointer::Drag(pos) => Caret {
                         pos,
                         anchor: self.caret.anchor,
                     },
                     Pointer::Press { pos, .. } => Caret::at(pos),
-                    Pointer::Drag(pos) => Caret {
-                        pos,
-                        anchor: self.caret.anchor,
-                    },
                     Pointer::Double(pos) => edit::word_at(value, pos),
                     Pointer::Triple => Caret::all(value),
                 }
@@ -998,7 +1008,6 @@ impl App {
                 }
                 Task::none()
             }
-            Message::ShutDown(_, Ok(())) => Task::none(),
             Message::ShutDown(action, Err(e)) => {
                 self.shutting_down = None;
                 if let Some(menu) = self.power.take() {
@@ -1022,7 +1031,6 @@ impl App {
                 self.battery = b;
                 Task::none()
             }
-            Message::Setup(_) => Task::none(),
             Message::TourShot(name, shot) => {
                 crate::tour::save(self, &name, &shot);
                 if let Some(t) = &mut self.tour {
@@ -1117,12 +1125,11 @@ impl App {
             RunMsg::Exited(r) => {
                 install.exited(r);
                 self.run_rx = None;
-                let shown = match install.outcome {
-                    Some(Outcome::Done { .. }) => self.go(Screen::Done),
-                    _ => {
-                        self.log_open = (true, now);
-                        self.go(Screen::Failed)
-                    }
+                let shown = if let Some(Outcome::Done { .. }) = install.outcome {
+                    self.go(Screen::Done)
+                } else {
+                    self.log_open = (true, now);
+                    self.go(Screen::Failed)
                 };
                 let Some(menu) = &mut self.power else {
                     return shown;
@@ -1138,7 +1145,7 @@ impl App {
 
     fn retry_probe(&mut self) {
         let (tx, rx) = mpsc::channel();
-        let b = self.backend.clone();
+        let b = Arc::clone(&self.backend);
         std::thread::spawn(move || {
             let _ = tx.send(b.probe());
         });
@@ -1191,7 +1198,6 @@ impl App {
                     Task::none()
                 }
             }
-            F::Hold => Task::none(),
             F::ToggleLog => {
                 let open = !self.log_open.0;
                 self.now = Instant::now();
@@ -1203,7 +1209,7 @@ impl App {
                 }
             }
             F::SaveLog => {
-                let text = self.install.as_ref().map(|i| i.log_text()).unwrap_or_default();
+                let text = self.install.as_ref().map(Install::log_text).unwrap_or_default();
                 self.now = Instant::now();
                 self.toast = Some((
                     match save_log(&text) {
@@ -1302,12 +1308,12 @@ impl App {
     }
 
     /// Keys while the power menu is open: it keeps them all, so nothing behind it moves.
-    fn power_key(&mut self, k: Key) -> Task<Message> {
+    fn power_key(&mut self, k: &Key) -> Task<Message> {
         let busy = self.shutting_down.is_some() || self.power.is_some_and(|m| m.stopping.is_some());
         if busy {
             return Task::none();
         }
-        match k {
+        match *k {
             Key::Esc => {
                 self.close_power();
                 Task::none()
@@ -1379,9 +1385,13 @@ impl App {
         self.focus.is_some_and(F::is_field)
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "One arm per key, each a line or two: the keyboard's whole map, read in one place."
+    )]
     pub fn key(&mut self, k: Key) -> Task<Message> {
         if self.power.is_some() {
-            return self.power_key(k);
+            return self.power_key(&k);
         }
         let focus = self.focus;
         match k {
@@ -2071,6 +2081,10 @@ pub fn on_event(ev: iced::Event, _status: event::Status, _w: window::Id) -> Opti
     translate(&k).map(Message::Key)
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "`event::listen_with` hands its function the event by value"
+)]
 pub fn on_mouse(ev: iced::Event, _status: event::Status, _w: window::Id) -> Option<Message> {
     match ev {
         iced::Event::Mouse(
@@ -2098,8 +2112,7 @@ pub fn translate(k: &keyboard::Event) -> Option<Key> {
             let shift = modifiers.shift();
             match key.as_ref() {
                 keyboard::Key::Named(n) => match n {
-                    Named::Enter if !repeat => Some(Key::Enter),
-                    Named::Enter => None,
+                    Named::Enter => (!repeat).then_some(Key::Enter),
                     Named::Escape => Some(Key::Esc),
                     Named::Tab => Some(Key::Tab { shift }),
                     Named::ArrowUp => Some(Key::Up),
@@ -2132,7 +2145,7 @@ pub fn translate(k: &keyboard::Event) -> Option<Key> {
                 },
                 _ => text
                     .as_ref()
-                    .map(|t| t.to_string())
+                    .map(ToString::to_string)
                     .filter(|t| !t.is_empty() && !t.chars().any(char::is_control))
                     .map(Key::Text),
             }

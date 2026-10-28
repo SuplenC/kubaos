@@ -121,13 +121,12 @@ fn combine(cells: &[Cell], mains_online: bool) -> Option<Battery> {
         return None;
     }
     let energies: Option<Vec<(u64, u64)>> = cells.iter().map(|c| c.energy).collect();
-    let percent = match energies {
-        Some(e) => ratio(e.iter().map(|x| x.0).sum(), e.iter().map(|x| x.1).sum()),
-        None => {
-            let sum: usize = cells.iter().map(|c| usize::from(c.percent())).sum();
-            let avg = (sum + cells.len() / 2) / cells.len();
-            u8::try_from(avg).unwrap_or(100)
-        }
+    let percent = if let Some(e) = energies {
+        ratio(e.iter().map(|x| x.0).sum(), e.iter().map(|x| x.1).sum())
+    } else {
+        let sum: usize = cells.iter().map(|c| usize::from(c.percent())).sum();
+        let avg = (sum + cells.len() / 2) / cells.len();
+        u8::try_from(avg).unwrap_or(100)
     };
     Some(Battery {
         percent,

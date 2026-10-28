@@ -32,6 +32,12 @@ pub struct Idle<'a, Message> {
     idle: bool,
 }
 
+impl<Message> std::fmt::Debug for Idle<'_, Message> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Idle").field("idle", &self.idle).finish_non_exhaustive()
+    }
+}
+
 /// `content`, pointerless while `idle`.
 pub fn idle<'a, Message>(content: impl Into<Element<'a, Message>>, idle: bool) -> Idle<'a, Message> {
     Idle {

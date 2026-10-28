@@ -1,6 +1,6 @@
 //! `--setup --demo --screenshot-tour DIR`: every card of the demo machine
 //! with the keyboard only, a PNG per state, then exit. Like the install
-//! screens' tour (crate::tour): key presses through `app::translate`, waits and
+//! screens' tour (`crate::tour`): key presses through `app::translate`, waits and
 //! screenshots, nothing else. The test below runs the same script headless.
 
 use std::collections::VecDeque;
@@ -44,6 +44,17 @@ fn state(s: &Setup, c: CardId) -> Option<State> {
 }
 
 /// The demo TUXEDO: every card, from nothing to all set.
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::enum_glob_use,
+        reason = "the script reads as a list of keys and steps, unprefixed"
+    )
+)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "One flat list of the tour's steps, in the order they run."
+)]
 pub fn script() -> Vec<Step> {
     use K::*;
     use Step::*;
@@ -161,6 +172,13 @@ pub fn script() -> Vec<Step> {
 }
 
 /// The bench VM: no TUXEDO, no reader, no key plugged in.
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::enum_glob_use,
+        reason = "the script reads as a list of keys and steps, unprefixed"
+    )
+)]
 pub fn script_vm() -> Vec<Step> {
     use K::*;
     use Step::*;
@@ -190,6 +208,13 @@ fn finished(s: &Setup) -> bool {
 
 /// After first boot, the Bitwarden card from the Command menu: narrow the SSH keys to a
 /// folder, pull again, log out, and log in to a self-hosted server.
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::enum_glob_use,
+        reason = "the script reads as a list of keys and steps, unprefixed"
+    )
+)]
 pub fn script_bitwarden() -> Vec<Step> {
     use K::*;
     use Step::*;
@@ -326,6 +351,10 @@ pub fn drive(s: &mut Setup) -> Task<Message> {
     Task::batch(tasks)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "`--screenshot-tour` is run from a terminal, which is told where each shot went"
+)]
 pub fn save(s: &Setup, name: &str, shot: &window::Screenshot) {
     let Some(tour) = &s.tour else { return };
     let _ = std::fs::create_dir_all(&tour.dir);
@@ -514,10 +543,13 @@ mod tests {
         let now = Instant::now();
         s.now = now;
 
-        s.phone_waiting_since = Some(now - Duration::from_secs(5));
+        s.phone_waiting_since = Some(now.checked_sub(Duration::from_secs(5)).expect("the clock is past 5 s"));
         assert!(!s.phone_by_address());
 
-        s.phone_waiting_since = Some(now - Duration::from_secs(31));
+        s.phone_waiting_since = Some(
+            now.checked_sub(Duration::from_secs(31))
+                .expect("the clock is past 31 s"),
+        );
         assert!(s.phone_by_address());
     }
 

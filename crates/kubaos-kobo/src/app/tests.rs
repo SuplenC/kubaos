@@ -2,6 +2,10 @@ use super::*;
 use crate::battery::Supply;
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The scales are the table's own values, returned as they are: equal means the same table entry."
+)]
 fn scale_fits_the_output() {
     let at = |w, h| auto_scale(Size::new(w, h));
     assert_eq!(at(1024.0, 768.0), 1.0);
@@ -12,6 +16,10 @@ fn scale_fits_the_output() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The scales are the table's own values, returned as they are: equal means the same table entry."
+)]
 fn a_big_output_gets_the_largest_supported_scale() {
     let at = |w, h| auto_scale(Size::new(w, h));
 
@@ -620,6 +628,10 @@ const LAYOUT_SIZES: [(f32, f32); 5] = [
 ];
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The layout puts the cards on device pixels, so cards in a row or column share their edges exactly."
+)]
 fn last_chance_shows_its_cards_as_an_even_two_by_two_grid() {
     use iced::widget::Id;
     use iced_test::simulator::Simulator;

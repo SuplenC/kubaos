@@ -334,7 +334,7 @@ impl Setup {
 
     fn detect(&mut self) {
         let (tx, rx) = mpsc::channel();
-        let b = self.backend.clone();
+        let b = Arc::clone(&self.backend);
         std::thread::spawn(move || {
             let _ = tx.send(b.status());
         });
@@ -663,13 +663,13 @@ impl Setup {
                     code: f.code.trim().to_string(),
                     client_id: f.client_id.trim().to_string(),
                     client_secret: f.client_secret.trim().to_string(),
-                })
+                });
             }
             CardId::Git => {
                 i.git = Some(GitIdentity {
                     name: f.git_name.trim().to_string(),
                     email: f.git_email.trim().to_string(),
-                })
+                });
             }
             CardId::Phone => i.phone = Some(PhoneStep::On),
             _ => {}
@@ -1032,7 +1032,7 @@ impl Setup {
     fn spawn(&mut self, inputs: Inputs, undo: Option<&'static str>) -> Task<Message> {
         let card = self.sel;
         let (tx, rx) = mpsc::channel();
-        let b = self.backend.clone();
+        let b = Arc::clone(&self.backend);
         std::thread::spawn(move || {
             b.run(card, &inputs, &mut |e| {
                 let _ = tx.send(e);
@@ -1116,7 +1116,7 @@ impl Setup {
     fn finish(&mut self) -> Task<Message> {
         let pending = self.status.as_ref().is_some_and(Status::reboot_pending);
         if !pending && let Err(e) = self.backend.finish() {
-            eprintln!("kobo: can't write the marker: {e}");
+            log::warn!("can't write the marker: {e}");
         }
         self.backend.start_bitwarden();
         iced::exit()
@@ -1196,7 +1196,7 @@ impl Setup {
             SF::LogOut => self.act(Act::LogOut),
             SF::TurnOff => self.act(Act::TurnOff),
             SF::Folders => {
-                if let Some(name) = self.bw_folders().get(self.form.folder_at).map(|f| f.to_string()) {
+                if let Some(name) = self.bw_folders().get(self.form.folder_at).map(ToString::to_string) {
                     self.toggle_folder(&name);
                 }
                 Task::none()
@@ -1255,6 +1255,10 @@ impl Setup {
         true
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "One arm per key, each a line or two: setup's whole keyboard map, read in one place."
+    )]
     pub fn key(&mut self, k: Key) -> Task<Message> {
         let focus = self.focus;
         // Focus can point at something the card no longer has (it changed

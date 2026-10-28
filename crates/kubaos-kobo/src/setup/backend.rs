@@ -125,7 +125,7 @@ impl SetupBackend for Real {
             .map_err(|e| e.to_string())
             .and_then(|s| if s.success() { Ok(()) } else { Err(s.to_string()) });
         if let Err(e) = started {
-            eprintln!("kobo: can't start Bitwarden: systemd-run: {e}");
+            log::warn!("can't start Bitwarden: systemd-run: {e}");
         }
     }
 }

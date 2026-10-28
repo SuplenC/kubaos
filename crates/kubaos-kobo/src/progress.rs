@@ -211,8 +211,9 @@ impl Install {
         self.shown += (target - self.shown) * k;
         if (target - self.shown).abs() < 0.0005 {
             self.shown = target;
+            return false;
         }
-        self.shown != target
+        true
     }
 
     pub fn log_text(&self) -> String {

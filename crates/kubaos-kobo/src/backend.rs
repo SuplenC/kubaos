@@ -255,7 +255,7 @@ pub fn stop_install_on_signals() {
     let mut signals = match Signals::new([SIGINT, SIGTERM, SIGHUP]) {
         Ok(signals) => signals,
         Err(e) => {
-            eprintln!("kobo: can't catch signals: {e}");
+            log::warn!("can't catch signals: {e}");
             return;
         }
     };
@@ -445,8 +445,12 @@ fn demo_detail(ev: Event) -> Event {
 
 const GB: u64 = 1_000_000_000;
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "One literal: the demo machine's disks, keymaps, zones and locales."
+)]
 pub fn demo_probe() -> Probe {
-    let strings = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    let strings = |v: &[&str]| v.iter().map(ToString::to_string).collect::<Vec<_>>();
     Probe {
         arch: "x86_64".into(),
         uefi: true,
@@ -520,7 +524,7 @@ pub fn demo_probe() -> Probe {
         keymaps: strings(&[
             "us", "us(intl)", "gb", "it", "de", "fr", "es", "pl", "jp", "dvorak", "colemak",
         ]),
-        timezones: crate::data::TIMEZONES.iter().map(|s| s.to_string()).collect(),
+        timezones: crate::data::TIMEZONES.iter().map(ToString::to_string).collect(),
         locales: strings(&[
             "en_US.UTF-8",
             "en_GB.UTF-8",

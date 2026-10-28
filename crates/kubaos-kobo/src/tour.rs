@@ -28,7 +28,10 @@ use crate::app::Screen;
 
 /// Keys the script and the tests press (the tests use more of them).
 #[derive(Debug, Clone, Copy)]
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the tests press keys the screenshot tour doesn't")
+)]
 pub enum K {
     Enter,
     Esc,
@@ -65,6 +68,13 @@ const SETTLE: u64 = 750;
 
 /// Welcome to Done, keys only. The demo backend fails the first install at
 /// "Activating your home", so the Failed screen and Retry get a turn.
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::enum_glob_use,
+        reason = "the script reads as a list of keys and steps, unprefixed"
+    )
+)]
 pub fn script() -> Vec<Step> {
     use K::*;
     use Step::*;
@@ -313,6 +323,10 @@ pub fn drive(app: &mut App) -> Task<Message> {
     Task::batch(tasks)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "`--screenshot-tour` is run from a terminal, which is told where each shot went"
+)]
 pub fn save(app: &App, name: &str, shot: &window::Screenshot) {
     let Some(tour) = &app.tour else { return };
     let _ = std::fs::create_dir_all(&tour.dir);
@@ -344,6 +358,8 @@ mod tests {
     /// window, no clicks, no messages other than keys and frame ticks.
     #[test]
     fn keyboard_only_install() {
+        use Screen::*;
+
         let mut app = App::headless(Arc::new(Demo::new(40.0, Some(StepId::Home))));
         let mut seen = vec![app.screen];
         let tick = |app: &mut App| {
@@ -374,7 +390,6 @@ mod tests {
                 seen.push(app.screen);
             }
         }
-        use Screen::*;
         assert_eq!(
             seen,
             [
