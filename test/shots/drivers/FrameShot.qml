@@ -12,8 +12,8 @@ import qs.modules.frame
 // PANEL is a name Panels opens (controlcenter, clock, sysmon, powermenu, wallpaper), or osd,
 // notifications, or bar (nothing open). STATE puts the panel in a state, through the services
 // and public properties only, so the driver works with any version of the panel:
-//   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), bluetooth, bluetooth-code,
-//                  keyboard
+//   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), bluetooth, bluetooth-code
+//                  (with the history cleared), keyboard
 //   clock: answer (a question typed into the search)
 //   sysmon: process (a process's details)
 //   wallpaper: settings
@@ -114,13 +114,16 @@ QtObject {
         }
         if (driver.state === "bluetooth" || driver.state === "bluetooth-code")
             cc.tab = 1;
-        if (driver.state === "bluetooth-code")
+        if (driver.state === "bluetooth-code") {
+            // The history cleared, so the tab has the room to show the prompt and its keycaps whole.
+            Notifs.clear();
             Bt.prompt = {
                 id: 1,
                 kind: "passkey",
                 name: "MX Master 3S",
                 passkey: "482913"
             };
+        }
         if (driver.state === "keyboard")
             cc.tab = cc.keyboardTab;
         if (driver.state === "")
