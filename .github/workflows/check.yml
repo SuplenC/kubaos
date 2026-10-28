@@ -1,20 +1,27 @@
-# A pull request's checks: `just check` in the flake's devshell on x86_64,
-# one step per recipe so a failure names what failed and stops the rest, and
-# `nix flake check --no-build` first, which only evaluates. `just shots` stays
-# out: its screenshots are for a person to look at, not a check.
+# A pull request's checks on x86_64: `just check` in the flake's devshell, and
+# `nix flake check --no-build`, which only evaluates. `just shots` stays out:
+# its screenshots are for a person to look at, not a check.
 #
-# Fast through three caches:
+# The checks run as parallel jobs, each on its own runner, one step per recipe
+# so a failure names what failed:
+# - flake: `nix flake check --no-build`.
+# - fmt and lint: `just fmt-check`, `just lint`.
+# - nextest: `just nextest`.
+# - qml: `just qml-test`.
+# - design: `just design-check`, with QML's parity.
+# `check (x86_64-linux)` needs them all and fails unless every one passed. It
+# is the one check branch protection requires, so a job added here goes in its
+# `needs`.
+#
+# Fast through three caches, which .github/actions/setup restores:
 # - Cachix (kuba-os.cachix.org), read-only, for what the binary cache workflow
 #   (cache.yml) built from main. No token: a PR never writes to it.
-# - The Nix store (cache-nix-action), keyed by the flake, for the devshell,
-#   the toolchain and the design checks' Qt.
-# - sccache's directory and cargo's downloads, keyed by Cargo.lock and
-#   flake.lock, for the crates' builds. Incremental builds are off, so
+# - The Nix store (cache-nix-action), keyed by the job and the flake, for the
+#   devshell, the toolchain and the design checks' Qt.
+# - sccache's directory and cargo's downloads, keyed by the job, Cargo.lock
+#   and flake.lock, for the crates' builds. Incremental builds are off, so
 #   sccache caches every crate.
-# Only the run on each push to main saves the two Actions caches, and every PR
-# starts from them: a PR saving its own would push main's out of the
-# repository's 10 GB. The compile cache's key ends in the run, so each push to
-# main saves a newer one and GitHub drops the oldest.
+# Only the run on each push to main saves the Actions caches.
 #
 # Actions are pinned to a commit, with the release in the comment beside it.
 name: Check
@@ -31,62 +38,43 @@ concurrency:
   group: check-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
-jobs:
-  check:
-    name: check (x86_64-linux)
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    env:
-      CARGO_INCREMENTAL: "0"
-      CARGO_TERM_COLOR: always
-      SCCACHE_CACHE_SIZE: 3G
-    steps:
-      # The runner image's preinstalled SDKs leave too little of the disk for
-      # Qt, the toolchain and the crates' builds.
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-          df -h /
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  SCCACHE_CACHE_SIZE: 3G
 
+jobs:
+  flake:
+    name: flake
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Install Nix
-        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      - name: Set up
+        uses: ./.github/actions/setup
         with:
-          extra_nix_config: |
-            max-jobs = auto
-
-      - name: Restore the Nix store
-        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix', 'qml/specimen/package.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 5G
-          save: ${{ github.event_name == 'push' }}
-
-      # No auth token: the cache is only read.
-      - name: Read the kuba-os Cachix
-        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
-        with:
-          name: kuba-os
-          skipPush: true
-
-      - name: Restore the compile cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cache/sccache
-            ~/.cargo/registry/index
-            ~/.cargo/registry/cache
-            ~/.cargo/git/db
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-${{ github.run_id }}
-          restore-keys: |
-            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-
-            cargo-${{ runner.os }}-
+          name: flake
 
       - name: Flake check
         run: nix flake check --no-build
+
+  lint:
+    name: fmt and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          name: lint
+          cargo: true
+          free-disk: true
 
       - name: Build the devshell
         run: nix develop --command true
@@ -97,18 +85,11 @@ jobs:
       - name: Clippy
         run: nix develop --command just lint
 
-      - name: Tests
-        run: nix develop --command just nextest
-
-      - name: QML logic tests
-        run: nix develop --command just qml-test
-
-      - name: Design checks
-        run: nix develop --command just design-check
-
       - name: Compile cache stats
         if: ${{ !cancelled() }}
-        run: nix develop --command sccache --show-stats
+        run: |
+          nix develop --command sccache --show-stats
+          df -h /
 
       - name: Save the compile cache
         if: ${{ github.event_name == 'push' && !cancelled() }}
@@ -119,4 +100,120 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-${{ github.run_id }}
+          key: ${{ steps.setup.outputs.cargo-key }}
+
+  nextest:
+    name: nextest
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          name: nextest
+          cargo: true
+          free-disk: true
+
+      - name: Build the devshell
+        run: nix develop --command true
+
+      - name: Tests
+        run: nix develop --command just nextest
+
+      - name: Compile cache stats
+        if: ${{ !cancelled() }}
+        run: |
+          nix develop --command sccache --show-stats
+          df -h /
+
+      - name: Save the compile cache
+        if: ${{ github.event_name == 'push' && !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/sccache
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ steps.setup.outputs.cargo-key }}
+
+  qml:
+    name: qml
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up
+        uses: ./.github/actions/setup
+        with:
+          name: qml
+
+      - name: Build the devshell
+        run: nix develop --command true
+
+      - name: QML logic tests
+        run: nix develop --command just qml-test
+
+  design:
+    name: design
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          name: design
+          cargo: true
+          free-disk: true
+
+      - name: Build the devshell
+        run: nix develop --command true
+
+      - name: Design checks
+        run: nix develop --command just design-check
+
+      - name: Compile cache stats
+        if: ${{ !cancelled() }}
+        run: |
+          nix develop --command sccache --show-stats
+          df -h /
+
+      - name: Save the compile cache
+        if: ${{ github.event_name == 'push' && !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/sccache
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ steps.setup.outputs.cargo-key }}
+
+  # Always runs: a required check that is skipped counts as passed, so this
+  # one runs on the others' failure or cancellation too, and fails.
+  check:
+    name: check (x86_64-linux)
+    needs: [flake, lint, nextest, qml, design]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          failed="$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key): \(.value.result)"' <<<"$NEEDS")"
+          if [[ -n $failed ]]; then
+            printf '%s\n' "$failed" >&2
+            exit 1
+          fi
