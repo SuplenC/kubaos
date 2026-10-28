@@ -292,18 +292,18 @@ fn text_scrolled_past_its_scroll_is_not_clipped_but_past_a_box_inside_it_is() {
     };
     let line = |y: f32| text("Install", natural, rect(0.0, y, 60.0, 20.0));
     let scrolled = with(
-        Node::new(Role::Scroll, rect(0.0, 0.0, 100.0, 40.0)),
+        Node::new(Role::Scroll { reach: None }, rect(0.0, 0.0, 100.0, 40.0)),
         vec![with(
             Node::new(Role::Box, rect(0.0, 0.0, 100.0, 80.0)),
             vec![line(0.0), line(60.0)],
         )],
     );
     let boxed = with(
-        Node::new(Role::Scroll, rect(0.0, 0.0, 100.0, 40.0)),
+        Node::new(Role::Scroll { reach: None }, rect(0.0, 0.0, 100.0, 40.0)),
         vec![with(Node::new(Role::Box, rect(0.0, 0.0, 48.0, 80.0)), vec![line(0.0)])],
     );
     let too_wide = with(
-        Node::new(Role::Scroll, rect(0.0, 0.0, 40.0, 40.0)),
+        Node::new(Role::Scroll { reach: None }, rect(0.0, 0.0, 40.0, 40.0)),
         vec![with(Node::new(Role::Box, rect(0.0, 0.0, 100.0, 80.0)), vec![line(0.0)])],
     );
 

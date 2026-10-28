@@ -23,6 +23,11 @@ import qs.services
 Item {
     id: root
 
+    // The room between the tab and the tabs above it, and the panel's edge below it, which its
+    // scroll reaches into.
+    property alias roomAbove: pane.roomAbove
+    property alias roomBelow: pane.roomBelow
+
     // "us", "us(intl)": the layouts as `kubaos keyboard show` spells them.
     property var layouts: []
     // Every layout and variant's name by its spelling.
@@ -275,7 +280,7 @@ Item {
 
     // The tab's content, scrolled when a short screen leaves it less room than two layouts and the
     // toolbar need; otherwise exactly the room it has.
-    Flickable {
+    K.Scroll {
         id: pane
 
         // The well round `rows` rows: its padding, the rows, the toolbar, and the gaps between them.
@@ -285,14 +290,12 @@ Item {
 
         // The well at its smallest: two rows.
         readonly property real fewest: pane.around(2)
-        // The room the well may take, above the problem when there is one.
-        readonly property real room: pane.contentHeight - (note.visible ? K.Tokens.space.s12 + note.height : 0)
+        // The problem under the well, and the gap above it, when there is one.
+        readonly property real noteRoom: note.visible ? K.Tokens.space.s12 + note.height : 0
+        // The room the well may take, above the problem: all the tab has, or two rows' worth.
+        readonly property real room: Math.max(pane.height, pane.fewest + pane.noteRoom) - pane.noteRoom
 
         anchors.fill: parent
-        contentWidth: width
-        contentHeight: Math.max(height, pane.fewest + (note.visible ? K.Tokens.space.s12 + note.height : 0))
-        interactive: contentHeight > height
-        boundsBehavior: Flickable.StopAtBounds
 
         Well {
             id: well

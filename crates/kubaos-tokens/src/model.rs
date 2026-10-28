@@ -87,7 +87,8 @@ pub struct Focus {
     pub far: u16,
     /// The far glow's opacity at the tube.
     pub far_opacity: f32,
-    /// The band a page's scroll reaches past its box, in logical pixels.
+    /// The band a picture keeps round itself inside its own box where its neighbours leave no
+    /// more room, in logical pixels.
     pub offset: u16,
 }
 

@@ -10,17 +10,21 @@ use iced_runtime::UserInterface;
 use iced_runtime::user_interface;
 use kubaos_geometry::Frame;
 use kubaos_geometry::Node;
+use kubaos_geometry::Reach;
 use kubaos_geometry::Role;
 use kubaos_geometry::Rule;
 use kubaos_geometry::Rules;
 
 use super::Collect;
 use crate::component::field::field;
+use crate::layout::Extent;
 use crate::layout::stack;
 use crate::look::Look;
 use crate::scale::Scale;
+use crate::scroll::scroll;
 use crate::tokens;
 use crate::tokens::Mode;
+use crate::tokens::Size as SizeToken;
 use crate::tokens::Space;
 
 /// `view`'s geometry tree, laid out headless `width` wide.
@@ -108,4 +112,42 @@ fn a_plain_field_forty_one_tall_fails_the_geometry_check() {
         .collect();
 
     assert!(broken.contains(&Rule::ScaleGrid), "{broken:?}");
+}
+
+#[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "Layout puts boxes on whole device pixels, so the sizes are exact: any difference is the bug."
+)]
+fn a_pages_scroll_is_reported_as_its_box_with_how_far_it_reaches() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let glow = f32::from(tokens::FOCUS_FAR);
+
+    let root = tree(
+        stack(&look, Space::S8)
+            .push(
+                scroll(&look, field::<()>("Kuba", "Your name").view(&look))
+                    .height(Extent::Fixed(SizeToken::Log))
+                    .room_above(Space::S12),
+            )
+            .into(),
+    );
+
+    let page = root
+        .children
+        .iter()
+        .find(|node| matches!(node.role, Role::Scroll { .. }))
+        .unwrap_or_else(|| panic!("no scroll in {root:#?}"));
+    assert_eq!(
+        page.role,
+        Role::Scroll {
+            reach: Some(Reach {
+                above: f32::from(Space::S12.px()),
+                below: glow,
+                left: glow,
+            })
+        }
+    );
+    assert_eq!(page.bounds.height, f32::from(SizeToken::Log.px()));
+    assert_eq!(page.bounds.width, root.bounds.width);
 }

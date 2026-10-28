@@ -152,6 +152,8 @@ K.Sheet {
         y: header.y + header.height + K.Tokens.space.s16
         width: root.contentWidth - root.bodyInset * 2
         height: root.contentHeight - y - root.pad
+        roomAbove: K.Tokens.space.s16
+        roomBelow: root.pad
         visible: root.settingsOpen
         onBack: root.pick(root.lastFolder)
     }

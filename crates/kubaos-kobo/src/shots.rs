@@ -698,3 +698,58 @@ fn done_frames() {
         take(crate::view::view(&app), &look, "done", Some(&path), app.now);
     }
 }
+
+/// Every box in `node`'s tree, `node` first.
+fn boxes(node: &kubaos_geometry::Node) -> Vec<&kubaos_geometry::Node> {
+    let mut all = vec![node];
+    for child in &node.children {
+        all.extend(boxes(child));
+    }
+    all
+}
+
+/// The Wallpapers page's note on how many are picked sits in the footer, just left of Continue
+/// and level with it, below everything the page's scroll reaches: nothing loose under its cut.
+#[test]
+fn wallpapers_note_sits_in_the_footer_beside_continue() {
+    use kubaos_geometry::Role;
+    load_fonts();
+    let mut app = app_with(Ok(demo_probe()));
+    let _ = app.go(Screen::Wallpapers);
+    settle_app(&mut app);
+    let look = app.look();
+    let frame = take(crate::view::view(&app), &look, "install-wallpapers", None, app.now);
+    let all = boxes(&frame.root);
+    let text = |says: &dyn Fn(&str) -> bool| {
+        all.iter()
+            .find(|n| matches!(&n.role, Role::Text { content, .. } if says(content)))
+            .map(|n| n.bounds)
+    };
+    let note = text(&|t| t.ends_with(" picked.")).expect("the note on how many are picked");
+    let next = text(&|t| t == "Continue").expect("Continue");
+    let (scroll, reach) = all
+        .iter()
+        .find_map(|n| match &n.role {
+            Role::Scroll { reach: Some(reach) } => Some((n.bounds, *reach)),
+            _ => None,
+        })
+        .expect("the page's scroll, with its reach");
+
+    assert!(
+        note.y >= scroll.y + scroll.height + reach.below,
+        "the note at {note:?} is under the scroll at {scroll:?}, which reaches {reach:?}"
+    );
+    let centre = |r: kubaos_geometry::Rect| r.y + r.height / 2.0;
+    assert!(
+        (centre(note) - centre(next)).abs() <= 1.0,
+        "the note at {note:?} is not level with Continue at {next:?}"
+    );
+    assert!(
+        note.x + note.width < next.x,
+        "the note at {note:?} is not left of Continue at {next:?}"
+    );
+    assert!(
+        next.x - (note.x + note.width) <= f32::from(Space::S40.px()),
+        "the note at {note:?} is not beside Continue at {next:?}"
+    );
+}

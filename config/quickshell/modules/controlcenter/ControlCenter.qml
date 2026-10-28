@@ -158,10 +158,16 @@ K.Sheet {
     // The tabs and their list, in the room the sections above leave, the container padding in
     // from the panel's edges.
     Item {
+        id: tabs
+
+        // The gap between the tabs and the tab, and the room between the tab and the panel's edge.
+        readonly property int gap: K.Tokens.space.s12
+        readonly property int foot: K.Tokens.space.s16
+
         x: body.padding
         y: body.height
         width: root.contentWidth - body.padding * 2
-        height: Math.max(0, root.height - y - K.Tokens.space.s16)
+        height: Math.max(0, root.height - y - tabs.foot)
 
         K.Tabs {
             id: tabBar
@@ -172,21 +178,18 @@ K.Sheet {
             onPicked: index => root.tab = index
         }
 
-        // Clipped `focus.offset` outside the tab's room: a list taller than the room the sections
-        // leave on a short screen is cut there, rather than drawn over them, a focused control's
-        // glow with it.
+        // The tab's room has no edge of its own, so it doesn't clip: a focused control's glow
+        // reaches past it to the panel's own edge. A tab that scrolls on a short screen reaches
+        // its scroll to the tabs and the panel's edge.
         Item {
-            x: -K.Tokens.focus.offset
-            y: tabBar.height + K.Tokens.space.s12 - K.Tokens.focus.offset
-            width: parent.width + K.Tokens.focus.offset * 2
-            height: Math.max(0, parent.height - y + K.Tokens.focus.offset)
-            clip: true
+            y: tabBar.height + tabs.gap
+            width: parent.width
+            height: Math.max(0, parent.height - y)
 
             WifiList {
                 id: wifi
 
                 anchors.fill: parent
-                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 0
             }
 
@@ -194,19 +197,18 @@ K.Sheet {
                 id: bluetooth
 
                 anchors.fill: parent
-                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 1
             }
 
             OutputList {
                 anchors.fill: parent
-                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 2
             }
 
             KeyboardList {
                 anchors.fill: parent
-                anchors.margins: K.Tokens.focus.offset
+                roomAbove: tabs.gap
+                roomBelow: tabs.foot
                 visible: root.tab === 3
             }
         }

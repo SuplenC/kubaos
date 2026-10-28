@@ -132,6 +132,9 @@ use crate::theme::jp;
 use crate::ui;
 use crate::ui::El;
 
+/// The room between a screen's body and the footer under it.
+const FOOTER_GAP: Space = Space::S16;
+
 /// The glass panel's rectangle in a window `win` logical pixels big, at `scale`: inset from the
 /// window's edges, and never wider than the rail beside two columns of text with the page's
 /// insets, so lines don't get silly on a big output. Its edges are on device pixels.
@@ -525,7 +528,7 @@ fn content<'a>(app: &'a App, look: &Look) -> El<'a> {
         .height(Extent::Fill)
         .push(widget::container(body).height(Length::Fill));
     if !matches!(app.screen, Screen::Installing | Screen::Failed | Screen::Summary) {
-        page = page.push(gap(Space::S16)).push(footer(app, look));
+        page = page.push(gap(FOOTER_GAP)).push(footer(app, look));
     }
     // The page slides in from the side it comes from, a whole device pixel at a time.
     let travel = look
@@ -571,6 +574,8 @@ fn footer<'a>(app: &'a App, look: &Look) -> El<'a> {
                 .push(icon(look, Icon::Error, IconSize::S16, colour))
                 .push(text(b, Type::Small, colour)),
         );
+    } else if let Some(note) = footer_note(app) {
+        r = r.push(text(note, Type::Small, c.on_surface_variant));
     }
     if app.screen != Screen::Summary {
         r = r.push(
@@ -582,6 +587,22 @@ fn footer<'a>(app: &'a App, look: &Look) -> El<'a> {
         );
     }
     r.into()
+}
+
+/// What the footer says beside Continue when nothing blocks it: on Wallpapers, how many are
+/// picked. It sits here rather than under the page's scroll, so the scroll runs down to the
+/// footer with nothing loose under its cut. With none picked, the blocker says so instead.
+fn footer_note(app: &App) -> Option<String> {
+    if app.screen != Screen::Wallpapers {
+        return None;
+    }
+    let sets = app.wallpaper_sets();
+    let total: u32 = sets.iter().map(|s| s.images).sum();
+    match app.form.wallpapers_picked(sets) {
+        0 => None,
+        n if n == total => Some(format!("All {total} picked.")),
+        n => Some(format!("{n} of {total} picked.")),
+    }
 }
 
 // -------------------------------------------------------------- screens --
@@ -953,7 +974,8 @@ fn account<'a>(app: &'a App, look: &Look) -> El<'a> {
         ),
     );
     // The title stays put; only the fields scroll (src/reveal.rs).
-    stack(look, Space::S32)
+    let apart = Space::S32;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(header(
             look,
@@ -971,7 +993,9 @@ fn account<'a>(app: &'a App, look: &Look) -> El<'a> {
                     .push(widget::container(passwords).id(ids::REVEAL_PASSWORDS)),
             )
             .id(ids::ACCOUNT_SCROLL)
-            .height(Extent::Fill),
+            .height(Extent::Fill)
+            .room_above(apart)
+            .room_below(FOOTER_GAP),
         )
         .into()
 }
@@ -1205,7 +1229,8 @@ fn disk<'a>(app: &'a App, look: &Look) -> El<'a> {
     }
     sections = sections.push(disk_encryption(app, look));
     // The title stays put; only what's under it scrolls (src/reveal.rs).
-    stack(look, Space::S20)
+    let apart = Space::S20;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(header(
             look,
@@ -1213,7 +1238,13 @@ fn disk<'a>(app: &'a App, look: &Look) -> El<'a> {
             "Where it goes",
             "Pick a disk, then decide whether whatever's on it gets to live.",
         ))
-        .push(scroll(look, sections).id(ids::DISK_SCROLL).height(Extent::Fill))
+        .push(
+            scroll(look, sections)
+                .id(ids::DISK_SCROLL)
+                .height(Extent::Fill)
+                .room_above(apart)
+                .room_below(FOOTER_GAP),
+        )
         .into()
 }
 
@@ -1420,9 +1451,8 @@ pub fn wallpapers_summary(
 }
 
 fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
-    let c = look.colors;
     let sets = app.wallpaper_sets();
-    let mut sections = stack(look, Space::S40).padding(Inset::NONE.right(Space::S16).bottom(Space::S16));
+    let mut sections = stack(look, Space::S40).padding(Inset::NONE.right(Space::S16));
     for (s, set) in sets.iter().enumerate() {
         let cards = (0..set.files.len()).map(|i| wallpaper_card(app, s, i, look));
         sections = sections.push(
@@ -1431,14 +1461,8 @@ fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
                 .push(grid(look, WALLPAPER_COLUMNS as u16, Space::S16).extend(cards)),
         );
     }
-    let total: u32 = sets.iter().map(|s| s.images).sum();
-    let picked = app.form.wallpapers_picked(sets);
-    let note = match picked {
-        0 => "None picked. The picker needs at least one to start on.".to_string(),
-        n if n == total => format!("All {total} picked."),
-        n => format!("{n} of {total} picked."),
-    };
-    stack(look, Space::S20)
+    let apart = Space::S20;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(header(
             look,
@@ -1448,8 +1472,13 @@ fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
              either way (later: ~/.config/kubaos/desktop/wallpapers/sets). Your own images go in \
              ~/Pictures/wallpapers.",
         ))
-        .push(scroll(look, sections).id(ids::WALLPAPER_SCROLL).height(Extent::Fill))
-        .push(text(note, Type::Small, c.on_surface_variant))
+        .push(
+            scroll(look, sections)
+                .id(ids::WALLPAPER_SCROLL)
+                .height(Extent::Fill)
+                .room_above(apart)
+                .room_below(FOOTER_GAP),
+        )
         .into()
 }
 
@@ -1559,7 +1588,8 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
         );
     }
 
-    stack(look, Space::S20)
+    let apart = Space::S20;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(top)
         .push(
@@ -1576,7 +1606,9 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
                 .padding(Inset::NONE.right(Space::S16).padding()),
             )
             .id(ids::SUMMARY_SCROLL)
-            .height(Extent::Fill),
+            .height(Extent::Fill)
+            .room_above(apart)
+            .room_below(apart),
         )
         // The cards keep a gutter for their scrollbar; the banner ends where they do.
         .push(widget::container(confirm(app, disk, whole, look)).padding(Inset::NONE.right(Space::S16).padding()))

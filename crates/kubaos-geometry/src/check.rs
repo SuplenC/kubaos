@@ -164,7 +164,7 @@ impl Walk<'_> {
         ancestors.push(Ancestor {
             label: label.clone(),
             bounds: node.bounds,
-            scrolls: node.role == Role::Scroll,
+            scrolls: matches!(node.role, Role::Scroll { .. }),
         });
         for (index, child) in node.children.iter().enumerate() {
             let segment = !matches!(node.role, Role::Box);

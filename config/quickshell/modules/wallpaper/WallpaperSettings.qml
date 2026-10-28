@@ -20,8 +20,11 @@ FocusScope {
         }
     ]
     property int current: 0
+    // The room between the rows' box and the tabs above it, and the panel's edge below it.
+    property alias roomAbove: scroll.roomAbove
+    property alias roomBelow: scroll.roomBelow
 
-    implicitHeight: column.implicitHeight + K.Tokens.space.s16
+    implicitHeight: column.implicitHeight
 
     function move(delta: int): void {
         const n = rows.length;
@@ -39,10 +42,10 @@ FocusScope {
             return;
         const top = it.y - K.Tokens.space.s32;
         const bottom = it.y + it.height + K.Tokens.space.s32;
-        if (top < flick.contentY)
-            flick.contentY = Math.max(0, top);
-        else if (bottom > flick.contentY + flick.height)
-            flick.contentY = Math.min(flick.contentHeight - flick.height, bottom - flick.height);
+        if (top < scroll.contentY)
+            scroll.contentY = Math.max(0, top);
+        else if (bottom > scroll.contentY + scroll.height)
+            scroll.contentY = Math.min(scroll.travel, bottom - scroll.height);
     }
 
     onCurrentChanged: Qt.callLater(reveal)
@@ -63,33 +66,15 @@ FocusScope {
         event.accepted = true;
     }
 
-    Flickable {
-        id: flick
+    K.Scroll {
+        id: scroll
 
         anchors.fill: parent
-        contentWidth: width
-        contentHeight: column.implicitHeight + K.Tokens.space.s16
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
 
-        Behavior on contentY {
-            enabled: !flick.moving
-
-            NumberAnimation {
-                duration: K.Tokens.duration.medium
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: K.Tokens.easing.standard
-            }
-        }
-
-        // The rows stand off the flickable's edges by `focus.offset`; the clip cuts a focused
-        // row's glow past that.
         Column {
             id: column
 
-            x: K.Tokens.focus.offset
-            y: K.Tokens.focus.offset
-            width: flick.width - K.Tokens.focus.offset * 2
+            width: parent.width
             spacing: K.Tokens.space.s4
 
             Repeater {

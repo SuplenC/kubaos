@@ -18,6 +18,7 @@ Fill 1.0 Fill.qml
 Gap 1.0 Gap.qml
 Page 1.0 Page.qml
 Container 1.0 Container.qml
+Scroll 1.0 Scroll.qml
 Header 1.0 Header.qml
 Section 1.0 Section.qml
 Divider 1.0 Divider.qml

@@ -91,6 +91,7 @@ use kubaos_ui::layout::Inset;
 use kubaos_ui::layout::fill;
 use kubaos_ui::layout::grid;
 use kubaos_ui::layout::row;
+use kubaos_ui::layout::scroll;
 use kubaos_ui::layout::section;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
@@ -169,6 +170,12 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             "Lists",
             Some("Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is."),
             lists(look),
+        ))
+        .push(section(
+            look,
+            "Page scroll",
+            Some("A page's or a panel's content taller than its room. It has no edge of its own, so it reaches past its box into the room around it, as far as a glow does and up to the text above it, with its content that far in: the focused button at its top keeps its whole glow, and what runs past that room is cut there."),
+            page_scroll(look),
         ))
         .push(section(look, "Chips", None, chips(look)))
         .push(section(
@@ -658,6 +665,24 @@ fn lists<'a>(look: &Look) -> Element<'a, Message> {
         .push(list(look, power, false))
         .push(list(look, tiled, false))
         .push(list(look, radios, false))
+        .into()
+}
+
+/// Every kind of button, twice, in a page's scroll a log tall: more than it shows, the first
+/// focused at its top edge.
+fn page_scroll<'a>(look: &Look) -> Element<'a, Message> {
+    let mut content = stack(look, Space::S8);
+    for (i, kind) in Kind::ALL.into_iter().chain(Kind::ALL).enumerate() {
+        // The first is focused, STATES' fourth; the rest are resting.
+        let state = if i == 0 { 3 } else { 0 };
+        content = content.push(button_in(look, kind, ButtonSize::Md, state));
+    }
+    grid(look, 3, Space::S24)
+        .push(
+            scroll(look, content)
+                .height(Extent::Fixed(Size::Log))
+                .room_above(Space::S16),
+        )
         .into()
 }
 
