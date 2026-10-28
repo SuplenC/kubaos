@@ -189,6 +189,7 @@ fn item(id: &str, shown: Shown) -> Item {
             .to_vec(),
         hidden: false,
         app_only: false,
+        weak_keywords: Vec::new(),
         actions: actions(shown),
     }
 }

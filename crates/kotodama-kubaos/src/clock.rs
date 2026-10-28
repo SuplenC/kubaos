@@ -126,6 +126,7 @@ fn live_result(query: &str, answer: &Answer) -> LiveResult {
             keywords: vec![],
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: vec![
                 Action::new(COPY, "Copy Answer"),
                 Action::new(COPY_ISO, "Copy as ISO").shortcut("ctrl+enter"),

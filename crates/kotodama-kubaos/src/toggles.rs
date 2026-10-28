@@ -236,6 +236,7 @@ impl Toggle {
             keywords: self.keywords().iter().map(|&keyword| keyword.to_owned()).collect(),
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: self.actions(),
         }
     }
@@ -400,6 +401,7 @@ fn device_list(runner: &impl Runner, direction: Direction) -> Result<Ran, String
             keywords: Vec::new(),
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: vec![Action::new(USE, "Use")],
         })
         .collect();

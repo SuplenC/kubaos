@@ -131,6 +131,7 @@ fn item(drive: &Drive) -> Item {
             .to_vec(),
         hidden: false,
         app_only: false,
+        weak_keywords: Vec::new(),
         actions: vec![Action::new(EJECT, "Eject")],
     }
 }

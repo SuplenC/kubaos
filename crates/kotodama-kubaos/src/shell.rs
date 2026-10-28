@@ -131,6 +131,7 @@ pub fn items() -> Vec<Item> {
             keywords: setting.keywords.iter().map(|word| (*word).to_owned()).collect(),
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: vec![
                 Action::new(TOGGLE, setting.toggle),
                 Action::new(ON, "Turn on"),

@@ -258,6 +258,7 @@ fn answer(topic: Topic, sample: &Sample) -> LiveResult {
             keywords: vec![],
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: vec![
                 Action::new(OPEN, "Open System Monitor"),
                 Action::new(COPY, "Copy Answer").shortcut("ctrl+c"),
@@ -374,6 +375,7 @@ fn process_result(group: &processes::Group, query: &str, first: &str) -> LiveRes
             keywords: vec![],
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions,
         },
         score: Fraction::new(score).unwrap_or_else(|_| certain()),

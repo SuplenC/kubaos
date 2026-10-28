@@ -118,6 +118,7 @@ fn item(layout: &Layout, name: &str) -> Item {
         keywords: vec![spelled, layout.layout.clone()],
         hidden: false,
         app_only: true,
+        weak_keywords: Vec::new(),
         actions: vec![Action::new(ADD, "Add")],
     }
 }

@@ -274,6 +274,7 @@ impl Entry {
             keywords: self.keywords.clone(),
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: vec![action],
         }
     }

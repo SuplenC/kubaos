@@ -53,6 +53,7 @@ pub fn item() -> Item {
         .to_vec(),
         hidden: false,
         app_only: false,
+        weak_keywords: Vec::new(),
         actions: vec![Action::new(SHOW, "Show")],
     }
 }
@@ -79,6 +80,7 @@ pub fn view(rows: &[Row]) -> View {
             keywords: Vec::new(),
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: Vec::new(),
         })
         .collect();

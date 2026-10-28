@@ -1905,6 +1905,15 @@ Name=Google Chrome
 GenericName=Web Browser
 Exec=true %U
 DESKTOP
+  # A Chrome web app: the browser's name is the first word of its desktop id, which finds it
+  # for "chrome" but never ranks it with the browser.
+  local webapp="${chrome%/*}/chrome-aghfnjkcajfp-Default.desktop"
+  install -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/stdin "$webapp" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Harness Mail
+Exec=true %U
+DESKTOP
   rm -f "$no_greeting"
   session_start sway 1280x720 1
   : >"$log"
@@ -1940,6 +1949,12 @@ DESKTOP
     echo "ok   typing 'chrome' lists the Chrome app first, then its removal, and no install:$ranked"
   else
     echo "FAIL typing 'chrome' with Chrome installed lists:$ranked"
+    bad=1
+  fi
+  if [[ $ranked == " apps/google-chrome "* && $ranked == *" apps/chrome-"* ]]; then
+    echo "ok   a Chrome web app is found by its desktop id, but ranks below the browser:$ranked"
+  else
+    echo "FAIL typing 'chrome' ranks a web app, found by its desktop id, with the browser:$ranked"
     bad=1
   fi
   printf 'chrome=off\n' >"$groups.new"
@@ -2173,6 +2188,7 @@ TOML
   if [[ -e $kb_saved ]]; then mv "$kb_saved" "$kb"; else rm -f "$kb"; fi
   if [[ -e $groups_saved ]]; then mv "$groups_saved" "$groups"; else rm -f "$groups"; fi
   if [[ -e $chrome_saved ]]; then mv "$chrome_saved" "$chrome"; else rm -f "$chrome"; fi
+  rm -f "$webapp"
   if [[ -e $kbset_saved ]]; then mv "$kbset_saved" "$kbset"; else rm -f "$kbset"; fi
   ((greeting_was_off)) || rm -f "$no_greeting"
   rm -f "$drives"
