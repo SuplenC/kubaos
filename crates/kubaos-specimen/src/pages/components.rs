@@ -853,9 +853,9 @@ fn tab_rows<'a>(look: &Look) -> Element<'a, Message> {
     let motion = [Tab::new("Always"), Tab::new("On AC"), Tab::new("Never")];
     row(look, Space::S32)
         .center()
-        .push(tabs(look, &views, 0, |_| Message::Sample, false))
-        .push(tabs(look, &tools, 1, |_| Message::Sample, true))
-        .push(tabs(look, &motion, 1, |_| Message::Sample, false))
+        .push(tabs(&views, 0, |_| Message::Sample).view(look))
+        .push(tabs(&tools, 1, |_| Message::Sample).focused(true).view(look))
+        .push(tabs(&motion, 1, |_| Message::Sample).view(look))
         .into()
 }
 

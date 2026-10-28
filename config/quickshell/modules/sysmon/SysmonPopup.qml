@@ -175,8 +175,6 @@ K.Sheet {
 
                         K.Meter {
                             readonly property real total: Math.max(1, root.s?.memory?.total ?? 1)
-
-                            fillWidth: true
                             parts: [
                                 {
                                     value: (root.s?.memory?.used ?? 0) / total,
@@ -201,7 +199,6 @@ K.Sheet {
 
                         K.Meter {
                             visible: (root.s?.memory?.swapTotal ?? 0) > 0
-                            fillWidth: true
                             parts: [
                                 {
                                     value: (root.s?.memory?.swapUsed ?? 0) / Math.max(1, root.s?.memory?.swapTotal ?? 1),
@@ -241,7 +238,6 @@ K.Sheet {
 
                                 K.Meter {
                                     visible: gpu.modelData.active && gpu.modelData.usage != null
-                                    fillWidth: true
                                     parts: [
                                         {
                                             value: (gpu.modelData.usage ?? 0) / 100,
@@ -306,7 +302,6 @@ K.Sheet {
                                 }
 
                                 K.Meter {
-                                    fillWidth: true
                                     parts: [
                                         {
                                             value: disk.modelData.percent / 100,
@@ -336,7 +331,6 @@ K.Sheet {
 
                         K.Meter {
                             visible: root.s?.battery != null
-                            fillWidth: true
                             parts: [
                                 {
                                     value: (root.s?.battery?.percent ?? 0) / 100,

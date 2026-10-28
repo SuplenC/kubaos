@@ -170,6 +170,7 @@ impl Sparkline {
         }
     }
 
+    /// How tall it is: [`Size::Sparkline`] in a panel, a line of small text inline.
     #[must_use]
     pub fn height(self, height: Extent) -> Self {
         Sparkline { height, ..self }

@@ -44,31 +44,50 @@ impl<'a> Tab<'a> {
     }
 }
 
-/// `choices` side by side, 4 apart, as small buttons: the `picked` one tonal, the rest text. A
-/// press sends `on_pick` with the choice's index. The row is one stop for the keyboard, which
-/// moves the pick with ← and →; while it has the keyboard (`focused`) the ring goes round the
-/// picked one.
-pub fn tabs<'a, M: Clone + 'a>(
-    look: &Look,
-    choices: &[Tab<'a>],
+/// A row of `choices`, the `picked` one showing, built up then drawn with [`Tabs::view`].
+#[derive(Debug)]
+pub struct Tabs<'a, 'c, F> {
+    choices: &'c [Tab<'a>],
     picked: usize,
-    on_pick: impl Fn(usize) -> M,
+    on_pick: F,
     focused: bool,
-) -> Element<'a, M> {
-    let buttons = choices.iter().enumerate().map(|(index, choice)| {
-        let current = index == picked;
-        let kind = if current { Kind::Tonal } else { Kind::Text };
-        let b = button(choice.label)
-            .kind(kind)
-            .size(ButtonSize::Sm)
-            .on_press(on_pick(index))
-            .focused(focused && current);
-        match choice.icon {
-            Some(glyph) => b.icon(glyph),
-            None => b,
-        }
-        .view(look)
-    });
-    let line = row(look, Space::S4).center().extend(buttons);
-    probe::component("Tabs", ["", "", ""], Fixed::HEIGHT, line)
+}
+
+/// `choices` side by side, 4 apart, as small buttons: the `picked` one tonal, the rest text. A
+/// press sends `on_pick` with the choice's index. The row is one stop for the keyboard; its owner
+/// moves the pick with ← and →.
+pub fn tabs<'a, 'c, M, F: Fn(usize) -> M>(choices: &'c [Tab<'a>], picked: usize, on_pick: F) -> Tabs<'a, 'c, F> {
+    Tabs {
+        choices,
+        picked,
+        on_pick,
+        focused: false,
+    }
+}
+
+impl<'a, M: Clone + 'a, F: Fn(usize) -> M> Tabs<'a, '_, F> {
+    /// Whether the row has the keyboard: the focus ring goes round the picked one.
+    #[must_use]
+    pub fn focused(self, focused: bool) -> Self {
+        Tabs { focused, ..self }
+    }
+
+    pub fn view(self, look: &Look) -> Element<'a, M> {
+        let buttons = self.choices.iter().enumerate().map(|(index, choice)| {
+            let current = index == self.picked;
+            let kind = if current { Kind::Tonal } else { Kind::Text };
+            let b = button(choice.label)
+                .kind(kind)
+                .size(ButtonSize::Sm)
+                .on_press((self.on_pick)(index))
+                .focused(self.focused && current);
+            match choice.icon {
+                Some(glyph) => b.icon(glyph),
+                None => b,
+            }
+            .view(look)
+        });
+        let line = row(look, Space::S4).center().extend(buttons);
+        probe::component("Tabs", ["", "", ""], Fixed::HEIGHT, line)
+    }
 }

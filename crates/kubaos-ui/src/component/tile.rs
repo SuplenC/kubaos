@@ -17,6 +17,7 @@ use iced::Element;
 use iced::Length;
 use iced::Shadow;
 use iced::Theme;
+use iced::alignment;
 use iced::widget;
 
 use crate::color;
@@ -46,7 +47,7 @@ const CORNER: Radius = Radius::Control;
 
 /// A tile reading `title`, built up then drawn with [`Tile::view`].
 #[derive(Debug)]
-pub struct Tile<'a, M> {
+pub struct Tile<M> {
     glyph: Icon,
     title: String,
     subtitle: String,
@@ -54,12 +55,11 @@ pub struct Tile<'a, M> {
     on_press: Option<M>,
     on_detail: Option<M>,
     focused: bool,
-    _text: std::marker::PhantomData<&'a str>,
 }
 
 /// A tile showing `glyph` and `title`, off. It is as tall as a two-line row, its two lines one
 /// line each, ending in an ellipsis where they don't fit.
-pub fn tile<'a, M>(glyph: Icon, title: impl Into<String>) -> Tile<'a, M> {
+pub fn tile<M>(glyph: Icon, title: impl Into<String>) -> Tile<M> {
     Tile {
         glyph,
         title: title.into(),
@@ -68,11 +68,10 @@ pub fn tile<'a, M>(glyph: Icon, title: impl Into<String>) -> Tile<'a, M> {
         on_press: None,
         on_detail: None,
         focused: false,
-        _text: std::marker::PhantomData,
     }
 }
 
-impl<'a, M: Clone + 'a> Tile<'a, M> {
+impl<M: Clone> Tile<M> {
     /// The status line under the title: the network, "Off", "2 connected".
     #[must_use]
     pub fn subtitle(self, subtitle: impl Into<String>) -> Self {
@@ -106,12 +105,16 @@ impl<'a, M: Clone + 'a> Tile<'a, M> {
         }
     }
 
+    /// Whether the keyboard is on it: the focus ring goes round it.
     #[must_use]
     pub fn focused(self, focused: bool) -> Self {
         Tile { focused, ..self }
     }
 
-    pub fn view(self, look: &Look) -> Element<'a, M> {
+    pub fn view<'a>(self, look: &Look) -> Element<'a, M>
+    where
+        M: 'a,
+    {
         let c = look.colors;
         let enabled = self.on_press.is_some();
         let (fill, content, muted, glyph_colour) = if !enabled {
@@ -137,20 +140,24 @@ impl<'a, M: Clone + 'a> Tile<'a, M> {
             .width(Extent::Fill)
             .push(line(self.title, Type::BodyStrong, content))
             .push(line(self.subtitle, Type::Small, muted));
-        let mut parts = row(look, Space::S12)
+        let parts = row(look, Space::S12)
             .center()
             .width(Extent::Fill)
             .height(Extent::Fill)
             .push(icon(look, self.glyph, Type::BodyStrong.icon(), glyph_colour))
             .push(words);
         let detail = self.on_detail.is_some();
-        if let Some(message) = self.on_detail {
-            parts = parts.push(arrow(look, message, glyph_colour, enabled));
-        }
+        // The words end before the arrow and its inset, or at the tile's own inset.
+        let inset = Inset::x(Space::S12).padding();
+        let end = if detail {
+            inset.right * 2.0 + f32::from(Size::ControlSm.px())
+        } else {
+            inset.right
+        };
         let pressable = widget::button(parts)
             .width(Length::Fill)
             .height(f32::from(Size::RowTwoLine.px()))
-            .padding(Inset::x(Space::S12).padding())
+            .padding(iced::Padding { right: end, ..inset })
             .on_press_maybe(self.on_press)
             .style(move |_theme: &Theme, _status| widget::button::Style {
                 background: Some(Background::Color(fill)),
@@ -159,8 +166,19 @@ impl<'a, M: Clone + 'a> Tile<'a, M> {
                 shadow: Shadow::default(),
                 snap: true,
             });
-        let layered = layered(pressable, CORNER, content, enabled, None);
-        let view: Element<'a, M> = focus_ring(look, layered, CORNER, self.focused, RingColor::Accent);
+        let mut tile: Element<'a, M> = layered(pressable, CORNER, content, enabled, None);
+        if let Some(message) = self.on_detail {
+            // Over the tile, not in it: the stack hides the pointer from the tile while it is on
+            // the arrow, so only the arrow's own state layer shows there.
+            let over = widget::container(arrow(look, message, glyph_colour, enabled))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .align_x(alignment::Horizontal::Right)
+                .align_y(alignment::Vertical::Center)
+                .padding(Inset::NONE.right(Space::S12).padding());
+            tile = widget::Stack::with_children([tile, over.into()]).into();
+        }
+        let view: Element<'a, M> = focus_ring(look, tile, CORNER, self.focused, RingColor::Accent);
         probe::component(
             "Tile",
             [if detail { "detail" } else { "" }, "", ""],

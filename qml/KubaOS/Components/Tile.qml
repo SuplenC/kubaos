@@ -23,6 +23,8 @@ K.Pressable {
     readonly property color muted: !root.enabled ? root.content : root.checked ? K.Look.alpha(Tokens.color.on_primary, Tokens.opacity.subdued_text) : Tokens.color.on_surface_variant
     // The symbol and the arrow: the content colour while on, quieter while off.
     readonly property color glyph: root.checked || !root.enabled ? root.content : Tokens.color.on_surface_variant
+    // Where the words end: before the arrow and its inset, or at the tile's own inset.
+    readonly property real end: root.expandable ? Tokens.space.s12 * 2 + Tokens.size.control_sm : Tokens.space.s12
     readonly property var probe: ({
             role: "component",
             name: "Tile",
@@ -68,7 +70,7 @@ K.Pressable {
         id: line
 
         x: Tokens.space.s12
-        width: root.width - Tokens.space.s12 * 2
+        width: root.width - Tokens.space.s12 - root.end
         fixedHeight: root.height
         gap: Tokens.space.s12
         align: "centre"
@@ -97,31 +99,33 @@ K.Pressable {
                 maximumLines: 1
             }
         }
+    }
 
-        K.Pressable {
-            id: arrow
+    K.Pressable {
+        id: arrow
 
-            visible: root.expandable
-            implicitWidth: Tokens.size.control_sm
-            implicitHeight: Tokens.size.control_sm
-            activeFocusOnTab: false
-            Accessible.name: `${root.title} settings`
-            onActivated: root.expanded()
+        x: root.width - Tokens.space.s12 - width
+        y: K.Look.snap((root.height - height) / 2, line.dpr)
+        width: Tokens.size.control_sm
+        height: Tokens.size.control_sm
+        visible: root.expandable
+        activeFocusOnTab: false
+        Accessible.name: `${root.title} settings`
+        onActivated: root.expanded()
 
-            K.StateLayer {
-                radius: Tokens.radius.full
-                content: root.glyph
-                hovered: arrow.hovered
-                pressed: arrow.down
-            }
+        K.StateLayer {
+            radius: Tokens.radius.full
+            content: root.glyph
+            hovered: arrow.hovered
+            pressed: arrow.down
+        }
 
-            K.Icon {
-                x: K.Look.snap((arrow.width - width) / 2, line.dpr)
-                y: K.Look.snap((arrow.height - height) / 2, line.dpr)
-                name: "chevron_right"
-                size: Tokens.type.button_small.icon
-                color: root.glyph
-            }
+        K.Icon {
+            x: K.Look.snap((arrow.width - width) / 2, line.dpr)
+            y: K.Look.snap((arrow.height - height) / 2, line.dpr)
+            name: "chevron_right"
+            size: Tokens.type.button_small.icon
+            color: root.glyph
         }
     }
 
