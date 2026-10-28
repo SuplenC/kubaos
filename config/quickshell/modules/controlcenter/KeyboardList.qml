@@ -390,6 +390,7 @@ Item {
                             grabPermissions: PointerHandler.CanTakeOverFromAnything
                             cursorShape: Qt.ClosedHandCursor
                             onActiveChanged: {
+                                root.probe(`drag ${row.index} ${active}`);
                                 if (active) {
                                     root.dragOffset = 0;
                                     root.dropAt = row.index;
