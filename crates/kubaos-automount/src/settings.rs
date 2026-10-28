@@ -40,6 +40,11 @@ impl Settings {
         kubaos_user_layer::config_home().map(Settings::new)
     }
 
+    /// The file whose existence turns automount off.
+    pub fn path(&self) -> &Path {
+        &self.off
+    }
+
     pub fn automount(&self) -> bool {
         !self.off.exists()
     }

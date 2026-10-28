@@ -120,6 +120,42 @@ fn the_upgrade_action_is_listed_while_the_update_check_has_one() {
 }
 
 #[test]
+fn turning_the_greeting_off_swaps_its_pair_in_the_menu() {
+    let config_home = tempfile::tempdir().expect("a config folder");
+    let runtime = tempfile::tempdir().expect("a runtime folder");
+    let mut extension = Spawned::start(
+        Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos"))
+            .env("XDG_CONFIG_HOME", config_home.path())
+            .env("XDG_RUNTIME_DIR", runtime.path()),
+        WAIT,
+    );
+    extension.send(config(
+        r#"
+        [actions.greeting-on]
+        title = "Terminal greeting on"
+        run = ["dot-greeting", "on"]
+        shown_when = { state = "terminal.greeting", is = false }
+        [actions.greeting-off]
+        title = "Terminal greeting off"
+        run = ["dot-greeting", "off"]
+        shown_when = { state = "terminal.greeting", is = true }
+        "#,
+    ));
+    let first: Vec<String> = extension.added().into_iter().map(|item| item.id).collect();
+
+    let zsh = config_home.path().join("kubaos/terminal/zsh");
+    std::fs::create_dir_all(&zsh).expect("make the zsh folder");
+    std::fs::write(zsh.join("no-greeting"), "").expect("turn the greeting off");
+    let removed = extension.removed();
+    let added: Vec<String> = extension.added().into_iter().map(|item| item.id).collect();
+
+    assert!(first.contains(&"greeting-off".to_owned()), "{first:?}");
+    assert!(!first.contains(&"greeting-on".to_owned()), "{first:?}");
+    assert_eq!(added, ["greeting-on"]);
+    assert_eq!(removed, ["greeting-off"]);
+}
+
+#[test]
 fn running_an_action_starts_its_command_and_closes_the_menu() {
     let dir = tempfile::tempdir().unwrap();
     let marker = dir.path().join("ran");

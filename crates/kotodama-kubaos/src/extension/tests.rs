@@ -7,6 +7,8 @@ use kotodama_protocol::NamespacedKind;
 use super::*;
 use crate::fake::FakeBus;
 use crate::fake::FakeRunner;
+use crate::states::Reading;
+use crate::states::States;
 
 fn configured(text: &str) -> Extension<FakeBus, FakeRunner> {
     let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
@@ -304,4 +306,28 @@ fn a_desk_item_comes_before_the_drives_and_goes_to_its_group_through_the_extensi
         extension.runner.launched.borrow()[0].0,
         ["hyprctl", "dispatch", "dot.workspaces.go_to_position(\"1\")"]
     );
+}
+
+#[test]
+fn the_states_choose_which_half_of_a_pair_is_sent() {
+    let mut extension = configured(
+        r#"
+        [actions.chrome-on]
+        title = "Install Google Chrome"
+        run = ["kubaos", "packages", "enable", "chrome"]
+        shown_when = { state = "packages.chrome", is = false }
+        [actions.chrome-off]
+        title = "Remove Google Chrome"
+        run = ["kubaos", "packages", "disable", "chrome"]
+        shown_when = { state = "packages.chrome", is = true }
+        "#,
+    );
+
+    let unknown = ids(&extension);
+    extension.set_states(States::default().with("packages.chrome", Reading::Bool(true)));
+    let installed = ids(&extension);
+
+    assert_eq!(&unknown[..2], ["chrome-off", "chrome-on"]);
+    assert_eq!(installed.first().map(String::as_str), Some("chrome-off"));
+    assert!(!installed.contains(&"chrome-on".to_owned()));
 }

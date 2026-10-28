@@ -9,9 +9,12 @@ license.workspace = true
 kotodama-extension = { workspace = true, features = ["watch"] }
 jiff.workspace = true
 kotodama-protocol.workspace = true
+kubaos-automount.workspace = true
 kubaos-clock.workspace = true
 kubaos-core.workspace = true
+kubaos-files.workspace = true
 kubaos-idle.workspace = true
+kubaos-phone.workspace = true
 kubaos-power.workspace = true
 kubaos-proxy.workspace = true
 kubaos-sysmon.workspace = true

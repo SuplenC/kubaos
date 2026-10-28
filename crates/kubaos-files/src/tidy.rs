@@ -201,6 +201,11 @@ impl Setting {
         }
     }
 
+    /// The file whose existence turns the daily tidy on.
+    pub fn path(&self) -> &Path {
+        &self.on
+    }
+
     pub fn daily(&self) -> bool {
         self.on.exists()
     }

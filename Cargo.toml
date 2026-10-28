@@ -50,7 +50,9 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 kubaos-core = { path = "crates/kubaos-core" }
+kubaos-automount = { path = "crates/kubaos-automount" }
 kubaos-cursor = { path = "crates/kubaos-cursor" }
+kubaos-files = { path = "crates/kubaos-files" }
 kubaos-clock = { path = "crates/kubaos-clock" }
 kubaos-idle = { path = "crates/kubaos-idle" }
 kubaos-power = { path = "crates/kubaos-power" }
