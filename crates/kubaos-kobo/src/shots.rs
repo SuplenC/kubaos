@@ -75,6 +75,21 @@ struct Out {
     /// Where the screenshots go; none, for the geometry check alone.
     shots: Option<PathBuf>,
     frames: Vec<Frame>,
+    /// One renderer for every stop, so its caches carry over. A new one loads every system font
+    /// before it parses an SVG, then parses the SVGs and converts the images again, which was most
+    /// of each install screen's layout: 300 ms of it in the test profile, where a reused one takes
+    /// 4 ms.
+    renderer: Renderer,
+}
+
+impl Out {
+    fn new(shots: Option<PathBuf>) -> Self {
+        Self {
+            shots,
+            frames: Vec::new(),
+            renderer: headless(),
+        }
+    }
 }
 
 fn load_fonts() {
@@ -102,8 +117,15 @@ fn mode_name(mode: Mode) -> &'static str {
 
 /// `view` laid out in [`WINDOW`] at `look`'s scale: its boxes, as the geometry check reads them,
 /// and, when `shot` names a file, its pixels written there, drawn as a frame at `now`.
-fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>, now: Instant) -> Frame {
-    take_scrolled(view, look, page, shot, now, None)
+fn take(
+    renderer: &mut Renderer,
+    view: Element<'_, Message>,
+    look: &Look,
+    page: &str,
+    shot: Option<&Path>,
+    now: Instant,
+) -> Frame {
+    take_scrolled(renderer, view, look, page, shot, now, None)
 }
 
 /// How a shot scrolls a scrollable before it is taken: a shot runs no tasks.
@@ -116,6 +138,7 @@ enum Scrolled {
 
 /// [`take`], with a scrollable scrolled first.
 fn take_scrolled(
+    renderer: &mut Renderer,
     view: Element<'_, Message>,
     look: &Look,
     page: &str,
@@ -123,15 +146,14 @@ fn take_scrolled(
     now: Instant,
     scrolled: Option<Scrolled>,
 ) -> Frame {
-    let mut renderer = headless();
     let factor = look.scale.factor();
-    let mut ui = UserInterface::build(view, WINDOW, user_interface::Cache::default(), &mut renderer);
+    let mut ui = UserInterface::build(view, WINDOW, user_interface::Cache::default(), renderer);
     let offset = match scrolled {
         None => None,
         Some(Scrolled::By(scroll, y)) => Some((scroll, y)),
         Some(Scrolled::Reveal(scroll, item)) => {
             let mut find = Unit(crate::reveal::Find::new(scroll, item));
-            ui.operate(&renderer, &mut find);
+            ui.operate(renderer, &mut find);
             match iced::advanced::widget::Operation::<crate::reveal::Found>::finish(&find.0) {
                 iced::advanced::widget::operation::Outcome::Some(found) => {
                     crate::reveal::target(found).map(|y| (scroll, y))
@@ -145,21 +167,21 @@ fn take_scrolled(
             iced::widget::Id::new(scroll),
             iced::widget::operation::AbsoluteOffset { x: None, y: Some(y) },
         );
-        ui.operate(&renderer, &mut to);
+        ui.operate(renderer, &mut to);
     }
     let mut collect = Collect::new();
-    ui.operate(&renderer, &mut collect);
+    ui.operate(renderer, &mut collect);
     if let Some(path) = shot {
         let mut messages = Vec::new();
         let _ = ui.update(
             &[Event::Window(window::Event::RedrawRequested(now))],
             mouse::Cursor::Unavailable,
-            &mut renderer,
+            renderer,
             &mut clipboard::Null,
             &mut messages,
         );
         ui.draw(
-            &mut renderer,
+            renderer,
             &Theme::Dark,
             &renderer::Style {
                 text_color: look.colors.on_surface,
@@ -289,7 +311,15 @@ fn take_every_look_scrolled(out: &mut Out, name: &str, app: &mut App, scrolled: 
                 .as_ref()
                 .map(|dir| dir.join(format!("{page}-{}-{}x.png", mode_name(mode), scale.factor())));
             let scrolled = scrolled.map(|(scroll, by)| Scrolled::By(scroll, by));
-            let frame = take_scrolled(crate::view::view(app), &look, &page, shot.as_deref(), app.now, scrolled);
+            let frame = take_scrolled(
+                &mut out.renderer,
+                crate::view::view(app),
+                &look,
+                &page,
+                shot.as_deref(),
+                app.now,
+                scrolled,
+            );
             out.frames.push(frame);
         }
     }
@@ -311,6 +341,7 @@ fn take_setup(out: &mut Out, name: &str, s: &mut Setup) {
                 .map(|dir| dir.join(format!("{page}-{}-{}x.png", mode_name(mode), scale.factor())));
             let reveal = Scrolled::Reveal(crate::setup::CARDS_SCROLL, crate::setup::card_item(s.sel));
             let frame = take_scrolled(
+                &mut out.renderer,
                 crate::setup::view(s),
                 &look,
                 &page,
@@ -636,10 +667,7 @@ fn rules() -> Rules {
 
 #[test]
 fn every_screen_keeps_to_the_grid() {
-    let mut out = Out {
-        shots: None,
-        frames: Vec::new(),
-    };
+    let mut out = Out::new(None);
     every_screen(&mut out);
 
     let findings = kubaos_geometry::check(&out.frames, &rules());
@@ -663,10 +691,7 @@ fn shots() {
     };
     let dir = PathBuf::from(dir);
     std::fs::create_dir_all(&dir).expect("create the shots directory");
-    let mut out = Out {
-        shots: Some(dir),
-        frames: Vec::new(),
-    };
+    let mut out = Out::new(Some(dir));
     every_screen(&mut out);
 }
 
@@ -689,13 +714,21 @@ fn done_frames() {
     let mut app = done_app(Duration::from_secs(108));
     settle_app(&mut app);
     let arrived = ago(app.now, Duration::from_secs(5));
+    let mut renderer = headless();
     for frame in 0..4 * fps {
         app.transition.0 = arrived;
         // design-allow(duration): a second divided into the recording's frames, not motion.
         app.now = arrived + Duration::from_secs(1) * frame / fps;
         let look = app.look();
         let path = dir.join(format!("done-{frame:03}.png"));
-        take(crate::view::view(&app), &look, "done", Some(&path), app.now);
+        take(
+            &mut renderer,
+            crate::view::view(&app),
+            &look,
+            "done",
+            Some(&path),
+            app.now,
+        );
     }
 }
 
@@ -718,7 +751,14 @@ fn wallpapers_note_sits_in_the_footer_beside_continue() {
     let _ = app.go(Screen::Wallpapers);
     settle_app(&mut app);
     let look = app.look();
-    let frame = take(crate::view::view(&app), &look, "install-wallpapers", None, app.now);
+    let frame = take(
+        &mut headless(),
+        crate::view::view(&app),
+        &look,
+        "install-wallpapers",
+        None,
+        app.now,
+    );
     let all = boxes(&frame.root);
     let text = |says: &dyn Fn(&str) -> bool| {
         all.iter()
