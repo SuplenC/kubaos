@@ -79,8 +79,8 @@ RUN eval "$(grep -E '^NIX_(VERSION|INSTALL_URL|INSTALL_SHA256)=' /opt/dotfiles/s
 # ---------------------------------------------------------------------------
 # tooling: test-only tools from apt. Nix-only ones (Chromium, which Ubuntu
 # ships only as a snap, and Nix's pamtester for the lock screen's libpam)
-# come from the flake's nixpkgs at warm time. gpu-screen-recorder: not in resolute's archive, and
-# it needs a GPU anyway; wf-recorder records instead. nodejs/npm stand in
+# come from the flake's nixpkgs at warm time. gpu-screen-recorder: not in
+# resolute's archive, and it needs a GPU anyway; wf-recorder records instead. nodejs/npm stand in
 # for the Node that proto installs on the laptop (Mason's npm packages).
 # Plymouth with its X11 renderer and Xvfb draw the boot splash for the
 # `splash` check, which runs the theme in boot, shutdown and reboot mode.

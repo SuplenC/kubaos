@@ -70,7 +70,7 @@ Details are in `docs/INSTALL-INTERNALS.md`, "First boot".
 
 ## What the VM release run verified
 
-Taken 2026-10-17 on the VM bench (screenshots are being retaken):
+Taken 2026-10-17 on the Mac's bench (screenshots are being retaken):
 
 - aarch64 on HVF: keyboard-only GUI install onto an encrypted disk (53 s), GRUB menu, snapshots menu, Plymouth passphrase prompt (wrong try included), first login with setup alone, "Done for now" opens nothing else, factory snapshot boots from GRUB onto its tmpfs overlay up to the desktop.
 - x86_64 under TCG with Secure Boot on: headless install of the `tuxedo` payload, shim and signed GRUB load the theme, first login shows setup only with no keyring prompt, Bitwarden opens floating and centred at 1100x750.

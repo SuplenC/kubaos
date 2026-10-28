@@ -127,9 +127,9 @@
           modules = [ self.homeModules.default ] ++ modules;
         };
 
-      # This checkout's own homes, for the payload build's user and the test
-      # harness (docs/TESTING.md). Installed machines switch their user flake
-      # (~/.config/kubaos/home) instead.
+      # This checkout's own homes, for a switch from the checkout and the test
+      # harness (docs/TESTING.md). Installed machines and the payloads switch
+      # their user flake (~/.config/kubaos/home) instead.
       homeConfigurations =
         let
           home =

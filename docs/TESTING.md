@@ -28,7 +28,7 @@ Before/after screenshots of a UI change don't need Docker: `just shots` renders 
 | `test/run clean` | Remove the harness's containers, keep the volumes |
 | `test/run nuke [--yes]` | `clean`, then delete the harness volumes (asks first) |
 
-`DOTFILES_SRC=/path/to/checkout test/run e2e` tests another copy of the repo, for example a `git worktree` of a branch. The harness scripts themselves are read from that copy (`test/lib/`), so they stay in step with it. 
+`DOTFILES_SRC=/path/to/checkout test/run e2e` tests another copy of the repo, for example a `git worktree` of a branch. The harness scripts themselves are read from that copy (`test/lib/`), so they stay in step with it.
 
 **Limits.** The machine runs its own session and other builds beside the harness, so the container is bounded: `DOTFILES_TEST_MEM` and `DOTFILES_TEST_CPUS` (default 12g and 8 CPUs; the `kubaos` CLI's cargo build gets the same), and Nix in the container builds with `max-jobs` `DOTFILES_TEST_NIX_JOBS` and `cores` `DOTFILES_TEST_NIX_CORES` (default 2 and 4; the cores are also cargo's jobs). `test/run warm` and `test/run e2e` print the container's peak memory (the cgroup's `memory.peak`) at the end, which is what to size `DOTFILES_TEST_MEM` by.
 
@@ -48,13 +48,13 @@ test/run shots stop
 
 | Layer | Holds | Rebuilt when |
 |---|---|---|
-| image stage `base` | `ubuntu:26.04`, user kuba (sudo-rs, zsh), `system/10-strip.sh` and `system/20-base.sh` run for real | `system/lib.sh`, `manifest.sh`, `packages.toml`, `10-strip.sh`, `20-base.sh`, `system/files/{apt,netplan,logind.conf.d}`, `system/files/systemd/{system,user}.conf.d` change |
+| image stage `base` | `ubuntu:26.04`, user kuba (sudo-rs, zsh), `system/10-strip.sh` and `system/20-base.sh` run for real | `system/lib.sh`, `manifest.sh`, `packages.toml`, `10-strip.sh`, `20-base.sh`, `system/files/{apt,netplan,logind.conf.d,proxy}`, the proxy's polkit files, `system/files/systemd/{system,user}.conf.d` change |
 | stage `nix` | Nix from the official installer, version, URL and sha256 read from `system/60-nix.sh`, `--daemon`, flakes on | `system/60-nix.sh` changes (or anything above) |
 | stage `tooling` | apt test tools: sway, swaybg, grim, slurp, wf-recorder, Mesa llvmpipe GL/GLES/EGL, dbus, gnome-keyring, secret-tool, pamtester, shellcheck, lua5.5, hyperfine, jq, expect, cwebp, ImageMagick, Python with requests/cryptography, Node (stand-in for proto's), Plymouth with its X11 renderer and Xvfb | the Dockerfile's package list |
 | stage `desktop` | `system/50-hyprland.sh` and `system/70-bitwarden.sh` run for real: the PPA's Hyprland, held, lock-screen PAM files, `unix_chkpwd` link, bw CLI, pam_u2f lines for sudo/sudo-i/polkit-1 | those two scripts or `system/files/{getty,pam.d,tmpfiles.d,systemd,udev,hyprland-autostart.zsh}` |
 | stage `hyprland` | placeholder, see below | |
 | volume `dotfiles-nix` (`/nix`) | the whole Nix store and database. Docker seeds an empty volume from the image's `/nix` (the bare install) on first use | never by the harness; `test/run nuke` deletes it |
-| the machine's `/nix`, at `/host/nix`, read-only | the development machine's own store, as the first substituter (`local?root=/host&read-only=true&trusted=true`, priority 10, ahead of `kuba-os.cachix.org` and cache.nixos.org): what the machine already built or fetched is copied, not built or downloaded again. Its paths carry no signature, hence `trusted`. Without Nix on the machine an empty folder stands in and the substituter is left out (`nix_settings` in `harness.sh`) | never written |
+| the machine's `/nix`, at `/host/nix`, read-only | the development machine's own store, as the first substituter (`local?root=/host&read-only=true&trusted=true`, priority 10, ahead of `kuba-os.cachix.org` and cache.nixos.org): what the machine already built or fetched is copied, not built or downloaded again. Its paths carry no signature, hence `trusted`. Without Nix on the machine an empty folder stands in and the substituter is left out (`start_nix_daemon` in `harness.sh`; the bounds and the substituter are the daemon's options, so `nix.conf` stays what `system/60-nix.sh` writes). Nix opens it without locks while the machine's own daemon may be writing it, so a query can miss a path the machine added during the run, or fail; a failed substitution falls through to the next substituter | never written |
 | volume `dotfiles-test-cache` | Nix's fetcher and eval caches, Neovim's plugins, Mason tools and treesitter parsers, GC roots for `warm` | `nuke` |
 | volumes `dotfiles-test-cargo`, `dotfiles-test-target` | Cargo's registry and target dirs for the `kubaos` build `test/run e2e` does in `rust:latest`, one target subdirectory per checkout | `nuke` |
 | apt `.deb`s | BuildKit cache mounts on `/var/cache/apt`, `/var/lib/apt` | `docker builder prune` |

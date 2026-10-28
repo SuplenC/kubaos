@@ -55,7 +55,14 @@ nix_() { NIX_REMOTE=daemon "$NIX_BIN/nix" --option cores "$CPUS" --option max-jo
 # ---------------------------------------------------------------------------
 say "nix-daemon"
 rm -f /nix/var/nix/daemon-socket/socket
-"$NIX_BIN/nix-daemon" >/tmp/nix-daemon.log 2>&1 &
+# A payload for another arch builds under QEMU's user-mode emulation
+# (binfmt), which can't load Nix's seccomp filter. Only this build daemon
+# goes without it; the payload's nix.conf keeps it.
+daemon_opts=()
+if [[ -n ${MACHINE_ARCH:-} && $MACHINE_ARCH != "$ARCH" ]]; then
+  daemon_opts=(--option filter-syscalls false)
+fi
+"$NIX_BIN/nix-daemon" ${daemon_opts[@]+"${daemon_opts[@]}"} >/tmp/nix-daemon.log 2>&1 &
 for _ in $(seq 100); do [[ -S /nix/var/nix/daemon-socket/socket ]] && break; sleep 0.1; done
 [[ -S /nix/var/nix/daemon-socket/socket ]] || die "nix-daemon didn't start: $(cat /tmp/nix-daemon.log)"
 

@@ -83,7 +83,7 @@ need_tools() {
   if ((!missing)); then
     qemu="$(readlink -f "$(command -v "qemu-system-$arch")")"
     fw="$(dirname "$(dirname "$qemu")")/share/qemu"
-    [[ -f $fw/edk2-$arch-code.fd ]] || missing=1
+    [[ -f $fw/edk2-$arch-code.fd && -f $fw/$(vars_fd "$arch") ]] || missing=1
   fi
   if ((missing)); then
     command -v nix >/dev/null || die "needs qemu-system-$arch, qemu-img, xorriso and cwebp, or Nix to fetch them"
@@ -94,9 +94,15 @@ need_tools() {
     qemu="$(readlink -f "$(command -v "qemu-system-$arch")")"
     fw="$(dirname "$(dirname "$qemu")")/share/qemu"
   fi
-  [[ -f $fw/edk2-$arch-code.fd ]] || die "no edk2 firmware for $arch in $fw"
+  [[ -f $fw/edk2-$arch-code.fd && -f $fw/$(vars_fd "$arch") ]] || die "no edk2 firmware for $arch in $fw"
   FW="$fw"
 }
+
+# vars_fd ARCH: the name of edk2's empty UEFI variable store for ARCH.
+vars_fd() { case "$1" in aarch64) echo edk2-arm-vars.fd ;; *) echo edk2-i386-vars.fd ;; esac; }
+
+# vm_arch: the arch of the VM in $OUT, else the machine's.
+vm_arch() { cat "$OUT/arch" 2>/dev/null || echo "$HOST_ARCH"; }
 
 # accel ARCH: KVM for a guest of the machine's own arch when /dev/kvm is
 # usable, else TCG, which is slow: meant for occasional correctness checks.
@@ -104,6 +110,7 @@ accel() {
   if [[ $1 == "$HOST_ARCH" && -r /dev/kvm && -w /dev/kvm ]]; then
     printf '%s\n' -accel kvm -cpu host
   else
+    [[ $1 == "$HOST_ARCH" ]] && say "no read and write access to /dev/kvm: running on TCG, which is slow"
     printf '%s\n' -accel tcg,thread=multi -cpu max
   fi
 }
@@ -129,7 +136,8 @@ new_disk() {
 # ensure_ovmf: Ubuntu's Secure Boot OVMF (code + MS-enrolled vars) in cache/ovmf.
 ensure_ovmf() {
   [[ -f $OVMF_DIR/OVMF_CODE_4M.secboot.fd && -f $OVMF_DIR/OVMF_VARS_4M.ms.fd ]] && return 0
-  local tmp
+  local tmp t
+  for t in curl ar zstd; do command -v "$t" >/dev/null || die "fetching Ubuntu's OVMF needs $t"; done
   tmp="$(mktemp -d)"
   say "fetching Ubuntu's OVMF (Secure Boot, MS keys) into $OVMF_DIR"
   curl -fsSL -o "$tmp/ovmf.deb" "$OVMF_DEB_URL" || { rm -rf "$tmp"; die "can't download $OVMF_DEB_URL"; }
@@ -144,8 +152,7 @@ ensure_ovmf() {
 new_vars() {
   local arch="$1" secure="${2:-0}" src
   case "$arch" in
-    aarch64) src="$FW/edk2-arm-vars.fd" ;;
-    x86_64) src="$FW/edk2-i386-vars.fd" ;;
+    aarch64 | x86_64) src="$FW/$(vars_fd "$arch")" ;;
   esac
   if ((secure)); then ensure_ovmf; src="$OVMF_DIR/OVMF_VARS_4M.ms.fd"; fi
   rm -f "$VARS"
@@ -434,7 +441,7 @@ cmd_serial() {
 }
 
 cmd_shot() {
-  need_tools
+  need_tools "$(vm_arch)"
   local name="${1:?shot NAME}" png=0
   [[ ${2:-} == --png ]] && png=1
   mkdir -p "$SHOTS"
@@ -451,7 +458,7 @@ cmd_shot() {
 }
 
 cmd_snapshot() {
-  need_tools
+  need_tools "$(vm_arch)"
   local op="${1:?snapshot save|restore|delete NAME | list}" name="${2:-}"
   [[ $op == list || -n $name ]] || die "snapshot $op NAME"
   if running; then
@@ -478,7 +485,7 @@ cmd_key() { qmp key "$@"; }
 cmd_type() { qmp type "${1:?type TEXT}"; }
 
 cmd_status() {
-  need_tools
+  need_tools "$(vm_arch)"
   if running; then
     echo "running: pid $(cat "$PIDF"), arch $(cat "$OUT/arch"), ssh 127.0.0.1:$SSH_PORT"
   else

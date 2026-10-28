@@ -48,7 +48,7 @@ rc=0
 docker run --rm --name "kubaos-image-check-$ARCH" --platform "linux/$DARCH" --privileged \
   --cpus 6 --memory 8g \
   -v "$VOLUME:/check" -v "$PAYLOAD:/payload" -v "$HERE/lib:/lib-image:ro" \
-  -e KEEP="$KEEP" "$TOOLS" /lib-image/check-inside.sh 2>&1 | tee "$PAYLOAD/check.txt" || rc=$?
+  -e KEEP="$KEEP" -e MACHINE_ARCH="$(uname -m)" "$TOOLS" /lib-image/check-inside.sh 2>&1 | tee "$PAYLOAD/check.txt" || rc=$?
 ((KEEP)) || docker volume rm "$VOLUME" >/dev/null 2>&1 || true
 ((rc)) || sha256sum "$PAYLOAD/manifest.json" | cut -d' ' -f1 >"$PAYLOAD/check.ok"
 exit "$rc"
