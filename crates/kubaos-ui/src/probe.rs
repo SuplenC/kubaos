@@ -45,6 +45,7 @@ pub use kubaos_geometry::Align;
 pub use kubaos_geometry::Axis;
 pub use kubaos_geometry::Fixed;
 use kubaos_geometry::Node;
+pub use kubaos_geometry::Reach;
 use kubaos_geometry::Rect;
 pub use kubaos_geometry::Role;
 
@@ -70,6 +71,8 @@ pub enum Tag {
     Icon(&'static str),
     /// Empty room: a gap, or a fill.
     Spacer { fill: bool },
+    /// A page's scroll, reaching that far past its box.
+    Scroll(Reach),
 }
 
 /// `content`, reported to the geometry check as `tag` says.
@@ -117,6 +120,7 @@ impl Tag {
             },
             Tag::Icon(name) => Role::Icon { name: name.to_owned() },
             Tag::Spacer { fill } => Role::Spacer { fill },
+            Tag::Scroll(reach) => Role::Scroll { reach: Some(reach) },
         }
     }
 }
@@ -404,7 +408,7 @@ impl Operation for Collect {
         _translation: Vector,
         _state: &mut dyn Scrollable,
     ) {
-        self.report(Role::Scroll, bounds, false);
+        self.report(Role::Scroll { reach: None }, bounds, false);
     }
 
     fn text(&mut self, _id: Option<&Id>, bounds: Rectangle, text: &str) {

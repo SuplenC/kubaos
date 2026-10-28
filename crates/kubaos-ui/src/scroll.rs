@@ -48,6 +48,9 @@ use iced::widget::scrollable;
 use crate::layout::Extent;
 use crate::look::Look;
 use crate::look::radius;
+use crate::probe::Reach;
+use crate::probe::Tag;
+use crate::probe::probe;
 use crate::tokens;
 use crate::tokens::Radius;
 use crate::tokens::Size as SizeToken;
@@ -232,8 +235,12 @@ impl<'a, M: 'a> From<Scroll<'a, M>> for Element<'a, M> {
         if let Some(id) = scroll.id {
             inner = inner.id(id);
         }
+        // A set height is the box's, so the room it reaches into is added to it.
         if let Some(height) = scroll.height {
-            inner = inner.height(height.length());
+            inner = inner.height(match (height.length(), scroll.reach) {
+                (Length::Fixed(box_height), Some(reach)) => Length::Fixed(box_height + reach.y()),
+                (length, _) => length,
+            });
         }
         if scroll.anchor_bottom {
             inner = inner.anchor_bottom();
@@ -242,10 +249,20 @@ impl<'a, M: 'a> From<Scroll<'a, M>> for Element<'a, M> {
             inner = inner.on_scroll(moved);
         }
         match scroll.reach {
-            Some(reach) => Element::new(Bleed {
-                content: inner.into(),
-                by: reach,
-            }),
+            Some(reach) => {
+                let tag = Tag::Scroll(Reach {
+                    above: reach.top,
+                    below: reach.bottom,
+                    left: reach.left,
+                });
+                probe(
+                    tag,
+                    Element::new(Bleed {
+                        content: inner.into(),
+                        by: reach,
+                    }),
+                )
+            }
             None => inner.into(),
         }
     }

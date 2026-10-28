@@ -55,10 +55,11 @@ struct Flat<'a> {
     path: String,
 }
 
-/// Every node of `node` but the plain boxes and scrolls (each toolkit scrolls in its own), in
-/// order, each with its depth among the kept ones.
+/// Every node of `node` but the plain boxes and the scrolls held to their box (each toolkit scrolls
+/// a list in its own), in order, each with its depth among the kept ones. A page's scroll is kept,
+/// with how far it reaches.
 fn flatten<'a>(node: &'a Node, depth: usize, path: &str, into: &mut Vec<Flat<'a>>) {
-    if matches!(node.role, Role::Box | Role::Scroll) {
+    if matches!(node.role, Role::Box | Role::Scroll { reach: None }) {
         for child in &node.children {
             flatten(child, depth, path, into);
         }
@@ -154,12 +155,20 @@ pub fn compare(reference: &Frame, other: &Frame, names: (&str, &str)) -> Vec<Dif
     found
 }
 
-/// A role as a difference names it: its label, and a layout's or grid's gap and alignment.
+/// A role as a difference names it: its label, a layout's or grid's gap and alignment, and how far
+/// a page's scroll reaches.
 fn describe(role: &Role) -> String {
     match role {
         Role::Layout { gap, align, .. } => format!("{} gap {gap} {align:?}", role.label()),
         Role::Grid { columns, gap, align } => format!("{} of {columns} gap {gap} {align:?}", role.label()),
         Role::Component { fixed, .. } => format!("{} fixing {fixed:?}", role.label()),
+        Role::Scroll { reach: Some(reach) } => format!(
+            "{} reaching {} above, {} below and {} left",
+            role.label(),
+            reach.above,
+            reach.below,
+            reach.left
+        ),
         _ => role.label(),
     }
 }

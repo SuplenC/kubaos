@@ -20,8 +20,17 @@ Item {
     // How far it can scroll: the content's height less the room it shows.
     readonly property real travel: Math.max(0, flick.contentHeight - flick.height)
     readonly property real reachSides: Tokens.focus.far
+    // In a layout it takes all the room it is given, as iced's scroll does.
+    readonly property bool fillWidth: true
+    // On its right it reaches as iced's does not, past content that runs to its edge, so the
+    // geometry check is told the other three sides.
     readonly property var probe: ({
-            role: "scroll"
+            role: "scroll",
+            reach: {
+                above: root.roomAbove,
+                below: root.roomBelow,
+                left: root.reachSides
+            }
         })
 
     Flickable {

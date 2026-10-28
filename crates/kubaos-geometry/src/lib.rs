@@ -82,8 +82,13 @@ pub enum Role {
     /// placement is not.
     Box,
     /// A box its content scrolls in. Content that runs past it is scrolled out of view, not
-    /// clipped, so the text and icons inside are held to the boxes inside it only.
-    Scroll,
+    /// clipped, so the text and icons inside are held to the boxes inside it only. A page's or a
+    /// panel's scroll, which has no edge of its own, says how far past its box it reaches; a
+    /// scroll held to its box (a list's, in its well) says nothing.
+    Scroll {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reach: Option<Reach>,
+    },
     /// Children one after another along `axis`, `gap` apart, lined up across it by `align`: the
     /// spec's Row and Stack, QML's `RowLayout` and `ColumnLayout`.
     Layout { axis: Axis, gap: f32, align: Align },
@@ -109,7 +114,7 @@ impl Role {
     fn label(&self) -> String {
         match self {
             Role::Box => "Box".to_owned(),
-            Role::Scroll => "Scroll".to_owned(),
+            Role::Scroll { .. } => "Scroll".to_owned(),
             Role::Layout { axis: Axis::X, .. } => "Row".to_owned(),
             Role::Layout { axis: Axis::Y, .. } => "Stack".to_owned(),
             Role::Grid { .. } => "Grid".to_owned(),
@@ -192,6 +197,16 @@ impl Fixed {
         height: false,
         holds: true,
     };
+}
+
+/// How far past its box a page's scroll reaches into the room around it, in logical pixels: above,
+/// below, and on its left. On its right each toolkit reaches as far as its thumb lets it, so the
+/// right is not part of what it says.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Reach {
+    pub above: f32,
+    pub below: f32,
+    pub left: f32,
 }
 
 /// A rectangle in logical pixels.
