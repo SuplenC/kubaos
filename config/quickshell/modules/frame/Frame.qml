@@ -267,11 +267,16 @@ Scope {
                 screen: root.screen
             }
 
+            // The two panels out of the right edge are twins: switching between them keeps the
+            // surface and swaps the content, each coming from the side of its button in the bar,
+            // the bell left of the status pill.
             ControlCenter {
                 id: controlCenter
 
                 frame: geo
                 shown: root.panel === "controlcenter"
+                twin: notificationPanel
+                side: 1
             }
 
             NotificationPanel {
@@ -279,6 +284,8 @@ Scope {
 
                 frame: geo
                 shown: root.panel === "notifications"
+                twin: controlCenter
+                side: -1
             }
 
             ClockPopup {
