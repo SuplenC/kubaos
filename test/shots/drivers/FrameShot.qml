@@ -14,10 +14,11 @@ import qs.modules.frame
 // and public properties only, so the driver works with any version of the panel:
 //   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), bluetooth, bluetooth-code
 //                  (with the history cleared), keyboard
-//   clock: answer (a question typed into the search)
+//   clock: answer (a question typed into the search), settings
 //   sysmon: process (a process's details)
 //   wallpaper: settings
 //   osd: volume, brightness
+//   bar: traymenu (the network item's menu open)
 QtObject {
     id: driver
 
@@ -103,6 +104,20 @@ QtObject {
         }
         if (driver.panel === "controlcenter")
             driver.controlCenter(root);
+        if (driver.panel === "clock" && driver.state === "settings") {
+            const clock = driver.find(root, it => it.page !== undefined && typeof it.land === "function");
+            if (clock)
+                clock.page = "settings";
+            else
+                console.warn("shot: no clock popup found");
+        }
+        if (driver.panel === "bar" && driver.state === "traymenu") {
+            const tray = driver.find(root, it => typeof it.openMenu === "function");
+            if (tray)
+                tray.openMenu(1);
+            else
+                console.warn("shot: no tray found");
+        }
         driver.capture.start();
     }
 

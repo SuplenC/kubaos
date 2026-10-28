@@ -3,6 +3,7 @@ singleton Quickshell 1.0 Quickshell.qml
 singleton ExclusionMode 1.0 ExclusionMode.qml
 singleton Intersection 1.0 Intersection.qml
 singleton PopupAdjustment 1.0 PopupAdjustment.qml
+singleton QsMenuButtonType 1.0 QsMenuButtonType.qml
 Scope 1.0 Scope.qml
 Singleton 1.0 Singleton.qml
 ShellRoot 1.0 Scope.qml
@@ -18,3 +19,5 @@ PopupAnchor 1.0 PopupAnchor.qml
 PopupRect 1.0 PopupRect.qml
 Region 1.0 Region.qml
 Edges 1.0 Edges.qml
+QsMenuOpener 1.0 QsMenuOpener.qml
+QsMenuEntry 1.0 QsMenuEntry.qml
