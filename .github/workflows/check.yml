@@ -16,8 +16,8 @@
 # Fast through three caches, which .github/actions/setup restores:
 # - Cachix (kuba-os.cachix.org), read-only, for what the binary cache workflow
 #   (cache.yml) built from main. No token: a PR never writes to it.
-# - The Nix store (cache-nix-action), keyed by the job and the flake, for the
-#   devshell, the toolchain and the design checks' Qt.
+# - The Nix store (cache-nix-action), keyed by the flake and by what the job
+#   builds, for the devshell, the toolchain and the design checks' Qt.
 # - sccache's directory and cargo's downloads, keyed by the job, Cargo.lock
 #   and flake.lock, for the crates' builds. Incremental builds are off, so
 #   sccache caches every crate.
@@ -79,6 +79,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           name: lint
+          store: devshell
           cargo: true
 
       - name: Build the devshell
@@ -118,6 +119,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           name: nextest
+          store: devshell
           cargo: true
 
       - name: Build the devshell
@@ -154,6 +156,7 @@ jobs:
         uses: ./.github/actions/setup
         with:
           name: nextest-slow
+          store: devshell
           cargo: true
 
       - name: Build the devshell

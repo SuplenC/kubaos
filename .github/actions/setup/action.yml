@@ -2,8 +2,10 @@
 # store from the Actions cache, the kuba-os Cachix read-only, and for the jobs
 # that compile, sccache's directory and cargo's downloads.
 #
-# Each job keeps its own two caches, named by `name`, since each one builds
-# different store paths and different crates. Only a push to main saves them,
+# Each job keeps its own compile cache, named by `name`, since each one builds
+# different crates. The Nix store cache is named by `store`, which jobs that
+# need the same store paths share: a job saving a key another one saved first
+# skips it. Only a push to main saves them,
 # and every PR starts from them: a PR saving its own would push main's out of
 # the repository's 10 GB. A job with no cache of its own yet starts from any
 # job's. The compile cache's key ends in the run, so each push to main saves a
@@ -15,8 +17,11 @@ description: Nix, the Nix store cache, the kuba-os Cachix and the compile cache.
 
 inputs:
   name:
-    description: The job's name in its cache keys.
+    description: The job's name in its compile cache's key.
     required: true
+  store:
+    description: The name in the Nix store cache's key, by default the job's.
+    default: ""
   cargo:
     description: Restore the compile cache.
     default: "false"
@@ -33,7 +38,7 @@ runs:
       id: keys
       shell: bash
       env:
-        NIX: nix-${{ runner.os }}-${{ inputs.name }}-${{ hashFiles('flake.lock', 'flake.nix', 'qml/specimen/package.nix') }}
+        NIX: nix-${{ runner.os }}-${{ inputs.store || inputs.name }}-${{ hashFiles('flake.lock', 'flake.nix', 'qml/specimen/package.nix') }}
         CARGO: cargo-${{ runner.os }}-${{ inputs.name }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}
       run: |
         echo "nix=$NIX" >>"$GITHUB_OUTPUT"
@@ -51,7 +56,7 @@ runs:
       with:
         primary-key: ${{ steps.keys.outputs.nix }}
         restore-prefixes-first-match: |
-          nix-${{ runner.os }}-${{ inputs.name }}-
+          nix-${{ runner.os }}-${{ inputs.store || inputs.name }}-
           nix-${{ runner.os }}-
         gc-max-store-size-linux: 5G
         save: ${{ github.event_name == 'push' }}
