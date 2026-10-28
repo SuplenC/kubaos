@@ -158,7 +158,7 @@ WlSessionLockSurface {
 
         K.Text {
             text: Qt.formatDateTime(clock.date, Time.timeFormat)
-            style: K.Tokens.type.hero_number
+            style: K.Tokens.type.clock
             color: K.Tokens.color.on_surface
         }
 
@@ -176,46 +176,54 @@ WlSessionLockSurface {
             space: K.Tokens.space.s48
         }
 
-        K.Field {
-            id: field
+        // Narrower than the stack: a password needs less room than PAM's and the key's messages
+        // under it, which keep the stack's width so they stay on one line.
+        Item {
+            implicitWidth: K.Tokens.size.password
+            implicitHeight: field.implicitHeight
 
-            icon: root.auth.busy ? "hourglass_top" : "lock"
-            placeholder: root.auth.busy ? "Checking…" : "Password"
-            secret: true
-            status: root.auth.message !== "" ? "Invalid" : "Normal"
-            Component.onCompleted: field.forceActiveFocus()
-            Keys.onEscapePressed: field.text = ""
-            onAccepted: root.auth.submit(field.text)
+            K.Field {
+                id: field
 
-            transform: Translate {
-                id: offset
-            }
+                anchors.fill: parent
+                icon: root.auth.busy ? "hourglass_top" : "lock"
+                placeholder: root.auth.busy ? "Checking…" : "Password"
+                secret: true
+                status: root.auth.message !== "" ? "Invalid" : "Normal"
+                Component.onCompleted: field.forceActiveFocus()
+                Keys.onEscapePressed: field.text = ""
+                onAccepted: root.auth.submit(field.text)
 
-            SequentialAnimation {
-                id: shake
-
-                Jolt {
-                    target: offset
-                    to: K.Tokens.space.s12
+                transform: Translate {
+                    id: offset
                 }
 
-                Jolt {
-                    target: offset
-                    to: -K.Tokens.space.s8
-                }
+                SequentialAnimation {
+                    id: shake
 
-                Jolt {
-                    target: offset
-                    to: K.Tokens.space.s4
-                }
+                    Jolt {
+                        target: offset
+                        to: K.Tokens.space.s12
+                    }
 
-                NumberAnimation {
-                    target: offset
-                    property: "x"
-                    to: 0
-                    duration: K.Tokens.duration.short
-                    easing.type: Easing.BezierSpline
-                    easing.bezierCurve: K.Tokens.easing.standard_decel
+                    Jolt {
+                        target: offset
+                        to: -K.Tokens.space.s8
+                    }
+
+                    Jolt {
+                        target: offset
+                        to: K.Tokens.space.s4
+                    }
+
+                    NumberAnimation {
+                        target: offset
+                        property: "x"
+                        to: 0
+                        duration: K.Tokens.duration.short
+                        easing.type: Easing.BezierSpline
+                        easing.bezierCurve: K.Tokens.easing.standard_decel
+                    }
                 }
             }
         }

@@ -18,7 +18,7 @@
 pub const GRID: u16 = 4;
 
 /// The only font sizes, in logical pixels.
-pub const FONT_SIZES: [u16; 10] = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64];
+pub const FONT_SIZES: [u16; 11] = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80];
 
 /// The display scales every length lands on whole device pixels at.
 pub const SCALES: [f32; 4] = [1.0, 1.25, 1.5, 2.0];
@@ -167,6 +167,7 @@ pub enum Size {
     Keycap,
     Log,
     Panel,
+    Password,
     Progress,
     RadioDot,
     Rail,
@@ -186,7 +187,7 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 26] = [
+    pub const ALL: [Size; 27] = [
         Size::Bar,
         Size::Check,
         Size::Chip,
@@ -198,6 +199,7 @@ impl Size {
         Size::Keycap,
         Size::Log,
         Size::Panel,
+        Size::Password,
         Size::Progress,
         Size::RadioDot,
         Size::Rail,
@@ -229,6 +231,7 @@ impl Size {
             Size::Keycap => 20,
             Size::Log => 232,
             Size::Panel => 384,
+            Size::Password => 320,
             Size::Progress => 8,
             Size::RadioDot => 8,
             Size::Rail => 236,
@@ -330,10 +333,13 @@ impl Weight {
 /// A type style: what a piece of text is drawn with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
+    /// The lock screen's clock, the one thing that screen shows: a step above the hero, light like
+    /// every big figure. The clock popup's time stays the hero's number style.
+    Clock,
     /// Words at the hero size: Kōbō's welcome line, and nothing else.
     Hero,
     /// Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the
-    /// clock.
+    /// clock popup's time.
     HeroNumber,
     /// The heading of a full-screen moment other than the welcome: Kōbō's done screen.
     Display,
@@ -375,7 +381,8 @@ pub enum Type {
 
 impl Type {
     /// Every type style, largest first.
-    pub const ALL: [Type; 20] = [
+    pub const ALL: [Type; 21] = [
+        Type::Clock,
         Type::Hero,
         Type::HeroNumber,
         Type::Display,
@@ -401,6 +408,7 @@ impl Type {
     /// The font size in logical pixels.
     pub const fn size(self) -> u16 {
         match self {
+            Type::Clock => 80,
             Type::Hero => 64,
             Type::HeroNumber => 64,
             Type::Display => 48,
@@ -427,6 +435,7 @@ impl Type {
     /// The line height in logical pixels.
     pub const fn line(self) -> u16 {
         match self {
+            Type::Clock => 88,
             Type::Hero => 72,
             Type::HeroNumber => 72,
             Type::Display => 56,
@@ -454,6 +463,7 @@ impl Type {
     /// here.
     pub const fn icon(self) -> IconSize {
         match self {
+            Type::Clock => IconSize::S48,
             Type::Hero => IconSize::S48,
             Type::HeroNumber => IconSize::S48,
             Type::Display => IconSize::S48,
@@ -480,6 +490,7 @@ impl Type {
     /// The weight.
     pub const fn weight(self) -> Weight {
         match self {
+            Type::Clock => Weight::Light,
             Type::Hero => Weight::Semibold,
             Type::HeroNumber => Weight::Light,
             Type::Display => Weight::Semibold,
@@ -506,6 +517,7 @@ impl Type {
     /// The family.
     pub const fn family(self) -> Family {
         match self {
+            Type::Clock => Family::Sans,
             Type::Hero => Family::Sans,
             Type::HeroNumber => Family::Sans,
             Type::Display => Family::Sans,
@@ -701,7 +713,7 @@ impl Opacity {
             Opacity::OutlineSoft => 0.55,
             Opacity::PanelScrim => 0.2,
             Opacity::Placeholder => 0.55,
-            Opacity::PlaceholderText => 0.8,
+            Opacity::PlaceholderText => 0.85,
             Opacity::Press => 0.14,
             Opacity::Scrim => 0.6,
             Opacity::Selection => 0.32,
@@ -1190,7 +1202,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 36] = [
+pub const CONTRAST: [ContrastPair; 38] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1253,6 +1265,20 @@ pub const CONTRAST: [ContrastPair; 36] = [
         need: Need::Text,
         opacity: Some(Opacity::PlaceholderText),
         purpose: "A field's placeholder",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Text,
+        opacity: Some(Opacity::PlaceholderText),
+        purpose: "A field's placeholder in its resting fill",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerHighest,
+        need: Need::Text,
+        opacity: Some(Opacity::PlaceholderText),
+        purpose: "A field's placeholder while it is focused or hovered",
     },
     ContrastPair {
         fg: Role::Primary,

@@ -31,7 +31,8 @@ pub fn view<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         Page::Type => (
             "書体",
             "Geist for the interface, Geist Mono for anything typed or read by a machine, M PLUS 1 for \
-             the Japanese accents. Ten sizes, 64 for the hero alone; every line height a multiple of 4.",
+             the Japanese accents. Eleven sizes, 64 for the hero and 80 for the lock screen's clock \
+             alone; every line height a multiple of 4.",
         ),
         Page::Colour => (
             "色",

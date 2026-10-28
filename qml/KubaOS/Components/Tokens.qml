@@ -22,7 +22,7 @@ QtObject {
         // logical pixels.
         readonly property int grid: 4
         // The only font sizes, in logical pixels.
-        readonly property list<int> font_sizes: [11, 12, 13, 14, 16, 20, 24, 32, 48, 64]
+        readonly property list<int> font_sizes: [11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80]
         // The display scales every length lands on whole device pixels at.
         readonly property list<real> scales: [1, 1.25, 1.5, 2]
     }
@@ -94,6 +94,7 @@ QtObject {
         readonly property int keycap: 20
         readonly property int log: 232
         readonly property int panel: 384
+        readonly property int password: 320
         readonly property int progress: 8
         readonly property int radio_dot: 8
         readonly property int rail: 236
@@ -162,6 +163,17 @@ QtObject {
     // Type styles: what a piece of text is drawn with. Pick one by what the text is.
     readonly property QtObject type: QtObject {
 
+        // The lock screen's clock, the one thing that screen shows: a step above the hero, light
+        // like every big figure. The clock popup's time stays the hero's number style.
+        readonly property QtObject clock: QtObject {
+            readonly property string name: "clock"
+            readonly property int size: 80
+            readonly property int line: 88
+            readonly property int icon: 48
+            readonly property int weight: 300
+            readonly property string family: "Geist"
+        }
+
         // Words at the hero size: Kōbō's welcome line, and nothing else.
         readonly property QtObject hero: QtObject {
             readonly property string name: "hero"
@@ -173,7 +185,7 @@ QtObject {
         }
 
         // Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent,
-        // the clock.
+        // the clock popup's time.
         readonly property QtObject hero_number: QtObject {
             readonly property string name: "hero_number"
             readonly property int size: 64
@@ -418,7 +430,7 @@ QtObject {
         readonly property real outline_soft: 0.55
         readonly property real panel_scrim: 0.2
         readonly property real placeholder: 0.55
-        readonly property real placeholder_text: 0.8
+        readonly property real placeholder_text: 0.85
         readonly property real press: 0.14
         readonly property real scrim: 0.6
         readonly property real selection: 0.32

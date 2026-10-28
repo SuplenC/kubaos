@@ -22,8 +22,9 @@
 # multiple of this.
 grid = 4
 # The only font sizes. A type style with any other size is refused. 64 is the
-# hero's alone: semibold for words, light for numbers.
-font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64]
+# hero's alone: semibold for words, light for numbers. 80 is the lock screen's
+# clock, the one thing that screen shows.
+font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80]
 # The scales every length is checked against: `grid` times each one must be a
 # whole number of device pixels.
 scales = [1.0, 1.25, 1.5, 2.0]
@@ -105,6 +106,10 @@ check = 20
 radio_dot = 8
 progress = 8
 dialog = 500
+# A password field alone on a screen, under the lock screen's clock: room for
+# a long password's bullets, and wider than the clock without outweighing it,
+# so the two read as one column, where the dialog's 500 dwarfed the time.
+password = 320
 # The widest a column of text and fields grows.
 column = 560
 # Kōbō's step rail on a wide screen.
@@ -167,6 +172,14 @@ jp = "M PLUS 1"
 # font size, held to an icon size no taller than the line, so an icon never
 # makes a line taller; its stroke is whole device pixels at every scale (see
 # `stroke.symbol`).
+[type.clock]
+size = 80
+line = 88
+icon = 48
+weight = "light"
+family = "sans"
+use = "The lock screen's clock, the one thing that screen shows: a step above the hero, light like every big figure. The clock popup's time stays the hero's number style."
+
 [type.hero]
 size = 64
 line = 72
@@ -181,7 +194,7 @@ line = 72
 icon = 48
 weight = "light"
 family = "sans"
-use = "Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the clock."
+use = "Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the clock popup's time."
 
 [type.display]
 size = 48
@@ -407,8 +420,10 @@ placeholder = 0.55
 selection = 0.32
 locked = 0.50
 # A field's placeholder text. It is text, so it keeps 4.5:1 (see
-# `[contrast]`): it reads as a hint by its muted role, not by fading out.
-placeholder_text = 0.80
+# `[contrast]`) on every fill a field takes, the focused one included, which
+# 0.80 misses in light (4.4:1): it reads as a hint by its muted role, not by
+# fading out.
+placeholder_text = 0.85
 # An accent colour as a faint fill under itself: a tag, a done step.
 tint = 0.16
 # A picture that sits back while another is picked: the wallpaper picker's
@@ -616,6 +631,8 @@ pairs = [
   { fg = "on_surface_variant", bg = "surface_container_high", need = "text", use = "Secondary text on a card" },
   { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", use = "A keycap's key" },
   { fg = "on_surface_variant", bg = "surface", need = "text", opacity = "placeholder_text", use = "A field's placeholder" },
+  { fg = "on_surface_variant", bg = "surface_container_high", need = "text", opacity = "placeholder_text", use = "A field's placeholder in its resting fill" },
+  { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", opacity = "placeholder_text", use = "A field's placeholder while it is focused or hovered" },
   { fg = "primary", bg = "surface", need = "text", use = "Accent text: an accent line, a detail, a Text button" },
   { fg = "primary", bg = "surface_container_low", need = "text", use = "Accent text in a well" },
   { fg = "on_primary", bg = "primary", need = "text", use = "A Filled button's label, today in the calendar" },
