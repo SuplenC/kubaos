@@ -77,6 +77,8 @@ impl Preview {
 /// What a checkout is at: [`Host::describe`] reads it from git.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Checkout {
+    /// The top of its working tree, which a folder inside it belongs to.
+    pub root: PathBuf,
     pub branch: Option<String>,
     pub commit: String,
     pub dirty: bool,
@@ -92,8 +94,16 @@ pub enum PreviewFileError {
         #[source]
         source: io::Error,
     },
-    #[error("parsing {}", path.display())]
+    /// The file holds no preview: `kubaos switch --release` empties it.
+    #[error("parsing {} (`kubaos switch --release` replaces it)", path.display())]
     Parse {
+        path: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
+    /// The preview can't be written as JSON: its path isn't UTF-8.
+    #[error("writing the preview of {} as JSON", path.display())]
+    Serialize {
         path: PathBuf,
         #[source]
         source: serde_json::Error,
@@ -142,10 +152,11 @@ impl PreviewFile {
     ///
     /// # Errors
     ///
-    /// [`PreviewFileError::Io`] when the file can't be written.
+    /// [`PreviewFileError::Io`] when the file can't be written, [`PreviewFileError::Serialize`]
+    /// when the preview's path isn't UTF-8.
     pub fn write(&self, preview: &Preview) -> Result<(), PreviewFileError> {
-        let json = serde_json::to_string_pretty(preview).map_err(|source| PreviewFileError::Parse {
-            path: self.path.clone(),
+        let json = serde_json::to_string_pretty(preview).map_err(|source| PreviewFileError::Serialize {
+            path: preview.path.clone(),
             source,
         })?;
         self.put(&json)
@@ -210,12 +221,7 @@ pub enum Notice {
 #[non_exhaustive]
 pub enum PlanError {
     /// A plain switch while a preview is in effect: which of the two is meant isn't known.
-    #[error(
-        "the home is a preview of {name} ({path}): `kubaos switch --from {path}` builds it again, \
-         `kubaos switch --release` goes back to the release",
-        name = preview.name(),
-        path = preview.path.display()
-    )]
+    #[error("{}", ways_out(preview))]
     Active { preview: Preview },
     /// The checkout's git state could not be read: it is no git checkout.
     #[error("{} is not a git checkout", path.display())]
@@ -255,11 +261,12 @@ pub fn plan(request: Request, active: Option<&Preview>, host: &impl Host) -> Res
             target: Target::Release,
             notice: Some(active.map_or(Notice::NoPreview, |p| Notice::Leaves(p.clone()))),
         }),
-        Request::From(path) => {
-            host.describe(&path).map_err(|source| PlanError::NotACheckout {
-                path: path.clone(),
-                source,
-            })?;
+        Request::From(folder) => {
+            // A folder inside a checkout previews the whole checkout.
+            let path = host
+                .describe(&folder)
+                .map_err(|source| PlanError::NotACheckout { path: folder, source })?
+                .root;
             host.evaluate(&path).map_err(|source| PlanError::DoesNotEvaluate {
                 path: path.clone(),
                 source,
@@ -272,6 +279,25 @@ pub fn plan(request: Request, active: Option<&Preview>, host: &impl Host) -> Res
                 notice,
             })
         }
+    }
+}
+
+/// What a plain switch during `preview` says: it's on, and the ways on from it. Building it again
+/// is one only while its checkout is still there.
+fn ways_out(preview: &Preview) -> String {
+    let on = format!(
+        "the home is a preview of {} ({})",
+        preview.name(),
+        preview.path.display()
+    );
+    let release = "`kubaos switch --release` goes back to the release";
+    if preview.path.is_dir() {
+        format!(
+            "{on}: `kubaos switch --from {}` builds it again, {release}",
+            preview.path.display()
+        )
+    } else {
+        format!("{on}, a checkout that is gone: {release}")
     }
 }
 
@@ -345,38 +371,47 @@ pub fn worktree_for(listing: &str, branch: &str) -> Option<PathBuf> {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum LeaveError {
-    /// The preview file could not be read.
+    /// The preview file could not be read after the switch back.
     #[error("reading the preview")]
     Read(#[source] PreviewFileError),
     /// The switch back to the release failed; the home is still the preview.
-    #[error("switching back to the release from the preview of {}: {reason}", preview.name())]
-    Switch { preview: Preview, reason: String },
+    #[error("switching back to the release from the preview of {name}")]
+    Switch {
+        name: String,
+        #[source]
+        source: SwitchFailed,
+    },
     /// The switch back succeeded, yet the preview file still names a preview.
-    #[error("the preview of {} is still recorded after switching back to the release", preview.name())]
-    StillActive { preview: Preview },
+    #[error("the preview of {name} is still recorded after switching back to the release")]
+    StillActive { name: String },
 }
 
+/// Why a switch failed, as the switch queue's job recorded it.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct SwitchFailed(String);
+
 /// Before an update, upgrade or rollback: when a preview is in effect, switches back to the
-/// release through `back` and checks it is gone, so an update never starts on a preview. Returns
-/// the preview it left, `None` when there was none.
+/// release through `back` and checks it is gone, so an update never starts on a preview. A
+/// preview file that doesn't read counts as a preview: the switch back empties it. Returns whether
+/// there was one to leave.
 ///
 /// # Errors
 ///
 /// [`LeaveError`] when the preview could not be left; the update must not run then.
-pub fn leave(
-    file: &PreviewFile,
-    back: impl FnOnce(&Preview) -> Result<(), String>,
-) -> Result<Option<Preview>, LeaveError> {
-    let Some(preview) = file.read().map_err(LeaveError::Read)? else {
-        return Ok(None);
+pub fn leave(file: &PreviewFile, back: impl FnOnce() -> Result<(), String>) -> Result<bool, LeaveError> {
+    let name = match file.read() {
+        Ok(None) => return Ok(false),
+        Ok(Some(preview)) => preview.name(),
+        Err(_) => format!("an unreadable record, {}", file.path().display()),
     };
-    back(&preview).map_err(|reason| LeaveError::Switch {
-        preview: preview.clone(),
-        reason,
+    back().map_err(|reason| LeaveError::Switch {
+        name,
+        source: SwitchFailed(reason),
     })?;
     match file.read().map_err(LeaveError::Read)? {
-        Some(still) => Err(LeaveError::StillActive { preview: still }),
-        None => Ok(Some(preview)),
+        Some(still) => Err(LeaveError::StillActive { name: still.name() }),
+        None => Ok(true),
     }
 }
 

@@ -52,7 +52,14 @@ impl Host for FakeHost {
         if self.not_checkouts.iter().any(|p| p == path) {
             return Err(HostError::exited("git", Some(128)));
         }
+        // A folder named `sub` is inside the checkout above it.
+        let root = if path.ends_with("sub") {
+            path.parent().unwrap()
+        } else {
+            path
+        };
         Ok(Checkout {
+            root: root.to_path_buf(),
             branch: Some("feature/x".to_owned()),
             commit: "abcdef0123".to_owned(),
             dirty: false,
@@ -125,15 +132,41 @@ fn a_plain_switch_without_a_preview_is_the_home_as_it_stands() {
 
 #[test]
 fn a_plain_switch_during_a_preview_is_refused_naming_both_ways_out() {
-    let active = preview("/w/a");
+    let tmp = tempfile::tempdir().unwrap();
+    let active = preview(tmp.path().to_str().unwrap());
 
     let err = plan(Request::Plain, Some(&active), &FakeHost::default()).unwrap_err();
 
     let message = err.to_string();
     assert!(matches!(err, PlanError::Active { .. }), "{err:?}");
     assert!(message.contains("feature/a"), "{message}");
-    assert!(message.contains("kubaos switch --from /w/a"), "{message}");
+    assert!(
+        message.contains(&format!("kubaos switch --from {}", tmp.path().display())),
+        "{message}"
+    );
     assert!(message.contains("kubaos switch --release"), "{message}");
+}
+
+#[test]
+fn a_plain_switch_during_a_preview_whose_checkout_is_gone_names_only_the_release() {
+    let active = preview("/w/gone");
+
+    let message = plan(Request::Plain, Some(&active), &FakeHost::default())
+        .unwrap_err()
+        .to_string();
+
+    assert!(!message.contains("--from"), "{message}");
+    assert!(message.contains("kubaos switch --release"), "{message}");
+}
+
+#[test]
+fn a_folder_inside_a_checkout_previews_the_whole_checkout() {
+    let host = FakeHost::default();
+
+    let plan = plan(from("/w/b/sub"), None, &host).unwrap();
+
+    assert_eq!(plan.target, Target::Checkout { path: "/w/b".into() });
+    assert_eq!(*host.evaluated.borrow(), [PathBuf::from("/w/b")]);
 }
 
 #[test]
@@ -295,9 +328,9 @@ fn leaving_without_a_preview_switches_nothing() {
     let tmp = tempfile::tempdir().unwrap();
     let file = PreviewFile::new(tmp.path().join("preview.json"));
 
-    let left = leave(&file, |_| panic!("no preview, no switch")).unwrap();
+    let left = leave(&file, || panic!("no preview, no switch")).unwrap();
 
-    assert_eq!(left, None);
+    assert!(!left);
 }
 
 #[test]
@@ -306,13 +339,28 @@ fn leaving_a_preview_switches_back_to_the_release_first() {
     let file = PreviewFile::new(tmp.path().join("preview.json"));
     file.write(&preview("/w/a")).unwrap();
 
-    let left = leave(&file, |_| {
+    let left = leave(&file, || {
         file.clear().unwrap();
         Ok(())
     })
     .unwrap();
 
-    assert_eq!(left, Some(preview("/w/a")));
+    assert!(left);
+}
+
+#[test]
+fn a_record_that_does_not_read_is_left_like_a_preview() {
+    let tmp = tempfile::tempdir().unwrap();
+    let file = PreviewFile::new(tmp.path().join("preview.json"));
+    fs::write(file.path(), "{ not a record").unwrap();
+
+    let left = leave(&file, || {
+        file.clear().unwrap();
+        Ok(())
+    })
+    .unwrap();
+
+    assert!(left);
 }
 
 #[test]
@@ -321,7 +369,7 @@ fn a_failed_switch_back_stops_the_update() {
     let file = PreviewFile::new(tmp.path().join("preview.json"));
     file.write(&preview("/w/a")).unwrap();
 
-    let err = leave(&file, |_| Err("home-manager exited with code 1".to_owned())).unwrap_err();
+    let err = leave(&file, || Err("home-manager exited with code 1".to_owned())).unwrap_err();
 
     assert!(matches!(err, LeaveError::Switch { .. }), "{err:?}");
     assert!(err.to_string().contains("feature/a"));
@@ -333,7 +381,7 @@ fn a_preview_still_recorded_after_switching_back_stops_the_update() {
     let file = PreviewFile::new(tmp.path().join("preview.json"));
     file.write(&preview("/w/a")).unwrap();
 
-    let err = leave(&file, |_| Ok(())).unwrap_err();
+    let err = leave(&file, || Ok(())).unwrap_err();
 
     assert!(matches!(err, LeaveError::StillActive { .. }), "{err:?}");
 }

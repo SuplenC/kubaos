@@ -16,7 +16,11 @@ Pill {
     ink: K.Tokens.color.cold
     tooltip: {
         const at = Preview.dirty ? `${Preview.commit} with uncommitted changes` : Preview.commit;
-        const since = Preview.since > 0 ? `, since ${Qt.formatDateTime(new Date(Preview.since), Time.timeFormat)}` : "";
+        const start = new Date(Preview.since);
+        // The day too, once it isn't today's.
+        const today = start.toDateString() === Time.now.toDateString();
+        const format = today ? Time.timeFormat : `${Time.shortDateFormat} ${Time.timeFormat}`;
+        const since = Preview.since > 0 ? `, since ${Qt.formatDateTime(start, format)}` : "";
         const of = Preview.branch !== "" ? `${Preview.branch} at ${at}` : at;
         return `Live preview of ${of}${since}. Click to go back to the release`;
     }

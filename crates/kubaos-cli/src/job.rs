@@ -134,8 +134,15 @@ pub fn switch_to(paths: &Paths, mode: SwitchMode, to: &SwitchTo) -> ExitCode {
     };
     let active = match PreviewFile::new(paths.preview()).read() {
         Ok(active) => active,
+        // Only a plain switch needs the record: the release and a new preview replace it.
+        Err(e) if to.release || to.from.is_some() => {
+            err!("kubaos: {}", chain(&e));
+            None
+        }
         Err(e) => return report(e),
     };
+    // A switch to the release still queued leaves the preview before this one runs.
+    let active = active.filter(|_| !releasing(&queue(paths)));
     let request = match (&to.from, to.release) {
         (Some(arg), _) => match resolve(paths, arg) {
             Ok(path) => {
@@ -188,11 +195,19 @@ pub fn switch(paths: &Paths, mode: SwitchMode) -> ExitCode {
     run(paths, &host, mode, Target::Current)
 }
 
+/// Whether a switch to the release is queued or running.
+fn releasing(queue: &Queue) -> bool {
+    queue.jobs().is_ok_and(|jobs| {
+        jobs.iter()
+            .any(|job| !job.state.is_done() && job.target == Target::Release)
+    })
+}
+
 /// The checkout `--from <arg>` names: a folder, or a branch of the main checkout's worktrees.
-fn resolve(paths: &Paths, arg: &str) -> Result<PathBuf, preview::ResolveError> {
-    let cwd = std::env::current_dir().unwrap_or_default();
+fn resolve(paths: &Paths, arg: &str) -> Result<PathBuf, String> {
+    let cwd = std::env::current_dir().map_err(|e| format!("finding the current folder: {e}"))?;
     let repo = paths.projects_root().join(preview::MAIN_CHECKOUT);
-    preview::resolve(arg, &cwd, &repo, Systemd::worktrees)
+    preview::resolve(arg, &cwd, &repo, Systemd::worktrees).map_err(|e| chain(&e))
 }
 
 /// A preview as a line names it: its branch, its commit, and the folder.
@@ -318,7 +333,7 @@ pub fn switch_step(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&st
 }
 
 /// The live preview the home is on, as a line names it, for the updater. A preview file that
-/// doesn't read counts as one, so that leaving it stops the update and says why.
+/// doesn't read counts as one: the switch back to the release empties it.
 pub fn active_preview(paths: &Paths) -> Option<String> {
     match PreviewFile::new(paths.preview()).read() {
         Ok(active) => active.as_ref().map(describe),
@@ -334,7 +349,7 @@ pub fn active_preview(paths: &Paths) -> Option<String> {
 /// Why the preview could not be left.
 pub fn leave_preview(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&str)) -> Result<(), String> {
     let file = PreviewFile::new(paths.preview());
-    preview::leave(&file, |_| switch_step(paths, place, on_output))
+    preview::leave(&file, || switch_step(paths, place, on_output))
         .map(|_| ())
         .map_err(|e| chain(&e))
 }

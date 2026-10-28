@@ -82,6 +82,7 @@ impl Host for FakeHost {
         }
         let commit = self.commit.lock().unwrap().clone();
         Ok(Checkout {
+            root: path.to_path_buf(),
             branch: Some(format!("feature/{}", path.file_name().unwrap().to_string_lossy())),
             commit,
             dirty: false,
@@ -513,8 +514,10 @@ fn a_switch_of_the_home_as_it_stands_keeps_the_preview_and_its_start() {
     let tmp = tempfile::tempdir().unwrap();
     let (queue, file) = previewing(tmp.path());
     let host = FakeHost::default();
+    let folder = tmp.path().join("a");
+    std::fs::create_dir(&folder).unwrap();
     *host.commit.lock().unwrap() = "aaaaaaa".to_owned();
-    queue.enqueue_to(checkout("/w/a")).unwrap();
+    queue.enqueue_to(Target::Checkout { path: folder.clone() }).unwrap();
     queue.work(&host).unwrap();
     let first = file.read().unwrap().unwrap();
     *host.commit.lock().unwrap() = "bbbbbbb".to_owned();
@@ -522,10 +525,53 @@ fn a_switch_of_the_home_as_it_stands_keeps_the_preview_and_its_start() {
     queue.enqueue().unwrap();
     queue.work(&host).unwrap();
 
-    assert_eq!(host.switched_from.lock().unwrap()[1], Some(PathBuf::from("/w/a")));
+    assert_eq!(host.switched_from.lock().unwrap()[1], Some(folder));
     let kept = file.read().unwrap().unwrap();
     assert_eq!(kept.commit, "bbbbbbb");
     assert_eq!(kept.since, first.since);
+}
+
+#[test]
+fn a_switch_of_the_home_as_it_stands_whose_checkout_is_gone_says_how_to_go_back() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+    queue.enqueue_to(checkout("/w/gone")).unwrap();
+    queue.work(&host).unwrap();
+
+    let id = queue.enqueue().unwrap();
+    queue.work(&host).unwrap();
+
+    let job = queue.job(&id).unwrap();
+    assert_eq!(job.state, JobState::Failed);
+    assert!(job.error.unwrap().contains("kubaos switch --release"));
+    assert_eq!(host.switches.load(Ordering::SeqCst), 1);
+    assert!(file.read().unwrap().is_some());
+}
+
+#[test]
+fn a_record_that_does_not_read_never_blocks_the_release_or_a_new_preview() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+    std::fs::write(file.path(), "{ not a record").unwrap();
+
+    let stuck = queue.enqueue().unwrap();
+    let release = queue.enqueue_to(Target::Release).unwrap();
+    queue.work(&host).unwrap();
+
+    let stuck = queue.job(&stuck).unwrap();
+    assert_eq!(stuck.state, JobState::Failed);
+    assert!(stuck.error.unwrap().contains("kubaos switch --release"));
+    assert_eq!(queue.job(&release).unwrap().state, JobState::Succeeded);
+    assert_eq!(std::fs::read_to_string(file.path()).unwrap(), "");
+
+    std::fs::write(file.path(), "{ not a record").unwrap();
+    let preview = queue.enqueue_to(checkout("/w/b")).unwrap();
+    queue.work(&host).unwrap();
+
+    assert_eq!(queue.job(&preview).unwrap().state, JobState::Succeeded);
+    assert_eq!(file.read().unwrap().unwrap().path, Path::new("/w/b"));
 }
 
 #[test]

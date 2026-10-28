@@ -452,15 +452,25 @@ impl Queue {
     /// Runs one job's switch to `target`, and records the preview it makes or clears when it
     /// succeeds. The caller holds the switch lock, so the preview file has one writer at a time.
     fn run_job(&self, host: &impl Host, target: &Target, log: File) -> Result<(), String> {
-        let active = match &self.previews {
-            Some(file) => file.read().map_err(|e| error_chain(&e))?,
-            None => None,
+        // Only the home as it stands depends on the record: the release empties it whatever it
+        // holds, and a checkout replaces it, so a record that doesn't read never blocks the way
+        // out.
+        let active = match (&self.previews, target) {
+            (None, _) | (_, Target::Release) => None,
+            (Some(file), Target::Checkout { .. }) => file.read().ok().flatten(),
+            (Some(file), Target::Current) => file.read().map_err(|e| error_chain(&e))?,
         };
         let from = match target {
             Target::Release => None,
             Target::Checkout { path } => Some(path.clone()),
             Target::Current => active.as_ref().map(|preview| preview.path.clone()),
         };
+        if let (Target::Current, Some(gone)) = (target, from.as_ref().filter(|path| !path.is_dir())) {
+            return Err(format!(
+                "the preview's checkout {} is gone: `kubaos switch --release` goes back to the release",
+                gone.display()
+            ));
+        }
         let Some(from) = from else {
             host.switch(log, None).map_err(|e| error_chain(&e))?;
             if let Some(file) = &self.previews
@@ -829,6 +839,7 @@ impl Host for Systemd {
             argv.extend(args.iter().map(OsString::from));
             argv
         };
+        let root = PathBuf::from(output(&git(&["rev-parse", "--show-toplevel"]))?.trim());
         let commit = output(&git(&["rev-parse", "--verify", "HEAD"]))?.trim().to_owned();
         // On a detached head `symbolic-ref` exits 1: no branch.
         let branch = output(&git(&["symbolic-ref", "--quiet", "--short", "HEAD"]))
@@ -837,6 +848,7 @@ impl Host for Systemd {
             .filter(|branch| !branch.is_empty());
         let status = output(&git(&["status", "--porcelain", "--untracked-files=no"]))?;
         Ok(Checkout {
+            root,
             branch,
             commit,
             dirty: !status.trim().is_empty(),
