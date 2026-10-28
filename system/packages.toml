@@ -62,7 +62,7 @@ keyring = "/etc/apt/keyrings/tuxedo.gpg"
 # pulled it in, and 10-strip.sh purges that.
 [group.tools]
 summary = "What the system scripts themselves use"
-packages = ["ca-certificates", "curl", "gnupg", "unzip", "git", "openssh-client"]
+packages = ["ca-certificates", "curl", "gnupg", "unzip", "file", "git", "openssh-client"]
 
 [group.network]
 summary = "NetworkManager and Wi-Fi"
@@ -142,7 +142,7 @@ packages = [
   "nautilus", "gnome-sushi", "gvfs-backends", "gvfs-fuse", "udisks2",
   "glycin-thumbnailers", "libheif-plugin-libde265", "ffmpegthumbnailer",
   "papers", "gnome-font-viewer", "file-roller", "7zip", "unar", "python3-nautilus",
-  "loupe", "showtime", "gstreamer1.0-plugins-good", "gstreamer1.0-libav", "imagemagick",
+  "loupe", "showtime", "gstreamer1.0-plugins-good", "gstreamer1.0-libav",
 ]
 
 [group.fonts]
@@ -152,7 +152,7 @@ packages = ["fonts-noto-core", "fonts-noto-ui-core", "fonts-noto-mono", "fonts-n
 # They work without Nix and without the shell.
 [group.fallback]
 summary = "The fallback session's tools, and the runtime helpers of the binds"
-packages = ["foot", "fuzzel", "wl-clipboard", "grim", "slurp", "playerctl", "socat", "qalc", "libnotify-bin"]
+packages = ["foot", "fuzzel", "wl-clipboard", "grim", "slurp", "imagemagick", "playerctl", "socat", "qalc", "libnotify-bin"]
 
 # Its config comes from home-manager.
 [group.shell]

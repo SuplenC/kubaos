@@ -223,7 +223,7 @@ bind("SUPER + CTRL + ALT + Z", "Reset zoom", function()
 end)
 
 ---------------------------------------------------------------------------
--- Screenshots and color picker (grim + slurp + wl-clipboard, satty, hyprpicker)
+-- Screenshots and color picker (grim + slurp + wl-clipboard, satty, hyprpicker; a region freezes the screen first)
 ---------------------------------------------------------------------------
 
 bind("Print", "Screenshot region", "dot-hypr-screenshot region")
