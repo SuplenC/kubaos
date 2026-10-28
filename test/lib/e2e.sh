@@ -1297,6 +1297,105 @@ c_notifications() {
   return "$bad"
 }
 
+# stub_screenshot_tools DIR: stand-ins for what dot-hypr-screenshot calls, in DIR. Two monitors
+# (1920x1200 at scale 1.5, 1920x1080 at 1), so grim's frame is 5760x1800 with a red 150x75 box at
+# pixel 300,150. Every call is logged to DIR/calls; slurp answers 200,100 100x50 (that box in
+# logical coordinates) or cancels when DIR/cancel exists.
+stub_screenshot_tools() {
+  local d=$1 tool
+  for tool in notify-send xdg-user-dir; do printf '#!/bin/sh\nexit 0\n' >"$d/$tool"; done
+  cat >"$d/hyprctl" <<'STUB'
+#!/bin/bash
+D=$(dirname "$0")
+case "$*" in
+  "-j monitors") echo '[{"x":0,"y":0,"scale":1.5},{"x":1920,"y":0,"scale":1}]' ;;
+  "-j layers")
+    if [[ -e $D/picker.pid ]]; then
+      echo '{"A":{"levels":{"3":[{"namespace":"hyprpicker"}]}},"B":{"levels":{"3":[{"namespace":"hyprpicker"}]}}}'
+    else
+      echo '{}'
+    fi ;;
+esac
+STUB
+  cat >"$d/grim" <<'STUB'
+#!/bin/bash
+D=$(dirname "$0")
+echo "grim $*" >>"$D/calls"
+magick -size 5760x1800 xc:white -fill red -draw 'rectangle 300,150 449,224' "${@: -1}"
+STUB
+  cat >"$d/hyprpicker" <<'STUB'
+#!/bin/bash
+D=$(dirname "$0")
+echo "hyprpicker $*" >>"$D/calls"
+trap 'echo ended >"$D/picker.ended"; rm -f "$D/picker.pid"; exit 0' TERM
+echo $$ >"$D/picker.pid"
+while :; do sleep 0.05; done
+STUB
+  cat >"$d/slurp" <<'STUB'
+#!/bin/bash
+D=$(dirname "$0")
+echo "slurp $*" >>"$D/calls"
+[[ ! -e $D/picker.pid ]] || echo "slurp saw the freeze" >>"$D/calls"
+[[ ! -e $D/cancel ]] || exit 1
+echo "200,100 100x50"
+STUB
+  for tool in wl-copy satty; do
+    cat >"$d/$tool" <<'STUB'
+#!/bin/bash
+{ printf '%s' "$(basename "$0")"; printf ' [%s]' "$@"; echo; } >>"$(dirname "$0")/calls"
+STUB
+  done
+  chmod +x "$d"/*
+}
+
+wait_for_file() {
+  local _
+  for _ in $(seq 40); do [[ -e $1 ]] && return; sleep 0.05; done
+  return 1
+}
+
+c_screenshot() {
+  local t dir bad=0 rc shot
+  t="$(mktemp -d)"
+  mkdir "$t/bin"
+  stub_screenshot_tools "$t/bin"
+  run_shot() { PATH="$t/bin:$PATH" HOME="$t" DOT_SCREENSHOT_DIR="$t/shots" bash "$REPO/scripts/dot-hypr-screenshot" "$@"; }
+
+  run_shot region || { echo "FAIL region exited non-zero"; bad=1; }
+  shot="$(ls "$t"/shots/Screenshot_*.png 2>/dev/null | head -1)"
+  [[ -n $shot ]] && [[ "$(magick "$shot" -format '%wx%h %[pixel:p{0,0}] %[pixel:p{149,74}]' info:)" == "150x75 srgb(255,0,0) srgb(255,0,0)" ]] \
+    && echo "ok   region crops the selection at scale 1.5 from the frame taken before slurp" \
+    || { echo "FAIL region crop: ${shot:-no file}"; bad=1; }
+  grep -q 'hyprpicker --render-inactive --no-zoom' "$t/bin/calls" && grep -q 'slurp saw the freeze' "$t/bin/calls" \
+    && echo "ok   hyprpicker's overlay is up when slurp starts" || { echo "FAIL freeze not up before slurp"; bad=1; }
+  wait_for_file "$t/bin/picker.ended" && echo "ok   the trap ended the freeze" || { echo "FAIL hyprpicker was left running"; bad=1; }
+  grep -q '^wl-copy \[--type\] \[image/png\]' "$t/bin/calls" && echo "ok   wl-copy gets the image type" || { echo "FAIL wl-copy without a type"; bad=1; }
+
+  rm -f "$t/bin/picker.ended" "$t/bin/calls"
+  rm -rf "$t/shots"
+  touch "$t/bin/cancel"
+  rc=0
+  run_shot region || rc=$?
+  [[ $rc == 0 && -z "$(compgen -G "$t/shots/Screenshot_*")" ]] && wait_for_file "$t/bin/picker.ended" && ! grep -q '^wl-copy' "$t/bin/calls" \
+    && echo "ok   Esc ends the freeze and saves nothing" || { echo "FAIL cancel (exit $rc)"; bad=1; }
+
+  rm -f "$t/bin/picker.ended" "$t/bin/cancel" "$t/bin/calls"
+  mkdir "$t/failing"
+  printf '#!/bin/sh\ncase "$*" in *-crop*) exit 1 ;; esac\nPATH=${PATH#*failing:}\nexec magick "$@"\n' >"$t/failing/magick"
+  chmod +x "$t/failing/magick"
+  rc=0
+  PATH="$t/failing:$t/bin:$PATH" HOME="$t" DOT_SCREENSHOT_DIR="$t/shots" bash "$REPO/scripts/dot-hypr-screenshot" region 2>/dev/null || rc=$?
+  [[ $rc != 0 ]] && wait_for_file "$t/bin/picker.ended" && echo "ok   an error ends the freeze too" || { echo "FAIL error path (exit $rc)"; bad=1; }
+
+  rm -f "$t/bin/calls"
+  run_shot region --edit
+  grep -q '^satty .*\[--copy-command\] \[wl-copy --type image/png\]' "$t/bin/calls" \
+    && echo "ok   satty copies through 'wl-copy --type image/png'" || { echo "FAIL satty copy command"; bad=1; }
+
+  rm -rf "$t"
+  return "$bad"
+}
+
 # dot-hypr-record's start/stop and state file, with wf-recorder (gsr needs a
 # GPU and KMS), stopped through Quickshell's IPC like the bar's click does.
 c_recorder() {
@@ -3237,7 +3336,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites pins dot_config user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites pins dot_config user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

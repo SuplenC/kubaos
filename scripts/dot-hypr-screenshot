@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Screenshot to clipboard and file.
 #
-#   dot-hypr-screenshot region   select an area with slurp (Esc cancels)
+#   dot-hypr-screenshot region   freeze the screen, select an area with slurp (Esc cancels)
 #   dot-hypr-screenshot output   the focused monitor
 #   dot-hypr-screenshot window   the active window
 #   dot-hypr-screenshot MODE --edit   then open it in satty to annotate
@@ -11,14 +11,66 @@
 # the clipboard, and sends a notification with an "Edit" action. satty saves
 # the annotated copy next to the original (<name>-annotated.png) and copies
 # it to the clipboard (Enter or Ctrl+C; Ctrl+S saves).
-# Needs: grim, slurp, wl-clipboard (apt), jq, satty (Nix), hyprctl.
+#
+# A region shot freezes the screen the moment the key is pressed, as macOS does: what moves, or
+# shows only while focused (a menu, a hover), stays as it was, and the selection cuts from that
+# frame. The freeze ends with the selection, on Esc and on any error.
+# Needs: grim, slurp, wl-clipboard, imagemagick (apt), hyprpicker, jq, satty (Nix), hyprctl.
 set -euo pipefail
 
+# satty runs the copy command through `sh -c` and writes a PNG to its stdin. wl-copy without a type
+# guesses it with `file`, which is not installed, and falls back to text/plain.
 edit() {
   satty --filename "$1" --output-filename "${1%.*}-annotated.png" \
-    --copy-command wl-copy --actions-on-enter save-to-clipboard,save-to-file --early-exit
+    --copy-command 'wl-copy --type image/png' --actions-on-enter save-to-clipboard,save-to-file --early-exit
 }
 
+# Waits until hyprpicker has a layer on every monitor, so its frozen frame is on screen before
+# slurp starts. Gives up after 2 s and goes on: the freeze is then late, not missing.
+wait_for_freeze() {
+  local want i
+  want=$(hyprctl -j monitors | jq length)
+  for ((i = 0; i < 40; i++)); do
+    [[ $(hyprctl -j layers | jq '[.[].levels[][] | select(.namespace == "hyprpicker")] | length') -ge $want ]] && return
+    sleep 0.05
+  done
+}
+
+# Crops the region "X,Y WxH" (logical coordinates) of the full capture $1 into $2. grim draws the
+# whole layout at the highest scale among the monitors, with the layout's top-left corner as
+# pixel 0,0, so the crop moves the logical box to that corner and multiplies it by that scale.
+crop() {
+  local full=$1 out=$2 pos size x y w h origin scale
+  read -r pos size <<<"$3"
+  x=${pos%,*} y=${pos#*,} w=${size%x*} h=${size#*x}
+  read -r origin scale < <(hyprctl -j monitors | jq -r '"\([.[].x] | min),\([.[].y] | min) \([.[].scale] | max)"')
+  magick "$full" -crop "$(awk -v x="$x" -v y="$y" -v w="$w" -v h="$h" -v o="$origin" -v s="$scale" '
+    BEGIN { split(o, c, ","); printf "%dx%d+%d+%d", w * s + 0.5, h * s + 0.5, (x - c[1]) * s + 0.5, (y - c[2]) * s + 0.5 }')" \
+    +repage "$out"
+}
+
+# Freezes the screen and cuts the selection out of the frozen frame into $1; exits 0 on Esc.
+#
+# The full grim capture is taken before slurp starts and cropped afterwards. A `grim -g` after
+# the selection would shoot whatever is on screen then: slurp's box while it is still up, and the
+# overlay hyprpicker repaints from its own copy of the frame. The capture taken first has neither
+# slurp's box nor the cursor and is the compositor's own pixels; hyprpicker only shows the frozen
+# frame to select on. The trap ends the freeze however the script ends.
+capture_region() {
+  local geometry
+  scratch=$(mktemp -d)
+  trap '[[ -z $picker ]] || kill "$picker" 2>/dev/null || true; rm -rf "$scratch"' EXIT
+  grim "$scratch/full.png"
+  hyprpicker --render-inactive --no-zoom --quiet >/dev/null 2>&1 &
+  picker=$!
+  wait_for_freeze
+  geometry=$(slurp -d) || exit 0
+  kill "$picker" 2>/dev/null || true
+  crop "$scratch/full.png" "$1" "$geometry"
+}
+
+picker=
+scratch=
 mode=${1:-region}
 if [[ $mode == edit ]]; then
   [[ -f ${2:-} ]] || { echo "usage: $(basename "$0") edit FILE" >&2; exit 2; }
@@ -36,8 +88,7 @@ file="$dir/Screenshot_$(date +%Y-%m-%d_%H-%M-%S).png"
 
 case "$mode" in
   region)
-    geometry=$(slurp -d) || exit 0 # cancelled
-    grim -g "$geometry" "$file"
+    capture_region "$file"
     ;;
   output)
     monitor=$(hyprctl -j activeworkspace | jq -r '.monitor')

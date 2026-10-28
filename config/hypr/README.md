@@ -29,7 +29,8 @@ Your own settings go in `~/.config/kubaos/desktop/hypr/` (`hyprland.lua`, `hypri
 Scripts (in `scripts/`, linked to `~/.local/bin`): `dot-hypr-workspaces`
 (event-socket listener, runs `dot-hypr-lid sync` on hotplug), `dot-hypr-lid`
 (laptop panel off when the lid closes with an external connected),
-`dot-hypr-on-ac` (used by hypridle), `dot-hypr-screenshot`.
+`dot-hypr-on-ac` (used by hypridle), `dot-hypr-screenshot` (a region shot freezes the
+screen with hyprpicker, then crops the selection from a grim capture taken first).
 
 ## Reload
 

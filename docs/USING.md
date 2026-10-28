@@ -24,7 +24,7 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + CTRL + A` / `B` / `W` | Control center: audio, Bluetooth, Wi-Fi |
 | `SUPER + CTRL + Space` | Wallpaper picker (the colors follow) |
 | `SUPER + SHIFT + Space` | Next keyboard layout, with two or more |
-| `Print` / `SUPER + SHIFT + S` | Screenshot a region, copied and saved |
+| `Print` / `SUPER + SHIFT + S` | Screenshot a region, copied and saved; the screen freezes when you press the key, so menus and hover states stay as they were |
 | `SUPER + SHIFT + R` | Record a region, same key stops |
 | `SUPER + Escape` | Power menu |
 | `SUPER + CTRL + Escape` | Lock |
