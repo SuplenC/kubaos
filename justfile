@@ -18,7 +18,7 @@ payload arch=host:
     install/image/check --arch {{arch}}
 
 # Check a built payload (unpack + chroot checks).
-check arch=host:
+payload-check arch=host:
     install/image/check --arch {{arch}}
 
 # Build the live ISO into iso/ (builds the payload first if there isn't one, and checks it if it hasn't passed). `just iso aarch64 vm` makes the bench ISO (ssh, no firmware).
@@ -28,7 +28,7 @@ iso arch=host profile="release":
     case "{{profile}}" in release|vm) ;; *) echo "profile is 'vm' or empty (release)" >&2; exit 2 ;; esac
     p=install/out/payload-{{arch}}
     [[ -f $p/manifest.json ]] || just payload {{arch}}
-    [[ "$(cat "$p/check.ok" 2>/dev/null)" == "$(shasum -a 256 "$p/manifest.json" | cut -d' ' -f1)" ]] || just check {{arch}}
+    [[ "$(cat "$p/check.ok" 2>/dev/null)" == "$(shasum -a 256 "$p/manifest.json" | cut -d' ' -f1)" ]] || just payload-check {{arch}}
     if [[ "{{profile}}" == vm ]]; then flags=(--profile vm); else flags=(--release); fi
     install/iso/build --arch {{arch}} --payload "$p" "${flags[@]}"
     ls -lh iso/kubaos-{{codename}}-{{ver}}-{{arch}}*.iso
@@ -42,6 +42,38 @@ release: test
     just iso x86_64 vm
     just iso x86_64
     ls -lh iso/kubaos-{{codename}}-{{ver}}-*.iso
+
+# What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests and the design checks.
+check: fmt-check lint
+    cargo nextest run --workspace
+    just design-check
+
+# Format the workspace with the nightly rustfmt and rustfmt.toml (`nix develop` has it; outside, point RUSTFMT at a nightly rustfmt), then turn the `use foo::{self};` it writes into `use foo;` (scripts/self-imports) and sort again.
+fmt: _nightly-rustfmt
+    cargo fmt --all
+    scripts/self-imports crates
+    cargo fmt --all
+
+# Check the formatting, rewriting nothing.
+fmt-check: _nightly-rustfmt
+    cargo fmt --all --check
+    scripts/self-imports --check crates
+
+# A stable rustfmt skips rustfmt.toml's unstable options with a warning and formats the rest with the defaults, so the fmt recipes refuse one that warns.
+_nightly-rustfmt:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rustfmt="${RUSTFMT:-rustfmt}"
+    if ! warnings="$(printf 'fn main() {}\n' | "$rustfmt" --edition 2024 --config-path rustfmt.toml 2>&1 >/dev/null)" || [[ -n $warnings ]]; then
+      printf '%s\n' "$warnings" >&2
+      echo "$rustfmt isn't a nightly rustfmt reading rustfmt.toml whole: run this in \`nix develop\`, or set RUSTFMT to a nightly rustfmt" >&2
+      exit 1
+    fi
+
+# Clippy, both passes: the code with -D warnings, then every target (tests, examples, benches) with unwrap allowed, since tests may unwrap. The lints are `[workspace.lints]` in Cargo.toml.
+lint:
+    cargo clippy --workspace --locked -- -D warnings
+    cargo clippy --workspace --locked --all-targets -- -D warnings -A clippy::unwrap_used
 
 # Cargo tests, the shell harness (Docker) and the engine end-to-end test.
 test:

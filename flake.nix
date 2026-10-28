@@ -53,6 +53,11 @@
         "aarch64-linux"
       ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f nixpkgs.legacyPackages.${system});
+      # rustfmt, built in nightly mode, so it reads rustfmt.toml's unstable
+      # options; a stable rustfmt skips them with a warning and formats the rest
+      # with the defaults. The same release as the devshell's rustc, so no
+      # second toolchain is fetched.
+      rustfmtNightly = pkgs: pkgs.rustfmt.override { asNightly = true; };
     in
     {
       # The curated set (home/curated.nix), from this flake's nixpkgs, and
@@ -165,25 +170,82 @@
         };
       });
 
-      formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);
-
-      # Cargo in the devshell compiles through sccache, its cache under
-      # ~/.cache/sccache, so a fresh worktree reuses the crates.io
-      # dependencies another checkout already built. Only the shell's cargo:
-      # crane and the flake's packages build in the sandbox, without it.
-      devShells = forAllSystems (pkgs: {
-        default = pkgs.mkShell {
-          packages = [
+      # `nix fmt`: nixfmt for the Nix files, and the Rust files as `just fmt`
+      # formats them. The patched dependencies under vendor/ keep upstream's
+      # layout.
+      formatter = forAllSystems (
+        pkgs:
+        let
+          rustfmt = pkgs.writeShellApplication {
+            name = "kubaos-rustfmt";
+            runtimeInputs = [ (rustfmtNightly pkgs) ];
+            text = ''
+              rustfmt --edition 2024 "$@"
+              ${./scripts/self-imports} "$@"
+              rustfmt --edition 2024 "$@"
+            '';
+          };
+        in
+        pkgs.treefmt.withConfig {
+          runtimeInputs = [
             pkgs.nixfmt
-            pkgs.nixfmt-tree
-            pkgs.sccache
-            home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
+            rustfmt
           ];
-          RUSTC_WRAPPER = pkgs.lib.getExe pkgs.sccache;
-          shellHook = ''
-            export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/sccache}
-          '';
-        };
-      });
+          settings = {
+            on-unmatched = "info";
+            formatter.nixfmt = {
+              command = "nixfmt";
+              includes = [ "*.nix" ];
+            };
+            formatter.rustfmt = {
+              command = "kubaos-rustfmt";
+              includes = [ "*.rs" ];
+              excludes = [ "vendor/*" ];
+            };
+          };
+        }
+      );
+
+      # The toolchain `just fmt`, `just lint` and `just check` run on, here and
+      # in CI (.github/workflows/check.yml): rustc, cargo, clippy and nextest
+      # from this flake's nixpkgs, so flake.lock pins them.
+      #
+      # rustfmt is the nightly one (rustfmtNightly). RUSTFMT points `cargo fmt`
+      # and rust-analyzer at it, and it comes first on PATH for an editor that
+      # runs `rustfmt` itself. `just fmt` and `just fmt-check` refuse a rustfmt
+      # that isn't nightly.
+      #
+      # Cargo compiles through sccache, its cache under ~/.cache/sccache, so a
+      # fresh worktree reuses the crates.io dependencies another checkout
+      # already built. Only the shell's cargo: crane and the flake's packages
+      # build in the sandbox, without it.
+      devShells = forAllSystems (
+        pkgs:
+        let
+          rustfmt-nightly = rustfmtNightly pkgs;
+        in
+        {
+          default = pkgs.mkShell {
+            packages = [
+              rustfmt-nightly
+              pkgs.cargo
+              pkgs.rustc
+              pkgs.clippy
+              pkgs.cargo-nextest
+              pkgs.just
+              pkgs.actionlint
+              pkgs.nixfmt
+              self.formatter.${pkgs.stdenv.hostPlatform.system}
+              pkgs.sccache
+              home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
+            ];
+            RUSTFMT = pkgs.lib.getExe' rustfmt-nightly "rustfmt";
+            RUSTC_WRAPPER = pkgs.lib.getExe pkgs.sccache;
+            shellHook = ''
+              export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/sccache}
+            '';
+          };
+        }
+      );
     };
 }

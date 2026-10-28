@@ -119,7 +119,7 @@ cmd_build() {
     local want
     want="$(shasum -a 256 "$payload/manifest.json" | cut -d' ' -f1)"
     [[ -f $payload/check.ok && "$(<"$payload/check.ok")" == "$want" ]] ||
-      die "payload $payload hasn't passed install/image/check: run just check $arch"
+      die "payload $payload hasn't passed install/image/check: run just payload-check $arch"
     # A payload from another commit passes its check, but ships that
     # commit's system: say so, since the ISO is named after this tree.
     local pc head
