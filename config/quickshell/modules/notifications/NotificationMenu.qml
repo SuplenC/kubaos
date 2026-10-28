@@ -13,6 +13,8 @@ Item {
     // Whether it opens a modal panel of its own while it shows.
     property bool modal: false
     property var notification: null
+    // What had the keyboard before the menu took it, given back when it closes.
+    property Item returnTo: null
     readonly property var actions: root.notification?.actions.filter(a => a.identifier !== "default") ?? []
     readonly property var entries: [...root.actions.map(a => ({
                     text: a.text
@@ -38,6 +40,7 @@ Item {
         const window = root.Window.window;
         if (!window)
             return;
+        root.returnTo = window.activeFocusItem;
         root.parent = window.contentItem;
         root.notification = notification;
         menu.currentIndex = -1;
@@ -52,11 +55,18 @@ Item {
         root.notification = null;
         if (root.modal && Panels.current === "notificationmenu")
             Panels.close();
+        const back = root.returnTo;
+        root.returnTo = null;
+        if (back)
+            back.forceActiveFocus();
     }
 
+    // HAZARD: read what was picked before closing. Closing clears the notification, which takes
+    // its actions out of `entries` and moves every item after them.
     function take(index: int): void {
         const n = root.notification;
         const actions = root.actions;
+        const name = root.entries[index]?.text ?? "";
         root.close();
         if (!n)
             return;
@@ -64,7 +74,6 @@ Item {
             actions[index].invoke();
             return;
         }
-        const name = root.entries[index].text;
         if (name === "Open")
             Notifs.activate(n);
         else if (name === "Dismiss")

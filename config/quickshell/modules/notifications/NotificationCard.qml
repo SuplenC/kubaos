@@ -56,7 +56,9 @@ K.Pressable {
         return `${Qt.formatDateTime(at, Time.shortDateFormat)} ${time}`;
     }
 
-    // Time left before the popup hides (1 -> 0); paused while hovered.
+    // Whether something keeps it, as its open menu does: a popup waits while it is held.
+    property bool held: false
+    // Time left before the popup hides (1 -> 0); paused while hovered or held.
     property real remaining: 1
 
     // `body` as plain words. A notification's body may carry the spec's small set of markup
@@ -78,7 +80,7 @@ K.Pressable {
 
     NumberAnimation on remaining {
         running: root.popup && !root.critical
-        paused: running && root.pointerOver
+        paused: running && (root.pointerOver || root.held)
         from: 1
         to: 0
         duration: root.timeout
