@@ -12,8 +12,9 @@
 //!   ([`progress`]), empty states ([`empty`]), errors with a hint and a log ([`error`]), keycaps
 //!   and key hints ([`keycap`]), pictures in a box of a fixed aspect ([`media`]) and pictures to
 //!   pick ([`picture`]), tabs ([`tabs`]), quick toggle tiles ([`tile`]), meters and sparklines
-//!   ([`meter`]), sheets ([`sheet`]) and calendars ([`calendar`]), icon tiles and badges
-//!   ([`avatar`]) and skeletons ([`skeleton`]).
+//!   ([`meter`]), sheets ([`sheet`]), calendars ([`calendar`]), icon tiles and badges
+//!   ([`avatar`]), skeletons ([`skeleton`]), popovers and menus ([`menu`]), selects
+//!   ([`select`]), tables ([`table`]) and collapsibles ([`collapsible`]).
 //!
 //! # Not here
 //!
@@ -25,6 +26,7 @@ pub mod calendar;
 pub mod card;
 pub mod check;
 pub mod chip;
+pub mod collapsible;
 pub mod dialog;
 pub mod empty;
 pub mod error;
@@ -34,13 +36,16 @@ pub mod keycap;
 mod layer;
 pub mod list;
 pub mod media;
+pub mod menu;
 pub mod meter;
 pub mod picture;
 pub mod progress;
+pub mod select;
 pub mod sheet;
 pub mod skeleton;
 pub mod slider;
 pub mod switch;
+pub mod table;
 pub mod tabs;
 pub mod tile;
 pub mod toast;

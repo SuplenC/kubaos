@@ -134,7 +134,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
 | Aspect ratios (`[aspect]`) | wallpaper 16:10 |
 
@@ -276,6 +276,13 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Skeleton` | `line`, `circle` or `block` | none | small, full, or the caller's |
 | `ListRow` | `one-line` or `two-line`; `icon` | height | control, nested 12 in a surface |
 | `Field` | `icon` | height | control |
+| `Select` | `icon` | height | control |
+| `Popover` | none | none, holds content | surface |
+| `Menu` | none | none | none |
+| `MenuItem` | `icon`, `check`, `danger` | height | control, nested 12 in a popover |
+| `Table` | none | none | none |
+| `TableRow` | none | height | control |
+| `Collapsible` | `open` | none, holds content | control, its header |
 | `Spinner` | size `16`, `20`, `24`, `32`, `48` | both | none |
 | `Switch` | none | both | full |
 | `Slider` | `stepped` | height | full |
@@ -383,7 +390,18 @@ Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so 
 | `Tile` | `tile::tile` | A quick toggle: a 20 symbol, a `body_strong` title over a `small` status line, as tall as a two-line row (56) at the control radius, 12 inside. On, it fills with `primary` and its content takes `on_primary`; off, `surface_container_high`. A press toggles it. A tile with more behind it ends in a detail arrow (`detail`), a 32 circle 12 from its end with a 16 chevron, which opens it; → does too. The arrow is a small control and stays quiet: no fill, in the tile's own content colour, its state layer under the pointer, and the tile's own layer gives way while the pointer is on it. The control center's Wi-Fi, Bluetooth and the rest. |
 | `Calendar` | `calendar::calendar` | A month as six weeks, each led by its ISO week number (`caption`, a small control wide), under the weekdays' names (`label`, weekends in `tertiary`). A day is a regular control (40), its disc a small one (32), a pill: today filled with `primary`, the picked day ringed with it in the thin stroke, a holiday dotted in `tertiary`, the days of the months around dimmed to the disabled content's 0.38. Between the arrows (`Text` `Sm` icon buttons) the title, a `subheading` pill, opens the year (`year`): the twelve months three to a row, the one shown filled. The app works the month out (`kubaos-clock` for the shell); the shell's slides a new month in from the side it lies on over `short`, and the wheel moves a month. The clock popup's. |
 
+| `Select` | `select::select` | One of a list too long for radio rows or tabs: a field's look (40, the control radius, a hairline, `surface_container_high`), the picked option in `body_large`, an optional 20 symbol before it and a chevron at its end. Enter, Space or a click opens its menu on a popover 4 under it, as wide as it, the picked option checked and the keyboard on it; open, its hairline takes the accent and its chevron turns up. ↑ ↓ and Enter pick, Esc or a click elsewhere closes it. In iced the app opens the menu and draws it. The clock's holidays. |
+
 A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's Items, never a hand-rolled filter: see the QML rules in `docs/agents/code-quality.md`. A field that parses what is typed (a time, a password) isn't a search.
+
+### Menus, tables and collapsibles
+
+| Name | Rust | What |
+|---|---|---|
+| `Popover` | `menu::popover` | The floating surface a menu sits on: `surface_container`, a soft hairline, the panel's shadow, the surface radius (24), 12 inside, so its items take 24 − 12 = 12, the control radius. It floats over the window at its anchor (a tray icon, the pointer, under a select), a menu's width (240, `menu`) or its select's; `kubaos-ui` draws one where it is laid out. |
+| `Menu`, `MenuItem` | `menu::menu`, `menu::menu_item`, `menu::menu_separator` | A few actions or choices one under the other. An item is a small control tall (32), 12 inside: an optional 20 symbol (`icon`), its words in `body` on one line, the keys that do the same as keycaps, and a check whose room is kept when unchecked (`check`). The item the keyboard is on takes `secondary_container`; one that destroys something (`danger`) is in `error`; one that can't be taken is dimmed. A hairline 4 clear of each side separates groups. ↑ ↓ (j k, Ctrl+J/K/N/P), Home and End move over the items that can be taken, Enter takes one, Esc leaves. The tray's app menus and a select's list. |
+| `Table`, `TableRow` | `table::table`, `table::table_row` | Readings in columns: a header in `label`, then a row per entry, each a line of body text with 4 above and below (28, `row_compact`), so many fit. Columns take set shares of the width, 12 apart, 12 in from the row's ends; words sit at their column's start on one line, ending in an ellipsis; numbers at its right edge in `mono_large`, so their digits line up. The whole row is one control: the pointer over it lays the state layer across every cell, and the picked row takes `secondary_container`. The system monitor's processes. |
+| `Collapsible` | `collapsible::collapsible` | A titled part that opens to show more: a header as tall as a row (44), its title in `body_strong` and a chevron at its end, down while closed and up while open (`open`); open, the content 8 under it. The shell reveals it over `medium` (`standard_decel`) and hides it over `short`. The system monitor's process details. |
 
 ### Lists, chips and cards
 

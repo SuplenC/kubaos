@@ -96,6 +96,11 @@ control_lg = 48
 # A list row with one line, and with a title over a subtitle.
 row = 44
 row_two_line = 56
+# A table's row: a line of body text with 4 above and below, so a list of readings (the
+# system monitor's processes) stays dense and each row is still easy to hit.
+row_compact = 28
+# A menu's width: an item's symbol, its words and a shortcut's keycaps side by side.
+menu = 240
 chip = 24
 # A badge over an icon's corner: a count's pill, a line of label text tall, and
 # a dot, the size of a picked radio button's.

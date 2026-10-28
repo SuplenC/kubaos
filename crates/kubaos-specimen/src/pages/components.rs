@@ -30,6 +30,7 @@ use kubaos_ui::component::check::checkbox;
 use kubaos_ui::component::check::radio;
 use kubaos_ui::component::chip::ChipKind;
 use kubaos_ui::component::chip::chip;
+use kubaos_ui::component::collapsible::collapsible;
 use kubaos_ui::component::dialog::Tone;
 use kubaos_ui::component::dialog::dialog;
 use kubaos_ui::component::dialog::prompt;
@@ -50,12 +51,17 @@ use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
 use kubaos_ui::component::media::Aspect;
 use kubaos_ui::component::media::media;
+use kubaos_ui::component::menu::menu;
+use kubaos_ui::component::menu::menu_item;
+use kubaos_ui::component::menu::menu_separator;
+use kubaos_ui::component::menu::popover;
 use kubaos_ui::component::meter::meter;
 use kubaos_ui::component::meter::sparkline;
 use kubaos_ui::component::picture::NamePlace;
 use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::progress::spinner;
+use kubaos_ui::component::select::select;
 use kubaos_ui::component::sheet;
 use kubaos_ui::component::skeleton::Bone;
 use kubaos_ui::component::skeleton::skeleton;
@@ -63,6 +69,9 @@ use kubaos_ui::component::slider::Value;
 use kubaos_ui::component::slider::slider;
 use kubaos_ui::component::slider::slider_held;
 use kubaos_ui::component::switch::switch;
+use kubaos_ui::component::table::Column;
+use kubaos_ui::component::table::table;
+use kubaos_ui::component::table::table_row;
 use kubaos_ui::component::tabs::Tab;
 use kubaos_ui::component::tabs::tabs;
 use kubaos_ui::component::tile::tile;
@@ -195,6 +204,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             readings(look),
         ))
         .push(section(look, "Empty states", None, empties(look)))
+        .extend(menus_tables_and_collapsibles(look))
         .push(section(look, "Errors", Some("What broke, what to do next, and the log behind it."), errors(look)))
         .into()
 }
@@ -1094,5 +1104,160 @@ fn skeletons<'a>(look: &Look) -> Element<'a, Message> {
     grid(look, 2, Space::S24)
         .push(scanning)
         .push(skeleton(look, Bone::Block(Size::ControlLg, Radius::Control)))
+        .into()
+}
+
+/// The sections of popovers and menus, tables and collapsibles.
+fn menus_tables_and_collapsibles<'a>(look: &Look) -> Vec<Element<'a, Message>> {
+    vec![
+        section(
+            look,
+            "Selects and menus",
+            Some(
+                "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control.",
+            ),
+            menus(look),
+        ),
+        section(
+            look,
+            "Tables",
+            Some(
+                "Readings in columns, a line of text with 4 above and below a row; the whole row takes the pointer, numbers line up at their column's right edge.",
+            ),
+            tables(look),
+        ),
+        section(
+            look,
+            "Collapsibles",
+            Some("A titled part that opens to show more."),
+            collapsibles(look),
+        ),
+    ]
+}
+
+/// The keys of the menu samples' shortcuts.
+const OPEN_KEYS: [&str; 1] = ["Enter"];
+const COPY_KEYS: [&str; 2] = ["Ctrl", "C"];
+
+fn menus<'a>(look: &Look) -> Element<'a, Message> {
+    let countries = ["None", "Germany", "Italy", "Poland"];
+    let picked = menu(
+        look,
+        countries.into_iter().map(|name| {
+            menu_item(name)
+                .checked(name == "Poland")
+                .highlighted(name == "Italy")
+                .on_press(Message::Sample)
+                .view(look)
+        }),
+    );
+    let open = stack(look, Space::S8)
+        .width(Extent::Fill)
+        .push(
+            select("Poland")
+                .icon(Icon::Flag)
+                .open(true)
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(popover(look, Extent::Fill, picked));
+    let context = popover(
+        look,
+        Extent::Fixed(Size::Menu),
+        menu(
+            look,
+            [
+                menu_item("Open")
+                    .icon(Icon::FolderOpen)
+                    .shortcut(&OPEN_KEYS)
+                    .highlighted(true)
+                    .on_press(Message::Sample)
+                    .view(look),
+                menu_item("Copy path")
+                    .icon(Icon::ContentPaste)
+                    .shortcut(&COPY_KEYS)
+                    .on_press(Message::Sample)
+                    .view(look),
+                menu_separator(look),
+                menu_item("Pin to the top")
+                    .icon(Icon::PushPin)
+                    .on_press(Message::Sample)
+                    .view(look),
+                menu_item::<Message>("Forget").icon(Icon::Close).view(look),
+                menu_separator(look),
+                menu_item("Quit")
+                    .icon(Icon::Logout)
+                    .danger()
+                    .on_press(Message::Sample)
+                    .view(look),
+            ],
+        ),
+    );
+    let closed = stack(look, Space::S16)
+        .width(Extent::Fill)
+        .push(select("Every 5 minutes").on_press(Message::Sample).view(look))
+        .push(
+            select("Every 5 minutes")
+                .on_press(Message::Sample)
+                .focused(true)
+                .view(look),
+        )
+        .push(select::<Message>("Unavailable").view(look));
+    grid(look, 3, Space::S24).push(open).push(context).push(closed).into()
+}
+
+fn tables<'a>(look: &Look) -> Element<'a, Message> {
+    let columns = [
+        Column::new("Name", 4),
+        Column::new("CPU", 1).numeric(),
+        Column::new("Memory", 1).numeric(),
+    ];
+    let processes = [
+        ("firefox", "38.4%", "2.1 GB"),
+        ("Hyprland", "12.1%", "384 MB"),
+        ("rust-analyzer", "9.7%", "1.8 GB"),
+        ("quickshell", "4.2%", "256 MB"),
+    ];
+    let rows: Vec<Element<'a, Message>> = processes
+        .into_iter()
+        .map(|(name, cpu, memory)| {
+            table_row(vec![name.to_owned(), cpu.to_owned(), memory.to_owned()])
+                .selected(name == "Hyprland")
+                .on_press(Message::Sample)
+                .view(look, &columns)
+        })
+        .collect();
+    table(look, &columns, rows)
+}
+
+fn collapsibles<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    grid(look, 2, Space::S24)
+        .push(collapsible(
+            look,
+            "firefox · pid 4127",
+            true,
+            Message::Sample,
+            false,
+            stack(look, Space::S4)
+                .push(text(
+                    "/usr/lib/firefox/firefox -contentproc",
+                    Type::Mono,
+                    c.on_surface_variant,
+                ))
+                .push(text(
+                    "kuba · sleeping · 92 threads · 2.1 GB",
+                    Type::Small,
+                    c.on_surface_variant,
+                )),
+        ))
+        .push(collapsible(
+            look,
+            "Hyprland · pid 1203",
+            false,
+            Message::Sample,
+            true,
+            text("Hidden while closed.", Type::Small, c.on_surface_variant),
+        ))
         .into()
 }

@@ -1382,6 +1382,184 @@ K.Stack {
                 }
 
                 K.Section {
+                    title: "Selects and menus"
+                    description: "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control."
+
+                    K.Grid {
+                        columns: 3
+                        gap: K.Tokens.space.s24
+
+                        K.Stack {
+                            fill: true
+                            gap: K.Tokens.space.s8
+
+                            K.Select {
+                                options: ["None", "Germany", "Italy", "Poland"]
+                                currentIndex: 3
+                                icon: "flag"
+                                open: true
+                            }
+
+                            K.Popover {
+                                fillWidth: true
+
+                                K.Menu {
+                                    currentIndex: 2
+                                    entries: ["None", "Germany", "Italy", "Poland"].map(name => ({
+                                                text: name,
+                                                checkable: true,
+                                                checked: name === "Poland"
+                                            }))
+                                }
+                            }
+                        }
+
+                        K.Popover {
+                            fixedWidth: K.Tokens.size.menu
+
+                            K.Menu {
+                                currentIndex: 0
+                                entries: [
+                                    {
+                                        text: "Open",
+                                        icon: "folder_open",
+                                        shortcut: ["Enter"]
+                                    },
+                                    {
+                                        text: "Copy path",
+                                        icon: "content_paste",
+                                        shortcut: ["Ctrl", "C"]
+                                    },
+                                    {
+                                        separator: true
+                                    },
+                                    {
+                                        text: "Pin to the top",
+                                        icon: "push_pin"
+                                    },
+                                    {
+                                        text: "Forget",
+                                        icon: "close",
+                                        enabled: false
+                                    },
+                                    {
+                                        separator: true
+                                    },
+                                    {
+                                        text: "Quit",
+                                        icon: "logout",
+                                        danger: true
+                                    }
+                                ]
+                            }
+                        }
+
+                        K.Stack {
+                            fill: true
+                            gap: K.Tokens.space.s16
+
+                            K.Select {
+                                options: ["Every 5 minutes"]
+                                currentIndex: 0
+                            }
+
+                            K.Select {
+                                options: ["Every 5 minutes"]
+                                currentIndex: 0
+                                focused: true
+                            }
+
+                            K.Select {
+                                options: ["Unavailable"]
+                                currentIndex: 0
+                                enabled: false
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Tables"
+                    description: "Readings in columns, a line of text with 4 above and below a row; the whole row takes the pointer, numbers line up at their column's right edge."
+
+                    K.Table {
+                        columns: [
+                            {
+                                title: "Name",
+                                weight: 4
+                            },
+                            {
+                                title: "CPU",
+                                weight: 1,
+                                numeric: true
+                            },
+                            {
+                                title: "Memory",
+                                weight: 1,
+                                numeric: true
+                            }
+                        ]
+                        rows: [
+                            {
+                                cells: ["firefox", "38.4%", "2.1 GB"]
+                            },
+                            {
+                                cells: ["Hyprland", "12.1%", "384 MB"],
+                                selected: true
+                            },
+                            {
+                                cells: ["rust-analyzer", "9.7%", "1.8 GB"]
+                            },
+                            {
+                                cells: ["quickshell", "4.2%", "256 MB"]
+                            }
+                        ]
+                    }
+                }
+
+                K.Section {
+                    title: "Collapsibles"
+                    description: "A titled part that opens to show more."
+
+                    K.Grid {
+                        columns: 2
+                        gap: K.Tokens.space.s24
+
+                        K.Collapsible {
+                            title: "firefox · pid 4127"
+                            open: true
+
+                            K.Stack {
+                                gap: K.Tokens.space.s4
+
+                                K.Text {
+                                    text: "/usr/lib/firefox/firefox -contentproc"
+                                    style: K.Tokens.type.mono
+                                    color: K.Tokens.color.on_surface_variant
+                                }
+
+                                K.Text {
+                                    text: "kuba · sleeping · 92 threads · 2.1 GB"
+                                    style: K.Tokens.type.small
+                                    color: K.Tokens.color.on_surface_variant
+                                }
+                            }
+                        }
+
+                        K.Collapsible {
+                            title: "Hyprland · pid 1203"
+                            focused: true
+
+                            K.Text {
+                                text: "Hidden while closed."
+                                style: K.Tokens.type.small
+                                color: K.Tokens.color.on_surface_variant
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
                     title: "Errors"
                     description: "What broke, what to do next, and the log behind it."
 

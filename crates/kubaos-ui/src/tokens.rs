@@ -169,6 +169,7 @@ pub enum Size {
     Hanko,
     Keycap,
     Log,
+    Menu,
     NeonMark,
     Panel,
     Password,
@@ -176,6 +177,7 @@ pub enum Size {
     RadioDot,
     Rail,
     Row,
+    RowCompact,
     RowTwoLine,
     Scrollbar,
     Slider,
@@ -192,7 +194,7 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 32] = [
+    pub const ALL: [Size; 34] = [
         Size::Badge,
         Size::BadgeDot,
         Size::Bar,
@@ -206,6 +208,7 @@ impl Size {
         Size::Hanko,
         Size::Keycap,
         Size::Log,
+        Size::Menu,
         Size::NeonMark,
         Size::Panel,
         Size::Password,
@@ -213,6 +216,7 @@ impl Size {
         Size::RadioDot,
         Size::Rail,
         Size::Row,
+        Size::RowCompact,
         Size::RowTwoLine,
         Size::Scrollbar,
         Size::Slider,
@@ -243,6 +247,7 @@ impl Size {
             Size::Hanko => 120,
             Size::Keycap => 20,
             Size::Log => 232,
+            Size::Menu => 240,
             Size::NeonMark => 200,
             Size::Panel => 384,
             Size::Password => 320,
@@ -250,6 +255,7 @@ impl Size {
             Size::RadioDot => 8,
             Size::Rail => 236,
             Size::Row => 44,
+            Size::RowCompact => 28,
             Size::RowTwoLine => 56,
             Size::Scrollbar => 4,
             Size::Slider => 24,

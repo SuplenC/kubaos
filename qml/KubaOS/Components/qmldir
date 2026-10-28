@@ -30,6 +30,14 @@ KeyHints 1.0 KeyHints.qml
 Button 1.0 Button.qml
 IconButton 1.0 IconButton.qml
 Field 1.0 Field.qml
+Select 1.0 Select.qml
+Popover 1.0 Popover.qml
+Menu 1.0 Menu.qml
+MenuItem 1.0 MenuItem.qml
+Table 1.0 Table.qml
+TableRow 1.0 TableRow.qml
+TableCell 1.0 TableCell.qml
+Collapsible 1.0 Collapsible.qml
 Labelled 1.0 Labelled.qml
 Note 1.0 Note.qml
 Switch 1.0 Switch.qml
