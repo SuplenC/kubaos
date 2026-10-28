@@ -574,6 +574,8 @@ fn footer<'a>(app: &'a App, look: &Look) -> El<'a> {
                 .push(icon(look, Icon::Error, IconSize::S16, colour))
                 .push(text(b, Type::Small, colour)),
         );
+    } else if let Some(note) = footer_note(app) {
+        r = r.push(text(note, Type::Small, c.on_surface_variant));
     }
     if app.screen != Screen::Summary {
         r = r.push(
@@ -585,6 +587,22 @@ fn footer<'a>(app: &'a App, look: &Look) -> El<'a> {
         );
     }
     r.into()
+}
+
+/// What the footer says beside Continue when nothing blocks it: on Wallpapers, how many are
+/// picked. It sits here rather than under the page's scroll, so the scroll runs down to the
+/// footer with nothing loose under its cut. With none picked, the blocker says so instead.
+fn footer_note(app: &App) -> Option<String> {
+    if app.screen != Screen::Wallpapers {
+        return None;
+    }
+    let sets = app.wallpaper_sets();
+    let total: u32 = sets.iter().map(|s| s.images).sum();
+    match app.form.wallpapers_picked(sets) {
+        0 => None,
+        n if n == total => Some(format!("All {total} picked.")),
+        n => Some(format!("{n} of {total} picked.")),
+    }
 }
 
 // -------------------------------------------------------------- screens --
@@ -1433,7 +1451,6 @@ pub fn wallpapers_summary(
 }
 
 fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
-    let c = look.colors;
     let sets = app.wallpaper_sets();
     let mut sections = stack(look, Space::S40).padding(Inset::NONE.right(Space::S16));
     for (s, set) in sets.iter().enumerate() {
@@ -1444,13 +1461,6 @@ fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
                 .push(grid(look, WALLPAPER_COLUMNS as u16, Space::S16).extend(cards)),
         );
     }
-    let total: u32 = sets.iter().map(|s| s.images).sum();
-    let picked = app.form.wallpapers_picked(sets);
-    let note = match picked {
-        0 => "None picked. The picker needs at least one to start on.".to_string(),
-        n if n == total => format!("All {total} picked."),
-        n => format!("{n} of {total} picked."),
-    };
     let apart = Space::S20;
     stack(look, apart)
         .height(Extent::Fill)
@@ -1467,9 +1477,8 @@ fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
                 .id(ids::WALLPAPER_SCROLL)
                 .height(Extent::Fill)
                 .room_above(apart)
-                .room_below(apart),
+                .room_below(FOOTER_GAP),
         )
-        .push(text(note, Type::Small, c.on_surface_variant))
         .into()
 }
 
