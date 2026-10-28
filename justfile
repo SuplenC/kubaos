@@ -43,8 +43,8 @@ release: test
     just iso x86_64
     ls -lh iso/kubaos-{{codename}}-{{ver}}-*.iso
 
-# What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests, the shell's logic tests and the design checks.
-check: fmt-check lint nextest qml-test design-check
+# What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests, the shell's logic tests, the screenshot harness's tests and the design checks.
+check: fmt-check lint nextest qml-test shots-test design-check
 
 # The shell's logic tests (test/qml) in Qt's test runner, headless, as `nix flake check` runs them (crates/checks.nix, qml-logic). The flake sees the files git knows about: `git add` a new test first.
 qml-test:
@@ -152,10 +152,14 @@ vm-install arch=host config="":
 vm-user-layer user="kuba":
     test/vm/run ssh "runuser -l {{user}} -c '. /etc/default/locale; export LANG XDG_RUNTIME_DIR=/run/user/\$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$(id -u)/bus; /usr/share/kubaos/test/user-layer-check'"
 
-# Before/after screenshots for a design PR (test/shots/shots, docs/agents/design-pr-loop.md): the surfaces changed against origin/main at 1× and 1.5× dark, or `just shots SURFACE… [--scales 1,1.5] [--modes dark,light] [--ref REV] [--full]`; `just shots kobo`, `just shots specimen`; `just shots publish BRANCH` prints the PR's table. Writes test/out/shots/.
+# Before/after screenshots for a design PR (test/shots/shots, docs/agents/design-pr-loop.md): the surfaces and specimen pages whose sources changed against origin/main at 1× and 1.5× dark, `just shots --all` every one, or `just shots SURFACE… [--scales 1,1.5] [--modes dark,light] [--ref REV] [--full]`; `just shots kobo`, `just shots specimen`, `just shots specimen/components`; `just shots publish BRANCH` prints the PR's table. Writes test/out/shots/, and keeps the before-trees of the last four base commits in ~/.cache/kubaos/shots.
 [positional-arguments]
 shots *args:
     nix run .#shots -- "$@"
+
+# The screenshot harness's tests (test/shots/shots-test): which surfaces a change renders, the table of their sources, and the pruning of the before-trees, on a throwaway repository and cache.
+shots-test:
+    test/shots/shots-test .
 
 # Screenshot session in Docker (test/run shots): `just shots-session`, then `test/run shots shot NAME`.
 shots-session *flags="--hyprland":

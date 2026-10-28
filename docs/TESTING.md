@@ -8,7 +8,7 @@ The point: a broken config shows up as a red FAIL in a container, not as a black
 
 Needs Docker Engine with BuildKit and Compose v2. Everything the harness creates is called `dotfiles-test-*` (containers, network, volumes) or `dotfiles-nix`, so it never touches other containers. It never touches the machine's session or its `~/.config`, `/etc` or `/usr` either: the repo and the machine's Nix store are mounted read-only, and everything else lives in the harness's own volumes and `test/out/`.
 
-Before/after screenshots of a UI change don't need Docker: `just shots` renders the shell's surfaces, Kōbō and the specimen headless, against stand-in services, and pairs and diffs them (`docs/agents/design-pr-loop.md`). The session below (`just shots-session`) is for looking at the whole desktop.
+Before/after screenshots of a UI change don't need Docker: `just shots` renders the shell's surfaces, Kōbō and the specimen's pages headless, against stand-in services, and pairs and diffs them (`docs/agents/design-pr-loop.md`). It renders only what the branch's changes reach, and keeps the before-trees of the last four base commits in `~/.cache/kubaos/shots`. Its own logic has tests outside Docker, in `just check` and CI: `just shots-test` (`test/shots/shots-test`) checks which surfaces a change renders, holds the table of their sources (`test/shots/surfaces`) to every surface, specimen page and path there is, and prunes a throwaway cache, a base a run holds and the shared `target/` kept. The session below (`just shots-session`) is for looking at the whole desktop.
 
 ## Commands
 

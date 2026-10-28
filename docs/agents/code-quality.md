@@ -6,7 +6,7 @@ New code follows every rule here. Older code is brought in line where you touch 
 
 Tools check some of these rules: `shellcheck` in the shell harness (`test/lib/e2e.sh`), `nix fmt`, rustfmt and clippy (`just fmt-check`, `just lint`), and the design checks (`just design-check`, below). The reviewer checks the rest.
 
-`just check` runs what a pull request must pass: `fmt-check`, `lint`, the workspace's tests (`just nextest`) and `design-check`. Run it in `nix develop`, which pins the toolchain from `flake.lock`; CI runs the same recipes on every pull request (`.github/workflows/check.yml`), with `nix flake check --no-build`.
+`just check` runs what a pull request must pass: `fmt-check`, `lint`, the workspace's tests (`just nextest`), the shell's logic tests (`qml-test`), the screenshot harness's tests (`shots-test`) and `design-check`. Run it in `nix develop`, which pins the toolchain from `flake.lock`; CI runs the same recipes on every pull request (`.github/workflows/check.yml`), with `nix flake check --no-build`.
 
 ## Comments, in every language
 

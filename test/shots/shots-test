@@ -1,0 +1,433 @@
+#!/usr/bin/env bash
+# test/shots/shots-test: test/shots/lib.sh, what `just shots` renders for a change and how it
+# prunes its cache. The table of surfaces is checked as the repo has it: every surface lists its
+# own sources, every source exists, and a page of the specimen is in it when `kubaos-specimen`
+# draws it. The pruning runs on a throwaway repository and cache. Needs bash, coreutils,
+# findutils, util-linux's flock, git, and cargo for the specimen's pages.
+#
+#   test/shots/shots-test REPO
+#
+# Prints an ok or FAIL line per test and exits 1 when any fails.
+# shellcheck disable=SC2329 # The tests are called by name from the list at the end.
+set -euo pipefail
+# A test function stops at its first failed check, inside the command substitution too.
+shopt -s inherit_errexit
+
+REPO="$(cd "${1:?usage: test/shots/shots-test REPO}" && pwd)"
+TABLE="$REPO/test/shots/surfaces"
+SCENARIOS="$REPO/test/shots/scenarios"
+# shellcheck source=test/shots/lib.sh
+source "$REPO/test/shots/lib.sh"
+failed=0
+
+# A repository whose main has six commits, C1 the oldest, and an empty shots cache.
+new_repo() {
+  T="$(mktemp -d)"
+  M="$T/repo"
+  CACHE="$T/cache/kubaos/shots"
+  mkdir -p "$M" "$CACHE"
+  git -C "$M" init -q -b main
+  local i
+  for i in 1 2 3 4 5 6; do
+    commit "C$i"
+  done
+}
+
+commit() {
+  git -C "$M" -c user.name=test -c user.email=test@kubaos -c commit.gpgsign=false \
+    commit -q --allow-empty -m "$1"
+  printf -v "$1" '%s' "$(git -C "$M" rev-parse HEAD)"
+}
+
+# base SHA AGE [HARNESS...]: a base's trees in the cache, last used AGE ago, with a BEFORE shot
+# of each HARNESS version.
+base() {
+  local dir=$CACHE/$1 age=$2 h
+  shift 2
+  mkdir -p "$dir/tree" "$dir/iced"
+  touch "$dir/tree/flake.nix" "$dir/iced/specimen-type-dark-1x.png"
+  for h in "$@"; do
+    mkdir -p "$dir/$h"
+    touch "$dir/$h/bar-dark-1x.png"
+  done
+  touch "$dir/.used"
+  find "$dir" -exec touch -d "$age ago" {} +
+}
+
+run_prune() { bash -c 'source "$1"; prune "$2" "$3"' _ "$REPO/test/shots/lib.sh" "$CACHE" "$M"; }
+
+bases() { (cd "$CACHE" && find . -mindepth 1 -maxdepth 1 -regextype egrep -regex '\./[0-9a-f]{40}' -printf '%f\n' | sort); }
+
+sorted() { printf '%s\n' "$@" | sort; }
+
+touched() { printf '%s\n' "$@" | surfaces_touched "$TABLE" "$SCENARIOS" | tr '\n' ' '; }
+
+test_case() {
+  local name="$1" out rc
+  shift
+  new_repo
+  set +e
+  out="$(set -e; "$@" 2>&1)"
+  rc=$?
+  set -e
+  if ((rc == 0)); then
+    echo "ok   $name"
+  else
+    echo "FAIL $name"
+    printf '%s\n' "$out" | sed 's/^/     /'
+    failed=1
+  fi
+  rm -rf "$T"
+}
+
+# expect WHAT ACTUAL WANT
+expect() {
+  [[ $2 == "$3" ]] || { printf '%s:\n  got:  %q\n  want: %q\n' "$1" "$2" "$3"; return 1; }
+}
+
+a_shell_modules_file_renders_its_surface_alone() {
+  expect "the OSD" "$(touched config/quickshell/modules/osd/Osd.qml)" "osd "
+  expect "the menu" "$(touched config/quickshell/modules/menu/Menu.qml)" "menu "
+}
+
+the_frame_renders_every_surface_that_opens_in_it() {
+  expect "the frame" "$(touched config/quickshell/modules/frame/Frame.qml)" \
+    "bar clock controlcenter notifications osd powermenu sysmon wallpaper "
+}
+
+a_specimen_pages_own_file_renders_that_page_alone() {
+  expect "a section" "$(touched crates/kubaos-specimen/src/pages/components/buttons.rs)" "specimen/components "
+  expect "the type page" "$(touched crates/kubaos-specimen/src/pages/type_scale.rs)" "specimen/type "
+  expect "a QML section" "$(touched qml/specimen/sections/Buttons.qml)" "specimen/qml "
+}
+
+the_specimens_shared_code_renders_every_page() {
+  expect "the shot" "$(touched crates/kubaos-specimen/src/shot.rs)" "$(specimen_pages "$TABLE" | tr '\n' ' ')"
+}
+
+a_shared_input_renders_everything() {
+  local every path
+  every=$(every_surface "$TABLE" "$SCENARIOS" | tr '\n' ' ')
+  for path in design/tokens.toml crates/kubaos-tokens/src/main.rs Cargo.toml Cargo.lock flake.lock \
+    test/shots/shots test/shots/lib.sh test/shots/surfaces test/shots/package.nix; do
+    expect "$path" "$(touched "$path")" "$every"
+  done
+}
+
+# but SURFACE...: every surface but those, as `touched` prints them.
+but() {
+  every_surface "$TABLE" "$SCENARIOS" | grep -vxF -f <(printf '%s\n' "$@") | tr '\n' ' '
+}
+
+a_qml_component_renders_the_qml_surfaces_alone() {
+  local drawn iced
+  mapfile -t iced < <(specimen_pages "$TABLE" | grep -vx specimen/qml)
+  drawn=$(touched qml/KubaOS/Components/Button.qml)
+
+  expect "a component" "$drawn" "$(but kobo terminals plymouth grub cursor "${iced[@]}")"
+  [[ " $drawn " != *" grub "* && " $drawn " != *" plymouth "* ]] || { echo "it renders the boot screens"; return 1; }
+}
+
+kubaos_uis_code_renders_the_iced_surfaces_alone() {
+  expect "the code" "$(touched crates/kubaos-ui/src/lib.rs)" \
+    "kobo $(specimen_pages "$TABLE" | grep -vx specimen/qml | tr '\n' ' ')"
+  expect "the geometry" "$(touched crates/kubaos-geometry/src/lib.rs)" \
+    "kobo $(specimen_pages "$TABLE" | grep -vx specimen/qml | tr '\n' ' ')"
+}
+
+kubaos_uis_fonts_render_every_surface_that_draws_text_with_them() {
+  expect "a font" "$(touched crates/kubaos-ui/assets/fonts/GeistMono-Regular.ttf)" "$(but plymouth grub cursor)"
+}
+
+kubaos_uis_symbols_render_the_shell_and_the_iced_and_qml_surfaces() {
+  expect "a symbol" "$(touched crates/kubaos-ui/assets/symbols/wifi.svg)" "$(but terminals plymouth grub cursor)"
+}
+
+a_file_no_surface_draws_renders_nothing() {
+  expect "a service" "$(touched config/quickshell/services/Net.qml)" ""
+  expect "a doc" "$(touched docs/DESIGN.md)" ""
+}
+
+a_change_renders_the_surfaces_of_all_its_files() {
+  expect "two files" "$(touched config/quickshell/modules/osd/Osd.qml qml/specimen/sections/Tabs.qml)" \
+    "osd specimen/qml "
+}
+
+the_table_lists_sources_for_every_surface() {
+  expect "the table's problems" "$(table_problems "$TABLE" "$SCENARIOS" "$REPO")" ""
+}
+
+a_surface_without_sources_fails_the_table() {
+  grep -v '^kobo ' "$TABLE" >"$T/surfaces"
+
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" "kobo has no sources"
+}
+
+a_source_that_isnt_there_fails_the_table() {
+  sed 's#^osd .*#& config/quickshell/modules/osd-gone#' "$TABLE" >"$T/surfaces"
+
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
+    "osd lists config/quickshell/modules/osd-gone, which isn't in the repo"
+}
+
+a_line_for_no_surface_fails_the_table() {
+  { cat "$TABLE"; echo "dock config/quickshell/modules/bar"; } >"$T/surfaces"
+
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" "dock is no surface"
+}
+
+a_path_under_a_shared_input_listed_by_one_surface_fails_the_table() {
+  sed 's#^terminals .*#& crates/kubaos-tokens/src#' "$TABLE" >"$T/surfaces"
+
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
+    "terminals lists crates/kubaos-tokens/src, under the shared crates/kubaos-tokens: a change there would render terminals alone"
+}
+
+a_shell_module_in_no_line_fails_the_table() {
+  grep -v '^menu ' "$TABLE" >"$T/surfaces"
+
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
+    "$(printf '%s\n' "menu has no sources" "config/quickshell/modules/menu is in no line: a change there would render nothing")"
+}
+
+a_harness_file_in_no_line_fails_the_table() {
+  sed 's# test/shots/stage.py##' "$TABLE" >"$T/surfaces"
+
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
+    "test/shots/stage.py is in no line: a change there would render nothing"
+}
+
+every_page_of_the_specimen_is_in_the_table() {
+  local drawn
+  drawn=$(cd "$REPO" && cargo run -q -p kubaos-specimen -- pages | sed 's#^#specimen/#' | sort)
+
+  expect "the pages" "$(specimen_pages "$TABLE" | grep -v '^specimen/qml$')" "$drawn"
+}
+prune_keeps_the_last_used_bases_and_drops_the_rest() {
+  base "$C1" '7 hours'
+  base "$C2" '6 hours'
+  base "$C3" '2 hours'
+  base "$C4" '5 hours'
+  base "$C5" '4 hours'
+  base "$C6" '3 hours'
+
+  run_prune >/dev/null
+
+  expect "the bases" "$(bases)" "$(sorted "$C3" "$C4" "$C5" "$C6")"
+}
+
+a_base_no_branch_has_is_dropped_however_recently_used() {
+  git -C "$M" switch -q -c chore/gone
+  commit GONE
+  git -C "$M" switch -q main
+  git -C "$M" branch -q -D chore/gone
+  base "$C6" '3 hours'
+  base "$GONE" '2 hours'
+  base 0123456789abcdef0123456789abcdef01234567 '2 hours'
+
+  run_prune >/dev/null
+
+  expect "the bases" "$(bases)" "$C6"
+}
+
+the_runs_own_base_is_kept_on_no_branch() {
+  base 0123456789abcdef0123456789abcdef01234567 '2 hours'
+
+  bash -c 'source "$1"; prune "$2" "$3" "$4"' _ "$REPO/test/shots/lib.sh" "$CACHE" "$M" \
+    0123456789abcdef0123456789abcdef01234567 >/dev/null
+
+  expect "the bases" "$(bases)" "0123456789abcdef0123456789abcdef01234567"
+}
+
+a_base_written_in_the_last_hour_is_never_dropped() {
+  base 0123456789abcdef0123456789abcdef01234567 '9 hours'
+  touch -d '10 minutes ago' "$CACHE/0123456789abcdef0123456789abcdef01234567/iced/kobo-dark-1x.png"
+
+  run_prune >/dev/null
+
+  expect "the bases" "$(bases)" "0123456789abcdef0123456789abcdef01234567"
+}
+
+a_base_on_a_local_branch_alone_is_kept() {
+  git -C "$M" switch -q -c feature/work
+  commit WORK
+  git -C "$M" switch -q main
+  base "$WORK" '2 hours'
+
+  run_prune >/dev/null
+
+  expect "the bases" "$(bases)" "$WORK"
+}
+
+a_base_on_origin_main_alone_is_kept() {
+  git -C "$M" switch -q -c later
+  commit LATER
+  git -C "$M" update-ref refs/remotes/origin/main "$LATER"
+  git -C "$M" switch -q main
+  git -C "$M" branch -q -D later
+  base "$LATER" '2 hours'
+
+  run_prune >/dev/null
+
+  expect "the bases" "$(bases)" "$LATER"
+}
+
+a_base_a_run_holds_is_never_dropped() {
+  local i c
+  for i in 1 2 3 4 5; do
+    c=C$i
+    base "${!c}" "$((i + 1)) hours"
+  done
+  base "$C6" '9 hours'
+  hold_base "$CACHE/$C6"
+  touch -d '9 hours ago' "$CACHE/$C6/.used"
+
+  run_prune >/dev/null
+  release_base
+
+  expect "the bases" "$(bases)" "$(sorted "$C1" "$C2" "$C3" "$C4" "$C6")"
+}
+
+a_process_a_run_leaves_behind_doesnt_keep_its_base_held() {
+  local dir=$CACHE/0123456789abcdef0123456789abcdef01234567 daemon
+  base "${dir##*/}" '9 hours'
+  hold_base "$dir"
+  touch -d '9 hours ago' "$dir/.used"
+  sleep 30 >/dev/null 2>&1 &
+  daemon=$!
+
+  release_base
+  run_prune >/dev/null
+  kill "$daemon"
+
+  expect "the bases" "$(bases)" ""
+}
+
+a_run_that_dies_holding_its_base_lets_it_go() {
+  local dir=$CACHE/0123456789abcdef0123456789abcdef01234567
+  base "${dir##*/}" '9 hours'
+  bash -c 'source "$1"; hold_base "$2"; touch -d "9 hours ago" "$2/.used"' _ "$REPO/test/shots/lib.sh" "$dir"
+  sleep 1.5
+
+  run_prune >/dev/null
+
+  expect "the bases" "$(bases)" ""
+}
+
+a_run_holding_its_base_marks_it_used() {
+  base "$C1" '9 hours'
+
+  hold_base "$CACHE/$C1"
+  release_base
+
+  local age=$(($(date +%s) - $(stat -c %Y "$CACHE/$C1/.used")))
+  ((age < 60)) || { echo ".used is $age s old"; return 1; }
+}
+
+a_run_finding_its_base_dropped_under_it_starts_a_fresh_one() {
+  base "$C1" '2 hours' aaaaaaaaaaaa
+  local dir=$CACHE/$C1
+  # shellcheck disable=SC2016 # $1 is the base, expanded by the inner bash.
+  flock -x "$dir/.lock" bash -c 'touch "$1/../locked"; sleep 1; mv -T "$1" "$1.gone"' _ "$dir" &
+  until [[ -e $CACHE/locked ]]; do sleep 0.05; done
+
+  hold_base "$dir"
+  wait %1
+
+  [[ /proc/$holder/fd/9 -ef $dir/.lock ]] || { echo "the lock held isn't the base's"; return 1; }
+  [[ ! -e $dir/aaaaaaaaaaaa ]] || { echo "the run went on in the dropped base"; return 1; }
+  release_base
+}
+
+prune_keeps_the_last_harness_versions_of_a_base() {
+  base "$C6" '2 hours' aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc
+  touch -d '3 hours ago' "$CACHE/$C6/aaaaaaaaaaaa/.used"
+  touch -d '2 hours ago' "$CACHE/$C6/bbbbbbbbbbbb/.used"
+  touch -d '4 hours ago' "$CACHE/$C6/cccccccccccc/.used"
+  touch -d '1 hour ago' "$CACHE/$C6/cccccccccccc"
+  mkdir "$CACHE/$C6/.extract.AbC123"
+  touch -d '2 hours ago' "$CACHE/$C6/.extract.AbC123"
+
+  run_prune >/dev/null
+
+  expect "the harnesses" "$(ls "$CACHE/$C6")" "$(printf '%s\n' aaaaaaaaaaaa bbbbbbbbbbbb iced tree)"
+}
+
+prune_trims_no_base_a_run_holds() {
+  base "$C6" '2 hours' aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc
+  hold_base "$CACHE/$C6"
+
+  run_prune >/dev/null
+  release_base
+
+  expect "the harnesses" "$(ls "$CACHE/$C6")" "$(printf '%s\n' aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc iced tree)"
+}
+
+prune_never_touches_anything_but_the_bases_and_scratch() {
+  mkdir -p "$CACHE/target/release" "$CACHE/xdg/fontconfig" "$CACHE/notes" "$T/cache/kubaos/other"
+  touch -d '9 days ago' "$CACHE/target/release/libx.rlib" "$CACHE/xdg/fontconfig/cache" \
+    "$CACHE/notes" "$T/cache/kubaos/other" "$CACHE/target/release" "$CACHE/target"
+  base 0123456789abcdef0123456789abcdef01234567 '9 days'
+
+  run_prune >/dev/null
+
+  [[ -e $CACHE/target/release/libx.rlib && -e $CACHE/xdg/fontconfig/cache && -d $CACHE/notes &&
+    -d $T/cache/kubaos/other ]] || { echo "something else went"; return 1; }
+  expect "the bases" "$(bases)" ""
+}
+
+prune_refuses_a_folder_that_isnt_the_shots_cache() {
+  mkdir -p "$T/elsewhere/0123456789abcdef0123456789abcdef01234567"
+
+  if bash -c 'source "$1"; prune "$2" "$3"' _ "$REPO/test/shots/lib.sh" "$T/elsewhere" "$M" 2>/dev/null; then
+    echo "pruned it"
+    return 1
+  fi
+
+  [[ -d $T/elsewhere/0123456789abcdef0123456789abcdef01234567 ]] || { echo "it went"; return 1; }
+}
+
+scratch_older_than_a_day_goes_and_newer_stays() {
+  mkdir -p "$CACHE/tmp/tmp.old/sub" "$CACHE/tmp/tmp.new" "$CACHE/.trash.x.1"
+  touch -d '2 days ago' "$CACHE/tmp/tmp.old" "$CACHE/.trash.x.1"
+
+  run_prune >/dev/null
+
+  expect "the cache" "$(ls -A "$CACHE")" "tmp"
+  expect "its tmp" "$(ls -A "$CACHE/tmp")" "tmp.new"
+}
+
+compiled_qml_older_than_an_hour_goes_and_newer_stays() {
+  local qmlc="$CACHE/xdg/QtProject/Qml Runtime/qmlcache"
+  mkdir -p "$qmlc" "$CACHE/xdg/fontconfig"
+  touch -d '30 minutes ago' "$qmlc/new.qmlc"
+  touch -d '2 hours ago' "$qmlc/old.qmlc"
+  touch -d '2 days ago' "$CACHE/xdg/fontconfig/old-cache"
+
+  run_prune >/dev/null
+
+  expect "the compiled QML" "$(ls "$qmlc")" "new.qmlc"
+  [[ -e $CACHE/xdg/fontconfig/old-cache ]] || { echo "fontconfig's cache went"; return 1; }
+}
+
+for t in a_shell_modules_file_renders_its_surface_alone the_frame_renders_every_surface_that_opens_in_it \
+  a_specimen_pages_own_file_renders_that_page_alone the_specimens_shared_code_renders_every_page \
+  a_shared_input_renders_everything a_qml_component_renders_the_qml_surfaces_alone \
+  kubaos_uis_code_renders_the_iced_surfaces_alone kubaos_uis_fonts_render_every_surface_that_draws_text_with_them \
+  kubaos_uis_symbols_render_the_shell_and_the_iced_and_qml_surfaces a_file_no_surface_draws_renders_nothing \
+  a_change_renders_the_surfaces_of_all_its_files the_table_lists_sources_for_every_surface \
+  a_surface_without_sources_fails_the_table a_source_that_isnt_there_fails_the_table \
+  a_line_for_no_surface_fails_the_table a_path_under_a_shared_input_listed_by_one_surface_fails_the_table \
+  a_shell_module_in_no_line_fails_the_table a_harness_file_in_no_line_fails_the_table \
+  every_page_of_the_specimen_is_in_the_table \
+  prune_keeps_the_last_used_bases_and_drops_the_rest a_base_no_branch_has_is_dropped_however_recently_used \
+  the_runs_own_base_is_kept_on_no_branch a_base_written_in_the_last_hour_is_never_dropped \
+  a_base_on_a_local_branch_alone_is_kept a_base_on_origin_main_alone_is_kept \
+  a_base_a_run_holds_is_never_dropped a_process_a_run_leaves_behind_doesnt_keep_its_base_held \
+  a_run_that_dies_holding_its_base_lets_it_go a_run_holding_its_base_marks_it_used a_run_finding_its_base_dropped_under_it_starts_a_fresh_one \
+  prune_keeps_the_last_harness_versions_of_a_base prune_trims_no_base_a_run_holds \
+  prune_never_touches_anything_but_the_bases_and_scratch prune_refuses_a_folder_that_isnt_the_shots_cache \
+  scratch_older_than_a_day_goes_and_newer_stays compiled_qml_older_than_an_hour_goes_and_newer_stays; do
+  test_case "${t//_/ }" "$t"
+done
+exit "$failed"

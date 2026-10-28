@@ -218,6 +218,9 @@ jobs:
       - name: Build the devshell
         run: nix develop --command true
 
+      - name: Screenshot harness tests
+        run: nix develop --command just shots-test
+
       - name: Design checks
         run: nix develop --command just design-check
 
