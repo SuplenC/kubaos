@@ -5,11 +5,11 @@
 #   cargo run -p kubaos-tokens -- write    regenerate every output
 #   cargo run -p kubaos-tokens -- check    fail when an output is stale
 #
-# The outputs are the Rust module of `kubaos-ui` (crates/kubaos-ui/src/tokens.rs)
-# and the `Tokens` and `Symbols` singletons of `KubaOS.Components`
-# (qml/KubaOS/Components/Tokens.qml and Symbols.qml). The matugen templates and
-# the Plymouth and GRUB values come from this same file as their front ends move
-# onto it.
+# The outputs are the Rust module of `kubaos-ui` (crates/kubaos-ui/src/tokens.rs),
+# the `Tokens` and `Symbols` singletons of `KubaOS.Components`
+# (qml/KubaOS/Components/Tokens.qml and Symbols.qml), and the terminals' settings
+# and matugen templates (see [terminal]). The Plymouth and GRUB values come from
+# this same file as they move onto it.
 #
 # Lengths are logical pixels. The supported scales are 1, 1.25, 1.5 and 2, so
 # a length lands on whole device pixels at every one of them only when it is a
@@ -686,6 +686,63 @@ pairs = [
 # neon tube, drawn on the tube. `kubaos-design contrast` fails on a role drawn with
 # that is in no pair and not here.
 decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", "scrim", "secondary", "shadow", "surface_bright"]
+
+# The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
+# btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes
+# Ghostty's and foot's settings from this table (config/ghostty/tokens,
+# config/foot/tokens.ini), the matugen templates of their palette and of the
+# roles the TUIs read, and the hues in config/matugen/config.toml, so both
+# terminals draw the same text on the same palette.
+[terminal]
+# The terminal's text: a command's style, Geist Mono 14 on a 20 line. The
+# terminals size fonts in points, 3/4 of a logical pixel: 10.5.
+type = "mono_large"
+# The font the terminals take the glyphs Geist Mono lacks from: the prompt's
+# and the file managers' icons, the pills' round caps. Geist Mono's own Nerd
+# Font, so a glyph sits on the same metrics as the letters beside it.
+glyphs = "GeistMono Nerd Font Mono"
+# Between the window's edge and the cells, from [space].
+padding_x = 12
+padding_y = 8
+# The window's background, by its name in [opacity]: glass over the blurred
+# wallpaper, as a panel of Kōbō's.
+opacity = "glass"
+# How far a bright ANSI colour (8 to 15) stands from its normal one, in HSL
+# lightness points, matugen's `lighten`: lighter in dark, darker in light, so
+# a bright colour always stands further from the surface.
+bright = 6
+# ANSI 8, dim text (a comment, a suggestion as you type): `white` moved this
+# many lightness points toward the surface. As far as keeps 4.5:1 on it in
+# both modes (4.7:1 in light); `outline`, which would be dimmer, is never
+# text.
+dim = 16
+
+# The terminal's own colours, by role: the cursor in the accent, a selection
+# as a selected row's tinted bar under the text, links in the cold accent.
+# `black`, `white` and `bright_white` are ANSI 0, 7 and 15.
+[terminal.roles]
+background = "surface"
+foreground = "on_surface"
+cursor = "primary"
+cursor_text = "on_primary"
+selection = "secondary_container"
+selection_text = "on_secondary_container"
+url = "cold"
+divider = "outline_variant"
+black = "surface_container_highest"
+white = "on_surface_variant"
+bright_white = "on_surface"
+
+# ANSI 1 to 6, the hues code is read in. Each is a seed (Tokyo Night's) that
+# matugen harmonizes toward the wallpaper's source colour as a custom colour,
+# so the six stay distinct and readable and still lean toward the wallpaper.
+[terminal.hues]
+red = "#f7768e"
+green = "#9ece6a"
+yellow = "#e0af68"
+blue = "#7aa2f7"
+magenta = "#bb9af7"
+cyan = "#7dcfff"
 
 # KubaOS Symbols: every symbol Kōbō and the shell draw, by the Material
 # Symbols name it replaces. Each is Tabler's outline icon of that name

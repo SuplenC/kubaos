@@ -1,6 +1,8 @@
 # matugen template for oh-my-posh (rendered by dot-theme to
-# ~/.local/state/theme/ohmyposh.toml). Same as config.toml but with theme colors.
-# oh-my-posh Go templates are escaped with a leading backslash so matugen leaves them alone.
+# ~/.local/state/theme/ohmyposh.toml). kubaos-tokens writes config.toml, the
+# fallback for before dot-theme has run, from this file and the tokens' dark
+# palette. oh-my-posh Go templates are escaped with a leading backslash so
+# matugen leaves them alone.
 #:schema https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json
 
 version = 3
@@ -130,12 +132,19 @@ console_title_template = '\{{ .Shell }} in \{{ .Folder }}'
   foreground = 'p:muted'
   template = '❯❯ '
 
+# The colour roles by matugen's names; the git states and the exit code take
+# the terminal's hues.
 [palette]
-  surface = '{{colors.surface_container_high.default.hex}}'  # pill background
-  text = '{{colors.on_surface.default.hex}}'  # text on pills
-  muted = '{{colors.outline.default.hex}}'  # icons, right prompt
-  accent = '{{colors.primary.default.hex}}'  # folder icon, prompt char
-  accent2 = '{{colors.tertiary.default.hex}}'  # ahead/behind
-  ok = '{{colors.green.default.hex}}'  # clean repo, success
-  warn = '{{colors.yellow.default.hex}}'  # dirty repo
-  err = '{{colors.red.default.hex}}'  # diverged, exit code
+  # The pills' background and their text.
+  surface = '{{colors.surface_container_high.default.hex}}'
+  text = '{{colors.on_surface.default.hex}}'
+  # Icons, and the right prompt's words: secondary text.
+  muted = '{{colors.on_surface_variant.default.hex}}'
+  # The folder's icon and the prompt's character; ahead or behind in the cold
+  # accent.
+  accent = '{{colors.primary.default.hex}}'
+  accent2 = '{{colors.tertiary.default.hex}}'
+  # A clean repo and success, a dirty repo, diverged and a failed command.
+  ok = '{{colors.green.default.hex}}'
+  warn = '{{colors.yellow.default.hex}}'
+  err = '{{colors.red.default.hex}}'

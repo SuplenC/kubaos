@@ -12,6 +12,10 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+use crate::contrast;
+use crate::contrast::Mode;
+use crate::model::Family;
+use crate::model::Need;
 use crate::model::Tokens;
 
 /// One broken rule, naming the token that breaks it.
@@ -52,6 +56,10 @@ pub enum Violation {
     EmptyAspect { token: String },
     /// A contrast pair naming a colour role or an opacity that doesn't exist.
     UnknownInPair { token: String, name: String },
+    /// A token naming a type style, an opacity or a colour role that doesn't exist.
+    UnknownName { token: String, name: String },
+    /// The terminals' type style isn't in the monospace family.
+    TerminalNotMono { style: String },
     /// A contrast pair under the minimum its foreground needs, in one of the fallback palettes.
     LowContrast {
         token: String,
@@ -112,6 +120,10 @@ impl fmt::Display for Violation {
             Violation::UnknownInPair { token, name } => {
                 write!(f, "{token} names {name}, which isn't a colour role or an opacity")
             }
+            Violation::UnknownName { token, name } => write!(f, "{token} names {name}, which doesn't exist"),
+            Violation::TerminalNotMono { style } => {
+                write!(f, "terminal.type is {style}, which isn't set in the mono family")
+            }
             Violation::LowContrast {
                 token,
                 mode,
@@ -132,8 +144,74 @@ pub fn check(tokens: &Tokens) -> Vec<Violation> {
     check_motion(tokens, &mut found);
     check_colors(tokens, &mut found);
     check_contrast(tokens, &mut found);
+    check_terminal(tokens, &mut found);
     check_symbols(tokens, &mut found);
     found
+}
+
+fn check_terminal(tokens: &Tokens, found: &mut Vec<Violation>) {
+    let terminal = &tokens.terminal;
+    match tokens.types.get(&terminal.style) {
+        None => found.push(Violation::UnknownName {
+            token: "terminal.type".into(),
+            name: terminal.style.clone(),
+        }),
+        Some(style) if style.family != Family::Mono => found.push(Violation::TerminalNotMono {
+            style: terminal.style.clone(),
+        }),
+        Some(_) => {}
+    }
+    for (name, value) in [("padding_x", terminal.padding_x), ("padding_y", terminal.padding_y)] {
+        if !tokens.space.values.contains(&value) {
+            found.push(Violation::OffScalePadding {
+                token: format!("terminal.{name}"),
+                value,
+            });
+        }
+    }
+    if !tokens.opacity.contains_key(&terminal.opacity) {
+        found.push(Violation::UnknownName {
+            token: "terminal.opacity".into(),
+            name: terminal.opacity.clone(),
+        });
+    }
+    let mut known = true;
+    for (slot, role) in terminal.roles.slots() {
+        if !tokens.color.source.contains_key(role) {
+            known = false;
+            found.push(Violation::UnknownName {
+                token: format!("terminal.roles.{slot}"),
+                name: role.into(),
+            });
+        }
+    }
+    if known {
+        check_dim(tokens, found);
+    }
+}
+
+/// ANSI 8, `white` dimmed toward `background`, keeps body text's contrast on it in both palettes.
+fn check_dim(tokens: &Tokens, found: &mut Vec<Violation>) {
+    let roles = &tokens.terminal.roles;
+    for mode in Mode::ALL {
+        let (palette, toward) = match mode {
+            Mode::Dark => (&tokens.color.dark, -1.0),
+            Mode::Light => (&tokens.color.light, 1.0),
+        };
+        let (Some(&white), Some(&background)) = (palette.get(&roles.white), palette.get(&roles.background)) else {
+            continue;
+        };
+        let dim = white.lighten(toward * f32::from(tokens.terminal.dim));
+        let ratio = contrast::ratio(contrast::channels(dim), contrast::channels(background));
+        if ratio < Need::Text.minimum() {
+            found.push(Violation::LowContrast {
+                token: format!("terminal.dim {} on {}", roles.white, roles.background),
+                mode: mode.name(),
+                ratio,
+                minimum: Need::Text.minimum(),
+            });
+        }
+    }
 }
 
 fn check_container(tokens: &Tokens, found: &mut Vec<Violation>) {
