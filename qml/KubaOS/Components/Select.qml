@@ -51,6 +51,7 @@ K.Pressable {
         root.placed = true;
         root.open = true;
         menu.forceActiveFocus();
+        Qt.callLater(menu.reveal);
     }
 
     function hide(): void {

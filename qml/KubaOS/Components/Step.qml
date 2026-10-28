@@ -106,7 +106,9 @@ K.Pressable {
 
         K.Chip {
             visible: !root.mark && root.status !== "current"
-            kind: root.status === "done" ? "Accent" : root.status === "action" ? "Filled" : "Neutral"
+            // On a selected row done is plain with its check: the accent's tint over the row's
+            // secondary container leaves its label under 4.5:1.
+            kind: root.status === "done" && !root.lit ? "Accent" : root.status === "action" ? "Filled" : "Neutral"
             icon: root.words !== "" ? root.wordsIcon : root.status === "done" ? "check" : root.status === "action" ? root.actionIcon : ""
             text: root.words !== "" ? root.words : root.status === "done" ? "Done" : root.status === "action" ? root.actionLabel : "To do"
         }

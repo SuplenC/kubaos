@@ -90,8 +90,11 @@ Item {
         target: Panels
 
         function onCurrentChanged(): void {
-            if (root.modal && Panels.current !== "notificationmenu")
+            // Another panel took over: the keyboard is its, so nothing is given back.
+            if (root.modal && Panels.current !== "notificationmenu") {
                 root.notification = null;
+                root.returnTo = null;
+            }
         }
     }
 

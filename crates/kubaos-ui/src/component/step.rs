@@ -194,7 +194,7 @@ impl<M: Clone> Step<M> {
         content = content.push(words);
         if self.mark {
             content = content.push(mark(look, self.state, main));
-        } else if let Some(chip) = state_chip(look, self.state, self.words) {
+        } else if let Some(chip) = state_chip(look, self.state, self.words, selected) {
             content = content.push(chip);
         }
         // A row with one line is a list row's 44, its parts centred down it, so a chip moves
@@ -232,14 +232,17 @@ impl<M: Clone> Step<M> {
 }
 
 /// The state as a chip: to do plain, done tonal with a check, an action the accent with its
-/// symbol, the current step none.
+/// symbol, the current step none. On a selected row done is plain with its check: the accent's
+/// tint over the row's secondary container leaves its label under 4.5:1.
 fn state_chip<'a, M: Clone + 'a>(
     look: &Look,
     state: StepState,
     words: Option<(&'static str, Option<Icon>)>,
+    selected: bool,
 ) -> Option<Element<'a, M>> {
     let (kind, label, glyph) = match state {
         StepState::Todo => (ChipKind::Neutral, "To do", None),
+        StepState::Done if selected => (ChipKind::Neutral, "Done", Some(Icon::Check)),
         StepState::Done => (ChipKind::Accent, "Done", Some(Icon::Check)),
         StepState::Action { label, glyph } => (ChipKind::Filled, label, Some(glyph)),
         StepState::Current => return None,

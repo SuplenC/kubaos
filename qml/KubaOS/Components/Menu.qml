@@ -86,15 +86,26 @@ Item {
         column.relayout();
     }
 
-    onCurrentIndexChanged: {
+    // Scrolls the item the keyboard is on into view. Laid out only while shown, the items have no
+    // place before the menu shows, so it waits for one.
+    function reveal(): void {
         const item = items.itemAt(root.currentIndex);
-        if (!item)
+        if (!item || !root.visible || scroller.height <= 0 || column.implicitHeight <= 0)
             return;
         if (item.y < scroller.contentY)
             scroller.contentY = item.y;
         else if (item.y + item.height > scroller.contentY + scroller.height)
             scroller.contentY = item.y + item.height - scroller.height;
     }
+
+    onCurrentIndexChanged: root.reveal()
+    onEntriesChanged: scroller.contentY = 0
+    // Each time it shows, and once its items have their places, the keyboard's item is in view.
+    onVisibleChanged: {
+        if (root.visible)
+            Qt.callLater(root.reveal);
+    }
+    onHeightChanged: Qt.callLater(root.reveal)
 
     Flickable {
         id: scroller
@@ -112,6 +123,7 @@ Item {
 
             width: root.width
             fill: true
+            onImplicitHeightChanged: Qt.callLater(root.reveal)
 
             Repeater {
                 id: items

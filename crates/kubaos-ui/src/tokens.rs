@@ -1519,7 +1519,7 @@ pub const CONTRAST: [ContrastPair; 43] = [
         bg: Role::SurfaceContainerHigh,
         need: Need::Text,
         opacity: None,
-        purpose: "An Action's title in the Action panel, a chip",
+        purpose: "An Action's title in the Action panel, a chip, a done step's chip on a selected row",
     },
     ContrastPair {
         fg: Role::Tertiary,

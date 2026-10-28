@@ -47,8 +47,9 @@ Item {
         id: well
 
         width: root.width
-        // While a scan has found nothing, as tall as its caption and rows: no empty well under them.
-        height: scanning.visible ? scanning.implicitHeight + K.Tokens.space.s12 * 2 : root.height - (password.visible ? password.height + K.Tokens.space.s12 : 0)
+        // The list's room whether or not a scan has found anything yet, so the first networks fill
+        // the well the skeleton rows sit in and nothing moves.
+        height: root.height - (password.visible ? password.height + K.Tokens.space.s12 : 0)
         focused: list.activeFocus
 
         NavList {

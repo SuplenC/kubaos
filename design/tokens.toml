@@ -737,7 +737,7 @@ pairs = [
   { fg = "outline", bg = "surface", need = "graphic", use = "A field's, a checkbox's or a switch's outline" },
   { fg = "outline", bg = "surface_container_highest", need = "graphic", use = "An outline on the highest container" },
   { fg = "on_surface", bg = "surface_container", need = "text", use = "A pill of the bar" },
-  { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title in the Action panel, a chip" },
+  { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title in the Action panel, a chip, a done step's chip on a selected row" },
   { fg = "tertiary", bg = "surface", need = "text", use = "The clock's Copied line" },
   { fg = "on_surface", bg = "surface_container_lowest", need = "text", use = "The lock screen before its wallpaper loads" },
   { fg = "primary_container", bg = "surface_container_lowest", need = "large_text", use = "The 完了 hanko on Kōbō's done screen" },

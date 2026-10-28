@@ -93,6 +93,7 @@ Pill {
         }
         root.trail = root.trail.slice(0, -1);
         menu.currentIndex = -1;
+        menu.forceActiveFocus();
     }
 
     function closeMenu(): void {
@@ -128,10 +129,13 @@ Pill {
         parent: root.window ? root.window.contentItem : root
         floating: true
         fixedWidth: K.Tokens.size.menu
-        // Kept inside the window, however long the menu.
+        // Under the icon. The menu's own room keeps it above the window's foot; this keeps it inside
+        // a window too short for even that.
         y: Math.max(K.Tokens.space.s8, Math.min(root.anchorY, parent.height - height - K.Tokens.space.s8))
-        // Nothing until the app's entries arrive, so no bare surface shows while they load.
-        visible: root.menuItem !== null && Panels.current === "traymenu" && (opener.children?.values.length ?? 0) > 0
+        // Nothing until the app's first entries arrive, so no bare surface shows while they load. A
+        // submenu shows at once with its way back, so the menu, and the keyboard on it, never hide
+        // between levels.
+        visible: root.menuItem !== null && Panels.current === "traymenu" && (root.trail.length > 0 || (opener.children?.values.length ?? 0) > 0)
 
         K.Menu {
             id: menu
@@ -148,6 +152,7 @@ Pill {
                 if (entry.hasChildren) {
                     root.trail = [...root.trail, entry];
                     menu.currentIndex = -1;
+                    menu.forceActiveFocus();
                     return;
                 }
                 entry.triggered();

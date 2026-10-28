@@ -174,8 +174,9 @@ Item {
     Well {
         y: top.height + K.Tokens.space.s12
         width: root.width
-        // While a search has found nothing, as tall as its rows: no empty well under them.
-        height: scanning.visible ? scanning.implicitHeight + K.Tokens.space.s12 * 2 : root.height - y
+        // The list's room whether or not a search has found anything yet, so the first devices fill
+        // the well the skeleton rows sit in and nothing moves.
+        height: root.height - y
         focused: list.activeFocus
 
         NavList {
