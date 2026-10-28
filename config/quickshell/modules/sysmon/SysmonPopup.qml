@@ -125,10 +125,11 @@ K.Sheet {
                             gap: K.Tokens.space.s4
 
                             Repeater {
-                                model: cores.list
+                                model: cores.list.length
 
                                 Rectangle {
-                                    required property real modelData
+                                    required property int index
+                                    readonly property real modelData: cores.list[index] ?? 0
                                     readonly property bool fillWidth: true
                                     // How busy the core is, 0 to 1, from its percent.
                                     readonly property real busy: Math.min(1, modelData / 100)
@@ -220,12 +221,13 @@ K.Sheet {
                         value: Sysmon.percent(root.s?.gpus?.[0]?.usage)
 
                         Repeater {
-                            model: root.s?.gpus ?? []
+                            model: (root.s?.gpus ?? []).length
 
                             K.Stack {
                                 id: gpu
 
-                                required property var modelData
+                                required property int index
+                                readonly property var modelData: root.s?.gpus?.[index] ?? ({})
 
                                 fill: true
                                 gap: K.Tokens.space.s4
@@ -282,12 +284,13 @@ K.Sheet {
                         value: root.s?.io ? `R ${Sysmon.rate(root.s.io.read)}  W ${Sysmon.rate(root.s.io.write)}` : ""
 
                         Repeater {
-                            model: root.s?.disks ?? []
+                            model: (root.s?.disks ?? []).length
 
                             K.Stack {
                                 id: disk
 
-                                required property var modelData
+                                required property int index
+                                readonly property var modelData: root.s?.disks?.[index] ?? ({})
                                 readonly property int level: Sysmon.level(modelData.percent, root.th.disk, 5)
 
                                 fill: true
@@ -372,10 +375,11 @@ K.Sheet {
                         title: "Fans"
 
                         Repeater {
-                            model: root.s?.fans ?? []
+                            model: (root.s?.fans ?? []).length
 
                             Line {
-                                required property var modelData
+                                required property int index
+                                readonly property var modelData: root.s?.fans?.[index] ?? ({})
 
                                 text: `${modelData.label}  ${modelData.rpm} rpm`
                             }
