@@ -14,6 +14,8 @@ use kubaos_ui::Mode;
 use kubaos_ui::component::avatar::TileSize;
 use kubaos_ui::component::avatar::badge;
 use kubaos_ui::component::avatar::icon_tile;
+use kubaos_ui::component::banner::BannerTone;
+use kubaos_ui::component::banner::banner;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::Preview;
@@ -31,6 +33,8 @@ use kubaos_ui::component::check::radio;
 use kubaos_ui::component::chip::ChipKind;
 use kubaos_ui::component::chip::chip;
 use kubaos_ui::component::collapsible::collapsible;
+use kubaos_ui::component::description::Fact;
+use kubaos_ui::component::description::description_list;
 use kubaos_ui::component::dialog::Tone;
 use kubaos_ui::component::dialog::dialog;
 use kubaos_ui::component::dialog::prompt;
@@ -61,6 +65,7 @@ use kubaos_ui::component::picture::NamePlace;
 use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::progress::spinner;
+use kubaos_ui::component::progress::timed_bar;
 use kubaos_ui::component::select::select;
 use kubaos_ui::component::sheet;
 use kubaos_ui::component::skeleton::Bone;
@@ -68,6 +73,8 @@ use kubaos_ui::component::skeleton::skeleton;
 use kubaos_ui::component::slider::Value;
 use kubaos_ui::component::slider::slider;
 use kubaos_ui::component::slider::slider_held;
+use kubaos_ui::component::step::StepState;
+use kubaos_ui::component::step::step;
 use kubaos_ui::component::switch::switch;
 use kubaos_ui::component::table::Column;
 use kubaos_ui::component::table::table;
@@ -189,6 +196,24 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             "Media",
             Some("Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then two pictures to pick, picked with its name under it and focused with its name over its foot."),
             media_samples(look),
+        ))
+        .push(section(
+            look,
+            "Banners",
+            Some("A message that matters on the page itself, its actions inside: info, a warning, and danger, really red, holding the button that destroys."),
+            banners(look),
+        ))
+        .push(section(
+            look,
+            "Steps",
+            Some("To do, done and waiting on an action each look their own, and the action carries the accent. A description wraps; a rail marks the state instead."),
+            steps(look),
+        ))
+        .push(section(
+            look,
+            "Description lists",
+            Some("Facts beside their labels, a quarter of the width; a path or an email gets a mono line of its own."),
+            descriptions(look),
         ))
         .push(section(
             look,
@@ -1258,6 +1283,142 @@ fn collapsibles<'a>(look: &Look) -> Element<'a, Message> {
             Message::Sample,
             true,
             text("Hidden while closed.", Type::Small, c.on_surface_variant),
+        ))
+        .into()
+}
+
+fn banners<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let hold = stack(look, Space::S8)
+        .push(
+            button("Hold to erase and install")
+                .kind(Kind::Danger)
+                .icon(Icon::Download)
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(
+            row(look, Space::S4)
+                .center()
+                .push(text(
+                    "or hold",
+                    Type::Caption,
+                    kubaos_ui::color::alpha(c.on_error_container, Opacity::SubduedText.value()),
+                ))
+                .push(keycap(look, "Enter")),
+        );
+    stack(look, Space::S16)
+        .push(
+            banner(
+                BannerTone::Info,
+                Icon::Storage,
+                "KubaOS goes into the free space on Samsung SSD 990 PRO.",
+                "Windows stays where it is.",
+            )
+            .view(look),
+        )
+        .push(
+            banner(
+                BannerTone::Warning,
+                Icon::Warning,
+                "12% left. Plug the damn thing in.",
+                "An install on battery may not finish.",
+            )
+            .view(look),
+        )
+        .push(
+            banner(
+                BannerTone::Danger,
+                Icon::Warning,
+                "Everything on Samsung SSD 990 PRO (nvme0n1, 2 TB) gets erased.",
+                "All 4 partitions, Windows included. There's no undo.",
+            )
+            .actions([
+                button("Back")
+                    .kind(Kind::Text)
+                    .icon(Icon::ArrowBack)
+                    .on_press(Message::Sample)
+                    .view(look),
+                hold.into(),
+            ])
+            .foot(timed_bar(look, 0.4))
+            .view(look),
+        )
+        .into()
+}
+
+fn steps<'a>(look: &Look) -> Element<'a, Message> {
+    let reboot = StepState::Action {
+        label: "Reboot",
+        glyph: Icon::RestartAlt,
+    };
+    let checklist = vec![
+        step("TUXEDO drivers")
+            .subtitle("Key queued. Reboot and enroll it on the blue MokManager screen, before KubaOS starts.")
+            .icon(Icon::Computer)
+            .state(reboot)
+            .selected(true)
+            .on_press_maybe(Some(Message::Sample))
+            .view(look),
+        step("Fingerprint")
+            .subtitle("One finger: right index. sudo and password dialogs take it.")
+            .icon(Icon::Fingerprint)
+            .state(StepState::Done)
+            .on_press_maybe(Some(Message::Sample))
+            .view(look),
+        step("Bitwarden")
+            .subtitle("Not logged in.")
+            .icon(Icon::Lock)
+            .on_press_maybe(Some(Message::Sample))
+            .view(look),
+    ];
+    let rail = stack(look, Gap::NONE)
+        .push(
+            step("Language")
+                .icon(Icon::Language)
+                .state(StepState::Done)
+                .mark()
+                .on_press_maybe(Some(Message::Sample))
+                .view(look),
+        )
+        .push(
+            step("Disk")
+                .icon(Icon::HardDrive)
+                .state(StepState::Current)
+                .mark()
+                .view(look),
+        )
+        .push(step("Git").icon(Icon::Code).mark().view(look))
+        .push(step("Reboot").icon(Icon::Computer).state(reboot).mark().view(look));
+    split(look, &[2, 1], Space::S24)
+        .push(list(look, checklist, true))
+        .push(rail)
+        .into()
+}
+
+fn descriptions<'a>(look: &Look) -> Element<'a, Message> {
+    grid(look, 2, Space::S24)
+        .push(card(
+            look,
+            description_list(
+                look,
+                [
+                    Fact::new("Name", "Kuba Example"),
+                    Fact::new("Login", "kuba@tuxedo"),
+                    Fact::new("Git", "Kuba Example").sub("kuba@example.com"),
+                ],
+            ),
+        ))
+        .push(card(
+            look,
+            description_list(
+                look,
+                [
+                    Fact::new("Disk", "Samsung SSD 990 PRO 2TB").sub("/dev/nvme0n1 · 2.0 TB"),
+                    Fact::new("Mode", "Erase everything"),
+                    Fact::new("Encryption", "LUKS2, account password"),
+                ],
+            ),
         ))
         .into()
 }

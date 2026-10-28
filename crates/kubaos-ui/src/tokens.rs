@@ -1424,6 +1424,27 @@ pub const CONTRAST: [ContrastPair; 42] = [
         purpose: "A reading close to its limit",
     },
     ContrastPair {
+        fg: Role::Warning,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A warning banner's symbol and hairline",
+    },
+    ContrastPair {
+        fg: Role::Error,
+        bg: Role::ErrorContainer,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A danger banner's symbol and hairline",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::ErrorContainer,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A Text button inside a danger banner (Back on Last chance)",
+    },
+    ContrastPair {
         fg: Role::Surface,
         bg: Role::OnSurface,
         need: Need::Text,

@@ -1066,6 +1066,194 @@ K.Stack {
                 }
 
                 K.Section {
+                    title: "Banners"
+                    description: "A message that matters on the page itself, its actions inside: info, a warning, and danger, really red, holding the button that destroys."
+
+                    K.Stack {
+                        fill: true
+                        gap: K.Tokens.space.s16
+
+                        K.Banner {
+                            tone: "Info"
+                            icon: "storage"
+                            title: "KubaOS goes into the free space on Samsung SSD 990 PRO."
+                            body: "Windows stays where it is."
+                        }
+
+                        K.Banner {
+                            tone: "Warning"
+                            icon: "warning"
+                            title: "12% left. Plug the damn thing in."
+                            body: "An install on battery may not finish."
+                        }
+
+                        K.Banner {
+                            tone: "Danger"
+                            icon: "warning"
+                            title: "Everything on Samsung SSD 990 PRO (nvme0n1, 2 TB) gets erased."
+                            body: "All 4 partitions, Windows included. There's no undo."
+                            foot: [
+                                K.ProgressBar {
+                                    value: 0.4
+                                }
+                            ]
+
+                            K.Button {
+                                text: "Back"
+                                kind: "Text"
+                                icon: "arrow_back"
+                            }
+
+                            K.Stack {
+                                gap: K.Tokens.space.s8
+
+                                K.Button {
+                                    text: "Hold to erase and install"
+                                    kind: "Danger"
+                                    icon: "download"
+                                }
+
+                                K.Row {
+                                    gap: K.Tokens.space.s4
+                                    align: "centre"
+
+                                    K.Text {
+                                        text: "or hold"
+                                        style: K.Tokens.type.caption
+                                        color: K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued_text)
+                                    }
+
+                                    K.Keycap {
+                                        key: "Enter"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Steps"
+                    description: "To do, done and waiting on an action each look their own, and the action carries the accent. A description wraps; a rail marks the state instead."
+
+                    K.Grid {
+                        weights: [2, 1]
+                        gap: K.Tokens.space.s24
+
+                        K.List {
+                            focused: true
+
+                            K.Step {
+                                title: "TUXEDO drivers"
+                                subtitle: "Key queued. Reboot and enroll it on the blue MokManager screen, before KubaOS starts."
+                                icon: "computer"
+                                status: "action"
+                                actionLabel: "Reboot"
+                                actionIcon: "restart_alt"
+                                selected: true
+                            }
+
+                            K.Step {
+                                title: "Fingerprint"
+                                subtitle: "One finger: right index. sudo and password dialogs take it."
+                                icon: "fingerprint"
+                                status: "done"
+                            }
+
+                            K.Step {
+                                title: "Bitwarden"
+                                subtitle: "Not logged in."
+                                icon: "lock"
+                            }
+                        }
+
+                        K.Stack {
+                            K.Step {
+                                title: "Language"
+                                icon: "language"
+                                status: "done"
+                                mark: true
+                            }
+
+                            K.Step {
+                                title: "Disk"
+                                icon: "hard_drive"
+                                status: "current"
+                                mark: true
+                                enabled: false
+                            }
+
+                            K.Step {
+                                title: "Git"
+                                icon: "code"
+                                mark: true
+                                enabled: false
+                            }
+
+                            K.Step {
+                                title: "Reboot"
+                                icon: "computer"
+                                status: "action"
+                                actionLabel: "Reboot"
+                                actionIcon: "restart_alt"
+                                mark: true
+                                enabled: false
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Description lists"
+                    description: "Facts beside their labels, a quarter of the width; a path or an email gets a mono line of its own."
+
+                    K.Grid {
+                        columns: 2
+                        gap: K.Tokens.space.s24
+
+                        K.Card {
+                            K.DescriptionList {
+                                facts: [
+                                    {
+                                        label: "Name",
+                                        value: "Kuba Example"
+                                    },
+                                    {
+                                        label: "Login",
+                                        value: "kuba@tuxedo"
+                                    },
+                                    {
+                                        label: "Git",
+                                        value: "Kuba Example",
+                                        sub: "kuba@example.com"
+                                    }
+                                ]
+                            }
+                        }
+
+                        K.Card {
+                            K.DescriptionList {
+                                facts: [
+                                    {
+                                        label: "Disk",
+                                        value: "Samsung SSD 990 PRO 2TB",
+                                        sub: "/dev/nvme0n1 · 2.0 TB"
+                                    },
+                                    {
+                                        label: "Mode",
+                                        value: "Erase everything"
+                                    },
+                                    {
+                                        label: "Encryption",
+                                        value: "LUKS2, account password"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
                     title: "Dialogs"
                     description: "A question, the confirmation before something is destroyed, and a prompt for what only you can type."
 

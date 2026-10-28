@@ -12,21 +12,24 @@
 //!   ([`progress`]), empty states ([`empty`]), errors with a hint and a log ([`error`]), keycaps
 //!   and key hints ([`keycap`]), pictures in a box of a fixed aspect ([`media`]) and pictures to
 //!   pick ([`picture`]), tabs ([`tabs`]), quick toggle tiles ([`tile`]), meters and sparklines
-//!   ([`meter`]), sheets ([`sheet`]), calendars ([`calendar`]), icon tiles and badges
-//!   ([`avatar`]), skeletons ([`skeleton`]), popovers and menus ([`menu`]), selects
-//!   ([`select`]), tables ([`table`]) and collapsibles ([`collapsible`]).
+//!   ([`meter`]), sheets ([`sheet`]), calendars ([`calendar`]), icon tiles and badges ([`avatar`]),
+//!   skeletons ([`skeleton`]), popovers and menus ([`menu`]), selects ([`select`]), tables
+//!   ([`table`]), collapsibles ([`collapsible`]), banners ([`banner`]), steps ([`step`]) and
+//!   description lists ([`description`]).
 //!
 //! # Not here
 //!
 //! - The focus ring: [`crate::focus`]. Layout: [`crate::layout`].
 
 pub mod avatar;
+pub mod banner;
 pub mod button;
 pub mod calendar;
 pub mod card;
 pub mod check;
 pub mod chip;
 pub mod collapsible;
+pub mod description;
 pub mod dialog;
 pub mod empty;
 pub mod error;
@@ -44,6 +47,7 @@ pub mod select;
 pub mod sheet;
 pub mod skeleton;
 pub mod slider;
+pub mod step;
 pub mod switch;
 pub mod table;
 pub mod tabs;

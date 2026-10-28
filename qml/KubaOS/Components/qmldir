@@ -56,6 +56,9 @@ ChoiceCard 1.0 ChoiceCard.qml
 Dialog 1.0 Dialog.qml
 Scrim 1.0 Scrim.qml
 Toast 1.0 Toast.qml
+Banner 1.0 Banner.qml
+Step 1.0 Step.qml
+DescriptionList 1.0 DescriptionList.qml
 ProgressBar 1.0 ProgressBar.qml
 Spinner 1.0 Spinner.qml
 EmptyState 1.0 EmptyState.qml
