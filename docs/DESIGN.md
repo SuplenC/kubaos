@@ -14,7 +14,7 @@ A rule marked *Not enforced yet* is decided but not built: no code follows it to
 
 Values below are shown so this file reads on its own. Each one names its token, and the token wins: when they disagree, `design/tokens.toml` is right and this file is stale.
 
-The pictures are the specimen, `kubaos-specimen`, which draws every token and component with `kubaos-ui`. The 1× shots are checked in under `design/specimen/`; `kubaos-specimen shots DIR` renders all of them at 1, 1.25, 1.5 and 2, light and dark. The Command menu's "Design specimen" Item opens it live.
+The pictures are the specimen, `kubaos-specimen`, which draws every token and component with `kubaos-ui`. The repo doesn't keep its pictures: `kubaos-specimen shots DIR` renders every page at 1, 1.25, 1.5 and 2, light and dark, `just shots specimen` a PR's before and after, and on each push to main CI publishes the 1× pages shown here to the image-only branch `chore/shots-specimen` (`.github/workflows/specimen.yml`). The Command menu's "Design specimen" Item opens it live.
 
 ## Principles
 
@@ -35,9 +35,9 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 ## Colour
 
-![Colour roles and contrast pairs, dark](../design/specimen/colour-dark-1x.png)
+![Colour roles and contrast pairs, dark](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/colour-dark-1x.png)
 
-*The roles as swatches, then each foreground and background pair with its contrast ratio and the minimum it needs. Light: [colour-light-1x.png](../design/specimen/colour-light-1x.png).*
+*The roles as swatches, then each foreground and background pair with its contrast ratio and the minimum it needs. Light: [colour-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/colour-light-1x.png).*
 
 - **Roles, never hex.** Code names a role (`primary`, `on_surface`, `surface_container_high`, `error`, `cold`, `warning`), never a colour. The roles are Material 3's, plus `cold` and `warning`. The palette changes with the wallpaper, so a hex value in a component is wrong the moment the wallpaper changes.
 - **Matugen derives them from the wallpaper** (`scripts/dot-theme`, `scheme-fidelity`). `[color.source]` in the tokens names the matugen colour each role comes from. `[color.dark]` and `[color.light]` are the fallback: matugen's output for the default wallpaper, used until a theme exists and in the specimen.
@@ -59,9 +59,9 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 ## Type
 
-![Type styles, dark](../design/specimen/type-dark-1x.png)
+![Type styles, dark](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/type-dark-1x.png)
 
-*Every style, largest first; the tint behind each is its line box, so the line height is visible. The lock screen's clock, 80, sits on top, then the hero's 64. Light: [type-light-1x.png](../design/specimen/type-light-1x.png).*
+*Every style, largest first; the tint behind each is its line box, so the line height is visible. The lock screen's clock, 80, sits on top, then the hero's 64. Light: [type-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/type-light-1x.png).*
 
 **Families** (`[font.family]`), and nothing else draws text:
 
@@ -126,9 +126,9 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 
 ## Space and shape
 
-![Spacing, radii, icon sizes, component sizes, hairlines, the focus tube, concentric corners and columns, dark](../design/specimen/space-dark-1x.png)
+![Spacing, radii, icon sizes, component sizes, hairlines, the focus tube, concentric corners and columns, dark](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/space-dark-1x.png)
 
-*Top to bottom: the spacing scale as bars, the radii, the icon boxes, every fixed component size, the hairline and thin stroke, the focus tube and its glow (accent, and cold on a picked card), concentric corners, and a grid split in device pixels. Light: [space-light-1x.png](../design/specimen/space-light-1x.png).*
+*Top to bottom: the spacing scale as bars, the radii, the icon boxes, every fixed component size, the hairline and thin stroke, the focus tube and its glow (accent, and cold on a picked card), concentric corners, and a grid split in device pixels. Light: [space-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/space-light-1x.png).*
 
 **The 4 px grid** (`rules.grid`). Every spacing, size, radius, icon size, line height, shadow offset and non-hairline border is a multiple of 4 logical pixels. The reason is the supported scales, 1, 1.25, 1.5 and 2 (`rules.scales`): 4 × 1.25 = 5 and 4 × 1.5 = 6, so a multiple of 4 is a whole number of device pixels at every one of them. A 6 px gap is 7.5 device pixels at 1.25 and blurs. `kubaos-tokens` refuses an off-grid length. The one exception is a mark drawn centred on a point that moves with a value, whose edges land between device pixels whatever its size: a slider's step dot (6) and its regular anchor dot (10), listed in `rules.off_grid`.
 
@@ -191,9 +191,9 @@ Every radius means something: what the shape is. There are three, plus full, and
 
 ## Motion
 
-![Durations, curves and two animations frame by frame, dark](../design/specimen/motion-dark-1x.png)
+![Durations, curves and two animations frame by frame, dark](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/motion-dark-1x.png)
 
-*Each duration as a bar (32 px per 100 ms), each curve as a graph and as nine evenly timed frames, then a switch and a toast frame by frame. Light: [motion-light-1x.png](../design/specimen/motion-light-1x.png).*
+*Each duration as a bar (32 px per 100 ms), each curve as a graph and as nine evenly timed frames, then a switch and a toast frame by frame. Light: [motion-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/motion-light-1x.png).*
 
 Beautiful and fast. Every animation takes a duration and a curve **by what it is**, never by feel:
 
@@ -228,9 +228,9 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 
 ## Iconography
 
-![KubaOS Symbols, the five we drew beside their Tabler relatives, the stroke table, and the comparison that picked Tabler, dark](../design/specimen/icons-dark-1x.png)
+![KubaOS Symbols, the five we drew beside their Tabler relatives, the stroke table, and the comparison that picked Tabler, dark](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/icons-dark-1x.png)
 
-*Every symbol at 16, 20 and 24; "Drawn by us" with each of our five above the Tabler symbols it borrows from, all one colour, at 16, 20, 24 and 48; the stroke at each size and scale; then the comparison sheet, kept as the record of the choice. Light: [icons-light-1x.png](../design/specimen/icons-light-1x.png).*
+*Every symbol at 16, 20 and 24; "Drawn by us" with each of our five above the Tabler symbols it borrows from, all one colour, at 16, 20, 24 and 48; the stroke at each size and scale; then the comparison sheet, kept as the record of the choice. Light: [icons-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/icons-light-1x.png).*
 
 - **One set: KubaOS Symbols.** They are Tabler's outline icons (`@tabler/icons` 3.49.0, MIT), picked by Kuba from a sheet of the same 40 glyphs in Material Symbols Rounded, Phosphor, Lucide and Tabler. `[symbols]` lists each, named for the Material Symbol it replaced; `crates/kubaos-ui/assets/make-symbols.sh` fetches them, hash-pinned.
 - **SVGs, not a font.** A font's stroke scales with its size: Tabler's 2 unit stroke on its 24 unit grid is 1.33 px at 16 and 1.67 px at 20, between device pixels, so every line blurs. Each symbol is drawn from its SVG at runtime, with the stroke set for its size and scale: 2 units scaled to the size, rounded half up to whole device pixels, never under one (`stroke.symbol`, `kubaos_ui::icon::device_stroke`):
@@ -255,9 +255,9 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 
 ## Components
 
-![Every component, every kind, size and state, dark](../design/specimen/components-dark-1x.png)
+![Every component, every kind, size and state, dark](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/components-dark-1x.png)
 
-*The button and icon-button matrices first (kind × size × resting, hovered, pressed, focused, disabled), then fields, switches, checkboxes and radios, lists, a page's scroll, chips, cards, dialogs, toasts and progress, empty states and errors with a log. Light: [components-light-1x.png](../design/specimen/components-light-1x.png). The same page drawn with `KubaOS.Components`: [1×](../design/specimen/qml/components-dark-1x.png) and [1.5×](../design/specimen/qml/components-dark-1.5x.png), dark.*
+*The button and icon-button matrices first (kind × size × resting, hovered, pressed, focused, disabled), then fields, switches, checkboxes and radios, lists, a page's scroll, chips, cards, dialogs, toasts and progress, empty states and errors with a log. Light: [components-light-1x.png](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/components-light-1x.png). The same page drawn with `KubaOS.Components`: [1×](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/qml/components-dark-1x.png) and [1.5×](https://raw.githubusercontent.com/SuplenC/kubaos/refs/heads/chore/shots-specimen/qml/components-dark-1.5x.png), dark.*
 
 Two libraries implement one spec, with the same names:
 
@@ -708,7 +708,7 @@ The QML shots come from the same runner, `nix run .#checks.x86_64-linux.qml-spec
 
 ### Screenshot diffs
 
-The specimen's 1× shots are checked in under `design/specimen/`, and the QML components page's 1× and 1.5× dark under `design/specimen/qml/`. A PR that changes how anything looks regenerates them with `kubaos-specimen shots DIR` and `qml-specimen shots DIR` and commits the ones that changed, so the change shows in review as an image diff. Kōbō's tour screens, 1× light and dark, are under `design/kobo/`, from `KOBO_SHOTS=DIR cargo test -p kubaos-kobo --release shots -- --ignored`, which draws every screen at every scale. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues. The boot screens and the pointer render headless too: `just shots plymouth grub cursor` (`test/shots/boot`).
+The specimen's pictures aren't in the repo, so two PRs that change how different things look never touch the same file. A PR that changes how anything looks renders its before and after with `just shots specimen` (`kubaos-specimen shots DIR` and `qml-specimen shots DIR`) and attaches the pairs that changed to the PR (`docs/agents/design-pr-loop.md`), so the change shows in review. On each push to main, CI renders every page and publishes the iced pages at 1×, light and dark, and the QML components page at 1× and 1.5×, dark, to the image-only branch `chore/shots-specimen`, which this file's pictures show (`.github/workflows/specimen.yml`). Kōbō's tour screens, 1× light and dark, are under `design/kobo/`, from `KOBO_SHOTS=DIR cargo test -p kubaos-kobo --release shots -- --ignored`, which draws every screen at every scale. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues. The boot screens and the pointer render headless too: `just shots plymouth grub cursor` (`test/shots/boot`).
 
 ## Changing the design
 
