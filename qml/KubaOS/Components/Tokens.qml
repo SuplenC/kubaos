@@ -106,6 +106,7 @@ QtObject {
         readonly property int slider: 24
         readonly property int slider_stop: 4
         readonly property int slider_thumb: 16
+        readonly property int sparkline: 48
         readonly property int switch_height: 24
         readonly property int switch_knob_off: 12
         readonly property int switch_knob_on: 16

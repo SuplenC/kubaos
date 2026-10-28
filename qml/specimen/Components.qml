@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import KubaOS.Components as K
 
 // The specimen's components page, drawn with `KubaOS.Components`: the same page
@@ -26,7 +27,49 @@ K.Stack {
         return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
     }
 
+    // The specimen's October 2026, weeks from Monday, as the shots' clock has it: Tuesday the 27th
+    // is today, and All Saints' Day falls in the next month's first week, as the iced page has it.
+    readonly property var october: {
+        const pad = n => String(n).padStart(2, "0");
+        const weeks = [];
+        for (let week = 0; week < 6; week++) {
+            const days = [];
+            for (let weekday = 0; weekday < 7; weekday++) {
+                const index = week * 7 + weekday;
+                const [month, day] = index <= 2 ? [9, 28 + index] : index <= 33 ? [10, index - 2] : [11, index - 33];
+                days.push({
+                    date: `2026-${pad(month)}-${pad(day)}`,
+                    day: day,
+                    inMonth: month === 10,
+                    today: month === 10 && day === 27,
+                    weekend: weekday >= 5,
+                    holiday: month === 11 && day === 1 ? "All Saints' Day" : ""
+                });
+            }
+            weeks.push({
+                number: 40 + week,
+                days: days
+            });
+        }
+        return {
+            year: 2026,
+            month: 10,
+            title: "October 2026",
+            weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+            weeks: weeks
+        };
+    }
+
     fill: true
+
+    // A minute of a reading, a sample every two seconds, as [t, value]: the wave the iced page
+    // draws.
+    function wave(level: real, swing: real, phase: real): var {
+        const points = [];
+        for (let i = 0; i < 30; i++)
+            points.push([i * 2000, level + swing * Math.sin(i * 0.4 + phase) + swing * 0.4 * Math.sin(i * 1.3 + phase)]);
+        return points;
+    }
 
     function sizeName(size: string): string {
         return `${size} · ${K.ButtonMetrics.of(size).height}`;
@@ -479,6 +522,72 @@ K.Stack {
                 }
 
                 K.Section {
+                    title: "Tabs"
+                    description: "One of a few views or values, picked from small buttons: the picked one tonal. The same row is a setting's segmented control."
+
+                    K.Row {
+                        gap: K.Tokens.space.s32
+                        align: "centre"
+
+                        K.Tabs {
+                            labels: ["Wi-Fi", "Bluetooth", "Output", "Keyboard"]
+                            currentIndex: 0
+                        }
+
+                        K.Tabs {
+                            labels: ["Timer", "Alarm"]
+                            icons: ["timer", "alarm"]
+                            currentIndex: 1
+                            focused: true
+                        }
+
+                        K.Tabs {
+                            labels: ["Always", "On AC", "Never"]
+                            currentIndex: 1
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Tiles"
+                    description: "Quick toggles as tall as a two-line row, filled with the accent while on. The detail arrow stays quiet: no fill, a state layer under the pointer."
+
+                    K.Grid {
+                        columns: 4
+                        gap: K.Tokens.space.s16
+
+                        K.Tile {
+                            icon: "signal_wifi_4_bar"
+                            title: "Wi-Fi"
+                            subtitle: "Shinjuku-5G"
+                            checked: true
+                        }
+
+                        K.Tile {
+                            icon: "bluetooth"
+                            title: "Bluetooth"
+                            subtitle: "Off"
+                        }
+
+                        K.Tile {
+                            icon: "keyboard"
+                            title: "Keyboard"
+                            subtitle: "US · 1 of 2"
+                            checked: true
+                            expandable: true
+                        }
+
+                        K.Tile {
+                            icon: "key"
+                            title: "Proxy"
+                            subtitle: "Off"
+                            expandable: true
+                            focused: true
+                        }
+                    }
+                }
+
+                K.Section {
                     title: "Lists"
                     description: "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The ring goes round the well; the row shows where the keyboard is."
 
@@ -705,6 +814,107 @@ K.Stack {
                                 title: "Focused, picked"
                                 body: "The cold ring."
                             }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Sheets"
+                    description: "A panel growing out of the frame's edge, one surface with it: concave fillets where it meets the edge, the surface radius at its far corners."
+
+                    Item {
+                        id: stage
+
+                        readonly property bool fillWidth: true
+                        readonly property color frameColour: K.Look.alpha(K.Tokens.color.surface, K.Tokens.opacity.frame)
+
+                        implicitHeight: K.Tokens.space.s8 + sheet.contentHeight + K.Tokens.space.s32
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: K.Tokens.radius.surface
+                            color: K.Look.alpha(K.Tokens.color.surface_container_highest, K.Tokens.opacity.well)
+                        }
+
+                        // The frame's top edge, which the sheet hangs from.
+                        Rectangle {
+                            width: stage.width
+                            height: K.Tokens.space.s8
+                            topLeftRadius: K.Tokens.radius.surface
+                            topRightRadius: K.Tokens.radius.surface
+                            color: stage.frameColour
+                        }
+
+                        Shape {
+                            anchors.fill: parent
+                            preferredRendererType: Shape.CurveRenderer
+
+                            ShapePath {
+                                fillColor: stage.frameColour
+                                // design-allow(size): -1 is ShapePath's "no stroke", not a width.
+                                strokeWidth: -1
+
+                                PathSvg {
+                                    path: sheet.path
+                                }
+                            }
+                        }
+
+                        K.Sheet {
+                            id: sheet
+
+                            frame: QtObject {
+                                readonly property real l: 0
+                                readonly property real t: K.Tokens.space.s8
+                                readonly property real r: stage.width
+                                readonly property real b: stage.height
+                            }
+                            // Shown open, without the motion that opens it.
+                            progress: 1
+                            takesFocus: false
+                            animateSize: false
+                            contentWidth: sheetBody.implicitWidth
+                            contentHeight: sheetBody.implicitHeight
+
+                            K.Stack {
+                                id: sheetBody
+
+                                gap: K.Tokens.space.s4
+                                leftPadding: K.Tokens.space.s16
+                                rightPadding: K.Tokens.space.s16
+                                topPadding: K.Tokens.space.s16
+                                bottomPadding: K.Tokens.space.s16
+
+                                K.Text {
+                                    text: "Control center"
+                                    style: K.Tokens.type.subheading
+                                }
+
+                                K.Text {
+                                    text: "It grows out of the frame's edge."
+                                    style: K.Tokens.type.small
+                                    color: K.Tokens.color.on_surface_variant
+                                }
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Calendars"
+                    description: "A month as six weeks led by their week numbers, today filled and the picked day ringed; the title opens the year."
+
+                    K.Row {
+                        gap: K.Tokens.space.s48
+
+                        K.Calendar {
+                            month: root.october
+                            selected: "2026-10-30"
+                        }
+
+                        K.Calendar {
+                            month: root.october
+                            yearView: true
                         }
                     }
                 }
@@ -959,6 +1169,70 @@ K.Stack {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Meters and sparklines"
+                    description: "Readings at a glance: a reading in parts on a progress bar's track, and the last minute of one as a line."
+
+                    K.Row {
+                        gap: K.Tokens.space.s48
+
+                        K.Stack {
+                            fill: true
+                            gap: K.Tokens.space.s16
+
+                            K.Meter {
+                                parts: [
+                                    {
+                                        value: 0.55,
+                                        color: K.Tokens.color.primary
+                                    },
+                                    {
+                                        value: 0.15,
+                                        color: K.Tokens.color.tertiary
+                                    }
+                                ]
+                            }
+
+                            K.Meter {
+                                parts: [
+                                    {
+                                        value: 0.92,
+                                        color: K.Tokens.color.warning
+                                    }
+                                ]
+                            }
+
+                            K.Meter {
+                                parts: [
+                                    {
+                                        value: 0.3,
+                                        color: K.Tokens.color.secondary
+                                    }
+                                ]
+                            }
+                        }
+
+                        K.Stack {
+                            fill: true
+                            gap: K.Tokens.space.s16
+
+                            // The waves' 30 samples, the first at the left edge and the last at
+                            // the right, as the iced page spaces them.
+                            K.Sparkline {
+                                points: root.wave(40, 20, 0)
+                                span: 58000
+                            }
+
+                            K.Sparkline {
+                                points: root.wave(1200, 600, 1)
+                                second: root.wave(300, 150, 2)
+                                span: 58000
+                                max: 0
                             }
                         }
                     }

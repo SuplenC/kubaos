@@ -5,7 +5,9 @@ use std::sync::LazyLock;
 
 use iced::Element;
 use iced::Length;
+use iced::border;
 use iced::widget;
+use iced::widget::container;
 use iced::widget::image;
 use kubaos_ui::Look;
 use kubaos_ui::Mode;
@@ -14,6 +16,10 @@ use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::Preview;
 use kubaos_ui::component::button::button;
 use kubaos_ui::component::button::icon_button;
+use kubaos_ui::component::calendar::Day;
+use kubaos_ui::component::calendar::Month;
+use kubaos_ui::component::calendar::Week;
+use kubaos_ui::component::calendar::calendar;
 use kubaos_ui::component::card::card;
 use kubaos_ui::component::card::choice_card;
 use kubaos_ui::component::check::Tick;
@@ -41,26 +47,36 @@ use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
 use kubaos_ui::component::media::Aspect;
 use kubaos_ui::component::media::media;
+use kubaos_ui::component::meter::meter;
+use kubaos_ui::component::meter::sparkline;
 use kubaos_ui::component::picture::NamePlace;
 use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::progress::spinner;
+use kubaos_ui::component::sheet;
 use kubaos_ui::component::slider::Value;
 use kubaos_ui::component::slider::slider;
 use kubaos_ui::component::slider::slider_held;
 use kubaos_ui::component::switch::switch;
+use kubaos_ui::component::tabs::Tab;
+use kubaos_ui::component::tabs::tabs;
+use kubaos_ui::component::tile::tile;
 use kubaos_ui::component::toast::toast;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::Extent;
 use kubaos_ui::layout::Gap;
+use kubaos_ui::layout::Inset;
 use kubaos_ui::layout::fill;
 use kubaos_ui::layout::grid;
 use kubaos_ui::layout::row;
 use kubaos_ui::layout::section;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
+use kubaos_ui::look::radius;
+use kubaos_ui::snap::centre_x;
 use kubaos_ui::text::text;
 use kubaos_ui::tokens::IconSize;
+use kubaos_ui::tokens::Opacity;
 use kubaos_ui::tokens::Radius;
 use kubaos_ui::tokens::Size;
 use kubaos_ui::tokens::Space;
@@ -97,6 +113,18 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         ))
         .push(section(
             look,
+            "Tabs",
+            Some("One of a few views or values, picked from small buttons: the picked one tonal. The same row is a setting's segmented control."),
+            tab_rows(look),
+        ))
+        .push(section(
+            look,
+            "Tiles",
+            Some("Quick toggles as tall as a two-line row, filled with the accent while on. The detail arrow stays quiet: no fill, a state layer under the pointer."),
+            tiles(look),
+        ))
+        .push(section(
+            look,
             "Lists",
             Some("Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The ring goes round the well; the row shows where the keyboard is."),
             lists(look),
@@ -116,6 +144,18 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         ))
         .push(section(
             look,
+            "Sheets",
+            Some("A panel growing out of the frame's edge, one surface with it: concave fillets where it meets the edge, the surface radius at its far corners."),
+            sheets(look),
+        ))
+        .push(section(
+            look,
+            "Calendars",
+            Some("A month as six weeks led by their week numbers, today filled and the picked day ringed; the title opens the year."),
+            calendars(look),
+        ))
+        .push(section(
+            look,
             "Media",
             Some("Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then two pictures to pick, picked with its name under it and focused with its name over its foot."),
             media_samples(look),
@@ -127,6 +167,12 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             dialogs(look),
         ))
         .push(section(look, "Toasts and progress", None, progress(look)))
+        .push(section(
+            look,
+            "Meters and sparklines",
+            Some("Readings at a glance: a reading in parts on a progress bar's track, and the last minute of one as a line."),
+            readings(look),
+        ))
         .push(section(look, "Empty states", None, empties(look)))
         .push(section(look, "Errors", Some("What broke, what to do next, and the log behind it."), errors(look)))
         .into()
@@ -792,6 +838,183 @@ fn errors<'a>(look: &Look) -> Element<'a, Message> {
                 .push(fill())
                 .push(button("Save log").kind(Kind::Tonal).icon(Icon::Save).on_press(Message::Sample).view(look))
                 .push(button("Try again").icon(Icon::RestartAlt).on_press(Message::Sample).focused(true).view(look)),
+        )
+        .into()
+}
+
+fn tab_rows<'a>(look: &Look) -> Element<'a, Message> {
+    let views = [
+        Tab::new("Wi-Fi"),
+        Tab::new("Bluetooth"),
+        Tab::new("Output"),
+        Tab::new("Keyboard"),
+    ];
+    let tools = [Tab::new("Timer").icon(Icon::Timer), Tab::new("Alarm").icon(Icon::Alarm)];
+    let motion = [Tab::new("Always"), Tab::new("On AC"), Tab::new("Never")];
+    row(look, Space::S32)
+        .center()
+        .push(tabs(look, &views, 0, |_| Message::Sample, false))
+        .push(tabs(look, &tools, 1, |_| Message::Sample, true))
+        .push(tabs(look, &motion, 1, |_| Message::Sample, false))
+        .into()
+}
+
+fn tiles<'a>(look: &Look) -> Element<'a, Message> {
+    grid(look, 4, Space::S16)
+        .push(
+            tile(Icon::SignalWifi4Bar, "Wi-Fi")
+                .subtitle("Shinjuku-5G")
+                .checked(true)
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(
+            tile(Icon::Bluetooth, "Bluetooth")
+                .subtitle("Off")
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(
+            tile(Icon::Keyboard, "Keyboard")
+                .subtitle("US · 1 of 2")
+                .checked(true)
+                .on_press(Message::Sample)
+                .on_detail(Message::Sample)
+                .view(look),
+        )
+        .push(
+            tile(Icon::Key, "Proxy")
+                .subtitle("Off")
+                .on_press(Message::Sample)
+                .on_detail(Message::Sample)
+                .focused(true)
+                .view(look),
+        )
+        .into()
+}
+
+/// A minute of a reading, a sample every two seconds: a wave the QML page draws too.
+fn wave(level: f32, swing: f32, phase: f32) -> Vec<f32> {
+    (0..30_u8)
+        .map(|i| {
+            let t = f32::from(i);
+            level + swing * (t * 0.4 + phase).sin() + swing * 0.4 * (t * 1.3 + phase).sin()
+        })
+        .collect()
+}
+
+fn readings<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let meters = stack(look, Space::S16)
+        .width(Extent::Fill)
+        .push(meter(look, &[(0.55, c.primary), (0.15, c.tertiary)]))
+        .push(meter(look, &[(0.92, c.warning)]))
+        .push(meter(look, &[(0.3, c.secondary)]));
+    let graphs = stack(look, Space::S16)
+        .width(Extent::Fill)
+        .push(sparkline(wave(40.0, 20.0, 0.0)).view(look))
+        .push(
+            sparkline(wave(1200.0, 600.0, 1.0))
+                .second(wave(300.0, 150.0, 2.0))
+                .max(0.0)
+                .view(look),
+        );
+    row(look, Space::S48).push(meters).push(graphs).into()
+}
+
+fn sheets<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let frame = sheet::surface(look);
+    let corner = radius(Radius::Surface);
+    // The frame's top edge, which the sheet hangs from.
+    let edge = widget::container(widget::Space::new())
+        .width(Length::Fill)
+        .height(f32::from(Space::S8.px()))
+        .style(move |_theme| container::Style {
+            background: Some(iced::Background::Color(frame)),
+            border: iced::Border {
+                radius: border::Radius::default().top(corner),
+                ..iced::Border::default()
+            },
+            ..container::Style::default()
+        });
+    let body = stack(look, Space::S4)
+        .padding(Inset::all(Space::S16))
+        .push(text("Control center", Type::Subheading, c.on_surface))
+        .push(text(
+            "It grows out of the frame's edge.",
+            Type::Small,
+            c.on_surface_variant,
+        ));
+    let backdrop = kubaos_ui::color::alpha(c.surface_container_highest, Opacity::Well.value());
+    let hanging = widget::container(centre_x(look.scale, sheet::sheet(look, body)))
+        .padding(Inset::NONE.top(Space::S8).bottom(Space::S32).padding());
+    // The hanging sheet first: a stack is as large as its first layer.
+    widget::container(widget::Stack::with_children([hanging.into(), edge.into()]))
+        .width(Length::Fill)
+        .style(move |_theme| container::Style {
+            background: Some(iced::Background::Color(backdrop)),
+            border: iced::Border::default().rounded(corner),
+            ..container::Style::default()
+        })
+        .into()
+}
+
+/// The specimen's October 2026, weeks from Monday, as the shots' clock has it: Tuesday the 27th
+/// is today, and All Saints' Day falls in the next month's first week.
+fn october() -> Month {
+    let names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(str::to_owned);
+    let weeks = (0..6_u8)
+        .map(|week| Week {
+            number: 40 + u32::from(week),
+            days: std::array::from_fn(|weekday| {
+                let weekday = u8::try_from(weekday).expect("a week has seven days");
+                let index = week * 7 + weekday;
+                // Monday the 28th of September starts the grid.
+                let (month, day) = match index {
+                    0..=2 => (9, 28 + index),
+                    3..=33 => (10, index - 2),
+                    _ => (11, index - 33),
+                };
+                Day {
+                    date: format!("2026-{month:02}-{day:02}"),
+                    day,
+                    in_month: month == 10,
+                    today: month == 10 && day == 27,
+                    weekend: weekday >= 5,
+                    holiday: (month == 11 && day == 1).then(|| "All Saints' Day".to_owned()),
+                }
+            }),
+        })
+        .collect();
+    Month {
+        year: 2026,
+        month: 10,
+        title: "October 2026".to_owned(),
+        weekdays: names,
+        weeks,
+    }
+}
+
+static OCTOBER: LazyLock<Month> = LazyLock::new(october);
+
+fn calendars<'a>(look: &Look) -> Element<'a, Message> {
+    row(look, Space::S48)
+        .push(
+            calendar(&OCTOBER)
+                .selected("2026-10-30")
+                .on_pick(|_| Message::Sample)
+                .on_move(|_| Message::Sample)
+                .on_title(Message::Sample)
+                .view(look),
+        )
+        .push(
+            calendar(&OCTOBER)
+                .year(true)
+                .on_move(|_| Message::Sample)
+                .on_title(Message::Sample)
+                .on_month(|_| Message::Sample)
+                .view(look),
         )
         .into()
 }

@@ -179,6 +179,7 @@ pub enum Size {
     Slider,
     SliderStop,
     SliderThumb,
+    Sparkline,
     SwitchHeight,
     SwitchKnobOff,
     SwitchKnobOn,
@@ -189,7 +190,7 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 29] = [
+    pub const ALL: [Size; 30] = [
         Size::Bar,
         Size::Check,
         Size::Chip,
@@ -213,6 +214,7 @@ impl Size {
         Size::Slider,
         Size::SliderStop,
         Size::SliderThumb,
+        Size::Sparkline,
         Size::SwitchHeight,
         Size::SwitchKnobOff,
         Size::SwitchKnobOn,
@@ -247,6 +249,7 @@ impl Size {
             Size::Slider => 24,
             Size::SliderStop => 4,
             Size::SliderThumb => 16,
+            Size::Sparkline => 48,
             Size::SwitchHeight => 24,
             Size::SwitchKnobOff => 12,
             Size::SwitchKnobOn => 16,
