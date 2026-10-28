@@ -64,6 +64,7 @@ pub fn item() -> Item {
         .to_vec(),
         hidden: false,
         app_only: false,
+        weak_keywords: Vec::new(),
         actions: vec![Action::new(SHOW, "Show")],
     }
 }
@@ -92,6 +93,7 @@ pub fn scheduler_item() -> Item {
         .to_vec(),
         hidden: false,
         app_only: false,
+        weak_keywords: Vec::new(),
         actions: vec![Action::new(SHOW, "Show")],
     }
 }
@@ -115,6 +117,7 @@ pub fn scheduler_view(report: &Report) -> View {
         keywords: Vec::new(),
         hidden: false,
         app_only: false,
+        weak_keywords: Vec::new(),
         actions: Vec::new(),
     };
     let running = row(
@@ -153,6 +156,7 @@ pub fn view(now: &Now) -> View {
             keywords: Vec::new(),
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: Vec::new(),
         })
         .collect();

@@ -155,6 +155,7 @@ impl Setting {
             keywords: self.keywords().iter().map(|&word| word.to_owned()).collect(),
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: vec![choose],
         }
     }
@@ -297,6 +298,7 @@ fn list(setting: Setting, settings: &Settings) -> View {
             keywords: Vec::new(),
             hidden: false,
             app_only: false,
+            weak_keywords: Vec::new(),
             actions: vec![
                 Action::new(BOTH, "On battery and plugged in"),
                 Action::new(BATTERY, "On battery only"),

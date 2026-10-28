@@ -238,6 +238,7 @@ fn item(id: &str, title: String, subtitle: String, actions: Vec<Action>) -> Item
             .to_vec(),
         hidden: false,
         app_only: false,
+        weak_keywords: Vec::new(),
         actions,
     }
 }

@@ -440,6 +440,7 @@ fn item(id: String, title: String, subtitle: String, keywords: &[&str], action: 
             .collect(),
         hidden: false,
         app_only: false,
+        weak_keywords: Vec::new(),
         actions: vec![action],
     }
 }
