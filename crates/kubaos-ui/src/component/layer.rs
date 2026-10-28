@@ -232,15 +232,28 @@ impl<M> Widget<M, Theme, Renderer> for Layer<'_, M> {
         if shown <= 0.0 {
             return;
         }
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: layout.bounds(),
-                border: Border::default().rounded(radius(self.corner)),
-                snap: true,
-                ..renderer::Quad::default()
-            },
-            Background::Color(color::alpha(self.colour, shown)),
-        );
+        let bounds = layout.bounds();
+        // Over the content, even content in layers of its own (a picture, what a stack lays over
+        // it), which would draw over a quad left in this layer: a later layer draws over an
+        // earlier one, and a picture over a quad in the same one. A layer's clip replaces its
+        // parent's instead of narrowing it, so it is clipped to the viewport by hand, a logical
+        // pixel (a device pixel or more) wider than the layer: the clip has no anti-aliasing, and
+        // would cut the layer's half-covered edge pixels where a scroll leaves it between device
+        // pixels.
+        let Some(clip) = bounds.expand(1.0).intersection(viewport) else {
+            return;
+        };
+        renderer.with_layer(clip, |renderer| {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds,
+                    border: Border::default().rounded(radius(self.corner)),
+                    snap: true,
+                    ..renderer::Quad::default()
+                },
+                Background::Color(color::alpha(self.colour, shown)),
+            );
+        });
     }
 
     fn overlay<'b>(

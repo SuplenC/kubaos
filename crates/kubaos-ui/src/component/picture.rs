@@ -29,6 +29,7 @@ use iced::widget::container;
 use iced::widget::image;
 
 use crate::color;
+use crate::component::button::Preview;
 use crate::component::chip::ChipKind;
 use crate::component::chip::chip;
 use crate::component::layered;
@@ -77,6 +78,7 @@ pub struct PictureChoice<'a, M> {
     _words: std::marker::PhantomData<&'a ()>,
     focused: bool,
     on_press: Option<M>,
+    preview: Option<Preview>,
 }
 
 /// `picture` (or its placeholder until it loads) as a tile to pick, at `aspect`, named `name`
@@ -97,6 +99,7 @@ pub fn picture_choice<'a, M>(
         badge: None,
         focused: false,
         on_press: None,
+        preview: None,
         _words: std::marker::PhantomData,
     }
 }
@@ -141,6 +144,15 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
     pub fn on_press(self, message: M) -> Self {
         PictureChoice {
             on_press: Some(message),
+            ..self
+        }
+    }
+
+    /// Shown hovered or pressed whatever the pointer does.
+    #[must_use]
+    pub fn preview(self, preview: Preview) -> Self {
+        PictureChoice {
+            preview: Some(preview),
             ..self
         }
     }
@@ -211,7 +223,7 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
                 shadow: Shadow::default(),
                 snap: true,
             });
-        let tile = layered(pressable, CORNER, content, enabled, None);
+        let tile = layered(pressable, CORNER, content, enabled, self.preview.map(Preview::pin));
         // The tube says picked, or where the keyboard is; on a picked tile the keyboard's is cold.
         let ring = if self.picked && self.focused {
             RingColor::Cold

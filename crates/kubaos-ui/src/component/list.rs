@@ -247,6 +247,7 @@ pub fn list<'a, M: 'a>(look: &Look, rows: impl IntoIterator<Item = Element<'a, M
         Inset::all(WELL_INSET),
         Extent::Shrink,
         focused,
+        false,
     )
 }
 
@@ -317,36 +318,60 @@ impl<'a, M: 'a> ScrollingList<'a, M> {
         if let Some(on_scroll) = self.on_scroll {
             scrolled = scrolled.on_scroll(on_scroll);
         }
-        well(look, scrolled, Inset::NONE, self.height, self.focused)
+        well(look, scrolled, Inset::NONE, self.height, self.focused, true)
     }
 }
 
 /// `content` in the list's well, `inset` inside it and `height` tall, its edge lit as the focus
-/// tube while `focused`.
+/// tube while `focused`. `scrolls` when the content is a scroll, whose rows pass under the edge.
 fn well<'a, M: 'a>(
     look: &Look,
     content: impl Into<Element<'a, M>>,
     inset: Inset,
     height: Extent,
     focused: bool,
+    scrolls: bool,
 ) -> Element<'a, M> {
     let c = look.colors;
     let surface = color::alpha(c.surface_container_low, Opacity::Well.value());
     let edge = look.outline_soft();
     let hairline = look.hairline();
-    let well = widget::container(content)
+    let border = Border {
+        color: edge,
+        width: hairline,
+        radius: radius(WELL_RADIUS).into(),
+    };
+    let rows = widget::container(content)
         .padding(inset.padding())
         .width(Length::Fill)
         .height(height.length())
         .style(move |_theme| container::Style {
             background: Some(Background::Color(surface)),
-            border: Border {
-                color: edge,
-                width: hairline,
-                radius: radius(WELL_RADIUS).into(),
+            border: if scrolls {
+                Border::default().rounded(radius(WELL_RADIUS))
+            } else {
+                border
             },
             ..container::Style::default()
         });
+    let well: Element<'a, M> = if scrolls {
+        // The edge is the well's, over the rows that scroll under it: drawn as the container's
+        // border it would sit under them, since the scroll draws its rows in a layer of its own,
+        // after the container's. A stack draws its upper child in a layer after the lower one's.
+        let rim = widget::container(widget::Space::new())
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(move |_theme| container::Style {
+                border,
+                ..container::Style::default()
+            });
+        widget::Stack::with_children([rows.into(), rim.into()])
+            .width(Length::Fill)
+            .height(height.length())
+            .into()
+    } else {
+        rows.into()
+    };
     let view: Element<'a, M> = focus_ring(look, well, WELL_RADIUS, focused, RingColor::Accent);
     probe::component("List", ["", "", ""], Fixed::NONE, view)
 }

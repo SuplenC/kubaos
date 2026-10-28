@@ -1,12 +1,12 @@
 //! The neon focus: the keyboard's place on screen, the focused control's own edge lit as a neon
 //! tube with its glow outside it.
 //!
-//! The tube is drawn on the control's edge, inside its box and over its outline, so there is only
-//! ever one line and nothing dark between the tube and the glow. The glow fades out from the tube
-//! over [`tokens::FOCUS_NEAR`] and, faintly, [`tokens::FOCUS_FAR`]. Neither takes layout space:
-//! focus moving never moves anything. Focus is a state of the control, drawn as part of it: the
-//! glow is always its full size, clipped by whatever clips the control (a scroll, a list, a well)
-//! and covered by whatever is drawn over the control.
+//! The tube is drawn on the control's edge, inside its box and over its outline and all it holds,
+//! so there is only ever one line and nothing dark between the tube and the glow. The glow fades
+//! out from the tube over [`tokens::FOCUS_NEAR`] and, faintly, [`tokens::FOCUS_FAR`]. Neither
+//! takes layout space: focus moving never moves anything. Focus is a state of the control, drawn
+//! as part of it: the glow is always its full size, clipped by whatever clips the control (a
+//! scroll, a list, a well) and covered by whatever is drawn over the control.
 //!
 //! # Owns
 //!
@@ -377,19 +377,32 @@ impl<M> Widget<M, Theme, Renderer> for Ring<'_, M> {
             None => (bounds, self.color, radius(self.radius)),
         };
         let width = if self.core.is_some() { self.thin } else { self.tube };
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: tube,
-                border: Border {
-                    color: color::alpha(color, lit),
-                    width,
-                    radius: corner.into(),
+        // The tube is the control's edge, over everything the control holds. Left in this layer it
+        // would sit under a picture the control holds, since a layer draws its pictures after its
+        // quads, and under the layers a control opens of its own (a list's scroll, a stack laid
+        // over a picture, a field's text), since a later layer draws over an earlier one. Its own
+        // layer, opened after the content's, keeps it on top. A layer's clip replaces its
+        // parent's instead of narrowing it, so it is clipped to the viewport by hand, a device
+        // pixel wider than the tube: the clip has no anti-aliasing, and would cut the tube's
+        // half-covered outer pixels where a scroll leaves it between device pixels.
+        let Some(clip) = tube.expand(self.scale.hairline()).intersection(viewport) else {
+            return;
+        };
+        renderer.with_layer(clip, |renderer| {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: tube,
+                    border: Border {
+                        color: color::alpha(color, lit),
+                        width,
+                        radius: corner.into(),
+                    },
+                    snap: true,
+                    ..renderer::Quad::default()
                 },
-                snap: true,
-                ..renderer::Quad::default()
-            },
-            Background::Color(Color::TRANSPARENT),
-        );
+                Background::Color(Color::TRANSPARENT),
+            );
+        });
     }
 
     fn overlay<'b>(
