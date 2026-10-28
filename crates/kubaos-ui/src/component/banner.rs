@@ -99,23 +99,20 @@ fn colours(look: &Look, tone: BannerTone) -> Colours {
     }
 }
 
-/// The looks a banner's actions are drawn with: a text button's (Back), then a bar's along its
-/// foot. On a danger banner's red the accent reads as a stray colour, so there the accent's role
-/// takes the banner's own colours: its content colour for a text button, the error colour for a
-/// bar. Other tones keep `look`.
+/// The look a text button takes inside a banner of `tone`. On a danger banner's red the accent
+/// reads as a stray colour, so there a text button takes the banner's own content colour; other
+/// tones keep `look`. The bar along a danger banner's foot is
+/// [`danger_timed_bar`](crate::component::progress::danger_timed_bar).
 #[must_use]
-pub fn inside(look: &Look, tone: BannerTone) -> (Look, Look) {
+pub fn inside(look: &Look, tone: BannerTone) -> Look {
     if tone != BannerTone::Danger {
-        return (*look, *look);
+        return *look;
     }
     let c = look.colors;
-    (
-        look.with_colors(crate::color::Colors {
-            primary: c.on_error_container,
-            ..c
-        }),
-        look.with_colors(crate::color::Colors { primary: c.error, ..c }),
-    )
+    look.with_colors(crate::color::Colors {
+        primary: c.on_error_container,
+        ..c
+    })
 }
 
 /// A banner, built up then drawn with [`Banner::view`].

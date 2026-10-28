@@ -64,8 +64,8 @@ use kubaos_ui::component::meter::sparkline;
 use kubaos_ui::component::picture::NamePlace;
 use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::bar;
+use kubaos_ui::component::progress::danger_timed_bar;
 use kubaos_ui::component::progress::spinner;
-use kubaos_ui::component::progress::timed_bar;
 use kubaos_ui::component::select::select;
 use kubaos_ui::component::sheet;
 use kubaos_ui::component::skeleton::Bone;
@@ -1340,10 +1340,10 @@ fn banners<'a>(look: &Look) -> Element<'a, Message> {
                     .kind(Kind::Text)
                     .icon(Icon::ArrowBack)
                     .on_press(Message::Sample)
-                    .view(&on_red.0),
+                    .view(&on_red),
                 hold.into(),
             ])
-            .foot(timed_bar(&on_red.1, 0.4))
+            .foot(danger_timed_bar(look, 0.4))
             .view(look),
         )
         .into()

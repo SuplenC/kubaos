@@ -1100,6 +1100,7 @@ K.Stack {
                             foot: [
                                 K.ProgressBar {
                                     value: 0.4
+                                    danger: true
                                 }
                             ]
 

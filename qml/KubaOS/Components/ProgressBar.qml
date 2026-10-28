@@ -10,6 +10,10 @@ Item {
 
     // How far the work is, 0 to 1.
     property real value: 0
+    // On a danger banner's red: the fill in the error colour on a pale track, so the work that
+    // destroys something reads as red all the way.
+    property bool danger: false
+    readonly property color fillColour: root.danger ? Tokens.color.error : Tokens.color.primary
 
     readonly property bool fillWidth: true
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
@@ -17,7 +21,7 @@ Item {
     readonly property var probe: ({
             role: "component",
             name: "ProgressBar",
-            variant: "",
+            variant: root.danger ? "danger" : "",
             fixed: {
                 width: false,
                 height: true
@@ -29,7 +33,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Tokens.radius.full
-        color: K.Look.alpha(Tokens.color.surface_container_highest, Tokens.opacity.track)
+        color: root.danger ? K.Look.alpha(Tokens.color.on_error_container, Tokens.opacity.tint) : K.Look.alpha(Tokens.color.surface_container_highest, Tokens.opacity.track)
     }
 
     // The row the fill sits in, as `kubaos-ui` lays it out.
@@ -49,7 +53,7 @@ Item {
             radius: fill.radius
             offset.y: Tokens.shadow.glow.y
             blur: Tokens.shadow.glow.blur
-            color: K.Look.alpha(Tokens.color.primary, Tokens.shadow.glow.opacity)
+            color: K.Look.alpha(root.fillColour, Tokens.shadow.glow.opacity)
         }
 
         Rectangle {
@@ -61,7 +65,7 @@ Item {
             width: K.Look.snapUp(root.width * fill.fraction, root.dpr)
             height: root.height
             radius: Tokens.radius.full
-            color: Tokens.color.primary
+            color: root.fillColour
 
             Behavior on fraction {
                 NumberAnimation {

@@ -1442,7 +1442,7 @@ pub const CONTRAST: [ContrastPair; 43] = [
         bg: Role::ErrorContainer,
         need: Need::Graphic,
         opacity: None,
-        purpose: "A danger banner's symbol and hairline",
+        purpose: "A danger banner's symbol and hairline, and a danger progress bar's fill",
     },
     ContrastPair {
         fg: Role::Primary,

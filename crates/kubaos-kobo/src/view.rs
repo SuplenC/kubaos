@@ -66,6 +66,7 @@ use kubaos_ui::component::list::scrolling_list;
 use kubaos_ui::component::media::Aspect;
 use kubaos_ui::component::picture::NamePlace;
 use kubaos_ui::component::picture::picture_choice;
+use kubaos_ui::component::progress::danger_timed_bar;
 use kubaos_ui::component::progress::spinner;
 use kubaos_ui::component::progress::timed_bar;
 use kubaos_ui::component::step::StepState as RailState;
@@ -1751,7 +1752,7 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
         )
     };
     let label = if app.hold.is_some() { "Keep holding…" } else { cta };
-    let (on_banner, bar) = kubaos_ui::component::banner::inside(look, tone);
+    let on_banner = kubaos_ui::component::banner::inside(look, tone);
     let back = button("Back")
         .kind(Kind::Text)
         .icon(Icon::ArrowBack)
@@ -1776,7 +1777,11 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
         );
     banner(tone, glyph, message, sub)
         .actions([back, hold_button.into()])
-        .foot(timed_bar(&bar, held))
+        .foot(if tone == BannerTone::Danger {
+            danger_timed_bar(look, held)
+        } else {
+            timed_bar(look, held)
+        })
         .view(look)
 }
 
