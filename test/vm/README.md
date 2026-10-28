@@ -1,7 +1,6 @@
 # QEMU test bench (`test/vm/run`)
 
-Boots the KubaOS live ISO (or any ISO) and the installed disk on the Mac.
-aarch64 runs on HVF with `-cpu host` and is fast. x86_64 runs on TCG and is slow, so use it only for occasional correctness checks. Needs Homebrew `qemu` (firmware comes from `/opt/homebrew/share/qemu`) and `cwebp` for screenshots.
+Boots the KubaOS live ISO (or any ISO) and the installed disk on the development machine. A guest of the machine's own arch runs on KVM with `-cpu host` and is fast; the other arch runs on TCG and is slow, so use it only for occasional correctness checks. `--arch` defaults to the machine's. QEMU, `qemu-img`, `xorriso` (the KUBAOS_CFG disk) and `cwebp` (screenshots) come from `PATH` when they are all there, else from the flake's nixpkgs (`nix build --inputs-from .`, cached after the first run). The edk2 firmware is the one beside that QEMU, in its `share/qemu`. KVM needs read and write access to `/dev/kvm`.
 
 One VM at a time. Its state lives in `test/vm/out/` (gitignored): `disk.qcow2` (the target, 64 GiB sparse), `vars.qcow2` (UEFI variables), `serial.log`, `qmp.sock`, `id_ed25519` (bench SSH key), `cfg.iso` (the KUBAOS_CFG disk), `shots/`, `install.log`. Downloaded ISOs go in `test/vm/cache/` (gitignored).
 
@@ -38,17 +37,17 @@ The `virt` machine (aarch64) or `q35` (x86_64), with edk2 UEFI from pflash. The 
 - Display is `virtio-gpu-pci` at 1920×1080 (`VM_RES`), plus USB keyboard and tablet and virtio-rng. One screen: for a second one, `workspaces-check` has Hyprland make a headless output (`hyprctl output create headless NAME`, gone again with `hyprctl output remove NAME`), which plugs and unplugs like a real screen and shows in `shot` only through its windows' workspace ids.
 - The serial console (`ttyAMA0` or `ttyS0`) goes to `out/serial.log`.
 
-`--gui` opens a Cocoa window, otherwise it's `-display none`. QEMU always runs in the background as a plain child process, never with `-daemonize`. On macOS the forked daemon aborts inside the ObjC runtime as soon as Hypervisor.framework serializes vGIC state (savevm).
+`--gui` opens a GTK window, otherwise it's `-display none`. QEMU runs in the background as a plain child process with a pidfile.
 
 ## Secure Boot (x86_64)
 
-`--secure-boot` swaps Homebrew's edk2 for Ubuntu's: `OVMF_CODE_4M.secboot.fd` with `OVMF_VARS_4M.ms.fd` (Microsoft's KEK and db enrolled, like a laptop out of the box), on `q35,smm=on` with the flash in secure mode. Homebrew has the secure code but no vars with keys in them. The two files come from Ubuntu's `ovmf-generic` .deb, downloaded once into `cache/ovmf/` and checked against the archive's sha256 (pinned in `run`; when Ubuntu drops that version from the pool, bump `OVMF_DEB_URL` and `OVMF_DEB_SHA256` from `dists/resolute-updates/main/binary-amd64/Packages`).
+`--secure-boot` swaps QEMU's edk2 for Ubuntu's: `OVMF_CODE_4M.secboot.fd` with `OVMF_VARS_4M.ms.fd` (Microsoft's KEK and db enrolled, like a laptop out of the box), on `q35,smm=on` with the flash in secure mode. QEMU's edk2 has the secure code but no vars with keys in them. The two files come from Ubuntu's `ovmf-generic` .deb, downloaded once into `cache/ovmf/` and checked against the archive's sha256 (pinned in `run`; when Ubuntu drops that version from the pool, bump `OVMF_DEB_URL` and `OVMF_DEB_SHA256` from `dists/resolute-updates/main/binary-amd64/Packages`).
 
 A fresh target disk always gets fresh vars, so an install never inherits an older boot entry. Check inside the guest with `mokutil --sb-state` and `dmesg | grep -i secure`.
 
 ## How config gets in: the KUBAOS_CFG disk
 
-`boot-iso --config/--demo/…` and `install` build `out/cfg.iso` with `hdiutil makehybrid -iso -joliet`, volume label **`KUBAOS_CFG`**, and attach it as a second CD. It holds:
+`boot-iso --config/--demo/…` and `install` build `out/cfg.iso` with `xorriso -as mkisofs -J` (ISO 9660 with Joliet), volume label **`KUBAOS_CFG`**, and attach it as a second CD. It holds:
 
 ```
 install.toml     the InstallConfig (makes the live system run headless)
@@ -72,9 +71,9 @@ QEMU passes the bench's public key as `-fw_cfg name=opt/kubaos/authorized_keys`.
 test/vm/run boot-iso                                   # newest KubaOS ISO, interactive flow
 test/vm/run wait-serial KUBAOS-INTERACTIVE && test/vm/run shot kobo
 test/vm/run ssh kubaos probe --json
-test/vm/run install test/vm/examples/install.toml test/vm/examples/secrets.toml --demo
-test/vm/run install test/vm/examples/install.toml test/vm/examples/secrets.toml   # the real engine
-test/vm/run install test/vm/examples/install.toml test/vm/examples/secrets.toml --ssh   # then:
+test/vm/run install test/vm/examples/install-x86_64.toml test/vm/examples/secrets.toml --demo
+test/vm/run install test/vm/examples/install-x86_64.toml test/vm/examples/secrets.toml   # the real engine
+test/vm/run install test/vm/examples/install-x86_64.toml test/vm/examples/secrets.toml --ssh   # then:
 test/vm/run boot-disk && sleep 15 && test/vm/run type 'bench-luks\n' && test/vm/run wait-ssh
 test/vm/run ssh snapper list                           # root on the installed system
 test/vm/run shot first-boot
@@ -84,36 +83,15 @@ test/vm/run snapshot save fresh; …; test/vm/run snapshot restore fresh
 test/vm/run stop
 ```
 
-Stock Ubuntu check: `test/vm/run boot-iso test/vm/cache/ubuntu-26.04.1-live-server-arm64.iso` reaches subiquity on serial in about 50 s (SHA256 checked against the official `SHA256SUMS`).
+Stock Ubuntu checks the bench itself: `test/vm/run boot-iso test/vm/cache/ubuntu-26.04.1-live-server-amd64.iso` (SHA256 checked against the official `SHA256SUMS`) brings subiquity up on serial.
 
-## Numbers (aarch64, HVF, 4 vCPU, 8 GB, 2026-10-16)
+## Rebuild and retest x86_64
 
-| | |
-|---|---|
-| `install` with the real payload (3.6 GB squashfs, 9.5 GB installed), QEMU start to `KUBAOS-RESULT: done` | about 50 s; the engine's own total is 38 to 41 s |
-| Per step | preflight 0.0 s, partition 4 s, encrypt 9 to 15 s (argon2id), filesystems 1 s, unpack 15 to 18 s, configure 1 s, user 0.5 s, bootloader 3 to 4 s, home 0.7 s, snapshot 0.3 s, finish 0.7 s |
-| Kōbō install, keyboard only | 51 s from "hold to install" to Done (Kōbō draws on llvmpipe at the same time) |
-| `boot-disk`: passphrase typed to the desktop with the wallpaper video playing | about 12 s |
-| Kernel + userspace to `graphical.target` | 3.6 s of userspace after the passphrase |
-
-x86_64 under TCG (6 vCPUs, 8 GB, the `tuxedo` payload, 3.9 GB squashfs), 2026-10-16:
-
-| | |
-|---|---|
-| Headless `install --secure-boot --ssh`, QEMU start to done | 6 min 59 s; the engine's total 351 s (unpack 232 s, bootloader 59 s, home 15 s, encrypt 10 s, snapshot 8 s, finish 9 s) |
-| Kōbō install, keyboard only, plain UEFI | 10 min 43 s from "hold to install" to Done, the engine's total 643 s (unpack 464 s): Kōbō draws on llvmpipe and an ISO build ran next to it |
-| Live ISO to `KUBAOS-INTERACTIVE` | 34 s (Secure Boot) to 48 s of uptime; Kōbō is drawn about 40 s later |
-| `boot-disk`: passphrase typed to SSH up | about 25 s |
-
-None of this says anything about the laptop: on the Mac's Docker VM `unsquashfs` does 333 to 516 MiB/s, and NVMe on a Ryzen does more.
-
-### Rebuild and retest x86_64
-
-From a clean worktree (the payload build refuses a dirty one), one amd64 build at a time:
+From a clean worktree (the payload build refuses a dirty one), one build at a time:
 
 ```sh
-install/image/build --arch x86_64                     # warm 4 to 10 min, cold about 75
-install/image/check --arch x86_64                     # about 1.5 min
+install/image/build --arch x86_64
+install/image/check --arch x86_64
 install/iso/build bins --arch x86_64                  # binaries into iso/bin/x86_64
 P=install/out/payload-x86_64 B=iso/bin/x86_64
 install/iso/build --arch x86_64 --profile vm --payload $P --bin $B   # -> …-x86_64-vm.iso, the bench's
@@ -132,6 +110,6 @@ test/vm/run wait-serial KUBAOS-INTERACTIVE --timeout 300   # the release ISO has
 test/vm/run stop
 ```
 
-`examples/install-x86_64.toml` is `install.toml` with `hostname = "tuxedo"`, which the x86_64 payload requires. `--iso` matters: without it `install` takes the newest `kubaos-*-x86_64*.iso`, which may be the release one, and that has no SSH for `--ssh`.
+`examples/install-x86_64.toml` is `install.toml` with `hostname = "tuxedo"`, which the x86_64 payload requires; `install.toml` (`hostname = "vm"`) is for the aarch64 payload. `--iso` matters: without it `install` takes the newest `kubaos-*-x86_64*.iso`, which may be the release one, and that has no SSH for `--ssh`.
 
-Hyprland and Quickshell render with llvmpipe here (Homebrew QEMU has no GL): Hyprland takes about three cores with the video wallpaper playing. Slow, never broken.
+Hyprland and Quickshell render with llvmpipe here (the display is `virtio-gpu-pci`, without GL): Hyprland takes about three cores with the video wallpaper playing. Slow, never broken.

@@ -298,10 +298,10 @@ fi
 # build inputs for that; building one proves it.
 t="$(now)"
 user_flake check-other kubaos-check
-# Rosetta (amd64 on Apple Silicon) can't load Nix's seccomp filter, as in
-# assemble.sh. The machine builds with it; only this check goes without.
 build_opts=(--option sandbox false)
-if [[ "$(uname -m)" == x86_64 ]] && grep -qi 'VirtualApple' /proc/cpuinfo; then
+# Under QEMU's user-mode emulation (a payload for another arch), Nix's
+# seccomp filter can't load, as in assemble.sh.
+if [[ -n ${MACHINE_ARCH:-} && $MACHINE_ARCH != "$(uname -m)" ]]; then
   build_opts+=(--option filter-syscalls false)
 fi
 if out="$(nix_offline build "${build_opts[@]}" --no-link --print-out-paths \

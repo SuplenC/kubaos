@@ -72,17 +72,16 @@ c_path() {
 }
 
 # Every tool docs/CONTRACTS.md lists ("Packages: who installs what") that
-# exists on arm64, resolved in a login shell, with its owner checked.
+# the image installs, resolved in a login shell, with its owner checked.
+# Hyprland is the PPA's, from apt.
 NIX_TOOLS=(qs ghostty nvim tmux tms lazygit yazi fzf zoxide atuin direnv eza bat fd rg delta dust dysk
   btop jq yq xh tldr just glow gh fastfetch lazydocker bacon cargo-nextest hyperfine sccache wild
   oh-my-posh matugen home-manager non-nixos-gpu-setup gpu-screen-recorder satty kubaos-files kubaos-bluetooth
   kubaos-automount kubaos-phone ripdrag)
 APT_TOOLS=(foot fuzzel wl-copy grim slurp playerctl socat qalc notify-send brightnessctl clang mold
   unzip git ssh secret-tool pamtester pamu2fcfg nmcli wpctl snapper fprintd-verify boltctl
-  powerprofilesctl ddcutil xdg-open hyprlock hypridle nautilus file-roller 7z unar magick udisksctl)
-# Hyprland comes from the PPA on amd64 and from nixpkgs on arm64, where
-# Ubuntu's is too old for the Lua config (home/desktop.nix).
-if [[ "$(dpkg --print-architecture)" == arm64 ]]; then NIX_TOOLS+=(Hyprland start-hyprland); else APT_TOOLS+=(Hyprland); fi
+  powerprofilesctl ddcutil xdg-open hyprlock hypridle nautilus file-roller 7z unar magick udisksctl
+  Hyprland)
 c_tools() {
   local out bad=0 t p
   out="$(zrun "for t in ${NIX_TOOLS[*]} ${APT_TOOLS[*]} bw; do printf '%s\t%s\n' \$t \"\$(command -v \$t || echo MISSING)\"; done")"
@@ -663,7 +662,7 @@ c_shellcheck() {
       *.sh) files+=("$f") ;;
       *) head -1 "$f" | grep -qE '^#!.*\b(ba)?sh\b' && files+=("$f") ;;
     esac
-  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
+  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config crates/self-imports | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
   echo "     ${#files[@]} files"
   # Gate on warnings and errors; info and style notes are listed, not fatal.
   local out notes
@@ -2717,10 +2716,16 @@ c_update_edge() {
     as_user tee "$UPD_WORK/migrations/user/2000000000-harness-user.sh" >/dev/null
   # A new kubaos, told apart by its version.
   as_user sed -i 's/^version = "0.1.0"$/version = "0.1.0-harness"/' "$UPD_WORK/Cargo.toml"
-  as_user awk -v v='version = "0.1.0-harness"' \
-    'prev ~ /^name = "(kubaos-core|kubaos-cli|kubaos-cursor|kubaos-kobo|kotodama-kubaos|kubaos-files|kubaos-bluetooth|kubaos-automount)"$/ && /^version = / { $0 = v } { print; prev = $0 }' \
+  # Every crate that takes the workspace's version, read from the manifests,
+  # so a new crate needs no change here: the release builds with --locked.
+  local crates
+  crates="$(grep -l '^version.workspace = true' "$UPD_WORK"/crates/*/Cargo.toml |
+    xargs awk 'FNR == 1 { seen = 0 } !seen && /^name = / { gsub(/^name = "|"$/, ""); print; seen = 1 }' |
+    paste -sd'|')"
+  as_user awk -v v='version = "0.1.0-harness"' -v names="^name = \"($crates)\"$" \
+    'prev ~ names && /^version = / { $0 = v } { print; prev = $0 }' \
     "$UPD_WORK/Cargo.lock" | as_user tee "$UPD_WORK/Cargo.lock.new" >/dev/null && as_user mv "$UPD_WORK/Cargo.lock.new" "$UPD_WORK/Cargo.lock"
-  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == 8 ]] ||
+  [[ $(grep -c '^version = "0.1.0-harness"$' "$UPD_WORK/Cargo.lock") == "$(tr '|' '\n' <<<"$crates" | wc -l)" ]] ||
     { echo "FAIL bumping the workspace's version in Cargo.lock"; return 1; }
   # A package new to the manifest, and the record of a machine where KubaOS
   # installed sway, which no group lists, and zsh, which one does.

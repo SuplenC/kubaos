@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install/iso/build: build the KubaOS live ISO in Docker (install/iso/README.md).
 #
-#   install/iso/build [--arch aarch64|x86_64] [--profile hw|vm] [--release]
+#   install/iso/build [--arch x86_64|aarch64] [--profile hw|vm] [--release]
 #                       [--payload DIR] [--bin DIR] [--branding DIR] [--name NAME] [--zstd N]
 #                       [--rebuild-base]
 #                                 build iso/NAME.iso (default kubaos-CODENAME-VERSION-ARCH,
@@ -9,6 +9,7 @@
 #                                 appended for --profile vm)
 #   install/iso/build bins [--arch A]
 #                                 only build kubaos + kobo into iso/bin/ARCH
+#   --arch defaults to this machine's; the builders always run natively on it.
 #   install/iso/build clean     remove this builder's containers, images and volumes
 #
 # --profile hw (default): linux-image-generic + linux-firmware, for real machines.
@@ -39,13 +40,15 @@ usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0
 elapsed() { printf '%dm%02ds' $((SECONDS / 60)) $((SECONDS % 60)); }
 
 platform() { case "$1" in aarch64) echo linux/arm64 ;; x86_64) echo linux/amd64 ;; *) die "bad arch $1" ;; esac; }
+HOST_ARCH="$(uname -m)"
+NATIVE="$(platform "$HOST_ARCH")"
 
 build_image() { # build_image TARGET PLATFORM
   docker buildx build -q --platform "$2" --target "$1" -t "kubaos-iso-$1:${2#linux/}" -f "$HERE/Dockerfile" "$HERE" >/dev/null
 }
 
 cmd_bins() {
-  local arch=aarch64
+  local arch="$HOST_ARCH"
   while (($#)); do
     case "$1" in
       --arch) arch="${2:?}"; shift ;;
@@ -55,28 +58,28 @@ cmd_bins() {
   done
   local triple="$arch-unknown-linux-gnu" dest="$OUT/bin/$arch"
   say "building kubaos and kobo for $triple"
-  build_image rust linux/arm64
+  build_image rust "$NATIVE"
   mkdir -p "$dest"
   # The target volume is shared by every checkout (worktree) of the repo, and
   # cargo decides freshness by mtime: in one target dir, a checkout whose files
   # are older than another checkout's last build gets that build's binaries.
   # So each checkout builds in its own subdirectory.
   local tdir
-  tdir="/target/$(printf '%s' "$ROOT" | shasum | cut -c1-12)"
+  tdir="/target/$(printf '%s' "$ROOT" | sha256sum | cut -c1-12)"
   docker run --rm --name "kubaos-iso-cargo-$arch" --cpus "$CPUS" --memory "$MEM" \
     -v kubaos-iso-cargo:/usr/local/cargo/registry \
     -v kubaos-iso-target:/target \
     -v "$ROOT:/src:ro" \
     -v "$dest:/dest" \
     -e CARGO_TARGET_DIR="$tdir" -e CARGO_PROFILE_RELEASE_STRIP=true -w /src \
-    kubaos-iso-rust:arm64 \
+    "kubaos-iso-rust:${NATIVE#linux/}" \
     sh -c "cargo build --release --locked --target $triple -p kubaos-cli -p kubaos-kobo &&
            install -m 755 $tdir/$triple/release/kubaos $tdir/$triple/release/kobo /dest/"
   ls -la "$dest" >&2
 }
 
 cmd_build() {
-  local arch=aarch64 profile=hw release=0 payload="$HERE/stub-payload" bins="" name="" zstd=19 rebuild=0
+  local arch="$HOST_ARCH" profile=hw release=0 payload="$HERE/stub-payload" bins="" name="" zstd=19 rebuild=0
   local branding="$ROOT/branding/iso"
   while (($#)); do
     case "$1" in
@@ -117,7 +120,7 @@ cmd_build() {
   # without a new check doesn't count.
   if [[ $pv != *-stub ]]; then
     local want
-    want="$(shasum -a 256 "$payload/manifest.json" | cut -d' ' -f1)"
+    want="$(sha256sum "$payload/manifest.json" | cut -d' ' -f1)"
     [[ -f $payload/check.ok && "$(<"$payload/check.ok")" == "$want" ]] ||
       die "payload $payload hasn't passed install/image/check: run just payload-check $arch"
     # A payload from another commit passes its check, but ships that
@@ -137,10 +140,10 @@ cmd_build() {
   mkdir -p "$OUT"
 
   say "building $name.iso ($arch, profile $profile, release $release)"
-  # The builder always runs natively (arm64); mmdebstrap --arch builds a foreign
-  # rootfs through binfmt. Running the whole build in an emulated amd64
-  # container breaks apt's `cat >&13` hook ("Bad fd number").
-  build_image iso linux/arm64
+  # The builder always runs natively; mmdebstrap --arch builds a foreign
+  # rootfs through binfmt. Running the whole build in an emulated container
+  # breaks apt's `cat >&13` hook ("Bad fd number").
+  build_image iso "$NATIVE"
   docker run --rm --name "kubaos-iso-build-$arch-$profile" --privileged \
     --cpus "$CPUS" --memory "$MEM" \
     -v "kubaos-iso-work-$arch:/work" \
@@ -149,14 +152,14 @@ cmd_build() {
     -e ARCH="$arch" -e PROFILE="$profile" -e RELEASE="$release" -e NAME="$name" \
     -e ZSTD_LEVEL="$zstd" -e REBUILD_BASE="$rebuild" \
     -e KUBAOS_VERSION="$KUBAOS_VERSION" -e KUBAOS_RELEASE_ID="$KUBAOS_RELEASE_ID" \
-    kubaos-iso-iso:arm64 bash /src/lib/build-iso.sh
+    "kubaos-iso-iso:${NATIVE#linux/}" bash /src/lib/build-iso.sh
   say "built $OUT/$name.iso in $(elapsed)"
 }
 
 cmd_clean() {
   local c
   for c in $(docker ps -aq --filter name='^kubaos-iso-'); do docker rm -f "$c" >/dev/null; done
-  docker image rm kubaos-iso-rust:arm64 kubaos-iso-iso:arm64 kubaos-iso-iso:amd64 >/dev/null 2>&1 || true
+  docker image rm kubaos-iso-rust:arm64 kubaos-iso-rust:amd64 kubaos-iso-iso:arm64 kubaos-iso-iso:amd64 >/dev/null 2>&1 || true
   docker volume rm "${VOLUMES[@]}" >/dev/null 2>&1 || true
   echo "removed kubaos-iso-* containers, images and volumes (iso/ kept)"
 }

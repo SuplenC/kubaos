@@ -35,7 +35,7 @@ case "$cmd" in
     fi
     switch
     note "store: $(du -sh /nix/store 2>/dev/null | cut -f1)"
-    say "warm in $(since "$t0") s"
+    say "warm in $(since "$t0") s, peak memory $(peak_memory)"
     ;;
 
   e2e)
@@ -45,7 +45,7 @@ case "$cmd" in
     prepare
     rc=0
     e2e_main "${1:-}" || rc=$?
-    note "e2e total $(since "$t0") s"
+    note "e2e total $(since "$t0") s, peak memory $(peak_memory)"
     exit "$rc"
     ;;
 

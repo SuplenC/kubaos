@@ -22,15 +22,16 @@ Flashing, checks and what to expect: [`docs/RELEASE-shinjuku.md`](docs/RELEASE-s
 
 ## Build it yourself
 
-You need Docker and [`just`](https://github.com/casey/just). On macOS you also need QEMU (`brew install qemu`) to boot the result. `arch` is `aarch64` or `x86_64` and defaults to the machine you're on. Amd64 builds are emulated on an Apple Silicon Mac, so they're slow.
+You need Linux, Docker, Nix and [`just`](https://github.com/casey/just). The VM bench takes QEMU from the flake's nixpkgs when the machine has none. `arch` is `x86_64` or `aarch64` and defaults to the machine you're on; the other arch builds and boots emulated, so it's slow.
 
 ```sh
 just                       # list everything
 just payload x86_64        # the system image the install lays down
 just iso x86_64            # the USB-stick ISO into iso/
-just iso aarch64 vm        # the bench ISO (ssh, no firmware) for QEMU
-just vm-install aarch64    # install it headless in QEMU, boot it, look around
-just vm aarch64            # boot an ISO in QEMU
+just iso x86_64 vm         # the bench ISO (ssh, no firmware) for QEMU
+just vm-install x86_64     # install it headless in QEMU (KVM), boot it, look around
+just vm x86_64             # boot an ISO in QEMU
+just e2e                   # the end-to-end checks in the Docker harness
 just test                  # cargo tests plus the Docker and engine checks
 just release               # tests, checks and all four ISOs
 just clean                 # remove iso/ and the build outputs

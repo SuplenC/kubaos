@@ -2,11 +2,11 @@
 # install/image/build: build the KubaOS payload (manifest.json + a
 # squashfs of the installed system). install/image/README.md has the details.
 #
-#   install/image/build [--arch aarch64|x86_64] [--out DIR] [--allow-dirty]
+#   install/image/build [--arch x86_64|aarch64] [--out DIR] [--allow-dirty]
 #                         [--zstd-level N] [--no-cache] [--progress plain]
 #
-#   --arch         aarch64 (default; host vm, native on Apple Silicon) or
-#                  x86_64 (host tuxedo, through QEMU)
+#   --arch         x86_64 (host tuxedo) or aarch64 (host vm); default this
+#                  machine's. The other arch builds through QEMU (binfmt)
 #   --out          payload dir (default install/out/payload-<arch>)
 #   --allow-dirty  build from the working tree (tracked + untracked, not
 #                  ignored) instead of HEAD; the commit gets a -dirty suffix
@@ -26,7 +26,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-ARCH=aarch64 OUT="" ALLOW_DIRTY=0 ZSTD_LEVEL=15 BUILD_ARGS=()
+ARCH="$(uname -m)" OUT="" ALLOW_DIRTY=0 ZSTD_LEVEL=15 BUILD_ARGS=()
 CPUS="${KUBAOS_IMAGE_CPUS:-6}" MEM="${KUBAOS_IMAGE_MEM:-8g}"
 PAYLOAD_USER=kuba   # the build user (Dockerfile); the engine rebuilds for any other name
 
@@ -78,12 +78,11 @@ IN="$(mktemp -d "${TMPDIR:-/tmp}/kubaos-image.XXXXXX")"
 trap 'rm -rf "$IN"' EXIT
 if ((ALLOW_DIRTY)); then
   (cd "$ROOT" && git ls-files -z -co --exclude-standard |
-    COPYFILE_DISABLE=1 tar --no-xattrs --no-mac-metadata --null -T - -cf "$IN/src.tar")
+    tar --no-xattrs --null -T - -cf "$IN/src.tar")
 else
   git -C "$ROOT" archive --format=tar -o "$IN/src.tar" HEAD
 fi
-# Unpacked here, not in the container: GNU tar can't create directories
-# under Rosetta (the amd64 build), and cp can.
+# Unpacked here: the container only copies it (lib/assemble.sh).
 mkdir "$IN/src"
 tar -C "$IN/src" -xf "$IN/src.tar"
 rm -f "$IN/src.tar"
@@ -125,7 +124,7 @@ docker run --rm --name "$CONTAINER" --platform "linux/$DARCH" \
   -e LOCAL_INPUTS="$LOCAL_INPUTS" \
   -e ARCH="$ARCH" -e HOST="$HOST" -e PAYLOAD_USER="$PAYLOAD_USER" -e COMMIT="$COMMIT" \
   -e VERSION="$VERSION" -e BUILT_AT="$BUILT_AT" -e ZSTD_LEVEL="$ZSTD_LEVEL" -e CPUS="$CPUS" \
-  -e BUILD_ID="$BUILD_ID" \
+  -e BUILD_ID="$BUILD_ID" -e MACHINE_ARCH="$(uname -m)" \
   -e OS_NAME=KubaOS -e OS_ID=kubaos -e OS_CODENAME="$KUBAOS_RELEASE_ID" -e OS_CODENAME_NAME="$KUBAOS_RELEASE" \
   -e OS_VERSION_SHORT="$KUBAOS_VERSION_SHORT" -e OS_HOME_URL="${KUBAOS_HOME_URL:-}" \
   "$IMAGE" /in/src/install/image/lib/assemble.sh

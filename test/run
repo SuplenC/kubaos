@@ -21,7 +21,9 @@
 #   test/run nuke [--yes]               clean, then delete the harness's volumes
 #
 # DOTFILES_SRC=<checkout> tests another copy of the repo (default: this one).
-# DOTFILES_TEST_MEM / DOTFILES_TEST_CPUS: container limits (5g / 6).
+# DOTFILES_TEST_MEM / DOTFILES_TEST_CPUS: container limits (12g / 8).
+# DOTFILES_TEST_NIX_JOBS / DOTFILES_TEST_NIX_CORES: Nix's max-jobs and cores
+# in the container (2 / 4); the cores are Cargo's jobs for the CLI too.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -34,6 +36,17 @@ VOLUMES=(dotfiles-nix dotfiles-test-cache dotfiles-test-vw-certs dotfiles-test-v
 export DOTFILES_SRC="${DOTFILES_SRC:-$ROOT}"
 DOTFILES_SRC="$(cd "$DOTFILES_SRC" && pwd)"
 export DOTFILES_TEST_OUT="${DOTFILES_TEST_OUT:-$HERE/out}"
+# The machine's Nix store, mounted read-only as a substituter (compose.yaml).
+# Without Nix on the machine an empty folder stands in, and harness.sh skips it.
+if [[ -z ${DOTFILES_HOST_NIX:-} ]]; then
+  if [[ -d /nix/store ]]; then
+    DOTFILES_HOST_NIX=/nix
+  else
+    DOTFILES_HOST_NIX="$DOTFILES_TEST_OUT/no-host-nix"
+    mkdir -p "$DOTFILES_HOST_NIX"
+  fi
+fi
+export DOTFILES_HOST_NIX
 
 die() { printf 'test/run: %s\n' "$*" >&2; exit 1; }
 usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
@@ -94,13 +107,13 @@ cmd_warm() {
 # cargo goes by mtime, and worktrees share the volume.
 build_kubaos() {
   local sub
-  sub="$(printf '%s' "$DOTFILES_SRC" | shasum | cut -c1-12)"
+  sub="$(printf '%s' "$DOTFILES_SRC" | sha256sum | cut -c1-12)"
   mkdir -p "$DOTFILES_TEST_OUT"
   echo "==> cargo build -p kubaos-cli --features test-suite (linux/$(docker version -f '{{.Server.Arch}}'))"
   docker rm -f dotfiles-test-cargo-build >/dev/null 2>&1 || true
   # shellcheck disable=SC2016 # $CARGO_TARGET_DIR expands in the build container.
   docker run --rm --name dotfiles-test-cargo-build \
-    --cpus "${DOTFILES_TEST_CPUS:-6}" --memory "${DOTFILES_TEST_MEM:-5g}" \
+    --cpus "${DOTFILES_TEST_CPUS:-8}" --memory "${DOTFILES_TEST_MEM:-12g}" -e CARGO_BUILD_JOBS="${DOTFILES_TEST_NIX_CORES:-4}" \
     -v dotfiles-test-cargo:/usr/local/cargo/registry -v dotfiles-test-target:/target \
     -v "$DOTFILES_SRC":/src:ro -v "$DOTFILES_TEST_OUT":/out -w /src -e CARGO_TARGET_DIR="/target/$sub" \
     rust:latest sh -c 'cargo build --locked --quiet -p kubaos-cli --features test-suite && install -m 0755 "$CARGO_TARGET_DIR/debug/kubaos" /out/kubaos'
@@ -155,8 +168,7 @@ cmd_bitwarden() {
 shots_running() { [[ "$(docker inspect -f '{{.State.Running}}' "$SHOTS" 2>/dev/null)" == true ]]; }
 # shots_out: the host directory behind the session's /out.
 shots_out() {
-  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/out"}}{{.Source}}{{end}}{{end}}' "$SHOTS" |
-    sed 's#^/host_mnt##'
+  docker inspect -f '{{range .Mounts}}{{if eq .Destination "/out"}}{{.Source}}{{end}}{{end}}' "$SHOTS"
 }
 
 cmd_shots() {

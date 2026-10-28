@@ -46,12 +46,12 @@
     kubaosPkgs.gpu-screen-recorder
     pkgs.satty
   ]
-  # aarch64 is the VM. The Hyprland PPA builds no arm64 binaries and Ubuntu's
-  # own is 0.53, which predates the Lua config: it ignores config/hypr and
-  # writes a stock hyprland.conf into the repo. nixpkgs' Hyprland reads
-  # hyprland.lua, and ~/.nix-profile/bin comes first on PATH, so tty1's
-  # start-hyprland is this one. It renders through /run/opengl-driver
-  # (llvmpipe in QEMU). The laptop keeps the PPA's.
+  # aarch64 (ARM machines and VMs): the Hyprland PPA builds no arm64
+  # binaries, and Ubuntu's own is 0.53, which predates the Lua config: it
+  # ignores config/hypr and writes a stock hyprland.conf into the repo.
+  # nixpkgs' Hyprland reads hyprland.lua, and ~/.nix-profile/bin comes first
+  # on PATH, so tty1's start-hyprland is this one. It renders through
+  # /run/opengl-driver (llvmpipe in QEMU). x86_64 keeps the PPA's.
   ++ lib.optionals pkgs.stdenv.hostPlatform.isAarch64 [ kubaosPkgs.hyprland ];
 
   # start-hyprland (no uwsm) never activates graphical-session.target, and

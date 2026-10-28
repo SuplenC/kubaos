@@ -3,9 +3,9 @@
 `install/image/build` produces the payload the engine installs: `manifest.json` (`kubaos_core::Manifest`) and `kubaos-shinjuku-<arch>.squashfs`, the whole installed KubaOS Shinjuku system. `install/image/check` unpacks a payload in a privileged container and checks it through chroot.
 
 ```sh
-install/image/build                       # aarch64, host vm -> install/out/payload-aarch64/
-install/image/build --arch x86_64         # host tuxedo, amd64 under Rosetta -> install/out/payload-x86_64/
-install/image/check [--arch x86_64]       # unpack + chroot checks; writes check.txt, packages.txt, and check.ok on a pass
+install/image/build                       # this machine's arch; x86_64 is host tuxedo -> install/out/payload-x86_64/
+install/image/build --arch aarch64        # host vm, through QEMU (binfmt) -> install/out/payload-aarch64/
+install/image/check [--arch aarch64]      # unpack + chroot checks; writes check.txt, packages.txt, and check.ok on a pass
 ```
 
 `build` refuses a dirty worktree unless you pass `--allow-dirty`. With it, the flake is built from the working tree (tracked plus untracked, not ignored), the commit gets a `-dirty` suffix, and the shipped checkout has the working tree laid over `HEAD`. Release payloads come from a clean tree.
@@ -24,7 +24,7 @@ The tree is Ubuntu 26.04 after `system/10-strip.sh`, `20-base.sh`, `25-boot.sh`,
 - the home-manager activation package for `kuba@<host>` (`vm` on aarch64, `tuxedo` on x86_64), built from the user flake with the shipped lock: `manifest.home_generation`, GC root `/nix/var/nix/gcroots/kubaos/home-generation`. `kuba` is the build user
 - what the engine needs to build that generation for another username offline (docs/INSTALL-INTERNALS.md, "Another username"), GC roots `kubaos/rebuild-input-*`. `assemble.sh` builds the generation for a probe user (`kubaos-probe`, from the user flake written for that name) and diffs the two derivation closures. What differs is what names the user. The inputs of those derivations that aren't themselves user-specific (their outputs, through `nix derivation show` and `lib/build-inputs.py`) go into the payload. About 18 MB beyond the generation's own closure
 - what `system/` links into the store: nixpkgs' `pam_fprintd` and `pam_u2f` and gpu-screen-recorder (GC roots `dotfiles-*`, as on the laptop), and the `/run/opengl-driver` bundle from `non-nixos-gpu-setup`
-- the user flake's inputs and `/usr/share/kubaos`'s (`nix flake archive`), so the machine can evaluate both offline (GC roots `kubaos/flake-input-*`). That includes local ones, such as a checkout on the build machine (`git+file:///Users/...`): `build` bind-mounts every `git+file://` and `path:` input from `flake.lock` read-only at its own path into the assemble container (`test/lib/local-inputs.sh`), and `assemble.sh` lists them as git `safe.directory` for the build user (in `~/.gitconfig`, which stays out of the payload with `/home`). `check` evaluates the user flake with `--offline` in the unpacked tree and compares it with `manifest.home_generation`, which is what `home-manager switch` on the machine needs
+- the user flake's inputs and `/usr/share/kubaos`'s (`nix flake archive`), so the machine can evaluate both offline (GC roots `kubaos/flake-input-*`). That includes local ones, such as a checkout on the build machine (`git+file:///home/...`): `build` bind-mounts every `git+file://` and `path:` input from `flake.lock` read-only at its own path into the assemble container (`test/lib/local-inputs.sh`), and `assemble.sh` lists them as git `safe.directory` for the build user (in `~/.gitconfig`, which stays out of the payload with `/home`). `check` evaluates the user flake with `--offline` in the unpacked tree and compares it with `manifest.home_generation`, which is what `home-manager switch` on the machine needs
 - Nix itself (the default profile from the official installer)
 
 Nothing else from the build's store goes in.
@@ -110,9 +110,7 @@ unsquashfs -f -d /mnt -processors "$(nproc)" -percentage kubaos-shinjuku-x86_64.
 
 A change under `home/`, `config/`, `scripts/` or `flake.lock` only reruns step 2, and in it only the derivations that changed. apt never runs again.
 
-**amd64 on the Mac** runs under Rosetta (Docker Desktop's default for amd64), not QEMU. Two things break there, and the build works around both on amd64 only. GNU tar 1.35 can't create directories ("Function not implemented"): the Nix installer gets bsdtar as `tar`, and the repo snapshot is unpacked on the host, so no tar runs in the container. Nix can't load its seccomp filter: `filter-syscalls = false` is set while the installer runs and passed to the assemble container's daemon. Neither ends up in the payload.
-
-Why not mkosi: it builds Ubuntu images well, but it has no per-step layer cache. Its incremental mode caches only the base tree, so any change to the package list or a script reruns everything after that. It would also need its own wrapper to run `system/*.sh` as a user with sudo, and a privileged Linux container on the Mac to run at all. The Docker stages reuse the harness's proven way of running the real scripts, cached per script.
+Why not mkosi: it builds Ubuntu images well, but it has no per-step layer cache. Its incremental mode caches only the base tree, so any change to the package list or a script reruns everything after that. It would also need its own wrapper to run `system/*.sh` as a user with sudo. The Docker stages reuse the harness's proven way of running the real scripts, cached per script.
 
 ### What the payload leaves out, and why
 
@@ -156,9 +154,9 @@ docker image rm $(docker image ls -q --filter reference='kubaos-image-*')
 
 After a Nix version bump in `60-nix.sh`, a new store volume is made. Delete the old one by hand.
 
-## Timings and sizes
+## Sizes
 
-Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (8 CPUs, 7.75 GB VM). The assemble container is limited to 6 CPUs and 8 GB. amd64 runs under Rosetta.
+The assemble container is limited to 6 CPUs and 8 GB (`KUBAOS_IMAGE_CPUS`, `KUBAOS_IMAGE_MEM`).
 
 | | aarch64 (`vm`) | x86_64 (`tuxedo`) |
 |---|---|---|
@@ -166,11 +164,5 @@ Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (8 CPUs, 7.75 GB VM)
 | Installed (`installed_bytes`) | 9143 MiB (9.8 GB on disk) | 9696 MiB (11 GB on disk) |
 | of which `/nix` / `/usr` | 5.8 / 4.0 GB | 5.7 / 3.7 GB |
 | Packages / generation closure | 794 / 814 paths, 4.8 GB | 803 / 817 paths, 4.7 GB |
-| System image, cold (empty apt cache) | 10 min 20 s (`os` 5 min 25 s, `base` 2 min 16 s, `nix` 1 min 33 s, `apps` 19 s, `desktop` 43 s) | about 24 min (`os` 6 min, `base` 13 min 21 s, `nix`..`desktop` about 4 min) |
-| Assemble, cold store volume | about 15 min (the generation 13.5 min, Quickshell built from source) | 49 min 36 s (the generation 46 min: Quickshell and the Papirus recolour run under Rosetta) |
-| **Whole build, cold** | **about 26 min** | **about 74 min** |
-| Rebuild, nothing changed | 1 min 51 s (image 2 s, assemble 1 min 49 s) | 2 min 33 s |
-| Rebuild after a `home/*.nix` change | 2 min 36 s (image 2 s; generation 8 s; squashfs 95 s) | not measured; same steps as aarch64 plus the changed derivations under Rosetta |
-| `check` (unpack + chroot checks) | 42 s; `unsquashfs` 17 to 20 s, 460 to 550 MiB/s | 70 s; `unsquashfs` 19 s, 516 MiB/s |
 
-In a warm build, most of the time goes to `mksquashfs` (zstd 15 over 9 GB), then the rsync of `/` and the `nix copy` of the closure (about 20 s each). `--zstd-level` trades build time for archive size. Unpack speed barely changes with the level.
+In a warm build, most of the time goes to `mksquashfs` (zstd 15 over 9 GB), then the rsync of `/` and the `nix copy` of the closure. `--zstd-level` trades build time for archive size. Unpack speed barely changes with the level.

@@ -4,8 +4,9 @@
 # by test/lib/entry after harness.sh; prepare() has run.
 #
 # Stand-ins: OpenSSH's ssh-agent on ~/.bitwarden-ssh-agent.sock for the
-# Bitwarden desktop agent (no arm64 build), gnome-keyring on a session bus
-# unlocked with a fixed password for the login keyring.
+# Bitwarden desktop agent (it serves keys only while its window is unlocked),
+# gnome-keyring on a session bus unlocked with a fixed password for the login
+# keyring.
 
 # shellcheck source=test/lib/e2e.sh
 . "$LIB/e2e.sh"

@@ -16,7 +16,7 @@ The stick holds a finished KubaOS: Ubuntu 26.04 after `system/10-strip.sh` throu
 
 ### Make the stick
 
-Build the payload and the ISO on the Mac (both run in Docker; details in `install/image/README.md` and `install/iso/README.md`):
+Build the payload and the ISO on a Linux machine with Docker (details in `install/image/README.md` and `install/iso/README.md`):
 
 ```sh
 install/image/build --arch x86_64          # the installed system, as one squashfs
@@ -207,7 +207,7 @@ updates follow it; `kubaos packages enable|disable <group>` changes it later.
 | `system/75-yubikey.sh` | Security key tools (`fido2-tools`), udev check, `--piv`: pcscd for the Multi-protocol Edition | no |
 | `system/relink.sh` | points the wallpaper, PAM and recorder links at the installed release; `kubaos update` runs it | |
 
-### Before you start (on the Mac)
+### Before you start
 
 - Ubuntu Server 26.04.1 amd64 ISO from <https://releases.ubuntu.com/26.04/>
   (`ubuntu-26.04.1-live-server-amd64.iso`), written to a USB stick
@@ -502,65 +502,31 @@ The official installer has no uninstaller. Per the Nix manual:
 delete the `nixbld*` users and group, then `/nix` (here, delete the `@nix`
 subvolume) and `~/.nix-*`, `~/.local/state/nix`.
 
-### Testing in a VM first (UTM on Apple Silicon)
+### Testing in a VM first
 
 Worth an evening before installing on hardware: practice the subvolume
-conversion, run the scripts, try the home-manager config `kuba@vm`.
+conversion, run the scripts, try the home-manager config. The VM bench
+(`test/vm/run`, `test/vm/README.md`) runs QEMU on KVM on an x86_64 machine.
 
 #### Setup
 
-1. ISO: `ubuntu-26.04.1-live-server-arm64.iso` from
-   <https://cdimage.ubuntu.com/releases/26.04/release/>.
-2. UTM -> Create a New VM -> **Virtualize** -> Linux. Tick **Hardware OpenGL
-   Acceleration** (UTM then uses the `virtio-gpu-gl-pci` display device;
-   check under Display after creating). 8 GB RAM, 4+ cores, 64 GB disk.
+1. ISO: `ubuntu-26.04.1-live-server-amd64.iso` from
+   <https://releases.ubuntu.com/26.04/>, in `test/vm/cache/`.
+2. `test/vm/run boot-iso test/vm/cache/ubuntu-26.04.1-live-server-amd64.iso --gui`
+   boots it in a window with a fresh 64 GB disk (`VM_MEM=8192 VM_CPUS=4` for
+   the desktop's sake).
 3. Install exactly as in section 2 (same partitions, LUKS, LVM, btrfs), with
-   hostname **`vm`**, then do `00-btrfs-subvolumes.md` from the ISO. The
+   hostname **`tuxedo`**, then do `00-btrfs-subvolumes.md` from the ISO. The
    device is `/dev/vda` (partitions `vda1`, `vda2`, `vda3`) instead of
    `nvme0n1p*`.
-4. `sudo apt install spice-vdagent` for clipboard sharing (optional).
-5. Run the scripts in order. `60-nix.sh` picks `--host vm` from the hostname
-   (`kuba@vm`, aarch64-linux).
+4. `test/vm/run stop`, then `test/vm/run boot-disk --gui`, and run the
+   scripts in order. `60-nix.sh` picks `--host tuxedo` (`kuba@tuxedo`).
 
 #### What you can and can't test
 
 | Works in the VM | Doesn't |
 |---|---|
-| Subvolume conversion, snapper, grub-btrfs, rollback drill | `tuxedo-drivers`, power profiles, MOK (TUXEDO repo is amd64 only; the script skips it) |
-| 10-strip, 20-base, NetworkManager, PipeWire | Fingerprint reader, USB4 dock, two external monitors at 120 Hz |
-| Docker (arm64 packages exist) | Chrome (amd64 only, skipped; use Chromium from Nix if needed) |
-| Nix, home-manager `kuba@vm`, GPU wiring via `/run/opengl-driver` with virgl | |
-| tty1 autologin -> zsh -> `start-hyprland` | **Hyprland from the PPA** |
-
-**Hyprland in the VM.** `ppa:cppiber/hyprland` builds amd64 binaries only
-(arm64 gets just the arch-independent data packages). On arm64,
-`50-hyprland.sh` installs Ubuntu's own `hyprland` from universe instead, which
-is **0.53.3** in resolute. That predates the Lua config (0.55+), so it starts
-but **ignores `config/hypr/*.lua`**: you can test the session plumbing
-(autologin, `start-hyprland`, portals, PipeWire, hyprlock PAM), not the
-Hyprland config.
-
-To test the Lua config in the VM, the realistic route is Hyprland from
-nixpkgs, not a source build (a source build needs the whole hypr* library
-stack at matching versions). nixos-26.05 has 0.55.4 (Lua config works, a
-minor version behind the laptop); nixos-unstable has 0.56.2. After
-`60-nix.sh` has set up `/run/opengl-driver`:
-
-```sh
-nix profile add nixpkgs/nixos-unstable#hyprland   # VM only, not in the flake
-~/.nix-profile/bin/start-hyprland                 # from tty1
-```
-
-This is a test-only detour, untested here; on the laptop Hyprland always
-comes from the PPA.
-
-If Hyprland shows a black screen or fails with EGL / GBM errors in the VM:
-
-- check that Hardware OpenGL Acceleration is on (`lspci -k` shows
-  `virtio-gpu`, `eglinfo -B` from `mesa-utils` shows virgl, not llvmpipe);
-- try `AQ_NO_ATOMIC=1 start-hyprland` (Aquamarine's switch for legacy KMS)
-  and `AQ_NO_MODIFIERS=1`.
-
-`WLR_RENDERER_ALLOW_SOFTWARE` does nothing here: that's a wlroots variable,
-and Hyprland hasn't used wlroots since 0.42 (it uses Aquamarine, which has no
-software-rendering switch). Without GL acceleration Hyprland doesn't run.
+| Subvolume conversion, snapper, grub-btrfs, rollback drill | `tuxedo-drivers`, power profiles, MOK on real firmware |
+| 10-strip, 20-base, NetworkManager, PipeWire, Docker, Chrome | Fingerprint reader, USB4 dock, two external monitors at 120 Hz |
+| Nix, home-manager, the PPA's Hyprland and the Lua config | GPU acceleration: the bench's display has no GL, so Hyprland and Quickshell render with llvmpipe, slowly |
+| tty1 autologin -> zsh -> `start-hyprland` | |

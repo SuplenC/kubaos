@@ -1,8 +1,8 @@
 # KubaOS build and test commands. `just` lists them.
-# Needs Docker, and on macOS QEMU (brew install qemu) for the vm recipes.
-# arch defaults to this machine's: aarch64 or x86_64.
+# Needs Docker; the vm recipes take QEMU from PATH or the flake's nixpkgs (test/vm/README.md).
+# arch defaults to this machine's: x86_64 or aarch64.
 
-host := `case "$(uname -m)" in arm64|aarch64) echo aarch64 ;; *) echo x86_64 ;; esac`
+host := `uname -m`
 dirty := if env("ALLOW_DIRTY", "") == "" { "" } else { "--allow-dirty" }
 # The release (docs/adr/0001-release-and-update-model.md, "Versions").
 ver := trim(read(justfile_directory() / "VERSION"))
@@ -21,14 +21,14 @@ payload arch=host:
 payload-check arch=host:
     install/image/check --arch {{arch}}
 
-# Build the live ISO into iso/ (builds the payload first if there isn't one, and checks it if it hasn't passed). `just iso aarch64 vm` makes the bench ISO (ssh, no firmware).
+# Build the live ISO into iso/ (builds the payload first if there isn't one, and checks it if it hasn't passed). `just iso x86_64 vm` makes the bench ISO (ssh, no firmware).
 iso arch=host profile="release":
     #!/usr/bin/env bash
     set -euo pipefail
     case "{{profile}}" in release|vm) ;; *) echo "profile is 'vm' or empty (release)" >&2; exit 2 ;; esac
     p=install/out/payload-{{arch}}
     [[ -f $p/manifest.json ]] || just payload {{arch}}
-    [[ "$(cat "$p/check.ok" 2>/dev/null)" == "$(shasum -a 256 "$p/manifest.json" | cut -d' ' -f1)" ]] || just payload-check {{arch}}
+    [[ "$(cat "$p/check.ok" 2>/dev/null)" == "$(sha256sum "$p/manifest.json" | cut -d' ' -f1)" ]] || just payload-check {{arch}}
     if [[ "{{profile}}" == vm ]]; then flags=(--profile vm); else flags=(--release); fi
     install/iso/build --arch {{arch}} --payload "$p" "${flags[@]}"
     ls -lh iso/kubaos-{{codename}}-{{ver}}-{{arch}}*.iso
@@ -50,16 +50,16 @@ check: fmt-check lint nextest design-check
 nextest:
     cargo nextest run --workspace
 
-# Format the workspace with the nightly rustfmt and rustfmt.toml (`nix develop` has it; outside, point RUSTFMT at a nightly rustfmt), then turn the `use foo::{self};` it writes into `use foo;` (scripts/self-imports) and sort again.
+# Format the workspace with the nightly rustfmt and rustfmt.toml (`nix develop` has it; outside, point RUSTFMT at a nightly rustfmt), then turn the `use foo::{self};` it writes into `use foo;` (crates/self-imports) and sort again.
 fmt: _nightly-rustfmt
     cargo fmt --all
-    scripts/self-imports crates
+    crates/self-imports crates
     cargo fmt --all
 
 # Check the formatting, rewriting nothing.
 fmt-check: _nightly-rustfmt
     cargo fmt --all --check
-    scripts/self-imports --check crates
+    crates/self-imports --check crates
 
 # A stable rustfmt skips rustfmt.toml's unstable options with a warning and formats the rest with the defaults, so the fmt recipes refuse one that warns.
 _nightly-rustfmt:
@@ -80,9 +80,19 @@ lint:
 # Cargo tests, the shell harness (Docker) and the engine end-to-end test.
 test:
     cargo test --workspace
-    test/run build
-    test/run e2e
+    just e2e
     install/test/engine-e2e
+
+# The end-to-end checks in the Docker harness (test/run, docs/TESTING.md): every check, or `just e2e pins suites` for those. Builds the image and warms the store first; both are cached, so a run after a config change goes straight to the switch.
+[positional-arguments]
+e2e *checks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    test/run build
+    test/run warm
+    only=()
+    (($#)) && only=(--only "$(IFS=,; echo "$*")")
+    test/run e2e ${only[@]+"${only[@]}"}
 
 # The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced. `just test` runs the first three as cargo tests; `nix flake check` runs them all.
 design-check: && design-parity
