@@ -28,6 +28,12 @@ note() { printf '%s    %s%s\n' "$C_DIM" "$*" "$C_OFF"; }
 die() { printf '%sxx  %s%s\n' "$C_ERR" "$*" "$C_OFF" >&2; exit 1; }
 now() { date +%s.%N; }
 since() { awk -v a="$1" -v b="$(now)" 'BEGIN { printf "%.1f", b - a }'; }
+# peak_memory: the container's highest memory use so far, for sizing
+# DOTFILES_TEST_MEM.
+peak_memory() {
+  local f=/sys/fs/cgroup/memory.peak
+  [[ -r $f ]] && awk '{ printf "%.1f GB", $1 / 1e9 }' "$f" || echo unknown
+}
 
 # The environment login(1) would give kuba on a tty, plus a runtime dir.
 JENV=(
@@ -44,7 +50,27 @@ zlogin() { as_user zsh -l -i -c "$1"; }
 zrun() { as_user zsh -l -c "$1"; }
 
 # --- once per container -------------------------------------------------------
+# nix_settings: bounds for the daemon's builds, which share the machine with
+# its session and other work (a Quickshell or crate build takes gigabytes per
+# core), and the machine's own store as the first substituter when test/run
+# mounted it, so nothing the machine has is built or downloaded again. That
+# store is mounted read-only, hence read-only=true (no locks), and its paths
+# carry no signature, hence trusted.
+nix_settings() {
+  local conf=/etc/nix/nix.conf
+  grep -q '^# test harness' "$conf" && return 0
+  {
+    printf '\n# test harness (test/lib/harness.sh)\n'
+    printf 'max-jobs = %s\ncores = %s\n' "${DOTFILES_TEST_NIX_JOBS:-2}" "${DOTFILES_TEST_NIX_CORES:-4}"
+    if [[ -d /host/nix/store && -f /host/nix/var/nix/db/db.sqlite ]]; then
+      printf 'extra-experimental-features = read-only-local-store\n'
+      printf 'extra-substituters = local?root=/host&read-only=true&trusted=true&priority=10\n'
+    fi
+  } >>"$conf"
+}
+
 start_nix_daemon() {
+  nix_settings
   [[ -S /nix/var/nix/daemon-socket/socket ]] && rm -f /nix/var/nix/daemon-socket/socket
   if ! pgrep -x nix-daemon >/dev/null; then
     "$NIX_BIN/nix-daemon" >"$LOGS/nix-daemon.log" 2>&1 &

@@ -142,8 +142,9 @@
         {
           # The laptop (TUXEDO InfinityBook Pro 14 Gen10).
           "kuba@tuxedo" = home "x86_64-linux";
-          # UTM VM on an Apple Silicon Mac, for testing.
-          "kuba@vm" = home "aarch64-linux";
+          # The test harness's home (test/run, docs/TESTING.md), in a
+          # container on the x86_64 development machine.
+          "kuba@vm" = home "x86_64-linux";
         };
 
       # The design checks (crates/checks.nix): the lint, the specimen's
@@ -184,7 +185,7 @@
             runtimeInputs = [ (rustfmtNightly pkgs) ];
             text = ''
               rustfmt --edition 2024 "$@"
-              ${./scripts/self-imports} "$@"
+              ${./crates/self-imports} "$@"
               rustfmt --edition 2024 "$@"
             '';
           };

@@ -3,9 +3,11 @@
 name: dotfiles-test
 
 x-limits: &limits
-  # Docker Desktop's VM has about 7.75 GB; leave room for other containers.
-  mem_limit: ${DOTFILES_TEST_MEM:-5g}
-  cpus: ${DOTFILES_TEST_CPUS:-6}
+  # A full e2e run peaks near 7 GB, page cache included, with the build
+  # bounds harness.sh gives Nix (a warm that rebuilds the crates, about 5 GB);
+  # 12 GB leaves headroom, and the machine's session and other work the rest.
+  mem_limit: ${DOTFILES_TEST_MEM:-12g}
+  cpus: ${DOTFILES_TEST_CPUS:-8}
 
 services:
   dotfiles:
@@ -21,6 +23,8 @@ services:
     environment:
       DOTFILES_TEST_SHOT_SIZE: ${DOTFILES_TEST_SHOT_SIZE:-1920x1080}
       DOTFILES_TEST_SHOT_SCALE: ${DOTFILES_TEST_SHOT_SCALE:-1}
+      DOTFILES_TEST_NIX_JOBS: ${DOTFILES_TEST_NIX_JOBS:-2}
+      DOTFILES_TEST_NIX_CORES: ${DOTFILES_TEST_NIX_CORES:-4}
     volumes:
       # The config under test: read-only, copied into the container per run.
       - type: bind
@@ -32,6 +36,14 @@ services:
         source: ${DOTFILES_TEST_OUT:-./out}
         target: /out
       - dotfiles-nix:/nix
+      # The machine's own Nix store, read-only: a substituter ahead of the
+      # binary caches, so what the machine has built is never built again
+      # (harness.sh, host_store). test/run points this at an empty folder
+      # on a machine without Nix.
+      - type: bind
+        source: ${DOTFILES_HOST_NIX:-/nix}
+        target: /host/nix
+        read_only: true
       - dotfiles-cache:/var/cache/dotfiles-test
       # Vaultwarden's CA (test/run bitwarden); empty otherwise.
       - dotfiles-vw-certs:/vw-certs:ro

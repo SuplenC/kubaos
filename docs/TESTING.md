@@ -1,10 +1,12 @@
 # Testing KubaOS in Docker
 
-The point: a broken config shows up as a red FAIL on the Mac, not as a black screen on the laptop.
+The point: a broken config shows up as a red FAIL in a container, not as a black screen on the laptop.
 
-`test/run` builds an arm64 Ubuntu 26.04 image with the repo's own `system/*.sh`, keeps the Nix store in a volume, and on every run copies the repo in and does a real `home-manager switch` for `kuba@vm`. Only the parts that change rarely are cached. The config under test never is.
+`test/run` builds an x86_64 Ubuntu 26.04 image with the repo's own `system/*.sh`, keeps the Nix store in a volume, and on every run copies the repo in and does a real `home-manager switch` for `kuba@vm` (`x86_64-linux`). Only the parts that change rarely are cached. The config under test never is. It runs natively on the x86_64 Linux development machine.
 
-Needs Docker with BuildKit and Compose v2 (Docker Desktop on the Mac is fine). Everything the harness creates is called `dotfiles-test-*` (containers, network, volumes) or `dotfiles-nix`, so it never touches other containers.
+`just e2e` is the entry point: it builds the image, warms the store and runs every check; `just e2e pins suites` runs those two. The build and the warm are cached, so a run after a config change goes straight to the switch.
+
+Needs Docker Engine with BuildKit and Compose v2. Everything the harness creates is called `dotfiles-test-*` (containers, network, volumes) or `dotfiles-nix`, so it never touches other containers. It never touches the machine's session or its `~/.config`, `/etc` or `/usr` either: the repo and the machine's Nix store are mounted read-only, and everything else lives in the harness's own volumes and `test/out/`.
 
 Before/after screenshots of a UI change don't need Docker: `just shots` renders the shell's surfaces, Kōbō and the specimen headless, against stand-in services, and pairs and diffs them (`docs/agents/design-pr-loop.md`). The session below (`just shots-session`) is for looking at the whole desktop.
 
@@ -12,6 +14,7 @@ Before/after screenshots of a UI change don't need Docker: `just shots` renders 
 
 | Command | What |
 |---|---|
+| `just e2e [CHECK...]` | `test/run build`, `test/run warm`, then `test/run e2e`, `--only` the checks named |
 | `test/run build [--progress=plain] [--no-cache]` | Build `dotfiles-test:latest` |
 | `test/run warm` | Realise the `kuba@vm` generation, the home-manager CLI, nixpkgs' `pam_u2f`, `fprintd`, `pamtester` and Chromium into the `dotfiles-nix` volume, then switch once |
 | `test/run e2e [--only a,b] [--keep]` | Every check below, a PASS/FAIL table, exit 1 on any failure. `--keep` leaves the container for `docker exec -it dotfiles-test-e2e bash` (logs in `/tmp/dotfiles-test/`) |
@@ -25,7 +28,11 @@ Before/after screenshots of a UI change don't need Docker: `just shots` renders 
 | `test/run clean` | Remove the harness's containers, keep the volumes |
 | `test/run nuke [--yes]` | `clean`, then delete the harness volumes (asks first) |
 
-`DOTFILES_SRC=/path/to/checkout test/run e2e` tests another copy of the repo, for example a `git worktree` of a branch. The harness scripts themselves are read from that copy (`test/lib/`), so they stay in step with it. `DOTFILES_TEST_MEM` and `DOTFILES_TEST_CPUS` set the container's limits (default 5g, 6 CPUs; Docker Desktop's VM has about 7.75 GB).
+`DOTFILES_SRC=/path/to/checkout test/run e2e` tests another copy of the repo, for example a `git worktree` of a branch. The harness scripts themselves are read from that copy (`test/lib/`), so they stay in step with it. 
+
+**Limits.** The machine runs its own session and other builds beside the harness, so the container is bounded: `DOTFILES_TEST_MEM` and `DOTFILES_TEST_CPUS` (default 12g and 8 CPUs; the `kubaos` CLI's cargo build gets the same), and Nix in the container builds with `max-jobs` `DOTFILES_TEST_NIX_JOBS` and `cores` `DOTFILES_TEST_NIX_CORES` (default 2 and 4; the cores are also cargo's jobs). `test/run warm` and `test/run e2e` print the container's peak memory (the cgroup's `memory.peak`) at the end, which is what to size `DOTFILES_TEST_MEM` by.
+
+**Not in PR CI.** A GitHub-hosted `ubuntu-latest` runner has about 14 GB of free disk, and the harness needs about 22 GB (the 6.6 GB image and a 15 GB store), and nothing it builds survives to the next run: the Actions cache holds 10 GB per repository. The store alone doesn't fit, and every run would start from a cold image and store on 4 CPUs. So CI runs `just check`, and a PR runs `just e2e` on the machine and puts the results table in its description.
 
 `shots --dir NAME` writes to `docs/screenshots/NAME/`. Without `--dir` or `--out` the files go to `test/out/` (git-ignored). Typical session:
 
@@ -44,14 +51,15 @@ test/run shots stop
 | image stage `base` | `ubuntu:26.04`, user kuba (sudo-rs, zsh), `system/10-strip.sh` and `system/20-base.sh` run for real | `system/lib.sh`, `manifest.sh`, `packages.toml`, `10-strip.sh`, `20-base.sh`, `system/files/{apt,netplan,logind.conf.d}`, `system/files/systemd/{system,user}.conf.d` change |
 | stage `nix` | Nix from the official installer, version, URL and sha256 read from `system/60-nix.sh`, `--daemon`, flakes on | `system/60-nix.sh` changes (or anything above) |
 | stage `tooling` | apt test tools: sway, swaybg, grim, slurp, wf-recorder, Mesa llvmpipe GL/GLES/EGL, dbus, gnome-keyring, secret-tool, pamtester, shellcheck, lua5.5, hyperfine, jq, expect, cwebp, ImageMagick, Python with requests/cryptography, Node (stand-in for proto's), Plymouth with its X11 renderer and Xvfb | the Dockerfile's package list |
-| stage `desktop` | `system/50-hyprland.sh` and `system/70-bitwarden.sh` run for real: Ubuntu's arm64 hyprland 0.53, lock-screen PAM files, `unix_chkpwd` link, bw CLI, pam_u2f lines for sudo/sudo-i/polkit-1 | those two scripts or `system/files/{getty,pam.d,tmpfiles.d,systemd,udev,hyprland-autostart.zsh}` |
+| stage `desktop` | `system/50-hyprland.sh` and `system/70-bitwarden.sh` run for real: the PPA's Hyprland, held, lock-screen PAM files, `unix_chkpwd` link, bw CLI, pam_u2f lines for sudo/sudo-i/polkit-1 | those two scripts or `system/files/{getty,pam.d,tmpfiles.d,systemd,udev,hyprland-autostart.zsh}` |
 | stage `hyprland` | placeholder, see below | |
 | volume `dotfiles-nix` (`/nix`) | the whole Nix store and database. Docker seeds an empty volume from the image's `/nix` (the bare install) on first use | never by the harness; `test/run nuke` deletes it |
+| the machine's `/nix`, at `/host/nix`, read-only | the development machine's own store, as the first substituter (`local?root=/host&read-only=true&trusted=true`, priority 10, ahead of `kuba-os.cachix.org` and cache.nixos.org): what the machine already built or fetched is copied, not built or downloaded again. Its paths carry no signature, hence `trusted`. Without Nix on the machine an empty folder stands in and the substituter is left out (`nix_settings` in `harness.sh`) | never written |
 | volume `dotfiles-test-cache` | Nix's fetcher and eval caches, Neovim's plugins, Mason tools and treesitter parsers, GC roots for `warm` | `nuke` |
 | volumes `dotfiles-test-cargo`, `dotfiles-test-target` | Cargo's registry and target dirs for the `kubaos` build `test/run e2e` does in `rust:latest`, one target subdirectory per checkout | `nuke` |
 | apt `.deb`s | BuildKit cache mounts on `/var/cache/apt`, `/var/lib/apt` | `docker builder prune` |
 
-**Local flake inputs.** `flake.lock` can point at a checkout on the Mac (`git+file://...` or `path:`). Inside the container that path doesn't exist, so `test/run` reads `flake.lock` and bind-mounts each such input read-only at the same absolute path (and a git worktree's main `.git`), and the container lists them as git `safe.directory` (`trust_local_inputs` in `harness.sh`): they're owned by root in there, and git, Nix's fetcher included, won't read a repository owned by someone else otherwise. `test/lib/local-inputs.sh` does the finding, for `install/image/build` too.
+**Local flake inputs.** `flake.lock` can point at a checkout on the machine (`git+file://...` or `path:`). Inside the container that path doesn't exist, so `test/run` reads `flake.lock` and bind-mounts each such input read-only at the same absolute path (and a git worktree's main `.git`), and the container lists them as git `safe.directory` (`trust_local_inputs` in `harness.sh`): they're owned by root in there, and git, Nix's fetcher included, won't read a repository owned by someone else otherwise. `test/lib/local-inputs.sh` does the finding, for `install/image/build` too.
 
 Not cached, on purpose: the repo. Each run bind-mounts it read-only at `/src`, copies it to `/home/kuba/Projects/dotfiles` (without `.git` and `docs/screenshots`), makes a fresh one-commit git repo there so the flake sees untracked files, and runs `system/60-nix.sh --host vm` (home-manager switch, the `pam_fprintd` link, the GPU setup, zsh) and `system/70-bitwarden.sh --no-desktop --no-cli` (the `pam_u2f` link) from a bash login shell, the way you would on the laptop. The home directory starts empty every run, so every run is a first activation.
 
@@ -61,21 +69,18 @@ What a container has that the laptop gets from boot: a user D-Bus at `/run/user/
 
 ## Timings
 
-Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (arm64 VM, 8 CPUs, 7.75 GB).
+Measured 2026-10-28 on the development machine (AMD Ryzen AI 9 HX 370, 24 threads, 64 GB), with the default limits (8 CPUs, 12 GB, Nix `max-jobs` 2 and `cores` 4) and other builds running beside it.
 
 | What | Time |
 |---|---|
-| `test/run build`, cold (empty BuildKit and apt caches) | 7 min 40 s, of which `20-base.sh` is 4 min 53 s (linux-firmware alone is about 1 GB) |
-| `test/run build` after editing `config/` or `home/` | 2 s (all cached) |
-| `test/run build` after editing `system/70-bitwarden.sh` | about 30 s (`desktop` stage onwards) |
-| `test/run build` after changing the tooling package list | 2 min 19 s |
-| `test/run warm`, empty `dotfiles-nix` volume | about 12.5 min (8.4 GB store, Chromium included) |
-| `test/run warm`, warm volume | 20 s |
-| `test/run e2e`, first run on an empty cache volume | about 2 min (Neovim plugins, Mason tools, treesitter parsers) |
-| `test/run e2e`, warm | 42 s (switch 4 s, checks 38 s) |
-| `test/run e2e` after a `home/*.nix` change and a `config/` change | 50 s (switch 8 s) |
-| `test/run bitwarden` | 1 min 25 s (seeding the vault with `bw` is 57 s of it) |
-| `test/run shots` until the session is ready | 11 s |
+| `test/run build` after a change to `system/` files the `base` stage copies | about 5 min (`20-base.sh` and every stage after it) |
+| `test/run build` after editing `config/`, `home/` or `test/` | 2 s (all cached) |
+| `test/run warm`, warm volume, after a crate change (the crates rebuild in release) | about 2 min, peak memory 5.2 GB |
+| `test/run warm`, nothing changed | 16 s, peak memory 1.1 GB |
+| `just e2e`, everything cached | 8 min 28 s: build 2 s, warm 17 s, switch 10 s, checks 8 min 14 s; peak memory 6.8 GB |
+| `test/run e2e`, the slowest checks | `packages` 51 s, `update_edge` 82 s (it builds a new `kubaos` release in the container, up to 7 min when the crates changed), `session_reload` 33 s, `suites` 34 s |
+
+A cold `test/run warm` on an empty `dotfiles-nix` volume wasn't measured here. Most of it comes from the machine's own store, which already holds the generation's paths, and the rest from the binary caches.
 
 ## The checks
 
@@ -88,7 +93,7 @@ Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (arm64 VM, 8 CPUs, 7
 | `zsh_start` | in a pty, the median of 20 `zsh -i -c exit` stays within 100 ms (the harness measures about 31 ms); deleting `~/.cache/kubaos/zsh` makes the next start write the fzf, atuin, direnv, zoxide and oh-my-posh caches and the dump again, the atuin one byte for byte what atuin prints; a second start writes nothing; a dump older than a day is rebuilt |
 | `greeting` | an interactive zsh with `TERM_PROGRAM=ghostty` greets once, and a shell started in it doesn't; none under `$TMUX`, `$NVIM`, `$SSH_CONNECTION`, `$SSH_TTY`, `KUBAOS_GREETING=0`, another terminal or `zsh -c`; `dot-greeting off` and `on` turn it off and on; prints what the greeting and the full `fastfetch` cost |
 | `path` | `~/.local/bin`, `~/.cargo/bin`, `~/.local/share/proto/{shims,bin}`, `~/.nix-profile/bin` on PATH, Nix's before `/usr/bin` |
-| `tools` | every tool in CONTRACTS ("Packages: who installs what") that exists on arm64 resolves, the Nix ones into `~/.nix-profile/bin`, the apt ones into `/usr`, `bw` to `/usr/local/bin`; nvim is 0.12; the login shell is `/usr/bin/zsh` |
+| `tools` | every tool in CONTRACTS ("Packages: who installs what") resolves, the Nix ones into `~/.nix-profile/bin`, the apt ones into `/usr`, `bw` to `/usr/local/bin`; nvim is 0.12; the login shell is `/usr/bin/zsh` |
 | `links` | every tracked file under `config/` is a store file with the repo's content in a real `~/.config/<app>` directory (except the ones `dot-config` seeds or merges); every `scripts/<file>` resolves into the repo copy; `~/Pictures/wallpapers` is a real folder; scripts are `dot-*`, executable, env shebang, `set -euo pipefail` |
 | `theme` | `dot-theme apply --force`, `set`, `next`, `toggle-folder`; all 21 files in `~/.local/state/theme`, every M3 key in `colors.json`; `apply` with nothing changed is a no-op; the theme links resolve |
 | `tmux` | the real `tmux.conf` loads with the theme and plugins, nothing complains |
@@ -102,7 +107,7 @@ Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (arm64 VM, 8 CPUs, 7
 | `shutdown` | `lua5.5 test/lua/session_test.lua`: the fallback exit bind stops `graphical-session.target` under a time limit before `hyprctl dispatch 'hl.dsp.exit()'`, and the `hyprland.shutdown` hook stops it with `--no-block`. `dot-session leave reboot`, `poweroff` and `logout`, with a logging `systemctl` and `loginctl`, stop the target before the action; another action exits 2. The switch put the 5 s stop timeouts for the portal and the polkit agent in `~/.config/systemd/user`. The `fast-shutdown-boot` system migration, on a container set back to an older install (no timeouts, `NetworkManager-wait-online` enabled, stand-in Docker, containerd and setvtrgb units enabled), installs both `DefaultTimeoutStopSec=10s` files and Docker's 20 s drop-in, enables `docker.socket`, disables `docker.service`, `containerd.service` and `NetworkManager-wait-online`, masks setvtrgb, and leaves `multi-user.target` and `network-online.target` wanting none of them; a second run changes nothing. Real shutdown and boot times are measured on the laptop |
 | `updaters` | the `retire-ubuntu-updaters` system migration on a container where the `apt-daily` timers are enabled: they, their services and `unattended-upgrades.service` end up masked, `99kubaos-no-periodic` is installed and `apt-config` reads the periodic jobs as `0`; a second run prints no change |
 | `splash` | Plymouth's `plymouth-poweroff` and `plymouth-reboot` units are wanted by their targets, in `shutdown` and `reboot` mode, and need `splash`, which `system/files/grub/kubaos.cfg` puts on the kernel line. The `shutdown-splash` system migration, on a container without its files, orders `plymouth-{poweroff,reboot,halt,kexec}.service` after `user.slice` (drop-ins) and installs `kubaos-shutdown-splash.service`, wanted by the four targets and clean under `systemd-analyze verify`; `plymouth --ping`, its condition, fails with no plymouthd; a second run changes nothing. Whether plymouthd gets the screen from Hyprland is checked on the laptop. The theme from the repo runs in plymouthd on Xvfb (X11 renderer), and the screen is grabbed: in boot mode the sign is lit within 6 s; in shutdown and reboot mode it is lit at 0.3 s and the screen is black within 6 s. A theme script Plymouth can't run draws nothing and fails both |
-| `shellcheck` | `shellcheck -x` on every shell script in `scripts/`, `system/`, `test/`, `config/`: no warnings or errors (info and style notes are listed, not fatal) |
+| `shellcheck` | `shellcheck -x` on every shell script in `scripts/`, `system/`, `migrations/`, `test/`, `config/` and `crates/self-imports`: no warnings or errors (info and style notes are listed, not fatal) |
 | `flake_check` | `nix flake check` |
 | `quickshell` | headless sway (pixman), Quickshell from the generation on Mesa llvmpipe: config loads, no QML error in the log, `qs ipc show` lists every target in CONTRACTS. Warnings about services a container lacks (NetworkManager, BlueZ, UPower, portals, Hyprland under sway) are printed, not fatal |
 | `sysmon` | `kubaos-sysmon sample` reads the container's `/proc` (CPU, memory, processes; no GPU, battery or fan to find); headless sway with Quickshell: the shell's stream samples at the pill's pace and writes `$XDG_RUNTIME_DIR/kubaos-sysmon.json`; `qs ipc call sysmon toggle` opens the popup and the engine samples in detail, a second toggle closes it and the pace drops back; `qs ipc call sysmon pill off` hides the pill and writes `sysmon.toml`, `kubaos-sysmon set pill on` brings it back; no QML errors, by `qs ipc call sysmon status` |
@@ -131,7 +136,7 @@ Measured 2026-10-16 on an Apple Silicon Mac, Docker Desktop (arm64 VM, 8 CPUs, 7
 |---|---|
 | `bw_server` | Vaultwarden answers; an account is registered the way the web vault does it (`test/lib/vw-register.py`), with authenticator-app two-step login on |
 | `bw_seed` | folders `Personal` and `Work` and five SSH key items spread over them and "No folder": GitHub with `signing=true` (Personal), a second GitHub account `Work GitHub` with `hosts=github-work hostname=github.com` (Work), a build server key with hostname/port/user (no folder), a later item also named GitHub with no fields (Work), and one whose `hosts` field tries to inject `ProxyCommand` (Work); folder `env/demo` with a URL, a token full of shell metacharacters, a multi-line PEM and an invalid name, plus an item elsewhere with `bwenv=demo` |
-| `bw_session` | session bus, gnome-keyring unlocked, OpenSSH's agent on `~/.bitwarden-ssh-agent.sock` holding the vault's keys (stand-in for Bitwarden desktop, which has no arm64 build), and the git identity first-boot setup writes |
+| `bw_session` | session bus, gnome-keyring unlocked, OpenSSH's agent on `~/.bitwarden-ssh-agent.sock` holding the vault's keys (stand-in for Bitwarden desktop, whose agent serves keys only while its window is unlocked), and the git identity first-boot setup writes |
 | `bw_setup` | `kubaos bitwarden setup` from logged out, answered by `expect`: server prompt, login choice, email, master password, the TOTP code; exits 0, reads all five SSH keys, reports the agent serving every key, warns about the second GitHub and names its `github-2.pub`, and the summary lists the keys with a Host block and the key-only one with the `hosts` hint |
 | `bw_files` | a `.pub` per key, the older GitHub in `github.pub` and the newer in `github-2.pub`; three Host blocks, no `ProxyCommand`; `ssh -G` picks the right identity, host and port, `github.com` and `github-work` one key each; a commit verifies with "Good "git" signature"; no secret in plaintext under `~`; `kubaos bitwarden check` sees the agent |
 | `bw_folder` | `kubaos bitwarden refresh --only ssh` with `folder=Work` (the older key name): only Work's three keys and one Host block; with `folders=Personal, Work,Archive`: a warning naming Archive, the four keys of Personal and Work, two Host blocks; with `folder=dotfiles`, a folder the vault doesn't have: warnings, then every SSH key in the vault again |
@@ -149,26 +154,18 @@ No image rebuild is needed for steps 1 to 3: `test/` is read from the mounted re
 
 ## Hyprland (TODO)
 
-The `hyprland` stage in `test/Dockerfile` is a placeholder (`# TODO(lead): recipe from screenshot agent`). Ubuntu's arm64 hyprland is 0.53, which predates the Lua config, and the PPA builds amd64 only. The contract the stage has to meet is written next to it: an executable `/usr/local/lib/dotfiles-test/hyprland-session` that starts Hyprland 0.56 headless with `~/.config/hypr` and writes `WAYLAND_DISPLAY` and `HYPRLAND_INSTANCE_SIGNATURE` to the file it's given. Store paths it needs must be realised at run time (`test/run warm --hyprland`, also a TODO in `test/lib/entry`), because the `dotfiles-nix` volume hides the image's `/nix`. Until then `test/run shots --hyprland` stops with a message, and everything runs under sway: no blur, no rounded corners or gradient borders, no workspace animations, and the workspace indicator stays on 1.
+The `hyprland` stage in `test/Dockerfile` is a placeholder (`# TODO(lead): recipe from screenshot agent`). The `desktop` stage already installs the PPA's Hyprland, the laptop's; what is missing is starting it headless. The contract the stage has to meet is written next to it: an executable `/usr/local/lib/dotfiles-test/hyprland-session` that starts Hyprland 0.56 headless with `~/.config/hypr` and writes `WAYLAND_DISPLAY` and `HYPRLAND_INSTANCE_SIGNATURE` to the file it's given. Store paths it needs must be realised at run time (`test/run warm --hyprland`, also a TODO in `test/lib/entry`), because the `dotfiles-nix` volume hides the image's `/nix`. Until then `test/run shots --hyprland` stops with a message, and everything runs under sway: no blur, no rounded corners or gradient borders, no workspace animations, and the workspace indicator stays on 1.
 
 ## Kōbō and the live ISO in a VM
 
-The Docker harness can't boot an ISO. `test/vm/run` (QEMU on HVF, `test/vm/README.md`) boots the live ISO from `install/iso/build`, runs headless installs from an `install.toml`, boots the result, and takes screenshots and snapshots. After `just vm-install`, `just vm-user-layer` runs `test/user-layer-check` on the installed system as its user: the same promise, from a real install.
+The Docker harness can't boot an ISO. `test/vm/run` (QEMU, on KVM for a guest of the machine's arch and TCG for another; `test/vm/README.md`) boots the live ISO from `install/iso/build`, runs headless installs from an `install.toml`, boots the result, and takes screenshots and snapshots. After `just vm-install`, `just vm-user-layer` runs `test/user-layer-check` on the installed system as its user: the same promise, from a real install.
 
 ## What this can't test
 
-- The GPU: there's no DRM device in Docker Desktop, so sway uses pixman and everything GL is Mesa llvmpipe. 120 Hz smoothness, VA-API, Vulkan and `non-nixos-gpu-setup` against real drivers need the laptop.
+- The GPU: the container gets no DRM device, so sway uses pixman and everything GL is Mesa llvmpipe. 120 Hz smoothness, VA-API, Vulkan and `non-nixos-gpu-setup` against real drivers need the laptop.
 - Real hardware: LUKS + Btrfs subvolumes, snapper and the GRUB rollback drill (the container's `/` is overlayfs, so those steps skip), lid and idle, the USB4 dock and two monitors, Wi-Fi, Bluetooth, audio devices, the fingerprint reader.
 - `system/30-hardware.sh` (TUXEDO repo and `tuxedo-drivers`, amd64 only, plus MOK) and `system/40-apps.sh` (Docker, Chrome amd64-only). Neither runs in the image.
 - systemd: no PID 1 systemd, so no units, timers, logind, getty autologin or `systemctl --user`; the harness fakes the bits the tests depend on (above).
 - A real FIDO2 key: PAM is tested with a mapping for a key that isn't there (the fallback path), never with a touch or a fingerprint on the key. `dot-u2f-enroll` isn't exercised.
-- Bitwarden desktop (no arm64 build): its SSH agent and polkit unlock. OpenSSH's agent stands in on the same socket. gh login isn't tested (it would need github.com).
-- The PPA's Hyprland and the Hyprland config, until the stage above is filled in. The installed VM (`test/vm`) runs the real config on nixpkgs' Hyprland.
-
-## Old volumes
-
-Earlier test containers used three ad-hoc Nix store volumes. The harness uses only `dotfiles-nix` now. Once nothing uses them (`docker ps -a --filter volume=<name>` is empty; `nix-store-dotfiles` was still mounted by the `dot-v3` screenshot container on 2026-10-16), free about 78 GB with:
-
-```sh
-docker volume rm nix-store-dotfiles qs-nix nixstore
-```
+- Bitwarden desktop: its SSH agent and polkit unlock, which need its window. OpenSSH's agent stands in on the same socket. gh login isn't tested (it would need github.com).
+- The Hyprland config in a running Hyprland, until the stage above is filled in. The installed VM (`test/vm`) runs the real config on the PPA's Hyprland.

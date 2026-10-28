@@ -46,6 +46,8 @@ COPY system/files/netplan/ /opt/dotfiles/system/files/netplan/
 COPY system/files/logind.conf.d/ /opt/dotfiles/system/files/logind.conf.d/
 COPY system/files/systemd/system.conf.d/ /opt/dotfiles/system/files/systemd/system.conf.d/
 COPY system/files/systemd/user.conf.d/ /opt/dotfiles/system/files/systemd/user.conf.d/
+COPY system/files/proxy/ /opt/dotfiles/system/files/proxy/
+COPY system/files/polkit/org.kubaos.proxy.policy system/files/polkit/50-kubaos-proxy.rules /opt/dotfiles/system/files/polkit/
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     runuser -u kuba -- /opt/dotfiles/system/10-strip.sh \
@@ -75,9 +77,9 @@ RUN eval "$(grep -E '^NIX_(VERSION|INSTALL_URL|INSTALL_SHA256)=' /opt/dotfiles/s
  && /nix/var/nix/profiles/default/bin/nix --version
 
 # ---------------------------------------------------------------------------
-# tooling: test-only tools from apt. Nix-only ones (Chromium for arm64,
-# Nix's pamtester for the lock screen's libpam) come from the flake's
-# nixpkgs at warm time. gpu-screen-recorder: not in resolute's archive, and
+# tooling: test-only tools from apt. Nix-only ones (Chromium, which Ubuntu
+# ships only as a snap, and Nix's pamtester for the lock screen's libpam)
+# come from the flake's nixpkgs at warm time. gpu-screen-recorder: not in resolute's archive, and
 # it needs a GPU anyway; wf-recorder records instead. nodejs/npm stand in
 # for the Node that proto installs on the laptop (Mason's npm packages).
 # Plymouth with its X11 renderer and Xvfb draw the boot splash for the
@@ -96,8 +98,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       plymouth plymouth-label-ft plymouth-x11 xvfb grub-common initramfs-tools-core
 
 # ---------------------------------------------------------------------------
-# desktop: the system halves of system/50-hyprland.sh (Ubuntu's arm64
-# hyprland 0.53, lock-screen PAM files, unix_chkpwd link, tty1 autologin,
+# desktop: the system halves of system/50-hyprland.sh (the PPA's Hyprland,
+# held, lock-screen PAM files, unix_chkpwd link, tty1 autologin,
 # keyd and the XKB option of the Mac-style accents, the system keyboard
 # writer and its polkit action) and
 # system/70-bitwarden.sh (bw CLI, pam_u2f lines for sudo/sudo-i/polkit-1,
@@ -121,7 +123,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
  && runuser -u kuba -- /opt/dotfiles/system/70-bitwarden.sh
 
 # ---------------------------------------------------------------------------
-# hyprland: Hyprland 0.56.2 for aarch64, headless on llvmpipe.
+# hyprland: Hyprland headless on llvmpipe, for screenshots of the real
+# compositor.
 #
 # TODO(lead): recipe from screenshot agent.
 # Contract for test/lib/shots.sh (`test/run shots --hyprland`): this stage
@@ -130,10 +133,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # config/hypr (live-linked to ~/.config/hypr) on a headless output, exports
 # WAYLAND_DISPLAY and HYPRLAND_INSTANCE_SIGNATURE to the file named by its
 # first argument (KEY=VALUE lines), and keeps running until killed.
-# Ubuntu's arm64 hyprland is 0.53 (no Lua config) and the PPA is amd64 only;
-# nixpkgs' nixos-unstable has 0.56.2 (prefer hyprland.cachix.org). Anything
-# it puts in /nix must be realised at run time (`test/run warm --hyprland`),
-# because the dotfiles-nix volume hides the image's /nix.
+# The `desktop` stage already installs the PPA's Hyprland, the one the
+# laptop runs; what is missing is the headless launch. Anything it puts in
+# /nix must be realised at run time (`test/run warm --hyprland`), because the
+# dotfiles-nix volume hides the image's /nix.
 FROM desktop AS hyprland
 
 # ---------------------------------------------------------------------------
