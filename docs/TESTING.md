@@ -6,6 +6,8 @@ The point: a broken config shows up as a red FAIL on the Mac, not as a black scr
 
 Needs Docker with BuildKit and Compose v2 (Docker Desktop on the Mac is fine). Everything the harness creates is called `dotfiles-test-*` (containers, network, volumes) or `dotfiles-nix`, so it never touches other containers.
 
+Before/after screenshots of a UI change don't need Docker: `just shots` renders the shell's surfaces, Kōbō and the specimen headless, against stand-in services, and pairs and diffs them (`docs/agents/design-pr-loop.md`). The session below (`just shots-session`) is for looking at the whole desktop.
+
 ## Commands
 
 | Command | What |
