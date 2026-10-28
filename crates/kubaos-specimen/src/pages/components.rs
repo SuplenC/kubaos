@@ -11,6 +11,11 @@ use iced::widget::container;
 use iced::widget::image;
 use kubaos_ui::Look;
 use kubaos_ui::Mode;
+use kubaos_ui::component::avatar::TileSize;
+use kubaos_ui::component::avatar::badge;
+use kubaos_ui::component::avatar::icon_tile;
+use kubaos_ui::component::banner::BannerTone;
+use kubaos_ui::component::banner::banner;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::Preview;
@@ -27,6 +32,9 @@ use kubaos_ui::component::check::checkbox;
 use kubaos_ui::component::check::radio;
 use kubaos_ui::component::chip::ChipKind;
 use kubaos_ui::component::chip::chip;
+use kubaos_ui::component::collapsible::collapsible;
+use kubaos_ui::component::description::Fact;
+use kubaos_ui::component::description::description_list;
 use kubaos_ui::component::dialog::Tone;
 use kubaos_ui::component::dialog::dialog;
 use kubaos_ui::component::dialog::prompt;
@@ -47,17 +55,30 @@ use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
 use kubaos_ui::component::media::Aspect;
 use kubaos_ui::component::media::media;
+use kubaos_ui::component::menu::menu;
+use kubaos_ui::component::menu::menu_item;
+use kubaos_ui::component::menu::menu_separator;
+use kubaos_ui::component::menu::popover;
 use kubaos_ui::component::meter::meter;
 use kubaos_ui::component::meter::sparkline;
 use kubaos_ui::component::picture::NamePlace;
 use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::bar;
+use kubaos_ui::component::progress::danger_timed_bar;
 use kubaos_ui::component::progress::spinner;
+use kubaos_ui::component::select::select;
 use kubaos_ui::component::sheet;
+use kubaos_ui::component::skeleton::Bone;
+use kubaos_ui::component::skeleton::skeleton;
 use kubaos_ui::component::slider::Value;
 use kubaos_ui::component::slider::slider;
 use kubaos_ui::component::slider::slider_held;
+use kubaos_ui::component::step::StepState;
+use kubaos_ui::component::step::step;
 use kubaos_ui::component::switch::switch;
+use kubaos_ui::component::table::Column;
+use kubaos_ui::component::table::table;
+use kubaos_ui::component::table::table_row;
 use kubaos_ui::component::tabs::Tab;
 use kubaos_ui::component::tabs::tabs;
 use kubaos_ui::component::tile::tile;
@@ -84,6 +105,10 @@ use kubaos_ui::tokens::Type;
 
 use crate::specimen::Message;
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The page is one section after another, in the order they show; split up, the order would be spread over functions."
+)]
 pub fn view<'a>(look: &Look) -> Element<'a, Message> {
     stack(look, Space::S48)
         .push(section(
@@ -125,6 +150,18 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         ))
         .push(section(
             look,
+            "Icon tiles and badges",
+            Some("Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small and regular, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."),
+            avatars(look),
+        ))
+        .push(section(
+            look,
+            "Skeletons",
+            Some("The shape of what is loading, in the placeholder colour, so what arrives moves nothing: a row being scanned, a thumbnail being decoded."),
+            skeletons(look),
+        ))
+        .push(section(
+            look,
             "Lists",
             Some("Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The ring goes round the well; the row shows where the keyboard is."),
             lists(look),
@@ -162,6 +199,24 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         ))
         .push(section(
             look,
+            "Banners",
+            Some("A message that matters on the page itself, its actions inside: info, a warning, and danger, really red, holding the button that destroys."),
+            banners(look),
+        ))
+        .push(section(
+            look,
+            "Steps",
+            Some("To do, done and waiting on an action each look their own, and the action carries the accent. A description wraps; a rail marks the state instead."),
+            steps(look),
+        ))
+        .push(section(
+            look,
+            "Description lists",
+            Some("Facts beside their labels, a quarter of the width; a path or an email gets a mono line of its own."),
+            descriptions(look),
+        ))
+        .push(section(
+            look,
             "Dialogs",
             Some("A question, the confirmation before something is destroyed, and a prompt for what only you can type."),
             dialogs(look),
@@ -174,6 +229,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             readings(look),
         ))
         .push(section(look, "Empty states", None, empties(look)))
+        .extend(menus_tables_and_collapsibles(look))
         .push(section(look, "Errors", Some("What broke, what to do next, and the log behind it."), errors(look)))
         .into()
 }
@@ -515,6 +571,7 @@ fn chips<'a>(look: &Look) -> Element<'a, Message> {
             ChipKind::Selected => "English (US)",
             ChipKind::Accent => "Recommended",
             ChipKind::Cold => "Demo",
+            ChipKind::Filled => "Reboot",
         };
         line = line.push(chip(look, kind, label, None, None, None::<Message>));
     }
@@ -1016,5 +1073,354 @@ fn calendars<'a>(look: &Look) -> Element<'a, Message> {
                 .on_month(|_| Message::Sample)
                 .view(look),
         )
+        .into()
+}
+
+/// `glyph` 24 in a small control's box, `mark` over its top right corner.
+fn badged<'a>(look: &Look, glyph: Icon, mark: Element<'a, Message>) -> Element<'a, Message> {
+    let c = look.colors;
+    let side = f32::from(Size::ControlSm.px());
+    widget::Stack::with_children([
+        widget::container(kubaos_ui::snap::centre(
+            look.scale,
+            kubaos_ui::icon::icon(look, glyph, IconSize::S24, c.on_surface_variant),
+        ))
+        .width(side)
+        .height(side)
+        .into(),
+        widget::container(mark)
+            .width(side)
+            .height(side)
+            .align_x(iced::alignment::Horizontal::Right)
+            .into(),
+    ])
+    .into()
+}
+
+fn avatars<'a>(look: &Look) -> Element<'a, Message> {
+    let picture = PICTURES[usize::from(look.mode == Mode::Light)].clone();
+    row(look, Space::S24)
+        .center()
+        .push(icon_tile(Icon::Terminal, TileSize::Sm).view(look))
+        .push(icon_tile(Icon::Terminal, TileSize::Md).view(look))
+        .push(
+            icon_tile(Icon::Notifications, TileSize::Md)
+                .photo(Some(picture))
+                .view(look),
+        )
+        .push(icon_tile(Icon::Warning, TileSize::Md).danger().view(look))
+        .push(badge(look, Some(3)))
+        .push(badge(look, Some(128)))
+        .push(badge(look, None))
+        .push(badged(look, Icon::Notifications, badge(look, Some(3))))
+        .push(badged(look, Icon::SystemUpdateAlt, badge(look, None)))
+        .into()
+}
+
+fn skeletons<'a>(look: &Look) -> Element<'a, Message> {
+    let scanning = row(look, Space::S12)
+        .center()
+        .push(skeleton(look, Bone::Circle(IconSize::S24)))
+        .push(
+            stack(look, Space::S4)
+                .width(Extent::Fill)
+                .push(skeleton(look, Bone::Line(Type::BodyStrong)))
+                .push(skeleton(look, Bone::Line(Type::Small))),
+        );
+    grid(look, 2, Space::S24)
+        .push(scanning)
+        .push(skeleton(look, Bone::Block(Size::ControlLg, Radius::Control)))
+        .into()
+}
+
+/// The sections of popovers and menus, tables and collapsibles.
+fn menus_tables_and_collapsibles<'a>(look: &Look) -> Vec<Element<'a, Message>> {
+    vec![
+        section(
+            look,
+            "Selects and menus",
+            Some(
+                "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control.",
+            ),
+            menus(look),
+        ),
+        section(
+            look,
+            "Tables",
+            Some(
+                "Readings in columns, a line of text with 4 above and below a row; the whole row takes the pointer, numbers line up at their column's right edge.",
+            ),
+            tables(look),
+        ),
+        section(
+            look,
+            "Collapsibles",
+            Some("A titled part that opens to show more."),
+            collapsibles(look),
+        ),
+    ]
+}
+
+/// The keys of the menu samples' shortcuts.
+const OPEN_KEYS: [&str; 1] = ["Enter"];
+const COPY_KEYS: [&str; 2] = ["Ctrl", "C"];
+
+fn menus<'a>(look: &Look) -> Element<'a, Message> {
+    let countries = ["None", "Germany", "Italy", "Poland"];
+    let picked = menu(
+        look,
+        countries.into_iter().map(|name| {
+            menu_item(name)
+                .checked(name == "Poland")
+                .highlighted(name == "Italy")
+                .on_press(Message::Sample)
+                .view(look)
+        }),
+    );
+    let open = stack(look, Space::S8)
+        .width(Extent::Fill)
+        .push(
+            select("Poland")
+                .icon(Icon::Flag)
+                .open(true)
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(popover(look, Extent::Fill, picked));
+    let context = popover(
+        look,
+        Extent::Fixed(Size::Menu),
+        menu(
+            look,
+            [
+                menu_item("Open")
+                    .icon(Icon::FolderOpen)
+                    .shortcut(&OPEN_KEYS)
+                    .highlighted(true)
+                    .on_press(Message::Sample)
+                    .view(look),
+                menu_item("Copy path")
+                    .icon(Icon::ContentPaste)
+                    .shortcut(&COPY_KEYS)
+                    .on_press(Message::Sample)
+                    .view(look),
+                menu_separator(look),
+                menu_item("Pin to the top")
+                    .icon(Icon::PushPin)
+                    .on_press(Message::Sample)
+                    .view(look),
+                menu_item::<Message>("Forget").icon(Icon::Close).view(look),
+                menu_separator(look),
+                menu_item("Quit")
+                    .icon(Icon::Logout)
+                    .danger()
+                    .on_press(Message::Sample)
+                    .view(look),
+            ],
+        ),
+    );
+    let closed = stack(look, Space::S16)
+        .width(Extent::Fill)
+        .push(select("Every 5 minutes").on_press(Message::Sample).view(look))
+        .push(
+            select("Every 5 minutes")
+                .on_press(Message::Sample)
+                .focused(true)
+                .view(look),
+        )
+        .push(select::<Message>("Unavailable").view(look));
+    grid(look, 3, Space::S24).push(open).push(context).push(closed).into()
+}
+
+fn tables<'a>(look: &Look) -> Element<'a, Message> {
+    let columns = [
+        Column::new("Name", 4),
+        Column::new("CPU", 1).numeric(),
+        Column::new("Memory", 1).numeric(),
+    ];
+    let processes = [
+        ("firefox", "38.4%", "2.1 GB"),
+        ("Hyprland", "12.1%", "384 MB"),
+        ("rust-analyzer", "9.7%", "1.8 GB"),
+        ("quickshell", "4.2%", "256 MB"),
+    ];
+    let rows: Vec<Element<'a, Message>> = processes
+        .into_iter()
+        .map(|(name, cpu, memory)| {
+            table_row(vec![name.to_owned(), cpu.to_owned(), memory.to_owned()])
+                .selected(name == "Hyprland")
+                .on_press(Message::Sample)
+                .view(look, &columns)
+        })
+        .collect();
+    table(look, &columns, rows)
+}
+
+fn collapsibles<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    grid(look, 2, Space::S24)
+        .push(collapsible(
+            look,
+            "firefox · pid 4127",
+            true,
+            Message::Sample,
+            false,
+            stack(look, Space::S4)
+                .push(text(
+                    "/usr/lib/firefox/firefox -contentproc",
+                    Type::Mono,
+                    c.on_surface_variant,
+                ))
+                .push(text(
+                    "kuba · sleeping · 92 threads · 2.1 GB",
+                    Type::Small,
+                    c.on_surface_variant,
+                )),
+        ))
+        .push(collapsible(
+            look,
+            "Hyprland · pid 1203",
+            false,
+            Message::Sample,
+            true,
+            text("Hidden while closed.", Type::Small, c.on_surface_variant),
+        ))
+        .into()
+}
+
+fn banners<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let on_red = kubaos_ui::component::banner::inside(look, BannerTone::Danger);
+    let hold = stack(look, Space::S8)
+        .push(
+            button("Hold to erase and install")
+                .kind(Kind::Danger)
+                .icon(Icon::Download)
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(
+            row(look, Space::S4)
+                .center()
+                .push(text(
+                    "or hold",
+                    Type::Caption,
+                    kubaos_ui::color::alpha(c.on_error_container, Opacity::SubduedText.value()),
+                ))
+                .push(keycap(look, "Enter")),
+        );
+    stack(look, Space::S16)
+        .push(
+            banner(
+                BannerTone::Info,
+                Icon::Storage,
+                "KubaOS goes into the free space on Samsung SSD 990 PRO.",
+                "Windows stays where it is.",
+            )
+            .view(look),
+        )
+        .push(
+            banner(
+                BannerTone::Warning,
+                Icon::Warning,
+                "12% left. Plug the damn thing in.",
+                "An install on battery may not finish.",
+            )
+            .view(look),
+        )
+        .push(
+            banner(
+                BannerTone::Danger,
+                Icon::Warning,
+                "Everything on Samsung SSD 990 PRO (nvme0n1, 2 TB) gets erased.",
+                "All 4 partitions, Windows included. There's no undo.",
+            )
+            .actions([
+                button("Back")
+                    .kind(Kind::Text)
+                    .icon(Icon::ArrowBack)
+                    .on_press(Message::Sample)
+                    .view(&on_red),
+                hold.into(),
+            ])
+            .foot(danger_timed_bar(look, 0.4))
+            .view(look),
+        )
+        .into()
+}
+
+fn steps<'a>(look: &Look) -> Element<'a, Message> {
+    let reboot = StepState::Action {
+        label: "Reboot",
+        glyph: Icon::RestartAlt,
+    };
+    let checklist = vec![
+        step("TUXEDO drivers")
+            .subtitle("Key queued. Reboot and enroll it on the blue MokManager screen, before KubaOS starts.")
+            .icon(Icon::Computer)
+            .state(reboot)
+            .selected(true)
+            .on_press_maybe(Some(Message::Sample))
+            .view(look),
+        step("Fingerprint")
+            .subtitle("One finger: right index. sudo and password dialogs take it.")
+            .icon(Icon::Fingerprint)
+            .state(StepState::Done)
+            .on_press_maybe(Some(Message::Sample))
+            .view(look),
+        step("Bitwarden")
+            .subtitle("Not logged in.")
+            .icon(Icon::Lock)
+            .on_press_maybe(Some(Message::Sample))
+            .view(look),
+    ];
+    let rail = stack(look, Gap::NONE)
+        .push(
+            step("Language")
+                .icon(Icon::Language)
+                .state(StepState::Done)
+                .mark()
+                .on_press_maybe(Some(Message::Sample))
+                .view(look),
+        )
+        .push(
+            step("Disk")
+                .icon(Icon::HardDrive)
+                .state(StepState::Current)
+                .mark()
+                .view(look),
+        )
+        .push(step("Git").icon(Icon::Code).mark().view(look))
+        .push(step("Reboot").icon(Icon::Computer).state(reboot).mark().view(look));
+    split(look, &[2, 1], Space::S24)
+        .push(list(look, checklist, true))
+        .push(rail)
+        .into()
+}
+
+fn descriptions<'a>(look: &Look) -> Element<'a, Message> {
+    grid(look, 2, Space::S24)
+        .push(card(
+            look,
+            description_list(
+                look,
+                [
+                    Fact::new("Name", "Kuba Example"),
+                    Fact::new("Login", "kuba@tuxedo"),
+                    Fact::new("Git", "Kuba Example").detail("kuba@example.com"),
+                ],
+            ),
+        ))
+        .push(card(
+            look,
+            description_list(
+                look,
+                [
+                    Fact::new("Disk", "Samsung SSD 990 PRO 2TB").detail("/dev/nvme0n1 · 2.0 TB"),
+                    Fact::new("Mode", "Erase everything"),
+                    Fact::new("Encryption", "LUKS2, account password"),
+                ],
+            ),
+        ))
         .into()
 }

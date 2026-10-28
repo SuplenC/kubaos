@@ -1,13 +1,13 @@
 import QtQuick
 import Quickshell
-import Quickshell.Widgets
 import KubaOS.Components as K
 import "words.js" as Words
 
-// One row of the Results or of a list View, as `K.ListRow` draws a two-line row: 56 tall, 12 in,
-// a 24 icon spanning both lines (`icon.two_line`), the title in `body_strong` with the matched
-// characters lit, the subtitle in `small`, and the Alias the query named it by as the row's mono
-// detail at its end. The list draws the selection behind it, so it can slide.
+// One row of the Results or of a list View: 56 tall, 12 in, the Item's icon on a regular icon
+// tile (40, its icon spanning both lines), 16 before the words so they stand clear of it, the
+// title in `body_strong` with the matched characters lit right over the subtitle in `small`, and
+// the Alias the query named it by as the row's mono detail at its end. The list draws the
+// selection behind it, so it can slide.
 //
 // HAZARD: no layout primitives and no `K.Text` in here. Every keystroke makes up to fourteen of
 // these, and fourteen `K.ListRow`s took 15 ms to make against 0.9 ms for these, most of a frame at
@@ -34,9 +34,9 @@ Item {
     readonly property color main: row.selected ? K.Tokens.color.on_secondary_container : K.Tokens.color.on_surface
     readonly property color muted: row.selected ? K.Look.alpha(K.Tokens.color.on_secondary_container, K.Tokens.opacity.subdued_text) : K.Tokens.color.on_surface_variant
     readonly property real dim: row.runs ? 1 : K.Tokens.opacity.disabled_content
-    // Where the words start: past the icon and the gap after it. Every row is 56 tall, a title
-    // alone included, so every icon is the two-line one and the words start in one column.
-    readonly property int textStart: K.Tokens.space.s12 * 2 + K.Tokens.icon.two_line
+    // Where the words start: past the tile and the gap after it. Every row is 56 tall, a title
+    // alone included, so every tile is the regular one and the words start in one column.
+    readonly property int textStart: K.Tokens.space.s12 + K.Tokens.size.control_md + K.Tokens.space.s16
     readonly property bool twoLine: subtitleLine.text !== ""
 
     // The pointer moved over the row at (x, y) in the row, or clicked it.
@@ -46,34 +46,21 @@ Item {
     width: ListView.view.width
     height: K.Tokens.size.row_two_line
 
-    IconImage {
-        id: image
-
+    // Items without an icon of their own, such as a sum or a bind, show their Extension's symbol.
+    K.IconTile {
         x: K.Tokens.space.s12
-        y: (row.height - K.Tokens.icon.two_line) / 2
-        implicitSize: K.Tokens.icon.two_line
-        visible: row.iconSource !== ""
-        asynchronous: true
+        y: (row.height - K.Tokens.size.control_md) / 2
+        icon: Words.glyph(row.extension)
         source: row.iconSource
         opacity: row.dim
     }
 
-    // Items without an icon of their own, such as a sum or a bind, show their Extension's symbol.
-    K.Icon {
-        x: K.Tokens.space.s12
-        y: (row.height - K.Tokens.icon.two_line) / 2
-        visible: !image.visible
-        name: Words.glyph(row.extension)
-        size: K.Tokens.icon.two_line
-        color: K.Look.alpha(row.main, row.dim)
-    }
-
-    // Title and subtitle, 4 apart, centred down the row; a title alone sits in the middle.
+    // Title and subtitle line on line, centred down the row; a title alone sits in the middle.
     Label {
         id: titleLine
 
         x: row.textStart
-        y: row.twoLine ? (row.height - K.Tokens.type.body_strong.line - K.Tokens.space.s4 - K.Tokens.type.small.line) / 2 : (row.height - K.Tokens.type.body_strong.line) / 2
+        y: row.twoLine ? (row.height - K.Tokens.type.body_strong.line - K.Tokens.type.small.line) / 2 : (row.height - K.Tokens.type.body_strong.line) / 2
         width: (detail.visible ? detail.x - K.Tokens.space.s12 : row.width - K.Tokens.space.s12) - row.textStart
         height: K.Tokens.type.body_strong.line
         type: K.Tokens.type.body_strong
@@ -86,7 +73,7 @@ Item {
         id: subtitleLine
 
         x: row.textStart
-        y: titleLine.y + K.Tokens.type.body_strong.line + K.Tokens.space.s4
+        y: titleLine.y + K.Tokens.type.body_strong.line
         width: titleLine.width
         height: K.Tokens.type.small.line
         visible: text !== ""

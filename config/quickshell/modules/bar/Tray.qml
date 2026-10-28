@@ -5,10 +5,13 @@ import Quickshell.Widgets
 import Quickshell.Services.SystemTray
 import KubaOS.Components as K
 import qs.components
+import qs.services
 
 // StatusNotifierItem tray. Left click activates, middle click secondary action, right click (or
-// left on menu-only items) opens the app's menu. Each app's icon sits in a circle as tall as a
-// chip, which takes the state layer under the pointer, 4 in from the pill's curve.
+// left on menu-only items) opens the app's menu, drawn as our own `Menu` on a `Popover` under the
+// icon: a modal panel (`traymenu`), so a click elsewhere or Esc closes it and the keyboard moves
+// in it. Each app's icon sits in a circle as tall as a chip, which takes the state layer under
+// the pointer, 4 in from the pill's curve.
 Pill {
     id: root
 
@@ -36,17 +39,140 @@ Pill {
         return grey && K.Look.contrast(average, K.Tokens.color.surface) < 3;
     }
 
+    // The item whose menu is open, or none, and the submenus opened in it, the one shown last.
+    property var menuItem: null
+    property var trail: []
+    readonly property var submenu: root.trail.length > 0 ? root.trail[root.trail.length - 1] : null
+    // Where the menu hangs from, under the icon, in the window's coordinates.
+    property real anchorY: 0
+    // The open menu's entries, as `Menu` takes them: a submenu's start with the way back.
+    readonly property var entries: [...(root.submenu ? [
+                {
+                    text: "Back",
+                    icon: "arrow_back"
+                },
+                {
+                    separator: true
+                }
+            ] : []), ...(opener.children?.values ?? []).map(entry => ({
+                    text: entry.text,
+                    checkable: entry.buttonType !== QsMenuButtonType.None,
+                    checked: entry.checkState === Qt.Checked,
+                    enabled: entry.enabled,
+                    separator: entry.isSeparator
+                }))]
+    // How many entries come before the app's own: the way back and its separator.
+    readonly property int lead: root.submenu ? 2 : 0
+
+    // Opens the menu of the `index`th item, under its icon.
+    function openMenu(index: int): void {
+        const entry = icons.itemAt(index);
+        const window = root.window;
+        if (!entry || !window || !entry.modelData.hasMenu)
+            return;
+        // A press on the icon whose menu is open closes it.
+        if (root.menuItem === entry.modelData && Panels.current === "traymenu") {
+            root.closeMenu();
+            return;
+        }
+        root.trail = [];
+        root.menuItem = entry.modelData;
+        const at = entry.mapToItem(window.contentItem, 0, entry.height + K.Tokens.space.s12);
+        popover.x = Math.max(K.Tokens.space.s8, Math.min(at.x, window.width - K.Tokens.size.menu - K.Tokens.space.s8));
+        root.anchorY = at.y;
+        menu.currentIndex = -1;
+        Panels.open("traymenu");
+        menu.forceActiveFocus();
+    }
+
+    // Back out of the submenu shown, or close the menu from its top.
+    function back(): void {
+        if (root.trail.length === 0) {
+            root.closeMenu();
+            return;
+        }
+        root.trail = root.trail.slice(0, -1);
+        menu.currentIndex = -1;
+        menu.forceActiveFocus();
+    }
+
+    function closeMenu(): void {
+        root.menuItem = null;
+        root.trail = [];
+        if (Panels.current === "traymenu")
+            Panels.close();
+    }
+
     visible: SystemTray.items.values.length > 0
     padding: K.Tokens.space.s4
     spacing: 0
 
+    Connections {
+        target: Panels
+
+        function onCurrentChanged(): void {
+            if (Panels.current !== "traymenu")
+                root.menuItem = null;
+        }
+    }
+
+    QsMenuOpener {
+        id: opener
+
+        menu: root.submenu ?? root.menuItem?.menu ?? null
+    }
+
+    // Over the frame's window, so the pill's clip doesn't cut it.
+    K.Popover {
+        id: popover
+
+        parent: root.window ? root.window.contentItem : root
+        floating: true
+        fixedWidth: K.Tokens.size.menu
+        // Under the icon. The menu's own room keeps it above the window's foot; this keeps it inside
+        // a window too short for even that.
+        y: Math.max(K.Tokens.space.s8, Math.min(root.anchorY, parent.height - height - K.Tokens.space.s8))
+        // Nothing until the app's first entries arrive, so no bare surface shows while they load. A
+        // submenu shows at once with its way back, so the menu, and the keyboard on it, never hide
+        // between levels.
+        visible: root.menuItem !== null && Panels.current === "traymenu" && (root.trail.length > 0 || (opener.children?.values.length ?? 0) > 0)
+
+        K.Menu {
+            id: menu
+
+            // No lower than the window's foot, less the popover's padding; a longer menu scrolls.
+            maxHeight: (root.window?.height ?? Infinity) - root.anchorY - K.Tokens.space.s8 - K.Tokens.space.s12 * 2
+            entries: root.entries
+            onActivated: index => {
+                if (index < root.lead) {
+                    root.back();
+                    return;
+                }
+                const entry = opener.children.values[index - root.lead];
+                if (entry.hasChildren) {
+                    root.trail = [...root.trail, entry];
+                    menu.currentIndex = -1;
+                    menu.forceActiveFocus();
+                    return;
+                }
+                entry.triggered();
+                root.closeMenu();
+            }
+            // Esc backs out one level, and closes the menu from its top.
+            onDismissed: root.back()
+        }
+    }
+
     Repeater {
+        id: icons
+
         model: SystemTray.items
 
         delegate: Item {
             id: entry
 
             required property SystemTrayItem modelData
+            required property int index
 
             implicitWidth: K.Tokens.size.chip
             implicitHeight: K.Tokens.size.chip
@@ -161,8 +287,7 @@ Pill {
                     } else if (mouse.button === Qt.LeftButton && !item.onlyMenu) {
                         item.activate();
                     } else if (item.hasMenu) {
-                        const pos = entry.mapToItem(null, 0, entry.height + K.Tokens.space.s12);
-                        item.display(root.window, pos.x, pos.y);
+                        root.openMenu(entry.index);
                     }
                 }
             }

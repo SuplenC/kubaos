@@ -139,6 +139,16 @@ pub enum Msg {
     /// A click on one of the two-step login methods.
     Method(BwMethod),
     CloseRequested,
+    /// Where the picked card's row sits in the cards' scroll, to bring it into view.
+    Reveal(crate::reveal::Found),
+}
+
+/// The cards' scroll, and each card's row in it, by which a picked card is brought into view.
+pub const CARDS_SCROLL: &str = "setup-cards";
+
+/// The id of `card`'s row in the cards' scroll.
+pub fn card_item(card: CardId) -> iced::widget::Id {
+    iced::widget::Id::from(format!("setup-card-{card:?}"))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -739,9 +749,19 @@ impl Setup {
     }
 
     pub fn update(&mut self, msg: Message) -> Task<Message> {
-        let task = self.update_inner(msg);
+        let picked = self.sel;
+        let mut task = self.update_inner(msg);
         if self.tour.is_some() {
-            return Task::batch([task, tour::drive(self)]);
+            task = Task::batch([task, tour::drive(self)]);
+        }
+        // The cards' summaries wrap, so the list can outgrow its well: a card picked out of view
+        // scrolls into it, whether a key or the tour picked it.
+        if self.sel != picked {
+            let find = crate::reveal::Find::new(CARDS_SCROLL, card_item(self.sel));
+            task = Task::batch([
+                task,
+                iced::advanced::widget::operate(find).map(|found| Message::Setup(Msg::Reveal(found))),
+            ]);
         }
         task
     }
@@ -825,6 +845,13 @@ impl Setup {
                 Task::none()
             }
             Message::Setup(Msg::CloseRequested) => self.finish(),
+            Message::Setup(Msg::Reveal(found)) => match crate::reveal::target(found) {
+                Some(y) => iced::widget::operation::scroll_to(
+                    CARDS_SCROLL,
+                    iced::widget::operation::AbsoluteOffset { x: None, y: Some(y) },
+                ),
+                None => Task::none(),
+            },
             Message::TourShot(name, shot) => {
                 tour::save(self, &name, &shot);
                 if let Some(t) = &mut self.tour {

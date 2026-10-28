@@ -35,6 +35,8 @@ use kubaos_core::probe::Probe;
 use kubaos_ui::Look;
 use kubaos_ui::Scale;
 use kubaos_ui::color;
+use kubaos_ui::component::banner::BannerTone;
+use kubaos_ui::component::banner::banner;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::button;
@@ -45,6 +47,8 @@ use kubaos_ui::component::check::Tick;
 use kubaos_ui::component::check::checkbox;
 use kubaos_ui::component::chip::ChipKind;
 use kubaos_ui::component::chip::chip;
+use kubaos_ui::component::description::Fact;
+use kubaos_ui::component::description::description_list;
 use kubaos_ui::component::dialog::Tone;
 use kubaos_ui::component::dialog::dialog;
 use kubaos_ui::component::dialog::scrim;
@@ -62,8 +66,11 @@ use kubaos_ui::component::list::scrolling_list;
 use kubaos_ui::component::media::Aspect;
 use kubaos_ui::component::picture::NamePlace;
 use kubaos_ui::component::picture::picture_choice;
+use kubaos_ui::component::progress::danger_timed_bar;
 use kubaos_ui::component::progress::spinner;
 use kubaos_ui::component::progress::timed_bar;
+use kubaos_ui::component::step::StepState as RailState;
+use kubaos_ui::component::step::step;
 use kubaos_ui::component::switch::switch;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::icon::icon;
@@ -356,11 +363,18 @@ fn rail<'a>(app: &'a App, look: &Look) -> El<'a> {
         let failed = current && app.screen == Screen::Failed;
         let clickable = !locked && i <= app.reached && !current && *s != Screen::Installing;
         let target = *s;
+        let state = if current {
+            RailState::Current
+        } else if done {
+            RailState::Done
+        } else {
+            RailState::Todo
+        };
         steps = steps.push(
-            list_row(s.rail_label())
+            step(s.rail_label())
                 .icon(if failed { Icon::Error } else { step_icon(*s) })
-                .selected(current)
-                .checked(done)
+                .state(state)
+                .mark()
                 .on_press_maybe(clickable.then_some(Message::Click(F::Step(target))))
                 .view(look),
         );
@@ -510,7 +524,7 @@ fn content<'a>(app: &'a App, look: &Look) -> El<'a> {
     let mut page = stack(look, Gap::NONE)
         .height(Extent::Fill)
         .push(widget::container(body).height(Length::Fill));
-    if !matches!(app.screen, Screen::Installing | Screen::Failed) {
+    if !matches!(app.screen, Screen::Installing | Screen::Failed | Screen::Summary) {
         page = page.push(gap(Space::S16)).push(footer(app, look));
     }
     // The page slides in from the side it comes from, a whole device pixel at a time.
@@ -1497,7 +1511,7 @@ fn wallpaper_card<'a>(app: &'a App, s: usize, i: usize, look: &Look) -> El<'a> {
 }
 
 /// A card on Last chance, as tall as the one beside it.
-fn block<'a>(id: &'static str, glyph: Icon, title: &'a str, facts: Vec<El<'a>>, look: &Look) -> El<'a> {
+fn block<'a>(id: &'static str, glyph: Icon, title: &'a str, facts: Vec<Fact<'a>>, look: &Look) -> El<'a> {
     let c = look.colors;
     widget::container(card_sized(
         look,
@@ -1508,7 +1522,7 @@ fn block<'a>(id: &'static str, glyph: Icon, title: &'a str, facts: Vec<El<'a>>, 
                     .push(icon(look, glyph, IconSize::S20, c.primary))
                     .push(text(title, Type::Subheading, c.on_surface)),
             )
-            .push(stack(look, Space::S8).extend(facts)),
+            .push(description_list(look, facts)),
         Extent::Fill,
     ))
     .id(id)
@@ -1517,7 +1531,6 @@ fn block<'a>(id: &'static str, glyph: Icon, title: &'a str, facts: Vec<El<'a>>, 
 }
 
 fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
-    let c = look.colors;
     let Some(probe) = app.ready_probe() else {
         return widget::Space::new().into();
     };
@@ -1537,12 +1550,12 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
         "Last chance",
         "Nothing's been written yet. Check it over, then hold the button.",
     ));
+    // One line, so the warning takes no more of the cards' room than it needs, ending where the
+    // cards do, short of their scrollbar's gutter.
     if let Some(note) = low_battery_note(app) {
         top = top.push(
-            row(look, Space::S8)
-                .center()
-                .push(icon(look, Icon::Warning, IconSize::S20, c.error))
-                .push(text(note, Type::BodyStrong, c.error)),
+            widget::container(banner(BannerTone::Warning, Icon::Warning, note, "").view(look))
+                .padding(Inset::NONE.right(Space::S16).padding()),
         );
     }
 
@@ -1565,7 +1578,8 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
             .id(ids::SUMMARY_SCROLL)
             .height(Extent::Fill),
         )
-        .push(confirm(app, disk, whole, look))
+        // The cards keep a gutter for their scrollbar; the banner ends where they do.
+        .push(widget::container(confirm(app, disk, whole, look)).padding(Inset::NONE.right(Space::S16).padding()))
         .into()
 }
 
@@ -1576,9 +1590,8 @@ fn summary_language<'a>(app: &'a App, look: &Look) -> El<'a> {
         Icon::Language,
         "Language",
         vec![
-            ui::fact(look, "Language", data::locale_name(&f.locale).into_owned()),
-            ui::fact(
-                look,
+            Fact::new("Language", data::locale_name(&f.locale).into_owned()),
+            Fact::new(
                 "Keyboard",
                 f.keymaps
                     .iter()
@@ -1586,7 +1599,7 @@ fn summary_language<'a>(app: &'a App, look: &Look) -> El<'a> {
                     .collect::<Vec<_>>()
                     .join(", "),
             ),
-            ui::fact(look, "Time zone", {
+            Fact::new("Time zone", {
                 let (city, region) = data::split_tz(&f.timezone);
                 if region.is_empty() {
                     city
@@ -1606,11 +1619,11 @@ fn summary_account<'a>(app: &'a App, cfg: &InstallConfig, look: &Look) -> El<'a>
         Icon::Person,
         "You",
         vec![
-            ui::fact(look, "Name", f.full_name.clone()),
-            ui::fact(look, "Login", format!("{}@{}", cfg.user.username, cfg.host.hostname)),
+            Fact::new("Name", f.full_name.clone()),
+            Fact::new("Login", format!("{}@{}", cfg.user.username, cfg.host.hostname)),
             match cfg.git.as_ref() {
-                Some(g) => ui::fact_with(look, "Git", g.name.clone(), g.email.clone()),
-                None => ui::fact(look, "Git", "Later".into()),
+                Some(g) => Fact::new("Git", g.name.clone()).detail(g.email.clone()),
+                None => Fact::new("Git", "Later".to_owned()),
             },
         ],
         look,
@@ -1625,19 +1638,15 @@ fn summary_disk<'a>(app: &'a App, probe: &Probe, disk: Option<&DiskInfo>, whole:
         "Disk",
         vec![
             match disk {
-                Some(d) => ui::fact_with(
-                    look,
-                    "Disk",
-                    disk_model(d).to_string(),
-                    format!("{} · {}", d.path, human_bytes(d.size_bytes)),
-                ),
-                None => ui::fact(look, "Disk", "None picked".into()),
+                Some(d) => {
+                    Fact::new("Disk", disk_model(d)).detail(format!("{} · {}", d.path, human_bytes(d.size_bytes)))
+                }
+                None => Fact::new("Disk", "None picked".to_owned()),
             },
-            ui::fact(
-                look,
+            Fact::new(
                 "Mode",
                 if whole {
-                    "Erase everything".into()
+                    "Erase everything".to_owned()
                 } else {
                     format!(
                         "Alongside, in {} free",
@@ -1645,13 +1654,12 @@ fn summary_disk<'a>(app: &'a App, probe: &Probe, disk: Option<&DiskInfo>, whole:
                     )
                 },
             ),
-            ui::fact(
-                look,
+            Fact::new(
                 "Encryption",
                 match (f.encrypt, f.luks_same_as_password) {
-                    (false, _) => "Off. Brave.".into(),
-                    (true, true) => "LUKS2, account password".into(),
-                    (true, false) => "LUKS2, its own passphrase".into(),
+                    (false, _) => "Off. Brave.".to_owned(),
+                    (true, true) => "LUKS2, account password".to_owned(),
+                    (true, false) => "LUKS2, its own passphrase".to_owned(),
                 },
             ),
         ],
@@ -1666,35 +1674,32 @@ fn summary_system<'a>(app: &'a App, probe: &Probe, cfg: &InstallConfig, look: &L
         Icon::DeployedCode,
         "System",
         vec![
-            ui::fact(look, "Release", format!("KubaOS {}", app.codename())),
-            ui::fact_with(
-                look,
+            Fact::new("Release", format!("KubaOS {}", app.codename())),
+            Fact::new(
                 "Image",
                 m.map(|m| format!("{} · {}", m.version, m.commit.chars().take(7).collect::<String>()))
                     .unwrap_or_default(),
-                m.map(|m| format!("Linux {}", m.kernel)).unwrap_or_default(),
-            ),
-            ui::fact(
-                look,
+            )
+            .detail(m.map(|m| format!("Linux {}", m.kernel)).unwrap_or_default()),
+            Fact::new(
                 "Wallpapers",
                 wallpapers_summary(cfg.wallpapers.as_ref(), app.wallpaper_sets()),
             ),
-            ui::fact(
-                look,
+            Fact::new(
                 "Network",
                 app.form
                     .wifi_ssid
                     .clone()
-                    .map_or_else(|| "None".into(), |s| format!("Wi-Fi “{s}”")),
+                    .map_or_else(|| "None".to_owned(), |s| format!("Wi-Fi “{s}”")),
             ),
         ],
         look,
     )
 }
 
-/// The confirm strip under Last chance: what the install does to the disk, and the button to hold.
-/// Erasing says so in the error colour and names the disk, with no jokes in that sentence
-/// (docs/BRAND.md, voice rule 4).
+/// What the install does to the disk, as a banner holding Back and the button to hold, the hold's
+/// bar along its foot. Erasing is a danger banner, really red, naming the disk, with no jokes in
+/// that sentence (docs/BRAND.md, voice rule 4); going into free space is an info banner.
 fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Look) -> El<'a> {
     let c = look.colors;
     let held = app
@@ -1710,14 +1715,14 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
             )
         })
         .unwrap_or_default();
-    let (tone, glyph, kind, message, sub, cta) = if whole {
+    let (tone, glyph, kind, message, sub, cta, ink) = if whole {
         let n = disk.map_or(0, |d| d.partitions.len());
         let others = disk
             .and_then(|d| d.other_os())
             .map(|o| format!(", {o} included"))
             .unwrap_or_default();
         (
-            c.error,
+            BannerTone::Danger,
             Icon::Warning,
             Kind::Danger,
             format!("Last chance to not fuck this up. Everything on {disk_name} gets erased."),
@@ -1730,10 +1735,11 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
                 )
             },
             "Hold to erase and install",
+            color::alpha(c.on_error_container, Opacity::SubduedText.value()),
         )
     } else {
         (
-            c.primary,
+            BannerTone::Info,
             Icon::Storage,
             Kind::Filled,
             format!("KubaOS goes into the free space on {disk_name}."),
@@ -1742,9 +1748,17 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
                 disk.and_then(|d| d.other_os()).unwrap_or("Everything else")
             ),
             "Hold to install",
+            c.on_surface_variant,
         )
     };
     let label = if app.hold.is_some() { "Keep holding…" } else { cta };
+    let on_banner = kubaos_ui::component::banner::inside(look, tone);
+    let back = button("Back")
+        .kind(Kind::Text)
+        .icon(Icon::ArrowBack)
+        .on_press(Message::Click(F::Back))
+        .focused(app.is_focused(F::Back))
+        .view(&on_banner);
     let hold_button = stack(look, Space::S8)
         .push(
             button(label)
@@ -1758,27 +1772,17 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
         .push(
             row(look, Space::S4)
                 .center()
-                .push(text("or hold", Type::Caption, c.on_surface_variant))
+                .push(text("or hold", Type::Caption, ink))
                 .push(keycap(look, "Enter")),
         );
-    // The hold fills the bar along the card's foot as it goes.
-    card(
-        look,
-        stack(look, Space::S16)
-            .push(
-                row(look, Space::S16)
-                    .center()
-                    .push(icon(look, glyph, IconSize::S24, tone))
-                    .push(
-                        stack(look, Space::S4)
-                            .width(Extent::Fill)
-                            .push(text(message, Type::Subheading, c.on_surface))
-                            .push(text(sub, Type::Body, c.on_surface_variant)),
-                    )
-                    .push(hold_button),
-            )
-            .push(timed_bar(look, held)),
-    )
+    banner(tone, glyph, message, sub)
+        .actions([back, hold_button.into()])
+        .foot(if tone == BannerTone::Danger {
+            danger_timed_bar(look, held)
+        } else {
+            timed_bar(look, held)
+        })
+        .view(look)
 }
 
 /// Asks for the charger on Last chance when the battery is low. It warns only: an install on a low

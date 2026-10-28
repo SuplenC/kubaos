@@ -156,6 +156,8 @@ pub const TWO_LINE_ICON: IconSize = IconSize::S24;
 /// A fixed dimension of a component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Size {
+    Badge,
+    BadgeDot,
     Bar,
     Check,
     Chip,
@@ -167,6 +169,7 @@ pub enum Size {
     Hanko,
     Keycap,
     Log,
+    Menu,
     NeonMark,
     Panel,
     Password,
@@ -174,6 +177,7 @@ pub enum Size {
     RadioDot,
     Rail,
     Row,
+    RowCompact,
     RowTwoLine,
     Scrollbar,
     Slider,
@@ -190,7 +194,9 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 30] = [
+    pub const ALL: [Size; 34] = [
+        Size::Badge,
+        Size::BadgeDot,
         Size::Bar,
         Size::Check,
         Size::Chip,
@@ -202,6 +208,7 @@ impl Size {
         Size::Hanko,
         Size::Keycap,
         Size::Log,
+        Size::Menu,
         Size::NeonMark,
         Size::Panel,
         Size::Password,
@@ -209,6 +216,7 @@ impl Size {
         Size::RadioDot,
         Size::Rail,
         Size::Row,
+        Size::RowCompact,
         Size::RowTwoLine,
         Size::Scrollbar,
         Size::Slider,
@@ -226,6 +234,8 @@ impl Size {
     /// The dimension in logical pixels.
     pub const fn px(self) -> u16 {
         match self {
+            Size::Badge => 16,
+            Size::BadgeDot => 8,
             Size::Bar => 40,
             Size::Check => 20,
             Size::Chip => 24,
@@ -237,6 +247,7 @@ impl Size {
             Size::Hanko => 120,
             Size::Keycap => 20,
             Size::Log => 232,
+            Size::Menu => 240,
             Size::NeonMark => 200,
             Size::Panel => 384,
             Size::Password => 320,
@@ -244,6 +255,7 @@ impl Size {
             Size::RadioDot => 8,
             Size::Rail => 236,
             Size::Row => 44,
+            Size::RowCompact => 28,
             Size::RowTwoLine => 56,
             Size::Scrollbar => 4,
             Size::Slider => 24,
@@ -1228,7 +1240,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 42] = [
+pub const CONTRAST: [ContrastPair; 46] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1412,6 +1424,34 @@ pub const CONTRAST: [ContrastPair; 42] = [
         purpose: "A reading close to its limit",
     },
     ContrastPair {
+        fg: Role::Warning,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A warning banner's symbol and hairline",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Text,
+        opacity: None,
+        purpose: "An info banner's symbol and hairline, a Text button inside it",
+    },
+    ContrastPair {
+        fg: Role::Error,
+        bg: Role::ErrorContainer,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A danger banner's symbol and hairline, and a danger progress bar's fill",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::ErrorContainer,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A Text button inside a danger banner in QML",
+    },
+    ContrastPair {
         fg: Role::Surface,
         bg: Role::OnSurface,
         need: Need::Text,
@@ -1479,7 +1519,7 @@ pub const CONTRAST: [ContrastPair; 42] = [
         bg: Role::SurfaceContainerHigh,
         need: Need::Text,
         opacity: None,
-        purpose: "An Action's title in the Action panel, a chip",
+        purpose: "An Action's title in the Action panel, a chip, a done step's chip on a selected row",
     },
     ContrastPair {
         fg: Role::Tertiary,

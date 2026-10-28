@@ -7,11 +7,14 @@
 # CROP is the part of the 1600×1000 logical screen the pair shows, `X,Y,W,H` in logical pixels,
 # or `-` for the whole window.
 bar                      bar            FrameShot   900,0,700,40      bar
+bar-traymenu             bar            FrameShot   900,0,700,320     bar traymenu
 controlcenter            controlcenter  FrameShot   1176,0,424,1000   controlcenter
 controlcenter-bluetooth  controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth
 controlcenter-passkey    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-code
 controlcenter-keyboard   controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard
+controlcenter-scanning   controlcenter  FrameShot   1176,0,424,1000   controlcenter scanning
 clock                    clock          FrameShot   400,0,800,800     clock answer
+clock-settings           clock          FrameShot   400,0,800,800     clock settings
 sysmon                   sysmon         FrameShot   760,0,840,900     sysmon
 sysmon-process           sysmon         FrameShot   760,0,840,900     sysmon process
 wallpaper                wallpaper      FrameShot   200,440,1200,560  wallpaper

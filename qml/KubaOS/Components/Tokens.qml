@@ -83,6 +83,8 @@ QtObject {
 
     // Fixed dimensions of components.
     readonly property QtObject size: QtObject {
+        readonly property int badge: 16
+        readonly property int badge_dot: 8
         readonly property int bar: 40
         readonly property int check: 20
         readonly property int chip: 24
@@ -94,6 +96,7 @@ QtObject {
         readonly property int hanko: 120
         readonly property int keycap: 20
         readonly property int log: 232
+        readonly property int menu: 240
         readonly property int neon_mark: 200
         readonly property int panel: 384
         readonly property int password: 320
@@ -101,6 +104,7 @@ QtObject {
         readonly property int radio_dot: 8
         readonly property int rail: 236
         readonly property int row: 44
+        readonly property int row_compact: 28
         readonly property int row_two_line: 56
         readonly property int scrollbar: 4
         readonly property int slider: 24

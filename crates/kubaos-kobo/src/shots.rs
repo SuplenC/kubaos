@@ -103,9 +103,36 @@ fn mode_name(mode: Mode) -> &'static str {
 /// `view` laid out in [`WINDOW`] at `look`'s scale: its boxes, as the geometry check reads them,
 /// and, when `shot` names a file, its pixels written there, drawn as a frame at `now`.
 fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>, now: Instant) -> Frame {
+    take_revealed(view, look, page, shot, now, None)
+}
+
+/// [`take`], with the item `reveal` names scrolled into view in its scrollable first, as the
+/// live app's reveal task does: a shot runs no tasks.
+fn take_revealed(
+    view: Element<'_, Message>,
+    look: &Look,
+    page: &str,
+    shot: Option<&Path>,
+    now: Instant,
+    reveal: Option<(&'static str, iced::widget::Id)>,
+) -> Frame {
     let mut renderer = headless();
     let factor = look.scale.factor();
     let mut ui = UserInterface::build(view, WINDOW, user_interface::Cache::default(), &mut renderer);
+    if let Some((scroll, item)) = reveal {
+        let mut find = Unit(crate::reveal::Find::new(scroll, item));
+        ui.operate(&renderer, &mut find);
+        if let iced::advanced::widget::operation::Outcome::Some(found) =
+            iced::advanced::widget::Operation::<crate::reveal::Found>::finish(&find.0)
+            && let Some(y) = crate::reveal::target(found)
+        {
+            let mut to = iced::advanced::widget::operation::scrollable::scroll_to(
+                iced::widget::Id::new(scroll),
+                iced::widget::operation::AbsoluteOffset { x: None, y: Some(y) },
+            );
+            ui.operate(&renderer, &mut to);
+        }
+    }
     let mut collect = Collect::new();
     ui.operate(&renderer, &mut collect);
     if let Some(path) = shot {
@@ -145,6 +172,38 @@ fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>
         mode: mode_name(look.mode).to_owned(),
         scale: factor,
         root: collect.into_tree().expect("the screen reports its boxes"),
+    }
+}
+
+/// The reveal's search, run where only operations that report nothing are taken; what it found is
+/// read from it afterwards.
+struct Unit(crate::reveal::Find);
+
+impl iced::advanced::widget::Operation for Unit {
+    fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn iced::advanced::widget::Operation)) {
+        operate(self);
+    }
+
+    fn container(&mut self, id: Option<&iced::widget::Id>, bounds: iced::Rectangle) {
+        iced::advanced::widget::Operation::<crate::reveal::Found>::container(&mut self.0, id, bounds);
+    }
+
+    fn scrollable(
+        &mut self,
+        id: Option<&iced::widget::Id>,
+        bounds: iced::Rectangle,
+        content_bounds: iced::Rectangle,
+        translation: iced::Vector,
+        state: &mut dyn iced::advanced::widget::operation::Scrollable,
+    ) {
+        iced::advanced::widget::Operation::<crate::reveal::Found>::scrollable(
+            &mut self.0,
+            id,
+            bounds,
+            content_bounds,
+            translation,
+            state,
+        );
     }
 }
 
@@ -224,7 +283,8 @@ fn take_setup(out: &mut Out, name: &str, s: &mut Setup) {
                 .shots
                 .as_ref()
                 .map(|dir| dir.join(format!("{page}-{}-{}x.png", mode_name(mode), scale.factor())));
-            let frame = take(crate::setup::view(s), &look, &page, shot.as_deref(), s.now);
+            let reveal = Some((crate::setup::CARDS_SCROLL, crate::setup::card_item(s.sel)));
+            let frame = take_revealed(crate::setup::view(s), &look, &page, shot.as_deref(), s.now, reveal);
             out.frames.push(frame);
         }
     }

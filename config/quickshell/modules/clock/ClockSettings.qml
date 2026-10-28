@@ -21,33 +21,18 @@ K.Stack {
         Time.change("set", { key: key, value: value }, error => root.error = error);
     }
 
+    // One country of many: a select, where every country's chip made a wall.
     Section {
         title: "Holidays"
-        note: Time.state.country ? `Marked in the calendar and left out of working days: ${Time.state.country}` : "None marked"
+        note: "Marked in the calendar and left out of working days"
 
-        Flow {
-            readonly property bool fillWidth: true
+        K.Select {
+            readonly property var countries: Time.state.countries ?? []
 
-            spacing: K.Tokens.space.s4
-
-            Chip {
-                label: "None"
-                selected: (root.settings.holidays ?? "") === ""
-                onClicked: root.set("holidays", "none")
-            }
-
-            Repeater {
-                model: Time.state.countries ?? []
-
-                Chip {
-                    required property var modelData
-
-                    label: modelData.code.toUpperCase()
-                    tooltip: modelData.name
-                    selected: root.settings.holidays === modelData.code
-                    onClicked: root.set("holidays", modelData.code)
-                }
-            }
+            options: ["None", ...countries.map(country => country.name)]
+            currentIndex: (root.settings.holidays ?? "") === "" ? 0 : countries.findIndex(country => country.code === root.settings.holidays) + 1
+            icon: "flag"
+            onPicked: index => root.set("holidays", index === 0 ? "none" : countries[index - 1].code)
         }
     }
 

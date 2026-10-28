@@ -53,22 +53,49 @@ use crate::tokens::Size;
 /// work over [`Duration::Short`] on [`Easing::Linear`], so it moves with the work instead of
 /// jumping; a bar that shows up already part full starts there.
 pub fn bar<'a, M: 'a>(look: &Look, fraction: f32) -> Element<'a, M> {
-    drawn(look, fraction, true)
+    drawn(look, fraction, true, Fill::Accent)
+}
+
+/// [`bar`] on a danger banner's red: the fill in the error colour on a pale track, so the work
+/// that destroys something reads as red all the way.
+pub fn danger_bar<'a, M: 'a>(look: &Look, fraction: f32) -> Element<'a, M> {
+    drawn(look, fraction, true, Fill::Danger)
 }
 
 /// [`bar`] for a fraction the app already times against the clock (how long a held button has been
 /// held): drawn where it is given, with no easing of its own to trail behind it.
 pub fn timed_bar<'a, M: 'a>(look: &Look, fraction: f32) -> Element<'a, M> {
-    drawn(look, fraction, false)
+    drawn(look, fraction, false, Fill::Accent)
 }
 
-fn drawn<'a, M: 'a>(look: &Look, fraction: f32, follows: bool) -> Element<'a, M> {
+/// [`timed_bar`] on a danger banner's red: how long the button that erases a disk has been held.
+pub fn danger_timed_bar<'a, M: 'a>(look: &Look, fraction: f32) -> Element<'a, M> {
+    drawn(look, fraction, false, Fill::Danger)
+}
+
+/// What a bar's fill says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Fill {
+    /// The accent: work going well.
+    Accent,
+    /// The error colour, on a danger banner's container: work that destroys something.
+    Danger,
+}
+
+fn drawn<'a, M: 'a>(look: &Look, fraction: f32, follows: bool, kind: Fill) -> Element<'a, M> {
     let c = look.colors;
+    let (fill, track) = match kind {
+        Fill::Accent => (
+            c.primary,
+            color::alpha(c.surface_container_highest, Opacity::Track.value()),
+        ),
+        Fill::Danger => (c.error, color::alpha(c.on_error_container, Opacity::Tint.value())),
+    };
     let fill = Bar {
         fraction: fraction.clamp(0.0, 1.0),
         follows,
-        fill: c.primary,
-        track: color::alpha(c.surface_container_highest, Opacity::Track.value()),
+        fill,
+        track,
         scale: look.scale,
     };
     // The fill's row, as the geometry check has always seen it: the shell's bar reports the same.
@@ -80,7 +107,8 @@ fn drawn<'a, M: 'a>(look: &Look, fraction: f32, follows: bool) -> Element<'a, M>
         },
         Element::new(fill),
     );
-    probe::component("ProgressBar", ["", "", ""], Fixed::HEIGHT, parts)
+    let variant = if kind == Fill::Danger { "danger" } else { "" };
+    probe::component("ProgressBar", [variant, "", ""], Fixed::HEIGHT, parts)
 }
 
 struct Bar {

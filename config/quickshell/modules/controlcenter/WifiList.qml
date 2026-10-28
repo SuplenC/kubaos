@@ -47,6 +47,8 @@ Item {
         id: well
 
         width: root.width
+        // The list's room whether or not a scan has found anything yet, so the first networks fill
+        // the well the skeleton rows sit in and nothing moves.
         height: root.height - (password.visible ? password.height + K.Tokens.space.s12 : 0)
         focused: list.activeFocus
 
@@ -90,14 +92,43 @@ Item {
             }
         }
 
+        // Rows still being found while the scan has nothing yet: the first results take the
+        // place they keep.
+        Column {
+            id: scanning
+
+            y: K.Tokens.space.s12
+            width: parent.width
+            visible: list.count === 0 && Net.wifiEnabled
+            spacing: K.Tokens.space.s4
+
+            K.Text {
+                x: K.Tokens.space.s12
+                text: "Scanning…"
+                style: K.Tokens.type.small
+                color: K.Tokens.color.on_surface_variant
+            }
+
+            Repeater {
+                model: [0.6, 0.45, 0.75]
+
+                SkeletonRow {
+                    required property real modelData
+
+                    width: parent.width
+                    share: modelData
+                }
+            }
+        }
+
         K.EmptyState {
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width
             room: parent.width
-            visible: list.count === 0
-            icon: Net.wifiEnabled ? "wifi_find" : "wifi_off"
-            title: Net.wifiEnabled ? "Scanning…" : "Wi-Fi is off"
-            body: Net.wifiEnabled ? "Networks show up here as they're found." : "The Wi-Fi tile turns it on."
+            visible: list.count === 0 && !Net.wifiEnabled
+            icon: "wifi_off"
+            title: "Wi-Fi is off"
+            body: "The Wi-Fi tile turns it on."
         }
     }
 

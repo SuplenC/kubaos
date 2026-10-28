@@ -71,6 +71,32 @@ K.Stack {
         return points;
     }
 
+    // A 24 symbol in a small control's box, a badge over its top right corner, as the iced page
+    // stacks them.
+    component Badged: Item {
+        id: badged
+
+        property string icon
+        property int count: 0
+        readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+
+        implicitWidth: K.Tokens.size.control_sm
+        implicitHeight: K.Tokens.size.control_sm
+
+        K.Icon {
+            x: K.Look.snap((badged.width - width) / 2, badged.dpr)
+            y: K.Look.snap((badged.height - height) / 2, badged.dpr)
+            name: badged.icon
+            size: K.Tokens.icon.s24
+            color: K.Tokens.color.on_surface_variant
+        }
+
+        K.Badge {
+            x: badged.width - width
+            count: badged.count
+        }
+    }
+
     function sizeName(size: string): string {
         return `${size} · ${K.ButtonMetrics.of(size).height}`;
     }
@@ -588,6 +614,92 @@ K.Stack {
                 }
 
                 K.Section {
+                    title: "Icon tiles and badges"
+                    description: "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small and regular, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."
+
+                    K.Row {
+                        gap: K.Tokens.space.s24
+                        align: "centre"
+
+                        K.IconTile {
+                            icon: "terminal"
+                            size: "Sm"
+                        }
+
+                        K.IconTile {
+                            icon: "terminal"
+                        }
+
+                        K.IconTile {
+                            photo: root.picture
+                        }
+
+                        K.IconTile {
+                            icon: "warning"
+                            danger: true
+                        }
+
+                        K.Badge {
+                            count: 3
+                        }
+
+                        K.Badge {
+                            count: 128
+                        }
+
+                        K.Badge {
+                        }
+
+                        Badged {
+                            icon: "notifications"
+                            count: 3
+                        }
+
+                        Badged {
+                            icon: "system_update_alt"
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Skeletons"
+                    description: "The shape of what is loading, in the placeholder colour, so what arrives moves nothing: a row being scanned, a thumbnail being decoded."
+
+                    K.Grid {
+                        columns: 2
+                        gap: K.Tokens.space.s24
+
+                        K.Row {
+                            gap: K.Tokens.space.s12
+                            align: "centre"
+
+                            K.Skeleton {
+                                bone: "circle"
+                                size: K.Tokens.icon.s24
+                            }
+
+                            K.Stack {
+                                fill: true
+                                gap: K.Tokens.space.s4
+
+                                K.Skeleton {
+                                    style: K.Tokens.type.body_strong
+                                }
+
+                                K.Skeleton {
+                                    style: K.Tokens.type.small
+                                }
+                            }
+                        }
+
+                        K.Skeleton {
+                            bone: "block"
+                            size: K.Tokens.size.control_lg
+                        }
+                    }
+                }
+
+                K.Section {
                     title: "Lists"
                     description: "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The ring goes round the well; the row shows where the keyboard is."
 
@@ -686,6 +798,11 @@ K.Stack {
                         K.Chip {
                             text: "Demo"
                             kind: "Cold"
+                        }
+
+                        K.Chip {
+                            text: "Reboot"
+                            kind: "Filled"
                         }
 
                         K.Chip {
@@ -949,6 +1066,195 @@ K.Stack {
                             badgeIcon: "play_arrow"
                             badgeText: "Video"
                             focused: true
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Banners"
+                    description: "A message that matters on the page itself, its actions inside: info, a warning, and danger, really red, holding the button that destroys."
+
+                    K.Stack {
+                        fill: true
+                        gap: K.Tokens.space.s16
+
+                        K.Banner {
+                            tone: "Info"
+                            icon: "storage"
+                            title: "KubaOS goes into the free space on Samsung SSD 990 PRO."
+                            body: "Windows stays where it is."
+                        }
+
+                        K.Banner {
+                            tone: "Warning"
+                            icon: "warning"
+                            title: "12% left. Plug the damn thing in."
+                            body: "An install on battery may not finish."
+                        }
+
+                        K.Banner {
+                            tone: "Danger"
+                            icon: "warning"
+                            title: "Everything on Samsung SSD 990 PRO (nvme0n1, 2 TB) gets erased."
+                            body: "All 4 partitions, Windows included. There's no undo."
+                            foot: [
+                                K.ProgressBar {
+                                    value: 0.4
+                                    danger: true
+                                }
+                            ]
+
+                            K.Button {
+                                text: "Back"
+                                kind: "Text"
+                                icon: "arrow_back"
+                            }
+
+                            K.Stack {
+                                gap: K.Tokens.space.s8
+
+                                K.Button {
+                                    text: "Hold to erase and install"
+                                    kind: "Danger"
+                                    icon: "download"
+                                }
+
+                                K.Row {
+                                    gap: K.Tokens.space.s4
+                                    align: "centre"
+
+                                    K.Text {
+                                        text: "or hold"
+                                        style: K.Tokens.type.caption
+                                        color: K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued_text)
+                                    }
+
+                                    K.Keycap {
+                                        key: "Enter"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Steps"
+                    description: "To do, done and waiting on an action each look their own, and the action carries the accent. A description wraps; a rail marks the state instead."
+
+                    K.Grid {
+                        weights: [2, 1]
+                        gap: K.Tokens.space.s24
+
+                        K.List {
+                            focused: true
+
+                            K.Step {
+                                title: "TUXEDO drivers"
+                                subtitle: "Key queued. Reboot and enroll it on the blue MokManager screen, before KubaOS starts."
+                                icon: "computer"
+                                status: "action"
+                                actionLabel: "Reboot"
+                                actionIcon: "restart_alt"
+                                selected: true
+                            }
+
+                            K.Step {
+                                title: "Fingerprint"
+                                subtitle: "One finger: right index. sudo and password dialogs take it."
+                                icon: "fingerprint"
+                                status: "done"
+                            }
+
+                            K.Step {
+                                title: "Bitwarden"
+                                subtitle: "Not logged in."
+                                icon: "lock"
+                            }
+                        }
+
+                        K.Stack {
+                            K.Step {
+                                title: "Language"
+                                icon: "language"
+                                status: "done"
+                                mark: true
+                            }
+
+                            K.Step {
+                                title: "Disk"
+                                icon: "hard_drive"
+                                status: "current"
+                                mark: true
+                                enabled: false
+                            }
+
+                            K.Step {
+                                title: "Git"
+                                icon: "code"
+                                mark: true
+                                enabled: false
+                            }
+
+                            K.Step {
+                                title: "Reboot"
+                                icon: "computer"
+                                status: "action"
+                                actionLabel: "Reboot"
+                                actionIcon: "restart_alt"
+                                mark: true
+                                enabled: false
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Description lists"
+                    description: "Facts beside their labels, a quarter of the width; a path or an email gets a mono line of its own."
+
+                    K.Grid {
+                        columns: 2
+                        gap: K.Tokens.space.s24
+
+                        K.Card {
+                            K.DescriptionList {
+                                facts: [
+                                    {
+                                        label: "Name",
+                                        value: "Kuba Example"
+                                    },
+                                    {
+                                        label: "Login",
+                                        value: "kuba@tuxedo"
+                                    },
+                                    {
+                                        label: "Git",
+                                        value: "Kuba Example",
+                                        sub: "kuba@example.com"
+                                    }
+                                ]
+                            }
+                        }
+
+                        K.Card {
+                            K.DescriptionList {
+                                facts: [
+                                    {
+                                        label: "Disk",
+                                        value: "Samsung SSD 990 PRO 2TB",
+                                        sub: "/dev/nvme0n1 · 2.0 TB"
+                                    },
+                                    {
+                                        label: "Mode",
+                                        value: "Erase everything"
+                                    },
+                                    {
+                                        label: "Encryption",
+                                        value: "LUKS2, account password"
+                                    }
+                                ]
+                            }
                         }
                     }
                 }
@@ -1264,6 +1570,184 @@ K.Stack {
                                 icon: "search"
                                 title: "Nothing matches"
                                 body: "Typo? Try fewer letters."
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Selects and menus"
+                    description: "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control."
+
+                    K.Grid {
+                        columns: 3
+                        gap: K.Tokens.space.s24
+
+                        K.Stack {
+                            fill: true
+                            gap: K.Tokens.space.s8
+
+                            K.Select {
+                                options: ["None", "Germany", "Italy", "Poland"]
+                                currentIndex: 3
+                                icon: "flag"
+                                open: true
+                            }
+
+                            K.Popover {
+                                fillWidth: true
+
+                                K.Menu {
+                                    currentIndex: 2
+                                    entries: ["None", "Germany", "Italy", "Poland"].map(name => ({
+                                                text: name,
+                                                checkable: true,
+                                                checked: name === "Poland"
+                                            }))
+                                }
+                            }
+                        }
+
+                        K.Popover {
+                            fixedWidth: K.Tokens.size.menu
+
+                            K.Menu {
+                                currentIndex: 0
+                                entries: [
+                                    {
+                                        text: "Open",
+                                        icon: "folder_open",
+                                        shortcut: ["Enter"]
+                                    },
+                                    {
+                                        text: "Copy path",
+                                        icon: "content_paste",
+                                        shortcut: ["Ctrl", "C"]
+                                    },
+                                    {
+                                        separator: true
+                                    },
+                                    {
+                                        text: "Pin to the top",
+                                        icon: "push_pin"
+                                    },
+                                    {
+                                        text: "Forget",
+                                        icon: "close",
+                                        enabled: false
+                                    },
+                                    {
+                                        separator: true
+                                    },
+                                    {
+                                        text: "Quit",
+                                        icon: "logout",
+                                        danger: true
+                                    }
+                                ]
+                            }
+                        }
+
+                        K.Stack {
+                            fill: true
+                            gap: K.Tokens.space.s16
+
+                            K.Select {
+                                options: ["Every 5 minutes"]
+                                currentIndex: 0
+                            }
+
+                            K.Select {
+                                options: ["Every 5 minutes"]
+                                currentIndex: 0
+                                focused: true
+                            }
+
+                            K.Select {
+                                options: ["Unavailable"]
+                                currentIndex: 0
+                                enabled: false
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Tables"
+                    description: "Readings in columns, a line of text with 4 above and below a row; the whole row takes the pointer, numbers line up at their column's right edge."
+
+                    K.Table {
+                        columns: [
+                            {
+                                title: "Name",
+                                weight: 4
+                            },
+                            {
+                                title: "CPU",
+                                weight: 1,
+                                numeric: true
+                            },
+                            {
+                                title: "Memory",
+                                weight: 1,
+                                numeric: true
+                            }
+                        ]
+                        rows: [
+                            {
+                                cells: ["firefox", "38.4%", "2.1 GB"]
+                            },
+                            {
+                                cells: ["Hyprland", "12.1%", "384 MB"],
+                                selected: true
+                            },
+                            {
+                                cells: ["rust-analyzer", "9.7%", "1.8 GB"]
+                            },
+                            {
+                                cells: ["quickshell", "4.2%", "256 MB"]
+                            }
+                        ]
+                    }
+                }
+
+                K.Section {
+                    title: "Collapsibles"
+                    description: "A titled part that opens to show more."
+
+                    K.Grid {
+                        columns: 2
+                        gap: K.Tokens.space.s24
+
+                        K.Collapsible {
+                            title: "firefox · pid 4127"
+                            open: true
+
+                            K.Stack {
+                                gap: K.Tokens.space.s4
+
+                                K.Text {
+                                    text: "/usr/lib/firefox/firefox -contentproc"
+                                    style: K.Tokens.type.mono
+                                    color: K.Tokens.color.on_surface_variant
+                                }
+
+                                K.Text {
+                                    text: "kuba · sleeping · 92 threads · 2.1 GB"
+                                    style: K.Tokens.type.small
+                                    color: K.Tokens.color.on_surface_variant
+                                }
+                            }
+                        }
+
+                        K.Collapsible {
+                            title: "Hyprland · pid 1203"
+                            focused: true
+
+                            K.Text {
+                                text: "Hidden while closed."
+                                style: K.Tokens.type.small
+                                color: K.Tokens.color.on_surface_variant
                             }
                         }
                     }

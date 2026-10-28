@@ -19,6 +19,8 @@ use kubaos_core::setup::State;
 use kubaos_core::setup::finger_name;
 use kubaos_ui::Look;
 use kubaos_ui::color;
+use kubaos_ui::component::banner::BannerTone;
+use kubaos_ui::component::banner::banner;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::button;
 use kubaos_ui::component::card::card;
@@ -34,10 +36,11 @@ use kubaos_ui::component::field::State as FieldState;
 use kubaos_ui::component::field::field;
 use kubaos_ui::component::field::labelled;
 use kubaos_ui::component::field::note;
-use kubaos_ui::component::list::list_row;
 use kubaos_ui::component::list::scrolling_list;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::progress::spinner;
+use kubaos_ui::component::step::StepState;
+use kubaos_ui::component::step::step;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::icon::icon;
 use kubaos_ui::layout::Extent;
@@ -118,20 +121,17 @@ fn card_icon(id: CardId) -> Icon {
     }
 }
 
-/// A card's state as a chip: what it is and how much it matters.
+/// A card's state as a chip, as its row in the list shows it: to do plain, done tonal with a
+/// check, a reboot on the accent.
 fn state_chip<'a>(look: &Look, st: State) -> El<'a> {
-    let (kind, glyph, word) = state_words(st);
-    chip(look, kind, word, glyph, None, None)
-}
-
-fn state_words(st: State) -> (ChipKind, Option<Icon>, &'static str) {
-    match st {
-        State::Done => (ChipKind::Neutral, Some(Icon::CheckCircle), "Done"),
-        State::Needed => (ChipKind::Accent, None, "To do"),
-        State::Reboot => (ChipKind::Accent, Some(Icon::RestartAlt), "Reboot"),
+    let (kind, glyph, word) = match st {
+        State::Done => (ChipKind::Accent, Some(Icon::Check), "Done"),
+        State::Needed => (ChipKind::Neutral, None, "To do"),
+        State::Reboot => (ChipKind::Filled, Some(Icon::RestartAlt), "Reboot"),
         State::Waiting => (ChipKind::Neutral, Some(Icon::Schedule), "Waiting"),
         State::Absent => (ChipKind::Neutral, None, "Not here"),
-    }
+    };
+    chip(look, kind, word, glyph, None, None)
 }
 
 fn left<'a>(s: &'a Setup, look: &Look) -> El<'a> {
@@ -164,7 +164,7 @@ fn left<'a>(s: &'a Setup, look: &Look) -> El<'a> {
             .push(cards)
             .push(gap(Space::S12))
             .push(detecting)
-            .push(widget::Space::new().height(Length::Fill))
+            .push(gap(Space::S12))
             .push(online)
             .push(gap(Space::S16))
             .push(footer)
@@ -181,7 +181,7 @@ fn left<'a>(s: &'a Setup, look: &Look) -> El<'a> {
                 .map(|(key, what)| ui::hint(look, key, what)),
             )),
     ))
-    .width(f32::from(Size::Column.px()))
+    .width(side_width(s, look))
     .height(Length::Fill)
     .style(move |_theme| container::Style {
         background: Some(Background::Color(rail)),
@@ -190,25 +190,44 @@ fn left<'a>(s: &'a Setup, look: &Look) -> El<'a> {
     .into()
 }
 
-/// The cards, or a spinner while the first detection runs.
+/// The side panel's width: a third of the window, so the card's page beside it keeps the room, and
+/// never wider than a column of text. On a whole device pixel.
+fn side_width(s: &Setup, look: &Look) -> f32 {
+    let third = s.size.width / 3.0;
+    look.scale.snap(third.min(f32::from(Size::Column.px())))
+}
+
+/// The cards, or a spinner while the first detection runs. The cards take the room the panel has
+/// left and scroll in their well past it: their summaries wrap, so six of them can outgrow it.
 fn left_cards<'a>(s: &'a Setup, seconds: f32, look: &Look) -> El<'a> {
     let c = look.colors;
     match &s.status {
-        None => row(look, Space::S12)
-            .center()
-            .padding(Inset::xy(Space::S12, Space::S12))
-            .push(spinner(look, IconSize::S20, seconds, c.primary))
-            .push(text(
-                "Checking what this machine has…",
-                Type::Body,
-                c.on_surface_variant,
-            ))
-            .into(),
+        None => widget::container(
+            row(look, Space::S12)
+                .center()
+                .padding(Inset::xy(Space::S12, Space::S12))
+                .push(spinner(look, IconSize::S20, seconds, c.primary))
+                .push(text(
+                    "Checking what this machine has…",
+                    Type::Body,
+                    c.on_surface_variant,
+                )),
+        )
+        .height(Length::Fill)
+        .into(),
         Some(st) => scrolling_list(
-            st.cards.iter().map(|card| card_row(s, card, look)).collect::<Vec<_>>(),
+            st.cards
+                .iter()
+                .map(|card| {
+                    widget::container(card_row(s, card, look))
+                        .id(super::card_item(card.id))
+                        .into()
+                })
+                .collect::<Vec<_>>(),
             s.is_focused(SF::Cards),
         )
-        .height(Extent::Shrink)
+        .id(super::CARDS_SCROLL)
+        .height(Extent::Fill)
         .view(look),
     }
 }
@@ -272,21 +291,34 @@ fn left_footer<'a>(s: &'a Setup, look: &Look) -> El<'a> {
     }
 }
 
+/// A card as a step: to do, done, or waiting on a reboot, each its own look, the reboot on the
+/// accent. Its summary wraps, so it is read whole.
 fn card_row<'a>(s: &'a Setup, c: &'a CardStatus, look: &Look) -> El<'a> {
     let running = s.run.as_ref().is_some_and(|r| r.card == c.id && r.running());
-    let (kind, _, word) = if running {
-        (ChipKind::Accent, None, "Running")
-    } else {
-        state_words(c.state)
-    };
-    list_row(c.id.title())
+    let row = step(c.id.title())
         .subtitle(c.summary.clone())
         .icon(card_icon(c.id))
-        .chip(kind, word)
         .selected(c.id == s.sel)
-        .on_press(Message::Setup(super::Msg::Pick(c.id)))
-        .view(look)
+        .on_press_maybe(Some(Message::Setup(super::Msg::Pick(c.id))));
+    let row = if running {
+        row.words("Running", Some(Icon::ProgressActivity))
+    } else {
+        match c.state {
+            State::Done => row.state(StepState::Done),
+            State::Needed => row,
+            State::Reboot => row.state(REBOOT),
+            State::Waiting => row.words("Waiting", Some(Icon::Schedule)),
+            State::Absent => row.words("Not here", None),
+        }
+    };
+    row.view(look)
 }
+
+/// A card waiting on a reboot: the action it needs, on the accent.
+const REBOOT: StepState = StepState::Action {
+    label: "Reboot",
+    glyph: Icon::RestartAlt,
+};
 
 // -------------------------------------------------------------- detail --
 
@@ -309,6 +341,15 @@ fn detail<'a>(s: &'a Setup, look: &Look) -> El<'a> {
 
 fn para<'a>(look: &Look, words: impl Into<String>) -> El<'a> {
     text(words.into(), Type::Body, look.colors.on_surface_variant)
+}
+
+/// A warning: something that goes wrong unless it is done right, as a banner with its symbol, its
+/// first line and the rest under it.
+fn warning<'a>(look: &Look, glyph: Icon, head: &'a str, lines: Vec<String>) -> El<'a> {
+    let mut lines = lines.into_iter();
+    banner(BannerTone::Warning, glyph, head, lines.next().unwrap_or_default())
+        .paragraphs(lines)
+        .view(look)
 }
 
 /// The serious kind of note: no jokes, a card with its symbol and its first line.
@@ -464,7 +505,7 @@ fn explain<'a>(s: &'a Setup, c: &'a CardStatus, look: &Look) -> Vec<El<'a>> {
                  screen. The password always keeps working. Enroll a second key as the backup: keys get lost.",
             ));
             if st == State::Needed && (*pin == Some(false) || *fingerprints == Some(false)) {
-                v.push(notice(
+                v.push(warning(
                     look,
                     Icon::Key,
                     "The key needs its own setup first",
@@ -591,7 +632,7 @@ fn phone_explain<'a>(s: &Setup, link: &kubaos_core::phone::Status, st: State, lo
             lines.push(format!("The phone shows a key too. It must be the same: {key}."));
         }
         lines.push("Accept only a phone you're holding: other KDE Connect devices on this network can ask too.".into());
-        v.push(notice(look, Icon::Key, "A phone wants to pair", lines));
+        v.push(warning(look, Icon::Key, "A phone wants to pair", lines));
     } else if st == State::Waiting {
         v.push(notice(
             look,
@@ -711,7 +752,7 @@ fn folder_ticks<'a>(s: &'a Setup, look: &Look) -> El<'a> {
 fn mok_notice<'a>(st: State, look: &Look) -> El<'a> {
     let steps = "Enroll MOK → Continue → Yes → type the password → Reboot.";
     if st == State::Reboot {
-        notice(
+        warning(
             look,
             Icon::RestartAlt,
             "Reboot, then enroll the key on the blue screen",
@@ -726,7 +767,7 @@ fn mok_notice<'a>(st: State, look: &Look) -> El<'a> {
             ],
         )
     } else {
-        notice(
+        warning(
             look,
             Icon::Lock,
             "Secure Boot is on",

@@ -101,6 +101,8 @@ components/             blocks composed from KubaOS.Components
   Pill                  the bar's pill: a row of content, hover, click, right-click and wheel
   NavList               the keyboard list over K.ListRow rows
   PowerSlider           the power stops on a K.Slider
+  BadgedIcon            a bar symbol with a K.Badge on its corner
+  SkeletonRow           a two-line list row still being found, as K.Skeletons
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),

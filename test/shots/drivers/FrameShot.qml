@@ -13,11 +13,13 @@ import qs.modules.frame
 // notifications, or bar (nothing open). STATE puts the panel in a state, through the services
 // and public properties only, so the driver works with any version of the panel:
 //   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), bluetooth, bluetooth-code
-//                  (with the history cleared), keyboard
-//   clock: answer (a question typed into the search)
+//                  (with the history cleared), keyboard, scanning (a Wi-Fi scan that has found
+//                  nothing yet, the history cleared)
+//   clock: answer (a question typed into the search), settings
 //   sysmon: process (a process's details)
 //   wallpaper: settings
 //   osd: volume, brightness
+//   bar: traymenu (the network item's menu open)
 QtObject {
     id: driver
 
@@ -103,6 +105,20 @@ QtObject {
         }
         if (driver.panel === "controlcenter")
             driver.controlCenter(root);
+        if (driver.panel === "clock" && driver.state === "settings") {
+            const clock = driver.find(root, it => it.page !== undefined && typeof it.land === "function");
+            if (clock)
+                clock.page = "settings";
+            else
+                console.warn("shot: no clock popup found");
+        }
+        if (driver.panel === "bar" && driver.state === "traymenu") {
+            const tray = driver.find(root, it => typeof it.openMenu === "function");
+            if (tray)
+                tray.openMenu(1);
+            else
+                console.warn("shot: no tray found");
+        }
         driver.capture.start();
     }
 
@@ -115,8 +131,6 @@ QtObject {
         if (driver.state === "bluetooth" || driver.state === "bluetooth-code")
             cc.tab = 1;
         if (driver.state === "bluetooth-code") {
-            // The history cleared, so the tab has the room to show the prompt and its keycaps whole.
-            Notifs.clear();
             Bt.prompt = {
                 id: 1,
                 kind: "passkey",
@@ -154,6 +168,15 @@ QtObject {
             Sysmon.pendingPid = 4211;
         if (driver.panel === "wallpaper" && driver.state === "settings")
             Wallpapers.openSettings = true;
+        // A scan that has found nothing yet, its skeleton rows with the room to show: emptied
+        // before the frame exists, so no row is made and torn down again.
+        if (driver.panel === "controlcenter" && driver.state === "scanning")
+            Net.networks = [];
+        // The history cleared, so the tab has the room to show the passkey prompt and its keycaps
+        // whole, or a scan's rows; cleared before the frame exists, so no card is made and torn
+        // down again.
+        if (driver.panel === "controlcenter" && (driver.state === "bluetooth-code" || driver.state === "scanning"))
+            Notifs.clear();
         driver.frame = driver.frameComponent.createObject(null);
         driver.window = driver.windowOf(driver.frame);
         if (!driver.window) {

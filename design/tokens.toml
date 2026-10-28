@@ -96,7 +96,16 @@ control_lg = 48
 # A list row with one line, and with a title over a subtitle.
 row = 44
 row_two_line = 56
+# A table's row: a line of body text with 4 above and below, so a list of readings (the
+# system monitor's processes) stays dense and each row is still easy to hit.
+row_compact = 28
+# A menu's width: an item's symbol, its words and a shortcut's keycaps side by side.
+menu = 240
 chip = 24
+# A badge over an icon's corner: a count's pill, a line of label text tall, and
+# a dot, the size of a picked radio button's.
+badge = 16
+badge_dot = 8
 switch_width = 44
 switch_height = 24
 # The switch's knob off and on: it grows as it turns on, leaving 6 and 4 of
@@ -715,6 +724,10 @@ pairs = [
   { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },
   { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent" },
   { fg = "warning", bg = "surface", need = "text", use = "A reading close to its limit" },
+  { fg = "warning", bg = "surface_container_high", need = "graphic", use = "A warning banner's symbol and hairline" },
+  { fg = "primary", bg = "surface_container_high", need = "text", use = "An info banner's symbol and hairline, a Text button inside it" },
+  { fg = "error", bg = "error_container", need = "graphic", use = "A danger banner's symbol and hairline, and a danger progress bar's fill" },
+  { fg = "primary", bg = "error_container", need = "text", use = "A Text button inside a danger banner in QML" },
   { fg = "surface", bg = "on_surface", need = "text", use = "A toast, a hint's bubble: the inverse colours" },
   { fg = "on_surface", bg = "surface", need = "graphic", use = "An icon, the wordmark of the logo" },
   { fg = "on_surface_variant", bg = "surface", need = "graphic", use = "A muted icon" },
@@ -724,7 +737,7 @@ pairs = [
   { fg = "outline", bg = "surface", need = "graphic", use = "A field's, a checkbox's or a switch's outline" },
   { fg = "outline", bg = "surface_container_highest", need = "graphic", use = "An outline on the highest container" },
   { fg = "on_surface", bg = "surface_container", need = "text", use = "A pill of the bar" },
-  { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title in the Action panel, a chip" },
+  { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title in the Action panel, a chip, a done step's chip on a selected row" },
   { fg = "tertiary", bg = "surface", need = "text", use = "The clock's Copied line" },
   { fg = "on_surface", bg = "surface_container_lowest", need = "text", use = "The lock screen before its wallpaper loads" },
   { fg = "primary_container", bg = "surface_container_lowest", need = "large_text", use = "The 完了 hanko on Kōbō's done screen" },

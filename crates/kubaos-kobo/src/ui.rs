@@ -4,8 +4,8 @@
 //! # Owns
 //!
 //! - The look Kōbō draws with ([`look`]) and the iced theme under it ([`theme`]).
-//! - Key hints, the battery, the strength of a password, the note under a confirmation, a fact
-//!   beside its label, and the toast.
+//! - Key hints, the battery, the strength of a password, the note under a confirmation, and the
+//!   toast.
 //!
 //! # Not here
 //!
@@ -34,7 +34,6 @@ use kubaos_ui::layout::row;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
 use kubaos_ui::snap::centre_x;
-use kubaos_ui::text::line;
 use kubaos_ui::text::text;
 use kubaos_ui::tokens::IconSize;
 use kubaos_ui::tokens::Space;
@@ -144,29 +143,6 @@ pub fn confirm_note<'a>(look: &Look, original: &str, confirm: &str) -> Option<El
 /// The confirmation is wrong, not just unfinished.
 pub fn mismatched(original: &str, confirm: &str) -> bool {
     !confirm.is_empty() && confirm != original && !original.starts_with(confirm)
-}
-
-/// A fact beside its label: the label a quarter of the width, the value the rest.
-pub fn fact<'a>(look: &Look, label: &'a str, value: String) -> El<'a> {
-    let c = look.colors;
-    split(look, &[1, 3], Space::S8)
-        .push(text(label, Type::Small, c.on_surface_variant))
-        .push(text(value, Type::Body, c.on_surface))
-        .into()
-}
-
-/// [`fact`] with a second, quieter line under the value, in mono: a path, an email, a version,
-/// which break badly wrapped mid-token, so they get a line of their own.
-pub fn fact_with<'a>(look: &Look, label: &'a str, value: String, sub: String) -> El<'a> {
-    let c = look.colors;
-    split(look, &[1, 3], Space::S8)
-        .push(text(label, Type::Small, c.on_surface_variant))
-        .push(
-            stack(look, Space::S4)
-                .push(text(value, Type::Body, c.on_surface))
-                .push(line(sub, Type::Mono, c.on_surface_variant)),
-        )
-        .into()
 }
 
 /// The toast, if one shows: at the bottom, in the middle.

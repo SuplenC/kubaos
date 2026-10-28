@@ -8,6 +8,8 @@ QtObject {
     property string tooltipDescription
     property bool onlyMenu: false
     property bool hasMenu: true
+    // The app's menu: a stand-in with `entries`.
+    property QtObject menu: null
     property int status: 1
     property int category: 0
 

@@ -89,7 +89,12 @@ K.Stack {
                 notification: modelData
                 inWell: true
                 selected: ListView.isCurrentItem && ListView.view.activeFocus
+                onMenuRequested: at => menu.open(modelData, at)
             }
         }
+    }
+
+    NotificationMenu {
+        id: menu
     }
 }
