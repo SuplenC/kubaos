@@ -9,6 +9,7 @@
 //! - Recolouring and rasterising them (`recolour`, `raster`).
 //! - The hyprcursor and XCursor file formats (`hyprcursor`, `xcursor`, `zip`).
 //! - Building a theme directory and swapping it in whole (`theme`).
+//! - The design tokens the pointer is sized by (`tokens`, generated from `design/tokens.toml`).
 //!
 //! # Not here
 //!
@@ -26,6 +27,7 @@ pub mod recolour;
 pub mod settings;
 pub mod source;
 pub mod theme;
+mod tokens;
 pub mod xcursor;
 mod zip;
 

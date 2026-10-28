@@ -336,7 +336,7 @@ run = ["kubaos", "cursor", "size", "48"]
 
 [extensions.kubaos.actions.cursor-size]
 title = "Set cursor size"
-subtitle = "The pointer's size in pixels, 16 to 96"
+subtitle = "The pointer's size in pixels, 16 to 96 in steps of 4"
 icon = "input-mouse"
 keywords = ["pointer size", "mouse"]
 keyword = "cursor-size"

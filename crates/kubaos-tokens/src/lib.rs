@@ -7,7 +7,10 @@
 //!                                                                         ├▶ qml/KubaOS/Components/Symbols.qml
 //!                                                                         ├▶ config/{ghostty,foot,fuzzel}, config/tmux/colors.conf
 //!                                                                         ├▶ config/matugen/templates/{ghostty,foot.ini,tmux.conf,…}
-//!                                                                         └▶ (boot: to come)
+//!                                                                         ├▶ the Plymouth script's tokens
+//!                                                                         ├▶ GRUB's theme.txt
+//!                                                                         ├▶ Kōbō's done/neon.rs
+//!                                                                         └▶ kubaos-cursor's tokens.rs
 //! ```
 //!
 //! # Owns
@@ -20,8 +23,11 @@
 //! - The values: `design/tokens.toml`. Using them in iced: `kubaos-ui`; in QML,
 //!   `KubaOS.Components`.
 
+pub mod boot;
 pub mod contrast;
+pub mod cursor;
 pub mod model;
+pub mod neon;
 pub mod qml;
 pub mod rules;
 pub mod rust;

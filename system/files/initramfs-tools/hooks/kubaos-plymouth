@@ -6,7 +6,7 @@
 # plymouth hook only copies label-pango (which drags in pango, cairo and a
 # font package), so copy the freetype plugin here. In the initramfs there is
 # no fc-match, so the plugin loads /usr/share/fonts/Plymouth.ttf and
-# Plymouth-monospace.ttf: point them at the theme's Geist and JetBrains Mono,
+# Plymouth-monospace.ttf: point them at the theme's Geist and Geist Mono,
 # which the plymouth hook copies with the theme. Without the monospace one,
 # plymouthd 24.004 crashes in its console viewer (the text it shows instead
 # of fbcon) as soon as console output arrives, e.g. the passphrase prompt.
@@ -29,4 +29,13 @@ else
 fi
 mkdir -p "${DESTDIR}/usr/share/fonts"
 ln -sf "${theme}/Geist-Regular.ttf" "${DESTDIR}/usr/share/fonts/Plymouth.ttf"
-ln -sf "${theme}/JetBrainsMono-Regular.ttf" "${DESTDIR}/usr/share/fonts/Plymouth-monospace.ttf"
+# HAZARD: link a monospace font the theme has. A theme installed by an older
+# release carries JetBrains Mono instead of Geist Mono; a link to a font that
+# isn't there crashes plymouthd at the passphrase prompt.
+mono="${theme}/GeistMono-Regular.ttf"
+[ -f "${DESTDIR}${mono}" ] || mono="${theme}/JetBrainsMono-Regular.ttf"
+if [ -f "${DESTDIR}${mono}" ]; then
+  ln -sf "${mono}" "${DESTDIR}/usr/share/fonts/Plymouth-monospace.ttf"
+else
+  echo "W: kubaos-plymouth: no monospace font in ${theme}: plymouthd will crash at the passphrase prompt" >&2
+fi

@@ -13,6 +13,10 @@
 # Geist and Geist Mono (the curated release), Geist Mono's and Meslo's Nerd Fonts (the terminals'
 # font before they took the tokens'), Noto Color Emoji and DejaVu; and fuzzel's icons, the curated
 # Colloid and Papirus, the icon theme before it.
+#
+# The boot screens (test/shots/boot) take plymouthd with its X11 renderer in Xvfb, sandboxed by
+# bubblewrap; GRUB under OVMF in QEMU; and Bibata's sources at the release `home/theme.nix` pins,
+# for the pointer.
 {
   lib,
   writeShellApplication,
@@ -24,6 +28,19 @@
   mesa,
   imagemagick,
   python3,
+  fetchFromGitHub,
+  plymouth,
+  xvfb,
+  xdotool,
+  xwd,
+  bubblewrap,
+  fontconfig,
+  qemu_kvm,
+  grub2_efi,
+  OVMF,
+  xorriso,
+  mtools,
+  socat,
   git,
   coreutils,
   findutils,
@@ -123,11 +140,24 @@ let
       cp $a/scalable/$f.svg $out/
     done
   '';
+  # Bibata's sources, as `home/theme.nix` pins them for `kubaos cursor`.
+  bibata = fetchFromGitHub {
+    owner = "ful1e5";
+    repo = "Bibata_Cursor";
+    rev = "v2.0.7";
+    hash = "sha256-kIKidw1vditpuxO1gVuZeUPdWBzkiksO/q2R/+DUdEc=";
+  };
+  python = python3.withPackages (p: [ p.pillow ]);
   tools = [
     qt6.qtdeclarative
     sway-unwrapped
     imagemagick
-    python3
+    python
+    qemu_kvm
+    grub2_efi
+    xorriso
+    mtools
+    socat
     git
     coreutils
     findutils
@@ -184,6 +214,23 @@ writeShellApplication {
         hicolor-icon-theme
       ]
     }
+    export KUBAOS_SHOTS_PLYMOUTH=${plymouth}
+    export KUBAOS_SHOTS_XVFB=${xvfb}/bin/Xvfb
+    export KUBAOS_SHOTS_XDOTOOL=${xdotool}/bin/xdotool
+    export KUBAOS_SHOTS_XWD=${xwd}/bin/xwd
+    export KUBAOS_SHOTS_BWRAP=${bubblewrap}/bin/bwrap
+    # label-freetype asks this fc-match for a font; the initramfs has none, so the sandbox hides it.
+    export KUBAOS_SHOTS_FCMATCH=${fontconfig}/bin/fc-match
+    export KUBAOS_SHOTS_SH=${bash}/bin/bash
+    export KUBAOS_SHOTS_SANDBOX_PATH=${
+      lib.makeBinPath [
+        coreutils
+        bash
+      ]
+    }
+    export KUBAOS_SHOTS_GRUB=${grub2_efi}
+    export KUBAOS_SHOTS_OVMF=${OVMF.fd}/FV/OVMF.fd
+    export KUBAOS_SHOTS_BIBATA=${bibata}
     repo=$(git rev-parse --show-toplevel 2>/dev/null) || {
       echo "kubaos-shots: run me inside a KubaOS checkout" >&2
       exit 2
@@ -191,7 +238,7 @@ writeShellApplication {
     exec bash "$repo/test/shots/shots" "$@"
   '';
   meta = {
-    description = "Before/after screenshots of KubaOS's shell, Kōbō, the specimen and the terminals, diffed";
+    description = "Before/after screenshots of KubaOS's shell, Kōbō, the specimen, the terminals and the boot screens, diffed";
     mainProgram = "kubaos-shots";
   };
 }

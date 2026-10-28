@@ -446,3 +446,64 @@ fn a_pair_naming_no_role_is_refused() {
         }]
     );
 }
+
+/// The `index`th stroke of the mark, to edit.
+fn mark_stroke(root: &mut toml::Table, index: usize) -> &mut toml::Table {
+    table(root, &["neon", "mark"])
+        .get_mut("strokes")
+        .and_then(toml::Value::as_array_mut)
+        .and_then(|strokes| strokes.get_mut(index))
+        .and_then(toml::Value::as_table_mut)
+        .expect("neon.mark.strokes has the stroke")
+}
+
+#[test]
+fn a_strike_brighter_than_lit_is_refused() {
+    let found = violations(|t| {
+        let strike = table(t, &["neon"])
+            .get_mut("strike")
+            .and_then(toml::Value::as_array_mut);
+        strike.expect("neon.strike is a list")[3] = toml::Value::Float(1.5);
+    });
+
+    assert_eq!(found, vec![Violation::StrikeOutOfRange { index: 3, value: 1.5 }]);
+}
+
+#[test]
+fn a_mark_stroke_with_a_command_its_readers_lack_is_refused() {
+    let found = violations(|t| {
+        mark_stroke(t, 0).insert("path".into(), "M29 13 C17 33 1 2 3 4".into());
+    });
+
+    assert_eq!(found, vec![Violation::BadMarkPath { index: 0 }]);
+}
+
+#[test]
+fn a_mark_stroke_that_doesnt_start_with_a_move_is_refused() {
+    let found = violations(|t| {
+        mark_stroke(t, 5).insert("path".into(), "L90 11 L94 22".into());
+    });
+
+    assert_eq!(found, vec![Violation::BadMarkPath { index: 5 }]);
+}
+
+#[test]
+fn a_mark_stroke_missing_a_number_is_refused() {
+    let found = violations(|t| {
+        mark_stroke(t, 2).insert("path".into(), "M66 41 Q64.5 63 53".into());
+    });
+
+    assert_eq!(found, vec![Violation::BadMarkPath { index: 2 }]);
+}
+
+#[test]
+fn a_core_wider_than_its_tube_is_refused() {
+    let found = violations(|t| set(t, &["neon", "mark"], "core", 1.2));
+
+    assert_eq!(
+        found,
+        vec![Violation::BadMarkSize {
+            token: "neon.mark.core".into()
+        }]
+    );
+}

@@ -158,8 +158,8 @@
       );
 
       # `just shots` (test/shots/shots): before/after screenshots of the
-      # shell, Kōbō and the specimen for a design PR, with Qt, sway, Mesa and
-      # the fonts pinned here.
+      # shell, Kōbō, the specimen and the boot screens for a design PR, with
+      # their renderers and the fonts pinned here.
       apps = forAllSystems (pkgs: {
         shots = {
           type = "app";
@@ -169,7 +169,7 @@
               inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) geist-font colloid-orange;
             }
           );
-          meta.description = "Before/after screenshots of KubaOS's shell, Kōbō, the specimen and the terminals, diffed";
+          meta.description = "Before/after screenshots of KubaOS's shell, Kōbō, the specimen, the terminals and the boot screens, diffed";
         };
       });
 

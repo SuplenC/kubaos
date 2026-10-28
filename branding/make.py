@@ -1,25 +1,33 @@
 #!/usr/bin/env python3
 """Generates the KubaOS logo SVGs. No fonts: every glyph is a stroked path
-drawn on a grid here. Run ./render.sh afterwards for the PNGs."""
-import os
+drawn on a grid here. Run ./render.sh afterwards for the PNGs.
 
-# Roles from the default wallpaper's scheme, config/matugen/default-colors.json.
-AMBER = "#ffb779"   # primary
-CYAN = "#85cfff"    # tertiary
-INK = "#f0dfd4"     # on_surface
-NIGHT = "#19120b"   # surface
-DEEP = "#140d07"    # surface_container_lowest
+The mark's strokes, its tubes' widths and every colour are the design tokens'
+(design/tokens.toml, `[neon.mark]` and the dark palette), which Kōbō's done
+screen draws the same mark from."""
+import os
+import tomllib
+
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../design/tokens.toml"), "rb") as f:
+    TOKENS = tomllib.load(f)
+DARK = TOKENS["color"]["dark"]
+MARK = TOKENS["neon"]["mark"]
+
+AMBER = DARK["primary"]
+CYAN = DARK["cold"]
+INK = DARK["on_surface"]
+NIGHT = DARK["surface"]
+DEEP = DARK["surface_container_lowest"]
 
 # --- the mark: クバ in a 100x100 box ---------------------------------------
 # ク: a short tick, then one stroke that runs right and sweeps down-left.
-# バ: two diverging strokes; the dakuten are two cyan ticks, like a second
-# neon tube on the same sign.
-KU = ["M29 13 L17 33", "M24 24 H47 Q51 24 49.6 28 L46 39 Q38 66 14 83"]
-BA = ["M66 41 Q64.5 63 53 81", "M76.5 39 Q84 61 94 79"]
-DAKUTEN = ["M81 14 L85 25", "M90 11 L94 22"]
+# バ: two diverging strokes (both warm); the dakuten are two cold ticks, like a
+# second neon tube on the same sign.
+WARM = [s["path"] for s in MARK["strokes"] if s["tone"] == "warm"]
+DAKUTEN = [s["path"] for s in MARK["strokes"] if s["tone"] == "cold"]
 # Lit core of the neon tube.
-CORE_AMBER = "#ffe6cf"
-CORE_CYAN = "#dcf1ff"
+CORE_AMBER = DARK["primary_core"]
+CORE_CYAN = DARK["cold_core"]
 
 
 def strokes(paths, color, width):
@@ -30,15 +38,15 @@ def strokes(paths, color, width):
     )
 
 
-def mark(main=AMBER, accent=CYAN, width=9.5, glow=True):
+def mark(main=AMBER, accent=CYAN, width=MARK["width"], glow=True):
     """The glyphs, in a 100x100 coordinate space. With `glow`, drawn as neon:
     a soft halo, the tube, and a pale lit core."""
     g = ""
     if glow:
-        g += f'<g filter="url(#glow)" opacity="0.7">{strokes(KU + BA, main, width * 1.3)}{strokes(DAKUTEN, accent, width)}</g>'
-    g += strokes(KU + BA, main, width) + strokes(DAKUTEN, accent, width * 0.8)
+        g += f'<g filter="url(#glow)" opacity="0.7">{strokes(WARM, main, width * 1.3)}{strokes(DAKUTEN, accent, width)}</g>'
+    g += strokes(WARM, main, width) + strokes(DAKUTEN, accent, width * MARK["cold_width"])
     if glow:
-        g += strokes(KU + BA, CORE_AMBER, width * 0.22) + strokes(DAKUTEN, CORE_CYAN, width * 0.18)
+        g += strokes(WARM, CORE_AMBER, width * MARK["core"]) + strokes(DAKUTEN, CORE_CYAN, width * MARK["cold_core"])
     return g
 
 

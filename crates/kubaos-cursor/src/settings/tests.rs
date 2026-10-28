@@ -35,13 +35,14 @@ fn the_file_sets_the_style_and_the_size() {
 }
 
 #[test]
-fn an_unknown_style_or_a_size_out_of_range_is_an_error() {
+fn an_unknown_style_or_a_size_out_of_range_or_off_the_grid_is_an_error() {
     assert!(matches!(
         Settings::parse("style = \"neon\""),
         Err(SettingsError::Parse(_))
     ));
     assert!(matches!(Settings::parse("size = 8"), Err(SettingsError::Size(8))));
     assert!(matches!(Settings::parse("size = 200"), Err(SettingsError::Size(200))));
+    assert!(matches!(Settings::parse("size = 18"), Err(SettingsError::Size(18))));
 }
 
 #[test]

@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# cursor TREE OUT: the pointer of the checkout TREE, as `kubaos cursor` writes its XCursor theme,
+# into OUT as cursor-{dark,light}-{1,1.25,1.5,2}x.png: a sheet of the shapes, the dark and the
+# accent style a row each, on the dark or the light surface, each shape at the size an app at that
+# display scale gets from the theme.
+#
+# TREE's `kubaos` (built with cargo in TREE; CARGO_TARGET_DIR picks where) renders the theme into
+# a home of its own, from Bibata's pinned sources and a palette from TREE's design tokens, with an
+# emptied environment: no Hyprland, D-Bus or session reaches it, so it tells nothing to the
+# desktop. Run by `shots` (`just shots cursor`), which pins the tools in KUBAOS_SHOTS_*.
+set -euo pipefail
+
+tree=$1 out=$2
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+mkdir -p "$out/boot-logs"
+work=$(mktemp -d "${TMPDIR:-/tmp}/kubaos-cursor.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+
+(cd "$tree" && cargo build -q --release -p kubaos-cli) >"$out/boot-logs/cursor-build.log" 2>&1
+kubaos=${CARGO_TARGET_DIR:-$tree/target}/release/kubaos
+
+home=$work/home
+mkdir -p "$home/.local/state/theme"
+python3 -I "$here/cursor-palette.py" "$tree/design/tokens.toml" >"$home/.local/state/theme/cursor.toml"
+settings=$home/.config/kubaos/desktop/cursor/cursor.toml
+mkdir -p "$(dirname "$settings")"
+for style in dark accent; do
+  printf 'style = "%s"\nsize = 24\n' "$style" >"$settings"
+  env -i HOME="$home" PATH=/var/empty KUBAOS_CURSOR_SOURCE="$KUBAOS_SHOTS_BIBATA" \
+    "$kubaos" cursor apply --sync >>"$out/boot-logs/cursor-apply.log" 2>&1
+  cp -r "$home/.local/share/icons/KubaOS-Bibata/cursors" "$work/$style"
+done
+python3 -I "$here/cursor-sheet.py" "$tree/design/tokens.toml" "$work/dark" "$work/accent" "$out"

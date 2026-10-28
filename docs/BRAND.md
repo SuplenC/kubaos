@@ -35,11 +35,13 @@ The boot menu says **KubaOS Shinjuku** (the entry), "Advanced options for KubaOS
 
 | Where | Text |
 |---|---|
-| Label | Disk passphrase |
-| Hint | The one you set when you installed KubaOS. Enter unlocks. |
-| While checking | Unlocking... |
+| Placeholder | Disk passphrase |
+| Hint | The one you set when you installed KubaOS. `Enter` unlocks. |
+| While checking | Unlocking… |
 | Wrong passphrase | Wrong passphrase. Try again. |
-| Caps Lock | Caps Lock is on. |
+| Caps Lock | `Caps Lock` is on. |
+
+The keys are keycaps, as everywhere (docs/DESIGN.md, "Keys").
 
 How it's built: `docs/INSTALL-INTERNALS.md`, "Boot".
 

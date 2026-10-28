@@ -16,6 +16,7 @@ Pillow and numpy:
   python3 branding/neon.py
 """
 
+import tomllib
 from pathlib import Path
 
 import numpy as np
@@ -28,9 +29,11 @@ PNG = HERE / "png"
 PLY = REPO / "system/files/plymouth/kubaos"
 GRUB = REPO / "system/files/grub/kubaos"
 
-# surface_container_lowest of config/matugen/default-colors.json: the boot
+# surface_container_lowest of the dark palette (design/tokens.toml): the boot
 # splash's background, and what the cut-out is checked against.
-DEEP = (0x14, 0x0D, 0x07)
+with open(REPO / "design/tokens.toml", "rb") as f:
+    _deep = tomllib.load(f)["color"]["dark"]["surface_container_lowest"].lstrip("#")
+DEEP = tuple(int(_deep[i : i + 2], 16) for i in (0, 2, 4))
 
 # The photo's geometry, in the source photo's pixels (neon-sign-front.png,
 # 1536 wide); the master is scaled from it. Lit glass is anything brighter
@@ -70,8 +73,11 @@ DEAD_ALPHA = 0.16
 
 # Display sizes, as the width of the lit glass in pixels.
 PLYMOUTH_TUBES = 720
-GRUB_TUBES = 880
 SPLASH_TUBES = 860
+# GRUB's at its scale (design/tokens.toml, `boot.grub_scale`), smaller than
+# the splash's, so the menu fits under it on a 1080p screen.
+with open(REPO / "design/tokens.toml", "rb") as f:
+    GRUB_TUBES = 440 * tomllib.load(f)["boot"]["grub_scale"]
 
 
 def load_master() -> np.ndarray:

@@ -38,6 +38,8 @@ pub struct Tokens {
     /// Opacities laid over a colour role, by name.
     pub opacity: BTreeMap<String, f32>,
     pub shadow: BTreeMap<String, Shadow>,
+    pub neon: Neon,
+    pub boot: Boot,
     pub color: Colors,
     pub contrast: ContrastPairs,
     pub terminal: Terminal,
@@ -247,6 +249,64 @@ pub struct Shadow {
     pub y: u16,
     pub blur: u16,
     pub opacity: f32,
+}
+
+/// The neon sign: how a tube strikes, and the クバ mark drawn as tubes.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Neon {
+    /// A striking tube's brightness, 0 to 1, through even steps over `medium`.
+    pub strike: Vec<f32>,
+    pub mark: Mark,
+}
+
+/// The クバ mark: its strokes and how wide its tubes are, in its drawing's units.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Mark {
+    /// The drawing's side.
+    pub units: f32,
+    /// How far inside the drawing the strokes' coordinates start.
+    pub margin: f32,
+    /// A warm tube's width.
+    pub width: f32,
+    /// A cold tube's width, of a warm one's.
+    pub cold_width: f32,
+    /// A warm tube's core's width, of a warm tube's.
+    pub core: f32,
+    /// A cold tube's core's width, of a warm tube's.
+    pub cold_core: f32,
+    /// In the order they are written.
+    pub strokes: Vec<MarkStroke>,
+}
+
+/// One stroke of the mark.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MarkStroke {
+    /// SVG path data: absolute `M`, `L`, `H` and `Q` commands, each letter starting a word.
+    pub path: String,
+    pub tone: Tone,
+}
+
+/// A tube's colour family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Tone {
+    /// `primary`, with `primary_core` along its middle.
+    Warm,
+    /// `cold`, with `cold_core` along its middle.
+    Cold,
+}
+
+/// How the boot screens, which draw in device pixels, scale the tokens.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Boot {
+    /// The one scale GRUB's theme draws at: one of `rules.scales`.
+    pub grub_scale: f32,
+    /// The screen height in device pixels from which Plymouth draws at 2.
+    pub plymouth_2x_from: u16,
 }
 
 /// Where a symbol's drawing comes from: Tabler's outline icon of a name, or our own, described.

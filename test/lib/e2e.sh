@@ -165,7 +165,7 @@ CUR_THEME=$CUR_ICONS/KubaOS-Bibata
 CUR_SETTINGS=$USER_HOME/.config/kubaos/desktop/cursor/cursor.toml
 CUR_PALETTE=$USER_HOME/.local/state/theme/cursor.toml
 # cursor_sizes SIZES: waits up to 60 s for the background render to leave an
-# XCursor theme at SIZES ("24 36 48").
+# XCursor theme at SIZES ("24 30 36 48").
 cursor_sizes() {
   local _
   for _ in $(seq 120); do
@@ -236,7 +236,7 @@ PY
   done
   echo "ok   the spinner and the corners are in the accent's tones, no rainbow left"
 
-  cursor_sizes "24 36 48" || return 1
+  cursor_sizes "24 30 36 48" || return 1
   python3 -I - "$CUR_THEME/cursors" "$surface" <<'PY' || return 1
 import os, struct, sys
 d, fill = sys.argv[1], int(sys.argv[2].lstrip("#"), 16)
@@ -255,11 +255,11 @@ for i in range(ntoc):
     sizes.add(nominal)
     pixels = struct.unpack_from(f"<{w * h}I", data, pos + 36)
     opaque += sum(1 for p in pixels if p == 0xFF000000 | fill)
-if sizes != {24, 36, 48}:
-    sys.exit(f"FAIL cursors/left_ptr has sizes {sorted(sizes)}, not 24 36 48")
+if sizes != {24, 30, 36, 48}:
+    sys.exit(f"FAIL cursors/left_ptr has sizes {sorted(sizes)}, not 24 30 36 48")
 if not opaque:
     sys.exit(f"FAIL cursors/left_ptr has no pixel of the fill #{fill:06x}")
-print(f"ok   XCursor theme at 24 36 48, its aliases linked, left_ptr filled with {opaque} #{fill:06x} pixels")
+print(f"ok   XCursor theme at 24 30 36 48, its aliases linked, left_ptr filled with {opaque} #{fill:06x} pixels")
 PY
 
   expect_ok "kubaos cursor style accent" zrun 'kubaos cursor style accent' || return 1
@@ -268,11 +268,13 @@ PY
   cursor_svg_has "$surface" && { echo "FAIL left_ptr.svg still has the dark style's fill $surface"; return 1; }
   echo "ok   style accent: left_ptr filled $primary"
   expect_ok "kubaos cursor size 32" zrun 'kubaos cursor size 32' || return 1
-  cursor_sizes "32 48 64" || return 1
+  cursor_sizes "32 40 48 64" || return 1
   [[ $(zrun 'kubaos cursor show') == "style=accent size=32" ]] || { echo "FAIL kubaos cursor show: $(zrun 'kubaos cursor show')"; return 1; }
   rc=0; out="$(zrun 'kubaos cursor size 7' 2>&1)" || rc=$?
   ((rc == 2)) || { echo "FAIL kubaos cursor size 7 exited $rc, not 2: $out"; return 1; }
-  echo "ok   size 32: XCursor at 32 48 64; size 7 is refused"
+  rc=0; out="$(zrun 'kubaos cursor size 18' 2>&1)" || rc=$?
+  ((rc == 2)) || { echo "FAIL kubaos cursor size 18, off the grid, exited $rc, not 2: $out"; return 1; }
+  echo "ok   size 32: XCursor at 32 40 48 64; size 7 and size 18 are refused"
   expect_ok "kubaos cursor style classic" zrun 'kubaos cursor style classic' || return 1
   cursor_classic || { echo "FAIL style classic didn't leave the Bibata-Modern-Classic stub"; ls -la "$CUR_THEME"; return 1; }
   echo "ok   style classic: the theme inherits Bibata-Modern-Classic"
@@ -3053,6 +3055,7 @@ c_splash() {
     { echo "FAIL the kernel command line in system/files/grub/kubaos.cfg has no splash"; return 1; }
   echo "ok   poweroff and reboot start Plymouth in its shutdown and reboot modes, and the kernel line has splash"
   shutdown_splash_migration || return 1
+  boot_theme_migration || return 1
 
   install -d "$theme"
   install -m 0644 "$REPO"/system/files/plymouth/kubaos/* "$theme/"
@@ -3097,6 +3100,46 @@ shutdown_splash_migration() {
     return 1
   fi
   echo "ok   the shutdown-splash migration: Plymouth after user.slice, the waiter wanted and skipped with no plymouthd"
+}
+
+# The boot-theme-tokens system migration on a machine whose themes an older
+# release installed: the Plymouth theme with JetBrains Mono and no Geist Mono,
+# GRUB's theme with its old fonts. It installs both themes, Geist Mono and the
+# .pf2 fonts theme.txt names, and the hook links the monospace font the theme
+# has; in a container it leaves the initramfs and grub.cfg alone. Then a
+# second run, which changes nothing.
+boot_theme_migration() {
+  local mig out ply=/usr/share/plymouth/themes/kubaos grub=/boot/grub/themes/kubaos spec ttf name dest
+  mig="$(ls "$REPO"/migrations/system/*-boot-theme-tokens.sh)"
+  rm -rf "$ply" "$grub"
+  install -d "$ply" "$grub"
+  echo '# the theme of an older release' >"$ply/kubaos.script"
+  echo 'stand-in' >"$ply/JetBrainsMono-Regular.ttf"
+  echo 'desktop-color: "#000000"' >"$grub/theme.txt"
+
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig:"; echo "$out" | tail; return 1; }
+
+  cmp -s "$REPO/system/files/plymouth/kubaos/kubaos.script" "$ply/kubaos.script" ||
+    { echo "FAIL the migration left the older splash script"; return 1; }
+  cmp -s "$REPO/system/files/fonts/GeistMono-Regular.ttf" "$ply/GeistMono-Regular.ttf" ||
+    { echo "FAIL the migration didn't install Geist Mono into the splash theme"; return 1; }
+  cmp -s "$REPO/system/files/grub/kubaos/theme.txt" "$grub/theme.txt" ||
+    { echo "FAIL the migration left the older GRUB theme"; return 1; }
+  grep -q 'GeistMono-Regular.ttf' /etc/initramfs-tools/hooks/kubaos-plymouth ||
+    { echo "FAIL the initramfs hook doesn't link Geist Mono"; return 1; }
+  while IFS= read -r spec; do
+    IFS='|' read -r ttf _ _ name <<<"$spec"
+    dest="$grub/$name.pf2"
+    [[ -s $dest ]] || { echo "FAIL no $dest for $ttf, which theme.txt names"; return 1; }
+  done < <(bash -c 'source "$1/system/lib.sh"; grub_theme_fonts "$1/system/files/grub/kubaos/theme.txt"' _ "$REPO")
+  grep -q 'initramfs and grub.cfg stay as they are' <<<"$out" ||
+    { echo "FAIL in a container the migration went on to the initramfs:"; echo "$out" | tail -3; return 1; }
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig, run again:"; echo "$out" | tail; return 1; }
+  if grep -E '^\s+\+ |creating|replacing' <<<"$out"; then
+    echo "FAIL the boot-theme-tokens migration changed something on its second run (above)"
+    return 1
+  fi
+  echo "ok   the boot-theme-tokens migration: both themes, Geist Mono and GRUB's fonts, nothing on a second run"
 }
 
 # splash_mode MODE lit-at SECONDS lit | lit-by SECONDS | black-by SECONDS:

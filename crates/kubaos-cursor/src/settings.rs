@@ -25,6 +25,8 @@ use std::str::FromStr;
 
 use serde::Deserialize;
 
+use crate::tokens;
+
 /// How the pointer is coloured.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -80,6 +82,9 @@ pub const DEFAULT_SIZE: u32 = 24;
 pub const MIN_SIZE: u32 = 16;
 /// The largest size the settings take, Bibata's own largest XCursor size.
 pub const MAX_SIZE: u32 = 96;
+/// Every size the settings take is a multiple of this, the design's grid, so the pointer is whole
+/// device pixels at every display scale, as every other length on the desktop is.
+pub const SIZE_STEP: u32 = tokens::GRID;
 
 /// The cursor settings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -105,7 +110,7 @@ pub enum SettingsError {
     Read(#[source] io::Error),
     #[error("parsing the cursor settings")]
     Parse(#[source] toml::de::Error),
-    #[error("cursor size {0} is outside {MIN_SIZE}..={MAX_SIZE}")]
+    #[error("cursor size {0} isn't a multiple of {SIZE_STEP} from {MIN_SIZE} to {MAX_SIZE}")]
     Size(u32),
     #[error("writing the cursor settings")]
     Write(#[source] io::Error),
@@ -117,7 +122,7 @@ impl Settings {
     /// # Errors
     ///
     /// [`SettingsError::Parse`] for malformed TOML, an unknown key or style, and
-    /// [`SettingsError::Size`] for a size outside [`MIN_SIZE`]..=[`MAX_SIZE`].
+    /// [`SettingsError::Size`] for a size outside [`MIN_SIZE`]..=[`MAX_SIZE`] or off [`SIZE_STEP`].
     pub fn parse(text: &str) -> Result<Self, SettingsError> {
         let settings: Self = toml::from_str(text).map_err(SettingsError::Parse)?;
         check_size(settings.size)?;
@@ -152,15 +157,15 @@ pub fn set_style(path: &Path, style: Style) -> Result<(), SettingsError> {
 ///
 /// # Errors
 ///
-/// [`SettingsError::Size`] for a size outside [`MIN_SIZE`]..=[`MAX_SIZE`], else as in
-/// [`set_style`].
+/// [`SettingsError::Size`] for a size outside [`MIN_SIZE`]..=[`MAX_SIZE`] or off [`SIZE_STEP`],
+/// else as in [`set_style`].
 pub fn set_size(path: &Path, size: u32) -> Result<(), SettingsError> {
     check_size(size)?;
     set_value(path, "size", &size.to_string())
 }
 
 fn check_size(size: u32) -> Result<(), SettingsError> {
-    if (MIN_SIZE..=MAX_SIZE).contains(&size) {
+    if (MIN_SIZE..=MAX_SIZE).contains(&size) && size.is_multiple_of(SIZE_STEP) {
         Ok(())
     } else {
         Err(SettingsError::Size(size))

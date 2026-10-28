@@ -38,6 +38,7 @@ use crate::raster::Drawing;
 use crate::raster::RasterError;
 use crate::recolour::recolour;
 use crate::source::CANVAS;
+use crate::tokens;
 use crate::xcursor;
 
 /// Bumped whenever the files written for the same inputs change, so every machine rewrites its
@@ -91,10 +92,23 @@ pub fn xcursor_stamp(theme_stamp: &str, size: u32) -> String {
     format!("{theme_stamp}sizes {}\n", sizes.join(" "))
 }
 
-/// The XCursor sizes for the setting `size`: itself, and the multiples Hyprland and XWayland ask
-/// for on the laptop panel at scale 1.5 (1.5x, and 2x once rounded up).
+/// The XCursor sizes for the setting `size`: itself at every display scale the desktop supports, so
+/// an XWayland or GTK 3 app on any output gets a pointer drawn at its size rather than the nearest
+/// one scaled. A size on the grid is whole device pixels at every one of them.
 pub fn xcursor_sizes(size: u32) -> Vec<u32> {
-    let mut sizes = vec![size, size * 3 / 2, size * 2];
+    let mut sizes: Vec<u32> = tokens::SCALES
+        .iter()
+        .map(|&scale| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss,
+                reason = "A cursor of at most 96 px at a scale of at most 2 is exact in f32 and fits u32."
+            )]
+            let px = (size as f32 * scale).round() as u32;
+            px
+        })
+        .collect();
     sizes.dedup();
     sizes
 }

@@ -25,6 +25,7 @@
 
 mod art;
 mod mark;
+mod neon;
 mod shift;
 
 use std::cell::Cell;
@@ -107,10 +108,6 @@ const FRAME: Duration = Duration::from_micros(16_667);
 /// The longest the hum waits between redraws, near its turns.
 // design-allow(duration): how long a redraw may wait, not motion.
 const HUM_WAIT: Duration = Duration::from_millis(250);
-
-/// A tube striking: its brightness through ten even steps over `medium`, the boot splash's
-/// stutter (`system/files/plymouth/kubaos/kubaos.script`).
-const STRIKE: [f32; 10] = [0.6, 0.0, 0.9, 0.2, 0.0, 1.0, 0.4, 1.0, 0.8, 1.0];
 
 /// The page's jolt on impact, in logical pixels: the draft's, through `short`.
 const JOLT: [(f32, f32); 5] = [(0.0, 0.0), (1.0, 2.0), (-1.0, -1.0), (1.0, 0.0), (0.0, 0.0)];
@@ -262,7 +259,10 @@ impl Sequence {
             return 0.0;
         };
         let x = elapsed.as_secs_f32() / self.motion.duration(tokens::Duration::Medium).as_secs_f32();
-        STRIKE.get((x * STRIKE.len() as f32) as usize).copied().unwrap_or(1.0)
+        neon::STRIKE
+            .get((x * neon::STRIKE.len() as f32) as usize)
+            .copied()
+            .unwrap_or(1.0)
     }
 
     /// When the last tube has struck, and the hum starts.

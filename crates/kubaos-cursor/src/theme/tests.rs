@@ -84,11 +84,11 @@ fn the_xcursor_theme_has_every_size_and_frame_and_links_the_aliases() {
     assert_eq!(outcome, XcursorOutcome::Written);
     let cursors = s.theme.dir().join("cursors");
     let arrow = decode(&fs::read(cursors.join("left_ptr")).unwrap());
-    assert_eq!(arrow.iter().map(|i| i.nominal).collect::<Vec<_>>(), [24, 36, 48]);
+    assert_eq!(arrow.iter().map(|i| i.nominal).collect::<Vec<_>>(), [24, 30, 36, 48]);
     assert_eq!((arrow[0].xhot, arrow[0].yhot), (5, 2));
     assert_eq!(arrow[0].pixels[12 * 24 + 12], 0xff1e_0f0e);
     let wait = decode(&fs::read(cursors.join("watch")).unwrap());
-    assert_eq!(wait.len(), 3 * 2);
+    assert_eq!(wait.len(), 4 * 2);
     assert!(wait.iter().all(|i| i.delay_ms == 40));
     assert_eq!(fs::read_link(cursors.join("default")).unwrap(), Path::new("left_ptr"));
     assert_eq!(s.theme.xcursor_stamp(), Some(xcursor_stamp(&s.stamp, 24)));
@@ -138,9 +138,9 @@ fn the_classic_stub_only_inherits_bibata_modern_classic() {
 }
 
 #[test]
-fn the_xcursor_sizes_are_the_size_and_its_hidpi_multiples() {
-    assert_eq!(xcursor_sizes(24), [24, 36, 48]);
-    assert_eq!(xcursor_sizes(32), [32, 48, 64]);
+fn the_xcursor_sizes_are_the_size_at_every_display_scale() {
+    assert_eq!(xcursor_sizes(24), [24, 30, 36, 48]);
+    assert_eq!(xcursor_sizes(32), [32, 40, 48, 64]);
 }
 
 #[test]

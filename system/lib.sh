@@ -637,6 +637,84 @@ install_shutdown_splash() {
   boot_unit kubaos-shutdown-splash.service enable
 }
 
+PLY_THEME_DIR=/usr/share/plymouth/themes/kubaos
+GRUB_THEME_DIR=/boot/grub/themes/kubaos
+
+# install_dir SRC DEST: install_root_file for every file directly in SRC.
+install_dir() {
+  local f
+  for f in "$1"/*; do
+    [[ -f "$f" ]] || continue
+    install_root_file "$f" "$2/$(basename "$f")" "$(if [[ -x "$f" ]]; then echo 0755; else echo 0644; fi)"
+  done
+}
+
+# grub_theme_fonts THEME: the fonts THEME (a theme.txt) names, "<family> Regular <size>", one
+# `TTF|FAMILY|SIZE|PF2` line each, PF2 the .pf2 file's name without its extension. Dies on a
+# family no font in system/files/fonts carries.
+grub_theme_fonts() {
+  local -a names
+  local line family size ttf
+  mapfile -t names < <(grep -oE '"[A-Za-z ]+ Regular [0-9]+"' "$1" | tr -d '"' | sort -u)
+  for line in "${names[@]}"; do
+    size="${line##* }"
+    family="${line% Regular *}"
+    case "$family" in
+      Geist) ttf=Geist-Regular.ttf ;;
+      "Geist Medium") ttf=Geist-Medium.ttf ;;
+      "Geist Mono") ttf=GeistMono-Regular.ttf ;;
+      *) die "$1 names the font $line, and no font in $FILES_DIR/fonts is $family" ;;
+    esac
+    printf '%s|%s|%s|%s\n' "$ttf" "$family" "$size" "$(tr 'A-Z' 'a-z' <<<"${ttf%.ttf}")-$size"
+  done
+}
+
+# install_boot_theme: the Plymouth theme (the splash and the disk passphrase prompt) with the
+# fonts its label plugin and the initramfs hook use, and the GRUB theme with the .pf2 fonts its
+# theme.txt names. Sets BOOT_THEME_CHANGED=1 when a file of either changed, so the caller can
+# rebuild the initramfs and grub.cfg. 25-boot.sh runs it, and a migration on a machine whose theme
+# is older.
+#
+# HAZARD: install the fonts before the hook. The hook links Plymouth-monospace.ttf to the theme's
+# Geist Mono, and plymouthd crashes at the passphrase prompt without a monospace font.
+install_boot_theme() {
+  local f before after spec ttf family size name dest src
+  BOOT_THEME_CHANGED=0
+  before="$(boot_theme_state)"
+  install_dir "$FILES_DIR/plymouth/kubaos" "$PLY_THEME_DIR"
+  for f in Geist-Regular.ttf Geist-OFL.txt GeistMono-Regular.ttf; do
+    install_root_file "$FILES_DIR/fonts/$f" "$PLY_THEME_DIR/$f" 0644
+  done
+  install_root_file "$FILES_DIR/plymouth/conf/plymouthd.conf" /etc/plymouth/plymouthd.conf 0644
+  install_root_file "$FILES_DIR/initramfs-tools/hooks/kubaos-plymouth" /etc/initramfs-tools/hooks/kubaos-plymouth 0755
+
+  install_dir "$FILES_DIR/grub/kubaos" "$GRUB_THEME_DIR"
+  # Fonts: ASCII and Latin-1 only, so GRUB loads them fast on every boot. theme.txt names them
+  # "<family> <style> <size>"; -n sets the family, because Geist-Medium.ttf would otherwise also
+  # call itself "Geist Regular".
+  while IFS='|' read -r ttf family size name; do
+    dest="$GRUB_THEME_DIR/$name.pf2"
+    src="$FILES_DIR/fonts/$ttf"
+    # Rebuilt when missing or older than its TTF.
+    if [[ -f "$dest" && ! "$src" -nt "$dest" ]]; then
+      ok "$dest"
+    else
+      # grub-mkfont warns about every OpenType feature it doesn't use.
+      sudo_run grub-mkfont -n "$family" -s "$size" -r 0x20-0x7e,0xa0-0xff -o "$dest" "$src" \
+        2> >(grep -v 'unsupported font feature' >&2 || true)
+    fi
+  done < <(grub_theme_fonts "$FILES_DIR/grub/kubaos/theme.txt")
+  after="$(boot_theme_state)"
+  [[ "$before" == "$after" ]] || BOOT_THEME_CHANGED=1
+}
+
+# boot_theme_state: a line per file of the installed boot themes and the hook, with its size and
+# time, to tell whether install_boot_theme changed any.
+boot_theme_state() {
+  as_root find "$PLY_THEME_DIR" "$GRUB_THEME_DIR" /etc/initramfs-tools/hooks/kubaos-plymouth \
+    /etc/plymouth/plymouthd.conf -maxdepth 1 -type f -printf '%p %s %T@\n' 2>/dev/null | sort || true
+}
+
 # nix_parallel_builds: the Nix daemon runs as many builds at once as the
 # machine has cores (`max-jobs = auto` in /etc/nix/nix.conf), where Nix's
 # default is one. A release rebuilds KubaOS's crates, nine small builds that

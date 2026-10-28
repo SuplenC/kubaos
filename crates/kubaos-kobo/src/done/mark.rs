@@ -3,11 +3,13 @@
 //!
 //! # Owns
 //!
-//! - The strokes' paths, order and tones, their widths, and the glow's band and blur around them.
+//! - Flattening the strokes, their widths in pixels, and the glow's band and blur around them.
 //!
 //! # Not here
 //!
-//! - Where each stroke is at a moment: `super::Sequence`. The glow baked around them: `super::art`.
+//! - The strokes' paths, order and tones, and the tubes' widths: the tokens, `super::neon`, which
+//!   the logo's SVGs draw from too. Where each stroke is at a moment: `super::Sequence`. The glow
+//!   baked around them: `super::art`.
 
 use std::sync::LazyLock;
 
@@ -16,6 +18,8 @@ use iced::Point;
 use iced::widget::canvas::Path;
 use kubaos_ui::color::Colors;
 use kubaos_ui::tokens::Size;
+
+use super::neon;
 
 /// A tube's colour family: the warm amber of ク and バ, or the cold blue of the dakuten.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,45 +37,36 @@ impl Tone {
         }
     }
 
-    /// The tube's width in the drawing's units: the logo's (`branding/make.py`), the dakuten a
-    /// fifth thinner.
+    /// The tube's width in the drawing's units.
     fn width(self) -> f32 {
         match self {
-            Tone::Warm => 9.5,
-            Tone::Cold => 7.6,
+            Tone::Warm => neon::WIDTH,
+            Tone::Cold => neon::WIDTH * neon::COLD_WIDTH,
+        }
+    }
+
+    /// The core's width in the drawing's units.
+    fn core_width(self) -> f32 {
+        match self {
+            Tone::Warm => neon::WIDTH * neon::CORE,
+            Tone::Cold => neon::WIDTH * neon::COLD_CORE,
         }
     }
 }
 
-/// The strokes in the order a hand writes them: ク's tick and sweep, バ's two strokes, then the
-/// dakuten. The path data is `branding/make.py`'s, in its 120 unit drawing.
-const STROKES: [(&str, Tone); 6] = [
-    ("M29 13 L17 33", Tone::Warm),
-    ("M24 24 H47 Q51 24 49.6 28 L46 39 Q38 66 14 83", Tone::Warm),
-    ("M66 41 Q64.5 63 53 81", Tone::Warm),
-    ("M76.5 39 Q84 61 94 79", Tone::Warm),
-    ("M81 14 L85 25", Tone::Cold),
-    ("M90 11 L94 22", Tone::Cold),
-];
-
 /// How many strokes the mark has.
-pub const COUNT: usize = STROKES.len();
+pub const COUNT: usize = neon::STROKES.len();
 
-/// The logo's drawing is 120 units square, its strokes inside a 10 unit margin.
-const UNITS: f32 = 120.0;
-const MARGIN: f32 = 10.0;
 /// The glow is a band this many times the tube's width, blurred by [`GLOW_SIGMA`] units: the
 /// draft Kuba picked.
 const GLOW_WIDTH: f32 = 1.6;
 const GLOW_SIGMA: f32 = 6.0;
-/// The core's width, of the tube's: the logo's.
-const CORE: f32 = 0.22;
 /// Line pieces per quadratic curve: under a tenth of a pixel from the curve at 2×.
 const CURVE_PIECES: u16 = 24;
 
 /// Logical pixels per unit of the drawing.
 pub fn unit() -> f32 {
-    f32::from(Size::NeonMark.px()) / UNITS
+    f32::from(Size::NeonMark.px()) / neon::UNITS
 }
 
 /// One stroke of the mark, as a polyline in logical pixels from the sign-off's top left.
@@ -91,7 +86,7 @@ impl Stroke {
 
     /// The core's width in logical pixels.
     pub fn core_width(&self) -> f32 {
-        self.width() * CORE
+        self.tone.core_width() * unit()
     }
 
     /// The half width of the glow's band, and the blur over it, in logical pixels.
@@ -132,7 +127,7 @@ impl Stroke {
 /// Every stroke, in writing order.
 pub fn strokes() -> &'static [Stroke] {
     static ALL: LazyLock<Vec<Stroke>> = LazyLock::new(|| {
-        STROKES
+        neon::STROKES
             .iter()
             .map(|&(data, tone)| {
                 let points = flatten(data);
@@ -160,7 +155,7 @@ pub fn centre() -> Point {
 /// The polyline of an SVG path made of absolute `M`, `L`, `H` and `Q` commands, the only ones the
 /// logo's strokes use, in logical pixels. Each command letter starts a word.
 fn flatten(data: &str) -> Vec<Point> {
-    let to_px = |(x, y): (f32, f32)| Point::new((x + MARGIN) * unit(), (y + MARGIN) * unit());
+    let to_px = |(x, y): (f32, f32)| Point::new((x + neon::MARGIN) * unit(), (y + neon::MARGIN) * unit());
     let mut words = data.split_whitespace();
     let mut out = Vec::new();
     let mut at = (0.0, 0.0);
