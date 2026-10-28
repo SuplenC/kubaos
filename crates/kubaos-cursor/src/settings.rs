@@ -122,10 +122,15 @@ impl Settings {
     /// # Errors
     ///
     /// [`SettingsError::Parse`] for malformed TOML, an unknown key or style, and
-    /// [`SettingsError::Size`] for a size outside [`MIN_SIZE`]..=[`MAX_SIZE`] or off [`SIZE_STEP`].
+    /// [`SettingsError::Size`] for a size outside [`MIN_SIZE`]..=[`MAX_SIZE`]. A size in range but
+    /// off [`SIZE_STEP`], which a file written by hand or before the grid may hold, is taken to the
+    /// nearest step, as `config/hypr/env.lua` takes it, so the style still applies.
     pub fn parse(text: &str) -> Result<Self, SettingsError> {
-        let settings: Self = toml::from_str(text).map_err(SettingsError::Parse)?;
-        check_size(settings.size)?;
+        let mut settings: Self = toml::from_str(text).map_err(SettingsError::Parse)?;
+        if !(MIN_SIZE..=MAX_SIZE).contains(&settings.size) {
+            return Err(SettingsError::Size(settings.size));
+        }
+        settings.size = on_grid(settings.size);
         Ok(settings)
     }
 
@@ -162,6 +167,11 @@ pub fn set_style(path: &Path, style: Style) -> Result<(), SettingsError> {
 pub fn set_size(path: &Path, size: u32) -> Result<(), SettingsError> {
     check_size(size)?;
     set_value(path, "size", &size.to_string())
+}
+
+/// `size` at the nearest multiple of [`SIZE_STEP`], half up.
+fn on_grid(size: u32) -> u32 {
+    (size + SIZE_STEP / 2) / SIZE_STEP * SIZE_STEP
 }
 
 fn check_size(size: u32) -> Result<(), SettingsError> {

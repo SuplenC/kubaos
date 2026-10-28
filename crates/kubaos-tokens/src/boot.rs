@@ -240,7 +240,7 @@ fn length(tokens: &Tokens, parts: &[&str]) -> Option<u16> {
 }
 
 /// One `{{…}}` of GRUB's template: `color.ROLE` as `#rrggbb`, `font.STYLE` as the name of the
-/// font `system/25-boot.sh` renders for it, or a sum of lengths in device pixels at GRUB's scale.
+/// font `install_boot_theme` renders for it, or a sum of lengths in device pixels at GRUB's scale.
 fn grub_value(tokens: &Tokens, root: &Path, expr: &str) -> io::Result<String> {
     let unknown = || invalid(format!("{GRUB_TEMPLATE}: `{{{{{expr}}}}}` names nothing in the tokens"));
     if let Some(role) = expr.strip_prefix("color.") {
@@ -331,8 +331,9 @@ fn at_grub_scale(tokens: &Tokens, logical: u16) -> Option<i64> {
     ((device - device.round()).abs() < 1e-4).then_some(whole)
 }
 
-/// The family name `system/25-boot.sh` gives a style's font with `grub-mkfont -n`: the family,
-/// then its weight unless it is regular.
+/// The family name `install_boot_theme` (`system/lib.sh`) gives a style's font with
+/// `grub-mkfont -n`: the family, then its weight unless it is regular. `grub_theme_fonts` there
+/// maps each back to its file.
 fn grub_family(tokens: &Tokens, family: Family, weight: Weight) -> String {
     let name = tokens.font.family.name(family);
     match weight {

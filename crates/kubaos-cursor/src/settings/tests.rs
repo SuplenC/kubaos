@@ -35,14 +35,28 @@ fn the_file_sets_the_style_and_the_size() {
 }
 
 #[test]
-fn an_unknown_style_or_a_size_out_of_range_or_off_the_grid_is_an_error() {
+fn an_unknown_style_or_a_size_out_of_range_is_an_error() {
     assert!(matches!(
         Settings::parse("style = \"neon\""),
         Err(SettingsError::Parse(_))
     ));
     assert!(matches!(Settings::parse("size = 8"), Err(SettingsError::Size(8))));
     assert!(matches!(Settings::parse("size = 200"), Err(SettingsError::Size(200))));
-    assert!(matches!(Settings::parse("size = 18"), Err(SettingsError::Size(18))));
+}
+
+#[test]
+fn a_size_off_the_grid_in_the_file_is_taken_to_the_nearest_step() {
+    assert_eq!(Settings::parse("size = 18").unwrap().size, 20);
+    assert_eq!(Settings::parse("size = 29").unwrap().size, 28);
+    assert_eq!(Settings::parse("style = \"accent\"\nsize = 30\n").unwrap().style, Style::Accent);
+}
+
+#[test]
+fn setting_a_size_off_the_grid_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("cursor.toml");
+
+    assert!(matches!(set_size(&path, 18), Err(SettingsError::Size(18))));
 }
 
 #[test]

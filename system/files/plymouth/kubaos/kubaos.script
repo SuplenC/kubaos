@@ -501,6 +501,7 @@ fun set_background(light)
   c = tokens.color.surface_container_lowest;
   Window.SetBackgroundTopColor(c.r * light, c.g * light, c.b * light);
   Window.SetBackgroundBottomColor(c.r * light, c.g * light, c.b * light);
+  global.background_light = light;
 }
 
 # While any group is below full, the dead glass and every group draw as their
@@ -533,7 +534,8 @@ fun draw_sign(t)
   light = 1 - darkness(t);
   global.spr_lit.SetOpacity(0);
   global.spr_base.SetOpacity(light);
-  if (global.shutting_down)
+  # Setting the background redraws the whole screen, so only when it fades.
+  if (global.shutting_down && light != global.background_light)
     set_background(light);
   for (i = 0; i < GROUPS; i++)
     global.spr_group[i].SetOpacity(global.group_level[i]);

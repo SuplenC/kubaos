@@ -671,15 +671,19 @@ grub_theme_fonts() {
 
 # install_boot_theme: the Plymouth theme (the splash and the disk passphrase prompt) with the
 # fonts its label plugin and the initramfs hook use, and the GRUB theme with the .pf2 fonts its
-# theme.txt names. Sets BOOT_THEME_CHANGED=1 when a file of either changed, so the caller can
-# rebuild the initramfs and grub.cfg. 25-boot.sh runs it, and a migration on a machine whose theme
-# is older.
+# theme.txt names. Fonts neither theme uses any more go: Ubuntu's 00_header loads every .pf2 in
+# the theme's directory on every boot, and the plymouth hook copies the whole theme into every
+# initramfs. Sets BOOT_THEME_CHANGED=1 when a file of either changed. 25-boot.sh runs it, and a
+# migration on a machine whose theme is older.
 #
 # HAZARD: install the fonts before the hook. The hook links Plymouth-monospace.ttf to the theme's
 # Geist Mono, and plymouthd crashes at the passphrase prompt without a monospace font.
 install_boot_theme() {
-  local f before after spec ttf family size name dest src
+  local f before after specs ttf family size name dest src
+  local -a wanted=()
   BOOT_THEME_CHANGED=0
+  # Read before anything is installed: a font theme.txt names that no file is stops here.
+  specs="$(grub_theme_fonts "$FILES_DIR/grub/kubaos/theme.txt")"
   before="$(boot_theme_state)"
   install_dir "$FILES_DIR/plymouth/kubaos" "$PLY_THEME_DIR"
   for f in Geist-Regular.ttf Geist-OFL.txt GeistMono-Regular.ttf; do
@@ -687,12 +691,21 @@ install_boot_theme() {
   done
   install_root_file "$FILES_DIR/plymouth/conf/plymouthd.conf" /etc/plymouth/plymouthd.conf 0644
   install_root_file "$FILES_DIR/initramfs-tools/hooks/kubaos-plymouth" /etc/initramfs-tools/hooks/kubaos-plymouth 0755
+  # The monospace font of an older release, once Geist Mono is there to take its place.
+  if [[ -f $PLY_THEME_DIR/GeistMono-Regular.ttf ]] || ((DRY_RUN)); then
+    for f in JetBrainsMono-Regular.ttf JetBrainsMono-OFL.txt; do
+      if [[ -e $PLY_THEME_DIR/$f ]]; then
+        sudo_run rm -f "$PLY_THEME_DIR/$f"
+      fi
+    done
+  fi
 
   install_dir "$FILES_DIR/grub/kubaos" "$GRUB_THEME_DIR"
   # Fonts: ASCII and Latin-1 only, so GRUB loads them fast on every boot. theme.txt names them
   # "<family> <style> <size>"; -n sets the family, because Geist-Medium.ttf would otherwise also
   # call itself "Geist Regular".
   while IFS='|' read -r ttf family size name; do
+    wanted+=("$name.pf2")
     dest="$GRUB_THEME_DIR/$name.pf2"
     src="$FILES_DIR/fonts/$ttf"
     # Rebuilt when missing or older than its TTF.
@@ -703,7 +716,12 @@ install_boot_theme() {
       sudo_run grub-mkfont -n "$family" -s "$size" -r 0x20-0x7e,0xa0-0xff -o "$dest" "$src" \
         2> >(grep -v 'unsupported font feature' >&2 || true)
     fi
-  done < <(grub_theme_fonts "$FILES_DIR/grub/kubaos/theme.txt")
+  done <<<"$specs"
+  for f in "$GRUB_THEME_DIR"/*.pf2; do
+    if [[ -e $f && " ${wanted[*]} " != *" $(basename "$f") "* ]]; then
+      sudo_run rm -f "$f"
+    fi
+  done
   after="$(boot_theme_state)"
   [[ "$before" == "$after" ]] || BOOT_THEME_CHANGED=1
 }

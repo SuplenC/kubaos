@@ -19,13 +19,14 @@ source "$KUBAOS_DIR/system/lib.sh"
 
 install_boot_theme
 
-((BOOT_THEME_CHANGED)) || exit 0
 if in_container; then
   info "in a container: the initramfs and grub.cfg stay as they are"
   exit 0
 fi
-# The hook links the fonts the theme now carries; a failed rebuild leaves the
-# old initramfs in place and stops the update, which runs this again.
+# Rebuilt whatever install_boot_theme found: a rebuild that failed on an
+# earlier run, which stopped the update, left the files installed and the
+# initramfs as it was, and this run has to finish it. update-initramfs
+# replaces an image only once the new one is built.
 if command -v update-initramfs >/dev/null; then
   sudo_run update-initramfs -u -k all
 fi

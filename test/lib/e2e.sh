@@ -3105,9 +3105,9 @@ shutdown_splash_migration() {
 # The boot-theme-tokens system migration on a machine whose themes an older
 # release installed: the Plymouth theme with JetBrains Mono and no Geist Mono,
 # GRUB's theme with its old fonts. It installs both themes, Geist Mono and the
-# .pf2 fonts theme.txt names, and the hook links the monospace font the theme
-# has; in a container it leaves the initramfs and grub.cfg alone. Then a
-# second run, which changes nothing.
+# .pf2 fonts theme.txt names, removes the fonts neither uses, and the hook
+# links the monospace font the theme has; in a container it leaves the
+# initramfs and grub.cfg alone. Then a second run, which changes nothing.
 boot_theme_migration() {
   local mig out ply=/usr/share/plymouth/themes/kubaos grub=/boot/grub/themes/kubaos spec ttf name dest
   mig="$(ls "$REPO"/migrations/system/*-boot-theme-tokens.sh)"
@@ -3116,6 +3116,7 @@ boot_theme_migration() {
   echo '# the theme of an older release' >"$ply/kubaos.script"
   echo 'stand-in' >"$ply/JetBrainsMono-Regular.ttf"
   echo 'desktop-color: "#000000"' >"$grub/theme.txt"
+  echo 'stand-in' >"$grub/jetbrainsmono-regular-24.pf2"
 
   out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig:"; echo "$out" | tail; return 1; }
 
@@ -3127,11 +3128,14 @@ boot_theme_migration() {
     { echo "FAIL the migration left the older GRUB theme"; return 1; }
   grep -q 'GeistMono-Regular.ttf' /etc/initramfs-tools/hooks/kubaos-plymouth ||
     { echo "FAIL the initramfs hook doesn't link Geist Mono"; return 1; }
+  [[ ! -e $ply/JetBrainsMono-Regular.ttf ]] ||
+    { echo "FAIL the older release's JetBrains Mono is still in the splash theme"; return 1; }
   while IFS= read -r spec; do
     IFS='|' read -r ttf _ _ name <<<"$spec"
     dest="$grub/$name.pf2"
     [[ -s $dest ]] || { echo "FAIL no $dest for $ttf, which theme.txt names"; return 1; }
   done < <(bash -c 'source "$1/system/lib.sh"; grub_theme_fonts "$1/system/files/grub/kubaos/theme.txt"' _ "$REPO")
+  [[ ! -e $grub/jetbrainsmono-regular-24.pf2 ]] || { echo "FAIL an older release's GRUB font is left"; return 1; }
   grep -q 'initramfs and grub.cfg stay as they are' <<<"$out" ||
     { echo "FAIL in a container the migration went on to the initramfs:"; echo "$out" | tail -3; return 1; }
   out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig, run again:"; echo "$out" | tail; return 1; }

@@ -225,7 +225,7 @@ for kv in 'GRUB_TIMEOUT_STYLE=hidden' 'GRUB_TIMEOUT=1' 'GRUB_RECORDFAIL_TIMEOUT=
   grep -qxF "$kv" "$g" && ok "10-kubaos.cfg: $kv" || fail "10-kubaos.cfg lacks $kv"
 done
 for f in theme.txt logo.png select_c.png item_c.png terminal_box_c.png background.png hints.png \
-  geist-regular-24.pf2 geist-medium-28.pf2 geistmono-regular-24.pf2; do
+  geist-regular-18.pf2 geist-medium-21.pf2 geistmono-regular-18.pf2; do
   check "GRUB theme /boot/grub/themes/kubaos/$f" test -s "$R/boot/grub/themes/kubaos/$f"
 done
 grep -q -- '--skip-login --noissue' "$R/etc/systemd/system/getty@tty1.service.d/autologin.conf" &&

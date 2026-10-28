@@ -34,7 +34,7 @@ while read -r line; do
       exit 1
       ;;
   esac
-  name=$(tr 'A-Z ' 'a-z-' <<<"$family")-$size
+  name=$(tr 'A-Z' 'a-z' <<<"${ttf%.ttf}")-$size
   "$KUBAOS_SHOTS_GRUB/bin/grub-mkfont" -n "$family" -s "$size" -r 0x20-0x7e,0xa0-0xff \
     -o "$theme/$name.pf2" "$tree/system/files/fonts/$ttf" 2>/dev/null
   loadfonts+="loadfont /boot/grub/themes/kubaos/$name.pf2"$'\n'
