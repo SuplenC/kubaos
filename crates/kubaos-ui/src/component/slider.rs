@@ -28,6 +28,26 @@ use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
 
+/// An arrow key's step along a continuous slider: a twentieth, 5% of a volume.
+const NUDGE: f32 = 0.05;
+
+/// Which way the icon of a slider with stops moves it next.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    /// Toward the first stop: from Max Performance toward Super Saver.
+    Down,
+    /// Toward the last stop.
+    Up,
+}
+
+/// Where a drag at `value` stands with a sticky point at `point`: on the point while within
+/// `reach` of it, so the value holds there until pulled further. All three are fractions of the
+/// track.
+#[must_use]
+pub fn stick(value: f32, point: f32, reach: f32) -> f32 {
+    if (value - point).abs() <= reach { point } else { value }
+}
+
 /// Where a slider stands.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Value {
@@ -52,9 +72,61 @@ impl Value {
         }
     }
 
+    /// One arrow key's move, toward the end when `forward`: a twentieth of the track, or a stop.
+    /// It stops at either end.
+    #[must_use]
+    pub fn step(self, forward: bool) -> Value {
+        match self {
+            Value::Continuous(v) => {
+                let by = if forward { NUDGE } else { -NUDGE };
+                Value::Continuous((v + by).clamp(0.0, 1.0))
+            }
+            Value::Stop { index, count } => {
+                let last = count.saturating_sub(1);
+                let index = if forward {
+                    index.saturating_add(1).min(last)
+                } else {
+                    index.saturating_sub(1)
+                };
+                Value::Stop { index, count }
+            }
+        }
+    }
+
+    /// Home's move to the start, or End's to the end when `end`.
+    #[must_use]
+    pub fn end(self, end: bool) -> Value {
+        self.at(if end { 1.0 } else { 0.0 })
+    }
+
+    /// The icon's press on a slider with stops: one stop `direction`'s way, turning around at
+    /// either end, so presses walk the stops down and back up. Gives the stop and the direction
+    /// the next press takes; a slider without stops stays where it is.
+    #[must_use]
+    pub fn turn(self, direction: Direction) -> (Value, Direction) {
+        let Value::Stop { index, count } = self else {
+            return (self, direction);
+        };
+        if count < 2 {
+            return (self, direction);
+        }
+        let last = count - 1;
+        let direction = match direction {
+            Direction::Down if index == 0 => Direction::Up,
+            Direction::Up if index >= last => Direction::Down,
+            kept => kept,
+        };
+        let index = match direction {
+            Direction::Down => index.min(last) - 1,
+            Direction::Up => index + 1,
+        };
+        (Value::Stop { index, count }, direction)
+    }
+
     /// The value nearest `fraction` of the way along: itself for a continuous slider, the nearest
-    /// stop for one with stops.
-    fn at(self, fraction: f32) -> Value {
+    /// stop for one with stops, where a released drag settles.
+    #[must_use]
+    pub fn at(self, fraction: f32) -> Value {
         let fraction = fraction.clamp(0.0, 1.0);
         match self {
             Value::Continuous(_) => Value::Continuous(fraction),
@@ -275,3 +347,6 @@ impl<M> canvas::Program<M> for Track<'_, M> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests;
