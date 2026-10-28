@@ -392,11 +392,17 @@ Item {
                             enabled: !root.busy && root.layouts.length > 1
                             grabPermissions: PointerHandler.CanTakeOverFromAnything
                             cursorShape: Qt.ClosedHandCursor
+                            // HAZARD: how far the pointer has come since the press, not
+                            // `activeTranslation`, which counts from the move that passed the drag
+                            // threshold. A busy window gets a drag's moves merged into one, and
+                            // when that one move is the whole drag the row drops back where it was.
+                            readonly property real travel: centroid.scenePosition.y - centroid.scenePressPosition.y
+
                             onActiveChanged: {
                                 root.probe(`drag ${row.index} ${active}`);
                                 if (active) {
-                                    root.dragOffset = 0;
-                                    root.dropAt = row.index;
+                                    root.dragOffset = travel;
+                                    root.dropAt = root.landing(row.index, travel);
                                     root.dragFrom = row.index;
                                     return;
                                 }
@@ -413,11 +419,11 @@ Item {
                                 root.dropAt = -1;
                                 root.dragOffset = 0;
                             }
-                            onActiveTranslationChanged: {
+                            onTravelChanged: {
                                 if (!active)
                                     return;
-                                root.dragOffset = activeTranslation.y;
-                                root.dropAt = root.landing(row.index, activeTranslation.y);
+                                root.dragOffset = travel;
+                                root.dropAt = root.landing(row.index, travel);
                             }
                         }
                     }
