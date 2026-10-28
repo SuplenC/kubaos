@@ -50,9 +50,10 @@ test:
     test/run e2e
     install/test/engine-e2e
 
-# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced. `just test` runs the first two as cargo tests; `nix flake check` runs all three.
+# The design checks (docs/DESIGN.md, "Checks"): the lint for literal design values against design/lint-baseline.toml, every colour pair's WCAG contrast in both modes, every specimen page at every scale, light and dark, held to the geometry rules, then QML's parity with iced. `just test` runs the first three as cargo tests; `nix flake check` runs them all.
 design-check: && design-parity
     cargo run -q -p kubaos-design -- lint
+    cargo run -q -p kubaos-design -- contrast >/dev/null
     cargo run -q -p kubaos-specimen -- check
 
 # The components page drawn with KubaOS.Components, laid out headless by Qt (qml-specimen, from the flake) and held to the iced page's boxes, node for node, at every scale, light and dark. The flake sees the files git knows about: `git add` a new QML file first, or it is left out of the page.

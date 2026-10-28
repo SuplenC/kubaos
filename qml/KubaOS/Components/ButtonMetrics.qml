@@ -14,7 +14,7 @@ QtObject {
             return {
                 height: Tokens.size.control_sm,
                 label: Tokens.type.button_small,
-                icon: Tokens.icon.s16,
+                icon: Tokens.type.button_small.icon,
                 gap: Tokens.space.s4,
                 padding: Tokens.space.s12,
                 textPadding: Tokens.space.s12
@@ -23,7 +23,7 @@ QtObject {
             return {
                 height: Tokens.size.control_lg,
                 label: Tokens.type.button_large,
-                icon: Tokens.icon.s24,
+                icon: Tokens.type.button_large.icon,
                 gap: Tokens.space.s8,
                 padding: Tokens.space.s32,
                 textPadding: Tokens.space.s16
@@ -32,7 +32,7 @@ QtObject {
             return {
                 height: Tokens.size.control_md,
                 label: Tokens.type.button,
-                icon: Tokens.icon.s20,
+                icon: Tokens.type.button.icon,
                 gap: Tokens.space.s8,
                 padding: Tokens.space.s24,
                 textPadding: Tokens.space.s12

@@ -201,4 +201,4 @@ The polkit agent is in-shell but turned off (`Settings.polkitAgent: false`), and
 | `dot-session leave` (then `systemctl`, `loginctl`) | power menu: log out, reboot, shut down | this repo |
 | `systemctl` | power menu: suspend | system |
 | NetworkManager, BlueZ, PipeWire, UPower, power-profiles-daemon | services over D-Bus | apt |
-| Fonts: Geist, M PLUS 1, Material Symbols Rounded, JetBrainsMono Nerd Font | UI, Japanese accents, icons | Nix (`home/desktop.nix`) |
+| Fonts: Geist, Geist Mono, M PLUS 1 (the icons are KubaOS Symbols, SVGs in `KubaOS.Components`) | UI, machine text and keycaps, Japanese accents | Nix (`home/desktop.nix`) |

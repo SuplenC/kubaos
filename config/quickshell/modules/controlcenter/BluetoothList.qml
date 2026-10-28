@@ -21,7 +21,7 @@ Item {
         switch (p.kind) {
         case "display-passkey":
         case "display-pin-code":
-            return `Type this on ${p.name}, then Enter`;
+            return `Type this on ${p.name}`;
         case "confirm":
             return `Pair with ${p.name}? It should show this code`;
         case "authorize":
@@ -88,6 +88,12 @@ Item {
             }
         }
 
+        // Enter on a device that is pairing stops it, as its row's action.
+        K.KeyHints {
+            visible: root.prompt === null && Bt.devices.some(device => Bt.isPairing(device))
+            hints: [["Enter", "cancel the pairing"]]
+        }
+
         K.Stack {
             visible: root.prompt !== null
             fill: true
@@ -143,13 +149,24 @@ Item {
 
                 visible: root.asksCode
                 icon: "key"
-                placeholder: root.kind === "passkey" ? "Six digits, then Enter" : "The PIN, then Enter"
+                placeholder: root.kind === "passkey" ? "Six digits" : "The PIN"
                 Keys.onEscapePressed: {
                     Bt.answer(false, "");
                     list.forceActiveFocus();
                 }
                 Keys.onReturnPressed: root.submitCode()
                 Keys.onEnterPressed: root.submitCode()
+            }
+
+            // The code shown is typed on the device, then its own Enter.
+            K.KeyHints {
+                visible: root.kind === "display-passkey" || root.kind === "display-pin-code"
+                hints: [["Enter", `on ${root.prompt?.name ?? "it"}, after the code`]]
+            }
+
+            K.KeyHints {
+                visible: root.asksCode
+                hints: [["Enter", "pair"], ["Esc", "cancel"]]
             }
         }
     }
@@ -164,6 +181,9 @@ Item {
             id: list
 
             anchors.fill: parent
+            // The well's padding above the first row and below the last, scrolled with them.
+            topMargin: K.Tokens.space.s12
+            bottomMargin: K.Tokens.space.s12
             visible: count > 0
             model: ScriptModel {
                 values: Bt.devices

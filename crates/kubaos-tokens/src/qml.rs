@@ -62,6 +62,7 @@ impl Target for QmlTokens {
         out.line("    property var matugen: null");
         rules(&mut out, tokens);
         lengths(&mut out, tokens);
+        container(&mut out, tokens);
         types(&mut out, tokens);
         motion(&mut out, tokens);
         surfaces(&mut out, tokens);
@@ -269,6 +270,11 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             for v in &tokens.icon.sizes {
                 out.line(format!("        readonly property int s{v}: {v}"));
             }
+            out.line("        // A row's icon beside a title over a subtitle: it spans both lines.");
+            out.line(format!(
+                "        readonly property int two_line: {}",
+                tokens.icon.two_line
+            ));
         },
     );
     out.group("    ", Some("Fixed dimensions of components."), "size", |out| {
@@ -276,6 +282,60 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             out.line(format!("        readonly property int {name}: {value}"));
         }
     });
+}
+
+/// The container's padding by width, and the aspect ratios.
+fn container(out: &mut Writer, tokens: &Tokens) {
+    let container = &tokens.container;
+    let list = |values: &[u16]| values.iter().map(u16::to_string).collect::<Vec<_>>().join(", ");
+    out.group(
+        "    ",
+        Some(
+            "A page's or a panel's padding by its width: each padding applies from its width up. Tailwind's container on its default breakpoints; `padding(width)` picks one.",
+        ),
+        "container",
+        |out| {
+            out.line(format!(
+                "        readonly property list<int> from: [{}]",
+                list(&container.from)
+            ));
+            out.line(format!(
+                "        readonly property list<int> padding: [{}]",
+                list(&container.padding)
+            ));
+        },
+    );
+    out.blank();
+    out.line("    // The container's padding at `width`: the padding of the widest step `width` reaches.");
+    out.line("    function containerPadding(width: real): int {");
+    out.line("        let padding = tokens.container.padding[0];");
+    out.line("        for (let i = 0; i < tokens.container.from.length; i++) {");
+    out.line("            if (width >= tokens.container.from[i])");
+    out.line("                padding = tokens.container.padding[i];");
+    out.line("        }");
+    out.line("        return padding;");
+    out.line("    }");
+    out.blank();
+    out.line("    // The padding of a container as wide as `content` and its own padding: a panel that takes its");
+    out.line("    // content's width. The widest step the padded width reaches, so the padding is the one");
+    out.line("    // `containerPadding` gives the panel's own width.");
+    out.line("    function containerPaddingAround(content: real): int {");
+    out.line("        for (let i = tokens.container.from.length - 1; i > 0; i--) {");
+    out.line("            if (content + tokens.container.padding[i] * 2 >= tokens.container.from[i])");
+    out.line("                return tokens.container.padding[i];");
+    out.line("        }");
+    out.line("        return tokens.container.padding[0];");
+    out.line("    }");
+    out.group(
+        "    ",
+        Some("Aspect ratios, width to height, a picture's box keeps before and after it loads."),
+        "aspect",
+        |out| {
+            for (name, [w, h]) in &tokens.aspect {
+                out.line(format!("        readonly property list<int> {name}: [{w}, {h}]"));
+            }
+        },
+    );
 }
 
 fn weight_value(weight: Weight) -> u16 {
@@ -344,6 +404,7 @@ fn types(out: &mut Writer, tokens: &Tokens) {
                 out.line(format!("            readonly property string name: {name:?}"));
                 out.line(format!("            readonly property int size: {}", style.size));
                 out.line(format!("            readonly property int line: {}", style.line));
+                out.line(format!("            readonly property int icon: {}", style.icon));
                 out.line(format!(
                     "            readonly property int weight: {}",
                     weight_value(style.weight)

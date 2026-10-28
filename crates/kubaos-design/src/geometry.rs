@@ -31,6 +31,13 @@ pub fn rules(root: &Path) -> Result<Rules, Error> {
     Ok(Rules {
         grid: f32::from(tokens.rules.grid),
         spacing: tokens.space.values.iter().map(|&v| f32::from(v)).collect(),
+        container: tokens
+            .container
+            .from
+            .iter()
+            .zip(&tokens.container.padding)
+            .map(|(&from, &padding)| (f32::from(from), f32::from(padding)))
+            .collect(),
     })
 }
 

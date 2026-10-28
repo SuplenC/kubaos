@@ -913,7 +913,7 @@ fn the_keymap_lists_hints_say_space_picks_and_the_arrows_move() {
 
     assert!(hints.contains(&("↑ ↓", "move")), "{hints:?}");
     assert!(hints.contains(&("Space", "pick a layout")), "{hints:?}");
-    assert!(hints.contains(&("Shift Space", "make it the default")), "{hints:?}");
+    assert!(hints.contains(&("Shift+Space", "make it the default")), "{hints:?}");
     assert!(!hints.contains(&("↑ ↓", "pick")), "{hints:?}");
 }
 

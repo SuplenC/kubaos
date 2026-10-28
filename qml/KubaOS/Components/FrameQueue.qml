@@ -46,8 +46,9 @@ QtObject {
         const times = new Map();
         while (queue.waiting.length > 0) {
             const layout = queue.waiting.shift();
-            // A layout destroyed while it waited has no `laid` left.
-            if (!layout || !layout.laid)
+            // A layout destroyed while it waited has no `laid` left; one being destroyed still
+            // has it, but its functions are already gone.
+            if (!layout || !layout.laid || typeof layout.relayout !== "function")
                 continue;
             layout.laid.queued = false;
             const n = (times.get(layout) ?? 0) + 1;

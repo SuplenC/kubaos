@@ -36,7 +36,7 @@ use crate::probe::Fixed;
 use crate::snap::centre_x;
 use crate::text::line;
 use crate::text::text;
-use crate::tokens::IconSize;
+use crate::tokens;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
@@ -171,22 +171,19 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
             (
                 Some(c.error),
                 c.on_error,
-                color::alpha(c.on_error, Opacity::Subdued.value()),
+                color::alpha(c.on_error, Opacity::SubduedText.value()),
             )
         } else if self.selected {
             (
                 Some(c.secondary_container),
                 c.on_secondary_container,
-                color::alpha(c.on_secondary_container, Opacity::Subdued.value()),
+                color::alpha(c.on_secondary_container, Opacity::SubduedText.value()),
             )
         } else {
             (None, c.on_surface, c.on_surface_variant)
         };
-        let height = if self.subtitle.is_some() {
-            Size::RowTwoLine
-        } else {
-            Size::Row
-        };
+        let two_line = self.subtitle.is_some();
+        let height = if two_line { Size::RowTwoLine } else { Size::Row };
         let mut words = stack(look, Space::S4)
             .width(Extent::Fill)
             .push(line(self.title, Type::BodyStrong, main));
@@ -198,7 +195,13 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         // does.
         let mut content = row(look, Space::S12).center().width(Extent::Fill).height(Extent::Fill);
         if let Some(glyph) = self.icon {
-            content = content.push(icon(look, glyph, IconSize::S20, main));
+            // Beside a title over a subtitle, the icon spans both lines.
+            let size = if two_line {
+                tokens::TWO_LINE_ICON
+            } else {
+                Type::BodyStrong.icon()
+            };
+            content = content.push(icon(look, glyph, size, main));
         }
         content = content.push(words);
         for (kind, label) in self.chips {
@@ -209,11 +212,11 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         }
         if let Some(checked) = self.checked {
             content = content.push(if checked {
-                Element::from(icon(look, Icon::Check, IconSize::S20, main))
+                Element::from(icon(look, Icon::Check, Type::BodyStrong.icon(), main))
             } else {
                 widget::Space::new()
-                    .width(f32::from(IconSize::S20.px()))
-                    .height(f32::from(IconSize::S20.px()))
+                    .width(f32::from(Type::BodyStrong.icon().px()))
+                    .height(f32::from(Type::BodyStrong.icon().px()))
                     .into()
             });
         }

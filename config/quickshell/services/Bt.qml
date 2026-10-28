@@ -103,7 +103,7 @@ Singleton {
 
     function stateText(device: BluetoothDevice): string {
         if (isPairing(device))
-            return "Pairing… · Enter to cancel";
+            return "Pairing…";
         const battery = device.batteryAvailable ? ` · ${Math.round(device.battery * 100)}%` : "";
         if (device.paired || device.connected)
             return BluetoothDeviceState.toString(device.state) + battery;

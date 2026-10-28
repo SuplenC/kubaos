@@ -45,20 +45,60 @@ const modifiers = {
     control: "⌃",
     shift: "⇧",
     alt: "⌥",
-    super: "Super+",
-    meta: "Super+"
+    super: "Super",
+    meta: "Super"
 };
 
-// An Action's shortcut as Kotodama's key hints write keys: `ctrl+l` reads `⌃L`, as `⌃K Actions`
-// does, and `ctrl+shift+backspace` `⌃⇧⌫`.
-function shortcutLabel(shortcut) {
+// An Action's shortcut as its keys, one keycap each, written as Kotodama's key hints write them:
+// `ctrl+l` is `⌃` and `L`, as `⌃K Actions` is, and `ctrl+shift+backspace` `⌃`, `⇧` and `⌫`.
+function shortcutKeys(shortcut) {
     if (shortcut === "")
-        return "";
+        return [];
     return shortcut.split("+").map(part => {
         const name = part.toLowerCase();
         const known = modifiers[name] ?? keys[name];
         if (known !== undefined)
             return known;
         return part.length === 1 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1);
-    }).join("");
+    });
+}
+
+// The symbols that are a key each even when written together, as `KubaOS.Components`' `KeyHints`
+// splits them: the modifiers' and the arrows' glyphs, Return, Backspace and Delete.
+const glyphKeys = "⌃⇧⌥⌘↑↓←→↵⌫⌦";
+
+// The keys of a hint's combination, one keycap each: `⌃K` is `⌃` and `K`, `↑↓` is `↑` and `↓`,
+// `Ctrl+K` is `Ctrl` and `K`, `Left Alt` one key; a `+` alone is the plus key.
+function hintKeys(combination) {
+    if (combination === "+")
+        return ["+"];
+    const found = [];
+    for (const part of combination.split("+")) {
+        let word = "";
+        const push = text => {
+            const trimmed = text.trim();
+            if (trimmed !== "")
+                found.push(trimmed);
+        };
+        for (const c of part) {
+            if (glyphKeys.includes(c)) {
+                push(word);
+                push(c);
+                word = "";
+            } else {
+                word += c;
+            }
+        }
+        push(word);
+    }
+    return found;
+}
+
+// A line of Kotodama's hints, `↵ Open · Tab Enter app`, as `[keys, what]` pairs.
+function hints(text) {
+    return text.split(" · ").filter(part => part !== "").map(part => {
+        const space = part.indexOf(" ");
+        const combination = space < 0 ? part : part.slice(0, space);
+        return [hintKeys(combination), space < 0 ? "" : part.slice(space + 1)];
+    });
 }

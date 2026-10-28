@@ -9,7 +9,9 @@
 //!   ([`hint`]), the text field ([`field`]), the switch ([`switch`]), the slider ([`slider`]),
 //!   checkboxes and radio buttons ([`check`]), list rows and their well ([`list`]), chips
 //!   ([`chip`]), cards ([`card`]), dialogs ([`dialog`]), toasts ([`toast`]), progress
-//!   ([`progress`]), empty states ([`empty`]), errors with a hint and a log ([`error`]).
+//!   ([`progress`]), empty states ([`empty`]), errors with a hint and a log ([`error`]), keycaps
+//!   and key hints ([`keycap`]), pictures in a box of a fixed aspect ([`media`]) and pictures to
+//!   pick ([`picture`]).
 //!
 //! # Not here
 //!
@@ -24,8 +26,11 @@ pub mod empty;
 pub mod error;
 pub mod field;
 pub mod hint;
+pub mod keycap;
 mod layer;
 pub mod list;
+pub mod media;
+pub mod picture;
 pub mod progress;
 pub mod slider;
 pub mod switch;

@@ -59,7 +59,6 @@ use crate::probe::Fixed;
 use crate::scale::Scale;
 use crate::snap::centre;
 use crate::text as type_style;
-use crate::tokens::IconSize;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
@@ -259,10 +258,10 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
         };
         // The icon is drawn over the field, in a box 12 wider than itself on each side, so it
         // centres on the field's height on a whole device pixel.
-        let well = f32::from(Space::S12.px() * 2 + IconSize::S20.px());
+        let well = f32::from(Space::S12.px() * 2 + Type::BodyLarge.icon().px());
         let mark = widget::container(centre(
             look.scale,
-            icon(look, glyph, IconSize::S20, look.colors.on_surface_variant),
+            icon(look, glyph, Type::BodyLarge.icon(), look.colors.on_surface_variant),
         ))
         .width(well)
         .height(Length::Fill);
@@ -328,7 +327,7 @@ impl<M> Input<'_, M> {
     /// line in the middle of the field's height.
     fn text_bounds(&self, bounds: Rectangle) -> Rectangle {
         let left = if self.icon {
-            Space::S12.px() + IconSize::S20.px() + Space::S8.px()
+            Space::S12.px() + Type::BodyLarge.icon().px() + Space::S8.px()
         } else {
             Space::S12.px()
         };
@@ -549,7 +548,7 @@ impl<M> Widget<M, Theme, Renderer> for Input<'_, M> {
                 renderer.fill_paragraph(
                     state.placeholder.raw(),
                     Point::new(room.x, room.y),
-                    color::alpha(c.on_surface_variant, Opacity::Placeholder.value()),
+                    color::alpha(c.on_surface_variant, Opacity::PlaceholderText.value()),
                     clip,
                 );
             } else {

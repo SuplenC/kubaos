@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use image::RgbaImage;
 use kubaos_core::probe::WallpaperFile;
 use kubaos_core::probe::WallpaperSet;
+use kubaos_ui::tokens::Aspect;
 
 use crate::model;
 
@@ -24,8 +25,12 @@ use crate::model;
 /// original is shrunk to it.
 pub const WIDTH: u32 = 480;
 
-/// The shape every thumbnail is cropped to, as a width and a height in pixels: a screen's 16:10.
-pub const SHAPE: (u32, u32) = (16, 10);
+/// The shape every thumbnail is cropped to, as a width and a height in pixels: the wallpaper's
+/// aspect token, a screen's 16:10, which the card's `Media` box keeps before it arrives.
+pub const SHAPE: (u32, u32) = {
+    let [width, height] = Aspect::Wallpaper.ratio();
+    (width as u32, height as u32)
+};
 
 /// Where an installed system keeps the originals. The live ISO has none: they're in the
 /// squashfs, which isn't mounted before the install.

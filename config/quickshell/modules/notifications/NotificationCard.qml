@@ -10,9 +10,10 @@ import qs.services
 // hover; a thin line along the bottom shows the time left). In the control
 // center history it stays until dismissed.
 //
-// It fills its stack 8 in from the panel's edge, so its corners are the
-// panel's surface radius nested 8 in. A click opens what it is about; the
-// dismiss button and the actions take their own clicks.
+// As a popup it fills its stack 8 in from the panel's edge, so its corners are
+// the panel's surface radius nested 8 in; in the history's well, 12 in. A click
+// opens what it is about; the dismiss button and the actions take their own
+// clicks.
 K.Pressable {
     id: root
 
@@ -33,8 +34,10 @@ K.Pressable {
         return n.appIcon ? Quickshell.iconPath(n.appIcon, true) : "";
     }
     readonly property color fg: critical ? K.Tokens.color.on_error_container : K.Tokens.color.on_surface
-    readonly property color fgMuted: critical ? K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
-    readonly property real radius: K.Look.nested(K.Tokens.radius.surface, K.Tokens.space.s8)
+    readonly property color fgMuted: critical ? K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued_text) : K.Tokens.color.on_surface_variant
+    // In the control center's well: one of its rows, so 12 in from its surface.
+    property bool inWell: false
+    readonly property real radius: K.Look.nested(K.Tokens.radius.surface, root.inWell ? K.Tokens.space.s12 : K.Tokens.space.s8)
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property bool imageShown: root.iconSource !== "" && image.status === Image.Ready
 

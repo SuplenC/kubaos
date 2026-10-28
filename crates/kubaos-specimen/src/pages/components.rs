@@ -1,10 +1,14 @@
 //! The components page: every component of the closed set, each kind and size, resting, focused
 //! and disabled.
 
+use std::sync::LazyLock;
+
 use iced::Element;
 use iced::Length;
 use iced::widget;
+use iced::widget::image;
 use kubaos_ui::Look;
+use kubaos_ui::Mode;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::Preview;
@@ -30,13 +34,20 @@ use kubaos_ui::component::field::State;
 use kubaos_ui::component::field::field;
 use kubaos_ui::component::field::labelled;
 use kubaos_ui::component::field::note;
+use kubaos_ui::component::keycap::key_hints;
+use kubaos_ui::component::keycap::keycap;
 use kubaos_ui::component::list::empty_list;
 use kubaos_ui::component::list::list;
 use kubaos_ui::component::list::list_row;
+use kubaos_ui::component::media::Aspect;
+use kubaos_ui::component::media::media;
+use kubaos_ui::component::picture::NamePlace;
+use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::progress::spinner;
 use kubaos_ui::component::slider::Value;
 use kubaos_ui::component::slider::slider;
+use kubaos_ui::component::slider::slider_held;
 use kubaos_ui::component::switch::switch;
 use kubaos_ui::component::toast::toast;
 use kubaos_ui::icon::Icon;
@@ -50,6 +61,7 @@ use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
 use kubaos_ui::text::text;
 use kubaos_ui::tokens::IconSize;
+use kubaos_ui::tokens::Radius;
 use kubaos_ui::tokens::Size;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
@@ -92,9 +104,21 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(look, "Chips", None, chips(look)))
         .push(section(
             look,
+            "Keycaps and key hints",
+            Some("Keys drawn as keys, as tall as a line of body text so they sit inline with it, then what each does."),
+            keycaps(look),
+        ))
+        .push(section(
+            look,
             "Cards",
             Some("Picked cards take the accent, so their focus ring is the cold one."),
             cards(look),
+        ))
+        .push(section(
+            look,
+            "Media",
+            Some("Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then two pictures to pick, picked with its name under it and focused with its name over its foot."),
+            media_samples(look),
         ))
         .push(section(
             look,
@@ -360,8 +384,16 @@ fn sliders<'a>(look: &Look) -> Element<'a, Message> {
             .push(text(label, Type::Small, c.on_surface_variant))
             .into()
     };
-    grid(look, 4, Space::S32)
+    let held = stack(look, Space::S8)
+        .push(slider_held(
+            look,
+            Value::Continuous(0.62),
+            Some(Box::new(|_| Message::Sample) as Box<dyn Fn(Value) -> Message>),
+        ))
+        .push(text("Pressed: the fill lights up", Type::Small, c.on_surface_variant));
+    grid(look, 5, Space::S32)
         .push(sample(Value::Continuous(0.62), true, false, "Volume, 62%"))
+        .push(held)
         .push(sample(Value::Stop { index: 2, count: 5 }, true, false, "Five stops"))
         .push(sample(Value::Continuous(0.3), true, true, "Focused"))
         .push(sample(Value::Continuous(0.3), false, false, "Disabled"))
@@ -474,6 +506,77 @@ fn chips<'a>(look: &Look) -> Element<'a, Message> {
             Some(Message::Sample),
         ));
     line.into()
+}
+
+fn keycaps<'a>(look: &Look) -> Element<'a, Message> {
+    let c = look.colors;
+    let caps = row(look, Space::S8).center().extend(
+        ["Esc", "Tab", "Enter", "↵", "K", "Ctrl", "← →", "+"]
+            .into_iter()
+            .map(|key| keycap(look, key)),
+    );
+    let inline = row(look, Space::S4)
+        .center()
+        .push(text("Press", Type::Body, c.on_surface))
+        .push(keycap(look, "Space"))
+        .push(text("to pick a layout, or", Type::Body, c.on_surface))
+        .push(keycap(look, "Del"))
+        .push(text("to drop it.", Type::Body, c.on_surface));
+    stack(look, Space::S16)
+        .push(caps)
+        .push(key_hints(
+            look,
+            &[("Enter", "continue"), ("Ctrl+K", "actions"), ("Esc", "back")],
+        ))
+        .push(key_hints(
+            look,
+            &[("↵", "Open"), ("Tab", "Enter app"), ("Ctrl+K", "Actions")],
+        ))
+        .push(inline)
+        .into()
+}
+
+/// The picture the media samples load, in each mode: the accent fading into the cold accent, made
+/// once, since a handle made from pixels is uploaded again whenever it is made.
+static PICTURES: LazyLock<[image::Handle; 2]> = LazyLock::new(|| [Mode::Dark, Mode::Light].map(gradient));
+
+/// 16 by 10 pixels from `mode`'s accent on the left to its cold accent on the right.
+fn gradient(mode: Mode) -> image::Handle {
+    let palette = kubaos_ui::tokens::palette(mode);
+    let (from, to) = (palette.primary, palette.cold);
+    let (width, height) = (16_u32, 10_u32);
+    let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+    for _ in 0..height {
+        for x in 0..width {
+            let t = x as f32 / (width - 1) as f32;
+            let blend = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * t).round() as u8;
+            pixels.extend([blend(from.r, to.r), blend(from.g, to.g), blend(from.b, to.b), u8::MAX]);
+        }
+    }
+    image::Handle::from_rgba(width, height, pixels)
+}
+
+fn media_samples<'a>(look: &Look) -> Element<'a, Message> {
+    let picture = PICTURES[usize::from(look.mode == Mode::Light)].clone();
+    grid(look, 4, Space::S16)
+        .push(media(look, None, Aspect::Wallpaper, Radius::Control))
+        .push(media(look, Some(picture.clone()), Aspect::Wallpaper, Radius::Control))
+        .push(
+            picture_choice(Some(picture.clone()), Aspect::Wallpaper, "Shinjuku, night")
+                .picked(true)
+                .mark(Icon::Check, "Current")
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(
+            picture_choice(Some(picture), Aspect::Wallpaper, "Golden Gai")
+                .name(NamePlace::Over)
+                .badge(Icon::PlayArrow, "Video")
+                .focused(true)
+                .on_press(Message::Sample)
+                .view(look),
+        )
+        .into()
 }
 
 fn cards<'a>(look: &Look) -> Element<'a, Message> {

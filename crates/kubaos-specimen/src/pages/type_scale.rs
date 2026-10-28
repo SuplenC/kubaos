@@ -1,10 +1,13 @@
-//! The type page: every style, its numbers, and its line box.
+//! The type page: every style, its numbers, its line box, and the icon that sits beside it.
 
 use iced::Element;
 use iced::widget;
 use iced::widget::container;
 use kubaos_ui::Look;
 use kubaos_ui::color;
+use kubaos_ui::icon::Icon;
+use kubaos_ui::icon::icon;
+use kubaos_ui::layout::row;
 use kubaos_ui::layout::section;
 use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
@@ -38,7 +41,8 @@ fn sample(style: Type) -> &'static str {
         Type::Label => "Full name",
         Type::Mono => "/dev/nvme0n1 · 2 TB · 00:42",
         Type::Small => "At least 8 characters. Longer is better.",
-        Type::Caption => "Kōbō · Shinjuku 0.1 · Enter continue · Esc back",
+        Type::Caption => "Kōbō · Shinjuku 0.1 · what a key does",
+        Type::Keycap => "Ctrl",
     }
 }
 
@@ -58,9 +62,10 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
     let mut styles = split(look, &[1, 3], Space::S24);
     for style in Type::ALL {
         let meta = format!(
-            "{} / {} · {} · {}",
+            "{} / {} · icon {} · {} · {}",
             style.size(),
             style.line(),
+            style.icon().px(),
             weight(style.weight()),
             style.family().name()
         );
@@ -71,8 +76,13 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
                     .push(text(meta, Type::Mono, c.on_surface_variant)),
             )
             .push(
-                widget::container(text(sample(style), style, c.on_surface))
-                    .style(move |_theme| container::Style::default().background(line_box)),
+                row(look, Space::S8)
+                    .center()
+                    .push(icon(look, Icon::Star, style.icon(), c.on_surface))
+                    .push(
+                        widget::container(text(sample(style), style, c.on_surface))
+                            .style(move |_theme| container::Style::default().background(line_box)),
+                    ),
             );
     }
     let mut families = split(look, &[1, 3], Space::S24).center();
@@ -93,7 +103,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Styles",
-            Some("Largest first. The tint is each style's line box: its height is the line height."),
+            Some("Largest first. The tint is each style's line box: its height is the line height. The symbol before it is the icon size that sits beside the style."),
             styles,
         ))
         .push(section(look, "Families", None, families))

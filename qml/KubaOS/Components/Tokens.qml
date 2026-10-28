@@ -77,6 +77,8 @@ QtObject {
         readonly property int s24: 24
         readonly property int s32: 32
         readonly property int s48: 48
+        // A row's icon beside a title over a subtitle: it spans both lines.
+        readonly property int two_line: 24
     }
 
     // Fixed dimensions of components.
@@ -89,6 +91,7 @@ QtObject {
         readonly property int control_md: 40
         readonly property int control_sm: 32
         readonly property int dialog: 500
+        readonly property int keycap: 20
         readonly property int log: 232
         readonly property int panel: 384
         readonly property int progress: 8
@@ -106,6 +109,39 @@ QtObject {
         readonly property int switch_width: 44
         readonly property int thumbnail_height: 160
         readonly property int thumbnail_width: 256
+    }
+
+    // A page's or a panel's padding by its width: each padding applies from its width up.
+    // Tailwind's container on its default breakpoints; `padding(width)` picks one.
+    readonly property QtObject container: QtObject {
+        readonly property list<int> from: [0, 640, 1024]
+        readonly property list<int> padding: [16, 24, 32]
+    }
+
+    // The container's padding at `width`: the padding of the widest step `width` reaches.
+    function containerPadding(width: real): int {
+        let padding = tokens.container.padding[0];
+        for (let i = 0; i < tokens.container.from.length; i++) {
+            if (width >= tokens.container.from[i])
+                padding = tokens.container.padding[i];
+        }
+        return padding;
+    }
+
+    // The padding of a container as wide as `content` and its own padding: a panel that takes its
+    // content's width. The widest step the padded width reaches, so the padding is the one
+    // `containerPadding` gives the panel's own width.
+    function containerPaddingAround(content: real): int {
+        for (let i = tokens.container.from.length - 1; i > 0; i--) {
+            if (content + tokens.container.padding[i] * 2 >= tokens.container.from[i])
+                return tokens.container.padding[i];
+        }
+        return tokens.container.padding[0];
+    }
+
+    // Aspect ratios, width to height, a picture's box keeps before and after it loads.
+    readonly property QtObject aspect: QtObject {
+        readonly property list<int> wallpaper: [16, 10]
     }
 
     // Type families, by the role they play.
@@ -131,6 +167,7 @@ QtObject {
             readonly property string name: "hero"
             readonly property int size: 64
             readonly property int line: 72
+            readonly property int icon: 48
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -141,6 +178,7 @@ QtObject {
             readonly property string name: "hero_number"
             readonly property int size: 64
             readonly property int line: 72
+            readonly property int icon: 48
             readonly property int weight: 300
             readonly property string family: "Geist"
         }
@@ -150,6 +188,7 @@ QtObject {
             readonly property string name: "display"
             readonly property int size: 48
             readonly property int line: 56
+            readonly property int icon: 48
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -159,6 +198,7 @@ QtObject {
             readonly property string name: "title"
             readonly property int size: 32
             readonly property int line: 40
+            readonly property int icon: 32
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -168,6 +208,7 @@ QtObject {
             readonly property string name: "headline"
             readonly property int size: 24
             readonly property int line: 32
+            readonly property int icon: 32
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -177,6 +218,7 @@ QtObject {
             readonly property string name: "heading"
             readonly property int size: 20
             readonly property int line: 28
+            readonly property int icon: 24
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -186,6 +228,7 @@ QtObject {
             readonly property string name: "body_large"
             readonly property int size: 16
             readonly property int line: 24
+            readonly property int icon: 20
             readonly property int weight: 400
             readonly property string family: "Geist"
         }
@@ -195,6 +238,7 @@ QtObject {
             readonly property string name: "button_large"
             readonly property int size: 16
             readonly property int line: 24
+            readonly property int icon: 24
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -204,6 +248,7 @@ QtObject {
             readonly property string name: "subheading"
             readonly property int size: 16
             readonly property int line: 24
+            readonly property int icon: 24
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -213,6 +258,7 @@ QtObject {
             readonly property string name: "button"
             readonly property int size: 14
             readonly property int line: 24
+            readonly property int icon: 20
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -222,6 +268,7 @@ QtObject {
             readonly property string name: "body"
             readonly property int size: 14
             readonly property int line: 20
+            readonly property int icon: 20
             readonly property int weight: 400
             readonly property string family: "Geist"
         }
@@ -231,6 +278,7 @@ QtObject {
             readonly property string name: "body_strong"
             readonly property int size: 14
             readonly property int line: 20
+            readonly property int icon: 20
             readonly property int weight: 500
             readonly property string family: "Geist"
         }
@@ -240,6 +288,7 @@ QtObject {
             readonly property string name: "mono_large"
             readonly property int size: 14
             readonly property int line: 20
+            readonly property int icon: 20
             readonly property int weight: 400
             readonly property string family: "Geist Mono"
         }
@@ -249,6 +298,7 @@ QtObject {
             readonly property string name: "accent"
             readonly property int size: 13
             readonly property int line: 20
+            readonly property int icon: 16
             readonly property int weight: 500
             readonly property string family: "M PLUS 1"
         }
@@ -258,6 +308,7 @@ QtObject {
             readonly property string name: "button_small"
             readonly property int size: 12
             readonly property int line: 16
+            readonly property int icon: 16
             readonly property int weight: 600
             readonly property string family: "Geist"
         }
@@ -267,6 +318,7 @@ QtObject {
             readonly property string name: "label"
             readonly property int size: 12
             readonly property int line: 16
+            readonly property int icon: 16
             readonly property int weight: 500
             readonly property string family: "Geist"
         }
@@ -276,6 +328,7 @@ QtObject {
             readonly property string name: "mono"
             readonly property int size: 12
             readonly property int line: 16
+            readonly property int icon: 16
             readonly property int weight: 400
             readonly property string family: "Geist Mono"
         }
@@ -285,15 +338,27 @@ QtObject {
             readonly property string name: "small"
             readonly property int size: 12
             readonly property int line: 16
+            readonly property int icon: 16
             readonly property int weight: 400
             readonly property string family: "Geist"
         }
 
-        // Key hints, version lines, the smallest print.
+        // The key on a keycap, on the keycap's 20 px line so it centres in it.
+        readonly property QtObject keycap: QtObject {
+            readonly property string name: "keycap"
+            readonly property int size: 11
+            readonly property int line: 20
+            readonly property int icon: 16
+            readonly property int weight: 500
+            readonly property string family: "Geist Mono"
+        }
+
+        // Version lines, what a key hint's key does, the smallest print.
         readonly property QtObject caption: QtObject {
             readonly property string name: "caption"
             readonly property int size: 11
             readonly property int line: 16
+            readonly property int icon: 16
             readonly property int weight: 400
             readonly property string family: "Geist"
         }
@@ -346,17 +411,20 @@ QtObject {
         readonly property real focus: 0.12
         readonly property real frame: 0.94
         readonly property real glass: 0.8
+        readonly property real held: 0.4
         readonly property real hover: 0.08
         readonly property real locked: 0.5
         readonly property real log: 0.85
         readonly property real outline_soft: 0.55
         readonly property real panel_scrim: 0.2
         readonly property real placeholder: 0.55
+        readonly property real placeholder_text: 0.8
         readonly property real press: 0.14
         readonly property real scrim: 0.6
         readonly property real selection: 0.32
         readonly property real spinner_track: 0.18
         readonly property real subdued: 0.75
+        readonly property real subdued_text: 0.85
         readonly property real tint: 0.16
         readonly property real track: 0.9
         readonly property real well: 0.75

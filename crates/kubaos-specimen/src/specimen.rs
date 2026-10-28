@@ -24,10 +24,12 @@ use kubaos_ui::component::button::button;
 use kubaos_ui::component::button::icon_button;
 use kubaos_ui::component::chip::ChipKind;
 use kubaos_ui::component::chip::chip;
+use kubaos_ui::component::keycap::key_hints;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::Extent;
 use kubaos_ui::layout::Gap;
 use kubaos_ui::layout::Inset;
+use kubaos_ui::layout::container;
 use kubaos_ui::layout::divider;
 use kubaos_ui::layout::fill;
 use kubaos_ui::layout::page;
@@ -165,23 +167,29 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         Mode::Dark => (Mode::Light, Icon::LightMode, "Light mode"),
         Mode::Light => (Mode::Dark, Icon::DarkMode, "Dark mode"),
     };
-    row(look, Space::S16)
-        .center()
-        .padding(Inset::x(Space::S40).top(Space::S16).bottom(Space::S16))
-        .width(Extent::Fill)
-        .push(text("KubaOS design specimen", Type::Subheading, c.on_surface))
-        .push(tabs)
-        .push(fill())
-        .push(text("Tab, ← → pages · M mode", Type::Caption, c.on_surface_variant))
-        .push(chip(look, ChipKind::Neutral, scale, None, None, None::<Message>))
-        .push(
-            icon_button(glyph, label)
-                .kind(Kind::Text)
-                .size(ButtonSize::Sm)
-                .on_press(Message::Mode(other))
-                .view(look),
-        )
-        .into()
+    // A toolbar band: the container padding at the sides, as the page under it, and a small
+    // control's room above and below.
+    container(
+        row(look, Space::S16)
+            .center()
+            .padding(Inset::y(Space::S16))
+            .width(Extent::Fill)
+            .push(text("KubaOS design specimen", Type::Subheading, c.on_surface))
+            .push(tabs)
+            .push(fill())
+            .push(key_hints(
+                look,
+                &[("Tab", "next page"), ("← →", "pages"), ("M", "mode")],
+            ))
+            .push(chip(look, ChipKind::Neutral, scale, None, None, None::<Message>))
+            .push(
+                icon_button(glyph, label)
+                    .kind(Kind::Text)
+                    .size(ButtonSize::Sm)
+                    .on_press(Message::Mode(other))
+                    .view(look),
+            ),
+    )
 }
 
 /// Kōbō's scroller: no rail, a thin pill in the muted text colour, stronger under the pointer.

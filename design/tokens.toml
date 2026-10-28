@@ -76,6 +76,10 @@ full = true
 # keeps 2 units clear inside, Tabler's margin.
 [icon]
 sizes = [16, 20, 24, 32, 48]
+# A row's icon beside a title over a subtitle (`body_strong` over `small`, a
+# 40 block): it spans both lines, a step up from the title's own 20, so an
+# app's icon in the Command menu reads at the size of the two lines beside it.
+two_line = 24
 
 # Fixed dimensions of components, by name.
 [size]
@@ -124,6 +128,28 @@ slider_stop = 4
 # A scrollbar's thumb, a pill: thin, since the keyboard and the wheel do the scrolling and the
 # thumb only says where you are.
 scrollbar = 4
+# A keycap: as tall as a line of body text, so it sits inline with body and
+# caption text without making the line taller, and never narrower than tall,
+# so a one-letter key is square.
+keycap = 20
+
+# A page's or a panel's body: its padding on every side, by its own width.
+# Tailwind's container, `px-4 sm:px-6 lg:px-8`, on Tailwind's default
+# breakpoints: 16 under 640 (`sm`), 24 from 640, 32 from 1024 (`lg`). A
+# panel of the shell (384) takes 16; Kōbō's content pane, 32 on a 1080p
+# screen and 24 on a 1280 px one.
+# https://tailwindcss.com/docs/responsive-design
+[container]
+# The width, in logical pixels, each padding applies from.
+from = [0, 640, 1024]
+# The padding inside every edge at that width and up, from `[space]`.
+padding = [16, 24, 32]
+
+# Aspect ratios, width to height, a picture's box keeps before and after it
+# loads, so nothing around it moves when it arrives.
+[aspect]
+# A wallpaper: 16:10, as the screens it is picked for are.
+wallpaper = [16, 10]
 
 # Type families. Nothing else draws text; symbols are drawn, see [symbols].
 [font.family]
@@ -134,9 +160,17 @@ jp = "M PLUS 1"
 # Type styles: size and line height in logical pixels, a weight and a family
 # from above. A single-line control's label takes the control's content box as
 # its line height, so it centres on the grid.
+#
+# `icon` is the symbol that sits beside the style on its line: a component
+# takes its icon's size from its text's style, never a size of its own, so an
+# icon reads as heavy as the letters next to it. The box is about 1.4 times the
+# font size, held to an icon size no taller than the line, so an icon never
+# makes a line taller; its stroke is whole device pixels at every scale (see
+# `stroke.symbol`).
 [type.hero]
 size = 64
 line = 72
+icon = 48
 weight = "semibold"
 family = "sans"
 use = "Words at the hero size: Kōbō's welcome line, and nothing else."
@@ -144,6 +178,7 @@ use = "Words at the hero size: Kōbō's welcome line, and nothing else."
 [type.hero_number]
 size = 64
 line = 72
+icon = 48
 weight = "light"
 family = "sans"
 use = "Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the clock."
@@ -151,6 +186,7 @@ use = "Numbers at the hero size, light so a big figure doesn't shout: Kōbō's i
 [type.display]
 size = 48
 line = 56
+icon = 48
 weight = "semibold"
 family = "sans"
 use = "The heading of a full-screen moment other than the welcome: Kōbō's done screen."
@@ -158,6 +194,7 @@ use = "The heading of a full-screen moment other than the welcome: Kōbō's done
 [type.title]
 size = 32
 line = 40
+icon = 32
 weight = "semibold"
 family = "sans"
 use = "A screen's or page's title."
@@ -165,6 +202,7 @@ use = "A screen's or page's title."
 [type.headline]
 size = 24
 line = 32
+icon = 32
 weight = "semibold"
 family = "sans"
 use = "A dialog's title, a big number."
@@ -172,6 +210,7 @@ use = "A dialog's title, a big number."
 [type.heading]
 size = 20
 line = 28
+icon = 24
 weight = "semibold"
 family = "sans"
 use = "A section's title inside a page."
@@ -179,6 +218,7 @@ use = "A section's title inside a page."
 [type.subheading]
 size = 16
 line = 24
+icon = 24
 weight = "semibold"
 family = "sans"
 use = "A card's or an error's first line."
@@ -186,6 +226,7 @@ use = "A card's or an error's first line."
 [type.body_large]
 size = 16
 line = 24
+icon = 20
 weight = "regular"
 family = "sans"
 use = "A lede under a display line, the text in a field."
@@ -193,6 +234,7 @@ use = "A lede under a display line, the text in a field."
 [type.body]
 size = 14
 line = 20
+icon = 20
 weight = "regular"
 family = "sans"
 use = "Running text, explanations, toasts."
@@ -200,6 +242,7 @@ use = "Running text, explanations, toasts."
 [type.body_strong]
 size = 14
 line = 20
+icon = 20
 weight = "medium"
 family = "sans"
 use = "A list row's title, a value next to its label."
@@ -207,6 +250,7 @@ use = "A list row's title, a value next to its label."
 [type.button]
 size = 14
 line = 24
+icon = 20
 weight = "semibold"
 family = "sans"
 use = "A regular button's label, on a 24 px line so it centres in a 40 px control."
@@ -214,6 +258,7 @@ use = "A regular button's label, on a 24 px line so it centres in a 40 px contro
 [type.button_large]
 size = 16
 line = 24
+icon = 24
 weight = "semibold"
 family = "sans"
 use = "A large button's label, centred in a 48 px control."
@@ -221,6 +266,7 @@ use = "A large button's label, centred in a 48 px control."
 [type.button_small]
 size = 12
 line = 16
+icon = 16
 weight = "semibold"
 family = "sans"
 use = "A small button's label, centred in a 32 px control."
@@ -228,6 +274,7 @@ use = "A small button's label, centred in a 32 px control."
 [type.label]
 size = 12
 line = 16
+icon = 16
 weight = "medium"
 family = "sans"
 use = "A field's label, a chip, a quiet button."
@@ -235,6 +282,7 @@ use = "A field's label, a chip, a quiet button."
 [type.small]
 size = 12
 line = 16
+icon = 16
 weight = "regular"
 family = "sans"
 use = "A note under a field, a subtitle under a row's title."
@@ -242,13 +290,23 @@ use = "A note under a field, a subtitle under a row's title."
 [type.caption]
 size = 11
 line = 16
+icon = 16
 weight = "regular"
 family = "sans"
-use = "Key hints, version lines, the smallest print."
+use = "Version lines, what a key hint's key does, the smallest print."
+
+[type.keycap]
+size = 11
+line = 20
+icon = 16
+weight = "medium"
+family = "mono"
+use = "The key on a keycap, on the keycap's 20 px line so it centres in it."
 
 [type.accent]
 size = 13
 line = 20
+icon = 16
 weight = "medium"
 family = "jp"
 use = "The Japanese accent above a title."
@@ -256,6 +314,7 @@ use = "The Japanese accent above a title."
 [type.mono]
 size = 12
 line = 16
+icon = 16
 weight = "regular"
 family = "mono"
 use = "Logs, device paths, timings, keycaps."
@@ -263,6 +322,7 @@ use = "Logs, device paths, timings, keycaps."
 [type.mono_large]
 size = 14
 line = 20
+icon = 20
 weight = "regular"
 family = "mono"
 use = "Commands and keys shown as the subject of a line."
@@ -329,21 +389,34 @@ use = "Progress that tracks a real quantity, and spinners."
 hover = 0.08
 focus = 0.12
 press = 0.14
+# A fill lit while its control is held: a slider pressed or dragged, its fill
+# brightened toward the palette's bright end as a progress bar's glows. A
+# state layer's press is too faint on a fill already the accent; under the
+# pointer the fill takes `press`.
+held = 0.40
 # A disabled control's content, and its container.
 disabled_content = 0.38
 disabled_container = 0.10
 # A well's surface over the panel, and a soft hairline.
 well = 0.75
 outline_soft = 0.55
-# A field's placeholder, its selected text's highlight, and a read-only
+# A shape that is only a suggestion of one: a workspace's ghost, a scroller
+# at rest under the pointer. Its selected text's highlight, and a read-only
 # field's outline and surface.
 placeholder = 0.55
 selection = 0.32
 locked = 0.50
+# A field's placeholder text. It is text, so it keeps 4.5:1 (see
+# `[contrast]`): it reads as a hint by its muted role, not by fading out.
+placeholder_text = 0.80
 # An accent colour as a faint fill under itself: a tag, a done step.
 tint = 0.16
-# Secondary text on a selected row, over its container.
+# A picture that sits back while another is picked: the wallpaper picker's
+# thumbnails not under the keyboard.
 subdued = 0.75
+# Secondary text on a selected row or a checked tile, over its container: as
+# low as keeps 4.5:1 on every container a row is selected in, in both modes.
+subdued_text = 0.85
 # What darkens the screen behind a dialog.
 scrim = 0.60
 # A dialog's hairline in its tint, for a question and for a danger.
@@ -366,8 +439,10 @@ panel_scrim = 0.20
 # A panel's surface over the blurred wallpaper it floats on, so the photo shows through as
 # glass: Kōbō's panel.
 glass = 0.80
-# The darkest the wallpaper is dimmed behind full-screen text, so the words read over any photo:
-# Kōbō's welcome and done screens, from the text's side.
+# The furthest the wallpaper is turned toward the surface behind full-screen text, so the words
+# read over any photo: at 0.90 every text role keeps 4.5:1 over pure black in light and pure
+# white in dark. Kōbō's welcome and done screens, from the text's side; the lock screen, behind
+# its words.
 backdrop = 0.90
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
@@ -521,6 +596,61 @@ inverse_on_surface = "#ffeee2"
 inverse_primary = "#ffb779"
 # Amber dark enough for text on the light surfaces (6.1:1 on `surface`).
 warning = "#7a5900"
+
+# Every foreground role the front ends draw on a background role, and the
+# contrast it needs (WCAG 2.1 AA): `text` 4.5:1; `large_text` 3:1, for 24 px
+# and up or 19 px semibold and up; `graphic` 3:1, for icons, outlines and
+# controls that carry meaning. `opacity` names an `[opacity]` the foreground is
+# drawn at. `kubaos-tokens` refuses a pair that fails in either fallback
+# palette, and `kubaos-design contrast` lists them all with their ratios.
+# Decoration (a divider, a well's edge, a disabled control) carries no meaning
+# and isn't held to a minimum, as WCAG exempts it.
+[contrast]
+pairs = [
+  { fg = "on_surface", bg = "surface", need = "text", use = "Text on a page or a panel" },
+  { fg = "on_surface", bg = "surface_container_low", need = "text", use = "A row's title in a well" },
+  { fg = "on_surface", bg = "surface_container_highest", need = "text", use = "Text on the highest container" },
+  { fg = "on_surface_variant", bg = "surface", need = "text", use = "Secondary text, a key hint's label" },
+  { fg = "on_surface_variant", bg = "surface_container_low", need = "text", use = "A row's subtitle in a well" },
+  { fg = "on_surface_variant", bg = "surface_container", need = "text", use = "Secondary text on a container" },
+  { fg = "on_surface_variant", bg = "surface_container_high", need = "text", use = "Secondary text on a card" },
+  { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", use = "A keycap's key" },
+  { fg = "on_surface_variant", bg = "surface", need = "text", opacity = "placeholder_text", use = "A field's placeholder" },
+  { fg = "primary", bg = "surface", need = "text", use = "Accent text: an accent line, a detail, a Text button" },
+  { fg = "primary", bg = "surface_container_low", need = "text", use = "Accent text in a well" },
+  { fg = "on_primary", bg = "primary", need = "text", use = "A Filled button's label, today in the calendar" },
+  { fg = "on_primary", bg = "primary", need = "text", opacity = "subdued_text", use = "Secondary text on a checked tile" },
+  { fg = "on_primary_container", bg = "primary_container", need = "text", use = "Text on the primary container" },
+  { fg = "on_secondary_container", bg = "secondary_container", need = "text", use = "A Tonal button, a selected row's title" },
+  { fg = "on_secondary_container", bg = "secondary_container", need = "text", opacity = "subdued_text", use = "A selected row's subtitle" },
+  { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label" },
+  { fg = "on_error", bg = "error", need = "text", opacity = "subdued_text", use = "A selected danger row's subtitle" },
+  { fg = "error", bg = "surface", need = "text", use = "An invalid field's note, a failure" },
+  { fg = "on_error_container", bg = "error_container", need = "text", use = "A critical notification" },
+  { fg = "on_error_container", bg = "error_container", need = "text", opacity = "subdued_text", use = "A critical notification's body" },
+  { fg = "cold", bg = "surface", need = "text", use = "A holiday in the calendar, a cold chip's label" },
+  { fg = "on_cold", bg = "cold", need = "text", use = "Text on the cold accent" },
+  { fg = "warning", bg = "surface", need = "text", use = "A reading close to its limit" },
+  { fg = "surface", bg = "on_surface", need = "text", use = "A toast, a hint's bubble: the inverse colours" },
+  { fg = "on_surface", bg = "surface", need = "graphic", use = "An icon, the wordmark of the logo" },
+  { fg = "on_surface_variant", bg = "surface", need = "graphic", use = "A muted icon" },
+  { fg = "primary", bg = "surface", need = "graphic", use = "The focus ring, a switch that is on, the mark of the logo" },
+  { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider's or a progress bar's fill on its track" },
+  { fg = "cold", bg = "surface", need = "graphic", use = "The cold focus ring, the logo's dakuten" },
+  { fg = "outline", bg = "surface", need = "graphic", use = "A field's, a checkbox's or a switch's outline" },
+  { fg = "outline", bg = "surface_container_highest", need = "graphic", use = "An outline on the highest container" },
+  { fg = "on_surface", bg = "surface_container", need = "text", use = "A pill of the bar" },
+  { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title in the Action panel, a chip" },
+  { fg = "tertiary", bg = "surface", need = "text", use = "The clock's Copied line" },
+  { fg = "on_surface", bg = "surface_container_lowest", need = "text", use = "The lock screen before its wallpaper loads" },
+]
+# Roles a front end draws only as decoration, with no text or meaning drawn on
+# them: no pair is needed. `outline_variant`, dividers and soft edges;
+# `secondary`, a faint tint under a group of workspaces; `shadow` and `scrim`;
+# `cold_container` and `surface_bright`, the segments of Kōbō's partition bar,
+# which its legend names. `kubaos-design contrast` fails on a role drawn with
+# that is in no pair and not here.
+decorative = ["cold_container", "outline_variant", "scrim", "secondary", "shadow", "surface_bright"]
 
 # KubaOS Symbols: every symbol Kōbō and the shell draw, by the Material
 # Symbols name it replaces. Each is Tabler's outline icon of that name

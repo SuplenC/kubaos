@@ -222,7 +222,7 @@ K.Stack {
     K.Text {
         text: root.error !== "" ? root.error : Time.problem !== "" ? Time.problem : `Kept in ${UserLayer.shown("clock", "clock.toml")}`
         style: K.Tokens.type.small
-        color: root.error !== "" || Time.problem !== "" ? K.Tokens.color.error : K.Tokens.color.outline
+        color: root.error !== "" || Time.problem !== "" ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
     }
 
     function addZone(): void {

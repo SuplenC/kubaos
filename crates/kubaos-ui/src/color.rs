@@ -83,6 +83,23 @@ impl Contrast {
     }
 }
 
+impl From<tokens::Need> for Contrast {
+    fn from(need: tokens::Need) -> Self {
+        match need {
+            tokens::Need::Text => Contrast::Text,
+            tokens::Need::LargeText => Contrast::LargeText,
+            tokens::Need::Graphic => Contrast::Graphic,
+        }
+    }
+}
+
+/// `pair`'s contrast ratio in `colors`, its foreground drawn at its opacity over its background.
+pub fn pair_ratio(pair: &tokens::ContrastPair, colors: &Colors) -> f32 {
+    let bg = pair.bg.of(colors);
+    let fg = alpha(pair.fg.of(colors), pair.opacity.map_or(1.0, tokens::Opacity::value));
+    contrast_ratio(over(fg, bg), bg)
+}
+
 /// WCAG 2.1's contrast ratio of two opaque colours, 1 to 21.
 pub fn contrast_ratio(a: Color, b: Color) -> f32 {
     let (la, lb) = (luminance(a), luminance(b));

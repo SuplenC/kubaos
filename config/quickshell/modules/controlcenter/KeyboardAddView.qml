@@ -121,6 +121,9 @@ Item {
             id: matchList
 
             anchors.fill: parent
+            // The well's padding above the first row and below the last, scrolled with them.
+            topMargin: K.Tokens.space.s12
+            bottomMargin: K.Tokens.space.s12
             visible: view.entered && count > 0
             vimKeys: false
             fieldKeys: true

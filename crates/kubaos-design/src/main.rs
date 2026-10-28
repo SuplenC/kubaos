@@ -1,4 +1,5 @@
-//! `kubaos-design`: the design lint and the geometry check of frames from any toolkit.
+//! `kubaos-design`: the design lint, the geometry check of frames from any toolkit, and the
+//! contrast of the colour pairs.
 //!
 //! ```text
 //! kubaos-design lint [--root DIR]            exit 1 when a file is over or under its baseline
@@ -6,6 +7,7 @@
 //! kubaos-design baseline [--root DIR]        shrink the baseline to what the lint finds
 //! kubaos-design baseline --init [--root DIR] write the first baseline, when git never had one
 //! kubaos-design geometry FILE… [--root DIR]  exit 1 when a frame breaks a geometry rule
+//! kubaos-design contrast [--root DIR]        exit 1 when a colour pair is under its WCAG minimum
 //! ```
 //!
 //! # Owns
@@ -35,6 +37,7 @@ const USAGE: &str = "\
 usage: kubaos-design lint [--all] [--root DIR]
        kubaos-design baseline [--init] [--root DIR]
        kubaos-design geometry FILE... [--root DIR]
+       kubaos-design contrast [--root DIR]
 
 lint      literal colours, sizes, spacing, radii, durations and fonts, and the toolkits' own
           controls, in QML and Rust UI code; fail when a file has more or fewer than
@@ -42,6 +45,8 @@ lint      literal colours, sizes, spacing, radii, durations and fonts, and the t
 baseline  lower design/lint-baseline.toml to what the lint finds; it never raises a count.
           --init writes it from what the lint finds, only when git has never had one
 geometry  check frames (JSON, one or an array per file) against the geometry rules
+contrast  every foreground and background pair in design/tokens.toml, in both modes, with its
+          contrast ratio; fail when one is under its WCAG 2.1 AA minimum
 
 DIR is the repo's root; by default the nearest directory up from here holding design/tokens.toml.";
 
@@ -70,6 +75,7 @@ fn main() -> ExitCode {
         ["baseline"] => shrink(&root),
         ["baseline", "--init"] => init(&root),
         ["geometry", files @ ..] if !files.is_empty() => geometry(&root, files),
+        ["contrast"] => contrast(&root),
         _ => return usage(),
     };
     match result {
@@ -171,6 +177,58 @@ fn init(root: &Path) -> Result<bool, Error> {
         baseline::BASELINE_PATH
     );
     Ok(true)
+}
+
+/// Every contrast pair of the tokens with its ratio in each mode, and whether all hold. The tokens
+/// refuse a pair under its minimum, so a failing pair shows as the rule it breaks.
+fn contrast(root: &Path) -> Result<bool, Error> {
+    let tokens = match kubaos_tokens::load(root) {
+        Ok(tokens) => tokens,
+        Err(kubaos_tokens::Error::Invalid(violations)) => {
+            for violation in &violations {
+                eprintln!("{violation}");
+            }
+            eprintln!(
+                "kubaos-design contrast: the tokens break {} rule(s): FAILED",
+                violations.len()
+            );
+            return Ok(false);
+        }
+        Err(err) => return Err(Error::Tokens(err)),
+    };
+    let readings = kubaos_tokens::contrast::readings(&tokens);
+    for reading in &readings {
+        let pair = reading.pair;
+        let at = pair
+            .opacity
+            .as_ref()
+            .map_or_else(String::new, |opacity| format!(" at {opacity}"));
+        let ratio = reading
+            .ratio
+            .map_or_else(|| "?".to_string(), |ratio| format!("{ratio:.2}:1"));
+        println!(
+            "{:5} {}{at} on {}: {ratio}, needs {}:1 ({})",
+            reading.mode.name(),
+            pair.fg,
+            pair.bg,
+            pair.need.minimum(),
+            pair.purpose
+        );
+    }
+    let unlisted = kubaos_design::contrast::unlisted(root, &tokens)?;
+    for role in &unlisted {
+        eprintln!(
+            "{}: draws `{}`, which no pair in [contrast] covers; add its pair, or list it as decorative",
+            role.at, role.role
+        );
+    }
+    let passed = unlisted.is_empty() && readings.iter().all(kubaos_tokens::contrast::Reading::holds);
+    eprintln!(
+        "kubaos-design contrast: {} pair(s) in 2 modes: {}",
+        tokens.contrast.pairs.len(),
+        if passed { "ok" } else { "FAILED" }
+    );
+    Ok(passed)
 }
 
 fn geometry(root: &Path, files: &[&str]) -> Result<bool, Error> {

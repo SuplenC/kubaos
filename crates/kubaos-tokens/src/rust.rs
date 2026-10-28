@@ -33,10 +33,12 @@ impl Target for RustModule {
         header(&mut out);
         rules(&mut out, tokens);
         lengths(&mut out, tokens);
+        container(&mut out, tokens);
         types(&mut out, tokens);
         motion(&mut out, tokens);
         surfaces(&mut out, tokens);
         colors(&mut out, tokens);
+        contrast(&mut out, tokens);
         symbols(&mut out, tokens);
         Ok(out.text)
     }
@@ -286,6 +288,12 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             ty: "u16",
         },
     );
+    out.blank();
+    out.line("/// A row's icon beside a title over a subtitle: it spans both lines.");
+    out.line(format!(
+        "pub const TWO_LINE_ICON: IconSize = IconSize::S{};",
+        tokens.icon.two_line
+    ));
     scale(
         out,
         &Scale {
@@ -301,6 +309,119 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             ty: "u16",
         },
     );
+}
+
+fn container(out: &mut Writer, tokens: &Tokens) {
+    let steps = &tokens.container;
+    out.blank();
+    out.line("/// A page's or a panel's padding by its width: `(from, padding)`, each padding applying from its");
+    out.line("/// width up, in logical pixels. Tailwind's container on its default breakpoints.");
+    out.line(format!(
+        "pub const CONTAINER: [(u16, Space); {}] = [{}];",
+        steps.from.len(),
+        steps
+            .from
+            .iter()
+            .zip(&steps.padding)
+            .map(|(from, padding)| format!("({from}, Space::S{padding})"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    ));
+    scale(
+        out,
+        &Scale {
+            doc: "An aspect ratio a picture's box keeps before and after it loads.",
+            name: "Aspect",
+            variants: tokens
+                .aspect
+                .iter()
+                .map(|(name, [w, h])| (camel(name), None, format!("[{w}, {h}]")))
+                .collect(),
+            getter_doc: "Width to height.",
+            getter: "ratio",
+            ty: "[u16; 2]",
+        },
+    );
+}
+
+fn contrast(out: &mut Writer, tokens: &Tokens) {
+    out.blank();
+    out.line("/// A colour role, by name, for the contrast pairs.");
+    out.line("#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]");
+    out.line("pub enum Role {");
+    for role in tokens.color.source.keys() {
+        out.line(format!("    {},", camel(role)));
+    }
+    out.line("}");
+    out.blank();
+    out.line("impl Role {");
+    out.line("    /// The role's colour in `palette`.");
+    out.line("    pub const fn of<C: Copy>(self, palette: &Palette<C>) -> C {");
+    out.line("        match self {");
+    for role in tokens.color.source.keys() {
+        out.line(format!("            Role::{} => palette.{role},", camel(role)));
+    }
+    out.line("        }");
+    out.line("    }");
+    out.blank();
+    out.line("    /// The role's name in `design/tokens.toml`.");
+    out.line("    pub const fn name(self) -> &'static str {");
+    out.line("        match self {");
+    for role in tokens.color.source.keys() {
+        out.line(format!("            Role::{} => {role:?},", camel(role)));
+    }
+    out.line("        }");
+    out.line("    }");
+    out.line("}");
+    out.blank();
+    out.line("/// The contrast a pair needs, by what the foreground is (WCAG 2.1 AA).");
+    out.line("#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]");
+    out.line("pub enum Need {");
+    out.line("    /// Body text and labels: 4.5:1.");
+    out.line("    Text,");
+    out.line("    /// Text of 24 px and up, or 19 px semibold and up: 3:1.");
+    out.line("    LargeText,");
+    out.line("    /// Icons, outlines and controls that carry meaning: 3:1.");
+    out.line("    Graphic,");
+    out.line("}");
+    out.blank();
+    out.line("/// A foreground role drawn on a background role, at an opacity or opaque.");
+    out.line("#[derive(Debug, Clone, Copy, PartialEq)]");
+    out.line("pub struct ContrastPair {");
+    out.line("    /// The role drawn on top: text, an icon, an outline.");
+    out.line("    pub fg: Role,");
+    out.line("    /// The role it is drawn on.");
+    out.line("    pub bg: Role,");
+    out.line("    /// The contrast it needs.");
+    out.line("    pub need: Need,");
+    out.line("    /// The opacity the foreground is drawn at, or opaque.");
+    out.line("    pub opacity: Option<Opacity>,");
+    out.line("    /// Where the pair is drawn.");
+    out.line("    pub purpose: &'static str,");
+    out.line("}");
+    out.blank();
+    out.line("/// Every foreground role the front ends draw on a background role, and the contrast it needs.");
+    let pairs = &tokens.contrast.pairs;
+    out.line(format!("pub const CONTRAST: [ContrastPair; {}] = [", pairs.len()));
+    for pair in pairs {
+        let need = match pair.need {
+            crate::model::Need::Text => "Text",
+            crate::model::Need::LargeText => "LargeText",
+            crate::model::Need::Graphic => "Graphic",
+        };
+        let opacity = pair
+            .opacity
+            .as_ref()
+            .map_or_else(|| "None".to_string(), |o| format!("Some(Opacity::{})", camel(o)));
+        out.line("    ContrastPair {");
+        out.line(format!("        fg: Role::{},", camel(&pair.fg)));
+        out.line(format!("        bg: Role::{},", camel(&pair.bg)));
+        out.line(format!("        need: Need::{need},"));
+        out.line(format!("        opacity: {opacity},"));
+        out.line(format!("        purpose: {:?},", pair.purpose));
+        out.line("    },");
+    }
+    out.line("];");
 }
 
 fn types(out: &mut Writer, tokens: &Tokens) {
@@ -369,21 +490,27 @@ fn types(out: &mut Writer, tokens: &Tokens) {
         out.line(format!("        Type::{},", variant(name)));
     }
     out.line("    ];");
-    let getters: [(&str, &str, &str); 4] = [
+    let getters: [(&str, &str, &str); 5] = [
         ("The font size in logical pixels.", "size", "u16"),
         ("The line height in logical pixels.", "line", "u16"),
+        (
+            "The icon that sits beside the style on its line: a component takes its icon's size from here.",
+            "icon",
+            "IconSize",
+        ),
         ("The weight.", "weight", "Weight"),
         ("The family.", "family", "Family"),
     ];
     for (doc, getter, ty) in getters {
         out.blank();
-        out.line(format!("    /// {doc}"));
+        out.doc("    ", doc);
         out.line(format!("    pub const fn {getter}(self) -> {ty} {{"));
         out.line("        match self {");
         for (name, style) in &styles {
             let value = match getter {
                 "size" => style.size.to_string(),
                 "line" => style.line.to_string(),
+                "icon" => format!("IconSize::S{}", style.icon),
                 "weight" => format!("Weight::{}", weight_variant(style.weight)),
                 _ => format!("Family::{}", family_variant(style.family)),
             };
@@ -470,6 +597,17 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
             ty: "f32",
         },
     );
+    out.blank();
+    out.line("impl Opacity {");
+    out.line("    /// The opacity's name in `design/tokens.toml`.");
+    out.line("    pub const fn name(self) -> &'static str {");
+    out.line("        match self {");
+    for name in tokens.opacity.keys() {
+        out.line(format!("            Opacity::{} => {name:?},", camel(name)));
+    }
+    out.line("        }");
+    out.line("    }");
+    out.line("}");
     out.blank();
     out.line("/// A shadow: offset down and blur in logical pixels, and its opacity.");
     out.line("#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]");

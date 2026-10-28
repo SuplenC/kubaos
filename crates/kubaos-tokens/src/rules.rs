@@ -40,6 +40,25 @@ pub enum Violation {
     RoleMissing { role: String, table: &'static str },
     /// A symbol that names both a Tabler icon and a drawing of ours, or neither.
     SymbolSource { token: String },
+    /// A type style's icon that isn't one of the icon sizes.
+    IconNotASize { token: String, icon: u16 },
+    /// A type style's icon taller than its line, so it would make the line taller.
+    IconTallerThanLine { token: String, icon: u16, line: u16 },
+    /// The container's widths and paddings don't pair up, or its first width isn't 0.
+    ContainerSteps,
+    /// A container padding that isn't a step of the spacing scale.
+    OffScalePadding { token: String, value: u16 },
+    /// An aspect ratio with a side of 0.
+    EmptyAspect { token: String },
+    /// A contrast pair naming a colour role or an opacity that doesn't exist.
+    UnknownInPair { token: String, name: String },
+    /// A contrast pair under the minimum its foreground needs, in one of the fallback palettes.
+    LowContrast {
+        token: String,
+        mode: &'static str,
+        ratio: f32,
+        minimum: f32,
+    },
 }
 
 impl fmt::Display for Violation {
@@ -76,6 +95,29 @@ impl fmt::Display for Violation {
             Violation::SymbolSource { token } => {
                 write!(f, "{token} needs exactly one of `tabler` and `drawn`")
             }
+            Violation::IconNotASize { token, icon } => {
+                write!(f, "{token}'s icon {icon} isn't in icon.sizes")
+            }
+            Violation::IconTallerThanLine { token, icon, line } => {
+                write!(f, "{token}'s icon {icon} is taller than its line {line}")
+            }
+            Violation::ContainerSteps => write!(
+                f,
+                "container.from and container.padding need one padding per width, from 0 up"
+            ),
+            Violation::OffScalePadding { token, value } => {
+                write!(f, "{token} is {value}, which isn't on the spacing scale")
+            }
+            Violation::EmptyAspect { token } => write!(f, "{token} has a side of 0"),
+            Violation::UnknownInPair { token, name } => {
+                write!(f, "{token} names {name}, which isn't a colour role or an opacity")
+            }
+            Violation::LowContrast {
+                token,
+                mode,
+                ratio,
+                minimum,
+            } => write!(f, "{token} is {ratio:.2}:1 in {mode}, under its {minimum}:1"),
         }
     }
 }
@@ -85,11 +127,82 @@ pub fn check(tokens: &Tokens) -> Vec<Violation> {
     let mut found = Vec::new();
     check_rules(tokens, &mut found);
     check_lengths(tokens, &mut found);
+    check_container(tokens, &mut found);
     check_types(tokens, &mut found);
     check_motion(tokens, &mut found);
     check_colors(tokens, &mut found);
+    check_contrast(tokens, &mut found);
     check_symbols(tokens, &mut found);
     found
+}
+
+fn check_container(tokens: &Tokens, found: &mut Vec<Violation>) {
+    let container = &tokens.container;
+    if container.from.len() != container.padding.len() || container.from.first() != Some(&0) {
+        found.push(Violation::ContainerSteps);
+    }
+    if !container.from.windows(2).all(|pair| pair[0] < pair[1]) {
+        found.push(Violation::NotAscending {
+            token: "container.from".into(),
+        });
+    }
+    for &value in &container.padding {
+        if !tokens.space.values.contains(&value) {
+            found.push(Violation::OffScalePadding {
+                token: format!("container.padding {value}"),
+                value,
+            });
+        }
+    }
+    for (name, sides) in &tokens.aspect {
+        if sides.contains(&0) {
+            found.push(Violation::EmptyAspect {
+                token: format!("aspect.{name}"),
+            });
+        }
+    }
+}
+
+fn check_contrast(tokens: &Tokens, found: &mut Vec<Violation>) {
+    let token = |pair: &crate::model::ContrastPair| {
+        let at = pair
+            .opacity
+            .as_ref()
+            .map_or_else(String::new, |opacity| format!(" at {opacity}"));
+        format!("contrast {}{at} on {}", pair.fg, pair.bg)
+    };
+    for pair in &tokens.contrast.pairs {
+        let roles = [&pair.fg, &pair.bg]
+            .into_iter()
+            .filter(|role| !tokens.color.source.contains_key(*role));
+        let opacity = pair.opacity.iter().filter(|name| !tokens.opacity.contains_key(*name));
+        for name in roles.chain(opacity) {
+            found.push(Violation::UnknownInPair {
+                token: token(pair),
+                name: name.clone(),
+            });
+        }
+    }
+    for name in &tokens.contrast.decorative {
+        if !tokens.color.source.contains_key(name) {
+            found.push(Violation::UnknownInPair {
+                token: "contrast.decorative".into(),
+                name: name.clone(),
+            });
+        }
+    }
+    for reading in crate::contrast::readings(tokens) {
+        if let Some(ratio) = reading.ratio
+            && !reading.holds()
+        {
+            found.push(Violation::LowContrast {
+                token: token(reading.pair),
+                mode: reading.mode.name(),
+                ratio,
+                minimum: reading.pair.need.minimum(),
+            });
+        }
+    }
 }
 
 fn check_rules(tokens: &Tokens, found: &mut Vec<Violation>) {
@@ -123,7 +236,11 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     ] {
         on_grid(format!("radius.{role}"), value);
     }
-    for (table, values) in [("space", &tokens.space.values), ("icon", &tokens.icon.sizes)] {
+    for (table, values) in [
+        ("space", &tokens.space.values),
+        ("icon", &tokens.icon.sizes),
+        ("container.from", &tokens.container.from),
+    ] {
         for &value in values {
             on_grid(format!("{table} {value}"), value);
         }
@@ -165,8 +282,27 @@ fn check_opacity(token: String, value: f32, found: &mut Vec<Violation>) {
 }
 
 fn check_types(tokens: &Tokens, found: &mut Vec<Violation>) {
+    if !tokens.icon.sizes.contains(&tokens.icon.two_line) {
+        found.push(Violation::IconNotASize {
+            token: "icon.two_line".into(),
+            icon: tokens.icon.two_line,
+        });
+    }
     for (name, style) in &tokens.types {
         let token = format!("type.{name}");
+        if !tokens.icon.sizes.contains(&style.icon) {
+            found.push(Violation::IconNotASize {
+                token: token.clone(),
+                icon: style.icon,
+            });
+        }
+        if style.icon > style.line {
+            found.push(Violation::IconTallerThanLine {
+                token: token.clone(),
+                icon: style.icon,
+                line: style.line,
+            });
+        }
         if !tokens.rules.font_sizes.contains(&style.size) {
             found.push(Violation::OffListFontSize {
                 token: token.clone(),
@@ -231,8 +367,9 @@ fn check_symbols(tokens: &Tokens, found: &mut Vec<Violation>) {
 
 /// Every name that becomes an identifier in an output, as `table.name`.
 fn names(tokens: &Tokens) -> Vec<String> {
-    let tables: [(&str, Vec<&String>); 8] = [
+    let tables: [(&str, Vec<&String>); 9] = [
         ("size", tokens.size.keys().collect()),
+        ("aspect", tokens.aspect.keys().collect()),
         ("type", tokens.types.keys().collect()),
         ("duration", tokens.duration.keys().collect()),
         ("easing", tokens.easing.keys().collect()),

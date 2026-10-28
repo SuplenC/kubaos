@@ -54,6 +54,15 @@ impl Look {
         }
     }
 
+    /// What a fill brightens toward under a state layer while it is held: the lighter end of the
+    /// palette, `on_surface` in dark and `surface` in light, so a held fill lights up in both.
+    pub fn bright(&self) -> Color {
+        match self.mode {
+            Mode::Dark => self.colors.on_surface,
+            Mode::Light => self.colors.surface,
+        }
+    }
+
     /// One device pixel, in logical pixels.
     pub fn hairline(&self) -> f32 {
         self.scale.hairline()

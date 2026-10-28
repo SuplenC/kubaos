@@ -17,6 +17,14 @@ K.Stack {
     readonly property list<string> sizes: ["Sm", "Md", "Lg"]
     // The columns of the button tables: the kinds' names, then one per state.
     readonly property list<int> columns: [1, 2, 2, 2, 2, 2]
+    // The picture the media samples load: the accent fading into the cold accent, as the iced
+    // page draws it.
+    readonly property string picture: {
+        const from = K.Tokens.color.primary.toString();
+        const to = K.Tokens.color.cold.toString();
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 10"><defs><linearGradient id="g"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="16" height="10" fill="url(#g)"/></svg>`;
+        return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    }
 
     fill: true
 
@@ -24,56 +32,56 @@ K.Stack {
         return `${size} · ${K.ButtonMetrics.of(size).height}`;
     }
 
-    // The bar above the page: the pages, then the mode and the scale it is shown at.
-    K.Row {
-        gap: K.Tokens.space.s16
-        align: "centre"
-        fill: true
-        leftPadding: K.Tokens.space.s40
-        rightPadding: K.Tokens.space.s40
-        topPadding: K.Tokens.space.s16
-        bottomPadding: K.Tokens.space.s16
-
-        K.Text {
-            text: "KubaOS design specimen"
-            style: K.Tokens.type.subheading
-        }
-
+    // The bar above the page: the pages, then the mode and the scale it is shown at. A toolbar
+    // band: the container padding at the sides, as the page under it, and a small control's room
+    // above and below.
+    K.Container {
         K.Row {
-            gap: K.Tokens.space.s4
+            gap: K.Tokens.space.s16
             align: "centre"
+            fill: true
+            topPadding: K.Tokens.space.s16
+            bottomPadding: K.Tokens.space.s16
 
-            Repeater {
-                model: ["Type", "Colour", "Space and shape", "Components", "Icons", "Motion"]
+            K.Text {
+                text: "KubaOS design specimen"
+                style: K.Tokens.type.subheading
+            }
 
-                K.Button {
-                    required property string modelData
+            K.Row {
+                gap: K.Tokens.space.s4
+                align: "centre"
 
-                    text: modelData
-                    kind: modelData === "Components" ? "Tonal" : "Text"
-                    size: "Sm"
+                Repeater {
+                    model: ["Type", "Colour", "Space and shape", "Components", "Icons", "Motion"]
+
+                    K.Button {
+                        required property string modelData
+
+                        text: modelData
+                        kind: modelData === "Components" ? "Tonal" : "Text"
+                        size: "Sm"
+                    }
                 }
             }
-        }
 
-        K.Fill {
-        }
+            K.Fill {
+            }
 
-        K.Text {
-            text: "Tab, ← → pages · M mode"
-            style: K.Tokens.type.caption
-            color: K.Tokens.color.on_surface_variant
-        }
+            K.KeyHints {
+                hints: [["Tab", "next page"], ["← →", "pages"], ["M", "mode"]]
+            }
 
-        K.Chip {
-            text: `${root.shownScale}×`
-        }
+            K.Chip {
+                text: `${root.shownScale}×`
+            }
 
-        K.IconButton {
-            icon: K.Tokens.mode === "dark" ? "light_mode" : "dark_mode"
-            label: K.Tokens.mode === "dark" ? "Light mode" : "Dark mode"
-            kind: "Text"
-            size: "Sm"
+            K.IconButton {
+                icon: K.Tokens.mode === "dark" ? "light_mode" : "dark_mode"
+                label: K.Tokens.mode === "dark" ? "Light mode" : "Dark mode"
+                kind: "Text"
+                size: "Sm"
+            }
         }
     }
 
@@ -396,7 +404,7 @@ K.Stack {
                     description: "A progress bar's track filled up to the thumb. One with stops marks those ahead and snaps to them."
 
                     K.Grid {
-                        columns: 4
+                        columns: 5
                         gap: K.Tokens.space.s32
 
                         Repeater {
@@ -408,6 +416,15 @@ K.Stack {
                                     index: 0,
                                     focused: false,
                                     enabled: true
+                                },
+                                {
+                                    label: "Pressed: the fill lights up",
+                                    value: 0.62,
+                                    stops: 0,
+                                    index: 0,
+                                    focused: false,
+                                    enabled: true,
+                                    preview: "pressed"
                                 },
                                 {
                                     label: "Five stops",
@@ -448,6 +465,7 @@ K.Stack {
                                     index: slid.modelData.index
                                     focused: slid.modelData.focused
                                     enabled: slid.modelData.enabled
+                                    preview: slid.modelData.preview ?? ""
                                 }
 
                                 K.Text {
@@ -589,6 +607,66 @@ K.Stack {
                 }
 
                 K.Section {
+                    title: "Keycaps and key hints"
+                    description: "Keys drawn as keys, as tall as a line of body text so they sit inline with it, then what each does."
+
+                    K.Stack {
+                        gap: K.Tokens.space.s16
+
+                        K.Row {
+                            gap: K.Tokens.space.s8
+                            align: "centre"
+
+                            Repeater {
+                                model: ["Esc", "Tab", "Enter", "↵", "K", "Ctrl", "← →", "+"]
+
+                                K.Keycap {
+                                    required property string modelData
+
+                                    key: modelData
+                                }
+                            }
+                        }
+
+                        K.KeyHints {
+                            hints: [["Enter", "continue"], ["Ctrl+K", "actions"], ["Esc", "back"]]
+                        }
+
+                        K.KeyHints {
+                            text: "↵ Open · Tab Enter app · Ctrl+K Actions"
+                        }
+
+                        K.Row {
+                            gap: K.Tokens.space.s4
+                            align: "centre"
+
+                            K.Text {
+                                text: "Press"
+                                style: K.Tokens.type.body
+                            }
+
+                            K.Keycap {
+                                key: "Space"
+                            }
+
+                            K.Text {
+                                text: "to pick a layout, or"
+                                style: K.Tokens.type.body
+                            }
+
+                            K.Keycap {
+                                key: "Del"
+                            }
+
+                            K.Text {
+                                text: "to drop it."
+                                style: K.Tokens.type.body
+                            }
+                        }
+                    }
+                }
+
+                K.Section {
                     title: "Cards"
                     description: "Picked cards take the accent, so their focus ring is the cold one."
 
@@ -627,6 +705,40 @@ K.Stack {
                                 title: "Focused, picked"
                                 body: "The cold ring."
                             }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Media"
+                    description: "Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then two pictures to pick, picked with its name under it and focused with its name over its foot."
+
+                    K.Grid {
+                        columns: 4
+                        gap: K.Tokens.space.s16
+
+                        K.Media {
+                        }
+
+                        K.Media {
+                            source: root.picture
+                        }
+
+                        K.PictureChoice {
+                            source: root.picture
+                            name: "Shinjuku, night"
+                            picked: true
+                            markIcon: "check"
+                            markText: "Current"
+                        }
+
+                        K.PictureChoice {
+                            source: root.picture
+                            name: "Golden Gai"
+                            namePlace: "over"
+                            badgeIcon: "play_arrow"
+                            badgeText: "Video"
+                            focused: true
                         }
                     }
                 }

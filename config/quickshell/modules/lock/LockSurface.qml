@@ -105,6 +105,39 @@ WlSessionLockSurface {
         opacity: root.enter
     }
 
+    // Behind the words, the wallpaper turned toward the surface by `backdrop` and fading out 64
+    // above and below them, so every line keeps 4.5:1 whatever the wallpaper: over pure black in
+    // light, or pure white in dark, the lowest is the error colour's 4.9:1 in light.
+    Rectangle {
+        id: backdrop
+
+        readonly property color solid: K.Look.alpha(K.Tokens.color.surface, K.Tokens.opacity.backdrop)
+        readonly property real edge: K.Tokens.space.s64 / backdrop.height
+
+        width: root.width
+        y: content.y - K.Tokens.space.s64
+        height: content.height + K.Tokens.space.s64 * 2
+        opacity: root.enter
+        gradient: Gradient {
+            GradientStop {
+                position: 0
+                color: K.Look.alpha(K.Tokens.color.surface, 0)
+            }
+            GradientStop {
+                position: backdrop.edge
+                color: backdrop.solid
+            }
+            GradientStop {
+                position: 1 - backdrop.edge
+                color: backdrop.solid
+            }
+            GradientStop {
+                position: 1
+                color: K.Look.alpha(K.Tokens.color.surface, 0)
+            }
+        }
+    }
+
     // Centred a little above the middle, where the eye takes a screen's centre to be, and rising
     // into place as it arrives.
     K.Stack {

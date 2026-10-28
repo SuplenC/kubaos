@@ -239,6 +239,10 @@ fn install_tour(out: &mut Out) {
             Step::Wait(_) => tick_app(&mut app),
             Step::Shot(name) => {
                 tick_app(&mut app);
+                // The probe names the wallpaper sets once it answers, partway into the tour.
+                if app.thumbs.is_empty() {
+                    load_payload(&mut app);
+                }
                 take_app(out, name, &mut app);
             }
             Step::Exit => break,
@@ -462,6 +466,10 @@ fn rules() -> Rules {
     Rules {
         grid: f32::from(tokens::GRID),
         spacing: Space::ALL.iter().map(|space| f32::from(space.px())).collect(),
+        container: tokens::CONTAINER
+            .iter()
+            .map(|&(from, padding)| (f32::from(from), f32::from(padding.px())))
+            .collect(),
     }
 }
 

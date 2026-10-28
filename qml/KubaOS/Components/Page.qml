@@ -1,8 +1,9 @@
 import QtQuick
 import KubaOS.Components as K
 
-// A whole page on the surface, with the page's insets around its content: 40 at the sides, 32
-// above, 24 below, where a footer's buttons sit (Kōbō's panel). `kubaos-ui`'s `layout::page`.
+// A whole page on the surface, its content the container padding in at the sides (16 under 640,
+// 24 from 640, 32 from 1024: `Tokens.containerPadding`), 32 below the top and 24 above the foot,
+// where a footer's buttons sit (Kōbō's panel). `kubaos-ui`'s `layout::page`.
 Rectangle {
     id: root
 
@@ -10,6 +11,8 @@ Rectangle {
     property alias room: slot.room
 
     readonly property bool fillWidth: true
+    // The padding at the sides, by the page's width.
+    readonly property int padding: Tokens.containerPadding(root.width)
     readonly property var probe: ({
             role: "component",
             name: "Page",
@@ -34,8 +37,8 @@ Rectangle {
 
         width: root.width
         fill: true
-        leftPadding: Tokens.space.s40
-        rightPadding: Tokens.space.s40
+        leftPadding: root.padding
+        rightPadding: root.padding
         topPadding: Tokens.space.s32
         bottomPadding: Tokens.space.s24
     }

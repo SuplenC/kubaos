@@ -5,7 +5,7 @@
 //! # Owns
 //!
 //! - [`Gap`], [`Inset`] and [`Extent`], the only spacing and sizes the primitives take, and the
-//!   primitives: [`page`], [`header`], [`section`], [`row`], [`stack`] and [`grid`].
+//!   primitives: [`page`], [`container`], [`header`], [`section`], [`row`], [`stack`] and [`grid`].
 //!
 //! # Not here
 //!
@@ -18,8 +18,9 @@ use iced::Background;
 use iced::Element;
 use iced::Length;
 use iced::Padding;
+use iced::advanced;
+use iced::advanced::widget::Tree;
 use iced::widget;
-use iced::widget::container;
 use iced::widget::text::IntoFragment;
 
 use crate::grid::Grid;
@@ -37,6 +38,7 @@ use crate::snap::centre_x;
 use crate::snap::placed;
 use crate::snap::snap;
 use crate::text::text;
+use crate::tokens;
 use crate::tokens::Size;
 use crate::tokens::Space;
 use crate::tokens::Type;
@@ -422,40 +424,199 @@ pub fn gap<'a, M: 'a>(space: Space) -> Element<'a, M> {
     probe(Tag::Spacer { fill: false }, widget::Space::new().width(px).height(px))
 }
 
-/// A whole page: the surface, with the page's insets around `content`.
-///
-/// The insets are Kōbō's panel content, on the grid: 40 at the sides, 32 above, 24 below, where the
-/// footer's buttons sit.
+/// A whole page: the surface, with `content` the container padding in at the sides
+/// ([`container_padding`]), 32 below the page's top and 24 above its foot, where the footer's
+/// buttons sit (Kōbō's panel), filling the room both ways.
 pub fn page<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>) -> Element<'a, M> {
     page_over(content, Some(look.colors.surface))
 }
 
-/// [`page`] with the page's insets and nothing behind it, over a surface of its own: Kōbō's glass
-/// panel, a pane beside a rail.
+/// [`page`] with nothing behind it, over a surface of its own: Kōbō's glass panel, a pane beside a
+/// rail.
 pub fn page_clear<'a, M: 'a>(content: impl Into<Element<'a, M>>) -> Element<'a, M> {
     page_over(content, None)
 }
 
 fn page_over<'a, M: 'a>(content: impl Into<Element<'a, M>>, surface: Option<iced::Color>) -> Element<'a, M> {
-    let view: Element<'a, M> = widget::container(content)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .padding(PAGE_INSET.padding())
-        .style(move |_theme| container::Style {
-            background: surface.map(Background::Color),
-            ..container::Style::default()
-        })
-        .into();
+    let view = Element::new(Container {
+        content: content.into(),
+        height: Length::Fill,
+        top: Space::S32.into(),
+        bottom: Space::S24.into(),
+        surface,
+    });
     probe::component("Page", ["", "", ""], Fixed::HOLDS, view)
 }
 
-/// A page's insets: 40 at the sides, 32 above, 24 below.
-pub const PAGE_INSET: Inset = Inset {
-    top: Gap(Some(Space::S32)),
-    right: Gap(Some(Space::S40)),
-    bottom: Gap(Some(Space::S24)),
-    left: Gap(Some(Space::S40)),
-};
+/// A panel's body or a toolbar band: `content` the container padding in at the sides, as wide as
+/// the room and as tall as the content. Above and below, the content keeps its own spacing.
+pub fn container<'a, M: 'a>(content: impl Into<Element<'a, M>>) -> Element<'a, M> {
+    let view = Element::new(Container {
+        content: content.into(),
+        height: Length::Shrink,
+        top: Gap::NONE,
+        bottom: Gap::NONE,
+        surface: None,
+    });
+    probe::component("Container", ["", "", ""], Fixed::HOLDS, view)
+}
+
+/// The padding at the sides of a page or a panel's body `width` wide: Tailwind's container
+/// (`px-4 sm:px-6 lg:px-8`), 16 under 640, 24 from 640, 32 from 1024 (`tokens::CONTAINER`).
+pub fn container_padding(width: f32) -> Space {
+    tokens::CONTAINER
+        .iter()
+        .rev()
+        .find(|&&(from, _)| width >= f32::from(from))
+        .map_or(tokens::CONTAINER[0].1, |&(_, padding)| padding)
+}
+
+/// Content padded at the sides by [`container_padding`] for the width it is given.
+struct Container<'a, M> {
+    content: Element<'a, M>,
+    height: Length,
+    top: Gap,
+    bottom: Gap,
+    surface: Option<iced::Color>,
+}
+
+impl<M> iced::advanced::Widget<M, iced::Theme, iced::Renderer> for Container<'_, M> {
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        iced::Size::new(Length::Fill, self.height)
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &advanced::layout::Limits,
+    ) -> advanced::layout::Node {
+        let width = limits.width(Length::Fill).max().width;
+        let side = f32::from(container_padding(width).px());
+        let padding = Padding {
+            top: self.top.px(),
+            right: side,
+            bottom: self.bottom.px(),
+            left: side,
+        };
+        let content = &mut self.content;
+        advanced::layout::padded(limits, Length::Fill, self.height, padding, |limits| {
+            content.as_widget_mut().layout(&mut tree.children[0], renderer, limits)
+        })
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: advanced::Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn advanced::widget::Operation,
+    ) {
+        let Some(content) = layout.children().next() else {
+            return;
+        };
+        let widget = &mut self.content;
+        operation.traverse(&mut |operation| {
+            widget
+                .as_widget_mut()
+                .operate(&mut tree.children[0], content, renderer, operation);
+        });
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &iced::Event,
+        layout: advanced::Layout<'_>,
+        cursor: advanced::mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn advanced::Clipboard,
+        shell: &mut advanced::Shell<'_, M>,
+        viewport: &iced::Rectangle,
+    ) {
+        if let Some(content) = layout.children().next() {
+            self.content.as_widget_mut().update(
+                &mut tree.children[0],
+                event,
+                content,
+                cursor,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
+        }
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: advanced::Layout<'_>,
+        cursor: advanced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> advanced::mouse::Interaction {
+        layout
+            .children()
+            .next()
+            .map_or_else(advanced::mouse::Interaction::default, |content| {
+                self.content
+                    .as_widget()
+                    .mouse_interaction(&tree.children[0], content, cursor, viewport, renderer)
+            })
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &advanced::renderer::Style,
+        layout: advanced::Layout<'_>,
+        cursor: advanced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        use iced::advanced::Renderer as _;
+
+        if let Some(surface) = self.surface {
+            renderer.fill_quad(
+                advanced::renderer::Quad {
+                    bounds: layout.bounds(),
+                    snap: true,
+                    ..advanced::renderer::Quad::default()
+                },
+                Background::Color(surface),
+            );
+        }
+        if let Some(content) = layout.children().next() {
+            self.content
+                .as_widget()
+                .draw(&tree.children[0], renderer, theme, style, content, cursor, viewport);
+        }
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: advanced::Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &iced::Rectangle,
+        translation: iced::Vector,
+    ) -> Option<advanced::overlay::Element<'b, M, iced::Theme, iced::Renderer>> {
+        let content = layout.children().next()?;
+        self.content
+            .as_widget_mut()
+            .overlay(&mut tree.children[0], content, renderer, viewport, translation)
+    }
+}
 
 /// `children` side by side, `gap` apart both ways, a new line started where the next one doesn't
 /// fit: chips, tags. Each box is rounded up to whole device pixels, so every child starts on one.
@@ -509,7 +670,7 @@ pub fn divider<'a, M: 'a>(look: &Look) -> Element<'a, M> {
     let view: Element<'a, M> = widget::container(widget::Space::new())
         .width(Length::Fill)
         .height(look.hairline())
-        .style(move |_theme| container::Style::default().background(soft))
+        .style(move |_theme| widget::container::Style::default().background(soft))
         .into();
     probe::component("Divider", ["", "", ""], Fixed::NONE, view)
 }

@@ -36,7 +36,7 @@ QtObject {
         appName: "KubaOS"
         expireTimeout: 600000
     }
-    readonly property var history: [root.build, root.lunch, root.battery]
+    property var history: [root.build, root.lunch, root.battery]
     readonly property int count: history.length
     property var popups: []
     property bool dnd: false
@@ -50,6 +50,7 @@ QtObject {
     }
 
     function clear(): void {
+        root.history = [];
     }
 
     function hidePopup(notification: var): void {

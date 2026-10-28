@@ -209,7 +209,7 @@ fn left<'a>(s: &'a Setup, look: &Look) -> El<'a> {
         row(look, Space::S8)
             .center()
             .push(spinner(look, IconSize::S16, seconds, c.primary))
-            .push(text("Checking again…", Type::Small, c.outline))
+            .push(text("Checking again…", Type::Small, c.on_surface_variant))
             .into()
     } else {
         widget::Space::new().into()

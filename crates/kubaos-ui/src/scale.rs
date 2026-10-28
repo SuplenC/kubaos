@@ -48,6 +48,16 @@ impl Scale {
         (logical * self.0).round() / self.0
     }
 
+    /// Half of `spare` logical pixels on a whole device pixel: how far in a box is centred. An odd
+    /// number of spare device pixels leaves the extra one after the box, never before it.
+    ///
+    /// HAZARD: rounding half of an odd count to nearest is a tie, which float error breaks either
+    /// way, and differently in f32 and in QML's doubles; this rounds ties down, a hair under, so
+    /// both toolkits centre to the same pixel.
+    pub fn centre(self, spare: f32) -> f32 {
+        (spare * self.0 / 2.0 - 1e-3).round() / self.0
+    }
+
     /// `logical` moved up to the next whole device pixel, in logical pixels.
     pub fn snap_up(self, logical: f32) -> f32 {
         // A hair under a whole pixel is that pixel: float error must not add a row.

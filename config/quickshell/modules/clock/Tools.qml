@@ -192,7 +192,7 @@ Item {
                 visible: Time.alarms.length === 0
                 text: "No alarms set"
                 style: K.Tokens.type.small
-                color: K.Tokens.color.outline
+                color: K.Tokens.color.on_surface_variant
             }
 
             Repeater {

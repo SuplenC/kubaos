@@ -60,67 +60,74 @@ Drawer {
         precision: SystemClock.Minutes
     }
 
-    K.Stack {
-        id: top
+    // The panel's body, the container padding in at the sides and 16 above and below: the
+    // sections, then the tabs in what is left.
+    K.Container {
+        id: body
 
-        x: K.Tokens.space.s16
-        y: K.Tokens.space.s16
-        width: root.contentWidth - K.Tokens.space.s16 * 2
-        room: width
-        fill: true
-        gap: K.Tokens.space.s16
+        width: root.contentWidth
 
-        K.Row {
+        K.Stack {
+            id: top
+
             fill: true
-            gap: K.Tokens.space.s8
-            align: "centre"
+            gap: K.Tokens.space.s16
+            topPadding: K.Tokens.space.s16
+            bottomPadding: K.Tokens.space.s16
 
-            // The weekday's kanji above the time, as a page's accent sits above its title.
-            K.Header {
-                accent: `${root.kanji[clock.date.getDay()]}曜日`
-                title: Qt.formatDateTime(clock.date, Time.timeFormat)
-                lede: Qt.formatDateTime(clock.date, Time.dateFormat) + (Battery.available ? ` · ${Math.round(Battery.percentage * 100)}% ${Battery.timeLeft}` : "")
+            K.Row {
+                fill: true
+                gap: K.Tokens.space.s8
+                align: "centre"
+
+                // The weekday's kanji above the time, as a page's accent sits above its title.
+                K.Header {
+                    accent: `${root.kanji[clock.date.getDay()]}曜日`
+                    title: Qt.formatDateTime(clock.date, Time.timeFormat)
+                    lede: Qt.formatDateTime(clock.date, Time.dateFormat) + (Battery.available ? ` · ${Math.round(Battery.percentage * 100)}% ${Battery.timeLeft}` : "")
+                }
+
+                K.Fill {
+                }
+
+                K.IconButton {
+                    icon: "wallpaper"
+                    label: "Wallpaper"
+                    kind: "Tonal"
+                    onActivated: Panels.open("wallpaper")
+                }
+
+                K.IconButton {
+                    icon: "power_settings_new"
+                    label: "Power"
+                    kind: "Tonal"
+                    onActivated: Panels.open("powermenu")
+                }
             }
 
-            K.Fill {
+            QuickToggles {
+                id: toggles
+
+                onKeyboardExpanded: root.tab = root.keyboardTab
             }
 
-            K.IconButton {
-                icon: "wallpaper"
-                label: "Wallpaper"
-                kind: "Tonal"
-                onActivated: Panels.open("wallpaper")
+            CaptureRow {
             }
 
-            K.IconButton {
-                icon: "power_settings_new"
-                label: "Power"
-                kind: "Tonal"
-                onActivated: Panels.open("powermenu")
+            Sliders {
             }
-        }
 
-        QuickToggles {
-            id: toggles
-
-            onKeyboardExpanded: root.tab = root.keyboardTab
-        }
-
-        CaptureRow {
-        }
-
-        Sliders {
-        }
-
-        NotificationHistory {
+            NotificationHistory {
+            }
         }
     }
 
-    // The tabs and their list, in the room the sections above leave.
+    // The tabs and their list, in the room the sections above leave, the container padding in
+    // from the panel's edges.
     Item {
-        x: top.x
-        y: top.y + top.height + K.Tokens.space.s16
-        width: top.width
+        x: body.padding
+        y: body.height
+        width: root.contentWidth - body.padding * 2
         height: Math.max(0, root.height - y - K.Tokens.space.s16)
 
         Tabs {
@@ -132,28 +139,36 @@ Drawer {
             onPicked: index => root.tab = index
         }
 
+        // Clipped a focus ring's width outside the tab's room: a list taller than the room
+        // the sections leave on a short screen is cut there, rather than drawn over them.
         Item {
-            y: tabBar.height + K.Tokens.space.s12
-            width: parent.width
-            height: Math.max(0, parent.height - y)
+            x: -K.Tokens.focus.offset
+            y: tabBar.height + K.Tokens.space.s12 - K.Tokens.focus.offset
+            width: parent.width + K.Tokens.focus.offset * 2
+            height: Math.max(0, parent.height - y + K.Tokens.focus.offset)
+            clip: true
 
             WifiList {
                 anchors.fill: parent
+                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 0
             }
 
             BluetoothList {
                 anchors.fill: parent
+                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 1
             }
 
             OutputList {
                 anchors.fill: parent
+                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 2
             }
 
             KeyboardList {
                 anchors.fill: parent
+                anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 3
             }
         }

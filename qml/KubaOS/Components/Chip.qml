@@ -84,7 +84,7 @@ Item {
             K.Icon {
                 visible: root.icon !== ""
                 name: root.icon
-                size: Tokens.icon.s16
+                size: Tokens.type.label.icon
                 color: root.colours[1]
             }
 
@@ -112,7 +112,7 @@ Item {
                     x: Tokens.space.s4
                     y: Tokens.space.s4
                     name: "close"
-                    size: Tokens.icon.s16
+                    size: Tokens.type.label.icon
                     color: root.colours[1]
                 }
             }

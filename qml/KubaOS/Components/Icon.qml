@@ -9,7 +9,8 @@ Item {
 
     // The symbol, by the Material Symbols name it replaces (`arrow_forward`).
     property string name
-    property int size: Tokens.icon.s20
+    // The icon beside body text by default; beside another style, that style's `icon`.
+    property int size: Tokens.type.body.icon
     property color color: Tokens.color.on_surface
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1

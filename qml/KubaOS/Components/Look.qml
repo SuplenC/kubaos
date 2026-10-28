@@ -26,6 +26,19 @@ QtObject {
         return blend;
     }
 
+    // WCAG 2.1's relative luminance of an opaque colour: `kubaos-ui`'s `color::luminance`.
+    function luminance(c: color): real {
+        const channel = v => v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+        return 0.2126 * channel(c.r) + 0.7152 * channel(c.g) + 0.0722 * channel(c.b);
+    }
+
+    // WCAG 2.1's contrast ratio of two opaque colours, 1 to 21: `color::contrast_ratio`.
+    function contrast(a: color, b: color): real {
+        const la = look.luminance(a);
+        const lb = look.luminance(b);
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+
     // The corner of a shape filling one with corner `outer` less `inset` on every side, so both
     // share a centre. A pill in a pill is a pill. Throws when the inset reaches the outer radius:
     // nothing is left to round, and the corners can't be concentric.
@@ -45,6 +58,14 @@ QtObject {
     // `v` logical pixels moved to the nearest device pixel at `dpr`.
     function snap(v: real, dpr: real): real {
         return Math.round(v * dpr) / dpr;
+    }
+
+    // Half of `spare` logical pixels on a whole device pixel at `dpr`: how far in a box is
+    // centred. An odd number of spare device pixels leaves the extra one after the box.
+    // HAZARD: half of an odd count is a tie, which float error breaks either way; ties round down,
+    // a hair under, as `kubaos-ui`'s `Scale::centre` does, so both toolkits pick the same pixel.
+    function centre(spare: real, dpr: real): real {
+        return Math.round(spare * dpr / 2 - 1e-3) / dpr;
     }
 
     // `v` logical pixels moved up to the next whole device pixel at `dpr`. A hair under a whole

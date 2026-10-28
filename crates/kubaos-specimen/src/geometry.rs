@@ -34,6 +34,10 @@ pub fn rules() -> Rules {
     Rules {
         grid: f32::from(tokens::GRID),
         spacing: Space::ALL.iter().map(|space| f32::from(space.px())).collect(),
+        container: tokens::CONTAINER
+            .iter()
+            .map(|&(from, padding)| (f32::from(from), f32::from(padding.px())))
+            .collect(),
     }
 }
 

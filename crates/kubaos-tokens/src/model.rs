@@ -27,6 +27,9 @@ pub struct Tokens {
     pub icon: IconSizes,
     /// Fixed dimensions of components, by name.
     pub size: BTreeMap<String, u16>,
+    pub container: Container,
+    /// Aspect ratios a picture's box keeps, width to height, by name.
+    pub aspect: BTreeMap<String, [u16; 2]>,
     pub font: Font,
     #[serde(rename = "type")]
     pub types: BTreeMap<String, TypeStyle>,
@@ -36,6 +39,7 @@ pub struct Tokens {
     pub opacity: BTreeMap<String, f32>,
     pub shadow: BTreeMap<String, Shadow>,
     pub color: Colors,
+    pub contrast: ContrastPairs,
     /// KubaOS Symbols, by the Material Symbols name each replaces.
     pub symbols: BTreeMap<String, Symbol>,
 }
@@ -94,6 +98,63 @@ pub struct Radii {
 #[serde(deny_unknown_fields)]
 pub struct IconSizes {
     pub sizes: Vec<u16>,
+    /// A row's icon beside a title over a subtitle: one of `sizes`.
+    pub two_line: u16,
+}
+
+/// A page's or a panel's padding by its width: each padding applies from its width up.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Container {
+    /// The width each padding applies from, smallest first; the first is 0.
+    pub from: Vec<u16>,
+    /// The padding inside every edge, one per width in `from`.
+    pub padding: Vec<u16>,
+}
+
+/// Every foreground drawn on a background, and the contrast each needs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContrastPairs {
+    pub pairs: Vec<ContrastPair>,
+    /// Roles drawn only as decoration, which carries no meaning and needs no contrast.
+    pub decorative: Vec<String>,
+}
+
+/// One foreground role on one background role.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContrastPair {
+    pub fg: String,
+    pub bg: String,
+    pub need: Need,
+    /// An opacity the foreground is drawn at, by its name in `[opacity]`.
+    pub opacity: Option<String>,
+    /// Where the pair is drawn, in a few words.
+    #[serde(rename = "use")]
+    pub purpose: String,
+}
+
+/// The contrast a pair needs, by what the foreground is (WCAG 2.1 AA).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Need {
+    /// Body text and labels: 4.5:1.
+    Text,
+    /// Text of 24 px and up, or 19 px semibold and up: 3:1.
+    LargeText,
+    /// Icons, outlines and controls that carry meaning: 3:1.
+    Graphic,
+}
+
+impl Need {
+    /// The lowest ratio that passes.
+    pub fn minimum(self) -> f32 {
+        match self {
+            Need::Text => 4.5,
+            Need::LargeText | Need::Graphic => 3.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -153,6 +214,8 @@ impl Weight {
 pub struct TypeStyle {
     pub size: u16,
     pub line: u16,
+    /// The icon size that sits beside the style on its line.
+    pub icon: u16,
     pub weight: Weight,
     pub family: Family,
     /// What the style is for, in a sentence.

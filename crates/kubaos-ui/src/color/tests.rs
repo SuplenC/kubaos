@@ -45,6 +45,25 @@ fn a_translucent_colour_is_judged_as_drawn_over_its_background() {
 }
 
 #[test]
+fn every_contrast_pair_the_tokens_list_meets_its_minimum_in_both_modes() {
+    for mode in [Mode::Dark, Mode::Light] {
+        let c = colors(mode);
+        for pair in crate::tokens::CONTRAST {
+            let ratio = super::pair_ratio(&pair, &c);
+            let need = Contrast::from(pair.need);
+
+            assert!(
+                ratio >= need.minimum(),
+                "{mode:?}: {} on {} ({}) is {ratio:.2}:1",
+                pair.fg.name(),
+                pair.bg.name(),
+                pair.purpose
+            );
+        }
+    }
+}
+
+#[test]
 fn the_fallback_palettes_meet_the_contrast_minimums() {
     for mode in [Mode::Dark, Mode::Light] {
         let c = colors(mode);

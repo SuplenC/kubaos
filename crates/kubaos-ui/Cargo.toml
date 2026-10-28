@@ -7,10 +7,10 @@ license.workspace = true
 
 [dependencies]
 kubaos-geometry.workspace = true
-# Kōbō's iced and features, less the image widget it draws its wallpaper with: svg for KubaOS
-# Symbols, canvas for the switch and the spinner, advanced for the focus ring's and the grid's own
-# widgets, and crisp, which snaps quads to device pixels in the wgpu renderer. winit needs a
-# windowing feature to build at all.
+# Kōbō's iced and features: svg for KubaOS Symbols, image for `Media`'s pictures, canvas for the
+# switch and the spinner, advanced for the focus ring's and the grid's own widgets, and crisp,
+# which snaps quads to device pixels in the wgpu renderer. winit needs a windowing feature to build
+# at all.
 iced = { version = "0.14", default-features = false, features = [
   "wgpu",
   "tiny-skia",
@@ -21,6 +21,7 @@ iced = { version = "0.14", default-features = false, features = [
   "wayland",
   "canvas",
   "svg",
+  "image",
   "advanced",
 ] }
 

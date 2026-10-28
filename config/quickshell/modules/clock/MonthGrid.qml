@@ -153,7 +153,7 @@ Item {
                     width: root.weekColumn
                     text: "Wk"
                     style: K.Tokens.type.caption
-                    color: K.Tokens.color.outline
+                    color: K.Tokens.color.on_surface_variant
                 }
 
                 Repeater {
@@ -194,7 +194,7 @@ Item {
                             height: root.cell
                             text: String(week.modelData.number)
                             style: K.Tokens.type.caption
-                            color: K.Tokens.color.outline
+                            color: K.Tokens.color.on_surface_variant
                         }
 
                         Repeater {

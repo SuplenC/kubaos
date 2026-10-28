@@ -25,7 +25,7 @@ Item {
     property int index: 0
     // Whether the keyboard is on it; Qt's focus by default, or the app's where it owns focus.
     property bool focused: root.activeFocus
-    // A state shown whatever the pointer does, `hovered`: the specimen's view of it.
+    // A state shown whatever the pointer does, `hovered` or `pressed`: the specimen's view of it.
     property string preview: ""
 
     readonly property bool fillWidth: true
@@ -38,6 +38,15 @@ Item {
     // How far the thumb's centre travels: the track less the thumb.
     readonly property real travel: Math.max(0, root.width - Tokens.size.slider_thumb)
     readonly property bool hovered: root.enabled && (root.preview === "hovered" || pointer.containsMouse)
+    readonly property bool held: root.enabled && (root.preview === "pressed" || pointer.pressed)
+    // The state layer over the fill and the thumb.
+    readonly property real stateLayer: root.held ? Tokens.opacity.press : root.hovered ? Tokens.opacity.hover : 0
+    // How far the fill lights up toward the bright end: a little under the pointer, and plainly
+    // while pressed or dragged.
+    readonly property real lift: root.held ? Tokens.opacity.held : root.hovered ? Tokens.opacity.press : 0
+    // What the fill brightens toward: the palette's lighter end, so a held fill lights up in both
+    // modes.
+    readonly property color bright: Tokens.mode === "light" ? Tokens.color.surface : Tokens.color.on_surface
     readonly property real dim: root.enabled ? 1 : Tokens.opacity.disabled_content
     // A step of a continuous slider from the keyboard or the wheel.
     readonly property real nudge: 0.05
@@ -118,11 +127,21 @@ Item {
             color: K.Look.alpha(K.Look.alpha(Tokens.color.surface_container_highest, Tokens.opacity.track), root.dim)
         }
 
+        // The fill lights up toward the palette's bright end while pressed or dragged, as a
+        // progress bar's fill glows.
         Rectangle {
             width: thumb.x + Tokens.size.slider_thumb / 2
             height: parent.height
             radius: Tokens.radius.full
-            color: K.Look.alpha(Tokens.color.primary, root.dim)
+            color: K.Look.alpha(K.Look.mix(Tokens.color.primary, root.bright, root.lift), root.dim)
+
+            Behavior on color {
+                ColorAnimation {
+                    duration: Tokens.duration.micro
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Tokens.easing.standard
+                }
+            }
         }
 
         // A mark at each stop the fill hasn't reached, centred where the thumb stands at it.
@@ -173,7 +192,7 @@ Item {
                 content: Tokens.color.on_primary
                 active: root.enabled
                 hovered: root.hovered
-                pressed: pointer.pressed
+                pressed: root.held
             }
         }
     }

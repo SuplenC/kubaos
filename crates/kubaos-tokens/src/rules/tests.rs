@@ -40,7 +40,7 @@ fn the_repos_tokens_hold_every_rule() {
 
 #[test]
 fn a_spacing_step_off_the_grid_is_refused() {
-    let found = violations(|t| set(t, &["space"], "values", vec![4, 8, 10, 16]));
+    let found = violations(|t| set(t, &["space"], "values", vec![4, 8, 10, 16, 24, 32]));
 
     assert_eq!(
         found,
@@ -87,7 +87,7 @@ fn a_radius_beside_the_roles_is_refused() {
 
 #[test]
 fn an_icon_size_off_the_grid_is_refused() {
-    let found = violations(|t| set(t, &["icon"], "sizes", vec![16, 18, 24]));
+    let found = violations(|t| set(t, &["icon"], "sizes", vec![16, 18, 20, 24, 32, 48]));
 
     assert_eq!(
         found,
@@ -172,6 +172,7 @@ fn a_font_size_off_the_list_is_refused() {
 fn a_line_shorter_than_its_letters_is_refused() {
     let found = violations(|t| {
         set(t, &["type", "display"], "line", 44);
+        set(t, &["type", "display"], "icon", 32);
     });
 
     assert_eq!(
@@ -211,7 +212,7 @@ fn a_thin_stroke_under_a_device_pixel_is_refused() {
 
 #[test]
 fn a_scale_out_of_order_is_refused() {
-    let found = violations(|t| set(t, &["space"], "values", vec![4, 12, 8]));
+    let found = violations(|t| set(t, &["space"], "values", vec![4, 12, 8, 16, 24, 32]));
 
     assert_eq!(
         found,
@@ -332,4 +333,86 @@ fn numbers_take_the_hero_size_in_light() {
         (tokens.types["hero"].size, tokens.types["hero"].line)
     );
     assert_eq!(number.weight, crate::model::Weight::Light);
+}
+
+#[test]
+fn a_type_styles_icon_must_be_an_icon_size() {
+    let found = violations(|t| set(t, &["type", "body"], "icon", 12));
+
+    assert_eq!(
+        found,
+        [Violation::IconNotASize {
+            token: "type.body".into(),
+            icon: 12
+        }]
+    );
+}
+
+#[test]
+fn an_icon_taller_than_its_line_is_refused() {
+    let found = violations(|t| set(t, &["type", "caption"], "icon", 20));
+
+    assert_eq!(
+        found,
+        [Violation::IconTallerThanLine {
+            token: "type.caption".into(),
+            icon: 20,
+            line: 16
+        }]
+    );
+}
+
+#[test]
+fn a_container_padding_off_the_spacing_scale_is_refused() {
+    let found = violations(|t| set(t, &["container"], "padding", vec![16, 28, 32]));
+
+    assert!(found.contains(&Violation::OffScalePadding {
+        token: "container.padding 28".into(),
+        value: 28
+    }));
+}
+
+#[test]
+fn the_containers_steps_start_at_no_width() {
+    let found = violations(|t| set(t, &["container"], "from", vec![320, 640, 1024]));
+
+    assert_eq!(found, [Violation::ContainerSteps]);
+}
+
+#[test]
+fn a_pair_under_its_contrast_minimum_is_refused() {
+    let found = violations(|t| set(t, &["opacity"], "subdued_text", 0.5));
+
+    assert!(
+        found.iter().any(|v| matches!(
+            v,
+            Violation::LowContrast { token, mode: "light", .. }
+                if token == "contrast on_secondary_container at subdued_text on secondary_container"
+        )),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_pair_naming_no_role_is_refused() {
+    let found = violations(|t| {
+        let pairs = table(t, &["contrast"])
+            .get_mut("pairs")
+            .and_then(toml::Value::as_array_mut)
+            .expect("contrast.pairs");
+        let mut pair = toml::Table::new();
+        pair.insert("fg".into(), "on_glass".into());
+        pair.insert("bg".into(), "surface".into());
+        pair.insert("need".into(), "text".into());
+        pair.insert("use".into(), "nothing".into());
+        pairs.push(toml::Value::Table(pair));
+    });
+
+    assert_eq!(
+        found,
+        [Violation::UnknownInPair {
+            token: "contrast on_glass on surface".into(),
+            name: "on_glass".into()
+        }]
+    );
 }

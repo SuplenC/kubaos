@@ -47,7 +47,6 @@ Rectangle {
                 readonly property bool heading: modelData.group !== "" && (index === 0 || panel.actions[index - 1].group !== modelData.group)
                 readonly property bool current: index === panel.current
                 readonly property color main: entry.current ? K.Tokens.color.on_secondary_container : K.Tokens.color.on_surface
-                readonly property color muted: entry.current ? K.Look.alpha(K.Tokens.color.on_secondary_container, K.Tokens.opacity.subdued) : K.Tokens.color.on_surface_variant
 
                 width: entries.width
                 spacing: K.Tokens.space.s4
@@ -80,15 +79,25 @@ Rectangle {
                         color: entry.main
                     }
 
-                    Label {
+                    // The Action's keys as keycaps, centred down the row at its end.
+                    Row {
                         id: shortcut
 
-                        x: parent.width - K.Tokens.space.s12 - K.Look.snapUp(implicitWidth, panel.dpr)
-                        y: (parent.height - height) / 2
-                        height: K.Tokens.type.mono.line
-                        type: K.Tokens.type.mono
-                        text: entry.index === 0 ? "↵" : Words.shortcutLabel(entry.modelData.shortcut)
-                        color: entry.muted
+                        readonly property var keys: entry.index === 0 ? ["↵"] : Words.shortcutKeys(entry.modelData.shortcut)
+
+                        x: parent.width - K.Tokens.space.s12 - width
+                        y: K.Look.snap((parent.height - height) / 2, panel.dpr)
+                        spacing: K.Tokens.space.s4
+
+                        Repeater {
+                            model: shortcut.keys.length
+
+                            Keycap {
+                                required property int index
+
+                                key: shortcut.keys[index] ?? ""
+                            }
+                        }
                     }
 
                     MouseArea {

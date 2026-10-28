@@ -21,6 +21,9 @@ use kubaos_ui::Look;
 use kubaos_ui::Mode;
 use kubaos_ui::Scale;
 use kubaos_ui::component::field::note;
+use kubaos_ui::component::keycap::key_hints;
+use kubaos_ui::component::keycap::keycap;
+use kubaos_ui::component::keycap::keys;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::toast::DEFAULT_STAY;
 use kubaos_ui::component::toast::toast_at;
@@ -65,34 +68,30 @@ pub fn theme(look: &Look) -> Theme {
     )
 }
 
-/// One key hint: the key in mono, what it does in a caption.
+/// One key hint: the key as a keycap, what it does beside it.
 pub fn hint<'a>(look: &Look, key: &'a str, what: &'a str) -> El<'a> {
-    let c = look.colors;
-    row(look, Space::S8)
-        .center()
-        .push(text(key, Type::Mono, c.on_surface_variant))
-        .push(text(what, Type::Caption, c.outline))
-        .into()
+    key_hints(look, &[(key, what)])
 }
 
-/// Key hints one under the other, the keys in a column of their own so what each does lines up.
+/// Key hints one under the other, the keycaps in a column of their own so what each does lines up.
 pub fn hint_column<'a>(look: &Look, hints: &[(&'a str, &'a str)]) -> El<'a> {
     let c = look.colors;
-    let mut lines = split(look, &[2, 5], Space::S4);
-    for &(key, what) in hints {
+    let mut lines = split(look, &[1, 1], Space::S4).center();
+    for &(combination, what) in hints {
         lines = lines
-            .push(text(key, Type::Mono, c.on_surface_variant))
-            .push(text(what, Type::Caption, c.outline));
+            .push(
+                row(look, Space::S4)
+                    .center()
+                    .extend(keys(combination).into_iter().map(|key| keycap(look, key))),
+            )
+            .push(text(what, Type::Caption, c.on_surface_variant));
     }
     lines.into()
 }
 
 /// Key hints side by side.
 pub fn hint_row<'a>(look: &Look, hints: &[(&'a str, &'a str)]) -> El<'a> {
-    row(look, Space::S20)
-        .center()
-        .extend(hints.iter().map(|&(key, what)| hint(look, key, what)))
-        .into()
+    key_hints(look, hints)
 }
 
 /// The battery: its symbol, charging or not, and the percent, muted; low, in the error colour.

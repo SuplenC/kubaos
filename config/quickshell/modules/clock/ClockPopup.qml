@@ -37,12 +37,15 @@ Drawer {
     readonly property var today: Time.state.today ?? null
     readonly property bool analog: !!Time.settings.analog
     readonly property int columnGap: K.Tokens.space.s20
+    // Above and below the body; at its sides, the container padding round the month and the
+    // rail beside it.
     readonly property int pad: K.Tokens.space.s20
+    readonly property int bodyInset: K.Tokens.containerPaddingAround(grid.implicitWidth + K.Tokens.size.rail + columnGap)
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
     edge: "top"
     align: 0.5
-    contentWidth: grid.implicitWidth + K.Tokens.size.rail + columnGap + pad * 2
+    contentWidth: grid.implicitWidth + K.Tokens.size.rail + columnGap + bodyInset * 2
     contentHeight: body.implicitHeight + pad * 2
 
     onShownChanged: Time.seconds = shown
@@ -196,12 +199,14 @@ Drawer {
         onTriggered: root.copied = ""
     }
 
+    // The body: the container padding round it at the sides, `pad` above and below. A panel
+    // as wide as its content, so the padding comes from the content's width (`bodyInset`).
     K.Stack {
         id: body
 
-        x: root.pad
+        x: root.bodyInset
         y: root.pad
-        width: root.contentWidth - root.pad * 2
+        width: root.contentWidth - root.bodyInset * 2
         room: width
         fill: true
         gap: K.Tokens.space.s16
@@ -345,7 +350,7 @@ Drawer {
                         K.Text {
                             text: zone.modelData.relative
                             style: K.Tokens.type.small
-                            color: K.Tokens.color.outline
+                            color: K.Tokens.color.on_surface_variant
                         }
                     }
                 }
@@ -399,7 +404,9 @@ Drawer {
                 readonly property bool fillWidth: true
 
                 implicitHeight: root.answer ? answerCard.implicitHeight : 0
-                visible: implicitHeight > 0
+                // Shown from the answer, not from its height: a hidden layout never measures,
+                // so a height read while hidden stays 0. It stays shown while it closes.
+                visible: !!root.answer || implicitHeight > 0
                 clip: true
 
                 Behavior on implicitHeight {
@@ -432,9 +439,15 @@ Drawer {
                         }
 
                         K.Text {
-                            text: root.copied !== "" ? `Copied ${root.copied}` : "Enter copies · Ctrl+Enter copies ISO"
+                            visible: root.copied !== ""
+                            text: `Copied ${root.copied}`
                             style: K.Tokens.type.caption
-                            color: root.copied !== "" ? K.Tokens.color.tertiary : K.Tokens.color.outline
+                            color: K.Tokens.color.tertiary
+                        }
+
+                        K.KeyHints {
+                            visible: root.copied === ""
+                            hints: [["Enter", "copies"], ["Ctrl+Enter", "copies ISO"]]
                         }
                     }
                 }
@@ -495,7 +508,7 @@ Drawer {
                             visible: (root.day?.zones ?? []).length > 0
                             text: (root.day?.zones ?? []).map(z => `${z.label} ${z.time}`).join("  ·  ")
                             style: K.Tokens.type.small
-                            color: K.Tokens.color.outline
+                            color: K.Tokens.color.on_surface_variant
                         }
                     }
                 }
