@@ -2,7 +2,7 @@ import QtQuick
 import KubaOS.Components as K
 
 // One of a few cards to pick from, at the surface radius: `kubaos-ui`'s `card::choice_card`. The
-// picked one takes the secondary container and an accent hairline; its focus ring is the cold
+// picked one takes the secondary container and an accent hairline; its focus tube is the cold
 // one, since the accent already means picked here.
 K.Pressable {
     id: root

@@ -105,7 +105,7 @@ impl<M: Clone> Tile<M> {
         }
     }
 
-    /// Whether the keyboard is on it: the focus ring goes round it.
+    /// Whether the keyboard is on it: the focus tube lights its edge.
     #[must_use]
     pub fn focused(self, focused: bool) -> Self {
         Tile { focused, ..self }

@@ -202,8 +202,8 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
         Field { state, ..self }
     }
 
-    /// The keyboard is in the field, its caret at `caret`: the accent edge, the ring, and the caret
-    /// or the selection.
+    /// The keyboard is in the field, its caret at `caret`: the focus tube on its edge, and the
+    /// caret or the selection.
     #[must_use]
     pub fn caret(self, caret: Caret) -> Self {
         Field {
@@ -252,8 +252,13 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
             on_pointer: self.on_pointer.filter(|_| !locked),
         });
         let focused = caret.is_some();
+        let tint = if self.state == State::Invalid {
+            RingColor::Error
+        } else {
+            RingColor::Accent
+        };
         let Some(glyph) = self.icon else {
-            let view: Element<'a, M> = focus_ring(look, input, Radius::Control, focused, RingColor::Accent);
+            let view: Element<'a, M> = focus_ring(look, input, Radius::Control, focused, tint);
             return probe::component("Field", variant, Fixed::HEIGHT, view);
         };
         // The icon is drawn over the field, in a box 12 wider than itself on each side, so it
@@ -266,7 +271,7 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
         .width(well)
         .height(Length::Fill);
         let field = widget::Stack::with_children([input, mark.into()]);
-        let view: Element<'a, M> = focus_ring(look, field, Radius::Control, focused, RingColor::Accent);
+        let view: Element<'a, M> = focus_ring(look, field, Radius::Control, focused, tint);
         probe::component("Field", variant, Fixed::HEIGHT, view)
     }
 }

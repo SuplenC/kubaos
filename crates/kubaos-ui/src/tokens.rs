@@ -1257,7 +1257,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 52] = [
+pub const CONTRAST: [ContrastPair; 55] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1551,6 +1551,27 @@ pub const CONTRAST: [ContrastPair; 52] = [
         need: Need::Graphic,
         opacity: None,
         purpose: "The cold focus tube on a picked card's fill",
+    },
+    ContrastPair {
+        fg: Role::Error,
+        bg: Role::SurfaceContainerLow,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "An invalid field's focus tube in a well",
+    },
+    ContrastPair {
+        fg: Role::Error,
+        bg: Role::SurfaceContainer,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "An invalid field's focus tube on a panel",
+    },
+    ContrastPair {
+        fg: Role::Error,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "An invalid field's focus tube in a dialog, and on its own fill",
     },
     ContrastPair {
         fg: Role::Outline,

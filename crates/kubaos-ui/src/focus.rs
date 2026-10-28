@@ -66,6 +66,8 @@ pub enum RingColor {
     Accent,
     /// The cold accent, on cards where the accent already means picked.
     Cold,
+    /// The error colour, on a control whose value is wrong, so focus never hides that.
+    Error,
 }
 
 /// `content`, a control whose corners have radius `radius`, with its edge lit as the focus tube
@@ -80,6 +82,7 @@ pub fn focus_ring<'a, M: 'a>(
     let tint = match color {
         RingColor::Accent => look.colors.primary,
         RingColor::Cold => look.colors.cold,
+        RingColor::Error => look.colors.error,
     };
     Element::new(Ring {
         content: content.into(),

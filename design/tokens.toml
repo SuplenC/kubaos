@@ -55,7 +55,7 @@ symbol = 2
 # focus moving never moves anything.
 [focus]
 # The tube's width in logical pixels, drawn rounded half up to whole device
-# pixels: 2, 2, 2, 3 at 1, 1.25, 1.5, 2.
+# pixels: 2, 2, 2, 3 device pixels at 1, 1.25, 1.5, 2.
 tube = 1.5
 # The glow: a near one and a far, faint one, each fading from its opacity at
 # the tube to nothing at its reach outside it, in logical pixels.
@@ -755,6 +755,9 @@ pairs = [
   { fg = "cold", bg = "surface_container_low", need = "graphic", use = "The cold focus tube in a well" },
   { fg = "cold", bg = "surface_container", need = "graphic", use = "The cold focus tube on a panel" },
   { fg = "cold", bg = "secondary_container", need = "graphic", use = "The cold focus tube on a picked card's fill" },
+  { fg = "error", bg = "surface_container_low", need = "graphic", use = "An invalid field's focus tube in a well" },
+  { fg = "error", bg = "surface_container", need = "graphic", use = "An invalid field's focus tube on a panel" },
+  { fg = "error", bg = "surface_container_high", need = "graphic", use = "An invalid field's focus tube in a dialog, and on its own fill" },
   { fg = "outline", bg = "surface", need = "graphic", use = "A field's, a checkbox's or a switch's outline" },
   { fg = "outline", bg = "surface_container_highest", need = "graphic", use = "An outline on the highest container" },
   { fg = "on_surface", bg = "surface_container", need = "text", use = "A pill of the bar" },

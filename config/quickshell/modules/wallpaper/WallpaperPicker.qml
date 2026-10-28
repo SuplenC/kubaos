@@ -46,7 +46,7 @@ K.Sheet {
     // every scale.
     readonly property real thumbWidth: K.Tokens.size.thumbnail_width
     readonly property real thumbHeight: K.Tokens.size.thumbnail_height
-    // The focus ring's band round each thumbnail, inside its cell so the grid's clip never cuts it.
+    // The band `focus.offset` round each thumbnail, inside its cell: a focused one's glow has that.
     readonly property real ring: K.Tokens.focus.offset
     readonly property real cellWidth: thumbWidth + ring * 2
     readonly property real cellHeight: ring + thumbHeight + K.Tokens.space.s8 + K.Tokens.type.small.line + K.Tokens.space.s8
@@ -166,7 +166,7 @@ K.Sheet {
         width: root.columns * root.cellWidth
         height: root.rows * root.cellHeight
         visible: !root.settingsOpen
-        // Cut at its own whole rows, the focus ring's band included, and scrolled a row at a time, so
+        // Cut at its own whole rows, the glow's band included, and scrolled a row at a time, so
         // no tile is ever cut through.
         clip: true
         snapMode: GridView.SnapToRow
@@ -215,9 +215,9 @@ K.Sheet {
             height: grid.cellHeight
 
             // A picture to pick, the whole tile: the applied one ringed and marked Current, the
-            // keyboard's the ring (cold on the applied one), the name under it. Its box is the
-            // wallpaper's aspect from the first frame, the placeholder in it until the picture or
-            // the video's poster fades in over it.
+            // keyboard's the focus tube (cold on the applied one), the name under it. Its box is
+            // the wallpaper's aspect from the first frame, the placeholder in it until the picture
+            // or the video's poster fades in over it.
             K.PictureChoice {
                 id: picture
 

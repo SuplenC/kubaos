@@ -2,8 +2,8 @@ import QtQuick
 import KubaOS.Components as K
 
 // Rows in a well: `kubaos-ui`'s `list::list`. A surface (24) with 12 inside and rows 4 apart, so
-// the rows take 24 - 12 = 12, the control radius: concentric with the well. The focus ring goes
-// round the well while the list has the keyboard; the rows show where it is themselves.
+// the rows take 24 - 12 = 12, the control radius: concentric with the well. The focus tube lights
+// the well's edge while the list has the keyboard; the rows show where it is themselves.
 Item {
     id: root
 

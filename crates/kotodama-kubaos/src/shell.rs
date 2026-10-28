@@ -49,6 +49,8 @@ pub enum SettingsError {
     Read(#[source] io::Error),
     #[error("the shell's settings aren't JSON, so they were left as they are")]
     Invalid(#[source] serde_json::Error),
+    #[error("the shell's settings put more than one key on a line, so they were left as they are")]
+    Crowded,
     #[error("writing the shell's settings")]
     Write(#[source] io::Error),
 }
@@ -65,7 +67,7 @@ pub fn items() -> Vec<Item> {
         kind: kind(),
         identity: None,
         title: "Focus stutter: on/off".to_owned(),
-        subtitle: Some("The focus ring strikes on like a neon sign, or simply fades in".to_owned()),
+        subtitle: Some("The focus tube strikes on like a neon sign, or simply fades in".to_owned()),
         icon: Some("preferences-desktop-accessibility".to_owned()),
         keyword: None,
         keywords: ["focus ring", "neon", "flicker", "flash", "animation", "motion", "glow"]
@@ -132,11 +134,18 @@ pub fn stutter(text: &str) -> Option<bool> {
 ///
 /// # Errors
 ///
-/// When `text`, or what it would become, isn't JSON with whole-line comments.
+/// When `text`, or what it would become, isn't JSON with whole-line comments, or the edit would
+/// change another key: the key shares a line with another.
 pub fn with(text: &str, key: &str, value: bool) -> Result<String, SettingsError> {
-    if !text.trim().is_empty() {
-        serde_json::from_str::<serde_json::Value>(&uncommented(text)).map_err(SettingsError::Invalid)?;
-    }
+    let mut wanted = if text.trim().is_empty() {
+        serde_json::Map::new()
+    } else {
+        match serde_json::from_str(&uncommented(text)).map_err(SettingsError::Invalid)? {
+            serde_json::Value::Object(map) => map,
+            _ => return Err(SettingsError::Crowded),
+        }
+    };
+    wanted.insert(key.to_owned(), serde_json::Value::Bool(value));
     let quoted = format!("\"{key}\"");
     let mut lines: Vec<String> = text.lines().map(str::to_owned).collect();
     let open = lines.iter().enumerate().find_map(|(at, line)| {
@@ -167,7 +176,12 @@ pub fn with(text: &str, key: &str, value: bool) -> Result<String, SettingsError>
     }
     let mut out = lines.join("\n");
     out.push('\n');
-    serde_json::from_str::<serde_json::Value>(&uncommented(&out)).map_err(SettingsError::Invalid)?;
+    let got: serde_json::Value = serde_json::from_str(&uncommented(&out)).map_err(SettingsError::Invalid)?;
+    // A line holding the key and another, or the key twice, edits the wrong thing: the result must
+    // be every key as it was with this one set, or the file stays as it is.
+    if got != serde_json::Value::Object(wanted) {
+        return Err(SettingsError::Crowded);
+    }
     Ok(out)
 }
 

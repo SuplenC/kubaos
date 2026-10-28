@@ -159,7 +159,7 @@ pub fn radio<'a, M: Clone + 'a>(
     probe::component("Radio", ["", "", ""], Fixed::HEIGHT, view)
 }
 
-/// `shape` with the focus ring, then `label`, all one press target.
+/// `shape` with the focus tube, then `label`, all one press target.
 fn labelled<'a, M: Clone + 'a>(
     look: &Look,
     shape: impl Into<Element<'a, M>>,

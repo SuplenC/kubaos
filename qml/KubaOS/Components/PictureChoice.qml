@@ -3,9 +3,9 @@ import KubaOS.Components as K
 
 // A picture to pick: `kubaos-ui`'s `picture::picture_choice`. The picture covers the whole tile,
 // edge to edge in its rounded shape (a `Media` box at the control radius, held before the picture
-// loads), with no frame round it. Picked, the ring goes round it and `mark` shows over its top
-// right corner; the keyboard on it shows the ring too, cold when it is picked, since the accent
-// already means picked. The name sits under the picture, or over its foot on a dark scrim.
+// loads), with no frame round it. Picked, its edge lights as the focus tube and `mark` shows over
+// its top right corner; the keyboard on it lights the tube too, cold when it is picked, since the
+// accent already means picked. The name sits under the picture, or over its foot on a dark scrim.
 //
 // The picture is `source`, or content put in the tile, laid over the placeholder and under the
 // name and the chips (a video).

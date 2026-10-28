@@ -59,6 +59,18 @@ fn a_key_added_after_an_uncommented_example_takes_its_comma() {
 }
 
 #[test]
+fn a_key_on_one_line_with_others_is_left_alone() {
+    let one_line = "{\"menuMotion\": \"fades\", \"focusStutter\": true}\n";
+    let leading = "{\n  \"focusStutter\": true, \"menuMotion\": \"full\"\n}\n";
+
+    assert!(matches!(
+        with(one_line, STUTTER_KEY, false),
+        Err(SettingsError::Crowded)
+    ));
+    assert!(matches!(with(leading, STUTTER_KEY, false), Err(SettingsError::Crowded)));
+}
+
+#[test]
 fn an_empty_file_gets_an_object_of_its_own() {
     let set = with("", STUTTER_KEY, false).unwrap();
 

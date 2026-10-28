@@ -4,7 +4,7 @@ import KubaOS.Components as K
 // The neon focus on its parent, a control whose corners have radius `controlRadius`: the control's
 // own edge lit as a tube `Tokens.focus.tube` wide, inside its box and over its outline, so there is
 // only ever one line and nothing dark between the tube and its glow. The glow is outside the
-// control, rings a device pixel wide fading out from the tube (`kubaos-ui`'s `focus::rings`), and
+// control, bands from its edge out fading from the tube (`kubaos-ui`'s `focus::rings`), and
 // reaches only as far as the room the control has before the nearest ancestor that clips, so it is
 // never cut. Nothing takes layout space, so focus moving never moves anything.
 //
@@ -20,13 +20,18 @@ Item {
     property int controlRadius: Tokens.radius.control
     // The cold accent, on cards where the accent already means picked.
     property bool cold: false
+    // The error colour, on a control whose value is wrong, so focus never hides that.
+    property bool error: false
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
-    readonly property color tint: root.cold ? Tokens.color.cold : Tokens.color.primary
+    readonly property color tint: root.error ? Tokens.color.error : root.cold ? Tokens.color.cold : Tokens.color.primary
     // How lit the tube is while it isn't striking, 0 to 1.
     property real level: 0
     // How far through the strike, 0 to its steps.
     property real step: 0
+    // Lit, lighting or fading: the bands and the watch on the room stay through the strike's dark
+    // steps, so they aren't built again on each.
+    readonly property bool lit: root.shown || root.level > 0 || strike.running || fade.running
     // The room the control has before what clips it, in logical pixels.
     property real room: Tokens.focus.far
     // What clips the control: its nearest ancestor that clips, or the window.
@@ -115,9 +120,33 @@ Item {
         easing.bezierCurve: Tokens.easing.standard
     }
 
+    // Anything that moves or sizes the control while it is lit (a panel sliding in, a dialog
+    // laying out after focus moved into it) moves its room: measured again after each frame that
+    // animated, and after the scene settles.
+    Connections {
+        target: root.lit ? root.Window.window : null
+
+        function onAfterAnimating(): void {
+            root.measure();
+        }
+
+        function onFrameSwapped(): void {
+            if (!settled.running)
+                settled.restart();
+        }
+    }
+
+    // The frame after the last one that drew: whatever laid out late has its place by then.
+    Timer {
+        id: settled
+
+        interval: 0
+        onTriggered: root.measure()
+    }
+
     // A scroll moving the control moves its room.
     Connections {
-        target: root.visible ? root.area : null
+        target: root.lit ? root.area : null
         ignoreUnknownSignals: true
 
         function onContentXChanged(): void {
@@ -141,7 +170,7 @@ Item {
     // `kubaos-ui`'s `focus::rings`. Laid over one another they make `glow` at every device pixel
     // out, and no two edges meet along a curve, so the corners show no seams.
     Repeater {
-        model: root.visible ? root.bands : 0
+        model: root.lit ? root.bands : 0
 
         Rectangle {
             required property int index

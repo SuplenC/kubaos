@@ -3,8 +3,8 @@ import Quickshell.Widgets
 import KubaOS.Components as K
 
 // A list's well as tall as its parent makes it, holding a scrolling view: `K.List`'s look round a
-// `NavList`, which lays out and scrolls rows the well alone can't. The ring goes round the well
-// while `focused`.
+// `NavList`, which lays out and scrolls rows the well alone can't. The focus tube lights the
+// well's edge while `focused`.
 //
 // The view fills the well across its rows' room, 12 in at the sides, and down its whole height:
 // rows scroll right to the well's edge and are cut by its own rounded shape, not by a rectangle
