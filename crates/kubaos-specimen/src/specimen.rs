@@ -88,6 +88,11 @@ impl Page {
         }
     }
 
+    /// The page whose [`Page::slug`] is `slug`, if there is one.
+    pub fn from_slug(slug: &str) -> Option<Page> {
+        Page::ALL.into_iter().find(|page| page.slug() == slug)
+    }
+
     /// The page after this one, wrapping round; `back` goes the other way.
     pub fn step(self, back: bool) -> Page {
         let at = Page::ALL.iter().position(|&p| p == self).unwrap_or(0);
@@ -225,3 +230,6 @@ fn scroller(look: &Look, status: widget::scrollable::Status) -> widget::scrollab
         },
     }
 }
+
+#[cfg(test)]
+mod tests;

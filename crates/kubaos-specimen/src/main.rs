@@ -2,7 +2,10 @@
 //!
 //! ```text
 //! kubaos-specimen                  the live specimen, in a window
-//! kubaos-specimen shots DIR        every page, light and dark, at 1, 1.25, 1.5 and 2, as PNG in DIR
+//! kubaos-specimen shots DIR [PAGE...]
+//!                                  every page, or the PAGEs, light and dark, at 1, 1.25, 1.5 and 2,
+//!                                  as PNG in DIR
+//! kubaos-specimen pages            the pages' names, one a line
 //! kubaos-specimen check [DIR]      the same pages held to the geometry rules; DIR gets their frames
 //! kubaos-specimen parity DIR       the QML specimen's frames in DIR held to the components page's
 //! ```
@@ -36,16 +39,18 @@ use crate::specimen::Specimen;
 
 const USAGE: &str = "\
 usage: kubaos-specimen
-       kubaos-specimen shots DIR
+       kubaos-specimen shots DIR [PAGE...]
+       kubaos-specimen pages
        kubaos-specimen check [DIR]
        kubaos-specimen parity DIR
 
 With no arguments, the live specimen opens in a window: Tab or the arrows move between pages,
 M switches light and dark, Esc closes it.
 
-shots  every page in light and dark at 1, 1.25, 1.5 and 2, as PNG files in DIR,
-       named PAGE-MODE-SCALE.png (type-dark-1.25x.png), each listing the boxes whose
-       edges fall between device pixels
+shots  every page, or the PAGEs named, in light and dark at 1, 1.25, 1.5 and 2, as PNG
+       files in DIR, named PAGE-MODE-SCALE.png (type-dark-1.25x.png), each listing the boxes
+       whose edges fall between device pixels
+pages  the pages' names, as shots takes and writes them, one a line
 check  the same pages, light and dark at every scale, held to the geometry rules (docs/DESIGN.md,
        \"Checks\"); exit 1 on any finding. With DIR, each page's frame is written there as
        PAGE-MODE-SCALE.json, the input `kubaos-design geometry` reads
@@ -73,7 +78,17 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
-        ["shots", dir] => shots(Path::new(dir)),
+        ["shots", dir, names @ ..] => match pages_named(names) {
+            Some(pages) => shots(Path::new(dir), &pages),
+            None => {
+                eprintln!("kubaos-specimen: no page among {}\n{USAGE}", names.join(" "));
+                ExitCode::from(2)
+            }
+        },
+        ["pages"] => {
+            print_pages();
+            ExitCode::SUCCESS
+        }
         ["check"] => check(None),
         ["check", dir] => check(Some(Path::new(dir))),
         ["parity", dir] => parity(Path::new(dir)),
@@ -84,18 +99,33 @@ fn main() -> ExitCode {
     }
 }
 
+/// The pages `names` picks: every page when it is empty, `None` when a name is no page's.
+fn pages_named(names: &[&str]) -> Option<Vec<Page>> {
+    if names.is_empty() {
+        return Some(Page::ALL.to_vec());
+    }
+    names.iter().map(|name| Page::from_slug(name)).collect()
+}
+
+#[expect(clippy::print_stdout, reason = "The pages' names are the command's output.")]
+fn print_pages() {
+    for page in Page::ALL {
+        println!("{}", page.slug());
+    }
+}
+
 #[expect(
     clippy::print_stdout,
     clippy::print_stderr,
     reason = "The shots written and their off-grid boxes are the command's report, for the developer who ran it."
 )]
-fn shots(dir: &Path) -> ExitCode {
+fn shots(dir: &Path, pages: &[Page]) -> ExitCode {
     if let Err(err) = fs::create_dir_all(dir) {
         eprintln!("kubaos-specimen: creating {}: {err}", dir.display());
         return ExitCode::FAILURE;
     }
     shot::load_fonts();
-    for page in Page::ALL {
+    for &page in pages {
         for mode in [Mode::Dark, Mode::Light] {
             for scale in Scale::SUPPORTED {
                 let specimen = Specimen {
