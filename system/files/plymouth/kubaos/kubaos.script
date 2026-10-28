@@ -140,6 +140,9 @@ now = 0;                # ms since the splash started
 scale = 0;              # 1 or 2, set by layout()
 prompt = "none";        # none | password | busy
 bullets = 0;
+# The bullet sprites made so far. A hotplug can lower bullet_max, and the
+# sprites past it still have to be hidden.
+bullet_sprites = 0;
 wrong = 0;              # a wrong passphrase was reported and not typed over yet
 caret_moved = 0;
 shake_start = -100000;
@@ -366,6 +369,7 @@ fun update_prompt()
           global.spr_bullets[i] = Sprite();
           global.spr_bullets[i].SetZ(11);
           global.spr_bullets[i].SetOpacity(0);
+          global.bullet_sprites = i + 1;
         }
       global.spr_bullets[i].SetImage(bullet);
     }
@@ -401,7 +405,7 @@ fun set_prompt_opacity(a)
   global.spr_field.SetOpacity(a);
   global.spr_icon.SetOpacity(a);
   global.spr_note.SetOpacity(a);
-  for (i = 0; i < global.bullet_max; i++)
+  for (i = 0; i < global.bullet_sprites; i++)
     {
       if (i < global.shown_bullets)
         global.spr_bullets[i].SetOpacity(a);

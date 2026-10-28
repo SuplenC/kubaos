@@ -30,12 +30,13 @@ fi
 mkdir -p "${DESTDIR}/usr/share/fonts"
 ln -sf "${theme}/Geist-Regular.ttf" "${DESTDIR}/usr/share/fonts/Plymouth.ttf"
 # HAZARD: link a monospace font the theme has. A theme installed by an older
-# release carries JetBrains Mono instead of Geist Mono; a link to a font that
-# isn't there crashes plymouthd at the passphrase prompt.
-mono="${theme}/GeistMono-Regular.ttf"
-[ -f "${DESTDIR}${mono}" ] || mono="${theme}/JetBrainsMono-Regular.ttf"
-if [ -f "${DESTDIR}${mono}" ]; then
-  ln -sf "${mono}" "${DESTDIR}/usr/share/fonts/Plymouth-monospace.ttf"
-else
-  echo "W: kubaos-plymouth: no monospace font in ${theme}: plymouthd will crash at the passphrase prompt" >&2
+# release carries JetBrains Mono instead of Geist Mono, and a link to a font
+# that isn't there crashes plymouthd at the passphrase prompt. Geist, which is
+# not monospaced, is the last resort: the console viewer only needs a font.
+for mono in GeistMono-Regular.ttf JetBrainsMono-Regular.ttf Geist-Regular.ttf; do
+  [ -f "${DESTDIR}${theme}/${mono}" ] && break
+done
+if [ "${mono}" = Geist-Regular.ttf ]; then
+  echo "W: kubaos-plymouth: no monospace font in ${theme}: the console viewer uses Geist" >&2
 fi
+ln -sf "${theme}/${mono}" "${DESTDIR}/usr/share/fonts/Plymouth-monospace.ttf"
