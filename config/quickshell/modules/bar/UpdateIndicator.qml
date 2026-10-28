@@ -18,9 +18,11 @@ Pill {
     tooltip: onlyUpgrade ? `KubaOS ${Updates.upgradeCodename || Updates.upgrade} is out. Click and I'll run kubaos upgrade` : securityWaiting ? `${Updates.aptSecurity} security ${Updates.aptSecurity === 1 ? "update is" : "updates are"} waiting. Click and I'll run kubaos update. Or don't, I'm not your mum` : `KubaOS ${Updates.update} is ready. Click and I'll run kubaos update. Or don't, I'm not your mum`
     onClicked: Updates.run(onlyUpgrade ? "upgrade" : "update")
 
-    K.Icon {
+    // Security updates waiting are counted; a release waiting is a dot.
+    BadgedIcon {
         name: "system_update_alt"
-        size: K.Tokens.icon.s16
         color: K.Tokens.color.tertiary
+        badged: true
+        count: Updates.aptSecurity
     }
 }

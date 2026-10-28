@@ -41,6 +41,15 @@ QtObject {
     property var popups: []
     property bool dnd: false
 
+    // When each arrived: a few minutes before the shots' frozen clock, and one the day before.
+    function arrived(notification: var): var {
+        if (notification === root.build)
+            return new Date(2026, 9, 27, 21, 41);
+        if (notification === root.lunch)
+            return new Date(2026, 9, 27, 12, 8);
+        return new Date(2026, 9, 26, 19, 30);
+    }
+
     function showPopups(): void {
         root.popups = [root.build, root.battery];
     }

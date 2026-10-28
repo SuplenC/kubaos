@@ -206,11 +206,32 @@ Item {
             }
         }
 
+        // Rows still being found while the scan has nothing yet: the first results take the
+        // place they keep.
+        Column {
+            x: K.Tokens.space.s12
+            y: K.Tokens.space.s12
+            width: parent.width - K.Tokens.space.s12 * 2
+            visible: list.count === 0 && Bt.scanning
+            spacing: K.Tokens.space.s4
+
+            Repeater {
+                model: [0.6, 0.45, 0.75]
+
+                SkeletonRow {
+                    required property real modelData
+
+                    width: parent.width
+                    share: modelData
+                }
+            }
+        }
+
         K.EmptyState {
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width
             room: parent.width
-            visible: list.count === 0
+            visible: list.count === 0 && !Bt.scanning
             icon: Bt.enabled ? "bluetooth_searching" : "bluetooth_disabled"
             title: !Bt.available ? "No Bluetooth adapter" : Bt.blocked ? "Bluetooth is blocked" : Bt.enabled ? "No devices" : "Bluetooth is off"
             body: !Bt.available ? "Nothing to pair with on this machine." : Bt.blocked ? "Unblock it, then turn it on." : Bt.enabled ? "Search, and devices in pairing mode show up here." : "The Bluetooth tile turns it on."

@@ -1,19 +1,20 @@
 import QtQuick
 import Quickshell
-import Quickshell.Widgets
 import Quickshell.Services.Notifications
 import KubaOS.Components as K
 import qs.settings
 import qs.services
 
-// One notification. As a popup it hides itself after the timeout (paused on
-// hover; a thin line along the bottom shows the time left). In the control
-// center history it stays until dismissed.
+// One notification. As a popup it hides itself after the timeout (paused on hover; a thin line
+// along the bottom shows the time left). In the control center history it stays until dismissed.
 //
-// As a popup it fills its stack 8 in from the panel's edge, so its corners are
-// the panel's surface radius nested 8 in; in the history's well, 12 in. A click
-// opens what it is about; the dismiss button and the actions take their own
-// clicks.
+// A header band says who it is from and when: the app's icon (or the notification's image) on a
+// small icon tile, its name, and the day and time it came, with the dismiss button in the band's
+// far corner. Under it, across the whole card, the summary, the body and the actions.
+//
+// The card is one step above what holds it, with its corners nested in it: the panel's surface
+// radius 8 in as a popup on the stack, and the well's 12 in as a row of the history. A click
+// opens what it is about; the dismiss button and the actions take their own clicks.
 K.Pressable {
     id: root
 
@@ -23,15 +24,11 @@ K.Pressable {
     readonly property bool critical: notification?.urgency === NotificationUrgency.Critical
     // expireTimeout is the raw D-Bus value in milliseconds (Quickshell's docs say seconds).
     readonly property int timeout: notification?.expireTimeout > 0 ? notification.expireTimeout : Settings.notificationTimeout
-    readonly property string iconSource: {
-        const n = notification;
-        if (!n)
+    readonly property string appIcon: {
+        const icon = notification?.appIcon ?? "";
+        if (icon === "")
             return "";
-        if (n.image)
-            return n.image;
-        if (n.appIcon.startsWith("/"))
-            return `file://${n.appIcon}`;
-        return n.appIcon ? Quickshell.iconPath(n.appIcon, true) : "";
+        return icon.startsWith("/") ? `file://${icon}` : Quickshell.iconPath(icon, true);
     }
     readonly property color fg: critical ? K.Tokens.color.on_error_container : K.Tokens.color.on_surface
     readonly property color fgMuted: critical ? K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued_text) : K.Tokens.color.on_surface_variant
@@ -39,19 +36,40 @@ K.Pressable {
     property bool inWell: false
     readonly property real radius: K.Look.nested(K.Tokens.radius.surface, root.inWell ? K.Tokens.space.s12 : K.Tokens.space.s8)
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
-    readonly property bool imageShown: root.iconSource !== "" && image.status === Image.Ready
+    // The band's inset from the card's top and from its corner: the dismiss button sits as close
+    // to the corner as the curve lets it, so the words below keep the room.
+    readonly property int band: K.Tokens.space.s8
+    readonly property var arrived: root.notification ? Notifs.arrived(root.notification) : null
+    // The day and time it came: the time alone today, the day's name before it otherwise.
+    readonly property string when: {
+        const at = root.arrived;
+        if (!at)
+            return "";
+        const now = Time.now;
+        const day = d => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const days = Math.round((day(now) - day(at)) / 86400000);
+        const time = Qt.formatDateTime(at, Time.timeFormat);
+        if (days === 0)
+            return time;
+        if (days === 1)
+            return `Yesterday ${time}`;
+        return `${Qt.formatDateTime(at, Time.shortDateFormat)} ${time}`;
+    }
 
     // Time left before the popup hides (1 -> 0); paused while hovered.
     property real remaining: 1
 
-    // Where a header text sits: centred on the dismiss button, on a whole device pixel.
-    function headerLine(text: Item): real {
-        return K.Tokens.space.s12 + K.Look.snap((K.Tokens.size.control_sm - text.implicitHeight) / 2, root.dpr);
+    // `body` as plain words. A notification's body may carry the spec's small set of markup
+    // (bold, italics, links, line breaks, entities), which a type style draws as written. A number
+    // keeps its unit on its line ("41 s", "20 %"), so a line never ends in a lone number.
+    // https://specifications.freedesktop.org/notification-spec/latest/markup.html
+    function plain(body: string): string {
+        return body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, "&").replace(/(\d) (?=[A-Za-z%°]{1,3}\b)/g, "$1 ");
     }
 
     // Every height here is a binding, never a layout pass: a list places the cards after this one
     // by its height as it arrives, and doesn't move them for a change while they slide in.
-    implicitHeight: K.Look.snapUp(K.Tokens.space.s12 * 2 + Math.max(K.Tokens.size.control_md, K.Tokens.size.control_sm + words.height), root.dpr)
+    implicitHeight: K.Look.snapUp(words.y + words.height + K.Tokens.space.s12, root.dpr)
     activeFocusOnTab: false
     onActivated: Notifs.activate(root.notification)
 
@@ -72,61 +90,55 @@ K.Pressable {
         K.StateLayer {
             radius: parent.radius
             content: root.fg
-            hovered: root.hovered
+            hovered: root.hovered && !dismiss.hovered
             pressed: root.down
         }
     }
 
-    // The app's icon or the notification's image on a tile, or a bell.
-    Item {
+    // The header band, a small control tall: who it is from and when.
+    K.IconTile {
         id: tile
 
         x: K.Tokens.space.s12
-        y: K.Tokens.space.s12
-        width: K.Tokens.size.control_md
-        height: K.Tokens.size.control_md
-
-        Rectangle {
-            anchors.fill: parent
-            radius: K.Tokens.radius.control
-            color: root.critical ? K.Tokens.color.error : K.Tokens.color.secondary_container
-        }
-
-        ClippingRectangle {
-            anchors.fill: parent
-            radius: K.Tokens.radius.control
-            color: "transparent"
-            visible: root.imageShown
-
-            Image {
-                id: image
-
-                anchors.fill: parent
-                source: root.iconSource
-                fillMode: Image.PreserveAspectCrop
-                sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
-                asynchronous: true
-                smooth: true
-                mipmap: true
-            }
-        }
-
-        K.Icon {
-            x: K.Look.snap((K.Tokens.size.control_md - size) / 2, root.dpr)
-            y: K.Look.snap((K.Tokens.size.control_md - size) / 2, root.dpr)
-            visible: !root.imageShown
-            name: root.critical ? "warning" : "notifications"
-            size: K.Tokens.icon.s20
-            color: root.critical ? K.Tokens.color.on_error : K.Tokens.color.on_secondary_container
-        }
+        y: root.band
+        size: "Sm"
+        icon: root.critical ? "warning" : "notifications"
+        source: root.appIcon
+        photo: root.notification?.image ?? ""
+        danger: root.critical
     }
 
-    // The header, a small control tall: the summary, the app's name and the dismiss button.
+    K.Text {
+        id: app
+
+        x: tile.x + tile.width + K.Tokens.space.s8
+        y: root.band + K.Look.snap((K.Tokens.size.control_sm - height) / 2, root.dpr)
+        room: Math.max(0, dismiss.x - K.Tokens.space.s8 - x - (time.visible ? time.width + K.Tokens.space.s8 : 0))
+        // One line, cut at the band's room: an app's name past it breaks at a space onto a line
+        // that isn't shown.
+        height: K.Tokens.type.label.line
+        clip: true
+        text: root.notification?.appName || "Notification"
+        style: K.Tokens.type.label
+        color: root.fg
+    }
+
+    K.Text {
+        id: time
+
+        x: app.x + app.width + K.Tokens.space.s8
+        y: root.band + K.Look.snap((K.Tokens.size.control_sm - height) / 2, root.dpr)
+        visible: text !== ""
+        text: root.when
+        style: K.Tokens.type.small
+        color: root.fgMuted
+    }
+
     K.IconButton {
         id: dismiss
 
-        x: root.width - K.Tokens.space.s12 - width
-        y: K.Tokens.space.s12
+        x: root.width - root.band - width
+        y: root.band
         icon: "close"
         label: qsTr("Dismiss")
         kind: "Text"
@@ -135,64 +147,44 @@ K.Pressable {
         onActivated: root.notification.dismiss()
     }
 
-    K.Text {
-        id: app
-
-        x: dismiss.x - K.Tokens.space.s8 - width
-        y: root.headerLine(app)
-        room: words.width / 2
-        text: root.notification?.appName ?? ""
-        style: K.Tokens.type.caption
-        color: root.fgMuted
-        maximumLines: 1
-    }
-
-    K.Text {
-        id: summary
-
-        x: words.x
-        y: root.headerLine(summary)
-        width: Math.max(0, app.x - K.Tokens.space.s8 - x)
-        room: width
-        text: root.notification?.summary ?? ""
-        style: K.Tokens.type.body_strong
-        color: root.fg
-        maximumLines: 1
-    }
-
-    // Under the header, beside the tile: the body, then the actions.
+    // Under the band, across the card: the summary, the body, then the actions.
     Item {
         id: words
 
-        readonly property real bodyHeight: body.text !== "" ? K.Tokens.space.s4 + body.implicitHeight : 0
-        // `body` as plain words. A notification's body may carry the spec's small set of markup
-        // (bold, italics, links, line breaks, entities), which a type style draws as written.
-        // https://specifications.freedesktop.org/notification-spec/latest/markup.html
-        function plain(body: string): string {
-            return body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, "&");
-        }
-
+        readonly property real summaryHeight: summary.text !== "" ? summary.height : 0
+        readonly property real bodyHeight: body.text !== "" ? K.Tokens.space.s4 + body.height : 0
         readonly property real actionsHeight: actions.count > 0 ? K.Tokens.space.s12 + K.Tokens.size.control_sm : 0
 
-        x: tile.x + tile.width + K.Tokens.space.s12
-        y: K.Tokens.space.s12 + K.Tokens.size.control_sm
-        width: Math.max(0, root.width - K.Tokens.space.s12 - x)
-        height: words.bodyHeight + words.actionsHeight
+        x: K.Tokens.space.s12
+        y: root.band + K.Tokens.size.control_sm + K.Tokens.space.s8
+        width: Math.max(0, root.width - K.Tokens.space.s12 * 2)
+        height: words.summaryHeight + words.bodyHeight + words.actionsHeight
+
+        K.Text {
+            id: summary
+
+            visible: text !== ""
+            room: words.width
+            text: root.notification?.summary ?? ""
+            style: K.Tokens.type.body_strong
+            color: root.fg
+            maximumLines: 2
+        }
 
         K.Text {
             id: body
 
-            y: K.Tokens.space.s4
+            y: words.summaryHeight + K.Tokens.space.s4
             visible: text !== ""
             room: words.width
-            text: words.plain(root.notification?.body ?? "")
+            text: root.plain(root.notification?.body ?? "")
             style: K.Tokens.type.body
             color: root.fgMuted
-            maximumLines: root.popup ? 3 : 6
+            maximumLines: root.popup ? 4 : 6
         }
 
         K.Row {
-            y: words.bodyHeight + K.Tokens.space.s12
+            y: words.summaryHeight + words.bodyHeight + K.Tokens.space.s12
             visible: actions.count > 0
             gap: K.Tokens.space.s8
 

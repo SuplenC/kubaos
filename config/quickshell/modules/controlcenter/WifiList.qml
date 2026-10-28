@@ -90,14 +90,35 @@ Item {
             }
         }
 
+        // Rows still being found while the scan has nothing yet: the first results take the
+        // place they keep.
+        Column {
+            x: K.Tokens.space.s12
+            y: K.Tokens.space.s12
+            width: parent.width - K.Tokens.space.s12 * 2
+            visible: list.count === 0 && Net.wifiEnabled
+            spacing: K.Tokens.space.s4
+
+            Repeater {
+                model: [0.6, 0.45, 0.75]
+
+                SkeletonRow {
+                    required property real modelData
+
+                    width: parent.width
+                    share: modelData
+                }
+            }
+        }
+
         K.EmptyState {
             anchors.verticalCenter: parent.verticalCenter
             width: parent.width
             room: parent.width
-            visible: list.count === 0
-            icon: Net.wifiEnabled ? "wifi_find" : "wifi_off"
-            title: Net.wifiEnabled ? "Scanning…" : "Wi-Fi is off"
-            body: Net.wifiEnabled ? "Networks show up here as they're found." : "The Wi-Fi tile turns it on."
+            visible: list.count === 0 && !Net.wifiEnabled
+            icon: "wifi_off"
+            title: "Wi-Fi is off"
+            body: "The Wi-Fi tile turns it on."
         }
     }
 
