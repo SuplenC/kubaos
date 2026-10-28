@@ -2,34 +2,74 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Notifications
+import "dnd.js" as Dnd
 
-// Notification daemon. Every notification is kept in `history` until dismissed;
-// `popups` is the subset currently shown on screen. Do-not-disturb suppresses
-// popups (except critical ones) but still records history.
+// Notification daemon. Every notification is kept in `history` until dismissed, unread until it is
+// opened, marked read or seen in the notifications panel; `popups` is the subset on screen now.
+//
+// Do not disturb (`dnd.js`) is on by hand, or by itself while Hyprland says the screen is shared
+// or a window is fullscreen. While it is on, new notifications land in the history without popping
+// up, critical ones apart. Its state is `$XDG_RUNTIME_DIR/kubaos-dnd.json`, which the Command
+// menu's on/off pair reads and a restarted shell takes the hand's on back from.
 Singleton {
     id: root
 
     readonly property var history: server.trackedNotifications.values.slice().reverse()
     readonly property int count: history.length
     property var popups: []
-    readonly property bool dnd: persisted.dnd
     // When each notification arrived, by its id: the spec carries no time, so it is the moment
     // the server took it.
     property var arrivals: ({})
+    // The ids of the notifications not read yet, as a set.
+    property var unreadIds: ({})
+    readonly property int unreadCount: history.filter(n => root.unreadIds[n.id] === true).length
+
+    property var dndState: Dnd.initial()
+    readonly property bool dnd: Dnd.on(root.dndState)
+    // Why it is on: "manual", "sharing" or "fullscreen"; "overridden" while it is off during a
+    // share or a fullscreen window; "" while it is simply off.
+    readonly property string dndReason: Dnd.reason(root.dndState)
+    // Whether the state file has been read, so nothing writes over it before then.
+    property bool dndRead: false
 
     // When `notification` arrived, or null for one from before this shell started.
     function arrived(notification): var {
         return root.arrivals[notification?.id] ?? null;
     }
 
+    function isUnread(notification): bool {
+        return root.unreadIds[notification?.id] === true;
+    }
+
+    function markRead(list: var): void {
+        const kept = Object.assign({}, root.unreadIds);
+        for (const n of list)
+            delete kept[n.id];
+        root.unreadIds = kept;
+    }
+
+    function markAllRead(): void {
+        root.unreadIds = {};
+    }
+
     function toggleDnd(): void {
-        persisted.dnd = !persisted.dnd;
+        root.dndState = Dnd.toggle(root.dndState);
+    }
+
+    function setDnd(on: bool): void {
+        root.dndState = Dnd.set(root.dndState, on);
     }
 
     function clear(): void {
         root.popups = [];
         for (const n of server.trackedNotifications.values.slice())
+            n.dismiss();
+    }
+
+    function dismissAll(list: var): void {
+        for (const n of list.slice())
             n.dismiss();
     }
 
@@ -39,12 +79,57 @@ Singleton {
             notification.expire();
     }
 
-    // Runs the default action if there is one, then dismisses.
+    // Runs the default action if there is one, and marks it read. A notification that isn't
+    // resident goes as its action is taken.
     function activate(notification): void {
+        root.markRead([notification]);
+        root.hidePopup(notification);
         const action = notification.actions.find(a => a.identifier === "default");
         if (action)
             action.invoke();
-        notification.dismiss();
+    }
+
+    onDndStateChanged: {
+        if (root.dndRead)
+            dndFile.setText(Dnd.saved(root.dndState));
+    }
+
+    // What Hyprland says now: whether the screen is shared, whether a window is fullscreen.
+    function sense(): void {
+        root.dndState = Dnd.sense(root.dndState, {
+            sharing: Hypr.sharing,
+            fullscreen: Hypr.fullscreen
+        });
+    }
+
+    Connections {
+        target: Hypr
+
+        function onSharingChanged(): void {
+            root.sense();
+        }
+
+        function onFullscreenChanged(): void {
+            root.sense();
+        }
+    }
+
+    FileView {
+        id: dndFile
+
+        path: `${Quickshell.env("XDG_RUNTIME_DIR")}/kubaos-dnd.json`
+        printErrors: false
+        onLoaded: {
+            root.dndState = Dnd.restore(text());
+            root.dndRead = true;
+            root.sense();
+            dndFile.setText(Dnd.saved(root.dndState));
+        }
+        onLoadFailed: {
+            root.dndRead = true;
+            root.sense();
+            dndFile.setText(Dnd.saved(root.dndState));
+        }
     }
 
     NotificationServer {
@@ -58,26 +143,24 @@ Singleton {
 
         onNotification: notification => {
             notification.tracked = true;
-            root.arrivals = Object.assign({}, root.arrivals, {
-                [notification.id]: new Date()
-            });
             const id = notification.id;
+            root.arrivals = Object.assign({}, root.arrivals, {
+                [id]: new Date()
+            });
+            root.unreadIds = Object.assign({}, root.unreadIds, {
+                [id]: true
+            });
             notification.closed.connect(() => {
                 root.popups = root.popups.filter(n => n !== notification);
                 const kept = Object.assign({}, root.arrivals);
                 delete kept[id];
                 root.arrivals = kept;
+                const unread = Object.assign({}, root.unreadIds);
+                delete unread[id];
+                root.unreadIds = unread;
             });
             if (!root.dnd || notification.urgency === NotificationUrgency.Critical)
                 root.popups = [notification, ...root.popups];
         }
-    }
-
-    PersistentProperties {
-        id: persisted
-
-        reloadableId: "notifications"
-
-        property bool dnd: false
     }
 }

@@ -61,6 +61,10 @@ Singleton {
     // Flip together with POLKIT_AGENT in config/hypr/autostart.lua ("quickshell").
     readonly property bool polkitAgent: false
 
+    // The bar's bell shows while there is a notification: false, or true to show it always. The
+    // user layer's `alwaysShowBell` wins; the Command menu's "Always show the bell" Item writes it.
+    readonly property bool alwaysShowBell: typeof user.alwaysShowBell === "boolean" ? user.alwaysShowBell : false
+
     // Popup lifetime when the sender does not set one, in milliseconds.
     readonly property int notificationTimeout: 6000
 

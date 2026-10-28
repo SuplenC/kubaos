@@ -5,7 +5,7 @@ import qs.services
 // A notification's right-click menu: its actions, then Open, Dismiss and Clear all, as a `Menu` on
 // a `Popover` floating over the window under the pointer. A press anywhere else or Esc closes it.
 // Over the corner stack, which is no panel, it opens a modal one (`notificationmenu`), so the
-// press elsewhere reaches it and the keys go to the menu; inside the control center, already
+// press elsewhere reaches it and the keys go to the menu; inside the notifications panel, already
 // modal, it stays its own.
 Item {
     id: root

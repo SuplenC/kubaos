@@ -10,9 +10,10 @@ import qs.modules.frame
 //   qml FrameShot.qml -- MODE OUT PANEL [STATE]
 //
 // PANEL is a name Panels opens (controlcenter, clock, sysmon, powermenu, wallpaper), or osd,
-// notifications, or bar (nothing open). STATE puts the panel in a state, through the services
-// and public properties only, so the driver works with any version of the panel:
-//   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), wifi (the Wi-Fi tab),
+// notifications (the popups, the peek or the panel), or bar (nothing open). STATE puts the panel
+// in a state, through the services and public properties only, so the driver works with any
+// version of the panel:
+//   controlcenter: "" (Wi-Fi tab), wifi (the Wi-Fi tab),
 //                  wifi-form (a secured network's form, a password typed), wifi-error (the
 //                  same, the password turned down), wifi-leaving (a network gone out of range
 //                  held half-way out), wifi-scan (a scan's update: a network gone, one new and two
@@ -25,7 +26,12 @@ import qs.modules.frame
 //   sysmon: process (a process's details)
 //   wallpaper: settings
 //   osd: volume, brightness
-//   bar: traymenu (the network item's menu open)
+//   notifications: "" (two popups), peek (the bell's peek), panel (the notifications panel, a
+//                  stack folded), panel-expanded (the stack open, its second card selected),
+//                  panel-empty (nothing in it), panel-dnd (Do not disturb on while the screen is
+//                  shared)
+//   bar: traymenu (the network item's menu open), dnd (the bell crossed out), nobell (no
+//        notification, so no bell)
 QtObject {
     id: driver
 
@@ -104,6 +110,16 @@ QtObject {
             osd.armed = true;
             driver.osd = osd;
             driver.keepOsd.start();
+        } else if (driver.panel === "notifications" && driver.state.startsWith("panel")) {
+            Panels.current = "notifications";
+            if (driver.state === "panel-expanded")
+                notificationsPose.start();
+        } else if (driver.panel === "notifications" && driver.state === "peek") {
+            const popups = driver.find(root, it => it.peeking !== undefined && it.hasPeek !== undefined);
+            if (popups)
+                popups.peeking = true;
+            else
+                console.warn("shot: no peek found");
         } else if (driver.panel === "notifications") {
             Notifs.showPopups();
         } else if (driver.panel !== "bar") {
@@ -144,8 +160,23 @@ QtObject {
             cc.tab = cc.keyboardTab;
             keyboardPose.start();
         }
-        if (driver.state === "")
-            scroll.start();
+    }
+
+    // The panel's stack opened once the panel has, the keyboard on its second card, through what
+    // NotificationPanel.qml exposes.
+    property Timer notificationsPose: Timer {
+        interval: 700
+        onTriggered: {
+            const panel = driver.find(driver.window.contentItem, it => it.expanded !== undefined && typeof it.setExpanded === "function");
+            if (!panel) {
+                console.warn("shot: no notifications panel found");
+                return;
+            }
+            const stack = panel.rows.find(row => row.stacked);
+            panel.setExpanded(stack.key, true);
+            const list = driver.find(panel, it => typeof it.jump === "function");
+            list.currentIndex = panel.rows.findIndex(row => row.key === stack.key) + 1;
+        }
     }
 
     // A radio tab's form or a row leaving, once the panel has opened, through what WifiList.qml
@@ -284,20 +315,6 @@ QtObject {
         }
     }
 
-    // The notification history, scrolled to its middle once the panel has opened.
-    property Timer scroll: Timer {
-        interval: 700
-        onTriggered: {
-            const history = driver.find(driver.window.contentItem, it => it.maxListHeight !== undefined);
-            const list = history ? driver.find(history, it => it.contentY !== undefined && it.count !== undefined) : null;
-            if (!list) {
-                console.warn("shot: no notification history found");
-                return;
-            }
-            list.contentY = Math.max(0, (list.contentHeight - list.height) / 2);
-        }
-    }
-
     Component.onCompleted: {
         K.Tokens.mode = driver.args[0] === "light" ? "light" : "dark";
         Hypr.focusedScreen = driver.screen;
@@ -312,11 +329,11 @@ QtObject {
         // before the frame exists, so no row is made and torn down again.
         if (driver.panel === "controlcenter" && driver.state === "scanning")
             Net.networks = [];
-        // The history cleared, so the tab has the room to show the passkey prompt and its keycaps
-        // whole, or a scan's rows; cleared before the frame exists, so no card is made and torn
-        // down again.
-        if (driver.panel === "controlcenter" && driver.state !== "")
+        // Emptied before the frame exists, so no card is made and torn down again.
+        if ((driver.panel === "notifications" && driver.state === "panel-empty") || (driver.panel === "bar" && driver.state === "nobell"))
             Notifs.clear();
+        if ((driver.panel === "notifications" && driver.state === "panel-dnd") || (driver.panel === "bar" && driver.state === "dnd"))
+            Notifs.dndReason = "sharing";
         driver.frame = driver.frameComponent.createObject(null);
         driver.window = driver.windowOf(driver.frame);
         if (!driver.window) {

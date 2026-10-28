@@ -16,6 +16,7 @@ QtObject {
     readonly property bool fingerprint: false
     readonly property bool polkitAgent: true
     readonly property int notificationTimeout: 6000
+    property bool alwaysShowBell: false
     property var user: ({})
 
     function readUser(text: string): void {

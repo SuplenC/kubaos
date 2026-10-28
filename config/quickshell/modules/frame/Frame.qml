@@ -46,7 +46,7 @@ Scope {
         readonly property bool modal: panel !== ""
         // 1 = frame shown, 0 = retracted (a fullscreen window, no panel open).
         property real reveal: fullscreen && !modal ? 0 : 1
-        readonly property var panels: [controlCenter, clockPopup, sysmonPopup, powerMenu, wallpaperPicker]
+        readonly property var panels: [controlCenter, notificationPanel, clockPopup, sysmonPopup, powerMenu, wallpaperPicker]
         // The panel on screen (opening, open or closing) that reaches into
         // the popups' corner column, or null. Popups never draw over it.
         readonly property K.Sheet toastCover: panels.find(d => (d.shown || d.active) && d.area.x + d.area.width + K.Tokens.radius.surface > geo.r - popups.contentWidth) ?? null
@@ -124,6 +124,7 @@ Scope {
             opacity: ({
                     powermenu: K.Tokens.opacity.scrim,
                     controlcenter: K.Tokens.opacity.panel_scrim,
+                    notifications: K.Tokens.opacity.panel_scrim,
                     clock: K.Tokens.opacity.panel_scrim,
                     sysmon: K.Tokens.opacity.panel_scrim
                 })[root.panel] ?? 0
@@ -172,6 +173,10 @@ Scope {
                 }
 
                 PanelPath {
+                    drawer: notificationPanel
+                }
+
+                PanelPath {
                     drawer: powerMenu
                 }
 
@@ -207,7 +212,24 @@ Scope {
             onClicked: Panels.close()
         }
 
+        // The peek shows while the pointer rests on the bell or on the peek, and a moment after it
+        // leaves either, so it can cross the bar's edge from one to the other.
+        readonly property bool peekWanted: bar.bellPeeking || popups.peekHovered
+
+        onPeekWantedChanged: {
+            if (!root.peekWanted)
+                peekLeave.restart();
+        }
+
+        Timer {
+            id: peekLeave
+
+            interval: K.Tokens.duration.short
+        }
+
         Bar {
+            id: bar
+
             y: geo.t - K.Tokens.size.bar
             width: root.width
             height: K.Tokens.size.bar
@@ -225,8 +247,9 @@ Scope {
                 id: popups
 
                 frame: geo
-                shown: Notifs.popups.length > 0 && Hypr.focusedScreen === root.screen && !root.toastCover
+                shown: ((Notifs.popups.length > 0 && Hypr.focusedScreen === root.screen) || popups.hasPeek) && !root.toastCover
                 covered: root.toastCover !== null
+                peeking: root.peekWanted || peekLeave.running
             }
 
             PopupsBelow {
@@ -248,6 +271,13 @@ Scope {
 
                 frame: geo
                 shown: root.panel === "controlcenter"
+            }
+
+            NotificationPanel {
+                id: notificationPanel
+
+                frame: geo
+                shown: root.panel === "notifications"
             }
 
             ClockPopup {

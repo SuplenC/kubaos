@@ -55,10 +55,16 @@ K.Stack {
             onActivated: Bt.toggle()
         }
 
+        // The one state the notifications panel and the Command menu switch too.
         K.Tile {
             icon: Notifs.dnd ? "notifications_off" : "notifications"
             title: "Do not disturb"
-            subtitle: Notifs.dnd ? "On" : "Off"
+            subtitle: ({
+                    manual: "On",
+                    sharing: "On, screen shared",
+                    fullscreen: "On, fullscreen",
+                    overridden: "Off for now"
+                })[Notifs.dndReason] ?? "Off"
             checked: Notifs.dnd
             onActivated: Notifs.toggleDnd()
         }

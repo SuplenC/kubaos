@@ -43,15 +43,18 @@ TestCase {
     }
 
     function test_an_app_without_a_name_stacks_by_its_desktop_entry() {
-        const history = [{
+        const history = [
+            {
                 id: 2,
                 appName: "",
                 desktopEntry: "org.gnome.Nautilus"
-            }, {
+            },
+            {
                 id: 1,
                 appName: "",
                 desktopEntry: "org.gnome.Nautilus"
-            }];
+            }
+        ];
 
         compare(Feed.stacks(history).length, 1);
     }

@@ -12,6 +12,7 @@ TestCase {
     Countdown {
         id: countdown
 
+        // design-allow(duration): a test's fixture, not a design value.
         duration: 300
     }
 
