@@ -122,8 +122,16 @@ let
             ../Cargo.toml
             ../Cargo.lock
             ../crates
+            # The patched dependencies `[patch.crates-io]` names.
+            ../vendor
           ];
         };
+        # crane stubs every crate it finds in the source, the patched dependencies too, and a
+        # stubbed dependency builds empty: theirs is the real code, as it is a dependency here.
+        extraDummyScript = ''
+          rm -rf $out/vendor
+          cp --recursive --no-preserve=mode,ownership ${../vendor} $out/vendor
+        '';
         buildPhaseCargoCommand = lib.concatMapStringsSep "\n" (
           crate: "cargoWithProfile build --locked -p ${crate}"
         ) crates;
@@ -145,6 +153,7 @@ let
           ../Cargo.toml
           ../Cargo.lock
           (lib.fileset.fileFilter (file: file.name == "Cargo.toml") ../crates)
+          ../vendor
         ]
         ++ map (dep: root + "/${manifests.${dep}.dir}") crates
         ++ lib.concatMap (dep: embeds.${dep} or [ ]) crates

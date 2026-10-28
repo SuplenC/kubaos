@@ -39,6 +39,9 @@ members = [
     "crates/kubaos-geometry",
     "crates/kubaos-design",
 ]
+# Patched copies of dependencies (`[patch.crates-io]` below): built with the workspace, never
+# members of it, so its lints don't apply to them.
+exclude = ["vendor/*"]
 
 [workspace.package]
 version = "0.1.0"
@@ -106,3 +109,11 @@ manual_let_else = "warn"
 mod_module_files = "warn"
 return_self_not_must_use = "warn"
 unwrap_used = "warn"
+
+# iced's software renderer, with images placed in floats and clipped to their own rounded bounds,
+# as the wgpu renderer draws them. 0.14.1 truncates an image's offset to whole image pixels (a
+# 16 px picture drawn 256 wide lands up to 16 px off) and ignores its clip and border radius, so
+# a `Media` picture overflowed its box with square corners. The change is marked `KubaOS:` in
+# `vendor/iced_tiny_skia/src/engine.rs` and `raster.rs`. Drop it when iced fixes both.
+[patch.crates-io]
+iced_tiny_skia = { path = "vendor/iced_tiny_skia" }
