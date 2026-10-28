@@ -334,7 +334,7 @@ impl Weight {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
     /// The lock screen's clock, the one thing that screen shows: a step above the hero, light like
-    /// every big figure.
+    /// every big figure. The clock popup's time is hero_number.
     Clock,
     /// Words at the hero size: Kōbō's welcome line, and nothing else.
     Hero,
@@ -713,7 +713,7 @@ impl Opacity {
             Opacity::OutlineSoft => 0.55,
             Opacity::PanelScrim => 0.2,
             Opacity::Placeholder => 0.55,
-            Opacity::PlaceholderText => 0.8,
+            Opacity::PlaceholderText => 0.85,
             Opacity::Press => 0.14,
             Opacity::Scrim => 0.6,
             Opacity::Selection => 0.32,
@@ -1202,7 +1202,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 36] = [
+pub const CONTRAST: [ContrastPair; 38] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1265,6 +1265,20 @@ pub const CONTRAST: [ContrastPair; 36] = [
         need: Need::Text,
         opacity: Some(Opacity::PlaceholderText),
         purpose: "A field's placeholder",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Text,
+        opacity: Some(Opacity::PlaceholderText),
+        purpose: "A field's placeholder in its resting fill",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerHighest,
+        need: Need::Text,
+        opacity: Some(Opacity::PlaceholderText),
+        purpose: "A field's placeholder while it is focused or hovered",
     },
     ContrastPair {
         fg: Role::Primary,
