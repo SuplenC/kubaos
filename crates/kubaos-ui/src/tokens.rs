@@ -1240,7 +1240,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 43] = [
+pub const CONTRAST: [ContrastPair; 46] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
