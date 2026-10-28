@@ -30,6 +30,9 @@ local function same(actual, expected, what)
 end
 
 local real_getenv = os.getenv
+local scratch = os.tmpname()
+os.remove(scratch)
+local homes = 0
 
 -- Hyprland's focus reasons, as `window.active` passes them.
 local FFM, KEYBIND, WORKSPACE_CHANGE, TOGGLE_SPECIAL, NEW_WINDOW = 1, 2, 11, 12, 16
@@ -38,6 +41,7 @@ local A = { address = "0xa", workspace = { id = 1 } }
 local B = { address = "0xb", workspace = { id = 1 } }
 local C = { address = "0xc", workspace = { id = 1 } }
 local HIDDEN = { address = "0xd", workspace = { id = 2 } }
+local GROUPED = { address = "0xf", workspace = { id = 1 }, group = {} }
 
 local SPECS = {
   border = { leaf = "border", enabled = true, speed = 3, bezier = "standard" },
@@ -49,10 +53,10 @@ local SPECS = {
 -- nil); through looks.lua when `looks` is true, with no generated palette.
 -- The world records the config Hyprland holds and each call made.
 local function world(settings, looks)
-  local home = os.tmpname()
-  os.remove(home)
+  homes = homes + 1
+  local home = scratch .. "/" .. homes
+  os.execute("mkdir -p '" .. home .. "/kubaos/desktop/quickshell'")
   if settings then
-    os.execute("mkdir -p '" .. home .. "/kubaos/desktop/quickshell'")
     local f = assert(io.open(home .. "/kubaos/desktop/quickshell/settings.json", "w"))
     f:write(settings)
     f:close()
@@ -66,7 +70,7 @@ local function world(settings, looks)
     return real_getenv(name)
   end
 
-  local w = { handlers = {}, timers = {}, animations = {}, configs = 0, active = A, fail_config = false }
+  local w = { handlers = {}, timers = {}, animations = {}, configs = 0, groups = 0, active = A, fail_config = false }
   w.held = { border = nil, group = nil, shadow = nil }
   -- Every key set, by its dotted name, as `hl.get_config` reads them.
   w.set = {}
@@ -92,8 +96,11 @@ local function world(settings, looks)
       local group = t.group and t.group.col
       local shadow = t.decoration and t.decoration.shadow
       w.held.border = general and general.active_border or w.held.border
-      w.held.group = group and group.border_active or w.held.group
       w.held.shadow = shadow and shadow.color or w.held.shadow
+      if group and group.border_active then
+        w.held.group = group.border_active
+        w.groups = w.groups + 1
+      end
     end,
     animation = function(spec)
       w.animations[spec.leaf] = spec
@@ -124,9 +131,9 @@ local function world(settings, looks)
 
   package.loaded.focus = nil
   package.loaded.colors = nil
+  _G.dot = {}
   w.palette = colors.defaults
   if looks then
-    _G.dot = {}
     assert(pcall(dofile, repo .. "/config/hypr/looks.lua"))
     w.focus = package.loaded.focus
   else
@@ -138,6 +145,7 @@ local function world(settings, looks)
     w.focus.use(w.palette)
   end
   w.configs = 0
+  w.groups = 0
 
   function w.fire(event, ...)
     for _, fn in ipairs(w.handlers[event] or {}) do
@@ -160,6 +168,16 @@ local function world(settings, looks)
     end
   end
 
+  -- Ticks until no timer is armed, at most `limit` times; how many it took.
+  function w.run(limit)
+    local ticks = 0
+    while w.armed() and ticks < (limit or 100) do
+      w.tick()
+      ticks = ticks + 1
+    end
+    return ticks
+  end
+
   function w.armed()
     for _, timer in ipairs(w.timers) do
       if timer.enabled then
@@ -175,7 +193,8 @@ local function world(settings, looks)
   end
 
   function w.fades_on()
-    return w.animations.border == SPECS.border and w.animations.fadeShadow == SPECS.fadeShadow
+    local border, shadow = w.animations.border, w.animations.fadeShadow
+    return border.enabled ~= false and shadow.enabled ~= false
   end
 
   return w
@@ -207,7 +226,7 @@ test("the lit tube is primary and its glow primary at the glow's opacity at the 
   same(w.lit(), true, "the active colours once the palette is in use")
 end)
 
-test("a dark tube is an inactive window's border and shadow", function()
+test("a dark tube is an inactive window's border and shadow, from the window opacities", function()
   local w = world(nil)
 
   local dark = at(w, 0)
@@ -215,6 +234,8 @@ test("a dark tube is an inactive window's border and shadow", function()
 
   same(dark.border, inactive.border, "border")
   same(dark.shadow, inactive.shadow, "shadow")
+  same(inactive.border, colors.rgba(w.palette.surface_container_highest, alpha(tokens.opacity.window_border)), "border")
+  same(inactive.shadow, colors.rgba(w.palette.shadow, alpha(tokens.opacity.window_shadow)), "shadow")
 end)
 
 test("the glow reaches as far as the far glow, falling off at the power that fits it best", function()
@@ -229,33 +250,53 @@ test("focus moving to another window strikes the tube and glow through every ste
   local strike = tokens.neon.strike
 
   w.focus_on(B, KEYBIND)
-  local seen = { w.held.border }
-  local fades_off = w.animations.border.enabled == false and w.animations.fadeShadow.enabled == false
+  local seen = { { w.held.border, w.held.shadow } }
+  local fades_off = not w.fades_on()
   for _ = 2, #strike do
     w.tick()
-    seen[#seen + 1] = w.held.border
+    seen[#seen + 1] = { w.held.border, w.held.shadow }
   end
+  w.tick()
+  local landed = { lit = w.lit(), fades_off = not w.fades_on(), armed = w.armed() }
   w.tick()
 
   same(fades_off, true, "the border's and shadow's fades off while it strikes")
   same(w.timers[1].timeout, tokens.duration.medium // #strike, "step")
   same(w.timers[1].type, "repeat", "timer type")
   for i, level in ipairs(strike) do
-    same(seen[i], at(w, level).border, "step " .. i)
+    same(seen[i][1], at(w, level).border, "tube at step " .. i)
+    same(seen[i][2], at(w, level).shadow, "glow at step " .. i)
   end
+  same(landed.lit and landed.fades_off and landed.armed, true, "lit with the fades still off for a step")
   same(w.lit(), true, "lit after the strike")
   same(w.armed(), false, "the timer disarmed")
-  same(w.fades_on(), true, "the fades back as looks.lua set them")
+  same(w.animations.border, SPECS.border, "the border's fade as set")
+  same(w.animations.fadeShadow, SPECS.fadeShadow, "the shadow's fade as set")
 end)
 
-test("the glow strikes with the tube, and a grouped window's tube too", function()
+test("only a grouped window's strike sets the group's colour", function()
+  local plain = world(nil)
+  plain.focus_on(B, FFM)
+  plain.run()
+  same(plain.groups, 0, "group colour sets for a plain window")
+
+  local w = world(nil)
+  w.focus_on(GROUPED, FFM)
+  w.tick()
+  same(w.held.group, at(w, tokens.neon.strike[2]).border, "group tube at step 2")
+  w.run()
+  same(w.lit(), true, "lit")
+end)
+
+test("a grouped window's strike cut short by a plain window's leaves the group's colour lit", function()
   local w = world(nil)
 
-  w.focus_on(B, FFM)
+  w.focus_on(GROUPED, KEYBIND)
   w.tick()
+  w.focus_on(B, KEYBIND)
+  w.run()
 
-  same(w.held.shadow, at(w, tokens.neon.strike[2]).shadow, "glow")
-  same(w.held.group, at(w, tokens.neon.strike[2]).border, "group")
+  same(w.lit(), true, "lit, the group's colour too")
 end)
 
 test("a new focus mid-strike strikes again from the first step and still ends lit", function()
@@ -267,26 +308,43 @@ test("a new focus mid-strike strikes again from the first step and still ends li
   w.tick()
   w.focus_on(C, KEYBIND)
   local first = w.held.border
-  for _ = 1, #strike do
-    w.tick()
-  end
+  local ticks = w.run()
 
   same(first, at(w, strike[1]).border, "first step again")
+  same(ticks, #strike + 1, "ticks from the new focus")
   same(#w.timers, 1, "timers")
   same(w.lit(), true, "lit")
-  same(w.armed(), false, "disarmed")
   same(w.fades_on(), true, "fades")
 end)
 
-test("a workspace switch mid-strike ends it lit at once", function()
+test("a new focus while the lit colours land strikes again with the fades still off", function()
+  local w = world(nil)
+
+  w.focus_on(B, KEYBIND)
+  for _ = 1, #tokens.neon.strike do
+    w.tick()
+  end
+  w.focus_on(C, KEYBIND)
+  local striking = { border = w.held.border, fades_off = not w.fades_on() }
+  w.run()
+
+  same(striking.border, at(w, tokens.neon.strike[1]).border, "first step")
+  same(striking.fades_off, true, "fades off")
+  same(w.lit() and w.fades_on() and not w.armed(), true, "lit, fades on, disarmed")
+end)
+
+test("a workspace switch mid-strike lights the window at once and then turns the fades on", function()
   local w = world(nil)
 
   w.focus_on(B, KEYBIND)
   w.tick()
   w.focus_on(HIDDEN, WORKSPACE_CHANGE)
+  local lit, fades_off = w.lit(), not w.fades_on()
+  local ticks = w.run()
 
-  same(w.lit(), true, "lit")
-  same(w.armed(), false, "disarmed")
+  same(lit, true, "lit at once")
+  same(fades_off, true, "with the fades off as it lands")
+  same(ticks, 1, "ticks to the fades")
   same(w.fades_on(), true, "fades")
 end)
 
@@ -348,6 +406,16 @@ test("the pointer landing on a window of a workspace just switched to doesn't st
   same(w.armed(), true, "a strike once the workspace shows")
 end)
 
+test("a workspace moved to a screen strikes once it shows there", function()
+  local w = world(nil)
+
+  w.monitors[1].active_workspace = { id = 2 }
+  w.fire("workspace.move_to_monitor", { id = 2 }, w.monitors[1])
+  w.focus_on(HIDDEN, KEYBIND)
+
+  same(w.armed(), true, "a strike on the moved workspace")
+end)
+
 test("a palette change mid-strike paints the steps left in the new colours", function()
   local w = world(nil)
   local light = {}
@@ -364,12 +432,25 @@ test("a palette change mid-strike paints the steps left in the new colours", fun
   same(w.held.border, at(w, tokens.neon.strike[2]).border, "step in the new palette")
 end)
 
-test("a step that fails ends the strike lit", function()
+test("a step that fails ends the strike lit, with the fades back", function()
   local w = world(nil)
 
   w.focus_on(B, KEYBIND)
   w.fail_config = true
   w.tick()
+  w.run()
+
+  same(w.lit(), true, "lit")
+  same(w.armed(), false, "disarmed")
+  same(w.fades_on(), true, "fades")
+end)
+
+test("a strike that can't start leaves the window lit with its fades", function()
+  local w = world(nil)
+
+  w.fail_config = true
+  w.focus_on(B, KEYBIND)
+  w.run()
 
   same(w.lit(), true, "lit")
   same(w.armed(), false, "disarmed")
@@ -382,9 +463,7 @@ test("looks.lua lights the active window and keeps inactive ones neutral, and a 
   local border, shadow = w.animations.border, w.animations.fadeShadow
 
   w.focus_on(B, KEYBIND)
-  for _ = 1, #tokens.neon.strike do
-    w.tick()
-  end
+  w.run()
 
   same(w.lit(), true, "lit")
   same(w.set["general.col.inactive_border"], inactive.border, "inactive border")
@@ -397,6 +476,17 @@ test("looks.lua lights the active window and keeps inactive ones neutral, and a 
   same(border.enabled and border.speed * 100, tokens.duration.medium, "border fade's length")
 end)
 
+test("a fade the user layer sets through dot.focus.fade is the one a strike brings back", function()
+  local w = world(nil, true)
+  local mine = { leaf = "border", enabled = true, speed = 1, bezier = "standard" }
+
+  _G.dot.focus.fade(mine)
+  w.focus_on(B, KEYBIND)
+  w.run()
+
+  same(w.animations.border, mine, "border fade")
+end)
+
 test("reloading the colours mid-strike keeps the step, and the strike still ends lit", function()
   local w = world(nil, true)
 
@@ -404,9 +494,7 @@ test("reloading the colours mid-strike keeps the step, and the strike still ends
   w.tick()
   _G.dot.reload_colors()
   local held = w.held.border
-  for _ = 1, #tokens.neon.strike do
-    w.tick()
-  end
+  w.run()
 
   same(held, at(w, tokens.neon.strike[2]).border, "the step through the reload")
   same(w.lit(), true, "lit")
@@ -414,4 +502,5 @@ test("reloading the colours mid-strike keeps the step, and the strike still ends
 end)
 
 os.getenv = real_getenv
+os.execute("rm -rf '" .. scratch .. "'")
 os.exit(failed == 0 and 0 or 1)

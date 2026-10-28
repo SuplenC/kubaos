@@ -502,6 +502,8 @@ QtObject {
         readonly property real tint: 0.16
         readonly property real track: 0.9
         readonly property real well: 0.75
+        readonly property real window_border: 0.8
+        readonly property real window_shadow: 0.33
     }
 
     // Shadows: how far down and how blurred, in logical pixels, and the `shadow` role's opacity.

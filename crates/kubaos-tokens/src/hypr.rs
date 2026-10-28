@@ -1,6 +1,6 @@
 //! The tokens Hyprland draws with, `config/hypr/tokens.lua`: the durations and curves its
-//! animations take, the focus glow its active window's shadow is fitted to, and how a tube
-//! strikes, which the active window's border plays as focus arrives.
+//! animations take, the focus glow its active window's shadow is fitted to, the opacities, and how
+//! a tube strikes, which the active window's border plays as focus arrives.
 //!
 //! # Owns
 //!
@@ -57,6 +57,14 @@ impl Target for HyprTokens {
         let _ = writeln!(out, "    near_opacity = {:?},", focus.near_opacity);
         let _ = writeln!(out, "    far = {},", focus.far);
         let _ = writeln!(out, "    far_opacity = {:?},", focus.far_opacity);
+        out.push_str(
+            "  },\n\
+             \x20 -- Opacities laid over a colour role.\n\
+             \x20 opacity = {\n",
+        );
+        for (name, opacity) in &tokens.opacity {
+            let _ = writeln!(out, "    {name} = {opacity:?},");
+        }
         out.push_str(
             "  },\n\
              \x20 neon = {\n\

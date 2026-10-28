@@ -115,11 +115,14 @@ hl.config({
 -- slight overshoot ("spatial"), things that leave accelerate out, quicker.
 -- speed is in deciseconds (4 = 400 ms). The shell's own layers have no_anim
 -- (rules.lua): Quickshell animates them itself.
+local function curve(name, easing)
+  hl.curve(name, { type = "bezier", points = { { easing[1], easing[2] }, { easing[3], easing[4] } } })
+end
+
 hl.curve("spatial", { type = "bezier", points = { { 0.38, 1.21 }, { 0.22, 1 } } })
-hl.curve("emphasizedDecel", { type = "bezier", points = { { 0.05, 0.7 }, { 0.1, 1 } } })
-hl.curve("emphasizedAccel", { type = "bezier", points = { { 0.3, 0 }, { 0.8, 0.15 } } })
-local standard = tokens.easing.standard
-hl.curve("standard", { type = "bezier", points = { { standard[1], standard[2] }, { standard[3], standard[4] } } })
+curve("emphasizedDecel", tokens.easing.emphasized_decel)
+curve("emphasizedAccel", tokens.easing.emphasized_accel)
+curve("standard", tokens.easing.standard)
 hl.curve("effects", { type = "bezier", points = { { 0.34, 0.8 }, { 0.34, 1 } } })
 
 hl.animation({ leaf = "windowsIn", enabled = true, speed = 4, bezier = "spatial", style = "popin 88%" })
