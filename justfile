@@ -50,6 +50,10 @@ check: fmt-check lint nextest design-check
 nextest:
     cargo nextest run --workspace
 
+# Start this worktree's cargo build from the main checkout's target/: a reflink copy, so the first build rebuilds only what differs from main (test/warm-target, docs/TESTING.md). Claude Code's agent worktrees get it from the WorktreeCreate hook; this is for a worktree made another way. Where reflinks aren't supported, it changes nothing.
+warm:
+    test/warm-target
+
 # Format the workspace with the nightly rustfmt and rustfmt.toml (`nix develop` has it; outside, point RUSTFMT at a nightly rustfmt), then turn the `use foo::{self};` it writes into `use foo;` (crates/self-imports) and sort again.
 fmt: _nightly-rustfmt
     cargo fmt --all

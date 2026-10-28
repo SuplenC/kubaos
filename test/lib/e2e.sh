@@ -662,7 +662,7 @@ c_shellcheck() {
       *.sh) files+=("$f") ;;
       *) head -1 "$f" | grep -qE '^#!.*\b(ba)?sh\b' && files+=("$f") ;;
     esac
-  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config crates/self-imports | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
+  done < <(as_user git -C "$REPO" ls-files scripts system migrations test config crates/self-imports .claude/hooks | grep -vE '\.(md|nix|lua|qml|toml|json|jpg|png|webp)$')
   echo "     ${#files[@]} files"
   # Gate on warnings and errors; info and style notes are listed, not fatal.
   local out notes
@@ -2754,6 +2754,13 @@ c_dot_config() {
   return "$bad"
 }
 
+# test/warm-target and the worktree hook in a throwaway repository: the copy of
+# main's target/, the timestamps cargo judges, the cold fallbacks, and the
+# worktree the hook makes and removes.
+c_warm_target() {
+  as_user bash "$REPO/test/warm-target-test" "$REPO" || { echo "FAIL test/warm-target-test"; return 1; }
+}
+
 # kubaos update, the channels and kubaos rollback, through /out/kubaos: a
 # bare repo stands in for GitHub as origin, a root-owned clone of it on its
 # `release` branch for /usr/share/kubaos (the real one, the wallpaper link,
@@ -3352,7 +3359,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites pins dot_config user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
