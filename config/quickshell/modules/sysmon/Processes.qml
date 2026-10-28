@@ -2,9 +2,9 @@ import QtQuick
 import KubaOS.Components as K
 import qs.services
 
-// The five busiest processes, by CPU or by memory. A click shows one's
-// details, with End (it may save and quit) and Kill (it stops at once), each
-// asking first.
+// The five busiest processes, by CPU or by memory, in a table of compact rows. A click shows one's
+// details under it, with End (it may save and quit) and Kill (it stops at once), each asking
+// first.
 K.Stack {
     id: root
 
@@ -48,12 +48,6 @@ K.Stack {
         });
     }
 
-    // `text` padded at the start to `width` characters with no-break spaces, so the numbers of
-    // every row end in one column in mono.
-    function padded(text: string, width: int): string {
-        return " ".repeat(Math.max(0, width - text.length)) + text;
-    }
-
     K.Row {
         fill: true
         gap: K.Tokens.space.s8
@@ -82,29 +76,33 @@ K.Stack {
         }
     }
 
-    // The rows sit on the popup's own surface, 4 apart as in a list's well: a well round them
-    // would take the room of a sixth row from a popup that already reaches far down the screen.
-    K.Stack {
+    // The rows sit on the popup's own surface: a well round them would take the room of a sixth
+    // row from a popup that already reaches far down the screen.
+    K.Table {
         visible: root.list.length > 0
-        fill: true
-        gap: K.Tokens.space.s4
-
-        Repeater {
-            model: root.list
-
-            K.ListRow {
-                required property var modelData
-
-                title: modelData.name
-                // The column it is ordered by first.
-                detail: {
-                    const cpu = root.padded(`${modelData.cpu.toFixed(1)}%`, 6);
-                    const memory = root.padded(Sysmon.bytes(modelData.memory), 8);
-                    return root.order === "cpu" ? `${cpu}  ${memory}` : `${memory}  ${cpu}`;
-                }
-                selected: root.details?.pid === modelData.pid
-                onActivated: selected ? root.clear() : root.show(modelData.pid)
+        columns: [
+            {
+                title: "Name",
+                weight: 4
+            },
+            {
+                title: "CPU",
+                weight: 1,
+                numeric: true
+            },
+            {
+                title: "Memory",
+                weight: 1,
+                numeric: true
             }
+        ]
+        rows: root.list.map(process => ({
+                    cells: [process.name, `${process.cpu.toFixed(1)}%`, Sysmon.bytes(process.memory)],
+                    selected: root.details?.pid === process.pid
+                }))
+        onActivated: index => {
+            const pid = root.list[index].pid;
+            root.details?.pid === pid ? root.clear() : root.show(pid);
         }
     }
 
@@ -113,18 +111,18 @@ K.Stack {
         text: Sysmon.sample?.detail ? "No processes to show" : "Counting…"
     }
 
-    // The picked process: what it runs, whose it is, and End or Kill.
-    K.Card {
+    // The picked process: what it runs, whose it is, and End or Kill. Its header closes it.
+    K.Collapsible {
         visible: root.details !== null
+        open: root.details !== null
+        title: root.details ? `${root.details.name} · pid ${root.details.pid}` : ""
+        onToggled: root.clear()
 
         K.Stack {
             fill: true
             gap: K.Tokens.space.s4
-
-            K.Text {
-                text: root.details ? `${root.details.name} · pid ${root.details.pid}` : ""
-                style: K.Tokens.type.body_strong
-            }
+            leftPadding: K.Tokens.space.s12
+            rightPadding: K.Tokens.space.s12
 
             K.Text {
                 text: root.details?.command ?? ""
