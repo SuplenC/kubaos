@@ -3144,6 +3144,36 @@ boot_theme_migration() {
     return 1
   fi
   echo "ok   the boot-theme-tokens migration: both themes, Geist Mono and GRUB's fonts, nothing on a second run"
+  plymouth_hook_fonts || return 1
+}
+
+# plymouth_hook_fonts: the installed kubaos-plymouth hook, run as update-initramfs runs it, over
+# an initramfs tree whose theme has Geist Mono, then only an older release's JetBrains Mono, then
+# no monospace font. Plymouth-monospace.ttf links to the best of them each time and never
+# dangles: plymouthd crashes at the passphrase prompt without it.
+plymouth_hook_fonts() {
+  local dest theme=/usr/share/plymouth/themes/kubaos case want got
+  for case in GeistMono-Regular.ttf JetBrainsMono-Regular.ttf Geist-Regular.ttf; do
+    dest="$(mktemp -d)"
+    install -d "$dest$theme"
+    install -m 0644 "$REPO/system/files/fonts/Geist-Regular.ttf" "$dest$theme/"
+    case $case in
+      GeistMono-Regular.ttf) install -m 0644 "$REPO/system/files/fonts/GeistMono-Regular.ttf" "$dest$theme/" ;;
+      JetBrainsMono-Regular.ttf) echo 'stand-in' >"$dest$theme/JetBrainsMono-Regular.ttf" ;;
+    esac
+    # mkinitramfs exports DESTDIR and verbose to every hook, and hook-functions runs under set -u.
+    DESTDIR="$dest" verbose=n sh /etc/initramfs-tools/hooks/kubaos-plymouth >/dev/null 2>&1 ||
+      { echo "FAIL the kubaos-plymouth hook failed with only $case"; rm -rf "$dest"; return 1; }
+    want="$theme/$case"
+    got="$(readlink "$dest/usr/share/fonts/Plymouth-monospace.ttf" || true)"
+    if [[ $got != "$want" || ! -f $dest$got ]]; then
+      echo "FAIL with $case the hook linked Plymouth-monospace.ttf to '$got', not $want"
+      rm -rf "$dest"
+      return 1
+    fi
+    rm -rf "$dest"
+  done
+  echo "ok   the initramfs hook links Plymouth-monospace.ttf to Geist Mono, else JetBrains Mono, else Geist"
 }
 
 # splash_mode MODE lit-at SECONDS lit | lit-by SECONDS | black-by SECONDS:

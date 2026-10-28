@@ -15,12 +15,12 @@
 # after the splash shows, so keep the whole of it, DARK_AT plus the fade,
 # under that.
 #
-# Installed to /usr/share/plymouth/themes/kubaos by system/25-boot.sh. The
-# sign's layers come from branding/neon.py, every other picture from
-# branding/boot.py, both drawn from the design tokens; the values this script
-# reads are in the generated block below. The only text drawn here is what
-# other programs send (fsck, a missing disk): label-freetype draws it with
-# /usr/share/fonts/Plymouth.ttf (Geist), which the initramfs hook provides.
+# Installed to /usr/share/plymouth/themes/kubaos by install_plymouth_theme in
+# system/lib.sh. The sign's layers come from branding/neon.py, every other
+# picture from branding/boot.py, both drawn from the design tokens; the values
+# this script reads are in the generated block below. The only text drawn here
+# is what other programs send (fsck, a missing disk): label-freetype draws it
+# with /usr/share/fonts/Plymouth.ttf (Geist), which the initramfs hook provides.
 #
 # HiDPI: plymouthd.conf sets DeviceScale=1, so this script works in device
 # pixels and picks the @2x pictures itself on screens
@@ -140,6 +140,8 @@ now = 0;                # ms since the splash started
 scale = 0;              # 1 or 2, set by layout()
 prompt = "none";        # none | password | busy
 bullets = 0;
+# The bullets drawn: bullets, up to bullet_max.
+shown_bullets = 0;
 # The bullet sprites made so far. A hotplug can lower bullet_max, and the
 # sprites past it still have to be hidden.
 bullet_sprites = 0;

@@ -1,6 +1,6 @@
 #!/bin/sh
 # KubaOS: installed to /etc/initramfs-tools/hooks/kubaos-plymouth by
-# system/25-boot.sh.
+# install_plymouth_theme in system/lib.sh.
 #
 # The kubaos Plymouth theme draws its text with label-freetype. Ubuntu's
 # plymouth hook only copies label-pango (which drags in pango, cairo and a

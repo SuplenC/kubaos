@@ -93,7 +93,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       xdg-utils xdg-user-dirs fonts-noto-core fonts-dejavu-core \
       pamtester shellcheck lua5.5 hyperfine jq expect procps psmisc less file libxkbcommon-tools \
       python3 python3-requests python3-cryptography openssl nodejs npm \
-      plymouth plymouth-label-ft plymouth-x11 xvfb
+      plymouth plymouth-label-ft plymouth-x11 xvfb grub-common initramfs-tools-core
 
 # ---------------------------------------------------------------------------
 # desktop: the system halves of system/50-hyprland.sh (Ubuntu's arm64

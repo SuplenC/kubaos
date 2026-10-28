@@ -19,9 +19,9 @@ source "$KUBAOS_DIR/system/lib.sh"
 [[ -d /boot/grub ]] || die "no /boot/grub: mount /boot and run kubaos update again"
 
 # The rebuilds run whatever the installs found: a rebuild that failed on an earlier run stopped
-# the update with the files installed, and this run has to finish it. Each rebuild only replaces
-# its file once the new one is whole (update-initramfs builds beside the image, grub-mkconfig
-# checks grub.cfg.new before it moves it), so a failure leaves the machine booting the old one.
+# the update with the files installed, and this run has to finish it. A rebuild that fails
+# leaves the machine booting the old file: update-initramfs builds beside the image and moves it
+# into place, and grub-mkconfig writes grub.cfg.new and checks it before copying it over grub.cfg.
 install_plymouth_theme
 if in_container; then
   install_grub_theme
@@ -30,8 +30,12 @@ if in_container; then
 fi
 if command -v update-initramfs >/dev/null; then
   sudo_run update-initramfs -u -k all
+else
+  warn "no update-initramfs here; the initramfs keeps the splash it has"
 fi
 install_grub_theme
 if command -v update-grub >/dev/null; then
   sudo_run update-grub
+else
+  warn "no update-grub here; grub.cfg stays as it is"
 fi

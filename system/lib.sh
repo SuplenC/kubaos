@@ -656,6 +656,7 @@ grub_theme_fonts() {
   local -a names
   local line family size ttf base
   mapfile -t names < <(grep -oE '"[A-Za-z ]+ Regular [0-9]+"' "$1" | tr -d '"' | sort -u)
+  ((${#names[@]})) || die "$1 names no font"
   for line in "${names[@]}"; do
     size="${line##* }"
     family="${line% Regular *}"
@@ -683,8 +684,9 @@ install_boot_theme() {
 # whole theme into every initramfs. The initramfs a machine boots keeps its own copy of the
 # theme, so nothing here changes the next boot until the initramfs is rebuilt.
 #
-# HAZARD: install the fonts before the hook. The hook links Plymouth-monospace.ttf to the theme's
-# Geist Mono, and plymouthd crashes at the passphrase prompt without a monospace font.
+# HAZARD: remove JetBrains Mono only after Geist Mono and this hook are installed. The hook an
+# older release installed links Plymouth-monospace.ttf to JetBrains Mono whatever the theme has,
+# and plymouthd crashes at the passphrase prompt without that font.
 install_plymouth_theme() {
   local f
   install_dir "$FILES_DIR/plymouth/kubaos" "$PLY_THEME_DIR"
@@ -714,6 +716,9 @@ install_grub_theme() {
   local -a wanted=()
   specs="$(grub_theme_fonts "$FILES_DIR/grub/kubaos/theme.txt")"
   tmp="$(mktemp -d)"
+  # A RETURN trap outlives the function that set it, so it clears itself.
+  # shellcheck disable=SC2064 # The trap removes this call's directory, expanded now.
+  trap "rm -rf '$tmp'; trap - RETURN" RETURN
   # Every font is rendered whole, every run, and installed only when its bytes differ: grub-mkfont
   # is deterministic and takes milliseconds for Latin-1, so a changed flag, size or TTF reaches
   # /boot, and a render cut short never stands in for a font.
@@ -737,7 +742,6 @@ install_grub_theme() {
     [[ -f $f ]] || continue
     install_root_file "$f" "$GRUB_THEME_DIR/$(basename "$f")" 0644
   done
-  rm -rf "$tmp"
   for f in "$GRUB_THEME_DIR"/*.pf2; do
     if [[ -e $f && " ${wanted[*]} " != *" $(basename "$f") "* ]]; then
       sudo_run rm -f "$f"

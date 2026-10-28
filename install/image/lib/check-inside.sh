@@ -207,6 +207,14 @@ if in_root mkinitramfs -o /tmp/check-initrd.img "$kernel" >/tmp/mkinitramfs.log 
     "$(in_root plymouth --get-splash-plugin-path | sed 's#^/##')label-freetype.so" usr/sbin/plymouthd; do
     grep -qx "$f" <<<"$ird" && ok "  initramfs has /$f" || fail "  initramfs lacks /$f"
   done
+  # lsinitramfs lists a link that dangles, and plymouthd crashes at the passphrase prompt on a
+  # monospace font that isn't there, so each font link's target has to be in the image too.
+  irdl="$(in_root lsinitramfs -l /tmp/check-initrd.img 2>/dev/null)"
+  for link in usr/share/fonts/Plymouth.ttf usr/share/fonts/Plymouth-monospace.ttf; do
+    target="$(sed -n "s#.* $link -> /##p" <<<"$irdl" | head -1)"
+    [[ -n $target ]] && grep -qx "$target" <<<"$ird" && ok "  initramfs /$link -> /$target, which it has" ||
+      fail "  initramfs /$link points at '${target:-nothing}', not a file it has"
+  done
   grep -qx 'scripts/local-bottom/kubaos-snapshot-overlay' <<<"$ird" && grep -q '/overlay.ko' <<<"$ird" &&
     ok "  initramfs has the snapshot overlay script and overlay.ko" || fail "  initramfs lacks the snapshot overlay"
   grep -q 'drivers/gpu/drm/virtio/virtio-gpu.ko' <<<"$ird" && ok "  initramfs has virtio-gpu" || fail "  initramfs lacks virtio-gpu"
