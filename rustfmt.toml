@@ -1,0 +1,14 @@
+# The formatting of docs/agents/code-quality.md, for `just fmt`, `just
+# fmt-check` and `nix fmt`. Most of these options are unstable: they need the
+# nightly rustfmt that `nix develop` provides (RUSTFMT), and a stable rustfmt
+# warns that it skips them.
+edition = "2024"
+max_width = 120
+group_imports = "StdExternalCrate"
+imports_granularity = "Item"
+normalize_comments = true
+wrap_comments = true
+comment_width = 100
+# Files marked `@generated` in their first lines (the tokens kubaos-tokens writes) keep the
+# generator's layout, which its own test compares them with.
+format_generated_files = false

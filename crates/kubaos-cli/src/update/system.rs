@@ -62,7 +62,11 @@ impl System {
     /// feeds the input.
     fn spawn(&self, cmd: &Cmd) -> Result<Child, MachineError> {
         let mut command = cmd.command(self.is_root, self.path.as_deref());
-        command.stdin(if cmd.input().is_some() { Stdio::piped() } else { Stdio::null() });
+        command.stdin(if cmd.input().is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        });
         command.stdout(Stdio::piped()).stderr(Stdio::piped());
         let spawn = |source| MachineError::Spawn {
             program: cmd.program(),

@@ -68,12 +68,7 @@ impl<S: Sink> Agent<S> {
     }
 
     /// Asks the user, and returns what they typed once they accept.
-    async fn wait(
-        &self,
-        kind: Kind,
-        device: &Device,
-        code: Option<String>,
-    ) -> Result<String, Refusal> {
+    async fn wait(&self, kind: Kind, device: &Device, code: Option<String>) -> Result<String, Refusal> {
         let (id, reply) = self.hub.ask(kind, device, code);
         let answered = async { reply.recv().await.ok() };
         let timed_out = async {
@@ -98,8 +93,7 @@ impl<S: Sink> Agent<S> {
     pub async fn request_pin_code(&self, device: &Device) -> Result<String, Refusal> {
         let pin = self.wait(Kind::PinCode, device, None).await?;
         let pin = pin.trim();
-        if pin.is_empty() || pin.len() > MAX_PIN || !pin.chars().all(|c| c.is_ascii_alphanumeric())
-        {
+        if pin.is_empty() || pin.len() > MAX_PIN || !pin.chars().all(|c| c.is_ascii_alphanumeric()) {
             return Err(Refusal::Rejected);
         }
         Ok(pin.to_owned())
@@ -125,19 +119,14 @@ impl<S: Sink> Agent<S> {
     /// `DisplayPinCode`: shows the PIN to type on the device. bluetoothd waits for the device,
     /// not for this reply, and calls `Cancel` once the PIN is no longer needed.
     pub fn display_pin_code(&self, device: &Device, pin: &str) {
-        self.hub
-            .show(Kind::DisplayPinCode, device, pin.to_owned(), None);
+        self.hub.show(Kind::DisplayPinCode, device, pin.to_owned(), None);
     }
 
     /// `DisplayPasskey`: shows the passkey to type on the device, with how much of it was typed.
     /// Called again as the user types.
     pub fn display_passkey(&self, device: &Device, passkey: u32, entered: u16) {
-        self.hub.show(
-            Kind::DisplayPasskey,
-            device,
-            passkey_code(passkey),
-            Some(entered),
-        );
+        self.hub
+            .show(Kind::DisplayPasskey, device, passkey_code(passkey), Some(entered));
     }
 
     /// `RequestConfirmation`: asks whether the passkey matches the one the device shows. Asked

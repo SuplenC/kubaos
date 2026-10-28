@@ -2,6 +2,10 @@ use super::*;
 use crate::battery::Supply;
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The scales are the table's own values, returned as they are: equal means the same table entry."
+)]
 fn scale_fits_the_output() {
     let at = |w, h| auto_scale(Size::new(w, h));
     assert_eq!(at(1024.0, 768.0), 1.0);
@@ -12,6 +16,10 @@ fn scale_fits_the_output() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The scales are the table's own values, returned as they are: equal means the same table entry."
+)]
 fn a_big_output_gets_the_largest_supported_scale() {
     let at = |w, h| auto_scale(Size::new(w, h));
 
@@ -36,7 +44,10 @@ fn shows_row(y: f32, row: usize) {
     let pitch = height + f32::from(tokens::Space::S4.px());
     let top = f32::from(tokens::Space::S12.px()) + row as f32 * pitch;
     assert!(y <= top, "row {row} at {top} starts above the offset {y}");
-    assert!(top + height <= y + 4.0 * pitch, "row {row} at {top} is below offset {y}");
+    assert!(
+        top + height <= y + 4.0 * pitch,
+        "row {row} at {top} is below offset {y}"
+    );
 }
 
 #[test]
@@ -89,13 +100,9 @@ impl Backend for Recorder {
         Ok(crate::backend::demo_probe())
     }
 
-    fn run(
-        &self,
-        _config: &kubaos_core::InstallConfig,
-        _secrets: &kubaos_core::Secrets,
-        emit: &mut dyn FnMut(RunMsg),
-    ) {
-        use kubaos_core::{Event, StepId};
+    fn run(&self, _config: &kubaos_core::InstallConfig, _secrets: &kubaos_core::Secrets, emit: &mut dyn FnMut(RunMsg)) {
+        use kubaos_core::Event;
+        use kubaos_core::StepId;
         emit(RunMsg::Event(Event::Plan {
             steps: StepId::ALL.iter().map(|s| s.info()).collect(),
         }));
@@ -191,10 +198,7 @@ const EVERY_SCREEN: [Screen; 12] = [
 
 fn open_menu_with_keys(app: &mut App) {
     let order = app.focus_order();
-    let start = order
-        .iter()
-        .position(|f| Some(*f) == app.focus)
-        .unwrap_or(0);
+    let start = order.iter().position(|f| Some(*f) == app.focus).unwrap_or(0);
     let tabs = order.len() - 1 - start;
     press(app, &vec![Key::Tab { shift: false }; tabs]);
     assert_eq!(
@@ -251,13 +255,8 @@ fn every_screen_draws_a_clickable_power_button() {
         ui.click("Power")
             .unwrap_or_else(|e| panic!("no power button on {screen:?}: {e}"));
 
-        let clicked = ui
-            .into_messages()
-            .any(|m| matches!(m, Message::Click(F::Power)));
-        assert!(
-            clicked,
-            "the power button on {screen:?} doesn't open the menu"
-        );
+        let clicked = ui.into_messages().any(|m| matches!(m, Message::Click(F::Power)));
+        assert!(clicked, "the power button on {screen:?} doesn't open the menu");
     }
 }
 
@@ -286,10 +285,7 @@ fn the_open_menu_draws_its_choices_and_keeps_clicks_from_the_screen_behind() {
         })
         .collect();
     // The last click lands on the scrim over Continue, which closes the menu.
-    assert_eq!(
-        clicks,
-        [F::PowerOff, F::PowerRestart, F::PowerCancel, F::PowerCancel]
-    );
+    assert_eq!(clicks, [F::PowerOff, F::PowerRestart, F::PowerCancel, F::PowerCancel]);
 }
 
 #[test]
@@ -322,17 +318,10 @@ fn cancel_and_esc_close_the_menu_and_touch_nothing() {
     assert!(app.power.is_none(), "Enter on Cancel closes the menu");
     assert_eq!(app.focus, Some(F::Power), "focus goes back where it was");
 
-    press(
-        &mut app,
-        &[Key::Enter, Key::Text("x".into()), Key::Down, Key::Esc],
-    );
+    press(&mut app, &[Key::Enter, Key::Text("x".into()), Key::Down, Key::Esc]);
 
     assert!(app.power.is_none(), "Esc closes the menu");
-    assert_eq!(
-        app.screen,
-        Screen::Timezone,
-        "Esc in the menu doesn't go back a screen"
-    );
+    assert_eq!(app.screen, Screen::Timezone, "Esc in the menu doesn't go back a screen");
     assert_eq!(
         app.field_value(F::TzQ),
         "",
@@ -381,10 +370,7 @@ fn power_off_before_the_install_powers_off_at_once() {
     wait_for(&recorder, "poweroff");
     assert_eq!(recorder.calls(), ["poweroff"]);
     assert_eq!(app.shutting_down, Some(PowerAction::PowerOff));
-    assert_eq!(
-        crate::view::power_copy(&app).status.as_deref(),
-        Some("Powering off…")
-    );
+    assert_eq!(crate::view::power_copy(&app).status.as_deref(), Some("Powering off…"));
 }
 
 #[test]
@@ -409,11 +395,7 @@ fn the_menu_before_the_install_says_no_disk_was_touched() {
     let copy = crate::view::power_copy(&app);
 
     assert_eq!(copy.title, "Power off or restart?");
-    assert!(
-        copy.body.contains("Nothing has been written"),
-        "{}",
-        copy.body
-    );
+    assert!(copy.body.contains("Nothing has been written"), "{}", copy.body);
     assert!(!copy.danger);
     assert_eq!((copy.off, copy.restart), ("Power off", "Restart"));
 }
@@ -440,19 +422,9 @@ fn the_menu_while_installing_warns_the_disk_is_left_unbootable() {
     assert!(copy.danger);
     assert!(copy.body.contains(&disk), "{}", copy.body);
     assert!(copy.body.contains("won't boot"), "{}", copy.body);
-    assert!(
-        copy.body.contains("install KubaOS on it again"),
-        "{}",
-        copy.body
-    );
-    assert_eq!(
-        (copy.off, copy.restart),
-        ("Stop and power off", "Stop and restart")
-    );
-    assert!(
-        recorder.calls().is_empty(),
-        "opening the menu doesn't stop anything"
-    );
+    assert!(copy.body.contains("install KubaOS on it again"), "{}", copy.body);
+    assert_eq!((copy.off, copy.restart), ("Stop and power off", "Stop and restart"));
+    assert!(recorder.calls().is_empty(), "opening the menu doesn't stop anything");
 }
 
 #[test]
@@ -462,28 +434,19 @@ fn power_off_while_installing_stops_the_install_first() {
 
     let _ = app.update_inner(Message::Click(F::PowerOff));
 
-    assert_eq!(
-        recorder.calls(),
-        ["stop"],
-        "nothing goes down before the install stops"
-    );
+    assert_eq!(recorder.calls(), ["stop"], "nothing goes down before the install stops");
     assert!(app.power.is_some_and(|m| m.stopping.is_some()));
     let status = crate::view::power_copy(&app).status.unwrap_or_default();
     assert!(status.starts_with("Stopping the install"), "{status}");
     press(&mut app, &[Key::Esc]);
     assert!(app.power.is_some(), "a stopping install can't be cancelled");
 
-    tick_until(&mut app, "the install to end", |a| {
-        a.shutting_down.is_some()
-    });
+    tick_until(&mut app, "the install to end", |a| a.shutting_down.is_some());
 
     wait_for(&recorder, "poweroff");
     assert_eq!(recorder.calls(), ["stop", "poweroff"]);
     assert_eq!(app.shutting_down, Some(PowerAction::PowerOff));
-    assert!(
-        app.power.is_some(),
-        "the menu stays up while the machine goes down"
-    );
+    assert!(app.power.is_some(), "the menu stays up while the machine goes down");
 }
 
 #[test]
@@ -492,9 +455,7 @@ fn restart_while_installing_stops_the_install_then_restarts() {
     let _ = app.update_inner(Message::Click(F::Power));
 
     let _ = app.update_inner(Message::Click(F::PowerRestart));
-    tick_until(&mut app, "the install to end", |a| {
-        a.shutting_down.is_some()
-    });
+    tick_until(&mut app, "the install to end", |a| a.shutting_down.is_some());
 
     wait_for(&recorder, "reboot");
     assert_eq!(recorder.calls(), ["stop", "reboot"]);
@@ -510,10 +471,7 @@ fn an_install_that_won_t_stop_still_powers_off_after_the_grace_period() {
     let _ = app.update_inner(Message::Click(F::PowerOff));
 
     let _ = app.update_inner(Message::Tick(Instant::now() + STOP_GRACE / 2));
-    assert!(
-        app.shutting_down.is_none(),
-        "too early to give up on the install"
-    );
+    assert!(app.shutting_down.is_none(), "too early to give up on the install");
     let _ = app.update_inner(Message::Tick(Instant::now() + STOP_GRACE));
 
     wait_for(&recorder, "poweroff");
@@ -578,7 +536,9 @@ fn the_done_line_changes_with_the_time_the_install_took() {
 fn the_done_screen_shows_the_time_the_install_took() {
     let (mut app, _) = recorded(Recorder::default());
     let mut install = Install::new(app.now);
-    install.outcome = Some(Outcome::Done { elapsed: Duration::from_secs(102) });
+    install.outcome = Some(Outcome::Done {
+        elapsed: Duration::from_secs(102),
+    });
     app.install = Some(install);
     app.form.username = "kuba".into();
     app.form.encrypt = false;
@@ -668,6 +628,10 @@ const LAYOUT_SIZES: [(f32, f32); 5] = [
 ];
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The layout puts the cards on device pixels, so cards in a row or column share their edges exactly."
+)]
 fn last_chance_shows_its_cards_as_an_even_two_by_two_grid() {
     use iced::widget::Id;
     use iced_test::simulator::Simulator;
@@ -681,11 +645,7 @@ fn last_chance_shows_its_cards_as_an_even_two_by_two_grid() {
         let (mut app, _) = recorded(Recorder::default());
         app.form.full_name = "Kuba Example".into();
         let _ = app.go(Screen::Summary);
-        let mut ui = Simulator::with_size(
-            iced::Settings::default(),
-            Size::new(w, h),
-            crate::view::view(&app),
-        );
+        let mut ui = Simulator::with_size(iced::Settings::default(), Size::new(w, h), crate::view::view(&app));
 
         let b: Vec<_> = cards
             .iter()
@@ -712,10 +672,7 @@ fn last_chance_has_no_edit_buttons_and_tab_goes_from_hold_to_back() {
 
     assert_eq!(app.focus_order(), vec![F::Hold, F::Back, F::Power]);
     assert!(!draws(&app, "Edit"));
-    assert!(
-        !draws(&app, "edit"),
-        "the rail's key hints offer no edit either"
-    );
+    assert!(!draws(&app, "edit"), "the rail's key hints offer no edit either");
 }
 
 #[test]
@@ -735,15 +692,9 @@ fn the_hostname_starts_as_the_payload_s_and_takes_what_you_type() {
     assert_eq!(app.form.hostname, "tuxedo");
     assert!(draws(&app, "kuba@tuxedo"));
 
-    press(
-        &mut app,
-        &[Key::Tab { shift: false }, Key::Tab { shift: false }],
-    );
+    press(&mut app, &[Key::Tab { shift: false }, Key::Tab { shift: false }]);
     assert_eq!(app.focus, Some(F::Hostname));
-    press(
-        &mut app,
-        &[Key::Text("nerv-hq".into()), Key::Tab { shift: false }],
-    );
+    press(&mut app, &[Key::Text("nerv-hq".into()), Key::Tab { shift: false }]);
 
     assert_eq!(app.form.hostname, "nerv-hq");
     assert_eq!(app.focus, Some(F::Password));
@@ -815,7 +766,11 @@ fn tab_goes_from_set_to_set_and_the_arrows_through_a_sets_thumbnails() {
     assert_eq!(app.focus, Some(F::Wallpaper(1, 0)), "the set above's last row");
 
     press(&mut app, &[RIGHT, TAB]);
-    assert_eq!(app.focus, Some(F::WallpaperSet(2)), "Tab leaves a thumbnail for the next set");
+    assert_eq!(
+        app.focus,
+        Some(F::WallpaperSet(2)),
+        "Tab leaves a thumbnail for the next set"
+    );
     press(&mut app, &[Key::Down, SHIFT_TAB]);
     assert_eq!(app.focus, Some(F::WallpaperSet(2)), "Shift+Tab, back to its own header");
 }
@@ -824,9 +779,19 @@ fn tab_goes_from_set_to_set_and_the_arrows_through_a_sets_thumbnails() {
 fn the_arrows_stop_at_the_edges_and_down_from_a_short_last_row_goes_to_the_next_set() {
     let app = on_wallpapers();
 
-    assert_eq!(app.wallpaper_neighbour(F::Wallpaper(0, 2), Dir::Down), Some(F::WallpaperSet(1)));
-    assert_eq!(app.wallpaper_neighbour(F::Wallpaper(2, 1), Dir::Down), Some(F::Wallpaper(2, 4)));
-    assert_eq!(app.wallpaper_neighbour(F::Wallpaper(2, 4), Dir::Down), None, "the last set");
+    assert_eq!(
+        app.wallpaper_neighbour(F::Wallpaper(0, 2), Dir::Down),
+        Some(F::WallpaperSet(1))
+    );
+    assert_eq!(
+        app.wallpaper_neighbour(F::Wallpaper(2, 1), Dir::Down),
+        Some(F::Wallpaper(2, 4))
+    );
+    assert_eq!(
+        app.wallpaper_neighbour(F::Wallpaper(2, 4), Dir::Down),
+        None,
+        "the last set"
+    );
     assert_eq!(app.wallpaper_neighbour(F::Wallpaper(2, 4), Dir::Right), None);
     assert_eq!(app.wallpaper_neighbour(F::Wallpaper(2, 0), Dir::Left), None);
     assert_eq!(app.wallpaper_neighbour(F::WallpaperSet(0), Dir::Up), None);
@@ -876,7 +841,8 @@ fn a_click_on_a_thumbnail_focuses_and_toggles_it() {
     );
 
     let tokyo_tower = wallpaper_item(F::Wallpaper(1, 1)).unwrap();
-    ui.click(iced::widget::Id::from(tokyo_tower)).expect("the thumbnail drawn");
+    ui.click(iced::widget::Id::from(tokyo_tower))
+        .expect("the thumbnail drawn");
 
     for m in ui.into_messages().collect::<Vec<_>>() {
         let _ = app.update_inner(m);
@@ -957,21 +923,14 @@ fn typing_a_layout_and_enter_picks_it_and_clears_the_search() {
     assert_eq!(app.keymap_q, "");
     assert_eq!(app.screen, Screen::Language, "the first Enter picks");
     press(&mut app, &[Key::Enter]);
-    assert_eq!(
-        app.screen,
-        Screen::Timezone,
-        "with nothing typed, Enter goes on"
-    );
+    assert_eq!(app.screen, Screen::Timezone, "with nothing typed, Enter goes on");
 }
 
 #[test]
 fn shift_space_makes_the_row_the_default_layout() {
     let mut app = on_the_keymap_list();
 
-    press(
-        &mut app,
-        &[Key::Text("ital".into()), Key::Enter, Key::ShiftSpace],
-    );
+    press(&mut app, &[Key::Text("ital".into()), Key::Enter, Key::ShiftSpace]);
     assert_eq!(
         app.form.keymaps,
         ["it", "us"],
@@ -982,20 +941,14 @@ fn shift_space_makes_the_row_the_default_layout() {
     let cfg = app.form.to_config(&probe);
     assert_eq!(cfg.locale.keyboard_layout, ["it", "us"]);
     let problems = kubaos_core::engine::validate::problems(&cfg, &probe);
-    assert!(
-        !problems.iter().any(|p| p.contains("keyboard")),
-        "{problems:#?}"
-    );
+    assert!(!problems.iter().any(|p| p.contains("keyboard")), "{problems:#?}");
 }
 
 #[test]
 fn a_search_still_takes_a_space() {
     let mut app = on_the_keymap_list();
 
-    press(
-        &mut app,
-        &[Key::Text("english".into()), Key::Space, Key::ShiftSpace],
-    );
+    press(&mut app, &[Key::Text("english".into()), Key::Space, Key::ShiftSpace]);
 
     assert_eq!(app.keymap_q, "english  ");
     assert_eq!(app.form.keymaps, ["us"]);

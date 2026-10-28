@@ -28,8 +28,10 @@ use iced::widget;
 use iced::widget::container;
 use iced::widget::image;
 use iced::widget::svg;
+use kubaos_core::InstallConfig;
 use kubaos_core::Level;
 use kubaos_core::probe::DiskInfo;
+use kubaos_core::probe::Probe;
 use kubaos_ui::Look;
 use kubaos_ui::Scale;
 use kubaos_ui::color;
@@ -853,27 +855,27 @@ fn secret_field<'a>(app: &'a App, label: &'a str, f: F, look: &Look) -> El<'a> {
     )
 }
 
+/// The note under the username: what it is for, the rule it breaks, or the home it gets. `baked`:
+/// the image's home config is built for this name already.
+fn username_note(username: &str, bad_name: bool, baked: bool) -> String {
+    if username.is_empty() {
+        "Your login and home folder.".to_string()
+    } else if bad_name {
+        "Lowercase: a-z first, then a-z, 0-9, - or _.".to_string()
+    } else if baked {
+        format!("/home/{username}. The image's home config is built for {username} already.")
+    } else {
+        format!("/home/{username}. The install builds the home config for {username}: a few seconds more.")
+    }
+}
+
 fn account<'a>(app: &'a App, look: &Look) -> El<'a> {
     let f = &app.form;
     let mismatch = ui::mismatched(&f.password, &f.password_confirm);
     let payload = app.ready_probe().and_then(|p| p.payload.as_ref());
     let baked = payload.is_some_and(|m| m.username == f.username);
     let bad_name = !f.username.is_empty() && !kubaos_core::engine::validate::valid_username(&f.username);
-    let username_note = if f.username.is_empty() {
-        "Your login and home folder.".to_string()
-    } else if bad_name {
-        "Lowercase: a-z first, then a-z, 0-9, - or _.".to_string()
-    } else if baked {
-        format!(
-            "/home/{}. The image's home config is built for {} already.",
-            f.username, f.username
-        )
-    } else {
-        format!(
-            "/home/{}. The install builds the home config for {}: a few seconds more.",
-            f.username, f.username
-        )
-    };
+    let name_note = username_note(&f.username, bad_name, baked);
     let bad_host = !f.hostname.is_empty() && !kubaos_core::engine::validate::valid_hostname(&f.hostname);
     let hostname_note = if bad_host {
         note(look, model::HOSTNAME_RULE, true)
@@ -904,7 +906,7 @@ fn account<'a>(app: &'a App, look: &Look) -> El<'a> {
             "Username",
             None,
             input_state(app, F::Username, "you", None, invalid(bad_name), look),
-            Some(note(look, username_note, bad_name)),
+            Some(note(look, name_note, bad_name)),
         ),
     );
     let host = pair(
@@ -1054,24 +1056,21 @@ fn layout_bar<'a>(d: &'a DiskInfo, mode: DiskMode, encrypt: bool, look: &Look) -
                 items.push((r.end - r.start, None));
             }
             for (bytes, which) in items {
-                match which {
-                    Some(i) => {
-                        let part = &d.partitions[i];
-                        let colour = part_color(part.os_hint.as_deref(), i, look);
-                        parts.push((colour, share(bytes), false));
-                        if bytes as f32 / total > 0.05 || part.os_hint.as_deref().is_some_and(|h| h.contains("EFI")) {
-                            let name = part
-                                .label
-                                .clone()
-                                .or(part.os_hint.clone())
-                                .unwrap_or_else(|| part.path.rsplit('/').next().unwrap_or("").to_string());
-                            legend.push(legend_item(colour, name, bytes));
-                        }
+                if let Some(i) = which {
+                    let part = &d.partitions[i];
+                    let colour = part_color(part.os_hint.as_deref(), i, look);
+                    parts.push((colour, share(bytes), false));
+                    if bytes as f32 / total > 0.05 || part.os_hint.as_deref().is_some_and(|h| h.contains("EFI")) {
+                        let name = part
+                            .label
+                            .clone()
+                            .or(part.os_hint.clone())
+                            .unwrap_or_else(|| part.path.rsplit('/').next().unwrap_or("").to_string());
+                        legend.push(legend_item(colour, name, bytes));
                     }
-                    None => {
-                        parts.push((c.primary, share(bytes), true));
-                        legend.push(legend_item(c.primary, ours.clone(), bytes));
-                    }
+                } else {
+                    parts.push((c.primary, share(bytes), true));
+                    legend.push(legend_item(c.primary, ours.clone(), bytes));
                 }
             }
         }
@@ -1183,55 +1182,75 @@ fn disk<'a>(app: &'a App, look: &Look) -> El<'a> {
         .push(disks);
     if let Some(d) = f.selected_disk(probe) {
         let mode = f.disk_mode.unwrap_or(DiskMode::Whole);
-        let free = d.largest_free().map_or(0, |r| r.end - r.start);
-        let others = d.other_os().map(str::to_string);
-        let free_sub = if d.fits_dual_boot(probe) {
-            format!(
-                "Keep {} and use the {} of free space.",
-                others.as_deref().unwrap_or("everything"),
-                human_bytes(free)
-            )
-        } else if free > 0 {
-            format!("Only {} free. Shrink something first.", human_bytes(free))
-        } else {
-            "No free space on this disk.".to_string()
-        };
-        let whole_sub = match d.partitions.len() {
-            _ if !d.fits(probe) => format!("Too small: KubaOS needs {}.", human_bytes(model::needed(probe))),
-            0 => "The disk is empty anyway.".to_string(),
-            n => format!(
-                "Wipes all {n} partition{}{}.",
-                if n == 1 { "" } else { "s" },
-                others.map(|o| format!(", {o} included")).unwrap_or_default()
-            ),
-        };
-        let modes = grid(look, 2, Space::S16)
-            .push(mode_card(
-                app,
-                Icon::Storage,
-                "Install alongside",
-                free_sub,
-                DiskMode::FreeSpace,
-                d.fits_dual_boot(probe)
-                    .then_some(Message::DiskModePick(DiskMode::FreeSpace)),
-                look,
-            ))
-            .push(mode_card(
-                app,
-                Icon::Warning,
-                "Erase the whole disk",
-                whole_sub,
-                DiskMode::Whole,
-                Some(Message::DiskModePick(DiskMode::Whole)),
-                look,
-            ));
-        sections = sections.push(widget::container(modes).id(ids::REVEAL_MODE)).push(
+        sections = sections.push(disk_modes(app, d, probe, look)).push(
             stack(look, Space::S8)
                 .push(text("After the install", Type::Label, c.on_surface_variant))
                 .push(layout_bar(d, mode, f.encrypt, look)),
         );
     }
+    sections = sections.push(disk_encryption(app, look));
+    // The title stays put; only what's under it scrolls (src/reveal.rs).
+    stack(look, Space::S20)
+        .height(Extent::Fill)
+        .push(header(
+            look,
+            jp::DISK,
+            "Where it goes",
+            "Pick a disk, then decide whether whatever's on it gets to live.",
+        ))
+        .push(scroll(look, sections).id(ids::DISK_SCROLL).height(Extent::Fill))
+        .into()
+}
 
+/// The two ways to use the selected disk: beside what's on it, or all of it.
+fn disk_modes<'a>(app: &'a App, d: &DiskInfo, probe: &Probe, look: &Look) -> El<'a> {
+    let free = d.largest_free().map_or(0, |r| r.end - r.start);
+    let others = d.other_os().map(str::to_string);
+    let free_sub = if d.fits_dual_boot(probe) {
+        format!(
+            "Keep {} and use the {} of free space.",
+            others.as_deref().unwrap_or("everything"),
+            human_bytes(free)
+        )
+    } else if free > 0 {
+        format!("Only {} free. Shrink something first.", human_bytes(free))
+    } else {
+        "No free space on this disk.".to_string()
+    };
+    let whole_sub = match d.partitions.len() {
+        _ if !d.fits(probe) => format!("Too small: KubaOS needs {}.", human_bytes(model::needed(probe))),
+        0 => "The disk is empty anyway.".to_string(),
+        n => format!(
+            "Wipes all {n} partition{}{}.",
+            if n == 1 { "" } else { "s" },
+            others.map(|o| format!(", {o} included")).unwrap_or_default()
+        ),
+    };
+    let modes = grid(look, 2, Space::S16)
+        .push(mode_card(
+            app,
+            Icon::Storage,
+            "Install alongside",
+            free_sub,
+            DiskMode::FreeSpace,
+            d.fits_dual_boot(probe)
+                .then_some(Message::DiskModePick(DiskMode::FreeSpace)),
+            look,
+        ))
+        .push(mode_card(
+            app,
+            Icon::Warning,
+            "Erase the whole disk",
+            whole_sub,
+            DiskMode::Whole,
+            Some(Message::DiskModePick(DiskMode::Whole)),
+            look,
+        ));
+    widget::container(modes).id(ids::REVEAL_MODE).into()
+}
+
+fn disk_encryption<'a>(app: &'a App, look: &Look) -> El<'a> {
+    let f = &app.form;
     let mut encryption = stack(look, Space::S16).push(
         widget::container(setting(
             app,
@@ -1283,18 +1302,7 @@ fn disk<'a>(app: &'a App, look: &Look) -> El<'a> {
             );
         }
     }
-    sections = sections.push(card(look, encryption));
-    // The title stays put; only what's under it scrolls (src/reveal.rs).
-    stack(look, Space::S20)
-        .height(Extent::Fill)
-        .push(header(
-            look,
-            jp::DISK,
-            "Where it goes",
-            "Pick a disk, then decide whether whatever's on it gets to live.",
-        ))
-        .push(scroll(look, sections).id(ids::DISK_SCROLL).height(Extent::Fill))
-        .into()
+    card(look, encryption)
 }
 
 fn git<'a>(app: &'a App, look: &Look) -> El<'a> {
@@ -1514,116 +1522,13 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
     };
     let f = &app.form;
     let cfg = f.to_config(probe);
-    let m = probe.payload.as_ref();
     let disk = f.selected_disk(probe);
     let whole = f.disk_mode != Some(DiskMode::FreeSpace);
 
-    let lang = block(
-        ids::SUMMARY_LANGUAGE,
-        Icon::Language,
-        "Language",
-        vec![
-            ui::fact(look, "Language", data::locale_name(&f.locale).into_owned()),
-            ui::fact(
-                look,
-                "Keyboard",
-                f.keymaps
-                    .iter()
-                    .map(|k| data::keymap_name(k))
-                    .collect::<Vec<_>>()
-                    .join(", "),
-            ),
-            ui::fact(look, "Time zone", {
-                let (city, region) = data::split_tz(&f.timezone);
-                if region.is_empty() {
-                    city
-                } else {
-                    format!("{city} ({region})")
-                }
-            }),
-        ],
-        look,
-    );
-    let acct = block(
-        ids::SUMMARY_ACCOUNT,
-        Icon::Person,
-        "You",
-        vec![
-            ui::fact(look, "Name", f.full_name.clone()),
-            ui::fact(look, "Login", format!("{}@{}", cfg.user.username, cfg.host.hostname)),
-            match cfg.git.as_ref() {
-                Some(g) => ui::fact_with(look, "Git", g.name.clone(), g.email.clone()),
-                None => ui::fact(look, "Git", "Later".into()),
-            },
-        ],
-        look,
-    );
-    let disk_block = block(
-        ids::SUMMARY_DISK,
-        Icon::HardDrive,
-        "Disk",
-        vec![
-            match disk {
-                Some(d) => ui::fact_with(
-                    look,
-                    "Disk",
-                    disk_model(d).to_string(),
-                    format!("{} · {}", d.path, human_bytes(d.size_bytes)),
-                ),
-                None => ui::fact(look, "Disk", "None picked".into()),
-            },
-            ui::fact(
-                look,
-                "Mode",
-                if whole {
-                    "Erase everything".into()
-                } else {
-                    format!(
-                        "Alongside, in {} free",
-                        human_bytes(f.free_region(probe).map_or(0, |r| r.end - r.start))
-                    )
-                },
-            ),
-            ui::fact(
-                look,
-                "Encryption",
-                match (f.encrypt, f.luks_same_as_password) {
-                    (false, _) => "Off. Brave.".into(),
-                    (true, true) => "LUKS2, account password".into(),
-                    (true, false) => "LUKS2, its own passphrase".into(),
-                },
-            ),
-        ],
-        look,
-    );
-    let sys = block(
-        ids::SUMMARY_SYSTEM,
-        Icon::DeployedCode,
-        "System",
-        vec![
-            ui::fact(look, "Release", format!("KubaOS {}", app.codename())),
-            ui::fact_with(
-                look,
-                "Image",
-                m.map(|m| format!("{} · {}", m.version, m.commit.chars().take(7).collect::<String>()))
-                    .unwrap_or_default(),
-                m.map(|m| format!("Linux {}", m.kernel)).unwrap_or_default(),
-            ),
-            ui::fact(
-                look,
-                "Wallpapers",
-                wallpapers_summary(cfg.wallpapers.as_ref(), app.wallpaper_sets()),
-            ),
-            ui::fact(
-                look,
-                "Network",
-                f.wifi_ssid
-                    .clone()
-                    .map_or_else(|| "None".into(), |s| format!("Wi-Fi “{s}”")),
-            ),
-        ],
-        look,
-    );
+    let lang = summary_language(app, look);
+    let acct = summary_account(app, &cfg, look);
+    let disk_block = summary_disk(app, probe, disk, whole, look);
+    let sys = summary_system(app, probe, &cfg, look);
 
     let mut top = stack(look, Space::S12).push(header(
         look,
@@ -1661,6 +1566,129 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
         )
         .push(confirm(app, disk, whole, look))
         .into()
+}
+
+fn summary_language<'a>(app: &'a App, look: &Look) -> El<'a> {
+    let f = &app.form;
+    block(
+        ids::SUMMARY_LANGUAGE,
+        Icon::Language,
+        "Language",
+        vec![
+            ui::fact(look, "Language", data::locale_name(&f.locale).into_owned()),
+            ui::fact(
+                look,
+                "Keyboard",
+                f.keymaps
+                    .iter()
+                    .map(|k| data::keymap_name(k))
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ),
+            ui::fact(look, "Time zone", {
+                let (city, region) = data::split_tz(&f.timezone);
+                if region.is_empty() {
+                    city
+                } else {
+                    format!("{city} ({region})")
+                }
+            }),
+        ],
+        look,
+    )
+}
+
+fn summary_account<'a>(app: &'a App, cfg: &InstallConfig, look: &Look) -> El<'a> {
+    let f = &app.form;
+    block(
+        ids::SUMMARY_ACCOUNT,
+        Icon::Person,
+        "You",
+        vec![
+            ui::fact(look, "Name", f.full_name.clone()),
+            ui::fact(look, "Login", format!("{}@{}", cfg.user.username, cfg.host.hostname)),
+            match cfg.git.as_ref() {
+                Some(g) => ui::fact_with(look, "Git", g.name.clone(), g.email.clone()),
+                None => ui::fact(look, "Git", "Later".into()),
+            },
+        ],
+        look,
+    )
+}
+
+fn summary_disk<'a>(app: &'a App, probe: &Probe, disk: Option<&DiskInfo>, whole: bool, look: &Look) -> El<'a> {
+    let f = &app.form;
+    block(
+        ids::SUMMARY_DISK,
+        Icon::HardDrive,
+        "Disk",
+        vec![
+            match disk {
+                Some(d) => ui::fact_with(
+                    look,
+                    "Disk",
+                    disk_model(d).to_string(),
+                    format!("{} · {}", d.path, human_bytes(d.size_bytes)),
+                ),
+                None => ui::fact(look, "Disk", "None picked".into()),
+            },
+            ui::fact(
+                look,
+                "Mode",
+                if whole {
+                    "Erase everything".into()
+                } else {
+                    format!(
+                        "Alongside, in {} free",
+                        human_bytes(f.free_region(probe).map_or(0, |r| r.end - r.start))
+                    )
+                },
+            ),
+            ui::fact(
+                look,
+                "Encryption",
+                match (f.encrypt, f.luks_same_as_password) {
+                    (false, _) => "Off. Brave.".into(),
+                    (true, true) => "LUKS2, account password".into(),
+                    (true, false) => "LUKS2, its own passphrase".into(),
+                },
+            ),
+        ],
+        look,
+    )
+}
+
+fn summary_system<'a>(app: &'a App, probe: &Probe, cfg: &InstallConfig, look: &Look) -> El<'a> {
+    let m = probe.payload.as_ref();
+    block(
+        ids::SUMMARY_SYSTEM,
+        Icon::DeployedCode,
+        "System",
+        vec![
+            ui::fact(look, "Release", format!("KubaOS {}", app.codename())),
+            ui::fact_with(
+                look,
+                "Image",
+                m.map(|m| format!("{} · {}", m.version, m.commit.chars().take(7).collect::<String>()))
+                    .unwrap_or_default(),
+                m.map(|m| format!("Linux {}", m.kernel)).unwrap_or_default(),
+            ),
+            ui::fact(
+                look,
+                "Wallpapers",
+                wallpapers_summary(cfg.wallpapers.as_ref(), app.wallpaper_sets()),
+            ),
+            ui::fact(
+                look,
+                "Network",
+                app.form
+                    .wifi_ssid
+                    .clone()
+                    .map_or_else(|| "None".into(), |s| format!("Wi-Fi “{s}”")),
+            ),
+        ],
+        look,
+    )
 }
 
 /// The confirm strip under Last chance: what the install does to the disk, and the button to hold.
@@ -1716,7 +1744,7 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
         )
     };
     let label = if app.hold.is_some() { "Keep holding…" } else { cta };
-    let hold = stack(look, Space::S8)
+    let hold_button = stack(look, Space::S8)
         .push(
             button(label)
                 .kind(kind)
@@ -1746,7 +1774,7 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
                             .push(text(message, Type::Subheading, c.on_surface))
                             .push(text(sub, Type::Body, c.on_surface_variant)),
                     )
-                    .push(hold),
+                    .push(hold_button),
             )
             .push(timed_bar(look, held)),
     )
@@ -2033,6 +2061,47 @@ fn lede<'a>(words: impl Into<String>, look: &Look) -> El<'a> {
 
 fn welcome<'a>(app: &'a App, look: &Look) -> El<'a> {
     let c = look.colors;
+    let status = welcome_status(app, look);
+    let meta = welcome_meta(app, look);
+    let action = welcome_action(app, look);
+    // No image, nothing to start: no "Enter: start" either, and the line keeps its room.
+    let keys = if app.ready_probe().is_some_and(|p| p.payload.is_none()) {
+        Vec::new()
+    } else {
+        hints(app)
+    };
+    stack(look, Gap::NONE)
+        .push(text(jp::WELCOME, Type::Accent, c.primary))
+        .push(gap(Space::S8))
+        .push(row(look, Space::S20).center().push(sign(look)).push(chip(
+            look,
+            ChipKind::Neutral,
+            app.codename().to_uppercase(),
+            None,
+            None,
+            None,
+        )))
+        .push(gap(Space::S20))
+        .push(text("Let's fix this shit.", Type::Hero, c.on_surface))
+        .push(gap(Space::S16))
+        .push(lede(
+            "Whatever's on here, it's had its chance. Kuba's own Linux: a fast, keyboard-driven desktop for \
+             writing Rust all day without the OS getting in the way. I update when you say so, I never nag, and \
+             if you break me there's always a way back.",
+            look,
+        ))
+        .push(gap(Space::S40))
+        .push(row(look, Space::S20).center().push(action).push(status))
+        .push(gap(Space::S16))
+        .push(ui::hint_row(look, &keys))
+        .push(gap(Space::S32))
+        .push(row(look, Space::S8).center().extend(meta))
+        .into()
+}
+
+/// The probe's progress beside the start button, or why there's nothing to start.
+fn welcome_status<'a>(app: &'a App, look: &Look) -> El<'a> {
+    let c = look.colors;
     let seconds = (app.now - app.epoch).as_secs_f32();
     let refused = |words: String| -> El<'a> {
         row(look, Space::S12)
@@ -2041,7 +2110,7 @@ fn welcome<'a>(app: &'a App, look: &Look) -> El<'a> {
             .push(widget::container(text(words, Type::Body, c.error)).max_width(f32::from(Size::Column.px())))
             .into()
     };
-    let status: El = match &app.probe {
+    match &app.probe {
         ProbeState::Loading => row(look, Space::S12)
             .center()
             .push(spinner(look, IconSize::S20, seconds, c.primary))
@@ -2052,7 +2121,11 @@ fn welcome<'a>(app: &'a App, look: &Look) -> El<'a> {
             "No system image on this stick, so I've got nothing to install. Rebuild the ISO and flash it again.".into(),
         ),
         ProbeState::Ready(_) => widget::Space::new().into(),
-    };
+    }
+}
+
+/// The chips under the welcome: the image's version, commit and build date, and the machine.
+fn welcome_meta<'a>(app: &'a App, look: &Look) -> Vec<El<'a>> {
     let mut meta: Vec<El> = vec![];
     if let Some(pr) = app.ready_probe() {
         if let Some(m) = &pr.payload {
@@ -2090,7 +2163,11 @@ fn welcome<'a>(app: &'a App, look: &Look) -> El<'a> {
             None,
         ));
     }
-    let action = if matches!(app.probe, ProbeState::Failed(_)) {
+    meta
+}
+
+fn welcome_action<'a>(app: &'a App, look: &Look) -> El<'a> {
+    if matches!(app.probe, ProbeState::Failed(_)) {
         button("Try again")
             .size(ButtonSize::Lg)
             .icon(Icon::RestartAlt)
@@ -2104,40 +2181,7 @@ fn welcome<'a>(app: &'a App, look: &Look) -> El<'a> {
             .on_press_maybe(app.blocker().is_none().then_some(Message::Click(F::Start)))
             .focused(app.is_focused(F::Start))
             .view(look)
-    };
-    // No image, nothing to start: no "Enter: start" either, and the line keeps its room.
-    let keys = if app.ready_probe().is_some_and(|p| p.payload.is_none()) {
-        Vec::new()
-    } else {
-        hints(app)
-    };
-    stack(look, Gap::NONE)
-        .push(text(jp::WELCOME, Type::Accent, c.primary))
-        .push(gap(Space::S8))
-        .push(row(look, Space::S20).center().push(sign(look)).push(chip(
-            look,
-            ChipKind::Neutral,
-            app.codename().to_uppercase(),
-            None,
-            None,
-            None,
-        )))
-        .push(gap(Space::S20))
-        .push(text("Let's fix this shit.", Type::Hero, c.on_surface))
-        .push(gap(Space::S16))
-        .push(lede(
-            "Whatever's on here, it's had its chance. Kuba's own Linux: a fast, keyboard-driven desktop for \
-             writing Rust all day without the OS getting in the way. I update when you say so, I never nag, and \
-             if you break me there's always a way back.",
-            look,
-        ))
-        .push(gap(Space::S40))
-        .push(row(look, Space::S20).center().push(action).push(status))
-        .push(gap(Space::S16))
-        .push(ui::hint_row(look, &keys))
-        .push(gap(Space::S32))
-        .push(row(look, Space::S8).center().extend(meta))
-        .into()
+    }
 }
 
 /// The Done screen's first line: the time the install took and a quip picked by it, so a quick

@@ -9,13 +9,7 @@ use crate::state::Kind;
 
 const SHORT: Duration = Duration::from_millis(20);
 
-fn pairing(
-    bluez: FakeBluez,
-) -> (
-    Pairing<Recorder, FakeBluez>,
-    Arc<Hub<Recorder>>,
-    Arc<FakeBluez>,
-) {
+fn pairing(bluez: FakeBluez) -> (Pairing<Recorder, FakeBluez>, Arc<Hub<Recorder>>, Arc<FakeBluez>) {
     let hub = Arc::new(Hub::new(Recorder::default()));
     let bluez = Arc::new(bluez);
     let pairing = Pairing::new(Arc::clone(&hub), Arc::clone(&bluez))
@@ -57,10 +51,7 @@ fn the_device_shows_as_pairing_while_pair_runs() {
     let device = keyboard().path;
     future::block_on(pairing.pair(&device));
     let published = hub.sink().states();
-    assert!(
-        published.first().unwrap().pairing.contains(&device),
-        "{published:#?}"
-    );
+    assert!(published.first().unwrap().pairing.contains(&device), "{published:#?}");
 }
 
 #[test]
@@ -79,11 +70,7 @@ fn a_hung_pairing_is_cancelled_after_the_timeout() {
         calls[..2],
         [format!("Pair {device}"), format!("CancelPairing {device}")]
     );
-    let failed = hub
-        .sink()
-        .states()
-        .into_iter()
-        .find(|state| !state.errors.is_empty());
+    let failed = hub.sink().states().into_iter().find(|state| !state.errors.is_empty());
     assert_eq!(
         failed
             .expect("the timeout was shown")
@@ -97,10 +84,7 @@ fn a_hung_pairing_is_cancelled_after_the_timeout() {
 
 #[test]
 fn a_failed_device_keeps_its_reason_then_is_forgotten() {
-    let (pairing, hub, bluez) = pairing(failing(
-        "org.bluez.Error.AuthenticationFailed",
-        "Authentication Failed",
-    ));
+    let (pairing, hub, bluez) = pairing(failing("org.bluez.Error.AuthenticationFailed", "Authentication Failed"));
     let device = keyboard().path;
     hub.show(Kind::DisplayPasskey, &keyboard(), "123456".into(), None);
 
@@ -125,10 +109,7 @@ fn a_failed_device_keeps_its_reason_then_is_forgotten() {
             format!("RemoveDevice {device}")
         ]
     );
-    assert!(
-        hub.state().errors.is_empty(),
-        "the reason goes with the device"
-    );
+    assert!(hub.state().errors.is_empty(), "the reason goes with the device");
 }
 
 #[test]
@@ -164,10 +145,7 @@ fn a_second_pairing_of_the_same_device_waits_for_the_first() {
 #[test]
 fn cancelling_a_pairing_bluetoothd_doesnt_have_ends_it_here() {
     let bluez = FakeBluez {
-        cancel: Err(BluezError::new(
-            "org.bluez.Error.DoesNotExist",
-            "No such pairing",
-        )),
+        cancel: Err(BluezError::new("org.bluez.Error.DoesNotExist", "No such pairing")),
         ..FakeBluez::default()
     };
     let (pairing, hub, _) = pairing(bluez);
@@ -178,10 +156,7 @@ fn cancelling_a_pairing_bluetoothd_doesnt_have_ends_it_here() {
 
     let state = hub.state();
     assert!(state.pairing.is_empty());
-    assert_eq!(
-        state.errors.get(&device).map(String::as_str),
-        Some(CANCELLED)
-    );
+    assert_eq!(state.errors.get(&device).map(String::as_str), Some(CANCELLED));
 }
 
 #[test]
@@ -198,11 +173,7 @@ fn a_cancel_bluetoothd_takes_leaves_the_ending_to_pair() {
 fn errors_read_as_a_few_words() {
     let cases = [
         ("org.bluez.Error.AuthenticationCanceled", "", CANCELLED),
-        (
-            "org.bluez.Error.AuthenticationRejected",
-            "",
-            "The device said no",
-        ),
+        ("org.bluez.Error.AuthenticationRejected", "", "The device said no"),
         ("org.bluez.Error.AuthenticationTimeout", "", TIMED_OUT),
         ("Timeout", "timed out", TIMED_OUT),
         (
@@ -211,11 +182,7 @@ fn errors_read_as_a_few_words() {
             "Couldn't reach it. Is it in pairing mode?",
         ),
         ("org.bluez.Error.NotReady", "Resource Not Ready", NOT_READY),
-        (
-            "org.freedesktop.DBus.Error.UnknownObject",
-            "",
-            "It's gone. Scan again",
-        ),
+        ("org.freedesktop.DBus.Error.UnknownObject", "", "It's gone. Scan again"),
         ("org.bluez.Error.Failed", "", "Pairing failed"),
         (
             "org.bluez.Error.Failed",

@@ -76,9 +76,7 @@ impl BluezError {
 
     fn zbus(err: zbus::Error) -> Self {
         match err {
-            zbus::Error::MethodError(name, message, _) => {
-                BluezError::new(name.as_str(), message.unwrap_or_default())
-            }
+            zbus::Error::MethodError(name, message, _) => BluezError::new(name.as_str(), message.unwrap_or_default()),
             zbus::Error::InputOutput(io) if io.kind() == io::ErrorKind::TimedOut => {
                 BluezError::new("Timeout", io.to_string())
             }
@@ -99,8 +97,7 @@ pub trait Bluez: Send + Sync + 'static {
     fn paired(&self, device: &str) -> impl Future<Output = Result<bool, BluezError>> + Send;
     /// `Adapter1.RemoveDevice` on the device's adapter.
     fn remove(&self, device: &str) -> impl Future<Output = Result<(), BluezError>> + Send;
-    fn start_discovery(&self, adapter: &str)
-    -> impl Future<Output = Result<(), BluezError>> + Send;
+    fn start_discovery(&self, adapter: &str) -> impl Future<Output = Result<(), BluezError>> + Send;
     fn stop_discovery(&self, adapter: &str) -> impl Future<Output = Result<(), BluezError>> + Send;
 }
 
@@ -117,18 +114,11 @@ impl SystemBluez {
         SystemBluez { conn }
     }
 
-    async fn call<B>(
-        &self,
-        path: &str,
-        interface: &str,
-        method: &str,
-        body: &B,
-    ) -> Result<zbus::Message, BluezError>
+    async fn call<B>(&self, path: &str, interface: &str, method: &str, body: &B) -> Result<zbus::Message, BluezError>
     where
         B: serde::Serialize + DynamicType,
     {
-        let path = ObjectPath::try_from(path)
-            .map_err(|err| BluezError::new("InvalidArgs", err.to_string()))?;
+        let path = ObjectPath::try_from(path).map_err(|err| BluezError::new("InvalidArgs", err.to_string()))?;
         self.conn
             .call_method(Some(SERVICE), path, Some(interface), method, body)
             .await
@@ -136,9 +126,7 @@ impl SystemBluez {
     }
 
     async fn get(&self, path: &str, interface: &str, name: &str) -> Result<OwnedValue, BluezError> {
-        let reply = self
-            .call(path, PROPERTIES, "Get", &(interface, name))
-            .await?;
+        let reply = self.call(path, PROPERTIES, "Get", &(interface, name)).await?;
         reply
             .body()
             .deserialize::<OwnedValue>()
@@ -181,25 +169,15 @@ impl SystemBluez {
         // A second registration on the same connection, after bluetoothd restarted, is refused
         // as AlreadyExists only when bluetoothd kept the first, which is as good.
         if let Err(err) = self
-            .call(
-                "/org/bluez",
-                AGENT_MANAGER,
-                "RegisterAgent",
-                &(&agent, CAPABILITY),
-            )
+            .call("/org/bluez", AGENT_MANAGER, "RegisterAgent", &(&agent, CAPABILITY))
             .await
             && !err.is("AlreadyExists")
         {
             return Err(err);
         }
-        self.call(
-            "/org/bluez",
-            AGENT_MANAGER,
-            "RequestDefaultAgent",
-            &(&agent,),
-        )
-        .await
-        .map(drop)
+        self.call("/org/bluez", AGENT_MANAGER, "RequestDefaultAgent", &(&agent,))
+            .await
+            .map(drop)
     }
 }
 
@@ -209,20 +187,13 @@ impl Bluez for SystemBluez {
     }
 
     async fn cancel_pairing(&self, device: &str) -> Result<(), BluezError> {
-        self.call(device, DEVICE, "CancelPairing", &())
-            .await
-            .map(drop)
+        self.call(device, DEVICE, "CancelPairing", &()).await.map(drop)
     }
 
     async fn set_trusted(&self, device: &str) -> Result<(), BluezError> {
-        self.call(
-            device,
-            PROPERTIES,
-            "Set",
-            &(DEVICE, "Trusted", Value::from(true)),
-        )
-        .await
-        .map(drop)
+        self.call(device, PROPERTIES, "Set", &(DEVICE, "Trusted", Value::from(true)))
+            .await
+            .map(drop)
     }
 
     async fn connect(&self, device: &str) -> Result<(), BluezError> {
@@ -235,26 +206,17 @@ impl Bluez for SystemBluez {
     }
 
     async fn remove(&self, device: &str) -> Result<(), BluezError> {
-        let adapter = device
-            .rsplit_once('/')
-            .map_or(device, |(adapter, _)| adapter);
-        let device = ObjectPath::try_from(device)
-            .map_err(|err| BluezError::new("InvalidArgs", err.to_string()))?;
-        self.call(adapter, ADAPTER, "RemoveDevice", &(&device,))
-            .await
-            .map(drop)
+        let adapter = device.rsplit_once('/').map_or(device, |(adapter, _)| adapter);
+        let device = ObjectPath::try_from(device).map_err(|err| BluezError::new("InvalidArgs", err.to_string()))?;
+        self.call(adapter, ADAPTER, "RemoveDevice", &(&device,)).await.map(drop)
     }
 
     async fn start_discovery(&self, adapter: &str) -> Result<(), BluezError> {
-        self.call(adapter, ADAPTER, "StartDiscovery", &())
-            .await
-            .map(drop)
+        self.call(adapter, ADAPTER, "StartDiscovery", &()).await.map(drop)
     }
 
     async fn stop_discovery(&self, adapter: &str) -> Result<(), BluezError> {
-        self.call(adapter, ADAPTER, "StopDiscovery", &())
-            .await
-            .map(drop)
+        self.call(adapter, ADAPTER, "StopDiscovery", &()).await.map(drop)
     }
 }
 
@@ -323,11 +285,7 @@ impl AgentObject {
         self.agent.display_passkey(&device, passkey, entered);
     }
 
-    async fn request_confirmation(
-        &self,
-        device: OwnedObjectPath,
-        passkey: u32,
-    ) -> Result<(), AgentError> {
+    async fn request_confirmation(&self, device: OwnedObjectPath, passkey: u32) -> Result<(), AgentError> {
         let device = self.bluez.device(&device).await;
         Ok(self.agent.request_confirmation(&device, passkey).await?)
     }
@@ -337,11 +295,7 @@ impl AgentObject {
         Ok(self.agent.request_authorization(&device).await?)
     }
 
-    async fn authorize_service(
-        &self,
-        device: OwnedObjectPath,
-        uuid: String,
-    ) -> Result<(), AgentError> {
+    async fn authorize_service(&self, device: OwnedObjectPath, uuid: String) -> Result<(), AgentError> {
         let trusted = self.bluez.trusted(&device).await;
         let allowed = self.agent.authorize_service(&device, trusted);
         if allowed.is_err() {
@@ -366,9 +320,7 @@ impl AgentObject {
 /// When the bus won't send bluetoothd's comings and goings.
 pub async fn keep_registered(bluez: &SystemBluez, hub: &Hub<StateFile>) -> zbus::Result<()> {
     let dbus = zbus::fdo::DBusProxy::new(&bluez.conn).await?;
-    let mut owners = dbus
-        .receive_name_owner_changed_with_args(&[(0, SERVICE)])
-        .await?;
+    let mut owners = dbus.receive_name_owner_changed_with_args(&[(0, SERVICE)]).await?;
     register(bluez, hub).await;
     while let Some(change) = owners.next().await {
         let appeared = change.args().is_ok_and(|args| args.new_owner().is_some());

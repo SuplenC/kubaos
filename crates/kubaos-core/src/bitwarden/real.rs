@@ -91,7 +91,11 @@ impl Real {
         if out.status.success() {
             Ok(String::from_utf8_lossy(&out.stdout).into_owned())
         } else {
-            Err(BwError::new(format!("bw {} failed ({})", args.first().unwrap_or(&""), out.status)))
+            Err(BwError::new(format!(
+                "bw {} failed ({})",
+                args.first().unwrap_or(&""),
+                out.status
+            )))
         }
     }
 }
@@ -145,7 +149,10 @@ impl Bw for Real {
                 client_id,
                 client_secret,
             } => {
-                let env = [("BW_CLIENTID", client_id.as_str()), ("BW_CLIENTSECRET", client_secret.0.as_str())];
+                let env = [
+                    ("BW_CLIENTID", client_id.as_str()),
+                    ("BW_CLIENTSECRET", client_secret.0.as_str()),
+                ];
                 self.quiet(&["login", "--apikey"], None, &env).map(|_| None)
             }
         }
@@ -183,9 +190,9 @@ impl Bw for Real {
 /// The program on `PATH`.
 fn find(program: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
-    std::env::split_paths(&path).map(|d| d.join(program)).find(|p| {
-        std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-    })
+    std::env::split_paths(&path)
+        .map(|d| d.join(program))
+        .find(|p| std::fs::metadata(p).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0))
 }
 
 impl Host for Real {
@@ -196,7 +203,10 @@ impl Host for Real {
     fn write(&mut self, path: &Path, contents: &str, mode: u32) -> Result<(), String> {
         let dir = path.parent().ok_or("no parent directory")?;
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
         let tmp = dir.join(format!(".{name}.kubaos-{}", std::process::id()));
         let _ = std::fs::remove_file(&tmp);
         let written = std::fs::OpenOptions::new()
@@ -247,9 +257,13 @@ impl Host for Real {
         let mut c = Command::new(&cmd.program);
         c.args(&cmd.args).env_remove("BW_SESSION");
         c.envs(cmd.env.iter().map(|(k, v)| (k, v)));
-        c.stdin(if cmd.stdin.is_some() { Stdio::piped() } else { Stdio::null() })
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        c.stdin(if cmd.stdin.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
         let mut child = c.spawn().map_err(|e| format!("can't run {}: {e}", cmd.program))?;
         if let (Some(input), Some(mut stdin)) = (&cmd.stdin, child.stdin.take()) {
             stdin

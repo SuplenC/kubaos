@@ -312,7 +312,7 @@ fn month_day(text: &str) -> Option<(i8, i8)> {
 /// Never for the years jiff takes: the algorithm always gives a day in March or April.
 #[expect(
     clippy::many_single_char_names,
-    reason = "the letters are the algorithm's own, so the code reads against its published form"
+    reason = "The letters are the algorithm's own, so the code reads against its published form."
 )]
 pub fn easter(year: i16) -> Date {
     let y = i32::from(year);

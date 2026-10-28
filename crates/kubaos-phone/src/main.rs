@@ -14,15 +14,13 @@
 //!
 //! # Owns
 //!
-//! - The command line and its exit codes: 2 for a usage error, 1 when the command failed, with
-//!   the reason and what to do on stderr. Every command but `status` and `restrict` also says how
-//!   it went in a notification, since the menu runs them with no terminal.
+//! - The command line and its exit codes: 2 for a usage error, 1 when the command failed, with the
+//!   reason and what to do on stderr. Every command but `status` and `restrict` also says how it
+//!   went in a notification, since the menu runs them with no terminal.
 //!
 //! # Not here
 //!
 //! - Everything else: the library's modules.
-
-#![forbid(unsafe_code)]
 
 use std::path::Path;
 use std::path::PathBuf;
@@ -56,6 +54,11 @@ restrict        turn off every KDE Connect plugin the phone link isn't for, on e
 
 const ICON: &str = "phone";
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The outcome, the help and the usage are the command's output, beside its notification."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -107,6 +110,11 @@ fn main() -> ExitCode {
 }
 
 /// The plugin restriction, quiet but for what it turned off: it runs at every start of the unit.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "What the restriction turned off, or why it couldn't, is the command's output for the unit's journal."
+)]
 fn restrict(link: &mut KdeConnect) -> ExitCode {
     match phone::restrict(link) {
         Ok(changed) => {
@@ -131,11 +139,18 @@ fn on_message(st: &Status) -> String {
 }
 
 fn sent_file(path: &Path, phone: &Device) -> String {
-    let file = path.file_name().map_or_else(|| path.display().to_string(), |f| f.to_string_lossy().into_owned());
+    let file = path
+        .file_name()
+        .map_or_else(|| path.display().to_string(), |f| f.to_string_lossy().into_owned());
     format!("{file} sent to {}.", phone.name)
 }
 
 /// The status for a person, or as JSON for the shell and scripts.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The status is the command's output, for the person, the shell or a script that asked."
+)]
 fn show(st: &Status, json: bool) -> ExitCode {
     if json {
         match serde_json::to_string_pretty(st) {
@@ -160,7 +175,10 @@ fn show(st: &Status, json: bool) -> ExitCode {
             (true, false, _) => "paired, out of reach",
             (false, _, _) => "seen on the network",
         };
-        let battery = d.battery.map(|b| format!(", battery {}%", b.charge)).unwrap_or_default();
+        let battery = d
+            .battery
+            .map(|b| format!(", battery {}%", b.charge))
+            .unwrap_or_default();
         println!("{}\t{}\t{state}{battery}", d.id, d.name);
     }
     ExitCode::SUCCESS

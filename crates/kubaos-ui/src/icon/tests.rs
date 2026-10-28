@@ -34,6 +34,10 @@ fn the_stroke_is_whole_device_pixels_at_every_size_and_scale() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The strokes are whole device pixels by design, so they are exact: any difference is the bug."
+)]
 fn the_stroke_is_tablers_at_24_and_rounds_at_16_and_20() {
     let at = |size| Scale::SUPPORTED.map(|scale| device_stroke(size, scale));
 

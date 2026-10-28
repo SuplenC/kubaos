@@ -1,18 +1,23 @@
 //! `--setup --demo --screenshot-tour DIR`: every card of the demo machine
 //! with the keyboard only, a PNG per state, then exit. Like the install
-//! screens' tour (crate::tour): key presses through `app::translate`, waits and
+//! screens' tour (`crate::tour`): key presses through `app::translate`, waits and
 //! screenshots, nothing else. The test below runs the same script headless.
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
+use iced::Task;
 use iced::keyboard;
-use iced::{Task, window};
+use iced::window;
+use kubaos_core::setup::CardId;
+use kubaos_core::setup::PromptKind;
+use kubaos_core::setup::State;
 use kubaos_core::setup::demo::Machine;
-use kubaos_core::setup::{CardId, PromptKind, State};
 
-use super::{Outcome, Setup};
+use super::Outcome;
+use super::Setup;
 use crate::app::Message;
 use crate::tour::K;
 
@@ -39,6 +44,17 @@ fn state(s: &Setup, c: CardId) -> Option<State> {
 }
 
 /// The demo TUXEDO: every card, from nothing to all set.
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::enum_glob_use,
+        reason = "The script reads as a list of keys and steps, unprefixed."
+    )
+)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "One flat list of the tour's steps, in the order they run."
+)]
 pub fn script() -> Vec<Step> {
     use K::*;
     use Step::*;
@@ -53,17 +69,13 @@ pub fn script() -> Vec<Step> {
         Wait(SETTLE),
         Shot("02-tuxedo-secure-boot"),
         Tap(Enter), // last field: the card's button
-        Until("tuxedo busy", |s| {
-            s.run.as_ref().is_some_and(|r| r.log.len() >= 4)
-        }),
+        Until("tuxedo busy", |s| s.run.as_ref().is_some_and(|r| r.log.len() >= 4)),
         Tap(Tab), // Skip (the card's button waits while it runs)
         Tap(Tab), // Show the log
         Tap(Enter),
         Wait(400),
         Shot("03-tuxedo-installing"),
-        Until("tuxedo done", |s| {
-            state(s, CardId::Tuxedo) == Some(State::Reboot)
-        }),
+        Until("tuxedo done", |s| state(s, CardId::Tuxedo) == Some(State::Reboot)),
         Wait(SETTLE),
         Shot("04-tuxedo-reboot"),
         Tap(Esc),
@@ -88,9 +100,7 @@ pub fn script() -> Vec<Step> {
         Until("key touch", |s| prompt(s, PromptKind::Key)),
         Wait(500),
         Shot("06-yubikey-touch"),
-        Until("yubikey done", |s| {
-            state(s, CardId::Yubikey) == Some(State::Done)
-        }),
+        Until("yubikey done", |s| state(s, CardId::Yubikey) == Some(State::Done)),
         Tap(Esc),
         Tap(Down),
         Tap(Enter), // Server (bitwarden.eu, from the machine)
@@ -114,9 +124,7 @@ pub fn script() -> Vec<Step> {
         Tap(ShiftTab), // the code field
         Type("424242"),
         Tap(Enter),
-        Until("bitwarden done", |s| {
-            state(s, CardId::Bitwarden) == Some(State::Done)
-        }),
+        Until("bitwarden done", |s| state(s, CardId::Bitwarden) == Some(State::Done)),
         Tap(Tab), // from Next to the log
         Tap(Enter),
         Wait(SETTLE),
@@ -164,6 +172,13 @@ pub fn script() -> Vec<Step> {
 }
 
 /// The bench VM: no TUXEDO, no reader, no key plugged in.
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::enum_glob_use,
+        reason = "The script reads as a list of keys and steps, unprefixed."
+    )
+)]
 pub fn script_vm() -> Vec<Step> {
     use K::*;
     use Step::*;
@@ -193,6 +208,13 @@ fn finished(s: &Setup) -> bool {
 
 /// After first boot, the Bitwarden card from the Command menu: narrow the SSH keys to a
 /// folder, pull again, log out, and log in to a self-hosted server.
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::enum_glob_use,
+        reason = "The script reads as a list of keys and steps, unprefixed."
+    )
+)]
 pub fn script_bitwarden() -> Vec<Step> {
     use K::*;
     use Step::*;
@@ -300,9 +322,7 @@ pub fn drive(s: &mut Setup) -> Task<Message> {
             break;
         };
         match step {
-            Step::Wait(ms) => {
-                tour.resume_at = Some(now + Duration::from_millis(ms).mul_f32(tour.pace))
-            }
+            Step::Wait(ms) => tour.resume_at = Some(now + Duration::from_millis(ms).mul_f32(tour.pace)),
             Step::Until(name, f) => {
                 let ready = s.window.is_some();
                 if !(ready && f(s)) {
@@ -315,9 +335,7 @@ pub fn drive(s: &mut Setup) -> Task<Message> {
             Step::Shot(name) => {
                 let Some(id) = s.window else { break };
                 tour.waiting_for_shot = true;
-                tasks.push(
-                    window::screenshot(id).map(move |sh| Message::TourShot(name.to_string(), sh)),
-                );
+                tasks.push(window::screenshot(id).map(move |sh| Message::TourShot(name.to_string(), sh)));
                 break;
             }
             Step::Exit => {
@@ -333,6 +351,10 @@ pub fn drive(s: &mut Setup) -> Task<Message> {
     Task::batch(tasks)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "`--screenshot-tour` is run from a terminal, which is told where each shot went."
+)]
 pub fn save(s: &Setup, name: &str, shot: &window::Screenshot) {
     let Some(tour) = &s.tour else { return };
     let _ = std::fs::create_dir_all(&tour.dir);
@@ -351,12 +373,14 @@ pub fn save(s: &Setup, name: &str, shot: &window::Screenshot) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use kubaos_core::setup::Facts;
+    use kubaos_core::setup::demo;
+
     use super::*;
     use crate::setup::SF;
-    use kubaos_core::setup::Facts;
     use crate::setup::backend::Demo;
-    use kubaos_core::setup::demo;
-    use std::sync::Arc;
 
     fn headless(machine: demo::Machine) -> Setup {
         Setup::headless(Arc::new(Demo {
@@ -431,10 +455,17 @@ mod tests {
         assert!(s.focus_order().contains(&SF::TurnOff));
 
         let _ = s.update_inner(Message::Setup(crate::setup::Msg::Click(SF::TurnOff)));
-        play(&mut s, vec![Step::Until("off", |s| s.run.as_ref().is_some_and(|r| !r.running()))]);
+        play(
+            &mut s,
+            vec![Step::Until("off", |s| s.run.as_ref().is_some_and(|r| !r.running()))],
+        );
 
         let run = s.run.as_ref().unwrap();
-        assert!(matches!(&run.outcome, Some(Outcome::Done(t)) if t.starts_with("Phone link off")), "{:?}", run.outcome);
+        assert!(
+            matches!(&run.outcome, Some(Outcome::Done(t)) if t.starts_with("Phone link off")),
+            "{:?}",
+            run.outcome
+        );
         assert_eq!(s.card(CardId::Phone).unwrap().state, State::Needed);
         assert_eq!(s.primary(), Some(("Set up a phone", crate::setup::Act::Run)));
         assert!(!s.focus_order().contains(&SF::TurnOff));
@@ -452,10 +483,16 @@ mod tests {
             })],
         );
 
-        let mut ui = Simulator::with_size(iced::Settings::default(), iced::Size::new(1280.0, 800.0), crate::setup::view(&s));
+        let mut ui = Simulator::with_size(
+            iced::Settings::default(),
+            iced::Size::new(1280.0, 800.0),
+            crate::setup::view(&s),
+        );
 
-        ui.find("The phone shows a key too. It must be the same: 807704F2.").expect("the key");
-        ui.find("Also on this network: site24. Not yours? Leave them be.").expect("the stranger");
+        ui.find("The phone shows a key too. It must be the same: 807704F2.")
+            .expect("the key");
+        ui.find("Also on this network: site24. Not yours? Leave them be.")
+            .expect("the stranger");
         ui.click("Accept the pairing").expect("the accept button");
         ui.click("Turn the phone link off").expect("the way out");
         let clicks: Vec<SF> = ui
@@ -489,7 +526,12 @@ mod tests {
         waiting_phone(&mut s);
 
         // The demo's own phone card is off: the poll brings that back in place of the edit.
-        play(&mut s, vec![Step::Until("polled", |s| s.card(CardId::Phone).unwrap().state == State::Needed)]);
+        play(
+            &mut s,
+            vec![Step::Until("polled", |s| {
+                s.card(CardId::Phone).unwrap().state == State::Needed
+            })],
+        );
 
         assert!(s.phone_link().is_some_and(|l| !l.on));
     }
@@ -501,20 +543,20 @@ mod tests {
         let now = Instant::now();
         s.now = now;
 
-        s.phone_waiting_since = Some(now - Duration::from_secs(5));
+        s.phone_waiting_since = Some(now.checked_sub(Duration::from_secs(5)).expect("the clock is past 5 s"));
         assert!(!s.phone_by_address());
 
-        s.phone_waiting_since = Some(now - Duration::from_secs(31));
+        s.phone_waiting_since = Some(
+            now.checked_sub(Duration::from_secs(31))
+                .expect("the clock is past 31 s"),
+        );
         assert!(s.phone_by_address());
     }
 
     #[test]
     fn a_run_that_leaves_its_card_to_do_shows_an_error_and_keeps_the_password() {
         let mut s = headless(demo::Machine::Tuxedo);
-        play(
-            &mut s,
-            vec![Step::Until("detection", |s| s.status.is_some())],
-        );
+        play(&mut s, vec![Step::Until("detection", |s| s.status.is_some())]);
         let mut still = s.card(CardId::Tuxedo).unwrap().clone();
         still.facts = kubaos_core::setup::Facts::Tuxedo {
             vendor: "TUXEDO".into(),
@@ -547,7 +589,10 @@ mod tests {
     fn a_card_waiting_on_a_reboot_puts_reboot_to_finish_before_done_for_now() {
         let mut s = headless(demo::Machine::Tuxedo);
         let script = script();
-        let upto = script.iter().position(|st| matches!(st, Step::Shot("04-tuxedo-reboot"))).unwrap();
+        let upto = script
+            .iter()
+            .position(|st| matches!(st, Step::Shot("04-tuxedo-reboot")))
+            .unwrap();
         play(&mut s, script.into_iter().take(upto).collect());
 
         let order = s.focus_order();
@@ -555,14 +600,20 @@ mod tests {
         let finish = order.iter().position(|f| *f == SF::Finish);
 
         assert!(reboot.is_some() && reboot < finish, "{order:?}");
-        assert_eq!(s.reboot_nudge().as_deref(), Some("The TUXEDO drivers load after a reboot."));
+        assert_eq!(
+            s.reboot_nudge().as_deref(),
+            Some("The TUXEDO drivers load after a reboot.")
+        );
     }
 
     #[test]
     fn reboot_to_finish_reboots_through_the_card_path_and_toasts_a_refusal() {
         let mut s = headless(demo::Machine::Tuxedo);
         let script = script();
-        let upto = script.iter().position(|st| matches!(st, Step::Shot("04-tuxedo-reboot"))).unwrap();
+        let upto = script
+            .iter()
+            .position(|st| matches!(st, Step::Shot("04-tuxedo-reboot")))
+            .unwrap();
         play(&mut s, script.into_iter().take(upto).collect());
 
         let _ = s.update_inner(Message::Setup(crate::setup::Msg::Click(SF::RebootAll)));
@@ -611,7 +662,12 @@ mod tests {
     fn the_installed_bitwarden_card_narrows_its_keys_logs_out_and_logs_in_to_another_server() {
         let mut s = headless(demo::Machine::Installed);
         let script = script_bitwarden();
-        let upto = |name| script.iter().position(|st| matches!(st, Step::Shot(n) if *n == name)).unwrap();
+        let upto = |name| {
+            script
+                .iter()
+                .position(|st| matches!(st, Step::Shot(n) if *n == name))
+                .unwrap()
+        };
         let (folders, pulled) = (upto("bw-02-folders"), upto("bw-04-logged-out"));
         let mut steps = script.into_iter();
 

@@ -62,8 +62,10 @@ pub struct LoginRequest {
 #[derive(Debug, Clone)]
 pub enum Login {
     /// bw asks for the master password and the authenticator code on the terminal.
-    Totp { email: String },
-    /// bw asks for client_id and client_secret on the terminal.
+    Totp {
+        email: String,
+    },
+    /// bw asks for `client_id` and `client_secret` on the terminal.
     ApiKeyPrompt,
     Sso,
     /// From the form: the password in bw's environment, `--method 0` or `3`.
@@ -74,7 +76,10 @@ pub enum Login {
         code: String,
     },
     /// From the form: the key in bw's environment.
-    ApiKey { client_id: String, client_secret: Sensitive },
+    ApiKey {
+        client_id: String,
+        client_secret: Sensitive,
+    },
 }
 
 /// Questions for the person at the terminal.
@@ -143,7 +148,10 @@ pub fn login(
         config.write(m, paths)?;
     }
     if !logged_out && current != server {
-        return Err(Error::OtherServer { current, wanted: server });
+        return Err(Error::OtherServer {
+            current,
+            wanted: server,
+        });
     }
 
     let mut session = None;
@@ -170,17 +178,16 @@ pub fn login(
         other => return Err(Error::UnknownStatus(super::one_line(other))),
     }
 
-    let session = match session {
-        Some(s) => s,
-        None => {
-            let password = req.form.as_ref().map(|f| &f.password);
-            if password.is_some_and(|pw| pw.0.is_empty()) {
-                return Err(Error::Incomplete("the vault is locked"));
-            }
-            // bw prompts for the master password itself; the 2026.10 bw can also ask the
-            // desktop app to unlock with system authentication, when the server allows it.
-            m.unlock(password).map_err(Error::Unlock)?
+    let session = if let Some(s) = session {
+        s
+    } else {
+        let password = req.form.as_ref().map(|f| &f.password);
+        if password.is_some_and(|pw| pw.0.is_empty()) {
+            return Err(Error::Incomplete("the vault is locked"));
         }
+        // bw prompts for the master password itself; the 2026.10 bw can also ask the
+        // desktop app to unlock with system authentication, when the server allows it.
+        m.unlock(password).map_err(Error::Unlock)?
     };
     if session.expose().is_empty() {
         return Err(Error::NoSession);
@@ -222,7 +229,10 @@ fn form_login(m: &mut dyn Machine, paths: &Paths, config: &mut Config, f: &Form)
                 method: if f.method == FormMethod::Totp { "0" } else { "3" },
                 code: code.to_string(),
             };
-            m.login(&how).map_err(|cause| Error::Login { what: "login failed", cause })?
+            m.login(&how).map_err(|cause| Error::Login {
+                what: "login failed",
+                cause,
+            })?
         }
         FormMethod::ApiKey => {
             let (id, secret) = (f.client_id.trim(), f.client_secret.0.trim());
@@ -233,8 +243,10 @@ fn form_login(m: &mut dyn Machine, paths: &Paths, config: &mut Config, f: &Form)
                 client_id: id.to_string(),
                 client_secret: Sensitive(secret.to_string()),
             };
-            m.login(&how)
-                .map_err(|cause| Error::Login { what: "API key login failed", cause })?;
+            m.login(&how).map_err(|cause| Error::Login {
+                what: "API key login failed",
+                cause,
+            })?;
             None
         }
     };
@@ -250,52 +262,49 @@ fn terminal_login(
     asker: &mut dyn Ask,
     p: &mut Progress,
 ) -> Result<Option<Session>, Error> {
-    let mut chosen = match method {
-        Some(m) => m,
-        None => {
-            p.info("How do you log in? bw can't use the YubiKey (FIDO2) for two-step login;");
-            p.info("it does authenticator-app codes, email codes and YubiKey OTP.");
-            p.info("  1) email + master password + authenticator-app code (recommended, Enter)");
-            p.info("  2) personal API key (web vault: Settings -> Security -> Keys -> View API key),");
-            p.info("     if you have no authenticator app as two-step method; asked now, never stored");
-            p.info("  3) SSO (your organization's identity provider, in the browser)");
-            match ask(asker, "Choice [1-3]:")?.trim() {
-                "" | "1" => Method::Totp,
-                "2" => Method::ApiKey,
-                "3" => Method::Sso,
-                _ => return Err(Error::Choice),
-            }
+    let mut chosen = if let Some(m) = method {
+        m
+    } else {
+        p.info("How do you log in? bw can't use the YubiKey (FIDO2) for two-step login;");
+        p.info("it does authenticator-app codes, email codes and YubiKey OTP.");
+        p.info("  1) email + master password + authenticator-app code (recommended, Enter)");
+        p.info("  2) personal API key (web vault: Settings -> Security -> Keys -> View API key),");
+        p.info("     if you have no authenticator app as two-step method; asked now, never stored");
+        p.info("  3) SSO (your organization's identity provider, in the browser)");
+        match ask(asker, "Choice [1-3]:")?.trim() {
+            "" | "1" => Method::Totp,
+            "2" => Method::ApiKey,
+            "3" => Method::Sso,
+            _ => return Err(Error::Choice),
         }
     };
     if chosen == Method::Totp {
-        let email = match config.get("email") {
-            Some(e) => e.to_string(),
-            None => {
-                let e = ask(asker, "Email:")?.trim().to_string();
-                remember_email(m, paths, config, &e)?;
-                e
-            }
+        let email = if let Some(e) = config.get("email") {
+            e.to_string()
+        } else {
+            let e = ask(asker, "Email:")?.trim().to_string();
+            remember_email(m, paths, config, &e)?;
+            e
         };
         // --method 0: the authenticator app, even when a YubiKey is the account's preferred
         // method. bw prompts on stderr and prints only the session on stdout.
-        match m.login(&Login::Totp { email }) {
+        let cause = match m.login(&Login::Totp { email }) {
             Ok(s) => return Ok(s),
-            Err(cause) => {
-                p.warn("authenticator-app login failed (wrong code, or no authenticator app on the account?)");
-                if !asker.tty() || method.is_some() {
-                    return Err(Error::Login {
-                        what: "try again, or: kubaos bitwarden setup --login apikey",
-                        cause,
-                    });
-                }
-                let again = ask(asker, "Log in with the personal API key instead? [y/N]")?;
-                if !again.trim().to_ascii_lowercase().starts_with('y') {
-                    return Err(Error::NotLoggedIn);
-                }
-                p.unwarn();
-                chosen = Method::ApiKey;
-            }
+            Err(cause) => cause,
+        };
+        p.warn("authenticator-app login failed (wrong code, or no authenticator app on the account?)");
+        if !asker.tty() || method.is_some() {
+            return Err(Error::Login {
+                what: "try again, or: kubaos bitwarden setup --login apikey",
+                cause,
+            });
         }
+        let again = ask(asker, "Log in with the personal API key instead? [y/N]")?;
+        if !again.trim().to_ascii_lowercase().starts_with('y') {
+            return Err(Error::NotLoggedIn);
+        }
+        p.unwarn();
+        chosen = Method::ApiKey;
     }
     let (how, what) = match chosen {
         Method::Sso => (Login::Sso, "SSO login failed"),

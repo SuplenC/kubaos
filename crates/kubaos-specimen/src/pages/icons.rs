@@ -1,6 +1,7 @@
 //! The icons page: KubaOS Symbols, every one at the sizes Kōbō draws them with the stroke each
-//! scale gets, then the comparison sheet that picked Tabler as their base, kept as a record: the same
-//! 40 glyphs from Material Symbols Rounded, Phosphor, Lucide and Tabler, side by side and in context.
+//! scale gets, then the comparison sheet that picked Tabler as their base, kept as a record: the
+//! same 40 glyphs from Material Symbols Rounded, Phosphor, Lucide and Tabler, side by side and in
+//! context.
 
 use iced::Background;
 use iced::Border;

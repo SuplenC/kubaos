@@ -20,7 +20,9 @@ impl Drawing {
     ///
     /// [`RasterError`] when it isn't an SVG resvg reads.
     pub fn parse(svg: &str) -> Result<Self, RasterError> {
-        usvg::Tree::from_str(svg, &usvg::Options::default()).map(Self).map_err(RasterError)
+        usvg::Tree::from_str(svg, &usvg::Options::default())
+            .map(Self)
+            .map_err(RasterError)
     }
 
     /// The whole canvas drawn into `px` by `px` pixels, as premultiplied ARGB, row by row: the

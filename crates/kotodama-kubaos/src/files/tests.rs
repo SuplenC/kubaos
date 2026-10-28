@@ -76,8 +76,15 @@ fn the_second_action_opens_the_folder_in_yazi() {
     let ran = folders.run("files:documents", YAZI, &runner);
 
     assert!(matches!(ran, Ok(Ran::Close)));
-    assert_eq!(runner.launched.borrow()[0].0, ["kubaos-files", "open", "/home/kuba/Documents"]);
-    let actions: Vec<String> = folders.items()[0].actions.iter().map(|action| action.id.clone()).collect();
+    assert_eq!(
+        runner.launched.borrow()[0].0,
+        ["kubaos-files", "open", "/home/kuba/Documents"]
+    );
+    let actions: Vec<String> = folders.items()[0]
+        .actions
+        .iter()
+        .map(|action| action.id.clone())
+        .collect();
     assert_eq!(actions, [OPEN, YAZI]);
 }
 

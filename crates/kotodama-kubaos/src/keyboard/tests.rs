@@ -95,9 +95,15 @@ fn moving_up_and_down_launches_kubaos_keyboard_move_with_the_new_place() {
     let keyboards = keyboards("us,it,de", "");
 
     assert_eq!(keyboards.run("keyboard:it", MOVE_UP, &none(), &runner), Ok(Ran::Close));
-    assert_eq!(keyboards.run("keyboard:it", MOVE_DOWN, &none(), &runner), Ok(Ran::Close));
+    assert_eq!(
+        keyboards.run("keyboard:it", MOVE_DOWN, &none(), &runner),
+        Ok(Ran::Close)
+    );
 
-    assert_eq!(launched(&runner), ["kubaos keyboard move it 1", "kubaos keyboard move it 3"]);
+    assert_eq!(
+        launched(&runner),
+        ["kubaos keyboard move it 1", "kubaos keyboard move it 3"]
+    );
 }
 
 #[test]
@@ -119,7 +125,11 @@ fn a_move_past_either_end_is_refused_and_runs_nothing() {
 #[test]
 fn the_users_layouts_win_over_the_systems_file() {
     let dir = tempfile::tempdir().unwrap();
-    let (mine, system, lst) = (dir.path().join("keyboard.toml"), dir.path().join("keyboard"), dir.path().join("evdev.lst"));
+    let (mine, system, lst) = (
+        dir.path().join("keyboard.toml"),
+        dir.path().join("keyboard"),
+        dir.path().join("evdev.lst"),
+    );
     fs::write(&system, "XKBLAYOUT=\"us,it\"\n").unwrap();
     fs::write(&lst, LST).unwrap();
 

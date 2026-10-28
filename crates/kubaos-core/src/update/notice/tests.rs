@@ -83,7 +83,10 @@ fn pending_apt_security_updates_are_in_the_file_and_notified_once() {
         "apt-security linux-image=6.8\napt-security openssl=3.0.13\n",
     ));
 
-    assert_eq!(text, "apt-security=2\napt-security-packages=linux-image=6.8,openssl=3.0.13\n");
+    assert_eq!(
+        text,
+        "apt-security=2\napt-security-packages=linux-image=6.8,openssl=3.0.13\n"
+    );
     assert_eq!(Available::apt_security_of(&text), available.apt_security);
     assert!(!available.is_empty());
     assert_eq!(

@@ -17,8 +17,8 @@
 //! - Logging in and unlocking through `bw` ([`login`], [`logout`]).
 //! - What a pull writes ([`pull`]) and the read-only check ([`check`]).
 //! - The project env cache in the keyring ([`env`]), which `use bwenv` in an `.envrc` reads.
-//! - The non-secret config (`~/.config/dot-bw/config`) and what the last pull found
-//!   ([`Overview`]), which Kōbō shows.
+//! - The non-secret config (`~/.config/dot-bw/config`) and what the last pull found ([`Overview`]),
+//!   which Kōbō shows.
 //!
 //! # Not here
 //!
@@ -44,24 +44,24 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use serde::Serialize;
 
+pub use self::agent::Agent;
+pub use self::config::Config;
+pub use self::login::Ask;
+pub use self::login::Form;
+pub use self::login::FormMethod;
+pub use self::login::Login;
+pub use self::login::LoginRequest;
+pub use self::login::Method;
+pub use self::login::NoTerminal;
+pub use self::login::login;
+pub use self::login::logout;
+pub use self::real::Real;
+pub use self::vault::DEFAULT_ENV_PREFIX;
+pub use self::vault::DEFAULT_GH_ITEM;
+pub use self::vault::Names;
+pub use self::vault::scope;
 pub use crate::engine::runner::Cmd;
 pub use crate::engine::runner::Sensitive;
-pub use agent::Agent;
-pub use config::Config;
-pub use login::Ask;
-pub use login::Form;
-pub use login::FormMethod;
-pub use login::Login;
-pub use login::LoginRequest;
-pub use login::Method;
-pub use login::NoTerminal;
-pub use login::login;
-pub use login::logout;
-pub use real::Real;
-pub use vault::DEFAULT_ENV_PREFIX;
-pub use vault::DEFAULT_GH_ITEM;
-pub use vault::Names;
-pub use vault::scope;
 
 /// The session `bw unlock` or `bw login` hands out. It unlocks the whole vault, so it stays in
 /// memory and goes to `bw` alone.
@@ -257,7 +257,13 @@ impl Paths {
     pub fn under(home: &Path) -> Self {
         let agent = home.join(".bitwarden-ssh-agent.sock");
         let sock = agent.display().to_string();
-        Self::new(home, &home.join(".config"), &home.join(".local/state"), agent, Some(sock))
+        Self::new(
+            home,
+            &home.join(".config"),
+            &home.join(".local/state"),
+            agent,
+            Some(sock),
+        )
     }
 
     fn new(home: &Path, config: &Path, state: &Path, agent: PathBuf, auth_sock: Option<String>) -> Self {
@@ -324,7 +330,9 @@ pub struct Progress<'a> {
 
 impl std::fmt::Debug for Progress<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Progress").field("report", &self.report).finish_non_exhaustive()
+        f.debug_struct("Progress")
+            .field("report", &self.report)
+            .finish_non_exhaustive()
     }
 }
 
@@ -445,6 +453,10 @@ impl Error {
 
 /// Which parts a pull writes (`--only`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Each field is one of the four parts `--only` names, which a pull writes or skips on its own."
+)]
 pub struct Parts {
     pub ssh: bool,
     pub git: bool,
@@ -549,7 +561,18 @@ pub fn preflight(m: &mut dyn Machine, parts: Parts) -> Result<(), Error> {
 /// # Errors
 ///
 /// bw failed to read the vault, or a file couldn't be written.
-pub fn pull(m: &mut dyn Machine, paths: &Paths, session: &Session, parts: Parts, p: &mut Progress) -> Result<(), Error> {
+///
+/// # Panics
+///
+/// If `serde_json` refuses the overview; it is plain data with string keys, which it always
+/// takes.
+pub fn pull(
+    m: &mut dyn Machine,
+    paths: &Paths,
+    session: &Session,
+    parts: Parts,
+    p: &mut Progress,
+) -> Result<(), Error> {
     p.step("Reading the vault");
     m.sync(session).map_err(Error::Sync)?;
     let folders = m.folders(session).map_err(|e| Error::List("folders", e))?;
@@ -560,12 +583,21 @@ pub fn pull(m: &mut dyn Machine, paths: &Paths, session: &Session, parts: Parts,
     let vault = vault::Vault::parse(&items, &folders, &paths.names).map_err(|e| Error::Parse("items", e))?;
     drop(items);
     let keys = vault.ssh_keys(&filter);
-    p.ok(format!("{} items, {} SSH key(s) in {}", vault.len(), keys.len(), filter.scope));
+    p.ok(format!(
+        "{} items, {} SSH key(s) in {}",
+        vault.len(),
+        keys.len(),
+        filter.scope
+    ));
     let mut keys = ssh::name_files(keys, p);
 
     let mut overview = Overview {
         // bw's "No Folder" has no id: no filter can name it.
-        folders: folders.iter().filter(|f| f.id.is_some()).map(|f| f.name.clone()).collect(),
+        folders: folders
+            .iter()
+            .filter(|f| f.id.is_some())
+            .map(|f| f.name.clone())
+            .collect(),
         keys: vec![],
     };
     overview.folders.sort();
@@ -599,7 +631,12 @@ pub fn check(m: &mut dyn Machine, paths: &Paths, p: &mut Progress) {
     let config = Config::read(m, paths);
     let scope = vault::scope(&config.folders());
     let mut fingerprints = vec![];
-    for f in m.read(&paths.pubkeys()).unwrap_or_default().lines().filter(|l| ssh::safe_file(l)) {
+    for f in m
+        .read(&paths.pubkeys())
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| ssh::safe_file(l))
+    {
         let path = paths.ssh.join(f);
         if !m.is_file(&path) {
             continue;

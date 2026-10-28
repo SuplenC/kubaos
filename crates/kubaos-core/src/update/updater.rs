@@ -6,8 +6,8 @@
 //! snapshot, the user's `flake.lock` saved and the update recorded in the history; apt; moving
 //! `release`; the Hyprland pin, the package manifest and the system migrations; `nix flake update`
 //! of the user flake; relinking what `system/` took from KubaOS's nixpkgs; the switch; the
-//! Bitwarden check; the user migrations; and the new release record. Packages first, then migrations, which are written
-//! against the new packages.
+//! Bitwarden check; the user migrations; and the new release record. Packages first, then
+//! migrations, which are written against the new packages.
 //!
 //! Each stage is a [`Phase`] of the progress stream (`event.rs`). Programs run with their output
 //! captured: every line goes to the run's log and to the stream, never to the terminal directly.
@@ -54,6 +54,7 @@ use super::machine::Machine;
 use super::machine::MachineError;
 use super::migrations;
 use super::migrations::Migration;
+use super::notice::APT_SECURITY_KEY;
 use super::notice::Available;
 use super::notice::parse_notified;
 use super::policy;
@@ -70,7 +71,6 @@ use super::record::RecordError;
 use super::record::SystemPaths;
 use super::record::parse_history;
 use super::record::short;
-use super::notice::APT_SECURITY_KEY;
 use super::security;
 use super::security::CountError;
 use super::version::Version;
@@ -234,7 +234,6 @@ impl UpdateOptions {
         self
     }
 }
-
 
 /// What dpkg does with a config file the user changed and the package changed too: keep the
 /// user's. Programs run with no terminal input, so dpkg can't ask.
@@ -406,9 +405,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         ));
         let lock = entry.lock.clone().filter(|lock| lock.is_file());
         match &lock {
-            Some(lock) => self
-                .j
-                .note(format!("Your flake.lock goes back to {}", lock.display())),
+            Some(lock) => self.j.note(format!("Your flake.lock goes back to {}", lock.display())),
             None => self
                 .j
                 .warn("that update saved no flake.lock: your packages stay where they are"),
@@ -514,9 +511,9 @@ impl<'a, M: Machine> Updater<'a, M> {
         let channel = self.channel(&installed);
         let (refs, refreshed) = self.phase(Phase::Fetching, |u| {
             let local = u.refs();
-            let url = local.origin_url().ok_or_else(|| UpdateError::NoRelease {
-                path: u.sys.checkout(),
-            })?;
+            let url = local
+                .origin_url()
+                .ok_or_else(|| UpdateError::NoRelease { path: u.sys.checkout() })?;
             u.j.step(format!("git ls-remote {url}"));
             let refs = RemoteRefs::fetch(&url, local).map_err(|e| UpdateError::Policy(PolicyError::Refs(e)))?;
             Ok((refs, u.refresh_apt_lists()))
@@ -533,7 +530,8 @@ impl<'a, M: Machine> Updater<'a, M> {
         let _lock = match self.lock() {
             Ok(lock) => lock,
             Err(UpdateError::Busy) => {
-                self.j.note("An update is running: the check leaves update-available to it");
+                self.j
+                    .note("An update is running: the check leaves update-available to it");
                 return Ok(Available::default());
             }
             Err(e) => return Err(e),
@@ -1120,8 +1118,7 @@ impl<'a, M: Machine> Updater<'a, M> {
             .quiet(&Cmd::user("dpkg").arg("--print-architecture"))
             .unwrap_or_default();
         if arch.trim() != "amd64" {
-            self.j
-                .skip("Hyprland comes from KubaOS's nixpkgs on this architecture");
+            self.j.skip("Hyprland comes from KubaOS's nixpkgs on this architecture");
             return Ok(false);
         }
         let pins = hyprland::parse(wanted);
@@ -1163,7 +1160,8 @@ impl<'a, M: Machine> Updater<'a, M> {
         rehold?;
         // Written once the versions are in, so a failed install is tried again on the next update.
         self.write_root(&self.sys.apt_pin(), wanted)?;
-        self.j.detail(format!("applied, {} held", count(to_hold.len(), "package")));
+        self.j
+            .detail(format!("applied, {} held", count(to_hold.len(), "package")));
         if self.quiet(&Cmd::user("Hyprland").arg("--verify-config")).is_err() {
             self.j
                 .warn("Hyprland --verify-config reports problems: run it and fix your config before logging out");
@@ -1396,7 +1394,11 @@ fn pick_detail(pick: &Pick) -> String {
 
 /// "1 package", "12 packages".
 fn count(n: usize, what: &str) -> String {
-    if n == 1 { format!("1 {what}") } else { format!("{n} {what}s") }
+    if n == 1 {
+        format!("1 {what}")
+    } else {
+        format!("{n} {what}s")
+    }
 }
 
 /// A release `system/70-bitwarden.sh --check-updates` reports, from its `!!` lines: "bw CLI

@@ -1,8 +1,8 @@
 //! A source file split into lines with its comments and string literals told apart, so the rules
 //! never match inside a comment and only look in strings where they mean to.
 //!
-//! One scanner serves Rust and QML: both have `//` and `/* */` comments and quoted strings. Rust adds
-//! raw strings and character literals, QML single-quoted and template strings.
+//! One scanner serves Rust and QML: both have `//` and `/* */` comments and quoted strings. Rust
+//! adds raw strings and character literals, QML single-quoted and template strings.
 
 /// The language a file is written in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -253,7 +253,7 @@ pub fn numbers(code: &str) -> Vec<Number> {
 /// name (`cell * 7`, seven columns of a cell). A count times a number is still a literal length.
 #[expect(
     clippy::float_cmp,
-    reason = "a literal as written is compared with the literals 2 and 0.5"
+    reason = "A literal as written is compared with the literals 2 and 0.5."
 )]
 pub fn is_halving(code: &str, number: Number) -> bool {
     let before = code[..byte_index(code, number.column)].trim_end();

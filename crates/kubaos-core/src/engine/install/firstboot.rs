@@ -3,9 +3,11 @@
 //! plus the files in `install/firstboot/` that make Kōbō open at the first
 //! login and give it a way to root.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 
-use super::{Install, R};
+use super::Install;
+use super::R;
 use crate::engine::runner::Cmd;
 
 const HELPER: &str = include_str!("../../../../../install/firstboot/setup-helper");
@@ -21,12 +23,12 @@ pub const INSTALLED_KUBAOS: &str = "/usr/lib/kubaos/kubaos";
 
 /// gnome-keyring's plaintext format: a keyring without a password is
 /// stored unencrypted and is never locked, so nothing ever asks for it.
-pub const KEYRING: &str = "[keyring]\ndisplay-name=Default keyring\nctime=0\nmtime=0\nlock-on-idle=false\nlock-after=false\n";
+pub const KEYRING: &str =
+    "[keyring]\ndisplay-name=Default keyring\nctime=0\nmtime=0\nlock-on-idle=false\nlock-after=false\n";
 
 pub const UNIT_PATH: &str = "/usr/lib/systemd/user/kubaos-setup.service";
 /// `systemctl --global enable`, done by hand: no systemd in the chroot.
-pub const UNIT_WANTS: &str =
-    "/etc/systemd/user/graphical-session.target.wants/kubaos-setup.service";
+pub const UNIT_WANTS: &str = "/etc/systemd/user/graphical-session.target.wants/kubaos-setup.service";
 
 impl Install<'_> {
     /// The user's default keyring, with an empty password (Omarchy does the
@@ -44,13 +46,13 @@ impl Install<'_> {
         self.mkdir(&self.t(&dir))?;
         self.write(&format!("{dir}/Default_keyring.keyring"), KEYRING, 0o600)?;
         self.write(&format!("{dir}/default"), "Default_keyring\n", 0o644)?;
-        self.sh(Cmd::new("chmod").args(["700", &self.ts(&dir)]))?;
-        self.sh(Cmd::new("chown").args([
+        self.sh(&Cmd::new("chmod").args(["700", &self.ts(&dir)]))?;
+        self.sh(&Cmd::new("chown").args([
             owner,
             &self.ts(&format!("{home}/.local")),
             &self.ts(&format!("{home}/.local/share")),
         ]))?;
-        self.sh(Cmd::new("chown").args(["-R", owner, &self.ts(&dir)]))?;
+        self.sh(&Cmd::new("chown").args(["-R", owner, &self.ts(&dir)]))?;
         Ok(())
     }
 
@@ -77,9 +79,8 @@ impl Install<'_> {
         }
         self.mkdir(&self.t("/usr/lib/kubaos"))?;
         for (src, dst) in [(&cli, INSTALLED_KUBAOS), (&gui, "/usr/bin/kobo")] {
-            let cmd =
-                Cmd::new("install").args(["-m", "0755", &src.display().to_string(), &self.ts(dst)]);
-            self.sh(cmd)?;
+            let cmd = Cmd::new("install").args(["-m", "0755", &src.display().to_string(), &self.ts(dst)]);
+            self.sh(&cmd)?;
         }
         // A launcher, not the binary: every switch installs the release's `kubaos` in the home,
         // and the launcher runs that one, so a new kubaos needs no copy here. `kubaos-setup`
@@ -87,18 +88,14 @@ impl Install<'_> {
         self.write("/usr/bin/kubaos", LAUNCHER, 0o755)?;
         self.write("/usr/lib/kubaos/setup-helper", HELPER, 0o755)?;
         self.write("/usr/bin/kubaos-setup", WRAPPER, 0o755)?;
-        self.write(
-            "/usr/share/polkit-1/actions/org.kubaos.setup.policy",
-            POLICY,
-            0o644,
-        )?;
+        self.write("/usr/share/polkit-1/actions/org.kubaos.setup.policy", POLICY, 0o644)?;
         self.write(UNIT_PATH, UNIT, 0o644)?;
         self.write("/usr/share/applications/kobo.desktop", DESKTOP, 0o644)?;
         let wants = self.t(UNIT_WANTS);
         if let Some(d) = wants.parent() {
             self.mkdir(d)?;
         }
-        self.sh(Cmd::new("ln").args(["-sfn", UNIT_PATH, &wants.display().to_string()]))?;
+        self.sh(&Cmd::new("ln").args(["-sfn", UNIT_PATH, &wants.display().to_string()]))?;
         self.info("first-boot setup opens at the first login (kubaos-setup any time)");
         Ok(())
     }

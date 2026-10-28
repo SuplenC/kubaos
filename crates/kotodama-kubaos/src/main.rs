@@ -1,9 +1,9 @@
-//! The KubaOS Extension's protocol loop, and with `layouts` the "Add a keyboard layout" app's: each config the Daemon sends makes
-//! the Items over, sending only the ones that changed, and so does each
-//! change the update check writes, each change to the keyboard layouts, to
+//! The KubaOS Extension's protocol loop, and with `layouts` the "Add a keyboard layout" app's: each
+//! config the Daemon sends makes the Items over, sending only the ones that changed, and so does
+//! each change the update check writes, each change to the keyboard layouts, to
 //! the wallpaper sets file, to Hyprland's screens file and to the drives file;
-//! each config also reads the user folders again; each run is answered with its outcome, after the View it
-//! pushes or pops. Each Live query is answered at once, with a monitor answer,
+//! each config also reads the user folders again; each run is answered with its outcome, after the
+//! View it pushes or pops. Each Live query is answered at once, with a monitor answer,
 //! processes to stop, a date answer, or nothing.
 //!
 //! # Owns
@@ -15,8 +15,6 @@
 //! # Not here
 //!
 //! - The Items and the runs: the library's modules.
-
-#![forbid(unsafe_code)]
 
 use std::path::Path;
 use std::path::PathBuf;

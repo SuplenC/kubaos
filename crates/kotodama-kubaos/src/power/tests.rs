@@ -78,8 +78,14 @@ fn the_scheduler_view_says_which_runs_and_why_then_the_details() {
         why: "LAVD crashed and the kernel fell back to its own scheduler; it starts again in 2 s.".to_owned(),
         agrees: false,
         details: vec![
-            ("Setting".to_owned(), "LAVD on (scheduler = \"lavd\" in power.toml)".to_owned()),
-            ("Service".to_owned(), "kubaos-scx.service: activating (auto-restart)".to_owned()),
+            (
+                "Setting".to_owned(),
+                "LAVD on (scheduler = \"lavd\" in power.toml)".to_owned(),
+            ),
+            (
+                "Service".to_owned(),
+                "kubaos-scx.service: activating (auto-restart)".to_owned(),
+            ),
         ],
     };
 

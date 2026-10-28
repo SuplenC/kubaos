@@ -23,8 +23,6 @@
 //!
 //! - Everything else: the library's modules.
 
-#![forbid(unsafe_code)]
-
 use std::io;
 use std::process::ExitCode;
 
@@ -52,6 +50,11 @@ set        holidays CODE|none, first-weekday DAY, analog on|off|toggle, bar-coun
 
 Settings: ~/.config/kubaos/desktop/clock/clock.toml";
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The answers and the usage are the command's output, for the person, the menu or the shell that ran it."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -105,6 +108,10 @@ fn report(result: Result<(), serve::CommandError>) -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The refusal is the command's answer to whoever ran it."
+)]
 fn failed(err: &dyn std::error::Error) -> ExitCode {
     eprintln!("kubaos-clock: {}", serve::chain(err));
     ExitCode::FAILURE

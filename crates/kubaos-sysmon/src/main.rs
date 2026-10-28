@@ -18,8 +18,6 @@
 //!
 //! - Everything else: the library's modules.
 
-#![forbid(unsafe_code)]
-
 use std::io;
 use std::process::ExitCode;
 use std::thread;
@@ -48,6 +46,11 @@ Settings: ~/.config/kubaos/desktop/sysmon/sysmon.toml";
 /// How long `sample` waits between its two reads, so CPU use and speeds have ticks to count.
 const SAMPLE_GAP: Duration = Duration::from_millis(500);
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The sample, the settings and the usage are the command's output, for the person or the shell that ran it."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -99,6 +102,10 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The refusal is the command's answer to whoever ran it."
+)]
 fn failed(err: &dyn std::error::Error) -> ExitCode {
     eprintln!("kubaos-sysmon: {}", serve::chain(err));
     ExitCode::FAILURE

@@ -20,11 +20,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
-use iced::keyboard::{self, key::Named};
-use iced::widget::{image, operation};
-use iced::{Size, Subscription, Task, event, window};
+use iced::Size;
+use iced::Subscription;
+use iced::Task;
+use iced::event;
+use iced::keyboard;
+use iced::keyboard::key::Named;
+use iced::widget::image;
+use iced::widget::operation;
+use iced::window;
 use kubaos_core::Probe;
 use kubaos_ui::Look;
 use kubaos_ui::Mode;
@@ -36,12 +43,17 @@ use kubaos_ui::motion::Motion;
 use kubaos_ui::tokens;
 use kubaos_ui::tokens::Easing;
 
-use crate::backend::{Backend, RunMsg};
+use crate::backend::Backend;
+use crate::backend::RunMsg;
 use crate::battery;
 use crate::battery::Battery;
-use crate::edit::{self, Edit};
-use crate::model::{DiskExt, DiskMode, Form};
-use crate::progress::{Install, Outcome};
+use crate::edit;
+use crate::edit::Edit;
+use crate::model::DiskExt;
+use crate::model::DiskMode;
+use crate::model::Form;
+use crate::progress::Install;
+use crate::progress::Outcome;
 use crate::theme;
 use crate::tour::Tour;
 
@@ -403,7 +415,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(backend: Arc<dyn Backend>, opts: Options) -> (Self, Task<Message>) {
+    pub fn new(backend: Arc<dyn Backend>, opts: &Options) -> (Self, Task<Message>) {
         let mut app = Self::headless(backend);
         app.blur_src = decode_blur();
         app.tour = opts.tour.clone().map(|d| Tour::new(d, opts.tour_pace));
@@ -421,7 +433,7 @@ impl App {
     pub fn headless(backend: Arc<dyn Backend>) -> Self {
         let now = Instant::now();
         let (tx, rx) = mpsc::channel();
-        let b = backend.clone();
+        let b = Arc::clone(&backend);
         std::thread::spawn(move || {
             let _ = tx.send(b.probe());
         });
@@ -599,9 +611,7 @@ impl App {
     fn initial_focus(&self) -> Option<F> {
         match self.screen {
             Screen::Account if !self.form.full_name.is_empty() => Some(F::Password),
-            Screen::Git if !self.form.git_name.is_empty() && !self.form.git_email.is_empty() => {
-                Some(F::Next)
-            }
+            Screen::Git if !self.form.git_name.is_empty() && !self.form.git_email.is_empty() => Some(F::Next),
             Screen::Git if !self.form.git_name.is_empty() => Some(F::GitEmail),
             _ => self.screen_focus_order().first().copied(),
         }
@@ -646,14 +656,10 @@ impl App {
             Screen::Welcome => match &self.probe {
                 ProbeState::Loading => Err("Poking at the hardware…"),
                 ProbeState::Failed(_) => Err("Couldn't read this machine."),
-                ProbeState::Ready(p) if p.payload.is_none() => {
-                    Err("No system image on this stick.")
-                }
+                ProbeState::Ready(p) if p.payload.is_none() => Err("No system image on this stick."),
                 ProbeState::Ready(_) => Ok(()),
             },
-            Screen::Wifi => self
-                .form
-                .wifi_ok(self.wifi_secured(self.form.wifi_ssid.as_deref())),
+            Screen::Wifi => self.form.wifi_ok(self.wifi_secured(self.form.wifi_ssid.as_deref())),
             Screen::Account => self.form.account_ok(),
             Screen::Disk => probe.map_or(Err("No disks. None at all."), |p| self.form.disk_ok(p)),
             Screen::Git => self.form.git_ok(),
@@ -670,7 +676,11 @@ impl App {
 
     /// How far the screen has arrived, 0 to 1: a page slides in over `long`.
     pub fn fade(&self) -> f32 {
-        Motion::default().progress(tokens::Duration::Long, Easing::EmphasizedDecel, self.now - self.transition.0)
+        Motion::default().progress(
+            tokens::Duration::Long,
+            Easing::EmphasizedDecel,
+            self.now - self.transition.0,
+        )
     }
 
     pub fn animating(&self) -> bool {
@@ -704,8 +714,7 @@ impl App {
         let mut subs = vec![
             event::listen_with(on_event),
             window::resize_events().map(|(_, s)| Message::Resized(s)),
-            Subscription::run_with(BatteryWatch(Arc::clone(&self.backend)), battery_watch)
-                .map(Message::Battery),
+            Subscription::run_with(BatteryWatch(Arc::clone(&self.backend)), battery_watch).map(Message::Battery),
         ];
         if self.animating() {
             subs.push(window::frames().map(Message::Tick));
@@ -771,7 +780,7 @@ impl App {
         }
         let config = self.form.to_config(probe);
         let secrets = self.form.to_secrets();
-        let backend = self.backend.clone();
+        let backend = Arc::clone(&self.backend);
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
             backend.run(&config, &secrets, &mut |m| {
@@ -780,7 +789,12 @@ impl App {
         });
         self.run_rx = Some(rx);
         self.install = Some(Install::new(Instant::now()));
-        self.log_open = (false, self.now - Motion::default().duration(tokens::Duration::Medium));
+        // The log starts closed, its close already over, so nothing animates.
+        let closed_at = self
+            .now
+            .checked_sub(Motion::default().duration(tokens::Duration::Medium))
+            .unwrap_or(self.now);
+        self.log_open = (false, closed_at);
         self.go(Screen::Installing)
     }
 
@@ -792,7 +806,12 @@ impl App {
             .expect("wallpaper")
             .to_rgba8();
         let h = image::Handle::from_rgba(img.width(), img.height(), img.into_raw());
-        self.wallpaper = Some((h, self.epoch - Duration::from_secs(5)));
+        self.wallpaper = Some((
+            h,
+            self.epoch
+                .checked_sub(Duration::from_secs(5))
+                .expect("the clock is past 5 s"),
+        ));
         self.blur_src = decode_blur();
         self.size = size;
         self.glass = None;
@@ -829,15 +848,15 @@ impl App {
             return;
         }
         let Some(src) = &self.blur_src else { return };
-        let r = crate::view::panel_rect(self.size, self.look().scale);
+        let panel = crate::view::panel_rect(self.size, self.look().scale);
         let (iw, ih) = (src.width() as f32, src.height() as f32);
-        let s = (self.size.width / iw).max(self.size.height / ih);
-        let ox = (iw * s - self.size.width) / 2.0;
-        let oy = (ih * s - self.size.height) / 2.0;
-        let x = ((r.x + ox) / s).max(0.0) as u32;
-        let y = ((r.y + oy) / s).max(0.0) as u32;
-        let w = ((r.width / s) as u32).clamp(1, src.width() - x);
-        let h = ((r.height / s) as u32).clamp(1, src.height() - y);
+        let zoom = (self.size.width / iw).max(self.size.height / ih);
+        let ox = (iw * zoom - self.size.width) / 2.0;
+        let oy = (ih * zoom - self.size.height) / 2.0;
+        let x = ((panel.x + ox) / zoom).max(0.0) as u32;
+        let y = ((panel.y + oy) / zoom).max(0.0) as u32;
+        let w = ((panel.width / zoom) as u32).clamp(1, src.width() - x);
+        let h = ((panel.height / zoom) as u32).clamp(1, src.height() - y);
         let crop = ::image::imageops::crop_imm(src, x, y, w, h).to_image();
         self.glass = Some((self.size, image::Handle::from_rgba(w, h, crop.into_raw())));
     }
@@ -850,6 +869,10 @@ impl App {
         task
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "One arm per message, each a few lines: the app's dispatch, read in one place."
+    )]
     pub(crate) fn update_inner(&mut self, msg: Message) -> Task<Message> {
         match msg {
             Message::Tick(now) => self.tick(now),
@@ -897,7 +920,7 @@ impl App {
                 self.type_text(&s.replace(['\n', '\r'], ""));
                 self.scroll_to_selection()
             }
-            Message::Pasted(None) => Task::none(),
+            Message::Pasted(None) | Message::ShutDown(_, Ok(())) | Message::Setup(_) => Task::none(),
             Message::Click(f) if self.power.is_some() && !f.in_power_menu() => Task::none(),
             Message::Click(f) => {
                 self.set_focus(Some(f));
@@ -913,15 +936,11 @@ impl App {
                 }
                 let value = self.field_value(f);
                 self.caret = match ptr {
-                    Pointer::Press { pos, extend: true } => Caret {
+                    Pointer::Press { pos, extend: true } | Pointer::Drag(pos) => Caret {
                         pos,
                         anchor: self.caret.anchor,
                     },
                     Pointer::Press { pos, .. } => Caret::at(pos),
-                    Pointer::Drag(pos) => Caret {
-                        pos,
-                        anchor: self.caret.anchor,
-                    },
                     Pointer::Double(pos) => edit::word_at(value, pos),
                     Pointer::Triple => Caret::all(value),
                 }
@@ -989,7 +1008,6 @@ impl App {
                 }
                 Task::none()
             }
-            Message::ShutDown(_, Ok(())) => Task::none(),
             Message::ShutDown(action, Err(e)) => {
                 self.shutting_down = None;
                 if let Some(menu) = self.power.take() {
@@ -1013,7 +1031,6 @@ impl App {
                 self.battery = b;
                 Task::none()
             }
-            Message::Setup(_) => Task::none(),
             Message::TourShot(name, shot) => {
                 crate::tour::save(self, &name, &shot);
                 if let Some(t) = &mut self.tour {
@@ -1092,13 +1109,7 @@ impl App {
             }
             task = Task::batch([
                 task,
-                operation::scroll_to(
-                    g.id,
-                    operation::AbsoluteOffset {
-                        x: None,
-                        y: Some(y),
-                    },
-                ),
+                operation::scroll_to(g.id, operation::AbsoluteOffset { x: None, y: Some(y) }),
             ]);
         }
         task
@@ -1114,12 +1125,11 @@ impl App {
             RunMsg::Exited(r) => {
                 install.exited(r);
                 self.run_rx = None;
-                let shown = match install.outcome {
-                    Some(Outcome::Done { .. }) => self.go(Screen::Done),
-                    _ => {
-                        self.log_open = (true, now);
-                        self.go(Screen::Failed)
-                    }
+                let shown = if let Some(Outcome::Done { .. }) = install.outcome {
+                    self.go(Screen::Done)
+                } else {
+                    self.log_open = (true, now);
+                    self.go(Screen::Failed)
                 };
                 let Some(menu) = &mut self.power else {
                     return shown;
@@ -1135,7 +1145,7 @@ impl App {
 
     fn retry_probe(&mut self) {
         let (tx, rx) = mpsc::channel();
-        let b = self.backend.clone();
+        let b = Arc::clone(&self.backend);
         std::thread::spawn(move || {
             let _ = tx.send(b.probe());
         });
@@ -1188,7 +1198,6 @@ impl App {
                     Task::none()
                 }
             }
-            F::Hold => Task::none(),
             F::ToggleLog => {
                 let open = !self.log_open.0;
                 self.now = Instant::now();
@@ -1200,18 +1209,12 @@ impl App {
                 }
             }
             F::SaveLog => {
-                let text = self
-                    .install
-                    .as_ref()
-                    .map(|i| i.log_text())
-                    .unwrap_or_default();
+                let text = self.install.as_ref().map(Install::log_text).unwrap_or_default();
                 self.now = Instant::now();
                 self.toast = Some((
                     match save_log(&text) {
                         Ok(p) => format!("Log saved to {}.", p.display()),
-                        Err(e) => format!(
-                            "Couldn't save the log: {e}. It's also in /var/log/kubaos-install.log."
-                        ),
+                        Err(e) => format!("Couldn't save the log: {e}. It's also in /var/log/kubaos-install.log."),
                     },
                     self.now,
                 ));
@@ -1305,12 +1308,12 @@ impl App {
     }
 
     /// Keys while the power menu is open: it keeps them all, so nothing behind it moves.
-    fn power_key(&mut self, k: Key) -> Task<Message> {
+    fn power_key(&mut self, k: &Key) -> Task<Message> {
         let busy = self.shutting_down.is_some() || self.power.is_some_and(|m| m.stopping.is_some());
         if busy {
             return Task::none();
         }
-        match k {
+        match *k {
             Key::Esc => {
                 self.close_power();
                 Task::none()
@@ -1382,9 +1385,13 @@ impl App {
         self.focus.is_some_and(F::is_field)
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "One arm per key, each a line or two: the keyboard's whole map, read in one place."
+    )]
     pub fn key(&mut self, k: Key) -> Task<Message> {
         if self.power.is_some() {
-            return self.power_key(k);
+            return self.power_key(&k);
         }
         let focus = self.focus;
         match k {
@@ -1401,9 +1408,7 @@ impl App {
             }
             Key::Enter => match focus {
                 Some(F::Hold) => self.update_inner(Message::HoldStart),
-                _ if self.screen == Screen::Summary
-                    && !matches!(focus, Some(F::Back | F::Power)) =>
-                {
+                _ if self.screen == Screen::Summary && !matches!(focus, Some(F::Back | F::Power)) => {
                     self.update_inner(Message::HoldStart)
                 }
                 Some(
@@ -1471,22 +1476,12 @@ impl App {
                 let left = matches!(k, Key::Left { .. });
                 if self.field_focused() {
                     self.edit(if left {
-                        Edit::Left {
-                            word,
-                            select: shift,
-                        }
+                        Edit::Left { word, select: shift }
                     } else {
-                        Edit::Right {
-                            word,
-                            select: shift,
-                        }
+                        Edit::Right { word, select: shift }
                     });
                 } else if focus == Some(F::DiskMode) {
-                    self.pick_mode(if left {
-                        DiskMode::FreeSpace
-                    } else {
-                        DiskMode::Whole
-                    });
+                    self.pick_mode(if left { DiskMode::FreeSpace } else { DiskMode::Whole });
                 } else if let Some(f @ (F::WallpaperSet(_) | F::Wallpaper(..))) = focus {
                     return self.move_in_wallpapers(f, if left { Dir::Left } else { Dir::Right });
                 }
@@ -1667,11 +1662,7 @@ impl App {
             List::Locale => (p.locales.clone(), &self.locale_q),
             // "custom" is xkb's slot for a hand-written layout: not one to pick.
             List::Keymap => (
-                p.keymaps
-                    .iter()
-                    .filter(|k| k.as_str() != "custom")
-                    .cloned()
-                    .collect(),
+                p.keymaps.iter().filter(|k| k.as_str() != "custom").cloned().collect(),
                 &self.keymap_q,
             ),
             List::Timezone => (p.timezones.clone(), &self.tz_q),
@@ -1907,10 +1898,7 @@ impl App {
             Screen::Wifi => &[List::Wifi],
             _ => &[],
         };
-        lists
-            .iter()
-            .filter_map(|&l| self.selection_scroll(l))
-            .collect()
+        lists.iter().filter_map(|&l| self.selection_scroll(l)).collect()
     }
 
     /// Where `list`'s scrollable moves to show its selected row: `None` when
@@ -1964,9 +1952,7 @@ pub fn reveal_target(screen: Screen, f: F) -> Option<(&'static str, &'static str
         (Screen::Disk, F::Luks | F::LuksConfirm | F::ShowSecrets) => ids::REVEAL_LUKS,
         (Screen::Account, F::FullName | F::Username) => ids::REVEAL_NAMES,
         (Screen::Account, F::Hostname) => ids::REVEAL_HOST,
-        (Screen::Account, F::Password | F::PasswordConfirm | F::ShowSecrets) => {
-            ids::REVEAL_PASSWORDS
-        }
+        (Screen::Account, F::Password | F::PasswordConfirm | F::ShowSecrets) => ids::REVEAL_PASSWORDS,
         _ => return None,
     };
     let scroll = match screen {
@@ -2075,15 +2061,11 @@ fn vim_arrow(text: &str) -> Option<Key> {
 
 /// Moves each scrollable to its vertical offset.
 fn scroll_lists(scrolls: impl IntoIterator<Item = (&'static str, f32)>) -> Task<Message> {
-    Task::batch(scrolls.into_iter().map(|(id, y)| {
-        operation::scroll_to(
-            id,
-            operation::AbsoluteOffset {
-                x: None,
-                y: Some(y),
-            },
-        )
-    }))
+    Task::batch(
+        scrolls
+            .into_iter()
+            .map(|(id, y)| operation::scroll_to(id, operation::AbsoluteOffset { x: None, y: Some(y) })),
+    )
 }
 
 /// iced keyboard event -> our `Key`. The window subscription and the key
@@ -2099,6 +2081,10 @@ pub fn on_event(ev: iced::Event, _status: event::Status, _w: window::Id) -> Opti
     translate(&k).map(Message::Key)
 }
 
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "`event::listen_with` hands its function the event by value."
+)]
 pub fn on_mouse(ev: iced::Event, _status: event::Status, _w: window::Id) -> Option<Message> {
     match ev {
         iced::Event::Mouse(
@@ -2126,8 +2112,7 @@ pub fn translate(k: &keyboard::Event) -> Option<Key> {
             let shift = modifiers.shift();
             match key.as_ref() {
                 keyboard::Key::Named(n) => match n {
-                    Named::Enter if !repeat => Some(Key::Enter),
-                    Named::Enter => None,
+                    Named::Enter => (!repeat).then_some(Key::Enter),
                     Named::Escape => Some(Key::Esc),
                     Named::Tab => Some(Key::Tab { shift }),
                     Named::ArrowUp => Some(Key::Up),
@@ -2160,7 +2145,7 @@ pub fn translate(k: &keyboard::Event) -> Option<Key> {
                 },
                 _ => text
                     .as_ref()
-                    .map(|t| t.to_string())
+                    .map(ToString::to_string)
                     .filter(|t| !t.is_empty() && !t.chars().any(char::is_control))
                     .map(Key::Text),
             }
@@ -2185,8 +2170,7 @@ async fn decode_wallpaper() -> image::Handle {
         };
         let _ = tx.send(h);
     });
-    rx.await
-        .unwrap_or_else(|_| image::Handle::from_bytes(theme::WALLPAPER))
+    rx.await.unwrap_or_else(|_| image::Handle::from_bytes(theme::WALLPAPER))
 }
 
 /// A set's thumbnails, decoded on a thread of their own (`thumbs::decode`), so a few dozen of them
@@ -2199,10 +2183,7 @@ async fn load_thumbs(payload: PathBuf, set: kubaos_core::probe::WallpaperSet) ->
     rx.await.unwrap_or_default()
 }
 
-fn decoded_thumbs(
-    payload: &std::path::Path,
-    set: &kubaos_core::probe::WallpaperSet,
-) -> Vec<(String, image::Handle)> {
+fn decoded_thumbs(payload: &std::path::Path, set: &kubaos_core::probe::WallpaperSet) -> Vec<(String, image::Handle)> {
     crate::thumbs::decode(payload, std::path::Path::new(crate::thumbs::ORIGINALS), set)
         .into_iter()
         .map(|(key, img)| {

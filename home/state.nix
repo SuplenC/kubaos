@@ -28,9 +28,13 @@ let
       entries = if builtins.pathExists folder then builtins.readDir folder else { };
     in
     map (name: folder + "/${name}") (
-      lib.attrNames (lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".toml" name) entries)
+      lib.attrNames (
+        lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".toml" name) entries
+      )
     );
-  files = lib.optional (builtins.pathExists (dir + "/packages.toml")) (dir + "/packages.toml") ++ tomlFiles "suites";
+  files =
+    lib.optional (builtins.pathExists (dir + "/packages.toml")) (dir + "/packages.toml")
+    ++ tomlFiles "suites";
 
   suites = lib.listToAttrs (
     map (
@@ -59,7 +63,9 @@ let
       found = lib.attrByPath (lib.splitString "." name) null pkgs;
     in
     if found == null then
-      throw "kubaos.d: ${name} is not a package in your nixpkgs (listed in ${lib.concatMapStringsSep ", " toString from})"
+      throw "kubaos.d: ${name} is not a package in your nixpkgs (listed in ${
+        lib.concatMapStringsSep ", " toString from
+      })"
     else
       found;
 in

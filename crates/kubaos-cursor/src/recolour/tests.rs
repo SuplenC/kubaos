@@ -7,7 +7,10 @@ fn the_three_placeholders_take_the_styles_colours() {
 
     let out = recolour(svg, &fixture::DARK);
 
-    assert_eq!(out, r##"<path fill="#1E0F0E" stroke="#FADBD9"/><circle fill="#1E0F0E"/>"##);
+    assert_eq!(
+        out,
+        r##"<path fill="#1E0F0E" stroke="#FADBD9"/><circle fill="#1E0F0E"/>"##
+    );
 }
 
 #[test]
@@ -31,7 +34,10 @@ fn the_spinner_segments_take_the_styles_spinner_tones_in_order() {
 fn no_rainbow_colour_is_left_in_a_recoloured_busy_cursor_or_corner() {
     let corners = r##"<path fill="#F1613A"/><path fill="#FDBE2A"/><path fill="#96C865"/><path fill="#4FADDF"/>"##;
 
-    for svg in [recolour(fixture::WATCH, &fixture::DARK), recolour(corners, &fixture::DARK)] {
+    for svg in [
+        recolour(fixture::WATCH, &fixture::DARK),
+        recolour(corners, &fixture::DARK),
+    ] {
         for colour in fixture::RAINBOW {
             assert!(!svg.to_uppercase().contains(colour), "{colour} left in {svg}");
         }

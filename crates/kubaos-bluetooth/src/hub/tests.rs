@@ -10,14 +10,9 @@ fn an_answer_reaches_the_waiter_and_closes_the_prompt() {
     let (id, reply) = hub.ask(Kind::PinCode, &keyboard(), None);
     assert_eq!(hub.state().prompt.unwrap().id, id);
 
-    let closed = hub
-        .answer(id, Answer::accept("0000"))
-        .expect("answer the open prompt");
+    let closed = hub.answer(id, Answer::accept("0000")).expect("answer the open prompt");
     assert_eq!(closed.kind, Kind::PinCode);
-    assert_eq!(
-        future::block_on(reply.recv()).unwrap(),
-        Answer::accept("0000")
-    );
+    assert_eq!(future::block_on(reply.recv()).unwrap(), Answer::accept("0000"));
     assert_eq!(hub.state().prompt, None);
 }
 
@@ -71,15 +66,9 @@ fn ending_a_pairing_keeps_its_failure_and_closes_its_prompt() {
     let state = hub.state();
     assert!(state.pairing.is_empty());
     assert_eq!(state.prompt, None);
-    assert_eq!(
-        state.errors.get(&device.path).map(String::as_str),
-        Some("Timed out")
-    );
+    assert_eq!(state.errors.get(&device.path).map(String::as_str), Some("Timed out"));
     assert!(hub.begin_pairing(&device.path));
-    assert!(
-        hub.state().errors.is_empty(),
-        "a new attempt forgets the last failure"
-    );
+    assert!(hub.state().errors.is_empty(), "a new attempt forgets the last failure");
 }
 
 #[test]

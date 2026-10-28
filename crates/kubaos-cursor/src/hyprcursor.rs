@@ -66,7 +66,11 @@ pub fn archive(shape: &Shape, colors: &Colors) -> Vec<u8> {
 fn frame_files(shape: &Shape) -> impl Iterator<Item = String> + '_ {
     let animated = shape.frames.len() > 1;
     (1..=shape.frames.len()).map(move |i| {
-        if animated { format!("{}-{i:02}.svg", shape.name) } else { format!("{}.svg", shape.name) }
+        if animated {
+            format!("{}-{i:02}.svg", shape.name)
+        } else {
+            format!("{}.svg", shape.name)
+        }
     })
 }
 

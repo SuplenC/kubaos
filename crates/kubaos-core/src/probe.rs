@@ -1,7 +1,8 @@
 //! What the machine offers: `kubaos probe --json` prints one `Probe`.
 //! Kōbō fills its pickers from it.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Probe {

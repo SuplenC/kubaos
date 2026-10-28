@@ -2285,6 +2285,7 @@ dependencies = [
  "kubaos-core",
  "kubaos-geometry",
  "kubaos-ui",
+ "log",
  "rustix 1.1.5",
  "serde_json",
  "signal-hook",
@@ -2308,6 +2309,7 @@ name = "kubaos-power"
 version = "0.1.0"
 dependencies = [
  "kubaos-user-layer",
+ "log",
  "serde",
  "serde_json",
  "tempfile",

@@ -2,13 +2,13 @@ use iced::Element;
 use iced::Pixels;
 use iced::Rectangle;
 use iced::Size;
-use iced::widget;
 use iced::advanced::renderer;
 use iced::advanced::renderer::Headless;
+use iced::widget;
 use iced::widget::image;
-use iced_test::selector;
 use iced_runtime::UserInterface;
 use iced_runtime::user_interface;
+use iced_test::selector;
 use iced_test::simulator::Simulator;
 
 use super::Aspect;
@@ -124,7 +124,12 @@ fn drawn(scale: Scale) -> (Vec<u8>, u32) {
         Some("tiny-skia"),
     ))
     .expect("a tiny-skia renderer");
-    let mut ui = UserInterface::build(view, Size::new(100.0, 60.0), user_interface::Cache::default(), &mut renderer);
+    let mut ui = UserInterface::build(
+        view,
+        Size::new(100.0, 60.0),
+        user_interface::Cache::default(),
+        &mut renderer,
+    );
     ui.draw(
         &mut renderer,
         &iced::Theme::Dark,
@@ -150,10 +155,25 @@ fn the_picture_is_drawn_inside_its_box_with_rounded_corners() {
         };
 
         // The box is 64 by 40 at (12, 8), its corners the control radius, 12.
-        assert!(red(12.5, 28.0) && red(75.5, 28.0), "{scale:?}: the box's sides are drawn");
-        assert!(red(44.0, 8.5) && red(44.0, 47.5), "{scale:?}: its top and foot are drawn");
-        assert!(!red(11.0, 28.0) && !red(77.0, 28.0), "{scale:?}: nothing left or right of it");
-        assert!(!red(44.0, 7.0) && !red(44.0, 49.0), "{scale:?}: nothing above or below it");
-        assert!(!red(12.5, 8.5) && !red(75.5, 47.5), "{scale:?}: the corners are rounded");
+        assert!(
+            red(12.5, 28.0) && red(75.5, 28.0),
+            "{scale:?}: the box's sides are drawn"
+        );
+        assert!(
+            red(44.0, 8.5) && red(44.0, 47.5),
+            "{scale:?}: its top and foot are drawn"
+        );
+        assert!(
+            !red(11.0, 28.0) && !red(77.0, 28.0),
+            "{scale:?}: nothing left or right of it"
+        );
+        assert!(
+            !red(44.0, 7.0) && !red(44.0, 49.0),
+            "{scale:?}: nothing above or below it"
+        );
+        assert!(
+            !red(12.5, 8.5) && !red(75.5, 47.5),
+            "{scale:?}: the corners are rounded"
+        );
     }
 }

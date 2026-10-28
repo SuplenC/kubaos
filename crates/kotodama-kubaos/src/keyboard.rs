@@ -1,10 +1,11 @@
 //! The keyboard layouts in the menu: one Item a layout to switch to it, make it the default, move
-//! it up or down or remove it, and "Keyboard: add a layout". They are the user's layouts, as `kubaos keyboard` keeps them: the
-//! list in `~/.config/kubaos/desktop/keyboard/keyboard.toml`, else the one in `/etc/default/keyboard`.
+//! it up or down or remove it, and "Keyboard: add a layout". They are the user's layouts, as
+//! `kubaos keyboard` keeps them: the list in `~/.config/kubaos/desktop/keyboard/keyboard.toml`,
+//! else the one in `/etc/default/keyboard`.
 //!
 //! Switching is `hyprctl switchxkblayout`, at once. A change to the layouts is checked here, so
-//! a refusal reads in the menu, then launched as `kubaos keyboard`, which writes it to the user's file
-//! and reloads Hyprland; the file's change comes back through the watch in `main.rs`.
+//! a refusal reads in the menu, then launched as `kubaos keyboard`, which writes it to the user's
+//! file and reloads Hyprland; the file's change comes back through the watch in `main.rs`.
 //!
 //! # Owns
 //!

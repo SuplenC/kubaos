@@ -3,10 +3,24 @@
 
 use std::collections::BTreeSet;
 
-use kubaos_core::config::{Disk, DiskTarget, Git, Host, Locale, Payload, User, Wallpapers, Wifi};
-use kubaos_core::keyboard::{self, Layout};
-use kubaos_core::probe::{DiskInfo, Region, WallpaperFile, WallpaperSet};
-use kubaos_core::{InstallConfig, Probe, Secrets};
+use kubaos_core::InstallConfig;
+use kubaos_core::Probe;
+use kubaos_core::Secrets;
+use kubaos_core::config::Disk;
+use kubaos_core::config::DiskTarget;
+use kubaos_core::config::Git;
+use kubaos_core::config::Host;
+use kubaos_core::config::Locale;
+use kubaos_core::config::Payload;
+use kubaos_core::config::User;
+use kubaos_core::config::Wallpapers;
+use kubaos_core::config::Wifi;
+use kubaos_core::keyboard;
+use kubaos_core::keyboard::Layout;
+use kubaos_core::probe::DiskInfo;
+use kubaos_core::probe::Region;
+use kubaos_core::probe::WallpaperFile;
+use kubaos_core::probe::WallpaperSet;
 
 /// Where the live ISO keeps the payload (docs/INSTALL-INTERNALS.md, `[payload]`).
 pub const PAYLOAD_DIR: &str = "/run/kubaos/payload";
@@ -93,11 +107,7 @@ impl Form {
                 .unwrap_or_else(|| want.to_string())
         };
         let manifest = probe.payload.as_ref();
-        let disk = probe
-            .disks
-            .iter()
-            .find(|d| d.is_target())
-            .map(|d| d.path.clone());
+        let disk = probe.disks.iter().find(|d| d.is_target()).map(|d| d.path.clone());
         let mut f = Self {
             locale: pick(&probe.locales, "en_US.UTF-8"),
             keymaps: vec![pick(&probe.keymaps, "us")],
@@ -177,7 +187,9 @@ impl Form {
     }
 
     pub fn account_ok(&self) -> Result<(), &'static str> {
-        use kubaos_core::engine::validate::{reserved_username, valid_hostname, valid_username};
+        use kubaos_core::engine::validate::reserved_username;
+        use kubaos_core::engine::validate::valid_hostname;
+        use kubaos_core::engine::validate::valid_username;
         if self.full_name.trim().is_empty() {
             return Err("Type your name.");
         }
@@ -216,9 +228,7 @@ impl Form {
         match self.disk_mode {
             None => return Err("Pick: alongside or erase."),
             Some(DiskMode::FreeSpace) if !disk.fits_dual_boot(probe) => {
-                return Err(
-                    "Not enough free space to live alongside. Erase it, or shrink something first.",
-                );
+                return Err("Not enough free space to live alongside. Erase it, or shrink something first.");
             }
             Some(DiskMode::Whole) if !disk.fits(probe) => {
                 return Err("This disk is too small for KubaOS.");
@@ -347,11 +357,10 @@ impl Form {
             _ => DiskTarget::Whole,
         };
         let layouts: Vec<Layout> = self.keymaps.iter().map(|k| Layout::parse(k)).collect();
-        let git =
-            (!self.git_name.trim().is_empty() && !self.git_email.trim().is_empty()).then(|| Git {
-                name: self.git_name.trim().to_string(),
-                email: self.git_email.trim().to_string(),
-            });
+        let git = (!self.git_name.trim().is_empty() && !self.git_email.trim().is_empty()).then(|| Git {
+            name: self.git_name.trim().to_string(),
+            email: self.git_email.trim().to_string(),
+        });
         InstallConfig {
             locale: Locale {
                 lang: self.locale.clone(),
@@ -404,9 +413,7 @@ fn still_typing(orig: &str, confirm: &str) -> bool {
 
 pub fn looks_like_email(s: &str) -> bool {
     match s.split_once('@') {
-        Some((user, host)) => {
-            !user.is_empty() && host.contains('.') && !host.starts_with('.') && !host.ends_with('.')
-        }
+        Some((user, host)) => !user.is_empty() && host.contains('.') && !host.starts_with('.') && !host.ends_with('.'),
         None => false,
     }
 }
@@ -422,12 +429,7 @@ pub trait DiskExt {
 
 /// Smallest disk (or free region) KubaOS fits in.
 pub fn needed(probe: &Probe) -> u64 {
-    probe
-        .payload
-        .as_ref()
-        .map(|m| m.installed_bytes)
-        .unwrap_or(0)
-        + HEADROOM
+    probe.payload.as_ref().map_or(0, |m| m.installed_bytes) + HEADROOM
 }
 
 impl DiskExt for DiskInfo {
@@ -436,10 +438,7 @@ impl DiskExt for DiskInfo {
     }
 
     fn largest_free(&self) -> Option<Region> {
-        self.free_regions
-            .iter()
-            .copied()
-            .max_by_key(|r| r.end - r.start)
+        self.free_regions.iter().copied().max_by_key(|r| r.end - r.start)
     }
 
     fn fits(&self, probe: &Probe) -> bool {
@@ -447,8 +446,7 @@ impl DiskExt for DiskInfo {
     }
 
     fn fits_dual_boot(&self, probe: &Probe) -> bool {
-        self.largest_free()
-            .is_some_and(|r| r.end - r.start >= needed(probe))
+        self.largest_free().is_some_and(|r| r.end - r.start >= needed(probe))
     }
 
     /// Keep another OS when there's room next to it.
@@ -568,10 +566,7 @@ mod tests {
         f.toggle_keymap("it").unwrap();
         f.toggle_keymap("de").unwrap();
         f.toggle_keymap("pl").unwrap();
-        assert_eq!(
-            f.toggle_keymap("fr"),
-            Err("Four layouts at most: XKB holds no more.")
-        );
+        assert_eq!(f.toggle_keymap("fr"), Err("Four layouts at most: XKB holds no more."));
         f.toggle_keymap("de").unwrap();
 
         assert_eq!(f.keymaps, ["us", "it", "pl"]);
@@ -586,11 +581,7 @@ mod tests {
         f.make_default_keymap("it").unwrap();
         assert_eq!(f.keymaps, ["it", "us"]);
         f.make_default_keymap("de").unwrap();
-        assert_eq!(
-            f.keymaps,
-            ["de", "it", "us"],
-            "a layout not yet picked is picked first"
-        );
+        assert_eq!(f.keymaps, ["de", "it", "us"], "a layout not yet picked is picked first");
     }
 
     #[test]
@@ -622,16 +613,7 @@ mod tests {
             assert!(f.account_ok().is_ok(), "{good:?}");
             assert_eq!(f.to_config(&p).host.hostname, good);
         }
-        for bad in [
-            "",
-            "Tuxedo",
-            "-box",
-            "box-",
-            "a.b",
-            "my box",
-            "zażółć",
-            &"a".repeat(64),
-        ] {
+        for bad in ["", "Tuxedo", "-box", "box-", "a.b", "my box", "zażółć", &"a".repeat(64)] {
             f.hostname = bad.into();
             assert!(f.account_ok().is_err(), "{bad:?}");
         }
@@ -659,9 +641,7 @@ mod tests {
         let sets = &p.payload.as_ref().unwrap().wallpaper_sets;
         let mut f = Form::new(&p);
         let config = |f: &Form| f.to_config(&p).wallpapers.unwrap();
-        let all = ["cyberpunk", "japanese", "shinjuku"]
-            .map(String::from)
-            .to_vec();
+        let all = ["cyberpunk", "japanese", "shinjuku"].map(String::from).to_vec();
         assert_eq!(config(&f).sets, all);
         assert_eq!(config(&f).files, Vec::<String>::new());
         assert_eq!(f.wallpapers_picked(sets), 10);

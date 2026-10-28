@@ -394,11 +394,15 @@ fn the_proxy_is_switched_imported_and_set_from_the_menu() {
         &["kubaos-proxy", "off"],
         &["kubaos-proxy", "import", "x"],
     ] {
-        assert!(runs.iter().any(|argv| tail(argv, wanted.len()) == wanted), "no Item runs {wanted:?}");
+        assert!(
+            runs.iter().any(|argv| tail(argv, wanted.len()) == wanted),
+            "no Item runs {wanted:?}"
+        );
     }
     assert!(
-        runs.iter()
-            .any(|argv| argv.last().is_some_and(|script| script.contains("dot-config path network"))),
+        runs.iter().any(|argv| argv
+            .last()
+            .is_some_and(|script| script.contains("dot-config path network"))),
         "no Item opens proxy.toml"
     );
 }

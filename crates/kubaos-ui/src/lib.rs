@@ -23,8 +23,6 @@
 //! - The values: `design/tokens.toml`. The shell's and the menu's components: `KubaOS.Components`
 //!   in QML, from the same tokens.
 
-#![forbid(unsafe_code)]
-
 pub mod color;
 pub mod component;
 pub mod focus;
@@ -42,10 +40,10 @@ pub mod text;
 #[expect(
     clippy::match_same_arms,
     clippy::too_many_lines,
-    reason = "generated: one arm per token, even where two share a value, and one per symbol"
+    reason = "Generated: one arm per token, even where two share a value, and one per symbol."
 )]
 pub mod tokens;
 
-pub use look::Look;
-pub use scale::Scale;
-pub use tokens::Mode;
+pub use self::look::Look;
+pub use self::scale::Scale;
+pub use self::tokens::Mode;

@@ -44,8 +44,14 @@ fn a_paired_iphone_out_of_reach_reads_as_such() {
 #[test]
 fn a_device_asking_to_pair_says_so() {
     let asking = IPHONE
-        .replace(r#""isPairRequestedByPeer":{"type":"b","data":false}"#, r#""isPairRequestedByPeer":{"type":"b","data":true}"#)
-        .replace(r#""isPaired":{"type":"b","data":true}"#, r#""isPaired":{"type":"b","data":false}"#);
+        .replace(
+            r#""isPairRequestedByPeer":{"type":"b","data":false}"#,
+            r#""isPairRequestedByPeer":{"type":"b","data":true}"#,
+        )
+        .replace(
+            r#""isPaired":{"type":"b","data":true}"#,
+            r#""isPaired":{"type":"b","data":false}"#,
+        );
 
     let device = parse_device(ID, &first(&asking).unwrap());
 
@@ -63,12 +69,18 @@ fn the_battery_reads_its_charge_and_whether_it_charges() {
             charging: true
         })
     );
-    assert_eq!(parse_battery(&first(r#"{"type":"a{sv}","data":[{"charge":{"type":"i","data":-1}}]}"#).unwrap()), None);
+    assert_eq!(
+        parse_battery(&first(r#"{"type":"a{sv}","data":[{"charge":{"type":"i","data":-1}}]}"#).unwrap()),
+        None
+    );
 }
 
 #[test]
 fn an_answer_that_isnt_busctls_json_is_an_error() {
-    assert!(matches!(first("Call failed: no such method"), Err(LinkError::Answer(_))));
+    assert!(matches!(
+        first("Call failed: no such method"),
+        Err(LinkError::Answer(_))
+    ));
 }
 
 #[test]
@@ -87,15 +99,32 @@ fn each_action_calls_its_plugin_on_the_devices_object() {
     let path = format!("/modules/kdeconnect/devices/{ID}");
     let call = |action| device_call(ID, &action).unwrap();
 
-    assert_eq!(call(Action::Accept), ["call", "org.kde.kdeconnect", &path, "org.kde.kdeconnect.device", "acceptPairing"]);
+    assert_eq!(
+        call(Action::Accept),
+        [
+            "call",
+            "org.kde.kdeconnect",
+            &path,
+            "org.kde.kdeconnect.device",
+            "acceptPairing"
+        ]
+    );
     assert_eq!(call(Action::Unpair)[4], "unpair");
     assert_eq!(
         call(Action::SendClipboard)[2..],
-        [format!("{path}/clipboard"), "org.kde.kdeconnect.device.clipboard".into(), "sendClipboard".into()]
+        [
+            format!("{path}/clipboard"),
+            "org.kde.kdeconnect.device.clipboard".into(),
+            "sendClipboard".into()
+        ]
     );
     assert_eq!(
         call(Action::Ring)[2..],
-        [format!("{path}/findmyphone"), "org.kde.kdeconnect.device.findmyphone".into(), "ring".into()]
+        [
+            format!("{path}/findmyphone"),
+            "org.kde.kdeconnect.device.findmyphone".into(),
+            "ring".into()
+        ]
     );
     assert_eq!(
         call(Action::Share("file:///home/kuba/a.jpg".into()))[2..],
@@ -121,6 +150,9 @@ fn only_a_kde_connect_plugin_name_goes_to_set_plugin_enabled() {
 #[test]
 fn an_id_that_would_leave_the_devices_object_is_refused() {
     for id in ["", "../daemon", "a/b", "a b"] {
-        assert!(matches!(device_call(id, &Action::Ring), Err(LinkError::BadId(_))), "{id:?}");
+        assert!(
+            matches!(device_call(id, &Action::Ring), Err(LinkError::BadId(_))),
+            "{id:?}"
+        );
     }
 }

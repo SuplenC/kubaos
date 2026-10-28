@@ -1,7 +1,8 @@
 //! The progress stream. `kubaos run --events json` writes one `Event`
 //! per line on stdout; Kōbō gets the same events in-process.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::step::StepId;
 
@@ -62,10 +63,21 @@ pub enum Level {
 }
 
 impl Event {
+    /// The event as one line of JSON, without the newline.
+    ///
+    /// # Panics
+    ///
+    /// If `serde_json` refuses the event; its fields are plain data with string keys, which it
+    /// always takes.
     pub fn to_json_line(&self) -> String {
         serde_json::to_string(self).expect("events always serialize")
     }
 
+    /// Reads an event from one line of JSON.
+    ///
+    /// # Errors
+    ///
+    /// When `line` isn't an event.
     pub fn from_json_line(line: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(line)
     }

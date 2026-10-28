@@ -94,14 +94,13 @@ pub fn locale_name(locale: &str) -> Cow<'static, str> {
     let lname = t
         .languages
         .get(lang)
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| lang.to_uppercase());
+        .map_or_else(|| lang.to_uppercase(), ToString::to_string);
     let mut extra: Vec<String> = vec![];
     if let Some(tr) = terr {
         extra.push(
             t.territories
                 .get(tr)
-                .map_or(tr.to_string(), |s| s.to_string()),
+                .map_or_else(|| tr.to_string(), ToString::to_string),
         );
     }
     if let Some(m) = modifier {
@@ -124,7 +123,7 @@ pub fn keymap_name(keymap: &str) -> Cow<'static, str> {
     let base = t
         .keymaps
         .get(layout.as_str())
-        .map_or_else(|| layout.to_uppercase(), |s| s.to_string());
+        .map_or_else(|| layout.to_uppercase(), ToString::to_string);
     if variant.is_empty() {
         Cow::Owned(base)
     } else {
@@ -141,14 +140,11 @@ pub fn split_keymap(keymap: &str) -> (String, String) {
 }
 
 /// Canonical IANA zones (tzdata zone1970.tab).
-/// "Europe/Rome" -> ("Rome", "Europe"); "America/Argentina/Buenos_Aires" ->
-/// ("Buenos Aires", "America, Argentina").
+/// `"Europe/Rome"` -> `("Rome", "Europe")`; `"America/Argentina/Buenos_Aires"` ->
+/// `("Buenos Aires", "America, Argentina")`.
 pub fn split_tz(tz: &str) -> (String, String) {
     match tz.rsplit_once('/') {
-        Some((region, city)) => (
-            city.replace('_', " "),
-            region.replace(['_'], " ").replace('/', ", "),
-        ),
+        Some((region, city)) => (city.replace('_', " "), region.replace(['_'], " ").replace('/', ", ")),
         None => (tz.replace('_', " "), String::new()),
     }
 }
@@ -598,10 +594,7 @@ mod tests {
     fn every_keymap_gets_a_name() {
         assert_eq!(keymap_name("us"), "English (US)");
         assert_eq!(keymap_name("pl"), "Polish");
-        assert_eq!(
-            keymap_name("us(intl)"),
-            "English (US, intl., with dead keys)"
-        );
+        assert_eq!(keymap_name("us(intl)"), "English (US, intl., with dead keys)");
         assert_eq!(keymap_name("pl(nope)"), "Polish (nope)");
         assert_eq!(keymap_name("zz"), "ZZ");
     }

@@ -31,8 +31,6 @@
 //! - The control center's tile and the bar's indicator: `config/quickshell/services/Proxy.qml`. The
 //!   menu's Items: `crates/kotodama-kubaos/src/proxy.rs` and `config/kotodama/kubaos.toml`.
 
-#![forbid(unsafe_code)]
-
 pub mod apply;
 pub mod machine;
 pub mod paths;
@@ -48,7 +46,7 @@ pub mod wireguard;
 #[cfg(test)]
 mod fake;
 
-pub use machine::Machine;
-pub use paths::Paths;
-pub use plan::Plan;
-pub use profile::Profile;
+pub use self::machine::Machine;
+pub use self::paths::Paths;
+pub use self::plan::Plan;
+pub use self::profile::Profile;

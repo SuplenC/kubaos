@@ -137,74 +137,9 @@ fn state_words(st: State) -> (ChipKind, Option<Icon>, &'static str) {
 fn left<'a>(s: &'a Setup, look: &Look) -> El<'a> {
     let c = look.colors;
     let seconds = (s.now - s.epoch).as_secs_f32();
-    let cards: El = match &s.status {
-        None => row(look, Space::S12)
-            .center()
-            .padding(Inset::xy(Space::S12, Space::S12))
-            .push(spinner(look, IconSize::S20, seconds, c.primary))
-            .push(text(
-                "Checking what this machine has…",
-                Type::Body,
-                c.on_surface_variant,
-            ))
-            .into(),
-        Some(st) => scrolling_list(
-            st.cards.iter().map(|card| card_row(s, card, look)).collect::<Vec<_>>(),
-            s.is_focused(SF::Cards),
-        )
-        .height(Extent::Shrink)
-        .view(look),
-    };
-    let online: El = match &s.status {
-        Some(st) if st.online => chip(look, ChipKind::Neutral, "Online", Some(Icon::Wifi), None, None),
-        Some(_) => chip(
-            look,
-            ChipKind::Neutral,
-            "Offline: drivers, fprintd and Bitwarden need the internet",
-            Some(Icon::WifiOff),
-            None,
-            None,
-        ),
-        None => widget::Space::new().into(),
-    };
-    let reboot = s.reboot_pending();
-    // Beside "Reboot to finish" the way out stays quiet.
-    let (finish_label, kind) = if reboot {
-        ("Done for now", Kind::Text)
-    } else if s.settled() {
-        ("All set", Kind::Filled)
-    } else {
-        ("Done for now", Kind::Tonal)
-    };
-    let finish = button(finish_label)
-        .kind(kind)
-        .icon(Icon::CheckCircle)
-        .on_press(click(SF::Finish))
-        .focused(s.is_focused(SF::Finish))
-        .view(look);
-    let footer: El = if reboot {
-        stack(look, Space::S12)
-            .push(text(
-                s.reboot_nudge().unwrap_or_default(),
-                Type::Small,
-                c.on_surface_variant,
-            ))
-            .push(
-                row(look, Space::S12)
-                    .center()
-                    .push(
-                        button("Reboot to finish")
-                            .icon(Icon::RestartAlt)
-                            .on_press(click(SF::RebootAll))
-                            .focused(s.is_focused(SF::RebootAll))
-                            .view(look),
-                    )
-                    .push(finish),
-            )
-            .into()
-    } else {
-        finish
-    };
+    let cards = left_cards(s, seconds, look);
+    let online = left_online(s, look);
+    let footer = left_footer(s, look);
     let detecting: El = if s.detecting() && s.status.is_some() {
         row(look, Space::S8)
             .center()
@@ -253,6 +188,88 @@ fn left<'a>(s: &'a Setup, look: &Look) -> El<'a> {
         ..container::Style::default()
     })
     .into()
+}
+
+/// The cards, or a spinner while the first detection runs.
+fn left_cards<'a>(s: &'a Setup, seconds: f32, look: &Look) -> El<'a> {
+    let c = look.colors;
+    match &s.status {
+        None => row(look, Space::S12)
+            .center()
+            .padding(Inset::xy(Space::S12, Space::S12))
+            .push(spinner(look, IconSize::S20, seconds, c.primary))
+            .push(text(
+                "Checking what this machine has…",
+                Type::Body,
+                c.on_surface_variant,
+            ))
+            .into(),
+        Some(st) => scrolling_list(
+            st.cards.iter().map(|card| card_row(s, card, look)).collect::<Vec<_>>(),
+            s.is_focused(SF::Cards),
+        )
+        .height(Extent::Shrink)
+        .view(look),
+    }
+}
+
+/// Whether the machine is online, once detection has said.
+fn left_online<'a>(s: &'a Setup, look: &Look) -> El<'a> {
+    match &s.status {
+        Some(st) if st.online => chip(look, ChipKind::Neutral, "Online", Some(Icon::Wifi), None, None),
+        Some(_) => chip(
+            look,
+            ChipKind::Neutral,
+            "Offline: drivers, fprintd and Bitwarden need the internet",
+            Some(Icon::WifiOff),
+            None,
+            None,
+        ),
+        None => widget::Space::new().into(),
+    }
+}
+
+/// The way out, with "Reboot to finish" beside it while a card waits on a reboot.
+fn left_footer<'a>(s: &'a Setup, look: &Look) -> El<'a> {
+    let c = look.colors;
+    let reboot = s.reboot_pending();
+    // Beside "Reboot to finish" the way out stays quiet.
+    let (finish_label, kind) = if reboot {
+        ("Done for now", Kind::Text)
+    } else if s.settled() {
+        ("All set", Kind::Filled)
+    } else {
+        ("Done for now", Kind::Tonal)
+    };
+    let finish = button(finish_label)
+        .kind(kind)
+        .icon(Icon::CheckCircle)
+        .on_press(click(SF::Finish))
+        .focused(s.is_focused(SF::Finish))
+        .view(look);
+    if reboot {
+        stack(look, Space::S12)
+            .push(text(
+                s.reboot_nudge().unwrap_or_default(),
+                Type::Small,
+                c.on_surface_variant,
+            ))
+            .push(
+                row(look, Space::S12)
+                    .center()
+                    .push(
+                        button("Reboot to finish")
+                            .icon(Icon::RestartAlt)
+                            .on_press(click(SF::RebootAll))
+                            .focused(s.is_focused(SF::RebootAll))
+                            .view(look),
+                    )
+                    .push(finish),
+            )
+            .into()
+    } else {
+        finish
+    }
 }
 
 fn card_row<'a>(s: &'a Setup, c: &'a CardStatus, look: &Look) -> El<'a> {
@@ -358,6 +375,10 @@ fn card_detail<'a>(s: &'a Setup, c: &'a CardStatus, look: &Look) -> El<'a> {
 }
 
 /// What the card is about, for its state. Facts first.
+#[expect(
+    clippy::too_many_lines,
+    reason = "One arm per card and state, each its few sentences: every card's words, read in one place."
+)]
 fn explain<'a>(s: &'a Setup, c: &'a CardStatus, look: &Look) -> Vec<El<'a>> {
     let mut v: Vec<El> = vec![];
     match (&c.facts, c.state) {
@@ -764,6 +785,10 @@ fn choice<'a>(s: &'a Setup, f: SF, options: Vec<(&'a str, bool, Message)>, look:
     flow(look, Space::S20, radios)
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "One arm per field, each its labelled input: every form field of setup, read in one place."
+)]
 fn form<'a>(s: &'a Setup, fields: &[SF], look: &Look) -> El<'a> {
     let f = &s.form;
     let mut col = stack(look, Space::S16);

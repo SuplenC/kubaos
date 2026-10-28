@@ -3,11 +3,14 @@
 //! and glide there instead of jumping. A control that's already in view
 //! doesn't move the page at all.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
-use iced::advanced::widget::{Id, Operation, operation};
-use iced::{Rectangle, Vector};
-
+use iced::Rectangle;
+use iced::Vector;
+use iced::advanced::widget::Id;
+use iced::advanced::widget::Operation;
+use iced::advanced::widget::operation;
 use kubaos_ui::motion::ease;
 use kubaos_ui::tokens;
 use kubaos_ui::tokens::Easing;
@@ -35,10 +38,7 @@ pub struct Found {
 /// as little as possible. `None` when it's already in view.
 pub fn target(f: Found) -> Option<f32> {
     let max = (f.content - f.viewport).max(0.0);
-    let (top, bottom) = (
-        (f.top - MARGIN).max(0.0),
-        (f.bottom + MARGIN).min(f.content),
-    );
+    let (top, bottom) = ((f.top - MARGIN).max(0.0), (f.bottom + MARGIN).min(f.content));
     let y = if top < f.offset {
         top
     } else if bottom > f.offset + f.viewport {

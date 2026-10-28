@@ -75,7 +75,8 @@ impl Scale {
         (logical * self.0).round().max(1.0) / self.0
     }
 
-    /// The thin stroke of the focus ring, the spinner and the partial checkbox's dash, in logical pixels.
+    /// The thin stroke of the focus ring, the spinner and the partial checkbox's dash, in logical
+    /// pixels.
     pub fn thin(self) -> f32 {
         self.stroke(f32::from(tokens::STROKE_THIN))
     }

@@ -196,16 +196,24 @@ impl Daemon {
         let name = block::block_name(block, drive);
         match block::verdict(block, drive) {
             Verdict::Mount => match self.udisks.mount(path).await {
-                Ok(mount) => self.mounted(&name, block.drive.clone().unwrap_or_default(), mount).await,
+                Ok(mount) => {
+                    self.mounted(&name, block.drive.clone().unwrap_or_default(), mount)
+                        .await;
+                }
                 Err(err) => {
                     log!("mounting {}: {err}", block.device);
-                    self.tell(Note::new(ICON, format!("Couldn't mount {name}"), err.message)).await;
+                    self.tell(Note::new(ICON, format!("Couldn't mount {name}"), err.message))
+                        .await;
                 }
             },
             Verdict::Encrypted => {
-                let note = Note::new(ICON, format!("{name} is encrypted"), "Unlock it from the sidebar in Files.")
-                    .action("default", "Open Files")
-                    .action("open", "Open Files");
+                let note = Note::new(
+                    ICON,
+                    format!("{name} is encrypted"),
+                    "Unlock it from the sidebar in Files.",
+                )
+                .action("default", "Open Files")
+                .action("open", "Open Files");
                 self.offer(note, Offer::Encrypted).await;
             }
             Verdict::Skip(_) => {}
@@ -326,7 +334,10 @@ pub async fn eject(udisks: &UDisks, target: &str) -> Result<String, EjectError> 
     let name = block::mounted_drives(&snapshot.blocks, std::slice::from_ref(drive))
         .into_iter()
         .next()
-        .map_or_else(|| block::drive_name(drive).unwrap_or_else(|| "The drive".to_owned()), |mounted| mounted.name);
+        .map_or_else(
+            || block::drive_name(drive).unwrap_or_else(|| "The drive".to_owned()),
+            |mounted| mounted.name,
+        );
     for step in block::eject_plan(drive, &snapshot.blocks) {
         udisks.run(&step).await.map_err(|source| {
             if source.is_busy() {
@@ -375,9 +386,10 @@ fn open(folder: Option<&Path>) {
 /// Starts `kubaos-automount import` on `dcim`, in a scope of its own, so a long copy neither
 /// holds up the service nor dies with it.
 fn import_from(dcim: &Path) {
-    let program = std::env::current_exe().map_or_else(|_| "kubaos-automount".to_owned(), |exe| {
-        exe.to_string_lossy().into_owned()
-    });
+    let program = std::env::current_exe().map_or_else(
+        |_| "kubaos-automount".to_owned(),
+        |exe| exe.to_string_lossy().into_owned(),
+    );
     let argv = [program, "import".to_owned(), dcim.to_string_lossy().into_owned()];
     if let Err(err) = launch::launch(&argv, None) {
         log!("starting the photo import: {err}");

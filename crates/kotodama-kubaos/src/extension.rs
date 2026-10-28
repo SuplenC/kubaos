@@ -14,9 +14,9 @@
 //!
 //! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
 //!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
-//!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`]. The
-//!   idle settings: [`crate::idle`]. The power stop's status and the CPU scheduler's:
-//!   [`crate::power`]. The Proxy's status: [`crate::proxy`].
+//!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`]. The idle
+//!   settings: [`crate::idle`]. The power stop's status and the CPU scheduler's: [`crate::power`].
+//!   The Proxy's status: [`crate::proxy`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -128,8 +128,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
     }
 
     /// The Items to index: the actions, the toggles, the idle settings, the power stop's, the CPU
-    /// scheduler's and the Proxy's status, the keyboard Items, the wallpaper sets, the user folders, the desk
-    /// positions and the drives `hide` leaves in, the update actions as the update check has them.
+    /// scheduler's and the Proxy's status, the keyboard Items, the wallpaper sets, the user
+    /// folders, the desk positions and the drives `hide` leaves in, the update actions as the
+    /// update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()

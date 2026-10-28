@@ -21,8 +21,6 @@
 //! - The card: `crates/kubaos-core/src/setup/` and `crates/kubaos-kobo/src/setup/`.
 //! - The Command menu's Items: `config/kotodama/kubaos.toml`.
 
-#![forbid(unsafe_code)]
-
 pub mod device;
 pub mod kdeconnect;
 pub mod link;
@@ -32,12 +30,12 @@ pub mod setting;
 #[cfg(any(test, feature = "fake"))]
 pub mod fake;
 
-pub use device::Battery;
-pub use device::Device;
-pub use device::Status;
-pub use kdeconnect::KdeConnect;
-pub use link::Action;
-pub use link::Link;
-pub use link::LinkError;
-pub use phone::Error;
-pub use phone::TEST_TEXT;
+pub use self::device::Battery;
+pub use self::device::Device;
+pub use self::device::Status;
+pub use self::kdeconnect::KdeConnect;
+pub use self::link::Action;
+pub use self::link::Link;
+pub use self::link::LinkError;
+pub use self::phone::Error;
+pub use self::phone::TEST_TEXT;

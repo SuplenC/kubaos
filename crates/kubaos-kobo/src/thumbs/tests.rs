@@ -35,7 +35,12 @@ fn reddish(px: Rgba<u8>) -> bool {
 fn the_payloads_thumbnail_comes_first() {
     let payload = tempfile::tempdir().unwrap();
     let originals = tempfile::tempdir().unwrap();
-    jpeg(&payload.path().join("wallpapers/shinjuku/gate.jpg.jpg"), 480, 270, [230, 20, 20]);
+    jpeg(
+        &payload.path().join("wallpapers/shinjuku/gate.jpg.jpg"),
+        480,
+        270,
+        [230, 20, 20],
+    );
     jpeg(&originals.path().join("shinjuku/gate.jpg"), 960, 540, [20, 20, 230]);
 
     let got = decode(payload.path(), originals.path(), &set(&["gate.jpg"]));
@@ -62,7 +67,12 @@ fn without_a_thumbnail_the_original_is_shrunk_to_the_thumbnail_width() {
 fn a_video_without_a_thumbnail_falls_back_to_its_poster() {
     let payload = tempfile::tempdir().unwrap();
     let originals = tempfile::tempdir().unwrap();
-    jpeg(&originals.path().join("shinjuku/rain.poster.jpg"), 640, 360, [230, 20, 20]);
+    jpeg(
+        &originals.path().join("shinjuku/rain.poster.jpg"),
+        640,
+        360,
+        [230, 20, 20],
+    );
     fs::write(originals.path().join("shinjuku/rain.mp4"), b"not a picture").unwrap();
 
     let got = decode(payload.path(), originals.path(), &set(&["rain.mp4"]));
@@ -76,7 +86,12 @@ fn a_video_without_a_thumbnail_falls_back_to_its_poster() {
 fn a_wallpaper_with_no_picture_anywhere_is_left_out() {
     let payload = tempfile::tempdir().unwrap();
     let originals = tempfile::tempdir().unwrap();
-    jpeg(&payload.path().join("wallpapers/shinjuku/b.jpg.jpg"), 480, 270, [230, 20, 20]);
+    jpeg(
+        &payload.path().join("wallpapers/shinjuku/b.jpg.jpg"),
+        480,
+        270,
+        [230, 20, 20],
+    );
 
     let got = decode(payload.path(), originals.path(), &set(&["a.jpg", "b.jpg"]));
 

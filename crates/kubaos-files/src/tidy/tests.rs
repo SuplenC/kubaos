@@ -112,6 +112,10 @@ fn the_downloads_folder_follows_user_dirs() {
     let home = Path::new("/home/kuba");
 
     assert_eq!(downloads_dir(home, config.path()), home.join("Downloads"));
-    fs::write(config.path().join("user-dirs.dirs"), "XDG_DOWNLOAD_DIR=\"$HOME/Scaricati\"\n").unwrap();
+    fs::write(
+        config.path().join("user-dirs.dirs"),
+        "XDG_DOWNLOAD_DIR=\"$HOME/Scaricati\"\n",
+    )
+    .unwrap();
     assert_eq!(downloads_dir(home, config.path()), home.join("Scaricati"));
 }

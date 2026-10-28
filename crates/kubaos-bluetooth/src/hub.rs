@@ -134,12 +134,7 @@ impl<S: Sink> Hub<S> {
     /// Opens a prompt that waits on the user, and returns its id and where its answer comes. It
     /// replaces any open prompt: bluetoothd asks one thing at a time, so a new question means it
     /// gave up on the old one, whose waiter is told it was cancelled.
-    pub fn ask(
-        &self,
-        kind: Kind,
-        device: &Device,
-        code: Option<String>,
-    ) -> (u32, async_channel::Receiver<Answer>) {
+    pub fn ask(&self, kind: Kind, device: &Device, code: Option<String>) -> (u32, async_channel::Receiver<Answer>) {
         let (sender, receiver) = async_channel::bounded(1);
         let id = self.change(|inner| {
             let id = inner.next_id();
@@ -192,12 +187,7 @@ impl<S: Sink> Hub<S> {
     /// Closes the prompt `id` if it is still open, as when its wait timed out.
     pub fn close(&self, id: u32) {
         self.change(|inner| {
-            if inner
-                .state
-                .prompt
-                .as_ref()
-                .is_some_and(|open| open.id == id)
-            {
+            if inner.state.prompt.as_ref().is_some_and(|open| open.id == id) {
                 inner.clear_prompt();
             }
         });
@@ -224,12 +214,7 @@ impl<S: Sink> Hub<S> {
             if let Err(message) = result {
                 inner.state.errors.insert(device.to_owned(), message);
             }
-            if inner
-                .state
-                .prompt
-                .as_ref()
-                .is_some_and(|open| open.device == device)
-            {
+            if inner.state.prompt.as_ref().is_some_and(|open| open.device == device) {
                 inner.clear_prompt();
             }
         });
@@ -257,13 +242,7 @@ impl<S: Sink> Hub<S> {
     }
 }
 
-fn prompt(
-    id: u32,
-    kind: Kind,
-    device: &Device,
-    code: Option<String>,
-    entered: Option<u16>,
-) -> Prompt {
+fn prompt(id: u32, kind: Kind, device: &Device, code: Option<String>, entered: Option<u16>) -> Prompt {
     Prompt {
         id,
         kind,

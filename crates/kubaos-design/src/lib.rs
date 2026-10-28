@@ -7,16 +7,14 @@
 //!
 //! # Owns
 //!
-//! - The lint ([`lint`]) and its baseline ([`baseline`]), reading geometry frames from files
-//!   with the tokens' rules ([`geometry`]), and the roles drawn that no contrast pair covers
+//! - The lint ([`lint`]) and its baseline ([`baseline`]), reading geometry frames from files with
+//!   the tokens' rules ([`geometry`]), and the roles drawn that no contrast pair covers
 //!   ([`contrast`]).
 //!
 //! # Not here
 //!
 //! - The geometry rules: `kubaos-geometry`. Rendering iced pages into frames: `kubaos-specimen
 //!   check`, through `kubaos-ui`'s probes.
-
-#![forbid(unsafe_code)]
 
 pub mod baseline;
 pub mod contrast;

@@ -10,8 +10,8 @@
 //!
 //! `--card` opens setup on one card, the way the Command menu opens the Bitwarden one.
 //!
-//! Also: --size WxH (window size), --scale F (UI scale; picked from the
-//! window size when not given, see `app::auto_scale`), --tour-pace F
+//! Also: `--size WxH` (window size), `--scale F` (UI scale; picked from the
+//! window size when not given, see `app::auto_scale`), `--tour-pace F`
 //! (slow the tour down for screen recordings).
 
 mod app;
@@ -32,21 +32,31 @@ mod tour;
 mod ui;
 mod view;
 
+use std::io;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use iced::{Size, window};
+use iced::Size;
+use iced::window;
 use kubaos_core::StepId;
 
-use crate::app::{App, Options};
-use crate::backend::{Backend, Demo, Engine};
+use crate::app::App;
+use crate::app::Options;
+use crate::backend::Backend;
+use crate::backend::Demo;
+use crate::backend::Engine;
 
 const USAGE: &str = "usage: kobo [--demo [--demo-speed N] [--demo-fail-at STEP]]
             [--fullscreen] [--size WxH] [--scale F] [--screenshot-tour DIR]
        kobo --setup [--first-boot] [--card CARD]
             [--demo [--demo-machine tuxedo|vm|installed]]";
 
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Each bool is one command-line flag, read once at startup."
+)]
 struct Args {
     demo: bool,
     demo_speed: Option<f32>,
@@ -83,9 +93,7 @@ fn parse() -> Result<Args, String> {
         let mut val = || it.next().ok_or_else(|| format!("{flag} needs a value"));
         match flag.as_str() {
             "--demo" => a.demo = true,
-            "--demo-speed" => {
-                a.demo_speed = Some(val()?.parse().map_err(|_| "--demo-speed: not a number")?)
-            }
+            "--demo-speed" => a.demo_speed = Some(val()?.parse().map_err(|_| "--demo-speed: not a number")?),
             "--demo-fail-at" => {
                 let v = val()?;
                 a.demo_fail_at = Some(
@@ -107,9 +115,8 @@ fn parse() -> Result<Args, String> {
             }
             "--card" => {
                 let v = val()?;
-                a.card = Some(
-                    kubaos_core::setup::CardId::parse(&v).ok_or_else(|| format!("--card: unknown card {v}"))?,
-                );
+                a.card =
+                    Some(kubaos_core::setup::CardId::parse(&v).ok_or_else(|| format!("--card: unknown card {v}"))?);
             }
             "--size" => {
                 let v = val()?;
@@ -121,9 +128,7 @@ fn parse() -> Result<Args, String> {
             }
             "--scale" => a.scale = Some(val()?.parse().map_err(|_| "--scale: not a number")?),
             "--screenshot-tour" => a.tour = Some(PathBuf::from(val()?)),
-            "--tour-pace" => {
-                a.tour_pace = val()?.parse().map_err(|_| "--tour-pace: not a number")?
-            }
+            "--tour-pace" => a.tour_pace = val()?.parse().map_err(|_| "--tour-pace: not a number")?,
             "-h" | "--help" => return Err(String::new()),
             other => return Err(format!("unknown flag {other}")),
         }
@@ -135,29 +140,28 @@ fn parse() -> Result<Args, String> {
 }
 
 fn main() -> ExitCode {
+    if log::set_logger(&Stderr).is_ok() {
+        log::set_max_level(log::LevelFilter::Warn);
+    }
     let args = match parse() {
         Ok(a) => a,
         Err(e) => {
             if !e.is_empty() {
-                eprintln!("kobo: {e}");
+                say(&format!("kobo: {e}"));
             }
-            eprintln!("{USAGE}");
+            say(USAGE);
             return ExitCode::from(2);
         }
     };
 
     if args.setup {
-        return run_setup(args);
+        return run_setup(&args);
     }
 
     let backend: Arc<dyn Backend> = if args.demo {
-        let speed = args
-            .demo_speed
-            .unwrap_or(if args.tour.is_some() { 4.0 } else { 1.0 });
+        let speed = args.demo_speed.unwrap_or(if args.tour.is_some() { 4.0 } else { 1.0 });
         // The tour shows the Failed screen and Retry, so its first run fails.
-        let fail_at = args
-            .demo_fail_at
-            .or(args.tour.is_some().then_some(StepId::Home));
+        let fail_at = args.demo_fail_at.or(args.tour.is_some().then_some(StepId::Home));
         Arc::new(Demo::new(speed, fail_at))
     } else {
         backend::stop_install_on_signals();
@@ -170,47 +174,44 @@ fn main() -> ExitCode {
         scale: args.scale,
     };
 
-    let mut app = iced::application(
-        move || App::new(backend.clone(), opts.clone()),
-        App::update,
-        view::view,
-    )
-    .title(|app: &App| format!("Kōbō · KubaOS {}", app.codename()))
-    .subscription(App::subscription)
-    .theme(|app: &App| ui::theme(&app.look()))
-    .window(window::Settings {
-        size: args.size,
-        min_size: Some(Size::new(900.0, 600.0)),
-        // No client-side decorations: under cage (and in a tiling compositor)
-        // winit's fallback title bar ate ~36 px off the bottom of the output.
-        decorations: !cfg!(target_os = "linux"),
-        ..window::Settings::default()
-    })
-    .scale_factor(|app: &App| app.ui_scale)
-    .default_font(kubaos_ui::text::default_font())
-    .antialiasing(true);
+    let mut app = iced::application(move || App::new(Arc::clone(&backend), &opts), App::update, view::view)
+        .title(|app: &App| format!("Kōbō · KubaOS {}", app.codename()))
+        .subscription(App::subscription)
+        .theme(|app: &App| ui::theme(&app.look()))
+        .window(window::Settings {
+            size: args.size,
+            min_size: Some(Size::new(900.0, 600.0)),
+            // No client-side decorations: under cage (and in a tiling compositor)
+            // winit's fallback title bar ate ~36 px off the bottom of the output.
+            decorations: !cfg!(target_os = "linux"),
+            ..window::Settings::default()
+        })
+        .scale_factor(|app: &App| app.ui_scale)
+        .default_font(kubaos_ui::text::default_font())
+        .antialiasing(true);
     for f in kubaos_ui::text::FONTS {
         app = app.font(*f);
     }
     match app.run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("kobo: {e}");
+            say(&format!("kobo: {e}"));
             ExitCode::FAILURE
         }
     }
 }
 
-/// `--setup`: the first-boot setup app (setup/mod.rs), as the desktop user.
-fn run_setup(args: Args) -> ExitCode {
-    use kubaos_core::setup::demo;
-    use setup::backend::{Demo as SetupDemo, Real, SetupBackend};
+/// `--setup`: the first-boot setup app (`setup.rs`), as the desktop user.
+fn run_setup(args: &Args) -> ExitCode {
     use std::sync::Mutex;
 
+    use kubaos_core::setup::demo;
+    use setup::backend::Demo as SetupDemo;
+    use setup::backend::Real;
+    use setup::backend::SetupBackend;
+
     let backend: Arc<dyn SetupBackend> = if args.demo {
-        let speed = args
-            .demo_speed
-            .unwrap_or(if args.tour.is_some() { 2.5 } else { 1.0 });
+        let speed = args.demo_speed.unwrap_or(if args.tour.is_some() { 2.5 } else { 1.0 });
         Arc::new(SetupDemo {
             demo: demo::Demo::new(args.demo_machine, speed),
         })
@@ -228,8 +229,7 @@ fn run_setup(args: Args) -> ExitCode {
     );
     let scale = args.scale;
     let card = args.card;
-    #[allow(unused_mut)]
-    let mut settings = window::Settings {
+    let settings = window::Settings {
         size: args.size,
         min_size: Some(Size::new(900.0, 600.0)),
         decorations: !cfg!(target_os = "linux"),
@@ -239,13 +239,17 @@ fn run_setup(args: Args) -> ExitCode {
         ..window::Settings::default()
     };
     #[cfg(target_os = "linux")]
-    {
-        settings.platform_specific.application_id = "kobo".into();
-    }
+    let settings = window::Settings {
+        platform_specific: window::settings::PlatformSpecific {
+            application_id: "kobo".into(),
+            ..window::settings::PlatformSpecific::default()
+        },
+        ..settings
+    };
     let mut app = iced::application(
         move || {
             setup::Setup::new(
-                backend.clone(),
+                Arc::clone(&backend),
                 tour.lock().ok().and_then(|mut t| t.take()),
                 card,
                 scale.unwrap_or(1.0),
@@ -267,8 +271,35 @@ fn run_setup(args: Args) -> ExitCode {
     match app.run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("kobo: {e}");
+            say(&format!("kobo: {e}"));
             ExitCode::FAILURE
         }
     }
+}
+
+/// One line to stderr: the usage, or the error Kōbō exits with.
+#[expect(
+    clippy::print_stderr,
+    reason = "The usage and the error kobo exits with are for whoever started it, on its terminal."
+)]
+fn say(line: &str) {
+    eprintln!("{line}");
+}
+
+/// Kōbō's own warnings, on stderr as `kobo: <message>`. iced, winit and wgpu log through the same
+/// facade; only Kōbō's records are written, so theirs stay off the installer's terminal.
+struct Stderr;
+
+impl log::Log for Stderr {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        metadata.level() <= log::Level::Warn && metadata.target().starts_with(module_path!())
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata()) {
+            let _ = writeln!(io::stderr(), "kobo: {}", record.args());
+        }
+    }
+
+    fn flush(&self) {}
 }

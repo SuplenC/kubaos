@@ -3,10 +3,10 @@
 //! logind's file (`system/files/logind.conf.d/lid.conf`) suspends on battery and ignores the lid
 //! plugged in or docked. While the settings say the same, nothing here runs and logind does it.
 //! When they say anything else, the session holds a `handle-lid-switch` inhibitor (`kubaos-idle lid
-//! hold` under `systemd-inhibit`, the user unit [`UNIT`]), so logind leaves the lid alone, and Hyprland's lid bind runs
-//! `kubaos-idle lid closed`, which does what the settings say. The holder exits with the Hyprland
-//! it was started in, and when the settings go back to logind's, so logind is always the fallback
-//! outside the session.
+//! hold` under `systemd-inhibit`, the user unit [`UNIT`]), so logind leaves the lid alone, and
+//! Hyprland's lid bind runs `kubaos-idle lid closed`, which does what the settings say. The holder
+//! exits with the Hyprland it was started in, and when the settings go back to logind's, so logind
+//! is always the fallback outside the session.
 //!
 //! logind also looks at a closed lid again while it stays closed, so a laptop closed plugged in
 //! and then unplugged suspends. The holder does the same with [`Recheck`].

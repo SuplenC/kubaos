@@ -18,20 +18,32 @@ mod view;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
-use iced::{Size, Subscription, Task, event, window};
+use iced::Size;
+use iced::Subscription;
+use iced::Task;
+use iced::event;
+use iced::window;
 use kubaos_core::Level;
-use kubaos_core::setup::{
-    BwLogin, BwMethod, CardId, CardStatus, Facts, GitIdentity, Inputs, MokState, PhoneStep,
-    PromptKind, SetupEvent, State, Status, YKMAN_PREP, git_identity_ok, mok_password_ok,
-    next_finger,
-};
-
-pub use view::view;
-
-use crate::app::{Key, Message};
-use crate::edit::{self, Edit};
+use kubaos_core::setup::BwLogin;
+use kubaos_core::setup::BwMethod;
+use kubaos_core::setup::CardId;
+use kubaos_core::setup::CardStatus;
+use kubaos_core::setup::Facts;
+use kubaos_core::setup::GitIdentity;
+use kubaos_core::setup::Inputs;
+use kubaos_core::setup::MokState;
+use kubaos_core::setup::PhoneStep;
+use kubaos_core::setup::PromptKind;
+use kubaos_core::setup::SetupEvent;
+use kubaos_core::setup::State;
+use kubaos_core::setup::Status;
+use kubaos_core::setup::YKMAN_PREP;
+use kubaos_core::setup::git_identity_ok;
+use kubaos_core::setup::mok_password_ok;
+use kubaos_core::setup::next_finger;
 use kubaos_ui::Look;
 use kubaos_ui::Mode;
 use kubaos_ui::component::field::Caret;
@@ -39,7 +51,13 @@ use kubaos_ui::component::field::Pointer;
 use kubaos_ui::component::toast;
 use kubaos_ui::motion::Motion;
 use kubaos_ui::tokens;
-use backend::SetupBackend;
+
+use self::backend::SetupBackend;
+pub use self::view::view;
+use crate::app::Key;
+use crate::app::Message;
+use crate::edit;
+use crate::edit::Edit;
 
 /// What the vault's project env folders start with. The folder list is drawn every frame, so the
 /// environment is read once.
@@ -104,10 +122,7 @@ impl SF {
     }
 
     pub fn is_secret(self) -> bool {
-        matches!(
-            self,
-            SF::Mok | SF::MokAgain | SF::Password | SF::ClientSecret
-        )
+        matches!(self, SF::Mok | SF::MokAgain | SF::Password | SF::ClientSecret)
     }
 }
 
@@ -319,7 +334,7 @@ impl Setup {
 
     fn detect(&mut self) {
         let (tx, rx) = mpsc::channel();
-        let b = self.backend.clone();
+        let b = Arc::clone(&self.backend);
         std::thread::spawn(move || {
             let _ = tx.send(b.status());
         });
@@ -478,9 +493,7 @@ impl Setup {
             (CardId::Phone, State::Needed) if phone.is_some_and(|l| l.request().is_some()) => {
                 ("Accept the pairing", Act::Accept)
             }
-            (CardId::Phone, State::Needed) if phone.is_some_and(|l| l.on) => {
-                ("Start KDE Connect again", Act::Run)
-            }
+            (CardId::Phone, State::Needed) if phone.is_some_and(|l| l.on) => ("Start KDE Connect again", Act::Run),
             (CardId::Phone, State::Needed) => ("Set up a phone", Act::Run),
             (CardId::Phone, State::Done) => ("Send a test copy", Act::Test),
             (_, State::Waiting) => ("Check again", Act::Recheck),
@@ -494,13 +507,9 @@ impl Setup {
             }
             (CardId::Tuxedo, State::Reboot) => ("Reboot now", Act::Reboot),
             (CardId::Fingerprint, State::Needed) => ("Enroll a finger", Act::Run),
-            (CardId::Yubikey, State::Needed) if self.key_needs_prep() => {
-                ("Set it up in a terminal", Act::Terminal)
-            }
+            (CardId::Yubikey, State::Needed) if self.key_needs_prep() => ("Set it up in a terminal", Act::Terminal),
             (CardId::Yubikey, State::Needed) => ("Enroll this key", Act::Run),
-            (CardId::Bitwarden, State::Needed) if self.bw_logged_in() => {
-                ("Unlock and pull", Act::Run)
-            }
+            (CardId::Bitwarden, State::Needed) if self.bw_logged_in() => ("Unlock and pull", Act::Run),
             (CardId::Bitwarden, State::Needed) => ("Log in and pull", Act::Run),
             (CardId::Git, State::Needed) => ("Save", Act::Run),
             _ => return None,
@@ -528,9 +537,7 @@ impl Setup {
         };
         match (c.id, c.state) {
             (CardId::Tuxedo, State::Needed) if self.wants_mok() => vec![SF::Mok, SF::MokAgain],
-            (CardId::Bitwarden, State::Needed | State::Done)
-                if self.bw_logged_in() || c.state == State::Done =>
-            {
+            (CardId::Bitwarden, State::Needed | State::Done) if self.bw_logged_in() || c.state == State::Done => {
                 let mut v = vec![];
                 if !self.bw_folders().is_empty() {
                     v.push(SF::Folders);
@@ -558,11 +565,7 @@ impl Setup {
     pub fn focus_order(&self) -> Vec<SF> {
         let mut v = vec![SF::Cards];
         // The form hides while its card runs.
-        let fields = if self.running() {
-            vec![]
-        } else {
-            self.fields()
-        };
+        let fields = if self.running() { vec![] } else { self.fields() };
         let secret = fields.iter().any(|f| f.is_secret());
         v.extend(fields);
         if secret {
@@ -625,12 +628,8 @@ impl Setup {
                     return Some("Your server's https:// address.");
                 }
                 match f.method {
-                    BwMethod::ApiKey if f.client_id.trim().is_empty() => {
-                        Some("client_id from the web vault.")
-                    }
-                    BwMethod::ApiKey if f.client_secret.trim().is_empty() => {
-                        Some("client_secret from the web vault.")
-                    }
+                    BwMethod::ApiKey if f.client_id.trim().is_empty() => Some("client_id from the web vault."),
+                    BwMethod::ApiKey if f.client_secret.trim().is_empty() => Some("client_secret from the web vault."),
                     BwMethod::ApiKey => None,
                     _ if !f.email.contains('@') => Some("Your Bitwarden email."),
                     _ if f.code.trim().is_empty() => Some("The two-step code."),
@@ -664,13 +663,13 @@ impl Setup {
                     code: f.code.trim().to_string(),
                     client_id: f.client_id.trim().to_string(),
                     client_secret: f.client_secret.trim().to_string(),
-                })
+                });
             }
             CardId::Git => {
                 i.git = Some(GitIdentity {
                     name: f.git_name.trim().to_string(),
                     email: f.git_email.trim().to_string(),
-                })
+                });
             }
             CardId::Phone => i.phone = Some(PhoneStep::On),
             _ => {}
@@ -685,20 +684,12 @@ impl Setup {
             return;
         }
         self.form.prefilled = true;
-        if let Some(Facts::Git {
-            name,
-            email,
-            full_name,
-        }) = self.card(CardId::Git).map(|c| c.facts.clone())
-        {
+        if let Some(Facts::Git { name, email, full_name }) = self.card(CardId::Git).map(|c| c.facts.clone()) {
             self.form.git_name = name.or(full_name).unwrap_or_default();
             self.form.git_email = email.unwrap_or_default();
         }
         if let Some(Facts::Bitwarden {
-            email,
-            server,
-            folders,
-            ..
+            email, server, folders, ..
         }) = self.card(CardId::Bitwarden).map(|c| c.facts.clone())
         {
             self.form.folders = folders;
@@ -741,9 +732,7 @@ impl Setup {
             || self.running()
             || t - self.changed < Motion::default().duration(tokens::Duration::Long)
             || self.toast.is_some()
-            || self
-                .flash
-                .is_some_and(|f| t - f < FLASH)
+            || self.flash.is_some_and(|f| t - f < FLASH)
             || self.tour.is_some()
             || self.phone_rx.is_some()
             || self.polls_phone()
@@ -810,11 +799,7 @@ impl Setup {
             }
             Message::Setup(Msg::Click(f)) => {
                 self.set_focus(Some(f));
-                if f.is_field() {
-                    Task::none()
-                } else {
-                    self.activate(f)
-                }
+                if f.is_field() { Task::none() } else { self.activate(f) }
             }
             Message::Setup(Msg::Folder(name)) => {
                 self.set_focus(Some(SF::Folders));
@@ -939,9 +924,7 @@ impl Setup {
         let Some(run) = &mut self.run else { return };
         match e {
             SetupEvent::Started { .. } => {}
-            SetupEvent::Prompt {
-                kind, text, count, ..
-            } => {
+            SetupEvent::Prompt { kind, text, count, .. } => {
                 run.prompt = Some((kind, text, count));
                 run.prompt_at = now;
             }
@@ -1049,7 +1032,7 @@ impl Setup {
     fn spawn(&mut self, inputs: Inputs, undo: Option<&'static str>) -> Task<Message> {
         let card = self.sel;
         let (tx, rx) = mpsc::channel();
-        let b = self.backend.clone();
+        let b = Arc::clone(&self.backend);
         std::thread::spawn(move || {
             b.run(card, &inputs, &mut |e| {
                 let _ = tx.send(e);
@@ -1104,10 +1087,7 @@ impl Setup {
             Act::Terminal => {
                 let pin = matches!(
                     self.card(CardId::Yubikey).map(|c| &c.facts),
-                    Some(Facts::Yubikey {
-                        pin: Some(false),
-                        ..
-                    })
+                    Some(Facts::Yubikey { pin: Some(false), .. })
                 );
                 let mut script = String::from("set -e\n");
                 if pin {
@@ -1136,7 +1116,7 @@ impl Setup {
     fn finish(&mut self) -> Task<Message> {
         let pending = self.status.as_ref().is_some_and(Status::reboot_pending);
         if !pending && let Err(e) = self.backend.finish() {
-            eprintln!("kobo: can't write the marker: {e}");
+            log::warn!("can't write the marker: {e}");
         }
         self.backend.start_bitwarden();
         iced::exit()
@@ -1216,7 +1196,7 @@ impl Setup {
             SF::LogOut => self.act(Act::LogOut),
             SF::TurnOff => self.act(Act::TurnOff),
             SF::Folders => {
-                if let Some(name) = self.bw_folders().get(self.form.folder_at).map(|f| f.to_string()) {
+                if let Some(name) = self.bw_folders().get(self.form.folder_at).map(ToString::to_string) {
                     self.toggle_folder(&name);
                 }
                 Task::none()
@@ -1275,6 +1255,10 @@ impl Setup {
         true
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "One arm per key, each a line or two: setup's whole keyboard map, read in one place."
+    )]
     pub fn key(&mut self, k: Key) -> Task<Message> {
         let focus = self.focus;
         // Focus can point at something the card no longer has (it changed
@@ -1339,11 +1323,7 @@ impl Setup {
                 Some(f) => self.activate(f),
             },
             Key::Up | Key::Down | Key::PageUp | Key::PageDown => {
-                let d = if matches!(k, Key::Up | Key::PageUp) {
-                    -1
-                } else {
-                    1
-                };
+                let d = if matches!(k, Key::Up | Key::PageUp) { -1 } else { 1 };
                 match focus {
                     Some(SF::Cards) => self.move_card(d),
                     Some(SF::Server) => self.cycle_server(d),
@@ -1367,15 +1347,9 @@ impl Setup {
             Key::Left { word, shift } | Key::Right { word, shift } => {
                 let left = matches!(k, Key::Left { .. });
                 let e = if left {
-                    Edit::Left {
-                        word,
-                        select: shift,
-                    }
+                    Edit::Left { word, select: shift }
                 } else {
-                    Edit::Right {
-                        word,
-                        select: shift,
-                    }
+                    Edit::Right { word, select: shift }
                 };
                 if !self.edit(e) {
                     let d = if left { -1 } else { 1 };

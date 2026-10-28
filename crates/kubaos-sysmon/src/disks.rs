@@ -1,9 +1,9 @@
 //! Disks: space on the mounts that matter (root, home on a disk of its own, removable drives),
 //! traffic from `/proc/diskstats`, and what Btrfs snapshots hold.
 //!
-//! Snapshot space comes from Btrfs quota groups in sysfs (`/sys/fs/btrfs/<uuid>/qgroups`): snapper's
-//! own group `1/0` when it set one up, otherwise what the subvolumes no mount uses hold alone. With
-//! quotas off the kernel doesn't know, and the space is `None`.
+//! Snapshot space comes from Btrfs quota groups in sysfs (`/sys/fs/btrfs/<uuid>/qgroups`):
+//! snapper's own group `1/0` when it set one up, otherwise what the subvolumes no mount uses hold
+//! alone. With quotas off the kernel doesn't know, and the space is `None`.
 //!
 //! # Owns
 //!

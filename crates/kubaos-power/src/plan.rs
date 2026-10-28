@@ -152,7 +152,7 @@ impl Panel {
 /// Everything one stop sets.
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "each bool is one row of the stops' table, on or off, as the table reads"
+    reason = "Each bool is one row of the stops' table, on or off, as the table reads."
 )]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Plan {

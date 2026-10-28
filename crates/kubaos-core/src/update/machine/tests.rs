@@ -83,7 +83,10 @@ fn output_is_cut_into_lines_at_newlines_and_progress_redraws() {
     lines.push(b"0%\r\n\nSetting up vim", |l| got.push(l.to_owned()));
     lines.finish(|l| got.push(l.to_owned()));
 
-    assert_eq!(got, ["Unpacking vim", "Progress: 10%", "Progress: 20%", "Setting up vim"]);
+    assert_eq!(
+        got,
+        ["Unpacking vim", "Progress: 10%", "Progress: 20%", "Setting up vim"]
+    );
 }
 
 #[test]

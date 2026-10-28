@@ -1,6 +1,8 @@
 //! What the user chose: `install.toml`. Secrets never live in this file.
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::Serialize;
 
 use crate::keyboard::Layout;
 
@@ -164,6 +166,11 @@ impl std::fmt::Debug for Secrets {
 }
 
 impl InstallConfig {
+    /// Reads a config from TOML.
+    ///
+    /// # Errors
+    ///
+    /// When `s` isn't TOML, or not an install config.
     pub fn from_toml(s: &str) -> Result<Self, toml::de::Error> {
         toml::from_str(s)
     }

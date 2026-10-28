@@ -2,10 +2,16 @@
 //! dry run prints instead of acting and tests can record what would happen.
 
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::fmt::Write as _;
+use std::io::Read;
+use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::Child;
+use std::process::Command;
+use std::process::Stdio;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -48,11 +54,13 @@ impl Cmd {
         }
     }
 
+    #[must_use]
     pub fn arg(mut self, a: impl Into<String>) -> Self {
         self.args.push(a.into());
         self
     }
 
+    #[must_use]
     pub fn args<I, S>(mut self, it: I) -> Self
     where
         I: IntoIterator<Item = S>,
@@ -62,16 +70,19 @@ impl Cmd {
         self
     }
 
+    #[must_use]
     pub fn secret_stdin(mut self, s: &str) -> Self {
         self.stdin = Some(Sensitive(s.to_string()));
         self
     }
 
+    #[must_use]
     pub fn env(mut self, k: &str, v: &str) -> Self {
         self.env.push((k.into(), v.into()));
         self
     }
 
+    #[must_use]
     pub fn placeholder(mut self, p: impl Into<String>) -> Self {
         self.placeholder = Some(p.into());
         self
@@ -81,7 +92,7 @@ impl Cmd {
     pub fn display(&self) -> String {
         let mut s = String::new();
         for (k, v) in &self.env {
-            s.push_str(&format!("{k}={} ", quote(v)));
+            let _ = write!(s, "{k}={} ", quote(v));
         }
         s.push_str(&quote(&self.program));
         for a in &self.args {
@@ -122,15 +133,36 @@ pub enum Stream {
 
 pub trait Runner {
     fn is_dry_run(&self) -> bool;
-    /// Run to completion. A non-zero exit is an error carrying the tail of
-    /// stderr.
+    /// Run to completion.
+    ///
+    /// # Errors
+    ///
+    /// When the command can't start, or exits non-zero: the tail of its stderr.
     fn run(&mut self, cmd: &Cmd) -> Result<Output, String>;
     /// Run, handing every stdout/stderr line (split on `\n` and `\r`) to `f`.
+    ///
+    /// # Errors
+    ///
+    /// When the command can't start, or exits non-zero.
     fn stream(&mut self, cmd: &Cmd, f: &mut dyn FnMut(Stream)) -> Result<(), String>;
     /// Start in the background; returns a handle for `kill`.
+    ///
+    /// # Errors
+    ///
+    /// When the command can't start.
     fn spawn(&mut self, cmd: &Cmd) -> Result<u32, String>;
     fn kill(&mut self, handle: u32);
+    /// Writes `contents` to `path` with `mode`.
+    ///
+    /// # Errors
+    ///
+    /// When the file can't be written or its mode set.
     fn write_file(&mut self, path: &Path, contents: &[u8], mode: u32) -> Result<(), String>;
+    /// Creates `path` and its missing parents.
+    ///
+    /// # Errors
+    ///
+    /// When a directory can't be created.
     fn mkdir_p(&mut self, path: &Path) -> Result<(), String>;
     /// Reads a file (on the target, mostly). `None` when it doesn't exist or,
     /// in a dry run, when it isn't there yet.
@@ -146,7 +178,7 @@ pub trait Runner {
 // ---------------------------------------------------------------------------
 
 /// Runs things for real.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct SystemRunner {
     children: HashMap<u32, Child>,
 }
@@ -206,9 +238,7 @@ impl Runner for SystemRunner {
             .spawn()
             .map_err(|e| format!("{}: {e}", cmd.program))?;
         Self::feed_stdin(&mut child, cmd)?;
-        let out = child
-            .wait_with_output()
-            .map_err(|e| format!("{}: {e}", cmd.program))?;
+        let out = child.wait_with_output().map_err(|e| format!("{}: {e}", cmd.program))?;
         let o = Output {
             stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
             stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
@@ -217,10 +247,7 @@ impl Runner for SystemRunner {
             Ok(o)
         } else {
             let detail = tail(&format!("{}\n{}", o.stdout, o.stderr), 6);
-            Err(format!(
-                "{} exited with {}: {}",
-                cmd.program, out.status, detail
-            ))
+            Err(format!("{} exited with {}: {}", cmd.program, out.status, detail))
         }
     }
 
@@ -235,14 +262,8 @@ impl Runner for SystemRunner {
         let (tx, rx) = mpsc::channel::<Option<String>>();
         let mut readers = Vec::new();
         for pipe in [
-            child
-                .stdout
-                .take()
-                .map(|p| Box::new(p) as Box<dyn Read + Send>),
-            child
-                .stderr
-                .take()
-                .map(|p| Box::new(p) as Box<dyn Read + Send>),
+            child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>),
+            child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>),
         ]
         .into_iter()
         .flatten()
@@ -278,11 +299,7 @@ impl Runner for SystemRunner {
         if status.success() {
             Ok(())
         } else {
-            Err(format!(
-                "{} exited with {status}: {}",
-                cmd.program,
-                last.join("\n")
-            ))
+            Err(format!("{} exited with {status}: {}", cmd.program, last.join("\n")))
         }
     }
 
@@ -331,8 +348,7 @@ impl Runner for SystemRunner {
                 .mode(mode)
                 .open(&tmp)
                 .map_err(|e| format!("{}: {e}", tmp.display()))?;
-            f.write_all(contents)
-                .map_err(|e| format!("{}: {e}", tmp.display()))?;
+            f.write_all(contents).map_err(|e| format!("{}: {e}", tmp.display()))?;
         }
         std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(mode))
             .map_err(|e| format!("{}: {e}", tmp.display()))?;
@@ -390,17 +406,13 @@ pub enum Action {
     Run(String),
     Spawn(String),
     Kill(u32),
-    Write {
-        path: PathBuf,
-        mode: u32,
-        contents: String,
-    },
+    Write { path: PathBuf, mode: u32, contents: String },
     Mkdir(PathBuf),
 }
 
 /// Touches nothing. Records every action; commands "succeed" with their
 /// placeholder as stdout, or with a canned response a test registered.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DryRunner {
     pub actions: Vec<Action>,
     /// (program + args prefix, stdout). First match wins.

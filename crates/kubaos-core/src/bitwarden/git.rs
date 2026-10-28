@@ -1,6 +1,8 @@
 //! git: commits signed with the SSH key whose item has `signing=true`, through the agent.
 //! `signing=verify` keys only go into `allowed_signers`, so old signatures still verify.
 
+use std::fmt::Write;
+
 use super::Cmd;
 use super::Error;
 use super::KeyInfo;
@@ -32,12 +34,17 @@ fn git_config(m: &mut dyn Machine, args: &[&str]) -> String {
         .args(["-C", "/", "config"])
         .args(args.iter().copied())
         .env("GIT_DIR", "/nonexistent");
-    m.run(&cmd).ok().filter(super::Ran::ok).map(|r| r.stdout).unwrap_or_default()
+    m.run(&cmd)
+        .ok()
+        .filter(super::Ran::ok)
+        .map(|r| r.stdout)
+        .unwrap_or_default()
 }
 
 /// The key git signs with: the oldest with `signing=true` and a public key.
 fn signer(keys: &[Key]) -> Option<&Key> {
-    keys.iter().find(|k| truthy(k.item.field("signing")) && k.item.public_key.as_deref().is_some_and(|k| !k.is_empty()))
+    keys.iter()
+        .find(|k| truthy(k.item.field("signing")) && k.item.public_key.as_deref().is_some_and(|k| !k.is_empty()))
 }
 
 /// Marks the overview's signing key.
@@ -63,7 +70,9 @@ fn pub_mismatch(m: &mut dyn Machine, paths: &Paths, sign: &Key) -> Option<String
     let have = on_disk(m, &pub_path);
     match have {
         Some(have) if have == want => None,
-        None => Some(format!("~/.ssh/{file}.pub isn't on disk, {LEFT}; run `{REFRESH}` to write it")),
+        None => Some(format!(
+            "~/.ssh/{file}.pub isn't on disk, {LEFT}; run `{REFRESH}` to write it"
+        )),
         // The SSH step never replaces the `.pub` of a private key on disk, so a refresh alone
         // doesn't fix this one.
         Some(_) if m.exists(&paths.ssh.join(file)) => Some(format!(
@@ -99,12 +108,18 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &[Key], scope: &str, p: &
             continue;
         }
         let extra = item.field("emails").replace(',', " ");
-        for email in emails.split_whitespace().chain(extra.split_whitespace()).filter(|e| email_ok(e)) {
-            allowed.push_str(&format!("{email} namespaces=\"git\" {public}\n"));
+        for email in emails
+            .split_whitespace()
+            .chain(extra.split_whitespace())
+            .filter(|e| email_ok(e))
+        {
+            let _ = writeln!(allowed, "{email} namespaces=\"git\" {public}");
         }
     }
     let Some(sign) = signer(keys) else {
-        p.warn(format!("no SSH key in {scope} has the field signing=true: commits stay unsigned"));
+        p.warn(format!(
+            "no SSH key in {scope} has the field signing=true: commits stay unsigned"
+        ));
         m.remove(&paths.signing());
         p.summary("git    no signing key (add a field signing=true to one SSH key item)");
         return Ok(());
@@ -137,7 +152,10 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &[Key], scope: &str, p: &
     );
     write_if_changed(m, &paths.signing(), &config, 0o644)?;
     if git_config(m, &["--get-all", "include.path"]).contains("git-bitwarden/signing.gitconfig") {
-        p.ok(format!("signing with ~/.ssh/{}.pub ({name}); git config includes it", sign.file));
+        p.ok(format!(
+            "signing with ~/.ssh/{}.pub ({name}); git config includes it",
+            sign.file
+        ));
     } else {
         p.warn("config/git/config doesn't include ~/.config/git-bitwarden/signing.gitconfig");
     }

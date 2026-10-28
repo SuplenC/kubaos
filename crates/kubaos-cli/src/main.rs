@@ -25,8 +25,6 @@
 //! - Updates (`update`, `upgrade`, `rollback`, `channel`): `update.rs`.
 //! - The work itself: the `kubaos-core` crate.
 
-#![forbid(unsafe_code)]
-
 use std::fmt::Display;
 use std::process::ExitCode;
 
@@ -34,12 +32,15 @@ use clap::Parser;
 use clap::Subcommand;
 use clap::ValueEnum;
 
+use crate::out::err;
+
 mod apt;
 mod bitwarden;
 mod cursor;
 mod install;
 mod job;
 mod keyboard;
+mod out;
 mod package;
 mod pin;
 mod power;
@@ -49,11 +50,7 @@ mod suite;
 mod update;
 
 #[derive(Parser)]
-#[command(
-    name = "kubaos",
-    version,
-    about = "Installs and changes a KubaOS machine"
-)]
+#[command(name = "kubaos", version, about = "Installs and changes a KubaOS machine")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -132,7 +129,8 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// The Proxy, one switch for the work network: on, off, status, or import IT's WireGuard config.
+    /// The Proxy, one switch for the work network: on, off, status, or import IT's WireGuard
+    /// config.
     #[command(disable_help_flag = true)]
     Proxy {
         /// `on`, `off`, `status [--json] [--live]`, `import FILE`, `pull`
@@ -150,14 +148,14 @@ pub(crate) enum Events {
 
 /// Prints `kubaos: <msg>` on stderr and returns exit code 2.
 pub(crate) fn usage_error(msg: impl Display) -> ExitCode {
-    eprintln!("kubaos: {msg}");
+    err!("kubaos: {msg}");
     ExitCode::from(2)
 }
 
 fn main() -> ExitCode {
     match Cli::parse().cmd {
         Cmd::Install(cmd) => install::main(cmd),
-        Cmd::Setup { cmd } => setup::main(cmd),
+        Cmd::Setup { cmd } => setup::main(&cmd),
         Cmd::Bitwarden { cmd } => bitwarden::main(cmd),
         Cmd::Package { cmd } => package::main(cmd),
         Cmd::Packages { cmd } => apt::main(cmd),

@@ -14,8 +14,6 @@
 //!
 //! - Everything else: the library.
 
-#![forbid(unsafe_code)]
-
 use std::env;
 use std::path::Path;
 use std::path::PathBuf;
@@ -34,6 +32,10 @@ write  regenerate every generated file that differs from the tokens
 
 DIR is the repo's root; by default the nearest directory up from here holding design/tokens.toml.";
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A usage error goes to whoever ran the command, on stderr."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -53,6 +55,10 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A usage error goes to whoever ran the command, on stderr."
+)]
 fn usage() -> ExitCode {
     eprintln!("{USAGE}");
     ExitCode::from(2)
@@ -65,6 +71,11 @@ fn find_root() -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The verdict and the stale files are the check's output, for the developer or the CI log."
+)]
 fn check(root: &Path) -> ExitCode {
     let tokens = match kubaos_tokens::load(root) {
         Ok(tokens) => tokens,
@@ -85,6 +96,10 @@ fn check(root: &Path) -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "The files written are the command's report, for the developer who ran it."
+)]
 fn write(root: &Path) -> ExitCode {
     let tokens = match kubaos_tokens::load(root) {
         Ok(tokens) => tokens,
@@ -105,6 +120,10 @@ fn write(root: &Path) -> ExitCode {
 }
 
 /// Prints `err`, its causes, and every broken rule, then fails.
+#[expect(
+    clippy::print_stderr,
+    reason = "The error and every broken rule are the command's answer to the developer who ran it."
+)]
 fn failed(err: &(dyn std::error::Error + 'static)) -> ExitCode {
     eprint!("kubaos-tokens: {err}");
     let mut cause = err.source();

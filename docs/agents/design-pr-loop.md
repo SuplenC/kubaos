@@ -6,7 +6,7 @@ How a PR that changes how something looks gets its screenshots and its review. T
 
 1. **Render while you iterate: `just shots`.** With no arguments it renders only the surfaces whose files changed against `origin/main` (the table in `test/shots/surfaces`), at 1× and 1.5×, dark. It renders your working tree as AFTER, uncommitted files included (and, for the shell, untracked ones), and the merge base with `origin/main` as BEFORE.
 2. **Look at `test/out/shots/changed.txt`.** It lists only the pairs that differ; the pairs are in `test/out/shots/pairs/` (before left, after right, cropped round the surface, at device pixels). Fix any QML warning it prints: they are the AFTER side's, in `warnings.txt`.
-3. **Run `just shots --full` once before the PR is ready**: every surface at 1, 1.25, 1.5 and 2, light and dark.
+3. **Run `just shots --full` once before the PR is ready**: every surface at 1, 1.25, 1.5 and 2, light and dark. Run `just check` in `nix develop` too: the formatting, clippy, the tests and the design checks, as the PR's CI runs them (`docs/agents/code-quality.md`). CI leaves the shots out.
 4. **Review the changed pairs against `docs/agents/design-review.md`** and `docs/DESIGN.md`. Run your reviewer sub-agent in the foreground (`run_in_background: false` on the Agent tool), so its report comes back to you and not to the coordinator. Fix what it finds and render again.
 5. **Attach the pairs: `just shots publish chore/shots-<your-branch>`.** It pushes `changed.txt`'s pairs to that image-only branch and prints the Markdown table; paste it into the PR body, with each visible change listed as a decision for Kuba.
 
@@ -38,4 +38,4 @@ The shell's surfaces: `bar` (the tray holds Adwaita's unfilled symbolic icon, on
 
 ## Compile cache
 
-`nix develop` runs cargo through sccache (`RUSTC_WRAPPER`, cache in `~/.cache/sccache`), shared by every checkout, so a fresh worktree reuses the crates.io dependencies another one built. The workspace's own crates still compile in each worktree: cargo builds them incrementally, which sccache doesn't cache, and their hash includes the checkout's path. Crane and the flake's packages build in the sandbox, without it.
+`nix develop` pins the toolchain (`flake.lock`'s rustc, cargo, clippy, nextest and the nightly rustfmt) and runs cargo through sccache (`RUSTC_WRAPPER`, cache in `~/.cache/sccache`), shared by every checkout, so a fresh worktree reuses the crates.io dependencies another one built. The workspace's own crates still compile in each worktree: cargo builds them incrementally, which sccache doesn't cache, and their hash includes the checkout's path. Crane and the flake's packages build in the sandbox, without it.

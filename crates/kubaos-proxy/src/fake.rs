@@ -26,7 +26,7 @@ pub const DEFAULT: &str = "@default";
 #[derive(Debug, Default)]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "each is a way the tests make the machine fail"
+    reason = "Each is a way the tests make the machine fail."
 )]
 pub struct Fake {
     /// Each command, as `program arg arg`.

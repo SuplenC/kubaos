@@ -15,9 +15,9 @@
 //!
 //! `update` is what `kubaos update` would install, `upgrade` the next series `kubaos upgrade`
 //! would, and `apt-security` how many apt packages from a security pocket `kubaos update` would
-//! upgrade (`security.rs`). The Command menu's KubaOS Extension reads the same keys (`crates/kotodama-kubaos`).
-//! `~/.local/state/kubaos/notified` lists one `update <commit>` or `upgrade <commit>` per line, so
-//! each is notified once.
+//! upgrade (`security.rs`). The Command menu's KubaOS Extension reads the same keys
+//! (`crates/kotodama-kubaos`). `~/.local/state/kubaos/notified` lists one `update <commit>` or
+//! `upgrade <commit>` per line, so each is notified once.
 //!
 //! # Owns
 //!
@@ -106,7 +106,10 @@ impl Available {
     pub fn notifications(&self, notified: &BTreeSet<String>) -> Vec<(String, String)> {
         let mut out = Vec::new();
         if let Some(target) = &self.update {
-            let name = target.codename.as_deref().map_or_else(|| "KubaOS".to_owned(), capitalise);
+            let name = target
+                .codename
+                .as_deref()
+                .map_or_else(|| "KubaOS".to_owned(), capitalise);
             out.push((
                 format!("update {}", target.commit),
                 format!(
@@ -122,7 +125,10 @@ impl Available {
                     "KubaOS {name} ({}) is out. kubaos upgrade when you're ready, I'll wait.",
                     target.label
                 ),
-                None => format!("KubaOS {} is out. kubaos upgrade when you're ready, I'll wait.", target.label),
+                None => format!(
+                    "KubaOS {} is out. kubaos upgrade when you're ready, I'll wait.",
+                    target.label
+                ),
             };
             out.push((format!("upgrade {}", target.commit), text));
         }

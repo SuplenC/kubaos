@@ -49,7 +49,8 @@ pub struct Baseline {
 /// How a file and rule stand against the baseline.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Problem<'a> {
-    /// More violations than allowed: each one of the rule in the file, since any may be the new one.
+    /// More violations than allowed: each one of the rule in the file, since any may be the new
+    /// one.
     Over {
         path: &'a str,
         rule: Rule,

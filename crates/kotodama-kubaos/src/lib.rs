@@ -11,8 +11,7 @@
 //! - "Power: what this stop does", the power stop's layers read live.
 //! - "Proxy status", the work network's parts and its tunnel read live.
 //! - The date answers, from the clock popup's engine.
-//! - The monitor answers (`cpu`, `ram`, `battery`) and the process search, from the system
-//!   monitor.
+//! - The monitor answers (`cpu`, `ram`, `battery`) and the process search, from the system monitor.
 //! - Which events of the files it watches are changes: `watched`.
 //!
 //! # Not here
@@ -20,8 +19,6 @@
 //! - The protocol loop: `main.rs`, on `kotodama_extension`.
 //! - Power and session: Kotodama's Bundled `system` Extension.
 //! - Hyprland's binds, which reach the search through the Bundled `hyprland` Extension.
-
-#![forbid(unsafe_code)]
 
 pub mod audio;
 pub mod bus;
@@ -36,8 +33,8 @@ pub mod layouts;
 pub mod power;
 pub mod proxy;
 pub mod registry;
-pub mod sysmon;
 pub mod run;
+pub mod sysmon;
 pub mod toggles;
 pub mod updates;
 pub mod wallpapers;

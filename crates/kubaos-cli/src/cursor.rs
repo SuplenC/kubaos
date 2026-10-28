@@ -51,6 +51,8 @@ use kubaos_cursor::theme::XcursorOutcome;
 use kubaos_user_layer::App;
 
 use crate::job::chain;
+use crate::out::err;
+use crate::out::out;
 use crate::usage_error;
 
 /// The background render's threads at most: enough to finish in a couple of seconds, few enough
@@ -90,7 +92,7 @@ pub fn main(cmd: CursorCmd) -> ExitCode {
         CursorCmd::Size { size } => change(&paths, settings::set_size(&paths.settings, size)),
         CursorCmd::Show => {
             let settings = load_settings(&paths);
-            println!("style={} size={}", settings.style, settings.size);
+            out!("style={} size={}", settings.style, settings.size);
             ExitCode::SUCCESS
         }
         CursorCmd::RenderXcursor => render_xcursor(&paths),
@@ -114,7 +116,9 @@ impl Paths {
     fn from_env() -> Result<Self, String> {
         let home = env::var_os("HOME").map(PathBuf::from).ok_or("HOME isn't set")?;
         let xdg = |var: &str, default: &str| {
-            env::var_os(var).filter(|v| !v.is_empty()).map_or_else(|| home.join(default), PathBuf::from)
+            env::var_os(var)
+                .filter(|v| !v.is_empty())
+                .map_or_else(|| home.join(default), PathBuf::from)
         };
         let config = xdg("XDG_CONFIG_HOME", ".config");
         let data = xdg("XDG_DATA_HOME", ".local/share");
@@ -169,7 +173,7 @@ fn wanted(paths: &Paths, style: Style) -> Result<Option<Wanted>, ApplyError> {
 
 fn load_settings(paths: &Paths) -> Settings {
     Settings::load(&paths.settings).unwrap_or_else(|e| {
-        eprintln!("kubaos: {}; the cursor is dark at 24", chain(&e));
+        err!("kubaos: {}; the cursor is dark at 24", chain(&e));
         Settings::default()
     })
 }
@@ -179,7 +183,7 @@ fn change(paths: &Paths, result: Result<(), settings::SettingsError>) -> ExitCod
         Ok(()) => apply(paths, false),
         Err(e @ settings::SettingsError::Size(_)) => usage_error(e),
         Err(e) => {
-            eprintln!("kubaos: {}", chain(&e));
+            err!("kubaos: {}", chain(&e));
             ExitCode::FAILURE
         }
     }
@@ -192,13 +196,18 @@ fn apply(paths: &Paths, sync: bool) -> ExitCode {
         let Some(wanted) = wanted else { return Ok(None) };
         if theme.stamp().as_deref() != Some(wanted.stamp.as_str()) {
             let shapes = source::load(&wanted.source).map_err(ApplyError::Source)?;
-            theme.write_hyprcursor(&shapes, &wanted.colors, &wanted.stamp).map_err(ApplyError::Theme)?;
+            theme
+                .write_hyprcursor(&shapes, &wanted.colors, &wanted.stamp)
+                .map_err(ApplyError::Theme)?;
         }
         Ok(Some(wanted))
     });
     let failed = written.as_ref().is_err();
     if let Err(e) = &written {
-        eprintln!("kubaos: writing the cursor theme: {}; the pointer is {FALLBACK_THEME}", chain(e));
+        err!(
+            "kubaos: writing the cursor theme: {}; the pointer is {FALLBACK_THEME}",
+            chain(e)
+        );
     }
     if let Ok(Some(_)) = written {
         set_hyprland_cursor(THEME_NAME, settings.size);
@@ -222,7 +231,7 @@ fn write_classic(theme: &Theme) {
         return;
     }
     if let Err(e) = theme.write_classic(&stamp) {
-        eprintln!("kubaos: writing the classic cursor stub: {}", chain(&e));
+        err!("kubaos: writing the classic cursor stub: {}", chain(&e));
     }
 }
 
@@ -230,7 +239,7 @@ fn write_classic(theme: &Theme) {
 /// process, its output appended to the log.
 fn spawn_render(paths: &Paths) {
     let Ok(exe) = env::current_exe() else {
-        eprintln!("kubaos: can't find this kubaos to render the XCursor theme");
+        err!("kubaos: can't find this kubaos to render the XCursor theme");
         return;
     };
     let mut cmd = if on_path("ionice") {
@@ -244,7 +253,9 @@ fn spawn_render(paths: &Paths) {
     } else {
         Command::new(exe)
     };
-    cmd.args(["cursor", "render-xcursor"]).stdin(Stdio::null()).stdout(Stdio::null());
+    cmd.args(["cursor", "render-xcursor"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null());
     if let Some(dir) = paths.log.parent() {
         let _ = fs::create_dir_all(dir);
     }
@@ -254,7 +265,7 @@ fn spawn_render(paths: &Paths) {
     };
     // Its own process group: a terminal's Ctrl+C or hangup for the caller doesn't stop it.
     if let Err(e) = cmd.process_group(0).spawn() {
-        eprintln!("kubaos: starting the XCursor render: {e}");
+        err!("kubaos: starting the XCursor render: {e}");
     }
 }
 
@@ -269,7 +280,7 @@ fn render_xcursor(paths: &Paths) -> ExitCode {
     let lock = match lock(paths) {
         Ok(lock) => lock,
         Err(e) => {
-            eprintln!("kubaos: taking the cursor render lock: {e}");
+            err!("kubaos: taking the cursor render lock: {e}");
             return ExitCode::FAILURE;
         }
     };
@@ -281,17 +292,24 @@ fn render_xcursor(paths: &Paths) -> ExitCode {
         && theme.stamp().as_deref() == Some(wanted.stamp.as_str())
         && theme.xcursor_stamp() != Some(theme::xcursor_stamp(&wanted.stamp, settings.size))
     {
-        let threads = thread::available_parallelism().map_or(1, usize::from).min(RENDER_THREADS);
-        let outcome = source::load(&wanted.source).map_err(ApplyError::Source).and_then(|shapes| {
-            theme
-                .write_xcursor(&shapes, &wanted.colors, settings.size, &wanted.stamp, threads)
-                .map_err(ApplyError::Theme)
-        });
+        let threads = thread::available_parallelism()
+            .map_or(1, usize::from)
+            .min(RENDER_THREADS);
+        let outcome = source::load(&wanted.source)
+            .map_err(ApplyError::Source)
+            .and_then(|shapes| {
+                theme
+                    .write_xcursor(&shapes, &wanted.colors, settings.size, &wanted.stamp, threads)
+                    .map_err(ApplyError::Theme)
+            });
         match outcome {
             Ok(XcursorOutcome::Written) => rewritten = true,
             Ok(XcursorOutcome::Superseded) => return ExitCode::SUCCESS,
             Err(e) => {
-                eprintln!("kubaos: rendering the XCursor theme: {}; XCursor apps get {FALLBACK_THEME}", chain(&e));
+                err!(
+                    "kubaos: rendering the XCursor theme: {}; XCursor apps get {FALLBACK_THEME}",
+                    chain(&e)
+                );
                 code = ExitCode::FAILURE;
             }
         }
@@ -352,5 +370,9 @@ fn tell_session(size: u32, bounce: bool) {
 
 /// Runs `cmd` for its effect alone: a session tool that's missing or fails changes nothing else.
 fn quietly(cmd: &mut Command) {
-    let _ = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+    let _ = cmd
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
 }

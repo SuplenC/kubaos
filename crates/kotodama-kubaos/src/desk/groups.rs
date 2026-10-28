@@ -9,15 +9,15 @@
 //!
 //! # Owns
 //!
-//! - Reading the file as Hyprland reads it, and the menu's edits to it: pinning a screen,
-//!   unpinning it, naming a group. An edit keeps the user's comments and writes the whole file
-//!   through a temporary one and a rename.
+//! - Reading the file as Hyprland reads it, and the menu's edits to it: pinning a screen, unpinning
+//!   it, naming a group. An edit keeps the user's comments and writes the whole file through a
+//!   temporary one and a rename.
 //!
 //! # Not here
 //!
-//! - Where each group goes, and reading the file in the session: `parse_groups` and `positions`
-//!   in `config/hypr/workspace_blocks.lua`. Telling Hyprland of an edit: [`crate::desk`] after
-//!   each one, and the bar for hand edits (`config/quickshell/services/Hypr.qml`).
+//! - Where each group goes, and reading the file in the session: `parse_groups` and `positions` in
+//!   `config/hypr/workspace_blocks.lua`. Telling Hyprland of an edit: [`crate::desk`] after each
+//!   one, and the bar for hand edits (`config/quickshell/services/Hypr.qml`).
 //! - The menu's Items: [`crate::desk`].
 
 use std::collections::BTreeMap;

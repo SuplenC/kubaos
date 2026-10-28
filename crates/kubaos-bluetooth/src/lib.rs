@@ -20,8 +20,6 @@
 //! - The prompt's look: `config/quickshell/modules/controlcenter/BluetoothList.qml`.
 //! - The user unit: `home/bluetooth.nix`.
 
-#![forbid(unsafe_code)]
-
 pub mod agent;
 pub mod bluez;
 pub mod hub;

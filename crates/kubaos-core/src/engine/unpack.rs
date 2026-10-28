@@ -14,6 +14,7 @@ pub trait Unpacker {
     fn progress(&mut self, line: &str) -> Option<f32>;
 }
 
+#[derive(Debug)]
 pub struct Squashfs;
 
 impl Unpacker for Squashfs {
@@ -39,6 +40,7 @@ impl Unpacker for Squashfs {
     }
 }
 
+#[derive(Debug)]
 pub struct TarZstd {
     /// Uncompressed size from the manifest; tar reports records read.
     pub installed_bytes: u64,
@@ -84,12 +86,16 @@ impl Unpacker for TarZstd {
 
 /// Picks the unpacker from the file's first bytes, or its name when the
 /// file can't be read (dry run on another machine).
+///
+/// # Errors
+///
+/// When the file is neither squashfs nor a zstd tar.
 pub fn detect(path: &Path, installed_bytes: u64) -> Result<Box<dyn Unpacker>, String> {
     let mut head = [0u8; 4];
     let magic = std::fs::File::open(path)
         .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head))
         .ok()
-        .map(|_| head);
+        .map(|()| head);
     match magic {
         Some(m) if &m == b"hsqs" => Ok(Box::new(Squashfs)),
         Some([0x28, 0xb5, 0x2f, 0xfd]) => Ok(Box::new(TarZstd { installed_bytes })),
@@ -118,10 +124,7 @@ mod tests {
         assert_eq!(u.progress("100"), Some(1.0));
         assert_eq!(u.progress("101"), None);
         let c = u.command(Path::new("/p/rootfs.sqfs"), Path::new("/mnt/t"));
-        assert_eq!(
-            c.display(),
-            "unsquashfs -percentage -f -d /mnt/t /p/rootfs.sqfs"
-        );
+        assert_eq!(c.display(), "unsquashfs -percentage -f -d /mnt/t /p/rootfs.sqfs");
     }
 
     #[test]
@@ -133,10 +136,7 @@ mod tests {
         assert_eq!(u.progress("tar: kubaos-ckpt 9000"), Some(0.99));
         assert_eq!(u.progress("tar: something else"), None);
         let c = u.command(Path::new("/p/rootfs.tar.zst"), Path::new("/mnt/t"));
-        assert!(
-            c.display()
-                .contains("'--checkpoint-action=echo=kubaos-ckpt %u'")
-        );
+        assert!(c.display().contains("'--checkpoint-action=echo=kubaos-ckpt %u'"));
     }
 
     #[test]
@@ -152,14 +152,8 @@ mod tests {
         let bad = dir.join("c.img");
         std::fs::write(&bad, b"nope").unwrap();
         assert!(detect(&bad, 1).is_err());
-        assert_eq!(
-            detect(&dir.join("missing.tar.zst"), 1).unwrap().name(),
-            "tar.zst"
-        );
-        assert_eq!(
-            detect(&dir.join("missing.sqfs"), 1).unwrap().name(),
-            "squashfs"
-        );
+        assert_eq!(detect(&dir.join("missing.tar.zst"), 1).unwrap().name(), "tar.zst");
+        assert_eq!(detect(&dir.join("missing.sqfs"), 1).unwrap().name(), "squashfs");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

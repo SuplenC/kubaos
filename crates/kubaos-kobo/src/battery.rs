@@ -86,9 +86,7 @@ impl Cell {
     /// `None` for a battery that isn't the machine's (a wireless mouse's reports `scope` `Device`),
     /// an empty bay (`present` `0`), or one that reports no charge at all.
     fn read(dir: &Path) -> Option<Self> {
-        if attr(dir, "scope").as_deref() == Some("Device")
-            || attr(dir, "present").as_deref() == Some("0")
-        {
+        if attr(dir, "scope").as_deref() == Some("Device") || attr(dir, "present").as_deref() == Some("0") {
             return None;
         }
         let capacity = attr(dir, "capacity")
@@ -123,13 +121,12 @@ fn combine(cells: &[Cell], mains_online: bool) -> Option<Battery> {
         return None;
     }
     let energies: Option<Vec<(u64, u64)>> = cells.iter().map(|c| c.energy).collect();
-    let percent = match energies {
-        Some(e) => ratio(e.iter().map(|x| x.0).sum(), e.iter().map(|x| x.1).sum()),
-        None => {
-            let sum: usize = cells.iter().map(|c| usize::from(c.percent())).sum();
-            let avg = (sum + cells.len() / 2) / cells.len();
-            u8::try_from(avg).unwrap_or(100)
-        }
+    let percent = if let Some(e) = energies {
+        ratio(e.iter().map(|x| x.0).sum(), e.iter().map(|x| x.1).sum())
+    } else {
+        let sum: usize = cells.iter().map(|c| usize::from(c.percent())).sum();
+        let avg = (sum + cells.len() / 2) / cells.len();
+        u8::try_from(avg).unwrap_or(100)
     };
     Some(Battery {
         percent,
@@ -165,9 +162,7 @@ fn ratio(now: u64, full: u64) -> u8 {
 }
 
 fn attr(dir: &Path, name: &str) -> Option<String> {
-    fs::read_to_string(dir.join(name))
-        .ok()
-        .map(|s| s.trim().to_string())
+    fs::read_to_string(dir.join(name)).ok().map(|s| s.trim().to_string())
 }
 
 fn number(dir: &Path, name: &str) -> Option<u64> {

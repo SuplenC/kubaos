@@ -43,6 +43,8 @@ use serde_json::Value;
 use serde_json::json;
 
 use crate::job::report;
+use crate::out::err;
+use crate::out::out;
 use crate::suite::tilde;
 use crate::suite::with_suite;
 use crate::usage_error;
@@ -92,7 +94,7 @@ pub fn pin(args: &PinArgs) -> ExitCode {
             None if pinned.created => format!(", in a new {}", tilde(&paths, &pinned.envrc)),
             None => String::new(),
         };
-        println!(
+        out!(
             "pinned the {} Suite to {} for {}{was}",
             suite.title,
             args.version,
@@ -111,7 +113,7 @@ pub fn pin(args: &PinArgs) -> ExitCode {
             Err(e) => return report(e),
         };
         for note in notes(&status) {
-            println!("{note}");
+            out!("{note}");
         }
         ExitCode::SUCCESS
     })
@@ -134,7 +136,7 @@ pub fn unpin(args: &UnpinArgs) -> ExitCode {
     } else {
         String::new()
     };
-    println!(
+    out!(
         "unpinned {} {} from {}{file}",
         args.suite,
         unpinned.version,
@@ -142,13 +144,13 @@ pub fn unpin(args: &UnpinArgs) -> ExitCode {
     );
     match pins.resolve(&folder) {
         Ok(resolution) => match resolution.pins.iter().find(|pin| pin.suite == args.suite) {
-            Some(above) => println!(
+            Some(above) => out!(
                 "{} {} from {} applies there now",
                 above.suite,
                 above.version,
                 tilde(&paths, &above.envrc)
             ),
-            None => println!("no {} pin applies there now", args.suite),
+            None => out!("no {} pin applies there now", args.suite),
         },
         Err(e) => return report(e),
     }
@@ -175,17 +177,17 @@ pub fn list(args: &PinsArgs) -> ExitCode {
         }
     }
     if args.json {
-        println!("{:#}", resolution_json(&folder, &resolution, &statuses));
+        out!("{:#}", resolution_json(&folder, &resolution, &statuses));
         return ExitCode::SUCCESS;
     }
     if statuses.is_empty() {
-        println!(
+        out!(
             "no Project pins in {}: the installed Suites' versions apply",
             tilde(&paths, &folder)
         );
     }
     for status in &statuses {
-        println!(
+        out!(
             "{} {}  from {}  ({})",
             status.pin.suite,
             status.pin.version,
@@ -194,7 +196,7 @@ pub fn list(args: &PinsArgs) -> ExitCode {
         );
     }
     for hidden in &resolution.hidden {
-        println!(
+        out!(
             "{} {} in {} doesn't reach here: {} has no `source_up`",
             hidden.pin.suite,
             hidden.pin.version,
@@ -219,18 +221,18 @@ fn all(paths: &Paths, pins: &Pins, json: bool) -> ExitCode {
     }
     if json {
         let rows: Vec<Value> = statuses.iter().map(status_json).collect();
-        println!("{:#}", Value::Array(rows));
+        out!("{:#}", Value::Array(rows));
         return ExitCode::SUCCESS;
     }
     if statuses.is_empty() {
-        println!(
+        out!(
             "no Project pins under {}; add one with `kubaos pin SUITE VERSION FOLDER`",
             tilde(paths, &paths.projects_root())
         );
     }
     for status in &statuses {
         let folder = status.pin.envrc.parent().unwrap_or(&status.pin.envrc);
-        println!(
+        out!(
             "{}  {} {}  ({})",
             tilde(paths, folder),
             status.pin.suite,
@@ -329,7 +331,7 @@ fn report_pin(paths: &Paths, e: PinError) -> ExitCode {
     };
     let code = report(e);
     if let Some(hint) = hint {
-        eprintln!("kubaos: {hint}");
+        err!("kubaos: {hint}");
     }
     code
 }
@@ -341,7 +343,7 @@ fn warn_overridden(paths: &Paths, resolution: &Resolution, suite: &str, envrc: &
         return;
     };
     if winner.envrc != envrc {
-        println!(
+        out!(
             "but {} {} from {} wins there: its `source_up` comes after the pin; move the pin below it",
             winner.suite,
             winner.version,

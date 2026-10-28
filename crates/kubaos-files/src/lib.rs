@@ -16,8 +16,6 @@
 //! - yazi's settings and keys: the user layer, `~/.config/kubaos/tools/yazi/`.
 //! - The Command menu's Files Items: `crates/kotodama-kubaos/src/files.rs`.
 
-#![forbid(unsafe_code)]
-
 pub mod entry;
 pub mod service;
 pub mod tidy;

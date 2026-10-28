@@ -4,8 +4,8 @@
 //!
 //! # Owns
 //!
-//! - The rules: nothing reaches kdeconnectd while the link is off, a pairing is accepted only
-//!   for a device that asked, and which paired phone a send goes to.
+//! - The rules: nothing reaches kdeconnectd while the link is off, a pairing is accepted only for a
+//!   device that asked, and which paired phone a send goes to.
 //! - The words for each refusal ([`Error`], [`Error::hint`]).
 //!
 //! # Not here
@@ -111,10 +111,7 @@ impl Error {
 pub fn status(link: &mut dyn Link) -> Status {
     let on = link.is_on();
     let running = on && link.running();
-    let name = running
-        .then(|| link.name().ok())
-        .flatten()
-        .or_else(|| link.hostname());
+    let name = running.then(|| link.name().ok()).flatten().or_else(|| link.hostname());
     let devices = if running {
         link.devices().unwrap_or_default()
     } else {

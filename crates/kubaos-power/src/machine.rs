@@ -5,12 +5,13 @@
 //! # Owns
 //!
 //! - [`Machine`]: finding the CPU's policies, the GPUs, the laptop panels, the PCIe ASPM policy,
-//!   the USB devices, the Wi-Fi interfaces, the charge limit and the battery, and reading each;
-//!   the CPUs' cores and how fast each can go, sched_ext's state, and the scheduler's files.
+//!   the USB devices, the Wi-Fi interfaces, the charge limit and the battery, and reading each; the
+//!   CPUs' cores and how fast each can go, sched_ext's state, and the scheduler's files.
 //!
 //! # Not here
 //!
-//! - What to write: [`crate::writes`]. Writing it, as root: `system/files/power/kubaos-power-write`.
+//! - What to write: [`crate::writes`]. Writing it, as root:
+//!   `system/files/power/kubaos-power-write`.
 
 use std::fs;
 use std::path::Path;
@@ -66,8 +67,8 @@ impl UsbDevice {
                 .any(|class| NEVER_SUSPENDED_CLASSES.contains(&class.as_str()))
     }
 
-    /// Whether it stays awake in every stop: an input device, a printer, or a network adapter, whose
-    /// link drops and renegotiates when it suspends, as a dock's Ethernet does.
+    /// Whether it stays awake in every stop: an input device, a printer, or a network adapter,
+    /// whose link drops and renegotiates when it suspends, as a dock's Ethernet does.
     pub fn kept_awake(&self) -> bool {
         self.is_input()
             || self

@@ -11,6 +11,8 @@ path = "src/main.rs"
 
 [dependencies]
 kubaos-user-layer.workspace = true
+# The service's log, on stderr, which the journal keeps with each line's priority.
+log = "0.4"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

@@ -4,8 +4,8 @@
 //!
 //! # Owns
 //!
-//! - The update logs, `~/.local/state/kubaos/update/<date>-<command>.log`: their text, and how
-//!   many are kept.
+//! - The update logs, `~/.local/state/kubaos/update/<date>-<command>.log`: their text, and how many
+//!   are kept.
 //!
 //! # Not here
 //!
@@ -332,7 +332,11 @@ fn log_text(event: &UpdateEvent) -> Option<String> {
                 Outcome::Failed => "failed",
             };
             let detail = detail.as_ref().map(|d| format!(": {d}")).unwrap_or_default();
-            format!("== {} {word} in {:.1}s{detail}", phase.title(), *elapsed_ms as f64 / 1000.0)
+            format!(
+                "== {} {word} in {:.1}s{detail}",
+                phase.title(),
+                *elapsed_ms as f64 / 1000.0
+            )
         }
         UpdateEvent::Available {
             update,

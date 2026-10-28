@@ -2,6 +2,8 @@
 //! what the first login asked; `folders=` narrows the SSH keys (`folder=` is its older name,
 //! still read).
 
+use std::fmt::Write;
+
 use super::Error;
 use super::Host;
 use super::Paths;
@@ -62,7 +64,10 @@ impl Config {
     }
 
     pub fn render(&self) -> String {
-        self.lines.iter().map(|(k, v)| format!("{k}={v}\n")).collect()
+        self.lines.iter().fold(String::new(), |mut out, (k, v)| {
+            let _ = writeln!(out, "{k}={v}");
+            out
+        })
     }
 
     /// Writes it back, mode 0600.
@@ -75,4 +80,3 @@ impl Config {
             .map_err(|e| Error::write(&paths.config, e))
     }
 }
-

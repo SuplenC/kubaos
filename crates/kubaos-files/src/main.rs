@@ -20,8 +20,6 @@
 //!
 //! - Everything else: the library's modules.
 
-#![forbid(unsafe_code)]
-
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::process::Command;
@@ -48,6 +46,11 @@ serve  org.freedesktop.FileManager1 on the session bus, for D-Bus to start
 tidy   sort Downloads into folders by kind, leaving files younger than a day;
        --scheduled only when the daily tidy is on; on|off turns the daily tidy on or off";
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The help and the usage are the command's output, for whoever ran it."
+)]
 fn main() -> ExitCode {
     let mut args = std::env::args_os().skip(1);
     let command = args.next();
@@ -77,6 +80,10 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A path that can't be opened is the command's answer to whoever ran it."
+)]
 fn open(args: &[OsString]) -> ExitCode {
     let resolver = Resolver::from_env();
     if args.is_empty() {
@@ -95,6 +102,10 @@ fn open(args: &[OsString]) -> ExitCode {
     show(&paths)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The refusal is the command's answer to whoever ran it."
+)]
 fn show(paths: &[PathBuf]) -> ExitCode {
     match window::open(paths) {
         Ok(()) => ExitCode::SUCCESS,
@@ -141,6 +152,11 @@ fn home_and_config() -> (PathBuf, PathBuf) {
 
 /// Tidies Downloads, and says how it went in a notification, as the menu and the timer start it
 /// with no terminal. A scheduled run with nothing to move stays quiet.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The count moved or the refusal is the command's answer, beside its notification."
+)]
 fn tidy_downloads(scheduled: bool) -> ExitCode {
     let (home, config) = home_and_config();
     if scheduled && !Setting::new(&config).daily() {
@@ -156,7 +172,10 @@ fn tidy_downloads(scheduled: bool) -> ExitCode {
                 1 => "Tidied 1 file in Downloads".to_owned(),
                 _ => format!("Tidied {moved} files in Downloads"),
             };
-            notify(&summary, "Sorted into Images, Documents, Archives, Installers, Video and Audio.");
+            notify(
+                &summary,
+                "Sorted into Images, Documents, Archives, Installers, Video and Audio.",
+            );
             ExitCode::SUCCESS
         }
         Err(err) => {
@@ -167,6 +186,11 @@ fn tidy_downloads(scheduled: bool) -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The setting's new state or the refusal is the command's answer to whoever ran it."
+)]
 fn set_daily(on: bool) -> ExitCode {
     let (_, config) = home_and_config();
     match Setting::new(config).set_daily(on) {

@@ -38,7 +38,10 @@ pub fn recolour(svg: &str, colors: &Colors) -> String {
         let at = i + offset;
         let hex = bytes.get(at + 1..at + 7);
         let replacement = hex.and_then(|hex| {
-            table.iter().find(|(colour, _)| hex.eq_ignore_ascii_case(*colour)).map(|(_, rgb)| rgb)
+            table
+                .iter()
+                .find(|(colour, _)| hex.eq_ignore_ascii_case(*colour))
+                .map(|(_, rgb)| rgb)
         });
         match replacement {
             Some(rgb) => {

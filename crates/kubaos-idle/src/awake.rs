@@ -1,8 +1,8 @@
 //! Keep awake: no lock, screens off or suspend after a time idle, for a while or until turned
 //! off. It is an `idle` inhibitor of logind's, held by `systemd-inhibit` around `kubaos-idle awake
 //! hold`, which hypridle honours (`ignore_systemd_inhibit` stays off). hypridle keeps running, so
-//! the lock before a suspend and a lock asked for still work, and a scheduled lock, suspend, shut down or reboot
-//! still fires.
+//! the lock before a suspend and a lock asked for still work, and a scheduled lock, suspend, shut
+//! down or reboot still fires.
 //!
 //! Its state is a file in the runtime dir the bar watches, replaced whole on every change:
 //!
@@ -11,7 +11,8 @@
 //! ```
 //!
 //! `until` is when it ends, in seconds since the epoch, 0 until turned off. The holder runs as the
-//! systemd user unit [`UNIT`], so it outlives the menu and the shell, and stopping the unit ends it.
+//! systemd user unit [`UNIT`], so it outlives the menu and the shell, and stopping the unit ends
+//! it.
 //!
 //! # Owns
 //!

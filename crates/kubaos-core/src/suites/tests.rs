@@ -378,7 +378,10 @@ fn removing_lists_the_user_layer_files_that_mention_the_suite() {
     let h = home();
     h.suites.add(&DEMO, &OptionsChange::default()).unwrap();
     let layer = h.paths.user_layer();
-    write(&layer.join("terminal/zsh/zshrc"), "export PATH=$HOME/demo-ls/bin:$PATH\n");
+    write(
+        &layer.join("terminal/zsh/zshrc"),
+        "export PATH=$HOME/demo-ls/bin:$PATH\n",
+    );
     write(&layer.join("tools/git/config"), "[user]\n  name = Demonstration\n");
     write(
         &layer.join("home/home.nix"),

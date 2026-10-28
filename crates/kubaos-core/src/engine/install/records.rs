@@ -59,7 +59,7 @@ impl Install<'_> {
         for name in self.migrations("user") {
             self.write(&format!("{user}/{name}"), &marker, 0o644)?;
         }
-        self.sh(crate::engine::runner::Cmd::new("chown").args(["-R", owner, &self.ts(&format!("{home}/.local"))]))?;
+        self.sh(&crate::engine::runner::Cmd::new("chown").args(["-R", owner, &self.ts(&format!("{home}/.local"))]))?;
         Ok(())
     }
 
@@ -104,13 +104,13 @@ impl Install<'_> {
             "--list",
             "v*",
         ]);
-        let Ok(out) = self.sh(list) else {
+        let Ok(out) = self.sh(&list) else {
             return Channel::Edge;
         };
         let tags: Vec<String> = out.stdout.lines().map(|t| t.trim().to_owned()).collect();
         for tag in tags.iter().filter(|t| Version::parse(t).is_ok()) {
             let verify = self.chroot(&["git", "-C", PAYLOAD_KUBAOS, "-c", &config, "verify-tag", tag]);
-            if self.sh(verify).is_ok() {
+            if self.sh(&verify).is_ok() {
                 return Channel::Stable;
             }
         }
@@ -122,7 +122,7 @@ impl Install<'_> {
     fn migrations(&mut self, kind: &str) -> Vec<String> {
         let dir = format!("{PAYLOAD_KUBAOS}/migrations/{kind}");
         let list = self.chroot(&["find", &dir, "-mindepth", "1", "-maxdepth", "1", "-printf", "%f\n"]);
-        match self.sh(list) {
+        match self.sh(&list) {
             Ok(out) => out
                 .stdout
                 .lines()

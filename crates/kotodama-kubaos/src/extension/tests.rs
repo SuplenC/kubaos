@@ -259,9 +259,15 @@ fn a_drive_item_comes_last_and_ejects_through_the_extension() {
         &BTreeMap::new(),
     );
 
-    assert_eq!(ids(&extension).last().map(String::as_str), Some("drive:SanDisk_Ultra_1234"));
+    assert_eq!(
+        ids(&extension).last().map(String::as_str),
+        Some("drive:SanDisk_Ultra_1234")
+    );
     assert_eq!(ran, Ok(Ran::Close));
-    assert_eq!(extension.runner.launched.borrow()[0].0, ["kubaos-automount", "eject", STICK]);
+    assert_eq!(
+        extension.runner.launched.borrow()[0].0,
+        ["kubaos-automount", "eject", STICK]
+    );
 }
 
 #[test]

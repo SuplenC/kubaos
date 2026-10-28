@@ -57,7 +57,7 @@ impl Service {
     /// Starts pairing `device`, and returns at once: the state file follows the pairing.
     #[expect(
         clippy::needless_pass_by_value,
-        reason = "zbus passes a method its arguments by value"
+        reason = "A zbus interface gets its arguments by value."
     )]
     fn pair(&self, device: OwnedObjectPath) -> fdo::Result<()> {
         let device = bluez_object(&device)?;
@@ -165,9 +165,7 @@ pub async fn run() -> Result<(), RunError> {
         .map_err(RunError::Session)?;
 
     hub.publish();
-    bluez::keep_registered(&bluez, &hub)
-        .await
-        .map_err(RunError::Follow)
+    bluez::keep_registered(&bluez, &hub).await.map_err(RunError::Follow)
 }
 
 /// The agent is unreachable or turned the call down.
@@ -197,8 +195,7 @@ where
         Err(zbus::Error::MethodError(name, _, _))
             if matches!(
                 name.as_str(),
-                "org.freedesktop.DBus.Error.ServiceUnknown"
-                    | "org.freedesktop.DBus.Error.NameHasNoOwner"
+                "org.freedesktop.DBus.Error.ServiceUnknown" | "org.freedesktop.DBus.Error.NameHasNoOwner"
             ) =>
         {
             Err(CallError::NotRunning)

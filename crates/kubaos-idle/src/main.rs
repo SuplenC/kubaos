@@ -25,14 +25,12 @@
 //!
 //! # Owns
 //!
-//! - The command line, running the programs, the toasts, and the holders' loops (`awake hold`,
-//!   `lid hold`, which run as systemd user units under `systemd-inhibit`).
+//! - The command line, running the programs, the toasts, and the holders' loops (`awake hold`, `lid
+//!   hold`, which run as systemd user units under `systemd-inhibit`).
 //!
 //! # Not here
 //!
 //! - The settings, the listeners, the lid's decision and the states: the library's modules.
-
-#![forbid(unsafe_code)]
 
 use std::env;
 use std::error::Error;
@@ -124,6 +122,11 @@ impl Toast {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The help and the usage are the command's output, for whoever ran it."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -177,6 +180,10 @@ fn main() -> ExitCode {
 }
 
 /// A refusal on stderr and in a toast, exit 1.
+#[expect(
+    clippy::print_stderr,
+    reason = "The refusal is the command's answer, on stderr beside its toast."
+)]
 fn report(from: Toast, result: Result<(), String>) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -201,6 +208,10 @@ fn chain(err: &dyn Error) -> String {
 }
 
 /// Says `body` on stdout and in a toast.
+#[expect(
+    clippy::print_stdout,
+    reason = "What a change came to is the command's answer, on stdout beside its toast."
+)]
 fn say(from: Toast, body: &str) {
     println!("{body}");
     notify(from, body, false);
@@ -239,6 +250,10 @@ fn this_program() -> String {
     env::current_exe().map_or_else(|_| "kubaos-idle".to_owned(), |exe| exe.to_string_lossy().into_owned())
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "The status is the command's output, for the person or the menu that asked."
+)]
 fn status() {
     let (settings, problem) = load();
     if let Some(problem) = problem {
@@ -334,6 +349,10 @@ fn home() -> Result<PathBuf, String> {
         .ok_or_else(|| "HOME isn't set".to_owned())
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A settings file that can't be read is the command's warning to whoever ran it."
+)]
 fn write_listeners() -> Result<(), String> {
     let (settings, problem) = load();
     if let Some(problem) = problem {
@@ -369,6 +388,10 @@ fn restart_hypridle() {
         .status();
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The login's idle start says on stderr, which the journal keeps, what kept hypridle from its listeners; the process then becomes hypridle."
+)]
 fn session() -> ExitCode {
     let (settings, problem) = load();
     if let Some(problem) = problem {

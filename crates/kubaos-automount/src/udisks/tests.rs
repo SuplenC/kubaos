@@ -22,7 +22,10 @@ fn path(path: &str) -> OwnedValue {
 }
 
 fn properties(pairs: Vec<(&str, OwnedValue)>) -> HashMap<String, OwnedValue> {
-    pairs.into_iter().map(|(name, value)| (name.to_owned(), value)).collect()
+    pairs
+        .into_iter()
+        .map(|(name, value)| (name.to_owned(), value))
+        .collect()
 }
 
 fn stick_partition(mounts: Vec<&str>, configuration: Vec<(String, HashMap<String, Value<'static>>)>) -> Interfaces {
@@ -74,7 +77,10 @@ fn stick() -> Interfaces {
 #[test]
 fn a_mounted_partition_and_its_drive_are_read_from_udisks_properties() {
     let objects = vec![
-        ("/org/freedesktop/UDisks2/block_devices/sdb1".to_owned(), stick_partition(vec!["/media/kuba/PHOTOS"], vec![])),
+        (
+            "/org/freedesktop/UDisks2/block_devices/sdb1".to_owned(),
+            stick_partition(vec!["/media/kuba/PHOTOS"], vec![]),
+        ),
         (STICK.to_owned(), stick()),
     ];
 
@@ -97,7 +103,10 @@ fn a_mounted_partition_and_its_drive_are_read_from_udisks_properties() {
 #[test]
 fn an_fstab_entry_marks_the_block_configured() {
     let fstab = vec![("fstab".to_owned(), HashMap::new())];
-    let objects = vec![("/org/freedesktop/UDisks2/block_devices/sdb1".to_owned(), stick_partition(vec![], fstab))];
+    let objects = vec![(
+        "/org/freedesktop/UDisks2/block_devices/sdb1".to_owned(),
+        stick_partition(vec![], fstab),
+    )];
 
     let snapshot = Snapshot::from_objects(objects);
 

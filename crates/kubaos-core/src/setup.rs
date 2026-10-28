@@ -25,14 +25,21 @@ mod parse;
 
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
-pub use crate::engine::runner::{Cmd, Output, Stream};
+pub use self::actions::YKMAN_PREP;
+pub use self::actions::git_identity_ok;
+pub use self::actions::mok_password_ok;
+pub use self::actions::run;
+pub use self::detect::card_status;
+pub use self::detect::online;
+pub use self::detect::status;
+pub use self::parse::*;
+pub use crate::engine::runner::Cmd;
+pub use crate::engine::runner::Output;
+pub use crate::engine::runner::Stream;
 use crate::event::Level;
-
-pub use actions::{YKMAN_PREP, git_identity_ok, mok_password_ok, run};
-pub use detect::{card_status, online, status};
-pub use parse::*;
 
 /// Where the engine puts the privileged helper (install/firstboot/).
 pub const HELPER: &str = "/usr/lib/kubaos/setup-helper";
@@ -142,7 +149,7 @@ pub enum Facts {
     Yubikey {
         /// The plugged-in YubiKeys, by USB product name.
         plugged: Vec<String>,
-        /// Credentials in /etc/u2f_mappings for this user.
+        /// Credentials in `/etc/u2f_mappings` for this user.
         enrolled: usize,
         /// The plugged-in key is one of them.
         this_key_enrolled: bool,
@@ -264,10 +271,21 @@ pub enum SetupEvent {
 }
 
 impl SetupEvent {
+    /// The event as one line of JSON, without the newline.
+    ///
+    /// # Panics
+    ///
+    /// If `serde_json` refuses the event; its fields are plain data with string keys, which it
+    /// always takes.
     pub fn to_json_line(&self) -> String {
         serde_json::to_string(self).expect("events always serialize")
     }
 
+    /// Reads an event from one line of JSON.
+    ///
+    /// # Errors
+    ///
+    /// When `line` isn't an event.
     pub fn from_json_line(line: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(line)
     }
@@ -346,10 +364,7 @@ pub struct BwLogin {
 impl std::fmt::Debug for Inputs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Inputs")
-            .field(
-                "mok_password",
-                &self.mok_password.as_ref().map(|_| "<secret>"),
-            )
+            .field("mok_password", &self.mok_password.as_ref().map(|_| "<secret>"))
             .field("finger", &self.finger)
             .field("bw", &self.bw)
             .field("bw_folders", &self.bw_folders)
@@ -383,9 +398,7 @@ pub struct Env {
 
 impl Env {
     pub fn current() -> Env {
-        let home = std::env::var_os("HOME")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| PathBuf::from("/"));
+        let home = std::env::var_os("HOME").map_or_else(|| PathBuf::from("/"), PathBuf::from);
         let user = std::env::var("USER")
             .or_else(|_| std::env::var("LOGNAME"))
             .unwrap_or_default();
@@ -437,11 +450,23 @@ pub trait Sys {
     fn exists(&mut self, path: &str) -> bool;
     /// Entry names in a directory (not paths), sorted.
     fn list(&mut self, dir: &str) -> Vec<String>;
-    /// Run to completion; a non-zero exit is `Err` with the output's tail.
+    /// Run to completion.
+    ///
+    /// # Errors
+    ///
+    /// When the command can't start, or exits non-zero: the output's tail.
     fn run(&mut self, cmd: &Cmd) -> Result<Output, String>;
     /// Run, handing over each output line as it comes.
+    ///
+    /// # Errors
+    ///
+    /// When the command can't start, or exits non-zero.
     fn stream(&mut self, cmd: &Cmd, f: &mut dyn FnMut(Stream)) -> Result<(), String>;
     /// Write a user-owned file (mode 0600 for anything under ~/.config).
+    ///
+    /// # Errors
+    ///
+    /// When the file can't be written.
     fn write(&mut self, path: &str, contents: &str) -> Result<(), String>;
     /// Last-resort online check when NetworkManager can't answer.
     fn reachable(&mut self) -> bool {
@@ -454,7 +479,7 @@ pub trait Sys {
 }
 
 /// The real machine.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RealSys {
     runner: crate::engine::runner::SystemRunner,
     bitwarden: crate::bitwarden::Real,
@@ -481,7 +506,7 @@ impl Sys for RealSys {
     fn list(&mut self, dir: &str) -> Vec<String> {
         let mut v: Vec<String> = std::fs::read_dir(dir)
             .map(|rd| {
-                rd.filter_map(|e| e.ok())
+                rd.filter_map(Result::ok)
                     .map(|e| e.file_name().to_string_lossy().into_owned())
                     .collect()
             })
@@ -507,7 +532,8 @@ impl Sys for RealSys {
     }
 
     fn reachable(&mut self) -> bool {
-        use std::net::{SocketAddr, TcpStream};
+        use std::net::SocketAddr;
+        use std::net::TcpStream;
         use std::time::Duration;
         // No DNS on purpose: it can't time out. Cloudflare's and Quad9's
         // resolvers answer on 443.
@@ -528,6 +554,10 @@ impl Sys for RealSys {
 
 /// Writes the marker. Setup then stays closed at login; `kubaos-setup`
 /// still opens it.
+///
+/// # Errors
+///
+/// When the marker can't be written.
 pub fn mark_done(sys: &mut dyn Sys, env: &Env) -> Result<(), String> {
     let p = env.marker();
     sys.write(

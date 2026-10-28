@@ -2,13 +2,20 @@
 //! zoneinfo, nmcli and the payload manifest. Works unprivileged.
 
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 use serde::Deserialize;
 
-use super::disk::{GIB, Part, PartTable};
-use crate::probe::{DiskInfo, Manifest, PartitionInfo, Probe, WifiNetwork};
+use super::disk::GIB;
+use super::disk::Part;
+use super::disk::PartTable;
+use crate::probe::DiskInfo;
+use crate::probe::Manifest;
+use crate::probe::PartitionInfo;
+use crate::probe::Probe;
+use crate::probe::WifiNetwork;
 
 pub const DEFAULT_PAYLOAD_DIR: &str = "/run/kubaos/payload";
 
@@ -97,9 +104,7 @@ fn flag<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
 
 impl BlockDev {
     pub fn dev_path(&self) -> String {
-        self.path
-            .clone()
-            .unwrap_or_else(|| format!("/dev/{}", self.name))
+        self.path.clone().unwrap_or_else(|| format!("/dev/{}", self.name))
     }
 
     pub fn mounts(&self) -> Vec<String> {
@@ -124,10 +129,10 @@ impl BlockDev {
         let pt = self.parttype.as_deref().unwrap_or("").to_ascii_lowercase();
         let fs = self.fstype.as_deref().unwrap_or("");
         let hint = match (pt.as_str(), fs) {
-            ("c12a7328-f81f-11d2-ba4b-00a0c93ec93b", _) | ("0xef", _) => "EFI system",
+            ("c12a7328-f81f-11d2-ba4b-00a0c93ec93b" | "0xef", _) => "EFI system",
             ("e3c9e316-0b5c-4db8-817d-f92df00215ae", _) => "Windows (reserved)",
             ("de94bba4-06d1-4d40-a16a-bfd50179d6ac", _) => "Windows recovery",
-            (_, "ntfs") | (_, "BitLocker") => "Windows",
+            (_, "ntfs" | "BitLocker") => "Windows",
             (_, "crypto_LUKS") => "Encrypted (LUKS)",
             (_, "btrfs" | "ext4" | "xfs" | "LVM2_member") => "Linux",
             (_, "swap") => "Linux swap",
@@ -192,11 +197,17 @@ pub fn in_use(l: &Lsblk, disk: &str) -> InUse {
     u
 }
 
+/// Reads the output of `lsblk --json`.
+///
+/// # Errors
+///
+/// When `json` isn't `lsblk`'s JSON.
 pub fn parse_lsblk(json: &str) -> Result<Lsblk, String> {
     serde_json::from_str(json).map_err(|e| format!("can't parse lsblk --json: {e}"))
 }
 
-pub const LSBLK_COLUMNS: &str = "NAME,PATH,TYPE,SIZE,MODEL,RM,RO,TRAN,FSTYPE,LABEL,PARTTYPE,PARTLABEL,PTTYPE,START,MOUNTPOINTS,PKNAME";
+pub const LSBLK_COLUMNS: &str =
+    "NAME,PATH,TYPE,SIZE,MODEL,RM,RO,TRAN,FSTYPE,LABEL,PARTTYPE,PARTLABEL,PTTYPE,START,MOUNTPOINTS,PKNAME";
 
 /// Mount points that mean "this is the stick we booted from".
 const LIVE_MOUNTS: [&str; 5] = [
@@ -209,11 +220,7 @@ const LIVE_MOUNTS: [&str; 5] = [
 
 /// Disks for `Probe`. `boot_devs` are device names (any level) that hold
 /// the live system or the payload; their top-level disk is the boot medium.
-pub fn disks_from_lsblk(
-    l: &Lsblk,
-    boot_devs: &BTreeSet<String>,
-    include_loop: bool,
-) -> Vec<DiskInfo> {
+pub fn disks_from_lsblk(l: &Lsblk, boot_devs: &BTreeSet<String>, include_loop: bool) -> Vec<DiskInfo> {
     l.blockdevices
         .iter()
         .filter(|d| d.type_ == "disk" || (include_loop && d.type_ == "loop"))
@@ -221,10 +228,7 @@ pub fn disks_from_lsblk(
         .map(|d| {
             let all = d.walk();
             let is_boot = all.iter().any(|x| {
-                boot_devs.contains(&x.name)
-                    || x.mounts()
-                        .iter()
-                        .any(|m| LIVE_MOUNTS.contains(&m.as_str()) || m == "/")
+                boot_devs.contains(&x.name) || x.mounts().iter().any(|m| LIVE_MOUNTS.contains(&m.as_str()) || m == "/")
             });
             let partitions = d
                 .children
@@ -274,10 +278,7 @@ fn boot_device_names(payload_dir: &Path) -> BTreeSet<String> {
         if seen > 32 || !t.exists() {
             continue;
         }
-        let Some(src) = command_stdout(
-            "findmnt",
-            &["-no", "SOURCE", "--target", &t.to_string_lossy()],
-        ) else {
+        let Some(src) = command_stdout("findmnt", &["-no", "SOURCE", "--target", &t.to_string_lossy()]) else {
             continue;
         };
         // "/dev/sda1[/subdir]" for bind mounts; keep the device.
@@ -342,16 +343,11 @@ fn keymaps() -> Vec<String> {
         }
     }
     command_stdout("localectl", &["list-x11-keymap-layouts"])
-        .map(|s| {
-            s.lines()
-                .map(str::to_string)
-                .filter(|l| !l.is_empty())
-                .collect()
-        })
+        .map(|s| s.lines().map(str::to_string).filter(|l| !l.is_empty()).collect())
         .unwrap_or_default()
 }
 
-/// Zone names under a zoneinfo tree: TZif files, minus the `posix/` and
+/// Zone names under a zoneinfo tree: `TZif` files, minus the `posix/` and
 /// `right/` copies.
 pub fn timezones_in(root: &Path) -> Vec<String> {
     fn walk(root: &Path, dir: &Path, out: &mut Vec<String>) {
@@ -360,11 +356,7 @@ pub fn timezones_in(root: &Path) -> Vec<String> {
         };
         for e in rd.flatten() {
             let p = e.path();
-            let rel = p
-                .strip_prefix(root)
-                .unwrap_or(&p)
-                .to_string_lossy()
-                .into_owned();
+            let rel = p.strip_prefix(root).unwrap_or(&p).to_string_lossy().into_owned();
             if rel == "posix" || rel == "right" || rel.starts_with('.') {
                 continue;
             }
@@ -443,30 +435,29 @@ pub fn parse_nmcli_wifi(s: &str) -> Vec<WifiNetwork> {
 }
 
 fn split_nmcli(line: &str) -> Vec<String> {
-    let mut out = vec![String::new()];
+    let mut out = Vec::new();
+    let mut field = String::new();
     let mut esc = false;
     for c in line.chars() {
         if esc {
-            out.last_mut().unwrap().push(c);
+            field.push(c);
             esc = false;
         } else if c == '\\' {
             esc = true;
         } else if c == ':' {
-            out.push(String::new());
+            out.push(std::mem::take(&mut field));
         } else {
-            out.last_mut().unwrap().push(c);
+            field.push(c);
         }
     }
+    out.push(field);
     out
 }
 
 fn wifi() -> Vec<WifiNetwork> {
-    command_stdout(
-        "nmcli",
-        &["-t", "-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list"],
-    )
-    .map(|s| parse_nmcli_wifi(&s))
-    .unwrap_or_default()
+    command_stdout("nmcli", &["-t", "-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list"])
+        .map(|s| parse_nmcli_wifi(&s))
+        .unwrap_or_default()
 }
 
 fn online() -> bool {
@@ -475,6 +466,11 @@ fn online() -> bool {
 
 // ---------------------------------------------------------------------------
 
+/// Reads `manifest.json` in the payload directory `dir`.
+///
+/// # Errors
+///
+/// The file and why, when it can't be read or isn't a manifest.
 pub fn load_manifest(dir: &Path) -> Result<Manifest, String> {
     let p = dir.join("manifest.json");
     let s = std::fs::read_to_string(&p).map_err(|e| format!("{}: {e}", p.display()))?;
@@ -489,20 +485,27 @@ pub fn uefi() -> bool {
     Path::new("/sys/firmware/efi").exists() || test_mode()
 }
 
+/// Lists the block devices with `lsblk`.
+///
+/// # Errors
+///
+/// When `lsblk` can't run, fails, or prints what [`parse_lsblk`] can't read.
 pub fn read_lsblk() -> Result<Lsblk, String> {
     let out = Command::new("lsblk")
         .args(["-J", "-b", "-o", LSBLK_COLUMNS])
         .output()
         .map_err(|e| format!("lsblk: {e}"))?;
     if !out.status.success() {
-        return Err(format!(
-            "lsblk: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ));
+        return Err(format!("lsblk: {}", String::from_utf8_lossy(&out.stderr).trim()));
     }
     parse_lsblk(&String::from_utf8_lossy(&out.stdout))
 }
 
+/// What the installer needs to know about the machine, with the payload in `payload_dir`.
+///
+/// # Errors
+///
+/// When the disks can't be listed ([`read_lsblk`]).
 pub fn probe(payload_dir: &Path) -> Result<Probe, String> {
     let lsblk = read_lsblk()?;
     let boot = boot_device_names(payload_dir);
@@ -568,22 +571,16 @@ mod tests {
         let stick = &disks[0];
         assert!(stick.is_boot_medium, "/cdrom is mounted from it");
         assert!(stick.removable);
-        assert!(
-            stick.free_regions.is_empty(),
-            "dos table: no free-space install"
-        );
+        assert!(stick.free_regions.is_empty(), "dos table: no free-space install");
         let nvme = &disks[1];
         assert!(!nvme.is_boot_medium);
         assert_eq!(nvme.model, "Samsung SSD 990 PRO 1TB");
         assert_eq!(nvme.partitions.len(), 4);
         assert_eq!(nvme.partitions[0].os_hint.as_deref(), Some("EFI system"));
         assert_eq!(nvme.partitions[2].os_hint.as_deref(), Some("Windows"));
-        assert_eq!(
-            nvme.partitions[3].os_hint.as_deref(),
-            Some("Windows recovery")
-        );
+        assert_eq!(nvme.partitions[3].os_hint.as_deref(), Some("Windows recovery"));
         assert_eq!(nvme.free_regions.len(), 1);
-        assert_eq!(nvme.free_regions[0].start, 524527616 * 512);
+        assert_eq!(nvme.free_regions[0].start, 524_527_616 * 512);
     }
 
     #[test]
@@ -607,7 +604,7 @@ mod tests {
         // pttype is null without udev, but partitions imply a table.
         assert_eq!(d.free_regions.len(), 1);
         let r = d.free_regions[0];
-        assert_eq!(r.start, (206848 + 8 * 1024 * 2048) * 512);
+        assert_eq!(r.start, (206_848 + 8 * 1024 * 2048) * 512);
         assert!(r.end <= 20 * GIB);
     }
 
@@ -631,10 +628,7 @@ mod tests {
     #[test]
     fn locales_list() {
         let s = "en_US.UTF-8 UTF-8\nen_US ISO-8859-1\nit_IT.UTF-8 UTF-8\nde_DE@euro ISO-8859-15\n";
-        assert_eq!(
-            parse_supported_locales(s),
-            vec!["en_US.UTF-8", "it_IT.UTF-8"]
-        );
+        assert_eq!(parse_supported_locales(s), vec!["en_US.UTF-8", "it_IT.UTF-8"]);
     }
 
     #[test]

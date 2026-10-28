@@ -159,7 +159,10 @@ fn only_removable_drives_with_a_mount_are_offered_for_eject() {
         vec![MountedDrive {
             drive: STICK.to_owned(),
             name: "PHOTOS".to_owned(),
-            mount_points: vec![PathBuf::from("/media/kuba/PHOTOS"), PathBuf::from("/media/kuba/1234-ABCD")],
+            mount_points: vec![
+                PathBuf::from("/media/kuba/PHOTOS"),
+                PathBuf::from("/media/kuba/1234-ABCD")
+            ],
         }]
     );
 }
@@ -200,8 +203,17 @@ fn eject_finds_the_drive_by_any_name_the_user_has_for_it() {
     let blocks = [mounted(partition("sdb1", STICK), "/media/kuba/STICK")];
     let drives = [stick(), nvme()];
 
-    for target in [STICK, "/org/freedesktop/UDisks2/block_devices/sdb1", "/dev/sdb1", "/media/kuba/STICK"] {
-        assert_eq!(find_drive(target, &blocks, &drives).map(|drive| drive.path.as_str()), Some(STICK), "{target}");
+    for target in [
+        STICK,
+        "/org/freedesktop/UDisks2/block_devices/sdb1",
+        "/dev/sdb1",
+        "/media/kuba/STICK",
+    ] {
+        assert_eq!(
+            find_drive(target, &blocks, &drives).map(|drive| drive.path.as_str()),
+            Some(STICK),
+            "{target}"
+        );
     }
     assert_eq!(find_drive("/media/kuba/OTHER", &blocks, &drives), None);
 }

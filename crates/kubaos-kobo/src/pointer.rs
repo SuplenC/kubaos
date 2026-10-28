@@ -6,23 +6,40 @@
 //! way through. This wrapper tells the UI there's no pointer while `idle`,
 //! and hides it; moving or clicking the mouse brings it back.
 
-use iced::advanced::layout::{self, Layout};
+use iced::Element;
+use iced::Event;
+use iced::Length;
+use iced::Rectangle;
+use iced::Renderer;
+use iced::Size;
+use iced::Theme;
+use iced::Vector;
+use iced::advanced::Clipboard;
+use iced::advanced::Shell;
+use iced::advanced::layout;
+use iced::advanced::layout::Layout;
+use iced::advanced::mouse;
 use iced::advanced::overlay;
 use iced::advanced::renderer;
-use iced::advanced::widget::{Operation, Tree, Widget, tree};
-use iced::advanced::{Clipboard, Shell, mouse};
-use iced::{Element, Event, Length, Rectangle, Renderer, Size, Theme, Vector, window};
+use iced::advanced::widget::Operation;
+use iced::advanced::widget::Tree;
+use iced::advanced::widget::Widget;
+use iced::advanced::widget::tree;
+use iced::window;
 
 pub struct Idle<'a, Message> {
     content: Element<'a, Message>,
     idle: bool,
 }
 
+impl<Message> std::fmt::Debug for Idle<'_, Message> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Idle").field("idle", &self.idle).finish_non_exhaustive()
+    }
+}
+
 /// `content`, pointerless while `idle`.
-pub fn idle<'a, Message>(
-    content: impl Into<Element<'a, Message>>,
-    idle: bool,
-) -> Idle<'a, Message> {
+pub fn idle<'a, Message>(content: impl Into<Element<'a, Message>>, idle: bool) -> Idle<'a, Message> {
     Idle {
         content: content.into(),
         idle,
@@ -31,11 +48,7 @@ pub fn idle<'a, Message>(
 
 impl<Message> Idle<'_, Message> {
     fn cursor(&self, c: mouse::Cursor) -> mouse::Cursor {
-        if self.idle {
-            mouse::Cursor::Unavailable
-        } else {
-            c
-        }
+        if self.idle { mouse::Cursor::Unavailable } else { c }
     }
 }
 
@@ -64,25 +77,12 @@ impl<Message> Widget<Message, Theme, Renderer> for Idle<'_, Message> {
         self.content.as_widget().size_hint()
     }
 
-    fn layout(
-        &mut self,
-        tree: &mut Tree,
-        renderer: &Renderer,
-        limits: &layout::Limits,
-    ) -> layout::Node {
+    fn layout(&mut self, tree: &mut Tree, renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         self.content.as_widget_mut().layout(tree, renderer, limits)
     }
 
-    fn operate(
-        &mut self,
-        tree: &mut Tree,
-        layout: Layout<'_>,
-        renderer: &Renderer,
-        operation: &mut dyn Operation,
-    ) {
-        self.content
-            .as_widget_mut()
-            .operate(tree, layout, renderer, operation);
+    fn operate(&mut self, tree: &mut Tree, layout: Layout<'_>, renderer: &Renderer, operation: &mut dyn Operation) {
+        self.content.as_widget_mut().operate(tree, layout, renderer, operation);
     }
 
     fn update(
@@ -102,9 +102,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Idle<'_, Message> {
             Event::Window(window::Event::RedrawRequested(_)) => self.cursor(cursor),
             _ => cursor,
         };
-        self.content.as_widget_mut().update(
-            tree, event, layout, cursor, renderer, clipboard, shell, viewport,
-        );
+        self.content
+            .as_widget_mut()
+            .update(tree, event, layout, cursor, renderer, clipboard, shell, viewport);
     }
 
     fn mouse_interaction(
@@ -133,15 +133,9 @@ impl<Message> Widget<Message, Theme, Renderer> for Idle<'_, Message> {
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        self.content.as_widget().draw(
-            tree,
-            renderer,
-            theme,
-            style,
-            layout,
-            self.cursor(cursor),
-            viewport,
-        );
+        self.content
+            .as_widget()
+            .draw(tree, renderer, theme, style, layout, self.cursor(cursor), viewport);
     }
 
     fn overlay<'b>(

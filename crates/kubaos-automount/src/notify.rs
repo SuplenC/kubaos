@@ -96,7 +96,16 @@ impl Notifier {
                 PATH,
                 Some(NAME),
                 "Notify",
-                &(APP, 0_u32, note.icon, &note.summary, &note.body, actions, hints, SHELL_DECIDES),
+                &(
+                    APP,
+                    0_u32,
+                    note.icon,
+                    &note.summary,
+                    &note.body,
+                    actions,
+                    hints,
+                    SHELL_DECIDES,
+                ),
             )
             .await?;
         reply.body().deserialize::<u32>()

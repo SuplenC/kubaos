@@ -120,8 +120,12 @@ fn import_one(file: &Path, pictures: &Path) -> io::Result<bool> {
     let modified = metadata.modified()?;
     let month = exif_month(file).unwrap_or_else(|| month_of(modified));
     let folder = pictures.join(month.folder());
-    let name = file.file_name().ok_or_else(|| io::Error::from(io::ErrorKind::InvalidInput))?;
-    let target = match place(&folder, name, metadata.len(), |path| fs::metadata(path).ok().map(|meta| meta.len())) {
+    let name = file
+        .file_name()
+        .ok_or_else(|| io::Error::from(io::ErrorKind::InvalidInput))?;
+    let target = match place(&folder, name, metadata.len(), |path| {
+        fs::metadata(path).ok().map(|meta| meta.len())
+    }) {
         Placement::Already(_) => return Ok(false),
         Placement::Copy(target) => target,
     };
@@ -150,13 +154,18 @@ pub enum Placement {
 pub fn place(folder: &Path, name: &OsStr, size: u64, size_of: impl Fn(&Path) -> Option<u64>) -> Placement {
     let name = Path::new(name);
     let stem = name.file_stem().unwrap_or_default().to_string_lossy();
-    let extension = name.extension().map(|extension| format!(".{}", extension.to_string_lossy()));
+    let extension = name
+        .extension()
+        .map(|extension| format!(".{}", extension.to_string_lossy()));
     let mut clashes = 0_u64;
     loop {
         let candidate = if clashes == 0 {
             folder.join(name)
         } else {
-            folder.join(format!("{stem} ({clashes}){}", extension.as_deref().unwrap_or_default()))
+            folder.join(format!(
+                "{stem} ({clashes}){}",
+                extension.as_deref().unwrap_or_default()
+            ))
         };
         match size_of(&candidate) {
             None => return Placement::Copy(candidate),
@@ -183,7 +192,9 @@ pub fn parse_exif_month(text: &str) -> Option<Month> {
 /// The month `time` falls in, in UTC: KubaOS reads no time zone database here, and a photo taken
 /// in the last hours of a month in another zone lands in the next one at worst.
 pub fn month_of(time: SystemTime) -> Month {
-    let days = time.duration_since(UNIX_EPOCH).map_or(0, |since| since.as_secs() / 86_400);
+    let days = time
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |since| since.as_secs() / 86_400);
     civil(i64::try_from(days).unwrap_or(0))
 }
 
@@ -196,7 +207,11 @@ fn civil(days: i64) -> Month {
     let year_of_era = (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
     let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
     let shifted_month = (5 * day_of_year + 2) / 153;
-    let month = if shifted_month < 10 { shifted_month + 3 } else { shifted_month - 9 };
+    let month = if shifted_month < 10 {
+        shifted_month + 3
+    } else {
+        shifted_month - 9
+    };
     let year = year_of_era + era * 400 + i64::from(month <= 2);
     Month {
         year: i32::try_from(year).unwrap_or(i32::MAX),

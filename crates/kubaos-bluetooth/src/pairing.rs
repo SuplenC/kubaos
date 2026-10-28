@@ -44,8 +44,7 @@ pub const TIMED_OUT: &str = "Timed out";
 pub const CANCELLED: &str = "Cancelled";
 /// What the shell shows when bluetoothd refuses for want of a powered adapter. Only bluetoothd
 /// restarting gets it out of that state when the adapter is on, and that needs root.
-pub const NOT_READY: &str =
-    "Bluetooth isn't responding. Restart it: sudo systemctl restart bluetooth";
+pub const NOT_READY: &str = "Bluetooth isn't responding. Restart it: sudo systemctl restart bluetooth";
 
 /// Pairs devices, one attempt per device at a time.
 #[derive(Debug)]

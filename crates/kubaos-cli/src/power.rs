@@ -14,6 +14,8 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::process::ExitCode;
 
+use crate::out::err;
+
 /// The power stops' own command.
 const PROGRAM: &str = "kubaos-power";
 
@@ -21,6 +23,6 @@ const PROGRAM: &str = "kubaos-power";
 /// `kubaos power`'s.
 pub fn main(args: &[String]) -> ExitCode {
     let err = Command::new(PROGRAM).args(args).exec();
-    eprintln!("kubaos: couldn't run {PROGRAM} ({err}); a home-manager switch installs it (home/power.nix)");
+    err!("kubaos: couldn't run {PROGRAM} ({err}); a home-manager switch installs it (home/power.nix)");
     ExitCode::FAILURE
 }

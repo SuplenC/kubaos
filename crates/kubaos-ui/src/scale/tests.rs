@@ -33,6 +33,10 @@ fn every_length_is_whole_device_pixels_at_every_supported_scale() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The scales and strokes are the tokens' exact values: any difference is the bug."
+)]
 fn the_supported_scales_are_the_tokens() {
     assert_eq!(Scale::SUPPORTED.map(Scale::factor), tokens::SCALES);
 }
@@ -45,6 +49,10 @@ fn a_hairline_is_one_device_pixel_at_every_scale() {
 }
 
 #[test]
+#[expect(
+    clippy::float_cmp,
+    reason = "The scales and strokes are the tokens' exact values: any difference is the bug."
+)]
 fn the_thin_stroke_is_two_three_three_and_four_device_pixels() {
     let device = Scale::SUPPORTED.map(|scale| scale.to_device(scale.thin()));
 

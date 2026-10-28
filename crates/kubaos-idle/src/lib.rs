@@ -21,10 +21,8 @@
 //!
 //! - Running programs, the holders' loops and the command line: `main.rs`.
 //! - Reading durations and times of day: `kubaos_clock::duration` and `kubaos_clock::alarm`.
-//! - The menu's Items: `crates/kotodama-kubaos/src/idle.rs` and `config/kotodama/kubaos.toml`.
-//!   The bar's markers: `config/quickshell/services/Idle.qml`.
-
-#![forbid(unsafe_code)]
+//! - The menu's Items: `crates/kotodama-kubaos/src/idle.rs` and `config/kotodama/kubaos.toml`. The
+//!   bar's markers: `config/quickshell/services/Idle.qml`.
 
 pub mod awake;
 pub mod hypridle;

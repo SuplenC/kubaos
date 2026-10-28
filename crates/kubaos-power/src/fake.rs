@@ -22,8 +22,9 @@ impl FakeRoot {
 
     /// The reference laptop as it stood on 2026-10-27, on battery in Power Saver: two CPU
     /// policies, amdgpu's card1 with eDP-1, ASPM at `default`, a webcam, a Logitech receiver, an
-    /// Ethernet adapter, a card reader, a hub and a security key, Wi-Fi, TUXEDO's charging profile and a battery
-    /// drawing 16.8 W. Its 24 CPUs are the Ryzen AI 9 HX 370's, and sched_ext is there, disabled.
+    /// Ethernet adapter, a card reader, a hub and a security key, Wi-Fi, TUXEDO's charging profile
+    /// and a battery drawing 16.8 W. Its 24 CPUs are the Ryzen AI 9 HX 370's, and sched_ext is
+    /// there, disabled.
     pub fn laptop() -> FakeRoot {
         let root = FakeRoot::empty();
         root.hx370();

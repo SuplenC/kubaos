@@ -1,7 +1,8 @@
 //! The fixed step list. Titles are what Kōbō shows; weights are rough
 //! shares of total time on the laptop.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 use crate::event::StepInfo;
 

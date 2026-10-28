@@ -38,14 +38,8 @@ fn a_comma_separated_list_reads_both_ways() {
 fn the_file_holds_every_layout_the_first_the_default() {
     let text = default_keyboard(&[l("us"), l("it(intl)")]);
 
-    assert!(
-        text.contains("XKBLAYOUT=\"us,it\"\nXKBVARIANT=\",intl\"\n"),
-        "{text}"
-    );
-    assert_eq!(
-        KeyboardFile::parse(&text).layouts,
-        vec![l("us"), l("it(intl)")]
-    );
+    assert!(text.contains("XKBLAYOUT=\"us,it\"\nXKBVARIANT=\",intl\"\n"), "{text}");
+    assert_eq!(KeyboardFile::parse(&text).layouts, vec![l("us"), l("it(intl)")]);
 }
 
 #[test]
@@ -69,29 +63,16 @@ fn a_list_has_one_to_four_known_layouts_each_once() {
     assert_eq!(problems(&[l("us"), l("it")], &known()), vec![]);
     assert_eq!(problems(&[], &known()), vec![LayoutsError::Empty]);
     assert_eq!(
-        problems(
-            &[l("us"), l("it"), l("de"), l("pl"), l("us(intl)")],
-            &known()
-        ),
+        problems(&[l("us"), l("it"), l("de"), l("pl"), l("us(intl)")], &known()),
         vec![LayoutsError::TooMany]
     );
     assert_eq!(
         problems(&[l("us"), l("us")], &known()),
         vec![LayoutsError::Twice("us".into())]
     );
-    assert_eq!(
-        problems(&[l("xx")], &known()),
-        vec![LayoutsError::Unknown("xx".into())]
-    );
-    assert_eq!(
-        problems(&[l("u\"s")], &known()),
-        vec![LayoutsError::Odd("u\"s".into())]
-    );
-    assert_eq!(
-        problems(&[l("xx")], &[]),
-        vec![],
-        "no list: any name passes"
-    );
+    assert_eq!(problems(&[l("xx")], &known()), vec![LayoutsError::Unknown("xx".into())]);
+    assert_eq!(problems(&[l("u\"s")], &known()), vec![LayoutsError::Odd("u\"s".into())]);
+    assert_eq!(problems(&[l("xx")], &[]), vec![], "no list: any name passes");
 }
 
 #[test]
@@ -107,18 +88,12 @@ fn changes_add_remove_and_reorder() {
         Change::Add(l("de")).apply(&now, &known()),
         Ok(vec![l("us"), l("it"), l("de")])
     );
-    assert_eq!(
-        Change::Remove(l("us")).apply(&now, &known()),
-        Ok(vec![l("it")])
-    );
+    assert_eq!(Change::Remove(l("us")).apply(&now, &known()), Ok(vec![l("it")]));
     assert_eq!(
         Change::MakeDefault(l("it")).apply(&now, &known()),
         Ok(vec![l("it"), l("us")])
     );
-    assert_eq!(
-        Change::Set(vec![l("pl")]).apply(&now, &known()),
-        Ok(vec![l("pl")])
-    );
+    assert_eq!(Change::Set(vec![l("pl")]).apply(&now, &known()), Ok(vec![l("pl")]));
 }
 
 #[test]
@@ -141,10 +116,7 @@ fn a_change_that_breaks_the_rules_is_refused() {
         Change::MakeDefault(l("de")).apply(&now, &known()),
         Err(LayoutsError::NotThere("de".into()))
     );
-    assert_eq!(
-        Change::Set(vec![]).apply(&now, &known()),
-        Err(LayoutsError::Empty)
-    );
+    assert_eq!(Change::Set(vec![]).apply(&now, &known()), Err(LayoutsError::Empty));
 }
 
 #[test]
@@ -153,10 +125,7 @@ fn names_come_from_the_rules_list() {
     let names = names(lst);
 
     assert_eq!(name(&l("it"), &names), "Italian");
-    assert_eq!(
-        name(&l("us(intl)"), &names),
-        "English (US, intl., with dead keys)"
-    );
+    assert_eq!(name(&l("us(intl)"), &names), "English (US, intl., with dead keys)");
     assert_eq!(name(&l("xx"), &names), "XX");
     assert!(!names.contains_key("pc105") && !names.contains_key("grp"));
 }
@@ -178,10 +147,7 @@ fn a_layout_moves_to_another_place() {
         Ok(vec![l("it"), l("us"), l("de")]),
         "the first place makes it the default"
     );
-    assert_eq!(
-        Change::Move(l("it"), 1).apply(&now, &known()),
-        Ok(now.clone())
-    );
+    assert_eq!(Change::Move(l("it"), 1).apply(&now, &known()), Ok(now.clone()));
 }
 
 #[test]
@@ -234,5 +200,8 @@ fn the_users_layouts_win_over_the_systems() {
 fn without_a_list_of_their_own_the_user_types_with_the_systems_layouts() {
     let system = KeyboardFile::parse("XKBLAYOUT=\"us,it\"\nXKBVARIANT=\",intl\"\n");
 
-    assert_eq!(layouts(&settings::Settings::default(), &system), [l("us"), l("it(intl)")]);
+    assert_eq!(
+        layouts(&settings::Settings::default(), &system),
+        [l("us"), l("it(intl)")]
+    );
 }

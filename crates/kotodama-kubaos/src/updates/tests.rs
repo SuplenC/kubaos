@@ -89,5 +89,8 @@ fn pending_apt_security_updates_show_in_the_update_subtitle_with_or_without_a_re
         with_release.as_deref(),
         Some("KubaOS 0.1.1 is ready, 2 apt security updates waiting")
     );
-    assert_eq!(alone.as_deref(), Some("Packages are due: 1 apt security update waiting"));
+    assert_eq!(
+        alone.as_deref(),
+        Some("Packages are due: 1 apt security update waiting")
+    );
 }

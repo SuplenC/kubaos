@@ -2,9 +2,12 @@
 //! can be built and screenshotted anywhere (macOS included).
 
 use std::thread::sleep;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
-use crate::{Event, Level, StepId};
+use crate::Event;
+use crate::Level;
+use crate::StepId;
 
 #[derive(Debug, Clone)]
 pub struct DemoOptions {
@@ -39,8 +42,7 @@ pub fn run(opts: &DemoOptions, emit: &mut dyn FnMut(Event)) -> bool {
             emit(Event::Progress {
                 id,
                 fraction: Some(i as f32 / ticks as f32),
-                detail: (id == StepId::Unpack)
-                    .then(|| format!("{:.1} / 9.4 GB", 9.4 * i as f32 / ticks as f32)),
+                detail: (id == StepId::Unpack).then(|| format!("{:.1} / 9.4 GB", 9.4 * i as f32 / ticks as f32)),
             });
             if i % 3 == 0 {
                 emit(Event::Log {
