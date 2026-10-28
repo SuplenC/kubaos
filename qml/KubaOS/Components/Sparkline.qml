@@ -1,11 +1,10 @@
 import QtQuick
 import KubaOS.Components as K
 
-// A line graph of the last minute of a series, in the theme's colours, filled
-// under the line: the system monitor's popup graphs and the bar pill's
-// sparklines. Points are [t, value] pairs, oldest first; the newest sits at
-// the right edge. It paints when a sample comes, its colour or size changes,
-// or it shows again; never per frame.
+// The last minute of a reading as a line, filled under it: `kubaos-ui`'s `meter::sparkline`. The
+// system monitor's graphs and the bar pill's sparklines. Points are [t, value] pairs, oldest
+// first; the newest sits at the right edge. It paints when a sample comes, its colour or size
+// changes, or it shows again; never per frame.
 Canvas {
     id: root
 
@@ -18,16 +17,25 @@ Canvas {
     property real max: 100
     // The time across, in ms.
     property real span: 60000
-    property color color: K.Tokens.color.primary
-    property color secondColor: K.Tokens.color.tertiary
+    property color color: Tokens.color.primary
+    property color secondColor: Tokens.color.tertiary
     property bool filled: true
     // Whether it takes the room a `K.Row` or `K.Stack` gives it.
-    property bool fillWidth: false
+    property bool fillWidth: true
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     // The line: the thin stroke, whole device pixels at every scale.
-    property real lineWidth: K.Look.thin(root.dpr)
-    // How strong the fill under the line is: an accent's tint under itself.
-    property real fillOpacity: K.Tokens.opacity.tint
+    readonly property real lineWidth: K.Look.thin(root.dpr)
+    readonly property var probe: ({
+            role: "component",
+            name: "Sparkline",
+            variant: "",
+            fixed: {
+                width: false,
+                height: true
+            }
+        })
+
+    implicitHeight: Tokens.size.sparkline
 
     onRevisionChanged: requestPaint()
     onColorChanged: requestPaint()
@@ -64,7 +72,7 @@ Canvas {
         ctx.lineTo(x(series[series.length - 1][0]), height);
         ctx.lineTo(x(series[0][0]), height);
         ctx.closePath();
-        ctx.globalAlpha = fillOpacity;
+        ctx.globalAlpha = Tokens.opacity.tint;
         ctx.fillStyle = String(stroke);
         ctx.fill();
     }
@@ -76,6 +84,8 @@ Canvas {
             return;
         const end = Math.max(newest(points), newest(second));
         let top = max;
+        // Fitted, the highest point sits a little under the top, so the line never runs along the
+        // graph's edge.
         if (top <= 0) {
             top = 1;
             for (const p of points)

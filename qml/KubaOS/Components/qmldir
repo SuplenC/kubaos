@@ -5,6 +5,7 @@ singleton Look 1.0 Look.qml
 singleton ButtonMetrics 1.0 ButtonMetrics.qml
 singleton LayoutPasses 1.0 LayoutPasses.qml
 singleton FrameQueue 1.0 FrameQueue.qml
+SheetPath 1.0 sheetpath.js
 Text 1.0 Text.qml
 Icon 1.0 Icon.qml
 Layout 1.0 Layout.qml
@@ -51,3 +52,9 @@ ErrorBlock 1.0 ErrorBlock.qml
 Log 1.0 Log.qml
 PictureChoice 1.0 PictureChoice.qml
 Media 1.0 Media.qml
+Tabs 1.0 Tabs.qml
+Tile 1.0 Tile.qml
+Meter 1.0 Meter.qml
+Sparkline 1.0 Sparkline.qml
+Sheet 1.0 Sheet.qml
+Calendar 1.0 Calendar.qml

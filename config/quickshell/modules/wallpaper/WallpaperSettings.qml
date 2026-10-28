@@ -1,6 +1,5 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // The wallpaper settings, the picker's last tab: one row per setting, each a
@@ -212,7 +211,7 @@ FocusScope {
             }
 
             // Clicks pick; the keys are the row's, so the tabs are no stop of their own.
-            Tabs {
+            K.Tabs {
                 readonly property list<string> options: ["always", "ac", "never"]
 
                 labels: ["Always", "On AC", "Never"]

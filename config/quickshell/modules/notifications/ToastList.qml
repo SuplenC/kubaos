@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 
 // The cards of a toast stack (`Popups.qml`, `PopupsBelow.qml`). New cards
 // slide in from the right as a panel arrives, gone ones slide out as one
@@ -9,7 +8,7 @@ import qs.components
 ListView {
     id: list
 
-    required property Drawer drawer
+    required property K.Sheet drawer
     // The notifications to show; empty while the drawer is away, so other
     // screens and hidden stacks don't run their countdown animations.
     required property var notifications

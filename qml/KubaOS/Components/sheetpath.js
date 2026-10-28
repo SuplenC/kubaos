@@ -1,8 +1,9 @@
 .pragma library
 
-// SVG path of a panel that grows out of one inner edge of the screen frame.
+// The SVG paths `Sheet` and the shell's frame are drawn from: a sheet that grows out of one inner
+// edge of the screen frame, and the frame itself.
 //
-// The panel is described in edge coordinates: u runs along the edge
+// The sheet is described in edge coordinates: u runs along the edge
 // (u0..u1), v grows away from it (0..depth). Where the panel meets the edge
 // it curves into the frame with concave fillets of radius `flare`; its far
 // corners are convex with radius `round`. If an end is flush with the

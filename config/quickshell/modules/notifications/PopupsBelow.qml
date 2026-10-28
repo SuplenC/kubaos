@@ -2,7 +2,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Services.Notifications
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Critical notifications while an open panel covers the popups' corner: a
@@ -10,14 +9,14 @@ import qs.services
 // one is seen without drawing over the panel. With no room under the panel
 // (the control center and the wallpaper picker reach the bottom edge), they
 // wait with the rest for the corner.
-Drawer {
+K.Sheet {
     id: root
 
     readonly property int padding: K.Tokens.space.s8
     // A card with its icon, and the padding around it.
     readonly property int oneCard: K.Tokens.size.control_md + K.Tokens.space.s12 * 2 + padding * 2
     // The open panel covering the corner, or null.
-    property Drawer cover: null
+    property K.Sheet cover: null
     // Where that panel ends. It is kept once the panel closes, so the stack
     // retracts in place instead of jumping up into the corner.
     property real coverBottom: 0

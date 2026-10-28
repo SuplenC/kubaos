@@ -134,7 +134,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
 | Aspect ratios (`[aspect]`) | wallpaper 16:10 |
 
@@ -280,6 +280,12 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Radio` | none | height | full |
 | `ProgressBar` | none | height | full |
 | `Keycap` | none | height | small |
+| `Tabs` | none | height | control |
+| `Tile` | `detail` | height | control |
+| `Calendar` | `year` | both | full, its days and title; control, its months |
+| `Meter` | none | height | full |
+| `Sparkline` | none | height | none |
+| `Sheet` | none | none, holds content | surface |
 | `Dialog` | tone `Normal`, `Danger` | width | surface |
 | `ErrorBlock` | `long` | none | surface |
 | `List`, `EmptyList`, `Toast`, `Log` | none | none | surface |
@@ -368,6 +374,12 @@ Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so 
 | `Radio` | `check::radio` | A 20 disc with an 8 dot. One of a group, exactly one picked. |
 | `Slider` | `slider::slider` | A value from 0 to 1, or one of a few stops (`stepped`), 24 tall: a progress bar's track filled up to a 16 thumb, a stop mark (4) on each stop the fill hasn't reached, and the focus ring a pill round it all. A drag follows the pointer; on a slider with stops it shows the stop under the pointer and picks it on release. Left and Right step by a twentieth or a stop, Home and End go to the ends. It takes effect as it moves, so it carries a live value: volume, brightness, a power stop. The thumb takes the state layer, and the fill lights up: under the pointer it brightens by `press`, and while it is pressed or dragged by `held` (0.40), toward the palette's bright end (`on_surface` in dark, `surface` in light), so a held slider lights up as a progress bar's fill glows (`slider::slider_held` draws it held, for the specimen). |
 
+| Name | Rust | What |
+|---|---|---|
+| `Tabs` | `tabs::tabs` | One of a few views or values, picked from a row of small buttons (`Sm`) 4 apart: the picked one `Tonal`, the rest `Text`, each with an optional symbol before its label. It is the segmented control too: a setting's few choices side by side (the wallpaper's motion, Always, On AC, Never). The row is one stop for Tab; ← and → (or h and l) pick the neighbour (the owner moves the pick in iced; `Tabs` in QML does it), and while the row has the keyboard the focus ring goes round the picked one. The control center's sections, the clock's tools, the wallpaper picker's folders, the system monitor's order. |
+| `Tile` | `tile::tile` | A quick toggle: a 20 symbol, a `body_strong` title over a `small` status line, as tall as a two-line row (56) at the control radius, 12 inside. On, it fills with `primary` and its content takes `on_primary`; off, `surface_container_high`. A press toggles it. A tile with more behind it ends in a detail arrow (`detail`), a 32 circle 12 from its end with a 16 chevron, which opens it; → does too. The arrow is a small control and stays quiet: no fill, in the tile's own content colour, its state layer under the pointer, and the tile's own layer gives way while the pointer is on it. The control center's Wi-Fi, Bluetooth and the rest. |
+| `Calendar` | `calendar::calendar` | A month as six weeks, each led by its ISO week number (`caption`, a small control wide), under the weekdays' names (`label`, weekends in `tertiary`). A day is a regular control (40), its disc a small one (32), a pill: today filled with `primary`, the picked day ringed with it in the thin stroke, a holiday dotted in `tertiary`, the days of the months around dimmed to the disabled content's 0.38. Between the arrows (`Text` `Sm` icon buttons) the title, a `subheading` pill, opens the year (`year`): the twelve months three to a row, the one shown filled. The app works the month out (`kubaos-clock` for the shell); the shell's slides a new month in from the side it lies on over `short`, and the wheel moves a month. The clock popup's. |
+
 A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's Items, never a hand-rolled filter: see the QML rules in `docs/agents/code-quality.md`. A field that parses what is typed (a time, a password) isn't a search.
 
 ### Lists, chips and cards
@@ -403,7 +415,15 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 | `EmptyState` | `empty::empty_state` | A place with nothing in it, centred: a 32 icon, 12 below it a `subheading` title, 4 below that a `body` line saying what to do, and 16 below that an optional action. Never a bare "No items". |
 | `ErrorBlock` | `error::error_block` | What broke and what to do next: a 24 error icon, 16 from the message in `subheading` (`body_strong` past 90 characters, since a whole command line in 16 px semibold is a wall), the hint in `body` 4 under it, on the error container with an error hairline, the surface radius (24), padding 20. |
 | `Log` | `error::log` | The log behind an error or a progress bar, `mono`, newest line at the bottom, opened on demand. The surface radius (24). The caller sets its height as an `Extent`; `log` (232) is the size the specimen and Kōbō use. |
+| `Meter` | `meter::meter` | A reading in parts on a progress bar's track: 8 tall, a pill, each part a share and its colour, left to right (memory as used and cache), every part keeping the bar's rounded ends. The QML one eases a new reading over `short` on `linear`, as a progress bar follows its work. The system monitor's memory, disks and battery, and the bar pill's bars. |
+| `Sparkline` | `meter::sparkline` | The last minute of a reading as a line in the thin stroke, filled under it with the line's colour at the tint's opacity, newest at the right edge (QML places each sample by its time over the last minute, so a graph with less than a minute of history starts part way across; iced spaces the samples evenly); a second reading over it, unfilled, in `tertiary` (upload over download). As wide as its room and 48 tall (`sparkline`), or a line of small text tall inline in the bar. The scale tops out at 100, or fits the highest point with room above it. It draws when a sample comes, never per frame. |
 | `FocusRing` | `focus::focus_ring` | The ring every focusable component draws (see "Focus"). An app never draws its own. |
+
+### Panels
+
+| Name | Rust | What |
+|---|---|---|
+| `Sheet` | `sheet::sheet` | A panel growing out of an inner edge of the screen frame: the shell's control center, clock, system monitor, power menu, wallpaper picker, OSD and notification stacks. The sheet and the frame are one surface, `surface` at the frame's glass (0.94): where the sheet meets the edge it curves into it through concave fillets of the surface radius, the frame's own inner corner, and its far corners take the surface radius. It is as large as its content, which keeps its own padding, and sits along the edge where its owner puts it, centred on whole device pixels by default. In the shell it slides out from under the frame as it opens, over `long` on `emphasized_decel`, its content riding on its far edge and fading in a beat after the surface moves; it leaves over `medium` on `emphasized_accel`. The owner draws its surface from its `path`, in one layer with the frame's, so the two never double up; `kubaos-ui` draws one open, hanging from the edge above it. |
 
 Rules the feedback components carry:
 

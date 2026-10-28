@@ -26,7 +26,7 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
 - **Panels over windows:** only the frame reserves space (the bar's 40 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (`opacity.panel_scrim`, 20%; the power menu as a dialog does, `opacity.scrim`, 60%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
 - **Glass:** the frame is drawn at 94% opacity (`opacity.frame`). Hyprland blurs what shows through (`qs-frame` layer rule, `ignore_alpha 0.5`, so the shadow is not blurred).
 
-The design was studied from Caelestia's source and README: its frame and drawer structure, Material 3 roles and motion tokens. No code comes from it (Caelestia is GPL-3.0); everything here was written from scratch, and the panel shapes are built differently (an SVG path per panel, see `components/drawerpath.js`).
+The design was studied from Caelestia's source and README: its frame and drawer structure, Material 3 roles and motion tokens. No code comes from it (Caelestia is GPL-3.0); everything here was written from scratch, and the panel shapes are built differently (an SVG path per panel, see `KubaOS.Components`' `sheetpath.js`).
 
 Screenshots: `just shots` (see `docs/TESTING.md`).
 
@@ -98,12 +98,9 @@ services/               singletons, no UI
                         the popup and the lock), the graphs' last minute, sysmon.toml (watched),
                         alerts as notifications
 components/             blocks composed from KubaOS.Components
-  Drawer, drawerpath.js a panel that grows out of a frame edge; its SVG outline
   Pill                  the bar's pill: a row of content, hover, click, right-click and wheel
   NavList               the keyboard list over K.ListRow rows
-  Tabs                  small buttons as tabs, one Tab stop
   PowerSlider           the power stops on a K.Slider
-  Graph, Meter          a minute's line graph (Canvas); a bar split into parts
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
@@ -115,13 +112,13 @@ modules/
                         ActionPanel, FormView, ProgressView, DetailView, IntroCard, Label (text that
                         changes with every key), words.js (glyphs, kinds, shortcuts),
                         Probe (test-only timing and state lines)
-  controlcenter/        ControlCenter, QuickToggles, QuickTile, CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a Well, history,
+  controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a Well, history,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)
   notifications/        Popups (corner), PopupsBelow (critical, under a panel), ToastList, NotificationCard, ToastProbe (tests)
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu
-  clock/                ClockPopup (the bar clock's popup), MonthGrid (month and year views),
+  clock/                ClockPopup (the bar clock's popup), the month on K.Calendar (month and year views),
                         AnalogFace, Tools (timer, stopwatch, alarms), ClockSettings, Chip,
                         Figure (a ticking number in a box as wide as its widest digits)
   sysmon/               SysmonPopup (the monitor pill's popup), Section, Processes (top five,
@@ -133,7 +130,7 @@ modules/
 
 ### How the frame works
 
-`modules/frame/Frame.qml` is one transparent full-screen layer (`qs-frame`, layer Top) per screen. Its input mask only covers the frame, the bar and the notification popups, so clicks elsewhere reach the windows. While a panel is open, the mask covers the whole screen, keyboard focus is exclusive, and a click outside closes the panel. The frame path (screen rectangle minus a rounded inner rectangle) and each panel's path (`Drawer.path`) are drawn in one `Shape` inside one layer. That layer carries the opacity and a single `MultiEffect` shadow, so overlaps never double up and panel and frame merge. Panel contents sit above it at full opacity. The exclusive zones come from four empty 1x1 windows (`Exclusions.qml`, `qs-exclusion`), so the frame window never has to move. On a fullscreen workspace the frame retracts (`reveal` 1 -> 0) and comes back for an open panel, switching to the Overlay layer.
+`modules/frame/Frame.qml` is one transparent full-screen layer (`qs-frame`, layer Top) per screen. Its input mask only covers the frame, the bar and the notification popups, so clicks elsewhere reach the windows. While a panel is open, the mask covers the whole screen, keyboard focus is exclusive, and a click outside closes the panel. The frame path (screen rectangle minus a rounded inner rectangle) and each panel's path (`K.Sheet`'s `path`) are drawn in one `Shape` inside one layer. That layer carries the opacity and a single `MultiEffect` shadow, so overlaps never double up and panel and frame merge. Panel contents sit above it at full opacity. The exclusive zones come from four empty 1x1 windows (`Exclusions.qml`, `qs-exclusion`), so the frame window never has to move. On a fullscreen workspace the frame retracts (`reveal` 1 -> 0) and comes back for an open panel, switching to the Overlay layer.
 
 ### Performance
 
@@ -170,7 +167,7 @@ The values come from the design tokens (`design/tokens.toml`, `docs/DESIGN.md`) 
 
 ## Adding a module
 
-1. Create `modules/<name>/<Name>.qml`. For a bar item, start from `Pill`. For a panel, start from `Drawer { edge: "top" | "bottom" | "left" | "right" }`. Set `contentWidth`/`contentHeight` from your content's implicit size; `align`, `flushStart`/`flushEnd` place it along the edge. Use only `KubaOS.Components` and its `Tokens` for sizes, colours and motion (`docs/DESIGN.md`).
+1. Create `modules/<name>/<Name>.qml`. For a bar item, start from `Pill`. For a panel, start from `K.Sheet { edge: "top" | "bottom" | "left" | "right" }`. Set `contentWidth`/`contentHeight` from your content's implicit size; `align`, `flushStart`/`flushEnd` place it along the edge. Use only `KubaOS.Components` and its `Tokens` for sizes, colours and motion (`docs/DESIGN.md`).
 2. Put data and side effects in a singleton under `services/` (`pragma Singleton` + `Singleton {}`), so UI files only bind to it.
 3. Add it to `modules/frame/Frame.qml`, with `frame: geo` and `shown: root.panel === "<name>"`, and add a `PanelPath { drawer: <id> }` to the background `Shape`. Or add it to `Bar.qml`.
 4. If Hyprland should open it, add an `IpcHandler` to `IpcHandlers.qml` that calls `Panels.toggle("<name>")`, and add the row to `docs/CONTRACTS.md`.

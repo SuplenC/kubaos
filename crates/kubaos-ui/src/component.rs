@@ -11,13 +11,15 @@
 //!   ([`chip`]), cards ([`card`]), dialogs ([`dialog`]), toasts ([`toast`]), progress
 //!   ([`progress`]), empty states ([`empty`]), errors with a hint and a log ([`error`]), keycaps
 //!   and key hints ([`keycap`]), pictures in a box of a fixed aspect ([`media`]) and pictures to
-//!   pick ([`picture`]).
+//!   pick ([`picture`]), tabs ([`tabs`]), quick toggle tiles ([`tile`]), meters and sparklines
+//!   ([`meter`]), sheets ([`sheet`]) and calendars ([`calendar`]).
 //!
 //! # Not here
 //!
 //! - The focus ring: [`crate::focus`]. Layout: [`crate::layout`].
 
 pub mod button;
+pub mod calendar;
 pub mod card;
 pub mod check;
 pub mod chip;
@@ -30,10 +32,14 @@ pub mod keycap;
 mod layer;
 pub mod list;
 pub mod media;
+pub mod meter;
 pub mod picture;
 pub mod progress;
+pub mod sheet;
 pub mod slider;
 pub mod switch;
+pub mod tabs;
+pub mod tile;
 pub mod toast;
 
 pub(crate) use self::layer::Pin;

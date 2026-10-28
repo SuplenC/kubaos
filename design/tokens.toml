@@ -142,6 +142,9 @@ keycap = 20
 neon_mark = 200
 # The 完了 hanko stamped beside it.
 hanko = 120
+# A sparkline in a panel: the system monitor's graphs, the last minute of a reading at a glance,
+# as tall as a large control so a graph and the buttons beside it line up.
+sparkline = 48
 
 # A page's or a panel's body: its padding on every side, by its own width.
 # Tailwind's container, `px-4 sm:px-6 lg:px-8`, on Tailwind's default
