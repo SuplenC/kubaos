@@ -23,13 +23,14 @@ end
 return {
   normal = mode(c.primary, c.on_primary),
   insert = mode(c.tertiary, c.on_tertiary),
-  visual = mode(c.secondary, c.on_secondary),
+  -- Visual mode selects, so it takes the selection's tinted bar.
+  visual = mode(c.secondary_container, c.on_secondary_container),
   replace = mode(c.error, c.on_error),
   command = mode(c.primary_container, c.on_primary_container),
   terminal = mode(c.tertiary_container, c.on_tertiary_container),
   inactive = {
-    a = { bg = c.surface_container, fg = c.outline, gui = "bold" },
-    b = { bg = c.surface_container, fg = c.outline },
-    c = { bg = none, fg = c.outline },
+    a = { bg = c.surface_container, fg = c.dim or c.outline, gui = "bold" },
+    b = { bg = c.surface_container, fg = c.dim or c.outline },
+    c = { bg = none, fg = c.dim or c.outline },
   },
 }

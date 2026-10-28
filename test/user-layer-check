@@ -44,6 +44,7 @@ USER_FILES=(desktop/hypr/hyprland.lua desktop/hypr/hypridle.conf desktop/hypr/hy
   desktop/clock/clock.toml desktop/sysmon/sysmon.toml desktop/idle/idle.toml
   desktop/workspaces/groups.toml
   terminal/tmux/tmux.conf terminal/foot/foot.ini terminal/ghostty/config terminal/fastfetch/config.jsonc
+  terminal/fastfetch/greeting.jsonc
   terminal/zsh/zshrc
   editor/nvim/options.lua editor/nvim/keymaps.lua editor/nvim/autocmds.lua editor/nvim/plugins/example.lua
   editor/nvim/lazy-lock.json editor/nvim/lazyvim.json

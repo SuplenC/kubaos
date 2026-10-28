@@ -25,6 +25,9 @@ let
   # laptop panel at scale 1.5 (config/hypr/monitors.lua) look the same.
   uiFont = "Geist";
   uiFontSize = 10;
+  # Monospace text in GTK and Qt apps, the terminals' font (design/tokens.toml,
+  # `[font.family] mono`).
+  monoFont = "Geist Mono";
   qtFont =
     family: size: weight:
     ''"${family},${toString size},-1,5,${toString weight},0,0,0,0,0,0,0,0,0,0,1"'';
@@ -33,7 +36,7 @@ let
   qtctSettings = dir: {
     Fonts = {
       general = qtFont uiFont uiFontSize 400;
-      fixed = qtFont "JetBrainsMono Nerd Font" uiFontSize 400;
+      fixed = qtFont monoFont uiFontSize 400;
     };
     Appearance = {
       style = "Fusion";
@@ -160,7 +163,7 @@ in
     gtk-theme = "adw-gtk3-dark";
     icon-theme = iconTheme;
     font-name = "${uiFont} ${toString uiFontSize}";
-    monospace-font-name = "JetBrainsMono Nerd Font ${toString uiFontSize}";
+    monospace-font-name = "${monoFont} ${toString uiFontSize}";
     # The size is `kubaos cursor`'s: it sets cursor-size from the user's
     # setting, which a switch would otherwise reset.
     cursor-theme = cursorTheme;

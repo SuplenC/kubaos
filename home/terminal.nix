@@ -21,8 +21,6 @@ in
     pkgs.tmux-sessionizer # `tms`
     # GPU access on Ubuntu is wired in desktop.nix (generic-Linux GPU support).
     pkgs.ghostty
-    # Font used by config/ghostty/config.
-    pkgs.nerd-fonts.meslo-lg
   ];
 
   # One Ghostty in the background, so SUPER + Return and the `tui` binds

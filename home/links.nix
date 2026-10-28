@@ -72,13 +72,16 @@ let
     };
     # No include: ~/.config/<file> = defaults + the user layer's file (the
     # value, relative to the user layer), rewritten by dot-config apply.
-    # concat appends; json merges objects key by key.
+    # concat appends; json merges objects key by key, with the wallpaper
+    # theme's colours for the app between the two (dot-theme runs
+    # `dot-config merge` after each theme change).
     concat = {
       "bat/config" = "${userLayer.apps.bat}/config";
       "git/ignore" = "${userLayer.apps.git}/ignore";
     };
     json = {
       "fastfetch/config.jsonc" = "${userLayer.apps.fastfetch}/config.jsonc";
+      "fastfetch/greeting.jsonc" = "${userLayer.apps.fastfetch}/greeting.jsonc";
     };
   };
   layerFile = lib.concatLines (
