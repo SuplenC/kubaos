@@ -1,6 +1,11 @@
 # Rust helpers and PATH for tools installed outside Nix (rustup, proto, bun via proto).
 # clang and mold come from apt; wild comes from nixpkgs.
-{ config, lib, pkgs, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 let
   # Linker cargo uses through clang: "mold" (apt, the default) or "wild"
   # (faster relinks, pre-1.0). Change it here, then home-manager switch.

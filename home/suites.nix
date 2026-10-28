@@ -16,7 +16,9 @@
 }:
 let
   suiteModules = lib.mapAttrsToList (name: _: ./suites + "/${name}") (
-    lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".nix" name) (builtins.readDir ./suites)
+    lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".nix" name) (
+      builtins.readDir ./suites
+    )
   );
 in
 {
