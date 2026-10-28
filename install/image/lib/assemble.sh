@@ -55,13 +55,7 @@ nix_() { NIX_REMOTE=daemon "$NIX_BIN/nix" --option cores "$CPUS" --option max-jo
 # ---------------------------------------------------------------------------
 say "nix-daemon"
 rm -f /nix/var/nix/daemon-socket/socket
-# Rosetta (amd64 on Apple Silicon) can't load Nix's seccomp filter. Only
-# this build daemon gets the option; the payload's nix.conf doesn't.
-daemon_opts=()
-if [[ "$ARCH" == x86_64 && "$(uname -m)" == x86_64 ]] && grep -qi 'VirtualApple' /proc/cpuinfo; then
-  daemon_opts=(--option filter-syscalls false)
-fi
-"$NIX_BIN/nix-daemon" ${daemon_opts[@]+"${daemon_opts[@]}"} >/tmp/nix-daemon.log 2>&1 &
+"$NIX_BIN/nix-daemon" >/tmp/nix-daemon.log 2>&1 &
 for _ in $(seq 100); do [[ -S /nix/var/nix/daemon-socket/socket ]] && break; sleep 0.1; done
 [[ -S /nix/var/nix/daemon-socket/socket ]] || die "nix-daemon didn't start: $(cat /tmp/nix-daemon.log)"
 
@@ -322,7 +316,7 @@ cat /usr/lib/os-release | sed 's/^/    /'
 # (/etc/default/grub.d/10-kubaos.cfg). The EFI directory stays EFI/ubuntu (the
 # engine's --bootloader-id): shim and the signed GRUB look for their files there.
 [[ -f /etc/default/grub.d/10-kubaos.cfg ]] || die "no /etc/default/grub.d/10-kubaos.cfg (system/25-boot.sh didn't run?)"
-# aarch64 is the VM payload (QEMU/UTM virt). There, with no console= the
+# aarch64 is the VM payload (QEMU virt). There, with no console= the
 # kernel picks the firmware's serial port (ACPI SPCR) as /dev/console, so the
 # LUKS prompt only shows on serial, and the screen stays black until
 # virtio_gpu loads from the root fs. Put the prompt on the screen: virtio_gpu

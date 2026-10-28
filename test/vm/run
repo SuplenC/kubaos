@@ -2,7 +2,7 @@
 # shellcheck disable=SC2054  # QEMU's own option syntax uses commas inside one argument
 # test/vm/run: the QEMU test bench for the live ISO and its installs (test/vm/README.md).
 #
-#   test/vm/run boot-iso [ISO] [--arch aarch64|x86_64] [--gui] [--keep-disk] [--secure-boot]
+#   test/vm/run boot-iso [ISO] [--arch aarch64|x86_64 (default: this machine's)] [--gui] [--keep-disk] [--secure-boot]
 #                        [--config FILE --secrets FILE] [--demo] [--after poweroff|reboot|shell]
 #                        [--env KEY=VALUE]...
 #                                       boot an ISO (default: the newest KubaOS ISO
@@ -38,6 +38,9 @@
 # Env: VM_OUT (state dir, default test/vm/out), VM_MEM (MiB, 4096), VM_CPUS (4),
 #      VM_DISK_SIZE (64G), VM_SSH_PORT (2229), VM_RES (1920x1080; 2880x1800 is the
 #      laptop's panel).
+#
+# QEMU, qemu-img, xorriso and cwebp come from PATH, else from the flake's
+# nixpkgs. A guest of the machine's own arch runs on KVM, another one on TCG.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -48,8 +51,10 @@ CPUS="${VM_CPUS:-4}"
 DISK_SIZE="${VM_DISK_SIZE:-64G}"
 SSH_PORT="${VM_SSH_PORT:-2229}"
 RES="${VM_RES:-1920x1080}"
-FW=/opt/homebrew/share/qemu
-# Secure Boot firmware for x86_64: Homebrew ships no vars with keys enrolled.
+HOST_ARCH="$(uname -m)"
+# QEMU's edk2 firmware (share/qemu, beside its bin), set by need_tools.
+FW=""
+# Secure Boot firmware for x86_64: QEMU's edk2 ships no vars with keys enrolled.
 OVMF_DEB_URL=http://archive.ubuntu.com/ubuntu/pool/main/e/edk2/ovmf-generic_2025.11-3ubuntu7.3_all.deb
 OVMF_DEB_SHA256=d35554c74dccef60c12d63dda1120bf1ddc3a44054a1bf4b596f7dda7504c588
 OVMF_DIR="$HERE/cache/ovmf"
@@ -68,6 +73,40 @@ die() { printf 'test/vm/run: %s\n' "$*" >&2; exit 1; }
 say() { printf '==> %s\n' "$*" >&2; }
 usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
 elapsed() { printf '%dm%02ds' $((SECONDS / 60)) $((SECONDS % 60)); }
+
+# need_tools ARCH: QEMU for ARCH and the bench's other tools on PATH, from
+# the machine when it has them all, else from the flake's nixpkgs (the same
+# QEMU on every machine, with its firmware beside it). Sets FW.
+need_tools() {
+  local arch="${1:-$HOST_ARCH}" qemu fw="" t missing=0 out
+  for t in "qemu-system-$arch" qemu-img xorriso cwebp; do command -v "$t" >/dev/null || missing=1; done
+  if ((!missing)); then
+    qemu="$(readlink -f "$(command -v "qemu-system-$arch")")"
+    fw="$(dirname "$(dirname "$qemu")")/share/qemu"
+    [[ -f $fw/edk2-$arch-code.fd ]] || missing=1
+  fi
+  if ((missing)); then
+    command -v nix >/dev/null || die "needs qemu-system-$arch, qemu-img, xorriso and cwebp, or Nix to fetch them"
+    say "QEMU, xorriso and cwebp from the flake's nixpkgs"
+    out="$(nix build --no-link --print-out-paths --inputs-from "$ROOT" nixpkgs#qemu nixpkgs#xorriso nixpkgs#libwebp)" ||
+      die "can't build QEMU from the flake's nixpkgs"
+    while IFS= read -r t; do [[ -d $t/bin ]] && PATH="$t/bin:$PATH"; done <<<"$out"
+    qemu="$(readlink -f "$(command -v "qemu-system-$arch")")"
+    fw="$(dirname "$(dirname "$qemu")")/share/qemu"
+  fi
+  [[ -f $fw/edk2-$arch-code.fd ]] || die "no edk2 firmware for $arch in $fw"
+  FW="$fw"
+}
+
+# accel ARCH: KVM for a guest of the machine's own arch when /dev/kvm is
+# usable, else TCG, which is slow: meant for occasional correctness checks.
+accel() {
+  if [[ $1 == "$HOST_ARCH" && -r /dev/kvm && -w /dev/kvm ]]; then
+    printf '%s\n' -accel kvm -cpu host
+  else
+    printf '%s\n' -accel tcg,thread=multi -cpu max
+  fi
+}
 
 running() { [[ -f $PIDF ]] && kill -0 "$(cat "$PIDF")" 2>/dev/null; }
 need_running() { running || die "no VM running (test/vm/run boot-iso or boot-disk first)"; }
@@ -94,7 +133,7 @@ ensure_ovmf() {
   tmp="$(mktemp -d)"
   say "fetching Ubuntu's OVMF (Secure Boot, MS keys) into $OVMF_DIR"
   curl -fsSL -o "$tmp/ovmf.deb" "$OVMF_DEB_URL" || { rm -rf "$tmp"; die "can't download $OVMF_DEB_URL"; }
-  [[ "$(shasum -a 256 "$tmp/ovmf.deb" | cut -d' ' -f1)" == "$OVMF_DEB_SHA256" ]] || { rm -rf "$tmp"; die "OVMF .deb checksum mismatch"; }
+  [[ "$(sha256sum "$tmp/ovmf.deb" | cut -d' ' -f1)" == "$OVMF_DEB_SHA256" ]] || { rm -rf "$tmp"; die "OVMF .deb checksum mismatch"; }
   (cd "$tmp" && ar x ovmf.deb && mkdir x && zstd -qdc data.tar.zst | tar -C x -xf -)
   mkdir -p "$OVMF_DIR"
   cp "$tmp/x/usr/share/OVMF/OVMF_CODE_4M.secboot.fd" "$tmp/x/usr/share/OVMF/OVMF_VARS_4M.ms.fd" "$OVMF_DIR/"
@@ -124,7 +163,7 @@ make_cfg_disk() {
   [[ -n $config ]] && cp "$config" "$CFGDIR/install.toml"
   [[ -n $secrets ]] && cp "$secrets" "$CFGDIR/secrets.toml"
   printf '%s\n' "$env" >"$CFGDIR/kubaos.env"
-  hdiutil makehybrid -quiet -iso -joliet -default-volume-name KUBAOS_CFG -o "$CFGISO" "$CFGDIR"
+  xorriso -as mkisofs -quiet -J -V KUBAOS_CFG -o "$CFGISO" "$CFGDIR"
 }
 
 # latest_iso ARCH: the newest KubaOS ISO for ARCH in iso (hw or vm).
@@ -138,8 +177,10 @@ latest_iso() {
 # launch ARCH GUI ISO-or-empty CFG-or-empty [SECURE]: start QEMU in the background.
 # SECURE: 1 Secure Boot, 0 plain, "" (boot-disk) whatever the last launch used.
 launch() {
-  local arch="$1" gui="$2" iso="$3" cfg="$4" secure="${5:-}" q=() display=() mode
+  local arch="$1" gui="$2" iso="$3" cfg="$4" secure="${5:-}" q=() display=() acc=() mode
   running && die "a VM is already running (test/vm/run stop)"
+  need_tools "$arch"
+  mapfile -t acc < <(accel "$arch")
   [[ -f $DISK ]] || new_disk
   mode="$(cat "$OUT/secureboot" 2>/dev/null || echo 0)"
   [[ -n $secure ]] || secure="$mode"
@@ -156,18 +197,18 @@ launch() {
 
   case "$arch" in
     aarch64)
-      q=(qemu-system-aarch64 -machine virt,pflash0=code,pflash1=vars -accel hvf -cpu host
+      q=(qemu-system-aarch64 -machine virt,pflash0=code,pflash1=vars "${acc[@]}"
         -blockdev "driver=file,filename=$FW/edk2-aarch64-code.fd,node-name=code,read-only=on")
       ;;
     x86_64)
       if ((secure)); then
         # SMM keeps the variable store out of the OS's reach; OVMF's
         # secboot build refuses to run without it.
-        q=(qemu-system-x86_64 -machine q35,smm=on,pflash0=code,pflash1=vars -accel tcg,thread=multi -cpu max -vga none
+        q=(qemu-system-x86_64 -machine q35,smm=on,pflash0=code,pflash1=vars "${acc[@]}" -vga none
           -global driver=cfi.pflash01,property=secure,value=on
           -blockdev "driver=file,filename=$OVMF_DIR/OVMF_CODE_4M.secboot.fd,node-name=code,read-only=on")
       else
-        q=(qemu-system-x86_64 -machine q35,pflash0=code,pflash1=vars -accel tcg,thread=multi -cpu max -vga none
+        q=(qemu-system-x86_64 -machine q35,pflash0=code,pflash1=vars "${acc[@]}" -vga none
           -blockdev "driver=file,filename=$FW/edk2-x86_64-code.fd,node-name=code,read-only=on")
       fi
       ;;
@@ -199,9 +240,7 @@ launch() {
       -device scsi-cd,drive=cfg,bus=scsi.0)
   fi
 
-  # Never -daemonize: on macOS the forked child aborts in the ObjC runtime as
-  # soon as Hypervisor.framework serializes state (savevm).
-  if ((gui)); then display=(-display cocoa); else display=(-display none); fi
+  if ((gui)); then display=(-display gtk); else display=(-display none); fi
   nohup "${q[@]}" "${display[@]}" -pidfile "$PIDF" </dev/null >"$OUT/qemu.log" 2>&1 &
   disown
   printf '%s\n' "${q[*]}" >"$OUT/cmdline"
@@ -211,7 +250,7 @@ launch() {
 }
 
 cmd_boot_iso() {
-  local iso="" arch=aarch64 gui=0 keep=0 config="" secrets="" demo=0 after="" extra="" secure=0
+  local iso="" arch="$HOST_ARCH" gui=0 keep=0 config="" secrets="" demo=0 after="" extra="" secure=0
   while (($#)); do
     case "$1" in
       --arch) arch="${2:?}"; shift ;;
@@ -231,6 +270,7 @@ cmd_boot_iso() {
   [[ -n $iso ]] || iso="$(latest_iso "$arch")"
   [[ -f $iso ]] || die "no such ISO: $iso"
   mkdir -p "$OUT"
+  need_tools "$arch"
   ((keep)) || { new_disk; rm -f "$VARS"; }
   local env="" cfg=""
   ((demo)) && env+="KUBAOS_DEMO=1"$'\n'
@@ -279,7 +319,7 @@ EOF
 }
 
 cmd_install() {
-  local config="" secrets="" iso="" arch=aarch64 demo=0 gui=0 timeout=1800 keep=0 fail_at="" sshon=0 secure=0
+  local config="" secrets="" iso="" arch="$HOST_ARCH" demo=0 gui=0 timeout=1800 keep=0 fail_at="" sshon=0 secure=0
   while (($#)); do
     case "$1" in
       --secure-boot) secure=1 ;;
@@ -299,6 +339,7 @@ cmd_install() {
   [[ -f $config && -f $secrets ]] || die "install CONFIG.toml SECRETS.toml"
   [[ -n $iso ]] || iso="$(latest_iso "$arch")"
   mkdir -p "$OUT"
+  need_tools "$arch"
   new_disk
   rm -f "$VARS"
   local env
@@ -338,7 +379,7 @@ cmd_boot_disk() {
   local gui=0 arch
   [[ ${1:-} == --gui ]] && gui=1
   [[ -f $DISK ]] || die "no target disk yet"
-  arch="$(cat "$OUT/arch" 2>/dev/null || echo aarch64)"
+  arch="$(cat "$OUT/arch" 2>/dev/null || echo "$HOST_ARCH")"
   launch "$arch" "$gui" "" ""
 }
 
@@ -393,6 +434,7 @@ cmd_serial() {
 }
 
 cmd_shot() {
+  need_tools
   local name="${1:?shot NAME}" png=0
   [[ ${2:-} == --png ]] && png=1
   mkdir -p "$SHOTS"
@@ -409,6 +451,7 @@ cmd_shot() {
 }
 
 cmd_snapshot() {
+  need_tools
   local op="${1:?snapshot save|restore|delete NAME | list}" name="${2:-}"
   [[ $op == list || -n $name ]] || die "snapshot $op NAME"
   if running; then
@@ -435,6 +478,7 @@ cmd_key() { qmp key "$@"; }
 cmd_type() { qmp type "${1:?type TEXT}"; }
 
 cmd_status() {
+  need_tools
   if running; then
     echo "running: pid $(cat "$PIDF"), arch $(cat "$OUT/arch"), ssh 127.0.0.1:$SSH_PORT"
   else

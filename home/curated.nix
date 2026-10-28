@@ -131,5 +131,5 @@ rec {
     };
   } "install -Dm755 ${pkgs.scx.rustscheds}/bin/scx_lavd $out/bin/scx_lavd";
 }
-# aarch64 is the VM, where Hyprland comes from nixpkgs (home/desktop.nix).
+# On aarch64 (ARM machines and VMs) Hyprland comes from nixpkgs (home/desktop.nix).
 // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isAarch64 { inherit (pkgs) hyprland; }

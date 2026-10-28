@@ -24,7 +24,7 @@ This file is the contract between the parts. If you need to change an interface,
 | `crates/kubaos-core/src/setup{.rs,/**}`, `crates/kubaos-kobo/src/setup/**`, `crates/kubaos-cli/src/setup.rs`, `crates/kubaos-core/src/engine/install/firstboot.rs`, `install/firstboot/**` | firstboot | First-boot setup |
 | `install/image/**` | image | Builds the payload (rootfs image + manifest) |
 | `install/iso/**` | iso | Builds the live ISO |
-| `test/vm/**` | iso | QEMU test bench on the Mac |
+| `test/vm/**` | iso | QEMU test bench on the development machine |
 
 Agents only edit files they own. If you need a change in someone else's file, put it in your report.
 
@@ -164,9 +164,9 @@ What it needs in the payload: `grub-efi-<arch>-bin` and `grub2-common` (plus `sh
 
 `installed_bytes` is used for the disk-size check and for unpack progress.
 
-Built by `install/image/build [--arch aarch64|x86_64]` into `install/out/payload-<arch>/` and checked by `install/image/check` (`install/image/README.md` has the details):
+Built by `install/image/build [--arch x86_64|aarch64]` into `install/out/payload-<arch>/` and checked by `install/image/check` (`install/image/README.md` has the details):
 
-- **Format: squashfs, zstd** (level 15, 1 MiB blocks), file `kubaos-shinjuku-<arch>.squashfs`; `manifest.version` is the KubaOS release (`0.1.0`). `unsquashfs` decompresses on every core (about 540 MiB/s of files on the Mac's Docker VM), restores xattrs as root without extra flags (the `cap_sys_admin` file cap on `gsr-kms-server` survives), keeps hardlinks, and prints `-percentage`. `installed_bytes` is the apparent size of the unpacked tree.
+- **Format: squashfs, zstd** (level 15, 1 MiB blocks), file `kubaos-shinjuku-<arch>.squashfs`; `manifest.version` is the KubaOS release (`0.1.0`). `unsquashfs` decompresses on every core, restores xattrs as root without extra flags (the `cap_sys_admin` file cap on `gsr-kms-server` survives), keeps hardlinks, and prints `-percentage`. `installed_bytes` is the apparent size of the unpacked tree.
 - **The tree** is Ubuntu 26.04 after the real `system/10-strip.sh`, `20-base.sh`, `25-boot.sh`, `40-apps.sh`, `50-hyprland.sh`, `60-nix.sh`, `65-recorder.sh`, `70-bitwarden.sh` and `75-yubikey.sh` (in image mode, `DOTFILES_IMAGE_BUILD=1`), plus `linux-generic`, GRUB EFI (plain and signed), shim-signed, cryptsetup-initramfs and the rest of what the engine needs. Not in it: `system/30-hardware.sh` (TUXEDO repo and DKMS drivers, MOK, fingerprint PAM: first-boot setup).
 - **`/nix`** holds only the closure of the generation, the store paths `system/` links to (PAM modules, gpu-screen-recorder, the GPU driver bundle), the flake's inputs and Nix itself, each with a GC root. The multi-user Nix has its `nix-daemon` socket and service enabled. Its `/etc/nix/nix.conf` has flakes on, `max-jobs = auto`, and KubaOS's binary cache (`extra-substituters = https://kuba-os.cachix.org` and its key in `extra-trusted-public-keys`, written by the image's `nix` stage, as `system/60-nix.sh` writes them on a machine), so the payload build and the installed machine download KubaOS's packages that CI has pushed (`docs/CONTRACTS.md`, "The binary cache").
 - **Identity:** no user (Docker's `ubuntu` and the build user are removed, uid and gid 1000 are free), empty `/etc/machine-id`, no SSH host keys (`openssh-server` installed but disabled), `/etc/hostname` `localhost`, no fstab or crypttab, no apt lists. `/etc/resolv.conf` links to resolved's stub.
@@ -258,8 +258,8 @@ Screenshots: `docs/screenshots/setup/` (from `kobo --setup --demo [--demo-machin
 
 All the commands, and how config gets in, are in `test/vm/README.md`.
 
-`test/vm/run` drives QEMU on the Mac. aarch64 runs with HVF, which is fast. x86_64 runs under TCG, which is slow and meant for occasional correctness checks. Each command uses an EFI firmware copy, a qcow2 target disk, a serial console log, SSH via a forwarded port, screenshots via QMP, and qcow2 snapshots. Minimum commands: boot the ISO, run a headless install with a given `install.toml`, boot the installed disk, run a command over SSH, take a screenshot, snapshot and restore. You can open the same ISO in UTM to click through Kōbō yourself.
+`test/vm/run` drives QEMU on the development machine. A guest of the machine's arch (x86_64) runs on KVM, which is fast; aarch64 runs under TCG, which is slow and meant for occasional correctness checks. Each command uses an EFI firmware copy, a qcow2 target disk, a serial console log, SSH via a forwarded port, screenshots via QMP, and qcow2 snapshots. Minimum commands: boot the ISO, run a headless install with a given `install.toml`, boot the installed disk, run a command over SSH, take a screenshot, snapshot and restore. `--gui` opens a window to click through Kōbō yourself.
 
 ## Scope v1
 
-Personal. The flake host comes from the payload. The username is yours to pick, and anything but the payload's builds its generation at install. Supported: whole-disk and free-space installs, LUKS on, GRUB, aarch64 for the VM and x86_64 for the TUXEDO.
+Personal. The flake host comes from the payload. The username is yours to pick, and anything but the payload's builds its generation at install. Supported: whole-disk and free-space installs, LUKS on, GRUB, aarch64 for ARM machines and VMs and x86_64 for the TUXEDO.

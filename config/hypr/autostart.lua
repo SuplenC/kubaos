@@ -48,7 +48,7 @@ hl.on("hyprland.start", function()
   -- SSH_AUTH_SOCK points at; home/secrets.nix) only answers while the app
   -- runs. Hyprland ignores XDG autostart, so the app's own "start on login"
   -- does nothing here. Turn on "Start to tray icon" in its settings to start
-  -- hidden. Not installed (arm64 VM): the exec fails quietly.
+  -- hidden. Not installed (aarch64 has no build): the exec fails quietly.
   -- While KubaOS first-boot setup is pending (its user unit is installed and
   -- its marker isn't there yet), setup has the screen to itself and starts
   -- Bitwarden when it closes (crates/kubaos-kobo/src/setup).

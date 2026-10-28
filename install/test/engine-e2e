@@ -27,7 +27,7 @@ LIVE=kubaos-engine-live
 PAYLOAD_IMG=kubaos-engine-payload-src
 # Every checkout (worktree) shares the target volume, and cargo goes by mtime,
 # so each builds in its own subdirectory; run mounts only that one at /target.
-TSUB="$(printf '%s' "$REPO" | shasum | cut -c1-12)"
+TSUB="$(printf '%s' "$REPO" | sha256sum | cut -c1-12)"
 
 build() {
   echo "==> live tools image"

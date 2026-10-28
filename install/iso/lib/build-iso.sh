@@ -19,8 +19,9 @@ case "$ARCH" in
   x86_64) DEBARCH=amd64 EFIARCH=amd64 GRUBPLAT=x86_64-efi EFI=x64 MIRROR=http://archive.ubuntu.com/ubuntu SERIAL=ttyS0 ;;
   *) echo "bad ARCH $ARCH" >&2; exit 2 ;;
 esac
-# A foreign ARCH (amd64 on the Mac) works through the host's binfmt emulation:
-# apt runs natively, only maintainer scripts in the chroot are emulated.
+# A foreign ARCH (aarch64 on an x86_64 machine) works through the host's
+# binfmt emulation: apt runs natively, only maintainer scripts in the chroot
+# are emulated.
 SUITE=resolute
 
 # ---- package list ---------------------------------------------------------

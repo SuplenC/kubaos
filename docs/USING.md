@@ -466,19 +466,19 @@ For the people who care. The reasoning is in [`docs/PLAN.md`](PLAN.md), the inte
 
 ## Testing
 
-Two benches, both on the Mac.
+Two benches, both on the x86_64 development machine.
 
-- **`test/run`** builds an arm64 Ubuntu 26.04 image with the repo's own `system/*.sh`, keeps the Nix store in a volume, and on every run does a real `home-manager switch` and the checks below. `test/run e2e` takes about 42 s warm. `test/run shots` starts a headless session with Quickshell for screenshots. Commands, caches and timings: [`docs/TESTING.md`](TESTING.md).
-- **`test/vm/run`** drives QEMU: boots the live ISO, runs a headless install, boots the result, takes screenshots and snapshots. See [`docs/INSTALL-INTERNALS.md`](INSTALL-INTERNALS.md), "Test bench".
+- **`test/run`** (`just e2e`) builds an x86_64 Ubuntu 26.04 image with the repo's own `system/*.sh`, keeps the Nix store in a volume, and on every run does a real `home-manager switch` and the checks below. `test/run shots` starts a headless session with Quickshell for screenshots. Commands, caches and timings: [`docs/TESTING.md`](TESTING.md).
+- **`test/vm/run`** drives QEMU on KVM: boots the live ISO, runs a headless install, boots the result, takes screenshots and snapshots. See [`docs/INSTALL-INTERNALS.md`](INSTALL-INTERNALS.md), "Test bench".
 
-Verified in an arm64 `ubuntu:26.04` container (user `kuba`, hostname `vm`, Nix installed with the official `--daemon` installer, daemon started by hand because there is no systemd):
+Verified in the harness's `ubuntu:26.04` container (user `kuba`, hostname `vm`, Nix installed with the official `--daemon` installer, daemon started by hand because there is no systemd):
 
-- `system/10-strip.sh`, `20-base.sh`, `50-hyprland.sh` (Ubuntu's arm64 hyprland, not the PPA) and `60-nix.sh` run clean; systemd, netplan and snapper steps skip themselves.
+- `system/10-strip.sh`, `20-base.sh`, `50-hyprland.sh` (the PPA's Hyprland) and `60-nix.sh` run clean; systemd, netplan and snapper steps skip themselves.
 - `home-manager switch --flake .#kuba@vm` builds and activates; every file in `~/.config/<dir>` and `~/.local/bin/dot-*` is a link into the store.
 - zsh login shell loads without errors (zoxide doctor quiet), PATH order, atuin Ctrl-R, direnv hook, oh-my-posh prompt, `.zprofile` sources the autostart snippet.
 - `dot-theme apply` and `dot-theme set` write every file in `~/.local/state/theme/`; tmux, Neovim (LazyVim from the lockfile), Ghostty config validation and tms work with the real configs.
 - PAM: through Nix's libpam (the same build Quickshell links), `qs-lock` accepts the right password and rejects a wrong one as a non-root user, using Ubuntu's `unix_chkpwd` linked to `/run/wrappers/bin`. Ubuntu's own modules don't load under Nix's libpam; details in `docs/INSTALL.md`.
-- Secrets, against Vaultwarden 1.37 with the official `bw` 2026.10.0 (arm64 standalone, sha256-checked by `70-bitwarden.sh`): `kubaos bitwarden setup` from logged-out to done (server prompt, password login, unlock), writes the `.pub` files, Host blocks (`ssh -G` picks the right `IdentityFile`), git signing (a commit verifies with "Good git signature" through an agent on `~/.bitwarden-ssh-agent.sock`) and keyring entries; rejects a vault field that tries to inject an ssh_config line; leaves no secret in plaintext under `$HOME`. direnv loads 5 variables (multi-line PEM and shell metacharacters intact) on `cd` in zsh and unloads them on leave; `direnv export` takes 22 ms. The agent was OpenSSH's on Bitwarden's socket path (no arm64 desktop build); gh login was tested only up to GitHub rejecting a fake token.
+- Secrets, against Vaultwarden 1.37 with the official `bw` 2026.10.0 (the standalone binary, sha256-checked by `70-bitwarden.sh`): `kubaos bitwarden setup` from logged-out to done (server prompt, password login, unlock), writes the `.pub` files, Host blocks (`ssh -G` picks the right `IdentityFile`), git signing (a commit verifies with "Good git signature" through an agent on `~/.bitwarden-ssh-agent.sock`) and keyring entries; rejects a vault field that tries to inject an ssh_config line; leaves no secret in plaintext under `$HOME`. direnv loads 5 variables (multi-line PEM and shell metacharacters intact) on `cd` in zsh and unloads them on leave; `direnv export` takes 22 ms. The agent was OpenSSH's on Bitwarden's socket path (Bitwarden desktop needs a desktop session and its own unlock); gh login was tested only up to GitHub rejecting a fake token.
 - Security key PAM without a key: `sudo`, `sudo-i` and `polkit-1` with the pam_u2f line accept the right password in about 50 ms, reject a wrong one, also with no mapping or no mapping file, and through sudo-rs. Under Nix's libpam, Ubuntu's `pam_u2f.so` fails ("Module is unknown": `libfido2.so.1` not found) and nixpkgs' through the root-owned link loads and fails in 17 ms with no key. The lock screen runs `qs-lock-u2f` every 4 s while locked, stops when the mapping goes away, and shows the hint.
 - Hyprland 0.56.2 (nixos-unstable) runs the Lua config unchanged in a NixOS VM (QEMU, virtio-gpu, llvmpipe): `--verify-config` passes, windows round and blur, panels open over windows without resizing them. Slow without KVM, so only a few stills.
 - Quickshell v0.3.2 from Nix loads the full config in headless sway (Mesa llvmpipe OpenGL) with no QML errors, and `qs ipc show` lists every contract target. Every panel, the lock screen and the terminal stack were screenshotted there (`docs/screenshots/README.md`).
@@ -492,7 +492,7 @@ Needs the real machine: LUKS + Btrfs subvolumes and the rollback drill, Hyprland
 - Fingerprint unlock in the Quickshell lock screen is untested: no reader in a container. nixpkgs' `pam_fprintd.so` loads and answers like Ubuntu's does without a reader. It's off now (`Settings.fingerprint`); hyprlock is the fallback.
 - Untested without hardware: a real FIDO2 touch (sudo, polkit, lock screen), Bitwarden desktop's SSH agent and its polkit unlock (amd64 only), and `bw` with real two-step login. `bw` can't do FIDO2 two-step login; `kubaos bitwarden setup --login apikey` is the way in for a key-only account (`docs/SECRETS.md`).
 - The in-shell polkit agent is off; hyprpolkitagent is the agent until the Quickshell one is tested on the machine.
-- The arm64 VM can't run the Hyprland Lua config from apt (the PPA is amd64 only, Ubuntu's own build is 0.53).
+- On ARM machines the session runs nixpkgs' Hyprland: the PPA is amd64 only, and Ubuntu's own build, 0.53, can't read the Lua config.
 - grub-btrfs is built from source (not packaged for 26.04) and isn't tracked by dpkg.
 - The official Nix installer has no uninstaller; the manual steps are in `docs/INSTALL.md`.
 

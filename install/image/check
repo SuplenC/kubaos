@@ -2,8 +2,9 @@
 # install/image/check: unpack a payload in a privileged Linux container and
 # check it from the inside (chroot). Prints ok/FAIL lines, exits 1 on any FAIL.
 #
-#   install/image/check [--arch aarch64|x86_64] [--payload DIR] [--keep]
+#   install/image/check [--arch x86_64|aarch64] [--payload DIR] [--keep]
 #
+#   --arch     default this machine's
 #   --payload  payload dir (default install/out/payload-<arch>)
 #   --keep     leave the unpacked tree in volume kubaos-image-check-<arch>
 #
@@ -15,7 +16,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-ARCH=aarch64 PAYLOAD="" KEEP=0
+ARCH="$(uname -m)" PAYLOAD="" KEEP=0
 die() { printf 'check: %s\n' "$*" >&2; exit 2; }
 usage() { sed -n '2,/^set -euo/{/^set -euo/d; s/^# \{0,1\}//p}' "${BASH_SOURCE[0]}"; }
 
@@ -49,5 +50,5 @@ docker run --rm --name "kubaos-image-check-$ARCH" --platform "linux/$DARCH" --pr
   -v "$VOLUME:/check" -v "$PAYLOAD:/payload" -v "$HERE/lib:/lib-image:ro" \
   -e KEEP="$KEEP" "$TOOLS" /lib-image/check-inside.sh 2>&1 | tee "$PAYLOAD/check.txt" || rc=$?
 ((KEEP)) || docker volume rm "$VOLUME" >/dev/null 2>&1 || true
-((rc)) || shasum -a 256 "$PAYLOAD/manifest.json" | cut -d' ' -f1 >"$PAYLOAD/check.ok"
+((rc)) || sha256sum "$PAYLOAD/manifest.json" | cut -d' ' -f1 >"$PAYLOAD/check.ok"
 exit "$rc"

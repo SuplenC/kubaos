@@ -10,8 +10,8 @@ The first KubaOS release: Ubuntu 26.04, Hyprland, Quickshell, your home-manager 
 |---|---|
 | `kubaos-shinjuku-0.1.0-x86_64.iso` | The laptop. This is the one you flash |
 | `kubaos-shinjuku-0.1.0-aarch64.iso` | ARM machines |
-| `kubaos-shinjuku-0.1.0-x86_64-vm.iso` | The Mac's x86_64 VM bench (`test/vm/run`). Has the bench SSH unit |
-| `kubaos-shinjuku-0.1.0-aarch64-vm.iso` | The Mac's aarch64 VM bench, fast on HVF |
+| `kubaos-shinjuku-0.1.0-x86_64-vm.iso` | The x86_64 VM bench (`test/vm/run`), on KVM. Has the bench SSH unit |
+| `kubaos-shinjuku-0.1.0-aarch64-vm.iso` | The aarch64 VM bench. Has the bench SSH unit |
 
 The `-vm` builds carry the dev SSH unit. The release builds leave openssh-server out (see `test/vm/README.md`). Each ISO has a `.sha256` and a `.txt` next to it.
 
@@ -70,7 +70,7 @@ Details are in `docs/INSTALL-INTERNALS.md`, "First boot".
 
 ## What the VM release run verified
 
-Taken 2026-10-17 on the Mac's bench (screenshots are being retaken):
+Taken 2026-10-17 on the VM bench (screenshots are being retaken):
 
 - aarch64 on HVF: keyboard-only GUI install onto an encrypted disk (53 s), GRUB menu, snapshots menu, Plymouth passphrase prompt (wrong try included), first login with setup alone, "Done for now" opens nothing else, factory snapshot boots from GRUB onto its tmpfs overlay up to the desktop.
 - x86_64 under TCG with Secure Boot on: headless install of the `tuxedo` payload, shim and signed GRUB load the theme, first login shows setup only with no keyring prompt, Bitwarden opens floating and centred at 1100x750.
@@ -98,7 +98,7 @@ None of this can be proven in a VM. Tick it on the real laptop.
 ## Known limitations
 
 - **ukiyo** is the default wallpaper in this ISO: see `docs/UKIYO.md`.
-- **TCG is slow.** x86_64 in the Mac's VM runs under TCG emulation. Quickshell needs about 70 s to load its QML, so the desktop behind setup is plain for the first two minutes, and Bitwarden shows up 79 s after "Done for now". That's emulation, not a bug. On aarch64 (HVF) and on the real laptop it's fast.
+- **TCG is slow.** A VM of another arch than its host's runs under TCG emulation. Quickshell needs about 70 s to load its QML there, so the desktop behind setup is plain for the first two minutes, and Bitwarden shows up 79 s after "Done for now". That's emulation, not a bug. On KVM and on the real laptop it's fast.
 - **Bitwarden desktop is x86_64 only.** The aarch64 ISO doesn't have it, and "Done for now" opens nothing there.
 - Under Secure Boot the GRUB menu uses the built-in font (see above).
 - The F7 and F2 keys, and everything on the hardware checklist, are unconfirmed until someone has the real machine on the desk.

@@ -26,7 +26,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean \
  && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/10kubaos-keep-cache
 
 # The kernel flavour is linux-generic on both arches: the TUXEDO needs nothing
-# else (tuxedo-drivers is DKMS, first boot), and a UTM/QEMU arm64 VM boots it.
+# else (tuxedo-drivers is DKMS, first boot), and a QEMU arm64 VM boots it.
 # grub-efi-*-signed + shim-signed: Secure Boot works on the laptop.
 RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=kubaos-image-apt-lists-${TARGETARCH},target=/var/lib/apt/lists,sharing=locked \
@@ -80,31 +80,11 @@ RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache
 FROM base AS nix
 ARG TARGETARCH
 COPY system/60-nix.sh /opt/dotfiles/system/60-nix.sh
-# amd64 on Apple Silicon runs under Rosetta, which lacks a syscall GNU tar
-# 1.35 uses to create directories ("Cannot mkdir: Function not implemented")
-# and can't load Nix's seccomp filter. So on amd64 only: the installer gets
-# bsdtar under the name `tar` (libarchive-tools is purged again after), and
-# Nix runs with filter-syscalls = false while installing (a nix.conf written
-# before the installer, which it later replaces; the sed is a safety net),
-# so the payload's Nix is configured as on the laptop.
-RUN --mount=type=cache,id=kubaos-image-apt-cache-${TARGETARCH},target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=kubaos-image-apt-lists-${TARGETARCH},target=/var/lib/apt/lists,sharing=locked \
-    eval "$(grep -E '^NIX_(VERSION|INSTALL_URL|INSTALL_SHA256)=' /opt/dotfiles/system/60-nix.sh)" \
+RUN eval "$(grep -E '^NIX_(VERSION|INSTALL_URL|INSTALL_SHA256)=' /opt/dotfiles/system/60-nix.sh)" \
  && tmp="$(mktemp -d)" && chmod 755 "$tmp" \
- && shim=() \
- && if [[ "$TARGETARCH" == amd64 ]]; then \
-      apt-get update && apt-get install -y --no-install-recommends libarchive-tools \
-      && install -d -m 0755 "$tmp/shim" && ln -s /usr/bin/bsdtar "$tmp/shim/tar" \
-      && shim=(env "PATH=$tmp/shim:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin") \
-      && install -d -m 0755 /etc/nix && echo 'filter-syscalls = false' >/etc/nix/nix.conf; \
-    fi \
  && curl --proto '=https' --tlsv1.2 -fsSL "$NIX_INSTALL_URL" -o "$tmp/install" \
  && sha256sum --quiet -c <<<"$NIX_INSTALL_SHA256  $tmp/install" \
- && runuser -u kuba -- ${shim[@]+"${shim[@]}"} sh "$tmp/install" --daemon --yes </dev/null \
- && if [[ "$TARGETARCH" == amd64 ]]; then \
-      apt-get purge -y --auto-remove libarchive-tools \
-      && sed -i '/^filter-syscalls = false$/d' /etc/nix/nix.conf; \
-    fi \
+ && runuser -u kuba -- sh "$tmp/install" --daemon --yes </dev/null \
  && rm -rf "$tmp" \
  && printf '\n# dotfiles/system/60-nix.sh\nexperimental-features = nix-command flakes\n' >>/etc/nix/nix.conf \
  && printf '\n# KubaOS: its binary cache (nix_binary_cache, system/lib.sh)\nextra-substituters = %s\nextra-trusted-public-keys = %s\n' \
