@@ -532,6 +532,11 @@ frame = 0.94
 # What darkens the desktop behind an open panel, lighter than a dialog's scrim:
 # a panel sits beside the windows rather than over a question.
 panel_scrim = 0.20
+# Where Hyprland starts blurring behind the frame's layer (its `ignore_alpha`): only the glass.
+# The layer also draws a scrim and, over it, the panels' shadow, which cover up to 0.81 together
+# (`scrim` under `shadow.panel` at `frame`); a cut-off under that blurs a ragged band of the
+# desktop under the bar, which cuts a window's top border off in steps beside an open panel.
+frame_blur = 0.85
 # A panel's surface over the blurred wallpaper it floats on, so the photo shows through as
 # glass: Kōbō's panel.
 glass = 0.80
