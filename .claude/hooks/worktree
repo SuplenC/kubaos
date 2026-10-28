@@ -90,8 +90,15 @@ remove() {
   else
     git -C "$main" worktree prune >&2
   fi
+  # The branch goes only when its commits are already on main's HEAD or the remote's default branch:
+  # one an agent committed to and never pushed stays, so removing a worktree never loses work.
   if git -C "$main" rev-parse --verify --quiet "refs/heads/worktree-$name" >/dev/null; then
-    git -C "$main" branch -D "worktree-$name" >&2
+    if git -C "$main" merge-base --is-ancestor "worktree-$name" HEAD ||
+      git -C "$main" merge-base --is-ancestor "worktree-$name" origin/HEAD 2>/dev/null; then
+      git -C "$main" branch -D "worktree-$name" >&2
+    else
+      echo "worktree hook: worktree-$name has commits main hasn't; kept" >&2
+    fi
   fi
 }
 

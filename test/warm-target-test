@@ -357,6 +357,19 @@ the_remove_hook_keeps_a_branch_of_another_name() {
   git -C "$M" rev-parse --verify --quiet refs/heads/chore/the-work >/dev/null
 }
 
+the_remove_hook_keeps_a_branch_with_commits_main_lacks() {
+  local dir="$M/.claude/worktrees/agent-x"
+  hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" >/dev/null 2>&1
+  printf 'work\n' >"$dir/work"
+  git -C "$dir" add work
+  git -C "$dir" -c user.name=test -c user.email=test@kubaos -c commit.gpgsign=false commit -qm work
+
+  hook remove "{\"worktree_path\": \"$dir\"}" >/dev/null 2>&1
+
+  [[ ! -e $dir ]] || { echo "$dir is still there"; return 1; }
+  git -C "$M" rev-parse --verify --quiet refs/heads/worktree-agent-x >/dev/null
+}
+
 the_remove_hook_deletes_the_branch_of_a_worktree_already_gone() {
   local dir="$M/.claude/worktrees/agent-x"
   hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" >/dev/null 2>&1
@@ -392,7 +405,7 @@ for t in a_worktree_gets_the_main_checkouts_target the_worktree_is_found_from_th
   the_create_hook_still_makes_the_worktree_without_reflinks \
   the_create_hook_refuses_a_name_that_leaves_the_worktrees_folder \
   the_remove_hook_removes_the_worktree_and_its_branch the_remove_hook_keeps_a_branch_of_another_name \
-  the_remove_hook_deletes_the_branch_of_a_worktree_already_gone \
+  the_remove_hook_keeps_a_branch_with_commits_main_lacks the_remove_hook_deletes_the_branch_of_a_worktree_already_gone \
   the_remove_hook_refuses_a_path_outside_the_worktrees_folder; do
   test_case "${t//_/ }" "$t"
 done
