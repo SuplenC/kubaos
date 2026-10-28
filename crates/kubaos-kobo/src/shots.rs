@@ -44,6 +44,7 @@ use kubaos_geometry::Rules;
 use kubaos_ui::Look;
 use kubaos_ui::Mode;
 use kubaos_ui::Scale;
+use kubaos_ui::motion::Motion;
 use kubaos_ui::probe::Collect;
 use kubaos_ui::tokens;
 use kubaos_ui::tokens::Space;
@@ -60,6 +61,7 @@ use crate::backend::demo_probe;
 use crate::battery::Battery;
 use crate::battery::Supply;
 use crate::progress::Install;
+use crate::progress::Outcome;
 use crate::setup::Setup;
 
 /// The window every screen is laid out in, in logical pixels: Kōbō's opening size.
@@ -99,8 +101,8 @@ fn mode_name(mode: Mode) -> &'static str {
 }
 
 /// `view` laid out in [`WINDOW`] at `look`'s scale: its boxes, as the geometry check reads them,
-/// and, when `shot` names a file, its pixels written there.
-fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>) -> Frame {
+/// and, when `shot` names a file, its pixels written there, drawn as a frame at `now`.
+fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>, now: Instant) -> Frame {
     let mut renderer = headless();
     let factor = look.scale.factor();
     let mut ui = UserInterface::build(view, WINDOW, user_interface::Cache::default(), &mut renderer);
@@ -109,7 +111,7 @@ fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>
     if let Some(path) = shot {
         let mut messages = Vec::new();
         let _ = ui.update(
-            &[Event::Window(window::Event::RedrawRequested(Instant::now()))],
+            &[Event::Window(window::Event::RedrawRequested(now))],
             mouse::Cursor::Unavailable,
             &mut renderer,
             &mut clipboard::Null,
@@ -181,6 +183,17 @@ fn settle_setup(s: &mut Setup) {
 
 fn take_app(out: &mut Out, name: &str, app: &mut App) {
     settle_app(app);
+    take_every_look(out, name, app);
+}
+
+/// The screen `since` it arrived, everything else settled: a moment of its own sequence.
+fn take_app_at(out: &mut Out, name: &str, app: &mut App, since: Duration) {
+    settle_app(app);
+    app.transition.0 = ago(app.now, since);
+    take_every_look(out, name, app);
+}
+
+fn take_every_look(out: &mut Out, name: &str, app: &mut App) {
     let page = format!("install-{name}");
     for mode in MODES {
         for scale in Scale::SUPPORTED {
@@ -191,7 +204,7 @@ fn take_app(out: &mut Out, name: &str, app: &mut App) {
                 .shots
                 .as_ref()
                 .map(|dir| dir.join(format!("{page}-{}-{}x.png", mode_name(mode), scale.factor())));
-            let frame = take(crate::view::view(app), &look, &page, shot.as_deref());
+            let frame = take(crate::view::view(app), &look, &page, shot.as_deref(), app.now);
             out.frames.push(frame);
         }
     }
@@ -211,7 +224,7 @@ fn take_setup(out: &mut Out, name: &str, s: &mut Setup) {
                 .shots
                 .as_ref()
                 .map(|dir| dir.join(format!("{page}-{}-{}x.png", mode_name(mode), scale.factor())));
-            let frame = take(crate::setup::view(s), &look, &page, shot.as_deref());
+            let frame = take(crate::setup::view(s), &look, &page, shot.as_deref(), s.now);
             out.frames.push(frame);
         }
     }
@@ -463,11 +476,35 @@ fn install_states(out: &mut Out) {
     take_app(out, "failed-log-saved", &mut app);
 }
 
+/// The done screen as an install of `took` leaves it, just arrived.
+fn done_app(took: Duration) -> App {
+    let mut app = app_with(Ok(demo_probe()));
+    let mut install = Install::new(Instant::now());
+    install.outcome = Some(Outcome::Done { elapsed: took });
+    app.install = Some(install);
+    app.form.username = "kuba".into();
+    let _ = app.go(Screen::Done);
+    app
+}
+
+/// The done screen through its sequence: the strokes writing in, the headline arriving, the hanko
+/// coming down, just after impact; then with reduce motion, everything in place from the start.
+/// The tour's stop is the settled screen.
+fn done_states(out: &mut Out) {
+    let mut app = done_app(Duration::from_secs(108));
+    for (name, ms) in [("0.5s", 500), ("1.5s", 1500), ("2.7s", 2700), ("3.2s", 3200)] {
+        take_app_at(out, &format!("done-{name}"), &mut app, Duration::from_millis(ms));
+    }
+    app.motion = Motion::default().reduced();
+    take_app_at(out, "done-reduced-motion", &mut app, Duration::ZERO);
+}
+
 /// Every stop and state, taken into `out`.
 fn every_screen(out: &mut Out) {
     load_fonts();
     install_tour(out);
     install_states(out);
+    done_states(out);
     setup_tour(out, demo::Machine::Tuxedo, crate::setup::tour::script());
     setup_tour(out, demo::Machine::Vm, crate::setup::tour::script_vm());
     setup_tour(out, demo::Machine::Installed, crate::setup::tour::script_bitwarden());
@@ -519,4 +556,33 @@ fn shots() {
         frames: Vec::new(),
     };
     every_screen(&mut out);
+}
+
+/// The done screen's sequence frame by frame, for a recording: `done-NNN.png` in the directory,
+/// at `KOBO_DONE_FPS` frames a second (30 by default) for four seconds, at 1×, dark.
+#[test]
+#[ignore = "writes frames: KOBO_DONE_FRAMES=DIR"]
+fn done_frames() {
+    let Some(dir) = std::env::var_os("KOBO_DONE_FRAMES") else {
+        say("set KOBO_DONE_FRAMES=DIR");
+        return;
+    };
+    let dir = PathBuf::from(dir);
+    std::fs::create_dir_all(&dir).expect("create the frames directory");
+    let fps: u32 = std::env::var("KOBO_DONE_FPS")
+        .ok()
+        .and_then(|f| f.parse().ok())
+        .unwrap_or(30);
+    load_fonts();
+    let mut app = done_app(Duration::from_secs(108));
+    settle_app(&mut app);
+    let arrived = ago(app.now, Duration::from_secs(5));
+    for frame in 0..4 * fps {
+        app.transition.0 = arrived;
+        // design-allow(duration): a second divided into the recording's frames, not motion.
+        app.now = arrived + Duration::from_secs(1) * frame / fps;
+        let look = app.look();
+        let path = dir.join(format!("done-{frame:03}.png"));
+        take(crate::view::view(&app), &look, "done", Some(&path), app.now);
+    }
 }

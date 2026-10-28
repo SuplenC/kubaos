@@ -137,6 +137,11 @@ scrollbar = 4
 # caption text without making the line taller, and never narrower than tall,
 # so a one-letter key is square.
 keycap = 20
+# The クバ mark drawn as lit neon tubes on Kōbō's done screen, with room inside for the glow
+# around them: the mark's 120 unit drawing at 200, as in the draft Kuba picked.
+neon_mark = 200
+# The 完了 hanko stamped beside it.
+hanko = 120
 
 # A page's or a panel's body: its padding on every side, by its own width.
 # Tailwind's container, `px-4 sm:px-6 lg:px-8`, on Tailwind's default
@@ -186,7 +191,7 @@ line = 72
 icon = 48
 weight = "semibold"
 family = "sans"
-use = "Words at the hero size: Kōbō's welcome line, and nothing else."
+use = "Words at the hero size: Kōbō's welcome line and its done screen's headline, and nothing else."
 
 [type.hero_number]
 size = 64
@@ -202,7 +207,7 @@ line = 56
 icon = 48
 weight = "semibold"
 family = "sans"
-use = "The heading of a full-screen moment other than the welcome: Kōbō's done screen."
+use = "The heading of a full-screen moment other than Kōbō's welcome and done screens."
 
 [type.title]
 size = 32
@@ -528,6 +533,10 @@ inverse_primary = "inverse_primary"
 # Amber, between fine and the error colour: a reading close to its limit.
 # Material 3 has no such role.
 warning = ""
+# The white-hot core along the middle of a lit neon tube, in `primary` and in `cold`: the
+# logo's own (branding/make.py). Light is emitted, so it is the same in both modes.
+primary_core = ""
+cold_core = ""
 
 [color.dark]
 primary = "#ffb779"
@@ -569,6 +578,8 @@ inverse_surface = "#f0dfd4"
 inverse_on_surface = "#382f27"
 inverse_primary = "#8e4e00"
 warning = "#f2c14e"
+primary_core = "#ffe6cf"
+cold_core = "#dcf1ff"
 
 [color.light]
 primary = "#8b4c00"
@@ -611,6 +622,8 @@ inverse_on_surface = "#ffeee2"
 inverse_primary = "#ffb779"
 # Amber dark enough for text on the light surfaces (6.1:1 on `surface`).
 warning = "#7a5900"
+primary_core = "#ffe6cf"
+cold_core = "#dcf1ff"
 
 # Every foreground role the front ends draw on a background role, and the
 # contrast it needs (WCAG 2.1 AA): `text` 4.5:1; `large_text` 3:1, for 24 px
@@ -660,14 +673,16 @@ pairs = [
   { fg = "on_surface", bg = "surface_container_high", need = "text", use = "An Action's title in the Action panel, a chip" },
   { fg = "tertiary", bg = "surface", need = "text", use = "The clock's Copied line" },
   { fg = "on_surface", bg = "surface_container_lowest", need = "text", use = "The lock screen before its wallpaper loads" },
+  { fg = "primary_container", bg = "surface_container_lowest", need = "large_text", use = "The 完了 hanko on Kōbō's done screen" },
 ]
 # Roles a front end draws only as decoration, with no text or meaning drawn on
 # them: no pair is needed. `outline_variant`, dividers and soft edges;
 # `secondary`, a faint tint under a group of workspaces; `shadow` and `scrim`;
 # `cold_container` and `surface_bright`, the segments of Kōbō's partition bar,
-# which its legend names. `kubaos-design contrast` fails on a role drawn with
+# which its legend names; `primary_core` and `cold_core`, the hot middle of a
+# neon tube, drawn on the tube. `kubaos-design contrast` fails on a role drawn with
 # that is in no pair and not here.
-decorative = ["cold_container", "outline_variant", "scrim", "secondary", "shadow", "surface_bright"]
+decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", "scrim", "secondary", "shadow", "surface_bright"]
 
 # KubaOS Symbols: every symbol Kōbō and the shell draw, by the Material
 # Symbols name it replaces. Each is Tabler's outline icon of that name

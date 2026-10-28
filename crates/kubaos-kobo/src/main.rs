@@ -18,6 +18,7 @@ mod app;
 mod backend;
 mod battery;
 mod data;
+mod done;
 mod edit;
 mod model;
 mod pointer;

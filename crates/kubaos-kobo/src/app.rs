@@ -389,6 +389,9 @@ pub struct App {
     pub system_scale: f32,
     /// Light or dark. Dark on the live ISO; the screenshots draw both.
     pub mode: Mode,
+    /// How things move: the tokens' durations, until Kōbō reads the speed and reduce-motion
+    /// settings. The done screen's sequence follows it; the shots draw it reduced too.
+    pub motion: Motion,
     fixed_scale: Option<f32>,
     /// The switch that last flipped, and when (its knob slides).
     pub switched: Option<(F, Instant)>,
@@ -467,6 +470,7 @@ impl App {
             ui_scale: 1.0,
             system_scale: 1.0,
             mode: Mode::Dark,
+            motion: Motion::default(),
             fixed_scale: None,
             nudged: None,
             pointer_idle: false,
@@ -708,6 +712,7 @@ impl App {
             || self.power.is_some_and(|m| m.stopping.is_some())
             || self.shutting_down.is_some()
             || self.glide.is_some()
+            || (self.screen == Screen::Done && crate::done::moving(self.transition.0, t, self.motion))
     }
 
     pub fn subscription(&self) -> Subscription<Message> {

@@ -34,6 +34,9 @@ iced = { version = "0.14", default-features = false, features = [
   "advanced",
 ] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+# Rasterises the done screen's hanko once, from its outline. iced's tiny-skia renderer already
+# builds it, with these features.
+tiny-skia = { version = "0.11", default-features = false, features = ["std", "simd"] }
 
 [dev-dependencies]
 # Lays views out headlessly, so widget sizes can be tested.
