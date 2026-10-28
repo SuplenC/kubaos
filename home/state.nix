@@ -85,10 +85,11 @@ in
   config = lib.mkMerge [
     # home-manager imports the user's nixpkgs again with `nixpkgs.config`.
     # Set here, it takes the place of the config of the pkgs mkHome was given
-    # (nixpkgs' defaults, for the user flake's legacyPackages); a user's own
-    # `nixpkgs.config` in home.nix merges with it, and their
-    # `allowUnfree = true` wins over the predicate.
-    { nixpkgs.config.allowUnfreePredicate = _: allowUnfree; }
+    # (nixpkgs' defaults, for the user flake's legacyPackages), and a user's
+    # own `nixpkgs.config` in home.nix merges with it key by key. Off, nothing
+    # is set, so nixpkgs' default refuses unfree packages and the user's
+    # `allowUnfreePredicate` or `allowUnfree` still decide.
+    (lib.mkIf allowUnfree { nixpkgs.config.allowUnfree = true; })
     (lib.mkIf present {
       home.packages = lib.mapAttrsToList package listed;
       kubaos.suites = suites;

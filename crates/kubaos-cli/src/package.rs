@@ -27,6 +27,7 @@
 //! - The `home.nix` migration and the restore: `kubaos_core::state`.
 //! - The switch: `job.rs`.
 
+use std::collections::BTreeSet;
 use std::io::IsTerminal;
 use std::path::PathBuf;
 use std::process::Command;
@@ -90,7 +91,7 @@ pub enum PackageCmd {
     Unfree {
         to: Option<OnOff>,
         /// Only record it; the next switch applies it.
-        #[arg(long)]
+        #[arg(long, requires = "to")]
         no_switch: bool,
         #[command(flatten)]
         mode: SwitchMode,
@@ -132,7 +133,10 @@ pub fn try_main(name: &str) -> ExitCode {
         Ok(paths) => paths,
         Err(e) => return usage_error(e),
     };
-    let argv = match try_command(paths.flake(), name) {
+    // A `nixpkgs.toml` that doesn't read fails the home's build, which says why; `try` goes on
+    // with the default.
+    let unfree = Setting::read(paths.state_dir().root()).unwrap_or_default();
+    let argv = match try_command(paths.flake(), name, unfree) {
         Ok(argv) => argv,
         Err(e) => return usage_error(e),
     };
@@ -293,7 +297,9 @@ fn unfree(paths: &Paths, to: Option<OnOff>, no_switch: bool, mode: SwitchMode) -
     if let Err(code) = need_user_flake(paths) {
         return code;
     }
+    let already = setting.get().is_ok_and(|current| current == wanted);
     if wanted == Unfree::Refused
+        && !already
         && let Err(code) = refuse_installed_unfree(paths)
     {
         return code;
@@ -334,20 +340,28 @@ fn refuse_installed_unfree(paths: &Paths) -> Result<(), ExitCode> {
     for name in &unfree {
         err!("kubaos: {name} is unfree ({})", origins(&declared, name).join(", "));
     }
-    let removable: Vec<&str> = unfree
-        .iter()
-        .copied()
-        .filter(|name| declared.origins(name).contains(&Origin::Packages))
-        .collect();
-    let them = if unfree.len() == 1 { "it" } else { "them" };
-    if removable.is_empty() {
-        err!("kubaos: remove {them} before turning unfree packages off");
-    } else {
-        err!(
-            "kubaos: remove {them} before turning unfree packages off: kubaos package remove {}",
-            removable.join(" ")
-        );
+    let mut added = Vec::new();
+    let mut suites = BTreeSet::new();
+    for name in &unfree {
+        for origin in declared.origins(name) {
+            match origin {
+                Origin::Packages => added.push(*name),
+                Origin::Suite(suite) => {
+                    suites.insert(suite);
+                }
+            }
+        }
     }
+    let mut ways: Vec<String> = Vec::new();
+    if !added.is_empty() {
+        ways.push(format!("kubaos package remove {}", added.join(" ")));
+    }
+    ways.extend(suites.into_iter().map(|suite| format!("kubaos suite remove {suite}")));
+    let them = if unfree.len() == 1 { "it" } else { "them" };
+    err!(
+        "kubaos: remove {them} before turning unfree packages off: {}",
+        ways.join(", then ")
+    );
     Err(ExitCode::FAILURE)
 }
 

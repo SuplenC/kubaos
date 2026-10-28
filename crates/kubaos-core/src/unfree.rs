@@ -29,7 +29,6 @@ use std::process::Command;
 use std::process::Stdio;
 
 use serde::Deserialize;
-use serde::Serialize;
 
 use crate::packages::InvalidName;
 use crate::packages::validate_name;
@@ -107,7 +106,7 @@ pub enum SettingError {
     Git(#[source] GitError),
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize)]
 struct NixpkgsFile {
     allow_unfree: Option<bool>,
 }
@@ -180,14 +179,11 @@ impl Setting {
             path: self.file.clone(),
             source,
         };
-        let body = toml::to_string(&NixpkgsFile {
-            allow_unfree: Some(unfree == Unfree::Allowed),
-        })
-        .map_err(|e| write_err(io::Error::other(e)))?;
         if let Some(dir) = self.file.parent() {
             fs::create_dir_all(dir).map_err(write_err)?;
         }
-        write_atomic(&self.file, &format!("{HEADER}{body}")).map_err(write_err)
+        let allow = unfree == Unfree::Allowed;
+        write_atomic(&self.file, &format!("{HEADER}allow_unfree = {allow}\n")).map_err(write_err)
     }
 }
 
@@ -196,7 +192,8 @@ impl Setting {
 pub enum License {
     Free,
     Unfree,
-    /// The name is no package in the user's nixpkgs, or its meta doesn't evaluate.
+    /// The name is no package in the user's nixpkgs, its meta doesn't evaluate, or it is no
+    /// package name at all.
     Unknown,
 }
 
@@ -292,9 +289,6 @@ pub struct LicenseCheck {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum CheckError {
-    /// One of the names is not a package name.
-    #[error("invalid package name")]
-    InvalidName(#[source] InvalidName),
     /// `nix` could not be started.
     #[error("running {program}")]
     Spawn {
@@ -302,12 +296,15 @@ pub enum CheckError {
         #[source]
         source: io::Error,
     },
-    /// `nix eval` failed; `message` is the last line it printed on stderr.
+    /// `nix eval` failed; `message` is its error line.
     #[error("nix eval failed ({status}): {message}")]
     Failed { status: String, message: String },
-    /// `nix eval` printed something other than one license per name.
+    /// `nix eval` printed something other than a JSON list of licenses.
     #[error("reading what nix eval printed")]
     Answer(#[source] serde_json::Error),
+    /// `nix eval` printed a list of another length than the names it was asked about.
+    #[error("nix eval answered {got} licenses for {asked} packages")]
+    Mismatch { asked: usize, got: usize },
 }
 
 impl LicenseCheck {
@@ -336,14 +333,18 @@ impl LicenseCheck {
     /// [`InvalidName`] when a name is not a package name, which also keeps every name safe as a
     /// Nix string.
     pub fn command(&self, names: &[impl AsRef<str>]) -> Result<Vec<OsString>, InvalidName> {
-        let mut quoted = Vec::with_capacity(names.len());
-        for name in names {
-            let name = name.as_ref();
+        let names: Vec<&str> = names.iter().map(AsRef::as_ref).collect();
+        for name in &names {
             validate_name(name)?;
-            quoted.push(format!("\"{name}\""));
         }
+        Ok(self.argv(&names))
+    }
+
+    /// [`Self::command`] for names already validated.
+    fn argv(&self, names: &[&str]) -> Vec<OsString> {
+        let quoted: Vec<String> = names.iter().map(|name| format!("\"{name}\"")).collect();
         let list = format!("[ {} ]", quoted.join(" "));
-        Ok(vec![
+        vec![
             self.program.clone(),
             "eval".into(),
             "--json".into(),
@@ -352,20 +353,29 @@ impl LicenseCheck {
             format!("nixpkgs#legacyPackages.{}", self.system).into(),
             "--apply".into(),
             format!("{UNFREE_OF} {list}").into(),
-        ])
+        ]
     }
 
-    /// Whether each of `names` is unfree, from one `nix eval`. No names runs nothing.
+    /// Whether each of `names` is unfree, from one `nix eval`. A name that is no package name
+    /// (a hand edit of a state file) is [`License::Unknown`] and never reaches Nix; no names to ask
+    /// about runs nothing.
     ///
     /// # Errors
     ///
-    /// [`CheckError`] when a name is invalid, or `nix eval` can't start, fails or answers
-    /// something else.
+    /// [`CheckError`] when `nix eval` can't start, fails or answers something else.
     pub fn run(&self, names: &[impl AsRef<str>]) -> Result<Licenses, CheckError> {
-        if names.is_empty() {
-            return Ok(Licenses::default());
+        let (asked, odd): (Vec<&str>, Vec<&str>) = names
+            .iter()
+            .map(AsRef::as_ref)
+            .partition(|name| validate_name(name).is_ok());
+        let mut by_name: BTreeMap<String, License> = odd
+            .into_iter()
+            .map(|name| (name.to_owned(), License::Unknown))
+            .collect();
+        if asked.is_empty() {
+            return Ok(Licenses { by_name });
         }
-        let argv = self.command(names).map_err(CheckError::InvalidName)?;
+        let argv = self.argv(&asked);
         let program = self.program.to_string_lossy().into_owned();
         let out = Command::new(&argv[0])
             .args(&argv[1..])
@@ -373,39 +383,36 @@ impl LicenseCheck {
             .output()
             .map_err(|source| CheckError::Spawn { program, source })?;
         if !out.status.success() {
-            let stderr = String::from_utf8_lossy(&out.stderr);
             return Err(CheckError::Failed {
                 status: out.status.to_string(),
-                message: stderr
-                    .lines()
-                    .rev()
-                    .find(|l| !l.trim().is_empty())
-                    .unwrap_or("")
-                    .trim()
-                    .to_owned(),
+                message: error_line(&String::from_utf8_lossy(&out.stderr)),
             });
         }
         let answers: Vec<Option<bool>> = serde_json::from_slice(&out.stdout).map_err(CheckError::Answer)?;
-        if answers.len() != names.len() {
-            return Err(CheckError::Answer(serde::de::Error::invalid_length(
-                answers.len(),
-                &"one value per package",
-            )));
+        if answers.len() != asked.len() {
+            return Err(CheckError::Mismatch {
+                asked: asked.len(),
+                got: answers.len(),
+            });
         }
-        let by_name = names
-            .iter()
-            .zip(answers)
-            .map(|(name, unfree)| {
-                let license = match unfree {
-                    Some(true) => License::Unfree,
-                    Some(false) => License::Free,
-                    None => License::Unknown,
-                };
-                (name.as_ref().to_owned(), license)
-            })
-            .collect();
+        for (name, unfree) in asked.into_iter().zip(answers) {
+            let license = match unfree {
+                Some(true) => License::Unfree,
+                Some(false) => License::Free,
+                None => License::Unknown,
+            };
+            by_name.insert(name.to_owned(), license);
+        }
         Ok(Licenses { by_name })
     }
+}
+
+/// The line of Nix's `stderr` that says what failed: its first `error:` line, else its last line,
+/// since the lines after an error are hints and the trace before it is long.
+fn error_line(stderr: &str) -> String {
+    let mut lines = stderr.lines().map(str::trim).filter(|line| !line.is_empty());
+    let error = lines.clone().find(|line| line.starts_with("error:"));
+    error.or_else(|| lines.next_back()).unwrap_or("").to_owned()
 }
 
 /// Licenses from names and their licenses.

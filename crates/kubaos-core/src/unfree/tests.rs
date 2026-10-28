@@ -16,14 +16,14 @@ fn setting(dir: &Path) -> Setting {
 }
 
 /// A fake `nix` in `dir` that saves its arguments, one per line, to `dir/args`, prints `stdout`
-/// and `stderr`, and exits with `code`.
+/// and `stderr` (each `\n` in it a new line), and exits with `code`.
 fn fake_nix(dir: &Path, stdout: &str, stderr: &str, code: i32) -> PathBuf {
     let path = dir.join("nix");
     let args = dir.join("args");
     fs::write(
         &path,
         format!(
-            "#!/bin/sh\nprintf '%s\\n' \"$@\" >'{}'\nprintf '%s' '{stdout}'\nprintf '%s\\n' '{stderr}' >&2\nexit {code}\n",
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" >'{}'\nprintf '%s' '{stdout}'\nprintf '%b\\n' '{stderr}' >&2\nexit {code}\n",
             args.display()
         ),
     )
@@ -169,15 +169,34 @@ fn the_check_runs_nothing_without_names() {
 }
 
 #[test]
-fn a_failed_nix_eval_is_an_error_with_its_last_line() {
+fn a_failed_nix_eval_is_an_error_with_its_error_line() {
     let tmp = tempfile::tempdir().unwrap();
-    let nix = fake_nix(tmp.path(), "", "error: cannot find flake 'flake:nixpkgs'", 1);
+    let nix = fake_nix(
+        tmp.path(),
+        "",
+        "warning: Git tree is dirty\\nerror: cannot find flake flake:nixpkgs\\n       hint: check the registry",
+        1,
+    );
     let check = LicenseCheck::new("/flake").with_program(&nix);
 
     let err = check.run(&["discord"]).unwrap_err();
 
     assert!(matches!(err, CheckError::Failed { .. }), "{err:?}");
-    assert!(err.to_string().contains("cannot find flake"), "{err}");
+    assert!(
+        err.to_string().ends_with("error: cannot find flake flake:nixpkgs"),
+        "{err}"
+    );
+}
+
+#[test]
+fn a_failed_nix_eval_without_an_error_line_gives_its_last_line() {
+    let tmp = tempfile::tempdir().unwrap();
+    let nix = fake_nix(tmp.path(), "", "warning: something\\nKilled", 137);
+    let check = LicenseCheck::new("/flake").with_program(&nix);
+
+    let err = check.run(&["discord"]).unwrap_err();
+
+    assert!(err.to_string().ends_with(": Killed"), "{err}");
 }
 
 #[test]
@@ -188,7 +207,44 @@ fn an_answer_with_a_value_missing_is_an_error() {
 
     let err = check.run(&["discord", "hello"]).unwrap_err();
 
+    assert!(matches!(err, CheckError::Mismatch { asked: 2, got: 1 }), "{err:?}");
+}
+
+#[test]
+fn an_answer_that_is_not_a_list_of_licenses_is_an_error() {
+    let tmp = tempfile::tempdir().unwrap();
+    let nix = fake_nix(tmp.path(), "{}", "", 0);
+    let check = LicenseCheck::new("/flake").with_program(&nix);
+
+    let err = check.run(&["discord"]).unwrap_err();
+
     assert!(matches!(err, CheckError::Answer(_)), "{err:?}");
+}
+
+#[test]
+fn a_name_that_is_no_package_name_is_unknown_and_never_reaches_nix() {
+    let tmp = tempfile::tempdir().unwrap();
+    let nix = fake_nix(tmp.path(), "[true]", "", 0);
+    let check = LicenseCheck::new("/flake").with_program(&nix);
+
+    let found = check.run(&["discord", "not a name"]).unwrap();
+
+    assert_eq!(found.get("discord"), License::Unfree);
+    assert_eq!(found.get("not a name"), License::Unknown);
+    let args = fs::read_to_string(tmp.path().join("args")).unwrap();
+    assert!(!args.contains("not a name"), "{args}");
+}
+
+#[test]
+fn only_names_that_are_no_package_names_run_nothing() {
+    let tmp = tempfile::tempdir().unwrap();
+    let nix = fake_nix(tmp.path(), "[]", "", 0);
+    let check = LicenseCheck::new("/flake").with_program(&nix);
+
+    let found = check.run(&["not a name"]).unwrap();
+
+    assert_eq!(found.get("not a name"), License::Unknown);
+    assert!(!tmp.path().join("args").exists());
 }
 
 #[test]
