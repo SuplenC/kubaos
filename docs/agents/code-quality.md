@@ -2,9 +2,11 @@
 
 How KubaOS's code is written. The rules come from Kotodama's guide (`SuplenC/kotodama`, `docs/agents/code-quality.md`), adapted to a repo that is mostly shell, Nix, QML and Lua around a few Rust crates. Each Rust rule names its source: Microsoft's Pragmatic Rust Guidelines (`M-…`), the Rust API Guidelines (`C-…`), the std docs, or **kubaos** where the choice is this project's own.
 
-New code follows every rule here. Older code is brought in line where you touch it: edit the lines you change in the new style, without restyling the rest of the file in the same PR. A restyle of a whole file or crate is its own PR.
+New code follows every rule here. Older code is brought in line where you touch it: edit the lines you change in the new style, without restyling the rest of the file in the same PR. A restyle of a whole file or crate is its own PR. The formatting and the lints below already hold for every crate: the tools enforce them.
 
-Tools check some of these rules: `shellcheck` in the shell harness (`test/lib/e2e.sh`), `nix fmt`, clippy, and the design checks (`just design-check`, below). The reviewer checks the rest.
+Tools check some of these rules: `shellcheck` in the shell harness (`test/lib/e2e.sh`), `nix fmt`, rustfmt and clippy (`just fmt-check`, `just lint`), and the design checks (`just design-check`, below). The reviewer checks the rest.
+
+`just check` runs what a pull request must pass: `fmt-check`, `lint`, the workspace's tests (`just nextest`) and `design-check`. Run it in `nix develop`, which pins the toolchain from `flake.lock`; CI runs the same recipes on every pull request (`.github/workflows/check.yml`), with `nix flake check --no-build`.
 
 ## Comments, in every language
 
@@ -53,7 +55,7 @@ Comments are written for a human: the developer reading the code to understand i
 
 - **`TODO(#77): <the action>; <why it waits>.`** Every TODO has an open issue, so the work is visible; whoever writes the TODO opens the issue first. The sentence still stands alone.
 - **The PR that closes an issue removes its TODOs.**
-- **`FIXME` and `XXX` are not used.**
+- **`FIXME` and `XXX` are not used**, and no `todo!()` or `unimplemented!()` is left behind (clippy `todo`, `unimplemented`).
 
 ### Tests
 
@@ -73,18 +75,19 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 
 ### Formatting and layout
 
+- **`just fmt` formats; `just fmt-check` checks.** They run the nightly rustfmt `nix develop` provides (`RUSTFMT`) with the root `rustfmt.toml`, then turn the `use foo::{self};` rustfmt leaves into `use foo;` (`scripts/self-imports`). `cargo fmt`, rust-analyzer and `nix fmt` in the devshell format the same way. Most of `rustfmt.toml`'s options are unstable: a stable rustfmt warns that it skips them and formats the rest with its defaults, so the recipes refuse a rustfmt that warns. Outside the devshell, set `RUSTFMT` to a nightly rustfmt. `vendor/` keeps its upstream layout. Source: kubaos.
 - **Imports: three blocks, one item per `use`.** `std`, then external crates, then `crate`/`super`/`self`, a blank line between. A module is imported as `use std::io;`, never `use std::io::{self};`. Source: kubaos (from Kotodama).
 - **`std::` paths everywhere**, not `core::`/`alloc::`. Source: kubaos.
 - **Line width 120.** Source: kubaos.
 - **A module with children is `foo.rs` beside `foo/`**, never `foo/mod.rs`. Clippy `mod_module_files`. Source: kubaos.
 - **Test helpers under `tests/` live in `tests/support/<name>.rs`**, included with `#[path = "support/<name>.rs"] mod <name>;`. A file directly in `tests/` is a target of its own. Source: kubaos.
-- **No `unsafe`.** A crate opens with `#![forbid(unsafe_code)]`. If an FFI boundary ever needs it, each `unsafe` block carries a `// SAFETY:` comment saying why every requirement of the call holds. Source: M-UNSAFE.
+- **No `unsafe`.** `unsafe_code = "forbid"` in `[workspace.lints.rust]`. If an FFI boundary ever needs it, the lint becomes `deny`, so that one module can take `#[expect(unsafe_code, reason = "…")]`, and each `unsafe` block carries a `// SAFETY:` comment saying why every requirement of the call holds (clippy `undocumented_unsafe_blocks`). Source: M-UNSAFE.
 
 ### Lints
 
-- **Clippy is clean under `-D warnings`, with `pedantic` on.** Source: M-STATIC-VERIFICATION.
-- **Silence a lint with `#[expect(lint, reason = "…")]`**, at the narrowest item. `#[allow]` is for generated code and macro output only. Source: M-LINT-OVERRIDE-EXPECT.
-- Beyond pedantic: `allow_attributes`, `clone_on_ref_ptr`, `dbg_macro`, `manual_let_else`, `mod_module_files`, `return_self_not_must_use`, `unwrap_used` (off in tests). The `[workspace.lints]` of Kotodama's root `Cargo.toml` is the reference set when a KubaOS workspace adopts them.
+- **Clippy is clean under `-D warnings`, with `pedantic` on.** Every crate takes the root `Cargo.toml`'s `[workspace.lints]` with `[lints] workspace = true`. `just lint` runs the two passes: the code with `-D warnings`, then every target with `-D warnings -A clippy::unwrap_used`, since tests may unwrap. `vendor/` isn't a member, so neither pass lints it. Source: M-STATIC-VERIFICATION.
+- **Silence a lint with `#[expect(lint, reason = "…")]`**, at the narrowest item. `#[allow]` is for generated code and macro output only, and carries a reason too. Clippy `allow_attributes`, `allow_attributes_without_reason`. Source: M-LINT-OVERRIDE-EXPECT.
+- Beyond pedantic: `allow_attributes`, `allow_attributes_without_reason`, `clone_on_ref_ptr`, `dbg_macro`, `manual_let_else`, `mod_module_files`, `print_stderr`, `print_stdout`, `return_self_not_must_use`, `todo`, `undocumented_unsafe_blocks`, `unimplemented`, `unwrap_used` (off in tests). The `[workspace.lints]` of Kotodama's root `Cargo.toml` is the reference set.
 
 ### Errors
 
@@ -144,7 +147,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 ### Logging
 
 - **Log with the `log` (or `tracing`) macros**, one event per fact, with the values in the message.
-- **No `println!`, `eprintln!` or `dbg!`** outside a binary's user-facing output (the `kubaos` command, the CLI's progress). Source: M-LOG-NOT-PRINT.
+- **No `println!`, `eprintln!` or `dbg!`** outside a binary's user-facing output (the `kubaos` command, the CLI's progress). Clippy `print_stdout`, `print_stderr`: a binary's output takes `#[expect(clippy::print_stdout, reason = "…")]` on the function that prints, and the `kubaos` CLI prints through `out!` and `err!` (`crates/kubaos-cli/src/out.rs`). A service's messages are logs, which reach the journal through a logger on stderr, as `kubaos-proxy` and `kubaos-power` do. Source: M-LOG-NOT-PRINT.
 
 ## Shell
 
