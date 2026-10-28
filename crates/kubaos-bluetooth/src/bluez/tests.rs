@@ -14,6 +14,15 @@ fn an_error_is_matched_on_its_names_last_part() {
 }
 
 #[test]
+fn the_rssi_is_read_from_a_devices_properties() {
+    let heard = HashMap::from([("RSSI".to_owned(), OwnedValue::from(-58_i16))]);
+    let silent = HashMap::from([("Paired".to_owned(), OwnedValue::from(true))]);
+
+    assert_eq!(rssi(&heard), Some(-58));
+    assert_eq!(rssi(&silent), None);
+}
+
+#[test]
 fn refusals_reach_bluetoothd_under_its_error_names() {
     use zbus::DBusError as _;
 

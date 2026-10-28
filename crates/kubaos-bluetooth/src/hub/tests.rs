@@ -96,3 +96,32 @@ fn losing_the_agent_closes_the_prompt() {
     assert!(future::block_on(reply.recv()).is_err());
     assert_eq!(hub.state().prompt, None);
 }
+
+#[test]
+fn a_signal_heard_is_published_once_per_change() {
+    let hub = Hub::new(Recorder::default());
+    let path = keyboard().path;
+
+    hub.heard(&path, -60);
+    hub.heard(&path, -60);
+    hub.heard(&path, -72);
+
+    let heard: Vec<_> = hub
+        .sink()
+        .states()
+        .iter()
+        .map(|state| state.rssi.get(&path).copied())
+        .collect();
+    assert_eq!(heard, [Some(-60), Some(-72)]);
+}
+
+#[test]
+fn a_device_that_goes_takes_its_signal_with_it() {
+    let hub = Hub::new(Recorder::default());
+    let path = keyboard().path;
+    hub.heard(&path, -60);
+
+    hub.gone(&path);
+
+    assert!(hub.state().rssi.is_empty());
+}

@@ -1,5 +1,6 @@
-//! What the shell shows of pairing: the agent's open prompt, the devices being paired, and the
-//! last failure of each, written as JSON to a file the shell watches.
+//! What the shell shows of pairing: the agent's open prompt, the devices being paired, the last
+//! failure of each, and how strongly each device was last heard, written as JSON to a file the
+//! shell watches.
 //!
 //! A file, not a call into the shell (`qs ipc call`): the agent never waits on the shell or
 //! depends on it running, a shell that restarts mid-pairing reads the prompt back, and Quickshell's
@@ -38,6 +39,10 @@ pub struct State {
     pub pairing: BTreeSet<String>,
     /// The last pairing failure of each device, by object path, as the shell shows it.
     pub errors: BTreeMap<String, String>,
+    /// The signal each device was last heard at while scanning, in dBm, by object path, so the
+    /// shell can order what is nearby. bluetoothd drops `RSSI` when a scan ends; this keeps it
+    /// until the device itself goes.
+    pub rssi: BTreeMap<String, i16>,
 }
 
 /// What the agent asks or shows the user, for one device.

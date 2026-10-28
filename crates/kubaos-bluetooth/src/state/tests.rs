@@ -14,6 +14,7 @@ fn the_json_is_what_the_shell_reads() {
         }),
         pairing: BTreeSet::from(["/org/bluez/hci0/dev_AA".to_owned()]),
         errors: BTreeMap::from([("/org/bluez/hci0/dev_BB".to_owned(), "Timed out".to_owned())]),
+        rssi: BTreeMap::from([("/org/bluez/hci0/dev_CC".to_owned(), -64)]),
     };
     let json: serde_json::Value = serde_json::to_value(&state).unwrap();
     assert_eq!(
@@ -30,6 +31,7 @@ fn the_json_is_what_the_shell_reads() {
             },
             "pairing": ["/org/bluez/hci0/dev_AA"],
             "errors": {"/org/bluez/hci0/dev_BB": "Timed out"},
+            "rssi": {"/org/bluez/hci0/dev_CC": -64},
         })
     );
 }
@@ -46,7 +48,10 @@ fn a_write_replaces_the_file_whole() {
     file.write(&State::default()).expect("write the second state");
 
     let text = fs::read_to_string(dir.path().join(FILE_NAME)).unwrap();
-    assert_eq!(text, r#"{"agent":false,"prompt":null,"pairing":[],"errors":{}}"#);
+    assert_eq!(
+        text,
+        r#"{"agent":false,"prompt":null,"pairing":[],"errors":{},"rssi":{}}"#
+    );
     assert_eq!(
         fs::read_dir(dir.path()).unwrap().count(),
         1,

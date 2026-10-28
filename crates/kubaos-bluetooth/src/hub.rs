@@ -3,8 +3,8 @@
 //!
 //! # Owns
 //!
-//! - [`Hub`]: opening, answering and closing the prompt, and which devices are pairing or failed.
-//!   Every change goes to the [`Sink`] as it happens.
+//! - [`Hub`]: opening, answering and closing the prompt, which devices are pairing or failed, and
+//!   how strongly each device was last heard. Every change goes to the [`Sink`] as it happens.
 //!
 //! # Not here
 //!
@@ -224,6 +224,20 @@ impl<S: Sink> Hub<S> {
     pub fn clear_error(&self, device: &str) {
         self.change(|inner| {
             inner.state.errors.remove(device);
+        });
+    }
+
+    /// Records that `device` was heard at `rssi` dBm.
+    pub fn heard(&self, device: &str, rssi: i16) {
+        self.change(|inner| {
+            inner.state.rssi.insert(device.to_owned(), rssi);
+        });
+    }
+
+    /// Forgets the signal of `device`, which bluetoothd no longer has.
+    pub fn gone(&self, device: &str) {
+        self.change(|inner| {
+            inner.state.rssi.remove(device);
         });
     }
 
