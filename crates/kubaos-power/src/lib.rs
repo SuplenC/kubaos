@@ -26,8 +26,6 @@
 //! - The slider: `config/quickshell/services/Power.qml` and the control center. The menu's Items:
 //!   `crates/kotodama-kubaos/src/power.rs` and `config/kotodama/kubaos.toml`.
 
-#![forbid(unsafe_code)]
-
 pub mod control;
 pub mod live;
 pub mod machine;

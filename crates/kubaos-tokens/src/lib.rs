@@ -18,8 +18,6 @@
 //! - The values: `design/tokens.toml`. Using them in iced: `kubaos-ui`; in QML,
 //!   `KubaOS.Components`.
 
-#![forbid(unsafe_code)]
-
 pub mod contrast;
 pub mod model;
 pub mod qml;

@@ -21,8 +21,6 @@
 //!   `config/quickshell/modules/sysmon/`. The menu's answers and process search:
 //!   `crates/kotodama-kubaos/src/sysmon.rs`; its Items: `config/kotodama/kubaos.toml`.
 
-#![forbid(unsafe_code)]
-
 pub mod alerts;
 pub mod cpu;
 pub mod disks;

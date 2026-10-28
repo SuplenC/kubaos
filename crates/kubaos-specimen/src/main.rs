@@ -17,8 +17,6 @@
 //! - The window: [`app`]. The screenshots: [`shot`]. The geometry check and parity with QML:
 //!   [`geometry`]. The pages: [`pages`].
 
-#![forbid(unsafe_code)]
-
 mod app;
 mod geometry;
 mod pages;
@@ -61,6 +59,10 @@ const AUDIT_SHOWN: usize = 5;
 /// The width the screenshots are laid out at, in logical pixels: Kōbō's panel on a 1366 px laptop.
 pub const SHOT_WIDTH: f32 = 1280.0;
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The failure and the usage are the command's answer to the developer who ran it."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
@@ -82,6 +84,11 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The shots written and their off-grid boxes are the command's report, for the developer who ran it."
+)]
 fn shots(dir: &Path) -> ExitCode {
     if let Err(err) = fs::create_dir_all(dir) {
         eprintln!("kubaos-specimen: creating {}: {err}", dir.display());
@@ -121,6 +128,11 @@ fn shots(dir: &Path) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The findings and the verdict are the check's output, for the developer or the CI log."
+)]
 fn check(dir: Option<&Path>) -> ExitCode {
     shot::load_fonts();
     let frames = match geometry::frames() {
@@ -152,6 +164,11 @@ fn check(dir: Option<&Path>) -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The differences and the verdict are the check's output, for the developer or the CI log."
+)]
 fn parity(dir: &Path) -> ExitCode {
     shot::load_fonts();
     match geometry::parity(dir) {

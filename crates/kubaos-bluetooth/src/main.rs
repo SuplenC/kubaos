@@ -17,8 +17,6 @@
 //!
 //! - Everything else: the library's modules.
 
-#![forbid(unsafe_code)]
-
 use std::process::ExitCode;
 
 use kotodama_extension::Chain;
@@ -39,6 +37,10 @@ cancel  cancel its pairing
 answer  answer the agent's prompt ID, with the PIN or passkey typed
 scan    start or stop scanning on the adapter at that object path";
 
+#[expect(
+    clippy::print_stdout,
+    reason = "The help is the command's output, for whoever asked for it."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -69,6 +71,10 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The agent's last word when it can't run, which the journal shows with the unit's failure."
+)]
 fn agent() -> ExitCode {
     match async_io::block_on(service::run()) {
         Ok(()) => ExitCode::SUCCESS,
@@ -79,6 +85,10 @@ fn agent() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A usage error goes to whoever ran the command, on stderr."
+)]
 fn with_path(path: &str, call: impl FnOnce(ObjectPath<'_>) -> Result<(), CallError>) -> ExitCode {
     let Ok(object) = ObjectPath::try_from(path) else {
         eprintln!("kubaos-bluetooth: {path} isn't a D-Bus object path");
@@ -97,6 +107,10 @@ fn yes_no(answer: &str) -> Option<bool> {
 
 /// The call's outcome as the exit code. A refusal or a missing agent is one bare line on stderr,
 /// since the shell shows that line as it is.
+#[expect(
+    clippy::print_stderr,
+    reason = "The refusal is the command's answer, and the shell shows the line as it is."
+)]
 fn report(result: Result<(), CallError>) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -111,6 +125,10 @@ fn report(result: Result<(), CallError>) -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A usage error goes to whoever ran the command, on stderr."
+)]
 fn usage() -> ExitCode {
     eprintln!("{USAGE}");
     ExitCode::from(2)

@@ -21,8 +21,6 @@
 //! - The card: `crates/kubaos-core/src/setup/` and `crates/kubaos-kobo/src/setup/`.
 //! - The Command menu's Items: `config/kotodama/kubaos.toml`.
 
-#![forbid(unsafe_code)]
-
 pub mod device;
 pub mod kdeconnect;
 pub mod link;

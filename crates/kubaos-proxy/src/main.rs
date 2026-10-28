@@ -26,8 +26,6 @@
 //!
 //! - Everything else: the library's modules.
 
-#![forbid(unsafe_code)]
-
 use std::fs;
 use std::fs::File;
 use std::io;
@@ -81,7 +79,7 @@ serve    the session service (home/proxy.nix)";
 const ICON: &str = "network-vpn";
 
 /// How long NetworkManager gets to wake after a resume before the tunnel goes up again.
-const WAKE_TIMEOUT: Duration = Duration::from_secs(60);
+const WAKE_TIMEOUT: Duration = Duration::from_mins(1);
 /// `NM_STATE_CONNECTED_LOCAL`: NetworkManager is awake and has a network.
 const NM_CONNECTED: u32 = 50;
 /// How long a burst of events gets to settle before the service acts once on it.
@@ -89,6 +87,11 @@ const SETTLE: Duration = Duration::from_secs(2);
 const NM: &str = "org.freedesktop.NetworkManager";
 const NM_PATH: &str = "/org/freedesktop/NetworkManager";
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The help, the usage and the missing home are the command's output, for whoever ran it."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -133,6 +136,10 @@ fn lock(paths: &Paths) -> io::Result<File> {
     Ok(file)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The commands and the service both publish; the line goes to stderr, which the terminal or the journal shows, as the service's log lines do."
+)]
 fn publish(m: &mut Real, paths: &Paths, profile: &Result<Profile, LoadError>, busy: bool, problem: Option<String>) {
     let mut now = status::read(m, paths, profile, false);
     now.busy = busy;
@@ -145,6 +152,11 @@ fn publish(m: &mut Real, paths: &Paths, profile: &Result<Profile, LoadError>, bu
 }
 
 /// `on` or `off`.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The summary, its notes and the lock's refusal are the command's answer to whoever ran it."
+)]
 fn switch(paths: &Paths, on: bool) -> ExitCode {
     let _lock = match lock(paths) {
         Ok(lock) => lock,
@@ -221,6 +233,10 @@ fn switch(paths: &Paths, on: bool) -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The failure is the command's answer to whoever ran it, beside its notification."
+)]
 fn fail(m: &mut Real, paths: &Paths, profile: &Result<Profile, LoadError>, title: &str, body: String) -> ExitCode {
     eprintln!("kubaos-proxy: {body}");
     notify(title, &body);
@@ -258,6 +274,11 @@ fn summary(now: &Status) -> String {
     format!("Proxy on: {}.", parts.join(", "))
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The status is the command's output, for the person or the shell that asked."
+)]
 fn show(paths: &Paths, json: bool, live: bool) -> ExitCode {
     let mut m = Real::new();
     let profile = Profile::load(&paths.network);
@@ -280,6 +301,10 @@ fn show(paths: &Paths, json: bool, live: bool) -> ExitCode {
 
 /// The vault's session: `BW_SESSION` when exported, else bw's own prompt for the master
 /// password, on a terminal.
+#[expect(
+    clippy::print_stderr,
+    reason = "It tells the person at the terminal why bw asks for the master password."
+)]
 fn session() -> Result<Session, String> {
     if let Ok(session) = std::env::var("BW_SESSION")
         && !session.trim().is_empty()
@@ -310,6 +335,11 @@ fn typed_path(typed: &str) -> PathBuf {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "What was imported, or why not, is the command's answer to whoever ran it."
+)]
 fn import(paths: &Paths, file: &Path) -> ExitCode {
     let config = match profile::read_conf(file) {
         Ok(config) => config,
@@ -367,6 +397,10 @@ fn import(paths: &Paths, file: &Path) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "The report of the imported tunnel is the command's output."
+)]
 fn report_import(config: &kubaos_proxy::wireguard::Config, conf: &Path) {
     let ranges: Vec<String> = config
         .peers
@@ -402,6 +436,11 @@ fn report_import(config: &kubaos_proxy::wireguard::Config, conf: &Path) {
     );
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The outcome is the command's answer to whoever ran it."
+)]
 fn pull(paths: &Paths) -> ExitCode {
     let session = match session() {
         Ok(session) => session,

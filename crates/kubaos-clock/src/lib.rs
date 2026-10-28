@@ -20,8 +20,6 @@
 //! - The popup itself: `config/quickshell/modules/clock/`. The menu's answers and Items:
 //!   `crates/kotodama-kubaos/src/clock.rs` and `config/kotodama/kubaos.toml`.
 
-#![forbid(unsafe_code)]
-
 pub mod calendar;
 pub mod holidays;
 mod parse;

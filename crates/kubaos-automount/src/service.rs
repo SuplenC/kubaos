@@ -198,7 +198,7 @@ impl Daemon {
             Verdict::Mount => match self.udisks.mount(path).await {
                 Ok(mount) => {
                     self.mounted(&name, block.drive.clone().unwrap_or_default(), mount)
-                        .await
+                        .await;
                 }
                 Err(err) => {
                     log!("mounting {}: {err}", block.device);

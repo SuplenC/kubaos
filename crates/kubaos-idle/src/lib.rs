@@ -24,8 +24,6 @@
 //! - The menu's Items: `crates/kotodama-kubaos/src/idle.rs` and `config/kotodama/kubaos.toml`. The
 //!   bar's markers: `config/quickshell/services/Idle.qml`.
 
-#![forbid(unsafe_code)]
-
 pub mod awake;
 pub mod hypridle;
 pub mod lid;

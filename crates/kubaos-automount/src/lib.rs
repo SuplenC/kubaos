@@ -21,8 +21,6 @@
 //! - The user unit: `home/automount.nix`.
 //! - The Eject Items: `crates/kotodama-kubaos/src/drives.rs`.
 
-#![forbid(unsafe_code)]
-
 pub mod block;
 pub mod drives;
 pub mod import;

@@ -28,8 +28,6 @@
 //!
 //! - Every decision and every value: the library's modules.
 
-#![forbid(unsafe_code)]
-
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -117,11 +115,20 @@ const UPOWER_PATH: &str = "/org/freedesktop/UPower";
 const DISPLAY_DEVICE: &str = "/org/freedesktop/UPower/devices/DisplayDevice";
 const SYSTEMD: &str = "org.freedesktop.systemd1";
 
+#[expect(
+    clippy::print_stdout,
+    reason = "The help, the scheduler's state and the Undo's outcome are the command's output, for whoever asked."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
     match args.as_slice() {
-        ["serve"] => report(serve()),
+        ["serve"] => {
+            if log::set_logger(&Journal).is_ok() {
+                log::set_max_level(log::LevelFilter::Info);
+            }
+            report(serve())
+        }
         ["set", stop] => report(set(stop)),
         ["undo"] => report(ask("undo").map(|reply| println!("{reply}"))),
         ["status"] => {
@@ -167,12 +174,20 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A usage error goes to whoever ran the command, on stderr."
+)]
 fn usage() -> ExitCode {
     eprintln!("{USAGE}");
     ExitCode::from(2)
 }
 
 /// A refusal on stderr, exit 1.
+#[expect(
+    clippy::print_stderr,
+    reason = "The refusal is the command's answer to whoever ran it."
+)]
 fn report(result: Result<(), String>) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -184,6 +199,11 @@ fn report(result: Result<(), String>) -> ExitCode {
 }
 
 /// What a settings change came to on stdout and in a toast; a refusal on stderr and in a toast.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "What a change came to, or the refusal, is the command's answer, beside its toast."
+)]
 fn report_said(result: Result<String, String>) -> ExitCode {
     match result {
         Ok(said) => {
@@ -267,6 +287,10 @@ fn ask(line: &str) -> Result<String, String> {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "What the stop came to is the command's answer to whoever ran it."
+)]
 fn set(stop: &str) -> Result<(), String> {
     let stop = Stop::from_id(stop).ok_or_else(|| {
         format!("`{stop}` isn't a stop: super-saver, power-saver, balanced, performance or max-performance")
@@ -396,12 +420,21 @@ fn apply_file() -> Result<String, String> {
 
 // ----- status and measure -----------------------------------------------------------------------
 
+#[expect(
+    clippy::print_stdout,
+    reason = "The status is the command's output, for the person or the menu that asked."
+)]
 fn status() {
     let (settings, problem) = load_settings();
     let now = live::read(&settings, problem.as_deref(), &Machine::real());
     print!("{}", status::text(&now.header, &now.rows));
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The report, and the note to leave the machine alone while it measures, are for the person who ran it."
+)]
 fn measure(seconds: u64) {
     let machine = Machine::real();
     let stop = runtime::file()
@@ -568,7 +601,7 @@ fn follow_devices(events: Sender<Event>) {
             .stderr(Stdio::null())
             .spawn();
         let Some(stdout) = child.ok().and_then(|mut child| child.stdout.take()) else {
-            eprintln!("kubaos-power: couldn't follow udev; new devices get the stop's settings at the next stop");
+            log::warn!("couldn't follow udev; new devices get the stop's settings at the next stop");
             return;
         };
         for line in BufReader::new(stdout).lines().map_while(Result::ok) {
@@ -605,8 +638,8 @@ fn follow_scheduler(bus: &zbus::blocking::Connection, events: Sender<Event>) {
             Ok(())
         };
         if let Err(err) = follow() {
-            eprintln!(
-                "kubaos-power: couldn't follow {} ({}); LAVD's fallbacks show in status only",
+            log::warn!(
+                "couldn't follow {} ({}); LAVD's fallbacks show in status only",
                 scheduler::UNIT,
                 chain(&err)
             );
@@ -727,7 +760,7 @@ impl Service {
                 .into_iter()
                 .flatten()
                 .min()
-                .unwrap_or(Duration::from_secs(3600));
+                .unwrap_or(Duration::from_hours(1));
             match received.recv_timeout(wait) {
                 Ok(Event::Lost(what)) => return Err(format!("lost {what} on the system bus")),
                 Ok(event) => self.hear(event),
@@ -836,7 +869,7 @@ impl Service {
             match effect {
                 Effect::SetProfile(profile) => {
                     if let Err(problem) = set_profile(&self.bus, profile) {
-                        eprintln!("kubaos-power: {problem}");
+                        log::error!("{problem}");
                     }
                 }
                 Effect::Apply(stop) => self.apply(stop),
@@ -844,7 +877,7 @@ impl Service {
                     if let Some(path) = memory::path()
                         && let Err(err) = memory.save(&path)
                     {
-                        eprintln!("kubaos-power: couldn't write {}: {err}", path.display());
+                        log::error!("couldn't write {}: {err}", path.display());
                     }
                 }
                 Effect::Toast(toast) => self.toast(toast),
@@ -875,10 +908,7 @@ impl Service {
         };
         if let Some(fallback) = fallback {
             let (title, body, urgency) = fallback.toast();
-            eprintln!(
-                "kubaos-power: LAVD fell back to the kernel's scheduler ({}): {body}",
-                now.words()
-            );
+            log::warn!("LAVD fell back to the kernel's scheduler ({}): {body}", now.words());
             thread::spawn(move || notify(title, &body, urgency, None));
         }
         self.scheduler_unit = Some(now);
@@ -911,7 +941,7 @@ impl Service {
         }
         let path = panel::path(&self.runtime);
         if let Err(err) = memory::write_atomic(&path, &text) {
-            eprintln!("kubaos-power: couldn't write {}: {err}", path.display());
+            log::error!("couldn't write {}: {err}", path.display());
             return;
         }
         let Some(signature) = running_hyprland(&self.runtime) else {
@@ -923,11 +953,11 @@ impl Service {
             .output();
         match asked {
             Ok(output) if output.status.success() => self.panel = Some(text),
-            Ok(output) => eprintln!(
-                "kubaos-power: Hyprland didn't take the panel: {}",
+            Ok(output) => log::warn!(
+                "Hyprland didn't take the panel: {}",
                 String::from_utf8_lossy(&output.stdout).trim()
             ),
-            Err(err) => eprintln!("kubaos-power: couldn't run hyprctl: {err}"),
+            Err(err) => log::error!("couldn't run hyprctl: {err}"),
         }
     }
 
@@ -967,9 +997,7 @@ impl Service {
         if !Path::new(HELPER).exists() {
             if !self.helper_said {
                 self.helper_said = true;
-                eprintln!(
-                    "kubaos-power: {HELPER} isn't installed (kubaos update installs it); only the profile changes"
-                );
+                log::warn!("{HELPER} isn't installed (kubaos update installs it); only the profile changes");
             }
             return;
         }
@@ -984,12 +1012,12 @@ impl Service {
             Ok(output) => {
                 let said = String::from_utf8_lossy(&output.stderr);
                 for line in said.lines().filter(|line| !line.trim().is_empty()) {
-                    eprintln!("kubaos-power: {line}");
+                    log::warn!("{line}");
                 }
                 self.refused.record(&String::from_utf8_lossy(&output.stdout));
                 self.publish();
             }
-            Err(err) => eprintln!("kubaos-power: couldn't run pkexec: {err}"),
+            Err(err) => log::error!("couldn't run pkexec: {err}"),
         }
     }
 
@@ -1027,7 +1055,7 @@ impl Service {
             return;
         }
         if let Err(err) = memory::write_atomic(&path, &published.text()) {
-            eprintln!("kubaos-power: couldn't write {}: {err}", path.display());
+            log::error!("couldn't write {}: {err}", path.display());
         }
     }
 }
@@ -1044,4 +1072,29 @@ fn running_hyprland(runtime: &Path) -> Option<String> {
             .is_dir()
             .then(|| instance.file_name().to_string_lossy().into_owned())
     })
+}
+
+/// The service's log: a line on stderr each, with the priority prefix the journal reads
+/// (`sd-daemon(3)`), as `kubaos-proxy`'s service writes it.
+struct Journal;
+
+impl log::Log for Journal {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        metadata.level() <= log::Level::Info
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if !self.enabled(record.metadata()) {
+            return;
+        }
+        let priority = match record.level() {
+            log::Level::Error => 3,
+            log::Level::Warn => 4,
+            log::Level::Info => 6,
+            log::Level::Debug | log::Level::Trace => 7,
+        };
+        let _ = writeln!(std::io::stderr(), "<{priority}>{}", record.args());
+    }
+
+    fn flush(&self) {}
 }

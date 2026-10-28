@@ -20,8 +20,6 @@
 //!
 //! - Everything else: the library's modules.
 
-#![forbid(unsafe_code)]
-
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -48,6 +46,11 @@ on|off  turn mounting drives as they're plugged in on or off";
 
 const PHOTOS_ICON: &str = "camera-photo";
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The help and the usage are the command's output, for whoever ran it."
+)]
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let args: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -67,6 +70,10 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The error the watch exits with goes to stderr, which the user unit's journal keeps."
+)]
 fn watch() -> ExitCode {
     match async_io::block_on(service::run()) {
         Ok(()) => ExitCode::SUCCESS,
@@ -77,6 +84,10 @@ fn watch() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The refusal is the command's answer to whoever ran it, beside its notification."
+)]
 async fn eject(target: &str) -> ExitCode {
     let system = match zbus::Connection::system().await {
         Ok(conn) => conn,
@@ -97,6 +108,11 @@ async fn eject(target: &str) -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The counts or the refusal are the command's answer, beside its notification."
+)]
 async fn import(folder: &Path) -> ExitCode {
     let source = import::dcim(folder).unwrap_or_else(|| folder.to_path_buf());
     let pictures = pictures();
@@ -158,6 +174,11 @@ fn pictures() -> PathBuf {
     import::pictures_dir(&home, &config)
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The setting's new state or the refusal is the command's answer to whoever ran it."
+)]
 fn set(on: bool) -> ExitCode {
     let Some(settings) = Settings::from_env() else {
         eprintln!("kubaos-automount: neither XDG_CONFIG_HOME nor HOME is set");

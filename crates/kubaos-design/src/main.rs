@@ -19,8 +19,6 @@
 //!
 //! - Everything else: the library.
 
-#![forbid(unsafe_code)]
-
 use std::env;
 use std::fmt::Write as _;
 use std::path::Path;
@@ -50,6 +48,10 @@ contrast  every foreground and background pair in design/tokens.toml, in both mo
 
 DIR is the repo's root; by default the nearest directory up from here holding design/tokens.toml.";
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A usage error goes to whoever ran the command, on stderr."
+)]
 fn main() -> ExitCode {
     let mut args: Vec<String> = env::args().skip(1).collect();
     let root = match args.iter().position(|a| a == "--root") {
@@ -88,11 +90,19 @@ fn main() -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "A usage error goes to whoever ran the command, on stderr."
+)]
 fn usage() -> ExitCode {
     eprintln!("{USAGE}");
     ExitCode::from(2)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The failure is the command's answer to whoever ran it."
+)]
 fn report(err: &Error) {
     let mut message = format!("kubaos-design: {err}");
     let mut source = std::error::Error::source(err);
@@ -111,6 +121,11 @@ fn find_root() -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The violations and the verdict are the check's output, for the developer or the CI log."
+)]
 fn lint(root: &Path, all: bool) -> Result<bool, Error> {
     let scan = lint::scan(root)?;
     if all {
@@ -137,6 +152,10 @@ fn lint(root: &Path, all: bool) -> Result<bool, Error> {
     Ok(passed)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The new count is the command's report, for the developer who ran it."
+)]
 fn shrink(root: &Path) -> Result<bool, Error> {
     let scan = lint::scan(root)?;
     let before = Baseline::load(root)?;
@@ -152,6 +171,10 @@ fn shrink(root: &Path) -> Result<bool, Error> {
     Ok(true)
 }
 
+#[expect(
+    clippy::print_stderr,
+    reason = "The refusal or the count written is the command's report, for the developer who ran it."
+)]
 fn init(root: &Path) -> Result<bool, Error> {
     if root.join(baseline::BASELINE_PATH).exists() {
         eprintln!(
@@ -181,6 +204,11 @@ fn init(root: &Path) -> Result<bool, Error> {
 
 /// Every contrast pair of the tokens with its ratio in each mode, and whether all hold. The tokens
 /// refuse a pair under its minimum, so a failing pair shows as the rule it breaks.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The readings and the verdict are the check's output, for the developer or the CI log."
+)]
 fn contrast(root: &Path) -> Result<bool, Error> {
     let tokens = match kubaos_tokens::load(root) {
         Ok(tokens) => tokens,
@@ -231,6 +259,11 @@ fn contrast(root: &Path) -> Result<bool, Error> {
     Ok(passed)
 }
 
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The findings and their count are the check's output, for the developer or the CI log."
+)]
 fn geometry(root: &Path, files: &[&str]) -> Result<bool, Error> {
     let rules = geometry::rules(root)?;
     let paths: Vec<&Path> = files.iter().map(Path::new).collect();

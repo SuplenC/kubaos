@@ -16,8 +16,6 @@
 //! - The geometry rules: `kubaos-geometry`. Rendering iced pages into frames: `kubaos-specimen
 //!   check`, through `kubaos-ui`'s probes.
 
-#![forbid(unsafe_code)]
-
 pub mod baseline;
 pub mod contrast;
 pub mod geometry;
