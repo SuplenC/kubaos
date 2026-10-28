@@ -18,6 +18,8 @@ Any UI, in any toolkit, follows `docs/DESIGN.md`: tokens and the shared componen
 
 Render, diff and attach a UI change's screenshots with `just shots`, as `docs/agents/design-pr-loop.md` describes.
 
+Generated files aren't committed, so UI PRs don't collide: the token outputs are built where they are read (`just tokens` writes them into a checkout for an editor), and the specimen's pictures are rendered, never checked in. A new component's specimen samples are a file of their own on each side, plus one registry line (`docs/DESIGN.md`, "Changing the design").
+
 ## Docs describe the current state
 
 Every file in the repo (docs, comments, config, agent guides) says how things are now. Git keeps the history: what changed, when, who asked and why go in commit messages, PRs and issues, never in a file as a dated note, a "previously", or an appended changelog. When something changes, rewrite the text to the new state instead of adding to it. The exceptions are records that are dated by design (ADRs in `docs/adr/`, `docs/PLAN.md`, `docs/RESEARCH-*.md`): they stay as written, and the current behaviour lives in `docs/CONTRACTS.md` and `docs/USING.md`, not in a note added to the record.

@@ -712,7 +712,7 @@ The specimen's pictures aren't in the repo, so two PRs that change how different
 
 ## Changing the design
 
-- **A new kind, size, component or value changes this file first**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it.
+- **A new kind, size, component or value changes this file first**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it. A component's samples are a section of their own on each side, by the same name: a module under `crates/kubaos-specimen/src/pages/components/` and a file under `qml/specimen/sections/`, each listed once in its page, at the same place (`sections!` in `components.rs`, the stack in `Components.qml`), so PRs adding different components touch different files and one line of each list.
 - **A rule a front end can't follow changes for everyone.** There is no exception column: if the shell can't keep a rule, the rule changes here and every front end follows the new one.
 - **Values change in `design/tokens.toml` only.** The builds write the outputs from it; `just tokens` rewrites the checked-in ones, and a test fails while one is stale.
 - **Every decision keeps its reason.** A rule with no reason here is a candidate for deletion, not for following.
