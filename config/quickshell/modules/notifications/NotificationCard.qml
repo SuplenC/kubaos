@@ -202,22 +202,13 @@ K.Pressable {
 
         x: root.width - root.band - width
         y: root.band
-        opacity: root.pointed || root.selected ? 1 : 0
-        enabled: opacity > 0
+        visible: root.pointed || root.selected
         icon: "close"
         label: root.stacked ? qsTr("Dismiss all %1").arg(root.items.length) : qsTr("Dismiss")
         kind: "Text"
         size: "Sm"
         activeFocusOnTab: false
         onActivated: root.dismiss()
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: K.Tokens.duration.micro
-                easing.type: Easing.BezierSpline
-                easing.bezierCurve: K.Tokens.easing.standard
-            }
-        }
     }
 
     // Under the band, across the card: the summary, the body, then the actions.
