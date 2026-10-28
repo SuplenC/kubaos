@@ -141,7 +141,10 @@ fn the_bell_item_leaves_the_stutter_as_it_is() {
 
 #[test]
 fn the_bell_item_is_found_by_what_people_type() {
-    let item = items().into_iter().find(|item| item.id == BELL).expect("the bell's Item");
+    let item = items()
+        .into_iter()
+        .find(|item| item.id == BELL)
+        .expect("the bell's Item");
 
     assert!(item.title.contains("Always show the bell"));
     assert!(item.keywords.iter().any(|word| word == "notifications"));

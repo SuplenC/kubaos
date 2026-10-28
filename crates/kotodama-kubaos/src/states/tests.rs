@@ -220,10 +220,7 @@ fn do_not_disturb_is_its_state_files_on_and_unknown_without_the_shell() {
         r#"{"on": true, "manual": false, "reason": "sharing"}"#,
     );
     let sharing = machine.read();
-    machine.write(
-        "run/kubaos-dnd.json",
-        r#"{"on": false, "manual": false, "reason": ""}"#,
-    );
+    machine.write("run/kubaos-dnd.json", r#"{"on": false, "manual": false, "reason": ""}"#);
     let off = machine.read();
 
     assert_eq!(missing.get(DND), None);

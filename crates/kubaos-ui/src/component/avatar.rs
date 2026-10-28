@@ -209,7 +209,11 @@ pub fn accent_badge<'a, M: 'a>(look: &Look, count: Option<u32>) -> Element<'a, M
 
 fn toned_badge<'a, M: 'a>(look: &Look, count: Option<u32>, accent: bool) -> Element<'a, M> {
     let c = look.colors;
-    let (fill, ink) = if accent { (c.primary, c.on_primary) } else { (c.error, c.on_error) };
+    let (fill, ink) = if accent {
+        (c.primary, c.on_primary)
+    } else {
+        (c.error, c.on_error)
+    };
     let tone = if accent { "accent" } else { "" };
     let pill_style = move |_theme: &iced::Theme| container::Style {
         background: Some(Background::Color(fill)),
