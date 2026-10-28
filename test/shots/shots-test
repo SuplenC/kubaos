@@ -299,11 +299,12 @@ scratch_older_than_a_day_goes_and_newer_stays() {
   expect "its tmp" "$(ls -A "$CACHE/tmp")" "tmp.new"
 }
 
-compiled_qml_older_than_a_day_goes_and_newer_stays() {
+compiled_qml_older_than_an_hour_goes_and_newer_stays() {
   local qmlc="$CACHE/xdg/QtProject/Qml Runtime/qmlcache"
   mkdir -p "$qmlc" "$CACHE/xdg/fontconfig"
-  touch "$qmlc/new.qmlc"
-  touch -d '2 days ago' "$qmlc/old.qmlc" "$CACHE/xdg/fontconfig/old-cache"
+  touch -d '30 minutes ago' "$qmlc/new.qmlc"
+  touch -d '2 hours ago' "$qmlc/old.qmlc"
+  touch -d '2 days ago' "$CACHE/xdg/fontconfig/old-cache"
 
   run_prune >/dev/null
 
@@ -323,7 +324,7 @@ for t in a_shell_modules_file_renders_its_surface_alone the_frame_renders_every_
   a_base_a_run_holds_is_never_dropped a_run_holding_its_base_marks_it_used \
   a_run_finding_its_base_dropped_under_it_starts_a_fresh_one prune_keeps_the_last_harness_versions_of_a_base \
   prune_never_touches_anything_but_the_bases_and_scratch prune_refuses_a_folder_that_isnt_the_shots_cache \
-  scratch_older_than_a_day_goes_and_newer_stays compiled_qml_older_than_a_day_goes_and_newer_stays; do
+  scratch_older_than_a_day_goes_and_newer_stays compiled_qml_older_than_an_hour_goes_and_newer_stays; do
   test_case "${t//_/ }" "$t"
 done
 exit "$failed"

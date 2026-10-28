@@ -198,12 +198,13 @@ prune() {
   echo "$dropped dropped, $kept kept"
 }
 
-# sweep CACHE: what is older than a day of CACHE's scratch: a killed run's in `tmp/`, a killed
-# prune's `.trash.*`, and Qt's compiled QML. Qt keys that by the file's path, and each run stages
-# the shell at a path of its own, so a run never reads another's and the folder only grows.
+# sweep CACHE: CACHE's scratch. A killed run's in `tmp/` and a killed prune's `.trash.*` go after
+# a day, past any run still using them. Qt's compiled QML goes after an hour: Qt keys it by the
+# file's path, and each run stages the shell at a path of its own, so only the renders of one run
+# read it, and a file one misses is compiled again.
 sweep() {
   local cache=$1
   find "$cache/tmp" -mindepth 1 -maxdepth 1 -mmin +1440 -exec rm -rf {} + 2>/dev/null || true
   find "$cache" -mindepth 1 -maxdepth 1 -name '.trash.*' -mmin +1440 -exec rm -rf {} + 2>/dev/null || true
-  find "$cache/xdg/QtProject" -path '*/qmlcache/*' -type f -mmin +1440 -delete 2>/dev/null || true
+  find "$cache/xdg/QtProject" -path '*/qmlcache/*' -type f -mmin +60 -delete 2>/dev/null || true
 }
