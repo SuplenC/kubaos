@@ -164,7 +164,7 @@ QtObject {
     readonly property QtObject type: QtObject {
 
         // The lock screen's clock, the one thing that screen shows: a step above the hero, light
-        // like every big figure. The clock popup's time is hero_number.
+        // like every big figure. The clock popup's time stays the hero's number style.
         readonly property QtObject clock: QtObject {
             readonly property string name: "clock"
             readonly property int size: 80

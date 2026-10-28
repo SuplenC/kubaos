@@ -178,7 +178,7 @@ line = 88
 icon = 48
 weight = "light"
 family = "sans"
-use = "The lock screen's clock, the one thing that screen shows: a step above the hero, light like every big figure. The clock popup's time is hero_number."
+use = "The lock screen's clock, the one thing that screen shows: a step above the hero, light like every big figure. The clock popup's time stays the hero's number style."
 
 [type.hero]
 size = 64

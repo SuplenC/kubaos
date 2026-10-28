@@ -334,7 +334,7 @@ impl Weight {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Type {
     /// The lock screen's clock, the one thing that screen shows: a step above the hero, light like
-    /// every big figure. The clock popup's time is hero_number.
+    /// every big figure. The clock popup's time stays the hero's number style.
     Clock,
     /// Words at the hero size: Kōbō's welcome line, and nothing else.
     Hero,
