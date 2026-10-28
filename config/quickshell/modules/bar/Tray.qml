@@ -85,7 +85,7 @@ Pill {
                     source: ink
                     maskEnabled: true
                     maskSource: glyph
-                    maskThresholdMin: 0
+                    maskThresholdMin: 0.5
                     maskSpreadAtMin: 1
 
                     Rectangle {
