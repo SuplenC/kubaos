@@ -152,7 +152,7 @@ fn colours(look: &Look, kind: Kind, enabled: bool) -> (Option<Color>, Color, Col
 }
 
 impl Preview {
-    fn pin(self) -> Pin {
+    pub(crate) fn pin(self) -> Pin {
         match self {
             Preview::Hovered => Pin::Hovered,
             Preview::Pressed => Pin::Pressed,

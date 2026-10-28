@@ -103,35 +103,49 @@ fn mode_name(mode: Mode) -> &'static str {
 /// `view` laid out in [`WINDOW`] at `look`'s scale: its boxes, as the geometry check reads them,
 /// and, when `shot` names a file, its pixels written there, drawn as a frame at `now`.
 fn take(view: Element<'_, Message>, look: &Look, page: &str, shot: Option<&Path>, now: Instant) -> Frame {
-    take_revealed(view, look, page, shot, now, None)
+    take_scrolled(view, look, page, shot, now, None)
 }
 
-/// [`take`], with the item `reveal` names scrolled into view in its scrollable first, as the
-/// live app's reveal task does: a shot runs no tasks.
-fn take_revealed(
+/// How a shot scrolls a scrollable before it is taken: a shot runs no tasks.
+enum Scrolled {
+    /// The item named scrolled into view in its scrollable, as the live app's reveal task does.
+    Reveal(&'static str, iced::widget::Id),
+    /// The scrollable scrolled down this many logical pixels, its content cut by both its edges.
+    By(&'static str, f32),
+}
+
+/// [`take`], with a scrollable scrolled first.
+fn take_scrolled(
     view: Element<'_, Message>,
     look: &Look,
     page: &str,
     shot: Option<&Path>,
     now: Instant,
-    reveal: Option<(&'static str, iced::widget::Id)>,
+    scrolled: Option<Scrolled>,
 ) -> Frame {
     let mut renderer = headless();
     let factor = look.scale.factor();
     let mut ui = UserInterface::build(view, WINDOW, user_interface::Cache::default(), &mut renderer);
-    if let Some((scroll, item)) = reveal {
-        let mut find = Unit(crate::reveal::Find::new(scroll, item));
-        ui.operate(&renderer, &mut find);
-        if let iced::advanced::widget::operation::Outcome::Some(found) =
-            iced::advanced::widget::Operation::<crate::reveal::Found>::finish(&find.0)
-            && let Some(y) = crate::reveal::target(found)
-        {
-            let mut to = iced::advanced::widget::operation::scrollable::scroll_to(
-                iced::widget::Id::new(scroll),
-                iced::widget::operation::AbsoluteOffset { x: None, y: Some(y) },
-            );
-            ui.operate(&renderer, &mut to);
+    let offset = match scrolled {
+        None => None,
+        Some(Scrolled::By(scroll, y)) => Some((scroll, y)),
+        Some(Scrolled::Reveal(scroll, item)) => {
+            let mut find = Unit(crate::reveal::Find::new(scroll, item));
+            ui.operate(&renderer, &mut find);
+            match iced::advanced::widget::Operation::<crate::reveal::Found>::finish(&find.0) {
+                iced::advanced::widget::operation::Outcome::Some(found) => {
+                    crate::reveal::target(found).map(|y| (scroll, y))
+                }
+                _ => None,
+            }
         }
+    };
+    if let Some((scroll, y)) = offset {
+        let mut to = iced::advanced::widget::operation::scrollable::scroll_to(
+            iced::widget::Id::new(scroll),
+            iced::widget::operation::AbsoluteOffset { x: None, y: Some(y) },
+        );
+        ui.operate(&renderer, &mut to);
     }
     let mut collect = Collect::new();
     ui.operate(&renderer, &mut collect);
@@ -252,7 +266,18 @@ fn take_app_at(out: &mut Out, name: &str, app: &mut App, since: Duration) {
     take_every_look(out, name, app);
 }
 
+/// The screen with the scrollable `scroll` scrolled down `by` logical pixels, everything else
+/// settled.
+fn take_app_scrolled(out: &mut Out, name: &str, app: &mut App, scroll: &'static str, by: f32) {
+    settle_app(app);
+    take_every_look_scrolled(out, name, app, Some((scroll, by)));
+}
+
 fn take_every_look(out: &mut Out, name: &str, app: &mut App) {
+    take_every_look_scrolled(out, name, app, None);
+}
+
+fn take_every_look_scrolled(out: &mut Out, name: &str, app: &mut App, scrolled: Option<(&'static str, f32)>) {
     let page = format!("install-{name}");
     for mode in MODES {
         for scale in Scale::SUPPORTED {
@@ -263,7 +288,8 @@ fn take_every_look(out: &mut Out, name: &str, app: &mut App) {
                 .shots
                 .as_ref()
                 .map(|dir| dir.join(format!("{page}-{}-{}x.png", mode_name(mode), scale.factor())));
-            let frame = take(crate::view::view(app), &look, &page, shot.as_deref(), app.now);
+            let scrolled = scrolled.map(|(scroll, by)| Scrolled::By(scroll, by));
+            let frame = take_scrolled(crate::view::view(app), &look, &page, shot.as_deref(), app.now, scrolled);
             out.frames.push(frame);
         }
     }
@@ -283,8 +309,15 @@ fn take_setup(out: &mut Out, name: &str, s: &mut Setup) {
                 .shots
                 .as_ref()
                 .map(|dir| dir.join(format!("{page}-{}-{}x.png", mode_name(mode), scale.factor())));
-            let reveal = Some((crate::setup::CARDS_SCROLL, crate::setup::card_item(s.sel)));
-            let frame = take_revealed(crate::setup::view(s), &look, &page, shot.as_deref(), s.now, reveal);
+            let reveal = Scrolled::Reveal(crate::setup::CARDS_SCROLL, crate::setup::card_item(s.sel));
+            let frame = take_scrolled(
+                crate::setup::view(s),
+                &look,
+                &page,
+                shot.as_deref(),
+                s.now,
+                Some(reveal),
+            );
             out.frames.push(frame);
         }
     }
@@ -461,6 +494,25 @@ fn install_states(out: &mut Out) {
     let _ = app.go(Screen::Wifi);
     let _ = app.update_inner(Message::Pick(List::Wifi, "FRITZ!Box 7590 XL Gästenetz OG".into()));
     take_app(out, "wifi-long", &mut app);
+
+    // Scrolled partway, so a scroll's edges cut through rows and pictures: nothing a control
+    // draws, its fill and glow included, shows past the edge or over what is beside it.
+    let mut scrolled = app_with(Ok(demo_probe()));
+    let _ = scrolled.go(Screen::Timezone);
+    let first = scrolled.list_items(List::Timezone).into_iter().next();
+    if let Some(first) = first {
+        let _ = scrolled.update_inner(Message::Pick(List::Timezone, first));
+    }
+    take_app_scrolled(out, "timezone-scrolled", &mut scrolled, crate::app::ids::TZ_LIST, 30.0);
+    let _ = scrolled.go(Screen::Wallpapers);
+    scrolled.focus = Some(F::Wallpaper(0, 0));
+    take_app_scrolled(
+        out,
+        "wallpapers-scrolled",
+        &mut scrolled,
+        crate::app::ids::WALLPAPER_SCROLL,
+        60.0,
+    );
 
     app.form.full_name = "Kuba Example".into();
     app.form.password = "hunter2".into();

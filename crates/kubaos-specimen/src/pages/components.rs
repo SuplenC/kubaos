@@ -664,6 +664,7 @@ fn media_samples<'a>(look: &Look) -> Element<'a, Message> {
             picture_choice(Some(picture.clone()), Aspect::Wallpaper, "Shinjuku, night")
                 .picked(true)
                 .mark(Icon::Check, "Current")
+                .preview(Preview::Hovered)
                 .on_press(Message::Sample)
                 .view(look),
         )
