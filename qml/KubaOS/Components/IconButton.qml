@@ -14,6 +14,9 @@ K.Pressable {
     property string kind: "Filled"
     // `Sm`, `Md` or `Lg`.
     property string size: "Md"
+    // A `Tooltip` among its children explains it, so its hint stays hidden: the card says its name
+    // and more, and a bubble under it as well would say the name twice.
+    property bool explained: false
 
     readonly property var metrics: K.ButtonMetrics.of(root.size)
     readonly property var colours: K.ButtonMetrics.colours(root.kind, root.enabled)
@@ -64,6 +67,6 @@ K.Pressable {
 
     K.Hint {
         text: root.label
-        shown: (root.focused && root.enabled) || root.pointerOver
+        shown: !root.explained && ((root.focused && root.enabled) || root.pointerOver)
     }
 }

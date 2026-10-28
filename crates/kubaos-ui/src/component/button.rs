@@ -381,6 +381,7 @@ pub struct IconButton<'a, M> {
     on_press: Option<M>,
     focused: bool,
     preview: Option<Preview>,
+    explained: bool,
 }
 
 /// A circular [`Kind::Filled`], [`ButtonSize::Md`] button showing `glyph`. `label` is its name,
@@ -394,10 +395,21 @@ pub fn icon_button<M>(glyph: Icon, label: &str) -> IconButton<'_, M> {
         on_press: None,
         focused: false,
         preview: None,
+        explained: false,
     }
 }
 
 impl<'a, M: Clone + 'a> IconButton<'a, M> {
+    /// A [`tooltip`](crate::component::tooltip) explains it, so its hint stays hidden: the card
+    /// says its name and more, and a bubble under it as well would say the name twice.
+    #[must_use]
+    pub fn explained(self) -> Self {
+        IconButton {
+            explained: true,
+            ..self
+        }
+    }
+
     #[must_use]
     pub fn kind(self, kind: Kind) -> Self {
         IconButton { kind, ..self }
@@ -465,7 +477,11 @@ impl<'a, M: Clone + 'a> IconButton<'a, M> {
             focus_ring
         };
         let ringed = ring(look, pressable, Radius::Full, self.focused, RingColor::Accent);
-        let view: Element<'a, M> = hint(look, ringed, self.label, self.focused);
+        let view: Element<'a, M> = if self.explained {
+            ringed
+        } else {
+            hint(look, ringed, self.label, self.focused)
+        };
         probe::component("IconButton", variant, Fixed::BOTH, view)
     }
 }
