@@ -519,7 +519,7 @@ impl<M> Widget<M, Theme, Renderer> for Input<'_, M> {
         _style: &renderer::Style,
         layout: Layout<'_>,
         _cursor: mouse::Cursor,
-        _viewport: &Rectangle,
+        viewport: &Rectangle,
     ) {
         use iced::advanced::text::Renderer as _;
         let state = tree.state.downcast_ref::<InputState>();
@@ -543,10 +543,16 @@ impl<M> Widget<M, Theme, Renderer> for Input<'_, M> {
         let offset = self.offset(state, room);
         // The text may run a caret's width past its room, so a caret at the end shows whole.
         let thin = self.scale.thin();
-        let clip = Rectangle {
+        let room_clip = Rectangle {
             x: room.x - thin,
             width: room.width + 2.0 * thin,
             ..room
+        };
+        // A layer's clip replaces its parent's instead of narrowing it, and a later layer draws over
+        // an earlier one: unclipped to the viewport, the text would show past a scroll's edge and
+        // over whatever the scroll sits under.
+        let Some(clip) = room_clip.intersection(viewport) else {
+            return;
         };
         renderer.with_layer(clip, |renderer| {
             if self.shown.is_empty() {
