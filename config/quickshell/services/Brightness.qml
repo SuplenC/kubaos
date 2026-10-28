@@ -18,7 +18,7 @@ Singleton {
     property bool sensor: false
     // A service that hands the backlight to the sensor. None runs, so no slider offers Auto.
     readonly property bool autoBackend: false
-    // Whether the brightness slider offers its Auto stop.
+    // Whether the brightness slider's icon switches Auto.
     readonly property bool autoAvailable: root.sensor && root.autoBackend
 
     function set(v: real): void {

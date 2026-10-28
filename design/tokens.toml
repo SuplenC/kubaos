@@ -32,9 +32,9 @@ font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80]
 # whole number of device pixels.
 scales = [1.0, 1.25, 1.5, 2.0]
 # The sizes allowed off the grid: a slider's step dot and its regular anchor
-# dot, Kuba's picks from the sketches. Each is drawn centred on a point that
-# moves with the slider's width and value, so its edges land between device
-# pixels whatever its size, and a size on the grid would buy nothing.
+# dot. Each is drawn centred on a point that moves with the slider's width and
+# value, so its edges land between device pixels whatever its size, and a size
+# on the grid would buy nothing.
 off_grid = ["size.slider_stop", "size.slider_anchor"]
 
 # Lines thinner than the grid. Neither is a multiple of 4, so neither is a
@@ -789,8 +789,10 @@ pairs = [
   { fg = "primary", bg = "surface_container_high", need = "graphic", use = "The focus tube in a card or a dialog, a field's tube on its fill" },
   { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider's or a progress bar's fill on its track, a focused field's tube on its fill" },
   { fg = "on_primary", bg = "primary", need = "graphic", opacity = "subdued", use = "A slider's step the fill has passed" },
-  { fg = "on_secondary_container", bg = "secondary_container", need = "graphic", opacity = "subdued", use = "A slider's passed step on its softer fill (Auto)" },
+  { fg = "on_secondary", bg = "secondary", need = "text", use = "A slider's label and icon on its softer fill (Auto)" },
+  { fg = "on_secondary", bg = "secondary", need = "graphic", opacity = "subdued", use = "A slider's passed step on its softer fill (Auto)" },
   { fg = "on_surface_variant", bg = "surface_container_highest", need = "graphic", use = "A slider's step ahead, on its track" },
+  { fg = "secondary", bg = "surface_container_highest", need = "graphic", use = "A slider's softer fill (Auto) on its track" },
   { fg = "cold", bg = "surface", need = "graphic", use = "The cold focus tube on a page, the logo's dakuten" },
   { fg = "cold", bg = "surface_container_low", need = "graphic", use = "The cold focus tube in a well" },
   { fg = "cold", bg = "surface_container", need = "graphic", use = "The cold focus tube on a panel" },
@@ -811,13 +813,13 @@ pairs = [
 ]
 # Roles a front end draws only as decoration, with no text or meaning drawn on
 # them: no pair is needed. `outline_variant`, dividers and soft edges;
-# `secondary`, a faint tint under a group of workspaces; `shadow` and `scrim`;
+# `shadow` and `scrim`;
 # `cold_container` and `surface_bright`, the segments of Kōbō's partition bar,
 # which its legend names; `primary_core` and `cold_core`, the hot middle of a
 # neon tube, drawn on the tube, and the focus core outside a filled control,
 # beside the fill it lights. `kubaos-design contrast` fails on a role drawn with
 # that is in no pair and not here.
-decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", "scrim", "secondary", "shadow", "surface_bright"]
+decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", "scrim", "shadow", "surface_bright"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes

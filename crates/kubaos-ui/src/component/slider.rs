@@ -252,7 +252,8 @@ impl Track {
 
     /// The dots of `points`, fractions along the track, with the value at `shown` and resting on
     /// `resting` when it does. A point the value rests on is the anchor; a step under the moving
-    /// value's end hides; no dot is drawn under the icon or the label, which mark that place
+    /// value's end hides, and so does one the fill's edge crosses, which would take one side's
+    /// colour over both; no dot is drawn under the icon or the label, which mark that place
     /// already.
     pub fn marks(&self, points: &[f32], shown: f32, resting: Option<f32>) -> Vec<Mark> {
         let value = self.centre(shown);
@@ -266,7 +267,8 @@ impl Track {
                 let size = if anchor { self.anchor } else { self.stop };
                 let clear = x - size / 2.0 >= left && x + size / 2.0 <= right;
                 let under_value = !anchor && (x - value).abs() < self.anchor / 2.0;
-                (clear && !under_value).then_some(Mark {
+                let astride = !anchor && (x - fill_end).abs() < size / 2.0;
+                (clear && !under_value && !astride).then_some(Mark {
                     x,
                     on_fill: x < fill_end,
                     anchor,
@@ -396,7 +398,8 @@ impl<'a, M: Clone + 'a> Slider<'a, M> {
         }
     }
 
-    /// The fill in the softer tonal colour: a level something else picked, as Auto brightness's.
+    /// The fill in the softer, desaturated accent: a level something else picked, as Auto
+    /// brightness's.
     #[must_use]
     pub fn soft(self) -> Self {
         Slider { soft: true, ..self }

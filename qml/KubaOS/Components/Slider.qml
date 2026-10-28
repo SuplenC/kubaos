@@ -43,7 +43,8 @@ Item {
     property string number: ""
     // The widest the number reads: its box is this wide, so the number ends in one place.
     property string widest: "100%"
-    // The fill in the softer tonal colour: a level something else picked, as Auto brightness's.
+    // The fill in the softer, desaturated accent: a level something else picked, as Auto
+    // brightness's.
     property bool soft: false
     // A sticky point, a fraction along the track, or -1 for none.
     property real sticky: -1
@@ -67,7 +68,7 @@ Item {
     // Where the value rests when nothing holds it: the stop, or the value.
     readonly property real rest: root.stepping ? root.index / root.last : Math.max(0, Math.min(1, root.value))
     // The fraction the fill shows: under the pointer while a drag holds it, else easing to rest.
-    property real shown: pointer.dragging ? pointer.drag : root.rest
+    property real shown: 0
     readonly property real span: Math.max(1, root.width - root.side)
     readonly property real valueX: root.centre(root.shown)
     // Where the fill ends, on a whole device pixel.
@@ -81,8 +82,8 @@ Item {
     // modes.
     readonly property color bright: Tokens.mode === "light" ? Tokens.color.surface : Tokens.color.on_surface
     readonly property real dim: root.enabled ? 1 : Tokens.opacity.disabled_content
-    readonly property color fillColor: K.Look.alpha(K.Look.mix(root.soft ? Tokens.color.secondary_container : Tokens.color.primary, root.bright, root.lift), root.dim)
-    readonly property color onFill: K.Look.alpha(root.soft ? Tokens.color.on_secondary_container : Tokens.color.on_primary, root.dim)
+    readonly property color fillColor: K.Look.alpha(K.Look.mix(root.soft ? Tokens.color.secondary : Tokens.color.primary, root.bright, root.lift), root.dim)
+    readonly property color onFill: K.Look.alpha(root.soft ? Tokens.color.on_secondary : Tokens.color.on_primary, root.dim)
     readonly property color onTrack: K.Look.alpha(Tokens.color.on_surface, root.dim)
     // What the label says: a name, a stop's name, or the number.
     readonly property bool numeric: root.words === "" && !(root.stepping && root.names.length > 0)
@@ -96,7 +97,10 @@ Item {
     readonly property real labelLeft: root.width - root.pad - root.labelWidth
     // The mark the value rests on, a fraction, or -1: a slider with stops at rest on its stop, or a
     // sticky point the value holds at.
-    readonly property real resting: root.stepping ? (!pointer.dragging && !settle.running ? root.rest : -1) : root.sticky >= 0 && Math.abs((pointer.dragging ? pointer.drag : root.rest) - root.sticky) < 1e-4 ? root.sticky : -1
+    // Never ahead of the fill: a value set there counts once the fill has arrived.
+    readonly property real resting: settle.running ? -1 : root.stepping ? (pointer.dragging ? -1 : root.rest) : root.sticky >= 0 && Math.abs(root.shown - root.sticky) < 1e-4 ? root.sticky : -1
+    // Each step's fraction, or the sticky point's: what the dots stand for. It changes only with
+    // the steps, so the dots aren't made again as the value moves.
     readonly property var points: {
         if (root.stepping) {
             const all = [];
@@ -106,8 +110,6 @@ Item {
         }
         return root.sticky >= 0 ? [root.sticky] : [];
     }
-    readonly property var marks: root.markAt(root.points, root.shown, root.resting)
-    readonly property var anchorMark: root.marks.find(mark => mark.anchor) ?? null
     // A step of a continuous slider from the keyboard or the wheel.
     readonly property real nudge: 0.05
     // Which way the icon steps next: -1 toward the first stop, +1 toward the last.
@@ -137,29 +139,31 @@ Item {
         return root.sticky >= 0 && Math.abs(fraction - root.sticky) <= reach ? root.sticky : fraction;
     }
 
-    // The dots of `points` with the value at `shown`, resting on `resting` (or -1): the one it
-    // rests on is the anchor, a step under the moving value's end hides, and none is drawn under
-    // the icon or the label. `kubaos-ui`'s `Track::marks`.
-    function markAt(points: var, shown: real, resting: real): var {
-        const value = root.centre(shown);
-        const fillEnd = value + root.side / 2;
-        const left = root.side + Tokens.space.s4;
-        const right = root.labelLeft - Tokens.space.s4;
-        const found = [];
-        for (const point of points) {
-            const x = root.centre(point);
-            const anchor = resting >= 0 && Math.abs(resting - point) < 1e-4;
-            const size = anchor ? root.anchorSide : Tokens.size.slider_stop;
-            const clear = x - size / 2 >= left && x + size / 2 <= right;
-            const underValue = !anchor && Math.abs(x - value) < root.anchorSide / 2;
-            if (clear && !underValue)
-                found.push({
-                    x: x,
-                    onFill: x < fillEnd,
-                    anchor: anchor
-                });
-        }
-        return found;
+    // Whether a dot `size` across at `x` stays clear of the icon and the label, which mark that
+    // place already. `kubaos-ui`'s `Track::marks` holds the same rules.
+    function clear(x: real, size: real): bool {
+        return x - size / 2 >= root.side + Tokens.space.s4 && x + size / 2 <= root.labelLeft - Tokens.space.s4;
+    }
+
+    // Whether the step at `point` shows: clear of the icon and the label, not the mark the value
+    // rests on (its anchor shows there), not under the moving value's end, and not astride the
+    // fill's edge, where it would take one side's colour over both.
+    function stepShows(point: real): bool {
+        const x = root.centre(point);
+        const size = Tokens.size.slider_stop;
+        const anchored = root.resting >= 0 && Math.abs(root.resting - point) < 1e-4;
+        const fillEnd = root.valueX + root.side / 2;
+        return root.clear(x, size) && !anchored && Math.abs(x - root.valueX) >= root.anchorSide / 2 && Math.abs(x - fillEnd) >= size / 2;
+    }
+
+    // Eases the fill from where it is to where the value rests.
+    function settleTo(): void {
+        settle.stop();
+        if (Math.abs(root.shown - root.rest) < 1e-6)
+            return;
+        settle.from = root.shown;
+        settle.to = root.rest;
+        settle.start();
     }
 
     function request(v: real): void {
@@ -184,20 +188,22 @@ Item {
         root.step(root.index + root.direction);
     }
 
-    Behavior on shown {
-        enabled: !pointer.dragging
-
-        NumberAnimation {
-            id: settle
-
-            duration: Tokens.duration.short
-            easing.type: Easing.BezierSpline
-            easing.bezierCurve: root.stepping ? Tokens.easing.standard_decel : Tokens.easing.standard
-        }
-    }
-
+    onRestChanged: if (!pointer.dragging)
+        root.settleTo()
     onRestingChanged: if (root.resting >= 0)
         pop.restart()
+    Component.onCompleted: root.shown = root.rest
+
+    // The fill easing to rest: to a value set from outside, and onto a stop after a drag.
+    NumberAnimation {
+        id: settle
+
+        target: root
+        property: "shown"
+        duration: Tokens.duration.short
+        easing.type: Easing.BezierSpline
+        easing.bezierCurve: root.stepping ? Tokens.easing.standard_decel : Tokens.easing.standard
+    }
 
     Keys.onPressed: event => {
         const k = event.key;
@@ -243,17 +249,19 @@ Item {
 
     // The steps, each in its side's colour.
     Repeater {
-        model: root.marks.filter(mark => !mark.anchor)
+        model: root.points
 
         Rectangle {
-            required property var modelData
+            required property real modelData
+            readonly property real at: root.centre(modelData)
 
-            x: modelData.x - width / 2
+            visible: root.stepShows(modelData)
+            x: at - width / 2
             y: (root.height - height) / 2
             width: Tokens.size.slider_stop
             height: Tokens.size.slider_stop
             radius: Tokens.radius.full
-            color: modelData.onFill ? K.Look.alpha(root.onFill, Tokens.opacity.subdued) : K.Look.alpha(Tokens.color.on_surface_variant, root.dim)
+            color: at < root.valueX + root.side / 2 ? K.Look.alpha(root.onFill, Tokens.opacity.subdued) : K.Look.alpha(Tokens.color.on_surface_variant, root.dim)
         }
     }
 
@@ -261,8 +269,8 @@ Item {
     Rectangle {
         id: anchorDot
 
-        visible: root.anchorMark !== null
-        x: (root.anchorMark?.x ?? 0) - width / 2
+        visible: root.resting >= 0 && root.clear(root.centre(root.resting), root.anchorSide)
+        x: root.centre(Math.max(0, root.resting)) - width / 2
         y: (root.height - height) / 2
         width: root.anchorSide
         height: root.anchorSide
@@ -285,8 +293,7 @@ Item {
     MouseArea {
         id: pointer
 
-        // The fraction under the pointer while a press holds it.
-        property real drag: 0
+        // Whether a press on the track holds the value, the fill following the pointer.
         property bool dragging: false
         // The wheel's turn not yet a whole notch: a touchpad sends it in pieces.
         property real wheelTurn: 0
@@ -297,36 +304,40 @@ Item {
         cursorShape: Qt.PointingHandCursor
         preventStealing: true
         onPressed: mouse => {
-            drag = root.fractionAt(mouse.x);
+            settle.stop();
             dragging = true;
+            root.shown = root.fractionAt(mouse.x);
             if (!root.stepping)
-                root.request(drag);
+                root.request(root.shown);
         }
         onPositionChanged: mouse => {
             if (!dragging)
                 return;
-            drag = root.fractionAt(mouse.x);
+            root.shown = root.fractionAt(mouse.x);
             if (!root.stepping)
-                root.request(drag);
+                root.request(root.shown);
         }
         onReleased: {
             if (dragging && root.stepping)
-                root.step(Math.round(drag * root.last));
+                root.step(Math.round(root.shown * root.last));
             dragging = false;
+            root.settleTo();
         }
-        onCanceled: dragging = false
+        onCanceled: {
+            dragging = false;
+            root.settleTo();
+        }
         onWheel: wheel => {
-            if (!root.stepping) {
-                root.request(root.value + (wheel.angleDelta.y > 0 ? root.nudge : -root.nudge));
-                return;
-            }
-            // A wheel's notch is 120 (Qt's QWheelEvent::angleDelta).
+            // A wheel's notch is 120 (Qt's QWheelEvent::angleDelta); a sideways scroll is no turn.
             wheelTurn += wheel.angleDelta.y;
             const notches = Math.trunc(wheelTurn / 120);
-            if (notches !== 0) {
-                wheelTurn -= notches * 120;
+            if (notches === 0)
+                return;
+            wheelTurn -= notches * 120;
+            if (root.stepping)
                 root.step(root.index + notches);
-            }
+            else
+                root.request(root.value + notches * root.nudge);
         }
     }
 

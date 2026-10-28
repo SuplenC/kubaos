@@ -149,6 +149,16 @@ impl<M> Pill<'_, M> {
         }
     }
 
+    /// Whether `shaped` holds the labels it shows now, so layout reshapes nothing.
+    fn labels_shaped(&self, shaped: &[(String, Paragraph)]) -> bool {
+        let same = |texts: &[&str]| shaped.len() == texts.len() && shaped.iter().zip(texts).all(|((a, _), b)| a == b);
+        match &self.slider.label {
+            Label::Number(None) => same(&[percent(self.slider.value.fraction()).as_str()]),
+            Label::Number(Some(text)) | Label::Words(text) => same(&[text.as_str()]),
+            Label::Stops(names) => same(&names.iter().map(String::as_str).collect::<Vec<_>>()),
+        }
+    }
+
     /// The sticky point's pull, as a fraction of a track `width` wide.
     fn hold(&self, width: f32) -> f32 {
         f32::from(SizeToken::SliderHold.px()) / (width - self.slider.size.height()).max(1.0)
@@ -170,7 +180,12 @@ impl<M> Pill<'_, M> {
         if self.stepped() {
             return (state.drag.is_none() && !state.shown.moving(now)).then(|| self.slider.value.fraction());
         }
-        let at = state.drag.unwrap_or_else(|| self.slider.value.fraction());
+        // Held there by the pointer, or set there and the fill arrived: never ahead of the fill.
+        let at = match state.drag {
+            Some(fraction) => fraction,
+            None if state.shown.moving(now) => return None,
+            None => self.slider.value.fraction(),
+        };
         self.slider.sticky.filter(|point| (at - point).abs() < 1e-4)
     }
 
@@ -247,7 +262,8 @@ impl<M> Pill<'_, M> {
             .snap(track.centre(fraction) + bounds.height / 2.0)
             .min(bounds.width);
         let held = enabled && (state.drag.is_some() || self.slider.preview == Preview::Held);
-        let hovered = enabled && ((state.hovered && !state.over_icon) || self.slider.preview == Preview::Hovered);
+        let on_button = state.over_icon && self.icon_presses();
+        let hovered = enabled && ((state.hovered && !on_button) || self.slider.preview == Preview::Hovered);
         let lift = if held {
             Opacity::Held.value()
         } else if hovered {
@@ -256,7 +272,7 @@ impl<M> Pill<'_, M> {
             0.0
         };
         let (fill, on_fill) = if self.slider.soft {
-            (c.secondary_container, c.on_secondary_container)
+            (c.secondary, c.on_secondary)
         } else {
             (c.primary, c.on_primary)
         };
@@ -496,10 +512,15 @@ impl<M: Clone> Widget<M, Theme, Renderer> for Pill<'_, M> {
     fn layout(&mut self, tree: &mut Tree, _renderer: &Renderer, limits: &layout::Limits) -> layout::Node {
         let style = self.style();
         let state = tree.state.downcast_mut::<State>();
-        let texts = self.label_texts();
-        let same = state.labels.len() == texts.len() && state.labels.iter().zip(&texts).all(|((a, _), b)| a == b);
-        if !same {
-            state.labels = texts.into_iter().map(|t| (t.clone(), shaped(&t, style))).collect();
+        if !self.labels_shaped(&state.labels) {
+            state.labels = self
+                .label_texts()
+                .into_iter()
+                .map(|text| {
+                    let paragraph = shaped(&text, style);
+                    (text, paragraph)
+                })
+                .collect();
         }
         if state.widest.0 != self.slider.widest {
             let width = shaped(&self.slider.widest, style).min_width();
@@ -594,6 +615,11 @@ impl<M: Clone> Widget<M, Theme, Renderer> for Pill<'_, M> {
                     }
                     shell.request_redraw();
                 }
+            }
+            Event::Mouse(mouse::Event::CursorLeft) => {
+                state.hovered = false;
+                state.over_icon = false;
+                shell.request_redraw();
             }
             _ => return,
         }

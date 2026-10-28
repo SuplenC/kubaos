@@ -1293,7 +1293,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 58] = [
+pub const CONTRAST: [ContrastPair; 60] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1568,8 +1568,15 @@ pub const CONTRAST: [ContrastPair; 58] = [
         purpose: "A slider's step the fill has passed",
     },
     ContrastPair {
-        fg: Role::OnSecondaryContainer,
-        bg: Role::SecondaryContainer,
+        fg: Role::OnSecondary,
+        bg: Role::Secondary,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A slider's label and icon on its softer fill (Auto)",
+    },
+    ContrastPair {
+        fg: Role::OnSecondary,
+        bg: Role::Secondary,
         need: Need::Graphic,
         opacity: Some(Opacity::Subdued),
         purpose: "A slider's passed step on its softer fill (Auto)",
@@ -1580,6 +1587,13 @@ pub const CONTRAST: [ContrastPair; 58] = [
         need: Need::Graphic,
         opacity: None,
         purpose: "A slider's step ahead, on its track",
+    },
+    ContrastPair {
+        fg: Role::Secondary,
+        bg: Role::SurfaceContainerHighest,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A slider's softer fill (Auto) on its track",
     },
     ContrastPair {
         fg: Role::Cold,

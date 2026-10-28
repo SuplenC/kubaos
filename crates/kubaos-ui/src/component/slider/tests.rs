@@ -106,6 +106,16 @@ fn a_step_the_moving_value_passes_over_hides_under_its_end() {
     assert!(t.marks(&[0.5], 0.505, None).is_empty());
 }
 
+#[test]
+fn a_step_the_fills_edge_crosses_hides_rather_than_take_one_sides_colour() {
+    let t = track();
+
+    // The value at 0.44 stands at 150: the fill ends at 168, across the step at 0.5.
+    assert!(t.marks(&[0.5], 0.44, None).is_empty());
+    // At 0.41 the fill ends at 159, clear of the step's dot from 165 to 171.
+    assert_eq!(t.marks(&[0.5], 0.41, None).len(), 1);
+}
+
 fn stop(index: u16, count: u16) -> Value {
     Value::Stop { index, count }
 }
