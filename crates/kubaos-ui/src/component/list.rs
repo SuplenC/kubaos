@@ -54,6 +54,17 @@ const ROW_GAP: Space = Space::S4;
 /// The rows' corners, concentric inside the well; a well and inset that can't be stop the build.
 const ROW_RADIUS: Corner = nested(WELL_RADIUS.corner(), WELL_INSET);
 
+/// How a row's icon is drawn.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Face {
+    /// The symbol alone.
+    Bare,
+    /// On an icon tile.
+    Tile,
+    /// On an icon tile, in the accent.
+    AccentTile,
+}
+
 /// One row of a list, built up then drawn with [`ListRow::view`].
 #[derive(Debug)]
 pub struct ListRow<'a, M> {
@@ -61,8 +72,7 @@ pub struct ListRow<'a, M> {
     subtitle: Option<String>,
     detail: Option<String>,
     icon: Option<Icon>,
-    tile: bool,
-    accent: bool,
+    face: Face,
     chips: Vec<(ChipKind, String)>,
     selected: bool,
     danger: bool,
@@ -79,8 +89,7 @@ pub fn list_row<'a, M>(title: impl Into<String>) -> ListRow<'a, M> {
         subtitle: None,
         detail: None,
         icon: None,
-        tile: false,
-        accent: false,
+        face: Face::Bare,
         chips: Vec::new(),
         selected: false,
         danger: false,
@@ -122,13 +131,21 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
     /// from the others at a glance (the default keyboard layout's star).
     #[must_use]
     pub fn tile(self) -> Self {
-        ListRow { tile: true, ..self }
+        let face = match self.face {
+            Face::Bare => Face::Tile,
+            kept => kept,
+        };
+        ListRow { face, ..self }
     }
 
-    /// The tile's symbol in the accent: the one row of the list that comes first (the default).
+    /// The icon on a tile, its symbol in the accent: the one row of the list that comes first (the
+    /// default).
     #[must_use]
     pub fn accent(self) -> Self {
-        ListRow { accent: true, ..self }
+        ListRow {
+            face: Face::AccentTile,
+            ..self
+        }
     }
 
     /// A chip near the row's end, after the chips before it: a fact about the row that matters at
@@ -185,10 +202,10 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         } else {
             "one-line"
         };
-        let symbol = match (self.icon, self.tile) {
+        let symbol = match (self.icon, self.face) {
             (None, _) => "",
-            (Some(_), false) => "icon",
-            (Some(_), true) => "tile",
+            (Some(_), Face::Bare) => "icon",
+            (Some(_), Face::Tile | Face::AccentTile) => "tile",
         };
         let variant = [lines, symbol, ""];
         let c = look.colors;
@@ -220,11 +237,16 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         // does.
         let mut content = row(look, Space::S12).center().width(Extent::Fill).height(Extent::Fill);
         if let Some(glyph) = self.icon
-            && self.tile
+            && self.face != Face::Bare
         {
             let size = if two_line { TileSize::Md } else { TileSize::Sm };
             let tile = icon_tile(glyph, size);
-            content = content.push(if self.accent { tile.accent() } else { tile }.view(look));
+            let tile = if self.face == Face::AccentTile {
+                tile.accent()
+            } else {
+                tile
+            };
+            content = content.push(tile.view(look));
         } else if let Some(glyph) = self.icon {
             // Beside a title over a subtitle, the icon spans both lines.
             let size = if two_line {
