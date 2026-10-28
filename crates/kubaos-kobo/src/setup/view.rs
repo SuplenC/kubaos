@@ -410,7 +410,13 @@ fn card_detail<'a>(s: &'a Setup, c: &'a CardStatus, look: &Look) -> El<'a> {
     stack(look, Space::S24)
         .height(Extent::Fill)
         .push(head)
-        .push(scroll(look, parts).id("setup-detail").height(Extent::Fill))
+        .push(
+            scroll(look, parts)
+                .id("setup-detail")
+                .height(Extent::Fill)
+                .room_above(Space::S24)
+                .room_below(Space::S24),
+        )
         .push(actions(s, c, look))
         .into()
 }

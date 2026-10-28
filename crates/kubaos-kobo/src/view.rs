@@ -132,6 +132,9 @@ use crate::theme::jp;
 use crate::ui;
 use crate::ui::El;
 
+/// The room between a screen's body and the footer under it.
+const FOOTER_GAP: Space = Space::S16;
+
 /// The glass panel's rectangle in a window `win` logical pixels big, at `scale`: inset from the
 /// window's edges, and never wider than the rail beside two columns of text with the page's
 /// insets, so lines don't get silly on a big output. Its edges are on device pixels.
@@ -525,7 +528,7 @@ fn content<'a>(app: &'a App, look: &Look) -> El<'a> {
         .height(Extent::Fill)
         .push(widget::container(body).height(Length::Fill));
     if !matches!(app.screen, Screen::Installing | Screen::Failed | Screen::Summary) {
-        page = page.push(gap(Space::S16)).push(footer(app, look));
+        page = page.push(gap(FOOTER_GAP)).push(footer(app, look));
     }
     // The page slides in from the side it comes from, a whole device pixel at a time.
     let travel = look
@@ -971,7 +974,9 @@ fn account<'a>(app: &'a App, look: &Look) -> El<'a> {
                     .push(widget::container(passwords).id(ids::REVEAL_PASSWORDS)),
             )
             .id(ids::ACCOUNT_SCROLL)
-            .height(Extent::Fill),
+            .height(Extent::Fill)
+            .room_above(Space::S32)
+            .room_below(FOOTER_GAP),
         )
         .into()
 }
@@ -1213,7 +1218,13 @@ fn disk<'a>(app: &'a App, look: &Look) -> El<'a> {
             "Where it goes",
             "Pick a disk, then decide whether whatever's on it gets to live.",
         ))
-        .push(scroll(look, sections).id(ids::DISK_SCROLL).height(Extent::Fill))
+        .push(
+            scroll(look, sections)
+                .id(ids::DISK_SCROLL)
+                .height(Extent::Fill)
+                .room_above(Space::S20)
+                .room_below(FOOTER_GAP),
+        )
         .into()
 }
 
@@ -1448,7 +1459,13 @@ fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
              either way (later: ~/.config/kubaos/desktop/wallpapers/sets). Your own images go in \
              ~/Pictures/wallpapers.",
         ))
-        .push(scroll(look, sections).id(ids::WALLPAPER_SCROLL).height(Extent::Fill))
+        .push(
+            scroll(look, sections)
+                .id(ids::WALLPAPER_SCROLL)
+                .height(Extent::Fill)
+                .room_above(Space::S20)
+                .room_below(Space::S20),
+        )
         .push(text(note, Type::Small, c.on_surface_variant))
         .into()
 }
@@ -1576,7 +1593,9 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
                 .padding(Inset::NONE.right(Space::S16).padding()),
             )
             .id(ids::SUMMARY_SCROLL)
-            .height(Extent::Fill),
+            .height(Extent::Fill)
+            .room_above(Space::S20)
+            .room_below(Space::S20),
         )
         // The cards keep a gutter for their scrollbar; the banner ends where they do.
         .push(widget::container(confirm(app, disk, whole, look)).padding(Inset::NONE.right(Space::S16).padding()))
