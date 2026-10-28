@@ -40,7 +40,7 @@ fn the_repos_tokens_hold_every_rule() {
 
 #[test]
 fn a_spacing_step_off_the_grid_is_refused() {
-    let found = violations(|t| set(t, &["space"], "values", vec![4, 8, 10, 16, 24, 32]));
+    let found = violations(|t| set(t, &["space"], "values", vec![4, 8, 10, 12, 16, 24, 32]));
 
     assert_eq!(
         found,
@@ -49,6 +49,36 @@ fn a_spacing_step_off_the_grid_is_refused() {
             value: 10,
             grid: 4
         }]
+    );
+}
+
+#[test]
+fn a_terminal_padding_off_the_spacing_scale_is_refused() {
+    let found = violations(|t| set(t, &["terminal"], "padding_x", 10));
+
+    assert_eq!(
+        found,
+        [Violation::OffScalePadding {
+            token: "terminal.padding_x".into(),
+            value: 10
+        }]
+    );
+}
+
+#[test]
+fn a_terminal_set_in_a_proportional_family_is_refused() {
+    let found = violations(|t| set(t, &["terminal"], "type", "body"));
+
+    assert_eq!(found, [Violation::TerminalNotMono { style: "body".into() }]);
+}
+
+#[test]
+fn dim_text_too_close_to_the_surface_is_refused() {
+    let found = violations(|t| set(t, &["terminal"], "dim", 20));
+
+    assert!(
+        matches!(found.as_slice(), [Violation::LowContrast { mode: "light", .. }]),
+        "{found:?}"
     );
 }
 

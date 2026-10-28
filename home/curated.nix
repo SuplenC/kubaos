@@ -101,9 +101,15 @@ rec {
   inherit (pkgs.libsForQt5) qt5ct;
   inherit (pkgs.qt6Packages) qt6ct;
 
-  # Papirus with cyan folders, the neon accent most Tokyo wallpapers share.
-  # An override, so cache.nixos.org doesn't have it.
-  papirus-cyan = pkgs.papirus-icon-theme.override { color = "cyan"; };
+  # The GTK and Qt icon theme, picked from test/shots/icon-themes' sheet:
+  # Colloid's symbolic icons are thin rounded outlines, the closest to KubaOS
+  # Symbols (Tabler's), and its orange sits beside the amber palette. Only
+  # the orange variants (Colloid-Orange, -Dark, -Light). An override, so
+  # cache.nixos.org doesn't have it.
+  colloid-orange = pkgs.colloid-icon-theme.override {
+    schemeVariants = [ "default" ];
+    colorVariants = [ "orange" ];
+  };
 
   # system/65-recorder.sh setcaps this package's gsr-kms-server; the gsr in
   # the profile must be the same build.

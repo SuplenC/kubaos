@@ -40,6 +40,7 @@ pub struct Tokens {
     pub shadow: BTreeMap<String, Shadow>,
     pub color: Colors,
     pub contrast: ContrastPairs,
+    pub terminal: Terminal,
     /// KubaOS Symbols, by the Material Symbols name each replaces.
     pub symbols: BTreeMap<String, Symbol>,
 }
@@ -300,5 +301,148 @@ impl<'de> Deserialize<'de> for Rgb {
     fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let hex = String::deserialize(deserializer)?;
         Rgb::parse(&hex).ok_or_else(|| de::Error::custom(format!("`{hex}` isn't a colour written #rrggbb")))
+    }
+}
+
+impl Rgb {
+    /// This colour with its HSL lightness moved by `points` of 100, clamped: matugen's `lighten`.
+    #[must_use]
+    pub fn lighten(self, points: f32) -> Rgb {
+        let [red, green, blue] = [self.r, self.g, self.b].map(|c| f32::from(c) / 255.0);
+        let max = red.max(green).max(blue);
+        let min = red.min(green).min(blue);
+        let chroma = max - min;
+        let lightness = f32::midpoint(max, min);
+        let grey = chroma <= f32::EPSILON;
+        let saturation = if grey {
+            0.0
+        } else {
+            chroma / (1.0 - (2.0 * lightness - 1.0).abs())
+        };
+        // The hue as a sixth of the circle, 0 to 6, from the channel that is largest.
+        let sector = if grey {
+            0.0
+        } else if max.total_cmp(&red).is_eq() {
+            ((green - blue) / chroma).rem_euclid(6.0)
+        } else if max.total_cmp(&green).is_eq() {
+            (blue - red) / chroma + 2.0
+        } else {
+            (red - green) / chroma + 4.0
+        };
+        let lightness = (lightness + points / 100.0).clamp(0.0, 1.0);
+        let chroma = (1.0 - (2.0 * lightness - 1.0).abs()) * saturation;
+        let second = chroma * (1.0 - (sector.rem_euclid(2.0) - 1.0).abs());
+        let (red, green, blue) = match sector {
+            at if at < 1.0 => (chroma, second, 0.0),
+            at if at < 2.0 => (second, chroma, 0.0),
+            at if at < 3.0 => (0.0, chroma, second),
+            at if at < 4.0 => (0.0, second, chroma),
+            at if at < 5.0 => (second, 0.0, chroma),
+            _ => (chroma, 0.0, second),
+        };
+        let floor = lightness - chroma / 2.0;
+        let channel = |value: f32| {
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "Clamped to 0..=255 and rounded first."
+            )]
+            let byte = ((value + floor) * 255.0).round().clamp(0.0, 255.0) as u8;
+            byte
+        };
+        Rgb {
+            r: channel(red),
+            g: channel(green),
+            b: channel(blue),
+        }
+    }
+}
+
+/// The terminals' text, padding and palette.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Terminal {
+    /// The type style the terminals set their text in, by its name in `[type]`.
+    #[serde(rename = "type")]
+    pub style: String,
+    /// The font the glyphs the type family lacks come from.
+    pub glyphs: String,
+    /// Logical pixels between the window's edge and the cells, at the sides.
+    pub padding_x: u16,
+    /// Logical pixels between the window's edge and the cells, above and below.
+    pub padding_y: u16,
+    /// The window's background's opacity, by its name in `[opacity]`.
+    pub opacity: String,
+    /// HSL lightness points a bright ANSI colour stands further from the surface than its normal
+    /// one.
+    pub bright: u8,
+    /// HSL lightness points ANSI 8 stands closer to the surface than ANSI 7.
+    pub dim: u8,
+    pub roles: TerminalRoles,
+    pub hues: Hues,
+}
+
+/// The terminal's own colours, each a colour role's name.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TerminalRoles {
+    pub background: String,
+    pub foreground: String,
+    pub cursor: String,
+    pub cursor_text: String,
+    pub selection: String,
+    pub selection_text: String,
+    pub url: String,
+    pub divider: String,
+    /// ANSI 0.
+    pub black: String,
+    /// ANSI 7, and ANSI 8 dimmed from it.
+    pub white: String,
+    /// ANSI 15.
+    pub bright_white: String,
+}
+
+impl TerminalRoles {
+    /// Every slot by its name, with the role it takes.
+    pub fn slots(&self) -> [(&'static str, &str); 11] {
+        [
+            ("background", &self.background),
+            ("foreground", &self.foreground),
+            ("cursor", &self.cursor),
+            ("cursor_text", &self.cursor_text),
+            ("selection", &self.selection),
+            ("selection_text", &self.selection_text),
+            ("url", &self.url),
+            ("divider", &self.divider),
+            ("black", &self.black),
+            ("white", &self.white),
+            ("bright_white", &self.bright_white),
+        ]
+    }
+}
+
+/// ANSI 1 to 6: seeds matugen harmonizes toward the wallpaper, as custom colours of these names.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Hues {
+    pub red: Rgb,
+    pub green: Rgb,
+    pub yellow: Rgb,
+    pub blue: Rgb,
+    pub magenta: Rgb,
+    pub cyan: Rgb,
+}
+
+impl Hues {
+    /// Each hue by its name, in ANSI order, 1 to 6.
+    pub fn ansi(&self) -> [(&'static str, Rgb); 6] {
+        [
+            ("red", self.red),
+            ("green", self.green),
+            ("yellow", self.yellow),
+            ("blue", self.blue),
+            ("magenta", self.magenta),
+            ("cyan", self.cyan),
+        ]
     }
 }

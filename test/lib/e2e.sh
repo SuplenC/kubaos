@@ -306,12 +306,12 @@ c_tmux() {
   local out
   out="$(zrun 'tmux -L dotfiles-test -f ~/.config/tmux/tmux.conf new-session -d -s t -x 200 -y 50 && \
     tmux -L dotfiles-test source-file ~/.config/tmux/tmux.conf && \
-    tmux -L dotfiles-test show -gv @thm_primary; tmux -L dotfiles-test show-messages; \
+    tmux -L dotfiles-test show -gv @color_primary; tmux -L dotfiles-test show-messages; \
     tmux -L dotfiles-test kill-server' 2>&1)" || { echo "FAIL tmux: $out"; return 1; }
-  grep -qE '^#[0-9a-fA-F]{6}$' <<<"$out" || { echo "FAIL @thm_primary unset; tmux said:"; printf '%s\n' "$out"; return 1; }
+  grep -qE '^#[0-9a-fA-F]{6}$' <<<"$out" || { echo "FAIL @color_primary unset; tmux said:"; printf '%s\n' "$out"; return 1; }
   # show-messages logs every command; anything else in it is a complaint.
   if grep -v -E ' command: |^#[0-9a-fA-F]{6}$' <<<"$out" | grep -qiE 'error|unknown|invalid|no such|bad '; then echo "FAIL tmux messages:"; printf '%s\n' "$out"; return 1; fi
-  echo "ok   tmux.conf + theme + plugins load, @thm_primary=$(head -1 <<<"$out")"
+  echo "ok   tmux.conf + theme + plugins load, @color_primary=$(head -1 <<<"$out")"
 }
 
 c_nvim() {

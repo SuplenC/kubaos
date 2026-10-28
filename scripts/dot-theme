@@ -15,6 +15,8 @@
 #   dot-theme apply [--force]     regenerate from the current wallpaper (login);
 #                                 a no-op when nothing changed, unless --force
 #   dot-theme current             print the current wallpaper's path
+#
+# The colours are dark; DOT_THEME_MODE=light makes them light for that run.
 set -euo pipefail
 
 STATE="$HOME/.local/state/theme"
@@ -35,6 +37,13 @@ OWN_FOLDER=yours
 # wallpaper's own neon hue in the accent roles (tonal-spot washes it out);
 # override per run with DOT_THEME_SCHEME (scheme-vibrant, scheme-content, ...).
 SCHEME="${DOT_THEME_SCHEME:-scheme-fidelity}"
+# matugen's mode, the palette every consumer reading matugen's `default`
+# colours gets: dark, as docs/DESIGN.md makes the default.
+MODE="${DOT_THEME_MODE:-dark}"
+[[ $MODE == dark || $MODE == light ]] || {
+  printf 'dot-theme: DOT_THEME_MODE is %s; it takes dark or light\n' "$MODE" >&2
+  exit 2
+}
 # First-boot wallpaper, a path relative to $SETS_DIR.
 # config/matugen/default-colors.json is generated from it (see
 # config/matugen/README.md).
@@ -308,6 +317,27 @@ reload_nvim() {
   wait
 }
 
+# foot can't read its colours again; its file holds both palettes
+# (config/matugen/templates/foot.ini), and SIGUSR1 shows the dark one, SIGUSR2
+# the light one.
+reload_foot() {
+  command -v pgrep >/dev/null || return 0
+  local pids signal=USR1
+  [[ $MODE == light ]] && signal=USR2
+  # HAZARD: match the exact process name only. SIGUSR1 kills a process that
+  # doesn't handle it; foot does from 1.24, and Ubuntu's is 1.25.
+  pids=$(pgrep -u "$(id -u)" -x foot || true)
+  [[ -n $pids ]] || return 0
+  # shellcheck disable=SC2086 # One pid per word.
+  kill -"$signal" $pids 2>/dev/null || true
+}
+
+# fastfetch has no include: its colours are a layer dot-config merges between
+# KubaOS's settings and the user's.
+reload_merged() {
+  "${BASH_SOURCE[0]%/*}/dot-config" merge >/dev/null 2>&1 || true
+}
+
 reload_hypr() {
   [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] || return 0
   command -v hyprctl >/dev/null || return 0
@@ -346,6 +376,8 @@ reload_cursor() {
 reload_all() {
   reload_tmux &
   reload_ghostty &
+  reload_foot &
+  reload_merged &
   reload_nvim &
   reload_hypr &
   reload_gtk &
@@ -376,7 +408,7 @@ run_matugen() {
   else
     ln -sfn "$dir/templates/empty" "$STATE/.ohmyposh.toml.tmpl"
   fi
-  matugen "$@" -c "$dir/config.toml" -m dark -t "$SCHEME" \
+  matugen "$@" -c "$dir/config.toml" -m "$MODE" -t "$SCHEME" \
     --source-color-index 0 --continue-on-error -q || rc=$?
   [[ -f $omp ]] || rm -f "$STATE/ohmyposh.toml"
   return "$rc"
@@ -385,7 +417,7 @@ run_matugen() {
 # --- skip unchanged runs ----------------------------------------------------
 
 # Everything that decides matugen's output for <wallpaper>, one item per line:
-# the image (path, mtime, size), the scheme, the matugen binary, and the
+# the image (path, mtime, size), the scheme, the mode, the matugen binary, and the
 # content of config.toml, templates/* and the oh-my-posh template.
 theme_stamp() {
   local file=$1 dir omp poster
@@ -400,6 +432,7 @@ theme_stamp() {
     printf 'poster %s %s\n' "$poster" "$(stat -L -c '%Y %s' -- "$poster")"
   fi
   printf 'scheme %s\n' "$SCHEME"
+  printf 'mode %s\n' "$MODE"
   printf 'matugen %s\n' "$(readlink -f -- "$(command -v matugen || true)")"
   sha256sum -- "${inputs[@]}"
 }

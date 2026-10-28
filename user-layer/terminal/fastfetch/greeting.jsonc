@@ -1,0 +1,12 @@
+// Your greeting's settings: ~/.config/kubaos/terminal/fastfetch/greeting.jsonc, merged over
+// KubaOS's greeting (the short list a new Ghostty window shows; objects key by key, anything
+// else replaces ours). dot-config apply, which every update runs, writes
+// ~/.config/fastfetch/greeting.jsonc from both: run it after editing. `fastfetch` on its own
+// reads config.jsonc beside this file.
+{
+  // The lines shown, in order. Each module you add costs time before the prompt shows: the
+  // GPU's alone takes about 150 ms.
+  // "modules": ["title", "separator", "os", "kernel", "uptime", "memory"]
+
+  // Full docs: https://github.com/fastfetch-cli/fastfetch/wiki/Configuration
+}

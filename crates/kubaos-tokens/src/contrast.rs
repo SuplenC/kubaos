@@ -87,7 +87,7 @@ fn ratio_of(pair: &ContrastPair, palette: &BTreeMap<String, Rgb>, opacity: &BTre
 /// toolkits do, and [`luminance`] linearises them.
 pub type Srgb = [f32; 3];
 
-fn channels(c: Rgb) -> Srgb {
+pub(crate) fn channels(c: Rgb) -> Srgb {
     [c.r, c.g, c.b].map(|v| f32::from(v) / 255.0)
 }
 

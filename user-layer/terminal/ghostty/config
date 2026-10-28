@@ -2,19 +2,21 @@
 # ~/.config/ghostty/config, so they win. Reload: ctrl+shift+, (or restart Ghostty).
 #
 # Text size in points; each screen's scale keeps it the same size on all of them.
-# font-size = 11
+# font-size = 10.5
 #
-# The font. Any installed one; `ghostty +list-fonts` lists them.
-# font-family = "MesloLGM Nerd Font"
+# The font. Any installed one; `ghostty +list-fonts` lists them. An empty value
+# first drops KubaOS's Geist Mono instead of falling back to it.
+# font-family = ""
+# font-family = "JetBrainsMono Nerd Font"
 #
 # Line spacing on top of the font's own.
-# adjust-cell-height = 6%
+# adjust-cell-height = 10%
 #
 # How much of the blurred wallpaper shows through, 0 to 1 (1 is opaque).
-# background-opacity = 0.85
+# background-opacity = 0.8
 #
 # Space between the window's edge and the text, in points.
-# window-padding-x = 10
+# window-padding-x = 9
 # window-padding-y = 6
 #
 # Full docs: https://ghostty.org/docs/config/reference (or `ghostty +show-config --default --docs`).

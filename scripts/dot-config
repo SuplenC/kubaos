@@ -9,6 +9,9 @@
 #                                fastfetch) from the defaults plus yours. Every
 #                                home-manager switch runs it; run it after
 #                                editing one of the merged files.
+#   dot-config merge             only rewrite the merged files: dot-theme runs
+#                                it after a theme change, since fastfetch's
+#                                colours are a layer between ours and yours
 #   dot-config relocate          move each app's folder from ~/.config/kubaos/<app>
 #                                into its group, ~/.config/kubaos/<group>/<app>
 #   dot-config path [APP|GROUP]  print the user layer's folder, or an app's or a
@@ -25,6 +28,9 @@ DATA="${XDG_DATA_HOME:-$HOME/.local/share}/kubaos"
 DEFAULTS="$DATA/defaults"
 SKEL="$DATA/skel"
 LAYER="$DATA/layer"
+# dot-theme's output: a merged app's colours, <app>.jsonc, sit between the
+# defaults and the user layer.
+THEME="${XDG_STATE_HOME:-$HOME/.local/state}/theme"
 
 die() { printf 'dot-config: %s\n' "$*" >&2; exit 1; }
 say() { printf 'dot-config: %s\n' "$*"; }
@@ -170,13 +176,16 @@ merge_concat() {
   replace "$out"
 }
 
-# merge_json FILE USER: the user's JSON from USER (comments allowed) merged
-# over the defaults' FILE, objects key by key. Written as plain JSON. A user
-# file that doesn't parse keeps the last merge: a typo must not stop an update.
+# merge_json FILE USER: the defaults' FILE, then the theme's colours for its
+# app (the shipped dark fallback, <app>/theme.jsonc in the defaults, then
+# dot-theme's <app>.jsonc), then the user's JSON from USER, each merged over
+# the last, objects key by key; comments allowed. Written as plain JSON. An
+# input that doesn't parse keeps the last merge: a typo must not stop an
+# update.
 merge_json() {
   local out="$CONFIG/$1"
   mkdir -p -- "$(dirname -- "$out")"
-  if ! python3 - "$DEFAULTS/$1" "$USER_LAYER/$2" >"$out.new" <<'PY'; then
+  if ! python3 - "$DEFAULTS/$1" "$DEFAULTS/${1%%/*}/theme.jsonc" "$THEME/${1%%/*}.jsonc" "$USER_LAYER/$2" >"$out.new" <<'PY'; then
 import json, os, sys
 
 def strip_comments(text):
@@ -235,16 +244,18 @@ def merge(base, over):
         return out
     return over
 
-try:
-    merged = merge(load(sys.argv[1]), load(sys.argv[2]))
-except ValueError as e:
-    sys.exit(f"{sys.argv[2]}: {e}")
+merged = {}
+for path in sys.argv[1:]:
+    try:
+        merged = merge(merged, load(path))
+    except ValueError as e:
+        sys.exit(f"{path}: {e}")
 json.dump(merged, sys.stdout, indent=2, ensure_ascii=False)
 print()
 PY
     rm -f -- "$out.new"
-    printf 'dot-config: %s is not valid JSON; kept the last %s\n' \
-      "$(shown "$USER_LAYER")/$2" "$(shown "$out")" >&2
+    printf 'dot-config: kept the last %s: the file above is not valid JSON\n' \
+      "$(shown "$out")" >&2
     return 0
   fi
   replace "$out"
@@ -269,10 +280,22 @@ cmd_apply() {
   while read -r kind src dst; do
     case "$kind" in
       seed) copy_new "$DEFAULTS/$src" "$CONFIG/$dst" ;;
+      concat | json | app | '' | '#'*) ;;
+      *) die "unknown entry in $LAYER: $kind" ;;
+    esac
+  done <"$LAYER"
+  cmd_merge
+}
+
+# cmd_merge: rewrite every merged file from the defaults, the theme and yours.
+cmd_merge() {
+  [[ -d $DEFAULTS && -f $LAYER ]] ||
+    die "no defaults in $(shown "$DATA") (run home-manager switch)"
+  local kind src dst
+  while read -r kind src dst; do
+    case "$kind" in
       concat) merge_concat "$src" "$dst" ;;
       json) merge_json "$src" "$dst" ;;
-      app | '' | '#'*) ;;
-      *) die "unknown entry in $LAYER: $kind" ;;
     esac
   done <"$LAYER"
 }
@@ -299,6 +322,7 @@ cmd_open() {
 
 case "${1:-}" in
   apply) cmd_apply ;;
+  merge) cmd_merge ;;
   relocate) relocate ;;
   path) cmd_path "${2:-}" ;;
   open) cmd_open "${2:-}" ;;

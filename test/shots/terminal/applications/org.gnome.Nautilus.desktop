@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Files
+Comment=Access and organize files
+Exec=true
+Icon=org.gnome.Nautilus

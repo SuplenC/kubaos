@@ -1,9 +1,11 @@
 -- Wallpaper theme for Neovim.
 --
 -- dot-theme (matugen) writes ~/.local/state/theme/nvim.lua, a Lua file that
--- returns a table of Material 3 colors ({ primary = "#rrggbb", surface = ..., ... }).
--- We map those roles onto a base16 palette and apply it with mini.base16 as the
--- "matugen" colorscheme (colors/matugen.lua). The file is watched and re-applied
+-- returns the design tokens' colour roles by name ({ primary = "#rrggbb",
+-- surface = ..., cold = ..., warning = ... }), the terminal's hues, its dim
+-- text, and the mode dot-theme ran in (generated from design/tokens.toml by
+-- kubaos-tokens). The roles map onto a base16 palette, applied with
+-- mini.base16 as the "matugen" colorscheme (colors/matugen.lua), in that mode. The file is watched and re-applied
 -- on change; `:ThemeReload` does it by hand. Without the file the colorscheme is
 -- M.fallback, LazyVim's own tokyonight. A plugin spec in the user layer can set
 -- `require("config.theme").fallback` to another installed colorscheme.
@@ -90,7 +92,7 @@ local function base16(c)
     base00 = c.surface, -- default background
     base01 = c.surface_container, -- lighter background (status, folds)
     base02 = c.surface_container_highest or c.surface_container_high, -- selection
-    base03 = c.outline, -- comments, invisibles
+    base03 = c.dim or c.outline, -- comments, invisibles
     base04 = c.on_surface_variant, -- dark foreground
     base05 = c.on_surface, -- default foreground
     base06 = c.on_surface,
@@ -113,6 +115,12 @@ function M.apply()
     error(err)
   end
   local h = M.hues(c)
+  -- Plugins pick their own colours by 'background'. Only set when it differs:
+  -- setting it reloads the colorscheme.
+  local background = c.mode == "light" and "light" or "dark"
+  if vim.o.background ~= background then
+    vim.o.background = background
+  end
   require("mini.base16").setup({ palette = base16(c), use_cterm = nil })
 
   local hl = function(name, val)
@@ -135,7 +143,9 @@ function M.apply()
   hl("@punctuation", { fg = c.outline })
   hl("Delimiter", { fg = c.outline })
   hl("Operator", { fg = h.cyan })
-  hl("Comment", { fg = c.outline, italic = true })
+  -- The terminal's dim text, so a comment reads as faded as bat's; outline,
+  -- which older palettes fall back to, is a graphic's colour.
+  hl("Comment", { fg = c.dim or c.outline, italic = true })
   -- Functions take the wallpaper's accent, so code and chrome share a hue
   -- (amber on Shinjuku, blue at Tokyo Tower); keywords keep the magenta.
   hl("Function", { fg = c.primary })
@@ -186,7 +196,8 @@ function M.apply()
   hl("CursorLineSign", { bg = none })
   hl("CursorLineFold", { bg = none })
   hl("LineNr", { fg = c.outline_variant or c.outline, bg = none })
-  hl("Visual", { bg = c.primary_container, fg = c.on_primary_container })
+  -- A selection is a selected row's tinted bar under the text, as in the terminal.
+  hl("Visual", { bg = c.secondary_container, fg = c.on_secondary_container })
   hl("Search", { bg = c.tertiary_container or high, fg = c.on_tertiary_container })
   hl("IncSearch", { bg = c.tertiary, fg = c.on_tertiary or c.surface })
   hl("CurSearch", { bg = c.tertiary, fg = c.on_tertiary or c.surface })

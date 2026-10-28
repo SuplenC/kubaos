@@ -1,28 +1,21 @@
 # Ghostty is a plain terminal here: tmux does panes/windows, Hyprland does
 # window management. No splits or tabs.
 
-window-padding-x = 10
-window-padding-y = 6
+# The font, its size, the padding, the glass and a fallback palette are the
+# design tokens' (config/ghostty/tokens, loaded below). Sizes are in points,
+# which Ghostty multiplies by each screen's scale, so the text keeps its size
+# on any screen whose scale matches its density (Hyprland picks it,
+# config/hypr/monitors.lua).
 window-padding-balance = true
 window-step-resize = false
 window-padding-color = extend
 
-# In points, which Ghostty multiplies by each screen's scale, so the text keeps
-# its size on any screen whose scale matches its density (Hyprland picks it,
-# config/hypr/monitors.lua). 11 is compact: about 210 columns across a screen
-# 1920 logical pixels wide, two tmux panes of code side by side.
-font-size = 11
-font-family = "MesloLGM Nerd Font"
-# A little more line spacing than the font's own; easier to scan code.
-adjust-cell-height = 6%
-
-# Lightly translucent: Hyprland blurs and darkens what shows through
+# Translucent: Hyprland blurs and darkens what shows through
 # (decoration:blur in config/hypr/looks.lua), so the wallpaper reads as a
 # dim, frosted tint behind the text. Ghostty's own blur only works on KDE.
 # Cells with an explicit background (Neovim floats, tmux pills, selections)
 # stay opaque; Neovim and tmux leave the main background unpainted
 # (config/nvim/lua/config/theme.lua, config/tmux/tmux.conf).
-background-opacity = 0.85
 background-opacity-cells = false
 background-blur = false
 
@@ -35,11 +28,10 @@ window-decoration = none
 # would ignore those arguments.
 gtk-single-instance = detect
 
-# Fallback colors if the generated theme file below is missing.
-theme = Monokai Soda
-
-# Colors from the wallpaper theme pipeline (dot-theme / matugen).
-# Loaded after this file, so it overrides `theme` above. `?` = optional.
+# The tokens, then the wallpaper's palette from the theme pipeline (dot-theme,
+# matugen), which overrides the tokens' fallback palette. Ghostty loads them
+# after this file, in this order. `?` = optional.
+config-file = tokens
 config-file = ?~/.local/state/theme/ghostty
 # dot-theme reloads every Ghostty window when the wallpaper changes; skip the
 # "Reloaded the configuration" toast that would pop up in each of them.

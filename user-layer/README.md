@@ -48,6 +48,7 @@ group.
 | Shell aliases, variables, PATH | `terminal/zsh/zshrc` |
 | The greeting in new Ghostty windows | `dot-greeting off` (writes `terminal/zsh/no-greeting`) |
 | What fastfetch shows | `terminal/fastfetch/config.jsonc`, then `dot-config apply` |
+| What the greeting shows | `terminal/fastfetch/greeting.jsonc`, then `dot-config apply` |
 | Neovim options, keymaps, autocmds | `editor/nvim/options.lua`, `keymaps.lua`, `autocmds.lua` |
 | Neovim plugins | `editor/nvim/plugins/*.lua` |
 | LazyVim extras | `:LazyExtras` in Neovim (kept in `editor/nvim/lazyvim.json`) |
@@ -64,10 +65,11 @@ group.
 | Where `kubaos suite new` makes projects (`~/Projects`) | `home/home.nix`: `home.sessionVariables.KUBAOS_PROJECTS` |
 | The Bitwarden item and folders gh and project env come from (`gh-token`, `env/<project>`) | `home/home.nix`: `KUBAOS_BW_GH_ITEM`, `KUBAOS_BW_ENV_PREFIX` (docs/SECRETS.md) |
 
-Three files have no include in their app, so `dot-config apply` writes the app's file
-from KubaOS's and yours: `tools/bat/config`, `tools/git/ignore` and
-`terminal/fastfetch/config.jsonc`. Every update runs it; after editing one of them, run
-`dot-config apply` yourself. Every other file applies the way its app reloads its config;
+Four files have no include in their app, so `dot-config apply` writes the app's file
+from KubaOS's and yours: `tools/bat/config`, `tools/git/ignore`,
+`terminal/fastfetch/config.jsonc` and `terminal/fastfetch/greeting.jsonc`. Every update
+runs it, and a change of wallpaper rewrites fastfetch's two with the new colours between
+KubaOS's and yours; after editing one of them, run `dot-config apply` yourself. Every other file applies the way its app reloads its config;
 each file says how.
 
 How each app loads its file: docs/CONTRACTS.md, "Defaults and the user layer"

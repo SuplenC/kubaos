@@ -5,7 +5,9 @@
 //! design/tokens.toml ─▶ parse ─▶ rules::check ─▶ Tokens ─▶ Target::render ─▶ crates/kubaos-ui/src/tokens.rs
 //!                                                                         ├▶ qml/KubaOS/Components/Tokens.qml
 //!                                                                         ├▶ qml/KubaOS/Components/Symbols.qml
-//!                                                                         └▶ (matugen, boot: to come)
+//!                                                                         ├▶ config/{ghostty,foot,fuzzel}, config/tmux/colors.conf
+//!                                                                         ├▶ config/matugen/templates/{ghostty,foot.ini,tmux.conf,…}
+//!                                                                         └▶ (boot: to come)
 //! ```
 //!
 //! # Owns
@@ -24,6 +26,7 @@ pub mod qml;
 pub mod rules;
 pub mod rust;
 pub mod target;
+pub mod terminal;
 
 use std::fs;
 use std::io;
