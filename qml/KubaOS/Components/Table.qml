@@ -71,16 +71,17 @@ Item {
             }
         }
 
+        // A row per entry, by count: new readings refill the rows there are, and only a count that
+        // changes makes or drops one. A list as the model would make every row again each time.
         Repeater {
-            model: root.rows
+            model: root.rows.length
 
             K.TableRow {
-                required property var modelData
                 required property int index
 
                 columns: root.columns
-                cells: modelData.cells
-                selected: modelData.selected ?? false
+                cells: root.rows[index]?.cells ?? []
+                selected: root.rows[index]?.selected ?? false
                 onActivated: root.activated(index)
             }
         }

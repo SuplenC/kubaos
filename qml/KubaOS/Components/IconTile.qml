@@ -25,7 +25,7 @@ Item {
     readonly property int side: root.size === "Sm" ? Tokens.size.control_sm : Tokens.size.control_md
     readonly property int glyph: root.size === "Sm" ? Tokens.type.body.icon : Tokens.icon.two_line
     readonly property color ink: root.danger ? Tokens.color.on_error : Tokens.color.on_surface_variant
-    readonly property bool pictured: app.status === Image.Ready || cover.status === Image.Ready
+    readonly property bool pictured: app.status === Image.Ready || (photoPath.item?.ready ?? false)
     readonly property var probe: ({
             role: "component",
             name: "IconTile",
@@ -70,33 +70,46 @@ Item {
         mipmap: true
     }
 
-    Image {
-        id: cover
+    // The photo's path only exists while there is a photo: a row of the Command menu, made on
+    // every keystroke, carries no effect it doesn't use.
+    Loader {
+        id: photoPath
 
         anchors.fill: parent
-        visible: false
-        source: root.photo
-        asynchronous: true
-        fillMode: Image.PreserveAspectCrop
-        sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
-    }
+        active: root.photo.toString() !== ""
 
-    Rectangle {
-        id: corners
+        sourceComponent: Item {
+            readonly property bool ready: cover.status === Image.Ready
 
-        anchors.fill: parent
-        radius: Tokens.radius.control
-        visible: false
-        layer.enabled: cover.status === Image.Ready
-    }
+            Image {
+                id: cover
 
-    MultiEffect {
-        anchors.fill: parent
-        visible: cover.status === Image.Ready
-        source: cover
-        maskEnabled: true
-        maskSource: corners
-        maskThresholdMin: 0.5
-        maskSpreadAtMin: 1
+                anchors.fill: parent
+                visible: false
+                source: root.photo
+                asynchronous: true
+                fillMode: Image.PreserveAspectCrop
+                sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
+            }
+
+            Rectangle {
+                id: corners
+
+                anchors.fill: parent
+                radius: Tokens.radius.control
+                visible: false
+                layer.enabled: cover.status === Image.Ready
+            }
+
+            MultiEffect {
+                anchors.fill: parent
+                visible: cover.status === Image.Ready
+                source: cover
+                maskEnabled: true
+                maskSource: corners
+                maskThresholdMin: 0.5
+                maskSpreadAtMin: 1
+            }
+        }
     }
 }

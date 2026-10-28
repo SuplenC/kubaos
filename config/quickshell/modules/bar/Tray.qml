@@ -39,17 +39,30 @@ Pill {
         return grey && K.Look.contrast(average, K.Tokens.color.surface) < 3;
     }
 
-    // The item whose menu is open, and the submenu shown, or none.
+    // The item whose menu is open, or none, and the submenus opened in it, the one shown last.
     property var menuItem: null
-    property var submenu: null
-    // The open menu's entries, as `Menu` takes them.
-    readonly property var entries: (opener.children?.values ?? []).map(entry => ({
-                text: entry.text,
-                checkable: entry.buttonType !== QsMenuButtonType.None,
-                checked: entry.checkState === Qt.Checked,
-                enabled: entry.enabled,
-                separator: entry.isSeparator
-            }))
+    property var trail: []
+    readonly property var submenu: root.trail.length > 0 ? root.trail[root.trail.length - 1] : null
+    // Where the menu hangs from, under the icon, in the window's coordinates.
+    property real anchorY: 0
+    // The open menu's entries, as `Menu` takes them: a submenu's start with the way back.
+    readonly property var entries: [...(root.submenu ? [
+                {
+                    text: "Back",
+                    icon: "arrow_back"
+                },
+                {
+                    separator: true
+                }
+            ] : []), ...(opener.children?.values ?? []).map(entry => ({
+                    text: entry.text,
+                    checkable: entry.buttonType !== QsMenuButtonType.None,
+                    checked: entry.checkState === Qt.Checked,
+                    enabled: entry.enabled,
+                    separator: entry.isSeparator
+                }))]
+    // How many entries come before the app's own: the way back and its separator.
+    readonly property int lead: root.submenu ? 2 : 0
 
     // Opens the menu of the `index`th item, under its icon.
     function openMenu(index: int): void {
@@ -57,19 +70,34 @@ Pill {
         const window = root.window;
         if (!entry || !window || !entry.modelData.hasMenu)
             return;
-        root.submenu = null;
+        // A press on the icon whose menu is open closes it.
+        if (root.menuItem === entry.modelData && Panels.current === "traymenu") {
+            root.closeMenu();
+            return;
+        }
+        root.trail = [];
         root.menuItem = entry.modelData;
         const at = entry.mapToItem(window.contentItem, 0, entry.height + K.Tokens.space.s12);
         popover.x = Math.max(K.Tokens.space.s8, Math.min(at.x, window.width - K.Tokens.size.menu - K.Tokens.space.s8));
-        popover.y = at.y;
+        root.anchorY = at.y;
         menu.currentIndex = -1;
         Panels.open("traymenu");
         menu.forceActiveFocus();
     }
 
+    // Back out of the submenu shown, or close the menu from its top.
+    function back(): void {
+        if (root.trail.length === 0) {
+            root.closeMenu();
+            return;
+        }
+        root.trail = root.trail.slice(0, -1);
+        menu.currentIndex = -1;
+    }
+
     function closeMenu(): void {
         root.menuItem = null;
-        root.submenu = null;
+        root.trail = [];
         if (Panels.current === "traymenu")
             Panels.close();
     }
@@ -100,23 +128,33 @@ Pill {
         parent: root.window ? root.window.contentItem : root
         floating: true
         fixedWidth: K.Tokens.size.menu
-        visible: root.menuItem !== null && Panels.current === "traymenu"
+        // Kept inside the window, however long the menu.
+        y: Math.max(K.Tokens.space.s8, Math.min(root.anchorY, parent.height - height - K.Tokens.space.s8))
+        // Nothing until the app's entries arrive, so no bare surface shows while they load.
+        visible: root.menuItem !== null && Panels.current === "traymenu" && (opener.children?.values.length ?? 0) > 0
 
         K.Menu {
             id: menu
 
+            // No lower than the window's foot, less the popover's padding; a longer menu scrolls.
+            maxHeight: (root.window?.height ?? Infinity) - root.anchorY - K.Tokens.space.s8 - K.Tokens.space.s12 * 2
             entries: root.entries
             onActivated: index => {
-                const entry = opener.children.values[index];
+                if (index < root.lead) {
+                    root.back();
+                    return;
+                }
+                const entry = opener.children.values[index - root.lead];
                 if (entry.hasChildren) {
-                    root.submenu = entry;
+                    root.trail = [...root.trail, entry];
                     menu.currentIndex = -1;
                     return;
                 }
                 entry.triggered();
                 root.closeMenu();
             }
-            onDismissed: root.closeMenu()
+            // Esc backs out one level, and closes the menu from its top.
+            onDismissed: root.back()
         }
     }
 

@@ -2,8 +2,8 @@ import QtQuick
 import KubaOS.Components as K
 
 // A bar's symbol with a badge centred on its top right corner: a count, or a dot when `count` is
-// 0. The badge stands out of the symbol's box without taking room, so the symbols beside it stay
-// where they are whether or not it shows.
+// 0. While it shows, the box takes the half of the badge past the symbol, so the badge keeps the
+// row's gap from the symbol beside it rather than running into it.
 Item {
     id: root
 
@@ -15,7 +15,7 @@ Item {
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
-    implicitWidth: glyph.width
+    implicitWidth: glyph.width + (root.badged ? K.Look.snapUp(badge.width / 2, root.dpr) : 0)
     implicitHeight: glyph.height
 
     K.Icon {
@@ -28,7 +28,7 @@ Item {
     K.Badge {
         id: badge
 
-        x: K.Look.snap(root.width - width / 2, root.dpr)
+        x: K.Look.snap(glyph.width - width / 2, root.dpr)
         y: K.Look.snap(-height / 2, root.dpr)
         visible: root.badged
     }

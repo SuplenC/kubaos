@@ -141,6 +141,8 @@ K.Pressable {
         K.Menu {
             id: menu
 
+            // Eight items at most; a longer list scrolls.
+            maxHeight: Tokens.size.control_sm * 8
             entries: root.options.map((option, index) => ({
                         text: option,
                         checkable: true,

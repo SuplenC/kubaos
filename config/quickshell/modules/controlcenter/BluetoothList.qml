@@ -174,7 +174,8 @@ Item {
     Well {
         y: top.height + K.Tokens.space.s12
         width: root.width
-        height: root.height - y
+        // While a search has found nothing, as tall as its rows: no empty well under them.
+        height: scanning.visible ? scanning.implicitHeight + K.Tokens.space.s12 * 2 : root.height - y
         focused: list.activeFocus
 
         NavList {
@@ -209,6 +210,8 @@ Item {
         // Rows still being found while the scan has nothing yet: the first results take the
         // place they keep.
         Column {
+            id: scanning
+
             x: K.Tokens.space.s12
             y: K.Tokens.space.s12
             width: parent.width - K.Tokens.space.s12 * 2

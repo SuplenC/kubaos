@@ -47,7 +47,8 @@ Item {
         id: well
 
         width: root.width
-        height: root.height - (password.visible ? password.height + K.Tokens.space.s12 : 0)
+        // While a scan has found nothing, as tall as its caption and rows: no empty well under them.
+        height: scanning.visible ? scanning.implicitHeight + K.Tokens.space.s12 * 2 : root.height - (password.visible ? password.height + K.Tokens.space.s12 : 0)
         focused: list.activeFocus
 
         NavList {
@@ -93,11 +94,20 @@ Item {
         // Rows still being found while the scan has nothing yet: the first results take the
         // place they keep.
         Column {
+            id: scanning
+
             x: K.Tokens.space.s12
             y: K.Tokens.space.s12
             width: parent.width - K.Tokens.space.s12 * 2
             visible: list.count === 0 && Net.wifiEnabled
             spacing: K.Tokens.space.s4
+
+            K.Text {
+                x: K.Tokens.space.s12
+                text: "Scanning…"
+                style: K.Tokens.type.small
+                color: K.Tokens.color.on_surface_variant
+            }
 
             Repeater {
                 model: [0.6, 0.45, 0.75]

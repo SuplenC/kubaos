@@ -24,7 +24,7 @@ K.Stack {
     // One country of many: a select, where every country's chip made a wall.
     Section {
         title: "Holidays"
-        note: Time.state.country ? `Marked in the calendar and left out of working days: ${Time.state.country}` : "None marked"
+        note: "Marked in the calendar and left out of working days"
 
         K.Select {
             readonly property var countries: Time.state.countries ?? []

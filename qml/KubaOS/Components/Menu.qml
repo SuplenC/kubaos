@@ -77,35 +77,62 @@ Item {
             }
         })
 
-    implicitHeight: column.implicitHeight
+    // The tallest it grows; past it, its items scroll, the one the keyboard is on kept in view.
+    property real maxHeight: Infinity
+
+    implicitHeight: Math.min(column.implicitHeight, root.maxHeight)
 
     function relayout(): void {
         column.relayout();
     }
 
-    K.Stack {
-        id: column
+    onCurrentIndexChanged: {
+        const item = items.itemAt(root.currentIndex);
+        if (!item)
+            return;
+        if (item.y < scroller.contentY)
+            scroller.contentY = item.y;
+        else if (item.y + item.height > scroller.contentY + scroller.height)
+            scroller.contentY = item.y + item.height - scroller.height;
+    }
+
+    Flickable {
+        id: scroller
 
         width: root.width
-        fill: true
+        height: root.height
+        contentWidth: root.width
+        contentHeight: column.implicitHeight
+        interactive: column.implicitHeight > root.maxHeight
+        clip: interactive
+        boundsBehavior: Flickable.StopAtBounds
 
-        Repeater {
-            model: root.entries
+        K.Stack {
+            id: column
 
-            K.MenuItem {
-                required property var modelData
-                required property int index
+            width: root.width
+            fill: true
 
-                text: modelData.text ?? ""
-                icon: modelData.icon ?? ""
-                shortcut: modelData.shortcut ?? []
-                checkable: modelData.checkable ?? false
-                checked: modelData.checked ?? false
-                danger: modelData.danger ?? false
-                separator: modelData.separator ?? false
-                enabled: !(modelData.separator ?? false) && modelData.enabled !== false
-                highlighted: index === root.currentIndex
-                onActivated: root.activated(index)
+            Repeater {
+                id: items
+
+                model: root.entries
+
+                K.MenuItem {
+                    required property var modelData
+                    required property int index
+
+                    text: modelData.text ?? ""
+                    icon: modelData.icon ?? ""
+                    shortcut: modelData.shortcut ?? []
+                    checkable: modelData.checkable ?? false
+                    checked: modelData.checked ?? false
+                    danger: modelData.danger ?? false
+                    separator: modelData.separator ?? false
+                    enabled: !(modelData.separator ?? false) && modelData.enabled !== false
+                    highlighted: index === root.currentIndex
+                    onActivated: root.activated(index)
+                }
             }
         }
     }
