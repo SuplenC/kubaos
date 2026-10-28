@@ -41,7 +41,7 @@ The boot menu says **KubaOS Shinjuku** (the entry), "Advanced options for KubaOS
 | Wrong passphrase | Wrong passphrase. Try again. |
 | Caps Lock | `Caps Lock` is on. |
 
-The keys are keycaps, as everywhere (docs/DESIGN.md, "Keys").
+The keys are keycaps, as everywhere (docs/design/components/keycap.md).
 
 How it's built: `docs/INSTALL-INTERNALS.md`, "Boot".
 

@@ -4,7 +4,7 @@
 # of tubes at a time (ク, バ, the dakuten, Kuba, OS), each stuttering before it
 # catches, then hums for as long as the boot takes, with a blink on バ every
 # few seconds. When the initramfs asks for the disk passphrase, the field fades
-# in under it: docs/DESIGN.md's `Field`, as the lock screen draws its password
+# in under it: docs/design/components/field.md's `Field`, as the lock screen draws its password
 # field, with the focus ring, a caret and a note under it. A wrong passphrase
 # shakes the field as the lock screen does and says so in the note.
 #

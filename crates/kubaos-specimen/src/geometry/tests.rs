@@ -123,3 +123,35 @@ fn every_component_reports_the_variant_words_and_fixed_measures_design_md_docume
         "DESIGN.md documents {missing:?}, which no page reports"
     );
 }
+
+/// Every component of DESIGN.md's variants table has a page under `docs/design/components/` with
+/// a heading naming it, and DESIGN.md's index links every page, so a component documented in one
+/// place is found from the other.
+#[test]
+fn every_documented_component_has_a_page_and_every_page_is_in_the_index() {
+    let docs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs");
+    let design = fs::read_to_string(docs.join("DESIGN.md")).expect("read docs/DESIGN.md");
+    let mut headed = BTreeSet::new();
+    let mut unlisted = Vec::new();
+    for entry in fs::read_dir(docs.join("design/components")).expect("read docs/design/components") {
+        let path = entry.expect("read a page").path();
+        let page = fs::read_to_string(&path).expect("read a page");
+        for heading in page.lines().filter_map(|line| line.strip_prefix("## ")) {
+            headed.extend(heading.split('`').skip(1).step_by(2).map(str::to_owned));
+        }
+        let name = path.file_name().and_then(|name| name.to_str()).expect("a page's name");
+        if !design.contains(&format!("(design/components/{name})")) {
+            unlisted.push(name.to_owned());
+        }
+    }
+
+    let homeless: Vec<String> = documented_variants()
+        .into_keys()
+        .filter(|name| !headed.contains(name))
+        .collect();
+    assert!(
+        homeless.is_empty(),
+        "no page under docs/design/components/ has a heading for {homeless:?}"
+    );
+    assert!(unlisted.is_empty(), "DESIGN.md's index doesn't link {unlisted:?}");
+}

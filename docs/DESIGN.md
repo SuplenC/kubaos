@@ -2,12 +2,13 @@
 
 How every KubaOS surface looks and behaves: the shell, the Command menu, Kōbō, the apps to come, the terminals, Plymouth and GRUB. Agents: read this before you build or change anything a person sees, in any toolkit. A rule here has a reason and a picture; follow the rule, and when the reason doesn't fit your case, change the rule here for everyone (see "Changing the design") instead of working round it.
 
-Three files hold the design, each owning one thing:
+Four places hold the design, each owning one thing:
 
 | File | Owns |
 |---|---|
 | `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols, the neon sign's stutter and the クバ mark's strokes. `kubaos-tokens` checks its rules and writes each toolkit's copy, where it is read (see "Where the outputs are generated"): `kubaos-ui`'s `tokens.rs`, `Tokens.qml` and `Symbols.qml` in `KubaOS.Components`, the boot screens' values (Plymouth's script and theme file, GRUB's `theme.txt`), the terminals' settings and matugen templates, Hyprland's `tokens.lua`, Kōbō's `done/neon.rs` and `kubaos-cursor`'s `tokens.rs`. |
-| `docs/DESIGN.md` (this file) | The rules and their reasons: which value is for what, the components, the keyboard, focus, scaling. |
+| `docs/DESIGN.md` (this file) | The rules and their reasons: which value is for what, the rules every component keeps, the keyboard, focus, scaling; and the index of the components. |
+| `docs/design/components/` | One page per component: its constructors in both libraries, how it looks and how it behaves. |
 | `docs/BRAND.md` | The words: name, voice, and how errors and buttons read. |
 
 A rule marked *Not enforced yet* is decided but not built: no code follows it today. The marker names the issue that builds it, or says that none does yet. Every other rule here is what the code does.
@@ -315,119 +316,81 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Header`, `Divider`, `Labelled`, `Note`, `EmptyState`, `KeyHints` | none | none | none |
 <!-- variants:end -->
 
-The set is **closed**. Every component takes the look (colours, mode, scale) and tokens, never a length, colour or duration of its own. A new kind, size or component changes this file first, then both libraries. **Composed blocks** (a settings row with a switch, a Wi-Fi row with its lock) are built from these, shadcn-style, in the app or the library, and add no new look.
+The set is **closed**. Every component takes the look (colours, mode, scale) and tokens, never a length, colour or duration of its own. A new kind, size or component changes its page here first (and the table above), then both libraries. **Composed blocks** (a settings row with a switch, a Wi-Fi row with its lock) are built from these, shadcn-style, in the app or the library, and add no new look.
 
 Every interactive component has these states, shown in the specimen: **resting, hovered, pressed, focused, disabled**. Hover and press lay a state layer of the content colour over the fill (`opacity.hover` 0.08, `opacity.press` 0.14). The layer fades in and out over `micro`. Focus is the neon focus tube. Disabled dims the content to 0.38 and the container to 0.10 and takes no input.
 
-### Layout
+### The components
 
-| Name | Rust | What |
-|---|---|---|
-| `Page` | `layout::page` | A whole page on the surface, its content the container padding in at the sides, 32 below the top and 24 above the foot (see "The container"). |
-| `Container` | `layout::container` | A panel's body or a toolbar band: its content the container padding in at the sides, as tall as the content, which keeps its own spacing above and below. |
-| `Header` | `layout::header` | A page's Japanese accent (`accent`), title (`title`), and one lede line (`body`) 8 below. |
-| `Section` | `layout::section` | A titled part of a page: `heading`, an optional `body` line 4 under it, the content 16 below. |
-| `Stack` | `layout::stack` | Children one above the other, a spacing token apart; start-aligned, or centred on whole device pixels. |
-| `Row` | `layout::row` | Children side by side, a spacing token apart; top, centre or bottom. |
-| `Grid` | `layout::grid` | Equal columns, a spacing token apart both ways, edges on device pixels. |
-| `Split` | `layout::split` | Columns of set weights (`[1, 3]` is a label column a quarter wide). |
-| `Divider` | `layout::divider` | A hairline across, in the soft outline. |
-| `Fill` | `layout::fill` | Room that pushes what follows to the row's far end. |
-| `Gap` | `layout::gap` | Empty room of one spacing token, where a stack needs one larger step. |
-| `Flow` | `layout::flow` | Children side by side, a spacing token apart both ways, a new line started where the next doesn't fit: chips, tags, checkboxes. Its lines tell the geometry check nothing; each child still says what it is. |
-| `Scroll` | `layout::scroll` | A page's content taller than its room. The thumb is 4 wide (`scrollbar`), on the right edge of its box, a pill in the outline variant (the outline while the pointer is on it), floating over the content so it takes no width: content that runs to the edge leaves 16 on its right. A scroll clips what it scrolls, a focus glow included, only at an edge you can see. A page's or a panel's scroll has no edge of its own, so it reaches past its box into the room around it, as far as a glow reaches (`focus.far`, 20), and above and below up to the part of the page there (`room_above`, `room_below`, `roomAbove`, `roomBelow`: Kōbō's header and footer, the wallpaper picker's tabs), with its content that far in: the content lines up with what is around it, a resting control at its edge keeps its whole glow, content scrolled past its box shows in that room and stops at the part beside it, and the panel's or window's own edge cuts whatever passes it. In iced, whose content leaves 16 on its right for the thumb, it reaches the 4 of the glow past that room on its right, so the thumb keeps its place and never takes the pointer from the content; in QML it reaches the glow there too, and the thumb floats over the content's last 4. A scroll with an edge of its own (a list's well, a log, a menu) clips at that edge. |
+Each component has a page of its own under `design/components/`: its constructors in both libraries, how it looks and how it behaves. A new component adds its page and its line here, and its row in the table above.
 
-A `Grid` row is as tall as its tallest child, and a child that fills its height is stretched to the row, so cards side by side end together (`card::card_sized`). Rows may all be as tall as the tallest (`uniform_rows`): Kōbō's four summary cards are one size. A grid can fill all the height there is (`fill_height`), sharing it between its rows: columns of lists that run to the page's foot; in a scroll, where the height has no end, each row keeps its own. `layout::page_clear` is a `Page` with nothing behind it, over a surface of its own (Kōbō's glass panel, a pane beside a rail).
+**Layout**
 
-Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so a view built from these can't leave the scale. Text in a type style is `Text` (`text::text`); a symbol is `Icon` (`icon::icon`). Text in a box of fixed height (a row's title, a card's name) is one line that ends in an ellipsis where it doesn't fit (`text::line`), so a long name never wraps out of its box. In the shell, where a window's title or a notification's body must keep to its lines, QML's `Text` takes `maximumLines`: the last line it keeps ends in an ellipsis at its room.
+- [Layout](design/components/layout.md): `Page`, `Container`, `Header`, `Section`, `Stack`, `Row`, `Grid`, `Split`, `Divider`, `Fill`, `Gap`, `Flow`
+- [Scroll](design/components/scroll.md)
 
-### Buttons
+**Buttons**
 
-| Name | Rust | QML |
-|---|---|---|
-| `Button` | `button::button(label)` | `Button` |
-| `IconButton` | `button::icon_button(glyph, label)` | `IconButton` |
-| `Hint` | `hint::hint` | `Hint` |
-| `Tooltip` | `tooltip::tooltip`, `tooltip::with_tooltip` | `Tooltip` |
+- [Button](design/components/button.md)
+- [IconButton and Hint](design/components/icon-button.md)
+- [Tooltip](design/components/tooltip.md)
 
-**Kinds**, by what the button is for:
+**Keys**
 
-| Kind | Fill, content | For |
-|---|---|---|
-| `Filled` | `primary`, `on_primary` | The one thing to do next on a screen. One per screen. |
-| `Tonal` | `secondary_container`, `on_secondary_container` | An alternative to the filled one. |
-| `Text` | none, `primary` | Back, Skip, Cancel, Show log. |
-| `Danger` | `error`, `on_error` | The action that destroys something, after a confirmation. |
+- [Keycap and KeyHints](design/components/keycap.md)
 
-**Sizes:**
+**Inputs**
 
-| Size | Height | Label | Icon | Gap | Padding (Text kind) | For |
-|---|---|---|---|---|---|---|
-| `Sm` | 32 (`control_sm`) | `button_small` | 16 | 4 | 12 (12) | Chrome around a screen, beside a field's label. |
-| `Md` | 40 (`control_md`) | `button` | 20 | 8 | 24 (12) | A screen's own actions; as tall as a field. |
-| `Lg` | 48 (`control_lg`) | `button_large` | 24 | 8 | 32 (16) | The one main action of a big page: Kōbō's Install. |
+- [Field, Labelled and Note](design/components/field.md)
+- [Switch](design/components/switch.md)
+- [Checkbox](design/components/checkbox.md)
+- [Radio](design/components/radio.md)
+- [Slider](design/components/slider.md)
+- [Tabs](design/components/tabs.md)
+- [Tile](design/components/tile.md)
+- [Calendar](design/components/calendar.md)
+- [Select](design/components/select.md)
 
-- A label button has the control radius, 12; an icon button is a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon sits in a box the label's line tall, centred on a device pixel, so an icon never changes a button's height.
-- **A held button** (`Button::on_hold`) is pressed for a while instead of clicked: the press going down and coming up (or the pointer leaving) are the app's to time, and a `timed_bar` beside it shows how far along the hold is. It is for the one action of a screen that destroys what was there, where a dialog would only ask the same question again: Kōbō's Install, held for 1.1 s with the mouse or Enter.
-- **`IconButton` is a circle as tall as the label button of its size** (32, 40, 48), in all four kinds. **Its label is a required argument.** It is the accessible name, and shows in a `Hint` while the pointer is over it or the keyboard is on it: a bubble in the inverse colours, `label` type, padding 8 × 4, the small radius (4), centred under the control, 8 below it. An icon alone says nothing out loud, so an icon button can't be built without its label.
-- A button's icon is its label's style's (see "Icons by type"); an icon button takes the icon of the label button of its size.
-- **A `Tooltip` explains a control** where a `Hint` only names it: a title in `body_strong`, the body in `small` and `on_surface_variant` 4 under it, and what it holds 8 below (the keys it is about, as `KeyHints`), on a `Popover` as wide as a menu (240). It shows while the pointer is over its control or the keyboard is on it, 8 above the control and starting where it starts, held inside the window: above, since the controls it explains sit in a toolbar at a panel's foot, and from the control's start, since a card centred on a chip at a toolbar's start would hang past the panel. Like the hint it floats over the window, no part of the page's layout. It is for a control whose words can't say enough on their own (the keyboard section's Mac accents chip), never for a sentence the page should show.
+**Menus, tables and collapsibles**
 
-### Keys
+- [Popover, Menu and MenuItem](design/components/menu.md)
+- [Table and TableRow](design/components/table.md)
+- [Collapsible](design/components/collapsible.md)
 
-| Name | Rust | QML | What |
-|---|---|---|---|
-| `Keycap` | `keycap::keycap(look, key)` | `Keycap` | A key drawn as a key: 20 tall (`keycap`), as a line of body text, so it sits inline with body and caption text without making the line taller. The `keycap` type (Geist Mono 11, medium) in `on_surface_variant` on `surface_container_highest`, a hairline edge in `outline_variant` with a second hairline at the bottom, so the key stands on the page, the small radius (4), 4 either side of the key and never narrower than tall, so a one-letter key is square. |
-| `KeyHints` | `keycap::key_hints(look, hints)` | `KeyHints` | Keys and what each does, side by side, 16 apart: a combination's keys as keycaps 4 apart, one keycap per key (`Ctrl+K` is `Ctrl` and `K`; a modifier's or an arrow's glyph is a key of its own however it is written, so `⌃K` is `⌃` and `K` and `← →` two arrows; a `+` alone is the plus key), then what it does in `caption`, `on_surface_variant`, 8 after them. QML also reads Kotodama's form, `↵ Open · Tab Enter app · ⌃K Actions`. The Command menu draws the same boxes with its own fast text (`modules/menu/Keycap.qml`, `KeyHints.qml`), since its keystroke path can't afford the library's measured text. |
+**Lists, chips and cards**
 
-- **A key hint is never text on text.** Every key named on screen is a `Keycap`: the Command menu's footer, its Action panel and its detail pane, Kōbō's rail, footers and screens, the control center's Bluetooth and keyboard sections, the wallpaper picker, the clock. The one exception is a `Hint` bubble, a single line of `label` text, which names a key in words (the keyboard layout pill's "SUPER+SHIFT+Space"). The key stands out as a key, so the eye finds it first and reads what it does after.
-- **Inline with text**: a keycap in a sentence ("Press `Space` to pick") sits in a row centred on the line, 4 from the words.
+- [List, ListRow and EmptyList](design/components/list.md)
+- [Chip](design/components/chip.md)
+- [IconTile](design/components/icon-tile.md)
+- [Badge](design/components/badge.md)
+- [Skeleton](design/components/skeleton.md)
+- [Card and ChoiceCard](design/components/card.md)
+- [Media](design/components/media.md)
+- [PictureChoice](design/components/picture-choice.md)
 
-### Inputs
+**Feedback**
 
-| Name | Rust | What |
-|---|---|---|
-| `Field` | `field::field(value, placeholder)` | One line of text, 40 tall (`control_md`), the control radius (12), a hairline outline, which the focus tube takes over while it is focused. `body_large` text. An optional 20 icon leads it, the text starting at 40. A placeholder is a hint, never a value that looks typed. States: normal, `Invalid` (error colour, the reason in the note), `Locked` (read-only, dimmed, never focused). Passwords show one bullet per character. The app owns the value and its editing: it keeps the `Caret` (where it is, what is selected), turns keys into edits, and gives the field both; the field draws the selection and a caret the thin stroke wide that blinks (solid for 530 ms after it moves, so it never hides while you type), scrolls the text sideways to keep the caret in view, and turns presses and drags into `Pointer`s. Real keys, a scripted tour and the tests all edit through the same code. |
-| `Labelled` | `field::labelled` | A control under its `label`-type label, with an optional small action at the label's right (Show, a small button) and an optional note under it. The label row is 32 tall whether or not it has an action, so fields side by side line up. |
-| `Note` | `field::note` | The `small` line under a field: muted, or the error colour when invalid. |
-| `Switch` | `switch::switch` | On or off, 44 × 24, the knob 12 off and 16 on, a hairline track. It takes effect at once; Space, Enter or a click toggles. |
-| `Checkbox` | `check::checkbox` | Square, 20, the small radius (4), a hairline edge. Empty, partial (a dash, for some of a group) or full. For several independent picks that apply together. |
-| `Radio` | `check::radio` | A 20 disc with an 8 dot. One of a group, exactly one picked. |
-| `Slider` | `slider::slider` | A value from 0 to 1, or one of a few stops (`stepped`), as a pill, full width: regular (`slider`, 36) or compact (`slider_compact`, 28, for a dense panel: the control center, the system monitor). The fill is the value: its round end marks it, the value being that end circle's centre, so at 0 the fill is the circle behind the icon and at 1 it reaches the far end; the pointer maps to that centre. The icon (`label`'s 16) sits in that circle, always on the fill, in its content colour (`on_primary`). The value sits at the far end, 12 in: a percentage in `label_number`, or a name in `label` (a stop's, "Muted", "Auto · 55%"), drawn in `on_surface` over the track and the fill's content colour over the fill, split where the fill ends. A compact slider shows a number only under the pointer, while held or focused, fading over `micro`; a name always shows. Steps show as dots (6) on both sides of the fill: those the fill has passed in its content colour at `subdued`, those ahead in `on_surface_variant`. The mark the value rests on (a step at rest, or a sticky point while the value holds there) turns solid, 10 regular and 8 compact, in the fill's content colour, popping in over `short` on `pop`; while a drag moves between marks there is none. No dot is drawn under the icon or the label, with 4 clear of each: they mark that place already. A drag follows the pointer; on a slider with stops it moves freely and settles on the nearest stop when released, over `short` on `standard_decel`. A sticky point (an option, for a surface that needs one: a volume boost to 150% holding at 100%) holds a drag within 12 (`slider_hold`) of it. Left and Right step by a twentieth or a stop, Home and End go to the ends, the wheel steps. The icon is a button where the slider has a toggle: volume's mutes and unmutes, keeping the level to come back to; brightness's switches Auto, where a light sensor and a service driving the backlight from it exist, its fill then the sensor's level in the softer, desaturated accent (`secondary`, its content `on_secondary`). On a slider with stops each press steps one stop from high to low and back, turning at either end. It takes effect as it moves, so it carries a live value. The fill lights up: under the pointer it brightens by `press`, and while it is pressed or dragged by `held`, toward the palette's bright end (`on_surface` in dark, `surface` in light). Its focus tube is a pill on its box's edge. |
+- [Dialog and Scrim](design/components/dialog.md)
+- [Toast](design/components/toast.md)
+- [ProgressBar](design/components/progress-bar.md)
+- [Spinner](design/components/spinner.md)
+- [EmptyState](design/components/empty-state.md)
+- [ErrorBlock](design/components/error-block.md)
+- [Log](design/components/log.md)
+- [Meter](design/components/meter.md)
+- [Sparkline](design/components/sparkline.md)
+- [Banner](design/components/banner.md)
+- [Step](design/components/step.md)
+- [DescriptionList](design/components/description-list.md)
+- [FocusRing](design/components/focus-ring.md)
 
-| Name | Rust | What |
-|---|---|---|
-| `Tabs` | `tabs::tabs` | One of a few views or values, picked from a row of small buttons (`Sm`) 4 apart: the picked one `Tonal`, the rest `Text`, each with an optional symbol before its label. It is the segmented control too: a setting's few choices side by side (the wallpaper's motion, Always, On AC, Never). The row is one stop for Tab; ← and → (or h and l) pick the neighbour (the owner moves the pick in iced; `Tabs` in QML does it), and while the row has the keyboard the focus tube lights the picked one. The control center's sections, the clock's tools, the wallpaper picker's folders, the system monitor's order. |
-| `Tile` | `tile::tile` | A quick toggle: a 20 symbol, a `body_strong` title over a `small` status line, as tall as a two-line row (56) at the control radius, 12 inside. On, it fills with `primary` and its content takes `on_primary`; off, `surface_container_high`. A press toggles it. A tile with more behind it ends in a detail arrow (`detail`), a 32 circle 12 from its end with a 16 chevron, which opens it; → does too. The arrow is a small control and stays quiet: no fill, in the tile's own content colour, its state layer under the pointer, and the tile's own layer gives way while the pointer is on it. The control center's Wi-Fi, Bluetooth and the rest. |
-| `Calendar` | `calendar::calendar` | A month as six weeks, each led by its ISO week number (`caption`, a small control wide), under the weekdays' names (`label`, weekends in `tertiary`). A day is a regular control (40), its disc a small one (32), a pill: today filled with `primary`, the picked day ringed with it in the thin stroke, a holiday dotted in `tertiary`, the days of the months around dimmed to the disabled content's 0.38. Between the arrows (`Text` `Sm` icon buttons) the title, a `subheading` pill, opens the year (`year`): the twelve months three to a row, the one shown filled. The app works the month out (`kubaos-clock` for the shell); the shell's slides a new month in from the side it lies on over `short`, and the wheel moves a month. The clock popup's. |
-| `Select` | `select::select` | One of a list too long for radio rows or tabs: a field's look (40, the control radius, a hairline, `surface_container_high`), the picked option in `body_large`, an optional 20 symbol before it and a chevron at its end. Enter, Space or a click opens its menu on a popover 4 under it, as wide as it, the picked option checked and the keyboard on it; open, its hairline takes the accent and its chevron turns up. ↑ ↓ and Enter pick, Esc or a click elsewhere closes it. In iced the app opens the menu and draws it. The clock's holidays. |
+**Panels**
+
+- [Sheet](design/components/sheet.md)
+
+### Rules every component keeps
 
 A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's Items, never a hand-rolled filter: see the QML rules in `docs/agents/code-quality.md`. A field that parses what is typed (a time, a password) isn't a search.
-
-### Menus, tables and collapsibles
-
-| Name | Rust | What |
-|---|---|---|
-| `Popover` | `menu::popover` | The floating surface a menu sits on: `surface_container`, a soft hairline, the panel's shadow, the surface radius (24), 12 inside, so its items take 24 − 12 = 12, the control radius. It floats over the window at its anchor (a tray icon, the pointer, under a select), a menu's width (240, `menu`) or its select's; `kubaos-ui` draws one where it is laid out. |
-| `Menu`, `MenuItem` | `menu::menu`, `menu::menu_item`, `menu::menu_separator` | A few actions or choices one under the other. An item is a small control tall (32), 12 inside: an optional 20 symbol (`icon`), its words in `body` on one line, the keys that do the same as keycaps, and a check whose room is kept when unchecked (`check`). The item the keyboard is on takes `secondary_container`; one that destroys something (`danger`) is in `error`; one that can't be taken is dimmed. A hairline 4 clear of each side separates groups. ↑ ↓ (j k, Ctrl+J/K/N/P), Home and End move over the items that can be taken, Enter takes one, Esc leaves. A menu taller than its room (`maxHeight`: a select's eight items, the room under a tray icon) scrolls, the item the keyboard is on kept in view. The tray's app menus, where a submenu opens in place with a Back item at its top and Esc steps back one level before it closes, and a select's list. |
-| `Table`, `TableRow` | `table::table`, `table::table_row` | Readings in columns: a header in `label`, then a row per entry, each a line of body text with 4 above and below (28, `row_compact`), so many fit. Columns take set shares of the width, 12 apart, 12 in from the row's ends; words sit at their column's start on one line, ending in an ellipsis; numbers at its right edge in `mono_large`, so their digits line up. The whole row is one control: the pointer over it lays the state layer across every cell, and the picked row takes `secondary_container`. The system monitor's processes. |
-| `Collapsible` | `collapsible::collapsible` | A titled part that opens to show more: a header as tall as a row (44), its title in `body_strong` and a chevron at its end, down while closed and up while open (`open`); open, the content 8 under it and in line with the title, 12 in at the sides, so the content brings no inset of its own. The shell reveals it over `medium` (`standard_decel`) and hides it over `short`. The system monitor's process details. |
-
-### Lists, chips and cards
-
-| Name | Rust | What |
-|---|---|---|
-| `List` | `list::list` | Rows in a well: the surface radius (24), padding 12, rows 4 apart, so the rows take 24 − 12 = 12, the control radius (concentric). The focus tube lights the well's edge; the row shows where the keyboard is. |
-| `ListRow` | `list::list_row(title)` | 44 tall with one line (`row`), 56 with a subtitle (`row_two_line`). Padding 12, a 20 icon (24, `icon.two_line`, beside a title over a subtitle, so it spans both lines) or the icon on an `IconTile` (`tile`: `Sm` beside one line, `Md` beside two), where the symbol is what tells the rows of one kind apart (the keyboard layouts, the default's star in the accent), the title in `body_strong`, subtitle in `small`, each one line that ends in an ellipsis, the subtitle optionally after a 16 symbol 4 from its words (`subtitle_icon`: the lock of a secured network, a device's battery); chips near the end for facts that matter at a glance (Default, Too small, To do), a detail in `mono` at the end, an optional check whose room is kept when unchecked so row ends line up. Each part is centred on the row's whole height, so a chip moves nothing else. The selected row takes `secondary_container`, or `error` on a row whose action can't be taken back (Shut down). A list taller than its room scrolls inside its well (`list::scrolling_list`), its thumb in the well's padding. A list whose order means something (the keyboard layouts, the first the default) is reordered by dragging any row, with no handle: past the drag threshold the row follows the pointer, drawn over the others at `subdued` so the row it passes over shows through, and a thin line in `primary` (`stroke.thin`, a pill, inset 12 as the rows' words are) in the gap where it will land; the list changes once, on the drop. |
-| `EmptyList` | `list::empty_list` | The well with nothing in it: one centred line. |
-| `Chip` | `chip::chip` | A short fact or pick, 24 tall (`chip`) at the control radius, 12, which on a chip is a pill, `label` type, an optional 16 icon 4 from the label, an optional close. A pick may also be pressed, with the state layer: Kōbō's picked layouts, where a press makes one the default, and a setting a toolbar turns on and off (the keyboard section's Mac accents, `Selected` while on, `Neutral` while off), which in the shell takes the keyboard too and shows the focus tube. Its left side pads 12, or 8 with an icon; its right pads 12, or nothing when the close button (a 24 circle) ends it. Kinds: `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters: Recommended, Default), `Cold` (rarely: demo, preview), `Filled` (the accent's own fill: an action among states, Reboot beside Done and To do). |
-| `IconTile` | `avatar::icon_tile` | What an app or a sender looks like in a row: a symbol or a picture on a tinted square of one size, `Sm` 32 beside one line (a 20 icon), `Md` 40 beside a title over a subtitle (24, `icon.two_line`) and `Lg` 48 over a `headline` name, the one thing a view is about (32, the headline's: a network or a device being connected), at the control radius, on `surface_container_highest`, which reads on a list, a card and a selected row alike (`error` for a critical notification). Its symbol is `on_surface_variant`, or `primary` on the one tile of a list that comes first (`accent`: the default keyboard layout's filled star). An app's icon sits inset at the icon size, keeping its own margins; a photo (a notification's image) covers the tile. The symbol shows until the picture has loaded and stays when there is none, so every row reads the same size whatever each vendor drew. The Command menu's rows, the notifications', a `ListRow`'s with `tile` and the control center's connection form. |
-| `Badge` | `avatar::badge` | What is new about something, over its icon's top right corner: a count in a pill 16 tall (`badge`), `label` type, a circle for one digit and 4 either side for more, 99+ past 99; or a dot, 8 (`badge_dot`). In `error`, with `on_error` on it, so it reads over any icon. Unread notifications on the bar's bell, waiting updates, a proxy that failed. In the bar a badged symbol takes the badge's overhang as room on both sides, so the badge keeps the gap to its neighbours and the symbol stays centred. |
-| `Skeleton` | `skeleton::skeleton` | The shape of what is loading, held in its place: a `line` of text in a style (as wide as its room, the style's line tall, the small radius), a `circle` an icon size across, or a `block` a size tall at a radius role. In the placeholder colour a `Media` box holds, `surface_container_high`; in QML it breathes between full and `subdued` over `slow` three times as it shows, then holds still, so a long wait draws no frames. A Wi-Fi or Bluetooth scan with nothing found yet shows skeleton rows; a `Media` box's placeholder is a block skeleton of its own. |
-| `Card` | `card::card` | A surface inside the page: the well's surface, a soft hairline, the surface radius (24), 16 inside. |
-| `ChoiceCard` | `card::choice_card` | One of a few cards to pick from, at the surface radius (24). Picked: `secondary_container` and an accent hairline. Its focus tube is cold, since the accent already means picked. |
-| `Media` | `media::media(look, picture, aspect, corner)` | A picture in a box as wide as its room and as tall as an `[aspect]` token makes it, down to the 4 px grid (so boxes side by side, whose widths can differ by a device pixel, come out one height and their feet line up), cut to cover the box at its corner. Until the picture has loaded the box holds the placeholder, `surface_container_high` (a block `Skeleton`, breathing as it shows in QML), so the box is the same before and after the load and nothing around it moves (`kubaos-ui` tests it). In QML the picture is `source`, or content laid over the placeholder to fill the box (a video, a picture that clips itself), which fades in over it. A `PictureChoice` is built on one. |
-| `PictureChoice` | `picture::picture_choice(picture, aspect, name)` | A picture to pick: the picture covers the whole tile, edge to edge in its own rounded shape at the control radius (12), a `Media` box, with no frame round it, so the picture is as large as the tile. Picked, its edge lights as the focus tube, with its glow (the accent; cold where the keyboard is on a picked one, since the accent already means picked) and its mark shows in a `Selected` chip 8 in from the top right: a check, "Current", as each use names it. The keyboard on it lights the tube too. A badge (a `Neutral` chip, "Video") sits 8 in from the top left whatever its state. The name is `small`, one line, under the picture 8 below it (`name-under`), or over its foot 12 in, light on the scrim darkening from 40% down to the backdrop's 0.90 at the foot (`name-over`), whatever the mode, since it is on a photo. Kōbō's wallpapers (several picked, name over, a check) and the shell's wallpaper picker (one applied, name under, "Current", and "Playing" or "Video") are this one component. |
 
 **A list in a well, a group in a card, the panel's own controls bare.** One rule for what a section's content sits in, so a panel doesn't put one list in a box and the next on the panel:
 
@@ -437,31 +400,6 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 - A card or a well is never inside another; the container padding is the only padding around them.
 - **A form takes its list's place.** Connecting to an item of a list (a Wi-Fi network's password, a Bluetooth pairing) turns the list's well into the form, the two cross-fading over `short` (`standard`), so nothing floats over the list. The form is centred in the well: the item's `Lg` icon tile, its name in `headline` 12 under it, a `small` line under that (Secured · WPA2, what to do on the device), then 16 under it what it asks for (a `Field`, or a pairing code in `headline`), a `small` status line under that (Connecting…, or the error, which keeps the form open), and the buttons 16 under it: Cancel (`Text`) on the left, the action (`Filled`) on the right. Enter does the action and Esc cancels, with no key hints; Tab goes field, Cancel, action. Success goes back to the list. Wi-Fi and Bluetooth share it (`modules/controlcenter/ConnectForm.qml`).
 - **What scrolls in a well or a card is cut by its own shape**, not by a rectangle inside its padding: the rows scroll right up to the well's rounded edge, and the padding is the scroll's padding, the room above the first row and below the last. In the shell the well clips to its rounded shape (`modules/controlcenter/Well.qml`). iced 0.14 clips only to rectangles, so `kubaos-ui`'s scrolling list cuts at the well's own rectangle, with the padding inside the scroll; at its rounded corners a row passing the curve, and the thumb at either end of its rail, show past it until iced clips to shapes. In both, the well's hairline and focus tube are drawn over the rows, so a row scrolled to the edge never covers them. A grid of pictures scrolls a whole row at a time, so no picture is ever cut.
-
-### Feedback
-
-| Name | Rust | What |
-|---|---|---|
-| `Dialog` | `dialog::dialog`, `dialog::prompt` | A question over a dimmed screen: one width (500, `dialog`), padding 32, the surface radius (24), the dialog shadow. A 32 icon (`headline`'s) and a `headline` title, the `body` 12 under it, the buttons 32 under the last: the dismiss button (Cancel) on the left, the actions on the right, the one Enter presses last. Tone `Normal` or `Danger`. A prompt asks for something only the user can type (a password): a `Normal` dialog with a `Labelled` field 16 under the body, Enter in the field doing what its action does. In QML it is a `Dialog` with the field as its child. |
-| `Scrim` | `dialog::scrim` | Everything behind a dialog, dimmed (`opacity.scrim`). |
-| `Toast` | `toast::toast` | One `body` line saying what just happened, in the inverse colours so it reads over anything, an optional 20 icon 12 from the text, padding 16 × 12, the surface radius (24), which on one line is a pill. It arrives over `short`, rising 32 into place as it fades in (`emphasized_decel`), stays 3.6 s, and leaves over `medium`, fading out (`standard_accel`): `toast::toast_at` draws it at an age. |
-| `ProgressBar` | `progress::bar` | Work that knows how far it is: 8 tall (`progress`), the fill glowing in its own colour. The fill follows the work over `short` on the `linear` curve; a bar that shows up already part full starts there. A fraction the app already times against the clock (how long a button has been held) is drawn as given (`progress::timed_bar`), with no easing to trail behind it. On a danger banner's red (`danger`, `progress::danger_bar` and `progress::danger_timed_bar`, `danger` in QML) the fill is `error` on a track of `on_error_container` at the tint's opacity, so the hold that erases a disk on Kōbō's Last chance reads as red all the way. |
-| `Spinner` | `progress::spinner` | Work that doesn't know: an icon size (16, 20 or 24 beside text; 32 and 48 for a page's one spinner), a thin arc over a faint full ring. The caller passes the time; the arc turns and breathes with it. |
-| `EmptyState` | `empty::empty_state` | A place with nothing in it, centred: a 32 icon, 12 below it a `subheading` title, 4 below that a `body` line saying what to do, and 16 below that an optional action. Never a bare "No items". |
-| `ErrorBlock` | `error::error_block` | What broke and what to do next: a 24 error icon, 16 from the message in `subheading` (`body_strong` past 90 characters, since a whole command line in 16 px semibold is a wall), the hint in `body` 4 under it, on the error container with an error hairline, the surface radius (24), padding 20. |
-| `Log` | `error::log` | The log behind an error or a progress bar, `mono`, newest line at the bottom, opened on demand. The surface radius (24). The caller sets its height as an `Extent`; `log` (232) is the size the specimen and Kōbō use. |
-| `Meter` | `meter::meter` | A reading in parts on a progress bar's track: 8 tall, a pill, each part a share and its colour, left to right (memory as used and cache), every part keeping the bar's rounded ends. The QML one eases a new reading over `short` on `linear`, as a progress bar follows its work. The system monitor's memory, disks and battery, and the bar pill's bars. |
-| `Sparkline` | `meter::sparkline` | The last minute of a reading as a line in the thin stroke, filled under it with the line's colour at the tint's opacity, newest at the right edge (QML places each sample by its time over the last minute, so a graph with less than a minute of history starts part way across; iced spaces the samples evenly); a second reading over it, unfilled, in `tertiary` (upload over download). As wide as its room and 48 tall (`sparkline`), or a line of small text tall inline in the bar. The scale tops out at 100, or fits the highest point with room above it. It draws when a sample comes, never per frame. |
-| `Banner` | `banner::banner` | A message that matters on the page itself, with what to do about it inside: a 24 symbol 16 from a `subheading` title over a `body` line and any paragraphs more, 4 apart, all wrapping, 16 inside at the surface radius; its actions 12 apart at its end beside the words, the one it is about last; an optional foot 16 under the rest (a held button's `timed_bar`). Tones: `Info` (`surface_container_high` with a `primary` hairline and symbol), `Warning` (the same with a `warning` hairline and symbol), `Danger` (really red: `error_container` with an `error` hairline and symbol, its words in `on_error_container`), so the step that destroys something can't be skimmed; on its red a `Text` button takes `on_error_container` and the foot's bar `error`, the banner's own colours, not the accent (`banner::inside`; in QML they keep the accent). An empty body leaves the title alone, a line tall. Kōbō's Last chance is a `Danger` banner holding Back and the held Install. |
-| `Step` | `step::step(title)` | One step of a stepper or a checklist: an optional symbol (24 beside two lines), a `body_strong` title and a `small` subtitle that wraps to as many lines as it needs, never cut, then where it stands. To do is a `Neutral` chip, done a quiet `Accent` chip with a check (on a selected row a `Neutral` one with its check, since the accent's tint over `secondary_container` leaves its label under 4.5:1), an action (Reboot) a `Filled` chip with its symbol, the loudest of the three, since it is what to do next, and the current step is the selected row (`secondary_container`); the three never look alike. A narrow rail takes a `mark` instead of a chip: a check when done, the action's symbol in `primary`, its room kept otherwise. 44 tall with one line, 56 with a subtitle's first line and a line taller for each line more; padding 12 across, the corners a row's, concentric in a list's well. Kōbō's step rail and first boot's checklist. |
-| `DescriptionList` | `description::description_list` | Facts beside their labels, 8 apart: each label in `small` a quarter of the width, its value in `body` the rest, wrapping, and an optional `mono` line under the value for a path, an email or a version, which break badly wrapped mid-token. Kōbō's Last chance cards. |
-| `FocusRing` | `focus::focus_ring` | The neon focus every focusable component draws (see "Focus"). An app never draws its own. |
-
-### Panels
-
-| Name | Rust | What |
-|---|---|---|
-| `Sheet` | `sheet::sheet` | A panel growing out of an inner edge of the screen frame: the shell's control center, clock, system monitor, power menu, wallpaper picker, OSD and notification stacks. The sheet and the frame are one surface, `surface` at the frame's glass (0.94): where the sheet meets the edge it curves into it through concave fillets of the surface radius, the frame's own inner corner, and its far corners take the surface radius. It is as large as its content, which keeps its own padding, and sits along the edge where its owner puts it, centred on whole device pixels by default. In the shell it slides out from under the frame as it opens, over `long` on `emphasized_decel`, its content riding on its far edge and fading in a beat after the surface moves; it leaves over `medium` on `emphasized_accel`. The owner draws its surface from its `path`, in one layer with the frame's, so the two never double up; `kubaos-ui` draws one open, hanging from the edge above it. |
 
 Rules the feedback components carry:
 
@@ -712,7 +650,7 @@ The specimen's pictures aren't in the repo, so two PRs that change how different
 
 ## Changing the design
 
-- **A new kind, size, component or value changes this file first**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it. A component's samples are a section of their own on each side, by the same name: a module under `crates/kubaos-specimen/src/pages/components/` and a file under `qml/specimen/sections/`, each listed in its page at the same place (`mod` and `SECTIONS` in `components.rs`, the stack in `Components.qml`), so PRs adding different components touch different files and a line of each list.
+- **A new kind, size, component or value changes this file or the component's page first**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it. A component's samples are a section of their own on each side, by the same name: a module under `crates/kubaos-specimen/src/pages/components/` and a file under `qml/specimen/sections/`, each listed in its page at the same place (`mod` and `SECTIONS` in `components.rs`, the stack in `Components.qml`), so PRs adding different components touch different files and a line of each list.
 - **A rule a front end can't follow changes for everyone.** There is no exception column: if the shell can't keep a rule, the rule changes here and every front end follows the new one.
 - **Values change in `design/tokens.toml` only.** The builds write the outputs from it; `just tokens` rewrites the checked-in ones, and a test fails while one is stale.
 - **Every decision keeps its reason.** A rule with no reason here is a candidate for deletion, not for following.
