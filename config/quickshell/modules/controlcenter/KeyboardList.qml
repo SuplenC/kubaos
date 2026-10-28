@@ -233,182 +233,203 @@ Item {
     }
 
 
-    // The layouts.
-    Well {
-        visible: !root.adding
-        width: root.width
-        height: Math.max(0, below.y - K.Tokens.space.s12)
-        focused: list.activeFocus
+    // The tab's content, scrolled when a short screen leaves it less room than two layouts and the
+    // controls under them need; otherwise exactly the room it has.
+    Flickable {
+        id: pane
 
-        NavList {
-            id: list
+        // The well at its smallest: two rows and its padding.
+        readonly property real fewest: K.Tokens.size.row * 2 + K.Tokens.space.s4 + K.Tokens.space.s12 * 2
 
-            anchors.fill: parent
-            // The well's padding above the first row and below the last, scrolled with them.
-            topMargin: K.Tokens.space.s12
-            bottomMargin: K.Tokens.space.s12
-            model: ScriptModel {
-                values: root.layouts
-            }
-            onActivated: index => Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)])
+        anchors.fill: parent
+        contentWidth: width
+        contentHeight: Math.max(height, pane.fewest + K.Tokens.space.s12 + below.height)
+        interactive: contentHeight > height
+        boundsBehavior: Flickable.StopAtBounds
 
-            // Plain j/k are this handler's, so Shift+J/K can move a layout;
-            // NavList's own still takes the arrows, Ctrl+j/k and Enter.
-            vimKeys: false
-            Keys.onPressed: event => {
-                const i = currentIndex;
-                const shift = event.modifiers & Qt.ShiftModifier;
-                if (event.modifiers & Qt.ControlModifier || i < 0 || i >= root.layouts.length)
-                    return;
-                if (event.key === Qt.Key_J)
-                    shift ? root.move(i, 1) : step(1);
-                else if (event.key === Qt.Key_K)
-                    shift ? root.move(i, -1) : step(-1);
-                else if (event.key === Qt.Key_D && i > 0) {
-                    root.change(["default", root.layouts[i]]);
-                    currentIndex = 0;
-                } else if ((event.key === Qt.Key_X || event.key === Qt.Key_Delete) && root.layouts.length > 1)
-                    root.change(["remove", root.layouts[i]]);
-                else
-                    return;
-                event.accepted = true;
-            }
+        // The layouts.
+        Well {
+            visible: !root.adding
+            width: root.width
+            height: Math.max(0, below.y - K.Tokens.space.s12)
+            focused: list.activeFocus
 
-            delegate: K.ListRow {
-                required property string modelData
-                required property int index
+            NavList {
+                id: list
 
-                width: ListView.view.width
-                icon: "keyboard"
-                title: root.nameOf(modelData)
-                subtitle: modelData + (index === 0 ? " · default" : "") + (Keyboard.active === index ? " · typing" : "")
-                checkable: true
-                checked: Keyboard.active === index
-                selected: ListView.isCurrentItem && ListView.view.highlightShown
-                onActivated: {
-                    ListView.view.currentIndex = index;
-                    Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)]);
+                anchors.fill: parent
+                // The well's padding above the first row and below the last, scrolled with them.
+                topMargin: K.Tokens.space.s12
+                bottomMargin: K.Tokens.space.s12
+                model: ScriptModel {
+                    values: root.layouts
+                }
+                onActivated: index => Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)])
+
+                // Plain j/k are this handler's, so Shift+J/K can move a layout;
+                // NavList's own still takes the arrows, Ctrl+j/k and Enter.
+                vimKeys: false
+                Keys.onPressed: event => {
+                    const i = currentIndex;
+                    const shift = event.modifiers & Qt.ShiftModifier;
+                    if (event.modifiers & Qt.ControlModifier || i < 0 || i >= root.layouts.length)
+                        return;
+                    if (event.key === Qt.Key_J)
+                        shift ? root.move(i, 1) : step(1);
+                    else if (event.key === Qt.Key_K)
+                        shift ? root.move(i, -1) : step(-1);
+                    else if (event.key === Qt.Key_D && i > 0) {
+                        root.change(["default", root.layouts[i]]);
+                        currentIndex = 0;
+                    } else if ((event.key === Qt.Key_X || event.key === Qt.Key_Delete) && root.layouts.length > 1)
+                        root.change(["remove", root.layouts[i]]);
+                    else
+                        return;
+                    event.accepted = true;
+                }
+
+                delegate: K.ListRow {
+                    required property string modelData
+                    required property int index
+
+                    width: ListView.view.width
+                    icon: "keyboard"
+                    title: root.nameOf(modelData)
+                    subtitle: modelData + (index === 0 ? " · default" : "") + (Keyboard.active === index ? " · typing" : "")
+                    checkable: true
+                    checked: Keyboard.active === index
+                    selected: ListView.isCurrentItem && ListView.view.highlightShown
+                    onActivated: {
+                        ListView.view.currentIndex = index;
+                        Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)]);
+                    }
                 }
             }
         }
-    }
 
 
-    K.Stack {
-        id: below
+        K.Stack {
+            id: below
 
-        y: root.height - height
-        width: root.width
-        room: root.width
-        fill: true
-        gap: K.Tokens.space.s12
-
-        K.Row {
-            visible: !root.adding
+            y: pane.contentHeight - height
+            width: root.width
+            room: root.width
             fill: true
-            gap: K.Tokens.space.s4
-            align: "centre"
+            gap: K.Tokens.space.s12
 
-            K.Button {
-                enabled: root.selected > 0
-                text: "Make the default"
-                icon: "star"
-                kind: "Text"
-                size: "Sm"
-                // The default moves to the top, so the selection goes with it, as `d` does.
-                onActivated: {
-                    root.changeOnClick(["default", root.layouts[root.selected]]);
-                    list.currentIndex = 0;
+            K.Row {
+                visible: !root.adding
+                fill: true
+                gap: K.Tokens.space.s4
+                align: "centre"
+
+                K.Button {
+                    enabled: root.selected > 0
+                    text: "Make the default"
+                    icon: "star"
+                    kind: "Text"
+                    size: "Sm"
+                    // The default moves to the top, so the selection goes with it, as `d` does.
+                    onActivated: {
+                        root.changeOnClick(["default", root.layouts[root.selected]]);
+                        list.currentIndex = 0;
+                    }
+                }
+
+                K.Fill {
+                }
+
+                K.IconButton {
+                    enabled: root.selected > 0
+                    icon: "arrow_upward"
+                    label: "Move up"
+                    kind: "Text"
+                    size: "Sm"
+                    onActivated: if (!root.settling)
+                        root.move(root.selected, -1)
+                }
+
+                K.IconButton {
+                    enabled: root.selected >= 0 && root.selected < root.layouts.length - 1
+                    icon: "arrow_downward"
+                    label: "Move down"
+                    kind: "Text"
+                    size: "Sm"
+                    onActivated: if (!root.settling)
+                        root.move(root.selected, 1)
+                }
+
+                K.IconButton {
+                    enabled: root.selected >= 0 && root.layouts.length > 1
+                    icon: "close"
+                    label: "Remove"
+                    kind: "Text"
+                    size: "Sm"
+                    onActivated: root.changeOnClick(["remove", root.layouts[root.selected]])
                 }
             }
 
-            K.Fill {
+            K.List {
+                visible: !root.adding
+
+                K.ListRow {
+                    id: addRow
+
+                    icon: "add"
+                    title: "Add a language…"
+                    subtitle: root.layouts.length >= root.maxLayouts ? `${root.maxLayouts} is the most a keyboard holds; remove one first` : ""
+                    onActivated: root.startAdding()
+                }
+
+                K.ListRow {
+                    icon: "keyboard_option_key"
+                    title: "Mac accents on Left Alt"
+                    subtitle: root.accents ? "On" : "Off"
+                    checkable: true
+                    checked: root.accents
+                    onActivated: root.changeOnClick(["accents", root.accents ? "off" : "on"])
+                }
+
+                // How the accents are typed, while they are on, under their row and 12 in as its
+                // words are.
+                K.Row {
+                    visible: root.accents
+                    leftPadding: K.Tokens.space.s12
+                    bottomPadding: K.Tokens.space.s8
+
+                    K.KeyHints {
+                        hints: [["Left Alt+E", "then"], ["E", "é"]]
+                    }
+                }
             }
 
-            K.IconButton {
-                enabled: root.selected > 0
-                icon: "arrow_upward"
-                label: "Move up"
-                kind: "Text"
-                size: "Sm"
-                onActivated: if (!root.settling)
-                    root.move(root.selected, -1)
-            }
-
-            K.IconButton {
-                enabled: root.selected >= 0 && root.selected < root.layouts.length - 1
-                icon: "arrow_downward"
-                label: "Move down"
-                kind: "Text"
-                size: "Sm"
-                onActivated: if (!root.settling)
-                    root.move(root.selected, 1)
-            }
-
-            K.IconButton {
-                enabled: root.selected >= 0 && root.layouts.length > 1
-                icon: "close"
-                label: "Remove"
-                kind: "Text"
-                size: "Sm"
-                onActivated: root.changeOnClick(["remove", root.layouts[root.selected]])
-            }
-        }
-
-        K.List {
-            visible: !root.adding
-
-            K.ListRow {
-                id: addRow
-
-                icon: "add"
-                title: "Add a language…"
-                subtitle: root.layouts.length >= root.maxLayouts ? `${root.maxLayouts} is the most a keyboard holds; remove one first` : ""
-                onActivated: root.startAdding()
-            }
-
-            K.ListRow {
-                icon: "keyboard_option_key"
-                title: "Mac accents on Left Alt"
-                subtitle: root.accents ? "On" : "Off"
-                checkable: true
-                checked: root.accents
-                onActivated: root.changeOnClick(["accents", root.accents ? "off" : "on"])
+            K.Text {
+                visible: root.problem !== ""
+                text: root.problem
+                style: K.Tokens.type.body
+                color: K.Tokens.color.error
             }
         }
 
-        // How the accents are typed, while they are on.
-        K.KeyHints {
-            visible: root.accents
-            hints: [["Left Alt+E", "then E: é"]]
-        }
+        // Adding: made while it shows, and gone once it closes.
+        Loader {
+            id: adder
 
-        K.Text {
-            visible: root.problem !== ""
-            text: root.problem
-            style: K.Tokens.type.body
-            color: K.Tokens.color.error
-        }
-    }
-
-    // Adding: made while it shows, and gone once it closes.
-    Loader {
-        id: adder
-
-        width: root.width
-        height: Math.max(0, below.y - (below.height > 0 ? K.Tokens.space.s12 : 0))
-        active: root.adding
-        visible: active
-        sourceComponent: KeyboardAddView {
-            onAdd: spelling => {
-                if (!root.settling)
-                    root.add(spelling);
+            width: root.width
+            height: Math.max(0, below.y - (below.height > 0 ? K.Tokens.space.s12 : 0))
+            active: root.adding
+            visible: active
+            sourceComponent: KeyboardAddView {
+                onAdd: spelling => {
+                    if (!root.settling)
+                        root.add(spelling);
+                }
+                onAddAtOnce: spelling => root.add(spelling)
+                onCancelled: root.stopAdding()
+                onPickedChanged: root.probe(`picked ${picked?.spelling ?? ""}`)
+                onEnteredChanged: root.probe(`entered ${entered}`)
+                onFailed: message => root.problem = message
             }
-            onAddAtOnce: spelling => root.add(spelling)
-            onCancelled: root.stopAdding()
-            onPickedChanged: root.probe(`picked ${picked?.spelling ?? ""}`)
-            onEnteredChanged: root.probe(`entered ${entered}`)
-            onFailed: message => root.problem = message
         }
     }
 }
