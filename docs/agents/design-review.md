@@ -5,6 +5,7 @@ What Kuba checks in every UI change. A design brief includes this list, and a PR
 ## The checklist
 
 - **No wasted space.** Bands, footers and toolbars are as tall as their content plus the container padding. No empty gutters, no oversized sliders, and list rows sit at their text's natural height. A view that needs scrolling scrolls; it has no "more below" strip.
+- **Padding is applied once.** The space between a container's edge and its first or last content is exactly the container's padding. Content never adds its own top or bottom spacing on top of it.
 - **Nothing shifts.** Images and thumbnails hold their final box at a fixed aspect ratio before they load. Numbers that tick keep their width. Content that arrives doesn't push other content around.
 - **Key hints are keycaps,** one cap per key, never text on text.
 - **Icons are sized to the text beside them** and stay crisp at every scale. Where rows carry icons of different shapes, each icon sits on a tinted tile, so every row reads the same size.
