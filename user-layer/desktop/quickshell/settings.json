@@ -7,8 +7,8 @@
   // nothing sliding or moving.
   // "menuMotion": "full"
 
-  // The focus tube strikes on as focus arrives, as the neon sign does: true
-  // (default), or false for a plain fade. "Focus stutter" in the Command menu
-  // turns it on and off.
+  // The focus tube strikes on as focus arrives, on a control and on the active
+  // window's border, as the neon sign does: true (default), or false for a
+  // plain fade. "Focus stutter" in the Command menu turns it on and off.
   // "focusStutter": true
 }

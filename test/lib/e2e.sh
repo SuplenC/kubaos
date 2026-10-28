@@ -688,6 +688,9 @@ c_lua() {
     luac5.5 -p "$f" || { echo "FAIL $f"; bad=1; }
   done
   ((bad == 0)) && echo "ok   luac5.5 -p: ${#files[@]} files"
+  # The active window's neon focus (config/hypr/focus.lua): its strike, cut
+  # short by a new focus, off with the setting, and always ending lit.
+  as_user lua5.5 "$REPO/test/lua/focus_test.lua" "$REPO" || { echo "FAIL test/lua/focus_test.lua"; bad=1; }
   return "$bad"
 }
 

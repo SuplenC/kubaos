@@ -1,5 +1,7 @@
 -- Look and feel: gaps, borders, rounding, blur, shadows, animations, layout.
--- Colors come from colors.lua (matugen output with fallbacks).
+-- Colors come from colors.lua (matugen output with fallbacks). The active
+-- window's border and shadow are the neon focus tube and its glow, which
+-- focus.lua owns.
 --
 -- Sizes and motion follow the design tokens (design/tokens.toml): the shell
 -- draws an 8 px frame with 24 px inner corners, the surface radius, and
@@ -10,6 +12,8 @@
 -- (OUTERROUND in Hyprland 0.56.2 src/render/decorations/CHyprBorderDecoration.cpp).
 
 local colors = require("colors")
+local focus = require("focus")
+local tokens = require("tokens")
 
 hl.config({
   general = {
@@ -52,10 +56,12 @@ hl.config({
       special = false,
     },
 
+    -- One falloff for every window's shadow: the one the active window's glow
+    -- is fitted to (focus.lua).
     shadow = {
       enabled = true,
-      range = 20,
-      render_power = 3,
+      range = focus.shadow.range,
+      render_power = focus.shadow.power,
     },
   },
 
@@ -112,7 +118,8 @@ hl.config({
 hl.curve("spatial", { type = "bezier", points = { { 0.38, 1.21 }, { 0.22, 1 } } })
 hl.curve("emphasizedDecel", { type = "bezier", points = { { 0.05, 0.7 }, { 0.1, 1 } } })
 hl.curve("emphasizedAccel", { type = "bezier", points = { { 0.3, 0 }, { 0.8, 0.15 } } })
-hl.curve("standard", { type = "bezier", points = { { 0.2, 0 }, { 0, 1 } } })
+local standard = tokens.easing.standard
+hl.curve("standard", { type = "bezier", points = { { standard[1], standard[2] }, { standard[3], standard[4] } } })
 hl.curve("effects", { type = "bezier", points = { { 0.34, 0.8 }, { 0.34, 1 } } })
 
 hl.animation({ leaf = "windowsIn", enabled = true, speed = 4, bezier = "spatial", style = "popin 88%" })
@@ -123,7 +130,10 @@ hl.animation({ leaf = "layersOut", enabled = true, speed = 2, bezier = "emphasiz
 hl.animation({ leaf = "fadeLayers", enabled = true, speed = 3, bezier = "effects" })
 hl.animation({ leaf = "fade", enabled = true, speed = 3, bezier = "effects" })
 hl.animation({ leaf = "fadeDim", enabled = true, speed = 3, bezier = "effects" })
-hl.animation({ leaf = "border", enabled = true, speed = 3, bezier = "standard" })
+-- The border's and the shadow's fades: focus.lua turns them off while the
+-- active window's tube strikes and back on after.
+focus.fade({ leaf = "border", enabled = true, speed = tokens.duration.medium / 100, bezier = "standard" })
+focus.fade({ leaf = "fadeShadow", enabled = true, speed = tokens.duration.medium / 100, bezier = "effects" })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 4, bezier = "emphasizedDecel", style = "slide" })
 hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 4, bezier = "emphasizedDecel", style = "slidefadevert 15%" })
 
@@ -132,23 +142,19 @@ hl.animation({ leaf = "specialWorkspace", enabled = true, speed = 4, bezier = "e
 -- after regenerating ~/.local/state/theme/hypr.lua (a plain `hyprctl reload`
 -- works too, it just re-runs the whole config).
 local function apply_colors(c)
-  -- Neon edge: primary into its complementary tertiary (scheme-fidelity).
-  local active = { colors = { colors.rgba(c.primary, "ff"), colors.rgba(c.tertiary, "ff") }, angle = 45 }
-  local inactive = colors.rgba(c.surface_container_highest, "cc")
+  local inactive = focus.inactive(c)
 
   hl.config({
     general = {
       col = {
-        active_border = active,
-        inactive_border = inactive,
+        inactive_border = inactive.border,
       },
     },
     group = {
       col = {
-        border_active = active,
-        border_inactive = inactive,
+        border_inactive = inactive.border,
         border_locked_active = colors.rgba(c.error, "ee"),
-        border_locked_inactive = inactive,
+        border_locked_inactive = inactive.border,
       },
       groupbar = {
         text_color = colors.rgba(c.on_surface),
@@ -160,13 +166,14 @@ local function apply_colors(c)
     },
     decoration = {
       shadow = {
-        color = colors.rgba(c.shadow, "55"),
+        color_inactive = inactive.shadow,
       },
     },
     misc = {
       background_color = colors.rgba(c.surface),
     },
   })
+  focus.use(c)
 end
 
 apply_colors(colors.load())

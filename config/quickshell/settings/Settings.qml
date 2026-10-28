@@ -40,7 +40,8 @@ Singleton {
 
     // The focus tube strikes on as focus arrives, as the neon sign does: true, or
     // false for a plain fade. The user layer's `focusStutter` wins; the Command
-    // menu's "Focus stutter" Item writes it.
+    // menu's "Focus stutter" Item writes it. Hyprland reads the same key for the
+    // active window's border (config/hypr/focus.lua).
     readonly property bool focusStutter: typeof user.focusStutter === "boolean" ? user.focusStutter : true
 
     // The Command menu's hidden and renamed apps, and the terminal for apps
