@@ -176,8 +176,8 @@ WlSessionLockSurface {
             space: K.Tokens.space.s48
         }
 
-        // Narrower than the column: a password needs less room than PAM's and the key's messages
-        // under it, which keep the column's width so they stay on one line.
+        // Narrower than the stack: a password needs less room than PAM's and the key's messages
+        // under it, which keep the stack's width so they stay on one line.
         Item {
             implicitWidth: K.Tokens.size.password
             implicitHeight: field.implicitHeight
