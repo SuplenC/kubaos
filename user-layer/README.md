@@ -63,6 +63,7 @@ group.
 | The fallback launcher (fuzzel) | `tools/fuzzel/fuzzel.ini` |
 | Command menu actions, hidden Items, project folders, quicklinks | `menu/kotodama/user.toml` |
 | Your own packages | `kubaos package add <name>`, or `home/home.nix` (your user flake) |
+| Unfree packages (Discord, Spotify, …): allowed, or free ones only | `kubaos package unfree on\|off` (kept in `home/kubaos.d/nixpkgs.toml`), or "Allow unfree packages" and "Free packages only" in the Command menu |
 | Where `kubaos suite new` makes projects (`~/Projects`) | `home/home.nix`: `home.sessionVariables.KUBAOS_PROJECTS` |
 | The Bitwarden item and folders gh and project env come from (`gh-token`, `env/<project>`) | `home/home.nix`: `KUBAOS_BW_GH_ITEM`, `KUBAOS_BW_ENV_PREFIX` (docs/SECRETS.md) |
 

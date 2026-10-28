@@ -2490,6 +2490,64 @@ c_packages() {
     { echo "FAIL kubaos switch"; tail -20 "$LOGS/packages-switch.log"; return 1; }
   ! has_bin hello || { echo "FAIL hello still on PATH with no file listing it"; return 1; }
   echo "ok   kubaos switch after deleting the Suite file: hello gone"
+  c_packages_unfree "$u"
+}
+
+# c_packages_unfree FLAKE: unfree packages in the user flake of c_packages.
+# unrar is unfree in nixpkgs and is only recorded, never built; home.nix's
+# kubaos-unfree-test is an unfree package built from nothing, so the switch
+# downloads nothing.
+c_packages_unfree() {
+  local u="$1" out
+  out="$(kz 'kubaos package add unrar --no-switch' 2>&1)" && grep -qx 'added unrar (unfree)' <<<"$out" ||
+    { echo "FAIL kubaos package add unrar doesn't say it is unfree"; printf '%s\n' "$out"; return 1; }
+  out="$(kz 'kubaos package list' 2>&1)" && grep -qx 'unrar  (packages.toml)  unfree' <<<"$out" ||
+    { echo "FAIL kubaos package list doesn't mark unrar unfree"; printf '%s\n' "$out"; return 1; }
+  out="$(kz 'kubaos package list --json' 2>&1)" && jq -e '.unrar.unfree == true' <<<"$out" >/dev/null ||
+    { echo "FAIL kubaos package list --json: unrar isn't unfree"; printf '%s\n' "$out"; return 1; }
+  echo "ok   kubaos package add and list mark unrar unfree"
+  out="$(kz 'kubaos package unfree off --no-switch' 2>&1)" &&
+    { echo "FAIL kubaos package unfree off went ahead with unrar recorded"; printf '%s\n' "$out"; return 1; }
+  grep -q 'unrar is unfree (packages.toml)' <<<"$out" && [[ ! -e $u/kubaos.d/nixpkgs.toml ]] ||
+    { echo "FAIL kubaos package unfree off with unrar recorded"; printf '%s\n' "$out"; return 1; }
+  kz 'kubaos package remove unrar --no-switch' >/dev/null 2>&1 || { echo "FAIL kubaos package remove unrar"; return 1; }
+  echo "ok   kubaos package unfree off refuses while unrar is recorded"
+
+  as_user tee "$u/home.nix" >/dev/null <<'EOF'
+{ pkgs, ... }:
+{
+  home.packages = [
+    (pkgs.runCommand "kubaos-unfree-test" { meta.license = pkgs.lib.licenses.unfree; } ''
+      mkdir -p $out/bin
+      printf '#!/bin/sh\necho unfree\n' >$out/bin/kubaos-unfree-test
+      chmod +x $out/bin/kubaos-unfree-test
+    '')
+  ];
+  kubaos.stateDir = ./kubaos.d;
+}
+EOF
+  kz 'kubaos switch --foreground' >"$LOGS/packages-unfree.log" 2>&1 && has_bin kubaos-unfree-test ||
+    { echo "FAIL a switch with an unfree package in home.nix"; tail -20 "$LOGS/packages-unfree.log"; return 1; }
+  echo "ok   unfree packages are allowed by default: a switch installs one"
+
+  out="$(kz 'kubaos package unfree off --no-switch && kubaos package unfree' 2>&1)" && [[ ${out##*$'\n'} == off ]] ||
+    { echo "FAIL kubaos package unfree off"; printf '%s\n' "$out"; return 1; }
+  grep -qx 'allow_unfree = false' "$u/kubaos.d/nixpkgs.toml" ||
+    { echo "FAIL kubaos.d/nixpkgs.toml"; cat "$u/kubaos.d/nixpkgs.toml"; return 1; }
+  ! kz 'kubaos switch --foreground' >"$LOGS/packages-free-only.log" 2>&1 &&
+    grep -q 'unfree license' "$LOGS/packages-free-only.log" ||
+    { echo "FAIL with unfree packages off, the switch built home.nix's unfree package"; tail -20 "$LOGS/packages-free-only.log"; return 1; }
+  echo "ok   with unfree packages off, the home build refuses one"
+  out="$(kz 'kubaos package add unrar --no-switch' 2>&1)" &&
+    { echo "FAIL kubaos package add unrar went ahead with unfree packages off"; printf '%s\n' "$out"; return 1; }
+  grep -q 'unrar is unfree, and unfree packages are turned off (allow_unfree in kubaos.d/nixpkgs.toml): turn them back on with `kubaos package unfree on`' <<<"$out" &&
+    ! grep -q unrar "$u/kubaos.d/packages.toml" ||
+    { echo "FAIL kubaos package add unrar with unfree packages off"; printf '%s\n' "$out"; return 1; }
+  echo "ok   with unfree packages off, kubaos package add refuses unrar, naming the setting"
+
+  kz 'kubaos package unfree on --foreground' >"$LOGS/packages-unfree-on.log" 2>&1 && has_bin kubaos-unfree-test ||
+    { echo "FAIL kubaos package unfree on"; tail -20 "$LOGS/packages-unfree-on.log"; return 1; }
+  echo "ok   kubaos package unfree on switches, and the unfree package installs again"
 }
 
 # The Suite framework, through the test Suite (home/suites/test.nix,

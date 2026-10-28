@@ -33,6 +33,7 @@ use crate::state::StateDir;
 use crate::state::lock_file;
 use crate::state::read_state_file;
 use crate::state::write_atomic;
+use crate::unfree::Unfree;
 
 /// The comment `packages.toml` starts with.
 const HEADER: &str = "\
@@ -124,20 +125,30 @@ pub fn validate_name(name: &str) -> Result<(), InvalidName> {
     }
 }
 
-/// The command that opens a shell with `name` from the user flake's nixpkgs, installing nothing.
+/// The command that opens a shell with `name` from the user flake's nixpkgs, installing nothing,
+/// and taking an unfree package as the home does while `unfree` allows them.
 ///
 /// # Errors
 ///
 /// [`InvalidName`] when `name` is not a package name.
-pub fn try_command(flake: &Path, name: &str) -> Result<Vec<OsString>, InvalidName> {
+pub fn try_command(flake: &Path, name: &str, unfree: Unfree) -> Result<Vec<OsString>, InvalidName> {
     validate_name(name)?;
-    Ok(vec![
-        "nix".into(),
-        "shell".into(),
+    let mut argv: Vec<OsString> = Vec::new();
+    // The flake's `legacyPackages` has nixpkgs' default config, which refuses unfree packages; the
+    // variable is the one way to allow them there, and only an impure evaluation reads it.
+    if unfree == Unfree::Allowed {
+        argv.extend(["env".into(), "NIXPKGS_ALLOW_UNFREE=1".into()]);
+    }
+    argv.extend(["nix".into(), "shell".into()]);
+    if unfree == Unfree::Allowed {
+        argv.push("--impure".into());
+    }
+    argv.extend([
         "--inputs-from".into(),
         flake.as_os_str().to_owned(),
         format!("nixpkgs#{name}").into(),
-    ])
+    ]);
+    Ok(argv)
 }
 
 impl Packages {

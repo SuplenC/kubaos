@@ -11,6 +11,7 @@ use super::Packages;
 use super::try_command;
 use super::validate_name;
 use crate::state::StateDir;
+use crate::unfree::Unfree;
 
 fn packages(dir: &Path) -> Packages {
     Packages::new(&StateDir::new(dir.join("kubaos.d")), dir.join("state/kubaos.d.lock"))
@@ -146,7 +147,7 @@ fn concurrent_adds_lose_none_of_the_packages() {
 
 #[test]
 fn trying_a_package_runs_nix_shell_from_the_user_flakes_nixpkgs() {
-    let cmd = try_command(Path::new("/home/kuba/.config/kubaos/home"), "cowsay").unwrap();
+    let cmd = try_command(Path::new("/home/kuba/.config/kubaos/home"), "cowsay", Unfree::Refused).unwrap();
 
     let want: Vec<OsString> = [
         "nix",
@@ -162,8 +163,28 @@ fn trying_a_package_runs_nix_shell_from_the_user_flakes_nixpkgs() {
 }
 
 #[test]
+fn trying_a_package_while_unfree_ones_are_allowed_allows_them_in_the_shell_too() {
+    let cmd = try_command(Path::new("/home/kuba/.config/kubaos/home"), "discord", Unfree::Allowed).unwrap();
+
+    let want: Vec<OsString> = [
+        "env",
+        "NIXPKGS_ALLOW_UNFREE=1",
+        "nix",
+        "shell",
+        "--impure",
+        "--inputs-from",
+        "/home/kuba/.config/kubaos/home",
+        "nixpkgs#discord",
+    ]
+    .into_iter()
+    .map(OsString::from)
+    .collect();
+    assert_eq!(cmd, want);
+}
+
+#[test]
 fn trying_an_invalid_name_runs_nothing() {
-    assert!(try_command(Path::new("/f"), "hello; rm -rf ~").is_err());
+    assert!(try_command(Path::new("/f"), "hello; rm -rf ~", Unfree::Allowed).is_err());
 }
 
 #[test]

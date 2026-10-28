@@ -16,6 +16,7 @@ pub mod state;
 pub mod step;
 pub mod suites;
 pub mod switch;
+pub mod unfree;
 pub mod update;
 
 pub use kubaos_phone as phone;

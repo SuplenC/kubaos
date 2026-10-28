@@ -70,9 +70,10 @@ kind = "scripts"
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
-# `notifications.dnd` and `power.panel-power-saving`, true or false;
-# `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
-# "super-saver", "off"). While a state can't be read, the action shows.
+# `notifications.dnd`, `power.panel-power-saving` and `nix.unfree`, true or
+# false; `power.scheduler` ("kernel", "lavd") and `power.low-battery`
+# ("power-saver", "super-saver", "off"). While a state can't be read, the
+# action shows.
 #
 # A keyword the query equals ranks an action with the exact titles, above an
 # app whose name only has the query as a word. So an action about an app
@@ -970,6 +971,29 @@ icon = "view-pin"
 keywords = ["project pin", "suite", "version", "envrc", "direnv", "list"]
 run = ["kubaos", "pins", "--all"]
 terminal = true
+
+# Unfree packages from your nixpkgs (`kubaos package unfree`, kept in
+# kubaos.d/nixpkgs.toml of your user flake): allowed until turned off, and
+# marked in `kubaos package list`. Either half switches your home in a
+# terminal; turning them off refuses while kubaos.d/ installs an unfree one.
+
+[extensions.kubaos.actions.unfree-on]
+title = "Allow unfree packages"
+subtitle = "kubaos package add takes proprietary packages from nixpkgs too, like Discord or Spotify"
+icon = "system-software-install"
+keywords = ["unfree", "proprietary", "non-free", "nixpkgs", "allowunfree", "license"]
+run = ["kubaos", "package", "unfree", "on"]
+terminal = true
+shown_when = { state = "nix.unfree", is = false }
+
+[extensions.kubaos.actions.unfree-off]
+title = "Free packages only"
+subtitle = "Your nixpkgs refuses unfree packages; remove any you added first"
+icon = "system-software-install"
+keywords = ["unfree", "proprietary", "non-free", "nixpkgs", "allowunfree", "license", "foss", "open source"]
+run = ["kubaos", "package", "unfree", "off"]
+terminal = true
+shown_when = { state = "nix.unfree", is = true }
 
 # KubaOS's apt packages (`kubaos packages`, system/packages.toml): how the
 # machine compares with the release, and the optional groups turned on or off

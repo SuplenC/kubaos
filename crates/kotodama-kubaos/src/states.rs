@@ -15,6 +15,7 @@
 //! | `power.panel-power-saving` | on: panel power saving | `U/desktop/power/power.toml` |
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
+//! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
 //!
 //! `U` is the user layer, `~/.config/kubaos`. A state whose file can't be read has no reading,
 //! and an action that names it shows whatever it declares.
@@ -40,6 +41,11 @@ use kubaos_core::apt::Choices;
 use kubaos_core::apt::Manifest;
 use kubaos_core::apt::Switch;
 use kubaos_core::keyboard::settings as keyboard_settings;
+use kubaos_core::state::DIR_NAME as STATE_DIR;
+use kubaos_core::state::NIXPKGS_FILE;
+use kubaos_core::state::user_flake;
+use kubaos_core::unfree::Setting as UnfreeSetting;
+use kubaos_core::unfree::Unfree;
 use kubaos_core::update::record::SystemPaths;
 use kubaos_user_layer::App;
 
@@ -65,6 +71,8 @@ pub const PANEL_POWER_SAVING: &str = "power.panel-power-saving";
 pub const SCHEDULER: &str = "power.scheduler";
 /// Where the low-battery drop goes, or `off`.
 pub const LOW_BATTERY: &str = "power.low-battery";
+/// Whether the user's nixpkgs takes unfree packages.
+pub const UNFREE: &str = "nix.unfree";
 
 /// What starts the state of an optional package group, `packages.chrome`.
 const PACKAGES: &str = "packages.";
@@ -192,6 +200,9 @@ impl States {
             let low_battery = power.low_battery_stop.map_or("off", |stop| stop.id());
             self.set(LOW_BATTERY, Reading::Word(low_battery.to_owned()));
         }
+        if let Ok(unfree) = UnfreeSetting::read(&files.state_dir) {
+            self.set(UNFREE, Reading::Bool(unfree == Unfree::Allowed));
+        }
     }
 }
 
@@ -201,7 +212,7 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | DND
-        | PANEL_POWER_SAVING => Some(Values::Bool),
+        | PANEL_POWER_SAVING | UNFREE => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ => None,
     }
@@ -250,6 +261,7 @@ impl Places {
                 user_layer.phone.path().to_path_buf(),
                 user_layer.keyboard,
                 user_layer.power,
+                user_layer.state_dir.join(NIXPKGS_FILE),
             ]);
         }
         files.extend(self.keep_awake.iter().chain(&self.proxy).chain(&self.dnd).cloned());
@@ -265,6 +277,8 @@ struct Files {
     phone: kubaos_phone::setting::Setting,
     keyboard: PathBuf,
     power: PathBuf,
+    /// The user flake's state directory, `U/home/kubaos.d`.
+    state_dir: PathBuf,
 }
 
 impl Files {
@@ -276,6 +290,7 @@ impl Files {
             phone: kubaos_phone::setting::Setting::new(config),
             keyboard: keyboard_settings::path(config),
             power: kubaos_user_layer::dir(config, App::Power).join(kubaos_power::settings::FILE),
+            state_dir: user_flake(config).join(STATE_DIR),
         }
     }
 }
