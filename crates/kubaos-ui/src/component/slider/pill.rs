@@ -350,22 +350,6 @@ impl<M> Pill<'_, M> {
         use iced::advanced::svg::Renderer as _;
 
         let height = bounds.height;
-        if self.icon_presses() && (state.over_icon || state.pressing_icon) {
-            let layer = if state.pressing_icon {
-                Opacity::Press
-            } else {
-                Opacity::Hover
-            };
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: Rectangle::new(bounds.position(), IcedSize::new(height, height)),
-                    border: Border::default().rounded(height / 2.0),
-                    snap: true,
-                    ..renderer::Quad::default()
-                },
-                Background::Color(color::alpha(paint.on_fill, layer.value())),
-            );
-        }
         let icon = Type::Label.icon();
         let side = f32::from(icon.px());
         let inset = self.scale.snap((height - side) / 2.0);
@@ -382,6 +366,27 @@ impl<M> Pill<'_, M> {
             ),
             *viewport,
         );
+        if !(self.icon_presses() && (state.over_icon || state.pressing_icon)) {
+            return;
+        }
+        let layer = if state.pressing_icon {
+            Opacity::Press
+        } else {
+            Opacity::Hover
+        };
+        // The state layer goes over its content, as every state layer does: in a layer of its own,
+        // since a picture draws over the quads of its own layer.
+        renderer.with_layer(*viewport, |renderer| {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: Rectangle::new(bounds.position(), IcedSize::new(height, height)),
+                    border: Border::default().rounded(height / 2.0),
+                    snap: true,
+                    ..renderer::Quad::default()
+                },
+                Background::Color(color::alpha(paint.on_fill, layer.value())),
+            );
+        });
     }
 
     /// The label at the far end: in the track's content colour over the track and the fill's over

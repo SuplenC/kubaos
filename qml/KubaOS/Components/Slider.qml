@@ -330,30 +330,6 @@ Item {
         }
     }
 
-    // The icon in the circle the fill starts with, always on the fill; a button where it presses.
-    MouseArea {
-        id: iconArea
-
-        width: root.side
-        height: root.side
-        enabled: root.iconPresses
-        visible: root.iconPresses
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        Accessible.role: Accessible.Button
-        Accessible.name: root.iconLabel
-        // The button is the circle: a press in the square's corners goes to the track.
-        onPressed: mouse => mouse.accepted = Math.hypot(mouse.x - width / 2, mouse.y - height / 2) <= width / 2
-        onClicked: root.pressIcon()
-
-        K.StateLayer {
-            radius: Tokens.radius.full
-            content: root.onFill
-            hovered: iconArea.containsMouse
-            pressed: iconArea.pressed
-        }
-    }
-
     // Drawn over the track by the slider itself, not laid out beside it, so the geometry check
     // sees the slider as one box, as iced's slider reports it.
     Item {
@@ -421,6 +397,31 @@ Item {
             visible: false
             text: root.widest
             style: Tokens.type.label_number
+        }
+    }
+
+    // The icon's button: over the drawn icon, so its state layer lies over it, as every state
+    // layer lies over its content. The icon's circle is the fill's start, always on the fill.
+    MouseArea {
+        id: iconArea
+
+        width: root.side
+        height: root.side
+        enabled: root.iconPresses
+        visible: root.iconPresses
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        Accessible.role: Accessible.Button
+        Accessible.name: root.iconLabel
+        // The button is the circle: a press in the square's corners goes to the track.
+        onPressed: mouse => mouse.accepted = Math.hypot(mouse.x - width / 2, mouse.y - height / 2) <= width / 2
+        onClicked: root.pressIcon()
+
+        K.StateLayer {
+            radius: Tokens.radius.full
+            content: root.onFill
+            hovered: iconArea.containsMouse
+            pressed: iconArea.pressed
         }
     }
 
