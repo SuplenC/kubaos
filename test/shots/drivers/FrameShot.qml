@@ -142,11 +142,9 @@ QtObject {
         }
         if (driver.state === "keyboard")
             cc.tab = cc.keyboardTab;
-        if (driver.state === "scanning") {
-            // A scan that has found nothing yet: the list's skeleton rows, with the room to show.
+        // A scan that has found nothing yet: the list's skeleton rows, with the room to show.
+        if (driver.state === "scanning")
             Notifs.clear();
-            Net.networks = [];
-        }
         if (driver.state === "")
             scroll.start();
     }
@@ -175,6 +173,9 @@ QtObject {
             Sysmon.pendingPid = 4211;
         if (driver.panel === "wallpaper" && driver.state === "settings")
             Wallpapers.openSettings = true;
+        // Emptied before the frame exists, so no network's row is made and torn down again.
+        if (driver.panel === "controlcenter" && driver.state === "scanning")
+            Net.networks = [];
         driver.frame = driver.frameComponent.createObject(null);
         driver.window = driver.windowOf(driver.frame);
         if (!driver.window) {
