@@ -96,6 +96,7 @@ pub struct IconTile {
     size: TileSize,
     face: Option<Face>,
     danger: bool,
+    accent: bool,
 }
 
 /// A `size` tile showing `glyph` on the highest container, which reads on a list, a card and a
@@ -108,6 +109,7 @@ pub fn icon_tile(glyph: Icon, size: TileSize) -> IconTile {
         size,
         face: None,
         danger: false,
+        accent: false,
     }
 }
 
@@ -137,10 +139,19 @@ impl IconTile {
         IconTile { danger: true, ..self }
     }
 
+    /// Its symbol in the accent: the one of a list that comes first, as the default keyboard
+    /// layout's star.
+    #[must_use]
+    pub fn accent(self) -> Self {
+        IconTile { accent: true, ..self }
+    }
+
     pub fn view<'a, M: 'a>(self, look: &Look) -> Element<'a, M> {
         let c = look.colors;
         let (tint, ink) = if self.danger {
             (c.error, c.on_error)
+        } else if self.accent {
+            (c.surface_container_highest, c.primary)
         } else {
             (c.surface_container_highest, c.on_surface_variant)
         };

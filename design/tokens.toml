@@ -43,10 +43,10 @@ off_grid = ["size.slider_stop", "size.slider_anchor"]
 # Dividers, outlines of cards, fields and the switch track: one device pixel
 # at every scale.
 hairline_device_px = 1
-# The spinner's arc, a field's caret and a partial checkbox's dash: 2 logical
-# pixels, rounded half up to whole device pixels (2, 3, 3, 4 at 1, 1.25, 1.5,
-# 2). A tick is the `check` symbol, drawn with the symbol stroke below like
-# every other icon.
+# The spinner's arc, a field's caret, a partial checkbox's dash and the line
+# where a dragged row will land: 2 logical pixels, rounded half up to whole
+# device pixels (2, 3, 3, 4 at 1, 1.25, 1.5, 2). A tick is the `check`
+# symbol, drawn with the symbol stroke below like every other icon.
 thin = 2
 # A symbol's stroke on its 24 unit grid: 2 at 24 px. At another size it
 # scales with the symbol, then rounds half up to whole device pixels, so a
@@ -787,7 +787,7 @@ pairs = [
   { fg = "primary", bg = "surface_container_low", need = "graphic", use = "The focus tube in a well" },
   { fg = "primary", bg = "surface_container", need = "graphic", use = "The focus tube on a panel" },
   { fg = "primary", bg = "surface_container_high", need = "graphic", use = "The focus tube in a card or a dialog, a field's tube on its fill" },
-  { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider's or a progress bar's fill on its track, a focused field's tube on its fill" },
+  { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider's or a progress bar's fill, a focused field's tube, an accent symbol on a tile" },
   { fg = "on_primary", bg = "primary", need = "graphic", opacity = "subdued", use = "A slider's step the fill has passed" },
   { fg = "on_secondary", bg = "secondary", need = "text", use = "A slider's label and icon on its softer fill (Auto)" },
   { fg = "on_secondary", bg = "secondary", need = "graphic", opacity = "subdued", use = "A slider's passed step on its softer fill (Auto)" },
@@ -999,6 +999,7 @@ signal_wifi_4_bar = { tabler = "wifi" }
 speaker = { tabler = "device-speaker" }
 speaker_group = { tabler = "devices" }
 star = { tabler = "star" }
+star_filled = { drawn = "Tabler's star, filled, its outline kept so it is the outline star's size" }
 stop = { tabler = "player-stop" }
 storage = { tabler = "database" }
 swap_vert = { tabler = "arrows-sort" }

@@ -1,5 +1,13 @@
 //! Hints: a control's name in a small bubble under it, while the pointer is over it or the keyboard
 //! is on it. An icon-only button has no other words, so its hint is its accessible label.
+//!
+//! # Owns
+//!
+//! - [`hint`], and the floating that a tooltip's card shares ([`floating`]).
+//!
+//! # Not here
+//!
+//! - The tooltip's card: [`crate::component::tooltip`].
 
 use iced::Background;
 use iced::Border;
@@ -46,10 +54,34 @@ pub fn hint<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>, label: &
             border: Border::default().rounded(radius(Radius::Small)),
             ..container::Style::default()
         });
+    floating(look, content, bubble, shown, Side::Below)
+}
+
+/// Which side of its control a floating bubble takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Side {
+    /// Under it and centred on it: a hint, which names the control.
+    Below,
+    /// Over it, starting where it starts: a tooltip, whose card is taller than the room a
+    /// control's foot usually leaves, and wider than a chip at a toolbar's start, so centred it
+    /// would hang past the panel.
+    Above,
+}
+
+/// `content` with `bubble` floating 8 from it on `side`, kept inside the window, while hovered or
+/// while `shown`.
+pub(crate) fn floating<'a, M: 'a>(
+    look: &Look,
+    content: impl Into<Element<'a, M>>,
+    bubble: impl Into<Element<'a, M>>,
+    shown: bool,
+    side: Side,
+) -> Element<'a, M> {
     Element::new(Hint {
         content: content.into(),
         bubble: bubble.into(),
         shown,
+        side,
         scale: look.scale,
     })
 }
@@ -58,6 +90,7 @@ struct Hint<'a, M> {
     content: Element<'a, M>,
     bubble: Element<'a, M>,
     shown: bool,
+    side: Side,
     scale: Scale,
 }
 
@@ -175,6 +208,7 @@ impl<M> Widget<M, Theme, Renderer> for Hint<'_, M> {
                 content: &mut self.bubble,
                 tree: &mut rest[0],
                 anchor: layout.bounds() + translation,
+                side: self.side,
                 scale: self.scale,
             }))
         });
@@ -188,6 +222,7 @@ struct Bubble<'a, 'b, M> {
     tree: &'b mut Tree,
     /// The control's bounds on the window.
     anchor: Rectangle,
+    side: Side,
     scale: Scale,
 }
 
@@ -199,13 +234,17 @@ impl<M> overlay::Overlay<M, Theme, Renderer> for Bubble<'_, '_, M> {
             .layout(self.tree, renderer, &layout::Limits::new(Size::ZERO, bounds));
         let size = node.size();
         let size = Size::new(self.scale.snap_up(size.width), self.scale.snap_up(size.height));
-        // Under the control, centred on a whole device pixel and kept inside the window.
-        let below = f32::from(Space::S8.px());
-        let x = self
-            .scale
-            .snap(self.anchor.center_x() - size.width / 2.0)
-            .clamp(0.0, (bounds.width - size.width).max(0.0));
-        let y = self.anchor.y + self.anchor.height + below;
+        // Beside the control, on a whole device pixel and kept inside the window.
+        let apart = f32::from(Space::S8.px());
+        let (x, y) = match self.side {
+            Side::Below => (
+                self.anchor.center_x() - size.width / 2.0,
+                self.anchor.y + self.anchor.height + apart,
+            ),
+            Side::Above => (self.anchor.x, self.anchor.y - apart - size.height),
+        };
+        let x = self.scale.snap(x).clamp(0.0, (bounds.width - size.width).max(0.0));
+        let y = self.scale.snap(y).max(0.0);
         layout::Node::with_children(size, vec![node]).move_to(Point::new(x, y))
     }
 

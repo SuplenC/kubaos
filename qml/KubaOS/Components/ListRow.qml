@@ -2,7 +2,7 @@ import QtQuick
 import KubaOS.Components as K
 
 // One row of a list: `kubaos-ui`'s `list::list_row`. 44 tall with one line, 56 with a subtitle;
-// 12 inside, a 20 icon (24 beside two lines), the title in `body_strong`, the subtitle in
+// 12 inside, a 20 icon (24 beside two lines) or the icon on an icon tile (`tile`), the title in `body_strong`, the subtitle in
 // `small`, chips and a detail in `mono` at the end, and an optional check whose room is kept when
 // unchecked, so the rows' ends line up. Each part is centred on the row's whole height, so a chip
 // moves nothing else.
@@ -18,6 +18,11 @@ K.Pressable {
     // Chips near the row's end, as `{ kind, text }`: facts that matter at a glance (Default).
     property var chips: []
     property string icon: ""
+    // The icon on an icon tile, `Sm` beside one line and `Md` beside two, as the Command menu's
+    // rows show theirs: a list of things of one kind, where the symbol tells one from the others.
+    property bool tile: false
+    // The tile's symbol in the accent: the one row of the list that comes first (the default).
+    property bool accent: false
     // The row the keyboard is on, or the one picked in a list of one.
     property bool selected: false
     // Its action can't be taken back (Shut down).
@@ -33,7 +38,7 @@ K.Pressable {
     readonly property var probe: ({
             role: "component",
             name: "ListRow",
-            variant: [root.subtitle === "" ? "one-line" : "two-line", root.icon === "" ? "" : "icon"].filter(word => word !== "").join(" "),
+            variant: [root.subtitle === "" ? "one-line" : "two-line", root.icon === "" ? "" : root.tile ? "tile" : "icon"].filter(word => word !== "").join(" "),
             fixed: {
                 width: false,
                 height: true
@@ -67,8 +72,21 @@ K.Pressable {
         gap: Tokens.space.s12
         align: "centre"
 
+        // Made only on a row that shows one: most rows have none, and a tile carries an image of
+        // its own.
+        Loader {
+            active: root.icon !== "" && root.tile
+            visible: active
+
+            sourceComponent: K.IconTile {
+                icon: root.icon
+                size: root.subtitle === "" ? "Sm" : "Md"
+                accent: root.accent
+            }
+        }
+
         K.Icon {
-            visible: root.icon !== ""
+            visible: root.icon !== "" && !root.tile
             name: root.icon
             // Beside a title over a subtitle, the icon spans both lines.
             size: root.subtitle === "" ? Tokens.type.body_strong.icon : Tokens.icon.two_line

@@ -808,6 +808,27 @@ K.Stack {
                                 selected: true
                             }
                         }
+
+                        K.List {
+                            K.ListRow {
+                                title: "English (US)"
+                                subtitle: "us"
+                                icon: "star_filled"
+                                tile: true
+                                accent: true
+                                checkable: true
+                            }
+
+                            K.ListRow {
+                                title: "Italian"
+                                subtitle: "it"
+                                icon: "keyboard"
+                                tile: true
+                                checkable: true
+                                checked: true
+                                selected: true
+                            }
+                        }
                     }
                 }
 
@@ -925,6 +946,40 @@ K.Stack {
                                 text: "to drop it."
                                 style: K.Tokens.type.body
                             }
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Tooltips"
+                    description: "What a control does, on a popover 8 above it while the pointer or the keyboard is on it; drawn here in place, over the chip it explains."
+
+                    K.Stack {
+                        gap: K.Tokens.space.s8
+
+                        K.Tooltip {
+                            floating: false
+                            title: "Mac accents on Left Alt"
+                            body: "Type accents as a Mac does: hold Left Alt with the accent's key, then type the letter."
+
+                            K.Stack {
+                                gap: K.Tokens.space.s8
+
+                                K.KeyHints {
+                                    hints: [["Left Alt+E", "then"], ["E", "é"]]
+                                }
+
+                                K.KeyHints {
+                                    hints: [["Left Alt+U", "then"], ["O", "ö"]]
+                                }
+                            }
+                        }
+
+                        K.Chip {
+                            text: "Mac accents"
+                            kind: "Selected"
+                            icon: "keyboard_option_key"
+                            pressable: true
                         }
                     }
                 }

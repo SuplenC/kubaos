@@ -17,6 +17,8 @@ use iced::widget::container;
 
 use crate::color;
 use crate::component::chip::ChipKind;
+use crate::component::avatar::TileSize;
+use crate::component::avatar::icon_tile;
 use crate::component::chip::chip;
 use crate::component::layered;
 use crate::focus::RingColor;
@@ -59,6 +61,8 @@ pub struct ListRow<'a, M> {
     subtitle: Option<String>,
     detail: Option<String>,
     icon: Option<Icon>,
+    tile: bool,
+    accent: bool,
     chips: Vec<(ChipKind, String)>,
     selected: bool,
     danger: bool,
@@ -75,6 +79,8 @@ pub fn list_row<'a, M>(title: impl Into<String>) -> ListRow<'a, M> {
         subtitle: None,
         detail: None,
         icon: None,
+        tile: false,
+        accent: false,
         chips: Vec::new(),
         selected: false,
         danger: false,
@@ -109,6 +115,20 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
             icon: Some(icon),
             ..self
         }
+    }
+
+    /// The icon on an icon tile, `Sm` beside one line and `Md` beside two, as the Command menu's
+    /// rows show theirs: a list of things of one kind, where the row's symbol is what tells one
+    /// from the others at a glance (the default keyboard layout's star).
+    #[must_use]
+    pub fn tile(self) -> Self {
+        ListRow { tile: true, ..self }
+    }
+
+    /// The tile's symbol in the accent: the one row of the list that comes first (the default).
+    #[must_use]
+    pub fn accent(self) -> Self {
+        ListRow { accent: true, ..self }
     }
 
     /// A chip near the row's end, after the chips before it: a fact about the row that matters at
@@ -165,7 +185,12 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         } else {
             "one-line"
         };
-        let variant = [lines, if self.icon.is_some() { "icon" } else { "" }, ""];
+        let symbol = match (self.icon, self.tile) {
+            (None, _) => "",
+            (Some(_), false) => "icon",
+            (Some(_), true) => "tile",
+        };
+        let variant = [lines, symbol, ""];
         let c = look.colors;
         let (fill_colour, main, muted) = if self.selected && self.danger {
             (
@@ -194,7 +219,13 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         // makes one row's parts taller moves none of the others: the title sits where every row's
         // does.
         let mut content = row(look, Space::S12).center().width(Extent::Fill).height(Extent::Fill);
-        if let Some(glyph) = self.icon {
+        if let Some(glyph) = self.icon
+            && self.tile
+        {
+            let size = if two_line { TileSize::Md } else { TileSize::Sm };
+            let tile = icon_tile(glyph, size);
+            content = content.push(if self.accent { tile.accent() } else { tile }.view(look));
+        } else if let Some(glyph) = self.icon {
             // Beside a title over a subtitle, the icon spans both lines.
             let size = if two_line {
                 tokens::TWO_LINE_ICON

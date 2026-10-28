@@ -842,13 +842,14 @@ kb_probe_wait() {
 }
 
 # The control center's Keyboard tab under a real pointer (a virtual one, as
-# the headless session has none), with the Daemon, which "Add a language…"
-# searches through. A double-click on "Add a language…" opens the search and
-# adds nothing. Once the search is in the "Add a keyboard layout" app, a click
-# on its first match only picks it, and the Add button adds it to the user's
-# layouts with no privilege asked.
+# the headless session has none), with the Daemon, which the add view searches
+# through. A double-click on the toolbar's + opens the search and adds
+# nothing. Once the search is in the "Add a keyboard layout" app, a click on
+# its first match adds it to the user's layouts with no privilege asked. A
+# drag of the last row up one place moves it there, through one
+# `kubaos keyboard move`.
 keyboard_tab_clicks() {
-  local dir at picked daemon mine="$USER_HOME/.config/kubaos/desktop/keyboard/keyboard.toml" saved bad=0
+  local dir at to x y added moves daemon mine="$USER_HOME/.config/kubaos/desktop/keyboard/keyboard.toml" saved bad=0
   pointer_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$dir/keyboard"
@@ -865,23 +866,23 @@ keyboard_tab_clicks() {
   fi
   if ((!bad)); then
     in_session 'qs ipc call controlcenter keyboard' >/dev/null 2>&1
-    kb_probe_wait 'at add-row' || { echo "FAIL qs ipc call controlcenter keyboard showed no \"Add a language…\""; bad=1; }
+    kb_probe_wait 'at .*add-button' || { echo "FAIL qs ipc call controlcenter keyboard showed no + in the toolbar"; bad=1; }
   fi
-  # The drawer slides in; the probe logs where the row is until it stops.
+  # The drawer slides in; the probe logs where the button is until it stops.
   sleep 1.5
-  at="$(kb_probe_at add-row)"
+  at="$(kb_probe_at add-button)"
 
   if ((!bad)); then
     in_session "$VP_RUN 1920 1080 move:$at wait:0.3 click wait:0.12 click wait:1" >>"$LOGS/vpointer.log" 2>&1 ||
       { echo "FAIL test/lib/vpointer.py: $(tail -3 "$LOGS/vpointer.log")"; bad=1; }
     if ! grep -qx 'layouts = \["us", "it"\]' "$mine"; then
-      echo "FAIL a double-click on \"Add a language…\" changed the layouts: $(cat "$mine")"; bad=1
+      echo "FAIL a double-click on + changed the layouts: $(cat "$mine")"; bad=1
     elif ! grep -q 'keyboard probe: adding true' "$QS_LOG" || grep -q 'keyboard probe: adding false' "$QS_LOG"; then
       echo "FAIL the double-click at $at didn't leave the search open:"
       grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
       bad=1
     else
-      echo "ok   a double-click on \"Add a language…\" opens the search and adds nothing"
+      echo "ok   a double-click on + opens the search and adds nothing"
     fi
   fi
 
@@ -895,25 +896,37 @@ keyboard_tab_clicks() {
       sleep 0.5
       at="$(kb_probe_at first-match)"
       in_session "$VP_RUN 1920 1080 move:$at wait:0.2 click wait:0.5" >>"$LOGS/vpointer.log" 2>&1
-      picked="$(grep -o 'keyboard probe: picked .*' "$QS_LOG" | tail -1 | sed 's/.*picked //')"
-      if [[ -z $picked ]] || ! grep -qx 'layouts = \["us", "it"\]' "$mine"; then
-        echo "FAIL a click on the first match at '$at' didn't only pick it: picked '$picked', layouts $(cat "$mine")"
-        bad=1
+      kb_probe_wait 'change add ' || true
+      added="$(grep -o 'keyboard probe: change add .*' "$QS_LOG" | tail -1 | sed 's/.*change add //')"
+      for _ in $(seq 30); do [[ -n $added ]] && grep -qF "\"$added\"" "$mine" && break; sleep 0.1; done
+      if [[ -n $added ]] && grep -qxF "layouts = [\"us\", \"it\", \"$added\"]" "$mine"; then
+        echo "ok   a click on the search's first match adds it ($added) to the user's layouts, no privilege asked"
       else
-        echo "ok   the search lists the app's layouts, and a click on one picks $picked"
+        echo "FAIL a click on the first match at '$at' didn't add it: added '$added', layouts $(cat "$mine")"
+        bad=1
       fi
     fi
   fi
 
   if ((!bad)); then
+    kb_probe_wait 'at .*row-2 ' || { echo "FAIL the list never showed a third row"; bad=1; }
     sleep 0.5
-    at="$(kb_probe_at add-button)"
-    in_session "$VP_RUN 1920 1080 move:$at wait:0.2 click wait:0.5" >>"$LOGS/vpointer.log" 2>&1
-    for _ in $(seq 30); do grep -q "\"$picked\"" "$mine" && break; sleep 0.1; done
-    if grep -qxF "layouts = [\"us\", \"it\", \"$picked\"]" "$mine"; then
-      echo "ok   the Add button adds the pick to the user's layouts, no privilege asked"
+    at="$(kb_probe_at row-2)"
+    to="$(kb_probe_at row-1)"
+    x="${at%,*}"
+    y="${at#*,}"
+    # Up past the drag threshold and on to the row above, in steps, as a hand moves.
+    in_session "$VP_RUN 1920 1080 move:$at wait:0.2 press wait:0.1 move:$x,$((y - 8)) wait:0.05 move:$x,$((y - 20)) wait:0.05 move:$x,$((y - 36)) wait:0.05 move:$to wait:0.3 release wait:1" >>"$LOGS/vpointer.log" 2>&1
+    for _ in $(seq 30); do grep -qxF "layouts = [\"us\", \"$added\", \"it\"]" "$mine" && break; sleep 0.1; done
+    moves="$(grep -c 'keyboard probe: change move' "$QS_LOG")"
+    if ! grep -qxF "layouts = [\"us\", \"$added\", \"it\"]" "$mine"; then
+      echo "FAIL dragging the last row from $at to $to didn't move it up one place: $(cat "$mine")"
+      grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
+      bad=1
+    elif ((moves != 1)); then
+      echo "FAIL a drag ran kubaos keyboard move $moves times, not once"; bad=1
     else
-      echo "FAIL the Add button at $at didn't add $picked: $(cat "$mine")"; bad=1
+      echo "ok   dragging a row onto the one above moves it there, with one kubaos keyboard move"
     fi
   fi
 

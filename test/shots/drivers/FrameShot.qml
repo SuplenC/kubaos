@@ -13,8 +13,10 @@ import qs.modules.frame
 // notifications, or bar (nothing open). STATE puts the panel in a state, through the services
 // and public properties only, so the driver works with any version of the panel:
 //   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), bluetooth, bluetooth-code
-//                  (with the history cleared), keyboard, scanning (a Wi-Fi scan that has found
-//                  nothing yet, the history cleared)
+//                  (with the history cleared), keyboard, keyboard-tooltip (the Mac accents
+//                  explained), keyboard-drag (the second layout dragged onto the first),
+//                  keyboard-add ("germ" searched for a layout to add), each with the history
+//                  cleared, scanning (a Wi-Fi scan that has found nothing yet, the history cleared)
 //   clock: answer (a question typed into the search), settings
 //   sysmon: process (a process's details)
 //   wallpaper: settings
@@ -138,10 +140,54 @@ QtObject {
                 passkey: "482913"
             };
         }
-        if (driver.state === "keyboard")
+        if (driver.state.startsWith("keyboard")) {
             cc.tab = cc.keyboardTab;
+            keyboardPose.start();
+        }
         if (driver.state === "")
             scroll.start();
+    }
+
+    // The Keyboard tab in its state once it has read its layouts, through what KeyboardList.qml
+    // exposes.
+    property Timer keyboardPose: Timer {
+        interval: 300
+        onTriggered: {
+            const tab = driver.find(driver.window.contentItem, it => it.dragFrom !== undefined && it.explaining !== undefined);
+            if (!tab) {
+                console.warn("shot: no keyboard tab found");
+                return;
+            }
+            if (driver.state === "keyboard-tooltip")
+                tab.explaining = true;
+            if (driver.state === "keyboard-drag") {
+                tab.dragFrom = 1;
+                tab.dropAt = 0;
+                tab.dragOffset = -K.Tokens.space.s32;
+            }
+            if (driver.state === "keyboard-add") {
+                tab.adding = true;
+                typing.start();
+            }
+        }
+    }
+
+    // A query typed into the add view's search once it has entered the layouts app, its caret
+    // stopped: llvmpipe takes about 400 ms to draw a frame of the add view at 1.5×,
+    // so a blinking caret leaves the window no quiet 300 ms to be shot in.
+    property Timer typing: Timer {
+        interval: 300
+        onTriggered: {
+            const field = driver.find(driver.window.contentItem, it => it.placeholder === "Search languages and layouts");
+            if (!field) {
+                console.warn("shot: no layout search found");
+                return;
+            }
+            field.text = "germ";
+            const input = driver.find(field, it => it.cursorVisible !== undefined);
+            if (input)
+                input.cursorVisible = false;
+        }
     }
 
     // The notification history, scrolled to its middle once the panel has opened.
@@ -175,7 +221,7 @@ QtObject {
         // The history cleared, so the tab has the room to show the passkey prompt and its keycaps
         // whole, or a scan's rows; cleared before the frame exists, so no card is made and torn
         // down again.
-        if (driver.panel === "controlcenter" && (driver.state === "bluetooth-code" || driver.state === "scanning"))
+        if (driver.panel === "controlcenter" && (driver.state === "bluetooth-code" || driver.state === "scanning" || driver.state.startsWith("keyboard")))
             Notifs.clear();
         driver.frame = driver.frameComponent.createObject(null);
         driver.window = driver.windowOf(driver.frame);

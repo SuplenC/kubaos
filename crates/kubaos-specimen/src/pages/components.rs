@@ -82,6 +82,7 @@ use kubaos_ui::component::table::table_row;
 use kubaos_ui::component::tabs::Tab;
 use kubaos_ui::component::tabs::tabs;
 use kubaos_ui::component::tile::tile;
+use kubaos_ui::component::tooltip::tooltip;
 use kubaos_ui::component::toast::toast;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::Extent;
@@ -175,6 +176,12 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             "Keycaps and key hints",
             Some("Keys drawn as keys, as tall as a line of body text so they sit inline with it, then what each does."),
             keycaps(look),
+        ))
+        .push(section(
+            look,
+            "Tooltips",
+            Some("What a control does, on a popover 8 above it while the pointer or the keyboard is on it; drawn here in place, over the chip it explains."),
+            tooltips(look),
         ))
         .push(section(
             look,
@@ -607,11 +614,30 @@ fn lists<'a>(look: &Look) -> Element<'a, Message> {
             .on_press(Message::Sample)
             .view(look),
     ];
+    let tiled = vec![
+        list_row("English (US)")
+            .subtitle("us")
+            .icon(Icon::StarFilled)
+            .tile()
+            .accent()
+            .checked(false)
+            .on_press(Message::Sample)
+            .view(look),
+        list_row("Italian")
+            .subtitle("it")
+            .icon(Icon::Keyboard)
+            .tile()
+            .checked(true)
+            .selected(true)
+            .on_press(Message::Sample)
+            .view(look),
+    ];
     grid(look, 3, Space::S24)
         .push(list(look, rows(look), false))
         .push(list(look, two_line, true))
         .push(empty_list(look, "Nothing matches. Typo?"))
         .push(list(look, power, false))
+        .push(list(look, tiled, false))
         .into()
 }
 
@@ -688,6 +714,29 @@ fn keycaps<'a>(look: &Look) -> Element<'a, Message> {
             &[("↵", "Open"), ("Tab", "Enter app"), ("Ctrl+K", "Actions")],
         ))
         .push(inline)
+        .into()
+}
+
+fn tooltips<'a>(look: &Look) -> Element<'a, Message> {
+    let keys = stack(look, Space::S8)
+        .push(key_hints(look, &[("Left Alt+E", "then"), ("E", "é")]))
+        .push(key_hints(look, &[("Left Alt+U", "then"), ("O", "ö")]));
+    let card = tooltip(
+        look,
+        "Mac accents on Left Alt",
+        "Type accents as a Mac does: hold Left Alt with the accent's key, then type the letter.",
+        Some(keys.into()),
+    );
+    stack(look, Space::S8)
+        .push(card)
+        .push(chip(
+            look,
+            ChipKind::Selected,
+            "Mac accents",
+            Some(Icon::KeyboardOptionKey),
+            Some(Message::Sample),
+            None,
+        ))
         .into()
 }
 

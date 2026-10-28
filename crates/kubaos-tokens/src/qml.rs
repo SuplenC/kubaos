@@ -81,8 +81,8 @@ impl Target for QmlSymbols {
         let mut out = Writer::default();
         header(&mut out);
         out.line("// KubaOS Symbols' drawings, by the Material Symbols name each replaces: an SVG on a 24 unit");
-        out.line("// grid whose `stroke-width=\"2\"` and `currentColor` `Icon` replaces with the stroke for its size");
-        out.line("// and scale and its colour.");
+        out.line("// grid whose `stroke-width=\"2\"` and every `currentColor` `Icon` replaces with the stroke for its");
+        out.line("// size and scale and its colour.");
         out.line("QtObject {");
         out.line("    readonly property var svg: ({");
         let last = tokens.symbols.len().saturating_sub(1);
@@ -104,14 +104,16 @@ impl Target for QmlSymbols {
 const STROKE: &str = "stroke-width=\"2\"";
 const COLOUR: &str = "currentColor";
 
-/// Whether `Icon` can restroke and recolour `svg`: its `String.replace` changes the first match
-/// only, so each of `STROKE` and `COLOUR` must be there exactly once.
+/// Whether `Icon` can restroke and recolour `svg`: it sets one stroke for the whole drawing, so
+/// `STROKE` is there exactly once, and it recolours every `COLOUR`, a filled shape's too, so there
+/// is at least one.
 fn recolourable(svg: &str) -> Result<(), String> {
-    for wanted in [STROKE, COLOUR] {
-        let found = svg.matches(wanted).count();
-        if found != 1 {
-            return Err(format!("has {found} `{wanted}`, and `Icon` replaces exactly one"));
-        }
+    let strokes = svg.matches(STROKE).count();
+    if strokes != 1 {
+        return Err(format!("has {strokes} `{STROKE}`, and `Icon` replaces exactly one"));
+    }
+    if !svg.contains(COLOUR) {
+        return Err(format!("has no `{COLOUR}` for `Icon` to recolour"));
     }
     Ok(())
 }

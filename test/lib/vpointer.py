@@ -5,9 +5,11 @@
 The XML files are wayland.xml and wlr-virtual-pointer-unstable-v1.xml, which
 pywayland's scanner turns into Python first. WIDTH and HEIGHT are the output's,
 in logical pixels. Each STEP is `move:X,Y` (to a point on the output), `click`
-(the left button) or `wait:SECONDS`. One virtual pointer lasts for all the steps:
-sway gives the seat a pointer only while a pointer device exists, and the shell
-binds it a moment after, so a pointer made per click would miss its own clicks.
+(the left button), `press` and `release` (it held down for a drag, the moves
+between them dragging) or `wait:SECONDS`. One virtual pointer lasts for all the
+steps: sway gives the seat a pointer only while a pointer device exists, and
+the shell binds it a moment after, so a pointer made per click would miss its
+own clicks.
 """
 
 import os
@@ -81,6 +83,10 @@ def main(argv: list[str]) -> int:
         elif verb == "click":
             button(PRESSED)
             time.sleep(0.03)
+            button(RELEASED)
+        elif verb == "press":
+            button(PRESSED)
+        elif verb == "release":
             button(RELEASED)
         elif verb == "wait":
             display.roundtrip()

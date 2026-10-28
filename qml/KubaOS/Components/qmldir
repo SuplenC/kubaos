@@ -28,6 +28,7 @@ IconInLine 1.0 IconInLine.qml
 Hint 1.0 Hint.qml
 Keycap 1.0 Keycap.qml
 KeyHints 1.0 KeyHints.qml
+Tooltip 1.0 Tooltip.qml
 Button 1.0 Button.qml
 IconButton 1.0 IconButton.qml
 Field 1.0 Field.qml

@@ -5,27 +5,21 @@ import KubaOS.Components as K
 import qs.components
 import qs.services
 
-// The keyboard layouts, the default first, and "Add a language…" with a
-// search over every layout and variant xkb knows. Every change runs
-// `kubaos keyboard`, the one writer of the layouts, which reloads Hyprland;
-// services/Keyboard.qml sees the reload and this list reads them again.
-// Keys in the list: Enter types with a layout, d makes it the default,
-// Shift+J/K moves it, x or Delete removes it. In the search, Enter adds the
-// selected match and Esc goes back. The buttons under the list do the same
-// to the selected layout, so the list always shows which one that is.
+// The keyboard layouts in one well: the rows, the default first and wearing a filled star, and a
+// toolbar at the well's foot with the Mac accents chip, ↑ ↓ to move the focused row, + to add a
+// layout and × to remove one. + swaps the rows for the add view (KeyboardAddView.qml) in the same
+// well. Every change runs `kubaos keyboard`, the one writer of the layouts, which reloads
+// Hyprland; services/Keyboard.qml sees the reload and this list reads them again.
 //
-// The search is Kotodama's, as every search over a list in the shell is: a
-// `KotodamaSearch` of its own enters the "Add a keyboard layout" app
-// (crates/kotodama-kubaos/layouts/), so typing matches the way the Command
-// menu does, accents and typos included, and this list draws its Results.
-// The add view is made anew each time it opens, so nothing from the last
-// time (a pick, a query, the selected row) shows over the new one.
+// A click on a row types with it and makes it the focused row the toolbar acts on. Dragging any
+// row reorders: past the drag threshold it follows the pointer, a drop line shows where it lands,
+// and the drop runs `kubaos keyboard move` once; dragged to the top, it is the default.
+// Keys in the list: ↑ ↓ (and Ctrl+j/k) move the focus, Enter types with the focused layout,
+// Alt+↑ ↓ or Shift+J/K move it, d makes it the default, x or Delete removes it. Tab goes on to
+// the toolbar.
 //
-// A click never adds a match: it picks it, and the Add button under the list
-// adds it. "Add a language…" opens the matches where the row was, so the
-// second click of a double-click lands on one. For the same reason a click
-// on anything that changes the layouts is ignored for a double-click's
-// interval after the view switches or the rows move.
+// A click on anything that changes the layouts is ignored for a double-click's interval after
+// the view switches or the rows move, so the second click of a double-click lands on nothing new.
 Item {
     id: root
 
@@ -43,8 +37,17 @@ Item {
     // The most a keymap holds (kubaos_core::keyboard::MAX_LAYOUTS).
     readonly property int maxLayouts: 4
 
-    // What the buttons under the list act on: the selected layout.
+    // The rows the well is round: the layouts, or one while they are read.
+    readonly property int rows: Math.max(1, root.layouts.length)
+    // What the toolbar acts on: the focused layout.
     readonly property int selected: list.currentIndex
+    // The row being dragged, how far the pointer has taken it, and the place it lands on if
+    // dropped now; -1 while no row is dragged.
+    property int dragFrom: -1
+    property real dragOffset: 0
+    property int dropAt: -1
+    // The Mac accents tooltip shown whatever the pointer does: the screenshots' view of it.
+    property bool explaining: false
 
     function nameOf(spelling: string): string {
         return names[spelling] ?? spelling;
@@ -55,24 +58,38 @@ Item {
         if (busy)
             return;
         busy = true;
+        probe(`change ${args.join(" ")}`);
         call.createObject(root, {
             command: ["kubaos", "keyboard", ...args]
         });
     }
 
-    // A change from a click, unless the click may be the second of a
-    // double-click meant for what was under the pointer a moment ago.
+    // A change from a click, unless the click may be the second of a double-click meant for what
+    // was under the pointer a moment ago.
     function changeOnClick(args: var): void {
         if (!settling)
             change(args);
     }
 
-    function move(index: int, delta: int): void {
-        const to = index + delta;
-        if (to >= 0 && to < layouts.length) {
-            change(["move", layouts[index], String(to + 1)]);
-            list.currentIndex = to;
-        }
+    // Moves the layout at `from` to `to` at once on screen, then for good: the rows don't wait for
+    // the reload, and the next `show` puts them back if the change fails.
+    function move(from: int, to: int): void {
+        if (busy || from === to || from < 0 || to < 0 || from >= layouts.length || to >= layouts.length)
+            return;
+        const spelling = layouts[from];
+        change(["move", spelling, String(to + 1)]);
+        const order = layouts.slice();
+        order.splice(from, 1);
+        order.splice(to, 0, spelling);
+        layouts = order;
+        list.currentIndex = to;
+    }
+
+    // Where a row dragged from `from` by `dy` lands: as many places on as whole rows it has passed
+    // half of, held to the list's ends.
+    function landing(from: int, dy: real): int {
+        const pitch = K.Tokens.size.row_two_line + list.spacing;
+        return Math.max(0, Math.min(layouts.length - 1, from + Math.round(dy / pitch)));
     }
 
     function startAdding(): void {
@@ -92,8 +109,8 @@ Item {
         stopAdding();
     }
 
-    // `kubaos keyboard` says "the keyboard layouts weren't changed: …";
-    // the tab shows it as a sentence.
+    // `kubaos keyboard` says "the keyboard layouts weren't changed: …"; the tab shows it as a
+    // sentence.
     function sentence(stderr: string): string {
         const line = stderr.trim().split("\n").pop().replace(/^kubaos: /, "").trim();
         if (line === "")
@@ -119,8 +136,8 @@ Item {
         interval: Qt.styleHints.mouseDoubleClickInterval
     }
 
-    // Where the probe's pointer clicks: the centre of each target on screen,
-    // logged when it moves (the drawer slides in).
+    // Where the probe's pointer clicks: the centre of each target on screen, logged when it moves
+    // (the drawer slides in).
     Timer {
         property string last: ""
 
@@ -129,15 +146,15 @@ Item {
         interval: 200
         onTriggered: {
             const at = (name, item) => {
-                if (!item.visible)
+                if (!item || !item.visible)
                     return "";
                 const p = item.mapToItem(null, item.width / 2, item.height / 2);
                 return `${name} x=${Math.round(p.x)} y=${Math.round(p.y)}`;
             };
-            const button = adder.item?.button;
             const matches = adder.item?.list;
             const first = matches?.visible ? matches.itemAtIndex(0) : null;
-            const now = [at("add-row", addRow), first ? at("first-match", first) : "", button ? at("add-button", button) : ""].filter(s => s !== "").join(" ");
+            const rows = root.adding ? [] : root.layouts.map((_, i) => at(`row-${i}`, list.itemAtIndex(i)));
+            const now = [root.adding ? "" : at("add-button", addButton), first ? at("first-match", first) : "", ...rows].filter(s => s !== "").join(" ");
             if (now !== last) {
                 last = now;
                 root.probe(`at ${now}`);
@@ -151,8 +168,8 @@ Item {
         accentsRead.running = true;
     }
 
-    // `kubaos keyboard` reloads Hyprland after a change, and the layouts
-    // Hyprland reports change with it.
+    // `kubaos keyboard` reloads Hyprland after a change, and the layouts Hyprland reports change
+    // with it.
     Connections {
         target: Keyboard
 
@@ -167,7 +184,12 @@ Item {
 
         command: ["kubaos", "keyboard", "show"]
         stdout: StdioCollector {
-            onStreamFinished: root.layouts = text.split("\n").filter(l => l !== "")
+            onStreamFinished: {
+                const read = text.split("\n").filter(l => l !== "");
+                // The same order again keeps the model, so a row just dropped doesn't flicker.
+                if (read.join(",") !== root.layouts.join(","))
+                    root.layouts = read;
+            }
         }
     }
 
@@ -232,56 +254,72 @@ Item {
         }
     }
 
-
     // The tab's content, scrolled when a short screen leaves it less room than two layouts and the
-    // controls under them need; otherwise exactly the room it has.
+    // toolbar need; otherwise exactly the room it has.
     Flickable {
         id: pane
 
-        // The well at its smallest: two rows and its padding.
-        readonly property real fewest: K.Tokens.size.row * 2 + K.Tokens.space.s4 + K.Tokens.space.s12 * 2
+        // The well round `rows` rows: its padding, the rows, the toolbar, and the gaps between them.
+        function around(rows: int): real {
+            return K.Tokens.space.s12 * 2 + (K.Tokens.size.row_two_line + K.Tokens.space.s4) * rows + K.Tokens.size.control_sm;
+        }
+
+        // The well at its smallest: two rows.
+        readonly property real fewest: pane.around(2)
+        // The room the well may take, above the problem when there is one.
+        readonly property real room: pane.contentHeight - (note.visible ? K.Tokens.space.s12 + note.height : 0)
 
         anchors.fill: parent
         contentWidth: width
-        contentHeight: Math.max(height, pane.fewest + K.Tokens.space.s12 + below.height)
+        contentHeight: Math.max(height, pane.fewest + (note.visible ? K.Tokens.space.s12 + note.height : 0))
         interactive: contentHeight > height
         boundsBehavior: Flickable.StopAtBounds
 
-        // The layouts.
         Well {
-            visible: !root.adding
-            width: root.width
-            height: Math.max(0, below.y - K.Tokens.space.s12)
-            focused: list.activeFocus
+            id: well
 
+            width: root.width
+            // As tall as the layouts and the toolbar, so nothing hangs empty between them; the add
+            // view takes all the room, for its matches.
+            height: Math.max(0, root.adding ? pane.room : Math.min(pane.room, pane.around(root.rows)))
+            focused: list.activeFocus || (adder.item?.listFocused ?? false)
+
+            // The layouts, down to the toolbar.
             NavList {
                 id: list
 
-                anchors.fill: parent
-                // The well's padding above the first row and below the last, scrolled with them.
+                visible: !root.adding
+                width: parent.width
+                height: Math.max(0, toolbar.y - K.Tokens.space.s4)
+                // The well's padding above the first row, scrolled with them.
                 topMargin: K.Tokens.space.s12
-                bottomMargin: K.Tokens.space.s12
+                // A mouse drag reorders the rows; the wheel still scrolls them.
+                acceptedButtons: Qt.NoButton
                 model: ScriptModel {
                     values: root.layouts
                 }
                 onActivated: index => Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)])
 
-                // Plain j/k are this handler's, so Shift+J/K can move a layout;
-                // NavList's own still takes the arrows, Ctrl+j/k and Enter.
+                // Plain j/k are this handler's, so Shift+J/K can move a layout; NavList's own
+                // still takes the arrows, Ctrl+j/k and Enter.
                 vimKeys: false
                 Keys.onPressed: event => {
                     const i = currentIndex;
                     const shift = event.modifiers & Qt.ShiftModifier;
+                    const alt = event.modifiers & Qt.AltModifier;
                     if (event.modifiers & Qt.ControlModifier || i < 0 || i >= root.layouts.length)
                         return;
-                    if (event.key === Qt.Key_J)
-                        shift ? root.move(i, 1) : step(1);
+                    if (alt && event.key === Qt.Key_Up)
+                        root.move(i, i - 1);
+                    else if (alt && event.key === Qt.Key_Down)
+                        root.move(i, i + 1);
+                    else if (event.key === Qt.Key_J)
+                        shift ? root.move(i, i + 1) : step(1);
                     else if (event.key === Qt.Key_K)
-                        shift ? root.move(i, -1) : step(-1);
-                    else if (event.key === Qt.Key_D && i > 0) {
-                        root.change(["default", root.layouts[i]]);
-                        currentIndex = 0;
-                    } else if ((event.key === Qt.Key_X || event.key === Qt.Key_Delete) && root.layouts.length > 1)
+                        shift ? root.move(i, i - 1) : step(-1);
+                    else if (event.key === Qt.Key_D && i > 0)
+                        root.move(i, 0);
+                    else if ((event.key === Qt.Key_X || event.key === Qt.Key_Delete) && root.layouts.length > 1)
                         root.change(["remove", root.layouts[i]]);
                     else
                         return;
@@ -289,50 +327,129 @@ Item {
                 }
 
                 delegate: K.ListRow {
+                    id: row
+
                     required property string modelData
                     required property int index
+                    readonly property bool dragged: root.dragFrom === row.index
 
                     width: ListView.view.width
-                    icon: "keyboard"
-                    title: root.nameOf(modelData)
-                    subtitle: modelData + (index === 0 ? " · default" : "") + (Keyboard.active === index ? " · typing" : "")
+                    z: row.dragged ? 1 : 0
+                    icon: row.index === 0 ? "star_filled" : "keyboard"
+                    tile: true
+                    accent: row.index === 0
+                    title: root.nameOf(row.modelData)
+                    subtitle: row.modelData
                     checkable: true
-                    checked: Keyboard.active === index
-                    selected: ListView.isCurrentItem && ListView.view.highlightShown
+                    checked: Keyboard.active === row.index
+                    selected: row.dragged || (ListView.isCurrentItem && ListView.view.highlightShown)
+                    Accessible.name: row.index === 0 ? `${row.title}, the default` : row.title
                     onActivated: {
-                        ListView.view.currentIndex = index;
-                        Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)]);
+                        ListView.view.currentIndex = row.index;
+                        Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(row.index)]);
+                    }
+
+                    // The row follows the pointer while it is dragged; a translation is drawn,
+                    // not laid out, so the list keeps 60 fps under it.
+                    transform: Translate {
+                        y: row.dragged ? root.dragOffset : 0
+                    }
+
+                    // Over the row, so its handler sees a press before the row's own click does,
+                    // and takes it over once the pointer passes the drag threshold.
+                    Item {
+                        anchors.fill: parent
+
+                        DragHandler {
+                            id: grab
+
+                            target: null
+                            xAxis.enabled: false
+                            enabled: !root.busy && root.layouts.length > 1
+                            grabPermissions: PointerHandler.CanTakeOverFromAnything
+                            cursorShape: Qt.ClosedHandCursor
+                            onActiveChanged: {
+                                if (active) {
+                                    row.ListView.view.currentIndex = row.index;
+                                    root.dragOffset = 0;
+                                    root.dropAt = row.index;
+                                    root.dragFrom = row.index;
+                                    return;
+                                }
+                                const from = root.dragFrom;
+                                const to = root.dropAt;
+                                root.dragFrom = -1;
+                                root.dropAt = -1;
+                                root.dragOffset = 0;
+                                root.move(from, to);
+                            }
+                            onActiveTranslationChanged: {
+                                if (!active)
+                                    return;
+                                root.dragOffset = activeTranslation.y;
+                                root.dropAt = root.landing(row.index, activeTranslation.y);
+                            }
+                        }
+                    }
+                }
+
+                // Where the dragged row lands: a thin line in the gap above the row it goes
+                // before, or below the one it goes after, inset as the rows' words are.
+                Rectangle {
+                    readonly property real pitch: K.Tokens.size.row_two_line + list.spacing
+                    readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+
+                    parent: list.contentItem
+                    visible: root.dragFrom >= 0 && root.dropAt !== root.dragFrom
+                    x: K.Tokens.space.s12
+                    width: list.width - K.Tokens.space.s12 * 2
+                    height: K.Look.thin(dpr)
+                    radius: K.Tokens.radius.full
+                    color: K.Tokens.color.primary
+                    y: {
+                        const gap = root.dropAt < root.dragFrom ? root.dropAt * pitch - list.spacing : root.dropAt * pitch + K.Tokens.size.row_two_line;
+                        return K.Look.snap(gap + (list.spacing - height) / 2, dpr);
                     }
                 }
             }
-        }
 
-
-        K.Stack {
-            id: below
-
-            y: pane.contentHeight - height
-            width: root.width
-            room: root.width
-            fill: true
-            gap: K.Tokens.space.s12
-
+            // At the well's foot, its padding in from the edge, as the rows are.
             K.Row {
+                id: toolbar
+
                 visible: !root.adding
+                y: well.height - K.Tokens.space.s12 - height
+                width: parent.width
+                room: parent.width
                 fill: true
                 gap: K.Tokens.space.s4
                 align: "centre"
 
-                K.Button {
-                    enabled: root.selected > 0
-                    text: "Make the default"
-                    icon: "star"
-                    kind: "Text"
-                    size: "Sm"
-                    // The default moves to the top, so the selection goes with it, as `d` does.
-                    onActivated: {
-                        root.changeOnClick(["default", root.layouts[root.selected]]);
-                        list.currentIndex = 0;
+                K.Chip {
+                    id: accentsChip
+
+                    text: "Mac accents"
+                    icon: "keyboard_option_key"
+                    kind: root.accents ? "Selected" : "Neutral"
+                    pressable: true
+                    onActivated: root.changeOnClick(["accents", root.accents ? "off" : "on"])
+
+                    K.Tooltip {
+                        title: "Mac accents on Left Alt"
+                        body: `${root.accents ? "On" : "Off"}. Type accents as a Mac does: hold Left Alt with the accent's key, then type the letter.`
+                        shown: root.explaining || accentsChip.focused || accentsChip.pointerOver
+
+                        K.Stack {
+                            gap: K.Tokens.space.s8
+
+                            K.KeyHints {
+                                hints: [["Left Alt+E", "then"], ["E", "é"]]
+                            }
+
+                            K.KeyHints {
+                                hints: [["Left Alt+U", "then"], ["O", "ö"]]
+                            }
+                        }
                     }
                 }
 
@@ -346,7 +463,7 @@ Item {
                     kind: "Text"
                     size: "Sm"
                     onActivated: if (!root.settling)
-                        root.move(root.selected, -1)
+                        root.move(root.selected, root.selected - 1)
                 }
 
                 K.IconButton {
@@ -356,7 +473,19 @@ Item {
                     kind: "Text"
                     size: "Sm"
                     onActivated: if (!root.settling)
-                        root.move(root.selected, 1)
+                        root.move(root.selected, root.selected + 1)
+                }
+
+                // Beside ×, so add and remove read as a pair.
+                K.IconButton {
+                    id: addButton
+
+                    enabled: root.layouts.length < root.maxLayouts
+                    icon: "add"
+                    label: root.layouts.length < root.maxLayouts ? "Add a language" : `${root.maxLayouts} is the most a keyboard holds`
+                    kind: "Tonal"
+                    size: "Sm"
+                    onActivated: root.startAdding()
                 }
 
                 K.IconButton {
@@ -369,67 +498,36 @@ Item {
                 }
             }
 
-            K.List {
-                visible: !root.adding
+            // Adding: in the same well, made while it shows and gone once it closes.
+            Loader {
+                id: adder
 
-                K.ListRow {
-                    id: addRow
-
-                    icon: "add"
-                    title: "Add a language…"
-                    subtitle: root.layouts.length >= root.maxLayouts ? `${root.maxLayouts} is the most a keyboard holds; remove one first` : ""
-                    onActivated: root.startAdding()
-                }
-
-                K.ListRow {
-                    icon: "keyboard_option_key"
-                    title: "Mac accents on Left Alt"
-                    subtitle: root.accents ? "On" : "Off"
-                    checkable: true
-                    checked: root.accents
-                    onActivated: root.changeOnClick(["accents", root.accents ? "off" : "on"])
-                }
-
-                // How the accents are typed, while they are on, under their row and 12 in as its
-                // words are.
-                K.Row {
-                    visible: root.accents
-                    leftPadding: K.Tokens.space.s12
-                    bottomPadding: K.Tokens.space.s8
-
-                    K.KeyHints {
-                        hints: [["Left Alt+E", "then"], ["E", "é"]]
+                width: parent.width
+                height: parent.height
+                active: root.adding
+                visible: active
+                sourceComponent: KeyboardAddView {
+                    onAdd: spelling => {
+                        if (!root.settling)
+                            root.add(spelling);
                     }
+                    onAddAtOnce: spelling => root.add(spelling)
+                    onCancelled: root.stopAdding()
+                    onEnteredChanged: root.probe(`entered ${entered}`)
+                    onFailed: message => root.problem = message
                 }
-            }
-
-            K.Text {
-                visible: root.problem !== ""
-                text: root.problem
-                style: K.Tokens.type.body
-                color: K.Tokens.color.error
             }
         }
 
-        // Adding: made while it shows, and gone once it closes.
-        Loader {
-            id: adder
+        K.Text {
+            id: note
 
-            width: root.width
-            height: Math.max(0, below.y - (below.height > 0 ? K.Tokens.space.s12 : 0))
-            active: root.adding
-            visible: active
-            sourceComponent: KeyboardAddView {
-                onAdd: spelling => {
-                    if (!root.settling)
-                        root.add(spelling);
-                }
-                onAddAtOnce: spelling => root.add(spelling)
-                onCancelled: root.stopAdding()
-                onPickedChanged: root.probe(`picked ${picked?.spelling ?? ""}`)
-                onEnteredChanged: root.probe(`entered ${entered}`)
-                onFailed: message => root.problem = message
-            }
+            y: well.height + K.Tokens.space.s12
+            visible: root.problem !== ""
+            text: root.problem
+            room: root.width
+            style: K.Tokens.type.body
+            color: K.Tokens.color.error
         }
     }
 }

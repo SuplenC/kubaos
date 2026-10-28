@@ -53,6 +53,7 @@ pub mod table;
 pub mod tabs;
 pub mod tile;
 pub mod toast;
+pub mod tooltip;
 
 pub(crate) use self::layer::Pin;
 pub(crate) use self::layer::layered;

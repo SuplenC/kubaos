@@ -36,6 +36,46 @@ ListModel {
     signal actionFailed(string message)
     signal queryReplaced(string text)
 
+    // What the "Add a keyboard layout" app lists once entered.
+    readonly property var layouts: [
+        {
+            title: "German",
+            subtitle: "de",
+            icon: "",
+            extension: "kubaos"
+        },
+        {
+            title: "German (Switzerland)",
+            subtitle: "ch",
+            icon: "",
+            extension: "kubaos"
+        },
+        {
+            title: "German (Austria)",
+            subtitle: "at",
+            icon: "",
+            extension: "kubaos"
+        },
+        {
+            title: "German (no dead keys)",
+            subtitle: "de(nodeadkeys)",
+            icon: "",
+            extension: "kubaos"
+        },
+        {
+            title: "French",
+            subtitle: "fr",
+            icon: "",
+            extension: "kubaos"
+        },
+        {
+            title: "Polish",
+            subtitle: "pl",
+            icon: "",
+            extension: "kubaos"
+        }
+    ]
+
     readonly property var results: [
         {
             title: "Files",
@@ -134,8 +174,17 @@ ListModel {
     }
 
     function fill(): void {
+        const inApp = search.scope !== "";
         const typed = search.depth > 0 ? (search.view.filter ?? "") : search.query;
-        const source = search.depth > 0 ? search.listItems : search.results;
+        const source = search.depth > 0 ? search.listItems : inApp ? search.layouts : search.results;
+        // The app's word enters it, as running its entry Item does with the Daemon: the view's
+        // own entering reads the title by `KotodamaSearch`'s role number, which a ListModel's
+        // roles don't have.
+        if (!inApp && search.query.startsWith("layout ")) {
+            search.clear();
+            Qt.callLater(() => search.scope = "layout");
+            return;
+        }
         const rows = source.filter(r => typed === "" || r.title.toLowerCase().includes(typed.toLowerCase()));
         search.clear();
         for (const r of rows)
@@ -151,6 +200,7 @@ ListModel {
     }
 
     onQueryChanged: fill()
+    onScopeChanged: fill()
     Component.onCompleted: fill()
 
     function run(row: int): bool {
