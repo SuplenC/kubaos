@@ -431,7 +431,7 @@ use = "A panel or dialog arriving, a page sliding in."
 
 [duration.slow]
 ms = 800
-use = "A wallpaper fading in, the light/dark crossfade."
+use = "A wallpaper fading in, the light/dark crossfade, a live list's new row fading in."
 
 [duration.scene]
 ms = 1200
@@ -951,6 +951,7 @@ flag = { tabler = "flag" }
 folder = { tabler = "folder" }
 folder_open = { tabler = "folder-open" }
 hard_drive = { drawn = "A drive's case in server-2's proportions, its board below a line, server-2's light and slot" }
+headphones = { tabler = "headphones" }
 hourglass_top = { tabler = "hourglass-high" }
 key = { tabler = "key" }
 keyboard = { tabler = "keyboard" }
@@ -968,6 +969,7 @@ manage_search = { tabler = "list-search" }
 memory = { tabler = "cpu" }
 memory_alt = { tabler = "device-sd-card" }
 mode_fan = { tabler = "propeller" }
+mouse = { tabler = "mouse" }
 mood = { tabler = "mood-smile" }
 more_time = { tabler = "clock-plus" }
 motion_photos_auto = { tabler = "circle-dashed-letter-a" }
@@ -1003,6 +1005,7 @@ settings = { tabler = "settings" }
 settings_power = { tabler = "settings-bolt" }
 signal_wifi_0_bar = { tabler = "wifi-off" }
 signal_wifi_4_bar = { tabler = "wifi" }
+smartphone = { tabler = "device-mobile" }
 speaker = { tabler = "device-speaker" }
 speaker_group = { tabler = "devices" }
 star = { tabler = "star" }

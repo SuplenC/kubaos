@@ -15,12 +15,15 @@
 //! - What the agent answers: [`crate::agent`].
 //! - What a pairing does with the calls: [`crate::pairing`].
 
+use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 
 use futures_lite::StreamExt;
 use kotodama_extension::log;
 use zbus::Connection;
+use zbus::MatchRule;
+use zbus::MessageStream;
 use zbus::zvariant::DynamicType;
 use zbus::zvariant::ObjectPath;
 use zbus::zvariant::OwnedObjectPath;
@@ -31,6 +34,7 @@ use crate::agent::Agent;
 use crate::agent::Refusal;
 use crate::hub::Device;
 use crate::hub::Hub;
+use crate::state::Sink;
 use crate::state::StateFile;
 
 /// bluetoothd's bus name.
@@ -45,6 +49,7 @@ const DEVICE: &str = "org.bluez.Device1";
 const ADAPTER: &str = "org.bluez.Adapter1";
 const AGENT_MANAGER: &str = "org.bluez.AgentManager1";
 const PROPERTIES: &str = "org.freedesktop.DBus.Properties";
+const OBJECT_MANAGER: &str = "org.freedesktop.DBus.ObjectManager";
 
 /// A call to bluetoothd failed: the D-Bus error's name and message.
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -218,6 +223,92 @@ impl Bluez for SystemBluez {
     async fn stop_discovery(&self, adapter: &str) -> Result<(), BluezError> {
         self.call(adapter, ADAPTER, "StopDiscovery", &()).await.map(drop)
     }
+}
+
+/// An object's interfaces and their properties, as bluetoothd's object manager sends them.
+type Interfaces = HashMap<String, HashMap<String, OwnedValue>>;
+
+impl SystemBluez {
+    /// Follows how strongly bluetoothd hears each device (`Device1.RSSI`) into `hub`, from the
+    /// devices it has now and every change after. Returns only when the bus does.
+    ///
+    /// # Errors
+    ///
+    /// When the bus won't send bluetoothd's signals.
+    pub async fn follow_signal<S: Sink>(&self, hub: &Hub<S>) -> zbus::Result<()> {
+        let signal = |interface: &'static str, member: &'static str| -> zbus::Result<MatchRule<'static>> {
+            Ok(MatchRule::builder()
+                .msg_type(zbus::message::Type::Signal)
+                .sender(SERVICE)?
+                .interface(interface)?
+                .member(member)?
+                .build())
+        };
+        let changed = MessageStream::for_match_rule(signal(PROPERTIES, "PropertiesChanged")?, &self.conn, None).await?;
+        let added = MessageStream::for_match_rule(signal(OBJECT_MANAGER, "InterfacesAdded")?, &self.conn, None).await?;
+        let removed =
+            MessageStream::for_match_rule(signal(OBJECT_MANAGER, "InterfacesRemoved")?, &self.conn, None).await?;
+        match self.call("/", OBJECT_MANAGER, "GetManagedObjects", &()).await {
+            Ok(reply) => {
+                let objects: HashMap<OwnedObjectPath, Interfaces> = reply.body().deserialize()?;
+                for (path, interfaces) in &objects {
+                    heard(hub, path, interfaces);
+                }
+            }
+            Err(err) => log!("reading bluetoothd's devices: {err}"),
+        }
+        let mut signals = changed.or(added).or(removed);
+        while let Some(message) = signals.next().await {
+            on_signal(hub, &message?);
+        }
+        Ok(())
+    }
+}
+
+/// Takes one of bluetoothd's signals into `hub`: a device heard again, one that appeared, or one
+/// that went. A signal whose body isn't what bluetoothd sends is skipped.
+fn on_signal<S: Sink>(hub: &Hub<S>, message: &zbus::Message) {
+    let header = message.header();
+    let body = message.body();
+    match header.member().map(zbus::names::MemberName::as_str) {
+        Some("PropertiesChanged") => {
+            if let Some(path) = header.path()
+                && let Ok((interface, properties, _)) =
+                    body.deserialize::<(String, HashMap<String, OwnedValue>, Vec<String>)>()
+                && interface == DEVICE
+                && let Some(rssi) = rssi(&properties)
+            {
+                hub.heard(path.as_str(), rssi);
+            }
+        }
+        Some("InterfacesAdded") => {
+            if let Ok((path, interfaces)) = body.deserialize::<(OwnedObjectPath, Interfaces)>() {
+                heard(hub, &path, &interfaces);
+            }
+        }
+        Some("InterfacesRemoved") => {
+            if let Ok((path, interfaces)) = body.deserialize::<(OwnedObjectPath, Vec<String>)>()
+                && interfaces.iter().any(|interface| interface == DEVICE)
+            {
+                hub.gone(path.as_str());
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Records the RSSI of the device at `path`, when its interfaces have one.
+fn heard<S: Sink>(hub: &Hub<S>, path: &OwnedObjectPath, interfaces: &Interfaces) {
+    if let Some(rssi) = interfaces.get(DEVICE).and_then(rssi) {
+        hub.heard(path.as_str(), rssi);
+    }
+}
+
+/// `RSSI` among a device's properties, in dBm.
+fn rssi(properties: &HashMap<String, OwnedValue>) -> Option<i16> {
+    properties
+        .get("RSSI")
+        .and_then(|value| value.downcast_ref::<i16>().ok())
 }
 
 /// The address in a device's object path: `/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF` is

@@ -49,16 +49,20 @@ pub enum TileSize {
     Sm,
     /// 40, a regular control: beside a title over a subtitle.
     Md,
+    /// 48, a large control: the one thing a view is about, over its `headline` name (a network
+    /// or a device being connected).
+    Lg,
 }
 
 impl TileSize {
-    pub const ALL: [TileSize; 2] = [TileSize::Sm, TileSize::Md];
+    pub const ALL: [TileSize; 3] = [TileSize::Sm, TileSize::Md, TileSize::Lg];
 
     /// The size's name in the spec.
     pub fn name(self) -> &'static str {
         match self {
             TileSize::Sm => "Sm",
             TileSize::Md => "Md",
+            TileSize::Lg => "Lg",
         }
     }
 
@@ -67,6 +71,7 @@ impl TileSize {
         match self {
             TileSize::Sm => Size::ControlSm,
             TileSize::Md => Size::ControlMd,
+            TileSize::Lg => Size::ControlLg,
         }
     }
 
@@ -75,6 +80,7 @@ impl TileSize {
         match self {
             TileSize::Sm => Type::Body.icon(),
             TileSize::Md => tokens::TWO_LINE_ICON,
+            TileSize::Lg => Type::Headline.icon(),
         }
     }
 }

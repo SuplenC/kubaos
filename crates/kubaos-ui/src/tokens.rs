@@ -627,7 +627,7 @@ pub enum Duration {
     Medium,
     /// A panel or dialog arriving, a page sliding in.
     Long,
-    /// A wallpaper fading in, the light/dark crossfade.
+    /// A wallpaper fading in, the light/dark crossfade, a live list's new row fading in.
     Slow,
     /// A whole scene changing once: the lock screen lifting, Kōbō's welcome settling.
     Scene,
@@ -1841,6 +1841,8 @@ pub enum Icon {
     /// Ours: A drive's case in server-2's proportions, its board below a line, server-2's light and
     /// slot.
     HardDrive,
+    /// Tabler's `headphones`.
+    Headphones,
     /// Tabler's `hourglass-high`.
     HourglassTop,
     /// Tabler's `key`.
@@ -1887,6 +1889,8 @@ pub enum Icon {
     MotionPhotosOn,
     /// Tabler's `player-pause`.
     MotionPhotosPaused,
+    /// Tabler's `mouse`.
+    Mouse,
     /// Tabler's `wifi-0`.
     NetworkWifi1Bar,
     /// Tabler's `wifi-1`.
@@ -1945,6 +1949,8 @@ pub enum Icon {
     SignalWifi0Bar,
     /// Tabler's `wifi`.
     SignalWifi4Bar,
+    /// Tabler's `device-mobile`.
+    Smartphone,
     /// Tabler's `device-speaker`.
     Speaker,
     /// Tabler's `devices`.
@@ -2003,7 +2009,7 @@ pub enum Icon {
 
 impl Icon {
     /// Every symbol.
-    pub const ALL: [Icon; 135] = [
+    pub const ALL: [Icon; 138] = [
         Icon::AccountCircle,
         Icon::Add,
         Icon::AddLocationAlt,
@@ -2060,6 +2066,7 @@ impl Icon {
         Icon::Folder,
         Icon::FolderOpen,
         Icon::HardDrive,
+        Icon::Headphones,
         Icon::HourglassTop,
         Icon::Key,
         Icon::Keyboard,
@@ -2083,6 +2090,7 @@ impl Icon {
         Icon::MotionPhotosOff,
         Icon::MotionPhotosOn,
         Icon::MotionPhotosPaused,
+        Icon::Mouse,
         Icon::NetworkWifi1Bar,
         Icon::NetworkWifi2Bar,
         Icon::NetworkWifi3Bar,
@@ -2112,6 +2120,7 @@ impl Icon {
         Icon::SettingsPower,
         Icon::SignalWifi0Bar,
         Icon::SignalWifi4Bar,
+        Icon::Smartphone,
         Icon::Speaker,
         Icon::SpeakerGroup,
         Icon::Star,
@@ -2200,6 +2209,7 @@ impl Icon {
             Icon::Folder => "folder",
             Icon::FolderOpen => "folder_open",
             Icon::HardDrive => "hard_drive",
+            Icon::Headphones => "headphones",
             Icon::HourglassTop => "hourglass_top",
             Icon::Key => "key",
             Icon::Keyboard => "keyboard",
@@ -2223,6 +2233,7 @@ impl Icon {
             Icon::MotionPhotosOff => "motion_photos_off",
             Icon::MotionPhotosOn => "motion_photos_on",
             Icon::MotionPhotosPaused => "motion_photos_paused",
+            Icon::Mouse => "mouse",
             Icon::NetworkWifi1Bar => "network_wifi_1_bar",
             Icon::NetworkWifi2Bar => "network_wifi_2_bar",
             Icon::NetworkWifi3Bar => "network_wifi_3_bar",
@@ -2252,6 +2263,7 @@ impl Icon {
             Icon::SettingsPower => "settings_power",
             Icon::SignalWifi0Bar => "signal_wifi_0_bar",
             Icon::SignalWifi4Bar => "signal_wifi_4_bar",
+            Icon::Smartphone => "smartphone",
             Icon::Speaker => "speaker",
             Icon::SpeakerGroup => "speaker_group",
             Icon::Star => "star",
@@ -2341,6 +2353,7 @@ impl Icon {
             Icon::Folder => Some("folder"),
             Icon::FolderOpen => Some("folder-open"),
             Icon::HardDrive => None,
+            Icon::Headphones => Some("headphones"),
             Icon::HourglassTop => Some("hourglass-high"),
             Icon::Key => Some("key"),
             Icon::Keyboard => Some("keyboard"),
@@ -2364,6 +2377,7 @@ impl Icon {
             Icon::MotionPhotosOff => Some("circle-dashed-x"),
             Icon::MotionPhotosOn => Some("circle-dashed"),
             Icon::MotionPhotosPaused => Some("player-pause"),
+            Icon::Mouse => Some("mouse"),
             Icon::NetworkWifi1Bar => Some("wifi-0"),
             Icon::NetworkWifi2Bar => Some("wifi-1"),
             Icon::NetworkWifi3Bar => Some("wifi-2"),
@@ -2393,6 +2407,7 @@ impl Icon {
             Icon::SettingsPower => Some("settings-bolt"),
             Icon::SignalWifi0Bar => Some("wifi-off"),
             Icon::SignalWifi4Bar => Some("wifi"),
+            Icon::Smartphone => Some("device-mobile"),
             Icon::Speaker => Some("device-speaker"),
             Icon::SpeakerGroup => Some("devices"),
             Icon::Star => Some("star"),
@@ -2482,6 +2497,7 @@ impl Icon {
             Icon::Folder => include_str!("../assets/symbols/folder.svg"),
             Icon::FolderOpen => include_str!("../assets/symbols/folder_open.svg"),
             Icon::HardDrive => include_str!("../assets/symbols/hard_drive.svg"),
+            Icon::Headphones => include_str!("../assets/symbols/headphones.svg"),
             Icon::HourglassTop => include_str!("../assets/symbols/hourglass_top.svg"),
             Icon::Key => include_str!("../assets/symbols/key.svg"),
             Icon::Keyboard => include_str!("../assets/symbols/keyboard.svg"),
@@ -2505,6 +2521,7 @@ impl Icon {
             Icon::MotionPhotosOff => include_str!("../assets/symbols/motion_photos_off.svg"),
             Icon::MotionPhotosOn => include_str!("../assets/symbols/motion_photos_on.svg"),
             Icon::MotionPhotosPaused => include_str!("../assets/symbols/motion_photos_paused.svg"),
+            Icon::Mouse => include_str!("../assets/symbols/mouse.svg"),
             Icon::NetworkWifi1Bar => include_str!("../assets/symbols/network_wifi_1_bar.svg"),
             Icon::NetworkWifi2Bar => include_str!("../assets/symbols/network_wifi_2_bar.svg"),
             Icon::NetworkWifi3Bar => include_str!("../assets/symbols/network_wifi_3_bar.svg"),
@@ -2534,6 +2551,7 @@ impl Icon {
             Icon::SettingsPower => include_str!("../assets/symbols/settings_power.svg"),
             Icon::SignalWifi0Bar => include_str!("../assets/symbols/signal_wifi_0_bar.svg"),
             Icon::SignalWifi4Bar => include_str!("../assets/symbols/signal_wifi_4_bar.svg"),
+            Icon::Smartphone => include_str!("../assets/symbols/smartphone.svg"),
             Icon::Speaker => include_str!("../assets/symbols/speaker.svg"),
             Icon::SpeakerGroup => include_str!("../assets/symbols/speaker_group.svg"),
             Icon::Star => include_str!("../assets/symbols/star.svg"),

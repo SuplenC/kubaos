@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Bluetooth
 import Quickshell.Io
+import "radios.js" as Radios
 
 // BlueZ adapter and devices through Quickshell.Bluetooth. Pairing and scanning go through the
 // pairing agent (`kubaos-bluetooth`, crates/kubaos-bluetooth), which bluetoothd asks for every
@@ -32,8 +33,13 @@ Singleton {
     property string problem: ""
     // How long powering on may take before the tab says it didn't.
     readonly property int powerOnWait: 4000
-    // Connected first, then paired, then by name. Unnamed discoveries are noise.
-    readonly property var devices: Bluetooth.devices.values.filter(d => d.paired || d.name !== d.address).sort((a, b) => (b.connected - a.connected) || (b.paired - a.paired) || a.name.localeCompare(b.name))
+    readonly property var devices: Bluetooth.devices.values
+    // How strongly each device was last heard while scanning, in dBm, by object path.
+    readonly property var rssi: agentState.rssi ?? ({})
+    // Paired devices, the connected first; then the ones in range to pair, nearest first
+    // (radios.js). BlueZ forgets an unpaired device a while after a scan stops hearing it.
+    readonly property var known: Radios.btKnown(devices)
+    readonly property var nearby: Radios.btNearby(devices, rssi)
     readonly property int connectedCount: devices.filter(d => d.connected).length
     readonly property string icon: !enabled ? "bluetooth_disabled" : connectedCount > 0 ? "bluetooth_connected" : "bluetooth"
 
@@ -66,12 +72,10 @@ Singleton {
         run(["scan", on ? "on" : "off", adapter.dbusPath], on);
     }
 
-    // The control center on the Bluetooth tab, scanning when `scan`.
-    function show(scan: bool): void {
+    // The control center on the Bluetooth tab, which scans while it shows.
+    function show(): void {
         reveal();
         Panels.open("controlcenter");
-        if (scan)
-            setScanning(true);
     }
 
     function isPairing(device: BluetoothDevice): bool {
@@ -101,16 +105,6 @@ Singleton {
             run(["answer", String(prompt.id), accept ? "yes" : "no", value], true);
     }
 
-    function stateText(device: BluetoothDevice): string {
-        if (isPairing(device))
-            return "Pairing…";
-        const battery = device.batteryAvailable ? ` · ${Math.round(device.battery * 100)}%` : "";
-        if (device.paired || device.connected)
-            return BluetoothDeviceState.toString(device.state) + battery;
-        const error = pairError(device);
-        return error ? `Not paired · ${error}` : "Not paired";
-    }
-
     // `kubaos-bluetooth ARGS`; its stderr becomes the problem when it fails and `report`.
     function run(args: var, report: bool): void {
         call.createObject(root, {
@@ -120,7 +114,7 @@ Singleton {
     }
 
     onPromptIdChanged: if (promptId)
-        show(false)
+        show()
 
     Component {
         id: call

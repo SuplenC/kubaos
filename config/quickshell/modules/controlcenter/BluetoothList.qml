@@ -1,243 +1,221 @@
 import QtQuick
-import Quickshell
+import Quickshell.Bluetooth
 import KubaOS.Components as K
-import qs.components
 import qs.services
+import "../../services/radios.js" as Radios
 
-// Paired and discovered Bluetooth devices, and the pairing agent's prompt: the code to type on
-// a keyboard, a passkey to confirm, or a PIN to enter. Enter on a device connects, disconnects,
-// pairs, or cancels its pairing. A connected device carries the check.
-Item {
+// The Bluetooth tab: paired devices (Known), the connected first and checked with their battery,
+// then the devices in range to pair (Nearby), nearest first by their last signal. A known device
+// connects or disconnects on a press; a nearby one opens the connection form, which pairs it and
+// shows what the pairing agent asks: a code to type on the device or to check, or a PIN or
+// passkey to type here. A pairing the device starts opens the form too.
+//
+// The form holds its device by object path, not the device itself: BlueZ drops a device it no
+// longer hears, and the form then says so instead of calling into it.
+RadioTab {
     id: root
 
-    readonly property var prompt: Bt.prompt
-    readonly property string kind: prompt?.kind ?? ""
-    // The prompts that take a PIN or passkey typed here.
-    readonly property bool asksCode: kind === "passkey" || kind === "pin-code"
-    // The prompts with a yes: the rest only show a code, and Cancel ends their pairing.
-    readonly property bool asksYes: asksCode || kind === "confirm" || kind === "authorize"
+    // The object path and name of the device the form is for; the path is empty while the list
+    // shows.
+    property string pendingPath: ""
+    property string pendingName: ""
+    readonly property var pending: root.pendingPath === "" ? null : root.find(root.pendingPath)
+    readonly property var prompt: root.pendingPath !== "" && Bt.prompt?.device === root.pendingPath ? Bt.prompt : null
+    readonly property string kind: root.prompt?.kind ?? ""
+    readonly property bool pairing: root.pending !== null && Bt.isPairing(root.pending)
+    readonly property string failure: root.pending ? (Bt.pairError(root.pending) || Bt.problem) : ""
 
-    function promptText(p): string {
-        switch (p.kind) {
+    function line(kind: string, key: string, title: string, failed: bool): var {
+        return {
+            key: key,
+            kind: kind,
+            title: title,
+            subtitle: "",
+            subtitleIcon: "",
+            icon: "",
+            accent: false,
+            checked: false,
+            forgettable: false,
+            failed: failed
+        };
+    }
+
+    function deviceRow(device): var {
+        const battery = device.connected && device.batteryAvailable;
+        return {
+            key: device.dbusPath,
+            kind: "row",
+            title: device.name,
+            subtitle: root.statusText(device),
+            subtitleIcon: battery ? Radios.batterySymbol(device.battery) : "",
+            icon: Radios.deviceSymbol(device.icon),
+            accent: device.connected,
+            checked: device.connected,
+            forgettable: device.paired && !device.connected,
+            failed: false
+        };
+    }
+
+    function statusText(device): string {
+        if (Bt.isPairing(device))
+            return "Pairing…";
+        if (device.state === BluetoothDeviceState.Connecting || device.state === BluetoothDeviceState.Disconnecting)
+            return `${BluetoothDeviceState.toString(device.state)}…`;
+        if (device.connected)
+            return device.batteryAvailable ? `Connected · ${Math.round(device.battery * 100)}%` : "Connected";
+        if (device.paired)
+            return "Not connected";
+        return Radios.distance(Bt.rssi[device.dbusPath]) || "Not paired";
+    }
+
+    function find(path: string): var {
+        return Bt.devices.find(device => device.dbusPath === path) ?? null;
+    }
+
+    // A six-digit passkey reads as two groups of three.
+    function grouped(code: string): string {
+        return code.length === 6 ? `${code.slice(0, 3)} ${code.slice(3)}` : code;
+    }
+
+    function formLine(): string {
+        switch (root.kind) {
         case "display-passkey":
         case "display-pin-code":
-            return `Type this on ${p.name}`;
+            return "Type this code on it, then press its Enter";
         case "confirm":
-            return `Pair with ${p.name}? It should show this code`;
+            return "Check that it shows the same code";
         case "authorize":
-            return `${p.name} wants to pair`;
+            return "It asks to pair";
         case "passkey":
-            return `Enter the passkey ${p.name} shows`;
+            return "Type the passkey it shows";
         case "pin-code":
-            return `Enter the PIN for ${p.name}`;
+            return "Type its PIN";
         }
-        return "";
+        const distance = Radios.distance(Bt.rssi[root.pendingPath]);
+        return distance === "" ? "Not paired" : `Not paired · ${distance}`;
     }
 
-    function submitCode(): void {
-        Bt.answer(true, code.text);
-        code.text = "";
-        list.forceActiveFocus();
+    function formStatus(): string {
+        if (root.pending === null)
+            return "Out of range";
+        if (root.failure !== "")
+            return root.failure;
+        if ((root.prompt?.entered ?? null) !== null)
+            return `${root.prompt.entered} of ${root.prompt.code?.length ?? 6} typed`;
+        return root.pairing && root.prompt === null ? "Pairing…" : "";
     }
 
-    onPromptChanged: if (asksCode && !code.focused) {
-        code.text = "";
-        code.forceActiveFocus();
+    function open(device): void {
+        Bt.problem = "";
+        root.pendingName = device.name;
+        root.pendingPath = device.dbusPath;
     }
 
-    K.Stack {
-        id: top
+    function close(): void {
+        root.pendingPath = "";
+    }
 
-        width: root.width
-        room: root.width
-        fill: true
-        gap: K.Tokens.space.s8
-
-        K.Row {
-            fill: true
-            gap: K.Tokens.space.s8
-            align: "centre"
-
-            // Takes the room the buttons leave, and wraps there.
-            K.Stack {
-                fill: true
-
-                K.Text {
-                    text: Bt.problem || (Bt.blocked ? Bt.blockedText : Bt.scanning ? "Searching for devices…" : `${Bt.devices.length} devices`)
-                    style: K.Tokens.type.body
-                    color: Bt.problem || Bt.blocked ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
-                }
-            }
-
-            K.IconButton {
-                visible: Bt.available && !Bt.enabled && !Bt.blocked
-                icon: "power_settings_new"
-                label: "Turn Bluetooth on"
-                kind: "Tonal"
-                size: "Sm"
-                onActivated: Bt.powerOn()
-            }
-
-            K.IconButton {
-                enabled: Bt.enabled
-                icon: "radar"
-                label: Bt.scanning ? "Stop searching" : "Search for devices"
-                kind: Bt.scanning ? "Filled" : "Tonal"
-                size: "Sm"
-                onActivated: Bt.setScanning(!Bt.scanning)
-            }
+    rows: {
+        const out = [];
+        if (Bt.known.length > 0) {
+            out.push(root.line("label", "label:known", "Known", false));
+            for (const device of Bt.known)
+                out.push(root.deviceRow(device));
         }
-
-        // Enter on a device that is pairing stops it, as its row's action.
-        K.KeyHints {
-            visible: root.prompt === null && Bt.devices.some(device => Bt.isPairing(device))
-            hints: [["Enter", "cancel the pairing"]]
+        out.push(root.line("label", "label:nearby", "Nearby", false));
+        if (Bt.nearby.length > 0) {
+            for (const device of Bt.nearby)
+                out.push(root.deviceRow(device));
+        } else if (Bt.scanning) {
+            // A scan that hasn't found anything yet: the devices it finds take these places.
+            for (const n of [0, 1])
+                out.push(root.line("skeleton", `skeleton:${n}`, "", false));
+        } else {
+            out.push(root.line("note", "note:nearby", Bt.problem || "Nothing in pairing mode nearby", Bt.problem !== ""));
         }
+        return out;
+    }
+    formOpen: root.pendingPath !== ""
+    off: !Bt.available || !Bt.enabled
+    offIcon: "bluetooth_disabled"
+    offTitle: !Bt.available ? "No Bluetooth adapter" : Bt.blocked ? "Bluetooth is blocked" : "Bluetooth is off"
+    offBody: !Bt.available ? "Nothing to pair with on this machine." : Bt.blocked ? Bt.blockedText : Bt.problem || "Turn it on to find devices."
+    offAction: Bt.available && !Bt.blocked ? turnOn : null
 
-        K.Stack {
-            visible: root.prompt !== null
-            fill: true
-            gap: K.Tokens.space.s4
+    form.icon: root.pending ? Radios.deviceSymbol(root.pending.icon) : "bluetooth"
+    form.title: root.pendingName
+    form.subtitle: root.formLine()
+    form.ask: root.kind === "passkey" || root.kind === "pin-code" ? "field" : (root.prompt?.code ?? "") !== "" ? "code" : ""
+    form.placeholder: root.kind === "passkey" ? "Six digits" : "The PIN"
+    form.code: root.grouped(root.prompt?.code ?? "")
+    form.status: root.formStatus()
+    form.failed: root.pending === null || root.failure !== ""
+    form.action: "Pair"
+    // Pair starts the pairing, or says yes to what the agent asks; a code shown to type on the
+    // device waits on the device.
+    form.ready: root.pending !== null && (root.prompt ? !root.kind.startsWith("display") : !root.pairing)
 
-            K.Text {
-                text: root.prompt ? root.promptText(root.prompt) : ""
-                style: K.Tokens.type.body
-            }
+    // A prompt that asks for a PIN or passkey puts the keyboard in its field.
+    onKindChanged: if (root.formOpen)
+        root.form.focusFirst()
+    onPicked: key => {
+        const device = root.find(key);
+        if (!device)
+            return;
+        if (device.paired)
+            Bt.activate(device);
+        else
+            root.open(device);
+    }
+    onForgot: key => root.find(key)?.forget()
 
-            K.Row {
-                fill: true
-                gap: K.Tokens.space.s8
-                align: "centre"
+    Component {
+        id: turnOn
 
-                K.Text {
-                    visible: (root.prompt?.code ?? null) !== null
-                    text: root.prompt?.code ?? ""
-                    style: K.Tokens.type.headline
-                    color: K.Tokens.color.primary
-                }
-
-                K.Text {
-                    visible: (root.prompt?.entered ?? null) !== null
-                    text: `${root.prompt?.entered ?? 0} of ${root.prompt?.code?.length ?? 6} typed`
-                    style: K.Tokens.type.body
-                    color: K.Tokens.color.on_surface_variant
-                }
-
-                K.Fill {
-                }
-
-                K.IconButton {
-                    visible: root.asksYes && !root.asksCode
-                    icon: "check"
-                    label: "Pair"
-                    kind: "Filled"
-                    size: "Sm"
-                    onActivated: Bt.answer(true, "")
-                }
-
-                K.IconButton {
-                    icon: "close"
-                    label: "Cancel"
-                    kind: "Tonal"
-                    size: "Sm"
-                    onActivated: Bt.answer(false, "")
-                }
-            }
-
-            K.Field {
-                id: code
-
-                visible: root.asksCode
-                icon: "key"
-                placeholder: root.kind === "passkey" ? "Six digits" : "The PIN"
-                Keys.onEscapePressed: {
-                    Bt.answer(false, "");
-                    list.forceActiveFocus();
-                }
-                Keys.onReturnPressed: root.submitCode()
-                Keys.onEnterPressed: root.submitCode()
-            }
-
-            // The code shown is typed on the device, then its own Enter.
-            K.KeyHints {
-                visible: root.kind === "display-passkey" || root.kind === "display-pin-code"
-                hints: [["Enter", `on ${root.prompt?.name ?? "it"}, after the code`]]
-            }
-
-            K.KeyHints {
-                visible: root.asksCode
-                hints: [["Enter", "pair"], ["Esc", "cancel"]]
-            }
+        K.Button {
+            text: "Turn on"
+            kind: "Tonal"
+            onActivated: Bt.powerOn()
         }
     }
 
-    Well {
-        y: top.height + K.Tokens.space.s12
-        width: root.width
-        // The list's room whether or not a search has found anything yet, so the first devices fill
-        // the well the skeleton rows sit in and nothing moves.
-        height: root.height - y
-        focused: list.activeFocus
+    // A pairing the device starts, or one from elsewhere, opens the form for its device.
+    Connections {
+        target: Bt
 
-        NavList {
-            id: list
+        function onPromptIdChanged(): void {
+            const device = Bt.prompt ? root.find(Bt.prompt.device) : null;
+            if (device)
+                root.open(device);
+        }
+    }
 
-            anchors.fill: parent
-            // The well's padding above the first row and below the last, scrolled with them.
-            topMargin: K.Tokens.space.s12
-            bottomMargin: K.Tokens.space.s12
-            visible: count > 0
-            model: ScriptModel {
-                values: Bt.devices
-            }
-            highlightShown: activeFocus
-            onActivated: index => Bt.activate(Bt.devices[index])
+    Connections {
+        target: root.pending
+        ignoreUnknownSignals: true
 
-            delegate: K.ListRow {
-                required property var modelData
-                required property int index
+        function onPairedChanged(): void {
+            if (root.pending.paired)
+                root.close();
+        }
+    }
 
-                width: ListView.view.width
-                icon: modelData.connected ? "bluetooth_connected" : "bluetooth"
-                title: modelData.name
-                subtitle: Bt.stateText(modelData)
-                checkable: true
-                checked: modelData.connected
-                selected: ListView.isCurrentItem && ListView.view.highlightShown
-                onActivated: Bt.activate(modelData)
-            }
+    Connections {
+        target: root.form
+
+        function onSubmitted(value: string): void {
+            if (root.prompt)
+                Bt.answer(true, value);
+            else if (root.pending)
+                Bt.activate(root.pending);
         }
 
-        // Rows still being found while the scan has nothing yet: the first results take the
-        // place they keep.
-        Column {
-            id: scanning
-
-            y: K.Tokens.space.s12
-            width: parent.width
-            visible: list.count === 0 && Bt.scanning
-            spacing: K.Tokens.space.s4
-
-            Repeater {
-                model: [0.6, 0.45, 0.75]
-
-                SkeletonRow {
-                    required property real modelData
-
-                    width: parent.width
-                    share: modelData
-                }
-            }
-        }
-
-        K.EmptyState {
-            anchors.verticalCenter: parent.verticalCenter
-            width: parent.width
-            room: parent.width
-            visible: list.count === 0 && !Bt.scanning
-            icon: Bt.enabled ? "bluetooth_searching" : "bluetooth_disabled"
-            title: !Bt.available ? "No Bluetooth adapter" : Bt.blocked ? "Bluetooth is blocked" : Bt.enabled ? "No devices" : "Bluetooth is off"
-            body: !Bt.available ? "Nothing to pair with on this machine." : Bt.blocked ? "Unblock it, then turn it on." : Bt.enabled ? "Search, and devices in pairing mode show up here." : "The Bluetooth tile turns it on."
+        function onCancelled(): void {
+            if (root.prompt)
+                Bt.answer(false, "");
+            else if (root.pairing && root.pending)
+                Bt.activate(root.pending);
+            root.close();
         }
     }
 }

@@ -155,7 +155,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Icon tiles and badges",
-            Some("Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small and regular, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."),
+            Some("Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."),
             avatars(look),
         ))
         .push(section(
@@ -632,12 +632,32 @@ fn lists<'a>(look: &Look) -> Element<'a, Message> {
             .on_press(Message::Sample)
             .view(look),
     ];
+    let radios = vec![
+        list_row("Shinjuku-5G")
+            .subtitle("Connected · 5 GHz")
+            .subtitle_icon(Icon::Lock)
+            .icon(Icon::SignalWifi4Bar)
+            .tile()
+            .accent()
+            .checked(true)
+            .on_press(Message::Sample)
+            .view(look),
+        list_row("Omoide Yokocho")
+            .subtitle("Secured")
+            .subtitle_icon(Icon::Lock)
+            .icon(Icon::NetworkWifi2Bar)
+            .tile()
+            .checked(false)
+            .on_press(Message::Sample)
+            .view(look),
+    ];
     grid(look, 3, Space::S24)
         .push(list(look, rows(look), false))
         .push(list(look, two_line, true))
         .push(empty_list(look, "Nothing matches. Typo?"))
         .push(list(look, power, false))
         .push(list(look, tiled, false))
+        .push(list(look, radios, false))
         .into()
 }
 
@@ -1205,6 +1225,7 @@ fn avatars<'a>(look: &Look) -> Element<'a, Message> {
         .center()
         .push(icon_tile(Icon::Terminal, TileSize::Sm).view(look))
         .push(icon_tile(Icon::Terminal, TileSize::Md).view(look))
+        .push(icon_tile(Icon::Terminal, TileSize::Lg).view(look))
         .push(
             icon_tile(Icon::Notifications, TileSize::Md)
                 .photo(Some(picture))

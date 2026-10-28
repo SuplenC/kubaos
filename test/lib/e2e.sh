@@ -1037,16 +1037,23 @@ c_quickshell() {
     return 1
   fi
   sleep 5   # let the panels, services and the wallpaper settle
-  out="$(qs_problems)"
   local ipc
   ipc="$(in_session 'qs ipc show' 2>&1 || true)"
+  # The Wi-Fi and Bluetooth tabs, as the Command menu opens them: each scans while it shows.
+  in_session 'qs ipc call controlcenter wifi' >/dev/null 2>&1
+  sleep 1
+  in_session 'qs ipc call controlcenter bluetooth' >/dev/null 2>&1
+  sleep 1
+  in_session 'qs ipc call controlcenter toggle' >/dev/null 2>&1
+  sleep 1
+  out="$(qs_problems)"
   session_stop
   if [[ -n $out ]]; then
     echo "FAIL QML errors/warnings ($QS_LOG):"
     printf '%s\n' "$out" | head -30
     return 1
   fi
-  echo "ok   Quickshell loaded with no QML errors"
+  echo "ok   Quickshell loaded with no QML errors, the Wi-Fi and Bluetooth tabs opened and closed"
   echo "     environment warnings (services a container doesn't have):"
   qs_env_warnings | cut -c1-120 | sed 's/^/       /'
   

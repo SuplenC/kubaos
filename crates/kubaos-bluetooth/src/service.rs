@@ -150,6 +150,8 @@ pub async fn run() -> Result<(), RunError> {
         .await
         .map_err(RunError::System)?;
 
+    // The system bus runs the pairings and the signal follower on its executor.
+    let executor = system.executor().clone();
     let service = Service {
         hub: Arc::clone(&hub),
         pairing: Arc::new(Pairing::new(Arc::clone(&hub), Arc::clone(&bluez))),
@@ -165,6 +167,17 @@ pub async fn run() -> Result<(), RunError> {
         .map_err(RunError::Session)?;
 
     hub.publish();
+    let (follower, heard) = (Arc::clone(&bluez), Arc::clone(&hub));
+    executor
+        .spawn(
+            async move {
+                if let Err(err) = follower.follow_signal(&heard).await {
+                    kotodama_extension::log!("following how strongly devices are heard: {err}");
+                }
+            },
+            "signal",
+        )
+        .detach();
     bluez::keep_registered(&bluez, &hub).await.map_err(RunError::Follow)
 }
 

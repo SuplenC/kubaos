@@ -397,11 +397,20 @@ icon = "preferences-system"
 keywords = ["quick settings", "panel"]
 run = ["qs", "ipc", "call", "controlcenter", "toggle"]
 
+# The control center's Wi-Fi tab, which scans while it shows: saved networks
+# and the ones in range, and the password form.
+[extensions.kubaos.actions.wifi-networks]
+title = "Wi-Fi networks"
+subtitle = "Connect to a network in range in the control center, or forget a saved one"
+icon = "network-wireless"
+keywords = ["wifi", "wi-fi", "wlan", "wireless", "network", "connect", "password", "hotspot"]
+run = ["qs", "ipc", "call", "controlcenter", "wifi"]
+
 # The code a keyboard or phone asks for shows in that tab, from the pairing
 # agent (home/bluetooth.nix).
 [extensions.kubaos.actions.bluetooth-pair]
 title = "Pair a Bluetooth device"
-subtitle = "Search for keyboards, headphones and phones in the control center, and pair one"
+subtitle = "Find keyboards, headphones and phones nearby in the control center, and pair one"
 icon = "bluetooth"
 keywords = ["bluetooth", "bt", "pair", "keyboard", "headphones", "connect", "scan"]
 run = ["qs", "ipc", "call", "controlcenter", "bluetooth"]

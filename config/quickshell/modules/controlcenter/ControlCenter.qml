@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
+import qs.components
 import qs.services
 
 // Side sheet on the right edge, from the bar down to the bottom border:
@@ -16,17 +17,21 @@ K.Sheet {
     // The Keyboard tab, which the keyboard tile's arrow and
     // `qs ipc call controlcenter keyboard` open.
     readonly property int keyboardTab: 3
-    readonly property bool scanWifi: shown && tab === 0
     readonly property var kanji: ["日", "月", "火", "水", "木", "金", "土"]
 
     edge: "right"
     flushStart: true
     flushEnd: true
     contentWidth: K.Tokens.size.panel
-    onOpened: toggles.focusFirst()
-    onScanWifiChanged: Net.setScanning(scanWifi)
-    onShownChanged: if (!shown)
-        Bt.setScanning(false)
+    // Onto the tab's connection form when one is open (a pairing the device started), else the
+    // first quick toggle.
+    onOpened: {
+        const radio = [wifi, bluetooth][root.tab];
+        if (radio?.formOpen)
+            radio.form.focusFirst();
+        else
+            toggles.focusFirst();
+    }
 
     Keys.onPressed: event => {
         const n = event.key - Qt.Key_1;
@@ -43,6 +48,35 @@ K.Sheet {
         function onReveal() {
             root.tab = 1;
         }
+    }
+
+    // "Wi-Fi networks" from the Command menu.
+    Connections {
+        target: Net
+
+        function onReveal() {
+            root.tab = 0;
+        }
+    }
+
+    // Each radio scans only while its tab shows. Wi-Fi scans about every 30 s, for a few seconds,
+    // as long as NetworkManager's scan takes, and not while its form connects. Bluetooth discovers
+    // for 20 s every 45 s, and goes on while its form shows, so the device being paired stays.
+    // HAZARD: BlueZ forgets a device it hasn't heard for 30 s (`TemporaryTimeout`); a gap between
+    // discoveries longer than that empties Nearby before the next one and fills it again, every
+    // time.
+    ScanPulse {
+        active: root.shown && root.tab === 0 && Net.wifiEnabled && !wifi.formOpen
+        every: 30000
+        window: 5000
+        onScanningChanged: Net.setScanning(scanning)
+    }
+
+    ScanPulse {
+        active: root.shown && root.tab === 1 && Bt.enabled
+        every: 45000
+        window: 20000
+        onScanningChanged: Bt.setScanning(scanning)
     }
 
     Connections {
@@ -149,12 +183,16 @@ K.Sheet {
             clip: true
 
             WifiList {
+                id: wifi
+
                 anchors.fill: parent
                 anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 0
             }
 
             BluetoothList {
+                id: bluetooth
+
                 anchors.fill: parent
                 anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 1
