@@ -362,6 +362,7 @@ K.Sheet {
                         }
 
                         PowerSlider {
+                            size: "Compact"
                         }
                     }
 
