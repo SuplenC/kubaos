@@ -700,6 +700,47 @@ c_lua() {
 c_workspaces() {
   as_user lua5.5 "$REPO/test/lua/workspaces_test.lua" "$REPO" || { echo "FAIL test/lua/workspaces_test.lua"; return 1; }
   echo "ok   per-screen workspaces: blocks, slots, joining on unplug and returning on replug"
+  workspaces_hotplug_bar
+}
+
+# The primary's bar after screens are plugged in: test/lib/hyprland-hotplug.py
+# stands in for Hyprland and sends the groups waiting on the primary to the new
+# screens, with Quickshell reading the workspace list it asked for before the
+# moves only after their events. The bar shows the primary's own group alone.
+workspaces_hotplug_bar() {
+  local signature=kubaos-e2e-hotplug state="$USER_HOME/.local/state" fake line bad=0
+  local screens="$state/kubaos/hypr/workspace-screens"
+  session_start sway 1920x1080 1
+  : >"$QS_LOG"
+  chown "$USER_NAME:" "$QS_LOG"
+  as_user python3 -I "$REPO/test/lib/hyprland-hotplug.py" "$RUNTIME_DIR" "$signature" "$state" "$QS_LOG" \
+    >"$LOGS/hyprland-hotplug.log" 2>&1 &
+  fake=$!
+  for _ in $(seq 50); do
+    grep -q ready "$LOGS/hyprland-hotplug.log" && break
+    sleep 0.1
+  done
+  if ! qs_start "HYPRLAND_INSTANCE_SIGNATURE=$signature" KUBAOS_WORKSPACES_PROBE=1; then
+    echo "FAIL Quickshell didn't load its config:"
+    tail -30 "$QS_LOG"
+    bad=1
+  elif ! wait "$fake"; then
+    echo "FAIL the hotplug didn't play out:"
+    tail -5 "$LOGS/hyprland-hotplug.log" | sed 's/^/     /'
+    bad=1
+  else
+    line="$(grep -o 'workspaces probe: HEADLESS-1 .*' "$QS_LOG" | tail -1)"
+    if [[ $line == 'workspaces probe: HEADLESS-1 [[1,2,4,5]]' ]]; then
+      echo "ok   after a hotplug the primary's bar shows its own group alone, whatever order Quickshell reads Hyprland in"
+    else
+      echo "FAIL after a hotplug the primary's bar shows ${line#workspaces probe: HEADLESS-1 }, not [[1,2,4,5]]"
+      bad=1
+    fi
+  fi
+  kill "$fake" 2>/dev/null || true
+  session_stop
+  rm -rf "${RUNTIME_DIR:?}/hypr/$signature" "$screens"
+  return "$bad"
 }
 
 # The power stops' laptop panel (config/hypr/monitors.lua): the stop's refresh
