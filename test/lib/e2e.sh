@@ -1360,6 +1360,56 @@ c_notifications() {
   in_session 'qs ipc call sysmon toggle' >/dev/null 2>&1
   toast_wait "closing the popup brings all three back to the corner" 'stack=top,3,.* stack=right,0,' || bad=1
 
+  # The notifications panel: the three are unread until it has shown them, and it covers the
+  # corner as the other panels do.
+  out="$(in_session 'qs ipc call notifications status' 2>&1 || true)"
+  if [[ $out == *'"count":3'*'"unread":3'* ]]; then
+    echo "ok   the three are unread before the panel shows them"
+  else
+    echo "FAIL the status before the panel: $out"
+    bad=1
+  fi
+  TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
+  in_session 'qs ipc call notifications toggle' >/dev/null 2>&1
+  toast_wait "the notifications panel sends the toasts away" 'panel=.* stack=top,0,' || bad=1
+  in_session 'qs ipc call notifications toggle' >/dev/null 2>&1
+  sleep 1
+  out="$(in_session 'qs ipc call notifications status' 2>&1 || true)"
+  if [[ $out == *'"count":3'*'"unread":0'*'"open":false'* ]]; then
+    echo "ok   closing the panel marks what it showed read and keeps it"
+  else
+    echo "FAIL the status after the panel: $out"
+    bad=1
+  fi
+
+  # Do not disturb: on by hand, a new one lands in the list with no popup, and the state file
+  # the Command menu reads says so.
+  in_session 'qs ipc call notifications clear' >/dev/null 2>&1
+  out="$(in_session 'qs ipc call notifications dnd on' 2>&1 || true)"
+  sleep 1
+  TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
+  in_session "notify-send -t 60000 Quiet 'Sent while Do not disturb is on'" >/dev/null 2>&1
+  sleep 1.5
+  out="$(in_session 'qs ipc call notifications status' 2>&1 || true)"
+  local dnd_file
+  dnd_file="$(in_session 'cat "$XDG_RUNTIME_DIR/kubaos-dnd.json"' 2>&1 || true)"
+  if [[ $out == *'"count":1'*'"dnd":true'*'"reason":"manual"'* ]] && [[ $dnd_file == *'"on":true'* ]] \
+    && ! tail -n +"$TOAST_MARK" "$QS_LOG" | grep -q 'stack=top,[1-9]'; then
+    echo "ok   Do not disturb holds the popup back, keeps the notification and writes its state"
+  else
+    echo "FAIL Do not disturb: $out, state file $dnd_file"
+    bad=1
+  fi
+  in_session 'qs ipc call notifications dnd off' >/dev/null 2>&1
+  sleep 0.5
+  dnd_file="$(in_session 'cat "$XDG_RUNTIME_DIR/kubaos-dnd.json"' 2>&1 || true)"
+  if [[ $dnd_file == *'"on":false'* ]]; then
+    echo "ok   Do not disturb off writes its state"
+  else
+    echo "FAIL Do not disturb off: state file $dnd_file"
+    bad=1
+  fi
+
   out="$(toast_overlaps)"
   frames="$(grep -c 'toast probe: panel=' "$QS_LOG")"
   if [[ -n $out ]]; then
