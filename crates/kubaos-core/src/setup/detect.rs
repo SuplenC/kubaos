@@ -11,7 +11,15 @@ use super::MokState;
 use super::State;
 use super::Status;
 use super::Sys;
-use super::parse::*;
+use super::parse::finger_name;
+use super::parse::fingerprint_usb;
+use super::parse::parse_bw_status;
+use super::parse::parse_fprintd_list;
+use super::parse::parse_key_info;
+use super::parse::parse_mok;
+use super::parse::parse_secure_boot;
+use super::parse::tuxedo_modules;
+use super::parse::u2f_count;
 use crate::bitwarden::Config;
 use crate::bitwarden::Overview;
 use crate::bitwarden::agent;
@@ -123,12 +131,7 @@ fn tuxedo(sys: &mut dyn Sys) -> CardStatus {
         None
     };
 
-    let (state, summary) = if !drivers {
-        (
-            State::Needed,
-            "Keyboard backlight, fans and power limits need TUXEDO's drivers.".to_string(),
-        )
-    } else {
+    let (state, summary) = if drivers {
         match mok {
             Some(MokState::NotEnrolled | MokState::NoKey) => (
                 State::Needed,
@@ -141,6 +144,11 @@ fn tuxedo(sys: &mut dyn Sys) -> CardStatus {
             _ if modules.is_empty() => (State::Reboot, "Installed. The drivers load after a reboot.".to_string()),
             _ => (State::Done, format!("Drivers loaded: {}.", modules.join(", "))),
         }
+    } else {
+        (
+            State::Needed,
+            "Keyboard backlight, fans and power limits need TUXEDO's drivers.".to_string(),
+        )
     };
     CardStatus {
         id: CardId::Tuxedo,
@@ -257,7 +265,7 @@ fn usb_reader(sys: &mut dyn Sys) -> Option<String> {
 
 fn count(n: usize, what: &str) -> String {
     let words = ["No", "One", "Two", "Three", "Four", "Five"];
-    let w = words.get(n).map_or(n.to_string(), |s| s.to_string());
+    let w = words.get(n).map_or(n.to_string(), ToString::to_string);
     if n == 1 {
         format!("{w} {what}")
     } else {

@@ -3,6 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
+use std::fmt::Write;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -174,8 +175,7 @@ impl Fake {
                     ran.code = Some(1);
                 }
                 for s in hits {
-                    ran.stdout
-                        .push_str(&format!("[/1]\nlabel = {}\nsecret = {}\n", s.label, s.value));
+                    let _ = write!(ran.stdout, "[/1]\nlabel = {}\nsecret = {}\n", s.label, s.value);
                     ran.stderr.push_str("attribute.service = dotfiles-env\n");
                 }
             }

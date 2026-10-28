@@ -306,6 +306,11 @@ pub enum UpdateEvent {
 
 impl UpdateEvent {
     /// The event as one line of JSON, without the newline.
+    ///
+    /// # Panics
+    ///
+    /// If `serde_json` refuses the event; its fields are plain data with string keys, which it
+    /// always takes.
     pub fn to_json_line(&self) -> String {
         serde_json::to_string(self).expect("update events always serialize")
     }
@@ -344,7 +349,7 @@ pub fn chain(e: &dyn Error) -> String {
 }
 
 /// For `skip_serializing_if`: a count that is zero leaves its key out of the JSON.
-#[expect(clippy::trivially_copy_pass_by_ref, reason = "serde passes the field by reference")]
+#[expect(clippy::trivially_copy_pass_by_ref, reason = "Serde passes the field by reference.")]
 fn count_is_zero(n: &usize) -> bool {
     *n == 0
 }

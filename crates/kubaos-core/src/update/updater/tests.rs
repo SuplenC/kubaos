@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::fmt::Write;
 use std::fs;
 use std::io;
 use std::path::Path;
@@ -101,27 +102,30 @@ impl FakeDpkg {
         let names = Self::names(cmd);
         match cmd.program().as_str() {
             "dpkg-query" if has("${db:Status-Status} ${db:Status-Want} ${Package} ${Version}\n") => {
-                let mut out: String = self
-                    .installed
-                    .iter()
-                    .map(|(p, held)| format!("installed {} {p} 1.0\n", if *held { "hold" } else { "install" }))
-                    .collect();
-                out.extend(self.held_missing.iter().map(|p| format!("not-installed hold {p} \n")));
+                let mut out = String::new();
+                for (p, held) in &self.installed {
+                    let _ = writeln!(out, "installed {} {p} 1.0", if *held { "hold" } else { "install" });
+                }
+                for p in &self.held_missing {
+                    let _ = writeln!(out, "not-installed hold {p} ");
+                }
                 Some(out)
             }
-            "apt-cache" => Some(
-                names
-                    .iter()
-                    .filter(|p| !self.unavailable.contains(p))
-                    .map(|p| format!("{p}:\n  Installed: (none)\n  Candidate: 1.0\n"))
-                    .collect(),
-            ),
+            "apt-cache" => Some(names.iter().filter(|p| !self.unavailable.contains(p)).fold(
+                String::new(),
+                |mut out, p| {
+                    let _ = write!(out, "{p}:\n  Installed: (none)\n  Candidate: 1.0\n");
+                    out
+                },
+            )),
             "apt-get" if has("-s") && has("remove") => Some(
                 names
                     .iter()
                     .flat_map(|p| std::iter::once(p.clone()).chain(self.takes.get(p).cloned().unwrap_or_default()))
-                    .map(|p| format!("Remv {p} [1.0]\n"))
-                    .collect(),
+                    .fold(String::new(), |mut out, p| {
+                        let _ = writeln!(out, "Remv {p} [1.0]");
+                        out
+                    }),
             ),
             "apt-get" if has("install") => {
                 for p in names {

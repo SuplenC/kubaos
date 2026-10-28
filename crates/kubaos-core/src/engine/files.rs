@@ -1,5 +1,6 @@
 //! Text of the files the engine writes into the target. Pure functions.
 
+use std::fmt::Write;
 use std::path::Path;
 
 use kubaos_user_layer::App;
@@ -49,10 +50,10 @@ pub fn fstab(u: &FsUuids, swapfile: bool) -> String {
          # <file system>  <mount point>  <type>  <options>  <dump>  <pass>\n",
     );
     for (sv, mp) in SUBVOLUMES {
-        s.push_str(&format!("UUID={}  {mp}  btrfs  {}  0 0\n", u.root, subvol_opts(sv)));
+        let _ = writeln!(s, "UUID={}  {mp}  btrfs  {}  0 0", u.root, subvol_opts(sv));
     }
-    s.push_str(&format!("UUID={}  /boot  ext4  defaults  0 2\n", u.boot));
-    s.push_str(&format!("UUID={}  /boot/efi  vfat  umask=0077  0 1\n", u.esp));
+    let _ = writeln!(s, "UUID={}  /boot  ext4  defaults  0 2", u.boot);
+    let _ = writeln!(s, "UUID={}  /boot/efi  vfat  umask=0077  0 1", u.esp);
     if swapfile {
         s.push_str("/swap/swapfile  none  swap  defaults  0 0\n");
     }
@@ -98,16 +99,13 @@ pub fn nmconnection(ssid: &str, psk: Option<&str>, uuid: &str) -> String {
         keyfile_ssid(ssid)
     );
     if let Some(psk) = psk.filter(|p| !p.is_empty()) {
-        s.push_str(&format!(
-            "\n[wifi-security]\nkey-mgmt=wpa-psk\npsk={}\n",
-            keyfile_escape(psk)
-        ));
+        let _ = write!(s, "\n[wifi-security]\nkey-mgmt=wpa-psk\npsk={}\n", keyfile_escape(psk));
     }
     s.push_str("\n[ipv4]\nmethod=auto\n\n[ipv6]\naddr-gen-mode=default\nmethod=auto\n");
     s
 }
 
-/// GKeyFile string escaping (what NM's keyfile reader undoes).
+/// `GKeyFile` string escaping (what NM's keyfile reader undoes).
 fn keyfile_escape(v: &str) -> String {
     let mut out = String::new();
     for (i, c) in v.chars().enumerate() {
@@ -134,7 +132,10 @@ fn keyfile_ssid(ssid: &str) -> String {
     if plain {
         ssid.to_string()
     } else {
-        ssid.bytes().map(|b| format!("{b};")).collect()
+        ssid.bytes().fold(String::new(), |mut out, b| {
+            let _ = write!(out, "{b};");
+            out
+        })
     }
 }
 
@@ -297,7 +298,7 @@ pub fn existing_groups(group_file: &str, wanted: &[&str]) -> Vec<String> {
     wanted
         .iter()
         .filter(|g| have.contains(g))
-        .map(|g| g.to_string())
+        .map(ToString::to_string)
         .collect()
 }
 

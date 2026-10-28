@@ -83,7 +83,15 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
         bad(format!("unknown locale \"{}\"", c.locale.lang));
     }
 
-    // Disk.
+    out.extend(disk_problems(c, p, manifest));
+    out
+}
+
+/// What keeps the install off the disk the config names: missing, the medium the install runs
+/// from, or too small for the payload.
+fn disk_problems(c: &InstallConfig, p: &Probe, manifest: Option<&Manifest>) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut bad = |s: String| out.push(s);
     let Some(d) = p.disks.iter().find(|d| d.path == c.disk.device) else {
         bad(format!("{} is not a disk this machine has", c.disk.device));
         return out;

@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::Path;
 
 use serde_json::json;
@@ -21,20 +22,21 @@ fn paths() -> Paths {
 }
 
 fn ssh_item(name: &str, slug: &str, folder: Option<&str>, created: u8, fields: serde_json::Value) -> serde_json::Value {
-    json!({
+    let mut item = json!({
         "id": format!("i-{slug}"),
         "type": 5,
         "name": name,
         "folderId": folder,
         "creationDate": format!("2026-01-01T00:00:{created:02}.000Z"),
         "notes": null,
-        "fields": fields,
         "sshKey": {
             "privateKey": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjE\n-----END OPENSSH PRIVATE KEY-----",
             "publicKey": format!("ssh-ed25519 AAAA{slug}"),
             "keyFingerprint": format!("SHA256:{slug}"),
         },
-    })
+    });
+    item["fields"] = fields;
+    item
 }
 
 fn field(name: &str, value: &str) -> serde_json::Value {
@@ -119,7 +121,10 @@ fn items() -> Vec<serde_json::Value> {
 }
 
 fn agent_lists(keys: &[&str]) -> String {
-    keys.iter().map(|k| format!("256 SHA256:{k} {k} (ED25519)\n")).collect()
+    keys.iter().fold(String::new(), |mut out, k| {
+        let _ = writeln!(out, "256 SHA256:{k} {k} (ED25519)");
+        out
+    })
 }
 
 /// Logged in and locked on the EU cloud, with the harness's vault, the desktop agent serving

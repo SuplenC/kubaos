@@ -1,6 +1,8 @@
 //! git: commits signed with the SSH key whose item has `signing=true`, through the agent.
 //! `signing=verify` keys only go into `allowed_signers`, so old signatures still verify.
 
+use std::fmt::Write;
+
 use super::Cmd;
 use super::Error;
 use super::KeyInfo;
@@ -111,7 +113,7 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &[Key], scope: &str, p: &
             .chain(extra.split_whitespace())
             .filter(|e| email_ok(e))
         {
-            allowed.push_str(&format!("{email} namespaces=\"git\" {public}\n"));
+            let _ = writeln!(allowed, "{email} namespaces=\"git\" {public}");
         }
     }
     let Some(sign) = signer(keys) else {

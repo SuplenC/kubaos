@@ -95,6 +95,17 @@ pub struct Field {
     pub kind: u8,
 }
 
+/// By hand: a field's value can be a secret (a hidden field, an env variable's token).
+impl std::fmt::Debug for Field {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Field")
+            .field("name", &self.name)
+            .field("value", &self.value.as_ref().map(|_| "<redacted>"))
+            .field("kind", &self.kind)
+            .finish()
+    }
+}
+
 impl Field {
     /// Whether the field is `name` as people type it in Bitwarden's editor: ssh's own spelling
     /// is `HostName`, and a trailing space is invisible there.
@@ -104,7 +115,7 @@ impl Field {
 }
 
 /// One item, cut down.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Item {
     pub id: String,
     pub name: String,
@@ -135,7 +146,7 @@ impl Item {
     }
 
     /// The name and the folder, which tell two keys of the same name apart. It goes into
-    /// comments in ssh_config, so it is kept to one line.
+    /// comments in `ssh_config`, so it is kept to one line.
     pub fn label(&self) -> String {
         one_line(&format!("{} ({})", self.name, self.folder))
     }
@@ -150,6 +161,7 @@ impl Item {
 }
 
 /// The whole vault, cut down.
+#[derive(Debug)]
 pub struct Vault {
     pub items: Vec<Item>,
     pub folders: Vec<Folder>,

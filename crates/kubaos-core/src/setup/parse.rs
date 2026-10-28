@@ -219,6 +219,10 @@ pub fn parse_bw_status(json: &str) -> Option<BwStatus> {
 }
 
 /// A Bitwarden server as `kubaos bitwarden setup` takes it: com, eu, or an https URL.
+///
+/// # Errors
+///
+/// When `s` is none of them.
 pub fn server_url(s: &str) -> Result<String, String> {
     let s = s.trim();
     match s {

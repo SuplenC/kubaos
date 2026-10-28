@@ -20,6 +20,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::hash::BuildHasher;
 
 /// The most layouts a keymap holds: XKB has four groups.
 pub const MAX_LAYOUTS: usize = 4;
@@ -330,7 +331,7 @@ pub fn catalogue(lst: &str) -> Vec<(Layout, String)> {
 }
 
 /// What a person calls `layout`: its name in `names`, else its spelling in capitals.
-pub fn name(layout: &Layout, names: &HashMap<String, String>) -> String {
+pub fn name<S: BuildHasher>(layout: &Layout, names: &HashMap<String, String, S>) -> String {
     names
         .get(&layout.to_string())
         .cloned()

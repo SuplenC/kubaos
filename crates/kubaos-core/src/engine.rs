@@ -13,6 +13,7 @@ pub mod runner;
 pub mod unpack;
 pub mod validate;
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -43,15 +44,28 @@ pub struct RunOptions {
 }
 
 /// Probe with the payload in the default place (`/run/kubaos/payload`).
+///
+/// # Errors
+///
+/// [`Error::Config`] when `lsblk` can't list the machine's disks.
 pub fn probe() -> Result<Probe, Error> {
     probe_with(Path::new(machine::DEFAULT_PAYLOAD_DIR))
 }
 
+/// Probe with the payload in `payload_dir`.
+///
+/// # Errors
+///
+/// [`Error::Config`] when `lsblk` can't list the machine's disks.
 pub fn probe_with(payload_dir: &Path) -> Result<Probe, Error> {
     machine::probe(payload_dir).map_err(Error::Config)
 }
 
-/// Every problem, one per line, in `Error::Config`.
+/// Checks the config against the machine.
+///
+/// # Errors
+///
+/// [`Error::Config`] with every problem found, one per line.
 pub fn validate(config: &InstallConfig, probe: &Probe) -> Result<(), Error> {
     let p = validate::problems(config, probe);
     if p.is_empty() {
@@ -61,6 +75,11 @@ pub fn validate(config: &InstallConfig, probe: &Probe) -> Result<(), Error> {
     }
 }
 
+/// Checks the secrets the config needs are there and usable.
+///
+/// # Errors
+///
+/// [`Error::Config`] with every problem found, one per line.
 pub fn validate_secrets(config: &InstallConfig, secrets: &Secrets) -> Result<(), Error> {
     let p = validate::secret_problems(config, secrets);
     if p.is_empty() {
@@ -77,6 +96,12 @@ pub fn plan(config: &InstallConfig) -> Vec<StepId> {
         .collect()
 }
 
+/// Installs, step by step, emitting each step's events; with `opts.dry_run`, only says what each
+/// step would do.
+///
+/// # Errors
+///
+/// [`Error::Step`] naming the step that failed, after the steps so far are cleaned up.
 pub fn run(
     config: &InstallConfig,
     secrets: &Secrets,
@@ -113,6 +138,10 @@ fn placeholder_manifest(config: &InstallConfig) -> Manifest {
 }
 
 /// `run` with a given runner (tests pass a `DryRunner` with canned output).
+///
+/// # Errors
+///
+/// [`Error::Step`] naming the step that failed, after the steps so far are cleaned up.
 pub fn run_with(
     config: &InstallConfig,
     secrets: &Secrets,
@@ -132,7 +161,7 @@ pub fn run_with(
         Err(e) => Err(e),
     };
     let disk = machine::read_lsblk().ok().and_then(|l| {
-        machine::disks_from_lsblk(&l, &Default::default(), true)
+        machine::disks_from_lsblk(&l, &BTreeSet::default(), true)
             .into_iter()
             .find(|d| d.path == config.disk.device)
     });
@@ -234,7 +263,7 @@ mod tests {
         let m = serde_json::json!({
             "version": "1", "arch": "x86_64", "built_at": "2026-10-16T10:00:00Z",
             "commit": "abc", "username": "kuba", "hostname": "vm",
-            "rootfs": "rootfs.tar.zst", "rootfs_bytes": 1, "installed_bytes": 10737418240u64,
+            "rootfs": "rootfs.tar.zst", "rootfs_bytes": 1, "installed_bytes": 10_737_418_240_u64,
             "sha256": "00", "kernel": "6.17.0-5-generic",
             "home_generation": "/nix/store/abc-home-manager-generation"
         });

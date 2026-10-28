@@ -30,8 +30,8 @@ use serde::Deserialize;
 
 use super::Layout;
 
-/// The accents are on until the user turns them off: Left Alt + e, `, u, i and n are the only
-/// Alt chords they take, and macOS hands have them in their fingers.
+/// The accents are on until the user turns them off: Left Alt with `e`, `` ` ``, `u`, `i` and `n`
+/// are the only Alt chords they take, and macOS hands have them in their fingers.
 pub const DEFAULT_MAC_ACCENTS: bool = true;
 
 /// The settings file in the keyboard's folder of the user layer.
@@ -50,7 +50,7 @@ pub fn path(config_home: &Path) -> PathBuf {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Settings {
-    /// Left Alt + e, `, u, i or n starts an accent for the next letter.
+    /// Left Alt with `e`, `` ` ``, `u`, `i` or `n` starts an accent for the next letter.
     pub mac_accents: bool,
     /// The layouts the user types with, spelled `it` or `us(intl)`, the first the default. Empty
     /// until `kubaos keyboard` first changes them; until then they are the system's.

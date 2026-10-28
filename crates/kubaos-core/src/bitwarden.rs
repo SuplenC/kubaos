@@ -453,6 +453,10 @@ impl Error {
 
 /// Which parts a pull writes (`--only`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "Each field is one of the four parts `--only` names, which a pull writes or skips on its own."
+)]
 pub struct Parts {
     pub ssh: bool,
     pub git: bool,
@@ -557,6 +561,11 @@ pub fn preflight(m: &mut dyn Machine, parts: Parts) -> Result<(), Error> {
 /// # Errors
 ///
 /// bw failed to read the vault, or a file couldn't be written.
+///
+/// # Panics
+///
+/// If `serde_json` refuses the overview; it is plain data with string keys, which it always
+/// takes.
 pub fn pull(
     m: &mut dyn Machine,
     paths: &Paths,

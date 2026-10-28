@@ -19,3 +19,6 @@ test-suite = []
 [dev-dependencies]
 kubaos-phone = { workspace = true, features = ["fake"] }
 tempfile.workspace = true
+
+[lints]
+workspace = true

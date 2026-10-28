@@ -23,7 +23,14 @@ use super::SetupEvent;
 use super::Stream;
 use super::Sys;
 use super::detect;
-use super::parse::*;
+use super::parse::Enroll;
+use super::parse::FINGERS;
+use super::parse::bw_error;
+use super::parse::enroll_line;
+use super::parse::finger_name;
+use super::parse::next_finger;
+use super::parse::parse_key_info;
+use super::parse::valid_credential;
 use crate::bitwarden;
 use crate::bitwarden::FormMethod;
 use crate::bitwarden::Line;
@@ -193,6 +200,10 @@ pub fn run(sys: &mut dyn Sys, env: &Env, card: CardId, inputs: &Inputs, emit: &m
 
 /// MokManager is a firmware app with a US keyboard and no layout switch:
 /// keep the password to what's printed on every key cap.
+///
+/// # Errors
+///
+/// What is wrong with `pw`, as the card shows it: too short, too long, or not letters and digits.
 pub fn mok_password_ok(pw: &str) -> Result<(), &'static str> {
     if pw.len() < 8 {
         Err("At least 8 characters.")
@@ -573,7 +584,11 @@ fn bw_failure(e: bitwarden::Error) -> Fail {
 
 // --------------------------------------------------------------------- Git
 
-/// Why git can't commit with this name and email.
+/// Checks git can commit with this name and email.
+///
+/// # Errors
+///
+/// Why it can't, as the card shows it: no name, more than one line, or not an email.
 pub fn git_identity_ok(name: &str, email: &str) -> Result<(), &'static str> {
     let (name, email) = (name.trim(), email.trim());
     if name.is_empty() {
@@ -629,7 +644,7 @@ fn phone(ctx: &mut Ctx, inputs: &Inputs) -> R<Option<String>> {
     match inputs.phone.clone().unwrap_or_default() {
         PhoneStep::On => {
             ctx.prompt(PromptKind::Wait, "Starting KDE Connect…", None);
-            let st = link::turn_on(ctx.sys.phone()).map_err(phone_failure)?;
+            let st = link::turn_on(ctx.sys.phone()).map_err(|e| phone_failure(&e))?;
             let name = st.name.unwrap_or_else(|| "this laptop".into());
             ctx.log(
                 Level::Info,
@@ -638,18 +653,18 @@ fn phone(ctx: &mut Ctx, inputs: &Inputs) -> R<Option<String>> {
             Ok(None)
         }
         PhoneStep::Off => {
-            link::turn_off(ctx.sys.phone()).map_err(phone_failure)?;
+            link::turn_off(ctx.sys.phone()).map_err(|e| phone_failure(&e))?;
             ctx.log(Level::Info, "ok  phone link off, KDE Connect stopped");
             Ok(None)
         }
         PhoneStep::Accept { device } => {
             ctx.prompt(PromptKind::Wait, "Pairing…", None);
-            let phone = link::accept(ctx.sys.phone(), &device).map_err(phone_failure)?;
+            let phone = link::accept(ctx.sys.phone(), &device).map_err(|e| phone_failure(&e))?;
             ctx.log(Level::Info, format!("ok  paired with {}", phone.name));
             Ok(None)
         }
         PhoneStep::Test => {
-            let phone = link::send_test(ctx.sys.phone()).map_err(phone_failure)?;
+            let phone = link::send_test(ctx.sys.phone()).map_err(|e| phone_failure(&e))?;
             ctx.log(Level::Info, format!("ok  clipboard sent to {}", phone.name));
             Ok(Some(format!(
                 "Sent “{}”. Paste it on {}: that's what should show up.",
@@ -658,7 +673,7 @@ fn phone(ctx: &mut Ctx, inputs: &Inputs) -> R<Option<String>> {
             )))
         }
         PhoneStep::Check => {
-            let text = link::received(ctx.sys.phone()).map_err(phone_failure)?;
+            let text = link::received(ctx.sys.phone()).map_err(|e| phone_failure(&e))?;
             Ok(Some(format!("The laptop got “{}” from the phone.", gist(&text))))
         }
     }
@@ -676,8 +691,8 @@ fn gist(text: &str) -> String {
 }
 
 /// What stopped the phone card, with its cause and what to do.
-fn phone_failure(e: kubaos_phone::Error) -> Fail {
-    let error = match std::error::Error::source(&e) {
+fn phone_failure(e: &kubaos_phone::Error) -> Fail {
+    let error = match std::error::Error::source(e) {
         Some(cause) => format!("{e}: {cause}"),
         None => e.to_string(),
     };
@@ -800,7 +815,7 @@ mod tests {
         assert!(!ok);
         match evs.last() {
             Some(SetupEvent::Failed { error, .. }) => {
-                assert!(error.contains("isn't queued"), "{error}")
+                assert!(error.contains("isn't queued"), "{error}");
             }
             e => panic!("{e:?}"),
         }
@@ -1001,7 +1016,7 @@ mod tests {
         assert!(!ok);
         match evs.last() {
             Some(SetupEvent::Failed { error, .. }) => {
-                assert_eq!(error, "wrong email or master password")
+                assert_eq!(error, "wrong email or master password");
             }
             e => panic!("{e:?}"),
         }
@@ -1029,7 +1044,7 @@ mod tests {
         assert!(all_text(&evs).contains(r#"1 SSH key(s) in the folder \"Work\""#));
         match evs.last() {
             Some(SetupEvent::Finished { status, .. }) => {
-                assert!(matches!(&status.facts, Facts::Bitwarden { folders, .. } if folders == &["Work"]))
+                assert!(matches!(&status.facts, Facts::Bitwarden { folders, .. } if folders == &["Work"]));
             }
             e => panic!("{e:?}"),
         }
@@ -1087,7 +1102,7 @@ mod tests {
         assert!(!ok);
         match evs.last() {
             Some(SetupEvent::Failed { hint: Some(h), .. }) => {
-                assert!(h.contains("~/.gitconfig"), "{h}")
+                assert!(h.contains("~/.gitconfig"), "{h}");
             }
             e => panic!("{e:?}"),
         }

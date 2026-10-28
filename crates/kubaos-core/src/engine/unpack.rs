@@ -14,6 +14,7 @@ pub trait Unpacker {
     fn progress(&mut self, line: &str) -> Option<f32>;
 }
 
+#[derive(Debug)]
 pub struct Squashfs;
 
 impl Unpacker for Squashfs {
@@ -39,6 +40,7 @@ impl Unpacker for Squashfs {
     }
 }
 
+#[derive(Debug)]
 pub struct TarZstd {
     /// Uncompressed size from the manifest; tar reports records read.
     pub installed_bytes: u64,
@@ -84,12 +86,16 @@ impl Unpacker for TarZstd {
 
 /// Picks the unpacker from the file's first bytes, or its name when the
 /// file can't be read (dry run on another machine).
+///
+/// # Errors
+///
+/// When the file is neither squashfs nor a zstd tar.
 pub fn detect(path: &Path, installed_bytes: u64) -> Result<Box<dyn Unpacker>, String> {
     let mut head = [0u8; 4];
     let magic = std::fs::File::open(path)
         .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut head))
         .ok()
-        .map(|_| head);
+        .map(|()| head);
     match magic {
         Some(m) if &m == b"hsqs" => Ok(Box::new(Squashfs)),
         Some([0x28, 0xb5, 0x2f, 0xfd]) => Ok(Box::new(TarZstd { installed_bytes })),

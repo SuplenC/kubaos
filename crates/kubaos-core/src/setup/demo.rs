@@ -7,6 +7,7 @@ use std::sync::Mutex;
 use std::thread::sleep;
 use std::time::Duration;
 
+use super::BwLogin;
 use super::BwMethod;
 use super::CardId;
 use super::CardStatus;
@@ -36,6 +37,38 @@ pub enum Machine {
     Installed,
 }
 
+/// The events of one card's run, each naming the card.
+#[derive(Debug, Clone, Copy)]
+struct Say(CardId);
+
+impl Say {
+    fn p(self, kind: PromptKind, text: &str, count: Option<(u32, u32)>) -> SetupEvent {
+        SetupEvent::Prompt {
+            card: self.0,
+            kind,
+            text: text.into(),
+            count,
+        }
+    }
+
+    fn log(self, line: &str) -> SetupEvent {
+        SetupEvent::Log {
+            card: self.0,
+            level: Level::Info,
+            line: line.into(),
+        }
+    }
+
+    fn fail(self, error: &str, hint: &str) -> SetupEvent {
+        SetupEvent::Failed {
+            card: self.0,
+            error: error.into(),
+            hint: Some(hint.into()),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct Demo {
     status: Mutex<Status>,
     /// 1.0 is human speed; the tour runs faster.
@@ -50,6 +83,11 @@ impl Demo {
         }
     }
 
+    /// The cards as they are now.
+    ///
+    /// # Panics
+    ///
+    /// If the status lock is poisoned: a run panicked while it held it.
     pub fn status(&self) -> Status {
         self.status.lock().expect("demo lock").clone()
     }
@@ -58,374 +96,384 @@ impl Demo {
         sleep(Duration::from_millis(ms).div_f32(self.speed.max(0.01)));
     }
 
+    /// Plays `card`'s action with fake timings, emitting the real events, and flips the card;
+    /// false when the action fails, as a wrong code does.
+    ///
+    /// # Panics
+    ///
+    /// If the made-up machine has no `card`, or the status lock is poisoned.
     pub fn run(&self, card: CardId, inputs: &Inputs, emit: &mut dyn FnMut(SetupEvent)) -> bool {
         emit(SetupEvent::Started { card });
-        let p = |kind, text: &str, count| SetupEvent::Prompt {
-            card,
-            kind,
-            text: text.into(),
-            count,
-        };
-        let log = |line: &str| SetupEvent::Log {
-            card,
-            level: Level::Info,
-            line: line.into(),
-        };
-        let fail = |error: &str, hint: &str| SetupEvent::Failed {
-            card,
-            error: error.into(),
-            hint: Some(hint.into()),
-        };
         let mut next = self.status().card(card).cloned().expect("demo card");
-        match card {
-            CardId::Tuxedo => {
-                let pw = inputs.mok_password.as_deref().unwrap_or("");
-                if let Err(why) = super::actions::mok_password_ok(pw) {
-                    emit(fail(
-                        "Secure Boot is on, so the drivers' signing key needs a one-time password",
-                        why,
-                    ));
-                    return false;
-                }
-                emit(p(
-                    PromptKind::Password,
-                    "Your password, in the dialog that just opened.",
-                    None,
-                ));
-                self.wait(1400);
-                for (step, lines) in [
-                    (
-                        "TUXEDO apt repository (resolute)",
-                        &[
-                            "+ apt-get update",
-                            "Get:1 https://deb.tuxedocomputers.com/ubuntu resolute InRelease [4,512 B]",
-                        ][..],
-                    ),
-                    (
-                        "Kernel headers + DKMS (tuxedo-drivers is a DKMS package)",
-                        &["+ apt-get install -y --no-install-recommends dkms mokutil linux-headers-generic"][..],
-                    ),
-                    (
-                        "tuxedo-drivers (NOT tuxedo-control-center)",
-                        &[
-                            "+ apt-get install -y --no-install-recommends tuxedo-drivers udev-hid-bpf",
-                            "Building for 7.0.0-14-generic",
-                            "Signing module /var/lib/dkms/tuxedo-drivers/4.15.4/build/tuxedo_keyboard.ko",
-                        ][..],
-                    ),
-                    (
-                        "Secure Boot: DKMS signing key (MOK)",
-                        &[
-                            "+ mokutil --import /var/lib/dkms/mok.pub",
-                            "  ok  key queued for the next boot",
-                        ][..],
-                    ),
-                ] {
-                    emit(p(PromptKind::Wait, &format!("{step}…"), None));
-                    emit(log(step));
-                    for l in lines {
-                        self.wait(500);
-                        emit(log(l));
-                    }
-                    self.wait(700);
-                }
-                next.state = State::Reboot;
-                next.summary = "Key queued. Reboot and enroll it on the blue MokManager screen.".into();
-                if let Facts::Tuxedo { drivers, mok, .. } = &mut next.facts {
-                    *drivers = true;
-                    *mok = Some(MokState::Pending);
-                }
-            }
-            CardId::Fingerprint => {
-                emit(p(
-                    PromptKind::Password,
-                    "Your password, in the dialog that just opened.",
-                    None,
-                ));
-                self.wait(1200);
-                emit(p(PromptKind::Wait, "Fingerprint reader (fprintd)…", None));
-                emit(log(
-                    "+ apt-get install -y --no-install-recommends fprintd libpam-fprintd",
-                ));
-                self.wait(1500);
-                emit(log("+ pam-auth-update --enable fprintd"));
-                let n = 8;
-                emit(p(
-                    PromptKind::Finger,
-                    "Put your right index finger on the reader.",
-                    Some((0, n)),
-                ));
-                for k in 1..=n {
-                    self.wait(900);
-                    if k == 3 {
-                        emit(p(
-                            PromptKind::Finger,
-                            "Off-centre. Put it flat in the middle.",
-                            Some((k - 1, n)),
-                        ));
-                        self.wait(900);
-                    }
-                    let text = if k == n - 1 {
-                        "Lift it. Once more."
-                    } else {
-                        "Lift it, touch again. Shift it a little each time."
-                    };
-                    emit(p(PromptKind::Finger, text, Some((k, n))));
-                }
+        let played = match card {
+            CardId::Tuxedo => self.tuxedo(inputs, &mut next, emit),
+            CardId::Fingerprint => self.fingerprint(&mut next, emit),
+            CardId::Yubikey => self.yubikey(&mut next, emit),
+            CardId::Bitwarden => self.bitwarden(inputs, &mut next, emit),
+            CardId::Git => self.git(inputs, &mut next, emit),
+            CardId::Phone => self.phone(inputs, &mut next, emit),
+        };
+        played && self.finish(card, next, emit)
+    }
+
+    /// Installs the TUXEDO drivers and queues their signing key for the next boot. False when the
+    /// action fails, with the failure emitted.
+    fn tuxedo(&self, inputs: &Inputs, next: &mut CardStatus, emit: &mut dyn FnMut(SetupEvent)) -> bool {
+        let say = Say(CardId::Tuxedo);
+        let pw = inputs.mok_password.as_deref().unwrap_or("");
+        if let Err(why) = super::actions::mok_password_ok(pw) {
+            emit(say.fail(
+                "Secure Boot is on, so the drivers' signing key needs a one-time password",
+                why,
+            ));
+            return false;
+        }
+        emit(say.p(
+            PromptKind::Password,
+            "Your password, in the dialog that just opened.",
+            None,
+        ));
+        self.wait(1400);
+        for (step, lines) in [
+            (
+                "TUXEDO apt repository (resolute)",
+                &[
+                    "+ apt-get update",
+                    "Get:1 https://deb.tuxedocomputers.com/ubuntu resolute InRelease [4,512 B]",
+                ][..],
+            ),
+            (
+                "Kernel headers + DKMS (tuxedo-drivers is a DKMS package)",
+                &["+ apt-get install -y --no-install-recommends dkms mokutil linux-headers-generic"][..],
+            ),
+            (
+                "tuxedo-drivers (NOT tuxedo-control-center)",
+                &[
+                    "+ apt-get install -y --no-install-recommends tuxedo-drivers udev-hid-bpf",
+                    "Building for 7.0.0-14-generic",
+                    "Signing module /var/lib/dkms/tuxedo-drivers/4.15.4/build/tuxedo_keyboard.ko",
+                ][..],
+            ),
+            (
+                "Secure Boot: DKMS signing key (MOK)",
+                &[
+                    "+ mokutil --import /var/lib/dkms/mok.pub",
+                    "  ok  key queued for the next boot",
+                ][..],
+            ),
+        ] {
+            emit(say.p(PromptKind::Wait, &format!("{step}…"), None));
+            emit(say.log(step));
+            for l in lines {
                 self.wait(500);
-                next.state = State::Done;
-                next.summary = "One finger: right index. sudo and password dialogs take it.".into();
-                if let Facts::Fingerprint {
-                    fingers, fprintd, pam, ..
-                } = &mut next.facts
-                {
-                    fingers.push("right-index-finger".into());
-                    *fprintd = true;
-                    *pam = true;
-                }
+                emit(say.log(l));
             }
-            CardId::Yubikey => {
-                emit(p(
-                    PromptKind::Key,
-                    "Put an enrolled finger on the key's sensor when it blinks.",
-                    None,
+            self.wait(700);
+        }
+        next.state = State::Reboot;
+        next.summary = "Key queued. Reboot and enroll it on the blue MokManager screen.".into();
+        if let Facts::Tuxedo { drivers, mok, .. } = &mut next.facts {
+            *drivers = true;
+            *mok = Some(MokState::Pending);
+        }
+        true
+    }
+
+    /// Installs fprintd and enrolls the right index finger, with one off-centre touch. False when
+    /// the action fails, with the failure emitted.
+    fn fingerprint(&self, next: &mut CardStatus, emit: &mut dyn FnMut(SetupEvent)) -> bool {
+        let say = Say(CardId::Fingerprint);
+        emit(say.p(
+            PromptKind::Password,
+            "Your password, in the dialog that just opened.",
+            None,
+        ));
+        self.wait(1200);
+        emit(say.p(PromptKind::Wait, "Fingerprint reader (fprintd)…", None));
+        emit(say.log("+ apt-get install -y --no-install-recommends fprintd libpam-fprintd"));
+        self.wait(1500);
+        emit(say.log("+ pam-auth-update --enable fprintd"));
+        let n = 8;
+        emit(say.p(
+            PromptKind::Finger,
+            "Put your right index finger on the reader.",
+            Some((0, n)),
+        ));
+        for k in 1..=n {
+            self.wait(900);
+            if k == 3 {
+                emit(say.p(
+                    PromptKind::Finger,
+                    "Off-centre. Put it flat in the middle.",
+                    Some((k - 1, n)),
                 ));
-                self.wait(2600);
-                emit(p(
-                    PromptKind::Password,
-                    "Your password, in the dialog that just opened.",
-                    None,
-                ));
-                self.wait(1400);
-                emit(p(PromptKind::Wait, "Adding the key to /etc/u2f_mappings…", None));
-                emit(log("  ok  /etc/u2f_mappings: kuba has 1 key"));
-                self.wait(600);
-                next.state = State::Done;
-                next.summary =
-                    "This key is enrolled (one key in total). Enroll a backup key too: keys get lost.".into();
-                if let Facts::Yubikey {
-                    enrolled,
-                    this_key_enrolled,
-                    ..
-                } = &mut next.facts
-                {
-                    *enrolled += 1;
-                    *this_key_enrolled = true;
+                self.wait(900);
+            }
+            let text = if k == n - 1 {
+                "Lift it. Once more."
+            } else {
+                "Lift it, touch again. Shift it a little each time."
+            };
+            emit(say.p(PromptKind::Finger, text, Some((k, n))));
+        }
+        self.wait(500);
+        next.state = State::Done;
+        next.summary = "One finger: right index. sudo and password dialogs take it.".into();
+        if let Facts::Fingerprint {
+            fingers, fprintd, pam, ..
+        } = &mut next.facts
+        {
+            fingers.push("right-index-finger".into());
+            *fprintd = true;
+            *pam = true;
+        }
+        true
+    }
+
+    /// Enrolls the plugged-in key. False when the action fails, with the failure emitted.
+    fn yubikey(&self, next: &mut CardStatus, emit: &mut dyn FnMut(SetupEvent)) -> bool {
+        let say = Say(CardId::Yubikey);
+        emit(say.p(
+            PromptKind::Key,
+            "Put an enrolled finger on the key's sensor when it blinks.",
+            None,
+        ));
+        self.wait(2600);
+        emit(say.p(
+            PromptKind::Password,
+            "Your password, in the dialog that just opened.",
+            None,
+        ));
+        self.wait(1400);
+        emit(say.p(PromptKind::Wait, "Adding the key to /etc/u2f_mappings…", None));
+        emit(say.log("  ok  /etc/u2f_mappings: kuba has 1 key"));
+        self.wait(600);
+        next.state = State::Done;
+        next.summary = "This key is enrolled (one key in total). Enroll a backup key too: keys get lost.".into();
+        if let Facts::Yubikey {
+            enrolled,
+            this_key_enrolled,
+            ..
+        } = &mut next.facts
+        {
+            *enrolled += 1;
+            *this_key_enrolled = true;
+        }
+        true
+    }
+
+    /// Logs out, or logs in and pulls the vault: SSH keys, signing, gh and the project env. False
+    /// when the action fails, with the failure emitted.
+    fn bitwarden(&self, inputs: &Inputs, next: &mut CardStatus, emit: &mut dyn FnMut(SetupEvent)) -> bool {
+        let say = Say(CardId::Bitwarden);
+        let logged_in = matches!(
+            &next.facts,
+            Facts::Bitwarden { login, .. } if login == "locked" || login == "unlocked"
+        );
+        if inputs.bw_logout {
+            self.bitwarden_logout(next, emit);
+            return true;
+        }
+        let Some((l, server)) = bitwarden_form(inputs, logged_in, emit) else {
+            return false;
+        };
+        emit(say.p(PromptKind::Wait, "Bitwarden login…", None));
+        if logged_in {
+            emit(say.log("ok  logged in as kuba@example.com"));
+        } else {
+            emit(say.log(&format!("bw login {} --method 0", l.email)));
+        }
+        self.wait(2200);
+        if l.code == "000000" {
+            emit(say.fail(
+                "Bitwarden didn't take that code",
+                "Codes last 30 seconds. Type the next one, quicker.",
+            ));
+            return false;
+        }
+        let folders = match (&inputs.bw_folders, &next.facts) {
+            (Some(f), _) => f.clone(),
+            (None, Facts::Bitwarden { folders, .. }) => folders.clone(),
+            _ => vec![],
+        };
+        let keys = self.bitwarden_pull(&folders, emit);
+        next.state = State::Done;
+        next.summary = format!(
+            "Logged in as {}. SSH keys, commit signing and project env come from the vault.",
+            if l.email.is_empty() {
+                "kuba@example.com"
+            } else {
+                &l.email
+            }
+        );
+        if let Facts::Bitwarden {
+            login,
+            email,
+            server: s,
+            configured,
+            folders: f,
+            overview,
+            agent,
+            ..
+        } = &mut next.facts
+        {
+            if !logged_in {
+                *s = Some(server);
+                if !l.email.is_empty() {
+                    *email = Some(l.email.clone());
                 }
             }
-            CardId::Bitwarden => {
-                let logged_in = matches!(
-                    &next.facts,
-                    Facts::Bitwarden { login, .. } if login == "locked" || login == "unlocked"
-                );
-                if inputs.bw_logout {
-                    emit(p(PromptKind::Wait, "Logging out…", None));
-                    self.wait(600);
-                    emit(log("logged out of Bitwarden"));
-                    next.state = State::Needed;
-                    next.summary = "Not logged in.".into();
-                    if let Facts::Bitwarden { login, agent, .. } = &mut next.facts {
-                        *login = "unauthenticated".into();
-                        *agent = None;
-                    }
-                    return self.finish(card, next, emit);
-                }
-                let Some(l) = &inputs.bw else {
-                    emit(fail("nothing to log in with", "Fill in the form first."));
-                    return false;
-                };
-                let empty = match l.method {
-                    _ if logged_in => l.password.is_empty(),
-                    BwMethod::ApiKey => l.client_id.is_empty() || l.client_secret.is_empty(),
-                    _ => l.email.is_empty() || l.password.is_empty() || l.code.is_empty(),
-                };
-                if empty && logged_in {
-                    emit(fail("the vault is locked", "Type the master password."));
-                    return false;
-                }
-                if empty {
-                    emit(fail(
-                        "email, master password and code, all three",
-                        "Fill in the empty one.",
-                    ));
-                    return false;
-                }
-                let server = match super::server_url(&l.server) {
-                    Ok(s) => s,
-                    Err(why) => {
-                        emit(fail(&why, "com, eu, or your server's https:// address."));
-                        return false;
-                    }
-                };
-                emit(p(PromptKind::Wait, "Bitwarden login…", None));
-                if logged_in {
-                    emit(log("ok  logged in as kuba@example.com"));
-                } else {
-                    emit(log(&format!("bw login {} --method 0", l.email)));
-                }
-                self.wait(2200);
-                if l.code == "000000" {
-                    emit(fail(
-                        "Bitwarden didn't take that code",
-                        "Codes last 30 seconds. Type the next one, quicker.",
-                    ));
-                    return false;
-                }
-                let folders = match (&inputs.bw_folders, &next.facts) {
-                    (Some(f), _) => f.clone(),
-                    (None, Facts::Bitwarden { folders, .. }) => folders.clone(),
-                    _ => vec![],
-                };
-                let keys = demo_keys(&folders);
-                let scope = crate::bitwarden::scope(&folders);
-                let blocks = keys.iter().filter(|k| k.block).count();
-                let reading = format!("ok  8 items, {} SSH key(s) in {scope}", keys.len());
-                let written = format!("ok  ~/.ssh/config.d/bitwarden ({blocks} Host block(s))");
-                let served = format!("agent  running, serves every SSH key in {scope}");
-                for (step, lines) in [
-                    ("Reading the vault", vec![reading.as_str()]),
-                    (
-                        "SSH: public keys and Host blocks",
-                        vec![
-                            "ok  ~/.ssh/github.pub  (SHA256:4f1x…)",
-                            "Host github.com",
-                            written.as_str(),
-                        ],
-                    ),
-                    (
-                        "git: commit signing with an SSH key from the vault",
-                        vec!["ok  signing with ~/.ssh/github.pub (GitHub (Personal)); git config includes it"],
-                    ),
-                    (
-                        "gh: token from the vault into the system keyring",
-                        vec!["ok  gh logged in to github.com, token in the keyring"],
-                    ),
-                    (
-                        "Project env: vault -> GNOME keyring",
-                        vec!["demo                 4 variable(s)"],
-                    ),
-                    (
-                        "Bitwarden desktop SSH agent (~/.bitwarden-ssh-agent.sock)",
-                        vec!["ok  agent answers with 4 key(s)", served.as_str()],
-                    ),
-                ] {
-                    emit(p(PromptKind::Wait, &format!("{step}…"), None));
-                    emit(log(step));
-                    for line in lines {
-                        self.wait(450);
-                        emit(log(line));
-                    }
-                }
-                next.state = State::Done;
-                next.summary = format!(
-                    "Logged in as {}. SSH keys, commit signing and project env come from the vault.",
-                    if l.email.is_empty() {
-                        "kuba@example.com"
-                    } else {
-                        &l.email
-                    }
-                );
-                if let Facts::Bitwarden {
-                    login,
-                    email,
-                    server: s,
-                    configured,
-                    folders: f,
-                    overview,
-                    agent,
-                    ..
-                } = &mut next.facts
-                {
-                    if !logged_in {
-                        *s = Some(server);
-                        if !l.email.is_empty() {
-                            *email = Some(l.email.clone());
-                        }
-                    }
-                    *login = "locked".into();
-                    *configured = true;
-                    f.clone_from(&folders);
-                    overview.keys = keys;
-                    *agent = Some(Agent::Serving {
-                        keys: vec!["SHA256:4f1x".into(); 4],
-                    });
-                }
-            }
-            CardId::Git => {
-                let g = inputs.git.clone().unwrap_or_default();
-                if let Err(why) = super::git_identity_ok(&g.name, &g.email) {
-                    emit(fail("no name and email to commit with", why));
-                    return false;
-                }
-                let (name, email) = (g.name.trim().to_string(), g.email.trim().to_string());
-                self.wait(300);
-                emit(log(&format!(
-                    "  ok  ~/{}: {name} <{email}>",
-                    crate::engine::files::GIT_IDENTITY
-                )));
-                next.state = State::Done;
-                next.summary = format!("Commits as {name} <{email}>.");
-                if let Facts::Git { name: n, email: e, .. } = &mut next.facts {
-                    *n = Some(name);
-                    *e = Some(email);
-                }
-            }
-            CardId::Phone => {
-                let Facts::Phone { link } = &next.facts else {
-                    emit(fail("no phone facts", "The demo machine has none."));
-                    return false;
-                };
-                let mut link = link.clone();
-                let mut said = None;
-                match inputs.phone.clone().unwrap_or_default() {
-                    PhoneStep::On => {
-                        emit(p(PromptKind::Wait, "Starting KDE Connect…", None));
-                        self.wait(900);
-                        emit(log("ok  KDE Connect runs; phones see this laptop as kubaos"));
-                        link.on = true;
-                        link.running = true;
-                        link.addresses = vec!["192.168.1.23".into()];
-                        link.devices = vec![demo_stranger(), demo_iphone(false)];
-                    }
-                    PhoneStep::Off => {
-                        emit(log("ok  phone link off, KDE Connect stopped"));
-                        link = crate::phone::Status {
-                            name: link.name,
-                            ..crate::phone::Status::default()
-                        };
-                    }
-                    PhoneStep::Accept { device } => {
-                        let Some(asking) = link.devices.iter_mut().find(|d| d.id == device && d.wants_to_pair) else {
-                            emit(fail(
-                                &format!("{device} isn't asking to pair"),
-                                "In the phone's KDE Connect app, tap this laptop, then Request pairing.",
-                            ));
-                            return false;
-                        };
-                        emit(p(PromptKind::Wait, "Pairing…", None));
-                        self.wait(700);
-                        *asking = demo_iphone(true);
-                        emit(log("ok  paired with iPhone"));
-                    }
-                    PhoneStep::Test => {
-                        self.wait(400);
-                        emit(log("ok  clipboard sent to iPhone"));
-                        said = Some(format!(
-                            "Sent “{}”. Paste it on iPhone: that's what should show up.",
-                            crate::phone::TEST_TEXT
-                        ));
-                    }
-                    PhoneStep::Check => {
-                        said = Some("The laptop got “Hi from the phone” from the phone.".to_string());
-                    }
-                }
-                next = super::detect::phone_card(link);
-                if let Some(said) = said {
-                    next.summary = said;
-                }
+            *login = "locked".into();
+            *configured = true;
+            f.clone_from(&folders);
+            overview.keys = keys;
+            *agent = Some(Agent::Serving {
+                keys: vec!["SHA256:4f1x".into(); 4],
+            });
+        }
+        true
+    }
+
+    /// Logs out: the card goes back to its login form.
+    fn bitwarden_logout(&self, next: &mut CardStatus, emit: &mut dyn FnMut(SetupEvent)) {
+        let say = Say(CardId::Bitwarden);
+        emit(say.p(PromptKind::Wait, "Logging out…", None));
+        self.wait(600);
+        emit(say.log("logged out of Bitwarden"));
+        next.state = State::Needed;
+        next.summary = "Not logged in.".into();
+        if let Facts::Bitwarden { login, agent, .. } = &mut next.facts {
+            *login = "unauthenticated".into();
+            *agent = None;
+        }
+    }
+
+    /// Plays a pull of the vault narrowed to `folders`, and returns the keys it found.
+    fn bitwarden_pull(&self, folders: &[String], emit: &mut dyn FnMut(SetupEvent)) -> Vec<KeyInfo> {
+        let say = Say(CardId::Bitwarden);
+        let keys = demo_keys(folders);
+        let scope = crate::bitwarden::scope(folders);
+        let blocks = keys.iter().filter(|k| k.block).count();
+        let reading = format!("ok  8 items, {} SSH key(s) in {scope}", keys.len());
+        let written = format!("ok  ~/.ssh/config.d/bitwarden ({blocks} Host block(s))");
+        let agent = format!("agent  running, serves every SSH key in {scope}");
+        for (step, lines) in [
+            ("Reading the vault", vec![reading.as_str()]),
+            (
+                "SSH: public keys and Host blocks",
+                vec![
+                    "ok  ~/.ssh/github.pub  (SHA256:4f1x…)",
+                    "Host github.com",
+                    written.as_str(),
+                ],
+            ),
+            (
+                "git: commit signing with an SSH key from the vault",
+                vec!["ok  signing with ~/.ssh/github.pub (GitHub (Personal)); git config includes it"],
+            ),
+            (
+                "gh: token from the vault into the system keyring",
+                vec!["ok  gh logged in to github.com, token in the keyring"],
+            ),
+            (
+                "Project env: vault -> GNOME keyring",
+                vec!["demo                 4 variable(s)"],
+            ),
+            (
+                "Bitwarden desktop SSH agent (~/.bitwarden-ssh-agent.sock)",
+                vec!["ok  agent answers with 4 key(s)", agent.as_str()],
+            ),
+        ] {
+            emit(say.p(PromptKind::Wait, &format!("{step}…"), None));
+            emit(say.log(step));
+            for line in lines {
+                self.wait(450);
+                emit(say.log(line));
             }
         }
-        self.finish(card, next, emit)
+        keys
+    }
+
+    /// Writes the git identity typed in. False when the action fails, with the failure emitted.
+    fn git(&self, inputs: &Inputs, next: &mut CardStatus, emit: &mut dyn FnMut(SetupEvent)) -> bool {
+        let say = Say(CardId::Git);
+        let g = inputs.git.clone().unwrap_or_default();
+        if let Err(why) = super::git_identity_ok(&g.name, &g.email) {
+            emit(say.fail("no name and email to commit with", why));
+            return false;
+        }
+        let (name, email) = (g.name.trim().to_string(), g.email.trim().to_string());
+        self.wait(300);
+        emit(say.log(&format!(
+            "  ok  ~/{}: {name} <{email}>",
+            crate::engine::files::GIT_IDENTITY
+        )));
+        next.state = State::Done;
+        next.summary = format!("Commits as {name} <{email}>.");
+        if let Facts::Git { name: n, email: e, .. } = &mut next.facts {
+            *n = Some(name);
+            *e = Some(email);
+        }
+        true
+    }
+
+    /// Plays one step of the phone link: on, off, pairing, or a clipboard test either way. False
+    /// when the action fails, with the failure emitted.
+    fn phone(&self, inputs: &Inputs, next: &mut CardStatus, emit: &mut dyn FnMut(SetupEvent)) -> bool {
+        let say = Say(CardId::Phone);
+        let Facts::Phone { link } = &next.facts else {
+            emit(say.fail("no phone facts", "The demo machine has none."));
+            return false;
+        };
+        let mut link = link.clone();
+        let mut said = None;
+        match inputs.phone.clone().unwrap_or_default() {
+            PhoneStep::On => {
+                emit(say.p(PromptKind::Wait, "Starting KDE Connect…", None));
+                self.wait(900);
+                emit(say.log("ok  KDE Connect runs; phones see this laptop as kubaos"));
+                link.on = true;
+                link.running = true;
+                link.addresses = vec!["192.168.1.23".into()];
+                link.devices = vec![demo_stranger(), demo_iphone(false)];
+            }
+            PhoneStep::Off => {
+                emit(say.log("ok  phone link off, KDE Connect stopped"));
+                link = crate::phone::Status {
+                    name: link.name,
+                    ..crate::phone::Status::default()
+                };
+            }
+            PhoneStep::Accept { device } => {
+                let Some(asking) = link.devices.iter_mut().find(|d| d.id == device && d.wants_to_pair) else {
+                    emit(say.fail(
+                        &format!("{device} isn't asking to pair"),
+                        "In the phone's KDE Connect app, tap this laptop, then Request pairing.",
+                    ));
+                    return false;
+                };
+                emit(say.p(PromptKind::Wait, "Pairing…", None));
+                self.wait(700);
+                *asking = demo_iphone(true);
+                emit(say.log("ok  paired with iPhone"));
+            }
+            PhoneStep::Test => {
+                self.wait(400);
+                emit(say.log("ok  clipboard sent to iPhone"));
+                said = Some(format!(
+                    "Sent “{}”. Paste it on iPhone: that's what should show up.",
+                    crate::phone::TEST_TEXT
+                ));
+            }
+            PhoneStep::Check => {
+                said = Some("The laptop got “Hi from the phone” from the phone.".to_string());
+            }
+        }
+        *next = super::detect::phone_card(link);
+        if let Some(said) = said {
+            next.summary = said;
+        }
+        true
     }
 
     /// The card flips to `next`, and the run ends with it.
@@ -483,6 +531,40 @@ fn demo_phone(paired: bool) -> CardStatus {
 
 /// The demo vault's SSH keys, as a pull from `folders` (none: the whole vault) leaves them: the
 /// harness's vault without its hostile item.
+/// The login form the Bitwarden card was given, and its server, or `None` with the failure
+/// emitted when a field it needs is empty or the server isn't one.
+fn bitwarden_form<'a>(
+    inputs: &'a Inputs,
+    logged_in: bool,
+    emit: &mut dyn FnMut(SetupEvent),
+) -> Option<(&'a BwLogin, String)> {
+    let say = Say(CardId::Bitwarden);
+    let Some(l) = &inputs.bw else {
+        emit(say.fail("nothing to log in with", "Fill in the form first."));
+        return None;
+    };
+    let empty = match l.method {
+        _ if logged_in => l.password.is_empty(),
+        BwMethod::ApiKey => l.client_id.is_empty() || l.client_secret.is_empty(),
+        _ => l.email.is_empty() || l.password.is_empty() || l.code.is_empty(),
+    };
+    if empty && logged_in {
+        emit(say.fail("the vault is locked", "Type the master password."));
+        return None;
+    }
+    if empty {
+        emit(say.fail("email, master password and code, all three", "Fill in the empty one."));
+        return None;
+    }
+    match super::server_url(&l.server) {
+        Ok(server) => Some((l, server)),
+        Err(why) => {
+            emit(say.fail(&why, "com, eu, or your server's https:// address."));
+            None
+        }
+    }
+}
+
 fn demo_keys(folders: &[String]) -> Vec<KeyInfo> {
     let key = |name: &str, folder: &str, file: &str, hosts: &[&str]| KeyInfo {
         name: name.into(),
@@ -522,6 +604,10 @@ fn demo_keys(folders: &[String]) -> Vec<KeyInfo> {
     keys
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "A table of every card of each made-up machine, as data, which reads worse split up."
+)]
 fn initial(machine: Machine) -> Status {
     let absent = |id, summary: &str, facts| CardStatus {
         id,

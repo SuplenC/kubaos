@@ -46,13 +46,13 @@ impl Install<'_> {
         self.mkdir(&self.t(&dir))?;
         self.write(&format!("{dir}/Default_keyring.keyring"), KEYRING, 0o600)?;
         self.write(&format!("{dir}/default"), "Default_keyring\n", 0o644)?;
-        self.sh(Cmd::new("chmod").args(["700", &self.ts(&dir)]))?;
-        self.sh(Cmd::new("chown").args([
+        self.sh(&Cmd::new("chmod").args(["700", &self.ts(&dir)]))?;
+        self.sh(&Cmd::new("chown").args([
             owner,
             &self.ts(&format!("{home}/.local")),
             &self.ts(&format!("{home}/.local/share")),
         ]))?;
-        self.sh(Cmd::new("chown").args(["-R", owner, &self.ts(&dir)]))?;
+        self.sh(&Cmd::new("chown").args(["-R", owner, &self.ts(&dir)]))?;
         Ok(())
     }
 
@@ -80,7 +80,7 @@ impl Install<'_> {
         self.mkdir(&self.t("/usr/lib/kubaos"))?;
         for (src, dst) in [(&cli, INSTALLED_KUBAOS), (&gui, "/usr/bin/kobo")] {
             let cmd = Cmd::new("install").args(["-m", "0755", &src.display().to_string(), &self.ts(dst)]);
-            self.sh(cmd)?;
+            self.sh(&cmd)?;
         }
         // A launcher, not the binary: every switch installs the release's `kubaos` in the home,
         // and the launcher runs that one, so a new kubaos needs no copy here. `kubaos-setup`
@@ -95,7 +95,7 @@ impl Install<'_> {
         if let Some(d) = wants.parent() {
             self.mkdir(d)?;
         }
-        self.sh(Cmd::new("ln").args(["-sfn", UNIT_PATH, &wants.display().to_string()]))?;
+        self.sh(&Cmd::new("ln").args(["-sfn", UNIT_PATH, &wants.display().to_string()]))?;
         self.info("first-boot setup opens at the first login (kubaos-setup any time)");
         Ok(())
     }
