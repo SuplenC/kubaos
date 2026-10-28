@@ -200,8 +200,8 @@ impl Fixed {
 }
 
 /// How far past its box a page's scroll reaches into the room around it, in logical pixels: above,
-/// below, and on its left. On its right each toolkit reaches as far as its thumb lets it, so the
-/// right is not part of what it says.
+/// below, and on its left. On its right iced reaches less than QML, past content that leaves a
+/// gutter for its thumb, so the right is not part of what it says.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Reach {
     pub above: f32,

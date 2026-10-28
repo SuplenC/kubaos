@@ -113,9 +113,7 @@ TestCase {
         verify(at.y < clipped().y, "the content above the room is past the clip");
     }
 
-    // The geometry check is told the reach above, below and on the left; on the right iced
-    // reaches only as far as its thumb lets it.
-    function test_it_tells_the_geometry_check_how_far_it_reaches() {
+    function test_it_tells_the_geometry_check_how_far_it_reaches_above_below_and_on_its_left() {
         scroll.roomAbove = K.Tokens.space.s12;
 
         compare(scroll.probe.role, "scroll");

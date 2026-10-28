@@ -122,7 +122,7 @@ fn page_scroll(reach: Reach, held: Option<Rect>) -> Node {
 
 #[test]
 fn a_pages_scroll_that_reaches_as_far_with_its_content_as_far_in_is_at_parity() {
-    let iced = frame(page_scroll(GLOW, Some(rect(0.0, 0.0, 304.0, 160.0))));
+    let iced = frame(page_scroll(GLOW, Some(rect(0.0, 0.0, 324.0, 160.0))));
     let qml = frame(page_scroll(GLOW, None));
 
     assert_eq!(compare(&iced, &qml, ("iced", "QML")), []);

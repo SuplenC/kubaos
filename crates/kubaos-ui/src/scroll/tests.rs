@@ -105,3 +105,16 @@ fn a_pages_scroll_reaches_all_the_room_up_to_its_neighbour_when_that_is_more_tha
 
     assert_eq!(inside.y - scrolled.y, f32::from(Space::S32.px()));
 }
+
+#[test]
+fn a_pages_scroll_of_a_set_height_tells_its_parent_that_height_whatever_it_reaches() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let log = f32::from(crate::tokens::Size::Log.px());
+
+    let scrolled: Element<'_, ()> = scroll(&look, inside())
+        .height(crate::layout::Extent::Fixed(crate::tokens::Size::Log))
+        .room_above(Space::S12)
+        .into();
+
+    assert_eq!(scrolled.as_widget().size().height, Length::Fixed(log));
+}

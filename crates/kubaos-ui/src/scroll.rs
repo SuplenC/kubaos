@@ -284,8 +284,14 @@ impl<M> Widget<M, Theme, Renderer> for Bleed<'_, M> {
         tree.diff_children(slice::from_ref(&self.content));
     }
 
+    // The box's size: a set length of the content's is the box's plus the reach.
     fn size(&self) -> Size<Length> {
-        self.content.as_widget().size()
+        let size = self.content.as_widget().size();
+        let less = |length: Length, by: f32| match length {
+            Length::Fixed(px) => Length::Fixed((px - by).max(0.0)),
+            other => other,
+        };
+        Size::new(less(size.width, self.by.x()), less(size.height, self.by.y()))
     }
 
     fn size_hint(&self) -> Size<Length> {
