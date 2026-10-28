@@ -2,7 +2,8 @@
 
     stage.py TREE HARNESS OUT WALLPAPERS ICONS
 
-TREE holds `config/quickshell` and `qml/KubaOS` (the working tree, or a rev extracted from git).
+TREE holds `config/quickshell` and `qml/KubaOS`, its token outputs written (the working tree, or a rev
+extracted from git).
 OUT gets `imports/`, the QML import path the drivers run with:
 
 - the stand-ins from HARNESS/fakes (Quickshell's modules, Kotodama and the shell's services and

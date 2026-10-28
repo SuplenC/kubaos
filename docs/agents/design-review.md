@@ -1,6 +1,6 @@
 # Design review
 
-What Kuba checks in every UI change. A design brief includes this list, and a PR is reviewed against it on its rendered screenshots, not only its code, before Kuba sees it. `docs/DESIGN.md` is the spec; this page holds the review points that `just design-check` doesn't measure.
+What Kuba checks in every UI change. A design brief includes this list, and a PR is reviewed against it on its rendered screenshots, not only its code, before Kuba sees it. `docs/DESIGN.md` and the component pages under `docs/design/components/` are the spec; this page holds the review points that `just design-check` doesn't measure.
 
 ## The checklist
 
@@ -21,5 +21,5 @@ What Kuba checks in every UI change. A design brief includes this list, and a PR
 ## How to apply it
 
 - **Before building a large visible change** (a new screen, a card's layout, an animation), show Kuba a rough HTML mockup and let him pick, then build it.
-- **Before the PR is ready,** a reviewer goes through the changed screenshots against this list and `docs/DESIGN.md`, and the PR lists each visible change as a decision for Kuba, with its before/after shots.
+- **Before the PR is ready,** a reviewer goes through the changed screenshots against this list, `docs/DESIGN.md` and the pages of the components it touches (`docs/design/components/`), and the PR lists each visible change as a decision for Kuba, with its before/after shots.
 - **A point that becomes measurable** is a `just design-check` rule instead of an entry here.

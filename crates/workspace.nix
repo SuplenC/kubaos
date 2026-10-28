@@ -32,23 +32,31 @@ let
     ) workspace.members
   );
 
-  # Files outside the crates that a crate embeds when it builds.
+  # Files outside the crates that a crate reads when it builds: what it
+  # embeds, and the tokens its build script writes its module from.
   embeds = {
     kubaos-core = [ ../install/firstboot ];
+    kubaos-ui = [ ../design/tokens.toml ];
+    kubaos-cursor = [ ../design/tokens.toml ];
+    kubaos-kobo = [ ../design/tokens.toml ];
   };
 
   # The workspace crates `crate` builds against, as cargo resolves them: its
-  # own and its targets' [dependencies] that are workspace members, and
-  # theirs. Dev-dependencies only build for the tests.
+  # own and its targets' [dependencies] and [build-dependencies] that are
+  # workspace members, and theirs. Dev-dependencies only build for the tests.
   workspaceDeps =
     crate:
     let
       manifest = manifests.${crate};
-      targetDeps = lib.concatMap (target: lib.attrNames (target.dependencies or { })) (
-        lib.attrValues (manifest.target or { })
-      );
+      targetDeps = lib.concatMap (
+        target: lib.attrNames (target.dependencies or { }) ++ lib.attrNames (target.build-dependencies or { })
+      ) (lib.attrValues (manifest.target or { }));
     in
-    lib.filter (dep: manifests ? ${dep}) (lib.attrNames (manifest.dependencies or { }) ++ targetDeps);
+    lib.filter (dep: manifests ? ${dep}) (
+      lib.attrNames (manifest.dependencies or { })
+      ++ lib.attrNames (manifest.build-dependencies or { })
+      ++ targetDeps
+    );
   closure =
     crate:
     map (item: item.key) (
@@ -89,6 +97,12 @@ let
     # no machine installs.
     checks = [
       "kubaos-design"
+    ];
+    # The tokens' generator, which the Nix build of the token outputs runs
+    # (design/package.nix): three small dependencies, kept apart so the
+    # outputs build without the tools' or iced's.
+    tokens = [
+      "kubaos-tokens"
     ];
   };
   groupOf =

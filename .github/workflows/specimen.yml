@@ -1,0 +1,126 @@
+# The specimen's pictures, which docs/DESIGN.md shows. The repo doesn't keep
+# them: on each push to main, `kubaos-specimen shots` and `qml-specimen shots`
+# render every page, and the iced pages at 1×, light and dark, and the QML
+# components page at 1× and 1.5×, dark, are pushed to the image-only branch
+# chore/shots-specimen as one commit with no history. A pull request's own
+# pictures come from `just shots specimen` (docs/agents/design-pr-loop.md),
+# and its design checks run in check.yml.
+#
+# Two jobs, so the one whose token can push runs none of the repo's code:
+# `render` only reads, and `publish` pushes the pictures `render` uploaded.
+# Both caches are only read: check.yml's run on the same push saves them.
+#
+# Actions are pinned to a commit, with the release in the comment beside it.
+name: Specimen
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: specimen
+  cancel-in-progress: true
+
+jobs:
+  render:
+    name: render (x86_64-linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      # The runner image's preinstalled SDKs leave too little of the disk for
+      # Qt, the toolchain and the crates' builds.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      # This job runs the repo's code: it keeps no token to push with.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+        with:
+          extra_nix_config: |
+            max-jobs = auto
+
+      - name: Restore the Nix store
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix', 'qml/specimen/package.nix') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          save: false
+
+      - name: Read the kuba-os Cachix
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: kuba-os
+          skipPush: true
+
+      - name: Restore the compile cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/sccache
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-
+            cargo-${{ runner.os }}-
+
+      # A debug build, as check.yml's compile cache holds one: the dependencies come from it, and
+      # every page renders in a few minutes. A release build would compile iced afresh.
+      - name: Render
+        run: |
+          nix develop --command cargo run -q -p kubaos-specimen -- shots out/iced
+          nix run .#checks.x86_64-linux.qml-specimen -- shots out/qml
+          mkdir -p shots/qml
+          cp out/iced/*-1x.png shots/
+          cp out/qml/components-dark-1x.png out/qml/components-dark-1.5x.png shots/qml/
+
+      - name: Upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: specimen
+          path: shots/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: publish
+    needs: render
+    # Only main's pictures are the docs': a manual run from another branch renders, never publishes.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: specimen
+          path: shots
+
+      - name: Push
+        working-directory: shots
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init -q -b chore/shots-specimen
+          git add .
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "shots: the specimen at ${GITHUB_SHA::12}"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            HEAD:refs/heads/chore/shots-specimen

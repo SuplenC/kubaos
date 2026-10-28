@@ -1,0 +1,6 @@
+# The token outputs still checked in, which `system/` installs from the
+# checkout outside any build: wholly generated, so a merge keeps one side
+# (with `git config merge.ours.driver true` in the clone) and `just tokens`
+# rewrites it; kubaos-tokens' test fails until it has. GitHub folds their diffs.
+system/files/plymouth/kubaos/kubaos.plymouth merge=ours linguist-generated
+system/files/grub/kubaos/theme.txt merge=ours linguist-generated

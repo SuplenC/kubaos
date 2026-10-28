@@ -11,11 +11,16 @@
 # handles them: it seeds the ones the app rewrites, merges the ones with no
 # include, and creates the user layer's missing files from user-layer/.
 #
+# The token outputs the repo doesn't keep (a terminal's tokens, the matugen
+# templates written from the tokens, Hyprland's tokens.lua) come from their Nix
+# build (design/package.nix) and are linked as if they were in config/.
+#
 # scripts/<file> is linked from the store to ~/.local/bin/<file> the same way.
 # In a checkout, new files need `git add` before the next switch (flakes only
 # see tracked files).
 {
   config,
+  kubaosPkgs,
   lib,
   pkgs,
   ...
@@ -41,6 +46,12 @@ let
     name = "kubaos-config";
   };
 
+  # The token outputs built into config/, by their paths under it: .gitignore
+  # lists them, and kubaos-tokens' tests hold that list to the generator's.
+  built = map (lib.removePrefix "/config/") (
+    lib.filter (lib.hasPrefix "/config/") (lib.splitString "\n" (builtins.readFile ../.gitignore))
+  );
+
   # tms's `search_dirs`, from the Command menu's folders, so both find the
   # same projects. A folder without a depth, such as the Scripts root, is
   # searched one level down.
@@ -53,9 +64,12 @@ let
 
   '') menuFolders;
 
-  # config/ as shipped, but for tms/config.toml, which gains the search_dirs.
+  # config/ as shipped with the token outputs built into it, but for
+  # tms/config.toml, which gains the search_dirs.
   defaults = pkgs.runCommand "kubaos-defaults" { } ''
     cp -r ${shipped} $out
+    chmod -R u+w $out
+    cp -r ${kubaosPkgs.kubaos-token-outputs}/config/. $out/
     chmod -R u+w $out
     { printf '%s' ${lib.escapeShellArg tmsSearchDirs}; cat ${shipped}/tms/config.toml; } >$out/tms/config.toml
   '';
@@ -106,7 +120,7 @@ let
           [ ]
       ) (builtins.readDir dir)
     );
-  linked = lib.subtractLists notLinked (files shipped);
+  linked = lib.subtractLists notLinked (lib.unique (files shipped ++ built));
 
   scriptsDir = builtins.path {
     path = ../scripts;

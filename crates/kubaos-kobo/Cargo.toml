@@ -46,5 +46,9 @@ iced_runtime = "0.14"
 kubaos-geometry.workspace = true
 tempfile.workspace = true
 
+# The neon sign's tokens (src/done/neon.rs), written from design/tokens.toml by build.rs.
+[build-dependencies]
+kubaos-tokens.workspace = true
+
 [lints]
 workspace = true

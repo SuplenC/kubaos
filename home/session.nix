@@ -39,18 +39,32 @@ let
       ]);
   };
 
+  # The token outputs (design/package.nix): Hyprland's tokens.lua, Ghostty's
+  # tokens and tmux's colours are among them. One store path holds them all, so
+  # a change to any token reloads all three.
+  tokens = kubaosPkgs.kubaos-token-outputs;
+
   # The names are the parts `scripts/dot-session` knows. hyprlock is left out:
   # it starts afresh at every lock.
   parts = {
-    hyprland = [ hyprlandConfig ];
+    hyprland = [
+      hyprlandConfig
+      tokens
+    ];
     # The package carries the Kotodama QML module the Command menu loads.
     quickshell = [
       (defaults "quickshell" ../config/quickshell)
       kubaosPkgs.quickshell
     ];
     hypridle = [ (defaults "hypridle" ../config/hypr/hypridle.conf) ];
-    ghostty = [ (defaults "ghostty" ../config/ghostty) ];
-    tmux = [ (defaults "tmux" ../config/tmux) ];
+    ghostty = [
+      (defaults "ghostty" ../config/ghostty)
+      tokens
+    ];
+    tmux = [
+      (defaults "tmux" ../config/tmux)
+      tokens
+    ];
   };
 
   record = pkgs.writeText "kubaos-session" (

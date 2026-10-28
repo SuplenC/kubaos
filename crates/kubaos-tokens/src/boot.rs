@@ -28,6 +28,7 @@ use crate::model::Family;
 use crate::model::Rgb;
 use crate::model::Tokens;
 use crate::model::Weight;
+use crate::target::Kept;
 use crate::target::Target;
 
 /// The Plymouth theme's script.
@@ -56,6 +57,10 @@ pub struct GrubTheme;
 impl Target for PlymouthScript {
     fn path(&self) -> &'static str {
         SCRIPT
+    }
+
+    fn kept(&self) -> Kept {
+        Kept::Committed
     }
 
     fn render(&self, tokens: &Tokens, root: &Path) -> io::Result<String> {
@@ -92,6 +97,10 @@ impl Target for PlymouthTheme {
         "system/files/plymouth/kubaos/kubaos.plymouth"
     }
 
+    fn kept(&self) -> Kept {
+        Kept::Committed
+    }
+
     fn render(&self, tokens: &Tokens, _root: &Path) -> io::Result<String> {
         let hex = |role: &str| {
             let Rgb { r, g, b } = *tokens
@@ -124,6 +133,10 @@ impl Target for PlymouthTheme {
 impl Target for GrubTheme {
     fn path(&self) -> &'static str {
         GRUB_THEME
+    }
+
+    fn kept(&self) -> Kept {
+        Kept::Committed
     }
 
     fn render(&self, tokens: &Tokens, root: &Path) -> io::Result<String> {

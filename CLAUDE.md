@@ -14,9 +14,11 @@ Before writing or reviewing code in this repo, read `docs/agents/code-quality.md
 
 ## Design
 
-Any UI, in any toolkit, follows `docs/DESIGN.md`: tokens and the shared components only, never a literal colour, size, spacing, radius, duration or font. `just design-check` passes (the rules are in `docs/agents/code-quality.md`, "Design"). Before a UI change reaches Kuba, review its rendered screenshots against `docs/agents/design-review.md`, his recurring review points.
+Any UI, in any toolkit, follows `docs/DESIGN.md` and each component's page under `docs/design/components/`: tokens and the shared components only, never a literal colour, size, spacing, radius, duration or font. `just design-check` passes (the rules are in `docs/agents/code-quality.md`, "Design"). Before a UI change reaches Kuba, review its rendered screenshots against `docs/agents/design-review.md`, his recurring review points.
 
 Render, diff and attach a UI change's screenshots with `just shots`, as `docs/agents/design-pr-loop.md` describes.
+
+Generated files aren't committed, so UI PRs don't collide: the token outputs are built where they are read (`just tokens` writes them into a checkout for an editor), and the specimen's pictures are rendered, never checked in. A new component is a page of its own under `docs/design/components/` and a specimen file of its own on each side, plus its lines in the lists (`docs/DESIGN.md`, "Changing the design").
 
 ## Docs describe the current state
 

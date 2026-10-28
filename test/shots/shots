@@ -2,8 +2,9 @@
 # shots: before/after screenshots of the shell, Kōbō, the specimen, the terminals and the boot
 # screens, paired and diffed, for a design PR. Run it through `just shots` (`nix run .#shots`),
 # which pins the shell's renderer (Qt, sway, Mesa, ImageMagick and the fonts), the terminals and
-# their TUIs, and the boot screens' tools. Kōbō and the specimen build with the cargo and nix on
-# your PATH. docs/agents/design-pr-loop.md has the loop it serves.
+# their TUIs, and the boot screens' tools. Kōbō, the specimen, and the token outputs the shell and
+# the terminals read, build with the cargo and nix on your PATH (`nix develop`).
+# docs/agents/design-pr-loop.md has the loop it serves.
 #
 #   shots [SURFACE...] [--scales 1,1.5] [--modes dark] [--ref REV] [--full] [--jobs N]
 #         [--threshold PX]
@@ -183,6 +184,21 @@ extract() {
   tmp=$(mktemp -d "$(dirname "$dir")/.extract.XXXXXX")
   git -C "$repo" archive "$rev" "$@" | tar -x -m -C "$tmp"
   mv -T "$tmp" "$dir" 2>/dev/null || rm -rf "$tmp"
+}
+
+# tokens SIDE TREE: writes the token outputs the repo doesn't keep (Tokens.qml, the terminals'
+# tokens and templates) into TREE, where the shell's and the terminals' renders read them. AFTER,
+# the working tree, gets only those (`kubaos-tokens build`), so no checked-in file changes under
+# you; BEFORE, an extracted rev, gets every output, which a rev from before they were built at all
+# already has. BEFORE builds the generator in the target dir iced's BEFORE uses.
+tokens() {
+  local side=$1 tree=$2
+  mkdir -p "$out/logs"
+  if [[ $side == after ]]; then
+    (cd "$tree" && cargo run -q -p kubaos-tokens -- build "$tree" --root "$tree")
+  else
+    (cd "$tree" && CARGO_TARGET_DIR="$cache/target" cargo run -q -p kubaos-tokens -- write --root "$tree")
+  fi >"$out/logs/tokens-$side.log" 2>&1 || die "the token outputs of $side weren't written: $out/logs/tokens-$side.log"
 }
 
 # shell_side SIDE TREE DIR: stages TREE and plans every render of SIDE into DIR, skipping the
@@ -509,15 +525,18 @@ main() {
 
   echo "shots: ${picked[*]} at ${scales[*]}, ${modes[*]}; before is $(cat "$out/base") ($ref), after the working tree" >&2
   local started=$SECONDS
+  if ((${#shell[@]} || terminals)); then
+    extract "$base" "$cache/$base/tree"
+    tokens after "$repo"
+    tokens before "$cache/$base/tree"
+  fi
   if ((${#shell[@]})); then
-    extract "$base" "$cache/$base/src" config/quickshell qml
     shell_side after "$repo" "$out/after"
-    shell_side before "$cache/$base/src" "$before_dir"
+    shell_side before "$cache/$base/tree" "$before_dir"
   fi
   if ((terminals)); then
-    extract "$base" "$cache/$base/terminals" config scripts branding user-layer home
     terminal_side "$repo" "$out/after"
-    terminal_side "$cache/$base/terminals" "$before_dir"
+    terminal_side "$cache/$base/tree" "$before_dir"
   fi
   run_jobs
   if ((${#iced_surfaces[@]})); then

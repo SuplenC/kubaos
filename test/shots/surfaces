@@ -3,7 +3,7 @@
 # and specimen are the iced renderers', terminals is test/shots/terminals', and plymouth, grub and
 # cursor are the boot screens' and the pointer's (test/shots/boot). The services are stand-ins
 # (fakes/qs/services), so a change to config/quickshell/services renders nothing.
-*              qml/KubaOS config/quickshell/components config/quickshell/theme test/shots flake.lock
+*              qml/KubaOS design/tokens.toml crates/kubaos-tokens crates/kubaos-ui/assets/symbols config/quickshell/components config/quickshell/theme test/shots flake.lock
 bar            config/quickshell/modules/bar config/quickshell/modules/frame
 controlcenter  config/quickshell/modules/controlcenter config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar
 clock          config/quickshell/modules/clock config/quickshell/modules/frame config/quickshell/modules/bar
@@ -17,7 +17,7 @@ polkit         config/quickshell/modules/polkit
 menu           config/quickshell/modules/menu
 kobo           crates/kubaos-kobo crates/kubaos-ui crates/kubaos-core design/tokens.toml
 specimen       crates/kubaos-specimen crates/kubaos-ui qml/KubaOS qml/specimen design/tokens.toml
-terminals      config/ghostty config/foot config/tmux config/nvim config/btop config/lazygit config/bat config/fuzzel config/ohmyposh config/fastfetch config/matugen design/tokens.toml scripts/dot-config test/shots/terminals test/shots/terminal
+terminals      config/ghostty config/foot config/tmux config/nvim config/btop config/lazygit config/bat config/fuzzel config/ohmyposh config/fastfetch config/matugen design/tokens.toml crates/kubaos-tokens crates/kubaos-ui/assets/fonts scripts/dot-config test/shots/terminals test/shots/terminal
 plymouth       system/files/plymouth system/files/fonts system/files/initramfs-tools test/shots/boot design/tokens.toml
 grub           system/files/grub system/files/fonts test/shots/boot design/tokens.toml
 cursor         crates/kubaos-cursor crates/kubaos-cli/src/cursor.rs test/shots/boot design/tokens.toml
