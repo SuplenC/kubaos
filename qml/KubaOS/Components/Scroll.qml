@@ -17,10 +17,8 @@ Item {
     property real roomAbove: Tokens.focus.far
     property real roomBelow: Tokens.focus.far
     property alias contentY: flick.contentY
-    readonly property real contentHeight: body.implicitHeight
     // How far it can scroll: the content's height less the room it shows.
     readonly property real travel: Math.max(0, flick.contentHeight - flick.height)
-    readonly property bool moving: flick.moving
     readonly property real reachSides: Tokens.focus.far
     readonly property var probe: ({
             role: "scroll"

@@ -158,10 +158,16 @@ K.Sheet {
     // The tabs and their list, in the room the sections above leave, the container padding in
     // from the panel's edges.
     Item {
+        id: tabs
+
+        // The gap between the tabs and the tab, and the room between the tab and the panel's edge.
+        readonly property int gap: K.Tokens.space.s12
+        readonly property int foot: K.Tokens.space.s16
+
         x: body.padding
         y: body.height
         width: root.contentWidth - body.padding * 2
-        height: Math.max(0, root.height - y - K.Tokens.space.s16)
+        height: Math.max(0, root.height - y - tabs.foot)
 
         K.Tabs {
             id: tabBar
@@ -172,10 +178,11 @@ K.Sheet {
             onPicked: index => root.tab = index
         }
 
-        // The tab's room has no edge of its own: a focused control's glow reaches past it, and
-        // only the panel's own edge cuts it, or a list taller than the room on a short screen.
+        // The tab's room has no edge of its own, so it doesn't clip: a focused control's glow
+        // reaches past it to the panel's own edge. A tab that scrolls on a short screen reaches
+        // its scroll to the tabs and the panel's edge.
         Item {
-            y: tabBar.height + K.Tokens.space.s12
+            y: tabBar.height + tabs.gap
             width: parent.width
             height: Math.max(0, parent.height - y)
 
@@ -200,6 +207,8 @@ K.Sheet {
 
             KeyboardList {
                 anchors.fill: parent
+                roomAbove: tabs.gap
+                roomBelow: tabs.foot
                 visible: root.tab === 3
             }
         }
