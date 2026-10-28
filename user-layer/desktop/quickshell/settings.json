@@ -11,4 +11,9 @@
   // window's border, as the neon sign does: true (default), or false for a
   // plain fade. "Focus stutter" in the Command menu turns it on and off.
   // "focusStutter": true
+
+  // The bar's bell: false (default) shows it only while there is a
+  // notification, true always. "Always show the bell" in the Command menu
+  // turns it on and off.
+  // "alwaysShowBell": false
 }

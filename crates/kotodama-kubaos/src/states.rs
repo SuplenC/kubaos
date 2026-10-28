@@ -11,6 +11,7 @@
 //! | `idle.keep-awake` | on: kept awake | `$XDG_RUNTIME_DIR/kubaos-keep-awake.json` |
 //! | `phone.link` | on: the phone link | `U/desktop/phone/phone-link` exists |
 //! | `proxy` | on: the user wants the Proxy | `$XDG_RUNTIME_DIR/kubaos-proxy.json` |
+//! | `notifications.dnd` | on: Do not disturb is on | `$XDG_RUNTIME_DIR/kubaos-dnd.json` |
 //! | `power.panel-power-saving` | on: panel power saving | `U/desktop/power/power.toml` |
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
@@ -56,6 +57,8 @@ pub const KEEP_AWAKE: &str = "idle.keep-awake";
 pub const PHONE_LINK: &str = "phone.link";
 /// Whether the user wants the Proxy on in this session.
 pub const PROXY: &str = "proxy";
+/// Whether Do not disturb is on, by hand or by itself.
+pub const DND: &str = "notifications.dnd";
 /// Whether the saver stops dim the panel.
 pub const PANEL_POWER_SAVING: &str = "power.panel-power-saving";
 /// The CPU scheduler's name in the power settings.
@@ -92,6 +95,10 @@ impl Values {
     }
 }
 
+/// Do not disturb's state file in the runtime dir: `config/quickshell/services/Notifs.qml`
+/// writes it.
+const DND_FILE: &str = "kubaos-dnd.json";
+
 /// The file that turns the greeting off, in the zsh folder of the user layer.
 /// `scripts/dot-greeting` owns it.
 const NO_GREETING: &str = "no-greeting";
@@ -122,6 +129,9 @@ impl States {
         }
         if let Some(active) = places.keep_awake.as_deref().and_then(kept_awake) {
             states.set(KEEP_AWAKE, Reading::Bool(active));
+        }
+        if let Some(dnd) = places.dnd.as_deref().and_then(dnd_on) {
+            states.set(DND, Reading::Bool(dnd));
         }
         if let Some(wanted) = places.proxy.as_deref().and_then(proxy_wanted) {
             states.set(PROXY, Reading::Bool(wanted));
@@ -190,7 +200,7 @@ pub fn values(name: &str) -> Option<Values> {
     match name {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
-        TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PANEL_POWER_SAVING => {
+        TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | DND | PANEL_POWER_SAVING => {
             Some(Values::Bool)
         }
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
@@ -211,6 +221,8 @@ pub struct Places {
     pub keep_awake: Option<PathBuf>,
     /// The Proxy's state file in the runtime dir.
     pub proxy: Option<PathBuf>,
+    /// Do not disturb's state file in the runtime dir, which the shell writes.
+    pub dnd: Option<PathBuf>,
 }
 
 impl Places {
@@ -223,6 +235,7 @@ impl Places {
             config_home: kubaos_user_layer::config_home(),
             keep_awake: kubaos_idle::runtime_dir().map(|runtime| kubaos_idle::awake::path(&runtime)),
             proxy: kubaos_proxy::paths::Paths::from_env().map(|paths| paths.shell()),
+            dnd: kubaos_idle::runtime_dir().map(|runtime| runtime.join(DND_FILE)),
         }
     }
 
@@ -240,7 +253,7 @@ impl Places {
                 user_layer.power,
             ]);
         }
-        files.extend(self.keep_awake.iter().chain(&self.proxy).cloned());
+        files.extend(self.keep_awake.iter().chain(&self.proxy).chain(&self.dnd).cloned());
         files
     }
 }
@@ -278,6 +291,14 @@ fn kept_awake(file: &Path) -> Option<bool> {
         Err(err) if err.kind() == io::ErrorKind::NotFound => Some(false),
         Err(_) => None,
     }
+}
+
+/// Whether Do not disturb's state file says it is on; `None` when it doesn't read, as while the
+/// shell isn't running, which writes it at its start.
+fn dnd_on(file: &Path) -> Option<bool> {
+    let text = fs::read_to_string(file).ok()?;
+    let state: serde_json::Value = serde_json::from_str(&text).ok()?;
+    state.get("on")?.as_bool()
 }
 
 /// Whether the Proxy's state file says the user wants it on; `None` when it doesn't read.

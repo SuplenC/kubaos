@@ -49,6 +49,7 @@ impl Machine {
             config_home: Some(root.join("config")),
             keep_awake: Some(root.join("run/kubaos-keep-awake.json")),
             proxy: Some(root.join("run/kubaos-proxy.json")),
+            dnd: Some(root.join("run/kubaos-dnd.json")),
         }
     }
 
@@ -210,6 +211,27 @@ fn the_proxy_is_on_while_the_user_wants_it_and_unknown_without_its_file() {
 }
 
 #[test]
+fn do_not_disturb_is_its_state_files_on_and_unknown_without_the_shell() {
+    let machine = Machine::new();
+
+    let missing = machine.read();
+    machine.write(
+        "run/kubaos-dnd.json",
+        r#"{"on": true, "manual": false, "reason": "sharing"}"#,
+    );
+    let sharing = machine.read();
+    machine.write(
+        "run/kubaos-dnd.json",
+        r#"{"on": false, "manual": false, "reason": ""}"#,
+    );
+    let off = machine.read();
+
+    assert_eq!(missing.get(DND), None);
+    assert_eq!(sharing.get(DND), Some(&on(true)));
+    assert_eq!(off.get(DND), Some(&on(false)));
+}
+
+#[test]
 fn the_power_settings_are_read_from_their_file_with_its_defaults() {
     let machine = Machine::new();
 
@@ -238,6 +260,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         config_home: None,
         keep_awake: None,
         proxy: None,
+        dnd: None,
         ..machine.places()
     };
 
@@ -252,6 +275,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         PANEL_POWER_SAVING,
         KEEP_AWAKE,
         PROXY,
+        DND,
     ] {
         assert_eq!(states.get(name), None, "{name}");
     }
@@ -276,6 +300,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/desktop/power/power.toml",
         "run/kubaos-keep-awake.json",
         "run/kubaos-proxy.json",
+        "run/kubaos-dnd.json",
     ] {
         assert!(files.contains(&root.join(file)), "{file} isn't watched: {files:?}");
     }
@@ -285,6 +310,7 @@ fn every_file_a_state_is_read_from_is_watched() {
 fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values("packages.chrome"), Some(Values::Bool));
     assert_eq!(values(PROXY), Some(Values::Bool));
+    assert_eq!(values(DND), Some(Values::Bool));
     assert_eq!(values(SCHEDULER), Some(Values::Words(&["kernel", "lavd"])));
     assert_eq!(values("packages."), None);
     assert_eq!(values("chrome"), None);

@@ -69,10 +69,10 @@ kind = "scripts"
 # states from their files and reads them again when one changes
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
-# `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy` and
-# `power.panel-power-saving`, true or false; `power.scheduler` ("kernel",
-# "lavd") and `power.low-battery` ("power-saver", "super-saver", "off"). While
-# a state can't be read, the action shows.
+# `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
+# `notifications.dnd` and `power.panel-power-saving`, true or false;
+# `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
+# "super-saver", "off"). While a state can't be read, the action shows.
 #
 # A keyword the query equals ranks an action with the exact titles, above an
 # app whose name only has the query as a word. So an action about an app
@@ -454,12 +454,33 @@ icon = "system-shutdown"
 keywords = ["shutdown", "session"]
 run = ["qs", "ipc", "call", "powermenu", "toggle"]
 
+# The notifications panel (SUPER + N): New and Earlier, Do not disturb and
+# Clear all. Do not disturb holds the popups back, and turns on by itself
+# while you share your screen or a window is fullscreen; its state is
+# `notifications.dnd`, so only the half of the pair that applies shows.
+
+[extensions.kubaos.actions.notifications]
+title = "Notifications"
+subtitle = "Everything that pinged you, new first, in its own panel (SUPER + N)"
+icon = "preferences-system-notifications"
+keywords = ["notification center", "inbox", "bell", "messages"]
+run = ["qs", "ipc", "call", "notifications", "open"]
+
 [extensions.kubaos.actions.do-not-disturb]
-title = "Do not disturb"
-subtitle = "Notification popups off or on. Off means I shut up"
+title = "Do not disturb: on"
+subtitle = "No popups till you turn it off. They still land in the panel"
 icon = "notifications-disabled"
-keywords = ["dnd", "notifications", "quiet", "focus"]
-run = ["qs", "ipc", "call", "notifications", "toggleDnd"]
+keywords = ["dnd", "notifications", "quiet", "focus", "silence"]
+run = ["qs", "ipc", "call", "notifications", "dnd", "on"]
+shown_when = { state = "notifications.dnd", is = false }
+
+[extensions.kubaos.actions.do-not-disturb-off]
+title = "Do not disturb: off"
+subtitle = "Popups again. During a share or a fullscreen window, off till it ends"
+icon = "preferences-system-notifications"
+keywords = ["dnd", "notifications", "quiet", "focus", "popups"]
+run = ["qs", "ipc", "call", "notifications", "dnd", "off"]
+shown_when = { state = "notifications.dnd", is = true }
 
 [extensions.kubaos.actions.clear-notifications]
 title = "Clear notifications"
@@ -480,7 +501,9 @@ run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
 # controls and on the active window's border, and Ctrl+K picks on or off. It
 # writes `focusStutter` in ~/.config/kubaos/desktop/quickshell/settings.json,
 # keeping your comments; the shell reads it again at once, and Hyprland
-# (config/hypr/focus.lua) at the next focus change.
+# (config/hypr/focus.lua) at the next focus change. "Always show the bell:
+# on/off" is one too, the same way: it writes `alwaysShowBell`, and the bar's
+# bell shows all the time, or only while there's a notification.
 
 # Idle (crates/kubaos-idle). "Lock after…", "Screens off after…", "Suspend
 # after…" and "When the lid closes…" are the Extension's own Items: Enter
