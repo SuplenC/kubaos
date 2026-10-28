@@ -131,8 +131,6 @@ QtObject {
         if (driver.state === "bluetooth" || driver.state === "bluetooth-code")
             cc.tab = 1;
         if (driver.state === "bluetooth-code") {
-            // The history cleared, so the tab has the room to show the prompt and its keycaps whole.
-            Notifs.clear();
             Bt.prompt = {
                 id: 1,
                 kind: "passkey",
@@ -142,9 +140,6 @@ QtObject {
         }
         if (driver.state === "keyboard")
             cc.tab = cc.keyboardTab;
-        // A scan that has found nothing yet: the list's skeleton rows, with the room to show.
-        if (driver.state === "scanning")
-            Notifs.clear();
         if (driver.state === "")
             scroll.start();
     }
@@ -173,9 +168,15 @@ QtObject {
             Sysmon.pendingPid = 4211;
         if (driver.panel === "wallpaper" && driver.state === "settings")
             Wallpapers.openSettings = true;
-        // Emptied before the frame exists, so no network's row is made and torn down again.
+        // A scan that has found nothing yet, its skeleton rows with the room to show: emptied
+        // before the frame exists, so no row is made and torn down again.
         if (driver.panel === "controlcenter" && driver.state === "scanning")
             Net.networks = [];
+        // The history cleared, so the tab has the room to show the passkey prompt and its keycaps
+        // whole, or a scan's rows; cleared before the frame exists, so no card is made and torn
+        // down again.
+        if (driver.panel === "controlcenter" && (driver.state === "bluetooth-code" || driver.state === "scanning"))
+            Notifs.clear();
         driver.frame = driver.frameComponent.createObject(null);
         driver.window = driver.windowOf(driver.frame);
         if (!driver.window) {
