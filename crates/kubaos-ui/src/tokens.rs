@@ -1228,7 +1228,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 39] = [
+pub const CONTRAST: [ContrastPair; 42] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1501,6 +1501,27 @@ pub const CONTRAST: [ContrastPair; 39] = [
         need: Need::LargeText,
         opacity: None,
         purpose: "The 完了 hanko on Kōbō's done screen",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerLowest,
+        need: Need::Text,
+        opacity: None,
+        purpose: "The boot screens' notes, key hints and messages",
+    },
+    ContrastPair {
+        fg: Role::Error,
+        bg: Role::SurfaceContainerLowest,
+        need: Need::Text,
+        opacity: None,
+        purpose: "A wrong disk passphrase",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::SurfaceContainerLowest,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The disk passphrase field's focus ring and caret",
     },
 ];
 

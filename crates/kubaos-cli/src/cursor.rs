@@ -2,7 +2,7 @@
 //!
 //!   kubaos cursor apply [--sync]                  the theme for the settings and the palette
 //!   kubaos cursor style <dark | accent | classic> change the style, then apply
-//!   kubaos cursor size <16-96>                    change the size, then apply
+//!   kubaos cursor size <16-96, by 4>              change the size, then apply
 //!   kubaos cursor show                            print the style and the size
 //!
 //! `scripts/dot-theme` runs `apply` after matugen; the Command menu runs `style` and `size`.
@@ -69,7 +69,7 @@ pub enum CursorCmd {
     },
     /// Set the cursor style (dark, accent or classic) and apply it.
     Style { style: String },
-    /// Set the cursor size in pixels at scale 1 (16 to 96) and apply it.
+    /// Set the cursor size in pixels at scale 1 (16 to 96, a multiple of 4) and apply it.
     Size { size: u32 },
     /// Print the cursor style and size.
     Show,

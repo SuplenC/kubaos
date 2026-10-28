@@ -13,14 +13,19 @@
 //! # Not here
 //!
 //! - What an output says: each target's own module ([`crate::rust`], [`crate::qml`],
-//!   [`crate::terminal`]).
+//!   [`crate::terminal`], [`crate::boot`], [`crate::neon`], [`crate::cursor`]).
 
 use std::fs;
 use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
+use crate::boot::GrubTheme;
+use crate::boot::PlymouthScript;
+use crate::boot::PlymouthTheme;
+use crate::cursor::CursorTokens;
 use crate::model::Tokens;
+use crate::neon::KoboNeon;
 use crate::qml::QmlSymbols;
 use crate::qml::QmlTokens;
 use crate::rust::RustModule;
@@ -39,9 +44,18 @@ pub trait Target: Sync {
     fn render(&self, tokens: &Tokens, root: &Path) -> io::Result<String>;
 }
 
-/// The toolkits' outputs: `kubaos-ui`'s module and `KubaOS.Components`' singletons.
-// TODO(#153): add Plymouth's and GRUB's values; they still carry their own.
-pub static TARGETS: &[&dyn Target] = &[&RustModule, &QmlTokens, &QmlSymbols];
+/// The toolkits' and the boot's outputs: `kubaos-ui`'s module, `KubaOS.Components`' singletons,
+/// Plymouth's script and theme, GRUB's theme, Kōbō's neon and `kubaos-cursor`'s tokens.
+pub static TARGETS: &[&dyn Target] = &[
+    &RustModule,
+    &QmlTokens,
+    &QmlSymbols,
+    &PlymouthScript,
+    &PlymouthTheme,
+    &GrubTheme,
+    &KoboNeon,
+    &CursorTokens,
+];
 
 /// Every output `kubaos-tokens` writes: the toolkits', then the terminals' ([`OUTPUTS`]).
 pub fn targets() -> impl Iterator<Item = &'static dyn Target> {

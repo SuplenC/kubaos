@@ -6,7 +6,8 @@
 # accent with a dark outline; "classic", Bibata-Modern-Classic.
 # style = "dark"
 #
-# Size in pixels at scale 1, 16 to 96 (default 24). Hyprland reads it at login.
+# Size in pixels at scale 1, 16 to 96 in steps of 4, so it is whole pixels at
+# every display scale (default 24). Hyprland reads it at login.
 # size = 24
 #
 # Full docs: docs/CONTRACTS.md, "Defaults and the user layer"

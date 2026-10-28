@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# plymouth TREE OUT: the Plymouth theme of the checkout TREE, drawn by plymouthd's X11 renderer in
+# a private Xvfb, into OUT as plymouth{,-prompt,-busy,-error}-dark-{1,2}x.png: the lit sign, the
+# passphrase field with a passphrase typed, the field while cryptsetup works, and a wrong
+# passphrase. 1x is a 1920x1080 screen, 2x the laptop's 2880x1800, where the theme takes its @2x
+# pictures.
+#
+# It stands in for the initramfs: only the script and label-freetype plugins and the X11
+# renderer, the theme at its installed path, Geist as /usr/share/fonts/Plymouth.ttf, and no
+# fc-match, so the label plugin loads that font as it does at boot. plymouthd, Xvfb and every
+# client run in their own namespaces (bwrap --unshare-all): their sockets, the root they see and
+# their processes are the sandbox's, so nothing reaches the machine's own plymouthd, display or
+# boot. Run by `shots` (`just shots plymouth`), which pins the tools in KUBAOS_SHOTS_*.
+set -euo pipefail
+
+tree=$1 out=$2
+mkdir -p "$out"
+work=$(mktemp -d "${TMPDIR:-/tmp}/kubaos-plymouth.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+
+theme=$tree/system/files/plymouth/kubaos
+mono=$tree/system/files/fonts/GeistMono-Regular.ttf
+# A tree from before the boot took Geist Mono.
+[[ -f $mono ]] || mono=$tree/system/files/fonts/JetBrainsMono-Regular.ttf
+mkdir -p "$work/plugins/renderers"
+cp "$KUBAOS_SHOTS_PLYMOUTH/lib/plymouth/script.so" "$KUBAOS_SHOTS_PLYMOUTH/lib/plymouth/label-freetype.so" "$work/plugins/"
+cp "$KUBAOS_SHOTS_PLYMOUTH/lib/plymouth/renderers/x11.so" "$work/plugins/renderers/"
+printf '[Daemon]\nTheme=kubaos\nDeviceScale=1\nShowDelay=0\n' >"$work/plymouthd.conf"
+
+# The steps inside the sandbox, for one screen: plymouthd shows the splash, then the cryptsetup
+# script's calls, the keys typed into the renderer's window, and a shot after each.
+cat >"$work/states" <<'EOF'
+set -euo pipefail
+size=$1 scale=$2
+ply=$KUBAOS_SHOTS_PLYMOUTH/bin
+export DISPLAY=:7
+shot() { "$KUBAOS_SHOTS_XWD" -root -silent >"/out/$1-dark-${scale}x.xwd"; }
+"$KUBAOS_SHOTS_XVFB" :7 -screen 0 "${size}x24" -nolisten tcp >/out/xvfb-$scale.log 2>&1 &
+for _ in $(seq 100); do [[ -S /tmp/.X11-unix/X7 ]] && break; sleep 0.05; done
+"$ply/plymouthd" --no-daemon --debug --debug-file="/out/plymouthd-$scale.log" \
+  --kernel-command-line="quiet splash" --mode=boot --graphical-boot --no-boot-log &
+for _ in $(seq 100); do "$ply/plymouth" --ping && break; sleep 0.05; done
+"$ply/plymouth" --show-splash
+# The sign has struck and hums.
+sleep 3
+shot plymouth
+"$ply/plymouth" ask-for-password --prompt="Please unlock disk cryptroot: " >/dev/null &
+sleep 0.8
+"$KUBAOS_SHOTS_XDOTOOL" type --delay 20 correct-horse-battery
+# Inside the caret's first blink, so it shows.
+sleep 0.25
+shot plymouth-prompt
+"$KUBAOS_SHOTS_XDOTOOL" key Return
+sleep 0.4
+shot plymouth-busy
+"$ply/plymouth" display-message --text="cryptsetup: ERROR: cryptroot: cryptsetup failed, bad password or options?"
+# Past the shake, inside the caret's second blink.
+sleep 1.2
+shot plymouth-error
+"$ply/plymouth" quit
+EOF
+
+for screen in 1920x1080:1 2880x1800:2; do
+  "$KUBAOS_SHOTS_BWRAP" --unshare-all --die-with-parent --new-session --uid 0 --gid 0 \
+    --tmpfs / --ro-bind /nix /nix --symlink "$KUBAOS_SHOTS_SH" /bin/sh \
+    --proc /proc --dev /dev --tmpfs /tmp --tmpfs /run --tmpfs /var \
+    --ro-bind "$work/plugins" /run/plymouth/plugins \
+    --ro-bind "$work/plymouthd.conf" /etc/plymouth/plymouthd.conf \
+    --ro-bind "$theme" /usr/share/plymouth/themes/kubaos --ro-bind "$theme" /run/plymouth/themes/kubaos \
+    --ro-bind "$tree/system/files/fonts/Geist-Regular.ttf" /usr/share/fonts/Plymouth.ttf \
+    --ro-bind "$mono" /usr/share/fonts/Plymouth-monospace.ttf \
+    --ro-bind /dev/null "$KUBAOS_SHOTS_FCMATCH" \
+    --bind "$work" /out --ro-bind "$work/states" /states \
+    --clearenv --setenv PATH "$KUBAOS_SHOTS_SANDBOX_PATH" --setenv HOME /tmp \
+    --setenv KUBAOS_SHOTS_PLYMOUTH "$KUBAOS_SHOTS_PLYMOUTH" --setenv KUBAOS_SHOTS_XVFB "$KUBAOS_SHOTS_XVFB" \
+    --setenv KUBAOS_SHOTS_XDOTOOL "$KUBAOS_SHOTS_XDOTOOL" --setenv KUBAOS_SHOTS_XWD "$KUBAOS_SHOTS_XWD" \
+    "$KUBAOS_SHOTS_SH" /states "${screen%:*}" "${screen#*:}" >"$work/states-${screen#*:}.log" 2>&1 ||
+    echo "shots: plymouth at ${screen%:*} failed: see its log in $out/boot-logs" >&2
+done
+
+mkdir -p "$out/boot-logs"
+cp "$work"/*.log "$out/boot-logs/" 2>/dev/null || true
+shopt -s nullglob
+for f in "$work"/*.xwd; do
+  name=$(basename "${f%.xwd}")
+  magick "xwd:$f" -define png:compression-level=9 "png:$out/$name.png.part" && mv "$out/$name.png.part" "$out/$name.png"
+done

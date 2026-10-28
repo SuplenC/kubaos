@@ -55,11 +55,14 @@ next to a dark one fades out across the wall instead of ending in a seam.
 The boot assets land in `system/files/`. From `neon.py`: the Plymouth sign
 layers (`plymouth/kubaos/sign-{base,ku,ba,dakuten,kuba,os,lit}{,@2x}.png`,
 2 MB in all, palette PNGs because they ride in the initramfs) and GRUB's
-`grub/kubaos/logo.png`. From `boot.py`: the passphrase field and bullets, the
-GRUB boxes and background, and the fonts both use. The theme scripts next to
-them (`kubaos.script`, `theme.txt`) are hand-written. Kōbō carries copies of
-the mark, the wordmark and `kubaos-sign-1024.png`
-(`crates/kubaos-kobo/assets/make-assets.sh`).
+`grub/kubaos/logo.png`. From `boot.py`: the passphrase field in its states,
+its icons, bullet, caret, placeholder and notes, GRUB's boxes, background and
+key hints, and the fonts both use, all drawn from the design tokens. The
+values the theme files read (`kubaos.script`'s token block, `kubaos.plymouth`,
+GRUB's `theme.txt` from `system/files/grub/theme.txt.in`) are written by
+`cargo run -p kubaos-tokens -- write`, which measures `boot.py`'s pictures:
+run it after `render.sh`. Kōbō carries copies of the mark, the wordmark and
+`kubaos-sign-1024.png` (`crates/kubaos-kobo/assets/make-assets.sh`).
 
 ## Regenerating
 
@@ -70,28 +73,29 @@ PYTHON=python3 branding/render.sh
 ```
 
 It runs `make.py`, renders the SVGs, writes `fastfetch.txt`, then runs
-`neon.py` and `boot.py`. It needs `resvg`, ImageMagick and a python3 with
-Pillow and numpy (`PYTHON` picks it). Only a new source photo needs
+`neon.py` and `boot.py`. It needs `resvg`, ImageMagick and a python3 (3.11 or
+later, for `tomllib`) with Pillow and numpy (`PYTHON` picks it). Only a new source photo needs
 `photo/upscale.sh` first, which needs Upscayl. Don't hand-edit the SVGs or
 PNGs, they get overwritten.
 
 ## Colours
 
-The vector marks, Kōbō and the boot screens use the default wallpaper's
-Material You scheme (`config/matugen/default-colors.json`, from the angled
-photo of this sign):
+The vector marks, Kōbō and the boot screens take their colours from the
+design tokens' dark palette (`design/tokens.toml`, `[color.dark]`: matugen's
+scheme for the default wallpaper, the angled photo of this sign), and the
+mark's strokes and tube widths from `[neon.mark]`, which Kōbō's done screen
+draws from too:
 
-| Role | Hex | Where |
-|---|---|---|
-| Amber (primary) | `#ffb779` | Mark tubes, "OS" |
-| Blue (tertiary) | `#85cfff` | Dakuten, icon border gradient end |
-| Off-white (on_surface) | `#f0dfd4` | "Kuba" |
-| Night (surface) | `#19120b` | Icon tile |
-| Deep (surface_container_lowest) | `#140d07` | Dark plates, the boot splash and GRUB |
+| Role | Where |
+|---|---|
+| `primary` (amber) | Mark tubes, "OS" |
+| `cold` (blue) | Dakuten, icon border gradient end |
+| `on_surface` (off-white) | "Kuba" |
+| `surface` | Icon tile |
+| `surface_container_lowest` | Dark plates, the boot splash and GRUB |
+| `primary_core`, `cold_core` | The lit core inside the amber and the blue tubes |
 
-Two colours aren't in the scheme: the lit core inside the vector tubes,
-`#ffe6cf` in the amber and `#dcf1ff` in the dakuten, a paler tint of each
-tube. The photo keeps its own colours.
+The photo keeps its own colours.
 
 On a light background use the dark plate version or the black mark. Don't
 put the neon (photo or vector) on anything lighter than `#3d332b`: neon needs

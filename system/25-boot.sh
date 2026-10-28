@@ -30,33 +30,16 @@ done
 
 require_sudo
 
-PLY_THEME_DIR=/usr/share/plymouth/themes/kubaos
-GRUB_THEME_DIR=/boot/grub/themes/kubaos
 # Not under /usr/share/kubaos: the payload build and the updater replace that
 # checkout whole, and the wrapper fails without the script.
 DIVERTED_10_LINUX=/usr/lib/kubaos/grub/10_linux.ubuntu
-
-# install_dir SRC DEST: install_root_file for every file directly in SRC.
-install_dir() {
-  local f
-  for f in "$1"/*; do
-    [[ -f "$f" ]] || continue
-    install_root_file "$f" "$2/$(basename "$f")" "$(if [[ -x "$f" ]]; then echo 0755; else echo 0644; fi)"
-  done
-}
 
 # --------------------------------------------------------------------------
 step "Plymouth (script module, freetype labels; no pango, no extra fonts)"
 group_install boot
 
-step "Plymouth theme kubaos -> $PLY_THEME_DIR"
-install_dir "$FILES_DIR/plymouth/kubaos" "$PLY_THEME_DIR"
-install_root_file "$FILES_DIR/fonts/Geist-Regular.ttf" "$PLY_THEME_DIR/Geist-Regular.ttf" 0644
-install_root_file "$FILES_DIR/fonts/Geist-OFL.txt" "$PLY_THEME_DIR/Geist-OFL.txt" 0644
-install_root_file "$FILES_DIR/fonts/JetBrainsMono-Regular.ttf" "$PLY_THEME_DIR/JetBrainsMono-Regular.ttf" 0644
-install_root_file "$FILES_DIR/fonts/JetBrainsMono-OFL.txt" "$PLY_THEME_DIR/JetBrainsMono-OFL.txt" 0644
-install_root_file "$FILES_DIR/plymouth/conf/plymouthd.conf" /etc/plymouth/plymouthd.conf 0644
-install_root_file "$FILES_DIR/initramfs-tools/hooks/kubaos-plymouth" /etc/initramfs-tools/hooks/kubaos-plymouth 0755
+step "Boot themes: Plymouth -> $PLY_THEME_DIR, GRUB -> $GRUB_THEME_DIR (on /boot: GRUB can't read the encrypted root)"
+install_boot_theme
 
 step "Plymouth on poweroff and reboot: once Hyprland has let go of the screen, and played out"
 install_shutdown_splash
@@ -119,32 +102,6 @@ elif grep -qxF "$title" "$btrfs_cfg"; then
 else
   sudo_run sed -i -e '/^GRUB_BTRFS_TITLE_FORMAT=/d' -e "\$a $title" "$btrfs_cfg"
 fi
-
-# --------------------------------------------------------------------------
-step "GRUB theme -> $GRUB_THEME_DIR (on /boot: GRUB can't read the encrypted root)"
-install_dir "$FILES_DIR/grub/kubaos" "$GRUB_THEME_DIR"
-# Fonts: ASCII and Latin-1 only, so GRUB loads them fast on every boot.
-# theme.txt names them "<family> <style> <size>"; -n sets the family, because
-# Geist-Medium.ttf would otherwise also call itself "Geist Regular".
-fonts=(
-  "Geist-Regular.ttf|Geist|30|geist-regular-30"
-  "Geist-Medium.ttf|Geist Medium|30|geist-medium-30"
-  "Geist-Regular.ttf|Geist|22|geist-regular-22"
-  "JetBrainsMono-Regular.ttf|JetBrains Mono|24|jetbrainsmono-regular-24"
-)
-for spec in "${fonts[@]}"; do
-  IFS='|' read -r ttf family size name <<<"$spec"
-  dest="$GRUB_THEME_DIR/$name.pf2"
-  src="$FILES_DIR/fonts/$ttf"
-  # Rebuilt when missing or older than its TTF or this script.
-  if [[ -f "$dest" && ! "$src" -nt "$dest" && ! "${BASH_SOURCE[0]}" -nt "$dest" ]]; then
-    ok "$dest"
-  else
-    # grub-mkfont warns about every OpenType feature it doesn't use.
-    sudo_run grub-mkfont -n "$family" -s "$size" -r 0x20-0x7e,0xa0-0xff -o "$dest" "$src" \
-      2> >(grep -v 'unsupported font feature' >&2 || true)
-  fi
-done
 
 # --------------------------------------------------------------------------
 if ((IMAGE_BUILD)); then

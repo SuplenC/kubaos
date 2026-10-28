@@ -19,6 +19,7 @@ How a PR that changes how something looks gets its screenshots and its review. T
 | `just shots --scales 1,2 --modes dark,light` | Other scales or modes |
 | `just shots --ref REV` | BEFORE is the merge base with REV |
 | `just shots --full` | Every scale and mode, of the surfaces named or, without names, of those that changed |
+| `just shots plymouth`, `just shots grub`, `just shots cursor` | The boot splash and the disk prompt (plymouthd's X11 renderer in Xvfb, in a bubblewrap sandbox), the GRUB menu and shell (QEMU under OVMF), and the pointer's XCursor sheets on dark and light (`kubaos cursor` in a home of its own), from `test/shots/boot`. Plymouth and GRUB render at 1 (1920x1080) and 2 (2880x1800), dark; the pointer at every scale |
 | `just shots kobo`, `just shots specimen` | Kōbō's tour (`KOBO_SHOTS`, `cargo test -p kubaos-kobo --release shots`) and the specimen pages (`kubaos-specimen shots`, `qml-specimen shots`), into the same pairs and `changed.txt`. They draw every scale and mode in release builds, a few minutes; the pairs keep the scales and modes asked for. `qml-specimen` reads the tree as a git flake: `git add` a new QML file first |
 | `just shots publish BRANCH` | Push the changed pairs to BRANCH, print the table (raw.githubusercontent URLs, pinned to the commit) |
 | `just shots self-test` | Check a render can't reach the desktop session |

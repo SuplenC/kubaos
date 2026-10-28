@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# grub TREE OUT: the GRUB theme of the checkout TREE, booted in QEMU from a rescue image under
+# UEFI and screendumped, into OUT as grub{,-shell}-dark-{1,2}x.png: the menu with KubaOS's
+# entries and its countdown, and the GRUB shell (c). 1x is a 1920x1080 screen, 2x the laptop's
+# 2880x1800; the theme draws at one scale on both, as on a real machine.
+#
+# The image carries the theme's files and the .pf2 fonts its theme.txt names, made with
+# grub-mkfont as system/25-boot.sh makes them, and a grub.cfg like the one update-grub writes:
+# the theme, its background, and the entries a KubaOS install has. Nothing of the machine's own
+# GRUB, /boot or firmware is read or written. Run by `shots` (`just shots grub`), which pins the
+# tools in KUBAOS_SHOTS_*.
+set -euo pipefail
+
+tree=$1 out=$2
+mkdir -p "$out/boot-logs"
+work=$(mktemp -d "${TMPDIR:-/tmp}/kubaos-grub.XXXXXX")
+qemu=
+trap 'if [[ -n $qemu ]]; then kill "$qemu" 2>/dev/null; wait "$qemu" 2>/dev/null; fi; rm -rf "$work"' EXIT
+
+theme=$work/iso/boot/grub/themes/kubaos
+mkdir -p "$theme"
+cp "$tree"/system/files/grub/kubaos/* "$theme/"
+loadfonts=""
+while read -r line; do
+  size=${line##* }
+  family=${line% Regular *}
+  case $family in
+    Geist) ttf=Geist-Regular.ttf ;;
+    "Geist Medium") ttf=Geist-Medium.ttf ;;
+    "Geist Mono") ttf=GeistMono-Regular.ttf ;;
+    "JetBrains Mono") ttf=JetBrainsMono-Regular.ttf ;;
+    *)
+      echo "shots: grub: no font for $line" >&2
+      exit 1
+      ;;
+  esac
+  name=$(tr 'A-Z' 'a-z' <<<"${ttf%.ttf}")-$size
+  "$KUBAOS_SHOTS_GRUB/bin/grub-mkfont" -n "$family" -s "$size" -r 0x20-0x7e,0xa0-0xff \
+    -o "$theme/$name.pf2" "$tree/system/files/fonts/$ttf" 2>/dev/null
+  loadfonts+="loadfont /boot/grub/themes/kubaos/$name.pf2"$'\n'
+done < <(grep -oE '"[A-Za-z ]+ Regular [0-9]+"' "$theme/theme.txt" | tr -d '"' | sort -u)
+
+# The theme's backdrop, as ImageMagick writes a pixel: RRGGBB in capitals.
+backdrop=$(sed -n 's/^desktop-color: "#\([0-9a-fA-F]*\)"$/\1/p' "$theme/theme.txt" | tr 'a-f' 'A-F')
+
+# mon SOCKET COMMAND: one command to QEMU's monitor.
+mon() { echo "$2" | socat - "UNIX-CONNECT:$1" >/dev/null; }
+
+for screen in 1920x1080:1 2880x1800:2; do
+  size=${screen%:*} scale=${screen#*:}
+  cat >"$work/iso/boot/grub/grub.cfg" <<EOF
+insmod all_video
+insmod gfxterm
+insmod png
+$loadfonts
+set gfxmode=$size
+set gfxpayload=keep
+terminal_output gfxterm
+set theme=/boot/grub/themes/kubaos/theme.txt
+background_image /boot/grub/themes/kubaos/background.png
+set timeout_style=menu
+set timeout=30
+menuentry "KubaOS Shinjuku" { true }
+submenu "Advanced options for KubaOS Shinjuku" { menuentry "KubaOS Shinjuku, with Linux 7.0.0-38-generic" { true } }
+submenu "KubaOS snapshots" { menuentry "2026-10-27 21:47 | before update" { true } }
+menuentry "UEFI Firmware Settings" { true }
+EOF
+  rm -f "$work/grub.iso"
+  grub-mkrescue -o "$work/grub.iso" "$work/iso" >"$out/boot-logs/grub-mkrescue-$scale.log" 2>&1
+  sock=$work/monitor-$scale
+  kvm=()
+  [[ -w /dev/kvm ]] && kvm=(-enable-kvm)
+  # The firmware's display takes the EDID's preferred mode, so GRUB's gfxmode finds the size.
+  qemu-system-x86_64 "${kvm[@]}" -m 512 -bios "$KUBAOS_SHOTS_OVMF" -cdrom "$work/grub.iso" \
+    -display none -device "VGA,edid=on,xres=${size%x*},yres=${size#*x},vgamem_mb=64" \
+    -monitor "unix:$sock,server,nowait" -nic none -no-reboot >"$out/boot-logs/qemu-$scale.log" 2>&1 &
+  qemu=$!
+  for _ in $(seq 100); do [[ -S $sock ]] && break; sleep 0.1; done
+  # The firmware takes seconds, more without KVM: the menu is up once the corner is the theme's
+  # backdrop, then its countdown and fonts settle.
+  for _ in $(seq 120); do
+    mon "$sock" "screendump $work/probe.ppm"
+    [[ -s $work/probe.ppm && $(magick "$work/probe.ppm" -format '%[hex:p{2,2}]' info: 2>/dev/null) == "$backdrop" ]] && break
+    sleep 0.5
+  done
+  sleep 1
+  mon "$sock" "screendump $work/grub-dark-${scale}x.ppm"
+  mon "$sock" "sendkey c"
+  sleep 1.5
+  mon "$sock" "screendump $work/grub-shell-dark-${scale}x.ppm"
+  kill "$qemu"
+  wait "$qemu" 2>/dev/null || true
+  qemu=
+done
+
+shopt -s nullglob
+for f in "$work"/*.ppm; do
+  name=$(basename "${f%.ppm}")
+  magick "$f" -define png:compression-level=9 "png:$out/$name.png.part" && mv "$out/$name.png.part" "$out/$name.png"
+done

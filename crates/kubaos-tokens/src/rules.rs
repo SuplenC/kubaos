@@ -60,6 +60,15 @@ pub enum Violation {
     UnknownName { token: String, name: String },
     /// The terminals' type style isn't in the monospace family.
     TerminalNotMono { style: String },
+    /// A brightness in the neon's strike outside 0..=1.
+    StrikeOutOfRange { index: usize, value: f32 },
+    /// A stroke of the mark whose path isn't absolute `M`, `L`, `H` and `Q` commands, each with
+    /// its numbers, starting with `M`.
+    BadMarkPath { index: usize },
+    /// A size of the mark that isn't positive and finite, or a fraction outside 0..=1.
+    BadMarkSize { token: String },
+    /// GRUB's scale isn't one of the scales every length is whole device pixels at.
+    GrubScaleNotAScale { scale: f32 },
     /// A contrast pair under the minimum its foreground needs, in one of the fallback palettes.
     LowContrast {
         token: String,
@@ -124,6 +133,19 @@ impl fmt::Display for Violation {
             Violation::TerminalNotMono { style } => {
                 write!(f, "terminal.type is {style}, which isn't set in the mono family")
             }
+            Violation::StrikeOutOfRange { index, value } => {
+                write!(f, "neon.strike[{index}] is {value}, outside 0..=1")
+            }
+            Violation::BadMarkPath { index } => write!(
+                f,
+                "neon.mark.strokes[{index}] isn't absolute M, L, H and Q commands, starting with M"
+            ),
+            Violation::BadMarkSize { token } => {
+                write!(f, "{token} isn't a positive size, or a fraction in 0..=1")
+            }
+            Violation::GrubScaleNotAScale { scale } => {
+                write!(f, "boot.grub_scale is {scale}, which isn't in rules.scales")
+            }
             Violation::LowContrast {
                 token,
                 mode,
@@ -146,6 +168,12 @@ pub fn check(tokens: &Tokens) -> Vec<Violation> {
     check_contrast(tokens, &mut found);
     check_terminal(tokens, &mut found);
     check_symbols(tokens, &mut found);
+    check_neon(tokens, &mut found);
+    if !tokens.rules.scales.contains(&tokens.boot.grub_scale) {
+        found.push(Violation::GrubScaleNotAScale {
+            scale: tokens.boot.grub_scale,
+        });
+    }
     found
 }
 
@@ -441,6 +469,64 @@ fn check_symbols(tokens: &Tokens, found: &mut Vec<Violation>) {
             });
         }
     }
+}
+
+fn check_neon(tokens: &Tokens, found: &mut Vec<Violation>) {
+    for (index, &value) in tokens.neon.strike.iter().enumerate() {
+        if !(0.0..=1.0).contains(&value) {
+            found.push(Violation::StrikeOutOfRange { index, value });
+        }
+    }
+    let mark = &tokens.neon.mark;
+    let sizes = [("units", mark.units), ("margin", mark.margin), ("width", mark.width)];
+    let fractions = [
+        ("cold_width", mark.cold_width),
+        ("core", mark.core),
+        ("cold_core", mark.cold_core),
+    ];
+    let bad_sizes = sizes.iter().filter(|(_, v)| !(v.is_finite() && *v > 0.0));
+    let bad_fractions = fractions.iter().filter(|(_, v)| !(0.0..=1.0).contains(v));
+    for (name, _) in bad_sizes.chain(bad_fractions) {
+        found.push(Violation::BadMarkSize {
+            token: format!("neon.mark.{name}"),
+        });
+    }
+    for (index, stroke) in mark.strokes.iter().enumerate() {
+        if !is_mark_path(&stroke.path) {
+            found.push(Violation::BadMarkPath { index });
+        }
+    }
+}
+
+/// Whether `path` is absolute `M`, `L`, `H` and `Q` commands, each letter starting a word and
+/// followed by the numbers it takes, the first an `M`: what every reader of the mark parses.
+fn is_mark_path(path: &str) -> bool {
+    let mut words = path.split_whitespace();
+    let mut first = true;
+    while let Some(word) = words.next() {
+        let (command, number) = word.split_at(word.chars().next().map_or(0, char::len_utf8));
+        let takes = match command {
+            "M" | "L" => 2,
+            "H" => 1,
+            "Q" => 4,
+            _ => return false,
+        };
+        if first && command != "M" {
+            return false;
+        }
+        first = false;
+        let mut numbers = vec![number];
+        while numbers.len() < takes {
+            match words.next() {
+                Some(next) => numbers.push(next),
+                None => return false,
+            }
+        }
+        if !numbers.iter().all(|n| n.parse::<f32>().is_ok_and(f32::is_finite)) {
+            return false;
+        }
+    }
+    !first
 }
 
 /// Every name that becomes an identifier in an output, as `table.name`.

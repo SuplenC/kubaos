@@ -1,12 +1,12 @@
 #!/bin/sh
 # KubaOS: installed to /etc/initramfs-tools/hooks/kubaos-plymouth by
-# system/25-boot.sh.
+# install_plymouth_theme in system/lib.sh.
 #
 # The kubaos Plymouth theme draws its text with label-freetype. Ubuntu's
 # plymouth hook only copies label-pango (which drags in pango, cairo and a
 # font package), so copy the freetype plugin here. In the initramfs there is
 # no fc-match, so the plugin loads /usr/share/fonts/Plymouth.ttf and
-# Plymouth-monospace.ttf: point them at the theme's Geist and JetBrains Mono,
+# Plymouth-monospace.ttf: point them at the theme's Geist and Geist Mono,
 # which the plymouth hook copies with the theme. Without the monospace one,
 # plymouthd 24.004 crashes in its console viewer (the text it shows instead
 # of fbcon) as soon as console output arrives, e.g. the passphrase prompt.
@@ -29,4 +29,14 @@ else
 fi
 mkdir -p "${DESTDIR}/usr/share/fonts"
 ln -sf "${theme}/Geist-Regular.ttf" "${DESTDIR}/usr/share/fonts/Plymouth.ttf"
-ln -sf "${theme}/JetBrainsMono-Regular.ttf" "${DESTDIR}/usr/share/fonts/Plymouth-monospace.ttf"
+# HAZARD: link a monospace font the theme has. A theme installed by an older
+# release carries JetBrains Mono instead of Geist Mono, and a link to a font
+# that isn't there crashes plymouthd at the passphrase prompt. Geist, which is
+# not monospaced, is the last resort: the console viewer only needs a font.
+for mono in GeistMono-Regular.ttf JetBrainsMono-Regular.ttf Geist-Regular.ttf; do
+  [ -f "${DESTDIR}${theme}/${mono}" ] && break
+done
+if [ "${mono}" = Geist-Regular.ttf ]; then
+  echo "W: kubaos-plymouth: no monospace font in ${theme}: the console viewer uses Geist" >&2
+fi
+ln -sf "${theme}/${mono}" "${DESTDIR}/usr/share/fonts/Plymouth-monospace.ttf"

@@ -189,7 +189,8 @@ alt="$(in_root update-alternatives --query default.plymouth 2>/dev/null | sed -n
 [[ "$alt" == /usr/share/plymouth/themes/kubaos/kubaos.plymouth ]] && ok "default.plymouth -> kubaos" || fail "default.plymouth is '$alt'"
 grep -qx 'Theme=kubaos' "$R/etc/plymouth/plymouthd.conf" && grep -qx 'DeviceScale=1' "$R/etc/plymouth/plymouthd.conf" &&
   ok "plymouthd.conf: Theme=kubaos, DeviceScale=1" || fail "plymouthd.conf: $(tr '\n' ' ' <"$R/etc/plymouth/plymouthd.conf")"
-for f in kubaos.plymouth kubaos.script sign-lit.png sign-lit@2x.png sign-ku@2x.png field@2x.png Geist-Regular.ttf JetBrainsMono-Regular.ttf; do
+for f in kubaos.plymouth kubaos.script sign-lit.png sign-lit@2x.png sign-ku@2x.png field@2x.png note-hint@2x.png \
+  Geist-Regular.ttf GeistMono-Regular.ttf; do
   check "theme file $f" test -s "$R/usr/share/plymouth/themes/kubaos/$f"
 done
 check "initramfs hook kubaos-plymouth" test -x "$R/etc/initramfs-tools/hooks/kubaos-plymouth"
@@ -201,9 +202,18 @@ if in_root mkinitramfs -o /tmp/check-initrd.img "$kernel" >/tmp/mkinitramfs.log 
   ird="$(in_root lsinitramfs /tmp/check-initrd.img 2>/dev/null)"
   for f in usr/share/plymouth/themes/kubaos/kubaos.script usr/share/plymouth/themes/default.plymouth \
     usr/share/fonts/Plymouth.ttf usr/share/fonts/Plymouth-monospace.ttf etc/plymouth/plymouthd.conf \
+    usr/share/plymouth/themes/kubaos/GeistMono-Regular.ttf usr/share/plymouth/themes/kubaos/field@2x.png \
     "$(in_root plymouth --get-splash-plugin-path | sed 's#^/##')script.so" \
     "$(in_root plymouth --get-splash-plugin-path | sed 's#^/##')label-freetype.so" usr/sbin/plymouthd; do
     grep -qx "$f" <<<"$ird" && ok "  initramfs has /$f" || fail "  initramfs lacks /$f"
+  done
+  # lsinitramfs lists a link that dangles, and plymouthd crashes at the passphrase prompt on a
+  # monospace font that isn't there, so each font link's target has to be in the image too.
+  irdl="$(in_root lsinitramfs -l /tmp/check-initrd.img 2>/dev/null)"
+  for link in usr/share/fonts/Plymouth.ttf usr/share/fonts/Plymouth-monospace.ttf; do
+    target="$(sed -n "s#.* $link -> /##p" <<<"$irdl" | head -1)"
+    [[ -n $target ]] && grep -qx "$target" <<<"$ird" && ok "  initramfs /$link -> /$target, which it has" ||
+      fail "  initramfs /$link points at '${target:-nothing}', not a file it has"
   done
   grep -qx 'scripts/local-bottom/kubaos-snapshot-overlay' <<<"$ird" && grep -q '/overlay.ko' <<<"$ird" &&
     ok "  initramfs has the snapshot overlay script and overlay.ko" || fail "  initramfs lacks the snapshot overlay"
@@ -222,8 +232,8 @@ for kv in 'GRUB_TIMEOUT_STYLE=hidden' 'GRUB_TIMEOUT=1' 'GRUB_RECORDFAIL_TIMEOUT=
   'GRUB_BACKGROUND="/boot/grub/themes/kubaos/background.png"'; do
   grep -qxF "$kv" "$g" && ok "10-kubaos.cfg: $kv" || fail "10-kubaos.cfg lacks $kv"
 done
-for f in theme.txt logo.png select_c.png item_c.png terminal_box_c.png background.png \
-  geist-regular-30.pf2 geist-medium-30.pf2 geist-regular-22.pf2 jetbrainsmono-regular-24.pf2; do
+for f in theme.txt logo.png select_c.png item_c.png terminal_box_c.png background.png hints.png \
+  geist-regular-18.pf2 geist-medium-21.pf2 geistmono-regular-18.pf2; do
   check "GRUB theme /boot/grub/themes/kubaos/$f" test -s "$R/boot/grub/themes/kubaos/$f"
 done
 grep -q -- '--skip-login --noissue' "$R/etc/systemd/system/getty@tty1.service.d/autologin.conf" &&

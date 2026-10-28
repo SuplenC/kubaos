@@ -1,0 +1,81 @@
+# KubaOS GRUB theme. Installed to /boot/grub/themes/kubaos by
+# install_boot_theme (system/lib.sh), which renders the .pf2 fonts this file
+# names next to it with grub-mkfont (Geist, Geist Medium and Geist Mono, from
+# system/files/fonts). The PNGs come from branding/boot.py and
+# branding/neon.py.
+#
+# `kubaos-tokens` writes theme.txt from this template, working out each name in
+# double braces from design/tokens.toml: `color.ROLE` is the role in the dark palette,
+# `font.STYLE` the font of a type style, and anything else a sum of lengths in
+# device pixels, each token times GRUB's scale (`boot.grub_scale`, 1.5),
+# `png.NAME.width` or `.height` a picture's here, as it is.
+#
+# GRUB draws in device pixels at the firmware's native mode (GRUB_GFXMODE=auto)
+# and can't tell how big the screen is, so the menu is drawn at 1.5, the
+# desktop's own scale on the laptop's 2880x1800 panel; a 1080p screen shows it
+# half as large again as its desktop.
+title-text: ""
+desktop-color: "{{color.surface_container_lowest}}"
+desktop-image: "background.png"
+desktop-image-scale-method: "stretch"
+terminal-font: "{{font.mono}}"
+terminal-left: "8%"
+terminal-top: "8%"
+terminal-width: "84%"
+terminal-height: "80%"
+terminal-border: "0"
+terminal-box: "terminal_box_*.png"
+
+# A column centred on the screen: the lit neon sign (branding/neon.py), whose
+# glow is its own clear space, and the menu right under it, room for four
+# entries.
++ image {
+  left = 50%-{{png.logo.width/2}}
+  top = 50%-{{png.logo.height/2 + size.row*2 + space.s4*3/2}}
+  file = "logo.png"
+}
+
+# The entries are `ListRow`s, `row` tall and `space.s4` apart, the picked one
+# in `secondary_container`, as a list's selected row. GRUB draws an entry's box
+# (item_*, select_*) round its text with the borders outside `item_height`:
+# boot.py makes the borders the room the row leaves round its line, and the
+# spacing takes them back.
++ boot_menu {
+  left = 50%-{{size.dialog/2}}
+  width = {{size.dialog}}
+  top = 50%+{{png.logo.height/2 - size.row*2 - space.s4*3/2}}
+  height = {{size.row*4 + space.s4*3}}
+  item_font = "{{font.body_strong}}"
+  selected_item_font = "{{font.body_strong}}"
+  item_color = "{{color.on_surface}}"
+  selected_item_color = "{{color.on_secondary_container}}"
+  item_height = {{type.body_strong.line}}
+  item_padding = 0
+  item_spacing = {{size.row + space.s4 - type.body_strong.line}}
+  item_icon_space = 0
+  icon_width = 0
+  icon_height = 0
+  item_pixmap_style = "item_*.png"
+  selected_item_pixmap_style = "select_*.png"
+  scrollbar = false
+}
+
++ label {
+  id = "__timeout__"
+  left = 0
+  top = 100%-{{space.s48 + size.keycap + space.s16 + type.small.line}}
+  width = 100%
+  height = {{type.small.line}}
+  align = "center"
+  font = "{{font.small}}"
+  color = "{{color.on_surface_variant}}"
+  text = "Booting in %d s. Any key stops the clock."
+}
+
+# The keys, as keycaps (branding/boot.py): ↑ ↓ pick, Enter boots, E edits the
+# entry, C opens a GRUB shell.
++ image {
+  left = 50%-{{png.hints.width/2}}
+  top = 100%-{{space.s48 + size.keycap}}
+  file = "hints.png"
+}

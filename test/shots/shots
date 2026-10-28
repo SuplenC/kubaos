@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# shots: before/after screenshots of the shell, Kōbō, the specimen and the terminals, paired and
-# diffed, for a design PR. Run it through `just shots` (`nix run .#shots`), which pins the shell's
-# renderer (Qt, sway, Mesa, ImageMagick and the fonts) and the terminals and their TUIs. Kōbō and
-# the specimen build with the cargo and nix on your PATH. docs/agents/design-pr-loop.md has the
-# loop it serves.
+# shots: before/after screenshots of the shell, Kōbō, the specimen, the terminals and the boot
+# screens, paired and diffed, for a design PR. Run it through `just shots` (`nix run .#shots`),
+# which pins the shell's renderer (Qt, sway, Mesa, ImageMagick and the fonts), the terminals and
+# their TUIs, and the boot screens' tools. Kōbō and the specimen build with the cargo and nix on
+# your PATH. docs/agents/design-pr-loop.md has the loop it serves.
 #
 #   shots [SURFACE...] [--scales 1,1.5] [--modes dark] [--ref REV] [--full] [--jobs N]
 #         [--threshold PX]
@@ -13,6 +13,9 @@
 #   shots kobo [FLAGS]     the same for Kōbō's screens (its `shots` test tour)
 #   shots specimen [FLAGS] the same for the specimen pages (kubaos-specimen and qml-specimen)
 #   shots terminals [FLAGS] the same for the terminals and the TUIs (test/shots/terminals)
+#   shots plymouth|grub|cursor [FLAGS]
+#                          the same for the boot splash and the disk prompt (plymouthd), the GRUB
+#                          menu (QEMU) and the pointer (`kubaos cursor`); test/shots/boot
 #   shots publish BRANCH   pushes changed.txt's pairs to the image-only BRANCH and prints the
 #                          Markdown table for the PR body
 #   shots self-test        checks a render can't reach the desktop session
@@ -20,7 +23,10 @@
 # Without SURFACE it renders the surfaces whose files changed against REV (`surfaces`), at 1× and
 # 1.5×, dark. `--full` makes it 1, 1.25, 1.5 and 2, light and dark, unless --scales or --modes
 # say otherwise. SURFACE is a surface in `scenarios` (controlcenter, menu, lock, ...), kobo,
-# specimen or terminals. Kōbō's and the specimen's renderers draw every scale and mode; the rest are dropped.
+# specimen, terminals, plymouth, grub or cursor. Kōbō's, the specimen's and the boot screens'
+# renderers draw every scale and mode they have; the rest are dropped. The boot screens are always
+# dark, at 1 (a 1080p screen) and 2 (the laptop's 2880x1800); the pointer is drawn on dark and
+# light, at every scale.
 #
 # Output, in test/out/shots/ (emptied on each run):
 # - after/ and before/: the shots;
@@ -287,6 +293,21 @@ terminal_side() {
   done < <(bash "$here/terminals" names) >>"$work/jobs"
 }
 
+# boot SIDE TREE DIR: the boot surfaces' shots of TREE into DIR, each renderer once per DIR. The
+# BEFORE side builds the pointer's `kubaos` in the target dir iced's BEFORE uses.
+boot() {
+  local side=$1 tree=$2 dir=$3 s run=(env)
+  [[ $side == before ]] && run=(env CARGO_TARGET_DIR="$cache/target")
+  mkdir -p "$out/logs" "$dir"
+  for s in "${boot_surfaces[@]}"; do
+    [[ -e $dir/.$s-done ]] && continue
+    echo "shots: $s, $side" >&2
+    "${run[@]}" bash "$here/boot/$s" "$tree" "$dir" >"$out/logs/$s-$side.log" 2>&1 ||
+      die "$s failed: $out/logs/$s-$side.log"
+    touch "$dir/.$s-done"
+  done
+}
+
 # Whether FILE (NAME-MODE-SCALEx.png) is in the planned modes and scales.
 planned() {
   local f=${1%.png} m s
@@ -462,14 +483,15 @@ main() {
   }
   local all
   all=$(shell_surfaces | tr '\n' ' ')
-  shell=() iced_surfaces=()
+  shell=() iced_surfaces=() boot_surfaces=()
   local s terminals=0
   for s in "${picked[@]}"; do
     case $s in
     kobo | specimen) iced_surfaces+=("$s") ;;
     terminals) terminals=1 ;;
+    plymouth | grub | cursor) boot_surfaces+=("$s") ;;
     *)
-      [[ " $all " == *" $s "* ]] || die "no surface $s: one of ${all}kobo specimen terminals"
+      [[ " $all " == *" $s "* ]] || die "no surface $s: one of ${all}kobo specimen terminals plymouth grub cursor"
       shell+=("$s")
       ;;
     esac
@@ -509,6 +531,11 @@ main() {
     shopt -s nullglob
     for f in "$iced_before"/*.png; do ln -sf "$f" "$before_dir/$(basename "$f")"; done
     shopt -u nullglob
+  fi
+  if ((${#boot_surfaces[@]})); then
+    extract "$base" "$cache/$base/tree"
+    boot after "$repo" "$out/after"
+    boot before "$cache/$base/tree" "$before_dir"
   fi
 
   local files=()

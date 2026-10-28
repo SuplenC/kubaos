@@ -5,8 +5,10 @@
 #
 #   branding/render.sh
 #
-# Needs resvg, ImageMagick (magick) and a python3 with Pillow and numpy;
-# PYTHON picks the interpreter (default python3).
+# Needs resvg, ImageMagick (magick) and a python3 (3.11 or later) with Pillow
+# and numpy; PYTHON picks the interpreter (default python3). Then run
+# `cargo run -p kubaos-tokens -- write`, which measures boot.py's pictures for
+# GRUB's theme.
 set -euo pipefail
 cd "$(dirname "$0")"
 python="${PYTHON:-python3}"
@@ -24,8 +26,9 @@ for f in horizontal horizontal-white stacked wordmark; do
   resvg -h 256 "svg/kubaos-$f.svg" "png/kubaos-$f.png"
 done
 resvg -h 256 svg/kubaos-horizontal-dark.svg png/kubaos-horizontal-dark.png
-# surface_container_lowest of config/matugen/default-colors.json.
-resvg -h 512 --background '#140d07' svg/kubaos-stacked.svg png/kubaos-stacked-dark.png
+# The boot screens' backdrop, surface_container_lowest of the dark palette.
+deep=$("$python" -c 'import tomllib; print(tomllib.load(open("../design/tokens.toml", "rb"))["color"]["dark"]["surface_container_lowest"])')
+resvg -h 512 --background "$deep" svg/kubaos-stacked.svg png/kubaos-stacked-dark.png
 "$python" fastfetch.py > fastfetch.txt
 "$python" neon.py
 "$python" boot.py

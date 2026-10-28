@@ -7,9 +7,12 @@
 #
 # The outputs are the Rust module of `kubaos-ui` (crates/kubaos-ui/src/tokens.rs),
 # the `Tokens` and `Symbols` singletons of `KubaOS.Components`
-# (qml/KubaOS/Components/Tokens.qml and Symbols.qml), and the terminals' settings
-# and matugen templates (see [terminal]). The Plymouth and GRUB values come from
-# this same file as they move onto it.
+# (qml/KubaOS/Components/Tokens.qml and Symbols.qml), the terminals' settings
+# and matugen templates (see [terminal]); the boot screens' values (the
+# Plymouth script's token block, kubaos.plymouth and GRUB's theme.txt); Kōbō's
+# neon sign (crates/kubaos-kobo/src/done/neon.rs); and the pointer's grid and
+# scales (crates/kubaos-cursor/src/tokens.rs). branding/boot.py and
+# branding/make.py read this file for the boot screens' pictures and the logo.
 #
 # Lengths are logical pixels. The supported scales are 1, 1.25, 1.5 and 2, so
 # a length lands on whole device pixels at every one of them only when it is a
@@ -486,6 +489,54 @@ y = 0
 blur = 12
 opacity = 0.55
 
+# The neon sign. The boot splash switches the sign on a group of tubes at a
+# time, and Kōbō's done screen writes the クバ mark in as lit tubes: one
+# stutter and one drawing, so the first and the last thing an install shows
+# are the same sign.
+[neon]
+# A tube striking: its brightness through ten even steps over `medium`. It
+# stutters, then catches.
+strike = [0.6, 0.0, 0.9, 0.2, 0.0, 1.0, 0.4, 1.0, 0.8, 1.0]
+
+# The クバ mark: its strokes in the order a hand writes them (ク's tick and
+# sweep, バ's two strokes, the dakuten), as SVG path data of absolute M, L, H
+# and Q commands in a drawing `units` square with the strokes `margin` inside
+# it. A warm tube is `primary` with `primary_core` along its middle, a cold one
+# `cold` with `cold_core`. The logo's SVGs (branding/make.py) and Kōbō's done
+# screen draw it from here.
+[neon.mark]
+units = 120
+margin = 10
+# A warm tube's width in the drawing's units, and a cold one's of it: the
+# dakuten is a fifth thinner.
+width = 9.5
+cold_width = 0.8
+# The white-hot cores' widths, of a warm tube's: a warm one's and a cold
+# one's.
+core = 0.22
+cold_core = 0.18
+strokes = [
+  { path = "M29 13 L17 33", tone = "warm" },
+  { path = "M24 24 H47 Q51 24 49.6 28 L46 39 Q38 66 14 83", tone = "warm" },
+  { path = "M66 41 Q64.5 63 53 81", tone = "warm" },
+  { path = "M76.5 39 Q84 61 94 79", tone = "warm" },
+  { path = "M81 14 L85 25", tone = "cold" },
+  { path = "M90 11 L94 22", tone = "cold" },
+]
+
+# The boot screens, Plymouth and GRUB, draw in device pixels before anything
+# scales them, and always in the dark palette. Their lengths are the tokens'
+# times the scale they draw at.
+[boot]
+# GRUB has one theme for every screen and can't tell how big a screen is, so
+# it draws at one scale: the desktop's on the laptop's 2880x1800 panel, 1.5.
+# A 1080p screen shows it half as large again as its desktop, and it still
+# fits there. One of `rules.scales`, so every length is whole device pixels.
+grub_scale = 1.5
+# Plymouth draws at 2 on a screen this many device pixels tall or taller, and
+# at 1 below. The 2880x1800 panel takes 2, a 1080p or 1440p screen 1.
+plymouth_2x_from = 1600
+
 # Colour roles. At runtime matugen derives them from the wallpaper
 # (`scripts/dot-theme`, `scheme-fidelity`); these are the fallback, matugen's
 # output for the default wallpaper, `shinjuku/kubaos-neon-sign.jpg`, in each
@@ -677,6 +728,9 @@ pairs = [
   { fg = "tertiary", bg = "surface", need = "text", use = "The clock's Copied line" },
   { fg = "on_surface", bg = "surface_container_lowest", need = "text", use = "The lock screen before its wallpaper loads" },
   { fg = "primary_container", bg = "surface_container_lowest", need = "large_text", use = "The 完了 hanko on Kōbō's done screen" },
+  { fg = "on_surface_variant", bg = "surface_container_lowest", need = "text", use = "The boot screens' notes, key hints and messages" },
+  { fg = "error", bg = "surface_container_lowest", need = "text", use = "A wrong disk passphrase" },
+  { fg = "primary", bg = "surface_container_lowest", need = "graphic", use = "The disk passphrase field's focus ring and caret" },
 ]
 # Roles a front end draws only as decoration, with no text or meaning drawn on
 # them: no pair is needed. `outline_variant`, dividers and soft edges;

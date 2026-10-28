@@ -67,10 +67,11 @@ do
   local file = io.open(user_layer.file("cursor", "cursor.toml"), "r")
   if file then
     for line in file:lines() do
-      -- The range `kubaos cursor` takes (crates/kubaos-cursor/src/settings.rs).
-      local value = line:match("^%s*size%s*=%s*(%d+)%s*$")
-      if value and tonumber(value) >= 16 and tonumber(value) <= 96 then
-        size = value
+      -- The range `kubaos cursor` takes, and an off-grid size taken to the
+      -- nearest multiple of 4 as it takes it (crates/kubaos-cursor/src/settings.rs).
+      local value = tonumber(line:match("^%s*size%s*=%s*(%d+)%s*$"))
+      if value and value >= 16 and value <= 96 then
+        size = tostring((value + 2) // 4 * 4)
         break
       end
     end
