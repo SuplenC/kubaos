@@ -632,7 +632,7 @@ delay_ms = 400
 [extensions.kubaos.actions.color-picker]
 title = "Color picker"
 subtitle = "Pick a color off the screen; copied"
-icon = "color-select"
+icon = "color-picker"
 keywords = ["hyprpicker", "eyedropper", "colour"]
 run = ["hyprpicker", "-a"]
 delay_ms = 400

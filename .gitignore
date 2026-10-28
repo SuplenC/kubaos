@@ -25,6 +25,9 @@ config/nvim/lazyvim.json.bak
 # the store, inside the KubaOS clone (system/lib.sh, link_wallpapers)
 /wallpapers
 
+# Python bytecode, from running the test scripts
+__pycache__/
+
 # Cargo build output of the workspace in Cargo.toml
 /target
 

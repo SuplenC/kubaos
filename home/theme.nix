@@ -15,7 +15,8 @@ let
     /* Wallpaper colors from dot-theme (matugen). */
     @import url("file://${stateDir}/gtk.css");
   '';
-  # Colloid's dark variant, as the rest of the session is dark (home/curated.nix).
+  # Colloid's dark variant (home/curated.nix), as GTK's colour scheme below is
+  # dark.
   iconTheme = "Colloid-Orange-Dark";
   # The recoloured pointer `kubaos cursor` writes, and the theme it inherits
   # (THEME_NAME and FALLBACK_THEME in crates/kubaos-cursor/src/lib.rs).
