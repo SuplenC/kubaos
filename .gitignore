@@ -33,3 +33,23 @@ __pycache__/
 
 # Agent worktrees (Claude Code), each a checkout of its own.
 .claude/worktrees/
+
+# The token outputs built where they are read: the Nix build writes them for
+# the packages and the home, `just tokens` into a checkout (docs/DESIGN.md,
+# "Where the outputs are generated"). kubaos-tokens' tests hold this list to
+# its own.
+/qml/KubaOS/Components/Tokens.qml
+/qml/KubaOS/Components/Symbols.qml
+/config/hypr/tokens.lua
+/config/ghostty/tokens
+/config/foot/tokens.ini
+/config/tmux/colors.conf
+/config/fuzzel/tokens.ini
+/config/fastfetch/theme.jsonc
+/config/ohmyposh/config.toml
+/config/matugen/templates/ghostty
+/config/matugen/templates/foot.ini
+/config/matugen/templates/tmux.conf
+/config/matugen/templates/nvim.lua
+/config/matugen/templates/fuzzel.ini
+/config/matugen/templates/fastfetch.jsonc

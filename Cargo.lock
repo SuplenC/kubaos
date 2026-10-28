@@ -2224,6 +2224,7 @@ name = "kubaos-cursor"
 version = "0.1.0"
 dependencies = [
  "crc32fast",
+ "kubaos-tokens",
  "resvg",
  "rustix 1.1.5",
  "serde",
@@ -2288,6 +2289,7 @@ dependencies = [
  "image",
  "kubaos-core",
  "kubaos-geometry",
+ "kubaos-tokens",
  "kubaos-ui",
  "log",
  "rustix 1.1.5",
@@ -2384,6 +2386,7 @@ dependencies = [
  "iced_runtime",
  "iced_test",
  "kubaos-geometry",
+ "kubaos-tokens",
 ]
 
 [[package]]

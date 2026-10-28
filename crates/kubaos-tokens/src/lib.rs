@@ -2,22 +2,21 @@
 //! and written out as each toolkit's copy.
 //!
 //! ```text
-//! design/tokens.toml ─▶ parse ─▶ rules::check ─▶ Tokens ─▶ Target::render ─▶ crates/kubaos-ui/src/tokens.rs
-//!                                                                         ├▶ qml/KubaOS/Components/Tokens.qml
-//!                                                                         ├▶ qml/KubaOS/Components/Symbols.qml
-//!                                                                         ├▶ config/{ghostty,foot,fuzzel}, config/tmux/colors.conf
-//!                                                                         ├▶ config/matugen/templates/{ghostty,foot.ini,tmux.conf,…}
-//!                                                                         ├▶ the Plymouth script's tokens
-//!                                                                         ├▶ GRUB's theme.txt
-//!                                                                         ├▶ Kōbō's done/neon.rs
-//!                                                                         ├▶ kubaos-cursor's tokens.rs
-//!                                                                         └▶ config/hypr/tokens.lua
+//! design/tokens.toml ─▶ parse ─▶ rules::check ─▶ Tokens ─▶ Target::render
+//!   ├▶ by each crate's build script, into its OUT_DIR: kubaos-ui's tokens.rs, Kōbō's done/neon.rs,
+//!   │  kubaos-cursor's tokens.rs
+//!   ├▶ by the Nix build, or `just tokens` in a checkout: qml/KubaOS/Components/{Tokens,Symbols}.qml,
+//!   │  config/{ghostty,foot,fuzzel}, config/tmux/colors.conf, config/matugen/templates/{ghostty,…},
+//!   │  config/hypr/tokens.lua
+//!   └▶ checked in: the Plymouth script's tokens, kubaos.plymouth, GRUB's theme.txt,
+//!      config/matugen/config.toml's hues
 //! ```
 //!
 //! # Owns
 //!
 //! - Reading the tokens ([`model`]), their rules ([`rules`]), and the outputs ([`target`]), each a
-//!   [`Target`] rendering the same [`Tokens`].
+//!   [`Target`] rendering the same [`Tokens`], and what a crate's build script does with its own
+//!   ([`build_script`]).
 //!
 //! # Not here
 //!
@@ -78,6 +77,36 @@ pub fn parse(text: &str) -> Result<Tokens, Error> {
     } else {
         Err(Error::Invalid(violations))
     }
+}
+
+/// What a crate's build script does for its [`target::Kept::OutDir`] output: reads the tokens from
+/// the repo the crate is in, renders `target` and writes it into `OUT_DIR` under its file's name,
+/// and asks cargo to run the script again when the tokens change.
+///
+/// # Errors
+///
+/// When cargo didn't set `CARGO_MANIFEST_DIR` and `OUT_DIR`, the crate isn't in `crates/` of the
+/// repo, the tokens can't be loaded, or the output can't be written.
+pub fn build_script(target: &dyn Target) -> Result<(), Box<dyn std::error::Error>> {
+    let var = |name: &str| {
+        std::env::var_os(name)
+            .map(PathBuf::from)
+            .ok_or_else(|| format!("cargo didn't set {name}"))
+    };
+    let root = var("CARGO_MANIFEST_DIR")?.join("../..");
+    let tokens_path = root.join(TOKENS_PATH);
+    rerun_if_changed(&tokens_path);
+    let tokens = load(&root)?;
+    let name = Path::new(target.path())
+        .file_name()
+        .ok_or_else(|| format!("{} names no file", target.path()))?;
+    fs::write(var("OUT_DIR")?.join(name), target.render(&tokens, &root)?)?;
+    Ok(())
+}
+
+#[expect(clippy::print_stdout, reason = "A build script talks to cargo on stdout.")]
+fn rerun_if_changed(path: &Path) {
+    println!("cargo::rerun-if-changed={}", path.display());
 }
 
 /// Reads and checks the tokens of the repo at `root`.

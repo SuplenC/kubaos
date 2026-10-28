@@ -62,7 +62,7 @@ in
       ''
         export HOME=$(mktemp -d)
         export XDG_RUNTIME_DIR=$HOME
-        ${pkgs.qt6.qtdeclarative}/bin/qmltestrunner -import ${src}/qml -input ${src}/test/qml
+        ${pkgs.qt6.qtdeclarative}/bin/qmltestrunner -import ${kubaos-components}/lib/qt-6/qml -input ${src}/test/qml
         touch $out
       '';
 }

@@ -69,8 +69,10 @@ If you change the default wallpaper, regenerate them all from
 The terminals' templates (Ghostty, foot, tmux, Neovim, fuzzel, fastfetch) and
 the hues in `config.toml`'s `[config.custom_colors]` are written by
 `kubaos-tokens` from `design/tokens.toml` (`[terminal]`, `[color.source]`):
-change the tokens and run `cargo run -p kubaos-tokens -- write`, never the
-files. The rest are written by hand.
+change the tokens, never the files. The templates aren't in the repo: the Nix
+build writes them and the home links them here, and `just tokens` writes them
+into a checkout. The hues are, and `just tokens` rewrites them. The rest are
+written by hand.
 
 | Template | Output | Notes |
 |---|---|---|

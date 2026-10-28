@@ -1,19 +1,23 @@
 # KubaOS's design tokens: every colour role, length, type style, duration and
 # curve the front ends draw with. Each value lives here once. `kubaos-tokens`
-# checks the rules below and writes the toolkits' copies:
+# checks the rules below and writes the toolkits' copies, each where it is read
+# (docs/DESIGN.md, "Where the outputs are generated"):
 #
-#   cargo run -p kubaos-tokens -- write    regenerate every output
-#   cargo run -p kubaos-tokens -- check    fail when an output is stale
+#   just tokens                            write every output a checkout keeps
+#   cargo run -p kubaos-tokens -- check    fail when a rule is broken or a
+#                                          checked-in output is stale
 #
-# The outputs are the Rust module of `kubaos-ui` (crates/kubaos-ui/src/tokens.rs),
-# the `Tokens` and `Symbols` singletons of `KubaOS.Components`
-# (qml/KubaOS/Components/Tokens.qml and Symbols.qml), the terminals' settings
-# and matugen templates (see [terminal]); the boot screens' values (the
-# Plymouth script's token block, kubaos.plymouth and GRUB's theme.txt); Kōbō's
-# neon sign (crates/kubaos-kobo/src/done/neon.rs); the pointer's grid and
-# scales (crates/kubaos-cursor/src/tokens.rs); and Hyprland's durations,
-# curves, focus glow, opacities and strike (config/hypr/tokens.lua). branding/boot.py and
-# branding/make.py read this file for the boot screens' pictures and the logo.
+# The outputs are the Rust module of `kubaos-ui` (crates/kubaos-ui/src/tokens.rs
+# includes it), Kōbō's neon sign (crates/kubaos-kobo/src/done/neon.rs) and the
+# pointer's grid and scales (crates/kubaos-cursor/src/tokens.rs), each written
+# by its crate's build script; the `Tokens` and `Symbols` singletons of
+# `KubaOS.Components` (qml/KubaOS/Components/Tokens.qml and Symbols.qml), the
+# terminals' settings and matugen templates (see [terminal]) and Hyprland's
+# durations, curves, focus glow, opacities and strike (config/hypr/tokens.lua),
+# written by the Nix build; and the boot screens' values (the Plymouth script's
+# token block, kubaos.plymouth and GRUB's theme.txt), checked in.
+# branding/boot.py and branding/make.py read this file for the boot screens'
+# pictures and the logo.
 #
 # Lengths are logical pixels. The supported scales are 1, 1.25, 1.5 and 2, so
 # a length lands on whole device pixels at every one of them only when it is a

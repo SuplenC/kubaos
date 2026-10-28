@@ -20,5 +20,9 @@ rustix = { version = "1", features = ["fs"] }
 [dev-dependencies]
 tempfile.workspace = true
 
+# The tokens module, written from design/tokens.toml by build.rs.
+[build-dependencies]
+kubaos-tokens.workspace = true
+
 [lints]
 workspace = true

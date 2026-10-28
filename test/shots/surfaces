@@ -3,7 +3,7 @@
 # and specimen are the iced renderers', terminals is test/shots/terminals', and plymouth, grub and
 # cursor are the boot screens' and the pointer's (test/shots/boot). The services are stand-ins
 # (fakes/qs/services), so a change to config/quickshell/services renders nothing.
-*              qml/KubaOS config/quickshell/components config/quickshell/theme test/shots flake.lock
+*              qml/KubaOS design/tokens.toml config/quickshell/components config/quickshell/theme test/shots flake.lock
 bar            config/quickshell/modules/bar config/quickshell/modules/frame
 controlcenter  config/quickshell/modules/controlcenter config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar
 clock          config/quickshell/modules/clock config/quickshell/modules/frame config/quickshell/modules/bar

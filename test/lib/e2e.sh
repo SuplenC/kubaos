@@ -550,6 +550,13 @@ c_links() {
       { echo "FAIL ~/.config/$f -> $target"; bad=1; }
     n_files=$((n_files + 1))
   done < <(as_user git -C "$REPO" ls-files config)
+  # The token outputs the Nix build adds to config/ (design/package.nix), which
+  # .gitignore lists: linked from the store like the rest.
+  while IFS= read -r f; do
+    target="$(readlink -f "$USER_HOME/.config/$f" || true)"
+    [[ $target == /nix/store/* && -s $target ]] || { echo "FAIL ~/.config/$f -> $target"; bad=1; }
+    n_files=$((n_files + 1))
+  done < <(sed -n 's|^/config/||p' "$REPO/.gitignore")
   for d in "$REPO"/config/*/; do
     n="$(basename "$d")"
     [[ -d $USER_HOME/.config/$n && ! -L $USER_HOME/.config/$n ]] || { echo "FAIL ~/.config/$n isn't a directory"; bad=1; }
@@ -690,7 +697,8 @@ c_lua() {
   ((bad == 0)) && echo "ok   luac5.5 -p: ${#files[@]} files"
   # The active window's neon focus (config/hypr/focus.lua): its strike, cut
   # short by a new focus, off with the setting, and always ending lit.
-  as_user lua5.5 "$REPO/test/lua/focus_test.lua" "$REPO" || { echo "FAIL test/lua/focus_test.lua"; bad=1; }
+  as_user lua5.5 "$REPO/test/lua/focus_test.lua" "$REPO" "$USER_HOME/.config/hypr" ||
+    { echo "FAIL test/lua/focus_test.lua"; bad=1; }
   return "$bad"
 }
 

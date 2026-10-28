@@ -31,5 +31,9 @@ iced_test = "0.14"
 # Runs an operation over a laid-out view, so the probes' tree can be read.
 iced_runtime = "0.14"
 
+# The tokens module, written from design/tokens.toml by build.rs.
+[build-dependencies]
+kubaos-tokens.workspace = true
+
 [lints]
 workspace = true

@@ -9,6 +9,3 @@ imports_granularity = "Item"
 normalize_comments = true
 wrap_comments = true
 comment_width = 100
-# Files marked `@generated` in their first lines (the tokens kubaos-tokens writes) keep the
-# generator's layout, which its own test compares them with.
-format_generated_files = false

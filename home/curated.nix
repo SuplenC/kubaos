@@ -80,9 +80,15 @@ rec {
     };
   });
 
+  # The tokens' generator, and the outputs it writes that the repo doesn't
+  # keep: KubaOS.Components' singletons, and the configs and Lua the home
+  # links (design/package.nix).
+  kubaos-tokens = callCrate ../crates/kubaos-tokens/package.nix;
+  kubaos-token-outputs = pkgs.callPackage ../design/package.nix { inherit kubaos-tokens; };
+
   # `KubaOS.Components`, the QML component library (qml/): the shell and the
   # Command menu draw with it.
-  kubaos-components = pkgs.callPackage ../qml/package.nix { };
+  kubaos-components = pkgs.callPackage ../qml/package.nix { inherit kubaos-token-outputs; };
 
   # Extra Qt modules on Quickshell's QML import path, beyond its built-in qtsvg.
   quickshell = inputs.quickshell.packages.${system}.default.withModules (

@@ -6,7 +6,7 @@ Three files hold the design, each owning one thing:
 
 | File | Owns |
 |---|---|
-| `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols, the neon sign's stutter and the クバ mark's strokes. `kubaos-tokens` checks its rules and writes each toolkit's copy: `kubaos-ui`'s `tokens.rs`, `Tokens.qml` and `Symbols.qml` in `KubaOS.Components`, the boot screens' values (Plymouth's script and theme file, GRUB's `theme.txt`), Kōbō's `done/neon.rs` and `kubaos-cursor`'s `tokens.rs`. |
+| `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols, the neon sign's stutter and the クバ mark's strokes. `kubaos-tokens` checks its rules and writes each toolkit's copy, where it is read (see "Where the outputs are generated"): `kubaos-ui`'s `tokens.rs`, `Tokens.qml` and `Symbols.qml` in `KubaOS.Components`, the boot screens' values (Plymouth's script and theme file, GRUB's `theme.txt`), the terminals' settings and matugen templates, Hyprland's `tokens.lua`, Kōbō's `done/neon.rs` and `kubaos-cursor`'s `tokens.rs`. |
 | `docs/DESIGN.md` (this file) | The rules and their reasons: which value is for what, the components, the keyboard, focus, scaling. |
 | `docs/BRAND.md` | The words: name, voice, and how errors and buttons read. |
 
@@ -714,5 +714,19 @@ The specimen's 1× shots are checked in under `design/specimen/`, and the QML co
 
 - **A new kind, size, component or value changes this file first**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it.
 - **A rule a front end can't follow changes for everyone.** There is no exception column: if the shell can't keep a rule, the rule changes here and every front end follows the new one.
-- **Values change in `design/tokens.toml` only**, then `cargo run -p kubaos-tokens -- write`. A test fails while a generated file is stale.
+- **Values change in `design/tokens.toml` only.** The builds write the outputs from it; `just tokens` rewrites the checked-in ones, and a test fails while one is stale.
 - **Every decision keeps its reason.** A rule with no reason here is a candidate for deletion, not for following.
+
+### Where the outputs are generated
+
+Each output of `kubaos-tokens` is generated where it is read, so the repo holds the tokens and two branches that change them never touch the same generated file. Only a file read straight from the checkout, outside any build, is checked in. `Kept` in `crates/kubaos-tokens/src/target.rs` says which is which, and its tests hold `.gitignore` to it.
+
+| Output | Generated | Why |
+|---|---|---|
+| `kubaos-ui`'s tokens module, Kōbō's `done/neon.rs`, `kubaos-cursor`'s tokens | By the crate's `build.rs`, into its `OUT_DIR`; the source file of that name includes it | Only cargo reads them, and cargo runs the build script again whenever the tokens change. |
+| `Tokens.qml` and `Symbols.qml` in `KubaOS.Components` | By the Nix build (`design/package.nix`), into the module `qml/package.nix` builds | The shell, the Command menu, parity and the QML logic tests load the module from the store. |
+| The terminals' settings (`config/{ghostty,foot,fuzzel}/tokens*`, `config/tmux/colors.conf`, `config/fastfetch/theme.jsonc`, `config/ohmyposh/config.toml`), their matugen templates, `config/hypr/tokens.lua` | By the Nix build, linked into `~/.config` beside `config/`'s own files (`home/links.nix`) | The home links `config/` from the store, never from the checkout. |
+| `kubaos.plymouth`, GRUB's `theme.txt` | Checked in, folded in GitHub's diffs (`.gitattributes`); a test fails while one is stale | `system/` installs them as root from the checkout, at install and at every update, before any Nix build. |
+| The token block of `kubaos.script`, the hues in `config/matugen/config.toml` | Checked in; a test fails while one is stale | A generated block inside a hand-written file. |
+
+**In a checkout**, `just tokens` writes them all: the checked-in ones after a change to the tokens, and the ignored ones for what reads them from the checkout, such as an editor's QML language server. `just shots` writes the ignored ones into each tree it renders. **A merge conflict** in `kubaos.plymouth` or `theme.txt` keeps one side when the clone has `git config merge.ours.driver true`; `just tokens` then writes the merged tokens' version, and the test fails until it has. `kubaos.script` and matugen's `config.toml` merge as text: take either side of the block, and `just tokens` rewrites it.

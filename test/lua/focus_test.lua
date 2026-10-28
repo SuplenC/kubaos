@@ -1,14 +1,18 @@
 -- `config/hypr/focus.lua` under plain Lua, against a stand-in for `hl`: the
 -- active window's tube and glow, and the strike it plays as focus arrives.
 --
---   lua5.5 test/lua/focus_test.lua REPO
+--   lua5.5 test/lua/focus_test.lua REPO [TOKENS]
 --
+-- TOKENS is the directory holding the generated tokens.lua: an installed
+-- ~/.config/hypr, or REPO/config/hypr (the default) after `just tokens`.
 -- Prints an ok or FAIL line per test and exits 1 when any fails.
 
-local repo = assert(arg[1], "usage: lua5.5 test/lua/focus_test.lua REPO")
+local repo = assert(arg[1], "usage: lua5.5 test/lua/focus_test.lua REPO [TOKENS]")
 package.path = repo .. "/config/hypr/?.lua;" .. package.path
 
-local tokens = dofile(repo .. "/config/hypr/tokens.lua")
+-- focus.lua's require("tokens") gets this one, whichever directory it is in.
+local tokens = dofile((arg[2] or (repo .. "/config/hypr")) .. "/tokens.lua")
+package.loaded.tokens = tokens
 local colors = dofile(repo .. "/config/hypr/colors.lua")
 
 local failed = 0

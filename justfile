@@ -117,6 +117,10 @@ design-parity:
     nix run .#checks.{{host}}-linux.qml-specimen -- frames "$frames" >/dev/null
     cargo run -q -p kubaos-specimen -- parity "$frames"
 
+# Write the token outputs a checkout keeps (docs/DESIGN.md, "Where the outputs are generated"): the checked-in boot files after a change to design/tokens.toml, and the ones git ignores (Tokens.qml, the terminals' tokens, Hyprland's tokens.lua), which the Nix build writes for the home, for an editor or a test reading them from the checkout. The crates' build scripts write their own.
+tokens:
+    cargo run -q -p kubaos-tokens -- write
+
 # After fixing literal design values: lower design/lint-baseline.toml to what the lint finds. It never raises a count.
 design-baseline:
     cargo run -q -p kubaos-design -- baseline
