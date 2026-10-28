@@ -1,0 +1,344 @@
+#!/usr/bin/env bash
+# test/warm-target-test: test/warm-target and the worktree hook
+# (.claude/hooks/worktree) against a throwaway repository with a worktree: the
+# copy, the timestamps cargo reads, every case that leaves the worktree to
+# build cold, and the worktree the hook makes and removes. A `cp` on PATH
+# stands in for the filesystem's reflinks, so the tests pass on any
+# filesystem. Needs bash, coreutils, util-linux's flock, git and jq.
+#
+#   test/warm-target-test REPO
+#
+# Prints an ok or FAIL line per test and exits 1 when any fails.
+# shellcheck disable=SC2329 # The tests are called by name from the list at the end.
+set -euo pipefail
+# A test function stops at its first failed check, inside the command substitution too.
+shopt -s inherit_errexit
+
+REPO="$(cd "${1:?usage: test/warm-target-test REPO}" && pwd)"
+WARM="$REPO/test/warm-target"
+HOOK="$REPO/.claude/hooks/worktree"
+REAL_CP="$(command -v cp)"
+failed=0
+
+# A main checkout with one crate and a built target/ older than its sources'
+# checkout, and a worktree of it, checked out after the build: what Claude Code
+# hands an agent.
+new_repo() {
+  T="$(mktemp -d)"
+  M="$T/main"
+  W="$T/main/.claude/worktrees/agent"
+  mkdir -p "$M/crates/a/src" "$T/bin"
+  printf 'fn main() {}\n' >"$M/crates/a/src/main.rs"
+  printf '[package]\nname = "a"\n' >"$M/crates/a/Cargo.toml"
+  printf '.claude/worktrees/\n/target\n' >"$M/.gitignore"
+  git -C "$M" init -q
+  git -C "$M" add -A
+  git -C "$M" -c user.name=test -c user.email=test@kubaos -c commit.gpgsign=false commit -qm main
+  mkdir -p "$M/target/debug/.fingerprint/a-1"
+  printf 'rlib\n' >"$M/target/debug/liba.rlib"
+  : >"$M/target/debug/.cargo-lock"
+  touch -d '2 hours ago' "$M/crates/a/src/main.rs" "$M/crates/a/Cargo.toml"
+  touch -d '1 hour ago' "$M/target/debug/liba.rlib"
+  git -C "$M" worktree add -q -b worktree-agent "$W"
+  reflinks
+}
+
+# The filesystem copies with reflinks: `cp --reflink=always` makes a plain copy.
+reflinks() {
+  cat >"$T/bin/cp" <<EOF
+#!/usr/bin/env bash
+args=()
+for a in "\$@"; do [[ \$a == --reflink=always ]] || args+=("\$a"); done
+exec "$REAL_CP" "\${args[@]}"
+EOF
+  chmod +x "$T/bin/cp"
+}
+
+# The filesystem has no reflinks (ext4, tmpfs): `cp --reflink=always` fails, as
+# GNU cp does there, after it has started the copy.
+no_reflinks() {
+  cat >"$T/bin/cp" <<EOF
+#!/usr/bin/env bash
+for a in "\$@"; do
+  if [[ \$a == --reflink=always ]]; then
+    mkdir -p "\${@: -1}"
+    echo "cp: failed to clone: Operation not supported" >&2
+    exit 1
+  fi
+done
+exec "$REAL_CP" "\$@"
+EOF
+  chmod +x "$T/bin/cp"
+}
+
+run() { PATH="$T/bin:$PATH" CARGO_TARGET_DIR="" bash "$WARM" "$@"; }
+
+mtime() { stat -c %Y "$1"; }
+
+test_case() {
+  local name="$1" out rc
+  shift
+  new_repo
+  set +e
+  out="$(set -e; "$@" 2>&1)"
+  rc=$?
+  set -e
+  if ((rc == 0)); then
+    echo "ok   $name"
+  else
+    echo "FAIL $name"
+    printf '%s\n' "$out" | sed 's/^/     /'
+    failed=1
+  fi
+  rm -rf "$T"
+}
+
+expect() { # expect WHAT ACTUAL WANT
+  [[ $2 == "$3" ]] || { printf '%s:\n  got:  %q\n  want: %q\n' "$1" "$2" "$3"; return 1; }
+}
+
+a_worktree_gets_the_main_checkouts_target() {
+  run "$W" >/dev/null
+
+  expect "the rlib" "$(cat "$W/target/debug/liba.rlib")" "rlib"
+  expect "the rlib's time" "$(mtime "$W/target/debug/liba.rlib")" "$(mtime "$M/target/debug/liba.rlib")"
+  [[ -d $W/target/debug/.fingerprint/a-1 ]] || { echo "no fingerprint"; return 1; }
+}
+
+the_worktree_is_found_from_the_current_directory() {
+  (cd "$W/crates/a" && run >/dev/null)
+
+  expect "the rlib" "$(cat "$W/target/debug/liba.rlib")" "rlib"
+}
+
+a_source_the_same_as_the_main_checkouts_takes_its_time() {
+  run "$W" >/dev/null
+
+  expect "main.rs" "$(mtime "$W/crates/a/src/main.rs")" "$(mtime "$M/crates/a/src/main.rs")"
+  expect "Cargo.toml" "$(mtime "$W/crates/a/Cargo.toml")" "$(mtime "$M/crates/a/Cargo.toml")"
+}
+
+a_source_that_differs_from_the_main_checkouts_keeps_its_own_time() {
+  printf 'fn main() { println!("edited in main"); }\n' >"$M/crates/a/src/main.rs"
+  touch -d '2 hours ago' "$M/crates/a/src/main.rs"
+  local before
+  before="$(mtime "$W/crates/a/src/main.rs")"
+
+  run "$W" >/dev/null
+
+  expect "main.rs" "$(mtime "$W/crates/a/src/main.rs")" "$before"
+}
+
+a_source_the_main_checkout_lacks_keeps_its_own_time() {
+  rm "$M/crates/a/Cargo.toml"
+  local before
+  before="$(mtime "$W/crates/a/Cargo.toml")"
+
+  run "$W" >/dev/null
+
+  expect "Cargo.toml" "$(mtime "$W/crates/a/Cargo.toml")" "$before"
+}
+
+a_unit_that_read_the_main_checkout_by_its_absolute_path_is_rebuilt() {
+  mkdir -p "$M/target/debug/deps" "$M/target/debug/.fingerprint/b-2222222222222222" \
+    "$M/target/debug/.fingerprint/c-3333333333333333" "$M/target/debug/.fingerprint/d-4444444444444444"
+  printf '%s\n' "$M/target/debug/deps/a-1111111111111111: crates/a/src/main.rs" \
+    "# env-dep:OUT_DIR=$M/target/debug/build/a-0/out" >"$M/target/debug/deps/a-1111111111111111.d"
+  printf '%s\n' "$M/target/debug/deps/libb-2222222222222222.rlib: crates/b/src/lib.rs $M/install/b.desktop" \
+    >"$M/target/debug/deps/b-2222222222222222.d"
+  printf '%s\n' "$M/target/debug/deps/c-3333333333333333: crates/c/tests/repo.rs" \
+    "# env-dep:CARGO_MANIFEST_DIR=$M/crates/c" >"$M/target/debug/deps/c-3333333333333333.d"
+  mv "$M/target/debug/.fingerprint/a-1" "$M/target/debug/.fingerprint/a-1111111111111111"
+
+  run "$W" >/dev/null
+
+  [[ -d $W/target/debug/.fingerprint/a-1111111111111111 ]] || { echo "a, built from its own sources, was forgotten"; return 1; }
+  [[ ! -e $W/target/debug/.fingerprint/b-2222222222222222 ]] || { echo "b, which included main's file, is kept"; return 1; }
+  [[ ! -e $W/target/debug/.fingerprint/c-3333333333333333 ]] || { echo "c, which baked in main's path, is kept"; return 1; }
+  [[ -d $W/target/debug/.fingerprint/d-4444444444444444 ]] || { echo "d, with no dep-info, was forgotten"; return 1; }
+  [[ -d $M/target/debug/.fingerprint/b-2222222222222222 ]] || { echo "main's own target/ was changed"; return 1; }
+}
+
+without_reflinks_nothing_is_copied_and_cargo_builds_cold() {
+  no_reflinks
+  local out before
+  before="$(mtime "$W/crates/a/src/main.rs")"
+
+  out="$(run "$W")"
+
+  [[ ! -e $W/target ]] || { echo "a target/ was left"; ls -la "$W/target"; return 1; }
+  [[ -z $(find "$W" -maxdepth 1 -name '.target.*') ]] || { echo "a partial copy was left"; return 1; }
+  expect "main.rs" "$(mtime "$W/crates/a/src/main.rs")" "$before"
+  [[ $out == *"cold"* ]] || { echo "no word of the cold build: $out"; return 1; }
+}
+
+a_worktree_with_a_target_of_its_own_is_left_alone() {
+  mkdir -p "$W/target/debug"
+  printf 'mine\n' >"$W/target/debug/liba.rlib"
+
+  run "$W" >/dev/null
+
+  expect "the rlib" "$(cat "$W/target/debug/liba.rlib")" "mine"
+}
+
+a_main_checkout_without_a_target_leaves_the_worktree_cold() {
+  rm -rf "$M/target"
+
+  run "$W" >/dev/null
+
+  [[ ! -e $W/target ]] || { echo "a target/ was made"; return 1; }
+}
+
+the_main_checkout_itself_is_never_warmed() {
+  local before
+  before="$(mtime "$M/target/debug/liba.rlib")"
+
+  run "$M" >/dev/null
+
+  expect "the rlib's time" "$(mtime "$M/target/debug/liba.rlib")" "$before"
+  [[ ! -e $M/target/target ]] || { echo "copied into itself"; return 1; }
+}
+
+a_build_running_in_the_main_checkout_is_waited_for_then_skipped() {
+  local out
+  exec {lock}<"$M/target/debug/.cargo-lock"
+  flock -x "$lock"
+
+  out="$(WARM_TARGET_LOCK_WAIT=0 run "$W")"
+
+  exec {lock}<&-
+  [[ ! -e $W/target ]] || { echo "copied while cargo held the lock"; return 1; }
+  [[ $out == *"cold"* ]] || { echo "no word of the cold build: $out"; return 1; }
+}
+
+a_shared_cargo_target_dir_needs_no_copy() {
+  local out
+
+  out="$(PATH="$T/bin:$PATH" CARGO_TARGET_DIR="$T/shared" bash "$WARM" "$W")"
+
+  [[ ! -e $W/target ]] || { echo "a target/ was made"; return 1; }
+  [[ $out == *CARGO_TARGET_DIR* ]] || { echo "no word of CARGO_TARGET_DIR: $out"; return 1; }
+}
+
+a_directory_outside_git_is_refused() {
+  mkdir "$T/plain"
+
+  ! run "$T/plain" 2>/dev/null
+}
+
+hook() { # hook create|remove JSON
+  printf '%s\n' "$2" | PATH="$T/bin:$PATH" CARGO_TARGET_DIR="" CLAUDE_PROJECT_DIR="$M" bash "$HOOK" "$1"
+}
+
+# A remote whose default branch is main's first commit, and a commit in main past it.
+main_ahead_of_origin() {
+  git clone -q --bare "$M" "$T/origin.git"
+  git -C "$M" remote add origin "$T/origin.git"
+  git -C "$M" fetch -q origin
+  git -C "$M" remote set-head origin -a >/dev/null
+  printf 'local\n' >"$M/local"
+  git -C "$M" add local
+  git -C "$M" -c user.name=test -c user.email=test@kubaos -c commit.gpgsign=false commit -qm local
+}
+
+the_create_hook_prints_only_the_path_of_a_warm_worktree_on_its_own_branch() {
+  local out dir="$M/.claude/worktrees/agent-x"
+
+  out="$(hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" 2>/dev/null)"
+
+  expect "stdout" "$out" "$dir"
+  expect "the branch" "$(git -C "$dir" symbolic-ref --short HEAD)" "worktree-agent-x"
+  expect "the rlib" "$(cat "$dir/target/debug/liba.rlib")" "rlib"
+}
+
+the_create_hook_starts_from_the_remotes_default_branch() {
+  main_ahead_of_origin
+  local dir="$M/.claude/worktrees/agent-x"
+
+  hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" >/dev/null 2>&1
+
+  expect "the commit" "$(git -C "$dir" rev-parse HEAD)" "$(git -C "$M" rev-parse origin/HEAD)"
+  ! git -C "$dir" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1 || { echo "the branch tracks the default branch"; return 1; }
+}
+
+the_create_hook_starts_from_head_without_a_remote() {
+  local dir="$M/.claude/worktrees/agent-x"
+
+  hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" >/dev/null 2>&1
+
+  expect "the commit" "$(git -C "$dir" rev-parse HEAD)" "$(git -C "$M" rev-parse HEAD)"
+}
+
+the_create_hook_finds_the_main_checkout_from_a_worktree() {
+  local out
+
+  out="$(hook create "{\"name\": \"agent-x\", \"cwd\": \"$W/crates\"}" 2>/dev/null)"
+
+  expect "stdout" "$out" "$M/.claude/worktrees/agent-x"
+}
+
+the_create_hook_reopens_a_worktree_as_it_is() {
+  local out dir="$M/.claude/worktrees/agent-x"
+  hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" >/dev/null 2>&1
+  printf 'work\n' >"$dir/work"
+
+  out="$(hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" 2>/dev/null)"
+
+  expect "stdout" "$out" "$dir"
+  expect "the work" "$(cat "$dir/work")" "work"
+}
+
+the_create_hook_still_makes_the_worktree_without_reflinks() {
+  no_reflinks
+  local out dir="$M/.claude/worktrees/agent-x"
+
+  out="$(hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" 2>/dev/null)"
+
+  expect "stdout" "$out" "$dir"
+  [[ ! -e $dir/target ]] || { echo "a target/ was left"; return 1; }
+}
+
+the_create_hook_refuses_a_name_that_leaves_the_worktrees_folder() {
+  if hook create "{\"name\": \"../escape\", \"cwd\": \"$M\"}" >/dev/null 2>&1; then echo "the name was taken"; return 1; fi
+
+  [[ ! -e $M/.claude/escape ]] || { echo "made $M/.claude/escape"; return 1; }
+}
+
+the_remove_hook_removes_the_worktree_and_its_branch() {
+  local dir="$M/.claude/worktrees/agent-x"
+  hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" >/dev/null 2>&1
+  printf 'work\n' >"$dir/work"
+
+  hook remove "{\"worktree_path\": \"$dir\"}" >/dev/null 2>&1
+
+  [[ ! -e $dir ]] || { echo "$dir is still there"; return 1; }
+  ! git -C "$M" rev-parse --verify --quiet refs/heads/worktree-agent-x >/dev/null
+}
+
+the_remove_hook_keeps_a_branch_of_another_name() {
+  local dir="$M/.claude/worktrees/agent-x"
+  hook create "{\"name\": \"agent-x\", \"cwd\": \"$M\"}" >/dev/null 2>&1
+  git -C "$dir" switch -q -c chore/the-work
+
+  hook remove "{\"worktree_path\": \"$dir\"}" >/dev/null 2>&1
+
+  git -C "$M" rev-parse --verify --quiet refs/heads/chore/the-work >/dev/null
+}
+
+for t in a_worktree_gets_the_main_checkouts_target the_worktree_is_found_from_the_current_directory \
+  a_source_the_same_as_the_main_checkouts_takes_its_time \
+  a_source_that_differs_from_the_main_checkouts_keeps_its_own_time \
+  a_source_the_main_checkout_lacks_keeps_its_own_time \
+  a_unit_that_read_the_main_checkout_by_its_absolute_path_is_rebuilt \
+  without_reflinks_nothing_is_copied_and_cargo_builds_cold a_worktree_with_a_target_of_its_own_is_left_alone \
+  a_main_checkout_without_a_target_leaves_the_worktree_cold the_main_checkout_itself_is_never_warmed \
+  a_build_running_in_the_main_checkout_is_waited_for_then_skipped a_shared_cargo_target_dir_needs_no_copy \
+  a_directory_outside_git_is_refused the_create_hook_prints_only_the_path_of_a_warm_worktree_on_its_own_branch \
+  the_create_hook_starts_from_the_remotes_default_branch the_create_hook_starts_from_head_without_a_remote \
+  the_create_hook_finds_the_main_checkout_from_a_worktree the_create_hook_reopens_a_worktree_as_it_is \
+  the_create_hook_still_makes_the_worktree_without_reflinks \
+  the_create_hook_refuses_a_name_that_leaves_the_worktrees_folder \
+  the_remove_hook_removes_the_worktree_and_its_branch the_remove_hook_keeps_a_branch_of_another_name; do
+  test_case "${t//_/ }" "$t"
+done
+exit "$failed"
