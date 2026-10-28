@@ -32,7 +32,7 @@ Before/after screenshots of a UI change don't need Docker: `just shots` renders 
 
 **Limits.** The machine runs its own session and other builds beside the harness, so the container is bounded: `DOTFILES_TEST_MEM` and `DOTFILES_TEST_CPUS` (default 12g and 8 CPUs; the `kubaos` CLI's cargo build gets the same), and Nix in the container builds with `max-jobs` `DOTFILES_TEST_NIX_JOBS` and `cores` `DOTFILES_TEST_NIX_CORES` (default 2 and 4; the cores are also cargo's jobs). `test/run warm` and `test/run e2e` print the container's peak memory (the cgroup's `memory.peak`) at the end, which is what to size `DOTFILES_TEST_MEM` by.
 
-**Not in PR CI.** A GitHub-hosted `ubuntu-latest` runner has about 14 GB of free disk, and the harness needs about 22 GB (the 6.6 GB image and a 15 GB store), and nothing it builds survives to the next run: the Actions cache holds 10 GB per repository. The store alone doesn't fit, and every run would start from a cold image and store on 4 CPUs. So CI runs `just check`, and a PR runs `just e2e` on the machine and puts the results table in its description.
+**Not in PR CI.** The harness needs about 22 GB (the 6.6 GB image and a 15 GB store), and nothing a GitHub-hosted runner builds survives to the next run: the Actions cache holds 10 GB per repository, which the store alone doesn't fit, so every run would start from a cold image and store on 4 CPUs. So CI runs `just check` ("CI" below), and a PR runs `just e2e` on the machine and puts the results table in its description.
 
 `shots --dir NAME` writes to `docs/screenshots/NAME/`. Without `--dir` or `--out` the files go to `test/out/` (git-ignored). Typical session:
 
@@ -185,6 +185,33 @@ A `WorktreeCreate` hook replaces Claude Code's own `git worktree add`, so the ho
 | Warm, from a main last built for other work | 7 s (copy) | 27 s | 147 | 4.3 GiB |
 
 On a quieter machine the cold test build takes about 70 s. Running the tests takes the same two to four minutes either way.
+
+## CI
+
+`.github/workflows/check.yml` runs on every pull request and every push to main, on GitHub's `ubuntu-latest` (x86_64, 4 CPUs). It runs what `just check` runs, in `nix develop`, and `nix flake check --no-build`, as parallel jobs, each on its own runner:
+
+| Job | Runs |
+|---|---|
+| `flake` | `nix flake check --no-build`, which evaluates the flake and builds nothing |
+| `fmt and lint` | `just fmt-check`, `just lint` |
+| `nextest` | `just nextest`, every test but Kōbō's `every_screen_keeps_to_the_grid` |
+| `nextest (slow)` | that one test, `cargo nextest run -p kubaos-kobo`: two to three minutes alone, longer than all the others together |
+| `qml` | `just qml-test` |
+| `design` | `just design-check`, with QML's parity |
+| `check (x86_64-linux)` | after all of them: fails unless every one passed, cancelled and skipped included |
+
+`check (x86_64-linux)` is the one check branch protection on main requires, so a job added to the workflow goes in its `needs`. The two nextest jobs split the tests with one nextest filter, `SLOW_TEST` in the workflow, negated in `nextest`, so every test runs in exactly one of them; a renamed test matches nothing, and `nextest (slow)` fails for running no test.
+
+`.github/actions/setup` sets up every job: Nix, the kuba-os Cachix read-only, the Nix store from the Actions cache, and for the jobs that compile, sccache's directory and cargo's downloads. Each compiling job keeps its own compile cache, as each builds different crates; the jobs that need only the devshell share one Nix store cache. Only the run on a push to main saves them, and every PR starts from them. A job with no cache of its own yet starts from another job's, and a change to `Cargo.lock` or `flake.lock` from the last one saved.
+
+Measured 2026-10-28, wall time from the push to `check (x86_64-linux)`:
+
+| Run | Wall time | Longest job |
+|---|---|---|
+| Starting from main's caches, the usual PR | 3 min 55 s | `nextest (slow)` 3 min 44 s: 48 s of build, 110 s of the test |
+| No Actions caches at all | 7 min 48 s | `nextest (slow)` 7 min 39 s: 4 min of build, 173 s of the test |
+
+The runner's disk has 86 GB free at the start, so no job deletes the image's preinstalled SDKs.
 
 
 ## Kōbō and the live ISO in a VM

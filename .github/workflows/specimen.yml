@@ -8,7 +8,8 @@
 #
 # Two jobs, so the one whose token can push runs none of the repo's code:
 # `render` only reads, and `publish` pushes the pictures `render` uploaded.
-# Both caches are only read: check.yml's run on the same push saves them.
+# Both caches are only read: they are check.yml's design job's, which its run
+# on the same push saves.
 #
 # Actions are pinned to a commit, with the release in the comment beside it.
 name: Specimen
@@ -56,8 +57,10 @@ jobs:
       - name: Restore the Nix store
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix', 'qml/specimen/package.nix') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
+          primary-key: nix-${{ runner.os }}-design-${{ hashFiles('flake.lock', 'flake.nix', 'qml/specimen/package.nix') }}
+          restore-prefixes-first-match: |
+            nix-${{ runner.os }}-design-
+            nix-${{ runner.os }}-
           save: false
 
       - name: Read the kuba-os Cachix
@@ -74,13 +77,15 @@ jobs:
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-${{ github.run_id }}
+          key: cargo-${{ runner.os }}-design-${{ hashFiles('Cargo.lock', 'flake.lock') }}-${{ github.run_id }}
           restore-keys: |
-            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-
+            cargo-${{ runner.os }}-design-${{ hashFiles('Cargo.lock', 'flake.lock') }}-
+            cargo-${{ runner.os }}-design-
             cargo-${{ runner.os }}-
 
-      # A debug build, as check.yml's compile cache holds one: the dependencies come from it, and
-      # every page renders in a few minutes. A release build would compile iced afresh.
+      # A debug build, as check.yml's design job's compile cache holds one: the
+      # dependencies come from it, and every page renders in a few minutes. A
+      # release build would compile iced afresh.
       - name: Render
         run: |
           nix develop --command cargo run -q -p kubaos-specimen -- shots out/iced

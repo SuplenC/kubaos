@@ -1,0 +1,84 @@
+# What every job of check.yml starts from, after the checkout: Nix, the Nix
+# store from the Actions cache, the kuba-os Cachix read-only, and for the jobs
+# that compile, sccache's directory and cargo's downloads.
+#
+# Each job keeps its own compile cache, named by `name`, since each one builds
+# different crates. The Nix store cache is named by `store`, which jobs that
+# need the same store paths share: a job saving a key another one saved first
+# skips it. Only a push to main saves them,
+# and every PR starts from them: a PR saving its own would push main's out of
+# the repository's 10 GB. A job with no cache of its own yet starts from any
+# job's. The compile cache's key ends in the run, so each push to main saves a
+# newer one and GitHub drops the oldest.
+#
+# Actions are pinned to a commit, with the release in the comment beside it.
+name: Set up Nix and the caches
+description: Nix, the Nix store cache, the kuba-os Cachix and the compile cache.
+
+inputs:
+  name:
+    description: The job's name in its compile cache's key.
+    required: true
+  store:
+    description: The name in the Nix store cache's key, by default the job's.
+    default: ""
+  cargo:
+    description: Restore the compile cache.
+    default: "false"
+
+outputs:
+  cargo-key:
+    description: The key to save the compile cache under.
+    value: ${{ steps.keys.outputs.cargo }}
+
+runs:
+  using: composite
+  steps:
+    - name: Cache keys
+      id: keys
+      shell: bash
+      env:
+        NIX: nix-${{ runner.os }}-${{ inputs.store || inputs.name }}-${{ hashFiles('flake.lock', 'flake.nix', 'qml/specimen/package.nix') }}
+        CARGO: cargo-${{ runner.os }}-${{ inputs.name }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}
+      run: |
+        echo "nix=$NIX" >>"$GITHUB_OUTPUT"
+        echo "cargo-prefix=$CARGO-" >>"$GITHUB_OUTPUT"
+        echo "cargo=$CARGO-$GITHUB_RUN_ID" >>"$GITHUB_OUTPUT"
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      with:
+        extra_nix_config: |
+          max-jobs = auto
+
+    - name: Restore the Nix store
+      uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7.0.2
+      with:
+        primary-key: ${{ steps.keys.outputs.nix }}
+        restore-prefixes-first-match: |
+          nix-${{ runner.os }}-${{ inputs.store || inputs.name }}-
+          nix-${{ runner.os }}-
+        gc-max-store-size-linux: 5G
+        save: ${{ github.event_name == 'push' }}
+
+    # No auth token: the cache is only read.
+    - name: Read the kuba-os Cachix
+      uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+      with:
+        name: kuba-os
+        skipPush: true
+
+    - name: Restore the compile cache
+      if: inputs.cargo == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cache/sccache
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+        key: ${{ steps.keys.outputs.cargo }}
+        restore-keys: |
+          ${{ steps.keys.outputs.cargo-prefix }}
+          cargo-${{ runner.os }}-${{ inputs.name }}-
+          cargo-${{ runner.os }}-
