@@ -704,13 +704,15 @@ c_workspaces() {
 }
 
 # The primary's bar after screens are plugged in: test/lib/hyprland-hotplug.py
-# stands in for Hyprland and sends the groups waiting on the primary to the new
-# screens, with Quickshell reading the workspace list it asked for before the
-# moves only after their events. The bar shows the primary's own group alone.
+# stands in for Hyprland and sends the groups waiting on the primary, and the
+# focused window's workspace among them, to the new screens, with Quickshell
+# reading the workspace list it asked for before the moves only after their
+# events. The primary's bar shows its own group alone, and no title.
 workspaces_hotplug_bar() {
-  local signature=kubaos-e2e-hotplug state="$USER_HOME/.local/state" fake line bad=0
+  local signature=kubaos-e2e-hotplug state="$USER_HOME/.local/state" fake groups title bad=0
   local screens="$state/kubaos/hypr/workspace-screens"
   session_start sway 1920x1080 1
+  # The stand-in reads the log from before Quickshell starts.
   : >"$QS_LOG"
   chown "$USER_NAME:" "$QS_LOG"
   as_user python3 -I "$REPO/test/lib/hyprland-hotplug.py" "$RUNTIME_DIR" "$signature" "$state" "$QS_LOG" \
@@ -720,7 +722,11 @@ workspaces_hotplug_bar() {
     grep -q ready "$LOGS/hyprland-hotplug.log" && break
     sleep 0.1
   done
-  if ! qs_start "HYPRLAND_INSTANCE_SIGNATURE=$signature" KUBAOS_WORKSPACES_PROBE=1; then
+  if ! grep -q ready "$LOGS/hyprland-hotplug.log"; then
+    echo "FAIL the stand-in for Hyprland didn't start:"
+    tail -5 "$LOGS/hyprland-hotplug.log" | sed 's/^/     /'
+    bad=1
+  elif ! qs_start "HYPRLAND_INSTANCE_SIGNATURE=$signature" KUBAOS_WORKSPACES_PROBE=1; then
     echo "FAIL Quickshell didn't load its config:"
     tail -30 "$QS_LOG"
     bad=1
@@ -729,11 +735,20 @@ workspaces_hotplug_bar() {
     tail -5 "$LOGS/hyprland-hotplug.log" | sed 's/^/     /'
     bad=1
   else
-    line="$(grep -o 'workspaces probe: HEADLESS-1 .*' "$QS_LOG" | tail -1)"
-    if [[ $line == 'workspaces probe: HEADLESS-1 [[1,2,4,5]]' ]]; then
-      echo "ok   after a hotplug the primary's bar shows its own group alone, whatever order Quickshell reads Hyprland in"
+    groups="$(grep -o 'workspaces probe: HEADLESS-1 .*' "$QS_LOG" | tail -1)"
+    groups="${groups#workspaces probe: HEADLESS-1 }"
+    title="$(grep -o 'active window probe: HEADLESS-1 .*' "$QS_LOG" | tail -1)"
+    title="${title#active window probe: HEADLESS-1 }"
+    if [[ $groups == '[[1,2,4,5]]' ]]; then
+      echo "ok   after a hotplug the primary's bar shows its own group alone, the workspace list read after the moves' events"
     else
-      echo "FAIL after a hotplug the primary's bar shows ${line#workspaces probe: HEADLESS-1 }, not [[1,2,4,5]]"
+      echo "FAIL after a hotplug the primary's bar shows $groups, not [[1,2,4,5]]"
+      bad=1
+    fi
+    if [[ $title == '""' ]]; then
+      echo "ok   the focused window's title leaves the primary's bar with its workspace"
+    else
+      echo "FAIL after a hotplug the primary's bar shows the title $title of a window on another screen"
       bad=1
     fi
   fi

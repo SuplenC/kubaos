@@ -139,13 +139,14 @@ Singleton {
     }
 
     // Id -> the connector of the screen Hyprland last moved the workspace to.
-    // Each move is an event, and Hyprland sends them in order, but Quickshell
-    // also takes a workspace's screen from the workspace list it reads, and
-    // reads a list asked for before a move after that move's event when both
-    // are waiting: on a hotplug, the list asked for as a screen arrives puts
-    // the groups the reconcile then moves off the primary back on it, until
-    // the next list is read. The events win. A workspace destroyed or created
-    // anew under an id is placed with no move, so it loses its entry.
+    // Quickshell sets a workspace's screen from move events and from each
+    // workspace list it reads. A list asked for before a move can be read
+    // after the move's event, and puts the workspace back where it was: on a
+    // hotplug, the list asked for as a screen arrives puts the groups the
+    // reconcile then moves off the primary back on it, until the next list is
+    // read. Hyprland sends every move of a workspace as an event, in order, so
+    // the last event's screen wins here. An id destroyed, created, or
+    // renumbered away from is placed with no move, so it loses its entry.
     property var movedTo: ({})
 
     // The connector of the screen workspace `workspace` is on, "" when unknown.

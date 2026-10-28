@@ -130,7 +130,8 @@ Item {
     readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
     readonly property var roles: ["kind", "borrowed", "head", "tail", "label"]
     property bool ready: false
-    // `c_workspaces`'s probe (test/lib/e2e.sh), with KUBAOS_WORKSPACES_PROBE=1 only.
+    // With KUBAOS_WORKSPACES_PROBE=1, the groups are logged on every change, for
+    // `workspaces_hotplug_bar` in `test/lib/e2e.sh`.
     readonly property bool probed: Quickshell.env("KUBAOS_WORKSPACES_PROBE") === "1"
 
     // By each window's own workspace, not a workspace's list of windows: a

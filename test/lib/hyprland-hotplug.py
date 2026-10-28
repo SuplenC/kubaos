@@ -7,11 +7,13 @@ RUNTIME_DIR/hypr/SIGNATURE for a Quickshell started with
 HYPRLAND_INSTANCE_SIGNATURE=SIGNATURE and KUBAOS_WORKSPACES_PROBE=1, and writes
 the per-screen workspace state file in STATE_DIR/kubaos/hypr. QS_LOG is
 Quickshell's log, where the bar's probe lines (`workspaces probe: SCREEN
-GROUPS`) tell it the bar has caught up.
+GROUPS` and `active window probe: SCREEN "TITLE"`) tell it the bar has caught
+up.
 
 The session's one screen, HEADLESS-1, is the primary: the laptop panel's
 block 0, with workspaces 1 and 2, holding the waiting groups of two desk
-positions no screen holds, 33-34 and 41. Then DP-8 and DP-9 are plugged in
+positions no screen holds, 33-34 and 41, and the focused window on 33. Then
+DP-8 and DP-9 are plugged in
 and `config/hypr/workspaces.lua` sends each group to its screen, as Hyprland
 does it:
 
@@ -26,7 +28,7 @@ does it:
 
 It exits 0 once Quickshell has read the answer, and 1, with the reason on
 stderr, when a step doesn't happen in time. The bar's state after it is the
-last probe line in QS_LOG.
+last probe line of each kind in QS_LOG.
 """
 
 import json
@@ -192,19 +194,27 @@ def log_end(log):
     return os.path.getsize(log)
 
 
-# Waits for the bar to show `groups` on the primary in a line of QS_LOG past the
-# offset `since`: while Quickshell reads the first workspace list, the bar
-# passes through the groups it reads one at a time.
-def wait_for_probe(log, since, groups, what):
-    line = f"workspaces probe: {PRIMARY} {groups}".encode()
+# Waits for the probe line `probe` in QS_LOG past the offset `since`: while
+# Quickshell reads the first workspace list, the bar passes through the groups
+# it reads one at a time.
+def wait_for_probe(log, since, probe, what):
+    line = probe.encode()
     end = time.monotonic() + STEP_TIMEOUT_S
     while time.monotonic() < end:
         with open(log, "rb") as text:
             text.seek(since)
-            if any(line in row for row in text):
+            if any(row.rstrip(b"\n").endswith(line) for row in text):
                 return
         time.sleep(0.1)
-    fail(f"{what}: the bar never showed {groups}")
+    fail(f"{what}: no `{probe}`")
+
+
+def groups_probe(groups):
+    return f"workspaces probe: {PRIMARY} {groups}"
+
+
+def title_probe(title):
+    return f"active window probe: {PRIMARY} {json.dumps(title)}"
 
 
 def write_screens(state_dir, rows):
@@ -233,7 +243,9 @@ def main():
 
     wait(hyprland.listener_ready, "Quickshell connecting to the event socket")
     wait(hyprland.served_workspaces, "Quickshell reading the workspaces")
-    wait_for_probe(log, 0, "[[1,2],[33,34],[41]]", "the waiting groups on the primary")
+    wait_for_probe(log, 0, groups_probe("[[1,2],[33,34],[41]]"), "the waiting groups on the primary")
+    hyprland.emit("activewindow>>foot,window 33", f"activewindowv2>>{hyprland.windows[33]:x}")
+    wait_for_probe(log, 0, title_probe("window 33"), "the focused window's title on the primary")
 
     since = log_end(log)
     hyprland.hold = True
@@ -248,7 +260,8 @@ def main():
         ["3", "DP-8", "2", "LG", "Centre"],
         ["4", "DP-9", "1", "BenQ", "Left"],
     ])
-    wait_for_probe(log, since, "[[1,2,4,5]]", "the groups leaving the primary as they move")
+    wait_for_probe(log, since, groups_probe("[[1,2,4,5]]"), "the groups leaving the primary as they move")
+    wait_for_probe(log, since, title_probe(""), "the focused window's title leaving the primary with 33")
 
     hyprland.release.set()
     wait(hyprland.held_read, "Quickshell reading the answer sent before the moves")
