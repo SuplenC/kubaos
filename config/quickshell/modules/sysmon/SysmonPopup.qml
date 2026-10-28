@@ -10,7 +10,7 @@ import qs.settings
 // processes below, and uptime, kernel and btop at the foot. While it is open
 // the engine samples every second. A sensor, GPU, battery or fan the machine
 // lacks leaves its line or part out. It is two panels wide.
-Drawer {
+K.Sheet {
     id: root
 
     // Above and below the body; at its sides, the container padding of the panel's width.
@@ -108,9 +108,7 @@ Drawer {
                         value: Sysmon.percent(root.s?.cpu?.usage)
                         valueColor: root.tint(Sysmon.tempLevel, K.Tokens.color.on_surface)
 
-                        Graph {
-                            fillWidth: true
-                            implicitHeight: K.Tokens.space.s48
+                        K.Sparkline {
                             points: Sysmon.history.cpu ?? []
                             revision: Sysmon.revision
                             color: root.tint(Sysmon.tempLevel, K.Tokens.color.primary)
@@ -175,7 +173,7 @@ Drawer {
                         value: Sysmon.percent(root.s?.memory?.percent)
                         valueColor: root.tint(Sysmon.ramLevel, K.Tokens.color.on_surface)
 
-                        Meter {
+                        K.Meter {
                             readonly property real total: Math.max(1, root.s?.memory?.total ?? 1)
 
                             fillWidth: true
@@ -195,15 +193,13 @@ Drawer {
                             text: root.s?.memory ? `${Sysmon.bytes(root.s.memory.used)} used · ${Sysmon.bytes(root.s.memory.cache)} cache · ${Sysmon.bytes(root.s.memory.available)} available of ${Sysmon.bytes(root.s.memory.total)}` : "Memory can't be read"
                         }
 
-                        Graph {
-                            fillWidth: true
-                            implicitHeight: K.Tokens.space.s48
+                        K.Sparkline {
                             points: Sysmon.history.ram ?? []
                             revision: Sysmon.revision
                             color: root.tint(Sysmon.ramLevel, K.Tokens.color.primary)
                         }
 
-                        Meter {
+                        K.Meter {
                             visible: (root.s?.memory?.swapTotal ?? 0) > 0
                             fillWidth: true
                             parts: [
@@ -243,7 +239,7 @@ Drawer {
                                     fine: gpu.modelData.active ? K.Tokens.color.on_surface : K.Tokens.color.on_surface_variant
                                 }
 
-                                Meter {
+                                K.Meter {
                                     visible: gpu.modelData.active && gpu.modelData.usage != null
                                     fillWidth: true
                                     parts: [
@@ -272,9 +268,7 @@ Drawer {
                         title: "Network"
                         value: root.s?.net?.down != null ? `↓ ${Sysmon.rate(root.s.net.down)}  ↑ ${Sysmon.rate(root.s.net.up ?? 0)}` : ""
 
-                        Graph {
-                            fillWidth: true
-                            implicitHeight: K.Tokens.space.s48
+                        K.Sparkline {
                             points: Sysmon.history.down ?? []
                             second: Sysmon.history.up ?? []
                             revision: Sysmon.revision
@@ -311,7 +305,7 @@ Drawer {
                                     level: disk.level
                                 }
 
-                                Meter {
+                                K.Meter {
                                     fillWidth: true
                                     parts: [
                                         {
@@ -340,7 +334,7 @@ Drawer {
                         title: "Power"
                         value: root.s?.battery ? `${Math.round(root.s.battery.percent)}%` : ""
 
-                        Meter {
+                        K.Meter {
                             visible: root.s?.battery != null
                             fillWidth: true
                             parts: [

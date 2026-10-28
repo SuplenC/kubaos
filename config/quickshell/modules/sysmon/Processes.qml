@@ -1,6 +1,5 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // The five busiest processes, by CPU or by memory. A click shows one's
@@ -75,7 +74,7 @@ K.Stack {
         }
 
         // The order is picked with the pointer only, as before: it is no stop for Tab.
-        Tabs {
+        K.Tabs {
             labels: ["CPU", "Memory"]
             currentIndex: root.order === "cpu" ? 0 : 1
             activeFocusOnTab: false

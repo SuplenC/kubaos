@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Notification popups, in a panel that grows down from the top-right corner
@@ -11,7 +10,7 @@ import qs.services
 // While an open panel covers the corner (`covered`), the cards wait in
 // `Notifs.popups`, still in the control center's history, and come back
 // when the panel has gone; critical ones show under it (`PopupsBelow.qml`).
-Drawer {
+K.Sheet {
     id: root
 
     readonly property int padding: K.Tokens.space.s8

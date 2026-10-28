@@ -72,8 +72,9 @@ Pill {
                 color: entry.tint
             }
 
-            Meter {
+            K.Meter {
                 visible: Sysmon.settings.style === "bars" && entry.metric?.max > 0
+                fillWidth: false
                 implicitWidth: K.Tokens.size.control_sm
                 parts: [
                     {
@@ -83,8 +84,9 @@ Pill {
                 ]
             }
 
-            Graph {
+            K.Sparkline {
                 visible: Sysmon.settings.style === "sparklines"
+                fillWidth: false
                 implicitWidth: K.Tokens.size.control_sm
                 implicitHeight: K.Tokens.icon.s16
                 points: Sysmon.history[entry.metric?.series] ?? []

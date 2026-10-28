@@ -1,6 +1,5 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Timer, stopwatch and alarms, on tabs. They run in the Time service, so
@@ -24,7 +23,7 @@ Item {
         error = "";
     }
 
-    Tabs {
+    K.Tabs {
         id: tabs
 
         labels: ["Timer", "Stopwatch", "Alarm"]

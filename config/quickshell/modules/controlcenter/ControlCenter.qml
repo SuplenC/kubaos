@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Side sheet on the right edge, from the bar down to the bottom border:
@@ -10,7 +9,7 @@ import qs.services
 // and keyboard layouts, whose list takes the room left at the bottom.
 // Keys: Tab/Shift+Tab move between controls, h/l switch tabs on the tab bar,
 // 1-4 jump to a tab, j/k move in lists, Esc closes.
-Drawer {
+K.Sheet {
     id: root
 
     property int tab: 0
@@ -130,7 +129,7 @@ Drawer {
         width: root.contentWidth - body.padding * 2
         height: Math.max(0, root.height - y - K.Tokens.space.s16)
 
-        Tabs {
+        K.Tabs {
             id: tabBar
 
             room: parent.width

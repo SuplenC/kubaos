@@ -9,7 +9,7 @@ import qs.components
 ListView {
     id: list
 
-    required property Drawer drawer
+    required property K.Sheet drawer
     // The notifications to show; empty while the drawer is away, so other
     // screens and hidden stacks don't run their countdown animations.
     required property var notifications

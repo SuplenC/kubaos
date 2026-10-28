@@ -1,6 +1,5 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // The clock popup, under the bar's clock: the time to the second, the date,
@@ -15,7 +14,7 @@ import qs.services
 //
 // It arrives and leaves as every panel does. Its columns are the month, a
 // regular control a day, and the rail's width for countdowns and the tools.
-Drawer {
+K.Sheet {
     id: root
 
     readonly property var kanji: ["日", "月", "火", "水", "木", "金", "土"]
@@ -462,7 +461,7 @@ Drawer {
             K.Stack {
                 gap: K.Tokens.space.s12
 
-                MonthGrid {
+                K.Calendar {
                     id: grid
 
                     selected: root.selected

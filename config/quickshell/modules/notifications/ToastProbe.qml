@@ -1,5 +1,5 @@
 import QtQuick
-import qs.components
+import KubaOS.Components as K
 
 // Logs where the toast stacks and the open panels are, as `toast probe: ...`
 // lines in Quickshell's log, each time that changes (polled every frame or
@@ -17,7 +17,7 @@ Timer {
     required property var stacks
     property string last: ""
 
-    function rect(d: Drawer): string {
+    function rect(d: K.Sheet): string {
         return [d.x, d.y, d.width, d.height].map(Math.round).join(",");
     }
 

@@ -23,7 +23,7 @@ K.Stack {
 
     // The layout in use; a click switches to the next, as the bar's pill does.
     // The arrow lists them, to add, remove, reorder or pick the default.
-    component KeyboardTile: QuickTile {
+    component KeyboardTile: K.Tile {
         icon: "keyboard"
         title: "Keyboard"
         subtitle: Keyboard.several ? `${Keyboard.code} · ${Keyboard.active + 1} of ${Keyboard.layouts.length}` : Keyboard.code || "Layouts"
@@ -37,7 +37,7 @@ K.Stack {
         columns: 2
         gap: K.Tokens.space.s8
 
-        QuickTile {
+        K.Tile {
             id: wifi
 
             icon: Net.icon
@@ -47,7 +47,7 @@ K.Stack {
             onActivated: Net.setWifiEnabled(!Net.wifiEnabled)
         }
 
-        QuickTile {
+        K.Tile {
             icon: Bt.icon
             title: "Bluetooth"
             subtitle: !Bt.available ? "Unavailable" : !Bt.enabled ? "Off" : Bt.connectedCount > 0 ? `${Bt.connectedCount} connected` : "On"
@@ -55,7 +55,7 @@ K.Stack {
             onActivated: Bt.toggle()
         }
 
-        QuickTile {
+        K.Tile {
             icon: Notifs.dnd ? "notifications_off" : "notifications"
             title: "Do not disturb"
             subtitle: Notifs.dnd ? "On" : "Off"
@@ -64,7 +64,7 @@ K.Stack {
         }
 
         // Always -> On AC -> Never. Remembered across restarts (services/Motion.qml).
-        QuickTile {
+        K.Tile {
             icon: Motion.mode === "never" ? "motion_photos_off" : Motion.mode === "always" ? "motion_photos_on" : "motion_photos_auto"
             title: "Wallpaper motion"
             subtitle: Motion.mode === "never" ? "Never" : Motion.mode === "always" ? "Always" : Motion.onBattery ? "On AC, paused" : "On AC"
@@ -80,7 +80,7 @@ K.Stack {
         // The work network's switch (services/Proxy.qml): every part of the
         // profile up together, or none. The arrow shows the tunnel's endpoint,
         // last handshake and bytes moved below.
-        QuickTile {
+        K.Tile {
             visible: Proxy.configured
             icon: Proxy.on ? "vpn_lock" : "key"
             title: "Proxy"

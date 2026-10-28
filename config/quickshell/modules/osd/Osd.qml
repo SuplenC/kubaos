@@ -1,13 +1,12 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Volume / brightness indicator, rising out of the bottom edge of the
 // focused screen. Hyprland binds the keys to wpctl and brightnessctl; this
 // only watches the resulting values.
-Drawer {
+K.Sheet {
     id: root
 
     required property ShellScreen screen

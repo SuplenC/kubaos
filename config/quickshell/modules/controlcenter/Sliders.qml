@@ -4,7 +4,8 @@ import qs.components
 import qs.services
 
 // Volume (with mute), screen brightness and the power stops. Each slider ends where the power
-// stop's name begins, so the three tracks are one length.
+// stop's name begins, so the three tracks are one length. Each row is a slider tall, the mute
+// button standing into the gap around its row, so the three sit as close as their thumbs allow.
 K.Stack {
     id: root
 
@@ -16,6 +17,7 @@ K.Stack {
 
     K.Row {
         fill: true
+        fixedHeight: K.Tokens.size.slider
         gap: K.Tokens.space.s12
         align: "centre"
 
@@ -40,7 +42,9 @@ K.Stack {
 
                 icon: Audio.muted ? "volume_off" : "volume_up"
                 label: Audio.muted ? "Unmute" : "Mute"
-                kind: Audio.muted ? "Filled" : "Tonal"
+                // A small control beside the slider, so it stays quiet: no fill, the state layer
+                // under the pointer.
+                kind: "Text"
                 size: "Sm"
                 onActivated: Audio.toggleMute()
             }

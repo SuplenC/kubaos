@@ -5,7 +5,6 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import KubaOS.Components as K
-import qs.components
 import qs.services
 import qs.modules.bar
 import qs.modules.clock
@@ -15,7 +14,6 @@ import qs.modules.osd
 import qs.modules.powermenu
 import qs.modules.sysmon
 import qs.modules.wallpaper
-import "../../components/drawerpath.js" as DrawerPath
 
 // The screen frame for one monitor: the bar along the top, a thin border on
 // the other edges with rounded inner corners, and every panel, each growing
@@ -51,7 +49,7 @@ Scope {
         readonly property var panels: [controlCenter, clockPopup, sysmonPopup, powerMenu, wallpaperPicker]
         // The panel on screen (opening, open or closing) that reaches into
         // the popups' corner column, or null. Popups never draw over it.
-        readonly property Drawer toastCover: panels.find(d => (d.shown || d.active) && d.area.x + d.area.width + K.Tokens.radius.surface > geo.r - popups.contentWidth) ?? null
+        readonly property K.Sheet toastCover: panels.find(d => (d.shown || d.active) && d.area.x + d.area.width + K.Tokens.radius.surface > geo.r - popups.contentWidth) ?? null
 
         screen: scope.screen
         color: "transparent"
@@ -165,7 +163,7 @@ Scope {
                     fillRule: ShapePath.OddEvenFill
 
                     PathSvg {
-                        path: DrawerPath.frame(root.width, root.height, geo, K.Tokens.radius.surface * root.reveal)
+                        path: K.SheetPath.frame(root.width, root.height, geo, K.Tokens.radius.surface * root.reveal)
                     }
                 }
 
@@ -293,7 +291,7 @@ Scope {
     }
 
     component PanelPath: ShapePath {
-        required property Drawer drawer
+        required property K.Sheet drawer
 
         fillColor: K.Tokens.color.surface
         // design-allow(size): -1 is ShapePath's "no stroke", not a width.

@@ -13,7 +13,7 @@ import qs.services
 // wallpaper settings (WallpaperSettings.qml).
 // Keys: hjkl/arrows move, Tab/Shift+Tab switch folder, S settings, Enter
 // apply, Esc close (from the settings: back to the wallpapers).
-Drawer {
+K.Sheet {
     id: root
 
     property int folderIndex: 0
@@ -126,7 +126,7 @@ Drawer {
         align: "centre"
 
         // Picked with the pointer; Tab and Shift+Tab in the grid switch folders.
-        Tabs {
+        K.Tabs {
             id: tabs
 
             labels: [...root.folders.map(f => `${f.name.charAt(0).toUpperCase()}${f.name.slice(1).replace(/-/g, " ")} ${(Wallpapers.images[f.name] ?? []).length}`), "Settings"]

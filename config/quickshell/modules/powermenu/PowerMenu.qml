@@ -1,13 +1,12 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Lock / suspend / log out / reboot / shut down, as list rows in a column that slides out of the
 // right edge. The panel is the rows' well: they sit 12 inside its surface, so their corners are
 // concentric with it, as in a list. The selected row is where the keyboard is.
 // Keys: j/k, h/l, arrows or Tab to move, Enter or Space to run, Esc to close.
-Drawer {
+K.Sheet {
     id: root
 
     readonly property var actions: [
