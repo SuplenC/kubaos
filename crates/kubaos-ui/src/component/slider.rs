@@ -1,32 +1,64 @@
-//! The slider: a value from 0 to 1, or one of a few stops, picked along a track.
+//! The slider: a pill whose fill is the value, from 0 to 1 or one of a few stops.
+//!
+//! The fill's round end marks the value: the value is that end circle's centre, and at 0 the fill
+//! is the circle behind the icon. The icon sits in that circle; the value, or a name for it, sits
+//! at the far end, in the track's colours over the track and the fill's over the fill.
+//!
+//! # Owns
+//!
+//! - [`slider`], built up with [`Slider`], in two [`Size`]s.
+//! - Where it stands ([`Value`]) and how it moves: an arrow key's [`Value::step`], Home and End
+//!   ([`Value::end`]), the stop a released drag settles on ([`Value::at`]), the icon's walk down
+//!   the stops and back ([`Value::turn`]) and a sticky point ([`stick`]).
+//! - Its geometry and its marks ([`Track`]).
+//!
+//! # Not here
+//!
+//! - Drawing it and the pointer on it: `slider/pill.rs`. The keys: the app, which moves the
+//!   [`Value`] it gives.
 
-use iced::Color;
 use iced::Element;
-use iced::Length;
-use iced::Point;
-use iced::Rectangle;
-use iced::Renderer;
-use iced::Size as IcedSize;
-use iced::Theme;
-use iced::mouse;
-use iced::widget::Action;
-use iced::widget::canvas;
-use iced::widget::canvas::Event;
-use iced::widget::canvas::Frame;
-use iced::widget::canvas::Geometry;
-use iced::widget::canvas::Path;
 
-use crate::color;
-use crate::color::Colors;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
+use crate::icon::Icon;
 use crate::look::Look;
 use crate::probe;
 use crate::probe::Fixed;
-use crate::scale::Scale;
-use crate::tokens::Opacity;
 use crate::tokens::Radius;
-use crate::tokens::Size;
+use crate::tokens::Size as SizeToken;
+use crate::tokens::Space;
+
+mod pill;
+
+/// An arrow key's step along a continuous slider: a twentieth, 5% of a volume.
+const NUDGE: f32 = 0.05;
+
+/// Which way the icon of a slider with stops moves it next.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Direction {
+    /// Toward the first stop: from Max Performance toward Super Saver.
+    Down,
+    /// Toward the last stop.
+    Up,
+}
+
+/// Where the icon's walk starts: from high to low, so a press from Max Performance eases off.
+pub const DEFAULT_DIRECTION: Direction = Direction::Down;
+
+impl Default for Direction {
+    fn default() -> Self {
+        DEFAULT_DIRECTION
+    }
+}
+
+/// Where a drag at `value` stands with a sticky point at `point`: on the point while within
+/// `reach` of it, so the value holds there until pulled further. All three are fractions of the
+/// track.
+#[must_use]
+pub fn stick(value: f32, point: f32, reach: f32) -> f32 {
+    if (value - point).abs() <= reach { point } else { value }
+}
 
 /// Where a slider stands.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -52,9 +84,61 @@ impl Value {
         }
     }
 
+    /// One arrow key's move, toward the end when `forward`: a twentieth of the track, or a stop.
+    /// It stops at either end.
+    #[must_use]
+    pub fn step(self, forward: bool) -> Value {
+        match self {
+            Value::Continuous(v) => {
+                let by = if forward { NUDGE } else { -NUDGE };
+                Value::Continuous((v + by).clamp(0.0, 1.0))
+            }
+            Value::Stop { index, count } => {
+                let last = count.saturating_sub(1);
+                let index = if forward {
+                    index.saturating_add(1).min(last)
+                } else {
+                    index.saturating_sub(1)
+                };
+                Value::Stop { index, count }
+            }
+        }
+    }
+
+    /// Home's move to the start, or End's to the end when `end`.
+    #[must_use]
+    pub fn end(self, end: bool) -> Value {
+        self.at(if end { 1.0 } else { 0.0 })
+    }
+
+    /// The icon's press on a slider with stops: one stop `direction`'s way, turning around at
+    /// either end, so presses walk the stops down and back up. Gives the stop and the direction
+    /// the next press takes; a slider without stops stays where it is.
+    #[must_use]
+    pub fn turn(self, direction: Direction) -> (Value, Direction) {
+        let Value::Stop { index, count } = self else {
+            return (self, direction);
+        };
+        if count < 2 {
+            return (self, direction);
+        }
+        let last = count - 1;
+        let direction = match direction {
+            Direction::Down if index == 0 => Direction::Up,
+            Direction::Up if index >= last => Direction::Down,
+            kept => kept,
+        };
+        let index = match direction {
+            Direction::Down => index.min(last) - 1,
+            Direction::Up => index + 1,
+        };
+        (Value::Stop { index, count }, direction)
+    }
+
     /// The value nearest `fraction` of the way along: itself for a continuous slider, the nearest
-    /// stop for one with stops.
-    fn at(self, fraction: f32) -> Value {
+    /// stop for one with stops, where a released drag settles.
+    #[must_use]
+    pub fn at(self, fraction: f32) -> Value {
         let fraction = fraction.clamp(0.0, 1.0);
         match self {
             Value::Continuous(_) => Value::Continuous(fraction),
@@ -72,206 +156,319 @@ impl Value {
     }
 }
 
-/// A slider at `value`, 24 tall: a progress bar's track filled up to a 16 thumb. A slider with
-/// stops marks each one the fill hasn't reached. A press or a drag on it sends `on_change` with
-/// the value under the pointer, at once for a continuous slider and on release for one with stops,
-/// which shows the stop under the pointer while it is held; without `on_change` it is disabled.
-/// Its focus tube is a pill on its box's edge.
-pub fn slider<'a, M: 'a>(
-    look: &Look,
-    value: Value,
-    on_change: Option<Box<dyn Fn(Value) -> M + 'a>>,
-    focused: bool,
-) -> Element<'a, M> {
-    slider_in(look, value, on_change, focused, false)
+/// A slider's height.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Size {
+    /// 36 tall, its value always shown.
+    #[default]
+    Regular,
+    /// 28 tall, for a dense panel: a number shows only under the pointer, while held or focused;
+    /// a name always shows.
+    Compact,
 }
 
-/// [`slider`] drawn as while a press holds it, its fill lit: the specimen's view of the state.
-pub fn slider_held<'a, M: 'a>(
-    look: &Look,
-    value: Value,
-    on_change: Option<Box<dyn Fn(Value) -> M + 'a>>,
-) -> Element<'a, M> {
-    slider_in(look, value, on_change, false, true)
+impl Size {
+    /// How tall it is.
+    pub fn height(self) -> f32 {
+        f32::from(
+            match self {
+                Size::Regular => SizeToken::Slider,
+                Size::Compact => SizeToken::SliderCompact,
+            }
+            .px(),
+        )
+    }
+
+    /// The dot of the mark the value rests on.
+    pub fn anchor(self) -> f32 {
+        f32::from(
+            match self {
+                Size::Regular => SizeToken::SliderAnchor,
+                Size::Compact => SizeToken::SliderAnchorCompact,
+            }
+            .px(),
+        )
+    }
+
+    fn word(self) -> &'static str {
+        match self {
+            Size::Regular => "regular",
+            Size::Compact => "compact",
+        }
+    }
 }
 
-fn slider_in<'a, M: 'a>(
-    look: &Look,
+/// A slider's track as its marks are placed on it: its size, its marks' and where its label
+/// starts. Logical pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Track {
+    pub width: f32,
+    pub height: f32,
+    /// A step's dot.
+    pub stop: f32,
+    /// The anchor dot.
+    pub anchor: f32,
+    /// The room kept clear between a mark and the icon or the label.
+    pub gap: f32,
+    /// Where the label's box starts, from the left.
+    pub label: f32,
+}
+
+/// A dot drawn on a slider: a step, or the anchor of the mark the value rests on.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Mark {
+    /// Its centre, from the left.
+    pub x: f32,
+    /// Whether it sits on the fill, so it takes the fill's content colour; the track's otherwise.
+    pub on_fill: bool,
+    /// Whether it is the solid dot of the mark the value rests on.
+    pub anchor: bool,
+}
+
+impl Track {
+    /// The track of `size`, `width` wide, its label's box starting at `label`.
+    pub fn new(size: Size, width: f32, label: f32) -> Track {
+        Track {
+            width,
+            height: size.height(),
+            stop: f32::from(SizeToken::SliderStop.px()),
+            anchor: size.anchor(),
+            gap: f32::from(Space::S4.px()),
+            label,
+        }
+    }
+
+    /// Where the value `fraction` stands: the centre of the fill's round end, from half the height
+    /// in at 0 to half the height short of the end at 1.
+    pub fn centre(&self, fraction: f32) -> f32 {
+        self.height / 2.0 + (self.width - self.height).max(0.0) * fraction.clamp(0.0, 1.0)
+    }
+
+    /// The fraction whose centre is at `x`: the pointer maps to the fill's end circle.
+    pub fn fraction_at(&self, x: f32) -> f32 {
+        let span = (self.width - self.height).max(1.0);
+        ((x - self.height / 2.0) / span).clamp(0.0, 1.0)
+    }
+
+    /// The dots of `points`, fractions along the track, with the value at `shown` and resting on
+    /// `resting` when it does. A point the value rests on is the anchor; a step under the moving
+    /// value's end hides, and so does one the fill's edge crosses, which would take one side's
+    /// colour over both; no dot is drawn under the icon or the label, which mark that place
+    /// already.
+    pub fn marks(&self, points: &[f32], shown: f32, resting: Option<f32>) -> Vec<Mark> {
+        let value = self.centre(shown);
+        let fill_end = value + self.height / 2.0;
+        let (left, right) = (self.height + self.gap, self.label - self.gap);
+        points
+            .iter()
+            .filter_map(|&point| {
+                let x = self.centre(point);
+                let anchor = resting.is_some_and(|rest| (rest - point).abs() < 1e-4);
+                let size = if anchor { self.anchor } else { self.stop };
+                let clear = x - size / 2.0 >= left && x + size / 2.0 <= right;
+                let under_value = !anchor && (x - value).abs() < self.anchor / 2.0;
+                let astride = !anchor && (x - fill_end).abs() < size / 2.0;
+                (clear && !under_value && !astride).then_some(Mark {
+                    x,
+                    on_fill: x < fill_end,
+                    anchor,
+                })
+            })
+            .collect()
+    }
+}
+
+/// What a slider shows at its end.
+#[derive(Debug, Clone, PartialEq)]
+enum Label {
+    /// A number: the value as a percentage, or the owner's own. A compact slider shows it only
+    /// under the pointer, while held or while focused.
+    Number(Option<String>),
+    /// A name, always shown: "Muted", "Auto · 55%".
+    Words(String),
+    /// Each stop's name, the one nearest the value shown.
+    Stops(Vec<String>),
+}
+
+/// How a slider is drawn whatever the pointer does: the specimen's view of a state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum Preview {
+    #[default]
+    None,
+    Hovered,
+    Held,
+}
+
+/// A slider showing `glyph`, at `value`, built up then drawn with [`Slider::view`].
+pub struct Slider<'a, M> {
+    glyph: Icon,
     value: Value,
+    size: Size,
+    label: Label,
+    widest: String,
+    soft: bool,
+    sticky: Option<f32>,
     on_change: Option<Box<dyn Fn(Value) -> M + 'a>>,
+    on_icon: Option<M>,
     focused: bool,
-    held: bool,
-) -> Element<'a, M> {
-    let stepped = matches!(value, Value::Stop { count, .. } if count > 1);
-    let track = canvas(Track {
+    preview: Preview,
+}
+
+impl<M> std::fmt::Debug for Slider<'_, M> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Slider")
+            .field("glyph", &self.glyph)
+            .field("value", &self.value)
+            .field("size", &self.size)
+            .field("label", &self.label)
+            .field("soft", &self.soft)
+            .field("sticky", &self.sticky)
+            .field("enabled", &self.on_change.is_some())
+            .field("focused", &self.focused)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The widest a percentage reads: its number's box is this wide, so the number ends in one place
+/// as it ticks. iced's text has no font features, so its figures are proportional, not tabular.
+const DEFAULT_WIDEST: &str = "100%";
+
+/// A regular slider showing `glyph` at `value`, its value as a percentage; disabled until it has
+/// [`Slider::on_change`].
+pub fn slider<'a, M>(glyph: Icon, value: Value) -> Slider<'a, M> {
+    Slider {
+        glyph,
         value,
-        on_change,
-        colors: look.colors,
-        bright: look.bright(),
-        scale: look.scale,
-        held,
-    })
-    .width(Length::Fill)
-    .height(f32::from(Size::Slider.px()));
-    let view: Element<'a, M> = focus_ring(look, track, Radius::Full, focused, RingColor::Accent);
-    let variant = if stepped { "stepped" } else { "" };
-    probe::component("Slider", [variant, "", ""], Fixed::HEIGHT, view)
-}
-
-struct Track<'a, M> {
-    value: Value,
-    on_change: Option<Box<dyn Fn(Value) -> M + 'a>>,
-    colors: Colors,
-    /// What the fill brightens toward under the pointer and while held: [`Look::bright`].
-    bright: Color,
-    scale: Scale,
-    /// Drawn as held whatever the pointer does.
-    held: bool,
-}
-
-/// A press held on the slider: the value under the pointer.
-#[derive(Debug, Default)]
-struct Held(Option<Value>);
-
-impl<M> Track<'_, M> {
-    /// The fraction of the way along the track at `x`, the thumb's centre travelling from half a
-    /// thumb in to half a thumb short of the end.
-    fn fraction_at(bounds: Rectangle, x: f32) -> f32 {
-        let thumb = f32::from(Size::SliderThumb.px());
-        let travel = (bounds.width - thumb).max(1.0);
-        (x - thumb / 2.0) / travel
+        size: Size::Regular,
+        label: Label::Number(None),
+        widest: DEFAULT_WIDEST.to_owned(),
+        soft: false,
+        sticky: None,
+        on_change: None,
+        on_icon: None,
+        focused: false,
+        preview: Preview::None,
     }
 }
 
-impl<M> canvas::Program<M> for Track<'_, M> {
-    type State = Held;
-
-    fn update(&self, held: &mut Held, event: &Event, bounds: Rectangle, cursor: mouse::Cursor) -> Option<Action<M>> {
-        let on_change = self.on_change.as_ref()?;
-        let continuous = matches!(self.value, Value::Continuous(_));
-        match event {
-            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
-                let at = cursor.position_in(bounds)?;
-                let value = self.value.at(Self::fraction_at(bounds, at.x));
-                held.0 = Some(value);
-                Some(if continuous {
-                    Action::publish(on_change(value)).and_capture()
-                } else {
-                    Action::request_redraw().and_capture()
-                })
-            }
-            Event::Mouse(mouse::Event::CursorMoved { position }) if held.0.is_some() => {
-                let value = self.value.at(Self::fraction_at(bounds, position.x - bounds.x));
-                held.0 = Some(value);
-                Some(if continuous {
-                    Action::publish(on_change(value))
-                } else {
-                    Action::request_redraw()
-                })
-            }
-            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
-                let value = held.0.take()?;
-                Some(if continuous {
-                    Action::request_redraw()
-                } else {
-                    Action::publish(on_change(value))
-                })
-            }
-            _ => None,
+impl<'a, M: Clone + 'a> Slider<'a, M> {
+    /// 28 tall, for a dense panel.
+    #[must_use]
+    pub fn compact(self) -> Self {
+        Slider {
+            size: Size::Compact,
+            ..self
         }
     }
 
-    fn draw(
-        &self,
-        held: &Held,
-        renderer: &Renderer,
-        _theme: &Theme,
-        bounds: Rectangle,
-        cursor: mouse::Cursor,
-    ) -> Vec<Geometry> {
-        let c = &self.colors;
-        let enabled = self.on_change.is_some();
-        let dim = if enabled { 1.0 } else { Opacity::DisabledContent.value() };
-        let shown = match (held.0, self.value) {
-            (Some(stop @ Value::Stop { .. }), _) => stop,
-            (_, value) => value,
-        };
-        let width = bounds.width;
-        let thumb = f32::from(Size::SliderThumb.px());
-        let rail = f32::from(Size::Progress.px());
-        let mark = f32::from(Size::SliderStop.px());
-        let height = bounds.height;
-        let travel = (width - thumb).max(0.0);
-        let snap = |v: f32| self.scale.snap(v);
-        let mut frame = Frame::new(renderer, bounds.size());
-
-        let rail_y = snap((height - rail) / 2.0);
-        let track = color::alpha(c.surface_container_highest, Opacity::Track.value());
-        frame.fill(
-            &Path::rounded_rectangle(Point::new(0.0, rail_y), IcedSize::new(width, rail), (rail / 2.0).into()),
-            color::alpha(track, dim),
-        );
-        let layer = if !enabled {
-            0.0
-        } else if held.0.is_some() || self.held {
-            Opacity::Press.value()
-        } else if cursor.is_over(bounds) {
-            Opacity::Hover.value()
-        } else {
-            0.0
-        };
-        let lift = if !enabled {
-            0.0
-        } else if held.0.is_some() || self.held {
-            Opacity::Held.value()
-        } else if cursor.is_over(bounds) {
-            Opacity::Press.value()
-        } else {
-            0.0
-        };
-        let thumb_x = snap(travel * shown.fraction());
-        // The fill lights up toward the palette's bright end: a little under the pointer, and
-        // plainly while pressed or dragged, as a progress bar's fill glows.
-        frame.fill(
-            &Path::rounded_rectangle(
-                Point::new(0.0, rail_y),
-                IcedSize::new(thumb_x + thumb / 2.0, rail),
-                (rail / 2.0).into(),
-            ),
-            color::alpha(color::mix(c.primary, self.bright, lift), dim),
-        );
-        if let Value::Stop { index, count } = shown
-            && count > 1
-        {
-            let last = f32::from(count - 1);
-            for stop in (index + 1)..count {
-                let x = snap(travel * f32::from(stop) / last + (thumb - mark) / 2.0);
-                let y = snap((height - mark) / 2.0);
-                frame.fill(
-                    &Path::circle(Point::new(x + mark / 2.0, y + mark / 2.0), mark / 2.0),
-                    color::alpha(c.on_surface_variant, dim),
-                );
-            }
+    /// The number shown in place of the percentage, as the owner reads the value: "100%" on a
+    /// track that runs to 150%.
+    #[must_use]
+    pub fn number(self, number: impl Into<String>) -> Self {
+        Slider {
+            label: Label::Number(Some(number.into())),
+            ..self
         }
-        let thumb_y = snap((height - thumb) / 2.0);
-        let centre = Point::new(thumb_x + thumb / 2.0, thumb_y + thumb / 2.0);
-        let fill: Color = color::mix(
-            c.primary,
-            Color {
-                a: c.primary.a,
-                ..c.on_primary
-            },
-            layer,
-        );
-        frame.fill(&Path::circle(centre, thumb / 2.0), color::alpha(fill, dim));
-        vec![frame.into_geometry()]
     }
 
-    fn mouse_interaction(&self, _held: &Held, bounds: Rectangle, cursor: mouse::Cursor) -> mouse::Interaction {
-        if self.on_change.is_some() && cursor.is_over(bounds) {
-            mouse::Interaction::Pointer
-        } else {
-            mouse::Interaction::default()
+    /// A name shown in place of the value, always: "Muted".
+    #[must_use]
+    pub fn words(self, words: impl Into<String>) -> Self {
+        Slider {
+            label: Label::Words(words.into()),
+            ..self
         }
+    }
+
+    /// Each stop's name, for a slider with stops: the one nearest the value shows.
+    #[must_use]
+    pub fn stops(self, names: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        Slider {
+            label: Label::Stops(names.into_iter().map(Into::into).collect()),
+            ..self
+        }
+    }
+
+    /// The widest the number reads, for a slider whose number runs past 100%.
+    #[must_use]
+    pub fn widest(self, widest: impl Into<String>) -> Self {
+        Slider {
+            widest: widest.into(),
+            ..self
+        }
+    }
+
+    /// The fill in the softer, desaturated accent: a level something else picked, as Auto
+    /// brightness's.
+    #[must_use]
+    pub fn soft(self) -> Self {
+        Slider { soft: true, ..self }
+    }
+
+    /// A sticky point, a fraction along the track: a drag within [`SizeToken::SliderHold`] of it
+    /// holds there until pulled further, and its dot shows while the value rests on it.
+    #[must_use]
+    pub fn sticky(self, point: f32) -> Self {
+        Slider {
+            sticky: Some(point.clamp(0.0, 1.0)),
+            ..self
+        }
+    }
+
+    /// What a press or a drag sends: the value under the pointer, at once on a continuous slider
+    /// and on release on one with stops, which then settles on the nearest. A slider with stops
+    /// also sends the icon's step. Without it the slider is disabled.
+    #[must_use]
+    pub fn on_change(self, on_change: impl Fn(Value) -> M + 'a) -> Self {
+        Slider {
+            on_change: Some(Box::new(on_change)),
+            ..self
+        }
+    }
+
+    /// What a press on the icon sends: the icon is then a button, as volume's mutes.
+    #[must_use]
+    pub fn on_icon(self, message: M) -> Self {
+        Slider {
+            on_icon: Some(message),
+            ..self
+        }
+    }
+
+    /// Whether the keyboard is on it: the focus tube lights its edge.
+    #[must_use]
+    pub fn focused(self, focused: bool) -> Self {
+        Slider { focused, ..self }
+    }
+
+    /// Drawn as under the pointer, whatever the pointer does: the specimen's view of the state.
+    #[must_use]
+    pub fn hovered(self) -> Self {
+        Slider {
+            preview: Preview::Hovered,
+            ..self
+        }
+    }
+
+    /// Drawn as while a press holds it, its fill lit: the specimen's view of the state.
+    #[must_use]
+    pub fn held(self) -> Self {
+        Slider {
+            preview: Preview::Held,
+            ..self
+        }
+    }
+
+    pub fn view(self, look: &Look) -> Element<'a, M> {
+        let stepped = matches!(self.value, Value::Stop { count, .. } if count > 1);
+        let size = self.size;
+        let focused = self.focused;
+        let pill: Element<'a, M> = Element::new(pill::Pill::new(look, self));
+        let view: Element<'a, M> = focus_ring(look, pill, Radius::Full, focused, RingColor::Accent);
+        let variant = [size.word(), if stepped { "stepped" } else { "" }, ""];
+        probe::component("Slider", variant, Fixed::HEIGHT, view)
     }
 }
+
+#[cfg(test)]
+mod tests;

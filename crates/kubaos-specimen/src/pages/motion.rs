@@ -52,13 +52,14 @@ const DURATIONS: [Duration; 7] = [
     Duration::Scene,
 ];
 
-const EASINGS: [Easing; 6] = [
+const EASINGS: [Easing; 7] = [
     Easing::Standard,
     Easing::StandardDecel,
     Easing::StandardAccel,
     Easing::EmphasizedDecel,
     Easing::EmphasizedAccel,
     Easing::Linear,
+    Easing::Pop,
 ];
 
 /// The frames the onion skins and filmstrips show: nine, evenly spaced in time.
@@ -79,7 +80,8 @@ fn use_of(duration: Duration) -> &'static str {
 fn curve_use(easing: Easing) -> &'static str {
     match easing {
         Easing::Standard => "Small changes that stay: toggles, colour, focus.",
-        Easing::StandardDecel => "Something moving settling in: a list reordering.",
+        Easing::StandardDecel => "Something moving settling in: a list, a slider's step.",
+        Easing::Pop => "A small mark popping in: a slider's anchor dot.",
         Easing::StandardAccel => "Something small leaving for good: a toast.",
         Easing::EmphasizedDecel => "Arriving: panels, dialogs, pages, the log.",
         Easing::EmphasizedAccel => "Leaving: panels and dialogs closing.",
@@ -241,7 +243,13 @@ fn held<'a>(look: &Look) -> Element<'a, Message> {
         .into()
 }
 
-/// An easing curve plotted: time across, distance up, with the diagonal for reference.
+/// The furthest `easing` goes, 1 unless it overshoots.
+fn peak(easing: Easing) -> f32 {
+    (0..=64).map(|i| ease(easing, i as f32 / 64.0)).fold(1.0, f32::max)
+}
+
+/// An easing curve plotted: time across, distance up, with the diagonal for reference. A curve that
+/// overshoots is scaled to fit its peak, with a hairline where the distance is whole.
 struct Graph {
     easing: Easing,
     line: Color,
@@ -271,15 +279,25 @@ impl canvas::Program<Message> for Graph {
             ),
             Stroke::default().with_width(self.hairline).with_color(self.grid),
         );
+        let samples: Vec<f32> = (0..=64).map(|i| ease(self.easing, i as f32 / 64.0)).collect();
+        let top = peak(self.easing);
+        let y = |distance: f32| h - distance / top * h;
+        // Where the curve covers the whole distance: the top, unless it overshoots.
+        let whole = h - h / top;
         frame.stroke(
-            &Path::line(Point::new(0.0, h), Point::new(w, 0.0)),
+            &Path::line(Point::new(0.0, h), Point::new(w, whole)),
             Stroke::default().with_width(self.hairline).with_color(self.grid),
         );
+        if top > 1.0 {
+            frame.stroke(
+                &Path::line(Point::new(0.0, whole), Point::new(w, whole)),
+                Stroke::default().with_width(self.hairline).with_color(self.grid),
+            );
+        }
         let curve = Path::new(|b| {
             b.move_to(Point::new(0.0, h));
-            for i in 1..=64 {
-                let x = i as f32 / 64.0;
-                b.line_to(Point::new(x * w, h - ease(self.easing, x) * h));
+            for (i, distance) in samples.iter().enumerate().skip(1) {
+                b.line_to(Point::new(i as f32 / 64.0 * w, y(*distance)));
             }
         });
         frame.stroke(
@@ -316,7 +334,8 @@ impl canvas::Program<Message> for Onion {
         let mut frame = canvas::Frame::new(renderer, bounds.size());
         let half = bounds.height / 4.0;
         let middle = bounds.height / 2.0;
-        let travel = bounds.width - 2.0 * half;
+        // A curve that overshoots travels to its peak, so the frames past the end still show.
+        let travel = (bounds.width - 2.0 * half) / peak(self.easing);
         frame.fill(
             &Path::rounded_rectangle(
                 Point::new(0.0, middle - half),

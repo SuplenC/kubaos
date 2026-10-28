@@ -55,7 +55,7 @@ pub fn view<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         ),
         Page::Motion => (
             "動き",
-            "Seven durations, six curves. Each animation takes the pair for what it is, never by \
+            "Seven durations, seven curves. Each animation takes the pair for what it is, never by \
              feel.",
         ),
     };

@@ -150,7 +150,7 @@ The lid setting works without root: while it differs from what logind does, your
 
 ## Power
 
-The control center's power slider has five stops: **Super Saver · Power Saver · Balanced · Performance · Max Performance**. Drag it (the stop under the pointer shows in the track and is picked when you let go), click it, scroll it a notch at a time, or focus it and press Left and Right. The bar's power icon shows the stop: a moon, a leaf, scales, a bolt, a rocket. The Command menu has an Item for each stop too ("Super Saver", "Max Performance", …), and `kubaos power set balanced` does it from a terminal.
+The control center's power slider has five stops: **Super Saver · Power Saver · Balanced · Performance · Max Performance**. Drag it (it moves freely and settles on the nearest stop when you let go), click it, scroll it a notch at a time, focus it and press Left and Right, or press its icon, which steps one stop from Max Performance down to Super Saver and back up. The bar's power icon shows the stop: a moon, a leaf, scales, a bolt, a rocket. The Command menu has an Item for each stop too ("Super Saver", "Max Performance", …), and `kubaos power set balanced` does it from a terminal.
 
 Each stop sets every layer of the machine at once:
 

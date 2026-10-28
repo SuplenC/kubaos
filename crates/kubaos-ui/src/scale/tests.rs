@@ -13,7 +13,12 @@ fn lengths() -> Vec<(String, u16)> {
     all.extend(Space::ALL.map(|s| (format!("{s:?}"), s.px())));
     all.extend(Radius::ALL.iter().filter_map(|r| Some((format!("{r:?}"), r.px()?))));
     all.extend(IconSize::ALL.map(|s| (format!("icon {s:?}"), s.px())));
-    all.extend(Size::ALL.map(|s| (format!("{s:?}"), s.px())));
+    all.extend(
+        Size::ALL
+            .into_iter()
+            .filter(|s| !s.off_grid())
+            .map(|s| (format!("{s:?}"), s.px())),
+    );
     all.extend(Type::ALL.map(|t| (format!("{t:?} line"), t.line())));
     for shadow in [Shadow::Panel, Shadow::Dialog, Shadow::Glow] {
         all.push((format!("{shadow:?} y"), shadow.y()));

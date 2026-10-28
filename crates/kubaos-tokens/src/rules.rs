@@ -360,7 +360,10 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         }
     }
     for (name, &value) in &tokens.size {
-        on_grid(format!("size.{name}"), value);
+        let token = format!("size.{name}");
+        if !tokens.rules.off_grid.contains(&token) {
+            on_grid(token, value);
+        }
     }
     for (name, shadow) in &tokens.shadow {
         on_grid(format!("shadow.{name}.y"), shadow.y);
@@ -368,6 +371,18 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     }
     for (name, style) in &tokens.types {
         on_grid(format!("type.{name}.line"), style.line);
+    }
+
+    for listed in &tokens.rules.off_grid {
+        let known = listed
+            .strip_prefix("size.")
+            .is_some_and(|name| tokens.size.contains_key(name));
+        if !known {
+            found.push(Violation::UnknownName {
+                token: "rules.off_grid".into(),
+                name: listed.clone(),
+            });
+        }
     }
 
     let roles = [radius.small, radius.control, radius.surface];

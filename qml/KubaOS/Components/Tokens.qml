@@ -124,9 +124,12 @@ QtObject {
         readonly property int row_compact: 28
         readonly property int row_two_line: 56
         readonly property int scrollbar: 4
-        readonly property int slider: 24
-        readonly property int slider_stop: 4
-        readonly property int slider_thumb: 16
+        readonly property int slider: 36
+        readonly property int slider_anchor: 10
+        readonly property int slider_anchor_compact: 8
+        readonly property int slider_compact: 28
+        readonly property int slider_hold: 12
+        readonly property int slider_stop: 6
         readonly property int sparkline: 48
         readonly property int switch_height: 24
         readonly property int switch_knob_off: 12
@@ -196,6 +199,7 @@ QtObject {
             readonly property int icon: 48
             readonly property int weight: 300
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // Words at the hero size: Kōbō's welcome line and its done screen's headline, and nothing
@@ -207,6 +211,7 @@ QtObject {
             readonly property int icon: 48
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent,
@@ -218,6 +223,7 @@ QtObject {
             readonly property int icon: 48
             readonly property int weight: 300
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // The heading of a full-screen moment other than Kōbō's welcome and done screens.
@@ -228,6 +234,7 @@ QtObject {
             readonly property int icon: 48
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A screen's or page's title.
@@ -238,6 +245,7 @@ QtObject {
             readonly property int icon: 32
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A dialog's title, a big number.
@@ -248,6 +256,7 @@ QtObject {
             readonly property int icon: 32
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A section's title inside a page.
@@ -258,6 +267,7 @@ QtObject {
             readonly property int icon: 24
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A lede under a display line, the text in a field.
@@ -268,6 +278,7 @@ QtObject {
             readonly property int icon: 20
             readonly property int weight: 400
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A large button's label, centred in a 48 px control.
@@ -278,6 +289,7 @@ QtObject {
             readonly property int icon: 24
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A card's or an error's first line.
@@ -288,6 +300,7 @@ QtObject {
             readonly property int icon: 24
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A regular button's label, on a 24 px line so it centres in a 40 px control.
@@ -298,6 +311,7 @@ QtObject {
             readonly property int icon: 20
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // Running text, explanations, toasts.
@@ -308,6 +322,7 @@ QtObject {
             readonly property int icon: 20
             readonly property int weight: 400
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A list row's title, a value next to its label.
@@ -318,6 +333,7 @@ QtObject {
             readonly property int icon: 20
             readonly property int weight: 500
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // Commands and keys shown as the subject of a line.
@@ -328,6 +344,7 @@ QtObject {
             readonly property int icon: 20
             readonly property int weight: 400
             readonly property string family: "Geist Mono"
+            readonly property bool tabular: false
         }
 
         // The Japanese accent above a title.
@@ -338,6 +355,7 @@ QtObject {
             readonly property int icon: 16
             readonly property int weight: 500
             readonly property string family: "M PLUS 1"
+            readonly property bool tabular: false
         }
 
         // A small button's label, centred in a 32 px control.
@@ -348,6 +366,7 @@ QtObject {
             readonly property int icon: 16
             readonly property int weight: 600
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // A field's label, a chip, a quiet button.
@@ -358,6 +377,18 @@ QtObject {
             readonly property int icon: 16
             readonly property int weight: 500
             readonly property string family: "Geist"
+            readonly property bool tabular: false
+        }
+
+        // A number that changes in place: a slider's value.
+        readonly property QtObject label_number: QtObject {
+            readonly property string name: "label_number"
+            readonly property int size: 12
+            readonly property int line: 16
+            readonly property int icon: 16
+            readonly property int weight: 500
+            readonly property string family: "Geist"
+            readonly property bool tabular: true
         }
 
         // Logs, device paths, timings, keycaps.
@@ -368,6 +399,7 @@ QtObject {
             readonly property int icon: 16
             readonly property int weight: 400
             readonly property string family: "Geist Mono"
+            readonly property bool tabular: false
         }
 
         // A note under a field, a subtitle under a row's title.
@@ -378,6 +410,7 @@ QtObject {
             readonly property int icon: 16
             readonly property int weight: 400
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
 
         // The key on a keycap, on the keycap's 20 px line so it centres in it.
@@ -388,6 +421,7 @@ QtObject {
             readonly property int icon: 16
             readonly property int weight: 500
             readonly property string family: "Geist Mono"
+            readonly property bool tabular: false
         }
 
         // Version lines, what a key hint's key does, the smallest print.
@@ -398,6 +432,7 @@ QtObject {
             readonly property int icon: 16
             readonly property int weight: 400
             readonly property string family: "Geist"
+            readonly property bool tabular: false
         }
     }
 
@@ -428,11 +463,13 @@ QtObject {
         readonly property list<real> emphasized_decel: [0.05, 0.7, 0.1, 1, 1, 1]
         // Progress that tracks a real quantity, and spinners.
         readonly property list<real> linear: [0, 0, 1, 1, 1, 1]
+        // A small mark popping in, a little past its size and back: a slider's anchor dot.
+        readonly property list<real> pop: [0.2, 0.9, 0.3, 1.3, 1, 1]
         // Small state changes that stay on screen: toggles, colour, focus.
         readonly property list<real> standard: [0.2, 0, 0, 1, 1, 1]
         // Something small leaving for good: a toast fading out.
         readonly property list<real> standard_accel: [0.3, 0, 1, 1, 1, 1]
-        // Something already moving settling in: a list reordering.
+        // Something already moving settling in: a list reordering, a slider settling on its step.
         readonly property list<real> standard_decel: [0, 0, 0, 1, 1, 1]
     }
 

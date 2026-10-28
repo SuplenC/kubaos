@@ -40,6 +40,7 @@ fn sample(style: Type) -> &'static str {
         Type::Accent => "書体見本 ようこそ",
         Type::ButtonSmall => "Show",
         Type::Label => "Full name",
+        Type::LabelNumber => "62%  100%",
         Type::Mono => "/dev/nvme0n1 · 2 TB · 00:42",
         Type::Small => "At least 8 characters. Longer is better.",
         Type::Caption => "Kōbō · Shinjuku 0.1 · what a key does",
