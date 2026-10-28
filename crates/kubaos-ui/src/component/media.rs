@@ -43,6 +43,7 @@ use crate::look::radius;
 use crate::probe;
 use crate::probe::Fixed;
 use crate::scale::Scale;
+use crate::tokens;
 pub use crate::tokens::Aspect;
 
 /// `picture` filling a box as wide as the room (a thumbnail's width where the room has no end) and
@@ -98,10 +99,13 @@ pub fn media_under<'a, M: 'a>(
     probe::component("Media", ["", "", ""], Fixed::NONE, view)
 }
 
-/// The height of a box `width` wide at `aspect`, on a whole device pixel at `scale`.
-pub fn height(width: f32, aspect: Aspect, scale: Scale) -> f32 {
+/// The height of a box `width` wide at `aspect`, down to the 4 px grid, so it lands on whole device
+/// pixels at every scale. Boxes side by side in a grid, whose columns differ by a device pixel at
+/// most, then come out one height, and what sits on their foot lines up across the row.
+pub fn height(width: f32, aspect: Aspect, _scale: Scale) -> f32 {
     let [w, h] = aspect.ratio();
-    scale.snap(width * f32::from(h) / f32::from(w))
+    let grid = f32::from(tokens::GRID);
+    (width * f32::from(h) / f32::from(w) / grid).floor() * grid
 }
 
 /// A box as wide as the room and as tall as its aspect makes it, its content laid out to fill it.

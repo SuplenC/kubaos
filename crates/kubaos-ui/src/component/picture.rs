@@ -151,10 +151,10 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
         let mut layers: Vec<Element<'a, M>> = Vec::new();
         if self.place == NamePlace::Over {
             // Over a photo the name is always light on a dark foot, whatever the mode: the
-            // scrim's colour at its opacity, from nothing halfway down the tile.
-            let foot = color::alpha(c.scrim, Opacity::Scrim.value());
+            // scrim's colour at the backdrop's opacity, from nothing 40% down the tile.
+            let foot = color::alpha(c.scrim, Opacity::Backdrop.value());
             let scrim = Linear::new(Radians(std::f32::consts::PI))
-                .add_stop(0.5, color::alpha(foot, 0.0))
+                .add_stop(0.4, color::alpha(foot, 0.0))
                 .add_stop(1.0, foot);
             layers.push(
                 widget::container(widget::Space::new())

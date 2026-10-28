@@ -77,7 +77,7 @@ Item {
                 radius: Tokens.radius.control
 
                 // Over a photo the name is always light on a dark foot, whatever the mode: the
-                // scrim's colour at its opacity, from nothing halfway down the tile.
+                // scrim's colour at the backdrop's opacity, from nothing 40% down the tile.
                 Rectangle {
                     anchors.fill: parent
                     z: 1
@@ -85,12 +85,12 @@ Item {
                     radius: Tokens.radius.control
                     gradient: Gradient {
                         GradientStop {
-                            position: 0.5
+                            position: 0.4
                             color: K.Look.alpha(Tokens.color.scrim, 0)
                         }
                         GradientStop {
                             position: 1
-                            color: K.Look.alpha(Tokens.color.scrim, Tokens.opacity.scrim)
+                            color: K.Look.alpha(Tokens.color.scrim, Tokens.opacity.backdrop)
                         }
                     }
                 }
