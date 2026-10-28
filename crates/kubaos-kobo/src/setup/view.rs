@@ -407,15 +407,16 @@ fn card_detail<'a>(s: &'a Setup, c: &'a CardStatus, look: &Look) -> El<'a> {
     if let Some(run) = s.shown_run() {
         parts = parts.push(log_view(s, run, look));
     }
-    stack(look, Space::S24)
+    let apart = Space::S24;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(head)
         .push(
             scroll(look, parts)
                 .id("setup-detail")
                 .height(Extent::Fill)
-                .room_above(Space::S24)
-                .room_below(Space::S24),
+                .room_above(apart)
+                .room_below(apart),
         )
         .push(actions(s, c, look))
         .into()

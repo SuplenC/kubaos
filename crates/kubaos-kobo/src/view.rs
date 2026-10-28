@@ -956,7 +956,8 @@ fn account<'a>(app: &'a App, look: &Look) -> El<'a> {
         ),
     );
     // The title stays put; only the fields scroll (src/reveal.rs).
-    stack(look, Space::S32)
+    let apart = Space::S32;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(header(
             look,
@@ -975,7 +976,7 @@ fn account<'a>(app: &'a App, look: &Look) -> El<'a> {
             )
             .id(ids::ACCOUNT_SCROLL)
             .height(Extent::Fill)
-            .room_above(Space::S32)
+            .room_above(apart)
             .room_below(FOOTER_GAP),
         )
         .into()
@@ -1210,7 +1211,8 @@ fn disk<'a>(app: &'a App, look: &Look) -> El<'a> {
     }
     sections = sections.push(disk_encryption(app, look));
     // The title stays put; only what's under it scrolls (src/reveal.rs).
-    stack(look, Space::S20)
+    let apart = Space::S20;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(header(
             look,
@@ -1222,7 +1224,7 @@ fn disk<'a>(app: &'a App, look: &Look) -> El<'a> {
             scroll(look, sections)
                 .id(ids::DISK_SCROLL)
                 .height(Extent::Fill)
-                .room_above(Space::S20)
+                .room_above(apart)
                 .room_below(FOOTER_GAP),
         )
         .into()
@@ -1433,7 +1435,7 @@ pub fn wallpapers_summary(
 fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
     let c = look.colors;
     let sets = app.wallpaper_sets();
-    let mut sections = stack(look, Space::S40).padding(Inset::NONE.right(Space::S16).bottom(Space::S16));
+    let mut sections = stack(look, Space::S40).padding(Inset::NONE.right(Space::S16));
     for (s, set) in sets.iter().enumerate() {
         let cards = (0..set.files.len()).map(|i| wallpaper_card(app, s, i, look));
         sections = sections.push(
@@ -1449,7 +1451,8 @@ fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
         n if n == total => format!("All {total} picked."),
         n => format!("{n} of {total} picked."),
     };
-    stack(look, Space::S20)
+    let apart = Space::S20;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(header(
             look,
@@ -1463,8 +1466,8 @@ fn wallpapers<'a>(app: &'a App, look: &Look) -> El<'a> {
             scroll(look, sections)
                 .id(ids::WALLPAPER_SCROLL)
                 .height(Extent::Fill)
-                .room_above(Space::S20)
-                .room_below(Space::S20),
+                .room_above(apart)
+                .room_below(apart),
         )
         .push(text(note, Type::Small, c.on_surface_variant))
         .into()
@@ -1576,7 +1579,8 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
         );
     }
 
-    stack(look, Space::S20)
+    let apart = Space::S20;
+    stack(look, apart)
         .height(Extent::Fill)
         .push(top)
         .push(
@@ -1594,8 +1598,8 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
             )
             .id(ids::SUMMARY_SCROLL)
             .height(Extent::Fill)
-            .room_above(Space::S20)
-            .room_below(Space::S20),
+            .room_above(apart)
+            .room_below(apart),
         )
         // The cards keep a gutter for their scrollbar; the banner ends where they do.
         .push(widget::container(confirm(app, disk, whole, look)).padding(Inset::NONE.right(Space::S16).padding()))
