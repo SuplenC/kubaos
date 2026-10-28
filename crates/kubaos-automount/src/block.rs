@@ -18,7 +18,7 @@ use std::path::PathBuf;
 /// A block device: a partition, a whole disk, or the cleartext side of an unlocked LUKS volume.
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "each flag is one of udisks2's properties, read as it is"
+    reason = "Each flag is one of udisks2's properties, read as it is."
 )]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Block {

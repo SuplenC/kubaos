@@ -55,7 +55,7 @@ const USAGE: &str = "usage: kobo [--demo [--demo-speed N] [--demo-fail-at STEP]]
 
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "each bool is one command-line flag, read once at startup"
+    reason = "Each bool is one command-line flag, read once at startup."
 )]
 struct Args {
     demo: bool,
@@ -280,7 +280,7 @@ fn run_setup(args: &Args) -> ExitCode {
 /// One line to stderr: the usage, or the error Kōbō exits with.
 #[expect(
     clippy::print_stderr,
-    reason = "the usage and the error kobo exits with are for whoever started it, on its terminal"
+    reason = "The usage and the error kobo exits with are for whoever started it, on its terminal."
 )]
 fn say(line: &str) {
     eprintln!("{line}");

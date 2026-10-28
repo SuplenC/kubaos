@@ -18,10 +18,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use runner::DryRunner;
-use runner::Runner;
-use runner::SystemRunner;
-
+use self::runner::DryRunner;
+use self::runner::Runner;
+use self::runner::SystemRunner;
 use crate::Error;
 use crate::Event;
 use crate::InstallConfig;
@@ -216,8 +215,7 @@ pub fn run_with(
 
 #[cfg(test)]
 mod tests {
-    use runner::DryRunner;
-
+    use super::runner::DryRunner;
     use super::*;
     use crate::config::DiskTarget;
 

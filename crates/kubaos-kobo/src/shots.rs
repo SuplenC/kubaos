@@ -162,7 +162,7 @@ fn settle_app(app: &mut App) {
 }
 
 /// A line for whoever ran the shots from a terminal: where a shot went, or how to ask for them.
-#[expect(clippy::print_stderr, reason = "the shots are run by hand, from a terminal")]
+#[expect(clippy::print_stderr, reason = "The shots are run by hand, from a terminal.")]
 fn say(line: &str) {
     eprintln!("{line}");
 }

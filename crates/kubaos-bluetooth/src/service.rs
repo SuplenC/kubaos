@@ -57,7 +57,7 @@ impl Service {
     /// Starts pairing `device`, and returns at once: the state file follows the pairing.
     #[expect(
         clippy::needless_pass_by_value,
-        reason = "zbus passes a method its arguments by value"
+        reason = "A zbus interface gets its arguments by value."
     )]
     fn pair(&self, device: OwnedObjectPath) -> fdo::Result<()> {
         let device = bluez_object(&device)?;

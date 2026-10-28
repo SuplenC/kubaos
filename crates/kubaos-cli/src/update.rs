@@ -42,10 +42,9 @@ use crate::usage_error;
 pub(crate) mod render;
 mod system;
 
-use render::Mode;
-use render::Ui;
-use system::System;
-
+use self::render::Mode;
+use self::render::Ui;
+use self::system::System;
 use crate::out::out;
 
 #[derive(Args)]

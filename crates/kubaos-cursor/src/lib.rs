@@ -29,12 +29,12 @@ pub mod theme;
 pub mod xcursor;
 mod zip;
 
-pub use colors::Colors;
-pub use colors::Palette;
-pub use colors::Rgb;
-pub use settings::Settings;
-pub use settings::Style;
-pub use source::Shape;
+pub use self::colors::Colors;
+pub use self::colors::Palette;
+pub use self::colors::Rgb;
+pub use self::settings::Settings;
+pub use self::settings::Style;
+pub use self::source::Shape;
 
 /// The generated theme's name, under `~/.local/share/icons/`.
 pub const THEME_NAME: &str = "KubaOS-Bibata";

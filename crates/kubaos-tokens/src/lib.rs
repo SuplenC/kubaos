@@ -30,9 +30,9 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-pub use model::Tokens;
-pub use rules::Violation;
-pub use target::Target;
+pub use self::model::Tokens;
+pub use self::rules::Violation;
+pub use self::target::Target;
 
 /// Where the tokens live, relative to the repo's root.
 pub const TOKENS_PATH: &str = "design/tokens.toml";

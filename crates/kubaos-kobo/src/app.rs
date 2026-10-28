@@ -2083,7 +2083,7 @@ pub fn on_event(ev: iced::Event, _status: event::Status, _w: window::Id) -> Opti
 
 #[expect(
     clippy::needless_pass_by_value,
-    reason = "`event::listen_with` hands its function the event by value"
+    reason = "`event::listen_with` hands its function the event by value."
 )]
 pub fn on_mouse(ev: iced::Event, _status: event::Status, _w: window::Id) -> Option<Message> {
     match ev {

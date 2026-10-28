@@ -96,7 +96,7 @@ pub fn prompt<'a, M: 'a>(
 /// the buttons.
 #[expect(
     clippy::too_many_arguments,
-    reason = "a dialog's parts, each an argument as `dialog` takes them, plus what it asks for"
+    reason = "A dialog's parts, each an argument as `dialog` takes them, plus what it asks for."
 )]
 fn compose<'a, M: 'a>(
     look: &Look,

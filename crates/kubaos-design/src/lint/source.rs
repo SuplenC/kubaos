@@ -253,7 +253,7 @@ pub fn numbers(code: &str) -> Vec<Number> {
 /// name (`cell * 7`, seven columns of a cell). A count times a number is still a literal length.
 #[expect(
     clippy::float_cmp,
-    reason = "a literal as written is compared with the literals 2 and 0.5"
+    reason = "A literal as written is compared with the literals 2 and 0.5."
 )]
 pub fn is_halving(code: &str, number: Number) -> bool {
     let before = code[..byte_index(code, number.column)].trim_end();

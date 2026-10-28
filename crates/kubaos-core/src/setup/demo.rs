@@ -529,8 +529,6 @@ fn demo_phone(paired: bool) -> CardStatus {
     super::detect::phone_card(link)
 }
 
-/// The demo vault's SSH keys, as a pull from `folders` (none: the whole vault) leaves them: the
-/// harness's vault without its hostile item.
 /// The login form the Bitwarden card was given, and its server, or `None` with the failure
 /// emitted when a field it needs is empty or the server isn't one.
 fn bitwarden_form<'a>(
@@ -565,6 +563,8 @@ fn bitwarden_form<'a>(
     }
 }
 
+/// The demo vault's SSH keys, as a pull from `folders` (none: the whole vault) leaves them: the
+/// harness's vault without its hostile item.
 fn demo_keys(folders: &[String]) -> Vec<KeyInfo> {
     let key = |name: &str, folder: &str, file: &str, hosts: &[&str]| KeyInfo {
         name: name.into(),

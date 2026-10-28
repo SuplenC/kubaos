@@ -31,8 +31,7 @@ use std::io;
 use std::path::Path;
 use std::path::PathBuf;
 
-pub use root::handshake;
-
+pub use self::root::handshake;
 use crate::machine::Cmd;
 use crate::machine::Machine;
 use crate::machine::Ran;

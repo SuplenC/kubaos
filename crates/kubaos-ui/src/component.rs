@@ -36,5 +36,5 @@ pub mod slider;
 pub mod switch;
 pub mod toast;
 
-pub(crate) use layer::Pin;
-pub(crate) use layer::layered;
+pub(crate) use self::layer::Pin;
+pub(crate) use self::layer::layered;

@@ -28,9 +28,10 @@ pub mod parity;
 
 use std::fmt;
 
-pub use check::check;
 use serde::Deserialize;
 use serde::Serialize;
+
+pub use self::check::check;
 
 /// One page laid out at one scale and mode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -163,7 +164,7 @@ pub struct Fixed {
 /// For serde: a flag left out of a frame when it is off.
 #[expect(
     clippy::trivially_copy_pass_by_ref,
-    reason = "serde's skip_serializing_if passes a reference"
+    reason = "Serde's skip_serializing_if passes a reference."
 )]
 fn is_false(flag: &bool) -> bool {
     !*flag

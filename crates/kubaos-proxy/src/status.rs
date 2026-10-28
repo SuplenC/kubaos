@@ -50,7 +50,7 @@ pub struct Tunnel {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[expect(
     clippy::struct_excessive_bools,
-    reason = "the shell reads each as a field of its own"
+    reason = "The shell reads each as a field of its own."
 )]
 #[serde(rename_all = "camelCase")]
 pub struct Status {

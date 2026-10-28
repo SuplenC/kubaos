@@ -21,7 +21,6 @@ use std::sync::mpsc;
 use std::time::Duration;
 use std::time::Instant;
 
-use backend::SetupBackend;
 use iced::Size;
 use iced::Subscription;
 use iced::Task;
@@ -52,8 +51,9 @@ use kubaos_ui::component::field::Pointer;
 use kubaos_ui::component::toast;
 use kubaos_ui::motion::Motion;
 use kubaos_ui::tokens;
-pub use view::view;
 
+use self::backend::SetupBackend;
+pub use self::view::view;
 use crate::app::Key;
 use crate::app::Message;
 use crate::edit;

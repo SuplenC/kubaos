@@ -39,5 +39,5 @@ pub mod settings;
 #[cfg(test)]
 mod fixture;
 
-pub use sampler::Sample;
-pub use sampler::Sampler;
+pub use self::sampler::Sample;
+pub use self::sampler::Sampler;

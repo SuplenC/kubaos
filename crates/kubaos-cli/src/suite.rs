@@ -102,7 +102,7 @@ pub enum SuiteCmd {
     /// Suite.
     #[expect(
         clippy::doc_markdown,
-        reason = "clap prints the doc as the help text, where backticks would show."
+        reason = "The doc is clap's help text, where backticks would show."
     )]
     New {
         name: String,

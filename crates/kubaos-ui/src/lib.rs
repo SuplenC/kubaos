@@ -40,10 +40,10 @@ pub mod text;
 #[expect(
     clippy::match_same_arms,
     clippy::too_many_lines,
-    reason = "generated: one arm per token, even where two share a value, and one per symbol"
+    reason = "Generated: one arm per token, even where two share a value, and one per symbol."
 )]
 pub mod tokens;
 
-pub use look::Look;
-pub use scale::Scale;
-pub use tokens::Mode;
+pub use self::look::Look;
+pub use self::scale::Scale;
+pub use self::tokens::Mode;

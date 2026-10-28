@@ -18,15 +18,16 @@ pub mod suites;
 pub mod switch;
 pub mod update;
 
-pub use config::InstallConfig;
-pub use config::Secrets;
-pub use event::Event;
-pub use event::Level;
-pub use event::StepInfo;
 pub use kubaos_phone as phone;
-pub use probe::Manifest;
-pub use probe::Probe;
-pub use step::StepId;
+
+pub use self::config::InstallConfig;
+pub use self::config::Secrets;
+pub use self::event::Event;
+pub use self::event::Level;
+pub use self::event::StepInfo;
+pub use self::probe::Manifest;
+pub use self::probe::Probe;
+pub use self::step::StepId;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

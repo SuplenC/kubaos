@@ -29,8 +29,8 @@ pub mod settings;
 mod words;
 pub mod zones;
 
-pub use parse::alarm;
-pub use parse::duration;
-pub use query::Answer;
-pub use query::Context;
-pub use query::evaluate;
+pub use self::parse::alarm;
+pub use self::parse::duration;
+pub use self::query::Answer;
+pub use self::query::Context;
+pub use self::query::evaluate;

@@ -48,7 +48,7 @@ fn state(s: &Setup, c: CardId) -> Option<State> {
     not(test),
     expect(
         clippy::enum_glob_use,
-        reason = "the script reads as a list of keys and steps, unprefixed"
+        reason = "The script reads as a list of keys and steps, unprefixed."
     )
 )]
 #[expect(
@@ -176,7 +176,7 @@ pub fn script() -> Vec<Step> {
     not(test),
     expect(
         clippy::enum_glob_use,
-        reason = "the script reads as a list of keys and steps, unprefixed"
+        reason = "The script reads as a list of keys and steps, unprefixed."
     )
 )]
 pub fn script_vm() -> Vec<Step> {
@@ -212,7 +212,7 @@ fn finished(s: &Setup) -> bool {
     not(test),
     expect(
         clippy::enum_glob_use,
-        reason = "the script reads as a list of keys and steps, unprefixed"
+        reason = "The script reads as a list of keys and steps, unprefixed."
     )
 )]
 pub fn script_bitwarden() -> Vec<Step> {
@@ -353,7 +353,7 @@ pub fn drive(s: &mut Setup) -> Task<Message> {
 
 #[expect(
     clippy::print_stderr,
-    reason = "`--screenshot-tour` is run from a terminal, which is told where each shot went"
+    reason = "`--screenshot-tour` is run from a terminal, which is told where each shot went."
 )]
 pub fn save(s: &Setup, name: &str, shot: &window::Screenshot) {
     let Some(tour) = &s.tour else { return };

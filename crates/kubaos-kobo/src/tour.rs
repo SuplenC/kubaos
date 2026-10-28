@@ -30,7 +30,7 @@ use crate::app::Screen;
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(
     not(test),
-    expect(dead_code, reason = "the tests press keys the screenshot tour doesn't")
+    expect(dead_code, reason = "The tests press keys the screenshot tour doesn't.")
 )]
 pub enum K {
     Enter,
@@ -72,7 +72,7 @@ const SETTLE: u64 = 750;
     not(test),
     expect(
         clippy::enum_glob_use,
-        reason = "the script reads as a list of keys and steps, unprefixed"
+        reason = "The script reads as a list of keys and steps, unprefixed."
     )
 )]
 pub fn script() -> Vec<Step> {
@@ -325,7 +325,7 @@ pub fn drive(app: &mut App) -> Task<Message> {
 
 #[expect(
     clippy::print_stderr,
-    reason = "`--screenshot-tour` is run from a terminal, which is told where each shot went"
+    reason = "`--screenshot-tour` is run from a terminal, which is told where each shot went."
 )]
 pub fn save(app: &App, name: &str, shot: &window::Screenshot) {
     let Some(tour) = &app.tour else { return };

@@ -33,11 +33,11 @@ pub mod version;
 
 mod updater;
 
-pub use updater::Confirm;
-pub use updater::MIN_FREE_BYTES;
-pub use updater::UpdateError;
-pub use updater::UpdateOptions;
-pub use updater::Updater;
+pub use self::updater::Confirm;
+pub use self::updater::MIN_FREE_BYTES;
+pub use self::updater::UpdateError;
+pub use self::updater::UpdateOptions;
+pub use self::updater::Updater;
 
 #[cfg(test)]
 mod fixture;

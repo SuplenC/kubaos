@@ -25,14 +25,14 @@ pub mod manifest;
 pub mod plan;
 pub mod record;
 
-pub use choices::Choices;
-pub use choices::Switch;
-pub use dpkg::Dpkg;
-pub use manifest::Group;
-pub use manifest::Manifest;
-pub use manifest::ManifestError;
-pub use plan::Status;
-pub use record::Record;
+pub use self::choices::Choices;
+pub use self::choices::Switch;
+pub use self::dpkg::Dpkg;
+pub use self::manifest::Group;
+pub use self::manifest::Manifest;
+pub use self::manifest::ManifestError;
+pub use self::plan::Status;
+pub use self::record::Record;
 
 #[cfg(test)]
 mod tests;

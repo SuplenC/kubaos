@@ -63,7 +63,7 @@ impl Value {
                 #[expect(
                     clippy::cast_possible_truncation,
                     clippy::cast_sign_loss,
-                    reason = "rounded, clamped to 0..=last, and last fits a u16"
+                    reason = "Rounded, clamped to 0..=last, and last fits a u16."
                 )]
                 let index = (fraction * last).round() as u16;
                 Value::Stop { index, count }

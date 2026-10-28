@@ -46,7 +46,7 @@ pub mod wireguard;
 #[cfg(test)]
 mod fake;
 
-pub use machine::Machine;
-pub use paths::Paths;
-pub use plan::Plan;
-pub use profile::Profile;
+pub use self::machine::Machine;
+pub use self::paths::Paths;
+pub use self::plan::Plan;
+pub use self::profile::Profile;
