@@ -161,6 +161,9 @@ panel = 384
 # The shell's bar along the top of every screen: a small control (32) with 4
 # above and below, so its pills and buttons centre on whole device pixels.
 bar = 40
+# The widest a name the bar shows grows (a live preview's branch): past it, it
+# ends in an ellipsis, so the bar's right side never runs into the clock.
+bar_label = 160
 # A wallpaper's thumbnail in the shell's picker, 16:10 as the screens are.
 thumbnail_width = 256
 thumbnail_height = 160

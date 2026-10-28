@@ -257,7 +257,7 @@ An update, in order:
 1. Refuses when another update runs, when `/` or `/nix` has less than 3 GiB free, or when `origin` can't be reached.
 2. Picks the release. On **edge** (a machine installed from a build that wasn't a verified release) that's `origin/main`'s head; with `/usr/share/kubaos-keys/allowed_signers` on the machine the head must be signed by one of its keys, without it the update warns once and goes on. On **stable** it's the newest verified `v*` tag of the installed series; with no such tag it says so and only updates packages.
 3. Shows the release's commits, the apt packages, a Hyprland pin change and the system migrations it will run, and asks.
-4. Takes a snapper snapshot, copies your `flake.lock` to `~/.local/state/kubaos/locks/`, and adds a line to `/var/lib/kubaos/update-history`.
+4. Switches your home back to the release when it is a live preview ("Hacking on KubaOS", below). Takes a snapper snapshot, copies your `flake.lock` to `~/.local/state/kubaos/locks/`, and adds a line to `/var/lib/kubaos/update-history`.
 5. `apt-get upgrade`, then moves `/usr/share/kubaos`'s `release` branch.
 6. When the release's `system/files/apt/preferences.d/kubaos-hyprland` differs from the installed one (amd64): unholds the Hyprland stack, installs the pinned versions, holds it again.
 7. Brings the apt packages in line with the release's package manifest, `system/packages.toml` (below): installs what its groups list and the machine lacks, holds the held ones, and removes a package no group lists any more, but only one KubaOS installed and nothing else needs.
@@ -376,14 +376,25 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
 
 ## Hacking on KubaOS
 
-KubaOS itself is the root-owned checkout `/usr/share/kubaos`. To change it, clone it anywhere and point your flake at the clone for a switch:
+KubaOS itself is the root-owned checkout `/usr/share/kubaos`. To change it, clone it into `~/Projects/kubaos` and try a branch live on your own home with a **live preview**:
 
 ```sh
 git clone https://github.com/SuplenC/kubaos.git ~/Projects/kubaos
-home-manager switch --flake ~/.config/kubaos/home --override-input kubaos git+file://$HOME/Projects/kubaos
+kubaos switch --from ~/Projects/kubaos          # a checkout, by its folder
+kubaos switch --from feature/issue-12-waybar    # or a branch: the worktree of ~/Projects/kubaos that has it
+kubaos switch --release                         # back to the release this machine is on
 ```
 
-`--override-input` doesn't touch your `flake.lock`, so a plain `home-manager switch --flake ~/.config/kubaos/home` goes back to the installed release. The clone's flake sees files git knows about: `git add` new ones first. `docs/CONTRACTS.md` ("Defaults and the user layer") has the details.
+`--from` first checks that your home evaluates with the checkout as KubaOS and refuses it, switching nothing, when it doesn't. Then it switches your home with your flake's `kubaos` input overridden to the checkout, as a queued switch job like any other. Your `flake.lock` stays as it is. The build sees the files git knows about, uncommitted changes to them included: `git add` new ones first.
+
+While a preview is on:
+
+- The bar shows a pill in the cold accent naming the branch, beside the workspaces. Its hint gives the commit and since when; a click opens the Command menu at "Back to the release", which runs `kubaos switch --release` in a terminal.
+- `kubaos switch` alone is refused and names both ways on: `--from` the same checkout builds it again, with its latest changes, and `--release` goes back. A switch that `kubaos package` or `kubaos suite` queues keeps the preview.
+- A second `--from` replaces the first, and says so. There is one preview at a time.
+- `kubaos update`, `upgrade` and `rollback` switch back to the release first, once you've said yes and before they change anything, so no update runs on top of a preview.
+
+A preview only changes what your home builds: the shell, Hyprland's config, the Command menu's KubaOS Extension, the configs and the packages of your home. The system stays the release's: apt packages, `system/`, migrations, the boot and the login screen. Try those through a branch's own install or update. `~/.local/state/kubaos/preview.json` records the preview on (`docs/CONTRACTS.md`, "Live previews").
 
 ## Daily commands
 

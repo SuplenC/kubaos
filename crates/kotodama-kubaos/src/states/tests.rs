@@ -50,6 +50,7 @@ impl Machine {
             keep_awake: Some(root.join("run/kubaos-keep-awake.json")),
             proxy: Some(root.join("run/kubaos-proxy.json")),
             dnd: Some(root.join("run/kubaos-dnd.json")),
+            preview: Some(root.join("state/kubaos/preview.json")),
         }
     }
 
@@ -229,6 +230,27 @@ fn do_not_disturb_is_its_state_files_on_and_unknown_without_the_shell() {
 }
 
 #[test]
+fn a_live_preview_is_on_while_its_record_names_one() {
+    let machine = Machine::new();
+
+    let missing = machine.read();
+    machine.write(
+        "state/kubaos/preview.json",
+        r#"{"path": "/h/Projects/kubaos", "branch": "feature/x", "commit": "1a2b3c4d", "dirty": false, "since": 1}"#,
+    );
+    let previewing = machine.read();
+    machine.write("state/kubaos/preview.json", "");
+    let released = machine.read();
+    machine.write("state/kubaos/preview.json", "{ not a record");
+    let broken = machine.read();
+
+    assert_eq!(missing.get(PREVIEW), Some(&on(false)));
+    assert_eq!(previewing.get(PREVIEW), Some(&on(true)));
+    assert_eq!(released.get(PREVIEW), Some(&on(false)));
+    assert_eq!(broken.get(PREVIEW), None);
+}
+
+#[test]
 fn the_power_settings_are_read_from_their_file_with_its_defaults() {
     let machine = Machine::new();
 
@@ -273,6 +295,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         keep_awake: None,
         proxy: None,
         dnd: None,
+        preview: None,
         ..machine.places()
     };
 
@@ -289,6 +312,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         KEEP_AWAKE,
         PROXY,
         DND,
+        PREVIEW,
     ] {
         assert_eq!(states.get(name), None, "{name}");
     }
@@ -315,6 +339,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "run/kubaos-keep-awake.json",
         "run/kubaos-proxy.json",
         "run/kubaos-dnd.json",
+        "state/kubaos/preview.json",
     ] {
         assert!(files.contains(&root.join(file)), "{file} isn't watched: {files:?}");
     }
@@ -326,6 +351,7 @@ fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values(PROXY), Some(Values::Bool));
     assert_eq!(values(DND), Some(Values::Bool));
     assert_eq!(values(UNFREE), Some(Values::Bool));
+    assert_eq!(values(PREVIEW), Some(Values::Bool));
     assert_eq!(values(SCHEDULER), Some(Values::Words(&["kernel", "lavd"])));
     assert_eq!(values("packages."), None);
     assert_eq!(values("chrome"), None);

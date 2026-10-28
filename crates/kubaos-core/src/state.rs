@@ -183,6 +183,12 @@ impl Paths {
         self.state.join("jobs")
     }
 
+    /// The live preview in effect, `~/.local/state/kubaos/preview.json`: empty or missing while the
+    /// home is the release (`preview.rs`).
+    pub fn preview(&self) -> PathBuf {
+        self.state.join("preview.json")
+    }
+
     /// The lock every edit of the state directory takes. It lives outside the directory, so that
     /// neither the flake nor a generation's copy picks it up.
     pub fn edit_lock(&self) -> PathBuf {

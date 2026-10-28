@@ -16,9 +16,10 @@
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
 //! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
+//! | `kubaos.preview` | on: the home is a live preview of a KubaOS checkout | `S/kubaos/preview.json` names one |
 //!
-//! `U` is the user layer, `~/.config/kubaos`. A state whose file can't be read has no reading,
-//! and an action that names it shows whatever it declares.
+//! `U` is the user layer, `~/.config/kubaos`; `S` is `XDG_STATE_HOME`, `~/.local/state`. A state
+//! whose file can't be read has no reading, and an action that names it shows whatever it declares.
 //!
 //! # Owns
 //!
@@ -41,8 +42,10 @@ use kubaos_core::apt::Choices;
 use kubaos_core::apt::Manifest;
 use kubaos_core::apt::Switch;
 use kubaos_core::keyboard::settings as keyboard_settings;
+use kubaos_core::preview::PreviewFile;
 use kubaos_core::state::DIR_NAME as STATE_DIR;
 use kubaos_core::state::NIXPKGS_FILE;
+use kubaos_core::state::Paths;
 use kubaos_core::state::user_flake;
 use kubaos_core::unfree::Setting as UnfreeSetting;
 use kubaos_core::unfree::Unfree;
@@ -73,6 +76,8 @@ pub const SCHEDULER: &str = "power.scheduler";
 pub const LOW_BATTERY: &str = "power.low-battery";
 /// Whether the user's nixpkgs takes unfree packages.
 pub const UNFREE: &str = "nix.unfree";
+/// Whether the home is a live preview of a KubaOS checkout rather than the release.
+pub const PREVIEW: &str = "kubaos.preview";
 
 /// What starts the state of an optional package group, `packages.chrome`.
 const PACKAGES: &str = "packages.";
@@ -144,6 +149,9 @@ impl States {
         if let Some(wanted) = places.proxy.as_deref().and_then(proxy_wanted) {
             states.set(PROXY, Reading::Bool(wanted));
         }
+        if let Some(previewing) = places.preview.as_deref().and_then(previewing) {
+            states.set(PREVIEW, Reading::Bool(previewing));
+        }
         states
     }
 
@@ -212,7 +220,7 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | DND
-        | PANEL_POWER_SAVING | UNFREE => Some(Values::Bool),
+        | PANEL_POWER_SAVING | UNFREE | PREVIEW => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ => None,
     }
@@ -233,6 +241,8 @@ pub struct Places {
     pub proxy: Option<PathBuf>,
     /// Do not disturb's state file in the runtime dir, which the shell writes.
     pub dnd: Option<PathBuf>,
+    /// The live preview's record, `~/.local/state/kubaos/preview.json`.
+    pub preview: Option<PathBuf>,
 }
 
 impl Places {
@@ -246,6 +256,7 @@ impl Places {
             keep_awake: kubaos_idle::runtime_dir().map(|runtime| kubaos_idle::awake::path(&runtime)),
             proxy: kubaos_proxy::paths::Paths::from_env().map(|paths| paths.shell()),
             dnd: kubaos_idle::runtime_dir().map(|runtime| runtime.join(DND_FILE)),
+            preview: Paths::from_env().ok().map(|paths| paths.preview()),
         }
     }
 
@@ -264,7 +275,14 @@ impl Places {
                 user_layer.state_dir.join(NIXPKGS_FILE),
             ]);
         }
-        files.extend(self.keep_awake.iter().chain(&self.proxy).chain(&self.dnd).cloned());
+        files.extend(
+            self.keep_awake
+                .iter()
+                .chain(&self.proxy)
+                .chain(&self.dnd)
+                .chain(&self.preview)
+                .cloned(),
+        );
         files
     }
 }
@@ -320,6 +338,12 @@ fn proxy_wanted(file: &Path) -> Option<bool> {
     let text = fs::read_to_string(file).ok()?;
     let status: serde_json::Value = serde_json::from_str(&text).ok()?;
     status.get("wanted")?.as_bool()
+}
+
+/// Whether the preview file names a live preview: not while it is empty or missing, as on the
+/// release; `None` when it doesn't read.
+fn previewing(file: &Path) -> Option<bool> {
+    PreviewFile::new(file).read().ok().map(|preview| preview.is_some())
 }
 
 #[cfg(test)]

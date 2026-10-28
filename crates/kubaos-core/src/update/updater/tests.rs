@@ -56,6 +56,10 @@ struct Fake {
     free: u64,
     /// When set, apt, dpkg and apt-mark answer from it and change it, as on a machine.
     dpkg: Option<FakeDpkg>,
+    /// The live preview the home is on.
+    preview: Option<String>,
+    /// Whether switching back from the preview fails.
+    leave_fails: bool,
 }
 
 /// A machine's packages, for the package manifest's tests.
@@ -180,6 +184,8 @@ impl Fake {
             authenticated: 0,
             free: u64::MAX,
             dpkg: None,
+            preview: None,
+            leave_fails: false,
         }
     }
 
@@ -285,6 +291,20 @@ impl Machine for Fake {
         for line in &self.switch_output {
             on_line(line);
         }
+        Ok(())
+    }
+
+    fn preview(&mut self) -> Option<String> {
+        self.preview.clone()
+    }
+
+    fn leave_preview(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
+        self.ran.push("leave preview".to_owned());
+        on_line("switching back");
+        if self.leave_fails {
+            return Err(MachineError::Switch("home-manager exited with code 1".to_owned()));
+        }
+        self.preview = None;
         Ok(())
     }
 
@@ -1119,6 +1139,125 @@ fn the_channel_file_overrides_the_record() {
     assert_eq!(fs::read_to_string(w.sys.channel()).unwrap(), "edge\n");
     let updater = w.updater(&mut m);
     assert_eq!(updater.channel(&w.installed()), Channel::Edge);
+}
+
+/// A machine whose home is a live preview of `feature/x`.
+fn previewing() -> Fake {
+    Fake {
+        preview: Some("feature/x (at 1a2b3c4, /h/Projects/kubaos)".to_owned()),
+        ..Fake::new()
+    }
+}
+
+/// Where each of `steps` first ran in `m`, in `steps`' order.
+fn first_runs(m: &Fake, steps: &[&str]) -> Vec<usize> {
+    steps
+        .iter()
+        .map(|step| m.ran.iter().position(|line| line.starts_with(step)).unwrap())
+        .collect()
+}
+
+#[test]
+fn an_update_leaves_a_live_preview_before_it_changes_anything() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = previewing();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert_eq!(m.preview, None);
+    let at = first_runs(&m, &["leave preview", "sudo apt-get upgrade", "switch"]);
+    assert!(at.is_sorted(), "leaving the preview comes first: {:?}", m.ran);
+    let phases = phases(&events);
+    assert_eq!(
+        phases[..4],
+        [Phase::Checking, Phase::Fetching, Phase::Verifying, Phase::Reviewing]
+    );
+    assert_eq!(phases[4..6], [Phase::LivePreview, Phase::Snapshot]);
+}
+
+#[test]
+fn an_upgrade_leaves_a_live_preview_first() {
+    let w = World::new(Channel::Stable, true);
+    w.push(&[("VERSION", "0.2.0\n"), ("CODENAME", "akihabara\n")], true);
+    fixture::tag(&w.work, "v0.2.0", Some(&w.key));
+    fixture::git(&w.work, &["push", "-q", "origin", "main", "--tags"]);
+    let mut m = previewing();
+
+    w.updater(&mut m).upgrade().unwrap();
+
+    assert_eq!(w.installed().version.to_string(), "0.2.0");
+    let at = first_runs(&m, &["leave preview", "sudo apt-get upgrade", "switch"]);
+    assert!(at.is_sorted(), "{:?}", m.ran);
+    assert_eq!(m.preview, None);
+}
+
+#[test]
+fn a_rollback_leaves_a_live_preview_first() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    w.updater(&mut Fake::new()).update(yes()).unwrap();
+    let mut m = previewing();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).rollback(Confirm::AssumeYes).unwrap();
+
+    let at = first_runs(&m, &["leave preview", "switch"]);
+    assert!(at.is_sorted(), "{:?}", m.ran);
+    assert_eq!(m.preview, None);
+    assert_eq!(
+        phases(&events),
+        [
+            Phase::Checking,
+            Phase::LivePreview,
+            Phase::Snapshot,
+            Phase::Release,
+            Phase::Home
+        ]
+    );
+}
+
+#[test]
+fn a_declined_update_keeps_the_live_preview() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = previewing();
+    m.answer = false;
+
+    let err = w.updater(&mut m).update(UpdateOptions::new()).unwrap_err();
+
+    assert!(matches!(err, UpdateError::Declined));
+    assert!(m.preview.is_some());
+    assert!(!m.ran.iter().any(|line| line == "leave preview"));
+}
+
+#[test]
+fn an_update_that_cannot_leave_the_live_preview_stops_before_anything_changes() {
+    let w = World::new(Channel::Edge, true);
+    let before = w.release();
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = previewing();
+    m.leave_fails = true;
+
+    let err = w.updater(&mut m).update(yes()).unwrap_err();
+
+    assert!(err.to_string().contains("leaving the live preview"), "{err}");
+    assert_eq!(w.release(), before);
+    assert_eq!(m.ran("sudo apt-get upgrade") + m.ran("sudo snapper") + m.switches, 0);
+}
+
+#[test]
+fn an_update_without_a_live_preview_has_no_such_phase() {
+    let w = World::new(Channel::Edge, true);
+    w.push(&[("VERSION", "0.1.1\n")], true);
+    let mut m = Fake::new();
+    let mut events = Vec::new();
+
+    w.reporting(&mut m, &mut events).update(yes()).unwrap();
+
+    assert!(!phases(&events).contains(&Phase::LivePreview));
+    assert!(!m.ran.iter().any(|line| line == "leave preview"));
 }
 
 mod manifest;

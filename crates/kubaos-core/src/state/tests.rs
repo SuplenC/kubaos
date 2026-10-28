@@ -120,6 +120,11 @@ fn paths_follow_the_xdg_variables_and_fall_back_to_home() {
     assert_eq!(defaults.jobs(), Path::new("/home/kuba/.local/state/kubaos/jobs"));
     assert_eq!(custom.flake(), Path::new("/cfg/kubaos/home"));
     assert_eq!(custom.jobs(), Path::new("/st/kubaos/jobs"));
+    assert_eq!(
+        defaults.preview(),
+        Path::new("/home/kuba/.local/state/kubaos/preview.json")
+    );
+    assert_eq!(custom.preview(), Path::new("/st/kubaos/preview.json"));
 }
 
 #[test]

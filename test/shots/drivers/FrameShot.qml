@@ -32,7 +32,8 @@ import qs.modules.frame
 //                  panel-empty (nothing in it), panel-dnd (Do not disturb on while the screen is
 //                  shared, its tooltip showing)
 //   bar: traymenu (the network item's menu open), dnd (the bell crossed out), nobell (no
-//        notification, so no bell), dnd-empty (no notification, the bell crossed out all the same)
+//        notification, so no bell), dnd-empty (no notification, the bell crossed out all the same),
+//        preview (the home a live preview of a branch)
 QtObject {
     id: driver
 
@@ -347,6 +348,12 @@ QtObject {
             Notifs.clear();
         if ((driver.panel === "notifications" && driver.state === "panel-dnd") || (driver.panel === "bar" && (driver.state === "dnd" || driver.state === "dnd-empty")))
             Notifs.dndReason = "sharing";
+        if (driver.panel === "bar" && driver.state === "preview") {
+            Preview.branch = "feature/issue-228-live-preview";
+            Preview.commit = "1a2b3c4";
+            Preview.since = new Date(2026, 9, 27, 20, 15).getTime();
+            Preview.active = true;
+        }
         driver.frame = driver.frameComponent.createObject(null);
         driver.window = driver.windowOf(driver.frame);
         if (!driver.window) {

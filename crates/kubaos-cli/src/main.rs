@@ -93,8 +93,10 @@ enum Cmd {
     Pins(pin::PinsArgs),
     /// Open a shell with a package from your nixpkgs, installing nothing.
     Try { name: String },
-    /// Switch your home to the user flake, as a queued job.
+    /// Switch your home to the user flake, as a queued job; or preview a KubaOS checkout, and back.
     Switch {
+        #[command(flatten)]
+        to: job::SwitchTo,
         #[command(flatten)]
         mode: job::SwitchMode,
     },
@@ -164,8 +166,8 @@ fn main() -> ExitCode {
         Cmd::Unpin(args) => pin::unpin(&args),
         Cmd::Pins(args) => pin::list(&args),
         Cmd::Try { name } => package::try_main(&name),
-        Cmd::Switch { mode } => match kubaos_core::state::Paths::from_env() {
-            Ok(paths) => job::switch(&paths, mode),
+        Cmd::Switch { to, mode } => match kubaos_core::state::Paths::from_env() {
+            Ok(paths) => job::switch_to(&paths, mode, &to),
             Err(e) => usage_error(e),
         },
         Cmd::Job { cmd } => job::main(cmd),

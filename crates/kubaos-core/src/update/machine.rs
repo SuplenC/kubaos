@@ -248,6 +248,18 @@ pub trait Machine {
     /// [`MachineError::Switch`] when the switch fails.
     fn switch(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError>;
 
+    /// The live preview the home is on (`crate::preview`), as a line names it, or `None` while it
+    /// is the release.
+    fn preview(&mut self) -> Option<String>;
+
+    /// Switches the home from its live preview back to the release, through the switch queue,
+    /// handing each line of the switch's output to `on_line`, and checks the preview is gone.
+    ///
+    /// # Errors
+    ///
+    /// [`MachineError::Switch`] when the switch fails or the preview is still recorded after it.
+    fn leave_preview(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError>;
+
     /// Reads the answer to `question`, yes by default. The updater has reported the question as a
     /// prompt before it asks.
     fn confirm(&mut self, question: &str) -> bool;

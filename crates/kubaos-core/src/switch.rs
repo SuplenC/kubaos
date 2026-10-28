@@ -8,6 +8,11 @@
 //! finds nothing to do when an earlier worker already ran its job. A front end follows a job by
 //! reading its two files.
 //!
+//! A job records what it switches to ([`Target`]): the home as it stands, the release, or a KubaOS
+//! checkout for a live preview (`preview.rs`), whose `kubaos` input the switch overrides. A job
+//! that switches to a checkout records the preview when it succeeds, and one to the release clears
+//! it, both under the switch lock.
+//!
 //! A job records the name of its worker unit. A job still queued whose unit is gone, while no
 //! worker holds the lock, will never run (its program failed to start, say), and [`Queue::reap`]
 //! fails it; following a job and listing the jobs both reap.
@@ -21,12 +26,14 @@
 //! # Owns
 //!
 //! - The job files, the queue order and the switch lock.
+//! - What each job switches to, and keeping the preview file in step with the switches that ran.
 //! - Following a job's output until it ends.
 //! - [`Host`], the seam to systemd and home-manager, and [`Systemd`], the real one.
 //!
 //! # Not here
 //!
 //! - What a switch applies: the user flake and its state directory (`state.rs`).
+//! - Which switch a `kubaos switch` asks for, and the preview record: `preview.rs`.
 //! - The `kubaos switch` and `kubaos job` commands: `kubaos-cli`.
 
 use std::ffi::OsStr;
@@ -54,6 +61,10 @@ use std::time::UNIX_EPOCH;
 use serde::Deserialize;
 use serde::Serialize;
 
+use crate::preview;
+use crate::preview::Checkout;
+use crate::preview::Preview;
+use crate::preview::PreviewFile;
 use crate::state::lock_file;
 use crate::state::write_atomic;
 
@@ -144,6 +155,21 @@ impl JobState {
     }
 }
 
+/// What a switch job builds the home from.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Target {
+    /// The home as it stands when the job runs: the preview in effect then, else the user flake as
+    /// locked. What every switch that applies a change of the state directory asks for, so a
+    /// package added during a preview keeps it.
+    #[default]
+    Current,
+    /// The user flake as locked: the release the machine is on. Clears the preview.
+    Release,
+    /// The user flake with its `kubaos` input overridden to the checkout at `path`: a preview.
+    Checkout { path: PathBuf },
+}
+
 /// One switch job, as `<id>.json` holds it. Times are milliseconds since the Unix epoch.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Job {
@@ -157,9 +183,13 @@ pub struct Job {
     /// The systemd user unit that runs it, or `None` when it runs in the process that queued it.
     #[serde(default)]
     pub unit: Option<String>,
+    /// What it switches to.
+    #[serde(default)]
+    pub target: Target,
 }
 
-/// What the queue needs from the machine: starting a worker unit, and the switch itself.
+/// What the queue needs from the machine: starting a worker unit, the switch itself, and reading
+/// and checking a checkout to preview.
 pub trait Host {
     /// The name of the unit [`Host::start_worker`] starts for `job`.
     fn worker_unit(&self, job: &JobId) -> String;
@@ -178,12 +208,28 @@ pub trait Host {
     /// [`HostError`] when its state could not be read.
     fn worker_alive(&self, unit: &str) -> Result<bool, HostError>;
 
-    /// Runs one switch to the end, its output going to `log`.
+    /// Runs one switch to the end, its output going to `log`: of the user flake as locked, or with
+    /// its `kubaos` input overridden to the checkout `from`.
     ///
     /// # Errors
     ///
     /// [`HostError`] when the switch could not start or failed.
-    fn switch(&self, log: File) -> Result<(), HostError>;
+    fn switch(&self, log: File, from: Option<&Path>) -> Result<(), HostError>;
+
+    /// The branch and commit of the checkout at `path`, and whether it has uncommitted changes.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when `path` is no git checkout.
+    fn describe(&self, path: &Path) -> Result<Checkout, HostError>;
+
+    /// Evaluates the user flake's home with its `kubaos` input overridden to `path`, building
+    /// nothing, so a checkout that would fail the switch is refused before it starts.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when the evaluation fails.
+    fn evaluate(&self, path: &Path) -> Result<(), HostError>;
 }
 
 /// A program the [`Host`] ran failed.
@@ -270,26 +316,48 @@ impl QueueError {
 #[derive(Clone, Debug)]
 pub struct Queue {
     dir: PathBuf,
+    /// The preview file the jobs keep in step; without one, previews aren't recorded and
+    /// [`Target::Current`] is the user flake as locked.
+    previews: Option<PreviewFile>,
 }
 
 impl Queue {
     /// The queue in `dir` (`Paths::jobs`). The folder is made on first use.
     #[must_use]
     pub fn new(dir: impl Into<PathBuf>) -> Self {
-        Self { dir: dir.into() }
+        Self {
+            dir: dir.into(),
+            previews: None,
+        }
     }
 
-    /// Queues a switch job, without starting a worker for it.
+    /// The same queue, recording previews in `file` (`Paths::preview`).
+    #[must_use]
+    pub fn previews(mut self, file: PreviewFile) -> Self {
+        self.previews = Some(file);
+        self
+    }
+
+    /// Queues a switch job of the home as it stands, without starting a worker for it.
     ///
     /// # Errors
     ///
     /// [`QueueError::Io`] when the job file cannot be written.
     pub fn enqueue(&self) -> Result<JobId, QueueError> {
-        self.enqueue_with(|_| None)
+        self.enqueue_to(Target::Current)
     }
 
-    /// Queues a job whose worker unit, if any, `unit` names from its id.
-    fn enqueue_with(&self, unit: impl FnOnce(&JobId) -> Option<String>) -> Result<JobId, QueueError> {
+    /// Queues a switch job to `target`, without starting a worker for it.
+    ///
+    /// # Errors
+    ///
+    /// [`QueueError::Io`] when the job file cannot be written.
+    pub fn enqueue_to(&self, target: Target) -> Result<JobId, QueueError> {
+        self.enqueue_with(target, |_| None)
+    }
+
+    /// Queues a job to `target` whose worker unit, if any, `unit` names from its id.
+    fn enqueue_with(&self, target: Target, unit: impl FnOnce(&JobId) -> Option<String>) -> Result<JobId, QueueError> {
         fs::create_dir_all(&self.dir).map_err(QueueError::io(&self.dir))?;
         let id = JobId::next();
         let job = Job {
@@ -300,19 +368,30 @@ impl Queue {
             started_at: None,
             finished_at: None,
             error: None,
+            target,
         };
         self.write_job(&job)?;
         Ok(id)
     }
 
-    /// Queues a switch job and starts its worker through `host`.
+    /// Queues a switch job of the home as it stands and starts its worker through `host`.
     ///
     /// # Errors
     ///
     /// [`QueueError::Start`] when the worker does not start, after marking the job failed, and
     /// [`QueueError::Io`] when the job file cannot be written.
     pub fn submit(&self, host: &impl Host) -> Result<JobId, QueueError> {
-        let id = self.enqueue_with(|id| Some(host.worker_unit(id)))?;
+        self.submit_to(host, Target::Current)
+    }
+
+    /// Queues a switch job to `target` and starts its worker through `host`.
+    ///
+    /// # Errors
+    ///
+    /// [`QueueError::Start`] when the worker does not start, after marking the job failed, and
+    /// [`QueueError::Io`] when the job file cannot be written.
+    pub fn submit_to(&self, host: &impl Host, target: Target) -> Result<JobId, QueueError> {
+        let id = self.enqueue_with(target, |id| Some(host.worker_unit(id)))?;
         if let Err(source) = host.start_worker(&id) {
             let mut job = self.job(&id)?;
             job.state = JobState::Failed;
@@ -355,19 +434,60 @@ impl Queue {
                 .append(true)
                 .open(&log_path)
                 .map_err(QueueError::io(&log_path))?;
-            let result = host.switch(log);
+            let result = self.run_job(host, &job.target, log);
             job.finished_at = Some(now_ms());
             match result {
                 Ok(()) => job.state = JobState::Succeeded,
                 Err(e) => {
                     job.state = JobState::Failed;
-                    job.error = Some(error_chain(&e));
+                    job.error = Some(e);
                 }
             }
             self.write_job(&job)?;
             ran.push(job.id);
         }
         Ok(ran)
+    }
+
+    /// Runs one job's switch to `target`, and records the preview it makes or clears when it
+    /// succeeds. The caller holds the switch lock, so the preview file has one writer at a time.
+    fn run_job(&self, host: &impl Host, target: &Target, log: File) -> Result<(), String> {
+        let active = match &self.previews {
+            Some(file) => file.read().map_err(|e| error_chain(&e))?,
+            None => None,
+        };
+        let from = match target {
+            Target::Release => None,
+            Target::Checkout { path } => Some(path.clone()),
+            Target::Current => active.as_ref().map(|preview| preview.path.clone()),
+        };
+        let Some(from) = from else {
+            host.switch(log, None).map_err(|e| error_chain(&e))?;
+            if let Some(file) = &self.previews
+                && *target == Target::Release
+            {
+                file.clear().map_err(|e| error_chain(&e))?;
+            }
+            return Ok(());
+        };
+        let checkout = host
+            .describe(&from)
+            .map_err(|e| format!("reading the checkout {}: {}", from.display(), error_chain(&e)))?;
+        host.switch(log, Some(&from)).map_err(|e| error_chain(&e))?;
+        let Some(file) = &self.previews else {
+            return Ok(());
+        };
+        let since = active
+            .filter(|preview| preview.path == from)
+            .map_or_else(now_ms, |preview| preview.since);
+        let preview = Preview {
+            path: from,
+            branch: checkout.branch,
+            commit: checkout.commit,
+            dirty: checkout.dirty,
+            since,
+        };
+        file.write(&preview).map_err(|e| error_chain(&e))
     }
 
     /// Fails every queued job that will never run: its worker unit is gone, and no other worker
@@ -614,15 +734,59 @@ impl Systemd {
             .collect()
     }
 
-    /// The switch itself. `-b hm-backup` moves a file home-manager would replace aside, as
-    /// `system/60-nix.sh` does.
-    pub fn switch_command(&self) -> Vec<OsString> {
-        ["home-manager", "switch", "-b", "hm-backup", "--flake"]
+    /// The switch itself, of the user flake as locked or with KubaOS from the checkout `from`.
+    /// `-b hm-backup` moves a file home-manager would replace aside, as `system/60-nix.sh` does.
+    pub fn switch_command(&self, from: Option<&Path>) -> Vec<OsString> {
+        let mut argv: Vec<OsString> = ["home-manager", "switch", "-b", "hm-backup", "--flake"]
             .into_iter()
             .map(OsString::from)
             .chain([self.flake.as_os_str().to_owned()])
-            .collect()
+            .collect();
+        argv.extend(from.map(override_args).into_iter().flatten());
+        argv
     }
+
+    /// The evaluation [`Host::evaluate`] runs: every home configuration of the user flake to its
+    /// activation package's derivation, with KubaOS from the checkout `from`. It instantiates the
+    /// whole home and builds nothing.
+    pub fn evaluate_command(&self, from: &Path) -> Vec<OsString> {
+        let mut installable = self.flake.as_os_str().to_owned();
+        installable.push("#homeConfigurations");
+        let mut argv: Vec<OsString> = vec!["nix".into(), "eval".into(), "--json".into(), installable];
+        argv.extend(override_args(from));
+        argv.extend([
+            "--apply".into(),
+            "configs: map (config: config.activationPackage.drvPath) (builtins.attrValues configs)".into(),
+        ]);
+        argv
+    }
+
+    /// The `git worktree list` a branch given to `--from` is looked up in ([`preview::resolve`]).
+    pub fn worktrees_command(repo: &Path) -> Vec<OsString> {
+        let mut argv: Vec<OsString> = vec!["git".into(), "-C".into(), repo.as_os_str().to_owned()];
+        argv.extend(["worktree", "list", "--porcelain"].map(OsString::from));
+        argv
+    }
+
+    /// `repo`'s worktrees, as `git worktree list --porcelain` prints them.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError`] when git fails, as outside a repository.
+    pub fn worktrees(repo: &Path) -> Result<String, HostError> {
+        output(&Self::worktrees_command(repo))
+    }
+}
+
+/// The arguments that override the user flake's `kubaos` input to the checkout `from`. The lock
+/// file is never written: it keeps the release, which `--release` goes back to.
+fn override_args(from: &Path) -> [OsString; 4] {
+    [
+        "--override-input".into(),
+        "kubaos".into(),
+        preview::flake_ref(from).into(),
+        "--no-write-lock-file".into(),
+    ]
 }
 
 impl Host for Systemd {
@@ -653,10 +817,35 @@ impl Host for Systemd {
         run(&self.worker_command(job, &env), Stdio::inherit(), Stdio::inherit())
     }
 
-    fn switch(&self, log: File) -> Result<(), HostError> {
+    fn switch(&self, log: File, from: Option<&Path>) -> Result<(), HostError> {
         let program = "home-manager";
         let stderr = log.try_clone().map_err(|e| HostError::spawn(program, e))?;
-        run(&self.switch_command(), Stdio::from(log), Stdio::from(stderr))
+        run(&self.switch_command(from), Stdio::from(log), Stdio::from(stderr))
+    }
+
+    fn describe(&self, path: &Path) -> Result<Checkout, HostError> {
+        let git = |args: &[&str]| {
+            let mut argv: Vec<OsString> = vec!["git".into(), "-C".into(), path.as_os_str().to_owned()];
+            argv.extend(args.iter().map(OsString::from));
+            argv
+        };
+        let commit = output(&git(&["rev-parse", "--verify", "HEAD"]))?.trim().to_owned();
+        // On a detached head `symbolic-ref` exits 1: no branch.
+        let branch = output(&git(&["symbolic-ref", "--quiet", "--short", "HEAD"]))
+            .ok()
+            .map(|branch| branch.trim().to_owned())
+            .filter(|branch| !branch.is_empty());
+        let status = output(&git(&["status", "--porcelain", "--untracked-files=no"]))?;
+        Ok(Checkout {
+            branch,
+            commit,
+            dirty: !status.trim().is_empty(),
+        })
+    }
+
+    fn evaluate(&self, path: &Path) -> Result<(), HostError> {
+        // Nix's errors reach the terminal: they say why the checkout doesn't evaluate.
+        run(&self.evaluate_command(path), Stdio::null(), Stdio::inherit())
     }
 }
 
@@ -683,6 +872,24 @@ fn run(argv: &[OsString], stdout: Stdio, stderr: Stdio) -> Result<(), HostError>
     } else {
         Err(HostError::exited(program, status.code()))
     }
+}
+
+/// Runs `argv` to the end with stdin closed and stderr dropped, returning what it printed.
+fn output(argv: &[OsString]) -> Result<String, HostError> {
+    let Some((executable, rest)) = argv.split_first() else {
+        return Err(HostError::spawn("", io::Error::other("empty command")));
+    };
+    let program = executable.to_string_lossy().into_owned();
+    let out = Command::new(executable)
+        .args(rest)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|e| HostError::spawn(&program, e))?;
+    if !out.status.success() {
+        return Err(HostError::exited(program, out.status.code()));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
 /// `e` and its causes, joined with `: `, for a job file a front end reads without the error types.

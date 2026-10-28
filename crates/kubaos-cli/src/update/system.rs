@@ -23,9 +23,14 @@ use kubaos_core::update::machine::NIX_BIN;
 /// The switch, handing each chunk of its output to the callback.
 type Switch = Box<dyn FnMut(&mut dyn FnMut(&str)) -> Result<(), String>>;
 
+/// The live preview the home is on, as a line names it.
+type ActivePreview = Box<dyn FnMut() -> Option<String>>;
+
 /// The real machine: root commands through `sudo`, output captured.
 pub struct System {
     switch: Switch,
+    preview: Option<ActivePreview>,
+    leave_preview: Option<Switch>,
     is_root: bool,
     /// `PATH` for user commands, with Nix's tools, when this process's lacks `nix`.
     path: Option<OsString>,
@@ -53,9 +58,24 @@ impl System {
         });
         Self {
             switch: Box::new(switch),
+            preview: None,
+            leave_preview: None,
             is_root: rustix::process::geteuid().is_root(),
             path,
         }
+    }
+
+    /// The same machine, finding the live preview the home is on through `preview` and switching
+    /// back from it through `leave`. Without them the home is never a preview.
+    #[must_use]
+    pub fn previewing(
+        mut self,
+        preview: impl FnMut() -> Option<String> + 'static,
+        leave: impl FnMut(&mut dyn FnMut(&str)) -> Result<(), String> + 'static,
+    ) -> Self {
+        self.preview = Some(Box::new(preview));
+        self.leave_preview = Some(Box::new(leave));
+        self
     }
 
     /// Starts `cmd` with stdin piped when it has input, else none, stdout and stderr piped, and
@@ -154,6 +174,20 @@ impl Machine for System {
         let switched = (self.switch)(&mut |chunk| cut.push(chunk.as_bytes(), &mut *on_line));
         cut.finish(&mut *on_line);
         switched.map_err(MachineError::Switch)
+    }
+
+    fn preview(&mut self) -> Option<String> {
+        self.preview.as_mut().and_then(|preview| preview())
+    }
+
+    fn leave_preview(&mut self, on_line: &mut dyn FnMut(&str)) -> Result<(), MachineError> {
+        let Some(leave) = self.leave_preview.as_mut() else {
+            return Ok(());
+        };
+        let mut cut = Lines::default();
+        let left = leave(&mut |chunk| cut.push(chunk.as_bytes(), &mut *on_line));
+        cut.finish(&mut *on_line);
+        left.map_err(MachineError::Switch)
     }
 
     fn confirm(&mut self, _question: &str) -> bool {
