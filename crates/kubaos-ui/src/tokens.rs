@@ -164,8 +164,10 @@ pub enum Size {
     ControlMd,
     ControlSm,
     Dialog,
+    Hanko,
     Keycap,
     Log,
+    NeonMark,
     Panel,
     Password,
     Progress,
@@ -187,7 +189,7 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 27] = [
+    pub const ALL: [Size; 29] = [
         Size::Bar,
         Size::Check,
         Size::Chip,
@@ -196,8 +198,10 @@ impl Size {
         Size::ControlMd,
         Size::ControlSm,
         Size::Dialog,
+        Size::Hanko,
         Size::Keycap,
         Size::Log,
+        Size::NeonMark,
         Size::Panel,
         Size::Password,
         Size::Progress,
@@ -228,8 +232,10 @@ impl Size {
             Size::ControlMd => 40,
             Size::ControlSm => 32,
             Size::Dialog => 500,
+            Size::Hanko => 120,
             Size::Keycap => 20,
             Size::Log => 232,
+            Size::NeonMark => 200,
             Size::Panel => 384,
             Size::Password => 320,
             Size::Progress => 8,
@@ -336,12 +342,13 @@ pub enum Type {
     /// The lock screen's clock, the one thing that screen shows: a step above the hero, light like
     /// every big figure. The clock popup's time stays the hero's number style.
     Clock,
-    /// Words at the hero size: Kōbō's welcome line, and nothing else.
+    /// Words at the hero size: Kōbō's welcome line and its done screen's headline, and nothing
+    /// else.
     Hero,
     /// Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the
     /// clock popup's time.
     HeroNumber,
-    /// The heading of a full-screen moment other than the welcome: Kōbō's done screen.
+    /// The heading of a full-screen moment other than Kōbō's welcome and done screens.
     Display,
     /// A screen's or page's title.
     Title,
@@ -822,6 +829,8 @@ pub struct Palette<C = Rgb> {
     pub cold: C,
     /// matugen's `tertiary_container`.
     pub cold_container: C,
+    /// Ours: the same whatever the wallpaper.
+    pub cold_core: C,
     /// matugen's `error`.
     pub error: C,
     /// matugen's `error_container`.
@@ -864,6 +873,8 @@ pub struct Palette<C = Rgb> {
     pub primary: C,
     /// matugen's `primary_container`.
     pub primary_container: C,
+    /// Ours: the same whatever the wallpaper.
+    pub primary_core: C,
     /// matugen's `scrim`.
     pub scrim: C,
     /// matugen's `secondary`.
@@ -904,6 +915,7 @@ impl<C: Copy> Palette<C> {
         Palette {
             cold: f(self.cold),
             cold_container: f(self.cold_container),
+            cold_core: f(self.cold_core),
             error: f(self.error),
             error_container: f(self.error_container),
             inverse_on_surface: f(self.inverse_on_surface),
@@ -925,6 +937,7 @@ impl<C: Copy> Palette<C> {
             outline_variant: f(self.outline_variant),
             primary: f(self.primary),
             primary_container: f(self.primary_container),
+            primary_core: f(self.primary_core),
             scrim: f(self.scrim),
             secondary: f(self.secondary),
             secondary_container: f(self.secondary_container),
@@ -949,6 +962,7 @@ impl<C: Copy> Palette<C> {
 pub const DARK: Palette = Palette {
     cold: Rgb { r: 0x85, g: 0xcf, b: 0xff },
     cold_container: Rgb { r: 0x0f, g: 0x9a, b: 0xd6 },
+    cold_core: Rgb { r: 0xdc, g: 0xf1, b: 0xff },
     error: Rgb { r: 0xff, g: 0xb4, b: 0xab },
     error_container: Rgb { r: 0x93, g: 0x00, b: 0x0a },
     inverse_on_surface: Rgb { r: 0x38, g: 0x2f, b: 0x27 },
@@ -970,6 +984,7 @@ pub const DARK: Palette = Palette {
     outline_variant: Rgb { r: 0x54, g: 0x44, b: 0x36 },
     primary: Rgb { r: 0xff, g: 0xb7, b: 0x79 },
     primary_container: Rgb { r: 0xd3, g: 0x7b, b: 0x1b },
+    primary_core: Rgb { r: 0xff, g: 0xe6, b: 0xcf },
     scrim: Rgb { r: 0x00, g: 0x00, b: 0x00 },
     secondary: Rgb { r: 0xf2, g: 0xbc, b: 0x8e },
     secondary_container: Rgb { r: 0x64, g: 0x3e, b: 0x1b },
@@ -992,6 +1007,7 @@ pub const DARK: Palette = Palette {
 pub const LIGHT: Palette = Palette {
     cold: Rgb { r: 0x00, g: 0x62, b: 0x8b },
     cold_container: Rgb { r: 0x00, g: 0x7c, b: 0xaf },
+    cold_core: Rgb { r: 0xdc, g: 0xf1, b: 0xff },
     error: Rgb { r: 0xba, g: 0x1a, b: 0x1a },
     error_container: Rgb { r: 0xff, g: 0xda, b: 0xd6 },
     inverse_on_surface: Rgb { r: 0xff, g: 0xee, b: 0xe2 },
@@ -1013,6 +1029,7 @@ pub const LIGHT: Palette = Palette {
     outline_variant: Rgb { r: 0xda, g: 0xc2, b: 0xb1 },
     primary: Rgb { r: 0x8b, g: 0x4c, b: 0x00 },
     primary_container: Rgb { r: 0xae, g: 0x61, b: 0x00 },
+    primary_core: Rgb { r: 0xff, g: 0xe6, b: 0xcf },
     scrim: Rgb { r: 0x00, g: 0x00, b: 0x00 },
     secondary: Rgb { r: 0x7f, g: 0x55, b: 0x30 },
     secondary_container: Rgb { r: 0xfe, g: 0xc7, b: 0x98 },
@@ -1044,6 +1061,7 @@ pub const fn palette(mode: Mode) -> Palette {
 pub enum Role {
     Cold,
     ColdContainer,
+    ColdCore,
     Error,
     ErrorContainer,
     InverseOnSurface,
@@ -1065,6 +1083,7 @@ pub enum Role {
     OutlineVariant,
     Primary,
     PrimaryContainer,
+    PrimaryCore,
     Scrim,
     Secondary,
     SecondaryContainer,
@@ -1089,6 +1108,7 @@ impl Role {
         match self {
             Role::Cold => palette.cold,
             Role::ColdContainer => palette.cold_container,
+            Role::ColdCore => palette.cold_core,
             Role::Error => palette.error,
             Role::ErrorContainer => palette.error_container,
             Role::InverseOnSurface => palette.inverse_on_surface,
@@ -1110,6 +1130,7 @@ impl Role {
             Role::OutlineVariant => palette.outline_variant,
             Role::Primary => palette.primary,
             Role::PrimaryContainer => palette.primary_container,
+            Role::PrimaryCore => palette.primary_core,
             Role::Scrim => palette.scrim,
             Role::Secondary => palette.secondary,
             Role::SecondaryContainer => palette.secondary_container,
@@ -1134,6 +1155,7 @@ impl Role {
         match self {
             Role::Cold => "cold",
             Role::ColdContainer => "cold_container",
+            Role::ColdCore => "cold_core",
             Role::Error => "error",
             Role::ErrorContainer => "error_container",
             Role::InverseOnSurface => "inverse_on_surface",
@@ -1155,6 +1177,7 @@ impl Role {
             Role::OutlineVariant => "outline_variant",
             Role::Primary => "primary",
             Role::PrimaryContainer => "primary_container",
+            Role::PrimaryCore => "primary_core",
             Role::Scrim => "scrim",
             Role::Secondary => "secondary",
             Role::SecondaryContainer => "secondary_container",
@@ -1202,7 +1225,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 38] = [
+pub const CONTRAST: [ContrastPair; 39] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1468,6 +1491,13 @@ pub const CONTRAST: [ContrastPair; 38] = [
         need: Need::Text,
         opacity: None,
         purpose: "The lock screen before its wallpaper loads",
+    },
+    ContrastPair {
+        fg: Role::PrimaryContainer,
+        bg: Role::SurfaceContainerLowest,
+        need: Need::LargeText,
+        opacity: None,
+        purpose: "The 完了 hanko on Kōbō's done screen",
     },
 ];
 

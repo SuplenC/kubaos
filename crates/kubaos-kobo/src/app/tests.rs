@@ -546,7 +546,8 @@ fn the_done_screen_shows_the_time_the_install_took() {
 
     assert!(draws(
         &app,
-        "Done in 1m 42s. Damn, that was quick. Pull the stick and reboot. You land on the desktop as kuba."
+        "That's it. Done in 1m 42s. Damn, that was quick. Pull the stick and reboot. You land on the desktop as \
+         kuba."
     ));
 }
 

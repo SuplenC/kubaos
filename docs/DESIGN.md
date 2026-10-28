@@ -80,9 +80,9 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | Style | Size / line | Weight, family | For |
 |---|---|---|---|
 | `clock` | 80 / 88 | light | The lock screen's clock, the one thing that screen shows: a step above the hero, light like every big figure. The clock popup's time stays `hero_number`. |
-| `hero` | 64 / 72 | semibold | Words at the hero size: Kōbō's welcome line, nothing else. |
+| `hero` | 64 / 72 | semibold | Words at the hero size: Kōbō's welcome line and its done screen's headline, nothing else. The first and the last thing an install shows get the same size. |
 | `hero_number` | 64 / 72 | light | Numbers at the hero size: the install percent, the clock popup's time. Light, so a big figure doesn't shout. |
-| `display` | 48 / 56 | semibold | The heading of a full-screen moment other than the welcome: Kōbō's done screen. |
+| `display` | 48 / 56 | semibold | The heading of a full-screen moment other than Kōbō's welcome and done screens. |
 | `title` | 32 / 40 | semibold | A screen's or page's title. |
 | `headline` | 24 / 32 | semibold | A dialog's title, a big number. |
 | `heading` | 20 / 28 | semibold | A section's title inside a page. |
@@ -217,6 +217,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 - **A surface a key summons to act and go is one step quicker**: the Command menu arrives over `short` and leaves over `micro`, its Action panel the same, and its Views slide in over `medium`. A key opens and closes it many times an hour, and what it runs waits for it to be gone, so a panel's `long` and `medium` would be felt on every run.
 - **Speed** 0.5× to 2× divides every duration (`kubaos_ui::motion::Motion`). *Not enforced yet: lands in #154, the setting; `Motion` applies it once there is one.*
 - **Reduce motion** caps every duration at `short` and turns moves into fades, or into nothing. *Not enforced yet: lands in #154, the setting; `Motion` caps the durations once there is one.*
+- **A choreographed scene** (Kōbō's done screen, `crates/kubaos-kobo/src/done.rs`) starts its parts on cues, the times its picked draft set. A cue says when a part starts; how long it then moves, and on which curve, is a token. A neon tube's hum is a slow pulse, 2.4 s, not a move: it redraws only when the glow has changed by a couple of levels (about 30 times a second on the GPU, 10 in software, where each redraw costs more), and it never rebuilds the view. Reduce motion shows every part in place and holds the hum still.
 - **What never animates:** typed text and the caret (`instant`), layout around focus (the ring is outside layout), a window's size or place, and anything while the user drags it.
 - **Full refresh rate, always.** An animation that drops a frame is a bug, measured with the frame times, not judged by eye. *Not enforced yet: nothing measures frame times today, and no issue builds it yet.*
 
@@ -244,7 +245,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 - **An app's tray icon is the app's drawing**, not ours, at the bar's 16. Where it is drawn dark on the dark bar (a monochrome symbolic icon from a light theme), the bar draws it in the content colour instead, so no tray icon is dark on dark; a coloured one keeps its colours.
 - **Optically centred.** A symbol's box is centred in its slot on a whole device pixel; the drawing's own optical centre is Tabler's grid, which ours follow.
 - **Apps show as uniform tiles** in our UI: the app's icon on a tile of one size and radius, so a list of apps reads as one set, whatever each vendor drew. *Not enforced yet: lands in #93.*
-- **The logo** is two things, as `docs/BRAND.md` says: the neon sign photo wherever it shows large (boot splash, GRUB, Kōbō, the README), and the vector クバ mark at small sizes (icons, tray, fastfetch). The neon sign is never redrawn as a symbol, and the mark is never used large.
+- **The logo** is two things, as `docs/BRAND.md` says: the neon sign photo wherever it shows large (boot splash, GRUB, Kōbō, the README), and the vector クバ mark at small sizes (icons, tray, fastfetch). The neon sign is never redrawn as a symbol, and the mark is never used large, with one exception: Kōbō's done screen draws it as lit neon tubes (`neon_mark`, 200), writing itself in beside the 完了 hanko (`hanko`, 120), its tubes in `primary` and `cold` with `primary_core` and `cold_core` along their middles (`crates/kubaos-kobo/src/done.rs`).
 - **The system icon theme** for GTK and Qt apps replaces Papirus with the theme closest to this look, picked in #152.
 
 ## Components

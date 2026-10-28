@@ -111,6 +111,7 @@ use crate::app::WALLPAPER_COLUMNS;
 use crate::app::ids;
 use crate::app::wallpaper_item;
 use crate::data;
+use crate::done;
 use crate::model;
 use crate::model::DiskExt;
 use crate::model::DiskMode;
@@ -2030,7 +2031,8 @@ fn failed<'a>(app: &'a App, look: &Look) -> El<'a> {
 // ----------------------------------------------------------------- hero --
 
 fn hero<'a>(app: &'a App, look: &Look) -> El<'a> {
-    let shown = app.fade();
+    // The done screen brings each part in itself (`crate::done`).
+    let shown = if app.screen == Screen::Done { 1.0 } else { app.fade() };
     let look = look.faded(shown);
     let inner: El = match app.screen {
         Screen::Welcome => welcome(app, &look),
@@ -2210,6 +2212,45 @@ fn done<'a>(app: &'a App, look: &Look) -> El<'a> {
     } else {
         format!("You land on the desktop as {user}.")
     };
+    // Every part arrives on the sequence's cues, rising onto whole device pixels; none of them
+    // waits for it, so Reboot works from the first frame.
+    let seq = done::Sequence::new(app.transition.0, app.now, app.motion);
+    let rising = |reveal: done::Reveal, part: El<'a>| -> El<'a> {
+        done::shift(part, Vector::new(0.0, look.scale.snap(reveal.below)))
+    };
+    let headline = DONE_HEADLINE.split(' ').zip(0..).map(|(word, i)| {
+        let reveal = seq.word(i);
+        // Each word carries the space before it, so the line keeps its own word spacing.
+        let word = if i == 0 { word.to_owned() } else { format!(" {word}") };
+        rising(reveal, text(word, Type::Hero, color::alpha(c.on_surface, reveal.shown)))
+    });
+    let lede_reveal = seq.lede();
+    let says = lede(
+        format!("That's it. {} {boot}", done_line(took)),
+        &look.faded(lede_reveal.shown),
+    );
+    let actions = seq.actions();
+    let hints_reveal = seq.hints();
+    let column = stack(look, Gap::NONE)
+        .push(done::sign_off(look, app.transition.0, app.now, app.motion))
+        .push(gap(Space::S24))
+        .push(row(look, Gap::NONE).extend(headline))
+        .push(gap(Space::S16))
+        .push(rising(lede_reveal, says))
+        .push(gap(Space::S40))
+        .push(rising(actions, done_actions(app, &look.faded(actions.shown))))
+        .push(gap(Space::S16))
+        .push(ui::hint_row(&look.faded(hints_reveal.shown), &hints(app)));
+    let jolt = seq.jolt();
+    done::shift(column, Vector::new(look.scale.snap(jolt.x), look.scale.snap(jolt.y)))
+}
+
+/// The done screen's headline, the words of the draft Kuba picked.
+const DONE_HEADLINE: &str = "Fixed. You're welcome.";
+
+/// Reboot, or how far the machine is in going down, beside staying in the live system.
+fn done_actions<'a>(app: &'a App, look: &Look) -> El<'a> {
+    let c = look.colors;
     let reboot: El = if let Some(action) = app.shutting_down {
         row(look, Space::S12)
             .center()
@@ -2229,27 +2270,17 @@ fn done<'a>(app: &'a App, look: &Look) -> El<'a> {
             .focused(app.is_focused(F::Reboot))
             .view(look)
     };
-    stack(look, Gap::NONE)
-        .push(icon(look, Icon::CheckCircle, IconSize::S48, c.primary))
-        .push(gap(Space::S32))
-        .push(text(jp::DONE, Type::Accent, c.primary))
-        .push(gap(Space::S8))
-        .push(text("That's it.", Type::Display, c.on_surface))
-        .push(gap(Space::S20))
-        .push(lede(format!("{} {boot}", done_line(took)), look))
-        .push(gap(Space::S40))
+    row(look, Space::S12)
+        .center()
+        .push(reboot)
         .push(
-            row(look, Space::S12).center().push(reboot).push(
-                button("Stay in the live system")
-                    .kind(Kind::Text)
-                    .size(ButtonSize::Lg)
-                    .on_press(Message::Click(F::Stay))
-                    .focused(app.is_focused(F::Stay))
-                    .view(look),
-            ),
+            button("Stay in the live system")
+                .kind(Kind::Text)
+                .size(ButtonSize::Lg)
+                .on_press(Message::Click(F::Stay))
+                .focused(app.is_focused(F::Stay))
+                .view(look),
         )
-        .push(gap(Space::S16))
-        .push(ui::hint_row(look, &hints(app)))
         .into()
 }
 

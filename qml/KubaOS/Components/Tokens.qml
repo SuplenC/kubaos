@@ -91,8 +91,10 @@ QtObject {
         readonly property int control_md: 40
         readonly property int control_sm: 32
         readonly property int dialog: 500
+        readonly property int hanko: 120
         readonly property int keycap: 20
         readonly property int log: 232
+        readonly property int neon_mark: 200
         readonly property int panel: 384
         readonly property int password: 320
         readonly property int progress: 8
@@ -174,7 +176,8 @@ QtObject {
             readonly property string family: "Geist"
         }
 
-        // Words at the hero size: Kōbō's welcome line, and nothing else.
+        // Words at the hero size: Kōbō's welcome line and its done screen's headline, and nothing
+        // else.
         readonly property QtObject hero: QtObject {
             readonly property string name: "hero"
             readonly property int size: 64
@@ -195,7 +198,7 @@ QtObject {
             readonly property string family: "Geist"
         }
 
-        // The heading of a full-screen moment other than the welcome: Kōbō's done screen.
+        // The heading of a full-screen moment other than Kōbō's welcome and done screens.
         readonly property QtObject display: QtObject {
             readonly property string name: "display"
             readonly property int size: 48
@@ -468,6 +471,8 @@ QtObject {
         readonly property color cold: tokens.role("cold")
         // matugen's `tertiary_container`.
         readonly property color cold_container: tokens.role("cold_container")
+        // Ours: the same whatever the wallpaper.
+        readonly property color cold_core: tokens.role("cold_core")
         // matugen's `error`.
         readonly property color error: tokens.role("error")
         // matugen's `error_container`.
@@ -510,6 +515,8 @@ QtObject {
         readonly property color primary: tokens.role("primary")
         // matugen's `primary_container`.
         readonly property color primary_container: tokens.role("primary_container")
+        // Ours: the same whatever the wallpaper.
+        readonly property color primary_core: tokens.role("primary_core")
         // matugen's `scrim`.
         readonly property color scrim: tokens.role("scrim")
         // matugen's `secondary`.
@@ -548,6 +555,7 @@ QtObject {
     readonly property var source: ({
             cold: "tertiary",
             cold_container: "tertiary_container",
+            cold_core: "",
             error: "error",
             error_container: "error_container",
             inverse_on_surface: "inverse_on_surface",
@@ -569,6 +577,7 @@ QtObject {
             outline_variant: "outline_variant",
             primary: "primary",
             primary_container: "primary_container",
+            primary_core: "",
             scrim: "scrim",
             secondary: "secondary",
             secondary_container: "secondary_container",
@@ -592,6 +601,7 @@ QtObject {
             dark: {
                 cold: "#85cfff",
                 cold_container: "#0f9ad6",
+                cold_core: "#dcf1ff",
                 error: "#ffb4ab",
                 error_container: "#93000a",
                 inverse_on_surface: "#382f27",
@@ -613,6 +623,7 @@ QtObject {
                 outline_variant: "#544436",
                 primary: "#ffb779",
                 primary_container: "#d37b1b",
+                primary_core: "#ffe6cf",
                 scrim: "#000000",
                 secondary: "#f2bc8e",
                 secondary_container: "#643e1b",
@@ -633,6 +644,7 @@ QtObject {
             light: {
                 cold: "#00628b",
                 cold_container: "#007caf",
+                cold_core: "#dcf1ff",
                 error: "#ba1a1a",
                 error_container: "#ffdad6",
                 inverse_on_surface: "#ffeee2",
@@ -654,6 +666,7 @@ QtObject {
                 outline_variant: "#dac2b1",
                 primary: "#8b4c00",
                 primary_container: "#ae6100",
+                primary_core: "#ffe6cf",
                 scrim: "#000000",
                 secondary: "#7f5530",
                 secondary_container: "#fec798",
