@@ -1,8 +1,8 @@
 pragma Singleton
 import QtQuick
 
-// Stand-in for Net: Wi-Fi on Shinjuku-5G, four more networks in range; a scan's driver empties
-// the list.
+// Stand-in for Net: Wi-Fi on Shinjuku-5G at 5 GHz, one more saved network and three in range; a
+// scan's driver empties the list, and the live-list drivers change it.
 QtObject {
     id: root
 
@@ -12,10 +12,16 @@ QtObject {
 
     readonly property var wifiDevice: ({})
     property var networks: [root.network("Shinjuku-5G", 0.86, true, true, true), root.network("Golden Gai", 0.7, false, true, true), root.network("Omoide Yokocho", 0.52, false, false, true), root.network("7SPOT", 0.4, false, false, false), root.network("Kabukicho Free Wi-Fi", 0.2, false, false, false)]
-    readonly property var active: networks[0] ?? null
+    // As radios.js orders them; written out here, as the tree before radios.js existed has none.
+    readonly property var known: networks.filter(n => n.known).sort((a, b) => (b.connected - a.connected) || (bars(b.signalStrength) - bars(a.signalStrength)) || a.name.localeCompare(b.name))
+    readonly property var nearby: networks.filter(n => !n.known).sort((a, b) => (bars(b.signalStrength) - bars(a.signalStrength)) || a.name.localeCompare(b.name))
+    readonly property var active: networks.find(n => n.connected) ?? null
+    property string band: "5 GHz"
     readonly property bool wired: false
     property bool wifiEnabled: true
     readonly property string icon: wired ? "lan" : !wifiEnabled ? "wifi_off" : !active ? "signal_wifi_0_bar" : strengthIcon(active.signalStrength)
+
+    signal reveal
 
     function bars(strength: real): int {
         const percent = Math.round(strength * 100);
@@ -41,10 +47,18 @@ QtObject {
         return network.secured;
     }
 
+    function securityText(network: var): string {
+        return "WPA2";
+    }
+
     function setWifiEnabled(on: bool): void {
         root.wifiEnabled = on;
     }
 
     function setScanning(on: bool): void {
+    }
+
+    function show(): void {
+        root.reveal();
     }
 }

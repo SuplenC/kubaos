@@ -6,7 +6,8 @@ TREE holds `config/quickshell` and `qml/KubaOS` (the working tree, or a rev extr
 OUT gets `imports/`, the QML import path the drivers run with:
 
 - the stand-ins from HARNESS/fakes (Quickshell's modules, Kotodama and the shell's services and
-  settings), with `@WALLPAPERS@` and `@ICONS@` filled in;
+  settings), with `@WALLPAPERS@` and `@ICONS@` filled in, beside TREE's own JavaScript from its
+  services, the logic the stand-ins and the modules share;
 - TREE's `KubaOS.Components`, as it is;
 - TREE's theme, components and modules as `qs.theme`, `qs.components` and `qs.modules.<name>`,
   each with a generated qmldir.
@@ -68,6 +69,8 @@ def main() -> None:
     shutil.copytree(harness / "fakes", imports)
     for f in imports.rglob("*.qml"):
         fill(f, wallpapers, icons)
+    for f in (shell / "services").glob("*.js"):
+        shutil.copy(f, imports / "qs/services" / f.name)
     shutil.copytree(tree / "qml/KubaOS", imports / "KubaOS")
     module("qs.theme", shell, "theme", imports / "qs/theme", stand_ins)
     module("qs.components", shell, "components", imports / "qs/components", stand_ins)

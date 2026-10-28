@@ -12,8 +12,12 @@ import qs.modules.frame
 // PANEL is a name Panels opens (controlcenter, clock, sysmon, powermenu, wallpaper), or osd,
 // notifications, or bar (nothing open). STATE puts the panel in a state, through the services
 // and public properties only, so the driver works with any version of the panel:
-//   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), bluetooth, bluetooth-code
-//                  (with the history cleared), keyboard, keyboard-tooltip (the Mac accents
+//   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), wifi (the Wi-Fi tab),
+//                  wifi-form (a secured network's form, a password typed), wifi-error (the
+//                  same, the password turned down), wifi-leaving (a network gone out of range
+//                  held half-way out), wifi-scan (a scan's update: a network gone, one new and two
+//                  swapped, its frame times logged), bluetooth (the Bluetooth tab), bluetooth-form (a nearby
+//                  device's form), bluetooth-code (its pairing code to type on it), keyboard, keyboard-tooltip (the Mac accents
 //                  explained), keyboard-drag (the second layout dragged onto the first),
 //                  keyboard-add ("germ" searched for a layout to add), each with the history
 //                  cleared, scanning (a Wi-Fi scan that has found nothing yet, the history cleared)
@@ -105,6 +109,8 @@ QtObject {
         } else if (driver.panel !== "bar") {
             Panels.current = driver.panel;
         }
+        if (driver.panel === "controlcenter" && driver.state === "wifi-scan")
+            driver.measure("panel opening");
         if (driver.panel === "controlcenter")
             driver.controlCenter(root);
         if (driver.panel === "clock" && driver.state === "settings") {
@@ -130,22 +136,105 @@ QtObject {
             console.warn("shot: no control center found");
             return;
         }
-        if (driver.state === "bluetooth" || driver.state === "bluetooth-code")
+        if (driver.state.startsWith("bluetooth"))
             cc.tab = 1;
-        if (driver.state === "bluetooth-code") {
-            Bt.prompt = {
-                id: 1,
-                kind: "passkey",
-                name: "MX Master 3S",
-                passkey: "482913"
-            };
-        }
+        if (driver.state.startsWith("wifi-") || driver.state.startsWith("bluetooth-"))
+            radioPose.start();
         if (driver.state.startsWith("keyboard")) {
             cc.tab = cc.keyboardTab;
             keyboardPose.start();
         }
         if (driver.state === "")
             scroll.start();
+    }
+
+    // A radio tab's form or a row leaving, once the panel has opened, through what WifiList.qml
+    // and BluetoothList.qml expose.
+    property Timer radioPose: Timer {
+        interval: 900
+        onTriggered: {
+            const content = driver.window.contentItem;
+            const wifi = driver.find(content, it => it.trying !== undefined && it.pending !== undefined);
+            const bluetooth = driver.find(content, it => it.prompt !== undefined && it.pending !== undefined && it.trying === undefined);
+            if (!wifi || !bluetooth) {
+                console.warn("shot: no Wi-Fi or Bluetooth tab found");
+                return;
+            }
+            const jbl = Bt.devices.find(device => device.name === "JBL Flip 6");
+            if (driver.state === "wifi-form" || driver.state === "wifi-error") {
+                wifi.open(Net.networks.find(network => network.name === "Omoide Yokocho"), driver.state === "wifi-error" ? "Wrong password" : "");
+                typing.start();
+            }
+            if (driver.state === "wifi-scan") {
+                const by = name => Net.networks.find(network => network.name === name);
+                by("Kabukicho Free Wi-Fi").signalStrength = 0.9;
+                Net.networks = [...Net.networks.filter(network => network.name !== "7SPOT"), Net.network("Tsutaya Wi-Fi", 0.6, false, false, true)];
+                driver.measure("scan update");
+            }
+            if (driver.state === "wifi-leaving") {
+                Net.networks = Net.networks.filter(network => network.name !== "7SPOT");
+                holdLeave.start();
+            }
+            if (driver.state === "bluetooth-form")
+                bluetooth.pending = jbl;
+            if (driver.state === "bluetooth-code") {
+                Bt.pairing = [jbl.dbusPath];
+                Bt.prompt = {
+                    id: 1,
+                    kind: "display-passkey",
+                    device: jbl.dbusPath,
+                    name: jbl.name,
+                    code: "482913",
+                    entered: null
+                };
+            }
+        }
+    }
+
+    // The frame times while something animates, logged as `what`: each frame's distance from the
+    // last, the first one's included. The scan pose measures the panel opening too, to set the
+    // update's against.
+    property var frames: []
+    property string measuring: ""
+
+    function measure(what: string): void {
+        driver.measuring = what;
+        driver.frames = [Date.now()];
+        frameLog.restart();
+    }
+
+    property Connections frameTimes: Connections {
+        target: driver.frames.length > 0 && frameLog.running ? driver.window : null
+
+        function onFrameSwapped(): void {
+            driver.frames.push(Date.now());
+        }
+    }
+    property Timer frameLog: Timer {
+        interval: K.Tokens.duration.slow
+        onTriggered: {
+            const gaps = driver.frames.slice(1).map((t, i) => t - driver.frames[i]);
+            const mean = gaps.reduce((a, b) => a + b, 0) / Math.max(1, gaps.length);
+            console.log(`shot: ${driver.measuring}, ${gaps.length} frames, mean ${mean.toFixed(1)} ms, longest ${Math.max(0, ...gaps)} ms`);
+        }
+    }
+
+    // The leaving row held about half-way out, watched for as the view removes it on its next
+    // frame, which llvmpipe can take a while to draw.
+    property int leaveWatch: 0
+    property Timer holdLeave: Timer {
+        interval: 16
+        repeat: true
+        onTriggered: {
+            const row = driver.find(driver.window.contentItem, it => it.leaving === true);
+            if (row && row.grow <= 0.6) {
+                row.leaveAnimation.pause();
+                stop();
+            } else if (++driver.leaveWatch > 200) {
+                console.warn("shot: no leaving row found");
+                stop();
+            }
+        }
     }
 
     // The Keyboard tab in its state once it has read its layouts, through what KeyboardList.qml
@@ -172,18 +261,20 @@ QtObject {
         }
     }
 
-    // A query typed into the add view's search once it has entered the layouts app, its caret
-    // stopped: llvmpipe takes about 400 ms to draw a frame of the add view at 1.5×,
-    // so a blinking caret leaves the window no quiet 300 ms to be shot in.
+    // A query typed into the add view's search once it has entered the layouts app, or a password
+    // into the Wi-Fi form, its caret stopped: llvmpipe takes about 400 ms to draw a frame of the
+    // add view at 1.5×, so a blinking caret leaves the window no quiet 300 ms to be shot in.
     property Timer typing: Timer {
         interval: 300
         onTriggered: {
-            const field = driver.find(driver.window.contentItem, it => it.placeholder === "Search languages and layouts");
+            const wifi = driver.state.startsWith("wifi");
+            const placeholder = wifi ? "Password" : "Search languages and layouts";
+            const field = driver.find(driver.window.contentItem, it => it.placeholder === placeholder && it.cursorPosition !== undefined && it.visible);
             if (!field) {
-                console.warn("shot: no layout search found");
+                console.warn(`shot: no field "${placeholder}" found`);
                 return;
             }
-            field.text = "germ";
+            field.text = wifi ? "hunter22" : "germ";
             const input = driver.find(field, it => it.cursorVisible !== undefined);
             if (input)
                 input.cursorVisible = false;
@@ -221,7 +312,7 @@ QtObject {
         // The history cleared, so the tab has the room to show the passkey prompt and its keycaps
         // whole, or a scan's rows; cleared before the frame exists, so no card is made and torn
         // down again.
-        if (driver.panel === "controlcenter" && (driver.state === "bluetooth-code" || driver.state === "scanning" || driver.state.startsWith("keyboard")))
+        if (driver.panel === "controlcenter" && driver.state !== "")
             Notifs.clear();
         driver.frame = driver.frameComponent.createObject(null);
         driver.window = driver.windowOf(driver.frame);

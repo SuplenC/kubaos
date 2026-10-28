@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
+import qs.components
 import qs.services
 
 // Side sheet on the right edge, from the bar down to the bottom border:
@@ -16,7 +17,6 @@ K.Sheet {
     // The Keyboard tab, which the keyboard tile's arrow and
     // `qs ipc call controlcenter keyboard` open.
     readonly property int keyboardTab: 3
-    readonly property bool scanWifi: shown && tab === 0
     readonly property var kanji: ["日", "月", "火", "水", "木", "金", "土"]
 
     edge: "right"
@@ -24,9 +24,6 @@ K.Sheet {
     flushEnd: true
     contentWidth: K.Tokens.size.panel
     onOpened: toggles.focusFirst()
-    onScanWifiChanged: Net.setScanning(scanWifi)
-    onShownChanged: if (!shown)
-        Bt.setScanning(false)
 
     Keys.onPressed: event => {
         const n = event.key - Qt.Key_1;
@@ -43,6 +40,33 @@ K.Sheet {
         function onReveal() {
             root.tab = 1;
         }
+    }
+
+    // "Wi-Fi networks" from the Command menu.
+    Connections {
+        target: Net
+
+        function onReveal() {
+            root.tab = 0;
+        }
+    }
+
+    // Each radio scans only while its tab shows, not while its connection form does: Wi-Fi about
+    // every 30 s, Bluetooth a short discovery about once a minute, which also refreshes the
+    // batteries. NetworkManager's scan takes a few seconds; a discovery 10 s finds what is in
+    // pairing mode nearby.
+    ScanPulse {
+        active: root.shown && root.tab === 0 && Net.wifiEnabled && !wifi.formOpen
+        every: 30000
+        window: 5000
+        onScanningChanged: Net.setScanning(scanning)
+    }
+
+    ScanPulse {
+        active: root.shown && root.tab === 1 && Bt.enabled && !bluetooth.formOpen
+        every: 60000
+        window: 10000
+        onScanningChanged: Bt.setScanning(scanning)
     }
 
     Connections {
@@ -149,12 +173,16 @@ K.Sheet {
             clip: true
 
             WifiList {
+                id: wifi
+
                 anchors.fill: parent
                 anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 0
             }
 
             BluetoothList {
+                id: bluetooth
+
                 anchors.fill: parent
                 anchors.margins: K.Tokens.focus.offset
                 visible: root.tab === 1

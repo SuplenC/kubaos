@@ -96,19 +96,27 @@ run = 'shell --orphan -- ripdrag --and-exit --all --no-click "$@"'
 desc = "Drag the selected files out"
 ```
 
+## Wi-Fi
+
+"Wi-Fi networks" in the Command menu, or `SUPER + CTRL + W`, opens the control center's Wi-Fi tab. Saved networks in range are under Known, the one in use first and checked ("Connected · 5 GHz"); the others in range are under Nearby, strongest first, a lock on the secured ones. While the tab shows it scans about every 30 seconds, and a network out of range drops off the list.
+
+A press on a known network connects to it; the × that shows under the pointer, or Delete, forgets one that isn't in use. A nearby network turns the list into its form: type the password and press Enter (or Connect), or Esc (or Cancel) to go back. A wrong password keeps the form open with the error; once connected, the network moves up into Known. A saved password that stops working opens the form too.
+
 ## Bluetooth
 
-"Pair a Bluetooth device" in the Command menu, or `SUPER + CTRL + B`, opens the control center's Bluetooth tab; the menu item also starts a search. Put the device in pairing mode, then pick it in the list (Enter or a click):
+"Pair a Bluetooth device" in the Command menu, or `SUPER + CTRL + B`, opens the control center's Bluetooth tab. Paired devices are under Known, the connected ones first and checked, with their battery; devices in range are under Nearby, nearest first ("Very close", "Nearby", "Far"). While the tab shows it searches for devices for 10 seconds about once a minute. A press on a known device connects or disconnects it; the × under the pointer, or Delete, forgets one that isn't connected.
 
-- A keyboard shows a six-digit code: type it on the keyboard, then Enter. The tab counts the digits as you type.
-- A phone shows a code to compare: check it matches, then Pair (the check button) or Cancel.
+Put a new device in pairing mode, then pick it under Nearby: the list turns into its form, and Pair (or Enter) starts pairing. Then:
+
+- A keyboard shows a six-digit code: type it on the keyboard, then Enter. The form counts the digits as you type.
+- A phone shows a code to compare: check it matches, then Pair, or Cancel.
 - A device that wants a PIN or passkey from you gets a field to type it in.
 
-While it pairs, the row says "Pairing…"; Enter or a click on it cancels. A pairing gives up after a minute and a half, and a prompt nobody answers after 50 seconds. A failed one leaves its reason under the device ("Wrong code, or the device said no", "Couldn't reach it. Is it in pairing mode?") for 30 seconds, then the device drops off the list until the next search finds it. A paired device is trusted, so it reconnects by itself.
+Cancel or Esc stops a pairing. A pairing gives up after a minute and a half, and a prompt nobody answers after 50 seconds. A failed one keeps its reason in the form ("Wrong code, or the device said no", "Couldn't reach it. Is it in pairing mode?"), and Pair tries again. Once paired, the device moves up into Known; it is trusted, so it reconnects by itself. A pairing the device starts opens its form by itself.
 
 The codes come from KubaOS's pairing agent, the `kubaos-bluetooth` user service: `systemctl --user status kubaos-bluetooth`, logs in `journalctl --user -u kubaos-bluetooth`. Without it the tab says so and can't pair. `bluetoothctl` works beside it; its own `agent on` takes over the prompts until it quits.
 
-When the adapter is off, the tab has a power button. When it is blocked (airplane mode), it says to run `rfkill unblock bluetooth`. When bluetoothd stops answering (it can after a pairing that hung), the tab says "Bluetooth isn't responding": run `sudo systemctl restart bluetooth`.
+When the adapter is off, the tab has a Turn on button. When it is blocked (airplane mode), it says to run `rfkill unblock bluetooth`. When bluetoothd stops answering (it can after a pairing that hung), the tab says "Bluetooth isn't responding": run `sudo systemctl restart bluetooth`.
 
 ## Your phone
 

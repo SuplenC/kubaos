@@ -1,7 +1,10 @@
 pragma Singleton
 
+import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Networking
+import "radios.js" as Radios
 
 // NetworkManager state through Quickshell.Networking.
 Singleton {
@@ -10,10 +13,14 @@ Singleton {
     readonly property var wifiDevice: Networking.devices.values.find(d => d.type === DeviceType.Wifi) ?? null
     readonly property bool wired: Networking.devices.values.some(d => d.type === DeviceType.Wired && d.connected)
     readonly property bool wifiEnabled: Networking.wifiEnabled
-    // Connected network first, then by signal bars, then by name. Sorting on bars rather than the raw
-    // strength keeps the order still while a scan nudges every strength by a point or two.
-    readonly property var networks: wifiDevice ? wifiDevice.networks.values.slice().sort((a, b) => (b.connected - a.connected) || (bars(b.signalStrength) - bars(a.signalStrength)) || a.name.localeCompare(b.name)) : []
+    // The networks in range: NetworkManager drops one a few scans after it was last seen.
+    readonly property var networks: wifiDevice ? wifiDevice.networks.values : []
+    // Saved networks in range, the one in use first; then the rest, by signal (radios.js).
+    readonly property var known: Radios.wifiKnown(networks)
+    readonly property var nearby: Radios.wifiNearby(networks)
     readonly property var active: networks.find(n => n.connected) ?? null
+    // The band the network in use is on (5 GHz), or empty while that isn't known.
+    property string band: ""
     readonly property string icon: {
         if (wired)
             return "lan";
@@ -24,21 +31,11 @@ Singleton {
         return strengthIcon(active.signalStrength);
     }
 
-    // Signal bars from 0 to 4 for a `signalStrength` (0 to 1), at the thresholds `nmcli` draws its
-    // BARS column with, so the icons agree with `nmcli device wifi`.
-    // https://github.com/NetworkManager/NetworkManager/blob/main/src/libnm-core-impl/nm-utils.c
-    // (`nm_utils_wifi_strength_bars`)
+    // The control center goes to its Wi-Fi tab.
+    signal reveal
+
     function bars(strength: real): int {
-        // NetworkManager reports whole percents; rounding undoes the float division (0.55 * 100
-        // is 55.00000000000001).
-        const percent = Math.round(strength * 100);
-        if (percent > 80)
-            return 4;
-        if (percent > 55)
-            return 3;
-        if (percent > 30)
-            return 2;
-        return percent > 5 ? 1 : 0;
+        return Radios.bars(strength);
     }
 
     // KubaOS Symbols has a wedge per bar count, named as Material Symbols named them; the two ends
@@ -56,6 +53,22 @@ Singleton {
         return network.security !== WifiSecurityType.Open && network.security !== WifiSecurityType.Owe;
     }
 
+    // How a secured network is secured, as the connection form names it.
+    function securityText(network): string {
+        switch (network.security) {
+        case WifiSecurityType.Sae:
+            return "WPA3";
+        case WifiSecurityType.Wpa2Psk:
+            return "WPA2";
+        case WifiSecurityType.WpaPsk:
+            return "WPA";
+        case WifiSecurityType.StaticWep:
+        case WifiSecurityType.DynamicWep:
+            return "WEP";
+        }
+        return "Enterprise";
+    }
+
     function setWifiEnabled(on: bool): void {
         Networking.wifiEnabled = on;
     }
@@ -63,5 +76,31 @@ Singleton {
     function setScanning(on: bool): void {
         if (wifiDevice)
             wifiDevice.scannerEnabled = on;
+    }
+
+    // The control center on the Wi-Fi tab.
+    function show(): void {
+        reveal();
+        Panels.open("controlcenter");
+    }
+
+    // Quickshell's networks carry no frequency: `nmcli` reads the one in use, read-only, without a
+    // rescan, each time it changes.
+    onActiveChanged: {
+        root.band = "";
+        if (root.active)
+            frequency.running = true;
+    }
+
+    Process {
+        id: frequency
+
+        command: ["nmcli", "--terse", "--fields", "ACTIVE,FREQ", "device", "wifi", "list", "--rescan", "no"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const line = text.split("\n").find(l => l.startsWith("yes:")) ?? "";
+                root.band = Radios.band(parseInt(line.slice(4)) || 0);
+            }
+        }
     }
 }

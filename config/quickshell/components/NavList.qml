@@ -16,6 +16,8 @@ ListView {
     property bool fieldKeys: false
     // Whether the current row shows as selected: while the list has the keyboard, as a rule.
     property bool highlightShown: true
+    // Whether the row at an index can be selected; a list with section labels skips them.
+    property var selectable: index => true
 
     signal activated(int index)
 
@@ -38,14 +40,31 @@ ListView {
     }
 
     function step(delta: int): void {
-        if (count > 0)
-            currentIndex = (currentIndex + delta + count) % count;
+        for (let i = 1; i <= count; i++) {
+            const next = (currentIndex + delta * i + count * i) % count;
+            if (selectable(next)) {
+                currentIndex = next;
+                return;
+            }
+        }
     }
 
-    // To row `index`, held to the list's ends: Home, End and a page never wrap round.
+    // To row `index`, held to the list's ends: Home, End and a page never wrap round. Onto a row
+    // that can't be selected, the nearest one after it that can, else the nearest before.
     function jump(index: int): void {
-        if (count > 0)
-            currentIndex = Math.max(0, Math.min(count - 1, index));
+        const at = Math.max(0, Math.min(count - 1, index));
+        for (let i = at; i < count; i++) {
+            if (selectable(i)) {
+                currentIndex = i;
+                return;
+            }
+        }
+        for (let i = at - 1; i >= 0; i--) {
+            if (selectable(i)) {
+                currentIndex = i;
+                return;
+            }
+        }
     }
 
     // How many rows a page is: as many as the view shows whole, measured on the selected row, or

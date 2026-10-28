@@ -13,9 +13,14 @@ Scope {
             Panels.toggle("controlcenter");
         }
 
-        // The Bluetooth tab, searching for devices to pair.
+        // The Wi-Fi tab, which scans while it shows.
+        function wifi(): void {
+            Net.show();
+        }
+
+        // The Bluetooth tab, which scans for devices to pair while it shows.
         function bluetooth(): void {
-            Bt.show(true);
+            Bt.show();
         }
 
         // The Keyboard tab: the layouts, "Add a language…" and the Mac accents.

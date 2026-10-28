@@ -9,7 +9,13 @@
 bar                      bar            FrameShot   900,0,700,40      bar
 bar-traymenu             bar            FrameShot   900,0,700,320     bar traymenu
 controlcenter            controlcenter  FrameShot   1176,0,424,1000   controlcenter
+controlcenter-wifi       controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi
+controlcenter-wifi-form  controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi-form
+controlcenter-wifi-error controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi-error
+controlcenter-wifi-leave controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi-leaving
+controlcenter-wifi-scan  controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi-scan
 controlcenter-bluetooth  controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth
+controlcenter-bt-form    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-form
 controlcenter-passkey    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-code
 controlcenter-keyboard   controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard
 controlcenter-kb-tooltip controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-tooltip

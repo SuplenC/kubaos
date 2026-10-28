@@ -1,154 +1,187 @@
 import QtQuick
-import Quickshell
 import Quickshell.Networking
-import KubaOS.Components as K
-import qs.components
 import qs.services
 
-// Nearby Wi-Fi networks. Enter connects; secured networks without saved
-// credentials (or whose saved ones were rejected) ask for a password below.
-// The connected one carries the check; whether one is secured is its subtitle.
-Item {
+// The Wi-Fi tab: saved networks in range (Known), the one in use first and checked, then the rest
+// in range (Nearby) by signal, each on its strength's tile, a lock before a secured one's line.
+// A known network connects at once; a nearby one opens the connection form, which asks a secured
+// network's password and keeps the form open with the error when it is wrong. A saved password
+// that stops working opens the form too.
+RadioTab {
     id: root
 
+    // The network the form is for, or null while the list shows.
     property var pending: null
+    // "connecting" while the form waits on NetworkManager, "failed" once it said no.
+    property string phase: ""
+    property string failure: ""
+    // A known network last pressed, whose saved password may turn out wrong.
+    property var trying: null
 
-    function choose(network): void {
-        if (network.connected)
-            return;
-        if (network.known || !Net.isSecured(network))
-            network.connect();
-        else
-            askPassword(network);
+    rows: {
+        const out = [];
+        if (Net.known.length > 0) {
+            out.push(root.line("label", "label:known", "Known"));
+            for (const network of Net.known)
+                out.push(root.networkRow(network));
+        }
+        out.push(root.line("label", "label:nearby", "Nearby"));
+        if (Net.nearby.length > 0) {
+            for (const network of Net.nearby)
+                out.push(root.networkRow(network));
+        } else if (Net.networks.length === 0) {
+            // The first scan, which hasn't found anything yet: the rows it finds take these places.
+            for (const n of [0, 1, 2])
+                out.push(root.line("skeleton", `skeleton:${n}`, ""));
+        } else {
+            out.push(root.line("note", "note:nearby", "No other networks in range"));
+        }
+        return out;
     }
 
-    function askPassword(network): void {
-        pending = network;
-        password.text = "";
-        password.forceActiveFocus();
+    function line(kind: string, key: string, title: string): var {
+        return {
+            key: key,
+            kind: kind,
+            title: title,
+            subtitle: "",
+            subtitleIcon: "",
+            icon: "",
+            accent: false,
+            checked: false,
+            forgettable: false,
+            failed: false
+        };
+    }
+
+    function networkRow(network): var {
+        return {
+            key: network.name,
+            kind: "row",
+            title: network.name,
+            subtitle: root.statusText(network),
+            subtitleIcon: Net.isSecured(network) ? "lock" : "",
+            icon: Net.strengthIcon(network.signalStrength),
+            accent: network.connected,
+            checked: network.connected,
+            forgettable: network.known && !network.connected,
+            failed: false
+        };
     }
 
     function statusText(network): string {
         if (network.connected)
-            return "Connected";
+            return Net.band === "" ? "Connected" : `Connected · ${Net.band}`;
         if (network.stateChanging)
-            return ConnectionState.toString(network.state);
+            return `${ConnectionState.toString(network.state)}…`;
         if (network.known)
             return "Saved";
         return Net.isSecured(network) ? "Secured" : "Open";
     }
 
-    function backToList(): void {
+    function find(name: string): var {
+        return Net.networks.find(network => network.name === name) ?? null;
+    }
+
+    function open(network, failure: string): void {
+        root.phase = failure === "" ? "" : "failed";
+        root.failure = failure;
+        root.pending = network;
+    }
+
+    function close(): void {
         root.pending = null;
-        list.forceActiveFocus();
+        root.phase = "";
     }
 
-    Well {
-        id: well
+    function failureText(reason: int): string {
+        switch (reason) {
+        case ConnectionFailReason.NoSecrets:
+            return "Wrong password";
+        case ConnectionFailReason.WifiAuthTimeout:
+            return "Wrong password, or the network didn't answer";
+        case ConnectionFailReason.WifiNetworkLost:
+            return "The network went out of range";
+        }
+        return "Couldn't connect";
+    }
 
-        width: root.width
-        // The list's room whether or not a scan has found anything yet, so the first networks fill
-        // the well the skeleton rows sit in and nothing moves.
-        height: root.height - (password.visible ? password.height + K.Tokens.space.s12 : 0)
-        focused: list.activeFocus
+    formOpen: root.pending !== null
+    off: !Net.wifiDevice || !Net.wifiEnabled
+    offIcon: "wifi_off"
+    offTitle: Net.wifiDevice ? "Wi-Fi is off" : "No Wi-Fi adapter"
+    offBody: Net.wifiDevice ? "The Wi-Fi tile turns it on." : "Nothing to connect with on this machine."
 
-        NavList {
-            id: list
+    form.icon: root.pending ? Net.strengthIcon(root.pending.signalStrength) : ""
+    form.title: root.pending?.name ?? ""
+    form.subtitle: root.pending && Net.isSecured(root.pending) ? `Secured · ${Net.securityText(root.pending)}` : "Open network"
+    form.subtitleIcon: root.pending && Net.isSecured(root.pending) ? "lock" : ""
+    form.ask: root.pending && Net.isSecured(root.pending) ? "field" : ""
+    form.placeholder: "Password"
+    form.secret: true
+    form.status: root.phase === "connecting" ? "Connecting…" : root.phase === "failed" ? root.failure : ""
+    form.failed: root.phase === "failed"
+    form.action: "Connect"
+    form.ready: root.phase !== "connecting"
 
-            anchors.fill: parent
-            // The well's padding above the first row and below the last, scrolled with them.
-            topMargin: K.Tokens.space.s12
-            bottomMargin: K.Tokens.space.s12
-            visible: count > 0
-            model: ScriptModel {
-                values: Net.networks
-            }
-            highlightShown: activeFocus
-            onActivated: index => root.choose(Net.networks[index])
+    onPicked: key => {
+        const network = root.find(key);
+        if (!network || network.connected)
+            return;
+        if (network.known) {
+            root.trying = network;
+            network.connect();
+        } else {
+            root.open(network, "");
+        }
+    }
+    onForgot: key => root.find(key)?.forget()
 
-            delegate: K.ListRow {
-                id: row
+    Connections {
+        target: root.form
 
-                required property var modelData
-                required property int index
-
-                width: ListView.view.width
-                icon: Net.strengthIcon(modelData.signalStrength)
-                title: modelData.name
-                subtitle: root.statusText(modelData)
-                checkable: true
-                checked: modelData.connected
-                selected: ListView.isCurrentItem && ListView.view.highlightShown
-                onActivated: root.choose(modelData)
-
-                Connections {
-                    target: row.modelData
-
-                    function onConnectionFailed(reason) {
-                        if (reason === ConnectionFailReason.NoSecrets)
-                            root.askPassword(row.modelData);
-                    }
-                }
-            }
+        function onSubmitted(value: string): void {
+            root.phase = "connecting";
+            if (Net.isSecured(root.pending))
+                root.pending.connectWithPsk(value);
+            else
+                root.pending.connect();
         }
 
-        // Rows still being found while the scan has nothing yet: the first results take the
-        // place they keep.
-        Column {
-            id: scanning
-
-            y: K.Tokens.space.s12
-            width: parent.width
-            visible: list.count === 0 && Net.wifiEnabled
-            spacing: K.Tokens.space.s4
-
-            K.Text {
-                x: K.Tokens.space.s12
-                text: "Scanning…"
-                style: K.Tokens.type.small
-                color: K.Tokens.color.on_surface_variant
-            }
-
-            Repeater {
-                model: [0.6, 0.45, 0.75]
-
-                SkeletonRow {
-                    required property real modelData
-
-                    width: parent.width
-                    share: modelData
-                }
-            }
-        }
-
-        K.EmptyState {
-            anchors.verticalCenter: parent.verticalCenter
-            width: parent.width
-            room: parent.width
-            visible: list.count === 0 && !Net.wifiEnabled
-            icon: "wifi_off"
-            title: "Wi-Fi is off"
-            body: "The Wi-Fi tile turns it on."
+        function onCancelled(): void {
+            root.close();
         }
     }
 
-    K.Field {
-        id: password
+    Connections {
+        target: root.pending
+        ignoreUnknownSignals: true
 
-        y: root.height - height
-        width: root.width
-        visible: root.pending !== null
-        icon: "key"
-        secret: true
-        placeholder: `Password for ${root.pending?.name ?? ""}`
-        Keys.onEscapePressed: root.backToList()
-        Keys.onReturnPressed: {
-            root.pending.connectWithPsk(text);
-            root.backToList();
+        function onConnectedChanged(): void {
+            if (root.pending.connected)
+                root.close();
         }
-        Keys.onEnterPressed: {
-            root.pending.connectWithPsk(text);
-            root.backToList();
+
+        function onConnectionFailed(reason: int): void {
+            root.phase = "failed";
+            root.failure = root.failureText(reason);
+        }
+    }
+
+    Connections {
+        target: root.trying
+        ignoreUnknownSignals: true
+
+        function onConnectedChanged(): void {
+            if (root.trying.connected)
+                root.trying = null;
+        }
+
+        function onConnectionFailed(reason: int): void {
+            const network = root.trying;
+            root.trying = null;
+            if (reason === ConnectionFailReason.NoSecrets)
+                root.open(network, "The saved password didn't work");
         }
     }
 }

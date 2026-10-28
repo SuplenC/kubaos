@@ -49,8 +49,9 @@ in
     ${kubaos-specimen}/bin/kubaos-specimen parity frames
     touch $out
   '';
-  # The shell's logic that needs no Quickshell: keyed list diffs, the scan schedule, how the radio
-  # tabs order what is in range. Offscreen, as the sandbox has no display.
+  # The shell's logic that needs no Quickshell, beside KubaOS.Components: keyed list diffs, a live
+  # list's rows coming and going, the scan schedule, how the radio tabs order what is in range.
+  # Offscreen, as the sandbox has no display.
   qml-logic =
     pkgs.runCommand "kubaos-qml-logic"
       {
@@ -61,7 +62,7 @@ in
       ''
         export HOME=$(mktemp -d)
         export XDG_RUNTIME_DIR=$HOME
-        ${pkgs.qt6.qtdeclarative}/bin/qmltestrunner -input ${src}/test/qml
+        ${pkgs.qt6.qtdeclarative}/bin/qmltestrunner -import ${src}/qml -input ${src}/test/qml
         touch $out
       '';
 }
