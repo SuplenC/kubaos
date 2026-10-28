@@ -10,8 +10,9 @@
 # (qml/KubaOS/Components/Tokens.qml and Symbols.qml), the terminals' settings
 # and matugen templates (see [terminal]); the boot screens' values (the
 # Plymouth script's token block, kubaos.plymouth and GRUB's theme.txt); Kōbō's
-# neon sign (crates/kubaos-kobo/src/done/neon.rs); and the pointer's grid and
-# scales (crates/kubaos-cursor/src/tokens.rs). branding/boot.py and
+# neon sign (crates/kubaos-kobo/src/done/neon.rs); the pointer's grid and
+# scales (crates/kubaos-cursor/src/tokens.rs); and Hyprland's durations,
+# curves, focus glow, opacities and strike (config/hypr/tokens.lua). branding/boot.py and
 # branding/make.py read this file for the boot screens' pictures and the logo.
 #
 # Lengths are logical pixels. The supported scales are 1, 1.25, 1.5 and 2, so
@@ -530,6 +531,11 @@ glass = 0.80
 # white in dark. Kōbō's welcome and done screens, from the text's side; the lock screen, behind
 # its words.
 backdrop = 0.90
+# An inactive window's border, the highest container over what is behind it,
+# and its neutral shadow, of the `shadow` role. The active window's tube and
+# glow strike on over these (config/hypr/focus.lua).
+window_border = 0.80
+window_shadow = 0.33
 
 # Shadows: offset down and blur in logical pixels, and the shadow's opacity
 # of the `shadow` role.
@@ -556,7 +562,8 @@ opacity = 0.55
 [neon]
 # A tube striking: its brightness through ten even steps over `medium`. It
 # stutters, then catches. The focus tube strikes the same way as focus
-# arrives, unless the user turns the stutter off.
+# arrives, on a control and on the active window's border, unless the user
+# turns the stutter off.
 strike = [0.6, 0.0, 0.9, 0.2, 0.0, 1.0, 0.4, 1.0, 0.8, 1.0]
 
 # The クバ mark: its strokes in the order a hand writes them (ク's tick and

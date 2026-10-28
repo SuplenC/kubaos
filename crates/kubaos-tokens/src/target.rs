@@ -13,7 +13,7 @@
 //! # Not here
 //!
 //! - What an output says: each target's own module ([`crate::rust`], [`crate::qml`],
-//!   [`crate::terminal`], [`crate::boot`], [`crate::neon`], [`crate::cursor`]).
+//!   [`crate::terminal`], [`crate::boot`], [`crate::neon`], [`crate::cursor`], [`crate::hypr`]).
 
 use std::fs;
 use std::io;
@@ -24,6 +24,7 @@ use crate::boot::GrubTheme;
 use crate::boot::PlymouthScript;
 use crate::boot::PlymouthTheme;
 use crate::cursor::CursorTokens;
+use crate::hypr::HyprTokens;
 use crate::model::Tokens;
 use crate::neon::KoboNeon;
 use crate::qml::QmlSymbols;
@@ -45,7 +46,7 @@ pub trait Target: Sync {
 }
 
 /// The toolkits' and the boot's outputs: `kubaos-ui`'s module, `KubaOS.Components`' singletons,
-/// Plymouth's script and theme, GRUB's theme, Kōbō's neon and `kubaos-cursor`'s tokens.
+/// Plymouth's script and theme, GRUB's theme, Kōbō's neon, `kubaos-cursor`'s tokens and Hyprland's.
 pub static TARGETS: &[&dyn Target] = &[
     &RustModule,
     &QmlTokens,
@@ -55,6 +56,7 @@ pub static TARGETS: &[&dyn Target] = &[
     &GrubTheme,
     &KoboNeon,
     &CursorTokens,
+    &HyprTokens,
 ];
 
 /// Every output `kubaos-tokens` writes: the toolkits', then the terminals' ([`OUTPUTS`]).

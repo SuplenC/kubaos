@@ -734,11 +734,13 @@ pub enum Opacity {
     Tint,
     Track,
     Well,
+    WindowBorder,
+    WindowShadow,
 }
 
 impl Opacity {
     /// Every opacity.
-    pub const ALL: [Opacity; 27] = [
+    pub const ALL: [Opacity; 29] = [
         Opacity::Backdrop,
         Opacity::DangerEdge,
         Opacity::DialogEdge,
@@ -766,6 +768,8 @@ impl Opacity {
         Opacity::Tint,
         Opacity::Track,
         Opacity::Well,
+        Opacity::WindowBorder,
+        Opacity::WindowShadow,
     ];
 
     /// The opacity, 0 to 1.
@@ -798,6 +802,8 @@ impl Opacity {
             Opacity::Tint => 0.16,
             Opacity::Track => 0.9,
             Opacity::Well => 0.75,
+            Opacity::WindowBorder => 0.8,
+            Opacity::WindowShadow => 0.33,
         }
     }
 }
@@ -833,6 +839,8 @@ impl Opacity {
             Opacity::Tint => "tint",
             Opacity::Track => "track",
             Opacity::Well => "well",
+            Opacity::WindowBorder => "window_border",
+            Opacity::WindowShadow => "window_shadow",
         }
     }
 }

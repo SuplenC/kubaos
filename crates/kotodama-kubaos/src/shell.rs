@@ -11,7 +11,7 @@
 //! # Not here
 //!
 //! - What the stutter does: the focus tube in `KubaOS.Components`' `FocusRing` and `kubaos-ui`'s
-//!   `focus`.
+//!   `focus`, and the active window's border in `config/hypr/focus.lua`.
 
 use std::fs;
 use std::io;
@@ -67,12 +67,22 @@ pub fn items() -> Vec<Item> {
         kind: kind(),
         identity: None,
         title: "Focus stutter: on/off".to_owned(),
-        subtitle: Some("The focus tube strikes on like a neon sign, or simply fades in".to_owned()),
+        subtitle: Some("The focus tube and the window border strike on like a neon sign, or simply fade in".to_owned()),
         icon: Some("preferences-desktop-accessibility".to_owned()),
         keyword: None,
-        keywords: ["focus ring", "neon", "flicker", "flash", "animation", "motion", "glow"]
-            .map(str::to_owned)
-            .to_vec(),
+        keywords: [
+            "focus ring",
+            "neon",
+            "flicker",
+            "flash",
+            "animation",
+            "motion",
+            "glow",
+            "window",
+            "border",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
         hidden: false,
         app_only: false,
         actions: vec![

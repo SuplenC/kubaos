@@ -442,10 +442,11 @@ keywords = ["shell", "bar", "reload"]
 run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
 
 # "Focus stutter: on/off" is the Extension's own Item (crates/kotodama-kubaos,
-# shell.rs): Enter turns the focus tube's neon strike off or back on, and
-# Ctrl+K picks on or off. It writes `focusStutter` in
-# ~/.config/kubaos/desktop/quickshell/settings.json, keeping your comments,
-# and the shell reads it again at once.
+# shell.rs): Enter turns the focus tube's neon strike off or back on, on
+# controls and on the active window's border, and Ctrl+K picks on or off. It
+# writes `focusStutter` in ~/.config/kubaos/desktop/quickshell/settings.json,
+# keeping your comments; the shell reads it again at once, and Hyprland
+# (config/hypr/focus.lua) at the next focus change.
 
 # Idle (crates/kubaos-idle). "Lock after…", "Screens off after…", "Suspend
 # after…" and "When the lid closes…" are the Extension's own Items: Enter

@@ -10,7 +10,8 @@
 //!                                                                         ├▶ the Plymouth script's tokens
 //!                                                                         ├▶ GRUB's theme.txt
 //!                                                                         ├▶ Kōbō's done/neon.rs
-//!                                                                         └▶ kubaos-cursor's tokens.rs
+//!                                                                         ├▶ kubaos-cursor's tokens.rs
+//!                                                                         └▶ config/hypr/tokens.lua
 //! ```
 //!
 //! # Owns
@@ -26,6 +27,7 @@
 pub mod boot;
 pub mod contrast;
 pub mod cursor;
+pub mod hypr;
 pub mod model;
 pub mod neon;
 pub mod qml;
