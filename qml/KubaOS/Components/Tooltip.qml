@@ -4,9 +4,10 @@ import KubaOS.Components as K
 // What a control does, on a card over it while the pointer is over it or the keyboard is on it:
 // `kubaos-ui`'s `tooltip::tooltip`. Where a `Hint` names a control in one line, a tooltip
 // explains one: a title in `body_strong`, the body in `small` under it, and what it holds 8 below
-// (its keys, as `KeyHints`). The card is a `Popover` as wide as a menu (240), 8 above the control
-// and starting where it starts, held inside the window, on whole device pixels: wider than a chip
-// at a toolbar's start, a centred card would hang past the panel.
+// (its keys, as `KeyHints`). The card is a `Popover` as wide as a menu (240), 8 above the control,
+// or 8 below where there is no room above (a header's button), starting where it starts and held
+// inside the window, or inside `within` (a panel), on whole device pixels: wider than a chip at a
+// toolbar's start, a centred card would hang past the panel.
 //
 // Floating (`floating`, the default), the card is drawn on the window's own content item, as a
 // `Hint`'s bubble is, so neither a clipping panel nor what is laid out after the control covers
@@ -20,6 +21,9 @@ Item {
     property string body
     property bool shown: false
     property bool floating: true
+    // The box the card keeps inside, a panel, rather than the whole window; it opens below where
+    // the box leaves no room above.
+    property Item within: null
 
     // What a geometry dump leaves out: a floating card is no part of the page.
     readonly property bool overlay: root.floating
@@ -34,8 +38,13 @@ Item {
         if (!root.floating || !root.host || !root.shown)
             return;
         const at = root.mapToItem(root.host, 0, 0);
-        floater.x = K.Look.snap(Math.max(0, Math.min(at.x, root.host.width - card.width)), root.dpr);
-        floater.y = K.Look.snap(Math.max(0, at.y - Tokens.space.s8 - card.height), root.dpr);
+        const box = root.within ? root.within.mapToItem(root.host, 0, 0) : Qt.point(0, 0);
+        const left = box.x;
+        const right = root.within ? box.x + root.within.width : root.host.width;
+        const above = at.y - Tokens.space.s8 - card.height;
+        const below = at.y + root.height + Tokens.space.s8;
+        floater.x = K.Look.snap(Math.max(left, Math.min(at.x, right - card.width)), root.dpr);
+        floater.y = K.Look.snap(above < box.y ? below : above, root.dpr);
     }
 
     anchors.fill: root.floating ? root.parent : undefined

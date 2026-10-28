@@ -110,6 +110,55 @@ fn the_item_makes_the_file_when_there_is_none() {
 }
 
 #[test]
+fn the_seed_leaves_the_bell_to_show_only_with_notifications() {
+    assert_eq!(value(SEED, BELL_KEY), None);
+}
+
+#[test]
+fn the_bell_item_turns_always_show_the_bell_on_and_off_in_the_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("settings.json");
+    let read = || value(&fs::read_to_string(&file).unwrap(), BELL_KEY);
+
+    run(BELL, TOGGLE, &file).unwrap();
+    assert_eq!(read(), Some(true));
+    run(BELL, TOGGLE, &file).unwrap();
+    assert_eq!(read(), Some(false));
+    run(BELL, ON, &file).unwrap();
+    assert_eq!(read(), Some(true));
+}
+
+#[test]
+fn the_bell_item_leaves_the_stutter_as_it_is() {
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("settings.json");
+    run(STUTTER, OFF, &file).unwrap();
+
+    run(BELL, ON, &file).unwrap();
+
+    assert_eq!(stutter(&fs::read_to_string(&file).unwrap()), Some(false));
+}
+
+#[test]
+fn the_bell_item_is_found_by_what_people_type() {
+    let item = items()
+        .into_iter()
+        .find(|item| item.id == BELL)
+        .expect("the bell's Item");
+
+    assert!(item.title.contains("Always show the bell"));
+    assert!(item.keywords.iter().any(|word| word == "notifications"));
+    assert_eq!(ids().len(), items().len());
+}
+
+#[test]
+fn an_item_that_isnt_a_shell_setting_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+
+    assert!(run("wallpaper", TOGGLE, &dir.path().join("settings.json")).is_err());
+}
+
+#[test]
 fn the_stutter_item_is_found_by_what_people_type() {
     let item = items().remove(0);
 

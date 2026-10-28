@@ -13,6 +13,7 @@ use iced::widget;
 use kubaos_ui::Look;
 use kubaos_ui::Mode;
 use kubaos_ui::component::avatar::TileSize;
+use kubaos_ui::component::avatar::accent_badge;
 use kubaos_ui::component::avatar::badge;
 use kubaos_ui::component::avatar::icon_tile;
 use kubaos_ui::icon::Icon;
@@ -28,7 +29,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Icon tiles and badges",
     lede: Some(
-        "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner.",
+        "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner, the accent's for something unread.",
     ),
     view,
 };
@@ -70,6 +71,7 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(badge(look, Some(3)))
         .push(badge(look, Some(128)))
         .push(badge(look, None))
+        .push(accent_badge(look, None))
         .push(badged(look, Icon::Notifications, badge(look, Some(3))))
         .push(badged(look, Icon::SystemUpdateAlt, badge(look, None)))
         .into()

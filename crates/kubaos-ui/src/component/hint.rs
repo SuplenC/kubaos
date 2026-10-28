@@ -64,7 +64,8 @@ pub(crate) enum Side {
     Below,
     /// Over it, starting where it starts: a tooltip, whose card is taller than the room a
     /// control's foot usually leaves, and wider than a chip at a toolbar's start, so centred it
-    /// would hang past the panel.
+    /// would hang past the panel. With no room above it, under it instead, still starting where
+    /// it starts: a control in a header at the window's top.
     Above,
 }
 
@@ -236,12 +237,13 @@ impl<M> overlay::Overlay<M, Theme, Renderer> for Bubble<'_, '_, M> {
         let size = Size::new(self.scale.snap_up(size.width), self.scale.snap_up(size.height));
         // Beside the control, on a whole device pixel and kept inside the window.
         let apart = f32::from(Space::S8.px());
+        let below = self.anchor.y + self.anchor.height + apart;
         let (x, y) = match self.side {
-            Side::Below => (
-                self.anchor.center_x() - size.width / 2.0,
-                self.anchor.y + self.anchor.height + apart,
-            ),
-            Side::Above => (self.anchor.x, self.anchor.y - apart - size.height),
+            Side::Below => (self.anchor.center_x() - size.width / 2.0, below),
+            Side::Above => {
+                let above = self.anchor.y - apart - size.height;
+                (self.anchor.x, if above < 0.0 { below } else { above })
+            }
         };
         let x = self.scale.snap(x).clamp(0.0, (bounds.width - size.width).max(0.0));
         let y = self.scale.snap(y).max(0.0);

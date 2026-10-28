@@ -8,7 +8,8 @@ import qs.services
 // Center: clock (opens the clock popup). Right: recording indicator (while recording), Keep
 // awake and a scheduled action (while on), the Proxy (while on), the keyboard layout (with two
 // or more), the update marker (while a KubaOS release waits), tray, the system monitor (opens its
-// popup), status (opens the control center), power menu.
+// popup), the bell (while there is a notification; opens the notifications panel), status (opens
+// the control center), power menu.
 //
 // Every group is a pill as tall as a small control, 4 inside the bar's 40, so each lands on whole
 // device pixels at every scale.
@@ -17,6 +18,8 @@ Item {
 
     required property ShellScreen screen
     required property QsWindow window
+    // The pointer has rested on the bell: the frame shows the peek.
+    readonly property bool bellPeeking: bell.peeking
 
     Workspaces {
         id: workspaces
@@ -66,6 +69,10 @@ Item {
         }
 
         SysmonPill {}
+
+        Bell {
+            id: bell
+        }
 
         Status {}
 

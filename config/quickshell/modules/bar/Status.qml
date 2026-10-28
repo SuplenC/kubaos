@@ -17,14 +17,6 @@ Pill {
         color: K.Tokens.color.on_surface_variant
     }
 
-    // The unread count on the bell, unless do not disturb has it quiet.
-    BadgedIcon {
-        name: Notifs.dnd ? "notifications_off" : "notifications"
-        visible: Notifs.dnd || Notifs.count > 0
-        badged: !Notifs.dnd && Notifs.count > 0
-        count: Notifs.count
-    }
-
     StatusIcon {
         name: Power.icon
     }

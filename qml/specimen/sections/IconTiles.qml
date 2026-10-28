@@ -6,7 +6,7 @@ import "samples.js" as Samples
 // `crates/kubaos-specimen/src/pages/components/icon_tiles.rs` draws with `kubaos-ui`, box for box.
 K.Section {
     title: "Icon tiles and badges"
-    description: "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."
+    description: "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner, the accent's for something unread."
 
     K.Row {
         gap: K.Tokens.space.s24
@@ -44,6 +44,10 @@ K.Section {
         }
 
         K.Badge {
+        }
+
+        K.Badge {
+            accent: true
         }
 
         Badged {

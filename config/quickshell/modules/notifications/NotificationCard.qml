@@ -4,23 +4,34 @@ import Quickshell.Services.Notifications
 import KubaOS.Components as K
 import qs.settings
 import qs.services
+import qs.components
 
-// One notification. As a popup it hides itself after the timeout (paused on hover; a thin line
-// along the bottom shows the time left). In the control center history it stays until dismissed.
+// One notification, or a stack of one app's, the same card in the popups, the bell's peek and the
+// notifications panel. As a popup it hides itself after the timeout (stopped while the pointer is
+// on it; a thin line along the bottom shows the time left).
 //
 // A header band says who it is from and when: the app's icon (or the notification's image) on a
-// small icon tile, its name, and the day and time it came, with the dismiss button in the band's
-// far corner. Under it, across the whole card, the summary, the body and the actions.
+// small icon tile, an accent dot on its corner while unread, its name, the stack's count, and the
+// day and time it came; the dismiss button shows in the band's far corner while the pointer is on
+// the card or the keyboard is. Under it, across the whole card, the summary, two lines of the body
+// and the notification's own actions, the first filled.
 //
-// The card is one step above what holds it, with its corners nested in it: the panel's surface
-// radius 8 in as a popup on the stack, and the well's 12 in as a row of the history. A click
-// opens what it is about; the dismiss button and the actions take their own clicks.
+// The card is one step above what holds it, its corners the panel's surface radius 8 in. A click
+// opens what it is about, or asks for the stack to open (`expandRequested`) where a stack opens;
+// the dismiss button and the actions take their own clicks.
 K.Pressable {
     id: root
 
+    // The newest of `items`, which the card shows.
     required property Notification notification
+    // The notifications the card stands for, newest first: one, or a stack.
+    property var items: [root.notification]
+    readonly property bool stacked: root.items.length > 1
+    // Whether a click on a stack asks for it to open rather than opening its newest.
+    property bool expands: false
     property bool popup: false
     property bool selected: false
+    readonly property bool unread: root.items.some(n => Notifs.isUnread(n))
     readonly property bool critical: notification?.urgency === NotificationUrgency.Critical
     // expireTimeout is the raw D-Bus value in milliseconds (Quickshell's docs say seconds).
     readonly property int timeout: notification?.expireTimeout > 0 ? notification.expireTimeout : Settings.notificationTimeout
@@ -32,9 +43,7 @@ K.Pressable {
     }
     readonly property color fg: critical ? K.Tokens.color.on_error_container : K.Tokens.color.on_surface
     readonly property color fgMuted: critical ? K.Look.alpha(K.Tokens.color.on_error_container, K.Tokens.opacity.subdued_text) : K.Tokens.color.on_surface_variant
-    // In the control center's well: one of its rows, so 12 in from its surface.
-    property bool inWell: false
-    readonly property real radius: K.Look.nested(K.Tokens.radius.surface, root.inWell ? K.Tokens.space.s12 : K.Tokens.space.s8)
+    readonly property real radius: K.Look.nested(K.Tokens.radius.surface, K.Tokens.space.s8)
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     // The band's inset from the card's top and from its corner: the dismiss button sits as close
     // to the corner as the curve lets it, so the words below keep the room.
@@ -58,31 +67,53 @@ K.Pressable {
 
     // Whether something keeps it, as its open menu does: a popup waits while it is held.
     property bool held: false
-    // Time left before the popup hides (1 -> 0); paused while hovered or held.
-    property real remaining: 1
+    // The pointer is on the card, its buttons included, which take their own hover.
+    readonly property bool pointed: hover.hovered
+    // Time left before the popup hides (1 -> 0).
+    readonly property real remaining: countdown.remaining
 
     // `body` as plain words. A notification's body may carry the spec's small set of markup
     // (bold, italics, links, line breaks, entities), which a type style draws as written. A number
     // keeps its unit on its line ("41 s", "20 %"), so a line never ends in a lone number.
     // https://specifications.freedesktop.org/notification-spec/latest/markup.html
     function plain(body: string): string {
-        return body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, "&").replace(/(\d) (?=[A-Za-z%°]{1,3}\b)/g, "$1 ");
+        return body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, "&").replace(/(\d) (?=[A-Za-z%°]{1,3}\b)/g, "$1\u00a0");
+    }
+
+    // What a click or Enter does: open the stack where stacks open, else run the newest's main
+    // action and mark every notification the card stands for read.
+    function open(): void {
+        if (root.stacked && root.expands) {
+            root.expandRequested();
+            return;
+        }
+        Notifs.markRead(root.items);
+        Notifs.activate(root.notification);
+    }
+
+    function dismiss(): void {
+        Notifs.dismissAll(root.items);
     }
 
     // Every height here is a binding, never a layout pass: a list places the cards after this one
     // by its height as it arrives, and doesn't move them for a change while they slide in.
     implicitHeight: K.Look.snapUp(words.y + words.height + K.Tokens.space.s12, root.dpr)
     activeFocusOnTab: false
-    onActivated: Notifs.activate(root.notification)
+    onActivated: root.open()
 
     // A right-click on the card asks for its menu, at the pointer in the window's coordinates.
     signal menuRequested(point at)
+    signal expandRequested
 
-    NumberAnimation on remaining {
+    HoverHandler {
+        id: hover
+    }
+
+    Countdown {
+        id: countdown
+
         running: root.popup && !root.critical
-        paused: running && (root.pointerOver || root.held)
-        from: 1
-        to: 0
+        held: root.pointed || root.held
         duration: root.timeout
         onFinished: Notifs.hidePopup(root.notification)
     }
@@ -98,7 +129,7 @@ K.Pressable {
     Rectangle {
         anchors.fill: parent
         radius: root.radius
-        color: root.critical ? K.Tokens.color.error_container : root.popup ? K.Tokens.color.surface_container : K.Tokens.color.surface_container_high
+        color: root.critical ? K.Tokens.color.error_container : K.Tokens.color.surface_container
 
         K.StateLayer {
             radius: parent.radius
@@ -121,12 +152,19 @@ K.Pressable {
         danger: root.critical
     }
 
+    K.Badge {
+        x: K.Look.snap(tile.x + tile.width - width / 2, root.dpr)
+        y: K.Look.snap(tile.y - height / 2, root.dpr)
+        visible: root.unread
+        accent: true
+    }
+
     K.Text {
         id: app
 
         x: tile.x + tile.width + K.Tokens.space.s8
         y: root.band + K.Look.snap((K.Tokens.size.control_sm - height) / 2, root.dpr)
-        room: Math.max(0, dismiss.x - K.Tokens.space.s8 - x - (time.visible ? time.width + K.Tokens.space.s8 : 0))
+        room: Math.max(0, dismiss.x - K.Tokens.space.s8 - x - (count.visible ? count.width + K.Tokens.space.s8 : 0) - (time.visible ? time.width + K.Tokens.space.s8 : 0))
         // One line, cut at the band's room: an app's name past it breaks at a space onto a line
         // that isn't shown.
         height: K.Tokens.type.label.line
@@ -136,10 +174,20 @@ K.Pressable {
         color: root.fg
     }
 
+    // How many the stack holds.
+    K.Chip {
+        id: count
+
+        x: app.x + app.width + K.Tokens.space.s8
+        y: root.band + K.Look.snap((K.Tokens.size.control_sm - height) / 2, root.dpr)
+        visible: root.stacked
+        text: String(root.items.length)
+    }
+
     K.Text {
         id: time
 
-        x: app.x + app.width + K.Tokens.space.s8
+        x: (count.visible ? count.x + count.width : app.x + app.width) + K.Tokens.space.s8
         y: root.band + K.Look.snap((K.Tokens.size.control_sm - height) / 2, root.dpr)
         visible: text !== ""
         text: root.when
@@ -147,17 +195,20 @@ K.Pressable {
         color: root.fgMuted
     }
 
+    // Shown while the pointer is on the card or the keyboard is, its room kept at rest so the band
+    // never moves.
     K.IconButton {
         id: dismiss
 
         x: root.width - root.band - width
         y: root.band
+        visible: root.pointed || root.selected
         icon: "close"
-        label: qsTr("Dismiss")
+        label: root.stacked ? qsTr("Dismiss all %1").arg(root.items.length) : qsTr("Dismiss")
         kind: "Text"
         size: "Sm"
         activeFocusOnTab: false
-        onActivated: root.notification.dismiss()
+        onActivated: root.dismiss()
     }
 
     // Under the band, across the card: the summary, the body, then the actions.
@@ -193,7 +244,7 @@ K.Pressable {
             text: root.plain(root.notification?.body ?? "")
             style: K.Tokens.type.body
             color: root.fgMuted
-            maximumLines: root.popup ? 4 : 6
+            maximumLines: 2
         }
 
         K.Row {
@@ -208,12 +259,16 @@ K.Pressable {
 
                 delegate: K.Button {
                     required property NotificationAction modelData
+                    required property int index
 
                     text: modelData.text
-                    kind: root.critical ? "Danger" : "Tonal"
+                    kind: index > 0 ? "Text" : root.critical ? "Danger" : "Filled"
                     size: "Sm"
                     activeFocusOnTab: false
-                    onActivated: modelData.invoke()
+                    onActivated: {
+                        Notifs.markRead(root.items);
+                        modelData.invoke();
+                    }
                 }
             }
         }

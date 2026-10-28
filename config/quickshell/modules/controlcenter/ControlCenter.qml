@@ -6,8 +6,9 @@ import qs.services
 
 // Side sheet on the right edge, from the bar down to the bottom border:
 // header, quick toggles, capture (screenshot, annotate, record, replay),
-// sliders, the notifications, and tabs for Wi-Fi, Bluetooth, audio output
-// and keyboard layouts, whose list takes the room left at the bottom.
+// sliders, and tabs for Wi-Fi, Bluetooth, audio output and keyboard
+// layouts, whose list takes the room left at the bottom. The notifications
+// have a panel of their own (modules/notifications/NotificationPanel.qml).
 // Keys: Tab/Shift+Tab move between controls, h/l switch tabs on the tab bar,
 // 1-4 jump to a tab, j/k move in lists, Esc closes.
 K.Sheet {
@@ -148,9 +149,6 @@ K.Sheet {
             }
 
             Sliders {
-            }
-
-            NotificationHistory {
             }
         }
     }

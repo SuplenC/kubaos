@@ -22,6 +22,7 @@ Every bind is in the Command menu, found by what it does: type "move to workspac
 | `SUPER + CTRL + ALT + →/←` | First workspace of the next / previous group on the focused screen |
 | `SUPER + ALT + Tab` | Next window in a group (`+ SHIFT` for previous) |
 | `SUPER + CTRL + A` / `B` / `W` | Control center: audio, Bluetooth, Wi-Fi |
+| `SUPER + N` | Notifications |
 | `SUPER + CTRL + Space` | Wallpaper picker (the colors follow) |
 | `SUPER + SHIFT + Space` | Next keyboard layout, with two or more |
 | `Print` / `SUPER + SHIFT + S` | Screenshot a region, copied and saved; the screen freezes when you press the key, so menus and hover states stay as they were |
@@ -95,6 +96,12 @@ on = "<C-n>"
 run = 'shell --orphan -- ripdrag --and-exit --all --no-click "$@"'
 desc = "Drag the selected files out"
 ```
+
+## Notifications
+
+A new notification pops up in the top right corner for a few seconds; the pointer on it stops its clock. Everything lands in the notifications panel too, out of the right edge (`SUPER + N`, the bell in the bar, or "Notifications" in the Command menu): New on top, what you've seen under Earlier, several from one app stacked into one card that a click or → opens. Enter or a click runs a notification's main action and marks it read, Delete dismisses it, Clear all empties the panel. The bell shows only while there is something in there ("Always show the bell" in the Command menu keeps it), and resting the pointer on it shows the three most recent unread ones in the corner, with Mark read and Clear.
+
+Do not disturb holds the popups back, all but critical ones (a battery about to die); notifications still land in the panel, and the bell stays in the bar, crossed out, even with none. Turn it on with the moon in the panel, the control center's tile, `SUPER + CTRL + ,` or "Do not disturb: on" in the Command menu, and it stays on until you turn it off. It also turns on by itself while you share your screen (Meet, Discord, OBS) or a window is fullscreen (a video, a game; a maximised window doesn't count), and off again when that ends. Turn it off during one and it stays off for that one only.
 
 ## Wi-Fi
 

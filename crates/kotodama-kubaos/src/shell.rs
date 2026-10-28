@@ -1,17 +1,18 @@
-//! The shell's settings the Command menu changes: the focus stutter, a key of the user layer's
-//! `desktop/quickshell/settings.json`. The Extension writes the file itself, keeping the user's
-//! comments and other keys, so the Item works with the shell down; the shell reads the file again
-//! as soon as it changes (`config/quickshell/settings/Settings.qml`).
+//! The shell's settings the Command menu changes: the focus stutter and "Always show the bell",
+//! keys of the user layer's `desktop/quickshell/settings.json`. The Extension writes the file
+//! itself, keeping the user's comments and other keys, so the Items work with the shell down; the
+//! shell reads the file again as soon as it changes (`config/quickshell/settings/Settings.qml`).
 //!
 //! # Owns
 //!
-//! - The "Focus stutter" Item and its Actions.
+//! - The "Focus stutter" and "Always show the bell" Items and their Actions.
 //! - Reading and setting one key of the file, in place.
 //!
 //! # Not here
 //!
 //! - What the stutter does: the focus tube in `KubaOS.Components`' `FocusRing` and `kubaos-ui`'s
-//!   `focus`, and the active window's border in `config/hypr/focus.lua`.
+//!   `focus`, and the active window's border in `config/hypr/focus.lua`. The bell:
+//!   `config/quickshell/modules/bar/Bell.qml`.
 
 use std::fs;
 use std::io;
@@ -42,6 +43,14 @@ pub const OFF: &str = "off";
 /// The stutter when the file doesn't set it: on, as `Settings.qml` has it.
 const DEFAULT_STUTTER: bool = true;
 
+/// "Always show the bell"'s Item.
+pub const BELL: &str = "always-show-bell";
+/// "Always show the bell"'s key in the file.
+pub const BELL_KEY: &str = "alwaysShowBell";
+/// The bell when the file doesn't set it: only while there is a notification, as `Settings.qml`
+/// has it, so the bar shows nothing that has nothing to say.
+const DEFAULT_BELL: bool = false;
+
 /// Why the settings file couldn't be changed.
 #[derive(Debug, thiserror::Error)]
 pub enum SettingsError {
@@ -60,17 +69,29 @@ pub fn path() -> Option<PathBuf> {
     kubaos_user_layer::config_home().map(|home| kubaos_user_layer::dir(&home, App::Quickshell).join("settings.json"))
 }
 
-/// The Items.
-pub fn items() -> Vec<Item> {
-    vec![Item {
-        id: STUTTER.to_owned(),
-        kind: kind(),
-        identity: None,
-        title: "Focus stutter: on/off".to_owned(),
-        subtitle: Some("The focus tube and the window border strike on like a neon sign, or simply fade in".to_owned()),
-        icon: Some("preferences-desktop-accessibility".to_owned()),
-        keyword: None,
-        keywords: [
+/// A setting the file turns on or off, and its Item.
+struct Setting {
+    id: &'static str,
+    key: &'static str,
+    /// What the shell does while the file doesn't set it, as `Settings.qml` has it.
+    default: bool,
+    title: &'static str,
+    subtitle: &'static str,
+    icon: &'static str,
+    keywords: &'static [&'static str],
+    /// The primary Action's words.
+    toggle: &'static str,
+}
+
+const SETTINGS: [Setting; 2] = [
+    Setting {
+        id: STUTTER,
+        key: STUTTER_KEY,
+        default: DEFAULT_STUTTER,
+        title: "Focus stutter: on/off",
+        subtitle: "The focus tube and the window border strike on like a neon sign, or simply fade in",
+        icon: "preferences-desktop-accessibility",
+        keywords: &[
             "focus ring",
             "neon",
             "flicker",
@@ -80,22 +101,48 @@ pub fn items() -> Vec<Item> {
             "glow",
             "window",
             "border",
-        ]
-        .map(str::to_owned)
-        .to_vec(),
-        hidden: false,
-        app_only: false,
-        actions: vec![
-            Action::new(TOGGLE, "Turn the focus stutter on or off"),
-            Action::new(ON, "Turn on"),
-            Action::new(OFF, "Turn off"),
         ],
-    }]
+        toggle: "Turn the focus stutter on or off",
+    },
+    Setting {
+        id: BELL,
+        key: BELL_KEY,
+        default: DEFAULT_BELL,
+        title: "Always show the bell: on/off",
+        subtitle: "The bar's bell all the time, or only while there's a notification",
+        icon: "preferences-system-notifications",
+        keywords: &["notifications", "bell", "bar", "indicator"],
+        toggle: "Always show the bell, or only with notifications",
+    },
+];
+
+/// The Items.
+pub fn items() -> Vec<Item> {
+    SETTINGS
+        .iter()
+        .map(|setting| Item {
+            id: setting.id.to_owned(),
+            kind: kind(),
+            identity: None,
+            title: setting.title.to_owned(),
+            subtitle: Some(setting.subtitle.to_owned()),
+            icon: Some(setting.icon.to_owned()),
+            keyword: None,
+            keywords: setting.keywords.iter().map(|word| (*word).to_owned()).collect(),
+            hidden: false,
+            app_only: false,
+            actions: vec![
+                Action::new(TOGGLE, setting.toggle),
+                Action::new(ON, "Turn on"),
+                Action::new(OFF, "Turn off"),
+            ],
+        })
+        .collect()
 }
 
 /// Every id of an Item this module sends, which no action of the registry may take.
-pub fn ids() -> [&'static str; 1] {
-    [STUTTER]
+pub fn ids() -> [&'static str; 2] {
+    SETTINGS.map(|setting| setting.id)
 }
 
 /// Runs `action` on the Item `id`, writing `file`; the error is what the user reads.
@@ -105,9 +152,9 @@ pub fn ids() -> [&'static str; 1] {
 /// When there is no such Item or Action, or the file can't be read, isn't JSON or can't be
 /// written.
 pub fn run(id: &str, action: &str, file: &Path) -> Result<Ran, String> {
-    if id != STUTTER {
+    let Some(setting) = SETTINGS.iter().find(|setting| setting.id == id) else {
         return Err(format!("`{id}` isn't a shell setting"));
-    }
+    };
     let text = match fs::read_to_string(file) {
         Ok(text) => text,
         Err(err) if err.kind() == io::ErrorKind::NotFound => String::new(),
@@ -116,10 +163,10 @@ pub fn run(id: &str, action: &str, file: &Path) -> Result<Ran, String> {
     let on = match action {
         ON => true,
         OFF => false,
-        TOGGLE => !stutter(&text).unwrap_or(DEFAULT_STUTTER),
+        TOGGLE => !value(&text, setting.key).unwrap_or(setting.default),
         _ => return Err(format!("`{id}` has no Action `{action}`")),
     };
-    let set = with(&text, STUTTER_KEY, on).map_err(|err| Chain(&err).to_string())?;
+    let set = with(&text, setting.key, on).map_err(|err| Chain(&err).to_string())?;
     write(file, &set).map_err(|err| Chain(&err).to_string())?;
     Ok(Ran::Close)
 }
@@ -135,8 +182,13 @@ fn write(file: &Path, text: &str) -> Result<(), SettingsError> {
 
 /// The focus stutter as `text` sets it, or `None` where it doesn't, or doesn't read.
 pub fn stutter(text: &str) -> Option<bool> {
-    let value: serde_json::Value = serde_json::from_str(&uncommented(text)).ok()?;
-    value.get(STUTTER_KEY)?.as_bool()
+    value(text, STUTTER_KEY)
+}
+
+/// The boolean `key` as `text` sets it, or `None` where it doesn't, or doesn't read.
+pub fn value(text: &str, key: &str) -> Option<bool> {
+    let json: serde_json::Value = serde_json::from_str(&uncommented(text)).ok()?;
+    json.get(key)?.as_bool()
 }
 
 /// `text` with the boolean `key` set to `value`: the key's line changed in place when it is set,

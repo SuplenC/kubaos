@@ -2,8 +2,8 @@ pragma Singleton
 
 import Quickshell
 
-// Which overlay panel is open (controlcenter, powermenu, wallpaper, clock, traymenu,
-// sysmon, or "") and on which screen. Only one panel is open at a time.
+// Which overlay panel is open (controlcenter, notifications, powermenu, wallpaper, clock,
+// traymenu, sysmon, or "") and on which screen. Only one panel is open at a time.
 Singleton {
     id: root
 

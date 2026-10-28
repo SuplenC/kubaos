@@ -189,12 +189,41 @@ Scope {
     IpcHandler {
         target: "notifications"
 
+        // The notifications panel (SUPER + N).
+        function toggle(): void {
+            Panels.toggle("notifications");
+        }
+
+        function open(): void {
+            Panels.open("notifications");
+        }
+
         function toggleDnd(): void {
             Notifs.toggleDnd();
         }
 
+        // Do not disturb on or off, whatever it is now: during a share or a fullscreen window,
+        // off holds until that ends.
+        function dnd(state: string): string {
+            if (state !== "on" && state !== "off")
+                return `unknown state '${state}': on or off`;
+            Notifs.setDnd(state === "on");
+            return Notifs.dnd ? "on" : "off";
+        }
+
         function clear(): void {
             Notifs.clear();
+        }
+
+        // JSON: how many there are and are unread, and whether Do not disturb is on and why.
+        function status(): string {
+            return JSON.stringify({
+                count: Notifs.count,
+                unread: Notifs.unreadCount,
+                dnd: Notifs.dnd,
+                reason: Notifs.dndReason,
+                open: Panels.current === "notifications"
+            });
         }
     }
 }
