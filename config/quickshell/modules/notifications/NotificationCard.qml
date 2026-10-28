@@ -73,6 +73,9 @@ K.Pressable {
     activeFocusOnTab: false
     onActivated: Notifs.activate(root.notification)
 
+    // A right-click on the card asks for its menu, at the pointer in the window's coordinates.
+    signal menuRequested(point at)
+
     NumberAnimation on remaining {
         running: root.popup && !root.critical
         paused: running && root.pointerOver
@@ -80,6 +83,14 @@ K.Pressable {
         to: 0
         duration: root.timeout
         onFinished: Notifs.hidePopup(root.notification)
+    }
+
+    // Under the card's buttons, which take their own clicks; it takes the right button alone, so
+    // a left click and the pointer's hover pass through to the card.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.RightButton
+        onClicked: mouse => root.menuRequested(mapToItem(null, mouse.x, mouse.y))
     }
 
     Rectangle {

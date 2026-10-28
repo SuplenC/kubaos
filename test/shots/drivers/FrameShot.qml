@@ -13,7 +13,8 @@ import qs.modules.frame
 // notifications, or bar (nothing open). STATE puts the panel in a state, through the services
 // and public properties only, so the driver works with any version of the panel:
 //   controlcenter: "" (Wi-Fi tab, the history scrolled to its middle), bluetooth, bluetooth-code
-//                  (with the history cleared), keyboard
+//                  (with the history cleared), keyboard, scanning (a Wi-Fi scan that has found
+//                  nothing yet, the history cleared)
 //   clock: answer (a question typed into the search), settings
 //   sysmon: process (a process's details)
 //   wallpaper: settings
@@ -141,6 +142,11 @@ QtObject {
         }
         if (driver.state === "keyboard")
             cc.tab = cc.keyboardTab;
+        if (driver.state === "scanning") {
+            // A scan that has found nothing yet: the list's skeleton rows, with the room to show.
+            Notifs.clear();
+            Net.networks = [];
+        }
         if (driver.state === "")
             scroll.start();
     }

@@ -1,7 +1,8 @@
 pragma Singleton
 import QtQuick
 
-// Stand-in for Net: Wi-Fi on Shinjuku-5G, four more networks in range.
+// Stand-in for Net: Wi-Fi on Shinjuku-5G, four more networks in range; a scan's driver empties
+// the list.
 QtObject {
     id: root
 
@@ -10,8 +11,8 @@ QtObject {
     }
 
     readonly property var wifiDevice: ({})
-    readonly property var networks: [root.network("Shinjuku-5G", 0.86, true, true, true), root.network("Golden Gai", 0.7, false, true, true), root.network("Omoide Yokocho", 0.52, false, false, true), root.network("7SPOT", 0.4, false, false, false), root.network("Kabukicho Free Wi-Fi", 0.2, false, false, false)]
-    readonly property var active: networks[0]
+    property var networks: [root.network("Shinjuku-5G", 0.86, true, true, true), root.network("Golden Gai", 0.7, false, true, true), root.network("Omoide Yokocho", 0.52, false, false, true), root.network("7SPOT", 0.4, false, false, false), root.network("Kabukicho Free Wi-Fi", 0.2, false, false, false)]
+    readonly property var active: networks[0] ?? null
     readonly property bool wired: false
     property bool wifiEnabled: true
     readonly property string icon: wired ? "lan" : !wifiEnabled ? "wifi_off" : !active ? "signal_wifi_0_bar" : strengthIcon(active.signalStrength)

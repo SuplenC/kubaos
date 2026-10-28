@@ -97,5 +97,12 @@ ListView {
         width: ListView.view.width
         notification: modelData
         popup: true
+        onMenuRequested: at => menu.open(modelData, at)
+    }
+
+    NotificationMenu {
+        id: menu
+
+        modal: true
     }
 }

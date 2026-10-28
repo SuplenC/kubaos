@@ -3,8 +3,8 @@ import KubaOS.Components as K
 
 // The shape of what is loading, held in its place until it arrives: `kubaos-ui`'s
 // `skeleton::skeleton`. In the placeholder colour a `Media` box holds until its picture loads, so
-// what arrives takes the room kept for it and moves nothing. It breathes while it shows, so it
-// reads as on its way rather than empty; hidden, or once nothing is on its way, it holds still.
+// what arrives takes the room kept for it and moves nothing. It breathes as it shows, so it reads
+// as on its way rather than empty, then holds still: a wait that goes on draws no frames for it.
 Item {
     id: root
 
@@ -44,7 +44,8 @@ Item {
 
         SequentialAnimation on opacity {
             running: root.visible && root.loading
-            loops: Animation.Infinite
+            // A few breaths say it is coming; a scan that takes longer costs no frames.
+            loops: 3
             // Back to full when it stops, so a still placeholder is the plain colour.
             onRunningChanged: {
                 if (!running)
