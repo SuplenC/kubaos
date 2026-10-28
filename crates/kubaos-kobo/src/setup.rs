@@ -751,17 +751,17 @@ impl Setup {
     pub fn update(&mut self, msg: Message) -> Task<Message> {
         let picked = self.sel;
         let mut task = self.update_inner(msg);
+        if self.tour.is_some() {
+            task = Task::batch([task, tour::drive(self)]);
+        }
         // The cards' summaries wrap, so the list can outgrow its well: a card picked out of view
-        // scrolls into it.
+        // scrolls into it, whether a key or the tour picked it.
         if self.sel != picked {
             let find = crate::reveal::Find::new(CARDS_SCROLL, card_item(self.sel));
             task = Task::batch([
                 task,
                 iced::advanced::widget::operate(find).map(|found| Message::Setup(Msg::Reveal(found))),
             ]);
-        }
-        if self.tour.is_some() {
-            return Task::batch([task, tour::drive(self)]);
         }
         task
     }

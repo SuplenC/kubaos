@@ -12,8 +12,9 @@ Item {
     signal activated
 
     property string text
-    // `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters) or
-    // `Cold` (rarely: a demo, a preview).
+    // `Neutral` (a fact), `Selected` (one of several picks), `Accent` (a tag that matters),
+    // `Cold` (rarely: a demo, a preview) or `Filled` (the accent's own fill: an action among
+    // states, Reboot beside Done).
     property string kind: "Neutral"
     // A symbol before the label, or none.
     property string icon: ""
@@ -32,6 +33,8 @@ Item {
             return [K.Look.alpha(c.primary, Tokens.opacity.tint), c.primary];
         case "Cold":
             return [K.Look.alpha(c.cold, Tokens.opacity.tint), c.cold];
+        case "Filled":
+            return [c.primary, c.on_primary];
         default:
             return [c.surface_container_high, c.on_surface];
         }

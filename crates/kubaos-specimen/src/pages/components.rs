@@ -571,6 +571,7 @@ fn chips<'a>(look: &Look) -> Element<'a, Message> {
             ChipKind::Selected => "English (US)",
             ChipKind::Accent => "Recommended",
             ChipKind::Cold => "Demo",
+            ChipKind::Filled => "Reboot",
         };
         line = line.push(chip(look, kind, label, None, None, None::<Message>));
     }
@@ -1289,6 +1290,7 @@ fn collapsibles<'a>(look: &Look) -> Element<'a, Message> {
 
 fn banners<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
+    let on_red = kubaos_ui::component::banner::inside(look, BannerTone::Danger);
     let hold = stack(look, Space::S8)
         .push(
             button("Hold to erase and install")
@@ -1338,10 +1340,10 @@ fn banners<'a>(look: &Look) -> Element<'a, Message> {
                     .kind(Kind::Text)
                     .icon(Icon::ArrowBack)
                     .on_press(Message::Sample)
-                    .view(look),
+                    .view(&on_red.0),
                 hold.into(),
             ])
-            .foot(timed_bar(look, 0.4))
+            .foot(timed_bar(&on_red.1, 0.4))
             .view(look),
         )
         .into()

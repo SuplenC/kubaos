@@ -801,6 +801,11 @@ K.Stack {
                         }
 
                         K.Chip {
+                            text: "Reboot"
+                            kind: "Filled"
+                        }
+
+                        K.Chip {
                             text: "Default"
                             kind: "Selected"
                             icon: "check"

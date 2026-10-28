@@ -106,7 +106,7 @@ K.Pressable {
 
         K.Chip {
             visible: !root.mark && root.status !== "current"
-            kind: root.status === "done" ? "Selected" : root.status === "action" ? "Accent" : "Neutral"
+            kind: root.status === "done" ? "Accent" : root.status === "action" ? "Filled" : "Neutral"
             icon: root.words !== "" ? root.wordsIcon : root.status === "done" ? "check" : root.status === "action" ? root.actionIcon : ""
             text: root.words !== "" ? root.words : root.status === "done" ? "Done" : root.status === "action" ? root.actionLabel : "To do"
         }

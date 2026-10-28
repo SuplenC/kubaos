@@ -99,6 +99,25 @@ fn colours(look: &Look, tone: BannerTone) -> Colours {
     }
 }
 
+/// The looks a banner's actions are drawn with: a text button's (Back), then a bar's along its
+/// foot. On a danger banner's red the accent reads as a stray colour, so there the accent's role
+/// takes the banner's own colours: its content colour for a text button, the error colour for a
+/// bar. Other tones keep `look`.
+#[must_use]
+pub fn inside(look: &Look, tone: BannerTone) -> (Look, Look) {
+    if tone != BannerTone::Danger {
+        return (*look, *look);
+    }
+    let c = look.colors;
+    (
+        look.with_colors(crate::color::Colors {
+            primary: c.on_error_container,
+            ..c
+        }),
+        look.with_colors(crate::color::Colors { primary: c.error, ..c }),
+    )
+}
+
 /// A banner, built up then drawn with [`Banner::view`].
 pub struct Banner<'a, M> {
     tone: BannerTone,
@@ -120,7 +139,8 @@ impl<M> std::fmt::Debug for Banner<'_, M> {
     }
 }
 
-/// A banner in `tone`: `glyph` beside `title` and `body`, which wrap to the room there is.
+/// A banner in `tone`: `glyph` beside `title` and `body`, which wrap to the room there is. An empty
+/// body leaves the title alone, a line tall: a warning that says it all in its title.
 pub fn banner<'a, M>(
     tone: BannerTone,
     glyph: Icon,
@@ -165,15 +185,18 @@ impl<'a, M: 'a> Banner<'a, M> {
 
     pub fn view(self, look: &Look) -> Element<'a, M> {
         let colours = colours(look, self.tone);
-        let words = stack(look, Space::S4)
-            .width(Extent::Fill)
-            .push(text(self.title, Type::Subheading, colours.title))
-            .push(text(self.body, Type::Body, colours.body))
-            .extend(
-                self.paragraphs
-                    .into_iter()
-                    .map(|paragraph| text(paragraph, Type::Body, colours.body)),
-            );
+        let mut words =
+            stack(look, Space::S4)
+                .width(Extent::Fill)
+                .push(text(self.title, Type::Subheading, colours.title));
+        if !self.body.is_empty() {
+            words = words.push(text(self.body, Type::Body, colours.body));
+        }
+        let words = words.extend(
+            self.paragraphs
+                .into_iter()
+                .map(|paragraph| text(paragraph, Type::Body, colours.body)),
+        );
         let mut line = row(look, Space::S16)
             .center()
             .push(icon(look, self.glyph, Type::Subheading.icon(), colours.glyph))

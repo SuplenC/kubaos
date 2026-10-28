@@ -240,8 +240,8 @@ fn state_chip<'a, M: Clone + 'a>(
 ) -> Option<Element<'a, M>> {
     let (kind, label, glyph) = match state {
         StepState::Todo => (ChipKind::Neutral, "To do", None),
-        StepState::Done => (ChipKind::Selected, "Done", Some(Icon::Check)),
-        StepState::Action { label, glyph } => (ChipKind::Accent, label, Some(glyph)),
+        StepState::Done => (ChipKind::Accent, "Done", Some(Icon::Check)),
+        StepState::Action { label, glyph } => (ChipKind::Filled, label, Some(glyph)),
         StepState::Current => return None,
     };
     let (label, glyph) = words.unwrap_or((label, glyph));

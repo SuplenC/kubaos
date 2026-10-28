@@ -727,7 +727,7 @@ pairs = [
   { fg = "warning", bg = "surface_container_high", need = "graphic", use = "A warning banner's symbol and hairline" },
   { fg = "primary", bg = "surface_container_high", need = "text", use = "An info banner's symbol and hairline, a Text button inside it" },
   { fg = "error", bg = "error_container", need = "graphic", use = "A danger banner's symbol and hairline" },
-  { fg = "primary", bg = "error_container", need = "text", use = "A Text button inside a danger banner (Back on Last chance)" },
+  { fg = "primary", bg = "error_container", need = "text", use = "A Text button inside a danger banner in QML" },
   { fg = "surface", bg = "on_surface", need = "text", use = "A toast, a hint's bubble: the inverse colours" },
   { fg = "on_surface", bg = "surface", need = "graphic", use = "An icon, the wordmark of the logo" },
   { fg = "on_surface_variant", bg = "surface", need = "graphic", use = "A muted icon" },

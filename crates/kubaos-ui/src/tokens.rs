@@ -1449,7 +1449,7 @@ pub const CONTRAST: [ContrastPair; 43] = [
         bg: Role::ErrorContainer,
         need: Need::Text,
         opacity: None,
-        purpose: "A Text button inside a danger banner (Back on Last chance)",
+        purpose: "A Text button inside a danger banner in QML",
     },
     ContrastPair {
         fg: Role::Surface,

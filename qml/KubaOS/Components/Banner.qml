@@ -107,6 +107,7 @@ Item {
                 }
 
                 K.Text {
+                    visible: root.body !== ""
                     text: root.body
                     style: Tokens.type.body
                     color: root.colours.body

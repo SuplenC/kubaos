@@ -125,9 +125,9 @@ fn card_icon(id: CardId) -> Icon {
 /// check, a reboot on the accent.
 fn state_chip<'a>(look: &Look, st: State) -> El<'a> {
     let (kind, glyph, word) = match st {
-        State::Done => (ChipKind::Selected, Some(Icon::Check), "Done"),
+        State::Done => (ChipKind::Accent, Some(Icon::Check), "Done"),
         State::Needed => (ChipKind::Neutral, None, "To do"),
-        State::Reboot => (ChipKind::Accent, Some(Icon::RestartAlt), "Reboot"),
+        State::Reboot => (ChipKind::Filled, Some(Icon::RestartAlt), "Reboot"),
         State::Waiting => (ChipKind::Neutral, Some(Icon::Schedule), "Waiting"),
         State::Absent => (ChipKind::Neutral, None, "Not here"),
     };

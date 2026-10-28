@@ -1549,15 +1549,12 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
         "Last chance",
         "Nothing's been written yet. Check it over, then hold the button.",
     ));
+    // One line, so the warning takes no more of the cards' room than it needs, ending where the
+    // cards do, short of their scrollbar's gutter.
     if let Some(note) = low_battery_note(app) {
         top = top.push(
-            banner(
-                BannerTone::Warning,
-                Icon::Warning,
-                note,
-                "An install that runs out of battery leaves a half-written disk.",
-            )
-            .view(look),
+            widget::container(banner(BannerTone::Warning, Icon::Warning, note, "").view(look))
+                .padding(Inset::NONE.right(Space::S16).padding()),
         );
     }
 
@@ -1580,7 +1577,8 @@ fn summary<'a>(app: &'a App, look: &Look) -> El<'a> {
             .id(ids::SUMMARY_SCROLL)
             .height(Extent::Fill),
         )
-        .push(confirm(app, disk, whole, look))
+        // The cards keep a gutter for their scrollbar; the banner ends where they do.
+        .push(widget::container(confirm(app, disk, whole, look)).padding(Inset::NONE.right(Space::S16).padding()))
         .into()
 }
 
@@ -1753,12 +1751,13 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
         )
     };
     let label = if app.hold.is_some() { "Keep holding…" } else { cta };
+    let (on_banner, bar) = kubaos_ui::component::banner::inside(look, tone);
     let back = button("Back")
         .kind(Kind::Text)
         .icon(Icon::ArrowBack)
         .on_press(Message::Click(F::Back))
         .focused(app.is_focused(F::Back))
-        .view(look);
+        .view(&on_banner);
     let hold_button = stack(look, Space::S8)
         .push(
             button(label)
@@ -1777,7 +1776,7 @@ fn confirm<'a>(app: &'a App, disk: Option<&'a DiskInfo>, whole: bool, look: &Loo
         );
     banner(tone, glyph, message, sub)
         .actions([back, hold_button.into()])
-        .foot(timed_bar(look, held))
+        .foot(timed_bar(&bar, held))
         .view(look)
 }
 

@@ -40,10 +40,18 @@ pub enum ChipKind {
     Accent,
     /// The cold accent, rarely: a demo, a preview.
     Cold,
+    /// The accent's own fill: the one thing still to do, an action such as Reboot among states.
+    Filled,
 }
 
 impl ChipKind {
-    pub const ALL: [ChipKind; 4] = [ChipKind::Neutral, ChipKind::Selected, ChipKind::Accent, ChipKind::Cold];
+    pub const ALL: [ChipKind; 5] = [
+        ChipKind::Neutral,
+        ChipKind::Selected,
+        ChipKind::Accent,
+        ChipKind::Cold,
+        ChipKind::Filled,
+    ];
 
     /// The kind's name in the spec.
     pub fn name(self) -> &'static str {
@@ -52,6 +60,7 @@ impl ChipKind {
             ChipKind::Selected => "Selected",
             ChipKind::Accent => "Accent",
             ChipKind::Cold => "Cold",
+            ChipKind::Filled => "Filled",
         }
     }
 }
@@ -75,6 +84,7 @@ pub fn chip<'a, M: Clone + 'a>(
         ChipKind::Selected => (c.secondary_container, c.on_secondary_container),
         ChipKind::Accent => (color::alpha(c.primary, Opacity::Tint.value()), c.primary),
         ChipKind::Cold => (color::alpha(c.cold, Opacity::Tint.value()), c.cold),
+        ChipKind::Filled => (c.primary, c.on_primary),
     };
     // The label starts where the chip's curve ends; an icon sits closer in. The close button is a
     // circle as tall as the chip, so its hover layer shares the chip's curve at the end.
