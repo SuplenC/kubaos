@@ -4,7 +4,7 @@ How a PR that changes how something looks gets its screenshots and its review. T
 
 ## The loop
 
-1. **Render while you iterate: `just shots`.** With no arguments it renders only the surfaces and specimen pages whose sources changed against `origin/main`, at 1× and 1.5×, dark. A change to a shell module renders the surfaces it draws, a change to one page of the specimen that page; a change to a shared input renders everything (below). It renders your working tree as AFTER, uncommitted files included (and, for the shell, untracked ones), and the merge base with `origin/main` as BEFORE.
+1. **Render while you iterate: `just shots`.** With no arguments it renders only the surfaces and specimen pages whose sources changed against `origin/main`, at 1× and 1.5×, dark. A change to a shell module renders the surfaces it draws, a change to one page of the specimen that page; a change to a shared input renders every surface built on it, and one to the tokens or the harness everything (below). It renders your working tree as AFTER, uncommitted files included (and, for the shell, untracked ones), and the merge base with `origin/main` as BEFORE.
 2. **Look at `test/out/shots/changed.txt`.** It lists only the pairs that differ; the pairs are in `test/out/shots/pairs/` (before left, after right, cropped round the surface, at device pixels). Fix any QML warning it prints: they are the AFTER side's, in `warnings.txt`.
 3. **Run `just shots --full` once before the PR is ready**: the surfaces and pages the change reaches at 1, 1.25, 1.5 and 2, light and dark. Run `just check` in `nix develop` too: the formatting, clippy, the tests and the design checks, as the PR's CI runs them (`docs/agents/code-quality.md`). CI leaves the shots out, and the end-to-end checks: run `just e2e` on the machine (`docs/TESTING.md`), or `just e2e quickshell notifications menu` for the checks the change reaches, and put its results table in the PR.
 4. **Review the changed pairs against `docs/agents/design-review.md`**, `docs/DESIGN.md` and the pages of the components it touches (`docs/design/components/`). Run your reviewer sub-agent in the foreground (`run_in_background: false` on the Agent tool), so its report comes back to you and not to the coordinator. Fix what it finds and render again.
@@ -29,7 +29,19 @@ The shell's surfaces: `bar` (the tray holds Adwaita's unfilled symbolic icon, on
 
 ## What a change renders
 
-`test/shots/surfaces` is the one table of what each surface and page is drawn from: a line per surface, `SURFACE PATH...`. A changed file renders the lines that list its most specific match, so `crates/kubaos-specimen/src/pages/components/buttons.rs` renders `specimen/components` alone and the rest of `crates/kubaos-specimen` every page. Three lines are groups: `shell` (every shell surface: the shared shell components and theme, the stand-ins, the drivers), `specimen` (every page), and `*`, the shared inputs, which render everything: `design/tokens.toml` and its generator, `crates/kubaos-ui` with its fonts and symbols, `crates/kubaos-geometry`, `qml/KubaOS/Components`, `Cargo.toml`, `Cargo.lock`, `flake.lock`, and the harness itself (`shots`, `lib.sh`, `surfaces`, `package.nix`). A file no line lists renders nothing, as the shell's services do: they are stand-ins.
+`test/shots/surfaces` is the one table of what each surface and page is drawn from: a line per surface, `SURFACE PATH...`. A changed file renders the lines that list its most specific match, so `crates/kubaos-specimen/src/pages/components/buttons.rs` renders `specimen/components` alone and the rest of `crates/kubaos-specimen` every page. A line may name several surfaces joined by `+`, and four names are groups: `shell` (every shell surface), `specimen` (every page), `iced` (kubaos-specimen's pages, all but `specimen/qml`) and `*` (everything).
+
+The shared inputs render the surfaces built against them:
+
+| Input | Renders |
+|---|---|
+| `design/tokens.toml` and its generator `crates/kubaos-tokens`, `Cargo.toml`, `Cargo.lock`, `flake.lock`, the harness (`shots`, `lib.sh`, `surfaces`, `package.nix`) | Everything |
+| `qml/KubaOS/Components` | The shell and `specimen/qml` |
+| `crates/kubaos-ui`, `crates/kubaos-geometry` | Kōbō and kubaos-specimen's pages |
+| `crates/kubaos-ui/assets/fonts` | Those, the shell and `specimen/qml` (their fontconfig), and the terminals (`kubaos-tokens` sizes them by Geist Mono) |
+| `crates/kubaos-ui/assets/symbols` | Kōbō, the shell and every specimen page (`kubaos-tokens` writes the QML symbols from them) |
+
+None reaches the boot screens or the pointer but the first row. A file no line lists renders nothing, as the shell's services do: they are stand-ins.
 
 A new surface (a line in `scenarios`, a page of the specimen) gets its own line, or `just shots-test` fails: every surface has sources, every source exists, and every page `kubaos-specimen pages` lists is in the table. A path under a `*` path listed by another line fails it too, as it would render that line alone, and so does a shell module or a file of the harness no line lists (but its tests and the icon themes' sheet).
 

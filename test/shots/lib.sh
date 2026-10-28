@@ -47,17 +47,23 @@ changed_paths() {
 
 # surfaces_touched TABLE SCENARIOS: the surfaces the paths on stdin render, one per line. A path
 # counts for the lines of TABLE that list its most specific match, so a page's own file renders
-# that page alone, and the rest of its renderer every page. `*` is every surface, `shell` every
-# shell surface and `specimen` every page of the specimen.
+# that page alone, and the rest of its renderer every page. A line's SURFACE may join several
+# with `+`. `*` is every surface, `shell` every shell surface, `specimen` every page of the
+# specimen and `iced` every page of kubaos-specimen's (all but `specimen/qml`).
 surfaces_touched() {
-  local table=$1 scenarios=$2 name
-  while read -r name; do
-    case $name in
-    '*') every_surface "$table" "$scenarios" ;;
-    shell) scenario_surfaces "$scenarios" ;;
-    specimen) specimen_pages "$table" ;;
-    *) echo "$name" ;;
-    esac
+  local table=$1 scenarios=$2 names name
+  local -a parts
+  while read -r names; do
+    IFS=+ read -r -a parts <<<"$names"
+    for name in "${parts[@]}"; do
+      case $name in
+      '*') every_surface "$table" "$scenarios" ;;
+      shell) scenario_surfaces "$scenarios" ;;
+      specimen) specimen_pages "$table" ;;
+      iced) specimen_pages "$table" | grep -vx specimen/qml ;;
+      *) echo "$name" ;;
+      esac
+    done
   done < <(
     awk '
       NR == FNR {
@@ -88,8 +94,15 @@ table_problems() {
   every_surface "$table" "$scenarios" |
     awk 'NR == FNR { if ($1 !~ /^#/ && NF >= 2) has[$1] = 1; next } !has[$1] { print $1 " has no sources" }' "$table" -
   awk -v known="$(every_surface "$table" "$scenarios" | tr '\n' ' ')" '
-    BEGIN { n = split(known, k, " "); for (i = 1; i <= n; i++) ok[k[i]] = 1; ok["*"] = ok["shell"] = ok["specimen"] = 1 }
-    $1 !~ /^#/ && NF >= 1 && !ok[$1] { print $1 " is no surface" }' "$table"
+    BEGIN {
+      n = split(known, k, " ")
+      for (i = 1; i <= n; i++) ok[k[i]] = 1
+      ok["*"] = ok["shell"] = ok["specimen"] = ok["iced"] = 1
+    }
+    $1 !~ /^#/ && NF >= 1 {
+      m = split($1, part, "+")
+      for (i = 1; i <= m; i++) if (!ok[part[i]]) print part[i] " is no surface"
+    }' "$table"
   local name path
   while read -r name path; do
     [[ -e $repo/$path ]] || echo "$name lists $path, which isn't in the repo"

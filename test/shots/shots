@@ -24,14 +24,15 @@
 #   shots self-test        checks a render can't reach the desktop session
 #
 # Without SURFACE it renders the surfaces and specimen pages whose sources changed against REV,
-# from the table in `surfaces`: a change to a shared input (the tokens, the component libraries,
-# their fonts and symbols, this harness) renders every one. `--all` renders every one, whatever
-# changed. They are drawn at 1× and 1.5×, dark; `--full` makes it 1, 1.25, 1.5 and 2, light and
-# dark, unless --scales or --modes say otherwise. SURFACE is a surface in `scenarios`
-# (controlcenter, menu, lock, ...), kobo, specimen or specimen/PAGE, terminals, plymouth, grub or
-# cursor. Kōbō's, the specimen's and the boot screens' renderers draw every scale and mode they
-# have; the rest are dropped. The boot screens are always dark, at 1 (a 1080p screen) and 2 (the
-# laptop's 2880x1800); the pointer is drawn on dark and light, at every scale.
+# from the table in `surfaces`: a change to the tokens, the lockfiles or this harness renders every
+# one, and one to a component library, its fonts or its symbols the surfaces built on them.
+# `--all` renders every one, whatever changed. They are drawn at 1× and 1.5×, dark; `--full`
+# makes it 1, 1.25, 1.5 and 2, light and dark, unless --scales or --modes say otherwise. SURFACE
+# is a surface in `scenarios` (controlcenter, menu, lock, ...), kobo, specimen or specimen/PAGE,
+# terminals, plymouth, grub or cursor. Kōbō's, the specimen's and the boot screens' renderers draw
+# every scale and mode they have; the rest are dropped. The boot screens are always dark, at 1 (a
+# 1080p screen) and 2 (the laptop's 2880x1800); the pointer is drawn on dark and light, at every
+# scale.
 #
 # Output, in test/out/shots/ (emptied on each run):
 # - after/ and before/: the shots;

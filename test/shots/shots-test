@@ -108,11 +108,39 @@ the_specimens_shared_code_renders_every_page() {
 a_shared_input_renders_everything() {
   local every path
   every=$(every_surface "$TABLE" "$SCENARIOS" | tr '\n' ' ')
-  for path in design/tokens.toml qml/KubaOS/Components/Button.qml crates/kubaos-ui/src/lib.rs \
-    crates/kubaos-ui/assets/fonts/Geist-Regular.ttf crates/kubaos-ui/assets/symbols/kubaos-symbols.ttf \
-    crates/kubaos-tokens/src/main.rs test/shots/shots test/shots/lib.sh test/shots/surfaces flake.lock; do
+  for path in design/tokens.toml crates/kubaos-tokens/src/main.rs Cargo.toml Cargo.lock flake.lock \
+    test/shots/shots test/shots/lib.sh test/shots/surfaces test/shots/package.nix; do
     expect "$path" "$(touched "$path")" "$every"
   done
+}
+
+# but SURFACE...: every surface but those, as `touched` prints them.
+but() {
+  every_surface "$TABLE" "$SCENARIOS" | grep -vxF -f <(printf '%s\n' "$@") | tr '\n' ' '
+}
+
+a_qml_component_renders_the_qml_surfaces_alone() {
+  local drawn iced
+  mapfile -t iced < <(specimen_pages "$TABLE" | grep -vx specimen/qml)
+  drawn=$(touched qml/KubaOS/Components/Button.qml)
+
+  expect "a component" "$drawn" "$(but kobo terminals plymouth grub cursor "${iced[@]}")"
+  [[ " $drawn " != *" grub "* && " $drawn " != *" plymouth "* ]] || { echo "it renders the boot screens"; return 1; }
+}
+
+kubaos_uis_code_renders_the_iced_surfaces_alone() {
+  expect "the code" "$(touched crates/kubaos-ui/src/lib.rs)" \
+    "kobo $(specimen_pages "$TABLE" | grep -vx specimen/qml | tr '\n' ' ')"
+  expect "the geometry" "$(touched crates/kubaos-geometry/src/lib.rs)" \
+    "kobo $(specimen_pages "$TABLE" | grep -vx specimen/qml | tr '\n' ' ')"
+}
+
+kubaos_uis_fonts_render_every_surface_that_draws_text_with_them() {
+  expect "a font" "$(touched crates/kubaos-ui/assets/fonts/GeistMono-Regular.ttf)" "$(but plymouth grub cursor)"
+}
+
+kubaos_uis_symbols_render_the_shell_and_the_iced_and_qml_surfaces() {
+  expect "a symbol" "$(touched crates/kubaos-ui/assets/symbols/wifi.svg)" "$(but terminals plymouth grub cursor)"
 }
 
 a_file_no_surface_draws_renders_nothing() {
@@ -149,10 +177,10 @@ a_line_for_no_surface_fails_the_table() {
 }
 
 a_path_under_a_shared_input_listed_by_one_surface_fails_the_table() {
-  sed 's#^terminals .*#& crates/kubaos-ui/assets/fonts#' "$TABLE" >"$T/surfaces"
+  sed 's#^terminals .*#& crates/kubaos-tokens/src#' "$TABLE" >"$T/surfaces"
 
   expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
-    "terminals lists crates/kubaos-ui/assets/fonts, under the shared crates/kubaos-ui: a change there would render terminals alone"
+    "terminals lists crates/kubaos-tokens/src, under the shared crates/kubaos-tokens: a change there would render terminals alone"
 }
 
 a_shell_module_in_no_line_fails_the_table() {
@@ -384,7 +412,9 @@ compiled_qml_older_than_an_hour_goes_and_newer_stays() {
 
 for t in a_shell_modules_file_renders_its_surface_alone the_frame_renders_every_surface_that_opens_in_it \
   a_specimen_pages_own_file_renders_that_page_alone the_specimens_shared_code_renders_every_page \
-  a_shared_input_renders_everything a_file_no_surface_draws_renders_nothing \
+  a_shared_input_renders_everything a_qml_component_renders_the_qml_surfaces_alone \
+  kubaos_uis_code_renders_the_iced_surfaces_alone kubaos_uis_fonts_render_every_surface_that_draws_text_with_them \
+  kubaos_uis_symbols_render_the_shell_and_the_iced_and_qml_surfaces a_file_no_surface_draws_renders_nothing \
   a_change_renders_the_surfaces_of_all_its_files the_table_lists_sources_for_every_surface \
   a_surface_without_sources_fails_the_table a_source_that_isnt_there_fails_the_table \
   a_line_for_no_surface_fails_the_table a_path_under_a_shared_input_listed_by_one_surface_fails_the_table \

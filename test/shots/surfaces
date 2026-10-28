@@ -1,10 +1,18 @@
 # What each surface is drawn from, for `shots` without surfaces: a change renders the surfaces of
 # the lines that list its most specific match. One per line, `SURFACE PATH...`, a path being a file
-# or a folder. The groups:
+# or a folder; SURFACE may join several with `+`. The groups:
 #
-# - `*` is everything: what every surface draws from, or the harness that draws them. A path under
-#   one of its paths is listed nowhere else, or a change there would render less than everything.
-# - `shell` is every shell surface (`scenarios`), `specimen` every page of the specimen.
+# - `*` is everything: the tokens and their generator, the lockfiles that pin every build, and
+#   the harness. A path under one of its paths is listed nowhere else, or a change there would
+#   render less than everything.
+# - `shell` is every shell surface (`scenarios`), `specimen` every page of the specimen, `iced`
+#   every page of kubaos-specimen's (all but `specimen/qml`).
+#
+# The other shared inputs render the surfaces that build against them. The QML components:
+# the shell and qml-specimen. kubaos-ui's code and kubaos-geometry: the iced renderers, Kōbō and
+# kubaos-specimen. Its fonts: those, the shell and qml-specimen (their fontconfig), and the
+# terminals (kubaos-tokens sizes them by Geist Mono). Its symbols: those but the terminals
+# (kubaos-tokens writes the QML symbols from them). The boot screens and the pointer read none.
 #
 # Every surface has a line of its own (`test/shots/shots-test` checks it): the shell's, kobo,
 # terminals (test/shots/terminals), plymouth, grub and cursor (test/shots/boot), and the
@@ -12,7 +20,11 @@
 # The shell's services are stand-ins (fakes/qs/services): of config/quickshell/services, only the
 # JavaScript the stand-ins load is drawn. The specimen's `pages/icons.rs` is in `specimen`: every
 # page loads its fonts.
-*                   design/tokens.toml crates/kubaos-tokens crates/kubaos-ui crates/kubaos-geometry qml/KubaOS/Components Cargo.toml Cargo.lock flake.lock test/shots/shots test/shots/lib.sh test/shots/surfaces test/shots/package.nix
+*                   design/tokens.toml crates/kubaos-tokens Cargo.toml Cargo.lock flake.lock test/shots/shots test/shots/lib.sh test/shots/surfaces test/shots/package.nix
+shell+specimen/qml  qml/KubaOS/Components
+kobo+iced           crates/kubaos-ui crates/kubaos-geometry
+shell+kobo+specimen+terminals crates/kubaos-ui/assets/fonts
+shell+kobo+specimen crates/kubaos-ui/assets/symbols
 shell               config/quickshell/components config/quickshell/theme test/shots/scenarios test/shots/stage.py test/shots/drivers test/shots/fakes
 bar                 config/quickshell/modules/bar config/quickshell/modules/frame
 controlcenter       config/quickshell/modules/controlcenter config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar config/quickshell/services/radios.js
