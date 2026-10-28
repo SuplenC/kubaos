@@ -29,10 +29,9 @@
 # changed. They are drawn at 1× and 1.5×, dark; `--full` makes it 1, 1.25, 1.5 and 2, light and
 # dark, unless --scales or --modes say otherwise. SURFACE is a surface in `scenarios`
 # (controlcenter, menu, lock, ...), kobo, specimen or specimen/PAGE, terminals, plymouth, grub or
-# cursor. Kōbō's, the specimen's and the boot screens'
-# renderers draw every scale and mode they have; the rest are dropped. The boot screens are always
-# dark, at 1 (a 1080p screen) and 2 (the laptop's 2880x1800); the pointer is drawn on dark and
-# light, at every scale.
+# cursor. Kōbō's, the specimen's and the boot screens' renderers draw every scale and mode they
+# have; the rest are dropped. The boot screens are always dark, at 1 (a 1080p screen) and 2 (the
+# laptop's 2880x1800); the pointer is drawn on dark and light, at every scale.
 #
 # Output, in test/out/shots/ (emptied on each run):
 # - after/ and before/: the shots;
@@ -146,7 +145,6 @@ scenarios_of() {
   done
 }
 
-
 # A short hash of the harness and the store paths of its pinned tools (Qt, sway, the fonts, the
 # wallpapers): BEFORE shots taken with anything else aren't reused.
 harness_hash() {
@@ -242,6 +240,24 @@ collect() {
   shopt -u nullglob
 }
 
+# before_pages TREE RUN...: the pages of `iced_pages` the specimen of TREE, a BEFORE rev that
+# refused them, has, drawn into $raw; `iced_pages` becomes every page asked for that it lacks
+# too, so they are marked done with no shot, as new. A rev whose specimen can't list its pages
+# takes no names either, and draws them all.
+before_pages() {
+  local tree=$1 has
+  shift
+  if has=$(cd "$tree" && "$@" cargo run -q --release -p kubaos-specimen -- pages); then
+    local -a there=()
+    mapfile -t there < <(printf '%s\n' "${iced_pages[@]}" | grep -Fx -f <(echo "$has"))
+    ((${#there[@]} == 0)) ||
+      (cd "$tree" && "$@" cargo run -q --release -p kubaos-specimen -- shots "$raw/specimen" "${there[@]}")
+  else
+    mapfile -t iced_pages < <(specimen_pages "$here/surfaces" | sed -n 's#^specimen/##p' | grep -vx qml)
+    (cd "$tree" && "$@" cargo run -q --release -p kubaos-specimen -- shots "$raw/specimen")
+  fi
+}
+
 # specimen_tour SIDE TREE DIR RUN...: the pages in `picked_pages` that DIR has no shots of yet,
 # drawn from TREE into DIR, each marked done; RUN is the prefix cargo and nix run under.
 specimen_tour() {
@@ -261,12 +277,8 @@ specimen_tour() {
   if ((${#iced_pages[@]})); then
     (cd "$tree" && "$@" cargo run -q --release -p kubaos-specimen -- shots "$raw/specimen" "${iced_pages[@]}") \
       >>"$log" 2>&1 || status=$?
-    # A rev whose specimen takes no page names exits 2 on them; it draws every page instead.
-    if ((status == 2)); then
-      status=0
-      mapfile -t iced_pages < <(specimen_pages "$here/surfaces" | sed -n 's#^specimen/##p' | grep -vx qml)
-      (cd "$tree" && "$@" cargo run -q --release -p kubaos-specimen -- shots "$raw/specimen") >>"$log" 2>&1 ||
-        status=$?
+    if ((status == 2)) && [[ $side == before ]]; then
+      before_pages "$tree" "$@" >>"$log" 2>&1 || status=$?
     fi
     ((status == 0)) || die "specimen failed: $log"
   fi
@@ -611,12 +623,12 @@ main() {
   fi
   echo "shots: ${#files[@]} pairs in ${out#"$repo"/}/pairs, $(wc -l <"$out/changed.txt") changed (changed.txt), $((SECONDS - started)) s"
   release_base
-  prune_cache
+  prune_cache "$base"
 }
 
-# prune_cache: the cache pruned to the last bases used, after a run.
+# prune_cache [BASE]: the cache pruned to the last bases used, after a run on BASE.
 prune_cache() {
-  echo "shots: cache of before-trees, $(prune "$cache" "$repo")" >&2
+  echo "shots: cache of before-trees, $(prune "$cache" "$repo" "$@")" >&2
 }
 
 main "$@"

@@ -75,10 +75,14 @@ surfaces_touched() {
   ) | sort -u
 }
 
+# The files of the harness no surface is drawn from: its tests, and the icon themes' sheet.
+undrawn=(test/shots/shots-test test/shots/icon-themes test/shots/icon-themes.py)
+
 # table_problems TABLE SCENARIOS REPO: what is wrong with TABLE, one problem a line: a surface
-# with no line of sources, a line naming no surface or group, a source not in REPO, and a path
-# under a shared input (the `*` line's) listed by another line, which would take the change there
-# from every surface to that line's alone.
+# with no line of sources, a line naming no surface or group, a source not in REPO, a path under
+# a shared input (the `*` line's) listed by another line, which would take the change there from
+# every surface to that line's alone, and a shell module or a file of the harness (but `undrawn`)
+# in no line.
 table_problems() {
   local table=$1 scenarios=$2 repo=$3
   every_surface "$table" "$scenarios" |
@@ -100,26 +104,43 @@ table_problems() {
           if (index(path[k], s "/") == 1)
             print name[k] " lists " path[k] ", under the shared " s ": a change there would render " name[k] " alone"
     }' "$table"
+  local file
+  while read -r file; do
+    [[ " ${undrawn[*]} " == *" $file "* ]] && continue
+    [[ -n $(surfaces_touched "$table" "$scenarios" <<<"$file") ]] ||
+      echo "$file is in no line: a change there would render nothing"
+  done < <(
+    git -C "$repo" ls-files config/quickshell/modules | cut -d/ -f1-4 | sort -u
+    git -C "$repo" ls-files test/shots
+  )
 }
 
-# hold_base DIR: a shared lock on DIR, a base commit's trees, held on the fd in `held` until the
-# run ends or `release_base`, and DIR marked as just used. `prune` never drops a DIR held.
+# hold_base DIR: a shared lock on DIR, a base commit's trees, until this shell ends or
+# `release_base`, and DIR marked as just used. `prune` never drops a DIR held. The lock is on fd 9
+# of the process `holder`.
 hold_base() {
-  local dir=$1
+  local dir=$1 fd
   while :; do
     mkdir -p "$dir"
-    exec {held}>>"$dir/.lock"
-    flock -s "$held"
+    exec {fd}>>"$dir/.lock"
+    flock -s "$fd"
     # HAZARD: a prune can move DIR away between the open and the lock. The lock is then on a file
     # no longer at DIR, and a run that went on would write into a tree being deleted.
-    [[ /dev/fd/$held -ef $dir/.lock ]] && break
-    exec {held}>&-
+    [[ /dev/fd/$fd -ef $dir/.lock ]] && break
+    exec {fd}>&-
   done
+  # HAZARD: the lock goes to a process of its own, which ends with this shell, and the shell
+  # closes its copy. A daemon a build starts (sccache's server) inherits the shell's open fds and
+  # outlives the run, and a lock it inherited would keep the base held for good.
+  tail --pid="$BASHPID" -f /dev/null 9>&"$fd" {fd}>&- </dev/null >/dev/null 2>&1 &
+  holder=$!
+  exec {fd}>&-
   touch "$dir/.used"
 }
 
 release_base() {
-  exec {held}>&-
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
 }
 
 # by_use DIR...: the DIRs, the last used first: by their `.used` mark, or their own time when
@@ -137,17 +158,31 @@ on_a_branch() {
     [[ -n $(git -C "$1" for-each-ref --count=1 --contains "$2" refs/heads refs/remotes/origin/main) ]]
 }
 
-# drop DIR: moves DIR out of the way and deletes it, unless a run holds it. Fails when one does.
+# written_lately DIR: whether anything in DIR's top two levels, its lock aside, changed in the
+# last hour. A branch whose `shots` predates the lock renders without one, and only this shows
+# it at work.
+written_lately() {
+  [[ -n $(find "$1" -mindepth 1 -maxdepth 2 ! -name .lock -mmin -60 -print -quit 2>/dev/null) ]]
+}
+
+# drop DIR: moves DIR out of the way and deletes it, unless a run holds it or wrote to it lately.
+# Fails when one does.
 drop() {
   local dir=$1 lock trash
+  written_lately "$dir" && return 1
   { exec {lock}>>"$dir/.lock"; } 2>/dev/null || return 1
   if ! flock -n -x "$lock"; then
     exec {lock}>&-
     return 1
   fi
   trash=$(dirname "$dir")/.trash.$(basename "$dir").$BASHPID
-  mv -T "$dir" "$trash"
+  if ! mv -T "$dir" "$trash"; then
+    exec {lock}>&-
+    return 1
+  fi
   exec {lock}>&-
+  # The move keeps DIR's time; the trash's age is that of the prune, for `sweep`.
+  touch "$trash"
   rm -rf "$trash"
 }
 
@@ -167,12 +202,13 @@ trim() {
   exec {lock}>&-
 }
 
-# prune CACHE REPO: drops from CACHE the trees of base commits no longer on main, origin/main or a
-# local branch of REPO, then those of all but the `keep_bases` bases last used, then trims the
-# rest. Trees a run holds stay. Then `sweep`. Nothing else in CACHE is touched, `target/`
-# included. Prints how many bases it dropped and kept.
+# prune CACHE REPO [OWN]: drops from CACHE the trees of base commits no longer on main,
+# origin/main or a local branch of REPO, then those of all but the `keep_bases` bases last used,
+# then trims the rest. The base OWN, the run's own, counts as on a branch. Trees a run holds or
+# wrote to lately stay, outside the `keep_bases`. Then `sweep`. Nothing else in CACHE is touched,
+# `target/` included. Prints how many bases it dropped and kept.
 prune() {
-  local cache=$1 repo=$2 dir kept=0 dropped=0
+  local cache=$1 repo=$2 own=${3:-} dir sha kept=0 busy=0 dropped=0
   local -a bases=()
   if [[ $cache != */kubaos/shots || ! -d $cache ]]; then
     echo "shots: $cache isn't the shots cache: nothing pruned" >&2
@@ -184,18 +220,19 @@ prune() {
   done
   if ((${#bases[@]})); then
     while read -r dir; do
-      if ((kept < keep_bases)) && on_a_branch "$repo" "${dir##*/}"; then
+      sha=${dir##*/}
+      if ((kept < keep_bases)) && { [[ $sha == "$own" ]] || on_a_branch "$repo" "$sha"; }; then
         trim "$dir"
         kept=$((kept + 1))
       elif drop "$dir"; then
         dropped=$((dropped + 1))
       else
-        kept=$((kept + 1))
+        busy=$((busy + 1))
       fi
     done < <(by_use "${bases[@]}")
   fi
   sweep "$cache"
-  echo "$dropped dropped, $kept kept"
+  echo "$dropped dropped, $((kept + busy)) kept"
 }
 
 # sweep CACHE: CACHE's scratch. A killed run's in `tmp/` and a killed prune's `.trash.*` go after

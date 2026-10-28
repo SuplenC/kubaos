@@ -79,9 +79,9 @@ fn main() -> ExitCode {
             }
         },
         ["shots", dir, names @ ..] => match pages_named(names) {
-            Some(pages) => shots(Path::new(dir), &pages),
-            None => {
-                eprintln!("kubaos-specimen: no page among {}\n{USAGE}", names.join(" "));
+            Ok(pages) => shots(Path::new(dir), &pages),
+            Err(name) => {
+                eprintln!("kubaos-specimen: no page {name}\n{USAGE}");
                 ExitCode::from(2)
             }
         },
@@ -99,12 +99,12 @@ fn main() -> ExitCode {
     }
 }
 
-/// The pages `names` picks: every page when it is empty, `None` when a name is no page's.
-fn pages_named(names: &[&str]) -> Option<Vec<Page>> {
+/// The pages `names` picks: every page when it is empty, or the first name that is no page's.
+fn pages_named<'a>(names: &[&'a str]) -> Result<Vec<Page>, &'a str> {
     if names.is_empty() {
-        return Some(Page::ALL.to_vec());
+        return Ok(Page::ALL.to_vec());
     }
-    names.iter().map(|name| Page::from_slug(name)).collect()
+    names.iter().map(|&name| Page::from_slug(name).ok_or(name)).collect()
 }
 
 #[expect(clippy::print_stdout, reason = "The pages' names are the command's output.")]

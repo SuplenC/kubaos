@@ -50,7 +50,8 @@ base() {
     mkdir -p "$dir/$h"
     touch "$dir/$h/bar-dark-1x.png"
   done
-  touch -d "$age ago" "$dir/.used"
+  touch "$dir/.used"
+  find "$dir" -exec touch -d "$age ago" {} +
 }
 
 run_prune() { bash -c 'source "$1"; prune "$2" "$3"' _ "$REPO/test/shots/lib.sh" "$CACHE" "$M"; }
@@ -115,7 +116,7 @@ a_shared_input_renders_everything() {
 }
 
 a_file_no_surface_draws_renders_nothing() {
-  expect "a service" "$(touched config/quickshell/services/Network.qml)" ""
+  expect "a service" "$(touched config/quickshell/services/Net.qml)" ""
   expect "a doc" "$(touched docs/DESIGN.md)" ""
 }
 
@@ -129,13 +130,13 @@ the_table_lists_sources_for_every_surface() {
 }
 
 a_surface_without_sources_fails_the_table() {
-  grep -v '^osd ' "$TABLE" >"$T/surfaces"
+  grep -v '^kobo ' "$TABLE" >"$T/surfaces"
 
-  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" "osd has no sources"
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" "kobo has no sources"
 }
 
 a_source_that_isnt_there_fails_the_table() {
-  sed 's#^osd .*#osd config/quickshell/modules/osd-gone#' "$TABLE" >"$T/surfaces"
+  sed 's#^osd .*#& config/quickshell/modules/osd-gone#' "$TABLE" >"$T/surfaces"
 
   expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
     "osd lists config/quickshell/modules/osd-gone, which isn't in the repo"
@@ -154,45 +155,76 @@ a_path_under_a_shared_input_listed_by_one_surface_fails_the_table() {
     "terminals lists crates/kubaos-ui/assets/fonts, under the shared crates/kubaos-ui: a change there would render terminals alone"
 }
 
+a_shell_module_in_no_line_fails_the_table() {
+  grep -v '^menu ' "$TABLE" >"$T/surfaces"
+
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
+    "$(printf '%s\n' "menu has no sources" "config/quickshell/modules/menu is in no line: a change there would render nothing")"
+}
+
+a_harness_file_in_no_line_fails_the_table() {
+  sed 's# test/shots/stage.py##' "$TABLE" >"$T/surfaces"
+
+  expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
+    "test/shots/stage.py is in no line: a change there would render nothing"
+}
+
 every_page_of_the_specimen_is_in_the_table() {
   local drawn
   drawn=$(cd "$REPO" && cargo run -q -p kubaos-specimen -- pages | sed 's#^#specimen/#' | sort)
 
   expect "the pages" "$(specimen_pages "$TABLE" | grep -v '^specimen/qml$')" "$drawn"
 }
-
 prune_keeps_the_last_used_bases_and_drops_the_rest() {
-  base "$C1" '6 hours'
-  base "$C2" '5 hours'
-  base "$C3" '1 hour'
-  base "$C4" '4 hours'
-  base "$C5" '3 hours'
-  base "$C6" '2 hours'
+  base "$C1" '7 hours'
+  base "$C2" '6 hours'
+  base "$C3" '2 hours'
+  base "$C4" '5 hours'
+  base "$C5" '4 hours'
+  base "$C6" '3 hours'
 
   run_prune >/dev/null
 
   expect "the bases" "$(bases)" "$(sorted "$C3" "$C4" "$C5" "$C6")"
 }
 
-a_base_no_branch_has_is_dropped_however_recent() {
+a_base_no_branch_has_is_dropped_however_recently_used() {
   git -C "$M" switch -q -c chore/gone
   commit GONE
   git -C "$M" switch -q main
   git -C "$M" branch -q -D chore/gone
-  base "$C6" '1 hour'
-  base "$GONE" '1 minute'
-  base 0123456789abcdef0123456789abcdef01234567 '1 minute'
+  base "$C6" '3 hours'
+  base "$GONE" '2 hours'
+  base 0123456789abcdef0123456789abcdef01234567 '2 hours'
 
   run_prune >/dev/null
 
   expect "the bases" "$(bases)" "$C6"
 }
 
+the_runs_own_base_is_kept_on_no_branch() {
+  base 0123456789abcdef0123456789abcdef01234567 '2 hours'
+
+  bash -c 'source "$1"; prune "$2" "$3" "$4"' _ "$REPO/test/shots/lib.sh" "$CACHE" "$M" \
+    0123456789abcdef0123456789abcdef01234567 >/dev/null
+
+  expect "the bases" "$(bases)" "0123456789abcdef0123456789abcdef01234567"
+}
+
+a_base_written_in_the_last_hour_is_never_dropped() {
+  base 0123456789abcdef0123456789abcdef01234567 '9 hours'
+  touch -d '10 minutes ago' "$CACHE/0123456789abcdef0123456789abcdef01234567/iced/kobo-dark-1x.png"
+
+  run_prune >/dev/null
+
+  expect "the bases" "$(bases)" "0123456789abcdef0123456789abcdef01234567"
+}
+
 a_base_on_a_local_branch_alone_is_kept() {
   git -C "$M" switch -q -c feature/work
   commit WORK
   git -C "$M" switch -q main
-  base "$WORK" '1 minute'
+  base "$WORK" '2 hours'
 
   run_prune >/dev/null
 
@@ -205,7 +237,7 @@ a_base_on_origin_main_alone_is_kept() {
   git -C "$M" update-ref refs/remotes/origin/main "$LATER"
   git -C "$M" switch -q main
   git -C "$M" branch -q -D later
-  base "$LATER" '1 minute'
+  base "$LATER" '2 hours'
 
   run_prune >/dev/null
 
@@ -216,7 +248,7 @@ a_base_a_run_holds_is_never_dropped() {
   local i c
   for i in 1 2 3 4 5; do
     c=C$i
-    base "${!c}" "$i hours"
+    base "${!c}" "$((i + 1)) hours"
   done
   base "$C6" '9 hours'
   hold_base "$CACHE/$C6"
@@ -226,6 +258,21 @@ a_base_a_run_holds_is_never_dropped() {
   release_base
 
   expect "the bases" "$(bases)" "$(sorted "$C1" "$C2" "$C3" "$C4" "$C6")"
+}
+
+a_process_a_run_leaves_behind_doesnt_keep_its_base_held() {
+  local dir=$CACHE/0123456789abcdef0123456789abcdef01234567 daemon
+  base "${dir##*/}" '9 hours'
+  hold_base "$dir"
+  touch -d '9 hours ago' "$dir/.used"
+  sleep 30 >/dev/null 2>&1 &
+  daemon=$!
+
+  release_base
+  run_prune >/dev/null
+  kill "$daemon"
+
+  expect "the bases" "$(bases)" ""
 }
 
 a_run_holding_its_base_marks_it_used() {
@@ -239,30 +286,42 @@ a_run_holding_its_base_marks_it_used() {
 }
 
 a_run_finding_its_base_dropped_under_it_starts_a_fresh_one() {
-  base "$C1" '1 hour' aaaaaaaaaaaa
+  base "$C1" '2 hours' aaaaaaaaaaaa
   local dir=$CACHE/$C1
   # shellcheck disable=SC2016 # $1 is the base, expanded by the inner bash.
   flock -x "$dir/.lock" bash -c 'touch "$1/../locked"; sleep 1; mv -T "$1" "$1.gone"' _ "$dir" &
   until [[ -e $CACHE/locked ]]; do sleep 0.05; done
 
   hold_base "$dir"
-  wait
+  wait %1
 
-  [[ /dev/fd/$held -ef $dir/.lock ]] || { echo "the lock held isn't the base's"; return 1; }
+  [[ /proc/$holder/fd/9 -ef $dir/.lock ]] || { echo "the lock held isn't the base's"; return 1; }
   [[ ! -e $dir/aaaaaaaaaaaa ]] || { echo "the run went on in the dropped base"; return 1; }
   release_base
 }
 
 prune_keeps_the_last_harness_versions_of_a_base() {
-  base "$C6" '1 hour' aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc
-  touch -d '3 hours ago' "$CACHE/$C6/aaaaaaaaaaaa"
-  touch -d '1 hour ago' "$CACHE/$C6/bbbbbbbbbbbb"
-  touch -d '2 hours ago' "$CACHE/$C6/cccccccccccc"
+  base "$C6" '2 hours' aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc
+  touch -d '3 hours ago' "$CACHE/$C6/aaaaaaaaaaaa/.used"
+  touch -d '2 hours ago' "$CACHE/$C6/bbbbbbbbbbbb/.used"
+  touch -d '4 hours ago' "$CACHE/$C6/cccccccccccc/.used"
+  touch -d '1 hour ago' "$CACHE/$C6/cccccccccccc"
   mkdir "$CACHE/$C6/.extract.AbC123"
+  touch -d '2 hours ago' "$CACHE/$C6/.extract.AbC123"
 
   run_prune >/dev/null
 
-  expect "the harnesses" "$(ls "$CACHE/$C6")" "$(printf '%s\n' bbbbbbbbbbbb cccccccccccc iced tree)"
+  expect "the harnesses" "$(ls "$CACHE/$C6")" "$(printf '%s\n' aaaaaaaaaaaa bbbbbbbbbbbb iced tree)"
+}
+
+prune_trims_no_base_a_run_holds() {
+  base "$C6" '2 hours' aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc
+  hold_base "$CACHE/$C6"
+
+  run_prune >/dev/null
+  release_base
+
+  expect "the harnesses" "$(ls "$CACHE/$C6")" "$(printf '%s\n' aaaaaaaaaaaa bbbbbbbbbbbb cccccccccccc iced tree)"
 }
 
 prune_never_touches_anything_but_the_bases_and_scratch() {
@@ -318,11 +377,14 @@ for t in a_shell_modules_file_renders_its_surface_alone the_frame_renders_every_
   a_change_renders_the_surfaces_of_all_its_files the_table_lists_sources_for_every_surface \
   a_surface_without_sources_fails_the_table a_source_that_isnt_there_fails_the_table \
   a_line_for_no_surface_fails_the_table a_path_under_a_shared_input_listed_by_one_surface_fails_the_table \
+  a_shell_module_in_no_line_fails_the_table a_harness_file_in_no_line_fails_the_table \
   every_page_of_the_specimen_is_in_the_table \
-  prune_keeps_the_last_used_bases_and_drops_the_rest a_base_no_branch_has_is_dropped_however_recent \
+  prune_keeps_the_last_used_bases_and_drops_the_rest a_base_no_branch_has_is_dropped_however_recently_used \
+  the_runs_own_base_is_kept_on_no_branch a_base_written_in_the_last_hour_is_never_dropped \
   a_base_on_a_local_branch_alone_is_kept a_base_on_origin_main_alone_is_kept \
-  a_base_a_run_holds_is_never_dropped a_run_holding_its_base_marks_it_used \
-  a_run_finding_its_base_dropped_under_it_starts_a_fresh_one prune_keeps_the_last_harness_versions_of_a_base \
+  a_base_a_run_holds_is_never_dropped a_process_a_run_leaves_behind_doesnt_keep_its_base_held \
+  a_run_holding_its_base_marks_it_used a_run_finding_its_base_dropped_under_it_starts_a_fresh_one \
+  prune_keeps_the_last_harness_versions_of_a_base prune_trims_no_base_a_run_holds \
   prune_never_touches_anything_but_the_bases_and_scratch prune_refuses_a_folder_that_isnt_the_shots_cache \
   scratch_older_than_a_day_goes_and_newer_stays compiled_qml_older_than_an_hour_goes_and_newer_stays; do
   test_case "${t//_/ }" "$t"

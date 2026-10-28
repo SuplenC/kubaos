@@ -10,7 +10,8 @@
 # terminals (test/shots/terminals), plymouth, grub and cursor (test/shots/boot), and the
 # specimen's pages, `specimen/PAGE` for kubaos-specimen's and `specimen/qml` for qml-specimen's.
 # The shell's services are stand-ins (fakes/qs/services): of config/quickshell/services, only the
-# JavaScript the stand-ins load is drawn.
+# JavaScript the stand-ins load is drawn. The specimen's `pages/icons.rs` is in `specimen`: every
+# page loads its fonts.
 *                   design/tokens.toml crates/kubaos-tokens crates/kubaos-ui crates/kubaos-geometry qml/KubaOS/Components Cargo.toml Cargo.lock flake.lock test/shots/shots test/shots/lib.sh test/shots/surfaces test/shots/package.nix
 shell               config/quickshell/components config/quickshell/theme test/shots/scenarios test/shots/stage.py test/shots/drivers test/shots/fakes
 bar                 config/quickshell/modules/bar config/quickshell/modules/frame
@@ -25,15 +26,15 @@ lock                config/quickshell/modules/lock
 polkit              config/quickshell/modules/polkit
 menu                config/quickshell/modules/menu
 kobo                crates/kubaos-kobo crates/kubaos-core
-specimen            crates/kubaos-specimen
+specimen            crates/kubaos-specimen crates/kubaos-specimen/src/pages/icons.rs
 specimen/type       crates/kubaos-specimen/src/pages/type_scale.rs
 specimen/colour     crates/kubaos-specimen/src/pages/colour.rs
 specimen/space      crates/kubaos-specimen/src/pages/space.rs
 specimen/components crates/kubaos-specimen/src/pages/components.rs crates/kubaos-specimen/src/pages/components
-specimen/icons      crates/kubaos-specimen/src/pages/icons.rs crates/kubaos-specimen/src/pages/icons
+specimen/icons      crates/kubaos-specimen/src/pages/icons
 specimen/motion     crates/kubaos-specimen/src/pages/motion.rs
-specimen/qml        qml/specimen
-terminals           config/ghostty config/foot config/tmux config/nvim config/btop config/lazygit config/bat config/fuzzel config/ohmyposh config/fastfetch config/matugen scripts/dot-config test/shots/terminals test/shots/terminal
+specimen/qml        qml/specimen qml/package.nix design/package.nix crates/checks.nix
+terminals           config/ghostty config/foot config/tmux config/nvim config/btop config/lazygit config/bat config/fuzzel config/ohmyposh config/fastfetch config/matugen scripts/dot-config branding/fastfetch.txt home/links.nix user-layer/terminal/fastfetch test/shots/terminals test/shots/terminal
 plymouth            system/files/plymouth system/files/fonts system/files/initramfs-tools test/shots/boot/plymouth
 grub                system/files/grub system/files/fonts test/shots/boot/grub
-cursor              crates/kubaos-cursor crates/kubaos-cli/src/cursor.rs test/shots/boot/cursor test/shots/boot/cursor-palette.py test/shots/boot/cursor-sheet.py
+cursor              crates/kubaos-cursor crates/kubaos-cli/src/cursor.rs crates/kubaos-cli/src/main.rs test/shots/boot/cursor test/shots/boot/cursor-palette.py test/shots/boot/cursor-sheet.py
