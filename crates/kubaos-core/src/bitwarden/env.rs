@@ -47,7 +47,11 @@ pub fn project_ok(p: &str) -> bool {
 ///
 /// The name isn't a project's.
 pub fn check_project(p: &str) -> Result<(), Error> {
-    if project_ok(p) { Ok(()) } else { Err(Error::Project(p.to_string())) }
+    if project_ok(p) {
+        Ok(())
+    } else {
+        Err(Error::Project(p.to_string()))
+    }
 }
 
 /// One keyring entry.
@@ -84,14 +88,20 @@ pub fn dump(host: &mut dyn Host, project: Option<&str>) -> Result<Vec<Entry>, Er
         } else if let Some(l) = line.strip_prefix("label = ") {
             label = l.to_string();
         } else if let Some(secret) = line.strip_prefix("secret = ") {
-            let Some(rest) = label.strip_prefix(&prefix) else { continue };
+            let Some(rest) = label.strip_prefix(&prefix) else {
+                continue;
+            };
             let (rest, b64) = match rest.strip_suffix("#base64") {
                 Some(r) => (r, true),
                 None => (rest, false),
             };
-            let Some((p, name)) = rest.split_once('/') else { continue };
+            let Some((p, name)) = rest.split_once('/') else {
+                continue;
+            };
             let value = if b64 {
-                base64::decode(secret).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default()
+                base64::decode(secret)
+                    .map(|b| String::from_utf8_lossy(&b).into_owned())
+                    .unwrap_or_default()
             } else {
                 secret.to_string()
             };
@@ -196,7 +206,9 @@ fn import_project(host: &mut dyn Host, vault: &Vault, project: &str, p: &mut Pro
         .collect();
     let items = vault.items.iter().filter(|i| {
         i.folder_id.as_ref().is_some_and(|f| ids.contains(&f))
-            || i.fields.iter().any(|f| f.is("bwenv") && f.value.as_deref() == Some(project))
+            || i.fields
+                .iter()
+                .any(|f| f.is("bwenv") && f.value.as_deref() == Some(project))
     });
     let mut vars: Vec<(&str, &str)> = vec![];
     let mut skipped: Vec<&str> = vec![];
@@ -238,7 +250,11 @@ pub fn import(
     p: &mut Progress,
 ) -> Result<Vec<(String, usize)>, Error> {
     let found = in_vault(vault);
-    let want: Vec<String> = if want.is_empty() { found.iter().cloned().collect() } else { want.to_vec() };
+    let want: Vec<String> = if want.is_empty() {
+        found.iter().cloned().collect()
+    } else {
+        want.to_vec()
+    };
     let mut done = vec![];
     for project in &want {
         if !project_ok(project) {
@@ -250,7 +266,9 @@ pub fn import(
         }
         if !found.contains(project) {
             let folder = vault.names.env_folder(project);
-            p.warn(format!("{project}: no folder {folder} and no item with bwenv={project} in the vault"));
+            p.warn(format!(
+                "{project}: no folder {folder} and no item with bwenv={project} in the vault"
+            ));
             continue;
         }
         let n = import_project(host, vault, project, p)?;
@@ -280,7 +298,11 @@ pub fn setup(m: &mut dyn Machine, vault: &Vault, p: &mut Progress) {
         }
         Ok(done) => {
             let names: Vec<&str> = done.iter().map(|(n, _)| n.as_str()).collect();
-            p.summary(format!("env    {} project(s) in the keyring: {}", done.len(), names.join(" ")));
+            p.summary(format!(
+                "env    {} project(s) in the keyring: {}",
+                done.len(),
+                names.join(" ")
+            ));
         }
     }
 }

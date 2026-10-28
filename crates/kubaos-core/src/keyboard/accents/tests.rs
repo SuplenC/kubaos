@@ -47,10 +47,16 @@ fn left_alt_is_alt_but_for_the_five_chords() {
 fn a_letter_after_a_chord_is_the_dead_key_then_the_same_key() {
     let config = keyd_config();
 
-    assert!(config.contains("[mac-acute]\nspace = setup\na = macro(move a)\n"), "{config}");
+    assert!(
+        config.contains("[mac-acute]\nspace = setup\na = macro(move a)\n"),
+        "{config}"
+    );
     assert!(config.contains("z = macro(move z)\n"), "{config}");
     assert!(config.contains("[mac-grave]\nspace = S-setup\n"), "{config}");
-    assert!(config.contains("[mac-tilde]\nspace = closecd\na = macro(iso a)\n"), "{config}");
+    assert!(
+        config.contains("[mac-tilde]\nspace = closecd\na = macro(iso a)\n"),
+        "{config}"
+    );
     let letters = config.lines().filter(|line| line.contains(" = macro(")).count();
     assert_eq!(letters, 26 * ACCENTS.len());
 }

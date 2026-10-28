@@ -49,17 +49,10 @@ pub fn fstab(u: &FsUuids, swapfile: bool) -> String {
          # <file system>  <mount point>  <type>  <options>  <dump>  <pass>\n",
     );
     for (sv, mp) in SUBVOLUMES {
-        s.push_str(&format!(
-            "UUID={}  {mp}  btrfs  {}  0 0\n",
-            u.root,
-            subvol_opts(sv)
-        ));
+        s.push_str(&format!("UUID={}  {mp}  btrfs  {}  0 0\n", u.root, subvol_opts(sv)));
     }
     s.push_str(&format!("UUID={}  /boot  ext4  defaults  0 2\n", u.boot));
-    s.push_str(&format!(
-        "UUID={}  /boot/efi  vfat  umask=0077  0 1\n",
-        u.esp
-    ));
+    s.push_str(&format!("UUID={}  /boot/efi  vfat  umask=0077  0 1\n", u.esp));
     if swapfile {
         s.push_str("/swap/swapfile  none  swap  defaults  0 0\n");
     }
@@ -158,10 +151,7 @@ pub fn nmconnection_name(ssid: &str) -> String {
         })
         .collect();
     let base = base.trim_start_matches('.');
-    format!(
-        "{}.nmconnection",
-        if base.is_empty() { "wifi" } else { base }
-    )
+    format!("{}.nmconnection", if base.is_empty() { "wifi" } else { base })
 }
 
 /// System files the image's scripts render for the build user (template in
@@ -247,9 +237,7 @@ pub fn snapper_info(num: u32, date_utc: &str, description: &str) -> String {
 }
 
 fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
 /// Unix seconds -> `YYYY-MM-DD HH:MM:SS` (UTC), snapper's date format.
@@ -305,10 +293,7 @@ pub const USER_GROUPS: [&str; 9] = [
 
 /// Names from an `/etc/group` that exist, in `wanted` order.
 pub fn existing_groups(group_file: &str, wanted: &[&str]) -> Vec<String> {
-    let have: Vec<&str> = group_file
-        .lines()
-        .filter_map(|l| l.split(':').next())
-        .collect();
+    let have: Vec<&str> = group_file.lines().filter_map(|l| l.split(':').next()).collect();
     wanted
         .iter()
         .filter(|g| have.contains(g))
@@ -468,17 +453,11 @@ mod tests {
     #[test]
     fn passwd_and_groups() {
         let passwd = "root:x:0:0:root:/root:/bin/bash\nubuntu:x:1000:1000::/home/ubuntu:/bin/bash\nkuba:x:1001:1001:J:/home/kuba:/usr/bin/zsh\n";
-        assert_eq!(
-            passwd_entry(passwd, "kuba"),
-            Some((1001, 1001, "/home/kuba".into()))
-        );
+        assert_eq!(passwd_entry(passwd, "kuba"), Some((1001, 1001, "/home/kuba".into())));
         assert_eq!(passwd_entry(passwd, "nobody"), None);
         assert_eq!(uid_owner(passwd, 1000), Some("ubuntu".into()));
         assert_eq!(uid_owner(passwd, 1002), None);
         let groups = "root:x:0:\nsudo:x:27:\nadm:x:4:syslog\ndocker:x:990:\n";
-        assert_eq!(
-            existing_groups(groups, &USER_GROUPS),
-            vec!["adm", "sudo", "docker"]
-        );
+        assert_eq!(existing_groups(groups, &USER_GROUPS), vec!["adm", "sudo", "docker"]);
     }
 }

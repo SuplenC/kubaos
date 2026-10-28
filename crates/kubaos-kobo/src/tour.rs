@@ -10,12 +10,21 @@
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
-use iced::keyboard::{self, Key, Location, Modifiers, key};
-use iced::{Task, window};
+use iced::Task;
+use iced::keyboard;
+use iced::keyboard::Key;
+use iced::keyboard::Location;
+use iced::keyboard::Modifiers;
+use iced::keyboard::key;
+use iced::window;
 
-use crate::app::{App, Message, ProbeState, Screen};
+use crate::app::App;
+use crate::app::Message;
+use crate::app::ProbeState;
+use crate::app::Screen;
 
 /// Keys the script and the tests press (the tests use more of them).
 #[derive(Debug, Clone, Copy)]
@@ -135,15 +144,12 @@ pub fn script() -> Vec<Step> {
         Shot("10-summary"),
         EnterDown,
         Until("holding", |a| {
-            a.hold
-                .is_some_and(|t| a.now - t >= crate::app::HOLD.mul_f32(0.6))
+            a.hold.is_some_and(|t| a.now - t >= crate::app::HOLD.mul_f32(0.6))
         }),
         Shot("11-summary-holding"),
         Until("installing", |a| a.screen == Screen::Installing),
         EnterUp,
-        Until("42%", |a| {
-            a.install.as_ref().is_some_and(|i| i.shown > 0.42)
-        }),
+        Until("42%", |a| a.install.as_ref().is_some_and(|i| i.shown > 0.42)),
         Shot("12-installing"),
         Tap(Enter), // show log
         Wait(450),
@@ -240,10 +246,7 @@ pub fn events(step: &Step) -> Vec<keyboard::Event> {
                 } else {
                     Key::Character(c.to_string().into())
                 };
-                [
-                    press(k.clone(), Some(&c.to_string()), Modifiers::default()),
-                    release(k),
-                ]
+                [press(k.clone(), Some(&c.to_string()), Modifiers::default()), release(k)]
             })
             .collect(),
         _ => vec![],
@@ -279,9 +282,7 @@ pub fn drive(app: &mut App) -> Task<Message> {
             break;
         };
         match step {
-            Step::Wait(ms) => {
-                tour.resume_at = Some(now + Duration::from_millis(ms).mul_f32(tour.pace))
-            }
+            Step::Wait(ms) => tour.resume_at = Some(now + Duration::from_millis(ms).mul_f32(tour.pace)),
             Step::Until(name, f) => {
                 // The window also has to be up, with its wallpaper, before
                 // anything is worth a screenshot.
@@ -296,9 +297,7 @@ pub fn drive(app: &mut App) -> Task<Message> {
             Step::Shot(name) => {
                 let Some(id) = app.window else { break };
                 tour.waiting_for_shot = true;
-                tasks.push(
-                    window::screenshot(id).map(move |s| Message::TourShot(name.to_string(), s)),
-                );
+                tasks.push(window::screenshot(id).map(move |s| Message::TourShot(name.to_string(), s)));
                 break;
             }
             Step::Exit => {
@@ -332,12 +331,14 @@ pub fn save(app: &App, name: &str, shot: &window::Screenshot) {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use kubaos_core::StepId;
+
     use super::*;
     use crate::app::F;
     use crate::backend::Demo;
     use crate::model::DiskMode;
-    use kubaos_core::StepId;
-    use std::sync::Arc;
 
     /// The whole install with synthetic key events only, headless: no
     /// window, no clicks, no messages other than keys and frame ticks.
@@ -377,8 +378,8 @@ mod tests {
         assert_eq!(
             seen,
             [
-                Welcome, Language, Timezone, Wifi, Account, Disk, Git, Wallpapers, Summary,
-                Installing, Failed, Installing, Done
+                Welcome, Language, Timezone, Wifi, Account, Disk, Git, Wallpapers, Summary, Installing, Failed,
+                Installing, Done
             ]
         );
         let f = &app.form;
@@ -447,10 +448,7 @@ mod tests {
         keys(&mut app, vec![Tap(Home), Type("X"), Tap(End), Type("!")]);
         assert_eq!(app.form.full_name, "XKuuba!");
         // Shift+Left selects, Backspace deletes the selection.
-        keys(
-            &mut app,
-            vec![Tap(ShiftLeft), Tap(ShiftLeft), Tap(Backspace)],
-        );
+        keys(&mut app, vec![Tap(ShiftLeft), Tap(ShiftLeft), Tap(Backspace)]);
         assert_eq!(app.form.full_name, "XKuub");
         // Word delete and word jump.
         keys(&mut app, vec![Type(" Example"), Tap(CtrlBackspace)]);
@@ -462,11 +460,7 @@ mod tests {
         assert_eq!(app.form.full_name, "Kuba Example");
         // Space types a space in a field, and Esc still goes back.
         keys(&mut app, vec![Tap(Esc)]);
-        assert_eq!(
-            app.screen,
-            Screen::Wifi,
-            "the demo is offline: Wi-Fi comes first"
-        );
+        assert_eq!(app.screen, Screen::Wifi, "the demo is offline: Wi-Fi comes first");
     }
 
     /// Focus order matches reading order on every screen.
@@ -495,14 +489,7 @@ mod tests {
             ),
             (
                 Screen::Disk,
-                vec![
-                    F::DiskList,
-                    F::DiskMode,
-                    F::Encrypt,
-                    F::LuksSame,
-                    F::Back,
-                    F::Next,
-                ],
+                vec![F::DiskList, F::DiskMode, F::Encrypt, F::LuksSame, F::Back, F::Next],
             ),
             (Screen::Git, vec![F::GitName, F::GitEmail, F::Back, F::Next]),
             (
@@ -525,17 +512,11 @@ mod tests {
         }
         // Own passphrase: its fields slot in after the switch that asks for them.
         let _ = app.go(Screen::Disk);
-        keys(
-            &mut app,
-            vec![Step::Tap(K::Tab), Step::Tap(K::Tab), Step::Tap(K::Tab)],
-        );
+        keys(&mut app, vec![Step::Tap(K::Tab), Step::Tap(K::Tab), Step::Tap(K::Tab)]);
         assert_eq!(app.focus, Some(F::LuksSame));
         keys(&mut app, vec![Step::Tap(K::Space), Step::Tap(K::Tab)]);
         assert_eq!(app.focus, Some(F::Luks));
-        assert_eq!(
-            app.focus_order()[4..7],
-            [F::Luks, F::LuksConfirm, F::ShowSecrets]
-        );
+        assert_eq!(app.focus_order()[4..7], [F::Luks, F::LuksConfirm, F::ShowSecrets]);
     }
 
     /// Arrows, Home/End and Page keys move list selections, and typing on a
@@ -549,10 +530,7 @@ mod tests {
         app.focus = Some(F::Next);
         let before = app.form.timezone.clone();
         keys(&mut app, vec![Tap(Down)]);
-        assert_eq!(
-            app.form.timezone, before,
-            "arrows on a button don't move the list"
-        );
+        assert_eq!(app.form.timezone, before, "arrows on a button don't move the list");
         keys(&mut app, vec![Type("tok")]);
         assert_eq!(app.focus, Some(F::TzQ));
         assert_eq!(app.form.timezone, "Asia/Tokyo");
@@ -592,11 +570,7 @@ mod tests {
             }
             assert_eq!(app.focus, start, "Tab doesn't cycle on {s:?}");
             let _ = send(&mut app, events(&Step::Tap(K::ShiftTab)));
-            assert_eq!(
-                app.focus,
-                order.last().copied(),
-                "Shift+Tab doesn't go back on {s:?}"
-            );
+            assert_eq!(app.focus, order.last().copied(), "Shift+Tab doesn't go back on {s:?}");
         }
     }
 }

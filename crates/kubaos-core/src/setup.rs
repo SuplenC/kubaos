@@ -25,14 +25,21 @@ mod parse;
 
 use std::path::PathBuf;
 
-use serde::{Deserialize, Serialize};
-
-pub use crate::engine::runner::{Cmd, Output, Stream};
-use crate::event::Level;
-
-pub use actions::{YKMAN_PREP, git_identity_ok, mok_password_ok, run};
-pub use detect::{card_status, online, status};
+pub use actions::YKMAN_PREP;
+pub use actions::git_identity_ok;
+pub use actions::mok_password_ok;
+pub use actions::run;
+pub use detect::card_status;
+pub use detect::online;
+pub use detect::status;
 pub use parse::*;
+use serde::Deserialize;
+use serde::Serialize;
+
+pub use crate::engine::runner::Cmd;
+pub use crate::engine::runner::Output;
+pub use crate::engine::runner::Stream;
+use crate::event::Level;
 
 /// Where the engine puts the privileged helper (install/firstboot/).
 pub const HELPER: &str = "/usr/lib/kubaos/setup-helper";
@@ -346,10 +353,7 @@ pub struct BwLogin {
 impl std::fmt::Debug for Inputs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Inputs")
-            .field(
-                "mok_password",
-                &self.mok_password.as_ref().map(|_| "<secret>"),
-            )
+            .field("mok_password", &self.mok_password.as_ref().map(|_| "<secret>"))
             .field("finger", &self.finger)
             .field("bw", &self.bw)
             .field("bw_folders", &self.bw_folders)
@@ -507,7 +511,8 @@ impl Sys for RealSys {
     }
 
     fn reachable(&mut self) -> bool {
-        use std::net::{SocketAddr, TcpStream};
+        use std::net::SocketAddr;
+        use std::net::TcpStream;
         use std::time::Duration;
         // No DNS on purpose: it can't time out. Cloudflare's and Quad9's
         // resolvers answer on 443.

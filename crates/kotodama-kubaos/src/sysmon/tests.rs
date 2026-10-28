@@ -200,7 +200,10 @@ fn other_queries_are_left_to_the_search() {
     assert_eq!(monitor.live("firefox", NOW), [] as [kotodama_protocol::LiveResult; 0]);
     assert_eq!(monitor.live("kill", NOW), [] as [kotodama_protocol::LiveResult; 0]);
     assert_eq!(monitor.live("kill zzz", NOW), [] as [kotodama_protocol::LiveResult; 0]);
-    assert_eq!(monitor.live("cpus are fast", NOW), [] as [kotodama_protocol::LiveResult; 0]);
+    assert_eq!(
+        monitor.live("cpus are fast", NOW),
+        [] as [kotodama_protocol::LiveResult; 0]
+    );
 }
 
 #[test]

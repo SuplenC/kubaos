@@ -174,7 +174,10 @@ fn charging_at_a_high_rate_is_no_alert() {
 
     alerts.check(&sample, &Thresholds::default(), 0);
 
-    assert_eq!(alerts.check(&sample, &Thresholds::default(), 60_000), [] as [super::Alert; 0]);
+    assert_eq!(
+        alerts.check(&sample, &Thresholds::default(), 60_000),
+        [] as [super::Alert; 0]
+    );
 }
 
 #[test]

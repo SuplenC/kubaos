@@ -72,7 +72,12 @@ pub enum XcursorOutcome {
 pub fn stamp(style: Style, colors: Option<&Colors>, source: &Path) -> String {
     let head = format!("kubaos-cursor {FORMAT}\nstyle {style}\n");
     match colors {
-        Some(Colors { fill, outline, watch, spinner: [a, b, c, d] }) => format!(
+        Some(Colors {
+            fill,
+            outline,
+            watch,
+            spinner: [a, b, c, d],
+        }) => format!(
             "{head}fill {fill}\noutline {outline}\nwatch {watch}\nspinner {a} {b} {c} {d}\nsource {}\n",
             source.display()
         ),
@@ -104,7 +109,10 @@ pub struct Theme {
 impl Theme {
     #[must_use]
     pub fn new(icons: impl Into<PathBuf>, name: impl Into<String>) -> Self {
-        Self { icons: icons.into(), name: name.into() }
+        Self {
+            icons: icons.into(),
+            name: name.into(),
+        }
     }
 
     pub fn dir(&self) -> PathBuf {
@@ -136,7 +144,10 @@ impl Theme {
             let cursors = new.join(hyprcursor::CURSORS_DIR);
             create_dir(&cursors)?;
             for shape in shapes {
-                write(&cursors.join(format!("{}.hlc", shape.name)), &hyprcursor::archive(shape, colors))?;
+                write(
+                    &cursors.join(format!("{}.hlc", shape.name)),
+                    &hyprcursor::archive(shape, colors),
+                )?;
             }
             self.keep_xcursor(&new);
             swap(&new, &self.dir())

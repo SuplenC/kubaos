@@ -7,8 +7,8 @@
 //!
 //! # Owns
 //!
-//! - The lint ([`lint`]) and its baseline ([`baseline`]), reading geometry frames from files
-//!   with the tokens' rules ([`geometry`]), and the roles drawn that no contrast pair covers
+//! - The lint ([`lint`]) and its baseline ([`baseline`]), reading geometry frames from files with
+//!   the tokens' rules ([`geometry`]), and the roles drawn that no contrast pair covers
 //!   ([`contrast`]).
 //!
 //! # Not here

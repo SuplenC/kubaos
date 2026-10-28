@@ -22,7 +22,9 @@ pub fn apply(m: &mut dyn Machine, vault: &Vault, p: &mut Progress) {
 
     p.step("gh: token from the vault into the system keyring");
     let Some(token) = token.filter(|t| !t.0.is_empty()) else {
-        p.info(format!("no item \"{item}\" in the vault; skipped (gh auth login works by hand too)"));
+        p.info(format!(
+            "no item \"{item}\" in the vault; skipped (gh auth login works by hand too)"
+        ));
         p.summary(format!("gh     no {item} item, skipped"));
         return;
     };
@@ -41,7 +43,15 @@ pub fn apply(m: &mut dyn Machine, vault: &Vault, p: &mut Progress) {
         // gh stores the token in the Secret Service keyring; with no keyring it falls back to
         // a plaintext ~/.config/gh/hosts.yml, which the status check below catches.
         let login = Cmd::new("gh")
-            .args(["auth", "login", "--hostname", &host, "--git-protocol", "ssh", "--with-token"])
+            .args([
+                "auth",
+                "login",
+                "--hostname",
+                &host,
+                "--git-protocol",
+                "ssh",
+                "--with-token",
+            ])
             .secret_stdin(&token.0);
         if !m.run(&login).is_ok_and(|r| r.ok()) {
             p.warn("gh auth login failed (token revoked or missing scopes? gh needs repo, read:org)");

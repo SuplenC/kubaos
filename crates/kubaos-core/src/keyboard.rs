@@ -9,8 +9,7 @@
 //!   the user's ([`layouts`]), and the changes the Command menu and `kubaos keyboard` make to one.
 //! - Reading and writing the layout fields of `/etc/default/keyboard`, and the layout names in
 //!   xkb's rules `.lst` files, with the catalogue of every layout and variant by name.
-//! - The Mac-style accents on Left Alt: their table ([`accents`]) and their setting
-//!   ([`settings`]).
+//! - The Mac-style accents on Left Alt: their table ([`accents`]) and their setting ([`settings`]).
 //!
 //! # Not here
 //!
@@ -53,9 +52,7 @@ impl Layout {
     pub fn parse(spelled: &str) -> Self {
         let spelled = spelled.trim();
         match spelled.split_once('(') {
-            Some((layout, variant)) => {
-                Layout::new(layout.trim(), variant.trim_end_matches(')').trim())
-            }
+            Some((layout, variant)) => Layout::new(layout.trim(), variant.trim_end_matches(')').trim()),
             None => Layout::new(spelled, ""),
         }
     }
@@ -120,8 +117,7 @@ pub fn problems(layouts: &[Layout], known: &[String]) -> Vec<LayoutsError> {
 
 /// The characters XKB names are made of. A comma or a quote would break the file's fields.
 fn plain(name: &str) -> bool {
-    name.chars()
-        .all(|c| c.is_ascii_alphanumeric() || "_-".contains(c))
+    name.chars().all(|c| c.is_ascii_alphanumeric() || "_-".contains(c))
 }
 
 /// Reads a comma-separated list, as `kubaos keyboard set us,it(intl)` takes it.
@@ -136,11 +132,7 @@ pub fn parse_list(spelled: &str) -> Vec<Layout> {
 
 /// The comma-separated list, as `parse_list` reads it.
 pub fn spell_list(layouts: &[Layout]) -> String {
-    layouts
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>()
-        .join(",")
+    layouts.iter().map(ToString::to_string).collect::<Vec<_>>().join(",")
 }
 
 /// Pairs XKB's two comma-separated fields, `us,it` and `,intl`. A variant list shorter than the

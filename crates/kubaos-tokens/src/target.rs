@@ -38,8 +38,8 @@ pub trait Target: Sync {
 }
 
 /// Every output `kubaos-tokens` writes.
-// TODO(#152): add the matugen templates from `color.source`; the terminals still use config/matugen.
-// TODO(#153): add Plymouth's and GRUB's values; they still carry their own.
+// TODO(#152): add the matugen templates from `color.source`; the terminals still use
+// config/matugen. TODO(#153): add Plymouth's and GRUB's values; they still carry their own.
 pub static TARGETS: &[&dyn Target] = &[&RustModule, &QmlTokens, &QmlSymbols];
 
 /// The checked-in output at `path` doesn't match the tokens.

@@ -118,10 +118,7 @@ mod tests {
         assert_eq!(u.progress("100"), Some(1.0));
         assert_eq!(u.progress("101"), None);
         let c = u.command(Path::new("/p/rootfs.sqfs"), Path::new("/mnt/t"));
-        assert_eq!(
-            c.display(),
-            "unsquashfs -percentage -f -d /mnt/t /p/rootfs.sqfs"
-        );
+        assert_eq!(c.display(), "unsquashfs -percentage -f -d /mnt/t /p/rootfs.sqfs");
     }
 
     #[test]
@@ -133,10 +130,7 @@ mod tests {
         assert_eq!(u.progress("tar: kubaos-ckpt 9000"), Some(0.99));
         assert_eq!(u.progress("tar: something else"), None);
         let c = u.command(Path::new("/p/rootfs.tar.zst"), Path::new("/mnt/t"));
-        assert!(
-            c.display()
-                .contains("'--checkpoint-action=echo=kubaos-ckpt %u'")
-        );
+        assert!(c.display().contains("'--checkpoint-action=echo=kubaos-ckpt %u'"));
     }
 
     #[test]
@@ -152,14 +146,8 @@ mod tests {
         let bad = dir.join("c.img");
         std::fs::write(&bad, b"nope").unwrap();
         assert!(detect(&bad, 1).is_err());
-        assert_eq!(
-            detect(&dir.join("missing.tar.zst"), 1).unwrap().name(),
-            "tar.zst"
-        );
-        assert_eq!(
-            detect(&dir.join("missing.sqfs"), 1).unwrap().name(),
-            "squashfs"
-        );
+        assert_eq!(detect(&dir.join("missing.tar.zst"), 1).unwrap().name(), "tar.zst");
+        assert_eq!(detect(&dir.join("missing.sqfs"), 1).unwrap().name(), "squashfs");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

@@ -49,11 +49,7 @@ mod suite;
 mod update;
 
 #[derive(Parser)]
-#[command(
-    name = "kubaos",
-    version,
-    about = "Installs and changes a KubaOS machine"
-)]
+#[command(name = "kubaos", version, about = "Installs and changes a KubaOS machine")]
 struct Cli {
     #[command(subcommand)]
     cmd: Cmd,
@@ -132,7 +128,8 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// The Proxy, one switch for the work network: on, off, status, or import IT's WireGuard config.
+    /// The Proxy, one switch for the work network: on, off, status, or import IT's WireGuard
+    /// config.
     #[command(disable_help_flag = true)]
     Proxy {
         /// `on`, `off`, `status [--json] [--live]`, `import FILE`, `pull`

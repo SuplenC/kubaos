@@ -52,7 +52,10 @@ const LEAP_DAY_2024: u64 = 1_709_208_000;
 
 #[test]
 fn an_exif_date_gives_its_year_and_month() {
-    assert_eq!(parse_exif_month("2024:07:15 10:00:00"), Some(Month { year: 2024, month: 7 }));
+    assert_eq!(
+        parse_exif_month("2024:07:15 10:00:00"),
+        Some(Month { year: 2024, month: 7 })
+    );
     assert_eq!(parse_exif_month("    :  :     :  :  "), None);
     assert_eq!(parse_exif_month("0000:00:00 00:00:00"), None);
 }
@@ -60,8 +63,14 @@ fn an_exif_date_gives_its_year_and_month() {
 #[test]
 fn a_time_falls_in_its_utc_month() {
     assert_eq!(month_of(UNIX_EPOCH), Month { year: 1970, month: 1 });
-    assert_eq!(month_of(UNIX_EPOCH + Duration::from_secs(NOVEMBER_2023)), Month { year: 2023, month: 11 });
-    assert_eq!(month_of(UNIX_EPOCH + Duration::from_secs(LEAP_DAY_2024)), Month { year: 2024, month: 2 });
+    assert_eq!(
+        month_of(UNIX_EPOCH + Duration::from_secs(NOVEMBER_2023)),
+        Month { year: 2023, month: 11 }
+    );
+    assert_eq!(
+        month_of(UNIX_EPOCH + Duration::from_secs(LEAP_DAY_2024)),
+        Month { year: 2024, month: 2 }
+    );
 }
 
 #[test]
@@ -131,13 +140,27 @@ fn photos_are_copied_by_capture_date_and_a_second_import_copies_nothing() {
     let first = import(&card.path().join("DCIM"), pictures.path()).unwrap();
     let second = import(&card.path().join("DCIM"), pictures.path()).unwrap();
 
-    assert_eq!(first, Report { copied: 2, already: 0, failed: 0 });
+    assert_eq!(
+        first,
+        Report {
+            copied: 2,
+            already: 0,
+            failed: 0
+        }
+    );
     assert!(pictures.path().join("2019/03/IMG_0001.JPG").is_file());
     let video = pictures.path().join("2023/11/MVI_0002.MP4");
     assert_eq!(fs::read(&video).unwrap(), b"video");
     let kept = fs::metadata(&video).unwrap().modified().unwrap();
     assert_eq!(kept, UNIX_EPOCH + Duration::from_secs(NOVEMBER_2023));
-    assert_eq!(second, Report { copied: 0, already: 2, failed: 0 });
+    assert_eq!(
+        second,
+        Report {
+            copied: 0,
+            already: 2,
+            failed: 0
+        }
+    );
     assert!(camera.join("IMG_0001.JPG").is_file(), "the device keeps its photos");
 }
 
@@ -147,6 +170,10 @@ fn the_pictures_folder_follows_user_dirs() {
     let home = Path::new("/home/kuba");
 
     assert_eq!(pictures_dir(home, config.path()), home.join("Pictures"));
-    fs::write(config.path().join("user-dirs.dirs"), "XDG_PICTURES_DIR=\"$HOME/Immagini\"\n").unwrap();
+    fs::write(
+        config.path().join("user-dirs.dirs"),
+        "XDG_PICTURES_DIR=\"$HOME/Immagini\"\n",
+    )
+    .unwrap();
     assert_eq!(pictures_dir(home, config.path()), home.join("Immagini"));
 }

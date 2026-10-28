@@ -1,6 +1,6 @@
 //! Whether drives are mounted when they're plugged in: on, unless the file
-//! `~/.config/kubaos/desktop/files/no-automount` exists. A file and not a key in a config file, so the
-//! setting needs no parser and lives in the user layer next to the other Files settings.
+//! `~/.config/kubaos/desktop/files/no-automount` exists. A file and not a key in a config file, so
+//! the setting needs no parser and lives in the user layer next to the other Files settings.
 //!
 //! # Owns
 //!

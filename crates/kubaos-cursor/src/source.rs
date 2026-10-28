@@ -91,7 +91,10 @@ pub fn load(root: &Path) -> Result<Vec<Shape>, SourceError> {
     let fallback: Fallback = config
         .cursors
         .remove("fallback_settings")
-        .map_or_else(|| toml::from_str("x_hotspot = 128\ny_hotspot = 128\nx11_delay = 40"), toml::Value::try_into)
+        .map_or_else(
+            || toml::from_str("x_hotspot = 128\ny_hotspot = 128\nx11_delay = 40"),
+            toml::Value::try_into,
+        )
         .map_err(parse_error)?;
 
     let svgs = root.join(SVG_DIR);
@@ -100,7 +103,10 @@ pub fn load(root: &Path) -> Result<Vec<Shape>, SourceError> {
         let entry: Entry = value.try_into().map_err(parse_error)?;
         shapes.push(Shape {
             frames: frames(&svgs, &entry.png)?,
-            hotspot: (entry.x_hotspot.unwrap_or(fallback.x_hotspot), entry.y_hotspot.unwrap_or(fallback.y_hotspot)),
+            hotspot: (
+                entry.x_hotspot.unwrap_or(fallback.x_hotspot),
+                entry.y_hotspot.unwrap_or(fallback.y_hotspot),
+            ),
             delay_ms: entry.x11_delay.unwrap_or(fallback.x11_delay),
             name: entry.x11_name,
             aliases: entry.x11_symlinks,

@@ -72,8 +72,8 @@ fn a_file_keyed_by_screen_gives_no_items_until_hyprland_migrates_it() {
 #[test]
 fn no_screens_file_means_no_items() {
     assert_eq!(
-        Desk::read(Path::new("/nonexistent/workspace-screens"))
-            .items(), [] as [kotodama_protocol::Item; 0]
+        Desk::read(Path::new("/nonexistent/workspace-screens")).items(),
+        [] as [kotodama_protocol::Item; 0]
     );
 }
 

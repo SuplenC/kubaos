@@ -70,12 +70,7 @@ impl Part {
     }
     /// The partition number from the node name (`/dev/nvme0n1p12` -> 12).
     pub fn number(&self) -> Option<u32> {
-        let digits: String = self
-            .node
-            .chars()
-            .rev()
-            .take_while(|c| c.is_ascii_digit())
-            .collect();
+        let digits: String = self.node.chars().rev().take_while(|c| c.is_ascii_digit()).collect();
         digits.chars().rev().collect::<String>().parse().ok()
     }
 }
@@ -343,10 +338,7 @@ mod tests {
         let t = PartTable::empty_gpt("/dev/vda", 64 * GIB, 512);
         let l = plan_layout(&DiskTarget::Whole, &t, true, 10 * GIB).unwrap();
         let Esp::New(esp) = &l.esp else { panic!() };
-        assert_eq!(
-            (esp.number, esp.start, esp.end),
-            (1, 2048, 2048 + 2097152 - 1)
-        );
+        assert_eq!((esp.number, esp.start, esp.end), (1, 2048, 2048 + 2097152 - 1));
         assert_eq!(l.boot.number, 2);
         assert_eq!(l.boot.start, esp.end + 1);
         assert_eq!((l.boot.end + 1 - l.boot.start) * 512, BOOT_BYTES);
@@ -357,11 +349,7 @@ mod tests {
         assert!(l.root.end <= t.lastlba);
         assert_eq!(
             esp.sgdisk_args(),
-            vec![
-                "--new=1:2048:2099199",
-                "--typecode=1:ef00",
-                "--change-name=1:EFI"
-            ]
+            vec!["--new=1:2048:2099199", "--typecode=1:ef00", "--change-name=1:EFI"]
         );
     }
 
@@ -419,10 +407,7 @@ mod tests {
 
     #[test]
     fn sizes() {
-        assert_eq!(
-            required_bytes(10 * GIB, false),
-            GIB + 2 * GIB + 10 * GIB + 4 * GIB
-        );
+        assert_eq!(required_bytes(10 * GIB, false), GIB + 2 * GIB + 10 * GIB + 4 * GIB);
         assert_eq!(required_bytes(40 * GIB, true), 2 * GIB + 40 * GIB + 8 * GIB);
         assert_eq!(swap_bytes(500 * GIB), 8 * GIB);
         assert_eq!(swap_bytes(20 * GIB), 0);

@@ -2,19 +2,26 @@
 //! remembered between runs, so a card done by hand (or by the scripts)
 //! shows as done here too.
 
+use super::CardId;
+use super::CardStatus;
+use super::Cmd;
+use super::Env;
+use super::Facts;
+use super::MokState;
+use super::State;
+use super::Status;
+use super::Sys;
 use super::parse::*;
 use crate::bitwarden::Config;
 use crate::bitwarden::Overview;
 use crate::bitwarden::agent;
-use super::{CardId, CardStatus, Cmd, Env, Facts, MokState, State, Status, Sys};
 
-const SECURE_BOOT_VAR: &str =
-    "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c";
+const SECURE_BOOT_VAR: &str = "/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c";
 /// Where DKMS keeps its signing certificate (Ubuntu's shim-signed path first).
 pub const MOK_KEYS: [&str; 2] = ["/var/lib/shim-signed/mok/MOK.der", "/var/lib/dkms/mok.pub"];
-/// shim's enrollment request, which `mokutil --import` writes for MokManager to show on the next boot.
-pub const MOK_NEW_VAR: &str =
-    "/sys/firmware/efi/efivars/MokNew-605dab50-e046-4300-abb6-3dd810dd8b23";
+/// shim's enrollment request, which `mokutil --import` writes for MokManager to show on the next
+/// boot.
+pub const MOK_NEW_VAR: &str = "/sys/firmware/efi/efivars/MokNew-605dab50-e046-4300-abb6-3dd810dd8b23";
 
 pub fn status(sys: &mut dyn Sys, env: &Env) -> Status {
     let online = online(sys);
@@ -87,19 +94,14 @@ fn tuxedo(sys: &mut dyn Sys) -> CardStatus {
             mok: None,
         },
     };
-    let is_tuxedo = [&vendor, &board]
-        .iter()
-        .any(|v| v.to_lowercase().contains("tuxedo"));
+    let is_tuxedo = [&vendor, &board].iter().any(|v| v.to_lowercase().contains("tuxedo"));
     if !is_tuxedo {
         let what = if vendor.is_empty() {
             "this machine".to_string()
         } else {
             vendor.clone()
         };
-        return absent(
-            format!("Not on this machine: {what} isn't a TUXEDO."),
-            vendor,
-        );
+        return absent(format!("Not on this machine: {what} isn't a TUXEDO."), vendor);
     }
     let arch = sys
         .run(&Cmd::new("dpkg").arg("--print-architecture"))
@@ -112,9 +114,7 @@ fn tuxedo(sys: &mut dyn Sys) -> CardStatus {
         );
     }
 
-    let secure_boot = sys
-        .read(SECURE_BOOT_VAR)
-        .and_then(|s| parse_secure_boot(s.as_bytes()));
+    let secure_boot = sys.read(SECURE_BOOT_VAR).and_then(|s| parse_secure_boot(s.as_bytes()));
     let drivers = pkg_installed(sys, "tuxedo-drivers");
     let modules = tuxedo_modules(&sys.read("/proc/modules").unwrap_or_default());
     let mok = if secure_boot == Some(true) && drivers {
@@ -132,21 +132,14 @@ fn tuxedo(sys: &mut dyn Sys) -> CardStatus {
         match mok {
             Some(MokState::NotEnrolled | MokState::NoKey) => (
                 State::Needed,
-                "Drivers are in, but Secure Boot won't load them until you enroll their key."
-                    .to_string(),
+                "Drivers are in, but Secure Boot won't load them until you enroll their key.".to_string(),
             ),
             Some(MokState::Pending) => (
                 State::Reboot,
                 "Key queued. Reboot and enroll it on the blue MokManager screen.".to_string(),
             ),
-            _ if modules.is_empty() => (
-                State::Reboot,
-                "Installed. The drivers load after a reboot.".to_string(),
-            ),
-            _ => (
-                State::Done,
-                format!("Drivers loaded: {}.", modules.join(", ")),
-            ),
+            _ if modules.is_empty() => (State::Reboot, "Installed. The drivers load after a reboot.".to_string()),
+            _ => (State::Done, format!("Drivers loaded: {}.", modules.join(", "))),
         }
     };
     CardStatus {
@@ -289,10 +282,7 @@ pub(super) fn yubikeys(sys: &mut dyn Sys) -> Vec<String> {
 
 fn yubikey(sys: &mut dyn Sys, env: &Env) -> CardStatus {
     let plugged = yubikeys(sys);
-    let enrolled = u2f_count(
-        &sys.read("/etc/u2f_mappings").unwrap_or_default(),
-        &env.user,
-    );
+    let enrolled = u2f_count(&sys.read("/etc/u2f_mappings").unwrap_or_default(), &env.user);
     let info = if plugged.len() == 1 {
         sys.run(&Cmd::new(env.script("dot-u2f-enroll")).arg("--info"))
             .ok()
@@ -329,10 +319,7 @@ fn yubikey(sys: &mut dyn Sys, env: &Env) -> CardStatus {
             State::Needed,
             "This key needs a PIN and a fingerprint of its own first.".to_string(),
         ),
-        (1, 0) => (
-            State::Needed,
-            format!("{} plugged in, not enrolled yet.", plugged[0]),
-        ),
+        (1, 0) => (State::Needed, format!("{} plugged in, not enrolled yet.", plugged[0])),
         (1, n) => (
             State::Needed,
             format!(
@@ -373,8 +360,7 @@ fn bitwarden(sys: &mut dyn Sys, env: &Env) -> CardStatus {
         return CardStatus {
             id: CardId::Bitwarden,
             state: State::Absent,
-            summary: "Not on this machine: bw isn't installed (system/70-bitwarden.sh does it)."
-                .into(),
+            summary: "Not on this machine: bw isn't installed (system/70-bitwarden.sh does it).".into(),
             facts: Facts::Bitwarden {
                 bw: false,
                 login: String::new(),
@@ -409,9 +395,7 @@ fn bitwarden(sys: &mut dyn Sys, env: &Env) -> CardStatus {
     } else {
         (
             State::Done,
-            format!(
-                "Logged in as {who}. SSH keys, commit signing and project env come from the vault."
-            ),
+            format!("Logged in as {who}. SSH keys, commit signing and project env come from the vault."),
         )
     };
     CardStatus {
@@ -455,20 +439,13 @@ fn git(sys: &mut dyn Sys, env: &Env) -> CardStatus {
         .filter(|n| !n.is_empty());
     let (state, summary) = match (&name, &email) {
         (Some(n), Some(e)) => (State::Done, format!("Commits as {n} <{e}>.")),
-        _ => (
-            State::Needed,
-            "No name and email for commits yet.".to_string(),
-        ),
+        _ => (State::Needed, "No name and email for commits yet.".to_string()),
     };
     CardStatus {
         id: CardId::Git,
         state,
         summary,
-        facts: Facts::Git {
-            name,
-            email,
-            full_name,
-        },
+        facts: Facts::Git { name, email, full_name },
     }
 }
 
@@ -496,7 +473,11 @@ pub(super) fn phone_card(link: kubaos_phone::Status) -> CardStatus {
             format!("{} wants to pair. Check the key, then accept.", asking.name),
         )
     } else if let Some(phone) = link.paired() {
-        let reach = if phone.reachable { "in reach" } else { "out of reach right now" };
+        let reach = if phone.reachable {
+            "in reach"
+        } else {
+            "out of reach right now"
+        };
         let battery = phone
             .battery
             .map(|b| format!(", battery {}%", b.charge))
@@ -518,11 +499,12 @@ pub(super) fn phone_card(link: kubaos_phone::Status) -> CardStatus {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::super::fake::FakeSys;
     use super::*;
     use crate::bitwarden::Agent;
     use crate::bitwarden::fake::Fake;
-    use std::path::PathBuf;
 
     pub fn env() -> Env {
         Env {
@@ -574,10 +556,7 @@ mod tests {
     fn tuxedo_box() -> FakeSys {
         FakeSys::new()
             .file("/sys/class/dmi/id/sys_vendor", "TUXEDO\n")
-            .file(
-                "/sys/class/dmi/id/product_name",
-                "TUXEDO InfinityBook Pro AMD Gen10\n",
-            )
+            .file("/sys/class/dmi/id/product_name", "TUXEDO InfinityBook Pro AMD Gen10\n")
             .ok("dpkg --print-architecture", "amd64\n")
     }
 
@@ -592,10 +571,7 @@ mod tests {
         let mut s = tuxedo_box()
             .file(SECURE_BOOT_VAR, "\u{6}\0\0\0\u{1}")
             .file("/var/lib/dkms/mok.pub", "cert")
-            .ok(
-                "dpkg-query -W -f=${Status} tuxedo-drivers",
-                "install ok installed",
-            )
+            .ok("dpkg-query -W -f=${Status} tuxedo-drivers", "install ok installed")
             .ok("sh -c mokutil", "/var/lib/dkms/mok.pub is not enrolled\n");
         let c = tuxedo(&mut s);
         assert_eq!(c.state, State::Needed);
@@ -644,10 +620,7 @@ mod tests {
             .file("/var/lib/shim-signed/mok/MOK.der", "cert")
             .file(MOK_NEW_VAR, "")
             .ok("dpkg-query", "install ok installed")
-            .ok(
-                "sh -c mokutil",
-                "/var/lib/shim-signed/mok/MOK.der is not enrolled\n",
-            );
+            .ok("sh -c mokutil", "/var/lib/shim-signed/mok/MOK.der is not enrolled\n");
 
         let c = tuxedo(&mut s);
 
@@ -674,7 +647,10 @@ mod tests {
         // fprintd answers: enrolled, PAM on.
         let mut s = FakeSys::new()
             .file("/usr/bin/fprintd-list", "")
-            .file("/etc/pam.d/common-auth", "auth [success=2 default=ignore] pam_fprintd.so max-tries=1 timeout=10\n")
+            .file(
+                "/etc/pam.d/common-auth",
+                "auth [success=2 default=ignore] pam_fprintd.so max-tries=1 timeout=10\n",
+            )
             .ok(
                 "fprintd-list kuba",
                 "Fingerprints for user kuba on Goodix MOC Fingerprint Sensor (press):\n - #0: right-index-finger\n",
@@ -767,11 +743,7 @@ mod tests {
             );
         let c = git(&mut s, &env());
         assert_eq!(c.state, State::Done);
-        assert!(
-            c.summary.contains("Kuba Example <kuba@example.com>"),
-            "{}",
-            c.summary
-        );
+        assert!(c.summary.contains("Kuba Example <kuba@example.com>"), "{}", c.summary);
     }
 
     #[test]
@@ -783,12 +755,17 @@ mod tests {
         let mut s = FakeSys::new();
         s.bw = Fake::new()
             .locked("https://vault.bitwarden.eu", "k@x.eu")
-            .file("/home/kuba/.config/dot-bw/config", "server=https://vault.bitwarden.eu\nfolders=Work\n")
+            .file(
+                "/home/kuba/.config/dot-bw/config",
+                "server=https://vault.bitwarden.eu\nfolders=Work\n",
+            )
             .file("/home/kuba/.ssh/config.d/bitwarden", "");
         let c = bitwarden(&mut s, &env());
         assert_eq!(c.state, State::Done);
         assert!(c.summary.contains("k@x.eu"));
-        assert!(matches!(c.facts, Facts::Bitwarden { ref folders, agent: Some(Agent::Off), .. } if folders == &["Work"]));
+        assert!(
+            matches!(c.facts, Facts::Bitwarden { ref folders, agent: Some(Agent::Off), .. } if folders == &["Work"])
+        );
 
         // Logged out, but the config remembers the email for the form.
         let mut s = FakeSys::new();
@@ -819,7 +796,9 @@ mod tests {
 
     #[test]
     fn a_phone_card_that_is_on_waits_for_a_phone_then_for_the_user_to_accept() {
-        use kubaos_phone::fake::{Fake, iphone_asking, stranger};
+        use kubaos_phone::fake::Fake;
+        use kubaos_phone::fake::iphone_asking;
+        use kubaos_phone::fake::stranger;
 
         let down = phone_card(Fake {
             on: true,
@@ -839,7 +818,8 @@ mod tests {
 
     #[test]
     fn a_paired_phone_is_done_with_its_reach_and_battery() {
-        use kubaos_phone::fake::{Fake, iphone};
+        use kubaos_phone::fake::Fake;
+        use kubaos_phone::fake::iphone;
 
         let c = phone_card(Fake::running(vec![iphone()]));
 

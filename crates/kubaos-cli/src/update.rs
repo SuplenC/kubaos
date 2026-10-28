@@ -127,8 +127,7 @@ pub fn update(args: &UpdateArgs) -> ExitCode {
         Err(code) => return code,
     };
     let mut ui = Ui::new(Mode::detect(args.json));
-    let mut updater =
-        Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
+    let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     if args.check {
         return done(updater.check());
     }
@@ -142,8 +141,7 @@ pub fn upgrade(args: &UpgradeArgs) -> ExitCode {
         Err(code) => return code,
     };
     let mut ui = Ui::new(Mode::detect(args.json));
-    let mut updater =
-        Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
+    let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     done(updater.upgrade())
 }
 
@@ -153,8 +151,7 @@ pub fn rollback(args: &RollbackArgs) -> ExitCode {
         Err(code) => return code,
     };
     let mut ui = Ui::new(Mode::detect(args.json));
-    let mut updater =
-        Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
+    let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     done(updater.rollback(confirm(args.yes)))
 }
 
@@ -164,8 +161,7 @@ pub fn channel(args: &ChannelArgs) -> ExitCode {
         Err(code) => return code,
     };
     let mut ui = Ui::new(Mode::Plain);
-    let mut updater =
-        Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
+    let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     let Some(name) = &args.channel else {
         return match updater.installed() {
             Ok(installed) => {

@@ -29,11 +29,23 @@ use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 
+use kubaos_core::Event;
+use kubaos_core::InstallConfig;
+use kubaos_core::Level;
+use kubaos_core::Manifest;
+use kubaos_core::Probe;
+use kubaos_core::Secrets;
+use kubaos_core::StepId;
+use kubaos_core::demo;
 use kubaos_core::engine;
 use kubaos_core::engine::RunOptions;
 use kubaos_core::engine::runner;
-use kubaos_core::probe::{DiskInfo, PartitionInfo, Region, WallpaperFile, WallpaperSet, WifiNetwork};
-use kubaos_core::{Event, InstallConfig, Level, Manifest, Probe, Secrets, StepId, demo};
+use kubaos_core::probe::DiskInfo;
+use kubaos_core::probe::PartitionInfo;
+use kubaos_core::probe::Region;
+use kubaos_core::probe::WallpaperFile;
+use kubaos_core::probe::WallpaperSet;
+use kubaos_core::probe::WifiNetwork;
 use signal_hook::consts::SIGHUP;
 use signal_hook::consts::SIGINT;
 use signal_hook::consts::SIGTERM;
@@ -154,12 +166,7 @@ fn systemctl(verb: &str) -> Result<(), String> {
 impl Engine {
     /// Checks what `kubaos run` checks before it starts, then installs. A failing step is reported
     /// by its `failed` event, so only a refusal or a crash comes back as `Err`.
-    fn install(
-        &self,
-        config: &InstallConfig,
-        secrets: &Secrets,
-        emit: &mut dyn FnMut(RunMsg),
-    ) -> Result<(), String> {
+    fn install(&self, config: &InstallConfig, secrets: &Secrets, emit: &mut dyn FnMut(RunMsg)) -> Result<(), String> {
         // Marked before preflight, so a stop or a signal during it holds and the engine stops at
         // its first step. Marked after, `Installing::start` would clear it.
         let _installing = Installing::start();
@@ -513,10 +520,7 @@ pub fn demo_probe() -> Probe {
         keymaps: strings(&[
             "us", "us(intl)", "gb", "it", "de", "fr", "es", "pl", "jp", "dvorak", "colemak",
         ]),
-        timezones: crate::data::TIMEZONES
-            .iter()
-            .map(|s| s.to_string())
-            .collect(),
+        timezones: crate::data::TIMEZONES.iter().map(|s| s.to_string()).collect(),
         locales: strings(&[
             "en_US.UTF-8",
             "en_GB.UTF-8",
@@ -581,7 +585,11 @@ pub fn demo_probe() -> Probe {
 const DEMO_WALLPAPERS: [(&str, &[&str]); 3] = [
     (
         "cyberpunk",
-        &["akihabara-after-rain.jpg", "shibuya-rainy-corner.jpg", "shinjuku-neon-canyon.jpg"],
+        &[
+            "akihabara-after-rain.jpg",
+            "shibuya-rainy-corner.jpg",
+            "shinjuku-neon-canyon.jpg",
+        ],
     ),
     ("japanese", &["shinjuku-purple-hour.jpg", "tokyo-tower-blue-hour.jpg"]),
     (
@@ -597,7 +605,8 @@ const DEMO_WALLPAPERS: [(&str, &[&str]); 3] = [
 ];
 
 /// A set with its thumbnails where a payload has them. The demo has no payload dir, so they're
-/// placeholders unless the app is pointed at one (`App::payload_dir`, the screenshots' `GALLERY_PAYLOAD`).
+/// placeholders unless the app is pointed at one (`App::payload_dir`, the screenshots'
+/// `GALLERY_PAYLOAD`).
 fn demo_wallpaper_set(id: &str, names: &[&str]) -> WallpaperSet {
     let files: Vec<WallpaperFile> = names
         .iter()

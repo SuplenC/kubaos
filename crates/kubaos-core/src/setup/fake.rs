@@ -2,7 +2,10 @@
 
 use std::collections::BTreeMap;
 
-use super::{Cmd, Output, Stream, Sys};
+use super::Cmd;
+use super::Output;
+use super::Stream;
+use super::Sys;
 
 #[derive(Default)]
 pub struct FakeSys {
@@ -61,18 +64,10 @@ impl FakeSys {
         self.ran.push(line.clone());
         self.stdin.push(cmd.stdin.as_ref().map(|s| s.0.clone()));
         self.env.push(cmd.env.clone());
-        for (_, path) in self
-            .creates
-            .iter()
-            .filter(|(p, _)| line.starts_with(p.as_str()))
-        {
+        for (_, path) in self.creates.iter().filter(|(p, _)| line.starts_with(p.as_str())) {
             self.files.insert(path.clone(), String::new());
         }
-        match self
-            .responses
-            .iter()
-            .find(|(p, _)| line.starts_with(p.as_str()))
-        {
+        match self.responses.iter().find(|(p, _)| line.starts_with(p.as_str())) {
             Some((_, Ok(out))) => Ok(Output {
                 stdout: out.clone(),
                 stderr: String::new(),

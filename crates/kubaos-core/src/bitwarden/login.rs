@@ -62,7 +62,9 @@ pub struct LoginRequest {
 #[derive(Debug, Clone)]
 pub enum Login {
     /// bw asks for the master password and the authenticator code on the terminal.
-    Totp { email: String },
+    Totp {
+        email: String,
+    },
     /// bw asks for client_id and client_secret on the terminal.
     ApiKeyPrompt,
     Sso,
@@ -74,7 +76,10 @@ pub enum Login {
         code: String,
     },
     /// From the form: the key in bw's environment.
-    ApiKey { client_id: String, client_secret: Sensitive },
+    ApiKey {
+        client_id: String,
+        client_secret: Sensitive,
+    },
 }
 
 /// Questions for the person at the terminal.
@@ -143,7 +148,10 @@ pub fn login(
         config.write(m, paths)?;
     }
     if !logged_out && current != server {
-        return Err(Error::OtherServer { current, wanted: server });
+        return Err(Error::OtherServer {
+            current,
+            wanted: server,
+        });
     }
 
     let mut session = None;
@@ -222,7 +230,10 @@ fn form_login(m: &mut dyn Machine, paths: &Paths, config: &mut Config, f: &Form)
                 method: if f.method == FormMethod::Totp { "0" } else { "3" },
                 code: code.to_string(),
             };
-            m.login(&how).map_err(|cause| Error::Login { what: "login failed", cause })?
+            m.login(&how).map_err(|cause| Error::Login {
+                what: "login failed",
+                cause,
+            })?
         }
         FormMethod::ApiKey => {
             let (id, secret) = (f.client_id.trim(), f.client_secret.0.trim());
@@ -233,8 +244,10 @@ fn form_login(m: &mut dyn Machine, paths: &Paths, config: &mut Config, f: &Form)
                 client_id: id.to_string(),
                 client_secret: Sensitive(secret.to_string()),
             };
-            m.login(&how)
-                .map_err(|cause| Error::Login { what: "API key login failed", cause })?;
+            m.login(&how).map_err(|cause| Error::Login {
+                what: "API key login failed",
+                cause,
+            })?;
             None
         }
     };

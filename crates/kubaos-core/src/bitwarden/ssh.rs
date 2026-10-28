@@ -78,7 +78,10 @@ pub enum KeyProblem {
     Empty,
     /// A newline or another control character, after `before`: a `.pub` file is one line, and
     /// the same text goes into `allowed_signers`.
-    Control { before: String, newline: bool },
+    Control {
+        before: String,
+        newline: bool,
+    },
     /// A type Bitwarden's agent doesn't serve.
     Kind(String),
     /// The second word isn't base64, or is missing.
@@ -236,10 +239,15 @@ fn bare_alias(host: &str) -> bool {
 /// The `hostname` an alias most likely stands for, for the fix in its warning.
 fn likely_hostname(alias: &str) -> &'static str {
     let alias = alias.to_ascii_lowercase();
-    [("github", "github.com"), ("gitlab", "gitlab.com"), ("bitbucket", "bitbucket.org"), ("codeberg", "codeberg.org")]
-        .into_iter()
-        .find(|(word, _)| alias.contains(word))
-        .map_or("the server's name or address", |(_, host)| host)
+    [
+        ("github", "github.com"),
+        ("gitlab", "gitlab.com"),
+        ("bitbucket", "bitbucket.org"),
+        ("codeberg", "codeberg.org"),
+    ]
+    .into_iter()
+    .find(|(word, _)| alias.contains(word))
+    .map_or("the server's name or address", |(_, host)| host)
 }
 
 /// The values a Host block takes from an item, checked for ssh_config.
@@ -254,10 +262,18 @@ struct HostFields {
 /// Why an item gets no Host block.
 enum NoBlock {
     /// A control character in a field: a newline plus `ProxyCommand` would run commands.
-    Control { field: &'static str, before: String, newline: bool },
+    Control {
+        field: &'static str,
+        before: String,
+        newline: bool,
+    },
     NoHosts,
     /// Characters ssh_config can't take safely in a field, and the ones it takes there.
-    Unsafe { field: &'static str, value: String, allowed: &'static str },
+    Unsafe {
+        field: &'static str,
+        value: String,
+        allowed: &'static str,
+    },
 }
 
 fn host_fields(item: &Item) -> Result<HostFields, NoBlock> {
@@ -277,8 +293,15 @@ fn host_fields(item: &Item) -> Result<HostFields, NoBlock> {
         return Err(NoBlock::NoHosts);
     }
     let all = |s: &str, ok: fn(char) -> bool| s.chars().all(ok);
-    let unsafe_in = |field, value: &str, allowed| NoBlock::Unsafe { field, value: value.to_string(), allowed };
-    if let Some(h) = hosts.iter().find(|h| !all(h, |c| c.is_ascii_alphanumeric() || "[].*?!_:%-".contains(c))) {
+    let unsafe_in = |field, value: &str, allowed| NoBlock::Unsafe {
+        field,
+        value: value.to_string(),
+        allowed,
+    };
+    if let Some(h) = hosts
+        .iter()
+        .find(|h| !all(h, |c| c.is_ascii_alphanumeric() || "[].*?!_:%-".contains(c)))
+    {
         return Err(unsafe_in("hosts", h, "letters, digits and . - _ : % * ? ! [ ]"));
     }
     if !all(hostname, |c| c.is_ascii_alphanumeric() || "._:%-".contains(c)) {
@@ -364,7 +387,13 @@ fn host_blocks(blocks: &[Block], sock: &str) -> String {
 /// # Errors
 ///
 /// A file can't be written.
-pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &mut [Key], scope: &str, p: &mut Progress) -> Result<Vec<KeyInfo>, Error> {
+pub fn apply(
+    m: &mut dyn Machine,
+    paths: &Paths,
+    keys: &mut [Key],
+    scope: &str,
+    p: &mut Progress,
+) -> Result<Vec<KeyInfo>, Error> {
     p.step("SSH: public keys and Host blocks");
     for dir in [paths.ssh.clone(), paths.ssh.join("config.d"), paths.state.clone()] {
         m.mkdir(&dir, 0o700).map_err(|e| Error::write(&dir, e))?;
@@ -476,7 +505,12 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &mut [Key], scope: &str, 
         info.hosts.clone_from(&fields.hosts);
         info.block = true;
         infos.push(info);
-        blocks.push(Block { label: label.clone(), fingerprint: fp, fields, pub_path });
+        blocks.push(Block {
+            label: label.clone(),
+            fingerprint: fp,
+            fields,
+            pub_path,
+        });
         with_block.push(label);
     }
     let conf = host_blocks(&blocks, &sock);
@@ -489,7 +523,10 @@ pub fn apply(m: &mut dyn Machine, paths: &Paths, keys: &mut [Key], scope: &str, 
         one_line(scope)
     );
     write_if_changed(m, &config, &text, 0o600)?;
-    p.ok(format!("~/.ssh/config.d/bitwarden ({} Host block(s))", with_block.len()));
+    p.ok(format!(
+        "~/.ssh/config.d/bitwarden ({} Host block(s))",
+        with_block.len()
+    ));
 
     remove_stale(m, paths, &written, p);
     let state = paths.pubkeys();
@@ -541,4 +578,3 @@ pub fn write_if_changed(m: &mut dyn Machine, path: &std::path::Path, contents: &
 pub fn on_disk(m: &mut dyn Machine, path: &std::path::Path) -> Option<String> {
     m.read(path).map(|s| key_of(&s))
 }
-

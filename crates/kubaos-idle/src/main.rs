@@ -25,8 +25,8 @@
 //!
 //! # Owns
 //!
-//! - The command line, running the programs, the toasts, and the holders' loops (`awake hold`,
-//!   `lid hold`, which run as systemd user units under `systemd-inhibit`).
+//! - The command line, running the programs, the toasts, and the holders' loops (`awake hold`, `lid
+//!   hold`, which run as systemd user units under `systemd-inhibit`).
 //!
 //! # Not here
 //!

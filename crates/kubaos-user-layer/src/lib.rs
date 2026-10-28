@@ -4,13 +4,13 @@
 //!
 //! # Owns
 //!
-//! - The apps with a folder in the user layer, each one's group and name ([`App`], [`Group`]),
-//!   and the layer's root under the config home ([`root`], [`dir`], [`config_home`]).
+//! - The apps with a folder in the user layer, each one's group and name ([`App`], [`Group`]), and
+//!   the layer's root under the config home ([`root`], [`dir`], [`config_home`]).
 //!
 //! # Not here
 //!
-//! - The same table in the other languages: `home/user-layer.nix` (Nix, and through the layer
-//!   file it writes, `scripts/dot-config`), `config/hypr/user_layer.lua`,
+//! - The same table in the other languages: `home/user-layer.nix` (Nix, and through the layer file
+//!   it writes, `scripts/dot-config`), `config/hypr/user_layer.lua`,
 //!   `config/nvim/lua/config/user.lua` and `config/quickshell/settings/UserLayer.qml`.
 //! - The seeds, `user-layer/` in the repo, which the tests hold this table to.
 //! - Reading or writing an app's settings: the app's own crate.

@@ -2,10 +2,15 @@
 //! dry run prints instead of acting and tests can record what would happen.
 
 use std::collections::HashMap;
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::io::Read;
+use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::Child;
+use std::process::Command;
+use std::process::Stdio;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -206,9 +211,7 @@ impl Runner for SystemRunner {
             .spawn()
             .map_err(|e| format!("{}: {e}", cmd.program))?;
         Self::feed_stdin(&mut child, cmd)?;
-        let out = child
-            .wait_with_output()
-            .map_err(|e| format!("{}: {e}", cmd.program))?;
+        let out = child.wait_with_output().map_err(|e| format!("{}: {e}", cmd.program))?;
         let o = Output {
             stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
             stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
@@ -217,10 +220,7 @@ impl Runner for SystemRunner {
             Ok(o)
         } else {
             let detail = tail(&format!("{}\n{}", o.stdout, o.stderr), 6);
-            Err(format!(
-                "{} exited with {}: {}",
-                cmd.program, out.status, detail
-            ))
+            Err(format!("{} exited with {}: {}", cmd.program, out.status, detail))
         }
     }
 
@@ -235,14 +235,8 @@ impl Runner for SystemRunner {
         let (tx, rx) = mpsc::channel::<Option<String>>();
         let mut readers = Vec::new();
         for pipe in [
-            child
-                .stdout
-                .take()
-                .map(|p| Box::new(p) as Box<dyn Read + Send>),
-            child
-                .stderr
-                .take()
-                .map(|p| Box::new(p) as Box<dyn Read + Send>),
+            child.stdout.take().map(|p| Box::new(p) as Box<dyn Read + Send>),
+            child.stderr.take().map(|p| Box::new(p) as Box<dyn Read + Send>),
         ]
         .into_iter()
         .flatten()
@@ -278,11 +272,7 @@ impl Runner for SystemRunner {
         if status.success() {
             Ok(())
         } else {
-            Err(format!(
-                "{} exited with {status}: {}",
-                cmd.program,
-                last.join("\n")
-            ))
+            Err(format!("{} exited with {status}: {}", cmd.program, last.join("\n")))
         }
     }
 
@@ -331,8 +321,7 @@ impl Runner for SystemRunner {
                 .mode(mode)
                 .open(&tmp)
                 .map_err(|e| format!("{}: {e}", tmp.display()))?;
-            f.write_all(contents)
-                .map_err(|e| format!("{}: {e}", tmp.display()))?;
+            f.write_all(contents).map_err(|e| format!("{}: {e}", tmp.display()))?;
         }
         std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(mode))
             .map_err(|e| format!("{}: {e}", tmp.display()))?;
@@ -390,11 +379,7 @@ pub enum Action {
     Run(String),
     Spawn(String),
     Kill(u32),
-    Write {
-        path: PathBuf,
-        mode: u32,
-        contents: String,
-    },
+    Write { path: PathBuf, mode: u32, contents: String },
     Mkdir(PathBuf),
 }
 

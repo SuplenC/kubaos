@@ -43,14 +43,10 @@ fn a_write_replaces_the_file_whole() {
         ..State::default()
     })
     .expect("write the first state");
-    file.write(&State::default())
-        .expect("write the second state");
+    file.write(&State::default()).expect("write the second state");
 
     let text = fs::read_to_string(dir.path().join(FILE_NAME)).unwrap();
-    assert_eq!(
-        text,
-        r#"{"agent":false,"prompt":null,"pairing":[],"errors":{}}"#
-    );
+    assert_eq!(text, r#"{"agent":false,"prompt":null,"pairing":[],"errors":{}}"#);
     assert_eq!(
         fs::read_dir(dir.path()).unwrap().count(),
         1,

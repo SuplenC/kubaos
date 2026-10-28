@@ -2,18 +2,12 @@ use super::*;
 
 #[test]
 fn the_address_comes_from_the_object_path() {
-    assert_eq!(
-        address("/org/bluez/hci0/dev_AA_BB_CC_DD_EE_0F"),
-        "AA:BB:CC:DD:EE:0F"
-    );
+    assert_eq!(address("/org/bluez/hci0/dev_AA_BB_CC_DD_EE_0F"), "AA:BB:CC:DD:EE:0F");
 }
 
 #[test]
 fn an_error_is_matched_on_its_names_last_part() {
-    let err = BluezError::new(
-        "org.bluez.Error.AuthenticationFailed",
-        "Authentication Failed",
-    );
+    let err = BluezError::new("org.bluez.Error.AuthenticationFailed", "Authentication Failed");
     assert_eq!(err.short_name(), "AuthenticationFailed");
     assert!(err.is("AuthenticationFailed"));
     assert!(!err.is("Failed"));

@@ -24,8 +24,8 @@
 //!
 //! # Not here
 //!
-//! - The seed with its comments: `user-layer/desktop/clock/clock.toml`. What a countdown's `at` may say:
-//!   [`crate::query`], through `crate::serve`.
+//! - The seed with its comments: `user-layer/desktop/clock/clock.toml`. What a countdown's `at` may
+//!   say: [`crate::query`], through `crate::serve`.
 
 use std::env;
 use std::fs;

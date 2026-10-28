@@ -4,7 +4,10 @@ use super::*;
 fn the_accents_are_on_without_a_file_or_a_line() {
     let dir = tempfile::tempdir().unwrap();
 
-    assert_eq!(Settings::load(&dir.path().join("keyboard.toml")).unwrap(), Settings::default());
+    assert_eq!(
+        Settings::load(&dir.path().join("keyboard.toml")).unwrap(),
+        Settings::default()
+    );
     assert!(Settings::default().mac_accents);
     assert!(Settings::parse("# mac_accents = false\n").unwrap().mac_accents);
 }
@@ -23,8 +26,14 @@ fn the_file_turns_the_accents_off() {
 
 #[test]
 fn an_unknown_key_or_a_wrong_type_is_refused() {
-    assert!(matches!(Settings::parse("accents = false\n"), Err(SettingsError::Parse(_))));
-    assert!(matches!(Settings::parse("mac_accents = \"no\"\n"), Err(SettingsError::Parse(_))));
+    assert!(matches!(
+        Settings::parse("accents = false\n"),
+        Err(SettingsError::Parse(_))
+    ));
+    assert!(matches!(
+        Settings::parse("mac_accents = \"no\"\n"),
+        Err(SettingsError::Parse(_))
+    ));
 }
 
 #[test]
@@ -90,7 +99,10 @@ fn writing_the_layouts_keeps_the_comments_and_the_accents() {
     set_layouts(&path, &[Layout::parse("us"), Layout::parse("it(intl)")]).unwrap();
     set_layouts(&path, &[Layout::parse("de")]).unwrap();
 
-    assert_eq!(fs::read_to_string(&path).unwrap(), "# Mine.\nmac_accents = false\nlayouts = [\"de\"]\n");
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        "# Mine.\nmac_accents = false\nlayouts = [\"de\"]\n"
+    );
     let settings = Settings::load(&path).unwrap();
     assert!(!settings.mac_accents);
     assert_eq!(settings.layouts, ["de"]);

@@ -227,7 +227,8 @@ impl Policy for Stable {
 }
 
 /// The note stable prints when the machine has no allowed signers.
-pub const NO_KEYS_STABLE: &str = "no allowed_signers on this machine: no release can be verified, so only packages update";
+pub const NO_KEYS_STABLE: &str =
+    "no allowed_signers on this machine: no release can be verified, so only packages update";
 
 /// The first of `releases` (newest first) whose tag verifies, noting the ones that don't.
 fn newest_verified(

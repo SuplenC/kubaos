@@ -27,8 +27,8 @@
 //!
 //! # Not here
 //!
-//! - Running `systemd-run`, `systemctl` and the actions: `main.rs`. Reading `10m` and
-//!   `friday 17:00`: `kubaos_clock::duration` and `kubaos_clock::alarm`.
+//! - Running `systemd-run`, `systemctl` and the actions: `main.rs`. Reading `10m` and `friday
+//!   17:00`: `kubaos_clock::duration` and `kubaos_clock::alarm`.
 
 use std::fs;
 use std::io;

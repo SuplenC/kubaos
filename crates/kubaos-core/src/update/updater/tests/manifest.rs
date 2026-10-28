@@ -14,8 +14,8 @@ use crate::apt::Switch;
 use crate::apt::plan::PackageState;
 use crate::update::UpdateError;
 use crate::update::event::GroupChange;
-use crate::update::event::Preview;
 use crate::update::event::Phase;
+use crate::update::event::Preview;
 use crate::update::event::UpdateEvent;
 use crate::update::record::Channel;
 
@@ -334,7 +334,9 @@ fn turning_a_group_off_keeps_what_kubaos_didnt_install_and_says_so() {
     m.dpkg = first.dpkg.take();
     let mut events = Vec::new();
 
-    w.reporting(&mut m, &mut events).set_group("docker", Switch::Off).unwrap();
+    w.reporting(&mut m, &mut events)
+        .set_group("docker", Switch::Off)
+        .unwrap();
 
     assert!(ran(&m, "sudo apt-get remove").is_empty());
     assert!(
@@ -430,7 +432,11 @@ fn the_preview_lists_what_the_manifest_phase_will_install_by_group() {
     w.push(&[(MANIFEST, &manifest(&["curl", "git", "gone-upstream"]))], true);
     let mut m = fake(&["curl", "libpam-u2f"]);
     // apt sees docker-ce only once the phase has set up docker's repository.
-    m.dpkg.as_mut().unwrap().unavailable.extend(["gone-upstream".into(), "docker-ce".into()]);
+    m.dpkg
+        .as_mut()
+        .unwrap()
+        .unavailable
+        .extend(["gone-upstream".into(), "docker-ce".into()]);
     let mut events = Vec::new();
 
     w.reporting(&mut m, &mut events).update(yes()).unwrap();
@@ -456,5 +462,8 @@ fn a_packages_only_preview_lists_the_installed_releases_manifest() {
 
     w.reporting(&mut m, &mut events).update(yes().packages_only()).unwrap();
 
-    assert!(preview(&events).apt.is_empty(), "jq is in the next release, not this one");
+    assert!(
+        preview(&events).apt.is_empty(),
+        "jq is in the next release, not this one"
+    );
 }

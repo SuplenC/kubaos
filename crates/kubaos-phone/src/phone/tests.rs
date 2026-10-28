@@ -172,7 +172,10 @@ fn a_phone_is_picked_by_its_name_in_any_case_or_by_its_id() {
     ]);
 
     assert_eq!(ring(&mut fake, Some("IPAD")).expect("ring the iPad").name, "iPad");
-    assert_eq!(ring(&mut fake, Some(&iphone().id)).expect("ring the iPhone").name, "iPhone");
+    assert_eq!(
+        ring(&mut fake, Some(&iphone().id)).expect("ring the iPhone").name,
+        "iPhone"
+    );
     let err = ring(&mut fake, Some("pixel")).expect_err("no Pixel");
     assert!(matches!(err, Error::Unknown(ref name) if name == "pixel"), "{err}");
 }
@@ -243,7 +246,9 @@ fn a_refusal_from_kdeconnect_keeps_its_reason() {
     let err = ring(&mut fake, None).expect_err("kdeconnectd refuses");
 
     assert!(matches!(err, Error::Link(_)), "{err}");
-    let cause = std::error::Error::source(&err).map(ToString::to_string).unwrap_or_default();
+    let cause = std::error::Error::source(&err)
+        .map(ToString::to_string)
+        .unwrap_or_default();
     assert!(cause.contains("Unknown method ring"), "{cause}");
 }
 
@@ -293,7 +298,10 @@ fn restricting_leaves_a_phone_only_the_plugins_the_link_is_for() {
 
     assert_eq!(on_plugins(&fake, &id), LINK_PLUGINS);
     assert_eq!(changed.len(), 5, "{changed:?}");
-    assert!(changed.iter().any(|c| c == "iPhone: kdeconnect_mousepad off"), "{changed:?}");
+    assert!(
+        changed.iter().any(|c| c == "iPhone: kdeconnect_mousepad off"),
+        "{changed:?}"
+    );
 }
 
 #[test]
@@ -301,7 +309,8 @@ fn a_plugin_kubaos_doesnt_know_stays_off_and_one_the_user_allowed_stays_on() {
     let id = iphone().id;
     let mut fake = Fake::running(vec![iphone()]);
     iphone_plugins(&mut fake, &id);
-    fake.plugins.push((id.clone(), "kdeconnect_from_the_future".into(), true));
+    fake.plugins
+        .push((id.clone(), "kdeconnect_from_the_future".into(), true));
     fake.extra = vec!["kdeconnect_mousepad".into()];
 
     restrict(&mut fake).expect("restrict the plugins");
@@ -354,7 +363,10 @@ fn accepting_a_pairing_restricts_the_new_phone() {
 fn a_typed_path_starting_with_a_tilde_is_under_home() {
     let home = Some(Path::new("/home/kuba"));
 
-    assert_eq!(typed_path("~/Downloads/a.jpg", home), Path::new("/home/kuba/Downloads/a.jpg"));
+    assert_eq!(
+        typed_path("~/Downloads/a.jpg", home),
+        Path::new("/home/kuba/Downloads/a.jpg")
+    );
     assert_eq!(typed_path("~", home), Path::new("/home/kuba"));
     assert_eq!(typed_path("/tmp/~a", home), Path::new("/tmp/~a"));
     assert_eq!(typed_path("~/a.jpg", None), Path::new("~/a.jpg"));

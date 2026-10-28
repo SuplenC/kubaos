@@ -333,7 +333,8 @@ fn shell_radii(theme: &str) -> Vec<(String, u16)> {
         .collect()
 }
 
-/// The violations and bad markers in one file's `text`; `path` is where it is, relative to the root.
+/// The violations and bad markers in one file's `text`; `path` is where it is, relative to the
+/// root.
 pub fn scan_text(path: &str, text: &str, language: Language, context: &Context) -> (Vec<Violation>, Vec<BadMarker>) {
     let lines = source::lines(text, language);
     let in_library = match language {

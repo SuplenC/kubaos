@@ -156,7 +156,10 @@ fn tidy_downloads(scheduled: bool) -> ExitCode {
                 1 => "Tidied 1 file in Downloads".to_owned(),
                 _ => format!("Tidied {moved} files in Downloads"),
             };
-            notify(&summary, "Sorted into Images, Documents, Archives, Installers, Video and Audio.");
+            notify(
+                &summary,
+                "Sorted into Images, Documents, Archives, Installers, Video and Audio.",
+            );
             ExitCode::SUCCESS
         }
         Err(err) => {

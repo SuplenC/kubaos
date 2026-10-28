@@ -1,7 +1,7 @@
 //! The wallpaper sets in the menu: one Item a set on this machine, to show it in the wallpaper
 //! picker or hide it from there. What the picker shows is the sets file,
-//! `~/.config/kubaos/desktop/wallpapers/sets`: a set's id for all of it, `<set>/<file>` for one of its
-//! wallpapers, and every set without the file.
+//! `~/.config/kubaos/desktop/wallpapers/sets`: a set's id for all of it, `<set>/<file>` for one of
+//! its wallpapers, and every set without the file.
 //!
 //! A change is checked here, so a refusal reads in the menu, then made by `dot-theme show-set`
 //! or `hide-set`, which own the file; its change comes back through the watch in `main.rs`.

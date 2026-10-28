@@ -14,9 +14,9 @@
 //!
 //! # Owns
 //!
-//! - The command line and its exit codes: 2 for a usage error, 1 when the command failed, with
-//!   the reason and what to do on stderr. Every command but `status` and `restrict` also says how
-//!   it went in a notification, since the menu runs them with no terminal.
+//! - The command line and its exit codes: 2 for a usage error, 1 when the command failed, with the
+//!   reason and what to do on stderr. Every command but `status` and `restrict` also says how it
+//!   went in a notification, since the menu runs them with no terminal.
 //!
 //! # Not here
 //!
@@ -131,7 +131,9 @@ fn on_message(st: &Status) -> String {
 }
 
 fn sent_file(path: &Path, phone: &Device) -> String {
-    let file = path.file_name().map_or_else(|| path.display().to_string(), |f| f.to_string_lossy().into_owned());
+    let file = path
+        .file_name()
+        .map_or_else(|| path.display().to_string(), |f| f.to_string_lossy().into_owned());
     format!("{file} sent to {}.", phone.name)
 }
 
@@ -160,7 +162,10 @@ fn show(st: &Status, json: bool) -> ExitCode {
             (true, false, _) => "paired, out of reach",
             (false, _, _) => "seen on the network",
         };
-        let battery = d.battery.map(|b| format!(", battery {}%", b.charge)).unwrap_or_default();
+        let battery = d
+            .battery
+            .map(|b| format!(", battery {}%", b.charge))
+            .unwrap_or_default();
         println!("{}\t{}\t{state}{battery}", d.id, d.name);
     }
     ExitCode::SUCCESS

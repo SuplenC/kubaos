@@ -14,8 +14,8 @@
 //!
 //! # Not here
 //!
-//! - The monitor rule, which keeps the panel's position, scale and transform as they are, and
-//!   never touches another screen: `config/hypr/monitors.lua`.
+//! - The monitor rule, which keeps the panel's position, scale and transform as they are, and never
+//!   touches another screen: `config/hypr/monitors.lua`.
 
 use std::path::Path;
 use std::path::PathBuf;

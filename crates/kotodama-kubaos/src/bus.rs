@@ -128,7 +128,8 @@ impl Bus for SystemBus {
         if read.variant() != Some("b") {
             return Err(BusError::answer(property.service, "a boolean"));
         }
-        read.bool().ok_or_else(|| BusError::answer(property.service, "a boolean"))
+        read.bool()
+            .ok_or_else(|| BusError::answer(property.service, "a boolean"))
     }
 
     fn set_bool(&mut self, property: &Property, value: bool) -> Result<(), BusError> {

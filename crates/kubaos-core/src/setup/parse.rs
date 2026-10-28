@@ -28,11 +28,7 @@ pub fn tuxedo_modules(proc_modules: &str) -> Vec<String> {
     proc_modules
         .lines()
         .filter_map(|l| l.split_whitespace().next())
-        .filter(|m| {
-            ["tuxedo", "uniwill", "clevo"]
-                .iter()
-                .any(|p| m.starts_with(p))
-        })
+        .filter(|m| ["tuxedo", "uniwill", "clevo"].iter().any(|p| m.starts_with(p)))
         .map(str::to_string)
         .collect()
 }
@@ -194,19 +190,13 @@ pub fn u2f_count(mappings: &str, user: &str) -> usize {
 /// the leading colon already gone): base64 fields, never a `:` or a newline.
 pub fn valid_credential(c: &str) -> bool {
     let parts: Vec<&str> = c.split(',').collect();
-    let b64 = |s: &str| {
-        !s.is_empty()
-            && s.chars()
-                .all(|ch| ch.is_ascii_alphanumeric() || "+/=_-".contains(ch))
-    };
+    let b64 = |s: &str| !s.is_empty() && s.chars().all(|ch| ch.is_ascii_alphanumeric() || "+/=_-".contains(ch));
     parts.len() == 4
         && (b64(parts[0]) || parts[0] == "*")
         && b64(parts[1])
         && parts[2].chars().all(|ch| ch.is_ascii_alphanumeric())
         && !parts[2].is_empty()
-        && parts[3]
-            .chars()
-            .all(|ch| ch.is_ascii_lowercase() || ch == '+')
+        && parts[3].chars().all(|ch| ch.is_ascii_lowercase() || ch == '+')
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -254,9 +244,7 @@ pub fn bw_error(stderr: &str) -> (String, Option<String>) {
             "Bitwarden didn't take that code",
             "Codes last 30 seconds. Type the next one, quicker.",
         )
-    } else if s.contains("username or password is incorrect")
-        || s.contains("invalid master password")
-    {
+    } else if s.contains("username or password is incorrect") || s.contains("invalid master password") {
         pick(
             "wrong email or master password",
             "Check both and try again, slower this time.",
@@ -343,10 +331,7 @@ mod tests {
             parse_mok("/var/lib/dkms/mok.pub is not enrolled"),
             MokState::NotEnrolled
         );
-        assert_eq!(
-            parse_mok("EFI variables are not supported"),
-            MokState::Unknown
-        );
+        assert_eq!(parse_mok("EFI variables are not supported"), MokState::Unknown);
     }
 
     #[test]
@@ -367,10 +352,7 @@ mod tests {
         assert_eq!(l.device.as_deref(), Some("Goodix MOC Fingerprint Sensor"));
         assert!(l.fingers.is_empty());
 
-        assert_eq!(
-            parse_fprintd_list("No devices available\n"),
-            FprintList::default()
-        );
+        assert_eq!(parse_fprintd_list("No devices available\n"), FprintList::default());
     }
 
     #[test]
@@ -378,22 +360,13 @@ mod tests {
         assert_eq!(finger_name("right-index-finger"), "right index");
         assert_eq!(finger_name("left-thumb"), "left thumb");
         assert_eq!(next_finger(&[]), "right-index-finger");
-        assert_eq!(
-            next_finger(&["right-index-finger".into()]),
-            "left-index-finger"
-        );
+        assert_eq!(next_finger(&["right-index-finger".into()]), "left-index-finger");
     }
 
     #[test]
     fn enroll_results() {
-        assert_eq!(
-            enroll_line("Enroll result: enroll-stage-passed"),
-            Enroll::Stage
-        );
-        assert_eq!(
-            enroll_line("Enroll result: enroll-completed"),
-            Enroll::Completed
-        );
+        assert_eq!(enroll_line("Enroll result: enroll-stage-passed"), Enroll::Stage);
+        assert_eq!(enroll_line("Enroll result: enroll-completed"), Enroll::Completed);
         assert!(matches!(
             enroll_line("Enroll result: enroll-retry-scan"),
             Enroll::Retry(_)
@@ -402,10 +375,7 @@ mod tests {
             enroll_line("Enroll result: enroll-duplicate"),
             Enroll::Failed("that finger is enrolled already".into())
         );
-        assert_eq!(
-            enroll_line("Enrolling right-index-finger finger."),
-            Enroll::Other
-        );
+        assert_eq!(enroll_line("Enrolling right-index-finger finger."), Enroll::Other);
     }
 
     #[test]
@@ -434,7 +404,8 @@ mod tests {
 
     #[test]
     fn mappings() {
-        let m = "other:a,b,es256,+presence\nkuba:k1,p1,es256,+presence+verification:k2,p2,es256,+presence+verification\n";
+        let m =
+            "other:a,b,es256,+presence\nkuba:k1,p1,es256,+presence+verification:k2,p2,es256,+presence+verification\n";
         assert_eq!(u2f_count(m, "kuba"), 2);
         assert_eq!(u2f_count(m, "jak"), 0);
         assert_eq!(u2f_count("", "kuba"), 0);
@@ -464,10 +435,7 @@ mod tests {
 
         assert_eq!(server_url("eu").unwrap(), "https://vault.bitwarden.eu");
         assert_eq!(server_url("").unwrap(), "https://vault.bitwarden.com");
-        assert_eq!(
-            server_url("https://bw.home.lan/").unwrap(),
-            "https://bw.home.lan"
-        );
+        assert_eq!(server_url("https://bw.home.lan/").unwrap(), "https://bw.home.lan");
         assert!(server_url("http://insecure").is_err());
     }
 

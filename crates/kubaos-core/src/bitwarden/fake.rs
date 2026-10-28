@@ -160,7 +160,9 @@ impl Fake {
                     self.keyring.insert((p, n), Secret { label, value });
                 }
             }
-            Some("clear") if ours => self.keyring.retain(|(p, _), _| project.as_ref().is_some_and(|w| w != p)),
+            Some("clear") if ours => self
+                .keyring
+                .retain(|(p, _), _| project.as_ref().is_some_and(|w| w != p)),
             Some("search") => {
                 let hits: Vec<&Secret> = self
                     .keyring
@@ -172,7 +174,8 @@ impl Fake {
                     ran.code = Some(1);
                 }
                 for s in hits {
-                    ran.stdout.push_str(&format!("[/1]\nlabel = {}\nsecret = {}\n", s.label, s.value));
+                    ran.stdout
+                        .push_str(&format!("[/1]\nlabel = {}\nsecret = {}\n", s.label, s.value));
                     ran.stderr.push_str("attribute.service = dotfiles-env\n");
                 }
             }
@@ -189,11 +192,17 @@ impl Bw for Fake {
 
     fn status(&mut self, session: Option<&Session>) -> Result<String, BwError> {
         self.bw.push("status".into());
-        let status = if self.session_ok(session) { "unlocked" } else { self.state.as_str() };
+        let status = if self.session_ok(session) {
+            "unlocked"
+        } else {
+            self.state.as_str()
+        };
         let quoted = |s: Option<&str>| s.map_or("null".to_string(), |s| format!("\"{s}\""));
         let server = quoted(self.server.as_deref());
         let email = quoted(Some(self.email.as_str()).filter(|e| !e.is_empty()));
-        Ok(format!(r#"{{"serverUrl":{server},"userEmail":{email},"status":"{status}"}}"#))
+        Ok(format!(
+            r#"{{"serverUrl":{server},"userEmail":{email},"status":"{status}"}}"#
+        ))
     }
 
     fn set_server(&mut self, url: &str) -> Result<(), BwError> {

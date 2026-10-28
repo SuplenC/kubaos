@@ -67,7 +67,11 @@ fn items() -> Vec<serde_json::Value> {
             "work",
             Some("f-work"),
             2,
-            json!([field("hosts", "github-work"), field("hostname", "github.com"), field("user", "git")]),
+            json!([
+                field("hosts", "github-work"),
+                field("hostname", "github.com"),
+                field("user", "git")
+            ]),
         ),
         ssh_item(
             "Build server",
@@ -131,10 +135,18 @@ fn machine() -> Fake {
             &agent_lists(&["github", "work", "build", "dup", "evil"]),
         )
         .answer("git -C / config --get user.email", 0, "k@x.eu\n")
-        .answer("git -C / config --get-all include.path", 0, "~/.config/git-bitwarden/signing.gitconfig\n")
+        .answer(
+            "git -C / config --get-all include.path",
+            0,
+            "~/.config/git-bitwarden/signing.gitconfig\n",
+        )
         .answer("gh auth token", 1, "")
         .answer("gh auth login", 0, "")
-        .answer("gh auth status", 0, "github.com\n  ✓ Logged in to github.com account kuba (keyring)\n");
+        .answer(
+            "gh auth status",
+            0,
+            "github.com\n  ✓ Logged in to github.com account kuba (keyring)\n",
+        );
     m.sockets.insert(AGENT.into());
     m
 }
@@ -194,11 +206,16 @@ fn ssh_only() -> Parts {
 }
 
 fn host_blocks(m: &Fake) -> usize {
-    m.text(SSH_CONFIG).unwrap().lines().filter(|l| l.starts_with("Host ")).count()
+    m.text(SSH_CONFIG)
+        .unwrap()
+        .lines()
+        .filter(|l| l.starts_with("Host "))
+        .count()
 }
 
 fn public_key(m: &Fake, file: &str) -> Option<String> {
-    m.text(&format!("{HOME}/.ssh/{file}")).map(|s| s.split(' ').take(2).collect::<Vec<_>>().join(" "))
+    m.text(&format!("{HOME}/.ssh/{file}"))
+        .map(|s| s.split(' ').take(2).collect::<Vec<_>>().join(" "))
 }
 
 // ------------------------------------------------------------------ ssh
@@ -209,7 +226,11 @@ fn a_pull_takes_every_ssh_key_in_the_vault_whatever_its_folder() {
 
     let out = pull_all(&mut m);
 
-    assert!(out.text().contains("8 items, 5 SSH key(s) in your vault"), "{}", out.text());
+    assert!(
+        out.text().contains("8 items, 5 SSH key(s) in your vault"),
+        "{}",
+        out.text()
+    );
     for (file, key) in [
         ("github.pub", "github"),
         ("github-2.pub", "dup"),
@@ -233,9 +254,9 @@ fn of_two_keys_with_one_name_the_older_keeps_the_plain_file_and_the_newer_is_nam
 
     let out = pull_all(&mut m);
 
-    assert!(out.warned(
-        "~/.ssh/github.pub is taken by \"GitHub\" (Personal): \"GitHub\" (Work) gets ~/.ssh/github-2.pub"
-    ));
+    assert!(
+        out.warned("~/.ssh/github.pub is taken by \"GitHub\" (Personal): \"GitHub\" (Work) gets ~/.ssh/github-2.pub")
+    );
     assert_eq!(public_key(&m, "github.pub").as_deref(), Some("ssh-ed25519 AAAAgithub"));
     assert_eq!(public_key(&m, "github-2.pub").as_deref(), Some("ssh-ed25519 AAAAdup"));
 }
@@ -248,7 +269,11 @@ fn the_summary_names_the_keys_with_a_host_block_and_the_keys_without() {
 
     let summary = &out.report.summary;
     assert!(summary.contains(&"ssh    5 public key(s), 3 Host block(s) in ~/.ssh/config.d/bitwarden".to_string()));
-    assert!(summary.contains(&"       Host blocks: GitHub (Personal), Work GitHub (Work), Build server (no folder)".to_string()));
+    assert!(
+        summary.contains(
+            &"       Host blocks: GitHub (Personal), Work GitHub (Work), Build server (no folder)".to_string()
+        )
+    );
     assert!(summary.contains(
         &"       key only: GitHub (Work). A 'hosts' field (hosts=example.com) gives a key its Host block".to_string()
     ));
@@ -289,7 +314,13 @@ fn a_field_smuggling_a_directive_gets_no_host_block() {
 
 #[test]
 fn characters_ssh_config_cant_take_get_no_host_block() {
-    let evil = ssh_item("Quote", "quote", None, 1, json!([field("hosts", "x\"y"), field("user", "a b")]));
+    let evil = ssh_item(
+        "Quote",
+        "quote",
+        None,
+        1,
+        json!([field("hosts", "x\"y"), field("user", "a b")]),
+    );
     let mut m = with_items(machine(), &[evil]);
 
     let out = pull_all(&mut m);
@@ -307,13 +338,22 @@ fn a_name_with_a_newline_stays_on_one_line_in_the_ssh_config() {
 
     let conf = m.text(SSH_CONFIG).unwrap();
     assert!(conf.contains("# Two lines (no folder) (SHA256:two)\nHost two.example\n"));
-    assert_eq!(m.text("/home/kuba/.ssh/two-lines.pub"), Some("ssh-ed25519 AAAAtwo bitwarden:Two lines\n"));
+    assert_eq!(
+        m.text("/home/kuba/.ssh/two-lines.pub"),
+        Some("ssh-ed25519 AAAAtwo bitwarden:Two lines\n")
+    );
 }
 
 #[test]
 fn a_host_in_two_items_warns_that_ssh_offers_both_keys() {
     let a = ssh_item("Personal GitHub", "a", None, 1, json!([field("hosts", "github.com")]));
-    let b = ssh_item("Work GitHub", "b", None, 2, json!([field("hosts", "github.com gist.github.com")]));
+    let b = ssh_item(
+        "Work GitHub",
+        "b",
+        None,
+        2,
+        json!([field("hosts", "github.com gist.github.com")]),
+    );
     let mut m = with_items(machine(), &[a, b]);
 
     let out = pull_all(&mut m);
@@ -346,13 +386,21 @@ fn default_and_aliases() -> Vec<serde_json::Value> {
 }
 
 fn host_lines(m: &Fake) -> Vec<String> {
-    m.text(SSH_CONFIG).unwrap().lines().filter(|l| l.starts_with("Host ")).map(str::to_string).collect()
+    m.text(SSH_CONFIG)
+        .unwrap()
+        .lines()
+        .filter(|l| l.starts_with("Host "))
+        .map(str::to_string)
+        .collect()
 }
 
 #[test]
 fn blocks_with_a_wildcard_come_after_every_specific_block_in_vault_order() {
     let mut items = default_and_aliases();
-    items.insert(1, ssh_item("Lab", "lab", None, 4, json!([field("hosts", "*.lab lab-?")])));
+    items.insert(
+        1,
+        ssh_item("Lab", "lab", None, 4, json!([field("hosts", "*.lab lab-?")])),
+    );
     let mut m = with_items(machine(), &items);
 
     pull_all(&mut m);
@@ -385,7 +433,13 @@ fn an_alias_offers_only_its_own_key_not_the_default_one_too() {
 #[test]
 fn a_wildcard_block_leaves_out_only_the_other_blocks_hosts() {
     let mixed = ssh_item("Mixed", "mixed", None, 1, json!([field("hosts", "* jump-box")]));
-    let alias = ssh_item("Alias", "alias", None, 2, json!([field("hosts", "github-a"), field("hostname", "github.com")]));
+    let alias = ssh_item(
+        "Alias",
+        "alias",
+        None,
+        2,
+        json!([field("hosts", "github-a"), field("hostname", "github.com")]),
+    );
     let mut m = with_items(machine(), &[mixed, alias]);
 
     pull_all(&mut m);
@@ -416,12 +470,20 @@ fn with_public_key(name: &str, slug: &str, key: &str, fields: serde_json::Value)
 
 #[test]
 fn a_public_key_with_a_comment_is_written_without_the_comment() {
-    let item = with_public_key("Mac", "mac", "ssh-ed25519 AAAAmac jakub@macbook", json!([field("hosts", "mac.example")]));
+    let item = with_public_key(
+        "Mac",
+        "mac",
+        "ssh-ed25519 AAAAmac jakub@macbook",
+        json!([field("hosts", "mac.example")]),
+    );
     let mut m = with_items(machine(), &[item]);
 
     let out = pull_all(&mut m);
 
-    assert_eq!(m.text("/home/kuba/.ssh/mac.pub"), Some("ssh-ed25519 AAAAmac bitwarden:Mac\n"));
+    assert_eq!(
+        m.text("/home/kuba/.ssh/mac.pub"),
+        Some("ssh-ed25519 AAAAmac bitwarden:Mac\n")
+    );
     assert_eq!(host_blocks(&m), 1);
     assert!(!out.warned("Mac (Work):"), "{:?}", out.report.warnings);
 }
@@ -433,17 +495,28 @@ fn a_public_key_with_runs_of_spaces_is_written_with_single_ones() {
 
     pull_all(&mut m);
 
-    assert_eq!(m.text("/home/kuba/.ssh/spaced.pub"), Some("ssh-ed25519 AAAAspaced bitwarden:Spaced\n"));
+    assert_eq!(
+        m.text("/home/kuba/.ssh/spaced.pub"),
+        Some("ssh-ed25519 AAAAspaced bitwarden:Spaced\n")
+    );
 }
 
 #[test]
 fn a_public_key_ending_in_a_line_break_is_written_without_it() {
-    let item = with_public_key("Alias2k", "alias", "ssh-ed25519 AAAAalias me@work\n", json!([field("hosts", "alias.example")]));
+    let item = with_public_key(
+        "Alias2k",
+        "alias",
+        "ssh-ed25519 AAAAalias me@work\n",
+        json!([field("hosts", "alias.example")]),
+    );
     let mut m = with_items(machine(), &[item]);
 
     let out = pull_all(&mut m);
 
-    assert_eq!(m.text("/home/kuba/.ssh/alias2k.pub"), Some("ssh-ed25519 AAAAalias bitwarden:Alias2k\n"));
+    assert_eq!(
+        m.text("/home/kuba/.ssh/alias2k.pub"),
+        Some("ssh-ed25519 AAAAalias bitwarden:Alias2k\n")
+    );
     assert!(!out.warned("Alias2k (Work):"), "{:?}", out.report.warnings);
 }
 
@@ -473,14 +546,26 @@ fn a_public_key_of_an_unknown_type_names_the_type() {
 
 #[test]
 fn a_signing_key_with_a_comment_signs() {
-    let item = with_public_key("Signer", "signer", "ssh-ed25519 AAAAsigner me@mac", json!([{ "name": "signing", "value": "true", "type": 2 }]));
+    let item = with_public_key(
+        "Signer",
+        "signer",
+        "ssh-ed25519 AAAAsigner me@mac",
+        json!([{ "name": "signing", "value": "true", "type": 2 }]),
+    );
     let mut m = with_items(machine(), &[item]);
 
     let out = pull_all(&mut m);
 
     assert!(!out.warned("signing is left as it was"), "{:?}", out.report.warnings);
-    assert!(m.text(SIGNING).unwrap().contains("signingKey = /home/kuba/.ssh/signer.pub"));
-    assert_eq!(m.text(SIGNERS), Some("k@x.eu namespaces=\"git\" ssh-ed25519 AAAAsigner\n"));
+    assert!(
+        m.text(SIGNING)
+            .unwrap()
+            .contains("signingKey = /home/kuba/.ssh/signer.pub")
+    );
+    assert_eq!(
+        m.text(SIGNERS),
+        Some("k@x.eu namespaces=\"git\" ssh-ed25519 AAAAsigner\n")
+    );
 }
 
 #[test]
@@ -492,34 +577,70 @@ fn a_pub_on_disk_with_another_comment_counts_as_the_same_key() {
     let out = pull_all(&mut m);
 
     assert!(!out.warned("different key on disk"), "{:?}", out.report.warnings);
-    assert_eq!(m.text("/home/kuba/.ssh/github.pub"), Some("ssh-ed25519 AAAAgithub bitwarden:GitHub\n"));
+    assert_eq!(
+        m.text("/home/kuba/.ssh/github.pub"),
+        Some("ssh-ed25519 AAAAgithub bitwarden:GitHub\n")
+    );
 }
 
 #[test]
 fn field_names_match_whatever_their_case_and_surrounding_spaces() {
-    let a = ssh_item("A", "a", None, 1, json!([field("Hosts", "a-alias"), field("HostName", "a.example"), field(" User", "git")]));
-    let b = ssh_item("B", "b", None, 2, json!([field("hosts", "b-alias"), field("hostname ", "b.example")]));
+    let a = ssh_item(
+        "A",
+        "a",
+        None,
+        1,
+        json!([
+            field("Hosts", "a-alias"),
+            field("HostName", "a.example"),
+            field(" User", "git")
+        ]),
+    );
+    let b = ssh_item(
+        "B",
+        "b",
+        None,
+        2,
+        json!([field("hosts", "b-alias"), field("hostname ", "b.example")]),
+    );
     let mut m = with_items(machine(), &[a, b]);
 
     let out = pull_all(&mut m);
 
     let conf = m.text(SSH_CONFIG).unwrap();
-    assert!(conf.contains("Host a-alias\n  HostName a.example\n  User git\n"), "{conf}");
+    assert!(
+        conf.contains("Host a-alias\n  HostName a.example\n  User git\n"),
+        "{conf}"
+    );
     assert!(conf.contains("Host b-alias\n  HostName b.example\n"), "{conf}");
-    assert!(!out.warned("A (no folder):") && !out.warned("B (no folder):"), "{:?}", out.report.warnings);
+    assert!(
+        !out.warned("A (no folder):") && !out.warned("B (no folder):"),
+        "{:?}",
+        out.report.warnings
+    );
 }
 
 #[test]
 fn an_alias_without_a_hostname_keeps_its_block_and_warns_with_the_fix() {
-    let item = ssh_item("Lavoro GitHub", "lavoro", None, 1, json!([field("hosts", "github-lavoro"), field("user", "git")]));
+    let item = ssh_item(
+        "Lavoro GitHub",
+        "lavoro",
+        None,
+        1,
+        json!([field("hosts", "github-lavoro"), field("user", "git")]),
+    );
     let mut m = with_items(machine(), &[item]);
 
     let out = pull_all(&mut m);
 
-    assert!(out.warned(
-        "Lavoro GitHub (no folder): Host github-lavoro has no `hostname` field, so ssh looks up \"github-lavoro\" \
+    assert!(
+        out.warned(
+            "Lavoro GitHub (no folder): Host github-lavoro has no `hostname` field, so ssh looks up \"github-lavoro\" \
          as a server name and fails; in Bitwarden, add a custom text field `hostname` = github.com"
-    ), "{:?}", out.report.warnings);
+        ),
+        "{:?}",
+        out.report.warnings
+    );
     assert!(m.text(SSH_CONFIG).unwrap().contains("Host github-lavoro\n  User git\n"));
 }
 
@@ -534,29 +655,55 @@ fn a_real_host_name_needs_no_hostname_field() {
 
 #[test]
 fn an_unknown_field_close_to_a_known_one_points_to_it() {
-    let item = ssh_item("Typo", "typo", None, 1, json!([field("host", "typo.example"), field("Hostnme", "x"), field("notes2", "y")]));
+    let item = ssh_item(
+        "Typo",
+        "typo",
+        None,
+        1,
+        json!([
+            field("host", "typo.example"),
+            field("Hostnme", "x"),
+            field("notes2", "y")
+        ]),
+    );
     let mut m = with_items(machine(), &[item]);
 
     let out = pull_all(&mut m);
 
-    assert!(out.warned(
-        "Typo (no folder): kubaos bitwarden reads no field `host`; in Bitwarden, rename it to `hosts`"
-    ), "{:?}", out.report.warnings);
-    assert!(out.warned("Typo (no folder): kubaos bitwarden reads no field `Hostnme`; in Bitwarden, rename it to `hostname`"));
+    assert!(
+        out.warned("Typo (no folder): kubaos bitwarden reads no field `host`; in Bitwarden, rename it to `hosts`"),
+        "{:?}",
+        out.report.warnings
+    );
+    assert!(
+        out.warned(
+            "Typo (no folder): kubaos bitwarden reads no field `Hostnme`; in Bitwarden, rename it to `hostname`"
+        )
+    );
     assert!(!out.warned("notes2"));
 }
 
 #[test]
 fn a_field_ssh_config_cant_take_is_named_with_its_value() {
-    let item = ssh_item("Spaced user", "su", None, 1, json!([field("hosts", "su.example"), field("user", "a b")]));
+    let item = ssh_item(
+        "Spaced user",
+        "su",
+        None,
+        1,
+        json!([field("hosts", "su.example"), field("user", "a b")]),
+    );
     let mut m = with_items(machine(), &[item]);
 
     let out = pull_all(&mut m);
 
-    assert!(out.warned(
-        "Spaced user (no folder): the field `user` holds `a b`, with characters ssh_config can't take safely \
+    assert!(
+        out.warned(
+            "Spaced user (no folder): the field `user` holds `a b`, with characters ssh_config can't take safely \
          (it takes letters, digits and . _ @ -); fix the value in Bitwarden. No Host block"
-    ), "{:?}", out.report.warnings);
+        ),
+        "{:?}",
+        out.report.warnings
+    );
 }
 
 #[test]
@@ -568,7 +715,10 @@ fn a_private_key_on_disk_under_the_same_name_keeps_its_pub() {
     let out = pull_all(&mut m);
 
     assert!(out.warned("GitHub (Personal): ~/.ssh/github is a different key on disk"));
-    assert_eq!(m.text("/home/kuba/.ssh/github.pub"), Some("ssh-ed25519 AAAAmine me@laptop\n"));
+    assert_eq!(
+        m.text("/home/kuba/.ssh/github.pub"),
+        Some("ssh-ed25519 AAAAmine me@laptop\n")
+    );
 }
 
 #[test]
@@ -588,7 +738,13 @@ fn no_private_key_or_secret_value_reaches_a_file() {
     pull_all(&mut m);
 
     for (path, (text, _)) in &m.files {
-        for secret in ["PRIVATE KEY", "b3BlbnNzaC1rZXktdjE", "tok-gh-99", "tok-7c1f", "MIIBmarker9d2e"] {
+        for secret in [
+            "PRIVATE KEY",
+            "b3BlbnNzaC1rZXktdjE",
+            "tok-gh-99",
+            "tok-7c1f",
+            "MIIBmarker9d2e",
+        ] {
             assert!(!text.contains(secret), "{} holds {secret}", path.display());
         }
     }
@@ -600,17 +756,30 @@ fn no_private_key_or_secret_value_reaches_a_file() {
 fn folder_work_takes_only_works_keys_and_its_github_alone_is_github_pub() {
     let mut m = machine();
     pull_parts(&mut m, ssh_only());
-    m.files.insert(CONFIG.into(), ("server=https://vault.bitwarden.eu\nfolder=Work\n".into(), 0o600));
+    m.files.insert(
+        CONFIG.into(),
+        ("server=https://vault.bitwarden.eu\nfolder=Work\n".into(), 0o600),
+    );
 
     let out = pull_parts(&mut m, ssh_only());
 
-    assert!(out.text().contains("3 SSH key(s) in the folder \"Work\""), "{}", out.text());
+    assert!(
+        out.text().contains("3 SSH key(s) in the folder \"Work\""),
+        "{}",
+        out.text()
+    );
     assert!(m.text("/home/kuba/.ssh/build-server.pub").is_none());
     assert!(m.text("/home/kuba/.ssh/github-2.pub").is_none());
     assert_eq!(public_key(&m, "github.pub").as_deref(), Some("ssh-ed25519 AAAAdup"));
-    assert_eq!(public_key(&m, "work-github.pub").as_deref(), Some("ssh-ed25519 AAAAwork"));
+    assert_eq!(
+        public_key(&m, "work-github.pub").as_deref(),
+        Some("ssh-ed25519 AAAAwork")
+    );
     assert_eq!(host_blocks(&m), 1);
-    assert!(out.text().contains("removed ~/.ssh/build-server.pub (no longer in the vault)"));
+    assert!(
+        out.text()
+            .contains("removed ~/.ssh/build-server.pub (no longer in the vault)")
+    );
     assert!(m.text(SSH_CONFIG).unwrap().contains("SSH keys in the folder \"Work\""));
 }
 
@@ -621,7 +790,10 @@ fn folders_lists_several_and_warns_about_the_one_the_vault_lacks() {
     let out = pull_parts(&mut m, ssh_only());
 
     assert!(out.warned("no folder \"Archive\" in the vault (folders= in ~/.config/dot-bw/config)"));
-    assert!(out.text().contains("4 SSH key(s) in the folders \"Personal\", \"Work\""));
+    assert!(
+        out.text()
+            .contains("4 SSH key(s) in the folders \"Personal\", \"Work\"")
+    );
     assert!(m.text("/home/kuba/.ssh/build-server.pub").is_none());
     assert_eq!(public_key(&m, "github.pub").as_deref(), Some("ssh-ed25519 AAAAgithub"));
     assert_eq!(public_key(&m, "github-2.pub").as_deref(), Some("ssh-ed25519 AAAAdup"));
@@ -635,9 +807,9 @@ fn a_folder_the_vault_lacks_falls_back_to_the_whole_vault() {
     let out = pull_parts(&mut m, ssh_only());
 
     assert!(out.warned("no folder \"dotfiles\" in the vault"));
-    assert!(out.warned(
-        "none of the folders in ~/.config/dot-bw/config is in the vault: using every SSH key in the vault"
-    ));
+    assert!(
+        out.warned("none of the folders in ~/.config/dot-bw/config is in the vault: using every SSH key in the vault")
+    );
     assert!(out.text().contains("5 SSH key(s) in your vault"));
     assert_eq!(host_blocks(&m), 3);
 }
@@ -645,12 +817,18 @@ fn a_folder_the_vault_lacks_falls_back_to_the_whole_vault() {
 #[test]
 fn a_folder_matches_whatever_spaces_surround_its_name_in_the_vault() {
     let folders = json!([{ "id": "f-personal", "name": "Personal" }, { "id": "f-work", "name": " Work " }]).to_string();
-    let mut m = machine().vault(&folders, &json!(items()).to_string()).file(CONFIG, "folders=Work\n");
+    let mut m = machine()
+        .vault(&folders, &json!(items()).to_string())
+        .file(CONFIG, "folders=Work\n");
 
     let out = pull_parts(&mut m, ssh_only());
 
     assert!(!out.warned("no folder"), "{:?}", out.report.warnings);
-    assert!(out.text().contains("3 SSH key(s) in the folder \"Work\""), "{}", out.text());
+    assert!(
+        out.text().contains("3 SSH key(s) in the folder \"Work\""),
+        "{}",
+        out.text()
+    );
 }
 
 #[test]
@@ -692,8 +870,15 @@ fn git_signs_with_the_key_marked_signing_and_trusts_it_for_every_address() {
     assert!(signing.contains("[gpg]\n\tformat = ssh\n"));
     assert!(signing.contains("allowedSignersFile = /home/kuba/.config/git-bitwarden/allowed_signers\n"));
     assert!(signing.contains("[commit]\n\tgpgSign = true\n"));
-    assert_eq!(m.text(SIGNERS), Some("k@x.eu namespaces=\"git\" ssh-ed25519 AAAAgithub\n"));
-    assert!(out.report.summary.contains(&"git    commits signed with GitHub (Personal) (~/.ssh/github.pub)".to_string()));
+    assert_eq!(
+        m.text(SIGNERS),
+        Some("k@x.eu namespaces=\"git\" ssh-ed25519 AAAAgithub\n")
+    );
+    assert!(
+        out.report
+            .summary
+            .contains(&"git    commits signed with GitHub (Personal) (~/.ssh/github.pub)".to_string())
+    );
 }
 
 #[test]
@@ -701,13 +886,7 @@ fn with_two_signing_keys_the_oldest_signs_and_the_other_is_named() {
     let sign = json!([{ "name": "signing", "value": "true", "type": 2 }, field("emails", "old@x.eu,other@x.eu")]);
     let a = ssh_item("Old", "old", None, 1, sign.clone());
     let b = ssh_item("New", "new", None, 2, sign);
-    let c = ssh_item(
-        "Retired",
-        "retired",
-        None,
-        3,
-        json!([field("signing", "verify")]),
-    );
+    let c = ssh_item("Retired", "retired", None, 3, json!([field("signing", "verify")]));
     let mut m = with_items(machine(), &[b, a, c]);
 
     let out = pull_all(&mut m);
@@ -715,7 +894,11 @@ fn with_two_signing_keys_the_oldest_signs_and_the_other_is_named() {
     assert!(out.warned(
         "2 SSH keys have signing=true: Old (no folder), New (no folder). Signing with the oldest, Old (no folder); set signing=verify on the others"
     ));
-    assert!(m.text(SIGNING).unwrap().contains("signingKey = /home/kuba/.ssh/old.pub"));
+    assert!(
+        m.text(SIGNING)
+            .unwrap()
+            .contains("signingKey = /home/kuba/.ssh/old.pub")
+    );
     let signers = m.text(SIGNERS).unwrap();
     assert!(signers.contains("k@x.eu namespaces=\"git\" ssh-ed25519 AAAAretired\n"));
     assert!(signers.contains("other@x.eu namespaces=\"git\" ssh-ed25519 AAAAnew\n"));
@@ -756,24 +939,37 @@ fn git_alone_without_the_pub_says_to_pull_ssh_too() {
 
     let out = pull_parts(&mut m, Parts::parse("git").unwrap());
 
-    assert!(out.warned(
-        "GitHub (Personal) has signing=true, but ~/.ssh/github.pub isn't on disk, so signing is left as it was; \
+    assert!(
+        out.warned(
+            "GitHub (Personal) has signing=true, but ~/.ssh/github.pub isn't on disk, so signing is left as it was; \
          run `kubaos bitwarden refresh --only ssh,git` to write it"
-    ), "{:?}", out.report.warnings);
+        ),
+        "{:?}",
+        out.report.warnings
+    );
     assert!(m.text(SIGNING).is_none());
 }
 
 #[test]
 fn a_signing_key_with_an_unusable_public_key_signs_nothing_and_says_to_fix_it() {
-    let item = with_public_key("Dss", "dss", "ssh-dss AAAAdss", json!([{ "name": "signing", "value": "true", "type": 2 }]));
+    let item = with_public_key(
+        "Dss",
+        "dss",
+        "ssh-dss AAAAdss",
+        json!([{ "name": "signing", "value": "true", "type": 2 }]),
+    );
     let mut m = with_items(machine(), &[item]);
 
     let out = pull_all(&mut m);
 
-    assert!(out.warned(
-        "Dss (Work) has signing=true, but its public key can't be used (see its warning), so signing is left \
+    assert!(
+        out.warned(
+            "Dss (Work) has signing=true, but its public key can't be used (see its warning), so signing is left \
          as it was; fix the public key in Bitwarden, then run `kubaos bitwarden refresh --only ssh,git`"
-    ), "{:?}", out.report.warnings);
+        ),
+        "{:?}",
+        out.report.warnings
+    );
     assert!(m.text(SIGNING).is_none());
 }
 
@@ -796,10 +992,18 @@ fn gh_gets_the_token_on_stdin_and_keeps_it_in_the_keyring() {
 
     let out = pull_all(&mut m);
 
-    let login = m.ran.iter().find(|c| c.args.starts_with(&["auth".into(), "login".into()])).unwrap();
+    let login = m
+        .ran
+        .iter()
+        .find(|c| c.args.starts_with(&["auth".into(), "login".into()]))
+        .unwrap();
     assert_eq!(login.stdin.as_ref().map(|s| s.0.as_str()), Some("tok-gh-99"));
     assert!(!login.args.iter().any(|a| a.contains("tok-gh")));
-    assert!(out.report.summary.contains(&"gh     logged in to github.com (token in the keyring)".to_string()));
+    assert!(
+        out.report
+            .summary
+            .contains(&"gh     logged in to github.com (token in the keyring)".to_string())
+    );
 }
 
 #[test]
@@ -818,7 +1022,11 @@ fn without_a_gh_token_item_gh_is_skipped() {
 
     let out = pull_all(&mut m);
 
-    assert!(out.report.summary.contains(&"gh     no gh-token item, skipped".to_string()));
+    assert!(
+        out.report
+            .summary
+            .contains(&"gh     no gh-token item, skipped".to_string())
+    );
 }
 
 // ------------------------------------------------------------------- env
@@ -829,12 +1037,20 @@ fn a_pull_puts_every_project_in_the_keyring_and_multi_line_values_go_base64() {
 
     let out = pull_all(&mut m);
 
-    assert!(out.report.summary.contains(&"env    1 project(s) in the keyring: demo".to_string()));
+    assert!(
+        out.report
+            .summary
+            .contains(&"env    1 project(s) in the keyring: demo".to_string())
+    );
     assert!(out.warned("demo: skipped fields that aren't variable names: bad-name"));
     let tls = &m.keyring[&("demo".to_string(), "TLS_KEY".to_string())];
     assert_eq!(tls.label, "dotfiles-env/demo/TLS_KEY#base64");
     assert!(!tls.value.contains('\n'));
-    let vars: Vec<(String, String)> = env::export(&mut m, "demo").unwrap().into_iter().map(|(n, v)| (n, v.0)).collect();
+    let vars: Vec<(String, String)> = env::export(&mut m, "demo")
+        .unwrap()
+        .into_iter()
+        .map(|(n, v)| (n, v.0))
+        .collect();
     assert_eq!(vars.len(), 4, "{vars:?}");
     assert!(vars.contains(&("TLS_KEY".into(), PEM.into())));
     assert!(vars.contains(&("API_TOKEN".into(), "tok-7c1f".into())));
@@ -856,14 +1072,26 @@ fn a_bwenv_field_counts_whatever_its_case_and_surrounding_spaces() {
 
     let out = pull_all(&mut m);
 
-    assert!(out.report.summary.contains(&"env    2 project(s) in the keyring: demo loose".to_string()), "{}", out.text());
+    assert!(
+        out.report
+            .summary
+            .contains(&"env    2 project(s) in the keyring: demo loose".to_string()),
+        "{}",
+        out.text()
+    );
     assert!(!out.warned("skipped fields"), "{:?}", out.report.warnings);
-    let mut vars: Vec<(String, String)> =
-        env::export(&mut m, "loose").unwrap().into_iter().map(|(n, v)| (n, v.0)).collect();
+    let mut vars: Vec<(String, String)> = env::export(&mut m, "loose")
+        .unwrap()
+        .into_iter()
+        .map(|(n, v)| (n, v.0))
+        .collect();
     vars.sort();
     assert_eq!(
         vars,
-        [("API_TOKEN".to_string(), "tok-upper".to_string()), ("Api_Token".to_string(), "tok-loose".to_string())]
+        [
+            ("API_TOKEN".to_string(), "tok-upper".to_string()),
+            ("Api_Token".to_string(), "tok-loose".to_string())
+        ]
     );
 }
 
@@ -874,7 +1102,14 @@ fn values_reach_secret_tool_on_stdin_never_in_argv() {
     pull_all(&mut m);
 
     let lines = m.lines().join("\n");
-    for secret in ["tok-7c1f", "MIIBmarker9d2e", "postgres://", "extra-value", SESSION, PASSWORD] {
+    for secret in [
+        "tok-7c1f",
+        "MIIBmarker9d2e",
+        "postgres://",
+        "extra-value",
+        SESSION,
+        PASSWORD,
+    ] {
         assert!(!lines.contains(secret), "{secret} in a command line");
     }
 }
@@ -893,7 +1128,10 @@ fn a_project_gone_from_the_vault_leaves_the_keyring_on_the_next_pull() {
 
     let out = pull_all(&mut m);
 
-    assert!(out.text().contains("old: gone from the vault, removed from the keyring"));
+    assert!(
+        out.text()
+            .contains("old: gone from the vault, removed from the keyring")
+    );
     assert_eq!(env::projects(&mut m).unwrap(), ["demo"]);
 }
 
@@ -901,7 +1139,15 @@ fn a_project_gone_from_the_vault_leaves_the_keyring_on_the_next_pull() {
 fn env_pull_fetches_only_the_projects_asked_for() {
     let mut m = machine();
 
-    let (out, r) = run(|p| env::pull(&mut m, &Session::new(SESSION), &Names::default(), &["demo".into(), "nope".into()], p));
+    let (out, r) = run(|p| {
+        env::pull(
+            &mut m,
+            &Session::new(SESSION),
+            &Names::default(),
+            &["demo".into(), "nope".into()],
+            p,
+        )
+    });
 
     r.unwrap();
     assert!(out.warned("nope: no folder env/nope and no item with bwenv=nope in the vault"));
@@ -949,7 +1195,10 @@ fn the_vault_names_default_to_gh_token_and_env_and_the_environment_overrides_the
     assert_eq!(none, Names::default());
     assert_eq!((none.gh_item.as_str(), none.env_prefix.as_str()), ("gh-token", "env/"));
     assert_eq!(blank, Names::default());
-    assert_eq!((set.gh_item.as_str(), set.env_prefix.as_str()), ("GitHub CLI", "secrets/"));
+    assert_eq!(
+        (set.gh_item.as_str(), set.env_prefix.as_str()),
+        ("GitHub CLI", "secrets/")
+    );
     assert_eq!(set.project("secrets/demo"), Some("demo"));
     assert_eq!(set.project("env/demo"), None);
     assert_eq!(set.project("secrets/"), None);
@@ -987,9 +1236,19 @@ fn a_pull_finds_gh_and_the_projects_under_the_names_it_is_given() {
     let (out, r) = run(|p| pull(&mut m, &paths, &Session::new(SESSION), Parts::ALL, p));
 
     r.expect("pull");
-    assert!(out.report.summary.contains(&"env    1 project(s) in the keyring: demo".to_string()), "{}", out.text());
+    assert!(
+        out.report
+            .summary
+            .contains(&"env    1 project(s) in the keyring: demo".to_string()),
+        "{}",
+        out.text()
+    );
     assert_eq!(env::projects(&mut m).unwrap(), ["demo"]);
-    let login = m.ran.iter().find(|c| c.args.starts_with(&["auth".into(), "login".into()])).unwrap();
+    let login = m
+        .ran
+        .iter()
+        .find(|c| c.args.starts_with(&["auth".into(), "login".into()]))
+        .unwrap();
     assert_eq!(login.stdin.as_ref().map(|s| s.0.as_str()), Some("tok-gh-99"));
 }
 
@@ -1001,11 +1260,23 @@ fn a_project_asked_for_by_name_says_which_folder_it_looked_for() {
         env_prefix: "secrets/".into(),
     };
 
-    let (out, r) = run(|p| env::pull(&mut m, &Session::new(SESSION), &names, &["demo".into(), "nope".into()], p));
+    let (out, r) = run(|p| {
+        env::pull(
+            &mut m,
+            &Session::new(SESSION),
+            &names,
+            &["demo".into(), "nope".into()],
+            p,
+        )
+    });
 
     r.unwrap();
     assert!(out.warned("nope: no folder secrets/nope and no item with bwenv=nope in the vault"));
-    assert!(out.text().contains("demo                 1 variable(s)"), "{}", out.text());
+    assert!(
+        out.text().contains("demo                 1 variable(s)"),
+        "{}",
+        out.text()
+    );
 }
 
 #[test]
@@ -1035,7 +1306,11 @@ fn the_agent_serving_every_key_says_so() {
     let out = pull_all(&mut m);
 
     assert!(out.text().contains("agent answers with 5 key(s)"));
-    assert!(out.report.summary.contains(&"agent  running, serves every SSH key in your vault".to_string()));
+    assert!(
+        out.report
+            .summary
+            .contains(&"agent  running, serves every SSH key in your vault".to_string())
+    );
     let probe = m.ran.iter().find(|c| c.args.contains(&"ssh-add".to_string())).unwrap();
     assert!(probe.env.contains(&("SSH_AUTH_SOCK".into(), AGENT.into())));
 }
@@ -1047,7 +1322,12 @@ fn the_agent_missing_a_key_names_it() {
     let out = pull_all(&mut m);
 
     assert!(out.warned("agent doesn't offer SHA256:work (vault not synced in the app?)"));
-    assert!(out.report.summary.iter().any(|l| l.contains("some vault keys are missing")));
+    assert!(
+        out.report
+            .summary
+            .iter()
+            .any(|l| l.contains("some vault keys are missing"))
+    );
 }
 
 #[test]
@@ -1102,8 +1382,16 @@ fn check_asks_the_agent_about_the_keys_on_disk_without_bw() {
     r.unwrap();
     assert!(m.bw.is_empty());
     assert!(out.text().contains("agent answers with 5 key(s)"));
-    assert!(out.report.summary.contains(&"file   ~/.ssh/config.d/bitwarden".to_string()));
-    assert!(out.report.summary.contains(&"file   ~/.config/git-bitwarden/signing.gitconfig".to_string()));
+    assert!(
+        out.report
+            .summary
+            .contains(&"file   ~/.ssh/config.d/bitwarden".to_string())
+    );
+    assert!(
+        out.report
+            .summary
+            .contains(&"file   ~/.config/git-bitwarden/signing.gitconfig".to_string())
+    );
     assert!(out.report.summary.contains(&"env    demo".to_string()));
 }
 
@@ -1116,7 +1404,11 @@ fn check_names_the_files_missing() {
         Ok(())
     });
 
-    assert!(out.report.summary.contains(&"file   ~/.ssh/config.d/bitwarden missing".to_string()));
+    assert!(
+        out.report
+            .summary
+            .contains(&"file   ~/.ssh/config.d/bitwarden missing".to_string())
+    );
 }
 
 // --------------------------------------------------------------- overview
@@ -1171,7 +1463,10 @@ fn a_first_terminal_login_asks_the_server_the_method_and_the_email() {
     let (out, r) = log_in(&mut m, &LoginRequest::default(), &mut Script(vec!["2", "", "k@x.eu"]));
 
     assert_eq!(r.unwrap().expose(), SESSION);
-    assert_eq!(m.text(CONFIG), Some("server=https://vault.bitwarden.eu\nemail=k@x.eu\n"));
+    assert_eq!(
+        m.text(CONFIG),
+        Some("server=https://vault.bitwarden.eu\nemail=k@x.eu\n")
+    );
     assert_eq!(m.server.as_deref(), Some(EU));
     assert!(matches!(&m.logins[0], Login::Totp { email } if email == "k@x.eu"));
     assert!(out.text().contains("vault unlocked for this run"));
@@ -1239,7 +1534,10 @@ fn a_refresh_asks_nothing() {
 fn a_question_without_a_terminal_names_it() {
     let (_, r) = log_in(&mut Fake::new(), &LoginRequest::default(), &mut NoTerminal);
 
-    assert_eq!(r.unwrap_err().to_string(), "need an answer for 'Choice [1-3]:' but stdin isn't a terminal");
+    assert_eq!(
+        r.unwrap_err().to_string(),
+        "need an answer for 'Choice [1-3]:' but stdin isn't a terminal"
+    );
 }
 
 #[test]
@@ -1307,7 +1605,10 @@ fn the_form_logs_in_with_the_password_in_bws_environment() {
 
     assert_eq!(r.unwrap().expose(), SESSION);
     assert!(matches!(&m.logins[0], Login::Password { method: "0", code, .. } if code == "123456"));
-    assert_eq!(m.text(CONFIG), Some("server=https://vault.bitwarden.eu\nemail=k@x.eu\n"));
+    assert_eq!(
+        m.text(CONFIG),
+        Some("server=https://vault.bitwarden.eu\nemail=k@x.eu\n")
+    );
     assert!(!out.text().contains(PASSWORD) && !out.text().contains(SESSION));
 }
 
@@ -1357,7 +1658,10 @@ fn the_form_says_what_it_lacks() {
         ..LoginRequest::default()
     };
     let (_, r) = log_in(&mut Fake::new(), &req, &mut NoTerminal);
-    assert_eq!(r.unwrap_err().to_string(), "the API key needs client_id and client_secret");
+    assert_eq!(
+        r.unwrap_err().to_string(),
+        "the API key needs client_id and client_secret"
+    );
 
     let mut f = form(FormMethod::Totp);
     f.password = Sensitive(String::new());
@@ -1380,13 +1684,17 @@ fn the_form_with_a_wrong_password_keeps_bws_words_as_the_cause() {
 
     let (_, r) = log_in(&mut Fake::new(), &req, &mut NoTerminal);
 
-    let Err(Error::Login { cause, .. }) = r else { panic!("not a login error") };
+    let Err(Error::Login { cause, .. }) = r else {
+        panic!("not a login error")
+    };
     assert!(cause.detail().contains("Username or password is incorrect"));
 }
 
 #[test]
 fn the_forms_server_counts_only_when_logged_out() {
-    let mut m = Fake::new().locked(EU, "k@x.eu").file(CONFIG, "server=https://vault.bitwarden.eu\n");
+    let mut m = Fake::new()
+        .locked(EU, "k@x.eu")
+        .file(CONFIG, "server=https://vault.bitwarden.eu\n");
     let mut f = form(FormMethod::Totp);
     f.server = "com".into();
     let req = LoginRequest {
@@ -1401,7 +1709,9 @@ fn the_forms_server_counts_only_when_logged_out() {
 
 #[test]
 fn logging_out_then_in_switches_the_server() {
-    let mut m = Fake::new().locked(EU, "k@x.eu").file(CONFIG, "server=https://vault.bitwarden.eu\n");
+    let mut m = Fake::new()
+        .locked(EU, "k@x.eu")
+        .file(CONFIG, "server=https://vault.bitwarden.eu\n");
 
     logout(&mut m).unwrap();
     let mut f = form(FormMethod::Totp);
@@ -1422,7 +1732,10 @@ fn logging_out_then_in_switches_the_server() {
 fn preflight_names_the_missing_program() {
     let mut m = Fake::new();
     m.installed = false;
-    assert_eq!(preflight(&mut m, Parts::ALL).unwrap_err().to_string(), "bw not found: run system/70-bitwarden.sh");
+    assert_eq!(
+        preflight(&mut m, Parts::ALL).unwrap_err().to_string(),
+        "bw not found: run system/70-bitwarden.sh"
+    );
 
     let mut m = Fake::new();
     m.programs.remove("secret-tool");
@@ -1450,9 +1763,18 @@ fn slug_makes_a_file_name_from_an_item_name() {
 #[test]
 fn a_public_key_is_one_known_type_and_base64() {
     let key = |k| ssh::public_key(k).ok();
-    assert_eq!(key("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+/=").as_deref(), Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+/="));
-    assert_eq!(key("ecdsa-sha2-nistp256 AAAA").as_deref(), Some("ecdsa-sha2-nistp256 AAAA"));
-    assert_eq!(key("ssh-ed25519 AAAA jakub@macbook pro").as_deref(), Some("ssh-ed25519 AAAA"));
+    assert_eq!(
+        key("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+/=").as_deref(),
+        Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIB+/=")
+    );
+    assert_eq!(
+        key("ecdsa-sha2-nistp256 AAAA").as_deref(),
+        Some("ecdsa-sha2-nistp256 AAAA")
+    );
+    assert_eq!(
+        key("ssh-ed25519 AAAA jakub@macbook pro").as_deref(),
+        Some("ssh-ed25519 AAAA")
+    );
     assert_eq!(key("ssh-ed25519  AAAA ").as_deref(), Some("ssh-ed25519 AAAA"));
     assert_eq!(key("ssh-dss AAAA"), None);
     assert_eq!(key("ecdsa-sha2-nistp AAAA"), None);
@@ -1465,10 +1787,17 @@ fn a_public_key_is_one_known_type_and_base64() {
 
 #[test]
 fn folders_reads_the_list_and_falls_back_to_the_older_key() {
-    assert_eq!(Config::parse("folders=Personal, Work,,Archive \n").folders(), ["Personal", "Work", "Archive"]);
+    assert_eq!(
+        Config::parse("folders=Personal, Work,,Archive \n").folders(),
+        ["Personal", "Work", "Archive"]
+    );
     assert_eq!(Config::parse("folder=Work\n").folders(), ["Work"]);
     assert_eq!(Config::parse("folder=Old\nfolders=New\n").folders(), ["New"]);
-    assert!(Config::parse("server=https://vault.bitwarden.eu\n").folders().is_empty());
+    assert!(
+        Config::parse("server=https://vault.bitwarden.eu\n")
+            .folders()
+            .is_empty()
+    );
 }
 
 #[test]

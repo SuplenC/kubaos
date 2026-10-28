@@ -39,7 +39,10 @@ fn files_read_back_by_name_in_order() {
 
     assert_eq!(
         files,
-        [("meta.hl".to_owned(), b"hotspot_x = 0.5\n".to_vec()), ("left_ptr.svg".to_owned(), b"<svg/>".to_vec())]
+        [
+            ("meta.hl".to_owned(), b"hotspot_x = 0.5\n".to_vec()),
+            ("left_ptr.svg".to_owned(), b"<svg/>".to_vec())
+        ]
     );
 }
 

@@ -10,14 +10,25 @@
 //! or config error.
 
 use std::fs::File;
-use std::io::{IsTerminal, Read, Write};
-use std::path::{Path, PathBuf};
+use std::io::IsTerminal;
+use std::io::Read;
+use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
 use clap::Subcommand;
-use kubaos_core::engine::{self, RunOptions, machine, runner};
-use kubaos_core::{Event, InstallConfig, Level, Secrets, StepId, demo};
+use kubaos_core::Event;
+use kubaos_core::InstallConfig;
+use kubaos_core::Level;
+use kubaos_core::Secrets;
+use kubaos_core::StepId;
+use kubaos_core::demo;
+use kubaos_core::engine;
+use kubaos_core::engine::RunOptions;
+use kubaos_core::engine::machine;
+use kubaos_core::engine::runner;
 use signal_hook::consts::SIGHUP;
 use signal_hook::consts::SIGINT;
 use signal_hook::consts::SIGTERM;
@@ -87,8 +98,7 @@ pub(crate) enum InstallCmd {
 }
 
 fn parse_step(s: &str) -> Result<StepId, String> {
-    serde_json::from_value(serde_json::Value::String(s.into()))
-        .map_err(|_| format!("unknown step {s}"))
+    serde_json::from_value(serde_json::Value::String(s.into())).map_err(|_| format!("unknown step {s}"))
 }
 
 pub(crate) fn main(cmd: InstallCmd) -> ExitCode {
@@ -105,29 +115,12 @@ pub(crate) fn main(cmd: InstallCmd) -> ExitCode {
             target,
             log,
             verbose,
-        } => cmd_run(
-            &config,
-            secrets,
-            secrets_stdin,
-            events,
-            dry_run,
-            target,
-            log,
-            verbose,
-        ),
-        InstallCmd::Demo {
-            speed,
-            fail_at,
-            events,
-        } => {
+        } => cmd_run(&config, secrets, secrets_stdin, events, dry_run, target, log, verbose),
+        InstallCmd::Demo { speed, fail_at, events } => {
             let opts = demo::DemoOptions { speed, fail_at };
             let mut out = Printer::new(events, None, false);
             let ok = demo::run(&opts, &mut |e| out.event(&e));
-            if ok {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(1)
-            }
+            if ok { ExitCode::SUCCESS } else { ExitCode::from(1) }
         }
     }
 }
@@ -144,29 +137,18 @@ fn cmd_probe(json: bool, payload: Option<PathBuf>) -> ExitCode {
         Err(e) => return usage_error(e),
     };
     if json {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&p).expect("probe serializes")
-        );
+        println!("{}", serde_json::to_string_pretty(&p).expect("probe serializes"));
         return ExitCode::SUCCESS;
     }
     println!("arch {}  uefi {}  online {}", p.arch, p.uefi, p.online);
     for d in &p.disks {
-        let flags = [
-            (d.removable, "removable"),
-            (d.is_boot_medium, "boot medium"),
-        ]
-        .iter()
-        .filter(|(on, _)| *on)
-        .map(|(_, s)| *s)
-        .collect::<Vec<_>>()
-        .join(", ");
-        println!(
-            "{}  {}  {}  {flags}",
-            d.path,
-            machine::gib(d.size_bytes),
-            d.model
-        );
+        let flags = [(d.removable, "removable"), (d.is_boot_medium, "boot medium")]
+            .iter()
+            .filter(|(on, _)| *on)
+            .map(|(_, s)| *s)
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!("{}  {}  {}  {flags}", d.path, machine::gib(d.size_bytes), d.model);
         for part in &d.partitions {
             println!(
                 "  {}  {}  {}  {}",
@@ -177,12 +159,7 @@ fn cmd_probe(json: bool, payload: Option<PathBuf>) -> ExitCode {
             );
         }
         for r in &d.free_regions {
-            println!(
-                "  free {}..{}  {}",
-                r.start,
-                r.end,
-                machine::gib(r.end - r.start)
-            );
+            println!("  free {}..{}  {}", r.start, r.end, machine::gib(r.end - r.start));
         }
     }
     println!(
@@ -272,10 +249,7 @@ fn read_secrets(file: Option<PathBuf>, stdin: bool) -> Result<Option<Secrets>, S
     use std::os::unix::fs::MetadataExt;
     let meta = std::fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     if meta.mode() & 0o077 != 0 {
-        return Err(format!(
-            "{} must not be readable by others (chmod 600)",
-            path.display()
-        ));
+        return Err(format!("{} must not be readable by others (chmod 600)", path.display()));
     }
     let s = std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     toml::from_str(&s)
@@ -399,19 +373,13 @@ impl Printer {
         Some(match e {
             Event::Plan { steps } => format!(
                 "plan: {}",
-                steps
-                    .iter()
-                    .map(|s| s.title.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+                steps.iter().map(|s| s.title.as_str()).collect::<Vec<_>>().join(", ")
             ),
             Event::StepStarted { id } => format!("{b}==> {}{off}", id.title()),
             Event::StepFinished { elapsed_ms, .. } => {
                 format!("    done in {:.1}s", *elapsed_ms as f64 / 1000.0)
             }
-            Event::Progress {
-                fraction, detail, ..
-            } => {
+            Event::Progress { fraction, detail, .. } => {
                 // Every 10% is plenty for a human.
                 let pct = (fraction.unwrap_or(0.0) * 100.0) as u32 / 10 * 10;
                 if for_log || self.last_pct == Some(pct) {
@@ -420,10 +388,7 @@ impl Printer {
                 self.last_pct = Some(pct);
                 format!(
                     "    {pct}%{}",
-                    detail
-                        .as_ref()
-                        .map(|d| format!("  {d}"))
-                        .unwrap_or_default()
+                    detail.as_ref().map(|d| format!("  {d}")).unwrap_or_default()
                 )
             }
             Event::Log { level, line, .. } => {

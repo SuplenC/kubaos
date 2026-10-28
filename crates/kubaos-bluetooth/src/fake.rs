@@ -120,9 +120,6 @@ impl Bluez for FakeBluez {
 
     fn stop_discovery(&self, adapter: &str) -> impl Future<Output = Result<(), BluezError>> {
         self.log("StopDiscovery", adapter);
-        std::future::ready(Err(BluezError::new(
-            "org.bluez.Error.Failed",
-            "No discovery started",
-        )))
+        std::future::ready(Err(BluezError::new("org.bluez.Error.Failed", "No discovery started")))
     }
 }

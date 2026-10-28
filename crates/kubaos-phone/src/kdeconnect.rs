@@ -7,8 +7,8 @@
 //!
 //! # Owns
 //!
-//! - The bus names, object paths and methods of kdeconnectd (26.04, the release's, and 26.08),
-//!   and reading its answers.
+//! - The bus names, object paths and methods of kdeconnectd (26.04, the release's, and 26.08), and
+//!   reading its answers.
 //!
 //! # Not here
 //!
@@ -104,7 +104,15 @@ impl Link for KdeConnect {
     }
 
     fn devices(&mut self) -> Result<Vec<Device>, LinkError> {
-        let ids = parse_ids(&bus_call(&[BUS, DAEMON, DAEMON_IFACE, "devices", "bb", "false", "false"])?);
+        let ids = parse_ids(&bus_call(&[
+            BUS,
+            DAEMON,
+            DAEMON_IFACE,
+            "devices",
+            "bb",
+            "false",
+            "false",
+        ])?);
         let mut devices = Vec::with_capacity(ids.len());
         for id in ids {
             // A device gone between the two calls is left out.
@@ -230,7 +238,12 @@ fn device_call(id: &str, action: &Action) -> Result<Vec<String>, LinkError> {
     let (plugin, iface, method, arg) = match action {
         Action::Accept => ("", DEVICE_IFACE, "acceptPairing", None),
         Action::Unpair => ("", DEVICE_IFACE, "unpair", None),
-        Action::SendClipboard => ("/clipboard", "org.kde.kdeconnect.device.clipboard", "sendClipboard", None),
+        Action::SendClipboard => (
+            "/clipboard",
+            "org.kde.kdeconnect.device.clipboard",
+            "sendClipboard",
+            None,
+        ),
         Action::Share(url) => ("/share", "org.kde.kdeconnect.device.share", "shareUrl", Some(url)),
         Action::Ring => ("/findmyphone", "org.kde.kdeconnect.device.findmyphone", "ring", None),
     };
@@ -257,7 +270,10 @@ fn device_path(id: &str) -> Result<String, LinkError> {
 
 /// Plugin names are `kdeconnect_` and lowercase letters, digits and underscores.
 fn valid_plugin(name: &str) -> bool {
-    name.starts_with("kdeconnect_") && name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    name.starts_with("kdeconnect_")
+        && name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 /// KDE Connect's ids are an object path's last element: letters, digits and underscores. Anything

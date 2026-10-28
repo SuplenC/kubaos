@@ -86,9 +86,7 @@ impl Cell {
     /// `None` for a battery that isn't the machine's (a wireless mouse's reports `scope` `Device`),
     /// an empty bay (`present` `0`), or one that reports no charge at all.
     fn read(dir: &Path) -> Option<Self> {
-        if attr(dir, "scope").as_deref() == Some("Device")
-            || attr(dir, "present").as_deref() == Some("0")
-        {
+        if attr(dir, "scope").as_deref() == Some("Device") || attr(dir, "present").as_deref() == Some("0") {
             return None;
         }
         let capacity = attr(dir, "capacity")
@@ -165,9 +163,7 @@ fn ratio(now: u64, full: u64) -> u8 {
 }
 
 fn attr(dir: &Path, name: &str) -> Option<String> {
-    fs::read_to_string(dir.join(name))
-        .ok()
-        .map(|s| s.trim().to_string())
+    fs::read_to_string(dir.join(name)).ok().map(|s| s.trim().to_string())
 }
 
 fn number(dir: &Path, name: &str) -> Option<u64> {

@@ -2,13 +2,20 @@
 //! zoneinfo, nmcli and the payload manifest. Works unprivileged.
 
 use std::collections::BTreeSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Command;
 
 use serde::Deserialize;
 
-use super::disk::{GIB, Part, PartTable};
-use crate::probe::{DiskInfo, Manifest, PartitionInfo, Probe, WifiNetwork};
+use super::disk::GIB;
+use super::disk::Part;
+use super::disk::PartTable;
+use crate::probe::DiskInfo;
+use crate::probe::Manifest;
+use crate::probe::PartitionInfo;
+use crate::probe::Probe;
+use crate::probe::WifiNetwork;
 
 pub const DEFAULT_PAYLOAD_DIR: &str = "/run/kubaos/payload";
 
@@ -97,9 +104,7 @@ fn flag<'de, D: serde::Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
 
 impl BlockDev {
     pub fn dev_path(&self) -> String {
-        self.path
-            .clone()
-            .unwrap_or_else(|| format!("/dev/{}", self.name))
+        self.path.clone().unwrap_or_else(|| format!("/dev/{}", self.name))
     }
 
     pub fn mounts(&self) -> Vec<String> {
@@ -196,7 +201,8 @@ pub fn parse_lsblk(json: &str) -> Result<Lsblk, String> {
     serde_json::from_str(json).map_err(|e| format!("can't parse lsblk --json: {e}"))
 }
 
-pub const LSBLK_COLUMNS: &str = "NAME,PATH,TYPE,SIZE,MODEL,RM,RO,TRAN,FSTYPE,LABEL,PARTTYPE,PARTLABEL,PTTYPE,START,MOUNTPOINTS,PKNAME";
+pub const LSBLK_COLUMNS: &str =
+    "NAME,PATH,TYPE,SIZE,MODEL,RM,RO,TRAN,FSTYPE,LABEL,PARTTYPE,PARTLABEL,PTTYPE,START,MOUNTPOINTS,PKNAME";
 
 /// Mount points that mean "this is the stick we booted from".
 const LIVE_MOUNTS: [&str; 5] = [
@@ -209,11 +215,7 @@ const LIVE_MOUNTS: [&str; 5] = [
 
 /// Disks for `Probe`. `boot_devs` are device names (any level) that hold
 /// the live system or the payload; their top-level disk is the boot medium.
-pub fn disks_from_lsblk(
-    l: &Lsblk,
-    boot_devs: &BTreeSet<String>,
-    include_loop: bool,
-) -> Vec<DiskInfo> {
+pub fn disks_from_lsblk(l: &Lsblk, boot_devs: &BTreeSet<String>, include_loop: bool) -> Vec<DiskInfo> {
     l.blockdevices
         .iter()
         .filter(|d| d.type_ == "disk" || (include_loop && d.type_ == "loop"))
@@ -221,10 +223,7 @@ pub fn disks_from_lsblk(
         .map(|d| {
             let all = d.walk();
             let is_boot = all.iter().any(|x| {
-                boot_devs.contains(&x.name)
-                    || x.mounts()
-                        .iter()
-                        .any(|m| LIVE_MOUNTS.contains(&m.as_str()) || m == "/")
+                boot_devs.contains(&x.name) || x.mounts().iter().any(|m| LIVE_MOUNTS.contains(&m.as_str()) || m == "/")
             });
             let partitions = d
                 .children
@@ -274,10 +273,7 @@ fn boot_device_names(payload_dir: &Path) -> BTreeSet<String> {
         if seen > 32 || !t.exists() {
             continue;
         }
-        let Some(src) = command_stdout(
-            "findmnt",
-            &["-no", "SOURCE", "--target", &t.to_string_lossy()],
-        ) else {
+        let Some(src) = command_stdout("findmnt", &["-no", "SOURCE", "--target", &t.to_string_lossy()]) else {
             continue;
         };
         // "/dev/sda1[/subdir]" for bind mounts; keep the device.
@@ -342,12 +338,7 @@ fn keymaps() -> Vec<String> {
         }
     }
     command_stdout("localectl", &["list-x11-keymap-layouts"])
-        .map(|s| {
-            s.lines()
-                .map(str::to_string)
-                .filter(|l| !l.is_empty())
-                .collect()
-        })
+        .map(|s| s.lines().map(str::to_string).filter(|l| !l.is_empty()).collect())
         .unwrap_or_default()
 }
 
@@ -360,11 +351,7 @@ pub fn timezones_in(root: &Path) -> Vec<String> {
         };
         for e in rd.flatten() {
             let p = e.path();
-            let rel = p
-                .strip_prefix(root)
-                .unwrap_or(&p)
-                .to_string_lossy()
-                .into_owned();
+            let rel = p.strip_prefix(root).unwrap_or(&p).to_string_lossy().into_owned();
             if rel == "posix" || rel == "right" || rel.starts_with('.') {
                 continue;
             }
@@ -461,12 +448,9 @@ fn split_nmcli(line: &str) -> Vec<String> {
 }
 
 fn wifi() -> Vec<WifiNetwork> {
-    command_stdout(
-        "nmcli",
-        &["-t", "-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list"],
-    )
-    .map(|s| parse_nmcli_wifi(&s))
-    .unwrap_or_default()
+    command_stdout("nmcli", &["-t", "-f", "SSID,SIGNAL,SECURITY", "dev", "wifi", "list"])
+        .map(|s| parse_nmcli_wifi(&s))
+        .unwrap_or_default()
 }
 
 fn online() -> bool {
@@ -495,10 +479,7 @@ pub fn read_lsblk() -> Result<Lsblk, String> {
         .output()
         .map_err(|e| format!("lsblk: {e}"))?;
     if !out.status.success() {
-        return Err(format!(
-            "lsblk: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        ));
+        return Err(format!("lsblk: {}", String::from_utf8_lossy(&out.stderr).trim()));
     }
     parse_lsblk(&String::from_utf8_lossy(&out.stdout))
 }
@@ -568,20 +549,14 @@ mod tests {
         let stick = &disks[0];
         assert!(stick.is_boot_medium, "/cdrom is mounted from it");
         assert!(stick.removable);
-        assert!(
-            stick.free_regions.is_empty(),
-            "dos table: no free-space install"
-        );
+        assert!(stick.free_regions.is_empty(), "dos table: no free-space install");
         let nvme = &disks[1];
         assert!(!nvme.is_boot_medium);
         assert_eq!(nvme.model, "Samsung SSD 990 PRO 1TB");
         assert_eq!(nvme.partitions.len(), 4);
         assert_eq!(nvme.partitions[0].os_hint.as_deref(), Some("EFI system"));
         assert_eq!(nvme.partitions[2].os_hint.as_deref(), Some("Windows"));
-        assert_eq!(
-            nvme.partitions[3].os_hint.as_deref(),
-            Some("Windows recovery")
-        );
+        assert_eq!(nvme.partitions[3].os_hint.as_deref(), Some("Windows recovery"));
         assert_eq!(nvme.free_regions.len(), 1);
         assert_eq!(nvme.free_regions[0].start, 524527616 * 512);
     }
@@ -631,10 +606,7 @@ mod tests {
     #[test]
     fn locales_list() {
         let s = "en_US.UTF-8 UTF-8\nen_US ISO-8859-1\nit_IT.UTF-8 UTF-8\nde_DE@euro ISO-8859-15\n";
-        assert_eq!(
-            parse_supported_locales(s),
-            vec!["en_US.UTF-8", "it_IT.UTF-8"]
-        );
+        assert_eq!(parse_supported_locales(s), vec!["en_US.UTF-8", "it_IT.UTF-8"]);
     }
 
     #[test]

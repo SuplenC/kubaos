@@ -165,9 +165,7 @@ pub async fn run() -> Result<(), RunError> {
         .map_err(RunError::Session)?;
 
     hub.publish();
-    bluez::keep_registered(&bluez, &hub)
-        .await
-        .map_err(RunError::Follow)
+    bluez::keep_registered(&bluez, &hub).await.map_err(RunError::Follow)
 }
 
 /// The agent is unreachable or turned the call down.
@@ -197,8 +195,7 @@ where
         Err(zbus::Error::MethodError(name, _, _))
             if matches!(
                 name.as_str(),
-                "org.freedesktop.DBus.Error.ServiceUnknown"
-                    | "org.freedesktop.DBus.Error.NameHasNoOwner"
+                "org.freedesktop.DBus.Error.ServiceUnknown" | "org.freedesktop.DBus.Error.NameHasNoOwner"
             ) =>
         {
             Err(CallError::NotRunning)

@@ -47,12 +47,7 @@ fn a_passkey_typed_in_the_shell_goes_to_bluetoothd() {
 fn a_passkey_that_isnt_six_digits_is_rejected() {
     for typed in ["", "1234567", "12a456", "-1"] {
         let (agent, hub) = fresh();
-        let passkey = answered(
-            &hub,
-            agent.request_passkey(&keyboard()),
-            Answer::accept(typed),
-            |_| {},
-        );
+        let passkey = answered(&hub, agent.request_passkey(&keyboard()), Answer::accept(typed), |_| {});
         assert_eq!(passkey, Err(Refusal::Rejected), "{typed:?}");
     }
 }
@@ -72,12 +67,7 @@ fn a_pin_is_one_to_sixteen_letters_or_digits() {
 
     for typed in ["", "12345678901234567", "12 34"] {
         let (agent, hub) = fresh();
-        let pin = answered(
-            &hub,
-            agent.request_pin_code(&keyboard()),
-            Answer::accept(typed),
-            |_| {},
-        );
+        let pin = answered(&hub, agent.request_pin_code(&keyboard()), Answer::accept(typed), |_| {});
         assert_eq!(pin, Err(Refusal::Rejected), "{typed:?}");
     }
 }
@@ -150,10 +140,7 @@ fn a_device_being_paired_needs_no_second_yes() {
     let (agent, hub) = fresh();
     let device = keyboard();
     hub.begin_pairing(&device.path);
-    assert_eq!(
-        future::block_on(agent.request_authorization(&device)),
-        Ok(())
-    );
+    assert_eq!(future::block_on(agent.request_authorization(&device)), Ok(()));
     assert_eq!(hub.state().prompt, None, "nothing was asked");
 }
 
@@ -176,10 +163,7 @@ fn services_are_allowed_for_trusted_devices_and_the_one_pairing() {
     let (agent, hub) = fresh();
     let device = keyboard();
     assert_eq!(agent.authorize_service(&device.path, true), Ok(()));
-    assert_eq!(
-        agent.authorize_service(&device.path, false),
-        Err(Refusal::Rejected)
-    );
+    assert_eq!(agent.authorize_service(&device.path, false), Err(Refusal::Rejected));
     hub.begin_pairing(&device.path);
     assert_eq!(agent.authorize_service(&device.path, false), Ok(()));
 }

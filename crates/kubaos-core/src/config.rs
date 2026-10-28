@@ -1,6 +1,8 @@
 //! What the user chose: `install.toml`. Secrets never live in this file.
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::Deserialize;
+use serde::Deserializer;
+use serde::Serialize;
 
 use crate::keyboard::Layout;
 

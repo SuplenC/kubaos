@@ -12,8 +12,8 @@
 //!
 //! # Not here
 //!
-//! - Running apt, and notifying: `updater.rs`. Installing the updates: `kubaos update`'s
-//!   `apt-get upgrade`.
+//! - Running apt, and notifying: `updater.rs`. Installing the updates: `kubaos update`'s `apt-get
+//!   upgrade`.
 
 use std::collections::BTreeSet;
 use std::ffi::OsString;

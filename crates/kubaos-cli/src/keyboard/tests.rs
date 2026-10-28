@@ -1,9 +1,8 @@
-use crate::job::chain;
-
 use super::WRITER;
 use super::logged;
 use super::pkexec_args;
 use super::refusal;
+use crate::job::chain;
 
 #[test]
 fn without_a_terminal_pkexec_leaves_the_asking_to_the_sessions_agent() {
@@ -41,7 +40,10 @@ fn no_agent_to_ask_for_the_password_says_so() {
 
 #[test]
 fn a_dismissed_password_prompt_says_so() {
-    let e = refusal("Error executing command as another user: Request dismissed\n", "exit status: 126");
+    let e = refusal(
+        "Error executing command as another user: Request dismissed\n",
+        "exit status: 126",
+    );
 
     assert_eq!(chain(&e), "the password prompt was dismissed");
 }
@@ -60,7 +62,10 @@ fn a_missing_helper_names_the_script_that_installs_it() {
 
 #[test]
 fn any_other_refusal_keeps_the_helpers_reason() {
-    let e = refusal("kubaos-keyboard-write: 'us\"' isn't an XKB name list\n", "exit status: 2");
+    let e = refusal(
+        "kubaos-keyboard-write: 'us\"' isn't an XKB name list\n",
+        "exit status: 2",
+    );
 
     assert_eq!(chain(&e), "kubaos-keyboard-write: 'us\"' isn't an XKB name list");
 }

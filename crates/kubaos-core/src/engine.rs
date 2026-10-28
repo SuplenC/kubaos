@@ -13,11 +13,21 @@ pub mod runner;
 pub mod unpack;
 pub mod validate;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::{Error, Event, InstallConfig, Manifest, Probe, Secrets, StepId};
-use runner::{DryRunner, Runner, SystemRunner};
+use runner::DryRunner;
+use runner::Runner;
+use runner::SystemRunner;
+
+use crate::Error;
+use crate::Event;
+use crate::InstallConfig;
+use crate::Manifest;
+use crate::Probe;
+use crate::Secrets;
+use crate::StepId;
 
 pub const DEFAULT_TARGET: &str = "/mnt/kubaos";
 
@@ -126,18 +136,12 @@ pub fn run_with(
             .into_iter()
             .find(|d| d.path == config.disk.device)
     });
-    let target = PathBuf::from(
-        opts.target_root
-            .clone()
-            .unwrap_or_else(|| DEFAULT_TARGET.into()),
-    );
+    let target = PathBuf::from(opts.target_root.clone().unwrap_or_else(|| DEFAULT_TARGET.into()));
 
     let manifest = match manifest {
         Ok(m) => m,
         Err(e) => {
-            emit(Event::StepStarted {
-                id: StepId::Preflight,
-            });
+            emit(Event::StepStarted { id: StepId::Preflight });
             emit(Event::Failed {
                 id: StepId::Preflight,
                 error: e.clone(),
@@ -151,16 +155,7 @@ pub fn run_with(
         }
     };
 
-    let mut inst = install::Install::new(
-        config,
-        secrets,
-        manifest,
-        disk,
-        r,
-        emit,
-        target,
-        opts.log_file.clone(),
-    );
+    let mut inst = install::Install::new(config, secrets, manifest, disk, r, emit, target, opts.log_file.clone());
     for id in steps {
         (inst.emit)(Event::StepStarted { id });
         let t = Instant::now();
@@ -192,9 +187,10 @@ pub fn run_with(
 
 #[cfg(test)]
 mod tests {
+    use runner::DryRunner;
+
     use super::*;
     use crate::config::DiskTarget;
-    use runner::DryRunner;
 
     fn config(payload: &Path) -> InstallConfig {
         InstallConfig::from_toml(&format!(
@@ -311,12 +307,7 @@ mod tests {
             .filter(|a| format!("{a:?}").contains("wifi-secret-psk"))
             .collect();
         assert_eq!(wifi.len(), 1);
-        let runner::Action::Write {
-            path,
-            mode,
-            contents,
-        } = wifi[0]
-        else {
+        let runner::Action::Write { path, mode, contents } = wifi[0] else {
             panic!()
         };
         assert_eq!(
@@ -329,9 +320,7 @@ mod tests {
         let cmds = r.commands();
         let has = |s: &str| cmds.iter().any(|c| c.contains(s));
         assert!(has("sgdisk --new=1:2048:2099199 --typecode=1:ef00"));
-        assert!(has(
-            "cryptsetup luksFormat --batch-mode --type luks2 --pbkdf argon2id"
-        ));
+        assert!(has("cryptsetup luksFormat --batch-mode --type luks2 --pbkdf argon2id"));
         assert!(has(
             "mount -o noatime,compress=zstd:1,subvol=@home /dev/mapper/cryptroot /mnt/t/home"
         ));
@@ -349,10 +338,7 @@ mod tests {
         // the user all the way down from ~/.config (home-manager writes there).
         let id = Path::new("/mnt/t/home/kuba/.config/git-identity/identity.gitconfig");
         assert!(r.files[id].contains("email = \"j@example.com\""));
-        assert!(
-            !r.files
-                .contains_key(Path::new("/mnt/t/home/kuba/.gitconfig"))
-        );
+        assert!(!r.files.contains_key(Path::new("/mnt/t/home/kuba/.gitconfig")));
         assert!(has(
             "chown 1000:1000 /mnt/t/home/kuba/.config /mnt/t/home/kuba/.config/git-identity \
              /mnt/t/home/kuba/.config/git-identity/identity.gitconfig"
@@ -403,10 +389,7 @@ mod tests {
             r.files[Path::new(&format!("{dir}/home.nix"))],
             "{ pkgs, ... }: { home.packages = [ ]; }\n"
         );
-        assert_eq!(
-            r.files[Path::new(&format!("{dir}/flake.lock"))],
-            "{\"version\": 7}\n"
-        );
+        assert_eq!(r.files[Path::new(&format!("{dir}/flake.lock"))], "{\"version\": 7}\n");
         let cmds = r.commands();
         assert!(
             cmds.iter()
@@ -415,10 +398,7 @@ mod tests {
         );
         // KubaOS's checkout stays in /usr/share/kubaos: nothing copies it to
         // the home or commits there.
-        assert!(
-            !cmds.iter().any(|c| c.contains("Projects/dotfiles")),
-            "{cmds:#?}"
-        );
+        assert!(!cmds.iter().any(|c| c.contains("Projects/dotfiles")), "{cmds:#?}");
         assert!(!cmds.iter().any(|c| c.contains("git ")), "{cmds:#?}");
     }
 
@@ -440,10 +420,7 @@ mod tests {
         assert_eq!(r.files[Path::new("/mnt/t/etc/hostname")], "nerv-hq\n");
         assert!(r.files[Path::new("/mnt/t/etc/hosts")].contains("127.0.1.1\tnerv-hq\n"));
         let flake = &r.files[Path::new("/mnt/t/home/kuba/.config/kubaos/home/flake.nix")];
-        assert!(
-            flake.contains("homeConfigurations.\"kuba@nerv-hq\""),
-            "{flake}"
-        );
+        assert!(flake.contains("homeConfigurations.\"kuba@nerv-hq\""), "{flake}");
         let cmds = r.commands();
         assert!(
             !cmds.iter().any(|c| c.contains("homeConfigurations")),
@@ -508,10 +485,7 @@ mod tests {
         };
         run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}).unwrap();
         let cmds = r.commands();
-        let build = cmds
-            .iter()
-            .find(|c| c.contains("homeConfigurations"))
-            .expect("a build");
+        let build = cmds.iter().find(|c| c.contains("homeConfigurations")).expect("a build");
         for want in [
             "--reuid=1000",
             "USER=alice",
@@ -524,10 +498,7 @@ mod tests {
             assert!(build.contains(want), "{want} not in {build}");
         }
         let act = activation(&cmds);
-        assert!(
-            act.contains("/tmp/kubaos-home-generation/activate"),
-            "{act}"
-        );
+        assert!(act.contains("/tmp/kubaos-home-generation/activate"), "{act}");
         let i = |c: &String| cmds.iter().position(|x| x == c).unwrap();
         assert!(i(build) < i(&act));
     }
@@ -553,8 +524,7 @@ mod tests {
         // the service (as if 40-apps.sh had skipped it).
         let autologin = "/mnt/t/etc/systemd/system/getty@tty1.service.d/autologin.conf";
         let path_unit = "/mnt/t/etc/systemd/system/dot-chrome-theme.path";
-        r.files
-            .insert(autologin.into(), "--autologin kuba\n".into());
+        r.files.insert(autologin.into(), "--autologin kuba\n".into());
         r.files.insert(path_unit.into(), "/home/kuba\n".into());
         let opts = RunOptions {
             dry_run: true,
@@ -570,9 +540,10 @@ mod tests {
             r.files[Path::new(path_unit)],
             "PathChanged=/home/alice/.local/state/theme/colors.json\n"
         );
-        assert!(!r.files.contains_key(Path::new(
-            "/mnt/t/etc/systemd/system/dot-chrome-theme.service"
-        )));
+        assert!(
+            !r.files
+                .contains_key(Path::new("/mnt/t/etc/systemd/system/dot-chrome-theme.service"))
+        );
     }
 
     #[test]
@@ -608,13 +579,11 @@ mod tests {
         assert_eq!(r.files[Path::new("/mnt/t/etc/kubaos/channel")], "edge\n");
         let release = &r.files[Path::new("/mnt/t/var/lib/kubaos/release")];
         assert!(release.starts_with("version=0.1.0\n"), "{release}");
+        assert!(release.contains("commit=1a2b3c4d5e6f\nchannel=edge\n"), "{release}");
         assert!(
-            release.contains("commit=1a2b3c4d5e6f\nchannel=edge\n"),
-            "{release}"
+            r.files
+                .contains_key(Path::new("/mnt/t/var/lib/kubaos/migrations/1790000000-fix-apt.sh"))
         );
-        assert!(r.files.contains_key(Path::new(
-            "/mnt/t/var/lib/kubaos/migrations/1790000000-fix-apt.sh"
-        )));
         assert!(
             !r.files
                 .contains_key(Path::new("/mnt/t/var/lib/kubaos/migrations/README.md"))
@@ -624,8 +593,7 @@ mod tests {
         )));
         let cmds = r.commands();
         assert!(
-            cmds.iter()
-                .any(|c| c == "chown -R 1000:1000 /mnt/t/home/kuba/.local"),
+            cmds.iter().any(|c| c == "chown -R 1000:1000 /mnt/t/home/kuba/.local"),
             "{cmds:#?}"
         );
     }
@@ -648,8 +616,7 @@ mod tests {
             target_root: Some("/mnt/t".into()),
             log_file: None,
         };
-        let Err(Error::Step { step, .. }) = run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {})
-        else {
+        let Err(Error::Step { step, .. }) = run_with(&cfg, &secrets(), &opts, &mut r, &mut |_| {}) else {
             panic!("the install should fail on {fail_on}")
         };
         (step, r.commands())
@@ -684,10 +651,7 @@ mod tests {
     fn a_failed_grub_install_puts_the_other_systems_fallback_loader_back() {
         let (step, cmds) = dry_free_space("grub-install");
         assert_eq!(step, StepId::Bootloader);
-        let failed = cmds
-            .iter()
-            .position(|c| c.contains("grub-install"))
-            .unwrap();
+        let failed = cmds.iter().position(|c| c.contains("grub-install")).unwrap();
         let restore = cmds[failed..]
             .iter()
             .position(|c| c == "cp -r /run/kubaos/efi-boot-saved /mnt/t/boot/efi/EFI/BOOT")
@@ -730,23 +694,14 @@ mod tests {
         assert!(hint.is_some());
 
         let cmds = r.commands();
-        let pos = cmds
-            .iter()
-            .position(|c| c.contains("grub-install"))
-            .unwrap();
+        let pos = cmds.iter().position(|c| c.contains("grub-install")).unwrap();
         let after: Vec<&String> = cmds[pos + 1..].iter().collect();
-        let umounts: Vec<&str> = after
-            .iter()
-            .filter_map(|c| c.strip_prefix("umount "))
-            .collect();
+        let umounts: Vec<&str> = after.iter().filter_map(|c| c.strip_prefix("umount ")).collect();
         // Newest mount first: the chroot binds, then /boot/efi, /boot, the
         // subvolumes, and / last.
         assert_eq!(umounts.first(), Some(&"/mnt/t/run"));
         assert_eq!(umounts.last(), Some(&"/mnt/t"));
-        let efi = umounts
-            .iter()
-            .position(|m| *m == "/mnt/t/boot/efi")
-            .unwrap();
+        let efi = umounts.iter().position(|m| *m == "/mnt/t/boot/efi").unwrap();
         let boot = umounts.iter().position(|m| *m == "/mnt/t/boot").unwrap();
         assert!(efi < boot);
         assert_eq!(after.last().unwrap().as_str(), "cryptsetup close cryptroot");

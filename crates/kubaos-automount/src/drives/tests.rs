@@ -27,7 +27,10 @@ fn each_drive_is_a_line_of_its_path_name_and_mount_points() {
 fn a_tab_in_a_name_becomes_a_space_and_a_mount_point_with_one_is_left_out() {
     let text = render(&[drive("MY\tSTICK", &["/media/kuba/odd\tname", "/media/kuba/MY STICK"])]);
 
-    assert_eq!(text, "/org/freedesktop/UDisks2/drives/SanDisk_Ultra_1234\tMY STICK\t/media/kuba/MY STICK\n");
+    assert_eq!(
+        text,
+        "/org/freedesktop/UDisks2/drives/SanDisk_Ultra_1234\tMY STICK\t/media/kuba/MY STICK\n"
+    );
 }
 
 #[test]

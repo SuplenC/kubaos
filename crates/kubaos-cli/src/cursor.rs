@@ -114,7 +114,9 @@ impl Paths {
     fn from_env() -> Result<Self, String> {
         let home = env::var_os("HOME").map(PathBuf::from).ok_or("HOME isn't set")?;
         let xdg = |var: &str, default: &str| {
-            env::var_os(var).filter(|v| !v.is_empty()).map_or_else(|| home.join(default), PathBuf::from)
+            env::var_os(var)
+                .filter(|v| !v.is_empty())
+                .map_or_else(|| home.join(default), PathBuf::from)
         };
         let config = xdg("XDG_CONFIG_HOME", ".config");
         let data = xdg("XDG_DATA_HOME", ".local/share");
@@ -192,13 +194,18 @@ fn apply(paths: &Paths, sync: bool) -> ExitCode {
         let Some(wanted) = wanted else { return Ok(None) };
         if theme.stamp().as_deref() != Some(wanted.stamp.as_str()) {
             let shapes = source::load(&wanted.source).map_err(ApplyError::Source)?;
-            theme.write_hyprcursor(&shapes, &wanted.colors, &wanted.stamp).map_err(ApplyError::Theme)?;
+            theme
+                .write_hyprcursor(&shapes, &wanted.colors, &wanted.stamp)
+                .map_err(ApplyError::Theme)?;
         }
         Ok(Some(wanted))
     });
     let failed = written.as_ref().is_err();
     if let Err(e) = &written {
-        eprintln!("kubaos: writing the cursor theme: {}; the pointer is {FALLBACK_THEME}", chain(e));
+        eprintln!(
+            "kubaos: writing the cursor theme: {}; the pointer is {FALLBACK_THEME}",
+            chain(e)
+        );
     }
     if let Ok(Some(_)) = written {
         set_hyprland_cursor(THEME_NAME, settings.size);
@@ -244,7 +251,9 @@ fn spawn_render(paths: &Paths) {
     } else {
         Command::new(exe)
     };
-    cmd.args(["cursor", "render-xcursor"]).stdin(Stdio::null()).stdout(Stdio::null());
+    cmd.args(["cursor", "render-xcursor"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null());
     if let Some(dir) = paths.log.parent() {
         let _ = fs::create_dir_all(dir);
     }
@@ -281,17 +290,24 @@ fn render_xcursor(paths: &Paths) -> ExitCode {
         && theme.stamp().as_deref() == Some(wanted.stamp.as_str())
         && theme.xcursor_stamp() != Some(theme::xcursor_stamp(&wanted.stamp, settings.size))
     {
-        let threads = thread::available_parallelism().map_or(1, usize::from).min(RENDER_THREADS);
-        let outcome = source::load(&wanted.source).map_err(ApplyError::Source).and_then(|shapes| {
-            theme
-                .write_xcursor(&shapes, &wanted.colors, settings.size, &wanted.stamp, threads)
-                .map_err(ApplyError::Theme)
-        });
+        let threads = thread::available_parallelism()
+            .map_or(1, usize::from)
+            .min(RENDER_THREADS);
+        let outcome = source::load(&wanted.source)
+            .map_err(ApplyError::Source)
+            .and_then(|shapes| {
+                theme
+                    .write_xcursor(&shapes, &wanted.colors, settings.size, &wanted.stamp, threads)
+                    .map_err(ApplyError::Theme)
+            });
         match outcome {
             Ok(XcursorOutcome::Written) => rewritten = true,
             Ok(XcursorOutcome::Superseded) => return ExitCode::SUCCESS,
             Err(e) => {
-                eprintln!("kubaos: rendering the XCursor theme: {}; XCursor apps get {FALLBACK_THEME}", chain(&e));
+                eprintln!(
+                    "kubaos: rendering the XCursor theme: {}; XCursor apps get {FALLBACK_THEME}",
+                    chain(&e)
+                );
                 code = ExitCode::FAILURE;
             }
         }
@@ -352,5 +368,9 @@ fn tell_session(size: u32, bounce: bool) {
 
 /// Runs `cmd` for its effect alone: a session tool that's missing or fails changes nothing else.
 fn quietly(cmd: &mut Command) {
-    let _ = cmd.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+    let _ = cmd
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
 }

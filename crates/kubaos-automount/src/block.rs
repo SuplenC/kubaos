@@ -16,7 +16,10 @@ use std::path::Path;
 use std::path::PathBuf;
 
 /// A block device: a partition, a whole disk, or the cleartext side of an unlocked LUKS volume.
-#[expect(clippy::struct_excessive_bools, reason = "each flag is one of udisks2's properties, read as it is")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each flag is one of udisks2's properties, read as it is"
+)]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Block {
     /// Its udisks2 object path, `/org/freedesktop/UDisks2/block_devices/sdb1`.
@@ -210,9 +213,7 @@ pub fn block_name(block: &Block, drive: Option<&Drive>) -> String {
     if !label.is_empty() {
         return label.to_owned();
     }
-    drive
-        .and_then(drive_name)
-        .unwrap_or_else(|| block.device.clone())
+    drive.and_then(drive_name).unwrap_or_else(|| block.device.clone())
 }
 
 /// A drive's vendor and model, when it reports either.

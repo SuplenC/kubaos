@@ -212,7 +212,10 @@ impl Ask for Terminal {
 
 /// `BW_SESSION`, when the person exported one.
 fn exported_session() -> Option<Session> {
-    std::env::var("BW_SESSION").ok().filter(|s| !s.is_empty()).map(Session::new)
+    std::env::var("BW_SESSION")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(Session::new)
 }
 
 fn parts(only: Option<&str>) -> Result<Parts, String> {

@@ -1,11 +1,16 @@
 //! Config vs. machine vs. payload. Every problem is collected, so Kōbō
 //! (and `kubaos validate`) can show them all at once.
 
-use super::disk::{self, MIB};
+use super::disk;
+use super::disk::MIB;
 use super::machine::gib;
-use crate::config::{DiskTarget, InstallConfig, Secrets, Wallpapers};
+use crate::config::DiskTarget;
+use crate::config::InstallConfig;
+use crate::config::Secrets;
+use crate::config::Wallpapers;
 use crate::keyboard;
-use crate::probe::{Manifest, Probe};
+use crate::probe::Manifest;
+use crate::probe::Probe;
 
 pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
     let mut out = Vec::new();
@@ -112,10 +117,7 @@ pub fn problems(c: &InstallConfig, p: &Probe) -> Vec<String> {
                     d.path
                 ));
             }
-            let has_esp = d
-                .partitions
-                .iter()
-                .any(|p| p.os_hint.as_deref() == Some("EFI system"));
+            let has_esp = d.partitions.iter().any(|p| p.os_hint.as_deref() == Some("EFI system"));
             let need = disk::required_bytes(installed, has_esp);
             let have = end.saturating_sub(start).saturating_sub(MIB);
             if have < need {
@@ -200,9 +202,7 @@ pub fn secret_problems(c: &InstallConfig, s: &Secrets) -> Vec<String> {
 pub fn valid_username(u: &str) -> bool {
     let mut ch = u.chars();
     u.len() <= 32
-        && ch
-            .next()
-            .is_some_and(|c| c.is_ascii_lowercase() || c == '_')
+        && ch.next().is_some_and(|c| c.is_ascii_lowercase() || c == '_')
         && ch.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-' || c == '_')
 }
 
@@ -274,7 +274,12 @@ pub fn valid_hostname(h: &str) -> bool {
 mod tests {
     use super::*;
     use crate::config::*;
-    use crate::probe::{DiskInfo, Manifest, PartitionInfo, Region, WallpaperFile, WallpaperSet};
+    use crate::probe::DiskInfo;
+    use crate::probe::Manifest;
+    use crate::probe::PartitionInfo;
+    use crate::probe::Region;
+    use crate::probe::WallpaperFile;
+    use crate::probe::WallpaperSet;
 
     pub fn manifest() -> Manifest {
         Manifest {
@@ -391,10 +396,7 @@ mod tests {
             p.iter()
                 .any(|s| s.contains("hostname \"-bad\" must be 1-63 characters"))
         );
-        assert!(
-            p.iter()
-                .any(|s| s.contains("medium this install runs from"))
-        );
+        assert!(p.iter().any(|s| s.contains("medium this install runs from")));
         assert!(p.iter().any(|s| s.contains("Mars/Olympus")));
         assert!(p.iter().any(|s| s == "unknown keyboard layout \"xx\""));
     }
@@ -417,15 +419,9 @@ mod tests {
             problems(&c, &probe())
         };
 
+        assert_eq!(problems_with(&[], &[]), ["pick at least one keyboard layout"]);
         assert_eq!(
-            problems_with(&[], &[]),
-            ["pick at least one keyboard layout"]
-        );
-        assert_eq!(
-            problems_with(
-                &["us", "it", "us", "it", "us"],
-                &["", "", "intl", "", "dvorak"]
-            ),
+            problems_with(&["us", "it", "us", "it", "us"], &["", "", "intl", "", "dvorak"]),
             [
                 "at most 4 keyboard layouts, XKB holds no more",
                 "keyboard layout \"it\" is listed twice"
@@ -470,11 +466,7 @@ mod tests {
             sets: vec![],
             files: vec![],
         });
-        assert_eq!(
-            problems(&c, &probe()),
-            Vec::<String>::new(),
-            "none is a choice"
-        );
+        assert_eq!(problems(&c, &probe()), Vec::<String>::new(), "none is a choice");
         c.wallpapers = Some(Wallpapers {
             sets: vec!["shinjuku".into(), "vaporwave".into(), "../etc".into()],
             files: vec![],
@@ -563,10 +555,7 @@ mod tests {
         assert_eq!(problems(&c, &probe()), Vec::<String>::new());
         for taken in ["root", "nixbld12", "systemd-network", "messagebus"] {
             c.user.username = taken.into();
-            assert!(
-                problems(&c, &probe())[0].contains("system account"),
-                "{taken}"
-            );
+            assert!(problems(&c, &probe())[0].contains("system account"), "{taken}");
         }
     }
 
@@ -612,25 +601,13 @@ mod tests {
     fn a_hostname_that_is_not_one_rfc_1123_label_is_refused() {
         let mut c = config();
         let long = "a".repeat(64);
-        for host in [
-            "",
-            "Nerv",
-            "-nerv",
-            "nerv-",
-            "nerv.hq",
-            "nerv hq",
-            long.as_str(),
-        ] {
+        for host in ["", "Nerv", "-nerv", "nerv-", "nerv.hq", "nerv hq", long.as_str()] {
             c.host.hostname = host.into();
 
             let p = problems(&c, &probe());
 
             assert_eq!(p.len(), 1, "{host:?}: {p:#?}");
-            assert!(
-                p[0].contains("must be 1-63 characters"),
-                "{host:?}: {}",
-                p[0]
-            );
+            assert!(p[0].contains("must be 1-63 characters"), "{host:?}: {}", p[0]);
         }
     }
 

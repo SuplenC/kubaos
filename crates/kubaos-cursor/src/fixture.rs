@@ -54,14 +54,21 @@ pub const WATCH: &str = r##"<svg width="256" height="256" viewBox="0 0 256 256" 
 "##;
 
 /// Bibata's spinner and corner colours, none of which a recoloured theme keeps.
-pub const RAINBOW: [&str; 8] = ["#F05024", "#FCB813", "#7EBA41", "#32A0DA", "#F1613A", "#FDBE2A", "#96C865", "#4FADDF"];
+pub const RAINBOW: [&str; 8] = [
+    "#F05024", "#FCB813", "#7EBA41", "#32A0DA", "#F1613A", "#FDBE2A", "#96C865", "#4FADDF",
+];
 
 /// The Shinjuku wallpaper's `dark` colours.
 pub const DARK: Colors = Colors {
     fill: Rgb([0x1e, 0x0f, 0x0e]),
     outline: Rgb([0xfa, 0xdb, 0xd9]),
     watch: Rgb([0x1e, 0x0f, 0x0e]),
-    spinner: [Rgb([0xff, 0xb3, 0xae]), Rgb([0xff, 0xda, 0xd6]), Rgb([0xab, 0x35, 0x37]), Rgb([0x89, 0x1d, 0x22])],
+    spinner: [
+        Rgb([0xff, 0xb3, 0xae]),
+        Rgb([0xff, 0xda, 0xd6]),
+        Rgb([0xab, 0x35, 0x37]),
+        Rgb([0x89, 0x1d, 0x22]),
+    ],
 };
 
 /// A Bibata source tree in a temporary directory.

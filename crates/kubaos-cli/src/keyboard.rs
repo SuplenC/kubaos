@@ -14,10 +14,10 @@
 //!                                             turn them on or off, or apply the setting
 //!
 //! A layout is spelled `it` or `us(intl)`. The layouts are the user's: `layouts` in
-//! `~/.config/kubaos/desktop/keyboard/keyboard.toml`, which Hyprland reads (`config/hypr/input.lua`).
-//! Until the user has a list, it is the one in `/etc/default/keyboard`, which the install wrote.
-//! A change is checked against xkb's rules list, written to the user's file and reaches Hyprland
-//! with `hyprctl reload`, with no privilege asked.
+//! `~/.config/kubaos/desktop/keyboard/keyboard.toml`, which Hyprland reads
+//! (`config/hypr/input.lua`). Until the user has a list, it is the one in `/etc/default/keyboard`,
+//! which the install wrote. A change is checked against xkb's rules list, written to the user's
+//! file and reaches Hyprland with `hyprctl reload`, with no privilege asked.
 //!
 //! `/etc/default/keyboard` is the system's: the console and the disk's passphrase prompt type
 //! with its layout. It follows the default alone. A new default is written there by a root helper
@@ -31,17 +31,17 @@
 //! reads another system file instead (the harness).
 //!
 //! The accents are keyd, which `system/50-hyprland.sh` installs and enables. `on` and `off` write
-//! the setting to `~/.config/kubaos/desktop/keyboard/keyboard.toml`, then apply it: keyd runs while they
-//! are on and is stopped while they are off (a polkit rule lets the desktop user start and stop
-//! `keyd.service`), and Hyprland reloads, so the Shortcuts View's cheat sheet follows. `apply`
+//! the setting to `~/.config/kubaos/desktop/keyboard/keyboard.toml`, then apply it: keyd runs while
+//! they are on and is stopped while they are off (a polkit rule lets the desktop user start and
+//! stop `keyd.service`), and Hyprland reloads, so the Shortcuts View's cheat sheet follows. `apply`
 //! runs at login (`config/hypr/autostart.lua`), as keyd starts with the machine.
 //! Exit codes: 0 ok, 1 writing the user's file, pkexec, the helper or `systemctl` failed, 2 usage
 //! or a change the rules refuse.
 //!
 //! # Owns
 //!
-//! - Writing the user's layouts, running the root helper for a new default, and telling systemd
-//!   and Hyprland.
+//! - Writing the user's layouts, running the root helper for a new default, and telling systemd and
+//!   Hyprland.
 //!
 //! # Not here
 //!
@@ -133,8 +133,8 @@ fn layouts(cmd: KeyboardCmd) -> ExitCode {
         Ok(user) => user,
         Err(e) => return usage_error(chain(&e)),
     };
-    let system_path = env::var_os("KUBAOS_KEYBOARD_FILE")
-        .map_or_else(|| PathBuf::from(keyboard::DEFAULT_KEYBOARD), PathBuf::from);
+    let system_path =
+        env::var_os("KUBAOS_KEYBOARD_FILE").map_or_else(|| PathBuf::from(keyboard::DEFAULT_KEYBOARD), PathBuf::from);
     let system = KeyboardFile::parse(&fs::read_to_string(&system_path).unwrap_or_default());
     let current = keyboard::layouts(&user, &system);
     let change = match cmd {
@@ -268,7 +268,9 @@ fn tell_keyd(accents: MacAccents) -> Result<(), String> {
         .map_err(|e| format!("running systemctl: {e}"))?;
     if String::from_utf8_lossy(&listed.stdout).trim().is_empty() {
         return match accents {
-            MacAccents::On => Err(format!("{KEYD_UNIT} isn't installed; system/50-hyprland.sh installs it")),
+            MacAccents::On => Err(format!(
+                "{KEYD_UNIT} isn't installed; system/50-hyprland.sh installs it"
+            )),
             MacAccents::Off => Ok(()),
         };
     }
@@ -286,7 +288,6 @@ fn tell_keyd(accents: MacAccents) -> Result<(), String> {
         Err(format!("systemctl {verb} {KEYD_UNIT} failed ({status})"))
     }
 }
-
 
 /// Writes `default` to `/etc/default/keyboard` as its one layout through the root helper, keeping
 /// the file's model and options; the helper then brings the console and the initramfs in line.

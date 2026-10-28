@@ -11,11 +11,11 @@
 //!
 //! # Owns
 //!
-//! - The stops ([`stop`]) and what each sets ([`plan`], the one place a stop becomes its
-//!   settings), the user's settings ([`settings`]), what the service remembers ([`memory`]) and
-//!   tells the shell ([`runtime`]), which stop to be on ([`control`]), what to write on this
-//!   machine ([`machine`], [`writes`], [`panel`]), the CPU scheduler ([`scheduler`]), `status`
-//!   ([`status`], read live by [`live`]) and `measure` ([`measure`]).
+//! - The stops ([`stop`]) and what each sets ([`plan`], the one place a stop becomes its settings),
+//!   the user's settings ([`settings`]), what the service remembers ([`memory`]) and tells the
+//!   shell ([`runtime`]), which stop to be on ([`control`]), what to write on this machine
+//!   ([`machine`], [`writes`], [`panel`]), the CPU scheduler ([`scheduler`]), `status` ([`status`],
+//!   read live by [`live`]) and `measure` ([`measure`]).
 //!
 //! # Not here
 //!

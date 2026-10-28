@@ -70,16 +70,28 @@ impl Kind {
     fn extensions(self) -> &'static [&'static str] {
         match self {
             Kind::Images => &[
-                "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "bmp", "tif", "tiff", "svg", "ico",
-                "dng", "cr2", "nef", "arw", "raw",
+                "jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "bmp", "tif", "tiff", "svg", "ico", "dng",
+                "cr2", "nef", "arw", "raw",
             ],
             Kind::Documents => &[
                 "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp",
                 "epub",
             ],
-            Kind::Archives => &["zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz", "zst", "lz"],
+            Kind::Archives => &[
+                "zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "xz", "txz", "zst", "lz",
+            ],
             Kind::Installers => &[
-                "deb", "rpm", "appimage", "flatpakref", "snap", "run", "msi", "exe", "dmg", "pkg", "iso",
+                "deb",
+                "rpm",
+                "appimage",
+                "flatpakref",
+                "snap",
+                "run",
+                "msi",
+                "exe",
+                "dmg",
+                "pkg",
+                "iso",
             ],
             Kind::Video => &["mp4", "mkv", "webm", "mov", "avi", "m4v", "wmv", "flv"],
             Kind::Audio => &["mp3", "flac", "ogg", "opus", "wav", "m4a", "aac", "wma"],
@@ -91,9 +103,11 @@ impl Kind {
 /// download (`.crdownload`, `.part`) has none, so it never moves while it is being written.
 pub fn kind(name: &OsStr) -> Option<Kind> {
     let extension = Path::new(name).extension()?.to_str()?;
-    Kind::ALL
-        .into_iter()
-        .find(|kind| kind.extensions().iter().any(|known| known.eq_ignore_ascii_case(extension)))
+    Kind::ALL.into_iter().find(|kind| {
+        kind.extensions()
+            .iter()
+            .any(|known| known.eq_ignore_ascii_case(extension))
+    })
 }
 
 /// A file at the top of Downloads, as [`plan`] reads it.

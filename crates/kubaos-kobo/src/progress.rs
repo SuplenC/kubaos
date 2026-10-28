@@ -1,8 +1,12 @@
 //! Folds the event stream into what the Installing screen shows.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
-use kubaos_core::{Event, Level, StepId, StepInfo};
+use kubaos_core::Event;
+use kubaos_core::Level;
+use kubaos_core::StepId;
+use kubaos_core::StepInfo;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepState {
@@ -87,11 +91,7 @@ impl Install {
                 }
                 self.push(Level::Info, format!("==> {}", id.title()));
             }
-            Event::Progress {
-                id,
-                fraction,
-                detail,
-            } => {
+            Event::Progress { id, fraction, detail } => {
                 if let Some(s) = self.step_mut(*id)
                     && let Some(f) = fraction
                 {
@@ -260,12 +260,7 @@ mod tests {
             },
             t0,
         );
-        i.apply(
-            &Event::StepStarted {
-                id: StepId::Encrypt,
-            },
-            t0,
-        );
+        i.apply(&Event::StepStarted { id: StepId::Encrypt }, t0);
         let share = 5.0 / 65.0;
         let at = |s| t0 + Duration::from_secs(s);
         assert!(i.overall_at(Some(at(3))) > 0.3 * share);
@@ -297,12 +292,7 @@ mod tests {
             },
             now,
         );
-        i.apply(
-            &Event::StepStarted {
-                id: StepId::Preflight,
-            },
-            now,
-        );
+        i.apply(&Event::StepStarted { id: StepId::Preflight }, now);
         i.apply(
             &Event::StepFinished {
                 id: StepId::Preflight,

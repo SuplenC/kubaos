@@ -32,9 +32,7 @@ fn dry_run(log: PathBuf) -> Vec<RunMsg> {
     form.disk_mode = Some(DiskMode::Whole);
     let mut out = vec![];
 
-    engine.run(&form.to_config(&probe), &form.to_secrets(), &mut |m| {
-        out.push(m)
-    });
+    engine.run(&form.to_config(&probe), &form.to_secrets(), &mut |m| out.push(m));
 
     out
 }
@@ -45,20 +43,12 @@ fn a_dry_run_streams_the_engine_events_and_exits_once() {
 
     let out = dry_run(dir.join("install.log"));
 
-    assert!(matches!(
-        out.first(),
-        Some(RunMsg::Event(Event::Plan { .. }))
-    ));
-    assert!(out.iter().any(|m| matches!(
-        m,
-        RunMsg::Event(Event::StepStarted {
-            id: StepId::Preflight
-        })
-    )));
-    assert!(matches!(
-        out[out.len() - 2],
-        RunMsg::Event(Event::Done { .. })
-    ));
+    assert!(matches!(out.first(), Some(RunMsg::Event(Event::Plan { .. }))));
+    assert!(
+        out.iter()
+            .any(|m| matches!(m, RunMsg::Event(Event::StepStarted { id: StepId::Preflight })))
+    );
+    assert!(matches!(out[out.len() - 2], RunMsg::Event(Event::Done { .. })));
     assert!(matches!(out.last(), Some(RunMsg::Exited(Ok(())))));
     std::fs::remove_dir_all(&dir).unwrap();
 }
@@ -71,16 +61,8 @@ fn the_install_log_has_every_step_and_no_secret() {
     dry_run(path.clone());
 
     let log = std::fs::read_to_string(&path).expect("read the install log");
-    assert!(
-        log.lines().any(|l| l.ends_with("==> Checking the machine")),
-        "{log}"
-    );
-    assert!(
-        log.lines()
-            .last()
-            .is_some_and(|l| l.contains("installed in ")),
-        "{log}"
-    );
+    assert!(log.lines().any(|l| l.ends_with("==> Checking the machine")), "{log}");
+    assert!(log.lines().last().is_some_and(|l| l.contains("installed in ")), "{log}");
     assert!(!log.contains("a password nobody logs"));
     std::fs::remove_dir_all(&dir).unwrap();
 }
@@ -91,7 +73,10 @@ fn a_log_that_cant_be_written_is_a_warning_not_a_failure() {
 
     let out = dry_run(dir.join("missing").join("install.log"));
 
-    assert!(out.iter().any(|m| matches!(m, RunMsg::Event(Event::Log { line, .. }) if line.starts_with("can't write the log"))));
+    assert!(
+        out.iter()
+            .any(|m| matches!(m, RunMsg::Event(Event::Log { line, .. }) if line.starts_with("can't write the log")))
+    );
     assert!(matches!(out.last(), Some(RunMsg::Exited(Ok(())))));
     std::fs::remove_dir_all(&dir).unwrap();
 }

@@ -45,9 +45,7 @@ fn main() -> ExitCode {
     match args.as_slice() {
         ["agent"] => agent(),
         ["pair", device] => with_path(device, |device| service::call("Pair", &(device,))),
-        ["cancel", device] => {
-            with_path(device, |device| service::call("CancelPairing", &(device,)))
-        }
+        ["cancel", device] => with_path(device, |device| service::call("CancelPairing", &(device,))),
         ["answer", id, answer, rest @ ..] if rest.len() <= 1 => {
             let (Ok(id), Some(accept)) = (id.parse::<u32>(), yes_no(answer)) else {
                 return usage();

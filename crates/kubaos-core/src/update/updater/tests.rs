@@ -84,7 +84,12 @@ impl FakeDpkg {
             .iter()
             .map(|a| a.to_string_lossy().into_owned())
             .filter(|a| !a.starts_with('-') && !a.contains("::"))
-            .filter(|a| !matches!(a.as_str(), "install" | "remove" | "hold" | "unhold" | "showhold" | "policy"))
+            .filter(|a| {
+                !matches!(
+                    a.as_str(),
+                    "install" | "remove" | "hold" | "unhold" | "showhold" | "policy"
+                )
+            })
             .map(|a| a.split('=').next().unwrap_or_default().to_owned())
             .collect()
     }
@@ -544,9 +549,15 @@ fn an_update_reports_each_phase_that_runs_in_order_and_ends_with_its_summary() {
     assert_eq!(preview.migrations, ["1790000000-fix-apt.sh"]);
     assert_eq!(preview.packages, 1);
     let summary = summary(&events);
-    assert_eq!((summary.from.commit.as_str(), summary.to.commit.as_str()), (before.as_str(), head.as_str()));
+    assert_eq!(
+        (summary.from.commit.as_str(), summary.to.commit.as_str()),
+        (before.as_str(), head.as_str())
+    );
     assert_eq!(summary.to.version, "0.1.1");
-    assert_eq!(summary.migrations, ["1790000000-fix-apt.sh", "1790000001-move-config.sh"]);
+    assert_eq!(
+        summary.migrations,
+        ["1790000000-fix-apt.sh", "1790000001-move-config.sh"]
+    );
     assert_eq!(summary.changes.len(), 1);
     assert_eq!(summary.restart, Restart::None);
     assert_eq!(summary.undo.as_deref(), Some("kubaos rollback"));
@@ -582,9 +593,7 @@ fn a_stale_sudo_password_is_asked_once_before_the_first_root_command() {
         .expect("a password prompt");
     assert!(matches!(
         events[asked - 2],
-        UpdateEvent::PhaseStarted {
-            phase: Phase::Fetching
-        }
+        UpdateEvent::PhaseStarted { phase: Phase::Fetching }
     ));
     assert_eq!(events[asked + 1], UpdateEvent::Answered { yes: true });
 }
@@ -660,7 +669,11 @@ fn a_failed_system_migration_stops_the_update_and_runs_again_next_time() {
     assert_eq!(w.ran_log(), "");
     assert_eq!(m.switches, 0);
     let Some(UpdateEvent::Failed {
-        phase, error, output, log, ..
+        phase,
+        error,
+        output,
+        log,
+        ..
     }) = events.last()
     else {
         panic!("the last event is {:?}, not a failure", events.last());
@@ -719,7 +732,10 @@ fn saying_no_changes_nothing() {
             prompt: Prompt::Confirm { .. }
         }
     ));
-    assert_eq!(tail[2..], [&UpdateEvent::Answered { yes: false }, &UpdateEvent::Declined]);
+    assert_eq!(
+        tail[2..],
+        [&UpdateEvent::Answered { yes: false }, &UpdateEvent::Declined]
+    );
 }
 
 #[test]
@@ -766,7 +782,11 @@ fn a_check_while_an_update_runs_leaves_update_available_alone() {
 fn a_partly_failed_refresh_keeps_the_last_count() {
     let w = World::new(Channel::Edge, true);
     fs::create_dir_all(w.user.update_available().parent().unwrap()).unwrap();
-    fs::write(w.user.update_available(), "apt-security=1\napt-security-packages=openssl=2\n").unwrap();
+    fs::write(
+        w.user.update_available(),
+        "apt-security=1\napt-security-packages=openssl=2\n",
+    )
+    .unwrap();
     let mut m = Fake::new();
     m.canned.insert(
         "apt-get",
@@ -826,7 +846,9 @@ fn a_rollback_puts_release_and_the_flake_lock_back_and_keeps_the_markers() {
 
     let mut back = Fake::new();
     let mut events = Vec::new();
-    w.reporting(&mut back, &mut events).rollback(Confirm::AssumeYes).unwrap();
+    w.reporting(&mut back, &mut events)
+        .rollback(Confirm::AssumeYes)
+        .unwrap();
 
     assert_eq!(w.release(), before);
     assert_eq!(fs::read_to_string(w.user.flake_lock()).unwrap(), "lock before\n");
@@ -840,7 +862,10 @@ fn a_rollback_puts_release_and_the_flake_lock_back_and_keeps_the_markers() {
         [Phase::Checking, Phase::Snapshot, Phase::Release, Phase::Home]
     );
     let summary = summary(&events);
-    assert_eq!((summary.to.commit.as_str(), summary.to.version.as_str()), (before.as_str(), "0.1.0"));
+    assert_eq!(
+        (summary.to.commit.as_str(), summary.to.version.as_str()),
+        (before.as_str(), "0.1.0")
+    );
     assert_eq!(summary.undo, None);
 
     let err = w.updater(&mut Fake::new()).rollback(Confirm::AssumeYes).unwrap_err();
@@ -877,7 +902,11 @@ fn stable_without_a_release_tag_says_so_and_updates_packages() {
     w.reporting(&mut m, &mut events).update(yes()).unwrap();
 
     assert_eq!(w.release(), before);
-    assert!(notes(&events).iter().any(|s| s.contains("newest release of its channel")));
+    assert!(
+        notes(&events)
+            .iter()
+            .any(|s| s.contains("newest release of its channel"))
+    );
     assert_eq!(m.ran("sudo apt-get upgrade"), 1);
 }
 
@@ -992,11 +1021,10 @@ fn the_daily_check_writes_what_is_available_and_notifies_once() {
     let available = w.reporting(&mut m, &mut events).check().unwrap();
 
     assert_eq!(available.update.as_ref().unwrap().commit, head);
-    assert_eq!(
-        phases(&events),
-        [Phase::Checking, Phase::Fetching, Phase::Verifying]
+    assert_eq!(phases(&events), [Phase::Checking, Phase::Fetching, Phase::Verifying]);
+    assert!(
+        matches!(events.last(), Some(UpdateEvent::Available { update: Some(u), upgrade: None, .. }) if u.contains(&head[..7]))
     );
-    assert!(matches!(events.last(), Some(UpdateEvent::Available { update: Some(u), upgrade: None, .. }) if u.contains(&head[..7])));
     assert!(!w.user.update_logs().exists(), "a check keeps no log");
     let text = fs::read_to_string(w.user.update_available()).unwrap();
     assert!(text.contains(&format!("update-commit={head}")));
@@ -1056,7 +1084,11 @@ fn a_check_apt_cannot_answer_keeps_the_last_count_and_warns() {
     let available = w.reporting(&mut m, &mut events).check().unwrap();
 
     assert_eq!(available.apt_security, ["openssl=2"]);
-    assert!(warnings(&events).iter().any(|text| text.contains("apt security updates")));
+    assert!(
+        warnings(&events)
+            .iter()
+            .any(|text| text.contains("apt security updates"))
+    );
 }
 
 #[test]

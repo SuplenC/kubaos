@@ -12,9 +12,17 @@
 use std::io::Read;
 use std::process::ExitCode;
 
-use clap::{Subcommand, ValueEnum};
+use clap::Subcommand;
+use clap::ValueEnum;
 use kubaos_core::Level;
-use kubaos_core::setup::{self, CardId, Env, Inputs, RealSys, SetupEvent, State, demo};
+use kubaos_core::setup;
+use kubaos_core::setup::CardId;
+use kubaos_core::setup::Env;
+use kubaos_core::setup::Inputs;
+use kubaos_core::setup::RealSys;
+use kubaos_core::setup::SetupEvent;
+use kubaos_core::setup::State;
+use kubaos_core::setup::demo;
 
 use crate::Events;
 
@@ -51,8 +59,7 @@ pub enum SetupCmd {
 }
 
 fn parse_card(s: &str) -> Result<CardId, String> {
-    CardId::parse(s)
-        .ok_or_else(|| format!("unknown card {s}: tuxedo, fingerprint, yubikey, bitwarden, git, phone"))
+    CardId::parse(s).ok_or_else(|| format!("unknown card {s}: tuxedo, fingerprint, yubikey, bitwarden, git, phone"))
 }
 
 fn machine(d: DemoMachine) -> demo::Machine {
@@ -75,25 +82,14 @@ pub fn main(cmd: SetupCmd) -> ExitCode {
                 None => setup::status(&mut RealSys::new(), &env),
             };
             if json {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&st).expect("status serializes")
-                );
+                println!("{}", serde_json::to_string_pretty(&st).expect("status serializes"));
             } else {
                 println!("online {}", if st.online { "yes" } else { "no" });
                 for c in &st.cards {
-                    println!(
-                        "{:<12} {:<8} {}",
-                        c.id.title(),
-                        state_word(c.state),
-                        c.summary
-                    );
+                    println!("{:<12} {:<8} {}", c.id.title(), state_word(c.state), c.summary);
                 }
                 if env.marker().exists() {
-                    println!(
-                        "marker {} (setup stays closed at login)",
-                        env.marker().display()
-                    );
+                    println!("marker {} (setup stays closed at login)", env.marker().display());
                 }
             }
             ExitCode::SUCCESS
@@ -121,11 +117,7 @@ pub fn main(cmd: SetupCmd) -> ExitCode {
                 Some(d) => demo::Demo::new(machine(d), 1.0).run(card, &inputs, &mut print),
                 None => setup::run(&mut RealSys::new(), &env, card, &inputs, &mut print),
             };
-            if ok {
-                ExitCode::SUCCESS
-            } else {
-                ExitCode::from(1)
-            }
+            if ok { ExitCode::SUCCESS } else { ExitCode::from(1) }
         }
         SetupCmd::Done => match setup::mark_done(&mut RealSys::new(), &env) {
             Ok(()) => {

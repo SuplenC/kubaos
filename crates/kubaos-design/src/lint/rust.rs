@@ -121,8 +121,8 @@ const WIDGETS: &[&str] = &[
 /// iced's macros that build the same.
 const MACROS: &[&str] = &["column!", "row!", "text!", "rich_text!"];
 
-/// Each line's hits, up to the file's inline test module. `longest_ms` is the longest duration token:
-/// a literal duration longer than any animation is a timeout or a poll, not motion.
+/// Each line's hits, up to the file's inline test module. `longest_ms` is the longest duration
+/// token: a literal duration longer than any animation is a timeout or a poll, not motion.
 pub fn hits(lines: &[Line], longest_ms: u32) -> Vec<Vec<Hit>> {
     let mut out = Vec::with_capacity(lines.len());
     let mut in_tests = false;
@@ -356,7 +356,8 @@ fn component_hits(bare: &str, hits: &mut Vec<Hit>) {
     }
 }
 
-/// `after` past a path to a module's type (`::Row` in `row::Row::new(`), so what follows is the call.
+/// `after` past a path to a module's type (`::Row` in `row::Row::new(`), so what follows is the
+/// call.
 fn type_path(after: &str) -> &str {
     let Some(rest) = after.strip_prefix("::") else {
         return after;

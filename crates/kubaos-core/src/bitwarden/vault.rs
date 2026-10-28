@@ -235,19 +235,13 @@ impl Vault {
                     .collect();
                 let token = (r.name == names.gh_item)
                     .then(|| {
-                        r.login.and_then(|l| l.password).or_else(|| {
-                            fields
-                                .iter()
-                                .find(|f| f.is("token"))
-                                .and_then(|f| f.value.clone())
-                        })
+                        r.login
+                            .and_then(|l| l.password)
+                            .or_else(|| fields.iter().find(|f| f.is("token")).and_then(|f| f.value.clone()))
                     })
                     .flatten()
                     .map(Sensitive);
-                let (public_key, fingerprint) = r
-                    .ssh_key
-                    .map(|k| (k.public_key, k.fingerprint))
-                    .unwrap_or_default();
+                let (public_key, fingerprint) = r.ssh_key.map(|k| (k.public_key, k.fingerprint)).unwrap_or_default();
                 Item {
                     folder: folder_name(&r.folder_id),
                     id: r.id,

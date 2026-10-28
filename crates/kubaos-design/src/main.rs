@@ -12,8 +12,8 @@
 //!
 //! # Owns
 //!
-//! - The command line, its output and its exit codes: 2 for a usage error, 1 for a failed check
-//!   or a file that can't be read or written.
+//! - The command line, its output and its exit codes: 2 for a usage error, 1 for a failed check or
+//!   a file that can't be read or written.
 //!
 //! # Not here
 //!

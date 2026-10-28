@@ -66,7 +66,10 @@ impl FromStr for Style {
     type Err = StyleError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Style::ALL.into_iter().find(|style| style.as_str() == s).ok_or_else(|| StyleError(s.to_owned()))
+        Style::ALL
+            .into_iter()
+            .find(|style| style.as_str() == s)
+            .ok_or_else(|| StyleError(s.to_owned()))
     }
 }
 
@@ -88,7 +91,10 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { style: Style::default(), size: DEFAULT_SIZE }
+        Self {
+            style: Style::default(),
+            size: DEFAULT_SIZE,
+        }
     }
 }
 
@@ -154,7 +160,11 @@ pub fn set_size(path: &Path, size: u32) -> Result<(), SettingsError> {
 }
 
 fn check_size(size: u32) -> Result<(), SettingsError> {
-    if (MIN_SIZE..=MAX_SIZE).contains(&size) { Ok(()) } else { Err(SettingsError::Size(size)) }
+    if (MIN_SIZE..=MAX_SIZE).contains(&size) {
+        Ok(())
+    } else {
+        Err(SettingsError::Size(size))
+    }
 }
 
 fn set_value(path: &Path, key: &str, value: &str) -> Result<(), SettingsError> {
@@ -195,7 +205,9 @@ pub fn with_value(text: &str, key: &str, value: &str) -> String {
 }
 
 fn assigns(line: &str, key: &str) -> bool {
-    line.trim_start().strip_prefix(key).is_some_and(|rest| rest.trim_start().starts_with('='))
+    line.trim_start()
+        .strip_prefix(key)
+        .is_some_and(|rest| rest.trim_start().starts_with('='))
 }
 
 #[cfg(test)]

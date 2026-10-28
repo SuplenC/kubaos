@@ -41,10 +41,7 @@ pub enum Edit {
 }
 
 fn byte(value: &str, pos: usize) -> usize {
-    value
-        .char_indices()
-        .nth(pos)
-        .map_or(value.len(), |(i, _)| i)
+    value.char_indices().nth(pos).map_or(value.len(), |(i, _)| i)
 }
 
 /// The selected text (empty without a selection).
@@ -231,11 +228,7 @@ mod tests {
     #[test]
     fn select_all_then_type_replaces() {
         let v = "Kuba Example";
-        let (v, c) = run(
-            v,
-            Caret::at(3),
-            vec![Edit::SelectAll, Edit::Insert("Kuba".into())],
-        );
+        let (v, c) = run(v, Caret::at(3), vec![Edit::SelectAll, Edit::Insert("Kuba".into())]);
         assert_eq!(v, "Kuba");
         assert_eq!(c, Caret::at(4));
     }
@@ -258,11 +251,7 @@ mod tests {
             }],
         );
         assert_eq!(c.pos, 8);
-        let (v, _) = run(
-            "correct horse",
-            Caret::at(0),
-            vec![Edit::Delete { word: true }],
-        );
+        let (v, _) = run("correct horse", Caret::at(0), vec![Edit::Delete { word: true }]);
         assert_eq!(v, " horse");
     }
 

@@ -36,11 +36,17 @@ fn a_failure_carries_the_phase_and_the_end_of_the_failing_output() {
         source: MachineError::exited(&cmd, Some(100), ""),
     });
 
-    let Some(UpdateEvent::Failed { phase, error, output, .. }) = events.last() else {
+    let Some(UpdateEvent::Failed {
+        phase, error, output, ..
+    }) = events.last()
+    else {
         panic!("no failed event: {events:?}");
     };
     assert_eq!(*phase, Some(Phase::SystemPackages));
-    assert_eq!(error, "upgrading apt packages: `sudo apt-get upgrade` exited with code 100");
+    assert_eq!(
+        error,
+        "upgrading apt packages: `sudo apt-get upgrade` exited with code 100"
+    );
     assert_eq!(output.len(), TAIL_LINES);
     assert_eq!(output.first().map(String::as_str), Some("line 11"));
     assert!(events.iter().any(|e| matches!(
@@ -119,7 +125,12 @@ fn the_log_keeps_every_line_and_only_the_newest_logs_stay() {
     let path = j.log_path().unwrap();
     assert_eq!(path, dir.path().join("2026-10-23T10-00-00-update.log"));
     let text = fs::read_to_string(&path).unwrap();
-    for wanted in ["== Home", "$ nix flake update", "   • Updated input 'nixpkgs':", "warning: snapper"] {
+    for wanted in [
+        "== Home",
+        "$ nix flake update",
+        "   • Updated input 'nixpkgs':",
+        "warning: snapper",
+    ] {
         assert!(text.contains(wanted), "{wanted:?} not in the log:\n{text}");
     }
     assert_eq!(fs::read_dir(dir.path()).unwrap().count(), 10);

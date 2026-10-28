@@ -2,19 +2,40 @@
 //! `Runner`, and a record of what's mounted/open so a failure anywhere can
 //! be undone in reverse order.
 
-use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::path::Path;
+use std::path::PathBuf;
+use std::time::Duration;
+use std::time::Instant;
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
-use super::disk::{self, Esp, Layout, PartTable};
-use super::files::{self, FsUuids, LUKS_NAME, SUBVOLUMES};
-use super::machine::{self, gib};
-use super::runner::{Cmd, Output, Runner, Stream, interrupted};
+use super::disk;
+use super::disk::Esp;
+use super::disk::Layout;
+use super::disk::PartTable;
+use super::files;
+use super::files::FsUuids;
+use super::files::LUKS_NAME;
+use super::files::SUBVOLUMES;
+use super::machine;
+use super::machine::gib;
+use super::runner::Cmd;
+use super::runner::Output;
+use super::runner::Runner;
+use super::runner::Stream;
+use super::runner::interrupted;
 use super::unpack;
 use super::validate;
-use crate::config::{DiskTarget, InstallConfig, Secrets, Wallpapers};
+use crate::Event;
+use crate::Level;
+use crate::StepId;
+use crate::config::DiskTarget;
+use crate::config::InstallConfig;
+use crate::config::Secrets;
+use crate::config::Wallpapers;
 use crate::keyboard;
-use crate::probe::{DiskInfo, Manifest};
-use crate::{Event, Level, StepId};
+use crate::probe::DiskInfo;
+use crate::probe::Manifest;
 
 mod firstboot;
 mod records;
@@ -41,10 +62,7 @@ pub struct StepError {
 
 impl From<String> for StepError {
     fn from(message: String) -> Self {
-        StepError {
-            message,
-            hint: None,
-        }
+        StepError { message, hint: None }
     }
 }
 
@@ -166,11 +184,7 @@ impl<'a> Install<'a> {
     }
 
     fn cmd_level(&self) -> Level {
-        if self.dry() {
-            Level::Info
-        } else {
-            Level::Debug
-        }
+        if self.dry() { Level::Info } else { Level::Debug }
     }
 
     fn sh(&mut self, cmd: Cmd) -> R<Output> {
@@ -274,10 +288,7 @@ impl<'a> Install<'a> {
     fn write_secret(&mut self, abs: &str, contents: &str) -> R<()> {
         let p = self.t(abs);
         let lvl = self.cmd_level();
-        self.log(
-            lvl,
-            format!("write {} (mode 600, contents not shown)", p.display()),
-        );
+        self.log(lvl, format!("write {} (mode 600, contents not shown)", p.display()));
         self.r.write_file(&p, contents.as_bytes(), 0o600)?;
         Ok(())
     }
@@ -302,11 +313,7 @@ impl<'a> Install<'a> {
         if r.is_err() {
             // Something still holds it (a stray process in the chroot):
             // detach it so the LUKS container can still close.
-            self.try_sh(
-                Cmd::new("umount")
-                    .arg("--lazy")
-                    .arg(mp.display().to_string()),
-            );
+            self.try_sh(Cmd::new("umount").arg("--lazy").arg(mp.display().to_string()));
         }
         self.mounts.retain(|m| m != mp);
         r.map(|_| ())
@@ -342,11 +349,7 @@ impl<'a> Install<'a> {
         if !self.created.is_empty() && !bootable {
             self.info("removing the partitions this install made");
             let dev = self.cfg.disk.device.clone();
-            let mut args: Vec<String> = self
-                .created
-                .iter()
-                .map(|n| format!("--delete={n}"))
-                .collect();
+            let mut args: Vec<String> = self.created.iter().map(|n| format!("--delete={n}")).collect();
             args.push(dev.clone());
             if self.try_sh(Cmd::new("sgdisk").args(args)) {
                 self.try_sh(Cmd::new("partprobe").arg(&dev));
@@ -413,12 +416,7 @@ impl<'a> Install<'a> {
         let mode = match c.disk.target {
             DiskTarget::Whole => "whole disk".to_string(),
             DiskTarget::FreeSpace { start, end } => {
-                format!(
-                    "free space {}..{} ({})",
-                    start,
-                    end,
-                    gib(end.saturating_sub(start))
-                )
+                format!("free space {}..{} ({})", start, end, gib(end.saturating_sub(start)))
             }
         };
         self.info(format!(
@@ -467,18 +465,12 @@ impl<'a> Install<'a> {
         }
         let image = Path::new(&c.payload.dir).join(&self.manifest.rootfs);
         let u = unpack::detect(&image, self.manifest.installed_bytes)?;
-        tools.push(if u.name() == "squashfs" {
-            "unsquashfs"
-        } else {
-            "tar"
-        });
+        tools.push(if u.name() == "squashfs" { "unsquashfs" } else { "tar" });
         let missing: Vec<&str> = tools.into_iter().filter(|t| which(t).is_none()).collect();
         if !missing.is_empty() {
             return Err(StepError {
                 message: format!("missing tools on the live system: {}", missing.join(", ")),
-                hint: Some(
-                    "The ISO build must include them (see docs/INSTALL-INTERNALS.md).".into(),
-                ),
+                hint: Some("The ISO build must include them (see docs/INSTALL-INTERNALS.md).".into()),
             });
         }
 
@@ -492,9 +484,7 @@ impl<'a> Install<'a> {
                     image.display(),
                     self.manifest.rootfs_bytes
                 ),
-                hint: Some(
-                    "The payload is damaged or incomplete. Rebuild or re-copy the stick.".into(),
-                ),
+                hint: Some("The payload is damaged or incomplete. Rebuild or re-copy the stick.".into()),
             });
         }
 
@@ -502,9 +492,7 @@ impl<'a> Install<'a> {
         if Path::new("/dev/mapper").join(LUKS_NAME).exists() {
             return Err(StepError {
                 message: format!("/dev/mapper/{LUKS_NAME} is already open"),
-                hint: Some(format!(
-                    "A previous attempt left it open: cryptsetup close {LUKS_NAME}"
-                )),
+                hint: Some(format!("A previous attempt left it open: cryptsetup close {LUKS_NAME}")),
             });
         }
         let mounts = std::fs::read_to_string("/proc/self/mounts").unwrap_or_default();
@@ -515,9 +503,7 @@ impl<'a> Install<'a> {
         {
             return Err(StepError {
                 message: format!("{target} is already mounted"),
-                hint: Some(format!(
-                    "A previous attempt left it mounted: umount -R {target}"
-                )),
+                hint: Some(format!("A previous attempt left it mounted: umount -R {target}")),
             });
         }
         if let Some(path) = self.disk.as_ref().map(|d| d.path.clone())
@@ -566,9 +552,7 @@ impl<'a> Install<'a> {
                 })
                 .unwrap_or((512 * disk::GIB, None));
             let mut t = PartTable::empty_gpt(&dev, size, 512);
-            if let (DiskTarget::FreeSpace { .. }, Some((node, bytes))) =
-                (&self.cfg.disk.target, esp)
-            {
+            if let (DiskTarget::FreeSpace { .. }, Some((node, bytes))) = (&self.cfg.disk.target, esp) {
                 t.partitions.push(disk::Part {
                     node,
                     start: 2048,
@@ -593,14 +577,9 @@ impl<'a> Install<'a> {
         }
         self.progress(0.2, None);
         let table = self.read_table()?;
-        let min_root = self.manifest.installed_bytes
-            + (self.manifest.installed_bytes / 5).max(disk::ROOT_HEADROOM);
+        let min_root = self.manifest.installed_bytes + (self.manifest.installed_bytes / 5).max(disk::ROOT_HEADROOM);
         let layout: Layout = disk::plan_layout(&c.disk.target, &table, c.disk.encrypt, min_root)?;
-        let mut args: Vec<String> = layout
-            .new_parts()
-            .iter()
-            .flat_map(|p| p.sgdisk_args())
-            .collect();
+        let mut args: Vec<String> = layout.new_parts().iter().flat_map(|p| p.sgdisk_args()).collect();
         args.push(dev.clone());
         self.sh(Cmd::new("sgdisk").args(args))?;
         if matches!(c.disk.target, DiskTarget::FreeSpace { .. }) {
@@ -621,11 +600,7 @@ impl<'a> Install<'a> {
                 .map(|x| x.node.clone())
                 .unwrap_or_else(|| disk::partition_path(&dev, p.number))
         };
-        let now = if self.dry() {
-            table.clone()
-        } else {
-            self.read_table()?
-        };
+        let now = if self.dry() { table.clone() } else { self.read_table()? };
         let (esp, esp_new) = match &layout.esp {
             Esp::New(p) => (node_of(&now, p), true),
             Esp::Reuse(node) => (node.clone(), false),
@@ -646,10 +621,7 @@ impl<'a> Install<'a> {
             // Old signatures at other offsets would confuse blkid later.
             self.sh(Cmd::new("wipefs").args(["--all", "--force", n]))?;
         }
-        self.info(format!(
-            "ESP {esp}, /boot {boot}, root {root} ({})",
-            gib(root_bytes)
-        ));
+        self.info(format!("ESP {esp}, /boot {boot}, root {root} ({})", gib(root_bytes)));
         self.parts = Some(Parts {
             esp,
             esp_new,
@@ -688,13 +660,7 @@ impl<'a> Install<'a> {
             .secret_stdin(&pass))?;
         self.progress(0.6, None);
         self.sh(Cmd::new("cryptsetup")
-            .args([
-                "open",
-                "--allow-discards",
-                "--key-file=-",
-                &p.root,
-                LUKS_NAME,
-            ])
+            .args(["open", "--allow-discards", "--key-file=-", &p.root, LUKS_NAME])
             .secret_stdin(&pass))?;
         self.luks_open = true;
         p.fs_dev = format!("/dev/mapper/{LUKS_NAME}");
@@ -718,11 +684,7 @@ impl<'a> Install<'a> {
         let top = self.top.clone();
         self.mount(&["-o", "subvolid=5", &p.fs_dev], &top)?;
         for (sv, _) in SUBVOLUMES {
-            self.sh(Cmd::new("btrfs").args([
-                "subvolume",
-                "create",
-                &top.join(sv).display().to_string(),
-            ]))?;
+            self.sh(Cmd::new("btrfs").args(["subvolume", "create", &top.join(sv).display().to_string()]))?;
         }
         self.umount(&top)?;
         self.progress(0.6, None);
@@ -733,11 +695,7 @@ impl<'a> Install<'a> {
             self.mount(&["-o", &opts, &p.fs_dev], &at)?;
             if sv == "@" {
                 // Tools that mount the device without options get @ too.
-                self.sh(Cmd::new("btrfs").args([
-                    "subvolume",
-                    "set-default",
-                    &at.display().to_string(),
-                ]))?;
+                self.sh(Cmd::new("btrfs").args(["subvolume", "set-default", &at.display().to_string()]))?;
             }
         }
         let boot = self.t("/boot");
@@ -798,8 +756,7 @@ impl<'a> Install<'a> {
                 Stream::Tick => {}
             }
             // At least every 250 ms (the runner ticks), at most every 100 ms.
-            if (changed && last.elapsed() >= Duration::from_millis(100))
-                || last.elapsed() >= Duration::from_millis(250)
+            if (changed && last.elapsed() >= Duration::from_millis(100)) || last.elapsed() >= Duration::from_millis(250)
             {
                 last = Instant::now();
                 let done = fraction as f64 * total as f64 / 1e9;
@@ -810,10 +767,7 @@ impl<'a> Install<'a> {
                 });
             }
         });
-        hint(
-            res,
-            "The payload may be damaged, or the disk is failing or too small.",
-        )?;
+        hint(res, "The payload may be damaged, or the disk is failing or too small.")?;
         self.progress(1.0, Some(format!("{0:.1} / {0:.1} GB", total as f64 / 1e9)));
         Ok(())
     }
@@ -834,10 +788,7 @@ impl<'a> Install<'a> {
         // A fresh /run, not the live one: tools in the chroot must not reach
         // the live system's systemd or D-Bus.
         let run = self.t("/run");
-        self.mount(
-            &["-t", "tmpfs", "-o", "nosuid,nodev,mode=0755", "tmpfs"],
-            &run,
-        )?;
+        self.mount(&["-t", "tmpfs", "-o", "nosuid,nodev,mode=0755", "tmpfs"], &run)?;
         Ok(())
     }
 
@@ -901,11 +852,7 @@ impl<'a> Install<'a> {
         };
         self.write("/etc/machine-id", &format!("{id}\n"), 0o444)?;
         if self.dry() || self.r.exists(&self.t("/var/lib/dbus")) {
-            self.sh(Cmd::new("ln").args([
-                "-sfn",
-                "/etc/machine-id",
-                &self.ts("/var/lib/dbus/machine-id"),
-            ]))?;
+            self.sh(Cmd::new("ln").args(["-sfn", "/etc/machine-id", &self.ts("/var/lib/dbus/machine-id")]))?;
         }
         if self.r.exists(&self.t("/etc/ssh/sshd_config")) {
             let cmd = self.chroot(&["ssh-keygen", "-A"]);
@@ -949,11 +896,7 @@ impl<'a> Install<'a> {
                 hint: Some("The image must ship without users (docs/INSTALL-INTERNALS.md).".into()),
             });
         }
-        let mut cmd_args: Vec<String> = vec![
-            "useradd".into(),
-            "--create-home".into(),
-            "--user-group".into(),
-        ];
+        let mut cmd_args: Vec<String> = vec!["useradd".into(), "--create-home".into(), "--user-group".into()];
         match files::uid_owner(&passwd, USER_UID) {
             None => cmd_args.extend(["--uid".into(), USER_UID.to_string()]),
             Some(other) => self.warn(format!(
@@ -1019,12 +962,7 @@ impl<'a> Install<'a> {
         // lists none, and without the file dot-theme shows every set on the
         // machine.
         let wallpapers = c.wallpapers.clone().unwrap_or_else(|| Wallpapers {
-            sets: self
-                .manifest
-                .wallpaper_sets
-                .iter()
-                .map(|s| s.id.clone())
-                .collect(),
+            sets: self.manifest.wallpaper_sets.iter().map(|s| s.id.clone()).collect(),
             files: Vec::new(),
         });
         if c.wallpapers.is_some() || !wallpapers.sets.is_empty() {
@@ -1050,9 +988,7 @@ impl<'a> Install<'a> {
             }
             let src = format!("{PAYLOAD_KUBAOS}/{template}");
             match self.r.read_file(&self.t(&src)) {
-                Some(t) => {
-                    self.write(dest, &files::render_user_template(&t, &name, &home), 0o644)?
-                }
+                Some(t) => self.write(dest, &files::render_user_template(&t, &name, &home), 0o644)?,
                 None => self.warn(format!(
                     "{dest} names the payload's user, and {src} isn't there to render it for {name}"
                 )),
@@ -1082,9 +1018,7 @@ impl<'a> Install<'a> {
         self.mkdir(&self.t(&dir))?;
         for (src, name, fill) in sources {
             let contents = match self.r.read_file(&self.t(&src)) {
-                Some(t) if fill => {
-                    files::user_flake(&t, &c.user.username, &c.host.hostname, &system)
-                }
+                Some(t) if fill => files::user_flake(&t, &c.user.username, &c.host.hostname, &system),
                 Some(t) => t,
                 None if self.dry() => {
                     self.info(format!("would write {dir}/{name} from {src}"));
@@ -1093,21 +1027,14 @@ impl<'a> Install<'a> {
                 None => {
                     return Err(StepError {
                         message: format!("{src} is not in the payload"),
-                        hint: Some(
-                            "The payload ships the user flake's template and lock (install/image)."
-                                .into(),
-                        ),
+                        hint: Some("The payload ships the user flake's template and lock (install/image).".into()),
                     });
                 }
             };
             self.write(&format!("{dir}/{name}"), &contents, 0o644)?;
         }
         self.sh(Cmd::new("chown").args([owner, &self.ts(&format!("{home}/.config"))]))?;
-        self.sh(Cmd::new("chown").args([
-            "-R",
-            owner,
-            &self.ts(&format!("{home}/.config/kubaos")),
-        ]))?;
+        self.sh(Cmd::new("chown").args(["-R", owner, &self.ts(&format!("{home}/.config/kubaos"))]))?;
         Ok(())
     }
 
@@ -1131,12 +1058,7 @@ impl<'a> Install<'a> {
                     .collect()
             })
             .unwrap_or_default();
-        v.retain(|k| {
-            self.target
-                .join("boot")
-                .join(format!("vmlinuz-{k}"))
-                .exists()
-        });
+        v.retain(|k| self.target.join("boot").join(format!("vmlinuz-{k}")).exists());
         v.sort();
         v
     }
@@ -1164,11 +1086,7 @@ impl<'a> Install<'a> {
         // when it can't write NVRAM. Set it aside and put it back after.
         let whole = matches!(self.cfg.disk.target, DiskTarget::Whole);
         let fallback = self.ts("/boot/efi/EFI/BOOT");
-        let saved = self
-            .top
-            .with_file_name("efi-boot-saved")
-            .display()
-            .to_string();
+        let saved = self.top.with_file_name("efi-boot-saved").display().to_string();
         let keep_fallback = !whole && (self.dry() || self.r.exists(Path::new(&fallback)));
         if keep_fallback {
             self.sh(Cmd::new("rm").args(["-rf", &saved]))?;
@@ -1185,9 +1103,7 @@ impl<'a> Install<'a> {
             "--recheck".into(),
         ];
         if !nvram {
-            self.info(
-                "no EFI variables here: not writing a boot entry, relying on the fallback path",
-            );
+            self.info("no EFI variables here: not writing a boot entry, relying on the fallback path");
             args.push("--no-nvram".into());
         }
         let refs: Vec<&str> = args.iter().map(String::as_str).collect();
@@ -1241,16 +1157,13 @@ impl<'a> Install<'a> {
         if !rebuild && !self.dry() && !self.r.exists(&self.t(&activate)) {
             return Err(StepError {
                 message: format!("{activate} is not in the payload"),
-                hint: Some(
-                    "manifest.home_generation must name a store path inside the rootfs.".into(),
-                ),
+                hint: Some("manifest.home_generation must name a store path inside the rootfs.".into()),
             });
         }
-        let (uid, gid, home) = self.user.clone().unwrap_or((
-            USER_UID,
-            USER_UID,
-            format!("/home/{}", self.cfg.user.username),
-        ));
+        let (uid, gid, home) =
+            self.user
+                .clone()
+                .unwrap_or((USER_UID, USER_UID, format!("/home/{}", self.cfg.user.username)));
         let name = self.cfg.user.username.clone();
         let owner = format!("{uid}:{gid}");
 
@@ -1409,10 +1322,7 @@ impl<'a> Install<'a> {
             let cmd = self.chroot(&["snapper", "--no-dbus", "-c", "root", "create-config", "/"]);
             self.sh(cmd)?;
             self.sh(Cmd::new("btrfs").args(["subvolume", "delete", &snaps.display().to_string()]))?;
-            self.mount(
-                &["-o", &files::subvol_opts("@snapshots"), &p.fs_dev],
-                &snaps,
-            )?;
+            self.mount(&["-o", &files::subvol_opts("@snapshots"), &p.fs_dev], &snaps)?;
             self.sh(Cmd::new("chmod").args(["750", &snaps.display().to_string()]))?;
         }
         let mut args = vec![
@@ -1445,27 +1355,11 @@ impl<'a> Install<'a> {
         if n != "1" {
             self.warn("expected the factory snapshot to be #1");
         }
-        let cmd = self.chroot(&[
-            "snapper",
-            "--no-dbus",
-            "-c",
-            "root",
-            "set-config",
-            "SYNC_ACL=yes",
-        ]);
+        let cmd = self.chroot(&["snapper", "--no-dbus", "-c", "root", "set-config", "SYNC_ACL=yes"]);
         if !self.try_sh(cmd) {
-            self.warn(
-                "couldn't turn on SYNC_ACL (no ACLs on this btrfs?); ALLOW_USERS still applies",
-            );
+            self.warn("couldn't turn on SYNC_ACL (no ACLs on this btrfs?); ALLOW_USERS still applies");
             // Leave it off, or every snapper call would fail the same way.
-            let cmd = self.chroot(&[
-                "snapper",
-                "--no-dbus",
-                "-c",
-                "root",
-                "set-config",
-                "SYNC_ACL=no",
-            ]);
+            let cmd = self.chroot(&["snapper", "--no-dbus", "-c", "root", "set-config", "SYNC_ACL=no"]);
             self.try_sh(cmd);
         }
         Ok(())
@@ -1571,11 +1465,7 @@ fn random16() -> Result<[u8; 16], String> {
 /// `abs` as a path inside `root` with every symlink resolved the way it would
 /// be after `chroot root`: absolute link targets start again at `root`, `..`
 /// never climbs out of it. Gives up (returns the path so far) after 40 links.
-fn resolve_in_root(
-    root: &Path,
-    abs: &str,
-    mut read_link: impl FnMut(&Path) -> Option<PathBuf>,
-) -> PathBuf {
+fn resolve_in_root(root: &Path, abs: &str, mut read_link: impl FnMut(&Path) -> Option<PathBuf>) -> PathBuf {
     let mut todo: Vec<String> = abs
         .split('/')
         .filter(|c| !c.is_empty())
@@ -1604,12 +1494,7 @@ fn resolve_in_root(
                 cur = PathBuf::from("/");
             }
             let l = link.to_string_lossy().into_owned();
-            todo.extend(
-                l.split('/')
-                    .filter(|p| !p.is_empty())
-                    .rev()
-                    .map(String::from),
-            );
+            todo.extend(l.split('/').filter(|p| !p.is_empty()).rev().map(String::from));
             continue;
         }
         cur = next;
@@ -1619,9 +1504,11 @@ fn resolve_in_root(
 
 #[cfg(test)]
 mod resolve_tests {
-    use super::resolve_in_root;
     use std::os::unix::fs::symlink;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
+    use std::path::PathBuf;
+
+    use super::resolve_in_root;
 
     #[test]
     fn follows_absolute_links_inside_the_root() {
@@ -1630,11 +1517,7 @@ mod resolve_tests {
         std::fs::create_dir_all(root.join("nix/store/abc-env/bin")).unwrap();
         std::fs::write(root.join("nix/store/abc-env/bin/nix-daemon"), "").unwrap();
         std::fs::create_dir_all(root.join("nix/var/nix/profiles")).unwrap();
-        symlink(
-            "/nix/store/abc-env",
-            root.join("nix/var/nix/profiles/default-1-link"),
-        )
-        .unwrap();
+        symlink("/nix/store/abc-env", root.join("nix/var/nix/profiles/default-1-link")).unwrap();
         symlink("default-1-link", root.join("nix/var/nix/profiles/default")).unwrap();
         symlink("../../../etc", root.join("nix/var/escape")).unwrap();
 

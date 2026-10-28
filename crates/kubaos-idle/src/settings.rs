@@ -50,7 +50,8 @@ pub const DEFAULT_SCREENS_OFF: Wait = Wait::from_secs(10 * 60);
 pub const DEFAULT_SUSPEND_ON_BATTERY: Wait = Wait::from_secs(30 * 60);
 /// Plugged in, never suspend: a desk machine runs builds and downloads while nobody looks.
 pub const DEFAULT_SUSPEND_ON_AC: Wait = Wait::NEVER;
-/// Closing the lid on battery suspends, as logind's file says (`system/files/logind.conf.d/lid.conf`).
+/// Closing the lid on battery suspends, as logind's file says
+/// (`system/files/logind.conf.d/lid.conf`).
 pub const DEFAULT_LID_ON_BATTERY: LidAction = LidAction::Suspend;
 /// Closing the lid plugged in does nothing, as logind's file says.
 pub const DEFAULT_LID_ON_AC: LidAction = LidAction::Nothing;

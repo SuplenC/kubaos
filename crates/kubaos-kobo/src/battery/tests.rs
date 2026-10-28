@@ -45,11 +45,7 @@ fn battery(percent: u8, supply: Supply) -> Option<Battery> {
 fn one_discharging_battery_reads_its_capacity() {
     let sys = Sysfs::new("one").supply(
         "BAT0",
-        &[
-            ("type", "Battery"),
-            ("capacity", "64"),
-            ("status", "Discharging"),
-        ],
+        &[("type", "Battery"), ("capacity", "64"), ("status", "Discharging")],
     );
 
     assert_eq!(read(sys.path()), battery(64, Supply::Discharging));
@@ -60,11 +56,7 @@ fn a_charging_battery_is_charging() {
     let sys = Sysfs::new("charging")
         .supply(
             "BAT0",
-            &[
-                ("type", "Battery"),
-                ("capacity", "41"),
-                ("status", "Charging"),
-            ],
+            &[("type", "Battery"), ("capacity", "41"), ("status", "Charging")],
         )
         .supply("AC", &[("type", "Mains"), ("online", "1")]);
 
@@ -74,10 +66,7 @@ fn a_charging_battery_is_charging() {
 #[test]
 fn a_full_battery_on_the_charger_is_plugged_in() {
     let sys = Sysfs::new("full")
-        .supply(
-            "BAT0",
-            &[("type", "Battery"), ("capacity", "100"), ("status", "Full")],
-        )
+        .supply("BAT0", &[("type", "Battery"), ("capacity", "100"), ("status", "Full")])
         .supply("ACAD", &[("type", "Mains"), ("online", "1")]);
 
     assert_eq!(read(sys.path()), battery(100, Supply::PluggedIn));
@@ -88,11 +77,7 @@ fn a_battery_held_below_full_on_the_charger_is_plugged_in() {
     let sys = Sysfs::new("held")
         .supply(
             "BAT0",
-            &[
-                ("type", "Battery"),
-                ("capacity", "80"),
-                ("status", "Not charging"),
-            ],
+            &[("type", "Battery"), ("capacity", "80"), ("status", "Not charging")],
         )
         .supply("AC", &[("type", "Mains"), ("online", "1")]);
 
@@ -101,10 +86,8 @@ fn a_battery_held_below_full_on_the_charger_is_plugged_in() {
 
 #[test]
 fn a_full_battery_with_no_mains_supply_listed_is_plugged_in() {
-    let sys = Sysfs::new("full-no-mains").supply(
-        "BAT0",
-        &[("type", "Battery"), ("capacity", "100"), ("status", "Full")],
-    );
+    let sys =
+        Sysfs::new("full-no-mains").supply("BAT0", &[("type", "Battery"), ("capacity", "100"), ("status", "Full")]);
 
     assert_eq!(read(sys.path()), battery(100, Supply::PluggedIn));
 }
@@ -114,11 +97,7 @@ fn an_unplugged_charger_leaves_the_battery_discharging() {
     let sys = Sysfs::new("unplugged")
         .supply(
             "BAT0",
-            &[
-                ("type", "Battery"),
-                ("capacity", "77"),
-                ("status", "Discharging"),
-            ],
+            &[("type", "Battery"), ("capacity", "77"), ("status", "Discharging")],
         )
         .supply("AC", &[("type", "Mains"), ("online", "0")]);
 
@@ -157,11 +136,7 @@ fn two_batteries_without_energy_average_their_capacity() {
     let sys = Sysfs::new("two-capacity")
         .supply(
             "BAT0",
-            &[
-                ("type", "Battery"),
-                ("capacity", "90"),
-                ("status", "Discharging"),
-            ],
+            &[("type", "Battery"), ("capacity", "90"), ("status", "Discharging")],
         )
         .supply(
             "BAT1",
@@ -182,19 +157,11 @@ fn one_of_two_batteries_charging_makes_the_machine_charging() {
     let sys = Sysfs::new("two-charging")
         .supply(
             "BAT0",
-            &[
-                ("type", "Battery"),
-                ("capacity", "50"),
-                ("status", "Charging"),
-            ],
+            &[("type", "Battery"), ("capacity", "50"), ("status", "Charging")],
         )
         .supply(
             "BAT1",
-            &[
-                ("type", "Battery"),
-                ("capacity", "100"),
-                ("status", "Not charging"),
-            ],
+            &[("type", "Battery"), ("capacity", "100"), ("status", "Not charging")],
         );
 
     assert_eq!(read(sys.path()), battery(75, Supply::Charging));
@@ -262,11 +229,7 @@ fn a_battery_reporting_no_charge_is_skipped() {
         .supply("BAT0", &[("type", "Battery"), ("status", "Unknown")])
         .supply(
             "BAT1",
-            &[
-                ("type", "Battery"),
-                ("capacity", "58"),
-                ("status", "Discharging"),
-            ],
+            &[("type", "Battery"), ("capacity", "58"), ("status", "Discharging")],
         );
 
     assert_eq!(read(sys.path()), battery(58, Supply::Discharging));
@@ -292,16 +255,9 @@ fn an_empty_battery_bay_is_skipped() {
     let sys = Sysfs::new("empty-bay")
         .supply(
             "BAT0",
-            &[
-                ("type", "Battery"),
-                ("capacity", "70"),
-                ("status", "Discharging"),
-            ],
+            &[("type", "Battery"), ("capacity", "70"), ("status", "Discharging")],
         )
-        .supply(
-            "BAT1",
-            &[("type", "Battery"), ("present", "0"), ("capacity", "0")],
-        );
+        .supply("BAT1", &[("type", "Battery"), ("present", "0"), ("capacity", "0")]);
 
     assert_eq!(read(sys.path()), battery(70, Supply::Discharging));
 }

@@ -10,8 +10,8 @@
 //!
 //! # Owns
 //!
-//! - Whether the Mac-style accents on Left Alt are on, and the user's keyboard layouts: reading
-//!   the file and changing it.
+//! - Whether the Mac-style accents on Left Alt are on, and the user's keyboard layouts: reading the
+//!   file and changing it.
 //!
 //! # Not here
 //!

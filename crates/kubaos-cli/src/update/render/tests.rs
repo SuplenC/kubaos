@@ -97,7 +97,10 @@ fn terminal(bytes: &[u8]) -> String {
             }
         }
     }
-    let lines: Vec<String> = rows.iter().map(|r| r.iter().collect::<String>().trim_end().to_owned()).collect();
+    let lines: Vec<String> = rows
+        .iter()
+        .map(|r| r.iter().collect::<String>().trim_end().to_owned())
+        .collect();
     lines.join("\n").trim_end().to_owned()
 }
 
@@ -146,12 +149,16 @@ fn edge_update() -> Vec<UpdateEvent> {
         UpdateEvent::PhaseStarted { phase: Phase::Fetching },
         step("git fetch origin"),
         finished(Phase::Fetching, 1240, None),
-        UpdateEvent::PhaseStarted { phase: Phase::Verifying },
+        UpdateEvent::PhaseStarted {
+            phase: Phase::Verifying,
+        },
         UpdateEvent::Warning {
             text: "no allowed_signers on this machine: main's head is taken unchecked".into(),
         },
         finished(Phase::Verifying, 30, Some("found main at 9f8e7d6 (0.1.1)")),
-        UpdateEvent::PhaseStarted { phase: Phase::Reviewing },
+        UpdateEvent::PhaseStarted {
+            phase: Phase::Reviewing,
+        },
         step("Refreshing apt's package lists"),
         finished(Phase::Reviewing, 3410, Some("12 apt packages, 2 commits")),
         UpdateEvent::Preview(Preview {
@@ -182,7 +189,11 @@ fn edge_update() -> Vec<UpdateEvent> {
         },
         UpdateEvent::Answered { yes: true },
         UpdateEvent::PhaseStarted { phase: Phase::Snapshot },
-        finished(Phase::Snapshot, 820, Some("before kubaos update 2026-10-23 09:14:03 (0.1.0 → 0.1.1)")),
+        finished(
+            Phase::Snapshot,
+            820,
+            Some("before kubaos update 2026-10-23 09:14:03 (0.1.0 → 0.1.1)"),
+        ),
         UpdateEvent::PhaseStarted {
             phase: Phase::SystemPackages,
         },
@@ -254,7 +265,12 @@ fn play(screen: &mut Screen<Shared>, out: &Shared, events: &[UpdateEvent]) -> In
     for event in events {
         screen.event(event, now);
         screen.tick(now);
-        if matches!(event, UpdateEvent::Prompt { prompt: Prompt::Confirm { .. } }) {
+        if matches!(
+            event,
+            UpdateEvent::Prompt {
+                prompt: Prompt::Confirm { .. }
+            }
+        ) {
             out.clone().write_all(b"y\n").unwrap();
         }
         now += Duration::from_secs(1);
@@ -317,7 +333,12 @@ fn the_live_area_shows_the_running_phase_its_step_and_the_last_line_of_output() 
     let (mut screen, out) = screen(Style::COLOR, 100);
     let start = Instant::now();
 
-    screen.event(&UpdateEvent::PhaseStarted { phase: Phase::SystemPackages }, start);
+    screen.event(
+        &UpdateEvent::PhaseStarted {
+            phase: Phase::SystemPackages,
+        },
+        start,
+    );
     screen.event(&step("apt-get upgrade"), start);
     screen.event(&output("Unpacking vim (2:9.1) over (2:9.0) ..."), start);
     screen.event(&UpdateEvent::Progress { done: 3, total: 12 }, start);
@@ -336,7 +357,12 @@ fn a_prompt_clears_the_live_area_and_nothing_is_drawn_until_it_is_answered() {
     screen.event(&UpdateEvent::PhaseStarted { phase: Phase::Fetching }, now);
     screen.event(&output("remote: Counting objects"), now);
 
-    screen.event(&UpdateEvent::Prompt { prompt: Prompt::Password }, now);
+    screen.event(
+        &UpdateEvent::Prompt {
+            prompt: Prompt::Password,
+        },
+        now,
+    );
     out.clone().write_all(b"[sudo] password for kuba: \n").unwrap();
     screen.tick(now + Duration::from_secs(1));
 
@@ -347,7 +373,10 @@ fn a_prompt_clears_the_live_area_and_nothing_is_drawn_until_it_is_answered() {
 
     screen.event(&UpdateEvent::Answered { yes: true }, now);
 
-    assert!(terminal(&out.bytes()).ends_with("[sudo] password for kuba:\n  ⠋ Fetching              0s\n    remote: Counting objects"));
+    assert!(
+        terminal(&out.bytes())
+            .ends_with("[sudo] password for kuba:\n  ⠋ Fetching              0s\n    remote: Counting objects")
+    );
 }
 
 #[test]
@@ -391,7 +420,10 @@ fn plain_output_is_one_line_per_fact_without_escapes_or_programs_output() {
     let text = out.text();
     println!("{text}");
     assert!(!text.contains('\x1b'));
-    assert!(!text.contains("Unpacking firefox"), "a program's output is in the plain view:\n{text}");
+    assert!(
+        !text.contains("Unpacking firefox"),
+        "a program's output is in the plain view:\n{text}"
+    );
     assert!(text.starts_with("KubaOS update\n\n  > Checking\n  ✓ Checking            0.0s  KubaOS Shinjuku"));
     assert!(text.contains("  > System packages\n      apt-get upgrade\n  ✓ System packages      42s  12 packages\n"));
     assert!(text.contains("    ! no allowed_signers on this machine: main's head is taken unchecked\n"));
@@ -444,9 +476,11 @@ fn a_skipped_phase_says_why_and_a_needed_reboot_is_the_next_step() {
     play(&mut screen, &out, &events);
 
     let shown = terminal(&out.bytes());
-    assert!(shown.contains(
-        "  – Hyprland pin        0.0s  skipped: Hyprland comes from KubaOS's nixpkgs on this architecture"
-    ));
+    assert!(
+        shown.contains(
+            "  – Hyprland pin        0.0s  skipped: Hyprland comes from KubaOS's nixpkgs on this architecture"
+        )
+    );
     assert!(shown.contains("  Next        reboot: an updated package asks for it"));
 }
 

@@ -1,9 +1,18 @@
 //! Where setup's facts and actions come from: this machine (the core's
 //! `setup` module, in-process) or the demo machine.
 
-use std::process::{Command, Stdio};
+use std::process::Command;
+use std::process::Stdio;
 
-use kubaos_core::setup::{self, CardId, CardStatus, Env, Inputs, RealSys, SetupEvent, Status, demo};
+use kubaos_core::setup;
+use kubaos_core::setup::CardId;
+use kubaos_core::setup::CardStatus;
+use kubaos_core::setup::Env;
+use kubaos_core::setup::Inputs;
+use kubaos_core::setup::RealSys;
+use kubaos_core::setup::SetupEvent;
+use kubaos_core::setup::Status;
+use kubaos_core::setup::demo;
 
 pub trait SetupBackend: Send + Sync {
     /// Detects every card. Slow-ish (bw status takes a second or three):
@@ -32,9 +41,7 @@ pub struct Real {
 
 impl Real {
     pub fn new() -> Self {
-        Self {
-            env: Env::current(),
-        }
+        Self { env: Env::current() }
     }
 }
 
@@ -75,9 +82,7 @@ impl SetupBackend for Real {
     }
 
     fn terminal(&self, script: &str) -> Result<(), String> {
-        let wrapped = format!(
-            "{script}\necho\nread -rp 'Done. Enter closes this window, then Check again in setup. '"
-        );
+        let wrapped = format!("{script}\necho\nread -rp 'Done. Enter closes this window, then Check again in setup. '");
         Command::new("ghostty")
             .args(["--title=KubaOS setup", "-e", "bash", "-c", &wrapped])
             .stdin(Stdio::null())
@@ -118,13 +123,7 @@ impl SetupBackend for Real {
             .stdout(Stdio::null())
             .status()
             .map_err(|e| e.to_string())
-            .and_then(|s| {
-                if s.success() {
-                    Ok(())
-                } else {
-                    Err(s.to_string())
-                }
-            });
+            .and_then(|s| if s.success() { Ok(()) } else { Err(s.to_string()) });
         if let Err(e) = started {
             eprintln!("kobo: can't start Bitwarden: systemd-run: {e}");
         }

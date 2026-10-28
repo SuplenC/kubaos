@@ -224,7 +224,10 @@ impl Text {
             ),
         };
         let detail = detail.map(|d| format!("  {}", s.dim(&d))).unwrap_or_default();
-        format!("  {glyph} {title}{:>TIME_WIDTH$}{detail}\n", finished_duration(elapsed_ms))
+        format!(
+            "  {glyph} {title}{:>TIME_WIDTH$}{detail}\n",
+            finished_duration(elapsed_ms)
+        )
     }
 
     fn preview(&self, preview: &Preview) -> String {
@@ -260,7 +263,10 @@ impl Text {
             out.push_str("  The Hyprland pin changes: Hyprland is installed at the release's versions.\n");
         }
         if !preview.migrations.is_empty() {
-            out.push_str(&format!("  System migrations to run: {}\n", preview.migrations.join(", ")));
+            out.push_str(&format!(
+                "  System migrations to run: {}\n",
+                preview.migrations.join(", ")
+            ));
         }
         out.push('\n');
         out
@@ -376,7 +382,11 @@ impl Text {
             out.push_str(&format!("    {} {}\n", s.dim("│"), s.dim(line)));
         }
         if let Some(log) = log {
-            out.push_str(&format!("  {}{}\n", s.dim(&format!("{:<LABEL_WIDTH$}", "Log")), self.path(log)));
+            out.push_str(&format!(
+                "  {}{}\n",
+                s.dim(&format!("{:<LABEL_WIDTH$}", "Log")),
+                self.path(log)
+            ));
         }
         out
     }
@@ -406,7 +416,10 @@ fn available(update: Option<&str>, upgrade: Option<&str>, apt_security: usize) -
         out.push_str(&format!("  KubaOS {upgrade} is out: kubaos upgrade\n"));
     }
     if apt_security > 0 {
-        out.push_str(&format!("  {} waiting: kubaos update\n", count(apt_security, "apt security update")));
+        out.push_str(&format!(
+            "  {} waiting: kubaos update\n",
+            count(apt_security, "apt security update")
+        ));
     }
     if update.is_none() && upgrade.is_none() && apt_security == 0 {
         out.push_str("  Nothing new: KubaOS is up to date.\n");
@@ -416,7 +429,11 @@ fn available(update: Option<&str>, upgrade: Option<&str>, apt_security: usize) -
 
 /// "1 package", "12 packages".
 fn count(n: usize, what: &str) -> String {
-    if n == 1 { format!("1 {what}") } else { format!("{n} {what}s") }
+    if n == 1 {
+        format!("1 {what}")
+    } else {
+        format!("{n} {what}s")
+    }
 }
 
 /// A finished phase's time: "0.4s", "42s", "3m05s".
@@ -662,7 +679,10 @@ impl<W: Write> Screen<W> {
         let s = self.text.style;
         let width = (self.width)().max(20) - 1;
         let elapsed = whole_duration(now.saturating_duration_since(running.started).as_millis() as u64);
-        let mut head = format!("  {} {:<TITLE_WIDTH$}{elapsed:>TIME_WIDTH$}", SPINNER[self.frame], running.title);
+        let mut head = format!(
+            "  {} {:<TITLE_WIDTH$}{elapsed:>TIME_WIDTH$}",
+            SPINNER[self.frame], running.title
+        );
         let mut extra = String::new();
         if let Some((done, total)) = running.progress {
             extra.push_str(&format!("  {done}/{total}"));

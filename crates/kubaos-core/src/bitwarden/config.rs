@@ -75,4 +75,3 @@ impl Config {
             .map_err(|e| Error::write(&paths.config, e))
     }
 }
-

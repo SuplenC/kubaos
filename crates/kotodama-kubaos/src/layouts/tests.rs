@@ -20,7 +20,11 @@ fn every_layout_not_in_use_is_an_item_by_name_with_its_spelling() {
         rows,
         [
             ("layout:cz", "Czech", Some("cz")),
-            ("layout:us(intl)", "English (US, intl., with dead keys)", Some("us(intl)")),
+            (
+                "layout:us(intl)",
+                "English (US, intl., with dead keys)",
+                Some("us(intl)")
+            ),
             ("layout:it", "Italian", Some("it")),
         ]
     );
@@ -34,7 +38,14 @@ fn the_items_stay_in_the_app_and_are_found_by_their_spelling() {
     assert!(czech.app_only);
     assert!(czech.keywords.contains(&"cz".to_owned()));
     assert_eq!(czech.kind.name(), KIND);
-    assert_eq!(czech.actions.iter().map(|action| action.id.as_str()).collect::<Vec<_>>(), [ADD]);
+    assert_eq!(
+        czech
+            .actions
+            .iter()
+            .map(|action| action.id.as_str())
+            .collect::<Vec<_>>(),
+        [ADD]
+    );
 }
 
 #[test]
@@ -56,7 +67,10 @@ fn a_refused_add_reads_as_kubaos_keyboards_last_line() {
 
     let ran = app(&["us"]).run("layout:it", ADD, &runner);
 
-    assert_eq!(ran.err().as_deref(), Some("At most 4 keyboard layouts, XKB holds no more"));
+    assert_eq!(
+        ran.err().as_deref(),
+        Some("At most 4 keyboard layouts, XKB holds no more")
+    );
 }
 
 #[test]

@@ -98,11 +98,7 @@ pub fn locale_name(locale: &str) -> Cow<'static, str> {
         .unwrap_or_else(|| lang.to_uppercase());
     let mut extra: Vec<String> = vec![];
     if let Some(tr) = terr {
-        extra.push(
-            t.territories
-                .get(tr)
-                .map_or(tr.to_string(), |s| s.to_string()),
-        );
+        extra.push(t.territories.get(tr).map_or(tr.to_string(), |s| s.to_string()));
     }
     if let Some(m) = modifier {
         extra.push(capitalize(m));
@@ -145,10 +141,7 @@ pub fn split_keymap(keymap: &str) -> (String, String) {
 /// ("Buenos Aires", "America, Argentina").
 pub fn split_tz(tz: &str) -> (String, String) {
     match tz.rsplit_once('/') {
-        Some((region, city)) => (
-            city.replace('_', " "),
-            region.replace(['_'], " ").replace('/', ", "),
-        ),
+        Some((region, city)) => (city.replace('_', " "), region.replace(['_'], " ").replace('/', ", ")),
         None => (tz.replace('_', " "), String::new()),
     }
 }
@@ -598,10 +591,7 @@ mod tests {
     fn every_keymap_gets_a_name() {
         assert_eq!(keymap_name("us"), "English (US)");
         assert_eq!(keymap_name("pl"), "Polish");
-        assert_eq!(
-            keymap_name("us(intl)"),
-            "English (US, intl., with dead keys)"
-        );
+        assert_eq!(keymap_name("us(intl)"), "English (US, intl., with dead keys)");
         assert_eq!(keymap_name("pl(nope)"), "Polish (nope)");
         assert_eq!(keymap_name("zz"), "ZZ");
     }

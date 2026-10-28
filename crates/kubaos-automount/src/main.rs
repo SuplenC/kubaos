@@ -12,9 +12,9 @@
 //!
 //! # Owns
 //!
-//! - The command line and its exit codes: 2 for a usage error, 1 when the command failed, with
-//!   the reason on stderr. `eject` and `import` also say how it went in a notification, since the
-//!   menu and the notifications start them with no terminal.
+//! - The command line and its exit codes: 2 for a usage error, 1 when the command failed, with the
+//!   reason on stderr. `eject` and `import` also say how it went in a notification, since the menu
+//!   and the notifications start them with no terminal.
 //!
 //! # Not here
 //!
@@ -102,7 +102,10 @@ async fn import(folder: &Path) -> ExitCode {
     let pictures = pictures();
     match import::import(&source, &pictures) {
         Ok(report) => {
-            println!("{} copied, {} already there, {} failed", report.copied, report.already, report.failed);
+            println!(
+                "{} copied, {} already there, {} failed",
+                report.copied, report.already, report.failed
+            );
             tell(&import_note(report, &pictures)).await;
             if report.failed == 0 {
                 ExitCode::SUCCESS

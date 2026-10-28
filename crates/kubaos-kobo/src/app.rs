@@ -20,11 +20,18 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+use std::time::Instant;
 
-use iced::keyboard::{self, key::Named};
-use iced::widget::{image, operation};
-use iced::{Size, Subscription, Task, event, window};
+use iced::Size;
+use iced::Subscription;
+use iced::Task;
+use iced::event;
+use iced::keyboard;
+use iced::keyboard::key::Named;
+use iced::widget::image;
+use iced::widget::operation;
+use iced::window;
 use kubaos_core::Probe;
 use kubaos_ui::Look;
 use kubaos_ui::Mode;
@@ -36,12 +43,17 @@ use kubaos_ui::motion::Motion;
 use kubaos_ui::tokens;
 use kubaos_ui::tokens::Easing;
 
-use crate::backend::{Backend, RunMsg};
+use crate::backend::Backend;
+use crate::backend::RunMsg;
 use crate::battery;
 use crate::battery::Battery;
-use crate::edit::{self, Edit};
-use crate::model::{DiskExt, DiskMode, Form};
-use crate::progress::{Install, Outcome};
+use crate::edit;
+use crate::edit::Edit;
+use crate::model::DiskExt;
+use crate::model::DiskMode;
+use crate::model::Form;
+use crate::progress::Install;
+use crate::progress::Outcome;
 use crate::theme;
 use crate::tour::Tour;
 
@@ -599,9 +611,7 @@ impl App {
     fn initial_focus(&self) -> Option<F> {
         match self.screen {
             Screen::Account if !self.form.full_name.is_empty() => Some(F::Password),
-            Screen::Git if !self.form.git_name.is_empty() && !self.form.git_email.is_empty() => {
-                Some(F::Next)
-            }
+            Screen::Git if !self.form.git_name.is_empty() && !self.form.git_email.is_empty() => Some(F::Next),
             Screen::Git if !self.form.git_name.is_empty() => Some(F::GitEmail),
             _ => self.screen_focus_order().first().copied(),
         }
@@ -646,14 +656,10 @@ impl App {
             Screen::Welcome => match &self.probe {
                 ProbeState::Loading => Err("Poking at the hardware…"),
                 ProbeState::Failed(_) => Err("Couldn't read this machine."),
-                ProbeState::Ready(p) if p.payload.is_none() => {
-                    Err("No system image on this stick.")
-                }
+                ProbeState::Ready(p) if p.payload.is_none() => Err("No system image on this stick."),
                 ProbeState::Ready(_) => Ok(()),
             },
-            Screen::Wifi => self
-                .form
-                .wifi_ok(self.wifi_secured(self.form.wifi_ssid.as_deref())),
+            Screen::Wifi => self.form.wifi_ok(self.wifi_secured(self.form.wifi_ssid.as_deref())),
             Screen::Account => self.form.account_ok(),
             Screen::Disk => probe.map_or(Err("No disks. None at all."), |p| self.form.disk_ok(p)),
             Screen::Git => self.form.git_ok(),
@@ -670,7 +676,11 @@ impl App {
 
     /// How far the screen has arrived, 0 to 1: a page slides in over `long`.
     pub fn fade(&self) -> f32 {
-        Motion::default().progress(tokens::Duration::Long, Easing::EmphasizedDecel, self.now - self.transition.0)
+        Motion::default().progress(
+            tokens::Duration::Long,
+            Easing::EmphasizedDecel,
+            self.now - self.transition.0,
+        )
     }
 
     pub fn animating(&self) -> bool {
@@ -704,8 +714,7 @@ impl App {
         let mut subs = vec![
             event::listen_with(on_event),
             window::resize_events().map(|(_, s)| Message::Resized(s)),
-            Subscription::run_with(BatteryWatch(Arc::clone(&self.backend)), battery_watch)
-                .map(Message::Battery),
+            Subscription::run_with(BatteryWatch(Arc::clone(&self.backend)), battery_watch).map(Message::Battery),
         ];
         if self.animating() {
             subs.push(window::frames().map(Message::Tick));
@@ -1092,13 +1101,7 @@ impl App {
             }
             task = Task::batch([
                 task,
-                operation::scroll_to(
-                    g.id,
-                    operation::AbsoluteOffset {
-                        x: None,
-                        y: Some(y),
-                    },
-                ),
+                operation::scroll_to(g.id, operation::AbsoluteOffset { x: None, y: Some(y) }),
             ]);
         }
         task
@@ -1200,18 +1203,12 @@ impl App {
                 }
             }
             F::SaveLog => {
-                let text = self
-                    .install
-                    .as_ref()
-                    .map(|i| i.log_text())
-                    .unwrap_or_default();
+                let text = self.install.as_ref().map(|i| i.log_text()).unwrap_or_default();
                 self.now = Instant::now();
                 self.toast = Some((
                     match save_log(&text) {
                         Ok(p) => format!("Log saved to {}.", p.display()),
-                        Err(e) => format!(
-                            "Couldn't save the log: {e}. It's also in /var/log/kubaos-install.log."
-                        ),
+                        Err(e) => format!("Couldn't save the log: {e}. It's also in /var/log/kubaos-install.log."),
                     },
                     self.now,
                 ));
@@ -1401,9 +1398,7 @@ impl App {
             }
             Key::Enter => match focus {
                 Some(F::Hold) => self.update_inner(Message::HoldStart),
-                _ if self.screen == Screen::Summary
-                    && !matches!(focus, Some(F::Back | F::Power)) =>
-                {
+                _ if self.screen == Screen::Summary && !matches!(focus, Some(F::Back | F::Power)) => {
                     self.update_inner(Message::HoldStart)
                 }
                 Some(
@@ -1471,22 +1466,12 @@ impl App {
                 let left = matches!(k, Key::Left { .. });
                 if self.field_focused() {
                     self.edit(if left {
-                        Edit::Left {
-                            word,
-                            select: shift,
-                        }
+                        Edit::Left { word, select: shift }
                     } else {
-                        Edit::Right {
-                            word,
-                            select: shift,
-                        }
+                        Edit::Right { word, select: shift }
                     });
                 } else if focus == Some(F::DiskMode) {
-                    self.pick_mode(if left {
-                        DiskMode::FreeSpace
-                    } else {
-                        DiskMode::Whole
-                    });
+                    self.pick_mode(if left { DiskMode::FreeSpace } else { DiskMode::Whole });
                 } else if let Some(f @ (F::WallpaperSet(_) | F::Wallpaper(..))) = focus {
                     return self.move_in_wallpapers(f, if left { Dir::Left } else { Dir::Right });
                 }
@@ -1667,11 +1652,7 @@ impl App {
             List::Locale => (p.locales.clone(), &self.locale_q),
             // "custom" is xkb's slot for a hand-written layout: not one to pick.
             List::Keymap => (
-                p.keymaps
-                    .iter()
-                    .filter(|k| k.as_str() != "custom")
-                    .cloned()
-                    .collect(),
+                p.keymaps.iter().filter(|k| k.as_str() != "custom").cloned().collect(),
                 &self.keymap_q,
             ),
             List::Timezone => (p.timezones.clone(), &self.tz_q),
@@ -1907,10 +1888,7 @@ impl App {
             Screen::Wifi => &[List::Wifi],
             _ => &[],
         };
-        lists
-            .iter()
-            .filter_map(|&l| self.selection_scroll(l))
-            .collect()
+        lists.iter().filter_map(|&l| self.selection_scroll(l)).collect()
     }
 
     /// Where `list`'s scrollable moves to show its selected row: `None` when
@@ -1964,9 +1942,7 @@ pub fn reveal_target(screen: Screen, f: F) -> Option<(&'static str, &'static str
         (Screen::Disk, F::Luks | F::LuksConfirm | F::ShowSecrets) => ids::REVEAL_LUKS,
         (Screen::Account, F::FullName | F::Username) => ids::REVEAL_NAMES,
         (Screen::Account, F::Hostname) => ids::REVEAL_HOST,
-        (Screen::Account, F::Password | F::PasswordConfirm | F::ShowSecrets) => {
-            ids::REVEAL_PASSWORDS
-        }
+        (Screen::Account, F::Password | F::PasswordConfirm | F::ShowSecrets) => ids::REVEAL_PASSWORDS,
         _ => return None,
     };
     let scroll = match screen {
@@ -2075,15 +2051,11 @@ fn vim_arrow(text: &str) -> Option<Key> {
 
 /// Moves each scrollable to its vertical offset.
 fn scroll_lists(scrolls: impl IntoIterator<Item = (&'static str, f32)>) -> Task<Message> {
-    Task::batch(scrolls.into_iter().map(|(id, y)| {
-        operation::scroll_to(
-            id,
-            operation::AbsoluteOffset {
-                x: None,
-                y: Some(y),
-            },
-        )
-    }))
+    Task::batch(
+        scrolls
+            .into_iter()
+            .map(|(id, y)| operation::scroll_to(id, operation::AbsoluteOffset { x: None, y: Some(y) })),
+    )
 }
 
 /// iced keyboard event -> our `Key`. The window subscription and the key
@@ -2185,8 +2157,7 @@ async fn decode_wallpaper() -> image::Handle {
         };
         let _ = tx.send(h);
     });
-    rx.await
-        .unwrap_or_else(|_| image::Handle::from_bytes(theme::WALLPAPER))
+    rx.await.unwrap_or_else(|_| image::Handle::from_bytes(theme::WALLPAPER))
 }
 
 /// A set's thumbnails, decoded on a thread of their own (`thumbs::decode`), so a few dozen of them
@@ -2199,10 +2170,7 @@ async fn load_thumbs(payload: PathBuf, set: kubaos_core::probe::WallpaperSet) ->
     rx.await.unwrap_or_default()
 }
 
-fn decoded_thumbs(
-    payload: &std::path::Path,
-    set: &kubaos_core::probe::WallpaperSet,
-) -> Vec<(String, image::Handle)> {
+fn decoded_thumbs(payload: &std::path::Path, set: &kubaos_core::probe::WallpaperSet) -> Vec<(String, image::Handle)> {
     crate::thumbs::decode(payload, std::path::Path::new(crate::thumbs::ORIGINALS), set)
         .into_iter()
         .map(|(key, img)| {

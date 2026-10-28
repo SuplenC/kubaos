@@ -7,10 +7,17 @@ use std::sync::Mutex;
 use std::thread::sleep;
 use std::time::Duration;
 
-use super::{
-    BwMethod, CardId, CardStatus, Facts, Inputs, MokState, PhoneStep, PromptKind, SetupEvent, State,
-    Status,
-};
+use super::BwMethod;
+use super::CardId;
+use super::CardStatus;
+use super::Facts;
+use super::Inputs;
+use super::MokState;
+use super::PhoneStep;
+use super::PromptKind;
+use super::SetupEvent;
+use super::State;
+use super::Status;
 use crate::bitwarden::Agent;
 use crate::bitwarden::KeyInfo;
 use crate::bitwarden::Overview;
@@ -96,9 +103,7 @@ impl Demo {
                     ),
                     (
                         "Kernel headers + DKMS (tuxedo-drivers is a DKMS package)",
-                        &[
-                            "+ apt-get install -y --no-install-recommends dkms mokutil linux-headers-generic",
-                        ][..],
+                        &["+ apt-get install -y --no-install-recommends dkms mokutil linux-headers-generic"][..],
                     ),
                     (
                         "tuxedo-drivers (NOT tuxedo-control-center)",
@@ -125,8 +130,7 @@ impl Demo {
                     self.wait(700);
                 }
                 next.state = State::Reboot;
-                next.summary =
-                    "Key queued. Reboot and enroll it on the blue MokManager screen.".into();
+                next.summary = "Key queued. Reboot and enroll it on the blue MokManager screen.".into();
                 if let Facts::Tuxedo { drivers, mok, .. } = &mut next.facts {
                     *drivers = true;
                     *mok = Some(MokState::Pending);
@@ -172,10 +176,7 @@ impl Demo {
                 next.state = State::Done;
                 next.summary = "One finger: right index. sudo and password dialogs take it.".into();
                 if let Facts::Fingerprint {
-                    fingers,
-                    fprintd,
-                    pam,
-                    ..
+                    fingers, fprintd, pam, ..
                 } = &mut next.facts
                 {
                     fingers.push("right-index-finger".into());
@@ -196,17 +197,12 @@ impl Demo {
                     None,
                 ));
                 self.wait(1400);
-                emit(p(
-                    PromptKind::Wait,
-                    "Adding the key to /etc/u2f_mappings…",
-                    None,
-                ));
+                emit(p(PromptKind::Wait, "Adding the key to /etc/u2f_mappings…", None));
                 emit(log("  ok  /etc/u2f_mappings: kuba has 1 key"));
                 self.wait(600);
                 next.state = State::Done;
                 next.summary =
-                    "This key is enrolled (one key in total). Enroll a backup key too: keys get lost."
-                        .into();
+                    "This key is enrolled (one key in total). Enroll a backup key too: keys get lost.".into();
                 if let Facts::Yubikey {
                     enrolled,
                     this_key_enrolled,
@@ -290,7 +286,11 @@ impl Demo {
                     ("Reading the vault", vec![reading.as_str()]),
                     (
                         "SSH: public keys and Host blocks",
-                        vec!["ok  ~/.ssh/github.pub  (SHA256:4f1x…)", "Host github.com", written.as_str()],
+                        vec![
+                            "ok  ~/.ssh/github.pub  (SHA256:4f1x…)",
+                            "Host github.com",
+                            written.as_str(),
+                        ],
                     ),
                     (
                         "git: commit signing with an SSH key from the vault",
@@ -300,7 +300,10 @@ impl Demo {
                         "gh: token from the vault into the system keyring",
                         vec!["ok  gh logged in to github.com, token in the keyring"],
                     ),
-                    ("Project env: vault -> GNOME keyring", vec!["demo                 4 variable(s)"]),
+                    (
+                        "Project env: vault -> GNOME keyring",
+                        vec!["demo                 4 variable(s)"],
+                    ),
                     (
                         "Bitwarden desktop SSH agent (~/.bitwarden-ssh-agent.sock)",
                         vec!["ok  agent answers with 4 key(s)", served.as_str()],
@@ -316,7 +319,11 @@ impl Demo {
                 next.state = State::Done;
                 next.summary = format!(
                     "Logged in as {}. SSH keys, commit signing and project env come from the vault.",
-                    if l.email.is_empty() { "kuba@example.com" } else { &l.email }
+                    if l.email.is_empty() {
+                        "kuba@example.com"
+                    } else {
+                        &l.email
+                    }
                 );
                 if let Facts::Bitwarden {
                     login,
@@ -358,10 +365,7 @@ impl Demo {
                 )));
                 next.state = State::Done;
                 next.summary = format!("Commits as {name} <{email}>.");
-                if let Facts::Git {
-                    name: n, email: e, ..
-                } = &mut next.facts
-                {
+                if let Facts::Git { name: n, email: e, .. } = &mut next.facts {
                     *n = Some(name);
                     *e = Some(email);
                 }
@@ -496,7 +500,12 @@ fn demo_keys(folders: &[String]) -> Vec<KeyInfo> {
             ..key("GitHub", "Personal", "github", &["github.com"])
         },
         key("Work GitHub", "Work", "work-github", &["github-work"]),
-        key("Build server", "no folder", "build-server", &["build", "build.example.com"]),
+        key(
+            "Build server",
+            "no folder",
+            "build-server",
+            &["build", "build.example.com"],
+        ),
         key("GitHub", "Work", "github-2", &[]),
     ];
     let mut keys: Vec<KeyInfo> = all
@@ -614,8 +623,7 @@ fn initial(machine: Machine) -> Status {
             CardStatus {
                 id: CardId::Yubikey,
                 state: State::Waiting,
-                summary: "Plug in your YubiKey to use it for sudo, polkit and the lock screen."
-                    .into(),
+                summary: "Plug in your YubiKey to use it for sudo, polkit and the lock screen.".into(),
                 facts: Facts::Yubikey {
                     plugged: vec![],
                     enrolled: 0,
@@ -630,10 +638,7 @@ fn initial(machine: Machine) -> Status {
         ],
         Machine::Installed => installed(),
     };
-    Status {
-        online: true,
-        cards,
-    }
+    Status { online: true, cards }
 }
 
 /// Every card done: what the Command menu's "Set up Bitwarden" opens on.
@@ -714,7 +719,8 @@ fn installed() -> Vec<CardStatus> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::setup::{BwLogin, GitIdentity};
+    use crate::setup::BwLogin;
+    use crate::setup::GitIdentity;
 
     #[test]
     fn demo_cards_flip() {
@@ -738,7 +744,11 @@ mod tests {
         for c in CardId::ALL {
             assert!(d.run(c, &inputs, &mut |_| {}), "{c:?}");
         }
-        assert_eq!(d.status().card(CardId::Phone).unwrap().state, State::Needed, "the iPhone asks to pair");
+        assert_eq!(
+            d.status().card(CardId::Phone).unwrap().state,
+            State::Needed,
+            "the iPhone asks to pair"
+        );
         let accept = Inputs {
             phone: Some(PhoneStep::Accept {
                 device: demo_iphone(true).id,

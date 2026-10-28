@@ -41,10 +41,7 @@ fn only_packages_from_a_security_pocket_count() {
 
     assert_eq!(
         found,
-        [
-            "linux-image-6.8.0-60-generic=6.8.0-60.63",
-            "openssl=3.0.13-0ubuntu3.5"
-        ]
+        ["linux-image-6.8.0-60-generic=6.8.0-60.63", "openssl=3.0.13-0ubuntu3.5"]
     );
 }
 

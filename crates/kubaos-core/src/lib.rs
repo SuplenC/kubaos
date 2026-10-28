@@ -18,10 +18,14 @@ pub mod suites;
 pub mod switch;
 pub mod update;
 
-pub use config::{InstallConfig, Secrets};
+pub use config::InstallConfig;
+pub use config::Secrets;
+pub use event::Event;
+pub use event::Level;
+pub use event::StepInfo;
 pub use kubaos_phone as phone;
-pub use event::{Event, Level, StepInfo};
-pub use probe::{Manifest, Probe};
+pub use probe::Manifest;
+pub use probe::Probe;
 pub use step::StepId;
 
 #[derive(Debug, thiserror::Error)]

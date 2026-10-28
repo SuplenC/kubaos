@@ -2,8 +2,8 @@
 //!
 //! # Owns
 //!
-//! - The contrast ratio of two colours, a foreground drawn at an opacity over an opaque
-//!   background, and reading every pair's ratio in each mode ([`readings`]).
+//! - The contrast ratio of two colours, a foreground drawn at an opacity over an opaque background,
+//!   and reading every pair's ratio in each mode ([`readings`]).
 //!
 //! # Not here
 //!

@@ -9,12 +9,21 @@
 //! the two-step code (`bw login --code`): bw has no other way to take it
 //! without a terminal, and it's spent the moment bw uses it.
 
+use super::BwLogin;
+use super::BwMethod;
+use super::CardId;
+use super::Cmd;
+use super::Env;
+use super::Facts;
+use super::Inputs;
+use super::MokState;
+use super::PhoneStep;
+use super::PromptKind;
+use super::SetupEvent;
+use super::Stream;
+use super::Sys;
 use super::detect;
 use super::parse::*;
-use super::{
-    BwLogin, BwMethod, CardId, Cmd, Env, Facts, Inputs, MokState, PhoneStep, PromptKind, SetupEvent,
-    Stream, Sys,
-};
 use crate::bitwarden;
 use crate::bitwarden::FormMethod;
 use crate::bitwarden::Line;
@@ -145,31 +154,16 @@ fn pkexec_error(e: &str) -> Fail {
     } else {
         let last = e.lines().last().unwrap_or(e).trim();
         Fail {
-            error: last
-                .trim_start_matches("xx")
-                .trim()
-                .trim_end_matches('.')
-                .to_string(),
+            error: last.trim_start_matches("xx").trim().trim_end_matches('.').to_string(),
             hint: Some("The details are in the log below.".into()),
         }
     }
 }
 
 /// Runs one card's action. `true` when it finished.
-pub fn run(
-    sys: &mut dyn Sys,
-    env: &Env,
-    card: CardId,
-    inputs: &Inputs,
-    emit: &mut dyn FnMut(SetupEvent),
-) -> bool {
+pub fn run(sys: &mut dyn Sys, env: &Env, card: CardId, inputs: &Inputs, emit: &mut dyn FnMut(SetupEvent)) -> bool {
     emit(SetupEvent::Started { card });
-    let mut ctx = Ctx {
-        sys,
-        env,
-        card,
-        emit,
-    };
+    let mut ctx = Ctx { sys, env, card, emit };
     // A run may finish with words of its own for the card, in place of its detected summary.
     let r: R<Option<String>> = match card {
         CardId::Tuxedo => tuxedo(&mut ctx, inputs).map(|()| None),
@@ -229,8 +223,8 @@ fn tuxedo(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
     }
     // A key to enroll: Secure Boot on, and the drivers not in yet (DKMS
     // makes the key while it builds them) or in with the key not enrolled.
-    let wants_mok = secure_boot == Some(true)
-        && (!drivers || matches!(mok, Some(MokState::NotEnrolled | MokState::NoKey)));
+    let wants_mok =
+        secure_boot == Some(true) && (!drivers || matches!(mok, Some(MokState::NotEnrolled | MokState::NoKey)));
     let pw = inputs.mok_password.as_deref().unwrap_or("");
     if wants_mok {
         if let Err(why) = mok_password_ok(pw) {
@@ -279,10 +273,7 @@ fn key_queued(ctx: &mut Ctx) -> R<()> {
 fn fingerprint(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
     let c = detect::card_status(ctx.sys, ctx.env, CardId::Fingerprint, true);
     let Facts::Fingerprint {
-        fprintd,
-        pam,
-        fingers,
-        ..
+        fprintd, pam, fingers, ..
     } = c.facts
     else {
         return Err("no fingerprint facts".to_string().into());
@@ -366,12 +357,10 @@ fn fingerprint(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
             format!("enrolling your {name} finger failed: {m}"),
             "Run it again. A different finger works too.",
         )),
-        (Err(e), false, None) if e.contains("PermissionDenied") || e.contains("Not Authorized") => {
-            Err(fail(
-                "fprintd wasn't allowed to enroll",
-                "Answer the password dialog, then try again.",
-            ))
-        }
+        (Err(e), false, None) if e.contains("PermissionDenied") || e.contains("Not Authorized") => Err(fail(
+            "fprintd wasn't allowed to enroll",
+            "Answer the password dialog, then try again.",
+        )),
         (Err(e), false, None) => Err(fail(
             format!("fprintd-enroll stopped: {}", e.lines().last().unwrap_or(&e)),
             "Run it again. If the reader is busy, wait a few seconds first.",
@@ -386,8 +375,7 @@ fn fingerprint(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
 // ------------------------------------------------------------------ YubiKey
 
 /// What to do in a terminal when the key isn't ready for enrolment.
-pub const YKMAN_PREP: &str =
-    "ykman fido access change-pin, then ykman fido fingerprints add right-index";
+pub const YKMAN_PREP: &str = "ykman fido access change-pin, then ykman fido fingerprints add right-index";
 
 fn yubikey(ctx: &mut Ctx) -> R<()> {
     let devs = ctx
@@ -564,9 +552,7 @@ fn bw_failure(e: bitwarden::Error) -> Fail {
         E::Incomplete(what) => {
             let hint = match what {
                 "the vault is locked" => "Type the master password.",
-                "the API key needs client_id and client_secret" => {
-                    "Web vault: Settings, Security, Keys, View API key."
-                }
+                "the API key needs client_id and client_secret" => "Web vault: Settings, Security, Keys, View API key.",
                 _ => "Fill in the empty one.",
             };
             fail(what, hint)
@@ -609,8 +595,7 @@ pub fn git_identity_ok(name: &str, email: &str) -> Result<(), &'static str> {
 /// is replaced: the file is setup's (and the install's), nobody else's.
 fn git(ctx: &mut Ctx, inputs: &Inputs) -> R<()> {
     let g = inputs.git.clone().unwrap_or_default();
-    git_identity_ok(&g.name, &g.email)
-        .map_err(|why| fail("no name and email to commit with", why))?;
+    git_identity_ok(&g.name, &g.email).map_err(|why| fail("no name and email to commit with", why))?;
     let path = ctx.env.home_path(crate::engine::files::GIT_IDENTITY);
     let (name, email) = (g.name.trim(), g.email.trim());
     ctx.sys
@@ -646,7 +631,10 @@ fn phone(ctx: &mut Ctx, inputs: &Inputs) -> R<Option<String>> {
             ctx.prompt(PromptKind::Wait, "Starting KDE Connect…", None);
             let st = link::turn_on(ctx.sys.phone()).map_err(phone_failure)?;
             let name = st.name.unwrap_or_else(|| "this laptop".into());
-            ctx.log(Level::Info, format!("ok  KDE Connect runs; phones see this laptop as {name}"));
+            ctx.log(
+                Level::Info,
+                format!("ok  KDE Connect runs; phones see this laptop as {name}"),
+            );
             Ok(None)
         }
         PhoneStep::Off => {
@@ -698,13 +686,17 @@ fn phone_failure(e: kubaos_phone::Error) -> Fail {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
+    use super::super::CardStatus;
+    use super::super::GitIdentity;
+    use super::super::PhoneStep;
+    use super::super::State;
     use super::super::fake::FakeSys;
-    use super::super::{CardStatus, GitIdentity, PhoneStep, State};
     use super::*;
     use crate::bitwarden::Login;
     use crate::bitwarden::fake::Fake;
     use crate::bitwarden::fake::SESSION;
-    use std::path::PathBuf;
 
     fn env() -> Env {
         Env {
@@ -768,10 +760,7 @@ mod tests {
         tuxedo_sb_on()
             .file("/var/lib/shim-signed/mok/MOK.der", "cert")
             .ok("dpkg-query", "install ok installed")
-            .ok(
-                "sh -c mokutil",
-                "/var/lib/shim-signed/mok/MOK.der is not enrolled\n",
-            )
+            .ok("sh -c mokutil", "/var/lib/shim-signed/mok/MOK.der is not enrolled\n")
             .ok(
                 "pkexec /usr/lib/kubaos/setup-helper tuxedo --mok-password-stdin",
                 "==> Secure Boot: DKMS signing key (MOK)\n  ok  queued\n",
@@ -898,10 +887,7 @@ mod tests {
                 "  PIN: set\n  fingerprints: enrolled\n  this host:    not enrolled (pam://vm)\n",
             )
             .ok("pamu2fcfg -n -u kuba -V", &format!(":{cred}\n"))
-            .ok(
-                "pkexec /usr/lib/kubaos/setup-helper u2f-add",
-                "  ok  added\n",
-            );
+            .ok("pkexec /usr/lib/kubaos/setup-helper u2f-add", "  ok  added\n");
         let (ok, evs) = go(&mut s, CardId::Yubikey, &Inputs::default());
         assert!(ok, "{}", all_text(&evs));
         let i = s.ran.iter().position(|l| l.contains("u2f-add")).unwrap();
@@ -1035,7 +1021,11 @@ mod tests {
         let (ok, evs) = go(&mut s, CardId::Bitwarden, &inputs);
 
         assert!(ok, "{}", all_text(&evs));
-        assert!(s.bw.text("/home/kuba/.config/dot-bw/config").unwrap().contains("folders=Work\n"));
+        assert!(
+            s.bw.text("/home/kuba/.config/dot-bw/config")
+                .unwrap()
+                .contains("folders=Work\n")
+        );
         assert!(all_text(&evs).contains(r#"1 SSH key(s) in the folder \"Work\""#));
         match evs.last() {
             Some(SetupEvent::Finished { status, .. }) => {
@@ -1085,10 +1075,7 @@ mod tests {
     #[test]
     fn git_says_when_gitconfig_wins() {
         // ~/.gitconfig is read after the include, so its [user] wins.
-        let mut s = FakeSys::new().ok(
-            "/usr/bin/git config --global --includes --get user.name",
-            "Old Name\n",
-        );
+        let mut s = FakeSys::new().ok("/usr/bin/git config --global --includes --get user.name", "Old Name\n");
         let inputs = Inputs {
             git: Some(GitIdentity {
                 name: "Kuba Example".into(),
@@ -1204,7 +1191,11 @@ mod tests {
         let (_, ok, evs) = phone(fake, Some(PhoneStep::Check));
 
         assert!(ok, "{}", all_text(&evs));
-        assert!(finished(&evs).summary.contains("“sent from the phone”"), "{}", finished(&evs).summary);
+        assert!(
+            finished(&evs).summary.contains("“sent from the phone”"),
+            "{}",
+            finished(&evs).summary
+        );
     }
 
     #[test]
