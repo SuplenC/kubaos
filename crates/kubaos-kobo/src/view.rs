@@ -2245,7 +2245,7 @@ fn done<'a>(app: &'a App, look: &Look) -> El<'a> {
     done::shift(column, Vector::new(look.scale.snap(jolt.x), look.scale.snap(jolt.y)))
 }
 
-/// The done screen's headline. A placeholder until its copy is written.
+/// The done screen's headline, the words of the draft Kuba picked.
 const DONE_HEADLINE: &str = "Fixed. You're welcome.";
 
 /// Reboot, or how far the machine is in going down, beside staying in the live system.

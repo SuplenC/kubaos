@@ -1,6 +1,14 @@
 //! An element drawn off its place while its layout stays where it is: the words rising into
 //! place, the page's jolt. Nothing around it moves, and the geometry check reads the place it
 //! settles in.
+//!
+//! # Owns
+//!
+//! - [`shift`]: drawing, the pointer and overlays moved together, by a whole offset.
+//!
+//! # Not here
+//!
+//! - How far a part is off its place at a moment: `super::Sequence`.
 
 use iced::Element;
 use iced::Event;

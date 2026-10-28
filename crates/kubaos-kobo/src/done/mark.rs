@@ -1,6 +1,10 @@
 //! The クバ mark as neon tubes: its strokes in the order they are written, flattened to
 //! polylines in the sign-off's logical pixels, so a stroke can be drawn part of the way.
 //!
+//! # Owns
+//!
+//! - The strokes' paths, order and tones, their widths, and the glow's band and blur around them.
+//!
 //! # Not here
 //!
 //! - Where each stroke is at a moment: `super::Sequence`. The glow baked around them: `super::art`.

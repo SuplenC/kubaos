@@ -6,6 +6,11 @@
 //! Every picture is at device pixels, and the ones that stay on screen sit on whole device pixels,
 //! so nothing is resampled once the sequence has settled.
 //!
+//! # Owns
+//!
+//! - The bakes ([`art`]), done once per palette and scale on a thread of their own, and kept.
+//! - How the glow falls off, the halo's shape, and the hanko's border, characters and ink.
+//!
 //! # Not here
 //!
 //! - When each picture shows, and how strongly: `super::Sequence`. The tubes: `super::mark`.
@@ -126,8 +131,9 @@ pub fn art(look: &Look, wait: bool) -> Option<Arc<Art>> {
     let key = inks.key(scale);
     let (slot, fresh) = {
         let mut baked = BAKED.lock().expect("the sign-off's bake list poisoned");
+        // A bake still running keeps its slot, so whoever waits on it gets it and none runs twice.
         if baked.len() >= KEPT && !baked.contains_key(&key) {
-            baked.clear();
+            baked.retain(|_, slot| slot.get().is_none());
         }
         let fresh = !baked.contains_key(&key);
         (Arc::clone(baked.entry(key).or_default()), fresh)

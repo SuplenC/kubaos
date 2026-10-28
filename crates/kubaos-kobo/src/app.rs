@@ -794,6 +794,7 @@ impl App {
         });
         self.run_rx = Some(rx);
         self.install = Some(Install::new(Instant::now()));
+        crate::done::prepare(&self.look());
         // The log starts closed, its close already over, so nothing animates.
         let closed_at = self
             .now

@@ -1,14 +1,14 @@
 //! The done screen's sign-off: the クバ mark writes itself in as neon tubes that stutter on and
 //! hum, the 完了 hanko stamps down beside it and the mark surges on impact, while the words
-//! settle in under them. Everything is in place within four seconds, and nothing waits for it:
-//! Reboot works from the first frame.
+//! settle in under them. Everything is in place 3.4 s in, the glow behind the mark gone by 3.6 s,
+//! and nothing waits for it: Reboot works from the first frame.
 //!
 //! ```text
 //! 0.30 s  the strokes write in, 0.22 s apart, each stuttering on as it ends; then the hum
 //! 2.00 s  the headline, a word every 0.09 s
 //! 2.40 s  the lede
 //! 2.60 s  the actions; the hanko comes down
-//! 2.78 s  impact: the mark flares white-hot and the glow behind it fades; the page jolts
+//! 2.78 s  impact: the mark flares white-hot, the glow behind it fades, the page jolts
 //! 2.90 s  the key hints
 //! ```
 //!
@@ -69,25 +69,24 @@ use self::art::Picture;
 pub use self::shift::shift;
 use crate::ui::El;
 
-/// A cue: when a part starts, from the screen's arrival. Cues are the draft Kuba picked; how long
-/// each part then moves, and on which curve, are the motion tokens.
-const fn cue(ms: u64) -> Duration {
-    Duration::from_millis(ms)
-}
+// The cues: when each part starts, from the screen's arrival, as the draft Kuba picked set them
+// (docs/DESIGN.md, "Motion"). How long a part then moves, and on which curve, is a token.
 
 /// The first stroke, and the gap to each next one.
-const STROKES_AT: Duration = cue(300);
-const STROKE_GAP: Duration = cue(220);
+// design-allow(duration): a cue, when the strokes start, not how long they move.
+const STROKES_AT: Duration = Duration::from_millis(300);
+// design-allow(duration): a cue, the stagger between strokes, not how long one moves.
+const STROKE_GAP: Duration = Duration::from_millis(220);
 /// The headline's first word, and the gap to each next one.
-const HEADLINE_AT: Duration = cue(2000);
-const WORD_GAP: Duration = cue(90);
-const LEDE_AT: Duration = cue(2400);
-const ACTIONS_AT: Duration = cue(2600);
-const STAMP_AT: Duration = cue(2600);
-/// The hanko lands: the mark surges.
-const SURGE_AT: Duration = cue(2780);
-const JOLT_AT: Duration = cue(2800);
-const HINTS_AT: Duration = cue(2900);
+const HEADLINE_AT: Duration = Duration::from_secs(2);
+// design-allow(duration): a cue, the stagger between words, not how long one moves.
+const WORD_GAP: Duration = Duration::from_millis(90);
+const LEDE_AT: Duration = Duration::from_millis(2400);
+const ACTIONS_AT: Duration = Duration::from_millis(2600);
+const STAMP_AT: Duration = Duration::from_millis(2600);
+/// Impact: the hanko lands, the mark surges and the page jolts.
+const IMPACT_AT: Duration = Duration::from_millis(2780);
+const HINTS_AT: Duration = Duration::from_millis(2900);
 
 /// One breath of the hum, longer than any motion token: a slow pulse, not a move.
 const HUM_PERIOD: Duration = Duration::from_millis(2400);
@@ -182,10 +181,10 @@ impl Sequence {
     /// When the last part has settled; only the hum goes on.
     fn settled_at(&self) -> Duration {
         let ends = [
-            self.at(SURGE_AT) + self.motion.duration(tokens::Duration::Slow),
+            self.at(IMPACT_AT) + self.motion.duration(tokens::Duration::Slow),
             self.at(HINTS_AT) + self.motion.duration(tokens::Duration::Long),
             self.at(STAMP_AT) + self.motion.duration(tokens::Duration::Medium),
-            self.at(JOLT_AT) + self.motion.duration(tokens::Duration::Short),
+            self.at(IMPACT_AT) + self.motion.duration(tokens::Duration::Short),
         ];
         ends.into_iter().max().unwrap_or_default()
     }
@@ -226,7 +225,7 @@ impl Sequence {
 
     /// How far the page is off its place in the jolt, in logical pixels.
     pub fn jolt(&self) -> Vector {
-        let Some(elapsed) = self.after(JOLT_AT).filter(|_| !self.still()) else {
+        let Some(elapsed) = self.after(IMPACT_AT).filter(|_| !self.still()) else {
             return Vector::ZERO;
         };
         let x = elapsed.as_secs_f32() / self.motion.duration(tokens::Duration::Short).as_secs_f32();
@@ -297,18 +296,18 @@ impl Sequence {
 
     /// The white-hot flare on impact, 1 to 0 over `micro`.
     fn flare(&self) -> f32 {
-        if self.still() || self.after(SURGE_AT).is_none() {
+        if self.still() || self.after(IMPACT_AT).is_none() {
             return 0.0;
         }
-        1.0 - self.progress(SURGE_AT, tokens::Duration::Micro, Easing::StandardAccel)
+        1.0 - self.progress(IMPACT_AT, tokens::Duration::Micro, Easing::StandardAccel)
     }
 
     /// The glow behind the mark on impact, 1 to 0 over `slow`.
     fn halo(&self) -> f32 {
-        if self.still() || self.after(SURGE_AT).is_none() {
+        if self.still() || self.after(IMPACT_AT).is_none() {
             return 0.0;
         }
-        1.0 - self.progress(SURGE_AT, tokens::Duration::Slow, Easing::Standard)
+        1.0 - self.progress(IMPACT_AT, tokens::Duration::Slow, Easing::Standard)
     }
 
     /// The hanko: nothing before it comes down, then shrinking from [`art::STAMP_FROM`] and
@@ -367,6 +366,12 @@ pub fn sign_off<'a>(look: &Look, arrived: Instant, now: Instant, motion: Motion)
     widget::stack![glow, sign].into()
 }
 
+/// Starts baking the sign-off's pictures for `look` on a thread of its own, long before the done
+/// screen draws them, so its first frames never wait for the bake.
+pub fn prepare(look: &Look) {
+    let _ = art::art(look, false);
+}
+
 /// Whether the done screen still needs frames `since` it arrived.
 pub fn moving(arrived: Instant, now: Instant, motion: Motion) -> bool {
     Sequence::new(arrived, now, motion).moving()
@@ -391,16 +396,22 @@ fn frame_bounds(bounds: Rectangle) -> Rectangle {
     )
 }
 
+/// A baked picture at `opacity`, pixel for pixel: it was baked on the device pixels it covers.
+/// It is clipped to its own box, so the software renderer fills only that box and not all the
+/// sign-off's frame, which is most of what a redraw of the hum costs there.
 fn picture(frame: &mut Frame, picture: &Picture, opacity: f32) {
     if opacity <= 0.0 {
         return;
     }
-    frame.draw_image(
-        picture.bounds,
-        canvas::Image::new(picture.handle.clone())
-            .opacity(opacity.min(1.0))
-            .filter_method(FilterMethod::Linear),
-    );
+    frame.with_clip(picture.bounds, |frame| {
+        frame.draw_image(
+            picture.bounds,
+            canvas::Image::new(picture.handle.clone())
+                .opacity(opacity.min(1.0))
+                .filter_method(FilterMethod::Nearest)
+                .snap(true),
+        );
+    });
 }
 
 /// The layer under the tubes: the unlit glass, the glow around each tube and the halo behind the
@@ -526,10 +537,13 @@ struct Sign {
 #[derive(Default)]
 struct SignState {
     cache: Cache,
-    /// What the cache was drawn with: the tubes' and the ink's colours, and whether the hanko was
-    /// there yet.
-    drawn: RefCell<Option<([[u8; 4]; 4], bool)>>,
+    /// What the cache was drawn with: the tubes' colours, and the baked pictures, which hold the
+    /// hanko's ink at the scale it was drawn at.
+    drawn: RefCell<Option<Drawn>>,
 }
+
+/// The tubes' four colours, and the address of the baked pictures, if there were any yet.
+type Drawn = ([[u8; 4]; 4], Option<usize>);
 
 impl canvas::Program<crate::app::Message> for Sign {
     type State = SignState;
@@ -551,7 +565,7 @@ impl canvas::Program<crate::app::Message> for Sign {
         let c = self.colors;
         let key = Some((
             [c.primary, c.primary_core, c.cold, c.cold_core].map(Color::into_rgba8),
-            self.art.is_some(),
+            self.art.as_ref().map(|art| Arc::as_ptr(art).addr()),
         ));
         if state.drawn.replace(key) != key {
             state.cache.clear();
@@ -580,12 +594,7 @@ impl Sign {
             return;
         };
         if stamp.landed {
-            frame.draw_image(
-                art.hanko.bounds,
-                canvas::Image::new(art.hanko.handle.clone())
-                    .filter_method(FilterMethod::Nearest)
-                    .snap(true),
-            );
+            picture(frame, &art.hanko, 1.0);
             return;
         }
         let rest = art.stamp.bounds;

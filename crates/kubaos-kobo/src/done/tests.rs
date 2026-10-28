@@ -52,8 +52,8 @@ fn nothing_shows_but_the_unlit_glass_at_the_start() {
 }
 
 #[test]
-fn everything_settles_within_four_seconds_and_only_the_hum_goes_on() {
-    let seq = at(4000);
+fn everything_settles_by_3_6_s_and_only_the_hum_goes_on() {
+    let seq = at(3600);
 
     assert!(!seq.moving());
     assert_eq!(seq.word(2), Reveal { shown: 1.0, below: 0.0 });
@@ -151,8 +151,8 @@ fn the_mark_flares_white_hot_on_impact_and_is_back_within_micro() {
 
 #[test]
 fn the_jolt_ends_where_it_started() {
-    assert_eq!(at(2799).jolt(), Vector::ZERO);
-    assert_ne!(at(2850).jolt(), Vector::ZERO);
+    assert_eq!(at(2779).jolt(), Vector::ZERO);
+    assert_ne!(at(2830).jolt(), Vector::ZERO);
     assert_eq!(at(3000).jolt(), Vector::ZERO);
 }
 
@@ -172,4 +172,54 @@ fn the_mark_has_the_logos_six_strokes_the_dakuten_cold() {
     assert_eq!(tones.len(), mark::COUNT);
     assert_eq!(&tones[4..], &[mark::Tone::Cold, mark::Tone::Cold]);
     assert!(tones[..4].iter().all(|t| *t == mark::Tone::Warm));
+}
+
+fn glow(arrived: Instant, motion: Motion) -> Glow {
+    Glow {
+        arrived,
+        now: arrived,
+        motion,
+        colors: color::colors(kubaos_ui::Mode::Dark),
+        art: None,
+    }
+}
+
+/// What the glow asks for when a frame `ms` after the screen arrived is drawn.
+fn redraw_after(ms: u64, motion: Motion) -> Option<window::RedrawRequest> {
+    let arrived = Instant::now();
+    let at = arrived + Duration::from_millis(ms);
+    let event = canvas::Event::Window(window::Event::RedrawRequested(at));
+
+    let action = canvas::Program::update(
+        &glow(arrived, motion),
+        &mut GlowState::default(),
+        &event,
+        Rectangle::default(),
+        mouse::Cursor::Unavailable,
+    );
+
+    action.map(|action| action.into_inner().1)
+}
+
+#[test]
+fn the_app_draws_every_frame_until_the_done_screen_settles_and_then_none() {
+    let arrived = Instant::now();
+
+    assert!(moving(arrived, arrived + Duration::from_secs(3), Motion::default()));
+    assert!(!moving(
+        arrived,
+        arrived + Duration::from_millis(3600),
+        Motion::default()
+    ));
+    assert!(!moving(arrived, arrived, Motion::default().reduced()));
+}
+
+#[test]
+fn the_settled_glow_asks_for_its_next_frame_itself_and_only_then() {
+    assert_eq!(redraw_after(1000, Motion::default()), None);
+    assert_eq!(redraw_after(9000, Motion::default().reduced()), None);
+    let Some(window::RedrawRequest::At(next)) = redraw_after(9000, Motion::default()) else {
+        panic!("the settled hum asks for a frame at a time");
+    };
+    assert!(next > Instant::now());
 }
