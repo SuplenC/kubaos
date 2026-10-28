@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# icon-themes: the sheet Kuba picks the GTK and Qt icon theme from: the same 24 icons in Papirus
+# (today's), Adwaita, MoreWaita, Colloid, Fluent and Tela, dark and light, as
+# test/out/icon-themes/icon-themes-{dark,light}.png. The themes are the flake's nixpkgs' builds;
+# test/shots/icon-themes.py draws the sheet.
+#
+#   test/shots/icon-themes
+set -euo pipefail
+
+repo=$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)
+out=$repo/test/out/icon-themes
+mkdir -p "$out"
+
+# The candidates, each in the colour closest to the accent (orange) where it has colours.
+themes=$(nix build --no-link --print-out-paths --impure --expr "
+  let
+    pkgs = (builtins.getFlake \"git+file://$repo\").inputs.nixpkgs.legacyPackages.\${builtins.currentSystem};
+  in
+  pkgs.linkFarm \"kubaos-icon-candidates\" [
+    { name = \"papirus\"; path = pkgs.papirus-icon-theme; }
+    { name = \"adwaita\"; path = pkgs.adwaita-icon-theme; }
+    { name = \"hicolor\"; path = pkgs.hicolor-icon-theme; }
+    { name = \"morewaita\"; path = pkgs.morewaita-icon-theme; }
+    { name = \"colloid\"; path = pkgs.colloid-icon-theme.override { schemeVariants = [ \"default\" ]; colorVariants = [ \"orange\" ]; }; }
+    { name = \"fluent\"; path = pkgs.fluent-icon-theme.override { colorVariants = [ \"orange\" ]; }; }
+    { name = \"tela\"; path = pkgs.tela-icon-theme; }
+  ]")
+
+tools=$(nix build --no-link --print-out-paths --impure --expr "
+  let
+    pkgs = (builtins.getFlake \"git+file://$repo\").inputs.nixpkgs.legacyPackages.\${builtins.currentSystem};
+  in
+  pkgs.symlinkJoin { name = \"kubaos-icon-sheet\"; paths = [ pkgs.librsvg (pkgs.python3.withPackages (p: [ p.pillow ])) ]; }")
+
+roots=()
+for d in "$themes"/*/share/icons; do roots+=("$d"); done
+PATH=$tools/bin:$PATH python3 -I "$repo/test/shots/icon-themes.py" "$repo" "$out" "${roots[@]}"
+echo "icon-themes: $out/icon-themes-dark.png, $out/icon-themes-light.png"
