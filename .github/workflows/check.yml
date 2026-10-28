@@ -6,7 +6,7 @@
 # so a failure names what failed:
 # - flake: `nix flake check --no-build`.
 # - fmt and lint: `just fmt-check`, `just lint`.
-# - nextest: `just nextest`.
+# - nextest and nextest (slow): `just nextest`, split in two by `SLOW_TEST`.
 # - qml: `just qml-test`.
 # - design: `just design-check`, with QML's parity.
 # `check (x86_64-linux)` needs them all and fails unless every one passed. It
@@ -42,6 +42,12 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_TERM_COLOR: always
   SCCACHE_CACHE_SIZE: 3G
+  # Kōbō's every screen at every scale, about three minutes alone, longer than
+  # every other test together: `nextest (slow)` runs it beside `nextest`,
+  # which runs the rest. One filter, negated in one of them, so every test
+  # runs in exactly one. Renamed, the test matches nothing, and nextest
+  # fails `nextest (slow)` for running no test.
+  SLOW_TEST: package(kubaos-kobo) & test(=shots::every_screen_keeps_to_the_grid)
 
 jobs:
   flake:
@@ -74,7 +80,6 @@ jobs:
         with:
           name: lint
           cargo: true
-          free-disk: true
 
       - name: Build the devshell
         run: nix develop --command true
@@ -87,9 +92,7 @@ jobs:
 
       - name: Compile cache stats
         if: ${{ !cancelled() }}
-        run: |
-          nix develop --command sccache --show-stats
-          df -h /
+        run: nix develop --command sccache --show-stats
 
       - name: Save the compile cache
         if: ${{ github.event_name == 'push' && !cancelled() }}
@@ -116,19 +119,53 @@ jobs:
         with:
           name: nextest
           cargo: true
-          free-disk: true
 
       - name: Build the devshell
         run: nix develop --command true
 
       - name: Tests
-        run: nix develop --command just nextest
+        run: nix develop --command just nextest -E "not ($SLOW_TEST)"
 
       - name: Compile cache stats
         if: ${{ !cancelled() }}
-        run: |
-          nix develop --command sccache --show-stats
-          df -h /
+        run: nix develop --command sccache --show-stats
+
+      - name: Save the compile cache
+        if: ${{ github.event_name == 'push' && !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/sccache
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ steps.setup.outputs.cargo-key }}
+
+  nextest-slow:
+    name: nextest (slow)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up
+        id: setup
+        uses: ./.github/actions/setup
+        with:
+          name: nextest-slow
+          cargo: true
+
+      - name: Build the devshell
+        run: nix develop --command true
+
+      # Only Kōbō's tests build, not the workspace's.
+      - name: Tests
+        run: nix develop --command cargo nextest run -p kubaos-kobo -E "$SLOW_TEST"
+
+      - name: Compile cache stats
+        if: ${{ !cancelled() }}
+        run: nix develop --command sccache --show-stats
 
       - name: Save the compile cache
         if: ${{ github.event_name == 'push' && !cancelled() }}
@@ -174,7 +211,6 @@ jobs:
         with:
           name: design
           cargo: true
-          free-disk: true
 
       - name: Build the devshell
         run: nix develop --command true
@@ -184,9 +220,7 @@ jobs:
 
       - name: Compile cache stats
         if: ${{ !cancelled() }}
-        run: |
-          nix develop --command sccache --show-stats
-          df -h /
+        run: nix develop --command sccache --show-stats
 
       - name: Save the compile cache
         if: ${{ github.event_name == 'push' && !cancelled() }}
@@ -203,7 +237,7 @@ jobs:
   # one runs on the others' failure or cancellation too, and fails.
   check:
     name: check (x86_64-linux)
-    needs: [flake, lint, nextest, qml, design]
+    needs: [flake, lint, nextest, nextest-slow, qml, design]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

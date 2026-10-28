@@ -50,9 +50,10 @@ check: fmt-check lint nextest qml-test design-check
 qml-test:
     nix build --no-link -L .#checks.{{host}}-linux.qml-logic
 
-# The workspace's tests, with nextest.
-nextest:
-    cargo nextest run --workspace
+# The workspace's tests, with nextest; arguments go to `cargo nextest run`, as `just nextest -E 'package(kubaos-kobo)'`.
+[positional-arguments]
+nextest *args:
+    cargo nextest run --workspace "$@"
 
 # Start this worktree's cargo build from the main checkout's target/: a reflink copy, so the first build rebuilds only what differs from main (test/warm-target, docs/TESTING.md). Claude Code's agent worktrees get it from the WorktreeCreate hook; this is for a worktree made another way. Where reflinks aren't supported, it changes nothing.
 warm:

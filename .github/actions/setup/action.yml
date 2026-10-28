@@ -20,9 +20,6 @@ inputs:
   cargo:
     description: Restore the compile cache.
     default: "false"
-  free-disk:
-    description: Delete the runner image's preinstalled SDKs, for a job that needs the disk.
-    default: "false"
 
 outputs:
   cargo-key:
@@ -32,18 +29,6 @@ outputs:
 runs:
   using: composite
   steps:
-    # The runner image's preinstalled SDKs leave too little of the disk for
-    # Qt, the toolchain and the crates' builds. Deleting them takes a minute or
-    # two, so it runs behind the restores: the store and the compile cache fit
-    # in what is free, and the builds come after.
-    - name: Free disk space
-      if: inputs.free-disk == 'true'
-      shell: bash
-      run: |
-        df -h /
-        sudo setsid --fork rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
-          </dev/null >/dev/null 2>&1
-
     - name: Cache keys
       id: keys
       shell: bash
