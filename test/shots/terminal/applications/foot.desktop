@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Foot
+Comment=Wayland terminal emulator
+Exec=true
+Icon=foot

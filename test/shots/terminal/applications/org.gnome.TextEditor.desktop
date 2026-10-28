@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Text Editor
+Comment=Edit text files
+Exec=true
+Icon=org.gnome.TextEditor

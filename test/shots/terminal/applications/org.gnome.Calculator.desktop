@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Calculator
+Comment=Perform calculations
+Exec=true
+Icon=org.gnome.Calculator

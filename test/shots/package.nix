@@ -7,6 +7,11 @@
 # on every machine. The fonts are the shell's and nothing else: kubaos-ui's Geist and Geist Mono,
 # M PLUS 1 and Noto Color Emoji, then DejaVu for the symbols they lack (⌃, ⇧), as Ubuntu falls
 # back to it.
+#
+# The terminals' shots (`test/shots/terminals`) run Ghostty, foot and fuzzel in the same sway,
+# with the TUIs they show and matugen pinned here, and the fonts a terminal finds on KubaOS:
+# Geist and Geist Mono (the curated release), Geist Mono's and Meslo's Nerd Fonts (the terminals'
+# font before they took the tokens'), Noto Color Emoji and DejaVu.
 {
   lib,
   writeShellApplication,
@@ -30,7 +35,25 @@
   mplus-outline-fonts,
   noto-fonts-color-emoji,
   dejavu_fonts,
+  nerd-fonts,
+  ghostty,
+  foot,
+  fuzzel,
+  tmux,
+  neovim-unwrapped,
+  vimPlugins,
+  btop,
+  lazygit,
+  bat,
+  fastfetch,
+  oh-my-posh,
+  matugen,
+  grim,
+  swaybg,
+  ncurses,
+  procps,
   wallpapers,
+  geist-font,
   ...
 }:
 let
@@ -66,6 +89,24 @@ let
       <cachedir prefix="xdg">fontconfig</cachedir>
     </fontconfig>
   '';
+  terminalFonts = writeText "kubaos-shots-terminal-fonts.conf" ''
+    <?xml version="1.0"?>
+    <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+    <fontconfig>
+      <dir>${geist-font}/share/fonts</dir>
+      <dir>${nerd-fonts.geist-mono}/share/fonts</dir>
+      <dir>${nerd-fonts.meslo-lg}/share/fonts</dir>
+      <dir>${shellFonts}/emoji</dir>
+      <dir>${shellFonts}/fallback</dir>
+      <cachedir prefix="xdg">fontconfig</cachedir>
+    </fontconfig>
+  '';
+  # Neovim's plugins the terminals' shots load beside `config/nvim`: mini.base16, which draws
+  # the theme, and lualine, which draws its status line.
+  nvimPlugins = lib.makeSearchPath "" [
+    vimPlugins.mini-nvim
+    vimPlugins.lualine-nvim
+  ];
   # The tray's icons: Adwaita's symbolic one as it ships (no fill), the same kind filled #2e3436
   # (as apps draw them for a light theme), and colour ones, for the tray and the menu's Results.
   icons = runCommand "kubaos-shots-icons" { } ''
@@ -91,6 +132,21 @@ let
     gawk
     gnutar
     bash
+    ghostty
+    foot
+    fuzzel
+    tmux
+    neovim-unwrapped
+    btop
+    lazygit
+    bat
+    fastfetch
+    oh-my-posh
+    matugen
+    grim
+    swaybg
+    ncurses
+    procps
   ];
 in
 writeShellApplication {
@@ -114,6 +170,9 @@ writeShellApplication {
     export KUBAOS_SHOTS_DRI=${mesa}/lib/dri
     export KUBAOS_SHOTS_WALLPAPERS=${wallpapers}
     export KUBAOS_SHOTS_ICONS=${icons}
+    export KUBAOS_SHOTS_TERMINAL_FONTS=${terminalFonts}
+    export KUBAOS_SHOTS_NVIM_PLUGINS=${nvimPlugins}
+    export KUBAOS_SHOTS_TERMINFO=${ncurses}/share/terminfo
     repo=$(git rev-parse --show-toplevel 2>/dev/null) || {
       echo "kubaos-shots: run me inside a KubaOS checkout" >&2
       exit 2
@@ -121,7 +180,7 @@ writeShellApplication {
     exec bash "$repo/test/shots/shots" "$@"
   '';
   meta = {
-    description = "Before/after screenshots of KubaOS's shell, Kōbō and the specimen, diffed";
+    description = "Before/after screenshots of KubaOS's shell, Kōbō, the specimen and the terminals, diffed";
     mainProgram = "kubaos-shots";
   };
 }

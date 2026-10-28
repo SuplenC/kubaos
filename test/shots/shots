@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# shots: before/after screenshots of the shell, Kōbō and the specimen, paired and diffed, for a
-# design PR. Run it through `just shots` (`nix run .#shots`), which pins the shell's renderer: Qt,
-# sway, Mesa, ImageMagick and the fonts. Kōbō and the specimen build with the cargo and nix on
-# your PATH. docs/agents/design-pr-loop.md has the loop it serves.
+# shots: before/after screenshots of the shell, Kōbō, the specimen and the terminals, paired and
+# diffed, for a design PR. Run it through `just shots` (`nix run .#shots`), which pins the shell's
+# renderer (Qt, sway, Mesa, ImageMagick and the fonts) and the terminals and their TUIs. Kōbō and
+# the specimen build with the cargo and nix on your PATH. docs/agents/design-pr-loop.md has the
+# loop it serves.
 #
 #   shots [SURFACE...] [--scales 1,1.5] [--modes dark] [--ref REV] [--full] [--jobs N]
 #         [--threshold PX]
@@ -11,14 +12,15 @@
 #                          and changed.txt
 #   shots kobo [FLAGS]     the same for Kōbō's screens (its `shots` test tour)
 #   shots specimen [FLAGS] the same for the specimen pages (kubaos-specimen and qml-specimen)
+#   shots terminals [FLAGS] the same for the terminals and the TUIs (test/shots/terminals)
 #   shots publish BRANCH   pushes changed.txt's pairs to the image-only BRANCH and prints the
 #                          Markdown table for the PR body
 #   shots self-test        checks a render can't reach the desktop session
 #
 # Without SURFACE it renders the surfaces whose files changed against REV (`surfaces`), at 1× and
 # 1.5×, dark. `--full` makes it 1, 1.25, 1.5 and 2, light and dark, unless --scales or --modes
-# say otherwise. SURFACE is a surface in `scenarios` (controlcenter, menu, lock, ...), kobo or
-# specimen. Kōbō's and the specimen's renderers draw every scale and mode; the rest are dropped.
+# say otherwise. SURFACE is a surface in `scenarios` (controlcenter, menu, lock, ...), kobo,
+# specimen or terminals. Kōbō's and the specimen's renderers draw every scale and mode; the rest are dropped.
 #
 # Output, in test/out/shots/ (emptied on each run):
 # - after/ and before/: the shots;
@@ -200,9 +202,10 @@ shell_side() {
 run_jobs() {
   [[ -s $work/jobs ]] || return 0
   echo "shots: $(wc -l <"$work/jobs") renders on $jobs cores" >&2
-  export -f isolated render
+  export -f isolated render render_terminal
   export KUBAOS_SHOTS_QML KUBAOS_SHOTS_SWAY KUBAOS_SHOTS_PATH KUBAOS_SHOTS_FONTS KUBAOS_SHOTS_QT_PLUGINS \
-    KUBAOS_SHOTS_QML_IMPORTS KUBAOS_SHOTS_EGL_VENDOR KUBAOS_SHOTS_DRI cache TMPDIR
+    KUBAOS_SHOTS_QML_IMPORTS KUBAOS_SHOTS_EGL_VENDOR KUBAOS_SHOTS_DRI KUBAOS_SHOTS_WALLPAPERS \
+    KUBAOS_SHOTS_TERMINAL_FONTS KUBAOS_SHOTS_NVIM_PLUGINS KUBAOS_SHOTS_TERMINFO here cache TMPDIR
   # A render that fails says so and leaves no file; the pairs show what is missing.
   # shellcheck disable=SC2016 # $1 is the job line, expanded by the inner bash.
   xargs -r -P "$jobs" -d '\n' -n 1 bash -c 'eval "$1"' _ <"$work/jobs" || true
@@ -249,6 +252,38 @@ iced() {
     iced_tour specimen "$tree" "$dir" bash -c '"${@:2}" cargo run -q --release -p kubaos-specimen -- shots "$0/specimen" &&
       nix run "$1" -- shots "$0/qml-specimen"' "$raw" "$flake" "${run[@]}"
   fi
+}
+
+# render_terminal TREE NAME MODE SCALE PNG LOG: one shot of `test/shots/terminals`, written whole
+# or not at all, as `render` writes the shell's.
+render_terminal() {
+  local tree=$1 name=$2 mode=$3 scale=$4 png=$5 log=$6
+  local part=${png%.png}.$$.part.png
+  mkdir -p "$(dirname "$png")" "$(dirname "$log")"
+  if isolated "$scale" timeout 120 env FONTCONFIG_FILE="$KUBAOS_SHOTS_TERMINAL_FONTS" \
+    KUBAOS_SHOTS_WALLPAPERS="$KUBAOS_SHOTS_WALLPAPERS" KUBAOS_SHOTS_NVIM_PLUGINS="$KUBAOS_SHOTS_NVIM_PLUGINS" \
+    KUBAOS_SHOTS_TERMINFO="$KUBAOS_SHOTS_TERMINFO" \
+    bash "$here/terminals" shot "$tree" "$name" "$mode" "$part" >"$log" 2>&1 && [[ -s $part ]]; then
+    mv -f "$part" "$png"
+  else
+    rm -f "$part"
+    echo "shots: $name ($mode, ${scale}x) wasn't drawn: $log" >&2
+  fi
+}
+
+# terminal_side TREE DIR: plans every terminal shot of TREE into DIR, skipping those DIR has.
+terminal_side() {
+  local tree=$1 dir=$2 name mode scale
+  while read -r name; do
+    for mode in "${modes[@]}"; do
+      for scale in "${scales[@]}"; do
+        local file=$name-$mode-${scale}x
+        [[ -s $dir/$file.png ]] && continue
+        printf '%q ' render_terminal "$tree" "$name" "$mode" "$scale" "$dir/$file.png" "$dir/logs/$file.log"
+        echo
+      done
+    done
+  done < <(bash "$here/terminals" names) >>"$work/jobs"
 }
 
 # Whether FILE (NAME-MODE-SCALEx.png) is in the planned modes and scales.
@@ -427,12 +462,13 @@ main() {
   local all
   all=$(shell_surfaces | tr '\n' ' ')
   shell=() iced_surfaces=()
-  local s
+  local s terminals=0
   for s in "${picked[@]}"; do
     case $s in
     kobo | specimen) iced_surfaces+=("$s") ;;
+    terminals) terminals=1 ;;
     *)
-      [[ " $all " == *" $s "* ]] || die "no surface $s: one of ${all}kobo specimen"
+      [[ " $all " == *" $s "* ]] || die "no surface $s: one of ${all}kobo specimen terminals"
       shell+=("$s")
       ;;
     esac
@@ -454,8 +490,13 @@ main() {
     extract "$base" "$cache/$base/src" config/quickshell qml
     shell_side after "$repo" "$out/after"
     shell_side before "$cache/$base/src" "$before_dir"
-    run_jobs
   fi
+  if ((terminals)); then
+    extract "$base" "$cache/$base/terminals" config scripts branding user-layer home
+    terminal_side "$repo" "$out/after"
+    terminal_side "$cache/$base/terminals" "$before_dir"
+  fi
+  run_jobs
   if ((${#iced_surfaces[@]})); then
     # Kōbō's and the specimen's BEFORE depend on the rev alone, not on this harness: they are
     # kept apart, so a change here doesn't rebuild them, and linked into BEFORE.

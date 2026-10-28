@@ -1,6 +1,6 @@
 # What each surface is drawn from, for `shots` without surfaces: a change to a file under any of a
-# surface's paths renders it. One per line, `SURFACE PATH...`; `*` is every shell surface, and kobo
-# and specimen are the iced renderers'. The services are stand-ins (fakes/qs/services), so a change
+# surface's paths renders it. One per line, `SURFACE PATH...`; `*` is every shell surface, kobo
+# and specimen are the iced renderers', and terminals is test/shots/terminals'. The services are stand-ins (fakes/qs/services), so a change
 # to config/quickshell/services renders nothing.
 *              qml/KubaOS config/quickshell/components config/quickshell/theme test/shots flake.lock
 bar            config/quickshell/modules/bar config/quickshell/modules/frame
@@ -16,3 +16,4 @@ polkit         config/quickshell/modules/polkit
 menu           config/quickshell/modules/menu
 kobo           crates/kubaos-kobo crates/kubaos-ui crates/kubaos-core design/tokens.toml
 specimen       crates/kubaos-specimen crates/kubaos-ui qml/KubaOS qml/specimen design/tokens.toml
+terminals      config/ghostty config/foot config/tmux config/nvim config/btop config/lazygit config/bat config/fuzzel config/ohmyposh config/fastfetch config/matugen design/tokens.toml scripts/dot-config test/shots/terminals test/shots/terminal

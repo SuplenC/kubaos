@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Ghostty
+Comment=Terminal emulator
+Exec=true
+Icon=ghostty

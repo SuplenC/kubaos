@@ -1,0 +1,6 @@
+# The terminals' shots' last lazygit config: nothing that pops up over the first screen.
+disableStartupPopups: true
+update:
+  method: never
+gui:
+  showRandomTip: false

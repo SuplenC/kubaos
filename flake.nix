@@ -164,9 +164,12 @@
         shots = {
           type = "app";
           program = pkgs.lib.getExe (
-            pkgs.callPackage ./test/shots/package.nix { wallpapers = inputs.kubaos-wallpapers; }
+            pkgs.callPackage ./test/shots/package.nix {
+              wallpapers = inputs.kubaos-wallpapers;
+              inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) geist-font;
+            }
           );
-          meta.description = "Before/after screenshots of KubaOS's shell, Kōbō and the specimen, diffed";
+          meta.description = "Before/after screenshots of KubaOS's shell, Kōbō, the specimen and the terminals, diffed";
         };
       });
 

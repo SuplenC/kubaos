@@ -1,0 +1,251 @@
+#!/usr/bin/env bash
+# terminals: one shot of a terminal or a TUI for `shots`. It runs inside `isolated` (test/shots/shots):
+# a private headless sway, an emptied environment and a private HOME, which it fills with a tree's
+# config/ the way home-manager links it and its theme rendered by matugen from the default
+# wallpaper, as dot-theme renders it.
+#
+#   terminals names                      the scenes, one per line
+#   terminals shot TREE NAME MODE PNG    draws scene NAME of TREE (a checkout, or a rev extracted
+#                                        whole) in MODE (dark or light) into PNG
+#
+# The scenes run in Ghostty, but `foot` (foot) and `fuzzel` (the launcher, over the wallpaper).
+# Each shows its tool on fixed content (test/shots/terminal/): a git repo whose commits have fixed
+# dates, a Rust and a Lua file, a few apps. btop shows the machine it runs on, its CPU, memory and
+# network but not its processes, so its shot differs from run to run.
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+fixtures=$here/terminal
+# The terminal's window, in logical pixels: wide enough for two tmux panes of code.
+width=960
+height=600
+# The default wallpaper, as dot-theme's DEFAULT_WALLPAPER.
+wallpaper=shinjuku/kubaos-neon-sign.jpg
+
+die() {
+  echo "terminals: $*" >&2
+  exit 1
+}
+
+names() {
+  printf '%s\n' ghostty foot tmux nvim bat lazygit btop fuzzel
+}
+
+# home TREE MODE: $HOME as home-manager and dot-theme leave it, from TREE's files.
+home() {
+  local tree=$1 mode=$2 app
+  mkdir -p "$HOME/.config" "$HOME/.local/state/theme"
+  for app in ghostty foot tmux nvim btop lazygit bat fuzzel ohmyposh fastfetch matugen; do
+    [[ -d $tree/config/$app ]] && cp -rs "$tree/config/$app" "$HOME/.config/$app"
+  done
+  chmod -R u+w "$HOME/.config"
+  mkdir -p "$HOME/.config/btop/themes"
+  ln -sfn "$HOME/.local/state/theme/btop.theme" "$HOME/.config/btop/themes/matugen.theme"
+  ln -sfn "$tree/branding/fastfetch.txt" "$HOME/.config/fastfetch/kubaos.txt"
+  theme "$tree" "$mode"
+  merged "$tree"
+}
+
+# theme TREE MODE: matugen over the default wallpaper, as dot-theme's run_matugen runs it.
+theme() {
+  local tree=$1 mode=$2 state=$HOME/.local/state/theme
+  ln -sfn "$HOME/.config/ohmyposh/config.toml.tmpl" "$state/.ohmyposh.toml.tmpl"
+  matugen image "$KUBAOS_SHOTS_WALLPAPERS/$wallpaper" -c "$HOME/.config/matugen/config.toml" -m "$mode" \
+    -t scheme-fidelity --source-color-index 0 --continue-on-error -q ||
+    die "matugen failed on $tree"
+}
+
+# merged TREE: the files dot-config merges (fastfetch's), from TREE's dot-config as a switch
+# runs it. A tree whose dot-config has no merge has them linked whole, as its home linked them.
+merged() {
+  local tree=$1 data=$HOME/.local/share/kubaos
+  mkdir -p "$data"
+  ln -sfn "$tree/config" "$data/defaults"
+  ln -sfn "$tree/user-layer" "$data/skel"
+  printf '%s\n' 'app fastfetch terminal/fastfetch' \
+    'json fastfetch/config.jsonc terminal/fastfetch/config.jsonc' >"$data/layer"
+  grep -q 'fastfetch/greeting.jsonc' "$tree/home/links.nix" &&
+    echo 'json fastfetch/greeting.jsonc terminal/fastfetch/greeting.jsonc' >>"$data/layer"
+  rm -f "$HOME/.config/fastfetch/config.jsonc"
+  grep -q 'fastfetch/greeting.jsonc' "$data/layer" && rm -f "$HOME/.config/fastfetch/greeting.jsonc"
+  bash "$tree/scripts/dot-config" apply >/dev/null
+}
+
+# window: sway's rule for the terminal's window, before it maps: floating, $width × $height, at the
+# top left. The wallpaper behind it is blurred and dimmed, roughly as Hyprland draws it.
+window() {
+  local ipc
+  ipc=$(echo "$XDG_RUNTIME_DIR"/sway-ipc.*.sock)
+  magick "$KUBAOS_SHOTS_WALLPAPERS/$wallpaper" -resize 1600x1000^ -gravity center -extent 1600x1000 \
+    -blur 0x24 -modulate 80 "$HOME/backdrop.png"
+  swaymsg -s "$ipc" "output * bg $HOME/backdrop.png fill" >/dev/null
+  swaymsg -s "$ipc" "for_window [app_id=\".*\"] resize set $width $height" >/dev/null
+  swaymsg -s "$ipc" "for_window [app_id=\".*\"] move position 0 0" >/dev/null
+}
+
+# settle PNG GEOMETRY: grabs GEOMETRY into PNG until two grabs in a row are the same, or for 20 s
+# (btop never stops drawing).
+settle() {
+  local png=$1 geometry=$2 last="" now
+  sleep 2
+  for _ in $(seq 40); do
+    grim -g "$geometry" "$png"
+    now=$(sha256sum <"$png")
+    [[ $now == "$last" ]] && return 0
+    last=$now
+    sleep 0.5
+  done
+}
+
+# The commands each scene's terminal runs.
+
+# prompt DIR [STATUS]: oh-my-posh's prompt in DIR, as zsh draws it from dot-theme's config.
+prompt() {
+  local config=$HOME/.local/state/theme/ohmyposh.toml
+  [[ -r $config ]] || config=$HOME/.config/ohmyposh/config.toml
+  oh-my-posh print primary --config "$config" --shell elvish --pwd "$1" --status "${2:-0}" \
+    --terminal-width "$(tput cols)"
+}
+
+# The greeting a new window opens with, on fixed facts, then a prompt, a command and the 16
+# colours.
+shell_scene() {
+  local repo=$1 greeting=$HOME/.config/fastfetch/greeting.jsonc
+  clear
+  python3 -I "$fixtures/greeting.py" "$greeting" >"$HOME/greeting.jsonc"
+  fastfetch --config "$HOME/greeting.jsonc"
+  prompt "$repo"
+  echo "palette"
+  for row in 0 8; do
+    # Each number in the colour that stands out on its swatch: black's in bright white.
+    for i in $(seq "$row" $((row + 7))); do
+      printf '\e[48;5;%dm\e[38;5;%dm %2d \e[0m ' "$i" "$((i == 0 ? 15 : 0))" "$i"
+    done
+    echo
+  done
+  for i in $(seq 0 15); do printf '\e[38;5;%dmAa%-2d\e[0m ' "$i" "$i"; done
+  printf '\n\e[2mdim\e[0m \e[1mbold\e[0m \e[3mitalic\e[0m \e[4munderline\e[0m '
+  printf '\e]8;;https://kubaos.dev\e\\a link\e]8;;\e\\\n\n'
+  prompt "$repo" 1
+  sleep infinity
+}
+
+tmux_scene() {
+  local repo=$1 tmux=(tmux -L shots -f "$HOME/.config/tmux/tmux.conf")
+  # HAZARD: tmux's sockets go in /tmp/tmux-<uid> otherwise, the desktop's own tmux's directory.
+  export TMUX_TMPDIR=$XDG_RUNTIME_DIR
+  "${tmux[@]}" new-session -d -s kubaos -n code -x "$(tput cols)" -y "$(tput lines)" -c "$repo" \
+    "bash $here/terminals pane bat $repo"
+  "${tmux[@]}" split-window -h -l 40% -t kubaos:1 -c "$repo" "bash $here/terminals pane log $repo"
+  "${tmux[@]}" new-window -d -t kubaos -n logs -c "$repo"
+  "${tmux[@]}" select-pane -t kubaos:1.1
+  exec "${tmux[@]}" attach -t kubaos
+}
+
+# pane WHAT REPO: one of tmux's panes: a file or the log, then a prompt.
+pane() {
+  local what=$1 repo=$2
+  cd "$repo"
+  case $what in
+  bat) bat --paging=never --wrap=never --color=always --terminal-width "$(tput cols)" src/main.rs | head -n 24 ;;
+  log) git log --graph --format='%C(auto)%h%d %s' --color=always | cut -c 1-80 ;;
+  esac
+  prompt "$repo"
+  sleep infinity
+}
+
+nvim_scene() {
+  local repo=$1
+  cd "$repo"
+  exec nvim --clean -u "$fixtures/init.lua" src/theme.lua
+}
+
+bat_scene() {
+  local repo=$1
+  cd "$repo"
+  clear
+  prompt "$repo"
+  echo "bat src/main.rs"
+  bat --paging=never --color=always src/main.rs
+  prompt "$repo"
+  sleep infinity
+}
+
+lazygit_scene() {
+  local repo=$1 config=$HOME/.config/lazygit/config.yml
+  local theme=$HOME/.local/state/theme/lazygit.yml
+  [[ -r $theme ]] && config+=,$theme
+  LG_CONFIG_FILE=$config,$fixtures/lazygit.yml exec lazygit -p "$repo"
+}
+
+# btop's second preset (config/btop/btop.conf): CPU, memory and network, no processes.
+btop_scene() {
+  exec btop --preset 2
+}
+
+# The fixture repo: a few commits on fixed dates, a branch, and changes, staged and not.
+repo() {
+  local repo=$HOME/Projects/kubaos
+  export GIT_AUTHOR_NAME="Kuba" GIT_AUTHOR_EMAIL="kuba@example.com"
+  export GIT_COMMITTER_NAME="Kuba" GIT_COMMITTER_EMAIL="kuba@example.com"
+  mkdir -p "$repo/src"
+  cd "$repo"
+  git init -q -b main
+  local n=0 message
+  while read -r message; do
+    n=$((n + 1))
+    export GIT_AUTHOR_DATE="2026-10-2${n}T21:47:00Z" GIT_COMMITTER_DATE="2026-10-2${n}T21:47:00Z"
+    printf '%s\n' "$message" >>notes.txt
+    git add notes.txt
+    git commit -q -m "$message"
+    [[ $n == 2 ]] && git branch -q feature/terminal-tokens
+  done <<'EOF'
+feat: a Suite installs its packages
+fix(kobo): the done screen's hanko lands once
+docs(design): the terminals take the tokens
+feat(terminals): Ghostty and foot share one palette
+EOF
+  cp "$fixtures/main.rs" "$fixtures/theme.lua" src/
+  git add src/main.rs
+  printf 'one more line\n' >>notes.txt
+  printf '%s\n' "$repo"
+}
+
+shot() {
+  local tree=$1 name=$2 mode=$3 png=$4 repo
+  export TERMINFO_DIRS=$KUBAOS_SHOTS_TERMINFO
+  home "$tree" "$mode"
+  repo=$(repo)
+  window
+  local scene=(bash "$here/terminals" scene "$name" "$repo")
+  case $name in
+  foot) foot --override=cursor.blink=no "${scene[@]}" >"$HOME/app.log" 2>&1 & ;;
+  fuzzel) fuzzel_shot "$png" && return ;;
+  *) ghostty --gtk-single-instance=false --cursor-style-blink=false --quit-after-last-window-closed=true \
+    -e "${scene[@]}" >"$HOME/app.log" 2>&1 & ;;
+  esac
+  settle "$png" "0,0 ${width}x${height}"
+}
+
+# fuzzel_shot PNG: the launcher over the wallpaper, listing the fixture's apps.
+fuzzel_shot() {
+  XDG_DATA_DIRS=$fixtures fuzzel >"$HOME/app.log" 2>&1 &
+  settle "$1" "480,200 640x600"
+}
+
+case ${1:-} in
+names) names ;;
+shot)
+  (($# == 5)) || die "usage: terminals shot TREE NAME MODE PNG"
+  shot "${@:2}"
+  ;;
+scene)
+  case $2 in
+  ghostty | foot) shell_scene "$3" ;;
+  tmux | nvim | bat | lazygit | btop) "$2_scene" "$3" ;;
+  *) die "no scene $2" ;;
+  esac
+  ;;
+pane) pane "$2" "$3" ;;
+*) die "usage: terminals names | terminals shot TREE NAME MODE PNG" ;;
+esac
