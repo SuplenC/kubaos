@@ -373,7 +373,8 @@ pub struct Terminal {
     pub padding_y: u16,
     /// The window's background's opacity, by its name in `[opacity]`.
     pub opacity: String,
-    /// HSL lightness points a bright ANSI colour stands further from the surface than its normal one.
+    /// HSL lightness points a bright ANSI colour stands further from the surface than its normal
+    /// one.
     pub bright: u8,
     /// HSL lightness points ANSI 8 stands closer to the surface than ANSI 7.
     pub dim: u8,

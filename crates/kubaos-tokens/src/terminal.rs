@@ -297,7 +297,12 @@ fn ansi(tokens: &Tokens) -> [Colour<'_>; 16] {
 /// What the TUIs read by name: every colour role, the six hues, and `dim`, ANSI 8's dim text.
 fn named(tokens: &Tokens) -> Vec<(&str, Colour<'_>)> {
     let roles = tokens.color.source.keys().map(|name| (name.as_str(), role(name)));
-    let hues = tokens.terminal.hues.ansi().into_iter().map(|(name, _)| (name, hue(name)));
+    let hues = tokens
+        .terminal
+        .hues
+        .ansi()
+        .into_iter()
+        .map(|(name, _)| (name, hue(name)));
     let dim = ansi(tokens)[8];
     roles.chain(hues).chain([("dim", dim)]).collect()
 }
@@ -352,7 +357,10 @@ fn header(comment: &str, what: &str) -> String {
 fn cell_stretch(style: &TypeStyle, root: &Path) -> io::Result<u32> {
     let font = fs::read(root.join(MONO_FONT))?;
     let (units, height) = font_line(&font).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, format!("{MONO_FONT} has no head or hhea table"))
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("{MONO_FONT} has no head or hhea table"),
+        )
     })?;
     let natural = f32::from(style.size) * f32::from(height) / f32::from(units);
     let stretch = (f32::from(style.line) / natural - 1.0) * 100.0;
@@ -406,7 +414,9 @@ fn ghostty_settings(tokens: &Tokens, root: &Path) -> io::Result<String> {
     let _ = writeln!(out, "window-padding-y = {}", points(terminal.padding_y));
     let _ = writeln!(out, "background-opacity = {}", opacity(tokens, &terminal.opacity));
     out.push('\n');
-    ghostty_palette(tokens, &mut out, |colour| spelled(fallback(tokens, colour, true), Form::Hex));
+    ghostty_palette(tokens, &mut out, |colour| {
+        spelled(fallback(tokens, colour, true), Form::Hex)
+    });
     Ok(out)
 }
 
@@ -460,7 +470,9 @@ fn foot_settings(tokens: &Tokens) -> String {
     let _ = writeln!(out, "pad={}x{} center", terminal.padding_x, terminal.padding_y);
     out.push('\n');
     out.push_str("[colors]\n");
-    foot_palette(tokens, &mut out, |colour| spelled(fallback(tokens, colour, true), Form::Bare));
+    foot_palette(tokens, &mut out, |colour| {
+        spelled(fallback(tokens, colour, true), Form::Bare)
+    });
     out
 }
 
@@ -522,7 +534,9 @@ fn tmux_fallback(tokens: &Tokens) -> String {
          the dark fallback palette and the hues' seeds: what config/tmux/tmux.conf draws with \
          until dot-theme has run.",
     );
-    tmux_options(tokens, &mut out, |colour| spelled(fallback(tokens, colour, true), Form::Hex));
+    tmux_options(tokens, &mut out, |colour| {
+        spelled(fallback(tokens, colour, true), Form::Hex)
+    });
     out
 }
 
@@ -556,17 +570,18 @@ fn nvim_template(tokens: &Tokens) -> String {
     out.push_str("  mode = \"{{mode}}\",\n");
     out.push_str("  wallpaper = \"{{image}}\",\n");
     for (name, colour) in named(tokens) {
-        let _ = writeln!(out, "  {name} = \"{}\",", template(tokens, colour, Mode::Current, Form::Hex));
+        let _ = writeln!(
+            out,
+            "  {name} = \"{}\",",
+            template(tokens, colour, Mode::Current, Form::Hex)
+        );
     }
     out.push_str("}\n");
     out
 }
 
 fn fuzzel_settings(tokens: &Tokens) -> String {
-    let body = tokens
-        .types
-        .get("body")
-        .expect("type.body is the launcher's row text");
+    let body = tokens.types.get("body").expect("type.body is the launcher's row text");
     let row = tokens.size.get("row").expect("size.row is a list row's height");
     let padding = tokens
         .container
@@ -574,7 +589,10 @@ fn fuzzel_settings(tokens: &Tokens) -> String {
         .first()
         .expect("container.padding has a padding for the narrowest width");
     let gap = LIST_GAP;
-    assert!(tokens.space.values.contains(&gap), "the launcher's gap is a step of [space]");
+    assert!(
+        tokens.space.values.contains(&gap),
+        "the launcher's gap is a step of [space]"
+    );
     let mut out = header(
         "#",
         "fuzzel's type and shape, as a list in a panel of the shell's: body text in rows a list \
