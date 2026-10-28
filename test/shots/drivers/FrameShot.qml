@@ -13,7 +13,7 @@ import qs.modules.frame
 // notifications (the popups, the peek or the panel), or bar (nothing open). STATE puts the panel
 // in a state, through the services and public properties only, so the driver works with any
 // version of the panel:
-//   controlcenter: "" (Wi-Fi tab), wifi (the Wi-Fi tab),
+//   controlcenter: "" and wifi (the Wi-Fi tab),
 //                  wifi-form (a secured network's form, a password typed), wifi-error (the
 //                  same, the password turned down), wifi-leaving (a network gone out of range
 //                  held half-way out), wifi-scan (a scan's update: a network gone, one new and two
@@ -26,8 +26,9 @@ import qs.modules.frame
 //   sysmon: process (a process's details)
 //   wallpaper: settings
 //   osd: volume, brightness
-//   notifications: "" (two popups), peek (the bell's peek), panel (the notifications panel, a
-//                  stack folded), panel-expanded (the stack open, its second card selected),
+//   notifications: "" (two popups), peek (the bell's peek, every one unread, so "+N more"),
+//                  panel (the notifications panel, a stack folded), panel-expanded (the stack
+//                  open, its second card selected), panel-keys (the keys button's tooltip),
 //                  panel-empty (nothing in it), panel-dnd (Do not disturb on while the screen is
 //                  shared)
 //   bar: traymenu (the network item's menu open), dnd (the bell crossed out), nobell (no
@@ -112,7 +113,7 @@ QtObject {
             driver.keepOsd.start();
         } else if (driver.panel === "notifications" && driver.state.startsWith("panel")) {
             Panels.current = "notifications";
-            if (driver.state === "panel-expanded")
+            if (driver.state === "panel-expanded" || driver.state === "panel-keys")
                 notificationsPose.start();
         } else if (driver.panel === "notifications" && driver.state === "peek") {
             const popups = driver.find(root, it => it.peeking !== undefined && it.hasPeek !== undefined);
@@ -170,6 +171,14 @@ QtObject {
             const panel = driver.find(driver.window.contentItem, it => it.expanded !== undefined && typeof it.setExpanded === "function");
             if (!panel) {
                 console.warn("shot: no notifications panel found");
+                return;
+            }
+            if (driver.state === "panel-keys") {
+                const tooltip = driver.find(driver.window.contentItem, it => it.title === "Keys" && it.shown !== undefined);
+                if (tooltip)
+                    tooltip.shown = true;
+                else
+                    console.warn("shot: no keys tooltip found");
                 return;
             }
             const stack = panel.rows.find(row => row.stacked);
@@ -329,6 +338,9 @@ QtObject {
         // before the frame exists, so no row is made and torn down again.
         if (driver.panel === "controlcenter" && driver.state === "scanning")
             Net.networks = [];
+        // Every one unread, so the peek has more than its three cards.
+        if (driver.panel === "notifications" && driver.state === "peek")
+            Notifs.unread = Notifs.history.slice();
         // Emptied before the frame exists, so no card is made and torn down again.
         if ((driver.panel === "notifications" && driver.state === "panel-empty") || (driver.panel === "bar" && driver.state === "nobell"))
             Notifs.clear();

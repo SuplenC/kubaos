@@ -162,7 +162,7 @@ K.Sheet {
                 root.fold();
             else if (event.key === Qt.Key_Delete)
                 root.dismissCurrent();
-            else if (event.key === Qt.Key_D && !(event.modifiers & Qt.ControlModifier))
+            else if (event.key === Qt.Key_D && event.modifiers === Qt.NoModifier)
                 Notifs.toggleDnd();
             else {
                 event.accepted = list.handleKey(event);

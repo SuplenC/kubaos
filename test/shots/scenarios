@@ -34,9 +34,10 @@ powermenu                powermenu      FrameShot   1160,260,440,480  powermenu
 osd                      osd            FrameShot   560,760,480,240   osd volume
 osd-brightness           osd            FrameShot   560,760,480,240   osd brightness
 notifications            notifications  FrameShot   1120,0,480,420    notifications
-notifications-peek       notifications  FrameShot   1120,0,480,520    notifications peek
+notifications-peek       notifications  FrameShot   1120,0,480,680    notifications peek
 notif-panel              notifications  FrameShot   1176,0,424,1000   notifications panel
 notif-panel-expanded     notifications  FrameShot   1176,0,424,1000   notifications panel-expanded
+notif-panel-keys         notifications  FrameShot   1176,0,424,1000   notifications panel-keys
 notif-panel-empty        notifications  FrameShot   1176,0,424,1000   notifications panel-empty
 notif-panel-dnd          notifications  FrameShot   1176,0,424,1000   notifications panel-dnd
 lock                     lock           LockShot    -

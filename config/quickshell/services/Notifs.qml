@@ -11,8 +11,10 @@ import "dnd.js" as Dnd
 //
 // Do not disturb (`dnd.js`) is on by hand, or by itself while Hyprland says the screen is shared
 // or a window is fullscreen. While it is on, new notifications land in the history without popping
-// up, critical ones apart. Its state is `$XDG_RUNTIME_DIR/kubaos-dnd.json`, which the Command
-// menu's on/off pair reads and a restarted shell takes the hand's on back from.
+// up. Its state is `$XDG_RUNTIME_DIR/kubaos-dnd.json`, which the Command menu's on/off pair reads
+// and a restarted shell takes the hand's on back from. A reload keeps the notifications
+// (`keepOnReload`), and `PersistentProperties` keeps what is unread, when each came and the whole
+// Do not disturb state with them.
 Singleton {
     id: root
 
@@ -33,6 +35,8 @@ Singleton {
     readonly property string dndReason: Dnd.reason(root.dndState)
     // Whether the state file has been read, so nothing writes over it before then.
     property bool dndRead: false
+    // Whether a reload handed the state over, so the file's doesn't replace it.
+    property bool dndKept: false
 
     // When `notification` arrived, or null for one from before this shell started.
     function arrived(notification): var {
@@ -81,17 +85,54 @@ Singleton {
 
     // Runs the default action if there is one, and marks it read. A notification that isn't
     // resident goes as its action is taken.
+    // HAZARD: invoke before anything closes it. Closing a notification destroys it, and a destroyed
+    // one refuses its action; `hidePopup` closes a transient one.
     function activate(notification): void {
         root.markRead([notification]);
-        root.hidePopup(notification);
+        root.popups = root.popups.filter(n => n !== notification);
         const action = notification.actions.find(a => a.identifier === "default");
         if (action)
             action.invoke();
+        else if (notification.transient)
+            notification.expire();
     }
 
     onDndStateChanged: {
+        persisted.dnd = JSON.stringify(root.dndState);
         if (root.dndRead)
             dndFile.setText(Dnd.saved(root.dndState));
+    }
+    onUnreadIdsChanged: persisted.unread = JSON.stringify(root.unreadIds)
+    onArrivalsChanged: {
+        const times = {};
+        for (const id in root.arrivals)
+            times[id] = root.arrivals[id].getTime();
+        persisted.arrivals = JSON.stringify(times);
+    }
+
+    // What the previous generation had, after a reload: the notifications themselves stay with
+    // the server.
+    PersistentProperties {
+        id: persisted
+
+        property string unread: "{}"
+        property string arrivals: "{}"
+        property string dnd: ""
+
+        reloadableId: "notifications"
+        onReloaded: {
+            root.unreadIds = JSON.parse(persisted.unread);
+            const arrivals = {};
+            const times = JSON.parse(persisted.arrivals);
+            for (const id in times)
+                arrivals[id] = new Date(times[id]);
+            root.arrivals = arrivals;
+            if (persisted.dnd !== "") {
+                root.dndState = JSON.parse(persisted.dnd);
+                root.dndKept = true;
+                root.sense();
+            }
+        }
     }
 
     // What Hyprland says now: whether the screen is shared, whether a window is fullscreen.
@@ -120,7 +161,9 @@ Singleton {
         path: `${Quickshell.env("XDG_RUNTIME_DIR")}/kubaos-dnd.json`
         printErrors: false
         onLoaded: {
-            root.dndState = Dnd.restore(text());
+            // A reload's state is the whole one, the file's only the hand's on.
+            if (!root.dndKept)
+                root.dndState = Dnd.restore(text());
             root.dndRead = true;
             root.sense();
             dndFile.setText(Dnd.saved(root.dndState));
@@ -159,7 +202,7 @@ Singleton {
                 delete unread[id];
                 root.unreadIds = unread;
             });
-            if (!root.dnd || notification.urgency === NotificationUrgency.Critical)
+            if (!root.dnd)
                 root.popups = [notification, ...root.popups];
         }
     }

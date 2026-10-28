@@ -52,11 +52,11 @@ function bellShown(count, always) {
     return count > 0 || always;
 }
 
-// The panel's line under its title: why it is silenced, or how many are new. `reason` is
-// `Notifs.dndReason`.
+// The panel's line under its title: why it is silenced, or how many are new; nothing when the
+// panel is empty, whose body says so. `reason` is `Notifs.dndReason`.
 function status(unread, count, reason) {
     const silenced = {
-        manual: "Silenced until you turn it back on",
+        manual: "Silenced until you turn it off",
         sharing: "Silenced while you share your screen",
         fullscreen: "Silenced while a window is fullscreen"
     }[reason];
@@ -64,7 +64,7 @@ function status(unread, count, reason) {
         return silenced;
     if (unread > 0)
         return `${unread} new`;
-    return count > 0 ? "All read" : "Inbox zero";
+    return count > 0 ? "All read" : "";
 }
 
 // The Do not disturb button's name, in its hint: whether it is on and why.

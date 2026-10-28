@@ -20,7 +20,13 @@ Pill {
     interactive: true
     padding: K.Tokens.space.s8
     tooltip: Notifs.unreadCount === 0 ? "No new notifications" : ""
-    onClicked: Panels.toggle("notifications")
+    // The panel takes the peek's place, and closing it doesn't bring the peek back until the
+    // pointer rests on the bell again.
+    onClicked: {
+        root.rested = false;
+        rest.stop();
+        Panels.toggle("notifications");
+    }
     onHoveredChanged: {
         root.rested = false;
         if (root.hovered)

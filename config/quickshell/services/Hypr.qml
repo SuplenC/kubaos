@@ -133,6 +133,16 @@ Singleton {
         }
     }
 
+    // The client list read once more after a burst of `fullscreen` events has settled. Quickshell
+    // drops a read asked for while another is in flight, so the last change of a burst (a window
+    // leaving fullscreen right after entering it) could otherwise be missed until the next one.
+    Timer {
+        id: fullscreenRead
+
+        interval: K.Tokens.duration.short
+        onTriggered: Hyprland.refreshToplevels()
+    }
+
     // The ids Hyprland has renumbered away from (`changeworkspaceid`, which
     // `dot.workspaces.move_to_monitor` causes), as a set. Quickshell (v0.3.2)
     // keys a workspace by the id it first saw and never changes it, so the
@@ -181,6 +191,7 @@ Singleton {
                 root.sharing = event.parse(2)[0] === "1";
             } else if (event.name === "fullscreen") {
                 Hyprland.refreshToplevels();
+                fullscreenRead.restart();
             } else if (event.name === "moveworkspacev2") {
                 const fields = event.parse(3);
                 const next = Object.assign({}, root.movedTo);

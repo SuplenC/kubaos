@@ -67,6 +67,8 @@ K.Pressable {
 
     // Whether something keeps it, as its open menu does: a popup waits while it is held.
     property bool held: false
+    // The pointer is on the card, its buttons included, which take their own hover.
+    readonly property bool pointed: hover.hovered
     // Time left before the popup hides (1 -> 0).
     readonly property real remaining: countdown.remaining
 
@@ -75,7 +77,7 @@ K.Pressable {
     // keeps its unit on its line ("41 s", "20 %"), so a line never ends in a lone number.
     // https://specifications.freedesktop.org/notification-spec/latest/markup.html
     function plain(body: string): string {
-        return body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, "&").replace(/(\d) (?=[A-Za-z%°]{1,3}\b)/g, "$1 ");
+        return body.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, "&").replace(/(\d) (?=[A-Za-z%°]{1,3}\b)/g, "$1\u00a0");
     }
 
     // What a click or Enter does: open the stack where stacks open, else run the newest's main
@@ -103,11 +105,15 @@ K.Pressable {
     signal menuRequested(point at)
     signal expandRequested
 
+    HoverHandler {
+        id: hover
+    }
+
     Countdown {
         id: countdown
 
         running: root.popup && !root.critical
-        held: root.pointerOver || root.held
+        held: root.pointed || root.held
         duration: root.timeout
         onFinished: Notifs.hidePopup(root.notification)
     }
@@ -196,7 +202,7 @@ K.Pressable {
 
         x: root.width - root.band - width
         y: root.band
-        opacity: root.pointerOver || dismiss.pointerOver || root.selected ? 1 : 0
+        opacity: root.pointed || root.selected ? 1 : 0
         enabled: opacity > 0
         icon: "close"
         label: root.stacked ? qsTr("Dismiss all %1").arg(root.items.length) : qsTr("Dismiss")

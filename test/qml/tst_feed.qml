@@ -158,13 +158,13 @@ TestCase {
     function test_the_status_line_says_how_many_are_new() {
         compare(Feed.status(2, 5, ""), "2 new");
         compare(Feed.status(0, 5, ""), "All read");
-        compare(Feed.status(0, 0, ""), "Inbox zero");
+        compare(Feed.status(0, 0, ""), "", "the panel's one quiet line says it, not the header too");
     }
 
     function test_the_status_line_says_why_it_is_silenced() {
         compare(Feed.status(2, 5, "sharing"), "Silenced while you share your screen");
         compare(Feed.status(2, 5, "fullscreen"), "Silenced while a window is fullscreen");
-        compare(Feed.status(2, 5, "manual"), "Silenced until you turn it back on");
+        compare(Feed.status(2, 5, "manual"), "Silenced until you turn it off");
         compare(Feed.status(2, 5, "overridden"), "2 new", "turned off during a share, it isn't silenced");
     }
 

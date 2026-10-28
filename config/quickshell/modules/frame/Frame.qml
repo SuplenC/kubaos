@@ -247,7 +247,8 @@ Scope {
                 id: popups
 
                 frame: geo
-                shown: ((Notifs.popups.length > 0 && Hypr.focusedScreen === root.screen) || popups.hasPeek) && !root.toastCover
+                here: Hypr.focusedScreen === root.screen
+                shown: (popups.hasPopups || popups.hasPeek) && !root.toastCover
                 covered: root.toastCover !== null
                 peeking: root.peekWanted || peekLeave.running
             }

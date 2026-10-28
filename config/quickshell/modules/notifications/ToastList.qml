@@ -14,12 +14,18 @@ ListView {
     required property var notifications
     // The cards on screen now: none while the drawer or the list is faded out.
     readonly property int drawn: drawer.active && drawer.contentOpacity > 0 && opacity > 0 ? count : 0
+    // The card the pointer is on. While it is, it shows alone: the others fade out where they are,
+    // their time stopped, and a new one waits, so nothing moves under the pointer.
+    property var pointed: null
+    // The cards when the pointer came onto one.
+    property var held: []
+    readonly property bool holding: list.pointed !== null && list.notifications.includes(list.pointed)
 
     height: contentHeight
     interactive: false
     spacing: K.Tokens.space.s8
     model: ScriptModel {
-        values: list.notifications
+        values: list.holding ? list.held.filter(n => list.notifications.includes(n)) : list.notifications
     }
 
     add: Transition {
@@ -91,14 +97,45 @@ ListView {
         }
     }
 
-    delegate: NotificationCard {
+    // The card in a box of its own: the transitions above move and fade the box, and the card
+    // fades by itself while another is pointed at.
+    delegate: Item {
+        id: slot
+
         required property var modelData
 
         width: ListView.view.width
-        notification: modelData
-        popup: true
-        held: menu.notification === modelData
-        onMenuRequested: at => menu.open(modelData, at)
+        height: card.implicitHeight
+
+        NotificationCard {
+            id: card
+
+            readonly property bool aside: list.holding && list.pointed !== slot.modelData
+
+            width: slot.width
+            notification: slot.modelData
+            popup: true
+            held: menu.notification === slot.modelData || list.holding
+            enabled: !card.aside
+            opacity: card.aside ? 0 : 1
+            onMenuRequested: at => menu.open(slot.modelData, at)
+            onPointedChanged: {
+                if (card.pointed) {
+                    list.held = list.notifications.slice();
+                    list.pointed = slot.modelData;
+                } else if (list.pointed === slot.modelData) {
+                    list.pointed = null;
+                }
+            }
+
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: K.Tokens.duration.micro
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: K.Tokens.easing.standard
+                }
+            }
+        }
     }
 
     NotificationMenu {

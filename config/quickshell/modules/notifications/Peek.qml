@@ -10,11 +10,23 @@ import "feed.js" as Feed
 Item {
     id: root
 
-    readonly property var peek: Feed.peek(Notifs.history, n => Notifs.isUnread(n))
+    // What there is to show now.
+    readonly property var now: Feed.peek(Notifs.history, n => Notifs.isUnread(n))
+    // What it shows: the last cards it had once there are none, so it closes with them on it
+    // rather than empty.
+    property var peek: ({
+            stacks: [],
+            more: 0
+        })
     readonly property var shown: [].concat(...root.peek.stacks.map(stack => stack.items))
     readonly property bool hovered: hover.hovered
 
     implicitHeight: column.implicitHeight
+    onNowChanged: {
+        if (root.now.stacks.length > 0)
+            root.peek = root.now;
+    }
+    Component.onCompleted: root.peek = root.now
 
     HoverHandler {
         id: hover

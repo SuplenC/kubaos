@@ -117,7 +117,7 @@ modules/
                         ActionPanel, FormView, ProgressView, DetailView, IntroCard, Label (text that
                         changes with every key), words.js (glyphs, kinds, shortcuts),
                         Probe (test-only timing and state lines)
-  controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a Well, history,
+  controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a Well,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)
   notifications/        NotificationPanel, Popups (corner, and the bell's Peek), PopupsBelow (critical, under a panel), ToastList, NotificationCard, feed.js (stacks, New and Earlier, the peek), ToastProbe (tests)
   osd/                  volume / brightness OSD

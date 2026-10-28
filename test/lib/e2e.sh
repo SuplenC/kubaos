@@ -1385,7 +1385,7 @@ c_notifications() {
   # Do not disturb: on by hand, a new one lands in the list with no popup, and the state file
   # the Command menu reads says so.
   in_session 'qs ipc call notifications clear' >/dev/null 2>&1
-  out="$(in_session 'qs ipc call notifications dnd on' 2>&1 || true)"
+  in_session 'qs ipc call notifications dnd on' >/dev/null 2>&1
   sleep 1
   TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
   in_session "notify-send -t 60000 Quiet 'Sent while Do not disturb is on'" >/dev/null 2>&1
