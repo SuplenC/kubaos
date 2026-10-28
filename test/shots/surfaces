@@ -1,23 +1,39 @@
-# What each surface is drawn from, for `shots` without surfaces: a change to a file under any of a
-# surface's paths renders it. One per line, `SURFACE PATH...`; `*` is every shell surface, kobo
-# and specimen are the iced renderers', terminals is test/shots/terminals', and plymouth, grub and
-# cursor are the boot screens' and the pointer's (test/shots/boot). The services are stand-ins
-# (fakes/qs/services), so a change to config/quickshell/services renders nothing.
-*              qml/KubaOS design/tokens.toml crates/kubaos-tokens crates/kubaos-ui/assets/symbols config/quickshell/components config/quickshell/theme test/shots flake.lock
-bar            config/quickshell/modules/bar config/quickshell/modules/frame
-controlcenter  config/quickshell/modules/controlcenter config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar
-clock          config/quickshell/modules/clock config/quickshell/modules/frame config/quickshell/modules/bar
-sysmon         config/quickshell/modules/sysmon config/quickshell/modules/frame config/quickshell/modules/bar
-wallpaper      config/quickshell/modules/wallpaper config/quickshell/modules/clock config/quickshell/modules/frame
-powermenu      config/quickshell/modules/powermenu config/quickshell/modules/frame config/quickshell/modules/bar
-osd            config/quickshell/modules/osd config/quickshell/modules/frame
-notifications  config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar
-lock           config/quickshell/modules/lock
-polkit         config/quickshell/modules/polkit
-menu           config/quickshell/modules/menu
-kobo           crates/kubaos-kobo crates/kubaos-ui crates/kubaos-core design/tokens.toml
-specimen       crates/kubaos-specimen crates/kubaos-ui qml/KubaOS qml/specimen design/tokens.toml
-terminals      config/ghostty config/foot config/tmux config/nvim config/btop config/lazygit config/bat config/fuzzel config/ohmyposh config/fastfetch config/matugen design/tokens.toml crates/kubaos-tokens crates/kubaos-ui/assets/fonts scripts/dot-config test/shots/terminals test/shots/terminal
-plymouth       system/files/plymouth system/files/fonts system/files/initramfs-tools test/shots/boot design/tokens.toml
-grub           system/files/grub system/files/fonts test/shots/boot design/tokens.toml
-cursor         crates/kubaos-cursor crates/kubaos-cli/src/cursor.rs test/shots/boot design/tokens.toml
+# What each surface is drawn from, for `shots` without surfaces: a change renders the surfaces of
+# the lines that list its most specific match. One per line, `SURFACE PATH...`, a path being a file
+# or a folder. The groups:
+#
+# - `*` is everything: what every surface draws from, or the harness that draws them. A path under
+#   one of its paths is listed nowhere else, or a change there would render less than everything.
+# - `shell` is every shell surface (`scenarios`), `specimen` every page of the specimen.
+#
+# Every surface has a line of its own (`test/shots/shots-test` checks it): the shell's, kobo,
+# terminals (test/shots/terminals), plymouth, grub and cursor (test/shots/boot), and the
+# specimen's pages, `specimen/PAGE` for kubaos-specimen's and `specimen/qml` for qml-specimen's.
+# The shell's services are stand-ins (fakes/qs/services): of config/quickshell/services, only the
+# JavaScript the stand-ins load is drawn.
+*                   design/tokens.toml crates/kubaos-tokens crates/kubaos-ui crates/kubaos-geometry qml/KubaOS/Components Cargo.toml Cargo.lock flake.lock test/shots/shots test/shots/lib.sh test/shots/surfaces test/shots/package.nix
+shell               config/quickshell/components config/quickshell/theme test/shots/scenarios test/shots/stage.py test/shots/drivers test/shots/fakes
+bar                 config/quickshell/modules/bar config/quickshell/modules/frame
+controlcenter       config/quickshell/modules/controlcenter config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar config/quickshell/services/radios.js
+clock               config/quickshell/modules/clock config/quickshell/modules/frame config/quickshell/modules/bar
+sysmon              config/quickshell/modules/sysmon config/quickshell/modules/frame config/quickshell/modules/bar
+wallpaper           config/quickshell/modules/wallpaper config/quickshell/modules/clock config/quickshell/modules/frame
+powermenu           config/quickshell/modules/powermenu config/quickshell/modules/frame config/quickshell/modules/bar
+osd                 config/quickshell/modules/osd config/quickshell/modules/frame
+notifications       config/quickshell/modules/notifications config/quickshell/modules/frame config/quickshell/modules/bar
+lock                config/quickshell/modules/lock
+polkit              config/quickshell/modules/polkit
+menu                config/quickshell/modules/menu
+kobo                crates/kubaos-kobo crates/kubaos-core
+specimen            crates/kubaos-specimen
+specimen/type       crates/kubaos-specimen/src/pages/type_scale.rs
+specimen/colour     crates/kubaos-specimen/src/pages/colour.rs
+specimen/space      crates/kubaos-specimen/src/pages/space.rs
+specimen/components crates/kubaos-specimen/src/pages/components.rs crates/kubaos-specimen/src/pages/components
+specimen/icons      crates/kubaos-specimen/src/pages/icons.rs crates/kubaos-specimen/src/pages/icons
+specimen/motion     crates/kubaos-specimen/src/pages/motion.rs
+specimen/qml        qml/specimen
+terminals           config/ghostty config/foot config/tmux config/nvim config/btop config/lazygit config/bat config/fuzzel config/ohmyposh config/fastfetch config/matugen scripts/dot-config test/shots/terminals test/shots/terminal
+plymouth            system/files/plymouth system/files/fonts system/files/initramfs-tools test/shots/boot/plymouth
+grub                system/files/grub system/files/fonts test/shots/boot/grub
+cursor              crates/kubaos-cursor crates/kubaos-cli/src/cursor.rs test/shots/boot/cursor test/shots/boot/cursor-palette.py test/shots/boot/cursor-sheet.py

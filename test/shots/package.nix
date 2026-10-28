@@ -70,6 +70,7 @@
   swaybg,
   ncurses,
   procps,
+  util-linux,
   wallpapers,
   geist-font,
   colloid-orange,
@@ -181,6 +182,7 @@ let
     swaybg
     ncurses
     procps
+    util-linux
   ];
 in
 writeShellApplication {
