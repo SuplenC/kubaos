@@ -11,9 +11,10 @@
 # - sccache's directory and cargo's downloads, keyed by Cargo.lock and
 #   flake.lock, for the crates' builds. Incremental builds are off, so
 #   sccache caches every crate.
-# A PR reads the caches its base branch saved and its own earlier runs': the
-# run on each push to main saves the ones every new PR starts from. Together
-# they stay under the repository's 10 GB of Actions cache.
+# Only the run on each push to main saves the two Actions caches, and every PR
+# starts from them: a PR saving its own would push main's out of the
+# repository's 10 GB. The compile cache's key ends in the run, so each push to
+# main saves a newer one and GitHub drops the oldest.
 #
 # Actions are pinned to a commit, with the release in the comment beside it.
 name: Check
@@ -47,9 +48,11 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
           df -h /
 
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      - name: Install Nix
+        uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
         with:
           extra_nix_config: |
             max-jobs = auto
@@ -60,28 +63,32 @@ jobs:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.lock', 'flake.nix', 'qml/specimen/package.nix') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
           gc-max-store-size-linux: 5G
+          save: ${{ github.event_name == 'push' }}
 
       # No auth token: the cache is only read.
-      - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+      - name: Read the kuba-os Cachix
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
           name: kuba-os
           skipPush: true
 
       - name: Restore the compile cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.cache/sccache
             ~/.cargo/registry/index
             ~/.cargo/registry/cache
             ~/.cargo/git/db
-          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}
-          restore-keys: cargo-${{ runner.os }}-
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-${{ github.run_id }}
+          restore-keys: |
+            cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-
+            cargo-${{ runner.os }}-
 
       - name: Flake check
         run: nix flake check --no-build
 
-      - name: Devshell
+      - name: Build the devshell
         run: nix develop --command true
 
       - name: Format
@@ -99,3 +106,14 @@ jobs:
       - name: Compile cache stats
         if: ${{ !cancelled() }}
         run: nix develop --command sccache --show-stats
+
+      - name: Save the compile cache
+        if: ${{ github.event_name == 'push' && !cancelled() }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/sccache
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'flake.lock') }}-${{ github.run_id }}
