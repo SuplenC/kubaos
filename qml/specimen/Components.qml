@@ -652,7 +652,7 @@ K.Stack {
 
                 K.Section {
                     title: "Icon tiles and badges"
-                    description: "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small and regular, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."
+                    description: "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."
 
                     K.Row {
                         gap: K.Tokens.space.s24
@@ -665,6 +665,11 @@ K.Stack {
 
                         K.IconTile {
                             icon: "terminal"
+                        }
+
+                        K.IconTile {
+                            icon: "terminal"
+                            size: "Lg"
                         }
 
                         K.IconTile {
@@ -827,6 +832,28 @@ K.Stack {
                                 checkable: true
                                 checked: true
                                 selected: true
+                            }
+                        }
+
+                        K.List {
+                            K.ListRow {
+                                title: "Shinjuku-5G"
+                                subtitle: "Connected · 5 GHz"
+                                subtitleIcon: "lock"
+                                icon: "signal_wifi_4_bar"
+                                tile: true
+                                accent: true
+                                checkable: true
+                                checked: true
+                            }
+
+                            K.ListRow {
+                                title: "Omoide Yokocho"
+                                subtitle: "Secured"
+                                subtitleIcon: "lock"
+                                icon: "network_wifi_2_bar"
+                                tile: true
+                                checkable: true
                             }
                         }
                     }

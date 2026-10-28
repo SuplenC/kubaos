@@ -70,6 +70,8 @@ enum Face {
 pub struct ListRow<'a, M> {
     title: String,
     subtitle: Option<String>,
+    /// A symbol before the subtitle: a fact about it at a glance (secured, the battery).
+    subtitle_icon: Option<Icon>,
     detail: Option<String>,
     icon: Option<Icon>,
     face: Face,
@@ -87,6 +89,7 @@ pub fn list_row<'a, M>(title: impl Into<String>) -> ListRow<'a, M> {
     ListRow {
         title: title.into(),
         subtitle: None,
+        subtitle_icon: None,
         detail: None,
         icon: None,
         face: Face::Bare,
@@ -105,6 +108,16 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
     pub fn subtitle(self, subtitle: impl Into<String>) -> Self {
         ListRow {
             subtitle: Some(subtitle.into()),
+            ..self
+        }
+    }
+
+    /// A symbol before the subtitle, the subtitle's 16, 4 from its words: a fact about it at a
+    /// glance (a lock on a secured network, a device's battery).
+    #[must_use]
+    pub fn subtitle_icon(self, glyph: Icon) -> Self {
+        ListRow {
+            subtitle_icon: Some(glyph),
             ..self
         }
     }
@@ -229,8 +242,20 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         let mut words = stack(look, Space::S4)
             .width(Extent::Fill)
             .push(line(self.title, Type::BodyStrong, main));
-        if let Some(subtitle) = self.subtitle {
-            words = words.push(line(subtitle, Type::Small, muted));
+        match (self.subtitle, self.subtitle_icon) {
+            (Some(subtitle), Some(glyph)) => {
+                let lead = icon(look, glyph, Type::Small.icon(), muted);
+                let words_after = line(subtitle, Type::Small, muted);
+                words = words.push(
+                    row(look, Space::S4)
+                        .center()
+                        .width(Extent::Fill)
+                        .push(lead)
+                        .push(words_after),
+                );
+            }
+            (Some(subtitle), None) => words = words.push(line(subtitle, Type::Small, muted)),
+            (None, _) => {}
         }
         // Each part centred on the row's whole height, on a whole device pixel, so a chip that
         // makes one row's parts taller moves none of the others: the title sits where every row's

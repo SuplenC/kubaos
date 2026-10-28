@@ -13,6 +13,9 @@ K.Pressable {
 
     property string title
     property string subtitle
+    // A symbol before the subtitle, the subtitle's 16, 4 from its words: a fact about it at a
+    // glance (a lock on a secured network, a device's battery).
+    property string subtitleIcon: ""
     // A short fact at the row's end, in mono: a device path, a size, a code.
     property string detail
     // Chips near the row's end, as `{ kind, text }`: facts that matter at a glance (Default).
@@ -105,11 +108,32 @@ K.Pressable {
             }
 
             K.Text {
-                visible: root.subtitle !== ""
+                visible: root.subtitle !== "" && root.subtitleIcon === ""
                 text: root.subtitle
                 style: Tokens.type.small
                 maximumLines: 1
                 color: root.muted
+            }
+
+            // The subtitle after its symbol, as iced's row of the two.
+            K.Row {
+                visible: root.subtitle !== "" && root.subtitleIcon !== ""
+                fill: true
+                gap: Tokens.space.s4
+                align: "centre"
+
+                K.Icon {
+                    name: root.subtitleIcon
+                    size: Tokens.type.small.icon
+                    color: root.muted
+                }
+
+                K.Text {
+                    text: root.subtitle
+                    style: Tokens.type.small
+                    maximumLines: 1
+                    color: root.muted
+                }
             }
         }
 
