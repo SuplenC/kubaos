@@ -254,6 +254,7 @@ A Project pin is a line in a folder's `.envrc`, `use suite <name> <version>` (`d
   - `keyboard.mac-accents`: `mac_accents` in `U/desktop/keyboard/keyboard.toml`, its default without the file.
   - `power.panel-power-saving` (true or false), `power.scheduler` (`kernel` or `lavd`) and `power.low-battery` (`power-saver`, `super-saver` or `off`): `U/desktop/power/power.toml`, with its defaults.
   - `idle.keep-awake`: `active` in `$XDG_RUNTIME_DIR/kubaos-keep-awake.json`, off without it. `proxy`: `wanted` in `$XDG_RUNTIME_DIR/kubaos-proxy.json`.
+  - `notifications.dnd`: `on` in `$XDG_RUNTIME_DIR/kubaos-dnd.json`, which the shell writes at its start and on every change (`config/quickshell/services/Notifs.qml`), unknown without it.
 - **Ranking.** Kotodama ranks an Item whose keyword equals the query with the exact titles, above an Item whose title has the query as a word, as an installed app's does; on an equal match an app ranks before an action. So an action about an app (installing or removing it) leaves the app's name out of its keywords, and a `confirm` action never has words of its own title as a keyword: typing "chrome" lists the Google Chrome app before "Remove Google Chrome". A test over `kubaos.toml` holds both.
 
 ## Theme pipeline
@@ -321,7 +322,9 @@ Quickshell config lives in `config/quickshell/` with `shell.qml` at its root (th
 | `qs ipc call wallpaper animate <always\|ac\|never>` | Wallpaper motion mode, remembered in `~/.local/state/quickshell/kubaos.json` (default `Settings.wallpaperAnimate`, `ac`) |
 | `qs ipc call wallpaper settings` | Wallpaper picker on its Settings tab |
 | `qs ipc call wallpaper status` | JSON: `wallpaper`, `video`, `mode`, `allowed`, `onBattery`, `screensOff`, `playing` (screen name -> video path) |
-| `qs ipc call notifications toggleDnd` / `clear` | Do not disturb, clear all |
+| `qs ipc call notifications toggle` / `open` | The notifications panel (`SUPER+N`, "Notifications" in the Command menu) |
+| `qs ipc call notifications toggleDnd` / `dnd <on\|off>` / `clear` | Do not disturb on or off (during a share or a fullscreen window, off holds until it ends), clear all |
+| `qs ipc call notifications status` | JSON: `count`, `unread`, `dnd`, `reason` (`manual`, `sharing`, `fullscreen`, `overridden` or empty), `open` |
 | `qs ipc call controlcenter toggle` | Wi-Fi, Bluetooth, audio, power profile panel |
 | `qs ipc call controlcenter wifi` | The control center on its Wi-Fi tab, which scans while it shows ("Wi-Fi networks" in the Command menu) |
 | `qs ipc call controlcenter bluetooth` | The control center on its Bluetooth tab, which scans for devices while it shows ("Pair a Bluetooth device" in the Command menu) |
@@ -336,6 +339,8 @@ Quickshell config lives in `config/quickshell/` with `shell.qml` at its root (th
 | `qs ipc call sysmon pill <on\|off\|toggle>` | The bar's monitor pill, through `kubaos-sysmon`'s `set`, so it lands in `sysmon.toml` |
 | `qs ipc call sysmon act <action>` | What an alert's button runs: `open`, `process:<pid>`, `files:<mount>` (`xdg-open`), `power-saver` (the Power Saver stop, `kubaos-power set power-saver`) |
 | `qs ipc call sysmon status` | JSON: `available`, `open`, `mode` (`pill`, `popup` or `paused`), `pill`, `metrics`, `problem`, `sample`, `detail`, `cpu`, `ram` |
+
+Do not disturb (`services/Notifs.qml`, `services/dnd.js`): on by hand until turned off, or by itself while Hyprland says the screen is shared (its last `screencast` event, `1` or `0`) or a window on a shown workspace is really fullscreen (the client list's `fullscreen` mode 2, read again on each `fullscreen` event; a maximised window is mode 1 and doesn't count). Turned off during a share or a fullscreen window, it stays off until every reason has ended. While it is on, new notifications go to the panel without a popup, critical ones apart. Its state is `$XDG_RUNTIME_DIR/kubaos-dnd.json`, `{"on", "manual", "reason"}`, written at the shell's start and on every change; a restarted shell takes `manual` back from it. A notification is unread until it is opened, marked read, or listed in the notifications panel when that closes; the bar's bell shows while there is one, or always with `alwaysShowBell` in `U/desktop/quickshell/settings.json`.
 
 Moving wallpapers (`services/Motion.qml`): a video decodes on a screen only when the mode allows it (`always`, or `ac` and UPower says not on battery), the session isn't locked, there has been input within `Settings.screenOffAfter` seconds (600, hypridle's DPMS timeout), and that monitor's active workspace has no fullscreen window. Otherwise the poster shows and the decoder is released. The lock screen plays the wallpaper if it's a video, else `Settings.lockLoop` (`""`, the blurred still), under the same rules minus the lock. One decoder per screen.
 

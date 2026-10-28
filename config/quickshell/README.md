@@ -15,10 +15,11 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
   |---|---|
   | Command menu (Kotodama) | Its own window on the focused screen, centred, with two fifths of the free height above it. Its width and rows follow the screen; on screens at least 1472 logical pixels wide it has a detail pane |
   | Control center | Side sheet on the right |
+  | Notifications panel | Side sheet on the right, in the control center's place; one or the other |
   | Power menu | Column on the right edge |
   | Wallpaper picker | Rises from the bottom |
   | OSD | Small bar rising from the bottom |
-  | Notifications | Top-right corner. While a panel reaching into that corner is open (control center, system monitor, power menu, or the clock popup or wallpaper picker on a narrow screen), they wait and come back when it closes; a critical one shows out of the right edge under the panel, or waits too if the panel reaches the bottom |
+  | Notification popups and the bell's peek | Top-right corner. While a panel reaching into that corner is open (control center, notifications panel, system monitor, power menu, or the clock popup or wallpaper picker on a narrow screen), they wait and come back when it closes; a critical one shows out of the right edge under the panel, or waits too if the panel reaches the bottom |
   | Clock popup | Under the bar's clock |
   | System monitor | Under the bar's right end, by its pill |
 
@@ -51,9 +52,10 @@ Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`hom
 | `qs ipc call wallpaper settings` | Wallpaper picker on its Settings tab (Motion) |
 | `qs ipc call wallpaper animate <always\|ac\|never>` | Wallpaper motion, remembered across restarts |
 | `qs ipc call wallpaper status` | What's shown, which screens play a video (JSON) |
-| `qs ipc call notifications toggleDnd` | Do not disturb on/off |
+| `qs ipc call notifications toggle` | The notifications panel (SUPER+N) |
+| `qs ipc call notifications toggleDnd` / `dnd on\|off` | Do not disturb on/off |
 | `qs ipc call notifications clear` | Dismiss all notifications |
-| `qs ipc call controlcenter toggle` | Wi-Fi, Bluetooth, audio, power profile, notification history |
+| `qs ipc call controlcenter toggle` | Wi-Fi, Bluetooth, audio, power profile |
 | `qs ipc call controlcenter bluetooth` | The control center on its Bluetooth tab, searching for devices |
 | `qs ipc call controlcenter keyboard` | The control center on its Keyboard tab |
 | `qs ipc call recorder toggle` / `stop` | Record the focused monitor / stop any recording or replay (`dot-hypr-record`) |
@@ -82,7 +84,7 @@ services/               singletons, no UI
   Battery               UPower battery
   Power                 the power stops, from kubaos-power's file (power-profiles-daemon's profile without it)
   Net, Bt               NetworkManager and BlueZ via Quickshell.Networking / .Bluetooth, pairing through kubaos-bluetooth
-  Notifs                notification server, popups, history, DND
+  Notifs                notification server, popups, history, unread, DND (dnd.js)
   Wallpapers            current wallpaper, picker preview, folder listing (stills, videos, posters), `dot-theme set`
   Motion                when moving wallpapers may decode: always / on AC / never (persisted), lock, idle, fullscreen
   Hypr                  focused screen, each screen's block of workspaces, workspace switching
@@ -104,10 +106,11 @@ components/             blocks composed from KubaOS.Components
   BadgedIcon            a bar symbol with a K.Badge on its corner
   SkeletonRow           a two-line list row still being found, as K.Skeletons
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
+  Countdown             a popup's time left, stopped while the pointer is on it
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)
-  bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, SysmonPill, Status, RecordingIndicator,
+  bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, SysmonPill, Bell, Status, RecordingIndicator,
                         IdleIndicator
   menu/                 Menu: the Command menu on KotodamaSearch, built from KubaOS.Components (its
                         sizes for the screen, its motion). ResultRow, DetailPane + PaneContent,
@@ -116,7 +119,7 @@ modules/
                         Probe (test-only timing and state lines)
   controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a Well, history,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)
-  notifications/        Popups (corner), PopupsBelow (critical, under a panel), ToastList, NotificationCard, ToastProbe (tests)
+  notifications/        NotificationPanel, Popups (corner, and the bell's Peek), PopupsBelow (critical, under a panel), ToastList, NotificationCard, feed.js (stacks, New and Earlier, the peek), ToastProbe (tests)
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu
@@ -150,7 +153,8 @@ Imports use Quickshell's module paths: `import qs.services`, `import qs.componen
 Every panel works without a mouse. Esc closes it.
 
 - Command menu (SUPER + Space, `kotodama toggle`): type to search apps, projects, scripts and windows, Up/Down to move, Enter to run. A sum typed is answered in the list; Enter copies the answer. SUPER + F1 opens it on the Shortcuts View. Ctrl+K opens the selected row's Actions, Tab enters an app, Esc steps back (the Action panel, a View, the query, then closed), Backspace with nothing typed leaves an app. Wide screens show the selected row in a detail pane: its Actions with their keys, and its hints. `"menuMotion": "fades"` in `~/.config/kubaos/desktop/quickshell/settings.json` turns its motion down to fades. Its config is `config/kotodama/kubaos.toml`, with your changes in `~/.config/kubaos/menu/kotodama/user.toml`.
-- Control center: Tab/Shift+Tab move between controls, Enter/Space toggle a tile, h/l or arrows move sliders and tabs, 1-4 jump to a tab, j/k move in lists, Delete dismisses a notification.
+- Control center: Tab/Shift+Tab move between controls, Enter/Space toggle a tile, h/l or arrows move sliders and tabs, 1-4 jump to a tab, j/k move in lists.
+- Notifications panel: ↑↓ (j/k) move, Enter opens, → (l) opens a stack and ← (h) folds it, Delete dismisses, D turns Do not disturb on or off, Esc closes.
 - Clock popup (click the bar's clock): type a date or date maths to search, Enter copies the answer, Ctrl+Enter copies it as ISO. With nothing typed, Left/Right or the wheel change month and T goes to today; clicking the month name opens the year view. Esc leaves the settings page or the year view, then closes.
 - System monitor (click the bar's monitor pill, right-click it to hide it): click a process for its details, then End or Kill and confirm. Esc closes.
 - Power menu: h/j/k/l, arrows or Tab, then Enter.
