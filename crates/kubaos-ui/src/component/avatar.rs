@@ -98,7 +98,8 @@ pub struct IconTile {
     danger: bool,
 }
 
-/// A `size` tile showing `glyph` on the secondary container: an Item's symbol, or the placeholder
+/// A `size` tile showing `glyph` on the highest container, which reads on a list, a card and a
+/// selected row alike: an Item's symbol, or the placeholder
 /// a row shows where it has no picture of its own.
 #[must_use]
 pub fn icon_tile(glyph: Icon, size: TileSize) -> IconTile {
@@ -141,7 +142,7 @@ impl IconTile {
         let (tint, ink) = if self.danger {
             (c.error, c.on_error)
         } else {
-            (c.secondary_container, c.on_secondary_container)
+            (c.surface_container_highest, c.on_surface_variant)
         };
         let side = f32::from(self.size.side().px());
         let glyph = f32::from(self.size.icon().px());

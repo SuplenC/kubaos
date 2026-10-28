@@ -48,6 +48,7 @@ Item {
         bone: "block"
         radius: root.radius
         reported: false
+        loading: picture.status === Image.Loading
         visible: !root.ready
     }
 
