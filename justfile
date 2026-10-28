@@ -44,9 +44,11 @@ release: test
     ls -lh iso/kubaos-{{codename}}-{{ver}}-*.iso
 
 # What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests and the design checks.
-check: fmt-check lint
+check: fmt-check lint nextest design-check
+
+# The workspace's tests, with nextest.
+nextest:
     cargo nextest run --workspace
-    just design-check
 
 # Format the workspace with the nightly rustfmt and rustfmt.toml (`nix develop` has it; outside, point RUSTFMT at a nightly rustfmt), then turn the `use foo::{self};` it writes into `use foo;` (scripts/self-imports) and sort again.
 fmt: _nightly-rustfmt
