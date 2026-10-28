@@ -157,6 +157,8 @@ Item {
             tile: true
             title: model.title ?? ""
             subtitle: row.spelling
+            // The check's room, kept for the + so a long name ends before it.
+            checkable: true
             selected: ListView.isCurrentItem
             onActivated: {
                 ListView.view.currentIndex = row.index;

@@ -62,6 +62,15 @@ fn our_drawings_are_the_five_tabler_lacks() {
         .map(Icon::name)
         .collect();
 
-    assert_eq!(ours, ["bluetooth_searching", "hard_drive", "star_filled", "wifi_find", "wifi_lock"]);
+    assert_eq!(
+        ours,
+        [
+            "bluetooth_searching",
+            "hard_drive",
+            "star_filled",
+            "wifi_find",
+            "wifi_lock"
+        ]
+    );
     assert!((GRID - 24.0).abs() < f32::EPSILON);
 }

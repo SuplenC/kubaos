@@ -2,10 +2,10 @@ import QtQuick
 import KubaOS.Components as K
 
 // One row of a list: `kubaos-ui`'s `list::list_row`. 44 tall with one line, 56 with a subtitle;
-// 12 inside, a 20 icon (24 beside two lines) or the icon on an icon tile (`tile`), the title in `body_strong`, the subtitle in
-// `small`, chips and a detail in `mono` at the end, and an optional check whose room is kept when
-// unchecked, so the rows' ends line up. Each part is centred on the row's whole height, so a chip
-// moves nothing else.
+// 12 inside, a 20 icon (24 beside two lines) or the icon on an icon tile (`tile`), the title in
+// `body_strong`, the subtitle in `small`, chips and a detail in `mono` at the end, and an optional
+// check whose room is kept when unchecked, so the rows' ends line up. Each part is centred on the
+// row's whole height, so a chip moves nothing else.
 // Its corners are concentric inside the list's well. The selected row takes the secondary
 // container, or the error colour on a row whose action can't be taken back (`danger`).
 K.Pressable {

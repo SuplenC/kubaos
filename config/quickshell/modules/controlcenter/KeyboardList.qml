@@ -46,6 +46,9 @@ Item {
     property int dragFrom: -1
     property real dragOffset: 0
     property int dropAt: -1
+    // The layout typed with while a move waits for Hyprland's reload: Hyprland's index of it
+    // (`Keyboard.active`) is the old order's until then. Empty while none waits.
+    property string typing: ""
     // The Mac accents tooltip shown whatever the pointer does: the screenshots' view of it.
     property bool explaining: false
 
@@ -77,6 +80,8 @@ Item {
         if (busy || from === to || from < 0 || to < 0 || from >= layouts.length || to >= layouts.length)
             return;
         const spelling = layouts[from];
+        if (typing === "")
+            typing = layouts[Keyboard.active] ?? "";
         change(["move", spelling, String(to + 1)]);
         const order = layouts.slice();
         order.splice(from, 1);
@@ -90,6 +95,13 @@ Item {
     function landing(from: int, dy: real): int {
         const pitch = K.Tokens.size.row_two_line + list.spacing;
         return Math.max(0, Math.min(layouts.length - 1, from + Math.round(dy / pitch)));
+    }
+
+    // Types with the layout at `index` of the list. Hyprland counts its layouts in its own
+    // order, which is the old one while a move waits for its reload, so it waits too.
+    function typeWith(index: int): void {
+        if (!busy && typing === "")
+            Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)]);
     }
 
     function startAdding(): void {
@@ -129,6 +141,9 @@ Item {
         probe(`adding ${adding}`);
     }
     onLayoutsChanged: settle.restart()
+    // The dragged row is the focused one, the toolbar's.
+    onDragFromChanged: if (dragFrom >= 0)
+        list.currentIndex = dragFrom
 
     Timer {
         id: settle
@@ -174,6 +189,7 @@ Item {
         target: Keyboard
 
         function onLayoutsChanged(): void {
+            root.typing = "";
             show.running = true;
             accentsRead.running = true;
         }
@@ -232,6 +248,9 @@ Item {
                 if (code < 0 || !streamed)
                     return;
                 root.problem = code === 0 ? "" : root.sentence(errors.text);
+                // Refused, the move never reaches Hyprland, whose order stays the one it counts in.
+                if (code !== 0)
+                    root.typing = "";
                 root.busy = false;
                 show.running = true;
                 accentsRead.running = true;
@@ -298,7 +317,7 @@ Item {
                 model: ScriptModel {
                     values: root.layouts
                 }
-                onActivated: index => Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(index)])
+                onActivated: index => root.typeWith(index)
 
                 // Plain j/k are this handler's, so Shift+J/K can move a layout; NavList's own
                 // still takes the arrows, Ctrl+j/k and Enter.
@@ -341,12 +360,14 @@ Item {
                     title: root.nameOf(row.modelData)
                     subtitle: row.modelData
                     checkable: true
-                    checked: Keyboard.active === row.index
+                    checked: root.typing !== "" ? root.typing === row.modelData : Keyboard.active === row.index
                     selected: row.dragged || (ListView.isCurrentItem && ListView.view.highlightShown)
+                    // Lifted: the row it passes over shows through, as the place it leaves.
+                    opacity: row.dragged ? K.Tokens.opacity.subdued : 1
                     Accessible.name: row.index === 0 ? `${row.title}, the default` : row.title
                     onActivated: {
                         ListView.view.currentIndex = row.index;
-                        Quickshell.execDetached(["hyprctl", "switchxkblayout", "all", String(row.index)]);
+                        root.typeWith(row.index);
                     }
 
                     // The row follows the pointer while it is dragged; a translation is drawn,
@@ -370,7 +391,6 @@ Item {
                             cursorShape: Qt.ClosedHandCursor
                             onActiveChanged: {
                                 if (active) {
-                                    row.ListView.view.currentIndex = row.index;
                                     root.dragOffset = 0;
                                     root.dropAt = row.index;
                                     root.dragFrom = row.index;
@@ -382,6 +402,12 @@ Item {
                                 root.dropAt = -1;
                                 root.dragOffset = 0;
                                 root.move(from, to);
+                            }
+                            // A drag taken away mid-way (the layouts changed under it) lands nowhere.
+                            onCanceled: {
+                                root.dragFrom = -1;
+                                root.dropAt = -1;
+                                root.dragOffset = 0;
                             }
                             onActiveTranslationChanged: {
                                 if (!active)
@@ -443,11 +469,11 @@ Item {
                             gap: K.Tokens.space.s8
 
                             K.KeyHints {
-                                hints: [["Left Alt+E", "then"], ["E", "é"]]
+                                hints: [["Left Alt+E", "then"], ["E", "types é"]]
                             }
 
                             K.KeyHints {
-                                hints: [["Left Alt+U", "then"], ["O", "ö"]]
+                                hints: [["Left Alt+U", "then"], ["O", "types ö"]]
                             }
                         }
                     }

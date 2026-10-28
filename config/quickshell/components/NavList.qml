@@ -60,8 +60,11 @@ ListView {
         return Math.max(1, Math.floor((room + spacing) / (row + spacing)));
     }
 
-    // Returns true when the key was handled, so callers can set event.accepted.
+    // Returns true when the key was handled, so callers can set event.accepted. Alt+key is the
+    // list's owner's: a list that reorders moves its row with Alt+↑ ↓.
     function handleKey(event: KeyEvent): bool {
+        if (event.modifiers & Qt.AltModifier)
+            return false;
         const ctrl = event.modifiers & Qt.ControlModifier;
         const plain = vimKeys && !ctrl;
         const k = event.key;

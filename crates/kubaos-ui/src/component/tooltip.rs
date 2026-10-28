@@ -27,16 +27,12 @@ use crate::tokens::Type;
 
 /// The card: `title` in `body_strong`, `body` in `small` under it, and `extra` 8 below, on a
 /// popover as wide as a menu.
-pub fn tooltip<'a, M: 'a>(
-    look: &Look,
-    title: &'a str,
-    body: &'a str,
-    extra: Option<Element<'a, M>>,
-) -> Element<'a, M> {
+pub fn tooltip<'a, M: 'a>(look: &Look, title: &'a str, body: &'a str, extra: Option<Element<'a, M>>) -> Element<'a, M> {
     let c = look.colors;
-    let words = stack(look, Space::S4)
-        .push(text(title, Type::BodyStrong, c.on_surface))
-        .push(text(body, Type::Small, c.on_surface_variant));
+    let mut words = stack(look, Space::S4).push(text(title, Type::BodyStrong, c.on_surface));
+    if !body.is_empty() {
+        words = words.push(text(body, Type::Small, c.on_surface_variant));
+    }
     let mut content = stack(look, Space::S8).push(words);
     if let Some(extra) = extra {
         content = content.push(extra);

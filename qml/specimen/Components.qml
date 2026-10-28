@@ -966,11 +966,11 @@ K.Stack {
                                 gap: K.Tokens.space.s8
 
                                 K.KeyHints {
-                                    hints: [["Left Alt+E", "then"], ["E", "é"]]
+                                    hints: [["Left Alt+E", "then"], ["E", "types é"]]
                                 }
 
                                 K.KeyHints {
-                                    hints: [["Left Alt+U", "then"], ["O", "ö"]]
+                                    hints: [["Left Alt+U", "then"], ["O", "types ö"]]
                                 }
                             }
                         }

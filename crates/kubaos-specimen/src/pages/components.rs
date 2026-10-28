@@ -82,8 +82,8 @@ use kubaos_ui::component::table::table_row;
 use kubaos_ui::component::tabs::Tab;
 use kubaos_ui::component::tabs::tabs;
 use kubaos_ui::component::tile::tile;
-use kubaos_ui::component::tooltip::tooltip;
 use kubaos_ui::component::toast::toast;
+use kubaos_ui::component::tooltip::tooltip;
 use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::Extent;
 use kubaos_ui::layout::Gap;
@@ -719,8 +719,8 @@ fn keycaps<'a>(look: &Look) -> Element<'a, Message> {
 
 fn tooltips<'a>(look: &Look) -> Element<'a, Message> {
     let keys = stack(look, Space::S8)
-        .push(key_hints(look, &[("Left Alt+E", "then"), ("E", "é")]))
-        .push(key_hints(look, &[("Left Alt+U", "then"), ("O", "ö")]));
+        .push(key_hints(look, &[("Left Alt+E", "then"), ("E", "types é")]))
+        .push(key_hints(look, &[("Left Alt+U", "then"), ("O", "types ö")]));
     let card = tooltip(
         look,
         "Mac accents on Left Alt",
