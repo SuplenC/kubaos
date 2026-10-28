@@ -441,6 +441,12 @@ icon = "view-refresh"
 keywords = ["shell", "bar", "reload"]
 run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
 
+# "Focus stutter: on/off" is the Extension's own Item (crates/kotodama-kubaos,
+# shell.rs): Enter turns the focus tube's neon strike off or back on, and
+# Ctrl+K picks on or off. It writes `focusStutter` in
+# ~/.config/kubaos/desktop/quickshell/settings.json, keeping your comments,
+# and the shell reads it again at once.
+
 # Idle (crates/kubaos-idle). "Lock after…", "Screens off after…", "Suspend
 # after…" and "When the lid closes…" are the Extension's own Items: Enter
 # lists the usual choices, each for both power sources or one (Ctrl+K), or

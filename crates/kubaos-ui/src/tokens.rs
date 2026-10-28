@@ -26,7 +26,7 @@ pub const SCALES: [f32; 4] = [1.0, 1.25, 1.5, 2.0];
 /// A hairline's width in device pixels, at every scale.
 pub const HAIRLINE_DEVICE_PX: u16 = 1;
 
-/// The stroke of the focus ring, the spinner and a partial checkbox's dash, in logical pixels,
+/// The stroke of the spinner, a field's caret and a partial checkbox's dash, in logical pixels,
 /// drawn rounded half up to whole device pixels.
 pub const STROKE_THIN: u16 = 2;
 
@@ -34,8 +34,25 @@ pub const STROKE_THIN: u16 = 2;
 /// whole device pixels.
 pub const SYMBOL_STROKE: u16 = 2;
 
-/// How far the focus ring's outer edge stands outside its control, in logical pixels.
+/// The focus tube's width on its control's edge, in logical pixels, drawn rounded half up to whole
+/// device pixels.
+pub const FOCUS_TUBE: f32 = 1.5;
+
+/// The focus tube's near glow: its reach outside the tube in logical pixels, and its opacity at the
+/// tube.
+pub const FOCUS_NEAR: u16 = 8;
+pub const FOCUS_NEAR_OPACITY: f32 = 0.45;
+
+/// The focus tube's far, faint glow: its reach and its opacity at the tube.
+pub const FOCUS_FAR: u16 = 20;
+pub const FOCUS_FAR_OPACITY: f32 = 0.14;
+
+/// The room a container that clips keeps around its content, in logical pixels: a focus glow is
+/// never narrower than this.
 pub const FOCUS_OFFSET: u16 = 4;
+
+/// A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.
+pub const NEON_STRIKE: [f32; 10] = [0.6, 0.0, 0.9, 0.2, 0.0, 1.0, 0.4, 1.0, 0.8, 1.0];
 
 /// A step of the spacing scale: gaps, paddings and insets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1240,7 +1257,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 46] = [
+pub const CONTRAST: [ContrastPair; 52] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1477,21 +1494,63 @@ pub const CONTRAST: [ContrastPair; 46] = [
         bg: Role::Surface,
         need: Need::Graphic,
         opacity: None,
-        purpose: "The focus ring, a switch that is on, the mark of the logo",
+        purpose: "The focus tube on a page, a switch that is on, the mark of the logo",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::SurfaceContainerLow,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The focus tube in a well",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::SurfaceContainer,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The focus tube on a panel",
+    },
+    ContrastPair {
+        fg: Role::Primary,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The focus tube in a card or a dialog, a field's tube on its fill",
     },
     ContrastPair {
         fg: Role::Primary,
         bg: Role::SurfaceContainerHighest,
         need: Need::Graphic,
         opacity: None,
-        purpose: "A slider's or a progress bar's fill on its track",
+        purpose: "A slider's or a progress bar's fill on its track, a focused field's tube on its fill",
     },
     ContrastPair {
         fg: Role::Cold,
         bg: Role::Surface,
         need: Need::Graphic,
         opacity: None,
-        purpose: "The cold focus ring, the logo's dakuten",
+        purpose: "The cold focus tube on a page, the logo's dakuten",
+    },
+    ContrastPair {
+        fg: Role::Cold,
+        bg: Role::SurfaceContainerLow,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The cold focus tube in a well",
+    },
+    ContrastPair {
+        fg: Role::Cold,
+        bg: Role::SurfaceContainer,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The cold focus tube on a panel",
+    },
+    ContrastPair {
+        fg: Role::Cold,
+        bg: Role::SecondaryContainer,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "The cold focus tube on a picked card's fill",
     },
     ContrastPair {
         fg: Role::Outline,

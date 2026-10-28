@@ -40,6 +40,7 @@ group.
 | Your own holiday rules | `desktop/clock/holidays.toml` |
 | The bar's system monitor, its alerts and thresholds | `desktop/sysmon/sysmon.toml` |
 | The Command menu's motion (full or fades only) | `desktop/quickshell/settings.json` |
+| The focus ring's neon stutter (on or off) | `desktop/quickshell/settings.json`, or "Focus stutter: on/off" in the Command menu |
 | Which wallpaper sets the picker shows | `desktop/wallpapers/sets` |
 | Tidy Downloads daily, automount of drives | `desktop/files/` (flag files `tidy-downloads` and `no-automount`; set them from the Command menu) |
 | Terminal font, size, transparency | `terminal/ghostty/config` |

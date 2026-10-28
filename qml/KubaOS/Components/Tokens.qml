@@ -30,7 +30,7 @@ QtObject {
     readonly property QtObject stroke: QtObject {
         // A hairline's width in device pixels, at every scale.
         readonly property int hairline_device_px: 1
-        // The focus ring's, the spinner's and a partial checkbox's stroke in logical pixels, drawn
+        // The spinner's, a field's caret's and a partial checkbox's stroke in logical pixels, drawn
         // rounded half up to whole device pixels.
         readonly property int thin: 2
         // A symbol's stroke on its 24 unit grid, drawn scaled to the symbol's size, then rounded
@@ -38,9 +38,25 @@ QtObject {
         readonly property int symbol: 2
     }
 
+    // The neon focus: the focused control's edge lit as a tube, its glow outside it.
     readonly property QtObject focus: QtObject {
-        // How far the focus ring's outer edge stands outside its control, in logical pixels.
+        // The tube's width on the control's edge in logical pixels, drawn rounded half up to whole
+        // device pixels.
+        readonly property real tube: 1.5
+        // The near glow's reach outside the tube in logical pixels, and its opacity at the tube.
+        readonly property int near: 8
+        readonly property real near_opacity: 0.45
+        // The far, faint glow's reach and its opacity at the tube.
+        readonly property int far: 20
+        readonly property real far_opacity: 0.14
+        // The room a container that clips keeps around its content, in logical pixels: a focus glow
+        // is never narrower than this.
         readonly property int offset: 4
+    }
+
+    readonly property QtObject neon: QtObject {
+        // A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.
+        readonly property list<real> strike: [0.6, 0, 0.9, 0.2, 0, 1, 0.4, 1, 0.8, 1]
     }
 
     // The spacing scale: gaps, paddings and insets.

@@ -163,7 +163,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Lists",
-            Some("Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The ring goes round the well; the row shows where the keyboard is."),
+            Some("Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is."),
             lists(look),
         ))
         .push(section(look, "Chips", None, chips(look)))
@@ -176,7 +176,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Cards",
-            Some("Picked cards take the accent, so their focus ring is the cold one."),
+            Some("Picked cards take the accent, so their focus tube is the cold one."),
             cards(look),
         ))
         .push(section(
@@ -380,11 +380,7 @@ fn fields<'a>(look: &Look) -> Element<'a, Message> {
                 .icon(Icon::Search)
                 .caret(Caret::at("Shinj".chars().count()))
                 .view(look),
-            Some(note(
-                look,
-                "Focused: the caret, the accent hairline and the ring.",
-                false,
-            )),
+            Some(note(look, "Focused: the caret, and the tube on its own edge.", false)),
         ))
         .push(labelled(
             look,
@@ -717,7 +713,7 @@ fn cards<'a>(look: &Look) -> Element<'a, Message> {
         ))
         .push(choice_card(
             look,
-            mode("Focused, picked", "The cold ring."),
+            mode("Focused, picked", "The cold tube."),
             true,
             Some(Message::Sample),
             true,

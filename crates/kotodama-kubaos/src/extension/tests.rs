@@ -32,6 +32,7 @@ fn always() -> Vec<&'static str> {
     toggles::ids()
         .into_iter()
         .chain(crate::idle::ids())
+        .chain(crate::shell::ids())
         .chain(crate::power::ids())
         .chain(crate::proxy::ids())
         .collect()

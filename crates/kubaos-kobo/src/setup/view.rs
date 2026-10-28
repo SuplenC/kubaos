@@ -817,7 +817,7 @@ fn input_state<'a>(
 }
 
 /// One of a few choices, as radio buttons: Left and Right (or Space) move between them, a click
-/// picks one. The picked one has the ring while the choice has the keyboard.
+/// picks one. The picked one has the focus tube while the choice has the keyboard.
 fn choice<'a>(s: &'a Setup, f: SF, options: Vec<(&'a str, bool, Message)>, look: &Look) -> El<'a> {
     let focused = s.is_focused(f);
     let radios = options

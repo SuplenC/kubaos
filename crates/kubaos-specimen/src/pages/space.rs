@@ -1,5 +1,5 @@
 //! The space page: the spacing scale, radii, icon and component sizes, hairlines, strokes, the
-//! focus ring, concentric corners and the grid's device-pixel columns.
+//! focus tube, concentric corners and the grid's device-pixel columns.
 
 use iced::Background;
 use iced::Border;
@@ -82,14 +82,14 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(look, "Component sizes", None, sizes(look)))
         .push(section(
             look,
-            "Hairlines, strokes and the focus ring",
-            Some("A hairline is one device pixel; the thin stroke is 2 rounded to whole device pixels; the ring stands 4 outside its control and takes no layout space."),
+            "Hairlines, strokes and the focus tube",
+            Some("A hairline is one device pixel; the thin stroke is 2 rounded to whole device pixels; the focus tube is the control's own edge, its glow outside, and neither takes layout space."),
             strokes(look),
         ))
         .push(section(
             look,
             "Concentric corners",
-            Some("24 with 8 inside is 16; 16 with 4 inside is 12. The focus ring adds 4 outside."),
+            Some("24 with 8 inside is 16; 16 with 4 inside is 12. The focus tube takes the control's own corner."),
             nesting(look),
         ))
         .push(section(
@@ -259,10 +259,15 @@ fn strokes<'a>(look: &Look) -> Element<'a, Message> {
         .push(line(thin, c.primary))
         .push(name(
             look,
-            "Focus ring".into(),
-            format!("offset {}", tokens::FOCUS_OFFSET),
+            "Focus tube".into(),
+            format!(
+                "{} device px, glow {} + {}",
+                scale.to_device(scale.stroke(tokens::FOCUS_TUBE)),
+                tokens::FOCUS_NEAR,
+                tokens::FOCUS_FAR
+            ),
         ))
-        .push(widget::container(rings).padding(Inset::all(Space::S8).padding()))
+        .push(widget::container(rings).padding(Inset::all(Space::S20).padding()))
         .into()
 }
 

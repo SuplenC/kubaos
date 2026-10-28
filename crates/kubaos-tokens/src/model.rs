@@ -73,7 +73,17 @@ pub struct Stroke {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Focus {
-    /// How far the ring's outer edge stands outside the control, in logical pixels.
+    /// The tube's width in logical pixels, drawn rounded half up to whole device pixels.
+    pub tube: f32,
+    /// The near glow's reach outside the tube, in logical pixels.
+    pub near: u16,
+    /// The near glow's opacity at the tube.
+    pub near_opacity: f32,
+    /// The far glow's reach outside the tube, in logical pixels.
+    pub far: u16,
+    /// The far glow's opacity at the tube.
+    pub far_opacity: f32,
+    /// The room a container that clips keeps around its content, in logical pixels.
     pub offset: u16,
 }
 

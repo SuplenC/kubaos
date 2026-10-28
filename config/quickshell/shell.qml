@@ -2,6 +2,7 @@
 
 import QtQuick
 import Quickshell
+import KubaOS.Components as K
 import qs.settings
 import qs.modules.frame
 import qs.modules.lock
@@ -14,6 +15,13 @@ import qs.modules.wallpaper
 // exist once, and so does the Command menu: `kotodama toggle` reaches one menu
 // only. See README.md for the file map.
 ShellRoot {
+    // The components' motion settings follow the user's.
+    Binding {
+        target: K.Motion
+        property: "stutter"
+        value: Settings.focusStutter
+    }
+
     Variants {
         model: Quickshell.screens
 

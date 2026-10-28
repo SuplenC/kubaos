@@ -8,7 +8,7 @@ clock, system monitor, idle, the power stops, files, wallpapers, the phone link,
 | `hypr/` | `hyprland.lua` | Gaps, rounding, binds, screens, input: any Hyprland setting | `hyprctl reload` |
 | | `hypridle.conf` | Idle listeners of your own, such as dimming the screen | `kubaos-idle apply`, or the next login |
 | | `hyprlock.conf` | The fallback lock screen | its next start |
-| `quickshell/` | `settings.json` | The shell's settings: the Command menu's motion | at once |
+| `quickshell/` | `settings.json` | The shell's settings: the Command menu's motion, the focus stutter | at once |
 | `cursor/` | `cursor.toml` | Pointer style and size | at once from the menu; `kubaos cursor apply` after a hand edit |
 | `clock/` | `clock.toml`, `holidays.toml` | Extra time zones, holidays, first weekday, countdowns; your holiday rules | the popup's next request |
 | `keyboard/` | `keyboard.toml` | Layouts, Mac-style accents on Left Alt | at once from the menu; `kubaos keyboard accents apply` and `hyprctl reload` after a hand edit |

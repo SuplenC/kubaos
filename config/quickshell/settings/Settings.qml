@@ -38,6 +38,11 @@ Singleton {
     // nothing sliding or moving. The user layer's `menuMotion` wins.
     readonly property string menuMotion: ["full", "fades"].includes(user.menuMotion) ? user.menuMotion : "full"
 
+    // The focus tube strikes on as focus arrives, as the neon sign does: true, or
+    // false for a plain fade. The user layer's `focusStutter` wins; the Command
+    // menu's "Focus stutter" Item writes it.
+    readonly property bool focusStutter: typeof user.focusStutter === "boolean" ? user.focusStutter : true
+
     // The Command menu's hidden and renamed apps, and the terminal for apps
     // with Terminal=true, are Kotodama's settings: config/kotodama/kubaos.toml,
     // and yours in ~/.config/kubaos/menu/kotodama/user.toml.

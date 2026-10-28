@@ -38,7 +38,7 @@ scales = [1.0, 1.25, 1.5, 2.0]
 # Dividers, outlines of cards, fields and the switch track: one device pixel
 # at every scale.
 hairline_device_px = 1
-# The focus ring, the spinner's arc and a partial checkbox's dash: 2 logical
+# The spinner's arc, a field's caret and a partial checkbox's dash: 2 logical
 # pixels, rounded half up to whole device pixels (2, 3, 3, 4 at 1, 1.25, 1.5,
 # 2). A tick is the `check` symbol, drawn with the symbol stroke below like
 # every other icon.
@@ -48,10 +48,24 @@ thin = 2
 # symbol is never drawn with a fractional stroke.
 symbol = 2
 
+# The neon focus: the focused control's own edge lit as a neon tube in the
+# focus colour, with its glow outside it. The tube is drawn on the control's
+# edge, inside its box and over its outline, so there is only ever one line and
+# nothing dark between the tube and the glow; neither takes layout space, so
+# focus moving never moves anything.
 [focus]
-# How far the focus ring's outer edge stands outside the control. The ring is
-# drawn in that band, `stroke.thin` wide at its outer edge, and never takes
-# layout space: focus moving never moves anything else.
+# The tube's width in logical pixels, drawn rounded half up to whole device
+# pixels: 2, 2, 2, 3 at 1, 1.25, 1.5, 2.
+tube = 1.5
+# The glow: a near one and a far, faint one, each fading from its opacity at
+# the tube to nothing at its reach outside it, in logical pixels.
+near = 8
+near_opacity = 0.45
+far = 20
+far_opacity = 0.14
+# The room a container that clips (a scroll, a list) keeps around its content.
+# A glow reaches only as far as the room it has before the clip, so it is
+# never cut, and is never narrower than this.
 offset = 4
 
 # The spacing scale: gaps, paddings and insets.
@@ -504,7 +518,8 @@ opacity = 0.55
 # are the same sign.
 [neon]
 # A tube striking: its brightness through ten even steps over `medium`. It
-# stutters, then catches.
+# stutters, then catches. The focus tube strikes the same way as focus
+# arrives, unless the user turns the stutter off.
 strike = [0.6, 0.0, 0.9, 0.2, 0.0, 1.0, 0.4, 1.0, 0.8, 1.0]
 
 # The クバ mark: its strokes in the order a hand writes them (ク's tick and
@@ -731,9 +746,15 @@ pairs = [
   { fg = "surface", bg = "on_surface", need = "text", use = "A toast, a hint's bubble: the inverse colours" },
   { fg = "on_surface", bg = "surface", need = "graphic", use = "An icon, the wordmark of the logo" },
   { fg = "on_surface_variant", bg = "surface", need = "graphic", use = "A muted icon" },
-  { fg = "primary", bg = "surface", need = "graphic", use = "The focus ring, a switch that is on, the mark of the logo" },
-  { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider's or a progress bar's fill on its track" },
-  { fg = "cold", bg = "surface", need = "graphic", use = "The cold focus ring, the logo's dakuten" },
+  { fg = "primary", bg = "surface", need = "graphic", use = "The focus tube on a page, a switch that is on, the mark of the logo" },
+  { fg = "primary", bg = "surface_container_low", need = "graphic", use = "The focus tube in a well" },
+  { fg = "primary", bg = "surface_container", need = "graphic", use = "The focus tube on a panel" },
+  { fg = "primary", bg = "surface_container_high", need = "graphic", use = "The focus tube in a card or a dialog, a field's tube on its fill" },
+  { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider's or a progress bar's fill on its track, a focused field's tube on its fill" },
+  { fg = "cold", bg = "surface", need = "graphic", use = "The cold focus tube on a page, the logo's dakuten" },
+  { fg = "cold", bg = "surface_container_low", need = "graphic", use = "The cold focus tube in a well" },
+  { fg = "cold", bg = "surface_container", need = "graphic", use = "The cold focus tube on a panel" },
+  { fg = "cold", bg = "secondary_container", need = "graphic", use = "The cold focus tube on a picked card's fill" },
   { fg = "outline", bg = "surface", need = "graphic", use = "A field's, a checkbox's or a switch's outline" },
   { fg = "outline", bg = "surface_container_highest", need = "graphic", use = "An outline on the highest container" },
   { fg = "on_surface", bg = "surface_container", need = "text", use = "A pill of the bar" },

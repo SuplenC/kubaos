@@ -31,13 +31,12 @@ use crate::look::Look;
 use crate::look::radius;
 use crate::scale::Scale;
 use crate::text::text;
-use crate::tokens;
 use crate::tokens::Radius;
 use crate::tokens::Space;
 use crate::tokens::Type;
 
 /// `content` with `label` in a bubble under it while hovered, or while `shown` (the keyboard is on
-/// it). The bubble is the toast's inverse colours, below the focus ring with 4 to spare.
+/// it). The bubble is the toast's inverse colours, 8 below the control.
 pub fn hint<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>, label: &'a str, shown: bool) -> Element<'a, M> {
     let c = look.colors;
     let bubble = widget::container(text(label, Type::Label, c.surface))
@@ -200,9 +199,8 @@ impl<M> overlay::Overlay<M, Theme, Renderer> for Bubble<'_, '_, M> {
             .layout(self.tree, renderer, &layout::Limits::new(Size::ZERO, bounds));
         let size = node.size();
         let size = Size::new(self.scale.snap_up(size.width), self.scale.snap_up(size.height));
-        // Under the control, past its focus ring and 4 more, centred on a whole device pixel and
-        // kept inside the window.
-        let below = f32::from(tokens::FOCUS_OFFSET + Space::S4.px());
+        // Under the control, centred on a whole device pixel and kept inside the window.
+        let below = f32::from(Space::S8.px());
         let x = self
             .scale
             .snap(self.anchor.center_x() - size.width / 2.0)

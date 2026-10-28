@@ -3,7 +3,7 @@
 //! # Owns
 //!
 //! - [`Look`], and corners: [`Corner`], a role's or one derived by nesting ([`nested`],
-//!   [`concentric`]), in pixels ([`radius`]), and the focus ring's around one ([`ring_radius`]).
+//!   [`concentric`]), in pixels ([`radius`]), and one drawn around another ([`outset`]).
 //!
 //! # Not here
 //!
@@ -13,19 +13,20 @@ use iced::Color;
 
 use crate::color;
 use crate::color::Colors;
+use crate::motion::Motion;
 use crate::scale::Scale;
-use crate::tokens;
 use crate::tokens::Mode;
 use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Space;
 
-/// The colours, mode and scale a view is drawn with. Every component takes one.
+/// The colours, mode, scale and motion settings a view is drawn with. Every component takes one.
 #[derive(Debug, Clone, Copy)]
 pub struct Look {
     pub mode: Mode,
     pub colors: Colors,
     pub scale: Scale,
+    pub motion: Motion,
 }
 
 impl Look {
@@ -36,7 +37,14 @@ impl Look {
             mode,
             colors: color::colors(mode),
             scale,
+            motion: Motion::default(),
         }
+    }
+
+    /// The same, moving as `motion` says: the focus stutter, and reduced motion.
+    #[must_use]
+    pub fn with_motion(self, motion: Motion) -> Look {
+        Look { motion, ..self }
     }
 
     /// The same, with matugen's colours from the wallpaper.
@@ -134,13 +142,10 @@ pub const fn nested(outer: Corner, inset: Space) -> Corner {
     }
 }
 
-/// The radius of the focus ring's outer edge around a control with corner `control`: concentric
-/// with it, [`tokens::FOCUS_OFFSET`] further out.
-pub fn ring_radius(control: impl Into<Corner>) -> f32 {
-    control
-        .into()
-        .px()
-        .map_or(PILL, |r| f32::from(r + tokens::FOCUS_OFFSET))
+/// The radius of a shape `by` logical pixels outside one with corner `inner` on every side,
+/// concentric with it: a glow's ring around its control. A pill around a pill is a pill.
+pub fn outset(inner: impl Into<Corner>, by: f32) -> f32 {
+    inner.into().px().map_or(PILL, |r| f32::from(r) + by)
 }
 
 #[cfg(test)]

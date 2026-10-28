@@ -16,6 +16,7 @@ kubaos-power.workspace = true
 kubaos-proxy.workspace = true
 kubaos-sysmon.workspace = true
 kubaos-user-layer.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 # Edits the workspace groups file in place, keeping the user's comments.
 toml_edit = "0.25"

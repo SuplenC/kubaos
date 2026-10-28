@@ -7,16 +7,16 @@
 //! - Which Items there are under the current config, `hide` applied, and what the update check
 //!   changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position, a drive, an idle setting, the power stop's status, the CPU
-//!   scheduler's or the Proxy's.
+//!   user folder, a desk position, a drive, an idle setting, a shell setting, the power stop's
+//!   status, the CPU scheduler's or the Proxy's.
 //!
 //! # Not here
 //!
 //! - Reading the config: [`crate::registry`]. The toggles: [`crate::toggles`]. The keyboard
 //!   layouts: [`crate::keyboard`]. The wallpaper sets: [`crate::wallpapers`]. The user folders:
 //!   [`crate::files`]. The desk positions: [`crate::desk`]. The drives: [`crate::drives`]. The idle
-//!   settings: [`crate::idle`]. The power stop's status and the CPU scheduler's: [`crate::power`].
-//!   The Proxy's status: [`crate::proxy`].
+//!   settings: [`crate::idle`]. The shell's settings: [`crate::shell`]. The power stop's status and
+//!   the CPU scheduler's: [`crate::power`]. The Proxy's status: [`crate::proxy`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -44,6 +44,7 @@ use crate::proxy;
 use crate::registry;
 use crate::registry::Registry;
 use crate::run::Runner;
+use crate::shell;
 use crate::toggles;
 use crate::toggles::Ran;
 use crate::toggles::Toggle;
@@ -89,6 +90,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .chain(keyboard::ids())
             .chain(idle::ids())
+            .chain(shell::ids())
             .chain(power::ids())
             .chain(proxy::ids())
             .collect();
@@ -127,10 +129,10 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         self.desk = desk;
     }
 
-    /// The Items to index: the actions, the toggles, the idle settings, the power stop's, the CPU
-    /// scheduler's and the Proxy's status, the keyboard Items, the wallpaper sets, the user
-    /// folders, the desk positions and the drives `hide` leaves in, the update actions as the
-    /// update check has them.
+    /// The Items to index: the actions, the toggles, the idle settings, the shell's, the power
+    /// stop's, the CPU scheduler's and the Proxy's status, the keyboard Items, the wallpaper
+    /// sets, the user folders, the desk positions and the drives `hide` leaves in, the update
+    /// actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -162,6 +164,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
+        let shell = shell::items().into_iter().filter(|item| !self.registry.hides(&item.id));
         let power = [power::item(), power::scheduler_item(), proxy::item()]
             .into_iter()
             .filter(|item| !self.registry.hides(&item.id));
@@ -170,6 +173,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .filter_map(|item| self.pending.apply(item))
             .chain(toggles)
             .chain(idle)
+            .chain(shell)
             .chain(power)
             .chain(keyboards)
             .chain(wallpapers)
@@ -211,6 +215,10 @@ impl<B: Bus, R: Runner> Extension<B, R> {
                 idle::run(&item.id, arguments, &idle_settings(), &self.runner)
             }
             idle::CHOICE_KIND => idle::choose(&item.id, action, &self.runner),
+            shell::KIND if !self.registry.hides(&item.id) => {
+                let file = shell::path().ok_or("There's no home folder to keep the setting in")?;
+                shell::run(&item.id, action, &file)
+            }
             power::KIND if action == power::SHOW && !self.registry.hides(&item.id) => {
                 Ok(Ran::Push(power::view(&power_now())))
             }

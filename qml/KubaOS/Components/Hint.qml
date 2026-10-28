@@ -3,7 +3,7 @@ import KubaOS.Components as K
 
 // A control's name in a small bubble under it, while the pointer is over it or the keyboard is on
 // it: `kubaos-ui`'s `hint::hint`. The inverse colours, `label` type, 8 by 4 inside, the small
-// radius, centred under the control past its focus ring and 4 more, on whole device pixels.
+// radius, centred under the control 8 below it, on whole device pixels.
 //
 // The bubble floats over the whole window, as iced's overlay does: it is drawn on the window's
 // own content item, so neither a clipping panel nor what is laid out after the control covers it.
@@ -69,7 +69,7 @@ Item {
             readonly property real centred: K.Look.snap((floating.width - width) / 2, root.dpr)
 
             x: bubble.centred + floating.shift
-            y: floating.height + Tokens.focus.offset + Tokens.space.s4
+            y: floating.height + Tokens.space.s8
             width: K.Look.snapUp(label.implicitWidth + Tokens.space.s8 * 2, root.dpr)
             height: K.Look.snapUp(label.implicitHeight + Tokens.space.s4 * 2, root.dpr)
             radius: Tokens.radius.small
