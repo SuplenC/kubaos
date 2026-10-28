@@ -587,7 +587,10 @@ fn nvim_template(tokens: &Tokens) -> String {
 
 fn fuzzel_settings(tokens: &Tokens) -> String {
     let body = tokens.types.get("body").expect("type.body is the launcher's row text");
-    let row = tokens.size.get("row").expect("size.row is a list row's height");
+    let row = *tokens
+        .size
+        .get("control_sm")
+        .expect("size.control_sm is a small control's height");
     let padding = tokens
         .container
         .padding
@@ -600,8 +603,11 @@ fn fuzzel_settings(tokens: &Tokens) -> String {
     );
     let mut out = header(
         "#",
-        "fuzzel's type and shape, as a list in a panel of the shell's: body text in rows a list \
-         row tall, the narrowest container's padding, a surface's corners, a hairline round it. \
+        "fuzzel's type and shape, as a list in a panel of the shell's: body text in rows a \
+         small control tall, the narrowest container's padding round it, a surface's corners, a \
+         hairline. fuzzel gives the prompt the rows' height too and centres the text in it, so \
+         the padding above and below is less the row's room round its line: the prompt's and the \
+         last row's text sit the padding in, once, as at the sides. \
          config/fuzzel/fuzzel.ini includes it first.",
     );
     out.push_str("[main]\n");
@@ -611,9 +617,9 @@ fn fuzzel_settings(tokens: &Tokens) -> String {
         tokens.font.family.name(body.family),
         points(body.size)
     );
-    let _ = writeln!(out, "line-height={}", points(*row));
+    let _ = writeln!(out, "line-height={}", points(row));
     let _ = writeln!(out, "horizontal-pad={padding}");
-    let _ = writeln!(out, "vertical-pad={padding}");
+    let _ = writeln!(out, "vertical-pad={}", padding - (row - body.line) / 2);
     let _ = writeln!(out, "inner-pad={gap}");
     out.push('\n');
     out.push_str("[border]\n");
