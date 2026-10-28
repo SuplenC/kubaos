@@ -11,6 +11,32 @@
 //   auto --toggle--> overridden --toggle--> auto
 //   overridden --both end--> off
 
+// A notification's urgency, as the spec numbers it (`NotificationUrgency` in Quickshell).
+// https://specifications.freedesktop.org/notification-spec/latest/urgency-levels.html
+const LOW = 0;
+const NORMAL = 1;
+const CRITICAL = 2;
+
+// Whether a new notification of `urgency` pops up: always while Do not disturb is off, and only a
+// critical one while it is on, however it was turned on, so what can't wait is never missed.
+function popsUp(state, urgency) {
+    return !on(state) || urgency === CRITICAL;
+}
+
+// How many shares run after Hyprland's `screencast` event `data` ("1,OWNER" as a client starts
+// taking frames, "0,OWNER" as it stops), given `count` before it. Each share sends its own, so two
+// at once take two stops to end; a stop with none counted is ignored.
+// https://wiki.hypr.land/IPC/#events-list
+function screencast(count, data) {
+    return data.split(",")[0] === "1" ? count + 1 : Math.max(0, count - 1);
+}
+
+// How many of `windows` ({shown, mode}: on a workspace a screen shows, Hyprland's fullscreen mode)
+// are really fullscreen: mode 2, alone or with maximised, never maximised (1) alone.
+function fullscreenWindows(windows) {
+    return windows.filter(w => w.shown && (w.mode & 2) !== 0).length;
+}
+
 function initial() {
     return {
         manual: false,

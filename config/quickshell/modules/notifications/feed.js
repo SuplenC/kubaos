@@ -48,8 +48,10 @@ function peek(history, unread) {
     };
 }
 
-function bellShown(count, always) {
-    return count > 0 || always;
+// Whether the bar's bell shows: while there is a notification, while Do not disturb is on (the
+// crossed-out bell says why things are quiet), or always with the setting.
+function bellShown(count, always, dnd) {
+    return count > 0 || always || dnd === true;
 }
 
 // The panel's line under its title: why it is silenced, or how many are new; nothing when the
@@ -67,14 +69,28 @@ function status(unread, count, reason) {
     return count > 0 ? "All read" : "";
 }
 
-// The Do not disturb button's name, in its hint: whether it is on and why.
-function dndLabel(reason) {
+// The Do not disturb button's tooltip: whether it is on, and why or until when. `sharing` says
+// which occurrence an override is for, a share or a fullscreen window.
+function dndTip(reason, sharing) {
+    const on = {
+        manual: "Until you turn it off",
+        sharing: "While you share your screen",
+        fullscreen: "While a window is fullscreen"
+    }[reason];
+    if (on)
+        return {
+            title: "Do not disturb is on",
+            body: on
+        };
+    if (reason === "overridden")
+        return {
+            title: "Do not disturb",
+            body: sharing ? "Off for this share" : "Off while this window is fullscreen"
+        };
     return {
-        manual: "Do not disturb: on until you turn it off",
-        sharing: "Do not disturb: on while you share your screen",
-        fullscreen: "Do not disturb: on while a window is fullscreen",
-        overridden: "Do not disturb: off until this ends"
-    }[reason] ?? "Do not disturb: on by itself while you share your screen or go fullscreen";
+        title: "Do not disturb",
+        body: "Turns on by itself while you share your screen or a window is fullscreen"
+    };
 }
 
 // The panel's rows: each non-empty section's label, then its stacks, one row each, or a row per

@@ -116,6 +116,11 @@ TestCase {
         verify(Feed.bellShown(1, false));
     }
 
+    function test_while_do_not_disturb_is_on_the_bell_shows_with_none() {
+        verify(Feed.bellShown(0, false, true), "crossed out, so it's clear why things are quiet");
+        verify(!Feed.bellShown(0, false, false));
+    }
+
     function test_with_always_show_the_bell_it_shows_with_none() {
         verify(Feed.bellShown(0, true));
         verify(Feed.bellShown(3, true));
@@ -168,12 +173,24 @@ TestCase {
         compare(Feed.status(2, 5, "overridden"), "2 new", "turned off during a share, it isn't silenced");
     }
 
-    function test_the_do_not_disturb_button_says_why_it_is_on() {
-        verify(Feed.dndLabel("sharing").includes("while you share your screen"));
-        verify(Feed.dndLabel("fullscreen").includes("while a window is fullscreen"));
-        verify(Feed.dndLabel("manual").includes("until you turn it off"));
-        verify(Feed.dndLabel("overridden").includes("off until this ends"));
-        verify(Feed.dndLabel("") !== Feed.dndLabel("manual"));
+    function test_the_do_not_disturb_tooltip_says_why_it_is_on() {
+        compare(Feed.dndTip("sharing", true).body, "While you share your screen");
+        compare(Feed.dndTip("fullscreen", false).body, "While a window is fullscreen");
+        compare(Feed.dndTip("manual", false).body, "Until you turn it off");
+        compare(Feed.dndTip("sharing", true).title, "Do not disturb is on");
+    }
+
+    function test_turned_off_during_one_the_tooltip_says_for_which() {
+        compare(Feed.dndTip("overridden", true).body, "Off for this share");
+        compare(Feed.dndTip("overridden", false).body, "Off while this window is fullscreen");
+        compare(Feed.dndTip("overridden", true).title, "Do not disturb");
+    }
+
+    function test_off_the_tooltip_says_when_it_turns_on_by_itself() {
+        const tip = Feed.dndTip("", false);
+
+        compare(tip.title, "Do not disturb");
+        verify(tip.body.includes("share your screen"));
     }
 
     function test_the_same_app_stacks_apart_in_new_and_earlier() {

@@ -108,20 +108,43 @@ K.Sheet {
                 }
 
                 K.IconButton {
+                    id: dnd
+
+                    readonly property var tip: Feed.dndTip(Notifs.dndReason, Notifs.dndState.sharing)
+
                     icon: "dark_mode"
-                    label: Feed.dndLabel(Notifs.dndReason)
+                    label: dnd.tip.title
                     kind: Notifs.dnd ? "Filled" : "Text"
                     size: "Sm"
+                    explained: true
                     onActivated: Notifs.toggleDnd()
+
+                    // Below the button: the header leaves no room above it.
+                    K.Tooltip {
+                        title: dnd.tip.title
+                        body: dnd.tip.body
+                        within: panelBox
+                        shown: dnd.pointerOver || dnd.focused
+                    }
                 }
 
                 K.IconButton {
+                    id: clearAll
+
                     visible: Notifs.count > 0
                     icon: "clear_all"
                     label: "Clear all"
                     kind: "Text"
                     size: "Sm"
+                    explained: true
                     onActivated: Notifs.clear()
+
+                    K.Tooltip {
+                        title: "Clear all"
+                        body: "Dismiss every notification, new and earlier."
+                        within: panelBox
+                        shown: clearAll.pointerOver || clearAll.focused
+                    }
                 }
             }
         }
@@ -225,6 +248,13 @@ K.Sheet {
         color: K.Tokens.color.on_surface_variant
     }
 
+    // The panel's own box, which its tooltips keep inside.
+    Item {
+        id: panelBox
+
+        anchors.fill: parent
+    }
+
     // The keys, floating in the bottom right corner over the list.
     K.IconButton {
         id: keys
@@ -240,6 +270,7 @@ K.Sheet {
 
         K.Tooltip {
             title: "Keys"
+            within: panelBox
             shown: keys.pointerOver
 
             K.Stack {

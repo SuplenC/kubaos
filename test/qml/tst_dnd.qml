@@ -116,6 +116,92 @@ TestCase {
         verify(!Dnd.on(Dnd.set(sensed(Dnd.initial(), false, true), false)));
     }
 
+    function test_while_it_is_off_every_notification_pops_up() {
+        for (const urgency of [Dnd.LOW, Dnd.NORMAL, Dnd.CRITICAL])
+            verify(Dnd.popsUp(Dnd.initial(), urgency), `urgency ${urgency}`);
+    }
+
+    function test_while_it_is_on_low_and_normal_ones_are_held() {
+        for (const state of [Dnd.toggle(Dnd.initial()), sensed(Dnd.initial(), true, false), sensed(Dnd.initial(), false, true)]) {
+            verify(!Dnd.popsUp(state, Dnd.LOW), Dnd.reason(state));
+            verify(!Dnd.popsUp(state, Dnd.NORMAL), Dnd.reason(state));
+        }
+    }
+
+    function test_a_critical_one_breaks_through_however_it_was_turned_on() {
+        for (const state of [Dnd.toggle(Dnd.initial()), sensed(Dnd.initial(), true, false), sensed(Dnd.initial(), false, true)])
+            verify(Dnd.popsUp(state, Dnd.CRITICAL), Dnd.reason(state));
+    }
+
+    function test_shares_are_counted_by_hyprlands_screencast_events() {
+        let shares = Dnd.screencast(0, "1,0");
+        shares = Dnd.screencast(shares, "1,1");
+        compare(shares, 2);
+
+        shares = Dnd.screencast(shares, "0,0");
+        compare(shares, 1);
+        compare(Dnd.screencast(Dnd.screencast(shares, "0,1"), "0,1"), 0, "never below none");
+    }
+
+    function test_the_first_of_two_shares_ending_keeps_it_on() {
+        let shares = Dnd.screencast(Dnd.screencast(0, "1,0"), "1,0");
+        let state = sensed(Dnd.initial(), shares > 0, false);
+
+        shares = Dnd.screencast(shares, "0,0");
+        state = sensed(state, shares > 0, false);
+        verify(Dnd.on(state));
+
+        shares = Dnd.screencast(shares, "0,0");
+        state = sensed(state, shares > 0, false);
+        verify(!Dnd.on(state));
+    }
+
+    function test_only_real_fullscreen_windows_on_a_shown_workspace_count() {
+        const windows = [
+            {
+                shown: true,
+                mode: 2
+            },
+            {
+                shown: true,
+                mode: 1
+            },
+            {
+                shown: false,
+                mode: 2
+            },
+            {
+                shown: true,
+                mode: 3
+            }
+        ];
+
+        compare(Dnd.fullscreenWindows(windows), 2);
+    }
+
+    function test_one_of_two_fullscreen_windows_leaving_keeps_it_on() {
+        const both = [
+            {
+                shown: true,
+                mode: 2
+            },
+            {
+                shown: true,
+                mode: 2
+            }
+        ];
+        let state = sensed(Dnd.initial(), false, Dnd.fullscreenWindows(both) > 0);
+
+        state = sensed(state, false, Dnd.fullscreenWindows([both[0],
+            {
+                shown: true,
+                mode: 0
+            }
+        ]) > 0);
+
+        verify(Dnd.on(state));
+    }
+
     function test_the_hand_kept_state_round_trips_through_its_file() {
         const state = Dnd.restore(Dnd.saved(Dnd.toggle(Dnd.initial())));
 

@@ -5,10 +5,11 @@ import qs.settings
 import qs.services
 import "../notifications/feed.js" as Feed
 
-// The bell: a pill with the bell alone, no count, while there is a notification (always, with the
-// "Always show the bell" setting), crossed out while Do not disturb is on. A click opens or closes
-// the notifications panel. The pointer resting on it a moment asks for the peek (`peeking`), so
-// passing over it shows nothing; with nothing unread there is no peek, and a hint says so.
+// The bell: a pill with the bell alone, no count, while there is a notification or Do not disturb
+// is on (always, with the "Always show the bell" setting), crossed out while Do not disturb is
+// on, so it says why things are quiet. A click opens or closes the notifications panel. The
+// pointer resting on it a moment asks for the peek (`peeking`), so passing over it shows nothing;
+// with nothing unread there is no peek, and a hint says so.
 Pill {
     id: root
 
@@ -16,7 +17,7 @@ Pill {
     readonly property bool peeking: root.hovered && root.rested
     property bool rested: false
 
-    visible: Feed.bellShown(Notifs.count, Settings.alwaysShowBell)
+    visible: Feed.bellShown(Notifs.count, Settings.alwaysShowBell, Notifs.dnd)
     interactive: true
     padding: K.Tokens.space.s8
     tooltip: Notifs.unreadCount === 0 ? "No new notifications" : ""

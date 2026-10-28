@@ -10,6 +10,7 @@ bar                      bar            FrameShot   900,0,700,40      bar
 bar-traymenu             bar            FrameShot   900,0,700,320     bar traymenu
 bar-dnd                  bar            FrameShot   900,0,700,40      bar dnd
 bar-nobell               bar            FrameShot   900,0,700,40      bar nobell
+bar-dnd-empty            bar            FrameShot   900,0,700,40      bar dnd-empty
 controlcenter            controlcenter  FrameShot   1176,0,424,1000   controlcenter
 controlcenter-wifi       controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi
 controlcenter-wifi-form  controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi-form

@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Hyprland
 import qs.settings
 import KubaOS.Components as K
+import "dnd.js" as Dnd
 
 // Small helpers on top of the Hyprland IPC, and each screen's workspaces.
 //
@@ -46,16 +47,20 @@ Singleton {
         return next;
     }
 
-    // Whether a screen is being shared, as Hyprland's last `screencast` event said: on as a client
-    // (Meet, Discord, OBS) starts taking frames of a screen or a window, off as it stops. Unknown
-    // at start, so off until the next share starts.
-    // https://wiki.hypr.land/IPC/#events-list
-    property bool sharing: false
+    // How many screen shares run, counted from Hyprland's `screencast` events: one more as a client
+    // (Meet, Discord, OBS) starts taking frames of a screen or a window, one less as it stops
+    // (`dnd.js`). Unknown at start, so none until the next share starts.
+    property int shares: 0
+    readonly property bool sharing: root.shares > 0
 
-    // Whether a window is really fullscreen on a workspace a screen shows: Hyprland's fullscreen
+    // How many windows are really fullscreen on a workspace a screen shows: Hyprland's fullscreen
     // mode 2, never a maximised window (mode 1), which a workspace's `hasFullscreen` counts too.
     // The mode is the client list's, read again on every `fullscreen` event.
-    readonly property bool fullscreen: Hyprland.toplevels.values.some(t => (t.workspace?.active ?? false) && ((t.lastIpcObject?.fullscreen ?? 0) & 2) !== 0)
+    readonly property int fullscreenWindows: Dnd.fullscreenWindows(Hyprland.toplevels.values.map(t => ({
+                shown: t.workspace?.active ?? false,
+                mode: t.lastIpcObject?.fullscreen ?? 0
+            })))
+    readonly property bool fullscreen: root.fullscreenWindows > 0
 
     function blockOf(id: int): int {
         return Math.floor((id - 1) / slots);
@@ -188,7 +193,7 @@ Singleton {
 
         function onRawEvent(event: HyprlandEvent): void {
             if (event.name === "screencast") {
-                root.sharing = event.parse(2)[0] === "1";
+                root.shares = Dnd.screencast(root.shares, event.data);
             } else if (event.name === "fullscreen") {
                 Hyprland.refreshToplevels();
                 fullscreenRead.restart();

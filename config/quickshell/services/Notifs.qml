@@ -11,10 +11,10 @@ import "dnd.js" as Dnd
 //
 // Do not disturb (`dnd.js`) is on by hand, or by itself while Hyprland says the screen is shared
 // or a window is fullscreen. While it is on, new notifications land in the history without popping
-// up. Its state is `$XDG_RUNTIME_DIR/kubaos-dnd.json`, which the Command menu's on/off pair reads
-// and a restarted shell takes the hand's on back from. A reload keeps the notifications
-// (`keepOnReload`), and `PersistentProperties` keeps what is unread, when each came and the whole
-// Do not disturb state with them.
+// up, critical ones apart. Its state is `$XDG_RUNTIME_DIR/kubaos-dnd.json`, which the Command
+// menu's on/off pair reads and a restarted shell takes the hand's on back from. A reload keeps the
+// notifications (`keepOnReload`), and `PersistentProperties` keeps what is unread, when each came
+// and the whole Do not disturb state with them.
 Singleton {
     id: root
 
@@ -202,7 +202,7 @@ Singleton {
                 delete unread[id];
                 root.unreadIds = unread;
             });
-            if (!root.dnd)
+            if (Dnd.popsUp(root.dndState, notification.urgency))
                 root.popups = [notification, ...root.popups];
         }
     }

@@ -30,9 +30,9 @@ import qs.modules.frame
 //                  panel (the notifications panel, a stack folded), panel-expanded (the stack
 //                  open, its second card selected), panel-keys (the keys button's tooltip),
 //                  panel-empty (nothing in it), panel-dnd (Do not disturb on while the screen is
-//                  shared)
+//                  shared, its tooltip showing)
 //   bar: traymenu (the network item's menu open), dnd (the bell crossed out), nobell (no
-//        notification, so no bell)
+//        notification, so no bell), dnd-empty (no notification, the bell crossed out all the same)
 QtObject {
     id: driver
 
@@ -113,7 +113,7 @@ QtObject {
             driver.keepOsd.start();
         } else if (driver.panel === "notifications" && driver.state.startsWith("panel")) {
             Panels.current = "notifications";
-            if (driver.state === "panel-expanded" || driver.state === "panel-keys")
+            if (driver.state === "panel-expanded" || driver.state === "panel-keys" || driver.state === "panel-dnd")
                 notificationsPose.start();
         } else if (driver.panel === "notifications" && driver.state === "peek") {
             const popups = driver.find(root, it => it.peeking !== undefined && it.hasPeek !== undefined);
@@ -173,12 +173,13 @@ QtObject {
                 console.warn("shot: no notifications panel found");
                 return;
             }
-            if (driver.state === "panel-keys") {
-                const tooltip = driver.find(driver.window.contentItem, it => it.title === "Keys" && it.shown !== undefined);
+            if (driver.state === "panel-keys" || driver.state === "panel-dnd") {
+                const title = driver.state === "panel-keys" ? "Keys" : "Do not disturb is on";
+                const tooltip = driver.find(driver.window.contentItem, it => it.title === title && it.shown !== undefined && it.within !== undefined);
                 if (tooltip)
                     tooltip.shown = true;
                 else
-                    console.warn("shot: no keys tooltip found");
+                    console.warn(`shot: no tooltip "${title}" found`);
                 return;
             }
             const stack = panel.rows.find(row => row.stacked);
@@ -342,9 +343,9 @@ QtObject {
         if (driver.panel === "notifications" && driver.state === "peek")
             Notifs.unread = Notifs.history.slice();
         // Emptied before the frame exists, so no card is made and torn down again.
-        if ((driver.panel === "notifications" && driver.state === "panel-empty") || (driver.panel === "bar" && driver.state === "nobell"))
+        if ((driver.panel === "notifications" && driver.state === "panel-empty") || (driver.panel === "bar" && (driver.state === "nobell" || driver.state === "dnd-empty")))
             Notifs.clear();
-        if ((driver.panel === "notifications" && driver.state === "panel-dnd") || (driver.panel === "bar" && driver.state === "dnd"))
+        if ((driver.panel === "notifications" && driver.state === "panel-dnd") || (driver.panel === "bar" && (driver.state === "dnd" || driver.state === "dnd-empty")))
             Notifs.dndReason = "sharing";
         driver.frame = driver.frameComponent.createObject(null);
         driver.window = driver.windowOf(driver.frame);

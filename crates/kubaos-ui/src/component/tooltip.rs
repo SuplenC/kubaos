@@ -46,8 +46,9 @@ pub fn tooltip<'a, M: 'a>(look: &Look, title: &'a str, body: &'a str, extra: Opt
     probe::component("Tooltip", ["", "", ""], fixed, card)
 }
 
-/// `content` with `tip` (a [`tooltip`]) floating 8 above it, starting where it starts and kept
-/// inside the window, while hovered or while `shown` (the keyboard is on it).
+/// `content` with `tip` (a [`tooltip`]) floating 8 above it, or 8 below where there is no room
+/// above, starting where it starts and kept inside the window, while hovered or while `shown` (the
+/// keyboard is on it).
 pub fn with_tooltip<'a, M: 'a>(
     look: &Look,
     content: impl Into<Element<'a, M>>,

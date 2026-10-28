@@ -1400,6 +1400,9 @@ c_notifications() {
     echo "FAIL Do not disturb: $out, state file $dnd_file"
     bad=1
   fi
+  TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
+  in_session "notify-send -u critical Urgent 'Breaks through Do not disturb'" >/dev/null 2>&1
+  toast_wait "a critical one pops up through Do not disturb" 'stack=top,1,' || bad=1
   in_session 'qs ipc call notifications dnd off' >/dev/null 2>&1
   sleep 0.5
   dnd_file="$(in_session 'cat "$XDG_RUNTIME_DIR/kubaos-dnd.json"' 2>&1 || true)"

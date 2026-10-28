@@ -74,6 +74,9 @@ QtObject {
     readonly property var unreadIds: ({})
     property string dndReason: ""
     readonly property bool dnd: ["manual", "sharing", "fullscreen"].includes(root.dndReason)
+    readonly property var dndState: ({
+            sharing: root.dndReason === "sharing"
+        })
 
     // When each arrived: a few minutes before the shots' frozen clock, and one the day before.
     function arrived(notification: var): var {
