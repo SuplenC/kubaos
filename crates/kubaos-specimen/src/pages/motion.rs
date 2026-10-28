@@ -79,7 +79,8 @@ fn use_of(duration: Duration) -> &'static str {
 fn curve_use(easing: Easing) -> &'static str {
     match easing {
         Easing::Standard => "Small changes that stay: toggles, colour, focus.",
-        Easing::StandardDecel => "Something moving settling in: a list reordering.",
+        Easing::StandardDecel => "Something moving settling in: a list, a slider's step.",
+        Easing::Pop => "A small mark popping in: a slider's anchor dot.",
         Easing::StandardAccel => "Something small leaving for good: a toast.",
         Easing::EmphasizedDecel => "Arriving: panels, dialogs, pages, the log.",
         Easing::EmphasizedAccel => "Leaving: panels and dialogs closing.",

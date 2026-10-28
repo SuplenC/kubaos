@@ -31,6 +31,11 @@ font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80]
 # The scales every length is checked against: `grid` times each one must be a
 # whole number of device pixels.
 scales = [1.0, 1.25, 1.5, 2.0]
+# The sizes allowed off the grid: a slider's step dot and its regular anchor
+# dot, Kuba's picks from the sketches. Each is drawn centred on a point that
+# moves with the slider's width and value, so its edges land between device
+# pixels whatever its size, and a size on the grid would buy nothing.
+off_grid = ["size.slider_stop", "size.slider_anchor"]
 
 # Lines thinner than the grid. Neither is a multiple of 4, so neither is a
 # length: each is drawn as whole device pixels at the scale it shows at.
@@ -87,7 +92,7 @@ control = 12
 # Everything that holds content: cards, dialogs, popups, panels, list wells,
 # the screen frame.
 surface = 24
-# Pills and circles: switches, icon buttons, the slider's thumb, avatars,
+# Pills and circles: switches, icon buttons, sliders, avatars,
 # badges.
 full = true
 
@@ -152,11 +157,20 @@ bar = 40
 # A wallpaper's thumbnail in the shell's picker, 16:10 as the screens are.
 thumbnail_width = 256
 thumbnail_height = 160
-# A slider: its thumb's room, the thumb, and the mark of each stop on a slider
-# that snaps to stops. The track is a progress bar's.
-slider = 24
-slider_thumb = 16
-slider_stop = 4
+# A slider is a pill: the fill is the pill, its round end marks the value, the
+# icon sits in the circle at its start and the value or its name at its end.
+# Regular, and compact for a dense panel (the control center, the system
+# monitor): as tall as a compact row.
+slider = 36
+slider_compact = 28
+# The dot of each step, on either side of the fill.
+slider_stop = 6
+# The solid dot of the mark the value rests on: a step, or a sticky point
+# while the value holds there. Regular and compact.
+slider_anchor = 10
+slider_anchor_compact = 8
+# How near a drag holds on a sticky point before it pulls free.
+slider_hold = 12
 # A scrollbar's thumb, a pill: thin, since the keyboard and the wheel do the scrolling and the
 # thumb only says where you are.
 scrollbar = 4
@@ -207,6 +221,11 @@ jp = "M PLUS 1"
 # font size, held to an icon size no taller than the line, so an icon never
 # makes a line taller; its stroke is whole device pixels at every scale (see
 # `stroke.symbol`).
+#
+# `tabular = true` draws a style's figures tabular (OpenType `tnum`), all one
+# width, for a number that changes in place. Off by default. iced's text has no
+# font features, so iced draws them proportional, and a component showing such
+# a number holds it in a box as wide as its widest value.
 [type.clock]
 size = 80
 line = 88
@@ -327,6 +346,17 @@ weight = "medium"
 family = "sans"
 use = "A field's label, a chip, a quiet button."
 
+# A number that changes in place at the label's size: the label's style with
+# tabular figures (`tnum`), so the number keeps its width as it ticks.
+[type.label_number]
+size = 12
+line = 16
+icon = 16
+weight = "medium"
+family = "sans"
+tabular = true
+use = "A number that changes in place: a slider's value."
+
 [type.small]
 size = 12
 line = 16
@@ -413,7 +443,12 @@ use = "Small state changes that stay on screen: toggles, colour, focus."
 
 [easing.standard_decel]
 curve = [0.0, 0.0, 0.0, 1.0]
-use = "Something already moving settling in: a list reordering."
+use = "Something already moving settling in: a list reordering, a slider settling on its step."
+
+# Past its end and back: a small mark popping in.
+[easing.pop]
+curve = [0.2, 0.9, 0.3, 1.3]
+use = "A small mark popping in, a little past its size and back: a slider's anchor dot."
 
 [easing.standard_accel]
 curve = [0.3, 0.0, 1.0, 1.0]
@@ -462,7 +497,8 @@ placeholder_text = 0.85
 # An accent colour as a faint fill under itself: a tag, a done step.
 tint = 0.16
 # A picture that sits back while another is picked: the wallpaper picker's
-# thumbnails not under the keyboard.
+# thumbnails not under the keyboard. A slider's step the fill has passed, on
+# the fill, as low as keeps 3:1 there in both modes.
 subdued = 0.75
 # Secondary text on a selected row or a checked tile, over its container: as
 # low as keeps 4.5:1 on every container a row is selected in, in both modes.
@@ -752,6 +788,9 @@ pairs = [
   { fg = "primary", bg = "surface_container", need = "graphic", use = "The focus tube on a panel" },
   { fg = "primary", bg = "surface_container_high", need = "graphic", use = "The focus tube in a card or a dialog, a field's tube on its fill" },
   { fg = "primary", bg = "surface_container_highest", need = "graphic", use = "A slider's or a progress bar's fill on its track, a focused field's tube on its fill" },
+  { fg = "on_primary", bg = "primary", need = "graphic", opacity = "subdued", use = "A slider's step the fill has passed" },
+  { fg = "on_secondary_container", bg = "secondary_container", need = "graphic", opacity = "subdued", use = "A slider's passed step on its softer fill (Auto)" },
+  { fg = "on_surface_variant", bg = "surface_container_highest", need = "graphic", use = "A slider's step ahead, on its track" },
   { fg = "cold", bg = "surface", need = "graphic", use = "The cold focus tube on a page, the logo's dakuten" },
   { fg = "cold", bg = "surface_container_low", need = "graphic", use = "The cold focus tube in a well" },
   { fg = "cold", bg = "surface_container", need = "graphic", use = "The cold focus tube on a panel" },

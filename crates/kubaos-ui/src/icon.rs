@@ -50,16 +50,22 @@ const WRITTEN_STROKE: &str = "stroke-width=\"2\"";
 /// `glyph` at `size`, in `color`, in a square box as wide and tall as `size`.
 pub fn icon<'a, M: 'a>(look: &Look, glyph: Icon, size: IconSize, color: Color) -> Element<'a, M> {
     let px = f32::from(size.px());
-    let grid_stroke = device_stroke(size, look.scale) / look.scale.factor() * GRID / px;
     // The colour filter keeps only the colour's channels; its alpha goes to the opacity, so a
     // disabled or fading icon dims like its label.
     let opaque = Color { a: 1.0, ..color };
-    let drawn = widget::svg(handle(glyph, grid_stroke))
+    let drawn = widget::svg(symbol(glyph, size, look.scale))
         .width(Length::Fixed(px))
         .height(Length::Fixed(px))
         .opacity(color.a)
         .style(move |_theme, _status| svg::Style { color: Some(opaque) });
     probe(Tag::Icon(glyph.name()), drawn)
+}
+
+/// `glyph`'s drawing at `size` and `scale`, its stroke whole device pixels, for a widget that draws
+/// the symbol itself.
+pub(crate) fn symbol(glyph: Icon, size: IconSize, scale: Scale) -> svg::Handle {
+    let px = f32::from(size.px());
+    handle(glyph, device_stroke(size, scale) / scale.factor() * GRID / px)
 }
 
 /// The stroke of a symbol at `size`, in device pixels at `scale`: the 2 unit stroke scaled to the

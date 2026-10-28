@@ -57,6 +57,10 @@ pub struct Rules {
     pub font_sizes: Vec<u16>,
     /// The display scales every length must land on whole device pixels at.
     pub scales: Vec<f32>,
+    /// Sizes allowed off the grid, as `size.<name>`: marks drawn centred on a point that moves
+    /// with a value, so their edges miss whole device pixels whatever their size.
+    #[serde(default)]
+    pub off_grid: Vec<String>,
 }
 
 /// Lines thinner than the grid, drawn in whole device pixels.
@@ -231,6 +235,10 @@ pub struct TypeStyle {
     pub icon: u16,
     pub weight: Weight,
     pub family: Family,
+    /// Whether its figures are tabular (OpenType `tnum`), all one width, so a number that changes
+    /// in place keeps its width. Off unless the style says so.
+    #[serde(default)]
+    pub tabular: bool,
     /// What the style is for, in a sentence.
     #[serde(rename = "use")]
     pub purpose: String,

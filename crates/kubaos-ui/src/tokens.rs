@@ -199,8 +199,11 @@ pub enum Size {
     RowTwoLine,
     Scrollbar,
     Slider,
+    SliderAnchor,
+    SliderAnchorCompact,
+    SliderCompact,
+    SliderHold,
     SliderStop,
-    SliderThumb,
     Sparkline,
     SwitchHeight,
     SwitchKnobOff,
@@ -212,7 +215,7 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 34] = [
+    pub const ALL: [Size; 37] = [
         Size::Badge,
         Size::BadgeDot,
         Size::Bar,
@@ -238,8 +241,11 @@ impl Size {
         Size::RowTwoLine,
         Size::Scrollbar,
         Size::Slider,
+        Size::SliderAnchor,
+        Size::SliderAnchorCompact,
+        Size::SliderCompact,
+        Size::SliderHold,
         Size::SliderStop,
-        Size::SliderThumb,
         Size::Sparkline,
         Size::SwitchHeight,
         Size::SwitchKnobOff,
@@ -276,9 +282,12 @@ impl Size {
             Size::RowCompact => 28,
             Size::RowTwoLine => 56,
             Size::Scrollbar => 4,
-            Size::Slider => 24,
-            Size::SliderStop => 4,
-            Size::SliderThumb => 16,
+            Size::Slider => 36,
+            Size::SliderAnchor => 10,
+            Size::SliderAnchorCompact => 8,
+            Size::SliderCompact => 28,
+            Size::SliderHold => 12,
+            Size::SliderStop => 6,
             Size::Sparkline => 48,
             Size::SwitchHeight => 24,
             Size::SwitchKnobOff => 12,
@@ -287,6 +296,13 @@ impl Size {
             Size::ThumbnailHeight => 160,
             Size::ThumbnailWidth => 256,
         }
+    }
+}
+
+impl Size {
+    /// Whether it may leave the grid: a mark centred on a point that moves with a value.
+    pub const fn off_grid(self) -> bool {
+        matches!(self, Size::SliderStop | Size::SliderAnchor)
     }
 }
 
@@ -409,6 +425,8 @@ pub enum Type {
     ButtonSmall,
     /// A field's label, a chip, a quiet button.
     Label,
+    /// A number that changes in place: a slider's value.
+    LabelNumber,
     /// Logs, device paths, timings, keycaps.
     Mono,
     /// A note under a field, a subtitle under a row's title.
@@ -421,7 +439,7 @@ pub enum Type {
 
 impl Type {
     /// Every type style, largest first.
-    pub const ALL: [Type; 21] = [
+    pub const ALL: [Type; 22] = [
         Type::Clock,
         Type::Hero,
         Type::HeroNumber,
@@ -439,6 +457,7 @@ impl Type {
         Type::Accent,
         Type::ButtonSmall,
         Type::Label,
+        Type::LabelNumber,
         Type::Mono,
         Type::Small,
         Type::Keycap,
@@ -465,6 +484,7 @@ impl Type {
             Type::Accent => 13,
             Type::ButtonSmall => 12,
             Type::Label => 12,
+            Type::LabelNumber => 12,
             Type::Mono => 12,
             Type::Small => 12,
             Type::Keycap => 11,
@@ -492,6 +512,7 @@ impl Type {
             Type::Accent => 20,
             Type::ButtonSmall => 16,
             Type::Label => 16,
+            Type::LabelNumber => 16,
             Type::Mono => 16,
             Type::Small => 16,
             Type::Keycap => 20,
@@ -520,6 +541,7 @@ impl Type {
             Type::Accent => IconSize::S16,
             Type::ButtonSmall => IconSize::S16,
             Type::Label => IconSize::S16,
+            Type::LabelNumber => IconSize::S16,
             Type::Mono => IconSize::S16,
             Type::Small => IconSize::S16,
             Type::Keycap => IconSize::S16,
@@ -547,6 +569,7 @@ impl Type {
             Type::Accent => Weight::Medium,
             Type::ButtonSmall => Weight::Semibold,
             Type::Label => Weight::Medium,
+            Type::LabelNumber => Weight::Medium,
             Type::Mono => Weight::Regular,
             Type::Small => Weight::Regular,
             Type::Keycap => Weight::Medium,
@@ -574,11 +597,19 @@ impl Type {
             Type::Accent => Family::Jp,
             Type::ButtonSmall => Family::Sans,
             Type::Label => Family::Sans,
+            Type::LabelNumber => Family::Sans,
             Type::Mono => Family::Mono,
             Type::Small => Family::Sans,
             Type::Keycap => Family::Mono,
             Type::Caption => Family::Sans,
         }
+    }
+
+    /// Whether its figures are tabular (OpenType `tnum`), all one width. iced's text has no font
+    /// features, so iced draws them proportional, and a component showing a changing number holds
+    /// it in a box as wide as its widest value.
+    pub const fn tabular(self) -> bool {
+        matches!(self, Type::LabelNumber)
     }
 }
 
@@ -637,20 +668,23 @@ pub enum Easing {
     EmphasizedDecel,
     /// Progress that tracks a real quantity, and spinners.
     Linear,
+    /// A small mark popping in, a little past its size and back: a slider's anchor dot.
+    Pop,
     /// Small state changes that stay on screen: toggles, colour, focus.
     Standard,
     /// Something small leaving for good: a toast fading out.
     StandardAccel,
-    /// Something already moving settling in: a list reordering.
+    /// Something already moving settling in: a list reordering, a slider settling on its step.
     StandardDecel,
 }
 
 impl Easing {
     /// Every easing.
-    pub const ALL: [Easing; 6] = [
+    pub const ALL: [Easing; 7] = [
         Easing::EmphasizedAccel,
         Easing::EmphasizedDecel,
         Easing::Linear,
+        Easing::Pop,
         Easing::Standard,
         Easing::StandardAccel,
         Easing::StandardDecel,
@@ -662,6 +696,7 @@ impl Easing {
             Easing::EmphasizedAccel => [0.3, 0.0, 0.8, 0.15],
             Easing::EmphasizedDecel => [0.05, 0.7, 0.1, 1.0],
             Easing::Linear => [0.0, 0.0, 1.0, 1.0],
+            Easing::Pop => [0.2, 0.9, 0.3, 1.3],
             Easing::Standard => [0.2, 0.0, 0.0, 1.0],
             Easing::StandardAccel => [0.3, 0.0, 1.0, 1.0],
             Easing::StandardDecel => [0.0, 0.0, 0.0, 1.0],
@@ -1258,7 +1293,7 @@ pub struct ContrastPair {
 }
 
 /// Every foreground role the front ends draw on a background role, and the contrast it needs.
-pub const CONTRAST: [ContrastPair; 55] = [
+pub const CONTRAST: [ContrastPair; 58] = [
     ContrastPair {
         fg: Role::OnSurface,
         bg: Role::Surface,
@@ -1524,6 +1559,27 @@ pub const CONTRAST: [ContrastPair; 55] = [
         need: Need::Graphic,
         opacity: None,
         purpose: "A slider's or a progress bar's fill on its track, a focused field's tube on its fill",
+    },
+    ContrastPair {
+        fg: Role::OnPrimary,
+        bg: Role::Primary,
+        need: Need::Graphic,
+        opacity: Some(Opacity::Subdued),
+        purpose: "A slider's step the fill has passed",
+    },
+    ContrastPair {
+        fg: Role::OnSecondaryContainer,
+        bg: Role::SecondaryContainer,
+        need: Need::Graphic,
+        opacity: Some(Opacity::Subdued),
+        purpose: "A slider's passed step on its softer fill (Auto)",
+    },
+    ContrastPair {
+        fg: Role::OnSurfaceVariant,
+        bg: Role::SurfaceContainerHighest,
+        need: Need::Graphic,
+        opacity: None,
+        purpose: "A slider's step ahead, on its track",
     },
     ContrastPair {
         fg: Role::Cold,

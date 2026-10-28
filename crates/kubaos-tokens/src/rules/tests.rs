@@ -31,6 +31,16 @@ fn set(root: &mut toml::Table, path: &[&str], key: &str, value: impl Into<toml::
     table(root, path).insert(key.into(), value.into());
 }
 
+/// Adds `token` to the sizes the repo already allows off the grid.
+fn allow_off_grid(root: &mut toml::Table, token: &str) {
+    table(root, &["rules"])
+        .entry("off_grid")
+        .or_insert_with(|| toml::Value::Array(Vec::new()))
+        .as_array_mut()
+        .expect("rules.off_grid is a list")
+        .push(token.into());
+}
+
 #[test]
 fn the_repos_tokens_hold_every_rule() {
     let tokens = crate::parse(TOKENS);
@@ -139,6 +149,29 @@ fn a_component_size_off_the_grid_is_refused() {
             token: "size.switch_height".into(),
             value: 26,
             grid: 4
+        }]
+    );
+}
+
+#[test]
+fn a_size_listed_as_off_the_grid_may_leave_it() {
+    let tokens = tokens_with(|t| {
+        set(t, &["size"], "switch_height", 26);
+        allow_off_grid(t, "size.switch_height");
+    });
+
+    assert!(tokens.is_ok(), "{tokens:?}");
+}
+
+#[test]
+fn an_off_grid_listing_naming_no_size_is_refused() {
+    let found = violations(|t| allow_off_grid(t, "size.no_such_size"));
+
+    assert_eq!(
+        found,
+        [Violation::UnknownName {
+            token: "rules.off_grid".into(),
+            name: "size.no_such_size".into()
         }]
     );
 }

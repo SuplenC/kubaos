@@ -447,6 +447,7 @@ fn types(out: &mut Writer, tokens: &Tokens) {
                     "            readonly property string family: {:?}",
                     families.name(style.family)
                 ));
+                out.line(format!("            readonly property bool tabular: {}", style.tabular));
                 out.line("        }");
             }
         },

@@ -70,9 +70,9 @@ use kubaos_ui::component::select::select;
 use kubaos_ui::component::sheet;
 use kubaos_ui::component::skeleton::Bone;
 use kubaos_ui::component::skeleton::skeleton;
+use kubaos_ui::component::slider::Slider;
 use kubaos_ui::component::slider::Value;
 use kubaos_ui::component::slider::slider;
-use kubaos_ui::component::slider::slider_held;
 use kubaos_ui::component::step::StepState;
 use kubaos_ui::component::step::step;
 use kubaos_ui::component::switch::switch;
@@ -133,7 +133,10 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Sliders",
-            Some("A progress bar's track filled up to the thumb. One with stops marks those ahead and snaps to them."),
+            Some(
+                "A pill whose fill is the value: its round end marks it. Steps show on both sides, and the mark \
+                 the value rests on turns solid. Regular above, compact below.",
+            ),
             sliders(look),
         ))
         .push(section(
@@ -474,28 +477,81 @@ fn toggles<'a>(look: &Look) -> Element<'a, Message> {
 
 fn sliders<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
-    let sample = |value: Value, enabled: bool, focused: bool, label: &'static str| -> Element<'a, Message> {
-        let on_change: Option<Box<dyn Fn(Value) -> Message>> =
-            enabled.then(|| Box::new(|_| Message::Sample) as Box<dyn Fn(Value) -> Message>);
+    let caption = |words: &'static str| text(words, Type::Small, c.on_surface_variant);
+    let live = |glyph: Icon, value: Value| -> Slider<'a, Message> {
+        slider(glyph, value)
+            .on_change(|_| Message::Sample)
+            .on_icon(Message::Sample)
+    };
+    let power = [
+        "Super Saver",
+        "Power Saver",
+        "Balanced",
+        "Performance",
+        "Max Performance",
+    ];
+    let cell = |shown: Slider<'a, Message>, compact: bool, words: &'static str| -> Element<'a, Message> {
+        let shown = if compact { shown.compact() } else { shown };
         stack(look, Space::S8)
-            .push(slider(look, value, on_change, focused))
-            .push(text(label, Type::Small, c.on_surface_variant))
+            .push(shown.view(look))
+            .push(caption(words))
             .into()
     };
-    let held = stack(look, Space::S8)
-        .push(slider_held(
-            look,
-            Value::Continuous(0.62),
-            Some(Box::new(|_| Message::Sample) as Box<dyn Fn(Value) -> Message>),
-        ))
-        .push(text("Pressed: the fill lights up", Type::Small, c.on_surface_variant));
-    grid(look, 5, Space::S32)
-        .push(sample(Value::Continuous(0.62), true, false, "Volume, 62%"))
-        .push(held)
-        .push(sample(Value::Stop { index: 2, count: 5 }, true, false, "Five stops"))
-        .push(sample(Value::Continuous(0.3), true, true, "Focused"))
-        .push(sample(Value::Continuous(0.3), false, false, "Disabled"))
-        .into()
+    let samples = |compact: bool| -> Element<'a, Message> {
+        grid(look, 3, Space::S32)
+            .push(cell(
+                live(Icon::VolumeUp, Value::Continuous(0.62)),
+                compact,
+                "Volume, 62%",
+            ))
+            .push(cell(
+                live(Icon::VolumeUp, Value::Continuous(0.62)).hovered(),
+                compact,
+                "Under the pointer",
+            ))
+            .push(cell(
+                live(Icon::VolumeUp, Value::Continuous(0.62)).held(),
+                compact,
+                "Held: the fill lights up",
+            ))
+            .push(cell(
+                live(Icon::VolumeOff, Value::Continuous(0.0)).words("Muted"),
+                compact,
+                "Muted: the icon mutes",
+            ))
+            .push(cell(
+                live(Icon::MotionPhotosAuto, Value::Continuous(0.55))
+                    .words("Auto · 55%")
+                    .soft(),
+                compact,
+                "Auto: the sensor's level",
+            ))
+            .push(cell(
+                live(Icon::Balance, Value::Stop { index: 2, count: 5 }).stops(power),
+                compact,
+                "Five steps, resting on one",
+            ))
+            .push(cell(
+                live(Icon::VolumeUp, Value::Continuous(2.0 / 3.0))
+                    .sticky(2.0 / 3.0)
+                    .number("100%")
+                    .widest("150%"),
+                compact,
+                "Sticky at 100% of 150%",
+            ))
+            .push(cell(
+                live(Icon::VolumeUp, Value::Continuous(0.3)).focused(true),
+                compact,
+                "Focused",
+            ))
+            .push(cell(
+                slider(Icon::VolumeUp, Value::Continuous(0.3)),
+                compact,
+                "Disabled",
+            ))
+            .into()
+    };
+    stack(look, Space::S32).push(samples(false)).push(samples(true)).into()
 }
 
 fn lists<'a>(look: &Look) -> Element<'a, Message> {

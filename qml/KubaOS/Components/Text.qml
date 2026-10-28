@@ -27,8 +27,13 @@ Item {
     // How much larger than the style the advances are measured, so Qt's rounding of each one to
     // 1/64 of a pixel shrinks to under a thousandth.
     readonly property int precision: 256
-    // Whether the text is shaped: iced shapes anything but plain ASCII.
-    readonly property bool shaped: /[^\x00-\x7f]/.test(root.text)
+    // Whether the text is shaped: iced shapes anything but plain ASCII. A style with tabular
+    // figures is shaped too, since Qt applies font features only to shaped text.
+    readonly property bool shaped: root.style.tabular || /[^\x00-\x7f]/.test(root.text)
+    // The OpenType features the style turns on: `tnum` for tabular figures.
+    readonly property var features: root.style.tabular ? {
+        "tnum": 1
+    } : {}
     // Each line's words and its width in logical pixels.
     // The words in lines as they wrap in `room`, before `maximumLines` cuts them.
     readonly property var laid: root.layOut(root.text, root.room, metrics.font)
@@ -111,6 +116,7 @@ Item {
         font.pixelSize: root.style.size * root.precision
         font.kerning: root.shaped
         font.preferShaping: root.shaped
+        font.features: root.features
         font.hintingPreference: Font.PreferNoHinting
     }
 
@@ -130,6 +136,7 @@ Item {
         font.pixelSize: root.style.size
         font.kerning: root.shaped
         font.preferShaping: root.shaped
+        font.features: root.features
         font.hintingPreference: Font.PreferNoHinting
         // Drawn by the font engine, not as distance fields, which a text that changes every
         // second (the bar's readings) pays for on each change: over 30 s of the bar's sysmon and

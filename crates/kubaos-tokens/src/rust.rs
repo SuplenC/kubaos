@@ -16,6 +16,7 @@ use std::path::Path;
 use crate::model::Family;
 use crate::model::Rgb;
 use crate::model::Tokens;
+use crate::model::TypeStyle;
 use crate::model::Weight;
 use crate::target::Target;
 
@@ -338,6 +339,29 @@ fn lengths(out: &mut Writer, tokens: &Tokens) {
             ty: "u16",
         },
     );
+    size_off_grid(out, tokens);
+}
+
+/// `Size::off_grid`: the sizes `rules.off_grid` lets leave the grid.
+fn size_off_grid(out: &mut Writer, tokens: &Tokens) {
+    let off_grid: Vec<String> = tokens
+        .rules
+        .off_grid
+        .iter()
+        .filter_map(|token| token.strip_prefix("size."))
+        .map(|name| format!("Size::{}", camel(name)))
+        .collect();
+    out.blank();
+    out.line("impl Size {");
+    out.line("    /// Whether it may leave the grid: a mark centred on a point that moves with a value.");
+    out.line("    pub const fn off_grid(self) -> bool {");
+    if off_grid.is_empty() {
+        out.line("        false");
+    } else {
+        out.line(format!("        matches!(self, {})", off_grid.join(" | ")));
+    }
+    out.line("    }");
+    out.line("}");
 }
 
 fn container(out: &mut Writer, tokens: &Tokens) {
@@ -548,7 +572,31 @@ fn types(out: &mut Writer, tokens: &Tokens) {
         out.line("        }");
         out.line("    }");
     }
+    tabular(out, &styles);
     out.line("}");
+}
+
+/// `Type::tabular`: whether a style's figures are all one width.
+fn tabular(out: &mut Writer, styles: &[(&String, &TypeStyle)]) {
+    out.blank();
+    out.doc(
+        "    ",
+        "Whether its figures are tabular (OpenType `tnum`), all one width. iced's text has no font features, so iced \
+         draws them proportional, and a component showing a changing number holds it in a box as wide as its widest \
+         value.",
+    );
+    out.line("    pub const fn tabular(self) -> bool {");
+    let tabular: Vec<String> = styles
+        .iter()
+        .filter(|(_, style)| style.tabular)
+        .map(|(name, _)| format!("Type::{}", camel(name)))
+        .collect();
+    if tabular.is_empty() {
+        out.line("        false");
+    } else {
+        out.line(format!("        matches!(self, {})", tabular.join(" | ")));
+    }
+    out.line("    }");
 }
 
 fn family_variant(family: Family) -> &'static str {

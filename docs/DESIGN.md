@@ -94,12 +94,15 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 | `button` | 14 / 24 | semibold | A regular button's label (40 control). |
 | `button_small` | 12 / 16 | semibold | A small button's label (32 control). |
 | `label` | 12 / 16 | medium | A field's label, a chip, a hint. |
+| `label_number` | 12 / 16 | medium, tabular figures | A number that changes in place: a slider's value. |
 | `small` | 12 / 16 | regular | A note under a field, a subtitle under a row's title. |
 | `caption` | 11 / 16 | regular | What a key hint's key does, version lines, the smallest print. |
 | `accent` | 13 / 20 | medium, M PLUS 1 | The Japanese accent above a title. |
 | `mono` | 12 / 16 | regular, Geist Mono | Logs, device paths, timings. |
 | `keycap` | 11 / 20 | medium, Geist Mono | The key on a `Keycap`, on the keycap's 20 line so it centres in it. |
 | `mono_large` | 14 / 20 | regular, Geist Mono | A command or key that is the subject of its line. |
+
+**Tabular figures** (`tabular` on a style, OpenType `tnum`) make every figure one width, so a number that changes in place keeps its width: `label_number` has them. QML turns the feature on (`font.features`, which Qt applies only to shaped text, so such a style is always shaped). iced's text (0.14) has no font features, so iced draws the figures proportional, and a component showing a changing number holds it in a box as wide as its widest value, ending in one place.
 
 A single-line control's label takes the control's content box as its line height (a 40 button has a 24 line inside 8 + 8 padding), so the label centres on the grid with no centring arithmetic.
 
@@ -127,14 +130,14 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 
 *Top to bottom: the spacing scale as bars, the radii, the icon boxes, every fixed component size, the hairline and thin stroke, the focus tube and its glow (accent, and cold on a picked card), concentric corners, and a grid split in device pixels. Light: [space-light-1x.png](../design/specimen/space-light-1x.png).*
 
-**The 4 px grid** (`rules.grid`). Every spacing, size, radius, icon size, line height, shadow offset and non-hairline border is a multiple of 4 logical pixels. The reason is the supported scales, 1, 1.25, 1.5 and 2 (`rules.scales`): 4 × 1.25 = 5 and 4 × 1.5 = 6, so a multiple of 4 is a whole number of device pixels at every one of them. A 6 px gap is 7.5 device pixels at 1.25 and blurs. `kubaos-tokens` refuses an off-grid length.
+**The 4 px grid** (`rules.grid`). Every spacing, size, radius, icon size, line height, shadow offset and non-hairline border is a multiple of 4 logical pixels. The reason is the supported scales, 1, 1.25, 1.5 and 2 (`rules.scales`): 4 × 1.25 = 5 and 4 × 1.5 = 6, so a multiple of 4 is a whole number of device pixels at every one of them. A 6 px gap is 7.5 device pixels at 1.25 and blurs. `kubaos-tokens` refuses an off-grid length. The one exception is a mark drawn centred on a point that moves with a value, whose edges land between device pixels whatever its size: a slider's step dot (6) and its regular anchor dot (10), listed in `rules.off_grid`.
 
 | Scale | Tokens |
 |---|---|
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 36, compact 28, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
 | Aspect ratios (`[aspect]`) | wallpaper 16:10 |
 
@@ -174,7 +177,7 @@ Every radius means something: what the shape is. There are three, plus full, and
 | Small | `Small` | 4 | Marks inside controls: the checkbox, a hint, focus details, inline tags. |
 | Control | `Control` | 12 | Everything you click or type in: buttons, fields, list rows, menu items, chips. |
 | Surface | `Surface` | 24 | Everything that holds content: cards, dialogs, popups, toasts, panels, list wells, the screen frame. |
-| Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, the slider's thumb, avatars, badges. |
+| Full | `Full` | half the shorter side | Pills and circles: switches, icon buttons, radios, progress bars, sliders, avatars, badges. |
 
 - **Nesting is derived, never picked.** A shape that fills another less an inset takes the outer radius minus the inset, so both corners share a centre: `nested(outer, inset)`, which refuses an inset that reaches the outer radius (in a `const`, that stops the build). A pill in a pill is a pill.
 - **Worked examples:**
@@ -198,7 +201,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 |---|---|---|
 | `instant` | 0 | The caret, text appearing as it is typed, reduce motion's moves. |
 | `micro` | 100 | Hover and press state layers, a colour change under the pointer. |
-| `short` | 200 | A switch's knob, a check mark, focus moving, a toast fading in. |
+| `short` | 200 | A switch's knob, a check mark, focus moving, a toast fading in, a slider settling on its step and its anchor dot popping in. |
 | `medium` | 300 | A panel or popup leaving, a log opening, a list reordering, a toast fading out, a neon tube striking on (the focus tube too). |
 | `long` | 500 | A panel or dialog arriving, a page sliding in. |
 | `slow` | 800 | A wallpaper fading in, the light/dark crossfade. |
@@ -207,7 +210,8 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | Curve (`[easing.*]`) | Bézier | For |
 |---|---|---|
 | `standard` | 0.2, 0, 0, 1 | Small changes that stay on screen: toggles, colour, focus. |
-| `standard_decel` | 0, 0, 0, 1 | Something already moving settling in: a list reordering. |
+| `standard_decel` | 0, 0, 0, 1 | Something already moving settling in: a list reordering, a slider settling on its step. |
+| `pop` | 0.2, 0.9, 0.3, 1.3 | A small mark popping in, a little past its size and back: a slider's anchor dot. |
 | `standard_accel` | 0.3, 0, 1, 1 | Something small leaving for good: a toast fading out. |
 | `emphasized_decel` | 0.05, 0.7, 0.1, 1 | Things arriving: panels, dialogs, pages, the log opening. |
 | `emphasized_accel` | 0.3, 0, 0.8, 0.15 | Things leaving: panels and dialogs closing. |
@@ -285,7 +289,7 @@ Each component reports its shared name, its variant (the words below that apply,
 | `Collapsible` | `open` | none, holds content | control, its header |
 | `Spinner` | size `16`, `20`, `24`, `32`, `48` | both | none |
 | `Switch` | none | both | full |
-| `Slider` | `stepped` | height | full |
+| `Slider` | size `regular`, `compact`; `stepped` | height | full |
 | `Checkbox` | none | height | small |
 | `Radio` | none | height | full |
 | `ProgressBar` | `danger` | height | full |
@@ -385,7 +389,7 @@ Gaps, paddings and fixed sizes take only `Space`, `Size` and `Inset` tokens, so 
 | `Switch` | `switch::switch` | On or off, 44 × 24, the knob 12 off and 16 on, a hairline track. It takes effect at once; Space, Enter or a click toggles. |
 | `Checkbox` | `check::checkbox` | Square, 20, the small radius (4), a hairline edge. Empty, partial (a dash, for some of a group) or full. For several independent picks that apply together. |
 | `Radio` | `check::radio` | A 20 disc with an 8 dot. One of a group, exactly one picked. |
-| `Slider` | `slider::slider` | A value from 0 to 1, or one of a few stops (`stepped`), 24 tall: a progress bar's track filled up to a 16 thumb, a stop mark (4) on each stop the fill hasn't reached, and the focus tube a pill on its box's edge. A drag follows the pointer; on a slider with stops it shows the stop under the pointer and picks it on release. Left and Right step by a twentieth or a stop, Home and End go to the ends. It takes effect as it moves, so it carries a live value: volume, brightness, a power stop. The thumb takes the state layer, and the fill lights up: under the pointer it brightens by `press`, and while it is pressed or dragged by `held` (0.40), toward the palette's bright end (`on_surface` in dark, `surface` in light), so a held slider lights up as a progress bar's fill glows (`slider::slider_held` draws it held, for the specimen). |
+| `Slider` | `slider::slider` | A value from 0 to 1, or one of a few stops (`stepped`), as a pill, full width: regular (`slider`, 36) or compact (`slider_compact`, 28, for a dense panel: the control center, the system monitor). The fill is the value: its round end marks it, the value being that end circle's centre, so at 0 the fill is the circle behind the icon and at 1 it reaches the far end; the pointer maps to that centre. The icon (`label`'s 16) sits in that circle, always on the fill, in its content colour (`on_primary`). The value sits at the far end, 12 in: a percentage in `label_number`, or a name in `label` (a stop's, "Muted", "Auto · 55%"), drawn in `on_surface` over the track and the fill's content colour over the fill, split where the fill ends. A compact slider shows a number only under the pointer, while held or focused, fading over `micro`; a name always shows. Steps show as dots (6) on both sides of the fill: those the fill has passed in its content colour at `subdued`, those ahead in `on_surface_variant`. The mark the value rests on (a step at rest, or a sticky point while the value holds there) turns solid, 10 regular and 8 compact, in the fill's content colour, popping in over `short` on `pop`; while a drag moves between marks there is none. No dot is drawn under the icon or the label, with 4 clear of each: they mark that place already. A drag follows the pointer; on a slider with stops it moves freely and settles on the nearest stop when released, over `short` on `standard_decel`. A sticky point (an option, for a surface that needs one: a volume boost to 150% holding at 100%) holds a drag within 12 (`slider_hold`) of it. Left and Right step by a twentieth or a stop, Home and End go to the ends, the wheel steps. The icon is a button where the slider has a toggle: volume's mutes and unmutes, keeping the level to come back to; brightness's switches Auto, where a light sensor and a service driving the backlight from it exist, its fill then the sensor's level in the softer tonal colour (`secondary_container`). On a slider with stops each press steps one stop from high to low and back, turning at either end. It takes effect as it moves, so it carries a live value. The fill lights up: under the pointer it brightens by `press`, and while it is pressed or dragged by `held`, toward the palette's bright end (`on_surface` in dark, `surface` in light). Its focus tube is a pill on its box's edge. |
 
 | Name | Rust | What |
 |---|---|---|
