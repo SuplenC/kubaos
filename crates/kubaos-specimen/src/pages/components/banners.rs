@@ -24,12 +24,14 @@ use kubaos_ui::tokens::Opacity;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Banners",
-    lede: Some("A message that matters on the page itself, its actions inside: info, a warning, and danger, really red, holding the button that destroys."),
+    lede: Some(
+        "A message that matters on the page itself, its actions inside: info, a warning, and danger, really red, holding the button that destroys.",
+    ),
     view,
 };
 

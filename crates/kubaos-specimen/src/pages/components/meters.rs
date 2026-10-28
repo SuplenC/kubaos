@@ -17,12 +17,14 @@ use kubaos_ui::layout::row;
 use kubaos_ui::layout::stack;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Meters and sparklines",
-    lede: Some("Readings at a glance: a reading in parts on a progress bar's track, and the last minute of one as a line."),
+    lede: Some(
+        "Readings at a glance: a reading in parts on a progress bar's track, and the last minute of one as a line.",
+    ),
     view,
 };
 

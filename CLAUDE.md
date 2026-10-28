@@ -18,7 +18,7 @@ Any UI, in any toolkit, follows `docs/DESIGN.md`: tokens and the shared componen
 
 Render, diff and attach a UI change's screenshots with `just shots`, as `docs/agents/design-pr-loop.md` describes.
 
-Generated files aren't committed, so UI PRs don't collide: the token outputs are built where they are read (`just tokens` writes them into a checkout for an editor), and the specimen's pictures are rendered, never checked in. A new component's specimen samples are a file of their own on each side, plus one registry line (`docs/DESIGN.md`, "Changing the design").
+Generated files aren't committed, so UI PRs don't collide: the token outputs are built where they are read (`just tokens` writes them into a checkout for an editor), and the specimen's pictures are rendered, never checked in. A new component's specimen samples are a file of their own on each side, plus its lines in each page's list (`docs/DESIGN.md`, "Changing the design").
 
 ## Docs describe the current state
 

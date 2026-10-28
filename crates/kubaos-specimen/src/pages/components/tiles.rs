@@ -15,12 +15,14 @@ use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::grid;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Tiles",
-    lede: Some("Quick toggles as tall as a two-line row, filled with the accent while on. The detail arrow stays quiet: no fill, a state layer under the pointer."),
+    lede: Some(
+        "Quick toggles as tall as a two-line row, filled with the accent while on. The detail arrow stays quiet: no fill, a state layer under the pointer.",
+    ),
     view,
 };
 

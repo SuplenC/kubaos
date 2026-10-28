@@ -25,12 +25,14 @@ use kubaos_ui::tokens::Radius;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Sheets",
-    lede: Some("A panel growing out of the frame's edge, one surface with it: concave fillets where it meets the edge, the surface radius at its far corners."),
+    lede: Some(
+        "A panel growing out of the frame's edge, one surface with it: concave fillets where it meets the edge, the surface radius at its far corners.",
+    ),
     view,
 };
 

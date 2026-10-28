@@ -18,8 +18,8 @@ use kubaos_ui::text::text;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Cards",

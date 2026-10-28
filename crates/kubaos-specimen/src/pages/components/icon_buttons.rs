@@ -21,15 +21,17 @@ use kubaos_ui::text::text;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
-use crate::specimen::Message;
-use super::buttons::STATES;
-use super::buttons::size_name;
-use super::buttons::state_heads;
 use super::Section;
+use super::samples::STATES;
+use super::samples::size_name;
+use super::samples::state_heads;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Icon buttons",
-    lede: Some("Circles as tall as the label buttons of each size. The label is required: it shows in a hint on hover and while focused."),
+    lede: Some(
+        "Circles as tall as the label buttons of each size. The label is required: it shows in a hint on hover and while focused.",
+    ),
     view,
 };
 

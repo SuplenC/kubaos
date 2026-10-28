@@ -16,12 +16,14 @@ use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::row;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Tabs",
-    lede: Some("One of a few views or values, picked from small buttons: the picked one tonal. The same row is a setting's segmented control."),
+    lede: Some(
+        "One of a few views or values, picked from small buttons: the picked one tonal. The same row is a setting's segmented control.",
+    ),
     view,
 };
 

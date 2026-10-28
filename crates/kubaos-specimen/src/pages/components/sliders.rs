@@ -20,15 +20,15 @@ use kubaos_ui::text::text;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Sliders",
     lede: Some(
-                "A pill whose fill is the value: its round end marks it. Steps show on both sides, and the mark \
+        "A pill whose fill is the value: its round end marks it. Steps show on both sides, and the mark \
                  the value rests on turns solid. Regular above, compact below.",
-            ),
+    ),
     view,
 };
 

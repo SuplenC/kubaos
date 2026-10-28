@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 use kubaos_tokens::target::Kept;
 
-fn root() -> std::path::PathBuf {
+fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
@@ -18,20 +19,23 @@ fn the_checked_in_outputs_match_the_tokens() {
     assert!(stale.is_empty(), "stale, run `just tokens`: {stale:?}");
 }
 
+/// The home links every `/config/` line of `.gitignore` as a built output, and the e2e checks
+/// each one, so the list must be the built outputs exactly, both ways.
 #[test]
 fn git_ignores_the_built_outputs_and_no_other() {
     let ignore = fs::read_to_string(root().join(".gitignore")).expect("read .gitignore");
-    let ignored: BTreeSet<&str> = ignore.lines().filter_map(|line| line.strip_prefix('/')).collect();
+    let ignored: BTreeSet<&str> = ignore
+        .lines()
+        .filter_map(|line| line.strip_prefix('/'))
+        .filter(|path| path.starts_with("config/") || path.starts_with("qml/"))
+        .collect();
+    let built: BTreeSet<&str> = kubaos_tokens::target::targets()
+        .filter(|target| target.kept() == Kept::Built)
+        .map(kubaos_tokens::Target::path)
+        .collect();
 
-    for target in kubaos_tokens::target::targets() {
-        let listed = ignored.contains(target.path());
-        assert_eq!(
-            listed,
-            target.kept() == Kept::Built,
-            "{} is kept {:?}: list it in .gitignore as `/{}` exactly when it is built",
-            target.path(),
-            target.kept(),
-            target.path()
-        );
-    }
+    assert_eq!(
+        ignored, built,
+        "the /config/ and /qml/ lines of .gitignore are the built outputs, each as `/PATH`"
+    );
 }

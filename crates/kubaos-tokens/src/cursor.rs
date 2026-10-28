@@ -1,6 +1,6 @@
-//! The tokens the pointer is sized by, `crates/kubaos-cursor/src/tokens.rs`: the grid its size
-//! keeps to and the scales its bitmaps are drawn at, so the pointer is whole device pixels wherever
-//! the rest of the desktop is.
+//! The tokens the pointer is sized by, written into `kubaos-cursor`'s `OUT_DIR` and included by
+//! `crates/kubaos-cursor/src/tokens.rs`: the grid its size keeps to and the scales its bitmaps are
+//! drawn at, so the pointer is whole device pixels wherever the rest of the desktop is.
 //!
 //! # Owns
 //!

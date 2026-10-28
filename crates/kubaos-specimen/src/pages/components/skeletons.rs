@@ -22,12 +22,14 @@ use kubaos_ui::tokens::Size;
 use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Skeletons",
-    lede: Some("The shape of what is loading, in the placeholder colour, so what arrives moves nothing: a row being scanned, a thumbnail being decoded."),
+    lede: Some(
+        "The shape of what is loading, in the placeholder colour, so what arrives moves nothing: a row being scanned, a thumbnail being decoded.",
+    ),
     view,
 };
 

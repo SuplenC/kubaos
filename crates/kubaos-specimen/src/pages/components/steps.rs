@@ -19,12 +19,14 @@ use kubaos_ui::layout::split;
 use kubaos_ui::layout::stack;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Steps",
-    lede: Some("To do, done and waiting on an action each look their own, and the action carries the accent. A description wraps; a rail marks the state instead."),
+    lede: Some(
+        "To do, done and waiting on an action each look their own, and the action carries the accent. A description wraps; a rail marks the state instead.",
+    ),
     view,
 };
 

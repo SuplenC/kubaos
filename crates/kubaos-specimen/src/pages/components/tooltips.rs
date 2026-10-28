@@ -18,12 +18,14 @@ use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::stack;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Tooltips",
-    lede: Some("What a control does, on a popover 8 above it while the pointer or the keyboard is on it; drawn here in place, over the chip it explains."),
+    lede: Some(
+        "What a control does, on a popover 8 above it while the pointer or the keyboard is on it; drawn here in place, over the chip it explains.",
+    ),
     view,
 };
 

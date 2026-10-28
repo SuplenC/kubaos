@@ -1,6 +1,6 @@
-//! The neon sign's tokens for Kōbō's done screen, `crates/kubaos-kobo/src/done/neon.rs`: how a
-//! tube strikes and the クバ mark's strokes, the same the boot splash strikes its sign with and the
-//! logo's SVGs draw.
+//! The neon sign's tokens for Kōbō's done screen, written into Kōbō's `OUT_DIR` and included by
+//! `crates/kubaos-kobo/src/done/neon.rs`: how a tube strikes and the クバ mark's strokes, the same
+//! the boot splash strikes its sign with and the logo's SVGs draw.
 //!
 //! # Owns
 //!

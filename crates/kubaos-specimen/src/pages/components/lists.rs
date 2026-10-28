@@ -18,12 +18,14 @@ use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::grid;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Lists",
-    lede: Some("Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is."),
+    lede: Some(
+        "Rows in a well: a surface, 24, with 12 inside, so the rows take 24 − 12 = 12, the control radius. The focus tube lights the well's edge; the row shows where the keyboard is.",
+    ),
     view,
 };
 

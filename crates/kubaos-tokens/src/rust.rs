@@ -1,4 +1,5 @@
-//! The Rust module of `kubaos-ui`, `crates/kubaos-ui/src/tokens.rs`: every token as a closed enum
+//! The Rust module of `kubaos-ui`, written into its `OUT_DIR` and included by
+//! `crates/kubaos-ui/src/tokens.rs`: every token as a closed enum
 //! or a constant, so a value off the scale can't be written in an iced app.
 //!
 //! # Owns

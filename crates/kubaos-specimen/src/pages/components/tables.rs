@@ -14,14 +14,14 @@ use kubaos_ui::component::table::Column;
 use kubaos_ui::component::table::table;
 use kubaos_ui::component::table::table_row;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Tables",
     lede: Some(
-                "Readings in columns, a line of text with 4 above and below a row; the whole row takes the pointer, numbers line up at their column's right edge.",
-            ),
+        "Readings in columns, a line of text with 4 above and below a row; the whole row takes the pointer, numbers line up at their column's right edge.",
+    ),
     view,
 };
 

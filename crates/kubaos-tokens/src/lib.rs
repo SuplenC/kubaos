@@ -79,29 +79,58 @@ pub fn parse(text: &str) -> Result<Tokens, Error> {
     }
 }
 
+/// Why a crate's build script couldn't write its tokens module.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum BuildScriptError {
+    #[error("cargo didn't set {0}")]
+    Env(&'static str),
+    #[error("loading the tokens")]
+    Load(#[source] Error),
+    #[error("{0} names no file")]
+    NoFileName(&'static str),
+    #[error("rendering {path}")]
+    Render {
+        path: &'static str,
+        #[source]
+        source: io::Error,
+    },
+    #[error("writing {}", path.display())]
+    Write {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+}
+
 /// What a crate's build script does for its [`target::Kept::OutDir`] output: reads the tokens from
 /// the repo the crate is in, renders `target` and writes it into `OUT_DIR` under its file's name,
 /// and asks cargo to run the script again when the tokens change.
 ///
 /// # Errors
 ///
-/// When cargo didn't set `CARGO_MANIFEST_DIR` and `OUT_DIR`, the crate isn't in `crates/` of the
-/// repo, the tokens can't be loaded, or the output can't be written.
-pub fn build_script(target: &dyn Target) -> Result<(), Box<dyn std::error::Error>> {
-    let var = |name: &str| {
+/// [`BuildScriptError`]: cargo didn't set `CARGO_MANIFEST_DIR` or `OUT_DIR`, the tokens can't be
+/// loaded from the repo two directories up, or the output can't be rendered or written.
+pub fn build_script(target: &dyn Target) -> Result<(), BuildScriptError> {
+    let var = |name: &'static str| {
         std::env::var_os(name)
             .map(PathBuf::from)
-            .ok_or_else(|| format!("cargo didn't set {name}"))
+            .ok_or(BuildScriptError::Env(name))
     };
     let root = var("CARGO_MANIFEST_DIR")?.join("../..");
-    let tokens_path = root.join(TOKENS_PATH);
-    rerun_if_changed(&tokens_path);
-    let tokens = load(&root)?;
+    rerun_if_changed(&root.join(TOKENS_PATH));
+    let tokens = load(&root).map_err(BuildScriptError::Load)?;
     let name = Path::new(target.path())
         .file_name()
-        .ok_or_else(|| format!("{} names no file", target.path()))?;
-    fs::write(var("OUT_DIR")?.join(name), target.render(&tokens, &root)?)?;
-    Ok(())
+        .ok_or(BuildScriptError::NoFileName(target.path()))?;
+    let text = target
+        .render(&tokens, &root)
+        .map_err(|source| BuildScriptError::Render {
+            path: target.path(),
+            source,
+        })?;
+    let path = var("OUT_DIR")?.join(name);
+    fs::write(&path, text).map_err(|source| BuildScriptError::Write { path, source })
 }
 
 #[expect(clippy::print_stdout, reason = "A build script talks to cargo on stdout.")]

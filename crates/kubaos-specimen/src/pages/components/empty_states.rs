@@ -18,8 +18,8 @@ use kubaos_ui::icon::Icon;
 use kubaos_ui::layout::grid;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Empty states",

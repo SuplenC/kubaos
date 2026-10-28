@@ -2,8 +2,9 @@
 # shots: before/after screenshots of the shell, Kōbō, the specimen, the terminals and the boot
 # screens, paired and diffed, for a design PR. Run it through `just shots` (`nix run .#shots`),
 # which pins the shell's renderer (Qt, sway, Mesa, ImageMagick and the fonts), the terminals and
-# their TUIs, and the boot screens' tools. Kōbō and the specimen build with the cargo and nix on
-# your PATH. docs/agents/design-pr-loop.md has the loop it serves.
+# their TUIs, and the boot screens' tools. Kōbō, the specimen, and the token outputs the shell and
+# the terminals read, build with the cargo and nix on your PATH (`nix develop`).
+# docs/agents/design-pr-loop.md has the loop it serves.
 #
 #   shots [SURFACE...] [--scales 1,1.5] [--modes dark] [--ref REV] [--full] [--jobs N]
 #         [--threshold PX]

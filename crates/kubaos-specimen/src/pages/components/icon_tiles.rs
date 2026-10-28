@@ -21,13 +21,15 @@ use kubaos_ui::tokens::IconSize;
 use kubaos_ui::tokens::Size;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
-use super::media::PICTURES;
 use super::Section;
+use super::samples::PICTURES;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Icon tiles and badges",
-    lede: Some("Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."),
+    lede: Some(
+        "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small, regular and large, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner.",
+    ),
     view,
 };
 

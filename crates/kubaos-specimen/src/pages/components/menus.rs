@@ -22,14 +22,14 @@ use kubaos_ui::layout::stack;
 use kubaos_ui::tokens::Size;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Selects and menus",
     lede: Some(
-                "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control.",
-            ),
+        "A popover floats over the page: the surface radius, 12 inside, its items small controls. A select drops one from a field-like control.",
+    ),
     view,
 };
 

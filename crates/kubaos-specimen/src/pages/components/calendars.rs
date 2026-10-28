@@ -9,6 +9,7 @@
 //! - Where the section goes on the page: [`super::SECTIONS`]. The components: `kubaos-ui`.
 
 use std::sync::LazyLock;
+
 use iced::Element;
 use kubaos_ui::Look;
 use kubaos_ui::component::calendar::Day;
@@ -18,12 +19,14 @@ use kubaos_ui::component::calendar::calendar;
 use kubaos_ui::layout::row;
 use kubaos_ui::tokens::Space;
 
-use crate::specimen::Message;
 use super::Section;
+use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Calendars",
-    lede: Some("A month as six weeks led by their week numbers, today filled and the picked day ringed; the title opens the year."),
+    lede: Some(
+        "A month as six weeks led by their week numbers, today filled and the picked day ringed; the title opens the year.",
+    ),
     view,
 };
 

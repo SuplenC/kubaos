@@ -20,7 +20,7 @@ use kubaos_ui::tokens::Size;
 use kubaos_ui::tokens::Space;
 
 use super::Section;
-use super::buttons::button_in;
+use super::samples::button_in;
 use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
