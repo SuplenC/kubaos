@@ -67,9 +67,9 @@ group.
 
 Four files have no include in their app, so `dot-config apply` writes the app's file
 from KubaOS's and yours: `tools/bat/config`, `tools/git/ignore`,
-`terminal/fastfetch/config.jsonc` and `terminal/fastfetch/greeting.jsonc`. Every update runs
-it, and a change of wallpaper rewrites fastfetch's two with the new colours between KubaOS's
-and yours; after editing one of them, run `dot-config apply` yourself. Every other file applies the way its app reloads its config;
+`terminal/fastfetch/config.jsonc` and `terminal/fastfetch/greeting.jsonc`. Every update
+runs it, and a change of wallpaper rewrites fastfetch's two with the new colours between
+KubaOS's and yours; after editing one of them, run `dot-config apply` yourself. Every other file applies the way its app reloads its config;
 each file says how.
 
 How each app loads its file: docs/CONTRACTS.md, "Defaults and the user layer"

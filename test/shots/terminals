@@ -116,13 +116,9 @@ shell_scene() {
   fastfetch --config "$HOME/greeting.jsonc"
   prompt "$repo"
   echo "palette"
-  for row in 0 8; do
-    # Each number in the colour that stands out on its swatch: black's in bright white.
-    for i in $(seq "$row" $((row + 7))); do
-      printf '\e[48;5;%dm\e[38;5;%dm %2d \e[0m ' "$i" "$((i == 0 ? 15 : 0))" "$i"
-    done
-    echo
-  done
+  # The 16 as swatches, each over its number as text in it.
+  for i in $(seq 0 15); do printf '\e[48;5;%dm    \e[0m ' "$i"; done
+  echo
   for i in $(seq 0 15); do printf '\e[38;5;%dmAa%-2d\e[0m ' "$i" "$i"; done
   printf '\n\e[2mdim\e[0m \e[1mbold\e[0m \e[3mitalic\e[0m \e[4munderline\e[0m '
   printf '\e]8;;https://kubaos.dev\e\\a link\e]8;;\e\\\n\n'

@@ -699,8 +699,10 @@ decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", 
 type = "mono_large"
 # The font the terminals take the glyphs Geist Mono lacks from: the prompt's
 # and the file managers' icons, the pills' round caps. Geist Mono's own Nerd
-# Font, so a glyph sits on the same metrics as the letters beside it.
-glyphs = "GeistMono Nerd Font Mono"
+# Font, so a glyph sits on the same metrics as the letters beside it. Its
+# icons are a cell and a half wide, as Ghostty draws its own, not squeezed
+# into one as the Mono variant's are.
+glyphs = "GeistMono Nerd Font"
 # Between the window's edge and the cells, from [space].
 padding_x = 12
 padding_y = 8
@@ -719,7 +721,9 @@ dim = 16
 
 # The terminal's own colours, by role: the cursor in the accent, a selection
 # as a selected row's tinted bar under the text, links in the cold accent.
-# `black`, `white` and `bright_white` are ANSI 0, 7 and 15.
+# `black`, `white` and `bright_white` are ANSI 0, 7 and 15. Black is a
+# graphic's colour, 3:1 on the surface in both modes, since what a program
+# prints in it must still show.
 [terminal.roles]
 background = "surface"
 foreground = "on_surface"
@@ -729,7 +733,7 @@ selection = "secondary_container"
 selection_text = "on_secondary_container"
 url = "cold"
 divider = "outline_variant"
-black = "surface_container_highest"
+black = "outline"
 white = "on_surface_variant"
 bright_white = "on_surface"
 

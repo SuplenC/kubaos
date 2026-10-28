@@ -177,14 +177,15 @@ merge_concat() {
 }
 
 # merge_json FILE USER: the defaults' FILE, then the theme's colours for its
-# app (dot-theme's <app>.jsonc), then the user's JSON from USER, each merged
-# over the last, objects key by key; comments allowed. Written as plain JSON.
-# A user file that doesn't parse keeps the last merge: a typo must not stop an
+# app (the shipped dark fallback, <app>/theme.jsonc in the defaults, then
+# dot-theme's <app>.jsonc), then the user's JSON from USER, each merged over
+# the last, objects key by key; comments allowed. Written as plain JSON. An
+# input that doesn't parse keeps the last merge: a typo must not stop an
 # update.
 merge_json() {
   local out="$CONFIG/$1"
   mkdir -p -- "$(dirname -- "$out")"
-  if ! python3 - "$DEFAULTS/$1" "$THEME/${1%%/*}.jsonc" "$USER_LAYER/$2" >"$out.new" <<'PY'; then
+  if ! python3 - "$DEFAULTS/$1" "$DEFAULTS/${1%%/*}/theme.jsonc" "$THEME/${1%%/*}.jsonc" "$USER_LAYER/$2" >"$out.new" <<'PY'; then
 import json, os, sys
 
 def strip_comments(text):
@@ -253,8 +254,8 @@ json.dump(merged, sys.stdout, indent=2, ensure_ascii=False)
 print()
 PY
     rm -f -- "$out.new"
-    printf 'dot-config: %s is not valid JSON; kept the last %s\n' \
-      "$(shown "$USER_LAYER")/$2" "$(shown "$out")" >&2
+    printf 'dot-config: kept the last %s: the file above is not valid JSON\n' \
+      "$(shown "$out")" >&2
     return 0
   fi
   replace "$out"

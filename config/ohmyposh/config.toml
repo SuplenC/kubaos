@@ -136,7 +136,7 @@ console_title_template = '{{ .Shell }} in {{ .Folder }}'
 # the terminal's hues.
 [palette]
   # The pills' background and their text.
-  surface = '#312821'
+  surface = '#3d332b'
   text = '#f0dfd4'
   # Icons, and the right prompt's words: secondary text.
   muted = '#dac2b1'

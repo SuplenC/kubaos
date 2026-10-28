@@ -69,7 +69,7 @@ impl Target for Output {
 }
 
 /// Every file this module writes.
-pub static OUTPUTS: [Output; 12] = [
+pub static OUTPUTS: [Output; 13] = [
     Output {
         path: "config/ghostty/tokens",
         render: Render::Reading(ghostty_settings),
@@ -109,6 +109,10 @@ pub static OUTPUTS: [Output; 12] = [
     Output {
         path: "config/matugen/templates/fastfetch.jsonc",
         render: Render::Tokens(fastfetch_template),
+    },
+    Output {
+        path: "config/fastfetch/theme.jsonc",
+        render: Render::Tokens(fastfetch_fallback),
     },
     Output {
         path: "config/matugen/config.toml",
@@ -403,6 +407,7 @@ fn ghostty_settings(tokens: &Tokens, root: &Path) -> io::Result<String> {
          run. config/ghostty/config loads it first, then the wallpaper's palette, then your settings.",
     );
     let _ = writeln!(out, "font-family = \"{}\"", tokens.font.family.name(style.family));
+    let _ = writeln!(out, "font-family = \"{}\"", tokens.terminal.glyphs);
     let _ = writeln!(out, "font-size = {}", points(style.size));
     let _ = writeln!(
         out,
@@ -456,7 +461,7 @@ fn foot_settings(tokens: &Tokens) -> String {
     let terminal = &tokens.terminal;
     let size = points(style.size);
     let mut out = header(
-        ";",
+        "#",
         "foot's type and padding, and the dark fallback palette for before dot-theme has run. \
          config/foot/foot.ini includes it first, then the wallpaper's palette, then your settings.",
     );
@@ -478,7 +483,7 @@ fn foot_settings(tokens: &Tokens) -> String {
 
 fn foot_template(tokens: &Tokens) -> String {
     let mut out = header(
-        ";",
+        "#",
         "matugen's template of foot's palettes, rendered by dot-theme to \
          ~/.local/state/theme/foot.ini, which config/foot/foot.ini includes. foot can't read its \
          colours again, so both are here: [colors] dark, [colors2] light. A new window opens in \
@@ -596,8 +601,8 @@ fn fuzzel_settings(tokens: &Tokens) -> String {
     let mut out = header(
         "#",
         "fuzzel's type and shape, as a list in a panel of the shell's: body text in rows a list \
-         row tall, the narrowest container's padding, a surface's corners and a control's on the \
-         selection, a hairline round it. config/fuzzel/fuzzel.ini includes it first.",
+         row tall, the narrowest container's padding, a surface's corners, a hairline round it. \
+         config/fuzzel/fuzzel.ini includes it first.",
     );
     out.push_str("[main]\n");
     let _ = writeln!(
@@ -614,7 +619,6 @@ fn fuzzel_settings(tokens: &Tokens) -> String {
     out.push_str("[border]\n");
     let _ = writeln!(out, "width={}", tokens.stroke.hairline_device_px);
     let _ = writeln!(out, "radius={}", tokens.radius.surface);
-    let _ = writeln!(out, "selection-radius={}", tokens.radius.control);
     out
 }
 
@@ -662,14 +666,29 @@ fn fastfetch_template(tokens: &Tokens) -> String {
          fastfetch settings and yours: the クバ mark in the accent with its dakuten in the cold \
          accent, as the logo draws it, and the keys in the accent.",
     );
-    let primary = template(tokens, role("primary"), Mode::Current, Form::Hex);
-    let cold = template(tokens, role("cold"), Mode::Current, Form::Hex);
+    fastfetch_colours(&mut out, |name| template(tokens, role(name), Mode::Current, Form::Hex));
+    out
+}
+
+fn fastfetch_fallback(tokens: &Tokens) -> String {
+    let mut out = header(
+        "//",
+        "fastfetch's colours before dot-theme has run, in the dark fallback palette: \
+         scripts/dot-config merges them over config/fastfetch's settings, then the wallpaper's \
+         (~/.local/state/theme/fastfetch.jsonc), then yours.",
+    );
+    fastfetch_colours(&mut out, |name| spelled(fallback(tokens, role(name), true), Form::Hex));
+    out
+}
+
+/// The logo's mark in the accent and its dakuten in the cold accent, the keys in the accent.
+fn fastfetch_colours(out: &mut String, spell: impl Fn(&str) -> String) {
+    let (primary, cold) = (spell("primary"), spell("cold"));
     let _ = writeln!(
         out,
         "{{ \"logo\": {{ \"color\": {{ \"1\": \"{primary}\", \"2\": \"{cold}\" }} }}, \
          \"display\": {{ \"color\": {{ \"keys\": \"{primary}\" }} }} }}"
     );
-    out
 }
 
 /// `config/matugen/config.toml` with its hues block written from `[terminal.hues]`.

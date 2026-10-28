@@ -149,7 +149,7 @@ def sheet(repo: pathlib.Path, roots, mode: str, out: pathlib.Path) -> None:
     caption = ImageFont.truetype(str(fonts / "Geist-Regular.ttf"), 11 * SCALE)
     columns = len(COLOUR) + len(SYMBOLIC)
     width = PAD * 2 + LABEL + columns * CELL + PAD
-    height = PAD * 2 + 32 + len(THEMES) * (CELL + 8)
+    height = PAD * 2 + 32 + len(THEMES) * (CELL + 8) + 32
     image = Image.new("RGB", (width * SCALE, height * SCALE), palette["surface"])
     draw = ImageDraw.Draw(image)
 
@@ -186,6 +186,12 @@ def sheet(repo: pathlib.Path, roots, mode: str, out: pathlib.Path) -> None:
                     r = 2 * SCALE
                     y = (top + CELL - 4) * SCALE
                     draw.ellipse((cx * SCALE - r, y - r, cx * SCALE + r, y + r), fill=palette["outline"])
+    legend = (
+        "Colour icons at 48, symbolic ones at 16 in on_surface, as GTK recolours them.  "
+        "•  only an inherited theme (Adwaita, hicolor) has it.  –  no icon: the app's own shows."
+    )
+    bottom = PAD + 32 + len(THEMES) * (CELL + 8) + 16
+    draw.text((PAD * SCALE, bottom * SCALE), legend, font=caption, fill=palette["on_surface_variant"], anchor="lm")
     image.save(out / f"icon-themes-{mode}.png", optimize=True)
 
 

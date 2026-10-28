@@ -59,8 +59,8 @@ the first wallpaper of the current folder. With no images at all it renders the
 templates from `DEFAULT_SEED` (that wallpaper's source color, also
 `fallback_color` in `config.toml`) and copies `default-colors.json` to
 `colors.json`. The fallbacks built into the consumers use the same palette:
-the tokens' palette (`[color.dark]` in `design/tokens.toml`), `config/hypr/colors.lua`, the `@thm_*` defaults in
-`config/tmux/tmux.conf`, and the variables in `config/hypr/hyprlock.conf`.
+the tokens' palette (`[color.dark]` in `design/tokens.toml`), `config/hypr/colors.lua`, the `@color_*` defaults in
+`config/tmux/colors.conf` (generated from the tokens), and the variables in `config/hypr/hyprlock.conf`.
 If you change the default wallpaper, regenerate them all from
 `dot-theme set <it>`'s `colors.json` (with `"wallpaper": ""`).
 
