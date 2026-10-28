@@ -46,7 +46,7 @@ Item {
         for (const workspace of Hyprland.workspaces.values) {
             const id = workspace.id;
             const owner = Hypr.blockOf(id);
-            if (id <= 0 || Hypr.isStale(id) || (owner !== block && workspace.monitor?.name !== monitor?.name))
+            if (id <= 0 || Hypr.isStale(id) || (owner !== block && Hypr.monitorNameOf(workspace) !== monitor?.name))
                 continue;
             sets[owner] = sets[owner] ?? [];
             if (!sets[owner].includes(id))
@@ -130,6 +130,9 @@ Item {
     readonly property var kanji: ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十"]
     readonly property var roles: ["kind", "borrowed", "head", "tail", "label"]
     property bool ready: false
+    // With KUBAOS_WORKSPACES_PROBE=1, the groups are logged on every change, for
+    // `workspaces_hotplug_bar` in `test/lib/e2e.sh`.
+    readonly property bool probed: Quickshell.env("KUBAOS_WORKSPACES_PROBE") === "1"
 
     // By each window's own workspace, not a workspace's list of windows: a
     // workspace renumbered away from keeps its list, and the object is reused
@@ -209,6 +212,10 @@ Item {
         }
     }
 
+    function probe(): void {
+        console.info(`workspaces probe: ${screen.name} ${JSON.stringify(groups)}`);
+    }
+
     function drop(key: string): void {
         const index = indexOfKey(key);
         if (index >= 0 && shapes.get(index).leaving)
@@ -227,9 +234,15 @@ Item {
     implicitWidth: cells.implicitWidth + K.Tokens.space.s4 * 2
     implicitHeight: K.Tokens.size.control_sm
     onEntriesChanged: sync()
+    onGroupsChanged: {
+        if (probed)
+            probe();
+    }
     Component.onCompleted: {
         sync();
         ready = true;
+        if (probed)
+            probe();
     }
 
     ListModel {

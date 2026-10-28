@@ -138,14 +138,47 @@ Singleton {
         return staleIds[id] === true;
     }
 
+    // Id -> the connector of the screen Hyprland last moved the workspace to.
+    // Quickshell sets a workspace's screen from move events and from each
+    // workspace list it reads. A list asked for before a move can be read
+    // after the move's event, and puts the workspace back where it was: on a
+    // hotplug, the list asked for as a screen arrives puts the groups the
+    // reconcile then moves off the primary back on it, until the next list is
+    // read. Hyprland sends every move of a workspace as an event, in order, so
+    // the last event's screen wins here. An id destroyed, created, or
+    // renumbered away from is placed with no move, so it loses its entry.
+    property var movedTo: ({})
+
+    // The connector of the screen workspace `workspace` is on, "" when unknown.
+    function monitorNameOf(workspace: HyprlandWorkspace): string {
+        return movedTo[workspace.id] ?? workspace.monitor?.name ?? "";
+    }
+
+    function forgetMove(id: int): void {
+        if (movedTo[id] === undefined)
+            return;
+        const next = Object.assign({}, movedTo);
+        delete next[id];
+        movedTo = next;
+    }
+
     Connections {
         target: Hyprland
 
         function onRawEvent(event: HyprlandEvent): void {
-            if (event.name === "changeworkspaceid") {
+            if (event.name === "moveworkspacev2") {
+                const fields = event.parse(3);
+                const next = Object.assign({}, root.movedTo);
+                next[parseInt(fields[0], 10)] = fields[2];
+                root.movedTo = next;
+            } else if (event.name === "destroyworkspacev2") {
+                root.forgetMove(parseInt(event.parse(2)[0], 10));
+            } else if (event.name === "changeworkspaceid") {
+                const id = parseInt(event.parse(2)[0], 10);
                 const next = Object.assign({}, root.staleIds);
-                next[parseInt(event.parse(2)[0], 10)] = true;
+                next[id] = true;
                 root.staleIds = next;
+                root.forgetMove(id);
                 // The windows stay on the old id's object until read again;
                 // the reply comes after the move that creates the new id's.
                 // Should it not, the windows' read makes the object with no id
@@ -159,6 +192,7 @@ Singleton {
                 Hyprland.refreshMonitors();
             } else if (event.name === "createworkspacev2") {
                 const id = parseInt(event.parse(2)[0], 10);
+                root.forgetMove(id);
                 if (root.staleIds[id] === true) {
                     const next = Object.assign({}, root.staleIds);
                     delete next[id];
