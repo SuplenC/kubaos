@@ -31,7 +31,8 @@ Item {
         source: {
             const drawing = K.Symbols.svg[root.name] ?? "";
             const stroke = K.Look.symbolStroke(root.size, root.dpr);
-            const svg = drawing.replace("stroke-width=\"2\"", `stroke-width="${stroke}"`).replace("currentColor", Qt.alpha(root.color, 1).toString());
+            // Every `currentColor`: a filled drawing paints its fill with it too.
+            const svg = drawing.replace("stroke-width=\"2\"", `stroke-width="${stroke}"`).split("currentColor").join(Qt.alpha(root.color, 1).toString());
             return drawing === "" ? "" : `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
         }
     }

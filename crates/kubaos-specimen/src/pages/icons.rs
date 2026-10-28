@@ -127,7 +127,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             "KubaOS Symbols",
             Some(
                 "Decided: Tabler's outline icons are the base. Each symbol is named for the Material \
-                 Symbol it replaces; the four Tabler lacks are drawn on its grid, with its stroke and \
+                 Symbol it replaces; the five Tabler lacks are drawn on its grid, with its stroke and \
                  caps, and marked ours.",
             ),
             symbols(look),
@@ -135,7 +135,7 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(section(
             look,
             "Drawn by us",
-            Some("The four Tabler lacks, each above the Tabler symbols it borrows from, in the same colour at every size: the same grid, stroke, caps and badges, and the same ink density."),
+            Some("The five Tabler lacks, each above the Tabler symbols it borrows from, in the same colour at every size: the same grid, stroke, caps and badges, and the same ink density."),
             drawn(look),
         ))
         .push(section(
@@ -183,11 +183,12 @@ fn symbols<'a>(look: &Look) -> Element<'a, Message> {
 /// every size: the screenshots at 1, 1.5 and 2 show them at every scale too.
 fn drawn<'a>(look: &Look) -> Element<'a, Message> {
     let c = look.colors;
-    let families = [
-        (Icon::HardDrive, [Icon::Storage, Icon::DeployedCode]),
-        (Icon::WifiLock, [Icon::Wifi, Icon::Lock]),
-        (Icon::WifiFind, [Icon::Wifi, Icon::Search]),
-        (Icon::BluetoothSearching, [Icon::Bluetooth, Icon::Search]),
+    let families: [(Icon, &[Icon]); 5] = [
+        (Icon::HardDrive, &[Icon::Storage, Icon::DeployedCode]),
+        (Icon::WifiLock, &[Icon::Wifi, Icon::Lock]),
+        (Icon::WifiFind, &[Icon::Wifi, Icon::Search]),
+        (Icon::BluetoothSearching, &[Icon::Bluetooth, Icon::Search]),
+        (Icon::StarFilled, &[Icon::Star]),
     ];
     let sizes = [IconSize::S16, IconSize::S20, IconSize::S24, IconSize::S48];
     let mut table = split(look, &[2, 1, 1, 1, 2], Space::S16)
@@ -195,7 +196,7 @@ fn drawn<'a>(look: &Look) -> Element<'a, Message> {
         .push(text("", Type::Label, c.on_surface_variant))
         .extend(sizes.map(|size| text(format!("{}", size.px()), Type::Label, c.on_surface_variant)));
     for (ours, relatives) in families {
-        for glyph in std::iter::once(ours).chain(relatives) {
+        for glyph in std::iter::once(ours).chain(relatives.iter().copied()) {
             let tone = if glyph == ours { c.cold } else { c.on_surface_variant };
             let source = glyph.tabler().unwrap_or("ours");
             table = table.push(

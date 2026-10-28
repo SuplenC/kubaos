@@ -4,7 +4,8 @@ import KubaOS.Components as K
 // A short fact or pick, 24 tall at the control radius, which on a chip is a pill: `kubaos-ui`'s
 // `chip::chip`. The label starts where the curve ends; an icon sits closer in. A removable chip
 // ends in a close button, a circle as tall as the chip, so its hover layer shares the chip's curve.
-// A pressable chip takes a press of its own (a pick made the default), with the state layer.
+// A pressable chip takes a press of its own (a pick made the default, a setting turned on), with
+// the state layer, and the keyboard, with the focus tube.
 Item {
     id: root
 
@@ -22,6 +23,10 @@ Item {
     property bool removable: false
     // Whether a press on it sends `activated`.
     property bool pressable: false
+
+    // Whether the keyboard, or the pointer, is on a pressable chip: what a tooltip on it follows.
+    readonly property bool focused: root.pressable && press.focused
+    readonly property bool pointerOver: root.pressable && press.pointerOver
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property var colours: {
@@ -61,8 +66,12 @@ Item {
     }
 
     K.Pressable {
+        id: press
+
         anchors.fill: parent
         visible: root.pressable
+        Accessible.name: root.text
+        Accessible.role: Accessible.Button
         onActivated: root.activated()
 
         K.StateLayer {
@@ -70,6 +79,12 @@ Item {
             content: root.colours[1]
             hovered: parent.hovered
             pressed: parent.down
+        }
+
+        K.FocusRing {
+            shown: press.focused
+            filled: root.kind === "Filled"
+            controlRadius: Tokens.radius.control
         }
     }
 

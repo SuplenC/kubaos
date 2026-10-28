@@ -20,11 +20,14 @@ Item {
     property string size: "Md"
     // On the error colour: a critical notification's.
     property bool danger: false
+    // Its symbol in the accent: the one of a list that comes first, as the default keyboard
+    // layout's star.
+    property bool accent: false
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property int side: root.size === "Sm" ? Tokens.size.control_sm : Tokens.size.control_md
     readonly property int glyph: root.size === "Sm" ? Tokens.type.body.icon : Tokens.icon.two_line
-    readonly property color ink: root.danger ? Tokens.color.on_error : Tokens.color.on_surface_variant
+    readonly property color ink: root.danger ? Tokens.color.on_error : root.accent ? Tokens.color.primary : Tokens.color.on_surface_variant
     readonly property bool pictured: app.status === Image.Ready || (photoPath.item?.ready ?? false)
     readonly property var probe: ({
             role: "component",

@@ -1558,7 +1558,7 @@ pub const CONTRAST: [ContrastPair; 60] = [
         bg: Role::SurfaceContainerHighest,
         need: Need::Graphic,
         opacity: None,
-        purpose: "A slider's or a progress bar's fill on its track, a focused field's tube on its fill",
+        purpose: "A slider's or a progress bar's fill, a focused field's tube, an accent symbol on a tile",
     },
     ContrastPair {
         fg: Role::OnPrimary,
@@ -1943,6 +1943,8 @@ pub enum Icon {
     SpeakerGroup,
     /// Tabler's `star`.
     Star,
+    /// Ours: Tabler's star, filled, its outline kept so it is the outline star's size.
+    StarFilled,
     /// Tabler's `player-stop`.
     Stop,
     /// Tabler's `database`.
@@ -1993,7 +1995,7 @@ pub enum Icon {
 
 impl Icon {
     /// Every symbol.
-    pub const ALL: [Icon; 134] = [
+    pub const ALL: [Icon; 135] = [
         Icon::AccountCircle,
         Icon::Add,
         Icon::AddLocationAlt,
@@ -2105,6 +2107,7 @@ impl Icon {
         Icon::Speaker,
         Icon::SpeakerGroup,
         Icon::Star,
+        Icon::StarFilled,
         Icon::Stop,
         Icon::Storage,
         Icon::SwapVert,
@@ -2244,6 +2247,7 @@ impl Icon {
             Icon::Speaker => "speaker",
             Icon::SpeakerGroup => "speaker_group",
             Icon::Star => "star",
+            Icon::StarFilled => "star_filled",
             Icon::Stop => "stop",
             Icon::Storage => "storage",
             Icon::SwapVert => "swap_vert",
@@ -2384,6 +2388,7 @@ impl Icon {
             Icon::Speaker => Some("device-speaker"),
             Icon::SpeakerGroup => Some("devices"),
             Icon::Star => Some("star"),
+            Icon::StarFilled => None,
             Icon::Stop => Some("player-stop"),
             Icon::Storage => Some("database"),
             Icon::SwapVert => Some("arrows-sort"),
@@ -2524,6 +2529,7 @@ impl Icon {
             Icon::Speaker => include_str!("../assets/symbols/speaker.svg"),
             Icon::SpeakerGroup => include_str!("../assets/symbols/speaker_group.svg"),
             Icon::Star => include_str!("../assets/symbols/star.svg"),
+            Icon::StarFilled => include_str!("../assets/symbols/star_filled.svg"),
             Icon::Stop => include_str!("../assets/symbols/stop.svg"),
             Icon::Storage => include_str!("../assets/symbols/storage.svg"),
             Icon::SwapVert => include_str!("../assets/symbols/swap_vert.svg"),

@@ -91,12 +91,16 @@ fn minifying_drops_comments_class_names_and_runs_of_space() {
 }
 
 #[test]
-fn a_drawing_without_exactly_one_stroke_and_one_colour_is_refused() {
+fn a_drawing_without_exactly_one_stroke_and_a_colour_is_refused() {
     let one = r#"<svg stroke="currentColor" stroke-width="2"><path d="M1 1"/></svg>"#;
-    let two_colours = r#"<svg stroke="currentColor" stroke-width="2"><path fill="currentColor"/></svg>"#;
+    let filled = r#"<svg stroke="currentColor" stroke-width="2"><path fill="currentColor"/></svg>"#;
     let no_stroke = r#"<svg stroke="currentColor"><path d="M1 1"/></svg>"#;
+    let two_strokes = r#"<svg stroke="currentColor" stroke-width="2"><path stroke-width="2"/></svg>"#;
+    let no_colour = r#"<svg stroke="black" stroke-width="2"><path d="M1 1"/></svg>"#;
 
     assert!(recolourable(one).is_ok());
-    assert!(recolourable(two_colours).is_err());
+    assert!(recolourable(filled).is_ok());
     assert!(recolourable(no_stroke).is_err());
+    assert!(recolourable(two_strokes).is_err());
+    assert!(recolourable(no_colour).is_err());
 }

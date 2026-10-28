@@ -12,6 +12,9 @@ controlcenter            controlcenter  FrameShot   1176,0,424,1000   controlcen
 controlcenter-bluetooth  controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth
 controlcenter-passkey    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-code
 controlcenter-keyboard   controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard
+controlcenter-kb-tooltip controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-tooltip
+controlcenter-kb-drag    controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-drag
+controlcenter-kb-add     controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-add
 controlcenter-scanning   controlcenter  FrameShot   1176,0,424,1000   controlcenter scanning
 clock                    clock          FrameShot   400,0,800,800     clock answer
 clock-settings           clock          FrameShot   400,0,800,800     clock settings
