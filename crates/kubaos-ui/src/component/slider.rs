@@ -220,16 +220,25 @@ impl<M> canvas::Program<M> for Track<'_, M> {
         } else {
             0.0
         };
+        let lift = if !enabled {
+            0.0
+        } else if held.0.is_some() || self.held {
+            Opacity::Held.value()
+        } else if cursor.is_over(bounds) {
+            Opacity::Press.value()
+        } else {
+            0.0
+        };
         let thumb_x = snap(travel * shown.fraction());
-        // The fill takes the state layer too, toward the palette's bright end: it lights up while
-        // pressed or dragged, as a progress bar's fill glows.
+        // The fill lights up toward the palette's bright end: a little under the pointer, and
+        // plainly while pressed or dragged, as a progress bar's fill glows.
         frame.fill(
             &Path::rounded_rectangle(
                 Point::new(0.0, rail_y),
                 IcedSize::new(thumb_x + thumb / 2.0, rail),
                 (rail / 2.0).into(),
             ),
-            color::alpha(color::mix(c.primary, self.bright, layer), dim),
+            color::alpha(color::mix(c.primary, self.bright, lift), dim),
         );
         if let Value::Stop { index, count } = shown
             && count > 1

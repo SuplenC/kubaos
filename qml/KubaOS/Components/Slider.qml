@@ -41,6 +41,9 @@ Item {
     readonly property bool held: root.enabled && (root.preview === "pressed" || pointer.pressed)
     // The state layer over the fill and the thumb.
     readonly property real stateLayer: root.held ? Tokens.opacity.press : root.hovered ? Tokens.opacity.hover : 0
+    // How far the fill lights up toward the bright end: a little under the pointer, and plainly
+    // while pressed or dragged.
+    readonly property real lift: root.held ? Tokens.opacity.held : root.hovered ? Tokens.opacity.press : 0
     // What the fill brightens toward: the palette's lighter end, so a held fill lights up in both
     // modes.
     readonly property color bright: Tokens.mode === "light" ? Tokens.color.surface : Tokens.color.on_surface
@@ -124,13 +127,13 @@ Item {
             color: K.Look.alpha(K.Look.alpha(Tokens.color.surface_container_highest, Tokens.opacity.track), root.dim)
         }
 
-        // The fill takes the state layer too, toward the palette's bright end: it lights up while
-        // pressed or dragged, as a progress bar's fill glows.
+        // The fill lights up toward the palette's bright end while pressed or dragged, as a
+        // progress bar's fill glows.
         Rectangle {
             width: thumb.x + Tokens.size.slider_thumb / 2
             height: parent.height
             radius: Tokens.radius.full
-            color: K.Look.alpha(K.Look.mix(Tokens.color.primary, root.bright, root.stateLayer), root.dim)
+            color: K.Look.alpha(K.Look.mix(Tokens.color.primary, root.bright, root.lift), root.dim)
 
             Behavior on color {
                 ColorAnimation {

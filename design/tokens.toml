@@ -389,6 +389,11 @@ use = "Progress that tracks a real quantity, and spinners."
 hover = 0.08
 focus = 0.12
 press = 0.14
+# A fill lit while its control is held: a slider pressed or dragged, its fill
+# brightened toward the palette's bright end as a progress bar's glows. A
+# state layer's press is too faint on a fill already the accent; under the
+# pointer the fill takes `press`.
+held = 0.40
 # A disabled control's content, and its container.
 disabled_content = 0.38
 disabled_container = 0.10

@@ -411,6 +411,7 @@ QtObject {
         readonly property real focus: 0.12
         readonly property real frame: 0.94
         readonly property real glass: 0.8
+        readonly property real held: 0.4
         readonly property real hover: 0.08
         readonly property real locked: 0.5
         readonly property real log: 0.85

@@ -630,6 +630,7 @@ pub enum Opacity {
     Focus,
     Frame,
     Glass,
+    Held,
     Hover,
     Locked,
     Log,
@@ -650,7 +651,7 @@ pub enum Opacity {
 
 impl Opacity {
     /// Every opacity.
-    pub const ALL: [Opacity; 26] = [
+    pub const ALL: [Opacity; 27] = [
         Opacity::Backdrop,
         Opacity::DangerEdge,
         Opacity::DialogEdge,
@@ -661,6 +662,7 @@ impl Opacity {
         Opacity::Focus,
         Opacity::Frame,
         Opacity::Glass,
+        Opacity::Held,
         Opacity::Hover,
         Opacity::Locked,
         Opacity::Log,
@@ -692,6 +694,7 @@ impl Opacity {
             Opacity::Focus => 0.12,
             Opacity::Frame => 0.94,
             Opacity::Glass => 0.8,
+            Opacity::Held => 0.4,
             Opacity::Hover => 0.08,
             Opacity::Locked => 0.5,
             Opacity::Log => 0.85,
@@ -726,6 +729,7 @@ impl Opacity {
             Opacity::Focus => "focus",
             Opacity::Frame => "frame",
             Opacity::Glass => "glass",
+            Opacity::Held => "held",
             Opacity::Hover => "hover",
             Opacity::Locked => "locked",
             Opacity::Log => "log",
