@@ -98,7 +98,11 @@ fn grubs_template_refuses_a_name_the_tokens_lack() {
 
 /// A picture of the Plymouth theme, at 1 or 2.
 fn plymouth_picture(name: &str, scale: u32) -> (u32, u32) {
-    let file = if scale == 2 { format!("{name}@2x.png") } else { format!("{name}.png") };
+    let file = if scale == 2 {
+        format!("{name}@2x.png")
+    } else {
+        format!("{name}.png")
+    };
     super::png_size(&root().join("system/files/plymouth/kubaos").join(file)).expect("a picture boot.py draws")
 }
 
@@ -111,9 +115,16 @@ fn the_prompts_pictures_are_the_sizes_the_tokens_lay_them_out_at() {
     let icon = u32::from(tokens.types["body_large"].icon);
 
     for s in [1, 2] {
-        let field = ((size("password") + 2 * offset) * s, (size("control_md") + 2 * offset) * s);
+        let field = (
+            (size("password") + 2 * offset) * s,
+            (size("control_md") + 2 * offset) * s,
+        );
         for name in ["field", "field-error", "field-busy"] {
-            assert_eq!(plymouth_picture(name, s), field, "{name} at {s}: rerun branding/boot.py");
+            assert_eq!(
+                plymouth_picture(name, s),
+                field,
+                "{name} at {s}: rerun branding/boot.py"
+            );
         }
         for name in ["icon-lock", "icon-busy"] {
             assert_eq!(plymouth_picture(name, s), (icon * s, icon * s), "{name} at {s}");

@@ -48,7 +48,10 @@ fn an_unknown_style_or_a_size_out_of_range_is_an_error() {
 fn a_size_off_the_grid_in_the_file_is_taken_to_the_nearest_step() {
     assert_eq!(Settings::parse("size = 18").unwrap().size, 20);
     assert_eq!(Settings::parse("size = 29").unwrap().size, 28);
-    assert_eq!(Settings::parse("style = \"accent\"\nsize = 30\n").unwrap().style, Style::Accent);
+    assert_eq!(
+        Settings::parse("style = \"accent\"\nsize = 30\n").unwrap().style,
+        Style::Accent
+    );
 }
 
 #[test]
