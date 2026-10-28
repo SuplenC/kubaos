@@ -12,12 +12,14 @@
 //!   ([`progress`]), empty states ([`empty`]), errors with a hint and a log ([`error`]), keycaps
 //!   and key hints ([`keycap`]), pictures in a box of a fixed aspect ([`media`]) and pictures to
 //!   pick ([`picture`]), tabs ([`tabs`]), quick toggle tiles ([`tile`]), meters and sparklines
-//!   ([`meter`]), sheets ([`sheet`]) and calendars ([`calendar`]).
+//!   ([`meter`]), sheets ([`sheet`]) and calendars ([`calendar`]), icon tiles and badges
+//!   ([`avatar`]) and skeletons ([`skeleton`]).
 //!
 //! # Not here
 //!
 //! - The focus ring: [`crate::focus`]. Layout: [`crate::layout`].
 
+pub mod avatar;
 pub mod button;
 pub mod calendar;
 pub mod card;
@@ -36,6 +38,7 @@ pub mod meter;
 pub mod picture;
 pub mod progress;
 pub mod sheet;
+pub mod skeleton;
 pub mod slider;
 pub mod switch;
 pub mod tabs;

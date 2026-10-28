@@ -40,6 +40,9 @@ ListRow 1.0 ListRow.qml
 List 1.0 List.qml
 EmptyList 1.0 EmptyList.qml
 Chip 1.0 Chip.qml
+IconTile 1.0 IconTile.qml
+Badge 1.0 Badge.qml
+Skeleton 1.0 Skeleton.qml
 Card 1.0 Card.qml
 ChoiceCard 1.0 ChoiceCard.qml
 Dialog 1.0 Dialog.qml

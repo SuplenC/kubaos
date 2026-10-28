@@ -156,6 +156,8 @@ pub const TWO_LINE_ICON: IconSize = IconSize::S24;
 /// A fixed dimension of a component.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Size {
+    Badge,
+    BadgeDot,
     Bar,
     Check,
     Chip,
@@ -190,7 +192,9 @@ pub enum Size {
 
 impl Size {
     /// Every size.
-    pub const ALL: [Size; 30] = [
+    pub const ALL: [Size; 32] = [
+        Size::Badge,
+        Size::BadgeDot,
         Size::Bar,
         Size::Check,
         Size::Chip,
@@ -226,6 +230,8 @@ impl Size {
     /// The dimension in logical pixels.
     pub const fn px(self) -> u16 {
         match self {
+            Size::Badge => 16,
+            Size::BadgeDot => 8,
             Size::Bar => 40,
             Size::Check => 20,
             Size::Chip => 24,

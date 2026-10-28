@@ -97,6 +97,10 @@ control_lg = 48
 row = 44
 row_two_line = 56
 chip = 24
+# A badge over an icon's corner: a count's pill, a line of label text tall, and
+# a dot, the size of a picked radio button's.
+badge = 16
+badge_dot = 8
 switch_width = 44
 switch_height = 24
 # The switch's knob off and on: it grows as it turns on, leaving 6 and 4 of

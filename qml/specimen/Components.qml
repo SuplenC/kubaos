@@ -71,6 +71,32 @@ K.Stack {
         return points;
     }
 
+    // A 24 symbol in a small control's box, a badge over its top right corner, as the iced page
+    // stacks them.
+    component Badged: Item {
+        id: badged
+
+        property string icon
+        property int count: 0
+        readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+
+        implicitWidth: K.Tokens.size.control_sm
+        implicitHeight: K.Tokens.size.control_sm
+
+        K.Icon {
+            x: K.Look.snap((badged.width - width) / 2, badged.dpr)
+            y: K.Look.snap((badged.height - height) / 2, badged.dpr)
+            name: badged.icon
+            size: K.Tokens.icon.s24
+            color: K.Tokens.color.on_surface_variant
+        }
+
+        K.Badge {
+            x: badged.width - width
+            count: badged.count
+        }
+    }
+
     function sizeName(size: string): string {
         return `${size} · ${K.ButtonMetrics.of(size).height}`;
     }
@@ -583,6 +609,92 @@ K.Stack {
                             subtitle: "Off"
                             expandable: true
                             focused: true
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Icon tiles and badges"
+                    description: "Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small and regular, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."
+
+                    K.Row {
+                        gap: K.Tokens.space.s24
+                        align: "centre"
+
+                        K.IconTile {
+                            icon: "terminal"
+                            size: "Sm"
+                        }
+
+                        K.IconTile {
+                            icon: "terminal"
+                        }
+
+                        K.IconTile {
+                            photo: root.picture
+                        }
+
+                        K.IconTile {
+                            icon: "warning"
+                            danger: true
+                        }
+
+                        K.Badge {
+                            count: 3
+                        }
+
+                        K.Badge {
+                            count: 128
+                        }
+
+                        K.Badge {
+                        }
+
+                        Badged {
+                            icon: "notifications"
+                            count: 3
+                        }
+
+                        Badged {
+                            icon: "system_update_alt"
+                        }
+                    }
+                }
+
+                K.Section {
+                    title: "Skeletons"
+                    description: "The shape of what is loading, in the placeholder colour, so what arrives moves nothing: a row being scanned, a thumbnail being decoded."
+
+                    K.Grid {
+                        columns: 2
+                        gap: K.Tokens.space.s24
+
+                        K.Row {
+                            gap: K.Tokens.space.s12
+                            align: "centre"
+
+                            K.Skeleton {
+                                bone: "circle"
+                                size: K.Tokens.icon.s24
+                            }
+
+                            K.Stack {
+                                fill: true
+                                gap: K.Tokens.space.s4
+
+                                K.Skeleton {
+                                    style: K.Tokens.type.body_strong
+                                }
+
+                                K.Skeleton {
+                                    style: K.Tokens.type.small
+                                }
+                            }
+                        }
+
+                        K.Skeleton {
+                            bone: "block"
+                            size: K.Tokens.size.control_lg
                         }
                     }
                 }

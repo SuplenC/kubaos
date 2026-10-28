@@ -11,6 +11,9 @@ use iced::widget::container;
 use iced::widget::image;
 use kubaos_ui::Look;
 use kubaos_ui::Mode;
+use kubaos_ui::component::avatar::TileSize;
+use kubaos_ui::component::avatar::badge;
+use kubaos_ui::component::avatar::icon_tile;
 use kubaos_ui::component::button::ButtonSize;
 use kubaos_ui::component::button::Kind;
 use kubaos_ui::component::button::Preview;
@@ -54,6 +57,8 @@ use kubaos_ui::component::picture::picture_choice;
 use kubaos_ui::component::progress::bar;
 use kubaos_ui::component::progress::spinner;
 use kubaos_ui::component::sheet;
+use kubaos_ui::component::skeleton::Bone;
+use kubaos_ui::component::skeleton::skeleton;
 use kubaos_ui::component::slider::Value;
 use kubaos_ui::component::slider::slider;
 use kubaos_ui::component::slider::slider_held;
@@ -84,6 +89,10 @@ use kubaos_ui::tokens::Type;
 
 use crate::specimen::Message;
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "The page is one section after another, in the order they show; split up, the order would be spread over functions."
+)]
 pub fn view<'a>(look: &Look) -> Element<'a, Message> {
     stack(look, Space::S48)
         .push(section(
@@ -122,6 +131,18 @@ pub fn view<'a>(look: &Look) -> Element<'a, Message> {
             "Tiles",
             Some("Quick toggles as tall as a two-line row, filled with the accent while on. The detail arrow stays quiet: no fill, a state layer under the pointer."),
             tiles(look),
+        ))
+        .push(section(
+            look,
+            "Icon tiles and badges",
+            Some("Every row's icon on one tile, a symbol until a picture loads, so rows read the same size: small and regular, an app's icon, a photo, a critical one. Then badges, a count or a dot over an icon's corner."),
+            avatars(look),
+        ))
+        .push(section(
+            look,
+            "Skeletons",
+            Some("The shape of what is loading, in the placeholder colour, so what arrives moves nothing: a row being scanned, a thumbnail being decoded."),
+            skeletons(look),
         ))
         .push(section(
             look,
@@ -1016,5 +1037,62 @@ fn calendars<'a>(look: &Look) -> Element<'a, Message> {
                 .on_month(|_| Message::Sample)
                 .view(look),
         )
+        .into()
+}
+
+/// `glyph` 24 in a small control's box, `mark` over its top right corner.
+fn badged<'a>(look: &Look, glyph: Icon, mark: Element<'a, Message>) -> Element<'a, Message> {
+    let c = look.colors;
+    let side = f32::from(Size::ControlSm.px());
+    widget::Stack::with_children([
+        widget::container(kubaos_ui::snap::centre(
+            look.scale,
+            kubaos_ui::icon::icon(look, glyph, IconSize::S24, c.on_surface_variant),
+        ))
+        .width(side)
+        .height(side)
+        .into(),
+        widget::container(mark)
+            .width(side)
+            .height(side)
+            .align_x(iced::alignment::Horizontal::Right)
+            .into(),
+    ])
+    .into()
+}
+
+fn avatars<'a>(look: &Look) -> Element<'a, Message> {
+    let picture = PICTURES[usize::from(look.mode == Mode::Light)].clone();
+    row(look, Space::S24)
+        .center()
+        .push(icon_tile(Icon::Terminal, TileSize::Sm).view(look))
+        .push(icon_tile(Icon::Terminal, TileSize::Md).view(look))
+        .push(
+            icon_tile(Icon::Notifications, TileSize::Md)
+                .photo(Some(picture))
+                .view(look),
+        )
+        .push(icon_tile(Icon::Warning, TileSize::Md).danger().view(look))
+        .push(badge(look, Some(3)))
+        .push(badge(look, Some(128)))
+        .push(badge(look, None))
+        .push(badged(look, Icon::Notifications, badge(look, Some(3))))
+        .push(badged(look, Icon::SystemUpdateAlt, badge(look, None)))
+        .into()
+}
+
+fn skeletons<'a>(look: &Look) -> Element<'a, Message> {
+    let scanning = row(look, Space::S12)
+        .center()
+        .push(skeleton(look, Bone::Circle(IconSize::S24)))
+        .push(
+            stack(look, Space::S4)
+                .width(Extent::Fill)
+                .push(skeleton(look, Bone::Line(Type::BodyStrong)))
+                .push(skeleton(look, Bone::Line(Type::Small))),
+        );
+    grid(look, 2, Space::S24)
+        .push(scanning)
+        .push(skeleton(look, Bone::Block(Size::ControlLg, Radius::Control)))
         .into()
 }

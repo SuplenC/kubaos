@@ -4,7 +4,7 @@ import KubaOS.Components as K
 
 // A picture that never moves what is around it: `kubaos-ui`'s `media::media`. As wide as it is
 // given and as tall as `aspect` makes it, down to the 4 px grid, whether or not the picture has
-// loaded; until it has, the box holds the placeholder, the high container.
+// loaded; until it has, the box holds the placeholder, a block skeleton of the high container.
 //
 // The picture is `source`, cut to cover the box at `radius`; or the content put in it, laid over
 // the placeholder to fill it (a video, a picture that clips itself, fading in over it).
@@ -41,10 +41,13 @@ Item {
         return Math.floor(width * down / across / Tokens.rules.grid) * Tokens.rules.grid;
     }
 
-    Rectangle {
+    // The placeholder: a block skeleton, the box's own, so it breathes until the picture covers
+    // it, then stops.
+    K.Skeleton {
         anchors.fill: parent
+        bone: "block"
         radius: root.radius
-        color: Tokens.color.surface_container_high
+        reported: false
         visible: !root.ready
     }
 
