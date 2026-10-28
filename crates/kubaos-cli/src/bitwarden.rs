@@ -45,6 +45,8 @@ use kubaos_core::bitwarden::Report;
 use kubaos_core::bitwarden::Session;
 use kubaos_core::bitwarden::env;
 
+use crate::out::err;
+use crate::out::out;
 use crate::usage_error;
 
 #[derive(Subcommand)]
@@ -147,20 +149,20 @@ impl Colours {
 
     fn print(&self, l: &Line) {
         match l {
-            Line::Step(s) => println!("\n{}==> {s}{}", self.step, self.off),
-            Line::Ok(s) => println!("{}  ok{}  {s}", self.ok, self.off),
-            Line::Info(s) => println!("      {s}"),
-            Line::Warn(s) => eprintln!("{}  !!  {s}{}", self.warn, self.off),
+            Line::Step(s) => out!("\n{}==> {s}{}", self.step, self.off),
+            Line::Ok(s) => out!("{}  ok{}  {s}", self.ok, self.off),
+            Line::Info(s) => out!("      {s}"),
+            Line::Warn(s) => err!("{}  !!  {s}{}", self.warn, self.off),
         }
     }
 
     /// The reason it stopped, and bw's own words under it. Exit code 1.
     fn die(&self, e: &Error) -> ExitCode {
-        eprintln!("{}  xx  {e}{}", self.err, self.off);
+        err!("{}  xx  {e}{}", self.err, self.off);
         let mut cause = e.source();
         while let Some(c) = cause {
             for line in c.to_string().lines().filter(|l| !l.trim().is_empty()) {
-                eprintln!("      bw: {line}");
+                err!("      bw: {line}");
             }
             cause = c.source();
         }
@@ -173,9 +175,9 @@ impl Colours {
             self.print(&Line::Info(line.clone()));
         }
         if r.warnings.is_empty() {
-            println!("\n{}  all done, nothing needs you{}", self.ok, self.off);
+            out!("\n{}  all done, nothing needs you{}", self.ok, self.off);
         } else {
-            println!("\n{}  {} thing(s) need you:{}", self.warn, r.warnings.len(), self.off);
+            out!("\n{}  {} thing(s) need you:{}", self.warn, r.warnings.len(), self.off);
             for w in &r.warnings {
                 self.print(&Line::Info(format!("- {w}")));
             }
@@ -194,6 +196,10 @@ struct Terminal {
 }
 
 impl Ask for Terminal {
+    #[expect(
+        clippy::print_stderr,
+        reason = "The prompt stays on the line the answer is typed on, as `read -p` leaves it."
+    )]
     fn ask(&mut self, prompt: &str) -> Option<String> {
         if !self.tty {
             return None;
@@ -295,7 +301,7 @@ fn env_main(c: &Colours, m: &mut Real, cmd: EnvCmd) -> ExitCode {
         EnvCmd::Pull { projects } => env_pull(c, m, &projects),
         EnvCmd::Refresh => match env::projects(m) {
             Ok(projects) if projects.is_empty() => {
-                eprintln!("kubaos bitwarden: no projects in the keyring yet (kubaos bitwarden env pull <project>)");
+                err!("kubaos bitwarden: no projects in the keyring yet (kubaos bitwarden env pull <project>)");
                 Ok(())
             }
             Ok(projects) => env_pull(c, m, &projects),
@@ -314,7 +320,7 @@ fn export(c: &Colours, m: &mut Real, project: &str) -> ExitCode {
         Err(e) => return c.die(&e),
     };
     if vars.is_empty() {
-        eprintln!("kubaos bitwarden: nothing for '{project}' in the keyring; run: kubaos bitwarden env pull {project}");
+        err!("kubaos bitwarden: nothing for '{project}' in the keyring; run: kubaos bitwarden env pull {project}");
         return ExitCode::SUCCESS;
     }
     let mut out = std::io::stdout().lock();
@@ -328,7 +334,7 @@ fn export(c: &Colours, m: &mut Real, project: &str) -> ExitCode {
 fn list(m: &mut Real, project: Option<&str>) -> Result<(), Error> {
     for (p, names) in env::list(m, project)? {
         let names: Vec<&str> = names.iter().map(String::as_str).collect();
-        println!("{p}: {}", names.join(" "));
+        out!("{p}: {}", names.join(" "));
     }
     Ok(())
 }
@@ -336,17 +342,17 @@ fn list(m: &mut Real, project: Option<&str>) -> Result<(), Error> {
 fn clear(m: &mut Real, projects: &[String], all: bool) -> Result<(), Error> {
     if all {
         env::clear(m, None);
-        eprintln!("kubaos bitwarden: cleared every project");
+        err!("kubaos bitwarden: cleared every project");
         return Ok(());
     }
     if projects.is_empty() {
-        eprintln!("kubaos bitwarden: name the projects, or --all");
+        err!("kubaos bitwarden: name the projects, or --all");
         return Ok(());
     }
     for p in projects {
         env::check_project(p)?;
         env::clear(m, Some(p));
-        eprintln!("kubaos bitwarden: cleared {p}");
+        err!("kubaos bitwarden: cleared {p}");
     }
     Ok(())
 }

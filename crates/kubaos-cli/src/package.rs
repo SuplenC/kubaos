@@ -38,6 +38,7 @@ use kubaos_core::state::migrate::wire_home_nix;
 use crate::job;
 use crate::job::SwitchMode;
 use crate::job::report;
+use crate::out::out;
 use crate::usage_error;
 
 /// The terminal `try` opens when it is not run from one.
@@ -88,7 +89,7 @@ pub fn main(cmd: PackageCmd) -> ExitCode {
         PackageCmd::List { json } => list(&paths, json),
         PackageCmd::Restore { generation } => match paths.state_dir().restore_from_generation(&generation) {
             Ok(()) => {
-                println!(
+                out!(
                     "restored {} from {}",
                     paths.state_dir().root().display(),
                     generation.display()
@@ -142,7 +143,7 @@ pub fn wire(paths: &Paths) -> Result<bool, ExitCode> {
     match wire_home_nix(&home_nix, &paths.backups()) {
         Ok(Migration::AlreadyWired) => Ok(false),
         Ok(Migration::Wired { backup }) => {
-            println!(
+            out!(
                 "wired {} to kubaos.d/ (backup: {})",
                 home_nix.display(),
                 backup.display()
@@ -172,10 +173,10 @@ fn edit(paths: &Paths, names: &[String], how: Edit, no_switch: bool, mode: Switc
         Edit::Remove => ("removed", "not added with kubaos package add"),
     };
     for name in &change.changed {
-        println!("{did} {name}");
+        out!("{did} {name}");
     }
     for name in &change.unchanged {
-        println!("{name}: {didnt}");
+        out!("{name}: {didnt}");
     }
     if how == Edit::Remove {
         warn_still_in_suites(paths, names);
@@ -201,7 +202,7 @@ fn warn_still_in_suites(paths: &Paths, removed: &[String]) {
             })
             .collect();
         if !suites.is_empty() {
-            println!("{name} stays installed: the {} Suite lists it", suites.join(", "));
+            out!("{name} stays installed: the {} Suite lists it", suites.join(", "));
         }
     }
 }
@@ -229,11 +230,11 @@ fn list(paths: &Paths, json: bool) -> ExitCode {
     if json {
         let value: serde_json::Map<String, serde_json::Value> =
             rows.into_iter().map(|(name, from)| (name, from.into())).collect();
-        println!("{}", serde_json::to_string_pretty(&value).expect("the list serializes"));
+        out!("{}", serde_json::to_string_pretty(&value).expect("the list serializes"));
         return ExitCode::SUCCESS;
     }
     for (name, from) in rows {
-        println!("{name}  ({})", from.join(", "));
+        out!("{name}  ({})", from.join(", "));
     }
     ExitCode::SUCCESS
 }

@@ -25,6 +25,8 @@ use kubaos_core::setup::State;
 use kubaos_core::setup::demo;
 
 use crate::Events;
+use crate::out::err;
+use crate::out::out;
 
 #[derive(Clone, Copy, PartialEq, ValueEnum)]
 pub enum DemoMachine {
@@ -69,27 +71,27 @@ fn machine(d: DemoMachine) -> demo::Machine {
     }
 }
 
-pub fn main(cmd: SetupCmd) -> ExitCode {
+pub fn main(cmd: &SetupCmd) -> ExitCode {
     if rustix::process::geteuid().is_root() {
-        eprintln!("kubaos setup: run it as yourself, not root; it asks for root when it needs it");
+        err!("kubaos setup: run it as yourself, not root; it asks for root when it needs it");
         return ExitCode::from(2);
     }
     let env = Env::current();
-    match cmd {
+    match *cmd {
         SetupCmd::Status { json, demo } => {
             let st = match demo {
                 Some(d) => demo::Demo::new(machine(d), 1.0).status(),
                 None => setup::status(&mut RealSys::new(), &env),
             };
             if json {
-                println!("{}", serde_json::to_string_pretty(&st).expect("status serializes"));
+                out!("{}", serde_json::to_string_pretty(&st).expect("status serializes"));
             } else {
-                println!("online {}", if st.online { "yes" } else { "no" });
+                out!("online {}", if st.online { "yes" } else { "no" });
                 for c in &st.cards {
-                    println!("{:<12} {:<8} {}", c.id.title(), state_word(c.state), c.summary);
+                    out!("{:<12} {:<8} {}", c.id.title(), state_word(c.state), c.summary);
                 }
                 if env.marker().exists() {
-                    println!("marker {} (setup stays closed at login)", env.marker().display());
+                    out!("marker {} (setup stays closed at login)", env.marker().display());
                 }
             }
             ExitCode::SUCCESS
@@ -121,11 +123,11 @@ pub fn main(cmd: SetupCmd) -> ExitCode {
         }
         SetupCmd::Done => match setup::mark_done(&mut RealSys::new(), &env) {
             Ok(()) => {
-                println!("{}", env.marker().display());
+                out!("{}", env.marker().display());
                 ExitCode::SUCCESS
             }
             Err(e) => {
-                eprintln!("kubaos setup: {e}");
+                err!("kubaos setup: {e}");
                 ExitCode::from(1)
             }
         },
@@ -144,28 +146,28 @@ fn state_word(s: State) -> &'static str {
 
 fn print_event(e: &SetupEvent, events: Events) {
     if events == Events::Json {
-        println!("{}", e.to_json_line());
+        out!("{}", e.to_json_line());
         return;
     }
     match e {
-        SetupEvent::Started { card } => println!("==> {}", card.title()),
+        SetupEvent::Started { card } => out!("==> {}", card.title()),
         SetupEvent::Prompt { text, count, .. } => match count {
-            Some((k, n)) => println!("  >> {text} ({k}/{n})"),
-            None => println!("  >> {text}"),
+            Some((k, n)) => out!("  >> {text} ({k}/{n})"),
+            None => out!("  >> {text}"),
         },
         SetupEvent::Log { level, line, .. } => match level {
             Level::Debug => {}
-            Level::Info => println!("     {line}"),
-            Level::Warn => println!("  !! {line}"),
-            Level::Error => println!("  xx {line}"),
+            Level::Info => out!("     {line}"),
+            Level::Warn => out!("  !! {line}"),
+            Level::Error => out!("  xx {line}"),
         },
         SetupEvent::Finished { status, .. } => {
-            println!("  ok {}: {}", state_word(status.state), status.summary)
+            out!("  ok {}: {}", state_word(status.state), status.summary);
         }
         SetupEvent::Failed { error, hint, .. } => {
-            println!("  xx Fuck. {error}.");
+            out!("  xx Fuck. {error}.");
             if let Some(h) = hint {
-                println!("     {h}");
+                out!("     {h}");
             }
         }
     }

@@ -16,6 +16,7 @@
 //!
 //! - The events and when they come: `kubaos_core::update`.
 
+use std::fmt::Write as _;
 use std::io;
 use std::io::IsTerminal;
 use std::io::Write;
@@ -234,39 +235,42 @@ impl Text {
         let s = self.style;
         let mut out = String::from("\n");
         match &preview.to {
-            Some(to) => out.push_str(&format!(
-                "  {} {} → {}, {}\n",
-                s.bold("KubaOS"),
-                preview.from.describe(),
-                s.bold(&to.describe()),
-                preview.channel
-            )),
-            None => out.push_str(&format!(
-                "  {} stays at {}, {}: packages only\n",
-                s.bold("KubaOS"),
-                preview.from.describe(),
-                preview.channel
-            )),
+            Some(to) => {
+                let _ = writeln!(
+                    out,
+                    "  {} {} → {}, {}",
+                    s.bold("KubaOS"),
+                    preview.from.describe(),
+                    s.bold(&to.describe()),
+                    preview.channel
+                );
+            }
+            None => {
+                let _ = writeln!(
+                    out,
+                    "  {} stays at {}, {}: packages only",
+                    s.bold("KubaOS"),
+                    preview.from.describe(),
+                    preview.channel
+                );
+            }
         }
         for change in &preview.changes {
             let (hash, subject) = change.split_once(' ').unwrap_or(("", change));
-            out.push_str(&format!("    {} {subject}\n", s.dim(hash)));
+            let _ = writeln!(out, "    {} {subject}", s.dim(hash));
         }
-        out.push_str(&format!("  {} to upgrade\n", count(preview.packages, "apt package")));
+        let _ = writeln!(out, "  {} to upgrade", count(preview.packages, "apt package"));
         if !preview.apt.is_empty() {
             out.push_str("  New apt packages to install:\n");
             for change in &preview.apt {
-                out.push_str(&format!("    {}: {}\n", change.group, change.installed.join(", ")));
+                let _ = writeln!(out, "    {}: {}", change.group, change.installed.join(", "));
             }
         }
         if preview.hyprland_pin {
             out.push_str("  The Hyprland pin changes: Hyprland is installed at the release's versions.\n");
         }
         if !preview.migrations.is_empty() {
-            out.push_str(&format!(
-                "  System migrations to run: {}\n",
-                preview.migrations.join(", ")
-            ));
+            let _ = writeln!(out, "  System migrations to run: {}", preview.migrations.join(", "));
         }
         out.push('\n');
         out
@@ -310,17 +314,17 @@ impl Text {
                 .map(|change| change.split_once(' ').map_or(change.as_str(), |(_, subject)| subject));
             out.push_str(&row("Changes", subjects.next().unwrap_or_default()));
             for subject in subjects {
-                out.push_str(&format!("{indent}{subject}\n"));
+                let _ = writeln!(out, "{indent}{subject}");
             }
             let more = summary.changes.len().saturating_sub(CHANGES_SHOWN);
             if more > 0 {
-                out.push_str(&format!("{indent}{}\n", s.dim(&format!("and {more} more"))));
+                let _ = writeln!(out, "{indent}{}", s.dim(&format!("and {more} more")));
             }
         }
         if summary.command != Command::Rollback {
             let mut packages = count(summary.packages, "apt package");
             if !summary.inputs.is_empty() {
-                packages.push_str(&format!(", Nix inputs {}", summary.inputs.join(", ")));
+                let _ = write!(packages, ", Nix inputs {}", summary.inputs.join(", "));
             }
             out.push_str(&row("Packages", &packages));
             if !summary.apt.is_empty() {
@@ -370,7 +374,7 @@ impl Text {
         let first = lines.next().unwrap_or_else(|| none.to_owned());
         let mut out = format!("  {}{first}\n", s.dim(&format!("{:<LABEL_WIDTH$}", "Apt")));
         for line in lines {
-            out.push_str(&format!("{indent}{line}\n"));
+            let _ = writeln!(out, "{indent}{line}");
         }
         out
     }
@@ -379,14 +383,15 @@ impl Text {
         let s = self.style;
         let mut out = format!("\n  {} {error}\n", s.red("✗"));
         for line in output {
-            out.push_str(&format!("    {} {}\n", s.dim("│"), s.dim(line)));
+            let _ = writeln!(out, "    {} {}", s.dim("│"), s.dim(line));
         }
         if let Some(log) = log {
-            out.push_str(&format!(
-                "  {}{}\n",
+            let _ = writeln!(
+                out,
+                "  {}{}",
                 s.dim(&format!("{:<LABEL_WIDTH$}", "Log")),
                 self.path(log)
-            ));
+            );
         }
         out
     }
@@ -410,16 +415,17 @@ fn heading(command: Command) -> String {
 fn available(update: Option<&str>, upgrade: Option<&str>, apt_security: usize) -> String {
     let mut out = String::from("\n");
     if let Some(update) = update {
-        out.push_str(&format!("  KubaOS {update} is ready: kubaos update\n"));
+        let _ = writeln!(out, "  KubaOS {update} is ready: kubaos update");
     }
     if let Some(upgrade) = upgrade {
-        out.push_str(&format!("  KubaOS {upgrade} is out: kubaos upgrade\n"));
+        let _ = writeln!(out, "  KubaOS {upgrade} is out: kubaos upgrade");
     }
     if apt_security > 0 {
-        out.push_str(&format!(
-            "  {} waiting: kubaos update\n",
+        let _ = writeln!(
+            out,
+            "  {} waiting: kubaos update",
             count(apt_security, "apt security update")
-        ));
+        );
     }
     if update.is_none() && upgrade.is_none() && apt_security == 0 {
         out.push_str("  Nothing new: KubaOS is up to date.\n");
@@ -685,10 +691,10 @@ impl<W: Write> Screen<W> {
         );
         let mut extra = String::new();
         if let Some((done, total)) = running.progress {
-            extra.push_str(&format!("  {done}/{total}"));
+            let _ = write!(extra, "  {done}/{total}");
         }
         if let Some(step) = &running.step {
-            extra.push_str(&format!("  {step}"));
+            let _ = write!(extra, "  {step}");
         }
         let room = width.saturating_sub(head.chars().count());
         let extra = fit(&extra, room);
@@ -701,7 +707,7 @@ impl<W: Write> Screen<W> {
         let mut area = head;
         self.drawn = 1;
         if let Some(line) = &running.line {
-            area.push_str(&format!("\n    {}", s.dim(&fit(line, width.saturating_sub(4)))));
+            let _ = write!(area, "\n    {}", s.dim(&fit(line, width.saturating_sub(4))));
             self.drawn = 2;
         }
         self.last_draw = Some(now);

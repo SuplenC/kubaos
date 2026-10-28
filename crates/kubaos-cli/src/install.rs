@@ -9,10 +9,12 @@
 //! Exit codes: 0 ok, 1 a step failed (the last event is `failed`), 2 usage
 //! or config error.
 
+use std::fmt::Write as _;
 use std::fs::File;
 use std::io::IsTerminal;
 use std::io::Read;
 use std::io::Write;
+use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -35,6 +37,8 @@ use signal_hook::consts::SIGTERM;
 use signal_hook::iterator::Signals;
 
 use crate::Events;
+use crate::out::err;
+use crate::out::out;
 use crate::usage_error;
 
 const LIVE_LOG: &str = "/var/log/kubaos-install.log";
@@ -137,10 +141,10 @@ fn cmd_probe(json: bool, payload: Option<PathBuf>) -> ExitCode {
         Err(e) => return usage_error(e),
     };
     if json {
-        println!("{}", serde_json::to_string_pretty(&p).expect("probe serializes"));
+        out!("{}", serde_json::to_string_pretty(&p).expect("probe serializes"));
         return ExitCode::SUCCESS;
     }
-    println!("arch {}  uefi {}  online {}", p.arch, p.uefi, p.online);
+    out!("arch {}  uefi {}  online {}", p.arch, p.uefi, p.online);
     for d in &p.disks {
         let flags = [(d.removable, "removable"), (d.is_boot_medium, "boot medium")]
             .iter()
@@ -148,9 +152,9 @@ fn cmd_probe(json: bool, payload: Option<PathBuf>) -> ExitCode {
             .map(|(_, s)| *s)
             .collect::<Vec<_>>()
             .join(", ");
-        println!("{}  {}  {}  {flags}", d.path, machine::gib(d.size_bytes), d.model);
+        out!("{}  {}  {}  {flags}", d.path, machine::gib(d.size_bytes), d.model);
         for part in &d.partitions {
-            println!(
+            out!(
                 "  {}  {}  {}  {}",
                 part.path,
                 machine::gib(part.size_bytes),
@@ -159,10 +163,10 @@ fn cmd_probe(json: bool, payload: Option<PathBuf>) -> ExitCode {
             );
         }
         for r in &d.free_regions {
-            println!("  free {}..{}  {}", r.start, r.end, machine::gib(r.end - r.start));
+            out!("  free {}..{}  {}", r.start, r.end, machine::gib(r.end - r.start));
         }
     }
-    println!(
+    out!(
         "{} keymaps, {} timezones, {} locales, {} Wi-Fi networks",
         p.keymaps.len(),
         p.timezones.len(),
@@ -170,7 +174,7 @@ fn cmd_probe(json: bool, payload: Option<PathBuf>) -> ExitCode {
         p.wifi.len()
     );
     match &p.payload {
-        Some(m) => println!(
+        Some(m) => out!(
             "payload {} ({}, {}) for {}@{}, {} unpacked",
             m.version,
             m.arch,
@@ -179,7 +183,7 @@ fn cmd_probe(json: bool, payload: Option<PathBuf>) -> ExitCode {
             m.hostname,
             machine::gib(m.installed_bytes)
         ),
-        None => println!("no payload in {}", dir.display()),
+        None => out!("no payload in {}", dir.display()),
     }
     ExitCode::SUCCESS
 }
@@ -199,12 +203,12 @@ fn cmd_validate(config: &Path) -> ExitCode {
     };
     match validate_config(&c) {
         Ok(()) => {
-            println!("ok");
+            out!("ok");
             ExitCode::SUCCESS
         }
         Err(problems) => {
             for p in problems.lines() {
-                eprintln!("{p}");
+                err!("{p}");
             }
             ExitCode::from(2)
         }
@@ -221,12 +225,15 @@ fn cmd_plan(config: &Path, json: bool) -> ExitCode {
         let e = Event::Plan {
             steps: steps.iter().map(|s| s.info()).collect(),
         };
-        println!("{}", e.to_json_line());
+        out!("{}", e.to_json_line());
     } else {
         for s in steps {
-            println!(
+            out!(
                 "{:<12} {:>3}  {}",
-                serde_json::to_value(s).unwrap().as_str().unwrap_or(""),
+                serde_json::to_value(s)
+                    .expect("a step serializes as its name")
+                    .as_str()
+                    .unwrap_or(""),
                 s.weight(),
                 s.title()
             );
@@ -246,7 +253,6 @@ fn read_secrets(file: Option<PathBuf>, stdin: bool) -> Result<Option<Secrets>, S
             .map_err(|e| format!("secrets on stdin: {e}"));
     }
     let Some(path) = file else { return Ok(None) };
-    use std::os::unix::fs::MetadataExt;
     let meta = std::fs::metadata(&path).map_err(|e| format!("{}: {e}", path.display()))?;
     if meta.mode() & 0o077 != 0 {
         return Err(format!("{} must not be readable by others (chmod 600)", path.display()));
@@ -263,7 +269,7 @@ fn stop_on_signals() {
     let mut signals = match Signals::new([SIGINT, SIGTERM, SIGHUP]) {
         Ok(signals) => signals,
         Err(e) => {
-            eprintln!("kubaos: can't catch signals: {e}");
+            err!("kubaos: can't catch signals: {e}");
             return;
         }
     };
@@ -274,7 +280,10 @@ fn stop_on_signals() {
     });
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "The `run` command's flags, one argument each, as clap parsed them."
+)]
 fn cmd_run(
     config: &Path,
     secrets: Option<PathBuf>,
@@ -305,7 +314,7 @@ fn cmd_run(
         }
         if let Err(problems) = validate_config(&c) {
             for p in problems.lines() {
-                eprintln!("{p}");
+                err!("{p}");
             }
             return ExitCode::from(2);
         }
@@ -321,7 +330,7 @@ fn cmd_run(
             .create(true)
             .append(true)
             .open(p)
-            .map_err(|e| eprintln!("kubaos: can't write the log {}: {e}", p.display()))
+            .map_err(|e| err!("kubaos: can't write the log {}: {e}", p.display()))
             .ok()
     });
     let opts = RunOptions {
@@ -334,7 +343,7 @@ fn cmd_run(
         Ok(()) => ExitCode::SUCCESS,
         Err(kubaos_core::Error::Step { .. }) => ExitCode::from(1),
         Err(e) => {
-            eprintln!("kubaos: {e}");
+            err!("kubaos: {e}");
             ExitCode::from(1)
         }
     }
@@ -405,7 +414,7 @@ impl Printer {
             Event::Failed { error, hint, .. } => {
                 let mut s = format!("!!! {error}");
                 if let Some(h) = hint {
-                    s.push_str(&format!("\n    {h}"));
+                    let _ = write!(s, "\n    {h}");
                 }
                 s
             }
@@ -435,12 +444,12 @@ impl Printer {
                 let _ = writeln!(so, "{}", e.to_json_line());
                 let _ = so.flush();
                 if let Some(line) = self.human(e, false) {
-                    eprintln!("{line}");
+                    err!("{line}");
                 }
             }
             Events::Human => {
                 if let Some(line) = self.human(e, false) {
-                    println!("{line}");
+                    out!("{line}");
                 }
             }
         }

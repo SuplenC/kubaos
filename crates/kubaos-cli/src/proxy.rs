@@ -12,6 +12,8 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 use std::process::ExitCode;
 
+use crate::out::err;
+
 /// The Proxy's own command.
 const PROGRAM: &str = "kubaos-proxy";
 
@@ -19,6 +21,6 @@ const PROGRAM: &str = "kubaos-proxy";
 /// `kubaos proxy`'s.
 pub fn main(args: &[String]) -> ExitCode {
     let err = Command::new(PROGRAM).args(args).exec();
-    eprintln!("kubaos: couldn't run {PROGRAM} ({err}); a home-manager switch installs it (home/proxy.nix)");
+    err!("kubaos: couldn't run {PROGRAM} ({err}); a home-manager switch installs it (home/proxy.nix)");
     ExitCode::FAILURE
 }

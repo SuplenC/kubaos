@@ -23,3 +23,6 @@ clap = { version = "4", features = ["derive"] }
 rustix = { version = "1", features = ["process", "fs", "termios"] }
 signal-hook = "0.3"
 thiserror.workspace = true
+
+[lints]
+workspace = true

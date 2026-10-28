@@ -23,7 +23,7 @@
 //! with its layout. It follows the default alone. A new default is written there by a root helper
 //! that pkexec runs (polkit decides, so `kubaos` runs as the desktop user). Ubuntu's
 //! systemd-localed can't do that writing: a D-Bus policy shipped with systemd refuses its
-//! SetX11Keyboard to everyone, root included, and Debian's localed no longer writes that file.
+//! `SetX11Keyboard` to everyone, root included, and Debian's localed no longer writes that file.
 //! When the helper fails the user's layouts have changed all the same; the last line says that the
 //! console keeps the old default and why, which the control center shows as is, after a line with
 //! everything pkexec said.
@@ -72,6 +72,8 @@ use kubaos_core::keyboard::settings::MacAccents;
 use kubaos_core::keyboard::settings::Settings;
 
 use crate::job::chain;
+use crate::out::err;
+use crate::out::out;
 use crate::usage_error;
 
 /// The model written when the file names none: the one the install writes.
@@ -140,13 +142,13 @@ fn layouts(cmd: KeyboardCmd) -> ExitCode {
     let change = match cmd {
         KeyboardCmd::Show => {
             for layout in &current {
-                println!("{layout}");
+                out!("{layout}");
             }
             return ExitCode::SUCCESS;
         }
         KeyboardCmd::List => {
             for (layout, name) in keyboard::catalogue(&rules_lst()) {
-                println!("{layout}\t{name}");
+                out!("{layout}\t{name}");
             }
             return ExitCode::SUCCESS;
         }
@@ -155,7 +157,7 @@ fn layouts(cmd: KeyboardCmd) -> ExitCode {
                 && !current.is_empty()
                 && let Err(e) = settings::set_layouts(&mine, &current)
             {
-                eprintln!("kubaos: {}", chain(&e));
+                err!("kubaos: {}", chain(&e));
                 return ExitCode::FAILURE;
             }
             return ExitCode::SUCCESS;
@@ -178,11 +180,11 @@ fn layouts(cmd: KeyboardCmd) -> ExitCode {
         Err(e) => return usage_error(e),
     };
     if let Err(e) = settings::set_layouts(&mine, &layouts) {
-        eprintln!("kubaos: the keyboard layouts weren't changed: {}", chain(&e));
+        err!("kubaos: the keyboard layouts weren't changed: {}", chain(&e));
         return ExitCode::FAILURE;
     }
     reload_hyprland();
-    println!("{}", keyboard::spell_list(&layouts));
+    out!("{}", keyboard::spell_list(&layouts));
     // The console and the disk's passphrase prompt type with the default alone, so only a new
     // default asks for an admin.
     let default = &layouts[0];
@@ -192,7 +194,7 @@ fn layouts(cmd: KeyboardCmd) -> ExitCode {
     match write_system_default(&system, default) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!(
+            err!(
                 "kubaos: the keyboard layouts changed, but the console and the disk's passphrase \
                  prompt still type with {old}: {}",
                 chain(&e)
@@ -230,24 +232,24 @@ fn accents(change: Option<AccentsChange>) -> ExitCode {
         },
     };
     let Some(change) = change else {
-        println!("{wanted}");
+        out!("{wanted}");
         return ExitCode::SUCCESS;
     };
     if change != AccentsChange::Apply
         && let Err(e) = settings::set_mac_accents(&path, wanted)
     {
-        eprintln!("kubaos: {}", chain(&e));
+        err!("kubaos: {}", chain(&e));
         return ExitCode::FAILURE;
     }
     if let Err(msg) = tell_keyd(wanted) {
-        eprintln!("kubaos: {msg}");
+        err!("kubaos: {msg}");
         return ExitCode::FAILURE;
     }
     // At login Hyprland has just read the setting; after a change its cheat sheet follows.
     if change != AccentsChange::Apply {
         reload_hyprland();
     }
-    println!("{wanted}");
+    out!("{wanted}");
     ExitCode::SUCCESS
 }
 
@@ -315,7 +317,7 @@ fn write_system_default(file: &KeyboardFile, default: &Layout) -> Result<(), Sys
         return Ok(());
     }
     let stderr = String::from_utf8_lossy(&out.stderr);
-    eprintln!("kubaos: {}", logged(&stderr, out.status));
+    err!("kubaos: {}", logged(&stderr, out.status));
     Err(refusal(&stderr, out.status))
 }
 

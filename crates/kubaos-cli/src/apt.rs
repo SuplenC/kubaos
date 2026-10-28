@@ -37,6 +37,7 @@ use kubaos_core::update::record::SystemPaths;
 
 use crate::job;
 use crate::job::SwitchIn;
+use crate::out::out;
 use crate::update;
 use crate::update::render::Mode;
 use crate::update::render::Ui;
@@ -73,6 +74,10 @@ pub fn main(cmd: PackagesCmd) -> ExitCode {
     }
 }
 
+#[expect(
+    clippy::print_stdout,
+    reason = "The table is the command's output, written whole as it ends its own lines."
+)]
 fn status(json: bool) -> ExitCode {
     let (paths, mut system) = match update::machine(SwitchIn::Unit) {
         Ok(m) => m,
@@ -84,7 +89,7 @@ fn status(json: bool) -> ExitCode {
         Err(e) => return job::report(e),
     };
     if json {
-        println!(
+        out!(
             "{}",
             serde_json::to_string(&status).expect("the status always serializes")
         );

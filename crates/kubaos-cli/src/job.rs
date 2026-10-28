@@ -36,6 +36,8 @@ use kubaos_core::switch::JobState;
 use kubaos_core::switch::Queue;
 use kubaos_core::switch::Systemd;
 
+use crate::out::err;
+use crate::out::out;
 use crate::usage_error;
 
 /// How often a follower looks at the job's files.
@@ -120,10 +122,10 @@ pub fn switch(paths: &Paths, mode: SwitchMode) -> ExitCode {
         Err(e) => return report(e),
     };
     if mode.detach {
-        println!("switch queued as job {id}: kubaos job follow {id}");
+        out!("switch queued as job {id}: kubaos job follow {id}");
         return ExitCode::SUCCESS;
     }
-    println!("switch queued as job {id}; Ctrl-C stops following, not the switch");
+    out!("switch queued as job {id}; Ctrl-C stops following, not the switch");
     follow(&queue, &id, Some(&host))
 }
 
@@ -143,11 +145,11 @@ fn follow(queue: &Queue, id: &JobId, host: Option<&Systemd>) -> ExitCode {
     };
     match wait(queue, id, host, print) {
         Ok(()) => {
-            println!("switch {id} done");
+            out!("switch {id} done");
             ExitCode::SUCCESS
         }
         Err(e) => {
-            eprintln!("kubaos: switch {id} failed: {e}");
+            err!("kubaos: switch {id} failed: {e}");
             ExitCode::FAILURE
         }
     }
@@ -208,21 +210,21 @@ pub fn switch_step(paths: &Paths, place: SwitchIn, on_output: &mut dyn FnMut(&st
 
 fn list(queue: &Queue, host: &Systemd, json: bool) -> ExitCode {
     if let Err(e) = queue.reap(host) {
-        eprintln!("kubaos: not checking the worker units: {e}");
+        err!("kubaos: not checking the worker units: {e}");
     }
     let jobs = match queue.jobs() {
         Ok(jobs) => jobs,
         Err(e) => return report(e),
     };
     if json {
-        println!("{}", serde_json::to_string_pretty(&jobs).expect("jobs serialize"));
+        out!("{}", serde_json::to_string_pretty(&jobs).expect("jobs serialize"));
         return ExitCode::SUCCESS;
     }
     for job in jobs {
         let state = format!("{:?}", job.state).to_lowercase();
         match job.error {
-            Some(error) => println!("{}  {state}  {error}", job.id),
-            None => println!("{}  {state}", job.id),
+            Some(error) => out!("{}  {state}  {error}", job.id),
+            None => out!("{}  {state}", job.id),
         }
     }
     ExitCode::SUCCESS
@@ -230,7 +232,7 @@ fn list(queue: &Queue, host: &Systemd, json: bool) -> ExitCode {
 
 /// Prints `e` with its causes on stderr and returns exit code 1.
 pub fn report(e: impl std::error::Error) -> ExitCode {
-    eprintln!("kubaos: {}", chain(&e));
+    err!("kubaos: {}", chain(&e));
     ExitCode::FAILURE
 }
 

@@ -44,6 +44,7 @@ use serde_json::json;
 use crate::job;
 use crate::job::SwitchMode;
 use crate::job::report;
+use crate::out::out;
 use crate::package;
 use crate::usage_error;
 
@@ -99,6 +100,10 @@ pub enum SuiteCmd {
     },
     /// Create a project in the Projects root (~/Projects, or $KUBAOS_PROJECTS) with an installed
     /// Suite.
+    #[expect(
+        clippy::doc_markdown,
+        reason = "clap prints the doc as the help text, where backticks would show."
+    )]
     New {
         name: String,
         project: String,
@@ -210,7 +215,7 @@ fn add(
         Ok(added) => added,
         Err(e) => return report(e),
     };
-    println!("added the {} Suite ({})", suite.title, describe(&added.config));
+    out!("added the {} Suite ({})", suite.title, describe(&added.config));
     print_seeds(paths, &added.seeds);
     if no_switch {
         return ExitCode::SUCCESS;
@@ -235,13 +240,13 @@ fn configure(
         Err(e) => return report(e),
     };
     if configured.changed {
-        println!(
+        out!(
             "configured the {} Suite ({})",
             suite.title,
             describe(&configured.config)
         );
     } else {
-        println!("the {} Suite is already {}", suite.title, describe(&configured.config));
+        out!("the {} Suite is already {}", suite.title, describe(&configured.config));
     }
     print_seeds(paths, &configured.seeds);
     if no_switch || !(configured.changed || wired) {
@@ -265,19 +270,19 @@ fn remove(
         Ok(removed) => removed,
         Err(e) => return report(e),
     };
-    println!("removed the {} Suite", suite.title);
+    out!("removed the {} Suite", suite.title);
     for cache in removed.caches.iter().filter(|c| c.bytes.is_some()) {
         let what = if removed.purged.contains(&cache.path) {
             "deleted"
         } else {
             "kept (--purge-caches deletes it)"
         };
-        println!("cache {} ({}): {what}", tilde(paths, &cache.path), size(cache));
+        out!("cache {} ({}): {what}", tilde(paths, &cache.path), size(cache));
     }
     if !removed.mentions.is_empty() {
-        println!("your files that mention it, left as they are:");
+        out!("your files that mention it, left as they are:");
         for path in &removed.mentions {
-            println!("  {}", tilde(paths, path));
+            out!("  {}", tilde(paths, path));
         }
     }
     if no_switch {
@@ -302,7 +307,7 @@ fn new(paths: &Paths, suites: &Suites, suite: &Suite, project: &str, id: Option<
     };
     match suites.scaffold(suite, scaffolder, project) {
         Ok(path) => {
-            println!("created {}", tilde(paths, &path));
+            out!("created {}", tilde(paths, &path));
             ExitCode::SUCCESS
         }
         Err(e) => report(e),
@@ -332,17 +337,17 @@ fn list(suites: &Suites, json: bool) -> ExitCode {
         rows.push(json!({ "name": name, "installed": true, "known": false }));
     }
     if json {
-        println!("{}", serde_json::to_string_pretty(&rows).expect("the list serializes"));
+        out!("{}", serde_json::to_string_pretty(&rows).expect("the list serializes"));
         return ExitCode::SUCCESS;
     }
     for suite in catalog::all() {
         let state = installed
             .get(suite.name)
             .map_or_else(|| "not installed".to_owned(), describe);
-        println!("{}  {}  ({state})", suite.name, suite.description);
+        out!("{}  {}  ({state})", suite.name, suite.description);
     }
     for name in installed.keys().filter(|name| catalog::find(name).is_none()) {
-        println!("{name}  (suites/{name}.toml: not a KubaOS Suite, its packages still install)");
+        out!("{name}  (suites/{name}.toml: not a KubaOS Suite, its packages still install)");
     }
     ExitCode::SUCCESS
 }
@@ -380,33 +385,35 @@ fn show(paths: &Paths, suites: &Suites, suite: &Suite, json: bool) -> ExitCode {
             "mentions": mentions,
             "scaffolders": scaffolders(suite),
         });
-        println!(
+        out!(
             "{}",
             serde_json::to_string_pretty(&value).expect("the Suite serializes")
         );
         return ExitCode::SUCCESS;
     }
-    println!("{} ({}): {}", suite.title, suite.name, suite.description);
+    out!("{} ({}): {}", suite.title, suite.name, suite.description);
     match &config {
-        Some(config) => println!("installed: {}", describe(config)),
-        None => println!("not installed"),
+        Some(config) => out!("installed: {}", describe(config)),
+        None => out!("not installed"),
     }
     if !suite.versions.is_empty() {
-        println!("versions: {}", suite.versions.join(", "));
+        out!("versions: {}", suite.versions.join(", "));
     }
     for extra in suite.extras {
-        println!("extra {}: {}", extra.name, extra.description);
+        out!("extra {}: {}", extra.name, extra.description);
     }
     for cache in &caches {
-        println!("cache {} ({})", tilde(paths, &cache.path), size(cache));
+        out!("cache {} ({})", tilde(paths, &cache.path), size(cache));
     }
     for path in &mentions {
-        println!("mentioned in {}", tilde(paths, path));
+        out!("mentioned in {}", tilde(paths, path));
     }
     for scaffolder in suite.scaffolders {
-        println!(
+        out!(
             "{}: kubaos suite new {} NAME --with {}",
-            scaffolder.label, suite.name, scaffolder.id
+            scaffolder.label,
+            suite.name,
+            scaffolder.id
         );
     }
     ExitCode::SUCCESS
@@ -422,10 +429,10 @@ fn scaffolders(suite: &Suite) -> Value {
 
 fn print_seeds(paths: &Paths, seeds: &Seeded) {
     for path in &seeds.created {
-        println!("created {} (yours to edit)", tilde(paths, path));
+        out!("created {} (yours to edit)", tilde(paths, path));
     }
     for path in &seeds.kept {
-        println!("kept {}: it is yours", tilde(paths, path));
+        out!("kept {}: it is yours", tilde(paths, path));
     }
 }
 

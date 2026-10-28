@@ -46,7 +46,13 @@ use render::Mode;
 use render::Ui;
 use system::System;
 
+use crate::out::out;
+
 #[derive(Args)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "The bools are the command's flags, as clap parses them."
+)]
 pub struct UpdateArgs {
     /// Don't ask before updating.
     #[arg(short, long)]
@@ -114,7 +120,7 @@ pub(crate) fn machine(place: SwitchIn) -> Result<(Paths, System), ExitCode> {
 }
 
 /// The exit code of a run whose events have shown how it ended.
-fn done<T>(result: Result<T, UpdateError>) -> ExitCode {
+fn done<T>(result: &Result<T, UpdateError>) -> ExitCode {
     match result {
         Ok(_) => ExitCode::SUCCESS,
         Err(_) => ExitCode::FAILURE,
@@ -129,10 +135,10 @@ pub fn update(args: &UpdateArgs) -> ExitCode {
     let mut ui = Ui::new(Mode::detect(args.json));
     let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
     if args.check {
-        return done(updater.check());
+        return done(&updater.check());
     }
     let opts = UpdateOptions::new().confirm(confirm(args.yes));
-    done(updater.update(if args.packages_only { opts.packages_only() } else { opts }))
+    done(&updater.update(if args.packages_only { opts.packages_only() } else { opts }))
 }
 
 pub fn upgrade(args: &UpgradeArgs) -> ExitCode {
@@ -142,7 +148,7 @@ pub fn upgrade(args: &UpgradeArgs) -> ExitCode {
     };
     let mut ui = Ui::new(Mode::detect(args.json));
     let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
-    done(updater.upgrade())
+    done(&updater.upgrade())
 }
 
 pub fn rollback(args: &RollbackArgs) -> ExitCode {
@@ -152,7 +158,7 @@ pub fn rollback(args: &RollbackArgs) -> ExitCode {
     };
     let mut ui = Ui::new(Mode::detect(args.json));
     let mut updater = Updater::new(&mut system, SystemPaths::machine(), paths, SystemTime::now()).reporting(&mut ui);
-    done(updater.rollback(confirm(args.yes)))
+    done(&updater.rollback(confirm(args.yes)))
 }
 
 pub fn channel(args: &ChannelArgs) -> ExitCode {
@@ -165,7 +171,7 @@ pub fn channel(args: &ChannelArgs) -> ExitCode {
     let Some(name) = &args.channel else {
         return match updater.installed() {
             Ok(installed) => {
-                println!("{}", updater.channel(&installed));
+                out!("{}", updater.channel(&installed));
                 ExitCode::SUCCESS
             }
             Err(e) => job::report(e),

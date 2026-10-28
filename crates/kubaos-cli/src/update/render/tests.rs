@@ -132,6 +132,7 @@ fn step(text: &str) -> UpdateEvent {
 const LOG: &str = "/home/kuba/.local/state/kubaos/update/2026-10-23T09-14-03-update.log";
 
 /// An edge update that asks, runs a migration and reloads the session, as the updater reports it.
+#[expect(clippy::too_many_lines, reason = "One update's events in order: a list, not logic.")]
 fn edge_update() -> Vec<UpdateEvent> {
     let from = release("0.1.0", Some("shinjuku"), "1a2b3c4d5e");
     let to = release("0.1.1", Some("shinjuku"), "9f8e7d6c5b");
@@ -324,7 +325,6 @@ fn the_live_view_leaves_each_phase_with_its_result_and_ends_on_the_summary() {
     play(&mut screen, &out, &edge_update());
 
     let shown = terminal(&out.bytes());
-    println!("{shown}");
     assert_eq!(shown, EDGE_UPDATE_SCREEN);
 }
 
@@ -418,8 +418,7 @@ fn plain_output_is_one_line_per_fact_without_escapes_or_programs_output() {
     }
 
     let text = out.text();
-    println!("{text}");
-    assert!(!text.contains('\x1b'));
+    assert!(!text.contains('\x1b'), "an escape is in the plain view:\n{text}");
     assert!(
         !text.contains("Unpacking firefox"),
         "a program's output is in the plain view:\n{text}"

@@ -51,6 +51,8 @@ use kubaos_cursor::theme::XcursorOutcome;
 use kubaos_user_layer::App;
 
 use crate::job::chain;
+use crate::out::err;
+use crate::out::out;
 use crate::usage_error;
 
 /// The background render's threads at most: enough to finish in a couple of seconds, few enough
@@ -90,7 +92,7 @@ pub fn main(cmd: CursorCmd) -> ExitCode {
         CursorCmd::Size { size } => change(&paths, settings::set_size(&paths.settings, size)),
         CursorCmd::Show => {
             let settings = load_settings(&paths);
-            println!("style={} size={}", settings.style, settings.size);
+            out!("style={} size={}", settings.style, settings.size);
             ExitCode::SUCCESS
         }
         CursorCmd::RenderXcursor => render_xcursor(&paths),
@@ -171,7 +173,7 @@ fn wanted(paths: &Paths, style: Style) -> Result<Option<Wanted>, ApplyError> {
 
 fn load_settings(paths: &Paths) -> Settings {
     Settings::load(&paths.settings).unwrap_or_else(|e| {
-        eprintln!("kubaos: {}; the cursor is dark at 24", chain(&e));
+        err!("kubaos: {}; the cursor is dark at 24", chain(&e));
         Settings::default()
     })
 }
@@ -181,7 +183,7 @@ fn change(paths: &Paths, result: Result<(), settings::SettingsError>) -> ExitCod
         Ok(()) => apply(paths, false),
         Err(e @ settings::SettingsError::Size(_)) => usage_error(e),
         Err(e) => {
-            eprintln!("kubaos: {}", chain(&e));
+            err!("kubaos: {}", chain(&e));
             ExitCode::FAILURE
         }
     }
@@ -202,7 +204,7 @@ fn apply(paths: &Paths, sync: bool) -> ExitCode {
     });
     let failed = written.as_ref().is_err();
     if let Err(e) = &written {
-        eprintln!(
+        err!(
             "kubaos: writing the cursor theme: {}; the pointer is {FALLBACK_THEME}",
             chain(e)
         );
@@ -229,7 +231,7 @@ fn write_classic(theme: &Theme) {
         return;
     }
     if let Err(e) = theme.write_classic(&stamp) {
-        eprintln!("kubaos: writing the classic cursor stub: {}", chain(&e));
+        err!("kubaos: writing the classic cursor stub: {}", chain(&e));
     }
 }
 
@@ -237,7 +239,7 @@ fn write_classic(theme: &Theme) {
 /// process, its output appended to the log.
 fn spawn_render(paths: &Paths) {
     let Ok(exe) = env::current_exe() else {
-        eprintln!("kubaos: can't find this kubaos to render the XCursor theme");
+        err!("kubaos: can't find this kubaos to render the XCursor theme");
         return;
     };
     let mut cmd = if on_path("ionice") {
@@ -263,7 +265,7 @@ fn spawn_render(paths: &Paths) {
     };
     // Its own process group: a terminal's Ctrl+C or hangup for the caller doesn't stop it.
     if let Err(e) = cmd.process_group(0).spawn() {
-        eprintln!("kubaos: starting the XCursor render: {e}");
+        err!("kubaos: starting the XCursor render: {e}");
     }
 }
 
@@ -278,7 +280,7 @@ fn render_xcursor(paths: &Paths) -> ExitCode {
     let lock = match lock(paths) {
         Ok(lock) => lock,
         Err(e) => {
-            eprintln!("kubaos: taking the cursor render lock: {e}");
+            err!("kubaos: taking the cursor render lock: {e}");
             return ExitCode::FAILURE;
         }
     };
@@ -304,7 +306,7 @@ fn render_xcursor(paths: &Paths) -> ExitCode {
             Ok(XcursorOutcome::Written) => rewritten = true,
             Ok(XcursorOutcome::Superseded) => return ExitCode::SUCCESS,
             Err(e) => {
-                eprintln!(
+                err!(
                     "kubaos: rendering the XCursor theme: {}; XCursor apps get {FALLBACK_THEME}",
                     chain(&e)
                 );
