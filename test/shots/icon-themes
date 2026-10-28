@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# icon-themes: the sheet Kuba picks the GTK and Qt icon theme from: the same 24 icons in Papirus
-# (today's), Adwaita, MoreWaita, Colloid, Fluent and Tela, dark and light, as
+# icon-themes: the sheet Kuba picked the GTK and Qt icon theme from: the same 24 icons in Papirus
+# (the theme before), Adwaita, MoreWaita, Colloid, Fluent and Tela, dark and light, as
 # test/out/icon-themes/icon-themes-{dark,light}.png. The themes are the flake's nixpkgs' builds;
 # test/shots/icon-themes.py draws the sheet.
 #

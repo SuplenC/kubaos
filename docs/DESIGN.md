@@ -246,7 +246,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 - **Optically centred.** A symbol's box is centred in its slot on a whole device pixel; the drawing's own optical centre is Tabler's grid, which ours follow.
 - **Apps show as uniform tiles** in our UI: the app's icon on a tile of one size and radius, so a list of apps reads as one set, whatever each vendor drew. *Not enforced yet: lands in #93.*
 - **The logo** is two things, as `docs/BRAND.md` says: the neon sign photo wherever it shows large (boot splash, GRUB, Kōbō, the README), and the vector クバ mark at small sizes (icons, tray, fastfetch). The neon sign is never redrawn as a symbol, and the mark is never used large, with one exception: Kōbō's done screen draws it as lit neon tubes (`neon_mark`, 200), writing itself in beside the 完了 hanko (`hanko`, 120), its tubes in `primary` and `cold` with `primary_core` and `cold_core` along their middles (`crates/kubaos-kobo/src/done.rs`).
-- **The system icon theme** for GTK and Qt apps replaces Papirus with the theme closest to this look, which Kuba picks from `test/shots/icon-themes`' sheet (#152). *Not enforced yet: Papirus stays until the pick; no issue builds the switch yet.*
+- **The system icon theme** for GTK and Qt apps is Colloid, its orange variant (`Colloid-Orange-Dark`; `-Light` for the light mode), picked by Kuba from `test/shots/icon-themes`' sheet of the same 24 icons in Papirus, Adwaita, MoreWaita, Colloid, Fluent and Tela (#152). Its symbolic icons are thin rounded outlines, the closest to KubaOS Symbols, and its orange sits beside the amber palette; it covers the apps', Files' and the tray's icons itself.
 
 ## Components
 
@@ -495,7 +495,7 @@ What can't use the libraries still follows the tokens as far as it can go:
   - **fuzzel**, the fallback launcher, is a panel of the shell's: body text in rows a `ListRow` tall, the narrowest container's padding, a surface's corners and a control's on the selection, the frame's glass.
 - **Plymouth and GRUB** are always dark and take their values from the tokens (#153). The splash is the neon sign (`docs/BRAND.md`, "Boot").
 - **The cursor** is recoloured from the palette (`kubaos-cursor`).
-- **GTK and Qt apps** get the colour roles, Geist and Geist Mono, and an icon theme close to KubaOS Symbols. Papirus is the icon theme until Kuba picks one from the comparison sheet (`test/shots/icon-themes`: the same 24 icons in Papirus, Adwaita, MoreWaita, Colloid, Fluent and Tela, dark and light).
+- **GTK and Qt apps** get the colour roles, Geist and Geist Mono, and an icon theme close to KubaOS Symbols: Colloid's orange variant (see "Iconography").
 
 ## Writing
 

@@ -223,9 +223,10 @@ shot() {
   settle "$png" "0,0 ${width}x${height}"
 }
 
-# fuzzel_shot PNG: the launcher over the wallpaper, listing the fixture's apps.
+# fuzzel_shot PNG: the launcher over the wallpaper, listing the fixture's apps with the icon theme
+# the tree's fuzzel.ini names.
 fuzzel_shot() {
-  XDG_DATA_DIRS=$fixtures fuzzel >"$HOME/app.log" 2>&1 &
+  XDG_DATA_DIRS=$fixtures:$KUBAOS_SHOTS_ICON_THEMES fuzzel >"$HOME/app.log" 2>&1 &
   settle "$1" "480,200 640x600"
 }
 

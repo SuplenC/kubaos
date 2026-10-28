@@ -166,7 +166,7 @@
           program = pkgs.lib.getExe (
             pkgs.callPackage ./test/shots/package.nix {
               wallpapers = inputs.kubaos-wallpapers;
-              inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) geist-font;
+              inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) geist-font colloid-orange;
             }
           );
           meta.description = "Before/after screenshots of KubaOS's shell, Kōbō, the specimen and the terminals, diffed";

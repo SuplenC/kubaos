@@ -205,7 +205,8 @@ run_jobs() {
   export -f isolated render render_terminal
   export KUBAOS_SHOTS_QML KUBAOS_SHOTS_SWAY KUBAOS_SHOTS_PATH KUBAOS_SHOTS_FONTS KUBAOS_SHOTS_QT_PLUGINS \
     KUBAOS_SHOTS_QML_IMPORTS KUBAOS_SHOTS_EGL_VENDOR KUBAOS_SHOTS_DRI KUBAOS_SHOTS_WALLPAPERS \
-    KUBAOS_SHOTS_TERMINAL_FONTS KUBAOS_SHOTS_NVIM_PLUGINS KUBAOS_SHOTS_TERMINFO here cache TMPDIR
+    KUBAOS_SHOTS_TERMINAL_FONTS KUBAOS_SHOTS_NVIM_PLUGINS KUBAOS_SHOTS_TERMINFO KUBAOS_SHOTS_ICON_THEMES here \
+    cache TMPDIR
   # A render that fails says so and leaves no file; the pairs show what is missing.
   # shellcheck disable=SC2016 # $1 is the job line, expanded by the inner bash.
   xargs -r -P "$jobs" -d '\n' -n 1 bash -c 'eval "$1"' _ <"$work/jobs" || true
@@ -262,7 +263,7 @@ render_terminal() {
   mkdir -p "$(dirname "$png")" "$(dirname "$log")"
   if isolated "$scale" timeout 120 env FONTCONFIG_FILE="$KUBAOS_SHOTS_TERMINAL_FONTS" \
     KUBAOS_SHOTS_WALLPAPERS="$KUBAOS_SHOTS_WALLPAPERS" KUBAOS_SHOTS_NVIM_PLUGINS="$KUBAOS_SHOTS_NVIM_PLUGINS" \
-    KUBAOS_SHOTS_TERMINFO="$KUBAOS_SHOTS_TERMINFO" \
+    KUBAOS_SHOTS_TERMINFO="$KUBAOS_SHOTS_TERMINFO" KUBAOS_SHOTS_ICON_THEMES="$KUBAOS_SHOTS_ICON_THEMES" \
     bash "$here/terminals" shot "$tree" "$name" "$mode" "$part" >"$log" 2>&1 && [[ -s $part ]]; then
     mv -f "$part" "$png"
   else

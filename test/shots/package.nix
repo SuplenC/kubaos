@@ -11,7 +11,8 @@
 # The terminals' shots (`test/shots/terminals`) run Ghostty, foot and fuzzel in the same sway,
 # with the TUIs they show and matugen pinned here, and the fonts a terminal finds on KubaOS:
 # Geist and Geist Mono (the curated release), Geist Mono's and Meslo's Nerd Fonts (the terminals'
-# font before they took the tokens'), Noto Color Emoji and DejaVu.
+# font before they took the tokens'), Noto Color Emoji and DejaVu; and fuzzel's icons, the curated
+# Colloid and Papirus, the icon theme before it.
 {
   lib,
   writeShellApplication,
@@ -54,6 +55,9 @@
   procps,
   wallpapers,
   geist-font,
+  colloid-orange,
+  papirus-icon-theme,
+  hicolor-icon-theme,
   ...
 }:
 let
@@ -173,6 +177,13 @@ writeShellApplication {
     export KUBAOS_SHOTS_TERMINAL_FONTS=${terminalFonts}
     export KUBAOS_SHOTS_NVIM_PLUGINS=${nvimPlugins}
     export KUBAOS_SHOTS_TERMINFO=${ncurses}/share/terminfo
+    export KUBAOS_SHOTS_ICON_THEMES=${
+      lib.makeSearchPath "share" [
+        colloid-orange
+        papirus-icon-theme
+        hicolor-icon-theme
+      ]
+    }
     repo=$(git rev-parse --show-toplevel 2>/dev/null) || {
       echo "kubaos-shots: run me inside a KubaOS checkout" >&2
       exit 2

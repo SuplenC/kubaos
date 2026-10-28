@@ -23,10 +23,10 @@ from PIL import Image, ImageDraw, ImageFont
 SCALE = 2
 # The candidates: their name on the sheet, the theme in dark and in light, and a note.
 THEMES = [
-    ("Papirus (today)", "Papirus-Dark", "Papirus-Light"),
+    ("Papirus (before)", "Papirus-Dark", "Papirus-Light"),
     ("Adwaita", "Adwaita", "Adwaita"),
     ("MoreWaita", "MoreWaita", "MoreWaita"),
-    ("Colloid orange", "Colloid-Orange-Dark", "Colloid-Orange-Light"),
+    ("Colloid orange (picked)", "Colloid-Orange-Dark", "Colloid-Orange-Light"),
     ("Fluent orange", "Fluent-orange-dark", "Fluent-orange-light"),
     ("Tela orange", "Tela-orange-dark", "Tela-orange-light"),
 ]

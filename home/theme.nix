@@ -15,7 +15,8 @@ let
     /* Wallpaper colors from dot-theme (matugen). */
     @import url("file://${stateDir}/gtk.css");
   '';
-  iconTheme = "Papirus-Dark";
+  # Colloid's dark variant, as the rest of the session is dark (home/curated.nix).
+  iconTheme = "Colloid-Orange-Dark";
   # The recoloured pointer `kubaos cursor` writes, and the theme it inherits
   # (THEME_NAME and FALLBACK_THEME in crates/kubaos-cursor/src/lib.rs).
   cursorTheme = "KubaOS-Bibata";
@@ -113,7 +114,7 @@ in
     };
     iconTheme = {
       name = iconTheme;
-      package = kubaosPkgs.papirus-cyan;
+      package = kubaosPkgs.colloid-orange;
     };
     font = {
       name = uiFont;
