@@ -94,8 +94,13 @@ vm-install arch=host config="":
 vm-user-layer user="kuba":
     test/vm/run ssh "runuser -l {{user}} -c '. /etc/default/locale; export LANG XDG_RUNTIME_DIR=/run/user/\$(id -u) DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/\$(id -u)/bus; /usr/share/kubaos/test/user-layer-check'"
 
-# Screenshot session in Docker (test/run shots): `just shots`, then `test/run shots shot NAME`.
-shots *flags="--hyprland":
+# Before/after screenshots for a design PR (test/shots/shots, docs/agents/design-pr-loop.md): the surfaces changed against origin/main at 1× and 1.5× dark, or `just shots SURFACE… [--scales 1,1.5] [--modes dark,light] [--ref REV] [--full]`; `just shots kobo`, `just shots specimen`; `just shots publish BRANCH` prints the PR's table. Writes test/out/shots/.
+[positional-arguments]
+shots *args:
+    nix run .#shots -- "$@"
+
+# Screenshot session in Docker (test/run shots): `just shots-session`, then `test/run shots shot NAME`.
+shots-session *flags="--hyprland":
     test/run shots {{flags}}
 
 # New migration: migrations/<system|user>/<unix time>-<slug>.sh, which kubaos update runs once per machine or user (docs/CONTRACTS.md, "Migrations").

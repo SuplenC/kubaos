@@ -152,15 +152,37 @@
         }
       );
 
+      # `just shots` (test/shots/shots): before/after screenshots of the
+      # shell, Kōbō and the specimen for a design PR, with Qt, sway, Mesa and
+      # the fonts pinned here.
+      apps = forAllSystems (pkgs: {
+        shots = {
+          type = "app";
+          program = pkgs.lib.getExe (
+            pkgs.callPackage ./test/shots/package.nix { wallpapers = inputs.kubaos-wallpapers; }
+          );
+          meta.description = "Before/after screenshots of KubaOS's shell, Kōbō and the specimen, diffed";
+        };
+      });
+
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);
 
+      # Cargo in the devshell compiles through sccache, its cache under
+      # ~/.cache/sccache, so a fresh worktree reuses the crates.io
+      # dependencies another checkout already built. Only the shell's cargo:
+      # crane and the flake's packages build in the sandbox, without it.
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = [
             pkgs.nixfmt
             pkgs.nixfmt-tree
+            pkgs.sccache
             home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
           ];
+          RUSTC_WRAPPER = pkgs.lib.getExe pkgs.sccache;
+          shellHook = ''
+            export SCCACHE_DIR=''${SCCACHE_DIR:-''${XDG_CACHE_HOME:-$HOME/.cache}/sccache}
+          '';
         };
       });
     };

@@ -1,0 +1,5 @@
+module Quickshell.Wayland
+singleton WlrLayer 1.0 WlrLayer.qml
+singleton WlrKeyboardFocus 1.0 WlrKeyboardFocus.qml
+WlSessionLock 1.0 WlSessionLock.qml
+WlSessionLockSurface 1.0 WlSessionLockSurface.qml
