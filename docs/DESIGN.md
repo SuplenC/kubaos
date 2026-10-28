@@ -246,7 +246,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 - **Optically centred.** A symbol's box is centred in its slot on a whole device pixel; the drawing's own optical centre is Tabler's grid, which ours follow.
 - **Apps show as uniform tiles** in our UI: the app's icon on a tile of one size and radius, so a list of apps reads as one set, whatever each vendor drew. *Not enforced yet: lands in #93.*
 - **The logo** is two things, as `docs/BRAND.md` says: the neon sign photo wherever it shows large (boot splash, GRUB, Kōbō, the README), and the vector クバ mark at small sizes (icons, tray, fastfetch). The neon sign is never redrawn as a symbol, and the mark is never used large, with one exception: Kōbō's done screen draws it as lit neon tubes (`neon_mark`, 200), writing itself in beside the 完了 hanko (`hanko`, 120), its tubes in `primary` and `cold` with `primary_core` and `cold_core` along their middles (`crates/kubaos-kobo/src/done.rs`).
-- **The system icon theme** for GTK and Qt apps replaces Papirus with the theme closest to this look, picked in #152.
+- **The system icon theme** for GTK and Qt apps replaces Papirus with the theme closest to this look, which Kuba picks from `test/shots/icon-themes`' sheet (#152). *Not enforced yet: Papirus stays until the pick; no issue builds the switch yet.*
 
 ## Components
 
@@ -487,10 +487,15 @@ A new surface implements the whole map, not the keys it happens to need. Today n
 
 What can't use the libraries still follows the tokens as far as it can go:
 
-- **The terminals** (Ghostty, foot, tmux, Neovim, btop, lazygit, bat, fuzzel, oh-my-posh, fastfetch) take the colour roles through matugen templates generated from `design/tokens.toml`, Geist Mono as their font, and KubaOS Symbols' glyphs where they draw icons (#152).
+- **The terminals** (Ghostty, foot, tmux, Neovim, btop, lazygit, bat, fuzzel, oh-my-posh, fastfetch) follow `[terminal]` in the tokens. `kubaos-tokens` writes Ghostty's and foot's settings (`config/ghostty/tokens`, `config/foot/tokens.ini`) and the matugen templates of their palette and of the roles the TUIs read, so every terminal draws the same thing:
+  - **Type:** `mono_large`, Geist Mono 14 on a 20 line (10.5 pt, since terminals size in points). Ghostty stretches Geist Mono's own line (1.3 times its size) to the 20, foot sets it outright, so a cell is whole device pixels tall at every scale. Glyphs Geist Mono lacks (the prompt's and the file managers' icons, the pills' round caps) come from Geist Mono's Nerd Font, on the same metrics; a font of KubaOS Symbols would draw Tabler's stroke at a fractional width at a terminal's sizes, the blur "Iconography" avoids.
+  - **Space:** 12 at the sides and 8 above and below the cells.
+  - **Colour:** the window is `glass` over the blurred wallpaper. The cursor is the accent, a selection a selected row's tinted bar (`secondary_container`), links `cold`, the background and text `surface` and `on_surface`. ANSI 0, 7 and 15 are roles; 1 to 6 are six hues (Tokyo Night's, harmonized toward the wallpaper by matugen); 9 to 14 stand 6 lightness points further from the surface; ANSI 8, dim text (comments, suggestions), is 7 moved 16 points toward it, as far as keeps 4.5:1, since `outline` is never text. tmux and Neovim read every role by name (`#{@color_primary}`, `c.primary`), and a role of our own (`warning`) is written out for the mode.
+  - **Light and dark:** the mode `dot-theme` runs matugen in (dark by default; `DOT_THEME_MODE=light`, until the Settings panel's switch). Ghostty, tmux, Neovim and oh-my-posh read their file again when it changes; foot holds both palettes and is signalled the one to show.
+  - **fuzzel**, the fallback launcher, is a panel of the shell's: body text in rows a `ListRow` tall, the narrowest container's padding, a surface's corners and a control's on the selection, the frame's glass.
 - **Plymouth and GRUB** are always dark and take their values from the tokens (#153). The splash is the neon sign (`docs/BRAND.md`, "Boot").
 - **The cursor** is recoloured from the palette (`kubaos-cursor`).
-- **GTK and Qt apps** get the colour roles and an icon theme close to KubaOS Symbols (#152).
+- **GTK and Qt apps** get the colour roles, Geist and Geist Mono, and an icon theme close to KubaOS Symbols. Papirus is the icon theme until Kuba picks one from the comparison sheet (`test/shots/icon-themes`: the same 24 icons in Papirus, Adwaita, MoreWaita, Colloid, Fluent and Tela, dark and light).
 
 ## Writing
 

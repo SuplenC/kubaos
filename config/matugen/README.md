@@ -7,7 +7,8 @@ matugen image <wallpaper> -c ~/.config/matugen/config.toml -m dark \
   -t scheme-fidelity --source-color-index 0 --continue-on-error -q
 ```
 
-matugen extracts a source color, builds a Material 3 dark scheme, and renders
+(`-m light` when `DOT_THEME_MODE=light`.) matugen extracts a source color,
+builds a Material 3 scheme in that mode, and renders
 every `[templates.*]` entry in `config.toml` into `~/.local/state/theme/`.
 After that, `dot-theme` reloads tmux, Ghostty (SIGUSR2), Neovim (`:ThemeReload`
 on each `$XDG_RUNTIME_DIR/nvim.*` socket), Hyprland
@@ -65,17 +66,24 @@ If you change the default wallpaper, regenerate them all from
 
 ## Templates
 
+The terminals' templates (Ghostty, foot, tmux, Neovim, fuzzel, fastfetch) and
+the hues in `config.toml`'s `[config.custom_colors]` are written by
+`kubaos-tokens` from `design/tokens.toml` (`[terminal]`, `[color.source]`):
+change the tokens and run `cargo run -p kubaos-tokens -- write`, never the
+files. The rest are written by hand.
+
 | Template | Output | Notes |
 |---|---|---|
 | `colors.json` | `colors.json` | Flat M3 keys + `wallpaper` + `mode`, for Quickshell |
-| `tmux.conf` | `tmux.conf` | `@thm_*` options + status/pane/message/mode styles |
-| `ghostty` | `ghostty` | ANSI 1-6 from the harmonized `[config.custom_colors]` (Tokyo Night's hues as seeds) |
-| `nvim.lua` | `nvim.lua` | `return { primary = "#...", ... }`, plus `red green yellow blue magenta cyan` for syntax |
+| `tmux.conf` | `tmux.conf` | Generated. A `@color_<role>` option per role, hue and `dim` |
+| `ghostty` | `ghostty` | Generated. ANSI 1-6 from the harmonized `[config.custom_colors]` (Tokyo Night's hues as seeds) |
+| `nvim.lua` | `nvim.lua` | Generated. `return { primary = "#...", ... }`: every role of the tokens, `red green yellow blue magenta cyan` for syntax, `dim`, `mode` |
 | `hypr.lua` | `hypr.lua` | `return { primary = "#...", ... }` |
 | `~/.config/ohmyposh/config.toml.tmpl` | `ohmyposh.toml` | Owned by the ports side. Go templates escaped as `\{{` |
 | `gtk.css` | `gtk.css` | libadwaita / adw-gtk3 `@define-color` overrides |
 | `qt6ct.colors` | `qt6ct.colors` | 22 roles x 3 groups |
-| `fuzzel.ini`, `foot.ini` | same | `include=` from `config/fuzzel/fuzzel.ini` and `config/foot/foot.ini` |
+| `fuzzel.ini`, `foot.ini` | same | Generated. `include=` from `config/fuzzel/fuzzel.ini` and `config/foot/foot.ini`; foot's has both palettes |
+| `fastfetch.jsonc` | same | Generated. The logo's and the keys' colours, merged by `dot-config merge` |
 | `lazygit.yml`, `lazydocker.yml` | same | `gui.theme`; lazygit through `LG_CONFIG_FILE`, lazydocker through a link |
 | `yazi.toml`, `btop.theme` | same | Read through relative links in `config/yazi/` and `config/btop/themes/` |
 | `delta.gitconfig` | same | `[delta]` colors, included by `config/git/config` |
