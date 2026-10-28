@@ -5,17 +5,19 @@ import qs.services
 import qs.modules.lock
 
 // The lock screen: dark over the neon sign, light over the busy, dark lanterns, which the light
-// veil has to carry.
+// veil has to carry, or either over the wallpaper named.
 //
-//   qml LockShot.qml -- MODE OUT [STATE]
+//   qml LockShot.qml -- MODE OUT [STATE [WALLPAPER]]
 //
-// STATE: "" (idle), error (a wrong password), waiting (the security key asked for a touch).
+// STATE: idle (or none), error (a wrong password), waiting (the security key asked for a touch).
+// WALLPAPER: a picture of the wallpaper sets, as `set/name.jpg`.
 QtObject {
     id: driver
 
     readonly property var args: Qt.application.arguments.slice(Qt.application.arguments.indexOf("--") + 1)
     readonly property bool light: driver.args[0] === "light"
-    readonly property string state: driver.args[2] ?? ""
+    readonly property string state: driver.args[2] ?? "idle"
+    readonly property string wallpaper: driver.args[3] ?? (driver.light ? "shinjuku/omoide-yokocho-lanterns.jpg" : "shinjuku/kubaos-neon-sign.jpg")
     readonly property ShellScreen screen: ShellScreen {}
     property var surface: null
 
@@ -44,7 +46,7 @@ QtObject {
 
     Component.onCompleted: {
         K.Tokens.mode = driver.light ? "light" : "dark";
-        Wallpapers.current = `@WALLPAPERS@/shinjuku/${driver.light ? "omoide-yokocho-lanterns" : "kubaos-neon-sign"}.jpg`;
+        Wallpapers.current = `@WALLPAPERS@/${driver.wallpaper}`;
         driver.surface = driver.lock.createObject(null);
         driver.capture.window = driver.surface;
         driver.capture.start();

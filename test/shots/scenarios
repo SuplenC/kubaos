@@ -23,6 +23,8 @@ notifications            notifications  FrameShot   1120,0,480,420    notificati
 lock                     lock           LockShot    -
 lock-error               lock           LockShot    -                 error
 lock-key                 lock           LockShot    -                 waiting
+lock-bright              lock           LockShot    -                 idle cyberpunk/akihabara-after-rain.jpg
+lock-busy                lock           LockShot    -                 idle shinjuku/train-neon-streak.jpg
 polkit                   polkit         PolkitShot  -
 polkit-failed            polkit         PolkitShot  -                 failed
 menu                     menu           MenuShot    -                 typed

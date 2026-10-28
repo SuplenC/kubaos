@@ -23,7 +23,7 @@ How a PR that changes how something looks gets its screenshots and its review. T
 | `just shots publish BRANCH` | Push the changed pairs to BRANCH, print the table (raw.githubusercontent URLs, pinned to the commit) |
 | `just shots self-test` | Check a render can't reach the desktop session |
 
-The shell's surfaces: `bar` (the tray holds Adwaita's unfilled symbolic icon, one filled #2e3436 and a colour one), `controlcenter` (Wi-Fi tab with the three notifications scrolled to the middle, the Bluetooth tab with a device pairing, its passkey prompt, the Keyboard tab), `clock` (with an answer to a typed question), `sysmon` (and a process's details), `wallpaper` (and its settings), `powermenu`, `osd` (volume and brightness), `notifications`, `lock` (and a wrong password, and the security key asked for), `polkit` (and a failed password), `menu` ("fi" typed, and its Action panel). Each is a line in `test/shots/scenarios`.
+The shell's surfaces: `bar` (the tray holds Adwaita's unfilled symbolic icon, one filled #2e3436 and a colour one), `controlcenter` (Wi-Fi tab with the three notifications scrolled to the middle, the Bluetooth tab with a device pairing, its passkey prompt, the Keyboard tab), `clock` (with an answer to a typed question), `sysmon` (and a process's details), `wallpaper` (and its settings), `powermenu`, `osd` (volume and brightness), `notifications`, `lock` (and a wrong password, the security key asked for, and the idle screen over a bright and over a busy wallpaper), `polkit` (and a failed password), `menu` ("fi" typed, and its Action panel). Each is a line in `test/shots/scenarios`.
 
 ## How it renders
 
