@@ -15,7 +15,7 @@ A rule marked *Not enforced yet* is decided but not built: no code follows it to
 
 Values below are shown so this file reads on its own. Each one names its token, and the token wins: when they disagree, `design/tokens.toml` is right and this file is stale.
 
-The pictures are the specimen, `kubaos-specimen`, which draws every token and component with `kubaos-ui`. The repo doesn't keep its pictures: `kubaos-specimen shots DIR` renders every page at 1, 1.25, 1.5 and 2, light and dark, `just shots specimen` a PR's before and after, and on each push to main CI publishes the 1× pages shown here to the image-only branch `chore/shots-specimen` (`.github/workflows/specimen.yml`). The Command menu's "Design specimen" Item opens it live.
+The pictures are the specimen, `kubaos-specimen`, which draws every token and component with `kubaos-ui`. The repo doesn't keep its pictures: `kubaos-specimen shots DIR [PAGE...]` renders every page, or the pages named, at 1, 1.25, 1.5 and 2, light and dark, `just shots` a PR's before and after of the pages it touches, and on each push to main CI publishes the 1× pages shown here to the image-only branch `chore/shots-specimen` (`.github/workflows/specimen.yml`). The Command menu's "Design specimen" Item opens it live.
 
 ## Principles
 
