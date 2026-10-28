@@ -7,9 +7,10 @@
 # packages.toml and every suites/<name>.toml may list `packages`, attribute
 # paths into the user's pkgs; the home gets the union. Each suites/<name>.toml
 # also turns on the Suite <name> (suites.nix) with the file's `version` and
-# `extras`. Each generation also
-# links its copy of the directory to ~/.local/share/kubaos/kubaos.d, which is
-# what a rollback restores the directory from.
+# `extras`. nixpkgs.toml's `allow_unfree` (true without it) decides whether
+# the user's pkgs takes unfree packages. Each generation also links its copy
+# of the directory to ~/.local/share/kubaos/kubaos.d, which is what a rollback
+# restores the directory from.
 {
   config,
   lib,
@@ -57,6 +58,10 @@ let
     )
   ) { } (lib.optionals present files);
 
+  settingsFile = dir + "/nixpkgs.toml";
+  allowUnfree =
+    !(present && builtins.pathExists settingsFile) || (readToml settingsFile).allow_unfree or true;
+
   package =
     name: from:
     let
@@ -77,9 +82,17 @@ in
     description = "The user flake's kubaos.d/ directory, whose TOML files list packages and Suites to install.";
   };
 
-  config = lib.mkIf present {
-    home.packages = lib.mapAttrsToList package listed;
-    kubaos.suites = suites;
-    xdg.dataFile."kubaos/kubaos.d".source = dir;
-  };
+  config = lib.mkMerge [
+    # home-manager imports the user's nixpkgs again with `nixpkgs.config`.
+    # Set here, it takes the place of the config of the pkgs mkHome was given
+    # (nixpkgs' defaults, for the user flake's legacyPackages); a user's own
+    # `nixpkgs.config` in home.nix merges with it, and their
+    # `allowUnfree = true` wins over the predicate.
+    { nixpkgs.config.allowUnfreePredicate = _: allowUnfree; }
+    (lib.mkIf present {
+      home.packages = lib.mapAttrsToList package listed;
+      kubaos.suites = suites;
+      xdg.dataFile."kubaos/kubaos.d".source = dir;
+    })
+  ];
 }

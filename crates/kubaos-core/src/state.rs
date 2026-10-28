@@ -1,9 +1,10 @@
 //! The state directory, `kubaos.d/` in the user flake: what the KubaOS CLI, the Command menu and
 //! Kōbō install, as files the tool owns.
 //!
-//! `packages.toml` lists packages from the user's nixpkgs, and each `suites/<name>.toml` holds one
-//! Suite's options and version, plus any packages it lists. KubaOS's home module (`home/state.nix`)
-//! reads the same files and installs the union of every `packages` list. Each home-manager
+//! `packages.toml` lists packages from the user's nixpkgs, `nixpkgs.toml` says whether it takes
+//! unfree ones, and each `suites/<name>.toml` holds one Suite's options and version, plus any
+//! packages it lists. KubaOS's home module (`home/state.nix`) reads the same files and installs
+//! the union of every `packages` list. Each home-manager
 //! generation carries a copy of the directory, so a rollback can bring it back.
 //!
 //! # Owns
@@ -19,6 +20,7 @@
 //! # Not here
 //!
 //! - Editing `packages.toml`: `packages.rs`.
+//! - Reading and writing `nixpkgs.toml`: `unfree.rs`.
 //! - Writing and deleting Suite files: `suites.rs`.
 //! - Running the switch that applies the directory: `switch.rs`.
 //! - The Nix side: `home/state.nix`.
@@ -45,6 +47,8 @@ pub use self::git::GitSync;
 pub const DIR_NAME: &str = "kubaos.d";
 /// The file of packages the user added, inside the state directory.
 pub const PACKAGES_FILE: &str = "packages.toml";
+/// The settings of the user's nixpkgs, inside the state directory (`unfree.rs`).
+pub const NIXPKGS_FILE: &str = "nixpkgs.toml";
 /// The folder of Suite files, inside the state directory.
 pub const SUITES_DIR: &str = "suites";
 /// Where a home-manager generation keeps its copy of the state directory, relative to the
@@ -108,7 +112,7 @@ impl Paths {
         let config = config.map_or_else(|| home.join(".config"), PathBuf::from);
         let state = state.map_or_else(|| home.join(".local/state"), PathBuf::from);
         Ok(Self {
-            flake: config.join("kubaos/home"),
+            flake: user_flake(&config),
             state: state.join("kubaos"),
             data: home.join(".local/share"),
             projects: home.join(PROJECTS_ROOT),
@@ -226,6 +230,12 @@ impl Paths {
     pub fn update_lock(&self) -> PathBuf {
         self.state.join("update.lock")
     }
+}
+
+/// The user flake for the user layer under `config_home` (`XDG_CONFIG_HOME`):
+/// `~/.config/kubaos/home`.
+pub fn user_flake(config_home: &Path) -> PathBuf {
+    kubaos_user_layer::root(config_home).join("home")
 }
 
 /// The state directory at one path. Nothing is read until asked.
@@ -356,6 +366,11 @@ impl StateDir {
     /// `packages.toml`.
     pub fn packages_file(&self) -> PathBuf {
         self.root.join(PACKAGES_FILE)
+    }
+
+    /// `nixpkgs.toml`, the settings of the user's nixpkgs.
+    pub fn nixpkgs_file(&self) -> PathBuf {
+        self.root.join(NIXPKGS_FILE)
     }
 
     /// `suites/`.

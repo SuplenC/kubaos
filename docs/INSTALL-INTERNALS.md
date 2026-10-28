@@ -42,7 +42,8 @@ kubaos setup status [--json] [--demo vm|tuxedo]     first-boot cards, as the use
 kubaos setup run CARD [--input-stdin] [--events json|human] [--demo vm|tuxedo]
 kubaos setup done                                     write the marker
 kubaos package add|remove NAME... [--no-switch] [--detach|--foreground]
-kubaos package list [--json]                          what kubaos.d/ installs, and from which file
+kubaos package list [--json]                          what kubaos.d/ installs, from which file, and which is unfree
+kubaos package unfree [on|off] [--no-switch] [...]    whether your nixpkgs takes unfree packages
 kubaos package restore GENERATION                     kubaos.d/ back from a home-manager generation
 kubaos try NAME                                       nix shell with NAME, installs nothing
 kubaos suite list [--json] | kubaos suite show NAME [--json]

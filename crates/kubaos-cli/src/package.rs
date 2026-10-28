@@ -4,11 +4,15 @@
 //!   kubaos package add NAME... [--no-switch] [--detach | --foreground]
 //!   kubaos package remove NAME... [--no-switch] [--detach | --foreground]
 //!   kubaos package list [--json]
+//!   kubaos package unfree [on|off] [--no-switch] [--detach | --foreground]
 //!   kubaos package restore GENERATION
 //!   kubaos try NAME
 //!
 //! `add` and `remove` first wire `home.nix` to the state directory if it isn't yet, backing it up
 //! to `~/.local/state/kubaos/backups/`.
+//! `add` and `list` mark unfree packages, from one `nix eval` per command, and `add` refuses one
+//! while `unfree` is off. `unfree off` refuses while a package kubaos.d/ installs is unfree, which
+//! would fail the switch.
 //! `try` opens `nix shell` with the package, in this terminal or a new one, and writes nothing.
 //! Exit codes: 0 ok, 1 the work failed, 2 usage.
 //!
@@ -19,6 +23,7 @@
 //! # Not here
 //!
 //! - Editing `packages.toml` and the `nix shell` command: `kubaos_core::packages`.
+//! - The unfree setting and the license check: `kubaos_core::unfree`.
 //! - The `home.nix` migration and the restore: `kubaos_core::state`.
 //! - The switch: `job.rs`.
 
@@ -28,16 +33,26 @@ use std::process::Command;
 use std::process::ExitCode;
 
 use clap::Subcommand;
+use clap::ValueEnum;
 use kubaos_core::packages::Packages;
 use kubaos_core::packages::try_command;
+use kubaos_core::packages::validate_name;
+use kubaos_core::state::Declared;
 use kubaos_core::state::Origin;
 use kubaos_core::state::Paths;
 use kubaos_core::state::migrate::Migration;
 use kubaos_core::state::migrate::wire_home_nix;
+use kubaos_core::unfree::License;
+use kubaos_core::unfree::LicenseCheck;
+use kubaos_core::unfree::Licenses;
+use kubaos_core::unfree::Setting;
+use kubaos_core::unfree::Unfree;
 
 use crate::job;
 use crate::job::SwitchMode;
+use crate::job::chain;
 use crate::job::report;
+use crate::out::err;
 use crate::out::out;
 use crate::usage_error;
 
@@ -66,10 +81,19 @@ pub enum PackageCmd {
         #[command(flatten)]
         mode: SwitchMode,
     },
-    /// The packages kubaos.d/ installs, and which file lists each.
+    /// The packages kubaos.d/ installs, which file lists each, and which are unfree.
     List {
         #[arg(long)]
         json: bool,
+    },
+    /// Whether your nixpkgs takes unfree packages: print it, or turn it on or off, then switch.
+    Unfree {
+        to: Option<OnOff>,
+        /// Only record it; the next switch applies it.
+        #[arg(long)]
+        no_switch: bool,
+        #[command(flatten)]
+        mode: SwitchMode,
     },
     /// Put back the kubaos.d/ a home-manager generation was built from (what a rollback does).
     Restore { generation: PathBuf },
@@ -87,6 +111,7 @@ pub fn main(cmd: PackageCmd) -> ExitCode {
         PackageCmd::Add { names, no_switch, mode } => edit(&paths, &names, Edit::Add, no_switch, mode),
         PackageCmd::Remove { names, no_switch, mode } => edit(&paths, &names, Edit::Remove, no_switch, mode),
         PackageCmd::List { json } => list(&paths, json),
+        PackageCmd::Unfree { to, no_switch, mode } => unfree(&paths, to, no_switch, mode),
         PackageCmd::Restore { generation } => match paths.state_dir().restore_from_generation(&generation) {
             Ok(()) => {
                 out!(
@@ -127,6 +152,15 @@ pub fn try_main(name: &str) -> ExitCode {
     }
 }
 
+/// What `kubaos package unfree` turns unfree packages to.
+#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum OnOff {
+    /// Unfree packages install like any other (the default).
+    On,
+    /// Only free packages install.
+    Off,
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Edit {
     Add,
@@ -136,10 +170,7 @@ enum Edit {
 /// Wires `home.nix` to the state directory unless it is already, as every command that edits the
 /// directory does first. Returns whether it changed the file, or the exit code of the failure.
 pub fn wire(paths: &Paths) -> Result<bool, ExitCode> {
-    let home_nix = paths.home_nix();
-    if !home_nix.is_file() {
-        return Err(usage_error(format!("no user flake: {} is missing", home_nix.display())));
-    }
+    let home_nix = need_user_flake(paths)?;
     match wire_home_nix(&home_nix, &paths.backups()) {
         Ok(Migration::AlreadyWired) => Ok(false),
         Ok(Migration::Wired { backup }) => {
@@ -154,7 +185,25 @@ pub fn wire(paths: &Paths) -> Result<bool, ExitCode> {
     }
 }
 
+/// The user flake's `home.nix`, or the exit code of a usage error when it is missing.
+fn need_user_flake(paths: &Paths) -> Result<PathBuf, ExitCode> {
+    let home_nix = paths.home_nix();
+    if home_nix.is_file() {
+        Ok(home_nix)
+    } else {
+        Err(usage_error(format!("no user flake: {} is missing", home_nix.display())))
+    }
+}
+
 fn edit(paths: &Paths, names: &[String], how: Edit, no_switch: bool, mode: SwitchMode) -> ExitCode {
+    let licenses = if how == Edit::Add {
+        match admit(paths, names) {
+            Ok(licenses) => licenses,
+            Err(code) => return code,
+        }
+    } else {
+        Licenses::default()
+    };
     let wired = match wire(paths) {
         Ok(wired) => wired,
         Err(code) => return code,
@@ -173,7 +222,11 @@ fn edit(paths: &Paths, names: &[String], how: Edit, no_switch: bool, mode: Switc
         Edit::Remove => ("removed", "not added with kubaos package add"),
     };
     for name in &change.changed {
-        out!("{did} {name}");
+        if licenses.is_unfree(name) {
+            out!("{did} {name} (unfree)");
+        } else {
+            out!("{did} {name}");
+        }
     }
     for name in &change.unchanged {
         out!("{name}: {didnt}");
@@ -185,6 +238,129 @@ fn edit(paths: &Paths, names: &[String], how: Edit, no_switch: bool, mode: Switc
         return ExitCode::SUCCESS;
     }
     job::switch(paths, mode)
+}
+
+/// Checks, before anything is written, that the setting lets `names` in: one `nix eval` of their
+/// licenses, which `add` then marks. While unfree packages are allowed, a check that can't run
+/// only warns; while they are refused, it stops the add, which would otherwise fail the switch.
+fn admit(paths: &Paths, names: &[String]) -> Result<Licenses, ExitCode> {
+    need_user_flake(paths)?;
+    for name in names {
+        validate_name(name).map_err(usage_error)?;
+    }
+    let setting = Setting::new(&paths.state_dir(), paths.edit_lock())
+        .get()
+        .map_err(report)?;
+    match LicenseCheck::new(paths.flake()).run(names) {
+        Ok(licenses) => {
+            setting.admit(&licenses).map_err(report)?;
+            Ok(licenses)
+        }
+        Err(e) if setting == Unfree::Allowed => {
+            err!("kubaos: not telling unfree packages apart: {}", chain(&e));
+            Ok(Licenses::default())
+        }
+        Err(e) => {
+            err!(
+                "kubaos: unfree packages are turned off, and checking that these are free failed: {}",
+                chain(&e)
+            );
+            Err(ExitCode::FAILURE)
+        }
+    }
+}
+
+/// `kubaos package unfree [on|off]`.
+fn unfree(paths: &Paths, to: Option<OnOff>, no_switch: bool, mode: SwitchMode) -> ExitCode {
+    let setting = Setting::new(&paths.state_dir(), paths.edit_lock());
+    let Some(to) = to else {
+        return match setting.get() {
+            Ok(Unfree::Allowed) => {
+                out!("on");
+                ExitCode::SUCCESS
+            }
+            Ok(Unfree::Refused) => {
+                out!("off");
+                ExitCode::SUCCESS
+            }
+            Err(e) => report(e),
+        };
+    };
+    let wanted = match to {
+        OnOff::On => Unfree::Allowed,
+        OnOff::Off => Unfree::Refused,
+    };
+    if let Err(code) = need_user_flake(paths) {
+        return code;
+    }
+    if wanted == Unfree::Refused
+        && let Err(code) = refuse_installed_unfree(paths)
+    {
+        return code;
+    }
+    let wired = match wire(paths) {
+        Ok(wired) => wired,
+        Err(code) => return code,
+    };
+    let changed = match setting.set(wanted) {
+        Ok(changed) => changed,
+        Err(e) => return report(e),
+    };
+    match (wanted, changed) {
+        (Unfree::Allowed, true) => out!("unfree packages: on"),
+        (Unfree::Refused, true) => out!("unfree packages: off, free ones only"),
+        (Unfree::Allowed, false) => out!("unfree packages: already on"),
+        (Unfree::Refused, false) => out!("unfree packages: already off"),
+    }
+    if no_switch || (!changed && !wired) {
+        return ExitCode::SUCCESS;
+    }
+    job::switch(paths, mode)
+}
+
+/// Fails, naming them and their files, while a package kubaos.d/ installs is unfree: with the
+/// setting off, the switch would fail on it. A check that can't run fails too.
+fn refuse_installed_unfree(paths: &Paths) -> Result<(), ExitCode> {
+    let declared = paths.state_dir().declared().map_err(report)?;
+    let names = declared.names();
+    let licenses = LicenseCheck::new(paths.flake()).run(&names).map_err(|e| {
+        err!("kubaos: checking the installed packages for unfree ones: {}", chain(&e));
+        ExitCode::FAILURE
+    })?;
+    let unfree = licenses.unfree();
+    if unfree.is_empty() {
+        return Ok(());
+    }
+    for name in &unfree {
+        err!("kubaos: {name} is unfree ({})", origins(&declared, name).join(", "));
+    }
+    let removable: Vec<&str> = unfree
+        .iter()
+        .copied()
+        .filter(|name| declared.origins(name).contains(&Origin::Packages))
+        .collect();
+    let them = if unfree.len() == 1 { "it" } else { "them" };
+    if removable.is_empty() {
+        err!("kubaos: remove {them} before turning unfree packages off");
+    } else {
+        err!(
+            "kubaos: remove {them} before turning unfree packages off: kubaos package remove {}",
+            removable.join(" ")
+        );
+    }
+    Err(ExitCode::FAILURE)
+}
+
+/// The files that list `name`, as `list` prints them.
+fn origins(declared: &Declared, name: &str) -> Vec<String> {
+    declared
+        .origins(name)
+        .into_iter()
+        .map(|o| match o {
+            Origin::Packages => "packages.toml".to_owned(),
+            Origin::Suite(suite) => format!("suites/{suite}.toml"),
+        })
+        .collect()
 }
 
 /// A package the user asked to remove that a Suite lists stays installed; say so.
@@ -212,29 +388,37 @@ fn list(paths: &Paths, json: bool) -> ExitCode {
         Ok(declared) => declared,
         Err(e) => return report(e),
     };
-    let rows: Vec<(String, Vec<String>)> = declared
-        .names()
-        .into_iter()
-        .map(|name| {
-            let from = declared
-                .origins(name)
-                .into_iter()
-                .map(|o| match o {
-                    Origin::Packages => "packages.toml".to_owned(),
-                    Origin::Suite(suite) => format!("suites/{suite}.toml"),
-                })
-                .collect();
-            (name.to_owned(), from)
-        })
-        .collect();
+    let names = declared.names();
+    let licenses = match LicenseCheck::new(paths.flake()).run(&names) {
+        Ok(licenses) => licenses,
+        Err(e) => {
+            err!("kubaos: not telling unfree packages apart: {}", chain(&e));
+            Licenses::default()
+        }
+    };
     if json {
-        let value: serde_json::Map<String, serde_json::Value> =
-            rows.into_iter().map(|(name, from)| (name, from.into())).collect();
+        let value: serde_json::Map<String, serde_json::Value> = names
+            .iter()
+            .map(|name| {
+                let unfree = match licenses.get(name) {
+                    License::Unfree => serde_json::Value::Bool(true),
+                    License::Free => serde_json::Value::Bool(false),
+                    License::Unknown => serde_json::Value::Null,
+                };
+                let row = serde_json::json!({ "from": origins(&declared, name), "unfree": unfree });
+                ((*name).to_owned(), row)
+            })
+            .collect();
         out!("{}", serde_json::to_string_pretty(&value).expect("the list serializes"));
         return ExitCode::SUCCESS;
     }
-    for (name, from) in rows {
-        out!("{name}  ({})", from.join(", "));
+    for name in names {
+        let from = origins(&declared, name).join(", ");
+        if licenses.is_unfree(name) {
+            out!("{name}  ({from})  unfree");
+        } else {
+            out!("{name}  ({from})");
+        }
     }
     ExitCode::SUCCESS
 }
