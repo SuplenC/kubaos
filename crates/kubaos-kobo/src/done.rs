@@ -95,8 +95,11 @@ const HUM_PERIOD: Duration = Duration::from_millis(2400);
 const HUM_LOW: f32 = 0.55;
 const HUM_HIGH: f32 = 0.9;
 /// The hum redraws when the glow at its brightest has changed by this many of 255 levels, and
-/// not sooner than a frame: about 30 redraws a second, fewer at the turns.
+/// not sooner than a frame: about 30 redraws a second on the GPU, fewer at the turns.
 const HUM_LEVELS: f32 = 2.0;
+/// The same in software, about 10 a second. There every redraw rasterises the whole wallpaper
+/// under the damaged region again: about 10 ms, so 30 a second held a core at 28%.
+const HUM_LEVELS_SOFTWARE: f32 = 6.0;
 /// The brightest the glow picture gets, at the middle of a tube.
 const GLOW_PEAK: f32 = 0.8;
 /// A frame at 60 Hz, the soonest the hum asks for the next.
@@ -281,14 +284,14 @@ impl Sequence {
         mid + swing * (TAU * elapsed.as_secs_f32() / HUM_PERIOD.as_secs_f32()).cos()
     }
 
-    /// How long until the hum has changed enough to redraw: the glow at its brightest a couple of
-    /// levels further on, at least a frame and at most [`HUM_WAIT`] away.
-    fn next_hum(&self) -> Duration {
+    /// How long until the hum has changed enough to redraw: the glow at its brightest `levels`
+    /// further on, at least a frame and at most [`HUM_WAIT`] away.
+    fn next_hum(&self, levels: f32) -> Duration {
         let swing = (HUM_HIGH - HUM_LOW) / 2.0;
         let omega = TAU / HUM_PERIOD.as_secs_f32();
         let phase = self.since.saturating_sub(self.hum_at()).as_secs_f32() * omega;
         let rate = swing * omega * phase.sin().abs() * GLOW_PEAK * 255.0;
-        let wait = if rate > 0.0 { HUM_LEVELS / rate } else { f32::MAX };
+        let wait = if rate > 0.0 { levels / rate } else { f32::MAX };
         Duration::from_secs_f32(wait.min(HUM_WAIT.as_secs_f32())).max(FRAME)
     }
 
@@ -418,6 +421,8 @@ struct GlowState {
     /// The unlit glass, kept once it has faded in.
     glass: Cache,
     glass_colour: Cell<Option<[u8; 4]>>,
+    /// Whether the last frame was drawn in software, by tiny-skia rather than the GPU.
+    software: Cell<bool>,
 }
 
 impl Glow {
@@ -446,7 +451,12 @@ impl canvas::Program<crate::app::Message> for Glow {
         if seq.still() || seq.moving() {
             return None;
         }
-        Some(Action::request_redraw_at(*at + seq.next_hum()))
+        let levels = if state.software.get() {
+            HUM_LEVELS_SOFTWARE
+        } else {
+            HUM_LEVELS
+        };
+        Some(Action::request_redraw_at(*at + seq.next_hum(levels)))
     }
 
     fn draw(
@@ -457,6 +467,7 @@ impl canvas::Program<crate::app::Message> for Glow {
         bounds: Rectangle,
         _cursor: mouse::Cursor,
     ) -> Vec<Geometry> {
+        state.software.set(matches!(renderer, Renderer::Secondary(_)));
         let seq = self.sequence(state);
         let c = self.colors;
         let dead = seq.dead();

@@ -101,22 +101,34 @@ fn the_hum_stays_between_its_bottom_and_its_top() {
 
 #[test]
 fn the_hum_never_asks_for_frames_faster_than_the_display_nor_waits_long() {
-    for ms in (4000..9000).step_by(13) {
-        let next = at(ms).next_hum();
-        assert!(next >= FRAME && next <= HUM_WAIT, "{ms} ms: {next:?}");
+    for levels in [HUM_LEVELS, HUM_LEVELS_SOFTWARE] {
+        for ms in (4000..9000).step_by(13) {
+            let next = at(ms).next_hum(levels);
+            assert!(next >= FRAME && next <= HUM_WAIT, "{ms} ms: {next:?}");
+        }
     }
 }
 
-#[test]
-fn the_hum_redraws_about_thirty_times_a_second() {
+/// How many times the hum redraws in one breath, stepping `levels` at a time.
+fn redraws_per_breath(levels: f32) -> u32 {
     let mut ms = 4000.0_f64;
     let mut redraws = 0;
-    while ms < 4000.0 + 2400.0 {
-        ms += at(ms as u64).next_hum().as_secs_f64() * 1000.0;
+    while ms < 4000.0 + HUM_PERIOD.as_secs_f64() * 1000.0 {
+        ms += at(ms as u64).next_hum(levels).as_secs_f64() * 1000.0;
         redraws += 1;
     }
+    redraws
+}
 
-    assert!((40..=90).contains(&redraws), "{redraws} redraws in one breath");
+#[test]
+fn the_hum_redraws_about_thirty_times_a_second_on_the_gpu_and_ten_in_software() {
+    let (gpu, software) = (redraws_per_breath(HUM_LEVELS), redraws_per_breath(HUM_LEVELS_SOFTWARE));
+
+    assert!((60..=84).contains(&gpu), "{gpu} redraws in one breath on the GPU");
+    assert!(
+        (20..=30).contains(&software),
+        "{software} redraws in one breath in software"
+    );
 }
 
 #[test]
