@@ -83,6 +83,7 @@ pub struct Step<M> {
     subtitle: Option<String>,
     glyph: Option<Icon>,
     state: StepState,
+    words: Option<(&'static str, Option<Icon>)>,
     mark: bool,
     selected: bool,
     on_press: Option<M>,
@@ -95,6 +96,7 @@ pub fn step<M>(title: impl Into<String>) -> Step<M> {
         subtitle: None,
         glyph: None,
         state: StepState::Todo,
+        words: None,
         mark: false,
         selected: false,
         on_press: None,
@@ -123,6 +125,16 @@ impl<M: Clone> Step<M> {
     #[must_use]
     pub fn state(self, state: StepState) -> Self {
         Step { state, ..self }
+    }
+
+    /// Other words on the state's chip, in the state's look: a step to do that waits on
+    /// something ("Waiting") or isn't there ("Not here").
+    #[must_use]
+    pub fn words(self, label: &'static str, glyph: Option<Icon>) -> Self {
+        Step {
+            words: Some((label, glyph)),
+            ..self
+        }
     }
 
     /// The state as a mark at the end in place of a chip, for a narrow rail: a check when done,
@@ -182,7 +194,7 @@ impl<M: Clone> Step<M> {
         content = content.push(words);
         if self.mark {
             content = content.push(mark(look, self.state, main));
-        } else if let Some(chip) = state_chip(look, self.state) {
+        } else if let Some(chip) = state_chip(look, self.state, self.words) {
             content = content.push(chip);
         }
         // A row with one line is a list row's 44, its parts centred down it, so a chip moves
@@ -221,13 +233,19 @@ impl<M: Clone> Step<M> {
 
 /// The state as a chip: to do plain, done tonal with a check, an action the accent with its
 /// symbol, the current step none.
-fn state_chip<'a, M: Clone + 'a>(look: &Look, state: StepState) -> Option<Element<'a, M>> {
-    match state {
-        StepState::Todo => Some(chip(look, ChipKind::Neutral, "To do", None, None, None)),
-        StepState::Done => Some(chip(look, ChipKind::Selected, "Done", Some(Icon::Check), None, None)),
-        StepState::Action { label, glyph } => Some(chip(look, ChipKind::Accent, label, Some(glyph), None, None)),
-        StepState::Current => None,
-    }
+fn state_chip<'a, M: Clone + 'a>(
+    look: &Look,
+    state: StepState,
+    words: Option<(&'static str, Option<Icon>)>,
+) -> Option<Element<'a, M>> {
+    let (kind, label, glyph) = match state {
+        StepState::Todo => (ChipKind::Neutral, "To do", None),
+        StepState::Done => (ChipKind::Selected, "Done", Some(Icon::Check)),
+        StepState::Action { label, glyph } => (ChipKind::Accent, label, Some(glyph)),
+        StepState::Current => return None,
+    };
+    let (label, glyph) = words.unwrap_or((label, glyph));
+    Some(chip(look, kind, label, glyph, None, None))
 }
 
 /// The state as a mark the size of the title's icon: a check when done, the action's symbol in

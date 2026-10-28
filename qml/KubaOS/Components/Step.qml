@@ -19,6 +19,10 @@ K.Pressable {
     // The action's label and symbol, while the step waits on one.
     property string actionLabel: ""
     property string actionIcon: ""
+    // Other words on the state's chip, in the state's look ("Waiting", "Not here"), and their
+    // symbol.
+    property string words: ""
+    property string wordsIcon: ""
     // The state as a mark at the end in place of a chip.
     property bool mark: false
     // The row the keyboard is on, or the one picked.
@@ -103,8 +107,8 @@ K.Pressable {
         K.Chip {
             visible: !root.mark && root.status !== "current"
             kind: root.status === "done" ? "Selected" : root.status === "action" ? "Accent" : "Neutral"
-            icon: root.status === "done" ? "check" : root.status === "action" ? root.actionIcon : ""
-            text: root.status === "done" ? "Done" : root.status === "action" ? root.actionLabel : "To do"
+            icon: root.words !== "" ? root.wordsIcon : root.status === "done" ? "check" : root.status === "action" ? root.actionIcon : ""
+            text: root.words !== "" ? root.words : root.status === "done" ? "Done" : root.status === "action" ? root.actionLabel : "To do"
         }
 
         Item {

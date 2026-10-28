@@ -1405,7 +1405,7 @@ fn descriptions<'a>(look: &Look) -> Element<'a, Message> {
                 [
                     Fact::new("Name", "Kuba Example"),
                     Fact::new("Login", "kuba@tuxedo"),
-                    Fact::new("Git", "Kuba Example").sub("kuba@example.com"),
+                    Fact::new("Git", "Kuba Example").detail("kuba@example.com"),
                 ],
             ),
         ))
@@ -1414,7 +1414,7 @@ fn descriptions<'a>(look: &Look) -> Element<'a, Message> {
             description_list(
                 look,
                 [
-                    Fact::new("Disk", "Samsung SSD 990 PRO 2TB").sub("/dev/nvme0n1 · 2.0 TB"),
+                    Fact::new("Disk", "Samsung SSD 990 PRO 2TB").detail("/dev/nvme0n1 · 2.0 TB"),
                     Fact::new("Mode", "Erase everything"),
                     Fact::new("Encryption", "LUKS2, account password"),
                 ],

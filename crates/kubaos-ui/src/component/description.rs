@@ -41,9 +41,9 @@ impl<'a> Fact<'a> {
     /// A second line under the value, in mono, one line: a path, an email, a version, which
     /// break badly wrapped mid-token, so they get a line of their own.
     #[must_use]
-    pub fn sub(self, sub: impl Into<String>) -> Fact<'a> {
+    pub fn detail(self, detail: impl Into<String>) -> Fact<'a> {
         Fact {
-            sub: Some(sub.into()),
+            sub: Some(detail.into()),
             ..self
         }
     }

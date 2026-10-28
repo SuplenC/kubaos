@@ -1431,6 +1431,13 @@ pub const CONTRAST: [ContrastPair; 42] = [
         purpose: "A warning banner's symbol and hairline",
     },
     ContrastPair {
+        fg: Role::Primary,
+        bg: Role::SurfaceContainerHigh,
+        need: Need::Text,
+        opacity: None,
+        purpose: "An info banner's symbol and hairline, a Text button inside it",
+    },
+    ContrastPair {
         fg: Role::Error,
         bg: Role::ErrorContainer,
         need: Need::Graphic,

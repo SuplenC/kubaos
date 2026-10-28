@@ -3,8 +3,8 @@ import KubaOS.Components as K
 
 // A message that matters on the page itself: `kubaos-ui`'s `banner::banner`. A symbol beside a
 // `subheading` title and a `body` line, which wrap to the room there is, 16 inside at the surface
-// radius, in one of three tones: `Info` (the secondary container), `Warning` (a container with a
-// warning hairline) or `Danger` (really red: the error container and an error hairline). Its
+// radius, in one of three tones: `Info` (a container with an accent hairline), `Warning` (one
+// with a warning hairline) or `Danger` (really red: the error container and an error hairline). Its
 // actions sit at its end beside the words, 12 apart; its foot (a held button's bar) 16 under the
 // rest.
 Item {
@@ -15,6 +15,8 @@ Item {
     property string icon: ""
     property string title
     property string body
+    // More of the body, a paragraph each, 4 apart: the steps of what to do.
+    property list<string> paragraphs
     // What to do about it, beside the words: the action the banner is about last.
     default property alias actions: actionsRow.data
     // A line across the foot: how far a held button is.
@@ -42,11 +44,11 @@ Item {
             };
         default:
             return {
-                fill: c.secondary_container,
-                edge: "transparent",
-                glyph: c.on_secondary_container,
-                title: c.on_secondary_container,
-                body: K.Look.alpha(c.on_secondary_container, Tokens.opacity.subdued_text)
+                fill: c.surface_container_high,
+                edge: c.primary,
+                glyph: c.primary,
+                title: c.on_surface,
+                body: c.on_surface_variant
             };
         }
     }
@@ -70,7 +72,7 @@ Item {
         anchors.fill: parent
         radius: Tokens.radius.surface
         color: root.colours.fill
-        border.width: root.tone === "Info" ? 0 : K.Look.hairline(column.dpr)
+        border.width: K.Look.hairline(column.dpr)
         border.color: root.colours.edge
     }
 
@@ -108,6 +110,18 @@ Item {
                     text: root.body
                     style: Tokens.type.body
                     color: root.colours.body
+                }
+
+                Repeater {
+                    model: root.paragraphs
+
+                    K.Text {
+                        required property string modelData
+
+                        text: modelData
+                        style: Tokens.type.body
+                        color: root.colours.body
+                    }
                 }
             }
 

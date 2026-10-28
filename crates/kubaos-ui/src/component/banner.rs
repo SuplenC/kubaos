@@ -66,7 +66,7 @@ impl BannerTone {
 /// A tone's colours: the fill, the hairline round it, the symbol, the title and the body.
 struct Colours {
     fill: Color,
-    edge: Option<Color>,
+    edge: Color,
     glyph: Color,
     title: Color,
     body: Color,
@@ -76,22 +76,22 @@ fn colours(look: &Look, tone: BannerTone) -> Colours {
     let c = look.colors;
     match tone {
         BannerTone::Info => Colours {
-            fill: c.secondary_container,
-            edge: None,
-            glyph: c.on_secondary_container,
-            title: c.on_secondary_container,
-            body: color::alpha(c.on_secondary_container, Opacity::SubduedText.value()),
+            fill: c.surface_container_high,
+            edge: c.primary,
+            glyph: c.primary,
+            title: c.on_surface,
+            body: c.on_surface_variant,
         },
         BannerTone::Warning => Colours {
             fill: c.surface_container_high,
-            edge: Some(c.warning),
+            edge: c.warning,
             glyph: c.warning,
             title: c.on_surface,
             body: c.on_surface_variant,
         },
         BannerTone::Danger => Colours {
             fill: c.error_container,
-            edge: Some(c.error),
+            edge: c.error,
             glyph: c.error,
             title: c.on_error_container,
             body: color::alpha(c.on_error_container, Opacity::SubduedText.value()),
@@ -105,6 +105,7 @@ pub struct Banner<'a, M> {
     glyph: Icon,
     title: String,
     body: String,
+    paragraphs: Vec<String>,
     actions: Vec<Element<'a, M>>,
     foot: Option<Element<'a, M>>,
 }
@@ -131,12 +132,20 @@ pub fn banner<'a, M>(
         glyph,
         title: title.into(),
         body: body.into(),
+        paragraphs: Vec::new(),
         actions: Vec::new(),
         foot: None,
     }
 }
 
 impl<'a, M: 'a> Banner<'a, M> {
+    /// More of the body, a paragraph each, 4 apart: the steps of what to do.
+    #[must_use]
+    pub fn paragraphs(mut self, paragraphs: impl IntoIterator<Item = String>) -> Self {
+        self.paragraphs.extend(paragraphs);
+        self
+    }
+
     /// What to do about it, beside the words at the banner's end, 12 apart: the action the banner
     /// is about last.
     #[must_use]
@@ -159,7 +168,12 @@ impl<'a, M: 'a> Banner<'a, M> {
         let words = stack(look, Space::S4)
             .width(Extent::Fill)
             .push(text(self.title, Type::Subheading, colours.title))
-            .push(text(self.body, Type::Body, colours.body));
+            .push(text(self.body, Type::Body, colours.body))
+            .extend(
+                self.paragraphs
+                    .into_iter()
+                    .map(|paragraph| text(paragraph, Type::Body, colours.body)),
+            );
         let mut line = row(look, Space::S16)
             .center()
             .push(icon(look, self.glyph, Type::Subheading.icon(), colours.glyph))
@@ -179,8 +193,8 @@ impl<'a, M: 'a> Banner<'a, M> {
             .style(move |_theme| container::Style {
                 background: Some(Background::Color(fill)),
                 border: Border {
-                    color: edge.unwrap_or(Color::TRANSPARENT),
-                    width: if edge.is_some() { hairline } else { 0.0 },
+                    color: edge,
+                    width: hairline,
                     radius: radius(Radius::Surface).into(),
                 },
                 ..container::Style::default()
