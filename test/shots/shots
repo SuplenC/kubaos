@@ -278,6 +278,7 @@ specimen_tour() {
     (cd "$tree" && "$@" cargo run -q --release -p kubaos-specimen -- shots "$raw/specimen" "${iced_pages[@]}") \
       >>"$log" 2>&1 || status=$?
     if ((status == 2)) && [[ $side == before ]]; then
+      status=0
       before_pages "$tree" "$@" >>"$log" 2>&1 || status=$?
     fi
     ((status == 0)) || die "specimen failed: $log"

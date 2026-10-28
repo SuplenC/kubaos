@@ -275,6 +275,17 @@ a_process_a_run_leaves_behind_doesnt_keep_its_base_held() {
   expect "the bases" "$(bases)" ""
 }
 
+a_run_that_dies_holding_its_base_lets_it_go() {
+  local dir=$CACHE/0123456789abcdef0123456789abcdef01234567
+  base "${dir##*/}" '9 hours'
+  bash -c 'source "$1"; hold_base "$2"; touch -d "9 hours ago" "$2/.used"' _ "$REPO/test/shots/lib.sh" "$dir"
+  sleep 1.5
+
+  run_prune >/dev/null
+
+  expect "the bases" "$(bases)" ""
+}
+
 a_run_holding_its_base_marks_it_used() {
   base "$C1" '9 hours'
 
@@ -383,7 +394,7 @@ for t in a_shell_modules_file_renders_its_surface_alone the_frame_renders_every_
   the_runs_own_base_is_kept_on_no_branch a_base_written_in_the_last_hour_is_never_dropped \
   a_base_on_a_local_branch_alone_is_kept a_base_on_origin_main_alone_is_kept \
   a_base_a_run_holds_is_never_dropped a_process_a_run_leaves_behind_doesnt_keep_its_base_held \
-  a_run_holding_its_base_marks_it_used a_run_finding_its_base_dropped_under_it_starts_a_fresh_one \
+  a_run_that_dies_holding_its_base_lets_it_go a_run_holding_its_base_marks_it_used a_run_finding_its_base_dropped_under_it_starts_a_fresh_one \
   prune_keeps_the_last_harness_versions_of_a_base prune_trims_no_base_a_run_holds \
   prune_never_touches_anything_but_the_bases_and_scratch prune_refuses_a_folder_that_isnt_the_shots_cache \
   scratch_older_than_a_day_goes_and_newer_stays compiled_qml_older_than_an_hour_goes_and_newer_stays; do

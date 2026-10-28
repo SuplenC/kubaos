@@ -119,7 +119,7 @@ table_problems() {
 # `release_base`, and DIR marked as just used. `prune` never drops a DIR held. The lock is on fd 9
 # of the process `holder`.
 hold_base() {
-  local dir=$1 fd
+  local dir=$1 fd shell=$BASHPID
   while :; do
     mkdir -p "$dir"
     exec {fd}>>"$dir/.lock"
@@ -132,7 +132,7 @@ hold_base() {
   # HAZARD: the lock goes to a process of its own, which ends with this shell, and the shell
   # closes its copy. A daemon a build starts (sccache's server) inherits the shell's open fds and
   # outlives the run, and a lock it inherited would keep the base held for good.
-  tail --pid="$BASHPID" -f /dev/null 9>&"$fd" {fd}>&- </dev/null >/dev/null 2>&1 &
+  tail --pid="$shell" -f /dev/null 9>&"$fd" {fd}>&- </dev/null >/dev/null 2>&1 &
   holder=$!
   exec {fd}>&-
   touch "$dir/.used"
