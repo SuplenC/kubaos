@@ -40,8 +40,9 @@ use crate::tokens::Size;
 use crate::tokens::Space;
 use crate::tokens::Type;
 
-/// `content` under a header reading `title`, shown while `open`. A press on the header sends
-/// `on_toggle`; while it has the keyboard (`focused`) the ring goes round the header.
+/// `content` under a header reading `title`, shown while `open`, in line with the title. A press on
+/// the header sends `on_toggle`; while it has the keyboard (`focused`) the ring goes round the
+/// header.
 pub fn collapsible<'a, M: Clone + 'a>(
     look: &Look,
     title: impl Into<String>,
@@ -78,7 +79,13 @@ pub fn collapsible<'a, M: Clone + 'a>(
     let header = focus_ring(look, header, Radius::Control, focused, RingColor::Accent);
     let mut view = stack(look, Space::S8).width(Extent::Fill).push(header);
     if open {
-        view = view.push(content);
+        // In line with the title: the header's own inset at the sides, once, so the content
+        // brings none of its own.
+        view = view.push(
+            widget::container(content)
+                .width(Length::Fill)
+                .padding(Inset::x(Space::S12).padding()),
+        );
     }
     probe::component(
         "Collapsible",

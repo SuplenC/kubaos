@@ -119,11 +119,15 @@ Item {
                 }
             }
 
+            // In line with the title: the header's own inset at the sides, once, so the content
+            // brings none of its own.
             K.Slot {
                 id: slot
 
                 width: body.width
                 fill: true
+                leftPadding: Tokens.space.s12
+                rightPadding: Tokens.space.s12
             }
         }
     }

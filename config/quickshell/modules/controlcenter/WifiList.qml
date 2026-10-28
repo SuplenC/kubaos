@@ -96,9 +96,8 @@ Item {
         Column {
             id: scanning
 
-            x: K.Tokens.space.s12
             y: K.Tokens.space.s12
-            width: parent.width - K.Tokens.space.s12 * 2
+            width: parent.width
             visible: list.count === 0 && Net.wifiEnabled
             spacing: K.Tokens.space.s4
 

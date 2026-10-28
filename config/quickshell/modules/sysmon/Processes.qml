@@ -121,8 +121,6 @@ K.Stack {
         K.Stack {
             fill: true
             gap: K.Tokens.space.s4
-            leftPadding: K.Tokens.space.s12
-            rightPadding: K.Tokens.space.s12
 
             K.Text {
                 text: root.details?.command ?? ""
