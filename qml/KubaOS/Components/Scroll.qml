@@ -61,7 +61,16 @@ Item {
             x: root.reachSides
             y: root.roomAbove
             width: root.width
-            implicitHeight: childrenRect.height
+            // Down to the foot of the lowest child shown: `childrenRect` counts hidden ones too,
+            // and a hidden one would give the content room to scroll that shows nothing.
+            implicitHeight: {
+                let foot = 0;
+                for (const kid of body.children) {
+                    if (kid.visible)
+                        foot = Math.max(foot, kid.y + kid.height);
+                }
+                return foot;
+            }
             height: implicitHeight
         }
     }

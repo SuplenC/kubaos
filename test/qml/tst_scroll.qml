@@ -34,6 +34,17 @@ TestCase {
             // design-allow(size): a test's fixture, not a design value.
             height: 300
         }
+
+        // What a panel shows only at times, under the rest: a problem's note.
+        Rectangle {
+            id: hidden
+
+            y: content.height
+            width: parent.width
+            // design-allow(size): a test's fixture, not a design value.
+            height: 100
+            visible: false
+        }
     }
 
     // The box the scroll clips at, in the scroll's own coordinates.
@@ -83,6 +94,14 @@ TestCase {
         scroll.roomAbove = K.Tokens.space.s32;
 
         compare(scroll.travel, content.height - scroll.height);
+    }
+
+    function test_a_hidden_child_gives_it_nothing_to_scroll_and_a_shown_one_does() {
+        compare(scroll.travel, content.height - scroll.height, "hidden");
+
+        hidden.visible = true;
+        compare(scroll.travel, content.height + hidden.height - scroll.height, "shown");
+        hidden.visible = false;
     }
 
     function test_content_scrolled_past_its_box_shows_in_that_room_and_stops_at_its_end() {
