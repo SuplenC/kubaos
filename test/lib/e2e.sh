@@ -870,14 +870,21 @@ keyboard_writer() {
   return "$bad"
 }
 
-# pointer_tools: VP_RUN, the command that drives test/lib/vpointer.py (Python
-# with pywayland, and the two protocols it needs), from the flake's nixpkgs:
-# the roots an earlier run made, or built now.
-pointer_tools() {
+# How long a check driving the shell waits for the state it asserts, in seconds.
+# A bound for a run that is broken, not a pace: every wait ends as soon as the
+# state is there, and a machine busy with other builds takes several seconds
+# for what an idle one does at once.
+PROBE_WAIT=30
+
+# input_tools: VI, the command that runs test/lib/vinput.py (Python with
+# pywayland), and VI_XML, the three protocols it needs, from the flake's
+# nixpkgs: the roots an earlier run made, or built now. The virtual keyboard's
+# protocol comes with wtype's source.
+input_tools() {
   local roots="$CACHE/roots" sys
   sys="$(uname -m)-linux"
-  [[ -x $roots/vpointer-python/bin/python3 ]] ||
-    as_user "$NIX_BIN/nix" build --out-link "$roots/vpointer-python" --impure --expr \
+  [[ -x $roots/vinput-python/bin/python3 ]] ||
+    as_user "$NIX_BIN/nix" build --out-link "$roots/vinput-python" --impure --expr \
       "(builtins.getFlake \"path:$REPO\").inputs.nixpkgs.legacyPackages.$sys.python3.withPackages (p: [ p.pywayland ])" \
       >/dev/null 2>&1
   [[ -f $roots/wayland-scanner/share/wayland/wayland.xml ]] ||
@@ -885,12 +892,36 @@ pointer_tools() {
       >/dev/null 2>&1
   [[ -d $roots/wlr-protocols ]] ||
     as_user "$NIX_BIN/nix" build --out-link "$roots/wlr-protocols" --inputs-from "$REPO" nixpkgs#wlr-protocols >/dev/null 2>&1
-  [[ -x $roots/vpointer-python/bin/python3 && -f $roots/wayland-scanner/share/wayland/wayland.xml &&
-    -d $roots/wlr-protocols ]] || return 1
-  VP_RUN="$roots/vpointer-python/bin/python3 -I $REPO/test/lib/vpointer.py \
-$roots/wayland-scanner/share/wayland/wayland.xml \
-$roots/wlr-protocols/share/wlr-protocols/unstable/wlr-virtual-pointer-unstable-v1.xml"
+  [[ -d $roots/wtype-src ]] ||
+    as_user "$NIX_BIN/nix" build --out-link "$roots/wtype-src" --inputs-from "$REPO" nixpkgs#wtype.src >/dev/null 2>&1
+  VI=("$roots/vinput-python/bin/python3" -I "$REPO/test/lib/vinput.py")
+  VI_XML=("$roots/wayland-scanner/share/wayland/wayland.xml"
+    "$roots/wtype-src/protocol/virtual-keyboard-unstable-v1.xml"
+    "$roots/wlr-protocols/share/wlr-protocols/unstable/wlr-virtual-pointer-unstable-v1.xml")
+  VI_SOCK="$RUNTIME_DIR/vinput.sock"
+  [[ -x ${VI[0]} && -f ${VI_XML[0]} && -f ${VI_XML[1]} && -f ${VI_XML[2]} ]]
 }
+
+# input_up WxH: the session's keyboard and pointer (test/lib/vinput.py), on
+# an output of that size. Started before Quickshell, so it binds both with the
+# seat and nothing typed or clicked comes before it can take it.
+input_up() {
+  local server
+  rm -f "$VI_SOCK"
+  in_session "exec ${VI[*]} serve $VI_SOCK ${VI_XML[*]} ${1%x*} ${1#*x}" >>"$LOGS/vinput.log" 2>&1 &
+  server=$!
+  for _ in $(seq $((PROBE_WAIT * 10))); do
+    [[ -S $VI_SOCK ]] && return 0
+    kill -0 "$server" 2>/dev/null || break
+    sleep 0.1
+  done
+  echo "FAIL test/lib/vinput.py didn't start: $(tail -3 "$LOGS/vinput.log")"
+  return 1
+}
+
+# input STEP...: the steps (test/lib/vinput.py) through the session's keyboard
+# and pointer; it returns once the compositor has taken them.
+input() { as_user "${VI[@]}" send "$VI_SOCK" "$@" 2>>"$LOGS/vinput.log"; }
 
 # kb_probe_at NAME: "X,Y", where the keyboard tab's probe last put NAME
 # (config/quickshell/modules/controlcenter/KeyboardList.qml).
@@ -899,10 +930,30 @@ kb_probe_at() {
     sed -E 's/.* x=([0-9]+) y=([0-9]+)/\1,\2/'
 }
 
-# kb_probe_wait PATTERN: up to 5 s for the probe to log a line matching PATTERN (ERE).
+# kb_probe_wait PATTERN: up to PROBE_WAIT for the probe to log a line matching PATTERN (ERE).
 kb_probe_wait() {
-  for _ in $(seq 50); do
+  for _ in $(seq $((PROBE_WAIT * 10))); do
     grep -qE "keyboard probe: $1" "$QS_LOG" && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+# kb_probe_last PATTERN: up to PROBE_WAIT for the probe's latest `at` line to
+# match PATTERN (ERE): where everything is now, not where it once was.
+kb_probe_last() {
+  for _ in $(seq $((PROBE_WAIT * 10))); do
+    grep -o "keyboard probe: at .*" "$QS_LOG" | tail -1 | grep -qE "$1" && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+# kb_layouts_are FILE LAYOUTS: up to PROBE_WAIT for keyboard.toml FILE to list
+# LAYOUTS, as `layouts = [...]` spells them.
+kb_layouts_are() {
+  for _ in $(seq $((PROBE_WAIT * 10))); do
+    grep -qxF "layouts = [$2]" "$1" && return 0
     sleep 0.1
   done
   return 1
@@ -917,7 +968,7 @@ kb_probe_wait() {
 # `kubaos keyboard move`.
 keyboard_tab_clicks() {
   local dir at to x y added moves daemon mine="$USER_HOME/.config/kubaos/desktop/keyboard/keyboard.toml" saved bad=0
-  pointer_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
+  input_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
   dir="$(mktemp -d)"
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$dir/keyboard"
   chown -R "$USER_NAME:" "$dir"
@@ -928,20 +979,21 @@ keyboard_tab_clicks() {
   session_start sway 1920x1080 1
   in_session "exec kotodamad >>$LOGS/kotodamad-keyboard.log 2>&1" &
   daemon=$!
-  if ! qs_start "KUBAOS_KEYBOARD_FILE=$dir/keyboard" KUBAOS_KEYBOARD_PROBE=1; then
+  input_up 1920x1080 || bad=1
+  if ((!bad)) && ! qs_start "KUBAOS_KEYBOARD_FILE=$dir/keyboard" KUBAOS_KEYBOARD_PROBE=1; then
     echo "FAIL Quickshell didn't load"; tail -30 "$QS_LOG"; bad=1
   fi
+  # The probe logs where things are once the sheet has slid in.
   if ((!bad)); then
     in_session 'qs ipc call controlcenter keyboard' >/dev/null 2>&1
     kb_probe_wait 'at .*add-button' || { echo "FAIL qs ipc call controlcenter keyboard showed no + in the toolbar"; bad=1; }
   fi
-  # The drawer slides in; the probe logs where the button is until it stops.
-  sleep 1.5
   at="$(kb_probe_at add-button)"
 
+  # The second click comes well inside the double-click interval; a second after
+  # it is the time it has to change something it shouldn't.
   if ((!bad)); then
-    in_session "$VP_RUN 1920 1080 move:$at wait:0.3 click wait:0.12 click wait:1" >>"$LOGS/vpointer.log" 2>&1 ||
-      { echo "FAIL test/lib/vpointer.py: $(tail -3 "$LOGS/vpointer.log")"; bad=1; }
+    input move:"$at" click wait:0.12 click wait:1 || { echo "FAIL test/lib/vinput.py: $(tail -3 "$LOGS/vinput.log")"; bad=1; }
     if ! grep -qx 'layouts = \["us", "it"\]' "$mine"; then
       echo "FAIL a double-click on + changed the layouts: $(cat "$mine")"; bad=1
     elif ! grep -q 'keyboard probe: adding true' "$QS_LOG" || grep -q 'keyboard probe: adding false' "$QS_LOG"; then
@@ -959,14 +1011,16 @@ keyboard_tab_clicks() {
       grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
       tail -5 "$LOGS/kotodamad-keyboard.log" | sed 's/^/     /'
       bad=1
+    elif ! kb_probe_last 'first-match '; then
+      echo "FAIL the search showed no first match:"
+      grep -o 'keyboard probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
+      bad=1
     else
-      sleep 0.5
       at="$(kb_probe_at first-match)"
-      in_session "$VP_RUN 1920 1080 move:$at wait:0.2 click wait:0.5" >>"$LOGS/vpointer.log" 2>&1
+      input move:"$at" click || echo "FAIL test/lib/vinput.py: $(tail -3 "$LOGS/vinput.log")"
       kb_probe_wait 'change add ' || true
       added="$(grep -o 'keyboard probe: change add .*' "$QS_LOG" | tail -1 | sed 's/.*change add //')"
-      for _ in $(seq 30); do [[ -n $added ]] && grep -qF "\"$added\"" "$mine" && break; sleep 0.1; done
-      if [[ -n $added ]] && grep -qxF "layouts = [\"us\", \"it\", \"$added\"]" "$mine"; then
+      if [[ -n $added ]] && kb_layouts_are "$mine" "\"us\", \"it\", \"$added\""; then
         echo "ok   a click on the search's first match adds it ($added) to the user's layouts, no privilege asked"
       else
         echo "FAIL a click on the first match at '$at' didn't add it: added '$added', layouts $(cat "$mine")"
@@ -976,15 +1030,16 @@ keyboard_tab_clicks() {
   fi
 
   if ((!bad)); then
-    kb_probe_wait 'at .*row-2 ' || { echo "FAIL the list never showed a third row"; bad=1; }
-    sleep 0.5
+    kb_probe_last 'row-2 ' || { echo "FAIL the list never showed a third row"; bad=1; }
     at="$(kb_probe_at row-2)"
     to="$(kb_probe_at row-1)"
     x="${at%,*}"
     y="${at#*,}"
-    # Up past the drag threshold and on to the row above, in steps, as a hand moves.
-    in_session "$VP_RUN 1920 1080 move:$at wait:0.2 press wait:0.1 move:$x,$((y - 8)) wait:0.05 move:$x,$((y - 20)) wait:0.05 move:$x,$((y - 36)) wait:0.05 move:$to wait:0.3 release wait:1" >>"$LOGS/vpointer.log" 2>&1
-    for _ in $(seq 30); do grep -qxF "layouts = [\"us\", \"$added\", \"it\"]" "$mine" && break; sleep 0.1; done
+    # Up past the drag threshold and on to the row above, in steps, as a hand moves. A second
+    # after the drop is the time a second move has to show up.
+    input move:"$at" press wait:0.1 move:"$x,$((y - 8))" wait:0.05 move:"$x,$((y - 20))" wait:0.05 \
+      move:"$x,$((y - 36))" wait:0.05 move:"$to" wait:0.05 release wait:1
+    kb_layouts_are "$mine" "\"us\", \"$added\", \"it\"" || true
     moves="$(grep -c 'keyboard probe: change move' "$QS_LOG")"
     if ! grep -qxF "layouts = [\"us\", \"$added\", \"it\"]" "$mine"; then
       echo "FAIL dragging the last row from $at to $to didn't move it up one place: $(cat "$mine")"
@@ -1660,22 +1715,15 @@ c_session_reload() {
   return "$bad"
 }
 
-# menu_stop PID: the Daemon (PID is its in_session job), its Extensions and the
-# session. Waiting on the job keeps the shell's "Terminated" out of the log.
+# menu_stop PID: the Daemon (PID is its in_session job), its Extensions, the
+# keyboard and pointer, and the session. Waiting on the job keeps the shell's
+# "Terminated" out of the log.
 menu_stop() {
   pkill -u "$USER_NAME" -x kotodamad 2>/dev/null || true
   pkill -u "$USER_NAME" -f '/kotodama-[a-z-]+$' 2>/dev/null || true
+  pkill -u "$USER_NAME" -f 'vinput\.py serve' 2>/dev/null || true
   wait "$1" 2>/dev/null || true
   session_stop
-}
-
-# menu_wtype: wtype, the menu's keyboard, from the flake's nixpkgs: the root
-# warm made, or built now.
-menu_wtype() {
-  local root="$CACHE/roots/wtype"
-  [[ -x $root/bin/wtype ]] ||
-    as_user "$NIX_BIN/nix" build --out-link "$root" --inputs-from "$REPO" nixpkgs#wtype >/dev/null 2>&1
-  [[ -x $root/bin/wtype ]] && echo "$root/bin/wtype"
 }
 
 # menu_example [--remove]: Kotodama's example shell Extension, from the
@@ -1701,38 +1749,82 @@ bookmarks = [
 EOF
 }
 
-# menu_up SIZE: a session at SIZE, the Daemon (its job in MENU_DAEMON) and
-# Quickshell with the menu's probe, which logs `menu probe: ...` lines
-# (config/quickshell/modules/menu/Probe.qml).
+# menu_up SIZE: a session at SIZE, the Daemon (its job in MENU_DAEMON), the
+# keyboard, and Quickshell with the menu's probe, which logs `menu probe: ...`
+# lines (config/quickshell/modules/menu/Probe.qml), once the menu's search has
+# reached the Daemon, which `kotodama toggle` needs.
 menu_up() {
   session_start sway "$1" 1
   in_session "exec kotodamad >>$LOGS/kotodamad.log 2>&1" &
   MENU_DAEMON=$!
+  input_up "$1" || return 1
   if ! qs_start KUBAOS_MENU_PROBE=1; then
     echo "FAIL Quickshell didn't load:"
     tail -30 "$QS_LOG"
     return 1
   fi
-  sleep 3
+  menu_now 'connected true' || { echo "FAIL the menu's search never reached the Daemon"; return 1; }
 }
 
-# menu_step DESC PATTERN CMD [SECONDS]: CMD in the session, then wait up to
-# SECONDS (3) for the probe to log a line matching PATTERN (ERE).
-menu_step() {
-  local desc="$1" pattern="$2" mark
+# menu_until PATTERN CMD...: CMD, then up to PROBE_WAIT for the probe to log a
+# line matching PATTERN (ERE) after it.
+menu_until() {
+  local pattern="$1" mark
+  shift
   mark=$(($(wc -l <"$QS_LOG") + 1))
-  in_session "$3" >/dev/null 2>&1
-  for _ in $(seq $((${4:-3} * 10))); do
-    if tail -n +"$mark" "$QS_LOG" | grep -q -E -- "menu probe: $pattern"; then
-      echo "ok   $desc"
-      return 0
-    fi
+  "$@" >>"$LOGS/menu-steps.log" 2>&1 || { echo "FAIL $* failed: $(tail -3 "$LOGS/menu-steps.log")"; return 1; }
+  for _ in $(seq $((PROBE_WAIT * 10))); do
+    tail -n +"$mark" "$QS_LOG" | grep -q -E -- "menu probe: $pattern" && return 0
     sleep 0.1
   done
-  echo "FAIL $desc: the probe logged no /$pattern/; it logged:"
-  tail -n +"$mark" "$QS_LOG" | grep -o 'menu probe: .*' | tail -5 | sed 's/^/     /'
   return 1
 }
+
+# menu_now STATE: up to PROBE_WAIT for the probe's latest line of STATE's kind
+# (its first word) to be STATE: how the menu is now, however long ago it got so.
+menu_now() {
+  for _ in $(seq $((PROBE_WAIT * 10))); do
+    [[ $(grep -o "menu probe: ${1%% *} .*" "$QS_LOG" | tail -1) == "menu probe: $1" ]] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+# menu_step DESC PATTERN CMD...: CMD, then up to PROBE_WAIT for the probe to
+# log a line matching PATTERN (ERE).
+menu_step() {
+  local desc="$1" pattern="$2"
+  shift 2
+  if menu_until "$pattern" "$@"; then
+    echo "ok   $desc"
+    return 0
+  fi
+  echo "FAIL $desc: the probe logged no /$pattern/; it logged:"
+  grep -o 'menu probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
+  return 1
+}
+
+# menu_keys PLACE: up to PROBE_WAIT for the menu's keys to go to PLACE
+# (`search`, `filter`, `form`), so nothing typed next lands elsewhere.
+menu_keys() {
+  menu_now "keys $1" && return 0
+  echo "FAIL the menu's keys never went to its $1: $(grep -o 'menu probe: keys.*' "$QS_LOG" | tail -1)"
+  return 1
+}
+
+# menu_typed QUERY STEP...: the keys (`input`), then up to PROBE_WAIT for the
+# Results for QUERY to reach the screen; what a step typed after it acts on.
+menu_typed() {
+  local query="$1"
+  shift
+  menu_until "frame query=\"$query\" " input "$@" && return 0
+  echo "FAIL the Results for \"$query\" never reached the screen; the probe logged:"
+  grep -o 'menu probe: .*' "$QS_LOG" | tail -5 | sed 's/^/     /'
+  return 1
+}
+
+# menu_kotodama ARGS...: the `kotodama` command in the session.
+menu_kotodama() { in_session "kotodama $*"; }
 
 # menu_layout PANE MIN_ROWS: the window's last layout has the pane or not, and
 # at least MIN_ROWS rows.
@@ -1759,28 +1851,29 @@ menu_latency() {
 }
 
 # The Command menu: Kotodama's Daemon, started by hand as its socket unit
-# would, and KubaOS's own menu inside Quickshell, driven by wtype. `kotodama
-# toggle` succeeds only when a menu answers it. KubaOS's settings reach the
-# Daemon, which finds nothing wrong with them. The container has no logind and
-# no Hyprland, so what an Extension reports (`extension <name>: ...`) is
-# listed, not fatal, and the Shortcuts View is test/vm/menu-check's.
+# would, and KubaOS's own menu inside Quickshell, driven by the session's
+# keyboard (test/lib/vinput.py). `kotodama toggle` succeeds only when a menu
+# answers it. KubaOS's settings reach the Daemon, which finds nothing wrong
+# with them. The container has no logind and no Hyprland, so what an Extension
+# reports (`extension <name>: ...`) is listed, not fatal, and the Shortcuts View
+# is test/vm/menu-check's.
 #
 # At 1280x800 the menu has no detail pane and more rows than Kotodama's own
 # menu (seven); at 1920x1080 it has the pane, and every View is walked through
-# with Kotodama's example shell Extension. A new virtual keyboard loses its
-# first key while the compositor takes its keymap, so each wtype waits 200 ms.
+# with Kotodama's example shell Extension. Each key is typed once the probe says
+# where the keys go and the Results it acts on are on screen.
 c_menu() {
-  local out bad=0 log="$LOGS/kotodamad.log" key
+  local out bad=0 log="$LOGS/kotodamad.log" downs=()
+  for _ in {1..12}; do downs+=(key:Down); done
   : >"$log"
   chown "$USER_NAME:" "$log"
-  key="$(menu_wtype)" || { echo "FAIL no wtype from the flake's nixpkgs"; return 1; }
-  key="$key -s 200"
+  input_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
   menu_example || { echo "FAIL Kotodama's example Extension isn't in flake.lock's Kotodama"; return 1; }
 
   menu_up 1280x800 || { menu_stop "$MENU_DAEMON"; return 1; }
-  menu_step "kotodama toggle opens the menu in Quickshell" 'visible true' 'kotodama toggle' || bad=1
+  menu_step "kotodama toggle opens the menu in Quickshell" 'visible true' menu_kotodama toggle || bad=1
   menu_layout false 8 || bad=1
-  menu_step "kotodama toggle closes it" 'visible false' 'kotodama toggle' || bad=1
+  menu_step "kotodama toggle closes it" 'visible false' menu_kotodama toggle || bad=1
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors at 1280x800:"; qs_problems | head; bad=1; }
   menu_stop "$MENU_DAEMON"
 
@@ -1804,36 +1897,40 @@ c_menu() {
   done
   ((bad)) || echo "ok   the apps' hidden, renamed apps and terminal, and the binds in the search, come from kubaos.toml"
 
-  menu_step "kotodama toggle opens the menu" 'visible true' 'kotodama toggle' || bad=1
+  menu_step "kotodama toggle opens the menu" 'visible true' menu_kotodama toggle || bad=1
   menu_layout true 8 || bad=1
-  menu_step "typing searches, and the Results reach the screen" 'frame query="tim" ' "$key -d 120 tim" || bad=1
-  menu_step "Ctrl+K opens the Action panel on Timer" 'actions [2-9]' "$key -M ctrl -k k -m ctrl" || bad=1
-  menu_step "Esc closes only the Action panel" 'actions 0' "$key -k Escape" || bad=1
-  menu_step "Enter on Timer pushes its form" 'view kind=form title="Start timer" depth=1' "$key -k Return" || bad=1
-  menu_step "the form's Enter starts a job, shown in a progress View" 'view kind=progress title="2 second timer" .*job=running' \
-    "sleep 0.5 && $key -d 50 2 && $key -k Return" || bad=1
-  menu_step "the job runs to the end" 'view kind=progress .*job=succeeded' ':' 8 || bad=1
-  menu_step "Esc pops the View" 'view kind= title="" depth=0' "$key -k Escape" || bad=1
+  menu_keys search &&
+    menu_step "typing searches, and the Results reach the screen" 'frame query="tim" ' input --delay 120 type:tim || bad=1
+  menu_step "Ctrl+K opens the Action panel on Timer" 'actions [2-9]' input down:ctrl type:k up:ctrl || bad=1
+  menu_step "Esc closes only the Action panel" 'actions 0' input key:Escape || bad=1
+  menu_step "Enter on Timer pushes its form" 'view kind=form title="Start timer" depth=1' input key:Return || bad=1
+  menu_keys form &&
+    menu_step "the form's Enter starts a job, shown in a progress View" \
+      'view kind=progress title="2 second timer" .*job=running' input --delay 50 type:2 key:Return || bad=1
+  menu_step "the job runs to the end" 'view kind=progress .*job=succeeded' : || bad=1
+  menu_step "Esc pops the View" 'view kind= title="" depth=0' input key:Escape || bad=1
   menu_step "kotodama open --view opens a list View" 'view kind=list title="Bookmarks" depth=1' \
-    'kotodama open --view shell-example/bookmarks' || bad=1
-  menu_step "the list View's filter narrows it" 'listed 1$' "$key -d 50 quick" || bad=1
-  menu_step "Esc clears the filter first" 'listed 3$' "$key -k Escape" || bad=1
-  menu_step "Esc again leaves the list View" 'view kind= title="" depth=0' "$key -k Escape" || bad=1
-  menu_step "kotodama open --app enters an app, with its intro card" 'intro ".+"' 'kotodama open --app shell' || bad=1
-  menu_step "Backspace with nothing typed leaves the app" 'scope ""' "$key -k BackSpace" || bad=1
-  menu_step "Esc clears the query" 'frame query="" ' "$key -k Escape" || bad=1
-  menu_step "Enter on Power Off asks first" 'confirming "Power Off\? ' \
-    "$key -d 50 'power off' && sleep 1 && $key -k Return" || bad=1
-  menu_step "Esc cancels the confirmation" 'confirming ""' "$key -k Escape" || bad=1
-  menu_step "Forget on Timer leaves a Toast" 'toast ".+"' \
-    "$key -k Escape && $key -d 50 timer && sleep 1 && $key -M ctrl -M shift -k BackSpace -m shift -m ctrl" 5 || bad=1
-  menu_step "Ctrl+Z undoes it" 'toast ""' "$key -M ctrl -k z -m ctrl" 5 || bad=1
-  menu_step "a date query is answered in the top row" 'top "[0-9]+ days? · until .* 25 December ' \
-    "$key -k Escape && $key -d 50 'days until christmas'" 5 || bad=1
-  menu_step "Down past the last row on screen scrolls the selection into view" 'selected row=12 shown=true' \
-    "$key -k Escape && $key -d 50 s && sleep 1 && $key -d 60$(printf ' -k Down%.0s' {1..12})" 8 || bad=1
-  menu_step "PageUp brings the top row back into view" 'selected row=[0-4] shown=true' "$key -k Prior" || bad=1
-  menu_step "Esc clears, and Esc again closes the menu" 'visible false' "$key -k Escape && sleep 0.5 && $key -k Escape" || bad=1
+    menu_kotodama open --view shell-example/bookmarks || bad=1
+  menu_keys filter && menu_step "the list View's filter narrows it" 'listed 1$' input --delay 50 type:quick || bad=1
+  menu_step "Esc clears the filter first" 'listed 3$' input key:Escape || bad=1
+  menu_step "Esc again leaves the list View" 'view kind= title="" depth=0' input key:Escape || bad=1
+  menu_step "kotodama open --app enters an app, with its intro card" 'intro ".+"' menu_kotodama open --app shell || bad=1
+  menu_keys search && menu_step "Backspace with nothing typed leaves the app" 'scope ""' input key:BackSpace || bad=1
+  menu_step "Esc clears the query" 'frame query="" ' input key:Escape || bad=1
+  menu_typed 'power off' --delay 50 'type:power off' &&
+    menu_step "Enter on Power Off asks first" 'confirming "Power Off\? ' input key:Return || bad=1
+  menu_step "Esc cancels the confirmation" 'confirming ""' input key:Escape || bad=1
+  menu_typed '' key:Escape && menu_typed timer --delay 50 type:timer &&
+    menu_step "Forget on Timer leaves a Toast" 'toast ".+"' input down:ctrl down:shift key:BackSpace up:shift up:ctrl || bad=1
+  menu_step "Ctrl+Z undoes it" 'toast ""' input down:ctrl type:z up:ctrl || bad=1
+  menu_typed '' key:Escape &&
+    menu_step "a date query is answered in the top row" 'top "[0-9]+ days? · until .* 25 December ' \
+      input --delay 50 'type:days until christmas' || bad=1
+  menu_typed '' key:Escape && menu_typed s type:s &&
+    menu_step "Down past the last row on screen scrolls the selection into view" 'selected row=12 shown=true' \
+      input --delay 60 "${downs[@]}" || bad=1
+  menu_step "PageUp brings the top row back into view" 'selected row=[0-4] shown=true' input key:Prior || bad=1
+  menu_typed '' key:Escape && menu_step "Esc clears, and Esc again closes the menu" 'visible false' input key:Escape || bad=1
   menu_latency || bad=1
 
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
@@ -3363,6 +3460,28 @@ c_shutdown() {
   fast_boot_migration || return 1
 }
 
+# The inotify limits: system/20-base.sh, which built the image, installed the
+# sysctl drop-in, and the inotify-limits migration puts it back on a machine
+# without it, and changes nothing on a second run. The container's
+# /proc/sys is the host's and read-only, so applying it is the laptop's.
+c_inotify() {
+  local mig out conf=/etc/sysctl.d/60-kubaos-inotify.conf
+  cmp -s "$REPO/system/files/sysctl.d/60-kubaos-inotify.conf" "$conf" ||
+    { echo "FAIL system/20-base.sh installed no $conf"; return 1; }
+  echo "ok   system/20-base.sh installed $conf"
+  mig="$(ls "$REPO"/migrations/system/*-inotify-limits.sh)"
+  rm -f "$conf"
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig:"; echo "$out" | tail; return 1; }
+  cmp -s "$REPO/system/files/sysctl.d/60-kubaos-inotify.conf" "$conf" ||
+    { echo "FAIL the inotify-limits migration installed no $conf"; return 1; }
+  out="$(KUBAOS_DIR="$REPO" bash -euo pipefail "$mig" 2>&1)" || { echo "FAIL $mig, run again:"; echo "$out" | tail; return 1; }
+  if grep -E 'creating|replacing' <<<"$out"; then
+    echo "FAIL the migration changed something on its second run (above)"
+    return 1
+  fi
+  echo "ok   the inotify-limits migration installs the drop-in, and a second run changes nothing"
+}
+
 # `dot-session leave`, with a systemctl and a loginctl that log their
 # arguments: the stop of graphical-session.target comes before the action.
 leave_order() {
@@ -3700,7 +3819,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

@@ -187,6 +187,22 @@ PanelWindow {
             viewKeys.forceActiveFocus();
     }
 
+    // Where the keys go, in `focusView`'s order, once the compositor has given the window the
+    // keyboard: the probe's `keys` line.
+    function keysAt(): string {
+        if (!panel.Window.window?.active)
+            return "";
+        if (actionPanel.activeFocus)
+            return "actions";
+        if (input.activeFocus)
+            return "search";
+        if (filter.activeFocus)
+            return "filter";
+        if (form.item?.activeFocus)
+            return "form";
+        return viewKeys.activeFocus ? "view" : "";
+    }
+
     function openActions(): void {
         const actions = search.actions(list.currentIndex);
         if (actions.length > 0) {
@@ -1111,6 +1127,7 @@ PanelWindow {
             selected: list.currentIndex
             selectedShown: list.currentShown && !follow.running
             results: list
+            keys: menu.keysAt()
         }
     }
 }

@@ -39,6 +39,8 @@ Item {
     readonly property bool settling: settle.running
     // `c_keyboard`'s probe (test/lib/e2e.sh), with KUBAOS_KEYBOARD_PROBE=1 only.
     readonly property bool probed: Quickshell.env("KUBAOS_KEYBOARD_PROBE") === "1"
+    // The sheet the tab is in has stopped moving, so what the probe logs is where things stay.
+    property bool settled: true
     // The most a keymap holds (kubaos_core::keyboard::MAX_LAYOUTS).
     readonly property int maxLayouts: 4
 
@@ -156,12 +158,12 @@ Item {
         interval: Qt.styleHints.mouseDoubleClickInterval
     }
 
-    // Where the probe's pointer clicks: the centre of each target on screen, logged when it moves
-    // (the drawer slides in).
+    // Where the probe's pointer clicks: the centre of each target on screen, logged when it moves,
+    // once the sheet has stopped sliding in.
     Timer {
         property string last: ""
 
-        running: root.probed && root.visible
+        running: root.probed && root.visible && root.settled
         repeat: true
         interval: 200
         onTriggered: {

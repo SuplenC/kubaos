@@ -37,6 +37,10 @@ QtObject {
     // every frame, not on the frame line.
     property ListView results: null
     property string top: ""
+    // What takes the keys (`search`, `filter`, `form`, `actions` or `view`) once the compositor
+    // has given the menu's window the keyboard; empty until then. A key typed before it lands
+    // nowhere, so the test types only once it names the place.
+    property string keys: ""
 
     property real typedAt: 0
     // The Results for the query typed are in the model, and then in a frame
@@ -63,6 +67,9 @@ QtObject {
     }
 
     onActionsChanged: log(`actions ${actions}`)
+    onKeysChanged: log(`keys ${keys}`)
+    // The menu's search reached the Daemon, so `kotodama toggle` has a menu to answer it.
+    Component.onCompleted: log(`connected ${search.connected}`)
     onPaneChanged: layout()
     onSelectedShownChanged: log(`selected row=${selected} shown=${selectedShown}`)
     onSelectedChanged: log(`selected row=${selected} shown=${selectedShown}`)
@@ -73,6 +80,10 @@ QtObject {
 
     readonly property Connections searchEvents: Connections {
         target: probe.search
+
+        function onConnectedChanged(): void {
+            probe.log(`connected ${probe.search.connected}`);
+        }
 
         function onQueryChanged(): void {
             probe.typedAt = Date.now();

@@ -208,6 +208,7 @@ K.Sheet {
                 roomAbove: tabs.gap
                 roomBelow: tabs.foot
                 visible: root.tab === 3
+                settled: root.progress === 1
             }
         }
     }
