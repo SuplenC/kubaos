@@ -212,8 +212,8 @@
       #
       # rustfmt is the nightly one (rustfmtNightly). RUSTFMT points `cargo fmt`
       # and rust-analyzer at it, and it comes first on PATH for an editor that
-      # runs `rustfmt` itself. `just fmt` and `just fmt-check` refuse a rustfmt
-      # that isn't nightly.
+      # runs `rustfmt` itself; editors get the shell through direnv (.envrc).
+      # `just fmt` and `just fmt-check` refuse a rustfmt that isn't nightly.
       #
       # Cargo compiles through sccache, its cache under ~/.cache/sccache, so a
       # fresh worktree reuses the crates.io dependencies another checkout

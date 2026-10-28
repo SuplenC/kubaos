@@ -75,7 +75,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 
 ### Formatting and layout
 
-- **`just fmt` formats; `just fmt-check` checks.** They run the nightly rustfmt `nix develop` provides (`RUSTFMT`) with the root `rustfmt.toml`, then turn the `use foo::{self};` rustfmt leaves into `use foo;` (`scripts/self-imports`). `cargo fmt`, rust-analyzer and `nix fmt` in the devshell format the same way. Most of `rustfmt.toml`'s options are unstable: a stable rustfmt warns that it skips them and formats the rest with its defaults, so the recipes refuse a rustfmt that warns. Outside the devshell, set `RUSTFMT` to a nightly rustfmt. `vendor/` keeps its upstream layout. Source: kubaos.
+- **`just fmt` formats; `just fmt-check` checks.** They run the nightly rustfmt `nix develop` provides (`RUSTFMT`) with the root `rustfmt.toml`, then turn the `use foo::{self};` rustfmt leaves into `use foo;` (`scripts/self-imports`). In the devshell (`nix develop`, or direnv with the repo's `.envrc`), `cargo fmt` and rust-analyzer use the same rustfmt and options; only `just fmt` and `nix fmt` also rewrite the `{self}` imports, which `just fmt-check` refuses. Most of `rustfmt.toml`'s options are unstable: a stable rustfmt warns that it skips them and formats the rest with its defaults, so the recipes refuse a rustfmt that warns. Outside the devshell, set `RUSTFMT` to a nightly rustfmt. `vendor/` keeps its upstream layout. Source: kubaos.
 - **Imports: three blocks, one item per `use`.** `std`, then external crates, then `crate`/`super`/`self`, a blank line between. A module is imported as `use std::io;`, never `use std::io::{self};`. Source: kubaos (from Kotodama).
 - **`std::` paths everywhere**, not `core::`/`alloc::`. Source: kubaos.
 - **Line width 120.** Source: kubaos.
@@ -147,7 +147,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 ### Logging
 
 - **Log with the `log` (or `tracing`) macros**, one event per fact, with the values in the message.
-- **No `println!`, `eprintln!` or `dbg!`** outside a binary's user-facing output (the `kubaos` command, the CLI's progress). Clippy `print_stdout`, `print_stderr`: a binary's output takes `#[expect(clippy::print_stdout, reason = "…")]` on the function that prints, and the `kubaos` CLI prints through `out!` and `err!` (`crates/kubaos-cli/src/out.rs`). A service's messages are logs, which reach the journal through a logger on stderr, as `kubaos-proxy` and `kubaos-power` do. Source: M-LOG-NOT-PRINT.
+- **No `println!`, `eprintln!` or `dbg!`** outside a binary's user-facing output (the `kubaos` command, the CLI's progress). Clippy `print_stdout`, `print_stderr`: a binary's output takes `#[expect(clippy::print_stdout, reason = "…")]` on the function that prints, and the `kubaos` CLI prints through `out!` and `err!` (`crates/kubaos-cli/src/out.rs`). A service's messages are logs, which reach the journal through a logger on stderr, as `kubaos-proxy` and `kubaos-power` do; the one error a process exits with is its output, and may print. Source: M-LOG-NOT-PRINT.
 
 ## Shell
 
