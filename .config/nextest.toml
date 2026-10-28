@@ -1,0 +1,14 @@
+# nextest's settings for the workspace (`just nextest`).
+# https://nexte.st/docs/configuration/test-groups/
+
+[test-groups]
+# Each run of the Command menu's KubaOS Extension starts six file watchers, an
+# inotify instance each. Without KubaOS's sysctl drop-in (CI, another
+# machine) the user may hold 128, which a desktop already uses most of.
+# Every test in the group starts the Extension, so three at a time hold at
+# most 18 instances.
+extension = { max-threads = 3 }
+
+[[profile.default.overrides]]
+filter = "package(kotodama-kubaos) & kind(test)"
+test-group = "extension"

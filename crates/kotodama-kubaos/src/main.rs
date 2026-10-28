@@ -298,7 +298,7 @@ fn watch(dir: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
             let _ = events.send(Event::Own(Own::Pending(Pending::read(&file))));
         },
     )
-    .map_err(|err| kotodama_extension::log!("not watching for KubaOS updates: {err}"))
+    .map_err(|err| kotodama_extension::log!("not watching for KubaOS updates: {}", watched::why(&err)))
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)
@@ -351,7 +351,7 @@ fn watch_keyboards(files: KeyboardFiles, events: Sender<Event<Own>>) -> Option<W
             let _ = events.send(Event::Own(Own::Keyboards(files.read())));
         },
     )
-    .map_err(|err| kotodama_extension::log!("not watching the keyboard layouts: {err}"))
+    .map_err(|err| kotodama_extension::log!("not watching the keyboard layouts: {}", watched::why(&err)))
     .ok()?;
     watcher.watch(vec![mine_dir, system_dir]);
     Some(watcher)
@@ -376,7 +376,7 @@ fn watch_wallpaper_sets(file: PathBuf, events: Sender<Event<Own>>) -> Option<Wat
             let _ = events.send(Event::Own(Own::WallpaperSets(sets)));
         },
     )
-    .map_err(|err| kotodama_extension::log!("not watching the wallpaper sets: {err}"))
+    .map_err(|err| kotodama_extension::log!("not watching the wallpaper sets: {}", watched::why(&err)))
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)
@@ -397,7 +397,7 @@ fn watch_drives(file: PathBuf, events: Sender<Event<Own>>) -> Option<Watcher> {
             let _ = events.send(Event::Own(Own::Drives(Drives::read(&file))));
         },
     )
-    .map_err(|err| kotodama_extension::log!("not watching the mounted drives: {err}"))
+    .map_err(|err| kotodama_extension::log!("not watching the mounted drives: {}", watched::why(&err)))
     .ok()?;
     watcher.watch(vec![dir]);
     Some(watcher)
@@ -457,7 +457,7 @@ fn watch_desk(files: DeskFiles, events: Sender<Event<Own>>) -> Option<Watcher> {
             let _ = events.send(Event::Own(Own::Desk(files.read())));
         },
     )
-    .map_err(|err| kotodama_extension::log!("not watching the desk positions: {err}"))
+    .map_err(|err| kotodama_extension::log!("not watching the desk positions: {}", watched::why(&err)))
     .ok()?;
     watcher.watch(dirs);
     Some(watcher)
@@ -510,7 +510,7 @@ fn watch_states(places: Places, events: Sender<Event<Own>>) -> Option<Watcher> {
             let _ = events.send(Event::Own(Own::States(States::read(&places))));
         },
     )
-    .map_err(|err| kotodama_extension::log!("not watching the states of the actions: {err}"))
+    .map_err(|err| kotodama_extension::log!("not watching the states of the actions: {}", watched::why(&err)))
     .ok()?;
     watcher.watch(dirs);
     Some(watcher)

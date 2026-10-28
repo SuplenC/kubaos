@@ -1,7 +1,11 @@
 //! The Extension's binary over its stdio, as the Daemon runs it.
 
 use std::collections::BTreeMap;
+use std::ops::Deref;
+use std::ops::DerefMut;
 use std::process::Command;
+use std::sync::Condvar;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -17,8 +21,54 @@ use kotodama_protocol::ToExtension;
 
 const WAIT: Duration = Duration::from_secs(5);
 
-fn start() -> Spawned {
-    Spawned::start(&mut Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")), WAIT)
+/// How many Extensions the tests run at once. Each starts six file watchers, an inotify instance
+/// each, and without KubaOS's sysctl drop-in the user may hold 128, most of them the desktop's:
+/// `cargo test` runs every test of the file at once. nextest's `extension` group holds the same
+/// number across processes.
+const AT_ONCE: usize = 3;
+
+/// The Extensions running, under [`AT_ONCE`].
+static RUNNING: (Mutex<usize>, Condvar) = (Mutex::new(0), Condvar::new());
+
+/// A running Extension, which holds its place under [`AT_ONCE`] until it is dropped.
+struct Running(Spawned);
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        let (count, freed) = &RUNNING;
+        *count.lock().unwrap_or_else(std::sync::PoisonError::into_inner) -= 1;
+        freed.notify_one();
+    }
+}
+
+impl Deref for Running {
+    type Target = Spawned;
+
+    fn deref(&self) -> &Spawned {
+        &self.0
+    }
+}
+
+impl DerefMut for Running {
+    fn deref_mut(&mut self) -> &mut Spawned {
+        &mut self.0
+    }
+}
+
+/// `command`, the Extension, once fewer than [`AT_ONCE`] run.
+fn spawn(command: &mut Command, wait: Duration) -> Running {
+    let (count, freed) = &RUNNING;
+    let mut running = count.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    while *running >= AT_ONCE {
+        running = freed.wait(running).unwrap_or_else(std::sync::PoisonError::into_inner);
+    }
+    *running += 1;
+    drop(running);
+    Running(Spawned::start(command, wait))
+}
+
+fn start() -> Running {
+    spawn(&mut Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")), WAIT)
 }
 
 fn config(text: &str) -> ToExtension {
@@ -42,7 +92,7 @@ fn it_is_usable_from_the_start() {
 #[test]
 fn the_layouts_app_is_usable_from_the_start() {
     let config_home = tempfile::tempdir().expect("a config folder");
-    let extension = Spawned::start(
+    let extension = spawn(
         Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos"))
             .arg("layouts")
             .env("XDG_CONFIG_HOME", config_home.path()),
@@ -98,7 +148,7 @@ fn the_upgrade_action_is_listed_while_the_update_check_has_one() {
         "upgrade=0.2.0\nupgrade-codename=akihabara\n",
     )
     .expect("write the check");
-    let mut extension = Spawned::start(
+    let mut extension = spawn(
         Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_STATE_HOME", state.path()),
         WAIT,
     );
@@ -123,7 +173,7 @@ fn the_upgrade_action_is_listed_while_the_update_check_has_one() {
 fn turning_the_greeting_off_swaps_its_pair_in_the_menu() {
     let config_home = tempfile::tempdir().expect("a config folder");
     let runtime = tempfile::tempdir().expect("a runtime folder");
-    let mut extension = Spawned::start(
+    let mut extension = spawn(
         Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos"))
             .env("XDG_CONFIG_HOME", config_home.path())
             .env("XDG_RUNTIME_DIR", runtime.path()),
@@ -206,7 +256,7 @@ fn a_run_that_fails_says_why_and_keeps_the_menu_open() {
 #[test]
 fn a_date_query_is_answered_and_its_answer_copies() {
     let config = tempfile::tempdir().expect("a config folder");
-    let mut extension = Spawned::start(
+    let mut extension = spawn(
         Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_CONFIG_HOME", config.path()),
         WAIT,
     );
@@ -264,7 +314,7 @@ fn a_query_that_is_not_a_date_is_answered_with_nothing() {
 #[test]
 fn ram_is_answered_by_the_monitor() {
     let runtime = tempfile::tempdir().expect("a runtime folder");
-    let mut extension = Spawned::start(
+    let mut extension = spawn(
         Command::new(env!("CARGO_BIN_EXE_kotodama-kubaos")).env("XDG_RUNTIME_DIR", runtime.path()),
         WAIT,
     );

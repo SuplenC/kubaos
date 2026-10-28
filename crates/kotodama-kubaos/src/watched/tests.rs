@@ -72,11 +72,23 @@ fn a_watcher_reading_its_file_once_it_settles_isnt_set_off_again() {
             let _ = settled.send(fs::read_to_string(&read).unwrap());
         },
     )
-    .unwrap();
+    .unwrap_or_else(|err| panic!("starting the watcher: {}", why(&err)));
     watcher.watch(vec![dir]);
 
     fs::write(&file, "2").unwrap();
 
     assert_eq!(reads.recv_timeout(Duration::from_secs(5)).unwrap(), "2");
     assert!(reads.recv_timeout(Duration::from_millis(500)).is_err());
+}
+
+#[test]
+fn a_watcher_that_cant_start_names_the_limit_that_ran_out() {
+    let other = notify::Error::generic("no such folder");
+
+    let instances = why(&notify::Error::io(std::io::Error::from_raw_os_error(EMFILE)));
+    let watches = why(&notify::Error::new(notify::ErrorKind::MaxFilesWatch));
+
+    assert!(instances.contains("fs.inotify.max_user_instances"), "{instances}");
+    assert!(watches.contains("fs.inotify.max_user_watches"), "{watches}");
+    assert_eq!(why(&other), other.to_string());
 }
