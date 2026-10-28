@@ -15,6 +15,7 @@ What Kuba checks in every UI change. A design brief includes this list, and a PR
 - **States are told apart.** Done, To do and an action such as Reboot each look different, and the action carries the accent.
 - **Small controls stay quiet.** Secondary controls, like a tile's detail arrow, are transparent with a hover colour, not filled.
 - **Controls respond.** A slider's fill brightens while it's pressed or dragged.
+- **Glow is cut only at an edge you can see.** A focused control at rest keeps its whole glow unless an outline, a well, a card or the panel's own edge is right there; a scroll with no edge of its own never cuts it flat.
 - **First and last impressions are amazing, not just great.** Kōbō's welcome page and its "That's it" page get a big hero and real animation.
 
 ## How to apply it
