@@ -61,7 +61,7 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 ![Type styles, dark](../design/specimen/type-dark-1x.png)
 
-*Every style, largest first; the tint behind each is its line box, so the line height is visible. Hero 64 sits on top. Light: [type-light-1x.png](../design/specimen/type-light-1x.png).*
+*Every style, largest first; the tint behind each is its line box, so the line height is visible. The lock screen's clock, 80, sits on top, then the hero's 64. Light: [type-light-1x.png](../design/specimen/type-light-1x.png).*
 
 **Families** (`[font.family]`), and nothing else draws text:
 
@@ -73,14 +73,15 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 
 `kubaos-ui` embeds the fonts it uses, so an app draws the same on a machine with none installed.
 
-**Sizes:** 11, 12, 13, 14, 16, 20, 24, 32, 48, 64 (`rules.font_sizes`). 64 is the hero's alone. **Every line height is a multiple of 4**, so text boxes stay on the grid. `kubaos-tokens` refuses any other size, and any line height off the grid.
+**Sizes:** 11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80 (`rules.font_sizes`). 64 is the hero's alone, and 80 the lock screen's clock's. **Every line height is a multiple of 4**, so text boxes stay on the grid. `kubaos-tokens` refuses any other size, and any line height off the grid.
 
 **Styles** (`[type.*]`, the `Type` enum). Pick by what the text is, never by how big you want it:
 
 | Style | Size / line | Weight, family | For |
 |---|---|---|---|
+| `clock` | 80 / 88 | light | The lock screen's clock, the one thing that screen shows: a step above the hero, light like every big figure. |
 | `hero` | 64 / 72 | semibold | Words at the hero size: Kōbō's welcome line, nothing else. |
-| `hero_number` | 64 / 72 | light | Numbers at the hero size: the install percent, the clock. Light, so a big figure doesn't shout. |
+| `hero_number` | 64 / 72 | light | Numbers at the hero size: the install percent, the clock popup's time. Light, so a big figure doesn't shout. |
 | `display` | 48 / 56 | semibold | The heading of a full-screen moment other than the welcome: Kōbō's done screen. |
 | `title` | 32 / 40 | semibold | A screen's or page's title. |
 | `headline` | 24 / 32 | semibold | A dialog's title, a big number. |
@@ -112,7 +113,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | 20 | `body`, `body_strong`, `body_large`, `mono_large`, `button` |
 | 24 | `subheading`, `heading`, `button_large` |
 | 32 | `headline`, `title` |
-| 48 | `display`, `hero`, `hero_number` |
+| 48 | `display`, `hero`, `hero_number`, `clock` |
 
 - **The box is one or two icon sizes above the font size**, so a symbol's ink (its box less Tabler's 2 unit margin) stands a little taller than the letters' capitals, and its stroke reads as heavy as their stems. A semibold style takes a step more than a regular one of its size, since its stems are heavier: at 16, `subheading` and `button_large` take 24, `body_large` 20.
 - **Never taller than the line**: `kubaos-tokens` refuses an icon taller than its style's line, so an icon never makes a line taller and a row with one is as tall as a row without.
@@ -133,7 +134,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56; chip 24; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 24, thumb 16, stop mark 4; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
 | Aspect ratios (`[aspect]`) | wallpaper 16:10 |
 

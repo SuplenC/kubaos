@@ -22,8 +22,9 @@
 # multiple of this.
 grid = 4
 # The only font sizes. A type style with any other size is refused. 64 is the
-# hero's alone: semibold for words, light for numbers.
-font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64]
+# hero's alone: semibold for words, light for numbers. 80 is the lock screen's
+# clock, the one thing that screen shows.
+font_sizes = [11, 12, 13, 14, 16, 20, 24, 32, 48, 64, 80]
 # The scales every length is checked against: `grid` times each one must be a
 # whole number of device pixels.
 scales = [1.0, 1.25, 1.5, 2.0]
@@ -105,6 +106,10 @@ check = 20
 radio_dot = 8
 progress = 8
 dialog = 500
+# A password field alone on a screen, under the lock screen's clock: room for
+# a long password's bullets, and about half again as wide as the clock, so the
+# two read as one column instead of the field outweighing the time.
+password = 320
 # The widest a column of text and fields grows.
 column = 560
 # Kōbō's step rail on a wide screen.
@@ -167,6 +172,14 @@ jp = "M PLUS 1"
 # font size, held to an icon size no taller than the line, so an icon never
 # makes a line taller; its stroke is whole device pixels at every scale (see
 # `stroke.symbol`).
+[type.clock]
+size = 80
+line = 88
+icon = 48
+weight = "light"
+family = "sans"
+use = "The lock screen's clock, the one thing that screen shows: a step above the hero, light like every big figure."
+
 [type.hero]
 size = 64
 line = 72
@@ -181,7 +194,7 @@ line = 72
 icon = 48
 weight = "light"
 family = "sans"
-use = "Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the clock."
+use = "Numbers at the hero size, light so a big figure doesn't shout: Kōbō's install percent, the clock popup's time."
 
 [type.display]
 size = 48
