@@ -47,7 +47,7 @@ const IN_SURFACE: Corner = nested(Radius::Surface.corner(), Space::S8);
 const IN_INNER: Corner = nested(IN_SURFACE, Space::S4);
 
 /// A plain filled box, `width` by `height` logical pixels.
-fn block<'a>(width: Length, height: f32, fill: Color, corner: Radius) -> Element<'a, Message> {
+fn block<'a>(width: Length, height: f32, fill: Color, corner: Radius) -> widget::Container<'a, Message> {
     widget::container(widget::Space::new())
         .width(width)
         .height(height)
@@ -56,7 +56,6 @@ fn block<'a>(width: Length, height: f32, fill: Color, corner: Radius) -> Element
             border: Border::default().rounded(radius(corner)),
             ..container::Style::default()
         })
-        .into()
 }
 
 /// A token's name and value, in the left column of a scale.
@@ -200,12 +199,8 @@ fn sizes<'a>(look: &Look) -> Element<'a, Message> {
     for size in Size::ALL {
         table = table
             .push(name(look, format!("{size:?}"), format!("{} px", size.px())))
-            .push(block(
-                Length::Fixed(f32::from(size.px())),
-                f32::from(Space::S16.px()),
-                fill,
-                Radius::Small,
-            ));
+            // A size wider than its column, an app's window, fills the column; its name says how wide.
+            .push(block(Length::Fill, f32::from(Space::S16.px()), fill, Radius::Small).max_width(f32::from(size.px())));
     }
     table.into()
 }

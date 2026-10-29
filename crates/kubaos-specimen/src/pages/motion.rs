@@ -52,7 +52,7 @@ const DURATIONS: [Duration; 7] = [
     Duration::Scene,
 ];
 
-const EASINGS: [Easing; 7] = [
+const EASINGS: [Easing; 8] = [
     Easing::Standard,
     Easing::StandardDecel,
     Easing::StandardAccel,
@@ -60,6 +60,7 @@ const EASINGS: [Easing; 7] = [
     Easing::EmphasizedAccel,
     Easing::Linear,
     Easing::Pop,
+    Easing::Spring,
 ];
 
 /// The frames the onion skins and filmstrips show: nine, evenly spaced in time.
@@ -82,6 +83,7 @@ fn curve_use(easing: Easing) -> &'static str {
         Easing::Standard => "Small changes that stay: toggles, colour, focus.",
         Easing::StandardDecel => "Something moving settling in: a list, a slider's step.",
         Easing::Pop => "A small mark popping in: a slider's anchor dot.",
+        Easing::Spring => "Gliding into place, a little past: the carousel's step.",
         Easing::StandardAccel => "Something small leaving for good: a toast.",
         Easing::EmphasizedDecel => "Arriving: panels, dialogs, pages, the log.",
         Easing::EmphasizedAccel => "Leaving: panels and dialogs closing.",

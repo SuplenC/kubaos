@@ -153,6 +153,15 @@ password = 320
 column = 560
 # Kōbō's step rail on a wide screen.
 rail = 236
+# An app's sidebar: Settings' list of pages beside its page, wider than Kōbō's
+# rail since its names are a setting's, not a step's few words.
+sidebar = 264
+# An app's window: it opens centred and floating at its default, 1120 × 720,
+# and tiled it takes its tile but never goes below its minimum, 720 × 480.
+app_width = 1120
+app_height = 720
+app_min_width = 720
+app_min_height = 480
 # A log opened under an error or a progress bar.
 log = 232
 # A panel of the shell, and a notification beside one: the control center's
@@ -460,6 +469,11 @@ use = "Something already moving settling in: a list reordering, a slider settlin
 curve = [0.2, 0.9, 0.3, 1.3]
 use = "A small mark popping in, a little past its size and back: a slider's anchor dot."
 
+# Past its end and back, softly: something gliding into place, over `long`.
+[easing.spring]
+curve = [0.34, 1.25, 0.64, 1.0]
+use = "Something gliding into place with a small overshoot: the wallpaper carousel's step."
+
 [easing.standard_accel]
 curve = [0.3, 0.0, 1.0, 1.0]
 use = "Something small leaving for good: a toast fading out."
@@ -693,6 +707,18 @@ warning = ""
 # logo's own (branding/make.py). Light is emitted, so it is the same in both modes.
 primary_core = ""
 cold_core = ""
+# Violet: anything shared off the machine, the screen above all. Its tube marks
+# what is being shared, with `sharing_core` along its middle as `primary_core`
+# runs along the accent's.
+sharing = ""
+sharing_core = ""
+# The privacy dots: a microphone that is listening, a camera that is watching.
+# Each keeps its colour whatever the wallpaper, so the dot means the same on
+# every desktop.
+microphone = ""
+camera = ""
+# Done and installed: the camera's green, one value for both.
+success = ""
 
 [color.dark]
 primary = "#ffb779"
@@ -736,6 +762,11 @@ inverse_primary = "#8e4e00"
 warning = "#f2c14e"
 primary_core = "#ffe6cf"
 cold_core = "#dcf1ff"
+sharing = "#c9a7ff"
+sharing_core = "#e9dbff"
+microphone = "#ff9f45"
+camera = "#5fd27a"
+success = "#5fd27a"
 
 [color.light]
 primary = "#8b4c00"
@@ -780,6 +811,13 @@ inverse_primary = "#ffb779"
 warning = "#7a5900"
 primary_core = "#ffe6cf"
 cold_core = "#dcf1ff"
+# Dark enough for text on every light surface, the highest container the
+# narrowest: sharing 5.2:1 there, microphone and camera 4.7:1.
+sharing = "#6b3fc4"
+sharing_core = "#e9dbff"
+microphone = "#a04a00"
+camera = "#1b7131"
+success = "#1b7131"
 
 # Every foreground role the front ends draw on a background role, and the
 # contrast it needs (WCAG 2.1 AA): `text` 4.5:1; `large_text` 3:1, for 24 px
@@ -852,16 +890,64 @@ pairs = [
   { fg = "on_surface_variant", bg = "surface_container_lowest", need = "text", use = "The boot screens' notes, key hints and messages" },
   { fg = "error", bg = "surface_container_lowest", need = "text", use = "A wrong disk passphrase" },
   { fg = "primary", bg = "surface_container_lowest", need = "graphic", use = "The disk passphrase field's focus ring and caret" },
+  { fg = "sharing", bg = "surface", need = "text", use = "Words about something shared off the machine, on a page" },
+  { fg = "sharing", bg = "surface_container_lowest", need = "text", use = "Words about something shared off the machine, on the lock screen" },
+  { fg = "sharing", bg = "surface_container_low", need = "text", use = "Words about something shared off the machine, on a well" },
+  { fg = "sharing", bg = "surface_container", need = "text", use = "Words about something shared off the machine, on a panel or a pill of the bar" },
+  { fg = "sharing", bg = "surface_container_high", need = "text", use = "Words about something shared off the machine, on a card or a dialog" },
+  { fg = "sharing", bg = "surface_container_highest", need = "text", use = "Words about something shared off the machine, on the highest container" },
+  { fg = "sharing", bg = "surface", need = "graphic", use = "The sharing tube and dot, on a page" },
+  { fg = "sharing", bg = "surface_container_lowest", need = "graphic", use = "The sharing tube and dot, on the lock screen" },
+  { fg = "sharing", bg = "surface_container_low", need = "graphic", use = "The sharing tube and dot, on a well" },
+  { fg = "sharing", bg = "surface_container", need = "graphic", use = "The sharing tube and dot, on a panel or a pill of the bar" },
+  { fg = "sharing", bg = "surface_container_high", need = "graphic", use = "The sharing tube and dot, on a card or a dialog" },
+  { fg = "sharing", bg = "surface_container_highest", need = "graphic", use = "The sharing tube and dot, on the highest container" },
+  { fg = "microphone", bg = "surface", need = "text", use = "A listening microphone's words, on a page" },
+  { fg = "microphone", bg = "surface_container_lowest", need = "text", use = "A listening microphone's words, on the lock screen" },
+  { fg = "microphone", bg = "surface_container_low", need = "text", use = "A listening microphone's words, on a well" },
+  { fg = "microphone", bg = "surface_container", need = "text", use = "A listening microphone's words, on a panel or a pill of the bar" },
+  { fg = "microphone", bg = "surface_container_high", need = "text", use = "A listening microphone's words, on a card or a dialog" },
+  { fg = "microphone", bg = "surface_container_highest", need = "text", use = "A listening microphone's words, on the highest container" },
+  { fg = "microphone", bg = "surface", need = "graphic", use = "A listening microphone's dot, on a page" },
+  { fg = "microphone", bg = "surface_container_lowest", need = "graphic", use = "A listening microphone's dot, on the lock screen" },
+  { fg = "microphone", bg = "surface_container_low", need = "graphic", use = "A listening microphone's dot, on a well" },
+  { fg = "microphone", bg = "surface_container", need = "graphic", use = "A listening microphone's dot, on a panel or a pill of the bar" },
+  { fg = "microphone", bg = "surface_container_high", need = "graphic", use = "A listening microphone's dot, on a card or a dialog" },
+  { fg = "microphone", bg = "surface_container_highest", need = "graphic", use = "A listening microphone's dot, on the highest container" },
+  { fg = "camera", bg = "surface", need = "text", use = "A watching camera's words, on a page" },
+  { fg = "camera", bg = "surface_container_lowest", need = "text", use = "A watching camera's words, on the lock screen" },
+  { fg = "camera", bg = "surface_container_low", need = "text", use = "A watching camera's words, on a well" },
+  { fg = "camera", bg = "surface_container", need = "text", use = "A watching camera's words, on a panel or a pill of the bar" },
+  { fg = "camera", bg = "surface_container_high", need = "text", use = "A watching camera's words, on a card or a dialog" },
+  { fg = "camera", bg = "surface_container_highest", need = "text", use = "A watching camera's words, on the highest container" },
+  { fg = "camera", bg = "surface", need = "graphic", use = "A watching camera's dot, on a page" },
+  { fg = "camera", bg = "surface_container_lowest", need = "graphic", use = "A watching camera's dot, on the lock screen" },
+  { fg = "camera", bg = "surface_container_low", need = "graphic", use = "A watching camera's dot, on a well" },
+  { fg = "camera", bg = "surface_container", need = "graphic", use = "A watching camera's dot, on a panel or a pill of the bar" },
+  { fg = "camera", bg = "surface_container_high", need = "graphic", use = "A watching camera's dot, on a card or a dialog" },
+  { fg = "camera", bg = "surface_container_highest", need = "graphic", use = "A watching camera's dot, on the highest container" },
+  { fg = "success", bg = "surface", need = "text", use = "Done or installed, a success chip's label, on a page" },
+  { fg = "success", bg = "surface_container_lowest", need = "text", use = "Done or installed, a success chip's label, on the lock screen" },
+  { fg = "success", bg = "surface_container_low", need = "text", use = "Done or installed, a success chip's label, on a well" },
+  { fg = "success", bg = "surface_container", need = "text", use = "Done or installed, a success chip's label, on a panel or a pill of the bar" },
+  { fg = "success", bg = "surface_container_high", need = "text", use = "Done or installed, a success chip's label, on a card or a dialog" },
+  { fg = "success", bg = "surface_container_highest", need = "text", use = "Done or installed, a success chip's label, on the highest container" },
+  { fg = "success", bg = "surface", need = "graphic", use = "A done or installed mark, on a page" },
+  { fg = "success", bg = "surface_container_lowest", need = "graphic", use = "A done or installed mark, on the lock screen" },
+  { fg = "success", bg = "surface_container_low", need = "graphic", use = "A done or installed mark, on a well" },
+  { fg = "success", bg = "surface_container", need = "graphic", use = "A done or installed mark, on a panel or a pill of the bar" },
+  { fg = "success", bg = "surface_container_high", need = "graphic", use = "A done or installed mark, on a card or a dialog" },
+  { fg = "success", bg = "surface_container_highest", need = "graphic", use = "A done or installed mark, on the highest container" },
 ]
 # Roles a front end draws only as decoration, with no text or meaning drawn on
 # them: no pair is needed. `outline_variant`, dividers and soft edges;
 # `shadow` and `scrim`;
 # `cold_container` and `surface_bright`, the segments of Kōbō's partition bar,
-# which its legend names; `primary_core` and `cold_core`, the hot middle of a
-# neon tube, drawn on the tube, and the focus core outside a filled control,
-# beside the fill it lights. `kubaos-design contrast` fails on a role drawn with
+# which its legend names; `primary_core`, `cold_core` and `sharing_core`, the
+# hot middle of a neon tube, drawn on the tube, and the focus core outside a
+# filled control, beside the fill it lights. `kubaos-design contrast` fails on a role drawn with
 # that is in no pair and not here.
-decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", "scrim", "shadow", "surface_bright"]
+decorative = ["cold_container", "cold_core", "outline_variant", "primary_core", "scrim", "shadow", "sharing_core", "surface_bright"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes
