@@ -56,6 +56,46 @@ fn curves_end_at_one_one_for_bezier_splines() {
 }
 
 #[test]
+fn the_spring_overshoots_in_its_bezier_spline_too() {
+    assert!(render(&QmlTokens).contains("readonly property list<real> spring: [0.34, 1.25, 0.64, 1, 1, 1]"));
+}
+
+#[test]
+fn an_app_window_s_sizes_and_the_sidebar_are_sizes() {
+    let singleton = render(&QmlTokens);
+
+    for size in [
+        "readonly property int app_width: 1120",
+        "readonly property int app_height: 720",
+        "readonly property int app_min_width: 720",
+        "readonly property int app_min_height: 480",
+        "readonly property int sidebar: 264",
+    ] {
+        assert!(singleton.contains(size), "{size}");
+    }
+}
+
+#[test]
+fn the_fixed_roles_are_written_in_both_palettes() {
+    let singleton = render(&QmlTokens);
+
+    for role in [
+        "sharing: \"#c9a7ff\"",
+        "sharing: \"#6b3fc4\"",
+        "sharing_core: \"#e9dbff\"",
+        "microphone: \"#ff9f45\"",
+        "microphone: \"#a04a00\"",
+        "camera: \"#5fd27a\"",
+        "camera: \"#1b7131\"",
+        "success: \"#5fd27a\"",
+        "success: \"#1b7131\"",
+        "readonly property color sharing: tokens.role(\"sharing\")",
+    ] {
+        assert!(singleton.contains(role), "{role}");
+    }
+}
+
+#[test]
 fn type_styles_carry_their_size_line_weight_and_family() {
     let singleton = render(&QmlTokens);
 

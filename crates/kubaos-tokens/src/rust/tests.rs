@@ -96,3 +96,43 @@ fn every_symbol_names_its_drawing() {
     assert!(module.contains("Icon::HardDrive => None,"));
     assert!(module.contains("Icon::ArrowBack => Some(\"arrow-left\"),"));
 }
+
+#[test]
+fn the_fixed_roles_keep_their_values_in_both_modes() {
+    let module = module();
+
+    for role in [
+        "sharing: Rgb { r: 0xc9, g: 0xa7, b: 0xff },",
+        "sharing: Rgb { r: 0x6b, g: 0x3f, b: 0xc4 },",
+        "sharing_core: Rgb { r: 0xe9, g: 0xdb, b: 0xff },",
+        "microphone: Rgb { r: 0xff, g: 0x9f, b: 0x45 },",
+        "microphone: Rgb { r: 0xa0, g: 0x4a, b: 0x00 },",
+        "camera: Rgb { r: 0x5f, g: 0xd2, b: 0x7a },",
+        "camera: Rgb { r: 0x1b, g: 0x71, b: 0x31 },",
+        "success: Rgb { r: 0x5f, g: 0xd2, b: 0x7a },",
+        "success: Rgb { r: 0x1b, g: 0x71, b: 0x31 },",
+    ] {
+        assert!(module.contains(role), "{role}");
+    }
+}
+
+#[test]
+fn the_spring_is_a_curve_like_the_others() {
+    assert!(module().contains("Easing::Spring => [0.34, 1.25, 0.64, 1.0],"));
+}
+
+#[test]
+fn an_app_window_has_a_default_and_a_minimum_size() {
+    let module = module();
+
+    for size in [
+        "Size::AppWidth => 1120,",
+        "Size::AppHeight => 720,",
+        "Size::AppMinWidth => 720,",
+        "Size::AppMinHeight => 480,",
+        "Size::Sidebar => 264,",
+        "Size::Rail => 236,",
+    ] {
+        assert!(module.contains(size), "{size}");
+    }
+}
