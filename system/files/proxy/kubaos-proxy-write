@@ -14,6 +14,10 @@
 #   killswitch=on|off              the nftables table inet kubaos_proxy: while on, nothing leaves
 #                                  but through the tunnel (wg-kubaos), the tunnel's own packets,
 #                                  DHCP, IPv6 neighbour discovery, and container bridges
+#   killswitch=lan|RANGES          the same, and the local network too: link-local ranges,
+#                                  discovery's multicast and broadcast (mDNS, SSDP, KDE Connect)
+#                                  and RANGES, the machine's own networks; a DNS lookup still
+#                                  goes nowhere but through the tunnel
 #   ca=-|off                       the company's root certificate, one PEM certificate on stdin:
 #                                  in the system's trust store (update-ca-certificates, which Nix
 #                                  reads too) and Chrome's policy (CACertificates); a running
@@ -30,6 +34,8 @@
 #
 # URL is http:// or https://, a host and a port, nothing else: no user, password or path.
 # NO_PROXY is hosts, domains and ranges joined by commas.
+# RANGES is at most 32 ranges joined by commas, none at all allowed, each by its first address
+# and a prefix of at least 1: 192.168.1.0/24, 2a02:a311:1:2::/64.
 #
 # The pins: a CA and a proxy put in place as root redirect and read every program's traffic, so
 # kubaos-proxy-write, which polkit lets an admin at the machine run without a password, puts in
@@ -73,6 +79,9 @@ CHROME_CA="$CHROME_DIR/kubaos-proxy-ca.json"
 UNITS="$ROOT/etc/systemd/system"
 # Larger than any root certificate: stdin is cut there.
 MAX_CA_BYTES=65536
+# The most local networks the kill switch lets through, as crates/kubaos-proxy/src/local_network.rs
+# gives them: more than any laptop's interfaces hold.
+MAX_NETWORKS=32
 
 URL_RE='^https?://([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]+\]):[0-9]{1,5}$'
 NO_PROXY_RE='^[A-Za-z0-9.:/*_-]+(,[A-Za-z0-9.:/*_-]+)*$'
@@ -114,6 +123,68 @@ no_proxy_ok() {
 
 pac_ok() {
   [[ $1 =~ $PAC_RE && ${#1} -le 2048 ]]
+}
+
+# v4_ok RANGE: an IPv4 range by its first address, 192.168.1.0/24, its prefix 1 to 32.
+v4_ok() {
+  local prefix octet value=0
+  local -a octets
+  [[ $1 =~ ^([0-9]{1,3}(\.[0-9]{1,3}){3})/([1-9][0-9]?)$ ]] || return 1
+  prefix="${BASH_REMATCH[3]}"
+  ((prefix <= 32)) || return 1
+  IFS=. read -r -a octets <<<"${BASH_REMATCH[1]}"
+  for octet in "${octets[@]}"; do
+    [[ $octet =~ ^(0|[1-9][0-9]{0,2})$ ]] && ((octet <= 255)) || return 1
+    value=$(((value << 8) | octet))
+  done
+  ((prefix == 32 || (value & ((1 << (32 - prefix)) - 1)) == 0))
+}
+
+# v6_ok RANGE: an IPv6 range by its first address, in lower case, 2a02:a311:1:2::/64, its prefix
+# 1 to 128.
+v6_ok() {
+  local addr prefix group bits i
+  local -a head tail groups
+  [[ $1 =~ ^([0-9a-f:]{2,39})/([1-9][0-9]{0,2})$ ]] || return 1
+  addr="${BASH_REMATCH[1]}"
+  prefix="${BASH_REMATCH[2]}"
+  ((prefix <= 128)) || return 1
+  [[ $addr != *[!:]: && $addr != :[!:]* ]] || return 1
+  if [[ $addr == *::* ]]; then
+    [[ ${addr#*::} != *::* ]] || return 1
+    IFS=: read -r -a head <<<"${addr%%::*}"
+    IFS=: read -r -a tail <<<"${addr#*::}"
+    ((${#head[@]} + ${#tail[@]} <= 7)) || return 1
+    groups=("${head[@]}")
+    for ((i = ${#head[@]} + ${#tail[@]}; i < 8; i++)); do
+      groups+=(0)
+    done
+    groups+=("${tail[@]}")
+  else
+    IFS=: read -r -a groups <<<"$addr"
+    ((${#groups[@]} == 8)) || return 1
+  fi
+  for ((i = 0; i < 8; i++)); do
+    group="${groups[i]}"
+    [[ $group =~ ^[0-9a-f]{1,4}$ ]] || return 1
+    bits=$((prefix - 16 * i))
+    ((bits >= 16)) && continue
+    ((bits < 0)) && bits=0
+    (((16#$group & ((1 << (16 - bits)) - 1)) == 0)) || return 1
+  done
+}
+
+# ranges_ok RANGES: at most MAX_NETWORKS ranges joined by commas, or none.
+ranges_ok() {
+  local range
+  local -a ranges
+  [[ -z $1 ]] && return 0
+  [[ $1 =~ ^[0-9a-f.:/]+(,[0-9a-f.:/]+)*$ ]] || return 1
+  IFS=, read -r -a ranges <<<"$1"
+  ((${#ranges[@]} <= MAX_NETWORKS)) || return 1
+  for range in "${ranges[@]}"; do
+    v4_ok "$range" || v6_ok "$range" || return 1
+  done
 }
 
 # put FILE MODE: stdin into FILE, whole or not at all.
@@ -171,7 +242,13 @@ valid() {
   local name="${1%%=*}" value="${1#*=}" url no_proxy
   [[ $value == off ]] && [[ $name =~ ^(killswitch|ca|apt|docker|nix|chrome)$ ]] && return 0
   case "$name" in
-    killswitch) [[ $value == on ]] || fail "killswitch=$value isn't on or off" ;;
+    killswitch)
+      case "$value" in
+        on) ;;
+        lan\|*) ranges_ok "${value#lan|}" || fail "killswitch=$value: ${value#lan|} isn't ranges (192.168.1.0/24,fd00::/64)" ;;
+        *) fail "killswitch=$value isn't on, lan|RANGES or off" ;;
+      esac
+      ;;
     ca) [[ $value == - ]] || fail "ca=$value isn't - (the certificate on stdin) or off" ;;
     apt) url_ok "$value" || fail "apt=$value isn't a proxy (http://host:port)" ;;
     docker | nix)
@@ -221,9 +298,32 @@ restart_if_running() {
   systemctl daemon-reload && systemctl try-restart "$1"
 }
 
+# local_network RANGES: the kill switch's rules that let the local network through. A DNS lookup
+# is refused first, so a resolver on the local network (the router's) never answers outside the
+# tunnel; mDNS, on 5353, is discovery and goes through.
+local_network() {
+  local range
+  local -a ranges
+  printf '%s\n' \
+    "    tcp dport { 53, 853 } reject with tcp reset" \
+    "    udp dport { 53, 853 } reject with icmpx admin-prohibited" \
+    "    ip daddr { 169.254.0.0/16, 224.0.0.0/24, 239.255.255.250, 255.255.255.255 } accept" \
+    "    ip6 daddr { fe80::/10, ff02::/16 } accept"
+  IFS=, read -r -a ranges <<<"$1"
+  for range in "${ranges[@]}"; do
+    if [[ $range == *:* ]]; then
+      printf '    ip6 daddr %s accept\n' "$range"
+    else
+      printf '    ip daddr %s accept\n' "$range"
+    fi
+  done
+}
+
 killswitch() {
+  local lan=""
   case "$1" in
-    on)
+    on | lan\|*)
+      [[ $1 == lan\|* ]] && lan="$(local_network "${1#lan|}")"
       # HAZARD: keep this one nft run. The empty table and its delete make it replace the table in
       # one transaction whether or not it was there; split in two, traffic would leak in between,
       # and the delete would fail when the table isn't there yet.
@@ -242,6 +342,7 @@ table inet $TABLE {
     udp sport 68 udp dport 67 accept
     udp sport 546 udp dport 547 accept
     icmpv6 type { nd-router-solicit, nd-neighbor-solicit, nd-neighbor-advert } accept
+$lan
     meta l4proto tcp reject with tcp reset
     reject with icmpx admin-prohibited
   }

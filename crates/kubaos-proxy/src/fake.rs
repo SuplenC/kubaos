@@ -44,6 +44,8 @@ pub struct Fake {
     pub tunnel: Option<Connection>,
     pub vault: Vec<Value>,
     pub names: BTreeMap<String, Vec<IpAddr>>,
+    /// What `ip -json address` says: the interfaces' addresses.
+    pub ip: String,
     /// A command whose line contains one of these fails.
     pub fail: Vec<String>,
     pub tunnel_fails: bool,
@@ -293,6 +295,7 @@ impl Machine for Fake {
             "pkexec" if args[1].ends_with("kubaos-proxy-pin") => self.pin(&args[2..], stdin.as_deref()),
             "pkexec" => self.helper(&args[2..], stdin.as_deref()),
             "bw" => self.bw(args, stdin.as_deref()),
+            "ip" => ok(self.ip.clone()),
             _ => ok(""),
         })
     }

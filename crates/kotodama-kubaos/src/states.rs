@@ -11,6 +11,7 @@
 //! | `idle.keep-awake` | on: kept awake | `$XDG_RUNTIME_DIR/kubaos-keep-awake.json` |
 //! | `phone.link` | on: the phone link | `U/desktop/phone/phone-link` exists |
 //! | `proxy` | on: the user wants the Proxy | `$XDG_RUNTIME_DIR/kubaos-proxy.json` |
+//! | `proxy.local-network` | on: the kill switch lets the local network through | `U/desktop/network/proxy.toml`, on without it |
 //! | `notifications.dnd` | on: Do not disturb is on | `$XDG_RUNTIME_DIR/kubaos-dnd.json` |
 //! | `power.panel-power-saving` | on: panel power saving | `U/desktop/power/power.toml` |
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
@@ -67,6 +68,8 @@ pub const KEEP_AWAKE: &str = "idle.keep-awake";
 pub const PHONE_LINK: &str = "phone.link";
 /// Whether the user wants the Proxy on in this session.
 pub const PROXY: &str = "proxy";
+/// Whether the Proxy's kill switch lets the local network through.
+pub const PROXY_LOCAL_NETWORK: &str = "proxy.local-network";
 /// Whether Do not disturb is on, by hand or by itself.
 pub const DND: &str = "notifications.dnd";
 /// Whether the saver stops dim the panel.
@@ -220,6 +223,9 @@ impl States {
         if let Ok(unfree) = UnfreeSetting::read(&files.state_dir) {
             self.set(UNFREE, Reading::Bool(unfree == Unfree::Allowed));
         }
+        if let Ok(allowed) = kubaos_proxy::profile::local_network_allowed(&files.network) {
+            self.set(PROXY_LOCAL_NETWORK, Reading::Bool(allowed));
+        }
     }
 }
 
@@ -228,8 +234,8 @@ pub fn values(name: &str) -> Option<Values> {
     match name {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
-        TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | DND
-        | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED => Some(Values::Bool),
+        TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
+        | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ => None,
     }
@@ -285,6 +291,7 @@ impl Places {
                 user_layer.keyboard,
                 user_layer.power,
                 user_layer.state_dir.join(NIXPKGS_FILE),
+                user_layer.network.join(kubaos_proxy::paths::PROFILE),
             ]);
         }
         files.extend(
@@ -310,6 +317,8 @@ struct Files {
     power: PathBuf,
     /// The user flake's state directory, `U/home/kubaos.d`.
     state_dir: PathBuf,
+    /// The network folder, `U/desktop/network`, with the Proxy's profile.
+    network: PathBuf,
 }
 
 impl Files {
@@ -322,6 +331,7 @@ impl Files {
             keyboard: keyboard_settings::path(config),
             power: kubaos_user_layer::dir(config, App::Power).join(kubaos_power::settings::FILE),
             state_dir: user_flake(config).join(STATE_DIR),
+            network: kubaos_user_layer::dir(config, App::Network),
         }
     }
 }

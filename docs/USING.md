@@ -225,11 +225,13 @@ What each part reaches:
 | Part | Where it goes |
 |---|---|
 | Tunnel | a NetworkManager connection, `wg-kubaos`, made at each "Proxy on" and gone at "Proxy off"; its keys are never written to disk |
-| Kill switch | a full tunnel only (`kill_switch = false` in the profile turns it off): while it is up, nothing leaves but through the tunnel, DNS lookups included, so a LAN printer is out of reach too |
+| Kill switch | a full tunnel only (`kill_switch = false` in the profile turns it off): while it is up, nothing leaves but through the tunnel, DNS lookups included, but the network you're on while "Allow local network" is on (below) |
 | Work DNS | systemd-resolved, on the tunnel's link: only the work domains go to the work servers, every other name to your network's own; a full tunnel sends every name to the work servers |
 | HTTP proxy | new shells and services (`http_proxy` and the like), GNOME's proxy setting and Chrome's policy (so browsers follow), apt, Docker (the daemon and `docker build`/`run`), Nix's daemon, and git; "Proxy off" puts back the GNOME, Docker and session proxy you had before |
 | PAC file | GNOME and Chrome only; the rest need the proxy itself |
 | Company CA | the system's trust store, which curl, git, Nix, Docker's daemon and most tools read, and Chrome's policy |
+
+**The network you're on.** With the kill switch up, "Allow local network" (on by default) lets the network you're on through beside the tunnel, so the phone link, printers, casting and SSH to a machine there keep working; the rest, DNS lookups included, still goes through the tunnel. A range the tunnel routes (a work network in the same `192.168.x` as your home one) stays behind it, so work traffic never leaves outside the tunnel. When you join another network while the Proxy is on, the kill switch follows it. Turn it off for a strict kill switch with the switch in the tile's detail, "Block local network behind the Proxy" in the Command menu or `kubaos proxy lan off` (`lan on` lets it through again); while the Proxy is on, it takes effect at once. `kubaos proxy status` shows the setting and the ranges it lets through.
 
 A terminal or an app already open keeps what it had; open a new one. Docker's and Nix's daemons restart when the proxy changes, and Docker's when the CA does, so running containers stop. While the Proxy is on, apt, Docker and Nix reach the internet through the work proxy: turn it off away from work, or they won't reach anything.
 

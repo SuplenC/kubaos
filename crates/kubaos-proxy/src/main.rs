@@ -4,6 +4,7 @@
 //! ```text
 //! kubaos-proxy on                     every part of the profile up, or none
 //! kubaos-proxy off                    every part down
+//! kubaos-proxy lan on|off             whether the kill switch lets the local networks through
 //! kubaos-proxy status [--json] [--live]
 //!                                     the parts and which are up; --live adds the tunnel's last
 //!                                     handshake and bytes moved
@@ -64,6 +65,7 @@ use kubaos_proxy::watch::Response;
 
 const USAGE: &str = "\
 usage: kubaos-proxy on|off
+       kubaos-proxy lan on|off
        kubaos-proxy status [--json] [--live]
        kubaos-proxy import FILE
        kubaos-proxy pull
@@ -71,6 +73,8 @@ usage: kubaos-proxy on|off
 
 on       the work network: every part of ~/.config/kubaos/desktop/network/proxy.toml up, or none
 off      every part down again
+lan      whether the kill switch lets the network you're on through (on by default): the phone
+         link, printers, casting and SSH there; a range the tunnel routes stays behind it
 status   the parts and which are up; --live adds the tunnel's last handshake and bytes moved
 import   IT's WireGuard config: its keys go to the vault and the keyring, the rest beside proxy.toml
 pull     the tunnel's keys from the vault to the keyring again (a new machine, a new keyring)
@@ -102,6 +106,7 @@ fn main() -> ExitCode {
     match args.as_slice() {
         ["on"] => switch(&paths, true),
         ["off"] => switch(&paths, false),
+        ["lan", setting @ ("on" | "off")] => local_network(&paths, *setting == "on"),
         ["status", flags @ ..] if flags.iter().all(|f| matches!(*f, "--json" | "--live")) => {
             show(&paths, flags.contains(&"--json"), flags.contains(&"--live"))
         }
@@ -231,6 +236,53 @@ fn switch(paths: &Paths, on: bool) -> ExitCode {
             fail(&mut m, paths, &profile, title, body)
         }
     }
+}
+
+/// `lan on|off`: writes the setting into the profile and, while the kill switch is up, puts it up
+/// again with the setting.
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "What the kill switch lets through now, or the lock's refusal, is the command's answer to whoever ran it."
+)]
+fn local_network(paths: &Paths, allowed: bool) -> ExitCode {
+    let _lock = match lock(paths) {
+        Ok(lock) => lock,
+        Err(err) => {
+            eprintln!("kubaos-proxy: couldn't take {}: {err}", paths.lock().display());
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut m = Real::new();
+    if let Err(err) = profile::set_local_network(&paths.profile(), allowed) {
+        let profile = Profile::load(&paths.network);
+        return fail(&mut m, paths, &profile, "Proxy settings", chain(&err));
+    }
+    let profile = Profile::load(&paths.network);
+    let plan = match &profile {
+        Ok(profile) => Plan::for_profile(profile),
+        Err(err) => {
+            let body = chain(err);
+            return fail(&mut m, paths, &profile, "Proxy settings", body);
+        }
+    };
+    if let Err(err) = apply::kill_switch_again(&mut m, paths, &plan) {
+        let body = format!("{}. The kill switch lets through what it did before.", chain(&err));
+        return fail(&mut m, paths, &profile, "Proxy's local network", body);
+    }
+    publish(&mut m, paths, &profile, false, None);
+    println!(
+        "{}",
+        if allowed {
+            "The kill switch lets the local network through."
+        } else {
+            "The kill switch blocks the local network."
+        }
+    );
+    if !plan.has_kill_switch() {
+        eprintln!("kubaos-proxy: note: the setting is for a full tunnel's kill switch, and this profile has none");
+    }
+    ExitCode::SUCCESS
 }
 
 #[expect(
@@ -485,6 +537,16 @@ fn reconcile(m: &mut Real, paths: &Paths, why: &str) -> bool {
             notify("Proxy", &body);
         }
         Reconciled::BroughtUp => log::info!("{why}: the Proxy is up again"),
+        Reconciled::KillSwitchAgain(kill_switch) => {
+            log::info!("{why}: the kill switch went up again, {kill_switch:?}");
+        }
+        Reconciled::KillSwitchKept(err) => {
+            log::warn!(
+                "{why}: the kill switch couldn't let the local networks as they are now through, and lets through \
+                 what it did before: {}",
+                chain(&err)
+            );
+        }
         Reconciled::Failed {
             cause,
             kill_switch_kept,
@@ -560,6 +622,19 @@ fn follow_network(bus: &zbus::blocking::Connection, events: &Sender<Event>) -> z
     Ok(())
 }
 
+/// Sends an event each time NetworkManager's state changes. A network joined is an active
+/// connection before it has an address; the state changes once it has one, so the kill switch
+/// lets its range through then.
+fn follow_state(bus: &zbus::blocking::Connection, events: &Sender<Event>) -> zbus::Result<()> {
+    let nm = zbus::blocking::Proxy::new(bus, NM, NM_PATH, NM)?;
+    for _ in nm.receive_property_changed::<u32>("State") {
+        if events.send(Event::NetworkChanged).is_err() {
+            break;
+        }
+    }
+    Ok(())
+}
+
 fn serve(paths: &Paths) -> ExitCode {
     let mut m = Real::new();
     reconcile(&mut m, paths, "at the start");
@@ -577,6 +652,7 @@ fn serve(paths: &Paths) -> ExitCode {
             follow_sleep as fn(&zbus::blocking::Connection, &Sender<Event>) -> zbus::Result<()>,
         ),
         ("NetworkManager", follow_network),
+        ("NetworkManager's state", follow_state),
     ] {
         let (bus, sender) = (bus.clone(), sender.clone());
         thread::spawn(move || {

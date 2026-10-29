@@ -1,7 +1,8 @@
 pragma Singleton
 import QtQuick
 
-// Stand-in for Proxy: a split tunnel, on.
+// Stand-in for Proxy: a full tunnel with the kill switch, on, letting the
+// local network through.
 QtObject {
     id: root
 
@@ -13,16 +14,19 @@ QtObject {
     readonly property string problem: ""
     readonly property var tunnel: ({
             endpoint: "vpn.example.org:51820",
-            full: false,
-            killSwitch: false
+            full: true,
+            killSwitch: true,
+            allowLocalNetwork: true,
+            localNetworks: ["192.168.1.0/24"]
         })
     readonly property var liveTunnel: ({
             handshake: 1793137620
         })
     readonly property string endpoint: "vpn.example.org:51820"
-    readonly property bool full: false
-    readonly property bool killSwitch: false
-    readonly property string kind: "Split tunnel"
+    readonly property bool full: true
+    readonly property bool killSwitch: true
+    property bool allowLocalNetwork: true
+    readonly property string kind: "Full tunnel, kill switch"
     readonly property string subtitle: on ? endpoint : "Off"
     readonly property bool watching: live && on
     readonly property real lastReceived: 1793137640
@@ -32,6 +36,10 @@ QtObject {
 
     function toggle(): void {
         root.on = !root.on;
+    }
+
+    function setLocalNetwork(allowed: bool): void {
+        root.allowLocalNetwork = allowed;
     }
 
     function ago(seconds: real, now: real): string {

@@ -49,6 +49,44 @@ fn a_profile_that_is_up_reads_live_with_its_handshake_and_bytes() {
 }
 
 #[test]
+fn the_local_network_reads_as_allowed_with_its_ranges_or_blocked() {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = Paths::under(dir.path());
+    let mut profile = whole(&paths.network, true);
+    let mut fake = Fake::new();
+    fake.keyring_has("key private-key", PRIVATE);
+    fake.names
+        .insert("vpn.example.com".to_owned(), vec!["198.51.100.7".parse().unwrap()]);
+    fake.ip = r#"[{"ifname":"wlp0s20f3","addr_info":[{"local":"192.168.1.23","prefixlen":24}]}]"#.to_owned();
+    let row = |now: &Status| {
+        rows(now, 0)
+            .into_iter()
+            .find(|row| row.label == "Local network")
+            .map(|row| row.value)
+    };
+    let off = read(&mut fake, &paths, &Ok(profile.clone()), false);
+    apply::on(&mut fake, &paths, &Plan::for_profile(&profile), None).expect("on");
+
+    let allowed = read(&mut fake, &paths, &Ok(profile.clone()), false);
+    profile.tunnel.as_mut().unwrap().allow_local_network = false;
+    apply::kill_switch_again(&mut fake, &paths, &Plan::for_profile(&profile)).expect("again");
+    let blocked = read(&mut fake, &paths, &Ok(profile), false);
+
+    assert_eq!(row(&off).as_deref(), Some("allowed"));
+    assert_eq!(row(&allowed).as_deref(), Some("allowed: 192.168.1.0/24"));
+    let tunnel = allowed.tunnel.as_ref().expect("the tunnel");
+    assert!(tunnel.allow_local_network);
+    assert_eq!(tunnel.local_networks, ["192.168.1.0/24"]);
+    assert_eq!(row(&blocked).as_deref(), Some("blocked"));
+    assert!(
+        blocked
+            .tunnel
+            .as_ref()
+            .is_some_and(|tunnel| tunnel.local_networks.is_empty())
+    );
+}
+
+#[test]
 fn not_live_the_helper_is_never_asked() {
     let dir = tempfile::tempdir().unwrap();
     let paths = Paths::under(dir.path());
@@ -76,6 +114,8 @@ fn the_shell_reads_camel_case_json() {
     let json = serde_json::to_string(&now).unwrap();
 
     assert!(json.contains("\"killSwitch\":true"), "{json}");
+    assert!(json.contains("\"allowLocalNetwork\":false"), "{json}");
+    assert!(json.contains("\"localNetworks\":[]"), "{json}");
     assert!(json.contains("\"rxBytes\":1"), "{json}");
     assert!(json.contains("\"dnsServers\":[]"), "{json}");
 }

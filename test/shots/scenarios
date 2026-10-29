@@ -29,6 +29,8 @@ controlcenter-kb-tooltip controlcenter  FrameShot   1176,0,424,1000   controlcen
 controlcenter-kb-drag    controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-drag
 controlcenter-kb-add     controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-add
 controlcenter-scanning   controlcenter  FrameShot   1176,0,424,1000   controlcenter scanning
+controlcenter-proxy      controlcenter  FrameShot   1176,0,424,1000   controlcenter proxy
+controlcenter-proxy-off  controlcenter  FrameShot   1176,0,424,1000   controlcenter proxy-lan-off
 clock                    clock          FrameShot   400,0,800,800     clock answer
 clock-settings           clock          FrameShot   400,0,800,800     clock settings
 sysmon                   sysmon         FrameShot   1176,0,424,1000   sysmon

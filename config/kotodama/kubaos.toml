@@ -70,10 +70,10 @@ kind = "scripts"
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
-# `notifications.dnd`, `power.panel-power-saving`, `nix.unfree`,
-# `kubaos.preview` and `bluetooth.unnamed`, true or false; `power.scheduler`
-# ("kernel", "lavd") and `power.low-battery` ("power-saver", "super-saver",
-# "off"). While a state can't be read, the action shows.
+# `proxy.local-network`, `notifications.dnd`, `power.panel-power-saving`,
+# `nix.unfree`, `kubaos.preview` and `bluetooth.unnamed`, true or false;
+# `power.scheduler` ("kernel", "lavd") and `power.low-battery` ("power-saver",
+# "super-saver", "off"). While a state can't be read, the action shows.
 #
 # A keyword the query equals ranks an action with the exact titles, above an
 # app whose name only has the query as a word. So an action about an app
@@ -896,6 +896,26 @@ icon = "network-vpn-disconnected"
 keywords = ["vpn", "wireguard", "work network", "disconnect", "tunnel", "proxy", "office"]
 run = ["kubaos-proxy", "off"]
 shown_when = { state = "proxy", is = true }
+
+# Whether a full tunnel's kill switch lets the network you're on through (on by
+# default): the phone link, printers, casting and SSH there. A range the
+# tunnel routes stays behind it, and no DNS lookup goes out beside the tunnel.
+# While the Proxy is on, it takes effect at once.
+[extensions.kubaos.actions.proxy-local-network-on]
+title = "Allow local network through the Proxy"
+subtitle = "The kill switch lets the network you're on through: the phone link, printers, casting, SSH"
+icon = "network-workgroup"
+keywords = ["vpn", "kill switch", "lan", "local network", "printer", "phone link", "casting", "proxy"]
+run = ["kubaos-proxy", "lan", "on"]
+shown_when = { state = "proxy.local-network", is = false }
+
+[extensions.kubaos.actions.proxy-local-network-off]
+title = "Block local network behind the Proxy"
+subtitle = "The kill switch lets nothing out but through the tunnel, the network you're on included"
+icon = "network-workgroup"
+keywords = ["vpn", "kill switch", "lan", "local network", "printer", "phone link", "casting", "proxy"]
+run = ["kubaos-proxy", "lan", "off"]
+shown_when = { state = "proxy.local-network", is = true }
 
 [extensions.kubaos.actions.proxy-import]
 title = "Import WireGuard config…"

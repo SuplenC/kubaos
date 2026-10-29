@@ -5,6 +5,7 @@
 //! [tunnel]
 //! conf = "wireguard.conf"     # written by `kubaos-proxy import`
 //! kill_switch = true          # a full tunnel blocks what would leave outside it
+//! allow_local_network = true  # but the network you're on
 //! vault_item = "kubaos-proxy" # the vault item with the keys
 //!
 //! [dns]
@@ -27,7 +28,8 @@
 //! # Owns
 //!
 //! - Reading and checking the profile ([`Profile::load`]), its values ([`ProxyUrl`], [`pac_ok`],
-//!   [`no_proxy_ok`]), and naming the tunnel's `.conf` in it ([`set_conf`]).
+//!   [`no_proxy_ok`]), naming the tunnel's `.conf` in it ([`set_conf`]), and the local network's
+//!   setting ([`local_network_allowed`], [`set_local_network`]).
 //!
 //! # Not here
 //!
@@ -50,6 +52,10 @@ use crate::wireguard::is_hostname;
 /// The vault item with the tunnel's keys, when the profile names none.
 pub const DEFAULT_VAULT_ITEM: &str = "kubaos-proxy";
 
+/// Whether the kill switch lets the local networks through when the profile doesn't say: on, so
+/// the phone link, printers and casting keep working while the Proxy is on.
+pub const DEFAULT_ALLOW_LOCAL_NETWORK: bool = true;
+
 /// What `no_proxy` always holds, the user's entries after it: the machine itself never goes
 /// through the proxy.
 pub const DEFAULT_NO_PROXY: [&str; 3] = ["localhost", "127.0.0.1", "::1"];
@@ -71,6 +77,7 @@ struct Raw {
 struct RawTunnel {
     conf: Option<String>,
     kill_switch: bool,
+    allow_local_network: bool,
     vault_item: String,
 }
 
@@ -79,6 +86,7 @@ impl Default for RawTunnel {
         RawTunnel {
             conf: None,
             kill_switch: true,
+            allow_local_network: DEFAULT_ALLOW_LOCAL_NETWORK,
             vault_item: DEFAULT_VAULT_ITEM.to_owned(),
         }
     }
@@ -112,6 +120,8 @@ pub struct Tunnel {
     pub config: Config,
     /// A full tunnel blocks everything that would leave outside it while it is up.
     pub kill_switch: bool,
+    /// The kill switch lets the local networks through ([`crate::local_network`]).
+    pub allow_local_network: bool,
     /// The file holds a key in plain text, which `status` warns of: the import keeps them out.
     pub keys_on_disk: bool,
 }
@@ -247,6 +257,7 @@ impl Profile {
                     file,
                     config: whole.sanitized(),
                     kill_switch: raw.tunnel.kill_switch,
+                    allow_local_network: raw.tunnel.allow_local_network,
                     keys_on_disk,
                 })
             }
@@ -283,6 +294,32 @@ impl Profile {
             .as_ref()
             .is_some_and(|tunnel| tunnel.kill_switch && tunnel.config.is_full())
     }
+
+    /// Whether the kill switch lets the local networks through: [`DEFAULT_ALLOW_LOCAL_NETWORK`]
+    /// without a tunnel.
+    pub fn allow_local_network(&self) -> bool {
+        self.tunnel
+            .as_ref()
+            .map_or(DEFAULT_ALLOW_LOCAL_NETWORK, |tunnel| tunnel.allow_local_network)
+    }
+}
+
+/// Whether the profile in `network` lets the local networks through the kill switch, read from
+/// `proxy.toml` alone: what the Command menu shows, whatever the files it names hold. No
+/// `proxy.toml` is [`DEFAULT_ALLOW_LOCAL_NETWORK`].
+///
+/// # Errors
+///
+/// The file can't be read, or isn't a profile.
+pub fn local_network_allowed(network: &Path) -> Result<bool, LoadError> {
+    let path = network.join(crate::paths::PROFILE);
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(DEFAULT_ALLOW_LOCAL_NETWORK),
+        Err(err) => return Err(LoadError::Read(path, err)),
+    };
+    let raw: Raw = toml::from_str(&text).map_err(LoadError::Toml)?;
+    Ok(raw.tunnel.allow_local_network)
 }
 
 /// `name` in `dir`, unless it is absolute or starts at the home (`~/`).
@@ -453,6 +490,22 @@ pub fn no_proxy_ok(entry: &str) -> bool {
 ///
 /// The profile can't be read or written, or isn't valid TOML.
 pub fn set_conf(path: &Path, conf: &str) -> Result<(), LoadError> {
+    set_tunnel(path, "conf", toml_edit::value(conf))
+}
+
+/// Sets whether the kill switch lets the local networks through in the profile at `path`, as
+/// [`set_conf`] keeps the rest.
+///
+/// # Errors
+///
+/// As [`set_conf`].
+pub fn set_local_network(path: &Path, allowed: bool) -> Result<(), LoadError> {
+    set_tunnel(path, "allow_local_network", toml_edit::value(allowed))
+}
+
+/// Sets `key` in `[tunnel]` of the profile at `path`, keeping everything else in it, comments
+/// included; a missing profile is made with that alone.
+fn set_tunnel(path: &Path, key: &str, item: toml_edit::Item) -> Result<(), LoadError> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
         Err(err) if err.kind() == io::ErrorKind::NotFound => String::new(),
@@ -465,7 +518,7 @@ pub fn set_conf(path: &Path, conf: &str) -> Result<(), LoadError> {
     let Some(tunnel) = tunnel.as_table_like_mut() else {
         return Err(value("tunnel", "a plain value", "a table, [tunnel]"));
     };
-    tunnel.insert("conf", toml_edit::value(conf));
+    tunnel.insert(key, item);
     write_atomic(path, &doc.to_string(), 0o644).map_err(|err| LoadError::Read(path.to_path_buf(), err))
 }
 

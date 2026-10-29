@@ -4,6 +4,7 @@ use super::session::gvariant_str;
 use super::session::sh_quote;
 use super::*;
 use crate::fake::Fake;
+use crate::paths::PKEXEC;
 use crate::plan::RootArg;
 use crate::plan::tests::whole;
 use crate::wireguard::tests::PRIVATE;
@@ -62,6 +63,7 @@ impl World {
         assert!(!self.paths.docker_record().exists(), "the Docker record");
         assert!(!self.paths.gnome_before().exists(), "GNOME's saved settings");
         assert!(!self.paths.env_before().exists(), "the saved variables");
+        assert!(!self.paths.kill_switch().exists(), "the kill switch's record");
         assert_eq!(applied(&self.paths), []);
         let docker = fs::read_to_string(self.paths.docker_config()).unwrap_or_default();
         assert!(!docker.contains("proxies"), "{docker}");
@@ -324,7 +326,7 @@ fn docker_gets_back_the_default_proxy_the_user_had() {
 fn a_part_that_fails_takes_every_part_before_it_away_again() {
     for failing in [
         "nm up",
-        "killswitch=on",
+        "killswitch=",
         "--user set-environment",
         "gsettings set org.gnome.system.proxy mode 'manual'",
     ] {
@@ -531,7 +533,7 @@ fn a_root_part_dropped_from_the_profile_goes_at_the_next_on() {
     world.on().expect("on");
     for part in &mut world.plan.parts {
         if let Part::Root(args) = part {
-            args.retain(|arg| *arg != RootArg::KillSwitch);
+            args.retain(|arg| !matches!(arg, RootArg::KillSwitch(_)));
         }
     }
 
@@ -653,6 +655,119 @@ fn a_split_tunnel_that_cant_come_back_takes_everything_down() {
     );
     assert!(!wanted(&world.paths));
     world.all_off();
+}
+
+/// What `ip -json address show up` says of a laptop on the network `local`, with the tunnel up.
+fn interfaces(local: &str, prefix: u8) -> String {
+    format!(
+        r#"[{{"ifname":"lo","addr_info":[{{"local":"127.0.0.1","prefixlen":8}}]}},
+            {{"ifname":"wlp0s20f3","addr_info":[{{"local":"{local}","prefixlen":{prefix}}}]}},
+            {{"ifname":"wg-kubaos","addr_info":[{{"local":"10.8.0.2","prefixlen":32}}]}}]"#
+    )
+}
+
+/// The helper's runs, each as its arguments.
+fn helper_runs(fake: &Fake) -> Vec<String> {
+    fake.ran
+        .iter()
+        .filter_map(|line| line.strip_prefix(&format!("{PKEXEC} --disable-internal-agent {HELPER} ")))
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn on_lets_the_network_youre_on_through_the_kill_switch() {
+    let mut world = world(true);
+    world.fake.ip = interfaces("192.168.1.23", 24);
+
+    world.on().expect("on");
+
+    let runs = helper_runs(&world.fake);
+    assert!(runs[0].starts_with("killswitch=lan|192.168.1.0/24 ca=- "), "{runs:?}");
+    assert_eq!(
+        local_networks_let_through(&world.paths),
+        [Cidr::parse("192.168.1.0/24").unwrap()]
+    );
+}
+
+#[test]
+fn a_network_the_tunnel_routes_stays_behind_the_kill_switch() {
+    let mut world = world(true);
+    world.fake.ip = interfaces("10.8.0.77", 16);
+
+    world.on().expect("on");
+
+    assert!(helper_runs(&world.fake)[0].starts_with("killswitch=lan| "));
+    assert!(local_networks_let_through(&world.paths).is_empty());
+}
+
+#[test]
+fn a_change_of_network_puts_the_kill_switch_up_again_alone() {
+    let mut world = world(true);
+    world.fake.ip = interfaces("192.168.1.23", 24);
+    set_wanted(&world.paths, true).unwrap();
+    world.on().expect("on");
+    world.fake.ran.clear();
+    world.fake.ip = interfaces("172.20.10.4", 28);
+
+    let moved = world.reconcile();
+    let again = world.reconcile();
+
+    assert!(
+        matches!(&moved, Reconciled::KillSwitchAgain(KillSwitch::LocalNetwork(networks))
+            if networks == &[Cidr::parse("172.20.10.0/28").unwrap()]),
+        "{moved:?}"
+    );
+    assert!(matches!(again, Reconciled::Nothing), "{again:?}");
+    assert_eq!(helper_runs(&world.fake), ["killswitch=lan|172.20.10.0/28"]);
+    world.all_on();
+}
+
+#[test]
+fn a_kill_switch_that_wont_go_up_again_keeps_what_it_let_through() {
+    let mut world = world(true);
+    world.fake.ip = interfaces("192.168.1.23", 24);
+    set_wanted(&world.paths, true).unwrap();
+    world.on().expect("on");
+    world.fake.ip = interfaces("172.20.10.4", 28);
+    world.fake.fail_on("killswitch=");
+
+    let done = world.reconcile();
+
+    assert!(matches!(done, Reconciled::KillSwitchKept(_)), "{done:?}");
+    assert_eq!(
+        local_networks_let_through(&world.paths),
+        [Cidr::parse("192.168.1.0/24").unwrap()]
+    );
+    world.all_on();
+}
+
+#[test]
+fn blocking_the_local_network_while_on_takes_effect_at_once() {
+    let mut world = world(true);
+    world.fake.ip = interfaces("192.168.1.23", 24);
+    world.on().expect("on");
+    world.fake.ran.clear();
+    world.profile.tunnel.as_mut().unwrap().allow_local_network = false;
+    let plan = Plan::for_profile(&world.profile);
+
+    let done = kill_switch_again(&mut world.fake, &world.paths, &plan).expect("again");
+
+    assert_eq!(done, Some(KillSwitch::Strict));
+    assert_eq!(helper_runs(&world.fake), ["killswitch=on"]);
+    assert!(local_networks_let_through(&world.paths).is_empty());
+}
+
+#[test]
+fn the_setting_changes_nothing_while_the_proxy_is_off() {
+    let mut world = world(true);
+    world.profile.tunnel.as_mut().unwrap().allow_local_network = false;
+    let plan = Plan::for_profile(&world.profile);
+
+    let done = kill_switch_again(&mut world.fake, &world.paths, &plan).expect("nothing to do");
+
+    assert_eq!(done, None);
+    assert!(world.fake.ran.is_empty(), "{:?}", world.fake.ran);
 }
 
 #[test]

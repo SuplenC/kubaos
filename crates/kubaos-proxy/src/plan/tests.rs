@@ -61,7 +61,7 @@ fn the_root_helper_gets_the_kill_switch_first_and_chrome_last() {
     assert_eq!(
         args,
         [
-            "killswitch=on".to_owned(),
+            "killswitch=lan|".to_owned(),
             "ca=-".to_owned(),
             "apt=http://proxy.corp.example.com:3128".to_owned(),
             format!("docker=http://proxy.corp.example.com:3128|{no_proxy}"),
@@ -69,6 +69,54 @@ fn the_root_helper_gets_the_kill_switch_first_and_chrome_last() {
             format!("chrome=proxy|http://proxy.corp.example.com:3128|{no_proxy}"),
         ]
     );
+}
+
+fn kill_switch_arg(plan: &Plan) -> Option<String> {
+    plan.kill_switch()
+        .map(|kill_switch| RootArg::KillSwitch(kill_switch.clone()).arg())
+}
+
+#[test]
+fn the_kill_switch_lets_the_local_networks_through_unless_the_profile_blocks_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut profile = whole(dir.path(), true);
+    let allowing = Plan::for_profile(&profile);
+    profile.tunnel.as_mut().unwrap().allow_local_network = false;
+
+    let blocking = Plan::for_profile(&profile);
+
+    assert_eq!(allowing.kill_switch(), Some(&KillSwitch::LocalNetwork(Vec::new())));
+    assert_eq!(blocking.kill_switch(), Some(&KillSwitch::Strict));
+    assert_eq!(kill_switch_arg(&blocking).as_deref(), Some("killswitch=on"));
+}
+
+#[test]
+fn the_kill_switch_gets_the_local_networks_but_those_the_tunnel_routes() {
+    let dir = tempfile::tempdir().unwrap();
+    let plan = Plan::for_profile(&whole(dir.path(), true));
+    let found: Vec<Cidr> = ["192.168.1.23/24", "fd00:1:2:3::9/64", "10.8.0.9/24"]
+        .iter()
+        .map(|text| Cidr::parse(text).unwrap())
+        .collect();
+
+    let plan = plan.with_local_networks(&found);
+
+    assert_eq!(
+        kill_switch_arg(&plan).as_deref(),
+        Some("killswitch=lan|192.168.1.0/24,fd00:1:2:3::/64")
+    );
+}
+
+#[test]
+fn a_blocking_kill_switch_gets_no_local_network() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut profile = whole(dir.path(), true);
+    profile.tunnel.as_mut().unwrap().allow_local_network = false;
+    let found = [Cidr::parse("192.168.1.23/24").unwrap()];
+
+    let plan = Plan::for_profile(&profile).with_local_networks(&found);
+
+    assert_eq!(kill_switch_arg(&plan).as_deref(), Some("killswitch=on"));
 }
 
 #[test]
@@ -80,7 +128,7 @@ fn a_split_tunnel_has_no_kill_switch() {
     let Some(Part::Root(args)) = plan.parts.iter().find(|part| part.kind() == Kind::Root) else {
         panic!("a root part");
     };
-    assert!(!args.contains(&RootArg::KillSwitch));
+    assert!(!args.iter().any(|arg| matches!(arg, RootArg::KillSwitch(_))));
 }
 
 #[test]
