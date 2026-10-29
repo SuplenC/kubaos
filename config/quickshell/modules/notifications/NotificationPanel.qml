@@ -252,7 +252,11 @@ K.Sheet {
                     root.inner = group.count - 1;
                 return;
             }
-            if (event.key === Qt.Key_Right || event.key === Qt.Key_L)
+            const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter;
+            if (enter && (event.modifiers & Qt.ShiftModifier)) {
+                if (!event.isAutoRepeat)
+                    root.currentGroup()?.runMain();
+            } else if (event.key === Qt.Key_Right || event.key === Qt.Key_L)
                 root.openCurrent(true);
             else if (event.key === Qt.Key_Left || event.key === Qt.Key_H)
                 root.openCurrent(false);
@@ -398,6 +402,10 @@ K.Sheet {
 
                 K.KeyHints {
                     hints: [["↑ ↓", "Move"], ["↵", "Unfold or open"]]
+                }
+
+                K.KeyHints {
+                    hints: [["⇧↵", "Run its main action"]]
                 }
 
                 K.KeyHints {

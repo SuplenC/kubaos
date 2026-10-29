@@ -171,6 +171,12 @@ Item {
         root.cards[root.isOpen ? Math.max(0, root.current) : 0]?.press();
     }
 
+    // What Shift+Enter on the group does: runs the main action of the card the keyboard is on, the
+    // newest while it is a stack. Whether there was one.
+    function runMain(): bool {
+        return root.cards[root.isOpen ? Math.max(0, root.current) : 0]?.runMain() ?? false;
+    }
+
     function place(index: int, card: Item): void {
         const next = root.cards.slice();
         next[index] = card;

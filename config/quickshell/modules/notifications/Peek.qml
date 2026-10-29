@@ -5,7 +5,7 @@ import "feed.js" as Feed
 
 // The bell's peek, in the popups' place: the most recent unread notifications as the popups'
 // cards, one app's in a group (`CardGroup.qml`), then "+N more" (which opens the panel) and two
-// one-click actions on what it shows, Mark read and Clear. Looking marks nothing read; a click on
+// one-click actions on what it shows, Mark all read and Clear. Looking marks nothing read; a click on
 // a group opens it, a click on a card unfolds its text, its buttons run its actions, and its ×
 // dismisses it. A group's preview floats past the peek's end (`overhang`), which the popups make
 // room for.
@@ -126,7 +126,7 @@ Item {
             K.Fill {}
 
             K.Button {
-                text: "Mark read"
+                text: Feed.MARK_ALL
                 kind: "Text"
                 size: "Sm"
                 activeFocusOnTab: false

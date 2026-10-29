@@ -68,6 +68,10 @@ TestCase {
         compare(sections.earlier.map(idsOf), [[3, 1]]);
     }
 
+    function test_the_peek_s_footer_marks_all_read_worded_apart_from_a_card_s_mark_read() {
+        compare(Feed.MARK_ALL, "Mark all read");
+    }
+
     function test_the_peek_shows_the_three_most_recent_unread() {
         const history = [note(6, "A"), note(5, "B"), note(4, "C"), note(3, "D"), note(2, "E"), note(1, "F")];
 

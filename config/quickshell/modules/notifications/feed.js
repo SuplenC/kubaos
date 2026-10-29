@@ -7,6 +7,10 @@
 // How many cards the peek shows at most.
 const PEEK = 3;
 
+// The peek's footer button, which marks every card it shows read: worded apart from each unread
+// card's own "Mark read".
+const MARK_ALL = "Mark all read";
+
 // Who a notification is from, which its stack goes by.
 function appOf(notification) {
     return notification.appName || notification.desktopEntry || "";
