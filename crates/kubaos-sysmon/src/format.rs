@@ -1,4 +1,4 @@
-//! Sizes and times as alerts and the Command menu write them: `9.1 GB`, `3 h 12 min`. The popup
+//! Sizes and times as alerts and the Command menu write them: `9.1 GB`, `3 h 12 min`. The panel
 //! writes them the same way in QML (`config/quickshell/services/Sysmon.qml`).
 //!
 //! # Owns

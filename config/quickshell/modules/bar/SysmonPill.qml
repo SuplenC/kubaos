@@ -5,7 +5,7 @@ import qs.services
 
 // The system monitor in the bar: the metrics the settings pick (CPU and RAM by default) as
 // numbers, tiny bars or sparklines, the warning colour close to a limit and the error colour past
-// it, with a red drive when a disk is nearly full. Click opens the monitor's popup; right-click
+// it, with a red drive when a disk is nearly full. Click opens the monitor's panel; right-click
 // offers Hide.
 Pill {
     id: root

@@ -55,8 +55,9 @@ K.Sheet {
         drawer: root
         notifications: (root.shown || root.active) && !root.showingPeek ? Notifs.popups.slice(0, 5) : []
         // HAZARD: the cards go at once when a panel covers them, not with the
-        // surface's fade. The sysmon and clock popups show their text within
-        // a few frames of opening, long before this panel's content has faded.
+        // surface's fade. The system monitor and the clock popup show their text
+        // within a few frames of opening, long before this panel's content has
+        // faded.
         opacity: root.covered ? 0 : 1
     }
 

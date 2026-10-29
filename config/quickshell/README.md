@@ -16,12 +16,12 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
   | Command menu (Kotodama) | Its own window on the focused screen, centred, with two fifths of the free height above it. Its width and rows follow the screen; on screens at least 1472 logical pixels wide it has a detail pane |
   | Control center | Side sheet on the right |
   | Notifications panel | Side sheet on the right, in the control center's place; one or the other |
+  | System monitor | Side sheet on the right, in the same place as the two above; one of the three |
   | Power menu | Column on the right edge |
   | Wallpaper picker | Rises from the bottom |
   | OSD | Small bar rising from the bottom |
   | Notification popups and the bell's peek | Top-right corner. While a panel reaching into that corner is open (control center, notifications panel, system monitor, power menu, or the clock popup or wallpaper picker on a narrow screen), they wait and come back when it closes; a critical one shows out of the right edge under the panel, or waits too if the panel reaches the bottom |
   | Clock popup | Under the bar's clock |
-  | System monitor | Under the bar's right end, by its pill |
 
 - **Density:** sized for Full HD at scale 1 (the laptop runs at 1.5, see `config/hypr/monitors.lua`): a 40 px bar (`size.bar`) of 32 px pills, 14 px body text.
 - **Panels over windows:** only the frame reserves space (the bar's 40 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (`opacity.panel_scrim`, 20%; the power menu as a dialog does, `opacity.scrim`, 60%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
@@ -63,11 +63,11 @@ Quickshell hot-reloads on save. `~/.config/quickshell` is a read-only copy (`hom
 | `qs ipc call clock search <text>` | The clock popup with a date search typed in |
 | `qs ipc call clock timer <duration>` / `alarm <time>` / `stopwatch` | Start a timer, set an alarm, start or stop the stopwatch |
 | `qs ipc call clock status` | The engine, timer, stopwatch, alarms and whether the popup is open (JSON) |
-| `qs ipc call sysmon toggle` / `open` | The system monitor's popup under the bar's pill |
-| `qs ipc call sysmon process <pid>` | The popup on a process's details, with End and Kill |
+| `qs ipc call sysmon toggle` / `open` | The system monitor's panel, out of the right edge |
+| `qs ipc call sysmon process <pid>` | The panel on a process's details, with End and Kill |
 | `qs ipc call sysmon pill <on\|off\|toggle>` | The bar's monitor pill, remembered in `sysmon.toml` |
 | `qs ipc call sysmon act <action>` | What an alert's button runs: `open`, `process:<pid>`, `files:<mount>`, `power-saver` |
-| `qs ipc call sysmon status` | The engine, its sampling mode, the pill's settings, whether a sample came, whether the popup is open (JSON) |
+| `qs ipc call sysmon status` | The engine, its sampling mode, the pill's settings, whether a sample came, whether the panel is open (JSON) |
 
 All handlers live in `IpcHandlers.qml`. `docs/CONTRACTS.md` is the source of truth.
 
@@ -97,8 +97,8 @@ services/               singletons, no UI
   Time                  the clock engine (`kubaos-clock serve`, line JSON), clock.toml (watched),
                         the timer, stopwatch and alarms
   Sysmon                the system monitor's stream (`kubaos-sysmon serve`, line JSON, paced by
-                        the popup and the lock), the graphs' last minute, sysmon.toml (watched),
-                        alerts as notifications
+                        the panel and the lock), the graphs' last minute, sysmon.toml (watched),
+                        alerts as notifications, the readings' colour steps (sysmon.js)
 components/             blocks composed from KubaOS.Components
   Pill                  the bar's pill: a row of content, hover, click, right-click and wheel
   NavList               the keyboard list over K.ListRow rows
@@ -126,8 +126,9 @@ modules/
   clock/                ClockPopup (the bar clock's popup), the month on K.Calendar (month and year views),
                         AnalogFace, Tools (timer, stopwatch, alarms), ClockSettings, Chip,
                         Figure (a ticking number in a box as wide as its widest digits)
-  sysmon/               SysmonPopup (the monitor pill's popup), Section, Processes (top five,
-                        details, End and Kill)
+  sysmon/               SysmonPanel (the monitor pill's side panel), Section (a reading's card),
+                        Processes, ProcessRow and ProcessDetails (the busiest, details, End and
+                        Kill), panel.js (its subtitle and rows)
   wallpaper/            Wallpaper (background, crossfade, preview), WallpaperPicker,
                         WallpaperSettings (the picker's Settings tab)
   polkit/               Polkit agent + dialog (off by default)
@@ -156,7 +157,7 @@ Every panel works without a mouse. Esc closes it.
 - Control center: Tab/Shift+Tab move between controls, Enter/Space toggle a tile, h/l or arrows move sliders and tabs, 1-4 jump to a tab, j/k move in lists.
 - Notifications panel: ↑↓ (j/k) move, Enter opens, → (l) opens a stack and ← (h) folds it, Delete dismisses, D turns Do not disturb on or off, Esc closes.
 - Clock popup (click the bar's clock): type a date or date maths to search, Enter copies the answer, Ctrl+Enter copies it as ISO. With nothing typed, Left/Right or the wheel change month and T goes to today; clicking the month name opens the year view. Esc leaves the settings page or the year view, then closes.
-- System monitor (click the bar's monitor pill, right-click it to hide it): click a process for its details, then End or Kill and confirm. Esc closes.
+- System monitor (click the bar's monitor pill, right-click it to hide it): click a process for its details, then End or Kill and confirm; the info button in the bottom right corner shows uptime, the kernel and the load. Esc closes.
 - Power menu: h/j/k/l, arrows or Tab, then Enter.
 - Wallpaper picker: h/j/k/l or arrows move (the desktop previews the selection), Tab switches folder, S opens Settings, Enter applies, Esc goes back to the current wallpaper.
 - Wallpaper settings (the picker's last tab): Tab/Shift+Tab or Up/Down between rows, Left/Right change a value (Shift: 10 steps), Home/End to the ends, Space toggles, Enter activates or edits a colour, Delete resets to the default, Esc back to the wallpapers.

@@ -967,6 +967,7 @@ folder_open = { tabler = "folder-open" }
 hard_drive = { drawn = "A drive's case in server-2's proportions, its board below a line, server-2's light and slot" }
 headphones = { tabler = "headphones" }
 hourglass_top = { tabler = "hourglass-high" }
+info = { tabler = "info-circle" }
 key = { tabler = "key" }
 keyboard = { tabler = "keyboard" }
 keyboard_command_key = { tabler = "command" }

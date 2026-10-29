@@ -162,6 +162,8 @@ QtObject {
         })
     readonly property int tempLevel: level(sample?.cpu?.temp, thresholds.cpuTemp, 10)
     readonly property int ramLevel: level(sample?.memory?.percent, thresholds.ram, 10)
+    readonly property int drawLevel: sample?.battery?.status === "Discharging" ? root.level(root.sample.battery.watts, thresholds.batteryDraw, 5) : 0
+    readonly property int worstLevel: Math.max(tempLevel, ramLevel, drawLevel, ...(sample?.disks ?? []).map(d => root.diskLevel(d)))
     readonly property var fullDisks: (sample?.disks ?? []).filter(d => d.percent > thresholds.disk)
 
     signal processRequested(int pid)
@@ -224,6 +226,10 @@ QtObject {
         if (value === null || value === undefined)
             return 0;
         return value > threshold ? 2 : value > threshold - margin ? 1 : 0;
+    }
+
+    function diskLevel(disk: var): int {
+        return root.level(disk?.percent, root.thresholds.disk, 5);
     }
 
     function metric(name: string): var {

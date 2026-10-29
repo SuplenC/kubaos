@@ -4,14 +4,15 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.settings
+import "sysmon.js" as Levels
 
-// The system monitor's state: the bar's pill, the popup and the alerts all
+// The system monitor's state: the bar's pill, the panel and the alerts all
 // read the one stream.
 //
 // Samples come from `kubaos-sysmon serve`, one process for the shell's life,
 // which reads /proc and /sys itself: a sample costs a line, not a process.
 // The shell tells it the pace: every 2 s for the pill, every second while the
-// popup is open, and nothing while the screen is locked or nothing shows. A
+// panel is open, and nothing while the screen is locked or nothing shows. A
 // request is a line of JSON on its stdin; the reply a line with its id. The
 // settings file (~/.config/kubaos/desktop/sysmon/sysmon.toml) is watched, so a change
 // from the Command menu shows at once.
@@ -74,7 +75,7 @@ Singleton {
         })
     property int revision: 0
 
-    // The process the popup shows the details of, as `qs ipc call sysmon
+    // The process the panel shows the details of, as `qs ipc call sysmon
     // process` or an alert asked, until it opens.
     property int pendingPid: 0
 
@@ -94,7 +95,7 @@ Singleton {
         Panels.toggle("sysmon");
     }
 
-    // Opens the popup on process `pid`'s details.
+    // Opens the panel on process `pid`'s details.
     function showProcess(pid: int): void {
         pendingPid = pid;
         Panels.open("sysmon");
@@ -168,13 +169,18 @@ Singleton {
     // The colour step of a reading: 0 fine, 1 close to the threshold
     // (amber), 2 over it (red).
     function level(value: var, threshold: real, margin: real): int {
-        if (value === null || value === undefined)
-            return 0;
-        return value > threshold ? 2 : value > threshold - margin ? 1 : 0;
+        return Levels.level(value, threshold, margin);
     }
 
-    readonly property int tempLevel: level(sample?.cpu?.temp, thresholds.cpuTemp, 10)
-    readonly property int ramLevel: level(sample?.memory?.percent, thresholds.ram, 10)
+    function diskLevel(disk: var): int {
+        return Levels.diskLevel(disk, thresholds);
+    }
+
+    readonly property int tempLevel: Levels.tempLevel(sample, thresholds)
+    readonly property int ramLevel: Levels.ramLevel(sample, thresholds)
+    readonly property int drawLevel: Levels.drawLevel(sample, thresholds)
+    // The worst of them all, the disks' included: what the panel's subtitle says.
+    readonly property int worstLevel: Levels.worst(sample, thresholds)
     readonly property var fullDisks: (sample?.disks ?? []).filter(d => d.percent > thresholds.disk)
 
     // A pill metric: its icon, its text, a 0..1 fill for the bars, its
@@ -193,7 +199,7 @@ Singleton {
         case "net":
             return { icon: "swap_vert", text: s?.net?.down != null ? rate(s.net.down + (s.net.up ?? 0)) : "–", fill: 0, level: 0, series: "net", max: 0 };
         case "power":
-            return { icon: "bolt", text: s?.battery?.watts != null ? `${s.battery.watts.toFixed(1)} W` : "–", fill: (s?.battery?.watts ?? 0) / Math.max(1, thresholds.batteryDraw), level: level(s?.battery?.watts, thresholds.batteryDraw, 5), series: "power", max: 0 };
+            return { icon: "bolt", text: s?.battery?.watts != null ? `${s.battery.watts.toFixed(1)} W` : "–", fill: (s?.battery?.watts ?? 0) / Math.max(1, thresholds.batteryDraw), level: drawLevel, series: "power", max: 0 };
         }
         return null;
     }
