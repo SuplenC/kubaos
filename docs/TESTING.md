@@ -212,6 +212,7 @@ On a quieter machine the cold test build takes about 70 s. Running the tests tak
 | `nextest (slow)` | that one test, `cargo nextest run -p kubaos-kobo`: two to three minutes alone, longer than all the others together |
 | `qml` | `just qml-test` |
 | `design` | `just design-check`, with QML's parity |
+| `system files` | `just system-files-check`'s two scripts, straight on the runner with no Nix (they need only bash and git), on the whole history for the merge base with main |
 | `check (x86_64-linux)` | after all of them: fails unless every one passed, cancelled and skipped included |
 
 `check (x86_64-linux)` is the one check branch protection on main requires, so a job added to the workflow goes in its `needs`. The two nextest jobs split the tests with one nextest filter, `SLOW_TEST` in the workflow, negated in `nextest`, so every test runs in exactly one of them; a renamed test matches nothing, and `nextest (slow)` fails for running no test.

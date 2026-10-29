@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# test/system-files/check: fails when a branch changes a file the system
+# scripts install (system/files/) and adds no system migration that installs
+# it again. kubaos update reaches an installed machine's system side only
+# through migrations/system/, so without one the machine keeps the old copy.
+#
+#   test/system-files/check [--base REV] REPO
+#
+# Also holds system/files.map to the tree: every file under system/files/ has
+# a line, every line matches a file, and every installer it names exists and
+# mentions the file. The branch's changes are REPO's working tree, untracked
+# files too, against its merge base with REV (origin/main); a migration counts
+# when it is new since then and names one of the file's installers, its path
+# under system/files/ or its name. Needs bash and git.
+set -euo pipefail
+
+base_ref=origin/main
+while (($#)); do
+  case "$1" in
+    --base) base_ref="${2:?--base takes a revision}"; shift ;;
+    -h | --help) sed -n '2,14p' "$0" | cut -c3-; exit 0 ;;
+    -*) echo "test/system-files/check: unknown option $1" >&2; exit 2 ;;
+    *) break ;;
+  esac
+  shift
+done
+REPO="$(cd "${1:?usage: test/system-files/check [--base REV] REPO}" && pwd)"
+MAP="$REPO/system/files.map"
+failed=0
+
+fail() {
+  printf 'system files: %s\n' "$*" >&2
+  failed=1
+}
+
+# The map's lines, as "PATTERN<TAB>INSTALLER..." with comments and blanks gone.
+mapfile -t entries < <(awk '!/^[[:space:]]*(#|$)/ { p = $1; $1 = ""; sub(/^ /, ""); print p "\t" $0 }' "$MAP")
+
+# installers_of PATH: what the first matching line says installs PATH, or
+# nothing when no line matches.
+installers_of() {
+  local e
+  for e in "${entries[@]}"; do
+    # shellcheck disable=SC2053 # The pattern is a glob on purpose.
+    if [[ $1 == ${e%%$'\t'*} ]]; then
+      printf '%s\n' "${e#*$'\t'}"
+      return
+    fi
+  done
+}
+
+# The text of FUNCTION's definition in system/*.sh, or nothing when no script
+# defines it.
+function_text() {
+  awk -v f="$1" '$0 ~ "^" f "\\(\\) *\\{" { on = 1 } on { print } on && /^}/ { exit }' "$REPO"/system/*.sh
+}
+
+is_keyword() { [[ $1 == update || $1 == in-place || $1 == source || $1 == image ]]; }
+
+# installer_mentions TEXT PATH: TEXT names PATH under system/files/, or the
+# folder it is in, which a loop or install_dir takes whole.
+installer_mentions() {
+  local dir
+  dir="$(dirname -- "$2")"
+  [[ $1 == *"$2"* || $1 == *"$dir/"* || $1 == *"$dir\""* ]]
+}
+
+# Every file has a line, and what the line names installs it.
+cd "$REPO"
+mapfile -t files < <(git ls-files --cached --others --exclude-standard -- system/files | sort -u)
+present=()
+for f in "${files[@]}"; do
+  [[ -f $f ]] && present+=("${f#system/files/}")
+done
+for f in "${present[@]}"; do
+  read -ra who <<<"$(installers_of "$f")"
+  if ((${#who[@]} == 0)); then
+    fail "system/files/$f has no line in system/files.map: add what installs it on a machine"
+    continue
+  fi
+  is_keyword "${who[0]}" && continue
+  for w in "${who[@]}"; do
+    if [[ $w == system/*.sh ]]; then
+      [[ -f $w ]] || { fail "system/files.map: $w, which installs system/files/$f, doesn't exist"; continue; }
+      text="$(<"$w")"
+    else
+      text="$(function_text "$w")"
+      [[ -n $text ]] || { fail "system/files.map: no system/*.sh defines $w, which installs system/files/$f"; continue; }
+    fi
+    installer_mentions "$text" "$f" || fail "system/files.map: $w doesn't install system/files/$f"
+  done
+done
+for e in "${entries[@]}"; do
+  pattern="${e%%$'\t'*}"
+  read -ra who <<<"${e#*$'\t'}"
+  if ((${#who[@]} > 1)); then
+    for w in "${who[@]}"; do
+      is_keyword "$w" && fail "system/files.map: $pattern mixes the word $w with installers"
+    done
+  fi
+  matched=0
+  for f in "${present[@]}"; do
+    # shellcheck disable=SC2053 # The pattern is a glob on purpose.
+    [[ $f == $pattern ]] && { matched=1; break; }
+  done
+  ((matched)) || fail "system/files.map: $pattern matches no file under system/files/"
+done
+
+# The branch's changes against the merge base.
+base="$(git merge-base "$base_ref" HEAD 2>/dev/null)" ||
+  { echo "system files: no merge base with $base_ref (fetch it, or pass --base)" >&2; exit 2; }
+mapfile -t changed < <(
+  {
+    git diff --no-renames --name-only "$base" -- system/files
+    git ls-files --others --exclude-standard -- system/files
+  } | sort -u
+)
+mapfile -t migrations < <(
+  {
+    git diff --no-renames --name-only --diff-filter=A "$base" -- 'migrations/system/*.sh'
+    git ls-files --others --exclude-standard -- 'migrations/system/*.sh'
+  } | sort -u
+)
+migration_text=""
+for m in "${migrations[@]}"; do
+  [[ -f $m ]] && migration_text+="$(<"$m")"$'\n'
+done
+
+for f in "${changed[@]}"; do
+  rel="${f#system/files/}"
+  read -ra who <<<"$(installers_of "$rel")"
+  ((${#who[@]})) && is_keyword "${who[0]}" && continue
+  covered=0
+  for name in "${who[@]}" "$rel" "$(basename -- "$rel")"; do
+    [[ $name == system/*.sh ]] && continue
+    [[ $migration_text == *"$name"* ]] && { covered=1; break; }
+  done
+  ((covered)) && continue
+  if [[ ! -e $f ]]; then
+    fail "$f is gone, and installed machines keep it: add a system migration (just migration system <slug>) that removes it"
+  elif ((${#who[@]} == 0)); then
+    : # Reported above, as a file with no line in the map.
+  else
+    how=""
+    for w in "${who[@]}"; do
+      if [[ $w == system/*.sh ]]; then
+        how+="${how:+, or }install it as $w does (install_root_file), naming system/files/$rel"
+      else
+        how+="${how:+, or }call $w"
+      fi
+    done
+    fail "$f changed, and no new system migration installs it on machines installed before: add one (just migration system <slug>) that sources system/lib.sh and $how"
+  fi
+done
+
+if ((failed)); then
+  echo "system files: see docs/agents/code-quality.md, \"Shell\", on changing an installed system file" >&2
+  exit 1
+fi
+echo "system files: ok (${#present[@]} files mapped, ${#changed[@]} changed since ${base:0:12}, ${#migrations[@]} new system migrations)"
