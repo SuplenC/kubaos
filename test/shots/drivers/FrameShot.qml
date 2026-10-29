@@ -265,7 +265,8 @@ QtObject {
             const stack = panel.rows.find(row => row.stacked);
             panel.setExpanded(stack.key, true);
             const list = driver.find(panel, it => typeof it.jump === "function");
-            list.currentIndex = panel.rows.findIndex(row => row.key === stack.key) + 1;
+            list.currentIndex = panel.rows.findIndex(row => row.key === stack.key);
+            panel.inner = 1;
         }
     }
 

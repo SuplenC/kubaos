@@ -100,6 +100,11 @@ Singleton {
             notification.expire();
     }
 
+    function hidePopups(list: var): void {
+        for (const n of list.slice())
+            root.hidePopup(n);
+    }
+
     // Runs `action`, one of `notification`'s, and marks it read. A notification that isn't
     // resident goes as its action is taken.
     // HAZARD: invoke before anything closes it. Closing a notification destroys it, and a destroyed

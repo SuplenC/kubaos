@@ -12,6 +12,13 @@ QtObject {
 
     signal finished
 
+    // From the whole time again, as for a newer notification taking the card.
+    function restart(): void {
+        root.remaining = 1;
+        if (root.running)
+            root.animation.restart();
+    }
+
     property NumberAnimation animation: NumberAnimation {
         target: root
         property: "remaining"

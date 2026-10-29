@@ -8,8 +8,9 @@ import KubaOS.Components as K
 //
 //   toast probe: panel=X,Y,W,H ... stack=EDGE,CARDS,X,Y,W,H ...
 //
-// A panel is listed while any of it is on screen; CARDS counts the cards a
-// stack draws now (0 while it or its cards are faded out).
+// A panel is listed while any of it is on screen; CARDS counts the
+// notifications a stack shows now, each of a group's (0 while it or its cards
+// are faded out).
 Timer {
     id: probe
 

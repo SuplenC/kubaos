@@ -6,10 +6,11 @@ import qs.services
 import qs.components
 import "feed.js" as Feed
 
-// One notification, or a stack of one app's, the same card in the popups, the bell's peek and the
-// notifications panel: `CardFace` fed from the notification, its buttons wired to it. As a popup it
-// hides itself after the timeout (stopped while the pointer is on it; a thin line along the bottom
-// shows the time left).
+// One notification, or the newest of a group standing for the whole of it, the same card in the
+// popups, the bell's peek and the notifications panel: `CardFace` fed from the notification, its
+// buttons wired to it. As a popup it hides itself, and what it stands for, after the timeout
+// (stopped while the pointer is on it; a thin line along the bottom shows the time left), from
+// the whole time again when a newer notification takes it.
 //
 // The card is one step above what holds it, its corners the panel's surface radius 8 in.
 CardFace {
@@ -17,7 +18,7 @@ CardFace {
 
     // The newest of `items`, which the card shows.
     required property Notification notification
-    // The notifications the card stands for, newest first: one, or a stack.
+    // The notifications the card stands for, newest first: one, or a group.
     property var items: [root.notification]
     // Whether something keeps it, as its open menu does: a popup waits while it is held.
     property bool held: false
@@ -39,6 +40,8 @@ CardFace {
         Notifs.markRead(root.items);
         Notifs.run(root.notification, action);
     }
+
+    onNotificationChanged: countdown.restart()
 
     function dismiss(): void {
         Notifs.dismissAll(root.items);
@@ -91,6 +94,6 @@ CardFace {
         running: root.popup && !root.critical
         held: root.pointed || root.held
         duration: root.timeout
-        onFinished: Notifs.hidePopup(root.notification)
+        onFinished: Notifs.hidePopups(root.items)
     }
 }
