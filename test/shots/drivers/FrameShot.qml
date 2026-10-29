@@ -26,7 +26,7 @@ import qs.modules.frame
 //   sysmon: "" (a disk close to full: Breaking a sweat), fine (every reading fine), critical (the
 //           CPU over its limit), loading (the processes still counted), bare (no GPU, battery
 //           or fan), scrolled (scrolled down to the processes, as a short screen shows them),
-//           process (a process's details, scrolled down to them)
+//           process (a process's details, scrolled down to them), kill (its Kill asking first)
 //   wallpaper: settings
 //   osd: volume, brightness
 //   notifications: "" (two popups), peek (the bell's peek, every one unread, so "+N more"),
@@ -134,7 +134,7 @@ QtObject {
             driver.measure("panel opening");
         if (driver.panel === "controlcenter")
             driver.controlCenter(root);
-        if (driver.panel === "sysmon" && (driver.state === "scrolled" || driver.state === "process"))
+        if (driver.panel === "sysmon" && ["scrolled", "process", "kill"].includes(driver.state))
             sysmonPose.start();
         if (driver.panel === "clock" && driver.state === "settings") {
             const clock = driver.find(root, it => it.page !== undefined && typeof it.land === "function");
@@ -196,15 +196,19 @@ QtObject {
             s.fans = [];
         }
         Sysmon.sample = s;
-        if (driver.state === "process")
+        if (driver.state === "process" || driver.state === "kill")
             Sysmon.pendingPid = 4211;
     }
 
-    // The system monitor scrolled to its end once it has opened, through its `K.Scroll`.
+    // The system monitor scrolled to its end once it has opened, through its `K.Scroll`, and for
+    // `kill` the shown process's Kill asking first.
     property Timer sysmonPose: Timer {
         interval: 700
         onTriggered: {
             const panel = driver.find(driver.window.contentItem, it => it.lastDetailed !== undefined);
+            const processes = panel ? driver.find(panel, it => it.confirming !== undefined) : null;
+            if (driver.state === "kill" && processes)
+                processes.confirming = "kill";
             const scroll = panel ? driver.find(panel, it => it.travel !== undefined && it.contentY !== undefined) : null;
             if (scroll)
                 scroll.contentY = scroll.travel;

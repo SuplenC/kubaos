@@ -35,6 +35,7 @@ sysmon-loading           sysmon         FrameShot   1176,0,424,1000   sysmon loa
 sysmon-bare              sysmon         FrameShot   1176,0,424,1000   sysmon bare
 sysmon-scrolled          sysmon         FrameShot   1176,0,424,1000   sysmon scrolled
 sysmon-process           sysmon         FrameShot   1176,0,424,1000   sysmon process
+sysmon-kill              sysmon         FrameShot   1176,0,424,1000   sysmon kill
 wallpaper                wallpaper      FrameShot   200,440,1200,560  wallpaper
 wallpaper-settings       wallpaper      FrameShot   200,440,1200,560  wallpaper settings
 powermenu                powermenu      FrameShot   1160,260,440,480  powermenu

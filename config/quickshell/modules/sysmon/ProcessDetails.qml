@@ -34,68 +34,69 @@ K.Stack {
         space: K.Tokens.space.s4
     }
 
+    // One row in both states: the button pressed turns into its confirmation where it is, so it
+    // stays under the pointer, the other holds still and rests, and the question and Cancel come
+    // in after them.
     K.Row {
-        visible: root.owner.confirming === ""
+        fill: true
         gap: K.Tokens.space.s8
         align: "centre"
 
         K.Button {
             text: "End"
-            kind: "Tonal"
+            kind: root.owner.confirming === "term" ? "Filled" : "Tonal"
             size: "Sm"
+            enabled: root.owner.confirming !== "kill"
             activeFocusOnTab: false
-            onActivated: root.owner.confirming = "term"
+            onActivated: {
+                if (root.owner.confirming === "term")
+                    root.owner.stop();
+                else
+                    root.owner.confirming = "term";
+            }
 
             K.Hint {
                 text: "Ask it to quit; it may save its work first"
-                shown: parent.pointerOver
+                shown: parent.pointerOver && root.owner.confirming === ""
             }
         }
 
         K.Button {
             text: "Kill"
-            kind: "Text"
+            kind: root.owner.confirming === "kill" ? "Danger" : "Text"
             size: "Sm"
+            enabled: root.owner.confirming !== "term"
             activeFocusOnTab: false
-            onActivated: root.owner.confirming = "kill"
+            onActivated: {
+                if (root.owner.confirming === "kill")
+                    root.owner.stop();
+                else
+                    root.owner.confirming = "kill";
+            }
 
             K.Hint {
                 text: "Stop it at once; unsaved work is lost"
-                shown: parent.pointerOver
+                shown: parent.pointerOver && root.owner.confirming === ""
             }
         }
-    }
-
-    K.Row {
-        visible: root.owner.confirming !== ""
-        fill: true
-        gap: K.Tokens.space.s8
-        align: "centre"
 
         K.Text {
+            readonly property bool fillWidth: true
+
+            visible: root.owner.confirming !== ""
             text: root.process ? `${root.owner.confirming === "kill" ? "Kill" : "End"} ${root.process.name}?` : ""
             style: K.Tokens.type.body_strong
             color: root.owner.confirming === "kill" ? K.Tokens.color.error : K.Tokens.color.on_surface
             maximumLines: 1
         }
 
-        K.Fill {
-        }
-
         K.Button {
+            visible: root.owner.confirming !== ""
             text: "Cancel"
             kind: "Text"
             size: "Sm"
             activeFocusOnTab: false
             onActivated: root.owner.confirming = ""
-        }
-
-        K.Button {
-            text: root.owner.confirming === "kill" ? "Kill" : "End"
-            kind: root.owner.confirming === "kill" ? "Danger" : "Filled"
-            size: "Sm"
-            activeFocusOnTab: false
-            onActivated: root.owner.stop()
         }
     }
 
