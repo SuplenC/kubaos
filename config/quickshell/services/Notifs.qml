@@ -83,17 +83,26 @@ Singleton {
             notification.expire();
     }
 
-    // Runs the default action if there is one, and marks it read. A notification that isn't
+    // Runs `action`, one of `notification`'s, and marks it read. A notification that isn't
     // resident goes as its action is taken.
     // HAZARD: invoke before anything closes it. Closing a notification destroys it, and a destroyed
     // one refuses its action; `hidePopup` closes a transient one.
-    function activate(notification): void {
+    function run(notification, action): void {
         root.markRead([notification]);
         root.popups = root.popups.filter(n => n !== notification);
+        action.invoke();
+    }
+
+    // Runs the default action if there is one, and marks it read.
+    function activate(notification): void {
         const action = notification.actions.find(a => a.identifier === "default");
-        if (action)
-            action.invoke();
-        else if (notification.transient)
+        if (action) {
+            root.run(notification, action);
+            return;
+        }
+        root.markRead([notification]);
+        root.popups = root.popups.filter(n => n !== notification);
+        if (notification.transient)
             notification.expire();
     }
 

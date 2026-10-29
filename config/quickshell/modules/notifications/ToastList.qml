@@ -20,6 +20,8 @@ ListView {
     // The cards when the pointer came onto one.
     property var held: []
     readonly property bool holding: list.pointed !== null && list.notifications.includes(list.pointed)
+    // The notification whose card shows its whole text, one at a time.
+    property var unfolded: null
 
     height: contentHeight
     interactive: false
@@ -115,10 +117,12 @@ ListView {
             width: slot.width
             notification: slot.modelData
             popup: true
+            unfolded: list.unfolded === slot.modelData
             held: menu.notification === slot.modelData || list.holding
             enabled: !card.aside
             opacity: card.aside ? 0 : 1
             onMenuRequested: at => menu.open(slot.modelData, at)
+            onUnfoldRequested: open => list.unfolded = open ? slot.modelData : null
             onPointedChanged: {
                 if (card.pointed) {
                     list.held = list.notifications.slice();

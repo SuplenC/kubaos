@@ -6,7 +6,7 @@ import "feed.js" as Feed
 // The bell's peek, in the popups' place: the most recent unread notifications as the popups'
 // cards, one app's stacked into one, then "+N more" (which opens the panel) and two one-click
 // actions on what it shows, Mark read and Clear. Looking marks nothing read; a click on a card
-// runs its main action and marks it read, and its × dismisses it.
+// unfolds its text, its buttons run its actions, and its × dismisses it.
 Item {
     id: root
 
@@ -20,11 +20,17 @@ Item {
         })
     readonly property var shown: [].concat(...root.peek.stacks.map(stack => stack.items))
     readonly property bool hovered: hover.hovered
+    // The notification whose card shows its whole text, one at a time, until the peek goes.
+    property var unfolded: null
 
     implicitHeight: column.implicitHeight
     onNowChanged: {
         if (root.now.stacks.length > 0)
             root.peek = root.now;
+    }
+    onVisibleChanged: {
+        if (!root.visible)
+            root.unfolded = null;
     }
     Component.onCompleted: root.peek = root.now
 
@@ -48,6 +54,8 @@ Item {
                 implicitWidth: root.width
                 notification: modelData.items[0]
                 items: modelData.items
+                unfolded: root.unfolded === modelData.items[0]
+                onUnfoldRequested: open => root.unfolded = open ? modelData.items[0] : null
             }
         }
 

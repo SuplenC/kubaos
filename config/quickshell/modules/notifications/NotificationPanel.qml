@@ -9,17 +9,19 @@ import "feed.js" as Feed
 // control center is, and never beside it (`Panels` opens one panel at a time). A header with the
 // title, a line saying how many are new or why they are silenced, and two quiet buttons: Do not
 // disturb (filled with the accent while on, its hint saying why) and Clear all. Under it the
-// notifications, New then Earlier, several from one app stacked into one card; the keys button
-// floats in the bottom right corner, its tooltip listing the keys, and the list keeps room at its
-// end to scroll clear of it.
+// notifications, New then Earlier, several from one app stacked into one card, one card at a time
+// unfolded to its whole text; the keys button floats in the bottom right corner, its tooltip
+// listing the keys, and the list keeps room at its end to scroll clear of it.
 //
-// What was unread when the panel opened stays under New while it shows, so nothing moves as a
-// card is opened; closing the panel marks everything read.
+// What was unread when the panel opened stays under New while it shows, so no card changes
+// section as it is marked read or its action runs; closing the panel marks everything read.
 K.Sheet {
     id: root
 
     // The stacks open in the list, by their rows' keys.
     property var expanded: ({})
+    // The notification whose card shows its whole text, null for none.
+    property var unfolded: null
     // The ids unread when the panel opened, as a set.
     property var fresh: ({})
     readonly property var sections: Feed.sections(Notifs.history, n => root.fresh[n.id] === true || Notifs.isUnread(n))
@@ -45,7 +47,7 @@ K.Sheet {
         list.currentIndex = root.rows.findIndex(r => r.key === key);
     }
 
-    function unfold(): void {
+    function openStack(): void {
         if (root.current?.stacked)
             root.setExpanded(root.current.key, true);
     }
@@ -73,6 +75,7 @@ K.Sheet {
         Notifs.markAllRead();
         root.fresh = {};
         root.expanded = {};
+        root.unfolded = null;
     }
 
     // The header, the container padding in at the sides and 16 above.
@@ -173,7 +176,7 @@ K.Sheet {
         model: ScriptModel {
             values: root.rows
         }
-        onActivated: index => cardAt(index)?.open()
+        onActivated: index => cardAt(index)?.press()
 
         function cardAt(index: int): var {
             const item = list.itemAtIndex(index);
@@ -182,14 +185,20 @@ K.Sheet {
 
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Right || event.key === Qt.Key_L)
-                root.unfold();
+                root.openStack();
             else if (event.key === Qt.Key_Left || event.key === Qt.Key_H)
                 root.fold();
             else if (event.key === Qt.Key_Delete)
                 root.dismissCurrent();
             else if (event.key === Qt.Key_D && event.modifiers === Qt.NoModifier)
                 Notifs.toggleDnd();
-            else {
+            else if (event.key === Qt.Key_Space) {
+                if (!event.isAutoRepeat)
+                    list.cardAt(list.currentIndex)?.press();
+            } else if (event.key === Qt.Key_Escape && root.unfolded !== null) {
+                // Esc folds an unfolded card first; with none it goes on to close the panel.
+                root.unfolded = null;
+            } else {
                 event.accepted = list.handleKey(event);
                 return;
             }
@@ -228,12 +237,14 @@ K.Sheet {
                 sourceComponent: NotificationCard {
                     notification: row.modelData.items[0]
                     items: row.modelData.items
-                    expands: true
+                    opens: true
+                    unfolded: root.unfolded === row.modelData.items[0]
                     selected: list.currentIndex === row.index && list.highlightShown
                     onExpandRequested: {
                         root.setExpanded(row.modelData.key, true);
                         list.currentIndex = row.index;
                     }
+                    onUnfoldRequested: open => root.unfolded = open ? row.modelData.items[0] : null
                     onMenuRequested: at => menu.open(row.modelData.items[0], at)
                 }
             }
@@ -285,7 +296,7 @@ K.Sheet {
                 gap: K.Tokens.space.s8
 
                 K.KeyHints {
-                    hints: [["↑ ↓", "Move"], ["↵", "Open"]]
+                    hints: [["↑ ↓", "Move"], ["↵", "Unfold"]]
                 }
 
                 K.KeyHints {
@@ -293,7 +304,7 @@ K.Sheet {
                 }
 
                 K.KeyHints {
-                    hints: [["D", "Do not disturb"], ["Esc", "Close"]]
+                    hints: [["D", "Do not disturb"], ["Esc", "Fold or close"]]
                 }
             }
         }
