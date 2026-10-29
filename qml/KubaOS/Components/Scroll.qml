@@ -22,6 +22,17 @@ Item {
     readonly property real reachSides: Tokens.focus.far
     // In a layout it takes all the room it is given, as iced's scroll does.
     readonly property bool fillWidth: true
+
+    // A scroll never rests past its end, as iced's never does: content that shrinks under it, a
+    // glide still heading for where its end was, or an offset set while the content was still
+    // being laid out, ends at the last of the content. Without it, a form whose field's list of
+    // paths closed as it scrolled to that field rests scrolled past everything it holds.
+    function keepInside(): void {
+        if (flick.contentY > root.travel || glide.running && gliding.targetValue > root.travel)
+            flick.contentY = root.travel;
+    }
+
+    onTravelChanged: root.keepInside()
     // On its right it reaches as iced's does not, past content that runs to its edge, so the
     // geometry check is told the other three sides.
     readonly property var probe: ({
@@ -46,12 +57,20 @@ Item {
         boundsBehavior: Flickable.StopAtBounds
 
         Behavior on contentY {
+            id: gliding
+
             enabled: !flick.moving && !drag.pressed
 
             NumberAnimation {
+                id: glide
+
                 duration: Tokens.duration.medium
                 easing.type: Easing.BezierSpline
                 easing.bezierCurve: Tokens.easing.standard
+                onRunningChanged: {
+                    if (!running)
+                        root.keepInside();
+                }
             }
         }
 

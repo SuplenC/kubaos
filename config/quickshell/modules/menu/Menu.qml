@@ -427,9 +427,9 @@ PanelWindow {
             const path = chosen.text.trim();
             const said = refusal.text.trim();
             menu.show(input.text);
-            if (path !== "" && menu.kind === "form" && (search.view.id ?? "") === picker.view)
+            if (menu.kind === "form" && (search.view.id ?? "") === picker.view)
                 form.item?.fill(picker.field, path);
-            else if (said !== "")
+            if (path === "" && said !== "")
                 menu.failure = `The file picker didn't open: ${said}`;
         }
 
@@ -1223,6 +1223,7 @@ PanelWindow {
             selected: list.currentIndex
             selectedShown: list.currentShown && !follow.running
             results: list
+            formView: form.item
             keys: menu.keysAt()
         }
     }

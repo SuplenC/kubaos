@@ -113,6 +113,29 @@ TestCase {
         verify(at.y < clipped().y, "the content above the room is past the clip");
     }
 
+    function test_content_that_shrinks_under_it_brings_it_back_to_its_end() {
+        hidden.visible = true;
+        scroll.contentY = scroll.travel;
+        tryCompare(scroll, "contentY", scroll.travel, 1000);
+
+        hidden.visible = false;
+
+        tryCompare(scroll, "contentY", scroll.travel, 1000);
+    }
+
+    function test_a_glide_to_where_its_end_was_ends_at_its_end_once_the_content_shrinks() {
+        hidden.visible = true;
+        const before = scroll.travel;
+
+        scroll.contentY = before;
+        hidden.visible = false;
+
+        verify(scroll.travel < before);
+        tryCompare(scroll, "contentY", scroll.travel, 1000);
+        wait(K.Tokens.duration.medium * 2);
+        compare(scroll.contentY, scroll.travel, "it rests at its end, not where its end was");
+    }
+
     function test_it_tells_the_geometry_check_how_far_it_reaches_above_below_and_on_its_left() {
         scroll.roomAbove = K.Tokens.space.s12;
 

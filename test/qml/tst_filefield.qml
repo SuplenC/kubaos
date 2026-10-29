@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import Kotodama
+import KubaOS.Components as K
 import "../../config/quickshell/modules/menu"
 
 // A Command menu form's file and folder field: what it asks the Daemon as it is typed into, and
@@ -364,6 +365,29 @@ TestCase {
         compare(form.current, 1);
         verify(form.pathCurrent);
         verify(!form.pathsOpen, "the path is taken: no list over it");
+    }
+
+    function test_the_last_fields_paths_never_scroll_its_label_out_of_view() {
+        const form = createTemporaryObject(formView, suite);
+        waitForRendering(form);
+        const many = Array.from({
+                length: 5
+            }, (_, n) => Object.assign({}, suite.downloads[1], {
+                title: `folder-${n}`,
+                path: `/home/kuba/folder-${n}`
+            }));
+
+        form.takeFirst();
+        form.move(-1);
+        engine.completions = many;
+        tryVerify(() => form.pathsOpen, 1000);
+        tryVerify(() => form.travel > 0, 1000, "the paths make the form taller than its room");
+        form.reveal();
+        wait(K.Tokens.duration.medium * 2);
+
+        const field = all(form, item => typeof item.fillPath === "function")[2];
+        const top = field.mapToItem(form, 0, 0).y;
+        verify(top >= 0, `the folder field's label is in view, not ${-top} above it`);
     }
 
     function test_a_path_is_never_put_in_a_text_field() {

@@ -42,6 +42,12 @@ QtObject {
     // nowhere, so the test types only once it names the place.
     property string keys: ""
 
+    // The form View on screen, and the line last logged for it: each field's value, how many
+    // fields a frame shows (each drawn opaque, sized, and inside the window) and how far its
+    // scroll rests past the end of its content, which must be 0.
+    property Item formView: null
+    property string formLine: ""
+
     property real typedAt: 0
     // The Results for the query typed are in the model, and then in a frame
     // begun since.
@@ -59,6 +65,30 @@ QtObject {
             return;
         top = line;
         log(`top ${JSON.stringify(line)}`);
+    }
+
+    // Whether `item` is drawn: visible, opaque and sized all the way up, and inside its window.
+    function onScreen(item: Item): bool {
+        const window = item.Window.window;
+        if (!window || !window.visible || item.width <= 0 || item.height <= 0)
+            return false;
+        for (let it = item; it; it = it.parent) {
+            if (!it.visible || it.opacity <= 0)
+                return false;
+        }
+        const at = item.mapToItem(window.contentItem, 0, 0);
+        return at.x + item.width > 0 && at.y + item.height > 0 && at.x < window.width && at.y < window.height;
+    }
+
+    function logForm(): void {
+        const fields = probe.formView ? probe.formView.shown() : [];
+        const past = probe.formView ? Math.round(Math.max(0, probe.formView.contentY - probe.formView.travel)) : 0;
+        const line = fields.length === 0 ? "" : `fields=${fields.length} shown=${fields.filter(field => probe.onScreen(field.item)).length} past=${past} values=${JSON.stringify(fields.map(field => field.value))}`;
+        if (line === probe.formLine)
+            return;
+        probe.formLine = line;
+        if (line !== "")
+            log(`form ${line}`);
     }
 
     function layout(): void {
@@ -139,6 +169,7 @@ QtObject {
 
         function onFrameSwapped(): void {
             probe.logTop();
+            probe.logForm();
             if (!probe.drawn)
                 return;
             probe.drawn = false;

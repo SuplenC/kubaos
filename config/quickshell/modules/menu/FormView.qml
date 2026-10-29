@@ -44,12 +44,30 @@ FocusScope {
     // The system's picker, for the `field`th field: a folder, or a file of a kind in `accept`.
     signal browse(int field, bool folder, var accept)
 
-    // Puts `path`, as the picker chose it, in the `field`th field, and gives that field the keys.
+    // Each field's item and what it holds, for the menu's probe: `{item, value}`.
+    function shown(): var {
+        const fields = [];
+        for (let n = 0; n < repeater.count; n++) {
+            const field = repeater.itemAt(n);
+            if (field)
+                fields.push({
+                    item: field,
+                    value: field.value()
+                });
+        }
+        return fields;
+    }
+
+    // Gives the `field`th field the keys again once the picker is gone, `path` in it as the picker
+    // chose it, or as it was when the pick was cancelled (`path` empty).
     function fill(field: int, path: string): void {
         const item = repeater.itemAt(field);
         if (!item?.path)
             return;
-        item.fillPath(path);
+        if (path === "")
+            item.take();
+        else
+            item.fillPath(path);
         form.reveal();
     }
 
@@ -73,11 +91,12 @@ FocusScope {
         const field = repeater.itemAt(form.current);
         if (!field)
             return;
+        const top = field.mapToItem(column, 0, 0).y;
+        // The last field's paths can be taller than the room: the scroll stops at its label then.
         if (form.current === repeater.count - 1) {
-            scroll.contentY = scroll.travel;
+            scroll.contentY = Math.min(scroll.travel, top);
             return;
         }
-        const top = field.mapToItem(column, 0, 0).y;
         const bottom = top + field.height;
         if (top < scroll.contentY)
             scroll.contentY = top;
@@ -127,6 +146,16 @@ FocusScope {
                         function fillPath(path: string): void {
                             pathField.focusField();
                             pathField.take(pathField.homeRelative(path));
+                        }
+
+                        function value(): var {
+                            if (field.path)
+                                return pathField.text;
+                            if (field.kind === "checkbox")
+                                return toggle.checked;
+                            if (field.kind === "select")
+                                return choice.options[choice.chosen]?.value ?? "";
+                            return typed.text;
                         }
 
                         function browse(): void {

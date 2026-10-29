@@ -2304,6 +2304,127 @@ TOML
   return "$bad"
 }
 
+# menu_form_is PATTERN DESC: up to PROBE_WAIT for the probe's latest form line, once the form rests,
+# to match PATTERN (ERE): the fields drawn, and what they hold.
+menu_form_is() {
+  # The scroll glides for a moment after a field takes the keys: the form is read once it rests.
+  sleep 1
+  for _ in $(seq $((PROBE_WAIT * 10))); do
+    grep -o 'menu probe: form .*' "$QS_LOG" | tail -1 | grep -qE -- "$1" && { echo "ok   $2"; return 0; }
+    sleep 0.1
+  done
+  echo "FAIL $2: the form is $(grep -o 'menu probe: form .*' "$QS_LOG" | tail -1)"
+  return 1
+}
+
+# The Command menu's file and folder fields, in Quickshell under the Daemon: Ctrl+O closes the
+# menu for the system's picker and opens it again on the form, the path chosen in its field and
+# every other field as it was, and Enter runs the action with it. A cancelled pick brings the
+# form back as it was. A stub stands in for `kubaos-files pick`, as the container has no portal:
+# it answers after a second, as a person would, with a file, a folder, or nothing.
+c_menu_files() {
+  local bad=0 daemon log="$LOGS/kotodamad-files.log" out
+  local layer="$USER_HOME/.config/kubaos/menu/kotodama/user.toml" saved="$LOGS/user.toml.files-saved"
+  local stub="$LOGS/pick-stub" cancel="$LOGS/pick-cancel" ran="$LOGS/files-ran"
+  local config="$USER_HOME/Downloads/work.conf" folder="$USER_HOME/Projects/acme"
+  input_tools || { echo "FAIL no pywayland or Wayland protocols from the flake's nixpkgs"; return 1; }
+
+  [[ -e $layer ]] && cp -p "$layer" "$saved"
+  install -D -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/stdin "$layer" <<TOML
+[extensions.kubaos.actions.harness-file]
+title = "Harness file"
+keyword = "harness-file"
+run = ["sh", "-c", "printf '%s\\\\n' \"\$1\" >$ran", "sh", "{path}"]
+arguments = [{ name = "path", kind = "file", accept = ["conf"] }]
+
+[extensions.kubaos.actions.harness-pair]
+title = "Harness pair"
+keyword = "harness-pair"
+run = ["sh", "-c", "printf '%s %s\\\\n' \"\$1\" \"\$2\" >$ran", "sh", "{suite}", "{folder}"]
+arguments = [{ name = "suite", placeholder = "node" }, { name = "folder", kind = "folder" }]
+TOML
+  install -d -o "$USER_NAME" -g "$USER_NAME" "${config%/*}" "$folder"
+  install -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/null "$config"
+  install -d -o "$USER_NAME" -g "$USER_NAME" "$stub"
+  install -o "$USER_NAME" -g "$USER_NAME" -m 755 /dev/stdin "$stub/kubaos-files" <<SH
+#!/bin/sh
+sleep 1
+[ -e $cancel ] && exit 1
+case " \$* " in
+  *" --folder "*) echo $folder ;;
+  *) echo $config ;;
+esac
+SH
+  rm -f "$cancel" "$ran"
+
+  session_start sway 1920x1080 1
+  : >"$log"
+  chown "$USER_NAME:" "$log"
+  in_session "exec kotodamad >$log 2>&1" &
+  daemon=$!
+  input_up 1920x1080 || { menu_stop "$daemon"; return 1; }
+  if ! qs_start KUBAOS_MENU_PROBE=1 "PATH=$stub:\$PATH"; then
+    echo "FAIL Quickshell didn't load:"
+    tail -30 "$QS_LOG"
+    menu_stop "$daemon"
+    return 1
+  fi
+  menu_now 'connected true' || { echo "FAIL the menu's search never reached the Daemon"; bad=1; }
+
+  # A file field: picked, then run.
+  menu_step "kotodama toggle opens the menu" 'visible true' menu_kotodama toggle || bad=1
+  menu_keys search && menu_typed 'harness file' --delay 50 'type:harness file' &&
+    menu_step "Enter on an action with a file argument asks for it in a form" 'view kind=form' input key:Return || bad=1
+  menu_keys form && menu_form_is 'fields=1 shown=1 past=0 values=\[""\]' "the form shows its file field" || bad=1
+  menu_step "Ctrl+O closes the menu for the picker" 'visible false' input down:ctrl type:o up:ctrl || bad=1
+  menu_step "the menu opens again once the picker answers" 'visible true' : || bad=1
+  menu_form_is 'fields=1 shown=1 past=0 values=\["~/Downloads/work.conf"\]' "the form is back, the file picked in its field" || bad=1
+  menu_keys form && input key:Return
+  for _ in $(seq $((PROBE_WAIT * 10))); do [[ -s $ran ]] && break; sleep 0.1; done
+  out="$(cat "$ran" 2>/dev/null)"
+  if [[ $out == "$config" ]]; then
+    echo "ok   Enter runs the action with the path picked: $out"
+  else
+    echo "FAIL Enter ran the action with '$out', not $config"
+    bad=1
+  fi
+  rm -f "$ran"
+
+  # Two fields: what was typed in one stays through a cancelled pick and a folder picked in the
+  # other.
+  menu_now 'visible false' || { echo "FAIL the menu stayed open after running the action"; bad=1; }
+  menu_step "kotodama toggle opens the menu again" 'visible true' menu_kotodama toggle || bad=1
+  menu_keys search && menu_typed 'harness pair' --delay 50 'type:harness pair' &&
+    menu_step "Enter on an action with a text and a folder argument asks for them" 'view kind=form' input key:Return || bad=1
+  menu_keys form && input --delay 50 type:node key:Tab
+  menu_form_is 'fields=2 shown=2 past=0 values=\["node",""\]' "the suite is typed in the first field" || bad=1
+  install -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/null "$cancel"
+  menu_step "Ctrl+O in the folder field closes the menu for the picker" 'visible false' input down:ctrl type:o up:ctrl || bad=1
+  menu_step "a cancelled pick opens the menu again" 'visible true' : || bad=1
+  menu_form_is 'fields=2 shown=2 past=0 values=\["node",""\]' "the form is back as it was after a cancel" || bad=1
+  rm -f "$cancel"
+  menu_keys form &&
+    menu_step "Ctrl+O again closes the menu for the picker" 'visible false' input down:ctrl type:o up:ctrl || bad=1
+  menu_step "the menu opens again with the folder" 'visible true' : || bad=1
+  menu_form_is 'fields=2 shown=2 past=0 values=\["node","~/Projects/acme"\]' "the folder is picked, the suite still typed" || bad=1
+  menu_keys form && input key:Return
+  for _ in $(seq $((PROBE_WAIT * 10))); do [[ -s $ran ]] && break; sleep 0.1; done
+  out="$(cat "$ran" 2>/dev/null)"
+  if [[ $out == "node $folder" ]]; then
+    echo "ok   Enter runs the action with both: $out"
+  else
+    echo "FAIL Enter ran the action with '$out', not 'node $folder'"
+    bad=1
+  fi
+
+  [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
+  if ((bad)); then tail -20 "$log"; fi
+  menu_stop "$daemon"
+  if [[ -e $saved ]]; then mv "$saved" "$layer"; else rm -f "$layer"; fi
+  rm -rf "$stub" "$cancel" "$ran" "$config" "$folder"
+  return "$bad"
+}
+
 # Wallpaper sets: every set read-only in /usr/share/kubaos/wallpapers,
 # the picker's folders are the chosen ones (~/.config/kubaos/desktop/wallpapers/sets,
 # all of them without the file) plus ~/Pictures/wallpapers, a real folder.
@@ -3834,7 +3955,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown inotify splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos menu_files files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done
