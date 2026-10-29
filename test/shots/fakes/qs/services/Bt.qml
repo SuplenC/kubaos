@@ -3,8 +3,8 @@ import QtQuick
 
 // Stand-in for Bt: headphones and a mouse connected with their batteries, a keyboard and a phone
 // paired, three devices in range at three distances, and three more in range that send no name,
-// folded away until `showUnnamed`. The drivers set `prompt`, `pairing` and `errors` for the
-// pairing states.
+// in a drawer that is closed until `showUnnamed`. The drivers set `prompt`, `pairing` and `errors`
+// for the pairing states.
 QtObject {
     id: root
 

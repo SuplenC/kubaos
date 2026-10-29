@@ -6,8 +6,8 @@ import "../../services/radios.js" as Radios
 
 // The Bluetooth tab: paired devices (Known), the connected first and checked with their battery,
 // then the devices in range to pair (Nearby), nearest first by their last signal. The devices
-// that send no name come last, under a line that says how many there are, folded away unless its
-// Show opens them, which is remembered. A known device
+// that send no name come last, in a drawer under a line that says how many there are, closed
+// unless its Show opens it, which is remembered. A known device
 // connects or disconnects on a press; a nearby one opens the connection form, which pairs it and
 // shows what the pairing agent asks: a code to type on the device or to check, or a PIN or
 // passkey to type here. A pairing the device starts opens the form too.
@@ -26,8 +26,8 @@ RadioTab {
     readonly property string kind: root.prompt?.kind ?? ""
     readonly property bool pairing: root.pending !== null && Bt.isPairing(root.pending)
     readonly property string failure: root.pending ? (Bt.pairError(root.pending) || Bt.problem) : ""
-    // The line at the end of Nearby that shows or hides the unnamed devices.
-    readonly property string unnamedKey: "action:unnamed"
+    // The line over the drawer of unnamed devices, whose button opens and closes it.
+    readonly property string unnamedKey: "disclosure:unnamed"
 
     function line(kind: string, key: string, title: string, failed: bool): var {
         return {
@@ -41,7 +41,6 @@ RadioTab {
             checked: false,
             forgettable: false,
             failed: failed,
-            action: "",
             folded: false
         };
     }
@@ -64,7 +63,6 @@ RadioTab {
             checked: device.connected,
             forgettable: device.paired && !device.connected,
             failed: false,
-            action: "",
             folded: false
         };
     }
@@ -146,13 +144,11 @@ RadioTab {
         } else {
             out.push(root.line("note", "note:nearby", Bt.problem || "Nothing in pairing mode nearby", Bt.problem !== ""));
         }
-        const unnamed = Radios.unnamedLine(Bt.unnamed.length, Bt.showUnnamed);
+        const unnamed = Radios.unnamedLine(Bt.unnamed.length);
         if (unnamed !== "") {
-            out.push(Object.assign(root.line("action", root.unnamedKey, unnamed, false), {
-                action: Bt.showUnnamed ? "Hide" : "Show"
-            }));
-            // Always listed, and folded away while hidden: Show and Hide then change no row, and
-            // the block opens and closes under its line in one motion.
+            out.push(root.line("disclosure", root.unnamedKey, unnamed, false));
+            // Always listed, in the drawer under the line: Show and Hide then change no row, and
+            // only the drawer's edge moves.
             for (const device of Bt.unnamed)
                 out.push(Object.assign(root.deviceRow(device), {
                     folded: true

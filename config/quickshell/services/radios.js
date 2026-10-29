@@ -85,11 +85,11 @@ function btSplit(nearby) {
     };
 }
 
-// The line before Nearby's `count` unnamed devices, or "" while there are none.
-function unnamedLine(count, showUnnamed) {
+// The line over the drawer of Nearby's `count` unnamed devices, or "" while there are none.
+function unnamedLine(count) {
     if (count === 0)
         return "";
-    return `${count} unnamed ${count === 1 ? "device" : "devices"} ${showUnnamed ? "shown" : "hidden"}`;
+    return `${count} unnamed ${count === 1 ? "device" : "devices"}`;
 }
 
 // KubaOS Symbols' drawing of a BlueZ device icon (`org.bluez.Device1.Icon`, freedesktop icon names).

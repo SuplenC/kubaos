@@ -101,8 +101,8 @@ TestCase {
 
         compare(names(split.named), ["Speaker", "Watch"]);
         compare(names(split.unnamed), ["11-22", "33-44"]);
-        compare(Radios.unnamedLine(split.unnamed.length, false), "2 unnamed devices hidden");
-        compare(Radios.unnamedLine(1, true), "1 unnamed device shown");
+        compare(Radios.unnamedLine(split.unnamed.length), "2 unnamed devices");
+        compare(Radios.unnamedLine(1), "1 unnamed device");
     }
 
     function test_the_unnamed_devices_come_after_the_named_ones_however_near_each_nearest_first() {
@@ -120,8 +120,7 @@ TestCase {
     }
 
     function test_there_is_no_line_without_unnamed_devices() {
-        compare(Radios.unnamedLine(0, false), "");
-        compare(Radios.unnamedLine(0, true), "");
+        compare(Radios.unnamedLine(0), "");
     }
 
     function test_known_devices_show_named_or_not() {

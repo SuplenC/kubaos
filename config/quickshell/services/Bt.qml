@@ -38,8 +38,8 @@ Singleton {
     readonly property var rssi: agentState.rssi ?? ({})
     // Paired devices, the connected first, named or not; then the ones in range to pair, nearest
     // first, those that send a name in `nearby` and those that don't in `unnamed`, which the tab
-    // folds away unless `showUnnamed` (radios.js). BlueZ forgets an unpaired device a while after
-    // a scan stops hearing it.
+    // keeps in a drawer that is closed unless `showUnnamed` (radios.js). BlueZ forgets an unpaired
+    // device a while after a scan stops hearing it.
     readonly property var known: Radios.btKnown(devices)
     readonly property var inRange: Radios.btSplit(Radios.btNearby(devices, rssi))
     readonly property var nearby: inRange.named

@@ -84,7 +84,7 @@ TestCase {
         compare(list.currentIndex, 1, "from the last row past the label, round to the first row");
     }
 
-    function test_the_keyboard_reaches_an_action_line() {
+    function test_the_keyboard_reaches_a_disclosure_line() {
         list.rows = [
             ...suite.rows(["a"]),
             {
@@ -93,13 +93,13 @@ TestCase {
             },
             {
                 key: "show",
-                kind: "action"
+                kind: "disclosure"
             }
         ];
         list.currentIndex = 0;
 
         list.step(1);
 
-        compare(list.currentIndex, 2, "past the note, onto the action line");
+        compare(list.currentIndex, 2, "past the note, onto the disclosure line");
     }
 }

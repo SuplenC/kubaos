@@ -7,13 +7,13 @@ import qs.components
 // cross-fading; or, while the radio is `off`, an empty state saying how to turn it on.
 //
 // A row is `{ key, kind, title, subtitle, subtitleIcon, icon, accent, checked, forgettable,
-// failed, action, folded }`. Its kind: "row" (a network or a device, on its icon tile, checked while in
+// failed, folded }`. Its kind: "row" (a network or a device, on its icon tile, checked while in
 // use; pressed, `picked(key)`; a forgettable one shows a quiet × under the pointer, and Delete on
 // it does the same, `forgot(key)`), "label" (a section's small muted title), "skeleton" (a row
-// still being found), "note" (one line, in the error colour while `failed`) or "action" (a quiet
-// line with a text button at its end, labelled `action`, which the keys reach as a row's; pressed,
-// `picked(key)`). The `folded` rows are one block that opens while `unfolded` and folds away
-// while not, all together (`LiveList`).
+// still being found), "note" (one line, in the error colour while `failed`) or "disclosure" (a
+// quiet line over the drawer of `folded` rows that follow it, with a Show or Hide text button at
+// its end, which the keys reach as a row's; pressed, `picked(key)`). The drawer is open while
+// `unfolded` (`LiveList`).
 Item {
     id: root
 
@@ -25,7 +25,7 @@ Item {
     property string offBody
     // A button under the empty state's words that turns the radio on, or none.
     property Component offAction: null
-    // Whether the `folded` rows show.
+    // Whether the drawer of `folded` rows is open.
     property bool unfolded: true
     readonly property alias form: form
     readonly property alias list: list
@@ -80,7 +80,6 @@ Item {
             delegate: LiveRow {
                 id: live
 
-                required property int index
                 required property string key
                 required property string kind
                 required property string title
@@ -91,27 +90,26 @@ Item {
                 required property bool checked
                 required property bool forgettable
                 required property bool failed
-                required property string action
                 required property bool folded
 
                 // A label after rows stands 12 clear of them, with the 4 the row above carries.
                 readonly property int labelRoom: live.index > 0 ? K.Tokens.space.s12 : 0
 
                 folds: live.folded
-                rowHeight: live.kind === "label" ? live.labelRoom + K.Tokens.type.label.line : live.kind === "note" || live.kind === "action" ? K.Tokens.size.row : K.Tokens.size.row_two_line
+                rowHeight: live.kind === "label" ? live.labelRoom + K.Tokens.type.label.line : live.kind === "note" || live.kind === "disclosure" ? K.Tokens.size.row : K.Tokens.size.row_two_line
 
-                // Only what the row's kind shows is made, and nothing while it is folded away: a
-                // scan's update makes and drops rows while the tab shows.
+                // Only what the row's kind shows is made, and nothing while the drawer's edge
+                // covers it: a scan's update makes and drops rows while the tab shows.
                 Loader {
                     width: live.width
                     height: live.rowHeight
-                    active: live.unfold > 0
+                    active: live.uncovered > 0
                     sourceComponent: ({
                             row: deviceRow,
                             label: sectionLabel,
                             skeleton: skeletonRow,
                             note: noteLine,
-                            action: actionLine
+                            disclosure: disclosureLine
                         })[live.kind] ?? null
                 }
 
@@ -199,15 +197,17 @@ Item {
                 }
 
                 // The note's words, then a text button at the row's end: its label's own padding
-                // puts the words 12 in, where a row's end is.
+                // puts the words 12 in, where a row's end is. Show and Hide hold one width, the
+                // wider label's with the chevron after it, so the button keeps its place and size
+                // as it flips; the chevron turns with the drawer's edge.
                 Component {
-                    id: actionLine
+                    id: disclosureLine
 
                     Item {
                         K.Text {
                             x: K.Tokens.space.s12
                             y: (parent.height - height) / 2
-                            width: button.x - x - K.Tokens.space.s8
+                            width: toggle.x - x - K.Tokens.space.s8
                             room: width
                             maximumLines: 1
                             text: live.title
@@ -216,15 +216,43 @@ Item {
                         }
 
                         K.Button {
-                            id: button
+                            id: toggle
 
+                            readonly property real labelRoom: Math.max(showLabel.implicitWidth, hideLabel.implicitWidth)
+
+                            width: K.Look.snapUp(toggle.padding * 2 + toggle.labelRoom + toggle.metrics.gap + toggle.metrics.icon, showLabel.dpr)
                             x: parent.width - width
                             y: (parent.height - height) / 2
-                            text: live.action
+                            text: list.unfolded ? "Hide" : "Show"
                             kind: "Text"
                             size: "Sm"
                             focused: live.current && list.highlightShown
                             onActivated: root.picked(live.key)
+
+                            K.Icon {
+                                x: toggle.width - toggle.padding - width
+                                y: K.Look.snap((toggle.height - height) / 2, showLabel.dpr)
+                                name: "expand_more"
+                                size: toggle.metrics.icon
+                                color: toggle.colours.shown
+                                rotation: list.drawerEdge * 180
+                            }
+
+                            K.Text {
+                                id: showLabel
+
+                                visible: false
+                                text: "Show"
+                                style: toggle.metrics.label
+                            }
+
+                            K.Text {
+                                id: hideLabel
+
+                                visible: false
+                                text: "Hide"
+                                style: toggle.metrics.label
+                            }
                         }
                     }
                 }
