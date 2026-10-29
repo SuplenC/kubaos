@@ -1,7 +1,6 @@
 import QtQuick
 import QtTest
 import KubaOS.Components as K
-import "../../config/quickshell/components"
 import "../../config/quickshell/modules/notifications"
 
 // A stack of popups under the pointer: pointing at one keeps every card on screen with its time

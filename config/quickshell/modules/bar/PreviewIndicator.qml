@@ -1,12 +1,11 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // While the home is a live preview of a KubaOS checkout: a cold pill naming its
 // branch, as a cold chip marks a preview. The hint gives the commit and the way
 // back; a click opens the Command menu at "Back to the release".
-Pill {
+K.Pill {
     id: root
 
     visible: Preview.active

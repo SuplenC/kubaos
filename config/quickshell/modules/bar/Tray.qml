@@ -4,7 +4,6 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Services.SystemTray
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // StatusNotifierItem tray. Left click activates, middle click secondary action, right click (or
@@ -12,7 +11,7 @@ import qs.services
 // icon: a modal panel (`traymenu`), so a click elsewhere or Esc closes it and the keyboard moves
 // in it. Each app's icon sits in a circle as tall as a chip, which takes the state layer under
 // the pointer, 4 in from the pill's curve.
-Pill {
+K.Pill {
     id: root
 
     required property QsWindow window

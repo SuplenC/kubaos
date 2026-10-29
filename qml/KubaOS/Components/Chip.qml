@@ -5,7 +5,7 @@ import KubaOS.Components as K
 // `chip::chip`. The label starts where the curve ends; an icon sits closer in. A removable chip
 // ends in a close button, a circle as tall as the chip, so its hover layer shares the chip's curve.
 // A pressable chip takes a press of its own (a pick made the default, a setting turned on), with
-// the state layer, and the keyboard, with the focus tube.
+// the state layer, and the keyboard, with the focus tube, unless it is no stop for Tab.
 Item {
     id: root
 
@@ -23,6 +23,11 @@ Item {
     property bool removable: false
     // Whether a press on it sends `activated`.
     property bool pressable: false
+    // Whether Tab stops on a pressable chip. Off where the field or the row beside the chips is
+    // the stop and a click picks one (the clock's timer presets and settings).
+    property bool tabStop: true
+    // A pressable chip's name, in a hint under it while the pointer or the keyboard is on it.
+    property string tooltip: ""
 
     // Whether the keyboard, or the pointer, is on a pressable chip: what a tooltip on it follows.
     readonly property bool focused: root.pressable && press.focused
@@ -56,6 +61,8 @@ Item {
             }
         })
 
+    // Above its neighbours while its hint shows, so the chips after it don't paint over the hint.
+    z: root.tooltip !== "" && root.pointerOver ? 1 : 0
     implicitWidth: K.Look.snapUp(root.leftPadding + outer.implicitWidth + root.rightPadding, root.dpr)
     implicitHeight: Tokens.size.chip
 
@@ -70,6 +77,7 @@ Item {
 
         anchors.fill: parent
         visible: root.pressable
+        activeFocusOnTab: root.tabStop && press.enabled
         Accessible.name: root.text
         Accessible.role: Accessible.Button
         onActivated: root.activated()
@@ -134,6 +142,18 @@ Item {
                     color: root.colours[1]
                 }
             }
+        }
+    }
+
+    // Made only for a chip with a tooltip, so a row of plain chips builds no hints.
+    Loader {
+        anchors.fill: parent
+        active: root.pressable && root.tooltip !== ""
+
+        sourceComponent: K.Hint {
+            objectName: "hint"
+            text: root.tooltip
+            shown: root.pointerOver || root.focused
         }
     }
 }

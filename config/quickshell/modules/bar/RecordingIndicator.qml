@@ -1,13 +1,12 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Red dot and elapsed time while dot-hypr-record runs. Click stops it.
 // In replay mode the dot is hollow and the label says how much is kept.
 // No blinking: a looping animation would repaint the frame layer (and its
 // shadow) every frame for as long as the recording runs.
-Pill {
+K.Pill {
     id: root
 
     visible: Recorder.active

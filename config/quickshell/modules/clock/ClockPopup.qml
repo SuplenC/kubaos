@@ -248,7 +248,7 @@ K.Sheet {
                             implicitWidth: ss.implicitWidth
                             implicitHeight: hhmm.implicitHeight
 
-                            Figure {
+                            K.Figure {
                                 id: ss
 
                                 y: K.Look.snap(root.baselineOf(heroMetrics, K.Tokens.type.hero_number) - root.baselineOf(secondsMetrics, K.Tokens.type.headline), root.dpr)
@@ -345,7 +345,7 @@ K.Sheet {
                                 color: K.Tokens.color.on_surface_variant
                             }
 
-                            Figure {
+                            K.Figure {
                                 text: Qt.formatDateTime(zone.there, Time.timeFormat)
                                 style: K.Tokens.type.body_strong
                             }
