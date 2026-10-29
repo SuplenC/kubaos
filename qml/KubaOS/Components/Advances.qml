@@ -8,9 +8,9 @@ import QtQuick
 // Widths are measured at `precision` times the size: Qt rounds each advance to 1/64 of a pixel,
 // which over a line comes to a pixel off iced, and a pixel moves every box after it.
 //
-// HAZARD: keep one metrics per font here, and the words' widths kept. A `FontMetrics` of its own
-// in every `Text` cost the menu's fourteen rows of three texts 2.2 ms a keystroke, and building
-// the font for each word measured cost 14 µs a word.
+// HAZARD: keep one metrics per font here, and the words' widths kept. Made headless, the
+// Command menu's fourteen rows of three texts took 2.2 ms with a `FontMetrics` in every `Text`
+// and 1.5 ms with these, and building the font for each word measured cost 14 µs a word.
 QtObject {
     id: advances
 
