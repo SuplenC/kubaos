@@ -1,9 +1,8 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 
 // The Wi-Fi and Bluetooth tabs' one well, which both share whole: a live list of Known and Nearby
-// (`rows`, for a `LiveList`), or, while `formOpen`, the connection form in its place, the two
+// (`rows`, for a `K.LiveList`), or, while `formOpen`, the connection form in its place, the two
 // cross-fading; or, while the radio is `off`, an empty state saying how to turn it on.
 //
 // A row is `{ key, kind, title, subtitle, subtitleIcon, icon, accent, checked, forgettable,
@@ -13,7 +12,7 @@ import qs.components
 // still being found), "note" (one line, in the error colour while `failed`) or "disclosure" (a
 // quiet line over the drawer of `folded` rows that follow it, with a Show or Hide text button at
 // its end, which the keys reach as a row's; pressed, `picked(key)`). The drawer is open while
-// `unfolded` (`LiveList`).
+// `unfolded` (`K.LiveList`).
 Item {
     id: root
 
@@ -46,13 +45,13 @@ Item {
             list.forceActiveFocus();
     }
 
-    Well {
+    K.ScrollingList {
         id: well
 
         anchors.fill: parent
         focused: list.activeFocus
 
-        LiveList {
+        K.LiveList {
             id: list
 
             anchors.fill: parent
@@ -77,7 +76,7 @@ Item {
                 }
             }
 
-            delegate: LiveRow {
+            delegate: K.LiveRow {
                 id: live
 
                 required property string key
@@ -174,7 +173,8 @@ Item {
                 Component {
                     id: skeletonRow
 
-                    SkeletonRow {
+                    K.ListRow {
+                        loading: true
                         share: live.index % 2 ? 0.45 : 0.7
                     }
                 }

@@ -1,7 +1,6 @@
 import QtQuick
 import QtTest
 import KubaOS.Components as K
-import "../../config/quickshell/components"
 
 // A live list while a scan fills it: it never scrolls by itself, so where the person left it
 // stays put as rows arrive, leave and change places, and the Known rows at its top stay in view.
@@ -67,12 +66,12 @@ TestCase {
         wait(700);
     }
 
-    LiveList {
+    K.LiveList {
         id: list
 
         anchors.fill: parent
 
-        delegate: LiveRow {
+        delegate: K.LiveRow {
             required property string key
             required property string kind
             required property bool folded

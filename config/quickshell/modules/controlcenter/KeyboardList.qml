@@ -2,7 +2,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // The keyboard layouts in one well: the rows, the default first and wearing a filled star, and a
@@ -299,7 +298,7 @@ Item {
 
         anchors.fill: parent
 
-        Well {
+        K.ScrollingList {
             id: well
 
             width: root.width
@@ -309,7 +308,7 @@ Item {
             focused: list.activeFocus || (adder.item?.listFocused ?? false)
 
             // The layouts, down to the toolbar.
-            NavList {
+            K.ListRows {
                 id: list
 
                 visible: !root.adding
@@ -324,7 +323,7 @@ Item {
                 }
                 onActivated: index => root.typeWith(index)
 
-                // Plain j/k are this handler's, so Shift+J/K can move a layout; NavList's own
+                // Plain j/k are this handler's, so Shift+J/K can move a layout; the list's own
                 // still takes the arrows, Ctrl+j/k and Enter.
                 vimKeys: false
                 Keys.onPressed: event => {

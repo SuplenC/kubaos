@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../../config/quickshell/components/keyed.js" as Keyed
+import KubaOS.Components as K
 
 // The keyed diff a live list applies to its model: what it removes, inserts and moves.
 TestCase {
@@ -47,11 +47,11 @@ TestCase {
     }
 
     function test_the_same_keys_need_no_ops() {
-        compare(Keyed.diff(["a", "b", "c"], ["a", "b", "c"]), []);
+        compare(K.Keyed.diff(["a", "b", "c"], ["a", "b", "c"]), []);
     }
 
     function test_a_new_key_is_one_insert_where_it_goes() {
-        const ops = Keyed.diff(["a", "c"], ["a", "b", "c"]);
+        const ops = K.Keyed.diff(["a", "c"], ["a", "b", "c"]);
 
         compare(kinds(ops), ["insert"]);
         compare(ops[0].at, 1);
@@ -59,21 +59,21 @@ TestCase {
     }
 
     function test_a_gone_key_is_one_remove() {
-        const ops = Keyed.diff(["a", "b", "c"], ["a", "c"]);
+        const ops = K.Keyed.diff(["a", "b", "c"], ["a", "c"]);
 
         compare(kinds(ops), ["remove"]);
         compare(ops[0].at, 1);
     }
 
     function test_one_row_moving_past_the_rest_is_one_move() {
-        const ops = Keyed.diff(["a", "b", "c", "d"], ["b", "c", "d", "a"]);
+        const ops = K.Keyed.diff(["a", "b", "c", "d"], ["b", "c", "d", "a"]);
 
         compare(kinds(ops), ["move"]);
         compare(play(["a", "b", "c", "d"], ops), ["b", "c", "d", "a"]);
     }
 
     function test_a_row_climbing_to_the_top_is_one_move() {
-        const ops = Keyed.diff(["a", "b", "c", "d"], ["d", "a", "b", "c"]);
+        const ops = K.Keyed.diff(["a", "b", "c", "d"], ["d", "a", "b", "c"]);
 
         compare(kinds(ops), ["move"]);
         compare(play(["a", "b", "c", "d"], ops), ["d", "a", "b", "c"]);
@@ -83,7 +83,7 @@ TestCase {
         const from = ["a", "b", "c", "d", "e"];
         const to = ["f", "d", "a", "g", "c"];
 
-        const ops = Keyed.diff(from, to);
+        const ops = K.Keyed.diff(from, to);
 
         compare(play(from, ops), to);
         const firstOther = ops.findIndex(op => op.op !== "remove");
@@ -101,14 +101,14 @@ TestCase {
             const from = keys.filter(() => random() < 0.7);
             const to = keys.filter(() => random() < 0.7).sort(() => random() - 0.5);
 
-            compare(play(from, Keyed.diff(from, to)), to, `${from} to ${to}`);
+            compare(play(from, K.Keyed.diff(from, to)), to, `${from} to ${to}`);
         }
     }
 
     function test_apply_brings_a_model_to_the_rows() {
         fill(["a", "b", "c"]);
 
-        Keyed.apply(model, [
+        K.Keyed.apply(model, [
             {
                 key: "c",
                 title: "C"
@@ -137,7 +137,7 @@ TestCase {
         model.rowsInserted.connect(inserted);
         model.rowsMoved.connect(moved);
 
-        Keyed.apply(model, [
+        K.Keyed.apply(model, [
             {
                 key: "c",
                 title: "c"
@@ -164,7 +164,7 @@ TestCase {
         const count = () => changes++;
         model.dataChanged.connect(count);
 
-        Keyed.apply(model, [
+        K.Keyed.apply(model, [
             {
                 key: "a",
                 title: "a"

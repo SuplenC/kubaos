@@ -1,16 +1,15 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Audio outputs. Enter makes the selected one the default, which carries the check.
-Well {
+K.ScrollingList {
     id: root
 
     focused: list.activeFocus
 
-    NavList {
+    K.ListRows {
         id: list
 
         anchors.fill: parent

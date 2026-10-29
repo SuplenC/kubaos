@@ -75,3 +75,8 @@ Meter 1.0 Meter.qml
 Sparkline 1.0 Sparkline.qml
 Sheet 1.0 Sheet.qml
 Calendar 1.0 Calendar.qml
+Keyed 1.0 keyed.js
+ListRows 1.0 ListRows.qml
+ScrollingList 1.0 ScrollingList.qml
+LiveList 1.0 LiveList.qml
+LiveRow 1.0 LiveRow.qml

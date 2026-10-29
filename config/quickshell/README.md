@@ -101,10 +101,8 @@ services/               singletons, no UI
                         alerts as notifications, the readings' colour steps (sysmon.js)
 components/             blocks composed from KubaOS.Components
   Pill                  the bar's pill: a row of content, hover, click, right-click and wheel
-  NavList               the keyboard list over K.ListRow rows
   PowerSlider           the power stops on a K.Slider
   BadgedIcon            a bar symbol with a K.Badge on its corner
-  SkeletonRow           a two-line list row still being found, as K.Skeletons
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
   Countdown             a popup's time left, stopped while the pointer is on it
 modules/
@@ -117,7 +115,7 @@ modules/
                         ActionPanel, FormView, ProgressView, DetailView, IntroCard, Label (text that
                         changes with every key), words.js (glyphs, kinds, shortcuts),
                         Probe (test-only timing and state lines)
-  controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a Well,
+  controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a K.ScrollingList,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)
   notifications/        NotificationPanel, Popups (corner, and the bell's Peek), PopupsBelow (critical, under a panel), ToastList, PopupHold (what a stack of popups keeps while the pointer is on it), CardGroup (one app's notifications: a stack at rest, a preview fanned over the list on hover, opened in place on a click), NotificationCard (a notification on its CardFace, which draws it and folds its text), feed.js (groups, New and Earlier, the peek, a card's buttons), ToastProbe (tests)
   osd/                  volume / brightness OSD

@@ -72,7 +72,7 @@ in
         export XDG_RUNTIME_DIR=$HOME
         components=$PWD/imports/qs/components
         mkdir -p $components
-        cp ${src}/config/quickshell/components/*.qml ${src}/config/quickshell/components/*.js $components
+        cp ${src}/config/quickshell/components/*.qml $components
         {
           echo "module qs.components"
           for file in $components/*.qml; do

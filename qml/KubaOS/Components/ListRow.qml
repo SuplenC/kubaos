@@ -8,6 +8,8 @@ import KubaOS.Components as K
 // row's whole height, so a chip moves nothing else.
 // Its corners are concentric inside the list's well. The selected row takes the secondary
 // container, or the error colour on a row whose action can't be taken back (`danger`).
+// A row still being found (`loading`) is a tiled two-line row's box with its tile and its two
+// lines as skeletons, so the row that arrives takes the place it kept and nothing moves.
 K.Pressable {
     id: root
 
@@ -33,6 +35,11 @@ K.Pressable {
     // Whether the row shows a check at its end, and whether it is ticked.
     property bool checkable: false
     property bool checked: false
+    // Still being found: skeletons in a tiled two-line row's place, taking no press.
+    property bool loading: false
+    // How much of the row a loading row's lines take, so rows one under another don't read as one
+    // block.
+    property real share: 0.6
 
     readonly property bool fillWidth: true
     readonly property color onFill: root.danger ? Tokens.color.on_error : Tokens.color.on_secondary_container
@@ -41,14 +48,15 @@ K.Pressable {
     readonly property var probe: ({
             role: "component",
             name: "ListRow",
-            variant: [root.subtitle === "" ? "one-line" : "two-line", root.icon === "" ? "" : root.tile ? "tile" : "icon"].filter(word => word !== "").join(" "),
+            variant: [root.subtitle === "" && !root.loading ? "one-line" : "two-line", root.icon === "" ? "" : root.tile ? "tile" : "icon"].filter(word => word !== "").join(" "),
             fixed: {
                 width: false,
                 height: true
             }
         })
 
-    implicitHeight: root.subtitle === "" ? Tokens.size.row : Tokens.size.row_two_line
+    implicitHeight: root.subtitle === "" && !root.loading ? Tokens.size.row : Tokens.size.row_two_line
+    enabled: !root.loading
     // The list's well shows where the keyboard is; a row draws no ring of its own.
     activeFocusOnTab: false
 
@@ -69,6 +77,7 @@ K.Pressable {
     K.Row {
         id: line
 
+        visible: !root.loading
         x: Tokens.space.s12
         width: root.width - Tokens.space.s12 * 2
         fixedHeight: root.height
@@ -165,6 +174,48 @@ K.Pressable {
                 name: "check"
                 size: Tokens.type.body_strong.icon
                 color: root.main
+            }
+        }
+    }
+
+    Loader {
+        anchors.fill: parent
+        active: root.loading
+        sourceComponent: skeletons
+    }
+
+    Component {
+        id: skeletons
+
+        Item {
+            id: bones
+
+            readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
+            readonly property real words: bones.width - Tokens.space.s12 * 3 - Tokens.size.control_md
+
+            K.Skeleton {
+                x: Tokens.space.s12
+                y: K.Look.snap((bones.height - height) / 2, bones.dpr)
+                width: Tokens.size.control_md
+                bone: "block"
+                size: Tokens.size.control_md
+                radius: Tokens.radius.control
+            }
+
+            Column {
+                x: Tokens.space.s12 * 2 + Tokens.size.control_md
+                y: K.Look.snap((bones.height - height) / 2, bones.dpr)
+                spacing: Tokens.space.s4
+
+                K.Skeleton {
+                    width: K.Look.snap(bones.words * root.share, bones.dpr)
+                    style: Tokens.type.body_strong
+                }
+
+                K.Skeleton {
+                    width: K.Look.snap(bones.words * root.share * root.share, bones.dpr)
+                    style: Tokens.type.small
+                }
             }
         }
     }

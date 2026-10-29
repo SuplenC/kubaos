@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../../config/quickshell/components"
+import KubaOS.Components as K
 
 // A live list's rows as a scan changes them: a leaving row stays, unpressable, until it has
 // faded and given its room back; an arriving one opens its room.
@@ -30,13 +30,13 @@ TestCase {
         return null;
     }
 
-    LiveList {
+    K.LiveList {
         id: list
 
         anchors.fill: parent
         rows: suite.rows(["a", "b", "c"])
 
-        delegate: LiveRow {
+        delegate: K.LiveRow {
             required property string key
             required property string kind
             // design-allow(size): a test's fixture, not a design value.
