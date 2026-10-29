@@ -14,7 +14,9 @@ import qs.modules.menu
 // with more Actions than the panel has room for), pushed (a list View pushed, held where its slide
 // starts, at full opacity), form-long (a form View with more fields than the body has room for),
 // actions-end (the same, the keys on its last Action), form-scrolled (the long form, the keys on
-// its last field).
+// its last field), file-recent ("Import VPN config…" asking for its file, the newest it takes
+// listed), file-typed (`~/Down` typed in it, completed by Downloads), folder ("Unpin a Suite
+// version…", the keys on its folder field, the projects listed).
 QtObject {
     id: driver
 
@@ -87,8 +89,136 @@ QtObject {
                     fields: driver.manyFields,
                     submit: "Save"
                 });
+            if (driver.state.startsWith("file") || driver.state === "folder") {
+                driver.menu.engine.push(driver.state === "folder" ? driver.unpinForm : driver.importForm);
+                toPath.start();
+            }
             if (driver.state === "form-scrolled" || driver.state === "actions-end")
                 toLast.start();
+            driver.capture.start();
+        }
+    }
+
+    // "Import VPN config…" as the Daemon asks for its file, and "Unpin a Suite version…" for its
+    // suite and folder.
+    readonly property var importForm: ({
+            kind: "form",
+            id: "argument-form",
+            title: "Import VPN config…",
+            submit: "Import VPN config…",
+            fields: [
+                {
+                    id: "path",
+                    label: "path",
+                    kind: "file",
+                    accept: ["conf", "ovpn"],
+                    placeholder: "~/Downloads/work.conf",
+                    value: ""
+                }
+            ]
+        })
+    readonly property var unpinForm: ({
+            kind: "form",
+            id: "argument-form",
+            title: "Unpin a Suite version…",
+            submit: "Unpin a Suite version…",
+            fields: [
+                {
+                    id: "suite",
+                    label: "suite",
+                    kind: "text",
+                    placeholder: "node",
+                    value: "node"
+                },
+                {
+                    id: "folder",
+                    label: "folder",
+                    kind: "folder",
+                    accept: [],
+                    placeholder: "~/Projects/acme",
+                    value: ""
+                }
+            ]
+        })
+    // Seconds since the epoch, `hours` before the harness's frozen clock.
+    function before(hours: real): int {
+        return Math.round(Time.now.getTime() / 1000 - hours * 3600);
+    }
+    // What the Daemon answers for each state: the newest files the field takes, what completes
+    // `~/Down`, and the folders in the projects folder.
+    readonly property var paths: ({
+            "file-recent": [
+                {
+                    path: "/home/kuba/Downloads/work-kuba.conf",
+                    title: "work-kuba.conf",
+                    folder: false,
+                    modified: driver.before(2),
+                    highlights: []
+                },
+                {
+                    path: "/home/kuba/Documents/vpn/home-router.ovpn",
+                    title: "home-router.ovpn",
+                    folder: false,
+                    modified: driver.before(30),
+                    highlights: []
+                },
+                {
+                    path: "/home/kuba/Desktop/work-old.conf",
+                    title: "work-old.conf",
+                    folder: false,
+                    modified: driver.before(24 * 16),
+                    highlights: []
+                }
+            ],
+            "file-typed": [
+                {
+                    path: "/home/kuba/Downloads",
+                    title: "Downloads",
+                    folder: true,
+                    modified: -1,
+                    highlights: [0, 1, 2, 3]
+                }
+            ],
+            "folder": [
+                {
+                    path: "/home/kuba/Projects/acme",
+                    title: "acme",
+                    folder: true,
+                    modified: -1,
+                    highlights: []
+                },
+                {
+                    path: "/home/kuba/Projects/kubaos",
+                    title: "kubaos",
+                    folder: true,
+                    modified: -1,
+                    highlights: []
+                },
+                {
+                    path: "/home/kuba/Projects/kotodama",
+                    title: "kotodama",
+                    folder: true,
+                    modified: -1,
+                    highlights: []
+                }
+            ]
+        })
+
+    // The keys on the form's path field, what was typed in it, and the Daemon's paths for it,
+    // once the View has laid out.
+    property Timer toPath: Timer {
+        interval: K.Tokens.duration.medium * 2
+        onTriggered: {
+            const content = driver.menu.contentItem;
+            const field = driver.find(content, it => typeof it.focusField === "function" && it.visible);
+            if (!field) {
+                console.warn("shot: no file field found");
+                return;
+            }
+            field.focusField();
+            if (driver.state === "file-typed")
+                field.text = "~/Down";
+            driver.menu.engine.completions = driver.paths[driver.state];
             driver.capture.start();
         }
     }

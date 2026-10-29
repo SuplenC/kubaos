@@ -132,6 +132,8 @@ FocusScope {
                         required property int index
                         required property var modelData
                         readonly property string kind: modelData.kind
+                        // In sentence case: the Daemon labels an Argument's field with its name, as `path`.
+                        readonly property string label: (modelData.label ?? "").charAt(0).toUpperCase() + (modelData.label ?? "").slice(1)
                         readonly property bool path: kind === "file" || kind === "folder"
                         readonly property bool pathsOpen: field.path && pathField.listOpen
                         readonly property bool current: typed.activeFocus || toggle.activeFocus || choice.activeFocus || pathField.hasKeys
@@ -175,7 +177,7 @@ FocusScope {
 
                         K.Labelled {
                             visible: field.kind !== "checkbox"
-                            label: field.modelData.label
+                            label: field.label
                             action: field.path ? browseButton : null
 
                             Component {
@@ -310,7 +312,7 @@ FocusScope {
                             K.Checkbox {
                                 id: box
 
-                                text: field.modelData.label
+                                text: field.label
                                 tick: toggle.checked ? "Full" : "Empty"
                                 focused: toggle.activeFocus
                                 activeFocusOnTab: false

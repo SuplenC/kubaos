@@ -46,7 +46,11 @@ K.Stack {
 
     // `path` written `~/…` under the home folder, as it would be typed.
     function homeRelative(path: string): string {
-        return root.home !== "" && path.startsWith(root.home + "/") ? "~" + path.slice(root.home.length) : path;
+        if (root.home === "")
+            return path;
+        if (path === root.home)
+            return "~";
+        return path.startsWith(root.home + "/") ? "~" + path.slice(root.home.length) : path;
     }
 
     // The folder `path` is in, as it would be typed.
@@ -60,7 +64,7 @@ K.Stack {
         if (modified < 0)
             return "";
         const at = new Date(modified * 1000);
-        const now = new Date();
+        const now = Time.now;
         if (at.toDateString() === now.toDateString())
             return Qt.formatDateTime(at, Time.timeFormat);
         if (at.getFullYear() === now.getFullYear())
@@ -142,8 +146,6 @@ K.Stack {
         id: typed
 
         placeholder: root.placeholder
-        // A file dragged over the field lights it as the keys do: it lands here.
-        focused: typed.activeFocus || drop.containsDrag
         onTextChanged: {
             root.search.setText(root.place, text);
             root.picked = -1;

@@ -80,3 +80,6 @@ menu-pushed              menu           MenuShot    -                 pushed
 menu-form-long           menu           MenuShot    -                 form-long
 menu-actions-end         menu           MenuShot    -                 actions-end
 menu-form-scrolled       menu           MenuShot    -                 form-scrolled
+menu-file-recent         menu           MenuShot    -                 file-recent
+menu-file-typed          menu           MenuShot    -                 file-typed
+menu-folder              menu           MenuShot    -                 folder
