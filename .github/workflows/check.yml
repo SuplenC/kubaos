@@ -9,6 +9,9 @@
 # - nextest and nextest (slow): `just nextest`, split in two by `SLOW_TEST`.
 # - qml: `just qml-test`.
 # - design: `just design-check`, with QML's parity.
+# - system files: `just system-files-check`'s two scripts, run straight on the
+#   runner: they need only bash and git, so the job sets up no Nix. It checks
+#   out the whole history, for the merge base with main.
 # `check (x86_64-linux)` needs them all and fails unless every one passed. It
 # is the one check branch protection requires, so a job added here goes in its
 # `needs`.
@@ -239,11 +242,27 @@ jobs:
             ~/.cargo/git/db
           key: ${{ steps.setup.outputs.cargo-key }}
 
+  system-files:
+    name: system files
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check's tests
+        run: test/system-files/check-test .
+
+      - name: System files
+        run: test/system-files/check --base origin/main .
+
   # Always runs: a required check that is skipped counts as passed, so this
   # one runs on the others' failure or cancellation too, and fails.
   check:
     name: check (x86_64-linux)
-    needs: [flake, lint, nextest, nextest-slow, qml, design]
+    needs: [flake, lint, nextest, nextest-slow, qml, design, system-files]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

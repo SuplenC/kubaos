@@ -43,8 +43,13 @@ release: test
     just iso x86_64
     ls -lh iso/kubaos-{{codename}}-{{ver}}-*.iso
 
-# What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests, the shell's logic tests, the screenshot harness's tests and the design checks.
-check: fmt-check lint nextest qml-test shots-test design-check
+# What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests, the shell's logic tests, the screenshot harness's tests, the design checks and the system files' check.
+check: fmt-check lint nextest qml-test shots-test design-check system-files-check
+
+# A changed file under system/files/ comes with a new system migration that installs it again, and system/files.map says what installs every file there (test/system-files/check, docs/agents/code-quality.md, "Shell"). Compares against the merge base with `base`; runs its own tests first.
+system-files-check base="origin/main":
+    test/system-files/check-test .
+    test/system-files/check --base {{base}} .
 
 # The shell's logic tests (test/qml) in Qt's test runner, headless, as `nix flake check` runs them (crates/checks.nix, qml-logic). A message from the QML engine fails them, as it fails the e2e checks. The flake sees the files git knows about: `git add` a new test first.
 qml-test:

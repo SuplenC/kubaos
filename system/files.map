@@ -1,0 +1,87 @@
+# What puts each file under system/files/ on a machine, which
+# test/system-files/check reads. kubaos update reaches an installed machine's
+# system side only through migrations, so a branch that changes or removes a
+# file here ships a new migrations/system/*.sh that installs it again.
+#
+# One line a file: its path under system/files/, then what installs it. A
+# pattern's * matches across folders too; the first line that matches wins.
+# What installs it is one or more of:
+# - a function in system/*.sh (install_proxy_helper): a migration calls it;
+# - a system script (system/50-hyprland.sh): a migration installs the file
+#   itself, as install_root_file does, naming its path;
+# or one word for a file no migration has to reinstall:
+# - update: every kubaos update installs it again (system/relink.sh);
+# - in-place: read from the release's checkout, /usr/share/kubaos, which the
+#   update moves;
+# - source: the input a generated file here is written from, the generated
+#   file listed itself;
+# - image: only the install image or the end-to-end harness reads it.
+# A file no line matches fails the check, so a new file comes with its line.
+
+apt/apt.conf.d/99kubaos-no-periodic                     retire_ubuntu_updaters
+apt/preferences.d/no-snapd                              system/10-strip.sh
+# kubaos update sets up a vendor repo only for a group with packages to
+# install, so a changed sources file still needs a migration.
+apt/sources.list.d/*.sources                            repo_setup
+
+chrome/dot-chrome-theme                                 system/40-apps.sh
+chrome/dot-chrome-theme.path.in                         system/40-apps.sh
+chrome/dot-chrome-theme.service.in                      system/40-apps.sh
+
+fonts/Geist-Regular.ttf                                 install_plymouth_theme install_grub_theme
+fonts/GeistMono-Regular.ttf                             install_plymouth_theme install_grub_theme
+fonts/Geist-OFL.txt                                     install_plymouth_theme
+fonts/Geist-Medium.ttf                                  install_grub_theme
+
+getty/autologin.conf.in                                 system/50-hyprland.sh
+
+grub/10_linux                                           system/25-boot.sh
+grub/kubaos.cfg                                         system/25-boot.sh
+grub/kubaos/*                                           install_grub_theme
+grub/theme.txt.in                                       source
+
+hyprland-autostart.zsh                                  in-place
+
+initramfs-tools/hooks/kubaos-plymouth                   install_plymouth_theme
+initramfs-tools/hooks/kubaos-snapshot-overlay           system/25-boot.sh
+initramfs-tools/scripts/local-bottom/kubaos-snapshot-overlay system/25-boot.sh
+
+keyboard/kubaos-keyboard-write                          install_keyboard_writer
+keyd/kubaos.conf                                        install_mac_accents
+logind.conf.d/lid.conf                                  system/20-base.sh
+modprobe.d/kubaos-amdgpu.conf                           install_power_helper
+netplan/01-network-manager-all.yaml                     system/20-base.sh
+
+pam.d/qs-lock                                           system/50-hyprland.sh
+pam.d/qs-lock-fingerprint                               system/50-hyprland.sh
+pam.d/qs-lock-u2f                                       system/70-bitwarden.sh
+
+plymouth/conf/plymouthd.conf                            install_plymouth_theme
+plymouth/kubaos/*                                       install_plymouth_theme
+
+polkit/50-kubaos-keyboard.rules                         install_keyboard_writer
+polkit/org.kubaos.keyboard.policy                       install_keyboard_writer
+polkit/50-kubaos-keyd.rules                             install_mac_accents
+polkit/50-kubaos-power.rules                            install_power_helper
+polkit/org.kubaos.power.policy                          install_power_helper
+polkit/50-kubaos-proxy.rules                            install_proxy_helper
+polkit/org.kubaos.proxy.policy                          install_proxy_helper
+
+power/kubaos-power-write                                install_power_helper
+proxy/kubaos-proxy-write                                install_proxy_helper
+sysctl.d/60-kubaos-inotify.conf                         install_inotify_limits
+
+systemd/docker.service.d/kubaos-stop.conf               docker_on_demand
+systemd/kubaos-scx.service                              update
+systemd/kubaos-shutdown-splash.service                  install_shutdown_splash
+systemd/plymouth-shutdown.d/kubaos-after-session.conf   install_shutdown_splash
+systemd/polkit-agent-helper@.service.d/u2f.conf         system/70-bitwarden.sh
+systemd/snapper-boot.service.d/kubaos-not-in-snapshot.conf system/25-boot.sh
+systemd/system.conf.d/kubaos-timeouts.conf              install_fast_shutdown_boot
+systemd/user.conf.d/kubaos-timeouts.conf                install_fast_shutdown_boot
+
+tmpfiles.d/qs-lock-unix-chkpwd.conf                     system/50-hyprland.sh
+udev/90-kubaos-backlight.rules                          system/50-hyprland.sh
+
+xkb/rules/evdev                                         install_mac_accents
+xkb/symbols/kubaos                                      install_mac_accents

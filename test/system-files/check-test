@@ -1,0 +1,187 @@
+#!/usr/bin/env bash
+# test/system-files/check-test: test/system-files/check on throwaway
+# repositories holding REPO's system/ and migrations/, one commit as the base
+# and each test's change on top. Needs bash, coreutils and git.
+#
+#   test/system-files/check-test REPO
+#
+# Prints an ok or FAIL line per test and exits 1 when any fails.
+# shellcheck disable=SC2329 # The tests are called by name, from declare -F.
+# shellcheck disable=SC2016 # The migrations written here expand their variables when they run.
+set -euo pipefail
+shopt -s inherit_errexit
+
+REPO="$(cd "${1:?usage: test/system-files/check-test REPO}" && pwd)"
+CHECK="$REPO/test/system-files/check"
+# Inside the repo's ignored target/, not the system's temporary folder.
+mkdir -p "$REPO/target"
+SCRATCH="$(mktemp -d "$REPO/target/system-files-check.XXXXXX")"
+trap 'rm -rf "$SCRATCH"' EXIT
+failed=0
+
+# A repository at $M whose one commit, $BASE, is REPO's system/ and
+# migrations/ as the working tree has them.
+new_repo() {
+  M="$(mktemp -d "$SCRATCH/repo.XXXXXX")"
+  git -C "$M" init -q -b main
+  cp -a "$REPO/system" "$REPO/migrations" "$M/"
+  commit base
+  BASE="$(git -C "$M" rev-parse HEAD)"
+}
+
+commit() {
+  git -C "$M" add -A
+  git -C "$M" -c user.name=test -c user.email=test@kubaos -c commit.gpgsign=false \
+    commit -q --allow-empty -m "$1"
+}
+
+# A system migration named SLUG whose body is the rest of the arguments.
+migration() {
+  local slug="$1"
+  shift
+  printf '%s\n' '#!/usr/bin/env bash' 'source "$KUBAOS_DIR/system/lib.sh"' "$@" \
+    >"$M/migrations/system/1999999999-$slug.sh"
+}
+
+# Runs the check on $M against $BASE; OUT is what it printed, and it returns
+# the check's status.
+run_check() {
+  local status=0
+  OUT="$("$CHECK" --base "$BASE" "$M" 2>&1)" || status=$?
+  return "$status"
+}
+
+expect_pass() {
+  run_check || { printf '%s\n' "$OUT" >&2; return 1; }
+}
+
+# expect_fail TEXT...: the check fails, naming each TEXT.
+expect_fail() {
+  local t
+  if run_check; then
+    echo "passed, expected a failure" >&2
+    return 1
+  fi
+  for t in "$@"; do
+    [[ $OUT == *"$t"* ]] || { printf 'no "%s" in:\n%s\n' "$t" "$OUT" >&2; return 1; }
+  done
+}
+
+edit() { printf '# changed\n' >>"$M/system/files/$1"; }
+
+test_the_repo_passes_unchanged() {
+  new_repo
+  expect_pass
+}
+
+test_a_changed_helper_without_a_migration_fails() {
+  new_repo
+  edit proxy/kubaos-proxy-write
+  commit helper
+  expect_fail system/files/proxy/kubaos-proxy-write install_proxy_helper
+}
+
+test_an_uncommitted_change_counts() {
+  new_repo
+  edit proxy/kubaos-proxy-write
+  expect_fail system/files/proxy/kubaos-proxy-write
+}
+
+test_a_migration_calling_the_installer_passes() {
+  new_repo
+  edit proxy/kubaos-proxy-write
+  migration proxy-again install_proxy_helper
+  commit helper
+  expect_pass
+}
+
+test_an_untracked_migration_counts() {
+  new_repo
+  edit proxy/kubaos-proxy-write
+  commit helper
+  migration proxy-again install_proxy_helper
+  expect_pass
+}
+
+test_a_migration_for_something_else_fails() {
+  new_repo
+  edit proxy/kubaos-proxy-write
+  migration power-again install_power_helper
+  commit helper
+  expect_fail system/files/proxy/kubaos-proxy-write install_proxy_helper
+}
+
+test_an_edited_old_migration_does_not_count() {
+  new_repo
+  edit proxy/kubaos-proxy-write
+  printf 'install_proxy_helper\n' >>"$M/migrations/system/1793283073-proxy-helper-lan.sh"
+  commit helper
+  expect_fail system/files/proxy/kubaos-proxy-write
+}
+
+test_a_script_installed_file_needs_its_path_named() {
+  new_repo
+  edit udev/90-kubaos-backlight.rules
+  migration unrelated 'install_root_file "$FILES_DIR/udev/other.rules" /etc/udev/rules.d/other.rules 0644'
+  commit rule
+  expect_fail system/files/udev/90-kubaos-backlight.rules system/50-hyprland.sh
+  migration backlight 'install_root_file "$FILES_DIR/udev/90-kubaos-backlight.rules" /etc/udev/rules.d/90-kubaos-backlight.rules 0644'
+  commit migration
+  expect_pass
+}
+
+test_a_file_read_in_place_needs_no_migration() {
+  new_repo
+  edit hyprland-autostart.zsh
+  commit autostart
+  expect_pass
+}
+
+test_a_removed_file_needs_a_migration() {
+  new_repo
+  rm "$M/system/files/udev/90-kubaos-backlight.rules"
+  sed -i '\|^udev/90-kubaos-backlight.rules|d' "$M/system/files.map"
+  commit removed
+  expect_fail "system/files/udev/90-kubaos-backlight.rules is gone"
+}
+
+test_a_file_with_no_line_fails() {
+  new_repo
+  printf 'x\n' >"$M/system/files/udev/91-new.rules"
+  migration new-rule 'install_root_file "$FILES_DIR/udev/91-new.rules" /etc/udev/rules.d/91-new.rules 0644'
+  expect_fail "system/files/udev/91-new.rules has no line in system/files.map"
+}
+
+test_a_line_matching_no_file_fails() {
+  new_repo
+  printf 'udev/gone.rules system/50-hyprland.sh\n' >>"$M/system/files.map"
+  expect_fail "udev/gone.rules matches no file"
+}
+
+test_an_installer_that_does_not_install_the_file_fails() {
+  new_repo
+  sed -i 's|^proxy/kubaos-proxy-write .*|proxy/kubaos-proxy-write install_power_helper|' "$M/system/files.map"
+  expect_fail "install_power_helper doesn't install system/files/proxy/kubaos-proxy-write"
+}
+
+test_an_installer_no_script_defines_fails() {
+  new_repo
+  sed -i 's|^proxy/kubaos-proxy-write .*|proxy/kubaos-proxy-write install_nothing|' "$M/system/files.map"
+  expect_fail "no system/*.sh defines install_nothing"
+}
+
+for t in $(declare -F | awk '$3 ~ /^test_/ { print $3 }'); do
+  # Not in a condition, so a test stops at its first failed command.
+  set +e
+  out="$(set -e; "$t" 2>&1)"
+  rc=$?
+  set -e
+  if ((rc == 0)); then
+    echo "ok    ${t#test_}"
+  else
+    echo "FAIL  ${t#test_}"
+    printf '%s\n' "$out" | sed 's/^/      /'
+    failed=1
+  fi
+done
+exit "$failed"

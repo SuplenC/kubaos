@@ -12,6 +12,8 @@ Personal Ubuntu + Nix + Hyprland OS. Recipes live in `justfile`; docs in `docs/`
 
 Before writing or reviewing code in this repo, read `docs/agents/code-quality.md`: the comment rules for every language, then the Rust, shell, Nix, QML and Lua rules. New code follows them; older code is brought in line where it is touched. Code comments carry the why, never an issue or ADR number; those belong in the issue and the PR.
 
+A change to a file under `system/files/` ships a new `migrations/system/` script that installs it again (it calls the file's `install_*`), or installed machines keep the old copy; `system/files.map` names what installs each file, and `just system-files-check` fails a branch without one (`docs/agents/code-quality.md`, "Shell").
+
 ## Design
 
 Any UI, in any toolkit, follows `docs/DESIGN.md` and each component's page under `docs/design/components/`: tokens and the shared components only, never a literal colour, size, spacing, radius, duration or font. `just design-check` passes (the rules are in `docs/agents/code-quality.md`, "Design"). Before a UI change reaches Kuba, review its rendered screenshots against `docs/agents/design-review.md`, his recurring review points.
