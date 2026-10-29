@@ -281,7 +281,7 @@ Everything a person sees is built from a few levels, each made only from the one
 | **Templates** | A screen's layout, empty: its regions, how it reflows as its window resizes, and how it moves between its pages | a sidebar beside a page, a step rail beside a page (Kōbō), a panel | The library |
 | **Apps and surfaces** | A template filled with organisms and real data | Kōbō, Screens; the control center | An app's own crate; a surface's shell module |
 
-"The library" is both libraries below, with the same names. A molecule may stay in its app only when it means something only there and is unlikely to be needed elsewhere; when a second surface needs it, it moves into the library. An app never builds a part of a lower level itself: `docs/agents/building-ui.md` is how a new UI gets the parts it needs, and in what order.
+"The library" is both libraries below, with the same names. A part only the shell has (the bar's `Pill`) may be in `KubaOS.Components` alone: its page says so, and it stays out of both specimens until `kubaos-ui` has it, since parity holds the two pages to each other box for box. A molecule may stay in its app only when it means something only there and is unlikely to be needed elsewhere; when a second surface needs it, it moves into the library. An app never builds a part of a lower level itself: `docs/agents/building-ui.md` is how a new UI gets the parts it needs, and in what order.
 
 *Not enforced yet:* the library has no templates; the first ones come with the next app (no issue yet).
 
