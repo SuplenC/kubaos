@@ -118,8 +118,19 @@ Item {
             return;
         K.LayoutPasses.count += 1;
         const kids = root.managed();
-        root.childFills = kids.some(kid => kid.fillWidth === true);
+        const childFills = () => kids.some(kid => kid.fillWidth === true);
+        root.childFills = childFills();
         root.arrange(kids);
+        // A child knows whether it fills only once it has laid out its own children, which
+        // arranging just did. HAZARD: arrange again here when that changed. The child's
+        // `fillWidthChanged` marks this layout dirty, but the line clearing `dirty` below drops it,
+        // and the layout would keep the width it took for children that didn't fill: a form's
+        // fields squashed into a narrow column, depending on which layout was laid out first.
+        if (childFills() !== root.childFills) {
+            K.LayoutPasses.count += 1;
+            root.childFills = childFills();
+            root.arrange(kids);
+        }
         root.laid.width = root.width;
         root.laid.room = root.room;
         root.laid.dpr = root.dpr;
