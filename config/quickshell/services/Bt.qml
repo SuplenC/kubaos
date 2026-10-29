@@ -36,10 +36,15 @@ Singleton {
     readonly property var devices: Bluetooth.devices.values
     // How strongly each device was last heard while scanning, in dBm, by object path.
     readonly property var rssi: agentState.rssi ?? ({})
-    // Paired devices, the connected first; then the ones in range to pair, nearest first
-    // (radios.js). BlueZ forgets an unpaired device a while after a scan stops hearing it.
+    // Paired devices, the connected first, named or not; then the ones in range to pair, nearest
+    // first, those that send a name in `nearby` and those that don't in `unnamed`, which the tab
+    // keeps in a drawer that is closed unless `showUnnamed` (radios.js). BlueZ forgets an unpaired
+    // device a while after a scan stops hearing it.
     readonly property var known: Radios.btKnown(devices)
-    readonly property var nearby: Radios.btNearby(devices, rssi)
+    readonly property var inRange: Radios.btSplit(Radios.btNearby(devices, rssi))
+    readonly property var nearby: inRange.named
+    readonly property var unnamed: inRange.unnamed
+    readonly property bool showUnnamed: ShellState.bluetoothUnnamed
     readonly property int connectedCount: devices.filter(d => d.connected).length
     readonly property string icon: !enabled ? "bluetooth_disabled" : connectedCount > 0 ? "bluetooth_connected" : "bluetooth"
 
@@ -70,6 +75,11 @@ Singleton {
         }
         problem = "";
         run(["scan", on ? "on" : "off", adapter.dbusPath], on);
+    }
+
+    // Remembered across restarts, for the Nearby line's Show and Hide and the Command menu's pair.
+    function setShowUnnamed(on: bool): void {
+        ShellState.bluetoothUnnamed = on;
     }
 
     // The control center on the Bluetooth tab, which scans while it shows.

@@ -2,14 +2,13 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.UPower
 import qs.settings
 
 // When moving wallpapers may decode. The user's mode (always / ac / never,
-// remembered on disk) and what the machine is doing: on battery, locked,
+// remembered in `ShellState`) and what the machine is doing: on battery, locked,
 // screens off (idle as long as hypridle waits before DPMS), a fullscreen
 // window on that monitor. Anything that says no stops the video and shows
 // its poster frame.
@@ -17,7 +16,7 @@ Singleton {
     id: root
 
     readonly property list<string> modes: ["ac", "always", "never"]
-    readonly property string mode: modes.includes(prefs.animate) ? prefs.animate : Settings.wallpaperAnimate
+    readonly property string mode: modes.includes(ShellState.animate) ? ShellState.animate : Settings.wallpaperAnimate
     readonly property string modeLabel: mode === "always" ? "Always" : mode === "never" ? "Never" : "On AC"
     readonly property bool onBattery: UPower.onBattery
     // The mode and the power source allow motion at all.
@@ -35,7 +34,7 @@ Singleton {
     function setMode(m: string): bool {
         if (!modes.includes(m))
             return false;
-        prefs.animate = m;
+        ShellState.animate = m;
         return true;
     }
 
@@ -68,25 +67,5 @@ Singleton {
 
         timeout: Settings.screenOffAfter
         respectInhibitors: true
-    }
-
-    FileView {
-        id: file
-
-        path: `${Quickshell.env("XDG_STATE_HOME") || `${Settings.home}/.local/state`}/quickshell/kubaos.json`
-        printErrors: false
-        atomicWrites: true
-        onAdapterUpdated: writeAdapter()
-        // First run: no file yet. Write the defaults so the next change has a place to go.
-        onLoadFailed: error => {
-            if (error === FileViewError.FileNotFound)
-                writeAdapter();
-        }
-
-        JsonAdapter {
-            id: prefs
-
-            property string animate: ""
-        }
     }
 }

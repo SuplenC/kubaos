@@ -189,6 +189,12 @@ impl Paths {
         self.state.join("preview.json")
     }
 
+    /// What the shell's panels remember, `~/.local/state/quickshell/kubaos.json`, beside KubaOS's
+    /// own state folder: `config/quickshell/services/ShellState.qml` writes it.
+    pub fn shell_state(&self) -> PathBuf {
+        self.state.with_file_name("quickshell").join("kubaos.json")
+    }
+
     /// The lock every edit of the state directory takes. It lives outside the directory, so that
     /// neither the flake nor a generation's copy picks it up.
     pub fn edit_lock(&self) -> PathBuf {

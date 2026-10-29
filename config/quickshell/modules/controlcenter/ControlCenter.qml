@@ -25,8 +25,10 @@ K.Sheet {
     flushEnd: true
     contentWidth: K.Tokens.size.panel
     // Onto the tab's connection form when one is open (a pairing the device started), else the
-    // first quick toggle.
+    // first quick toggle. The radio lists open at their top, Known first, wherever they were left.
     onOpened: {
+        wifi.list.positionViewAtBeginning();
+        bluetooth.list.positionViewAtBeginning();
         const radio = [wifi, bluetooth][root.tab];
         if (radio?.formOpen)
             radio.form.focusFirst();

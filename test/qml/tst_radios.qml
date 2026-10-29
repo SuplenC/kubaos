@@ -84,7 +84,50 @@ TestCase {
         const devices = [device("Headphones", true), device("AA:BB", false, false, "AA:BB"), device("Speaker")];
 
         compare(names(Radios.btKnown(devices)), ["Headphones"]);
-        compare(names(Radios.btNearby(devices, {})), ["Speaker"]);
+        compare(names(Radios.btSplit(Radios.btNearby(devices, {})).named), ["Speaker"]);
+    }
+
+    function test_a_device_bluez_names_by_its_address_is_unnamed() {
+        verify(Radios.unnamed(device("4C-2F-9A-01-BE-77", false, false, "4C:2F:9A:01:BE:77")), "BlueZ's alias, dashes for colons");
+        verify(Radios.unnamed(device("4c-2f-9a-01-be-77", false, false, "4C:2F:9A:01:BE:77")), "whatever its case");
+        verify(Radios.unnamed(device("", false, false, "4C:2F:9A:01:BE:77")), "no name at all");
+        verify(!Radios.unnamed(device("Speaker")), "a name of its own");
+    }
+
+    function test_unnamed_devices_are_set_apart_and_counted() {
+        const devices = [device("Speaker"), device("11-22", false, false, "11:22"), device("33-44", false, false, "33:44"), device("Watch")];
+
+        const split = Radios.btSplit(Radios.btNearby(devices, {}));
+
+        compare(names(split.named), ["Speaker", "Watch"]);
+        compare(names(split.unnamed), ["11-22", "33-44"]);
+        compare(Radios.unnamedLine(split.unnamed.length), "2 unnamed devices");
+        compare(Radios.unnamedLine(1), "1 unnamed device");
+    }
+
+    function test_the_unnamed_devices_come_after_the_named_ones_however_near_each_nearest_first() {
+        const devices = [device("11-22", false, false, "11:22"), device("Speaker"), device("33-44", false, false, "33:44"), device("Watch")];
+        const rssi = {
+            "/org/bluez/hci0/11-22": -88,
+            "/org/bluez/hci0/33-44": -40,
+            "/org/bluez/hci0/Watch": -88
+        };
+
+        const split = Radios.btSplit(Radios.btNearby(devices, rssi));
+
+        compare(names(split.named), ["Watch", "Speaker"]);
+        compare(names(split.unnamed), ["33-44", "11-22"]);
+    }
+
+    function test_there_is_no_line_without_unnamed_devices() {
+        compare(Radios.unnamedLine(0), "");
+    }
+
+    function test_known_devices_show_named_or_not() {
+        const devices = [device("11-22", true, false, "11:22"), device("Headphones", true), device("33-44", false, false, "33:44")];
+
+        compare(names(Radios.btKnown(devices)), ["11-22", "Headphones"]);
+        compare(Radios.btSplit(Radios.btNearby(devices, {})).unnamed.length, 1, "only the unpaired one counts");
     }
 
     function test_connected_devices_lead_the_known_ones() {

@@ -30,6 +30,18 @@ Scope {
     }
 
     IpcHandler {
+        target: "bluetooth"
+
+        // Whether Nearby lists the devices that send no name: show or hide. Remembered.
+        function unnamed(state: string): string {
+            if (state !== "show" && state !== "hide")
+                return `unknown state '${state}': show or hide`;
+            Bt.setShowUnnamed(state === "show");
+            return Bt.showUnnamed ? "show" : "hide";
+        }
+    }
+
+    IpcHandler {
         target: "powermenu"
 
         function toggle(): void {

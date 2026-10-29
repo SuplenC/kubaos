@@ -2,13 +2,14 @@ pragma Singleton
 import QtQuick
 
 // Stand-in for Bt: headphones and a mouse connected with their batteries, a keyboard and a phone
-// paired, and three devices in range at three distances. The drivers set `prompt`, `pairing` and
-// `errors` for the pairing states.
+// paired, three devices in range at three distances, and three more in range that send no name,
+// in a drawer that is closed until `showUnnamed`. The drivers set `prompt`, `pairing` and `errors`
+// for the pairing states.
 QtObject {
     id: root
 
-    function device(name: string, icon: string, connected: bool, paired: bool, battery: real): QtObject {
-        return Qt.createQmlObject(`import QtQuick; QtObject { property string name: "${name}"; property string address: "00:11:22:33:44:55"; property string dbusPath: "/org/bluez/hci0/${name.replace(/\W/g, "_")}"; property string icon: "${icon}"; property bool connected: ${connected}; property bool paired: ${paired}; property bool trusted: ${paired}; property bool batteryAvailable: ${battery >= 0}; property real battery: ${battery}; property int state: ${connected ? 1 : 0}; function connect() {} function disconnect() {} function forget() {} }`, root);
+    function device(name: string, icon: string, connected: bool, paired: bool, battery: real, address: string): QtObject {
+        return Qt.createQmlObject(`import QtQuick; QtObject { property string name: "${name}"; property string address: "${address ?? "00:11:22:33:44:55"}"; property string dbusPath: "/org/bluez/hci0/${name.replace(/\W/g, "_")}"; property string icon: "${icon}"; property bool connected: ${connected}; property bool paired: ${paired}; property bool trusted: ${paired}; property bool batteryAvailable: ${battery >= 0}; property real battery: ${battery}; property int state: ${connected ? 1 : 0}; function connect() {} function disconnect() {} function forget() {} }`, root);
     }
 
     readonly property bool available: true
@@ -33,6 +34,9 @@ QtObject {
     // As radios.js orders them, the fixture's RSSIs already nearest first; written out here, as the
     // tree before radios.js existed has none.
     readonly property var known: devices.filter(d => d.paired).sort((a, b) => (b.connected - a.connected) || a.name.localeCompare(b.name))
+    // BlueZ names a device that sends none by its address, dashes for the colons.
+    readonly property var unnamed: ["4C:2F:9A:01:BE:77", "D8:3A:DD:5E:10:C2", "F1:07:63:A4:29:8B"].map(address => root.device(address.replace(/:/g, "-"), "", false, false, -1, address))
+    property bool showUnnamed: false
     readonly property var nearby: devices.filter(d => !d.paired).sort((a, b) => (rssi[b.dbusPath] ?? -999) - (rssi[a.dbusPath] ?? -999))
     readonly property int connectedCount: devices.filter(d => d.connected).length
     readonly property string icon: !enabled ? "bluetooth_disabled" : connectedCount > 0 ? "bluetooth_connected" : "bluetooth"
@@ -48,6 +52,10 @@ QtObject {
     }
 
     function setScanning(on: bool): void {
+    }
+
+    function setShowUnnamed(on: bool): void {
+        root.showUnnamed = on;
     }
 
     function show(): void {

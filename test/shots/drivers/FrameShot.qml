@@ -17,9 +17,13 @@ import qs.modules.frame
 //                  wifi-form (a secured network's form, a password typed), wifi-error (the
 //                  same, the password turned down), wifi-leaving (a network gone out of range
 //                  held half-way out), wifi-scan (a scan's update: a network gone, one new and two
-//                  swapped, its frame times logged), bluetooth (the Bluetooth tab), bluetooth-form (a nearby
-//                  device's form), bluetooth-code (its pairing code to type on it), keyboard, keyboard-tooltip (the Mac accents
-//                  explained), keyboard-drag (the second layout dragged onto the first),
+//                  swapped, its frame times logged), bluetooth (the Bluetooth tab),
+//                  bluetooth-unnamed (scrolled to its end, the line over the closed drawer of
+//                  unnamed devices), bluetooth-unnamed-open (the drawer opened, scrolled to its
+//                  end), bluetooth-scan (a
+//                  scan that finds six more devices, nearer than the ones listed), bluetooth-form
+//                  (a nearby device's form), bluetooth-code (its pairing code to type on it),
+//                  keyboard, keyboard-tooltip (the Mac accents explained), keyboard-drag (the second layout dragged onto the first),
 //                  keyboard-add ("germ" searched for a layout to add), each with the history
 //                  cleared, scanning (a Wi-Fi scan that has found nothing yet, the history cleared)
 //   clock: answer (a question typed into the search), settings
@@ -273,6 +277,20 @@ QtObject {
                 Net.networks = Net.networks.filter(network => network.name !== "7SPOT");
                 holdLeave.start();
             }
+            if (driver.state === "bluetooth-unnamed")
+                bluetooth.list.positionViewAtEnd();
+            if (driver.state === "bluetooth-unnamed-open") {
+                Bt.setShowUnnamed(true);
+                drawerPose.list = bluetooth.list;
+                drawerPose.start();
+            }
+            if (driver.state === "bluetooth-scan") {
+                const found = ["Bose QC45", "AirPods Pro", "Galaxy Buds2", "Sonos Roam", "Kindle", "Apple Watch"].map(name => Bt.device(name, "audio-headphones", false, false, -1));
+                const rssi = Object.assign({}, Bt.rssi);
+                found.forEach((device, n) => rssi[device.dbusPath] = -40 - n);
+                Bt.rssi = rssi;
+                Bt.devices = [...Bt.devices, ...found];
+            }
             if (driver.state === "bluetooth-form")
                 bluetooth.open(jbl);
             if (driver.state === "bluetooth-code") {
@@ -320,6 +338,14 @@ QtObject {
     // The leaving row held half-way out, watched for as the view removes it on its next frame,
     // which llvmpipe can take a while to draw.
     property int leaveWatch: 0
+    // The open drawer scrolled into view once it has opened, as the person would scroll to it.
+    property Timer drawerPose: Timer {
+        property var list: null
+
+        interval: 600
+        onTriggered: list.positionViewAtEnd()
+    }
+
     property Timer holdLeave: Timer {
         interval: 16
         repeat: true

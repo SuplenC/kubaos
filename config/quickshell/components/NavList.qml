@@ -7,6 +7,8 @@ import KubaOS.Components as K
 // true: a text field that forwards its keys here keeps both.
 // Its rows are `K.ListRow`s 4 apart, as in a `K.List` well; the current row shows itself selected
 // while `highlightShown`, by `selected: ListView.isCurrentItem && ListView.view.highlightShown`.
+// A list that sets `highlightFollowsCurrentItem: false` scrolls only for the keys: they bring the
+// row they select into view, and a current row the model moves takes the view nowhere.
 ListView {
     id: root
 
@@ -105,9 +107,17 @@ ListView {
         else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && currentIndex >= 0 && count > 0) {
             if (!event.isAutoRepeat)
                 activated(currentIndex);
+            return true;
         } else
             return false;
+        reveal();
         return true;
+    }
+
+    // The selected row into view, where the view doesn't follow it by itself.
+    function reveal(): void {
+        if (!highlightFollowsCurrentItem && currentIndex >= 0)
+            positionViewAtIndex(currentIndex, ListView.Contain);
     }
 
     Keys.onPressed: event => event.accepted = handleKey(event)

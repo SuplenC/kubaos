@@ -51,6 +51,7 @@ impl Machine {
             proxy: Some(root.join("run/kubaos-proxy.json")),
             dnd: Some(root.join("run/kubaos-dnd.json")),
             preview: Some(root.join("state/kubaos/preview.json")),
+            shell_state: Some(root.join("state/quickshell/kubaos.json")),
         }
     }
 
@@ -251,6 +252,33 @@ fn a_live_preview_is_on_while_its_record_names_one() {
 }
 
 #[test]
+fn unnamed_bluetooth_devices_are_hidden_until_the_shell_remembers_them_shown() {
+    let machine = Machine::new();
+
+    let missing = machine.read();
+    machine.write("state/quickshell/kubaos.json", r#"{"animate": "ac"}"#);
+    let unset = machine.read();
+    machine.write(
+        "state/quickshell/kubaos.json",
+        r#"{"animate": "ac", "bluetoothUnnamed": true}"#,
+    );
+    let shown = machine.read();
+    machine.write(
+        "state/quickshell/kubaos.json",
+        r#"{"animate": "ac", "bluetoothUnnamed": false}"#,
+    );
+    let hidden = machine.read();
+    machine.write("state/quickshell/kubaos.json", "{ not json");
+    let broken = machine.read();
+
+    assert_eq!(missing.get(BLUETOOTH_UNNAMED), Some(&on(false)));
+    assert_eq!(unset.get(BLUETOOTH_UNNAMED), Some(&on(false)));
+    assert_eq!(shown.get(BLUETOOTH_UNNAMED), Some(&on(true)));
+    assert_eq!(hidden.get(BLUETOOTH_UNNAMED), Some(&on(false)));
+    assert_eq!(broken.get(BLUETOOTH_UNNAMED), None);
+}
+
+#[test]
 fn the_power_settings_are_read_from_their_file_with_its_defaults() {
     let machine = Machine::new();
 
@@ -296,6 +324,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         proxy: None,
         dnd: None,
         preview: None,
+        shell_state: None,
         ..machine.places()
     };
 
@@ -313,6 +342,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         PROXY,
         DND,
         PREVIEW,
+        BLUETOOTH_UNNAMED,
     ] {
         assert_eq!(states.get(name), None, "{name}");
     }
@@ -340,6 +370,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "run/kubaos-proxy.json",
         "run/kubaos-dnd.json",
         "state/kubaos/preview.json",
+        "state/quickshell/kubaos.json",
     ] {
         assert!(files.contains(&root.join(file)), "{file} isn't watched: {files:?}");
     }
@@ -352,6 +383,7 @@ fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values(DND), Some(Values::Bool));
     assert_eq!(values(UNFREE), Some(Values::Bool));
     assert_eq!(values(PREVIEW), Some(Values::Bool));
+    assert_eq!(values(BLUETOOTH_UNNAMED), Some(Values::Bool));
     assert_eq!(values(SCHEDULER), Some(Values::Words(&["kernel", "lavd"])));
     assert_eq!(values("packages."), None);
     assert_eq!(values("chrome"), None);

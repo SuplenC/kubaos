@@ -5,7 +5,9 @@ import qs.services
 import "../../services/radios.js" as Radios
 
 // The Bluetooth tab: paired devices (Known), the connected first and checked with their battery,
-// then the devices in range to pair (Nearby), nearest first by their last signal. A known device
+// then the devices in range to pair (Nearby), nearest first by their last signal. The devices
+// that send no name come last, in a drawer under a line that says how many there are, closed
+// unless its Show opens it, which is remembered. A known device
 // connects or disconnects on a press; a nearby one opens the connection form, which pairs it and
 // shows what the pairing agent asks: a code to type on the device or to check, or a PIN or
 // passkey to type here. A pairing the device starts opens the form too.
@@ -24,6 +26,8 @@ RadioTab {
     readonly property string kind: root.prompt?.kind ?? ""
     readonly property bool pairing: root.pending !== null && Bt.isPairing(root.pending)
     readonly property string failure: root.pending ? (Bt.pairError(root.pending) || Bt.problem) : ""
+    // The line over the drawer of unnamed devices, whose button opens and closes it.
+    readonly property string unnamedKey: "disclosure:unnamed"
 
     function line(kind: string, key: string, title: string, failed: bool): var {
         return {
@@ -36,8 +40,14 @@ RadioTab {
             accent: false,
             checked: false,
             forgettable: false,
-            failed: failed
+            failed: failed,
+            folded: false
         };
+    }
+
+    // An unnamed device goes by its address as Bluetooth writes it, with colons.
+    function nameOf(device): string {
+        return Radios.unnamed(device) ? device.address : device.name;
     }
 
     function deviceRow(device): var {
@@ -45,14 +55,15 @@ RadioTab {
         return {
             key: device.dbusPath,
             kind: "row",
-            title: device.name,
+            title: root.nameOf(device),
             subtitle: root.statusText(device),
             subtitleIcon: battery ? Radios.batterySymbol(device.battery) : "",
             icon: Radios.deviceSymbol(device.icon),
             accent: device.connected,
             checked: device.connected,
             forgettable: device.paired && !device.connected,
-            failed: false
+            failed: false,
+            folded: false
         };
     }
 
@@ -107,7 +118,7 @@ RadioTab {
 
     function open(device): void {
         Bt.problem = "";
-        root.pendingName = device.name;
+        root.pendingName = root.nameOf(device);
         root.pendingPath = device.dbusPath;
     }
 
@@ -133,8 +144,19 @@ RadioTab {
         } else {
             out.push(root.line("note", "note:nearby", Bt.problem || "Nothing in pairing mode nearby", Bt.problem !== ""));
         }
+        const unnamed = Radios.unnamedLine(Bt.unnamed.length);
+        if (unnamed !== "") {
+            out.push(root.line("disclosure", root.unnamedKey, unnamed, false));
+            // Always listed, in the drawer under the line: Show and Hide then change no row, and
+            // only the drawer's edge moves.
+            for (const device of Bt.unnamed)
+                out.push(Object.assign(root.deviceRow(device), {
+                    folded: true
+                }));
+        }
         return out;
     }
+    unfolded: Bt.showUnnamed
     formOpen: root.pendingPath !== ""
     off: !Bt.available || !Bt.enabled
     offIcon: "bluetooth_disabled"
@@ -159,6 +181,10 @@ RadioTab {
     onKindChanged: if (root.formOpen)
         root.form.focusFirst()
     onPicked: key => {
+        if (key === root.unnamedKey) {
+            Bt.setShowUnnamed(!Bt.showUnnamed);
+            return;
+        }
         const device = root.find(key);
         if (!device)
             return;

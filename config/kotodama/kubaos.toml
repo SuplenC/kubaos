@@ -70,10 +70,10 @@ kind = "scripts"
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
-# `notifications.dnd`, `power.panel-power-saving`, `nix.unfree` and
-# `kubaos.preview`, true or false; `power.scheduler` ("kernel", "lavd") and
-# `power.low-battery` ("power-saver", "super-saver", "off"). While a state
-# can't be read, the action shows.
+# `notifications.dnd`, `power.panel-power-saving`, `nix.unfree`,
+# `kubaos.preview` and `bluetooth.unnamed`, true or false; `power.scheduler`
+# ("kernel", "lavd") and `power.low-battery` ("power-saver", "super-saver",
+# "off"). While a state can't be read, the action shows.
 #
 # A keyword the query equals ranks an action with the exact titles, above an
 # app whose name only has the query as a word. So an action about an app
@@ -440,6 +440,25 @@ subtitle = "Find keyboards, headphones and phones nearby in the control center, 
 icon = "bluetooth"
 keywords = ["bluetooth", "bt", "pair", "keyboard", "headphones", "connect", "scan"]
 run = ["qs", "ipc", "call", "controlcenter", "bluetooth"]
+
+# The devices in range that send no name, which the Bluetooth tab hides by
+# default and counts in its last line; Show and Hide there change the same
+# setting, which the shell remembers.
+[extensions.kubaos.actions.bluetooth-unnamed-show]
+title = "Show unnamed Bluetooth devices"
+subtitle = "List the devices nearby that send no name, by their address"
+icon = "bluetooth"
+keywords = ["bluetooth", "bt", "unnamed", "nameless", "address", "nearby", "pair"]
+run = ["qs", "ipc", "call", "bluetooth", "unnamed", "show"]
+shown_when = { state = "bluetooth.unnamed", is = false }
+
+[extensions.kubaos.actions.bluetooth-unnamed-hide]
+title = "Hide unnamed Bluetooth devices"
+subtitle = "Nearby lists only the devices that send a name; paired ones always show"
+icon = "bluetooth"
+keywords = ["bluetooth", "bt", "unnamed", "nameless", "address", "nearby", "pair"]
+run = ["qs", "ipc", "call", "bluetooth", "unnamed", "hide"]
+shown_when = { state = "bluetooth.unnamed", is = true }
 
 [extensions.kubaos.actions.keyboard-tab]
 title = "Keyboard layouts"

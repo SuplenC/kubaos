@@ -17,6 +17,7 @@
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
 //! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
 //! | `kubaos.preview` | on: the home is a live preview of a KubaOS checkout | `S/kubaos/preview.json` names one |
+//! | `bluetooth.unnamed` | on: Bluetooth lists the devices that send no name | `S/quickshell/kubaos.json` |
 //!
 //! `U` is the user layer, `~/.config/kubaos`; `S` is `XDG_STATE_HOME`, `~/.local/state`. A state
 //! whose file can't be read has no reading, and an action that names it shows whatever it declares.
@@ -78,6 +79,8 @@ pub const LOW_BATTERY: &str = "power.low-battery";
 pub const UNFREE: &str = "nix.unfree";
 /// Whether the home is a live preview of a KubaOS checkout rather than the release.
 pub const PREVIEW: &str = "kubaos.preview";
+/// Whether the control center's Bluetooth tab lists the devices in range that send no name.
+pub const BLUETOOTH_UNNAMED: &str = "bluetooth.unnamed";
 
 /// What starts the state of an optional package group, `packages.chrome`.
 const PACKAGES: &str = "packages.";
@@ -111,6 +114,9 @@ impl Values {
 /// Do not disturb's state file in the runtime dir: `config/quickshell/services/Notifs.qml`
 /// writes it.
 const DND_FILE: &str = "kubaos-dnd.json";
+
+/// The key of [`BLUETOOTH_UNNAMED`] in the shell's remembered settings.
+const BLUETOOTH_UNNAMED_KEY: &str = "bluetoothUnnamed";
 
 /// The file that turns the greeting off, in the zsh folder of the user layer.
 /// `scripts/dot-greeting` owns it.
@@ -151,6 +157,9 @@ impl States {
         }
         if let Some(previewing) = places.preview.as_deref().and_then(previewing) {
             states.set(PREVIEW, Reading::Bool(previewing));
+        }
+        if let Some(shown) = places.shell_state.as_deref().and_then(unnamed_shown) {
+            states.set(BLUETOOTH_UNNAMED, Reading::Bool(shown));
         }
         states
     }
@@ -220,7 +229,7 @@ pub fn values(name: &str) -> Option<Values> {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | DND
-        | PANEL_POWER_SAVING | UNFREE | PREVIEW => Some(Values::Bool),
+        | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
         _ => None,
     }
@@ -243,6 +252,8 @@ pub struct Places {
     pub dnd: Option<PathBuf>,
     /// The live preview's record, `~/.local/state/kubaos/preview.json`.
     pub preview: Option<PathBuf>,
+    /// What the shell's panels remember, `~/.local/state/quickshell/kubaos.json`.
+    pub shell_state: Option<PathBuf>,
 }
 
 impl Places {
@@ -257,6 +268,7 @@ impl Places {
             proxy: kubaos_proxy::paths::Paths::from_env().map(|paths| paths.shell()),
             dnd: kubaos_idle::runtime_dir().map(|runtime| runtime.join(DND_FILE)),
             preview: Paths::from_env().ok().map(|paths| paths.preview()),
+            shell_state: Paths::from_env().ok().map(|paths| paths.shell_state()),
         }
     }
 
@@ -281,6 +293,7 @@ impl Places {
                 .chain(&self.proxy)
                 .chain(&self.dnd)
                 .chain(&self.preview)
+                .chain(&self.shell_state)
                 .cloned(),
         );
         files
@@ -344,6 +357,22 @@ fn proxy_wanted(file: &Path) -> Option<bool> {
 /// release; `None` when it doesn't read.
 fn previewing(file: &Path) -> Option<bool> {
     PreviewFile::new(file).read().ok().map(|preview| preview.is_some())
+}
+
+/// Whether the shell's remembered settings list the unnamed Bluetooth devices: not without the
+/// file or the key, the shell's default, as the shell writes the file at its first start and the
+/// key at its first change; `None` when it doesn't read.
+fn unnamed_shown(file: &Path) -> Option<bool> {
+    let text = match fs::read_to_string(file) {
+        Ok(text) => text,
+        Err(err) if err.kind() == io::ErrorKind::NotFound => return Some(false),
+        Err(_) => return None,
+    };
+    let state: serde_json::Value = serde_json::from_str(&text).ok()?;
+    match state.get(BLUETOOTH_UNNAMED_KEY) {
+        None => Some(false),
+        Some(value) => value.as_bool(),
+    }
 }
 
 #[cfg(test)]
