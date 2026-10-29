@@ -16,6 +16,10 @@ _Avoid_: Local config, overrides
 The user's own home-manager flake, which takes KubaOS as an input and adds the user's packages.
 _Avoid_: Home config, dotfiles
 
+**Live preview**:
+The user's home built from a KubaOS checkout (a branch's worktree) instead of the release the machine is on, by `kubaos switch --from`, until `kubaos switch --release` or an update takes it back; the system stays the release's.
+_Avoid_: Dev mode, test build, override
+
 **Package manifest**:
 The one list of KubaOS's apt packages, `system/packages.toml`, which the install and every update read, so the machine's apt packages follow the release as its Nix packages do.
 _Avoid_: Package list, base packages

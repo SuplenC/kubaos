@@ -2550,6 +2550,63 @@ EOF
   echo "ok   kubaos package unfree on switches, and the unfree package installs again"
 }
 
+# A live preview: the home switched to another KubaOS checkout and back to
+# the release (the repo copy), through /out/kubaos and a user flake like the
+# installer's. The checkout is a worktree of a clone of the repo copy under a
+# Projects root of its own, on a branch, with an uncommitted line in a file the
+# home links (branding/fastfetch.txt), so only that file builds anew. Switches
+# run --foreground, as in packages.
+c_preview() {
+  local u="$USER_HOME/.config/kubaos/home" record="$USER_HOME/.local/state/kubaos/preview.json"
+  local root="$USER_HOME/Projects/preview-root" linked="$USER_HOME/.config/fastfetch/kubaos.txt"
+  local env="KUBAOS_PROJECTS=$USER_HOME/Projects/preview-root" out lock marked broken
+  marked="$root/marked"
+  broken="$root/broken"
+  install_kubaos || return 1
+  user_flake "$u" || return 1
+  as_user cp "$REPO/user-flake/home.nix" "$u/home.nix"
+  rm -rf "$root" "$record"
+  as_user git clone -q "$REPO" "$root/kubaos"
+  as_user git -C "$root/kubaos" worktree add -q -b feature/marked "$marked"
+  as_user git -C "$root/kubaos" worktree add -q -b feature/broken "$broken"
+  echo 'kubaos-preview-marker' | as_user tee -a "$marked/branding/fastfetch.txt" >/dev/null
+  echo '{' | as_user tee "$broken/flake.nix" >/dev/null
+
+  kz 'kubaos switch --foreground' >"$LOGS/preview-release.log" 2>&1 ||
+    { echo "FAIL the first switch, on the release"; tail -20 "$LOGS/preview-release.log"; return 1; }
+  ! grep -q kubaos-preview-marker "$linked" || { echo "FAIL the marker is in the release"; return 1; }
+  lock="$(sha256sum <"$u/flake.lock")"
+
+  out="$(kz "$env kubaos switch --from feature/marked --foreground" 2>&1)" ||
+    { echo "FAIL kubaos switch --from feature/marked"; printf '%s\n' "$out" | tail -20; return 1; }
+  grep -q kubaos-preview-marker "$linked" ||
+    { echo "FAIL the home isn't built from the checkout: no marker in $linked"; return 1; }
+  [[ $(jq -r '.path, .branch, .dirty' "$record" | paste -sd' ') == "$marked feature/marked true" ]] &&
+    [[ $(jq -r .commit "$record") == "$(as_user git -C "$marked" rev-parse HEAD)" ]] ||
+    { echo "FAIL the preview record"; cat "$record"; return 1; }
+  [[ $(sha256sum <"$u/flake.lock") == "$lock" ]] || { echo "FAIL the preview wrote flake.lock"; return 1; }
+  echo "ok   kubaos switch --from a branch: its worktree built, uncommitted change included; recorded; flake.lock untouched"
+
+  out="$(kz 'kubaos switch --foreground' 2>&1)" && { echo "FAIL a plain switch during a preview ran"; return 1; }
+  grep -q -- '--release' <<<"$out" && grep -q -- "--from $marked" <<<"$out" ||
+    { echo "FAIL a plain switch during a preview doesn't name both ways on"; printf '%s\n' "$out"; return 1; }
+  echo "ok   a plain kubaos switch during a preview is refused, naming --from and --release"
+
+  out="$(kz "kubaos switch --from '$broken' --foreground" 2>&1)" &&
+    { echo "FAIL a checkout that doesn't evaluate was switched to"; return 1; }
+  grep -q "doesn't evaluate" <<<"$out" && [[ $(jq -r .path "$record") == "$marked" ]] &&
+    grep -q kubaos-preview-marker "$linked" ||
+    { echo "FAIL a broken checkout: not refused as it should be"; printf '%s\n' "$out" | tail -20; return 1; }
+  echo "ok   a checkout that doesn't evaluate is refused, and the preview stays"
+
+  out="$(kz 'kubaos switch --release --foreground' 2>&1)" ||
+    { echo "FAIL kubaos switch --release"; printf '%s\n' "$out" | tail -20; return 1; }
+  ! grep -q kubaos-preview-marker "$linked" && [[ ! -s $record ]] ||
+    { echo "FAIL --release: still on the preview, or still recorded"; cat "$record"; return 1; }
+  [[ $(sha256sum <"$u/flake.lock") == "$lock" ]] || { echo "FAIL --release changed flake.lock"; return 1; }
+  echo "ok   kubaos switch --release: back on the release, the record emptied"
+}
+
 # The Suite framework, through the test Suite (home/suites/test.nix,
 # in a kubaos built with the test-suite feature) and a user flake under git,
 # so every file kubaos writes into kubaos.d/ must reach git's index for Nix to
@@ -3643,7 +3700,7 @@ e2e_main() {
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
-  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
+  for c in screenshot login_shell zsh_start greeting path tools links theme cursor tmux nvim ghostty tms pam lua workspaces power keyboard shutdown splash updaters shellcheck flake_check quickshell clock sysmon notifications menu menu_kubaos files automount bluetooth phone recorder session_reload wallpaper_sets wallpaper_video packages preview suites pins dot_config warm_target user_layer update_edge update_stable rollback; do
     [[ -n $only && ",$only," != *",$c,"* ]] && continue
     check "$c" "c_$c"
   done

@@ -10,6 +10,7 @@ pub mod event;
 pub mod keyboard;
 pub mod packages;
 pub mod pins;
+pub mod preview;
 pub mod probe;
 pub mod setup;
 pub mod state;

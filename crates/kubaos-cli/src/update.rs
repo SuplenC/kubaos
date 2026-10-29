@@ -6,7 +6,9 @@
 //!   kubaos rollback [-y] [--foreground] [--json]
 //!   kubaos channel [stable | edge]
 //!
-//! They run as the desktop user and ask for sudo for the steps that need root. `--foreground`
+//! They run as the desktop user and ask for sudo for the steps that need root. Once confirmed, an
+//! update, upgrade or rollback switches the home back to the release first when it is a live
+//! preview (`kubaos switch --from`). `--foreground`
 //! runs the home-manager switch in this process, for a session without a systemd user manager.
 //! `--check` is the daily notifier's: it only looks at origin. On a terminal they show a live
 //! view of each phase; elsewhere plain lines; with `--json` one event per line
@@ -113,8 +115,11 @@ pub(crate) fn machine(place: SwitchIn) -> Result<(Paths, System), ExitCode> {
         return Err(usage_error(UpdateError::Root));
     }
     let paths = Paths::from_env().map_err(usage_error)?;
-    let for_switch = paths.clone();
-    let system = System::new(move |on_output| job::switch_step(&for_switch, place, on_output));
+    let (for_switch, for_preview, for_leave) = (paths.clone(), paths.clone(), paths.clone());
+    let system = System::new(move |on_output| job::switch_step(&for_switch, place, on_output)).previewing(
+        move || job::active_preview(&for_preview),
+        move |on_output| job::leave_preview(&for_leave, place, on_output),
+    );
     Ok((paths, system))
 }
 

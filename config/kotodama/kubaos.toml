@@ -70,10 +70,10 @@ kind = "scripts"
 # (crates/kotodama-kubaos/src/states.rs, docs/CONTRACTS.md): `packages.<group>`,
 # `files.tidy-daily`, `files.automount`, `terminal.greeting`,
 # `keyboard.mac-accents`, `idle.keep-awake`, `phone.link`, `proxy`,
-# `notifications.dnd`, `power.panel-power-saving` and `nix.unfree`, true or
-# false; `power.scheduler` ("kernel", "lavd") and `power.low-battery`
-# ("power-saver", "super-saver", "off"). While a state can't be read, the
-# action shows.
+# `notifications.dnd`, `power.panel-power-saving`, `nix.unfree` and
+# `kubaos.preview`, true or false; `power.scheduler` ("kernel", "lavd") and
+# `power.low-battery` ("power-saver", "super-saver", "off"). While a state
+# can't be read, the action shows.
 #
 # A keyword the query equals ranks an action with the exact titles, above an
 # app whose name only has the query as a word. So an action about an app
@@ -923,6 +923,18 @@ icon = "edit-undo"
 keywords = ["undo update", "downgrade", "revert"]
 run = ["kubaos", "rollback"]
 terminal = true
+
+# A live preview (`kubaos switch --from`, crates/kubaos-core/src/preview.rs):
+# the home built from a KubaOS checkout instead of the release. Listed only
+# while one is on. It runs in a terminal, where the switch shows what it does.
+[extensions.kubaos.actions.preview-release]
+title = "Back to the release"
+subtitle = "Leave the live preview: your home goes back to the KubaOS release"
+icon = "edit-undo"
+keywords = ["live preview", "branch", "checkout", "kubaos switch", "release", "leave preview"]
+run = ["kubaos", "switch", "--release"]
+terminal = true
+shown_when = { state = "kubaos.preview", is = true }
 
 [extensions.kubaos.actions.channel]
 title = "Switch channel (stable/edge)"

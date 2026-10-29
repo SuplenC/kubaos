@@ -10,6 +10,10 @@ How a PR that changes how something looks gets its screenshots and its review. T
 4. **Review the changed pairs against `docs/agents/design-review.md`**, `docs/DESIGN.md` and the pages of the components it touches (`docs/design/components/`). Run your reviewer sub-agent in the foreground (`run_in_background: false` on the Agent tool), so its report comes back to you and not to the coordinator. Fix what it finds and render again.
 5. **Attach the pairs: `just shots publish chore/shots-<your-branch>`.** It pushes `changed.txt`'s pairs to that image-only branch and prints the Markdown table; paste it into the PR body, with each visible change listed as a decision for Kuba.
 
+## Live preview
+
+Kuba may want to try a UI change on his own desktop before it is reviewed: sketch, build it on a branch, try it live, give feedback, iterate. When the brief says the work is meant for a live preview, build and commit it on the branch, run `just check`, then **stop before the shots and the PR** and report the branch and its worktree. Kuba previews it with `kubaos switch --from <branch>` and goes back with `kubaos switch --release` (`docs/USING.md`, "Hacking on KubaOS"). Never run either yourself: they switch his home. Once he's happy, the loop above goes on from step 1 on the same branch. A preview changes only what the home builds; a change to `system/`, apt or the boot can't be tried this way.
+
 ## Commands
 
 | Command | What |

@@ -4,7 +4,8 @@ import KubaOS.Components as K
 import qs.components
 import qs.services
 
-// The top edge of the frame. Left: workspaces and window title.
+// The top edge of the frame. Left: workspaces, the live preview (while the home is built from a
+// KubaOS checkout) and the window title.
 // Center: clock (opens the clock popup). Right: recording indicator (while recording), Keep
 // awake and a scheduled action (while on), the Proxy (while on), the keyboard layout (with two
 // or more), the update marker (while a KubaOS release waits), tray, the system monitor (opens its
@@ -30,10 +31,20 @@ Item {
         screen: root.screen
     }
 
+    // Beside the workspaces, where the window title gives way to it, so the right side never
+    // reaches the clock.
+    PreviewIndicator {
+        id: preview
+
+        anchors.left: workspaces.right
+        anchors.leftMargin: K.Tokens.space.s8
+        anchors.verticalCenter: parent.verticalCenter
+    }
+
     // Anchored to the pill rather than laid out beside it, so its place follows the pill's width
     // as it animates, and its width depends on nothing it sets itself.
     ActiveWindow {
-        anchors.left: workspaces.right
+        anchors.left: preview.visible ? preview.right : workspaces.right
         anchors.leftMargin: K.Tokens.space.s12
         anchors.verticalCenter: parent.verticalCenter
         room: Math.max(0, clock.x - x - K.Tokens.space.s40)

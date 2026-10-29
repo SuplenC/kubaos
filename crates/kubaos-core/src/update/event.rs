@@ -72,6 +72,8 @@ pub enum Phase {
     Verifying,
     /// apt's package lists, the release's commits and what will run.
     Reviewing,
+    /// Switching the home from a live preview back to the release, before anything changes.
+    LivePreview,
     /// The snapper snapshot, the saved `flake.lock` and the history line.
     Snapshot,
     /// `apt-get upgrade`.
@@ -100,6 +102,7 @@ impl Phase {
             Self::Fetching => "Fetching",
             Self::Verifying => "Verifying",
             Self::Reviewing => "Reviewing changes",
+            Self::LivePreview => "Live preview",
             Self::Snapshot => "Snapshot",
             Self::SystemPackages => "System packages",
             Self::Release => "Release",

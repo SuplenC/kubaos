@@ -413,6 +413,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         if confirm == Confirm::Ask && !self.confirm("Roll back?") {
             return Err(UpdateError::Declined);
         }
+        self.leave_preview()?;
         let description = format!("before kubaos rollback {}", self.date());
         self.phase(Phase::Snapshot, |u| {
             u.snapshot(&description);
@@ -759,6 +760,30 @@ impl<'a, M: Machine> Updater<'a, M> {
         ran
     }
 
+    /// Switches the home from a live preview back to the release, once the run is confirmed and
+    /// before it changes anything, so no update, upgrade or rollback runs on top of a preview and
+    /// a declined one keeps it.
+    fn leave_preview(&mut self) -> Result<(), UpdateError> {
+        let Some(preview) = self.m.preview() else {
+            return Ok(());
+        };
+        self.phase(Phase::LivePreview, |u| {
+            u.j.step(format!(
+                "Leaving the preview of {preview}: your home goes back to the release"
+            ));
+            u.j.command_line("home-manager switch (kubaos switch --release)");
+            let j = &mut u.j;
+            let left = u.m.leave_preview(&mut |line| j.output(line));
+            match left {
+                Ok(()) => {
+                    u.j.succeeded();
+                    Ok(())
+                }
+                Err(e) => Err(UpdateError::step("leaving the live preview")(e)),
+            }
+        })
+    }
+
     /// The home-manager switch, its output reported.
     fn switch(&mut self) -> Result<(), UpdateError> {
         self.j.step("Switching your home");
@@ -872,6 +897,7 @@ impl<'a, M: Machine> Updater<'a, M> {
         if ask && !self.confirm("Update now?") {
             return Err(UpdateError::Declined);
         }
+        self.leave_preview()?;
 
         let to = target.map_or_else(|| installed.version.to_string(), |t| t.label.clone());
         let description = format!(

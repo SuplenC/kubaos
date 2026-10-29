@@ -1,5 +1,7 @@
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Barrier;
 use std::sync::Mutex;
@@ -14,6 +16,9 @@ use super::JobId;
 use super::JobState;
 use super::Queue;
 use super::QueueError;
+use super::Target;
+use crate::preview::Checkout;
+use crate::preview::PreviewFile;
 
 /// A host that records what the queue asks of it instead of running systemd and home-manager.
 #[derive(Default)]
@@ -30,6 +35,12 @@ struct FakeHost {
     /// The units asked about.
     checked: Mutex<Vec<String>>,
     switch_time: Duration,
+    /// The checkout each switch built KubaOS from, `None` for the release.
+    switched_from: Mutex<Vec<Option<PathBuf>>>,
+    /// The commit every checkout is at.
+    commit: Mutex<String>,
+    /// Paths git can't describe.
+    not_checkouts: Vec<PathBuf>,
 }
 
 impl Host for FakeHost {
@@ -50,7 +61,8 @@ impl Host for FakeHost {
         Ok(!self.units_dead)
     }
 
-    fn switch(&self, mut log: File) -> Result<(), HostError> {
+    fn switch(&self, mut log: File, from: Option<&Path>) -> Result<(), HostError> {
+        self.switched_from.lock().unwrap().push(from.map(Path::to_path_buf));
         let n = self.switches.fetch_add(1, Ordering::SeqCst) + 1;
         let now = self.in_flight.fetch_add(1, Ordering::SeqCst) + 1;
         self.most_at_once.fetch_max(now, Ordering::SeqCst);
@@ -61,6 +73,23 @@ impl Host for FakeHost {
         if self.failing.contains(&n) {
             return Err(HostError::exited("home-manager", Some(1)));
         }
+        Ok(())
+    }
+
+    fn describe(&self, path: &Path) -> Result<Checkout, HostError> {
+        if self.not_checkouts.iter().any(|p| p == path) {
+            return Err(HostError::exited("git", Some(128)));
+        }
+        let commit = self.commit.lock().unwrap().clone();
+        Ok(Checkout {
+            root: path.to_path_buf(),
+            branch: Some(format!("feature/{}", path.file_name().unwrap().to_string_lossy())),
+            commit,
+            dirty: false,
+        })
+    }
+
+    fn evaluate(&self, _path: &Path) -> Result<(), HostError> {
         Ok(())
     }
 }
@@ -292,7 +321,7 @@ fn the_systemd_host_runs_the_worker_in_a_transient_user_unit() {
         ]
     );
     assert_eq!(
-        host.switch_command(),
+        host.switch_command(None),
         [
             "home-manager",
             "switch",
@@ -430,4 +459,237 @@ fn the_systemd_host_asks_systemd_for_the_units_state() {
     for dead in ["inactive", "failed", ""] {
         assert!(!super::is_alive_state(dead), "{dead:?}");
     }
+}
+
+/// A queue in `dir` that records previews in `dir/preview.json`.
+fn previewing(dir: &Path) -> (Queue, PreviewFile) {
+    let file = PreviewFile::new(dir.join("preview.json"));
+    (Queue::new(dir.join("jobs")).previews(file.clone()), file)
+}
+
+fn checkout(path: &str) -> Target {
+    Target::Checkout { path: path.into() }
+}
+
+#[test]
+fn a_job_to_a_checkout_overrides_kubaos_and_records_the_preview() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+    *host.commit.lock().unwrap() = "1a2b3c4d5e".to_owned();
+
+    let id = queue.enqueue_to(checkout("/w/live-preview")).unwrap();
+    queue.work(&host).unwrap();
+
+    assert_eq!(queue.job(&id).unwrap().target, checkout("/w/live-preview"));
+    assert_eq!(
+        *host.switched_from.lock().unwrap(),
+        [Some(PathBuf::from("/w/live-preview"))]
+    );
+    let preview = file.read().unwrap().expect("a preview recorded");
+    assert_eq!(preview.path, Path::new("/w/live-preview"));
+    assert_eq!(preview.branch.as_deref(), Some("feature/live-preview"));
+    assert_eq!(preview.commit, "1a2b3c4d5e");
+    assert!(preview.since > 0);
+}
+
+#[test]
+fn a_job_to_the_release_switches_the_flake_as_locked_and_clears_the_preview() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+    queue.enqueue_to(checkout("/w/a")).unwrap();
+    queue.work(&host).unwrap();
+
+    queue.enqueue_to(Target::Release).unwrap();
+    queue.work(&host).unwrap();
+
+    assert_eq!(host.switched_from.lock().unwrap()[1], None);
+    assert_eq!(file.read().unwrap(), None);
+    assert_eq!(std::fs::read_to_string(file.path()).unwrap(), "");
+}
+
+#[test]
+fn a_switch_of_the_home_as_it_stands_keeps_the_preview_and_its_start() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+    let folder = tmp.path().join("a");
+    std::fs::create_dir(&folder).unwrap();
+    *host.commit.lock().unwrap() = "aaaaaaa".to_owned();
+    queue.enqueue_to(Target::Checkout { path: folder.clone() }).unwrap();
+    queue.work(&host).unwrap();
+    let first = file.read().unwrap().unwrap();
+    *host.commit.lock().unwrap() = "bbbbbbb".to_owned();
+
+    queue.enqueue().unwrap();
+    queue.work(&host).unwrap();
+
+    assert_eq!(host.switched_from.lock().unwrap()[1], Some(folder));
+    let kept = file.read().unwrap().unwrap();
+    assert_eq!(kept.commit, "bbbbbbb");
+    assert_eq!(kept.since, first.since);
+}
+
+#[test]
+fn a_switch_of_the_home_as_it_stands_whose_checkout_is_gone_says_how_to_go_back() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+    queue.enqueue_to(checkout("/w/gone")).unwrap();
+    queue.work(&host).unwrap();
+
+    let id = queue.enqueue().unwrap();
+    queue.work(&host).unwrap();
+
+    let job = queue.job(&id).unwrap();
+    assert_eq!(job.state, JobState::Failed);
+    assert!(job.error.unwrap().contains("kubaos switch --release"));
+    assert_eq!(host.switches.load(Ordering::SeqCst), 1);
+    assert!(file.read().unwrap().is_some());
+}
+
+#[test]
+fn a_record_that_does_not_read_never_blocks_the_release_or_a_new_preview() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+    std::fs::write(file.path(), "{ not a record").unwrap();
+
+    let stuck = queue.enqueue().unwrap();
+    let release = queue.enqueue_to(Target::Release).unwrap();
+    queue.work(&host).unwrap();
+
+    let stuck = queue.job(&stuck).unwrap();
+    assert_eq!(stuck.state, JobState::Failed);
+    assert!(stuck.error.unwrap().contains("kubaos switch --release"));
+    assert_eq!(queue.job(&release).unwrap().state, JobState::Succeeded);
+    assert_eq!(std::fs::read_to_string(file.path()).unwrap(), "");
+
+    std::fs::write(file.path(), "{ not a record").unwrap();
+    let preview = queue.enqueue_to(checkout("/w/b")).unwrap();
+    queue.work(&host).unwrap();
+
+    assert_eq!(queue.job(&preview).unwrap().state, JobState::Succeeded);
+    assert_eq!(file.read().unwrap().unwrap().path, Path::new("/w/b"));
+}
+
+#[test]
+fn a_switch_of_the_home_as_it_stands_without_a_preview_is_the_release() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+
+    queue.enqueue().unwrap();
+    queue.work(&host).unwrap();
+
+    assert_eq!(*host.switched_from.lock().unwrap(), [None]);
+    assert_eq!(file.read().unwrap(), None);
+}
+
+#[test]
+fn a_second_checkout_replaces_the_first_preview() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost::default();
+    queue.enqueue_to(checkout("/w/a")).unwrap();
+    queue.work(&host).unwrap();
+
+    queue.enqueue_to(checkout("/w/b")).unwrap();
+    queue.work(&host).unwrap();
+
+    assert_eq!(file.read().unwrap().unwrap().path, Path::new("/w/b"));
+}
+
+#[test]
+fn a_failed_preview_switch_leaves_the_record_as_it_was() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost {
+        failing: vec![2],
+        ..FakeHost::default()
+    };
+    queue.enqueue_to(checkout("/w/a")).unwrap();
+    queue.work(&host).unwrap();
+
+    let id = queue.enqueue_to(checkout("/w/b")).unwrap();
+    queue.work(&host).unwrap();
+
+    assert_eq!(queue.job(&id).unwrap().state, JobState::Failed);
+    assert_eq!(file.read().unwrap().unwrap().path, Path::new("/w/a"));
+}
+
+#[test]
+fn a_checkout_that_cannot_be_read_fails_its_job_before_switching() {
+    let tmp = tempfile::tempdir().unwrap();
+    let (queue, file) = previewing(tmp.path());
+    let host = FakeHost {
+        not_checkouts: vec![PathBuf::from("/w/gone")],
+        ..FakeHost::default()
+    };
+
+    let id = queue.enqueue_to(checkout("/w/gone")).unwrap();
+    queue.work(&host).unwrap();
+
+    let job = queue.job(&id).unwrap();
+    assert_eq!(job.state, JobState::Failed);
+    assert!(job.error.unwrap().contains("/w/gone"));
+    assert_eq!(host.switches.load(Ordering::SeqCst), 0);
+    assert_eq!(file.read().unwrap(), None);
+}
+
+#[test]
+fn a_job_file_without_a_target_reads_as_the_home_as_it_stands() {
+    let tmp = tempfile::tempdir().unwrap();
+    std::fs::write(
+        tmp.path().join("1-2-3.json"),
+        r#"{"id":"1-2-3","state":"queued","queued_at":1,"started_at":null,"finished_at":null,"error":null}"#,
+    )
+    .unwrap();
+    let queue = Queue::new(tmp.path());
+
+    assert_eq!(
+        queue.job(&JobId::parse("1-2-3").unwrap()).unwrap().target,
+        Target::Current
+    );
+}
+
+#[test]
+fn the_systemd_host_overrides_kubaos_without_writing_the_lock_file() {
+    let host = super::Systemd::new("/usr/bin/kubaos", "/h/.config/kubaos/home");
+
+    assert_eq!(
+        host.switch_command(Some(Path::new("/h/Projects/kubaos"))),
+        [
+            "home-manager",
+            "switch",
+            "-b",
+            "hm-backup",
+            "--flake",
+            "/h/.config/kubaos/home",
+            "--override-input",
+            "kubaos",
+            "git+file:///h/Projects/kubaos",
+            "--no-write-lock-file",
+        ]
+    );
+    assert_eq!(
+        host.evaluate_command(Path::new("/h/Projects/kubaos")),
+        [
+            "nix",
+            "eval",
+            "--json",
+            "/h/.config/kubaos/home#homeConfigurations",
+            "--override-input",
+            "kubaos",
+            "git+file:///h/Projects/kubaos",
+            "--no-write-lock-file",
+            "--apply",
+            "configs: map (config: config.activationPackage.drvPath) (builtins.attrValues configs)",
+        ]
+    );
+    assert_eq!(
+        super::Systemd::worktrees_command(Path::new("/h/Projects/kubaos")),
+        ["git", "-C", "/h/Projects/kubaos", "worktree", "list", "--porcelain"]
+    );
 }
