@@ -8,7 +8,8 @@ import KubaOS.Components as K
 // The bubble floats over the whole window, as iced's overlay does: it is drawn on the window's
 // own content item, so neither a clipping panel nor what is laid out after the control covers it.
 // It shows only while its control shows whole: a control a scroll has cut, or taken out of view,
-// takes its bubble with it. It is no part of the page's layout; leave it room below the control, as the specimen's rows do.
+// takes its bubble with it. It is no part of the page's layout; leave it room below the control,
+// as the specimen's rows do.
 Item {
     id: root
 

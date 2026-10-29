@@ -982,8 +982,11 @@ PanelWindow {
             parent: inside
             // Over the body, whichever of the two `inside` took first.
             z: 1
+            // Across the body, stopping short of the scroll's thumb at its right edge, so the thumb
+            // is never covered.
+            x: body.x
             y: head.y + head.height - inside.edge
-            width: inside.width
+            width: body.width - K.Tokens.size.scrollbar
             gap: menu.gap
             scrolled: (form.item?.contentY ?? 0) > 0
         }

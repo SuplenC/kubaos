@@ -50,11 +50,16 @@ FocusScope {
         return true;
     }
 
-    // Scrolls the field with the keys into view, its label with it.
+    // Scrolls the field with the keys into view, its label with it; the last field's with the
+    // submit button under it too.
     function reveal(): void {
         const field = repeater.itemAt(form.current);
         if (!field)
             return;
+        if (form.current === repeater.count - 1) {
+            scroll.contentY = scroll.travel;
+            return;
+        }
         const top = field.mapToItem(column, 0, 0).y;
         const bottom = top + field.height;
         if (top < scroll.contentY)
