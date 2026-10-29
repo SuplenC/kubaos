@@ -56,13 +56,23 @@ in
     pkgs.runCommand "kubaos-qml-logic"
       {
         QT_QPA_PLATFORM = "offscreen";
-        QT_PLUGIN_PATH = pkgs.lib.makeSearchPath "lib/qt-6/plugins" [ pkgs.qt6.qtbase ];
+        # The SVG plugin decodes the components' icons, which would fail with a QML message.
+        QT_PLUGIN_PATH = pkgs.lib.makeSearchPath "lib/qt-6/plugins" [
+          pkgs.qt6.qtbase
+          pkgs.qt6.qtsvg
+        ];
         NIXPKGS_QT6_QML_IMPORT_PATH = "${pkgs.qt6.qtdeclarative}/lib/qt-6/qml";
       }
       ''
         export HOME=$(mktemp -d)
         export XDG_RUNTIME_DIR=$HOME
-        ${pkgs.qt6.qtdeclarative}/bin/qmltestrunner -import ${kubaos-components}/lib/qt-6/qml -input ${src}/test/qml
+        ${pkgs.qt6.qtdeclarative}/bin/qmltestrunner -import ${kubaos-components}/lib/qt-6/qml -input ${src}/test/qml 2>&1 | tee log
+        # A message from the QML engine fails the check, as it fails the e2e checks: some, as a
+        # row whose making outlives its list, are info lines no TestCase can catch.
+        if grep -E '^(QINFO|QWARN|QCRITICAL|QSYSTEM) *:.*\.qml(:[0-9]+)*: ' log; then
+          echo "QML messages above: the tests logged problems"
+          exit 1
+        fi
         touch $out
       '';
 }
