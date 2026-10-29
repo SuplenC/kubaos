@@ -327,15 +327,8 @@ QtObject {
             const list = driver.find(driver.window.contentItem, it => it.hold !== undefined && it.unfolded !== undefined);
             if (list)
                 list.hold.pointed = true;
-            fanLater.start();
+            driver.fanFirstGroup(driver.find(driver.window.contentItem, it => it.peeking !== undefined && it.hasPeek !== undefined));
         }
-    }
-
-    // Holding the popups rebuilds the stand-in model's rows, the groups with them, so the group
-    // fans once they have settled.
-    property Timer fanLater: Timer {
-        interval: 300
-        onTriggered: driver.fanFirstGroup(driver.find(driver.window.contentItem, it => it.peeking !== undefined && it.hasPeek !== undefined))
     }
 
     // A radio tab's form or a row leaving, once the panel has opened, through what WifiList.qml
