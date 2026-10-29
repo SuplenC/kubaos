@@ -61,8 +61,6 @@ Item {
             }
         })
 
-    // Above its neighbours while its hint shows, so the chips after it don't paint over the hint.
-    z: root.tooltip !== "" && root.pointerOver ? 1 : 0
     implicitWidth: K.Look.snapUp(root.leftPadding + outer.implicitWidth + root.rightPadding, root.dpr)
     implicitHeight: Tokens.size.chip
 

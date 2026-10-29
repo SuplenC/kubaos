@@ -4,7 +4,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 ## `ProgressPanel`
 
-QML `ProgressPanel`; *its `kubaos-ui` twin comes with the list and progress molecules (#304), and until then it is in neither specimen, so the parity check leaves it out.*
+QML `ProgressPanel`; *QML only: its `kubaos-ui` twin comes with the list and progress molecules (#304). Until then it is in neither specimen, so the parity check leaves it out.*
 
 A job followed to its end, as Kōbō's install screen shows one: the Command menu's progress View. A column as wide as the content column (`column`) at most, centred in the panel's room, its parts 16 apart and centred: the job's state as the panel's one big symbol (48), its title in `headline`, a `ProgressBar` while it knows how far it is, and a `body` line with its state and what it last said ("42% · Downloading", "Done", "Failed · …").
 
