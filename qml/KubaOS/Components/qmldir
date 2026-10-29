@@ -6,6 +6,7 @@ singleton ButtonMetrics 1.0 ButtonMetrics.qml
 singleton LayoutPasses 1.0 LayoutPasses.qml
 singleton FrameQueue 1.0 FrameQueue.qml
 singleton Motion 1.0 Motion.qml
+singleton Advances 1.0 Advances.qml
 SheetPath 1.0 sheetpath.js
 Text 1.0 Text.qml
 Icon 1.0 Icon.qml
