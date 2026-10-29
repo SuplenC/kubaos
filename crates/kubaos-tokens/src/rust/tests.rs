@@ -98,7 +98,7 @@ fn every_symbol_names_its_drawing() {
 }
 
 #[test]
-fn the_fixed_roles_keep_their_values_in_both_modes() {
+fn the_fixed_roles_are_written_in_both_palettes() {
     let module = module();
 
     for role in [
