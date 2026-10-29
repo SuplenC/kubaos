@@ -75,3 +75,5 @@ menu-actions             menu           MenuShot    -                 actions
 menu-actions-long        menu           MenuShot    -                 actions-long
 menu-pushed              menu           MenuShot    -                 pushed
 menu-form-long           menu           MenuShot    -                 form-long
+menu-actions-end         menu           MenuShot    -                 actions-end
+menu-form-scrolled       menu           MenuShot    -                 form-scrolled

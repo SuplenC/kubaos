@@ -12,7 +12,9 @@ import qs.modules.menu
 //
 // STATE: typed ("fi" typed), actions (then the Action panel open), actions-long (the Action panel
 // with more Actions than the panel has room for), pushed (a list View pushed, held where its slide
-// starts, at full opacity), form-long (a form View with more fields than the body has room for).
+// starts, at full opacity), form-long (a form View with more fields than the body has room for),
+// actions-end (the same, the keys on its last Action), form-scrolled (the long form, the keys on
+// its last field).
 QtObject {
     id: driver
 
@@ -68,9 +70,9 @@ QtObject {
     property Timer typed: Timer {
         interval: 300
         onTriggered: {
-            if (driver.state === "actions" || driver.state === "actions-long")
+            if (driver.state.startsWith("actions"))
                 driver.menu.openActions();
-            if (driver.state === "actions-long")
+            if (driver.state === "actions-long" || driver.state === "actions-end")
                 driver.menu.actions = driver.manyActions;
             if (driver.state === "pushed") {
                 driver.menu.engine.push({
@@ -79,12 +81,52 @@ QtObject {
                 }, driver.menu.engine.results);
                 holdSlide.start();
             }
-            if (driver.state === "form-long")
+            if (driver.state === "form-long" || driver.state === "form-scrolled")
                 driver.menu.engine.push({
                     kind: "form",
                     fields: driver.manyFields,
                     submit: "Save"
                 });
+            if (driver.state === "form-scrolled" || driver.state === "actions-end")
+                toLast.start();
+            driver.capture.start();
+        }
+    }
+
+    // The first item under `item` for which `test` holds, depth first.
+    function find(item: Item, test: var): Item {
+        if (!item)
+            return null;
+        if (test(item))
+            return item;
+        for (const kid of item.children) {
+            const hit = driver.find(kid, test);
+            if (hit)
+                return hit;
+        }
+        return null;
+    }
+
+    // The keys on the last field of the form, as Shift+Tab from the first takes them there, or on
+    // the last Action, once the View or the Action panel has laid out. The shot waits from here
+    // for the scroll that follows.
+    property Timer toLast: Timer {
+        interval: K.Tokens.duration.medium * 2
+        onTriggered: {
+            const content = driver.menu.contentItem;
+            if (driver.state === "actions-end") {
+                const panel = driver.find(content, it => it.maxHeight !== undefined && typeof it.reveal === "function");
+                if (panel)
+                    panel.current = driver.manyActions.length - 1;
+                else
+                    console.warn("shot: no Action panel found");
+            } else {
+                const form = driver.find(content, it => typeof it.takeFirst === "function" && it.fields !== undefined);
+                if (form)
+                    form.move(-1);
+                else
+                    console.warn("shot: no form found");
+            }
             driver.capture.start();
         }
     }

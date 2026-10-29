@@ -176,7 +176,9 @@ QtObject {
             else
                 console.warn("shot: no tray found");
         }
-        driver.capture.start();
+        // A panel shot as it closes starts its wait once it has been told to close.
+        if (!driver.state.endsWith("-closed"))
+            driver.capture.start();
     }
 
     function controlCenter(root: Item): void {
@@ -268,7 +270,7 @@ QtObject {
                 return;
             }
             if (driver.state === "panel-menu-closed") {
-                const menu = driver.find(driver.window.contentItem, it => it.entries !== undefined && typeof it.take === "function");
+                const menu = driver.find(panel, it => it.entries !== undefined && typeof it.take === "function");
                 if (!menu) {
                     console.warn("shot: no notification menu found");
                     return;
@@ -365,7 +367,7 @@ QtObject {
     }
 
     // The open panel closed, as its keybind closes it, with what it opened still showing. The
-    // shot's wait starts again from here, so it can't catch the panel before it starts to close.
+    // shot's wait starts here, so it can't catch the panel before it starts to close.
     property Timer closeLater: Timer {
         interval: 400
         onTriggered: {
