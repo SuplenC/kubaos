@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import Kotodama
 import KubaOS.Components as K
+import qs.components
 import qs.services
 import qs.settings
 
@@ -672,15 +673,31 @@ PanelWindow {
             Keys.onPressed: event => event.accepted = menu.key(event)
         }
 
-        // Results and list Views, the pane, or the other Views. It slides as a View is pushed or
-        // popped.
+        // The panel inside its hairline, which clips the body as it slides: a View pushed or popped
+        // travels further than the panel's padding, and it is cut at the panel's edge, never drawn
+        // over the hairline or past it.
+        Item {
+            id: inside
+
+            readonly property real edge: K.Look.hairline(menu.dpr)
+
+            x: inside.edge
+            y: inside.edge
+            width: panel.width - inside.edge * 2
+            height: panel.height - inside.edge * 2
+            clip: true
+        }
+
+        // Results and list Views, the pane, or the other Views, in the panel's clip. It slides as a
+        // View is pushed or popped.
         Item {
             id: body
 
-            x: menu.gap
-            y: head.y + head.height + menu.gap
+            parent: inside
+            x: menu.gap - inside.edge
+            y: head.y + head.height + menu.gap - inside.edge
             width: panel.width - menu.gap * 2
-            height: footer.y - menu.gap * 2 - y
+            height: footer.y - menu.gap * 2 - head.y - head.height - menu.gap
             opacity: menu.settle
             transform: Translate {
                 x: menu.slide
@@ -921,6 +938,10 @@ PanelWindow {
                 anchors.fill: parent
                 active: menu.kind === "form"
                 sourceComponent: FormView {
+                    // Up to the field above and the footer's divider below: fields scrolled past
+                    // the body are cut at those edges.
+                    roomAbove: menu.gap
+                    roomBelow: menu.gap
                     search: menu.engine
                     keys: event => menu.key(event)
                     fields: search.view.fields ?? []
@@ -953,6 +974,18 @@ PanelWindow {
                     moves: menu.moves
                 }
             }
+        }
+
+        // A form scrolled up keeps the gap under the field clear, and fades in under it, as a
+        // panel's list does under its header.
+        HeaderFade {
+            parent: inside
+            // Over the body, whichever of the two `inside` took first.
+            z: 1
+            y: head.y + head.height - inside.edge
+            width: inside.width
+            gap: menu.gap
+            scrolled: (form.item?.contentY ?? 0) > 0
         }
 
         // What Forget or "Clear history" just did, and the key that undoes it, over the bottom of
@@ -1062,6 +1095,8 @@ PanelWindow {
             x: panel.width - width - menu.gap
             y: footerRule.y - height - menu.gap
             width: menu.onGrid(panel.width / 2)
+            // No taller than the body it sits over, so it never covers the field.
+            maxHeight: body.height
             actions: menu.actions
             visible: opacity > 0
             opacity: menu.actionsOpen ? 1 : 0
