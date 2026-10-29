@@ -29,7 +29,7 @@ import qs.modules.frame
 //   notifications: "" (two popups), peek (the bell's peek, every one unread, so "+N more"),
 //                  panel (the notifications panel, a stack folded), panel-expanded (the stack
 //                  open, its second card selected), panel-keys (the keys button's tooltip),
-//                  panel-empty (nothing in it), panel-dnd (Do not disturb on while the screen is
+//                  panel-empty (nothing in it), panel-read (every one read), panel-dnd (Do not disturb on while the screen is
 //                  shared, its tooltip showing)
 //   bar: traymenu (the network item's menu open), dnd (the bell crossed out), nobell (no
 //        notification, so no bell), dnd-empty (no notification, the bell crossed out all the same),
@@ -346,6 +346,8 @@ QtObject {
         // Emptied before the frame exists, so no card is made and torn down again.
         if ((driver.panel === "notifications" && driver.state === "panel-empty") || (driver.panel === "bar" && (driver.state === "nobell" || driver.state === "dnd-empty")))
             Notifs.clear();
+        if (driver.panel === "notifications" && driver.state === "panel-read")
+            Notifs.unread = [];
         if ((driver.panel === "notifications" && driver.state === "panel-dnd") || (driver.panel === "bar" && (driver.state === "dnd" || driver.state === "dnd-empty")))
             Notifs.dndReason = "sharing";
         if (driver.panel === "bar" && driver.state === "preview") {

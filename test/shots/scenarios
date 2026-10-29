@@ -41,6 +41,7 @@ notif-panel              notifications  FrameShot   1176,0,424,1000   notificati
 notif-panel-expanded     notifications  FrameShot   1176,0,424,1000   notifications panel-expanded
 notif-panel-keys         notifications  FrameShot   1176,0,424,1000   notifications panel-keys
 notif-panel-empty        notifications  FrameShot   1176,0,424,1000   notifications panel-empty
+notif-panel-read         notifications  FrameShot   1176,0,424,1000   notifications panel-read
 notif-panel-dnd          notifications  FrameShot   1176,0,424,1000   notifications panel-dnd
 lock                     lock           LockShot    -
 lock-error               lock           LockShot    -                 error
