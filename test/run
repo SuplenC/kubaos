@@ -17,10 +17,12 @@
 #   test/run shots run CMD...           run in the session (qs ipc call controlcenter toggle)
 #   test/run shots record start NAME | record stop
 #   test/run shots log | stop
-#   test/run clean                      remove the harness's containers, keep volumes
+#   test/run clean                      remove the harness's containers, every run's, keep volumes
 #   test/run nuke [--yes]               clean, then delete the harness's volumes
 #
 # DOTFILES_SRC=<checkout> tests another copy of the repo (default: this one).
+# Runs of different checkouts run side by side; runs of one checkout take turns,
+# and say they are waiting (docs/TESTING.md, "Concurrent runs").
 # DOTFILES_TEST_MEM / DOTFILES_TEST_CPUS: container limits (12g / 8).
 # DOTFILES_TEST_NIX_JOBS / DOTFILES_TEST_NIX_CORES: Nix's max-jobs and cores
 # in the container (2 / 4); the cores are Cargo's jobs for the CLI too.
@@ -36,6 +38,10 @@ VOLUMES=(dotfiles-nix dotfiles-test-cache dotfiles-test-vw-certs dotfiles-test-v
 export DOTFILES_SRC="${DOTFILES_SRC:-$ROOT}"
 DOTFILES_SRC="$(cd "$DOTFILES_SRC" && pwd)"
 export DOTFILES_TEST_OUT="${DOTFILES_TEST_OUT:-$HERE/out}"
+# The checkout's own names: its containers and its target directory in the
+# dotfiles-test-target volume.
+RUN_ID="$(printf '%s' "$DOTFILES_SRC" | sha256sum | cut -c1-12)"
+LOCKS="${XDG_CACHE_HOME:-$HOME/.cache}/kubaos/test-run"
 # The machine's Nix store, mounted read-only as a substituter (compose.yaml).
 # Without Nix on the machine an empty folder stands in, and harness.sh skips it.
 if [[ -z ${DOTFILES_HOST_NIX:-} ]]; then
@@ -63,6 +69,24 @@ run_dotfiles() {
   compose run ${LOCAL_INPUT_MOUNTS[@]+"${LOCAL_INPUT_MOUNTS[@]}"} -e DOTFILES_LOCAL_INPUTS="$LOCAL_INPUTS" "$@"
 }
 elapsed() { printf '%dm%02ds' $((SECONDS / 60)) $((SECONDS % 60)); }
+
+# hold LOCK WHAT: take $LOCKS/LOCK.lock for the rest of this test/run, first
+# saying whom it waits for when another run holds it. WHAT names the holder in
+# that message. The file keeps the holder's pid and command, so it is opened
+# without truncating it.
+hold() {
+  local lock="$LOCKS/$1.lock" fd
+  mkdir -p "$LOCKS"
+  exec {fd}<>"$lock"
+  if ! flock -n "$fd"; then
+    printf 'test/run: waiting for %s (%s)\n' "$2" "$(cat "$lock")" >&2
+    flock "$fd"
+  fi
+  printf 'pid %s, test/run %s, since %s\n' "$$" "$CMD" "$(date +%T)" >"$lock"
+}
+# hold_checkout: one run at a time of this checkout, as its runs share their
+# containers' names and test/out/kubaos.
+hold_checkout() { hold "checkout-$RUN_ID" "another test/run of $DOTFILES_SRC"; }
 
 need_image() {
   docker image inspect "$IMAGE" >/dev/null 2>&1 || die "no $IMAGE yet: run test/run build"
@@ -96,7 +120,8 @@ cmd_build() {
 }
 
 cmd_warm() {
-  in_container dotfiles-test-warm warm "$@"
+  hold_checkout
+  in_container "dotfiles-test-warm-$RUN_ID" warm "$@"
   echo "warm done in $(elapsed)"
 }
 
@@ -104,23 +129,23 @@ cmd_warm() {
 # container's /out/kubaos), for the packages, suites and bitwarden checks, with the test Suite built in. The image has no Rust toolchain, so it builds
 # in rust:latest, as install/test/engine-e2e does. Cargo's registry and target dir live in the
 # dotfiles-test-cargo and dotfiles-test-target volumes, with a target subdirectory per checkout:
-# cargo goes by mtime, and worktrees share the volume.
+# cargo goes by mtime, and worktrees share the volume. Cargo locks the registry itself, so two
+# checkouts build at once.
 build_kubaos() {
-  local sub
-  sub="$(printf '%s' "$DOTFILES_SRC" | sha256sum | cut -c1-12)"
+  local name="dotfiles-test-cargo-$RUN_ID"
   mkdir -p "$DOTFILES_TEST_OUT"
   echo "==> cargo build -p kubaos-cli --features test-suite (linux/$(docker version -f '{{.Server.Arch}}'))"
-  docker rm -f dotfiles-test-cargo-build >/dev/null 2>&1 || true
+  docker rm -f "$name" >/dev/null 2>&1 || true
   # shellcheck disable=SC2016 # $CARGO_TARGET_DIR expands in the build container.
-  docker run --rm --name dotfiles-test-cargo-build \
+  docker run --rm --name "$name" \
     --cpus "${DOTFILES_TEST_CPUS:-8}" --memory "${DOTFILES_TEST_MEM:-12g}" -e CARGO_BUILD_JOBS="${DOTFILES_TEST_NIX_CORES:-4}" \
     -v dotfiles-test-cargo:/usr/local/cargo/registry -v dotfiles-test-target:/target \
-    -v "$DOTFILES_SRC":/src:ro -v "$DOTFILES_TEST_OUT":/out -w /src -e CARGO_TARGET_DIR="/target/$sub" \
+    -v "$DOTFILES_SRC":/src:ro -v "$DOTFILES_TEST_OUT":/out -w /src -e CARGO_TARGET_DIR="/target/$RUN_ID" \
     rust:latest sh -c 'cargo build --locked --quiet -p kubaos-cli --features test-suite && install -m 0755 "$CARGO_TARGET_DIR/debug/kubaos" /out/kubaos'
 }
 
 cmd_e2e() {
-  local only="" keep=0 rc=0
+  local only="" keep=0 rc=0 name="dotfiles-test-e2e-$RUN_ID"
   while (($#)); do
     case "$1" in
       --only) only="${2:?--only needs a,b,c}"; shift ;;
@@ -129,37 +154,43 @@ cmd_e2e() {
     esac
     shift
   done
+  hold_checkout
   if [[ -z $only || ,$only, =~ ,(packages|preview|suites|pins|keyboard|update_edge|update_stable|rollback), ]]; then
     build_kubaos
   fi
   if ((keep)); then
     need_image
-    docker rm -f dotfiles-test-e2e >/dev/null 2>&1 || true
-    run_dotfiles -d --name dotfiles-test-e2e dotfiles sleep infinity >/dev/null
+    docker rm -f "$name" >/dev/null 2>&1 || true
+    run_dotfiles -d --name "$name" dotfiles sleep infinity >/dev/null
     local t=()
     [[ -t 1 ]] && t=(-t)
-    docker exec ${t[@]+"${t[@]}"} dotfiles-test-e2e /src/test/lib/entry e2e "$only" || rc=$?
-    echo "container kept: docker exec -it dotfiles-test-e2e bash  (test/run clean removes it)"
+    docker exec ${t[@]+"${t[@]}"} "$name" /src/test/lib/entry e2e "$only" || rc=$?
+    echo "container kept: docker exec -it $name bash  (test/run clean removes it)"
   else
-    in_container dotfiles-test-e2e e2e "$only" || rc=$?
+    in_container "$name" e2e "$only" || rc=$?
   fi
   echo "e2e finished in $(elapsed)"
   return "$rc"
 }
 
+# A shell per call, so a second one doesn't end the first.
 cmd_shell() {
-  in_container dotfiles-test-shell shell
+  in_container "dotfiles-test-shell-$RUN_ID-$$" shell
 }
 
+# Vaultwarden is one container and one data volume for the machine, so
+# bitwarden runs take turns across checkouts too.
 cmd_bitwarden() {
   need_image
+  hold_checkout
+  hold bitwarden "another test/run bitwarden"
   build_kubaos
   # A fresh vault every run; certificates are reused.
   compose --profile bitwarden rm -sf vaultwarden >/dev/null 2>&1 || true
   docker volume rm dotfiles-test-vw-data >/dev/null 2>&1 || true
   compose --profile bitwarden up -d --wait vaultwarden
   local rc=0
-  in_container dotfiles-test-bitwarden bitwarden || rc=$?
+  in_container "dotfiles-test-bitwarden-$RUN_ID" bitwarden || rc=$?
   compose --profile bitwarden stop vaultwarden >/dev/null 2>&1 || true
   echo "bitwarden finished in $(elapsed)"
   return "$rc"
@@ -261,7 +292,8 @@ cmd_nuke() {
 }
 
 main() {
-  local cmd="${1:-}"
+  CMD="${1:-}"
+  local cmd="$CMD"
   shift || true
   cd "$ROOT"
   case "$cmd" in

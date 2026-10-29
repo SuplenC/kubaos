@@ -317,6 +317,7 @@ c_tmux() {
 
 c_nvim() {
   local out
+  cache_lock nvim
   # LazyVim's plugins from the lockfile (cached in the dotfiles-test-cache volume).
   expect_ok "Lazy! restore" zrun 'nvim --headless "+Lazy! restore" +qa' || return 1
   out="$(zrun "nvim --headless +'lua io.write(vim.g.colors_name or \"none\", \" \", vim.v.errmsg)' +qa" 2>&1 | tr -d '\r')"
@@ -2735,6 +2736,7 @@ c_suites() {
   # opts NAME: LazyVim's opts.kubaos_test_suite as "<greeting> <version>", as
   # the Defaults plus the user layer give them.
   opts() {
+    cache_lock nvim
     zrun "nvim --headless +'lua local o = LazyVim.opts(\"LazyVim\").kubaos_test_suite or {}; io.write(\"\\nOPTS \", tostring(o.greeting), \" \", tostring(o.version))' +qa" 2>&1 |
       tr -d '\r' | sed -n 's/^OPTS //p'
   }
@@ -3827,6 +3829,8 @@ e2e_main() {
   local t0 only="${1:-}"
   t0="$(now)"
   say "checks"
+  # shellcheck disable=SC2034 # cache_lock (harness.sh) tells the console here of a wait.
+  exec {CONSOLE}>&1
   RESULTS+=("switch|PASS|$SWITCH_SECONDS|home-manager switch via system/60-nix.sh")
   printf '%sPASS%s  %-14s %6ss\n' "$C_OK" "$C_OFF" switch "$SWITCH_SECONDS"
   local c
