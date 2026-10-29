@@ -10,7 +10,8 @@ import qs.services
 //
 // While an open panel covers the corner (`covered`), the cards wait in
 // `Notifs.popups`, still in the history, and come back when the panel has
-// gone; critical ones show under it (`PopupsBelow.qml`).
+// gone; critical ones show under it (`PopupsBelow.qml`). The notifications
+// panel is the exception: opening it is seeing them, so they leave for good.
 K.Sheet {
     id: root
 

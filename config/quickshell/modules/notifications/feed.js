@@ -122,3 +122,25 @@ function rows(sections, expanded) {
     }
     return out;
 }
+
+// A card's buttons for a notification's `list` of actions: the main one, filled (its default
+// action, else its first), and the others after it. Its default action's text is a word for
+// people, "Open" when the sender gave none. An action saying what the main one says is left out:
+// a sender often offers its default action again under the same name, for servers that show no
+// default.
+function actions(list) {
+    const main = list.find(a => a.identifier === "default") ?? list[0] ?? null;
+    if (!main)
+        return {
+            main: null,
+            label: "",
+            others: []
+        };
+    const text = main.text.trim();
+    const label = text === "" || text.toLowerCase() === "default" ? "Open" : text;
+    return {
+        main: main,
+        label: label,
+        others: list.filter(a => a !== main && a.identifier !== "default" && a.text !== label)
+    };
+}

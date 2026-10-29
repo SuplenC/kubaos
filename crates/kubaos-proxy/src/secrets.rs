@@ -90,7 +90,8 @@ impl Keys {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    #[error("the keyring has no key for the tunnel: run kubaos proxy pull (or import IT's config again)")]
+    /// Only reading the keys for the tunnel meets it, so it says "its", after the words naming it.
+    #[error("its keys aren't in the keyring: run kubaos proxy pull (or import IT's config again)")]
     NotInKeyring,
     #[error("the GNOME keyring couldn't be reached")]
     Keyring(#[source] Said),

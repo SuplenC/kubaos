@@ -33,8 +33,12 @@ import qs.modules.frame
 //           process (a process's details, scrolled down to them), kill (its Kill asking first)
 //   wallpaper: settings
 //   osd: volume, brightness
-//   notifications: "" (two popups), peek (the bell's peek, every one unread, so "+N more"),
-//                  panel (the notifications panel, a stack folded), panel-expanded (the stack
+//   notifications: "" (two popups, folded, one with actions and one without), unfolded (the
+//                  one without actions unfolded), held (the stack held as the pointer on it holds
+//                  it, a third notification waiting), over (the panel opened over the popups),
+//                  peek (the bell's peek, every one unread, so "+N more"),
+//                  panel (the notifications panel, a stack folded), panel-unfolded (the build,
+//                  with actions, unfolded), panel-expanded (the stack
 //                  open, its second card selected), panel-keys (the keys button's tooltip),
 //                  panel-empty (nothing in it), panel-read (every one read), panel-dnd (Do
 //                  not disturb on while the screen is shared, its tooltip showing)
@@ -121,7 +125,7 @@ QtObject {
             driver.keepOsd.start();
         } else if (driver.panel === "notifications" && driver.state.startsWith("panel")) {
             Panels.current = "notifications";
-            if (driver.state === "panel-expanded" || driver.state === "panel-keys" || driver.state === "panel-dnd")
+            if (["panel-expanded", "panel-keys", "panel-dnd", "panel-unfolded"].includes(driver.state))
                 notificationsPose.start();
         } else if (driver.panel === "notifications" && driver.state === "peek") {
             const popups = driver.find(root, it => it.peeking !== undefined && it.hasPeek !== undefined);
@@ -131,6 +135,8 @@ QtObject {
                 console.warn("shot: no peek found");
         } else if (driver.panel === "notifications") {
             Notifs.showPopups();
+            if (driver.state !== "")
+                popupsPose.start();
         } else if (driver.panel !== "bar") {
             Panels.current = driver.panel;
         }
@@ -234,6 +240,10 @@ QtObject {
                 console.warn("shot: no notifications panel found");
                 return;
             }
+            if (driver.state === "panel-unfolded") {
+                panel.unfolded = Notifs.build;
+                return;
+            }
             if (driver.state === "panel-keys" || driver.state === "panel-dnd") {
                 const title = driver.state === "panel-keys" ? "Keys" : "Do not disturb is on";
                 const tooltip = driver.find(driver.window.contentItem, it => it.title === title && it.shown !== undefined && it.within !== undefined);
@@ -247,6 +257,28 @@ QtObject {
             panel.setExpanded(stack.key, true);
             const list = driver.find(panel, it => typeof it.jump === "function");
             list.currentIndex = panel.rows.findIndex(row => row.key === stack.key) + 1;
+        }
+    }
+
+    // The popups posed once they have come in, through what ToastList.qml exposes: a card
+    // unfolded, the stack held as the pointer holds it (a stand-in has no pointer) while one more
+    // arrives, or the panel opened over them.
+    property Timer popupsPose: Timer {
+        interval: 700
+        onTriggered: {
+            const list = driver.find(driver.window.contentItem, it => it.hold !== undefined && it.unfolded !== undefined);
+            if (!list) {
+                console.warn("shot: no popups found");
+                return;
+            }
+            if (driver.state === "unfolded")
+                list.unfolded = Notifs.battery;
+            if (driver.state === "held") {
+                list.hold.pointed = true;
+                Notifs.arrive();
+            }
+            if (driver.state === "over")
+                Panels.current = "notifications";
         }
     }
 

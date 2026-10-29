@@ -53,10 +53,12 @@ use crate::tunnel;
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum StepError {
-    #[error("the tunnel's keys")]
-    Keys(#[source] secrets::Error),
-    #[error("the tunnel")]
-    Tunnel(#[source] TunnelError),
+    /// The cause's message alone: [`Failed`] has named the tunnel already.
+    #[error(transparent)]
+    Keys(secrets::Error),
+    /// The cause's message alone, as with `Keys`.
+    #[error(transparent)]
+    Tunnel(TunnelError),
     #[error("the tunnel's endpoint, with no address known for it")]
     Endpoint(#[source] ResolveError),
     #[error("the root helper, {HELPER}")]

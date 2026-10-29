@@ -14,18 +14,31 @@ ListView {
     required property var notifications
     // The cards on screen now: none while the drawer or the list is faded out.
     readonly property int drawn: drawer.active && drawer.contentOpacity > 0 && opacity > 0 ? count : 0
-    // The card the pointer is on. While it is, it shows alone: the others fade out where they are,
-    // their time stopped, and a new one waits, so nothing moves under the pointer.
-    property var pointed: null
-    // The cards when the pointer came onto one.
-    property var held: []
-    readonly property bool holding: list.pointed !== null && list.notifications.includes(list.pointed)
+    // While the pointer is on the stack, every card stays with its time stopped.
+    readonly property bool holding: hold.holding
+    // What the stack keeps while the pointer is on it; the shots hold it without a pointer.
+    readonly property PopupHold hold: hold
+    // The notification whose card shows its whole text, one at a time.
+    property var unfolded: null
 
     height: contentHeight
     interactive: false
     spacing: K.Tokens.space.s8
     model: ScriptModel {
-        values: list.holding ? list.held.filter(n => list.notifications.includes(n)) : list.notifications
+        values: hold.shown
+    }
+
+    PopupHold {
+        id: hold
+
+        notifications: list.notifications
+        pointed: stackHover.hovered
+    }
+
+    // On the list, not on each card, so the pointer crossing the gap between two cards doesn't
+    // let them go for a moment.
+    HoverHandler {
+        id: stackHover
     }
 
     add: Transition {
@@ -97,8 +110,7 @@ ListView {
         }
     }
 
-    // The card in a box of its own: the transitions above move and fade the box, and the card
-    // fades by itself while another is pointed at.
+    // The card in a box of its own, which the transitions above move and fade.
     delegate: Item {
         id: slot
 
@@ -110,31 +122,13 @@ ListView {
         NotificationCard {
             id: card
 
-            readonly property bool aside: list.holding && list.pointed !== slot.modelData
-
             width: slot.width
             notification: slot.modelData
             popup: true
+            unfolded: list.unfolded === slot.modelData
             held: menu.notification === slot.modelData || list.holding
-            enabled: !card.aside
-            opacity: card.aside ? 0 : 1
             onMenuRequested: at => menu.open(slot.modelData, at)
-            onPointedChanged: {
-                if (card.pointed) {
-                    list.held = list.notifications.slice();
-                    list.pointed = slot.modelData;
-                } else if (list.pointed === slot.modelData) {
-                    list.pointed = null;
-                }
-            }
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: K.Tokens.duration.micro
-                    easing.type: Easing.BezierSpline
-                    easing.bezierCurve: K.Tokens.easing.standard
-                }
-            }
+            onUnfoldRequested: open => list.unfolded = open ? slot.modelData : null
         }
     }
 

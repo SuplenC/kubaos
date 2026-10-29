@@ -394,6 +394,34 @@ fn networkmanager_failing_says_how() {
 }
 
 #[test]
+fn networkmanager_dropping_the_tunnel_names_it_once() {
+    let mut world = world(true);
+    world.fake.tunnel_fails = true;
+
+    let err = world.on().expect_err("dropped");
+
+    assert_eq!(
+        chain(&err),
+        "The tunnel couldn't be put in place: NetworkManager dropped it on the way up (journalctl -u \
+         NetworkManager says why)"
+    );
+}
+
+#[test]
+fn a_tunnel_without_its_key_names_it_once() {
+    let mut world = world(true);
+    world.fake.keyring.clear();
+
+    let err = world.on().expect_err("no key");
+
+    assert_eq!(
+        chain(&err),
+        "The tunnel couldn't be put in place: its keys aren't in the keyring: run kubaos proxy pull (or \
+         import IT's config again)"
+    );
+}
+
+#[test]
 fn a_part_that_wont_go_puts_the_others_back_so_the_proxy_stays_whole() {
     let mut world = world(true);
     world.on().expect("on");

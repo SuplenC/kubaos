@@ -4,8 +4,9 @@ import Quickshell.Services.Notifications
 
 // Stand-in for Notifs: six notifications in the history, newest first: three from Slack, which
 // stack, and the build, unread; lunch and the battery, read. The popups are empty unless a driver
-// shows them (`showPopups`): the build, with an image and actions, and the battery, a plain one.
-// A driver sets `dndReason` for Do not disturb.
+// shows them (`showPopups`): the build, with an image and actions, and the battery, a plain one,
+// both longer than a card's two lines; `arrive` pops up the update too. Opening the panel takes
+// the popups away, as the service's does. A driver sets `dndReason` for Do not disturb.
 QtObject {
     id: root
 
@@ -62,7 +63,13 @@ QtObject {
     }
     property Notification battery: Notification {
         summary: "Battery at 20%"
-        body: "Plug in soon, or switch to Power Saver."
+        body: "Plug in soon, or switch to Power Saver. At this rate it lasts about 40 min; Power Saver dims the screen and slows the apps in the background to stretch it."
+        appName: "KubaOS"
+        expireTimeout: 600000
+    }
+    property Notification update: Notification {
+        summary: "Update ready"
+        body: "KubaOS 0.9 is ready to install."
         appName: "KubaOS"
         expireTimeout: 600000
     }
@@ -77,6 +84,12 @@ QtObject {
     readonly property var dndState: ({
             sharing: root.dndReason === "sharing"
         })
+    readonly property bool listing: Panels.current === "notifications"
+
+    onListingChanged: {
+        if (root.listing)
+            root.popups = [];
+    }
 
     // When each arrived: a few minutes before the shots' frozen clock, and one the day before.
     function arrived(notification: var): var {
@@ -102,6 +115,16 @@ QtObject {
 
     function showPopups(): void {
         root.popups = [root.build, root.battery];
+    }
+
+    function arrive(): void {
+        root.popups = [root.update, ...root.popups];
+    }
+
+    function run(notification: var, action: var): void {
+    }
+
+    function letGoSeen(): void {
     }
 
     function toggleDnd(): void {

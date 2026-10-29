@@ -204,4 +204,47 @@ TestCase {
         compare(rows.filter(r => r.kind === "card").length, 2);
         verify(rows[1].key !== rows[3].key);
     }
+
+    function action(identifier, text) {
+        return {
+            identifier: identifier,
+            text: text
+        };
+    }
+
+    function test_the_default_action_is_the_main_one_and_the_rest_follow_it() {
+        const list = [action("reply", "Reply"), action("default", "View"), action("mute", "Mute")];
+
+        const buttons = Feed.actions(list);
+
+        compare(buttons.main.identifier, "default");
+        compare(buttons.label, "View");
+        compare(buttons.others.map(a => a.text), ["Reply", "Mute"]);
+    }
+
+    function test_with_no_default_action_the_first_is_the_main_one() {
+        const buttons = Feed.actions([action("open", "Open"), action("eject", "Eject")]);
+
+        compare(buttons.main.identifier, "open");
+        compare(buttons.others.map(a => a.text), ["Eject"]);
+    }
+
+    function test_a_default_action_without_a_name_is_called_open() {
+        compare(Feed.actions([action("default", "")]).label, "Open");
+        compare(Feed.actions([action("default", "default")]).label, "Open");
+    }
+
+    function test_an_action_saying_what_the_main_one_says_is_left_out() {
+        const list = [action("default", "Open"), action("open", "Open"), action("eject", "Eject")];
+
+        compare(Feed.actions(list).others.map(a => a.identifier), ["eject"]);
+    }
+
+    function test_a_notification_without_actions_has_no_main_one() {
+        const buttons = Feed.actions([]);
+
+        compare(buttons.main, null);
+        compare(buttons.label, "");
+        compare(buttons.others, []);
+    }
 }
