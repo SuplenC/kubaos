@@ -1,13 +1,13 @@
 import QtQuick
 import KubaOS.Components as K
 
-// Text in a type style that changes with every key or selection: a row's title and subtitle, the
-// detail pane, the footer. One line cut short with an ellipsis, or wrapped where a caller sets
-// `wrapMode`; `textFormat: Text.StyledText` takes Kotodama's lit matches.
+// Text in a type style for the Results' rows, which are made fresh with every key: a row's title,
+// subtitle and Alias. One line cut short with an ellipsis; `textFormat: Text.StyledText` takes
+// Kotodama's lit matches.
 //
-// HAZARD: keep this on Qt's own text. `K.Text` measures every word the way iced lays it out, which
-// cost 0.23 ms a text against 0.008 ms here; a keystroke's fourteen fresh rows of three texts
-// would spend 10 ms on it.
+// HAZARD: keep the Results' rows on Qt's own text. Made headless, a keystroke's fourteen fresh
+// rows of three texts take 1.5 ms in `K.Text` against 0.5 ms here, and the rows on `K.Text` took
+// the menu's keystroke-to-frame median from 9 ms to 12 ms (the e2e `menu` check, five runs).
 Text {
     id: root
 
