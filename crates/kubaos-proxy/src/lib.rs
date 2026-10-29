@@ -13,16 +13,18 @@
 //! ```
 //!
 //! The tunnel's private and preshared keys live in the Bitwarden vault, and a copy in the GNOME
-//! keyring lets the switch work without the master password. They reach NetworkManager in the
-//! call that brings the tunnel up, as agent-owned secrets of an in-memory connection: they are
-//! never written to disk in plain text.
+//! keyring lets the switch work without the master password. They are agent-owned secrets of an
+//! in-memory connection, so NetworkManager saves them nowhere: as it brings the tunnel up it asks
+//! for them, and `kubaos-proxy`, its secret agent for as long as that takes, answers ([`agent`]).
+//! They are never written to a file.
 //!
 //! # Owns
 //!
 //! - The `.conf` ([`wireguard`]) and the profile ([`profile`]), where their files are ([`paths`]),
 //!   what a profile comes to ([`plan`]), putting it in place and taking it away ([`apply`]), the
-//!   keys ([`secrets`]), the tunnel as NetworkManager is given it ([`tunnel`]), and what the shell,
-//!   the menu and `status` read ([`status`]), and when the service acts ([`watch`]).
+//!   keys ([`secrets`]), the tunnel as NetworkManager is given it ([`tunnel`]), who gets the keys
+//!   when NetworkManager asks ([`agent`]), and what the shell, the menu and `status` read
+//!   ([`status`]), and when the service acts ([`watch`]).
 //!
 //! # Not here
 //!
@@ -31,6 +33,7 @@
 //! - The control center's tile and the bar's indicator: `config/quickshell/services/Proxy.qml`. The
 //!   menu's Items: `crates/kotodama-kubaos/src/proxy.rs` and `config/kotodama/kubaos.toml`.
 
+pub mod agent;
 pub mod apply;
 pub mod machine;
 pub mod paths;
