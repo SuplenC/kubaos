@@ -23,7 +23,10 @@ import qs.modules.frame
 //                  keyboard-add ("germ" searched for a layout to add), each with the history
 //                  cleared, scanning (a Wi-Fi scan that has found nothing yet, the history cleared)
 //   clock: answer (a question typed into the search), settings
-//   sysmon: process (a process's details)
+//   sysmon: "" (a disk close to full: Breaking a sweat), fine (every reading fine), critical (the
+//           CPU over its limit), loading (the processes still counted), bare (no GPU, battery
+//           or fan), scrolled (scrolled down to the processes, as a short screen shows them),
+//           process (a process's details, scrolled down to them)
 //   wallpaper: settings
 //   osd: volume, brightness
 //   notifications: "" (two popups), peek (the bell's peek, every one unread, so "+N more"),
@@ -131,6 +134,8 @@ QtObject {
             driver.measure("panel opening");
         if (driver.panel === "controlcenter")
             driver.controlCenter(root);
+        if (driver.panel === "sysmon" && (driver.state === "scrolled" || driver.state === "process"))
+            sysmonPose.start();
         if (driver.panel === "clock" && driver.state === "settings") {
             const clock = driver.find(root, it => it.page !== undefined && typeof it.land === "function");
             if (clock)
@@ -161,6 +166,50 @@ QtObject {
         if (driver.state.startsWith("keyboard")) {
             cc.tab = cc.keyboardTab;
             keyboardPose.start();
+        }
+    }
+
+    // The system monitor's sample for the state, changed from the stand-in's before the frame
+    // exists, so nothing is drawn twice.
+    function sysmonSample(): void {
+        const s = JSON.parse(JSON.stringify(Sysmon.sample));
+        if (driver.state === "fine")
+            s.disks[1] = Object.assign(s.disks[1], {
+                free: 256055095296,
+                percent: 50
+            });
+        if (driver.state === "critical")
+            s.cpu.temp = 94;
+        // A light sample, as the pill's pace leaves the panel with when it opens.
+        if (driver.state === "loading") {
+            s.detail = false;
+            s.cpu.cores = [];
+            s.cpu.mhz = null;
+            s.fans = [];
+            s.io = null;
+            s.net.address = null;
+            s.top = null;
+        }
+        if (driver.state === "bare") {
+            s.gpus = [];
+            s.battery = null;
+            s.fans = [];
+        }
+        Sysmon.sample = s;
+        if (driver.state === "process")
+            Sysmon.pendingPid = 4211;
+    }
+
+    // The system monitor scrolled to its end once it has opened, through its `K.Scroll`.
+    property Timer sysmonPose: Timer {
+        interval: 700
+        onTriggered: {
+            const panel = driver.find(driver.window.contentItem, it => it.lastDetailed !== undefined);
+            const scroll = panel ? driver.find(panel, it => it.travel !== undefined && it.contentY !== undefined) : null;
+            if (scroll)
+                scroll.contentY = scroll.travel;
+            else
+                console.warn("shot: no system monitor scroll found");
         }
     }
 
@@ -332,8 +381,8 @@ QtObject {
         Panels.screen = driver.screen;
         if (driver.panel === "clock" && driver.state === "answer")
             Time.pendingSearch = "days until vacation";
-        if (driver.panel === "sysmon" && driver.state === "process")
-            Sysmon.pendingPid = 4211;
+        if (driver.panel === "sysmon")
+            driver.sysmonSample();
         if (driver.panel === "wallpaper" && driver.state === "settings")
             Wallpapers.openSettings = true;
         // A scan that has found nothing yet, its skeleton rows with the room to show: emptied
