@@ -46,7 +46,7 @@ release: test
 # What a pull request's CI runs (.github/workflows/check.yml), in `nix develop`: the formatting, both clippy passes, the workspace's tests, the shell's logic tests, the screenshot harness's tests and the design checks.
 check: fmt-check lint nextest qml-test shots-test design-check
 
-# The shell's logic tests (test/qml) in Qt's test runner, headless, as `nix flake check` runs them (crates/checks.nix, qml-logic). The flake sees the files git knows about: `git add` a new test first.
+# The shell's logic tests (test/qml) in Qt's test runner, headless, as `nix flake check` runs them (crates/checks.nix, qml-logic). A message from the QML engine fails them, as it fails the e2e checks. The flake sees the files git knows about: `git add` a new test first.
 qml-test:
     nix build --no-link -L .#checks.{{host}}-linux.qml-logic
 

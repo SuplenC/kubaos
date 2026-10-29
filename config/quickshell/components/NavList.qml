@@ -121,4 +121,10 @@ ListView {
     }
 
     Keys.onPressed: event => event.accepted = handleKey(event)
+
+    // HAZARD: the list lets go of its model as its context goes. A Loader that closes clears its
+    // item's context at once and deletes the item only later, and the rows past the view's edge
+    // are made a slice at a time between frames: one still half made is resumed in between and
+    // fails with "Object or context destroyed during incubation". Dropping the model cancels it.
+    Component.onDestruction: model = null
 }
