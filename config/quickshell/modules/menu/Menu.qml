@@ -3,7 +3,6 @@ import Quickshell
 import Quickshell.Wayland
 import Kotodama
 import KubaOS.Components as K
-import qs.components
 import qs.services
 import qs.settings
 
@@ -969,7 +968,7 @@ PanelWindow {
             Loader {
                 anchors.fill: parent
                 active: menu.kind === "progress"
-                sourceComponent: ProgressView {
+                sourceComponent: K.ProgressPanel {
                     job: search.view.job ?? ({})
                     moves: menu.moves
                 }
@@ -978,7 +977,7 @@ PanelWindow {
 
         // A form scrolled up keeps the gap under the field clear, and fades in under it, as a
         // panel's list does under its header.
-        HeaderFade {
+        K.HeaderFade {
             parent: inside
             // Over the body, whichever of the two `inside` took first.
             z: 1

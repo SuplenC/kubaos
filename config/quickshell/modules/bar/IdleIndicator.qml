@@ -1,12 +1,11 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Keep awake and a scheduled action, while either is on: a cup, and the
 // action's icon (suspend, power, restart, or a clock) with the time left. Click
 // stops Keep awake, or cancels the action when only that is on.
-Pill {
+K.Pill {
     id: root
 
     visible: Idle.keepAwake || Idle.scheduledPending

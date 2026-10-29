@@ -100,11 +100,8 @@ services/               singletons, no UI
                         the panel and the lock), the graphs' last minute, sysmon.toml (watched),
                         alerts as notifications, the readings' colour steps (sysmon.js)
 components/             blocks composed from KubaOS.Components
-  Pill                  the bar's pill: a row of content, hover, click, right-click and wheel
   PowerSlider           the power stops on a K.Slider
-  BadgedIcon            a bar symbol with a K.Badge on its corner
   WallpaperView         a still, or a video looping over its poster (desktop, lock screen, picker)
-  Countdown             a popup's time left, stopped while the pointer is on it
 modules/
   frame/                Frame (one layer per screen: bar, border, every panel, input mask),
                         Exclusions (exclusive zones as four empty windows)
@@ -112,18 +109,18 @@ modules/
                         IdleIndicator
   menu/                 Menu: the Command menu on KotodamaSearch, built from KubaOS.Components (its
                         sizes for the screen, its motion). ResultRow, DetailPane + PaneContent,
-                        ActionPanel, FormView, ProgressView, DetailView, IntroCard, Label (text that
+                        ActionPanel, FormView, DetailView, IntroCard, Label (text that
                         changes with every key), words.js (glyphs, kinds, shortcuts),
                         Probe (test-only timing and state lines)
   controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a K.ScrollingList,
-                        KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app)
-  notifications/        NotificationPanel, Popups (corner, and the bell's Peek), PopupsBelow (critical, under a panel), ToastList, PopupHold (what a stack of popups keeps while the pointer is on it), CardGroup (one app's notifications: a stack at rest, a preview fanned over the list on hover, opened in place on a click), NotificationCard (a notification on its CardFace, which draws it and folds its text), feed.js (groups, New and Earlier, the peek, a card's buttons), ToastProbe (tests)
+                        KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app),
+                        ScanPulse (when a radio's tab scans for what is in range)
+  notifications/        NotificationPanel, Popups (corner, and the bell's Peek), PopupsBelow (critical, under a panel), ToastList, PopupHold (what a stack of popups keeps while the pointer is on it), CardGroup (one app's notifications: a stack at rest, a preview fanned over the list on hover, opened in place on a click), NotificationCard (a notification on its CardFace, which draws it and folds its text), feed.js (groups, New and Earlier, the peek, a card's buttons), Countdown (a popup's time left, stopped while the pointer is on it), ToastProbe (tests)
   osd/                  volume / brightness OSD
   lock/                 Lock (WlSessionLock), LockSurface, Auth (PAM)
   powermenu/            PowerMenu
   clock/                ClockPopup (the bar clock's popup), the month on K.Calendar (month and year views),
-                        AnalogFace, Tools (timer, stopwatch, alarms), ClockSettings, Chip,
-                        Figure (a ticking number in a box as wide as its widest digits)
+                        AnalogFace, Tools (timer, stopwatch, alarms), ClockSettings
   sysmon/               SysmonPanel (the monitor pill's side panel), Section (a reading's card),
                         Processes, ProcessRow and ProcessDetails (the busiest, details, End and
                         Kill), panel.js (its subtitle and rows)
@@ -172,7 +169,7 @@ The values come from the design tokens (`design/tokens.toml`, `docs/DESIGN.md`) 
 
 ## Adding a module
 
-1. Create `modules/<name>/<Name>.qml`. For a bar item, start from `Pill`. For a panel, start from `K.Sheet { edge: "top" | "bottom" | "left" | "right" }`. Set `contentWidth`/`contentHeight` from your content's implicit size; `align`, `flushStart`/`flushEnd` place it along the edge. Use only `KubaOS.Components` and its `Tokens` for sizes, colours and motion (`docs/DESIGN.md`).
+1. Create `modules/<name>/<Name>.qml`. For a bar item, start from `K.Pill`. For a panel, start from `K.Sheet { edge: "top" | "bottom" | "left" | "right" }`. Set `contentWidth`/`contentHeight` from your content's implicit size; `align`, `flushStart`/`flushEnd` place it along the edge. Use only `KubaOS.Components` and its `Tokens` for sizes, colours and motion (`docs/DESIGN.md`).
 2. Put data and side effects in a singleton under `services/` (`pragma Singleton` + `Singleton {}`), so UI files only bind to it.
 3. Add it to `modules/frame/Frame.qml`, with `frame: geo` and `shown: root.panel === "<name>"`, and add a `PanelPath { drawer: <id> }` to the background `Shape`. Or add it to `Bar.qml`.
 4. If Hyprland should open it, add an `IpcHandler` to `IpcHandlers.qml` that calls `Panels.toggle("<name>")`, and add the row to `docs/CONTRACTS.md`.

@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Side sheet on the right edge, from the bar down to the bottom border:

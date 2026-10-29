@@ -3,7 +3,6 @@ import Quickshell
 import Quickshell.Services.Notifications
 import qs.settings
 import qs.services
-import qs.components
 import "feed.js" as Feed
 
 // One notification, or the newest of a group standing for the whole of it, the same card in the

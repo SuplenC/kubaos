@@ -80,3 +80,8 @@ ListRows 1.0 ListRows.qml
 ScrollingList 1.0 ScrollingList.qml
 LiveList 1.0 LiveList.qml
 LiveRow 1.0 LiveRow.qml
+Pill 1.0 Pill.qml
+HeaderFade 1.0 HeaderFade.qml
+BadgedIcon 1.0 BadgedIcon.qml
+Figure 1.0 Figure.qml
+ProgressPanel 1.0 ProgressPanel.qml

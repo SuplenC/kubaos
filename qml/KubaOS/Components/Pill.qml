@@ -14,9 +14,6 @@ Item {
     property int padding: K.Tokens.space.s12
     property alias spacing: row.gap
     property bool interactive: false
-    // Off for content that animates its own width: the pill then follows it frame by frame, where
-    // a second animation would lag behind it.
-    property bool animatesWidth: true
     property color color: K.Tokens.color.surface_container
     // The content's colour, which the state layer lays over the fill.
     property color ink: K.Tokens.color.on_surface
@@ -65,8 +62,6 @@ Item {
 
     // New content settles into the pill's new width, as a list reordering does.
     Behavior on implicitWidth {
-        enabled: root.animatesWidth
-
         NumberAnimation {
             duration: K.Tokens.duration.medium
             easing.type: Easing.BezierSpline

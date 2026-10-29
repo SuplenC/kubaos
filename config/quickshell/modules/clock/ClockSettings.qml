@@ -52,13 +52,15 @@ K.Stack {
             Repeater {
                 model: root.weekdays
 
-                Chip {
+                K.Chip {
                     required property string modelData
                     required property int index
 
-                    label: modelData.slice(0, 3).replace(/^./, c => c.toUpperCase())
-                    selected: root.settings.firstWeekday === index + 1
-                    onClicked: root.set("first-weekday", modelData)
+                    text: modelData.slice(0, 3).replace(/^./, c => c.toUpperCase())
+                    kind: root.settings.firstWeekday === index + 1 ? "Selected" : "Neutral"
+                    pressable: true
+                    tabStop: false
+                    onActivated: root.set("first-weekday", modelData)
                 }
             }
         }
@@ -71,23 +73,29 @@ K.Stack {
         K.Row {
             gap: K.Tokens.space.s4
 
-            Chip {
-                label: "Locale"
+            K.Chip {
+                text: "Locale"
                 tooltip: `Your locale's: ${Time.twelveHourByLocale ? "12-hour" : "24-hour"}`
-                selected: !root.settings.timeFormat
-                onClicked: root.set("time-format", "locale")
+                kind: !root.settings.timeFormat ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("time-format", "locale")
             }
 
-            Chip {
-                label: "24-hour"
-                selected: root.settings.timeFormat === "24h"
-                onClicked: root.set("time-format", "24h")
+            K.Chip {
+                text: "24-hour"
+                kind: root.settings.timeFormat === "24h" ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("time-format", "24h")
             }
 
-            Chip {
-                label: "12-hour"
-                selected: root.settings.timeFormat === "12h"
-                onClicked: root.set("time-format", "12h")
+            K.Chip {
+                text: "12-hour"
+                kind: root.settings.timeFormat === "12h" ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("time-format", "12h")
             }
         }
     }
@@ -98,23 +106,29 @@ K.Stack {
         K.Row {
             gap: K.Tokens.space.s4
 
-            Chip {
-                label: "Locale"
+            K.Chip {
+                text: "Locale"
                 tooltip: `Your locale's: ${Time.dayFirstByLocale ? "day first" : "month first"}`
-                selected: !root.settings.dateOrder
-                onClicked: root.set("date-order", "locale")
+                kind: !root.settings.dateOrder ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("date-order", "locale")
             }
 
-            Chip {
-                label: "Day first"
-                selected: root.settings.dateOrder === "day-month"
-                onClicked: root.set("date-order", "day-month")
+            K.Chip {
+                text: "Day first"
+                kind: root.settings.dateOrder === "day-month" ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("date-order", "day-month")
             }
 
-            Chip {
-                label: "Month first"
-                selected: root.settings.dateOrder === "month-day"
-                onClicked: root.set("date-order", "month-day")
+            K.Chip {
+                text: "Month first"
+                kind: root.settings.dateOrder === "month-day" ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("date-order", "month-day")
             }
         }
     }
@@ -125,16 +139,20 @@ K.Stack {
         K.Row {
             gap: K.Tokens.space.s4
 
-            Chip {
-                label: "Off"
-                selected: !root.settings.analog
-                onClicked: root.set("analog", "off")
+            K.Chip {
+                text: "Off"
+                kind: !root.settings.analog ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("analog", "off")
             }
 
-            Chip {
-                label: "On"
-                selected: !!root.settings.analog
-                onClicked: root.set("analog", "on")
+            K.Chip {
+                text: "On"
+                kind: !!root.settings.analog ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("analog", "on")
             }
         }
     }
@@ -147,21 +165,25 @@ K.Stack {
 
             spacing: K.Tokens.space.s4
 
-            Chip {
-                label: "None"
-                selected: !root.settings.barCountdown
-                onClicked: root.set("bar-countdown", "none")
+            K.Chip {
+                text: "None"
+                kind: !root.settings.barCountdown ? "Selected" : "Neutral"
+                pressable: true
+                tabStop: false
+                onActivated: root.set("bar-countdown", "none")
             }
 
             Repeater {
                 model: Time.state.countdowns ?? []
 
-                Chip {
+                K.Chip {
                     required property var modelData
 
-                    label: modelData.name
-                    selected: root.settings.barCountdown === modelData.name
-                    onClicked: root.set("bar-countdown", modelData.name)
+                    text: modelData.name
+                    kind: root.settings.barCountdown === modelData.name ? "Selected" : "Neutral"
+                    pressable: true
+                    tabStop: false
+                    onActivated: root.set("bar-countdown", modelData.name)
                 }
             }
         }

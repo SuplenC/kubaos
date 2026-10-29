@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../../config/quickshell/components"
+import "../../config/quickshell/modules/notifications"
 
 // A popup's time left: it runs down while nothing holds it, stops while the pointer is on the popup
 // (or its menu holds it), and goes on from where it stopped.

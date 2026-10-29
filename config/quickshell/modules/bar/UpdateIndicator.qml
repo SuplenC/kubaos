@@ -1,12 +1,11 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // A small marker while the daily check has a KubaOS release or apt security
 // updates waiting. Click opens a terminal running kubaos update, or kubaos
 // upgrade when only the next series is waiting.
-Pill {
+K.Pill {
     id: root
 
     readonly property bool onlyUpgrade: Updates.update === "" && Updates.upgrade !== "" && Updates.aptSecurity === 0
@@ -19,7 +18,7 @@ Pill {
     onClicked: Updates.run(onlyUpgrade ? "upgrade" : "update")
 
     // Security updates waiting are counted; a release waiting is a dot.
-    BadgedIcon {
+    K.BadgedIcon {
         name: "system_update_alt"
         color: K.Tokens.color.tertiary
         badged: true

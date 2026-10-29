@@ -1,13 +1,12 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // Date and time. The weekday's kanji (月 火 水 木 金 土 日) leads as a small accent; the countdown
 // the clock settings pin follows the time. The time is in mono, whose figures are all one width,
 // so the pill keeps its width as the minutes turn. Click opens the clock popup under it.
-Pill {
+K.Pill {
     id: root
 
     readonly property var kanji: ["日", "月", "火", "水", "木", "金", "土"]

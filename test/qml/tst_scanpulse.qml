@@ -1,6 +1,6 @@
 import QtQuick
 import QtTest
-import "../../config/quickshell/components"
+import "../../config/quickshell/modules/controlcenter"
 
 // When a scan runs: at once when its tab is shown, then every `every` for `window`, and never
 // while the tab is hidden.

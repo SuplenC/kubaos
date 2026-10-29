@@ -350,13 +350,17 @@ Each component has a page of its own under `design/components/`: its constructor
 **Layout**
 
 - [Layout](design/components/layout.md): `Page`, `Container`, `Header`, `Section`, `Stack`, `Row`, `Grid`, `Split`, `Divider`, `Fill`, `Gap`, `Flow`
-- [Scroll](design/components/scroll.md)
+- [Scroll and HeaderFade](design/components/scroll.md)
 
 **Buttons**
 
 - [Button](design/components/button.md)
 - [IconButton and Hint](design/components/icon-button.md)
 - [Tooltip](design/components/tooltip.md)
+
+**Text**
+
+- [Figure](design/components/figure.md)
 
 **Keys**
 
@@ -385,7 +389,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [List, ScrollingList, ListRows, ListRow, LiveList and EmptyList](design/components/list.md)
 - [Chip](design/components/chip.md)
 - [IconTile](design/components/icon-tile.md)
-- [Badge](design/components/badge.md)
+- [Badge and BadgedIcon](design/components/badge.md)
 - [Skeleton](design/components/skeleton.md)
 - [Card and ChoiceCard](design/components/card.md)
 - [Media](design/components/media.md)
@@ -396,6 +400,7 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Dialog and Scrim](design/components/dialog.md)
 - [Toast](design/components/toast.md)
 - [ProgressBar](design/components/progress-bar.md)
+- [ProgressPanel](design/components/progress-panel.md)
 - [Spinner](design/components/spinner.md)
 - [EmptyState](design/components/empty-state.md)
 - [ErrorBlock](design/components/error-block.md)
@@ -407,9 +412,10 @@ Each component has a page of its own under `design/components/`: its constructor
 - [DescriptionList](design/components/description-list.md)
 - [FocusRing](design/components/focus-ring.md)
 
-**Panels**
+**Panels and the bar**
 
 - [Sheet](design/components/sheet.md)
+- [Pill](design/components/pill.md)
 
 ### Rules every component keeps
 
