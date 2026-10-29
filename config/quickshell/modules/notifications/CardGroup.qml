@@ -9,8 +9,8 @@ import KubaOS.Components as K
 //   below it for a pair, two for more, each card's shadow cast onto the edge under it. The edges'
 //   room is part of the group's height, so nothing overlaps.
 // - With the pointer resting on it a beat, a preview: up to three cards spread down into whole
-//   cards the list's gap apart, lifted over the list behind (`backdrop`), which recedes; nothing in
-//   the list moves. "+N more · click to open" sits under them when there are more. Leaving tucks
+//   cards the list's gap apart, lifted over the list behind, which its owner fades toward the
+//   surface by `recede`; nothing in the list moves. "+N more · click to open" sits under them when there are more. Leaving tucks
 //   them back. The keyboard never previews.
 // - Opened (`open`, which its owner keeps): every card takes its place under a heading with the
 //   app, the count and Show less, and the group grows, so only what is below it moves. Each card
@@ -18,7 +18,7 @@ import KubaOS.Components as K
 //
 // The cards are the owner's `delegate`, made as they are needed: the newest always, the preview's
 // when it shows, every one while open. A delegate is a `CardFace` with a `required property int
-// index`, showing `items[index]` and standing for `standsFor(index)`; the group places it and sets
+// index`, showing `items[index]` and standing for `standing[index]`; the group places it and sets
 // its `opens` and `selected`. A single notification is the card alone.
 Item {
     id: root
@@ -28,9 +28,6 @@ Item {
     // Whether it is opened; the owner keeps it, and `openRequested` asks for a change.
     property bool open: false
     property Component delegate
-    // What the preview floats over and turns toward the surface: the list the group is in.
-    property Item backdrop: null
-    property real backdropRadius: 0
     // The list's gap between two cards, which the preview and the opened group keep.
     property int gap: K.Tokens.space.s8
     // Whether the keyboard is on the group: on its newest while it is a stack, on `current` open.
@@ -66,6 +63,9 @@ Item {
     property real opening: root.isOpen ? 1 : 0
     // The preview is drawn over the list: the owner raises the group above the rows after it.
     readonly property bool raised: root.fan > 0
+    // How far the rest of the list sits back behind the preview (0 -> 1): the owner fades every
+    // other row by it, at `opacity.recede`, toward the panel's own surface.
+    readonly property real recede: root.fan * (1 - root.opening)
     // Moving between two states; an owner sized by the group follows it frame by frame.
     readonly property bool settling: root.fan !== (root.fanning ? 1 : 0) || root.opening !== (root.isOpen ? 1 : 0)
     readonly property bool live: root.armed || root.isOpen || root.fan > 0 || root.opening > 0
@@ -127,6 +127,16 @@ Item {
         }
         return out;
     }
+    // How much of each card's content shows, by index: it fades in just after its edge has spread.
+    // Values, not a function, as everything the cards bind to: a group going away takes its
+    // functions' context with it while their bindings still run.
+    readonly property var reveals: root.heights.map((h, k) => {
+        const spread = Math.max(k < root.fanCount ? root.fan : 0, root.opening);
+        return Math.max(0, Math.min(1, 1 - (1 - spread) * 5));
+    })
+    // The notifications each card stands for, by index: the whole group on a stack's newest card,
+    // so its dismiss and its actions take them all.
+    readonly property var standing: root.items.map((one, index) => index === 0 && !root.isOpen ? root.items : [one])
     // A box for a card the group no longer has, for the moment before what draws it goes.
     readonly property var nowhere: ({
             x: 0,
@@ -145,20 +155,6 @@ Item {
 
     signal openRequested(bool open)
 
-    // How much of card `k`'s content shows: it fades in just after its edge has spread.
-    function shown(k: int): real {
-        const spread = Math.max(k < root.fanCount ? root.fan : 0, root.opening);
-        return Math.max(0, Math.min(1, 1 - (1 - spread) * 5));
-    }
-
-    // The notifications card `index` stands for: the whole group on a stack's newest card, so its
-    // dismiss and its actions take them all.
-    function standsFor(index: int): var {
-        const one = root.items[index];
-        if (one === undefined)
-            return [];
-        return index === 0 && !root.isOpen ? root.items : [one];
-    }
 
     // Where card `k` sits once the group has opened, for an owner keeping it in view.
     function cardRect(k: int): rect {
@@ -183,7 +179,7 @@ Item {
         card.width = Qt.binding(() => root.width);
         card.y = Qt.binding(() => root.boxes[index]?.y ?? 0);
         card.z = Qt.binding(() => (root.heights.length - index) * 3 + 1);
-        card.opacity = Qt.binding(() => index === 0 ? 1 : root.shown(index));
+        card.opacity = Qt.binding(() => index === 0 ? 1 : root.reveals[index] ?? 0);
         card.visible = Qt.binding(() => card.opacity > 0);
         card.opens = Qt.binding(() => index === 0 && !root.isOpen);
         card.selected = Qt.binding(() => root.selected && (root.isOpen ? root.current === index : index === 0));
@@ -221,7 +217,7 @@ Item {
     // HAZARD: let go once the hover has settled, not as it changes. The cards the preview makes and
     // the catcher growing under the pointer move the hover between them on the way, and letting go
     // there would tuck the preview the moment it spreads.
-    onPointedChanged: Qt.callLater(root.letGo)
+    onPointedChanged: settle.restart()
     onIsOpenChanged: {
         if (!root.isOpen && root.pointed)
             root.shut = true;
@@ -249,6 +245,15 @@ Item {
         }
     }
 
+    // The hover settled, a turn of the event loop after it changed; a timer of the group's own, so
+    // nothing calls into a group that has gone.
+    Timer {
+        id: settle
+
+        interval: K.Tokens.duration.instant
+        onTriggered: root.letGo()
+    }
+
     // The beat the pointer rests before the preview spreads, about as long as it takes to spread.
     Timer {
         id: dwell
@@ -256,25 +261,6 @@ Item {
         interval: K.Tokens.duration.medium
         running: root.pointed && root.stacked && !root.armed && !root.isOpen && !root.shut
         onTriggered: root.armed = true
-    }
-
-    // The list behind the preview, turned toward the surface as the cards spread.
-    Rectangle {
-        readonly property point at: {
-            root.fan;
-            root.backdrop?.contentY;
-            return root.backdrop ? root.mapFromItem(root.backdrop, 0, 0) : Qt.point(0, 0);
-        }
-
-        x: at.x
-        y: at.y
-        z: 0
-        width: root.backdrop?.width ?? 0
-        height: root.backdrop?.height ?? 0
-        radius: root.backdropRadius
-        color: K.Tokens.color.surface
-        opacity: K.Tokens.opacity.recede * root.fan * (1 - root.opening)
-        visible: root.backdrop !== null && opacity > 0
     }
 
     // Each previewed card's own shadow, straight under it on the list, under every card.
@@ -313,7 +299,7 @@ Item {
             height: box.h
             radius: root.radius
             color: K.Tokens.color.surface_container
-            visible: root.shown(k) < 1
+            visible: (root.reveals[k] ?? 0) < 1
         }
     }
 
@@ -375,7 +361,7 @@ Item {
         y: root.fanBottom + root.gap
         z: (root.heights.length + 1) * 3
         visible: root.more > 0 && opacity > 0
-        opacity: root.shown(root.fanCount - 1) * (1 - root.opening)
+        opacity: (root.reveals[root.fanCount - 1] ?? 0) * (1 - root.opening)
         text: `+${root.more} more · click to open`
         style: K.Tokens.type.small
         color: K.Tokens.color.primary

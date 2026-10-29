@@ -29,6 +29,8 @@ Item {
     // The group whose preview shows, which may reach past the peek's end.
     property CardGroup lifted: null
     readonly property real overhang: root.lifted ? Math.max(0, root.lifted.y + root.lifted.extent - root.implicitHeight) : 0
+    // How far what isn't a group's preview sits back behind it.
+    readonly property real sitBack: 1 - K.Tokens.opacity.recede * (root.lifted?.recede ?? 0)
     // How many groups are moving between two states, which the popups' size follows frame by frame.
     property int settling: 0
 
@@ -77,8 +79,8 @@ Item {
                 z: group.raised ? 1 : 0
                 items: group.modelData.items
                 open: root.opened[group.modelData.app] === true
-                backdrop: column
-                backdropRadius: K.Look.nested(K.Tokens.radius.surface, K.Tokens.space.s8)
+                // Every other group sits back behind one's preview.
+                opacity: root.lifted && root.lifted !== group ? root.sitBack : 1
                 onOpenRequested: open => root.setOpened(group.modelData.app, open)
                 onRaisedChanged: {
                     if (group.raised)
@@ -98,7 +100,7 @@ Item {
                     required property int index
 
                     notification: group.items[index] ?? null
-                    items: group.standsFor(index)
+                    items: group.standing[index] ?? []
                     unfolded: root.unfolded !== null && root.unfolded === notification
                     onUnfoldRequested: open => root.unfolded = open ? notification : null
                 }
@@ -107,6 +109,7 @@ Item {
 
         K.Row {
             width: root.width
+            opacity: root.sitBack
             fill: true
             gap: K.Tokens.space.s4
             align: "centre"

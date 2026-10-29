@@ -6,6 +6,8 @@ ListModel {
     id: model
 
     property var values: []
+    // The real one keeps a row by this property as its value changes; this one rebuilds.
+    property string objectProp: ""
     property var shown: []
 
     function sync(): void {

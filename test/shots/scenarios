@@ -50,9 +50,11 @@ notifications            notifications  FrameShot   1120,0,480,680    notificati
 notifications-unfold     notifications  FrameShot   1120,0,480,680    notifications unfolded
 notifications-held       notifications  FrameShot   1120,0,480,680    notifications held
 notifications-over       notifications  FrameShot   1120,0,480,1000   notifications over
+notifications-fan        notifications  FrameShot   1120,0,480,680    notifications fan
 notifications-peek       notifications  FrameShot   1120,0,480,680    notifications peek
 notif-panel              notifications  FrameShot   1176,0,424,1000   notifications panel
 notif-panel-unfolded     notifications  FrameShot   1176,0,424,1000   notifications panel-unfolded
+notif-panel-fan          notifications  FrameShot   1176,0,424,1000   notifications panel-fan
 notif-panel-expanded     notifications  FrameShot   1176,0,424,1000   notifications panel-expanded
 notif-panel-keys         notifications  FrameShot   1176,0,424,1000   notifications panel-keys
 notif-panel-empty        notifications  FrameShot   1176,0,424,1000   notifications panel-empty

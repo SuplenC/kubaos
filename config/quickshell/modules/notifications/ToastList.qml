@@ -146,10 +146,11 @@ ListView {
             id: group
 
             width: slot.width
+            // Every other group sits back behind one's preview: on the group, as the slot's own
+            // opacity is the transitions'.
+            opacity: list.lifted && list.lifted !== group ? 1 - K.Tokens.opacity.recede * list.lifted.recede : 1
             items: slot.modelData.items
             open: list.opened[slot.modelData.key] === true
-            backdrop: list
-            backdropRadius: K.Look.nested(K.Tokens.radius.surface, K.Tokens.space.s8)
             onOpenRequested: open => list.setOpened(slot.modelData.key, open)
             onRaisedChanged: {
                 if (group.raised)
@@ -169,7 +170,7 @@ ListView {
                 required property int index
 
                 notification: group.items[index] ?? null
-                items: group.standsFor(index)
+                items: group.standing[index] ?? []
                 popup: true
                 unfolded: list.unfolded !== null && list.unfolded === notification
                 held: menu.notification === notification || list.holding

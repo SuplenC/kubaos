@@ -289,6 +289,8 @@ K.Sheet {
             width: list.width
             height: row.label ? K.Tokens.type.label.line + (row.index > 0 ? K.Tokens.space.s8 : 0) : (loader.item?.implicitHeight ?? 0)
             z: row.group?.raised ? 1 : 0
+            // Every other row sits back behind a group's preview.
+            opacity: list.lifted && list.lifted !== row.group ? 1 - K.Tokens.opacity.recede * list.lifted.recede : 1
 
             K.Text {
                 x: list.reach
@@ -311,7 +313,6 @@ K.Sheet {
 
                     items: row.modelData.items
                     open: root.expanded[row.modelData.key] === true
-                    backdrop: list
                     selected: list.currentIndex === row.index && list.highlightShown
                     current: list.currentIndex === row.index ? root.inner : -1
                     onOpenRequested: open => {
@@ -334,7 +335,7 @@ K.Sheet {
                         required property int index
 
                         notification: group.items[index] ?? null
-                        items: group.standsFor(index)
+                        items: group.standing[index] ?? []
                         unfolded: root.unfolded !== null && root.unfolded === notification
                         onUnfoldRequested: open => root.unfolded = open ? notification : null
                         onMenuRequested: at => menu.open(notification, at)

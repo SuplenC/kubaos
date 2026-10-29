@@ -48,7 +48,6 @@ TestCase {
                 id: group
 
                 width: column.width
-                backdrop: listBox
                 onOpenRequested: open => group.open = open
 
                 delegate: CardFace {
@@ -58,7 +57,7 @@ TestCase {
                     appName: "Backups"
                     summary: note.summary ?? ""
                     body: note.body ?? ""
-                    count: group.standsFor(index).length
+                    count: (group.standing[index] ?? []).length
                     unfolded: suite.unfolded === note
                     onUnfoldRequested: open => suite.unfolded = open ? note : null
                 }
