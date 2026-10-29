@@ -20,12 +20,15 @@ TestCase {
 
     readonly property string long: "The nightly backup of the home folder finished, but three folders were skipped because they changed while they were being read; run it again tonight or open the log to see which ones and why."
     property var unfolded: null
+    // The notifications whose main action ran, in order.
+    property var ran: []
 
     function notes(n) {
         const out = [];
         for (let i = 0; i < n; i++)
             out.push({
                 summary: `Backup ${n - i}`,
+                action: i === 2 ? "" : "Open",
                 body: i === 1 ? suite.long : "Everything was copied."
             });
         return out;
@@ -53,6 +56,9 @@ TestCase {
                 delegate: CardFace {
                     required property int index
                     readonly property var note: group.items[index] ?? ({})
+
+                    mainAction: note.action ?? ""
+                    onMainPicked: suite.ran.push(note)
 
                     appName: "Backups"
                     summary: note.summary ?? ""
@@ -85,6 +91,7 @@ TestCase {
         mouseMove(suite, suite.width - 1, suite.height - 1);
         group.open = false;
         suite.unfolded = null;
+        suite.ran = [];
         group.items = suite.notes(3);
         opens.clear();
         tryVerify(() => !group.live && group.fan === 0 && group.opening === 0);
@@ -307,6 +314,32 @@ TestCase {
 
         verify(group.open);
         compare(suite.unfolded, group.items[1]);
+    }
+
+    function test_shift_enter_on_a_stack_runs_its_newest_s_main_action() {
+        verify(group.runMain());
+
+        compare(suite.ran, [group.items[0]]);
+        verify(!group.isOpen, "it runs the action, it doesn't open");
+    }
+
+    function test_shift_enter_in_an_opened_group_runs_the_current_card_s_main_action() {
+        group.open = true;
+        group.current = 1;
+
+        verify(group.runMain());
+
+        compare(suite.ran, [group.items[1]]);
+        verify(group.isOpen);
+    }
+
+    function test_shift_enter_on_a_card_without_a_main_action_does_nothing() {
+        group.open = true;
+        group.current = 2;
+
+        verify(!group.runMain());
+
+        compare(suite.ran.length, 0);
     }
 
     function test_press_opens_a_stack_and_then_unfolds_the_current_card() {

@@ -233,6 +233,34 @@ TestCase {
         compare(card.implicitHeight, withButtons - K.Tokens.space.s12 - K.Tokens.size.control_sm);
     }
 
+    function test_shift_enter_runs_the_main_action_and_unfolds_nothing() {
+        card.body = suite.long;
+        card.mainAction = "Open";
+        card.forceActiveFocus();
+
+        keyClick(Qt.Key_Return, Qt.ShiftModifier);
+
+        compare(mains.count, 1);
+        compare(unfolds.count, 0);
+    }
+
+    function test_shift_enter_on_a_card_without_a_main_action_does_nothing() {
+        card.body = suite.long;
+        card.forceActiveFocus();
+
+        keyClick(Qt.Key_Return, Qt.ShiftModifier);
+
+        compare(mains.count, 0);
+        compare(unfolds.count, 0);
+        verify(!card.runMain());
+    }
+
+    function test_the_card_s_own_button_reads_mark_read() {
+        card.unread = true;
+
+        compare(button("markRead").text, "Mark read");
+    }
+
     function test_a_click_on_the_card_never_runs_an_action() {
         card.body = suite.long;
         card.mainAction = "Open";

@@ -14,7 +14,7 @@ import KubaOS.Components as K
 // A click, Enter or Space unfolds cut-off text to the whole of it (`unfoldRequested`), or asks for
 // a stack to open where a stack opens (`expandRequested`); Esc folds it again. Its owner keeps
 // `unfolded`, one card at a time. A card with nothing to unfold takes no click, and a click never
-// runs an action: the buttons do.
+// runs an action: the buttons do, and Shift+Enter runs the main one (`runMain`).
 Item {
     id: root
 
@@ -80,6 +80,14 @@ Item {
             root.unfoldRequested(!root.unfolded);
     }
 
+    // What Shift+Enter does: runs the main action. Whether there was one.
+    function runMain(): bool {
+        if (root.mainAction === "")
+            return false;
+        root.mainPicked();
+        return true;
+    }
+
     // What Esc does: folds the card if it is unfolded. Whether it did, so Esc goes on to close what
     // holds the card otherwise.
     function foldBack(): bool {
@@ -97,7 +105,11 @@ Item {
 
     Keys.onPressed: event => {
         const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space;
-        if (enter) {
+        if (enter && event.key !== Qt.Key_Space && (event.modifiers & Qt.ShiftModifier)) {
+            event.accepted = true;
+            if (!event.isAutoRepeat)
+                root.runMain();
+        } else if (enter) {
             event.accepted = true;
             if (!event.isAutoRepeat)
                 root.press();
