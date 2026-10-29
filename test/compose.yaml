@@ -11,7 +11,7 @@ x-limits: &limits
 
 services:
   dotfiles:
-    image: dotfiles-test:latest
+    image: ${DOTFILES_TEST_IMAGE:?test/run names the checkout's image}
     build:
       context: ..
       dockerfile: test/Dockerfile
@@ -62,7 +62,7 @@ services:
   # One-shot: a CA and a TLS certificate for "vw" (bw only talks https).
   vw-certs:
     profiles: [bitwarden]
-    image: dotfiles-test:latest
+    image: ${DOTFILES_TEST_IMAGE:?test/run names the checkout's image}
     container_name: dotfiles-test-vw-certs
     network_mode: none
     volumes:

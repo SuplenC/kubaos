@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test/run: the cached Docker test harness for this repo (docs/TESTING.md).
 #
-#   test/run build [--progress=plain] [--no-cache]   build the image (dotfiles-test:latest)
+#   test/run build [--progress=plain] [--no-cache]   build the image (dotfiles-test:<checkout>)
 #   test/run warm                       realise the home-manager generation and
 #                                       test tools into the dotfiles-nix volume
 #   test/run e2e [--only a,b] [--keep]  every check, PASS/FAIL table, exit 1 on failure;
@@ -30,7 +30,10 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
-IMAGE=dotfiles-test:latest
+# The image is this checkout's, tagged for it, as checkouts can differ in
+# what it is built from; BuildKit shares the layers they have in common.
+IMAGE="dotfiles-test:$(printf '%s' "$ROOT" | sha256sum | cut -c1-12)"
+export DOTFILES_TEST_IMAGE="$IMAGE"
 SHOTS=dotfiles-test-shots
 VOLUMES=(dotfiles-nix dotfiles-test-cache dotfiles-test-vw-certs dotfiles-test-vw-data dotfiles-test-cargo
   dotfiles-test-target)
@@ -288,7 +291,7 @@ cmd_nuke() {
   fi
   cmd_clean
   docker volume rm "${VOLUMES[@]}" 2>/dev/null || true
-  echo "volumes removed; the image $IMAGE stays (docker image rm $IMAGE)"
+  echo "volumes removed; the images stay (docker image ls dotfiles-test)"
 }
 
 main() {

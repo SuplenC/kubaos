@@ -142,6 +142,14 @@ FROM desktop AS hyprland
 
 # ---------------------------------------------------------------------------
 FROM hyprland AS harness
+# The build users' uids, moved past the machine's (30001 and up, as here).
+# A container has no namespaces for Nix's sandbox, so a build runs as its
+# build user, and Nix kills every process of that uid before and after it.
+# The machine's own nix-daemon does the same from the host's PID namespace,
+# which reaches into every container: a build on the machine would kill a
+# harness build that had the same uid.
+RUN awk -F: '$1 ~ /^nixbld[0-9]+$/ { print $1, $3 }' /etc/passwd | \
+      while read -r user uid; do usermod -u $((uid + 10000)) "$user"; done
 # Mount points for the caches, owned by kuba so the volumes start that way.
 RUN install -d -o kuba -g kuba -m 0755 /var/cache/dotfiles-test /out \
  && install -d -o kuba -g kuba -m 0700 /home/kuba/.cache \
