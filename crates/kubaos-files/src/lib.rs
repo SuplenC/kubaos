@@ -9,6 +9,7 @@
 //! - The command that opens the window: [`window`].
 //! - The `org.freedesktop.FileManager1` service: [`service`].
 //! - Sorting Downloads into folders by kind: [`tidy`].
+//! - The system's file picker, for the Command menu's file fields: [`pick`].
 //!
 //! # Not here
 //!
@@ -17,6 +18,7 @@
 //! - The Command menu's Files Items: `crates/kotodama-kubaos/src/files.rs`.
 
 pub mod entry;
+pub mod pick;
 pub mod service;
 pub mod tidy;
 pub mod window;

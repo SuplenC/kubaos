@@ -28,6 +28,11 @@ ListModel {
     property var lastChecked: null
     property string lastText: ""
     property int selected: 0
+    // The paths offered to complete a file field, and its place in the form, which a driver sets;
+    // `complete` keeps what it was last asked.
+    property var completions: []
+    property int completingField: -1
+    property string lastCompleted: ""
 
     signal closeRequested
     signal openRequested(string query, string view)
@@ -288,6 +293,12 @@ ListModel {
 
     function setText(field: int, text: string): bool {
         search.lastText = `${field}:${text}`;
+        return true;
+    }
+
+    function complete(field: int, text: string): bool {
+        search.lastCompleted = `${field}:${text}`;
+        search.completingField = field;
         return true;
     }
 

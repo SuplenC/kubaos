@@ -16,6 +16,11 @@
 //! arguments = [{ name = "name", placeholder = "github" }]
 //! terminal = true
 //!
+//! [extensions.kubaos.actions.proxy-import]
+//! title = "Import VPN config…"
+//! run = ["kubaos-proxy", "import", "{path}"]
+//! arguments = [{ name = "path", kind = "file", accept = ["conf", "ovpn"] }]
+//!
 //! [extensions.kubaos.actions.packages-chrome-off]
 //! title = "Remove Google Chrome"
 //! run = ["kubaos", "packages", "disable", "chrome"]
@@ -354,8 +359,9 @@ fn boolean(table: &Table, key: &str) -> Result<bool, String> {
     }
 }
 
-/// The `arguments` list: tables of `name`, and optionally `placeholder` and
-/// `optional`.
+/// The `arguments` list: tables of `name`, and optionally `placeholder`,
+/// `optional`, `kind` (`text`, `number`, `file` or `folder`) and, for a
+/// file, `accept`: the extensions or MIME types it takes.
 fn arguments(table: &Table) -> Result<Vec<Argument>, String> {
     let Some(value) = table.get("arguments") else {
         return Ok(Vec::new());
@@ -370,12 +376,22 @@ fn arguments(table: &Table) -> Result<Vec<Argument>, String> {
             let Value::Table(argument) = value else {
                 return Err(shape());
             };
+            let kind = match string(argument, "kind")? {
+                None => ArgumentKind::Text,
+                Some(kind) => ArgumentKind::try_from(kind).map_err(|error| error.to_string())?,
+            };
+            let accept = match argument.get("accept").map(config::strings) {
+                None => Vec::new(),
+                Some(Some(accept)) if kind == ArgumentKind::File => accept,
+                Some(Some(_)) => return Err("`accept` is for an Argument of kind `file`".to_owned()),
+                Some(None) => return Err("`accept` should be a list of extensions or MIME types".to_owned()),
+            };
             Ok(Argument {
                 name: string(argument, "name")?.ok_or_else(shape)?,
                 placeholder: string(argument, "placeholder")?,
                 optional: boolean(argument, "optional")?,
-                kind: ArgumentKind::Text,
-                accept: Vec::new(),
+                kind,
+                accept,
             })
         })
         .collect()

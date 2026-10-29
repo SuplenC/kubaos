@@ -5,7 +5,9 @@ import KubaOS.Components as K
 // A form View, in a column: each field under its label, Kōbō's way, and the submit button at the
 // end. Tab and Shift+Tab (or Down and Up) move between fields, Space ticks a checkbox, Left and
 // Right pick an option, Enter submits from anywhere; the menu's own keys come first, through
-// `keys`.
+// `keys`. A file or folder field (`FileField`) takes the arrows, Tab and Enter for its list of
+// paths while it shows one, and has Browse… at its label's right, as a password field has its
+// Show, which asks the menu for the system's picker through `browse`.
 //
 // A checkbox or a select keeps the keyboard on an item of its own, which draws its focus on the
 // control: the library's controls press on Enter, and here Enter submits.
@@ -19,7 +21,7 @@ FocusScope {
     required property KotodamaSearch search
     // The menu's keys, `Menu.qml`'s `key(event)`: true if it took the event.
     property var keys: event => false
-    // Each `{label, kind, placeholder, secret, options, value}`.
+    // Each `{label, kind, placeholder, secret, options, accept, value}`.
     property var fields: []
     property string submitLabel: ""
     // The field that has the keys.
@@ -34,7 +36,22 @@ FocusScope {
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
 
+    // Whether the field with the keys is a file or folder field, and whether it shows its paths.
+    readonly property bool pathCurrent: repeater.count > form.current && (repeater.itemAt(form.current)?.path ?? false)
+    readonly property bool pathsOpen: repeater.count > form.current && (repeater.itemAt(form.current)?.pathsOpen ?? false)
+
     signal submitted
+    // The system's picker, for the `field`th field: a folder, or a file of a kind in `accept`.
+    signal browse(int field, bool folder, var accept)
+
+    // Puts `path`, as the picker chose it, in the `field`th field, and gives that field the keys.
+    function fill(field: int, path: string): void {
+        const item = repeater.itemAt(field);
+        if (!item?.path)
+            return;
+        item.fillPath(path);
+        form.reveal();
+    }
 
     function move(by: int): void {
         if (repeater.count > 0)
@@ -96,10 +113,24 @@ FocusScope {
                         required property int index
                         required property var modelData
                         readonly property string kind: modelData.kind
-                        readonly property bool current: typed.activeFocus || toggle.activeFocus || choice.activeFocus
+                        readonly property bool path: kind === "file" || kind === "folder"
+                        readonly property bool pathsOpen: field.path && pathField.listOpen
+                        readonly property bool current: typed.activeFocus || toggle.activeFocus || choice.activeFocus || pathField.hasKeys
 
                         function take(): void {
-                            (field.kind === "checkbox" ? toggle : field.kind === "select" ? choice : typed).forceActiveFocus();
+                            if (field.path)
+                                pathField.focusField();
+                            else
+                                (field.kind === "checkbox" ? toggle : field.kind === "select" ? choice : typed).forceActiveFocus();
+                        }
+
+                        function fillPath(path: string): void {
+                            pathField.focusField();
+                            pathField.take(pathField.homeRelative(path));
+                        }
+
+                        function browse(): void {
+                            form.browse(field.index, field.kind === "folder", field.modelData.accept ?? []);
                         }
 
                         fill: true
@@ -107,10 +138,29 @@ FocusScope {
                             if (current)
                                 form.current = index;
                         }
+                        // A file field's paths open under it: they scroll into view with it.
+                        onHeightChanged: {
+                            if (current)
+                                Qt.callLater(form.reveal);
+                        }
 
                         K.Labelled {
                             visible: field.kind !== "checkbox"
                             label: field.modelData.label
+                            action: field.path ? browseButton : null
+
+                            Component {
+                                id: browseButton
+
+                                K.Button {
+                                    text: "Browse…"
+                                    kind: "Text"
+                                    size: "Sm"
+                                    icon: "folder_open"
+                                    activeFocusOnTab: false
+                                    onActivated: field.browse()
+                                }
+                            }
 
                             K.Field {
                                 id: typed
@@ -124,6 +174,23 @@ FocusScope {
                                 }
                                 onTextChanged: form.search.setText(field.index, text)
                                 onKeyPressed: event => event.accepted = form.keys(event)
+                            }
+
+                            FileField {
+                                id: pathField
+
+                                visible: field.path
+                                active: field.path
+                                search: form.search
+                                place: field.index
+                                folder: field.kind === "folder"
+                                placeholder: field.modelData.placeholder ?? ""
+                                keys: form.keys
+                                Component.onCompleted: {
+                                    if (field.path)
+                                        text = field.modelData.value ?? "";
+                                }
+                                onBrowse: field.browse()
                             }
 
                             // A select: one radio per option, Left and Right step through them.

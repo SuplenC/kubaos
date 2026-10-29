@@ -260,6 +260,65 @@ fn an_optional_argument_left_out_drops_its_own_word() {
 }
 
 #[test]
+fn a_path_argument_asks_for_a_file_of_the_kinds_it_accepts_or_a_folder() {
+    let registry = loaded(
+        r#"
+        [actions.import]
+        title = "Import"
+        run = ["import", "{config}", "{into}"]
+        arguments = [
+          { name = "config", kind = "file", accept = ["conf", "application/x-openvpn-profile"] },
+          { name = "into", kind = "folder" },
+        ]
+        "#,
+    );
+
+    let item = registry.items(&States::default()).next().expect("an item");
+    let [config, into] = &item.actions[0].arguments[..] else {
+        panic!("two arguments: {:?}", item.actions[0].arguments);
+    };
+
+    assert_eq!(config.kind, ArgumentKind::File);
+    assert_eq!(config.accept, ["conf", "application/x-openvpn-profile"]);
+    assert_eq!(into.kind, ArgumentKind::Folder);
+    assert!(into.accept.is_empty());
+}
+
+#[test]
+fn an_argument_without_a_kind_is_text() {
+    let registry =
+        loaded("[actions.say]\ntitle = \"Say\"\nrun = [\"say\", \"{what}\"]\narguments = [{ name = \"what\" }]");
+
+    let item = registry.items(&States::default()).next().expect("an item");
+
+    assert_eq!(item.actions[0].arguments[0].kind, ArgumentKind::Text);
+}
+
+#[test]
+fn an_unknown_argument_kind_is_a_problem() {
+    let (registry, problems) = Registry::from_config(
+        &config("[actions.odd]\ntitle = \"Odd\"\nrun = [\"true\"]\narguments = [{ name = \"x\", kind = \"path\" }]"),
+        &[],
+    );
+
+    assert_eq!(registry.items(&States::default()).count(), 0);
+    assert!(problems[0].contains("`path`"), "{problems:?}");
+}
+
+#[test]
+fn accept_on_an_argument_that_isnt_a_file_is_a_problem() {
+    let (registry, problems) = Registry::from_config(
+        &config(
+            "[actions.odd]\ntitle = \"Odd\"\nrun = [\"true\"]\narguments = [{ name = \"x\", kind = \"folder\", accept = [\"conf\"] }]",
+        ),
+        &[],
+    );
+
+    assert_eq!(registry.items(&States::default()).count(), 0);
+    assert!(problems[0].contains("`accept`"), "{problems:?}");
+}
+
+#[test]
 fn delay_ms_waits_before_the_command_runs() {
     let registry = loaded(
         r#"
@@ -381,6 +440,40 @@ fn project_pins_are_set_removed_and_listed_from_the_menu() {
     assert_eq!(tail(&pin.argv, 5), ["kubaos", "pin", "node", "18", "~/Projects/acme"]);
     assert_eq!(tail(&unpin.argv, 4), ["kubaos", "unpin", "node", "~/Projects/acme"]);
     assert_eq!(tail(&pins.argv, 3), ["kubaos", "pins", "--all"]);
+}
+
+/// The kind of the argument `name` of the shipped action `id`, and what it accepts.
+fn shipped_argument(registry: &Registry, id: &str, name: &str) -> (ArgumentKind, Vec<String>) {
+    let item = registry
+        .items(&States::default())
+        .find(|item| item.id == id)
+        .unwrap_or_else(|| panic!("no action `{id}`"));
+    let argument = item.actions[0]
+        .arguments
+        .iter()
+        .find(|argument| argument.name == name)
+        .unwrap_or_else(|| panic!("`{id}` has no argument `{name}`"));
+    (argument.kind, argument.accept.clone())
+}
+
+#[test]
+fn every_path_kubaos_toml_asks_for_is_a_file_or_a_folder_field() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let files = |kinds: &[&str]| (ArgumentKind::File, kinds.iter().map(|&kind| kind.to_owned()).collect());
+    let folder = (ArgumentKind::Folder, Vec::new());
+
+    assert_eq!(
+        shipped_argument(&registry, "proxy-import", "path"),
+        files(&["conf", "ovpn"])
+    );
+    assert_eq!(
+        shipped_argument(&registry, "theme-set", "file"),
+        files(&["jpg", "jpeg", "png", "webp", "mp4", "webm", "mkv", "mov"])
+    );
+    assert_eq!(shipped_argument(&registry, "phone-file", "path"), files(&[]));
+    assert_eq!(shipped_argument(&registry, "files-open", "path"), folder);
+    assert_eq!(shipped_argument(&registry, "pin", "folder"), folder);
+    assert_eq!(shipped_argument(&registry, "unpin", "folder"), folder);
 }
 
 #[test]

@@ -10,11 +10,16 @@
 //! kubaos-files tidy [--scheduled]   sort the files in Downloads older than a day into folders by
 //!                                   kind; with --scheduled, only when the daily tidy is on
 //! kubaos-files tidy on|off          turn the daily tidy on or off
+//! kubaos-files pick [--folder] [--title TITLE] [KIND]...
+//!                                   the system's file picker, through xdg-desktop-portal: prints
+//!                                   the path chosen, or nothing and exits 1 on a cancel. KIND is
+//!                                   an extension (`conf`) or MIME type (`image/*`) a file may have.
 //! ```
 //!
 //! # Owns
 //!
-//! - The command line and its exit codes: 2 for a usage error, 1 when nothing could be opened.
+//! - The command line and its exit codes: 2 for a usage error, 1 when nothing could be opened or
+//!   picked.
 //!
 //! # Not here
 //!
@@ -30,6 +35,8 @@ use kotodama_extension::Chain;
 use kotodama_extension::log;
 use kubaos_files::entry;
 use kubaos_files::entry::Resolver;
+use kubaos_files::pick;
+use kubaos_files::pick::Pick;
 use kubaos_files::service;
 use kubaos_files::service::Entries;
 use kubaos_files::tidy;
@@ -40,11 +47,14 @@ const USAGE: &str = "\
 usage: kubaos-files open [PATH|URI]...
        kubaos-files serve
        kubaos-files tidy [--scheduled|on|off]
+       kubaos-files pick [--folder] [--title TITLE] [KIND]...
 
 open   yazi on each path or file:// URI (the home folder without one)
 serve  org.freedesktop.FileManager1 on the session bus, for D-Bus to start
 tidy   sort Downloads into folders by kind, leaving files younger than a day;
-       --scheduled only when the daily tidy is on; on|off turns the daily tidy on or off";
+       --scheduled only when the daily tidy is on; on|off turns the daily tidy on or off
+pick   the system's file picker: prints the path chosen, or exits 1 on a cancel;
+       --folder for a folder, KIND an extension (conf) or MIME type (image/*) a file may have";
 
 #[expect(
     clippy::print_stdout,
@@ -57,6 +67,14 @@ fn main() -> ExitCode {
     match command.as_ref().and_then(|command| command.to_str()) {
         Some("open") => open(&args.collect::<Vec<_>>()),
         Some("serve") if args.next().is_none() => serve(),
+        Some("pick") => {
+            if let Some(request) = pick_request(args) {
+                pick(&request)
+            } else {
+                eprintln!("{USAGE}");
+                ExitCode::from(2)
+            }
+        }
         Some("tidy") => {
             let rest: Vec<OsString> = args.collect();
             match rest.iter().map(|arg| arg.to_str()).collect::<Vec<_>>().as_slice() {
@@ -111,6 +129,41 @@ fn show(paths: &[PathBuf]) -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             eprintln!("kubaos-files: {err}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// `pick`'s arguments: `--folder`, `--title TITLE` and the kinds of file. `None` for one that
+/// isn't text, a title missing, or kinds given to a folder.
+fn pick_request(args: impl Iterator<Item = OsString>) -> Option<Pick> {
+    let mut request = Pick::default();
+    let mut args = args.map(OsString::into_string);
+    while let Some(arg) = args.next() {
+        match arg.ok()?.as_str() {
+            "--folder" => request.folder = true,
+            "--title" => request.title = args.next()?.ok()?,
+            kind if !kind.starts_with("--") => request.accept.push(kind.to_owned()),
+            _ => return None,
+        }
+    }
+    (!request.folder || request.accept.is_empty()).then_some(request)
+}
+
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The path chosen, or why the picker couldn't open, is the command's answer to whoever ran it."
+)]
+fn pick(request: &Pick) -> ExitCode {
+    match pick::pick(request, &Resolver::from_env()) {
+        Ok(Some(path)) => {
+            println!("{}", path.display());
+            ExitCode::SUCCESS
+        }
+        Ok(None) => ExitCode::FAILURE,
+        Err(err) => {
+            eprintln!("kubaos-files: {}", Chain(&err));
             ExitCode::FAILURE
         }
     }

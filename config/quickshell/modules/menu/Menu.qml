@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import Kotodama
 import KubaOS.Components as K
@@ -106,6 +107,10 @@ PanelWindow {
         return search.scope !== "" ? "Esc Leave app" : "Esc Close";
     }
     readonly property string footerHints: {
+        if (kind === "form" && form.item?.pathsOpen)
+            return "↑↓ Pick · Tab Complete · ↵ Take · Esc Close list";
+        if (kind === "form" && form.item?.pathCurrent)
+            return `Tab Next field · ⌃O Browse · ↵ ${search.view.submit ?? "Submit"} · ${escapeHint}`;
         if (kind === "form")
             return `Tab Next field · ↵ ${search.view.submit ?? "Submit"} · ${escapeHint}`;
         if (!listing)
@@ -160,6 +165,20 @@ PanelWindow {
             opening.restart();
         }
         menu.focusView();
+    }
+
+    // Opens the system's file picker for the form's `field`th field. The menu is on the overlay
+    // layer and holds the keyboard, so it would cover the picker and keep its keys: it closes
+    // while the picker is open, and opens again on the form with the path chosen filled in.
+    function browse(field: int, folder: bool, accept: var): void {
+        if (picker.running)
+            return;
+        picker.field = field;
+        picker.view = search.view.id ?? "";
+        picker.closed = 0;
+        picker.command = ["kubaos-files", "pick", "--title", search.view.title ?? ""].concat(folder ? ["--folder"] : accept);
+        picker.running = true;
+        menu.hide();
     }
 
     // Closing pops no View: Extensions aren't told the user left one, so their jobs keep running,
@@ -385,6 +404,44 @@ PanelWindow {
 
         function onOpenRequested(query: string): void {
             menu.show(query);
+        }
+    }
+
+    // `kubaos-files pick`: xdg-desktop-portal's file chooser, which prints the path chosen, or
+    // nothing on a cancel. The menu opens again either way, the path in the field it was for while
+    // that form is still on top.
+    Process {
+        id: picker
+
+        property int field: -1
+        // The form the picker was opened for, by its View's id.
+        property string view: ""
+        // Which of its two streams have closed: it is done once both have, in either order.
+        property int closed: 0
+
+        // Opens the menu again, with what the picker chose or why it didn't open.
+        function done(): void {
+            if (++picker.closed < 2)
+                return;
+            picker.closed = 0;
+            const path = chosen.text.trim();
+            const said = refusal.text.trim();
+            menu.show(input.text);
+            if (path !== "" && menu.kind === "form" && (search.view.id ?? "") === picker.view)
+                form.item?.fill(picker.field, path);
+            else if (said !== "")
+                menu.failure = `The file picker didn't open: ${said}`;
+        }
+
+        stdout: StdioCollector {
+            id: chosen
+
+            onStreamFinished: picker.done()
+        }
+        stderr: StdioCollector {
+            id: refusal
+
+            onStreamFinished: picker.done()
         }
     }
 
@@ -950,6 +1007,7 @@ PanelWindow {
                         menu.failure = "";
                         search.submit();
                     }
+                    onBrowse: (field, folder, accept) => menu.browse(field, folder, accept)
                 }
                 onLoaded: {
                     if (menu.visible)

@@ -60,7 +60,7 @@ In Files:
 
 Images open in Loupe, videos in Showtime, PDFs in Papers.
 
-yazi opens from `SUPER + CTRL + F` or "Yazi" in the Command menu (your home folder), "Open folder in yazi…" (`open-folder` then a path, any folder, or a file, which opens in its folder with the cursor on it), "Open With" → Yazi in Files, or `y` in a shell: yazi in that terminal, and when you quit it, the shell `cd`s to where you ended up. Plain `yazi` leaves the shell where it was. `kubaos-files open [PATH|URI]...` does the same from a terminal: paths, `~`, and `file://` URIs, several at once as tabs.
+yazi opens from `SUPER + CTRL + F` or "Yazi" in the Command menu (your home folder), "Open folder in yazi…" (`open-folder` then a folder, or the folder field it asks with: complete it as you type, pick a recent one, or Browse…), "Open With" → Yazi in Files, or `y` in a shell: yazi in that terminal, and when you quit it, the shell `cd`s to where you ended up. Plain `yazi` leaves the shell where it was. `kubaos-files open [PATH|URI]...` does the same from a terminal: paths, `~`, and `file://` URIs, several at once as tabs.
 
 ### Drives and photos
 
@@ -368,7 +368,15 @@ In the Command menu, "Settings folder" opens it in Files, and "Settings: Desktop
   keyword = "timer"   # type "timer 5m"
   arguments = [{ name = "duration", placeholder = "5m" }]   # fills {duration}
   run = ["sh", "-c", "sleep \"$1\" && notify-send Done", "sh", "{duration}"]
+
+  [extensions.kubaos.actions.print]
+  title = "Print a PDF…"
+  keyword = "print"
+  arguments = [{ name = "pdf", kind = "file", accept = ["pdf"] }]   # a file field
+  run = ["lp", "{pdf}"]
   ```
+
+  An argument with `kind = "file"` (`accept` listing the extensions or MIME types it takes) or `kind = "folder"` is asked for in a file field: it completes the path as you type, lists the newest matching files from Downloads, Documents and Desktop while it's empty, has Browse… for the system's file picker (also Ctrl+O), and takes a file dropped on it. In the list, ↓ and ↑ pick a path, Tab completes it, Enter takes it. The command gets the path absolute, `~` expanded.
 
   Keys set under one of KubaOS's ids change only those keys of its action. `terminal = true` runs it in a floating terminal, centred over your windows instead of tiled between them, which stays open until you close it; and `delay_ms` waits that long first, so the menu is gone before a screenshot. `shown_when = { state = "packages.chrome", is = true }` lists an action only in that state (`is_not` for every other), which is how only one half of each on/off pair shows, "Remove Google Chrome" while it is installed and "Install Google Chrome" while it isn't; the states are listed in `docs/CONTRACTS.md`, "The Command menu's KubaOS Extension", and an action whose state can't be read shows. Leave a word of an app's name out of `keywords` on an action about that app: a keyword equal to what you typed ranks the action above the app. The Extension logs what it can't use, such as an id it doesn't know (`journalctl --user -u kotodamad`).
 - `kubaos package add` records the package in `~/.config/kubaos/home/kubaos.d/packages.toml`, a file the command owns, and switches. Every switch (`kubaos switch`, or one an `add` queued) runs in a systemd user unit, one at a time: closing the terminal doesn't stop it, and `kubaos job list` and `kubaos job follow <id>` show it. The first `add` on an older install adds `kubaos.stateDir = ./kubaos.d;` to your `home.nix`, after backing it up to `~/.local/state/kubaos/backups/home.nix.bak`. If your flake is under git, the command records each file it writes with `git add --intent-to-add` (and drops the ones it deletes from the index), so Nix sees them; it never commits.

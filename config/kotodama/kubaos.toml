@@ -63,6 +63,13 @@ kind = "scripts"
 # long, so the menu is off the screen first) and `shown_when` (listed only in
 # that state, below).
 #
+# An argument is `{ name, placeholder, optional }`, and one that is a path says
+# so with `kind = "file"` or `kind = "folder"`: the menu asks for it in a file
+# field, which completes it as it is typed, lists the newest files it takes,
+# opens the system's picker and takes a dropped file, and the command gets it
+# as an absolute path. A file's `accept` lists the extensions (`"conf"`) or
+# MIME types (`"image/png"`) it takes; none takes any file.
+#
 # `shown_when = { state = "<state>", is = <value> }` lists an action only
 # while the state reads as the value, and `is_not` only while it doesn't, so
 # of an on/off pair only the half that applies shows. The Extension reads the
@@ -107,12 +114,12 @@ run = ["kubaos-files", "open"]
 
 [extensions.kubaos.actions.files-open]
 title = "Open folder in yazi…"
-subtitle = "A folder or a file by its path, in yazi"
+subtitle = "A folder by its path, in yazi"
 icon = "folder-open"
 keywords = ["file manager", "yazi", "go to folder", "path"]
 keyword = "open-folder"
 run = ["kubaos-files", "open", "{path}"]
-arguments = [{ name = "path", placeholder = "~/Projects/kubaos" }]
+arguments = [{ name = "path", kind = "folder", placeholder = "~/Projects/kubaos" }]
 
 [extensions.kubaos.actions.files-recent]
 title = "Recent files"
@@ -266,7 +273,7 @@ icon = "preferences-desktop-wallpaper"
 keywords = ["theme", "background"]
 keyword = "wallpaper"
 run = ["dot-theme", "set", "{file}"]
-arguments = [{ name = "file", placeholder = "~/Pictures/wallpapers/city.jpg" }]
+arguments = [{ name = "file", kind = "file", accept = ["jpg", "jpeg", "png", "webp", "mp4", "webm", "mkv", "mov"], placeholder = "~/Pictures/wallpapers/city.jpg" }]
 
 [extensions.kubaos.actions.wallpaper-folder]
 title = "Switch wallpaper folder"
@@ -847,7 +854,7 @@ icon = "document-send"
 keywords = ["kde connect", "iphone", "android", "share", "photo", "transfer", "airdrop"]
 keyword = "send-file"
 run = ["kubaos-phone", "send-file", "{path}"]
-arguments = [{ name = "path", placeholder = "~/Downloads/photo.jpg" }]
+arguments = [{ name = "path", kind = "file", placeholder = "~/Downloads/photo.jpg" }]
 
 [extensions.kubaos.actions.phone-ring]
 title = "Ring the phone"
@@ -925,7 +932,7 @@ icon = "document-import"
 keywords = ["vpn", "wireguard", "openvpn", "conf", "ovpn", "work network", "tunnel", "import", "proxy"]
 keyword = "import-vpn"
 run = ["kubaos-proxy", "import", "{path}"]
-arguments = [{ name = "path", placeholder = "~/Downloads/work.conf" }]
+arguments = [{ name = "path", kind = "file", accept = ["conf", "ovpn"], placeholder = "~/Downloads/work.conf" }]
 terminal = true
 
 [extensions.kubaos.actions.proxy-settings]
@@ -1002,7 +1009,7 @@ run = ["kubaos", "pin", "{suite}", "{version}", "{folder}"]
 arguments = [
   { name = "suite", placeholder = "node" },
   { name = "version", placeholder = "18" },
-  { name = "folder", placeholder = "~/Projects/acme" },
+  { name = "folder", kind = "folder", placeholder = "~/Projects/acme" },
 ]
 terminal = true
 
@@ -1013,7 +1020,7 @@ icon = "list-remove"
 keywords = ["project pin", "suite", "version", "envrc", "direnv", "remove"]
 keyword = "unpin"
 run = ["kubaos", "unpin", "{suite}", "{folder}"]
-arguments = [{ name = "suite", placeholder = "node" }, { name = "folder", placeholder = "~/Projects/acme" }]
+arguments = [{ name = "suite", placeholder = "node" }, { name = "folder", kind = "folder", placeholder = "~/Projects/acme" }]
 terminal = true
 
 [extensions.kubaos.actions.pins]
