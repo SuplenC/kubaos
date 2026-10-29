@@ -85,6 +85,26 @@ fn a_process_scan_fills_the_top_lists() {
 }
 
 #[test]
+fn a_detailed_sample_lists_enough_processes_to_fill_the_panel_and_a_light_one_five() {
+    let machine = Machine::laptop();
+    for pid in 100..150 {
+        machine.process(pid, "worker", 100, 1000);
+    }
+    let mut sampler = Sampler::new(machine.root());
+
+    let light = sampler.sample(1000, false, true);
+    let detailed = sampler.sample(2000, true, true);
+
+    let light = light.top.expect("the light sample's top lists");
+    assert_eq!((light.cpu.len(), light.memory.len()), (super::TOP, super::TOP));
+    let detailed = detailed.top.expect("the detailed sample's top lists");
+    assert_eq!(
+        (detailed.cpu.len(), detailed.memory.len()),
+        (super::TOP_DETAILED, super::TOP_DETAILED)
+    );
+}
+
+#[test]
 fn after_a_restart_the_next_sample_counts_from_the_restart() {
     let machine = Machine::laptop();
     let mut sampler = Sampler::new(machine.root());
