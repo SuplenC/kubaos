@@ -263,10 +263,32 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 
 Two libraries implement one spec, with the same names:
 
-- **`kubaos-ui`** (Rust, iced): Kōbō, Screens, the updater, a future Settings app. `crates/kubaos-ui`.
+- **`kubaos-ui`** (Rust, iced): the apps, Kōbō, Screens and the updater. `crates/kubaos-ui`.
 - **`KubaOS.Components`** (QML): the shell and the Command menu. `qml/KubaOS/Components`, on Quickshell's import path (`home/curated.nix`), so `import KubaOS.Components as K`. Its values are the generated `Tokens` singleton, by their names in `design/tokens.toml` (`Tokens.size.control_md`, `Tokens.color.on_primary`); `Look` nests corners, blends colours and puts lengths on device pixels. The layout primitives (`Page`, `Stack`, `Row`, `Grid`, `Fill`, `Gap`…) lay out as iced's do, so a page built from them is the iced page's boxes; `qml/specimen/` is the components page drawn with it, held to the iced one by the parity check (see "Checks").
 
 **The shared name** of each component is the PascalCase of its `kubaos-ui` constructor (`icon_button` is `IconButton`); `progress::bar` is `ProgressBar`. The QML type has that name, and the geometry check reports components by it. A front end uses only these; a raw toolkit widget (iced's `button`, Qt Quick Controls' `Button`) in an app is a lint failure.
+
+### Levels and where they live
+
+Everything a person sees is built from a few levels, each made only from the ones above it in this list:
+
+| Level | What it is | Examples | Where it lives |
+|---|---|---|---|
+| **Tokens** | Every value: colour, length, type, duration, curve | `control_md`, `primary`, `short` | `design/tokens.toml` |
+| **Atoms** | The smallest parts, which don't split further | `Text`, `Icon`, `Button`, `Switch`, `Field`, `Chip`, `Divider`, `Keycap`, `Spinner` | The library |
+| **Molecules** | A few atoms doing one job together | `ListRow`, `Step`, `Tile`, `Slider`, `Select`, `Tabs`, `Toast`, `EmptyState`, `ErrorBlock` | The library; an app-only one in its app |
+| **Organisms** | A part of a screen, from molecules and atoms, doing one of the app's jobs | Wi-Fi's network list, a notification group, a page of settings | The app |
+| **Templates** | A screen's layout, empty: its regions, how it reflows as its window resizes, and how it moves between its pages | a sidebar beside a page, a step rail beside a page (Kōbō), a panel | The library |
+| **Apps and surfaces** | A template filled with organisms and real data | Kōbō, Screens; the control center | An app's own crate; a surface's shell module |
+
+"The library" is both libraries below, with the same names. A molecule may stay in its app only when it means something only there and is unlikely to be needed elsewhere; when a second surface needs it, it moves into the library. An app never builds a part of a lower level itself: `docs/agents/building-ui.md` is how a new UI gets the parts it needs, and in what order.
+
+*Not enforced yet:* the library has no templates; the first ones come with the next app (no issue yet).
+
+**Which library:**
+
+- **An app**, a window you work in for a while (Kōbō, Screens, the updater, Settings), is built with `kubaos-ui` in Rust and iced. It is a normal window: Hyprland tiles or floats it by its rules, it moves and resizes, and Super+Q closes it.
+- **A shell surface**, something you glance at or call up and dismiss (the bar, the panels, the Command menu, notifications, the lock screen), is built with `KubaOS.Components` in QML.
 
 ### What the geometry check compares
 
@@ -467,7 +489,7 @@ A new surface implements the whole map, not the keys it happens to need. Today n
 ## Settings
 
 - **Every setting is a Command menu Item**, and is written to the User layer, so it can be found, changed and kept like any other. A feature ships with its Items (`CLAUDE.md`).
-- **A Settings panel in the shell** groups them: Appearance, Displays, Keyboard, Phone, Updates and the rest (#154). It may become an app of its own later, on `kubaos-ui`.
+- **A Settings app**, on `kubaos-ui`, groups them: Appearance, Displays, Keyboard, Phone, Updates and the rest. *Not enforced yet:* there is no Settings app (#269).
 
 ## Terminals, boot and the rest
 

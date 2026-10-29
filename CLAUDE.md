@@ -16,6 +16,8 @@ A change to a file under `system/files/` ships a new `migrations/system/` script
 
 ## Design
 
+**Before you plan, brief or build anything a person sees, read `docs/agents/building-ui.md`.** A UI is assembled from library parts that Kuba has already sketched, reviewed and approved: atoms, molecules and templates live in the component library, organisms in the app. A missing or lacking part goes through inventory, a sketch with Kuba and the library first; an app never builds its own. Apps are `kubaos-ui` (Rust, iced) windows; the shell's surfaces are `KubaOS.Components` (QML).
+
 Any UI, in any toolkit, follows `docs/DESIGN.md` and each component's page under `docs/design/components/`: tokens and the shared components only, never a literal colour, size, spacing, radius, duration or font. `just design-check` passes (the rules are in `docs/agents/code-quality.md`, "Design"). Before a UI change reaches Kuba, review its rendered screenshots against `docs/agents/design-review.md`, his recurring review points.
 
 Render, diff and attach a UI change's screenshots with `just shots`, as `docs/agents/design-pr-loop.md` describes.
