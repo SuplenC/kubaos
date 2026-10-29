@@ -15,6 +15,7 @@ import "feed.js" as Feed
 //
 // What was unread when the panel opened stays under New while it shows, so no card changes
 // section as it is marked read or its action runs; closing the panel marks everything read.
+// Opening it is seeing the popups too: they leave as it opens and are read with the rest.
 K.Sheet {
     id: root
 
@@ -66,6 +67,10 @@ K.Sheet {
     onOpened: {
         list.jump(0);
         list.forceActiveFocus();
+    }
+    onActiveChanged: {
+        if (!root.active)
+            Notifs.letGoSeen();
     }
     onShownChanged: {
         if (root.shown) {

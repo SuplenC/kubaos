@@ -49,7 +49,16 @@ Scope {
         readonly property var panels: [controlCenter, notificationPanel, clockPopup, sysmonPanel, powerMenu, wallpaperPicker]
         // The panel on screen (opening, open or closing) that reaches into
         // the popups' corner column, or null. Popups never draw over it.
-        readonly property K.Sheet toastCover: panels.find(d => (d.shown || d.active) && d.area.x + d.area.width + K.Tokens.radius.surface > geo.r - popups.contentWidth) ?? null
+        readonly property K.Sheet toastCover: panels.find(d => root.reachesToasts(d)) ?? null
+        // Whether a panel but the notifications one reaches the corner. Opening that one is
+        // seeing the popups, which leave with their own motion under it as it comes.
+        readonly property bool toastsCovered: panels.some(d => d !== notificationPanel && root.reachesToasts(d))
+
+        // Whether `drawer` is on screen (opening, open or closing) and reaches into the popups'
+        // corner column.
+        function reachesToasts(drawer: K.Sheet): bool {
+            return (drawer.shown || drawer.active) && drawer.area.x + drawer.area.width + K.Tokens.radius.surface > geo.r - popups.contentWidth;
+        }
 
         screen: scope.screen
         color: "transparent"
@@ -249,7 +258,7 @@ Scope {
                 frame: geo
                 here: Hypr.focusedScreen === root.screen
                 shown: (popups.hasPopups || popups.hasPeek) && !root.toastCover
-                covered: root.toastCover !== null
+                covered: root.toastsCovered
                 peeking: root.peekWanted || peekLeave.running
             }
 

@@ -5,9 +5,12 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Notifications
 import "dnd.js" as Dnd
+import "popups.js" as Popups
 
 // Notification daemon. Every notification is kept in `history` until dismissed, unread until it is
 // opened, marked read or seen in the notifications panel; `popups` is the subset on screen now.
+// Opening the panel is seeing every popup (`popups.js`): they leave as it opens, and nothing pops
+// up while it is open, as it lists what comes.
 //
 // Do not disturb (`dnd.js`) is on by hand, or by itself while Hyprland says the screen is shared
 // or a window is fullscreen. While it is on, new notifications land in the history without popping
@@ -20,7 +23,10 @@ Singleton {
 
     readonly property var history: server.trackedNotifications.values.slice().reverse()
     readonly property int count: history.length
-    property var popups: []
+    property var popupState: Popups.initial()
+    readonly property var popups: root.popupState.popups
+    // Whether the notifications panel is open, where everything is seen.
+    readonly property bool listing: Panels.current === "notifications"
     // When each notification arrived, by its id: the spec carries no time, so it is the moment
     // the server took it.
     property var arrivals: ({})
@@ -67,7 +73,9 @@ Singleton {
     }
 
     function clear(): void {
-        root.popups = [];
+        root.popupState = Object.assign({}, root.popupState, {
+            popups: []
+        });
         for (const n of server.trackedNotifications.values.slice())
             n.dismiss();
     }
@@ -77,8 +85,17 @@ Singleton {
             n.dismiss();
     }
 
+    // Lets the transient notifications seen in the panel go, once it has gone: not before, so no
+    // row leaves the panel as it slides away.
+    function letGoSeen(): void {
+        const seen = root.popupState.seen;
+        root.popupState = Popups.gone(root.popupState);
+        for (const n of seen)
+            n.expire();
+    }
+
     function hidePopup(notification): void {
-        root.popups = root.popups.filter(n => n !== notification);
+        root.popupState = Popups.left(root.popupState, notification);
         if (notification?.transient)
             notification.expire();
     }
@@ -89,7 +106,7 @@ Singleton {
     // one refuses its action; `hidePopup` closes a transient one.
     function run(notification, action): void {
         root.markRead([notification]);
-        root.popups = root.popups.filter(n => n !== notification);
+        root.popupState = Popups.left(root.popupState, notification);
         action.invoke();
     }
 
@@ -101,11 +118,12 @@ Singleton {
             return;
         }
         root.markRead([notification]);
-        root.popups = root.popups.filter(n => n !== notification);
+        root.popupState = Popups.left(root.popupState, notification);
         if (notification.transient)
             notification.expire();
     }
 
+    onListingChanged: root.popupState = Popups.listed(root.popupState, root.listing)
     onDndStateChanged: {
         persisted.dnd = JSON.stringify(root.dndState);
         if (root.dndRead)
@@ -203,7 +221,7 @@ Singleton {
                 [id]: true
             });
             notification.closed.connect(() => {
-                root.popups = root.popups.filter(n => n !== notification);
+                root.popupState = Popups.left(root.popupState, notification);
                 const kept = Object.assign({}, root.arrivals);
                 delete kept[id];
                 root.arrivals = kept;
@@ -211,8 +229,7 @@ Singleton {
                 delete unread[id];
                 root.unreadIds = unread;
             });
-            if (Dnd.popsUp(root.dndState, notification.urgency))
-                root.popups = [notification, ...root.popups];
+            root.popupState = Popups.arrived(root.popupState, notification, Dnd.popsUp(root.dndState, notification.urgency));
         }
     }
 }

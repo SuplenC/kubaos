@@ -84,7 +84,7 @@ services/               singletons, no UI
   Battery               UPower battery
   Power                 the power stops, from kubaos-power's file (power-profiles-daemon's profile without it)
   Net, Bt               NetworkManager and BlueZ via Quickshell.Networking / .Bluetooth, pairing through kubaos-bluetooth
-  Notifs                notification server, popups, history, unread, DND (dnd.js)
+  Notifs                notification server, popups (popups.js), history, unread, DND (dnd.js)
   Wallpapers            current wallpaper, picker preview, folder listing (stills, videos, posters), `dot-theme set`
   Motion                when moving wallpapers may decode: always / on AC / never (persisted), lock, idle, fullscreen
   Hypr                  focused screen, each screen's block of workspaces, workspace switching
