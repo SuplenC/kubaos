@@ -410,11 +410,9 @@ fn name_item(number: u32, name: Option<&str>) -> Item {
         Some(name) => format!("Called {name} now; the menu and the bar show it. Blank takes it away"),
         None => "A name for the menu, and for the bar while the group waits on another screen".to_owned(),
     };
-    let ask = Argument {
-        name: NAME_ARGUMENT.to_owned(),
-        placeholder: Some(name.unwrap_or("Left").to_owned()),
-        optional: true,
-    };
+    let ask = Argument::new(NAME_ARGUMENT)
+        .placeholder(name.unwrap_or("Left"))
+        .optional();
     item(
         format!("desk-name:{number}"),
         format!("Name group {number}…"),
@@ -441,6 +439,7 @@ fn item(id: String, title: String, subtitle: String, keywords: &[&str], action: 
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions: vec![action],
     }
 }

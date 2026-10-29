@@ -134,11 +134,7 @@ impl Keyboards {
             ADD,
             "Keyboard: add a layout".to_owned(),
             format!("Another layout to switch to, {} at most", keyboard::MAX_LAYOUTS),
-            vec![Action::new(RUN, "Add").arguments(vec![Argument {
-                name: LAYOUT.to_owned(),
-                placeholder: Some("it, or us(intl)".to_owned()),
-                optional: false,
-            }])],
+            vec![Action::new(RUN, "Add").arguments(vec![Argument::new(LAYOUT).placeholder("it, or us(intl)")])],
         );
         layouts.chain(std::iter::once(add)).collect()
     }
@@ -239,6 +235,7 @@ fn item(id: &str, title: String, subtitle: String, actions: Vec<Action>) -> Item
         hidden: false,
         app_only: false,
         weak_keywords: Vec::new(),
+        yields: false,
         actions,
     }
 }

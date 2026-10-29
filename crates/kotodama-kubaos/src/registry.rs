@@ -43,6 +43,7 @@ use std::time::Duration;
 use kotodama_extension::config;
 use kotodama_protocol::Action;
 use kotodama_protocol::Argument;
+use kotodama_protocol::ArgumentKind;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemKind;
 use kotodama_protocol::NamespacedKind;
@@ -275,6 +276,7 @@ impl Entry {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: vec![action],
         }
     }
@@ -372,6 +374,8 @@ fn arguments(table: &Table) -> Result<Vec<Argument>, String> {
                 name: string(argument, "name")?.ok_or_else(shape)?,
                 placeholder: string(argument, "placeholder")?,
                 optional: boolean(argument, "optional")?,
+                kind: ArgumentKind::Text,
+                accept: Vec::new(),
             })
         })
         .collect()

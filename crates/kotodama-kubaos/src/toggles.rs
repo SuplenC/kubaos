@@ -214,11 +214,9 @@ impl Toggle {
                 Action::new(ON, "Turn on"),
                 Action::new(OFF, "Turn off"),
             ],
-            Toggle::Volume | Toggle::Brightness => vec![Action::new(RUN, self.title()).arguments(vec![Argument {
-                name: PERCENT.to_owned(),
-                placeholder: Some("50".to_owned()),
-                optional: false,
-            }])],
+            Toggle::Volume | Toggle::Brightness => {
+                vec![Action::new(RUN, self.title()).arguments(vec![Argument::new(PERCENT).placeholder("50")])]
+            }
             _ => vec![Action::new(RUN, self.title())],
         }
     }
@@ -237,6 +235,7 @@ impl Toggle {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: self.actions(),
         }
     }
@@ -402,6 +401,7 @@ fn device_list(runner: &impl Runner, direction: Direction) -> Result<Ran, String
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: vec![Action::new(USE, "Use")],
         })
         .collect();

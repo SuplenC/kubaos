@@ -132,6 +132,7 @@ pub fn items() -> Vec<Item> {
             hidden: false,
             app_only: false,
             weak_keywords: Vec::new(),
+            yields: false,
             actions: vec![
                 Action::new(TOGGLE, setting.toggle),
                 Action::new(ON, "Turn on"),

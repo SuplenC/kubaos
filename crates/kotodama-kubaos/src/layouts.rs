@@ -119,6 +119,7 @@ fn item(layout: &Layout, name: &str) -> Item {
         hidden: false,
         app_only: true,
         weak_keywords: Vec::new(),
+        yields: false,
         actions: vec![Action::new(ADD, "Add")],
     }
 }
