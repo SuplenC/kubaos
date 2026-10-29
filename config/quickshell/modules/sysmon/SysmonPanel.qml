@@ -107,6 +107,8 @@ K.Sheet {
     K.Container {
         id: head
 
+        // Over the list's fade, so a tooltip hanging under the header is never faded.
+        z: 1
         width: root.contentWidth
 
         K.Stack {
@@ -468,6 +470,12 @@ K.Sheet {
                 }
             }
         }
+    }
+
+    HeaderFade {
+        y: head.height
+        width: root.contentWidth
+        scrolled: scroll.contentY > 0
     }
 
     // The panel's own box, which its tooltips keep inside.
