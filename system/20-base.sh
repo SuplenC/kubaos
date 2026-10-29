@@ -145,6 +145,10 @@ install_root_file "$FILES_DIR/logind.conf.d/lid.conf" /etc/systemd/logind.conf.d
 info "takes effect after the next reboot (restarting logind would end your session)"
 
 # --------------------------------------------------------------------------
+step "inotify: room for every program that watches files"
+install_inotify_limits
+
+# --------------------------------------------------------------------------
 step "Short shutdown and boot: 10 s stop timeouts, no wait for the network, no console palette"
 install_fast_shutdown_boot
 

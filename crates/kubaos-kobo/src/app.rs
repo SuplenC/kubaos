@@ -810,17 +810,24 @@ impl App {
     /// screenshots, which have no event loop to do it in the background).
     #[cfg(test)]
     pub fn load_images_now(&mut self, size: Size) {
-        let img = ::image::load_from_memory(theme::WALLPAPER)
-            .expect("wallpaper")
-            .to_rgba8();
-        let h = image::Handle::from_rgba(img.width(), img.height(), img.into_raw());
+        // Decoded once for every app a test makes, and one handle for all of them, so a renderer
+        // they share converts the wallpaper once.
+        static DECODED: std::sync::LazyLock<(image::Handle, Option<::image::RgbaImage>)> =
+            std::sync::LazyLock::new(|| {
+                let img = ::image::load_from_memory(theme::WALLPAPER)
+                    .expect("wallpaper")
+                    .to_rgba8();
+                let wallpaper = image::Handle::from_rgba(img.width(), img.height(), img.into_raw());
+                (wallpaper, decode_blur())
+            });
+        let (wallpaper, blur) = &*DECODED;
         self.wallpaper = Some((
-            h,
+            wallpaper.clone(),
             self.epoch
                 .checked_sub(Duration::from_secs(5))
                 .expect("the clock is past 5 s"),
         ));
-        self.blur_src = decode_blur();
+        self.blur_src = blur.clone();
         self.size = size;
         self.glass = None;
         self.ensure_glass();

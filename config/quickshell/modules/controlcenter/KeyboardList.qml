@@ -39,6 +39,8 @@ Item {
     readonly property bool settling: settle.running
     // `c_keyboard`'s probe (test/lib/e2e.sh), with KUBAOS_KEYBOARD_PROBE=1 only.
     readonly property bool probed: Quickshell.env("KUBAOS_KEYBOARD_PROBE") === "1"
+    // The sheet the tab is in has stopped moving, so what the probe logs is where things stay.
+    property bool settled: true
     // The most a keymap holds (kubaos_core::keyboard::MAX_LAYOUTS).
     readonly property int maxLayouts: 4
 
@@ -156,12 +158,12 @@ Item {
         interval: Qt.styleHints.mouseDoubleClickInterval
     }
 
-    // Where the probe's pointer clicks: the centre of each target on screen, logged when it moves
-    // (the drawer slides in).
+    // Where the probe's pointer clicks: the centre of each target on screen, logged when it moves,
+    // once the sheet has stopped sliding in.
     Timer {
         property string last: ""
 
-        running: root.probed && root.visible
+        running: root.probed && root.visible && root.settled
         repeat: true
         interval: 200
         onTriggered: {
@@ -392,11 +394,17 @@ Item {
                             enabled: !root.busy && root.layouts.length > 1
                             grabPermissions: PointerHandler.CanTakeOverFromAnything
                             cursorShape: Qt.ClosedHandCursor
+                            // HAZARD: how far the pointer has come since the press, not
+                            // `activeTranslation`, which counts from the move that passed the drag
+                            // threshold. A busy window gets a drag's moves merged into one, and
+                            // when that one move is the whole drag the row drops back where it was.
+                            readonly property real travel: centroid.scenePosition.y - centroid.scenePressPosition.y
+
                             onActiveChanged: {
                                 root.probe(`drag ${row.index} ${active}`);
                                 if (active) {
-                                    root.dragOffset = 0;
-                                    root.dropAt = row.index;
+                                    root.dragOffset = travel;
+                                    root.dropAt = root.landing(row.index, travel);
                                     root.dragFrom = row.index;
                                     return;
                                 }
@@ -413,11 +421,11 @@ Item {
                                 root.dropAt = -1;
                                 root.dragOffset = 0;
                             }
-                            onActiveTranslationChanged: {
+                            onTravelChanged: {
                                 if (!active)
                                     return;
-                                root.dragOffset = activeTranslation.y;
-                                root.dropAt = root.landing(row.index, activeTranslation.y);
+                                root.dragOffset = travel;
+                                root.dropAt = root.landing(row.index, travel);
                             }
                         }
                     }

@@ -572,6 +572,18 @@ install_fast_shutdown_boot() {
   fi
 }
 
+# install_inotify_limits: room for more inotify instances and watches per user
+# (system/files/sysctl.d/60-kubaos-inotify.conf), applied at once on a booted
+# machine. A container's /proc/sys is read-only, and an image or a build
+# without systemd running gets it from systemd-sysctl at boot. 20-base.sh runs
+# it, and a migration on machines installed before it.
+install_inotify_limits() {
+  install_root_file "$FILES_DIR/sysctl.d/60-kubaos-inotify.conf" /etc/sysctl.d/60-kubaos-inotify.conf 0644
+  if ((!IMAGE_BUILD)) && has_systemd && ! in_container; then
+    sudo_run sysctl -q -p /etc/sysctl.d/60-kubaos-inotify.conf
+  fi
+}
+
 # file_locked FILE: whether a process holds a lock on FILE, from the kernel's lock table. It is
 # read-only and sees flock and fcntl locks alike; unattended-upgrade takes an fcntl one, which
 # `flock -n` on the file would not notice.
