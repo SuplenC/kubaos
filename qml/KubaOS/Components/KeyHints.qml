@@ -98,15 +98,14 @@ Item {
             required property int index
             readonly property var pair: root.shown[hint.index] ?? ["", ""]
             readonly property var caps: root.keys(hint.pair[0])
+            readonly property string does: hint.pair[1]
             readonly property Item before: hint.index > 0 ? hints.itemAt(hint.index - 1) : null
 
             x: hint.before ? hint.before.x + hint.before.width + Tokens.space.s16 : 0
-            width: keys.width + (hint.pair[1] === "" ? 0 : Tokens.space.s8 + what.width)
+            width: keys.width + (hint.does === "" ? 0 : Tokens.space.s8 + what.width)
             height: Tokens.size.keycap
-            // Left out whole past the room, and so is every hint after it.
             visible: (!hint.before || hint.before.visible) && hint.x + hint.width <= root.room
 
-            // Qt's own row: this library's `Row` is a layout primitive.
             Q.Row {
                 id: keys
 
@@ -128,8 +127,8 @@ Item {
 
                 x: keys.width + Tokens.space.s8
                 y: K.Look.snap((Tokens.size.keycap - Tokens.type.caption.line) / 2, root.dpr)
-                visible: hint.pair[1] !== ""
-                text: hint.pair[1]
+                visible: hint.does !== ""
+                text: hint.does
                 style: Tokens.type.caption
                 color: root.color
             }

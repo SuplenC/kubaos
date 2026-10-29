@@ -32,6 +32,10 @@ TestCase {
         }
     }
 
+    function init() {
+        K.Advances.widths.clear();
+    }
+
     function test_a_text_that_fits_is_measured_once_as_it_is_made() {
         const before = K.Advances.widths.size;
 
@@ -64,7 +68,7 @@ TestCase {
         });
 
         const words = K.Advances.of(K.Tokens.type.body_strong, false, "Firefox Web Browser");
-        compare(made.implicitWidth, Math.ceil(words));
+        compare(made.implicitWidth, K.Look.snapUp(words, 1));
     }
 
     function test_markup_is_drawn_where_the_words_keep_to_one_line() {
@@ -74,7 +78,20 @@ TestCase {
         });
 
         verify(made.lit);
-        compare(made.implicitWidth, Math.ceil(K.Advances.of(K.Tokens.type.body_strong, false, "Firefox")));
+        compare(made.implicitWidth, K.Look.snapUp(K.Advances.of(K.Tokens.type.body_strong, false, "Firefox"), 1));
+    }
+
+    function test_a_word_wider_than_the_room_is_cut_on_its_one_line() {
+        const made = createTemporaryObject(text, suite, {
+            text: "/home/someone/Projects/a/very/long/path/without/a/single/space/in/it",
+            maximumLines: 3,
+            room: 120
+        });
+        const drawn = made.children[0];
+
+        compare(made.implicitHeight, K.Tokens.type.body_strong.line);
+        compare(drawn.lineCount, 1);
+        verify(drawn.truncated);
     }
 
     // The hints' delegates, in order; the Repeater is a child of the hints too.
