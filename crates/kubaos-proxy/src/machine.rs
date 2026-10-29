@@ -31,19 +31,20 @@ pub struct StartError {
     pub said: Said,
 }
 
-/// Why NetworkManager didn't do what the tunnel needed.
+/// Why NetworkManager didn't do what the tunnel needed. Each message calls the tunnel "it": it is
+/// only ever shown after the words naming it, "The tunnel couldn't be put in place".
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum TunnelError {
     #[error("NetworkManager couldn't be reached on the system bus")]
     Unreachable(#[source] Said),
-    #[error("NetworkManager refused the tunnel")]
+    #[error("NetworkManager refused it")]
     Refused(#[source] Said),
-    #[error("NetworkManager dropped the tunnel as it came up (journalctl -u NetworkManager says why)")]
+    #[error("NetworkManager dropped it on the way up (journalctl -u NetworkManager says why)")]
     Dropped,
-    #[error("the tunnel wasn't up after {0} s")]
+    #[error("it wasn't up after {0} s")]
     NotUp(u64),
-    #[error("the tunnel was still up after {0} s")]
+    #[error("it was still up after {0} s")]
     StillUp(u64),
     #[error("the kernel gave no uuid for the tunnel")]
     NoUuid(#[source] Said),
