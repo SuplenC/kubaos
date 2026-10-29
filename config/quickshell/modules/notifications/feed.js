@@ -67,7 +67,7 @@ function status(unread, count, reason) {
         return silenced;
     if (unread > 0)
         return `${unread} new`;
-    return count > 0 ? "All read" : "Zero pings given";
+    return count > 0 ? "All read" : "Silence is golden";
 }
 
 // The Do not disturb button's tooltip: whether it is on, and why or until when. `sharing` says

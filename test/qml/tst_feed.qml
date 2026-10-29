@@ -163,7 +163,7 @@ TestCase {
     function test_the_status_line_says_how_many_are_new() {
         compare(Feed.status(2, 5, ""), "2 new");
         compare(Feed.status(0, 5, ""), "All read");
-        compare(Feed.status(0, 0, ""), "Zero pings given", "a line even when empty");
+        compare(Feed.status(0, 0, ""), "Silence is golden", "a line even when empty");
     }
 
     function test_the_status_line_is_never_empty() {
