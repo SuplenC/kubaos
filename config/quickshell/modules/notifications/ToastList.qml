@@ -16,6 +16,8 @@ ListView {
     readonly property int drawn: drawer.active && drawer.contentOpacity > 0 && opacity > 0 ? count : 0
     // While the pointer is on the stack, every card stays with its time stopped.
     readonly property bool holding: hold.holding
+    // What the stack keeps while the pointer is on it; the shots hold it without a pointer.
+    readonly property PopupHold hold: hold
     // The notification whose card shows its whole text, one at a time.
     property var unfolded: null
 
