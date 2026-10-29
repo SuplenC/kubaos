@@ -4,8 +4,10 @@
 //! A light sample (the pill's) reads a handful of files: `/proc/stat`, `/proc/meminfo`, the CPU
 //! temperature, the GPUs, the routing table and `/proc/net/dev`, the battery, and the space on the
 //! watched mounts. A detailed one (the panel's) adds the cores' clock, disk traffic, the address,
-//! fans and snapshots, and a process scan when asked for one. Devices (sensors, GPUs, disks,
-//! mounts) are looked for again every [`REDISCOVER_MS`], so a drive plugged in shows up.
+//! fans and snapshots, and a process scan when asked for one. A light one still says how many fans
+//! a detailed one would list, whether it would have snapshots and whether Btrfs quotas are on, from
+//! what the last look for devices found. Devices (sensors, GPUs, disks, mounts) are looked for
+//! again every [`REDISCOVER_MS`], so a drive plugged in shows up.
 //!
 //! # Owns
 //!
@@ -116,10 +118,45 @@ pub struct Sample {
     pub net: Net,
     pub battery: Option<Battery>,
     pub fans: Vec<Fan>,
+    /// How many fans a detailed sample lists, in every sample, so the panel keeps their lines from
+    /// its first frame.
+    #[serde(default)]
+    pub fan_count: usize,
+    /// Whether a detailed sample has `snapshots`, in every sample, so the panel keeps their line
+    /// from its first frame.
+    #[serde(default)]
+    pub has_snapshots: bool,
+    /// Whether Btrfs quotas are on, which the snapshots' size needs, in every sample, so the panel
+    /// knows from its first frame whether their line has an info button.
+    #[serde(default)]
+    pub quotas: bool,
     pub top: Option<Top>,
     /// Seconds since boot.
     pub uptime: u64,
     pub kernel: String,
+}
+
+impl Sample {
+    /// This sample with the readings only a detailed sample has taken from `detailed`, and marked
+    /// detailed: the newest numbers, with the last cores, clock, traffic, address, snapshots, fans
+    /// and processes the panel showed.
+    #[must_use]
+    pub fn with_details_of(&self, detailed: &Sample) -> Sample {
+        let mut sample = self.clone();
+        sample.detail = true;
+        if detailed.cpu.cores.len() == sample.cpu.count {
+            sample.cpu.cores.clone_from(&detailed.cpu.cores);
+        }
+        sample.cpu.mhz = detailed.cpu.mhz;
+        sample.io.clone_from(&detailed.io);
+        sample.snapshots.clone_from(&detailed.snapshots);
+        if sample.net.interface == detailed.net.interface {
+            sample.net.address.clone_from(&detailed.net.address);
+        }
+        sample.fans.clone_from(&detailed.fans);
+        sample.top.clone_from(&detailed.top);
+        sample
+    }
 }
 
 /// The counters of the sample before, which speeds are worked out against.
@@ -145,6 +182,8 @@ pub struct Sampler {
     watched: Vec<Watched>,
     /// When devices and mounts were last looked for.
     discovered: Option<u64>,
+    /// Whether Btrfs quotas were on when last looked for.
+    quotas: bool,
     last: Option<Last>,
     tracker: Tracker,
 }
@@ -164,6 +203,7 @@ impl Sampler {
             mounts: Vec::new(),
             watched: Vec::new(),
             discovered: None,
+            quotas: false,
             last: None,
             tracker: Tracker::default(),
         }
@@ -282,6 +322,9 @@ impl Sampler {
             },
             battery: power::read_battery(&self.root),
             fans: if detail { self.sensors.fans() } else { Vec::new() },
+            fan_count: self.sensors.fan_count(),
+            has_snapshots: disks::has_snapshots(&self.mounts),
+            quotas: self.quotas,
             top,
             uptime: read::text(&self.root.join("proc/uptime"))
                 .and_then(|text| text.split('.').next()?.trim().parse().ok())
@@ -302,6 +345,7 @@ impl Sampler {
         self.gpus = Gpus::discover(&self.root);
         self.disk_set = DiskSet::discover(&self.root);
         self.read_mounts();
+        self.quotas = disks::quotas_on(&self.root);
         self.discovered = Some(now);
     }
 

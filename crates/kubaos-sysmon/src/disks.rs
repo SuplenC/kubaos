@@ -15,6 +15,7 @@
 //! - Mounting and ejecting drives: `crates/kubaos-automount`. Traffic speeds: [`crate::sampler`].
 
 use std::path::Path;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -219,23 +220,44 @@ pub struct Snapshots {
     pub count: Option<u32>,
 }
 
+/// The system's own mount, `/`, when it is Btrfs: the one whose snapshots are counted.
+fn btrfs_system(mounts: &[Mount]) -> Option<&Mount> {
+    mounts
+        .iter()
+        .rev()
+        .find(|mount| mount.point == "/")
+        .filter(|system| system.fstype == "btrfs")
+}
+
+/// Whether [`snapshots`] has figures for these mounts: the system is on Btrfs. It reads no file,
+/// so a light sample can say it.
+pub fn has_snapshots(mounts: &[Mount]) -> bool {
+    btrfs_system(mounts).is_some()
+}
+
+/// The Btrfs filesystem's qgroups folder in sysfs, where it has one.
+fn qgroups(root: &Path) -> Option<PathBuf> {
+    let btrfs = root.join("sys/fs/btrfs");
+    read::entries(&btrfs)
+        .into_iter()
+        .find(|entry| entry.contains('-'))
+        .map(|uuid| btrfs.join(uuid).join("qgroups"))
+}
+
+/// Whether Btrfs quotas are on, which [`Snapshots::bytes`] needs: the qgroups folder lists any.
+pub fn quotas_on(root: &Path) -> bool {
+    qgroups(root).is_some_and(|dir| !read::entries(&dir).is_empty())
+}
+
 /// The snapshot figures for a Btrfs root; `None` when root isn't Btrfs.
 pub fn snapshots(root: &Path, mounts: &[Mount]) -> Option<Snapshots> {
-    let system = mounts.iter().rev().find(|mount| mount.point == "/")?;
-    if system.fstype != "btrfs" {
-        return None;
-    }
+    let system = btrfs_system(mounts)?;
     let mounted: Vec<u64> = mounts
         .iter()
         .filter(|mount| mount.fstype == "btrfs" && mount.device == system.device)
         .filter_map(Mount::subvolume_id)
         .collect();
-    let btrfs = root.join("sys/fs/btrfs");
-    let qgroups = read::entries(&btrfs)
-        .into_iter()
-        .find(|entry| entry.contains('-'))
-        .map(|uuid| btrfs.join(uuid).join("qgroups"));
-    let bytes = qgroups.and_then(|dir| snapshot_bytes(&dir, &mounted));
+    let bytes = qgroups(root).and_then(|dir| snapshot_bytes(&dir, &mounted));
     let entries = read::entries(&root.join(".snapshots"));
     let count = entries
         .iter()

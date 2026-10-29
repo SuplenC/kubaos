@@ -40,6 +40,8 @@ sysmon                   sysmon         FrameShot   1176,0,424,1000   sysmon
 sysmon-fine              sysmon         FrameShot   1176,0,424,1000   sysmon fine
 sysmon-critical          sysmon         FrameShot   1176,0,424,1000   sysmon critical
 sysmon-loading           sysmon         FrameShot   1176,0,424,1000   sysmon loading
+sysmon-cached            sysmon         FrameShot   1176,0,424,1000   sysmon cached
+sysmon-quotas            sysmon         FrameShot   1176,0,424,1000   sysmon quotas
 sysmon-bare              sysmon         FrameShot   1176,0,424,1000   sysmon bare
 sysmon-scrolled          sysmon         FrameShot   1176,0,424,1000   sysmon scrolled
 sysmon-process           sysmon         FrameShot   1176,0,424,1000   sysmon process

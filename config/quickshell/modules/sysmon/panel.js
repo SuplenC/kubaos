@@ -1,7 +1,8 @@
 .pragma library
 
-// What the system monitor's panel shows of the stream: the subtitle under its title, and the
-// process rows, which take the panel's room left under the readings.
+// What the system monitor's panel shows of the stream: the subtitle under its title, the disk's
+// snapshots line, the placeholders' lengths, and the process rows, which take the panel's room left
+// under the readings.
 
 // The subtitle for the worst colour step (`Sysmon.worstLevel`): 0 fine, 1 close to a threshold,
 // 2 over one.
@@ -24,6 +25,28 @@ function slot(index, counted, count) {
     if (!counted)
         return "placeholder";
     return index < count ? "process" : "empty";
+}
+
+// How much of a card's headline a placeholder for its reading takes: about as much as two rates,
+// "R 1.2 MB/s  W 340 KB/s", in `mono_large` in a panel's width.
+function headline() {
+    return 0.4;
+}
+
+// What the disk's snapshots line says: how many there are and the space they hold, which is
+// unknown with Btrfs quotas off (the line's info button says why). Each case is a whole message,
+// so a translation can order its words.
+function snapshots(snaps, bytes) {
+    const count = snaps.count;
+    if (snaps.bytes == null) {
+        if (count == null)
+            return "Snapshots · size unknown";
+        return count === 1 ? "1 snapshot · size unknown" : `${count} snapshots · size unknown`;
+    }
+    const size = bytes(snaps.bytes);
+    if (count == null)
+        return `Snapshots · ${size}`;
+    return count === 1 ? `1 snapshot · ${size}` : `${count} snapshots · ${size}`;
 }
 
 // A process's row: its name, its CPU share (unknown for a process outside the list, which only

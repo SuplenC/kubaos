@@ -21,8 +21,8 @@ fn server(machine: &Machine) -> (tempfile::TempDir, Server) {
 }
 
 fn ask(server: &mut Server, request: &str) -> (Value, Next) {
-    let (reply, next) = server.handle(request, 5000);
-    (serde_json::from_str(&reply).expect("a JSON reply"), next)
+    let (lines, next) = server.handle(request, 5000);
+    (serde_json::from_str(&lines[0]).expect("a JSON reply"), next)
 }
 
 fn json(line: &str) -> Value {
@@ -96,7 +96,7 @@ fn an_unknown_mode_or_op_is_an_error_with_the_id() {
 
     let (mode, _) = ask(&mut server, r#"{"id":3,"op":"mode","mode":"fast"}"#);
     let (op, _) = ask(&mut server, r#"{"id":4,"op":"dance"}"#);
-    let (reply, _) = server.handle("not json", 0);
+    let (lines, _) = server.handle("not json", 0);
 
     assert_eq!(mode["id"], 3);
     assert!(
@@ -105,7 +105,94 @@ fn an_unknown_mode_or_op_is_an_error_with_the_id() {
             .is_some_and(|error| error.contains("pill, popup or paused"))
     );
     assert_eq!(op["id"], 4);
-    assert!(json(&reply)["error"].as_str().is_some());
+    assert_eq!(lines.len(), 1);
+    assert!(json(&lines[0])["error"].as_str().is_some());
+}
+
+#[test]
+fn the_first_opening_sends_only_the_reply() {
+    let machine = Machine::laptop();
+    let (_dir, mut server) = server(&machine);
+    server.tick(1000);
+
+    let (lines, _) = server.handle(r#"{"id":1,"op":"mode","mode":"popup"}"#, 2000);
+
+    assert_eq!(lines.len(), 1);
+    assert_eq!(json(&lines[0])["mode"], "popup");
+}
+
+#[test]
+fn opening_again_sends_the_last_detailed_sample_at_once_with_the_newest_numbers() {
+    let machine = Machine::laptop();
+    machine.process(300, "firefox", 10, 100);
+    let (dir, mut server) = server(&machine);
+    let stream = dir.path().join("kubaos-sysmon.json");
+    server.handle(r#"{"id":1,"op":"mode","mode":"popup"}"#, 1000);
+    server.tick(1500);
+    server.tick(2500);
+    server.handle(r#"{"id":2,"op":"mode","mode":"pill"}"#, 3000);
+    machine.meminfo_percent_used(40);
+    server.tick(4000);
+    let pill = json(&server.tick(6000)[0]);
+
+    let (lines, next) = server.handle(r#"{"id":3,"op":"mode","mode":"popup"}"#, 6500);
+
+    assert_eq!(lines.len(), 2);
+    assert_eq!(json(&lines[0])["mode"], "popup");
+    assert_eq!(next, Next::Soon);
+    let opening = json(&lines[1]);
+    assert_eq!(opening["type"], "sample");
+    assert_eq!(opening["cached"], true);
+    assert_eq!(opening["detail"], true);
+    assert_eq!(opening["t"], 6000);
+    assert_eq!(opening["memory"], pill["memory"]);
+    assert_eq!(opening["cpu"]["mhz"], 3000);
+    assert_eq!(opening["fans"][0]["rpm"], 2100);
+    assert_eq!(opening["net"]["address"], "192.168.1.42");
+    assert_eq!(opening["top"]["memory"][0]["name"], "firefox");
+    let written = read_stream(&stream, 6000, 10_000).expect("the stream file");
+    assert!(!written.detail, "the opening isn't written to the stream file");
+}
+
+#[test]
+fn a_mode_reply_while_open_sends_no_sample_again() {
+    let machine = Machine::laptop();
+    let (_dir, mut server) = server(&machine);
+    server.handle(r#"{"id":1,"op":"mode","mode":"popup"}"#, 1000);
+    server.tick(1500);
+
+    let (lines, next) = server.handle(r#"{"id":2,"op":"mode","mode":"popup"}"#, 2000);
+
+    assert_eq!(lines.len(), 1);
+    assert_eq!(next, Next::Keep);
+}
+
+#[test]
+fn a_light_sample_says_how_many_fans_and_whether_snapshots_and_quotas_a_detailed_one_has() {
+    let machine = Machine::laptop();
+    machine.write("proc/self/mounts", "/dev/nvme0n1p2 / btrfs rw,subvolid=256 0 0\n");
+    let (_dir, mut server) = server(&machine);
+
+    let light = json(&server.tick(1000)[0]);
+
+    assert_eq!(light["detail"], false);
+    assert_eq!(light["fans"], serde_json::json!([]));
+    assert_eq!(light["fanCount"], 1);
+    assert!(light["snapshots"].is_null());
+    assert_eq!(light["hasSnapshots"], true);
+    assert_eq!(light["quotas"], false);
+}
+
+#[test]
+fn quotas_on_are_found_with_the_devices() {
+    let machine = Machine::laptop();
+    machine.write("proc/self/mounts", "/dev/nvme0n1p2 / btrfs rw,subvolid=256 0 0\n");
+    machine.write("sys/fs/btrfs/0f1e-2d3c/qgroups/0_256/exclusive", "4096\n");
+    let (_dir, mut server) = server(&machine);
+
+    let light = json(&server.tick(1000)[0]);
+
+    assert_eq!(light["quotas"], true);
 }
 
 #[test]
