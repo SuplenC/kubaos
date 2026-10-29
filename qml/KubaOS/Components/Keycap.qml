@@ -26,7 +26,7 @@ Item {
             }
         })
 
-    implicitWidth: Math.max(Tokens.size.keycap, label.implicitWidth + Tokens.space.s4 * 2)
+    implicitWidth: Math.max(Tokens.size.keycap, padded.width)
     implicitHeight: Tokens.size.keycap
 
     // The edge fills the whole key; the face stands on it one hairline short of the bottom, so
@@ -46,12 +46,29 @@ Item {
         border.color: Tokens.color.outline_variant
     }
 
-    K.Text {
-        id: label
+    // The key and the 4 either side of it, centred: the box iced's padded row is, which the
+    // geometry check holds this to.
+    Item {
+        id: padded
 
-        x: K.Look.snap((root.width - label.implicitWidth) / 2, root.dpr)
-        text: root.key
-        style: Tokens.type.keycap
-        color: Tokens.color.on_surface_variant
+        readonly property var probe: ({
+                role: "layout",
+                axis: "x",
+                gap: 0,
+                align: "start"
+            })
+
+        x: K.Look.snap((root.width - padded.width) / 2, root.dpr)
+        width: label.implicitWidth + Tokens.space.s4 * 2
+        height: label.implicitHeight
+
+        K.Text {
+            id: label
+
+            x: Tokens.space.s4
+            text: root.key
+            style: Tokens.type.keycap
+            color: Tokens.color.on_surface_variant
+        }
     }
 }
