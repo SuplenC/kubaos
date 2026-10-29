@@ -63,11 +63,36 @@ function btKnown(devices) {
     return devices.filter(d => d.paired).sort((a, b) => (b.connected - a.connected) || byName(a, b));
 }
 
-// Devices in range to pair, nearest first, by their last RSSI (`rssi`, by object path). An
-// unnamed discovery (its name is its address) is noise.
+// Whether a device sends no name: BlueZ then names it by its address, dashes for the colons
+// (`org.bluez.Device1.Alias`). A name the user gave it counts as its own.
+function unnamed(device) {
+    const name = device.name.replace(/-/g, ":").toUpperCase();
+    return name === "" || name === device.address.toUpperCase();
+}
+
+// Devices in range to pair: the named ones nearest first by their last RSSI (`rssi`, by object
+// path), then the unnamed ones the same way.
 function btNearby(devices, rssi) {
     const near = d => nearness(rssi[d.dbusPath]);
-    return devices.filter(d => !d.paired && d.name !== d.address).sort((a, b) => (near(b) - near(a)) || byName(a, b));
+    return devices.filter(d => !d.paired).sort((a, b) => (unnamed(a) - unnamed(b)) || (near(b) - near(a)) || byName(a, b));
+}
+
+// What Nearby lists of `nearby` (`btNearby`'s), and how many unnamed devices are in range,
+// `{ shown, unnamed }`: the unnamed ones are listed only on `showUnnamed`, as they are mostly
+// beacons and phones nobody pairs.
+function btShown(nearby, showUnnamed) {
+    const named = nearby.filter(d => !unnamed(d));
+    return {
+        shown: showUnnamed ? nearby : named,
+        unnamed: nearby.length - named.length
+    };
+}
+
+// The line at the end of Nearby about its `count` unnamed devices, or "" while there are none.
+function unnamedLine(count, showUnnamed) {
+    if (count === 0)
+        return "";
+    return `${count} unnamed ${count === 1 ? "device" : "devices"} ${showUnnamed ? "shown" : "hidden"}`;
 }
 
 // KubaOS Symbols' drawing of a BlueZ device icon (`org.bluez.Device1.Icon`, freedesktop icon names).

@@ -125,6 +125,11 @@ fn paths_follow_the_xdg_variables_and_fall_back_to_home() {
         Path::new("/home/kuba/.local/state/kubaos/preview.json")
     );
     assert_eq!(custom.preview(), Path::new("/st/kubaos/preview.json"));
+    assert_eq!(
+        defaults.shell_state(),
+        Path::new("/home/kuba/.local/state/quickshell/kubaos.json")
+    );
+    assert_eq!(custom.shell_state(), Path::new("/st/quickshell/kubaos.json"));
 }
 
 #[test]

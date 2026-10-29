@@ -7,10 +7,12 @@ import qs.components
 // cross-fading; or, while the radio is `off`, an empty state saying how to turn it on.
 //
 // A row is `{ key, kind, title, subtitle, subtitleIcon, icon, accent, checked, forgettable,
-// failed }`. Its kind: "row" (a network or a device, on its icon tile, checked while in use;
-// pressed, `picked(key)`; a forgettable one shows a quiet × under the pointer, and Delete on it
-// does the same, `forgot(key)`), "label" (a section's small muted title), "skeleton" (a row still
-// being found) or "note" (one line, in the error colour while `failed`).
+// failed, action }`. Its kind: "row" (a network or a device, on its icon tile, checked while in
+// use; pressed, `picked(key)`; a forgettable one shows a quiet × under the pointer, and Delete on
+// it does the same, `forgot(key)`), "label" (a section's small muted title), "skeleton" (a row
+// still being found), "note" (one line, in the error colour while `failed`) or "action" (a quiet
+// line with a text button at its end, labelled `action`, which the keys reach as a row's; pressed,
+// `picked(key)`).
 Item {
     id: root
 
@@ -85,11 +87,12 @@ Item {
                 required property bool checked
                 required property bool forgettable
                 required property bool failed
+                required property string action
 
                 // A label after rows stands 12 clear of them, with the 4 the row above carries.
                 readonly property int labelRoom: live.index > 0 ? K.Tokens.space.s12 : 0
 
-                rowHeight: live.kind === "label" ? live.labelRoom + K.Tokens.type.label.line : live.kind === "note" ? K.Tokens.size.row : K.Tokens.size.row_two_line
+                rowHeight: live.kind === "label" ? live.labelRoom + K.Tokens.type.label.line : live.kind === "note" || live.kind === "action" ? K.Tokens.size.row : K.Tokens.size.row_two_line
 
                 // Only what the row's kind shows is made: a scan's update makes and drops rows
                 // while the tab shows.
@@ -100,7 +103,8 @@ Item {
                             row: deviceRow,
                             label: sectionLabel,
                             skeleton: skeletonRow,
-                            note: noteLine
+                            note: noteLine,
+                            action: actionLine
                         })[live.kind] ?? null
                 }
 
@@ -183,6 +187,37 @@ Item {
                             text: live.title
                             style: K.Tokens.type.body
                             color: live.failed ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
+                        }
+                    }
+                }
+
+                // The note's words, then a text button at the row's end: its label's own padding
+                // puts the words 12 in, where a row's end is.
+                Component {
+                    id: actionLine
+
+                    Item {
+                        K.Text {
+                            x: K.Tokens.space.s12
+                            y: (parent.height - height) / 2
+                            width: button.x - x - K.Tokens.space.s8
+                            room: width
+                            maximumLines: 1
+                            text: live.title
+                            style: K.Tokens.type.body
+                            color: K.Tokens.color.on_surface_variant
+                        }
+
+                        K.Button {
+                            id: button
+
+                            x: parent.width - width
+                            y: (parent.height - height) / 2
+                            text: live.action
+                            kind: "Text"
+                            size: "Sm"
+                            focused: live.current && list.highlightShown
+                            onActivated: root.picked(live.key)
                         }
                     }
                 }

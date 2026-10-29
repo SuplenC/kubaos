@@ -35,7 +35,8 @@ RadioTab {
             accent: false,
             checked: false,
             forgettable: false,
-            failed: false
+            failed: false,
+            action: ""
         };
     }
 
@@ -50,7 +51,8 @@ RadioTab {
             accent: network.connected,
             checked: network.connected,
             forgettable: network.known && !network.connected,
-            failed: false
+            failed: false,
+            action: ""
         };
     }
 
