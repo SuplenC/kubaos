@@ -212,6 +212,15 @@ TestCase {
         verify(button("markRead").visible);
     }
 
+    function test_a_sender_s_own_mark_read_stands_in_for_the_card_s() {
+        card.mainAction = "Reply";
+        card.otherActions = ["Mark as read"];
+        card.unread = true;
+
+        verify(!button("markRead").visible);
+        verify(button("other0").visible);
+    }
+
     function test_read_and_without_actions_it_has_no_buttons() {
         const withButtons = (() => {
                 card.unread = true;

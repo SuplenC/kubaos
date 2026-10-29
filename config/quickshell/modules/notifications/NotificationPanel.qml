@@ -309,7 +309,7 @@ K.Sheet {
                 }
 
                 K.KeyHints {
-                    hints: [["D", "Do not disturb"], ["Esc", "Fold or close"]]
+                    hints: [["D", "Do not disturb"], ["Esc", "Fold, close"]]
                 }
             }
         }

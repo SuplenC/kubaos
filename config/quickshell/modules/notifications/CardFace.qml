@@ -9,7 +9,7 @@ import KubaOS.Components as K
 // day and time it came; at the band's far corner the dismiss button, shown while the pointer is on
 // the card or the keyboard is, and beside it a chevron while the text is cut off. Under it, across
 // the whole card, the summary, two lines of the body, then the buttons: the main action filled,
-// the others as text after it, and Mark read while it is unread.
+// the others as text after it, and Mark read while it is unread, unless the sender offers its own.
 //
 // A click, Enter or Space unfolds cut-off text to the whole of it (`unfoldRequested`), or asks for
 // a stack to open where a stack opens (`expandRequested`); Esc folds it again. Its owner keeps
@@ -44,6 +44,10 @@ Item {
     property bool opens: false
     // Whether the whole text shows; the owner keeps it.
     property bool unfolded: false
+
+    // Whether it has a Mark read button of its own: while unread, unless the sender offers one,
+    // as a chat app does, whose action tells the app too, so two never sit side by side.
+    readonly property bool marksRead: root.unread && ![root.mainAction, ...root.otherActions].some(text => /^mark (as )?read$/i.test(text.trim()))
 
     // The lines of the summary and of the body shown while folded.
     readonly property int foldedLines: 2
@@ -249,7 +253,7 @@ Item {
         // The whole text is laid out from the moment it starts unfolding until it has folded.
         readonly property bool open: words.progress > 0
         readonly property real textShown: words.foldedHeight + (words.fullHeight - words.foldedHeight) * words.progress
-        readonly property bool hasButtons: root.mainAction !== "" || root.otherActions.length > 0 || root.unread
+        readonly property bool hasButtons: root.mainAction !== "" || root.otherActions.length > 0 || root.marksRead
         readonly property real buttonsHeight: words.hasButtons ? K.Tokens.space.s12 + K.Tokens.size.control_sm : 0
 
         x: K.Tokens.space.s12
@@ -296,9 +300,12 @@ Item {
             }
         }
 
+        // A filled main action's box starts on the text's edge; a row of text buttons starts its
+        // first label there instead, its box reaching out into the padding as the peek's footer's.
         K.Row {
             id: buttons
 
+            x: root.mainAction !== "" ? 0 : -K.ButtonMetrics.of("Sm").textPadding
             y: words.textShown + K.Tokens.space.s12
             visible: words.hasButtons
             gap: K.Tokens.space.s8
@@ -335,7 +342,7 @@ Item {
 
             K.Button {
                 objectName: "markRead"
-                visible: root.unread
+                visible: root.marksRead
                 text: "Mark read"
                 kind: "Text"
                 size: "Sm"
