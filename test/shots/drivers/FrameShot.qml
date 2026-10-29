@@ -25,7 +25,9 @@ import qs.modules.frame
 //                  (a nearby device's form), bluetooth-code (its pairing code to type on it),
 //                  keyboard, keyboard-tooltip (the Mac accents explained), keyboard-drag (the second layout dragged onto the first),
 //                  keyboard-add ("germ" searched for a layout to add), each with the history
-//                  cleared, scanning (a Wi-Fi scan that has found nothing yet, the history cleared)
+//                  cleared, scanning (a Wi-Fi scan that has found nothing yet, the history cleared),
+//                  proxy (the Proxy tile's detail open, the local network let through),
+//                  proxy-lan-off (the same, the local network blocked)
 //   clock: answer (a question typed into the search), settings
 //   sysmon: "" (a disk close to full: Breaking a sweat), fine (every reading fine), critical (the
 //           CPU over its limit), loading (the processes still counted), bare (no GPU, battery
@@ -176,6 +178,13 @@ QtObject {
         if (driver.state.startsWith("keyboard")) {
             cc.tab = cc.keyboardTab;
             keyboardPose.start();
+        }
+        if (driver.state.startsWith("proxy")) {
+            const toggles = driver.find(root, it => it.proxyDetail !== undefined);
+            if (toggles)
+                toggles.proxyDetail = true;
+            else
+                console.warn("shot: no Proxy tile found");
         }
     }
 
@@ -454,6 +463,8 @@ QtObject {
         // before the frame exists, so no row is made and torn down again.
         if (driver.panel === "controlcenter" && driver.state === "scanning")
             Net.networks = [];
+        if (driver.panel === "controlcenter" && driver.state === "proxy-lan-off")
+            Proxy.allowLocalNetwork = false;
         // Every one unread, so the peek has more than its three cards.
         if (driver.panel === "notifications" && driver.state === "peek")
             Notifs.unread = Notifs.history.slice();
