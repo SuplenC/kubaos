@@ -5,10 +5,7 @@ import KubaOS.Components as K
 // rounded up to a device pixel, and as tall as its lines on the style's line height. Given less
 // `room`, it breaks between words, at the same places iced does.
 //
-// Widths are measured as iced lays text out: plain ASCII from the font's own advances, unkerned
-// and unshaped, and anything else shaped, kerning included. They are measured at `precision`
-// times the size: Qt rounds each advance to 1/64 of a pixel, which over a line comes to a pixel
-// off iced, and a pixel moves every box after it.
+// Widths are measured as iced lays text out (`Advances`), so a box is as wide here as there.
 Item {
     id: root
 
@@ -22,11 +19,12 @@ Item {
     // The most lines it takes, 0 for as many as the words need. Past them, the last line ends in
     // an ellipsis where it reaches `room`: a window's title, a notification's body.
     property int maximumLines: 0
+    // The same words as Qt's `StyledText` with runs of them in other colours, as Kotodama lights
+    // the characters a query matched; empty for none. `text` is laid out and measured, and the
+    // markup drawn in its place while the words keep to one line.
+    property string markup: ""
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
-    // How much larger than the style the advances are measured, so Qt's rounding of each one to
-    // 1/64 of a pixel shrinks to under a thousandth.
-    readonly property int precision: 256
     // Whether the text is shaped: iced shapes anything but plain ASCII. A style with tabular
     // figures is shaped too, since Qt applies font features only to shaped text.
     readonly property bool shaped: root.style.tabular || /[^\x00-\x7f]/.test(root.text)
@@ -36,13 +34,14 @@ Item {
     } : {}
     // Each line's words and its width in logical pixels.
     // The words in lines as they wrap in `room`, before `maximumLines` cuts them.
-    readonly property var laid: root.layOut(root.text, root.room, metrics.font)
+    readonly property var laid: root.layOut(root.text, root.room, root.style, root.shaped)
     readonly property var lines: root.clamped(root.laid)
     // Whether `maximumLines` cuts the words: more lines than it keeps, or one wider than the room or
     // than a box its owner made narrower.
     // HAZARD: wrap and elide only then. Qt wraps a line laid out exactly as wide as its own
     // advance onto a second line now and then, and a kept line count of one drops what moved.
     readonly property bool cut: root.maximumLines > 0 && (root.laid.length > root.maximumLines || root.laid.some(line => line.width > Math.min(root.room, root.width + 1e-3)))
+    readonly property bool lit: root.markup !== "" && root.lines.length === 1
     readonly property real naturalWidth: root.lines.reduce((widest, line) => Math.max(widest, line.width), 0)
     readonly property real naturalHeight: root.lines.length * root.style.line
     readonly property var probe: ({
@@ -58,7 +57,7 @@ Item {
     implicitHeight: root.naturalHeight
 
     function advance(words: string): real {
-        return metrics.advanceWidth(words) / root.precision;
+        return K.Advances.of(root.style, root.shaped, words);
     }
 
     // `lines` cut to `maximumLines`: the last one kept takes every word after it, and each is
@@ -81,49 +80,45 @@ Item {
     }
 
     // `text` in lines no wider than `room`, broken at spaces: each line takes words while they
-    // fit, and a word wider than the room has a line of its own.
-    function layOut(text: string, room: real, font: font): var {
-        // The font is read so a new one lays the text out again.
-        font.family;
-        font.weight;
-        font.pixelSize;
-        font.kerning;
+    // fit, and a word wider than the room has a line of its own. A paragraph that fits is one
+    // line, measured once: no part of a line is wider than the whole.
+    function layOut(text: string, room: real, style: QtObject, shaped: bool): var {
         const lines = [];
         for (const paragraph of text.split("\n")) {
+            const whole = K.Advances.of(style, shaped, paragraph);
+            if (whole <= room) {
+                lines.push({
+                    text: paragraph,
+                    width: whole
+                });
+                continue;
+            }
             let line = "";
             for (const word of paragraph.split(" ")) {
                 const longer = line === "" ? word : `${line} ${word}`;
-                if (line !== "" && root.advance(longer) > room) {
-                    lines.push(line);
+                if (line !== "" && K.Advances.of(style, shaped, longer) > room) {
+                    lines.push({
+                        text: line,
+                        width: K.Advances.of(style, shaped, line)
+                    });
                     line = word;
                 } else {
                     line = longer;
                 }
             }
-            lines.push(line);
+            lines.push({
+                text: line,
+                width: K.Advances.of(style, shaped, line)
+            });
         }
-        return lines.map(line => ({
-                    text: line,
-                    width: root.advance(line)
-                }));
-    }
-
-    FontMetrics {
-        id: metrics
-
-        font.family: root.style.family
-        font.weight: root.style.weight
-        font.pixelSize: root.style.size * root.precision
-        font.kerning: root.shaped
-        font.preferShaping: root.shaped
-        font.features: root.features
-        font.hintingPreference: Font.PreferNoHinting
+        return lines;
     }
 
     Text {
         width: root.width
         height: root.height
-        text: root.lines.map(line => line.text).join("\n")
+        text: root.lit ? root.markup : root.lines.map(line => line.text).join("\n")
+        textFormat: root.lit ? Text.StyledText : Text.AutoText
         color: root.color
         horizontalAlignment: root.horizontalAlignment
         // The lines laid out above already fit the room but the last kept, which Qt wraps and cuts

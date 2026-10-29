@@ -19,7 +19,7 @@ import qs.settings
 // on an animation, the rows are cheap (ResultRow.qml), and the detail pane updates only once a
 // frame with the Results is on screen and typing has paused. The panel's frame (the field, the
 // footer, the cards) is the library's components on its layout primitives, laid out while the menu
-// is built; what changes with every key is in `Label`s on token arithmetic, which costs a keystroke
+// is built; what changes with every key is placed with token arithmetic, which costs a keystroke
 // nothing to lay out.
 PanelWindow {
     id: menu
@@ -598,12 +598,13 @@ PanelWindow {
                 }
 
                 // It takes the rest of the row, and a long one ends in an ellipsis.
-                Label {
+                K.Text {
                     readonly property bool fillWidth: true
 
                     visible: !menu.listing
+                    maximumLines: 1
                     text: search.view.title ?? ""
-                    type: K.Tokens.type.subheading
+                    style: K.Tokens.type.subheading
                 }
             }
 
@@ -1042,29 +1043,31 @@ PanelWindow {
             width: panel.width - menu.gap * 2
             height: K.Tokens.size.control_sm
 
-            Label {
+            K.Text {
                 width: footer.room
                 height: parent.height
+                maximumLines: 1
                 visible: search.confirming === "" && (menu.failure !== "" || search.down.length > 0)
-                type: K.Tokens.type.small
+                style: K.Tokens.type.small
                 text: menu.failure !== "" ? menu.failure : `Unavailable: ${search.down.join(", ")}`
                 color: menu.failure !== "" ? K.Tokens.color.error : K.Tokens.color.on_surface_variant
             }
 
-            Label {
+            K.Text {
                 id: question
 
-                width: Math.min(K.Look.snapUp(implicitWidth, menu.dpr), footer.room)
+                width: Math.min(implicitWidth, footer.room)
                 height: parent.height
+                maximumLines: 1
                 visible: search.confirming !== ""
-                type: K.Tokens.type.label
+                style: K.Tokens.type.label
                 text: search.confirming.slice(0, footer.asks)
                 color: K.Tokens.color.error
             }
 
             // The keys, as keycaps: the confirmation's after its question, else the menu's own. A
             // hint the room the problems leave can't hold is left out whole.
-            KeyHints {
+            K.KeyHints {
                 x: search.confirming !== "" ? question.width + K.Tokens.space.s12 : 0
                 y: K.Look.snap((parent.height - height) / 2, menu.dpr)
                 room: footer.room - x
