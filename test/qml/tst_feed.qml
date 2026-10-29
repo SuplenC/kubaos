@@ -129,7 +129,7 @@ TestCase {
     function test_rows_list_the_sections_with_a_label_each() {
         const sections = Feed.sections([note(2, "A"), note(1, "B")], unreadOf([2]));
 
-        const rows = Feed.rows(sections, {});
+        const rows = Feed.rows(sections);
 
         compare(rows.map(r => r.kind), ["label", "card", "label", "card"]);
         compare(rows[0].text, "New");
@@ -137,27 +137,55 @@ TestCase {
     }
 
     function test_rows_leave_out_an_empty_section() {
-        const rows = Feed.rows(Feed.sections([note(1, "A")], unreadOf([])), {});
+        const rows = Feed.rows(Feed.sections([note(1, "A")], unreadOf([])));
 
         compare(rows.map(r => r.kind), ["label", "card"]);
         compare(rows[0].text, "Earlier");
     }
 
-    function test_a_collapsed_stack_is_one_row_and_an_expanded_one_a_row_each() {
+    function test_a_group_is_one_row_holding_its_notifications_newest_first() {
         const sections = Feed.sections([note(3, "A"), note(2, "A"), note(1, "B")], unreadOf([3, 2, 1]));
 
-        const collapsed = Feed.rows(sections, {});
-        compare(collapsed.length, 3);
-        compare(collapsed[1].items.length, 2);
-        verify(collapsed[1].stacked);
+        const rows = Feed.rows(sections);
 
-        const expanded = Feed.rows(sections, {
-            [collapsed[1].key]: true
-        });
-        compare(expanded.length, 4);
-        compare(expanded.slice(1, 3).map(r => r.items[0].id), [3, 2]);
-        verify(!expanded[1].stacked);
-        compare(expanded[1].key, collapsed[1].key, "an expanded card still names its stack, so ← folds it");
+        compare(rows.length, 3);
+        compare(rows[1].items.map(n => n.id), [3, 2]);
+        verify(rows[1].stacked);
+        verify(!rows[2].stacked);
+    }
+
+    function test_a_group_keeps_its_key_as_notifications_come() {
+        const before = Feed.rows(Feed.sections([note(2, "A"), note(1, "A")], unreadOf([2, 1])));
+
+        const after = Feed.rows(Feed.sections([note(3, "A"), note(2, "A"), note(1, "A")], unreadOf([3, 2, 1])));
+
+        compare(after[1].key, before[1].key);
+    }
+
+    function test_a_row_the_preview_covers_any_of_fades_out_whole() {
+        compare(Feed.behind(100, 200, 0, 150, 1, 0.6), 0, "under the preview's lower part");
+        compare(Feed.behind(100, 200, 120, 180, 1, 0.6), 0, "the preview inside it");
+    }
+
+    function test_a_row_clear_of_the_preview_only_sits_back() {
+        compare(Feed.behind(200, 300, 0, 150, 1, 0.6), 1 - 0.6);
+        compare(Feed.behind(0, 50, 60, 200, 1, 0.6), 1 - 0.6, "above it");
+    }
+
+    function test_a_row_just_touching_the_preview_isn_t_covered() {
+        compare(Feed.behind(150, 250, 0, 150, 1, 0.6), 1 - 0.6);
+    }
+
+    function test_rows_come_back_as_the_preview_tucks_in() {
+        compare(Feed.behind(100, 200, 0, 150, 0, 0.6), 1);
+        compare(Feed.behind(100, 200, 0, 150, 0.5, 0.6), 0.5);
+    }
+
+    function test_the_popups_group_by_app_keyed_by_it() {
+        const groups = Feed.groups([note(4, "A"), note(3, "B"), note(2, "A")]);
+
+        compare(groups.map(g => g.key), ["A", "B"]);
+        compare(groups[0].items.map(n => n.id), [4, 2]);
     }
 
     function test_the_status_line_says_how_many_are_new() {
@@ -199,7 +227,7 @@ TestCase {
     }
 
     function test_the_same_app_stacks_apart_in_new_and_earlier() {
-        const rows = Feed.rows(Feed.sections([note(2, "A"), note(1, "A")], unreadOf([2])), {});
+        const rows = Feed.rows(Feed.sections([note(2, "A"), note(1, "A")], unreadOf([2])));
 
         compare(rows.filter(r => r.kind === "card").length, 2);
         verify(rows[1].key !== rows[3].key);

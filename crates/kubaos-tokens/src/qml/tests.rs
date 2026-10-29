@@ -29,6 +29,14 @@ fn names_stay_as_the_tokens_spell_them() {
 }
 
 #[test]
+fn a_shadow_with_a_light_opacity_follows_the_mode_and_one_without_keeps_its_own() {
+    let singleton = render(&QmlTokens);
+
+    assert!(singleton.contains("readonly property real opacity: tokens.mode === \"light\" ? 0.16 : 0.4"));
+    assert!(singleton.contains("readonly property real opacity: 0.55"));
+}
+
+#[test]
 fn radii_are_the_roles_and_a_pill() {
     let singleton = render(&QmlTokens);
 

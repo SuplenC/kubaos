@@ -30,7 +30,8 @@ K.Sheet {
     shown: cover !== null && critical.length > 0 && room >= oneCard
     takesFocus: false
     contentWidth: K.Tokens.size.panel
-    contentHeight: Math.min(Math.max(list.contentHeight, 0) + padding * 2, room)
+    contentHeight: Math.min(Math.max(list.contentHeight + list.overhang, 0) + padding * 2, room)
+    animateSize: list.settling === 0
 
     Binding {
         target: root
@@ -47,7 +48,7 @@ K.Sheet {
         y: root.padding
         width: root.contentWidth - root.padding * 2
         drawer: root
-        notifications: root.shown || root.active ? root.critical.slice(0, 5) : []
+        notifications: root.shown || root.active ? root.critical : []
         // The corner shows these cards as soon as the panel has gone, so
         // they leave here at once rather than fade beside their copies.
         opacity: root.cover ? 1 : 0

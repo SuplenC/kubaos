@@ -691,10 +691,15 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
     out.line("}");
     out.blank();
     out.line("impl Shadow {");
-    let getters: [(&str, &str, &str); 3] = [
+    let getters: [(&str, &str, &str); 4] = [
         ("How far down the shadow falls, in logical pixels.", "y", "u16"),
         ("The blur radius in logical pixels.", "blur", "u16"),
         ("The opacity, 0 to 1.", "opacity", "f32"),
+        (
+            "The opacity in light mode, 0 to 1: `opacity` unless light mode has its own.",
+            "light_opacity",
+            "f32",
+        ),
     ];
     for (i, (doc, getter, ty)) in getters.into_iter().enumerate() {
         if i > 0 {
@@ -707,7 +712,8 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
             let value = match getter {
                 "y" => shadow.y.to_string(),
                 "blur" => shadow.blur.to_string(),
-                _ => format!("{:?}", shadow.opacity),
+                "opacity" => format!("{:?}", shadow.opacity),
+                _ => format!("{:?}", shadow.light_opacity.unwrap_or(shadow.opacity)),
             };
             out.line(format!("            Shadow::{} => {value},", camel(name)));
         }

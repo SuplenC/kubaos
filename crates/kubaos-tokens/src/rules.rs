@@ -407,6 +407,9 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     }
     for (name, shadow) in &tokens.shadow {
         check_opacity(format!("shadow.{name}.opacity"), shadow.opacity, found);
+        if let Some(light) = shadow.light_opacity {
+            check_opacity(format!("shadow.{name}.light_opacity"), light, found);
+        }
     }
     for (name, &value) in &tokens.opacity {
         check_opacity(format!("opacity.{name}"), value, found);

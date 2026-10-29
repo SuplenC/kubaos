@@ -38,9 +38,11 @@ import qs.modules.frame
 //   notifications: "" (two popups, folded, one with actions and one without), unfolded (the
 //                  one without actions unfolded), held (the stack held as the pointer on it holds
 //                  it, a third notification waiting), over (the panel opened over the popups),
-//                  peek (the bell's peek, every one unread, so "+N more"),
-//                  panel (the notifications panel, a stack folded), panel-unfolded (the build,
-//                  with actions, unfolded), panel-expanded (the stack
+//                  fan (a burst from one app, its group's preview showing),
+//                  peek (the bell's peek, every one unread, so "+N more"), panel (the
+//                  notifications panel, a group of four and a pair at rest), panel-unfolded (the
+//                  build, with actions, unfolded), panel-fan (the group of four's preview, "+1
+//                  more" under it), panel-expanded (the group
 //                  open, its second card selected), panel-keys (the keys button's tooltip),
 //                  panel-empty (nothing in it), panel-read (every one read), panel-dnd (Do
 //                  not disturb on while the screen is shared, its tooltip showing)
@@ -127,7 +129,7 @@ QtObject {
             driver.keepOsd.start();
         } else if (driver.panel === "notifications" && driver.state.startsWith("panel")) {
             Panels.current = "notifications";
-            if (["panel-expanded", "panel-keys", "panel-dnd", "panel-unfolded"].includes(driver.state))
+            if (["panel-expanded", "panel-fan", "panel-keys", "panel-dnd", "panel-unfolded"].includes(driver.state))
                 notificationsPose.start();
         } else if (driver.panel === "notifications" && driver.state === "peek") {
             const popups = driver.find(root, it => it.peeking !== undefined && it.hasPeek !== undefined);
@@ -135,6 +137,9 @@ QtObject {
                 popups.peeking = true;
             else
                 console.warn("shot: no peek found");
+        } else if (driver.panel === "notifications" && driver.state === "fan") {
+            Notifs.showBurst();
+            fanPose.start();
         } else if (driver.panel === "notifications") {
             Notifs.showPopups();
             if (driver.state !== "")
@@ -262,10 +267,16 @@ QtObject {
                     console.warn(`shot: no tooltip "${title}" found`);
                 return;
             }
+            if (driver.state === "panel-fan") {
+                driver.fanFirstGroup(panel);
+                return;
+            }
+            driver.settleGroups();
             const stack = panel.rows.find(row => row.stacked);
             panel.setExpanded(stack.key, true);
             const list = driver.find(panel, it => typeof it.jump === "function");
-            list.currentIndex = panel.rows.findIndex(row => row.key === stack.key) + 1;
+            list.currentIndex = panel.rows.findIndex(row => row.key === stack.key);
+            panel.inner = 1;
         }
     }
 
@@ -288,6 +299,35 @@ QtObject {
             }
             if (driver.state === "over")
                 Panels.current = "notifications";
+        }
+    }
+
+    // A notification group's motion is over at once in a shot, so the capture can't catch it
+    // part-way on a busy machine: the group's end state is the picture.
+    function settleGroups(): void {
+        K.Motion.reduced = true;
+    }
+
+    // The first notification group's preview, as if the pointer had rested on it: the shots have
+    // no pointer.
+    function fanFirstGroup(within: Item): void {
+        driver.settleGroups();
+        const group = driver.find(within, it => it.fanCount !== undefined && it.stacked === true);
+        if (group)
+            group.armed = true;
+        else
+            console.warn("shot: no notification group found");
+    }
+
+    // The popups' group fanned once the popups have slid in, and held as the pointer resting on it
+    // holds them: their clocks stopped, so their lines don't keep the window drawing.
+    property Timer fanPose: Timer {
+        interval: 700
+        onTriggered: {
+            const list = driver.find(driver.window.contentItem, it => it.hold !== undefined && it.unfolded !== undefined);
+            if (list)
+                list.hold.pointed = true;
+            driver.fanFirstGroup(driver.find(driver.window.contentItem, it => it.peeking !== undefined && it.hasPeek !== undefined));
         }
     }
 

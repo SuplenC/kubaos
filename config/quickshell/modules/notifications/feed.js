@@ -1,7 +1,7 @@
 .pragma library
 
 // What the notifications panel, the bar's bell and its peek show of the history (newest first, as
-// `Notifs.history` is): the notifications of one app stacked into one, New (unread) and Earlier,
+// `Notifs.history` is): the notifications of one app in a group, New (unread) and Earlier,
 // and the peek's few cards.
 
 // How many cards the peek shows at most.
@@ -94,9 +94,9 @@ function dndTip(reason, sharing) {
     };
 }
 
-// The panel's rows: each non-empty section's label, then its stacks, one row each, or a row per
-// notification for a stack in `expanded` (keys, as the rows name them).
-function rows(sections, expanded) {
+// The panel's rows: each non-empty section's label, then its groups, one row each however it is
+// opened, keyed by section and app, so a group keeps its row as notifications come and go.
+function rows(sections) {
     const out = [];
     for (const [name, text] of [["fresh", "New"], ["earlier", "Earlier"]]) {
         const list = sections[name];
@@ -107,20 +107,32 @@ function rows(sections, expanded) {
             key: name,
             text: text
         });
-        for (const stack of list) {
-            const key = `${name}:${stack.app}`;
-            const open = expanded[key] === true && stack.items.length > 1;
-            const each = open ? stack.items.map(n => [n]) : [stack.items];
-            for (const items of each)
-                out.push({
-                    kind: "card",
-                    key: key,
-                    items: items,
-                    stacked: items.length > 1
-                });
-        }
+        for (const stack of list)
+            out.push({
+                kind: "card",
+                key: `${name}:${stack.app}`,
+                items: stack.items,
+                stacked: stack.items.length > 1
+            });
     }
     return out;
+}
+
+// How opaque a row of a list is while a group's preview floats over it, `spread` (0 -> 1) the
+// preview's `recede`: a row the preview covers any of, from `coverTop` to `coverBottom`, fades out
+// whole, so no cut-off piece of it shows through the gaps between the fanned cards; the others sit
+// back by `amount`, `opacity.recede`.
+function behind(top, bottom, coverTop, coverBottom, spread, amount) {
+    const covered = top < coverBottom && bottom > coverTop;
+    return 1 - (covered ? 1 : amount) * spread;
+}
+
+// The popups' groups, one per app, keyed by it, newest first.
+function groups(list) {
+    return stacks(list).map(stack => ({
+                key: stack.app,
+                items: stack.items
+            }));
 }
 
 // A card's buttons for a notification's `list` of actions: the main one, filled (its default

@@ -529,6 +529,9 @@ log = 0.85
 # The shell's frame and the panels growing out of it: glass, which Hyprland
 # blurs what shows through.
 frame = 0.94
+# A list behind what floats over it, turned toward the surface so it sits back
+# in either mode: the notifications under a group's fanned cards.
+recede = 0.60
 # What darkens the desktop behind an open panel, lighter than a dialog's scrim:
 # a panel sits beside the windows rather than over a question.
 panel_scrim = 0.20
@@ -562,6 +565,23 @@ opacity = 0.55
 y = 16
 blur = 48
 opacity = 0.60
+
+# A card in a stack, cast onto the edge of the card tucked under it: close and
+# tight, so it reads as one card lying on another. Lighter in light mode, where
+# the dark one's strength turns the edges into grey bands rather than paper.
+[shadow.tucked]
+y = 4
+blur = 8
+opacity = 0.40
+light_opacity = 0.16
+
+# A card lifted over a list, lying flat beside the others it fans out with,
+# its shadow straight under it on what it floats over: a notification
+# group's preview.
+[shadow.lifted]
+y = 8
+blur = 24
+opacity = 0.55
 
 # The glow under a progress bar's fill, in the fill's own colour.
 [shadow.glow]
@@ -783,6 +803,7 @@ pairs = [
   { fg = "on_surface_variant", bg = "surface_container_high", need = "text", opacity = "placeholder_text", use = "A field's placeholder in its resting fill" },
   { fg = "on_surface_variant", bg = "surface_container_highest", need = "text", opacity = "placeholder_text", use = "A field's placeholder while it is focused or hovered" },
   { fg = "primary", bg = "surface", need = "text", use = "Accent text: an accent line, a detail, a Text button" },
+  { fg = "primary", bg = "surface_container", need = "text", use = "A notification group's \"+N more\" under its fan, over the cards turned toward the surface" },
   { fg = "primary", bg = "surface_container_low", need = "text", use = "Accent text in a well" },
   { fg = "on_primary", bg = "primary", need = "text", use = "A Filled button's label, today in the calendar" },
   { fg = "on_primary", bg = "primary", need = "text", opacity = "subdued_text", use = "Secondary text on a checked tile" },

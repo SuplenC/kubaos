@@ -320,6 +320,19 @@ fn an_easing_that_runs_time_backwards_is_refused() {
 }
 
 #[test]
+fn a_light_opacity_over_one_is_refused() {
+    let found = violations(|t| set(t, &["shadow", "tucked"], "light_opacity", 1.5));
+
+    assert_eq!(
+        found,
+        [Violation::OpacityOutOfRange {
+            token: "shadow.tucked.light_opacity".into(),
+            value: 1.5
+        }]
+    );
+}
+
+#[test]
 fn an_opacity_over_one_is_refused() {
     let found = violations(|t| set(t, &["opacity"], "hover", 1.5));
 

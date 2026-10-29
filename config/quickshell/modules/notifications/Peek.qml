@@ -4,9 +4,11 @@ import qs.services
 import "feed.js" as Feed
 
 // The bell's peek, in the popups' place: the most recent unread notifications as the popups'
-// cards, one app's stacked into one, then "+N more" (which opens the panel) and two one-click
-// actions on what it shows, Mark read and Clear. Looking marks nothing read; a click on a card
-// unfolds its text, its buttons run its actions, and its × dismisses it.
+// cards, one app's in a group (`CardGroup.qml`), then "+N more" (which opens the panel) and two
+// one-click actions on what it shows, Mark read and Clear. Looking marks nothing read; a click on
+// a group opens it, a click on a card unfolds its text, its buttons run its actions, and its ×
+// dismisses it. A group's preview floats past the peek's end (`overhang`), which the popups make
+// room for.
 Item {
     id: root
 
@@ -19,9 +21,25 @@ Item {
             more: 0
         })
     readonly property var shown: [].concat(...root.peek.stacks.map(stack => stack.items))
-    readonly property bool hovered: hover.hovered
+    readonly property bool hovered: hover.hovered || (root.lifted?.pointed ?? false)
     // The notification whose card shows its whole text, one at a time, until the peek goes.
     property var unfolded: null
+    // The groups opened, by app, until the peek goes.
+    property var opened: ({})
+    // The group whose preview shows, which may reach past the peek's end.
+    property CardGroup lifted: null
+    readonly property real overhang: root.lifted ? Math.max(0, root.lifted.y + root.lifted.extent - root.implicitHeight) : 0
+    // How many groups are moving between two states, which the popups' size follows frame by frame.
+    property int settling: 0
+
+    function setOpened(app: string, open: bool): void {
+        const next = Object.assign({}, root.opened);
+        if (open)
+            next[app] = true;
+        else
+            delete next[app];
+        root.opened = next;
+    }
 
     implicitHeight: column.implicitHeight
     onNowChanged: {
@@ -29,8 +47,10 @@ Item {
             root.peek = root.now;
     }
     onVisibleChanged: {
-        if (!root.visible)
-            root.unfolded = null;
+        if (root.visible)
+            return;
+        root.unfolded = null;
+        root.opened = {};
     }
     Component.onCompleted: root.peek = root.now
 
@@ -48,19 +68,48 @@ Item {
             // No cards while the peek is away, so a new notification makes none unseen.
             model: root.visible ? root.peek.stacks : []
 
-            delegate: NotificationCard {
+            delegate: CardGroup {
+                id: group
+
                 required property var modelData
 
                 implicitWidth: root.width
-                notification: modelData.items[0]
-                items: modelData.items
-                unfolded: root.unfolded === modelData.items[0]
-                onUnfoldRequested: open => root.unfolded = open ? modelData.items[0] : null
+                z: group.raised ? 1 : 0
+                items: group.modelData.items
+                open: root.opened[group.modelData.app] === true
+                // Every other group sits back behind one's preview, and goes where it covers them.
+                opacity: root.lifted && root.lifted !== group ? Feed.behind(group.y, group.y + group.height, root.lifted.y, root.lifted.y + root.lifted.extent, root.lifted.recede, K.Tokens.opacity.recede) : 1
+                onOpenRequested: open => root.setOpened(group.modelData.app, open)
+                onRaisedChanged: {
+                    if (group.raised)
+                        root.lifted = group;
+                    else if (root.lifted === group)
+                        root.lifted = null;
+                }
+                onSettlingChanged: root.settling += group.settling ? 1 : -1
+                Component.onDestruction: {
+                    if (group.settling)
+                        root.settling -= 1;
+                    if (root.lifted === group)
+                        root.lifted = null;
+                }
+
+                delegate: NotificationCard {
+                    required property int index
+
+                    notification: group.items[index] ?? null
+                    items: group.standing[index] ?? []
+                    unfolded: root.unfolded !== null && root.unfolded === notification
+                    onUnfoldRequested: open => root.unfolded = open ? notification : null
+                }
             }
         }
 
         K.Row {
+            id: footer
+
             width: root.width
+            opacity: root.lifted ? Feed.behind(footer.y, footer.y + footer.height, root.lifted.y, root.lifted.y + root.lifted.extent, root.lifted.recede, K.Tokens.opacity.recede) : 1
             fill: true
             gap: K.Tokens.space.s4
             align: "centre"

@@ -4,9 +4,10 @@ import KubaOS.Components as K
 import qs.services
 
 // Notification popups, in a panel that grows down from the top-right corner
-// of the frame. New cards slide in from the right; the panel's height follows
-// the stack. With no popup to show on this screen, the bell's peek
-// (`Peek.qml`) takes the same place while the bar asks for it (`peeking`).
+// of the frame, one app's in a group. New cards slide in from the right; the
+// panel's height follows the stack, and a group's preview past its end. With
+// no popup to show on this screen, the bell's peek (`Peek.qml`) takes the same
+// place while the bar asks for it (`peeking`).
 //
 // While an open panel covers the corner (`covered`), the cards wait in
 // `Notifs.popups`, still in the history, and come back when the panel has
@@ -33,7 +34,10 @@ K.Sheet {
     flushEnd: true
     takesFocus: false
     contentWidth: K.Tokens.size.panel
-    contentHeight: Math.max(root.showingPeek ? peek.implicitHeight : list.contentHeight, 0) + padding * 2
+    contentHeight: Math.max(root.showingPeek ? peek.implicitHeight + peek.overhang : list.contentHeight + list.overhang, 0) + padding * 2
+    // A group moving between two states sizes the panel frame by frame, rather than one easing after
+    // the other.
+    animateSize: list.settling === 0 && peek.settling === 0
     onHasPeekChanged: {
         if (root.hasPeek)
             root.showingPeek = true;
@@ -54,7 +58,7 @@ K.Sheet {
         y: root.padding
         width: root.contentWidth - root.padding * 2
         drawer: root
-        notifications: (root.shown || root.active) && !root.showingPeek ? Notifs.popups.slice(0, 5) : []
+        notifications: (root.shown || root.active) && !root.showingPeek ? Notifs.popups : []
         // HAZARD: the cards go at once when a panel covers them, not with the
         // surface's fade. The system monitor and the clock popup show their text
         // within a few frames of opening, long before this panel's content has
