@@ -1,12 +1,13 @@
 import QtQuick
 import KubaOS.Components as K
 
-// ListView driven from the keyboard, with the keys of docs/DESIGN.md ("The keyboard"): the arrows
-// along it, h j k l, Ctrl+j/k, Ctrl+n/p, Home and End, Page Up and Page Down, and Enter once per
-// press. Plain letters are skipped when `vimKeys` is false, and Home and End when `fieldKeys` is
-// true: a text field that forwards its keys here keeps both.
-// Its rows are `K.ListRow`s 4 apart, as in a `K.List` well; the current row shows itself selected
-// while `highlightShown`, by `selected: ListView.isCurrentItem && ListView.view.highlightShown`.
+// A list's rows that scroll, moved through with the keys of docs/DESIGN.md ("The keyboard"): the
+// arrows along it, h j k l, Ctrl+j/k, Ctrl+n/p, Home and End, Page Up and Page Down, and Enter
+// once per press. Plain letters are skipped when `vimKeys` is false, and Home and End when
+// `fieldKeys` is true: a text field that forwards its keys here keeps both.
+// Its rows are 4 apart, as a rule `ListRow`s in a `ScrollingList`'s well, as in a `List`; the
+// current row shows itself selected while `highlightShown`, by
+// `selected: ListView.isCurrentItem && ListView.view.highlightShown`.
 // A list that sets `highlightFollowsCurrentItem: false` scrolls only for the keys: they bring the
 // row they select into view, and a current row the model moves takes the view nowhere.
 ListView {

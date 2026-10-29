@@ -106,7 +106,7 @@ ListView {
     }
 
     // A card displaced mid-slide-in finishes the slide and the fade, or it stays faded and
-    // off to the side (see `components/NavList.qml`).
+    // off to the side (see `K.ListRows`).
     displaced: Transition {
         NumberAnimation {
             property: "y"

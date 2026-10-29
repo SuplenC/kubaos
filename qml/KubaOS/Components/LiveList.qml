@@ -1,10 +1,9 @@
 import QtQuick
 import KubaOS.Components as K
-import "keyed.js" as Keyed
 
-// A list a scan updates while it shows, which never jumps (docs/DESIGN.md, "Motion"): its rows
-// come from `rows`, each `{ key, kind, folded, ... }` with the same roles, kept in step by key
-// (`keyed.js`), so only what changed changes. Its delegates are `LiveRow`s: a row that arrives
+// A list a scan updates while it shows, which never jumps (docs/DESIGN.md, "Motion"): `ListRows`
+// whose rows come from `rows`, each `{ key, kind, folded, ... }` with the same roles, kept in step
+// by key (`Keyed`), so only what changed changes. Its delegates are `LiveRow`s: a row that arrives
 // opens its room and fades in, one that leaves fades and gives its room back, taking no press
 // while it goes, and one that changes place glides there. The keyboard skips the rows whose
 // `kind` is neither "row" nor "disclosure" (section labels, a note), and the drawer while it is
@@ -23,7 +22,7 @@ import "keyed.js" as Keyed
 //
 // Each row carries the 4 after it, so a leaving row gives back its gap with its room, and the
 // list's bottom margin is the well's 12 less that 4.
-NavList {
+K.ListRows {
     id: root
 
     property var rows: []
@@ -187,13 +186,13 @@ NavList {
     onContentYChanged: root.slack = Math.max(0, Math.min(root.slack, root.overshoot()))
 
     onRowsChanged: {
-        Keyed.apply(rowModel, root.rows);
+        K.Keyed.apply(rowModel, root.rows);
         if (!root.selectable(root.currentIndex))
             root.jump(root.currentIndex);
     }
     Component.onCompleted: {
         root.drawerEdge = root.unfolded ? 1 : 0;
         root.drawerShown = root.drawerEdge;
-        Keyed.apply(rowModel, root.rows);
+        K.Keyed.apply(rowModel, root.rows);
     }
 }

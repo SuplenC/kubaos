@@ -94,8 +94,8 @@ K.Sheet {
         Qt.callLater(() => list.jump(at));
     }
 
-    // Which way a key moves along the list: 1, -1, or 0 for a key that doesn't, as `NavList` reads
-    // them.
+    // Which way a key moves along the list: 1, -1, or 0 for a key that doesn't, as `K.ListRows`
+    // reads them.
     function stepOf(event: KeyEvent): int {
         const ctrl = event.modifiers & Qt.ControlModifier;
         const plain = !ctrl && !(event.modifiers & Qt.AltModifier);
@@ -211,7 +211,7 @@ K.Sheet {
     // The list, in the room under the header. It reaches past the container padding at the sides
     // as far as a glow does, so the focused card keeps its glow, and is cut at the header. A
     // group's preview floats over the header's fade too.
-    NavList {
+    K.ListRows {
         id: list
 
         readonly property int reach: K.Tokens.focus.far
