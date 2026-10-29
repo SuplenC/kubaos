@@ -63,6 +63,16 @@ Comments are written for a human: the developer reading the code to understand i
 - **Blank lines separate setup, action and assertion**; a comment only for setup whose purpose is not visible.
 - **A regression test** has one line linking the bug: `# Regression: #102.`
 
+## Text a person reads
+
+KubaOS isn't translated yet, but its text is written so it can be, in every language here (QML, Rust, the Command menu's TOML):
+
+- **One message per thing said, with placeholders**, never a sentence glued together from pieces: `"{count} snapshots · size unknown"` as one string, not `count + " snapshots" + " · " + "size unknown"`. Word order differs between languages.
+- **A count's word is part of the message**, chosen by the count, never `"snapshot" + (n > 1 ? "s" : "")`: other languages have more than two plural forms.
+- **No text in pictures or icons**, and no meaning carried by a string's position alone.
+- **Text can grow**: translations run up to a third longer, so text fits by wrapping, eliding or the layout giving it room, never by a fixed width chosen for the English string.
+- **Dates, times and numbers go through the locale's formatting** (`Qt.formatDateTime`, `Number.toLocaleString`, chrono's formatting in Rust), never assembled by hand.
+
 ## Performance comes before style
 
 New KubaOS components are written for speed and memory first. On a hot path (anything a keystroke, a login or a theme change waits on), performance wins over the style rules here. Three conditions keep it honest:
