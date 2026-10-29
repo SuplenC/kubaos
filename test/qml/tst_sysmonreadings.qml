@@ -73,6 +73,7 @@ TestCase {
         s.fanCount = 0;
         s.snapshots = null;
         s.hasSnapshots = false;
+        s.quotas = false;
     }
 
     function find(item, test) {
@@ -122,7 +123,10 @@ TestCase {
             },
             {
                 tag: "with snapshot sizes unknown",
-                change: s => s.snapshots.bytes = null
+                change: s => {
+                    s.snapshots.bytes = null;
+                    s.quotas = false;
+                }
             },
             {
                 tag: "a bare machine",
@@ -160,6 +164,7 @@ TestCase {
                 count: 68,
                 bytes: null
             };
+            s.quotas = false;
         });
 
         suite.show(full);

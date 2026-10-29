@@ -34,10 +34,19 @@ function headline() {
 }
 
 // What the disk's snapshots line says: how many there are and the space they hold, which is
-// unknown with Btrfs quotas off (the line's info button says why).
+// unknown with Btrfs quotas off (the line's info button says why). Each case is a whole message,
+// so a translation can order its words.
 function snapshots(snaps, bytes) {
-    const count = snaps.count == null ? "Snapshots" : snaps.count === 1 ? "1 snapshot" : `${snaps.count} snapshots`;
-    return `${count} · ${snaps.bytes == null ? "size unknown" : bytes(snaps.bytes)}`;
+    const count = snaps.count;
+    if (snaps.bytes == null) {
+        if (count == null)
+            return "Snapshots · size unknown";
+        return count === 1 ? "1 snapshot · size unknown" : `${count} snapshots · size unknown`;
+    }
+    const size = bytes(snaps.bytes);
+    if (count == null)
+        return `Snapshots · ${size}`;
+    return count === 1 ? `1 snapshot · ${size}` : `${count} snapshots · ${size}`;
 }
 
 // A process's row: its name, its CPU share (unknown for a process outside the list, which only

@@ -266,17 +266,19 @@ K.Stack {
             }
         }
 
-        // As tall as the info button, whether it shows or not, so the size arriving moves
-        // nothing.
+        // With Btrfs quotas off, which every sample says, the size is unknown and an info button
+        // says why: the row is as tall as the button from the first frame, before it shows, so
+        // nothing moves as it does. With them on, it is a line of text.
         K.Row {
             id: snapshots
 
             readonly property var figures: root.sample?.snapshots ?? null
+            readonly property bool explained: root.sample?.quotas !== true
             readonly property bool unknown: root.detailed && snapshots.figures !== null && snapshots.figures.bytes == null
 
             visible: root.sample?.hasSnapshots === true || snapshots.figures !== null
             fill: true
-            fixedHeight: K.Tokens.size.control_sm
+            fixedHeight: snapshots.explained ? K.Tokens.size.control_sm : 0
             gap: K.Tokens.space.s4
             align: "centre"
 
@@ -311,7 +313,7 @@ K.Stack {
 
                 K.Tooltip {
                     title: "Snapshot size unknown"
-                    body: "Btrfs counts the space snapshots hold only with its quotas on, and they are off. sudo btrfs quota enable / turns them on; deleting snapshots then takes longer."
+                    body: "Btrfs counts the space snapshots hold only with its quotas on, and they are off. Turning them on (sudo btrfs quota enable /) makes deleting snapshots slower."
                     within: root.within
                     shown: quotas.pointerOver || quotas.focused
                 }

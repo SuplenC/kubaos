@@ -168,7 +168,7 @@ fn a_mode_reply_while_open_sends_no_sample_again() {
 }
 
 #[test]
-fn a_light_sample_says_how_many_fans_and_whether_snapshots_a_detailed_one_has() {
+fn a_light_sample_says_how_many_fans_and_whether_snapshots_and_quotas_a_detailed_one_has() {
     let machine = Machine::laptop();
     machine.write("proc/self/mounts", "/dev/nvme0n1p2 / btrfs rw,subvolid=256 0 0\n");
     let (_dir, mut server) = server(&machine);
@@ -180,6 +180,19 @@ fn a_light_sample_says_how_many_fans_and_whether_snapshots_a_detailed_one_has() 
     assert_eq!(light["fanCount"], 1);
     assert!(light["snapshots"].is_null());
     assert_eq!(light["hasSnapshots"], true);
+    assert_eq!(light["quotas"], false);
+}
+
+#[test]
+fn quotas_on_are_found_with_the_devices() {
+    let machine = Machine::laptop();
+    machine.write("proc/self/mounts", "/dev/nvme0n1p2 / btrfs rw,subvolid=256 0 0\n");
+    machine.write("sys/fs/btrfs/0f1e-2d3c/qgroups/0_256/exclusive", "4096\n");
+    let (_dir, mut server) = server(&machine);
+
+    let light = json(&server.tick(1000)[0]);
+
+    assert_eq!(light["quotas"], true);
 }
 
 #[test]

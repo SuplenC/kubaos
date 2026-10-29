@@ -33,8 +33,10 @@ import qs.modules.frame
 //   clock: answer (a question typed into the search), settings, select-closed (the settings'
 //          holidays select open, then the popup closed as a keybind closes it)
 //   sysmon: "" (a disk close to full: Breaking a sweat), fine (every reading fine), critical (the
-//           CPU over its limit), loading (the processes still counted), bare (no GPU, battery
-//           or fan), scrolled (scrolled down to the processes, as a short screen shows them),
+//           CPU over its limit), loading (opened on a light sample: the readings and
+//           processes a detailed one brings are placeholders), cached (opened again on the engine's
+//           last detailed sample, Btrfs quotas off), quotas (the same, the snapshots line's
+//           tooltip showing), bare (no GPU, battery or fan), scrolled (scrolled down to the processes, as a short screen shows them),
 //           process (a process's details, scrolled down to them), kill (its Kill asking first)
 //   wallpaper: settings
 //   osd: volume, brightness
@@ -158,7 +160,7 @@ QtObject {
             driver.measure("panel opening");
         if (driver.panel === "controlcenter")
             driver.controlCenter(root);
-        if (driver.panel === "sysmon" && ["scrolled", "process", "kill"].includes(driver.state))
+        if (driver.panel === "sysmon" && ["scrolled", "process", "kill", "quotas"].includes(driver.state))
             sysmonPose.start();
         if (driver.panel === "clock" && (driver.state === "settings" || driver.state === "select-closed")) {
             const clock = driver.find(root, it => it.page !== undefined && typeof it.land === "function");
@@ -226,6 +228,16 @@ QtObject {
             s.top = null;
             s.snapshots = null;
         }
+        // The engine's last detailed sample, as a panel opened again opens on, on a machine with
+        // Btrfs quotas off.
+        if (driver.state === "cached" || driver.state === "quotas") {
+            s.cached = true;
+            s.quotas = false;
+            s.snapshots = {
+                count: 68,
+                bytes: null
+            };
+        }
         if (driver.state === "bare") {
             s.gpus = [];
             s.battery = null;
@@ -243,7 +255,15 @@ QtObject {
     property Timer sysmonPose: Timer {
         interval: 700
         onTriggered: {
-            const panel = driver.find(driver.window.contentItem, it => it.s !== undefined && it.fades !== undefined);
+            if (driver.state === "quotas") {
+                const tooltip = driver.find(driver.window.contentItem, it => it.title === "Snapshot size unknown" && it.shown !== undefined && it.within !== undefined);
+                if (tooltip)
+                    tooltip.shown = true;
+                else
+                    console.warn("shot: no snapshots tooltip found");
+                return;
+            }
+            const panel = driver.find(driver.window.contentItem, it => it.s !== undefined && it.edge !== undefined);
             const processes = panel ? driver.find(panel, it => it.confirming !== undefined) : null;
             if (driver.state === "kill" && processes)
                 processes.confirming = "kill";

@@ -5,9 +5,9 @@
 //! temperature, the GPUs, the routing table and `/proc/net/dev`, the battery, and the space on the
 //! watched mounts. A detailed one (the panel's) adds the cores' clock, disk traffic, the address,
 //! fans and snapshots, and a process scan when asked for one. A light one still says how many fans
-//! a detailed one would list and whether it would have snapshots, which it knows without reading a
-//! file. Devices (sensors, GPUs, disks, mounts) are looked for again every [`REDISCOVER_MS`], so a
-//! drive plugged in shows up.
+//! a detailed one would list, whether it would have snapshots and whether Btrfs quotas are on, from
+//! what the last look for devices found. Devices (sensors, GPUs, disks, mounts) are looked for
+//! again every [`REDISCOVER_MS`], so a drive plugged in shows up.
 //!
 //! # Owns
 //!
@@ -126,6 +126,10 @@ pub struct Sample {
     /// from its first frame.
     #[serde(default)]
     pub has_snapshots: bool,
+    /// Whether Btrfs quotas are on, which the snapshots' size needs, in every sample, so the panel
+    /// knows from its first frame whether their line has an info button.
+    #[serde(default)]
+    pub quotas: bool,
     pub top: Option<Top>,
     /// Seconds since boot.
     pub uptime: u64,
@@ -178,6 +182,8 @@ pub struct Sampler {
     watched: Vec<Watched>,
     /// When devices and mounts were last looked for.
     discovered: Option<u64>,
+    /// Whether Btrfs quotas were on when last looked for.
+    quotas: bool,
     last: Option<Last>,
     tracker: Tracker,
 }
@@ -197,6 +203,7 @@ impl Sampler {
             mounts: Vec::new(),
             watched: Vec::new(),
             discovered: None,
+            quotas: false,
             last: None,
             tracker: Tracker::default(),
         }
@@ -317,6 +324,7 @@ impl Sampler {
             fans: if detail { self.sensors.fans() } else { Vec::new() },
             fan_count: self.sensors.fan_count(),
             has_snapshots: disks::has_snapshots(&self.mounts),
+            quotas: self.quotas,
             top,
             uptime: read::text(&self.root.join("proc/uptime"))
                 .and_then(|text| text.split('.').next()?.trim().parse().ok())
@@ -337,6 +345,7 @@ impl Sampler {
         self.gpus = Gpus::discover(&self.root);
         self.disk_set = DiskSet::discover(&self.root);
         self.read_mounts();
+        self.quotas = disks::quotas_on(&self.root);
         self.discovered = Some(now);
     }
 

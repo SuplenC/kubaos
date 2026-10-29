@@ -15,6 +15,7 @@
 //! - Mounting and ejecting drives: `crates/kubaos-automount`. Traffic speeds: [`crate::sampler`].
 
 use std::path::Path;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -234,6 +235,20 @@ pub fn has_snapshots(mounts: &[Mount]) -> bool {
     btrfs_system(mounts).is_some()
 }
 
+/// The Btrfs filesystem's qgroups folder in sysfs, where it has one.
+fn qgroups(root: &Path) -> Option<PathBuf> {
+    let btrfs = root.join("sys/fs/btrfs");
+    read::entries(&btrfs)
+        .into_iter()
+        .find(|entry| entry.contains('-'))
+        .map(|uuid| btrfs.join(uuid).join("qgroups"))
+}
+
+/// Whether Btrfs quotas are on, which [`Snapshots::bytes`] needs: the qgroups folder lists any.
+pub fn quotas_on(root: &Path) -> bool {
+    qgroups(root).is_some_and(|dir| !read::entries(&dir).is_empty())
+}
+
 /// The snapshot figures for a Btrfs root; `None` when root isn't Btrfs.
 pub fn snapshots(root: &Path, mounts: &[Mount]) -> Option<Snapshots> {
     let system = btrfs_system(mounts)?;
@@ -242,12 +257,7 @@ pub fn snapshots(root: &Path, mounts: &[Mount]) -> Option<Snapshots> {
         .filter(|mount| mount.fstype == "btrfs" && mount.device == system.device)
         .filter_map(Mount::subvolume_id)
         .collect();
-    let btrfs = root.join("sys/fs/btrfs");
-    let qgroups = read::entries(&btrfs)
-        .into_iter()
-        .find(|entry| entry.contains('-'))
-        .map(|uuid| btrfs.join(uuid).join("qgroups"));
-    let bytes = qgroups.and_then(|dir| snapshot_bytes(&dir, &mounted));
+    let bytes = qgroups(root).and_then(|dir| snapshot_bytes(&dir, &mounted));
     let entries = read::entries(&root.join(".snapshots"));
     let count = entries
         .iter()
