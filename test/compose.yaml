@@ -11,7 +11,7 @@ x-limits: &limits
 
 services:
   dotfiles:
-    image: dotfiles-test:latest
+    image: ${DOTFILES_TEST_IMAGE:?test/run names the checkout's image}
     build:
       context: ..
       dockerfile: test/Dockerfile
@@ -36,6 +36,15 @@ services:
         source: ${DOTFILES_TEST_OUT:-./out}
         target: /out
       - dotfiles-nix:/nix
+      # Each container's own nix-daemon socket. The store is the volume every
+      # run shares, and its default socket path is in there too: a second
+      # run's daemon would take the path over, and the first run's clients
+      # would lose their daemon when the second container ends. Two daemons
+      # on one store are safe, as two Nix processes on one machine are: the
+      # database, the build users and the store paths are held by file locks,
+      # which hold across containers on one kernel.
+      - type: tmpfs
+        target: /nix/var/nix/daemon-socket
       # The machine's own Nix store, read-only: a substituter ahead of the
       # binary caches, so what the machine has built is never built again
       # (harness.sh, host_store). test/run points this at an empty folder
@@ -53,7 +62,7 @@ services:
   # One-shot: a CA and a TLS certificate for "vw" (bw only talks https).
   vw-certs:
     profiles: [bitwarden]
-    image: dotfiles-test:latest
+    image: ${DOTFILES_TEST_IMAGE:?test/run names the checkout's image}
     container_name: dotfiles-test-vw-certs
     network_mode: none
     volumes:

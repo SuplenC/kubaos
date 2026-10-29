@@ -57,18 +57,20 @@ zrun() { as_user zsh -l -c "$1"; }
 # again. That store is mounted read-only, hence read-only=true (no locks), and
 # its paths carry no signature, hence trusted. They are the daemon's options,
 # not nix.conf lines, so nix.conf stays what system/60-nix.sh writes.
+# The socket's directory is the container's own (compose.yaml), so the daemon
+# is this container's, beside other runs' daemons on the same store.
 start_nix_daemon() {
+  local socket=/nix/var/nix/daemon-socket/socket
   local opts=(--option max-jobs "${DOTFILES_TEST_NIX_JOBS:-2}" --option cores "${DOTFILES_TEST_NIX_CORES:-4}")
   if [[ -d /host/nix/store && -f /host/nix/var/nix/db/db.sqlite ]]; then
     opts+=(--option extra-experimental-features read-only-local-store
       --option extra-substituters 'local?root=/host&read-only=true&trusted=true&priority=10')
   fi
-  [[ -S /nix/var/nix/daemon-socket/socket ]] && rm -f /nix/var/nix/daemon-socket/socket
   if ! pgrep -x nix-daemon >/dev/null; then
     "$NIX_BIN/nix-daemon" "${opts[@]}" >"$LOGS/nix-daemon.log" 2>&1 &
   fi
   for _ in $(seq 50); do
-    [[ -S /nix/var/nix/daemon-socket/socket ]] && return 0
+    [[ -S $socket ]] && return 0
     sleep 0.1
   done
   die "nix-daemon didn't start ($LOGS/nix-daemon.log)"
@@ -105,6 +107,23 @@ trust_local_inputs() {
     git config --system --get-all safe.directory | grep -qxF -- "$dir" ||
       git config --system --add safe.directory "$dir"
   done
+}
+
+# cache_lock NAME: hold $CACHE/locks/NAME until the calling (sub)shell ends,
+# saying so on stderr first when another run's container holds it, so the
+# caller's output stays its own. It guards what runs
+# write into the cache volume, which every run shares and the first use fills:
+# two Lazy restores in one plugin tree break each other's checkouts. flock
+# holds across containers, as they share the kernel.
+cache_lock() {
+  local fd
+  install -d "$CACHE/locks"
+  exec {fd}>"$CACHE/locks/$1"
+  flock -n "$fd" && return 0
+  note "waiting for another run's $1 cache" >&2
+  # A check's output goes to its log; the run's console hears of the wait too.
+  [[ -n ${CONSOLE:-} ]] && note "waiting for another run's $1 cache" >&"$CONSOLE"
+  flock "$fd"
 }
 
 # Download caches that survive containers (never config): Nix's fetcher and
