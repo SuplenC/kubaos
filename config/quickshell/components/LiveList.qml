@@ -7,7 +7,11 @@ import "keyed.js" as Keyed
 // (`keyed.js`), so only what changed changes. Its delegates are `LiveRow`s: a row that arrives
 // opens its room and fades in, one that leaves fades and gives its room back, taking no press
 // while it goes, and one that changes place glides there. The keyboard skips the rows whose
-// `kind` isn't "row" (section labels, a note).
+// `kind` is neither "row" nor "action" (section labels, a note).
+//
+// It scrolls only when the person scrolls it, or moves the selection with the keys: a scan moves
+// the current row as it re-sorts, and a view that followed it would carry the Known rows out of
+// sight.
 //
 // Each row carries the 4 after it, so a leaving row gives back its gap with its room, and the
 // list's bottom margin is the well's 12 less that 4.
@@ -19,9 +23,10 @@ NavList {
     readonly property bool animated: root.visible
 
     spacing: 0
+    highlightFollowsCurrentItem: false
     topMargin: K.Tokens.space.s12
     bottomMargin: K.Tokens.space.s8
-    selectable: index => index >= 0 && index < rowModel.count && rowModel.get(index).kind === "row"
+    selectable: index => index >= 0 && index < rowModel.count && ["row", "action"].includes(rowModel.get(index).kind)
     model: ListModel {
         id: rowModel
     }
