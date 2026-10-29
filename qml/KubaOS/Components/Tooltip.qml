@@ -11,7 +11,8 @@ import KubaOS.Components as K
 //
 // Floating (`floating`, the default), the card is drawn on the window's own content item, as a
 // `Hint`'s bubble is, so neither a clipping panel nor what is laid out after the control covers
-// it, and it is no part of the page's layout: the tooltip fills its control, its parent. In place
+// it, and it is no part of the page's layout: the tooltip fills its control, its parent. As a
+// hint's, it shows only while its control shows whole, never for one a scroll has cut. In place
 // (the specimen), it is laid out where it is, as tall as the card.
 Item {
     id: root
@@ -24,6 +25,9 @@ Item {
     // The box the card keeps inside, a panel, rather than the whole window; it opens below where
     // the box leaves no room above.
     property Item within: null
+    // Whether the control shows whole where it is: one scrolled out of its view, even part way,
+    // shows no card, as a `Hint` shows no bubble. Read as the card is placed.
+    property bool inView: true
 
     // What a geometry dump leaves out: a floating card is no part of the page.
     readonly property bool overlay: root.floating
@@ -37,6 +41,7 @@ Item {
     function place(): void {
         if (!root.floating || !root.host || !root.shown)
             return;
+        root.inView = K.Look.unclipped(root);
         const at = root.mapToItem(root.host, 0, 0);
         const box = root.within ? root.within.mapToItem(root.host, 0, 0) : Qt.point(0, 0);
         const left = box.x;
@@ -73,7 +78,7 @@ Item {
         height: card.height
         // Its control's visibility, which it no longer inherits on the window's content item.
         visible: floater.opacity > 0 && root.visible
-        opacity: !root.floating || root.shown ? 1 : 0
+        opacity: !root.floating || root.shown && root.inView ? 1 : 0
 
         Behavior on opacity {
             NumberAnimation {

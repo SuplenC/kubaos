@@ -56,6 +56,22 @@ QtObject {
         return inner >= Tokens.radius.full ? inner : inner + by;
     }
 
+    // Whether `item`'s whole box shows inside every ancestor that clips it. What floats over the
+    // window for a control (a hint, a tooltip) asks this, so a control scrolled out of its view,
+    // even part way, takes what floats for it along.
+    function unclipped(item: Item): bool {
+        for (let clipper = item.parent; clipper; clipper = clipper.parent) {
+            if (!clipper.clip)
+                continue;
+            const at = item.mapToItem(clipper, 0, 0);
+            // A hair over is float error, not a box past the edge.
+            const slack = 1e-3;
+            if (at.x < -slack || at.y < -slack || at.x + item.width > clipper.width + slack || at.y + item.height > clipper.height + slack)
+                return false;
+        }
+        return true;
+    }
+
     // `v` logical pixels moved to the nearest device pixel at `dpr`.
     function snap(v: real, dpr: real): real {
         return Math.round(v * dpr) / dpr;
