@@ -425,5 +425,7 @@ K.Sheet {
 
     NotificationMenu {
         id: menu
+
+        held: root.shown
     }
 }

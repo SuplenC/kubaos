@@ -47,7 +47,12 @@ K.Sheet {
     contentWidth: grid.implicitWidth + K.Tokens.size.rail + columnGap + bodyInset * 2
     contentHeight: body.implicitHeight + pad * 2
 
-    onShownChanged: Time.seconds = shown
+    onShownChanged: {
+        Time.seconds = shown;
+        // Closed by any route, the popup takes the settings' open menu with it.
+        if (!shown)
+            settingsPage.dismiss();
+    }
     // Esc the search let through: out of the settings or the year first.
     Keys.onEscapePressed: event => {
         if (page === "settings") {
@@ -612,6 +617,8 @@ K.Sheet {
         }
 
         ClockSettings {
+            id: settingsPage
+
             visible: root.page === "settings"
         }
 

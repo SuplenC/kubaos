@@ -54,16 +54,29 @@ K.Pressable {
         Qt.callLater(menu.reveal);
     }
 
+    // Closes the menu and gives the keyboard back to the select.
     function hide(): void {
+        root.dismiss();
+        root.forceActiveFocus();
+    }
+
+    // Closes the menu and leaves the keyboard where it is: what holds the select is going (a
+    // panel closing, a page swapped out), and the keyboard goes where that sends it.
+    function dismiss(): void {
         root.open = false;
         root.placed = false;
-        root.forceActiveFocus();
     }
 
     implicitHeight: Tokens.size.control_md
     Accessible.role: Accessible.ComboBox
     Accessible.name: root.options[root.currentIndex] ?? root.placeholder
     onActivated: root.open ? root.hide() : root.show()
+    // The menu floats over the window, out of the select's own visibility, so a select hidden
+    // with what holds it takes its menu along.
+    onVisibleChanged: {
+        if (!root.visible)
+            root.dismiss();
+    }
 
     Rectangle {
         anchors.fill: parent

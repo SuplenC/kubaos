@@ -21,12 +21,19 @@ K.Stack {
         Time.change("set", { key: key, value: value }, error => root.error = error);
     }
 
+    // Closes the holidays menu if it is open, as the popup goes.
+    function dismiss(): void {
+        holidays.dismiss();
+    }
+
     // One country of many: a select, where every country's chip made a wall.
     Section {
         title: "Holidays"
         note: "Marked in the calendar and left out of working days"
 
         K.Select {
+            id: holidays
+
             readonly property var countries: Time.state.countries ?? []
 
             options: ["None", ...countries.map(country => country.name)]
