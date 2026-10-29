@@ -1,14 +1,15 @@
 import QtQuick
 import KubaOS.Components as K
 
-// A progress View: the job it follows, as Kōbō's install screen shows one: its state as the page's
-// one big symbol, its title, a bar while it knows how far it is, and what it last said.
+// A job followed to its end, as Kōbō's install screen shows one: its state as the panel's one big
+// symbol, its title, a bar while it knows how far it is, and what it last said, in a column centred
+// in the panel's room. The Command menu's progress View.
 Item {
     id: view
 
     // `{title, state, progress, message}`, as `KotodamaSearch.jobs` lists them.
     property var job: ({})
-    // Whether things may move: `Settings.menuMotion`, as Menu.qml reads it.
+    // Whether things may move: off, the spinner stands still.
     property bool moves: true
     readonly property bool failed: job.state === "failed"
     readonly property bool succeeded: job.state === "succeeded"

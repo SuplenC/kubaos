@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 
 // The top edge of the frame. Left: workspaces, the live preview (while the home is built from a

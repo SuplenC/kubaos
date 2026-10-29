@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 import "feed.js" as Feed
 
@@ -356,7 +355,7 @@ K.Sheet {
         }
     }
 
-    HeaderFade {
+    K.HeaderFade {
         y: head.height
         width: root.contentWidth
         scrolled: !list.atYBeginning

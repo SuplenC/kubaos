@@ -1,7 +1,6 @@
 import QtQuick
 import Quickshell
 import KubaOS.Components as K
-import qs.components
 import qs.services
 import qs.settings
 import "panel.js" as Panel
@@ -176,7 +175,7 @@ K.Sheet {
         }
     }
 
-    HeaderFade {
+    K.HeaderFade {
         y: head.height
         width: root.contentWidth
         scrolled: scroll.contentY > 0

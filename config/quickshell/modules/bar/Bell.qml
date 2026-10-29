@@ -1,6 +1,5 @@
 import QtQuick
 import KubaOS.Components as K
-import qs.components
 import qs.settings
 import qs.services
 import "../notifications/feed.js" as Feed
@@ -10,7 +9,7 @@ import "../notifications/feed.js" as Feed
 // on, so it says why things are quiet. A click opens or closes the notifications panel. The
 // pointer resting on it a moment asks for the peek (`peeking`), so passing over it shows nothing;
 // with nothing unread there is no peek, and a hint says so.
-Pill {
+K.Pill {
     id: root
 
     // The pointer has rested on the bell long enough for the peek.
