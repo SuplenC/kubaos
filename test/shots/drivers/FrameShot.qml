@@ -201,7 +201,8 @@ QtObject {
     }
 
     // The system monitor scrolled to its end once it has opened, through its `K.Scroll`, and for
-    // `kill` the shown process's Kill asking first.
+    // `kill` the shown process's Kill asking first. It stays at the end as the body lengthens: a
+    // process's details arrive from the stand-in engine after the panel opens.
     property Timer sysmonPose: Timer {
         interval: 700
         onTriggered: {
@@ -210,10 +211,12 @@ QtObject {
             if (driver.state === "kill" && processes)
                 processes.confirming = "kill";
             const scroll = panel ? driver.find(panel, it => it.travel !== undefined && it.contentY !== undefined) : null;
-            if (scroll)
-                scroll.contentY = scroll.travel;
-            else
+            if (!scroll) {
                 console.warn("shot: no system monitor scroll found");
+                return;
+            }
+            scroll.contentY = scroll.travel;
+            scroll.travelChanged.connect(() => scroll.contentY = scroll.travel);
         }
     }
 
