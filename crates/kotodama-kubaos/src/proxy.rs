@@ -1,5 +1,5 @@
 //! "Proxy status" in the menu: the work network's switch, each part of the profile and whether it
-//! is up, and the tunnel's endpoint, last handshake and bytes moved, read live when the Item runs.
+//! is up, and the VPN's type, server, last handshake and bytes moved, read live when the Item runs.
 //!
 //! # Owns
 //!
@@ -7,7 +7,7 @@
 //!
 //! # Not here
 //!
-//! - The rows: `kubaos_proxy::status`. Proxy on and off, importing IT's config and opening the
+//! - The rows: `kubaos_proxy::status`. Proxy on and off, importing IT's VPN config and opening the
 //!   profile: actions of the registry (`config/kotodama/kubaos.toml`), which run `kubaos-proxy`.
 
 use kotodama_protocol::Action;
@@ -36,13 +36,14 @@ pub fn item() -> Item {
         kind: kind(KIND),
         identity: None,
         title: "Proxy status".to_owned(),
-        subtitle: Some("The work network: each part, whether it is up, and the tunnel's last handshake".to_owned()),
+        subtitle: Some("The work network: each part, whether it is up, and the VPN's last handshake".to_owned()),
         icon: Some(ICON.to_owned()),
         keyword: None,
         keywords: [
             "proxy",
             "vpn",
             "wireguard",
+            "openvpn",
             "work network",
             "tunnel",
             "handshake",
@@ -97,7 +98,7 @@ pub fn view(rows: &[Row]) -> View {
     }
 }
 
-/// The rows as the machine has them now: the profile, what is up, and the tunnel read live.
+/// The rows as the machine has them now: the profile, what is up, and the VPN read live.
 pub fn now() -> Vec<Row> {
     let Some(paths) = kubaos_proxy::Paths::from_env() else {
         return vec![Row {

@@ -29,7 +29,7 @@ import qs.modules.frame
 //                  under the well, past the toolbar), each with the history cleared, scanning (a
 //                  Wi-Fi scan that has found nothing yet, the history cleared), proxy (the Proxy
 //                  tile's detail open, the local network let through), proxy-lan-off (the same,
-//                  the local network blocked)
+//                  the local network blocked), proxy-openvpn (the detail of an OpenVPN VPN)
 //   clock: answer (a question typed into the search), settings, select-closed (the settings'
 //          holidays select open, then the popup closed as a keybind closes it)
 //   sysmon: "" (a disk close to full: Breaking a sweat), fine (every reading fine), critical (the
@@ -578,6 +578,8 @@ QtObject {
             Net.networks = [];
         if (driver.panel === "controlcenter" && driver.state === "proxy-lan-off")
             Proxy.allowLocalNetwork = false;
+        if (driver.panel === "controlcenter" && driver.state === "proxy-openvpn")
+            Proxy.openvpn = true;
         // Every one unread, so the peek has more than its three cards.
         if (driver.panel === "notifications" && driver.state === "peek")
             Notifs.unread = Notifs.history.slice();

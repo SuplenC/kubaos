@@ -404,7 +404,7 @@ fn networkmanager_dropping_the_tunnel_names_it_once() {
 
     assert_eq!(
         chain(&err),
-        "The tunnel couldn't be put in place: NetworkManager dropped it on the way up (journalctl -u \
+        "The VPN couldn't be put in place: NetworkManager dropped it on the way up (journalctl -u \
          NetworkManager says why)"
     );
 }
@@ -418,7 +418,7 @@ fn a_tunnel_without_its_key_names_it_once() {
 
     assert_eq!(
         chain(&err),
-        "The tunnel couldn't be put in place: its keys aren't in the keyring: run kubaos proxy pull (or \
+        "The VPN couldn't be put in place: its secrets aren't in the keyring: run kubaos proxy pull (or \
          import IT's config again)"
     );
 }
@@ -533,7 +533,7 @@ fn a_root_part_dropped_from_the_profile_goes_at_the_next_on() {
     world.on().expect("on");
     for part in &mut world.plan.parts {
         if let Part::Root(args) = part {
-            args.retain(|arg| !matches!(arg, RootArg::KillSwitch(_)));
+            args.retain(|arg| !matches!(arg, RootArg::KillSwitch { .. }));
         }
     }
 
@@ -775,4 +775,127 @@ fn values_reach_gsettings_as_gvariant_strings() {
     assert_eq!(gvariant_str("proxy.corp"), "'proxy.corp'");
     assert_eq!(gvariant_str(r"a'b\c"), r"'a\'b\\c'");
     assert_eq!(sh_quote("it's"), r"'it'\''s'");
+}
+
+/// A home whose profile is a full OpenVPN VPN, its kill switch letting the local network through,
+/// its certificate, keys and login in the keyring, both servers' names resolving, a laptop on
+/// 192.168.1.0/24 and 10.20.5.0/24, and a server that pushes 10.20.0.0/16.
+fn openvpn_world() -> World {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let paths = Paths::under(dir.path());
+    let text = crate::openvpn::tests::inline() + "auth-user-pass\nredirect-gateway def1\n";
+    let config = crate::openvpn::Config::parse(&text, dir.path()).expect("parses");
+    fs::create_dir_all(&paths.network).unwrap();
+    fs::write(paths.network.join("vpn.ovpn"), config.sanitized().render()).unwrap();
+    fs::write(paths.profile(), "[tunnel]\ntype = \"openvpn\"\nconf = \"vpn.ovpn\"\n").unwrap();
+    let profile = Profile::load(&paths.network).expect("the profile");
+    let plan = Plan::for_profile(&profile);
+    let mut fake = Fake::new();
+    let mut credentials = config.credentials.clone();
+    credentials.username = Some(crate::secrets::Secret::new("kuba"));
+    credentials.password = Some(crate::secrets::Secret::new("hunter2"));
+    secrets::store(&mut fake, &Secrets::OpenVpn(credentials)).expect("in the keyring");
+    fake.names
+        .insert("vpn.example.com".to_owned(), vec![ENDPOINT_IP.parse().unwrap()]);
+    fake.names
+        .insert("vpn2.example.com".to_owned(), vec!["203.0.113.9".parse().unwrap()]);
+    fake.ip = r#"[{"ifname":"wlp0s20f3","addr_info":[{"local":"192.168.1.23","prefixlen":24}]},
+        {"ifname":"enp5s0","addr_info":[{"local":"10.20.5.4","prefixlen":24}]},
+        {"ifname":"tun-kubaos","addr_info":[{"local":"10.8.0.2","prefixlen":24}]}]"#
+        .to_owned();
+    fake.routes = r#"[{"dst":"10.20.0.0/16","dev":"tun-kubaos","flags":[]}]"#.to_owned();
+    World {
+        _dir: dir,
+        paths,
+        fake,
+        profile,
+        plan,
+    }
+}
+
+#[test]
+fn an_openvpn_vpn_comes_up_on_its_servers_addresses_with_its_files_only_while_it_does() {
+    let mut world = openvpn_world();
+
+    world.on().expect("on");
+
+    let Some(connection) = &world.fake.tunnel else {
+        panic!("the VPN isn't up");
+    };
+    let Some(crate::tunnel::Prop::Map(data)) = connection["vpn"].get("data") else {
+        panic!("no data: {connection:?}");
+    };
+    assert_eq!(
+        data.get("remote").map(String::as_str),
+        Some("198.51.100.7:1194:udp, 203.0.113.9:443:tcp")
+    );
+    let files: Vec<(&str, u32, &str)> = world
+        .fake
+        .files_at_up
+        .iter()
+        .map(|(key, mode, text)| (key.as_str(), *mode, text.as_str()))
+        .collect();
+    assert_eq!(
+        files,
+        [
+            ("ca", 0o600, crate::openvpn::tests::CA),
+            ("cert", 0o600, crate::openvpn::tests::CERT),
+            ("key", 0o600, crate::openvpn::tests::KEY),
+            ("ta", 0o600, crate::openvpn::tests::TLS_AUTH),
+        ]
+    );
+    assert!(!world.paths.vpn_files().exists(), "the files outlived the activation");
+}
+
+#[test]
+fn an_openvpn_kill_switch_lets_its_servers_out_and_keeps_pushed_ranges_behind_it() {
+    let mut world = openvpn_world();
+
+    world.on().expect("on");
+
+    assert_eq!(
+        helper_runs(&world.fake)[0],
+        "killswitch=server:udp/198.51.100.7/1194,tcp/203.0.113.9/443|lan|192.168.1.0/24 ca=off apt=off \
+         docker=off nix=off chrome=off"
+    );
+    assert_eq!(
+        local_networks_let_through(&world.paths),
+        [Cidr::parse("192.168.1.0/24").unwrap()]
+    );
+}
+
+#[test]
+fn an_openvpn_vpn_comes_back_with_the_kill_switch_up_without_a_lookup() {
+    let mut world = openvpn_world();
+    set_wanted(&world.paths, true).unwrap();
+    world.on().expect("on");
+    world.fake.tunnel = None;
+    world.fake.resolver_down = true;
+
+    let back = world.reconcile();
+
+    assert!(matches!(back, Reconciled::BroughtUp), "{back:?}");
+    assert!(world.fake.tunnel.is_some());
+}
+
+#[test]
+fn an_openvpn_vpn_goes_down_whole_and_leaves_no_file() {
+    let mut world = openvpn_world();
+    world.on().expect("on");
+
+    world.off().expect("off");
+
+    world.all_off();
+    assert!(!world.paths.vpn_files().exists());
+}
+
+#[test]
+fn an_openvpn_vpn_networkmanager_drops_leaves_no_file_either() {
+    let mut world = openvpn_world();
+    world.fake.tunnel_fails = true;
+
+    world.on().expect_err("dropped");
+
+    assert_eq!(world.fake.files_at_up.len(), 4);
+    assert!(!world.paths.vpn_files().exists());
 }

@@ -1,5 +1,5 @@
 //! [`Agent`] on the system bus: NetworkManager's `SecretAgent` interface on a bus connection of its
-//! own, registered with NetworkManager's agent manager while one activation of the tunnel takes.
+//! own, registered with NetworkManager's agent manager while one activation of the VPN takes.
 //!
 //! # Owns
 //!
@@ -7,7 +7,7 @@
 //!
 //! # Not here
 //!
-//! - Which requests get the keys: [`crate::agent`].
+//! - Which requests get the secrets: [`crate::agent`].
 
 #![expect(
     clippy::used_underscore_binding,
@@ -38,7 +38,7 @@ const AGENT_MANAGER_PATH: &str = "/org/freedesktop/NetworkManager/AgentManager";
 /// Where NetworkManager calls every agent, by its API.
 const AGENT_PATH: &str = "/org/freedesktop/NetworkManager/SecretAgent";
 /// The agent's identifier in NetworkManager, which takes one agent of an identifier per user. The
-/// session lock keeps a second `kubaos-proxy` from bringing the tunnel up at the same time.
+/// session lock keeps a second `kubaos-proxy` from bringing the VPN up at the same time.
 const IDENTIFIER: &str = "org.kubaos.proxy";
 
 /// A connection's settings as they come over the bus (`a{sa{sv}}`).
@@ -80,7 +80,7 @@ impl Drop for Registered {
             .bus
             .call_method(Some(NM), AGENT_MANAGER_PATH, Some(AGENT_MANAGER), "Unregister", &());
         if let Err(err) = unregistered {
-            log::debug!("unregistering the tunnel's secret agent: {err}");
+            log::debug!("unregistering the VPN's secret agent: {err}");
         }
     }
 }
@@ -122,7 +122,7 @@ impl SecretAgent {
         };
         match self.agent.answer(&request) {
             Answer::Keys(keys) => {
-                log::info!("gave NetworkManager the tunnel's keys");
+                log::info!("gave NetworkManager the VPN's secrets for {}", request.setting);
                 Ok(settings(&keys))
             }
             Answer::Nothing(refusal) => {
@@ -139,7 +139,7 @@ impl SecretAgent {
     )]
     fn cancel_get_secrets(&self, _connection_path: OwnedObjectPath, _setting_name: String) {}
 
-    /// The keys are saved nowhere, so NetworkManager's request to save them is answered with
+    /// The secrets are saved nowhere, so NetworkManager's request to save them is answered with
     /// nothing done.
     #[expect(
         clippy::unused_self,
@@ -147,7 +147,7 @@ impl SecretAgent {
     )]
     fn save_secrets(&self, _connection: Settings, _connection_path: OwnedObjectPath) {}
 
-    /// The keys are kept nowhere, so there is nothing to delete.
+    /// The secrets are kept nowhere, so there is nothing to delete.
     #[expect(
         clippy::unused_self,
         reason = "NetworkManager calls it with these arguments, and zbus calls it on the object."

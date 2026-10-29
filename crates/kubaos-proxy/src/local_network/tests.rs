@@ -1,4 +1,5 @@
 use super::*;
+use crate::vpn;
 use crate::wireguard::tests::PEER;
 
 fn cidr(text: &str) -> Cidr {
@@ -9,13 +10,14 @@ fn cidrs(texts: &[&str]) -> Vec<Cidr> {
     texts.iter().map(|text| cidr(text)).collect()
 }
 
-/// A full tunnel whose peer routes `allowed` too.
-fn tunnel(allowed: &str) -> Config {
-    Config::parse(&format!(
+/// What a full tunnel whose peer routes `allowed` too routes.
+fn tunnel(allowed: &str) -> Vec<Cidr> {
+    let config = crate::wireguard::Config::parse(&format!(
         "[Interface]\nPrivateKey = {PEER}\nAddress = 10.8.0.2/24\n\
          [Peer]\nPublicKey = {PEER}\nEndpoint = vpn.example.com:51820\nAllowedIPs = 0.0.0.0/0, ::/0{allowed}\n"
     ))
-    .expect("the tunnel")
+    .expect("the tunnel");
+    vpn::Config::WireGuard(config).routes()
 }
 
 /// What `ip -json address show up` says of a laptop on Wi-Fi with Docker running and the tunnel
@@ -106,4 +108,42 @@ fn at_most_the_helpers_count_go_through() {
     let found: Vec<Cidr> = (0..40).map(|n| cidr(&format!("10.0.{n}.1/24"))).collect();
 
     assert_eq!(let_through(&found, &tunnel("")).len(), MAX_NETWORKS);
+}
+
+#[test]
+fn the_routes_on_the_vpns_interface_are_its_ranges_but_the_default_and_the_kernels_own() {
+    let json = r#"[
+      {"dst":"default","dev":"tun-kubaos","flags":[]},
+      {"dst":"10.20.0.0/16","gateway":"10.8.0.1","dev":"tun-kubaos","flags":[]},
+      {"dst":"192.168.1.0/24","dev":"tun-kubaos","flags":[]},
+      {"dst":"10.8.0.0/24","dev":"tun-kubaos","protocol":"kernel","scope":"link","prefsrc":"10.8.0.2","flags":[]},
+      {"type":"local","dst":"10.8.0.2","table":"local","dev":"tun-kubaos","protocol":"kernel","scope":"host","flags":[]},
+      {"type":"broadcast","dst":"10.8.0.255","table":"local","dev":"tun-kubaos","flags":[]},
+      {"dst":"fe80::/64","dev":"tun-kubaos","protocol":"kernel","flags":[]}
+    ]"#;
+
+    let routed = parse_routes(json);
+
+    assert_eq!(
+        routed,
+        cidrs(&["10.20.0.0/16", "192.168.1.0/24", "10.8.0.0/24", "fe80::/64"])
+    );
+    assert!(parse_routes("").is_empty());
+}
+
+#[test]
+fn a_range_a_server_pushed_stays_behind_the_vpn() {
+    let found = parse(IP);
+    let pushed = parse_routes(r#"[{"dst":"192.168.0.0/16","dev":"tun-kubaos","flags":[]}]"#);
+
+    let networks = let_through(&found, &pushed);
+
+    assert_eq!(networks, cidrs(&["2a02:a311:1:2::/64"]));
+}
+
+#[test]
+fn the_openvpn_interface_never_counts_as_a_local_network() {
+    let json = r#"[{"ifname":"tun-kubaos","addr_info":[{"local":"10.8.0.2","prefixlen":24}]}]"#;
+
+    assert!(parse(json).is_empty());
 }

@@ -105,8 +105,12 @@ _Avoid_: KDE Connect (as the feature's name), phone sync
 ## Network
 
 **Proxy**:
-KubaOS's one switch for the work network: a profile of up to four parts (IT's WireGuard tunnel, the work DNS, an HTTP proxy or PAC file, the company's root certificate), which go up together or not at all and never on by themselves.
-_Avoid_: VPN (the tunnel is one part), work mode
+KubaOS's one switch for the work network: a profile of up to four parts (IT's VPN, the work DNS, an HTTP proxy or PAC file, the company's root certificate), which go up together or not at all and never on by themselves.
+_Avoid_: VPN for the whole switch (the VPN is one part), work mode
+
+**VPN**:
+The Proxy's tunnel: IT's WireGuard `.conf` or OpenVPN `.ovpn`, its type read from the file at the import, its secrets in the vault and the keyring. WireGuard and OpenVPN are its types, never its name.
+_Avoid_: WireGuard or OpenVPN for the part itself, tunnel config
 
 ## Power
 

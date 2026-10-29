@@ -1,28 +1,29 @@
 //! What a profile comes to on the machine: the parts to put in place, in the order they go up.
 //!
 //! ```text
-//! tunnel ─▶ root (kill switch, CA, apt, Docker, Nix, Chrome) ─▶ session env ─▶ GNOME ─▶ Docker client ─▶ git
+//! VPN ─▶ root (kill switch, CA, apt, Docker, Nix, Chrome) ─▶ session env ─▶ GNOME ─▶ Docker client ─▶ git
 //! ```
 //!
-//! The tunnel goes first, so the kill switch never blocks the network before the tunnel is
-//! there, and the proxies last, once what they reach is up. Taking them down goes the other way.
+//! The VPN goes first, so the kill switch never blocks the network before the tunnel is there,
+//! and the proxies last, once what they reach is up. Taking them down goes the other way.
 //!
 //! # Owns
 //!
 //! - [`Plan`], its [`Part`]s and their [`Kind`]s, and the root helper's arguments ([`RootArg`]),
-//!   the kill switch's among them ([`KillSwitch`]).
+//!   the kill switch's among them ([`KillSwitch`], [`Server`]).
 //!
 //! # Not here
 //!
 //! - Putting them in place and taking them away: [`crate::apply`].
 
 use std::fmt;
+use std::net::IpAddr;
 
 use crate::local_network;
+use crate::net::Cidr;
 use crate::profile::Dns;
 use crate::profile::Profile;
-use crate::wireguard::Cidr;
-use crate::wireguard::Config;
+use crate::vpn;
 
 /// The variables the session gets, for the programs that read the proxy from the environment.
 pub const ENV_NAMES: [&str; 6] = [
@@ -78,7 +79,7 @@ impl Kind {
     /// What it is, for a person: "the session's proxy variables".
     pub const fn title(self) -> &'static str {
         match self {
-            Kind::Tunnel => "the tunnel",
+            Kind::Tunnel => "the VPN",
             Kind::Root => "the system's parts (apt, Docker, Nix, Chrome, the CA, the kill switch)",
             Kind::Env => "the session's proxy variables",
             Kind::Gnome => "GNOME's proxy settings",
@@ -91,6 +92,24 @@ impl Kind {
 impl fmt::Display for Kind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(self.title())
+    }
+}
+
+/// A VPN server the kill switch lets out to, by its address, port and protocol: how a VPN whose
+/// packets carry no mark of their own (OpenVPN's) still reaches its server. WireGuard's packets
+/// carry the tunnel's mark, which the kill switch lets out whatever their address.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Server {
+    pub tcp: bool,
+    pub addr: IpAddr,
+    pub port: u16,
+}
+
+impl fmt::Display for Server {
+    /// As the root helper takes it: `udp/198.51.100.7/1194`, `tcp/2001:db8::1/443`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let proto = if self.tcp { "tcp" } else { "udp" };
+        write!(f, "{proto}/{}/{}", self.addr, self.port)
     }
 }
 
@@ -108,7 +127,11 @@ pub enum KillSwitch {
 /// again.
 #[derive(Clone, PartialEq, Eq)]
 pub enum RootArg {
-    KillSwitch(KillSwitch),
+    /// What it lets through beside the tunnel, and the VPN's servers it lets out to.
+    KillSwitch {
+        through: KillSwitch,
+        servers: Vec<Server>,
+    },
     /// The certificate, in PEM, which goes on the helper's stdin.
     Ca(String),
     Apt(String),
@@ -137,7 +160,7 @@ impl RootArg {
     /// Its part's name: `apt`.
     pub const fn name(&self) -> &'static str {
         match self {
-            RootArg::KillSwitch(_) => "killswitch",
+            RootArg::KillSwitch { .. } => "killswitch",
             RootArg::Ca(_) => "ca",
             RootArg::Apt(_) => "apt",
             RootArg::Docker { .. } => "docker",
@@ -146,14 +169,25 @@ impl RootArg {
         }
     }
 
-    /// The argument that puts it in place: `apt=http://proxy:3128`, `killswitch=lan|192.168.1.0/24`.
+    /// The argument that puts it in place: `apt=http://proxy:3128`, `killswitch=lan|192.168.1.0/24`,
+    /// `killswitch=server:udp/198.51.100.7/1194|on`.
     pub fn arg(&self) -> String {
         let name = self.name();
         match self {
-            RootArg::KillSwitch(KillSwitch::Strict) => format!("{name}=on"),
-            RootArg::KillSwitch(KillSwitch::LocalNetwork(networks)) => {
-                let networks: Vec<String> = networks.iter().map(ToString::to_string).collect();
-                format!("{name}=lan|{}", networks.join(","))
+            RootArg::KillSwitch { through, servers } => {
+                let to = if servers.is_empty() {
+                    String::new()
+                } else {
+                    let servers: Vec<String> = servers.iter().map(ToString::to_string).collect();
+                    format!("server:{}|", servers.join(","))
+                };
+                match through {
+                    KillSwitch::Strict => format!("{name}={to}on"),
+                    KillSwitch::LocalNetwork(networks) => {
+                        let networks: Vec<String> = networks.iter().map(ToString::to_string).collect();
+                        format!("{name}={to}lan|{}", networks.join(","))
+                    }
+                }
             }
             RootArg::Ca(_) => format!("{name}=-"),
             RootArg::Apt(proxy) => format!("{name}={proxy}"),
@@ -200,15 +234,19 @@ pub struct DockerClient {
     pub no_proxy: String,
 }
 
-/// The tunnel: its `.conf` without the keys, and the work DNS on its link.
+/// The VPN: its config without the secrets, and the work DNS on its link.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tunnel {
-    pub config: Config,
+    pub config: vpn::Config,
     pub dns: Dns,
 }
 
 /// One part, with what it puts in place.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "A plan holds a handful of parts, made once a switch; boxing the VPN saves nothing."
+)]
 pub enum Part {
     Tunnel(Tunnel),
     Root(Vec<RootArg>),
@@ -251,7 +289,7 @@ impl Plan {
             }));
             if tunnel.keys_on_disk {
                 warnings.push(format!(
-                    "{} holds the tunnel's keys in plain text: import it (kubaos proxy import) and delete \
+                    "{} holds the VPN's secrets in plain text: import it (kubaos proxy import) and delete \
                      that copy",
                     tunnel.file.display()
                 ));
@@ -272,11 +310,14 @@ impl Plan {
         let no_proxy = profile.http.no_proxy.join(",");
         let mut root = Vec::new();
         if profile.kill_switch() {
-            root.push(RootArg::KillSwitch(if profile.allow_local_network() {
-                KillSwitch::LocalNetwork(Vec::new())
-            } else {
-                KillSwitch::Strict
-            }));
+            root.push(RootArg::KillSwitch {
+                through: if profile.allow_local_network() {
+                    KillSwitch::LocalNetwork(Vec::new())
+                } else {
+                    KillSwitch::Strict
+                },
+                servers: Vec::new(),
+            });
         }
         if let Some(ca) = &profile.ca {
             root.push(RootArg::Ca(ca.pem.clone()));
@@ -349,40 +390,68 @@ impl Plan {
         self.kill_switch().is_some()
     }
 
-    /// The kill switch the plan puts up.
+    /// What the kill switch the plan puts up lets through beside the tunnel.
     pub fn kill_switch(&self) -> Option<&KillSwitch> {
+        match self.kill_switch_arg()? {
+            RootArg::KillSwitch { through, .. } => Some(through),
+            _ => None,
+        }
+    }
+
+    /// The root helper's argument for the kill switch the plan puts up.
+    pub fn kill_switch_arg(&self) -> Option<&RootArg> {
         self.parts.iter().find_map(|part| match part {
-            Part::Root(args) => args.iter().find_map(|arg| match arg {
-                RootArg::KillSwitch(kill_switch) => Some(kill_switch),
-                _ => None,
-            }),
+            Part::Root(args) => args.iter().find(|arg| matches!(arg, RootArg::KillSwitch { .. })),
             _ => None,
         })
     }
 
-    /// The plan with its kill switch letting through those of the `found` ranges that
-    /// [`local_network::let_through`] allows beside its tunnel, when it lets the local networks
-    /// through at all.
-    #[must_use]
-    pub fn with_local_networks(&self, found: &[Cidr]) -> Plan {
-        let mut plan = self.clone();
-        let Some(tunnel) = plan.parts.iter().find_map(|part| match part {
-            Part::Tunnel(tunnel) => Some(tunnel.config.clone()),
+    /// The VPN's config, when the plan has one.
+    pub fn vpn(&self) -> Option<&vpn::Config> {
+        self.parts.iter().find_map(|part| match part {
+            Part::Tunnel(tunnel) => Some(&tunnel.config),
             _ => None,
-        }) else {
-            return plan;
-        };
+        })
+    }
+
+    /// The kill switch's argument, changed by `change`.
+    fn with_kill_switch(&self, change: impl Fn(&mut KillSwitch, &mut Vec<Server>)) -> Plan {
+        let mut plan = self.clone();
         for part in &mut plan.parts {
             let Part::Root(args) = part else {
                 continue;
             };
             for arg in args {
-                if let RootArg::KillSwitch(KillSwitch::LocalNetwork(networks)) = arg {
-                    *networks = local_network::let_through(found, &tunnel);
+                if let RootArg::KillSwitch { through, servers } = arg {
+                    change(through, servers);
                 }
             }
         }
         plan
+    }
+
+    /// The plan with its kill switch letting through those of the `found` ranges that
+    /// [`local_network::let_through`] allows beside its VPN, when it lets the local networks
+    /// through at all. `routed` are the ranges the VPN's interface carries beside those its config
+    /// names: the routes an OpenVPN server pushed.
+    #[must_use]
+    pub fn with_local_networks(&self, found: &[Cidr], routed: &[Cidr]) -> Plan {
+        let Some(vpn) = self.vpn() else {
+            return self.clone();
+        };
+        let mut behind = vpn.routes();
+        behind.extend(routed.iter().filter(|cidr| !cidr.is_default()));
+        self.with_kill_switch(|through, _| {
+            if let KillSwitch::LocalNetwork(networks) = through {
+                *networks = local_network::let_through(found, &behind);
+            }
+        })
+    }
+
+    /// The plan with its kill switch letting out to `servers`, the VPN's servers by address.
+    #[must_use]
+    pub fn with_servers(&self, servers: &[Server]) -> Plan {
+        self.with_kill_switch(|_, to| *to = servers.to_vec())
     }
 }
 

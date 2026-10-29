@@ -12,12 +12,16 @@
 # kubaos-proxy-write's parts:
 #
 #   killswitch=on|off              the nftables table inet kubaos_proxy: while on, nothing leaves
-#                                  but through the tunnel (wg-kubaos), the tunnel's own packets,
-#                                  DHCP, IPv6 neighbour discovery, and container bridges
+#                                  but through the VPN (wg-kubaos for WireGuard, tun-kubaos for
+#                                  OpenVPN), WireGuard's own packets (by their mark), DHCP, IPv6
+#                                  neighbour discovery, and container bridges
 #   killswitch=lan|RANGES          the same, and the local network too: link-local ranges,
 #                                  discovery's multicast and broadcast (mDNS, SSDP, KDE Connect)
 #                                  and RANGES, the machine's own networks; a DNS lookup still
-#                                  goes nowhere but through the tunnel
+#                                  goes nowhere but through the VPN
+#   killswitch=server:SERVERS|on, killswitch=server:SERVERS|lan|RANGES
+#                                  either, and the VPN's own packets to SERVERS too: an OpenVPN
+#                                  server, which its packets reach outside the tunnel unmarked
 #   ca=-|off                       the company's root certificate, one PEM certificate on stdin:
 #                                  in the system's trust store (update-ca-certificates, which Nix
 #                                  reads too) and Chrome's policy (CACertificates); a running
@@ -29,13 +33,15 @@
 #   chrome=proxy|URL|NO_PROXY, chrome=pac|URL, chrome=off
 #                                  Chrome's proxy policy (ProxySettings)
 #   off                            every part off
-#   stats                          the tunnel's latest handshake with each peer, from wg:
+#   stats                          a WireGuard VPN's latest handshake with each peer, from wg:
 #                                  `PUBLIC-KEY EPOCH` lines
 #
 # URL is http:// or https://, a host and a port, nothing else: no user, password or path.
 # NO_PROXY is hosts, domains and ranges joined by commas.
 # RANGES is at most 32 ranges joined by commas, none at all allowed, each by its first address
 # and a prefix of at least 1: 192.168.1.0/24, 2a02:a311:1:2::/64.
+# SERVERS is 1 to 16 servers joined by commas, each udp or tcp, an address and a port, joined by
+# slashes: udp/198.51.100.7/1194, tcp/2001:db8::1/443.
 #
 # The pins: a CA and a proxy put in place as root redirect and read every program's traffic, so
 # kubaos-proxy-write, which polkit lets an admin at the machine run without a password, puts in
@@ -64,9 +70,10 @@ trap '' PIPE
 # crates/kubaos-proxy/tests/helper.rs). pkexec clears the environment, so it never reaches a run
 # from the Proxy.
 ROOT="${KUBAOS_PROXY_ROOT:-}"
-# The tunnel's interface and the mark of its own packets, as crates/kubaos-proxy/src/tunnel.rs
-# gives them to NetworkManager. Keep the three the same.
-INTERFACE=wg-kubaos
+# The VPN's interfaces, WireGuard's first, as crates/kubaos-proxy/src/vpn.rs names them, and the
+# mark of WireGuard's own packets, as crates/kubaos-proxy/src/tunnel.rs gives it to
+# NetworkManager. Keep them the same.
+INTERFACES=(wg-kubaos tun-kubaos)
 FWMARK=0x6b6f
 TABLE=kubaos_proxy
 PINS="$ROOT/etc/kubaos/proxy-pins"
@@ -82,6 +89,9 @@ MAX_CA_BYTES=65536
 # The most local networks the kill switch lets through, as crates/kubaos-proxy/src/local_network.rs
 # gives them: more than any laptop's interfaces hold.
 MAX_NETWORKS=32
+# The most VPN servers the kill switch lets out to, as crates/kubaos-proxy/src/openvpn.rs takes
+# them: more than any config lists.
+MAX_SERVERS=16
 
 URL_RE='^https?://([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?)*|\[[0-9A-Fa-f:.]+\]):[0-9]{1,5}$'
 NO_PROXY_RE='^[A-Za-z0-9.:/*_-]+(,[A-Za-z0-9.:/*_-]+)*$'
@@ -187,6 +197,23 @@ ranges_ok() {
   done
 }
 
+# servers_ok SERVERS: 1 to MAX_SERVERS servers joined by commas, each PROTO/ADDRESS/PORT: udp or
+# tcp, an IPv4 address or an IPv6 one in lower case, a port from 1 to 65535.
+servers_ok() {
+  local server addr port
+  local -a servers
+  [[ $1 =~ ^[0-9a-z./:]+(,[0-9a-z./:]+)*$ ]] || return 1
+  IFS=, read -r -a servers <<<"$1"
+  ((${#servers[@]} >= 1 && ${#servers[@]} <= MAX_SERVERS)) || return 1
+  for server in "${servers[@]}"; do
+    [[ $server =~ ^(udp|tcp)/([0-9a-f.:]+)/([1-9][0-9]{0,4})$ ]] || return 1
+    addr="${BASH_REMATCH[2]}"
+    port="${BASH_REMATCH[3]}"
+    ((port <= 65535)) || return 1
+    v4_ok "$addr/32" || v6_ok "$addr/128" || return 1
+  done
+}
+
 # put FILE MODE: stdin into FILE, whole or not at all.
 put() {
   local file="$1" mode="$2" tmp
@@ -243,10 +270,16 @@ valid() {
   [[ $value == off ]] && [[ $name =~ ^(killswitch|ca|apt|docker|nix|chrome)$ ]] && return 0
   case "$name" in
     killswitch)
+      if [[ $value == server:* ]]; then
+        [[ $value == *"|"* ]] || { fail "killswitch=$value isn't server:SERVERS|on or server:SERVERS|lan|RANGES"; return; }
+        url="${value%%|*}"
+        servers_ok "${url#server:}" || { fail "killswitch=$value: ${url#server:} isn't servers (udp/198.51.100.7/1194)"; return; }
+        value="${value#*|}"
+      fi
       case "$value" in
         on) ;;
         lan\|*) ranges_ok "${value#lan|}" || fail "killswitch=$value: ${value#lan|} isn't ranges (192.168.1.0/24,fd00::/64)" ;;
-        *) fail "killswitch=$value isn't on, lan|RANGES or off" ;;
+        *) fail "killswitch=$value isn't on, lan|RANGES or off, after server:SERVERS| or alone" ;;
       esac
       ;;
     ca) [[ $value == - ]] || fail "ca=$value isn't - (the certificate on stdin) or off" ;;
@@ -319,11 +352,44 @@ local_network() {
   done
 }
 
+# servers SERVERS: the kill switch's rules that let the VPN's own packets out to each server, by
+# its address, protocol and port.
+servers() {
+  local server proto addr port
+  local -a servers
+  IFS=, read -r -a servers <<<"$1"
+  for server in "${servers[@]}"; do
+    IFS=/ read -r proto addr port <<<"$server"
+    if [[ $addr == *:* ]]; then
+      printf '    ip6 daddr %s %s dport %s accept\n' "$addr" "$proto" "$port"
+    else
+      printf '    ip daddr %s %s dport %s accept\n' "$addr" "$proto" "$port"
+    fi
+  done
+}
+
+# interfaces CHAIN: the rules that let the VPN's interfaces through, out of each and, on the
+# forward chain, into each.
+interfaces() {
+  local interface
+  for interface in "${INTERFACES[@]}"; do
+    printf '    oifname "%s" accept\n' "$interface"
+    [[ $1 == forward ]] && printf '    iifname "%s" accept\n' "$interface"
+  done
+}
+
 killswitch() {
-  local lan=""
-  case "$1" in
+  local value="$1" lan="" to="" out forward
+  if [[ $value == server:* ]]; then
+    to="${value%%|*}"
+    to="$(servers "${to#server:}")"
+    value="${value#*|}"
+  fi
+  case "$value" in
     on | lan\|*)
-      [[ $1 == lan\|* ]] && lan="$(local_network "${1#lan|}")"
+      [[ $value == lan\|* ]] && lan="$(local_network "${value#lan|}")"
+      out="$(interfaces output)"
+      forward="$(interfaces forward)"
       # HAZARD: keep this one nft run. The empty table and its delete make it replace the table in
       # one transaction whether or not it was there; split in two, traffic would leak in between,
       # and the delete would fail when the table isn't there yet.
@@ -334,8 +400,9 @@ table inet $TABLE {
   chain output {
     type filter hook output priority filter; policy accept;
     oifname "lo" accept
-    oifname "$INTERFACE" accept
+$out
     meta mark $FWMARK accept
+$to
     oifname { "docker0", "virbr0" } accept
     oifname "br-*" accept
     oifname "veth*" accept
@@ -348,8 +415,7 @@ $lan
   }
   chain forward {
     type filter hook forward priority filter; policy accept;
-    oifname "$INTERFACE" accept
-    iifname "$INTERFACE" accept
+$forward
     oifname { "docker0", "virbr0" } accept
     oifname "br-*" accept
     oifname "veth*" accept
@@ -467,7 +533,7 @@ docker_roots() {
 
 stats() {
   command -v wg >/dev/null || { fail "wg isn't installed (wireguard-tools, kubaos update installs it)"; return; }
-  wg show "$INTERFACE" latest-handshakes || fail "wg can't read $INTERFACE"
+  wg show "${INTERFACES[0]}" latest-handshakes || fail "wg can't read ${INTERFACES[0]}"
 }
 
 # part PART=VALUE: puts one valid, pinned part in place, or takes it away.

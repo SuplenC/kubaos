@@ -452,6 +452,110 @@ fn a_range_that_isnt_a_networks_first_address_is_refused() {
 }
 
 #[test]
+fn the_kill_switch_lets_either_vpns_interface_through() {
+    let root = Root::new();
+
+    let run = root.run(&["killswitch=on"], "");
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let tables = root.tables();
+    let rules = output_rules(&tables);
+    let reject = rules.len() - 1;
+    for interface in ["wg-kubaos", "tun-kubaos"] {
+        let out = format!("oifname \"{interface}\" accept");
+        assert!(
+            rules.iter().position(|rule| *rule == out).is_some_and(|at| at < reject),
+            "{rules:#?}"
+        );
+        assert!(tables.contains(&format!("iifname \"{interface}\" accept")), "{tables}");
+    }
+}
+
+#[test]
+fn the_kill_switch_lets_an_openvpn_servers_own_packets_out_and_nothing_else_to_it() {
+    let root = Root::new();
+    let arg = "killswitch=server:udp/198.51.100.7/1194,tcp/2001:db8::1/443|lan|192.168.1.0/24";
+
+    let run = root.run(&[arg], "");
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert_eq!(run.stdout, format!("done {arg}\n"));
+    let rules = output_rules(&root.tables());
+    let at = |rule: &str| {
+        rules
+            .iter()
+            .position(|r| r == rule)
+            .unwrap_or_else(|| panic!("no `{rule}` in {rules:#?}"))
+    };
+    let lookups = at("udp dport { 53, 853 } reject with icmpx admin-prohibited");
+    for rule in [
+        "ip daddr 198.51.100.7 udp dport 1194 accept",
+        "ip6 daddr 2001:db8::1 tcp dport 443 accept",
+    ] {
+        assert!(at(rule) < lookups, "{rule} comes after the lookups are refused");
+    }
+    assert!(at("ip daddr 192.168.1.0/24 accept") < at("meta l4proto tcp reject with tcp reset"));
+    assert!(
+        !rules
+            .iter()
+            .any(|rule| rule.contains("198.51.100.7") && !rule.contains("dport 1194")),
+        "{rules:#?}"
+    );
+}
+
+#[test]
+fn a_strict_kill_switch_with_a_server_lets_only_the_server_out() {
+    let root = Root::new();
+
+    let run = root.run(&["killswitch=server:tcp/203.0.113.9/443|on"], "");
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let rules = output_rules(&root.tables());
+    let through: Vec<&String> = rules.iter().filter(|rule| rule.contains("daddr")).collect();
+    assert_eq!(through, ["ip daddr 203.0.113.9 tcp dport 443 accept"]);
+    assert_eq!(
+        rules.last().map(String::as_str),
+        Some("reject with icmpx admin-prohibited")
+    );
+}
+
+#[test]
+fn a_server_that_isnt_a_protocol_an_address_and_a_port_is_refused() {
+    let seventeen = vec!["udp/198.51.100.7/1194"; 17].join(",");
+    let refused = [
+        "server:|on".to_owned(),
+        "server:udp/198.51.100.7/1194".to_owned(),
+        "server:udp/198.51.100.7/1194|maybe".to_owned(),
+        "server:sctp/198.51.100.7/1194|on".to_owned(),
+        "server:udp/vpn.example.com/1194|on".to_owned(),
+        "server:udp/198.51.100.7|on".to_owned(),
+        "server:udp/198.51.100.7/0|on".to_owned(),
+        "server:udp/198.51.100.7/65536|on".to_owned(),
+        "server:udp/198.51.100.7/01194|on".to_owned(),
+        "server:udp/256.1.1.1/1194|on".to_owned(),
+        "server:udp/198.51.100.0/24/1194|on".to_owned(),
+        "server:tcp/2001:DB8::1/443|on".to_owned(),
+        "server:tcp/1::2::3/443|on".to_owned(),
+        "server:udp/198.51.100.7/1194,|on".to_owned(),
+        "server:udp/198.51.100.7/1194 accept|on".to_owned(),
+        "server:udp/198.51.100.7/1194; flush ruleset|on".to_owned(),
+        "server:udp/198.51.100.7/1194\naccept|on".to_owned(),
+        "server:$(reboot)|on".to_owned(),
+        "server:udp/198.51.100.7/1194|server:udp/198.51.100.8/1194|on".to_owned(),
+        format!("server:{seventeen}|on"),
+    ];
+    for value in refused {
+        let root = Root::new();
+
+        let run = root.run(&[&format!("killswitch={value}")], "");
+
+        assert_eq!(run.code, Some(1), "{value:?}: {}", run.stderr);
+        assert_eq!(run.stdout, "", "{value:?}");
+        nothing_written(&root);
+    }
+}
+
+#[test]
 fn what_an_admin_didnt_pin_changes_nothing_and_says_so() {
     let root = Root::new();
     let evil = certificate();

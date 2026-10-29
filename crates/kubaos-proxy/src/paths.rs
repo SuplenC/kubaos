@@ -17,8 +17,6 @@ use kubaos_user_layer::App;
 
 /// The profile's file in the user layer's network folder.
 pub const PROFILE: &str = "proxy.toml";
-/// The tunnel's `.conf` without its keys, beside the profile, as `kubaos-proxy import` writes it.
-pub const DEFAULT_CONF: &str = "wireguard.conf";
 /// The root helper, as `install_proxy_helper` (`system/lib.sh`) installs it.
 pub const HELPER: &str = "/usr/local/libexec/kubaos-proxy-write";
 /// The same helper by its other name, which pins what the first may put in place, under a polkit
@@ -30,7 +28,7 @@ pub const PKEXEC: &str = "/usr/bin/pkexec";
 /// Every place the Proxy reads or writes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Paths {
-    /// The user layer's network folder: `proxy.toml`, the `.conf`, the CA.
+    /// The user layer's network folder: `proxy.toml`, the VPN's config, the CA.
     pub network: PathBuf,
     /// `~/.local/state/kubaos-proxy`: what is applied, and git's include. Not `XDG_STATE_HOME`:
     /// `config/git/config` names the include by this path.
@@ -39,7 +37,7 @@ pub struct Paths {
     pub runtime: PathBuf,
     /// Docker's client config folder: `$DOCKER_CONFIG`, else `~/.docker`.
     pub docker: PathBuf,
-    /// `/sys`, where the tunnel's byte counts are.
+    /// `/sys`, where the VPN's byte counts are.
     pub sys: PathBuf,
 }
 
@@ -97,6 +95,11 @@ impl Paths {
         self.session().join("wanted")
     }
 
+    /// An OpenVPN VPN's certificates and keys while NetworkManager's plugin reads them.
+    pub fn vpn_files(&self) -> PathBuf {
+        self.session().join("vpn")
+    }
+
     /// Taken by whatever changes the Proxy, so the service and a command never interleave.
     pub fn lock(&self) -> PathBuf {
         self.session().join("lock")
@@ -142,8 +145,9 @@ impl Paths {
         self.session().join("env-before")
     }
 
-    /// The address each peer's endpoint name last resolved to: with the kill switch up, the
-    /// tunnel comes back on it without a lookup outside the tunnel.
+    /// The address each VPN server's name last resolved to: with the kill switch up, the VPN comes
+    /// back on it without a lookup outside the tunnel, and the kill switch lets an OpenVPN server
+    /// out by it.
     pub fn endpoints(&self) -> PathBuf {
         self.state.join("endpoints")
     }

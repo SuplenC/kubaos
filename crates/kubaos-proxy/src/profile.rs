@@ -1,9 +1,10 @@
 //! The Proxy's profile, `~/.config/kubaos/desktop/network/proxy.toml`, and the files it names
-//! beside it: the tunnel's `.conf` without its keys and the company's root certificate.
+//! beside it: the VPN's config without its secrets and the company's root certificate.
 //!
 //! ```toml
 //! [tunnel]
-//! conf = "wireguard.conf"     # written by `kubaos-proxy import`
+//! type = "openvpn"            # or "wireguard", which a profile without it is
+//! conf = "vpn.ovpn"           # written by `kubaos-proxy import`
 //! kill_switch = true          # a full tunnel blocks what would leave outside it
 //! allow_local_network = true  # but the network you're on
 //! vault_item = "kubaos-proxy" # the vault item with the keys
@@ -28,8 +29,9 @@
 //! # Owns
 //!
 //! - Reading and checking the profile ([`Profile::load`]), its values ([`ProxyUrl`], [`pac_ok`],
-//!   [`no_proxy_ok`]), naming the tunnel's `.conf` in it ([`set_conf`]), and the local network's
-//!   setting ([`local_network_allowed`], [`set_local_network`]).
+//!   [`no_proxy_ok`]), naming the VPN's config and its type in it ([`set_conf`]), reading a config
+//!   to import ([`read_conf`]), and the local network's setting ([`local_network_allowed`],
+//!   [`set_local_network`]).
 //!
 //! # Not here
 //!
@@ -44,12 +46,11 @@ use std::path::PathBuf;
 
 use serde::Deserialize;
 
-use crate::wireguard;
-use crate::wireguard::Config;
-use crate::wireguard::ParseError;
-use crate::wireguard::is_hostname;
+use crate::net::is_hostname;
+use crate::vpn;
+use crate::vpn::Type;
 
-/// The vault item with the tunnel's keys, when the profile names none.
+/// The vault item with the VPN's secrets, when the profile names none.
 pub const DEFAULT_VAULT_ITEM: &str = "kubaos-proxy";
 
 /// Whether the kill switch lets the local networks through when the profile doesn't say: on, so
@@ -75,6 +76,8 @@ struct Raw {
 #[derive(Debug, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct RawTunnel {
+    #[serde(rename = "type")]
+    kind: Option<String>,
     conf: Option<String>,
     kill_switch: bool,
     allow_local_network: bool,
@@ -84,6 +87,7 @@ struct RawTunnel {
 impl Default for RawTunnel {
     fn default() -> Self {
         RawTunnel {
+            kind: None,
             conf: None,
             kill_switch: true,
             allow_local_network: DEFAULT_ALLOW_LOCAL_NETWORK,
@@ -113,20 +117,20 @@ struct RawCa {
     file: Option<String>,
 }
 
-/// The tunnel: IT's `.conf`, without its keys.
+/// The VPN: IT's config, without its secrets.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tunnel {
     pub file: PathBuf,
-    pub config: Config,
+    pub config: vpn::Config,
     /// A full tunnel blocks everything that would leave outside it while it is up.
     pub kill_switch: bool,
     /// The kill switch lets the local networks through ([`crate::local_network`]).
     pub allow_local_network: bool,
-    /// The file holds a key in plain text, which `status` warns of: the import keeps them out.
+    /// The file holds a secret in plain text, which `status` warns of: the import keeps them out.
     pub keys_on_disk: bool,
 }
 
-/// The work DNS servers and the domains they answer for, the `.conf`'s first.
+/// The work DNS servers and the domains they answer for, the VPN config's first.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Dns {
     pub servers: Vec<IpAddr>,
@@ -187,8 +191,10 @@ pub enum LoadError {
     Toml(#[source] toml::de::Error),
     #[error("proxy.toml isn't valid TOML")]
     Edit(#[source] toml_edit::TomlError),
-    #[error("{} isn't a WireGuard config the Proxy can use", .0.display())]
-    WireGuard(PathBuf, #[source] ParseError),
+    #[error("{} isn't a VPN config the Proxy can use", .0.display())]
+    Vpn(PathBuf, #[source] vpn::ParseError),
+    #[error("{} is neither a WireGuard config ([Interface], [Peer]) nor an OpenVPN one (client, remote)", .0.display())]
+    UnknownType(PathBuf),
     #[error("{key} has `{value}`, which isn't {wanted}")]
     Value {
         key: &'static str,
@@ -246,13 +252,17 @@ impl Profile {
         if vault_item.is_empty() || vault_item.len() > 128 || vault_item.chars().any(char::is_control) {
             return Err(value("tunnel.vault_item", &vault_item, "a vault item's name"));
         }
+        let kind = match raw.tunnel.kind.as_deref().map(str::trim) {
+            None => Type::WireGuard,
+            Some(name) => Type::from_name(name).ok_or_else(|| value("tunnel.type", name, "wireguard or openvpn"))?,
+        };
         let tunnel = match raw.tunnel.conf.as_deref().map(str::trim).filter(|c| !c.is_empty()) {
             Some(conf) => {
                 let file = resolve(dir, conf);
                 let text = fs::read_to_string(&file).map_err(|err| LoadError::Read(file.clone(), err))?;
-                let whole = Config::parse(&text).map_err(|err| LoadError::WireGuard(file.clone(), err))?;
-                let keys_on_disk = whole.interface.private_key.is_some()
-                    || whole.peers.iter().any(|peer| peer.preshared_key.is_some());
+                let folder = file.parent().unwrap_or(dir);
+                let whole = vpn::Config::parse(kind, &text, folder).map_err(|err| LoadError::Vpn(file.clone(), err))?;
+                let keys_on_disk = whole.has_secrets();
                 Some(Tunnel {
                     file,
                     config: whole.sanitized(),
@@ -334,8 +344,8 @@ fn resolve(dir: &Path, name: &str) -> PathBuf {
 
 fn dns(raw: &RawDns, tunnel: Option<&Tunnel>) -> Result<Dns, LoadError> {
     let mut dns = tunnel.map_or_else(Dns::default, |tunnel| Dns {
-        servers: tunnel.config.interface.dns_servers.clone(),
-        domains: tunnel.config.interface.dns_domains.clone(),
+        servers: tunnel.config.dns_servers().to_vec(),
+        domains: tunnel.config.dns_domains().to_vec(),
     });
     for server in &raw.servers {
         let addr: IpAddr = server
@@ -483,14 +493,31 @@ pub fn no_proxy_ok(entry: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b".:/*_-".contains(&b))
 }
 
-/// Names `conf` as the tunnel's `.conf` in the profile at `path`, keeping everything else in it,
-/// comments included; a missing profile is made with that alone.
+/// Names `conf` as the VPN's config, of type `kind`, in the profile at `path`, keeping everything
+/// else in it, comments included; a missing profile is made with that alone.
 ///
 /// # Errors
 ///
 /// The profile can't be read or written, or isn't valid TOML.
-pub fn set_conf(path: &Path, conf: &str) -> Result<(), LoadError> {
-    set_tunnel(path, "conf", toml_edit::value(conf))
+pub fn set_conf(path: &Path, kind: Type, conf: &str) -> Result<(), LoadError> {
+    set_tunnel(
+        path,
+        &[
+            ("type", toml_edit::value(kind.name())),
+            ("conf", toml_edit::value(conf)),
+        ],
+    )
+}
+
+/// The VPN's config the profile at `path` names, as written there, from `proxy.toml` alone: what
+/// an import replaces.
+pub fn conf_named(path: &Path) -> Option<String> {
+    let text = fs::read_to_string(path).ok()?;
+    let raw: Raw = toml::from_str(&text).ok()?;
+    raw.tunnel
+        .conf
+        .map(|conf| conf.trim().to_owned())
+        .filter(|conf| !conf.is_empty())
 }
 
 /// Sets whether the kill switch lets the local networks through in the profile at `path`, as
@@ -500,12 +527,12 @@ pub fn set_conf(path: &Path, conf: &str) -> Result<(), LoadError> {
 ///
 /// As [`set_conf`].
 pub fn set_local_network(path: &Path, allowed: bool) -> Result<(), LoadError> {
-    set_tunnel(path, "allow_local_network", toml_edit::value(allowed))
+    set_tunnel(path, &[("allow_local_network", toml_edit::value(allowed))])
 }
 
-/// Sets `key` in `[tunnel]` of the profile at `path`, keeping everything else in it, comments
-/// included; a missing profile is made with that alone.
-fn set_tunnel(path: &Path, key: &str, item: toml_edit::Item) -> Result<(), LoadError> {
+/// Sets each key in `[tunnel]` of the profile at `path`, keeping everything else in it, comments
+/// included; a missing profile is made with them alone.
+fn set_tunnel(path: &Path, items: &[(&str, toml_edit::Item)]) -> Result<(), LoadError> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
         Err(err) if err.kind() == io::ErrorKind::NotFound => String::new(),
@@ -518,7 +545,9 @@ fn set_tunnel(path: &Path, key: &str, item: toml_edit::Item) -> Result<(), LoadE
     let Some(tunnel) = tunnel.as_table_like_mut() else {
         return Err(value("tunnel", "a plain value", "a table, [tunnel]"));
     };
-    tunnel.insert(key, item);
+    for (key, item) in items {
+        tunnel.insert(key, item.clone());
+    }
     write_atomic(path, &doc.to_string(), 0o644).map_err(|err| LoadError::Read(path.to_path_buf(), err))
 }
 
@@ -557,14 +586,17 @@ pub fn write_atomic(path: &Path, contents: &str, mode: u32) -> io::Result<()> {
     written
 }
 
-/// Whether `file` holds a WireGuard config: what `import` checks before it touches the vault.
+/// The VPN config in `file`, its type told by what it holds and the files it names read: what
+/// `import` checks before it touches the vault.
 ///
 /// # Errors
 ///
-/// The file can't be read or isn't a WireGuard config.
-pub fn read_conf(file: &Path) -> Result<wireguard::Config, LoadError> {
+/// The file can't be read, or is neither a WireGuard nor an OpenVPN config the Proxy can use.
+pub fn read_conf(file: &Path) -> Result<vpn::Config, LoadError> {
     let text = fs::read_to_string(file).map_err(|err| LoadError::Read(file.to_path_buf(), err))?;
-    Config::parse(&text).map_err(|err| LoadError::WireGuard(file.to_path_buf(), err))
+    let kind = vpn::detect(&text).ok_or_else(|| LoadError::UnknownType(file.to_path_buf()))?;
+    let dir = file.parent().unwrap_or_else(|| Path::new("."));
+    vpn::Config::parse(kind, &text, dir).map_err(|err| LoadError::Vpn(file.to_path_buf(), err))
 }
 
 #[cfg(test)]

@@ -1,28 +1,36 @@
 pragma Singleton
 import QtQuick
 
-// Stand-in for Proxy: a full tunnel with the kill switch, on, letting the
-// local network through.
+// Stand-in for Proxy: a full WireGuard tunnel with the kill switch, on,
+// letting the local network through. `openvpn` makes it an OpenVPN one,
+// which has no handshake to read.
 QtObject {
     id: root
 
     property bool live: false
+    property bool openvpn: false
     readonly property bool configured: true
     property bool on: true
     readonly property bool busy: false
     readonly property bool pending: false
     readonly property string problem: ""
     readonly property var tunnel: ({
-            endpoint: "vpn.example.org:51820",
+            type: openvpn ? "openvpn" : "wireguard",
+            typeName: typeName,
+            interface: openvpn ? "tun-kubaos" : "wg-kubaos",
+            endpoint: endpoint,
             full: true,
             killSwitch: true,
             allowLocalNetwork: true,
             localNetworks: ["192.168.1.0/24"]
         })
-    readonly property var liveTunnel: ({
+    readonly property var liveTunnel: openvpn ? ({
+            handshake: null
+        }) : ({
             handshake: 1793137620
         })
-    readonly property string endpoint: "vpn.example.org:51820"
+    readonly property string endpoint: openvpn ? "vpn.example.org:1194" : "vpn.example.org:51820"
+    readonly property string typeName: openvpn ? "OpenVPN" : "WireGuard"
     readonly property bool full: true
     readonly property bool killSwitch: true
     property bool allowLocalNetwork: true

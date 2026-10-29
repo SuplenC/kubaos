@@ -131,8 +131,8 @@ enum Cmd {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// The Proxy, one switch for the work network: on, off, status, or import IT's WireGuard
-    /// config.
+    /// The Proxy, one switch for the work network: on, off, status, or import IT's VPN config,
+    /// WireGuard or OpenVPN.
     #[command(disable_help_flag = true)]
     Proxy {
         /// `on`, `off`, `status [--json] [--live]`, `import FILE`, `pull`

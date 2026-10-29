@@ -65,7 +65,8 @@ fn every_part_reads_with_the_files_it_names() {
 
     let tunnel = profile.tunnel.as_ref().expect("a tunnel");
     assert!(tunnel.config.is_full());
-    assert!(tunnel.config.interface.private_key.is_none());
+    assert_eq!(tunnel.config.kind(), Type::WireGuard);
+    assert!(!tunnel.config.has_secrets());
     assert!(profile.kill_switch());
     assert_eq!(
         profile.dns.servers,
@@ -146,7 +147,7 @@ fn a_conf_with_its_keys_in_it_is_used_without_them_and_flagged() {
 
     let tunnel = profile.tunnel.expect("a tunnel");
     assert!(tunnel.keys_on_disk);
-    assert!(tunnel.config.interface.private_key.is_none());
+    assert!(!tunnel.config.has_secrets());
 }
 
 #[test]
@@ -235,7 +236,7 @@ fn naming_the_conf_keeps_the_users_comments_and_settings() {
     )
     .unwrap();
 
-    set_conf(&path, "wireguard.conf").expect("written");
+    set_conf(&path, Type::WireGuard, "wireguard.conf").expect("written");
 
     let text = fs::read_to_string(&path).unwrap();
     assert!(text.contains("# Mine."), "{text}");
@@ -250,12 +251,61 @@ fn naming_the_conf_without_a_profile_makes_one() {
     let dir = dir();
     let path = dir.path().join("network/proxy.toml");
 
-    set_conf(&path, "wireguard.conf").expect("written");
+    set_conf(&path, Type::OpenVpn, "vpn.ovpn").expect("written");
 
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
-        "[tunnel]\nconf = \"wireguard.conf\"\n"
+        "[tunnel]\ntype = \"openvpn\"\nconf = \"vpn.ovpn\"\n"
     );
+}
+
+#[test]
+fn an_openvpn_profile_reads_its_config_and_its_dns() {
+    let dir = dir();
+    let config = crate::openvpn::tests::inline() + "redirect-gateway def1\ndhcp-option DNS 10.20.0.53\n";
+    let sanitized = crate::openvpn::Config::parse(&config, dir.path()).unwrap().sanitized();
+    fs::write(dir.path().join("vpn.ovpn"), sanitized.render()).unwrap();
+
+    let profile = parse(
+        "[tunnel]\ntype = \"openvpn\"\nconf = \"vpn.ovpn\"\n[dns]\ndomains = [\"corp.example.com\"]\n",
+        dir.path(),
+    )
+    .expect("parses");
+
+    let tunnel = profile.tunnel.as_ref().expect("a tunnel");
+    assert_eq!(tunnel.config.kind(), Type::OpenVpn);
+    assert!(!tunnel.keys_on_disk);
+    assert!(profile.kill_switch());
+    assert_eq!(profile.dns.servers, ["10.20.0.53".parse::<IpAddr>().unwrap()]);
+    assert_eq!(profile.dns.domains, ["corp.example.com"]);
+}
+
+#[test]
+fn a_type_the_proxy_doesnt_run_is_refused() {
+    let dir = dir();
+
+    let err = parse("[tunnel]\ntype = \"ipsec\"\n", dir.path()).expect_err("refused");
+
+    assert!(matches!(err, LoadError::Value { key: "tunnel.type", .. }), "{err:?}");
+}
+
+#[test]
+fn a_config_to_import_is_told_by_what_it_holds() {
+    let dir = dir();
+    let wireguard = dir.path().join("work.conf");
+    let openvpn = dir.path().join("work.ovpn");
+    let neither = dir.path().join("notes.txt");
+    fs::write(
+        &wireguard,
+        conf(true).replacen("[Interface]\n", &format!("[Interface]\nPrivateKey = {PRIVATE}\n"), 1),
+    )
+    .unwrap();
+    fs::write(&openvpn, crate::openvpn::tests::inline()).unwrap();
+    fs::write(&neither, "remember the milk\n").unwrap();
+
+    assert_eq!(read_conf(&wireguard).expect("WireGuard").kind(), Type::WireGuard);
+    assert_eq!(read_conf(&openvpn).expect("OpenVPN").kind(), Type::OpenVpn);
+    assert!(matches!(read_conf(&neither), Err(LoadError::UnknownType(_))));
 }
 
 #[test]

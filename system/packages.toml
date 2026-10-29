@@ -68,11 +68,13 @@ packages = ["ca-certificates", "curl", "gnupg", "unzip", "file", "git", "openssh
 summary = "NetworkManager and Wi-Fi"
 packages = ["network-manager", "wpasupplicant", "iw"]
 
-# wg reads the tunnel's last handshake, nft holds the kill switch, openssl
-# checks the company CA before it reaches the trust store (crates/kubaos-proxy).
+# NetworkManager's OpenVPN plugin runs an OpenVPN VPN (it pulls in openvpn),
+# wg reads a WireGuard VPN's last handshake, nft holds the kill switch,
+# openssl checks the company CA before it reaches the trust store
+# (crates/kubaos-proxy).
 [group.proxy]
-summary = "The Proxy's tunnel status, kill switch and certificate check"
-packages = ["wireguard-tools", "nftables", "openssl"]
+summary = "The Proxy's OpenVPN plugin, VPN status, kill switch and certificate check"
+packages = ["network-manager-openvpn", "wireguard-tools", "nftables", "openssl"]
 
 [group.audio]
 summary = "PipeWire and Bluetooth"
