@@ -52,6 +52,16 @@ fn arriving_curves_lead_the_clock_and_leaving_ones_lag_it() {
 }
 
 #[test]
+fn the_spring_glides_a_little_past_its_end_and_settles_back() {
+    let samples: Vec<f32> = (0..=200).map(|i| ease(Easing::Spring, i as f32 / 200.0)).collect();
+    let peak = samples.iter().copied().fold(0.0, f32::max);
+
+    assert!(ease(Easing::Spring, 0.0).abs() < 1e-6);
+    assert!((ease(Easing::Spring, 1.0) - 1.0).abs() < 1e-6);
+    assert!(peak > 1.02 && peak < 1.1, "peak {peak}");
+}
+
+#[test]
 fn speed_divides_every_duration() {
     let twice = Motion::default().speed(2.0);
 

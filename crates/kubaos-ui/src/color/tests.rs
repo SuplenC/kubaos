@@ -93,6 +93,30 @@ fn the_fallback_palettes_meet_the_contrast_minimums() {
             ("on_error on error", c.on_error, c.error, Contrast::Text),
             ("cold on surface", c.cold, c.surface, Contrast::Text),
             ("warning on surface", c.warning, c.surface, Contrast::Text),
+            (
+                "sharing on surface_container_highest",
+                c.sharing,
+                c.surface_container_highest,
+                Contrast::Text,
+            ),
+            (
+                "microphone on surface_container_highest",
+                c.microphone,
+                c.surface_container_highest,
+                Contrast::Text,
+            ),
+            (
+                "camera on surface_container_highest",
+                c.camera,
+                c.surface_container_highest,
+                Contrast::Text,
+            ),
+            (
+                "success on surface_container_highest",
+                c.success,
+                c.surface_container_highest,
+                Contrast::Text,
+            ),
             ("surface on on_surface (toast)", c.surface, c.on_surface, Contrast::Text),
             ("outline on surface", c.outline, c.surface, Contrast::Graphic),
             (
