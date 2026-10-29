@@ -1,7 +1,6 @@
 import QtQuick
 import KubaOS.Components as K
 import Kotodama
-import qs.components
 import qs.services
 
 // "Add a language" in the Keyboard tab's well, in place of the layouts: a header with the way
@@ -127,7 +126,7 @@ Item {
         onTextChanged: view.send()
     }
 
-    NavList {
+    K.ListRows {
         id: matchList
 
         y: search.y + search.height + K.Tokens.space.s4
