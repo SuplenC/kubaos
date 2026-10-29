@@ -4,29 +4,34 @@
 # until it is set here. Nothing switches on by itself at login. `kubaos proxy status` shows each
 # part and whether it is up; a change here takes effect at the next `kubaos proxy on`.
 #
-# The tunnel: IT's WireGuard config. `kubaos proxy import FILE` (or "Import WireGuard config" in
-# the Command menu) puts its keys in your Bitwarden vault and the GNOME keyring, writes the rest
-# beside this file as wireguard.conf, and sets `conf` below. AllowedIPs = 0.0.0.0/0 or ::/0 make it
-# a full tunnel; anything else is a split tunnel, which carries only those ranges.
+# The VPN: IT's WireGuard (.conf) or OpenVPN (.ovpn) config, its type read from the file.
+# `kubaos proxy import FILE` (or "Import VPN config…" in the Command menu) puts its secrets (keys,
+# certificates, a username and password it asks for once) in your Bitwarden vault and the GNOME
+# keyring, writes the rest beside this file as vpn.conf or vpn.ovpn, and sets `type` and `conf`
+# below; without `type` the config is WireGuard's. WireGuard's AllowedIPs = 0.0.0.0/0 or ::/0, or
+# OpenVPN's redirect-gateway, make it a full tunnel; anything else is a split tunnel, which carries
+# only its own ranges (and, for OpenVPN, the ones the server pushes).
 [tunnel]
-# conf = "wireguard.conf"
+# type = "openvpn"
+# conf = "vpn.ovpn"
 #
 # A full tunnel blocks everything that would leave outside it while it is up (the kill switch):
 # kill_switch = true
 #
 # But the network you're on: the kill switch lets its ranges through, as they are when the tunnel
 # comes up and each time the network changes, so the phone link, printers, casting and SSH there
-# keep working. A range the tunnel routes stays behind it, and no DNS lookup goes out beside the
-# tunnel. `kubaos proxy lan on|off`, the Command menu or the control center's Proxy detail set it,
+# keep working. A range the VPN routes stays behind it, and no DNS lookup goes out beside the
+# VPN. `kubaos proxy lan on|off`, the Command menu or the control center's Proxy detail set it,
 # and while the Proxy is on, it takes effect at once:
 # allow_local_network = true
 #
-# The vault item that holds the tunnel's keys; `kubaos proxy pull` copies them to the keyring
+# The vault item that holds the VPN's secrets; `kubaos proxy pull` copies them to the keyring
 # again on a new machine:
 # vault_item = "kubaos-proxy"
 
 # The work DNS servers, and the domains they answer for; every other name goes to your network's
-# own resolver. The DNS line of the WireGuard config counts too. They need the tunnel:
+# own resolver. The VPN config's own DNS (WireGuard's DNS line, OpenVPN's dhcp-option DNS) counts
+# too. They need the VPN:
 [dns]
 # servers = ["10.0.0.53"]
 # domains = ["corp.example.com"]

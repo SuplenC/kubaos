@@ -3,11 +3,11 @@ import KubaOS.Components as K
 import qs.services
 
 // The Proxy tile's detail, under the tiles while its arrow is open: the
-// state, the tunnel's endpoint, whether a full tunnel's kill switch lets the
-// local network through (a switch), when it last received, its last
-// handshake and the bytes moved, read live while it shows
-// (services/Proxy.qml). The values tick while it shows, so they are mono and
-// keep their width.
+// state, the VPN's type and kind, its server, whether a full tunnel's kill
+// switch lets the local network through (a switch), when it last received, a
+// WireGuard VPN's last handshake and the bytes moved, read live while it
+// shows (services/Proxy.qml). The values tick while it shows, so they are
+// mono and keep their width.
 K.Card {
     id: root
 
@@ -19,11 +19,16 @@ K.Card {
                 value: Proxy.busy ? "Switching…" : Proxy.on ? "On" : Proxy.problem !== "" ? Proxy.problem : "Off"
             }
         ];
-        if (Proxy.tunnel)
+        if (Proxy.tunnel) {
             list.push({
-                label: "Tunnel",
-                value: `${Proxy.kind} to ${Proxy.endpoint || "no endpoint"}`
+                label: "VPN",
+                value: Proxy.typeName !== "" ? `${Proxy.typeName}, ${Proxy.kind.toLowerCase()}` : Proxy.kind
             });
+            list.push({
+                label: "Server",
+                value: Proxy.endpoint || "None"
+            });
+        }
         return list;
     }
     // The rows read live, below the switch, so they come and go without

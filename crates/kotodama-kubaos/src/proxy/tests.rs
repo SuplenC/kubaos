@@ -8,6 +8,7 @@ fn the_item_is_found_by_what_people_type() {
     assert_eq!(item.title, "Proxy status");
     assert!(item.keywords.contains(&"vpn".to_owned()));
     assert!(item.keywords.contains(&"wireguard".to_owned()));
+    assert!(item.keywords.contains(&"openvpn".to_owned()));
 }
 
 #[test]

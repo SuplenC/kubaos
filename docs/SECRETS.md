@@ -10,7 +10,7 @@ KubaOS keeps secrets out of files. One Bitwarden account holds your SSH keys, pr
 | git signing | `~/.config/git-bitwarden/{signing.gitconfig,allowed_signers}`, included by `config/git/config` | `kubaos bitwarden setup` |
 | GitHub CLI token | GNOME keyring (gh's own entry) | `kubaos bitwarden setup` |
 | Project env secrets | vault, cached in the GNOME keyring | `kubaos bitwarden setup`, `kubaos bitwarden env pull` |
-| The Proxy's WireGuard keys | Bitwarden vault (`kubaos-proxy` secure note), cached in the GNOME keyring | `kubaos proxy import`, `kubaos proxy pull` |
+| The Proxy's VPN secrets (WireGuard's keys; OpenVPN's certificate, keys, username and password) | Bitwarden vault (`kubaos-proxy` secure note), cached in the GNOME keyring | `kubaos proxy import`, `kubaos proxy pull` |
 | Security key credentials | `/etc/u2f_mappings`, root:root 0644 | `dot-u2f-enroll` |
 | YubiKey SSH keys (optional) | `~/.ssh/<name>_sk` (key handle) + `.pub` | `dot-ssh-sk-new` |
 | Server URL, email, optional folder list | `~/.config/dot-bw/config`, nothing secret | `kubaos bitwarden setup`, Kōbō's Bitwarden card |

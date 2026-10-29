@@ -32,6 +32,7 @@ controlcenter-kb-hint    controlcenter  FrameShot   1176,0,424,680    controlcen
 controlcenter-scanning   controlcenter  FrameShot   1176,0,424,1000   controlcenter scanning
 controlcenter-proxy      controlcenter  FrameShot   1176,0,424,1000   controlcenter proxy
 controlcenter-proxy-off  controlcenter  FrameShot   1176,0,424,1000   controlcenter proxy-lan-off
+controlcenter-proxy-ovpn controlcenter  FrameShot   1176,0,424,1000   controlcenter proxy-openvpn
 clock                    clock          FrameShot   400,0,800,800     clock answer
 clock-settings           clock          FrameShot   400,0,800,800     clock settings
 clock-select-closed      clock          FrameShot   400,0,800,800     clock select-closed

@@ -5,6 +5,7 @@
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::net::IpAddr;
+use std::os::unix::fs::PermissionsExt as _;
 use std::path::PathBuf;
 
 use kubaos_core::bitwarden::base64;
@@ -18,6 +19,7 @@ use crate::machine::Said;
 use crate::machine::StartError;
 use crate::machine::TunnelError;
 use crate::tunnel::Connection;
+use crate::tunnel::Prop;
 
 /// What `gsettings get` says of a key the fake never set, and what `set` takes as going back to
 /// it.
@@ -46,6 +48,11 @@ pub struct Fake {
     pub names: BTreeMap<String, Vec<IpAddr>>,
     /// What `ip -json address` says: the interfaces' addresses.
     pub ip: String,
+    /// What `ip -json route` says: the routes on the VPN's interface.
+    pub routes: String,
+    /// Each file an OpenVPN connection names, by its key, with its mode and what it held as the
+    /// VPN came up.
+    pub files_at_up: Vec<(String, u32, String)>,
     /// A command whose line contains one of these fails.
     pub fail: Vec<String>,
     pub tunnel_fails: bool,
@@ -295,6 +302,7 @@ impl Machine for Fake {
             "pkexec" if args[1].ends_with("kubaos-proxy-pin") => self.pin(&args[2..], stdin.as_deref()),
             "pkexec" => self.helper(&args[2..], stdin.as_deref()),
             "bw" => self.bw(args, stdin.as_deref()),
+            "ip" if args.get(1).is_some_and(|arg| arg == "route") => ok(self.routes.clone()),
             "ip" => ok(self.ip.clone()),
             _ => ok(""),
         })
@@ -302,6 +310,16 @@ impl Machine for Fake {
 
     fn tunnel_up(&mut self, connection: &Connection) -> Result<(), TunnelError> {
         self.ran.push("nm up".to_owned());
+        if let Some(Prop::Map(data)) = connection.get("vpn").and_then(|vpn| vpn.get("data")) {
+            for key in ["ca", "cert", "key", "ta", "tls-crypt", "tls-crypt-v2"] {
+                let Some(path) = data.get(key) else {
+                    continue;
+                };
+                let mode = std::fs::metadata(path).map_or(0, |meta| meta.permissions().mode() & 0o777);
+                let text = std::fs::read_to_string(path).unwrap_or_default();
+                self.files_at_up.push((key.to_owned(), mode, text));
+            }
+        }
         if self.tunnel_fails {
             return Err(TunnelError::Dropped);
         }

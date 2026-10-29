@@ -1,14 +1,17 @@
-//! The local networks the kill switch lets out beside the tunnel while the profile allows them:
-//! the ranges of the machine's own interfaces, as they are when the kill switch goes up, so the
-//! phone link, a printer or SSH on the network you're on keep working.
+//! The local networks the kill switch lets out beside the VPN while the profile allows them: the
+//! ranges of the machine's own interfaces, as they are when the kill switch goes up, so the phone
+//! link, a printer or SSH on the network you're on keep working.
 //!
-//! A range the tunnel routes never goes out beside it: a work network in 192.168.x behind the
-//! tunnel and a home network in the same range can't both be reached, and the tunnel wins.
+//! A range the VPN routes never goes out beside it: a work network in 192.168.x behind the VPN
+//! and a home network in the same range can't both be reached, and the VPN wins. What it routes is
+//! what its config names, and what its interface carries once it is up: an OpenVPN server pushes
+//! its routes then.
 //!
 //! # Owns
 //!
-//! - Reading the interfaces' ranges ([`read`], from `ip -json address`) and which of them the kill
-//!   switch lets through ([`let_through`]).
+//! - Reading the interfaces' ranges ([`read`], from `ip -json address`), the ranges the VPN's
+//!   interface carries ([`routed`], from `ip -json route`), and which of the first the kill switch
+//!   lets through ([`let_through`]).
 //!
 //! # Not here
 //!
@@ -21,19 +24,18 @@ use serde_json::Value;
 
 use crate::machine::Cmd;
 use crate::machine::Machine;
-use crate::tunnel::INTERFACE;
-use crate::wireguard::Cidr;
-use crate::wireguard::Config;
+use crate::net::Cidr;
+use crate::vpn::INTERFACES;
 
 /// The most ranges the kill switch takes, as the root helper does: more than any laptop's
 /// interfaces hold.
 pub const MAX_NETWORKS: usize = 32;
 
-/// The interfaces whose ranges never count: loopback, the tunnel, and the container bridges, which
+/// The interfaces whose ranges never count: loopback, the VPN's, and the container bridges, which
 /// the kill switch lets through by name.
 fn counts(interface: &str) -> bool {
     !(interface == "lo"
-        || interface == INTERFACE
+        || INTERFACES.contains(&interface)
         || interface == "docker0"
         || interface == "virbr0"
         || interface.starts_with("br-")
@@ -75,17 +77,28 @@ pub fn read(m: &mut dyn Machine) -> Vec<Cidr> {
     }
 }
 
-/// What the tunnel routes: its peers' allowed IPs but a whole family, which is what makes it full,
-/// and its own addresses.
-fn routes(tunnel: &Config) -> Vec<Cidr> {
-    tunnel
-        .peers
+/// The ranges `ip -json route show table all dev IFACE` gives, the default and the kernel's own
+/// local and broadcast routes left out. A route read wrong is left out too.
+pub fn parse_routes(json: &str) -> Vec<Cidr> {
+    let Ok(Value::Array(routes)) = serde_json::from_str::<Value>(json) else {
+        return Vec::new();
+    };
+    routes
         .iter()
-        .flat_map(|peer| &peer.allowed_ips)
-        .chain(&tunnel.interface.addresses)
+        .filter(|route| route["type"].as_str().is_none_or(|kind| kind == "unicast"))
+        .filter_map(|route| Cidr::parse(route["dst"].as_str()?))
         .filter(|cidr| !cidr.is_default())
-        .copied()
+        .map(Cidr::network)
         .collect()
+}
+
+/// The ranges the VPN's interface carries now; none when it isn't up or `ip` can't say.
+pub fn routed(m: &mut dyn Machine, interface: &str) -> Vec<Cidr> {
+    let cmd = Cmd::new("ip").args(["-json", "route", "show", "table", "all", "dev", interface]);
+    match m.run(&cmd) {
+        Ok(ran) if ran.ok() => parse_routes(&ran.stdout),
+        _ => Vec::new(),
+    }
 }
 
 /// Whether the kill switch lets the range itself out: link-local ranges it lets through whole,
@@ -102,11 +115,10 @@ fn reachable(cidr: &Cidr) -> bool {
         }
 }
 
-/// Which of the `found` ranges the kill switch lets out beside `tunnel`: each once, by its first
-/// address, the widest of those inside each other, and none that overlaps a range the tunnel
-/// routes, so work traffic never leaves outside it. At most [`MAX_NETWORKS`].
-pub fn let_through(found: &[Cidr], tunnel: &Config) -> Vec<Cidr> {
-    let routes = routes(tunnel);
+/// Which of the `found` ranges the kill switch lets out beside a VPN that routes `routes`: each
+/// once, by its first address, the widest of those inside each other, and none that overlaps a
+/// range the VPN routes, so work traffic never leaves outside it. At most [`MAX_NETWORKS`].
+pub fn let_through(found: &[Cidr], routes: &[Cidr]) -> Vec<Cidr> {
     let mut networks: Vec<Cidr> = found
         .iter()
         .map(|cidr| cidr.network())

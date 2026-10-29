@@ -9,10 +9,11 @@ import qs.settings
 // ($XDG_RUNTIME_DIR/kubaos-proxy.json, crates/kubaos-proxy, replaced whole
 // on every change), and switching it through `kubaos-proxy on|off`, and the
 // kill switch's local network through `kubaos-proxy lan on|off`. Watched,
-// never polled. While `live` is set and the tunnel is up, the bytes moved
-// come from /sys every few seconds, which needs no root, and when the tunnel
-// last received; the handshake needs root (`status --json --live`, through
-// pkexec), so it is read as the detail opens and then once a minute. An edit
+// never polled. While `live` is set and the VPN is up, the bytes moved come
+// from its interface's counters in /sys every few seconds, which needs no
+// root, and when it last received; a WireGuard handshake needs root
+// (`status --json --live`, through pkexec), so it is read as the detail
+// opens and then once a minute, and OpenVPN has none to read. An edit
 // of the profile is read again at once (`status --json`), so the tile shows
 // as soon as it has a part.
 Singleton {
@@ -30,8 +31,10 @@ Singleton {
     property var localNetworkPending: null
     // The control center's detail is open: read the tunnel live.
     property bool live: false
-    readonly property bool watching: live && on && tunnel !== null
-    readonly property string statistics: "/sys/class/net/wg-kubaos/statistics"
+    readonly property bool watching: live && on && statistics !== ""
+    // The VPN's interface's counters: wg-kubaos for WireGuard, tun-kubaos
+    // for OpenVPN, as the Proxy publishes it.
+    readonly property string statistics: tunnel?.interface ? `/sys/class/net/${tunnel.interface}/statistics` : ""
     property real rxBytes: -1
     property real txBytes: -1
     // When the received bytes last grew, in seconds since the epoch; 0 before
@@ -53,6 +56,8 @@ Singleton {
     readonly property var tunnel: published?.tunnel ?? null
     readonly property var liveTunnel: liveStatus?.tunnel ?? null
     readonly property string endpoint: tunnel?.endpoint ?? ""
+    // The VPN's type for a person: "WireGuard", "OpenVPN".
+    readonly property string typeName: tunnel?.typeName ?? ""
     readonly property bool full: tunnel?.full ?? false
     readonly property bool killSwitch: tunnel?.killSwitch ?? false
     // The kill switch lets the network you're on through: on unless the

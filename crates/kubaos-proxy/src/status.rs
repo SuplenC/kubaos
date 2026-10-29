@@ -1,10 +1,11 @@
 //! What the Proxy is now, for `kubaos-proxy status`, the shell and the Command menu: the parts the
-//! profile has and which are up, and the tunnel's endpoint, last handshake and bytes moved.
+//! profile has and which are up, and the VPN's type, server, last handshake and bytes moved.
 //!
 //! The shell watches `$XDG_RUNTIME_DIR/kubaos-proxy.json`, which every change rewrites whole
-//! ([`publish`]). The handshake needs root (WireGuard's netlink is admin-only), so it is read
-//! through the helper only when asked live, while the control center's detail or the menu's View
-//! is open.
+//! ([`publish`]). The bytes moved are the VPN's interface's counters. A WireGuard handshake needs
+//! root (WireGuard's netlink is admin-only), so it is read through the helper only when asked
+//! live, while the control center's detail or the menu's View is open; OpenVPN's has no reader
+//! but OpenVPN itself, so the shell tells when its interface last received instead.
 //!
 //! # Owns
 //!
@@ -29,9 +30,9 @@ use crate::plan::Plan;
 use crate::profile::LoadError;
 use crate::profile::Profile;
 use crate::profile::write_atomic;
-use crate::tunnel::INTERFACE;
+use crate::vpn::Type;
 
-/// The tunnel, as the profile has it and NetworkManager runs it.
+/// The VPN, as the profile has it and NetworkManager runs it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[expect(
     clippy::struct_excessive_bools,
@@ -39,6 +40,13 @@ use crate::tunnel::INTERFACE;
 )]
 #[serde(rename_all = "camelCase")]
 pub struct Tunnel {
+    /// Its type's name: `wireguard`, `openvpn`.
+    #[serde(rename = "type")]
+    pub kind: &'static str,
+    /// Its type for a person: `WireGuard`, `OpenVPN`.
+    pub type_name: &'static str,
+    /// The network interface whose counters are its bytes moved.
+    pub interface: &'static str,
     pub full: bool,
     pub kill_switch: bool,
     /// The profile lets the local networks through the kill switch.
@@ -47,8 +55,8 @@ pub struct Tunnel {
     pub local_networks: Vec<String>,
     pub endpoint: Option<String>,
     pub up: bool,
-    /// The latest handshake with any peer, in seconds since the epoch; 0 for none yet. Only when
-    /// read live.
+    /// WireGuard's latest handshake with any peer, in seconds since the epoch; 0 for none yet.
+    /// Only when read live.
     pub handshake: Option<u64>,
     pub rx_bytes: Option<u64>,
     pub tx_bytes: Option<u64>,
@@ -106,8 +114,8 @@ fn parts(profile: &Profile) -> Vec<&'static str> {
     parts
 }
 
-fn counter(sys: &Path, name: &str) -> Option<u64> {
-    fs::read_to_string(sys.join("class/net").join(INTERFACE).join("statistics").join(name))
+fn counter(sys: &Path, interface: &str, name: &str) -> Option<u64> {
+    fs::read_to_string(sys.join("class/net").join(interface).join("statistics").join(name))
         .ok()?
         .trim()
         .parse()
@@ -141,16 +149,33 @@ pub fn read(m: &mut dyn Machine, paths: &Paths, profile: &Result<Profile, LoadEr
         .collect();
     let tunnel = profile.tunnel.as_ref().map(|tunnel| {
         let live = live && tunnel_up;
+        let kind = tunnel.config.kind();
+        let interface = kind.interface();
         Tunnel {
+            kind: kind.name(),
+            type_name: kind.title(),
+            interface,
             full: tunnel.config.is_full(),
             kill_switch: profile.kill_switch(),
             allow_local_network: tunnel.allow_local_network,
             local_networks,
             endpoint: tunnel.config.endpoint().map(ToString::to_string),
             up: tunnel_up,
-            handshake: if live { apply::handshake(m) } else { None },
-            rx_bytes: if live { counter(&paths.sys, "rx_bytes") } else { None },
-            tx_bytes: if live { counter(&paths.sys, "tx_bytes") } else { None },
+            handshake: if live && kind == Type::WireGuard {
+                apply::handshake(m)
+            } else {
+                None
+            },
+            rx_bytes: if live {
+                counter(&paths.sys, interface, "rx_bytes")
+            } else {
+                None
+            },
+            tx_bytes: if live {
+                counter(&paths.sys, interface, "tx_bytes")
+            } else {
+                None
+            },
         }
     });
     Status {
@@ -250,8 +275,8 @@ pub fn rows(status: &Status, now: u64) -> Vec<Row> {
         let endpoint = tunnel.endpoint.as_deref().unwrap_or("no endpoint");
         let state = if tunnel.up { "up" } else { "down" };
         rows.push(Row {
-            label: "Tunnel",
-            value: format!("{state}: {kind} to {endpoint}{guard}"),
+            label: "VPN",
+            value: format!("{state}: {}, {kind} to {endpoint}{guard}", tunnel.type_name),
         });
         if tunnel.kill_switch {
             rows.push(Row {

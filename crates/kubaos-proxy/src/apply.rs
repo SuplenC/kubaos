@@ -21,10 +21,12 @@
 //! # Not here
 //!
 //! - Which parts a profile has: [`crate::plan`]. Each part on the machine: `apply/session.rs` (the
-//!   session's), `apply/root.rs` (the root helper's), `apply/endpoints.rs` (the tunnel's endpoint
-//!   addresses). The root side: `system/files/proxy/kubaos-proxy-write`.
+//!   session's), `apply/root.rs` (the root helper's), `apply/endpoints.rs` (the VPN's server
+//!   addresses), `apply/files.rs` (an OpenVPN VPN's certificates and keys while it comes up). The
+//!   root side: `system/files/proxy/kubaos-proxy-write`.
 
 mod endpoints;
+mod files;
 mod root;
 mod session;
 
@@ -41,6 +43,7 @@ use crate::machine::Ran;
 use crate::machine::ResolveError;
 use crate::machine::Said;
 use crate::machine::TunnelError;
+use crate::net::Cidr;
 use crate::paths::HELPER;
 use crate::paths::Paths;
 use crate::plan::KillSwitch;
@@ -52,8 +55,9 @@ use crate::profile::LoadError;
 use crate::profile::Profile;
 use crate::profile::write_atomic;
 use crate::secrets;
+use crate::secrets::Secrets;
 use crate::tunnel;
-use crate::wireguard::Cidr;
+use crate::vpn;
 
 /// Why one part couldn't be put in place or taken away.
 #[derive(Debug, thiserror::Error)]
@@ -65,7 +69,7 @@ pub enum StepError {
     /// The cause's message alone, as with `Keys`.
     #[error(transparent)]
     Tunnel(TunnelError),
-    #[error("the tunnel's endpoint, with no address known for it")]
+    #[error("the VPN's server, with no address known for it")]
     Endpoint(#[source] ResolveError),
     #[error("the root helper, {HELPER}")]
     Root(#[source] Said),
@@ -177,7 +181,7 @@ pub fn set_wanted(paths: &Paths, on: bool) -> io::Result<()> {
     }
 }
 
-/// Who runs this, for the tunnel's owner.
+/// Who runs this, for the VPN's owner.
 pub fn user() -> Option<String> {
     ["USER", "LOGNAME"]
         .iter()
@@ -185,8 +189,8 @@ pub fn user() -> Option<String> {
         .filter(|name| !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b)))
 }
 
-/// Whether undoing keeps the kill switch: a tunnel that went down while the user wants it up
-/// leaves nothing to go out in the clear.
+/// Whether undoing keeps the kill switch: a VPN that went down while the user wants it up leaves
+/// nothing to go out in the clear.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Keep {
     Nothing,
@@ -204,7 +208,6 @@ pub fn on(m: &mut dyn Machine, paths: &Paths, plan: &Plan, user: Option<&str>) -
 }
 
 fn on_keeping(m: &mut dyn Machine, paths: &Paths, plan: &Plan, user: Option<&str>, keep: Keep) -> Result<(), Failed> {
-    let plan = &with_local_networks(m, plan);
     let mut up = applied(paths);
     let guarded = up.contains(&Kind::Root) && plan.has_kill_switch();
     let wanted: Vec<Kind> = plan.kinds();
@@ -233,7 +236,8 @@ fn on_keeping(m: &mut dyn Machine, paths: &Paths, plan: &Plan, user: Option<&str
         if let Err(cause) = record(paths, &up) {
             return fail(m, kind, true, cause);
         }
-        if let Err(cause) = put(m, paths, part, user, guarded) {
+        let part = as_now(m, paths, plan, part);
+        if let Err(cause) = put(m, paths, &part, user, guarded) {
             if fresh && matches!(cause, StepError::NotRun) {
                 up.retain(|k| *k != kind);
                 let _ = record(paths, &up);
@@ -304,7 +308,6 @@ fn undo_keeping(m: &mut dyn Machine, paths: &Paths, keep: Keep) -> Vec<String> {
 }
 
 fn put_back(m: &mut dyn Machine, paths: &Paths, plan: &Plan, taken: &[Kind], user: Option<&str>) -> Vec<String> {
-    let plan = &with_local_networks(m, plan);
     let mut up = applied(paths);
     let mut left = Vec::new();
     for part in plan.parts.iter().filter(|part| taken.contains(&part.kind())) {
@@ -312,7 +315,8 @@ fn put_back(m: &mut dyn Machine, paths: &Paths, plan: &Plan, taken: &[Kind], use
             up.push(part.kind());
             let _ = record(paths, &up);
         }
-        if let Err(err) = put(m, paths, part, user, false) {
+        let part = as_now(m, paths, plan, part);
+        if let Err(err) = put(m, paths, &part, user, false) {
             left.push(format!(
                 "{} couldn't go back up: {}",
                 capital(part.kind().title()),
@@ -419,14 +423,39 @@ pub fn reconcile(
     }
 }
 
-/// `plan`, its kill switch letting through the machine's local networks as they are now, when it
-/// lets them through at all.
-fn with_local_networks(m: &mut dyn Machine, plan: &Plan) -> Plan {
-    if matches!(plan.kill_switch(), Some(KillSwitch::LocalNetwork(_))) {
-        plan.with_local_networks(&local_network::read(m))
-    } else {
-        plan.clone()
+/// `plan`, its kill switch letting out to the VPN's servers by the addresses NetworkManager was
+/// given, and letting through the machine's local networks as they are now, when it lets them
+/// through at all, but those the VPN's interface carries.
+fn with_machine(m: &mut dyn Machine, paths: &Paths, plan: &Plan) -> Plan {
+    let Some(vpn) = plan.vpn() else {
+        return plan.clone();
+    };
+    if !plan.has_kill_switch() {
+        return plan.clone();
     }
+    let plan = plan.with_servers(&endpoints::servers(paths, vpn));
+    if !matches!(plan.kill_switch(), Some(KillSwitch::LocalNetwork(_))) {
+        return plan;
+    }
+    let routed = match vpn {
+        vpn::Config::WireGuard(_) => Vec::new(),
+        vpn::Config::OpenVpn(_) => local_network::routed(m, vpn.kind().interface()),
+    };
+    plan.with_local_networks(&local_network::read(m), &routed)
+}
+
+/// `part` as it goes up now: the root part with its kill switch read from the machine
+/// ([`with_machine`]) once the VPN before it is up, so an OpenVPN server's address and the routes
+/// it pushed are known; any other part as the plan has it.
+fn as_now(m: &mut dyn Machine, paths: &Paths, plan: &Plan, part: &Part) -> Part {
+    if !matches!(part, Part::Root(_)) {
+        return part.clone();
+    }
+    with_machine(m, paths, plan)
+        .parts
+        .into_iter()
+        .find(|now| now.kind() == Kind::Root)
+        .unwrap_or_else(|| part.clone())
 }
 
 /// The kill switch's argument as it last went up, `None` when it isn't recorded.
@@ -439,7 +468,7 @@ fn kill_switch_recorded(paths: &Paths) -> Option<String> {
 /// Records the kill switch among `args` as it went up, or that none did.
 fn record_kill_switch(paths: &Paths, args: &[RootArg]) -> Result<(), StepError> {
     let path = paths.kill_switch();
-    match args.iter().find(|arg| matches!(arg, RootArg::KillSwitch(_))) {
+    match args.iter().find(|arg| matches!(arg, RootArg::KillSwitch { .. })) {
         Some(arg) => write_atomic(&path, &format!("{}\n", arg.arg()), 0o644).map_err(|err| StepError::File(path, err)),
         None => remove_file(&path),
     }
@@ -451,8 +480,16 @@ pub fn local_networks_let_through(paths: &Paths) -> Vec<Cidr> {
     if !applied(paths).contains(&Kind::Root) {
         return Vec::new();
     }
-    kill_switch_recorded(paths)
-        .and_then(|arg| arg.strip_prefix("killswitch=lan|").map(str::to_owned))
+    let Some(recorded) = kill_switch_recorded(paths) else {
+        return Vec::new();
+    };
+    let value = recorded.strip_prefix("killswitch=").unwrap_or_default();
+    let through = match value.strip_prefix("server:") {
+        Some(rest) => rest.split_once('|').map_or("", |(_, through)| through),
+        None => value,
+    };
+    through
+        .strip_prefix("lan|")
         .map(|list| list.split(',').filter_map(Cidr::parse).collect())
         .unwrap_or_default()
 }
@@ -469,16 +506,15 @@ pub fn kill_switch_again(m: &mut dyn Machine, paths: &Paths, plan: &Plan) -> Res
     if !applied(paths).contains(&Kind::Root) || !plan.has_kill_switch() {
         return Ok(None);
     }
-    let plan = with_local_networks(m, plan);
-    let Some(kill_switch) = plan.kill_switch() else {
+    let plan = with_machine(m, paths, plan);
+    let (Some(kill_switch), Some(arg)) = (plan.kill_switch(), plan.kill_switch_arg()) else {
         return Ok(None);
     };
-    let arg = RootArg::KillSwitch(kill_switch.clone());
     if kill_switch_recorded(paths).as_deref() == Some(arg.arg().as_str()) {
         return Ok(None);
     }
-    root::put_alone(m, &arg)?;
-    record_kill_switch(paths, std::slice::from_ref(&arg))?;
+    root::put_alone(m, arg)?;
+    record_kill_switch(paths, std::slice::from_ref(arg))?;
     Ok(Some(kill_switch.clone()))
 }
 
@@ -504,15 +540,29 @@ fn run(m: &mut dyn Machine, cmd: &Cmd) -> Result<Ran, StepError> {
     }
 }
 
-/// Puts one part in place. `guarded`: the kill switch is up, so the endpoint's last address
-/// goes first, with no lookup outside the tunnel.
+/// Puts one part in place. `guarded`: the kill switch is up, so each server's last address goes
+/// first, with no lookup outside the tunnel.
 fn put(m: &mut dyn Machine, paths: &Paths, part: &Part, user: Option<&str>, guarded: bool) -> Result<(), StepError> {
     match part {
         Part::Tunnel(plan) => {
-            let keys = secrets::load(m, &plan.config).map_err(StepError::Keys)?;
+            let secrets = secrets::load(m, &plan.config).map_err(StepError::Keys)?;
             let config = endpoints::resolved(m, paths, &plan.config, guarded)?;
-            let connection = tunnel::connection(&config, &keys, &plan.dns, user);
-            m.tunnel_up(&connection).map_err(StepError::Tunnel)
+            match (&config, &secrets) {
+                (vpn::Config::WireGuard(config), Secrets::WireGuard(keys)) => {
+                    let connection = tunnel::wireguard(config, keys, &plan.dns, user);
+                    m.tunnel_up(&connection).map_err(StepError::Tunnel)
+                }
+                (vpn::Config::OpenVpn(config), Secrets::OpenVpn(credentials)) => {
+                    let files = files::write(paths, config, credentials)?;
+                    let connection = tunnel::openvpn(config, credentials, &files, &plan.dns, user);
+                    // HAZARD: remove the files only once `tunnel_up` returns. The plugin reads
+                    // them as NetworkManager activates the VPN; gone before, it fails.
+                    let up = m.tunnel_up(&connection);
+                    files::remove(paths);
+                    up.map_err(StepError::Tunnel)
+                }
+                _ => Err(StepError::Keys(secrets::Error::NotInKeyring)),
+            }
         }
         Part::Root(args) => {
             root::put(m, args)?;
@@ -528,7 +578,10 @@ fn put(m: &mut dyn Machine, paths: &Paths, part: &Part, user: Option<&str>, guar
 /// Takes one part away, whatever of it KubaOS put there, and puts back what the user had.
 fn remove(m: &mut dyn Machine, paths: &Paths, kind: Kind, keep: Keep) -> Result<(), StepError> {
     match kind {
-        Kind::Tunnel => m.tunnel_down().map_err(StepError::Tunnel),
+        Kind::Tunnel => {
+            files::remove(paths);
+            m.tunnel_down().map_err(StepError::Tunnel)
+        }
         Kind::Root if keep == Keep::KillSwitch => root::remove(m, true),
         Kind::Root => {
             root::remove(m, false)?;

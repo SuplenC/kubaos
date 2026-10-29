@@ -1,5 +1,9 @@
 use super::*;
 use crate::fake::Fake;
+use crate::openvpn::tests::CERT;
+use crate::openvpn::tests::KEY;
+use crate::openvpn::tests::inline;
+use crate::wireguard::Config;
 use crate::wireguard::tests::OTHER_PEER;
 use crate::wireguard::tests::PEER;
 use crate::wireguard::tests::PRESHARED as PRESHARED_KEY;
@@ -18,6 +22,14 @@ fn keys() -> Keys {
     Keys::of(&config()).expect("keys")
 }
 
+fn secrets() -> Secrets {
+    Secrets::WireGuard(keys())
+}
+
+fn tunnel() -> vpn::Config {
+    vpn::Config::WireGuard(config().sanitized())
+}
+
 fn session() -> Session {
     Session::new("the-session")
 }
@@ -34,11 +46,11 @@ fn never_in_argv(fake: &Fake) {
 fn the_keys_go_to_the_keyring_on_stdin_and_come_back() {
     let mut fake = Fake::new();
 
-    store(&mut fake, &keys()).expect("stored");
-    let back = load(&mut fake, &config().sanitized()).expect("loaded");
+    store(&mut fake, &secrets()).expect("stored");
+    let back = load(&mut fake, &tunnel()).expect("loaded");
 
-    assert_eq!(back, keys());
-    assert_eq!(back.preshared.len(), 1);
+    assert_eq!(back, secrets());
+    assert!(matches!(&back, Secrets::WireGuard(keys) if keys.preshared.len() == 1));
     never_in_argv(&fake);
     assert!(fake.ran_like("secret-tool clear service kubaos-proxy"));
 }
@@ -47,7 +59,7 @@ fn the_keys_go_to_the_keyring_on_stdin_and_come_back() {
 fn an_empty_keyring_says_to_pull_the_keys() {
     let mut fake = Fake::new();
 
-    let err = load(&mut fake, &config().sanitized()).expect_err("nothing there");
+    let err = load(&mut fake, &tunnel()).expect_err("nothing there");
 
     assert!(matches!(err, Error::NotInKeyring), "{err:?}");
     assert!(err.to_string().contains("kubaos proxy pull"), "{err}");
@@ -57,7 +69,7 @@ fn an_empty_keyring_says_to_pull_the_keys() {
 fn a_new_vault_item_holds_the_keys_as_hidden_fields() {
     let mut fake = Fake::new();
 
-    to_vault(&mut fake, &session(), "kubaos-proxy", &keys()).expect("stored");
+    to_vault(&mut fake, &session(), "kubaos-proxy", &secrets()).expect("stored");
 
     never_in_argv(&fake);
     let item = &fake.vault[0];
@@ -74,7 +86,7 @@ fn a_new_vault_item_holds_the_keys_as_hidden_fields() {
 #[test]
 fn importing_again_replaces_the_keys_and_keeps_the_items_other_fields() {
     let mut fake = Fake::new();
-    to_vault(&mut fake, &session(), "kubaos-proxy", &keys()).expect("stored");
+    to_vault(&mut fake, &session(), "kubaos-proxy", &secrets()).expect("stored");
     fake.vault[0]["fields"]
         .as_array_mut()
         .unwrap()
@@ -82,7 +94,7 @@ fn importing_again_replaces_the_keys_and_keeps_the_items_other_fields() {
     let mut new = keys();
     new.preshared.clear();
 
-    to_vault(&mut fake, &session(), "kubaos-proxy", &new).expect("stored again");
+    to_vault(&mut fake, &session(), "kubaos-proxy", &Secrets::WireGuard(new)).expect("stored again");
 
     assert_eq!(fake.vault.len(), 1);
     assert!(
@@ -102,17 +114,17 @@ fn importing_again_replaces_the_keys_and_keeps_the_items_other_fields() {
 #[test]
 fn the_vault_gives_the_keys_back_for_a_new_keyring() {
     let mut fake = Fake::new();
-    to_vault(&mut fake, &session(), "kubaos-proxy", &keys()).expect("stored");
+    to_vault(&mut fake, &session(), "kubaos-proxy", &secrets()).expect("stored");
 
     let back = from_vault(&mut fake, &session(), "kubaos-proxy").expect("read");
 
-    assert_eq!(back, keys());
+    assert_eq!(back, secrets());
 }
 
 #[test]
 fn an_item_named_like_but_not_exactly_is_not_the_tunnels() {
     let mut fake = Fake::new();
-    to_vault(&mut fake, &session(), "kubaos-proxy-old", &keys()).expect("stored");
+    to_vault(&mut fake, &session(), "kubaos-proxy-old", &secrets()).expect("stored");
 
     let err = from_vault(&mut fake, &session(), "kubaos-proxy").expect_err("no such item");
 
@@ -125,6 +137,105 @@ fn keys_never_print() {
 
     assert!(
         !printed.contains(PRIVATE_KEY) && !printed.contains(PRESHARED_KEY),
+        "{printed}"
+    );
+}
+
+fn openvpn() -> (vpn::Config, Secrets) {
+    let text = inline() + "auth-user-pass\n";
+    let config = crate::openvpn::Config::parse(&text, std::path::Path::new("/nonexistent")).expect("parses");
+    let mut credentials = config.credentials.clone();
+    credentials.username = Some(Secret::new("kuba"));
+    credentials.password = Some(Secret::new("hunter2"));
+    (vpn::Config::OpenVpn(config.sanitized()), Secrets::OpenVpn(credentials))
+}
+
+#[test]
+fn an_openvpn_certificate_key_and_login_go_to_the_keyring_on_stdin_and_come_back() {
+    let mut fake = Fake::new();
+    let (config, secrets) = openvpn();
+
+    store(&mut fake, &secrets).expect("stored");
+    let back = load(&mut fake, &config).expect("loaded");
+
+    assert_eq!(back, secrets);
+    for line in &fake.ran {
+        assert!(!line.contains("hunter2") && !line.contains("clientKEYsecret"), "{line}");
+    }
+    assert_eq!(
+        fake.keyring.get("service kubaos-proxy key key").map(String::as_str),
+        Some(KEY)
+    );
+    assert_eq!(
+        fake.keyring.get("service kubaos-proxy key cert").map(String::as_str),
+        Some(CERT)
+    );
+}
+
+#[test]
+fn an_openvpn_vpn_without_its_password_in_the_keyring_says_to_pull() {
+    let mut fake = Fake::new();
+    let (config, secrets) = openvpn();
+    store(&mut fake, &secrets).expect("stored");
+    fake.keyring.remove("service kubaos-proxy key password");
+
+    let err = load(&mut fake, &config).expect_err("no password");
+
+    assert!(matches!(err, Error::NotInKeyring), "{err:?}");
+}
+
+#[test]
+fn the_vault_holds_openvpn_secrets_as_hidden_fields_and_gives_them_back() {
+    let mut fake = Fake::new();
+    let (_, secrets) = openvpn();
+
+    to_vault(&mut fake, &session(), "kubaos-proxy", &secrets).expect("stored");
+    let back = from_vault(&mut fake, &session(), "kubaos-proxy").expect("read");
+
+    assert_eq!(back, secrets);
+    let names: Vec<&str> = fake.vault[0]["fields"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|f| f["name"].as_str())
+        .collect();
+    assert_eq!(names, ["cert", "key", "tls-auth", "username", "password"]);
+    assert!(
+        fake.vault[0]["fields"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|f| f["type"] == 1)
+    );
+}
+
+#[test]
+fn importing_another_type_replaces_the_old_types_secrets_in_the_vault() {
+    let mut fake = Fake::new();
+    to_vault(&mut fake, &session(), "kubaos-proxy", &secrets()).expect("WireGuard's");
+    let (_, openvpn) = openvpn();
+
+    to_vault(&mut fake, &session(), "kubaos-proxy", &openvpn).expect("OpenVPN's");
+    let back = from_vault(&mut fake, &session(), "kubaos-proxy").expect("read");
+
+    assert_eq!(back, openvpn);
+    let fields = fake.vault[0]["fields"].as_array().unwrap();
+    assert!(
+        !fields
+            .iter()
+            .any(|f| f["name"].as_str().is_some_and(|n| n.starts_with("pr"))),
+        "{fields:?}"
+    );
+}
+
+#[test]
+fn openvpn_secrets_never_print() {
+    let (_, secrets) = openvpn();
+
+    let printed = format!("{secrets:?}");
+
+    assert!(
+        !printed.contains("hunter2") && !printed.contains("clientKEYsecret"),
         "{printed}"
     );
 }

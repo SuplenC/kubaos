@@ -10,7 +10,7 @@ buildCrate "kubaos-proxy" {
   pname = "kubaos-proxy";
 
   meta = {
-    description = "KubaOS's Proxy: one switch for the work network, its WireGuard tunnel, DNS, HTTP proxy and company CA";
+    description = "KubaOS's Proxy: one switch for the work network, its VPN (WireGuard or OpenVPN), DNS, HTTP proxy and company CA";
     license = with lib.licenses; [
       mit
       asl20

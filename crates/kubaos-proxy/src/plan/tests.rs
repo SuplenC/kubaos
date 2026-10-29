@@ -72,8 +72,7 @@ fn the_root_helper_gets_the_kill_switch_first_and_chrome_last() {
 }
 
 fn kill_switch_arg(plan: &Plan) -> Option<String> {
-    plan.kill_switch()
-        .map(|kill_switch| RootArg::KillSwitch(kill_switch.clone()).arg())
+    plan.kill_switch_arg().map(RootArg::arg)
 }
 
 #[test]
@@ -99,7 +98,7 @@ fn the_kill_switch_gets_the_local_networks_but_those_the_tunnel_routes() {
         .map(|text| Cidr::parse(text).unwrap())
         .collect();
 
-    let plan = plan.with_local_networks(&found);
+    let plan = plan.with_local_networks(&found, &[]);
 
     assert_eq!(
         kill_switch_arg(&plan).as_deref(),
@@ -114,7 +113,7 @@ fn a_blocking_kill_switch_gets_no_local_network() {
     profile.tunnel.as_mut().unwrap().allow_local_network = false;
     let found = [Cidr::parse("192.168.1.23/24").unwrap()];
 
-    let plan = Plan::for_profile(&profile).with_local_networks(&found);
+    let plan = Plan::for_profile(&profile).with_local_networks(&found, &[]);
 
     assert_eq!(kill_switch_arg(&plan).as_deref(), Some("killswitch=on"));
 }
@@ -128,7 +127,7 @@ fn a_split_tunnel_has_no_kill_switch() {
     let Some(Part::Root(args)) = plan.parts.iter().find(|part| part.kind() == Kind::Root) else {
         panic!("a root part");
     };
-    assert!(!args.iter().any(|arg| matches!(arg, RootArg::KillSwitch(_))));
+    assert!(!args.iter().any(|arg| matches!(arg, RootArg::KillSwitch { .. })));
 }
 
 #[test]

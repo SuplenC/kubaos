@@ -1,11 +1,13 @@
 //! The machine for real: programs through `kubaos_core`'s runner, names through the system's
-//! resolver, and the tunnel through NetworkManager's D-Bus API on the system bus.
+//! resolver, and the VPN through NetworkManager's D-Bus API on the system bus.
 //!
-//! The tunnel's keys are agent-owned, so NetworkManager asks a secret agent for them as it
-//! activates the tunnel. `kubaos-proxy` is that agent for the length of [`Real::tunnel_up`] alone,
+//! The VPN's secrets are agent-owned, so NetworkManager asks a secret agent for them as it
+//! activates the VPN. `kubaos-proxy` is that agent for the length of [`Real::tunnel_up`] alone,
 //! the only time NetworkManager asks: the connection is volatile and never starts by itself, so
-//! every activation, at `on` and when `serve` brings a dropped tunnel back, is a `tunnel_up`; and
-//! WireGuard's re-keying is the kernel's, between the peers, with no secret asked of anyone.
+//! every activation, at `on` and when `serve` brings a dropped VPN back, is a `tunnel_up`.
+//! WireGuard's re-keying is the kernel's, between the peers, with no secret asked of anyone, and
+//! OpenVPN's renegotiation takes what the plugin was given as the VPN came up: the plugin answers
+//! OpenVPN's own requests for the password, and runs it with `--persist-key`.
 //!
 //! # Owns
 //!
@@ -52,10 +54,13 @@ const NM_PATH: &str = "/org/freedesktop/NetworkManager";
 const ACTIVE: &str = "org.freedesktop.NetworkManager.Connection.Active";
 /// `NM_ACTIVE_CONNECTION_STATE_ACTIVATED`; above it, the connection is going or gone.
 const ACTIVATED: u32 = 2;
-/// How long NetworkManager gets to bring the tunnel up. A WireGuard link has no handshake to
-/// wait for, so it is up in well under a second; a name to resolve for the endpoint is the most
-/// it waits on.
+/// How long NetworkManager gets to bring a WireGuard VPN up. Its link has no handshake to wait
+/// for, so it is up in well under a second; a name to resolve for the endpoint is the most it
+/// waits on.
 const UP_TIMEOUT: Duration = Duration::from_secs(20);
+/// How long NetworkManager gets to bring an OpenVPN VPN up: its TLS handshake with the server, a
+/// server tried after another that doesn't answer, and the server's own check of a password.
+const VPN_UP_TIMEOUT: Duration = Duration::from_mins(1);
 const POLL: Duration = Duration::from_millis(100);
 /// How long NetworkManager gets to take the tunnel down: a deactivation is near instant.
 const DOWN_TIMEOUT: Duration = Duration::from_secs(5);
@@ -101,6 +106,31 @@ impl Real {
         }
         Ok(ours)
     }
+
+    /// The active connection a VPN plugin's connection goes over: NetworkManager's primary one,
+    /// else the first that isn't the loopback's or the VPN's own. NetworkManager takes `/` as the
+    /// primary connection and refuses the VPN when there is none, as on a network with no
+    /// default route.
+    fn base(&mut self) -> Result<OwnedObjectPath, TunnelError> {
+        let bus = self.bus()?;
+        let nm = Proxy::new(&bus, NM, NM_PATH, NM).map_err(unreachable)?;
+        let primary: OwnedObjectPath = nm.get_property("PrimaryConnection").map_err(unreachable)?;
+        if primary.as_str() != "/" {
+            return Ok(primary);
+        }
+        let active: Vec<OwnedObjectPath> = nm.get_property("ActiveConnections").map_err(unreachable)?;
+        for path in active {
+            let Ok(connection) = Proxy::new(&bus, NM, path.clone(), ACTIVE) else {
+                continue;
+            };
+            let id = connection.get_property::<String>("Id").unwrap_or_default();
+            let kind = connection.get_property::<String>("Type").unwrap_or_default();
+            if id != ID && kind != "loopback" && kind != "vpn" {
+                return Ok(path);
+            }
+        }
+        Ok(primary)
+    }
 }
 
 fn unreachable(err: impl std::fmt::Display) -> TunnelError {
@@ -123,6 +153,11 @@ fn value(prop: &Prop) -> Value<'static> {
         Prop::Bool(b) => Value::Bool(*b),
         Prop::Strs(list) => Value::from(list.clone()),
         Prop::Dicts(dicts) => Value::from(dicts.iter().map(dict).collect::<Vec<_>>()),
+        Prop::Map(map) | Prop::Secrets(map) => Value::from(
+            map.iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<HashMap<_, _>>(),
+        ),
     }
 }
 
@@ -159,14 +194,24 @@ impl Machine for Real {
         // HAZARD: the named binding keeps the agent registered until the tunnel is up or has
         // failed. `let _ =` drops it at once, and NetworkManager fails the tunnel with no-secrets.
         let _agent = secret_agent::Registered::new(Agent::new(&connection, uuid))?;
+        let is_plugin = matches!(
+            connection.get("connection").and_then(|c| c.get("type")),
+            Some(Prop::Str(kind)) if kind == "vpn"
+        );
+        let timeout = if is_plugin { VPN_UP_TIMEOUT } else { UP_TIMEOUT };
         let bus = self.bus()?;
         let nm = Proxy::new(&bus, NM, NM_PATH, NM).map_err(unreachable)?;
         let root = ObjectPath::from_static_str_unchecked("/");
+        let over = if is_plugin {
+            self.base()?
+        } else {
+            OwnedObjectPath::from(root.clone())
+        };
         let options: HashMap<&str, Value<'_>> = HashMap::from([("persist", Value::from("volatile"))]);
         let (_, active, _): (OwnedObjectPath, OwnedObjectPath, HashMap<String, OwnedValue>) = nm
             .call(
                 "AddAndActivateConnection2",
-                &(settings(&connection), &root, &root, options),
+                &(settings(&connection), &root, &over, options),
             )
             .map_err(refused)?;
         let start = Instant::now();
@@ -178,9 +223,9 @@ impl Machine for Real {
                 Some(ACTIVATED) => return Ok(()),
                 Some(state) if state > ACTIVATED => return Err(TunnelError::Dropped),
                 None => return Err(TunnelError::Dropped),
-                Some(_) if start.elapsed() > UP_TIMEOUT => {
+                Some(_) if start.elapsed() > timeout => {
                     let _ = self.tunnel_down();
-                    return Err(TunnelError::NotUp(UP_TIMEOUT.as_secs()));
+                    return Err(TunnelError::NotUp(timeout.as_secs()));
                 }
                 Some(_) => thread::sleep(POLL),
             }
@@ -202,7 +247,7 @@ impl Machine for Real {
                 return Err(refused(err));
             }
         }
-        // A new tunnel takes the same interface, which NetworkManager frees only once the old
+        // A new VPN takes the same interface, which NetworkManager frees only once the old
         // connection is gone, a moment after it said yes.
         let start = Instant::now();
         while !self.ours()?.is_empty() {

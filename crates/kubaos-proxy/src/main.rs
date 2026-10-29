@@ -6,11 +6,11 @@
 //! kubaos-proxy off                    every part down
 //! kubaos-proxy lan on|off             whether the kill switch lets the local networks through
 //! kubaos-proxy status [--json] [--live]
-//!                                     the parts and which are up; --live adds the tunnel's last
+//!                                     the parts and which are up; --live adds the VPN's last
 //!                                     handshake and bytes moved
-//! kubaos-proxy import FILE            IT's WireGuard config: its keys to the vault and the
-//!                                     keyring, the rest beside proxy.toml
-//! kubaos-proxy pull                   the keys from the vault to the keyring again
+//! kubaos-proxy import FILE            IT's VPN config, WireGuard or OpenVPN: its secrets to the
+//!                                     vault and the keyring, the rest beside proxy.toml
+//! kubaos-proxy pull                   the secrets from the vault to the keyring again
 //! kubaos-proxy serve                  the session service: at its start, after a resume and when
 //!                                     the network changes, makes the machine what the user wants
 //! ```
@@ -51,14 +51,18 @@ use kubaos_proxy::Profile;
 use kubaos_proxy::apply;
 use kubaos_proxy::apply::Reconciled;
 use kubaos_proxy::apply::chain;
-use kubaos_proxy::paths::DEFAULT_CONF;
+use kubaos_proxy::openvpn;
 use kubaos_proxy::profile;
 use kubaos_proxy::profile::LoadError;
 use kubaos_proxy::real::Real;
 use kubaos_proxy::secrets;
 use kubaos_proxy::secrets::Keys;
+use kubaos_proxy::secrets::Secret;
+use kubaos_proxy::secrets::Secrets;
 use kubaos_proxy::status;
 use kubaos_proxy::status::Status;
+use kubaos_proxy::vpn;
+use kubaos_proxy::vpn::Type;
 use kubaos_proxy::watch;
 use kubaos_proxy::watch::Event;
 use kubaos_proxy::watch::Response;
@@ -74,10 +78,12 @@ usage: kubaos-proxy on|off
 on       the work network: every part of ~/.config/kubaos/desktop/network/proxy.toml up, or none
 off      every part down again
 lan      whether the kill switch lets the network you're on through (on by default): the phone
-         link, printers, casting and SSH there; a range the tunnel routes stays behind it
-status   the parts and which are up; --live adds the tunnel's last handshake and bytes moved
-import   IT's WireGuard config: its keys go to the vault and the keyring, the rest beside proxy.toml
-pull     the tunnel's keys from the vault to the keyring again (a new machine, a new keyring)
+         link, printers, casting and SSH there; a range the VPN routes stays behind it
+status   the parts and which are up; --live adds the VPN's last handshake and bytes moved
+import   IT's VPN config, a WireGuard .conf or an OpenVPN .ovpn, its type read from the file: its
+         secrets go to the vault and the keyring, the rest beside proxy.toml; a username and
+         password it asks for are asked once, here
+pull     the VPN's secrets from the vault to the keyring again (a new machine, a new keyring)
 serve    the session service (home/proxy.nix)";
 
 const ICON: &str = "network-vpn";
@@ -184,7 +190,7 @@ fn switch(paths: &Paths, on: bool) -> ExitCode {
                     paths,
                     &profile,
                     "Proxy not set up",
-                    "Nothing to switch on: import IT's WireGuard config (kubaos proxy import FILE) or edit \
+                    "Nothing to switch on: import IT's VPN config (kubaos proxy import FILE) or edit \
                      ~/.config/kubaos/desktop/network/proxy.toml"
                         .to_owned(),
                 );
@@ -310,7 +316,7 @@ fn summary(now: &Status) -> String {
             .map(|e| format!(" to {e}"))
             .unwrap_or_default();
         let guard = if tunnel.kill_switch { ", kill switch on" } else { "" };
-        parts.push(format!("{kind}{to}{guard}"));
+        parts.push(format!("{} VPN, {kind}{to}{guard}", tunnel.type_name));
     }
     if !now.dns_servers.is_empty() {
         parts.push("work DNS".to_owned());
@@ -370,7 +376,7 @@ fn session() -> Result<Session, String> {
     if !io::stdin().is_terminal() {
         return Err("the vault is locked and there's no terminal to unlock it: run this in one".to_owned());
     }
-    eprintln!("kubaos-proxy: unlocking the vault for the tunnel's keys");
+    eprintln!("kubaos-proxy: unlocking the vault for the VPN's secrets");
     bw.unlock(None)
         .map_err(|err| format!("bw couldn't unlock the vault ({err}): kubaos bitwarden setup logs in"))
 }
@@ -387,6 +393,89 @@ fn typed_path(typed: &str) -> PathBuf {
     }
 }
 
+/// Asks the person at the terminal for `what`, its typing hidden when `hidden`.
+#[expect(
+    clippy::print_stderr,
+    reason = "The question is for the person at the terminal, on stderr beside bw's own prompt."
+)]
+fn ask(what: &str, hidden: bool) -> io::Result<String> {
+    let echo = |on: bool| {
+        Command::new("stty")
+            .arg(if on { "echo" } else { "-echo" })
+            .stdin(Stdio::inherit())
+            .status()
+            .map(drop)
+    };
+    eprint!("{what}: ");
+    io::stderr().flush()?;
+    if hidden {
+        echo(false)?;
+    }
+    let mut line = String::new();
+    let read = io::stdin().read_line(&mut line);
+    if hidden {
+        let _ = echo(true);
+        eprintln!();
+    }
+    read?;
+    Ok(line.trim_end_matches(['\n', '\r']).to_owned())
+}
+
+/// The secrets of an imported config, what an OpenVPN one lacks asked for at the terminal: the
+/// username and password `auth-user-pass` wants, and an encrypted key's passphrase.
+fn secrets_of(config: &vpn::Config, file: &Path) -> Result<Secrets, String> {
+    let config = match config {
+        vpn::Config::WireGuard(config) => {
+            return Keys::of(config).map(Secrets::WireGuard).ok_or_else(|| {
+                format!(
+                    "{} has no PrivateKey: import the config IT gave you, with its keys",
+                    file.display()
+                )
+            });
+        }
+        vpn::Config::OpenVpn(config) => config,
+    };
+    let mut credentials = config.credentials.clone();
+    let mut questions = Vec::new();
+    if config.auth_user_pass {
+        if credentials.username.is_none() {
+            questions.push(("username", "The VPN's username", false));
+        }
+        if credentials.password.is_none() {
+            questions.push(("password", "The VPN's password", true));
+        }
+    }
+    if credentials
+        .key
+        .as_ref()
+        .is_some_and(|key| openvpn::is_encrypted(key.expose()))
+        && credentials.cert_pass.is_none()
+    {
+        questions.push(("cert-pass", "The private key's passphrase", true));
+    }
+    if !questions.is_empty() && !io::stdin().is_terminal() {
+        return Err(format!(
+            "{} asks for a password, and there's no terminal to ask in: run this in one",
+            file.display()
+        ));
+    }
+    for (name, question, hidden) in questions {
+        let answer = ask(question, hidden).map_err(|err| format!("couldn't read the answer: {err}"))?;
+        if !answer.is_empty() {
+            credentials.set(name, Secret::new(answer));
+        }
+    }
+    let missing = credentials.missing(config);
+    if !missing.is_empty() {
+        return Err(format!(
+            "{} has no {}: import the config IT gave you, with its certificate and key or a login",
+            file.display(),
+            missing.join(", ")
+        ));
+    }
+    Ok(Secrets::OpenVpn(credentials))
+}
+
 #[expect(
     clippy::print_stdout,
     clippy::print_stderr,
@@ -400,12 +489,12 @@ fn import(paths: &Paths, file: &Path) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let Some(keys) = Keys::of(&config) else {
-        eprintln!(
-            "kubaos-proxy: {} has no PrivateKey: import the config IT gave you, with its keys",
-            file.display()
-        );
-        return ExitCode::FAILURE;
+    let secrets = match secrets_of(&config, file) {
+        Ok(secrets) => secrets,
+        Err(err) => {
+            eprintln!("kubaos-proxy: {err}");
+            return ExitCode::FAILURE;
+        }
     };
     let session = match session() {
         Ok(session) => session,
@@ -416,33 +505,42 @@ fn import(paths: &Paths, file: &Path) -> ExitCode {
     };
     let mut m = Real::new();
     let item = vault_item(paths);
-    if let Err(err) = secrets::to_vault(&mut m, &session, &item, &keys) {
+    if let Err(err) = secrets::to_vault(&mut m, &session, &item, &secrets) {
         eprintln!("kubaos-proxy: {}", chain(&err));
         return ExitCode::FAILURE;
     }
-    println!("The keys are in the vault, in {item:?}.");
-    if let Err(err) = secrets::store(&mut m, &keys) {
+    println!("The VPN's secrets are in the vault, in {item:?}.");
+    if let Err(err) = secrets::store(&mut m, &secrets) {
         eprintln!("kubaos-proxy: {}; kubaos proxy pull tries again", chain(&err));
         return ExitCode::FAILURE;
     }
-    let conf = paths.network.join(DEFAULT_CONF);
+    let kind = config.kind();
+    let conf = paths.network.join(kind.file_name());
     // The file's name goes in a comment line: a newline in it would start a line of config.
     let from: String = file
         .file_name()
         .map(|name| name.to_string_lossy().chars().filter(|c| !c.is_control()).collect())
         .unwrap_or_default();
     let text = format!(
-        "# IT's WireGuard config without its keys, from {from} (kubaos-proxy import).\n\
-         # The keys are in the vault, in {item:?}, and the GNOME keyring.\n{}",
+        "# IT's {kind} config without its secrets, from {from} (kubaos-proxy import).\n\
+         # The secrets are in the vault, in {item:?}, and the GNOME keyring.\n{}",
         config.sanitized().render()
     );
     if let Err(err) = profile::write_atomic(&conf, &text, 0o644) {
         eprintln!("kubaos-proxy: couldn't write {}: {err}", conf.display());
         return ExitCode::FAILURE;
     }
-    if let Err(err) = profile::set_conf(&paths.profile(), DEFAULT_CONF) {
+    let before = profile::conf_named(&paths.profile());
+    if let Err(err) = profile::set_conf(&paths.profile(), kind, kind.file_name()) {
         eprintln!("kubaos-proxy: {}", chain(&err));
         return ExitCode::FAILURE;
+    }
+    // The other type's file, an import's own, is the config this one replaces.
+    if let Some(before) = before
+        && before != kind.file_name()
+        && Type::ALL.iter().any(|other| other.file_name() == before)
+    {
+        let _ = fs::remove_file(paths.network.join(before));
     }
     report_import(&config, &conf);
     publish(&mut m, paths, &Profile::load(&paths.network), false, None);
@@ -451,35 +549,63 @@ fn import(paths: &Paths, file: &Path) -> ExitCode {
 
 #[expect(
     clippy::print_stdout,
-    reason = "The report of the imported tunnel is the command's output."
+    reason = "The report of the imported VPN is the command's output."
 )]
-fn report_import(config: &kubaos_proxy::wireguard::Config, conf: &Path) {
-    let ranges: Vec<String> = config
-        .peers
-        .iter()
-        .flat_map(|peer| peer.allowed_ips.iter().map(ToString::to_string))
-        .collect();
-    if config.is_full() {
-        println!(
-            "A full tunnel (AllowedIPs {}): everything goes through it, and the kill switch blocks what \
-             would leave outside it.",
-            ranges.join(", ")
-        );
-    } else {
-        println!("A split tunnel: only {} go through it.", ranges.join(", "));
+fn report_import(config: &vpn::Config, conf: &Path) {
+    match config {
+        vpn::Config::WireGuard(config) => {
+            let ranges: Vec<String> = config
+                .peers
+                .iter()
+                .flat_map(|peer| peer.allowed_ips.iter().map(ToString::to_string))
+                .collect();
+            if config.is_full() {
+                println!(
+                    "A WireGuard VPN, a full tunnel (AllowedIPs {}): everything goes through it, and the kill \
+                     switch blocks what would leave outside it.",
+                    ranges.join(", ")
+                );
+            } else {
+                println!(
+                    "A WireGuard VPN, a split tunnel: only {} go through it.",
+                    ranges.join(", ")
+                );
+            }
+        }
+        vpn::Config::OpenVpn(config) => {
+            if config.is_full() {
+                println!(
+                    "An OpenVPN VPN, a full tunnel (redirect-gateway): everything goes through it, and the kill \
+                     switch blocks what would leave outside it."
+                );
+            } else {
+                let own: Vec<String> = config.routes.iter().map(ToString::to_string).collect();
+                let also = if own.is_empty() {
+                    String::new()
+                } else {
+                    format!(", and {},", own.join(", "))
+                };
+                println!(
+                    "An OpenVPN VPN, a split tunnel: only the ranges the server pushes{also} go through it. Add \
+                     redirect-gateway def1 to {} for a full one.",
+                    conf.display()
+                );
+            }
+        }
     }
     if let Some(endpoint) = config.endpoint() {
-        println!("Endpoint: {endpoint}.");
+        println!("Server: {endpoint}.");
     }
-    if !config.interface.dns_servers.is_empty() {
-        let servers: Vec<String> = config.interface.dns_servers.iter().map(ToString::to_string).collect();
+    if !config.dns_servers().is_empty() {
+        let servers: Vec<String> = config.dns_servers().iter().map(ToString::to_string).collect();
         println!("Work DNS: {}.", servers.join(", "));
     }
-    if !config.ignored.is_empty() {
-        println!(
-            "Left out, since KubaOS runs no wg-quick scripts: {}.",
-            config.ignored.join(", ")
-        );
+    if !config.ignored().is_empty() {
+        let why = match config.kind() {
+            Type::WireGuard => "since KubaOS runs no wg-quick scripts",
+            Type::OpenVpn => "since NetworkManager's OpenVPN plugin runs it",
+        };
+        println!("Left out, {why}: {}.", config.ignored().join(", "));
     }
     println!(
         "Written to {} and named in proxy.toml. The Proxy tile in the control center, or kubaos proxy on, \
@@ -503,10 +629,10 @@ fn pull(paths: &Paths) -> ExitCode {
     };
     let mut m = Real::new();
     let item = vault_item(paths);
-    let done = secrets::from_vault(&mut m, &session, &item).and_then(|keys| secrets::store(&mut m, &keys));
+    let done = secrets::from_vault(&mut m, &session, &item).and_then(|secrets| secrets::store(&mut m, &secrets));
     match done {
         Ok(()) => {
-            println!("The tunnel's keys are in the keyring again, from {item:?} in the vault.");
+            println!("The VPN's secrets are in the keyring again, from {item:?} in the vault.");
             ExitCode::SUCCESS
         }
         Err(err) => {
