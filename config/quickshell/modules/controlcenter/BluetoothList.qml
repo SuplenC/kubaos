@@ -5,9 +5,9 @@ import qs.services
 import "../../services/radios.js" as Radios
 
 // The Bluetooth tab: paired devices (Known), the connected first and checked with their battery,
-// then the devices in range to pair (Nearby), nearest first by their last signal. Nearby leaves
-// out the devices that send no name unless the person asks for them, and its last line says how
-// many there are, with Show or Hide, which is remembered. A known device
+// then the devices in range to pair (Nearby), nearest first by their last signal. The devices
+// that send no name come last, under a line that says how many there are, folded away unless its
+// Show opens them, which is remembered. A known device
 // connects or disconnects on a press; a nearby one opens the connection form, which pairs it and
 // shows what the pairing agent asks: a code to type on the device or to check, or a PIN or
 // passkey to type here. A pairing the device starts opens the form too.
@@ -41,7 +41,8 @@ RadioTab {
             checked: false,
             forgettable: false,
             failed: failed,
-            action: ""
+            action: "",
+            folded: false
         };
     }
 
@@ -63,7 +64,8 @@ RadioTab {
             checked: device.connected,
             forgettable: device.paired && !device.connected,
             failed: false,
-            action: ""
+            action: "",
+            folded: false
         };
     }
 
@@ -144,13 +146,21 @@ RadioTab {
         } else {
             out.push(root.line("note", "note:nearby", Bt.problem || "Nothing in pairing mode nearby", Bt.problem !== ""));
         }
-        const unnamed = Radios.unnamedLine(Bt.unnamedCount, Bt.showUnnamed);
-        if (unnamed !== "")
+        const unnamed = Radios.unnamedLine(Bt.unnamed.length, Bt.showUnnamed);
+        if (unnamed !== "") {
             out.push(Object.assign(root.line("action", root.unnamedKey, unnamed, false), {
                 action: Bt.showUnnamed ? "Hide" : "Show"
             }));
+            // Always listed, and folded away while hidden: Show and Hide then change no row, and
+            // the block opens and closes under its line in one motion.
+            for (const device of Bt.unnamed)
+                out.push(Object.assign(root.deviceRow(device), {
+                    folded: true
+                }));
+        }
         return out;
     }
+    unfolded: Bt.showUnnamed
     formOpen: root.pendingPath !== ""
     off: !Bt.available || !Bt.enabled
     offIcon: "bluetooth_disabled"

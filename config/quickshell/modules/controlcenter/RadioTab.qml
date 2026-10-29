@@ -7,12 +7,13 @@ import qs.components
 // cross-fading; or, while the radio is `off`, an empty state saying how to turn it on.
 //
 // A row is `{ key, kind, title, subtitle, subtitleIcon, icon, accent, checked, forgettable,
-// failed, action }`. Its kind: "row" (a network or a device, on its icon tile, checked while in
+// failed, action, folded }`. Its kind: "row" (a network or a device, on its icon tile, checked while in
 // use; pressed, `picked(key)`; a forgettable one shows a quiet × under the pointer, and Delete on
 // it does the same, `forgot(key)`), "label" (a section's small muted title), "skeleton" (a row
 // still being found), "note" (one line, in the error colour while `failed`) or "action" (a quiet
 // line with a text button at its end, labelled `action`, which the keys reach as a row's; pressed,
-// `picked(key)`).
+// `picked(key)`). The `folded` rows are one block that opens while `unfolded` and folds away
+// while not, all together (`LiveList`).
 Item {
     id: root
 
@@ -24,6 +25,8 @@ Item {
     property string offBody
     // A button under the empty state's words that turns the radio on, or none.
     property Component offAction: null
+    // Whether the `folded` rows show.
+    property bool unfolded: true
     readonly property alias form: form
     readonly property alias list: list
 
@@ -58,6 +61,7 @@ Item {
             opacity: root.formOpen ? 0 : 1
             highlightShown: activeFocus
             rows: root.rows
+            unfolded: root.unfolded
             onActivated: index => root.picked(root.rowAt(index).key)
             Keys.onDeletePressed: {
                 const row = root.rowAt(list.currentIndex);
@@ -88,17 +92,20 @@ Item {
                 required property bool forgettable
                 required property bool failed
                 required property string action
+                required property bool folded
 
                 // A label after rows stands 12 clear of them, with the 4 the row above carries.
                 readonly property int labelRoom: live.index > 0 ? K.Tokens.space.s12 : 0
 
+                folds: live.folded
                 rowHeight: live.kind === "label" ? live.labelRoom + K.Tokens.type.label.line : live.kind === "note" || live.kind === "action" ? K.Tokens.size.row : K.Tokens.size.row_two_line
 
-                // Only what the row's kind shows is made: a scan's update makes and drops rows
-                // while the tab shows.
+                // Only what the row's kind shows is made, and nothing while it is folded away: a
+                // scan's update makes and drops rows while the tab shows.
                 Loader {
                     width: live.width
                     height: live.rowHeight
+                    active: live.unfold > 0
                     sourceComponent: ({
                             row: deviceRow,
                             label: sectionLabel,

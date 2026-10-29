@@ -37,14 +37,14 @@ Singleton {
     // How strongly each device was last heard while scanning, in dBm, by object path.
     readonly property var rssi: agentState.rssi ?? ({})
     // Paired devices, the connected first, named or not; then the ones in range to pair, nearest
-    // first, the unnamed ones only while `showUnnamed` (radios.js). BlueZ forgets an unpaired
-    // device a while after a scan stops hearing it.
+    // first, those that send a name in `nearby` and those that don't in `unnamed`, which the tab
+    // folds away unless `showUnnamed` (radios.js). BlueZ forgets an unpaired device a while after
+    // a scan stops hearing it.
     readonly property var known: Radios.btKnown(devices)
+    readonly property var inRange: Radios.btSplit(Radios.btNearby(devices, rssi))
+    readonly property var nearby: inRange.named
+    readonly property var unnamed: inRange.unnamed
     readonly property bool showUnnamed: ShellState.bluetoothUnnamed
-    readonly property var inRange: Radios.btShown(Radios.btNearby(devices, rssi), showUnnamed)
-    readonly property var nearby: inRange.shown
-    // How many devices in range send no name, listed or not.
-    readonly property int unnamedCount: inRange.unnamed
     readonly property int connectedCount: devices.filter(d => d.connected).length
     readonly property string icon: !enabled ? "bluetooth_disabled" : connectedCount > 0 ? "bluetooth_connected" : "bluetooth"
 

@@ -70,25 +70,22 @@ function unnamed(device) {
     return name === "" || name === device.address.toUpperCase();
 }
 
-// Devices in range to pair: the named ones nearest first by their last RSSI (`rssi`, by object
-// path), then the unnamed ones the same way.
+// Devices in range to pair, nearest first by their last RSSI (`rssi`, by object path).
 function btNearby(devices, rssi) {
     const near = d => nearness(rssi[d.dbusPath]);
-    return devices.filter(d => !d.paired).sort((a, b) => (unnamed(a) - unnamed(b)) || (near(b) - near(a)) || byName(a, b));
+    return devices.filter(d => !d.paired).sort((a, b) => (near(b) - near(a)) || byName(a, b));
 }
 
-// What Nearby lists of `nearby` (`btNearby`'s), and how many unnamed devices are in range,
-// `{ shown, unnamed }`: the unnamed ones are listed only on `showUnnamed`, as they are mostly
-// beacons and phones nobody pairs.
-function btShown(nearby, showUnnamed) {
-    const named = nearby.filter(d => !unnamed(d));
+// `nearby` (`btNearby`'s) as Nearby lists it, `{ named, unnamed }`, each in its order: the named
+// devices, then a line and the unnamed ones, which are mostly beacons and phones nobody pairs.
+function btSplit(nearby) {
     return {
-        shown: showUnnamed ? nearby : named,
-        unnamed: nearby.length - named.length
+        named: nearby.filter(d => !unnamed(d)),
+        unnamed: nearby.filter(unnamed)
     };
 }
 
-// The line at the end of Nearby about its `count` unnamed devices, or "" while there are none.
+// The line before Nearby's `count` unnamed devices, or "" while there are none.
 function unnamedLine(count, showUnnamed) {
     if (count === 0)
         return "";

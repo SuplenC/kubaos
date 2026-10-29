@@ -36,7 +36,8 @@ RadioTab {
             checked: false,
             forgettable: false,
             failed: false,
-            action: ""
+            action: "",
+            folded: false
         };
     }
 
@@ -52,7 +53,8 @@ RadioTab {
             checked: network.connected,
             forgettable: network.known && !network.connected,
             failed: false,
-            action: ""
+            action: "",
+            folded: false
         };
     }
 

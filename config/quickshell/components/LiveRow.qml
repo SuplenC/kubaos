@@ -3,7 +3,9 @@ import KubaOS.Components as K
 
 // A `LiveList`'s delegate: its row (the child), `rowHeight` tall, and the 4 after it. Added to the
 // list while it shows, it opens its room over `medium` and fades in over `slow`; removed, it stays
-// in the view, unpressable, while it fades and gives its room back over `medium`, then goes.
+// in the view, unpressable, while it fades and gives its room back over `medium`, then goes. A row
+// that `folds` belongs to the list's one block, and takes as much of its room, and shows as much,
+// as the list's `unfold`.
 Item {
     id: root
 
@@ -11,6 +13,11 @@ Item {
     property real rowHeight: K.Tokens.size.row_two_line
     // How much of its room the row has: 0 while it arrives or leaves, else 1.
     property real grow: 1
+    // How much of it shows while it arrives or leaves, which a fold scales.
+    property real shown: 1
+    // Whether the row is in the list's block that folds away.
+    property bool folds: false
+    readonly property real unfold: root.folds && ListView.view ? ListView.view.unfold : 1
     // Whether this is the list's current row, for a row's `selected`.
     readonly property bool current: ListView.isCurrentItem
     readonly property bool leaving: leave.running
@@ -18,8 +25,11 @@ Item {
     readonly property alias leaveAnimation: leave
 
     width: ListView.view ? ListView.view.width : 0
-    height: (root.rowHeight + K.Tokens.space.s4) * root.grow
-    clip: root.grow < 1
+    height: (root.rowHeight + K.Tokens.space.s4) * root.grow * root.unfold
+    opacity: root.shown * root.unfold
+    visible: root.unfold > 0
+    enabled: root.unfold === 1
+    clip: root.grow < 1 || root.unfold < 1
 
     ListView.onAdd: if (ListView.view.animated)
         enter.start()
@@ -41,7 +51,7 @@ Item {
 
         NumberAnimation {
             target: root
-            property: "opacity"
+            property: "shown"
             from: 0
             to: 1
             duration: K.Tokens.duration.slow
@@ -77,7 +87,7 @@ Item {
 
             NumberAnimation {
                 target: root
-                property: "opacity"
+                property: "shown"
                 to: 0
                 duration: K.Tokens.duration.medium
                 easing.type: Easing.BezierSpline

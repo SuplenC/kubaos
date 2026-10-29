@@ -3,8 +3,8 @@ import QtQuick
 
 // Stand-in for Bt: headphones and a mouse connected with their batteries, a keyboard and a phone
 // paired, three devices in range at three distances, and three more in range that send no name,
-// hidden until `showUnnamed`. The drivers set `prompt`, `pairing` and `errors` for the pairing
-// states.
+// folded away until `showUnnamed`. The drivers set `prompt`, `pairing` and `errors` for the
+// pairing states.
 QtObject {
     id: root
 
@@ -37,8 +37,7 @@ QtObject {
     // BlueZ names a device that sends none by its address, dashes for the colons.
     readonly property var unnamed: ["4C:2F:9A:01:BE:77", "D8:3A:DD:5E:10:C2", "F1:07:63:A4:29:8B"].map(address => root.device(address.replace(/:/g, "-"), "", false, false, -1, address))
     property bool showUnnamed: false
-    readonly property int unnamedCount: unnamed.length
-    readonly property var nearby: [...devices.filter(d => !d.paired).sort((a, b) => (rssi[b.dbusPath] ?? -999) - (rssi[a.dbusPath] ?? -999)), ...(showUnnamed ? unnamed : [])]
+    readonly property var nearby: devices.filter(d => !d.paired).sort((a, b) => (rssi[b.dbusPath] ?? -999) - (rssi[a.dbusPath] ?? -999))
     readonly property int connectedCount: devices.filter(d => d.connected).length
     readonly property string icon: !enabled ? "bluetooth_disabled" : connectedCount > 0 ? "bluetooth_connected" : "bluetooth"
 

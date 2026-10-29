@@ -18,7 +18,8 @@ TestCase {
     function line(key, kind) {
         return {
             key: key,
-            kind: kind
+            kind: kind,
+            folded: false
         };
     }
 
@@ -73,6 +74,9 @@ TestCase {
         delegate: LiveRow {
             required property string key
             required property string kind
+            required property bool folded
+
+            folds: folded
             // design-allow(size): a test's fixture, not a design value.
             rowHeight: 40
         }
@@ -80,6 +84,7 @@ TestCase {
 
     function init() {
         list.rows = [];
+        list.unfolded = true;
         list.currentIndex = -1;
         list.positionViewAtBeginning();
         settle();
@@ -144,6 +149,79 @@ TestCase {
         settle();
 
         compare(shownAt(watched), before, "the row the person looked at is where it was");
+    }
+
+    // Nearby with the line before its unnamed block, as the Bluetooth tab lists it.
+    function withBlock(count) {
+        return [...radio(["known-a"], ["near-a", "near-b"]), line("action:unnamed", "action"), ...names("unnamed-", count).map(key => Object.assign(line(key, "row"), {
+                    folded: true
+                }))];
+    }
+
+    // The block's rows' heights through a fold, sampled each frame, and where the line stood.
+    function fold(open) {
+        const block = names("unnamed-", 4);
+        const samples = [];
+        const count = list.count;
+        list.unfolded = open;
+        for (let n = 0; n < 40; n++) {
+            samples.push({
+                heights: block.map(key => delegateFor(key)?.height ?? -1),
+                line: shownAt("action:unnamed"),
+                count: list.count
+            });
+            wait(16);
+        }
+        return {
+            samples: samples,
+            count: count
+        };
+    }
+
+    function test_hide_folds_the_unnamed_block_away_in_one_motion_under_a_line_that_stays_put() {
+        list.rows = withBlock(4);
+        settle();
+        const line = shownAt("action:unnamed");
+
+        const run = fold(false);
+
+        verify(run.samples.some(sample => sample.heights[0] > 0 && sample.heights[0] < delegateFor("near-a").height), "it folds over frames");
+        for (const sample of run.samples) {
+            compare(sample.count, run.count, "no row left the model");
+            verify(sample.heights.every(height => height === sample.heights[0]), `the block folds as one: ${sample.heights}`);
+            compare(sample.line, line, "the line didn't move");
+        }
+        compare(run.samples[run.samples.length - 1].heights[0], 0, "folded away");
+    }
+
+    function test_show_opens_the_unnamed_block_in_one_motion_under_a_line_that_stays_put() {
+        list.unfolded = false;
+        list.rows = withBlock(4);
+        settle();
+        const line = shownAt("action:unnamed");
+
+        const run = fold(true);
+
+        verify(run.samples.some(sample => sample.heights[0] > 0 && sample.heights[0] < delegateFor("near-a").height), "it opens over frames");
+        for (const sample of run.samples) {
+            verify(sample.heights.every(height => height === sample.heights[0]), `the block opens as one: ${sample.heights}`);
+            compare(sample.line, line, "the line didn't move");
+        }
+        compare(run.samples[run.samples.length - 1].heights[0], delegateFor("near-a").height, "open");
+        list.unfolded = true;
+    }
+
+    function test_the_keyboard_skips_the_folded_block_and_leaves_it_as_it_folds() {
+        list.rows = withBlock(2);
+        settle();
+        list.jump(list.count - 1);
+
+        list.unfolded = false;
+
+        compare(list.model.get(list.currentIndex).key, "action:unnamed", "onto the line before the block");
+        list.step(1);
+        compare(list.model.get(list.currentIndex).key, "known-a", "round past the block");
+        list.unfolded = true;
     }
 
     function test_the_keyboard_still_brings_its_row_into_view() {
