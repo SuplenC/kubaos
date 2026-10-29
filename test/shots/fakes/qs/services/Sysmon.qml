@@ -111,6 +111,8 @@ QtObject {
                     rpm: 2380
                 }
             ],
+            fanCount: 1,
+            hasSnapshots: true,
             top: {
                 cpu: [root.firefox, root.hyprland, root.analyzer, root.quickshell, root.ghostty],
                 memory: [root.firefox, root.analyzer, root.hyprland, root.quickshell, root.ghostty]

@@ -57,6 +57,8 @@ Item {
         opacity: root.kind === "placeholder" ? 1 : 0
 
         Behavior on opacity {
+            enabled: root.owner.fades
+
             NumberAnimation {
                 duration: root.fade
                 easing.type: Easing.BezierSpline
@@ -100,6 +102,8 @@ Item {
         onActivated: root.owner.toggle(root.process.pid)
 
         Behavior on opacity {
+            enabled: root.owner.fades
+
             NumberAnimation {
                 duration: root.fade
                 easing.type: Easing.BezierSpline

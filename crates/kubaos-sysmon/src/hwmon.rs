@@ -87,6 +87,12 @@ impl Sensors {
         millidegrees(self.cpu_temperature.as_deref()?)
     }
 
+    /// How many fans were found, which [`Sensors::fans`] lists unless one can't be read. It reads
+    /// no file, so a light sample can say it.
+    pub fn fan_count(&self) -> usize {
+        self.fans.len()
+    }
+
     /// Each fan's speed now.
     pub fn fans(&self) -> Vec<Fan> {
         self.fans

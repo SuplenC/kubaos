@@ -162,4 +162,37 @@ TestCase {
                 verify(Panel.share(i, numeric) > 0 && Panel.share(i, numeric) <= 1, `row ${i}, numeric ${numeric}`);
         }
     }
+
+    function test_the_snapshots_line_says_how_many_and_their_size_data() {
+        return [
+            {
+                tag: "quotas off",
+                snaps: {
+                    count: 68,
+                    bytes: null
+                },
+                line: "68 snapshots · size unknown"
+            },
+            {
+                tag: "one, quotas on",
+                snaps: {
+                    count: 1,
+                    bytes: 2048
+                },
+                line: "1 snapshot · 2 KB"
+            },
+            {
+                tag: "uncounted",
+                snaps: {
+                    count: null,
+                    bytes: null
+                },
+                line: "Snapshots · size unknown"
+            }
+        ];
+    }
+
+    function test_the_snapshots_line_says_how_many_and_their_size(data) {
+        compare(Panel.snapshots(data.snaps, bytes => `${bytes / 1024} KB`), data.line);
+    }
 }

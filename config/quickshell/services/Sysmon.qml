@@ -12,7 +12,9 @@ import "sysmon.js" as Levels
 // Samples come from `kubaos-sysmon serve`, one process for the shell's life,
 // which reads /proc and /sys itself: a sample costs a line, not a process.
 // The shell tells it the pace: every 2 s for the pill, every second while the
-// panel is open, and nothing while the screen is locked or nothing shows. A
+// panel is open, and nothing while the screen is locked or nothing shows. As
+// the panel opens, the engine sends its last detailed sample at once, so the
+// panel opens on its last readings. A
 // request is a line of JSON on its stdin; the reply a line with its id. The
 // settings file (~/.config/kubaos/desktop/sysmon/sysmon.toml) is watched, so a change
 // from the Command menu shows at once.
@@ -283,7 +285,11 @@ Singleton {
                     return;
                 }
                 restart.failures = 0;
-                if (message.type === "sample") {
+                // The engine's last detailed sample, sent as the panel opens: its numbers are
+                // in the history already.
+                if (message.type === "sample" && message.cached) {
+                    root.sample = message;
+                } else if (message.type === "sample") {
                     root.record(message);
                 } else if (message.type === "alert") {
                     root.alert(message);

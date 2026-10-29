@@ -6,6 +6,8 @@
 //! out: {"type":"sample","t":...,"cpu":{...},...}          every 2 s (pill), 10 s (quiet), 1 s (popup),
 //!                                                         none (paused)
 //!      {"type":"alert","id":"memory","title":...}         when an alert fires
+//!      {"type":"sample","cached":true,...}                after the reply to popup, the last
+//!                                                         detailed sample once there is one
 //! in:  {"id":1,"op":"mode","mode":"popup"}                {"id":1,"mode":"popup"}
 //!      {"id":2,"op":"process","pid":4242}                 {"id":2,"process":{...}}
 //!      {"id":3,"op":"signal","pid":4242,"signal":"term"}  {"id":3,"ok":true}
@@ -17,10 +19,15 @@
 //! file (`$XDG_RUNTIME_DIR/kubaos-sysmon.json`), where the Command menu reads it, so the pill, the
 //! panel and the menu show the same numbers.
 //!
+//! The last detailed sample is kept in memory. When the panel opens, the reply to `popup` is
+//! followed at once by that sample with the newest numbers in it, marked `"cached":true`, so the
+//! panel opens on its last readings while the first fresh detailed sample is read. Nothing is
+//! sampled for it while the panel is closed, and it is never written anywhere.
+//!
 //! # Owns
 //!
 //! - The modes and their pace, the requests and replies, reading the settings again when they
-//!   change, and the stream file.
+//!   change, the last detailed sample, and the stream file.
 //!
 //! # Not here
 //!
@@ -134,6 +141,10 @@ pub struct Server {
     mode: Mode,
     /// The last sample's alert conditions want a process scan.
     culprits: bool,
+    /// The newest light sample, whose numbers the panel opens on.
+    light: Option<Sample>,
+    /// The last detailed sample, whose details the panel opens on.
+    detailed: Option<Sample>,
 }
 
 impl Server {
@@ -150,6 +161,8 @@ impl Server {
             stream,
             mode: Mode::default(),
             culprits: false,
+            light: None,
+            detailed: None,
         };
         server.reload();
         server
@@ -194,17 +207,23 @@ impl Server {
         } else {
             self.culprits = false;
         }
+        if sample.detail {
+            self.detailed = Some(sample);
+        } else {
+            self.light = Some(sample);
+        }
         lines
     }
 
-    /// Answers one request line at `now`, and says when the next sample is due.
-    pub fn handle(&mut self, line: &str, now: u64) -> (String, Next) {
+    /// Answers one request line at `now`, and says when the next sample is due. The lines are the
+    /// reply, then, when the panel opens, the sample it opens on (`Server::opening`).
+    pub fn handle(&mut self, line: &str, now: u64) -> (Vec<String>, Next) {
         self.refresh();
         let request: Value = match serde_json::from_str(line) {
             Ok(request) => request,
             Err(err) => {
                 return (
-                    json!({ "id": Value::Null, "error": format!("not JSON: {err}") }).to_string(),
+                    vec![json!({ "id": Value::Null, "error": format!("not JSON: {err}") }).to_string()],
                     Next::Keep,
                 );
             }
@@ -213,9 +232,11 @@ impl Server {
         let text = |key: &str| request.get(key).and_then(Value::as_str).unwrap_or_default().to_owned();
         let pid = request.get("pid").and_then(Value::as_i64).map(|pid| pid as i32);
         let mut next = Next::Keep;
+        let mut opened = false;
         let mut reply = match text("op").as_str() {
             "mode" => match Mode::parse(&text("mode")) {
                 Some(mode) => {
+                    opened = mode == Mode::Popup && self.mode != Mode::Popup;
                     next = self.switch(mode, now);
                     Ok(json!({ "mode": mode.name() }))
                 }
@@ -248,11 +269,31 @@ impl Server {
         }
         .unwrap_or_else(|error| json!({ "error": error }));
         reply["id"] = id;
-        (reply.to_string(), next)
+        let mut lines = vec![reply.to_string()];
+        if opened {
+            lines.extend(self.opening());
+        }
+        (lines, next)
     }
 
     fn settings_json(&self) -> Value {
         json!({ "settings": self.settings, "problem": self.problem })
+    }
+
+    /// The line the panel opens on: the last detailed sample, with the numbers of a light one
+    /// taken since, marked `"cached":true`. It isn't a new reading, so it isn't written to the
+    /// stream file, and the shell adds nothing of it to its history. `None` before the first
+    /// detailed sample.
+    fn opening(&self) -> Option<String> {
+        let detailed = self.detailed.as_ref()?;
+        let mut line = match &self.light {
+            Some(light) if light.t > detailed.t => serde_json::to_value(light.with_details_of(detailed)),
+            _ => serde_json::to_value(detailed),
+        }
+        .unwrap_or_default();
+        line["type"] = json!("sample");
+        line["cached"] = json!(true);
+        Some(line.to_string())
     }
 
     /// Moves to `mode`. Out of a pause the counters start afresh; into the panel the processes
@@ -355,8 +396,10 @@ pub fn run(server: &mut Server, input: impl BufRead + Send + 'static, mut output
         match message {
             Ok(line) if line.trim().is_empty() => {}
             Ok(line) => {
-                let (reply, next) = server.handle(&line, now_ms());
-                writeln!(output, "{reply}")?;
+                let (lines, next) = server.handle(&line, now_ms());
+                for line in lines {
+                    writeln!(output, "{line}")?;
+                }
                 match next {
                     Next::Keep => {}
                     Next::Now => due = Instant::now(),

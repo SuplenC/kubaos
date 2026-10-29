@@ -219,12 +219,24 @@ pub struct Snapshots {
     pub count: Option<u32>,
 }
 
+/// The system's own mount, `/`, when it is Btrfs: the one whose snapshots are counted.
+fn btrfs_system(mounts: &[Mount]) -> Option<&Mount> {
+    mounts
+        .iter()
+        .rev()
+        .find(|mount| mount.point == "/")
+        .filter(|system| system.fstype == "btrfs")
+}
+
+/// Whether [`snapshots`] has figures for these mounts: the system is on Btrfs. It reads no file,
+/// so a light sample can say it.
+pub fn has_snapshots(mounts: &[Mount]) -> bool {
+    btrfs_system(mounts).is_some()
+}
+
 /// The snapshot figures for a Btrfs root; `None` when root isn't Btrfs.
 pub fn snapshots(root: &Path, mounts: &[Mount]) -> Option<Snapshots> {
-    let system = mounts.iter().rev().find(|mount| mount.point == "/")?;
-    if system.fstype != "btrfs" {
-        return None;
-    }
+    let system = btrfs_system(mounts)?;
     let mounted: Vec<u64> = mounts
         .iter()
         .filter(|mount| mount.fstype == "btrfs" && mount.device == system.device)

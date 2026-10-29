@@ -224,11 +224,13 @@ QtObject {
             s.io = null;
             s.net.address = null;
             s.top = null;
+            s.snapshots = null;
         }
         if (driver.state === "bare") {
             s.gpus = [];
             s.battery = null;
             s.fans = [];
+            s.fanCount = 0;
         }
         Sysmon.sample = s;
         if (driver.state === "process" || driver.state === "kill")
@@ -241,7 +243,7 @@ QtObject {
     property Timer sysmonPose: Timer {
         interval: 700
         onTriggered: {
-            const panel = driver.find(driver.window.contentItem, it => it.lastDetailed !== undefined);
+            const panel = driver.find(driver.window.contentItem, it => it.s !== undefined && it.fades !== undefined);
             const processes = panel ? driver.find(panel, it => it.confirming !== undefined) : null;
             if (driver.state === "kill" && processes)
                 processes.confirming = "kill";

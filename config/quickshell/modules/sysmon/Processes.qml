@@ -17,6 +17,8 @@ K.Stack {
     property real tallest: 0
     // The sample the panel shows.
     property var sample: null
+    // Whether processes fade in over their placeholders (`Line`, `fades`).
+    property bool fades: true
     property string order: "cpu"
     // The process shown, from the engine's `process` reply, or null.
     property var details: null
