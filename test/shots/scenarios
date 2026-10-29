@@ -19,6 +19,9 @@ controlcenter-wifi-error controlcenter  FrameShot   1176,0,424,1000   controlcen
 controlcenter-wifi-leave controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi-leaving
 controlcenter-wifi-scan  controlcenter  FrameShot   1176,0,424,1000   controlcenter wifi-scan
 controlcenter-bluetooth  controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth
+controlcenter-bt-unnamed controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-unnamed
+controlcenter-bt-drawer  controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-unnamed-open
+controlcenter-bt-scan    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-scan
 controlcenter-bt-form    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-form
 controlcenter-passkey    controlcenter  FrameShot   1176,0,424,1000   controlcenter bluetooth-code
 controlcenter-keyboard   controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard
