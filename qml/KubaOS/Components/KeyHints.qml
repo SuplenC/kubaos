@@ -74,63 +74,92 @@ Item {
         return found;
     }
 
-    implicitWidth: {
-        let end = 0;
-        for (let i = 0; i < hints.count; i++) {
-            const hint = hints.itemAt(i);
-            if (hint && hint.visible)
-                end = hint.x + hint.width;
-        }
-        return end;
-    }
+    implicitWidth: line.width
     implicitHeight: Tokens.size.keycap
 
-    // By count, not by the pairs themselves: a new text with as many hints keeps the same
-    // delegates and only rebinds their words, rather than making them all again.
-    Repeater {
-        id: hints
+    // The hints that fit, side by side: the box iced's row of them is, which the geometry check
+    // holds this to, as it holds each hint and its keys below.
+    Item {
+        id: line
 
-        model: root.shown.length
+        readonly property var probe: ({
+                role: "layout",
+                axis: "x",
+                gap: Tokens.space.s16,
+                align: "centre"
+            })
 
-        Item {
-            id: hint
+        width: {
+            let end = 0;
+            for (let i = 0; i < hints.count; i++) {
+                const hint = hints.itemAt(i);
+                if (hint && hint.visible)
+                    end = hint.x + hint.width;
+            }
+            return end;
+        }
+        height: Tokens.size.keycap
 
-            required property int index
-            readonly property var pair: root.shown[hint.index] ?? ["", ""]
-            readonly property var caps: root.keys(hint.pair[0])
-            readonly property string does: hint.pair[1]
-            readonly property Item before: hint.index > 0 ? hints.itemAt(hint.index - 1) : null
+        // By count, not by the pairs themselves: a new text with as many hints keeps the same
+        // delegates and only rebinds their words, rather than making them all again.
+        Repeater {
+            id: hints
 
-            x: hint.before ? hint.before.x + hint.before.width + Tokens.space.s16 : 0
-            width: keys.width + (hint.does === "" ? 0 : Tokens.space.s8 + what.width)
-            height: Tokens.size.keycap
-            visible: (!hint.before || hint.before.visible) && hint.x + hint.width <= root.room
+            model: root.shown.length
 
-            Q.Row {
-                id: keys
+            Item {
+                id: hint
 
-                spacing: Tokens.space.s4
+                required property int index
+                readonly property var pair: root.shown[hint.index] ?? ["", ""]
+                readonly property var caps: root.keys(hint.pair[0])
+                readonly property string does: hint.pair[1]
+                readonly property Item before: hint.index > 0 ? hints.itemAt(hint.index - 1) : null
+                readonly property var probe: ({
+                        role: "layout",
+                        axis: "x",
+                        gap: Tokens.space.s8,
+                        align: "centre"
+                    })
 
-                Repeater {
-                    model: hint.caps.length
+                x: hint.before ? hint.before.x + hint.before.width + Tokens.space.s16 : 0
+                width: keys.width + (hint.does === "" ? 0 : Tokens.space.s8 + what.width)
+                height: Tokens.size.keycap
+                visible: (!hint.before || hint.before.visible) && hint.x + hint.width <= root.room
 
-                    K.Keycap {
-                        required property int index
+                Q.Row {
+                    id: keys
 
-                        key: hint.caps[index] ?? ""
+                    readonly property var probe: ({
+                            role: "layout",
+                            axis: "x",
+                            gap: Tokens.space.s4,
+                            align: "centre"
+                        })
+
+                    spacing: Tokens.space.s4
+
+                    Repeater {
+                        model: hint.caps.length
+
+                        K.Keycap {
+                            required property int index
+
+                            key: hint.caps[index] ?? ""
+                        }
                     }
                 }
-            }
 
-            K.Text {
-                id: what
+                K.Text {
+                    id: what
 
-                x: keys.width + Tokens.space.s8
-                y: K.Look.snap((Tokens.size.keycap - Tokens.type.caption.line) / 2, root.dpr)
-                visible: hint.does !== ""
-                text: hint.does
-                style: Tokens.type.caption
-                color: root.color
+                    x: keys.width + Tokens.space.s8
+                    y: K.Look.snap((Tokens.size.keycap - Tokens.type.caption.line) / 2, root.dpr)
+                    visible: hint.does !== ""
+                    text: hint.does
+                    style: Tokens.type.caption
+                    color: root.color
+                }
             }
         }
     }

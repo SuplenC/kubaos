@@ -94,9 +94,9 @@ TestCase {
         verify(drawn.truncated);
     }
 
-    // The hints' delegates, in order; the Repeater is a child of the hints too.
-    function hintsOf(line: Item): var {
-        return Array.from(line.children).filter(child => child.index !== undefined);
+    // The hints' delegates, in order, in the hints' one line; the Repeater is a child there too.
+    function hintsOf(hints: Item): var {
+        return Array.from(hints.children[0].children).filter(child => child.index !== undefined);
     }
 
     function test_hints_past_the_room_are_left_out_whole() {
