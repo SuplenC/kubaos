@@ -3,9 +3,10 @@
 //!
 //! It is in memory only and volatile (`AddAndActivateConnection2`, `persist=volatile`):
 //! NetworkManager never writes it to `/etc`, deletes it when it goes down, and never starts it on
-//! its own. The private and preshared keys are in the call, flagged agent-owned, so
-//! NetworkManager keeps them for that activation and saves them nowhere; a profile it does write
-//! (its in-memory copy under `/run`) has no keys. The tunnel's DNS is the connection's too:
+//! its own. The private and preshared keys are flagged agent-owned, so NetworkManager saves them
+//! nowhere, not even in its in-memory profile under `/run`: it drops the ones in the call, and asks
+//! a secret agent for them as it activates the tunnel ([`crate::agent`]). The tunnel's DNS is the
+//! connection's too:
 //! NetworkManager hands the servers and routing domains to systemd-resolved for the tunnel's link
 //! alone, and gives them again whenever it reconfigures that link.
 //!
@@ -35,7 +36,8 @@ pub const INTERFACE: &str = "wg-kubaos";
 /// tunnel. The kill switch lets them out (`system/files/proxy/kubaos-proxy-write`, `FWMARK`):
 /// keep the two the same.
 pub const FWMARK: u32 = 0x6b6f;
-/// `NM_SETTING_SECRET_FLAG_AGENT_OWNED`: NetworkManager saves the secret nowhere.
+/// `NM_SETTING_SECRET_FLAG_AGENT_OWNED`: NetworkManager saves the secret nowhere and asks a secret
+/// agent for it.
 pub const AGENT_OWNED: u32 = 1;
 /// The DNS priority of a full tunnel: below every other link's, so with `~.` every name goes to
 /// the work servers and none leaks to the network's own.

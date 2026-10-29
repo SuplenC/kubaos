@@ -45,6 +45,8 @@ pub enum TunnelError {
     NotUp(u64),
     #[error("the tunnel was still up after {0} s")]
     StillUp(u64),
+    #[error("the kernel gave no uuid for the tunnel")]
+    NoUuid(#[source] Said),
 }
 
 /// A name didn't resolve.
