@@ -69,6 +69,9 @@ pub enum Violation {
     BadMarkSize { token: String },
     /// GRUB's scale isn't one of the scales every length is whole device pixels at.
     GrubScaleNotAScale { scale: f32 },
+    /// The frame layer's blur cut-off at or under what its scrim and shadow cover, so Hyprland
+    /// blurs the desktop beside the glass too, or at or over the glass, so it blurs nothing.
+    FrameBlurOffGlass { cutoff: f32, shade: f32, glass: f32 },
     /// A contrast pair under the minimum its foreground needs, in one of the fallback palettes.
     LowContrast {
         token: String,
@@ -146,6 +149,11 @@ impl fmt::Display for Violation {
             Violation::GrubScaleNotAScale { scale } => {
                 write!(f, "boot.grub_scale is {scale}, which isn't in rules.scales")
             }
+            Violation::FrameBlurOffGlass { cutoff, shade, glass } => write!(
+                f,
+                "opacity.frame_blur is {cutoff}, which isn't between the frame's scrim under its shadow \
+                 ({shade:.2}) and its glass ({glass})"
+            ),
             Violation::LowContrast {
                 token,
                 mode,
@@ -169,6 +177,7 @@ pub fn check(tokens: &Tokens) -> Vec<Violation> {
     check_terminal(tokens, &mut found);
     check_symbols(tokens, &mut found);
     check_neon(tokens, &mut found);
+    check_frame_blur(tokens, &mut found);
     if !tokens.rules.scales.contains(&tokens.boot.grub_scale) {
         found.push(Violation::GrubScaleNotAScale {
             scale: tokens.boot.grub_scale,
@@ -408,6 +417,41 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
         found.push(Violation::NotAscending {
             token: "focus.near, focus.far".into(),
         });
+    }
+}
+
+/// Hyprland blurs behind the frame's layer where it is more opaque than `opacity.frame_blur`. The
+/// layer draws its glass at `frame`, and outside it the darker scrim with the panels' shadow over
+/// it, at `frame` too; the cut-off lies between the two, so only the glass is blurred.
+fn check_frame_blur(tokens: &Tokens, found: &mut Vec<Violation>) {
+    let mut opacity = |name: &str| {
+        let value = tokens.opacity.get(name).copied();
+        if value.is_none() {
+            found.push(Violation::UnknownName {
+                token: "opacity.frame_blur".into(),
+                name: format!("opacity.{name}"),
+            });
+        }
+        value
+    };
+    let (Some(cutoff), Some(glass), Some(scrim), Some(panel_scrim)) = (
+        opacity("frame_blur"),
+        opacity("frame"),
+        opacity("scrim"),
+        opacity("panel_scrim"),
+    ) else {
+        return;
+    };
+    let Some(shadow) = tokens.shadow.get("panel") else {
+        found.push(Violation::UnknownName {
+            token: "opacity.frame_blur".into(),
+            name: "shadow.panel".into(),
+        });
+        return;
+    };
+    let shade = 1.0 - (1.0 - scrim.max(panel_scrim)) * (1.0 - shadow.opacity * glass);
+    if cutoff <= shade || cutoff >= glass {
+        found.push(Violation::FrameBlurOffGlass { cutoff, shade, glass });
     }
 }
 

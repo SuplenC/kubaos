@@ -163,7 +163,12 @@ TestCase {
     function test_the_status_line_says_how_many_are_new() {
         compare(Feed.status(2, 5, ""), "2 new");
         compare(Feed.status(0, 5, ""), "All read");
-        compare(Feed.status(0, 0, ""), "", "the panel's one quiet line says it, not the header too");
+        compare(Feed.status(0, 0, ""), "Silence is golden", "a line even when empty");
+    }
+
+    function test_the_status_line_is_never_empty() {
+        for (const [unread, count, reason] of [[0, 0, ""], [0, 5, ""], [2, 5, ""], [0, 0, "manual"], [0, 0, "sharing"], [2, 5, "fullscreen"]])
+            verify(Feed.status(unread, count, reason) !== "", `${unread} new of ${count}, ${reason || "not silenced"}`);
     }
 
     function test_the_status_line_says_why_it_is_silenced() {

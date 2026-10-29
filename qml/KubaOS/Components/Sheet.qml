@@ -11,6 +11,13 @@ import KubaOS.Components as K
 // to progress * depth and the content rides on its far edge, so it slides out from under the frame
 // instead of fading in place. The sheet meets the frame through concave fillets of the surface
 // radius, the frame's own inner corner.
+//
+// Two sheets in the same place are twins, as the notifications panel and the control center are.
+// One asked for while its twin is open takes the surface over where it is, and only the content
+// changes: the twin's slides away from this one's button and fades over `micro`, and this one's
+// slides in from its button's side over `short`, starting half a beat later and fading in once
+// the twin's is gone, so the two are never drawn over each other. With reduce motion the content
+// swaps at once.
 FocusScope {
     id: root
 
@@ -33,6 +40,17 @@ FocusScope {
     property real contentHeight: 0
     // Whether content that grows or shrinks while it is open settles into its new size.
     property bool animateSize: true
+    // The sheet that opens in this one's place, and the side this one's button is on against the
+    // twin's: -1 left, 1 right.
+    property K.Sheet twin: null
+    property int side: 0
+    // Handing the surface over to its twin: the content is on its way out, and the twin draws the
+    // surface.
+    property bool leaving: false
+    // How far the content is moved sideways, and how much of it shows, while it is swapped.
+    property real shift: 0
+    property real presence: 1
+    readonly property int travel: Tokens.space.s24
     default property alias content: body.data
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
@@ -74,7 +92,7 @@ FocusScope {
     // Content fades in a beat after the surface starts moving and out before it has fully
     // retracted.
     readonly property real contentOpacity: Math.max(0, Math.min(1, (progress - 0.2) / 0.55))
-    readonly property string path: active ? K.SheetPath.build(frame, edge, u0, u1, reveal, Tokens.radius.surface, Tokens.radius.surface, flushStart, flushEnd) : ""
+    readonly property string path: active && !leaving ? K.SheetPath.build(frame, edge, u0, u1, reveal, Tokens.radius.surface, Tokens.radius.surface, flushStart, flushEnd) : ""
     readonly property var probe: ({
             role: "component",
             name: "Sheet",
@@ -89,7 +107,59 @@ FocusScope {
     // Emitted once the sheet starts opening; give keyboard focus here.
     signal opened
 
+    // Takes the surface over from the twin, which is open or on its way in or out: the surface
+    // carries on from where the twin's was, and the twin's content leaves as this one's arrives.
+    function takeOver(): void {
+        // Asked for again before the twin's content has begun to show: this one's content turns
+        // back from where it is instead of leaving the screen empty for a beat.
+        const turningBack = root.leaving && twin.presence === 0;
+        swap.stop();
+        back.stop();
+        root.leaving = false;
+        root.progress = twin.progress;
+        twin.yieldTo(root);
+        if (K.Motion.reduced) {
+            twin.settle();
+            root.shift = 0;
+            root.presence = 1;
+            return;
+        }
+        if (turningBack) {
+            twin.settle();
+            back.start();
+            return;
+        }
+        root.shift = root.side * root.travel;
+        root.presence = 0;
+        swap.start();
+    }
+
+    // Hands the surface over to `to`, which runs the swap: this sheet stays as open as `to` is
+    // while its content leaves.
+    function yieldTo(to: Item): void {
+        swap.stop();
+        back.stop();
+        motion.stop();
+        root.leaving = true;
+        root.progress = Qt.binding(() => to.progress);
+    }
+
+    // Ends a hand-over to the twin: the content is gone, and so is this sheet.
+    function settle(): void {
+        swap.stop();
+        back.stop();
+        root.leaving = false;
+        root.progress = 0;
+        root.shift = 0;
+        root.presence = 1;
+    }
+
     onShownChanged: {
+        // A twin taking over has already set this one leaving; it goes when its content has.
+        if (!shown && leaving)
+            return;
+        if (shown && twin?.active)
+            takeOver();
         motion.stop();
         motion.to = shown ? 1 : 0;
         motion.duration = shown ? Tokens.duration.long : Tokens.duration.medium;
@@ -139,19 +209,105 @@ FocusScope {
         easing.type: Easing.BezierSpline
     }
 
-    // Swallow clicks on the sheet so they don't reach the click-away catcher.
+    // The content swap, run by the sheet taking over: the twin's content leaves away from this
+    // one's button, then this one's comes in from it.
+    //
+    //   0       micro/2 micro                   micro/2 + short
+    //   |---------------|                       the twin's content moves out and fades
+    //           |-------------------------------| this one's moves in
+    //                   |-----------------------| and fades in
+    ParallelAnimation {
+        id: swap
+
+        onFinished: root.twin.settle()
+
+        SequentialAnimation {
+            ParallelAnimation {
+                NumberAnimation {
+                    target: root.twin
+                    property: "shift"
+                    to: -root.side * root.travel
+                    duration: Tokens.duration.micro
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Tokens.easing.emphasized_accel
+                }
+
+                NumberAnimation {
+                    target: root.twin
+                    property: "presence"
+                    to: 0
+                    duration: Tokens.duration.micro
+                    easing.type: Easing.BezierSpline
+                    easing.bezierCurve: Tokens.easing.standard_accel
+                }
+            }
+
+            NumberAnimation {
+                target: root
+                property: "presence"
+                to: 1
+                duration: Tokens.duration.short - Tokens.duration.micro / 2
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Tokens.easing.standard
+            }
+        }
+
+        SequentialAnimation {
+            PauseAnimation {
+                duration: Tokens.duration.micro / 2
+            }
+
+            NumberAnimation {
+                target: root
+                property: "shift"
+                to: 0
+                duration: Tokens.duration.short
+                easing.type: Easing.BezierSpline
+                easing.bezierCurve: Tokens.easing.emphasized_decel
+            }
+        }
+    }
+
+    // This sheet's content returning to rest from part-way out, when it is asked for again before
+    // its twin's has begun to show.
+    ParallelAnimation {
+        id: back
+
+        NumberAnimation {
+            target: root
+            property: "shift"
+            to: 0
+            duration: Tokens.duration.short
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Tokens.easing.emphasized_decel
+        }
+
+        NumberAnimation {
+            target: root
+            property: "presence"
+            to: 1
+            duration: Tokens.duration.short
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Tokens.easing.standard
+        }
+    }
+
+    // Swallow clicks on the sheet so they don't reach the click-away catcher. Content on its way
+    // out to the twin takes no clicks, so none lands on what is leaving over what arrives.
     MouseArea {
         anchors.fill: parent
+        enabled: !root.leaving
     }
 
     FocusScope {
         id: body
 
         focus: true
-        x: root.edge === "left" ? root.reveal - root.depth : 0
+        x: (root.edge === "left" ? root.reveal - root.depth : 0) + root.shift
         y: root.edge === "top" ? root.reveal - root.depth : 0
         width: root.horizontal ? root.u1 - root.u0 : root.depth
         height: root.horizontal ? root.depth : root.u1 - root.u0
-        opacity: root.contentOpacity
+        opacity: root.contentOpacity * root.presence
+        enabled: !root.leaving
     }
 }

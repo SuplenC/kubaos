@@ -4,6 +4,8 @@
 -- Pattern: rules add tags ("+name"), and one rule per tag applies the
 -- effects. Tag-effect rules come last so they see every tag.
 
+local tokens = require("tokens")
+
 local function tag(match, name)
   hl.window_rule({ match = match, tag = "+" .. name })
 end
@@ -114,8 +116,14 @@ hl.layer_rule({ match = { namespace = "^hyprpicker$" }, animation = "fade" })
 
 -- Quickshell (config/quickshell). The shell animates its own surfaces, so
 -- Hyprland must not animate them too. The frame (bar, border and panels) is
--- drawn at ~94% opacity: blur what shows through, but not its soft shadow.
-hl.layer_rule({ match = { namespace = "^qs-frame$" }, blur = true, ignore_alpha = 0.5, no_anim = true })
+-- glass (`opacity.frame`): blur what shows through it, but not through its
+-- scrim or its soft shadow (`opacity.frame_blur` says why that cut-off).
+hl.layer_rule({
+  match = { namespace = "^qs-frame$" },
+  blur = true,
+  ignore_alpha = tokens.opacity.frame_blur,
+  no_anim = true,
+})
 hl.layer_rule({ match = { namespace = "^qs-(wallpaper|exclusion)$" }, no_anim = true })
 hl.layer_rule({ match = { namespace = "^qs-polkit$" }, animation = "fade" })
 -- The Command menu (config/quickshell/modules/menu/Menu.qml), translucent like the frame.

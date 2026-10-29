@@ -25,7 +25,7 @@ Tokyo at night, in the structure of [Caelestia](https://github.com/caelestia-dot
 
 - **Density:** sized for Full HD at scale 1 (the laptop runs at 1.5, see `config/hypr/monitors.lua`): a 40 px bar (`size.bar`) of 32 px pills, 14 px body text.
 - **Panels over windows:** only the frame reserves space (the bar's 40 px and 8 px on the other edges, `Exclusions.qml`). Panels, notifications and the OSD reserve nothing: they float over the tiled windows, so nothing resizes or reflows when one opens. Modal panels dim the desktop behind them (`opacity.panel_scrim`, 20%; the power menu as a dialog does, `opacity.scrim`, 60%) so a window's text doesn't read as part of the panel; the wallpaper picker stays undimmed because the desktop is its preview. Screenshots: `docs/screenshots/v3/`.
-- **Glass:** the frame is drawn at 94% opacity (`opacity.frame`). Hyprland blurs what shows through (`qs-frame` layer rule, `ignore_alpha 0.5`, so the shadow is not blurred).
+- **Glass:** the frame is drawn at 94% opacity (`opacity.frame`). Hyprland blurs what shows through the glass and nothing else: the `qs-frame` layer rule's `ignore_alpha` is `opacity.frame_blur` (0.85), above the scrim under the shadow, so neither is blurred.
 
 The design was studied from Caelestia's source and README: its frame and drawer structure, Material 3 roles and motion tokens. No code comes from it (Caelestia is GPL-3.0); everything here was written from scratch, and the panel shapes are built differently (an SVG path per panel, see `KubaOS.Components`' `sheetpath.js`).
 

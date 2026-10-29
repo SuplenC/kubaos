@@ -540,3 +540,34 @@ fn a_core_wider_than_its_tube_is_refused() {
         }]
     );
 }
+
+// Regression: #203.
+#[test]
+fn a_frame_blur_cut_off_under_the_scrim_and_shadow_is_refused() {
+    let found = violations(|t| set(t, &["opacity"], "frame_blur", 0.5));
+
+    assert!(
+        matches!(found.as_slice(), [Violation::FrameBlurOffGlass { cutoff, .. }] if (*cutoff - 0.5).abs() < f32::EPSILON),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_frame_blur_cut_off_over_the_glass_is_refused() {
+    let found = violations(|t| set(t, &["opacity"], "frame_blur", 0.96));
+
+    assert!(
+        matches!(found.as_slice(), [Violation::FrameBlurOffGlass { .. }]),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_darker_scrim_moves_the_frame_blur_cut_off_up_with_it() {
+    let found = violations(|t| set(t, &["opacity"], "scrim", 0.75));
+
+    assert!(
+        matches!(found.as_slice(), [Violation::FrameBlurOffGlass { .. }]),
+        "{found:?}"
+    );
+}
