@@ -2304,6 +2304,33 @@ TOML
   return "$bad"
 }
 
+# menu_closes_as_is DESC STEP...: the steps, then up to PROBE_WAIT for the menu to
+# close. It closes from what it showed: no other View, and no Action panel closing,
+# reaches the screen between the steps and the menu being gone.
+menu_closes_as_is() {
+  local desc="$1" mark shown before
+  shift
+  mark=$(($(wc -l <"$QS_LOG") + 1))
+  before="$(grep -o 'menu probe: screen .* visible=' "$QS_LOG" | tail -1)"
+  input "$@" 2>>"$LOGS/menu-steps.log" || { echo "FAIL $desc: the keys didn't go"; return 1; }
+  for _ in $(seq $((PROBE_WAIT * 10))); do
+    tail -n +"$mark" "$QS_LOG" | grep -q 'menu probe: visible false' && break
+    sleep 0.1
+  done
+  shown="$(tail -n +"$mark" "$QS_LOG" | grep -o 'menu probe: .*' | sed '/^menu probe: visible false$/q')"
+  if [[ $shown != *"menu probe: visible false" ]]; then
+    echo "FAIL $desc: the menu didn't close"
+    return 1
+  fi
+  if grep -E '^menu probe: screen .* visible=true$' <<<"$shown" | grep -qvF "${before}true" ||
+    grep -qx 'menu probe: actions 0' <<<"$shown"; then
+    echo "FAIL $desc: the menu changed on screen before it closed:"
+    grep -E '^menu probe: (screen|actions)' <<<"$shown" | sed 's/^/     /'
+    return 1
+  fi
+  echo "ok   $desc"
+}
+
 # menu_form_is PATTERN DESC: up to PROBE_WAIT for the probe's latest form line, once the form rests,
 # to match PATTERN (ERE): the fields drawn, and what they hold.
 menu_form_is() {
@@ -2319,8 +2346,9 @@ menu_form_is() {
 
 # The Command menu's file and folder fields, in Quickshell under the Daemon: Ctrl+O closes the
 # menu for the system's picker and opens it again on the form, the path chosen in its field and
-# every other field as it was, and Enter runs the action with it. A cancelled pick brings the
-# form back as it was. A stub stands in for `kubaos-files pick`, as the container has no portal:
+# every other field as it was, and Enter runs the action with it, the menu closing from the form
+# with nothing else on screen first, as it does from the Action panel. A cancelled pick brings
+# the form back as it was, and Esc still pops a form on screen. A stub stands in for `kubaos-files pick`, as the container has no portal:
 # it answers after a second, as a person would, with a file, a folder, or nothing.
 c_menu_files() {
   local bad=0 daemon log="$LOGS/kotodamad-files.log" out
@@ -2336,6 +2364,10 @@ title = "Harness file"
 keyword = "harness-file"
 run = ["sh", "-c", "printf '%s\\\\n' \"\$1\" >$ran", "sh", "{path}"]
 arguments = [{ name = "path", kind = "file", accept = ["conf"] }]
+
+[extensions.kubaos.actions.harness-close]
+title = "Harness close"
+run = ["true"]
 
 [extensions.kubaos.actions.harness-pair]
 title = "Harness pair"
@@ -2379,7 +2411,7 @@ SH
   menu_step "Ctrl+O closes the menu for the picker" 'visible false' input down:ctrl type:o up:ctrl || bad=1
   menu_step "the menu opens again once the picker answers" 'visible true' : || bad=1
   menu_form_is 'fields=1 shown=1 past=0 values=\["~/Downloads/work.conf"\]' "the form is back, the file picked in its field" || bad=1
-  menu_keys form && input key:Return
+  menu_keys form && menu_closes_as_is "Enter runs the action, and the menu closes from the form" key:Return || bad=1
   for _ in $(seq $((PROBE_WAIT * 10))); do [[ -s $ran ]] && break; sleep 0.1; done
   out="$(cat "$ran" 2>/dev/null)"
   if [[ $out == "$config" ]]; then
@@ -2407,7 +2439,7 @@ SH
     menu_step "Ctrl+O again closes the menu for the picker" 'visible false' input down:ctrl type:o up:ctrl || bad=1
   menu_step "the menu opens again with the folder" 'visible true' : || bad=1
   menu_form_is 'fields=2 shown=2 past=0 values=\["node","~/Projects/acme"\]' "the folder is picked, the suite still typed" || bad=1
-  menu_keys form && input key:Return
+  menu_keys form && menu_closes_as_is "Enter runs it, and the menu closes from the form" key:Return || bad=1
   for _ in $(seq $((PROBE_WAIT * 10))); do [[ -s $ran ]] && break; sleep 0.1; done
   out="$(cat "$ran" 2>/dev/null)"
   if [[ $out == "node $folder" ]]; then
@@ -2416,6 +2448,19 @@ SH
     echo "FAIL Enter ran the action with '$out', not 'node $folder'"
     bad=1
   fi
+
+  # The Action panel: the Action run from it closes the menu with the panel still on it.
+  menu_now 'visible false' || { echo "FAIL the menu stayed open after running the action"; bad=1; }
+  menu_step "kotodama toggle opens the menu for the Action panel" 'visible true' menu_kotodama toggle || bad=1
+  menu_keys search && menu_typed 'harness close' --delay 50 'type:harness close' &&
+    menu_step "Ctrl+K opens the Action panel" 'actions [1-9]' input down:ctrl type:k up:ctrl || bad=1
+  menu_closes_as_is "Enter in the Action panel runs it, and the menu closes with the panel on it" key:Return || bad=1
+
+  # Esc still goes back one View, on screen.
+  menu_step "kotodama toggle opens the menu once more" 'visible true' menu_kotodama toggle || bad=1
+  menu_keys search && menu_typed 'harness pair' --delay 50 'type:harness pair' &&
+    menu_step "Enter asks for the suite and the folder again" 'view kind=form' input key:Return || bad=1
+  menu_keys form && menu_step "Esc pops the form, on screen" 'screen kind= title="" visible=true' input key:Escape || bad=1
 
   [[ -z "$(qs_problems)" ]] || { echo "FAIL QML errors:"; qs_problems | head; bad=1; }
   if ((bad)); then tail -20 "$log"; fi

@@ -47,6 +47,11 @@ QtObject {
     // scroll rests past the end of its content, which must be 0.
     property Item formView: null
     property string formLine: ""
+    // The View the menu shows, which can stay behind the Daemon's while an Action settles: each
+    // change is logged with whether the window was on screen for it.
+    property var shownView: ({})
+
+    onShownViewChanged: log(`screen kind=${shownView.kind ?? ""} title=${JSON.stringify(shownView.title ?? "")} visible=${item.Window.window?.visible ?? false}`)
 
     property real typedAt: 0
     // The Results for the query typed are in the model, and then in a frame

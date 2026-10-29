@@ -78,8 +78,18 @@ PanelWindow {
 
     // Why the last Action failed, until the next Action or opening.
     property string failure: ""
+    // The View on screen and how deep it is: the Daemon's, except while an Action run from a
+    // pushed View or the Action panel settles (`hold`). The Daemon pops an Argument form as it
+    // runs the Action, and an Extension its own form, before the Action says to close: the View
+    // the user ran it from stays until the menu has gone, so the menu closes from it and never
+    // shows the View under it first. The stack below changes while the menu is hidden.
+    property var heldView: null
+    property int heldDepth: 0
+    readonly property bool holding: menu.heldView !== null
+    readonly property var view: menu.holding ? menu.heldView : search.view
+    readonly property int depth: menu.holding ? menu.heldDepth : search.depth
     // The top View's kind (`list`, `form`, `detail` or `progress`), or empty at the search.
-    readonly property string kind: search.view.kind ?? ""
+    readonly property string kind: menu.view.kind ?? ""
     // Whether the body is a list: the Results, or a list View's Items.
     readonly property bool listing: kind === "" || kind === "list"
     readonly property bool paneShown: menu.paneFits && listing
@@ -102,7 +112,7 @@ PanelWindow {
     readonly property string escapeHint: {
         if (kind === "list" && filter.text !== "" || kind === "" && input.text !== "")
             return "Esc Clear";
-        if (search.depth > 0)
+        if (menu.depth > 0)
             return "Esc Back";
         return search.scope !== "" ? "Esc Leave app" : "Esc Close";
     }
@@ -110,9 +120,9 @@ PanelWindow {
         if (kind === "form" && form.item?.pathsOpen)
             return "↑↓ Pick · Tab Complete · ↵ Take · Esc Close list";
         if (kind === "form" && form.item?.pathCurrent)
-            return `Tab Next field · ⌃O Browse · ↵ ${search.view.submit ?? "Submit"} · ${escapeHint}`;
+            return `Tab Next field · ⌃O Browse · ↵ ${menu.view.submit ?? "Submit"} · ${escapeHint}`;
         if (kind === "form")
-            return `Tab Next field · ↵ ${search.view.submit ?? "Submit"} · ${escapeHint}`;
+            return `Tab Next field · ↵ ${menu.view.submit ?? "Submit"} · ${escapeHint}`;
         if (!listing)
             return escapeHint;
         return paneShown ? `↑↓ Select · ⌃K Actions · ${escapeHint}` : hints;
@@ -150,6 +160,7 @@ PanelWindow {
     }
 
     function show(query: string): void {
+        menu.release();
         menu.failure = "";
         input.text = query;
         input.cursorPosition = query.length;
@@ -181,10 +192,29 @@ PanelWindow {
         menu.hide();
     }
 
+    // An Action is about to run: what is on screen stays until it settles (`view`). Nothing is
+    // held at the search with no Action panel open, where there is no View for it to pop.
+    function hold(): void {
+        if (search.depth === 0 && !menu.actionsOpen)
+            return;
+        menu.heldDepth = search.depth;
+        menu.heldView = search.view;
+        settle.restart();
+    }
+
+    // Shows the Daemon's View again: the menu has gone, or the Action kept it open.
+    function release(): void {
+        if (!menu.holding)
+            return;
+        settle.stop();
+        menu.heldView = null;
+        if (menu.visible && menu.actionsOpen)
+            menu.closeActions();
+    }
+
     // Closing pops no View: Extensions aren't told the user left one, so their jobs keep running,
     // and the menu opens again where it was. Only Esc pops.
     function hide(): void {
-        menu.actions = [];
         search.cancelConfirm();
         if (!visible || closing.running)
             return;
@@ -238,10 +268,14 @@ PanelWindow {
         menu.focusView();
     }
 
+    // Runs the `n`th Action of the panel. The panel stays while the Action settles, so a menu the
+    // Action closes goes with the panel on it.
     function runAction(n: int): void {
         menu.failure = "";
+        menu.hold();
         search.runAction(actionPanel.row, n);
-        menu.closeActions();
+        if (!menu.holding)
+            menu.closeActions();
     }
 
     // The pane shows the selection, if it is behind and typing has paused.
@@ -293,6 +327,9 @@ PanelWindow {
 
     // The keys every View shares. True if `event` was one of them.
     function key(event: KeyEvent): bool {
+        // A key while an Action settles is the user moving on: the Daemon's View comes back.
+        if (!menu.modifierAlone(event))
+            menu.release();
         const ctrl = menu.ctrlOnly(event);
         const enter = event.key === Qt.Key_Return || event.key === Qt.Key_Enter;
         if (menu.undoKey(event))
@@ -302,6 +339,7 @@ PanelWindow {
         if (search.confirming !== "" && !menu.modifierAlone(event)) {
             if (enter) {
                 menu.failure = "";
+                menu.hold();
                 search.confirm();
                 return true;
             }
@@ -328,6 +366,7 @@ PanelWindow {
         if (menu.kind === "form") {
             if (enter) {
                 menu.failure = "";
+                menu.hold();
                 search.submit();
             } else if (event.key === Qt.Key_Tab || event.key === Qt.Key_Down) {
                 form.item?.move(1);
@@ -347,6 +386,7 @@ PanelWindow {
             menu.failure = "";
         } else if (enter) {
             menu.failure = "";
+            menu.hold();
             search.run(list.currentIndex);
         } else if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_N)) {
             list.incrementCurrentIndex();
@@ -358,6 +398,7 @@ PanelWindow {
             list.currentIndex = Math.max(0, list.currentIndex - menu.rows);
         } else if ((event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier)) && search.runShortcut(list.currentIndex, event.key, event.modifiers)) {
             menu.failure = "";
+            menu.hold();
         } else {
             return false;
         }
@@ -459,7 +500,10 @@ PanelWindow {
                 search.closed();
             }
         }
-        onActionFailed: message => menu.failure = message
+        onActionFailed: message => {
+            menu.release();
+            menu.failure = message;
+        }
         // The field shows the rest of the query once it is in an app, or what the Daemon typed.
         // The cursor keeps its place from the end.
         onQueryReplaced: text => {
@@ -477,27 +521,45 @@ PanelWindow {
             else
                 list.positionViewAtIndex(row, ListView.Contain);
         }
-        // A View pushed slides in from the right, one popped from the left.
+        // An Action that settles into a new View kept the menu open: it shows at once.
         onDepthChanged: {
-            menu.actions = [];
-            list.currentIndex = 0;
-            follow.stop();
-            list.positionViewAtBeginning();
-            viewMove.from = search.depth > menu.lastDepth ? menu.viewTravel : -menu.viewTravel;
-            menu.lastDepth = search.depth;
-            if (menu.visible)
-                viewIn.restart();
+            if (search.depth > menu.heldDepth)
+                menu.release();
         }
-        // A View that is pushed, popped or changed takes the keys; one whose job progressed keeps
-        // them where they are. A list's filter shows what was typed into it, which is nothing for
-        // a new one.
         onViewChanged: {
-            const typed = search.view.filter ?? "";
-            if (filter.text !== typed)
-                filter.text = typed;
-            if (menu.visible && !menu.actionsOpen)
-                Qt.callLater(menu.focusView);
+            if (menu.holding && search.depth === menu.heldDepth && (search.view.id ?? "") !== (menu.heldView.id ?? ""))
+                menu.release();
         }
+    }
+
+    // A View pushed slides in from the right, one popped from the left.
+    onDepthChanged: {
+        menu.actions = [];
+        list.currentIndex = 0;
+        follow.stop();
+        list.positionViewAtBeginning();
+        viewMove.from = menu.depth > menu.lastDepth ? menu.viewTravel : -menu.viewTravel;
+        menu.lastDepth = menu.depth;
+        if (menu.visible)
+            viewIn.restart();
+    }
+    // A View that is pushed, popped or changed takes the keys; one whose job progressed keeps
+    // them where they are. A list's filter shows what was typed into it, which is nothing for
+    // a new one.
+    onViewChanged: {
+        const typed = menu.view.filter ?? "";
+        if (filter.text !== typed)
+            filter.text = typed;
+        if (menu.visible && !menu.actionsOpen)
+            Qt.callLater(menu.focusView);
+    }
+
+    // How long an Action may take to say it closes the menu before what it changed shows anyway.
+    Timer {
+        id: settle
+
+        interval: 1000
+        onTriggered: menu.release()
     }
 
     Timer {
@@ -528,7 +590,11 @@ PanelWindow {
         duration: K.Tokens.duration.micro
         easing.type: Easing.BezierSpline
         easing.bezierCurve: K.Tokens.easing.emphasized_accel
-        onFinished: menu.visible = false
+        onFinished: {
+            menu.visible = false;
+            menu.actions = [];
+            menu.release();
+        }
     }
 
     // The body arrives readable: it starts part faded, so a pushed list's rows show in the View's
@@ -598,7 +664,7 @@ PanelWindow {
                 align: "centre"
 
                 K.IconButton {
-                    visible: search.depth > 0
+                    visible: menu.depth > 0
                     icon: "arrow_back"
                     label: "Back"
                     kind: "Text"
@@ -646,7 +712,7 @@ PanelWindow {
 
                     visible: menu.kind === "list"
                     icon: "search"
-                    placeholder: search.view.title ?? ""
+                    placeholder: menu.view.title ?? ""
                     onTextChanged: {
                         keystroke.restart();
                         menu.paneTyped = true;
@@ -660,7 +726,7 @@ PanelWindow {
                     readonly property bool fillWidth: true
 
                     visible: !menu.listing
-                    text: search.view.title ?? ""
+                    text: menu.view.title ?? ""
                     type: K.Tokens.type.subheading
                 }
             }
@@ -961,6 +1027,7 @@ PanelWindow {
                         onPointed: (x, y) => list.hover(row.index, row, x, y)
                         onPicked: {
                             menu.failure = "";
+                            menu.hold();
                             search.run(row.index);
                         }
                     }
@@ -1001,10 +1068,11 @@ PanelWindow {
                     roomBelow: menu.gap
                     search: menu.engine
                     keys: event => menu.key(event)
-                    fields: search.view.fields ?? []
-                    submitLabel: search.view.submit ?? "Submit"
+                    fields: menu.view.fields ?? []
+                    submitLabel: menu.view.submit ?? "Submit"
                     onSubmitted: {
                         menu.failure = "";
+                        menu.hold();
                         search.submit();
                     }
                     onBrowse: (field, folder, accept) => menu.browse(field, folder, accept)
@@ -1019,8 +1087,8 @@ PanelWindow {
                 anchors.fill: parent
                 active: menu.kind === "detail"
                 sourceComponent: DetailView {
-                    markdown: search.view.markdown ?? ""
-                    metadata: search.view.metadata ?? []
+                    markdown: menu.view.markdown ?? ""
+                    metadata: menu.view.metadata ?? []
                 }
             }
 
@@ -1028,7 +1096,7 @@ PanelWindow {
                 anchors.fill: parent
                 active: menu.kind === "progress"
                 sourceComponent: ProgressView {
-                    job: search.view.job ?? ({})
+                    job: menu.view.job ?? ({})
                     moves: menu.moves
                 }
             }
@@ -1201,7 +1269,7 @@ PanelWindow {
                     menu.runAction(actionPanel.current);
                 } else if (search.runShortcut(actionPanel.row, event.key, event.modifiers)) {
                     menu.failure = "";
-                    menu.closeActions();
+                    menu.hold();
                 }
                 event.accepted = true;
             }
@@ -1224,6 +1292,7 @@ PanelWindow {
             selectedShown: list.currentShown && !follow.running
             results: list
             formView: form.item
+            shownView: menu.view
             keys: menu.keysAt()
         }
     }
