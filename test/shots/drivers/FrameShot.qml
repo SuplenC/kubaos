@@ -319,9 +319,22 @@ QtObject {
             console.warn("shot: no notification group found");
     }
 
-    // The popups' group fanned once the popups have slid in.
+    // The popups' group fanned once the popups have slid in, and held as the pointer resting on it
+    // holds them: their clocks stopped, so their lines don't keep the window drawing.
     property Timer fanPose: Timer {
         interval: 700
+        onTriggered: {
+            const list = driver.find(driver.window.contentItem, it => it.hold !== undefined && it.unfolded !== undefined);
+            if (list)
+                list.hold.pointed = true;
+            fanLater.start();
+        }
+    }
+
+    // Holding the popups rebuilds the stand-in model's rows, the groups with them, so the group
+    // fans once they have settled.
+    property Timer fanLater: Timer {
+        interval: 300
         onTriggered: driver.fanFirstGroup(driver.find(driver.window.contentItem, it => it.peeking !== undefined && it.hasPeek !== undefined))
     }
 
