@@ -14,6 +14,17 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
+## Bigger work: a parent issue, sub-issues, one branch, one PR
+
+Work bigger than one piece (a feature with several surfaces, a section-by-section build, a multi-step migration) is tracked and shipped as a whole:
+
+- **A parent issue** holds the goal, the approved design or shape, the rules every piece follows, and the list of pieces. If an epic sits above it (e.g. #124, the design system), the parent references it in its first lines and is its sub-issue; otherwise it is a sub-issue of the tracking issue, #17.
+- **One sub-issue per piece**, each about one to two hours of agent work. Each starts with `Part of #<parent>` and names the branch it lands on.
+- **One branch for the parent** (e.g. `feature/settings`). Each piece is built on a short branch off it, reviewed, rebased onto it and fast-forwarded in, so the branch stays linear. Its sub-issue closes with a comment naming the commit.
+- **One PR** from the parent's branch to main, opened when every sub-issue is done. It closes the parent and every sub-issue, and lists each piece's decisions and screenshots.
+
+An agent working on a piece pushes its own short branch and never opens a PR to main for it.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
