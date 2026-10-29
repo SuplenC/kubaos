@@ -202,6 +202,29 @@ TestCase {
         compare(left.progress, 1);
     }
 
+    function test_asked_for_again_before_the_new_content_shows_the_old_one_turns_back() {
+        openFully(left);
+        switchTo(left, right, false);
+        wait(K.Tokens.duration.micro / 4);
+        const part = left.presence;
+        verify(part > 0 && part < 1, `part-way out: ${part}`);
+
+        switchTo(right, left, false);
+
+        verify(left.presence >= part, `no blink: ${left.presence} after ${part}`);
+        verify(!right.active, "the other content never showed");
+        compare(left.path !== "", true, "the surface stays drawn");
+        let last = left.presence;
+        const ends = Date.now() + suite.swapTime * 4;
+        while (Date.now() < ends && !(left.presence === 1 && left.shift === 0)) {
+            verify(left.presence >= last, "it only comes back");
+            last = left.presence;
+            wait(4);
+        }
+        compare(left.presence, 1);
+        compare(left.shift, 0);
+    }
+
     function test_with_reduce_motion_the_content_swaps_at_once() {
         openFully(left);
         K.Motion.reduced = true;

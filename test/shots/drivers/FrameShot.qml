@@ -29,8 +29,8 @@ import qs.modules.frame
 //   notifications: "" (two popups), peek (the bell's peek, every one unread, so "+N more"),
 //                  panel (the notifications panel, a stack folded), panel-expanded (the stack
 //                  open, its second card selected), panel-keys (the keys button's tooltip),
-//                  panel-empty (nothing in it), panel-read (every one read), panel-dnd (Do not disturb on while the screen is
-//                  shared, its tooltip showing)
+//                  panel-empty (nothing in it), panel-read (every one read), panel-dnd (Do
+//                  not disturb on while the screen is shared, its tooltip showing)
 //   bar: traymenu (the network item's menu open), dnd (the bell crossed out), nobell (no
 //        notification, so no bell), dnd-empty (no notification, the bell crossed out all the same),
 //        preview (the home a live preview of a branch)

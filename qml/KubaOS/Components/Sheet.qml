@@ -50,7 +50,7 @@ FocusScope {
     // How far the content is moved sideways, and how much of it shows, while it is swapped.
     property real shift: 0
     property real presence: 1
-    readonly property int travel: K.Tokens.space.s24
+    readonly property int travel: Tokens.space.s24
     default property alias content: body.data
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
@@ -110,7 +110,11 @@ FocusScope {
     // Takes the surface over from the twin, which is open or on its way in or out: the surface
     // carries on from where the twin's was, and the twin's content leaves as this one's arrives.
     function takeOver(): void {
+        // Asked for again before the twin's content has begun to show: this one's content turns
+        // back from where it is instead of leaving the screen empty for a beat.
+        const turningBack = root.leaving && twin.presence === 0;
         swap.stop();
+        back.stop();
         root.leaving = false;
         root.progress = twin.progress;
         twin.yieldTo(root);
@@ -118,6 +122,11 @@ FocusScope {
             twin.settle();
             root.shift = 0;
             root.presence = 1;
+            return;
+        }
+        if (turningBack) {
+            twin.settle();
+            back.start();
             return;
         }
         root.shift = root.side * root.travel;
@@ -129,6 +138,7 @@ FocusScope {
     // while its content leaves.
     function yieldTo(to: Item): void {
         swap.stop();
+        back.stop();
         motion.stop();
         root.leaving = true;
         root.progress = Qt.binding(() => to.progress);
@@ -137,6 +147,7 @@ FocusScope {
     // Ends a hand-over to the twin: the content is gone, and so is this sheet.
     function settle(): void {
         swap.stop();
+        back.stop();
         root.leaving = false;
         root.progress = 0;
         root.shift = 0;
@@ -257,9 +268,35 @@ FocusScope {
         }
     }
 
-    // Swallow clicks on the sheet so they don't reach the click-away catcher.
+    // This sheet's content returning to rest from part-way out, when it is asked for again before
+    // its twin's has begun to show.
+    ParallelAnimation {
+        id: back
+
+        NumberAnimation {
+            target: root
+            property: "shift"
+            to: 0
+            duration: Tokens.duration.short
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Tokens.easing.emphasized_decel
+        }
+
+        NumberAnimation {
+            target: root
+            property: "presence"
+            to: 1
+            duration: Tokens.duration.short
+            easing.type: Easing.BezierSpline
+            easing.bezierCurve: Tokens.easing.standard
+        }
+    }
+
+    // Swallow clicks on the sheet so they don't reach the click-away catcher. Content on its way
+    // out to the twin takes no clicks, so none lands on what is leaving over what arrives.
     MouseArea {
         anchors.fill: parent
+        enabled: !root.leaving
     }
 
     FocusScope {
@@ -271,5 +308,6 @@ FocusScope {
         width: root.horizontal ? root.u1 - root.u0 : root.depth
         height: root.horizontal ? root.depth : root.u1 - root.u0
         opacity: root.contentOpacity * root.presence
+        enabled: !root.leaving
     }
 }
