@@ -2,9 +2,10 @@ import QtQuick
 import QtTest
 import KubaOS.Components as K
 
-// Two sheets in one place, as the notifications panel (its button on the left) and the control
-// center (on the right): switching straight from one to the other keeps the surface and swaps the
-// content, each coming from its button's side; opening from nothing and closing slide the surface.
+// Sheets in one place, as the system monitor, the notifications panel and the control center are,
+// their buttons in that order along the bar: switching straight from one to another keeps the
+// surface and swaps the content, each coming from its button's side; opening from nothing and
+// closing slide the surface.
 TestCase {
     id: suite
 
@@ -33,7 +34,7 @@ TestCase {
         flushStart: true
         flushEnd: true
         contentWidth: K.Tokens.size.panel
-        twin: right
+        twins: [right, far]
         side: -1
     }
 
@@ -45,8 +46,21 @@ TestCase {
         flushStart: true
         flushEnd: true
         contentWidth: K.Tokens.size.panel
-        twin: left
+        twins: [left, far]
         side: 1
+    }
+
+    // A third, its button right of both.
+    K.Sheet {
+        id: far
+
+        frame: frame
+        edge: "right"
+        flushStart: true
+        flushEnd: true
+        contentWidth: K.Tokens.size.panel
+        twins: [left, right]
+        side: 2
     }
 
     // The longest a swap may take: `micro` / 2 + `short`, and a few frames.
@@ -56,8 +70,10 @@ TestCase {
         K.Motion.reduced = false;
         left.shown = false;
         right.shown = false;
+        far.shown = false;
         tryCompare(left, "active", false, K.Tokens.duration.long * 4);
         tryCompare(right, "active", false, K.Tokens.duration.long * 4);
+        tryCompare(far, "active", false, K.Tokens.duration.long * 4);
     }
 
     function cleanup() {
@@ -85,15 +101,17 @@ TestCase {
     // milliseconds that the two are never drawn together and that each moves its own way.
     function watchSwap(from, to) {
         const ends = Date.now() + suite.swapTime * 4;
+        // 1 where the new one's button is right of the old one's.
+        const toward = Math.sign(to.side - from.side);
         let both = 0;
         let fromWrongWay = 0;
         let toWrongWay = 0;
         while (Date.now() < ends && !(to.shift === 0 && to.presence === 1 && !from.active)) {
             if (from.active && from.presence > 0 && to.presence > 0)
                 both++;
-            if (from.active && Math.sign(from.shift) === to.side)
+            if (from.active && Math.sign(from.shift) === toward)
                 fromWrongWay++;
-            if (Math.sign(to.shift) === -to.side)
+            if (Math.sign(to.shift) === -toward)
                 toWrongWay++;
             compare(to.progress, 1, "the surface stays open");
             compare(from.path, "", "only one surface is drawn");
@@ -247,5 +265,79 @@ TestCase {
 
         tryCompare(right, "active", false, K.Tokens.duration.medium * 4);
         tryCompare(left, "active", false, suite.swapTime * 4);
+    }
+
+    function test_any_twin_takes_over_from_any_other_from_its_buttons_side_data() {
+        return [
+            {
+                tag: "from the leftmost to the rightmost",
+                from: "left",
+                to: "far"
+            },
+            {
+                tag: "from the rightmost to the leftmost",
+                from: "far",
+                to: "left"
+            },
+            {
+                tag: "between the two on the right",
+                from: "right",
+                to: "far"
+            },
+            {
+                tag: "and back",
+                from: "far",
+                to: "right"
+            }
+        ];
+    }
+
+    function test_any_twin_takes_over_from_any_other_from_its_buttons_side(data) {
+        const sheets = {
+            left: left,
+            right: right,
+            far: far
+        };
+        const from = sheets[data.from];
+        const to = sheets[data.to];
+        openFully(from);
+
+        switchTo(from, to, false);
+
+        compare(to.progress, 1, "the surface where it was");
+        compare(to.shift, Math.sign(to.side - from.side) * to.travel, "the new content starts on its button's side");
+        watchSwap(from, to);
+    }
+
+    // The middle one is still on its way in from the right when the third takes over, so its
+    // content starts right of its place: what holds is that it only ever moves left from there.
+    function test_a_third_asked_for_mid_swap_takes_over_and_the_first_goes_at_once() {
+        openFully(left);
+        switchTo(left, right, false);
+        wait(K.Tokens.duration.micro / 2);
+
+        switchTo(right, far, false);
+
+        verify(!left.active, "the first gone");
+        verify(!left.leaving, "the first settled");
+        const ends = Date.now() + suite.swapTime * 4;
+        let last = right.shift;
+        let backwards = 0;
+        let both = 0;
+        while (Date.now() < ends && !(far.shift === 0 && far.presence === 1 && !right.active)) {
+            if (right.active && right.shift > last)
+                backwards++;
+            if (right.active && right.presence > 0 && far.presence > 0)
+                both++;
+            last = right.shift;
+            compare(far.progress, 1, "the surface stays open");
+            compare(right.path, "", "only one surface is drawn");
+            wait(4);
+        }
+        compare(backwards, 0, "the middle one's content only moves left, away from the third's button");
+        compare(both, 0, "the two contents are never drawn together");
+        compare(far.shift, 0);
+        compare(far.presence, 1);
+        verify(!right.active, "the middle one gone");
     }
 }

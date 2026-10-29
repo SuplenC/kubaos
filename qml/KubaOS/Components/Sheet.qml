@@ -12,12 +12,12 @@ import KubaOS.Components as K
 // instead of fading in place. The sheet meets the frame through concave fillets of the surface
 // radius, the frame's own inner corner.
 //
-// Two sheets in the same place are twins, as the notifications panel and the control center are.
-// One asked for while its twin is open takes the surface over where it is, and only the content
-// changes: the twin's slides away from this one's button and fades over `micro`, and this one's
-// slides in from its button's side over `short`, starting half a beat later and fading in once
-// the twin's is gone, so the two are never drawn over each other. With reduce motion the content
-// swaps at once.
+// Sheets in the same place are twins, as the system monitor, the notifications panel and the
+// control center are. One asked for while a twin is open takes the surface over where it is, and
+// only the content changes: the twin's slides away from this one's button and fades over `micro`,
+// and this one's slides in from its button's side over `short`, starting half a beat later and
+// fading in once the twin's is gone, so the two are never drawn over each other. With reduce
+// motion the content swaps at once.
 FocusScope {
     id: root
 
@@ -40,10 +40,14 @@ FocusScope {
     property real contentHeight: 0
     // Whether content that grows or shrinks while it is open settles into its new size.
     property bool animateSize: true
-    // The sheet that opens in this one's place, and the side this one's button is on against the
-    // twin's: -1 left, 1 right.
-    property K.Sheet twin: null
+    // The sheets that open in this one's place, and where this one's button is along the bar
+    // against theirs: a twin with a lower `side` has its button further left.
+    property var twins: []
     property int side: 0
+    // The twin this one is taking the surface over from, and which way this one's content moves
+    // in: 1 from the right, -1 from the left.
+    property K.Sheet from: null
+    readonly property int toward: root.from ? Math.sign(root.side - root.from.side) : 0
     // Handing the surface over to its twin: the content is on its way out, and the twin draws the
     // surface.
     property bool leaving: false
@@ -107,14 +111,26 @@ FocusScope {
     // Emitted once the sheet starts opening; give keyboard focus here.
     signal opened
 
-    // Takes the surface over from the twin, which is open or on its way in or out: the surface
+    // The twin on screen to take the surface over from: the one drawing it, else one on its way
+    // out with it, or null.
+    function holder(): K.Sheet {
+        return root.twins.find(twin => twin.active && !twin.leaving) ?? root.twins.find(twin => twin.active) ?? null;
+    }
+
+    // Takes the surface over from `twin`, which is open or on its way in or out: the surface
     // carries on from where the twin's was, and the twin's content leaves as this one's arrives.
-    function takeOver(): void {
+    // A third still leaving from the switch before goes at once, so only two ever swap.
+    function takeOver(twin: K.Sheet): void {
         // Asked for again before the twin's content has begun to show: this one's content turns
         // back from where it is instead of leaving the screen empty for a beat.
         const turningBack = root.leaving && twin.presence === 0;
         swap.stop();
         back.stop();
+        for (const other of root.twins) {
+            if (other !== twin && other.leaving)
+                other.settle();
+        }
+        root.from = twin;
         root.leaving = false;
         root.progress = twin.progress;
         twin.yieldTo(root);
@@ -129,7 +145,7 @@ FocusScope {
             back.start();
             return;
         }
-        root.shift = root.side * root.travel;
+        root.shift = root.toward * root.travel;
         root.presence = 0;
         swap.start();
     }
@@ -158,8 +174,9 @@ FocusScope {
         // A twin taking over has already set this one leaving; it goes when its content has.
         if (!shown && leaving)
             return;
-        if (shown && twin?.active)
-            takeOver();
+        const twin = shown ? holder() : null;
+        if (twin)
+            takeOver(twin);
         motion.stop();
         motion.to = shown ? 1 : 0;
         motion.duration = shown ? Tokens.duration.long : Tokens.duration.medium;
@@ -219,21 +236,21 @@ FocusScope {
     ParallelAnimation {
         id: swap
 
-        onFinished: root.twin.settle()
+        onFinished: root.from.settle()
 
         SequentialAnimation {
             ParallelAnimation {
                 NumberAnimation {
-                    target: root.twin
+                    target: root.from
                     property: "shift"
-                    to: -root.side * root.travel
+                    to: -root.toward * root.travel
                     duration: Tokens.duration.micro
                     easing.type: Easing.BezierSpline
                     easing.bezierCurve: Tokens.easing.emphasized_accel
                 }
 
                 NumberAnimation {
-                    target: root.twin
+                    target: root.from
                     property: "presence"
                     to: 0
                     duration: Tokens.duration.micro
