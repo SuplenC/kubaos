@@ -1,4 +1,4 @@
-//! `kubaos-sysmon`: the system monitor behind the bar's pill and its popup, and the changes the
+//! `kubaos-sysmon`: the system monitor behind the bar's pill and its panel, and the changes the
 //! Command menu makes to its settings.
 //!
 //! ```text

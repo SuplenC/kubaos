@@ -45,8 +45,8 @@ pub struct Alert {
     pub id: String,
     pub title: String,
     pub body: String,
-    /// What the notification's button does: `process:<pid>` (the popup on that process),
-    /// `files:<mount>` (the mount in Files), `power-saver`, or `open` (the popup).
+    /// What the notification's button does: `process:<pid>` (the panel on that process),
+    /// `files:<mount>` (the mount in Files), `power-saver`, or `open` (the panel).
     pub action: String,
     pub action_label: String,
 }

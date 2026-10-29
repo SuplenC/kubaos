@@ -13,12 +13,12 @@
 //! battery_draw = 30          # W
 //! ```
 //!
-//! The popup and the Command menu change it through `kubaos-sysmon set`, which edits the file in
+//! The panel and the Command menu change it through `kubaos-sysmon set`, which edits the file in
 //! place, so the user's comments and layout stay.
 //!
 //! # Owns
 //!
-//! - Reading the file, the defaults, and every change the popup and the menu make to it.
+//! - Reading the file, the defaults, and every change the panel and the menu make to it.
 //!
 //! # Not here
 //!

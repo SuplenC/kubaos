@@ -2,7 +2,7 @@
 //! `kill chrome` or `end slack` finding the processes to stop, each stop confirmed first.
 //!
 //! The numbers come from the monitor's stream file while the shell's monitor writes it, so the
-//! menu, the bar's pill and the popup show one reading. Without a fresh one (the shell down, or
+//! menu, the bar's pill and the panel show one reading. Without a fresh one (the shell down, or
 //! the screen locked) they are read from `/proc` and `/sys` here.
 //!
 //! # Owns
@@ -42,13 +42,13 @@ pub const KIND: &str = "kubaos.sysmon";
 pub const PROCESS_KIND: &str = "kubaos.process";
 /// Copies the answer, as shown.
 pub const COPY: &str = "copy";
-/// Opens the monitor's popup.
+/// Opens the monitor's panel.
 pub const OPEN: &str = "open";
 /// Asks every process of the name to exit.
 pub const END: &str = "end";
 /// Stops every process of the name at once.
 pub const KILL: &str = "kill";
-/// Opens the popup on the process's details.
+/// Opens the panel on the process's details.
 pub const SHOW: &str = "show";
 
 /// How old a sample in the stream file may be and still answer: the pill's pace with room to
@@ -136,7 +136,7 @@ impl Monitor {
     ///
     /// # Errors
     ///
-    /// When the Action is unknown, the popup can't be reached, or a process couldn't be stopped;
+    /// When the Action is unknown, the panel can't be reached, or a process couldn't be stopped;
     /// the message is what the user reads.
     pub fn run(
         &mut self,

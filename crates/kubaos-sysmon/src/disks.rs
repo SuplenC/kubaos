@@ -82,7 +82,7 @@ fn unescape(field: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// A mount shown in the popup.
+/// A mount shown in the panel.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Watched {
     pub point: String,

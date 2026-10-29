@@ -1,9 +1,9 @@
 //! KubaOS's system monitor: CPU, memory, GPU, disks, network, battery, fans and processes, read
 //! straight from `/proc` and `/sys`, with no process started for a sample. One stream feeds the
-//! bar's pill, its popup and the Command menu.
+//! bar's pill, its panel and the Command menu.
 //!
 //! ```text
-//! /proc, /sys ─▶ Sampler ─▶ kubaos-sysmon serve ─{"type":"sample",...}─▶ Sysmon.qml ─▶ pill, popup
+//! /proc, /sys ─▶ Sampler ─▶ kubaos-sysmon serve ─{"type":"sample",...}─▶ Sysmon.qml ─▶ pill, panel
 //!                                  │      ▲                                   │
 //!                                  │      └──{"op":"mode","mode":"popup"}─────┘
 //!                                  └─▶ $XDG_RUNTIME_DIR/kubaos-sysmon.json ─▶ kotodama-kubaos (`cpu`)
@@ -17,7 +17,7 @@
 //!
 //! # Not here
 //!
-//! - The pill and the popup: `config/quickshell/modules/bar/SysmonPill.qml` and
+//! - The pill and the panel: `config/quickshell/modules/bar/SysmonPill.qml` and
 //!   `config/quickshell/modules/sysmon/`. The menu's answers and process search:
 //!   `crates/kotodama-kubaos/src/sysmon.rs`; its Items: `config/kotodama/kubaos.toml`.
 

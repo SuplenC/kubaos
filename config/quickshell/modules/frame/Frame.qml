@@ -46,7 +46,7 @@ Scope {
         readonly property bool modal: panel !== ""
         // 1 = frame shown, 0 = retracted (a fullscreen window, no panel open).
         property real reveal: fullscreen && !modal ? 0 : 1
-        readonly property var panels: [controlCenter, notificationPanel, clockPopup, sysmonPopup, powerMenu, wallpaperPicker]
+        readonly property var panels: [controlCenter, notificationPanel, clockPopup, sysmonPanel, powerMenu, wallpaperPicker]
         // The panel on screen (opening, open or closing) that reaches into
         // the popups' corner column, or null. Popups never draw over it.
         readonly property K.Sheet toastCover: panels.find(d => (d.shown || d.active) && d.area.x + d.area.width + K.Tokens.radius.surface > geo.r - popups.contentWidth) ?? null
@@ -185,7 +185,7 @@ Scope {
                 }
 
                 PanelPath {
-                    drawer: sysmonPopup
+                    drawer: sysmonPanel
                 }
 
                 PanelPath {
@@ -267,16 +267,16 @@ Scope {
                 screen: root.screen
             }
 
-            // The two panels out of the right edge are twins: switching between them keeps the
+            // The three panels out of the right edge are twins: switching between them keeps the
             // surface and swaps the content, each coming from the side of its button in the bar,
-            // the bell left of the status pill.
-            ControlCenter {
-                id: controlCenter
+            // where the system monitor's pill, the bell and the status pill sit in that order.
+            SysmonPanel {
+                id: sysmonPanel
 
                 frame: geo
-                shown: root.panel === "controlcenter"
-                twin: notificationPanel
-                side: 1
+                shown: root.panel === "sysmon"
+                twins: [notificationPanel, controlCenter]
+                side: 0
             }
 
             NotificationPanel {
@@ -284,8 +284,17 @@ Scope {
 
                 frame: geo
                 shown: root.panel === "notifications"
-                twin: controlCenter
-                side: -1
+                twins: [sysmonPanel, controlCenter]
+                side: 1
+            }
+
+            ControlCenter {
+                id: controlCenter
+
+                frame: geo
+                shown: root.panel === "controlcenter"
+                twins: [sysmonPanel, notificationPanel]
+                side: 2
             }
 
             ClockPopup {
@@ -293,13 +302,6 @@ Scope {
 
                 frame: geo
                 shown: root.panel === "clock"
-            }
-
-            SysmonPopup {
-                id: sysmonPopup
-
-                frame: geo
-                shown: root.panel === "sysmon"
             }
 
             PowerMenu {

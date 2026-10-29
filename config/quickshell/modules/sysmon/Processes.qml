@@ -1,20 +1,61 @@
 import QtQuick
 import KubaOS.Components as K
 import qs.services
+import "panel.js" as Panel
 
-// The five busiest processes, by CPU or by memory, in a table of compact rows. A click shows one's
-// details under it, with End (it may save and quit) and Kill (it stops at once), each asking
-// first.
+// The busiest processes, by CPU or by memory, in compact rows on the panel's own surface, as many
+// as fit in `tallest` and never fewer than five. The heading and the column heads show at once; a
+// row not counted yet is a placeholder, and the process fades in over it, so nothing moves as the
+// list arrives. A click on a row opens its details under it, with End (it may save and quit) and
+// Kill (it stops at once), each asking first; a process shown that isn't in the list (one a
+// Command menu Item asked for) sits above the rest with its details.
 K.Stack {
     id: root
 
+    // The tallest the processes may grow to fill the panel, the heading included. Not `room`,
+    // which is the width a layout is offered.
+    property real tallest: 0
+    // The sample the panel shows.
+    property var sample: null
     property string order: "cpu"
     // The process shown, from the engine's `process` reply, or null.
     property var details: null
     // "term" or "kill" while its confirmation shows, else "".
     property string confirming: ""
     property string error: ""
-    readonly property var list: Sysmon.sample?.top?.[order] ?? []
+
+    // Whether the processes are counted: the panel's samples are detailed, and only those scan them.
+    readonly property bool counted: root.sample?.detail === true
+    readonly property var list: root.counted ? (root.sample?.top?.[root.order] ?? []) : []
+    readonly property int least: 5
+    // The most rows there are: as many as a detailed sample lists (`TOP_DETAILED` in
+    // `crates/kubaos-sysmon/src/sampler.rs`). They are all made once and those past the room
+    // hidden, so a room that changes as the panel lays out makes and drops none.
+    readonly property int most: 40
+    readonly property int slots: Panel.slots(root.tallest - rows.y - heads.height, K.Tokens.size.row_compact, root.least, root.most)
+    // Where the shown process is in the rows, or -1 where it isn't among them.
+    readonly property int pickedAt: {
+        const at = root.details ? root.list.findIndex(process => process.pid === root.details.pid) : -1;
+        return at < root.slots ? at : -1;
+    }
+    // The numbers' columns are wide enough for "1023 MB" and "100.0%" in `mono_large` in a
+    // panel's width; the name takes the rest.
+    readonly property var columns: [
+        {
+            title: "Name",
+            weight: 2
+        },
+        {
+            title: "CPU",
+            weight: 1,
+            numeric: true
+        },
+        {
+            title: "Memory",
+            weight: 1,
+            numeric: true
+        }
+    ]
 
     fill: true
     gap: K.Tokens.space.s8
@@ -48,6 +89,10 @@ K.Stack {
         });
     }
 
+    function toggle(pid: int): void {
+        root.details?.pid === pid ? root.clear() : root.show(pid);
+    }
+
     K.Row {
         fill: true
         gap: K.Tokens.space.s8
@@ -55,7 +100,7 @@ K.Stack {
 
         K.Icon {
             name: "list_alt"
-            size: K.Tokens.icon.s20
+            size: K.Tokens.type.body_strong.icon
             color: K.Tokens.color.primary
         }
 
@@ -67,7 +112,7 @@ K.Stack {
         K.Fill {
         }
 
-        // The order is picked with the pointer only, as before: it is no stop for Tab.
+        // The order is picked with the pointer only: it is no stop for Tab.
         K.Tabs {
             labels: ["CPU", "Memory"]
             currentIndex: root.order === "cpu" ? 0 : 1
@@ -76,135 +121,55 @@ K.Stack {
         }
     }
 
-    // The rows sit on the popup's own surface: a well round them would take the room of a sixth
-    // row from a popup that already reaches far down the screen.
-    K.Table {
-        visible: root.list.length > 0
-        columns: [
-            {
-                title: "Name",
-                weight: 4
-            },
-            {
-                title: "CPU",
-                weight: 1,
-                numeric: true
-            },
-            {
-                title: "Memory",
-                weight: 1,
-                numeric: true
-            }
-        ]
-        rows: root.list.map(process => ({
-                    cells: [process.name, `${process.cpu.toFixed(1)}%`, Sysmon.bytes(process.memory)],
-                    selected: root.details?.pid === process.pid
-                }))
-        onActivated: index => {
-            const pid = root.list[index].pid;
-            root.details?.pid === pid ? root.clear() : root.show(pid);
+    K.Stack {
+        id: rows
+
+        fill: true
+
+        // The column heads alone: the rows under them are `ProcessRow`s, so a row's details can
+        // open under it.
+        K.Table {
+            id: heads
+
+            columns: root.columns
+            rows: []
         }
-    }
 
-    K.EmptyList {
-        visible: root.list.length === 0
-        text: Sysmon.sample?.detail ? "No processes to show" : "Counting…"
-    }
+        ProcessRow {
+            visible: root.details !== null && root.pickedAt < 0
+            owner: root
+            process: root.details
+        }
 
-    // The picked process: what it runs, whose it is, and End or Kill. Its header closes it.
-    K.Collapsible {
-        visible: root.details !== null
-        open: root.details !== null
-        title: root.details ? `${root.details.name} · pid ${root.details.pid}` : ""
-        onToggled: root.clear()
+        Repeater {
+            model: root.most
 
-        K.Stack {
-            fill: true
-            gap: K.Tokens.space.s4
+            ProcessRow {
+                id: slot
 
-            K.Text {
-                text: root.details?.command ?? ""
-                style: K.Tokens.type.mono
-                color: K.Tokens.color.on_surface_variant
-                maximumLines: 2
-            }
+                required property int index
 
-            K.Text {
-                text: root.details ? [root.details.user, root.details.state, `${root.details.threads} threads`, Sysmon.bytes(root.details.memory), root.details.started ? `since ${Qt.formatDateTime(new Date(root.details.started * 1000), "ddd HH:mm")}` : "", `parent ${root.details.parent}`].filter(Boolean).join(" · ") : ""
-                style: K.Tokens.type.small
-                color: K.Tokens.color.on_surface_variant
-            }
-
-            K.Gap {
-                space: K.Tokens.space.s8
-            }
-
-            K.Row {
-                visible: root.confirming === ""
-                gap: K.Tokens.space.s8
-                align: "centre"
-
-                K.Button {
-                    text: "End"
-                    kind: "Tonal"
-                    size: "Sm"
-                    activeFocusOnTab: false
-                    onActivated: root.confirming = "term"
-
-                    K.Hint {
-                        text: "Ask it to quit; it may save its work first"
-                        shown: parent.pointerOver
-                    }
-                }
-
-                K.Button {
-                    text: "Kill"
-                    kind: "Text"
-                    size: "Sm"
-                    activeFocusOnTab: false
-                    onActivated: root.confirming = "kill"
-
-                    K.Hint {
-                        text: "Stop it at once; unsaved work is lost"
-                        shown: parent.pointerOver
-                    }
-                }
-            }
-
-            K.Row {
-                visible: root.confirming !== ""
-                gap: K.Tokens.space.s8
-                align: "centre"
-
-                K.Text {
-                    text: root.details ? `${root.confirming === "kill" ? "Kill" : "End"} ${root.details.name}?` : ""
-                    style: K.Tokens.type.body_strong
-                    color: root.confirming === "kill" ? K.Tokens.color.error : K.Tokens.color.on_surface
-                }
-
-                K.Button {
-                    text: "Cancel"
-                    kind: "Text"
-                    size: "Sm"
-                    activeFocusOnTab: false
-                    onActivated: root.confirming = ""
-                }
-
-                K.Button {
-                    text: root.confirming === "kill" ? "Kill" : "End"
-                    kind: root.confirming === "kill" ? "Danger" : "Filled"
-                    size: "Sm"
-                    activeFocusOnTab: false
-                    onActivated: root.stop()
-                }
+                visible: slot.index < root.slots
+                owner: root
+                slotIndex: slot.index
+                kind: Panel.slot(slot.index, root.counted, root.list.length)
+                process: slot.kind === "process" ? root.list[slot.index] : null
             }
         }
     }
 
+    // The engine's reply when the shown process couldn't be read, with no row to open under.
     K.Text {
-        visible: root.error !== ""
+        visible: root.error !== "" && root.details === null
         text: root.error
         style: K.Tokens.type.small
         color: K.Tokens.color.error
+    }
+
+    K.Text {
+        visible: root.counted && root.list.length === 0
+        text: "No processes to show"
+        style: K.Tokens.type.small
+        color: K.Tokens.color.on_surface_variant
     }
 }

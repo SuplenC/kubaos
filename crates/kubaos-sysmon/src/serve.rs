@@ -15,7 +15,7 @@
 //!
 //! A request that fails gets `{"id":n,"error":"..."}`. Each sample is also written to the stream
 //! file (`$XDG_RUNTIME_DIR/kubaos-sysmon.json`), where the Command menu reads it, so the pill, the
-//! popup and the menu show the same numbers.
+//! panel and the menu show the same numbers.
 //!
 //! # Owns
 //!
@@ -57,7 +57,7 @@ pub const PILL_INTERVAL: Duration = Duration::from_secs(2);
 /// The pill's pace in a power saver stop, whose background work waits: a number in the bar may lag
 /// a few seconds, and five times fewer samples wake the CPU five times less.
 pub const QUIET_INTERVAL: Duration = Duration::from_secs(10);
-/// The popup's pace, for its graphs.
+/// The panel's pace, for its graphs.
 pub const POPUP_INTERVAL: Duration = Duration::from_secs(1);
 /// How soon after a restart of the counters the first sample comes: enough ticks for a usage.
 pub const AFTER_RESTART: Duration = Duration::from_millis(500);
@@ -72,7 +72,7 @@ pub enum Mode {
     Pill,
     /// The pill's samples at a slower pace, while a power saver stop holds background work back.
     Quiet,
-    /// Detailed samples with processes, for the open popup.
+    /// Detailed samples with processes, for the open panel.
     Popup,
     /// None: the screen is locked, or nothing shows them.
     Paused,
@@ -114,7 +114,7 @@ impl Mode {
 pub enum Next {
     /// As planned.
     Keep,
-    /// At once: the popup opened and wants numbers now.
+    /// At once: the panel opened and wants numbers now.
     Now,
     /// After [`AFTER_RESTART`]: the counters were read afresh.
     Soon,
@@ -255,7 +255,7 @@ impl Server {
         json!({ "settings": self.settings, "problem": self.problem })
     }
 
-    /// Moves to `mode`. Out of a pause the counters start afresh; into the popup the processes
+    /// Moves to `mode`. Out of a pause the counters start afresh; into the panel the processes
     /// are scanned, so its first full sample has their CPU use.
     fn switch(&mut self, mode: Mode, now: u64) -> Next {
         let before = self.mode;

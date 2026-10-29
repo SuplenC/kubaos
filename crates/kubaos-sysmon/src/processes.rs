@@ -1,4 +1,4 @@
-//! Processes: a scan of `/proc/<pid>/stat`, CPU use between two scans, the top five, a process's
+//! Processes: a scan of `/proc/<pid>/stat`, CPU use between two scans, the top lists, a process's
 //! details, finding processes by name, and ending or killing one.
 //!
 //! A scan reads one file a process. CPU use is a process's ticks as a share of the whole
@@ -12,7 +12,7 @@
 //!
 //! # Not here
 //!
-//! - Asking before a process is ended: the popup (`config/quickshell/modules/sysmon/`) and the
+//! - Asking before a process is ended: the panel (`config/quickshell/modules/sysmon/`) and the
 //!   Command menu (`crates/kotodama-kubaos/src/sysmon.rs`) both confirm first.
 
 use std::collections::HashMap;
@@ -90,7 +90,7 @@ pub fn scan(root: &Path, page: u64) -> Vec<ProcStat> {
         .collect()
 }
 
-/// A process as the popup lists it.
+/// A process as the panel lists it.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Process {
     pub pid: i32,
@@ -207,7 +207,7 @@ pub fn by_memory(list: &[Process]) -> Vec<(String, u64)> {
     sorted
 }
 
-/// What the popup shows for one process.
+/// What the panel shows for one process.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Details {
     pub pid: i32,

@@ -7,8 +7,9 @@ import qs.services
 // Critical notifications while an open panel covers the popups' corner: a
 // stack out of the frame's right edge, just under that panel, so an urgent
 // one is seen without drawing over the panel. With no room under the panel
-// (the control center, the notifications panel and the wallpaper picker
-// reach the bottom edge), they wait with the rest for the corner.
+// (the control center, the notifications panel, the system monitor and the
+// wallpaper picker reach the bottom edge), they wait with the rest for the
+// corner.
 K.Sheet {
     id: root
 

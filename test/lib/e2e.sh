@@ -1235,7 +1235,7 @@ c_clock() {
 }
 
 # The system monitor: kubaos-sysmon reads the container's /proc with no GPU,
-# battery or fan, the shell's stream feeds the pill, the popup opens through
+# battery or fan, the shell's stream feeds the pill, the panel opens through
 # the sysmon IPC with the engine sampling in detail, and the pill hides and
 # comes back through the IPC, with no QML errors on the way.
 c_sysmon() {
@@ -1280,9 +1280,9 @@ c_sysmon() {
     sleep 0.2
   done
   if [[ $out == *'"open":true'* && $out == *'"mode":"popup"'* && $out == *'"detail":true'* ]]; then
-    echo "ok   qs ipc call sysmon toggle opens the popup, sampling in detail"
+    echo "ok   qs ipc call sysmon toggle opens the panel, sampling in detail"
   else
-    echo "FAIL the popup isn't open with detailed samples: $out"
+    echo "FAIL the panel isn't open with detailed samples: $out"
     bad=1
   fi
   in_session 'qs ipc call sysmon toggle' >/dev/null 2>&1
@@ -1292,7 +1292,7 @@ c_sysmon() {
     sleep 0.2
   done
   [[ $out == *'"open":false'* && $out == *'"mode":"pill"'* ]] && echo "ok   toggling again closes it, back to the pill's pace" ||
-    { echo "FAIL the popup stayed open or the pace stayed fast: $out"; bad=1; }
+    { echo "FAIL the panel stayed open or the pace stayed fast: $out"; bad=1; }
 
   in_session 'qs ipc call sysmon pill off' >/dev/null 2>&1
   for i in $(seq 30); do
@@ -1322,7 +1322,7 @@ c_sysmon() {
     printf '%s\n' "$out" | head -30
     bad=1
   fi
-  ((bad)) || echo "ok   no QML errors with the pill and the popup"
+  ((bad)) || echo "ok   no QML errors with the pill and the panel"
   return "$bad"
 }
 
@@ -1363,9 +1363,10 @@ toast_overlaps() {
 # (config/quickshell/modules/notifications/ToastProbe.qml), which logs the
 # stacks' and panels' rectangles as they change. A toast on screen when the
 # system monitor opens leaves the corner, one sent while it is open waits, and
-# a critical one shows under the popup; closing it brings all three back to
-# the corner. At no logged frame, the glides included, does a stack drawing
-# cards meet an open panel.
+# so does a critical one, as the panel reaches the bottom edge; under the power
+# menu, which leaves room below it, the critical one shows. Closing it brings
+# all three back to the corner. At no logged frame, the glides included, does a
+# stack drawing cards meet an open panel.
 c_notifications() {
   local out bad=0 i frames
   session_start sway 1920x1080 1
@@ -1378,7 +1379,7 @@ c_notifications() {
   sleep 3
 
   TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
-  in_session "notify-send -t 60000 Earlier 'On screen before the popup opens'" >/dev/null 2>&1
+  in_session "notify-send -t 60000 Earlier 'On screen before the panel opens'" >/dev/null 2>&1
   toast_wait "a toast shows in the corner" 'stack=top,1,' || bad=1
 
   TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
@@ -1393,27 +1394,37 @@ c_notifications() {
   if [[ $out == *' stack=top,0,'* ]]; then
     echo "ok   the system monitor opening sends it away at once"
   else
-    echo "FAIL the toast was still drawn in the popup's first frame: $out"
+    echo "FAIL the toast was still drawn in the panel's first frame: $out"
     bad=1
   fi
 
-  in_session "notify-send -t 60000 Held 'Sent while the popup is open'" >/dev/null 2>&1
+  in_session "notify-send -t 60000 Held 'Sent while the panel is open'" >/dev/null 2>&1
   sleep 1.5
   out="$(grep -o 'toast probe: .*' "$QS_LOG" | tail -1)"
   if [[ $out == *panel=*' stack=top,0,'*' stack=right,0,'* ]]; then
-    echo "ok   one sent while the popup is open waits"
+    echo "ok   one sent while the panel is open waits"
   else
-    echo "FAIL a toast showed with the popup open: $out"
+    echo "FAIL a toast showed with the panel open: $out"
+    bad=1
+  fi
+
+  in_session "notify-send -u critical Critical 'Shows under the power menu'" >/dev/null 2>&1
+  sleep 1.5
+  out="$(grep -o 'toast probe: .*' "$QS_LOG" | tail -1)"
+  if [[ $out == *panel=*' stack=top,0,'*' stack=right,0,'* ]]; then
+    echo "ok   a critical one waits too, with no room under the full-height panel"
+  else
+    echo "FAIL a critical toast showed with the full-height panel open: $out"
     bad=1
   fi
 
   TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
-  in_session "notify-send -u critical Critical 'Shows under the popup'" >/dev/null 2>&1
-  toast_wait "a critical one shows under the popup" 'panel=.* stack=top,0,.* stack=right,1,' || bad=1
+  in_session 'qs ipc call powermenu toggle' >/dev/null 2>&1
+  toast_wait "the critical one shows under the power menu" 'panel=.* stack=top,0,.* stack=right,1,' || bad=1
 
   TOAST_MARK=$(($(wc -l <"$QS_LOG") + 1))
-  in_session 'qs ipc call sysmon toggle' >/dev/null 2>&1
-  toast_wait "closing the popup brings all three back to the corner" 'stack=top,3,.* stack=right,0,' || bad=1
+  in_session 'qs ipc call powermenu toggle' >/dev/null 2>&1
+  toast_wait "closing the power menu brings all three back to the corner" 'stack=top,3,.* stack=right,0,' || bad=1
 
   # The notifications panel: the three are unread until it has shown them, and it covers the
   # corner as the other panels do.
@@ -1475,10 +1486,10 @@ c_notifications() {
     head -5 <<<"$out" | sed 's/^/     /'
     bad=1
   elif ((frames < 5)); then
-    echo "FAIL the probe logged the popup open in $frames frames only"
+    echo "FAIL the probe logged the panels open in $frames frames only"
     bad=1
   else
-    echo "ok   no toast met the popup in any of $frames frames with it on screen"
+    echo "ok   no toast met a panel in any of $frames frames with one on screen"
   fi
 
   out="$(qs_problems)"
@@ -1488,7 +1499,7 @@ c_notifications() {
     printf '%s\n' "$out" | head -30
     bad=1
   fi
-  ((bad)) || echo "ok   no QML errors with the toasts and the popup"
+  ((bad)) || echo "ok   no QML errors with the toasts and the panels"
   return "$bad"
 }
 

@@ -1,9 +1,9 @@
-//! A sample: everything the pill, the popup and the menu show, read from `/proc` and `/sys` in one
+//! A sample: everything the pill, the panel and the menu show, read from `/proc` and `/sys` in one
 //! go, with the speeds worked out against the sample before.
 //!
 //! A light sample (the pill's) reads a handful of files: `/proc/stat`, `/proc/meminfo`, the CPU
 //! temperature, the GPUs, the routing table and `/proc/net/dev`, the battery, and the space on the
-//! watched mounts. A detailed one (the popup's) adds the cores' clock, disk traffic, the address,
+//! watched mounts. A detailed one (the panel's) adds the cores' clock, disk traffic, the address,
 //! fans and snapshots, and a process scan when asked for one. Devices (sensors, GPUs, disks,
 //! mounts) are looked for again every [`REDISCOVER_MS`], so a drive plugged in shows up.
 //!
@@ -48,8 +48,12 @@ use crate::read;
 /// How often devices and mounts are looked for again, in ms: a drive plugged in shows within it.
 pub const REDISCOVER_MS: u64 = 15_000;
 
-/// How many processes each top list holds.
+/// How many processes each top list holds in a light sample: the alerts read only the first.
 pub const TOP: usize = 5;
+
+/// How many processes each top list holds in a detailed sample. The panel shows as many as fit
+/// in its room under the readings, and 40 rows fill it on a screen 2160 logical pixels tall.
+pub const TOP_DETAILED: usize = 40;
 
 /// The processor now.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -101,7 +105,7 @@ pub struct Top {
 pub struct Sample {
     /// When, in ms since the epoch.
     pub t: u64,
-    /// A detailed sample, the popup's.
+    /// A detailed sample, the panel's.
     pub detail: bool,
     pub cpu: Cpu,
     pub memory: Option<Memory>,
@@ -206,7 +210,7 @@ impl Sampler {
         });
     }
 
-    /// A sample at `now` (ms since the epoch): detailed for the popup, with a process scan if
+    /// A sample at `now` (ms since the epoch): detailed for the panel, with a process scan if
     /// `processes`.
     pub fn sample(&mut self, now: u64, detail: bool, processes: bool) -> Sample {
         if self.discovered.is_none_or(|at| now.saturating_sub(at) >= REDISCOVER_MS) {
@@ -249,9 +253,10 @@ impl Sampler {
             let scanned = self
                 .tracker
                 .update(processes::scan(&self.root, self.page), stat.total.total);
+            let count = if detail { TOP_DETAILED } else { TOP };
             Top {
-                cpu: Order::Cpu.top(&scanned, TOP),
-                memory: Order::Memory.top(&scanned, TOP),
+                cpu: Order::Cpu.top(&scanned, count),
+                memory: Order::Memory.top(&scanned, count),
                 heaviest: processes::by_memory(&scanned).into_iter().next(),
             }
         });

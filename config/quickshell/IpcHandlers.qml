@@ -158,7 +158,7 @@ Scope {
             Sysmon.show();
         }
 
-        // The popup on process `pid`'s details, with End and Kill.
+        // The panel on process `pid`'s details, with End and Kill.
         function process(pid: int): void {
             Sysmon.showProcess(pid);
         }
@@ -180,7 +180,7 @@ Scope {
         }
 
         // JSON: whether the engine runs, the mode it samples in, the pill's
-        // settings, whether a sample has come and the popup is open.
+        // settings, whether a sample has come and the panel is open.
         function status(): string {
             return JSON.stringify(Sysmon.status());
         }

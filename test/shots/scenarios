@@ -28,8 +28,14 @@ controlcenter-kb-add     controlcenter  FrameShot   1176,0,424,1000   controlcen
 controlcenter-scanning   controlcenter  FrameShot   1176,0,424,1000   controlcenter scanning
 clock                    clock          FrameShot   400,0,800,800     clock answer
 clock-settings           clock          FrameShot   400,0,800,800     clock settings
-sysmon                   sysmon         FrameShot   760,0,840,900     sysmon
-sysmon-process           sysmon         FrameShot   760,0,840,900     sysmon process
+sysmon                   sysmon         FrameShot   1176,0,424,1000   sysmon
+sysmon-fine              sysmon         FrameShot   1176,0,424,1000   sysmon fine
+sysmon-critical          sysmon         FrameShot   1176,0,424,1000   sysmon critical
+sysmon-loading           sysmon         FrameShot   1176,0,424,1000   sysmon loading
+sysmon-bare              sysmon         FrameShot   1176,0,424,1000   sysmon bare
+sysmon-scrolled          sysmon         FrameShot   1176,0,424,1000   sysmon scrolled
+sysmon-process           sysmon         FrameShot   1176,0,424,1000   sysmon process
+sysmon-kill              sysmon         FrameShot   1176,0,424,1000   sysmon kill
 wallpaper                wallpaper      FrameShot   200,440,1200,560  wallpaper
 wallpaper-settings       wallpaper      FrameShot   200,440,1200,560  wallpaper settings
 powermenu                powermenu      FrameShot   1160,260,440,480  powermenu
