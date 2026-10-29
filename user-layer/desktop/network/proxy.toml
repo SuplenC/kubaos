@@ -11,9 +11,15 @@
 [tunnel]
 # conf = "wireguard.conf"
 #
-# A full tunnel blocks everything that would leave outside it while it is up (the kill switch).
-# Turn it off to reach printers and the like on the network you're on:
+# A full tunnel blocks everything that would leave outside it while it is up (the kill switch):
 # kill_switch = true
+#
+# But the network you're on: the kill switch lets its ranges through, as they are when the tunnel
+# comes up and each time the network changes, so the phone link, printers, casting and SSH there
+# keep working. A range the tunnel routes stays behind it, and no DNS lookup goes out beside the
+# tunnel. `kubaos proxy lan on|off`, the Command menu or the control center's Proxy detail set it,
+# and while the Proxy is on, it takes effect at once:
+# allow_local_network = true
 #
 # The vault item that holds the tunnel's keys; `kubaos proxy pull` copies them to the keyring
 # again on a new machine:

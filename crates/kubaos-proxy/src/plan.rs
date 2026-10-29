@@ -9,7 +9,8 @@
 //!
 //! # Owns
 //!
-//! - [`Plan`], its [`Part`]s and their [`Kind`]s, and the root helper's arguments ([`RootArg`]).
+//! - [`Plan`], its [`Part`]s and their [`Kind`]s, and the root helper's arguments ([`RootArg`]),
+//!   the kill switch's among them ([`KillSwitch`]).
 //!
 //! # Not here
 //!
@@ -17,8 +18,10 @@
 
 use std::fmt;
 
+use crate::local_network;
 use crate::profile::Dns;
 use crate::profile::Profile;
+use crate::wireguard::Cidr;
 use crate::wireguard::Config;
 
 /// The variables the session gets, for the programs that read the proxy from the environment.
@@ -91,11 +94,21 @@ impl fmt::Display for Kind {
     }
 }
 
+/// What the kill switch lets out beside the tunnel, the tunnel's own packets aside.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum KillSwitch {
+    /// Nothing.
+    Strict,
+    /// The local networks: link-local ranges, discovery's multicast and broadcast, and these
+    /// ranges of the machine's interfaces ([`crate::local_network::let_through`]).
+    LocalNetwork(Vec<Cidr>),
+}
+
 /// One argument to the root helper, `system/files/proxy/kubaos-proxy-write`, which checks it
 /// again.
 #[derive(Clone, PartialEq, Eq)]
 pub enum RootArg {
-    KillSwitch,
+    KillSwitch(KillSwitch),
     /// The certificate, in PEM, which goes on the helper's stdin.
     Ca(String),
     Apt(String),
@@ -124,7 +137,7 @@ impl RootArg {
     /// Its part's name: `apt`.
     pub const fn name(&self) -> &'static str {
         match self {
-            RootArg::KillSwitch => "killswitch",
+            RootArg::KillSwitch(_) => "killswitch",
             RootArg::Ca(_) => "ca",
             RootArg::Apt(_) => "apt",
             RootArg::Docker { .. } => "docker",
@@ -133,11 +146,15 @@ impl RootArg {
         }
     }
 
-    /// The argument that puts it in place: `apt=http://proxy:3128`.
+    /// The argument that puts it in place: `apt=http://proxy:3128`, `killswitch=lan|192.168.1.0/24`.
     pub fn arg(&self) -> String {
         let name = self.name();
         match self {
-            RootArg::KillSwitch => format!("{name}=on"),
+            RootArg::KillSwitch(KillSwitch::Strict) => format!("{name}=on"),
+            RootArg::KillSwitch(KillSwitch::LocalNetwork(networks)) => {
+                let networks: Vec<String> = networks.iter().map(ToString::to_string).collect();
+                format!("{name}=lan|{}", networks.join(","))
+            }
             RootArg::Ca(_) => format!("{name}=-"),
             RootArg::Apt(proxy) => format!("{name}={proxy}"),
             RootArg::Docker { proxy, no_proxy } | RootArg::Nix { proxy, no_proxy } => {
@@ -255,7 +272,11 @@ impl Plan {
         let no_proxy = profile.http.no_proxy.join(",");
         let mut root = Vec::new();
         if profile.kill_switch() {
-            root.push(RootArg::KillSwitch);
+            root.push(RootArg::KillSwitch(if profile.allow_local_network() {
+                KillSwitch::LocalNetwork(Vec::new())
+            } else {
+                KillSwitch::Strict
+            }));
         }
         if let Some(ca) = &profile.ca {
             root.push(RootArg::Ca(ca.pem.clone()));
@@ -325,9 +346,43 @@ impl Plan {
 
     /// Whether the plan puts the kill switch up.
     pub fn has_kill_switch(&self) -> bool {
-        self.parts
-            .iter()
-            .any(|part| matches!(part, Part::Root(args) if args.contains(&RootArg::KillSwitch)))
+        self.kill_switch().is_some()
+    }
+
+    /// The kill switch the plan puts up.
+    pub fn kill_switch(&self) -> Option<&KillSwitch> {
+        self.parts.iter().find_map(|part| match part {
+            Part::Root(args) => args.iter().find_map(|arg| match arg {
+                RootArg::KillSwitch(kill_switch) => Some(kill_switch),
+                _ => None,
+            }),
+            _ => None,
+        })
+    }
+
+    /// The plan with its kill switch letting through those of the `found` ranges that
+    /// [`local_network::let_through`] allows beside its tunnel, when it lets the local networks
+    /// through at all.
+    #[must_use]
+    pub fn with_local_networks(&self, found: &[Cidr]) -> Plan {
+        let mut plan = self.clone();
+        let Some(tunnel) = plan.parts.iter().find_map(|part| match part {
+            Part::Tunnel(tunnel) => Some(tunnel.config.clone()),
+            _ => None,
+        }) else {
+            return plan;
+        };
+        for part in &mut plan.parts {
+            let Part::Root(args) = part else {
+                continue;
+            };
+            for arg in args {
+                if let RootArg::KillSwitch(KillSwitch::LocalNetwork(networks)) = arg {
+                    *networks = local_network::let_through(found, &tunnel);
+                }
+            }
+        }
+        plan
     }
 }
 

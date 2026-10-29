@@ -7,7 +7,8 @@ import qs.settings
 
 // The Proxy, the work network's switch: what `kubaos-proxy` last published
 // ($XDG_RUNTIME_DIR/kubaos-proxy.json, crates/kubaos-proxy, replaced whole
-// on every change), and switching it through `kubaos-proxy on|off`. Watched,
+// on every change), and switching it through `kubaos-proxy on|off`, and the
+// kill switch's local network through `kubaos-proxy lan on|off`. Watched,
 // never polled. While `live` is set and the tunnel is up, the bytes moved
 // come from /sys every few seconds, which needs no root, and when the tunnel
 // last received; the handshake needs root (`status --json --live`, through
@@ -24,6 +25,9 @@ Singleton {
     property var liveStatus: null
     // A switch asked here that hasn't come back yet: the tile shows it at once.
     property bool pending: false
+    // The local network's setting asked here that hasn't come back yet, null
+    // for none: the detail's switch shows it at once.
+    property var localNetworkPending: null
     // The control center's detail is open: read the tunnel live.
     property bool live: false
     readonly property bool watching: live && on && tunnel !== null
@@ -51,6 +55,9 @@ Singleton {
     readonly property string endpoint: tunnel?.endpoint ?? ""
     readonly property bool full: tunnel?.full ?? false
     readonly property bool killSwitch: tunnel?.killSwitch ?? false
+    // The kill switch lets the network you're on through: on unless the
+    // profile says otherwise.
+    readonly property bool allowLocalNetwork: localNetworkPending ?? (tunnel?.allowLocalNetwork ?? true)
     readonly property string problem: published?.problem ?? ""
     readonly property string kind: !tunnel ? "" : full ? (killSwitch ? "Full tunnel, kill switch" : "Full tunnel") : "Split tunnel"
     // The tile's status line.
@@ -62,6 +69,16 @@ Singleton {
         pending = true;
         confirm.restart();
         Quickshell.execDetached(["kubaos-proxy", on ? "off" : "on"]);
+    }
+
+    // Whether the kill switch lets the local network through; while the Proxy
+    // is on, it takes effect at once.
+    function setLocalNetwork(allowed: bool): void {
+        if (busy || allowed === allowLocalNetwork)
+            return;
+        localNetworkPending = allowed;
+        confirm.restart();
+        Quickshell.execDetached(["kubaos-proxy", "lan", allowed ? "on" : "off"]);
     }
 
     // `seconds` since the epoch, as how long before `now`: "12 s ago".
@@ -89,7 +106,10 @@ Singleton {
         id: confirm
 
         interval: 30000
-        onTriggered: root.pending = false
+        onTriggered: {
+            root.pending = false;
+            root.localNetworkPending = null;
+        }
     }
 
     FileView {
@@ -105,6 +125,7 @@ Singleton {
             }
             if (!(root.published?.busy ?? false))
                 root.pending = false;
+            root.localNetworkPending = null;
         }
         onLoadFailed: root.published = null
     }

@@ -104,6 +104,49 @@ impl Cidr {
     pub fn is_default(&self) -> bool {
         self.prefix == 0
     }
+
+    /// The range it is in, by its first address: `192.168.1.0/24` for `192.168.1.20/24`.
+    #[must_use]
+    pub fn network(self) -> Cidr {
+        let (bits, width) = bits(self.addr);
+        let first = bits & mask(self.prefix, width);
+        let addr = match self.addr {
+            IpAddr::V4(_) => IpAddr::V4(std::net::Ipv4Addr::from(u32::try_from(first).unwrap_or_default())),
+            IpAddr::V6(_) => IpAddr::V6(std::net::Ipv6Addr::from(first)),
+        };
+        Cidr {
+            addr,
+            prefix: self.prefix,
+        }
+    }
+
+    /// Whether the two ranges share an address: one holds the other.
+    pub fn overlaps(&self, other: &Cidr) -> bool {
+        if self.addr.is_ipv4() != other.addr.is_ipv4() {
+            return false;
+        }
+        let (mine, width) = bits(self.addr);
+        let (theirs, _) = bits(other.addr);
+        let mask = mask(self.prefix.min(other.prefix), width);
+        mine & mask == theirs & mask
+    }
+}
+
+/// The address as a number, and how many bits its family has.
+fn bits(addr: IpAddr) -> (u128, u8) {
+    match addr {
+        IpAddr::V4(v4) => (u128::from(u32::from(v4)), 32),
+        IpAddr::V6(v6) => (u128::from(v6), 128),
+    }
+}
+
+/// The mask of a `prefix` in a family of `width` bits.
+fn mask(prefix: u8, width: u8) -> u128 {
+    let family = if width == 128 { u128::MAX } else { (1u128 << width) - 1 };
+    if prefix == 0 {
+        return 0;
+    }
+    (u128::MAX << (width - prefix.min(width))) & family
 }
 
 impl fmt::Display for Cidr {

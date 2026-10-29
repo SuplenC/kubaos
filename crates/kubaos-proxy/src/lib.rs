@@ -23,8 +23,9 @@
 //! - The `.conf` ([`wireguard`]) and the profile ([`profile`]), where their files are ([`paths`]),
 //!   what a profile comes to ([`plan`]), putting it in place and taking it away ([`apply`]), the
 //!   keys ([`secrets`]), the tunnel as NetworkManager is given it ([`tunnel`]), who gets the keys
-//!   when NetworkManager asks ([`agent`]), and what the shell, the menu and `status` read
-//!   ([`status`]), and when the service acts ([`watch`]).
+//!   when NetworkManager asks ([`agent`]), the local networks the kill switch lets through
+//!   ([`local_network`]), what the shell, the menu and `status` read ([`status`]), and when the
+//!   service acts ([`watch`]).
 //!
 //! # Not here
 //!
@@ -35,6 +36,7 @@
 
 pub mod agent;
 pub mod apply;
+pub mod local_network;
 pub mod machine;
 pub mod paths;
 pub mod plan;

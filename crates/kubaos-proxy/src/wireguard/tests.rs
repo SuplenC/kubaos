@@ -185,3 +185,26 @@ fn a_key_is_44_characters_of_base64_for_32_bytes() {
     assert!(Key::parse("xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8D==").is_none());
     assert!(Key::parse("xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZq\"8Dg=").is_none());
 }
+
+#[test]
+fn a_range_is_named_by_its_first_address() {
+    let cidr = |text| Cidr::parse(text).unwrap();
+
+    assert_eq!(cidr("192.168.1.20/24").network(), cidr("192.168.1.0/24"));
+    assert_eq!(cidr("10.1.2.3/8").network(), cidr("10.0.0.0/8"));
+    assert_eq!(cidr("10.1.2.3/32").network(), cidr("10.1.2.3/32"));
+    assert_eq!(cidr("2a02:1:2:3:4::9/64").network(), cidr("2a02:1:2:3::/64"));
+    assert_eq!(cidr("8.8.8.8/0").network(), cidr("0.0.0.0/0"));
+}
+
+#[test]
+fn ranges_overlap_when_one_holds_the_other() {
+    let cidr = |text| Cidr::parse(text).unwrap();
+
+    assert!(cidr("192.168.0.0/16").overlaps(&cidr("192.168.10.0/24")));
+    assert!(cidr("192.168.10.0/24").overlaps(&cidr("192.168.0.0/16")));
+    assert!(cidr("10.0.0.0/8").overlaps(&cidr("10.0.0.0/8")));
+    assert!(!cidr("192.168.1.0/24").overlaps(&cidr("192.168.2.0/24")));
+    assert!(!cidr("10.0.0.0/8").overlaps(&cidr("::/0")));
+    assert!(cidr("fd00::/8").overlaps(&cidr("fd12:3456::/64")));
+}

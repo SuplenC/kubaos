@@ -15,6 +15,8 @@
 //! # Owns
 //!
 //! - [`on`], [`off`], [`reconcile`] and the applied file.
+//! - Putting the kill switch up again alone when the local networks it lets through change
+//!   ([`kill_switch_again`]), and the record of what it went up with.
 //!
 //! # Not here
 //!
@@ -32,6 +34,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 pub use self::root::handshake;
+use crate::local_network;
 use crate::machine::Cmd;
 use crate::machine::Machine;
 use crate::machine::Ran;
@@ -40,14 +43,17 @@ use crate::machine::Said;
 use crate::machine::TunnelError;
 use crate::paths::HELPER;
 use crate::paths::Paths;
+use crate::plan::KillSwitch;
 use crate::plan::Kind;
 use crate::plan::Part;
 use crate::plan::Plan;
+use crate::plan::RootArg;
 use crate::profile::LoadError;
 use crate::profile::Profile;
 use crate::profile::write_atomic;
 use crate::secrets;
 use crate::tunnel;
+use crate::wireguard::Cidr;
 
 /// Why one part couldn't be put in place or taken away.
 #[derive(Debug, thiserror::Error)]
@@ -198,6 +204,7 @@ pub fn on(m: &mut dyn Machine, paths: &Paths, plan: &Plan, user: Option<&str>) -
 }
 
 fn on_keeping(m: &mut dyn Machine, paths: &Paths, plan: &Plan, user: Option<&str>, keep: Keep) -> Result<(), Failed> {
+    let plan = &with_local_networks(m, plan);
     let mut up = applied(paths);
     let guarded = up.contains(&Kind::Root) && plan.has_kill_switch();
     let wanted: Vec<Kind> = plan.kinds();
@@ -297,6 +304,7 @@ fn undo_keeping(m: &mut dyn Machine, paths: &Paths, keep: Keep) -> Vec<String> {
 }
 
 fn put_back(m: &mut dyn Machine, paths: &Paths, plan: &Plan, taken: &[Kind], user: Option<&str>) -> Vec<String> {
+    let plan = &with_local_networks(m, plan);
     let mut up = applied(paths);
     let mut left = Vec::new();
     for part in plan.parts.iter().filter(|part| taken.contains(&part.kind())) {
@@ -338,6 +346,12 @@ pub enum Reconciled {
     TookDown(Vec<String>),
     /// The Proxy is on again, as wanted.
     BroughtUp,
+    /// Every part was up, and the kill switch went up again to let through what it now lets
+    /// through: the local networks changed.
+    KillSwitchAgain(KillSwitch),
+    /// Every part is up, but the kill switch couldn't go up again for the local networks as they
+    /// are now, so it lets through what it did before.
+    KillSwitchKept(StepError),
     /// The Proxy was wanted on and couldn't be. Every part is off but, when it was up, the kill
     /// switch: then the Proxy stays wanted, so the next change of network tries again, and "Proxy
     /// off" lifts it. Without it, the Proxy is no longer wanted.
@@ -383,7 +397,11 @@ pub fn reconcile(
     let missing = plan.kinds().iter().any(|kind| !up.contains(kind));
     let dropped = plan.kinds().contains(&Kind::Tunnel) && !tunnel_up;
     if !missing && !dropped {
-        return Reconciled::Nothing;
+        return match kill_switch_again(m, paths, &plan) {
+            Ok(None) => Reconciled::Nothing,
+            Ok(Some(kill_switch)) => Reconciled::KillSwitchAgain(kill_switch),
+            Err(err) => Reconciled::KillSwitchKept(err),
+        };
     }
     let guarded = guarded && plan.has_kill_switch();
     let keep = if guarded { Keep::KillSwitch } else { Keep::Nothing };
@@ -399,6 +417,69 @@ pub fn reconcile(
             }
         }
     }
+}
+
+/// `plan`, its kill switch letting through the machine's local networks as they are now, when it
+/// lets them through at all.
+fn with_local_networks(m: &mut dyn Machine, plan: &Plan) -> Plan {
+    if matches!(plan.kill_switch(), Some(KillSwitch::LocalNetwork(_))) {
+        plan.with_local_networks(&local_network::read(m))
+    } else {
+        plan.clone()
+    }
+}
+
+/// The kill switch's argument as it last went up, `None` when it isn't recorded.
+fn kill_switch_recorded(paths: &Paths) -> Option<String> {
+    fs::read_to_string(paths.kill_switch())
+        .ok()
+        .map(|text| text.trim().to_owned())
+}
+
+/// Records the kill switch among `args` as it went up, or that none did.
+fn record_kill_switch(paths: &Paths, args: &[RootArg]) -> Result<(), StepError> {
+    let path = paths.kill_switch();
+    match args.iter().find(|arg| matches!(arg, RootArg::KillSwitch(_))) {
+        Some(arg) => write_atomic(&path, &format!("{}\n", arg.arg()), 0o644).map_err(|err| StepError::File(path, err)),
+        None => remove_file(&path),
+    }
+}
+
+/// The local networks the kill switch lets through now, as it last went up: none while it is
+/// strict or down.
+pub fn local_networks_let_through(paths: &Paths) -> Vec<Cidr> {
+    if !applied(paths).contains(&Kind::Root) {
+        return Vec::new();
+    }
+    kill_switch_recorded(paths)
+        .and_then(|arg| arg.strip_prefix("killswitch=lan|").map(str::to_owned))
+        .map(|list| list.split(',').filter_map(Cidr::parse).collect())
+        .unwrap_or_default()
+}
+
+/// Puts the kill switch up again, alone, when what `plan`'s lets through differs from what it
+/// last went up with: the local networks changed, or whether it lets them through. Nothing while
+/// the root part isn't up or the plan has no kill switch. What it lets through now, when it went
+/// up again.
+///
+/// # Errors
+///
+/// The helper couldn't put it up; it lets through what it did before.
+pub fn kill_switch_again(m: &mut dyn Machine, paths: &Paths, plan: &Plan) -> Result<Option<KillSwitch>, StepError> {
+    if !applied(paths).contains(&Kind::Root) || !plan.has_kill_switch() {
+        return Ok(None);
+    }
+    let plan = with_local_networks(m, plan);
+    let Some(kill_switch) = plan.kill_switch() else {
+        return Ok(None);
+    };
+    let arg = RootArg::KillSwitch(kill_switch.clone());
+    if kill_switch_recorded(paths).as_deref() == Some(arg.arg().as_str()) {
+        return Ok(None);
+    }
+    root::put_alone(m, &arg)?;
+    record_kill_switch(paths, std::slice::from_ref(&arg))?;
+    Ok(Some(kill_switch.clone()))
 }
 
 fn run(m: &mut dyn Machine, cmd: &Cmd) -> Result<Ran, StepError> {
@@ -433,7 +514,10 @@ fn put(m: &mut dyn Machine, paths: &Paths, part: &Part, user: Option<&str>, guar
             let connection = tunnel::connection(&config, &keys, &plan.dns, user);
             m.tunnel_up(&connection).map_err(StepError::Tunnel)
         }
-        Part::Root(args) => root::put(m, args),
+        Part::Root(args) => {
+            root::put(m, args)?;
+            record_kill_switch(paths, args)
+        }
         Part::Env(vars) => session::env_on(m, paths, vars),
         Part::Gnome(gnome) => session::gnome_on(m, paths, gnome),
         Part::DockerClient(docker) => session::docker_on(paths, docker),
@@ -445,7 +529,11 @@ fn put(m: &mut dyn Machine, paths: &Paths, part: &Part, user: Option<&str>, guar
 fn remove(m: &mut dyn Machine, paths: &Paths, kind: Kind, keep: Keep) -> Result<(), StepError> {
     match kind {
         Kind::Tunnel => m.tunnel_down().map_err(StepError::Tunnel),
-        Kind::Root => root::remove(m, keep == Keep::KillSwitch),
+        Kind::Root if keep == Keep::KillSwitch => root::remove(m, true),
+        Kind::Root => {
+            root::remove(m, false)?;
+            remove_file(&paths.kill_switch())
+        }
         Kind::Env => session::env_off(m, paths),
         Kind::Gnome => session::gnome_off(m, paths),
         Kind::DockerClient => session::docker_off(paths),

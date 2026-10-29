@@ -98,6 +98,42 @@ fn a_split_tunnel_has_no_kill_switch_and_a_full_one_can_turn_it_off() {
 }
 
 #[test]
+fn the_local_network_is_allowed_unless_the_profile_says_otherwise() {
+    let dir = dir();
+    fs::write(dir.path().join("full.conf"), conf(true)).unwrap();
+
+    let unsaid = parse("[tunnel]\nconf = \"full.conf\"\n", dir.path()).unwrap();
+    let blocked = parse(
+        "[tunnel]\nconf = \"full.conf\"\nallow_local_network = false\n",
+        dir.path(),
+    )
+    .unwrap();
+
+    const { assert!(DEFAULT_ALLOW_LOCAL_NETWORK) };
+    assert!(unsaid.allow_local_network());
+    assert!(!blocked.allow_local_network());
+    assert!(Profile::empty().allow_local_network());
+    assert!(local_network_allowed(dir.path()).unwrap());
+}
+
+#[test]
+fn the_local_network_setting_is_written_beside_the_users_comments() {
+    let dir = dir();
+    let path = dir.path().join(crate::paths::PROFILE);
+    fs::write(&path, "# Mine.\n[tunnel]\n# The switch.\nkill_switch = true\n").unwrap();
+
+    set_local_network(&path, false).expect("written");
+    let off = local_network_allowed(dir.path()).unwrap();
+    set_local_network(&path, true).expect("written");
+
+    assert!(!off);
+    assert!(local_network_allowed(dir.path()).unwrap());
+    let text = fs::read_to_string(&path).unwrap();
+    assert!(text.contains("# Mine.") && text.contains("# The switch."), "{text}");
+    assert!(text.contains("allow_local_network = true"), "{text}");
+}
+
+#[test]
 fn a_conf_with_its_keys_in_it_is_used_without_them_and_flagged() {
     let dir = dir();
     fs::write(

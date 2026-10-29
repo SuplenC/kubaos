@@ -1,6 +1,6 @@
 //! What the session service does when the machine wakes or the network changes: logind's resume,
-//! and NetworkManager's active connections, which change when the tunnel drops while the machine
-//! is awake.
+//! and NetworkManager's active connections and state, which change when the tunnel drops while the
+//! machine is awake, and when a network comes, goes or gets its address.
 //!
 //! # Owns
 //!
@@ -21,7 +21,8 @@ pub const RETRY_AFTER: Duration = Duration::from_secs(30);
 pub enum Event {
     /// The machine woke from sleep.
     Resumed,
-    /// NetworkManager's active connections changed: a network came or went, or the tunnel.
+    /// NetworkManager's active connections or state changed: a network came, went or got its
+    /// address, or the tunnel came or went.
     NetworkChanged,
 }
 

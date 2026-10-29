@@ -33,10 +33,18 @@ use crate::tunnel::INTERFACE;
 
 /// The tunnel, as the profile has it and NetworkManager runs it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "The shell reads each as a field of its own."
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Tunnel {
     pub full: bool,
     pub kill_switch: bool,
+    /// The profile lets the local networks through the kill switch.
+    pub allow_local_network: bool,
+    /// The local networks the kill switch lets through now; none while it is down.
+    pub local_networks: Vec<String>,
     pub endpoint: Option<String>,
     pub up: bool,
     /// The latest handshake with any peer, in seconds since the epoch; 0 for none yet. Only when
@@ -127,11 +135,17 @@ pub fn read(m: &mut dyn Machine, paths: &Paths, profile: &Result<Profile, LoadEr
     let on = !plan.is_empty()
         && plan.kinds().iter().all(|kind| applied.contains(kind))
         && (profile.tunnel.is_none() || tunnel_up);
+    let local_networks = apply::local_networks_let_through(paths)
+        .iter()
+        .map(ToString::to_string)
+        .collect();
     let tunnel = profile.tunnel.as_ref().map(|tunnel| {
         let live = live && tunnel_up;
         Tunnel {
             full: tunnel.config.is_full(),
             kill_switch: profile.kill_switch(),
+            allow_local_network: tunnel.allow_local_network,
+            local_networks,
             endpoint: tunnel.config.endpoint().map(ToString::to_string),
             up: tunnel_up,
             handshake: if live { apply::handshake(m) } else { None },
@@ -208,6 +222,15 @@ pub fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_secs())
 }
 
+/// Whether the kill switch lets the local networks through, and which, for a person.
+fn local_network(tunnel: &Tunnel) -> String {
+    match (tunnel.allow_local_network, tunnel.local_networks.as_slice()) {
+        (false, _) => "blocked".to_owned(),
+        (true, []) => "allowed".to_owned(),
+        (true, networks) => format!("allowed: {}", networks.join(", ")),
+    }
+}
+
 /// The state first, then each part.
 pub fn rows(status: &Status, now: u64) -> Vec<Row> {
     let mut rows = Vec::new();
@@ -230,6 +253,12 @@ pub fn rows(status: &Status, now: u64) -> Vec<Row> {
             label: "Tunnel",
             value: format!("{state}: {kind} to {endpoint}{guard}"),
         });
+        if tunnel.kill_switch {
+            rows.push(Row {
+                label: "Local network",
+                value: local_network(tunnel),
+            });
+        }
         if let Some(handshake) = tunnel.handshake {
             rows.push(Row {
                 label: "Last handshake",

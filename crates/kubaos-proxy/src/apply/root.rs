@@ -111,6 +111,12 @@ pub(super) fn put(m: &mut dyn Machine, args: &[RootArg]) -> Result<(), StepError
     }
 }
 
+/// Puts `arg` in place alone, leaving every other root part as it is. For a part that needs no
+/// pin: the kill switch.
+pub(super) fn put_alone(m: &mut dyn Machine, arg: &RootArg) -> Result<(), StepError> {
+    pkexec(m, HELPER, &[arg.arg()], arg.stdin()).map(drop)
+}
+
 /// Takes every root part away, the kill switch too unless `keep_kill_switch`.
 pub(super) fn remove(m: &mut dyn Machine, keep_kill_switch: bool) -> Result<(), StepError> {
     if !keep_kill_switch {

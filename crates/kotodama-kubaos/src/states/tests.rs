@@ -213,6 +213,33 @@ fn the_proxy_is_on_while_the_user_wants_it_and_unknown_without_its_file() {
 }
 
 #[test]
+fn the_local_network_is_let_through_the_kill_switch_until_the_profile_blocks_it() {
+    let machine = Machine::new();
+
+    let missing = machine.read();
+    machine.write(
+        "config/kubaos/desktop/network/proxy.toml",
+        "[tunnel]\nkill_switch = true\n",
+    );
+    let unsaid = machine.read();
+    machine.write(
+        "config/kubaos/desktop/network/proxy.toml",
+        "[tunnel]\nallow_local_network = false\n",
+    );
+    let blocked = machine.read();
+    machine.write(
+        "config/kubaos/desktop/network/proxy.toml",
+        "[tunnel]\nallow_local_network = \"no\"\n",
+    );
+    let broken = machine.read();
+
+    assert_eq!(missing.get(PROXY_LOCAL_NETWORK), Some(&on(true)));
+    assert_eq!(unsaid.get(PROXY_LOCAL_NETWORK), Some(&on(true)));
+    assert_eq!(blocked.get(PROXY_LOCAL_NETWORK), Some(&on(false)));
+    assert_eq!(broken.get(PROXY_LOCAL_NETWORK), None);
+}
+
+#[test]
 fn do_not_disturb_is_its_state_files_on_and_unknown_without_the_shell() {
     let machine = Machine::new();
 
@@ -340,6 +367,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         UNFREE,
         KEEP_AWAKE,
         PROXY,
+        PROXY_LOCAL_NETWORK,
         DND,
         PREVIEW,
         BLUETOOTH_UNNAMED,
@@ -366,6 +394,7 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/desktop/phone/phone-link",
         "config/kubaos/desktop/power/power.toml",
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
+        "config/kubaos/desktop/network/proxy.toml",
         "run/kubaos-keep-awake.json",
         "run/kubaos-proxy.json",
         "run/kubaos-dnd.json",
@@ -380,6 +409,7 @@ fn every_file_a_state_is_read_from_is_watched() {
 fn a_state_name_is_one_of_the_probes_or_a_package_group() {
     assert_eq!(values("packages.chrome"), Some(Values::Bool));
     assert_eq!(values(PROXY), Some(Values::Bool));
+    assert_eq!(values(PROXY_LOCAL_NETWORK), Some(Values::Bool));
     assert_eq!(values(DND), Some(Values::Bool));
     assert_eq!(values(UNFREE), Some(Values::Bool));
     assert_eq!(values(PREVIEW), Some(Values::Bool));

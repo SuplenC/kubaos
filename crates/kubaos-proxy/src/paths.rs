@@ -112,6 +112,13 @@ impl Paths {
         self.state.join("applied")
     }
 
+    /// The kill switch's argument to the root helper as it last went up (`killswitch=on`,
+    /// `killswitch=lan|192.168.1.0/24`), so a change of network puts it up again only when the
+    /// local networks it lets through changed.
+    pub fn kill_switch(&self) -> PathBuf {
+        self.state.join("kill-switch")
+    }
+
     /// Git's proxy, which `config/git/config` includes.
     pub fn git(&self) -> PathBuf {
         self.state.join("proxy.gitconfig")

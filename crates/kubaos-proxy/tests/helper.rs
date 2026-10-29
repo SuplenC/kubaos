@@ -306,6 +306,151 @@ fn the_kill_switch_lets_no_lookup_out_beside_the_tunnel() {
     assert!(!tables.contains("dport { 53"), "{tables}");
 }
 
+/// The output chain's rules, one a line, trimmed.
+fn output_rules(tables: &str) -> Vec<String> {
+    let chain = tables.split("chain output {").nth(1).unwrap_or_default();
+    let chain = chain.split("chain forward {").next().unwrap_or_default();
+    chain
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && *line != "}")
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn the_strict_kill_switch_lets_no_local_network_through() {
+    let root = Root::new();
+
+    let run = root.run(&["killswitch=on"], "");
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let rules = output_rules(&root.tables());
+    assert!(!rules.iter().any(|rule| rule.contains("daddr")), "{rules:#?}");
+    assert_eq!(
+        rules.last().map(String::as_str),
+        Some("reject with icmpx admin-prohibited")
+    );
+}
+
+#[test]
+fn the_kill_switch_lets_the_local_network_through_but_no_lookup() {
+    let root = Root::new();
+
+    let run = root.run(&["killswitch=lan|192.168.1.0/24,2a02:a311:1:2::/64"], "");
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    assert_eq!(run.stdout, "done killswitch=lan|192.168.1.0/24,2a02:a311:1:2::/64\n");
+    let rules = output_rules(&root.tables());
+    let at = |rule: &str| {
+        rules
+            .iter()
+            .position(|r| r == rule)
+            .unwrap_or_else(|| panic!("no `{rule}` in {rules:#?}"))
+    };
+    let lookups = at("udp dport { 53, 853 } reject with icmpx admin-prohibited");
+    assert!(at("tcp dport { 53, 853 } reject with tcp reset") < lookups);
+    for rule in [
+        "ip daddr { 169.254.0.0/16, 224.0.0.0/24, 239.255.255.250, 255.255.255.255 } accept",
+        "ip6 daddr { fe80::/10, ff02::/16 } accept",
+        "ip daddr 192.168.1.0/24 accept",
+        "ip6 daddr 2a02:a311:1:2::/64 accept",
+    ] {
+        assert!(lookups < at(rule), "{rule} comes before the lookups are refused");
+        assert!(at(rule) < at("meta l4proto tcp reject with tcp reset"));
+    }
+    assert!(at("oifname \"wg-kubaos\" accept") < lookups);
+    assert!(
+        !rules
+            .iter()
+            .any(|rule| rule.contains("dport") && rule.contains("53") && rule.contains("accept")),
+        "{rules:#?}"
+    );
+}
+
+#[test]
+fn with_no_range_the_kill_switch_lets_only_link_local_and_discovery_through() {
+    let root = Root::new();
+
+    let run = root.run(&["killswitch=lan|"], "");
+
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let rules = output_rules(&root.tables());
+    let through: Vec<&String> = rules.iter().filter(|rule| rule.contains("daddr")).collect();
+    assert_eq!(
+        through,
+        [
+            "ip daddr { 169.254.0.0/16, 224.0.0.0/24, 239.255.255.250, 255.255.255.255 } accept",
+            "ip6 daddr { fe80::/10, ff02::/16 } accept",
+        ]
+    );
+}
+
+#[test]
+fn every_range_by_its_first_address_is_taken() {
+    let taken = [
+        "lan|10.0.0.0/8",
+        "lan|192.168.1.7/32",
+        "lan|0.0.0.0/1",
+        "lan|fd00::/8",
+        "lan|2a02:a311:1:2::/64",
+        "lan|1:2:3:4:5:6:7:8/128",
+        "lan|1:2:3:4:5:6:7::/112",
+        "lan|::1/128",
+        "lan|fd00:0:0:1::/64,192.168.1.0/24,10.20.0.0/16",
+    ];
+    for value in taken {
+        let root = Root::new();
+
+        let run = root.run(&[&format!("killswitch={value}")], "");
+
+        assert_eq!(run.code, Some(0), "{value}: {}", run.stderr);
+    }
+}
+
+#[test]
+fn a_range_that_isnt_a_networks_first_address_is_refused() {
+    let thirty_three = vec!["10.0.0.0/24"; 33].join(",");
+    let refused = [
+        "lan|192.168.1.5/24".to_owned(),
+        "lan|0.0.0.0/0".to_owned(),
+        "lan|::/0".to_owned(),
+        "lan|fe80::1/64".to_owned(),
+        "lan|192.168.1.0/24,".to_owned(),
+        "lan|,192.168.1.0/24".to_owned(),
+        "lan|192.168.1.0/24,,10.0.0.0/8".to_owned(),
+        "lan|1::2::3/64".to_owned(),
+        "lan|a::b:/64".to_owned(),
+        "lan|:a::b/64".to_owned(),
+        "lan|1:2:3:4:5:6:7:8:9/128".to_owned(),
+        "lan|1:2:3:4:5:6:7/112".to_owned(),
+        "lan|12345::/16".to_owned(),
+        "lan|192.168.01.0/24".to_owned(),
+        "lan|256.0.0.0/8".to_owned(),
+        "lan|10.0.0.0/33".to_owned(),
+        "lan|fd00::/129".to_owned(),
+        "lan|10.0.0.0/08".to_owned(),
+        "lan|10.0.0.0".to_owned(),
+        "lan|FD00::/8".to_owned(),
+        "lan|10.0.0.0/8 accept".to_owned(),
+        "lan|10.0.0.0/8\naccept".to_owned(),
+        "lan|10.0.0.0/8; flush ruleset".to_owned(),
+        "lan|$(reboot)".to_owned(),
+        "lan|10.0.0.0/8|10.0.0.0/8".to_owned(),
+        "lan".to_owned(),
+        format!("lan|{thirty_three}"),
+    ];
+    for value in refused {
+        let root = Root::new();
+
+        let run = root.run(&[&format!("killswitch={value}")], "");
+
+        assert_eq!(run.code, Some(1), "{value:?}: {}", run.stderr);
+        assert_eq!(run.stdout, "", "{value:?}");
+        nothing_written(&root);
+    }
+}
+
 #[test]
 fn what_an_admin_didnt_pin_changes_nothing_and_says_so() {
     let root = Root::new();
