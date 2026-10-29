@@ -162,6 +162,25 @@ TestCase {
         compare(after[1].key, before[1].key);
     }
 
+    function test_a_row_the_preview_covers_any_of_fades_out_whole() {
+        compare(Feed.behind(100, 200, 0, 150, 1, 0.6), 0, "under the preview's lower part");
+        compare(Feed.behind(100, 200, 120, 180, 1, 0.6), 0, "the preview inside it");
+    }
+
+    function test_a_row_clear_of_the_preview_only_sits_back() {
+        compare(Feed.behind(200, 300, 0, 150, 1, 0.6), 1 - 0.6);
+        compare(Feed.behind(0, 50, 60, 200, 1, 0.6), 1 - 0.6, "above it");
+    }
+
+    function test_a_row_just_touching_the_preview_isn_t_covered() {
+        compare(Feed.behind(150, 250, 0, 150, 1, 0.6), 1 - 0.6);
+    }
+
+    function test_rows_come_back_as_the_preview_tucks_in() {
+        compare(Feed.behind(100, 200, 0, 150, 0, 0.6), 1);
+        compare(Feed.behind(100, 200, 0, 150, 0.5, 0.6), 0.5);
+    }
+
     function test_the_popups_group_by_app_keyed_by_it() {
         const groups = Feed.groups([note(4, "A"), note(3, "B"), note(2, "A")]);
 

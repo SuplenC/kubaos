@@ -215,8 +215,9 @@ K.Sheet {
         id: list
 
         readonly property int reach: K.Tokens.focus.far
-        // The group whose preview shows.
+        // The group whose preview shows, and its row.
         property CardGroup lifted: null
+        property Item liftedRow: null
 
         x: root.padding - list.reach
         y: head.height
@@ -289,8 +290,9 @@ K.Sheet {
             width: list.width
             height: row.label ? K.Tokens.type.label.line + (row.index > 0 ? K.Tokens.space.s8 : 0) : (loader.item?.implicitHeight ?? 0)
             z: row.group?.raised ? 1 : 0
-            // Every other row sits back behind a group's preview.
-            opacity: list.lifted && list.lifted !== row.group ? 1 - K.Tokens.opacity.recede * list.lifted.recede : 1
+            // Every other row sits back behind a group's preview, and goes where the preview
+            // covers it.
+            opacity: list.lifted && list.liftedRow && list.lifted !== row.group ? Feed.behind(row.y, row.y + row.height, list.liftedRow.y, list.liftedRow.y + list.lifted.extent, list.lifted.recede, K.Tokens.opacity.recede) : 1
 
             K.Text {
                 x: list.reach
@@ -321,14 +323,19 @@ K.Sheet {
                         root.inner = 0;
                     }
                     onRaisedChanged: {
-                        if (group.raised)
+                        if (group.raised) {
                             list.lifted = group;
-                        else if (list.lifted === group)
+                            list.liftedRow = row;
+                        } else if (list.lifted === group) {
                             list.lifted = null;
+                            list.liftedRow = null;
+                        }
                     }
                     Component.onDestruction: {
-                        if (list.lifted === group)
-                            list.lifted = null;
+                        if (list.lifted !== group)
+                            return;
+                        list.lifted = null;
+                        list.liftedRow = null;
                     }
 
                     delegate: NotificationCard {

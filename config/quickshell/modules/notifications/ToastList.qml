@@ -146,9 +146,10 @@ ListView {
             id: group
 
             width: slot.width
-            // Every other group sits back behind one's preview: on the group, as the slot's own
-            // opacity is the transitions'.
-            opacity: list.lifted && list.lifted !== group ? 1 - K.Tokens.opacity.recede * list.lifted.recede : 1
+            // Every other group sits back behind one's preview, and goes where the preview covers
+            // it: on the group, as the slot's own opacity is the transitions'. A lifted group's
+            // parent is its slot.
+            opacity: list.lifted && list.lifted !== group ? Feed.behind(slot.y, slot.y + slot.height, list.lifted.parent.y, list.lifted.parent.y + list.lifted.extent, list.lifted.recede, K.Tokens.opacity.recede) : 1
             items: slot.modelData.items
             open: list.opened[slot.modelData.key] === true
             onOpenRequested: open => list.setOpened(slot.modelData.key, open)

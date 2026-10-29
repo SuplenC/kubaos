@@ -118,6 +118,15 @@ function rows(sections) {
     return out;
 }
 
+// How opaque a row of a list is while a group's preview floats over it, `spread` (0 -> 1) the
+// preview's `recede`: a row the preview covers any of, from `coverTop` to `coverBottom`, fades out
+// whole, so no cut-off piece of it shows through the gaps between the fanned cards; the others sit
+// back by `amount`, `opacity.recede`.
+function behind(top, bottom, coverTop, coverBottom, spread, amount) {
+    const covered = top < coverBottom && bottom > coverTop;
+    return 1 - (covered ? 1 : amount) * spread;
+}
+
 // The popups' groups, one per app, keyed by it, newest first.
 function groups(list) {
     return stacks(list).map(stack => ({

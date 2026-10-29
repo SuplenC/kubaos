@@ -268,6 +268,10 @@ pub struct Shadow {
     pub y: u16,
     pub blur: u16,
     pub opacity: f32,
+    /// Its opacity in light mode, where a shadow of the same strength reads heavier on the light
+    /// surfaces; `opacity` in both modes when absent.
+    #[serde(default)]
+    pub light_opacity: Option<f32>,
 }
 
 /// The neon sign: how a tube strikes, and the クバ mark drawn as tubes.

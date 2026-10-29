@@ -38,6 +38,14 @@ fn every_spacing_step_is_a_variant_with_its_value() {
 }
 
 #[test]
+fn a_shadow_s_light_opacity_falls_back_to_its_opacity() {
+    let module = module();
+
+    assert!(module.contains("Shadow::Tucked => 0.16,"));
+    assert!(module.contains("pub const fn light_opacity(self) -> f32"));
+}
+
+#[test]
 fn radii_are_roles_not_numbers() {
     let module = module();
 

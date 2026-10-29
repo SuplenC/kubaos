@@ -514,17 +514,24 @@ fn surfaces(out: &mut Writer, tokens: &Tokens) {
     );
     out.group(
         "    ",
-        Some("Shadows: how far down and how blurred, in logical pixels, and the `shadow` role's opacity."),
+        Some(
+            "Shadows: how far down and how blurred, in logical pixels, and the `shadow` role's opacity, which follows `mode` where light mode has its own.",
+        ),
         "shadow",
         |out| {
             for (name, shadow) in &tokens.shadow {
                 out.line(format!("        readonly property QtObject {name}: QtObject {{"));
                 out.line(format!("            readonly property int y: {}", shadow.y));
                 out.line(format!("            readonly property int blur: {}", shadow.blur));
-                out.line(format!(
-                    "            readonly property real opacity: {}",
-                    number(shadow.opacity)
-                ));
+                let opacity = match shadow.light_opacity {
+                    Some(light) => format!(
+                        "tokens.mode === \"light\" ? {} : {}",
+                        number(light),
+                        number(shadow.opacity)
+                    ),
+                    None => number(shadow.opacity),
+                };
+                out.line(format!("            readonly property real opacity: {opacity}"));
                 out.line("        }");
             }
         },

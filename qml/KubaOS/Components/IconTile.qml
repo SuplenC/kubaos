@@ -88,6 +88,7 @@ Item {
             Image {
                 id: cover
 
+                objectName: "cover"
                 anchors.fill: parent
                 visible: false
                 source: root.photo
@@ -96,13 +97,17 @@ Item {
                 sourceSize: Qt.size(Math.ceil(width * root.dpr), Math.ceil(height * root.dpr))
             }
 
+            // HAZARD: the mask's texture exists from the moment there is a photo, not from the
+            // moment it has loaded. Made in the same frame as the effect starts drawing, the
+            // effect kept an empty mask, and a card that didn't move again showed a blank tile.
             Rectangle {
                 id: corners
 
+                objectName: "corners"
                 anchors.fill: parent
                 radius: Tokens.radius.control
                 visible: false
-                layer.enabled: cover.status === Image.Ready
+                layer.enabled: true
             }
 
             MultiEffect {
