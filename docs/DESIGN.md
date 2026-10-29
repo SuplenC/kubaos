@@ -43,12 +43,12 @@ Kōbō is the reference. Kuba designed it; the shell's look was inherited from s
 - **Roles, never hex.** Code names a role (`primary`, `on_surface`, `surface_container_high`, `error`, `cold`, `warning`, `success`), never a colour. The roles are Material 3's, plus `cold` and the fixed roles below. The palette changes with the wallpaper, so a hex value in a component is wrong the moment the wallpaper changes.
 - **Matugen derives them from the wallpaper** (`scripts/dot-theme`, `scheme-fidelity`). `[color.source]` in the tokens names the matugen colour each role comes from. `[color.dark]` and `[color.light]` are the fallback: matugen's output for the default wallpaper, used until a theme exists and in the specimen.
 - **Cold accent** (`cold`, from matugen's tertiary): the blue of the sign's dakuten. With `scheme-fidelity` tertiary is the wallpaper's complement, so cold follows the wallpaper. Use it rarely: the focus tube on picked cards, where the accent already means picked, and a demo or preview badge. It is never a second primary. It is configurable: the complement is the default, and the user may pick another. *Not enforced yet: lands in #154.*
-- **Fixed roles** are ours (Material 3 has none of them) and have no matugen source: each keeps its value whatever the wallpaper, so it means the same on every desktop. Each is one colour, drawn as text or as a mark straight on `surface` and the surface containers, so none has an `on_` or a `container` variant. `[contrast]` holds each as text and as a mark on all six in both fallback palettes; in light, the highest container is the narrowest.
+- **Fixed roles** are ours (Material 3 has none of them) and have no matugen source: each keeps its value whatever the wallpaper, so it means the same on every desktop. Each is one colour, drawn as text or as a mark straight on `surface` and the surface containers, so none has an `on_` or a `container` variant. `[contrast]` holds `success`, `sharing`, `microphone` and `camera` as text and as a mark on all six in both fallback palettes; in light, the highest container is the narrowest. *Not enforced yet: no component draws `success`, `sharing`, `microphone` or `camera`, and no tube is violet.*
 
   | Role | Dark | Light | For |
   |---|---|---|---|
   | `warning` | `#f2c14e` | `#7a5900` | Amber, between fine and the error colour: a reading close to its limit. |
-  | `success` | `#5fd27a` | `#1b7131` | Done and installed: a success chip, a done mark. The camera's green, one value for both. |
+  | `success` | `#5fd27a` | `#1b7131` | Done and installed: a done mark, words saying something is installed. The camera's green, one value for both. |
   | `sharing` | `#c9a7ff` | `#6b3fc4` | Violet: anything shared off the machine, the screen above all. Its neon tube marks what is shared, with `sharing_core` (`#e9dbff`) along its middle, the same in both modes, as `primary_core` runs along the accent's. |
   | `microphone` | `#ff9f45` | `#a04a00` | The privacy dot of a microphone that is listening. |
   | `camera` | `#5fd27a` | `#1b7131` | The privacy dot of a camera that is watching. |
@@ -227,7 +227,7 @@ Beautiful and fast. Every animation takes a duration and a curve **by what it is
 | `emphasized_accel` | 0.3, 0, 0.8, 0.15 | Things leaving: panels and dialogs closing. |
 | `linear` | 0, 0, 1, 1 | Progress that tracks a real quantity, and spinners. |
 | `pop` | 0.2, 0.9, 0.3, 1.3 | A small mark popping in, a little past its size and back: a slider's anchor dot. |
-| `spring` | 0.34, 1.25, 0.64, 1 | Something gliding into place with a small overshoot, over `long`: the wallpaper carousel's step. |
+| `spring` | 0.34, 1.25, 0.64, 1 | Something gliding into place with a small overshoot, over `long`: the wallpaper carousel's step. *Not enforced yet: nothing moves on it.* |
 
 - **Arriving is slower than leaving** (`long` in, `medium` out): you look at what arrives, and what leaves is already done with.
 - **A surface a key summons to act and go is one step quicker**: the Command menu arrives over `short` and leaves over `micro`, its Action panel the same, and its Views slide in over `medium`. A key opens and closes it many times an hour, and what it runs waits for it to be gone, so a panel's `long` and `medium` would be felt on every run.
