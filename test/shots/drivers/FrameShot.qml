@@ -61,7 +61,7 @@ QtObject {
     readonly property string panel: driver.args[2]
     readonly property string state: driver.args[3] ?? ""
     readonly property ShellScreen screen: ShellScreen {}
-    // design-allow(size): a short screen's height, for a panel that scrolls on one.
+    // A short screen's height, for a panel that scrolls on one.
     readonly property int shortScreen: 680
     property var frame: null
     property var window: null
