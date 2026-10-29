@@ -7,8 +7,31 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Output;
+use std::sync::OnceLock;
 
 use tempfile::TempDir;
+
+/// The one fake `nix` every test runs, made before the first `kubaos` starts. It answers with
+/// what the home it runs in (`HOME`) wrote for it, and records there that it ran.
+///
+/// HAZARD: one script for every test, written once. A script a test writes while another test
+/// forks is held open for writing by that child until it execs, and running it then fails with
+/// "Text file busy".
+fn fake_nix() -> &'static Path {
+    static BIN: OnceLock<TempDir> = OnceLock::new();
+    BIN.get_or_init(|| {
+        let bin = tempfile::tempdir().expect("a folder for the fake nix");
+        let nix = bin.path().join("nix");
+        fs::write(
+            &nix,
+            "#!/bin/sh\ntouch \"$HOME/nix-ran\"\ncat \"$HOME/nix-stdout\"\nexit \"$(cat \"$HOME/nix-code\")\"\n",
+        )
+        .expect("write the fake nix");
+        fs::set_permissions(&nix, fs::Permissions::from_mode(0o755)).expect("make nix executable");
+        bin
+    })
+    .path()
+}
 
 /// A home with a user flake wired to its state directory, and a fake `nix` that answers every
 /// `nix eval` with one fixed answer.
@@ -42,17 +65,10 @@ impl Home {
         fs::write(path, text).expect("write the file");
     }
 
-    /// The fake `nix`: prints `stdout` and exits with `code`, and records that it ran.
+    /// What the fake `nix` answers in this home: `stdout`, and exit `code`.
     fn nix(&self, stdout: &str, code: i32) {
-        let ran = self.path("nix-ran");
-        self.write(
-            "bin/nix",
-            &format!(
-                "#!/bin/sh\ntouch '{}'\nprintf '%s' '{stdout}'\nexit {code}\n",
-                ran.display()
-            ),
-        );
-        fs::set_permissions(self.path("bin/nix"), fs::Permissions::from_mode(0o755)).expect("make nix executable");
+        self.write("nix-stdout", stdout);
+        self.write("nix-code", &code.to_string());
     }
 
     fn nix_ran(&self) -> bool {
@@ -60,11 +76,7 @@ impl Home {
     }
 
     fn kubaos(&self, args: &[&str]) -> Output {
-        let path = format!(
-            "{}:{}",
-            self.path("bin").display(),
-            std::env::var("PATH").unwrap_or_default()
-        );
+        let path = format!("{}:{}", fake_nix().display(), std::env::var("PATH").unwrap_or_default());
         Command::new(env!("CARGO_BIN_EXE_kubaos"))
             .args(args)
             .env("HOME", self.dir.path())
