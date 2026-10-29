@@ -24,11 +24,14 @@ import qs.modules.frame
 //                  scan that finds six more devices, nearer than the ones listed), bluetooth-form
 //                  (a nearby device's form), bluetooth-code (its pairing code to type on it),
 //                  keyboard, keyboard-tooltip (the Mac accents explained), keyboard-drag (the second layout dragged onto the first),
-//                  keyboard-add ("germ" searched for a layout to add), each with the history
-//                  cleared, scanning (a Wi-Fi scan that has found nothing yet, the history cleared),
-//                  proxy (the Proxy tile's detail open, the local network let through),
-//                  proxy-lan-off (the same, the local network blocked)
-//   clock: answer (a question typed into the search), settings
+//                  keyboard-add ("germ" searched for a layout to add), keyboard-hint (on a short
+//                  screen, the toolbar's + focused, then the tab scrolled down to a problem
+//                  under the well, past the toolbar), each with the history cleared, scanning (a
+//                  Wi-Fi scan that has found nothing yet, the history cleared), proxy (the Proxy
+//                  tile's detail open, the local network let through), proxy-lan-off (the same,
+//                  the local network blocked)
+//   clock: answer (a question typed into the search), settings, select-closed (the settings'
+//          holidays select open, then the popup closed as a keybind closes it)
 //   sysmon: "" (a disk close to full: Breaking a sweat), fine (every reading fine), critical (the
 //           CPU over its limit), loading (the processes still counted), bare (no GPU, battery
 //           or fan), scrolled (scrolled down to the processes, as a short screen shows them),
@@ -45,7 +48,9 @@ import qs.modules.frame
 //                  more" under it), panel-expanded (the group
 //                  open, its second card selected), panel-keys (the keys button's tooltip),
 //                  panel-empty (nothing in it), panel-read (every one read), panel-dnd (Do
-//                  not disturb on while the screen is shared, its tooltip showing)
+//                  not disturb on while the screen is shared, its tooltip showing),
+//                  panel-menu-closed (a card's menu open, then the panel closed as a keybind
+//                  closes it)
 //   bar: traymenu (the network item's menu open), dnd (the bell crossed out), nobell (no
 //        notification, so no bell), dnd-empty (no notification, the bell crossed out all the same),
 //        preview (the home a live preview of a branch)
@@ -56,6 +61,8 @@ QtObject {
     readonly property string panel: driver.args[2]
     readonly property string state: driver.args[3] ?? ""
     readonly property ShellScreen screen: ShellScreen {}
+    // design-allow(size): a short screen's height, for a panel that scrolls on one.
+    readonly property int shortScreen: 680
     property var frame: null
     property var window: null
 
@@ -129,7 +136,7 @@ QtObject {
             driver.keepOsd.start();
         } else if (driver.panel === "notifications" && driver.state.startsWith("panel")) {
             Panels.current = "notifications";
-            if (["panel-expanded", "panel-fan", "panel-keys", "panel-dnd", "panel-unfolded"].includes(driver.state))
+            if (["panel-expanded", "panel-fan", "panel-keys", "panel-dnd", "panel-unfolded", "panel-menu-closed"].includes(driver.state))
                 notificationsPose.start();
         } else if (driver.panel === "notifications" && driver.state === "peek") {
             const popups = driver.find(root, it => it.peeking !== undefined && it.hasPeek !== undefined);
@@ -153,12 +160,14 @@ QtObject {
             driver.controlCenter(root);
         if (driver.panel === "sysmon" && ["scrolled", "process", "kill"].includes(driver.state))
             sysmonPose.start();
-        if (driver.panel === "clock" && driver.state === "settings") {
+        if (driver.panel === "clock" && (driver.state === "settings" || driver.state === "select-closed")) {
             const clock = driver.find(root, it => it.page !== undefined && typeof it.land === "function");
             if (clock)
                 clock.page = "settings";
             else
                 console.warn("shot: no clock popup found");
+            if (driver.state === "select-closed")
+                clockPose.start();
         }
         if (driver.panel === "bar" && driver.state === "traymenu") {
             const tray = driver.find(root, it => typeof it.openMenu === "function");
@@ -258,6 +267,16 @@ QtObject {
                 panel.unfolded = Notifs.build;
                 return;
             }
+            if (driver.state === "panel-menu-closed") {
+                const menu = driver.find(driver.window.contentItem, it => it.entries !== undefined && typeof it.take === "function");
+                if (!menu) {
+                    console.warn("shot: no notification menu found");
+                    return;
+                }
+                menu.open(Notifs.history[0], Qt.point(driver.screen.width - K.Tokens.size.menu - K.Tokens.size.panel / 2, K.Tokens.size.panel / 2));
+                closeLater.start();
+                return;
+            }
             if (driver.state === "panel-keys" || driver.state === "panel-dnd") {
                 const title = driver.state === "panel-keys" ? "Keys" : "Do not disturb is on";
                 const tooltip = driver.find(driver.window.contentItem, it => it.title === title && it.shown !== undefined && it.within !== undefined);
@@ -328,6 +347,30 @@ QtObject {
             if (list)
                 list.hold.pointed = true;
             driver.fanFirstGroup(driver.find(driver.window.contentItem, it => it.peeking !== undefined && it.hasPeek !== undefined));
+        }
+    }
+
+    // The clock settings' select opened once the page shows, then the popup closed.
+    property Timer clockPose: Timer {
+        interval: 700
+        onTriggered: {
+            const select = driver.find(driver.window.contentItem, it => it.options !== undefined && typeof it.show === "function" && it.visible);
+            if (!select) {
+                console.warn("shot: no select found");
+                return;
+            }
+            select.show();
+            closeLater.start();
+        }
+    }
+
+    // The open panel closed, as its keybind closes it, with what it opened still showing. The
+    // shot's wait starts again from here, so it can't catch the panel before it starts to close.
+    property Timer closeLater: Timer {
+        interval: 400
+        onTriggered: {
+            Panels.current = "";
+            driver.capture.start();
         }
     }
 
@@ -445,6 +488,21 @@ QtObject {
         }
     }
 
+    // The Keyboard tab's scroll at its end once the problem under the well shows, as the person
+    // would scroll down to read it.
+    property Timer scrollToEnd: Timer {
+        property var tab: null
+
+        interval: 300
+        onTriggered: {
+            const scroll = driver.find(tab, it => it.travel !== undefined && it.contentY !== undefined);
+            if (scroll)
+                scroll.contentY = scroll.travel;
+            else
+                console.warn("shot: no keyboard scroll found");
+        }
+    }
+
     // The Keyboard tab in its state once it has read its layouts, through what KeyboardList.qml
     // exposes.
     property Timer keyboardPose: Timer {
@@ -457,6 +515,16 @@ QtObject {
             }
             if (driver.state === "keyboard-tooltip")
                 tab.explaining = true;
+            if (driver.state === "keyboard-hint") {
+                const button = driver.find(tab, it => it.label === "Add a language" && it.icon !== undefined);
+                if (button)
+                    button.focused = true;
+                else
+                    console.warn("shot: no Add a language button found");
+                tab.problem = "The keyboard layouts weren't changed: Hyprland didn't answer in time, so the old order stays until the next reload of the keymap.";
+                scrollToEnd.tab = tab;
+                scrollToEnd.start();
+            }
             if (driver.state === "keyboard-drag") {
                 tab.dragFrom = 1;
                 tab.dropAt = 0;
@@ -493,6 +561,9 @@ QtObject {
         K.Tokens.mode = driver.args[0] === "light" ? "light" : "dark";
         Hypr.focusedScreen = driver.screen;
         Panels.screen = driver.screen;
+        // A screen short enough that the Keyboard tab scrolls, its toolbar past the scroll's foot.
+        if (driver.panel === "controlcenter" && driver.state === "keyboard-hint")
+            driver.screen.height = driver.shortScreen;
         if (driver.panel === "clock" && driver.state === "answer")
             Time.pendingSearch = "days until vacation";
         if (driver.panel === "sysmon")

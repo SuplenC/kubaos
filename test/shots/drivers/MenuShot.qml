@@ -10,7 +10,9 @@ import qs.modules.menu
 //
 //   qml MenuShot.qml -- MODE OUT STATE
 //
-// STATE: typed ("fi" typed), actions (then the Action panel open).
+// STATE: typed ("fi" typed), actions (then the Action panel open), actions-long (the Action panel
+// with more Actions than the panel has room for), pushed (a list View pushed, held where its slide
+// starts, at full opacity), form-long (a form View with more fields than the body has room for).
 QtObject {
     id: driver
 
@@ -40,12 +42,60 @@ QtObject {
         path: driver.args[1]
     }
 
+    // Twenty Actions: more than the Action panel has room for on any screen.
+    readonly property var manyActions: Array.from({
+            length: 20
+        }, (_, n) => ({
+                title: n === 0 ? "Open" : `Action ${n + 1}`,
+                group: n < 12 ? "" : "kubaos",
+                shortcut: n === 1 ? "ctrl+enter" : ""
+            }))
+
+    // Twelve fields: more than the body has room for on a Full HD screen.
+    readonly property var manyFields: Array.from({
+            length: 12
+        }, (_, n) => n % 4 === 3 ? {
+                label: `Option ${n + 1}`,
+                kind: "checkbox",
+                value: n % 8 === 3
+            } : {
+                label: `Field ${n + 1}`,
+                kind: "text",
+                placeholder: "Type here",
+                value: ""
+            })
+
     property Timer typed: Timer {
         interval: 300
         onTriggered: {
-            if (driver.state === "actions")
+            if (driver.state === "actions" || driver.state === "actions-long")
                 driver.menu.openActions();
+            if (driver.state === "actions-long")
+                driver.menu.actions = driver.manyActions;
+            if (driver.state === "pushed") {
+                driver.menu.engine.push({
+                    kind: "list",
+                    filter: ""
+                }, driver.menu.engine.results);
+                holdSlide.start();
+            }
+            if (driver.state === "form-long")
+                driver.menu.engine.push({
+                    kind: "form",
+                    fields: driver.manyFields,
+                    submit: "Save"
+                });
             driver.capture.start();
+        }
+    }
+
+    // Once the push's slide is over, the body is put back where it starts: a View's first frame,
+    // held for the shot.
+    property Timer holdSlide: Timer {
+        interval: K.Tokens.duration.medium * 2
+        onTriggered: {
+            driver.menu.slide = driver.menu.viewTravel;
+            driver.menu.settle = 1;
         }
     }
 

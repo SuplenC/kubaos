@@ -28,11 +28,13 @@ controlcenter-keyboard   controlcenter  FrameShot   1176,0,424,1000   controlcen
 controlcenter-kb-tooltip controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-tooltip
 controlcenter-kb-drag    controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-drag
 controlcenter-kb-add     controlcenter  FrameShot   1176,0,424,1000   controlcenter keyboard-add
+controlcenter-kb-hint    controlcenter  FrameShot   1176,0,424,680    controlcenter keyboard-hint
 controlcenter-scanning   controlcenter  FrameShot   1176,0,424,1000   controlcenter scanning
 controlcenter-proxy      controlcenter  FrameShot   1176,0,424,1000   controlcenter proxy
 controlcenter-proxy-off  controlcenter  FrameShot   1176,0,424,1000   controlcenter proxy-lan-off
 clock                    clock          FrameShot   400,0,800,800     clock answer
 clock-settings           clock          FrameShot   400,0,800,800     clock settings
+clock-select-closed      clock          FrameShot   400,0,800,800     clock select-closed
 sysmon                   sysmon         FrameShot   1176,0,424,1000   sysmon
 sysmon-fine              sysmon         FrameShot   1176,0,424,1000   sysmon fine
 sysmon-critical          sysmon         FrameShot   1176,0,424,1000   sysmon critical
@@ -60,6 +62,7 @@ notif-panel-keys         notifications  FrameShot   1176,0,424,1000   notificati
 notif-panel-empty        notifications  FrameShot   1176,0,424,1000   notifications panel-empty
 notif-panel-read         notifications  FrameShot   1176,0,424,1000   notifications panel-read
 notif-panel-dnd          notifications  FrameShot   1176,0,424,1000   notifications panel-dnd
+notif-panel-menu-closed  notifications  FrameShot   1120,0,480,1000   notifications panel-menu-closed
 lock                     lock           LockShot    -
 lock-error               lock           LockShot    -                 error
 lock-key                 lock           LockShot    -                 waiting
@@ -69,3 +72,6 @@ polkit                   polkit         PolkitShot  -
 polkit-failed            polkit         PolkitShot  -                 failed
 menu                     menu           MenuShot    -                 typed
 menu-actions             menu           MenuShot    -                 actions
+menu-actions-long        menu           MenuShot    -                 actions-long
+menu-pushed              menu           MenuShot    -                 pushed
+menu-form-long           menu           MenuShot    -                 form-long
