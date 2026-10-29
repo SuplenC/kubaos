@@ -7,12 +7,17 @@ import KubaOS.Components as K
 //
 // The bubble floats over the whole window, as iced's overlay does: it is drawn on the window's
 // own content item, so neither a clipping panel nor what is laid out after the control covers it.
-// It is no part of the page's layout; leave it room below the control, as the specimen's rows do.
+// It shows only while its control shows whole: a control a scroll has cut, or taken out of view,
+// takes its bubble with it. It is no part of the page's layout; leave it room below the control,
+// as the specimen's rows do.
 Item {
     id: root
 
     property string text
     property bool shown: false
+    // Whether the control shows whole where it is: one scrolled out of its view, even part way,
+    // shows no bubble, which would float over whatever is there instead. Read as it is placed.
+    property bool inView: true
 
     // What a geometry dump leaves out: the bubble floats, as iced's overlay does.
     readonly property bool overlay: true
@@ -26,6 +31,7 @@ Item {
     function place(): void {
         if (!root.host || !root.shown)
             return;
+        root.inView = K.Look.unclipped(root);
         const at = root.mapToItem(root.host, 0, 0);
         floating.x = K.Look.snap(at.x, root.dpr);
         floating.y = K.Look.snap(at.y, root.dpr);
@@ -60,8 +66,10 @@ Item {
         z: 1
         width: root.width
         height: root.height
-        // Its control's visibility, which it no longer inherits on the window's content item.
-        visible: bubble.visible && root.visible
+        // Its control's visibility, which it no longer inherits on the window's content item. It
+        // reads the bubble's opacity, not its `visible`: that is the bubble's own and this item's
+        // together, so once hidden it would keep this item hidden for good.
+        visible: bubble.opacity > 0 && root.visible
 
         Rectangle {
             id: bubble
@@ -74,7 +82,7 @@ Item {
             height: K.Look.snapUp(label.implicitHeight + Tokens.space.s4 * 2, root.dpr)
             radius: Tokens.radius.small
             color: Tokens.color.on_surface
-            opacity: root.shown ? 1 : 0
+            opacity: root.shown && root.inView ? 1 : 0
             visible: opacity > 0
 
             Behavior on opacity {

@@ -51,7 +51,9 @@ in
   '';
   # The shell's logic that needs no Quickshell, beside KubaOS.Components: keyed list diffs, a live
   # list's rows coming and going, the scan schedule, how the radio tabs order what is in range.
-  # Offscreen, as the sandbox has no display.
+  # The screenshots' stand-ins (test/shots/fakes) take Quickshell's, Kotodama's and the services'
+  # place, so a module of the shell can be tested on its own: the Command menu's Action panel and
+  # forms, a notification's menu. Offscreen, as the sandbox has no display.
   qml-logic =
     pkgs.runCommand "kubaos-qml-logic"
       {
@@ -66,7 +68,7 @@ in
       ''
         export HOME=$(mktemp -d)
         export XDG_RUNTIME_DIR=$HOME
-        ${pkgs.qt6.qtdeclarative}/bin/qmltestrunner -import ${kubaos-components}/lib/qt-6/qml -input ${src}/test/qml 2>&1 | tee log
+        ${pkgs.qt6.qtdeclarative}/bin/qmltestrunner -import ${kubaos-components}/lib/qt-6/qml -import ${src}/test/shots/fakes -input ${src}/test/qml 2>&1 | tee log
         # A message from the QML engine fails the check, as it fails the e2e checks: some, as a
         # row whose making outlives its list, are info lines no TestCase can catch.
         if grep -E '^(QINFO|QWARN|QCRITICAL|QSYSTEM) *:.*\.qml(:[0-9]+)*: ' log; then

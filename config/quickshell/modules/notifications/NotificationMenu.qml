@@ -12,6 +12,9 @@ Item {
 
     // Whether it opens a modal panel of its own while it shows.
     property bool modal: false
+    // Whether what it opens from still shows. A panel closed by any route (its keybind, a click
+    // outside, another panel opening) takes the menu with it.
+    property bool held: true
     property var notification: null
     // What had the keyboard before the menu took it, given back when it closes.
     property Item returnTo: null
@@ -85,6 +88,13 @@ Item {
     anchors.fill: parent
     visible: root.notification !== null
     z: 1000
+    // The panel is going, and the keyboard with it, so nothing is given back.
+    onHeldChanged: {
+        if (!root.held) {
+            root.notification = null;
+            root.returnTo = null;
+        }
+    }
 
     Connections {
         target: Panels
