@@ -15,9 +15,9 @@ Before/after screenshots of a UI change don't need Docker: `just shots` renders 
 | Command | What |
 |---|---|
 | `just e2e [CHECK...]` | `test/run build`, `test/run warm`, then `test/run e2e`, `--only` the checks named |
-| `test/run build [--progress=plain] [--no-cache]` | Build `dotfiles-test:latest` |
+| `test/run build [--progress=plain] [--no-cache]` | Build the checkout's image, `dotfiles-test:<id>` (below, "Concurrent runs") |
 | `test/run warm` | Realise the `kuba@vm` generation, the home-manager CLI, nixpkgs' `pam_u2f`, `fprintd`, `pamtester` and Chromium into the `dotfiles-nix` volume, then switch once |
-| `test/run e2e [--only a,b] [--keep]` | Every check below, a PASS/FAIL table, exit 1 on any failure. `--keep` leaves the container for `docker exec -it dotfiles-test-e2e bash` (logs in `/tmp/dotfiles-test/`) |
+| `test/run e2e [--only a,b] [--keep]` | Every check below, a PASS/FAIL table, exit 1 on any failure. `--keep` leaves the container for `docker exec -it dotfiles-test-e2e-<id> bash`, the name it prints (logs in `/tmp/dotfiles-test/`) |
 | `test/run shell` | Fresh switch, then a login zsh as kuba in `~/Projects/dotfiles` (a copy: edit on the host) |
 | `test/run bitwarden` | Vaultwarden + `kubaos bitwarden` + `use bwenv` (below); builds the kubaos CLI first |
 | `test/run shots [--dir NAME \| --out PATH] [--size WxH] [--scale N] [--wallpaper FOLDER/FILE] [--hyprland]` | Headless session with Quickshell, left running for screenshots |
@@ -25,12 +25,23 @@ Before/after screenshots of a UI change don't need Docker: `just shots` renders 
 | `test/run shots run CMD...` | Run in the session as kuba: `qs ipc call controlcenter toggle`, `notify-send hi`, `dot-theme next` |
 | `test/run shots record start NAME`, `record stop` | `wf-recorder` to `NAME.mp4` |
 | `test/run shots log`, `shots stop` | Quickshell's log; end the session |
-| `test/run clean` | Remove the harness's containers, keep the volumes |
+| `test/run clean` | Remove the harness's containers, every checkout's, running ones included; keep the volumes |
 | `test/run nuke [--yes]` | `clean`, then delete the harness volumes (asks first) |
 
 `DOTFILES_SRC=/path/to/checkout test/run e2e` tests another copy of the repo, for example a `git worktree` of a branch. The harness scripts themselves are read from that copy (`test/lib/`), so they stay in step with it.
 
 **Limits.** The machine runs its own session and other builds beside the harness, so the container is bounded: `DOTFILES_TEST_MEM` and `DOTFILES_TEST_CPUS` (default 12g and 8 CPUs; the `kubaos` CLI's cargo build gets the same), and Nix in the container builds with `max-jobs` `DOTFILES_TEST_NIX_JOBS` and `cores` `DOTFILES_TEST_NIX_CORES` (default 2 and 4; the cores are also cargo's jobs). `test/run warm` and `test/run e2e` print the container's peak memory (the cgroup's `memory.peak`) at the end, which is what to size `DOTFILES_TEST_MEM` by.
+
+**Concurrent runs.** Runs of different checkouts, such as two `git worktree`s, run side by side and don't touch each other; runs of one checkout take turns. Each checkout has an id, the first 12 hex digits of the SHA-256 of its path, and its own names: the image `dotfiles-test:<id>` (BuildKit shares the layers checkouts have in common), the containers `dotfiles-test-e2e-<id>`, `-warm-<id>`, `-cargo-<id>` and `-bitwarden-<id>`, a `test/run shell` per call, and its cargo target directory. What the runs share, and why that holds:
+
+- **The store**, the `dotfiles-nix` volume. Each container starts its own `nix-daemon`, on a socket in a tmpfs of its own over `/nix/var/nix/daemon-socket` (`compose.yaml`): the volume's socket path would let a second run's daemon take over the first run's clients, which then lose their daemon when the second container ends. Two daemons on one store are as safe as two Nix commands on one machine: the database, the build users and every store path are held by file locks, which hold across containers on one kernel, so a path both runs need is built once while the other waits for it. Each run's home-manager profile is in its container's home.
+- **The build users' uids.** A container has no namespaces for Nix's sandbox, so a build runs as a build user, and Nix kills every process of that uid before and after it. The machine's own `nix-daemon` uses 30001 and up and reaches into every container from the host's PID namespace, so the image moves its build users to 40001 and up (`test/Dockerfile`, stage `harness`), and a build on the machine never kills one in the harness.
+- **The cache volume**, `dotfiles-test-cache`. Nix's fetcher and eval caches lock themselves. Neovim's plugins, Mason tools and treesitter parsers don't, so the checks that run Neovim (`nvim`, `suites`) hold a lock on them (`cache_lock` in `harness.sh`), and a check that waits prints `waiting for another run's nvim cache`. The GC roots `warm` leaves in `roots/` are replaced whole, and either run's are good for the other's tools.
+- **Cargo's registry**, which cargo locks itself.
+
+A second run of the same checkout waits for the first, as they share their containers' names and `test/out/kubaos`, and says so: `test/run: waiting for another test/run of <checkout> (pid …, test/run e2e, since …)`. `test/run bitwarden` also takes turns across checkouts, as Vaultwarden is one container and one data volume for the machine; `test/run shots` is one session for the machine, under one name. The locks are files in `~/.cache/kubaos/test-run/`, held with `flock` until `test/run` exits. Two runs take twice the limits above, so on a machine without that to spare, lower `DOTFILES_TEST_MEM` and the Nix jobs for each.
+
+Nothing in the harness collects garbage in `dotfiles-nix`, and nothing may while a run is live: a collector in one container sees neither another container's processes nor its temporary roots, whose files are named by PID, and PIDs repeat across containers.
 
 **Not in PR CI.** The harness needs about 22 GB (the 6.6 GB image and a 15 GB store), and nothing a GitHub-hosted runner builds survives to the next run: the Actions cache holds 10 GB per repository, which the store alone doesn't fit, so every run would start from a cold image and store on 4 CPUs. So CI runs `just check` ("CI" below), and a PR runs `just e2e` on the machine and puts the results table in its description.
 
@@ -78,6 +89,7 @@ Measured 2026-10-28 on the development machine (AMD Ryzen AI 9 HX 370, 24 thread
 | `test/run warm`, warm volume, after a crate change (the crates rebuild in release) | about 2 min, peak memory 5.2 GB |
 | `test/run warm`, nothing changed | 16 s, peak memory 1.1 GB |
 | `just e2e`, everything cached | 8 min 28 s: build 2 s, warm 17 s, switch 10 s, checks 8 min 14 s; peak memory 6.8 GB |
+| `test/run e2e --only tools,nvim,flake_check`, alone and two at once from two worktrees (measured 2026-10-29, the machine at a load of 68 from other agents' builds) | alone 55 s (switch 26 s, checks 21 s); together 57 s and 74 s, the second's `nvim` waiting 14 s for the first's Neovim cache |
 | `test/run e2e`, the slowest checks | `packages` 51 s, `update_edge` 82 s (it builds a new `kubaos` release in the container, up to 7 min when the crates changed), `session_reload` 33 s, `suites` 34 s |
 
 A cold `test/run warm` on an empty `dotfiles-nix` volume wasn't measured here. Most of it comes from the machine's own store, which already holds the generation's paths, and the rest from the binary caches.
