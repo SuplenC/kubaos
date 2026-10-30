@@ -149,6 +149,11 @@ dialog = 500
 # a long password's bullets, and wider than the clock without outweighing it,
 # so the two read as one column, where the dialog's 500 dwarfed the time.
 password = 320
+# The find box floating over a page of an app's sidebar page: a field and its
+# "n of m" side by side, as wide as the lock screen's password field, so a
+# long query still shows, and narrow enough to leave the page's words beside it
+# at the 720 minimum.
+find = 320
 # The widest a column of text and fields grows.
 column = 560
 # Kōbō's step rail on a wide screen.
