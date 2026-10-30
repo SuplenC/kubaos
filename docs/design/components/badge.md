@@ -12,6 +12,6 @@ What is new about something, over its icon's top right corner: a count in a pill
 
 ## `BadgedIcon`
 
-QML `BadgedIcon`; *QML only: the bar's. Its badge hangs past the top of its box, which iced lays out only inside it, so `kubaos-ui` gets it as a widget of its own with the first app that badges a symbol. Until then it is in neither specimen, so the parity check leaves it out.*
+QML `BadgedIcon`; *QML only: the bar's. Its badge hangs past the top of its box, which iced lays out only inside it, so `kubaos-ui` gets it as a widget of its own with the first app that badges a symbol. Until then it is on the QML specimen's "Shell only" page, which the parity check leaves out.*
 
 An `Icon` (`name`, `size`, `color`; 16 in `on_surface_variant` by default) with a `Badge` centred on its top right corner while `badged`: a count, or a dot when `count` is 0. Its box is the symbol's height; while the badge shows, it takes the half of the badge past the symbol as room on both sides, so the badge keeps the row's gap to the symbol beside it and the symbol stays centred in a pill of its own. The bar's updates (how many security updates wait, or a dot while only a release or an upgrade does) and proxy (a dot while something is wrong with it).
