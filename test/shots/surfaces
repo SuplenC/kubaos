@@ -56,6 +56,7 @@ mockups             design/mockups test/shots/mockups
 mockups/button      design/mockups/src/pages/atoms/button.ts
 mockups/icon-button design/mockups/src/pages/atoms/icon-button.ts
 mockups/hint        design/mockups/src/pages/atoms/hint.ts
+mockups/switch      design/mockups/src/pages/atoms/switch.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
 mockups/type        design/mockups/src/pages/foundations/type.ts
 mockups/space       design/mockups/src/pages/foundations/space.ts
