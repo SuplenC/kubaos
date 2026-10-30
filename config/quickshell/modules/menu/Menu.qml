@@ -618,7 +618,7 @@ PanelWindow {
                 Repeater {
                     model: search.jobs
 
-                    K.Grid {
+                    K.Split {
                         id: running
 
                         required property var modelData
