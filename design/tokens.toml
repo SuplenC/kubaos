@@ -455,11 +455,11 @@ use = "Changes that must not lag: the caret, text appearing as it is typed, redu
 
 [duration.micro]
 ms = 100
-use = "Hover and press state layers, a colour change under the pointer."
+use = "A control pressed, a state layer, a colour change under the pointer."
 
 [duration.short]
 ms = 200
-use = "A toggle's knob, a checkbox's mark, focus moving, a toast fading in."
+use = "A control lighting up or going back to rest, a toggle's knob, a checkbox's mark, a toast fading in."
 
 [duration.medium]
 ms = 300

@@ -36,8 +36,8 @@ A mockup is the thing itself, complete, in the mockup site: `design/mockups/`, s
 A mockup page is **exhaustive**. It shows and describes every one of these that applies, live, next to its written description:
 
 - **Variants and sizes,** and which is for what.
-- **Every state:** rest, hover, pressed, focused from the keyboard (the neon tube), disabled, selected, loading, empty, error.
-- **Both looks of the focus line:** lit (the neon and its glow, dark mode at rest) and unlit (the same line as unlit glass with no glow, light mode always and dark mode during a sequence), each tube, core or knob in each, and the unlit look as its own pinned column in the states.
+- **Every state:** rest, lit (hovered or focused from the keyboard, one state), pressed, disabled, selected, loading, empty, error, by night and by day (`docs/DESIGN.md`, "States").
+- **The lit line:** each tube, core or knob a lit control burns at night, its glow, and its line by day, when nothing glows.
 - **Content extremes:** the shortest and longest text, a translation 40% longer, a missing icon or picture, none, one and many.
 - **Motion:** how it arrives, leaves and moves between states, each carrying its reproducible recipe as data: every part that moves, each property's from and to by token, each part's duration, cue and curve by token, a stepped move's keyframes, and what reduced motion and the speed make of it. The player animates from that same data, looping, with pause, restart, slow motion, a plot of every track's curve over the loop to seek on, and each part of a move of several played alone beside the whole, so a library builds the same move from the page alone.
 - **The keyboard:** every key, where focus goes, and where it lands when the part appears or a page changes.

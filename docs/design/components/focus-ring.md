@@ -6,4 +6,4 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `focus::focus_ring`; QML `FocusRing`.
 
-The neon focus every focusable component draws (see [DESIGN.md, "Focus"](../../DESIGN.md#focus)). An app never draws its own.
+The neon focus every focusable component draws (see [DESIGN.md, "States"](../../DESIGN.md#states)). An app never draws its own.
