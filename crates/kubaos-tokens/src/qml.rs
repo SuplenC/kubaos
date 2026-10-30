@@ -555,6 +555,18 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
                 }
                 out.line(format!("        readonly property color {role}: tokens.role({role:?})"));
             }
+            for (role, derived) in &colors.derived {
+                out.line(format!(
+                    "        // `{}` taken {} of the way to white, whatever its colour.",
+                    derived.mix,
+                    number(derived.white)
+                ));
+                out.line(format!(
+                    "        readonly property color {role}: tokens.towardWhite(tokens.color.{}, {})",
+                    derived.mix,
+                    number(derived.white)
+                ));
+            }
         },
     );
     out.blank();
@@ -578,6 +590,15 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
     out.line("        const from = tokens.source[name];");
     out.line("        const live = tokens.matugen && from ? tokens.matugen[from] : undefined;");
     out.line("        return live ?? tokens.palette[tokens.mode === \"light\" ? \"light\" : \"dark\"][name];");
+    out.line("    }");
+    out.blank();
+    out.line("    // `c` taken `t` of the way to white, each 8-bit channel rounded half up, as the tokens compute it.");
+    out.line("    function towardWhite(c: color, t: real): color {");
+    out.line("        const mixed = v => {");
+    out.line("            const byte = Math.round(v * 255);");
+    out.line("            return Math.floor(byte + (255 - byte) * t + 0.5) / 255;");
+    out.line("        };");
+    out.line("        return Qt.rgba(mixed(c.r), mixed(c.g), mixed(c.b), 1);");
     out.line("    }");
 }
 

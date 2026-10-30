@@ -42,6 +42,8 @@ pub enum Violation {
     OpacityOutOfRange { token: String, value: f32 },
     /// A colour role missing from one of `source`, `dark` and `light`.
     RoleMissing { role: String, table: &'static str },
+    /// A role both derived and given values of its own.
+    RoleTwice { role: String },
     /// A symbol that names both a Tabler icon and a drawing of ours, or neither.
     SymbolSource { token: String },
     /// A type style's icon that isn't one of the icon sizes.
@@ -111,6 +113,9 @@ impl fmt::Display for Violation {
             }
             Violation::RoleMissing { role, table } => {
                 write!(f, "colour role {role} is missing from color.{table}")
+            }
+            Violation::RoleTwice { role } => {
+                write!(f, "colour role {role} is in color.derived and in color.source")
             }
             Violation::SymbolSource { token } => {
                 write!(f, "{token} needs exactly one of `tabler` and `drawn`")
@@ -299,7 +304,7 @@ fn check_contrast(tokens: &Tokens, found: &mut Vec<Violation>) {
         }
     }
     for name in &tokens.contrast.decorative {
-        if !tokens.color.source.contains_key(name) {
+        if !tokens.color.source.contains_key(name) && !tokens.color.derived.contains_key(name) {
             found.push(Violation::UnknownInPair {
                 token: "contrast.decorative".into(),
                 name: name.clone(),
@@ -531,6 +536,23 @@ fn check_colors(tokens: &Tokens, found: &mut Vec<Violation>) {
             }
         }
     }
+    for (role, derived) in &colors.derived {
+        if colors.source.contains_key(role) {
+            found.push(Violation::RoleTwice { role: role.clone() });
+        }
+        if !colors.source.contains_key(&derived.mix) {
+            found.push(Violation::UnknownName {
+                token: format!("color.derived.{role}.mix"),
+                name: derived.mix.clone(),
+            });
+        }
+        if !(0.0..=1.0).contains(&derived.white) {
+            found.push(Violation::OpacityOutOfRange {
+                token: format!("color.derived.{role}.white"),
+                value: derived.white,
+            });
+        }
+    }
     for name in names(tokens) {
         if !is_identifier(&name) {
             found.push(Violation::BadName { token: name });
@@ -608,7 +630,7 @@ fn is_mark_path(path: &str) -> bool {
 
 /// Every name that becomes an identifier in an output, as `table.name`.
 fn names(tokens: &Tokens) -> Vec<String> {
-    let tables: [(&str, Vec<&String>); 9] = [
+    let tables: [(&str, Vec<&String>); 10] = [
         ("size", tokens.size.keys().collect()),
         ("aspect", tokens.aspect.keys().collect()),
         ("type", tokens.types.keys().collect()),
@@ -617,6 +639,7 @@ fn names(tokens: &Tokens) -> Vec<String> {
         ("opacity", tokens.opacity.keys().collect()),
         ("shadow", tokens.shadow.keys().collect()),
         ("color", tokens.color.source.keys().collect()),
+        ("color", tokens.color.derived.keys().collect()),
         ("symbols", tokens.symbols.keys().collect()),
     ];
     tables

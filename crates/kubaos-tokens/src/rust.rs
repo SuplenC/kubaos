@@ -775,6 +775,24 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
     out.line("        Mode::Dark => DARK,");
     out.line("    }");
     out.line("}");
+    out.blank();
+    out.line("/// A role computed from another role of whichever palette is drawn, so it follows the wallpaper:");
+    out.line("/// `tone` taken `white` of the way to white.");
+    out.line("#[derive(Debug, Clone, Copy, PartialEq)]");
+    out.line("pub struct Derived {");
+    out.line("    pub tone: Role,");
+    out.line("    pub white: f32,");
+    out.line("}");
+    for (role, derived) in &colors.derived {
+        out.blank();
+        out.line(format!("/// `{}` taken {:?} of the way to white.", derived.mix, derived.white));
+        out.line(format!(
+            "pub const {}: Derived = Derived {{ tone: Role::{}, white: {:?} }};",
+            role.to_uppercase(),
+            camel(&derived.mix),
+            derived.white
+        ));
+    }
 }
 
 fn palette(out: &mut Writer, name: &str, doc: &str, roles: &BTreeMap<String, Rgb>) {

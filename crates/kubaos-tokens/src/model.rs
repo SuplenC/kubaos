@@ -316,9 +316,9 @@ pub struct MarkStroke {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Tone {
-    /// `primary`, with `primary_core` along its middle.
+    /// `primary`, with `logo_core_warm` along its middle.
     Warm,
-    /// `cold`, with `cold_core` along its middle.
+    /// `cold`, with `logo_core_cold` along its middle.
     Cold,
 }
 
@@ -348,6 +348,35 @@ pub struct Colors {
     pub source: BTreeMap<String, String>,
     pub dark: BTreeMap<String, Rgb>,
     pub light: BTreeMap<String, Rgb>,
+    /// The roles computed from another role, whatever its value in a palette: never a fixed value,
+    /// so they follow the wallpaper.
+    #[serde(default)]
+    pub derived: BTreeMap<String, Derived>,
+}
+
+/// A role computed from another: `mix` taken `white` of the way to white, each channel rounded
+/// half up.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Derived {
+    /// The role it is computed from, one of `source`.
+    pub mix: String,
+    /// How far toward white, 0 to 1.
+    pub white: f32,
+}
+
+impl Colors {
+    /// `palette` with the derived roles computed from its own values. A derived role whose tone the
+    /// palette lacks is left out; `rules` refuses one.
+    pub fn with_derived(&self, palette: &BTreeMap<String, Rgb>) -> BTreeMap<String, Rgb> {
+        let mut out = palette.clone();
+        for (role, derived) in &self.derived {
+            if let Some(&tone) = palette.get(&derived.mix) {
+                out.insert(role.clone(), tone.toward_white(derived.white));
+            }
+        }
+        out
+    }
 }
 
 /// An opaque colour, written `#rrggbb`.
@@ -388,6 +417,26 @@ impl<'de> Deserialize<'de> for Rgb {
 }
 
 impl Rgb {
+    /// This colour mixed `t` of the way to white, each channel rounded half up.
+    #[must_use]
+    pub fn toward_white(self, t: f32) -> Rgb {
+        let channel = |c: u8| {
+            let c = f32::from(c);
+            #[expect(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                reason = "Clamped to 0..=255 and rounded first."
+            )]
+            let byte = (c + (255.0 - c) * t + 0.5).floor().clamp(0.0, 255.0) as u8;
+            byte
+        };
+        Rgb {
+            r: channel(self.r),
+            g: channel(self.g),
+            b: channel(self.b),
+        }
+    }
+
     /// This colour with its HSL lightness moved by `points` of 100, clamped: matugen's `lighten`.
     #[must_use]
     pub fn lighten(self, points: f32) -> Rgb {

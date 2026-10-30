@@ -32,8 +32,8 @@ impl Tone {
     /// The tube's colour and its white-hot core's.
     pub fn colors(self, c: &Colors) -> (Color, Color) {
         match self {
-            Tone::Warm => (c.primary, c.primary_core),
-            Tone::Cold => (c.cold, c.cold_core),
+            Tone::Warm => (c.primary, c.logo_core_warm),
+            Tone::Cold => (c.cold, c.logo_core_cold),
         }
     }
 
