@@ -35,7 +35,7 @@ import {
   tracksOf,
 } from "../recipe.ts";
 import { CHROME, onChange, settings } from "../settings.ts";
-import { legend, type Mark, named, Plot, swatch } from "./plot.ts";
+import { key as keyOf, legend, type Mark, named, Plot } from "./plot.ts";
 import { partOr, subheading } from "./section.ts";
 
 /** How many times slower slow motion plays. */
@@ -104,8 +104,10 @@ interface Row {
   readonly index: number;
 }
 
+/** A table of the recipe; wider than the page at a large scale, it scrolls on its own rather than the page. */
 function table(heads: readonly string[], rows: readonly HTMLElement[]): HTMLElement {
-  return el("table", "page-table", el("thead", "", el("tr", "", ...heads.map((h) => cell(h, true)))), el("tbody", "", ...rows));
+  const drawn = el("table", "page-table", el("thead", "", el("tr", "", ...heads.map((h) => cell(h, true)))), el("tbody", "", ...rows));
+  return el("div", "page-table-scroll", drawn);
 }
 
 /** Whether `t` is inside one of `spans`. */
@@ -117,7 +119,7 @@ function within(t: number, spans: readonly Span[]): boolean {
 function tracksTable(tracks: readonly Track[], set: TrackSet, lits: Lit[], picks: Row[]): HTMLElement {
   const rows = tracks.map((track, i) => {
     // The row's swatch is its curve's on the plot, when this set plays.
-    const part = el("td", "", el("span", "page-plot-key", swatch(i), label(track.part, "small", "on_surface")));
+    const part = el("td", "", keyOf(i, track.part));
     const row = el(
       "tr",
       "",
@@ -308,8 +310,8 @@ function player(move: Move): HTMLElement {
     for (const layer of stage.querySelectorAll(track.target)) {
       const box = layer.getBoundingClientRect();
       const outline = el("div", "page-player-outline");
-      outline.style.left = `${(box.left - origin.left) * zoom}px`;
-      outline.style.top = `${(box.top - origin.top) * zoom}px`;
+      outline.style.left = `${(box.left - origin.left) * zoom + stage.scrollLeft}px`;
+      outline.style.top = `${(box.top - origin.top) * zoom + stage.scrollTop}px`;
       outline.style.width = `${box.width * zoom}px`;
       outline.style.height = `${box.height * zoom}px`;
       outlines.append(outline);
@@ -420,18 +422,21 @@ function player(move: Move): HTMLElement {
    * on the player's one clock, so the part and the whole never disagree.
    */
   function drawParts(): Animation[] {
-    const resting = restingInDaylight();
+    const resting = restingIn(playing);
     if (playing.timed.length + resting.length < 2) {
       parts.replaceChildren();
       return [];
     }
+    // Each part's words hold the room of the other mode's part in the same place, so the parts are
+    // as tall in either mode.
+    const other = partWords(loop(move, settings().mode === "light" ? "dark" : "light"));
     const added: Animation[] = [];
     parts.replaceChildren(
       ...playing.timed.map((timed, i) => {
         const alone = move.sample();
         const target = timed.track.target;
-        for (const other of playing.timed) {
-          for (const layer of alone.querySelectorAll<HTMLElement>(other.track.target)) {
+        for (const each of playing.timed) {
+          for (const layer of alone.querySelectorAll<HTMLElement>(each.track.target)) {
             if (!layer.matches(target)) layer.style.visibility = "hidden";
           }
         }
@@ -446,11 +451,11 @@ function player(move: Move): HTMLElement {
         // A picture of the part, not more controls: no focus, no hover, nothing read out twice.
         box.inert = true;
         box.setAttribute("aria-hidden", "true");
-        const part = el("div", "page-part-alone", el("span", "page-plot-key", swatch(i), label(named(timed.track), "small", "on_surface")), box);
+        const part = el("div", "page-part-alone", keyOf(i, named(timed.track), "on_surface", other[i]), box);
         pickable(part, i);
         return part;
       }),
-      ...resting.map(restingPart),
+      ...resting.map((track, i) => restingPart(track, other[playing.timed.length + i])),
     );
     // Their rings' glows are drawn by the page's settle, which follows every build.
     return added;
@@ -460,10 +465,10 @@ function player(move: Move): HTMLElement {
    * The move's own tracks that light mode's tracks leave out, while those play: each keeps its row
    * among the parts, so the page is as tall in either mode.
    */
-  function restingInDaylight(): Track[] {
-    if (playing.set !== "daylight") return [];
+  function restingIn(of: Loop): Track[] {
+    if (of.set !== "daylight") return [];
     const key = (track: Track) => `${track.part}\u0000${track.property}`;
-    const left = playing.timed.map((timed) => key(timed.track));
+    const left = of.timed.map((timed) => key(timed.track));
     return move.tracks.filter((track) => {
       const at = left.indexOf(key(track));
       if (at < 0) return true;
@@ -472,16 +477,22 @@ function player(move: Move): HTMLElement {
     });
   }
 
+  /** A part that doesn't play in light mode, as its row says it. */
+  const restingWords = (track: Track) => `${track.part}: doesn't play in light mode, where the neon is off`;
+
+  /** What each part's row says in `of`, in the parts' order. */
+  function partWords(of: Loop): string[] {
+    return [...of.timed.map((timed) => named(timed.track)), ...restingIn(of).map(restingWords)];
+  }
+
   /** A part that doesn't play in light mode: its sample still, under a line saying why. */
-  function restingPart(track: Track): HTMLElement {
+  function restingPart(track: Track, room: string | undefined): HTMLElement {
     const alone = move.sample();
     spread(alone);
     const box = el("div", "page-part-stage mock", alone);
     box.inert = true;
     box.setAttribute("aria-hidden", "true");
-    // Its part's name alone: with what it's on, as the legend says it, the line runs past the page.
-    const words = `${track.part}: doesn't play in light mode, where the neon is off`;
-    return el("div", "page-part-resting", el("span", "page-plot-key", label(words, "small", "on_surface_variant")), box);
+    return el("div", "page-part-resting", keyOf(null, restingWords(track), "on_surface_variant", room), box);
   }
 
   /**

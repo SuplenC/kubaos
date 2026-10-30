@@ -201,7 +201,9 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     const alone = player.locator(".page-part-alone");
     // The parts alone stack one under another, each a full row, in the legend's order.
     const stacked = await player.evaluate((element) => {
-      const keys = [...element.querySelectorAll(".page-plot-legend .page-plot-key")].map((key) => key.textContent);
+      // A key's words are its first line of words; the rest is the other mode's room, unseen.
+      const words = (key: Element | null) => key?.querySelector(".page-plot-words > :first-child")?.textContent;
+      const keys = [...element.querySelectorAll(".page-plot-legend .page-plot-key")].map(words);
       const rows = [...element.querySelectorAll<HTMLElement>(".page-part-alone")];
       // A move of one part has no parts alone; a move of more has one per legend key.
       if (rows.length !== (keys.length > 1 ? keys.length : 0)) return false;
@@ -209,7 +211,7 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
       return rows.every((row, i) => {
         const box = row.getBoundingClientRect();
         const above = rows[i - 1]?.getBoundingClientRect();
-        return (!above || box.top >= above.bottom) && Math.abs(box.width - width) < 0.5 && row.querySelector(".page-plot-key")?.textContent === keys[i];
+        return (!above || box.top >= above.bottom) && Math.abs(box.width - width) < 0.5 && words(row.querySelector(".page-plot-key")) === keys[i];
       });
     });
     check(stacked, `${where}: the parts alone don't stack one under another in the legend's order`);

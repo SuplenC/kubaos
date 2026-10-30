@@ -271,12 +271,15 @@ body {
   background: var(--color-surface_container_low);
 }
 
-/* A player's sample in a box of its own, which the player's animations move. */
+/* A player's sample in a box of its own, which the player's animations move. Wider than the page
+   at a large scale, it scrolls on its own rather than the page; its padding is past the glow's
+   reach, so the scroll cuts no glow. */
 .page-player-stage {
   position: relative;
   display: flex;
   justify-content: flex-start;
   padding: var(--space-s24);
+  overflow-x: auto;
 }
 
 /* A player's sample laid out as a grid (`spread` in `site/parts/motion.ts`): its columns, gap and
@@ -325,6 +328,7 @@ body {
 
 .page-part-stage {
   display: flex;
+  overflow-x: auto;
   padding: var(--space-s24);
   border-radius: var(--radius-control);
   outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
@@ -343,6 +347,7 @@ body {
 
 .page-player-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-s8);
 }
 
@@ -457,16 +462,34 @@ body {
   visibility: hidden;
 }
 
+/* A track's key: its swatch on its words' first line, the words wrapping in the room the page
+   gives them, over the other mode's words held unseen in the same place. */
 .page-plot-key {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-s8);
+  min-width: 0;
+  max-width: 100%;
+}
+
+.page-plot-words {
+  display: grid;
+  min-width: 0;
+}
+
+.page-plot-words > * {
+  grid-area: 1 / 1;
+}
+
+.page-plot-words > [aria-hidden] {
+  visibility: hidden;
 }
 
 .page-plot-swatch {
   display: inline-flex;
+  flex: none;
   width: var(--space-s24);
-  height: var(--space-s8);
+  height: var(--type-small-line);
 }
 
 .page-plot-swatch svg {
@@ -497,6 +520,13 @@ body {
 .page-table {
   align-self: flex-start;
   border-collapse: collapse;
+}
+
+/* A recipe's table, wider than the page at a large scale, scrolls on its own rather than the page. */
+.page-table-scroll {
+  align-self: flex-start;
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .page-table th,
