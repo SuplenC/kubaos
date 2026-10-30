@@ -155,14 +155,20 @@ pub fn view<'a, M: Clone + 'a>(
 fn sidebar<'a>(state: &'a SidebarPage, look: &Look) -> Element<'a, Message> {
     let outline = &state.outline;
     let ring = |entry: Entry| state.region == Region::Sidebar && state.keyboard && state.cursor == entry;
-    let mut rows = stack(look, ROW_GAP).width(Extent::Fill).push(sidebar_row(
+    let mut entry = 0;
+    let mut marked = |row: Element<'a, Message>| {
+        let row = mark(Spot::Entry(entry), row);
+        entry += 1;
+        row
+    };
+    let mut rows = stack(look, ROW_GAP).width(Extent::Fill).push(marked(sidebar_row(
         look,
         Some(outline.home.icon),
         &outline.home.label,
         state.place == Place::Home,
         ring(Entry::Home),
         Entry::Home,
-    ));
+    )));
     rows = rows.push(
         stack(look, Gap::NONE)
             .width(Extent::Fill)
@@ -174,14 +180,14 @@ fn sidebar<'a>(state: &'a SidebarPage, look: &Look) -> Element<'a, Message> {
     let mut children = 2;
     for (index, section) in outline.sections.iter().enumerate() {
         let open = state.place == Place::Section(index);
-        rows = rows.push(sidebar_row(
+        rows = rows.push(marked(sidebar_row(
             look,
             Some(section.icon),
             &section.title,
             open,
             ring(Entry::Section(index)),
             Entry::Section(index),
-        ));
+        )));
         children += 1;
         if !open {
             continue;
@@ -191,14 +197,14 @@ fn sidebar<'a>(state: &'a SidebarPage, look: &Look) -> Element<'a, Message> {
             if current {
                 bar = Some(children);
             }
-            rows = rows.push(sidebar_row(
+            rows = rows.push(marked(sidebar_row(
                 look,
                 None,
                 &shape.title,
                 current,
                 ring(Entry::Sub(index, sub)),
                 Entry::Sub(index, sub),
-            ));
+            )));
             children += 1;
         }
     }
@@ -218,13 +224,15 @@ fn sidebar<'a>(state: &'a SidebarPage, look: &Look) -> Element<'a, Message> {
         look,
         widget::container(glide).padding(Inset::all(SIDEBAR_INSET).padding()),
     )
+    .id(state.sidebar_id.clone())
+    .on_scroll(Message::SidebarScrolled)
     .height(Extent::Fill);
     let band = look.colors.surface_container_low;
-    let view = widget::container(scrolled)
+    widget::container(scrolled)
         .width(f32::from(Size::Sidebar.px()))
         .height(Length::Fill)
-        .style(move |_theme| widget::container::Style::default().background(band));
-    mark(Spot::Sidebar, view)
+        .style(move |_theme| widget::container::Style::default().background(band))
+        .into()
 }
 
 /// A row of the sidebar: a section's (with its symbol) or a sub-section's, its words where a
@@ -403,23 +411,34 @@ fn find_box<'a, M: Clone + 'a>(
     let corner = container(
         row(look, Gap::NONE)
             .width(Extent::Fill)
-            .padding(Inset::NONE.top(Space::S16))
+            .padding(Inset::NONE.top(FIND_TOP))
             .push(fill())
             .push(floating),
     );
     Some(shift(-above, corner))
 }
 
+/// How far below the pane's top the find box's field reaches: its room above, the popover's 12 on
+/// either side of the field, and the field.
+pub(super) fn find_reach() -> f32 {
+    f32::from(FIND_TOP.px() + 2 * Space::S12.px() + Size::ControlMd.px())
+}
+
+/// The find box's room above it, a small control's band.
+const FIND_TOP: Space = Space::S16;
+
 /// The find box's placeholder.
 const FIND_PLACEHOLDER: &str = "Find on this page";
 
 /// `content` drawn `by` below its place, taking no layout: a page rising in, a box dropping in.
+///
+/// HAZARD: it wraps its content at rest too. Unwrapped at 0, the tree would change shape as the
+/// motion ends, and iced would rebuild the content's state: a page's scroll back at its top.
 fn shift<'a, M: 'a>(by: f32, content: impl Into<Element<'a, M>>) -> Element<'a, M> {
-    let content = content.into();
-    if by == 0.0 {
-        return content;
-    }
-    Element::new(Shift { by, content })
+    Element::new(Shift {
+        by,
+        content: content.into(),
+    })
 }
 
 struct Shift<'a, M> {
@@ -467,12 +486,13 @@ impl<M> Widget<M, Theme, Renderer> for Shift<'_, M> {
         shell: &mut Shell<'_, M>,
         viewport: &Rectangle,
     ) {
+        let by = self.offset();
         if let Some(content) = layout.children().next() {
             self.content.as_widget_mut().update(
                 &mut tree.children[0],
                 event,
                 content,
-                cursor,
+                cursor - by,
                 renderer,
                 clipboard,
                 shell,
@@ -493,9 +513,13 @@ impl<M> Widget<M, Theme, Renderer> for Shift<'_, M> {
             .children()
             .next()
             .map_or_else(mouse::Interaction::default, |content| {
-                self.content
-                    .as_widget()
-                    .mouse_interaction(&tree.children[0], content, cursor, viewport, renderer)
+                self.content.as_widget().mouse_interaction(
+                    &tree.children[0],
+                    content,
+                    cursor - self.offset(),
+                    viewport,
+                    renderer,
+                )
             })
     }
 
@@ -512,11 +536,38 @@ impl<M> Widget<M, Theme, Renderer> for Shift<'_, M> {
         let Some(content) = layout.children().next() else {
             return;
         };
-        renderer.with_translation(Vector::new(0.0, self.by), |renderer| {
-            self.content
-                .as_widget()
-                .draw(&tree.children[0], renderer, theme, style, content, cursor, viewport);
+        renderer.with_translation(self.offset(), |renderer| {
+            self.content.as_widget().draw(
+                &tree.children[0],
+                renderer,
+                theme,
+                style,
+                content,
+                cursor - self.offset(),
+                viewport,
+            );
         });
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<iced::advanced::overlay::Element<'b, M, Theme, Renderer>> {
+        let content = layout.children().next()?;
+        let by = self.offset();
+        self.content
+            .as_widget_mut()
+            .overlay(&mut tree.children[0], content, renderer, viewport, translation + by)
+    }
+}
+
+impl<M> Shift<'_, M> {
+    fn offset(&self) -> Vector {
+        Vector::new(0.0, self.by)
     }
 }
 
@@ -541,7 +592,7 @@ struct Bar {
 }
 
 impl<M> Glide<'_, M> {
-    /// The box of the row the bar is beside.
+    /// The box of the row the bar is beside, in the drawn layout.
     fn target(&self, layout: Layout<'_>) -> Option<Rectangle> {
         let rows = layout.children().next()?;
         rows.children().nth(self.target?).map(|row| row.bounds())
@@ -575,7 +626,11 @@ impl<M> Widget<M, Theme, Renderer> for Glide<'_, M> {
             .as_widget_mut()
             .layout(&mut tree.children[0], renderer, limits);
         let size = node.size();
-        let target = self.target(Layout::new(&layout::Node::with_children(size, vec![node.clone()])));
+        // The rows' stack is the content itself, laid out at the glide's origin.
+        let target = self
+            .target
+            .and_then(|index| node.children().get(index))
+            .map(layout::Node::bounds);
         let bar = tree.state.downcast_mut::<Bar>();
         match target {
             Some(row) => {

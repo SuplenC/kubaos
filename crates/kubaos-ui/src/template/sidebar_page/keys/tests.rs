@@ -66,3 +66,8 @@ fn enter_fires_once_per_press_and_carries_shift() {
 fn tab_carries_shift() {
     assert_eq!(named(Named::Tab, Modifiers::SHIFT), Some(Key::Tab { shift: true }));
 }
+
+#[test]
+fn control_tab_is_left_to_the_window() {
+    assert_eq!(named(Named::Tab, Modifiers::CTRL), None);
+}

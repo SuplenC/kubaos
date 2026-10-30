@@ -3,7 +3,7 @@
 //! # Owns
 //!
 //! - The window, the keys (Tab and the arrows for pages, M for the mode, Esc to close; on the
-//!   templates page, the template's) and the motion clock.
+//!   templates page, the template's, and Ctrl+Tab to leave it) and the motion clock.
 //!
 //! # Not here
 //!
@@ -81,6 +81,13 @@ impl App {
         let keyboard::Event::KeyPressed { key, modifiers, .. } = event else {
             return Task::none();
         };
+        // On the templates page the keys are the template's, all but Ctrl+Tab, which leaves it.
+        if self.specimen.page == Page::Templates {
+            if matches!(key.as_ref(), keyboard::Key::Named(Named::Tab)) && modifiers.control() {
+                self.specimen.page = self.specimen.page.step(modifiers.shift());
+            }
+            return Task::none();
+        }
         match key.as_ref() {
             keyboard::Key::Named(Named::Tab) => self.specimen.page = self.specimen.page.step(modifiers.shift()),
             keyboard::Key::Named(Named::ArrowRight) => self.specimen.page = self.specimen.page.step(false),
@@ -102,19 +109,17 @@ impl App {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        // On the templates page the keys are the template's, as they are an app's.
-        let keys = if self.specimen.page == Page::Templates {
-            self.demo.page.subscription().map(Message::Template)
-        } else {
-            keyboard::listen().map(Message::Key)
-        };
         let mut subscriptions = vec![
-            keys,
+            keyboard::listen().map(Message::Key),
             window::events().filter_map(|(_, event)| match event {
                 window::Event::Rescaled(factor) => Some(Message::Scaled(factor)),
                 _ => None,
             }),
         ];
+        // On the templates page the keys are the template's, as they are an app's.
+        if self.specimen.page == Page::Templates {
+            subscriptions.push(self.demo.page.subscription().map(Message::Template));
+        }
         if self.specimen.page == Page::Motion {
             subscriptions.push(window::frames().map(Message::Frame));
         }

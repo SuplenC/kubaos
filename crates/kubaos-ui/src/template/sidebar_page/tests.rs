@@ -69,6 +69,8 @@ fn measure() -> Measure {
         reach: 20.0,
         pane: 300.0,
         sidebar: 300.0,
+        sidebar_max: 0.0,
+        entries: Vec::new(),
         max: 600.0,
         subs: vec![100.0, 400.0, 700.0],
         rows: (0..6)
@@ -278,7 +280,7 @@ fn a_row_below_the_pane_scrolls_into_view_as_the_keyboard_reaches_it() {
         press(&mut page, Key::Down);
     }
 
-    assert_close(page.offset(), measure().reveal(5, 0.0).unwrap());
+    assert_close(page.offset(), measure().reveal(5, 0.0, 0.0).unwrap());
 }
 
 #[test]
@@ -463,6 +465,32 @@ fn esc_closes_find_and_puts_the_keyboard_and_the_page_back() {
     assert_eq!(page.region(), Region::Page);
     assert_eq!(page.row(), row);
     assert_close(page.offset(), offset);
+}
+
+#[test]
+fn esc_on_find_keeps_a_sub_section_picked_current() {
+    let mut page = on_power();
+    let _ = page.measured(Measure {
+        max: 340.0,
+        ..measure()
+    });
+    let _ = page.update(Message::Pick(Entry::Sub(0, 1)), &EvenRows);
+    press(&mut page, Key::Find);
+    text(&mut page, "s");
+    press(&mut page, Key::Up);
+
+    press(&mut page, Key::Esc);
+
+    assert_eq!(page.current_sub(), 1);
+}
+
+#[test]
+fn a_press_on_a_home_result_opens_it() {
+    let mut page = SidebarPage::new(outline());
+
+    let (_, event) = page.update(Message::Open(2), &EvenRows);
+
+    assert_eq!(event, Some(Event::Open(2)));
 }
 
 #[test]

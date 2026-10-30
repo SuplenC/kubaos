@@ -70,6 +70,8 @@ pub fn translate(event: &keyboard::Event) -> Option<Key> {
         keyboard::Key::Named(named) => match named {
             Named::Enter => (!repeat).then_some(Key::Enter { shift }),
             Named::Escape => Some(Key::Esc),
+            // Ctrl+Tab is the window's: an app's tabs, or the specimen's pages.
+            Named::Tab if ctrl => None,
             Named::Tab => Some(Key::Tab { shift }),
             Named::ArrowUp => Some(Key::Up),
             Named::ArrowDown => Some(Key::Down),

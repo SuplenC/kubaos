@@ -212,7 +212,7 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
 /// keys are the template's, the template's.
 fn hints(specimen: &Specimen) -> &'static [(&'static str, &'static str)] {
     if specimen.live && specimen.page == Page::Templates {
-        &[("/", "find"), ("Tab", "next region"), ("Ctrl+PgDn", "next section")]
+        &[("Ctrl+Tab", "next page"), ("/", "find"), ("Ctrl+PgDn", "next section")]
     } else {
         &[("Tab", "next page"), ("← →", "pages"), ("M", "mode")]
     }

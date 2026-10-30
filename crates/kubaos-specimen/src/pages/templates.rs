@@ -247,6 +247,7 @@ impl Demo {
                 .subtitle(path)
                 .detail(value)
                 .selected(home.result == Some(index))
+                .on_press(Message::Template(sidebar_page::Message::Open(index)))
                 .view(look)
         });
         list(look, rows, false)
@@ -339,14 +340,14 @@ fn pressed(keys: &[&[Key]]) -> Demo {
     demo
 }
 
-/// `demo` in a window `width` × `height`, edged with the soft hairline.
+/// `demo` in a window `width` × `height`, edged with the soft hairline over it, as a window's
+/// border is drawn over what it holds.
 fn framed<'a>(look: &Look, demo: &'static Demo, width: Size, height: Size) -> Element<'a, Message> {
     let edge = look.outline_soft();
     let hairline = look.hairline();
-    widget::container(demo.view(look))
-        .width(f32::from(width.px()))
-        .height(f32::from(height.px()))
-        .clip(true)
+    let border = widget::container(widget::Space::new())
+        .width(Length::Fill)
+        .height(Length::Fill)
         .style(move |_theme| widget::container::Style {
             border: Border {
                 color: edge,
@@ -354,7 +355,11 @@ fn framed<'a>(look: &Look, demo: &'static Demo, width: Size, height: Size) -> El
                 ..Border::default()
             },
             ..widget::container::Style::default()
-        })
+        });
+    widget::container(widget::Stack::with_children([demo.view(look), border.into()]))
+        .width(f32::from(width.px()))
+        .height(f32::from(height.px()))
+        .clip(true)
         .into()
 }
 

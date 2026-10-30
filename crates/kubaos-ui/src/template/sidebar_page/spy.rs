@@ -48,8 +48,8 @@ pub(crate) const MARGIN: Space = Space::S24;
 pub(crate) enum Spot {
     /// The page's pane: the box the person sees the page in.
     Pane,
-    /// The sidebar's box.
-    Sidebar,
+    /// A row of the sidebar, by its place among the sidebar's rows.
+    Entry(usize),
     /// A sub-section, by its place in the section.
     Sub(usize),
     /// A row, by its place in the section's reading order.
@@ -63,8 +63,10 @@ pub struct Measure {
     pub(crate) reach: f32,
     /// The pane's height.
     pub(crate) pane: f32,
-    /// The sidebar's height.
+    /// The sidebar's height, how far its rows can scroll, and each row's top and bottom in them.
     pub(crate) sidebar: f32,
+    pub(crate) sidebar_max: f32,
+    pub(crate) entries: Vec<(f32, f32)>,
     /// How far the content can scroll.
     pub(crate) max: f32,
     /// Each sub-section's top.
@@ -92,21 +94,38 @@ impl Measure {
         self.subs.iter().rposition(|&top| top <= line).unwrap_or(0)
     }
 
-    /// The offset that brings `row` into view with [`MARGIN`] around it, scrolling as little as
-    /// it can; `None` when it is in view already.
-    pub fn reveal(&self, row: usize, offset: f32) -> Option<f32> {
+    /// The offset that brings `row` into view with [`MARGIN`] around it, below `covered` at the
+    /// pane's top (what floats there), scrolling as little as it can; `None` when it is in view
+    /// already.
+    pub fn reveal(&self, row: usize, offset: f32, covered: f32) -> Option<f32> {
         let &(top, bottom) = self.rows.get(row)?;
         let margin = f32::from(MARGIN.px());
         let shown = offset + self.reach;
-        let to = if top - margin < shown {
-            top - margin - self.reach
+        let above = covered + margin;
+        let to = if top - above < shown {
+            top - above - self.reach
         } else if bottom + margin > shown + self.pane {
             // A row taller than the pane shows its top.
-            (bottom + margin - self.pane - self.reach).min(top - margin - self.reach)
+            (bottom + margin - self.pane - self.reach).min(top - above - self.reach)
         } else {
             return None;
         };
         let to = to.clamp(0.0, self.max);
+        ((to - offset).abs() >= 1.0).then_some(to)
+    }
+
+    /// The sidebar's offset that shows its row `entry` whole with the sidebar's padding around it,
+    /// scrolling as little as it can; `None` when it shows already.
+    pub fn reveal_entry(&self, entry: usize, offset: f32, padding: f32) -> Option<f32> {
+        let &(top, bottom) = self.entries.get(entry)?;
+        let to = if top - padding < offset {
+            top - padding
+        } else if bottom + padding > offset + self.sidebar {
+            bottom + padding - self.sidebar
+        } else {
+            return None;
+        };
+        let to = to.clamp(0.0, self.sidebar_max);
         ((to - offset).abs() >= 1.0).then_some(to)
     }
 
@@ -141,26 +160,31 @@ pub(crate) fn mark<'a, M: 'a>(spot: Spot, content: impl Into<Element<'a, M>>) ->
     })
 }
 
-/// Reads the marks inside the scroll `scroll` into a [`Measure`].
-pub(crate) fn measure(scroll: Id) -> impl Operation<Measure> {
+/// Reads the marks inside the page's scroll `scroll` and the sidebar's `sidebar` into a
+/// [`Measure`].
+pub(crate) fn measure(scroll: Id, sidebar: Id) -> impl Operation<Measure> {
     Spy {
         scroll,
+        sidebar,
         view: None,
+        side: None,
         pane: None,
-        sidebar: 0.0,
         subs: Vec::new(),
         rows: Vec::new(),
+        entries: Vec::new(),
     }
 }
 
 struct Spy {
     scroll: Id,
-    /// The scroll's box and its content's.
+    sidebar: Id,
+    /// Each scroll's box and its content's.
     view: Option<(Rectangle, Rectangle)>,
+    side: Option<(Rectangle, Rectangle)>,
     pane: Option<Rectangle>,
-    sidebar: f32,
     subs: Vec<(usize, Rectangle)>,
     rows: Vec<(usize, Rectangle)>,
+    entries: Vec<(usize, Rectangle)>,
 }
 
 impl Operation<Measure> for Spy {
@@ -178,13 +202,15 @@ impl Operation<Measure> for Spy {
     ) {
         if id == Some(&self.scroll) {
             self.view = Some((bounds, content_bounds));
+        } else if id == Some(&self.sidebar) {
+            self.side = Some((bounds, content_bounds));
         }
     }
 
     fn custom(&mut self, _id: Option<&Id>, bounds: Rectangle, state: &mut dyn Any) {
         match state.downcast_ref::<Spot>() {
             Some(Spot::Pane) => self.pane = Some(bounds),
-            Some(Spot::Sidebar) => self.sidebar = bounds.height,
+            Some(&Spot::Entry(at)) => self.entries.push((at, bounds)),
             Some(&Spot::Sub(at)) => self.subs.push((at, bounds)),
             Some(&Spot::Row(at)) => self.rows.push((at, bounds)),
             None => {}
@@ -201,10 +227,18 @@ impl Operation<Measure> for Spy {
         subs.sort_by_key(|&(at, _)| at);
         let mut rows = self.rows.clone();
         rows.sort_by_key(|&(at, _)| at);
+        let mut entries = self.entries.clone();
+        entries.sort_by_key(|&(at, _)| at);
+        let (side, side_content) = self.side.unwrap_or_default();
         operation::Outcome::Some(Measure {
             reach: pane.y - scroll.y,
             pane: pane.height,
-            sidebar: self.sidebar,
+            sidebar: side.height,
+            sidebar_max: (side_content.height - side.height).max(0.0),
+            entries: entries
+                .iter()
+                .map(|(_, r)| (r.y - side_content.y, r.y - side_content.y + r.height))
+                .collect(),
             max: (content.height - scroll.height).max(0.0),
             subs: subs.iter().map(|(_, r)| in_content(r)).collect(),
             rows: rows

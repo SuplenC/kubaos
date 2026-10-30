@@ -140,9 +140,12 @@ pub enum Message {
     Pick(Entry),
     /// A press on a row of the page: the app sends it from its row.
     Point(RowAt),
+    /// A press on Home's result: the app sends it from its result.
+    Open(usize),
     SearchPointer(Pointer),
     FindPointer(Pointer),
     Scrolled(scrollable::Viewport),
+    SidebarScrolled(scrollable::Viewport),
     Measured(Measure),
     Resized,
     Frame(Instant),
@@ -158,6 +161,7 @@ struct Find {
     region: Region,
     offset: f32,
     row: usize,
+    pin: Option<(f32, usize)>,
     open: bool,
     /// When it last arrived or started to go.
     at: Instant,
@@ -193,6 +197,8 @@ pub struct SidebarPage {
     find: Option<Find>,
     id: Id,
     offset: f32,
+    sidebar_id: Id,
+    sidebar_offset: f32,
     measure: Option<Measure>,
     goal: Option<Goal>,
     /// When the section last changed: the page fades and rises in.
@@ -220,6 +226,8 @@ impl SidebarPage {
             find: None,
             id: Id::unique(),
             offset: 0.0,
+            sidebar_id: Id::unique(),
+            sidebar_offset: 0.0,
             measure: None,
             goal: None,
             changed: None,
@@ -326,9 +334,12 @@ impl SidebarPage {
         task
     }
 
-    /// Measures the page, once it has been laid out: the app calls it as the window opens.
+    /// Measures the page and the sidebar once they are laid out. The template measures again as a
+    /// section opens and as the window resizes; the app calls it as the window opens, and after
+    /// anything on a page changes its height (a row that opens, a note that appears), so the
+    /// scroll-spy and the keys work on where the rows are.
     pub fn measure(&self) -> Task<Message> {
-        iced::advanced::widget::operate(spy::measure(self.id.clone())).map(Message::Measured)
+        iced::advanced::widget::operate(spy::measure(self.id.clone(), self.sidebar_id.clone())).map(Message::Measured)
     }
 
     /// The keys, the window's size and, while anything moves, its frames.
@@ -391,6 +402,11 @@ impl SidebarPage {
                     self.keyboard = false;
                     self.row = index;
                 }
+                (Task::none(), None)
+            }
+            Message::Open(result) => (Task::none(), Some(Event::Open(result))),
+            Message::SidebarScrolled(viewport) => {
+                self.sidebar_offset = viewport.absolute_offset().y;
                 (Task::none(), None)
             }
             Message::SearchPointer(pointer) => {
@@ -506,9 +522,29 @@ impl SidebarPage {
             _ => None,
         };
         match to {
-            Some(to) => self.pick(entries[to]),
+            Some(to) => {
+                let task = self.pick(entries[to]);
+                task.chain(self.reveal_entry())
+            }
             None => Task::none(),
         }
+    }
+
+    /// Scrolls the sidebar to show the row the keyboard is on.
+    fn reveal_entry(&mut self) -> Task<Message> {
+        let Some(at) = self.entries().iter().position(|&entry| entry == self.cursor) else {
+            return Task::none();
+        };
+        let padding = f32::from(view::SIDEBAR_INSET.px());
+        let Some(to) = self
+            .measure
+            .as_ref()
+            .and_then(|m| m.reveal_entry(at, self.sidebar_offset, padding))
+        else {
+            return Task::none();
+        };
+        self.sidebar_offset = to;
+        iced::widget::operation::scroll_to(self.sidebar_id.clone(), AbsoluteOffset { x: None, y: Some(to) })
     }
 
     fn page_key(&mut self, key: &Key) -> (Task<Message>, Option<Event>) {
@@ -712,6 +748,7 @@ impl SidebarPage {
                     region: self.region,
                     offset: self.offset,
                     row: self.row,
+                    pin: self.pin,
                     open: true,
                     at: Instant::now(),
                 });
@@ -728,14 +765,17 @@ impl SidebarPage {
         };
         find.open = false;
         find.at = Instant::now();
-        let (region, offset, row) = (find.region, find.offset, find.row);
+        let (region, offset, row, pin) = (find.region, find.offset, find.row, find.pin);
         self.region = if region == Region::Find {
             Region::Sidebar
         } else {
             region
         };
         self.row = row;
-        self.scroll_free(offset)
+        match pin {
+            Some((at, sub)) if (at - offset).abs() <= 1.0 => self.scroll_pinned(offset, sub),
+            _ => self.scroll_free(offset),
+        }
     }
 
     /// Home, its field holding `query`, the find box gone.
@@ -801,9 +841,18 @@ impl SidebarPage {
             self.goal = Some(Goal::Row(index));
             return Task::none();
         };
-        match measure.reveal(index, self.offset) {
+        match measure.reveal(index, self.offset, self.covered()) {
             Some(offset) => self.scroll_free(offset),
             None => Task::none(),
+        }
+    }
+
+    /// How much of the pane's top the find box covers while it is open.
+    fn covered(&self) -> f32 {
+        if self.find.as_ref().is_some_and(|find| find.open) {
+            view::find_reach()
+        } else {
+            0.0
         }
     }
 
@@ -844,7 +893,8 @@ impl SidebarPage {
     fn measured(&mut self, measure: Measure) -> Task<Message> {
         self.offset = self.offset.clamp(0.0, measure.max);
         self.measure = Some(measure);
-        match self.goal.take() {
+        let entry = self.reveal_entry();
+        let page = match self.goal.take() {
             Some(Goal::Sub(sub)) => {
                 let offset = self
                     .measure
@@ -858,7 +908,8 @@ impl SidebarPage {
                 self.spy();
                 Task::none()
             }
-        }
+        };
+        entry.chain(page)
     }
 
     /// The current sub-section from where the page is scrolled to, and the sidebar's cursor with
