@@ -1,0 +1,365 @@
+/* The site around the mocks (the toolbar, the navigation) at scale 1, and the page's parts, drawn
+   at the page's scale like the mocks they hold. Every value is a token. */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+/* Every glyph at its outline's own advance, unhinted, so the words wrap the same whatever the
+   machine's font settings are, and a mock below them lands where its frame says. */
+html,
+body {
+  text-rendering: geometricPrecision;
+  background: var(--color-surface);
+  color: var(--color-on_surface);
+  font-family: var(--type-body-family);
+  font-size: var(--type-body-size);
+  line-height: var(--type-body-line);
+}
+
+/* The site's own controls: the toolbar's choices and the motion players' buttons. */
+.site-control {
+  all: unset;
+  font-family: var(--type-label-family);
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  line-height: var(--type-label-line);
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-small);
+  color: var(--color-on_surface_variant);
+  background: var(--color-surface_container);
+  cursor: pointer;
+}
+
+.site-control[aria-pressed="true"] {
+  color: var(--color-on_secondary_container);
+  background: var(--color-secondary_container);
+}
+
+.site-control:disabled {
+  cursor: default;
+  color: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.site-control:focus-visible {
+  outline: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--color-primary);
+}
+
+.site-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s8) var(--space-s24);
+  padding: var(--space-s12) var(--space-s16);
+  background: var(--color-surface_container_low);
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.site-note {
+  flex-basis: 100%;
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+  color: var(--color-warning);
+}
+
+.site-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s4);
+}
+
+.site-choice-name {
+  margin-right: var(--space-s4);
+  font-size: var(--type-label-size);
+  line-height: var(--type-label-line);
+  color: var(--color-on_surface_variant);
+}
+
+.site-body {
+  display: flex;
+  align-items: flex-start;
+}
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  flex: none;
+  width: var(--size-sidebar);
+  padding: var(--space-s16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+.site-nav-title {
+  font-size: var(--type-label-size);
+  font-weight: var(--type-label-weight);
+  line-height: var(--type-label-line);
+  color: var(--color-on_surface_variant);
+  padding: 0 var(--space-s8) var(--space-s4);
+}
+
+.site-nav-link,
+.site-nav-empty {
+  display: block;
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-control);
+  color: var(--color-on_surface);
+  text-decoration: none;
+}
+
+.site-nav-empty {
+  color: var(--color-on_surface_variant);
+  font-size: var(--type-small-size);
+  line-height: var(--type-small-line);
+}
+
+.site-nav-link[aria-current="page"] {
+  background: var(--color-secondary_container);
+  color: var(--color-on_secondary_container);
+}
+
+/* The page: its parts at the page's scale. Its sides take the container's padding for its width,
+   which `site/settle.ts` picks. */
+.page {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-s32) var(--page-padding, var(--container-0-padding)) var(--space-s48);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s48);
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.page-section,
+.page-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+.page-prose {
+  max-width: var(--size-column);
+  font-family: var(--t-family);
+  font-size: var(--t-size);
+  font-weight: var(--t-weight);
+  line-height: var(--t-line);
+}
+
+.page-code {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  color: var(--color-on_surface_variant);
+}
+
+/* The description: the thing itself, live, beside its words. */
+.page-description {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-s32);
+}
+
+/* The live thing at the top of its column, where it starts on a whole device pixel. */
+.page-live {
+  display: flex;
+  align-items: flex-start;
+}
+
+.page-description-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+.page-heading,
+.page-subheading,
+.page-title {
+  font: inherit;
+}
+
+.page-subheading {
+  margin-top: var(--space-s8);
+}
+
+/* A grid of samples: the names' column, then a column per state or length, as wide as their
+   widest cell, so every cell starts on a whole device pixel. */
+.page-matrix {
+  display: grid;
+  grid-template-columns: repeat(calc(var(--columns) + 1), max-content);
+  gap: var(--space-s24) var(--space-s32);
+}
+
+.page-variants {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  gap: var(--space-s24) var(--space-s32);
+}
+
+/* A cell of the page's own words is centred down its row; one holding a mock starts at its top,
+   and `site/settle.ts` centres the mock on a whole device pixel. */
+.page-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.page-cell[data-mock] {
+  justify-content: flex-start;
+}
+
+.page-variants > .page-prose {
+  align-self: center;
+}
+
+.page-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-s8) var(--space-s24);
+}
+
+.page-list dd {
+  margin: 0;
+}
+
+.page-keys {
+  display: flex;
+  align-self: start;
+  align-items: flex-start;
+  gap: var(--space-s4);
+}
+
+.page-key {
+  padding: 0 var(--space-s4);
+  border-radius: var(--radius-small);
+  background: var(--color-surface_container_high);
+}
+
+.page-players {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+.page-player {
+  display: grid;
+  grid-template-columns: var(--size-menu) minmax(0, 1fr);
+  gap: var(--space-s24);
+  align-items: start;
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+}
+
+/* A player's sample in a box of its own, which slow motion stretches every duration in. */
+.page-player-stage {
+  display: flex;
+  justify-content: flex-start;
+  padding: var(--space-s24);
+}
+
+.page-player-words {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s4);
+}
+
+.page-player-controls {
+  display: flex;
+  gap: var(--space-s8);
+  margin-top: var(--space-s8);
+}
+
+.page-na {
+  max-width: var(--size-column);
+  padding: var(--space-s12) var(--space-s16);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_low);
+}
+
+/* The measures overlay: a hairline round every probed box, coloured by what it is. */
+/* Room above for the bands' token names, two lines of them, and below for the box's size. */
+.page-measured {
+  position: relative;
+  display: flex;
+  margin: var(--space-s40) 0 var(--space-s24);
+}
+
+.page-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.page-mark {
+  position: absolute;
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+}
+
+.page-mark[data-role="component"] {
+  outline-color: var(--color-cold);
+  background: rgb(from var(--color-cold) r g b / var(--opacity-hover));
+}
+
+.page-mark[data-role="layout"] {
+  outline-color: var(--color-warning);
+}
+
+.page-mark[data-role="text"],
+.page-mark[data-role="icon"] {
+  outline-color: var(--color-on_surface);
+}
+
+/* A padding or a gap, shaded, its token's name above the box: paddings on the first line, gaps
+   on the second, so the names of neighbouring bands never run into each other. */
+.page-band {
+  position: absolute;
+  background: rgb(from var(--color-warning) r g b / var(--opacity-press));
+}
+
+.page-band-name {
+  position: absolute;
+  bottom: calc(100% + var(--space-s4));
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  color: var(--color-on_surface_variant);
+  white-space: nowrap;
+}
+
+.page-band[data-kind="padding-start"] > .page-band-name { left: 0; }
+.page-band[data-kind="padding-end"] > .page-band-name { right: 0; }
+
+.page-band[data-kind="gap"] > .page-band-name {
+  left: 0;
+  bottom: calc(100% + var(--space-s4) + var(--type-mono-line) + var(--space-s4));
+}
+
+.page-mark-size {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: var(--space-s4);
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  color: var(--color-cold);
+  white-space: nowrap;
+}
+
+.page-window {
+  margin-top: var(--space-s16);
+  border: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  border-radius: var(--radius-surface);
+  overflow: hidden;
+}

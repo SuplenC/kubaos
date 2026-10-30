@@ -223,6 +223,11 @@
       # fresh worktree reuses the crates.io dependencies another checkout
       # already built. Only the shell's cargo: crane and the flake's packages
       # build in the sandbox, without it.
+      #
+      # Node runs the mockups (design/mockups, `just mockups`): Vite and
+      # TypeScript from its package-lock.json. Their pictures and frames are
+      # drawn by the Chromium of nixpkgs' Playwright, which playwright-core of
+      # the same version (1.59.1, pinned in package.json) drives.
       devShells = forAllSystems (
         pkgs:
         let
@@ -241,8 +246,11 @@
               pkgs.nixfmt
               self.formatter.${pkgs.stdenv.hostPlatform.system}
               pkgs.sccache
+              pkgs.nodejs_24
               home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
             ];
+            PLAYWRIGHT_BROWSERS_PATH = pkgs.playwright-driver.browsers-chromium;
+            PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
             RUSTFMT = pkgs.lib.getExe' rustfmt-nightly "rustfmt";
             RUSTC_WRAPPER = pkgs.lib.getExe pkgs.sccache;
             shellHook = ''

@@ -59,3 +59,7 @@ __pycache__/
 # publishes main's to the branch chore/shots-specimen (docs/DESIGN.md,
 # "Screenshot diffs"). Kept out, so a render into the old place is never added.
 /design/specimen/
+
+# The mockup site's dependencies and its static build (`just mockups-build`).
+/design/mockups/node_modules/
+/design/mockups/dist/

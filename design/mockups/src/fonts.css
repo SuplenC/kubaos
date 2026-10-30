@@ -1,0 +1,8 @@
+/* The fonts `kubaos-ui` embeds, read from its assets, so a mockup draws the letters the builds do. */
+@font-face { font-family: "Geist"; font-weight: 300; src: url("../../../crates/kubaos-ui/assets/fonts/Geist-Light.ttf"); }
+@font-face { font-family: "Geist"; font-weight: 400; src: url("../../../crates/kubaos-ui/assets/fonts/Geist-Regular.ttf"); }
+@font-face { font-family: "Geist"; font-weight: 500; src: url("../../../crates/kubaos-ui/assets/fonts/Geist-Medium.ttf"); }
+@font-face { font-family: "Geist"; font-weight: 600; src: url("../../../crates/kubaos-ui/assets/fonts/Geist-SemiBold.ttf"); }
+@font-face { font-family: "Geist Mono"; font-weight: 400; src: url("../../../crates/kubaos-ui/assets/fonts/GeistMono-Regular.ttf"); }
+@font-face { font-family: "Geist Mono"; font-weight: 500; src: url("../../../crates/kubaos-ui/assets/fonts/GeistMono-Medium.ttf"); }
+@font-face { font-family: "M PLUS 1"; font-weight: 100 900; src: url("../../../crates/kubaos-ui/assets/fonts/MPLUS1-subset.ttf"); }

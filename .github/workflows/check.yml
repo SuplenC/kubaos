@@ -8,7 +8,7 @@
 # - fmt and lint: `just fmt-check`, `just lint`.
 # - nextest and nextest (slow): `just nextest`, split in two by `SLOW_TEST`.
 # - qml: `just qml-test`.
-# - design: `just design-check`, with QML's parity.
+# - design: `just design-check`, with QML's parity and the mockups' check.
 # - system files: `just system-files-check`'s two scripts, run straight on the
 #   runner: they need only bash and git, so the job sets up no Nix. It checks
 #   out the whole history, for the merge base with main.
