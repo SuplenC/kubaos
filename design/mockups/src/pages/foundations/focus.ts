@@ -1,6 +1,6 @@
 // The Focus foundation: the neon tube and its glow, the line inside the edge of every kind of
 // control, the lit and unlit looks, content lit in its tone, the stutter, where a glow is cut and
-// the active window's tube (`docs/DESIGN.md`, "Focus").
+// the active window's tube (`docs/DESIGN.md`, "States").
 //
 // The controls other than the button are their shapes alone, drawn for their focus line: each
 // gets its own page, and its own mock, at its level.
