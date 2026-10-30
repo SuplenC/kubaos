@@ -1936,9 +1936,7 @@ c_menu() {
     menu_step "Forget on Timer leaves a Toast" 'toast ".+"' input down:ctrl down:shift key:BackSpace up:shift up:ctrl || bad=1
   menu_step "Ctrl+Z undoes it" 'toast ""' input down:ctrl type:z up:ctrl || bad=1
   menu_typed '' key:Escape &&
-    # Kotodama's calculator answers dates too, and its answer may take the top row over the
-    # clock's; either is a date answer.
-    menu_step "a date query is answered in the top row" 'top "[0-9]+ days? · (until .* 25 December |days until christmas")' \
+    menu_step "a date query is answered in the top row" 'top "[0-9]+ days? · until .* 25 December ' \
       input --delay 50 'type:days until christmas' || bad=1
   menu_typed '' key:Escape && menu_typed s type:s &&
     menu_step "Down past the last row on screen scrolls the selection into view" 'selected row=12 shown=true' \
@@ -1984,7 +1982,7 @@ PY
   printf 'XKBMODEL="pc105"\nXKBLAYOUT="us,it"\nXKBVARIANT=","\nXKBOPTIONS=""\n' >"$kb"
   install -D -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/stdin "$layer" <<'TOML'
 [extensions.kubaos]
-hide = ["theme-next", "bluetooth"]
+hide = ["color-picker", "bluetooth"]
 
 [extensions.kubaos.actions.harness-notes]
 title = "Back up harness notes"
@@ -2117,18 +2115,46 @@ DESKTOP
     bad=1
   fi
 
-  out="$(in_session "$query 'Back up harness notes' 'Previous wallpaper' 'Control center' 'Set volume' 'Next wallpaper' Bluetooth" 2>&1)" ||
+  # A former Item's title finds its subject with that Action marked for Enter.
+  local titles=(
+    'Ring the phone=phone-link>ring' 'Send the clipboard to the phone=phone-link>clipboard'
+    'Phone link status=phone-link>status' 'Unpair the phone=phone-link>unpair'
+    'Proxy status=proxy>status' 'Open proxy settings=proxy>settings' 'Import VPN config=proxy>import'
+    'Screenshot region=screenshot>region' 'Screenshot monitor=screenshot>monitor'
+    'Screenshot window=screenshot>window' 'Record region=record>region' 'Stop recording=record>stop'
+    'Save the last 30 seconds=replay>save' 'Keep awake for 1 hour=idle>1h' 'Keep awake for 2 hours=idle>2h'
+    'Super Saver=power>super-saver' 'Power Saver=power>power-saver' 'Max Performance=power>max-performance'
+    'Undo the low-battery drop=low-battery>undo' 'Dark cursor=cursor>dark' 'Cursor size 32=cursor>size-32'
+    'Set cursor size=cursor>size' 'Charge limit: 80 %=battery>80' 'Charge limit: full=battery>full'
+    'Measure power draw=battery>measure' 'CPU scheduler: status=cpu-scheduler-lavd>status'
+    'Next wallpaper=wallpaper>next' 'Wallpaper picker=wallpaper>pick' 'Show every wallpaper set=wallpaper>all-sets'
+    'Animate wallpaper on AC=wallpaper>ac' 'Never animate wallpaper=wallpaper>never'
+  )
+  local queries=() title
+  for title in "${titles[@]}"; do queries+=("'${title%%=*}'"); done
+  out="$(in_session "$query --primary ${queries[*]}" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
+  local missed=0 chosen line
+  for title in "${titles[@]}"; do
+    chosen="${title#*=}"
+    line="$(awk -F '\t' -v typed="${title%%=*}" '$1 == typed' <<<"$out")"
+    grep -qE -- "kubaos/${chosen%%>*}>kubaos/${chosen#*>}( |\$)" <<<"$line" ||
+      { echo "FAIL typing '${title%%=*}' doesn't find kubaos/${chosen%%>*} with ${chosen#*>} chosen: $line"; missed=1; }
+  done
+  ((missed)) && bad=1
+  ((missed)) || echo "ok   ${#titles[@]} former Items' titles find their subject with that Action chosen"
+
+  out="$(in_session "$query 'Back up harness notes' 'Previous wallpaper' 'Control center' 'Set volume' 'Color picker' Bluetooth" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
   printf '%s\n' "$out" | sed 's/^/     found: /'
   local want
-  for want in 'Back up harness notes:harness-notes' 'Previous wallpaper:theme-previous' \
+  for want in 'Back up harness notes:harness-notes' 'Previous wallpaper:wallpaper' \
     'Control center:control-center' 'Set volume:volume'; do
     grep -qE -- "^${want%%:*}[[:blank:]](.* )?kubaos/${want#*:}( |$)" <<<"$out" ||
       { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
   done
   ((bad)) || echo "ok   KubaOS's actions, the toggles and the user layer's action are found"
-  if grep -qE 'kubaos/(theme-next|bluetooth)( |$)' <<<"$out"; then
-    echo "FAIL the user layer hides theme-next and bluetooth, and the menu shows them"
+  if grep -qE 'kubaos/(color-picker|bluetooth)( |$)' <<<"$out"; then
+    echo "FAIL the user layer hides color-picker and bluetooth, and the menu shows them"
     bad=1
   else
     echo "ok   the actions the user layer hides aren't found"
@@ -2261,12 +2287,13 @@ DESKTOP
       { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
   done
   ((bad)) || echo "ok   Open calendar, Add countdown, Add time zone and Calendar settings are found"
-  # Kotodama's calculator answers dates too, and may rank its answer first: the clock's is listed.
-  out="$(in_session "$query 'days until christmas'" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
-  if [[ " $(cut -f2 <<<"$out") " == *" kubaos/days until christmas "* ]]; then
-    echo "ok   'days until christmas' has the clock's answer: $(cut -f2 <<<"$out")"
+  # Kotodama's calculator answers dates too; the clock's answer, which knows the countdowns, ranks
+  # above it.
+  out="$(in_session "$query --top 'days until christmas'" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
+  if [[ $out == "days until christmas"$'\t'"kubaos/days until christmas"$'\t'[0-9]*" day"*$'\t'"until "*" 25 December "* ]]; then
+    echo "ok   'days until christmas' is answered on top: $(cut -f3 <<<"$out"), $(cut -f4 <<<"$out")"
   else
-    echo "FAIL 'days until christmas' has no KubaOS answer: $out"
+    echo "FAIL 'days until christmas' has no KubaOS answer on top: $out"
     bad=1
   fi
 
