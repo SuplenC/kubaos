@@ -5,15 +5,15 @@
 // button's kinds, colours and states (`lib/button.ts`), and the icon of the label button of its
 // size.
 
-import { lightKind, METRICS, paintKind, type Kind, type Size } from "./button.ts";
+import { KINDS, lightKind, METRICS, paintKind, type Kind, type Size } from "./button.ts";
 import { pin, type Pinned } from "./control.ts";
 import { withHint } from "./hint.ts";
 import { icon } from "./icon.ts";
 import { probe, variant } from "./probe.ts";
 
-/** The kinds an icon button comes in, each a button's kind with its colours and states. */
-export const ICON_KINDS = ["Filled", "Tonal", "Text", "Danger"] as const satisfies readonly Kind[];
-export type IconKind = (typeof ICON_KINDS)[number];
+/** The kinds an icon button comes in: every button kind, with its colours and states. */
+export const ICON_KINDS = KINDS;
+export type IconKind = Kind;
 
 export interface IconButtonOptions {
   readonly icon: string;
