@@ -2,7 +2,7 @@
 // the keyframes the player animates, and as the JSON a library reads to build the same move. Both
 // come from the page's `Move`, so what plays and what is written down are one thing.
 
-import { length, number, raw } from "../lib/tokens.ts";
+import { cubic, length, number, raw } from "../lib/tokens.ts";
 import type { Duration, Easing, Move, NonEmpty, Track, Value } from "./page.ts";
 import { settings } from "./settings.ts";
 
@@ -23,8 +23,7 @@ export function milliseconds(duration: Duration): number {
 
 /** A curve token's four numbers. */
 export function bezier(easing: Easing): number[] {
-  const inside = raw(`easing-${easing}`).replace(/^cubic-bezier\((.*)\)$/, "$1");
-  return inside.split(",").map((n) => Number.parseFloat(n));
+  return cubic(`easing-${easing}`);
 }
 
 /**

@@ -3,6 +3,7 @@
 
 const lengths = new Map<string, number>();
 const numbers = new Map<string, number>();
+const curves = new Map<string, number[]>();
 
 /** The token `--name`'s length in logical pixels. */
 export function length(name: string): number {
@@ -22,6 +23,19 @@ export function length(name: string): number {
 export function forgetLengths(): void {
   lengths.clear();
   numbers.clear();
+  curves.clear();
+}
+
+/** The token `--name`'s cubic Bézier, its four numbers, read once: a ball is eased along it each
+ *  frame. */
+export function cubic(name: string): number[] {
+  const known = curves.get(name);
+  if (known !== undefined) return known;
+  const inside = raw(name).replace(/^cubic-bezier\((.*)\)$/, "$1");
+  const value = inside.split(",").map((n) => Number.parseFloat(n));
+  if (value.length !== 4 || value.some(Number.isNaN)) throw new Error(`--${name} is no cubic-bezier()`);
+  curves.set(name, value);
+  return value;
 }
 
 /** The token `--name`'s number, as written: an opacity, a step of the strike. */

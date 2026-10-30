@@ -1,7 +1,8 @@
 // The motion player: each move live on its sample, looping (its first state held, the move, its
 // last state held, then back), with pause, restart and slow motion, a plot of its tracks' curves
-// over the loop to seek it on frame by frame, and its recipe beside it: every part, property, value, timing, curve and keyframe, what
-// reduced motion and the speed make of it, as tables and as JSON. The sample is animated with the
+// over the loop to seek it on frame by frame, each part alone, and its recipe beside it: every
+// part, property, value, timing, curve and keyframe, what reduced motion and the speed make of it,
+// as tables and as JSON. The sample is animated with the
 // Web Animations API from the move's own data (`site/recipe.ts`), so a frame seeked to is exactly
 // the frame that plays, and the recipe shown is what plays.
 
@@ -28,7 +29,6 @@ import {
   tokenOf,
   tracksOf,
 } from "../recipe.ts";
-import { redrawRings } from "../../lib/focus.ts";
 import { CHROME, onChange } from "../settings.ts";
 import { legend, type Mark, Plot, swatch } from "./plot.ts";
 import { partOr, subheading } from "./section.ts";
@@ -297,15 +297,22 @@ function player(move: Move): HTMLElement {
   /** The frame `t` is in. */
   const frameOf = (t: number) => Math.min(Math.floor(t / FRAME + 1e-6), lastFrame());
 
-  function show(t: number): void {
+  /** Shows `t` on the plot, the readout and the recipe; held, on the slider's value too. */
+  function show(t: number, held: boolean): void {
     const at = frameOf(t);
     plot.at(t);
     readout.textContent = `${Math.round(t)} ms · frame ${at + 1} of ${lastFrame() + 1} · a frame is ${shown(FRAME)} ms (60 Hz)`;
+    for (const { row, lit } of [...lits, ...loopLits]) row.toggleAttribute("data-now", lit(t, playing));
+    // A value changing every frame is noise to a screen reader: it is told where a held loop is.
+    if (!held) {
+      bar.removeAttribute("aria-valuenow");
+      bar.setAttribute("aria-valuetext", "playing");
+      return;
+    }
     bar.setAttribute("aria-valuemin", "0");
     bar.setAttribute("aria-valuemax", String(Math.round(playing.total)));
     bar.setAttribute("aria-valuenow", String(Math.round(t)));
     bar.setAttribute("aria-valuetext", `${Math.round(t)} ms, frame ${at + 1}`);
-    for (const { row, lit } of [...lits, ...loopLits]) row.toggleAttribute("data-now", lit(t, playing));
   }
 
   /** Holds every animation at `t`. */
@@ -315,7 +322,7 @@ function player(move: Move): HTMLElement {
       animation.pause();
       animation.currentTime = t;
     }
-    show(t);
+    show(t, true);
   }
 
   /** Plays every animation on from `t`, in step, on the document's clock. */
@@ -329,7 +336,7 @@ function player(move: Move): HTMLElement {
     cancelAnimationFrame(frame);
     const tick = () => {
       if (!stage.isConnected) return;
-      show(current());
+      show(current(), false);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -387,12 +394,15 @@ function player(move: Move): HTMLElement {
         }
         added.push(...animate(alone, timed));
         const box = el("div", "page-part-stage mock", alone);
+        // A picture of the part, not more controls: no focus, no hover, nothing read out twice.
+        box.inert = true;
+        box.setAttribute("aria-hidden", "true");
         const part = el("div", "page-part-alone", el("span", "page-plot-key", swatch(i), label(`${timed.track.part} (${timed.track.on})`, "small", "on_surface")), box);
         pickable(part, i);
         return part;
       }),
     );
-    redrawRings();
+    // Their rings' glows are drawn by the page's settle, which follows every build.
     return added;
   }
 
@@ -405,11 +415,10 @@ function player(move: Move): HTMLElement {
     animations.push(...drawParts());
     loopLits = [];
     loopPart.replaceChildren(loopTable(playing, loopLits));
-    key.replaceChildren(legend(playing.timed.map((timed) => timed.track)));
+    key.replaceChildren(legend(playing));
     for (const [i, item] of [...key.querySelectorAll(".page-plot-key")].entries()) pickable(item, i);
     const at = Math.min(t, playing.total - 1e-3);
     plot.draw(playing, marks(playing), at);
-    for (const [i, curve] of plot.hits().entries()) pickable(curve, i);
     go(at);
   }
 
@@ -449,21 +458,29 @@ function player(move: Move): HTMLElement {
 
   const seekTo = (event: PointerEvent) => pause(plot.timeAt(event.clientX));
   bar.addEventListener("pointerdown", (event) => {
-    bar.setPointerCapture(event.pointerId);
-    // A mark pressed is its exact moment, wherever on its target the pointer is.
+    if (!event.isPrimary || event.button !== 0) return;
+    // A mark pressed is its exact moment, wherever on its target the pointer is, and stays it: a
+    // press on a mark isn't a drag.
     const mark = event.target instanceof Element ? event.target.closest(".page-plot-mark") : null;
     const at = mark?.getAttribute("data-at");
-    if (at) pause(Number(at));
-    else seekTo(event);
+    if (at) {
+      pause(Number(at));
+      return;
+    }
+    bar.setPointerCapture(event.pointerId);
+    seekTo(event);
   });
   bar.addEventListener("pointermove", (event) => {
     if (bar.hasPointerCapture(event.pointerId)) seekTo(event);
   });
   bar.addEventListener("keydown", (event) => {
     const by = event.shiftKey ? BIG_STEP : 1;
-    const at = frameOf(current());
+    const t0 = current();
+    const at = frameOf(t0);
+    // Between two frames' starts, ← goes back to the start of the frame it is in first.
+    const back = Math.abs(t0 - at * FRAME) > 1e-6 ? by - 1 : by;
     const to: Record<string, number> = {
-      ArrowLeft: Math.max(0, at - by) * FRAME,
+      ArrowLeft: Math.max(0, at - back) * FRAME,
       ArrowRight: Math.min(lastFrame(), at + by) * FRAME,
       Home: 0,
       End: lastFrame() * FRAME,
@@ -479,6 +496,12 @@ function player(move: Move): HTMLElement {
     else if (changed.has("scale")) plot.draw(playing, marks(playing), current());
   });
   for (const { row, set, index } of picks) pickable(row, index, set);
+  // The curves are drawn again with the plot, so the plot listens for them.
+  plot.element.addEventListener("pointerover", (event) => {
+    const curve = event.target instanceof Element ? event.target.closest(".page-plot-curve-hit") : null;
+    pick(curve ? Number(curve.getAttribute("data-pick")) : null);
+  });
+  plot.element.addEventListener("pointerleave", () => pick(null));
   build(0);
 
   whole.append(
