@@ -584,6 +584,33 @@ install_inotify_limits() {
   fi
 }
 
+# install_arp_per_interface: each interface answers ARP only for its own
+# addresses (system/files/sysctl.d/60-kubaos-arp.conf), so a cable and Wi-Fi on
+# one network don't take each other's address as a conflict. Applied at once on
+# a booted machine, as install_inotify_limits is. 20-base.sh runs it, and a
+# migration on machines installed before it.
+install_arp_per_interface() {
+  install_root_file "$FILES_DIR/sysctl.d/60-kubaos-arp.conf" /etc/sysctl.d/60-kubaos-arp.conf 0644
+  if ((!IMAGE_BUILD)) && has_systemd && ! in_container; then
+    sudo_run sysctl -q -p /etc/sysctl.d/60-kubaos-arp.conf
+  fi
+}
+
+# install_connectivity_check: NetworkManager's internet check
+# (system/files/NetworkManager/conf.d/50-kubaos-connectivity.conf), which moves
+# traffic off a link that is up with no internet behind it. A running
+# NetworkManager rereads its configuration files without touching a connection.
+# 20-base.sh runs it, and a migration on machines installed before it.
+install_connectivity_check() {
+  local dest=/etc/NetworkManager/conf.d/50-kubaos-connectivity.conf changed=0
+  same_content "$FILES_DIR/NetworkManager/conf.d/50-kubaos-connectivity.conf" "$dest" || changed=1
+  install_root_file "$FILES_DIR/NetworkManager/conf.d/50-kubaos-connectivity.conf" "$dest" 0644
+  if ((changed && !IMAGE_BUILD)) && has_systemd && ! in_container &&
+    systemctl is-active -q NetworkManager.service; then
+    sudo_run nmcli general reload conf
+  fi
+}
+
 # file_locked FILE: whether a process holds a lock on FILE, from the kernel's lock table. It is
 # read-only and sees flock and fcntl locks alike; unattended-upgrade takes an fcntl one, which
 # `flock -n` on the file would not notice.
