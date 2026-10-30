@@ -100,6 +100,8 @@ export interface Tube {
   readonly tone: Tone;
   /** Filled with its tone's colour: the fill is the tube, and the tone's core rides outside it. */
   readonly filled: boolean;
+  /** Its content is drawn in its tone, so lit, the content is a tube too: core-hot, with the glow. */
+  readonly content: boolean;
 }
 
 /**
