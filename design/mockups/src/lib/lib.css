@@ -282,6 +282,10 @@
   margin-left: max(0px, round(down, calc((var(--bubble) - var(--side)) / 2), 1px));
 }
 
+.k-hint-room[data-held="end"] > * {
+  margin-left: max(0px, calc(var(--bubble) - var(--side)));
+}
+
 /* A control in the state model (`docs/DESIGN.md`, "States"): a button, an icon button, a switch,
    a checkbox, a radio, a pressable chip. Its states are numbers: `--lit`, hovered or focused, and
    `--press`. Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while
