@@ -158,19 +158,21 @@ fn a_drawing_without_exactly_one_stroke_and_a_colour_is_refused() {
 fn a_core_is_bound_to_its_tone_not_fixed() {
     let singleton = render(&QmlTokens);
 
-    assert!(singleton.contains(
-        "readonly property color primary_core: tokens.towardWhite(tokens.color.primary, 0.5)"
-    ));
+    assert!(singleton.contains("readonly property color primary_core: tokens.towardWhite(tokens.color.primary, 0.5)"));
     assert!(singleton.contains("function towardWhite(c: color, t: real): color {"));
-    assert!(!singleton.contains("primary_core: \"#"), "no palette holds a fixed core");
+    assert!(
+        !singleton.contains("primary_core: \"#"),
+        "no palette holds a fixed core"
+    );
 }
 
 #[test]
-fn an_unlit_core_is_bound_to_its_tone_toward_black() {
+fn a_state_model_recipe_is_not_built_into_the_singleton_yet() {
     let singleton = render(&QmlTokens);
 
-    assert!(singleton.contains(
-        "readonly property color primary_unlit: tokens.towardBlack(tokens.color.primary, 0.35)"
-    ));
+    assert!(
+        !singleton.contains("primary_unlit"),
+        "an OKLCH recipe is neither a formula nor a fixed value"
+    );
     assert!(singleton.contains("function towardBlack(c: color, t: real): color {"));
 }

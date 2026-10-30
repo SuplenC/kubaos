@@ -31,6 +31,7 @@ pub mod cursor;
 pub mod hypr;
 pub mod model;
 pub mod neon;
+pub mod oklch;
 pub mod qml;
 pub mod rules;
 pub mod rust;

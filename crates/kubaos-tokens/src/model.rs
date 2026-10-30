@@ -15,6 +15,10 @@ use std::fmt;
 use serde::Deserialize;
 use serde::de;
 
+use crate::contrast::Mode;
+use crate::oklch::Oklch;
+use crate::oklch::fit_text;
+
 /// Every token in `design/tokens.toml`.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -92,6 +96,13 @@ pub struct Focus {
     pub content_near: u16,
     /// Content drawn in its tone, lit: its near glow's opacity at the content.
     pub content_glow: f32,
+    /// A lit label on a fill (a Filled button's, at night): its glow's reach outside the letters,
+    /// in logical pixels.
+    pub label_near: u16,
+    /// A lit label on a fill: its glow's opacity at the letters.
+    pub label_glow: f32,
+    /// How much brighter a pressed control's glow is than a lit one's, as a multiple.
+    pub pressed_glow: f32,
     /// The band a picture keeps round itself inside its own box where its neighbours leave no
     /// more room, in logical pixels.
     pub offset: u16,
@@ -361,19 +372,50 @@ pub struct Colors {
     pub derived: BTreeMap<String, Derived>,
 }
 
-/// A role computed from another: `mix` taken `white` of the way to white, or `black` of the way to
-/// black, each channel rounded half up. `rules` refuses one with both or neither.
+/// A role computed from others, whichever palette is drawn, so it follows the wallpaper. A recipe
+/// starts from a role (`mix` moved toward white or black in sRGB, or `from` as it is), may move its
+/// OKLCH lightness and chroma (fitted back into sRGB at the same hue and lightness), and may then
+/// fit its lightness until it holds text contrast on every role in `text_on`. A role with a recipe
+/// for each mode gives it in `dark` and `light` and nothing else. `rules` refuses anything else.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Derived {
-    /// The role it is computed from, one of `source`.
-    pub mix: String,
+    /// The role it is mixed from, in sRGB, toward white or black.
+    #[serde(default)]
+    pub mix: Option<String>,
     /// How far toward white, 0 to 1.
     #[serde(default)]
     pub white: Option<f32>,
     /// How far toward black, 0 to 1.
     #[serde(default)]
     pub black: Option<f32>,
+    /// The role it starts from as it is.
+    #[serde(default)]
+    pub from: Option<String>,
+    /// Its OKLCH lightness times this.
+    #[serde(default)]
+    pub lightness: Option<f32>,
+    /// Its OKLCH lightness set to this.
+    #[serde(default)]
+    pub at_lightness: Option<f32>,
+    /// Its OKLCH lightness raised by this.
+    #[serde(default)]
+    pub lighter: Option<f32>,
+    /// Its OKLCH lightness lowered by this.
+    #[serde(default)]
+    pub darker: Option<f32>,
+    /// Its OKLCH chroma times this, as far as sRGB holds it.
+    #[serde(default)]
+    pub chroma: Option<f32>,
+    /// The backgrounds it is text on: its lightness moves until it holds 4.5:1 on each.
+    #[serde(default)]
+    pub text_on: Option<Vec<String>>,
+    /// Its recipe in dark mode, for a role computed differently in each mode.
+    #[serde(default)]
+    pub dark: Option<Box<Derived>>,
+    /// Its recipe in light mode.
+    #[serde(default)]
+    pub light: Option<Box<Derived>>,
 }
 
 /// Which way a derived role moves from its tone.
@@ -395,36 +437,142 @@ impl Toward {
 }
 
 impl Derived {
-    /// Which way it moves and how far, or `None` for one that names both or neither.
+    /// Which way it moves and how far, for a role that is only its tone mixed toward white or
+    /// black, the same in both modes: one every toolkit computes as a formula of the live tone.
+    /// `None` for every other recipe.
     #[must_use]
     pub fn toward(&self) -> Option<(Toward, f32)> {
+        if !self.is_mix() {
+            return None;
+        }
+        self.way()
+    }
+
+    /// Which way its `mix` moves and how far, or `None` for one that names both or neither.
+    #[must_use]
+    pub fn way(&self) -> Option<(Toward, f32)> {
         match (self.white, self.black) {
             (Some(t), None) => Some((Toward::White, t)),
             (None, Some(t)) => Some((Toward::Black, t)),
             _ => None,
         }
     }
-}
 
-impl Colors {
-    /// `palette` with the derived roles computed from its own values. A derived role whose tone the
-    /// palette lacks is left out; `rules` refuses one.
-    pub fn with_derived(&self, palette: &BTreeMap<String, Rgb>) -> BTreeMap<String, Rgb> {
-        let mut out = palette.clone();
-        for (role, derived) in &self.derived {
-            if let (Some(&tone), Some((toward, t))) = (palette.get(&derived.mix), derived.toward()) {
-                let rgb = match toward {
-                    Toward::White => tone.toward_white(t),
-                    Toward::Black => tone.toward_black(t),
-                };
-                out.insert(role.clone(), rgb);
+    /// Whether it is only `mix` toward white or black, in one recipe for both modes.
+    #[must_use]
+    pub fn is_mix(&self) -> bool {
+        self.mix.is_some() && !self.moves_oklch() && self.from.is_none() && self.text_on.is_none() && !self.by_mode()
+    }
+
+    /// The role its `mix` names, or nothing.
+    #[must_use]
+    pub fn tone(&self) -> &str {
+        self.mix.as_deref().unwrap_or_default()
+    }
+
+    /// Whether it gives a recipe for each mode.
+    #[must_use]
+    pub fn by_mode(&self) -> bool {
+        self.dark.is_some() || self.light.is_some()
+    }
+
+    /// Whether it moves the colour's OKLCH lightness or chroma.
+    #[must_use]
+    pub fn moves_oklch(&self) -> bool {
+        self.lightness.is_some()
+            || self.at_lightness.is_some()
+            || self.lighter.is_some()
+            || self.darker.is_some()
+            || self.chroma.is_some()
+    }
+
+    /// Its recipe in `mode`.
+    #[must_use]
+    pub fn in_mode(&self, mode: Mode) -> &Derived {
+        let own = match mode {
+            Mode::Dark => self.dark.as_deref(),
+            Mode::Light => self.light.as_deref(),
+        };
+        own.unwrap_or(self)
+    }
+
+    /// Every role its recipe in `mode` reads.
+    pub fn reads(&self, mode: Mode) -> impl Iterator<Item = &String> {
+        let recipe = self.in_mode(mode);
+        recipe
+            .mix
+            .iter()
+            .chain(recipe.from.iter())
+            .chain(recipe.text_on.iter().flatten())
+    }
+
+    /// Its colour in `mode` from the roles it reads, as `role` gives them, or `None` when one is
+    /// missing.
+    fn compute(&self, mode: Mode, role: &mut dyn FnMut(&str) -> Option<Rgb>) -> Option<Rgb> {
+        let recipe = self.in_mode(mode);
+        let mut colour = match (&recipe.mix, &recipe.from, recipe.way()) {
+            (Some(mix), None, Some((Toward::White, t))) => role(mix)?.toward_white(t),
+            (Some(mix), None, Some((Toward::Black, t))) => role(mix)?.toward_black(t),
+            (None, Some(from), None) => role(from)?,
+            _ => return None,
+        };
+        if recipe.moves_oklch() {
+            let mut lch = Oklch::of(colour);
+            if let Some(at) = recipe.at_lightness {
+                lch.l = f64::from(at);
             }
+            lch.l *= f64::from(recipe.lightness.unwrap_or(1.0));
+            lch.l += f64::from(recipe.lighter.unwrap_or(0.0)) - f64::from(recipe.darker.unwrap_or(0.0));
+            lch.c *= f64::from(recipe.chroma.unwrap_or(1.0));
+            colour = lch.to_rgb();
         }
-        out
+        if let Some(on) = &recipe.text_on {
+            let backgrounds = on.iter().map(|name| role(name)).collect::<Option<Vec<_>>>()?;
+            colour = fit_text(colour, &backgrounds, Need::Text.minimum());
+        }
+        Some(colour)
     }
 }
 
-/// An opaque colour, written `#rrggbb`.
+impl Colors {
+    /// `palette`, the colours of `mode`, with the derived roles computed from its own values. A
+    /// derived role whose roles the palette lacks, or that reads itself, is left out; `rules`
+    /// refuses either.
+    #[must_use]
+    pub fn with_derived(&self, palette: &BTreeMap<String, Rgb>, mode: Mode) -> BTreeMap<String, Rgb> {
+        let mut out = palette.clone();
+        let mut reading = Vec::new();
+        for role in self.derived.keys() {
+            self.resolve(role, mode, &mut out, &mut reading);
+        }
+        out
+    }
+
+    fn resolve(
+        &self,
+        name: &str,
+        mode: Mode,
+        out: &mut BTreeMap<String, Rgb>,
+        reading: &mut Vec<String>,
+    ) -> Option<Rgb> {
+        if let Some(&known) = out.get(name) {
+            return Some(known);
+        }
+        let derived = self.derived.get(name)?;
+        if reading.iter().any(|each| each == name) {
+            return None;
+        }
+        reading.push(name.to_owned());
+        let colour = derived.compute(mode, &mut |role| self.resolve(role, mode, out, reading));
+        reading.pop();
+        if let Some(colour) = colour {
+            out.insert(name.to_owned(), colour);
+        }
+        colour
+    }
+}
+
+/// An opaque colour, written `#rrggbb`, or `oklch(L C H)` for a fixed tone decided in OKLCH.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Rgb {
     pub r: u8,
@@ -448,6 +596,21 @@ impl Rgb {
     }
 }
 
+impl Rgb {
+    /// Reads `oklch(L C H)`, fitted into sRGB at its hue and lightness, or `None` for anything
+    /// else.
+    pub fn parse_oklch(written: &str) -> Option<Rgb> {
+        let inside = written.strip_prefix("oklch(")?.strip_suffix(')')?;
+        let numbers: Vec<f64> = inside
+            .split_whitespace()
+            .map(str::parse)
+            .collect::<Result<_, _>>()
+            .ok()?;
+        let [l, c, h] = numbers.as_slice() else { return None };
+        Some(Oklch { l: *l, c: *c, h: *h }.to_rgb())
+    }
+}
+
 impl fmt::Debug for Rgb {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "#{:02x}{:02x}{:02x}", self.r, self.g, self.b)
@@ -456,8 +619,10 @@ impl fmt::Debug for Rgb {
 
 impl<'de> Deserialize<'de> for Rgb {
     fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        let hex = String::deserialize(deserializer)?;
-        Rgb::parse(&hex).ok_or_else(|| de::Error::custom(format!("`{hex}` isn't a colour written #rrggbb")))
+        let written = String::deserialize(deserializer)?;
+        Rgb::parse(&written)
+            .or_else(|| Rgb::parse_oklch(&written))
+            .ok_or_else(|| de::Error::custom(format!("`{written}` isn't a colour written #rrggbb or oklch(L C H)")))
     }
 }
 

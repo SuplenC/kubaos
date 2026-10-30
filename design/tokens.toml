@@ -58,15 +58,15 @@ thin = 2
 # symbol is never drawn with a fractional stroke.
 symbol = 2
 
-# The neon focus, one rule for every component: one line inside the focused
-# control's edge, at its corner, and the glow outside it in the control's tone.
-# On a control not filled with its tone the line is the tube, `tube` wide, over
-# the control's outline; on one filled with its tone (a Filled or Danger
-# button) the fill is the tube and the line inside the fill's edge is its core,
-# `stroke.thin` wide. Nothing but the glow reaches past the box, so a focused
-# control's shape never grows, and nothing takes layout space, so focus moving
-# never moves anything. Lit at night; off in daylight, where the line is unlit
-# glass and there is no glow (`[color.derived]`).
+# The neon of a lit control (hovered or focused, one state), one rule for every
+# component: one line inside the control's edge, at its corner, and the glow
+# outside it in the control's tone. On a control not filled with its tone the
+# line is the tube, `tube` wide, over the control's outline; on a filled one
+# (Filled, Danger, Success, Warning) the line inside the fill's edge is the
+# tone's core, `stroke.thin` wide. Nothing but the glow reaches past the box, so
+# a lit control's shape never grows, and nothing takes layout space, so focus
+# moving never moves anything. At night the line burns and the glow shows; in
+# daylight nothing glows, and the line is the dark one of `[color.derived]`.
 [focus]
 # The tube's width in logical pixels, drawn rounded half up to whole device
 # pixels: 2, 2, 2, 3 device pixels at 1, 1.25, 1.5, 2.
@@ -82,6 +82,12 @@ far_opacity = 0.14
 # reach, in logical pixels, the same at every size. No far glow.
 content_near = 3
 content_glow = 0.4
+# A lit label on a fill (a Filled button's, at night): a tiny glow round its
+# letters, fading from its opacity to nothing at its reach, in logical pixels.
+label_near = 2
+label_glow = 0.3
+# A pressed control's glow, at night: the lit glow this many times brighter.
+pressed_glow = 1.25
 # The band a picture keeps round itself inside its own box where its
 # neighbours leave no more room: a wallpaper thumbnail inside its grid cell,
 # the boot prompt's field drawn as one picture with its ring. A focused one's
@@ -89,9 +95,9 @@ content_glow = 0.4
 # its own reaches past its box as far as the glow (`far`), or up to the part
 # of the page beside it, so it never cuts a resting control's glow.
 offset = 4
-# In daylight the neon is off: a tube on a control not filled with its tone is
-# unlit glass, its tone's unlit core (`primary_unlit`) at this opacity over the
-# control's own container, so one line at `tube` blends into what it edges.
+# Unlit glass: a tone's unlit core (`primary_unlit`) at this opacity over a
+# control's own container. The Focus foundation page draws a field's unlit
+# tube with it; a control's states don't use it.
 glass = 0.55
 
 # The spacing scale: gaps, paddings and insets.
@@ -537,6 +543,8 @@ press = 0.14
 # state layer's press is too faint on a fill already the accent; under the
 # pointer the fill takes `press`.
 held = 0.40
+# A Text button pressed in daylight: its tone as a faint fill under it.
+press_tint = 0.10
 # A disabled control's content, and its container.
 disabled_content = 0.38
 disabled_container = 0.10
@@ -754,6 +762,13 @@ microphone = ""
 camera = ""
 # Done and installed: the camera's green, one value for both.
 success = ""
+# The burning kinds' fixed tones: a Danger, Success or Warning button's fill,
+# always lit, so it can't be taken for any wallpaper's accent, even one of the
+# same hue (`docs/DESIGN.md`, "States"). Decided in OKLCH and fitted into sRGB
+# at their hue and lightness.
+burn_danger = ""
+burn_success = ""
+burn_warning = ""
 
 [color.dark]
 primary = "#ffb779"
@@ -801,6 +816,11 @@ logo_core_cold = "#dcf1ff"
 microphone = "#ff9f45"
 camera = "#5fd27a"
 success = "#5fd27a"
+# Bright neon at night. Success's chroma is a step under the 0.21 that read
+# too loud.
+burn_danger = "oklch(0.66 0.25 27)"
+burn_success = "oklch(0.74 0.18 150)"
+burn_warning = "oklch(0.85 0.17 88)"
 
 [color.light]
 primary = "#8b4c00"
@@ -851,31 +871,95 @@ logo_core_cold = "#dcf1ff"
 microphone = "#a04a00"
 camera = "#1b7131"
 success = "#1b7131"
+# By day: deeper, so a fill reads on the light surfaces with nothing glowing.
+burn_danger = "oklch(0.56 0.21 27)"
+burn_success = "oklch(0.62 0.16 150)"
+burn_warning = "oklch(0.84 0.16 85)"
 
-# The roles computed from a tone, whichever palette is drawn: a tone `mix`
-# taken `white` of the way to white, or `black` of the way to black, each
-# channel rounded half up. None is a fixed value: every output computes it from
-# its tone's value there, the live tone where the wallpaper sets one, so it
-# follows the theme.
+# The roles computed from a tone, whichever palette is drawn. None is a fixed
+# value: each is a recipe over the live tone, the wallpaper's where it sets one,
+# so it follows the theme. A recipe starts from a role, either `mix`, taken
+# `white` of the way to white or `black` of the way to black in sRGB (each
+# channel rounded half up), or `from`, as it is. It may then move the colour in
+# OKLCH: its lightness times `lightness`, set to `at_lightness`, raised by
+# `lighter` or lowered by `darker`, and its chroma times `chroma`; the result is
+# fitted into sRGB by lowering its chroma alone, at the same hue and lightness,
+# so a hue never shifts (a yellow darkens to olive, never orange). Last,
+# `text_on` names the backgrounds it is text on: its lightness moves away from
+# them only as far as it takes to hold 4.5:1 on every one, so a label holds on
+# any wallpaper. A role computed differently by night and by day gives a
+# recipe in `dark` and one in `light`.
 #
-# A focus tube is lit at night and off in daylight. In dark mode its core, the
-# white-hot line along the middle of a lit tube, is `_core`, half way to white.
-# In light mode the tube is unlit glass, its core `_unlit`, 35% of the way to
-# black: the line inside a filled control's edge, or over any other control's
-# container at `focus.glass`.
+# A role that is only a `mix`, the same in both modes, is a formula every
+# output computes (`color-mix` in CSS, `Tokens.towardWhite` in QML,
+# `color::derived` in iced). The rest are the state model's: the mockups' CSS
+# computes them; the iced and QML outputs don't build them yet.
+#
+# The states (`docs/DESIGN.md`, "States"): rest, lit (hovered or focused, one
+# state), pressed and disabled. At night a control rests unlit and lights up;
+# by day nothing glows.
 [color.derived]
+# A tone's core, the white-hot line along the middle of a lit tube: half way
+# to white.
 primary_core = { mix = "primary", white = 0.5 }
 cold_core = { mix = "cold", white = 0.5 }
 error_core = { mix = "error", white = 0.5 }
 success_core = { mix = "success", white = 0.5 }
 warning_core = { mix = "warning", white = 0.5 }
 sharing_core = { mix = "sharing", white = 0.5 }
-primary_unlit = { mix = "primary", black = 0.35 }
-cold_unlit = { mix = "cold", black = 0.35 }
-error_unlit = { mix = "error", black = 0.35 }
-success_unlit = { mix = "success", black = 0.35 }
-warning_unlit = { mix = "warning", black = 0.35 }
-sharing_unlit = { mix = "sharing", black = 0.35 }
+# A tone unlit: deep, not pale, at 60% of its lightness and 1.2 times its
+# chroma, as far as sRGB holds it. On hues already at the gamut's edge there
+# (cyan, green, yellow) that is the most saturated fill the lightness allows.
+primary_unlit = { from = "primary", lightness = 0.6, chroma = 1.2 }
+cold_unlit = { from = "cold", lightness = 0.6, chroma = 1.2 }
+error_unlit = { from = "error", lightness = 0.6, chroma = 1.2 }
+success_unlit = { from = "success", lightness = 0.6, chroma = 1.2 }
+warning_unlit = { from = "warning", lightness = 0.6, chroma = 1.2 }
+sharing_unlit = { from = "sharing", lightness = 0.6, chroma = 1.2 }
+
+# Filled. At night the fill stays unlit, resting, lit and pressed, and the
+# letters light: near white, tinted 18% with the tone at rest and 8% lit. Lit
+# adds the core inside the edge; pressed lifts the fill a little. By day the
+# fill is the tone lifted to lightness 0.80, where a dark label reads (0.56 to
+# 0.64 is a dead zone where neither a white nor a dark label does); lit adds a
+# dark line, the fill at 62% of its lightness, and pressed goes a little darker.
+primary_fill = { dark = { from = "primary_unlit" }, light = { from = "primary", at_lightness = 0.80 } }
+primary_fill_pressed = { dark = { from = "primary_fill", lighter = 0.035 }, light = { from = "primary_fill", darker = 0.04 } }
+on_primary_fill = { dark = { mix = "primary", white = 0.82, text_on = ["primary_fill", "primary_fill_pressed"] }, light = { from = "primary_fill", lightness = 0.45, text_on = ["primary_fill", "primary_fill_pressed"] } }
+on_primary_fill_lit = { dark = { mix = "primary", white = 0.92, text_on = ["primary_fill", "primary_fill_pressed"] }, light = { from = "on_primary_fill" } }
+primary_fill_line = { dark = { from = "primary_core" }, light = { from = "primary_fill", lightness = 0.62 } }
+
+# Tonal: the accent's quieter sibling, on its container. At night its label
+# rests dimmed and lights to `on_secondary_container`; pressed lifts the
+# container a little at night and darkens it a little by day.
+on_secondary_container_rest = { dark = { from = "on_secondary_container", lightness = 0.8, text_on = ["secondary_container"] }, light = { from = "on_secondary_container" } }
+secondary_container_pressed = { dark = { from = "secondary_container", lighter = 0.035 }, light = { from = "secondary_container", darker = 0.04 } }
+
+# Text: a label in the tone, with no fill. At night it rests unlit, the tone's
+# `_unlit` lifted only as far as it reads, and lights to the core; by day it is
+# the tone itself. Both hold on every surface a Text button sits on.
+primary_rest = { dark = { from = "primary_unlit", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "primary", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
+primary_lit = { dark = { from = "primary_core", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "primary", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
+
+# The burning kinds, Danger, Success and Warning: always lit, the bright fixed
+# tone with a dark label, the tone at a quarter of its lightness, made darker
+# still where it must be to hold on every fill it sits on. At night lit moves
+# the fill half way to the core (the tone 25% toward white) and adds the core
+# inside the edge; pressed takes it 8% further toward white. By day lit is
+# 0.035 darker with a dark line inside the edge, the tone at 60% of its
+# lightness, and pressed is 0.06 darker.
+burn_danger_lit = { dark = { mix = "burn_danger", white = 0.25 }, light = { from = "burn_danger", darker = 0.035 } }
+burn_danger_pressed = { dark = { mix = "burn_danger_lit", white = 0.08 }, light = { from = "burn_danger", darker = 0.06 } }
+burn_danger_line = { dark = { mix = "burn_danger", white = 0.5 }, light = { from = "burn_danger", lightness = 0.6 } }
+on_burn_danger = { from = "burn_danger", lightness = 0.25, text_on = ["burn_danger", "burn_danger_lit", "burn_danger_pressed"] }
+burn_success_lit = { dark = { mix = "burn_success", white = 0.25 }, light = { from = "burn_success", darker = 0.035 } }
+burn_success_pressed = { dark = { mix = "burn_success_lit", white = 0.08 }, light = { from = "burn_success", darker = 0.06 } }
+burn_success_line = { dark = { mix = "burn_success", white = 0.5 }, light = { from = "burn_success", lightness = 0.6 } }
+on_burn_success = { from = "burn_success", lightness = 0.25, text_on = ["burn_success", "burn_success_lit", "burn_success_pressed"] }
+burn_warning_lit = { dark = { mix = "burn_warning", white = 0.25 }, light = { from = "burn_warning", darker = 0.035 } }
+burn_warning_pressed = { dark = { mix = "burn_warning_lit", white = 0.08 }, light = { from = "burn_warning", darker = 0.06 } }
+burn_warning_line = { dark = { mix = "burn_warning", white = 0.5 }, light = { from = "burn_warning", lightness = 0.6 } }
+on_burn_warning = { from = "burn_warning", lightness = 0.25, text_on = ["burn_warning", "burn_warning_lit", "burn_warning_pressed"] }
 
 # Every foreground role the front ends draw on a background role, and the
 # contrast it needs (WCAG 2.1 AA): `text` 4.5:1; `large_text` 3:1, for 24 px
@@ -906,7 +990,29 @@ pairs = [
   { fg = "on_primary_container", bg = "primary_container", need = "text", use = "Text on the primary container" },
   { fg = "on_secondary_container", bg = "secondary_container", need = "text", use = "A Tonal button, a selected row's title" },
   { fg = "on_secondary_container", bg = "secondary_container", need = "text", opacity = "subdued_text", use = "A selected row's subtitle" },
-  { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label" },
+  { fg = "on_error", bg = "error", need = "text", use = "A Danger button's label in iced and QML, which don't build the burning kinds yet" },
+  { fg = "on_primary_fill", bg = "primary_fill", need = "text", use = "A Filled button's label at rest" },
+  { fg = "on_primary_fill_lit", bg = "primary_fill", need = "text", use = "A Filled button's label, lit" },
+  { fg = "on_primary_fill_lit", bg = "primary_fill_pressed", need = "text", use = "A Filled button's label, pressed" },
+  { fg = "on_secondary_container_rest", bg = "secondary_container", need = "text", use = "A Tonal button's label at rest" },
+  { fg = "on_secondary_container", bg = "secondary_container_pressed", need = "text", use = "A Tonal button's label, pressed" },
+  { fg = "primary_rest", bg = "surface", need = "text", use = "A Text button's label at rest, on a page" },
+  { fg = "primary_rest", bg = "surface_container_low", need = "text", use = "A Text button's label at rest, in a well" },
+  { fg = "primary_rest", bg = "surface_container", need = "text", use = "A Text button's label at rest, on a panel" },
+  { fg = "primary_rest", bg = "surface_container_high", need = "text", use = "A Text button's label at rest, in a card or a dialog" },
+  { fg = "primary_lit", bg = "surface", need = "text", use = "A Text button's label lit or pressed, on a page" },
+  { fg = "primary_lit", bg = "surface_container_low", need = "text", use = "A Text button's label lit or pressed, in a well" },
+  { fg = "primary_lit", bg = "surface_container", need = "text", use = "A Text button's label lit or pressed, on a panel" },
+  { fg = "primary_lit", bg = "surface_container_high", need = "text", use = "A Text button's label lit or pressed, in a card or a dialog" },
+  { fg = "on_burn_danger", bg = "burn_danger", need = "text", use = "A Danger button's label at rest" },
+  { fg = "on_burn_danger", bg = "burn_danger_lit", need = "text", use = "A Danger button's label, lit" },
+  { fg = "on_burn_danger", bg = "burn_danger_pressed", need = "text", use = "A Danger button's label, pressed" },
+  { fg = "on_burn_success", bg = "burn_success", need = "text", use = "A Success button's label at rest" },
+  { fg = "on_burn_success", bg = "burn_success_lit", need = "text", use = "A Success button's label, lit" },
+  { fg = "on_burn_success", bg = "burn_success_pressed", need = "text", use = "A Success button's label, pressed" },
+  { fg = "on_burn_warning", bg = "burn_warning", need = "text", use = "A Warning button's label at rest" },
+  { fg = "on_burn_warning", bg = "burn_warning_lit", need = "text", use = "A Warning button's label, lit" },
+  { fg = "on_burn_warning", bg = "burn_warning_pressed", need = "text", use = "A Warning button's label, pressed" },
   { fg = "on_error", bg = "error", need = "text", opacity = "subdued_text", use = "A selected danger row's subtitle" },
   { fg = "error", bg = "surface", need = "text", use = "An invalid field's note, a failure" },
   { fg = "on_error_container", bg = "error_container", need = "text", use = "A critical notification" },
@@ -1004,10 +1110,12 @@ pairs = [
 # which its legend names; the cores (`primary_core`, `cold_core`, `sharing_core`,
 # `error_core`, `success_core`, `warning_core`, `logo_core_warm`,
 # `logo_core_cold`), the hot middle of a neon tube, drawn on the tube, and the
-# focus core, the line inside a filled control's edge; and the unlit cores
-# (`primary_unlit` and the rest), the same line in daylight. `kubaos-design contrast` fails on
-# a role drawn with that is in no pair and not here.
-decorative = ["cold_container", "cold_core", "cold_unlit", "error_core", "error_unlit", "logo_core_cold", "logo_core_warm", "outline_variant", "primary_core", "primary_unlit", "scrim", "shadow", "sharing_core", "sharing_unlit", "success_core", "success_unlit", "surface_bright", "warning_core", "warning_unlit"]
+# focus core, the line inside a filled control's edge; the unlit tones
+# (`primary_unlit` and the rest), a tube at rest; and a lit control's line by
+# day and night (`primary_fill_line`, `burn_danger_line` and the rest), which
+# marks the state its fill and label already show. `kubaos-design contrast`
+# fails on a role drawn with that is in no pair and not here.
+decorative = ["burn_danger_line", "burn_success_line", "burn_warning_line", "cold_container", "cold_core", "cold_unlit", "error_core", "error_unlit", "logo_core_cold", "logo_core_warm", "outline_variant", "primary_core", "primary_fill_line", "primary_unlit", "scrim", "shadow", "sharing_core", "sharing_unlit", "success_core", "success_unlit", "surface_bright", "warning_core", "warning_unlit"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes

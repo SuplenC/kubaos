@@ -14,6 +14,7 @@ use std::fmt;
 
 use crate::contrast;
 use crate::contrast::Mode;
+use crate::model::Derived;
 use crate::model::Family;
 use crate::model::Need;
 use crate::model::Tokens;
@@ -46,6 +47,10 @@ pub enum Violation {
     RoleTwice { role: String },
     /// A derived role that names both `white` and `black`, or neither.
     DerivedWay { role: String },
+    /// A derived role's recipe that can't be computed: it starts from both `mix` and `from` or
+    /// neither, gives one mode's recipe without the other's or beside its own, moves a lightness
+    /// or chroma out of range, or reads itself.
+    DerivedRecipe { role: String, why: &'static str },
     /// A symbol that names both a Tabler icon and a drawing of ours, or neither.
     SymbolSource { token: String },
     /// A type style's icon that isn't one of the icon sizes.
@@ -122,6 +127,7 @@ impl fmt::Display for Violation {
             Violation::DerivedWay { role } => {
                 write!(f, "color.derived.{role} needs exactly one of `white` and `black`")
             }
+            Violation::DerivedRecipe { role, why } => write!(f, "color.derived.{role} {why}"),
             Violation::SymbolSource { token } => {
                 write!(f, "{token} needs exactly one of `tabler` and `drawn`")
             }
@@ -299,7 +305,7 @@ fn check_contrast(tokens: &Tokens, found: &mut Vec<Violation>) {
     for pair in &tokens.contrast.pairs {
         let roles = [&pair.fg, &pair.bg]
             .into_iter()
-            .filter(|role| !tokens.color.source.contains_key(*role));
+            .filter(|role| !tokens.color.source.contains_key(*role) && !tokens.color.derived.contains_key(*role));
         let opacity = pair.opacity.iter().filter(|name| !tokens.opacity.contains_key(*name));
         for name in roles.chain(opacity) {
             found.push(Violation::UnknownInPair {
@@ -427,6 +433,13 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     check_opacity("focus.near_opacity".into(), tokens.focus.near_opacity, found);
     check_opacity("focus.far_opacity".into(), tokens.focus.far_opacity, found);
     check_opacity("focus.content_glow".into(), tokens.focus.content_glow, found);
+    check_opacity("focus.label_glow".into(), tokens.focus.label_glow, found);
+    let edge = 1.0 - (1.0 - tokens.focus.near_opacity) * (1.0 - tokens.focus.far_opacity);
+    check_opacity(
+        "focus.pressed_glow, at the edge".into(),
+        edge * tokens.focus.pressed_glow,
+        found,
+    );
     check_opacity("focus.glass".into(), tokens.focus.glass, found);
     if tokens.focus.near >= tokens.focus.far {
         found.push(Violation::NotAscending {
@@ -547,26 +560,100 @@ fn check_colors(tokens: &Tokens, found: &mut Vec<Violation>) {
         if colors.source.contains_key(role) {
             found.push(Violation::RoleTwice { role: role.clone() });
         }
-        if !colors.source.contains_key(&derived.mix) {
-            found.push(Violation::UnknownName {
-                token: format!("color.derived.{role}.mix"),
-                name: derived.mix.clone(),
-            });
-        }
-        match derived.toward() {
-            None => found.push(Violation::DerivedWay { role: role.clone() }),
-            Some((toward, t)) if !(0.0..=1.0).contains(&t) => found.push(Violation::OpacityOutOfRange {
-                token: format!("color.derived.{role}.{}", toward.name()),
-                value: t,
-            }),
-            Some(_) => {}
-        }
+        check_derived(tokens, role, derived, found);
     }
     for name in names(tokens) {
         if !is_identifier(&name) {
             found.push(Violation::BadName { token: name });
         }
     }
+}
+
+fn check_derived(tokens: &Tokens, role: &str, derived: &Derived, found: &mut Vec<Violation>) {
+    let colors = &tokens.color;
+    let mut whys: Vec<&'static str> = Vec::new();
+    if derived.by_mode() {
+        if derived.dark.is_none() || derived.light.is_none() {
+            whys.push("gives one mode's recipe without the other's");
+        }
+        if derived.mix.is_some() || derived.from.is_some() || derived.moves_oklch() || derived.text_on.is_some() {
+            whys.push("gives a recipe of its own beside each mode's");
+        }
+    }
+    let recipes: Vec<&Derived> = if derived.by_mode() {
+        derived
+            .dark
+            .iter()
+            .chain(derived.light.iter())
+            .map(|recipe| &**recipe)
+            .collect()
+    } else {
+        vec![derived]
+    };
+    for recipe in recipes {
+        if recipe.by_mode() {
+            whys.push("gives a mode's recipe inside a mode's recipe");
+        }
+        match (&recipe.mix, &recipe.from) {
+            (Some(_), None) => match recipe.way() {
+                None => found.push(Violation::DerivedWay { role: role.to_owned() }),
+                Some((toward, t)) if !(0.0..=1.0).contains(&t) => found.push(Violation::OpacityOutOfRange {
+                    token: format!("color.derived.{role}.{}", toward.name()),
+                    value: t,
+                }),
+                Some(_) => {}
+            },
+            (None, Some(_)) if recipe.white.is_some() || recipe.black.is_some() => {
+                whys.push("moves toward white or black without a `mix`");
+            }
+            (None, Some(_)) => {}
+            _ => whys.push("needs exactly one of `mix` and `from`"),
+        }
+        let amounts = [recipe.lightness, recipe.chroma, recipe.lighter, recipe.darker];
+        if amounts.into_iter().flatten().any(|value| value < 0.0) {
+            whys.push("moves a lightness or chroma by a negative amount");
+        }
+        if recipe.at_lightness.is_some_and(|at| !(0.0..=1.0).contains(&at)) {
+            whys.push("sets a lightness outside 0..=1");
+        }
+    }
+    let known = |name: &String| colors.source.contains_key(name) || colors.derived.contains_key(name);
+    let mut unknown = BTreeSet::new();
+    for mode in Mode::ALL {
+        unknown.extend(derived.reads(mode).filter(|name| !known(name)).cloned());
+    }
+    if Mode::ALL
+        .into_iter()
+        .any(|mode| reads_itself(colors, role, role, mode, &mut Vec::new()))
+    {
+        whys.push("reads itself, through the roles it reads");
+    }
+    for name in unknown {
+        found.push(Violation::UnknownName {
+            token: format!("color.derived.{role}"),
+            name,
+        });
+    }
+    for why in whys {
+        found.push(Violation::DerivedRecipe {
+            role: role.to_owned(),
+            why,
+        });
+    }
+}
+
+/// Whether `name`'s recipe in `mode` reads `role`, directly or through the derived roles it reads.
+fn reads_itself(colors: &crate::model::Colors, role: &str, name: &str, mode: Mode, seen: &mut Vec<String>) -> bool {
+    let Some(derived) = colors.derived.get(name) else {
+        return false;
+    };
+    if seen.iter().any(|each| each == name) {
+        return false;
+    }
+    seen.push(name.to_owned());
+    derived
+        .reads(mode)
+        .any(|read| read == role || reads_itself(colors, role, read, mode, seen))
 }
 
 fn check_symbols(tokens: &Tokens, found: &mut Vec<Violation>) {

@@ -59,6 +59,9 @@ const FIXED_FOR: Record<string, { for: string; shows: string }> = {
   sharing: { for: "Violet: anything shared off the machine, the screen above all. Its tube marks what is shared, with `sharing_core` along its middle.", shows: "Sharing your screen" },
   microphone: { for: "The privacy dot of a microphone that is listening, and its words.", shows: "Microphone on" },
   camera: { for: "The privacy dot of a camera that is watching, and its words.", shows: "Camera on" },
+  burn_danger: { for: "A Danger button's fill: bright neon red, always lit, so the one action that destroys something can't be taken for any wallpaper's accent. Its label is `on_burn_danger`, fitted to it.", shows: "Erase disk" },
+  burn_success: { for: "A Success button's fill: bright neon green, always lit. Its label is `on_burn_success`, fitted to it.", shows: "Finish" },
+  burn_warning: { for: "A Warning button's fill: bright neon amber, always lit. Its label is `on_burn_warning`, fitted to it.", shows: "Restart now" },
   logo_core_warm: { for: "The logo's own core along the middle of the クバ mark's warm tubes: brand art, paler than a control's, the same in both modes. No control takes it.", shows: "クバ" },
   logo_core_cold: { for: "The logo's own core along the middle of the mark's cold tube, the dakuten. No control takes it.", shows: "クバ" },
 };
