@@ -227,9 +227,9 @@ export default foundation({
   title: "Type",
   summary: "A closed set of type styles, picked by what the text is: three families, eleven sizes, every line on the 4 grid, and an icon size for each.",
   live: () =>
-    stack(
-      "s8",
-      "start",
+    el(
+      "div",
+      "f-measure",
       text(WORDS.accent, "accent", "primary"),
       text("Welcome to KubaOS", "title", "on_surface"),
       wrapping("Everything on this disk will be erased. KubaOS takes the whole disk and encrypts it.", "body_large", "on_surface_variant"),
