@@ -2,7 +2,7 @@
 // `#/LEVEL/PAGE`. `?chrome=off` shows the page alone, as the shots draw it.
 //
 // `window.kubaos` lets a script that drives the site (`scripts/render.ts`) wait until the page is
-// drawn and read its geometry frame.
+// drawn and read its geometry frame and its moves' recipes.
 
 import "./tokens.css";
 import "./fonts.css";
@@ -17,18 +17,23 @@ import { type Frame, frame } from "./site/frame.ts";
 import { nav } from "./site/nav.ts";
 import type { Page } from "./site/page.ts";
 import { applies } from "./site/page.ts";
+import { recipes } from "./site/parts/motion.ts";
 import { render } from "./site/render.ts";
-import { apply, onChange, settings } from "./site/settings.ts";
+import { apply, CHROME, onChange, settings } from "./site/settings.ts";
 import { settle } from "./site/settle.ts";
 import { toolbar, updateToolbar } from "./site/toolbar.ts";
 
 declare global {
   interface Window {
-    kubaos: { ready: Promise<void>; frame(): Frame; pages: { level: string; slug: string }[] };
+    kubaos: {
+      ready: Promise<void>;
+      frame(): Frame;
+      motion(): Record<string, unknown> | null;
+      pages: { level: string; slug: string }[];
+    };
   }
 }
 
-const chrome = new URLSearchParams(location.search).get("chrome") !== "off";
 const site = document.getElementById("site")!;
 const pageBox = el("main", "page mock");
 pageBox.id = "page";
@@ -66,7 +71,7 @@ function draw(): void {
   const page = picked();
   apply(pageBox);
   pageBox.replaceChildren(...(page ? render(page) : [el("p", "page-prose", "No pages yet.")]));
-  if (chrome) {
+  if (CHROME) {
     const hasWindow = page !== undefined && applies(page.measures.reflow);
     const bar = toolbar(hasWindow);
     site.replaceChildren(bar, el("div", "site-body", nav(page), pageBox));
@@ -110,5 +115,9 @@ async function start(): Promise<void> {
 window.kubaos = {
   ready: start(),
   frame: () => frame(pageBox, picked()?.slug ?? "", settings().mode, settings().scale),
+  motion: () => {
+    const page = picked();
+    return page ? recipes(page.motion) : null;
+  },
   pages: PAGES.map((page) => ({ level: page.level, slug: page.slug })),
 };

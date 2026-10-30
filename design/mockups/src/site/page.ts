@@ -5,6 +5,7 @@
 // A page only says what it shows; `site/render.ts` draws every page the same way.
 
 import type { Words } from "../lib/content.ts";
+import type { Tone } from "../lib/focus.ts";
 
 /** A part that doesn't apply to this page, and why. */
 export interface DoesntApply {
@@ -88,6 +89,18 @@ export interface States<S extends State> {
   readonly described: Record<S, string>;
 }
 
+/**
+ * A focus tube the part lights, and its tone: the part's own, or the accent for a part with none
+ * (`docs/DESIGN.md`, "Focus"). A page names each, so no tube's colour is left to a default.
+ */
+export interface Tube {
+  /** The variant or state it lights on. */
+  readonly name: string;
+  readonly tone: Tone;
+  /** Filled with its tone's colour: the fill is the tube, and the tone's core rides outside it. */
+  readonly filled: boolean;
+}
+
 /** The content extremes the mockup skill names. */
 export interface Content {
   /** The shortest and the longest text, and the translation 40% longer (the toolbar's text). */
@@ -116,15 +129,51 @@ export type Easing =
  */
 export type Curve = Easing | "neon.strike";
 
-/** One move: what moves, its tokens, what reduced motion makes of it, and how to play it. */
+/**
+ * A value an animated property takes: a plain number, or a token's, named so a library reads the
+ * same token: an opacity, a colour role, a length.
+ */
+export type Value = number | { readonly opacity: string } | { readonly color: string } | { readonly length: string };
+
+/** One part's change in a move: what it is, the property, its values and its timing. */
+export interface Track {
+  /** The part, as a library names it: the state layer, the tube, the glow, the core. */
+  readonly part: string;
+  /** Which of the sample's variants it is on: every kind, Tonal and Text. */
+  readonly on: string;
+  /** The sample's elements it moves, as a selector inside the sample. */
+  readonly target: string;
+  /** The CSS property animated, as the libraries animate the same one: `opacity`. */
+  readonly property: string;
+  readonly from: Value;
+  readonly to: Value;
+  readonly duration: Duration;
+  /** How long after the move starts this part does; a part with none starts with it. */
+  readonly cue?: Duration;
+  readonly curve: Curve;
+}
+
+/**
+ * One move, as data: every part that moves, each property's values and timing. Its player animates
+ * from this same object and shows it as the move's recipe, so what plays and what a library reads
+ * never disagree. The player loops it: the first state held, the move, the last state held, back.
+ */
 export interface Move {
   readonly name: string;
   readonly what: string;
-  readonly duration: Duration;
-  readonly curve: Curve;
-  readonly reduced: string;
-  /** The sample the move plays on; `play` starts it again from its start, `rest` puts it back. */
-  readonly sample: () => { readonly element: Element; play(): void; rest(): void };
+  readonly tracks: NonEmpty<Track>;
+  /** What plays with reduced motion: the same tracks, or the ones it turns them into. */
+  readonly reduced: "same" | NonEmpty<Track>;
+  /** What plays with the focus stutter off, which a move that strikes must say. */
+  readonly unstuttered?: NonEmpty<Track>;
+  /**
+   * How the loop goes back to the first state: the move `plays` backwards where that is the same
+   * move reversed (a hover leaving), or it `cuts` back where going back is a move of its own
+   * (focus leaving after focus arriving), which its own player shows.
+   */
+  readonly back: "plays" | "cuts";
+  /** The sample the move plays on, at rest: the player moves its parts. */
+  readonly sample: () => Element;
 }
 
 /** How the part arrives, leaves and moves between its states. */
@@ -170,6 +219,8 @@ export interface Page<S extends State = State> {
   readonly variants: readonly Variant[] | DoesntApply;
   readonly sizes: readonly Variant[] | DoesntApply;
   readonly states: States<S>;
+  /** Every focus tube it lights, each in its tone; a part that takes no focus doesn't apply. */
+  readonly focus: NonEmpty<Tube> | DoesntApply;
   readonly content: Content;
   readonly motion: Motion;
   readonly keyboard: Keyboard | DoesntApply;

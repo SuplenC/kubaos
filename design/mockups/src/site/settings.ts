@@ -5,6 +5,13 @@
 // properties, and every length, colour and duration follows at once. Text length changes the words
 // on the page, so it draws the page again; nothing ever reloads.
 
+/**
+ * Whether the toolbar and the navigation show. `?chrome=off` draws the page alone, as the shots
+ * draw it, and holds its motion players still on their first state, so a shot is the same every
+ * time.
+ */
+export const CHROME = new URLSearchParams(location.search).get("chrome") !== "off";
+
 export type Mode = "dark" | "light";
 export type TextLength = "short" | "long" | "translated";
 
@@ -121,8 +128,13 @@ export function change(patch: Partial<Settings>): void {
   for (const listener of listeners) listener(current, changed);
 }
 
-export function onChange(listener: Listener): void {
+/** Calls `listener` on every change, until the function it returns is called. */
+export function onChange(listener: Listener): () => void {
   listeners.push(listener);
+  return () => {
+    const at = listeners.indexOf(listener);
+    if (at >= 0) listeners.splice(at, 1);
+  };
 }
 
 /**

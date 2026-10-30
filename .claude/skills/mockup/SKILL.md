@@ -38,7 +38,7 @@ A mockup page is **exhaustive**. It shows and describes every one of these that 
 - **Variants and sizes,** and which is for what.
 - **Every state:** rest, hover, pressed, focused from the keyboard (the neon tube), disabled, selected, loading, empty, error.
 - **Content extremes:** the shortest and longest text, a translation 40% longer, a missing icon or picture, none, one and many.
-- **Motion:** how it arrives, leaves and moves between states, each with its duration and curve token, replayable and slowed down, and what reduced motion turns it into.
+- **Motion:** how it arrives, leaves and moves between states, each carrying its reproducible recipe as data: every part that moves, each property's from and to by token, each part's duration, cue and curve by token, a stepped move's keyframes, and what reduced motion and the speed make of it. The player animates from that same data, looping, with pause, restart, slow motion and a scrubber, so a library builds the same move from the page alone.
 - **The keyboard:** every key, where focus goes, and where it lands when the part appears or a page changes.
 - **Measures:** every box, padding and gap by its token, and the reflow from the minimum size to a full screen, across window sizes.
 - **Light and dark, at scales 1, 1.25, 1.5 and 2.**

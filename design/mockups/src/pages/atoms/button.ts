@@ -1,8 +1,9 @@
 // The Button page: `docs/design/components/button.md`, as the specimens draw it today.
 
-import { button, KINDS, type Kind, type Pinned, type Size, SIZES } from "../../lib/button.ts";
+import { button, filledWithTone, KINDS, type Kind, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
-import { doesntApply, type Move, nonEmpty, page } from "../../site/page.ts";
+import { row } from "../../lib/layout.ts";
+import { type Curve, type Duration, doesntApply, type NonEmpty, nonEmpty, page, type Track, type Value } from "../../site/page.ts";
 
 /** The words and symbol each kind shows in the specimens, and how long they get. */
 const SAMPLES: Record<Kind, { words: Words; icon: string; trailing: boolean }> = {
@@ -38,34 +39,45 @@ const SIZE_FOR: Record<Size, string> = {
   Lg: "`size.control_lg` tall, a `button_large` label and its icon, `space.s8` between them, `space.s32` at the sides (`space.s16` on Text): the one main action of a big page, Kōbō's Install.",
 };
 
-/** A move on a resting button: `play` puts it at rest, then into `to` on the next frame. */
-function move(name: string, what: string, to: (b: HTMLElement) => void, back: (b: HTMLElement) => void, tokens: Pick<Move, "duration" | "curve" | "reduced">): Move {
-  return {
-    name,
-    what,
-    ...tokens,
-    sample: () => {
-      const element = sample("Filled", "Md");
-      return {
-        element,
-        play: () => {
-          back(element);
-          requestAnimationFrame(() => requestAnimationFrame(() => to(element)));
-        },
-        rest: () => back(element),
-      };
-    },
-  };
+/** Every kind side by side at Md, at rest: what each move plays on, so each kind's tone shows. */
+function kinds(): HTMLElement {
+  return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md")));
 }
 
-const pin = (state: Pinned) => (b: HTMLElement) => {
-  b.dataset.pinned = state;
-};
-const unpin = (b: HTMLElement) => {
-  delete b.dataset.pinned;
-  b.removeAttribute("data-lit");
-};
-const light = (b: HTMLElement) => b.setAttribute("data-lit", "");
+/** The kinds of a list, as the recipe says them. */
+function on(list: readonly Kind[]): string {
+  return list.length === KINDS.length ? "every kind" : list.join(" and ");
+}
+
+const FILLED = KINDS.filter(filledWithTone);
+const EDGED = KINDS.filter((kind) => !filledWithTone(kind));
+
+/**
+ * The neon's parts from `from` to `to`: the glow on every kind, the tube on the edge of a kind not
+ * filled with its tone, and the core outside the fill of one that is.
+ */
+function neon(from: number, to: number, duration: Duration, curve: Curve): NonEmpty<Track> {
+  const part = (name: string, list: readonly Kind[], target: string): Track => ({
+    part: name,
+    on: on(list),
+    target,
+    property: "opacity",
+    from,
+    to,
+    duration,
+    curve,
+  });
+  return [
+    part("glow", KINDS, ".k-glow"),
+    part("tube", EDGED, ".k-ring:not([data-filled]) > .k-tube"),
+    part("core", FILLED, ".k-ring[data-filled] > .k-tube"),
+  ];
+}
+
+/** The state layer from `from` to `to` over `micro`. */
+function layer(from: Value, to: Value): NonEmpty<Track> {
+  return [{ part: "state layer", on: on(KINDS), target: ".k-layer", property: "opacity", from, to, duration: "micro", curve: "standard" }];
+}
 
 export default page({
   level: "atoms",
@@ -76,7 +88,7 @@ export default page({
   description: [
     "A button names its action in sentence case, as the user would say it: Erase and install, never OK. Its label is its size's button style on a line as tall as the button's content box, so the label sits in the middle of the button on the grid, with the size's padding at its sides.",
     "Its corners take the control radius (`radius.control`); an icon-only button is an `IconButton`, a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon is the label's style's icon size, in a box the label's line tall, centred on a whole device pixel, so an icon never changes a button's height.",
-    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it; a Filled button is filled with the focus colour, so its fill is the tube and the tube's hot core, `primary_core`, rides just outside it, the thin stroke wide. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
+    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it, in the kind's tone: red (`error`) on Danger, the accent on the others. A Filled or a Danger button is filled with its tone's colour, so its fill is the tube and the tone's hot core (`primary_core`, `error_core`) rides just outside it, the thin stroke wide. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
     "A held button (`Button::on_hold`) is pressed for a while instead of clicked, and a timed bar beside it shows how far along the hold is: Kōbō's Install, held with the mouse or Enter. It looks like any button of its kind.",
   ],
   variants: nonEmpty(KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") }))),
@@ -101,10 +113,11 @@ export default page({
       rest: "Its fill and content, nothing over them.",
       hovered: "The content colour over the fill at `opacity.hover`, faded in over `micro`.",
       pressed: "The content colour at `opacity.press`, over `micro`.",
-      focused: "The neon tube on its edge, `focus.tube` wide rounded half up to device pixels, and the glow outside it: the near glow over `focus.near`, the far one over `focus.far`. On Filled, the `primary_core` line outside the fill, then the glow. Hover and press still lay their layer under it.",
+      focused: "The neon tube on its edge in the kind's tone, `focus.tube` wide rounded half up to device pixels, and the glow outside it in the same tone: the near glow over `focus.near`, the far one over `focus.far`. On Filled and Danger, the fill is the tube: the tone's core (`primary_core`, `error_core`) outside the fill, then the glow. Danger's is red. Hover and press still lay their layer under it.",
       disabled: "Content at `opacity.disabled_content` of `on_surface`, fill at `opacity.disabled_container` of it (none on Text); no layer, no focus, no action.",
     },
   },
+  focus: nonEmpty(KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filledWithTone(kind) }))),
   content: {
     text: KINDS.map((kind) => ({
       name: kind,
@@ -124,26 +137,39 @@ export default page({
     arrives: doesntApply("a button comes with the surface or the page it is on, and moves as that does."),
     leaves: doesntApply("a button goes with the surface or the page it is on."),
     between: [
-      move("Hover", "The state layer fades in as the pointer comes onto the button, and out as it leaves.", pin("hovered"), unpin, {
-        duration: "micro",
-        curve: "standard",
-        reduced: "the same: `micro` is under the `short` that reduced motion caps every duration at.",
-      }),
-      move("Press", "The layer deepens from rest to `opacity.press` as the button goes down.", pin("pressed"), unpin, {
-        duration: "micro",
-        curve: "standard",
-        reduced: "the same.",
-      }),
-      move("Focus arrives", "The tube strikes on as the boot sign's tubes do: `neon.strike`'s ten steps over `medium`. With the stutter off it fades in over `short` on `standard` instead.", light, unpin, {
-        duration: "medium",
-        curve: "neon.strike",
-        reduced: "it fades in over `short` on `standard`.",
-      }),
-      move("Focus leaves", "The tube and its glow fade out.", unpin, light, {
-        duration: "short",
-        curve: "standard",
-        reduced: "the same.",
-      }),
+      {
+        name: "Hover",
+        what: "The state layer, the content colour over the fill, fades in as the pointer comes onto the button, and out as it leaves.",
+        tracks: layer(0, { opacity: "hover" }),
+        reduced: "same",
+        back: "plays",
+        sample: kinds,
+      },
+      {
+        name: "Press",
+        what: "The layer deepens from hover's to `opacity.press` as the button goes down under the pointer, and back as it comes up.",
+        tracks: layer({ opacity: "hover" }, { opacity: "press" }),
+        reduced: "same",
+        back: "plays",
+        sample: kinds,
+      },
+      {
+        name: "Focus arrives",
+        what: "The tube strikes on in the kind's tone as the boot sign's tubes do, `neon.strike`'s steps over `medium`, and the glow with it: red on Danger, the accent on the others. On Filled and Danger the fill is the tube, so the core strikes just outside it.",
+        tracks: neon(0, 1, "medium", "neon.strike"),
+        reduced: neon(0, 1, "short", "standard"),
+        unstuttered: neon(0, 1, "short", "standard"),
+        back: "cuts",
+        sample: kinds,
+      },
+      {
+        name: "Focus leaves",
+        what: "The tube, the core and the glow fade out together.",
+        tracks: neon(1, 0, "short", "standard"),
+        reduced: "same",
+        back: "cuts",
+        sample: kinds,
+      },
     ],
   },
   keyboard: {
@@ -176,7 +202,7 @@ export default page({
       { what: "Lg's padding.", token: "space-s32" },
       { what: "The corners.", token: "radius-control" },
       { what: "The focus tube, rounded half up to device pixels.", token: "focus-tube" },
-      { what: "The core outside a Filled button's fill, rounded half up.", token: "stroke-thin" },
+      { what: "The core outside a Filled or Danger button's fill, rounded half up.", token: "stroke-thin" },
       { what: "The near glow's reach.", token: "focus-near" },
       { what: "The far glow's reach.", token: "focus-far" },
     ],

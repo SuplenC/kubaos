@@ -159,35 +159,28 @@
   100% { --lit: 1; }
 }
 
-/* The glow: the focus colour through its mask, which `lib/focus.ts` works out per device pixel. */
+/* The glow: the tube's tone through its mask, which `lib/focus.ts` works out per device pixel. */
 .k-glow {
   position: absolute;
   inset: calc(-1 * (var(--inset) + var(--glow-reach)));
   --glow-reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
-  background: var(--color-primary);
+  background: var(--tube);
   opacity: var(--lit);
   mask-size: 100% 100%;
 }
 
-/* The tube on the control's edge; on a fill, the core just outside it. */
+/* The tube on the control's edge; on a fill, the core just outside it. Each lights by its
+   opacity, as the glow does, so a motion player moves each part by its own. */
 .k-tube {
   position: absolute;
   inset: 0;
-  border: max(1px, round(nearest, var(--focus-tube), 1px)) solid rgb(from var(--color-primary) r g b / var(--lit));
+  border: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--tube);
   border-radius: var(--corner);
+  opacity: var(--lit);
 }
 
 .k-ring[data-filled] > .k-tube {
   inset: calc(-1 * var(--inset));
-  border: var(--inset) solid rgb(from var(--color-primary_core) r g b / var(--lit));
+  border: var(--inset) solid var(--core);
   border-radius: calc(var(--corner) + var(--inset));
-}
-
-/* Lit by a motion player: focus arriving on a button no key focused. */
-[data-lit] > .k-ring {
-  --lit: 1;
-}
-
-[data-stutter] [data-lit] > .k-ring {
-  animation: k-strike var(--motion-medium) step-end;
 }
