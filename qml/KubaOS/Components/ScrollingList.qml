@@ -20,9 +20,45 @@ Item {
     property bool focused: false
     // The well's padding: the view's sides, and its scroll padding above and below.
     readonly property int inset: K.Tokens.space.s12
+    // Whether rows are drawn away from where their view lays them, as a dragged row is, so they
+    // may reach the well's corners while the list fits.
+    property bool adrift: false
+    // Whether what the well holds reaches its rounded corners, and is drawn through its shape.
+    // HAZARD: draw through the shape only then. The shape is a layer the well's whole content is
+    // drawn into and masked: with the software renderer, a list that fits and redraws (a scan's
+    // pulse) takes 11.2 CPU s over 8 s this way against 6.1 s drawn as it is.
+    readonly property bool shaped: root.adrift || Array.from(holder.children).some(item => root.reaches(item))
 
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property bool fillWidth: true
+    // How far in from the well's top and bottom its corners cut what it holds, at the content's
+    // sides: where the corner's arc meets them, and a pixel of the mask's edge.
+    readonly property real cornerDepth: K.Tokens.radius.surface - Math.sqrt(K.Tokens.radius.surface ** 2 - (K.Tokens.radius.surface - root.inset) ** 2) + 1
+
+    // Whether `item` draws into the corners' depth at the top or bottom. A view draws its rows
+    // where they are, moving ones included, cut to its own box when it clips.
+    function reaches(item: Item): bool {
+        if (!item.visible || item.opacity === 0)
+            return false;
+        let top = item.y;
+        let bottom = item.y + item.height;
+        if (item instanceof Flickable) {
+            // HAZARD: the rows' own boxes, not the content's `childrenRect`, which works itself out
+            // as it is read and loops this binding.
+            let rowsTop = Infinity;
+            let rowsBottom = -Infinity;
+            for (const row of item.contentItem.children) {
+                if (!row.visible)
+                    continue;
+                rowsTop = Math.min(rowsTop, row.y);
+                rowsBottom = Math.max(rowsBottom, row.y + row.height);
+            }
+            const shift = item.y + item.contentItem.y;
+            top = item.clip ? Math.max(top, shift + rowsTop) : shift + rowsTop;
+            bottom = item.clip ? Math.min(bottom, shift + rowsBottom) : shift + rowsBottom;
+        }
+        return bottom > top && (top < root.cornerDepth || bottom > root.height - root.cornerDepth);
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -36,14 +72,14 @@ Item {
         anchors.fill: parent
         radius: K.Tokens.radius.surface
         visible: false
-        layer.enabled: true
+        layer.enabled: root.shaped
     }
 
     // The rows drawn through the well's shape. A layer, not a hidden source, so they still take
     // the pointer.
     Item {
         anchors.fill: parent
-        layer.enabled: true
+        layer.enabled: root.shaped
         layer.effect: MultiEffect {
             maskEnabled: true
             maskSource: shape

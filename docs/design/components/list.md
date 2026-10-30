@@ -14,7 +14,7 @@ Rows in a well: the surface radius (24), padding 12, rows 4 apart, so the rows t
 
 Rust `list::scrolling_list`; QML `ScrollingList`.
 
-A `List` whose rows scroll inside its well, as tall as its place makes it. The rows scroll right up to the well's edge and are cut by its own rounded shape; the 12 above the first row and below the last is the scroll's padding (`DESIGN.md`, "Rules every component keeps"). The well's hairline and focus tube are drawn over the rows. In QML it holds a `ListRows` (or a `LiveList`) beside whatever else the well holds (a toolbar at its foot, a form that takes the list's place), 12 in at the sides and down its whole height, and the view's `topMargin` and `bottomMargin` are the 12.
+A `List` whose rows scroll inside its well, as tall as its place makes it. The rows scroll right up to the well's edge and are cut by its own rounded shape; the 12 above the first row and below the last is the scroll's padding (`DESIGN.md`, "Rules every component keeps"). The well's hairline and focus tube are drawn over the rows. In QML it holds a `ListRows` (or a `LiveList`) beside whatever else the well holds (a toolbar at its foot, a form that takes the list's place), 12 in at the sides and down its whole height, and the view's `topMargin` and `bottomMargin` are the 12. The rows are drawn through the shape only while they reach its corners, so a list that fits draws as it is; a row drawn away from where its view lays it (a dragged row) sets `adrift`, which draws them through it.
 
 **States:** resting, and focused: the tube on the well's edge while the list has the keyboard.
 

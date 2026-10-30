@@ -306,6 +306,8 @@ Item {
             // view takes all the room, for its matches.
             height: Math.max(0, root.adding ? pane.room : Math.min(pane.room, pane.around(root.rows)))
             focused: list.activeFocus || (adder.item?.listFocused ?? false)
+            // A dragged row is drawn where the pointer takes it, past the rows if it goes there.
+            adrift: root.dragFrom >= 0
 
             // The layouts, down to the toolbar.
             K.ListRows {
