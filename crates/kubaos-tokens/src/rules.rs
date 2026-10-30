@@ -426,6 +426,7 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     }
     check_opacity("focus.near_opacity".into(), tokens.focus.near_opacity, found);
     check_opacity("focus.far_opacity".into(), tokens.focus.far_opacity, found);
+    check_opacity("focus.content_glow".into(), tokens.focus.content_glow, found);
     check_opacity("focus.glass".into(), tokens.focus.glass, found);
     if tokens.focus.near >= tokens.focus.far {
         found.push(Violation::NotAscending {

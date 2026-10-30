@@ -220,8 +220,8 @@
 }
 
 /* Content drawn in the control's tone, lit as a tube (a Text button's label and icon): a copy of
-   it in the tone's core over it, with the glow round its letters, burning on the ring's `--lit`
-   as the glow does. Unlit, it is out and the content below is its own tone. It sits where the
+   it in the tone's core over it, with a faint near glow round its letters and no far one, burning
+   on the ring's `--lit` as the glow does. Unlit, it is out and the content below is its own tone. It sits where the
    content does: the content is centred in the control, between equal paddings. */
 .k-lit {
   position: absolute;
