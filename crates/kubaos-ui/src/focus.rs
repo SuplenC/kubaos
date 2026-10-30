@@ -94,8 +94,8 @@ pub fn focus_ring_on_fill<'a, M: 'a>(
     color: RingColor,
 ) -> Element<'a, M> {
     let core = match color {
-        RingColor::Accent => look.colors.primary_core,
-        RingColor::Cold => look.colors.cold_core,
+        RingColor::Accent => color::derived(&look.colors, tokens::PRIMARY_CORE),
+        RingColor::Cold => color::derived(&look.colors, tokens::COLD_CORE),
         RingColor::Error => look.colors.error,
     };
     ring(look, content.into(), radius.into(), focused, color, Some(core))

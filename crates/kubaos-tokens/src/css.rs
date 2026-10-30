@@ -229,6 +229,14 @@ fn mode(out: &mut Css, tokens: &Tokens, palette: &BTreeMap<String, Rgb>, light: 
     for (role, rgb) in palette {
         out.var(&format!("color-{role}"), format!("{rgb:?}"));
     }
+    out.comment("The derived roles, computed from their tone wherever it is set, so they follow it.");
+    for (role, derived) in &tokens.color.derived {
+        let percent = number(derived.white * 100.0);
+        out.var(
+            &format!("color-{role}"),
+            format!("color-mix(in srgb, var(--color-{}), white {percent}%)", derived.mix),
+        );
+    }
     out.comment("The `shadow` role's opacity for each shadow.");
     for (name, shadow) in &tokens.shadow {
         let opacity = match (light, shadow.light_opacity) {

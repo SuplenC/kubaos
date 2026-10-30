@@ -3,7 +3,9 @@ use iced::Color;
 use super::Contrast;
 use super::colors;
 use super::contrast_ratio;
+use super::derived;
 use super::over;
+use crate::tokens;
 use crate::tokens::Mode;
 
 #[test]
@@ -131,4 +133,19 @@ fn the_fallback_palettes_meet_the_contrast_minimums() {
             assert!(need.holds(fg, bg), "{mode:?}: {name} is {ratio:.2}:1");
         }
     }
+}
+
+#[test]
+fn a_core_follows_the_primary_it_is_drawn_with() {
+    let fallback = colors(Mode::Dark);
+    let live = super::Colors {
+        primary: Color::from_rgb8(0x3a, 0x7b, 0xd5),
+        ..fallback
+    };
+
+    assert_eq!(
+        derived(&fallback, tokens::PRIMARY_CORE).into_rgba8(),
+        [0xff, 0xdb, 0xbc, 0xff]
+    );
+    assert_eq!(derived(&live, tokens::PRIMARY_CORE).into_rgba8(), [0x9d, 0xbd, 0xea, 0xff]);
 }

@@ -564,7 +564,7 @@ impl canvas::Program<crate::app::Message> for Sign {
         }
         let c = self.colors;
         let key = Some((
-            [c.primary, c.primary_core, c.cold, c.cold_core].map(Color::into_rgba8),
+            [c.primary, c.logo_core_warm, c.cold, c.logo_core_cold].map(Color::into_rgba8),
             self.art.as_ref().map(|art| Arc::as_ptr(art).addr()),
         ));
         if state.drawn.replace(key) != key {

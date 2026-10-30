@@ -124,7 +124,7 @@ draws from too:
 | `on_surface` (off-white) | "Kuba" |
 | `surface` | Icon tile |
 | `surface_container_lowest` | Dark plates, the boot splash and GRUB |
-| `primary_core`, `cold_core` | The lit core inside the amber and the blue tubes |
+| `logo_core_warm`, `logo_core_cold` | The lit core inside the amber and the blue tubes |
 
 The photos keep their own colours.
 
