@@ -13,24 +13,11 @@
   initial-value: 0;
 }
 
-/* The neon's state, as numbers a sequence animates on the page's one clock: `--glass`, how much a
-   focused ring's unlit glass shows; `--day`, 0 at night and 1 in daylight, where the neon can't
-   light; `--unlit`, how much of every focus line is unlit glass rather than neon; `--before` and
-   `--after`, how brightly the lights burn in the old colours and in the new; `--recolour`, how far
-   every colour role is along its path from the old palette to the new (`site/recolour.ts`). */
-@property --glass {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
-
+/* The neon's state, as numbers a sequence animates on the page's one clock: `--day`, 0 at night
+   and 1 in daylight, where the signs are off; `--before` and `--after`, how brightly the lights
+   burn in the old colours and in the new; `--recolour`, how far every colour role is along its
+   path from the old palette to the new (`site/recolour.ts`). */
 @property --day {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
-
-@property --unlit {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;
@@ -54,16 +41,14 @@
   initial-value: 0;
 }
 
-/* The lights are lit at night and off in daylight, every focus line unlit glass. */
+/* The lights are lit at night and off in daylight, where a lit line is unlit glass. */
 [data-mode="dark"] {
   --day: 0;
-  --unlit: 0;
   --before: 1;
 }
 
 [data-mode="light"] {
   --day: 1;
-  --unlit: 1;
   --before: 0;
 }
 

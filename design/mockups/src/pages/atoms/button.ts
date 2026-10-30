@@ -99,7 +99,7 @@ function on(list: readonly Kind[]): string {
 /**
  * A button lighting up or going back to rest, `--lit` from `from` to `to` over `short`: its fill,
  * label, line and glow all follow it, each from its rest colour to its lit one. A fade, never the
- * stutter.
+ * flicker.
  */
 function lights(from: 0 | 1, to: 0 | 1): NonEmpty<Track<"standard">> {
   return [{ part: "lit", on: on(KINDS), target: ".k-button", property: "--lit", from, to, duration: "short", curve: "standard" }];
@@ -119,7 +119,7 @@ export default page({
   description: [
     "A button names its action in sentence case, as the user would say it: Erase and install, never OK. Its label is its size's button style on a line as tall as the button's content box, so the label sits in the middle of the button on the grid, with the size's padding at its sides.",
     "Its corners take the control radius (`radius.control`); an icon-only button is an `IconButton`, a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon is the label's style's icon size, in a box the label's line tall, centred on a whole device pixel, so an icon never changes a button's height.",
-    "Its states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit, pressed and disabled. Hovering it and focusing it from the keyboard are one state, lit: the same look whether the pointer or the keyboard got there. At night a button rests unlit and lights up: the line inside its edge burns (the tone's core on a fill, the tube elsewhere) with the glow outside it, and its label brightens. Lit has two looks, signs on and signs off: with the neon unpowered, by day always and at night while a power change has the lights out, the button is still lit, its line still inside its edge as unlit glass, with no glow and its label at its rest colour. A lit button is lit with the signs on or off, never gone. Pressed, it is overdriven: its fill goes a touch brighter and its glow a touch stronger. Every colour is a role computed from the live tone, and every label holds at least 4.5:1 on every fill it sits on, on any wallpaper. Nothing but the glow reaches past the button's box, so its shape never seems to grow. Lighting up, going back to rest and pressing are fades; the neon's stutter is for power changes only.",
+    "Its states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit, pressed and disabled. Hovering it and focusing it from the keyboard are one state, lit: the same look whether the pointer or the keyboard got there. At night a button rests unlit and lights up: the line inside its edge burns (the tone's core on a fill, the tube elsewhere) with the glow outside it, and its label brightens. Lit has two looks, signs on and signs off: with the neon unpowered, by day always and at night while a power change has the lights out, the button is still lit, its line still inside its edge as unlit glass, with no glow and its label at its rest colour. A lit button is lit with the signs on or off, never gone. Pressed, it is overdriven: its fill goes a touch brighter and its glow a touch stronger. Every colour is a role computed from the live tone, and every label holds at least 4.5:1 on every fill it sits on, on any wallpaper. Nothing but the glow reaches past the button's box, so its shape never seems to grow. Lighting up, going back to rest and pressing are fades; the neon's flicker is for power changes only.",
     "The kinds make an emphasis ladder: Filled is the one main action, Tonal medium emphasis, Text minor actions. Danger, Success and Warning carry a meaning, not an emphasis, and burn: always lit, on their own fixed bright tones with dark labels, so none can be taken for a wallpaper's accent, even one of the same hue.",
     "Disabled, it has no action: grey, with no tone, no line and no glow. Its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
     "A held button (`Button::on_hold`) is pressed for a while instead of clicked, and a timed bar beside it shows how far along the hold is: Kōbō's Install, held with the mouse or Enter. It looks like any button of its kind.",
@@ -180,7 +180,7 @@ export default page({
     between: [
       {
         name: "Focus arrives",
-        what: "Hovered or focused, the button lights up: a fade over `short` on `standard`, never the stutter, which is for power changes. Its fill, label, line and glow move together from their rest colours to their lit ones, as `--lit` goes from 0 to 1: on Filled the core and the glow fade in and the letters brighten, on Text the label burns up to the core, on the burning kinds the fill moves half way to the core.",
+        what: "Hovered or focused, the button lights up: a fade over `short` on `standard`, never the flicker, which is for power changes. Its fill, label, line and glow move together from their rest colours to their lit ones, as `--lit` goes from 0 to 1: on Filled the core and the glow fade in and the letters brighten, on Text the label burns up to the core, on the burning kinds the fill moves half way to the core.",
         tracks: lights(0, 1),
         reduced: "same",
         back: "cuts",

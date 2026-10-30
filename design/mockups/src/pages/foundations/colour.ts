@@ -1,13 +1,14 @@
 // The Colour foundation: every colour role in both modes and every theme, the fixed roles, the
-// derived cores as their formulas, the opacities and state layers, and every contrast pair with
+// derived roles as their recipes, the opacities and state layers, and every contrast pair with
 // its ratio in the palette picked (`docs/DESIGN.md`, "Colour").
 
-import { button, KINDS, type Kind } from "../../lib/button.ts";
+import { button, KINDS, type Kind, type Pinned } from "../../lib/button.ts";
 import { row, stack } from "../../lib/layout.ts";
 import { nested, role as corner } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
-import { declared, names, number, words } from "../../lib/tokens.ts";
+import { names, number, words } from "../../lib/tokens.ts";
 import { decorative, type Pair, pairs, ratioIn } from "../../site/contrast.ts";
+import { described } from "../../site/derive.ts";
 import { el, label, prose } from "../../site/dom.ts";
 import { doesntApply, foundation } from "../../site/page.ts";
 import { bandedGrid } from "../../site/parts/bands.ts";
@@ -28,28 +29,6 @@ function fixed(): string[] {
   return names("source-")
     .filter((name) => words(name) === "")
     .map((name) => name.slice("source-".length));
-}
-
-/** A derived role: the tone it is mixed from, toward white or black, and how far. */
-interface Derived {
-  readonly role: string;
-  readonly tone: string;
-  readonly toward: "white" | "black";
-  readonly share: string;
-}
-
-/** The derived roles, read from their formulas in the tokens' CSS. */
-function derived(): Derived[] {
-  return names("color-").flatMap((name) => {
-    const found = /^color-mix\(in srgb, var\(--color-([a-z_]+)\), (white|black) ([\d.]+%)\)$/.exec(declared(name));
-    if (!found) return [];
-    return [{ role: name.slice("color-".length), tone: found[1]!, toward: found[2] as "white" | "black", share: found[3]! }];
-  });
-}
-
-/** A derived role's formula, as the page says it. */
-function formula(each: Derived): string {
-  return `${each.tone} mixed ${each.share} toward ${each.toward}`;
 }
 
 /** What each fixed role is for, and words it shows them with. */
@@ -269,16 +248,24 @@ function filled(tone: string, role: string): HTMLElement {
   return box;
 }
 
-/** Every derived role as its formula, then drawn from its tone in every theme, in `mode`. */
+/** `role` as text on `ground`, as a label fitted to it is drawn. */
+function textOn(role: string, ground: string): HTMLElement {
+  const box = el("div", "f-ground", text("Text", "body_strong", role));
+  box.style.setProperty("--ground", `var(--color-${ground})`);
+  return box;
+}
+
+/** Every derived role as its recipe, then drawn from its tone in every theme, in `mode`. */
 function derivedIn(mode: Mode): HTMLElement {
   return bandedGrid(
-    ["Formula", ...themes().map((theme) => paletteName(theme.slug, mode))],
-    derived().map((each) => ({
+    ["Recipe", ...themes().map((theme) => paletteName(theme.slug, mode))],
+    described(mode).map((each) => ({
       name: each.role,
       cells: [
-        el("div", "page-cell", token(formula(each))),
+        el("div", "page-cell", prose(each.words, "small")),
         ...themes().map((theme) => {
-          const box = painted(theme.slug, mode, filled(each.tone, each.role), swatch(each.role));
+          const shown = each.textOn[0] ? textOn(each.role, each.textOn[0]) : filled(each.tone, each.role);
+          const box = painted(theme.slug, mode, shown, swatch(each.role));
           box.dataset.tight = "";
           return el("div", "page-cell", box);
         }),
@@ -315,20 +302,22 @@ function opacities(): HTMLElement {
   );
 }
 
-/** The state layers: every kind of button resting, hovered, pressed and disabled. */
-function stateLayers(): HTMLElement {
-  const states = ["Resting", "Hovered", "Pressed", "Disabled"] as const;
-  const sample = (kind: Kind, state: (typeof states)[number]) =>
-    button({
-      label: kind,
-      kind,
-      size: "Md",
-      disabled: state === "Disabled",
-      ...(state === "Hovered" ? { pinned: "lit" as const } : state === "Pressed" ? { pinned: "pressed" as const } : {}),
-    });
+/** A button state's column and how it is pinned: none for rest and disabled. */
+const BUTTON_STATES: readonly { name: string; pinned?: Pinned; disabled?: boolean }[] = [
+  { name: "Rest" },
+  { name: "Lit · signs on", pinned: "lit" },
+  { name: "Lit · signs off", pinned: "signs-off" },
+  { name: "Pressed", pinned: "pressed" },
+  { name: "Disabled", disabled: true },
+];
+
+/** Every kind of button in each state, in the mode picked: each state its own roles. */
+function buttonStates(): HTMLElement {
+  const sample = (kind: Kind, state: (typeof BUTTON_STATES)[number]) =>
+    button({ label: kind, kind, size: "Md", disabled: state.disabled ?? false, ...(state.pinned ? { pinned: state.pinned } : {}) });
   return bandedGrid(
-    [...states],
-    KINDS.map((kind) => ({ name: kind, cells: states.map((state) => el("div", "page-cell", sample(kind, state))) })),
+    BUTTON_STATES.map((state) => state.name),
+    KINDS.map((kind) => ({ name: kind, cells: BUTTON_STATES.map((state) => el("div", "page-cell", sample(kind, state))) })),
   );
 }
 
@@ -393,7 +382,7 @@ function moving(from: { theme: string; mode: Mode } | string, to: { theme: strin
   return () => {
     const mode = settings().mode;
     const [a, b] = [from, to].map((each) => (typeof each === "string" ? { theme: each, mode } : each)) as [{ theme: string; mode: Mode }, { theme: string; mode: Mode }];
-    const roles = el("div", "f-row", ...[...sourced().map((each) => each.role), ...fixed(), ...derived().map((each) => each.role)].map((role) => swatch(role)));
+    const roles = el("div", "f-row", ...[...sourced().map((each) => each.role), ...fixed(), ...described(a.mode).map((each) => each.role)].map((role) => swatch(role)));
     const playing = el("div", "page-scene", label("Every colour role, on one clock", "body_strong", "on_surface"), scene(), roles);
     playing.dataset.mode = a.mode;
     paintBetween(playing, path, palette(a.theme, a.mode), palette(b.theme, b.mode));
@@ -405,12 +394,12 @@ export default foundation({
   level: "foundations",
   slug: "colour",
   title: "Colour",
-  summary: "Every colour is a role: matugen's from the wallpaper, a few fixed roles of our own, and cores derived from their tones, held to a contrast minimum in every pair.",
+  summary: "Every colour is a role: matugen's from the wallpaper, a few fixed roles of our own, and roles derived from their tones by recipe, held to a contrast minimum in every pair.",
   live: () => painted(settings().theme, settings().mode, scene()),
   description: [
     "Code names a role (`primary`, `on_surface`, `surface_container_high`), never a colour. Matugen sets every role it has a source for from the wallpaper (`scheme-fidelity`), so `primary`, `cold` and `error` and everything around them are dynamic: the hex values here are a theme's, never the role's. The tokens' palettes are matugen's for the default wallpaper, the Neon sign theme; the toolbar paints the page in three others matugen made from seed colours, so nothing is judged in one accent alone.",
     "The fixed roles are ours and keep their value whatever the wallpaper, so they mean the same on every desktop: `warning`, `success`, `sharing`, `microphone` and `camera`, each drawn as text or a mark straight on the surfaces, and the logo's own cores. Each has a value per mode and no `on_` or container role.",
-    "A lit neon tube's core is its tone mixed 50% toward white, and its unlit core in daylight its tone mixed 35% toward black. Both are formulas of the live tone, never values, so they follow the theme: `color-mix` here, `Tokens.towardWhite` in QML, `color::derived` in iced.",
+    "Everything that follows from a tone is a derived role (`[color.derived]`), a recipe over the live tone, never a value, so it follows the wallpaper. A lit tube's core is its tone 50% toward white (`_core`); the tone unlit is its OKLCH lightness × 0.6 and chroma × 1.2 (`_unlit`), a deep, rich colour, not a greyed one. Each button kind's fills, labels and lines build on them: Filled's unlit fill is `primary_unlit`, its pressed fill 0.035 lighter, its signs-off glass 0.12 lighter; by day its fill is the tone at lightness 0.80. A recipe that moves lightness or chroma is fitted back into sRGB by lowering its chroma alone, so the hue and lightness hold, and a label's recipe fits its lightness until it holds 4.5:1 on every fill it sits on. `primary`, and so every role built on it, comes from the wallpaper: here each is drawn in every theme the toolbar paints in.",
     "An opacity lays a role over another: the state layers, disabled content, scrims, glass. A component never picks its own alpha. Every foreground drawn on a background is a listed pair that holds WCAG 2.1 AA: 4.5:1 for text, 3:1 for large text and for marks that carry meaning.",
   ],
   tokens: [
@@ -431,7 +420,7 @@ export default foundation({
     },
     {
       name: "Derived roles",
-      described: "Each core is its formula, drawn from its tone wherever the tone is: the line inside a control filled with the tone, as a focused Filled button draws it, then the role alone. `_core` is the lit line at night, `_unlit` the unlit glass by day. No value is fixed: in every theme and mode, the same formula on that tone.",
+      described: "Every derived role as its recipe, in each mode, drawn from what it is computed from in every theme: a line inside a control filled with its tone, or, for a label, its text on the first fill it is fitted to; then the role alone. `_core` is the line lit with the signs on, `_unlit` the tone unlit; the `_fill`, `_rest`, `_lit`, `_pressed`, `_line` and `_glass` roles are the button kinds' states. No value is fixed: in every theme, the same recipe on that tone.",
       sample: () => el("div", "page-part", ...MODES.flatMap((mode) => [label(modeName(mode), "body_strong", "on_surface"), derivedIn(mode)])),
     },
     {
@@ -440,9 +429,9 @@ export default foundation({
       sample: opacities,
     },
     {
-      name: "State layers",
-      described: "Hover lays the content colour over the fill at `opacity.hover`, press at `opacity.press`; disabled dims the content to `opacity.disabled_content` of `on_surface` and the fill to `opacity.disabled_container`. Every kind of button, as the Button page shows them.",
-      sample: stateLayers,
+      name: "A button's states, by role",
+      described: "A button has no state layer: each state is its own derived roles, computed from the live tone (`docs/DESIGN.md`, \"States\"). Rest, lit with the signs on (its line, its glow and its lit label), lit with the signs off (its line as glass, no glow, its label at rest), and pressed, overdriven. Disabled alone lays opacities: its content at `opacity.disabled_content` of `on_surface`, its fill at `opacity.disabled_container`. Every kind, in the theme and mode picked, as the Button page shows them.",
+      sample: buttonStates,
     },
   ],
   rules: [
@@ -458,14 +447,14 @@ export default foundation({
     },
     {
       name: "Decoration needs no pair",
-      described: "A role drawn only as decoration carries no meaning, as WCAG exempts it: dividers and soft edges, the shadow and the scrim, the cores along a tube's middle. `kubaos-design contrast` fails on a role a front end draws that is in no pair and not here.",
+      described: "A role drawn only as decoration carries no meaning, as WCAG exempts it: dividers and soft edges, the shadow and the scrim, the cores along a tube's middle, the unlit tones, and a lit button's line and glass. `kubaos-design contrast` fails on a role a front end draws that is in no pair and not here.",
       sample: () => el("div", "f-row", ...decorative().map((role) => swatchWith(role, role))),
     },
   ],
   modes: [
     {
       name: "The same scene, dark and light",
-      described: "Dark is the default. In light mode the neon is off: the focused button's line is unlit glass, its core 35% toward black, with no glow. Geometry never changes with the mode.",
+      described: "Dark is the default: the Filled button rests on its unlit fill with near-white letters, and lit, its core burns inside its edge with the glow outside. By day the signs are off and nothing glows: its fill is the tone lifted to lightness 0.80 with a dark label, and lit adds a dark line inside its edge. Geometry never changes with the mode.",
       sample: () => el("div", "f-row", ...MODES.map((mode) => sceneIn(settings().theme, mode))),
     },
   ],
