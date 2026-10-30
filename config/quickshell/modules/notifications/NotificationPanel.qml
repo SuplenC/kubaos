@@ -356,8 +356,9 @@ K.Sheet {
     }
 
     K.HeaderFade {
+        x: list.x
         y: head.height
-        width: root.contentWidth
+        width: list.width
         scrolled: !list.atYBeginning
     }
 
