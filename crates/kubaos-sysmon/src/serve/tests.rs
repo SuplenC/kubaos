@@ -337,3 +337,38 @@ fn run_samples_at_once_answers_requests_and_stops_when_input_ends() {
     let text = String::from_utf8(output).expect("UTF-8");
     assert!(text.lines().any(|line| json(line)["id"] == 1), "{text}");
 }
+
+/// The battery alert's action after 30 s of a 41 W drain, with the power service's file saying
+/// `stop` from `pid`, whose `comm` is `comm`.
+fn drain_action(stop: &str, comm: &str) -> Value {
+    let machine = Machine::laptop();
+    machine.write("proc/self/mounts", "");
+    machine.battery("Discharging", 41_000_000);
+    machine.write("proc/4242/comm", &format!("{comm}\n"));
+    let (dir, mut server) = server(&machine);
+    std::fs::write(
+        dir.path().join("kubaos-power.json"),
+        format!(
+            r#"{{"stop":"{stop}","index":1,"title":"","source":"battery","dropped_from":null,"quiet":true,"pid":4242}}"#
+        ),
+    )
+    .expect("write the power file");
+
+    server.tick(0);
+    let lines = server.tick(30_000);
+    let alert = json(lines.last().expect("lines"));
+    assert_eq!(alert["id"], "battery");
+    alert["action"].clone()
+}
+
+#[test]
+fn a_drain_on_a_saver_stop_opens_the_monitor() {
+    assert_eq!(drain_action("power-saver", "kubaos-power"), "open");
+    assert_eq!(drain_action("super-saver", "kubaos-power"), "open");
+}
+
+#[test]
+fn a_drain_on_balanced_or_with_the_file_of_a_killed_service_offers_the_power_saver() {
+    assert_eq!(drain_action("balanced", "kubaos-power"), "power-saver");
+    assert_eq!(drain_action("power-saver", "bash"), "power-saver");
+}
