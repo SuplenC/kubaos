@@ -120,11 +120,12 @@ but() {
 }
 
 a_qml_component_renders_the_qml_surfaces_alone() {
-  local drawn iced
+  local drawn iced mockups
   mapfile -t iced < <(specimen_pages "$TABLE" | grep -vx specimen/qml)
+  mapfile -t mockups < <(mockup_pages "$TABLE")
   drawn=$(touched qml/KubaOS/Components/Button.qml)
 
-  expect "a component" "$drawn" "$(but kobo terminals plymouth grub cursor "${iced[@]}")"
+  expect "a component" "$drawn" "$(but kobo terminals plymouth grub cursor "${iced[@]}" "${mockups[@]}")"
   [[ " $drawn " != *" grub "* && " $drawn " != *" plymouth "* ]] || { echo "it renders the boot screens"; return 1; }
 }
 
@@ -195,6 +196,22 @@ a_harness_file_in_no_line_fails_the_table() {
 
   expect "the problems" "$(table_problems "$T/surfaces" "$SCENARIOS" "$REPO")" \
     "test/shots/stage.py is in no line: a change there would render nothing"
+}
+
+a_mockup_pages_own_file_renders_that_page_alone() {
+  expect "the button page" "$(touched design/mockups/src/pages/atoms/button.ts)" "mockups/button "
+}
+
+the_mockup_sites_own_code_renders_every_mockup_page() {
+  expect "a part of every page" "$(touched design/mockups/src/site/parts/matrix.ts)" "$(mockup_pages "$TABLE" | tr '\n' ' ')"
+  expect "the renderer" "$(touched test/shots/mockups)" "$(mockup_pages "$TABLE" | tr '\n' ' ')"
+}
+
+every_page_of_the_mockups_is_in_the_table() {
+  local drawn
+  drawn=$(cd "$REPO/design/mockups/src/pages" && find . -mindepth 2 -name '*.ts' | sed 's#^.*/##; s#\.ts$##; s#^#mockups/#' | sort)
+
+  expect "the pages" "$(mockup_pages "$TABLE")" "$drawn"
 }
 
 every_page_of_the_specimen_is_in_the_table() {
@@ -419,7 +436,8 @@ for t in a_shell_modules_file_renders_its_surface_alone the_frame_renders_every_
   a_surface_without_sources_fails_the_table a_source_that_isnt_there_fails_the_table \
   a_line_for_no_surface_fails_the_table a_path_under_a_shared_input_listed_by_one_surface_fails_the_table \
   a_shell_module_in_no_line_fails_the_table a_harness_file_in_no_line_fails_the_table \
-  every_page_of_the_specimen_is_in_the_table \
+  every_page_of_the_specimen_is_in_the_table a_mockup_pages_own_file_renders_that_page_alone \
+  the_mockup_sites_own_code_renders_every_mockup_page every_page_of_the_mockups_is_in_the_table \
   prune_keeps_the_last_used_bases_and_drops_the_rest a_base_no_branch_has_is_dropped_however_recently_used \
   the_runs_own_base_is_kept_on_no_branch a_base_written_in_the_last_hour_is_never_dropped \
   a_base_on_a_local_branch_alone_is_kept a_base_on_origin_main_alone_is_kept \
