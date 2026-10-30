@@ -337,3 +337,24 @@ fn run_samples_at_once_answers_requests_and_stops_when_input_ends() {
     let text = String::from_utf8(output).expect("UTF-8");
     assert!(text.lines().any(|line| json(line)["id"] == 1), "{text}");
 }
+
+#[test]
+fn a_drain_on_the_power_services_saver_stop_opens_the_monitor() {
+    let machine = Machine::laptop();
+    machine.write("proc/self/mounts", "");
+    machine.battery("Discharging", 41_000_000);
+    machine.write("proc/4242/comm", "kubaos-power\n");
+    let (dir, mut server) = server(&machine);
+    std::fs::write(
+        dir.path().join("kubaos-power.json"),
+        r#"{"stop":"power-saver","index":1,"title":"Power Saver","source":"battery","dropped_from":null,"quiet":true,"pid":4242}"#,
+    )
+    .expect("write the power file");
+
+    server.tick(0);
+    let lines = server.tick(30_000);
+
+    let alert = json(lines.last().expect("lines"));
+    assert_eq!(alert["id"], "battery");
+    assert_eq!(alert["action"], "open");
+}
