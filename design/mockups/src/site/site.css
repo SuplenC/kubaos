@@ -1341,3 +1341,65 @@ body {
   stroke-width: max(1px, round(nearest, var(--stroke-thin), 1px));
   stroke-linejoin: round;
 }
+
+/* The whole symbol set: a cell per symbol, its name under it at 16, 20 and 24. */
+.f-symbols {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-menu), 1fr));
+  gap: var(--space-s16);
+}
+
+.f-symbol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  padding: var(--space-s12);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_low);
+}
+
+.f-symbol[data-ours] {
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-primary);
+}
+
+/* A symbol's box drawn round it: its size, the ink 2 of its 24 units clear inside. */
+.f-icon-box {
+  position: relative;
+  flex: none;
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+/* A symbol on its 24 unit grid, a line every unit, the 2 unit margin shaded. */
+.f-icon-grid {
+  position: relative;
+  flex: none;
+  width: var(--icon-s48);
+  height: var(--icon-s48);
+  background-image:
+    repeating-linear-gradient(to right, var(--color-outline_variant) 0 var(--stroke-hairline_device_px), transparent var(--stroke-hairline_device_px) calc(var(--icon-s48) / 24)),
+    repeating-linear-gradient(to bottom, var(--color-outline_variant) 0 var(--stroke-hairline_device_px), transparent var(--stroke-hairline_device_px) calc(var(--icon-s48) / 24));
+  box-shadow: inset 0 0 0 calc(var(--icon-s48) / 12) rgb(from var(--color-warning) r g b / var(--opacity-press));
+}
+
+.f-icon-grid > .k-icon {
+  position: absolute;
+  inset: 0;
+}
+
+/* A slot a symbol is centred in, its middle marked across and down. */
+.f-slot {
+  position: relative;
+  flex: none;
+  width: var(--side);
+  height: var(--side);
+  outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface_variant);
+  background:
+    linear-gradient(var(--color-outline_variant), var(--color-outline_variant)) center / 100% var(--stroke-hairline_device_px) no-repeat,
+    linear-gradient(var(--color-outline_variant), var(--color-outline_variant)) center / var(--stroke-hairline_device_px) 100% no-repeat;
+}
+
+.f-slot > .k-icon {
+  position: absolute;
+  left: round(down, calc((var(--side) - var(--icon-size)) / 2), 1px);
+  top: round(down, calc((var(--side) - var(--icon-size)) / 2), 1px);
+}

@@ -61,3 +61,4 @@ mockups/radii       design/mockups/src/pages/foundations/radii.ts
 mockups/elevation   design/mockups/src/pages/foundations/elevation.ts
 mockups/focus       design/mockups/src/pages/foundations/focus.ts
 mockups/motion      design/mockups/src/pages/foundations/motion.ts
+mockups/icons       design/mockups/src/pages/foundations/icons.ts
