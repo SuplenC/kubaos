@@ -57,8 +57,8 @@
 //!
 //! `state` names the state such an action follows: its `subtitle` may be a table of one by the
 //! state's value, and the Actions whose `primary_when` holds come first, so Enter runs what applies
-//! next. While the state can't be read there is no subtitle by state, and the Actions keep their id
-//! order.
+//! next. While the state can't be read there is no subtitle by state, and the Actions with a
+//! `primary_when` come first, each part in id order.
 //!
 //! `identity` makes the Item a placeholder for a thing not there yet, such as an app not
 //! installed: it steps aside while another Item of that Identity is indexed. Its `remove` is what

@@ -2045,7 +2045,7 @@ DESKTOP
   fi
 
   # Typing "chrome" with Chrome installed lists the app first, and not the placeholder that
-  # installs it. "remove chrome" lists the app with KubaOS's Remove as the Action Enter runs, while
+  # installs it. "remove chrome" lists the app with KubaOS's Remove as the Action the Daemon marks, while
   # the package group is on; turning it off, through the choices file alone, withdraws Remove.
   # Without the app, the placeholder comes back.
   local ranked
@@ -2073,7 +2073,7 @@ DESKTOP
     sleep 1
   done
   if [[ $ranked == " apps/google-chrome>kubaos/remove "* ]]; then
-    echo "ok   typing 'remove chrome' lists the Chrome app first, with Remove as Enter's Action (${i}s)"
+    echo "ok   typing 'remove chrome' lists the Chrome app first, with Remove chosen (${i}s)"
   else
     echo "FAIL typing 'remove chrome' with Chrome installed lists:$ranked"
     bad=1
@@ -2104,11 +2104,11 @@ DESKTOP
     bad=1
   fi
 
-  # Wi-Fi is one Item, and the word typed chooses what Enter does.
+  # Wi-Fi is one Item, and the word typed chooses its Action.
   out="$(in_session "$query --primary 'wifi off' 'wifi on'" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
   if grep -E '^wifi off[[:blank:]]' <<<"$out" | grep -qE 'kubaos/wifi>kubaos/off( |$)' &&
     grep -E '^wifi on[[:blank:]]' <<<"$out" | grep -qE 'kubaos/wifi>kubaos/on( |$)'; then
-    echo "ok   'wifi off' and 'wifi on' find Wi-Fi with Turn off and Turn on as Enter's Action"
+    echo "ok   'wifi off' and 'wifi on' find Wi-Fi with Turn off and Turn on chosen"
   else
     echo "FAIL 'wifi off' and 'wifi on' find: $out"
     bad=1
@@ -2169,8 +2169,8 @@ DESKTOP
     echo "FAIL in the layouts app, czech and italian found: $out"; bad=1
   fi
   # The accents are one Item, whose first Action follows the keyboard settings: with them off,
-  # then on, typing either name finds it with the Action that applies, and "accents off" chooses
-  # Turn off whatever they are.
+  # then on, typing its title or a keyword finds it with the Action that applies, and
+  # "accents off" chooses Turn off whatever they are.
   local accents next found
   [[ -e $kbset ]] && cp -p "$kbset" "$kbset_saved"
   install -d -o "$USER_NAME" -g "$USER_NAME" "${kbset%/*}"
@@ -2181,15 +2181,15 @@ DESKTOP
     chown "$USER_NAME:" "$kbset.new"
     mv "$kbset.new" "$kbset"
     for i in $(seq 20); do
-      out="$(in_session "$query --primary 'Mac accents on Left Alt' accents 'accents off'" 2>&1 || true)"
-      found="$(grep -E '^(Mac accents on Left Alt|accents)[[:blank:]]' <<<"$out" | grep -cE "kubaos/mac-accents>kubaos/${next}( |\$)" || true)"
+      out="$(in_session "$query --primary 'Mac accents' accents 'accents off'" 2>&1 || true)"
+      found="$(grep -E '^(Mac accents|accents)[[:blank:]]' <<<"$out" | grep -cE "kubaos/mac-accents>kubaos/${next}( |\$)" || true)"
       [[ $found == 2 ]] && break
       sleep 1
     done
     if [[ $found == 2 ]] && grep -E '^accents off[[:blank:]]' <<<"$out" | grep -qE 'kubaos/mac-accents>kubaos/off( |$)'; then
       echo "ok   with mac_accents = $accents, the accents' Item offers Turn $next first, and 'accents off' Turn off (${i}s)"
     else
-      echo "FAIL with mac_accents = $accents, typing the accents' names finds: $out"
+      echo "FAIL with mac_accents = $accents, typing the accents' title and keyword finds: $out"
       bad=1
     fi
   done

@@ -75,8 +75,8 @@ kind = "scripts"
 # never an Item of its own. In place of `run`, a thing's action takes
 # `actions`, one table an Action by id, under
 # [extensions.kubaos.actions.<id>.actions.<action>]: each takes `title`,
-# `keywords`, the verbs that choose it from the query ("proxy off", "remove
-# docker"), and `run`, `arguments`, `terminal`, `confirm`, `role` and
+# `keywords`, its verbs ("proxy off", "remove docker" find the thing, and
+# Kotodama marks that Action for Enter), and `run`, `arguments`, `terminal`, `confirm`, `role` and
 # `delay_ms` as above. `state = "<state>"` names the state the thing is in: its
 # `subtitle` may be a table by the state's value (`{ true = "On: …", false =
 # "Off: …" }`), and the Actions whose `primary_when = { is = <value> }` (or
@@ -97,8 +97,8 @@ kind = "scripts"
 # `power.panel-power-saving`, `nix.unfree`, `kubaos.preview` and
 # `bluetooth.unnamed`, true or false; `power.scheduler` ("kernel", "lavd") and
 # `power.low-battery` ("power-saver", "super-saver", "off"). While a state
-# can't be read, the action shows, with no subtitle by state and its Actions
-# in id order.
+# can't be read, the action shows, with no subtitle by state and the Actions
+# with a `primary_when` first.
 #
 # What a `terminal = true` action runs in. It stays open once the action
 # exits, so what it said can be read, and floats (dot.float,
@@ -418,10 +418,10 @@ arguments = [{ name = "layouts", placeholder = "us,de" }]
 # View (SUPER + F1).
 
 [extensions.kubaos.actions.mac-accents]
-title = "Mac accents on Left Alt"
+title = "Mac accents"
 subtitle = { true = "On: Left Alt + e, then e, is é. Also ` à, u ö, i ô and n ñ", false = "Off: Left Alt is plain Alt, e, `, u, i and n too" }
 icon = "input-keyboard"
-keywords = ["accents", "dead keys", "option key", "macos", "diacritics", "keyboard"]
+keywords = ["accents", "left alt", "dead keys", "option key", "macos", "diacritics", "keyboard"]
 state = "keyboard.mac-accents"
 
 [extensions.kubaos.actions.mac-accents.actions.on]
@@ -544,7 +544,7 @@ primary_when = { is = true }
 title = "Clear notifications"
 subtitle = "Empty the notification history. Out of sight, out of mind"
 icon = "edit-clear-all"
-keywords = ["notifications", "dismiss"]
+keywords = ["dismiss"]
 run = ["qs", "ipc", "call", "notifications", "clear"]
 role = "destructive"
 
@@ -555,13 +555,13 @@ icon = "view-refresh"
 keywords = ["shell", "bar", "reload"]
 run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
 
-# "Focus stutter: on/off" is the Extension's own Item (crates/kotodama-kubaos,
+# "Focus stutter" is the Extension's own Item (crates/kotodama-kubaos,
 # shell.rs): Enter turns the focus tube's neon strike off or back on, on
 # controls and on the active window's border, and Ctrl+K picks on or off. It
 # writes `focusStutter` in ~/.config/kubaos/desktop/quickshell/settings.json,
 # keeping your comments; the shell reads it again at once, and Hyprland
-# (config/hypr/focus.lua) at the next focus change. "Always show the bell:
-# on/off" is one too, the same way: it writes `alwaysShowBell`, and the bar's
+# (config/hypr/focus.lua) at the next focus change. "Always show the bell"
+# is one too, the same way: it writes `alwaysShowBell`, and the bar's
 # bell shows all the time, or only while there's a notification.
 
 # Idle (crates/kubaos-idle). "Lock after…", "Screens off after…", "Suspend
@@ -871,7 +871,7 @@ state = "phone.link"
 
 [extensions.kubaos.actions.phone-link.actions.set-up]
 title = "Set up a phone"
-keywords = ["setup", "on", "enable", "start"]
+keywords = ["on", "enable", "start"]
 run = ["kubaos-setup", "--card", "phone"]
 primary_when = { is = false }
 
@@ -1100,7 +1100,7 @@ primary_when = { is = false }
 
 [extensions.kubaos.actions.unfree.actions.free-only]
 title = "Free packages only"
-keywords = ["block", "off", "disable", "forbid"]
+keywords = ["block", "off", "disable"]
 run = ["kubaos", "package", "unfree", "off"]
 terminal = true
 primary_when = { is = true }
@@ -1150,6 +1150,7 @@ icon = "web-browser"
 keywords = ["web browser", "apt", "packages"]
 state = "packages.chrome"
 identity = "app:google-chrome.desktop"
+shown_when = { state = "packages.chrome", is = false }
 remove = { run = ["kubaos", "packages", "disable", "chrome"], terminal = true }
 
 [extensions.kubaos.actions.packages-chrome.actions.install]
@@ -1260,7 +1261,7 @@ arguments = [{ name = "name", placeholder = "Vacation" }, { name = "when", place
 title = "Remove countdown"
 subtitle = "Take a countdown out of the clock popup, and out of the bar"
 icon = "alarm-symbolic"
-keywords = ["countdown", "clock", "delete"]
+keywords = ["clock", "delete"]
 run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "countdown", "remove", "{name}"]
 arguments = [{ name = "name", placeholder = "Vacation" }]
 role = "destructive"
@@ -1286,7 +1287,7 @@ arguments = [{ name = "zone", placeholder = "Tokyo" }]
 title = "Remove time zone"
 subtitle = "Take an extra clock out of the popup"
 icon = "preferences-system-time"
-keywords = ["time zone", "world clock", "clock", "delete"]
+keywords = ["world clock", "clock", "delete"]
 run = ["sh", "-c", 'out=$(kubaos-clock "$@" 2>&1) || notify-send -a Clock -u critical Clock "$out"', "sh", "zone", "remove", "{zone}"]
 arguments = [{ name = "zone", placeholder = "Tokyo" }]
 role = "destructive"
@@ -1465,18 +1466,18 @@ run = ["kubaos-power", "undo"]
 title = "Low battery drop"
 subtitle = { power-saver = "To Power Saver: at the low-battery level (20 %) on battery, with an Undo; it isn't remembered as your battery stop", super-saver = "To Super Saver: at the low-battery level (20 %) on battery, all the way down, with an Undo", off = "Off: the stop stays where you put it, however low the battery goes" }
 icon = "battery-caution"
-keywords = ["power stop", "low battery", "battery saver", "automatic", "20 percent", "power saver", "super saver"]
+keywords = ["power stop", "low battery", "battery saver", "automatic", "20 percent"]
 state = "power.low-battery"
 
 [extensions.kubaos.actions.low-battery.actions.power-saver]
 title = "Drop to Power Saver"
-keywords = ["power"]
+keywords = ["saver"]
 run = ["kubaos-power", "low-battery", "power-saver"]
 primary_when = { is_not = "power-saver" }
 
 [extensions.kubaos.actions.low-battery.actions.super-saver]
 title = "Drop to Super Saver"
-keywords = ["super"]
+keywords = ["supersaver"]
 run = ["kubaos-power", "low-battery", "super-saver"]
 primary_when = { is_not = "super-saver" }
 

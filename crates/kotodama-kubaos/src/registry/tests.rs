@@ -613,18 +613,50 @@ fn words(text: &str) -> Vec<String> {
 }
 
 #[test]
-fn no_destructive_action_of_kubaos_toml_has_words_of_its_title_as_a_keyword() {
+fn no_destructive_item_of_one_action_in_kubaos_toml_has_words_of_its_title_as_a_keyword() {
     let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
 
-    for item in registry
-        .items(&States::default())
-        .filter(|item| item.actions[0].confirm)
-    {
+    for item in registry.items(&States::default()).filter(|item| {
+        let [action] = &item.actions[..] else {
+            return false;
+        };
+        action.confirm || action.role == ActionRole::Destructive
+    }) {
         let title = words(&item.title);
         for keyword in &item.keywords {
             assert!(
                 !words(keyword).iter().all(|word| title.contains(word)),
                 "`{}` has `{keyword}`, words of its title, as a keyword",
+                item.id
+            );
+        }
+    }
+}
+
+/// Whether the query word `word` names the verb `keyword`, as Kotodama reads a verb: the whole
+/// keyword, or its first three letters or more.
+fn names(word: &str, keyword: &str) -> bool {
+    word == keyword || (word.chars().count() >= 3 && keyword.starts_with(word))
+}
+
+#[test]
+fn no_word_of_a_title_in_kubaos_toml_is_a_verb_of_an_item_with_several_actions() {
+    let (registry, _) = Registry::from_config(&shipped(), &crate::toggles::ids());
+    let items: Vec<Item> = registry.items(&States::default()).collect();
+    let verbs: BTreeSet<&str> = items
+        .iter()
+        .filter(|item| item.actions.len() > 1)
+        .flat_map(|item| &item.actions)
+        .flat_map(|action| &action.keywords)
+        .map(String::as_str)
+        .collect();
+
+    for item in items.iter().filter(|item| item.actions.len() > 1) {
+        for word in words(&item.title) {
+            let named: Vec<&&str> = verbs.iter().filter(|verb| names(&word, verb)).collect();
+            assert!(
+                named.is_empty(),
+                "`{}`'s title has `{word}`, which names the verbs {named:?}: typing the title would choose one",
                 item.id
             );
         }
@@ -1044,6 +1076,10 @@ fn google_chrome_waits_as_a_placeholder_and_is_removed_from_the_installed_app() 
 
     assert!(placeholder.yields);
     assert_eq!(placeholder.title, "Google Chrome");
+    assert!(
+        registry.items(&installed).all(|item| item.id != placeholder.id),
+        "the placeholder shows while the group is on"
+    );
     assert!(placeholder.actions[0].keywords.contains(&"install".to_owned()));
     assert_eq!(
         placeholder.actions[0].arguments.len(),

@@ -9,15 +9,17 @@
 
 // The place of the Item's own first Action in `actions`, the row's Action panel as
 // `KotodamaSearch.actions` lists it; -1 when the Item has none. kotodama-qml lists the chosen Action
-// first and the Item's own Actions next, in their order.
+// first, then the Item's own Actions in their order, its destructive ones after every other: so
+// for an Item whose own first Action is destructive, this is its first one that isn't.
 function usual(actions, chosen) {
     if (!chosen)
         return actions.length > 0 ? 0 : -1;
     return actions.findIndex((action, n) => n > 0 && action.group === "");
 }
 
-// The Action panel with the Item's own first Action first, as it is without a chosen Action. The
-// chosen one follows it, or goes last with the other destructive Actions, as the panel keeps them.
+// The Action panel opening on the Item's own first Action, which Enter runs. The chosen one follows
+// it, or goes last when it is destructive, where the panel keeps destructive Actions; the rest keep
+// kotodama-qml's order.
 function unchosen(actions, chosen) {
     const first = usual(actions, chosen);
     if (!chosen || first < 0)

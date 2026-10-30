@@ -265,14 +265,11 @@ impl<B, R: Runner> Extension<B, R> {
     }
 }
 
-/// The Identity of another Extension's Item of `kind`, as the apps Extension and a Folder source
-/// give an app's: `app:` and its desktop id. The Daemon names an Item to its Contributed actions
-/// by its id and kind alone.
+/// The Identity the apps Extension gives an app's Item of `kind`, `app:` and its desktop id: the
+/// Daemon names an Item to a Contributed action by its id and kind alone.
 fn identity(kind: &ItemKind) -> Option<String> {
-    let desktop_id = match kind {
-        ItemKind::App { desktop_id } => desktop_id.as_str(),
-        ItemKind::File { path } => path.file_name()?.to_str().filter(|name| name.ends_with(".desktop"))?,
-        _ => return None,
+    let ItemKind::App { desktop_id } = kind else {
+        return None;
     };
     Some(format!("app:{desktop_id}"))
 }

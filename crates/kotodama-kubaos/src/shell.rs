@@ -88,7 +88,7 @@ const SETTINGS: [Setting; 2] = [
         id: STUTTER,
         key: STUTTER_KEY,
         default: DEFAULT_STUTTER,
-        title: "Focus stutter: on/off",
+        title: "Focus stutter",
         subtitle: "The focus tube and the window border strike on like a neon sign, or simply fade in",
         icon: "preferences-desktop-accessibility",
         keywords: &[
@@ -108,7 +108,7 @@ const SETTINGS: [Setting; 2] = [
         id: BELL,
         key: BELL_KEY,
         default: DEFAULT_BELL,
-        title: "Always show the bell: on/off",
+        title: "Always show the bell",
         subtitle: "The bar's bell all the time, or only while there's a notification",
         icon: "preferences-system-notifications",
         keywords: &["notifications", "bell", "bar", "indicator"],

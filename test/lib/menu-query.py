@@ -3,8 +3,9 @@
 A Front end of its own on the Daemon's socket (Kotodama protocol 1.0, JSON):
 for each TEXT it sends a `query` and prints one line, the TEXT, a tab, then
 `<extension>/<item id>` for every Result, best first. With --primary, each
-Result is followed by `><extension>/<action id>`, the Action Enter runs on
-it: the one the query chose by its verb, else the Item's first. With --top, the line is
+Result is followed by `><extension>/<action id>`, the Action the Daemon marks
+for Enter: the one the query chose by its verb, else the Item's first. The
+shell's menu runs the Item's first all the same (its `enter.js`). With --top, the line is
 the TEXT, then the top Result's `<extension>/<item id>`, title and subtitle,
 tab-separated: what an answer in the top row says. With --app, it first
 enters the app of WORD from its entry Item, as a user does, and each TEXT is

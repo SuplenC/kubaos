@@ -192,3 +192,24 @@ fn each_setting_is_turned_on_or_off_by_the_word_typed() {
         );
     }
 }
+
+#[test]
+fn no_setting_has_a_verb_of_its_own_in_its_title() {
+    for item in items() {
+        let words: Vec<String> = item
+            .title
+            .split(|c: char| !c.is_alphanumeric())
+            .map(str::to_lowercase)
+            .collect();
+
+        for action in &item.actions {
+            for keyword in &action.keywords {
+                assert!(
+                    !words.contains(keyword),
+                    "`{}` has `{keyword}` in its title",
+                    item.title
+                );
+            }
+        }
+    }
+}

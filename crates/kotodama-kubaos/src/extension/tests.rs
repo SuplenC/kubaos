@@ -309,7 +309,7 @@ fn a_desk_item_comes_before_the_drives_and_goes_to_its_group_through_the_extensi
 }
 
 #[test]
-fn the_states_choose_which_half_of_a_pair_is_sent() {
+fn the_states_choose_which_actions_are_sent() {
     let mut extension = configured(
         r#"
         [actions.chrome-on]
@@ -377,22 +377,6 @@ fn remove_on_an_installed_app_runs_its_placeholders_remove() {
         extension.runner.launched.borrow()[0].0,
         ["ghostty", "-e", "kubaos", "packages", "disable", "chrome"]
     );
-}
-
-#[test]
-fn remove_on_a_desktop_file_runs_the_remove_of_its_app() {
-    let mut extension = configured(CHROME);
-    let file = ItemRef {
-        id: "/usr/share/applications/google-chrome.desktop".to_owned(),
-        kind: ItemKind::File {
-            path: "/usr/share/applications/google-chrome.desktop".into(),
-        },
-    };
-
-    let ran = extension.run(registry::REMOVE, &file, &BTreeMap::new());
-
-    assert_eq!(ran, Ok(Ran::Close));
-    assert_eq!(extension.runner.launched.borrow().len(), 1);
 }
 
 #[test]

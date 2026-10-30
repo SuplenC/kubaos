@@ -229,31 +229,37 @@ ListModel {
             return [];
         return [
             {
+                id: "open",
                 title: "Open",
                 group: "",
                 shortcut: ""
             },
             {
+                id: "new-window",
                 title: "Open in new window",
                 group: "",
                 shortcut: "ctrl+enter"
             },
             {
+                id: "copy-path",
                 title: "Copy path",
                 group: "",
                 shortcut: "ctrl+shift+c"
             },
             {
+                id: "forget",
                 title: "Forget",
                 group: "",
                 shortcut: "ctrl+shift+backspace"
             },
             {
+                id: "pin",
                 title: "Pin to the top",
                 group: "kubaos",
                 shortcut: "ctrl+p"
             },
             {
+                id: "search-web",
                 title: "Search the web for it",
                 group: "web-search",
                 shortcut: ""

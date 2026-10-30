@@ -56,6 +56,12 @@ TestCase {
         compare(Enter.hints("↵ Turn off · ⌃K Actions", wifiOff, true), "↵ Turn Wi-Fi on or off · ⌃K Actions");
     }
 
+    function test_an_items_destructive_own_first_action_never_runs_in_place_of_a_chosen_one() {
+        const docker = [entry("enable", "Enable", "other", "normal"), entry("install", "Install", "", "normal"), entry("remove", "Remove", "", "destructive")];
+
+        compare(Enter.usual(docker, true), 1);
+    }
+
     function test_an_item_with_no_action_of_its_own_runs_nothing() {
         const contributedOnly = [entry("remove", "Remove", "kubaos", "destructive")];
 
