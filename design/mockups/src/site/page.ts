@@ -78,8 +78,8 @@ export const STATE_NAMES: Record<State, string> = {
 };
 
 /**
- * The state matrix: a row per variant, a column per state it has in each mode, night then
- * daylight, each cell live in that mode. Every state the page doesn't show is in `absent` with
+ * The state matrix: a row per variant and a column per state it has, once in each mode, night
+ * then daylight, each cell live in that mode. Every state the page doesn't show is in `absent` with
  * why, which the types hold to the list.
  */
 export interface States<S extends State> {
