@@ -260,3 +260,34 @@
   opacity: calc(1 - var(--neon));
   mask-size: 100% 100%;
 }
+
+/* An icon tile (`lib/tile.ts`): its symbol or an app's picture centred on a whole device pixel, the
+   odd one after it; a photo covering the tile. */
+.k-tile {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--side);
+  height: var(--side);
+  border-radius: var(--radius-control);
+  background: var(--tint);
+  overflow: hidden;
+}
+
+.k-tile > .k-icon,
+.k-tile > .k-tile-picture {
+  position: absolute;
+  left: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
+  top: round(down, calc((var(--side) - var(--icon)) / 2), 1px);
+  width: var(--icon);
+  height: var(--icon);
+  object-fit: contain;
+}
+
+.k-tile > .k-tile-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
