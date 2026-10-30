@@ -10,8 +10,8 @@
 //!
 //! # Not here
 //!
-//! - A picture in a box of an aspect ratio: [`crate::component::media`]. What is new about it,
-//!   over its corner: [`crate::component::badge`].
+//! - A picture in a box of an aspect ratio: [`crate::component::media`]. What is new about it, over
+//!   its corner: [`crate::component::badge`].
 
 use iced::Background;
 use iced::Border;

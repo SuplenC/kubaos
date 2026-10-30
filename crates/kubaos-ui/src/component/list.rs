@@ -16,10 +16,10 @@ use iced::widget;
 use iced::widget::container;
 
 use crate::color;
-use crate::component::icon_tile::TileSize;
-use crate::component::icon_tile::icon_tile;
 use crate::component::chip::ChipKind;
 use crate::component::chip::chip;
+use crate::component::icon_tile::TileSize;
+use crate::component::icon_tile::icon_tile;
 use crate::component::layered;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
@@ -283,7 +283,7 @@ impl<'a, M: Clone + 'a> ListRow<'a, M> {
         }
         content = content.push(words);
         for (kind, label) in self.chips {
-            content = content.push(chip(look, kind, label, None, None, None));
+            content = content.push(chip(kind, label).view(look));
         }
         if let Some(detail) = self.detail {
             content = content.push(text(detail, Type::Mono, muted));

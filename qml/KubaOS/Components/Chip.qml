@@ -5,7 +5,9 @@ import KubaOS.Components as K
 // `chip::chip`. The label starts where the curve ends; an icon sits closer in. A removable chip
 // ends in a close button, a circle as tall as the chip, so its hover layer shares the chip's curve.
 // A pressable chip takes a press of its own (a pick made the default, a setting turned on), with
-// the state layer, and the keyboard, with the focus tube, unless it is no stop for Tab.
+// the state layer, and the keyboard, with the focus tube, unless it is no stop for Tab. Disabled
+// (`enabled: false`), its content is at the disabled opacity and the chip at its own, and neither
+// its press nor its close button takes the pointer or the keyboard.
 Item {
     id: root
 
@@ -36,6 +38,8 @@ Item {
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     readonly property var colours: {
         const c = Tokens.color;
+        if (!root.enabled)
+            return [K.Look.alpha(c.on_surface, Tokens.opacity.disabled_container), K.Look.alpha(c.on_surface, Tokens.opacity.disabled_content)];
         switch (root.kind) {
         case "Selected":
             return [c.secondary_container, c.on_secondary_container];

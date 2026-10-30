@@ -20,6 +20,7 @@ use iced::Shadow;
 use iced::Theme;
 use iced::widget;
 
+use crate::color;
 use crate::component::layered;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
@@ -35,6 +36,7 @@ use crate::look::radius;
 use crate::probe;
 use crate::probe::Fixed;
 use crate::text::line;
+use crate::tokens::Opacity;
 use crate::tokens::Radius;
 use crate::tokens::Size;
 use crate::tokens::Space;
@@ -42,16 +44,25 @@ use crate::tokens::Type;
 
 /// `content` under a header reading `title`, shown while `open`, in line with the title. A press on
 /// the header sends `on_toggle`; while it has the keyboard (`focused`) the focus tube lights the
-/// header.
+/// header. Without `on_toggle` it is disabled: the header's title and chevron at the disabled
+/// opacity, no hover, no press and no focus. What it holds is the caller's to disable with it.
 pub fn collapsible<'a, M: Clone + 'a>(
     look: &Look,
     title: impl Into<String>,
     open: bool,
-    on_toggle: M,
+    on_toggle: Option<M>,
     focused: bool,
     content: impl Into<Element<'a, M>>,
 ) -> Element<'a, M> {
     let c = look.colors;
+    let enabled = on_toggle.is_some();
+    let dim = |colour| {
+        if enabled {
+            colour
+        } else {
+            color::alpha(c.on_surface, Opacity::DisabledContent.value())
+        }
+    };
     let chevron = if open { Icon::ExpandLess } else { Icon::ExpandMore };
     let parts = row(look, Space::S12)
         .center()
@@ -60,14 +71,14 @@ pub fn collapsible<'a, M: Clone + 'a>(
         .push(
             stack(look, Gap::NONE)
                 .width(Extent::Fill)
-                .push(line(title, Type::BodyStrong, c.on_surface)),
+                .push(line(title, Type::BodyStrong, dim(c.on_surface))),
         )
-        .push(icon(look, chevron, Type::BodyStrong.icon(), c.on_surface_variant));
+        .push(icon(look, chevron, Type::BodyStrong.icon(), dim(c.on_surface_variant)));
     let header = widget::button(parts)
         .width(Length::Fill)
         .height(f32::from(Size::Row.px()))
         .padding(Inset::x(Space::S12).padding())
-        .on_press(on_toggle)
+        .on_press_maybe(on_toggle)
         .style(move |_theme: &Theme, _status| widget::button::Style {
             background: None,
             text_color: c.on_surface,
@@ -75,8 +86,8 @@ pub fn collapsible<'a, M: Clone + 'a>(
             shadow: Shadow::default(),
             snap: true,
         });
-    let header = layered(header, Radius::Control, c.on_surface, true, None);
-    let header = focus_ring(look, header, Radius::Control, focused, RingColor::Accent);
+    let header = layered(header, Radius::Control, c.on_surface, enabled, None);
+    let header = focus_ring(look, header, Radius::Control, focused && enabled, RingColor::Accent);
     let mut view = stack(look, Space::S8).width(Extent::Fill).push(header);
     if open {
         // In line with the title: the header's own inset at the sides, once, so the content

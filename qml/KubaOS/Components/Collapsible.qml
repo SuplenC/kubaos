@@ -5,7 +5,9 @@ import KubaOS.Components as K
 // a control as tall as a list row: its title, and a chevron at its end, down while closed and up
 // while open. Open, the content sits 8 under it, revealed over `medium` as a list reordering
 // settles (`standard_decel`); closing hides it over `short`. Enter, Space or a click on the header
-// toggles it (`toggled`); the owner keeps `open`.
+// toggles it (`toggled`); the owner keeps `open`. Disabled (`enabled: false`), the header's title
+// and chevron are at the disabled opacity, and it takes no hover, press or focus; what it holds is
+// the owner's to disable with it.
 Item {
     id: root
 
@@ -19,6 +21,7 @@ Item {
     signal toggled
 
     readonly property bool fillWidth: true
+    readonly property color disabledContent: K.Look.alpha(Tokens.color.on_surface, Tokens.opacity.disabled_content)
     readonly property var probe: ({
             role: "component",
             name: "Collapsible",
@@ -78,6 +81,7 @@ Item {
                     K.Text {
                         text: root.title
                         style: Tokens.type.body_strong
+                        color: root.enabled ? Tokens.color.on_surface : root.disabledContent
                         maximumLines: 1
                     }
                 }
@@ -85,7 +89,7 @@ Item {
                 K.Icon {
                     name: root.open ? "expand_less" : "expand_more"
                     size: Tokens.type.body_strong.icon
-                    color: Tokens.color.on_surface_variant
+                    color: root.enabled ? Tokens.color.on_surface_variant : root.disabledContent
                 }
             }
 

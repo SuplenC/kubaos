@@ -8,6 +8,7 @@ use iced_test::simulator::Simulator;
 
 use super::Caret;
 use super::Pointer;
+use super::State;
 use super::field;
 use crate::Look;
 use crate::Mode;
@@ -83,4 +84,25 @@ fn a_field_scrolled_up_a_page_takes_a_press_where_it_is_drawn() {
 
     let pressed: Vec<Pointer> = ui.into_messages().collect();
     assert_eq!(pressed, [Pointer::Press { pos: 4, extend: false }]);
+}
+
+#[test]
+fn a_disabled_field_takes_no_press_and_shows_no_caret() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let input = field::<Pointer>("Kuba", "Your name")
+        .state(State::Disabled)
+        .caret(Caret::at(2))
+        .on_pointer(|pointer| pointer)
+        .view(&look);
+    let page: Element<'_, Pointer> = widget::column![input].height(Length::Fill).into();
+    let mut ui = Simulator::with_size(iced::Settings::default(), Size::new(400.0, 200.0), page);
+    let on = iced::Point::new(20.0, 20.0);
+
+    ui.point_at(on);
+    let _ = ui.simulate([
+        iced::Event::Mouse(iced::mouse::Event::CursorMoved { position: on }),
+        iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+    ]);
+
+    assert_eq!(ui.into_messages().count(), 0);
 }

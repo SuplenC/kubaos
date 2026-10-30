@@ -3,7 +3,8 @@ import KubaOS.Components as K
 
 // One of a few cards to pick from, at the surface radius: `kubaos-ui`'s `card::choice_card`. The
 // picked one takes the secondary container and an accent hairline; its focus tube is the cold
-// one, since the accent already means picked here.
+// one, since the accent already means picked here. Disabled (`enabled: false`), what it holds is at
+// the disabled opacity and the card is the disabled container, with no hover, press or focus.
 K.Pressable {
     id: root
 
@@ -38,6 +39,8 @@ K.Pressable {
         radius: Tokens.radius.surface
         color: {
             const c = Tokens.color;
+            if (!root.enabled)
+                return K.Look.alpha(c.on_surface, Tokens.opacity.disabled_container);
             if (root.checked)
                 return c.secondary_container;
             if (root.enabled && root.pointerOver)
@@ -61,6 +64,7 @@ K.Pressable {
 
         width: root.width
         fill: true
+        opacity: root.enabled ? 1 : Tokens.opacity.disabled_content
         leftPadding: Tokens.space.s16
         rightPadding: Tokens.space.s16
         topPadding: Tokens.space.s16

@@ -5,8 +5,9 @@ import KubaOS.Components as K
 // radius, a hairline the focus tube takes over, `body_large` text. An optional 20 icon leads it,
 // the text starting past it. A placeholder is a hint, never a value that looks typed.
 //
-// States: `Normal`; `Invalid`, in the error colour with the reason in the note under it; and
-// `Locked`, read-only, dimmed and never focused.
+// States: `Normal`; `Invalid`, in the error colour with the reason in the note under it; `Locked`,
+// read-only, dimmed and never focused; and `Disabled`, not usable now: the content at the disabled
+// opacity, the field at its own, no hover and no stop for Tab.
 FocusScope {
     id: root
 
@@ -23,7 +24,7 @@ FocusScope {
     property string icon: ""
     // Bullets instead of the value: a password.
     property bool secret: false
-    // `Normal`, `Invalid` or `Locked`.
+    // `Normal`, `Invalid`, `Locked` or `Disabled`.
     property string status: "Normal"
     // Whether the keyboard is on it; Qt's focus by default, or the app's where it owns focus.
     property bool focused: input.activeFocus
@@ -33,6 +34,10 @@ FocusScope {
 
     readonly property bool fillWidth: true
     readonly property bool locked: root.status === "Locked"
+    readonly property bool disabled: root.status === "Disabled"
+    // Takes no input: no caret, no hover, no focus.
+    readonly property bool inert: root.locked || root.disabled
+    readonly property color disabledContent: K.Look.alpha(Tokens.color.on_surface, Tokens.opacity.disabled_content)
     readonly property real dpr: Window.window ? Window.window.devicePixelRatio : 1
     // Where the text starts: 12 in, or past the icon and 8 more.
     readonly property real textStart: root.icon === "" ? Tokens.space.s12 : Tokens.space.s12 + Tokens.type.body_large.icon + Tokens.space.s8
@@ -47,7 +52,7 @@ FocusScope {
         })
 
     implicitHeight: Tokens.size.control_md
-    activeFocusOnTab: !root.locked
+    activeFocusOnTab: !root.inert
 
     Rectangle {
         anchors.fill: parent
@@ -55,6 +60,8 @@ FocusScope {
         border.width: K.Look.hairline(root.dpr)
         border.color: {
             const c = Tokens.color;
+            if (root.disabled)
+                return K.Look.alpha(c.on_surface, Tokens.opacity.disabled_container);
             if (root.locked)
                 return K.Look.alpha(c.outline_variant, Tokens.opacity.locked);
             if (root.status === "Invalid")
@@ -65,6 +72,8 @@ FocusScope {
         }
         color: {
             const c = Tokens.color;
+            if (root.disabled)
+                return K.Look.alpha(c.on_surface, Tokens.opacity.disabled_container);
             if (root.locked)
                 return K.Look.alpha(c.surface_container_high, Tokens.opacity.locked);
             if (root.status === "Normal" && (root.focused || hover.hovered))
@@ -97,7 +106,7 @@ FocusScope {
             y: K.Look.snap((root.height - Tokens.type.body_large.icon) / 2, root.dpr)
             name: root.icon
             size: Tokens.type.body_large.icon
-            color: Tokens.color.on_surface_variant
+            color: root.disabled ? root.disabledContent : Tokens.color.on_surface_variant
         }
     }
 
@@ -109,14 +118,14 @@ FocusScope {
         width: root.width - root.textStart - Tokens.space.s12
         height: Tokens.type.body_large.line
         focus: true
-        readOnly: root.locked
-        enabled: !root.locked
+        readOnly: root.inert
+        enabled: !root.inert
         clip: true
         echoMode: root.secret ? TextInput.Password : TextInput.Normal
         // iced's bullet; Qt's default is the heavier black circle.
         passwordCharacter: "•"
         verticalAlignment: TextInput.AlignVCenter
-        color: root.locked ? Tokens.color.on_surface_variant : Tokens.color.on_surface
+        color: root.disabled ? root.disabledContent : root.locked ? Tokens.color.on_surface_variant : Tokens.color.on_surface
         selectionColor: K.Look.alpha(Tokens.color.primary, Tokens.opacity.selection)
         selectedTextColor: Tokens.color.on_surface
         font.family: Tokens.type.body_large.family
@@ -138,7 +147,7 @@ FocusScope {
             visible: input.text === "" && input.preeditText === ""
             text: root.placeholder
             verticalAlignment: Text.AlignVCenter
-            color: K.Look.alpha(Tokens.color.on_surface_variant, Tokens.opacity.placeholder_text)
+            color: root.disabled ? root.disabledContent : K.Look.alpha(Tokens.color.on_surface_variant, Tokens.opacity.placeholder_text)
             font: input.font
         }
     }
@@ -146,12 +155,12 @@ FocusScope {
     HoverHandler {
         id: hover
 
-        enabled: !root.locked
+        enabled: !root.inert
         cursorShape: Qt.IBeamCursor
     }
 
     K.FocusRing {
-        shown: root.focused && !root.locked
+        shown: root.focused && !root.inert
         error: root.status === "Invalid"
         controlRadius: Tokens.radius.control
     }

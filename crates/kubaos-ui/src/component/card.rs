@@ -54,7 +54,10 @@ pub fn card_sized<'a, M: 'a>(look: &Look, content: impl Into<Element<'a, M>>, he
 }
 
 /// One of a few cards to pick from. The picked one takes the secondary container and an accent
-/// hairline; focus is the cold ring, since the accent already means picked here.
+/// hairline; focus is the cold ring, since the accent already means picked here. Without `on_pick`
+/// it is disabled: the card is the disabled container, with no hover and no ring, and the caller
+/// builds `content` at the disabled opacity (`look.faded(Opacity::DisabledContent.value())`), since
+/// iced can't dim what it is given.
 pub fn choice_card<'a, M: Clone + 'a>(
     look: &Look,
     content: impl Into<Element<'a, M>>,
@@ -70,7 +73,9 @@ pub fn choice_card<'a, M: Clone + 'a>(
         .padding(Inset::all(Space::S16).padding())
         .on_press_maybe(on_pick)
         .style(move |_theme: &Theme, status| {
-            let fill = if picked {
+            let fill = if !enabled {
+                color::alpha(c.on_surface, Opacity::DisabledContainer.value())
+            } else if picked {
                 c.secondary_container
             } else if enabled && matches!(status, widget::button::Status::Hovered) {
                 color::mix(c.surface_container_low, c.on_surface, Opacity::Hover.value())
@@ -89,6 +94,6 @@ pub fn choice_card<'a, M: Clone + 'a>(
                 snap: true,
             }
         });
-    let view: Element<'a, M> = focus_ring(look, pressable, CARD_RADIUS, focused, RingColor::Cold);
+    let view: Element<'a, M> = focus_ring(look, pressable, CARD_RADIUS, focused && enabled, RingColor::Cold);
     probe::component("ChoiceCard", ["", "", ""], Fixed::HOLDS, view)
 }

@@ -82,6 +82,16 @@ pub enum State {
     Invalid,
     /// Read-only: dimmed, never focused.
     Locked,
+    /// Not usable now: the content at the disabled opacity, the field at its own, no hover, no
+    /// caret and never focused.
+    Disabled,
+}
+
+impl State {
+    /// Whether the field takes no input: no caret, no presses, no hover.
+    fn inert(self) -> bool {
+        matches!(self, State::Locked | State::Disabled)
+    }
 }
 
 /// Where the caret is in a field's value and what is selected, in `char`s: a field drawn with
@@ -233,8 +243,8 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
 
     pub fn view(self, look: &Look) -> Element<'a, M> {
         let variant = [if self.icon.is_some() { "icon" } else { "" }, "", ""];
-        let locked = self.state == State::Locked;
-        let caret = self.caret.filter(|_| !locked);
+        let inert = self.state.inert();
+        let caret = self.caret.filter(|_| !inert);
         let shown = if self.secret {
             "•".repeat(self.value.chars().count())
         } else {
@@ -249,7 +259,7 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
             blink_from: self.blink_from,
             colors: look.colors,
             scale: look.scale,
-            on_pointer: self.on_pointer.filter(|_| !locked),
+            on_pointer: self.on_pointer.filter(|_| !inert),
         });
         let focused = caret.is_some();
         let tint = if self.state == State::Invalid {
@@ -263,10 +273,15 @@ impl<'a, M: Clone + 'a> Field<'a, M> {
         };
         // The icon is drawn over the field, in a box 12 wider than itself on each side, so it
         // centres on the field's height on a whole device pixel.
+        let mark_color = if self.state == State::Disabled {
+            color::alpha(look.colors.on_surface, Opacity::DisabledContent.value())
+        } else {
+            look.colors.on_surface_variant
+        };
         let well = f32::from(Space::S12.px() * 2 + Type::BodyLarge.icon().px());
         let mark = widget::container(centre(
             look.scale,
-            icon(look, glyph, Type::BodyLarge.icon(), look.colors.on_surface_variant),
+            icon(look, glyph, Type::BodyLarge.icon(), mark_color),
         ))
         .width(well)
         .height(Length::Fill);
@@ -395,6 +410,10 @@ impl<M> Input<'_, M> {
                 color::alpha(c.outline_variant, Opacity::Locked.value()),
                 color::alpha(c.surface_container_high, Opacity::Locked.value()),
             ),
+            State::Disabled => {
+                let container = color::alpha(c.on_surface, Opacity::DisabledContainer.value());
+                (container, container)
+            }
             State::Invalid => (c.error, c.surface_container_high),
             State::Normal if self.caret.is_some() => (c.primary, c.surface_container_highest),
             State::Normal if hovered => (c.outline, c.surface_container_highest),
@@ -462,7 +481,7 @@ impl<M> Widget<M, Theme, Renderer> for Input<'_, M> {
             // The cursor, not the event's position: in a scrolled page the cursor is where the
             // field is drawn, the event's position is where it is in the window.
             Event::Mouse(mouse::Event::CursorMoved { .. }) => {
-                let hovered = self.state != State::Locked && cursor.is_over(bounds);
+                let hovered = !self.state.inert() && cursor.is_over(bounds);
                 if hovered != state.hovered {
                     state.hovered = hovered;
                     shell.request_redraw();
@@ -559,7 +578,11 @@ impl<M> Widget<M, Theme, Renderer> for Input<'_, M> {
                 renderer.fill_paragraph(
                     state.placeholder.raw(),
                     Point::new(room.x, room.y),
-                    color::alpha(c.on_surface_variant, Opacity::PlaceholderText.value()),
+                    if self.state == State::Disabled {
+                        color::alpha(c.on_surface, Opacity::DisabledContent.value())
+                    } else {
+                        color::alpha(c.on_surface_variant, Opacity::PlaceholderText.value())
+                    },
                     clip,
                 );
             } else {
@@ -579,10 +602,10 @@ impl<M> Widget<M, Theme, Renderer> for Input<'_, M> {
                         Background::Color(color::alpha(c.primary, Opacity::Selection.value())),
                     );
                 }
-                let value = if self.state == State::Locked {
-                    c.on_surface_variant
-                } else {
-                    c.on_surface
+                let value = match self.state {
+                    State::Locked => c.on_surface_variant,
+                    State::Disabled => color::alpha(c.on_surface, Opacity::DisabledContent.value()),
+                    State::Normal | State::Invalid => c.on_surface,
                 };
                 renderer.fill_paragraph(state.value.raw(), Point::new(room.x - offset, room.y), value, clip);
             }

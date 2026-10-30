@@ -9,6 +9,10 @@ import KubaOS.Components as K
 //
 // The picture is `source`, or content put in the tile, laid over the placeholder and under the
 // name and the chips (a video).
+//
+// Disabled (`enabled: false`), the picture is at the disabled opacity (its placeholder the
+// disabled container), its name and chips dim, the tube is off, and it takes no press, hover or
+// focus.
 Item {
     id: root
 
@@ -75,6 +79,7 @@ Item {
                 source: root.source
                 aspect: root.aspect
                 radius: Tokens.radius.control
+                dimmed: !root.enabled
 
                 // Over a photo the name is always light on a dark foot, whatever the mode: the
                 // scrim's colour at the backdrop's opacity, from nothing 40% down the tile.
@@ -104,7 +109,7 @@ Item {
                     maximumLines: 1
                     text: root.name
                     style: Tokens.type.small
-                    color: Tokens.palette.dark.on_surface
+                    color: root.enabled ? Tokens.palette.dark.on_surface : K.Look.alpha(Tokens.palette.dark.on_surface, Tokens.opacity.disabled_content)
                 }
 
                 K.Chip {
@@ -134,7 +139,7 @@ Item {
             }
 
             K.FocusRing {
-                shown: root.picked || root.focused
+                shown: (root.picked || root.focused) && root.enabled
                 cold: root.picked && root.focused
                 controlRadius: Tokens.radius.control
             }
@@ -146,7 +151,7 @@ Item {
             maximumLines: 1
             text: root.name
             style: Tokens.type.small
-            color: root.picked ? Tokens.color.on_surface : Tokens.color.on_surface_variant
+            color: !root.enabled ? K.Look.alpha(Tokens.color.on_surface, Tokens.opacity.disabled_content) : root.picked ? Tokens.color.on_surface : Tokens.color.on_surface_variant
         }
     }
 }
