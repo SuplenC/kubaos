@@ -60,7 +60,7 @@ const SURFACES: [&str; 6] = [
 fn every_fixed_role_is_held_as_text_and_as_a_mark_on_every_surface() {
     let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
 
-    for role in ["sharing", "microphone", "camera", "success"] {
+    for role in ["sharing", "microphone", "recording", "success"] {
         assert_eq!(
             tokens.color.source.get(role).map(String::as_str),
             Some(""),
@@ -76,15 +76,5 @@ fn every_fixed_role_is_held_as_text_and_as_a_mark_on_every_surface() {
                 assert!(held, "{role} on {bg} as {need:?}");
             }
         }
-    }
-}
-
-#[test]
-fn success_is_the_camera_s_green() {
-    let tokens = crate::parse(TOKENS).expect("the repo's tokens hold");
-
-    for palette in [&tokens.color.dark, &tokens.color.light] {
-        let success = palette.get("success").expect("success has a value");
-        assert_eq!(Some(success), palette.get("camera"));
     }
 }

@@ -768,10 +768,12 @@ warning = ""
 burn_sharing = ""
 sharing = ""
 # The privacy dots: a microphone that is listening, in an orange clear of the warning's amber and
-# the error's red, and a camera that is watching, in done's green.
+# the error's red, and anything recording, the camera watching or the screen being recorded, in
+# the recording red: crimson, a step cooler and darker than the error's red.
 burn_microphone = ""
 microphone = ""
-camera = ""
+burn_recording = ""
+recording = ""
 # The logo's own cores, along the middles of the クバ mark's warm and cold tubes
 # (`[neon.mark]`): brand art, paler than a control's, and the same in both modes.
 logo_core_warm = ""
@@ -821,6 +823,7 @@ burn_success = "oklch(0.74 0.18 150)"
 burn_warning = "oklch(0.85 0.17 88)"
 burn_sharing = "oklch(0.68 0.21 300)"
 burn_microphone = "oklch(0.74 0.19 55)"
+burn_recording = "oklch(0.62 0.25 18)"
 
 [color.light]
 primary = "#8b4c00"
@@ -866,6 +869,7 @@ burn_success = "oklch(0.62 0.16 150)"
 burn_warning = "oklch(0.84 0.16 85)"
 burn_sharing = "oklch(0.52 0.22 300)"
 burn_microphone = "oklch(0.70 0.18 55)"
+burn_recording = "oklch(0.54 0.22 18)"
 
 # The roles computed from a tone, whichever palette is drawn. None is a fixed
 # value: each is a recipe over the live tone, the wallpaper's where it sets one,
@@ -904,8 +908,7 @@ success = { from = "burn_success", text_on = ["surface", "surface_container_lowe
 warning = { from = "burn_warning", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
 sharing = { from = "burn_sharing", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
 microphone = { from = "burn_microphone", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
-# The watching camera's dot is done's green: one green for the palette.
-camera = { from = "success" }
+recording = { from = "burn_recording", text_on = ["surface", "surface_container_lowest", "surface_container_low", "surface_container", "surface_container_high", "surface_container_highest"] }
 # The rest of the error family, from the same tone: a container that is the
 # tone deep at night and pale by day, and the labels fitted to the error and
 # to its container.
@@ -922,6 +925,7 @@ success_core = { mix = "burn_success", white = 0.5 }
 warning_core = { mix = "burn_warning", white = 0.5 }
 sharing_core = { mix = "burn_sharing", white = 0.5 }
 microphone_core = { mix = "burn_microphone", white = 0.5 }
+recording_core = { mix = "burn_recording", white = 0.5 }
 # A tone unlit: deep, not pale, at 60% of its lightness and 1.2 times its
 # chroma, as far as sRGB holds it. On hues already at the gamut's edge there
 # (cyan, green, yellow) that is the most saturated fill the lightness allows.
@@ -932,6 +936,7 @@ success_unlit = { from = "burn_success", lightness = 0.6, chroma = 1.2 }
 warning_unlit = { from = "burn_warning", lightness = 0.6, chroma = 1.2 }
 sharing_unlit = { from = "burn_sharing", lightness = 0.6, chroma = 1.2 }
 microphone_unlit = { from = "burn_microphone", lightness = 0.6, chroma = 1.2 }
+recording_unlit = { from = "burn_recording", lightness = 0.6, chroma = 1.2 }
 
 # Filled. At night the fill stays unlit, resting, lit and pressed, and the
 # letters light: near white, tinted 18% with the tone at rest and 8% lit. Lit
@@ -1104,18 +1109,18 @@ pairs = [
   { fg = "microphone", bg = "surface_container", need = "graphic", use = "A listening microphone's dot, on a panel or a pill of the bar" },
   { fg = "microphone", bg = "surface_container_high", need = "graphic", use = "A listening microphone's dot, on a card or a dialog" },
   { fg = "microphone", bg = "surface_container_highest", need = "graphic", use = "A listening microphone's dot, on the highest container" },
-  { fg = "camera", bg = "surface", need = "text", use = "A watching camera's words, on a page" },
-  { fg = "camera", bg = "surface_container_lowest", need = "text", use = "A watching camera's words, on the lock screen" },
-  { fg = "camera", bg = "surface_container_low", need = "text", use = "A watching camera's words, on a well" },
-  { fg = "camera", bg = "surface_container", need = "text", use = "A watching camera's words, on a panel or a pill of the bar" },
-  { fg = "camera", bg = "surface_container_high", need = "text", use = "A watching camera's words, on a card or a dialog" },
-  { fg = "camera", bg = "surface_container_highest", need = "text", use = "A watching camera's words, on the highest container" },
-  { fg = "camera", bg = "surface", need = "graphic", use = "A watching camera's dot, on a page" },
-  { fg = "camera", bg = "surface_container_lowest", need = "graphic", use = "A watching camera's dot, on the lock screen" },
-  { fg = "camera", bg = "surface_container_low", need = "graphic", use = "A watching camera's dot, on a well" },
-  { fg = "camera", bg = "surface_container", need = "graphic", use = "A watching camera's dot, on a panel or a pill of the bar" },
-  { fg = "camera", bg = "surface_container_high", need = "graphic", use = "A watching camera's dot, on a card or a dialog" },
-  { fg = "camera", bg = "surface_container_highest", need = "graphic", use = "A watching camera's dot, on the highest container" },
+  { fg = "recording", bg = "surface", need = "text", use = "Recording's words, on a page" },
+  { fg = "recording", bg = "surface_container_lowest", need = "text", use = "Recording's words, on the lock screen" },
+  { fg = "recording", bg = "surface_container_low", need = "text", use = "Recording's words, on a well" },
+  { fg = "recording", bg = "surface_container", need = "text", use = "Recording's words, on a panel or a pill of the bar" },
+  { fg = "recording", bg = "surface_container_high", need = "text", use = "Recording's words, on a card or a dialog" },
+  { fg = "recording", bg = "surface_container_highest", need = "text", use = "Recording's words, on the highest container" },
+  { fg = "recording", bg = "surface", need = "graphic", use = "Recording's dot, on a page" },
+  { fg = "recording", bg = "surface_container_lowest", need = "graphic", use = "Recording's dot, on the lock screen" },
+  { fg = "recording", bg = "surface_container_low", need = "graphic", use = "Recording's dot, on a well" },
+  { fg = "recording", bg = "surface_container", need = "graphic", use = "Recording's dot, on a panel or a pill of the bar" },
+  { fg = "recording", bg = "surface_container_high", need = "graphic", use = "Recording's dot, on a card or a dialog" },
+  { fg = "recording", bg = "surface_container_highest", need = "graphic", use = "Recording's dot, on the highest container" },
   { fg = "success", bg = "surface", need = "text", use = "Done or installed, on a page" },
   { fg = "success", bg = "surface_container_lowest", need = "text", use = "Done or installed, on the lock screen" },
   { fg = "success", bg = "surface_container_low", need = "text", use = "Done or installed, on a well" },
@@ -1142,7 +1147,7 @@ pairs = [
 # `primary_glass`, `burn_error_line`, `burn_error_glass` and the rest), which
 # marks the state its fill and label already show. `kubaos-design contrast`
 # fails on a role drawn with that is in no pair and not here.
-decorative = ["burn_error_glass", "burn_error_line", "burn_success_glass", "burn_success_line", "burn_warning_glass", "burn_warning_line", "cold_container", "cold_core", "cold_unlit", "error_core", "error_unlit", "logo_core_cold", "logo_core_warm", "microphone_core", "microphone_unlit", "outline_variant", "primary_core", "primary_fill_glass", "primary_fill_line", "primary_glass", "primary_unlit", "scrim", "shadow", "sharing_core", "sharing_unlit", "success_core", "success_unlit", "surface_bright", "warning_core", "warning_unlit"]
+decorative = ["burn_error_glass", "burn_error_line", "burn_success_glass", "burn_success_line", "burn_warning_glass", "burn_warning_line", "cold_container", "cold_core", "cold_unlit", "error_core", "error_unlit", "logo_core_cold", "logo_core_warm", "microphone_core", "microphone_unlit", "outline_variant", "primary_core", "primary_fill_glass", "primary_fill_line", "primary_glass", "primary_unlit", "recording_core", "recording_unlit", "scrim", "shadow", "sharing_core", "sharing_unlit", "success_core", "success_unlit", "surface_bright", "warning_core", "warning_unlit"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes

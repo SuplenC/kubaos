@@ -102,16 +102,16 @@ fn the_fixed_roles_are_written_in_both_palettes() {
     let module = module();
 
     for role in [
-        "sharing: Rgb { r: 0xc9, g: 0xa7, b: 0xff },",
-        "sharing: Rgb { r: 0x6b, g: 0x3f, b: 0xc4 },",
+        "sharing: Rgb { r: 0xb4, g: 0x84, b: 0xff },",
+        "sharing: Rgb { r: 0x80, g: 0x38, b: 0xd1 },",
         "logo_core_warm: Rgb { r: 0xff, g: 0xe6, b: 0xcf },",
         "logo_core_cold: Rgb { r: 0xdc, g: 0xf1, b: 0xff },",
-        "microphone: Rgb { r: 0xff, g: 0x9f, b: 0x45 },",
-        "microphone: Rgb { r: 0xa0, g: 0x4a, b: 0x00 },",
-        "camera: Rgb { r: 0x5f, g: 0xd2, b: 0x7a },",
-        "camera: Rgb { r: 0x1b, g: 0x71, b: 0x31 },",
-        "success: Rgb { r: 0x5f, g: 0xd2, b: 0x7a },",
-        "success: Rgb { r: 0x1b, g: 0x71, b: 0x31 },",
+        "microphone: Rgb { r: 0xff, g: 0x85, b: 0x05 },",
+        "microphone: Rgb { r: 0x9e, g: 0x50, b: 0x00 },",
+        "recording: Rgb { r: 0xff, g: 0x6d, b: 0x78 },",
+        "recording: Rgb { r: 0xcb, g: 0x00, b: 0x3a },",
+        "success: Rgb { r: 0x3c, g: 0xc9, b: 0x6a },",
+        "success: Rgb { r: 0x00, g: 0x75, b: 0x33 },",
     ] {
         assert!(module.contains(role), "{role}");
     }
