@@ -89,6 +89,9 @@
   --press: 0;
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --on: calc(var(--lit) * var(--signs));
+  /* The line's share of the lit state, worked out here: the ring under the button keeps a `--lit`
+     of its own for other controls, which would hide the button's. */
+  --line-shown: var(--lit);
   --lit-fill: color-mix(in srgb, var(--fill-off), var(--fill-lit) calc(var(--signs) * 100%));
   background: color-mix(
     in srgb,
@@ -269,7 +272,7 @@
    only the glow round it shows, with the signs on. */
 .k-button > .k-ring > .k-tube {
   border-color: color-mix(in srgb, var(--edge-off), var(--edge) calc(var(--signs) * 100%));
-  opacity: var(--lit);
+  opacity: var(--line-shown);
 }
 
 .k-button > .k-ring > .k-glow {
