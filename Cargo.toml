@@ -76,8 +76,8 @@ tempfile = "3"
 # runs under. They aren't on crates.io yet. Bump `rev` with every
 # `nix flake update kotodama`: the harness's `menu_kubaos` check fails while
 # the two differ.
-kotodama-extension = { git = "https://github.com/SuplenC/kotodama", rev = "ee7d7f93954fef4118eb7cfff60cc7eaad72e5d8" }
-kotodama-protocol = { git = "https://github.com/SuplenC/kotodama", rev = "ee7d7f93954fef4118eb7cfff60cc7eaad72e5d8" }
+kotodama-extension = { git = "https://github.com/SuplenC/kotodama", rev = "8ec76a4a2af93684238bdf897508b55e9cba83b6" }
+kotodama-protocol = { git = "https://github.com/SuplenC/kotodama", rev = "8ec76a4a2af93684238bdf897508b55e9cba83b6" }
 
 # The lints of docs/agents/code-quality.md, which every crate takes with
 # `[lints] workspace = true`. `just lint` runs clippy with -D warnings, so
