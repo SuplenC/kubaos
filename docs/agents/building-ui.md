@@ -8,7 +8,7 @@ The aim is that building an app is assembly: the parts are designed, built and a
 
 `docs/DESIGN.md`, "Levels and where they live", defines them: tokens, atoms, molecules, organisms, templates, apps. In short:
 
-- **Atoms, molecules and templates live in the component library**, in both toolkits (`kubaos-ui` and `KubaOS.Components`), each with its page under `docs/design/components/` and its section in the specimen; a part only the shell has may be in `KubaOS.Components` alone (`docs/DESIGN.md`, "Levels and where they live").
+- **Atoms, molecules and templates live in the component library**, in both toolkits (`kubaos-ui` and `KubaOS.Components`), each with its page under `docs/design/components/` and its section in the specimen; a part only the shell has may be in `KubaOS.Components` alone, with its section on the QML specimen's "Shell only" page, which the parity check skips (`docs/DESIGN.md`, "Levels and where they live").
 - **Organisms live in the app.** They are built only from library parts.
 - **An app-only molecule** may live in its app when it means something only there and is unlikely to be needed elsewhere. It is still built only from library atoms. The moment a second surface needs it, it moves into the library (moved, never copied) and goes through the same review as any new component.
 
