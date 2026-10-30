@@ -1,6 +1,6 @@
 // The Button page: `docs/design/components/button.md`, as the specimens draw it today.
 
-import { button, filledWithTone, KINDS, type Kind, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
+import { button, contentInTone, filledWithTone, KINDS, type Kind, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { row } from "../../lib/layout.ts";
 import { el, label } from "../../site/dom.ts";
@@ -92,10 +92,12 @@ function on(list: readonly Kind[]): string {
 
 const FILLED = KINDS.filter(filledWithTone);
 const EDGED = KINDS.filter((kind) => !filledWithTone(kind));
+const LIT_CONTENT = KINDS.filter(contentInTone);
 
 /**
  * The neon's parts from `from` to `to`: the glow on every kind, the tube inside the edge of a kind
- * not filled with its tone, and the core inside the fill's edge of one that is.
+ * not filled with its tone, the core inside the fill's edge of one that is, and the label of one
+ * whose content is drawn in its tone, core-hot with its own glow.
  */
 function neon<C extends Curve>(from: number, to: number, duration: Duration, curve: C): NonEmpty<Track<C>> {
   const part = (name: string, list: readonly Kind[], target: string): Track<C> => ({
@@ -112,17 +114,22 @@ function neon<C extends Curve>(from: number, to: number, duration: Duration, cur
     part("glow", KINDS, ".k-glow"),
     part("tube", EDGED, ".k-ring:not([data-filled]) > .k-tube"),
     part("core", FILLED, ".k-ring[data-filled] > .k-tube"),
+    part("label", LIT_CONTENT, ".k-lit"),
   ];
 }
 
 /**
  * In daylight the neon is off: the unlit glass of the tube and of the core comes and goes over
- * `short`, never struck. The glow keeps its track, so the player is the same in both modes, but
- * daylight puts it out.
+ * `short`, never struck. The glow and the lit label keep their tracks, so the player is the same in
+ * both modes, but daylight puts them out.
  */
 function glass(from: number, to: number): NonEmpty<Track<Easing>> {
-  const [glow, ...rest] = neon(from, to, "short", "standard");
-  return [{ ...glow, on: "every kind, unseen: daylight puts the glow out" }, ...rest];
+  const unseen: Record<string, string> = {
+    glow: "every kind, unseen: daylight puts the glow out",
+    label: `${on(LIT_CONTENT)}, unseen: daylight leaves the label its own tone`,
+  };
+  const [first, ...rest] = neon(from, to, "short", "standard").map((track) => ({ ...track, on: unseen[track.part] ?? track.on }));
+  return [first!, ...rest];
 }
 
 /** The state layer from `from` to `to` over `micro`. */
@@ -139,7 +146,7 @@ export default page({
   description: [
     "A button names its action in sentence case, as the user would say it: Erase and install, never OK. Its label is its size's button style on a line as tall as the button's content box, so the label sits in the middle of the button on the grid, with the size's padding at its sides.",
     "Its corners take the control radius (`radius.control`); an icon-only button is an `IconButton`, a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon is the label's style's icon size, in a box the label's line tall, centred on a whole device pixel, so an icon never changes a button's height.",
-    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it, in the kind's tone: red (`error`) on Danger, the accent on the others. A Filled or a Danger button is filled with its tone's colour, so its fill is the tube and the tone's hot core (`primary_core`, `error_core`) is the line inside the fill's edge, the thin stroke wide, at the button's corner. Nothing but the glow reaches past the button's box, so its shape never seems to grow. That is its lit look; its unlit look is the same line as unlit glass (the tone's `_unlit`, 35% toward black; on Tonal and Text at `focus.glass` over the button's own container), with no glow. Light mode is always unlit, and dark mode is unlit while a sequence has the lights out: the scene picks the look, never the user. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
+    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it, in the kind's tone: red (`error`) on Danger, the accent on the others. A Filled or a Danger button is filled with its tone's colour, so its fill is the tube and the tone's hot core (`primary_core`, `error_core`) is the line inside the fill's edge, the thin stroke wide, at the button's corner. A Text button's label and icon are drawn in its tone with nothing under them, so they light as a tube too: `primary_core` letters and icon with the tone's near and far glow round them, scaled by the label's stroke over the tube's width, burning, striking and going out with the line. Nothing but the glow reaches past the button's box, so its shape never seems to grow. That is its lit look; its unlit look is the same line as unlit glass (the tone's `_unlit`, 35% toward black; on Tonal and Text at `focus.glass` over the button's own container), with no glow, and a Text button's label its own `primary`. Light mode is always unlit, and dark mode is unlit while a sequence has the lights out: the scene picks the look, never the user. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
     "A held button (`Button::on_hold`) is pressed for a while instead of clicked, and a timed bar beside it shows how far along the hold is: Kōbō's Install, held with the mouse or Enter. It looks like any button of its kind.",
   ],
   variants: nonEmpty(KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") }))),
@@ -162,16 +169,16 @@ export default page({
       rest: "Its fill and content, nothing over them.",
       hovered: "The content colour over the fill at `opacity.hover`, faded in over `micro`.",
       pressed: "The content colour at `opacity.press`, over `micro`.",
-      focused: "Focused from the keyboard, in the look the scene gives it, never one the user picks: lit in dark mode at rest, unlit in light mode and in dark mode while a sequence has the lights out (the next column). Lit: the neon tube inside its edge in the kind's tone, `focus.tube` wide rounded half up to device pixels, and the glow outside it in the same tone: the near glow over `focus.near`, the far one over `focus.far`. On Filled and Danger, the fill is the tube: the tone's core (`primary_core`, `error_core`, half way to white) is the line inside the fill's edge, `stroke.thin` wide, and the glow is outside. Danger's is red. In light mode this column is the unlit look. Hover and press still lay their layer under it.",
+      focused: "Focused from the keyboard, in the look the scene gives it, never one the user picks: lit in dark mode at rest, unlit in light mode and in dark mode while a sequence has the lights out (the next column). Lit: the neon tube inside its edge in the kind's tone, `focus.tube` wide rounded half up to device pixels, and the glow outside it in the same tone: the near glow over `focus.near`, the far one over `focus.far`. On Filled and Danger, the fill is the tube: the tone's core (`primary_core`, `error_core`, half way to white) is the line inside the fill's edge, `stroke.thin` wide, and the glow is outside. Danger's is red. On Text, the label and icon are a tube too: `primary_core`, with the near and far glow round them, scaled by the label's stroke over `focus.tube`. In light mode this column is the unlit look. Hover and press still lay their layer under it.",
       disabled: "Content at `opacity.disabled_content` of `on_surface`, fill at `opacity.disabled_container` of it (none on Text); no layer, no focus, no action.",
     },
   },
   focus: {
-    tubes: nonEmpty(KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filledWithTone(kind) }))),
+    tubes: nonEmpty(KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filledWithTone(kind), content: contentInTone(kind) }))),
     looks: {
-      lit: "The neon burning, in dark mode at rest: the tube inside the edge in the kind's tone, or on Filled and Danger the tone's core half way to white inside the fill's edge, with the glow outside.",
+      lit: "The neon burning, in dark mode at rest: the tube inside the edge in the kind's tone, or on Filled and Danger the tone's core half way to white inside the fill's edge, with the glow outside. On Text the label and icon burn too: `primary_core`, with the glow round them.",
       unlit:
-        "The same line as unlit glass, with no glow: on Filled and Danger the tone's `_unlit` core (35% toward black) inside the fill's edge, `stroke.thin` wide; on Tonal and Text, `primary_unlit` at `focus.glass` over the button's own container, `focus.tube` wide. Light mode is always this look, so there this column is the same as Focused; dark mode shows it while a sequence has the lights out (the theme change, the switch to light or dark), in the dark palette's `_unlit`. Nothing the user does picks it: the scene does.",
+        "The same line as unlit glass, with no glow: on Filled and Danger the tone's `_unlit` core (35% toward black) inside the fill's edge, `stroke.thin` wide; on Tonal and Text, `primary_unlit` at `focus.glass` over the button's own container, `focus.tube` wide; a Text button's label is its own `primary`, with no glow. Light mode is always this look, so there this column is the same as Focused; dark mode shows it while a sequence has the lights out (the theme change, the switch to light or dark), in the dark palette's `_unlit`. Nothing the user does picks it: the scene does.",
     },
     unlit: (index: number) => sample(ROWS[index]!.kind, ROWS[index]!.size, "unlit"),
   },
@@ -212,7 +219,7 @@ export default page({
       },
       {
         name: "Focus arrives",
-        what: "The tube strikes on in the kind's tone as the boot sign's tubes do, `neon.strike`'s steps over `medium`, and the glow with it: red on Danger, the accent on the others. On Filled and Danger the fill is the tube, so the core strikes inside the fill's edge. In light mode the neon is off: the unlit glass fades in over `short`, never struck, and the glow stays out.",
+        what: "The tube strikes on in the kind's tone as the boot sign's tubes do, `neon.strike`'s steps over `medium`, and the glow with it: red on Danger, the accent on the others. On Filled and Danger the fill is the tube, so the core strikes inside the fill's edge; on Text the label strikes with the tube, core-hot with its glow. In light mode the neon is off: the unlit glass fades in over `short`, never struck, and the glow and the lit label stay out.",
         tracks: neon(0, 1, "medium", "neon.strike"),
         reduced: neon(0, 1, "short", "standard"),
         unstuttered: neon(0, 1, "short", "standard"),
@@ -222,7 +229,7 @@ export default page({
       },
       {
         name: "Focus leaves",
-        what: "The tube, the core and the glow fade out together; in light mode the unlit glass alone.",
+        what: "The tube, the core, the glow and Text's lit label fade out together, the label back to its own `primary`; in light mode the unlit glass alone.",
         tracks: neon(1, 0, "short", "standard"),
         reduced: "same",
         daylight: glass(1, 0),
