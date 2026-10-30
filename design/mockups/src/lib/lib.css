@@ -350,6 +350,109 @@
   opacity: 0;
 }
 
+/* A checkbox or a radio (`lib/check.ts`): its box, then its label, one press target. Unpicked,
+   the box is the highest container with a hairline of `outline` inside its edge. Picked, it is
+   filled with the accent: at night the unlit fill (`primary_fill`) with its mark `on_primary_fill`,
+   brightening to `on_primary_fill_lit` with the signs on, as a Filled button's label does;
+   pressed, the fill lifts. Unpicked and pressed by day, the tone tints the box, as under a Text
+   button. The fill, the outline and the mark fade on `--checked`; its line is the tube unpicked
+   and the core picked (`--edge`). The label is `on_surface` and doesn't light. */
+.k-check {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  cursor: pointer;
+  --fill-on: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
+  --box: color-mix(in srgb, var(--color-surface_container_highest), var(--fill-on) calc(var(--checked) * 100%));
+  --mark: color-mix(in srgb, var(--color-on_primary_fill), var(--color-on_primary_fill_lit) calc(var(--on) * 100%));
+  --words: var(--color-on_surface);
+  --edge: color-mix(in srgb, var(--color-primary), var(--color-primary_fill_line) calc(var(--checked) * 100%));
+  --edge-off: color-mix(
+    in srgb,
+    rgb(from var(--color-primary_unlit) r g b / var(--focus-glass)),
+    var(--color-primary_fill_glass) calc(var(--checked) * 100%)
+  );
+}
+
+.k-check-box {
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--size-check);
+  height: var(--size-check);
+  border-radius: var(--radius-small);
+  background: linear-gradient(var(--tint), var(--tint)), var(--box);
+}
+
+.k-check-box[data-shape="disc"] {
+  border-radius: var(--radius-full);
+}
+
+/* The hairline inside the box's edge while unpicked, fading as it is picked. */
+.k-check-box::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--color-outline);
+  border-radius: inherit;
+  opacity: calc(1 - var(--checked));
+}
+
+.k-check-mark {
+  position: absolute;
+  inset: 0;
+  opacity: var(--checked);
+}
+
+/* The tick: `icon.s16` centred in the box on a whole device pixel. */
+.k-check-tick {
+  position: absolute;
+  left: round(nearest, calc((var(--size-check) - var(--icon-s16)) / 2), 1px);
+  top: round(nearest, calc((var(--size-check) - var(--icon-s16)) / 2), 1px);
+}
+
+/* A partial tick: the box less `space.s4` at each side wide, a thin stroke tall, on whole device
+   pixels. */
+.k-check-dash {
+  position: absolute;
+  --thick: max(1px, round(nearest, var(--stroke-thin), 1px));
+  left: var(--space-s4);
+  top: round(nearest, calc((var(--size-check) - var(--thick)) / 2), 1px);
+  width: calc(var(--size-check) - 2 * var(--space-s4));
+  height: var(--thick);
+  background: var(--mark);
+}
+
+.k-check:not([data-tick="Full"]) .k-check-tick,
+.k-check:not([data-tick="Partial"]) .k-check-dash {
+  display: none;
+}
+
+/* A picked radio's dot, `size.radio_dot` across, centred on a whole device pixel. */
+.k-check-dot {
+  position: absolute;
+  left: round(nearest, calc((var(--size-check) - var(--size-radio_dot)) / 2), 1px);
+  top: round(nearest, calc((var(--size-check) - var(--size-radio_dot)) / 2), 1px);
+  width: var(--size-radio_dot);
+  height: var(--size-radio_dot);
+  border-radius: var(--radius-full);
+  background: var(--mark);
+}
+
+.k-check:disabled {
+  cursor: default;
+  --box: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --mark: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+  --words: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.k-check:disabled .k-check-box::before {
+  opacity: 0;
+}
+
 /* A control in the state model (`docs/DESIGN.md`, "States"): a button, an icon button, a switch,
    a checkbox, a radio, a pressable chip. Its states are numbers: `--lit`, hovered or focused, and
    `--press`. Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while
