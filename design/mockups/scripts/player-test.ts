@@ -1,8 +1,9 @@
 // Drives the motion players of the built site (`dist/`) in headless Chromium and holds them to
 // their recipes: seeking on the plot holds the exact frame, and each track's ball sits on its
 // curve at the progress the browser is playing, for every easing and each of `neon.strike`'s
-// steps, with the move's own tracks, reduced motion's, light mode's and the stutter off's. Each part alone moves
-// with the whole, a mark seeks to its moment, and the arrow keys step a 60 Hz frame.
+// steps, with the move's own tracks, reduced motion's, light mode's and the stutter off's. Each
+// part alone moves with the whole, or with its own ball where a later track on its property wins
+// the whole, a mark seeks to its moment, and the arrow keys step a 60 Hz frame.
 //
 //   node scripts/player-test.ts [PAGE...]
 //
@@ -35,7 +36,7 @@ function check(ok: boolean, what: string): void {
 /** What one player shows held at a time: per ball, its progress, where it sits, and what plays. */
 interface Held {
   time: number;
-  balls: { part: string; progress: number; cy: number; want: number; onCurve: boolean; played: number[]; alone: number[] }[];
+  balls: { part: string; progress: number; cy: number; want: number; onCurve: boolean; played: number[]; alone: number[]; followed: boolean }[];
   head: number;
   cx: number[];
 }
@@ -57,7 +58,9 @@ async function held(page: Page, index: number): Promise<Held> {
       curve.style.strokeDasharray = dash;
       return result;
     };
-    const balls = [...plot.querySelectorAll<SVGCircleElement>(".page-plot-ball")].map((ball, i) => {
+    const circles = [...plot.querySelectorAll<SVGCircleElement>(".page-plot-ball")];
+    const keyOf = (ball: SVGCircleElement) => `${ball.dataset.target}|${ball.dataset.property}`;
+    const balls = circles.map((ball, i) => {
       const target = ball.dataset.target!;
       const property = ball.dataset.property!;
       const progress = Number(ball.dataset.progress);
@@ -73,6 +76,9 @@ async function held(page: Page, index: number): Promise<Held> {
         onCurve: undashed(curves[i]!, (curve) => curve.isPointInStroke(centre)),
         played: [...stage.querySelectorAll(target)].map((element) => value(element, property)),
         alone: alone[i] ? [...alone[i]!.querySelectorAll(target)].map((element) => value(element, property)) : [],
+        // A later track on the same target and property wins it on the whole sample, from its
+        // lead's value on: the whole plays the last one's.
+        followed: circles.some((other, j) => j > i && keyOf(other) === keyOf(ball)),
       };
     });
     const head = Number(plot.querySelector(".page-plot-head")!.getAttribute("x1"));
@@ -153,11 +159,19 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
         check(Math.abs(ball.cy - ball.want) <= PIXEL, `${where} at ${shown.time} ms: ${ball.part}'s ball at y ${ball.cy}, its progress ${ball.progress} is drawn at ${ball.want}`);
         check(ball.onCurve, `${where} at ${shown.time} ms: ${ball.part}'s ball is off its curve`);
         check(Math.abs(shown.cx[i]! - shown.head) <= 1, `${where} at ${shown.time} ms: ${ball.part}'s ball isn't on the playhead`);
-        for (const p of playing) {
-          check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} plays at ${p}, its ball says ${ball.progress}`);
-        }
-        for (const v of ball.alone) {
-          check(Math.abs(v - (ball.played[0] ?? v)) <= 1e-6, `${where} at ${shown.time} ms: ${ball.part} alone plays ${v}, the whole ${ball.played[0]}`);
+        if (ball.followed) {
+          // Its part alone plays it alone: held to its own ball, as the whole is to the last's.
+          for (const v of ball.alone) {
+            const p = (v - range.from) / (range.to - range.from);
+            check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} alone plays at ${p}, its ball says ${ball.progress}`);
+          }
+        } else {
+          for (const p of playing) {
+            check(Math.abs(p - ball.progress) <= PROGRESS, `${where} at ${shown.time} ms: ${ball.part} plays at ${p}, its ball says ${ball.progress}`);
+          }
+          for (const v of ball.alone) {
+            check(Math.abs(v - (ball.played[0] ?? v)) <= 1e-6, `${where} at ${shown.time} ms: ${ball.part} alone plays ${v}, the whole ${ball.played[0]}`);
+          }
         }
         checked++;
         balls++;
