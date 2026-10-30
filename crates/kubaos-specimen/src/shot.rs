@@ -188,7 +188,7 @@ fn lay_out<'a>(
 ) -> (UserInterface<'a, Message, Theme, Renderer>, Size<u32>) {
     let factor = specimen.scale.factor();
     let mut ui = UserInterface::build(
-        specimen::view(specimen),
+        specimen::view(specimen, None),
         Size::new(width, MEASURE_HEIGHT),
         user_interface::Cache::default(),
         renderer,

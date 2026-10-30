@@ -3,7 +3,7 @@
 //! # Owns
 //!
 //! - Picking the page, and each page's content: [`type_scale`], [`colour`], [`space`],
-//!   [`components`], [`icons`] and [`motion`].
+//!   [`components`], [`icons`], [`motion`] and [`templates`].
 //!
 //! # Not here
 //!
@@ -14,6 +14,7 @@ mod components;
 pub mod icons;
 mod motion;
 mod space;
+pub mod templates;
 mod type_scale;
 
 use iced::Element;
@@ -58,6 +59,12 @@ pub fn view<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
             "Seven durations, seven curves. Each animation takes the pair for what it is, never by \
              feel.",
         ),
+        Page::Templates => (
+            "型",
+            "A screen's layout before an app fills it. SidebarPage: an app's sections beside a page \
+             that scrolls, Home's search at the top. Here in its states; in the window, live: resize \
+             it, and drive it with the keys.",
+        ),
     };
     let body = match specimen.page {
         Page::Type => type_scale::view(look),
@@ -66,6 +73,7 @@ pub fn view<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
         Page::Components => components::view(look),
         Page::Icons => icons::view(look),
         Page::Motion => motion::view(look, specimen.seconds, specimen.live),
+        Page::Templates => templates::view(look),
     };
     stack(look, Space::S40)
         .push(header(look, accent, specimen.page.title(), lede))

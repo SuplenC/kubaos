@@ -146,7 +146,7 @@ Every style names the icon that sits beside it on its line (`icon` in `[type.*]`
 | Spacing (`[space]`) | 4, 8, 12, 16, 20, 24, 32, 40, 48, 64 |
 | Radii (`[radius]`) | three roles, small 4, control 12, surface 24, and `full`; below |
 | Icon sizes (`[icon]`) | 16, 20, 24, 32, 48 |
-| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 36, compact 28, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; column 560; rail 236 (Kōbō's); an app's sidebar 264; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48 |
+| Component sizes (`[size]`) | control sm 32, md 40, lg 48; row 44, two-line row 56, compact row 28; menu 240; chip 24; badge 16, its dot 8; keycap 20; switch 44 × 24, knob 12 off, 16 on; slider 36, compact 28, its step dot 6, its anchor dot 10 and 8 (compact), its sticky point's hold 12; check 20, radio dot 8; progress 8; dialog 500; a password field alone on a screen (the lock screen's) 320; the find box over an app's page 320; column 560; rail 236 (Kōbō's); an app's sidebar 264; an app's window 1120 × 720, at least 720 × 480; log 232; scrollbar 4; the shell's panel 384 and bar 40; a wallpaper's thumbnail 256 × 160; sparkline 48 |
 | Container padding (`[container]`) | 16 under 640, 24 from 640, 32 from 1024 |
 | Aspect ratios (`[aspect]`) | wallpaper 16:10 |
 
@@ -294,7 +294,7 @@ Everything a person sees is built from a few levels, each made only from the one
 
 "The library" is both libraries below, with the same names. A part only the shell has (the bar's `Pill`) may be in `KubaOS.Components` alone: its page says so, and it stays out of both specimens and the variants table until `kubaos-ui` has it, since parity holds the two pages to each other box for box. A molecule may stay in its app only when it means something only there and is unlikely to be needed elsewhere; when a second surface needs it, it moves into the library. An app never builds a part of a lower level itself: `docs/agents/building-ui.md` is how a new UI gets the parts it needs, and in what order.
 
-*Not enforced yet:* the library has no templates; the first ones come with the next app (no issue yet).
+The templates are `kubaos-ui`'s: [SidebarPage](design/components/sidebar-page.md), an app's sections beside a page that scrolls, is the first. A template's own parts (the sidebar's rows) are drawn by it from atoms, as a component's are.
 
 **Which library:**
 
@@ -347,6 +347,8 @@ Each component reports its shared name, its variant (the words below that apply,
 | `PictureChoice` | `name-over` or `name-under` | none, holds content | control |
 | `Card`, `ChoiceCard` | none | none, holds content | surface |
 | `Page`, `Container`, `Section` | none | none, holds content | none |
+| `SidebarPage` | none | none, holds content | none |
+| `SidebarRow` | `section` or `sub` | height | control |
 | `Header`, `Divider`, `Labelled`, `Note`, `EmptyState`, `KeyHints` | none | none | none |
 <!-- variants:end -->
 
@@ -422,6 +424,10 @@ Each component has a page of its own under `design/components/`: its constructor
 - [Step](design/components/step.md)
 - [DescriptionList](design/components/description-list.md)
 - [FocusRing](design/components/focus-ring.md)
+
+**Templates**
+
+- [SidebarPage and SidebarRow](design/components/sidebar-page.md)
 
 **Panels and the bar**
 

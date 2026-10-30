@@ -45,6 +45,7 @@ specimen/space      crates/kubaos-specimen/src/pages/space.rs
 specimen/components crates/kubaos-specimen/src/pages/components.rs crates/kubaos-specimen/src/pages/components
 specimen/icons      crates/kubaos-specimen/src/pages/icons
 specimen/motion     crates/kubaos-specimen/src/pages/motion.rs
+specimen/templates  crates/kubaos-specimen/src/pages/templates.rs
 specimen/qml        qml/specimen qml/package.nix design/package.nix crates/checks.nix
 terminals           config/ghostty config/foot config/tmux config/nvim config/btop config/lazygit config/bat config/fuzzel config/ohmyposh config/fastfetch config/matugen scripts/dot-config branding/fastfetch.txt home/links.nix user-layer/terminal/fastfetch test/shots/terminals test/shots/terminal
 plymouth            system/files/plymouth system/files/fonts system/files/initramfs-tools test/shots/boot/plymouth

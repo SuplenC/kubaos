@@ -35,7 +35,7 @@ K.Stack {
                 align: "centre"
 
                 Repeater {
-                    model: ["Type", "Colour", "Space and shape", "Components", "Icons", "Motion"]
+                    model: ["Type", "Colour", "Space and shape", "Components", "Icons", "Motion", "Templates"]
 
                     K.Button {
                         required property string modelData

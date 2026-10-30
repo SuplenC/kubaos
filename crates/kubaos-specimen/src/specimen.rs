@@ -36,6 +36,7 @@ use kubaos_ui::layout::page;
 use kubaos_ui::layout::row;
 use kubaos_ui::layout::stack;
 use kubaos_ui::look::radius;
+use kubaos_ui::template::sidebar_page;
 use kubaos_ui::text::text;
 use kubaos_ui::tokens::Opacity;
 use kubaos_ui::tokens::Radius;
@@ -43,6 +44,8 @@ use kubaos_ui::tokens::Space;
 use kubaos_ui::tokens::Type;
 
 use crate::pages;
+use crate::pages::templates;
+use crate::pages::templates::Demo;
 
 /// A page of the specimen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,16 +56,18 @@ pub enum Page {
     Components,
     Icons,
     Motion,
+    Templates,
 }
 
 impl Page {
-    pub const ALL: [Page; 6] = [
+    pub const ALL: [Page; 7] = [
         Page::Type,
         Page::Colour,
         Page::Space,
         Page::Components,
         Page::Icons,
         Page::Motion,
+        Page::Templates,
     ];
 
     pub fn title(self) -> &'static str {
@@ -73,6 +78,7 @@ impl Page {
             Page::Components => "Components",
             Page::Icons => "Icons",
             Page::Motion => "Motion",
+            Page::Templates => "Templates",
         }
     }
 
@@ -85,6 +91,7 @@ impl Page {
             Page::Components => "components",
             Page::Icons => "icons",
             Page::Motion => "motion",
+            Page::Templates => "templates",
         }
     }
 
@@ -124,22 +131,29 @@ pub enum Message {
     Key(iced::keyboard::Event),
     /// A press on a sample: the components look enabled, and nothing happens.
     Sample,
+    /// The live template's own.
+    Template(sidebar_page::Message),
 }
 
 /// The id of the specimen's whole content, which a screenshot measures.
 pub const ROOT: &str = "specimen-root";
 
-pub fn view(specimen: &Specimen) -> Element<'_, Message> {
+/// The specimen; on the templates page in the window, `demo` live in all the room under the bar,
+/// so resizing the window resizes it.
+pub fn view<'a>(specimen: &'a Specimen, demo: Option<&'a Demo>) -> Element<'a, Message> {
     let look = Look::new(specimen.mode, specimen.scale);
-    let content = pages::view(specimen, &look);
-    let body: Element<'_, Message> = if specimen.live {
-        widget::scrollable(page(&look, content))
-            .height(Length::Fill)
-            .style(move |_theme, status| scroller(&look, status))
-            .into()
-    } else {
-        page(&look, content)
-    };
+    let body: Element<'a, Message> =
+        if let Some(demo) = demo.filter(|_| specimen.live && specimen.page == Page::Templates) {
+            templates::live(demo, &look)
+        } else if specimen.live {
+            let content = pages::view(specimen, &look);
+            widget::scrollable(page(&look, content))
+                .height(Length::Fill)
+                .style(move |_theme, status| scroller(&look, status))
+                .into()
+        } else {
+            page(&look, pages::view(specimen, &look))
+        };
     let whole = stack(&look, Gap::NONE)
         .push(bar(specimen, &look))
         .push(divider(&look))
@@ -182,10 +196,7 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
             .push(text("KubaOS design specimen", Type::Subheading, c.on_surface))
             .push(tabs)
             .push(fill())
-            .push(key_hints(
-                look,
-                &[("Tab", "next page"), ("← →", "pages"), ("M", "mode")],
-            ))
+            .push(key_hints(look, hints(specimen)))
             .push(chip(look, ChipKind::Neutral, scale, None, None, None::<Message>))
             .push(
                 icon_button(glyph, label)
@@ -195,6 +206,16 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
                     .view(look),
             ),
     )
+}
+
+/// The keys the bar names: the specimen's own, or, on the templates page in the window, where its
+/// keys are the template's, the template's.
+fn hints(specimen: &Specimen) -> &'static [(&'static str, &'static str)] {
+    if specimen.live && specimen.page == Page::Templates {
+        &[("/", "find"), ("Tab", "next region"), ("Ctrl+PgDn", "next section")]
+    } else {
+        &[("Tab", "next page"), ("← →", "pages"), ("M", "mode")]
+    }
 }
 
 /// Kōbō's scroller: no rail, a thin pill in the muted text colour, stronger under the pointer.
