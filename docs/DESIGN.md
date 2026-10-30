@@ -369,8 +369,10 @@ Each component has a page of its own under `design/components/`: its constructor
 - [IconButton and Hint](design/components/icon-button.md)
 - [Tooltip](design/components/tooltip.md)
 
-**Text**
+**Text and icons**
 
+- [Text](design/components/text.md)
+- [Icon](design/components/icon.md)
 - [Figure](design/components/figure.md)
 
 **Keys**
