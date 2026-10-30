@@ -114,7 +114,7 @@ export function button(options: ButtonOptions): HTMLButtonElement {
   layer.className = "k-layer";
   const content = row(m.gap, "start", ...children);
   element.append(layer, content);
-  focusRing(element, "control", TONES[kind], filledWithTone(kind), contentInTone(kind) ? { content, style: m.label } : undefined);
+  focusRing(element, "control", TONES[kind], filledWithTone(kind), contentInTone(kind) ? { content } : undefined);
   const placement = !options.icon ? "" : options.trailing ? "trailing-icon" : "leading-icon";
   return probe(element, { role: "component", name: "Button", variant: variant(kind, size, placement), fixed: FIXED_HEIGHT });
 }

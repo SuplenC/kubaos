@@ -156,6 +156,9 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.var("focus-near_opacity", number(focus.near_opacity));
     out.length("focus-far", focus.far);
     out.var("focus-far_opacity", number(focus.far_opacity));
+    out.comment("Content drawn in its tone, lit: a faint near glow only.");
+    out.length("focus-content_near", focus.content_near);
+    out.var("focus-content_glow", number(focus.content_glow));
     out.length("focus-offset", focus.offset);
     out.var("focus-glass", number(focus.glass));
     for (name, shadow) in &tokens.shadow {

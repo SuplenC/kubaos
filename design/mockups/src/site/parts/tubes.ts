@@ -12,7 +12,7 @@ function described(tube: Tube): string {
   const colour = toneColour(tube.tone);
   const tone = tube.tone === "accent" ? "the accent" : `the ${tube.tone} tone`;
   const content = tube.content
-    ? ` Its content is drawn in \`${colour}\`, so it lights with the line: lit, its letters and icon are \`${colour}_core\` with the glow round them in \`${colour}\`, striking and going out with the tube; unlit, they are \`${colour}\`, with no glow.`
+    ? ` Its content is drawn in \`${colour}\`, so it lights with the line: lit, its letters and icon are \`${colour}_core\` with a faint near glow round them in \`${colour}\` (\`focus.content_near\` from \`focus.content_glow\`) and no far glow, striking and going out with the tube; unlit, they are \`${colour}\`, with no glow.`
     : "";
   const line = tube.filled
     ? `In ${tone}: filled with \`${colour}\`, so its fill is the tube and the line inside the fill's edge is its core. Lit, the core is \`${colour}_core\` with the glow outside in \`${colour}\`; unlit, it is \`${colour}_unlit\`, with no glow.`
