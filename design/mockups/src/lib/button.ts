@@ -168,7 +168,7 @@ const role = (name: string | null) => (name ? `var(--color-${name})` : "transpar
 
 /**
  * Sets `element`'s colours as `kind`'s, its fill, label and line in every state and look, as the
- * custom properties `.k-button` crossfades.
+ * custom properties `.k-kind` crossfades.
  */
 export function paintKind(element: HTMLElement, kind: Kind): void {
   const colours = COLOURS[kind];
@@ -201,7 +201,7 @@ export function button(options: ButtonOptions): HTMLButtonElement {
   const size = options.size ?? "Md";
   const m = METRICS[size];
   const element = document.createElement("button");
-  element.className = "k-button k-control";
+  element.className = "k-button k-kind k-control";
   element.type = "button";
   element.disabled = options.disabled ?? false;
   pin(element, options.pinned);
