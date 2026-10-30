@@ -10,6 +10,10 @@ How a PR that changes how something looks gets its screenshots and its review. T
 4. **Review the changed pairs against `docs/agents/design-review.md`**, `docs/DESIGN.md` and the pages of the components it touches (`docs/design/components/`). Run your reviewer sub-agent in the foreground (`run_in_background: false` on the Agent tool), so its report comes back to you and not to the coordinator. Fix what it finds and render again.
 5. **Attach the pairs: `just shots publish chore/shots-<your-branch>`.** It pushes `changed.txt`'s pairs to that image-only branch and prints the Markdown table; paste it into the PR body, with each visible change listed as a decision for Kuba.
 
+## Reviewing a mockup
+
+A mockup is reviewed live, not through pictures alone. The agent pushes its branch and names the pages it added or changed; Kuba runs `just mockups` in that branch's checkout and opens them, switches the toolbar through light and dark, the four scales, reduce motion, the speed, the text lengths and the window sizes, plays the motion, and tries the keys. He may change the page himself. Before it reaches him the agent has run `just mockups-check` (the mocked components' boxes held to the specimen's), rendered the pages with `just shots mockups --full`, reviewed them against `docs/agents/design-review.md`, and, for a part that exists already, compared them with its current build's shots, listing every difference as a question. The mockup is approved when Kuba says so.
+
 ## Live preview
 
 Kuba may want to try a UI change on his own desktop before it is reviewed: sketch, build it on a branch, try it live, give feedback, iterate. When the brief says the work is meant for a live preview, build and commit it on the branch, run `just check`, then **stop before the shots and the PR** and report the branch and its worktree. Kuba previews it with `kubaos switch --from <branch>` and goes back with `kubaos switch --release` (`docs/USING.md`, "Hacking on KubaOS"). Never run either yourself: they switch his home. Once he's happy, the loop above goes on from step 1 on the same branch. A preview changes only what the home builds; a change to `system/`, apt or the boot can't be tried this way.
@@ -25,6 +29,7 @@ Kuba may want to try a UI change on his own desktop before it is reviewed: sketc
 | `just shots --ref REV` | BEFORE is the merge base with REV |
 | `just shots --full` | Every scale and mode, of the surfaces named or, without names, of those that changed |
 | `just shots plymouth`, `just shots grub`, `just shots cursor` | The boot splash and the disk prompt (plymouthd's X11 renderer in Xvfb, in a bubblewrap sandbox), the GRUB menu and shell (QEMU under OVMF), and the pointer's XCursor sheets on dark and light (`kubaos cursor` in a home of its own), from `test/shots/boot`. Plymouth and GRUB render at 1 (1920x1080) and 2 (2880x1800), dark; the pointer at every scale |
+| `just shots mockups`, `just shots mockups/button` | The mockup site's pages (`test/shots/mockups`: built with Vite, drawn by nixpkgs' Playwright Chromium, a CSS pixel to a device pixel), every page or the one named, at every scale and mode; the pairs keep the ones asked for. A mockup page's own file renders that page, the rest of the site every page |
 | `just shots kobo`, `just shots specimen`, `just shots specimen/components` | Kōbō's tour (`KOBO_SHOTS`, `cargo test -p kubaos-kobo --release shots`) and the specimen's pages (`kubaos-specimen shots DIR PAGE...`, `qml-specimen shots`), every page or the one named: `specimen/type`, `colour`, `space`, `components`, `icons`, `motion`, or `specimen/qml` for qml-specimen's components page. They go into the same pairs and `changed.txt`. They draw every scale and mode in release builds, from under a minute for one page to a few for the tour; the pairs keep the scales and modes asked for. `qml-specimen` reads the tree as a git flake: `git add` a new QML file first. The repo keeps no pictures of the specimen, so these pairs are how a PR shows its change; CI publishes main's to `chore/shots-specimen` (`docs/DESIGN.md`, "Screenshot diffs") |
 | `just shots publish BRANCH` | Push the changed pairs to BRANCH, print the table (raw.githubusercontent URLs, pinned to the commit) |
 | `just shots self-test` | Check a render can't reach the desktop session |
@@ -33,7 +38,7 @@ The shell's surfaces: `bar` (the tray holds Adwaita's unfilled symbolic icon, on
 
 ## What a change renders
 
-`test/shots/surfaces` is the one table of what each surface and page is drawn from: a line per surface, `SURFACE PATH...`. A changed file renders the lines that list its most specific match, so `crates/kubaos-specimen/src/pages/components/buttons.rs` renders `specimen/components` alone and the rest of `crates/kubaos-specimen` every page. A line may name several surfaces joined by `+`, and four names are groups: `shell` (every shell surface), `specimen` (every page), `iced` (kubaos-specimen's pages, all but `specimen/qml`) and `*` (everything).
+`test/shots/surfaces` is the one table of what each surface and page is drawn from: a line per surface, `SURFACE PATH...`. A changed file renders the lines that list its most specific match, so `crates/kubaos-specimen/src/pages/components/buttons.rs` renders `specimen/components` alone and the rest of `crates/kubaos-specimen` every page. A line may name several surfaces joined by `+`, and five names are groups: `shell` (every shell surface), `specimen` (every page), `iced` (kubaos-specimen's pages, all but `specimen/qml`), `mockups` (every mockup page) and `*` (everything).
 
 The shared inputs render the surfaces built against them:
 
@@ -42,8 +47,8 @@ The shared inputs render the surfaces built against them:
 | `design/tokens.toml` and its generator `crates/kubaos-tokens`, `Cargo.toml`, `Cargo.lock`, `flake.lock`, the harness (`shots`, `lib.sh`, `surfaces`, `package.nix`) | Everything |
 | `qml/KubaOS/Components` | The shell and `specimen/qml` |
 | `crates/kubaos-ui`, `crates/kubaos-geometry` | Kōbō and kubaos-specimen's pages |
-| `crates/kubaos-ui/assets/fonts` | Those, the shell and `specimen/qml` (their fontconfig), and the terminals (`kubaos-tokens` sizes them by Geist Mono) |
-| `crates/kubaos-ui/assets/symbols` | Kōbō, the shell and every specimen page (`kubaos-tokens` writes the QML symbols from them) |
+| `crates/kubaos-ui/assets/fonts` | Those, the shell and `specimen/qml` (their fontconfig), the terminals (`kubaos-tokens` sizes them by Geist Mono) and the mockups |
+| `crates/kubaos-ui/assets/symbols` | Kōbō, the shell, every specimen page (`kubaos-tokens` writes the QML symbols from them) and the mockups |
 
 None reaches the boot screens or the pointer but the first row. A file no line lists renders nothing, as the shell's services do: they are stand-ins.
 

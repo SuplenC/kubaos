@@ -2,12 +2,13 @@
 
 How every KubaOS surface looks and behaves: the shell, the Command menu, Kōbō, the apps to come, the terminals, Plymouth and GRUB. Agents: read this before you build or change anything a person sees, in any toolkit. A rule here has a reason and a picture; follow the rule, and when the reason doesn't fit your case, change the rule here for everyone (see "Changing the design") instead of working round it.
 
-Four places hold the design, each owning one thing:
+Five places hold the design, each owning one thing:
 
 | File | Owns |
 |---|---|
-| `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols, the neon sign's stutter and the クバ mark's strokes. `kubaos-tokens` checks its rules and writes each toolkit's copy, where it is read (see "Where the outputs are generated"): `kubaos-ui`'s `tokens.rs`, `Tokens.qml` and `Symbols.qml` in `KubaOS.Components`, the boot screens' values (Plymouth's script and theme file, GRUB's `theme.txt`), the terminals' settings and matugen templates, Hyprland's `tokens.lua`, Kōbō's `done/neon.rs` and `kubaos-cursor`'s `tokens.rs`. |
+| `design/tokens.toml` | Every value: colour roles, lengths, type styles, durations, curves, opacities, shadows, the list of symbols, the neon sign's stutter and the クバ mark's strokes. `kubaos-tokens` checks its rules and writes each toolkit's copy, where it is read (see "Where the outputs are generated"): `kubaos-ui`'s `tokens.rs`, `Tokens.qml` and `Symbols.qml` in `KubaOS.Components`, the boot screens' values (Plymouth's script and theme file, GRUB's `theme.txt`), the terminals' settings and matugen templates, Hyprland's `tokens.lua`, Kōbō's `done/neon.rs`, `kubaos-cursor`'s `tokens.rs` and the mockups' `tokens.css`. |
 | `docs/DESIGN.md` (this file) | The rules and their reasons: which value is for what, the rules every component keeps, the keyboard, focus, scaling; and the index of the components. |
+| `design/mockups/` | The mockups, the single source of truth for every UI: each part, surface and screen as it is meant to be, complete and live, in every state, size, motion and scale (`just mockups`). A build matches its mockup; `.claude/skills/mockup/SKILL.md` says how one is made. |
 | `docs/design/components/` | One page per component: its constructors in both libraries, how it looks and how it behaves. |
 | `docs/BRAND.md` | The words: name, voice, and how errors and buttons read. |
 
@@ -540,7 +541,7 @@ The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a pers
 
 ## Checks
 
-Four checks keep every front end on this file: the lint, the contrast check, the geometry check and parity. The first three run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`, and parity in `just design-check` and `nix flake check`; a PR that fails any isn't done.
+Five checks keep every front end on this file: the lint, the contrast check, the geometry check, parity and the mockups' check. The first three run in `cargo test --workspace` (`just test`), in `nix flake check` (`crates/checks.nix`) and in `just design-check`, parity in `just design-check` and `nix flake check`, and the mockups' check in `just design-check`; a PR that fails any isn't done.
 
 ### The contrast check
 
@@ -686,13 +687,21 @@ That run is Qt drawing `mono` text in a proportional font from the desktop's own
 
 The QML shots come from the same runner, `nix run .#checks.x86_64-linux.qml-specimen -- shots DIR`. Headless, Qt draws with its software renderer, which leaves `RectangularShadow` out: the dialogs' shadow and the progress bar's glow are missing from these shots.
 
+**The mockups.** Every mocked element in `design/mockups/` carries the same probe, and the site reports a page's boxes as a frame (`scripts/render.ts --frames`, in headless Chromium at every scale, light and dark). `just mockups-check` holds each frame to the rules above, and each mocked component to its twin on the specimen's pages, of the same name, variant and words at the same mode and scale, wherever each page puts it (`kubaos-specimen mockup DIR`): its boxes to a hundredth of a device pixel and its texts' natural sizes to a hundredth of a logical pixel, as parity does. A component whose words the specimen doesn't show (a translation's) is held to the rules alone.
+
+```text
+$ just mockups-check
+kubaos-specimen mockup: 8 frame(s), 640 component(s) compared, 0 difference(s), 0 finding(s)
+```
+
 ### Screenshot diffs
 
 The specimen's pictures aren't in the repo, so two PRs that change how different things look never touch the same file. A PR that changes how anything looks renders its before and after with `just shots specimen` (`kubaos-specimen shots DIR` and `qml-specimen shots DIR`) and attaches the pairs that changed to the PR (`docs/agents/design-pr-loop.md`), so the change shows in review. On each push to main, CI renders every page and publishes the iced pages at 1×, light and dark, and the QML components page at 1× and 1.5×, dark, to the image-only branch `chore/shots-specimen`, which this file's pictures show (`.github/workflows/specimen.yml`). Kōbō's tour screens, 1× light and dark, are under `design/kobo/`, from `KOBO_SHOTS=DIR cargo test -p kubaos-kobo --release shots -- --ignored`, which draws every screen at every scale. Each front end's alignment issue (#148 to #153) attaches its screens before and after, at every scale, light and dark; diffing them on the test machine comes with those issues. The boot screens and the pointer render headless too: `just shots plymouth grub cursor` (`test/shots/boot`).
 
 ## Changing the design
 
-- **A new kind, size, component or value changes this file or the component's page first**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it. A component's samples are a section of their own on each side, by the same name: a module under `crates/kubaos-specimen/src/pages/components/` and a file under `qml/specimen/sections/`, each listed in its page at the same place (`mod` and `SECTIONS` in `components.rs`, the stack in `Components.qml`), so PRs adding different components touch different files and a line of each list.
+- **Anything a person sees is sketched, then mocked up, then built** (`docs/agents/building-ui.md`, and the mockup skill, `.claude/skills/mockup/SKILL.md`). Its mockup page in `design/mockups/` is the source of truth: Kuba approves it before anything is built, and a change to how something looks or behaves changes the mockup first.
+- **A new kind, size, component or value changes its mockup, then this file or the component's page**, then `design/tokens.toml`, then both libraries, in one PR, with the specimen showing it and `just mockups-check` holding the libraries' boxes to the mockup's. A component's samples are a section of their own on each side, by the same name: a module under `crates/kubaos-specimen/src/pages/components/` and a file under `qml/specimen/sections/`, each listed in its page at the same place (`mod` and `SECTIONS` in `components.rs`, the stack in `Components.qml`), so PRs adding different components touch different files and a line of each list.
 - **A rule a front end can't follow changes for everyone.** There is no exception column: if the shell can't keep a rule, the rule changes here and every front end follows the new one.
 - **Values change in `design/tokens.toml` only.** The builds write the outputs from it; `just tokens` rewrites the checked-in ones, and a test fails while one is stale.
 - **Every decision keeps its reason.** A rule with no reason here is a candidate for deletion, not for following.
@@ -707,6 +716,7 @@ Each output of `kubaos-tokens` is generated where it is read, so the repo holds 
 | `Tokens.qml` and `Symbols.qml` in `KubaOS.Components` | By the Nix build (`design/package.nix`), into the module `qml/package.nix` builds | The shell, the Command menu, parity and the QML logic tests load the module from the store. |
 | The terminals' settings (`config/{ghostty,foot,fuzzel}/tokens*`, `config/tmux/colors.conf`, `config/fastfetch/theme.jsonc`, `config/ohmyposh/config.toml`), their matugen templates, `config/hypr/tokens.lua` | By the Nix build, linked into `~/.config` beside `config/`'s own files (`home/links.nix`) | The home links `config/` from the store, never from the checkout. |
 | `kubaos.plymouth`, GRUB's `theme.txt` | Checked in, folded in GitHub's diffs (`.gitattributes`); a test fails while one is stale | `system/` installs them as root from the checkout, at install and at every update, before any Nix build. |
+| The mockups' `design/mockups/src/tokens.css` | By the mockup site's Vite build (`just mockups`, `just mockups-build`), which runs `kubaos-tokens build` into the checkout, again whenever `design/tokens.toml` changes | Only the site reads it, from the checkout it is served from. |
 | The token block of `kubaos.script`, the hues in `config/matugen/config.toml` | Checked in; a test fails while one is stale | A generated block inside a hand-written file. |
 
 **In a checkout**, `just tokens` writes them all: the checked-in ones after a change to the tokens, and the ignored ones for what reads them from the checkout, such as an editor's QML language server. `just shots` writes the ignored ones into each tree it renders. **A merge conflict** in `kubaos.plymouth` or `theme.txt` keeps one side when the clone has `git config merge.ours.driver true`; `just tokens` then writes the merged tokens' version, and the test fails until it has. `kubaos.script` and matugen's `config.toml` merge as text: take either side of the block, and `just tokens` rewrites it.

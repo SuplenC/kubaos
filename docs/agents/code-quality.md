@@ -10,7 +10,7 @@ Tools check some of these rules: `shellcheck` in the shell harness (`test/lib/e2
 
 ## Comments, in every language
 
-The comment rules hold for Rust, shell, Nix, QML, Lua and config files alike, written with that language's line comment (`//`, `#`, `--`).
+The comment rules hold for Rust, shell, Nix, QML, Lua, TypeScript, CSS and config files alike, written with that language's line comment (`//`, `#`, `--`; CSS, which has none, `/* */`).
 
 Comments are written for a human: the developer reading the code to understand it, and the reviewer of the change. Developers read code first, so the code explains itself. When something is long or strange, the first fix is to split it into well-named functions; a comment is the fallback for logic that stays non-obvious. Obvious code carries no comment at all.
 
@@ -36,7 +36,7 @@ Comments are written for a human: the developer reading the code to understand i
 
 - **Full sentences, capitalised, ending with a period**, declarative and about the code: "The watcher re-arms on the new target", never "we re-arm".
 - **Above the code, never trailing.** No comment after code on the same line, and no labels on closing braces. A `shellcheck disable=` directive may trail, with its reason after `#`.
-- **Line comments only**: `//` in Rust and QML (never `/* */`), `#` in shell and Nix, `--` in Lua. Wrap at 100 columns.
+- **Line comments only**: `//` in Rust, QML and TypeScript (never `/* */`), `#` in shell and Nix, `--` in Lua; CSS has only `/* */`. Wrap at 100 columns.
 - **Markdown is allowed** inside comments: backticks, emphasis, short lists.
 - **A comment needing paragraphs means the block wants to be a function**: extract it and put the prose in its doc comment. The header of a script or a config file is the exception (see below).
 - **Numbered steps (`# 1. …`) only where a sequence is genuinely non-obvious** and splitting it into functions would not make it clearer.
@@ -185,6 +185,17 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 - **A property that needs explaining gets a one-line comment above it**, never trailing.
 - **No magic numbers in layout**: colours, sizes, spacing, radii, durations and fonts come from the tokens, as "Design" below says. A named property holding a literal (`property int iconSize: 22`) is still a literal.
 - **A search over a list in the shell uses Kotodama's engine, never a hand-rolled filter.** The list's entries are Items of a Kotodama app (an Extension with a word, in `crates/kotodama-kubaos`), and the view embeds a `KotodamaSearch` of its own that enters the app and draws its Results, so typing matches the way the Command menu does, accents, typos and frecency included, and the same list is in the menu. `modules/controlcenter/KeyboardAddView.qml` is the example. A field that parses what is typed (a time, a password) isn't a search and stays as it is.
+
+## TypeScript and CSS (the mockups)
+
+`design/mockups/` is plain TypeScript and CSS built by Vite (`design/mockups/README.md`).
+
+- **TypeScript is strict**: `tsconfig.json`'s `strict`, `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`, checked by `just mockups-build`. No `any`; a cast says why in a comment when the reason isn't plain.
+- **Only erasable syntax** (`erasableSyntaxOnly`): no enums or namespaces, so Node runs the scripts as they are.
+- **A file opens with a comment on what it owns**, and an exported function, type or constant whose name doesn't say everything gets a `/** */` doc comment, shown on hover as rustdoc is.
+- **The DOM is built in TypeScript, the look is CSS.** A mock sets custom properties naming tokens (`var(--space-s8)`) and CSS draws it; a length worked out in script is one the CSS can't express (a text's advance, a glow's mask) and says so.
+- **No literal design values**, as "Design" below says: every length, colour, duration and curve is a token's custom property, and a length rounds to device pixels in CSS (`round()`), never by a fixed offset.
+- **No UI framework, no dependency beyond the locked dev tools.** A new npm package is a decision for the PR, with its reason.
 
 ## Design
 
