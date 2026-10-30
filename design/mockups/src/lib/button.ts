@@ -54,6 +54,14 @@ export const TONES: Record<Kind, Tone> = {
 };
 
 /**
+ * Whether a kind's content is drawn in its tone, so lit it is a tube too: core-hot letters and
+ * icon with the tone's glow. Content on a fill or a container never is.
+ */
+export function contentInTone(kind: Kind): boolean {
+  return COLOURS[kind].fill === null && COLOURS[kind].content === toneColour(TONES[kind]);
+}
+
+/**
  * Whether a kind is filled with its tone's colour, so its fill is the tube and the tone's core
  * rides outside it.
  */
@@ -104,8 +112,9 @@ export function button(options: ButtonOptions): HTMLButtonElement {
   const children = glyph ? (options.trailing ? [label, glyph] : [glyph, label]) : [label];
   const layer = document.createElement("span");
   layer.className = "k-layer";
-  element.append(layer, row(m.gap, "start", ...children));
-  focusRing(element, "control", TONES[kind], filledWithTone(kind));
+  const content = row(m.gap, "start", ...children);
+  element.append(layer, content);
+  focusRing(element, "control", TONES[kind], filledWithTone(kind), contentInTone(kind) ? { content, style: m.label } : undefined);
   const placement = !options.icon ? "" : options.trailing ? "trailing-icon" : "leading-icon";
   return probe(element, { role: "component", name: "Button", variant: variant(kind, size, placement), fixed: FIXED_HEIGHT });
 }

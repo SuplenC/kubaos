@@ -13,7 +13,7 @@ import type { ColourPath } from "./recolour.ts";
 /** What a sequence's tracks move: the scene's root, which every light and colour inside follows. */
 export const SCENE = ".page-scene";
 
-const LIGHTS = "every light: the focus tubes, their cores and glows, a switch's and a slider's glow, the active window's border";
+const LIGHTS = "every light: the focus tubes, their cores and glows, a Text button's lit label, a switch's and a slider's glow, the active window's border";
 
 /** The lights in the old colours going out at the start, struck backwards or faded. */
 function lightsOut<C extends Easing | "neon.strike.reversed">(curve: C): Track<C> {

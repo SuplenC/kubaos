@@ -1,5 +1,6 @@
 // The focus line: what each look makes of it, then which tone each variant's tube and glow light
-// in, and whether its fill is the tube with the tone's core inside the fill's edge.
+// in, whether its fill is the tube with the tone's core inside the fill's edge, and whether its
+// content, drawn in its tone, lights as a tube with it.
 
 import { toneColour } from "../../lib/focus.ts";
 import { el, label, prose } from "../dom.ts";
@@ -10,9 +11,13 @@ import { subheading } from "./section.ts";
 function described(tube: Tube): string {
   const colour = toneColour(tube.tone);
   const tone = tube.tone === "accent" ? "the accent" : `the ${tube.tone} tone`;
-  return tube.filled
+  const content = tube.content
+    ? ` Its content is drawn in \`${colour}\`, so it lights with the line: lit, its letters and icon are \`${colour}_core\` with the glow round them in \`${colour}\`, striking and going out with the tube; unlit, they are \`${colour}\`, with no glow.`
+    : "";
+  const line = tube.filled
     ? `In ${tone}: filled with \`${colour}\`, so its fill is the tube and the line inside the fill's edge is its core. Lit, the core is \`${colour}_core\` with the glow outside in \`${colour}\`; unlit, it is \`${colour}_unlit\`, with no glow.`
     : `In ${tone}: the tube inside its edge. Lit, it is \`${colour}\` with the glow outside it in the same colour; unlit, it is glass, \`${colour}_unlit\` at \`focus.glass\` over the control's container, with no glow.`;
+  return line + content;
 }
 
 export function tubes(focus: Focus): HTMLElement {
