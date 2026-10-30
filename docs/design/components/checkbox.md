@@ -7,3 +7,5 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 Rust `check::checkbox`; QML `Checkbox`.
 
 Square, 20, the small radius (4), a hairline edge. Empty, partial (a dash, for some of a group) or full. For several independent picks that apply together.
+
+**States:** empty, partial and full, each resting, focused and disabled (no `on_toggle`, `enabled: false`).

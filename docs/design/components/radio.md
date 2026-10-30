@@ -7,3 +7,5 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 Rust `check::radio`; QML `Radio`.
 
 A 20 disc with an 8 dot. One of a group, exactly one picked.
+
+**States:** picked or not, each resting, focused and disabled (no action, `enabled: false`).
