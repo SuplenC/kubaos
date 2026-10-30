@@ -58,17 +58,21 @@ thin = 2
 # symbol is never drawn with a fractional stroke.
 symbol = 2
 
-# The neon focus: the focused control's own edge lit as a neon tube in the
-# focus colour, with its glow outside it. The tube is drawn on the control's
-# edge, inside its box and over its outline, so there is only ever one line and
-# nothing dark between the tube and the glow; neither takes layout space, so
-# focus moving never moves anything.
+# The neon focus, one rule for every component: one line inside the focused
+# control's edge, at its corner, and the glow outside it in the control's tone.
+# On a control not filled with its tone the line is the tube, `tube` wide, over
+# the control's outline; on one filled with its tone (a Filled or Danger
+# button) the fill is the tube and the line inside the fill's edge is its core,
+# `stroke.thin` wide. Nothing but the glow reaches past the box, so a focused
+# control's shape never grows, and nothing takes layout space, so focus moving
+# never moves anything. Lit at night; off in daylight, where the line is unlit
+# glass and there is no glow (`[color.derived]`).
 [focus]
 # The tube's width in logical pixels, drawn rounded half up to whole device
 # pixels: 2, 2, 2, 3 device pixels at 1, 1.25, 1.5, 2.
 tube = 1.5
 # The glow: a near one and a far, faint one, each fading from its opacity at
-# the tube to nothing at its reach outside it, in logical pixels.
+# the control's edge to nothing at its reach outside it, in logical pixels.
 near = 8
 near_opacity = 0.45
 far = 20
@@ -80,6 +84,10 @@ far_opacity = 0.14
 # its own reaches past its box as far as the glow (`far`), or up to the part
 # of the page beside it, so it never cuts a resting control's glow.
 offset = 4
+# In daylight the neon is off: a tube on a control not filled with its tone is
+# unlit glass, its tone's unlit core (`primary_unlit`) at this opacity over the
+# control's own container, so one line at `tube` blends into what it edges.
+glass = 0.55
 
 # The spacing scale: gaps, paddings and insets.
 [space]
@@ -452,11 +460,26 @@ use = "A panel or dialog arriving, a page sliding in."
 
 [duration.slow]
 ms = 800
-use = "A wallpaper fading in, the light/dark crossfade, a live list's new row fading in."
+use = "A wallpaper fading in, a live list's new row fading in."
 
 [duration.scene]
 ms = 1200
 use = "A whole scene changing once: the lock screen lifting, Kōbō's welcome settling."
+
+# The theme change's and the dark ⇄ light switch's own phases, on one clock for
+# every screen (`docs/DESIGN.md`, "Motion"); their flicker out and first pause
+# are `medium`.
+[duration.recolour]
+ms = 700
+use = "Every colour role changing together in a theme change or the dark ⇄ light switch."
+
+[duration.settle]
+ms = 400
+use = "The dark beat in the new colours after a theme change's colours change, before the lights strike."
+
+[duration.strike]
+ms = 600
+use = "Every light striking on together at the end of a theme change or a switch to dark."
 
 # Easing curves, as CSS cubic béziers (x1, y1, x2, y2).
 [easing.standard]
@@ -492,6 +515,11 @@ use = "Things leaving the screen: panels and dialogs closing."
 [easing.linear]
 curve = [0.0, 0.0, 1.0, 1.0]
 use = "Progress that tracks a real quantity, and spinners."
+
+# In, gently: slow to start, gathering speed to the end.
+[easing.gather]
+curve = [0.11, 0.0, 0.5, 0.0]
+use = "A colour change gathering speed: the theme change and the dark ⇄ light switch."
 
 # Opacities laid over a colour role.
 [opacity]
@@ -819,11 +847,17 @@ microphone = "#a04a00"
 camera = "#1b7131"
 success = "#1b7131"
 
-# The white-hot core along the middle of a lit neon tube, which a focus tube
-# takes on a control of that tone: its tone `mix` taken `white` of the way to
-# white, each channel rounded half up. A core is never a fixed value: every
-# output computes it from its tone's value there, the live tone where the
-# wallpaper sets one, in either mode, so the core follows the theme.
+# The roles computed from a tone, whichever palette is drawn: a tone `mix`
+# taken `white` of the way to white, or `black` of the way to black, each
+# channel rounded half up. None is a fixed value: every output computes it from
+# its tone's value there, the live tone where the wallpaper sets one, so it
+# follows the theme.
+#
+# A focus tube is lit at night and off in daylight. In dark mode its core, the
+# white-hot line along the middle of a lit tube, is `_core`, half way to white.
+# In light mode the tube is unlit glass, its core `_unlit`, 35% of the way to
+# black: the line inside a filled control's edge, or over any other control's
+# container at `focus.glass`.
 [color.derived]
 primary_core = { mix = "primary", white = 0.5 }
 cold_core = { mix = "cold", white = 0.5 }
@@ -831,6 +865,12 @@ error_core = { mix = "error", white = 0.5 }
 success_core = { mix = "success", white = 0.5 }
 warning_core = { mix = "warning", white = 0.5 }
 sharing_core = { mix = "sharing", white = 0.5 }
+primary_unlit = { mix = "primary", black = 0.35 }
+cold_unlit = { mix = "cold", black = 0.35 }
+error_unlit = { mix = "error", black = 0.35 }
+success_unlit = { mix = "success", black = 0.35 }
+warning_unlit = { mix = "warning", black = 0.35 }
+sharing_unlit = { mix = "sharing", black = 0.35 }
 
 # Every foreground role the front ends draw on a background role, and the
 # contrast it needs (WCAG 2.1 AA): `text` 4.5:1; `large_text` 3:1, for 24 px
@@ -959,9 +999,10 @@ pairs = [
 # which its legend names; the cores (`primary_core`, `cold_core`, `sharing_core`,
 # `error_core`, `success_core`, `warning_core`, `logo_core_warm`,
 # `logo_core_cold`), the hot middle of a neon tube, drawn on the tube, and the
-# focus core outside a filled control, beside the fill it lights. `kubaos-design contrast` fails on
+# focus core, the line inside a filled control's edge; and the unlit cores
+# (`primary_unlit` and the rest), the same line in daylight. `kubaos-design contrast` fails on
 # a role drawn with that is in no pair and not here.
-decorative = ["cold_container", "cold_core", "error_core", "logo_core_cold", "logo_core_warm", "outline_variant", "primary_core", "scrim", "shadow", "sharing_core", "success_core", "surface_bright", "warning_core"]
+decorative = ["cold_container", "cold_core", "cold_unlit", "error_core", "error_unlit", "logo_core_cold", "logo_core_warm", "outline_variant", "primary_core", "primary_unlit", "scrim", "shadow", "sharing_core", "sharing_unlit", "success_core", "success_unlit", "surface_bright", "warning_core", "warning_unlit"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes

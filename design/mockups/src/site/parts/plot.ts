@@ -7,7 +7,7 @@ import { length } from "../../lib/tokens.ts";
 import { advance } from "../../lib/text.ts";
 import { el, label } from "../dom.ts";
 import type { Track } from "../page.ts";
-import { bezier, type Loop, progress, reach, type Span, steps, strikeSteps, type Timed } from "../recipe.ts";
+import { bezier, type Loop, progress, reach, type Span, steps, stepsOf, struck, type Timed } from "../recipe.ts";
 import { settings } from "../settings.ts";
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -139,7 +139,7 @@ export class Plot {
     let low = 0;
     let high = 1;
     for (const { track, back } of playing.timed) {
-      if (track.curve === "neon.strike") continue;
+      if (struck(track.curve)) continue;
       const range = reach(track.curve);
       low = Math.min(low, range.low);
       high = Math.max(high, range.high);
@@ -239,7 +239,11 @@ export class Plot {
     this.head.setAttribute("y2", String(bottom));
     this.head.setAttribute("stroke-width", String(thin));
     this.balls = playing.timed.map((_, i) => {
-      const ball = svg("circle", "page-plot-ball", { r: px(BALLS[i % BALLS.length]!) / 2, "data-target": playing.timed[i]!.track.target });
+      const ball = svg("circle", "page-plot-ball", {
+        r: px(BALLS[i % BALLS.length]!) / 2,
+        "data-target": playing.timed[i]!.track.target,
+        "data-property": playing.timed[i]!.track.property,
+      });
       look(ball, i);
       return ball;
     });
@@ -278,14 +282,14 @@ function path(timed: Timed, total: number, x: (t: number) => number, y: (v: numb
   const point = (t: number, v: number) => `${x(t)} ${y(v)}`;
   const parts = [`M ${point(0, 0)}`];
   const eased = (span: Span, from: number, to: number) => {
-    if (track.curve === "neon.strike") return;
+    if (struck(track.curve)) return;
     const [x1, y1, x2, y2] = bezier(track.curve) as [number, number, number, number];
     const time = (share: number) => span.start + share * (span.end - span.start);
     const value = (share: number) => from + share * (to - from);
     parts.push(`L ${point(span.start, from)}`, `C ${point(time(x1), value(y1))} ${point(time(x2), value(y2))} ${point(span.end, to)}`);
   };
-  if (track.curve === "neon.strike") {
-    const values = strikeSteps();
+  if (struck(track.curve)) {
+    const values = stepsOf(track.curve);
     let before = 0;
     steps({ ...timed, back: null }).forEach((span, i) => {
       parts.push(`L ${point(span.start, before)}`, `L ${point(span.start, values[i]!)}`);

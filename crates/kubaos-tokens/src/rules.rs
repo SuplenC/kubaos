@@ -44,6 +44,8 @@ pub enum Violation {
     RoleMissing { role: String, table: &'static str },
     /// A role both derived and given values of its own.
     RoleTwice { role: String },
+    /// A derived role that names both `white` and `black`, or neither.
+    DerivedWay { role: String },
     /// A symbol that names both a Tabler icon and a drawing of ours, or neither.
     SymbolSource { token: String },
     /// A type style's icon that isn't one of the icon sizes.
@@ -116,6 +118,9 @@ impl fmt::Display for Violation {
             }
             Violation::RoleTwice { role } => {
                 write!(f, "colour role {role} is in color.derived and in color.source")
+            }
+            Violation::DerivedWay { role } => {
+                write!(f, "color.derived.{role} needs exactly one of `white` and `black`")
             }
             Violation::SymbolSource { token } => {
                 write!(f, "{token} needs exactly one of `tabler` and `drawn`")
@@ -421,6 +426,7 @@ fn check_lengths(tokens: &Tokens, found: &mut Vec<Violation>) {
     }
     check_opacity("focus.near_opacity".into(), tokens.focus.near_opacity, found);
     check_opacity("focus.far_opacity".into(), tokens.focus.far_opacity, found);
+    check_opacity("focus.glass".into(), tokens.focus.glass, found);
     if tokens.focus.near >= tokens.focus.far {
         found.push(Violation::NotAscending {
             token: "focus.near, focus.far".into(),
@@ -546,11 +552,13 @@ fn check_colors(tokens: &Tokens, found: &mut Vec<Violation>) {
                 name: derived.mix.clone(),
             });
         }
-        if !(0.0..=1.0).contains(&derived.white) {
-            found.push(Violation::OpacityOutOfRange {
-                token: format!("color.derived.{role}.white"),
-                value: derived.white,
-            });
+        match derived.toward() {
+            None => found.push(Violation::DerivedWay { role: role.clone() }),
+            Some((toward, t)) if !(0.0..=1.0).contains(&t) => found.push(Violation::OpacityOutOfRange {
+                token: format!("color.derived.{role}.{}", toward.name()),
+                value: t,
+            }),
+            Some(_) => {}
         }
     }
     for name in names(tokens) {

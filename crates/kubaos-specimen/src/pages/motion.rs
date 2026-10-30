@@ -73,8 +73,11 @@ fn use_of(duration: Duration) -> &'static str {
         Duration::Short => "A switch's knob, a check mark, focus moving, a toast arriving.",
         Duration::Medium => "A panel or popup leaving, the log opening, a toast leaving.",
         Duration::Long => "A panel or dialog arriving, a page sliding in.",
-        Duration::Slow => "A wallpaper fading in, the light/dark crossfade.",
+        Duration::Slow => "A wallpaper fading in, a live list's new row.",
         Duration::Scene => "A whole scene once: the lock lifting, Kōbō's welcome settling.",
+        Duration::Recolour => "A theme change's colours, all together.",
+        Duration::Settle => "A theme change's dark beat before the lights strike.",
+        Duration::Strike => "Every light striking on after a theme change.",
     }
 }
 
@@ -88,6 +91,7 @@ fn curve_use(easing: Easing) -> &'static str {
         Easing::EmphasizedDecel => "Arriving: panels, dialogs, pages, the log.",
         Easing::EmphasizedAccel => "Leaving: panels and dialogs closing.",
         Easing::Linear => "Real quantities, spinners.",
+        Easing::Gather => "A colour change gathering speed: a theme change.",
     }
 }
 

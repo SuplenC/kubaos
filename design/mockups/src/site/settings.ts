@@ -1,7 +1,8 @@
 // The toolbar's settings: what every page is shown at. Each one is read from the URL first, so a
 // link or a screenshot names its state, then from what was last picked, then its default.
 //
-// Mode, scale and motion apply through CSS: the page's box carries them as attributes and custom
+// Mode, scale and motion apply through CSS, and a theme or mode picked plays the theme change or
+// the dark ⇄ light switch across the page (`site/change.ts`): the page's box carries them as attributes and custom
 // properties, and every length, colour and duration follows at once. Text length changes the words
 // on the page, so it draws the page again; nothing ever reloads.
 
@@ -11,6 +12,8 @@
  * time.
  */
 export const CHROME = new URLSearchParams(location.search).get("chrome") !== "off";
+
+import { THEMES } from "./themes.ts";
 
 export type Mode = "dark" | "light";
 export type TextLength = "short" | "long" | "translated";
@@ -44,6 +47,8 @@ export const WINDOWS: readonly WindowSize[] = [
 
 export interface Settings {
   mode: Mode;
+  /** The theme every page is painted in, by its slug (`site/themes.ts`). */
+  theme: string;
   scale: Scale;
   reduced: boolean;
   speed: Speed;
@@ -54,6 +59,7 @@ export interface Settings {
 
 const DEFAULTS: Settings = {
   mode: "dark",
+  theme: THEMES[0]!.slug,
   scale: 1,
   reduced: false,
   speed: 1,
@@ -69,6 +75,7 @@ type Listener = (settings: Settings, changed: ReadonlySet<keyof Settings>) => vo
 function parsed(raw: Record<string, string | null | undefined>): Partial<Settings> {
   const found: Partial<Settings> = {};
   if (raw.mode === "dark" || raw.mode === "light") found.mode = raw.mode;
+  if (THEMES.some((theme) => theme.slug === raw.theme) && raw.theme) found.theme = raw.theme;
   const scale = SCALES.find((s) => String(s) === raw.scale);
   if (scale !== undefined) found.scale = scale;
   if (raw.reduced === "on" || raw.reduced === "off") found.reduced = raw.reduced === "on";
@@ -96,6 +103,7 @@ function fromUrl(): Partial<Settings> {
 function serialised(settings: Settings): Record<string, string> {
   return {
     mode: settings.mode,
+    theme: settings.theme,
     scale: String(settings.scale),
     reduced: settings.reduced ? "on" : "off",
     speed: String(settings.speed),

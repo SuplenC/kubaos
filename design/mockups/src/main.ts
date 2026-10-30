@@ -11,6 +11,8 @@ import "./lib/lib.css";
 import "./site/site.css";
 import { forgetWidths } from "./lib/text.ts";
 import { forgetLengths } from "./lib/tokens.ts";
+import { type Painted, paintPage, playChange } from "./site/change.ts";
+import { forgetPalettes } from "./site/recolour.ts";
 import { PAGES } from "./pages/index.ts";
 import { el } from "./site/dom.ts";
 import { type Frame, frame } from "./site/frame.ts";
@@ -86,10 +88,14 @@ function draw(): void {
   pageBox.dataset.page = page?.slug ?? "";
 }
 
+/** The theme and mode the page is painted in now, so a change knows where it starts. */
+let painted: Painted = { theme: settings().theme, mode: settings().mode };
+
 async function start(): Promise<void> {
   await Promise.all([...document.fonts].map((face) => face.load()));
   fitDevicePixels();
   draw();
+  paintPage([document.documentElement, pageBox], painted);
   addEventListener("hashchange", draw);
   addEventListener("resize", () => settle(pageBox));
   // A change to the tokens reaches the page as new CSS; what script measured from the old CSS is
@@ -97,9 +103,19 @@ async function start(): Promise<void> {
   import.meta.hot?.on("vite:afterUpdate", () => {
     forgetWidths();
     forgetLengths();
+    forgetPalettes();
     draw();
+    paintPage([document.documentElement, pageBox], painted);
   });
-  onChange((_, changed) => {
+  onChange((now, changed) => {
+    if (changed.has("theme") || changed.has("mode")) {
+      const from = painted;
+      painted = { theme: now.theme, mode: now.mode };
+      // A page's samples are drawn for the mode they show in, its scenes in the theme's palettes.
+      draw();
+      playChange([document.documentElement, pageBox], from, painted);
+      return;
+    }
     if (changed.has("text") || changed.has("window")) {
       draw();
       return;

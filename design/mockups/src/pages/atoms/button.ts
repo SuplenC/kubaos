@@ -3,7 +3,11 @@
 import { button, filledWithTone, KINDS, type Kind, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { row } from "../../lib/layout.ts";
-import { type Curve, type Duration, doesntApply, type NonEmpty, nonEmpty, page, type Track, type Value } from "../../site/page.ts";
+import { el, label } from "../../site/dom.ts";
+import { type Curve, type Duration, doesntApply, type Easing, type NonEmpty, nonEmpty, page, type Track, type Value } from "../../site/page.ts";
+import { type ColourPath, paintBetween, palette, paletteName, themeName } from "../../site/recolour.ts";
+import { themeChange, toDark, toLight } from "../../site/sequences.ts";
+import { type Mode, settings } from "../../site/settings.ts";
 
 /** The words and symbol each kind shows in the specimens, and how long they get. */
 const SAMPLES: Record<Kind, { words: Words; icon: string; trailing: boolean }> = {
@@ -44,6 +48,39 @@ function kinds(): HTMLElement {
   return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md")));
 }
 
+/** Every kind at md, focused: the lights a sequence dims and strikes. */
+function focusedKinds(): HTMLElement {
+  return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md", "focused")));
+}
+
+/** A palette: a theme in a mode. */
+interface Painted {
+  readonly theme: string;
+  readonly mode: Mode;
+}
+
+/**
+ * A scene on its own surface, painted on the way from `from` to `to` along `path`, its focused
+ * kinds lit as `from`'s mode lights them: what a theme change or a switch plays on. A palette
+ * without a mode is in the mode picked when the scene is drawn.
+ */
+function scene(from: Painted | string, to: Painted | string, path: ColourPath): () => Element {
+  return () => {
+    const mode = settings().mode;
+    const [a, b] = [from, to].map((each) => (typeof each === "string" ? { theme: each, mode } : each)) as [Painted, Painted];
+    const painted = el("div", "page-scene", label("Every light and every colour, on one clock", "body_strong", "on_surface"), focusedKinds());
+    painted.dataset.mode = a.mode;
+    paintBetween(painted, path, palette(a.theme, a.mode), palette(b.theme, b.mode));
+    return el("div", "page-scene-box", painted);
+  };
+}
+
+/** The theme change between two themes, in the mode picked. */
+function themeMove(from: string, to: string): ReturnType<typeof themeChange> {
+  const between = { from: themeName(from), to: themeName(to) };
+  return themeChange(`Theme change: ${between.from} to ${between.to}`, between, scene(from, to, "through grey"));
+}
+
 /** The kinds of a list, as the recipe says them. */
 function on(list: readonly Kind[]): string {
   return list.length === KINDS.length ? "every kind" : list.join(" and ");
@@ -53,8 +90,8 @@ const FILLED = KINDS.filter(filledWithTone);
 const EDGED = KINDS.filter((kind) => !filledWithTone(kind));
 
 /**
- * The neon's parts from `from` to `to`: the glow on every kind, the tube on the edge of a kind not
- * filled with its tone, and the core outside the fill of one that is.
+ * The neon's parts from `from` to `to`: the glow on every kind, the tube inside the edge of a kind
+ * not filled with its tone, and the core inside the fill's edge of one that is.
  */
 function neon<C extends Curve>(from: number, to: number, duration: Duration, curve: C): NonEmpty<Track<C>> {
   const part = (name: string, list: readonly Kind[], target: string): Track<C> => ({
@@ -74,6 +111,16 @@ function neon<C extends Curve>(from: number, to: number, duration: Duration, cur
   ];
 }
 
+/**
+ * In daylight the neon is off: the unlit glass of the tube and of the core comes and goes over
+ * `short`, never struck. The glow keeps its track, so the player is the same in both modes, but
+ * daylight puts it out.
+ */
+function glass(from: number, to: number): NonEmpty<Track<Easing>> {
+  const [glow, ...rest] = neon(from, to, "short", "standard");
+  return [{ ...glow, on: "every kind, unseen: daylight puts the glow out" }, ...rest];
+}
+
 /** The state layer from `from` to `to` over `micro`. */
 function layer(from: Value, to: Value): NonEmpty<Track<"standard">> {
   return [{ part: "state layer", on: on(KINDS), target: ".k-layer", property: "opacity", from, to, duration: "micro", curve: "standard" }];
@@ -88,7 +135,7 @@ export default page({
   description: [
     "A button names its action in sentence case, as the user would say it: Erase and install, never OK. Its label is its size's button style on a line as tall as the button's content box, so the label sits in the middle of the button on the grid, with the size's padding at its sides.",
     "Its corners take the control radius (`radius.control`); an icon-only button is an `IconButton`, a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon is the label's style's icon size, in a box the label's line tall, centred on a whole device pixel, so an icon never changes a button's height.",
-    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it, in the kind's tone: red (`error`) on Danger, the accent on the others. A Filled or a Danger button is filled with its tone's colour, so its fill is the tube and the tone's hot core (`primary_core`, `error_core`) rides just outside it, the thin stroke wide. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
+    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it, in the kind's tone: red (`error`) on Danger, the accent on the others. A Filled or a Danger button is filled with its tone's colour, so its fill is the tube and the tone's hot core (`primary_core`, `error_core`) is the line inside the fill's edge, the thin stroke wide, at the button's corner. Nothing but the glow reaches past the button's box, so its shape never seems to grow. In light mode the neon is off: the line is unlit glass (the tone's `_unlit`, 35% toward black; on Tonal and Text at `focus.glass` over the button's own container), with no glow. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
     "A held button (`Button::on_hold`) is pressed for a while instead of clicked, and a timed bar beside it shows how far along the hold is: Kōbō's Install, held with the mouse or Enter. It looks like any button of its kind.",
   ],
   variants: nonEmpty(KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") }))),
@@ -113,7 +160,7 @@ export default page({
       rest: "Its fill and content, nothing over them.",
       hovered: "The content colour over the fill at `opacity.hover`, faded in over `micro`.",
       pressed: "The content colour at `opacity.press`, over `micro`.",
-      focused: "The neon tube on its edge in the kind's tone, `focus.tube` wide rounded half up to device pixels, and the glow outside it in the same tone: the near glow over `focus.near`, the far one over `focus.far`. On Filled and Danger, the fill is the tube: the tone's core (`primary_core`, `error_core`) outside the fill, then the glow. Danger's is red. Hover and press still lay their layer under it.",
+      focused: "Dark: the neon tube inside its edge in the kind's tone, `focus.tube` wide rounded half up to device pixels, and the glow outside it in the same tone: the near glow over `focus.near`, the far one over `focus.far`. On Filled and Danger, the fill is the tube: the tone's core (`primary_core`, `error_core`, half way to white) is the line inside the fill's edge, `stroke.thin` wide, and the glow is outside. Danger's is red. Light: the neon is off, so the same line is unlit glass and there is no glow: on Filled and Danger the tone's `_unlit` core (35% toward black) inside the fill's edge; on Tonal and Text, `primary_unlit` at `focus.glass` over the button's own container. Hover and press still lay their layer under it.",
       disabled: "Content at `opacity.disabled_content` of `on_surface`, fill at `opacity.disabled_container` of it (none on Text); no layer, no focus, no action.",
     },
   },
@@ -155,21 +202,33 @@ export default page({
       },
       {
         name: "Focus arrives",
-        what: "The tube strikes on in the kind's tone as the boot sign's tubes do, `neon.strike`'s steps over `medium`, and the glow with it: red on Danger, the accent on the others. On Filled and Danger the fill is the tube, so the core strikes just outside it.",
+        what: "The tube strikes on in the kind's tone as the boot sign's tubes do, `neon.strike`'s steps over `medium`, and the glow with it: red on Danger, the accent on the others. On Filled and Danger the fill is the tube, so the core strikes inside the fill's edge. In light mode the neon is off: the unlit glass fades in over `short`, never struck, and the glow stays out.",
         tracks: neon(0, 1, "medium", "neon.strike"),
         reduced: neon(0, 1, "short", "standard"),
         unstuttered: neon(0, 1, "short", "standard"),
+        daylight: glass(0, 1),
         back: "cuts",
         sample: kinds,
       },
       {
         name: "Focus leaves",
-        what: "The tube, the core and the glow fade out together.",
+        what: "The tube, the core and the glow fade out together; in light mode the unlit glass alone.",
         tracks: neon(1, 0, "short", "standard"),
         reduced: "same",
+        daylight: glass(1, 0),
         back: "cuts",
         sample: kinds,
       },
+      themeMove("neon", "rose"),
+      themeMove("rose", "lagoon"),
+      toLight(
+        { from: paletteName("neon", "dark"), to: paletteName("neon", "light") },
+        scene({ theme: "neon", mode: "dark" }, { theme: "neon", mode: "light" }, "dawn"),
+      ),
+      toDark(
+        { from: paletteName("neon", "light"), to: paletteName("neon", "dark") },
+        scene({ theme: "neon", mode: "light" }, { theme: "neon", mode: "dark" }, "dawn"),
+      ),
     ],
   },
   keyboard: {
@@ -202,7 +261,7 @@ export default page({
       { what: "lg's padding.", token: "space-s32" },
       { what: "The corners.", token: "radius-control" },
       { what: "The focus tube, rounded half up to device pixels.", token: "focus-tube" },
-      { what: "The core outside a Filled or Danger button's fill, rounded half up.", token: "stroke-thin" },
+      { what: "The core inside a Filled or Danger button's fill's edge, rounded half up.", token: "stroke-thin" },
       { what: "The near glow's reach.", token: "focus-near" },
       { what: "The far glow's reach.", token: "focus-far" },
     ],

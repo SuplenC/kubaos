@@ -25,7 +25,11 @@ import {
   type Span,
   steps,
   type Timed,
+  cueOf,
+  cuePhases,
+  stepsOf,
   strikeSteps,
+  struck,
   tokenOf,
   tracksOf,
 } from "../recipe.ts";
@@ -70,7 +74,15 @@ function valueWords(value: Value): string {
 
 function curveWords(track: Track): string {
   if (track.curve === "neon.strike") return `\`neon.strike\`, ${strikeSteps().length} even steps (keyframes below)`;
+  if (track.curve === "neon.strike.reversed") return `\`neon.strike\` played backwards, ${strikeSteps().length} even steps (keyframes below)`;
   return `\`easing.${track.curve}\` cubic-bezier(${bezier(track.curve).join(", ")})`;
+}
+
+function cueWords(track: Track): string {
+  const phases = cuePhases(track);
+  if (phases.length === 0) return "at the start";
+  const each = phases.map((phase) => `\`duration.${phase}\``).join(" + ");
+  return `${each}, ${cueOf(track)} ms after the start`;
 }
 
 /** A table's cell of the page's words. */
@@ -114,7 +126,7 @@ function tracksTable(tracks: readonly Track[], set: TrackSet, lits: Lit[], picks
       cell(valueWords(track.from)),
       cell(valueWords(track.to)),
       cell(`\`duration.${track.duration}\` ${milliseconds(track.duration)} ms`),
-      cell(track.cue ? `\`duration.${track.cue}\` ${milliseconds(track.cue)} ms after the start` : "at the start"),
+      cell(cueWords(track)),
       cell(curveWords(track)),
     );
     picks.push({ row, set, index: i });
@@ -133,14 +145,14 @@ function tracksTable(tracks: readonly Track[], set: TrackSet, lits: Lit[], picks
 /** The keyframes of every stepped track in `set`, those with the same timing in one table. */
 function keyframeTables(tracks: readonly Track[], set: TrackSet, lits: Lit[]): HTMLElement[] {
   const groups = new Map<string, Track[]>();
-  for (const track of tracks.filter((each) => each.curve === "neon.strike")) {
-    const key = JSON.stringify([track.duration, track.cue, track.from, track.to]);
+  for (const track of tracks.filter((each) => struck(each.curve))) {
+    const key = JSON.stringify([track.duration, track.cue, track.from, track.to, track.curve]);
     groups.set(key, [...(groups.get(key) ?? []), track]);
   }
   return [...groups.values()].map((group) => {
     const first = group[0]!;
     const duration = milliseconds(first.duration);
-    const values = strikeSteps();
+    const values = struck(first.curve) ? stepsOf(first.curve) : [];
     const rows = values.map((step, i) => {
       const row = el("tr", "", cell(`${shown((i * duration) / values.length)} ms`), cell(shown(between(first, step))));
       lits.push({
@@ -153,7 +165,8 @@ function keyframeTables(tracks: readonly Track[], set: TrackSet, lits: Lit[]): H
     });
     rows.push(el("tr", "", cell(`${duration} ms`), cell(`${shown(between(first, 1))}, held`)));
     const parts = group.map((track) => `the ${track.part} (${track.on})`).join(", ");
-    return el("div", "page-recipe-part", prose(`\`neon.strike\`'s keyframes for ${parts}: each value holds until the next. Time is from the part's start, at speed 1.`, "small"), table(["Time", first.property], rows));
+    const whose = first.curve === "neon.strike.reversed" ? "`neon.strike`'s keyframes played backwards" : "`neon.strike`'s keyframes";
+    return el("div", "page-recipe-part", prose(`${whose} for ${parts}: each value holds until the next. Time is from the part's start, at speed 1.`, "small"), table(["Time", first.property], rows));
   });
 }
 
@@ -171,9 +184,13 @@ function recipeOf(move: Move, lits: Lit[], picks: Row[]): HTMLElement {
     ...(move.reduced === "same"
       ? [label("Reduced motion", "body_strong", "on_surface"), prose("The same: every duration is within the `short` that reduced motion caps durations at.", "small")]
       : of("reduced", "Reduced motion")),
+    ...of("daylight", "In light mode, where the neon is off"),
     ...of("unstuttered", "With the focus stutter off"),
+    ...(move.tail
+      ? [label("The closing beat", "body_strong", "on_surface"), prose(`After the last part, a still \`duration.${move.tail}\`, ${milliseconds(move.tail)} ms, that belongs to the move; reduced motion's move has none.`, "small")]
+      : []),
     label("Speed", "body_strong", "on_surface"),
-    prose("The speed setting (0.5× to 2×) divides every duration and cue; the player's holds aren't motion, so they stay.", "small"),
+    prose("The speed setting (0.5× to 2×) divides every duration, cue and beat; the player's holds aren't motion, so they stay.", "small"),
   );
 }
 
@@ -208,7 +225,7 @@ function marks(playing: Loop): Mark[] {
       add(span.start, "part", `the ${timed.track.part} starts`);
       add(span.end, "part", `the ${timed.track.part} ends`);
     }
-    if (timed.track.curve === "neon.strike") {
+    if (struck(timed.track.curve)) {
       for (const span of steps(timed)) add(span.start, "key", `the ${timed.track.part}'s keyframe`);
     }
   }
