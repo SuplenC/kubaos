@@ -6,7 +6,7 @@ import { length, number, raw } from "../lib/tokens.ts";
 import type { Duration, Easing, Move, NonEmpty, Track, Value } from "./page.ts";
 import { settings } from "./settings.ts";
 
-/** One frame at 60 Hz, in milliseconds: the scrubber's step. */
+/** One frame at 60 Hz, in milliseconds: the step the plot's arrow keys take. */
 export const FRAME = 1000 / 60;
 
 /** How long the player holds each end of a move: long enough to see the state. */
@@ -25,6 +25,50 @@ export function milliseconds(duration: Duration): number {
 export function bezier(easing: Easing): number[] {
   const inside = raw(`easing-${easing}`).replace(/^cubic-bezier\((.*)\)$/, "$1");
   return inside.split(",").map((n) => Number.parseFloat(n));
+}
+
+/**
+ * How far along a curve token is at `x`, a share of its duration: the cubic Bézier solved for its
+ * y at that x as Chromium does (`gfx::CubicBezier`), Newton's method then bisection, to 1e-7. An
+ * overshooting curve (`pop`, `spring`) goes past 1.
+ */
+export function eased(easing: Easing, x: number): number {
+  const [x1, y1, x2, y2] = bezier(easing) as [number, number, number, number];
+  const at = (a: number, b: number, t: number) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+  const slope = (a: number, b: number, t: number) => 3 * a * (1 - t) ** 2 + 6 * (b - a) * t * (1 - t) + 3 * (1 - b) * t * t;
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  let t = x;
+  for (let i = 0; i < 8; i++) {
+    const error = at(x1, x2, t) - x;
+    if (Math.abs(error) < 1e-7) return at(y1, y2, t);
+    const d = slope(x1, x2, t);
+    if (Math.abs(d) < 1e-6) break;
+    t -= error / d;
+  }
+  let low = 0;
+  let high = 1;
+  t = x;
+  while (high - low > 1e-7) {
+    if (at(x1, x2, t) < x) low = t;
+    else high = t;
+    t = (low + high) / 2;
+  }
+  return at(y1, y2, t);
+}
+
+/** The lowest and highest a curve token goes, over its whole duration. */
+export function reach(easing: Easing): { low: number; high: number } {
+  const [, y1, , y2] = bezier(easing) as [number, number, number, number];
+  let low = 0;
+  let high = 1;
+  for (let i = 1; i < 1000; i++) {
+    const t = i / 1000;
+    const y = 3 * y1 * t * (1 - t) ** 2 + 3 * y2 * t * t * (1 - t) + t ** 3;
+    low = Math.min(low, y);
+    high = Math.max(high, y);
+  }
+  return { low, high };
 }
 
 /** `neon.strike`'s steps: the tube's brightness at each even step of its duration. */
@@ -137,6 +181,26 @@ export function steps(timed: Timed): Span[] {
     const step = (span.end - span.start) / count;
     return Array.from({ length: count }, (_, i) => ({ start: span.start + i * step, end: span.start + (i + 1) * step }));
   });
+}
+
+/**
+ * How far `timed` is from its `from` (0) to its `to` (1) at `t` on the loop, as its keyframes play
+ * it: before its start, along its curve or `neon.strike`'s steps, held, then back along the same
+ * curve, or held to the loop's end when the move cuts back.
+ */
+export function progress(timed: Timed, t: number): number {
+  const along = (span: Span) => (t - span.start) / (span.end - span.start);
+  const { track, forward, back } = timed;
+  if (t < forward.start) return 0;
+  if (t < forward.end) {
+    if (track.curve !== "neon.strike") return eased(track.curve, along(forward));
+    const values = strikeSteps();
+    return values[Math.min(values.length - 1, Math.floor(along(forward) * values.length))]!;
+  }
+  if (!back || t < back.start) return 1;
+  // A move that plays back is eased, never struck (`page.ts`, `Struck`).
+  if (t < back.end && track.curve !== "neon.strike") return 1 - eased(track.curve, along(back));
+  return 0;
 }
 
 /** The keyframes of one track over the whole loop, which the player plays and seeks. */

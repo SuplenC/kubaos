@@ -266,9 +266,51 @@ body {
 
 /* A player's sample in a box of its own, which the player's animations move. */
 .page-player-stage {
+  position: relative;
   display: flex;
   justify-content: flex-start;
   padding: var(--space-s24);
+}
+
+/* The picked part's layers, outlined on the whole sample. */
+.page-player-outlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.page-player-outline {
+  position: absolute;
+  outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface);
+}
+
+/* Each part alone, in a row under the legend, each on its own stage at the page's scale. */
+.page-parts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s16);
+}
+
+.page-parts:empty {
+  display: none;
+}
+
+.page-part-alone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.page-part-stage {
+  display: flex;
+  padding: var(--space-s24);
+  border-radius: var(--radius-control);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.page-part-alone[data-picked] > .page-part-stage {
+  outline-color: var(--color-on_surface);
 }
 
 .page-player-words {
@@ -282,59 +324,117 @@ body {
   gap: var(--space-s8);
 }
 
-/* The scrubber: the whole loop as a bar, its marks, and the playhead. */
-.page-scrubber {
-  position: relative;
-  height: var(--space-s24);
+/* The plot: the loop across, each track's progress up, a curve and a ball per track. Its axes and
+   grid are the soft outline; each track takes a colour and a dash, told apart in colour and without. */
+.page-plot-box {
   cursor: pointer;
   touch-action: none;
 }
 
-.page-scrubber:focus-visible {
+.page-plot-box:focus-visible {
   outline: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--color-primary);
 }
 
-.page-scrubber-rail {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc((var(--space-s24) - var(--space-s4)) / 2);
-  height: var(--space-s4);
-  border-radius: var(--radius-full);
-  background: var(--color-surface_container_highest);
+.page-plot {
+  display: block;
 }
 
-.page-scrubber-marks {
-  position: absolute;
-  inset: 0;
+.page-plot-grid line {
+  stroke: var(--color-outline_variant);
+  stroke-width: var(--stroke-hairline_device_px);
 }
 
-.page-scrubber-mark {
-  position: absolute;
-  left: calc(var(--at) * 100%);
-  top: calc((var(--space-s24) - var(--space-s16)) / 2);
-  width: var(--stroke-hairline_device_px);
-  height: var(--space-s16);
-  background: var(--color-outline);
+.page-plot-text {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  fill: var(--color-on_surface_variant);
 }
 
-.page-scrubber-mark[data-kind="key"] {
-  top: calc((var(--space-s24) - var(--space-s8)) / 2);
+.page-plot-mark line {
+  stroke: var(--color-on_surface_variant);
+  stroke-width: var(--stroke-hairline_device_px);
+}
+
+.page-plot-mark[data-kind="key"] line {
+  stroke: var(--color-cold);
+}
+
+.page-plot-hit {
+  fill: transparent;
+}
+
+.page-plot-curve {
+  fill: none;
+  stroke-linejoin: round;
+}
+
+.page-plot-head {
+  stroke: var(--color-on_surface);
+}
+
+[data-track="0"] { --track: var(--color-primary); }
+[data-track="1"] { --track: var(--color-cold); --dash: var(--space-s8) var(--space-s4); }
+[data-track="2"] { --track: var(--color-sharing); --dash: var(--space-s4) var(--space-s4); }
+[data-track="3"] { --track: var(--color-success); --dash: var(--space-s12) var(--space-s4) var(--space-s4) var(--space-s4); }
+
+.page-plot-curve[data-track] {
+  stroke: var(--track);
+  stroke-dasharray: var(--dash, none);
+}
+
+.page-plot-ball[data-track] {
+  fill: var(--track);
+}
+
+.page-plot-curve-hit {
+  fill: none;
+  stroke: transparent;
+  pointer-events: stroke;
+}
+
+/* A part picked: the other curves and balls step back, the picked one stays. */
+[data-picking] .page-plot-curve[data-pick]:not([data-picked]),
+[data-picking] .page-plot-ball:not([data-picked]) {
+  opacity: var(--opacity-disabled_content);
+}
+
+[data-picking] .page-plot-key[data-pick]:not([data-picked]) {
+  opacity: var(--opacity-disabled_content);
+}
+
+.page-table tr[data-picked] > td {
+  box-shadow: inset 0 calc(-1 * var(--stroke-hairline_device_px)) var(--color-on_surface), inset 0 var(--stroke-hairline_device_px) var(--color-on_surface);
+}
+
+.page-plot-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s4) var(--space-s16);
+}
+
+.page-plot-key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s8);
+}
+
+.page-plot-swatch {
+  display: inline-flex;
+  width: var(--space-s24);
   height: var(--space-s8);
-  background: var(--color-cold);
 }
 
-.page-scrubber-head {
-  position: absolute;
-  left: calc(var(--at, 0) * 100%);
-  top: 0;
-  width: var(--stroke-thin);
-  height: var(--space-s24);
-  background: var(--color-primary);
-  pointer-events: none;
+.page-plot-swatch svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
 
-.page-scrubber-time {
+.page-plot-swatch .page-plot-curve {
+  stroke-width: max(1px, round(nearest, var(--stroke-thin), 1px));
+}
+
+.page-plot-time {
   font-family: var(--type-mono-family);
   font-size: var(--type-mono-size);
   line-height: var(--type-mono-line);
@@ -374,11 +474,13 @@ body {
 }
 
 /* The measures overlay: a hairline round every probed box, coloured by what it is. */
-/* Room above for the bands' token names, two lines of them, and below for the box's size. */
+/* Room above for the bands' token names, as many lines as they take, and below for the box's
+   size. The room above is padding, so it is part of the mock its cell centres. */
 .page-measured {
   position: relative;
   display: flex;
-  margin: var(--space-s40) 0 var(--space-s24);
+  padding-top: calc(var(--lines, 1) * (var(--type-mono-line) + var(--space-s4)));
+  margin-bottom: var(--space-s24);
 }
 
 .page-overlay {
@@ -406,8 +508,8 @@ body {
   outline-color: var(--color-on_surface);
 }
 
-/* A padding or a gap, shaded, its token's name above the box: paddings on the first line, gaps
-   on the second, so the names of neighbouring bands never run into each other. */
+/* A padding or a gap, shaded, its token's name above the box, on the first line where it runs
+   into no other name (`stack` in measures.ts). */
 .page-band {
   position: absolute;
   background: rgb(from var(--color-warning) r g b / var(--opacity-press));
@@ -415,7 +517,7 @@ body {
 
 .page-band-name {
   position: absolute;
-  bottom: calc(100% + var(--space-s4));
+  bottom: calc(100% + var(--space-s4) + var(--line, 0) * (var(--type-mono-line) + var(--space-s4)));
   font-family: var(--type-mono-family);
   font-size: var(--type-mono-size);
   line-height: var(--type-mono-line);
@@ -426,10 +528,7 @@ body {
 .page-band[data-kind="padding-start"] > .page-band-name { left: 0; }
 .page-band[data-kind="padding-end"] > .page-band-name { right: 0; }
 
-.page-band[data-kind="gap"] > .page-band-name {
-  left: 0;
-  bottom: calc(100% + var(--space-s4) + var(--type-mono-line) + var(--space-s4));
-}
+.page-band[data-kind="gap"] > .page-band-name { left: 0; }
 
 .page-mark-size {
   position: absolute;

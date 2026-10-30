@@ -8,11 +8,16 @@ import type { Measures } from "../page.ts";
 import { el, label, mockCell, prose } from "../dom.ts";
 import { partOr, subheading } from "./section.ts";
 
-const overlays = new Set<() => void>();
+const overlays = new Set<() => boolean>();
 
-/** Lays every overlay on the page out again: after a change of scale, or of the window. */
-export function redrawOverlays(): void {
-  for (const draw of overlays) draw();
+/**
+ * Lays every overlay on the page out again: after a change of scale, or of the window. Whether one
+ * took another line of names above its sample, so the page's mocks are centred again.
+ */
+export function redrawOverlays(): boolean {
+  let moved = false;
+  for (const draw of overlays) moved = draw() || moved;
+  return moved;
 }
 
 function role(element: Element): string {
@@ -31,11 +36,11 @@ function tokenOf(element: Element, property: string): string {
 function overlaid(sample: Element): HTMLElement {
   const marks = el("div", "page-overlay");
   const holder = el("div", "page-measured", sample, marks);
-  const draw = () => {
+  const draw = (): boolean => {
     marks.replaceChildren();
     if (!holder.isConnected) {
       overlays.delete(draw);
-      return;
+      return false;
     }
     const origin = holder.getBoundingClientRect();
     const zoom = holder.offsetWidth / origin.width || 1;
@@ -47,10 +52,13 @@ function overlaid(sample: Element): HTMLElement {
       mark.style.height = `${height * zoom}px`;
       marks.append(mark);
     };
+    const names: HTMLElement[] = [];
     const band = (left: number, top: number, width: number, height: number, token: string, kind: string) => {
-      const shade = el("div", "page-band", el("span", "page-band-name", token));
+      const name = el("span", "page-band-name", token);
+      const shade = el("div", "page-band", name);
       shade.dataset.kind = kind;
       place(shade, left, top, width, height);
+      names.push(name);
     };
     for (const element of holder.querySelectorAll("[data-probe]")) {
       const box = element.getBoundingClientRect();
@@ -83,9 +91,37 @@ function overlaid(sample: Element): HTMLElement {
         }
       }
     }
+    // A line of names and the gap above it, in the viewport's pixels.
+    const rise = ((length("type-mono-line") + length("space-s4")) * scale) / zoom;
+    // And the room kept between two names on a line, so they read as two.
+    const apart = (length("space-s8") * scale) / zoom;
+    return stack(holder, names, rise, apart);
   };
   overlays.add(draw);
   return holder;
+}
+
+/**
+ * Lifts each of `names` a line at a time until it comes no nearer than `apart` to a name before
+ * it, paddings first and then gaps, so two names never meet however narrow the box; and gives `holder` room above for
+ * the lines used. Whether that room changed.
+ */
+function stack(holder: HTMLElement, names: readonly HTMLElement[], rise: number, apart: number): boolean {
+  const placed: DOMRect[] = [];
+  let lines = 1;
+  for (const name of names) {
+    const box = name.getBoundingClientRect();
+    let line = 0;
+    const at = (n: number) => new DOMRect(box.left, box.top - n * rise, box.width, box.height);
+    const meets = (a: DOMRect) => placed.some((b) => a.left < b.right + apart && b.left < a.right + apart && a.top < b.bottom && b.top < a.bottom);
+    while (meets(at(line))) line++;
+    name.style.setProperty("--line", String(line));
+    placed.push(at(line));
+    lines = Math.max(lines, line + 1);
+  }
+  const before = holder.style.getPropertyValue("--lines");
+  holder.style.setProperty("--lines", String(lines));
+  return before !== String(lines);
 }
 
 function round(value: number): string {
