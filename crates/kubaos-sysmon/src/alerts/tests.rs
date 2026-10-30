@@ -221,10 +221,23 @@ fn a_drain_spread_over_many_processes_names_the_load_not_the_top_one() {
 fn a_process_with_a_third_of_the_load_is_named() {
     let mut alerts = Alerts::default();
 
-    alerts.check(&draining(60.0, 20.0), &Thresholds::default(), false, 0);
-    let fired = alerts.check(&draining(60.0, 20.0), &Thresholds::default(), false, 30_000);
+    alerts.check(&draining(60.0, 21.0), &Thresholds::default(), false, 0);
+    let fired = alerts.check(&draining(60.0, 21.0), &Thresholds::default(), false, 30_000);
 
-    assert_eq!(fired[0].body, "cc1plus uses 20 % of the CPU; 1 h 51 min left");
+    assert_eq!(fired[0].body, "cc1plus uses 21 % of the CPU; 1 h 51 min left");
+}
+
+#[test]
+fn a_process_under_a_third_of_the_load_is_not_named() {
+    let mut alerts = Alerts::default();
+
+    alerts.check(&draining(60.0, 19.0), &Thresholds::default(), false, 0);
+    let fired = alerts.check(&draining(60.0, 19.0), &Thresholds::default(), false, 30_000);
+
+    assert_eq!(
+        fired[0].body,
+        "The CPU is 60 % busy across many processes; 1 h 51 min left"
+    );
 }
 
 #[test]
