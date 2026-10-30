@@ -212,7 +212,10 @@ function drawContent(ring: HTMLElement, scale: number): void {
   });
 }
 
-/** Draws `ring`'s glow for its control's size now, at `scale`. */
+/**
+ * Draws `ring`'s glow for its control's size now, at `scale`; on a window, its neutral shadow
+ * through the same mask.
+ */
 function draw(ring: HTMLElement, scale: number): void {
   const glowing = ring.querySelector<HTMLElement>(".k-glow");
   if (!glowing || !ring.isConnected) return;
@@ -223,7 +226,35 @@ function draw(ring: HTMLElement, scale: number): void {
   const key = `${width}x${height}r${corner}@${scale}`;
   if (glowing.dataset.drawn === key) return;
   glowing.dataset.drawn = key;
-  glowing.style.maskImage = mask(width, height, corner, scale);
+  const made = mask(width, height, corner, scale);
+  glowing.style.maskImage = made;
+  const shade = ring.querySelector<HTMLElement>(".k-shade");
+  if (shade) shade.style.maskImage = made;
+}
+
+/**
+ * The scale `ring` is drawn at: the page's, or that of a box drawn at a scale of its own, which
+ * sets its own `--scale`.
+ */
+function scaleOf(ring: HTMLElement): number {
+  return Number.parseFloat(getComputedStyle(ring).getPropertyValue("--scale")) || settings().scale;
+}
+
+/**
+ * Makes `ring` an active window's tube (`config/hypr/focus.lua`): the window's border, `width` (a
+ * length token's name) and its corner `corner` (CSS), the neutral border under the tube and the
+ * neutral shadow under the glow, which the lit tube and glow are laid over, as Hyprland blends
+ * them.
+ */
+export function windowRing(ring: HTMLElement, width: string, corner: string): void {
+  ring.dataset.window = "";
+  ring.style.setProperty("--corner", corner);
+  ring.style.setProperty("--line", `max(1px, round(nearest, var(--${width}), 1px))`);
+  const shade = document.createElement("span");
+  shade.className = "k-shade";
+  const border = document.createElement("span");
+  border.className = "k-border";
+  ring.prepend(shade, border);
 }
 
 /** A control's content drawn in its own tone, which lights as a tube with the line. */
@@ -234,9 +265,9 @@ export interface LitContent {
 /**
  * Adds the focus ring in `tone` to `control`, whose corner is the radius token `corner`; `filled`
  * for a control filled with its tone's colour; `lit`, the content drawn in its tone, to light as
- * a tube with it. Its glows are drawn once the control is laid out.
+ * a tube with it. Its glows are drawn once the control is laid out. Returns the ring.
  */
-export function focusRing(control: HTMLElement, corner: string, tone: Tone, filled: boolean, lit?: LitContent): void {
+export function focusRing(control: HTMLElement, corner: string, tone: Tone, filled: boolean, lit?: LitContent): HTMLElement {
   const ring = document.createElement("span");
   ring.className = "k-ring";
   ring.toggleAttribute("data-filled", filled);
@@ -266,13 +297,14 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
   }
   control.append(ring);
   rings.add(ring);
+  return ring;
 }
 
 /** Draws every ring on the page for its control's size at the scale picked, and lets go of those
  *  no longer on it. */
 export function redrawRings(): void {
   for (const ring of rings) {
-    if (ring.isConnected) draw(ring, settings().scale);
+    if (ring.isConnected) draw(ring, scaleOf(ring));
     else rings.delete(ring);
   }
 }
