@@ -29,7 +29,7 @@ export function render(page: Page): HTMLElement[] {
       subheading("Sizes"),
       partOr(page.sizes, variants),
     ),
-    section("States", matrix(page.states), subheading("The focus tube"), partOr(page.focus, tubes)),
+    section("States", matrix(page.states, page.focus), subheading("The focus line"), partOr(page.focus, tubes)),
     section("Content", content(page.content)),
     section("Motion", motion(page.motion)),
     section("Keyboard", partOr(page.keyboard, keyboard)),

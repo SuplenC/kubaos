@@ -1,8 +1,10 @@
 // The neon focus on a control: `kubaos-ui`'s `focus_ring` and `focus_ring_on_fill`. One line inside
 // the control's edge, at its corner: the tube in the control's tone, or on a control filled with
 // its tone's colour, the tone's core inside the fill's edge. The glow outside is that tone too, and
-// it is all that reaches past the box. At night the neon is lit, its core half way to white; in
-// daylight it is off, the line unlit glass (`_unlit`, the tone toward black) and no glow.
+// it is all that reaches past the box. Focused has two looks, which the scene picks: lit, the neon
+// burning with its core half way to white, at night at rest; and unlit, the line as unlit glass
+// (`_unlit`, the tone toward black) with no glow, in daylight always and at night while a sequence
+// has the lights out.
 // The glow is `glow` at the middle of every device pixel out from the edge, as
 // `kubaos_ui::focus::rings` lays its bands to give. Nothing of it takes layout room.
 //

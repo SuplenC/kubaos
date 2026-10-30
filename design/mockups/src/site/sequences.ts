@@ -7,7 +7,7 @@
 // `--unlit`, how much of every focus line is unlit glass rather than neon; `--after`, the lights in
 // the new colours.
 
-import type { Duration, Easing, Move, NonEmpty, Strike, Track } from "./page.ts";
+import type { Curve, Duration, Easing, Move, NonEmpty, Strike, Track } from "./page.ts";
 import type { ColourPath } from "./recolour.ts";
 
 /** What a sequence's tracks move: the scene's root, which every light and colour inside follows. */
@@ -58,14 +58,17 @@ function daylight(from: 0 | 1, cue?: NonEmpty<Duration>, duration: Duration = "r
 
 const GLASS = "every focus line, unlit: the tone's `_unlit` inside the fill's edge on Filled and Danger, at `focus.glass` over the container on Tonal and Text";
 
+const DAYLIGHT_GLASS = "in the light palette's colours from the first step";
+const CURRENT_GLASS = "in the colours of the moment, following them along their path";
+
 /**
  * The unlit glass taking the place of the lights flickering out, step for step, or giving its place
  * to the lights striking on: the line crossfades between the two, so it is never gone.
  */
-function glass<C extends Easing | Strike>(from: 0 | 1, cue: NonEmpty<Duration> | undefined, curve: C, duration: Duration): Track<C> {
+function glass<C extends Easing | Strike>(from: 0 | 1, cue: NonEmpty<Duration> | undefined, curve: C, duration: Duration, colours: string): Track<C> {
   return {
     part: "glass",
-    on: from === 0 ? `${GLASS}, in the light palette's colours from the first step` : `${GLASS}, in the colours on their way`,
+    on: `${GLASS}, ${colours}`,
     target: SCENE,
     property: "--unlit",
     from,
@@ -82,27 +85,40 @@ export interface Between {
   readonly to: string;
 }
 
+/** The theme change's lights going out and coming back, unseen in daylight, where the neon is off. */
+function unseen<C extends Curve>(track: Track<C>): Track<C> {
+  return { ...track, on: `${track.on}, unseen: daylight puts the neon out` };
+}
+
+const STRIKE_CUE: NonEmpty<Duration> = ["medium", "medium", "recolour", "settle"];
+
 /**
- * The theme change: the lights flicker out, a dark pause, every colour through grey, a dark beat in
- * the new colours, then the lights strike on. In daylight the same clock runs with nothing lit, so
- * only the colours are seen to change.
+ * The theme change: the lights flicker out into unlit glass, a dark pause, every colour through
+ * grey with the glass following it, a dark beat in the new colours, then the lights strike on in
+ * the glass's place. In daylight the same clock runs with the glass as it always is, so only the
+ * colours are seen to change.
  */
 export function themeChange(name: string, between: Between, sample: () => Element): Move {
   const { from, to } = between;
   return {
     name,
-    what: `A new wallpaper's accent or a custom colour, here ${from} to ${to}: every light on every screen flickers out together over \`medium\` (\`neon.strike\` played backwards), everything holds dark for \`medium\`, every colour role moves through grey over \`recolour\` on \`gather\`, everything holds dark in the new colours for \`settle\`, then every light strikes on together over \`strike\`, its core half way to white from the new tone. 2.3 s in all, on one clock: a control focused mid-way waits and strikes with the rest. In light mode the same clock runs, but the neon is off: only the colours are seen to change, at the same moment.`,
+    what: `A new wallpaper's accent or a custom colour, here ${from} to ${to}. A focus line is always lit neon or unlit glass, never gone, in this sequence as in every other. Every light on every screen flickers out together over \`medium\` (\`neon.strike\` played backwards), and at each step every focus line crossfades from its neon to unlit glass in the old theme's colours: the tone's \`_unlit\`, at \`focus.glass\` over the container on Tonal and Text. The glass stays fully seen while everything holds for \`medium\`, while every colour role moves through grey over \`recolour\` on \`gather\`, the glass following its tone through grey, and through a beat of \`settle\` in the new colours. Then every light strikes on together over \`strike\` (\`neon.strike\`), and at each step the line crossfades from the glass to the new theme's lit tube, or on Filled and Danger the core half way to white, with its full glow. 2.3 s in all, on one clock: a control focused mid-way waits and strikes with the rest. In light mode the same clock runs and the line is the glass it always is there: only the colours are seen to change, at the same moment.`,
     tracks: [
       lightsOut("neon.strike.reversed"),
+      glass(0, undefined, "neon.strike.reversed", "medium", CURRENT_GLASS),
       colours("through grey", from, to, ["medium", "medium"]),
-      lightsOn(["medium", "medium", "recolour", "settle"], "neon.strike"),
+      lightsOn(STRIKE_CUE, "neon.strike"),
+      glass(1, STRIKE_CUE, "neon.strike", "strike", CURRENT_GLASS),
     ],
     reduced: [colours("through grey", from, to, undefined, "instant")],
     unstuttered: [
       lightsOut("standard"),
+      glass(0, undefined, "standard", "medium", CURRENT_GLASS),
       colours("through grey", from, to, ["medium", "medium"]),
-      lightsOn(["medium", "medium", "recolour", "settle"], "standard"),
+      lightsOn(STRIKE_CUE, "standard"),
+      glass(1, STRIKE_CUE, "standard", "strike", CURRENT_GLASS),
     ],
+    daylight: [unseen(lightsOut("standard")), colours("through grey", from, to, ["medium", "medium"]), unseen(lightsOn(STRIKE_CUE, "standard"))],
     back: "cuts",
     sample,
   };
@@ -115,22 +131,22 @@ export function themeChange(name: string, between: Between, sample: () => Elemen
 export function toLight(between: Between, sample: () => Element): Move {
   return {
     name: "To light",
-    what: `Dark to light, ${between.from} to ${between.to}: the lit signs flicker out together over \`medium\` (\`neon.strike\` played backwards), and at each step every focus line crossfades from its neon to daylight's unlit glass, already in the light palette's colours: the tone's light \`_unlit\`, at \`focus.glass\` over the container on Tonal and Text. The line is never gone, and when the flicker ends it is its final daylight self. It holds as it is while everything else pauses for \`medium\`, the colours change on the dawn path over \`recolour\` on \`gather\` as the night turns to daylight, and a closing beat of \`settle\` passes. About 1.7 s. The signs stay off in daylight.`,
+    what: `Dark to light, ${between.from} to ${between.to}: the lit signs flicker out together over \`medium\` (\`neon.strike\` played backwards), and at each step every focus line crossfades from its neon to daylight's unlit glass, already in the light palette's colours: the tone's light \`_unlit\`, at \`focus.glass\` over the container on Tonal and Text. The line is never gone, and when the flicker ends it is its final daylight self, as in every sequence. It holds as it is while everything else pauses for \`medium\`, the colours change on the dawn path over \`recolour\` on \`gather\` as the night turns to daylight, and a closing beat of \`settle\` passes. About 1.7 s. The signs stay off in daylight.`,
     tracks: [
       lightsOut("neon.strike.reversed"),
-      glass(0, undefined, "neon.strike.reversed", "medium"),
+      glass(0, undefined, "neon.strike.reversed", "medium", DAYLIGHT_GLASS),
       colours("dawn", between.from, between.to, ["medium", "medium"]),
       daylight(0, ["medium", "medium"]),
     ],
     tail: "settle",
     reduced: [
       colours("dawn", between.from, between.to, undefined, "instant"),
-      glass(0, undefined, "linear", "instant"),
+      glass(0, undefined, "linear", "instant", DAYLIGHT_GLASS),
       daylight(0, undefined, "instant"),
     ],
     unstuttered: [
       lightsOut("standard"),
-      glass(0, undefined, "standard", "medium"),
+      glass(0, undefined, "standard", "medium", DAYLIGHT_GLASS),
       colours("dawn", between.from, between.to, ["medium", "medium"]),
       daylight(0, ["medium", "medium"]),
     ],
@@ -146,24 +162,24 @@ export function toLight(between: Between, sample: () => Element): Move {
 export function toDark(between: Between, sample: () => Element): Move {
   return {
     name: "To dark",
-    what: `Light to dark, ${between.from} to ${between.to}: every focus line stays unlit glass, fully seen, through a pause of \`medium\`, the colours changing on the dawn path over \`recolour\` on \`gather\` as the daylight goes, and a beat of \`settle\`, its colour following the palette from the light \`_unlit\` to the dark one. Then every sign strikes on over \`strike\` (\`neon.strike\`), and at each step the line crossfades from the glass to the lit tube, or on Filled and Danger the core half way to white, with its full glow. The line is never gone. About 2 s.`,
+    what: `Light to dark, ${between.from} to ${between.to}: every focus line stays unlit glass, fully seen, through a pause of \`medium\`, the colours changing on the dawn path over \`recolour\` on \`gather\` as the daylight goes, and a beat of \`settle\`, its colour following the palette from the light \`_unlit\` to the dark one. Then every sign strikes on over \`strike\` (\`neon.strike\`), and at each step the line crossfades from the glass to the lit tube, or on Filled and Danger the core half way to white, with its full glow. The line is never gone, as in every sequence. About 2 s.`,
     tracks: [
       daylight(1, ["medium"]),
       colours("dawn", between.from, between.to, ["medium"]),
       lightsOn(["medium", "recolour", "settle"], "neon.strike"),
-      glass(1, ["medium", "recolour", "settle"], "neon.strike", "strike"),
+      glass(1, ["medium", "recolour", "settle"], "neon.strike", "strike", CURRENT_GLASS),
     ],
     reduced: [
       colours("dawn", between.from, between.to, undefined, "instant"),
       daylight(1, undefined, "instant"),
       lightsOn(undefined, "linear", "instant"),
-      glass(1, undefined, "linear", "instant"),
+      glass(1, undefined, "linear", "instant", CURRENT_GLASS),
     ],
     unstuttered: [
       daylight(1, ["medium"]),
       colours("dawn", between.from, between.to, ["medium"]),
       lightsOn(["medium", "recolour", "settle"], "standard"),
-      glass(1, ["medium", "recolour", "settle"], "standard", "strike"),
+      glass(1, ["medium", "recolour", "settle"], "standard", "strike", CURRENT_GLASS),
     ],
     back: "cuts",
     sample,
