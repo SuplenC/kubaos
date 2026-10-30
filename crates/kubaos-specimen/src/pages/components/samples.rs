@@ -56,12 +56,12 @@ pub(super) fn button_in<'a>(look: &Look, kind: Kind, size: ButtonSize, state: us
 
 /// A button size's name over its table, lowercase as sizes are written, then its height.
 pub(super) fn size_name(size: ButtonSize) -> String {
-    let (name, height) = match size {
-        ButtonSize::Sm => ("sm", Size::ControlSm),
-        ButtonSize::Md => ("md", Size::ControlMd),
-        ButtonSize::Lg => ("lg", Size::ControlLg),
+    let height = match size {
+        ButtonSize::Sm => Size::ControlSm,
+        ButtonSize::Md => Size::ControlMd,
+        ButtonSize::Lg => Size::ControlLg,
     };
-    format!("{name} · {}", height.px())
+    format!("{} · {}", size.name().to_lowercase(), height.px())
 }
 
 /// The states' names over a table's columns, after the kinds' column.
