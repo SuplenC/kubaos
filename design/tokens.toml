@@ -77,6 +77,11 @@ near = 8
 near_opacity = 0.45
 far = 20
 far_opacity = 0.14
+# Content drawn in its tone (a Text button's label and icon), lit: a faint
+# near glow only, fading from its opacity at the letters to nothing at its
+# reach, in logical pixels, the same at every size. No far glow.
+content_near = 3
+content_glow = 0.4
 # The band a picture keeps round itself inside its own box where its
 # neighbours leave no more room: a wallpaper thumbnail inside its grid cell,
 # the boot prompt's field drawn as one picture with its ring. A focused one's

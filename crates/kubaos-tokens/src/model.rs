@@ -87,6 +87,11 @@ pub struct Focus {
     pub far: u16,
     /// The far glow's opacity at the tube.
     pub far_opacity: f32,
+    /// Content drawn in its tone, lit: its near glow's reach outside the content, in logical
+    /// pixels.
+    pub content_near: u16,
+    /// Content drawn in its tone, lit: its near glow's opacity at the content.
+    pub content_glow: f32,
     /// The band a picture keeps round itself inside its own box where its neighbours leave no
     /// more room, in logical pixels.
     pub offset: u16,
