@@ -77,13 +77,13 @@ export function strikeSteps(): number[] {
   return Array.from({ length: count }, (_, i) => number(`neon-strike-${i}`));
 }
 
-/** Whether a curve is the neon sign's stutter, either way. */
+/** Whether a curve is the neon sign's flicker, either way. */
 export function struck(curve: Curve): curve is Strike {
   return curve === "neon.strike" || curve === "neon.strike.reversed";
 }
 
 /**
- * A stuttering track's progress from its `from` (0) to its `to` (1) at each even step: a strike's
+ * A flickering track's progress from its `from` (0) to its `to` (1) at each even step: a strike's
  * brightness, or for one switching off, the strike's steps played backwards, the tube's brightness
  * at each step then `1 - progress`.
  */
@@ -132,29 +132,29 @@ export function between(track: Track, part: number): number {
 }
 
 /**
- * Which of a move's track lists plays: its own, reduced motion's, light mode's, or the stutter's
+ * Which of a move's track lists plays: its own, reduced motion's, light mode's, or the flicker's
  * off one.
  */
-export type TrackSet = "tracks" | "reduced" | "daylight" | "unstuttered";
+export type TrackSet = "tracks" | "reduced" | "daylight" | "unflickered";
 
 /** The tracks of `set` in `move`. */
 export function tracksOf(move: Move, set: TrackSet): NonEmpty<Track> | null {
   if (set === "tracks") return move.tracks;
   if (set === "reduced") return move.reduced === "same" ? null : move.reduced;
   if (set === "daylight") return move.daylight ?? null;
-  return move.unstuttered ?? null;
+  return move.unflickered ?? null;
 }
 
 /**
  * The set the settings picked play, in `mode`, the one picked by default: reduced motion's first,
- * then light mode's, then the stutter's.
+ * then light mode's, then the flicker's.
  */
 export function playing(move: Move, mode: Mode = settings().mode): TrackSet {
-  const { reduced, stutter } = settings();
+  const { reduced, flicker } = settings();
   if (reduced && move.reduced !== "same") return "reduced";
   if (mode === "light" && move.daylight) return "daylight";
   if (reduced) return "tracks";
-  if (!stutter && move.unstuttered) return "unstuttered";
+  if (!flicker && move.unflickered) return "unflickered";
   return "tracks";
 }
 
@@ -395,7 +395,7 @@ export function recipe(move: Move): Record<string, unknown> {
     ...(move.tail ? { tail: { token: `duration.${move.tail}`, ms: milliseconds(move.tail), what: "a still beat after the last part, part of the move" } } : {}),
     reduced: move.reduced === "same" ? "same" : move.reduced.map(trackJson),
     ...(move.daylight ? { daylight: move.daylight.map(trackJson) } : {}),
-    ...(move.unstuttered ? { unstuttered: move.unstuttered.map(trackJson) } : {}),
+    ...(move.unflickered ? { unflickered: move.unflickered.map(trackJson) } : {}),
     speed: "every duration, cue and beat divided by the speed setting, 0.5 to 2",
     player: {
       hold: { token: `duration.${HOLD}`, ms: milliseconds(HOLD) },

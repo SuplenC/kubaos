@@ -1,6 +1,6 @@
 // The theme change and the dark ⇄ light switch, as moves (`docs/DESIGN.md`, "Motion"): one
 // sequence on one clock for every light and every colour on every screen. They are power changes,
-// so the lights flicker with `neon.strike`'s stutter; a control's own states only ever fade. Their
+// so the lights flicker through `neon.strike`'s steps; a control's own states only ever fade. Their
 // players and the toolbar's theme and mode play these same tracks, so what the recipe says is what
 // the page does.
 //
@@ -90,7 +90,7 @@ export function themeChange(name: string, between: Between, sample: () => Elemen
     what: `A new wallpaper's accent or a custom colour, here ${from} to ${to}: a power change, so the lights flicker. ${ALWAYS} Every light on every screen flickers out together over \`medium\` (\`neon.strike\` played backwards), and at each step every lit control goes to its signs-off look and back: its line to unlit glass, which stays inside its edge, its glow out, its label to its rest colour. Everything holds for \`medium\`, every colour role moves through grey over \`recolour\` on \`gather\`, the glass following the colours, and a beat of \`settle\` passes in the new colours, the signs off. Then every light strikes on together over \`strike\` (\`neon.strike\`), and every lit control strikes back to its lit look with the signs on, in the new theme. 2.3 s in all, on one clock: a control lit mid-way waits and strikes with the rest. In light mode the same clock runs with nothing to flicker, a lit control keeping its daylight lit look: only the colours are seen to change, at the same moment.`,
     tracks: [lightsOut("neon.strike.reversed"), colours("through grey", from, to, ["medium", "medium"]), lightsOn(STRIKE_CUE, "neon.strike")],
     reduced: [colours("through grey", from, to, undefined, "instant")],
-    unstuttered: [lightsOut("standard"), colours("through grey", from, to, ["medium", "medium"]), lightsOn(STRIKE_CUE, "standard")],
+    unflickered: [lightsOut("standard"), colours("through grey", from, to, ["medium", "medium"]), lightsOn(STRIKE_CUE, "standard")],
     daylight: [unseen(lightsOut("standard")), colours("through grey", from, to, ["medium", "medium"]), unseen(lightsOn(STRIKE_CUE, "standard"))],
     back: "cuts",
     sample,
@@ -109,7 +109,7 @@ export function toLight(between: Between, sample: () => Element): Move {
     tracks: [lightsOut("neon.strike.reversed"), colours("dawn", between.from, between.to, ["medium", "medium"]), daylight(0, ["medium", "medium"])],
     tail: "settle",
     reduced: [colours("dawn", between.from, between.to, undefined, "instant"), daylight(0, undefined, "instant")],
-    unstuttered: [lightsOut("standard"), colours("dawn", between.from, between.to, ["medium", "medium"]), daylight(0, ["medium", "medium"])],
+    unflickered: [lightsOut("standard"), colours("dawn", between.from, between.to, ["medium", "medium"]), daylight(0, ["medium", "medium"])],
     back: "cuts",
     sample,
   };
@@ -126,7 +126,7 @@ export function toDark(between: Between, sample: () => Element): Move {
     what: `Light to dark, ${between.from} to ${between.to}: a power change. ${ALWAYS} After a pause of \`medium\`, the colours change on the dawn path over \`recolour\` on \`gather\` as the daylight goes, and a lit control holds its daylight lit look, which is its signs-off look: its line stays inside its edge as glass, following the palette into the night's unlit colour. A beat of \`settle\` passes, the signs off. Then every sign strikes on over \`strike\` (\`neon.strike\`), and every lit control strikes to its lit look with the signs on: the core or the tube inside its edge, its glow and its lit label. About 2 s.`,
     tracks: [daylight(1, ["medium"]), colours("dawn", between.from, between.to, ["medium"]), lightsOn(["medium", "recolour", "settle"], "neon.strike")],
     reduced: [colours("dawn", between.from, between.to, undefined, "instant"), daylight(1, undefined, "instant"), lightsOn(undefined, "linear", "instant")],
-    unstuttered: [daylight(1, ["medium"]), colours("dawn", between.from, between.to, ["medium"]), lightsOn(["medium", "recolour", "settle"], "standard")],
+    unflickered: [daylight(1, ["medium"]), colours("dawn", between.from, between.to, ["medium"]), lightsOn(["medium", "recolour", "settle"], "standard")],
     back: "cuts",
     sample,
   };

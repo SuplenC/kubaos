@@ -154,12 +154,12 @@ export type Easing =
   | "gather";
 
 /**
- * The neon sign's stutter: `neon.strike`'s steps, a tube switching on, or the same steps played
+ * The neon sign's flicker: `neon.strike`'s steps, a tube switching on, or the same steps played
  * backwards, a tube switching off.
  */
 export type Strike = "neon.strike" | "neon.strike.reversed";
 
-/** How a move runs over its duration: an easing curve, or the neon sign's stutter. */
+/** How a move runs over its duration: an easing curve, or the neon sign's flicker. */
 export type Curve = Easing | Strike;
 
 /**
@@ -223,7 +223,7 @@ interface MoveWords {
   readonly tail?: Duration;
   /**
    * What plays in light mode, where the neon is off, when that differs. Nothing in it strikes, so
-   * the stutter doesn't change it; reduced motion's own tracks still win.
+   * the flicker doesn't change it; reduced motion's own tracks still win.
    */
   readonly daylight?: NonEmpty<Track<Easing>>;
 }
@@ -233,7 +233,7 @@ interface Eased {
   readonly tracks: NonEmpty<Track<Easing>>;
   /** What plays with reduced motion: the same tracks, or the ones it turns them into. */
   readonly reduced: "same" | NonEmpty<Track<Easing>>;
-  readonly unstuttered?: never;
+  readonly unflickered?: never;
   /**
    * How the loop goes back to the first state: the move `plays` backwards where that is the same
    * move reversed (a hover leaving), or it `cuts` back where going back is a move of its own
@@ -243,13 +243,13 @@ interface Eased {
 }
 
 /**
- * A move that strikes as a neon tube does. Reduced motion and the stutter off each turn a strike
+ * A move that strikes as a neon tube does. Reduced motion and the flicker off each turn a strike
  * into a fade, so it names both; a strike is never played backwards, so its loop cuts back.
  */
 interface Struck {
   readonly tracks: NonEmpty<Track>;
   readonly reduced: NonEmpty<Track<Easing>>;
-  readonly unstuttered: NonEmpty<Track<Easing>>;
+  readonly unflickered: NonEmpty<Track<Easing>>;
   readonly back: "cuts";
 }
 
