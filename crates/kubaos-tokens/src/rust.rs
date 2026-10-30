@@ -454,7 +454,17 @@ fn contrast(out: &mut Writer, tokens: &Tokens) {
     out.line("}");
     out.blank();
     out.line("/// Every foreground role the front ends draw on a background role, and the contrast it needs.");
-    let pairs = &tokens.contrast.pairs;
+    out.line("/// The pairs of the state model's derived roles aren't built here yet.");
+    let pairs: Vec<_> = tokens
+        .contrast
+        .pairs
+        .iter()
+        .filter(|pair| {
+            [&pair.fg, &pair.bg]
+                .iter()
+                .all(|role| tokens.color.source.contains_key(*role))
+        })
+        .collect();
     out.line(format!("pub const CONTRAST: [ContrastPair; {}] = [", pairs.len()));
     for pair in pairs {
         let need = match pair.need {
@@ -795,6 +805,9 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
     out.line("    pub tone: Role,");
     out.line("    pub black: f32,");
     out.line("}");
+    out.blank();
+    out.line("// The state model's derived roles (OKLCH lightness and chroma, gamut and contrast fitting, a");
+    out.line("// recipe for each mode) aren't built here yet: only the mockups' CSS computes them.");
     for (role, derived) in &colors.derived {
         let Some((toward, t)) = derived.toward() else { continue };
         let (kind, field) = match toward {
@@ -802,11 +815,11 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
             Toward::Black => ("Darkened", "black"),
         };
         out.blank();
-        out.line(format!("/// `{}` taken {t:?} of the way to {field}.", derived.mix));
+        out.line(format!("/// `{}` taken {t:?} of the way to {field}.", derived.tone()));
         out.line(format!(
             "pub const {}: {kind} = {kind} {{ tone: Role::{}, {field}: {t:?} }};",
             role.to_uppercase(),
-            camel(&derived.mix),
+            camel(derived.tone()),
         ));
     }
 }

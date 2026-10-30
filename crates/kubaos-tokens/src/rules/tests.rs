@@ -1,5 +1,8 @@
 use crate::Error;
 use crate::Violation;
+use crate::contrast;
+use crate::contrast::Mode;
+use crate::oklch::Oklch;
 
 const TOKENS: &str = include_str!("../../../../design/tokens.toml");
 
@@ -588,7 +591,7 @@ fn a_darker_scrim_moves_the_frame_blur_cut_off_up_with_it() {
 #[test]
 fn every_core_is_its_tone_half_way_to_white() {
     let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
-    let dark = tokens.color.with_derived(&tokens.color.dark);
+    let dark = tokens.color.with_derived(&tokens.color.dark, Mode::Dark);
 
     for (role, core) in [
         ("primary_core", "#ffdbbc"),
@@ -608,7 +611,7 @@ fn a_core_follows_a_primary_the_wallpaper_set() {
     let mut live = tokens.color.dark.clone();
     live.insert("primary".into(), crate::model::Rgb::parse("#3a7bd5").expect("a colour"));
 
-    let core = tokens.color.with_derived(&live)["primary_core"];
+    let core = tokens.color.with_derived(&live, Mode::Dark)["primary_core"];
 
     assert_eq!(format!("{core:?}"), "#9dbdea");
 }
@@ -639,24 +642,117 @@ fn a_core_of_a_role_that_doesnt_exist_is_refused() {
 }
 
 #[test]
-fn every_unlit_core_is_its_tone_35_percent_toward_black() {
+fn an_unlit_tone_is_deeper_at_the_same_hue() {
     let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
-    let light = tokens.color.with_derived(&tokens.color.light);
+    let dark = tokens.color.with_derived(&tokens.color.dark, Mode::Dark);
 
-    for (role, core) in [("primary_unlit", "#5a3100"), ("error_unlit", "#791111"), ("cold_unlit", "#00405a")] {
-        assert_eq!(format!("{:?}", light[role]), core, "{role}");
+    for (tone, unlit) in [
+        ("primary", "primary_unlit"),
+        ("error", "error_unlit"),
+        ("cold", "cold_unlit"),
+    ] {
+        let (tone, unlit) = (Oklch::of(dark[tone]), Oklch::of(dark[unlit]));
+        assert!((unlit.l - tone.l * 0.6).abs() < 0.005, "{unlit:?} from {tone:?}");
+        assert!((unlit.h - tone.h).abs() < 1.5, "{unlit:?} from {tone:?}");
     }
 }
 
 #[test]
-fn an_unlit_core_follows_a_primary_the_wallpaper_set() {
+fn an_unlit_tone_follows_a_primary_the_wallpaper_set() {
     let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
-    let mut live = tokens.color.light.clone();
+    let mut live = tokens.color.dark.clone();
     live.insert("primary".into(), crate::model::Rgb::parse("#3a7bd5").expect("a colour"));
 
-    let core = tokens.color.with_derived(&live)["primary_unlit"];
+    let unlit = Oklch::of(tokens.color.with_derived(&live, Mode::Dark)["primary_unlit"]);
 
-    assert_eq!(format!("{core:?}"), "#26508a");
+    let tone = Oklch::of(live["primary"]);
+    assert!((unlit.l - tone.l * 0.6).abs() < 0.005, "{unlit:?}");
+    assert!(
+        unlit.c <= tone.c * 1.2 + 0.005,
+        "1.2 times as rich at most, as far as sRGB holds: {unlit:?}"
+    );
+    assert!((unlit.h - tone.h).abs() < 1.5, "{unlit:?}");
+}
+
+#[test]
+fn a_role_with_a_recipe_for_each_mode_takes_each_in_its_own() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+
+    let light = Oklch::of(tokens.color.with_derived(&tokens.color.light, Mode::Light)["primary_fill"]);
+    let dark = tokens.color.with_derived(&tokens.color.dark, Mode::Dark);
+
+    assert!((light.l - 0.80).abs() < 0.005, "lifted to 0.80 by day: {light:?}");
+    assert_eq!(dark["primary_fill"], dark["primary_unlit"], "unlit at night");
+}
+
+#[test]
+fn a_label_fitted_on_its_fills_holds_on_every_one() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+
+    for (palette, mode) in [(&tokens.color.dark, Mode::Dark), (&tokens.color.light, Mode::Light)] {
+        let roles = tokens.color.with_derived(palette, mode);
+        for (label, fills) in [
+            ("on_primary_fill", &["primary_fill", "primary_fill_pressed"][..]),
+            (
+                "on_burn_danger",
+                &["burn_danger", "burn_danger_lit", "burn_danger_pressed"][..],
+            ),
+            (
+                "on_burn_warning",
+                &["burn_warning", "burn_warning_lit", "burn_warning_pressed"][..],
+            ),
+        ] {
+            for fill in fills {
+                let ratio = contrast::ratio(contrast::channels(roles[label]), contrast::channels(roles[*fill]));
+                assert!(ratio >= 4.5, "{label} on {fill} in {}: {ratio}", mode.name());
+            }
+        }
+    }
+}
+
+#[test]
+fn a_fixed_tone_written_in_oklch_is_fitted_into_srgb() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+
+    let danger = Oklch::of(tokens.color.dark["burn_danger"]);
+
+    assert!(
+        (danger.l - 0.66).abs() < 0.005 && (danger.h - 27.0).abs() < 1.0,
+        "{danger:?}"
+    );
+    assert!(danger.c < 0.25, "sRGB can't hold 0.25 there: {danger:?}");
+}
+
+#[test]
+fn a_derived_role_that_reads_itself_is_refused() {
+    let found = violations(|t| {
+        let mut role = toml::Table::new();
+        role.insert("from".into(), "primary_fill_pressed".into());
+        set(t, &["color", "derived"], "primary_fill", role);
+    });
+
+    assert!(
+        found
+            .iter()
+            .any(|v| matches!(v, Violation::DerivedRecipe { role, .. } if role == "primary_fill" || role == "primary_fill_pressed")),
+        "{found:?}"
+    );
+}
+
+#[test]
+fn a_derived_role_with_one_mode_alone_is_refused() {
+    let found = violations(|t| {
+        let mut dark = toml::Table::new();
+        dark.insert("from".into(), "primary".into());
+        let mut role = toml::Table::new();
+        role.insert("dark".into(), dark.into());
+        set(t, &["color", "derived"], "primary_fill_line", role);
+    });
+
+    assert!(
+        matches!(found.as_slice(), [Violation::DerivedRecipe { role, .. }] if role == "primary_fill_line"),
+        "{found:?}"
+    );
 }
 
 #[test]
