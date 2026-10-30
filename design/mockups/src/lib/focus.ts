@@ -1,8 +1,8 @@
 // The neon focus on a control: `kubaos-ui`'s `focus_ring` and `focus_ring_on_fill`. The tube is the
 // control's own edge, drawn inside its box, in the control's tone, and the glow is that tone too; a
-// control filled with its tone's colour shows the tone's hot core just outside its fill instead. The glow is `glow` at the middle of every device pixel
-// out from the edge, as `kubaos_ui::focus::rings` lays its bands to give. Nothing of it takes
-// layout room.
+// control filled with its tone's colour shows the tone's hot core just outside its fill instead.
+// The glow is `glow` at the middle of every device pixel out from the edge, as
+// `kubaos_ui::focus::rings` lays its bands to give. Nothing of it takes layout room.
 //
 // The glow is one mask, worked out per device pixel from its distance to the edge, in the focus
 // colour, so it is rounded to 8 bits once: as twenty translucent elements, one per band, Chromium
