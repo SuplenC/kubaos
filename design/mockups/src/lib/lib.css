@@ -239,3 +239,24 @@
   background: var(--tube-lit);
   mask-size: 100% 100%;
 }
+
+/* An active window's tube (`windowRing` in `lib/focus.ts`, `config/hypr/focus.lua`): the window's
+   neutral border under the tube, and its neutral shadow, `shadow` at `opacity.window_shadow` at the
+   edge falling off as the glow does, under the glow. The lit tube is laid over the border as
+   Hyprland blends them; the shadow gives way as the glow comes, so lit, only the glow is left. */
+.k-ring[data-window] > .k-border {
+  position: absolute;
+  inset: 0;
+  border: var(--line) solid rgb(from var(--color-surface_container_highest) r g b / var(--opacity-window_border));
+  border-radius: var(--corner);
+}
+
+.k-ring[data-window] > .k-shade {
+  position: absolute;
+  inset: calc(-1 * var(--glow-reach));
+  --glow-reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
+  --edge: calc(1 - (1 - var(--focus-near_opacity)) * (1 - var(--focus-far_opacity)));
+  background: rgb(from var(--color-shadow) r g b / calc(var(--opacity-window_shadow) / var(--edge)));
+  opacity: calc(1 - var(--neon));
+  mask-size: 100% 100%;
+}
