@@ -16,6 +16,9 @@ Item {
     property url source: ""
     property int radius: Tokens.radius.control
     default property alias content: slot.data
+    // Drawn for a control that can't be used now: the picture at the disabled opacity, and the
+    // placeholder the disabled container.
+    property bool dimmed: false
 
     // Whether `source` has loaded, and covers the placeholder.
     readonly property bool ready: picture.status === Image.Ready
@@ -49,7 +52,14 @@ Item {
         radius: root.radius
         reported: false
         loading: picture.status === Image.Loading
-        visible: !root.ready
+        visible: !root.ready && !root.dimmed
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        visible: !root.ready && root.dimmed
+        radius: root.radius
+        color: K.Look.alpha(Tokens.color.on_surface, Tokens.opacity.disabled_container)
     }
 
     Image {
@@ -76,6 +86,7 @@ Item {
     MultiEffect {
         anchors.fill: parent
         visible: picture.status === Image.Ready
+        opacity: root.dimmed ? Tokens.opacity.disabled_content : 1
         source: picture
         maskEnabled: true
         maskSource: corners
@@ -87,5 +98,6 @@ Item {
         id: slot
 
         anchors.fill: parent
+        opacity: root.dimmed ? Tokens.opacity.disabled_content : 1
     }
 }

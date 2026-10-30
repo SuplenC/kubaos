@@ -186,7 +186,7 @@ fn bar<'a>(specimen: &Specimen, look: &Look) -> Element<'a, Message> {
                 look,
                 &[("Tab", "next page"), ("← →", "pages"), ("M", "mode")],
             ))
-            .push(chip(look, ChipKind::Neutral, scale, None, None, None::<Message>))
+            .push(chip::<Message>(ChipKind::Neutral, scale).view(look))
             .push(
                 icon_button(glyph, label)
                     .kind(Kind::Text)

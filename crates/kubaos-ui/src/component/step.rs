@@ -248,7 +248,7 @@ fn state_chip<'a, M: Clone + 'a>(
         StepState::Current => return None,
     };
     let (label, glyph) = words.unwrap_or((label, glyph));
-    Some(chip(look, kind, label, glyph, None, None))
+    Some(chip(kind, label).icon_maybe(glyph).view(look))
 }
 
 /// The state as a mark the size of the title's icon: a check when done, the action's symbol in

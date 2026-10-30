@@ -170,7 +170,7 @@ pub fn view(app: &App) -> El<'_> {
     // The panel screens carry the power button in the rail; the full-bleed ones in the corner.
     let mut corner = row(&look, Space::S16).center();
     if app.backend.is_demo() {
-        corner = corner.push(chip(&look, ChipKind::Cold, "Demo", Some(Icon::Bolt), None, None));
+        corner = corner.push(chip(ChipKind::Cold, "Demo").icon(Icon::Bolt).view(&look));
     }
     if !app.screen.in_panel() {
         if let Some(b) = app.battery {
@@ -672,13 +672,13 @@ fn keymap_chips<'a>(app: &'a App, look: &Look) -> El<'a> {
     let chips = keymaps.iter().enumerate().map(|(i, k)| {
         let lead = i == 0;
         chip(
-            look,
             if lead { ChipKind::Selected } else { ChipKind::Neutral },
             data::keymap_name(k).into_owned(),
-            lead.then_some(Icon::Check),
-            (!lead).then(|| Message::KeymapDefault(k.clone())),
-            (keymaps.len() > 1).then(|| Message::KeymapDrop(k.clone())),
         )
+        .icon_maybe(lead.then_some(Icon::Check))
+        .on_press_maybe((!lead).then(|| Message::KeymapDefault(k.clone())))
+        .on_remove_maybe((keymaps.len() > 1).then(|| Message::KeymapDrop(k.clone())))
+        .view(look)
     });
     let hint = if keymaps.len() > 1 {
         text(
@@ -1508,7 +1508,7 @@ fn wallpaper_set_header<'a>(app: &'a App, s: usize, set: &'a kubaos_core::probe:
                 Some(Message::Click(f)),
                 app.is_focused(f),
             ))
-            .push(chip(look, kind, count, None, None, None)),
+            .push(chip(kind, count).view(look)),
     )
     .id(wallpaper_item(f).unwrap_or_default())
     .into()
@@ -2111,14 +2111,12 @@ fn welcome<'a>(app: &'a App, look: &Look) -> El<'a> {
     stack(look, Gap::NONE)
         .push(text(jp::WELCOME, Type::Accent, c.primary))
         .push(gap(Space::S8))
-        .push(row(look, Space::S20).center().push(sign(look)).push(chip(
-            look,
-            ChipKind::Neutral,
-            app.codename().to_uppercase(),
-            None,
-            None,
-            None,
-        )))
+        .push(
+            row(look, Space::S20)
+                .center()
+                .push(sign(look))
+                .push(chip(ChipKind::Neutral, app.codename().to_uppercase()).view(look)),
+        )
         .push(gap(Space::S20))
         .push(text("Let's fix this shit.", Type::Hero, c.on_surface))
         .push(gap(Space::S16))
@@ -2167,39 +2165,27 @@ fn welcome_meta<'a>(app: &'a App, look: &Look) -> Vec<El<'a>> {
     let mut meta: Vec<El> = vec![];
     if let Some(pr) = app.ready_probe() {
         if let Some(m) = &pr.payload {
-            meta.push(chip(
-                look,
-                ChipKind::Accent,
-                format!("v{}", m.version),
-                Some(Icon::DeployedCode),
-                None,
-                None,
-            ));
-            meta.push(chip(
-                look,
-                ChipKind::Neutral,
-                m.commit.chars().take(7).collect::<String>(),
-                None,
-                None,
-                None,
-            ));
-            meta.push(chip(
-                look,
-                ChipKind::Neutral,
-                format!("built {}", m.built_at.get(..10).unwrap_or(&m.built_at)),
-                None,
-                None,
-                None,
-            ));
+            meta.push(
+                chip(ChipKind::Accent, format!("v{}", m.version))
+                    .icon(Icon::DeployedCode)
+                    .view(look),
+            );
+            meta.push(chip(ChipKind::Neutral, m.commit.chars().take(7).collect::<String>()).view(look));
+            meta.push(
+                chip(
+                    ChipKind::Neutral,
+                    format!("built {}", m.built_at.get(..10).unwrap_or(&m.built_at)),
+                )
+                .view(look),
+            );
         }
-        meta.push(chip(
-            look,
-            ChipKind::Neutral,
-            format!("{}{}", pr.arch, if pr.uefi { " · UEFI" } else { " · BIOS" }),
-            None,
-            None,
-            None,
-        ));
+        meta.push(
+            chip(
+                ChipKind::Neutral,
+                format!("{}{}", pr.arch, if pr.uefi { " · UEFI" } else { " · BIOS" }),
+            )
+            .view(look),
+        );
     }
     meta
 }

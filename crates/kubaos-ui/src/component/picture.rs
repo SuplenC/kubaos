@@ -34,6 +34,7 @@ use crate::component::chip::ChipKind;
 use crate::component::chip::chip;
 use crate::component::layered;
 use crate::component::media::Aspect;
+use crate::component::media::media_disabled;
 use crate::component::media::media_under;
 use crate::focus::RingColor;
 use crate::focus::focus_ring;
@@ -77,6 +78,7 @@ pub struct PictureChoice<'a, M> {
     badge: Option<(Icon, String)>,
     _words: std::marker::PhantomData<&'a ()>,
     focused: bool,
+    disabled: bool,
     on_press: Option<M>,
     preview: Option<Preview>,
 }
@@ -98,6 +100,7 @@ pub fn picture_choice<'a, M>(
         mark: None,
         badge: None,
         focused: false,
+        disabled: false,
         on_press: None,
         preview: None,
         _words: std::marker::PhantomData,
@@ -140,6 +143,13 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
         PictureChoice { focused, ..self }
     }
 
+    /// Whether it can't be picked now: the picture at the disabled opacity (its placeholder the
+    /// disabled container), its name and chips dimmed, no tube, and no press or hover.
+    #[must_use]
+    pub fn disabled(self, disabled: bool) -> Self {
+        PictureChoice { disabled, ..self }
+    }
+
     #[must_use]
     pub fn on_press(self, message: M) -> Self {
         PictureChoice {
@@ -180,6 +190,11 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
                     .into(),
             );
             let light = color::rgb(tokens::DARK.on_surface);
+            let light = if self.disabled {
+                color::alpha(light, Opacity::DisabledContent.value())
+            } else {
+                light
+            };
             layers.push(
                 widget::container(snap(look.scale, line(self.name.clone(), Type::Small, light)))
                     .width(Length::Fill)
@@ -196,6 +211,7 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
                 glyph,
                 label,
                 alignment::Horizontal::Left,
+                self.disabled,
             ));
         }
         if self.picked
@@ -207,15 +223,20 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
                 glyph,
                 label,
                 alignment::Horizontal::Right,
+                self.disabled,
             ));
         }
         let content = c.on_surface;
-        let enabled = self.on_press.is_some();
-        let picture = media_under(look, self.picture, self.aspect, CORNER, layers);
+        let enabled = self.on_press.is_some() && !self.disabled;
+        let picture = if self.disabled {
+            media_disabled(look, self.picture, self.aspect, CORNER, layers)
+        } else {
+            media_under(look, self.picture, self.aspect, CORNER, layers)
+        };
         let pressable = widget::button(picture)
             .padding(0)
             .width(Length::Fill)
-            .on_press_maybe(self.on_press)
+            .on_press_maybe(self.on_press.filter(|_| enabled))
             .style(move |_theme: &Theme, _status| widget::button::Style {
                 background: None,
                 text_color: content,
@@ -230,10 +251,13 @@ impl<'a, M: Clone + 'a> PictureChoice<'a, M> {
         } else {
             RingColor::Accent
         };
-        let ringed = focus_ring(look, tile, CORNER, self.picked || self.focused, ring);
+        let lit = (self.picked || self.focused) && !self.disabled;
+        let ringed = focus_ring(look, tile, CORNER, lit, ring);
         let mut column = stack(look, Space::S8).center().push(ringed);
         if self.place == NamePlace::Under {
-            let words = if self.picked {
+            let words = if self.disabled {
+                color::alpha(c.on_surface, Opacity::DisabledContent.value())
+            } else if self.picked {
                 c.on_surface
             } else {
                 c.on_surface_variant
@@ -256,8 +280,9 @@ fn corner_chip<'a, M: Clone + 'a>(
     glyph: Icon,
     label: String,
     side: alignment::Horizontal,
+    disabled: bool,
 ) -> Element<'a, M> {
-    widget::container(chip(look, kind, label, Some(glyph), None, None))
+    widget::container(chip(kind, label).icon(glyph).disabled(disabled).view(look))
         .width(Length::Fill)
         .height(Length::Fill)
         .padding(Inset::all(Space::S8).padding())

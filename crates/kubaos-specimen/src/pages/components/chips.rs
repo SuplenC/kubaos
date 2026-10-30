@@ -35,40 +35,26 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
             ChipKind::Cold => "Demo",
             ChipKind::Filled => "Reboot",
         };
-        line = line.push(chip(look, kind, label, None, None, None::<Message>));
+        line = line.push(chip::<Message>(kind, label).view(look));
     }
     line = line
-        .push(chip(
-            look,
-            ChipKind::Selected,
-            "Default",
-            Some(Icon::Check),
-            None,
-            None::<Message>,
-        ))
-        .push(chip(
-            look,
-            ChipKind::Cold,
-            "Demo",
-            Some(Icon::Bolt),
-            None,
-            None::<Message>,
-        ))
-        .push(chip(
-            look,
-            ChipKind::Neutral,
-            "Italian",
-            None,
-            Some(Message::Sample),
-            Some(Message::Sample),
-        ))
-        .push(chip(
-            look,
-            ChipKind::Selected,
-            "English (US)",
-            Some(Icon::Check),
-            None,
-            Some(Message::Sample),
-        ));
+        .push(
+            chip::<Message>(ChipKind::Selected, "Default")
+                .icon(Icon::Check)
+                .view(look),
+        )
+        .push(chip::<Message>(ChipKind::Cold, "Demo").icon(Icon::Bolt).view(look))
+        .push(
+            chip(ChipKind::Neutral, "Italian")
+                .on_press(Message::Sample)
+                .on_remove(Message::Sample)
+                .view(look),
+        )
+        .push(
+            chip(ChipKind::Selected, "English (US)")
+                .icon(Icon::Check)
+                .on_remove(Message::Sample)
+                .view(look),
+        );
     line.into()
 }

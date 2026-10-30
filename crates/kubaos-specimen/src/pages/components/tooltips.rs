@@ -41,13 +41,11 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
     );
     stack(look, Space::S8)
         .push(card)
-        .push(chip(
-            look,
-            ChipKind::Selected,
-            "Mac accents",
-            Some(Icon::KeyboardOptionKey),
-            Some(Message::Sample),
-            None,
-        ))
+        .push(
+            chip(ChipKind::Selected, "Mac accents")
+                .icon(Icon::KeyboardOptionKey)
+                .on_press(Message::Sample)
+                .view(look),
+        )
         .into()
 }
