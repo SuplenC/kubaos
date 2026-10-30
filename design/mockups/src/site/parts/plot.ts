@@ -7,7 +7,7 @@
 
 import { length } from "../../lib/tokens.ts";
 import { advance } from "../../lib/text.ts";
-import { el, label } from "../dom.ts";
+import { el, prose } from "../dom.ts";
 import type { Track } from "../page.ts";
 import { bezier, css, type Loop, progress, reach, steps, stepsOf, struck, type Timed, toward } from "../recipe.ts";
 import { settings } from "../settings.ts";
@@ -99,6 +99,23 @@ export function named(track: Track): string {
   return `${track.part} (${track.on})${plotted(track).value ? "" : ", its progress from 0 to 1"}`;
 }
 
+/**
+ * A track's key: its swatch, or the room of one for a part with no curve, and its words, wrapping
+ * in the room the page gives them. `room` is what the other mode says in the same place, held
+ * unseen under the words, so the key is as tall in either mode.
+ */
+export function key(index: number | null, words: string, colour = "on_surface", room?: string): HTMLElement {
+  const mark = swatch(index ?? 0);
+  if (index === null) mark.style.visibility = "hidden";
+  const said = el("span", "page-plot-words", prose(words, "small", colour));
+  if (room !== undefined && room !== words) {
+    const unseen = prose(room, "small", colour);
+    unseen.setAttribute("aria-hidden", "true");
+    said.append(unseen);
+  }
+  return el("span", "page-plot-key", mark, said);
+}
+
 /** The legend under the plot: each track's swatch and its part, as the recipe's rows name it. */
 export function legend(playing: Loop): HTMLElement {
   const shared = together(playing)
@@ -111,8 +128,8 @@ export function legend(playing: Loop): HTMLElement {
   return el(
     "div",
     "page-plot-legend",
-    ...playing.timed.map((timed, i) => el("span", "page-plot-key", swatch(i), label(named(timed.track), "small", "on_surface"))),
-    ...shared.map((words) => label(words, "small", "on_surface_variant")),
+    ...playing.timed.map((timed, i) => key(i, named(timed.track))),
+    ...shared.map((words) => prose(words, "small", "on_surface_variant")),
   );
 }
 
