@@ -256,16 +256,15 @@ body {
 }
 
 .page-player {
-  display: grid;
-  grid-template-columns: var(--size-menu) minmax(0, 1fr);
-  gap: var(--space-s24);
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s12);
   padding: var(--space-s16);
   border-radius: var(--radius-surface);
   background: var(--color-surface_container_low);
 }
 
-/* A player's sample in a box of its own, which slow motion stretches every duration in. */
+/* A player's sample in a box of its own, which the player's animations move. */
 .page-player-stage {
   display: flex;
   justify-content: flex-start;
@@ -281,7 +280,90 @@ body {
 .page-player-controls {
   display: flex;
   gap: var(--space-s8);
-  margin-top: var(--space-s8);
+}
+
+/* The scrubber: the whole loop as a bar, its marks, and the playhead. */
+.page-scrubber {
+  position: relative;
+  height: var(--space-s24);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.page-scrubber:focus-visible {
+  outline: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--color-primary);
+}
+
+.page-scrubber-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc((var(--space-s24) - var(--space-s4)) / 2);
+  height: var(--space-s4);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_highest);
+}
+
+.page-scrubber-marks {
+  position: absolute;
+  inset: 0;
+}
+
+.page-scrubber-mark {
+  position: absolute;
+  left: calc(var(--at) * 100%);
+  top: calc((var(--space-s24) - var(--space-s16)) / 2);
+  width: var(--stroke-hairline_device_px);
+  height: var(--space-s16);
+  background: var(--color-outline);
+}
+
+.page-scrubber-mark[data-kind="key"] {
+  top: calc((var(--space-s24) - var(--space-s8)) / 2);
+  height: var(--space-s8);
+  background: var(--color-cold);
+}
+
+.page-scrubber-head {
+  position: absolute;
+  left: calc(var(--at, 0) * 100%);
+  top: 0;
+  width: var(--stroke-thin);
+  height: var(--space-s24);
+  background: var(--color-primary);
+  pointer-events: none;
+}
+
+.page-scrubber-time {
+  font-family: var(--type-mono-family);
+  font-size: var(--type-mono-size);
+  line-height: var(--type-mono-line);
+  color: var(--color-on_surface_variant);
+}
+
+/* A move's recipe: its tables, each row lit while what it says is playing. */
+.page-recipe,
+.page-recipe-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+}
+
+.page-table {
+  align-self: flex-start;
+  border-collapse: collapse;
+}
+
+.page-table th,
+.page-table td {
+  padding: var(--space-s4) var(--space-s8);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.page-table tr[data-now] {
+  background: var(--color-secondary_container);
 }
 
 .page-na {
