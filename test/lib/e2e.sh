@@ -2044,8 +2044,10 @@ DESKTOP
     bad=1
   fi
 
-  # Typing "chrome" with Chrome installed lists the app first, its removal below it, and no
-  # install. Turning the group off swaps the pair, through the choices file alone.
+  # Typing "chrome" with Chrome installed lists the app first, and not the placeholder that
+  # installs it. "remove chrome" lists the app with KubaOS's Remove as the Action Enter runs, while
+  # the package group is on; turning it off, through the choices file alone, withdraws Remove.
+  # Without the app, the placeholder comes back.
   local ranked
   # The wait above is for the KubaOS Extension; the Apps Extension may still be scanning.
   for i in $(seq 20); do
@@ -2053,9 +2055,8 @@ DESKTOP
     [[ $ranked == " apps/google-chrome "* ]] && break
     sleep 1
   done
-  if [[ $ranked == " apps/google-chrome "* && $ranked == *" kubaos/packages-chrome-off "* &&
-    $ranked != *" kubaos/packages-chrome-on "* ]]; then
-    echo "ok   typing 'chrome' lists the Chrome app first, then its removal, and no install:$ranked"
+  if [[ $ranked == " apps/google-chrome "* && $ranked != *" kubaos/packages-chrome "* ]]; then
+    echo "ok   typing 'chrome' lists the Chrome app first, and not its placeholder:$ranked"
   else
     echo "FAIL typing 'chrome' with Chrome installed lists:$ranked"
     bad=1
@@ -2066,17 +2067,50 @@ DESKTOP
     echo "FAIL typing 'chrome' ranks a web app, found by its desktop id, with the browser:$ranked"
     bad=1
   fi
+  for i in $(seq 20); do
+    ranked=" $(in_session "$query --primary 'remove chrome'" 2>&1 | cut -f2 || true) "
+    [[ $ranked == " apps/google-chrome>kubaos/remove "* ]] && break
+    sleep 1
+  done
+  if [[ $ranked == " apps/google-chrome>kubaos/remove "* ]]; then
+    echo "ok   typing 'remove chrome' lists the Chrome app first, with Remove as Enter's Action (${i}s)"
+  else
+    echo "FAIL typing 'remove chrome' with Chrome installed lists:$ranked"
+    bad=1
+  fi
   printf 'chrome=off\n' >"$groups.new"
   mv "$groups.new" "$groups"
   for i in $(seq 20); do
-    ranked=" $(in_session "$query chrome" 2>&1 | cut -f2 || true) "
-    [[ $ranked == *" kubaos/packages-chrome-on "* && $ranked != *" kubaos/packages-chrome-off "* ]] && break
+    ranked=" $(in_session "$query --primary 'remove chrome'" 2>&1 | cut -f2 || true) "
+    [[ $ranked == *" apps/google-chrome>apps/open "* ]] && break
     sleep 1
   done
-  if [[ $ranked == *" kubaos/packages-chrome-on "* && $ranked != *" kubaos/packages-chrome-off "* ]]; then
-    echo "ok   with the chrome group off, Install Google Chrome is listed instead of Remove (${i}s)"
+  if [[ $ranked == *" apps/google-chrome>apps/open "* && $ranked != *">kubaos/remove "* ]]; then
+    echo "ok   with the chrome group off, Remove is withdrawn from the Chrome app (${i}s)"
   else
-    echo "FAIL with the chrome group off, typing 'chrome' lists:$ranked"
+    echo "FAIL with the chrome group off, typing 'remove chrome' lists:$ranked"
+    bad=1
+  fi
+  rm -f "$chrome"
+  for i in $(seq 20); do
+    ranked=" $(in_session "$query --primary chrome" 2>&1 | cut -f2 || true) "
+    [[ $ranked == *" kubaos/packages-chrome>kubaos/install "* ]] && break
+    sleep 1
+  done
+  if [[ $ranked == *" kubaos/packages-chrome>kubaos/install "* && $ranked != *" apps/google-chrome"* ]]; then
+    echo "ok   without the Chrome app, its placeholder is listed, with Install and open (${i}s)"
+  else
+    echo "FAIL without the Chrome app, typing 'chrome' lists:$ranked"
+    bad=1
+  fi
+
+  # Wi-Fi is one Item, and the word typed chooses what Enter does.
+  out="$(in_session "$query --primary 'wifi off' 'wifi on'" 2>&1)" || { echo "FAIL querying the menu: $out"; bad=1; }
+  if grep -E '^wifi off[[:blank:]]' <<<"$out" | grep -qE 'kubaos/wifi>kubaos/off( |$)' &&
+    grep -E '^wifi on[[:blank:]]' <<<"$out" | grep -qE 'kubaos/wifi>kubaos/on( |$)'; then
+    echo "ok   'wifi off' and 'wifi on' find Wi-Fi with Turn off and Turn on as Enter's Action"
+  else
+    echo "FAIL 'wifi off' and 'wifi on' find: $out"
     bad=1
   fi
 
@@ -2134,25 +2168,26 @@ DESKTOP
   else
     echo "FAIL in the layouts app, czech and italian found: $out"; bad=1
   fi
-  # The accents' pair follows the keyboard settings: with them off, then on, typing either name
-  # finds only the half that applies.
-  local accents shown hidden found
+  # The accents are one Item, whose first Action follows the keyboard settings: with them off,
+  # then on, typing either name finds it with the Action that applies, and "accents off" chooses
+  # Turn off whatever they are.
+  local accents next found
   [[ -e $kbset ]] && cp -p "$kbset" "$kbset_saved"
   install -d -o "$USER_NAME" -g "$USER_NAME" "${kbset%/*}"
   for accents in false true; do
-    shown=mac-accents-on hidden=mac-accents-off
-    [[ $accents == true ]] && shown=mac-accents-off hidden=mac-accents-on
+    next=on
+    [[ $accents == true ]] && next=off
     { grep -vE '^[[:blank:]]*mac_accents[[:blank:]]*=' "$kbset_saved" 2>/dev/null || true; echo "mac_accents = $accents"; } >"$kbset.new"
     chown "$USER_NAME:" "$kbset.new"
     mv "$kbset.new" "$kbset"
     for i in $(seq 20); do
-      out="$(in_session "$query 'Mac accents on Left Alt' accents" 2>&1 || true)"
-      found="$(grep -cE "kubaos/${shown}( |\$)" <<<"$out" || true)"
-      [[ $found == 2 ]] && ! grep -qE "kubaos/${hidden}( |\$)" <<<"$out" && break
+      out="$(in_session "$query --primary 'Mac accents on Left Alt' accents 'accents off'" 2>&1 || true)"
+      found="$(grep -E '^(Mac accents on Left Alt|accents)[[:blank:]]' <<<"$out" | grep -cE "kubaos/mac-accents>kubaos/${next}( |\$)" || true)"
+      [[ $found == 2 ]] && break
       sleep 1
     done
-    if [[ $found == 2 ]] && ! grep -qE "kubaos/${hidden}( |\$)" <<<"$out"; then
-      echo "ok   with mac_accents = $accents, typing 'Mac accents on Left Alt' or 'accents' finds $shown alone (${i}s)"
+    if [[ $found == 2 ]] && grep -E '^accents off[[:blank:]]' <<<"$out" | grep -qE 'kubaos/mac-accents>kubaos/off( |$)'; then
+      echo "ok   with mac_accents = $accents, the accents' Item offers Turn $next first, and 'accents off' Turn off (${i}s)"
     else
       echo "FAIL with mac_accents = $accents, typing the accents' names finds: $out"
       bad=1
@@ -2176,27 +2211,23 @@ DESKTOP
     bad=1
   fi
 
-  out="$(in_session "$query 'Terminal greeting' fastfetch" 2>&1)" ||
+  out="$(in_session "$query --primary 'Terminal greeting' fastfetch" 2>&1)" ||
     { echo "FAIL querying the menu: $out"; bad=1; }
-  for want in 'Terminal greeting:greeting-off' 'fastfetch:greeting-off'; do
-    grep -E -- "^${want%%:*}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/${want#*:}( |$)" ||
-      { echo "FAIL typing '${want%%:*}' doesn't find kubaos/${want#*:}"; bad=1; }
+  for want in 'Terminal greeting' fastfetch; do
+    grep -E -- "^${want}[[:blank:]]" <<<"$out" | grep -qE -- "kubaos/greeting>kubaos/off( |$)" ||
+      { echo "FAIL typing '$want' doesn't find kubaos/greeting with Turn off first"; bad=1; }
   done
-  if grep -qE 'kubaos/greeting-on( |$)' <<<"$out"; then
-    echo "FAIL the greeting is on, and 'Terminal greeting on' is listed"
-    bad=1
-  fi
-  ((bad)) || echo "ok   with the greeting on, only 'Terminal greeting off' is found"
+  ((bad)) || echo "ok   with the greeting on, the greeting's Item offers Turn off first"
   install -D -o "$USER_NAME" -g "$USER_NAME" -m 644 /dev/null "$no_greeting"
   for i in $(seq 20); do
-    out="$(in_session "$query 'Terminal greeting'" 2>&1 || true)"
-    grep -qE 'kubaos/greeting-on( |$)' <<<"$out" && ! grep -qE 'kubaos/greeting-off( |$)' <<<"$out" && break
+    out="$(in_session "$query --primary 'Terminal greeting'" 2>&1 || true)"
+    grep -qE 'kubaos/greeting>kubaos/on( |$)' <<<"$out" && break
     sleep 1
   done
-  if grep -qE 'kubaos/greeting-on( |$)' <<<"$out" && ! grep -qE 'kubaos/greeting-off( |$)' <<<"$out"; then
-    echo "ok   turning the greeting off lists 'Terminal greeting on' in its place (${i}s)"
+  if grep -qE 'kubaos/greeting>kubaos/on( |$)' <<<"$out"; then
+    echo "ok   turning the greeting off offers Turn on first (${i}s)"
   else
-    echo "FAIL the greeting's pair didn't follow its file: $out"
+    echo "FAIL the greeting's Item didn't follow its file: $out"
     bad=1
   fi
 

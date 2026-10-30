@@ -1,8 +1,10 @@
-"""menu-query.py SOCKET [--top | --app WORD] TEXT...: what the Command menu finds for each TEXT.
+"""menu-query.py SOCKET [--top | --primary | --app WORD] TEXT...: what the Command menu finds for each TEXT.
 
 A Front end of its own on the Daemon's socket (Kotodama protocol 1.0, JSON):
 for each TEXT it sends a `query` and prints one line, the TEXT, a tab, then
-`<extension>/<item id>` for every Result, best first. With --top, the line is
+`<extension>/<item id>` for every Result, best first. With --primary, each
+Result is followed by `><extension>/<action id>`, the Action Enter runs on
+it: the one the query chose by its verb, else the Item's first. With --top, the line is
 the TEXT, then the top Result's `<extension>/<item id>`, title and subtitle,
 tab-separated: what an answer in the top row says. With --app, it first
 enters the app of WORD from its entry Item, as a user does, and each TEXT is
@@ -81,7 +83,16 @@ def enter(daemon, word):
     sys.exit(f"running {item['id']} entered no app")
 
 
-def main(path, texts, top=False, app=None):
+def primary(result):
+    """`><extension>/<action id>` of the Action Enter runs on `result`."""
+    chosen = result.get("primary")
+    if chosen:
+        return f">{chosen['extension']}/{chosen['id']}"
+    actions = result["item"].get("actions") or [{"id": ""}]
+    return f">{result['extension']}/{actions[0]['id']}"
+
+
+def main(path, texts, top=False, app=None, verbs=False):
     daemon = Daemon(path)
     daemon.send({"version": 1, "minor": 0, "formats": ["json"]})
     hello = daemon.recv(WAIT)
@@ -97,7 +108,7 @@ def main(path, texts, top=False, app=None):
             fields = [text, f"{first['extension']}/{item['id']}", item.get("title", ""), item.get("subtitle") or ""]
             print("\t".join(fields))
             continue
-        found = [f"{r['extension']}/{r['item']['id']}" for r in shown]
+        found = [f"{r['extension']}/{r['item']['id']}" + (primary(r) if verbs else "") for r in shown]
         print(text + "\t" + " ".join(found))
 
 
@@ -106,9 +117,12 @@ if __name__ == "__main__":
     top = bool(args) and args[0] == "--top"
     if top:
         args = args[1:]
+    verbs = bool(args) and args[0] == "--primary"
+    if verbs:
+        args = args[1:]
     app = None
     if len(args) > 1 and args[0] == "--app":
         app, args = args[1], args[2:]
     if not args:
         sys.exit(__doc__)
-    main(sys.argv[1], args, top, app)
+    main(sys.argv[1], args, top, app, verbs)
