@@ -35,13 +35,16 @@ export function token(name: string, value?: string): HTMLElement {
   return el("code", "page-code", value === undefined ? name : `${name} = ${value}`);
 }
 
-/** A table: its headings, then its rows, each cell the page's words or a sample. */
+/**
+ * A table: its headings, then its rows, each cell the page's words or a sample. Wider than the
+ * page at a large scale, it scrolls on its own rather than the page.
+ */
 export function table(heads: readonly string[], rows: readonly (readonly (Element | string)[])[]): HTMLElement {
   const head = el("tr", "", ...heads.map((words) => el("th", "", label(words, "label"))));
   const body = rows.map((cells) =>
     el("tr", "", ...cells.map((cell) => el("td", "", typeof cell === "string" ? label(cell, "body", "on_surface") : cell))),
   );
-  return el("table", "page-table", el("thead", "", head), el("tbody", "", ...body));
+  return el("div", "f-scroll", el("table", "page-table", el("thead", "", head), el("tbody", "", ...body)));
 }
 
 /** Every theme the toolbar paints in, by slug, with its name. */

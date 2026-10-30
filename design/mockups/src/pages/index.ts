@@ -3,11 +3,12 @@
 import type { AnyPage, Level } from "../site/page.ts";
 import button from "./atoms/button.ts";
 import colour from "./foundations/colour.ts";
+import elevation from "./foundations/elevation.ts";
 import radii from "./foundations/radii.ts";
 import space from "./foundations/space.ts";
 import type from "./foundations/type.ts";
 
-export const PAGES: readonly AnyPage[] = [colour, type, space, radii, button];
+export const PAGES: readonly AnyPage[] = [colour, type, space, radii, elevation, button];
 
 export function pagesOf(level: Level): AnyPage[] {
   return PAGES.filter((page) => page.level === level);

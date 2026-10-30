@@ -964,3 +964,131 @@ body {
 .f-well-row[data-selected] {
   background: var(--color-secondary_container);
 }
+
+/* Shapes casting a shadow, with the room below them the shadow falls into. */
+.f-shadows {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-s48);
+  padding: var(--space-s16) var(--space-s16) var(--space-s64);
+}
+
+.f-raised {
+  width: var(--size-thumbnail_height);
+  height: var(--size-row_two_line);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_high);
+  box-shadow: 0 var(--y) var(--blur) rgb(from var(--cast) r g b / var(--alpha));
+}
+
+.f-track {
+  display: flex;
+  width: var(--size-thumbnail_height);
+  height: var(--size-progress);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_highest);
+}
+
+/* A reading of the bar, not a measure: the fill part of the way along. */
+.f-fill {
+  width: 60%;
+  border-radius: inherit;
+  background: var(--cast);
+  box-shadow: 0 var(--y) var(--blur) rgb(from var(--cast) r g b / var(--alpha));
+}
+
+/* The surface containers, each holding the one above it, a step in. */
+.f-rung {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s8);
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--rung);
+}
+
+/* Hairlines: one device pixel, at every scale. */
+.f-divided {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s12);
+  width: var(--size-rail);
+  padding: var(--space-s12) var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.f-divider {
+  height: var(--stroke-hairline_device_px);
+  background: var(--color-outline_variant);
+}
+
+.f-outlined,
+.f-caret-field {
+  display: flex;
+  align-items: center;
+  width: var(--size-rail);
+  height: var(--size-control_md);
+  padding-inline: var(--space-s12);
+  border-radius: var(--radius-control);
+  background: var(--color-surface_container_high);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.f-track-outline {
+  width: var(--size-switch_width);
+  height: var(--size-switch_height);
+  border-radius: var(--radius-full);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+/* Thin strokes: `stroke.thin` rounded half up to device pixels. */
+.f-caret-field,
+.f-check,
+.f-spinner,
+.f-drop {
+  --thin: max(1px, round(nearest, var(--stroke-thin), 1px));
+}
+
+.f-caret {
+  width: var(--thin);
+  height: var(--type-body_large-line);
+  background: var(--color-primary);
+}
+
+.f-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-check);
+  height: var(--size-check);
+  border-radius: var(--radius-small);
+  background: var(--color-primary);
+}
+
+.f-dash {
+  width: var(--space-s8);
+  height: var(--thin);
+  background: var(--color-on_primary);
+}
+
+.f-spinner {
+  width: var(--icon-s24);
+  height: var(--icon-s24);
+  border-radius: var(--radius-full);
+  border: var(--thin) solid rgb(from var(--color-primary) r g b / var(--opacity-spinner_track));
+  border-top-color: var(--color-primary);
+}
+
+.f-drop {
+  width: var(--size-rail);
+  height: var(--thin);
+  margin-top: var(--space-s8);
+  background: var(--color-primary);
+}
