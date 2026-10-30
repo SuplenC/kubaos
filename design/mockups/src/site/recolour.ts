@@ -197,3 +197,23 @@ export function paintBetween(element: HTMLElement, path: ColourPath, from: Palet
     element.style.setProperty(`--color-${role}`, a === b ? a : formula(path, a, b));
   }
 }
+
+/**
+ * Holds `element`'s unlit glass, every tone's `_unlit`, in `to`'s colours, the palette of `mode`,
+ * while the rest recolours: the switch to light, whose glass is daylight's from the first step of
+ * the flicker. `unpaint` takes it off with the rest.
+ */
+export function paintGlass(element: HTMLElement, to: Palette, mode: Mode): void {
+  const probe = document.createElement("div");
+  probe.dataset.mode = mode;
+  probe.hidden = true;
+  paint(probe, to);
+  document.body.append(probe);
+  // Each unlit core computes from its tone where the mode's box is, so the probe's is `to`'s.
+  const style = getComputedStyle(probe);
+  for (const role of Object.keys(to)) {
+    const unlit = style.getPropertyValue(`--color-${role}_unlit`).trim();
+    if (unlit) element.style.setProperty(`--color-${role}_unlit`, unlit);
+  }
+  probe.remove();
+}

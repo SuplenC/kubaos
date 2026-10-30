@@ -4,9 +4,10 @@
 //
 // The tracks move the numbers `motion.css` names on the scene they play on: `--before`, the lights
 // in the old colours; `--recolour`, every colour role along its path; `--day`, night to daylight;
-// `--after`, the lights in the new colours.
+// `--unlit`, how much of every focus line is unlit glass rather than neon; `--after`, the lights in
+// the new colours.
 
-import type { Duration, Easing, Move, NonEmpty, Track } from "./page.ts";
+import type { Duration, Easing, Move, NonEmpty, Strike, Track } from "./page.ts";
 import type { ColourPath } from "./recolour.ts";
 
 /** What a sequence's tracks move: the scene's root, which every light and colour inside follows. */
@@ -40,11 +41,11 @@ function colours(path: ColourPath, from: string, to: string, cue?: NonEmpty<Dura
   };
 }
 
-/** Night turning to daylight, or back, with the colours: the lit neon becomes unlit glass. */
+/** Night turning to daylight, or back, with the colours, while every light is out. */
 function daylight(from: 0 | 1, cue?: NonEmpty<Duration>, duration: Duration = "recolour"): Track<Easing> {
   return {
     part: from === 0 ? "daylight" : "nightfall",
-    on: "every focus tube: lit at night, unlit glass in daylight",
+    on: "every light: free to burn at night; in daylight the neon and its glow can't light",
     target: SCENE,
     property: "--day",
     from,
@@ -52,6 +53,26 @@ function daylight(from: 0 | 1, cue?: NonEmpty<Duration>, duration: Duration = "r
     duration,
     ...(cue ? { cue } : {}),
     curve: duration === "instant" ? "linear" : "gather",
+  };
+}
+
+const GLASS = "every focus line, unlit: the tone's `_unlit` inside the fill's edge on Filled and Danger, at `focus.glass` over the container on Tonal and Text";
+
+/**
+ * The unlit glass taking the place of the lights flickering out, step for step, or giving its place
+ * to the lights striking on: the line crossfades between the two, so it is never gone.
+ */
+function glass<C extends Easing | Strike>(from: 0 | 1, cue: NonEmpty<Duration> | undefined, curve: C, duration: Duration): Track<C> {
+  return {
+    part: "glass",
+    on: from === 0 ? `${GLASS}, in the light palette's colours from the first step` : `${GLASS}, in the colours on their way`,
+    target: SCENE,
+    property: "--unlit",
+    from,
+    to: from === 0 ? 1 : 0,
+    duration,
+    ...(cue ? { cue } : {}),
+    curve,
   };
 }
 
@@ -88,22 +109,28 @@ export function themeChange(name: string, between: Between, sample: () => Elemen
 }
 
 /**
- * To light: the lit signs flicker out, a dark pause, the colours and the daylight change on the
- * dawn path, then a closing beat. The signs stay off in daylight: unlit glass.
+ * To light: the lit signs flicker out into unlit glass, a pause, the colours and the daylight
+ * change on the dawn path around the glass, then a closing beat. The signs stay off in daylight.
  */
 export function toLight(between: Between, sample: () => Element): Move {
   return {
     name: "To light",
-    what: `Dark to light, ${between.from} to ${between.to}: the lit signs flicker out together over \`medium\`, everything holds dark for \`medium\`, the colours change on the dawn path over \`recolour\` on \`gather\` while the night turns to daylight and the unlit glass of every focus tube comes up, then a closing beat of \`settle\`. About 1.7 s. The signs stay off in daylight.`,
+    what: `Dark to light, ${between.from} to ${between.to}: the lit signs flicker out together over \`medium\` (\`neon.strike\` played backwards), and at each step every focus line crossfades from its neon to daylight's unlit glass, already in the light palette's colours: the tone's light \`_unlit\`, at \`focus.glass\` over the container on Tonal and Text. The line is never gone, and when the flicker ends it is its final daylight self. It holds as it is while everything else pauses for \`medium\`, the colours change on the dawn path over \`recolour\` on \`gather\` as the night turns to daylight, and a closing beat of \`settle\` passes. About 1.7 s. The signs stay off in daylight.`,
     tracks: [
       lightsOut("neon.strike.reversed"),
+      glass(0, undefined, "neon.strike.reversed", "medium"),
       colours("dawn", between.from, between.to, ["medium", "medium"]),
       daylight(0, ["medium", "medium"]),
     ],
     tail: "settle",
-    reduced: [colours("dawn", between.from, between.to, undefined, "instant"), daylight(0, undefined, "instant")],
+    reduced: [
+      colours("dawn", between.from, between.to, undefined, "instant"),
+      glass(0, undefined, "linear", "instant"),
+      daylight(0, undefined, "instant"),
+    ],
     unstuttered: [
       lightsOut("standard"),
+      glass(0, undefined, "standard", "medium"),
       colours("dawn", between.from, between.to, ["medium", "medium"]),
       daylight(0, ["medium", "medium"]),
     ],
@@ -113,23 +140,30 @@ export function toLight(between: Between, sample: () => Element): Move {
 }
 
 /**
- * To dark: the unlit glass holds, the colours and the night change on the dawn path, a beat, then
- * every sign strikes on.
+ * To dark: the unlit glass holds through the pause, the colours and the night changing on the
+ * dawn path, and a beat, its colour following the palette; then every sign strikes on in its place.
  */
 export function toDark(between: Between, sample: () => Element): Move {
   return {
     name: "To dark",
-    what: `Light to dark, ${between.from} to ${between.to}: the unlit tubes stay as they are for \`medium\`, the colours change on the dawn path over \`recolour\` on \`gather\` while the daylight goes and the glass fades, everything holds for \`settle\`, then every sign strikes on over \`strike\`, its core half way to white, with its full glow. About 2 s.`,
+    what: `Light to dark, ${between.from} to ${between.to}: every focus line stays unlit glass, fully seen, through a pause of \`medium\`, the colours changing on the dawn path over \`recolour\` on \`gather\` as the daylight goes, and a beat of \`settle\`, its colour following the palette from the light \`_unlit\` to the dark one. Then every sign strikes on over \`strike\` (\`neon.strike\`), and at each step the line crossfades from the glass to the lit tube, or on Filled and Danger the core half way to white, with its full glow. The line is never gone. About 2 s.`,
     tracks: [
       daylight(1, ["medium"]),
       colours("dawn", between.from, between.to, ["medium"]),
       lightsOn(["medium", "recolour", "settle"], "neon.strike"),
+      glass(1, ["medium", "recolour", "settle"], "neon.strike", "strike"),
     ],
-    reduced: [colours("dawn", between.from, between.to, undefined, "instant"), daylight(1, undefined, "instant"), lightsOn(undefined, "linear", "instant")],
+    reduced: [
+      colours("dawn", between.from, between.to, undefined, "instant"),
+      daylight(1, undefined, "instant"),
+      lightsOn(undefined, "linear", "instant"),
+      glass(1, undefined, "linear", "instant"),
+    ],
     unstuttered: [
       daylight(1, ["medium"]),
       colours("dawn", between.from, between.to, ["medium"]),
       lightsOn(["medium", "recolour", "settle"], "standard"),
+      glass(1, ["medium", "recolour", "settle"], "standard", "strike"),
     ],
     back: "cuts",
     sample,
