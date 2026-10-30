@@ -55,3 +55,4 @@ cursor              crates/kubaos-cursor crates/kubaos-cli/src/cursor.rs crates/
 mockups             design/mockups test/shots/mockups
 mockups/button      design/mockups/src/pages/atoms/button.ts
 mockups/colour      design/mockups/src/pages/foundations/colour.ts
+mockups/type        design/mockups/src/pages/foundations/type.ts
