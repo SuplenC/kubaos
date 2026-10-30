@@ -2119,6 +2119,7 @@ DESKTOP
   local titles=(
     'Ring the phone=phone-link>ring' 'Send the clipboard to the phone=phone-link>clipboard'
     'Phone link status=phone-link>status' 'Unpair the phone=phone-link>unpair'
+    'Send a file to the phone=phone-link>file' 'Low battery drop at=low-battery>level'
     'Proxy status=proxy>status' 'Open proxy settings=proxy>settings' 'Import VPN config=proxy>import'
     'Screenshot region=screenshot>region' 'Screenshot monitor=screenshot>monitor'
     'Screenshot window=screenshot>window' 'Record region=record>region' 'Stop recording=record>stop'

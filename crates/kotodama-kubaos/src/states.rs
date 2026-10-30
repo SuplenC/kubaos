@@ -427,7 +427,8 @@ fn proxy_wanted(file: &Path) -> Option<bool> {
 }
 
 /// The stop the power service's state file says it is on; `None` without the file, or while the
-/// process it names is gone, as the file of a service killed outright stays behind.
+/// process it names is gone, as the file of a service killed outright stays behind. Its going
+/// changes no file, so the reading stays until the states are read again.
 fn power_stop(file: &Path) -> Option<Stop> {
     let published = Published::load(file)?;
     if published.pid != 0 && !Path::new("/proc").join(published.pid.to_string()).exists() {

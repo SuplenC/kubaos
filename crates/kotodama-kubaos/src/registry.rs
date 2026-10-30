@@ -7,7 +7,7 @@
 //! ```toml
 //! [extensions.kubaos]
 //! terminal = ["ghostty", "-e"]
-//! hide = ["theme-previous"]
+//! hide = ["color-picker"]
 //!
 //! [extensions.kubaos.actions.ssh-key]
 //! title = "New SSH key on the security key"
@@ -16,15 +16,11 @@
 //! arguments = [{ name = "name", placeholder = "github" }]
 //! terminal = true
 //!
-//! [extensions.kubaos.actions.proxy-import]
-//! title = "Import VPN config…"
-//! run = ["kubaos-proxy", "import", "{path}"]
-//! arguments = [{ name = "path", kind = "file", accept = ["conf", "ovpn"] }]
-//!
 //! [extensions.kubaos.actions.proxy]
 //! title = "Proxy"
 //! state = "proxy"
 //! subtitle = { true = "On", false = "Off" }
+//! order = ["on", "off", "status", "import"]
 //!
 //! [extensions.kubaos.actions.proxy.actions.on]
 //! title = "Turn on"
@@ -37,6 +33,17 @@
 //! keywords = ["off", "disconnect"]
 //! run = ["kubaos-proxy", "off"]
 //! primary_when = { is = true }
+//!
+//! [extensions.kubaos.actions.proxy.actions.status]
+//! title = "Status"
+//! keywords = ["status"]
+//! view = "proxy"
+//!
+//! [extensions.kubaos.actions.proxy.actions.import]
+//! title = "Import VPN config…"
+//! keywords = ["import"]
+//! run = ["kubaos-proxy", "import", "{path}"]
+//! arguments = [{ name = "path", kind = "file", accept = ["conf", "ovpn"] }]
 //!
 //! [extensions.kubaos.actions.packages-chrome]
 //! title = "Google Chrome"

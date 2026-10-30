@@ -497,6 +497,7 @@ fn a_former_items_title_finds_its_subject_with_that_action_chosen() {
         ("Send the clipboard to the phone", "phone-link", "clipboard"),
         ("Phone link status", "phone-link", "status"),
         ("Unpair the phone", "phone-link", "unpair"),
+        ("Send a file to the phone", "phone-link", "file"),
         ("Proxy status", "proxy", "status"),
         ("Open proxy settings", "proxy", "settings"),
         ("Import VPN config", "proxy", "import"),
@@ -513,6 +514,7 @@ fn a_former_items_title_finds_its_subject_with_that_action_chosen() {
         ("Power Saver", "power", "power-saver"),
         ("Max Performance", "power", "max-performance"),
         ("Undo the low-battery drop", "low-battery", "undo"),
+        ("Low battery drop at", "low-battery", "level"),
         ("Dark cursor", "cursor", "dark"),
         ("Accent cursor", "cursor", "accent"),
         ("Classic cursor", "cursor", "classic"),
@@ -540,7 +542,8 @@ fn a_former_items_title_finds_its_subject_with_that_action_chosen() {
             .iter()
             .enumerate()
             .find_map(|(at, word)| Some((at, named(&verbs, word))).filter(|(_, verb)| !verb.is_empty()))
-            .unwrap_or_else(|| panic!("no word of {title:?} is a verb"));
+            .filter(|_| words.len() > 1)
+            .unwrap_or_else(|| panic!("no word of {title:?} is a verb with a subject beside it"));
         let rest: Vec<String> = words
             .iter()
             .enumerate()

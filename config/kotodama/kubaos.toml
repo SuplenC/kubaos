@@ -77,9 +77,14 @@ kind = "scripts"
 # [extensions.kubaos.actions.<id>.actions.<action>]: each takes `title`,
 # `keywords`, its verbs ("proxy off", "remove docker" find the thing, and
 # Kotodama marks that Action for Enter), and `run`, `arguments`, `terminal`, `confirm`, `role` and
-# `delay_ms` as above. `state = "<state>"` names the state the thing is in: its
-# `subtitle` may be a table by the state's value (`{ true = "On: …", false =
-# "Off: …" }`), and the Actions whose `primary_when = { is = <value> }` (or
+# `delay_ms` as above, or in place of `run` a View of the Extension's own,
+# read live: `view = "proxy"`, `"power"` or `"cpu-scheduler"`. The Actions
+# come in id order, or in the order `order = ["<action>", …]` lists them, the
+# rest after it. Kotodama reads the query's first word that names a verb, so
+# what a person types for an Action ("ring the phone") has that Action's verb
+# as its first verb word. `state = "<state>"` names the state the thing is in:
+# its `subtitle` may be a table by the state's value (`{ true = "On: …", false
+# = "Off: …" }`), and the Actions whose `primary_when = { is = <value> }` (or
 # `is_not`) holds come first, so Enter runs what applies next.
 #
 # `identity = "app:<desktop id>"` makes the action a placeholder for an app
@@ -95,8 +100,10 @@ kind = "scripts"
 # `terminal.greeting`, `keyboard.mac-accents`, `idle.keep-awake`,
 # `phone.link`, `proxy`, `proxy.local-network`, `notifications.dnd`,
 # `power.panel-power-saving`, `nix.unfree`, `kubaos.preview` and
-# `bluetooth.unnamed`, true or false; `power.scheduler` ("kernel", "lavd") and
-# `power.low-battery` ("power-saver", "super-saver", "off"). While a state
+# `bluetooth.unnamed`, true or false; `power.scheduler` ("kernel", "lavd"),
+# `power.low-battery` ("power-saver", "super-saver", "off"),
+# `power.charge-limit` ("80", "90", "100"), `power.stop` ("super-saver" …
+# "max-performance") and `wallpaper.motion` ("always", "ac", "never"). While a state
 # can't be read, the action shows, with no subtitle by state and the Actions
 # with a `primary_when` first.
 #
@@ -812,7 +819,7 @@ terminal = true
 title = "Phone link"
 subtitle = { true = "On: the clipboard and files go both ways with your phone, through KDE Connect", false = "Off: pair an iPhone or Android with KDE Connect for the clipboard and files, both ways" }
 icon = "phone"
-keywords = ["kde connect", "kdeconnect", "iphone", "android", "pair", "phone", "clipboard", "set up a phone", "the phone", "copy", "paste", "share", "photo", "transfer", "airdrop", "find my phone", "lost", "battery", "paired", "phone link status"]
+keywords = ["kde connect", "kdeconnect", "iphone", "android", "pair", "phone", "set up a phone", "the phone", "send the clipboard to the phone", "send a file to the phone", "copy", "paste", "share", "photo", "transfer", "airdrop", "find my phone", "lost", "battery", "paired", "phone link status"]
 state = "phone.link"
 order = ["set-up", "off", "clipboard", "file", "ring", "status", "unpair"]
 
@@ -831,7 +838,7 @@ primary_when = { is = true }
 # What you copied here, on the phone's clipboard.
 [extensions.kubaos.actions.phone-link.actions.clipboard]
 title = "Send the clipboard to the phone"
-keywords = ["send"]
+keywords = ["clipboard"]
 run = ["kubaos-phone", "send-clipboard"]
 
 [extensions.kubaos.actions.phone-link.actions.file]
