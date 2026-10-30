@@ -40,7 +40,7 @@ Item {
         Repeater {
             model: root.facts
 
-            K.Grid {
+            K.Split {
                 id: fact
 
                 required property var modelData

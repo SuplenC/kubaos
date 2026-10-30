@@ -30,7 +30,7 @@ K.Section {
                 K.Stack {
                     gap: K.Tokens.space.s40
 
-                    K.Grid {
+                    K.Split {
                         weights: Samples.columns
                         gap: K.Tokens.space.s16
                         centred: true

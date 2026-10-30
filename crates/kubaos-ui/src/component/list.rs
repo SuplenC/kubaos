@@ -16,8 +16,8 @@ use iced::widget;
 use iced::widget::container;
 
 use crate::color;
-use crate::component::avatar::TileSize;
-use crate::component::avatar::icon_tile;
+use crate::component::icon_tile::TileSize;
+use crate::component::icon_tile::icon_tile;
 use crate::component::chip::ChipKind;
 use crate::component::chip::chip;
 use crate::component::layered;

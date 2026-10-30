@@ -14,6 +14,8 @@ Layout 1.0 Layout.qml
 Row 1.0 Row.qml
 Stack 1.0 Stack.qml
 Grid 1.0 Grid.qml
+Split 1.0 Split.qml
+Flow 1.0 Flow.qml
 Slot 1.0 Slot.qml
 Fill 1.0 Fill.qml
 Gap 1.0 Gap.qml

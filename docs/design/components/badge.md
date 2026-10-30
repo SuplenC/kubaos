@@ -4,7 +4,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 ## `Badge`
 
-Rust `avatar::badge`, `avatar::accent_badge`; QML `Badge`, `accent` for the second.
+Rust `badge::badge`, `badge::accent_badge`; QML `Badge`, `accent` for the second.
 
 What is new about something, over its icon's top right corner: a count in a pill 16 tall (`badge`), `label` type, a circle for one digit and 4 either side for more, 99+ past 99; or a dot, 8 (`badge_dot`). In `error`, with `on_error` on it, so it reads over any icon: waiting updates, a proxy that failed.
 

@@ -3,7 +3,7 @@ import QtQuick.Effects
 import KubaOS.Components as K
 
 // A symbol or a picture on a tinted rounded square of one size: `kubaos-ui`'s
-// `avatar::icon_tile`. A list of apps reads as one set whatever each vendor drew, and a row with
+// `icon_tile::icon_tile`. A list of apps reads as one set whatever each vendor drew, and a row with
 // no picture keeps the room a picture takes: the symbol shows until the picture has loaded, and
 // stays when there is none. An app's icon (`source`) sits inset at the icon size, keeping its own
 // margins; a photo (`photo`, a notification's image) covers the tile.

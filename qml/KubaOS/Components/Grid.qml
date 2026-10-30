@@ -1,15 +1,15 @@
 import QtQuick
 import KubaOS.Components as K
 
-// Columns, `gap` apart both ways, filled row by row: `kubaos-ui`'s `layout::grid` with `columns`
-// equal ones, and `layout::split` with `weights` (`[1, 3]` is a label column a quarter wide beside
-// the rest). The width is split in device pixels, so every edge lands on one and the columns
-// differ by one device pixel at most. A grid takes all the room it is given.
+// `columns` equal columns, `gap` apart both ways, filled row by row: `kubaos-ui`'s `layout::grid`.
+// The width is split in device pixels, so every edge lands on one and the columns differ by one
+// device pixel at most. A grid takes all the room it is given. `Split` is a grid whose columns
+// take their share of `weights`.
 K.Layout {
     id: root
 
     property int columns: 1
-    // Each column's share of the width; equal columns when empty.
+    // Each column's share of the width, which `Split` sets; equal columns when empty.
     property list<int> weights: []
     property int gap: 0
     // Each row's cells centred down it, on whole device pixels.

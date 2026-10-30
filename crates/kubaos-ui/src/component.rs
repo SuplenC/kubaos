@@ -12,16 +12,16 @@
 //!   ([`progress`]), empty states ([`empty`]), errors with a hint and a log ([`error`]), keycaps
 //!   and key hints ([`keycap`]), pictures in a box of a fixed aspect ([`media`]) and pictures to
 //!   pick ([`picture`]), tabs ([`tabs`]), quick toggle tiles ([`tile`]), meters and sparklines
-//!   ([`meter`]), sheets ([`sheet`]), calendars ([`calendar`]), icon tiles and badges ([`avatar`]),
-//!   skeletons ([`skeleton`]), popovers and menus ([`menu`]), selects ([`select`]), tables
-//!   ([`table`]), collapsibles ([`collapsible`]), banners ([`banner`]), steps ([`step`]) and
-//!   description lists ([`description`]).
+//!   ([`meter`]), sheets ([`sheet`]), calendars ([`calendar`]), icon tiles ([`icon_tile`]),
+//!   badges ([`badge`]), skeletons ([`skeleton`]), popovers and menus ([`menu`]), selects
+//!   ([`select`]), tables ([`table`]), collapsibles ([`collapsible`]), banners ([`banner`]), steps
+//!   ([`step`]) and description lists ([`description`]).
 //!
 //! # Not here
 //!
 //! - The focus tube: [`crate::focus`]. Layout: [`crate::layout`].
 
-pub mod avatar;
+pub mod badge;
 pub mod banner;
 pub mod button;
 pub mod calendar;
@@ -35,6 +35,7 @@ pub mod empty;
 pub mod error;
 pub mod field;
 pub mod hint;
+pub mod icon_tile;
 pub mod keycap;
 mod layer;
 pub mod list;

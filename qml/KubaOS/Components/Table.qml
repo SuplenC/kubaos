@@ -46,7 +46,7 @@ Item {
                 titles.relayout();
             }
 
-            K.Grid {
+            K.Split {
                 id: titles
 
                 x: Tokens.space.s12
