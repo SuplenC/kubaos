@@ -14,8 +14,11 @@ export type Kind = (typeof KINDS)[number];
 export const SIZES = ["Sm", "Md", "Lg"] as const;
 export type Size = (typeof SIZES)[number];
 
-/** A state shown whatever the pointer and the keyboard do, as the specimens pin them. */
-export type Pinned = "hovered" | "pressed" | "focused";
+/**
+ * A state shown whatever the pointer and the keyboard do, as the specimens pin them: `unlit` is
+ * focused in its unlit look, the line as unlit glass with no glow, whatever the mode.
+ */
+export type Pinned = "hovered" | "pressed" | "focused" | "unlit";
 
 /** A size's measures, every one a token. */
 export interface Metrics {
