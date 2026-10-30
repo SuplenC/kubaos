@@ -67,7 +67,7 @@ export default page({
     ],
     looks: {
       lit: "At night at rest, the signs burn: off, the tube over the track's outline; on, the core inside the fill's edge; the glow outside either, all that reaches past the track. The knob brightens: `on_surface_variant` off, `on_primary_fill_lit` on.",
-      signsOff: "The same switch still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. Off, the tube is unlit glass, `primary_unlit` at `focus.glass` over the track, as a field's; on, the line inside the fill's edge is `primary_fill_glass`, the unlit fill lifted 0.12. No glow, and the knob at its rest colour.",
+      signsOff: "The same switch still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. Off, the tube is solid unlit glass, `primary_glass`, as a Tonal or Text button's; on, the line inside the fill's edge is `primary_fill_glass`, the unlit fill lifted 0.12. No glow, and the knob at its rest colour.",
     },
     signsOff: (index: number) => sample(VALUES[index]!.on, "signs-off"),
   },

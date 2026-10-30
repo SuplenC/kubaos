@@ -44,7 +44,7 @@ const ON = "every kind";
 
 const FOR: Record<ChipKind, string> = {
   Neutral: "A fact: a picked keyboard layout, a file's type. `surface_container_high` with an `on_surface` label.",
-  Selected: "One of several picks that is on: a setting a toolbar turns on (`Neutral` while off). The accent's quieter sibling, as a Tonal button: `secondary_container`, its label dimmed at night at rest (`on_secondary_container_rest`) and full lit.",
+  Selected: "One of several picks that is on: a setting a toolbar turns on (`Neutral` while off). The accent's quieter sibling, as a Tonal button: `secondary_container`, but its label is full (`on_secondary_container`) at rest as well as lit, by night too, so a pick that is on reads as on.",
   Accent: "A tag that matters: Recommended, Default. The accent at `opacity.tint` under a `primary` label.",
   Cold: "Rarely: a demo, a preview. The cold accent at `opacity.tint` under a `cold` label; it lights in the cold accent.",
   Filled: "An action among states: Reboot beside Done and To do. Filled with the accent, so at night it rests on the unlit fill (`primary_fill`) with a near-white label (`on_primary_fill`), as a Filled button.",
@@ -66,7 +66,7 @@ export default page({
   description: [
     "A chip is a short fact or pick: a keyboard layout, a tag, a state. It is `size.chip` tall at the control radius, which on a chip is a pill, its label `label` type. An optional icon, `label`'s icon, sits `space.s4` before the label; an optional close button ends it, a circle as tall as the chip with its `close` symbol `space.s4` in, whose curve is the chip's own. Its left side pads `space.s12`, or `space.s8` with an icon; its right `space.s12`, or nothing when the close button ends it. Its content is centred down it.",
     "A plain chip is a fact and has no states: it is what its kind's colours are at rest. A pressable one takes a press of its own (a pick made the default, a setting turned on), and in the shell the keyboard too; one that toggles a setting is `Selected` while on and `Neutral` while off, fading between the two over `short`. In QML a pressable chip may be no stop for Tab (`tabStop: false`) where the field or the row beside the chips is the stop and a click picks one: the clock's timer presets. A pressable chip's `tooltip` names it in a `Hint` under it while it is lit.",
-    "A pressable chip's states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit (hovered or focused, one state, with its two looks), pressed and disabled. Lit, the line inside its edge burns with the glow outside it, in its kind's tone: the tube, `focus.tube` wide, on Neutral, Selected and Accent in the accent and on Cold in the cold accent; the core inside the fill's edge, `stroke.thin` wide, on Filled. Selected's label goes from dimmed to full and Filled's brightens, as a Tonal and a Filled button's do; the others' labels don't change. Nothing but the glow reaches past the pill. Lighting up, going back to rest and pressing are fades; the flicker is for power changes only.",
+    "A pressable chip's states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit (hovered or focused, one state, with its two looks), pressed and disabled. Lit, the line inside its edge burns with the glow outside it, in its kind's tone: the tube, `focus.tube` wide, on Neutral, Selected and Accent in the accent and on Cold in the cold accent; the core inside the fill's edge, `stroke.thin` wide, on Filled. Filled's label brightens, as a Filled button's does; the others' labels don't change, Selected's among them: it is full already at rest, so a pick that is on reads as on. Nothing but the glow reaches past the pill. Lighting up, going back to rest and pressing are fades; the flicker is for power changes only.",
     "Its close button is a control of its own: it lights as a Text icon button does, the tube inside its circle in the chip's tone (the core on a Filled chip) with the glow outside it, and with the pointer over it the close button lights alone, so it is plain which press is under the pointer. Disabled, neither the chip's press nor its close button takes the pointer or the keyboard: the chip goes grey, `on_surface` at `opacity.disabled_container` under its content at `opacity.disabled_content`, with no tone, no line and no glow.",
   ],
   variants: nonEmpty([
@@ -90,8 +90,8 @@ export default page({
     },
     rows: nonEmpty(ROWS.map(({ name, cell }) => ({ name, cell: (state: "rest" | "lit" | "pressed" | "disabled") => cell(state) }))),
     described: {
-      rest: "Its kind's colours. Neutral `surface_container_high` under `on_surface`; Selected `secondary_container` under its dimmed label at night (`on_secondary_container_rest`); Accent the accent at `opacity.tint` under `primary`; Cold the cold accent at `opacity.tint` under `cold`; Filled at night the unlit fill, `primary_fill`, under `on_primary_fill`. By day: the same roles in daylight colours, Filled the accent lifted to lightness 0.80 with a dark label. A plain chip is always this.",
-      lit: "Hovered or focused, here with the signs on: the line inside the pill's edge burns with the glow outside it, the tube in the accent on Neutral, Selected and Accent and in the cold accent on Cold, the core (`primary_fill_line`, `stroke.thin` wide) on Filled. Selected's label goes full (`on_secondary_container`), Filled's brightens (`on_primary_fill_lit`). On the close rows the close button is lit: the tube inside its circle, which shares the pill's curve, or the core on Filled. By day lit is its signs-off look in daylight colours: no glow, the line as glass.",
+      rest: "Its kind's colours. Neutral `surface_container_high` under `on_surface`; Selected `secondary_container` under its full label (`on_secondary_container`), never dimmed as a Tonal button's is at night, so a pick that is on reads as on; Accent the accent at `opacity.tint` under `primary`; Cold the cold accent at `opacity.tint` under `cold`; Filled at night the unlit fill, `primary_fill`, under `on_primary_fill`. By day: the same roles in daylight colours, Filled the accent lifted to lightness 0.80 with a dark label. A plain chip is always this.",
+      lit: "Hovered or focused, here with the signs on: the line inside the pill's edge burns with the glow outside it, the tube in the accent on Neutral, Selected and Accent and in the cold accent on Cold, the core (`primary_fill_line`, `stroke.thin` wide) on Filled. Filled's label brightens (`on_primary_fill_lit`); Selected's stays full, as it rests. On the close rows the close button is lit: the tube inside its circle, which shares the pill's curve, or the core on Filled. By day lit is its signs-off look in daylight colours: no glow, the line as glass.",
       pressed: "Overdriven, under the pointer or Space and Enter, so lit as well; the glow `focus.pressed_glow` times the lit one. Neutral, Accent and Cold: the tube runs white-hot, to the core; by day their tone tints the pill at `opacity.press_tint`. Selected: the container lifts 0.035 (`secondary_container_pressed`), 0.04 darker by day. Filled: the fill lifts 0.035 (`primary_fill_pressed`), 0.04 darker by day. The close button's tube runs white-hot, its tone a tint under it by day.",
       disabled: "Grey, with no tone, no line and no glow: the pill `on_surface` at `opacity.disabled_container`, its label, icon and close at `opacity.disabled_content`. Neither its press nor its close takes the pointer or the keyboard.",
     },
@@ -99,8 +99,8 @@ export default page({
   focus: {
     tubes: nonEmpty(CHIP_KINDS.map((kind) => ({ name: kind, tone: CHIP_TONES[kind], filled: chipFilled(kind), content: false }))),
     looks: {
-      lit: "At night at rest, the signs burn: the tube inside the pill's edge, or the core inside a Filled chip's fill, with the glow outside it, all that reaches past the pill; Selected's and Filled's labels light. A lit close button draws its own line inside its circle, the pill's curve at its end.",
-      signsOff: "The same chip still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. The tube is unlit glass, its tone's `_unlit` at `focus.glass` over the pill, as a field's; a Filled chip's line is `primary_fill_glass`, the unlit fill lifted 0.12. No glow, and the label at its rest colour.",
+      lit: "At night at rest, the signs burn: the tube inside the pill's edge, or the core inside a Filled chip's fill, with the glow outside it, all that reaches past the pill; Filled's label lights. A lit close button draws its own line inside its circle, the pill's curve at its end.",
+      signsOff: "The same chip still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. The tube is solid unlit glass, its tone's `_glass` (`primary_glass`, `cold_glass` on Cold), as a Tonal or Text button's; a Filled chip's line is `primary_fill_glass`, the unlit fill lifted 0.12. No glow, and the label at its rest colour.",
     },
     signsOff: (index: number) => ROWS[index]!.cell("signs-off"),
   },
@@ -132,7 +132,7 @@ export default page({
       },
       {
         name: "Focus arrives",
-        what: "Hovered or focused, a pressable chip lights up: a fade over `short` on `standard`, never the flicker. Its line and glow fade in and Selected's and Filled's labels light as `--lit` goes from 0 to 1.",
+        what: "Hovered or focused, a pressable chip lights up: a fade over `short` on `standard`, never the flicker. Its line and glow fade in and Filled's label lights as `--lit` goes from 0 to 1.",
         tracks: lights(".k-chip", ON, 0, 1),
         reduced: "same",
         back: "cuts",

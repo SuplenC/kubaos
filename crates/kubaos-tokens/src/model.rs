@@ -106,8 +106,6 @@ pub struct Focus {
     /// The band a picture keeps round itself inside its own box where its neighbours leave no
     /// more room, in logical pixels.
     pub offset: u16,
-    /// In daylight, the opacity of an unlit tube's glass over its control's container.
-    pub glass: f32,
 }
 
 /// A scale of lengths, smallest first.
