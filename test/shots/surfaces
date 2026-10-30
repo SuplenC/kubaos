@@ -54,3 +54,4 @@ grub                system/files/grub system/files/fonts test/shots/boot/grub
 cursor              crates/kubaos-cursor crates/kubaos-cli/src/cursor.rs crates/kubaos-cli/src/main.rs test/shots/boot/cursor test/shots/boot/cursor-palette.py test/shots/boot/cursor-sheet.py
 mockups             design/mockups test/shots/mockups
 mockups/button      design/mockups/src/pages/atoms/button.ts
+mockups/colour      design/mockups/src/pages/foundations/colour.ts
