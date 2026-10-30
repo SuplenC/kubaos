@@ -56,8 +56,8 @@ const EDGED = KINDS.filter((kind) => !filledWithTone(kind));
  * The neon's parts from `from` to `to`: the glow on every kind, the tube on the edge of a kind not
  * filled with its tone, and the core outside the fill of one that is.
  */
-function neon(from: number, to: number, duration: Duration, curve: Curve): NonEmpty<Track> {
-  const part = (name: string, list: readonly Kind[], target: string): Track => ({
+function neon<C extends Curve>(from: number, to: number, duration: Duration, curve: C): NonEmpty<Track<C>> {
+  const part = (name: string, list: readonly Kind[], target: string): Track<C> => ({
     part: name,
     on: on(list),
     target,
@@ -75,7 +75,7 @@ function neon(from: number, to: number, duration: Duration, curve: Curve): NonEm
 }
 
 /** The state layer from `from` to `to` over `micro`. */
-function layer(from: Value, to: Value): NonEmpty<Track> {
+function layer(from: Value, to: Value): NonEmpty<Track<"standard">> {
   return [{ part: "state layer", on: on(KINDS), target: ".k-layer", property: "opacity", from, to, duration: "micro", curve: "standard" }];
 }
 

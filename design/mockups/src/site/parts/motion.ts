@@ -36,6 +36,15 @@ const SLOW = 10;
 /** How many frames Shift with an arrow moves. */
 const BIG_STEP = 10;
 
+/** How to stop each player on the page drawn: its settings listener, its observer, its frames. */
+const players = new Set<() => void>();
+
+/** Stops every player on the page, before the page is drawn again. */
+export function stopPlayers(): void {
+  for (const stop of players) stop();
+  players.clear();
+}
+
 function control(words: string, pressed: boolean | null, onPress: () => void): HTMLButtonElement {
   const button = el("button", "site-control", words);
   button.type = "button";
@@ -135,7 +144,7 @@ function keyframeTables(tracks: readonly Track[], set: TrackSet, lits: Lit[]): H
   });
 }
 
-/** The recipe of `move`: its tracks, their keyframes, reduced motion, the stutter off, the speed. */
+/** The recipe of `move`: its tracks, their keyframes, reduced motion, the stutter off, speed. */
 function recipeOf(move: Move, lits: Lit[]): HTMLElement {
   const of = (set: TrackSet, words: string): Element[] => {
     const tracks = tracksOf(move, set);
@@ -147,7 +156,7 @@ function recipeOf(move: Move, lits: Lit[]): HTMLElement {
     "page-recipe",
     ...of("tracks", "The recipe"),
     ...(move.reduced === "same"
-      ? [label("Reduced motion", "body_strong", "on_surface"), prose("The same: every duration is under the `short` that reduced motion caps durations at.", "small")]
+      ? [label("Reduced motion", "body_strong", "on_surface"), prose("The same: every duration is within the `short` that reduced motion caps durations at.", "small")]
       : of("reduced", "Reduced motion")),
     ...of("unstuttered", "With the focus stutter off"),
     label("Speed", "body_strong", "on_surface"),
@@ -227,15 +236,20 @@ function player(move: Move): HTMLElement {
     return Number(first.currentTime ?? 0) % playing.total;
   }
 
+  /** The loop's last frame: the one after it is the first again. */
+  const lastFrame = () => Math.ceil(playing.total / FRAME - 1e-6) - 1;
+
+  /** The frame `t` is in. */
+  const frameOf = (t: number) => Math.min(Math.floor(t / FRAME + 1e-6), lastFrame());
+
   function show(t: number): void {
-    const frames = Math.round(playing.total / FRAME);
-    const at = Math.round(t / FRAME);
+    const at = frameOf(t);
     head.style.setProperty("--at", String(t / playing.total));
-    readout.textContent = `${Math.round(t)} ms · frame ${at} of ${frames} · a frame is ${shown(FRAME)} ms (60 Hz)`;
+    readout.textContent = `${Math.round(t)} ms · frame ${at + 1} of ${lastFrame() + 1} · a frame is ${shown(FRAME)} ms (60 Hz)`;
     bar.setAttribute("aria-valuemin", "0");
     bar.setAttribute("aria-valuemax", String(Math.round(playing.total)));
     bar.setAttribute("aria-valuenow", String(Math.round(t)));
-    bar.setAttribute("aria-valuetext", `${Math.round(t)} ms, frame ${at}`);
+    bar.setAttribute("aria-valuetext", `${Math.round(t)} ms, frame ${at + 1}`);
     for (const { row, lit } of [...lits, ...loopLits]) row.toggleAttribute("data-now", lit(t, playing));
   }
 
@@ -301,11 +315,11 @@ function player(move: Move): HTMLElement {
         element.dataset.kind = mark.kind;
         element.title = mark.words;
         element.style.setProperty("--at", String(mark.at / playing.total));
-        element.addEventListener("click", () => pause(mark.at));
+        element.dataset.at = String(mark.at);
         return element;
       }),
     );
-    go(Math.min(t, playing.total) % playing.total);
+    go(Math.min(t, playing.total - 1e-3));
   }
 
   const playControl = control("Pause", null, () => {
@@ -348,19 +362,22 @@ function player(move: Move): HTMLElement {
   };
   bar.addEventListener("pointerdown", (event) => {
     bar.setPointerCapture(event.pointerId);
-    seekTo(event);
+    // A mark pressed is its exact moment, wherever on its width the pointer is.
+    const mark = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(".page-scrubber-mark") : null;
+    if (mark?.dataset.at) pause(Number(mark.dataset.at));
+    else seekTo(event);
   });
   bar.addEventListener("pointermove", (event) => {
     if (bar.hasPointerCapture(event.pointerId)) seekTo(event);
   });
   bar.addEventListener("keydown", (event) => {
     const by = event.shiftKey ? BIG_STEP : 1;
-    const at = Math.round(current() / FRAME);
+    const at = frameOf(current());
     const to: Record<string, number> = {
-      ArrowLeft: (at - by) * FRAME,
-      ArrowRight: (at + by) * FRAME,
+      ArrowLeft: Math.max(0, at - by) * FRAME,
+      ArrowRight: Math.min(lastFrame(), at + by) * FRAME,
       Home: 0,
-      End: playing.total,
+      End: lastFrame() * FRAME,
     };
     const t = to[event.key];
     if (t === undefined) return;
@@ -369,10 +386,6 @@ function player(move: Move): HTMLElement {
   });
 
   const forget = onChange((_, changed) => {
-    if (!stage.isConnected) {
-      forget();
-      return;
-    }
     if (changed.has("reduced") || changed.has("speed") || changed.has("stutter")) build(current());
   });
   build(0);
@@ -390,10 +403,17 @@ function player(move: Move): HTMLElement {
     loopPart,
   );
   // Only a player on screen runs: one scrolled away holds where it is.
-  new IntersectionObserver(([entry]) => {
+  const watch = new IntersectionObserver(([entry]) => {
     visible = entry?.isIntersecting ?? false;
     go(current());
-  }).observe(whole);
+  });
+  watch.observe(whole);
+  players.add(() => {
+    forget();
+    watch.disconnect();
+    cancelAnimationFrame(frame);
+    for (const animation of animations) animation.cancel();
+  });
   return whole;
 }
 

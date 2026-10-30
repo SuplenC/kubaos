@@ -17,7 +17,7 @@ import { type Frame, frame } from "./site/frame.ts";
 import { nav } from "./site/nav.ts";
 import type { Page } from "./site/page.ts";
 import { applies } from "./site/page.ts";
-import { recipes } from "./site/parts/motion.ts";
+import { recipes, stopPlayers } from "./site/parts/motion.ts";
 import { render } from "./site/render.ts";
 import { apply, CHROME, onChange, settings } from "./site/settings.ts";
 import { settle } from "./site/settle.ts";
@@ -70,6 +70,7 @@ const toolbarHeight = new ResizeObserver(([entry]) => {
 function draw(): void {
   const page = picked();
   apply(pageBox);
+  stopPlayers();
   pageBox.replaceChildren(...(page ? render(page) : [el("p", "page-prose", "No pages yet.")]));
   if (CHROME) {
     const hasWindow = page !== undefined && applies(page.measures.reflow);
