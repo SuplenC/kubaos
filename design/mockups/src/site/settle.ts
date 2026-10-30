@@ -45,5 +45,9 @@ export function settle(page: HTMLElement): void {
   padPage(page);
   centreMocks(page);
   redrawRings();
-  redrawOverlays();
+  // An overlay that took another line of names above its sample is taller: centre again.
+  if (redrawOverlays()) {
+    centreMocks(page);
+    redrawOverlays();
+  }
 }
