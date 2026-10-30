@@ -180,6 +180,18 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     // its row, its curve, its ball, its stage, and an outline of its layers on the whole.
     const player = page.locator(".page-player").nth(index);
     const alone = player.locator(".page-part-alone");
+    // The parts alone stack one under another, each a full row, in the legend's order.
+    const stacked = await player.evaluate((element) => {
+      const keys = [...element.querySelectorAll(".page-plot-legend .page-plot-key")].map((key) => key.textContent);
+      const rows = [...element.querySelectorAll<HTMLElement>(".page-part-alone")];
+      const width = element.querySelector<HTMLElement>(".page-parts")?.getBoundingClientRect().width ?? 0;
+      return rows.every((row, i) => {
+        const box = row.getBoundingClientRect();
+        const above = rows[i - 1]?.getBoundingClientRect();
+        return (!above || box.top >= above.bottom) && Math.abs(box.width - width) < 0.5 && row.querySelector(".page-plot-key")?.textContent === keys[i];
+      });
+    });
+    check(stacked, `${where}: the parts alone don't stack one under another in the legend's order`);
     const pointers = (i: number) => [
       alone.nth(i),
       player.locator(".page-plot-legend .page-plot-key").nth(i),
