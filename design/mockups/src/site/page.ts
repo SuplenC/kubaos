@@ -102,6 +102,31 @@ export interface Tube {
   readonly filled: boolean;
 }
 
+/**
+ * The looks of the focused state. Nothing the user does picks one; the scene does: `lit` is the
+ * neon burning, in dark mode at rest; `unlit` is the same line as unlit glass with no glow, in
+ * light mode always and in dark mode while a sequence has the lights out (`docs/DESIGN.md`, "Focus").
+ */
+export const LOOKS = ["lit", "unlit"] as const;
+export type Look = (typeof LOOKS)[number];
+
+export const LOOK_NAMES: Record<Look, string> = {
+  lit: "Lit",
+  unlit: "Unlit",
+};
+
+/**
+ * The focus line a part lights: every tube in its tone, what each look makes of the line, and the
+ * state matrix's "focused · unlit" column, pinned as "focused" is.
+ */
+export interface Focus {
+  readonly tubes: NonEmpty<Tube>;
+  /** What the tube, the core or the knob is in each look, in words. */
+  readonly looks: Record<Look, string>;
+  /** The matrix's row at `index`, focused in its unlit look. */
+  readonly unlit: (index: number) => Element;
+}
+
 /** The content extremes the mockup skill names. */
 export interface Content {
   /** The shortest and the longest text, and the translation 40% longer (the toolbar's text). */
@@ -263,8 +288,11 @@ export interface Page<S extends State = State> {
   readonly variants: readonly Variant[] | DoesntApply;
   readonly sizes: readonly Variant[] | DoesntApply;
   readonly states: States<S>;
-  /** Every focus tube it lights, each in its tone; a part that takes no focus doesn't apply. */
-  readonly focus: NonEmpty<Tube> | DoesntApply;
+  /**
+   * Its focus line: every tube it lights, each in its tone, and both looks of it; a part with no
+   * focus line doesn't apply.
+   */
+  readonly focus: Focus | DoesntApply;
   readonly content: Content;
   readonly motion: Motion;
   readonly keyboard: Keyboard | DoesntApply;

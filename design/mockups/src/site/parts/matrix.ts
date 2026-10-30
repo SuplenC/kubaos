@@ -1,25 +1,31 @@
 // The state matrix: a row per variant, a column per state, every cell live, then what each state
-// is and which states don't apply, with why.
+// is and which states don't apply, with why. A part with a focus line has a column after Focused
+// for its unlit look, pinned as Focused is.
 
-import { STATE_NAMES, type State, type States } from "../page.ts";
+import { applies, type DoesntApply, type Focus, STATE_NAMES, type State, type States } from "../page.ts";
 import { el, label, mockCell, prose } from "../dom.ts";
 import { subheading } from "./section.ts";
 
-export function matrix<S extends State>(states: States<S>): HTMLElement {
+const UNLIT = "Focused · unlit";
+
+export function matrix<S extends State>(states: States<S>, focus: Focus | DoesntApply): HTMLElement {
+  const unlit = applies(focus) && (states.shown as readonly State[]).includes("focused") ? focus : null;
+  const columns = states.shown.flatMap((state): (S | "unlit")[] => (unlit && state === "focused" ? [state, "unlit"] : [state]));
+  const name = (column: S | "unlit") => (column === "unlit" ? UNLIT : STATE_NAMES[column]);
   const grid = el("div", "page-matrix");
-  grid.style.setProperty("--columns", String(states.shown.length));
+  grid.style.setProperty("--columns", String(columns.length));
   grid.append(el("div", "page-cell"));
-  for (const state of states.shown) grid.append(el("div", "page-cell", label(STATE_NAMES[state], "label")));
-  for (const row of states.rows) {
+  for (const column of columns) grid.append(el("div", "page-cell", label(name(column), "label")));
+  states.rows.forEach((row, index) => {
     grid.append(el("div", "page-cell", label(row.name, "label")));
-    for (const state of states.shown) grid.append(mockCell(row.cell(state)));
-  }
+    for (const column of columns) grid.append(mockCell(column === "unlit" ? unlit!.unlit(index) : row.cell(column)));
+  });
   const described = el(
     "dl",
     "page-list",
-    ...states.shown.flatMap((state) => [
-      el("dt", "", label(STATE_NAMES[state], "body_strong", "on_surface")),
-      el("dd", "", prose(states.described[state])),
+    ...columns.flatMap((column) => [
+      el("dt", "", label(name(column), "body_strong", "on_surface")),
+      el("dd", "", prose(column === "unlit" ? unlit!.looks.unlit : states.described[column])),
     ]),
   );
   const absent = Object.entries(states.absent) as [State, string][];

@@ -26,7 +26,7 @@ function sample(kind: Kind, size: Size, state: Pinned | "rest" | "disabled" = "r
     icon,
     trailing,
     disabled: state === "disabled",
-    ...(state === "hovered" || state === "pressed" || state === "focused" ? { pinned: state } : {}),
+    ...(state === "rest" || state === "disabled" ? {} : { pinned: state }),
   });
 }
 
@@ -52,6 +52,9 @@ function kinds(): HTMLElement {
 function focusedKinds(): HTMLElement {
   return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md", "focused")));
 }
+
+/** The state matrix's rows: every kind at every size. */
+const ROWS = SIZES.flatMap((size) => KINDS.map((kind) => ({ kind, size })));
 
 /** A palette: a theme in a mode. */
 interface Painted {
@@ -136,7 +139,7 @@ export default page({
   description: [
     "A button names its action in sentence case, as the user would say it: Erase and install, never OK. Its label is its size's button style on a line as tall as the button's content box, so the label sits in the middle of the button on the grid, with the size's padding at its sides.",
     "Its corners take the control radius (`radius.control`); an icon-only button is an `IconButton`, a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon is the label's style's icon size, in a box the label's line tall, centred on a whole device pixel, so an icon never changes a button's height.",
-    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it, in the kind's tone: red (`error`) on Danger, the accent on the others. A Filled or a Danger button is filled with its tone's colour, so its fill is the tube and the tone's hot core (`primary_core`, `error_core`) is the line inside the fill's edge, the thin stroke wide, at the button's corner. Nothing but the glow reaches past the button's box, so its shape never seems to grow. In light mode the neon is off: the line is unlit glass (the tone's `_unlit`, 35% toward black; on Tonal and Text at `focus.glass` over the button's own container), with no glow. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
+    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it, in the kind's tone: red (`error`) on Danger, the accent on the others. A Filled or a Danger button is filled with its tone's colour, so its fill is the tube and the tone's hot core (`primary_core`, `error_core`) is the line inside the fill's edge, the thin stroke wide, at the button's corner. Nothing but the glow reaches past the button's box, so its shape never seems to grow. That is its lit look; its unlit look is the same line as unlit glass (the tone's `_unlit`, 35% toward black; on Tonal and Text at `focus.glass` over the button's own container), with no glow. Light mode is always unlit, and dark mode is unlit while a sequence has the lights out: the scene picks the look, never the user. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
     "A held button (`Button::on_hold`) is pressed for a while instead of clicked, and a timed bar beside it shows how far along the hold is: Kōbō's Install, held with the mouse or Enter. It looks like any button of its kind.",
   ],
   variants: nonEmpty(KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") }))),
@@ -150,22 +153,28 @@ export default page({
       error: "a button has no value to be wrong; what its action failed at shows where its result would, as an `ErrorBlock` or a `Note`.",
     },
     rows: nonEmpty(
-      SIZES.flatMap((size) =>
-        KINDS.map((kind) => ({
-          name: `${kind} ${size.toLowerCase()}`,
-          cell: (state: "rest" | "hovered" | "pressed" | "focused" | "disabled") => sample(kind, size, state),
-        })),
-      ),
+      ROWS.map(({ kind, size }) => ({
+        name: `${kind} ${size.toLowerCase()}`,
+        cell: (state: "rest" | "hovered" | "pressed" | "focused" | "disabled") => sample(kind, size, state),
+      })),
     ),
     described: {
       rest: "Its fill and content, nothing over them.",
       hovered: "The content colour over the fill at `opacity.hover`, faded in over `micro`.",
       pressed: "The content colour at `opacity.press`, over `micro`.",
-      focused: "Dark: the neon tube inside its edge in the kind's tone, `focus.tube` wide rounded half up to device pixels, and the glow outside it in the same tone: the near glow over `focus.near`, the far one over `focus.far`. On Filled and Danger, the fill is the tube: the tone's core (`primary_core`, `error_core`, half way to white) is the line inside the fill's edge, `stroke.thin` wide, and the glow is outside. Danger's is red. Light: the neon is off, so the same line is unlit glass and there is no glow: on Filled and Danger the tone's `_unlit` core (35% toward black) inside the fill's edge; on Tonal and Text, `primary_unlit` at `focus.glass` over the button's own container. Hover and press still lay their layer under it.",
+      focused: "Focused from the keyboard, in the look the scene gives it, never one the user picks: lit in dark mode at rest, unlit in light mode and in dark mode while a sequence has the lights out (the next column). Lit: the neon tube inside its edge in the kind's tone, `focus.tube` wide rounded half up to device pixels, and the glow outside it in the same tone: the near glow over `focus.near`, the far one over `focus.far`. On Filled and Danger, the fill is the tube: the tone's core (`primary_core`, `error_core`, half way to white) is the line inside the fill's edge, `stroke.thin` wide, and the glow is outside. Danger's is red. In light mode this column is the unlit look. Hover and press still lay their layer under it.",
       disabled: "Content at `opacity.disabled_content` of `on_surface`, fill at `opacity.disabled_container` of it (none on Text); no layer, no focus, no action.",
     },
   },
-  focus: nonEmpty(KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filledWithTone(kind) }))),
+  focus: {
+    tubes: nonEmpty(KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filledWithTone(kind) }))),
+    looks: {
+      lit: "The neon burning, in dark mode at rest: the tube inside the edge in the kind's tone, or on Filled and Danger the tone's core half way to white inside the fill's edge, with the glow outside.",
+      unlit:
+        "The same line as unlit glass, with no glow: on Filled and Danger the tone's `_unlit` core (35% toward black) inside the fill's edge, `stroke.thin` wide; on Tonal and Text, `primary_unlit` at `focus.glass` over the button's own container, `focus.tube` wide. Light mode is always this look, so there this column is the same as Focused; dark mode shows it while a sequence has the lights out (the theme change, the switch to light or dark), in the dark palette's `_unlit`. Nothing the user does picks it: the scene does.",
+    },
+    unlit: (index: number) => sample(ROWS[index]!.kind, ROWS[index]!.size, "unlit"),
+  },
   content: {
     text: KINDS.map((kind) => ({
       name: kind,

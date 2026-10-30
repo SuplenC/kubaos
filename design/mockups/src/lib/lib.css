@@ -117,7 +117,7 @@
 
 /* The focus ring. It lights as focus arrives: struck on through the neon sign's stutter over
    `medium`, or faded in over `short` with the stutter off or motion reduced; it fades out over
-   `short`. A control pinned focused is lit at once, since nothing moved.
+   `short`. A control pinned focused, lit or unlit, shows at once, since nothing moved.
 
    At night (`--day` 0) the neon is lit: the tube or the core in its lit colour, the glow outside.
    In daylight (`--day` 1) it is off: the tube is unlit glass, which never strikes, and there is no
@@ -125,8 +125,9 @@
    ring burns as brightly as the lights before a theme change (`--before`) or after it (`--after`),
    so a sequence on the page's one clock dims and strikes every focused ring together.
 
-   The line is the neon and the glass crossfaded by `--unlit`, how much of it is glass: the switch
-   between dark and light moves `--unlit` on the lights' own steps, so as each step dims the neon
+   Focused has two looks: lit, the neon and its glow, and unlit, the same line as unlit glass with
+   no glow. The line is the two crossfaded by `--unlit`, how much of it is glass: daylight is all
+   glass, and every sequence moves `--unlit` on the lights' own steps, so as each step dims the neon
    the glass takes its place, and the line is never gone. */
 .k-ring {
   position: absolute;
@@ -155,11 +156,19 @@
   --glass: 1;
 }
 
+/* Focused in its unlit look, whatever the scene: the line all glass, the neon and its glow out. */
+:not(:disabled)[data-pinned="unlit"] > .k-ring {
+  --lit: 0;
+  --glass: 1;
+  --unlit: 1;
+}
+
 [data-stutter] :not(:disabled):focus-visible > .k-ring {
   animation: k-strike var(--motion-medium) step-end;
 }
 
 :not(:disabled)[data-pinned="focused"] > .k-ring,
+:not(:disabled)[data-pinned="unlit"] > .k-ring,
 [data-sequence] .k-ring {
   transition: none;
 }

@@ -1,23 +1,28 @@
-// The focus tubes: which tone each variant's tube and glow light in, and whether its fill is the
-// tube with the tone's core inside the fill's edge.
+// The focus line: what each look makes of it, then which tone each variant's tube and glow light
+// in, and whether its fill is the tube with the tone's core inside the fill's edge.
 
 import { toneColour } from "../../lib/focus.ts";
 import { el, label, prose } from "../dom.ts";
-import type { NonEmpty, Tube } from "../page.ts";
+import { type Focus, LOOK_NAMES, LOOKS, type Tube } from "../page.ts";
+import { subheading } from "./section.ts";
 
-/** What `tube` looks like, in words. */
+/** What `tube` looks like in each look, in words. */
 function described(tube: Tube): string {
   const colour = toneColour(tube.tone);
   const tone = tube.tone === "accent" ? "the accent" : `the ${tube.tone} tone`;
   return tube.filled
-    ? `In ${tone}: filled with \`${colour}\`, so its fill is the tube and the line inside the fill's edge is its core, \`${colour}_core\` at night, \`${colour}_unlit\` in daylight; the glow outside, at night only, is \`${colour}\`.`
-    : `In ${tone}: the tube inside its edge is \`${colour}\` at night, with the glow outside it in the same colour; in daylight it is unlit glass, \`${colour}_unlit\` at \`focus.glass\` over the control's container, with no glow.`;
+    ? `In ${tone}: filled with \`${colour}\`, so its fill is the tube and the line inside the fill's edge is its core. Lit, the core is \`${colour}_core\` with the glow outside in \`${colour}\`; unlit, it is \`${colour}_unlit\`, with no glow.`
+    : `In ${tone}: the tube inside its edge. Lit, it is \`${colour}\` with the glow outside it in the same colour; unlit, it is glass, \`${colour}_unlit\` at \`focus.glass\` over the control's container, with no glow.`;
 }
 
-export function tubes(list: NonEmpty<Tube>): HTMLElement {
+export function tubes(focus: Focus): HTMLElement {
+  const list = (entries: readonly (readonly [string, string])[]) =>
+    el("dl", "page-list", ...entries.flatMap(([name, words]) => [el("dt", "", label(name, "body_strong", "on_surface")), el("dd", "", prose(words))]));
   return el(
-    "dl",
-    "page-list",
-    ...list.flatMap((tube) => [el("dt", "", label(tube.name, "body_strong", "on_surface")), el("dd", "", prose(described(tube)))]),
+    "div",
+    "page-part",
+    list(LOOKS.map((look) => [LOOK_NAMES[look], focus.looks[look]] as const)),
+    subheading("Each variant's tube"),
+    list(focus.tubes.map((tube) => [tube.name, described(tube)] as const)),
   );
 }
