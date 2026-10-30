@@ -4,11 +4,8 @@
 import { button, filled, KINDS, type Kind, labelGlow, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { row } from "../../lib/layout.ts";
-import { el, label } from "../../site/dom.ts";
-import { doesntApply, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
-import { type ColourPath, paintBetween, palette, paletteName, themeName } from "../../site/recolour.ts";
-import { themeChange, toDark, toLight } from "../../site/sequences.ts";
-import { type Mode, settings } from "../../site/settings.ts";
+import { lights, powerMoves, press } from "../../site/moves.ts";
+import { doesntApply, nonEmpty, page } from "../../site/page.ts";
 
 /** The words and symbol each kind shows in the specimens, and how long they get. */
 const SAMPLES: Record<Kind, { words: Words; icon: string; trailing: boolean }> = {
@@ -63,51 +60,9 @@ function litKinds(): HTMLElement {
 /** The state matrix's rows: every kind at every size. */
 const ROWS = SIZES.flatMap((size) => KINDS.map((kind) => ({ kind, size })));
 
-/** A palette: a theme in a mode. */
-interface Painted {
-  readonly theme: string;
-  readonly mode: Mode;
-}
-
-/**
- * A scene on its own surface, painted on the way from `from` to `to` along `path`, its lit kinds
- * as `from`'s mode shows them: what a theme change or a switch plays on. A palette
- * without a mode is in the mode picked when the scene is drawn.
- */
-function scene(from: Painted | string, to: Painted | string, path: ColourPath): () => Element {
-  return () => {
-    const mode = settings().mode;
-    const [a, b] = [from, to].map((each) => (typeof each === "string" ? { theme: each, mode } : each)) as [Painted, Painted];
-    const painted = el("div", "page-scene", label("Every light and every colour, on one clock", "body_strong", "on_surface"), litKinds());
-    painted.dataset.mode = a.mode;
-    paintBetween(painted, path, palette(a.theme, a.mode), palette(b.theme, b.mode));
-    return el("div", "page-scene-box", painted);
-  };
-}
-
-/** The theme change between two themes, in the mode picked. */
-function themeMove(from: string, to: string): ReturnType<typeof themeChange> {
-  const between = { from: themeName(from), to: themeName(to) };
-  return themeChange(`Theme change: ${between.from} to ${between.to}`, between, scene(from, to, "through grey"));
-}
-
 /** The kinds of a list, as the recipe says them. */
 function on(list: readonly Kind[]): string {
   return list.length === KINDS.length ? "every kind" : list.join(", ");
-}
-
-/**
- * A button lighting up or going back to rest, `--lit` from `from` to `to` over `short`: its fill,
- * label, line and glow all follow it, each from its rest colour to its lit one. A fade, never the
- * flicker.
- */
-function lights(from: 0 | 1, to: 0 | 1): NonEmpty<Track<"standard">> {
-  return [{ part: "lit", on: on(KINDS), target: ".k-button", property: "--lit", from, to, duration: "short", curve: "standard" }];
-}
-
-/** A lit button pressed, `--press` from 0 to 1 over `micro`. */
-function press(): NonEmpty<Track<"standard">> {
-  return [{ part: "pressed", on: on(KINDS), target: ".k-button", property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" }];
 }
 
 export default page({
@@ -181,7 +136,7 @@ export default page({
       {
         name: "Focus arrives",
         what: "Hovered or focused, the button lights up: a fade over `short` on `standard`, never the flicker, which is for power changes. Its fill, label, line and glow move together from their rest colours to their lit ones, as `--lit` goes from 0 to 1: on Filled the core and the glow fade in and the letters brighten, on Text the label burns up to the core, on the burning kinds the fill moves half way to the core.",
-        tracks: lights(0, 1),
+        tracks: lights(".k-button", on(KINDS), 0, 1),
         reduced: "same",
         back: "cuts",
         sample: kinds,
@@ -189,7 +144,7 @@ export default page({
       {
         name: "Focus leaves",
         what: "The pointer leaves or focus moves on: the button fades back to rest over `short` on `standard`, every colour back to its rest one and the line and glow out.",
-        tracks: lights(1, 0),
+        tracks: lights(".k-button", on(KINDS), 1, 0),
         reduced: "same",
         back: "cuts",
         sample: litKinds,
@@ -197,21 +152,12 @@ export default page({
       {
         name: "Press",
         what: "A lit button goes down under the pointer, or with Space or Enter, over `micro`, and back as it comes up: Filled's fill lifts 0.035 and the burning kinds' 8% further toward white, Tonal's container lifts, Text's tube runs white-hot, and every glow grows to `focus.pressed_glow` times the lit one.",
-        tracks: press(),
+        tracks: press(".k-button", on(KINDS)),
         reduced: "same",
         back: "plays",
         sample: litKinds,
       },
-      themeMove("neon", "rose"),
-      themeMove("rose", "lagoon"),
-      toLight(
-        { from: paletteName("neon", "dark"), to: paletteName("neon", "light") },
-        scene({ theme: "neon", mode: "dark" }, { theme: "neon", mode: "light" }, "dawn"),
-      ),
-      toDark(
-        { from: paletteName("neon", "light"), to: paletteName("neon", "dark") },
-        scene({ theme: "neon", mode: "light" }, { theme: "neon", mode: "dark" }, "dawn"),
-      ),
+      ...powerMoves(litKinds),
     ],
   },
   keyboard: {
