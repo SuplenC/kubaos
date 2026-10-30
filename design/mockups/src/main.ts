@@ -53,13 +53,25 @@ function refit(): void {
   draw();
 }
 
+/**
+ * The toolbar's height, which wraps onto more lines in a narrow window, kept in
+ * `--site-toolbar-height` so the navigation sticks just under it instead of sliding beneath it.
+ */
+const toolbarHeight = new ResizeObserver(([entry]) => {
+  const height = entry?.borderBoxSize[0]?.blockSize ?? 0;
+  document.documentElement.style.setProperty("--site-toolbar-height", `${height}px`);
+});
+
 function draw(): void {
   const page = picked();
   apply(pageBox);
   pageBox.replaceChildren(...(page ? render(page) : [el("p", "page-prose", "No pages yet.")]));
   if (chrome) {
     const hasWindow = page !== undefined && applies(page.measures.reflow);
-    site.replaceChildren(toolbar(hasWindow), el("div", "site-body", nav(page), pageBox));
+    const bar = toolbar(hasWindow);
+    site.replaceChildren(bar, el("div", "site-body", nav(page), pageBox));
+    toolbarHeight.disconnect();
+    toolbarHeight.observe(bar);
   } else {
     site.replaceChildren(pageBox);
   }
