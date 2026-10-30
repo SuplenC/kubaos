@@ -23,7 +23,9 @@ let
     fileset = lib.fileset.unions [
       ./main.qml
       ./Components.qml
+      ./ShellOnly.qml
       ./sections
+      ./shell
     ];
   };
   # HAZARD: nixpkgs' `makeFontsConf` also lists the user's and the system's font directories and
