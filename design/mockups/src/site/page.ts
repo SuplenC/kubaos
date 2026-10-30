@@ -165,7 +165,12 @@ export type Curve = Easing | Strike;
  */
 export type Value = number | { readonly opacity: string } | { readonly color: string } | { readonly length: string };
 
-/** One part's change in a move: what it is, the property, its values and its timing. */
+/**
+ * One part's change in a move: what it is, the property, its values and its timing. Tracks of one
+ * move on the same target and property play as one timeline in cue order: until a later one's cue
+ * the value is what the earlier left. They are listed in cue order, take numbers and never overlap
+ * (`recipe.ts`, `leads`); the recipe's JSON keeps each as it is, for a library to play in that order.
+ */
 export interface Track<C extends Curve = Curve> {
   /** The part, as a library names it: the state layer, the tube, the glow, the core. */
   readonly part: string;

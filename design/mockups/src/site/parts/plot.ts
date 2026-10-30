@@ -9,7 +9,7 @@ import { length } from "../../lib/tokens.ts";
 import { advance } from "../../lib/text.ts";
 import { el, label } from "../dom.ts";
 import type { Track } from "../page.ts";
-import { bezier, css, type Loop, progress, reach, type Span, steps, stepsOf, struck, type Timed } from "../recipe.ts";
+import { bezier, css, type Loop, progress, reach, steps, stepsOf, struck, type Timed, toward } from "../recipe.ts";
 import { settings } from "../settings.ts";
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -306,41 +306,57 @@ export class Plot {
 }
 
 /**
- * `timed`'s curve over the loop as path data: at 0, then its easing as the very cubic Bézier the
- * browser eases along, laid on the track's span (a Bézier stays one under an affine map), or
- * `neon.strike`'s steps, held, then back along the same curve, or cut back at the loop's end.
- * `y` takes a progress, 0 to 1, to where the track's value at it is drawn. `x` and `y` put it on
- * device pixels, so its straight runs are crisp; a ball is drawn unrounded, a fraction of a pixel
- * off them at most.
+ * `timed`'s curve over the loop as path data: at 0, or its lead's curve up to its cue, then its
+ * easing as the very cubic Bézier the browser eases along, laid on the track's span (a Bézier stays
+ * one under an affine map), or `neon.strike`'s steps, held, then back along the same curve, or cut
+ * back at the loop's end. `y` takes a progress, 0 to 1, to where the track's value at it is drawn.
+ * `x` and `y` put it on device pixels, so its straight runs are crisp; a ball is drawn unrounded, a
+ * fraction of a pixel off them at most.
  */
 function path(timed: Timed, total: number, x: (t: number) => number, y: (v: number) => number): string {
-  const { track } = timed;
+  const parts: string[] = [];
+  forward(timed, x, y, parts);
   const point = (t: number, v: number) => `${x(t)} ${y(v)}`;
-  const parts = [`M ${point(0, 0)}`];
-  const eased = (span: Span, from: number, to: number) => {
-    if (struck(track.curve)) return;
-    const [x1, y1, x2, y2] = bezier(track.curve) as [number, number, number, number];
-    const time = (share: number) => span.start + share * (span.end - span.start);
-    const value = (share: number) => from + share * (to - from);
-    parts.push(`L ${point(span.start, from)}`, `C ${point(time(x1), value(y1))} ${point(time(x2), value(y2))} ${point(span.end, to)}`);
-  };
-  if (struck(track.curve)) {
-    const values = stepsOf(track.curve);
-    let before = 0;
-    steps({ ...timed, back: null }).forEach((span, i) => {
-      parts.push(`L ${point(span.start, before)}`, `L ${point(span.start, values[i]!)}`);
-      before = values[i]!;
-    });
-    parts.push(`L ${point(timed.forward.end, before)}`, `L ${point(timed.forward.end, 1)}`);
-  } else {
-    eased(timed.forward, 0, 1);
-  }
+  const { track } = timed;
   if (timed.back) {
-    eased(timed.back, 1, 0);
+    if (!struck(track.curve)) {
+      const [x1, y1, x2, y2] = bezier(track.curve) as [number, number, number, number];
+      const span = timed.back;
+      const time = (share: number) => span.start + share * (span.end - span.start);
+      parts.push(`L ${point(span.start, 1)}`, `C ${point(time(x1), 1 - y1)} ${point(time(x2), 1 - y2)} ${point(span.end, 0)}`);
+    }
     parts.push(`L ${point(total, 0)}`);
   } else {
     // Cut back: the last state holds to the loop's end, and the loop starts again on the first.
     parts.push(`L ${point(total, 1)}`, `L ${point(total, 0)}`);
   }
   return parts.join(" ");
+}
+
+/** `timed`'s curve from the loop's start to the end of its forward span, onto `parts`. */
+function forward(timed: Timed, x: (t: number) => number, y: (v: number) => number, parts: string[]): void {
+  const { track, lead } = timed;
+  const point = (t: number, v: number) => `${x(t)} ${y(v)}`;
+  if (lead) {
+    // Its lead's curve on this track's scale, held to the cue.
+    const scaled = toward(lead.track, track);
+    forward(lead, x, (p) => y(scaled(p)), parts);
+    parts.push(`L ${x(timed.forward.start)} ${y(scaled(1))}`);
+  } else {
+    parts.push(`M ${point(0, 0)}`);
+  }
+  const span = timed.forward;
+  if (struck(track.curve)) {
+    const values = stepsOf(track.curve);
+    let before = 0;
+    steps({ ...timed, back: null }).forEach((step, i) => {
+      parts.push(`L ${point(step.start, before)}`, `L ${point(step.start, values[i]!)}`);
+      before = values[i]!;
+    });
+    parts.push(`L ${point(span.end, before)}`, `L ${point(span.end, 1)}`);
+  } else {
+    const [x1, y1, x2, y2] = bezier(track.curve) as [number, number, number, number];
+    const time = (share: number) => span.start + share * (span.end - span.start);
+    parts.push(`L ${point(span.start, 0)}`, `C ${point(time(x1), y1)} ${point(time(x2), y2)} ${point(span.end, 1)}`);
+  }
 }

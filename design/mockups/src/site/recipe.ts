@@ -161,11 +161,36 @@ export interface Span {
   readonly end: number;
 }
 
+/**
+ * Each track of `tracks` that shares its target and property with an earlier one, and that earlier
+ * track: the value before its cue is whatever the earlier one left. Such tracks are listed in cue
+ * order, take numbers, and never overlap; a recipe that breaks that is refused.
+ */
+export function leads(tracks: readonly Track[]): Map<Track, Track> {
+  const last = new Map<string, Track>();
+  const found = new Map<Track, Track>();
+  for (const track of tracks) {
+    const key = JSON.stringify([track.target, track.property]);
+    const lead = last.get(key);
+    last.set(key, track);
+    if (!lead) continue;
+    const named = `${track.part}'s ${track.property} on ${track.target}`;
+    if (cueOf(lead) + milliseconds(lead.duration) > cueOf(track)) throw new Error(`${named} starts before the earlier track on it ends, or is listed before it`);
+    for (const each of [lead, track]) {
+      if (each.colours || typeof css(each.from) !== "number" || typeof css(each.to) !== "number") throw new Error(`${named} shares its property with another track, which needs numbers`);
+    }
+    found.set(track, lead);
+  }
+  return found;
+}
+
 /** A track on the loop: when it plays forward, and back if the move plays back. */
 export interface Timed {
   readonly track: Track;
   readonly forward: Span;
   readonly back: Span | null;
+  /** The earlier track on the same target and property, whose value holds until this one's cue. */
+  readonly lead: Timed | null;
 }
 
 /** The player's loop of a move at the settings picked: hold, move, hold, back. */
@@ -195,11 +220,19 @@ export function loop(move: Move): Loop {
   const backStart = hold + length + hold;
   const plays = move.back === "plays";
   const total = plays ? backStart + length : backStart;
-  const timed = timing.map(({ track, cue, duration }) => ({
-    track,
-    forward: { start: hold + cue, end: hold + cue + duration },
-    back: plays ? { start: backStart + cue, end: backStart + cue + duration } : null,
-  }));
+  const led = leads(tracks);
+  // Played back, a later track would go back before the earlier one it follows has.
+  if (plays && led.size > 0) throw new Error(`${move.name} plays back, so no two of its tracks may share a property`);
+  const timed: Timed[] = [];
+  for (const { track, cue, duration } of timing) {
+    const lead = led.get(track);
+    timed.push({
+      track,
+      forward: { start: hold + cue, end: hold + cue + duration },
+      back: plays ? { start: backStart + cue, end: backStart + cue + duration } : null,
+      lead: lead ? timed.find((each) => each.track === lead)! : null,
+    });
+  }
   const phases = [
     { name: "Hold the first state", span: { start: 0, end: hold } },
     { name: "The move", span: { start: hold, end: hold + parts } },
@@ -222,14 +255,26 @@ export function steps(timed: Timed): Span[] {
 }
 
 /**
+ * `lead`'s progress as `timed`'s: the same value, on `timed`'s scale from its `from` to its `to`.
+ * Both take numbers (`leads`).
+ */
+export function toward(lead: Track, track: Track): (part: number) => number {
+  const a = between(lead, 0);
+  const b = between(lead, 1);
+  const from = between(track, 0);
+  const to = between(track, 1);
+  return (part) => (a + (b - a) * part - from) / (to - from);
+}
+
+/**
  * How far `timed` is from its `from` (0) to its `to` (1) at `t` on the loop, as its keyframes play
- * it: before its start, along its curve or `neon.strike`'s steps, held, then back along the same
- * curve, or held to the loop's end when the move cuts back.
+ * it: before its start, its lead's value or its own `from`; along its curve or `neon.strike`'s
+ * steps, held, then back along the same curve, or held to the loop's end when the move cuts back.
  */
 export function progress(timed: Timed, t: number): number {
   const along = (span: Span) => (t - span.start) / (span.end - span.start);
-  const { track, forward, back } = timed;
-  if (t < forward.start) return 0;
+  const { track, forward, back, lead } = timed;
+  if (t < forward.start) return lead ? toward(lead.track, track)(progress(lead, t)) : 0;
   if (t < forward.end) {
     if (!struck(track.curve)) return eased(track.curve, along(forward));
     const values = stepsOf(track.curve);
@@ -241,12 +286,26 @@ export function progress(timed: Timed, t: number): number {
   return 0;
 }
 
-/** The keyframes of one track over the whole loop, which the player plays and seeks. */
+interface Stop {
+  readonly at: number;
+  readonly value: number | string;
+  readonly easing: string;
+}
+
+/**
+ * The keyframes of one track over the whole loop, which the player plays and seeks. Before its cue
+ * they play its lead's up to then, so a later track on the same property, which wins over the
+ * earlier, starts from what the earlier left.
+ */
 export function keyframes(timed: Timed, total: number): Keyframe[] {
-  const { track } = timed;
+  return stopsOf(timed, total).map((stop) => ({ offset: Math.min(1, stop.at / total), easing: stop.easing, [timed.track.property]: stop.value }));
+}
+
+function stopsOf(timed: Timed, total: number): Stop[] {
+  const { track, lead } = timed;
   const from = css(track.from);
   const to = css(track.to);
-  const stops: { at: number; value: number | string; easing: string }[] = [];
+  const stops: Stop[] = [];
   const at = (ms: number, value: number | string, easing = "linear") => stops.push({ at: ms, value, easing });
   // A strike only ever plays forward: a move that strikes cuts back (`page.ts`, `Struck`).
   const segment = (span: Span, a: number | string, b: number | string) => {
@@ -261,7 +320,13 @@ export function keyframes(timed: Timed, total: number): Keyframe[] {
     }
     at(span.end, b);
   };
-  at(0, from);
+  if (lead) {
+    stops.push(...stopsOf(lead, total).filter((stop) => stop.at < timed.forward.start));
+    // The lead holds its last value up to the cue.
+    at(timed.forward.start, css(lead.track.to));
+  } else {
+    at(0, from);
+  }
   segment(timed.forward, from, to);
   if (timed.back) {
     segment(timed.back, to, from);
@@ -270,7 +335,7 @@ export function keyframes(timed: Timed, total: number): Keyframe[] {
     // Cut back: the last state holds to the end, and the loop starts again on the first.
     at(total, to);
   }
-  return stops.map((stop) => ({ offset: Math.min(1, stop.at / total), easing: stop.easing, [track.property]: stop.value }));
+  return stops;
 }
 
 function valueJson(value: Value): Record<string, unknown> {

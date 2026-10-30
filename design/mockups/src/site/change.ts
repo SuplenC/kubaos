@@ -4,7 +4,7 @@
 // motion swaps the colours at once; the speed scales the whole sequence.
 
 import type { Track } from "./page.ts";
-import { between, bezier, cueOf, milliseconds, playing, stepsOf, struck, tracksOf } from "./recipe.ts";
+import { between, bezier, cueOf, leads, milliseconds, playing, stepsOf, struck, tracksOf } from "./recipe.ts";
 import { paint, paintBetween, paintGlass, palette, unpaint } from "./recolour.ts";
 import { themeChange, toDark, toLight } from "./sequences.ts";
 import { type Mode, settings } from "./settings.ts";
@@ -28,8 +28,12 @@ function settleOn(roots: readonly HTMLElement[], to: Painted): void {
   }
 }
 
-/** One track played once on `element`, from its cue, at the speed picked. */
-function playTrack(element: HTMLElement, track: Track, speed: number): Animation {
+/**
+ * One track played once on `element`, from its cue, at the speed picked. A track that follows an
+ * earlier one on the same property (`led`) fills only forwards, so until its cue the earlier one's
+ * value shows; being made later, it wins from then on.
+ */
+function playTrack(element: HTMLElement, track: Track, speed: number, led: boolean): Animation {
   const value = (part: number) => between(track, part);
   const frames: Keyframe[] = struck(track.curve)
     ? [...stepsOf(track.curve).map((step, i, all) => ({ offset: i / all.length, easing: "step-end", [track.property]: value(step) })), { offset: 1, [track.property]: value(1) }]
@@ -37,7 +41,7 @@ function playTrack(element: HTMLElement, track: Track, speed: number): Animation
         { offset: 0, easing: `cubic-bezier(${bezier(track.curve).join(", ")})`, [track.property]: value(0) },
         { offset: 1, [track.property]: value(1) },
       ];
-  return element.animate(frames, { delay: cueOf(track) / speed, duration: milliseconds(track.duration) / speed, fill: "both" });
+  return element.animate(frames, { delay: cueOf(track) / speed, duration: milliseconds(track.duration) / speed, fill: led ? "forwards" : "both" });
 }
 
 /** Paints `roots` in `to` at once, as the page is drawn. */
@@ -58,6 +62,7 @@ export function playChange(roots: readonly HTMLElement[], from: Painted, to: Pai
     settleOn(roots, to);
     return;
   }
+  const led = leads(tracks);
   const path = tracks.find((track) => track.colours)?.colours?.path ?? "through grey";
   const animations: Animation[] = [];
   for (const root of roots) {
@@ -66,7 +71,7 @@ export function playChange(roots: readonly HTMLElement[], from: Painted, to: Pai
     // The mode's attribute changes at once: the lights before the change are the old mode's.
     if (switched) root.style.setProperty("--before", from.mode === "dark" ? "1" : "0");
     root.setAttribute("data-sequence", "");
-    for (const track of tracks) animations.push(playTrack(root, track, speed));
+    for (const track of tracks) animations.push(playTrack(root, track, speed, led.has(track)));
   }
   const length = Math.max(...tracks.map((track) => cueOf(track) + milliseconds(track.duration))) + (move.tail ? milliseconds(move.tail) : 0);
   const timer = setTimeout(() => done(), length / speed);
