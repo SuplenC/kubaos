@@ -47,7 +47,7 @@ K.Pressable {
         }
     }
 
-    K.Grid {
+    K.Split {
         id: grid
 
         x: Tokens.space.s12

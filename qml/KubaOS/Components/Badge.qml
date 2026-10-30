@@ -1,9 +1,9 @@
 import QtQuick
 import KubaOS.Components as K
 
-// What is new about something, over its icon's corner: `kubaos-ui`'s `avatar::badge`. A count in a
+// What is new about something, over its icon's corner: `kubaos-ui`'s `badge::badge`. A count in a
 // pill a line of label text tall, or a dot when `count` is 0, in the error colour so it reads over
-// any icon, or in the accent (`accent`, `avatar::accent_badge`) where it marks something unread
+// any icon, or in the accent (`accent`, `badge::accent_badge`) where it marks something unread
 // rather than something wrong. One digit makes a circle; more pad 4 either side, and past 99 it
 // reads 99+.
 Item {

@@ -3,7 +3,7 @@ import KubaOS.Components as K
 import "samples.js" as Samples
 
 // Every kind of label button of `size`, in every state.
-K.Grid {
+K.Split {
     id: table
 
     property string size
