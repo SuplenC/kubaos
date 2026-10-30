@@ -57,7 +57,7 @@ function renderComponent(page: Page): HTMLElement[] {
       subheading("Sizes"),
       partOr(page.sizes, variants),
     ),
-    section("States", matrix(page.states), subheading("The lit line"), partOr(page.focus, tubes)),
+    section("States", matrix(page.states, page.focus), subheading("The lit line"), partOr(page.focus, tubes)),
     section("Content", content(page.content)),
     section("Motion", motion(page.motion)),
     section("Keyboard", partOr(page.keyboard, keyboard)),
