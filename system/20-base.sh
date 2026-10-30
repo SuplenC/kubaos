@@ -102,6 +102,11 @@ fi
 info "Wi-Fi: nmtui (or: nmcli device wifi connect <SSID> --ask), then unplug the cable."
 
 # --------------------------------------------------------------------------
+step "Network: cable first, Wi-Fi standing by"
+install_arp_per_interface
+install_connectivity_check
+
+# --------------------------------------------------------------------------
 step "Proxy: the work network's root helper (polkit, pkexec)"
 install_proxy_helper
 

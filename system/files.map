@@ -51,6 +51,7 @@ keyd/kubaos.conf                                        install_mac_accents
 logind.conf.d/lid.conf                                  system/20-base.sh
 modprobe.d/kubaos-amdgpu.conf                           install_power_helper
 netplan/01-network-manager-all.yaml                     system/20-base.sh
+NetworkManager/conf.d/50-kubaos-connectivity.conf       install_connectivity_check
 
 pam.d/qs-lock                                           system/50-hyprland.sh
 pam.d/qs-lock-fingerprint                               system/50-hyprland.sh
@@ -69,6 +70,7 @@ polkit/org.kubaos.proxy.policy                          install_proxy_helper
 
 power/kubaos-power-write                                install_power_helper
 proxy/kubaos-proxy-write                                install_proxy_helper
+sysctl.d/60-kubaos-arp.conf                             install_arp_per_interface
 sysctl.d/60-kubaos-inotify.conf                         install_inotify_limits
 
 systemd/docker.service.d/kubaos-stop.conf               docker_on_demand
