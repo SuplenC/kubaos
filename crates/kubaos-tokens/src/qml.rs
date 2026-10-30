@@ -193,7 +193,7 @@ fn header(out: &mut Writer) {
 }
 
 /// A number as QML writes it: `1`, `0.25`.
-fn number(value: f32) -> String {
+pub(crate) fn number(value: f32) -> String {
     let text = format!("{value:?}");
     text.strip_suffix(".0").map_or(text.clone(), str::to_owned)
 }

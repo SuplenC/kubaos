@@ -53,6 +53,7 @@ __pycache__/
 /config/matugen/templates/nvim.lua
 /config/matugen/templates/fuzzel.ini
 /config/matugen/templates/fastfetch.jsonc
+/design/mockups/src/tokens.css
 
 # The specimen's pictures: `just shots specimen` renders them for a PR, and CI
 # publishes main's to the branch chore/shots-specimen (docs/DESIGN.md,

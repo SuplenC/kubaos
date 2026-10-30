@@ -5,9 +5,10 @@
 //! design/tokens.toml ─▶ parse ─▶ rules::check ─▶ Tokens ─▶ Target::render
 //!   ├▶ by each crate's build script, into its OUT_DIR: kubaos-ui's tokens.rs, Kōbō's done/neon.rs,
 //!   │  kubaos-cursor's tokens.rs
-//!   ├▶ by the Nix build, or `just tokens` in a checkout: qml/KubaOS/Components/{Tokens,Symbols}.qml,
+//!   ├▶ by the Nix build, or `just tokens` (and the mockups' Vite build) in a checkout:
+//!   │  qml/KubaOS/Components/{Tokens,Symbols}.qml,
 //!   │  config/{ghostty,foot,fuzzel}, config/tmux/colors.conf, config/matugen/templates/{ghostty,…},
-//!   │  config/hypr/tokens.lua
+//!   │  config/hypr/tokens.lua, design/mockups/src/tokens.css
 //!   └▶ checked in: the Plymouth script's tokens, kubaos.plymouth, GRUB's theme.txt,
 //!      config/matugen/config.toml's hues
 //! ```
@@ -25,6 +26,7 @@
 
 pub mod boot;
 pub mod contrast;
+pub mod css;
 pub mod cursor;
 pub mod hypr;
 pub mod model;

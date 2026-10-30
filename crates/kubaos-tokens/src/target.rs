@@ -8,8 +8,9 @@
 //!
 //! An output is generated where it is consumed, so two branches that change the tokens never touch
 //! the same generated file: a crate's build script writes its Rust module ([`Kept::OutDir`]), and
-//! the Nix build writes the QML, the configs and the Lua ([`Kept::Built`]). Only a file a program
-//! reads straight from the checkout, outside any build, is checked in ([`Kept::Committed`]).
+//! the Nix build writes the QML, the configs, the Lua and the mockups' CSS ([`Kept::Built`]). Only
+//! a file a program reads straight from the checkout, outside any build, is checked in
+//! ([`Kept::Committed`]).
 //!
 //! # Owns
 //!
@@ -18,7 +19,8 @@
 //! # Not here
 //!
 //! - What an output says: each target's own module ([`crate::rust`], [`crate::qml`],
-//!   [`crate::terminal`], [`crate::boot`], [`crate::neon`], [`crate::cursor`], [`crate::hypr`]).
+//!   [`crate::terminal`], [`crate::boot`], [`crate::neon`], [`crate::cursor`], [`crate::hypr`],
+//!   [`crate::css`]).
 
 use std::fs;
 use std::io;
@@ -28,6 +30,7 @@ use std::path::PathBuf;
 use crate::boot::GrubTheme;
 use crate::boot::PlymouthScript;
 use crate::boot::PlymouthTheme;
+use crate::css::CssTokens;
 use crate::cursor::CursorTokens;
 use crate::hypr::HyprTokens;
 use crate::model::Tokens;
@@ -82,7 +85,8 @@ pub trait Target: Sync {
 }
 
 /// The toolkits' and the boot's outputs: `kubaos-ui`'s module, `KubaOS.Components`' singletons,
-/// Plymouth's script and theme, GRUB's theme, Kōbō's neon, `kubaos-cursor`'s tokens and Hyprland's.
+/// Plymouth's script and theme, GRUB's theme, Kōbō's neon, `kubaos-cursor`'s tokens, Hyprland's and
+/// the mockups' CSS.
 pub static TARGETS: &[&dyn Target] = &[
     &RustModule,
     &QmlTokens,
@@ -93,6 +97,7 @@ pub static TARGETS: &[&dyn Target] = &[
     &KoboNeon,
     &CursorTokens,
     &HyprTokens,
+    &CssTokens,
 ];
 
 /// Every output `kubaos-tokens` writes: the toolkits', then the terminals' ([`OUTPUTS`]).
