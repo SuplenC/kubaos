@@ -754,3 +754,61 @@ body {
 .f-tile[data-filled] {
   background: var(--tile);
 }
+
+/* A line of text with its icon, its line box tinted so its height shows. */
+.f-line {
+  display: flex;
+  align-self: flex-start;
+  background: rgb(from var(--color-primary) r g b / var(--opacity-tint));
+}
+
+/* Words that wrap in the room they have, in a type style, its figures as the style draws them; a
+   word longer than its column breaks at the edge. */
+.f-wrap {
+  max-width: 100%;
+  font-family: var(--t-family);
+  font-size: var(--t-size);
+  font-weight: var(--t-weight);
+  line-height: var(--t-line);
+  font-feature-settings: var(--t-features);
+  overflow-wrap: anywhere;
+}
+
+/* A column of numbers, ending in one place. */
+.f-figures {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-s4);
+}
+
+/* The 4 grid drawn behind what sits on it: a hairline every `grid`. */
+.f-grid-paper {
+  align-self: flex-start;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--color-outline_variant) 0 var(--stroke-hairline_device_px),
+    transparent var(--stroke-hairline_device_px) var(--grid)
+  );
+}
+
+/* A sample drawn at a scale of its own. */
+.f-at-scale {
+  display: flex;
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+}
+
+/* A column as wide as a panel, and one as narrow as a rail, the words wrapping inside. */
+.f-measure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s8);
+  width: var(--size-panel);
+}
+
+.f-narrow {
+  width: var(--size-rail);
+  outline: var(--stroke-hairline_device_px) dashed var(--color-outline_variant);
+}
