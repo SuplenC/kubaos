@@ -41,3 +41,15 @@ triggers = [
     '(?i)\s(time|now)\s*$',
 ]
 debounce_ms = 0
+
+# "Remove" on the apps KubaOS installed, whichever Extension lists them: the
+# Extension aims it at the Identities of the placeholders in
+# config/kotodama/kubaos.toml with a `remove`, while their state says the app
+# is installed, and runs that `remove`.
+[[contributed_actions]]
+targeted = true
+id = "remove"
+title = "Remove"
+keywords = ["remove", "uninstall", "delete"]
+role = "destructive"
+confirm = true

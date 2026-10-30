@@ -170,3 +170,25 @@ fn the_stutter_item_is_found_by_what_people_type() {
         [TOGGLE, ON, OFF]
     );
 }
+
+#[test]
+fn each_setting_is_turned_on_or_off_by_the_word_typed() {
+    for item in items() {
+        let verbs: Vec<(&str, &[String])> = item
+            .actions
+            .iter()
+            .map(|action| (action.id.as_str(), action.keywords.as_slice()))
+            .collect();
+
+        assert_eq!(
+            verbs,
+            [
+                (TOGGLE, &["toggle".to_owned()][..]),
+                (ON, &["on".to_owned(), "enable".to_owned()][..]),
+                (OFF, &["off".to_owned(), "disable".to_owned()][..]),
+            ],
+            "{}",
+            item.id
+        );
+    }
+}

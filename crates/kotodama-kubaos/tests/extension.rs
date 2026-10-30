@@ -126,6 +126,43 @@ fn a_user_action_shows_and_a_hidden_one_does_not() {
 }
 
 #[test]
+fn remove_is_aimed_at_a_placeholders_app_and_withdrawn_with_it() {
+    let mut extension = start();
+    let chrome = r#"
+        [actions.chrome]
+        title = "Google Chrome"
+        identity = "app:google-chrome.desktop"
+        remove = { run = ["true"] }
+        [actions.chrome.actions.install]
+        title = "Install"
+        keywords = ["install"]
+        run = ["true"]
+        "#;
+
+    extension.send(config(chrome));
+    extension.added();
+    let aimed = extension.recv();
+    extension.send(config(""));
+    extension.removed();
+    let withdrawn = extension.recv();
+
+    assert_eq!(
+        aimed,
+        FromExtension::TargetAction {
+            action: "remove".to_owned(),
+            identities: vec!["app:google-chrome.desktop".to_owned()],
+        }
+    );
+    assert_eq!(
+        withdrawn,
+        FromExtension::TargetAction {
+            action: "remove".to_owned(),
+            identities: Vec::new(),
+        }
+    );
+}
+
+#[test]
 fn hiding_an_action_later_takes_its_item_away() {
     let mut extension = start();
     extension.send(config("[actions.mine]\ntitle = \"Mine\"\nrun = [\"true\"]"));

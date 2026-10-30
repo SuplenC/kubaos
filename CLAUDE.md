@@ -32,6 +32,8 @@ Every file in the repo (docs, comments, config, agent guides) says how things ar
 
 A new feature ships with its Kotodama integration in the same PR, through the KubaOS Extension (`crates/kotodama-kubaos`, actions in `config/kotodama/kubaos.toml`): Items to run it, or at the very least its settings, so it can be found, run and changed from the menu. A feature with no Item is not done.
 
+One result per thing: a feature adds Actions to its subject's Item, each with its verbs and role, never Items of its own about another one (no "Install X" beside X, no "Proxy on" beside "Proxy off"). See "The Command menu" in `docs/agents/code-quality.md`.
+
 In-shell searches over lists use Kotodama's engine, never a hand-rolled filter (see the QML rules in `docs/agents/code-quality.md`).
 
 ## Git

@@ -2,13 +2,15 @@
 //! config the Daemon sends makes the Items over, sending only the ones that changed, and so does
 //! each change the update check writes, each change to the keyboard layouts, to the wallpaper sets
 //! file, to Hyprland's screens file, to the drives file and to a file a state of the actions is
-//! read from; each config also reads the user folders and the states again; each run is answered
+//! read from, and with them the apps `remove` is aimed at, sent again when they change; each
+//! config also reads the user folders and the states again; each run is answered
 //! with its outcome, after the View it pushes or pops. Each Live query is answered at once, with a
 //! monitor answer, processes to stop, a date answer, or nothing.
 //!
 //! # Owns
 //!
 //! - The loop, logging the config's problems, and turning what a run came to into messages.
+//! - Sending the Identities `remove` is aimed at, whole, each time they change.
 //! - Watching the update check's file, the keyboard settings and `/etc/default/keyboard`, the
 //!   wallpaper sets file, Hyprland's screens file, the drives file and the states' files.
 //!
@@ -27,6 +29,7 @@ use kotodama_extension::Connection;
 use kotodama_extension::Event;
 use kotodama_extension::SentItems;
 use kotodama_extension::SentStatus;
+use kotodama_extension::Writer;
 use kotodama_extension::config;
 use kotodama_extension::watch::RecursiveMode;
 use kotodama_extension::watch::Watcher;
@@ -41,6 +44,7 @@ use kotodama_kubaos::extension::Extension;
 use kotodama_kubaos::files::UserFolders;
 use kotodama_kubaos::keyboard::Keyboards;
 use kotodama_kubaos::layouts::LayoutsApp;
+use kotodama_kubaos::registry;
 use kotodama_kubaos::run::Programs;
 use kotodama_kubaos::states::Places;
 use kotodama_kubaos::states::States;
@@ -187,7 +191,7 @@ fn run() -> Result<(), Error> {
         dates: Dates::new(clock_settings::dir()),
         monitor: Monitor::new("/", serve::stream_file()),
     };
-    let mut sent = SentItems::default();
+    let mut sent = Sent::default();
     // The toggles work on any machine, and the actions need only their programs.
     SentStatus::default().usable(&mut writer)?;
     let state = updates::state_dir();
@@ -222,7 +226,7 @@ fn run() -> Result<(), Error> {
                 }
                 read_again(&mut extension, &places);
                 configured = true;
-                sent.publish(&mut writer, extension.items())?;
+                sent.publish(&mut writer, &extension)?;
             }
             Event::Own(own) => {
                 match own {
@@ -234,7 +238,7 @@ fn run() -> Result<(), Error> {
                     Own::States(states) => extension.set_states(states),
                 }
                 if configured {
-                    sent.publish(&mut writer, extension.items())?;
+                    sent.publish(&mut writer, &extension)?;
                 }
             }
             Event::Message(ToExtension::LiveQuery { id, query, .. }) => {
@@ -279,6 +283,32 @@ fn run() -> Result<(), Error> {
         }
     }
     Ok(())
+}
+
+/// What the Daemon has of the Extension: its Items, and the Identities the Contributed action
+/// `remove` is aimed at, none at the start, as the Daemon aims a targeted Action at nothing until
+/// it is told.
+#[derive(Default)]
+struct Sent {
+    items: SentItems,
+    aimed: Vec<String>,
+}
+
+impl Sent {
+    /// Makes it what `extension` offers now, sending only what changed: the Items, and the whole
+    /// set `remove` is aimed at.
+    fn publish(&mut self, writer: &mut Writer, extension: &Extension<SystemBus, Programs>) -> Result<(), Error> {
+        self.items.publish(writer, extension.items())?;
+        let aimed = extension.targets();
+        if aimed != self.aimed {
+            writer.send(&FromExtension::TargetAction {
+                action: registry::REMOVE.to_owned(),
+                identities: aimed.clone(),
+            })?;
+            self.aimed = aimed;
+        }
+        Ok(())
+    }
 }
 
 /// Watches `dir` for the update check's file, sending what it says on each change. Without a

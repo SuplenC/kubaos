@@ -24,6 +24,7 @@ use std::collections::BTreeMap;
 
 use kotodama_extension::Chain;
 use kotodama_protocol::Item;
+use kotodama_protocol::ItemKind;
 use kotodama_protocol::ItemRef;
 use kotodama_protocol::Table;
 use kubaos_power::live::Now;
@@ -191,6 +192,12 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .chain(drives)
     }
 
+    /// The Identities the Contributed action [`registry::REMOVE`] is aimed at: the things KubaOS
+    /// installed that a placeholder stands for.
+    pub fn targets(&self) -> Vec<String> {
+        self.registry.targets(&self.states)
+    }
+
     /// Runs `action` on `item`; an error is what the user reads.
     ///
     /// # Errors
@@ -199,12 +206,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
     pub fn run(&mut self, action: &str, item: &ItemRef, arguments: &BTreeMap<String, String>) -> Result<Ran, String> {
         let unknown = || format!("`{}` has no Action `{action}`", item.id);
         match item.kind.name() {
-            registry::KIND if action == registry::RUN => {
-                let command = self.registry.command(&item.id, arguments).ok_or_else(unknown)?;
-                self.runner
-                    .launch(&command.argv, command.delay)
-                    .map_err(|err| Chain(&err).to_string())?;
-                Ok(Ran::Close)
+            registry::KIND => {
+                let command = self.registry.command(&item.id, action, arguments).ok_or_else(unknown)?;
+                self.launch(&command)
             }
             toggles::KIND => {
                 let toggle = Toggle::from_id(&item.id)
@@ -241,9 +245,36 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             proxy::KIND if action == proxy::SHOW && !self.registry.hides(&item.id) => {
                 Ok(Ran::Push(proxy::view(&proxy::now())))
             }
+            _ if action == registry::REMOVE => {
+                let command = identity(&item.kind)
+                    .and_then(|identity| self.registry.removal(&identity))
+                    .ok_or_else(|| format!("KubaOS didn't install `{}`, so it can't remove it", item.id))?;
+                self.launch(&command)
+            }
             _ => Err(unknown()),
         }
     }
+}
+
+impl<B, R: Runner> Extension<B, R> {
+    fn launch(&self, command: &registry::Command) -> Result<Ran, String> {
+        self.runner
+            .launch(&command.argv, command.delay)
+            .map_err(|err| Chain(&err).to_string())?;
+        Ok(Ran::Close)
+    }
+}
+
+/// The Identity of another Extension's Item of `kind`, as the apps Extension and a Folder source
+/// give an app's: `app:` and its desktop id. The Daemon names an Item to its Contributed actions
+/// by its id and kind alone.
+fn identity(kind: &ItemKind) -> Option<String> {
+    let desktop_id = match kind {
+        ItemKind::App { desktop_id } => desktop_id.as_str(),
+        ItemKind::File { path } => path.file_name()?.to_str().filter(|name| name.ends_with(".desktop"))?,
+        _ => return None,
+    };
+    Some(format!("app:{desktop_id}"))
 }
 
 /// The idle settings as the file has them now, which a choice list marks; read at each list, not

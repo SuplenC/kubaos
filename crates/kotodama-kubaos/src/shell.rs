@@ -20,12 +20,12 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use kotodama_extension::Chain;
-use kotodama_protocol::Action;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemKind;
 use kotodama_protocol::NamespacedKind;
 use kubaos_user_layer::App;
 
+use crate::toggles;
 use crate::toggles::Ran;
 
 /// The Item kind of every shell setting.
@@ -133,11 +133,7 @@ pub fn items() -> Vec<Item> {
             app_only: false,
             weak_keywords: Vec::new(),
             yields: false,
-            actions: vec![
-                Action::new(TOGGLE, setting.toggle),
-                Action::new(ON, "Turn on"),
-                Action::new(OFF, "Turn off"),
-            ],
+            actions: toggles::switch_actions(setting.toggle),
         })
         .collect()
 }

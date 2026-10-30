@@ -73,6 +73,15 @@ KubaOS isn't translated yet, but its text is written so it can be, in every lang
 - **Text can grow**: translations run up to a third longer, so text fits by wrapping, eliding or the layout giving it room, never by a fixed width chosen for the English string.
 - **Dates, times and numbers go through the locale's formatting** (`Qt.formatDateTime`, `Number.toLocaleString`, chrono's formatting in Rust), never assembled by hand.
 
+## The Command menu
+
+Every feature reaches the Command menu through the KubaOS Extension (`CLAUDE.md`), one result per thing:
+
+- **What can be done to a thing is an Action of its Item.** An on/off pair, an install and a remove, a show and a hide are one Item with an Action each, never two Items: an action in `config/kotodama/kubaos.toml` takes `actions` in place of `run`, and the Extension's own Items (`crates/kotodama-kubaos/src/toggles.rs`) list several Actions. A feature about an existing thing adds an Action to that thing's Item, not an Item of its own.
+- **Every Action has its verbs and its role.** `keywords` are the words that choose it from the query (`on`, `off`, `install`, `remove`), so `wifi off` runs Turn off on Wi-Fi; never words of the Item's title. An Action that removes something is `role = "destructive"`, and one that can't be undone also asks first (`confirm`).
+- **A thing with a state says it and offers what applies next.** Its `state` picks its `subtitle` ("On: …", "Off: …") and puts first the Action whose `primary_when` holds, so Enter turns off what is on. A test over `kubaos.toml` holds both.
+- **A thing that isn't there yet is a placeholder.** It names the real thing's Identity (`identity = "app:<desktop id>"`) and steps aside once that is in the menu; what removes the real thing is a Contributed action on it (`remove`), not an Item.
+
 ## Performance comes before style
 
 New KubaOS components are written for speed and memory first. On a hot path (anything a keystroke, a login or a theme change waits on), performance wins over the style rules here. Three conditions keep it honest:

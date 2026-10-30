@@ -331,3 +331,98 @@ fn the_states_choose_which_half_of_a_pair_is_sent() {
     assert_eq!(installed.first().map(String::as_str), Some("chrome-off"));
     assert!(!installed.contains(&"chrome-on".to_owned()));
 }
+
+const CHROME: &str = r#"
+    terminal = ["ghostty", "-e"]
+    [actions.chrome]
+    title = "Google Chrome"
+    identity = "app:google-chrome.desktop"
+    state = "packages.chrome"
+    remove = { run = ["kubaos", "packages", "disable", "chrome"], terminal = true }
+    [actions.chrome.actions.install]
+    title = "Install and open"
+    keywords = ["install"]
+    run = ["kubaos", "packages", "enable", "chrome"]
+    "#;
+
+#[test]
+fn each_action_of_an_item_with_several_runs_through_the_extension() {
+    let mut extension = configured(CHROME);
+
+    let ran = extension.run("install", &item(registry::KIND, "chrome"), &BTreeMap::new());
+    let unknown = extension.run(registry::RUN, &item(registry::KIND, "chrome"), &BTreeMap::new());
+
+    assert_eq!(ran, Ok(Ran::Close));
+    assert_eq!(
+        extension.runner.launched.borrow()[0].0,
+        ["kubaos", "packages", "enable", "chrome"]
+    );
+    assert_eq!(unknown, Err("`chrome` has no Action `run`".to_owned()));
+}
+
+#[test]
+fn remove_on_an_installed_app_runs_its_placeholders_remove() {
+    let mut extension = configured(CHROME);
+    let app = ItemRef {
+        id: "google-chrome".to_owned(),
+        kind: ItemKind::App {
+            desktop_id: "google-chrome.desktop".to_owned(),
+        },
+    };
+
+    let ran = extension.run(registry::REMOVE, &app, &BTreeMap::new());
+
+    assert_eq!(ran, Ok(Ran::Close));
+    assert_eq!(
+        extension.runner.launched.borrow()[0].0,
+        ["ghostty", "-e", "kubaos", "packages", "disable", "chrome"]
+    );
+}
+
+#[test]
+fn remove_on_a_desktop_file_runs_the_remove_of_its_app() {
+    let mut extension = configured(CHROME);
+    let file = ItemRef {
+        id: "/usr/share/applications/google-chrome.desktop".to_owned(),
+        kind: ItemKind::File {
+            path: "/usr/share/applications/google-chrome.desktop".into(),
+        },
+    };
+
+    let ran = extension.run(registry::REMOVE, &file, &BTreeMap::new());
+
+    assert_eq!(ran, Ok(Ran::Close));
+    assert_eq!(extension.runner.launched.borrow().len(), 1);
+}
+
+#[test]
+fn remove_on_an_app_no_placeholder_stands_for_says_so() {
+    let mut extension = configured(CHROME);
+    let app = ItemRef {
+        id: "firefox".to_owned(),
+        kind: ItemKind::App {
+            desktop_id: "firefox.desktop".to_owned(),
+        },
+    };
+
+    let ran = extension.run(registry::REMOVE, &app, &BTreeMap::new());
+
+    assert_eq!(
+        ran,
+        Err("KubaOS didn't install `firefox`, so it can't remove it".to_owned())
+    );
+    assert!(extension.runner.launched.borrow().is_empty());
+}
+
+#[test]
+fn remove_is_aimed_at_what_the_states_say_is_installed() {
+    let mut extension = configured(CHROME);
+
+    extension.set_states(States::default().with("packages.chrome", Reading::Bool(false)));
+    let missing = extension.targets();
+    extension.set_states(States::default().with("packages.chrome", Reading::Bool(true)));
+    let installed = extension.targets();
+
+    assert_eq!(missing, Vec::<String>::new());
+    assert_eq!(installed, ["app:google-chrome.desktop"]);
+}

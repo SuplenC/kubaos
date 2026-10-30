@@ -182,8 +182,8 @@ impl Toggle {
     /// The other words people type for it.
     fn keywords(self) -> &'static [&'static str] {
         match self {
-            Toggle::Wifi => &["wifi", "wireless", "wlan", "network", "wifi on", "wifi off", "airplane"],
-            Toggle::Bluetooth => &["bt", "bluetooth on", "bluetooth off"],
+            Toggle::Wifi => &["wifi", "wireless", "wlan", "network", "airplane"],
+            Toggle::Bluetooth => &["bt"],
             Toggle::Mute => &["sound", "audio", "unmute", "speakers", "silence"],
             Toggle::MuteMicrophone => &["mic", "microphone", "unmute"],
             Toggle::VolumeUp => &["louder", "sound", "audio"],
@@ -209,11 +209,7 @@ impl Toggle {
 
     fn actions(self) -> Vec<Action> {
         match self {
-            Toggle::Wifi | Toggle::Bluetooth => vec![
-                Action::new(TOGGLE, format!("Turn {} on or off", self.title())),
-                Action::new(ON, "Turn on"),
-                Action::new(OFF, "Turn off"),
-            ],
+            Toggle::Wifi | Toggle::Bluetooth => switch_actions(format!("Turn {} on or off", self.title())),
             Toggle::Volume | Toggle::Brightness => {
                 vec![Action::new(RUN, self.title()).arguments(vec![Argument::new(PERCENT).placeholder("50")])]
             }
@@ -276,6 +272,16 @@ impl Toggle {
             Toggle::Brightness => brightnessctl(runner, &format!("{}%", percent(arguments, 1)?), Ran::Close),
         }
     }
+}
+
+/// The Actions of a setting that is on or off: `toggle`, titled `toggle`, then on and off, each
+/// known by the words that choose it from the query, as in `wifi off`.
+pub fn switch_actions(toggle: impl Into<String>) -> Vec<Action> {
+    vec![
+        Action::new(TOGGLE, toggle).keywords(["toggle"]),
+        Action::new(ON, "Turn on").keywords(["on", "enable"]),
+        Action::new(OFF, "Turn off").keywords(["off", "disable"]),
+    ]
 }
 
 /// Every toggle's id, which no action of the registry may take.

@@ -262,3 +262,30 @@ fn a_device_id_that_is_no_device_runs_nothing() {
     assert!(use_device("54", &runner).is_err());
     assert_eq!(runner.ran(), [] as [std::string::String; 0]);
 }
+
+#[test]
+fn wifi_and_bluetooth_are_turned_on_or_off_by_the_word_typed() {
+    for toggle in [Toggle::Wifi, Toggle::Bluetooth] {
+        let item = toggle.item();
+        let verbs = |id: &str| {
+            item.actions
+                .iter()
+                .find(|action| action.id == id)
+                .map(|action| action.keywords.clone())
+                .unwrap_or_default()
+        };
+
+        assert_eq!(item.actions[0].id, TOGGLE);
+        assert_eq!(verbs(ON), ["on", "enable"]);
+        assert_eq!(verbs(OFF), ["off", "disable"]);
+        assert_eq!(verbs(TOGGLE), ["toggle"]);
+        assert!(
+            !item
+                .keywords
+                .iter()
+                .any(|keyword| keyword.ends_with(" on") || keyword.ends_with(" off")),
+            "{:?}",
+            item.keywords
+        );
+    }
+}
