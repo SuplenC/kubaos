@@ -39,7 +39,7 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
     let day_first = chip(ChipKind::Neutral, "Day first")
         .on_press(Message::Sample)
         .view(look);
-    row(look, Space::S32)
+    row(look, Space::S64)
         .center()
         .push(settings)
         .push(hint(look, day_first, "Your locale's order", true))

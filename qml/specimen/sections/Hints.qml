@@ -8,7 +8,7 @@ K.Section {
     description: "A control's name in a small bubble 8 under it, while the pointer or the keyboard is on it: an icon button's label, a chip's tooltip."
 
     K.Row {
-        gap: K.Tokens.space.s32
+        gap: K.Tokens.space.s64
         align: "centre"
 
         K.IconButton {
