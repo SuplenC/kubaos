@@ -7,9 +7,13 @@
 //! else. Plain boxes are left out: each toolkit wraps content in containers of its own, and they
 //! claim nothing.
 //!
+//! A page that shows components on a layout of its own (a mockup's) is held to a toolkit's pages
+//! component by component instead: each of its components to a twin of the same name, variant and
+//! words, wherever each page puts it ([`components`]).
+//!
 //! # Owns
 //!
-//! - [`compare`] and its [`Difference`].
+//! - [`compare`], [`components`] and their [`Difference`].
 //!
 //! # Not here
 //!
@@ -203,6 +207,124 @@ fn same_role(a: &Role, b: &Role) -> bool {
             },
         ) => ac == bc && (ag - bg).abs() < f32::EPSILON && aa == ba,
         _ => a == b,
+    }
+}
+
+/// What [`components`] found.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Components {
+    /// How many components had a twin to be held to.
+    pub compared: usize,
+    /// The components with no twin, as `Button(Filled Md) reading "Continue to the disks"`.
+    pub unmatched: Vec<String>,
+    /// Where a component and its twin part ways.
+    pub differences: Vec<Difference>,
+}
+
+/// Every component of `other`, outermost only, held to its twin in `references` of the same mode
+/// and scale: the first component there with its name, variant and the same parts (texts with
+/// their words, icons with their symbols) in the same order. A state (hovered, focused, disabled)
+/// is the same variant and never moves a box, so the twin may be in another state. Each is compared
+/// as [`compare`] compares a page, its boxes measured from the component's own top left, so where
+/// each page puts it doesn't count. `names` labels the two sides in messages: `("iced", "mockup")`.
+pub fn components(references: &[Frame], other: &Frame, names: (&str, &str)) -> Components {
+    let mut ours = Vec::new();
+    outermost(&other.root, &mut ours);
+    let mut theirs = Vec::new();
+    for reference in references
+        .iter()
+        .filter(|r| r.mode == other.mode && (r.scale - other.scale).abs() < f32::EPSILON)
+    {
+        every_component(&reference.root, &mut theirs);
+    }
+    let mut report = Components::default();
+    for component in ours {
+        let key = parts(component);
+        let Some(twin) = theirs
+            .iter()
+            .find(|twin| twin.role == component.role && parts(twin) == key)
+        else {
+            report.unmatched.push(reading(component));
+            continue;
+        };
+        report.compared += 1;
+        let alone = |node: &Node| Frame {
+            page: format!("{} {}", other.page, reading(component)),
+            mode: other.mode.clone(),
+            scale: other.scale,
+            root: moved(node, node.bounds.x, node.bounds.y),
+        };
+        report
+            .differences
+            .extend(compare(&alone(twin), &alone(component), names));
+    }
+    report
+}
+
+/// The outermost components under `node`.
+fn outermost<'a>(node: &'a Node, into: &mut Vec<&'a Node>) {
+    if matches!(node.role, Role::Component { .. }) {
+        into.push(node);
+        return;
+    }
+    for child in &node.children {
+        outermost(child, into);
+    }
+}
+
+/// Every component under `node`, nested ones too.
+fn every_component<'a>(node: &'a Node, into: &mut Vec<&'a Node>) {
+    if matches!(node.role, Role::Component { .. }) {
+        into.push(node);
+    }
+    for child in &node.children {
+        every_component(child, into);
+    }
+}
+
+/// The labels of what a component holds that says what it is, in order: its texts with their
+/// words, its icons with their symbols, its nested components.
+fn parts(node: &Node) -> Vec<String> {
+    let mut flat = Vec::new();
+    flatten(node, 0, "", &mut flat);
+    flat.iter()
+        .skip(1)
+        .filter(|f| {
+            matches!(
+                f.node.role,
+                Role::Text { .. } | Role::Icon { .. } | Role::Component { .. }
+            )
+        })
+        .map(|f| f.node.role.label())
+        .collect()
+}
+
+/// A component as a finding names it: its label and its words.
+fn reading(node: &Node) -> String {
+    let mut words = Vec::new();
+    texts(node, &mut words);
+    format!("{} reading {:?}", node.role.label(), words.join(" "))
+}
+
+fn texts<'a>(node: &'a Node, into: &mut Vec<&'a str>) {
+    if let Role::Text { content, .. } = &node.role {
+        into.push(content);
+    }
+    for child in &node.children {
+        texts(child, into);
+    }
+}
+
+/// `node` and everything in it moved by `-x`, `-y`.
+fn moved(node: &Node, x: f32, y: f32) -> Node {
+    Node {
+        role: node.role.clone(),
+        bounds: Rect {
+            x: node.bounds.x - x,
+            y: node.bounds.y - y,
+            ..node.bounds
+        },
+        children: node.children.iter().map(|child| moved(child, x, y)).collect(),
     }
 }
 

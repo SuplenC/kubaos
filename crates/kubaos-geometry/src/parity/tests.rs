@@ -6,6 +6,7 @@ use crate::Rect;
 use crate::Role;
 use crate::Size;
 use crate::parity::compare;
+use crate::parity::components;
 
 fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
     Rect { x, y, width, height }
@@ -137,4 +138,69 @@ fn a_pages_scroll_that_reaches_less_far_is_a_difference() {
 
     assert_eq!(found.len(), 1, "{found:?}");
     assert_eq!(found[0].path, "Scroll");
+}
+
+fn page_of(page: &str, children: Vec<Node>) -> Frame {
+    let mut root = Node::new(Role::Box, rect(0.0, 0.0, 1280.0, 2000.0));
+    root.children = children;
+    Frame {
+        page: page.to_owned(),
+        ..frame(root)
+    }
+}
+
+#[test]
+fn a_component_matches_its_twin_wherever_each_page_puts_it() {
+    let iced = page_of("components", vec![button(rect(152.0, 640.0, 101.6, 40.0), 52.956)]);
+    let mockup = page_of("button", vec![button(rect(127.2, 96.8, 101.6, 40.0), 52.953)]);
+
+    let report = components(&[iced], &mockup, ("iced", "mockup"));
+
+    assert_eq!(report.compared, 1);
+    assert_eq!(report.unmatched, Vec::<String>::new());
+    assert_eq!(report.differences, []);
+}
+
+#[test]
+fn a_component_s_part_moved_inside_it_is_a_difference() {
+    let iced = page_of("components", vec![button(rect(152.0, 640.0, 101.6, 40.0), 52.956)]);
+    let mut moved = button(rect(0.0, 0.0, 101.6, 40.0), 52.956);
+    moved.children[0].bounds.y += 0.8;
+    let mockup = page_of("button", vec![moved]);
+
+    let report = components(&[iced], &mockup, ("iced", "mockup"));
+
+    assert_eq!(report.compared, 1);
+    assert_eq!(report.differences.len(), 1, "{:?}", report.differences);
+    assert!(report.differences[0].message.contains("in mockup"));
+}
+
+#[test]
+fn a_component_with_no_twin_of_its_name_variant_and_words_is_unmatched() {
+    let iced = page_of("components", vec![button(rect(152.0, 640.0, 101.6, 40.0), 52.956)]);
+    let mut longer = button(rect(0.0, 0.0, 180.0, 40.0), 120.0);
+    if let Role::Text { content, .. } = &mut longer.children[0].role {
+        *content = "Continue to the disks".to_owned();
+    }
+    let mockup = page_of("button", vec![longer]);
+
+    let report = components(&[iced], &mockup, ("iced", "mockup"));
+
+    assert_eq!(report.compared, 0);
+    assert_eq!(
+        report.unmatched,
+        ["Button(Filled Md) reading \"Continue to the disks\""]
+    );
+}
+
+#[test]
+fn only_a_twin_of_the_same_scale_and_mode_counts() {
+    let iced = page_of("components", vec![button(rect(152.0, 640.0, 101.6, 40.0), 52.956)]);
+    let mut mockup = page_of("button", vec![button(rect(0.0, 0.0, 101.6, 40.0), 52.956)]);
+    mockup.scale = 2.0;
+
+    let report = components(&[iced], &mockup, ("iced", "mockup"));
+
+    assert_eq!(report.compared, 0);
+    assert_eq!(report.unmatched.len(), 1);
 }
