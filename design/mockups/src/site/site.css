@@ -83,9 +83,13 @@ body {
   align-items: flex-start;
 }
 
+/* The navigation sticks under the toolbar and scrolls on its own when it is taller than the window
+   below it, so no link hides under the toolbar or past the window's foot. */
 .site-nav {
   position: sticky;
-  top: 0;
+  top: var(--site-toolbar-height, 0px);
+  max-height: calc(100vh - var(--site-toolbar-height, 0px));
+  overflow-y: auto;
   flex: none;
   width: var(--size-sidebar);
   padding: var(--space-s16);
