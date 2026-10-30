@@ -272,6 +272,19 @@ body {
   padding: var(--space-s24);
 }
 
+/* A player's sample laid out as a grid (`spread` in `site/parts/motion.ts`): its columns, gap and
+   alignment are set on it. */
+[data-player-grid] {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), auto);
+  justify-content: start;
+  justify-items: start;
+  align-items: start;
+}
+
+[data-player-grid][data-align="centre"] { align-items: center; }
+[data-player-grid][data-align="end"] { align-items: end; }
+
 /* The picked part's layers, outlined on the whole sample. */
 .page-player-outlines {
   position: absolute;
