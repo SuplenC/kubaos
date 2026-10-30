@@ -1,5 +1,5 @@
-// The state matrix: a row per variant, a column per state in each mode, night then daylight, every
-// cell live and painted in its mode in the theme picked, then what each state is and which states
+// The state matrix: a row per variant and a column per state, once by night and once by day, each
+// grid live and painted in its mode in the theme picked, then what each state is and which states
 // don't apply, with why. Wider than the page, the columns wrap onto bands.
 
 import { el, label, mockCell, prose } from "../dom.ts";
@@ -9,23 +9,18 @@ import { bandedGrid } from "./bands.ts";
 import { subheading } from "./section.ts";
 import { painted } from "./swatches.ts";
 
-const MODES: readonly Mode[] = ["dark"];
-const MODE_NAMES: Record<Mode, string> = { dark: "night", light: "day" };
+const MODES: readonly Mode[] = ["dark", "light"];
+const MODE_NAMES: Record<Mode, string> = { dark: "Night", light: "Day" };
 
 export function matrix<S extends State>(states: States<S>): HTMLElement {
   const theme = settings().theme;
-  const columns = MODES.flatMap((mode) => states.shown.map((state) => ({ state, mode })));
-  const grid = bandedGrid(
-    columns.map(({ state, mode }) => `${STATE_NAMES[state]} · ${MODE_NAMES[mode]}`),
-    states.rows.map((row) => ({
-      name: row.name,
-      cells: columns.map(({ state, mode }) => {
-        const cell = mockCell(painted(theme, mode, row.cell(state)));
-        cell.dataset.mode = mode;
-        return cell;
-      }),
-    })),
-  );
+  const grids = MODES.map((mode) => {
+    const grid = bandedGrid(
+      states.shown.map((state) => STATE_NAMES[state]),
+      states.rows.map((row) => ({ name: row.name, cells: states.shown.map((state) => mockCell(row.cell(state))) })),
+    );
+    return painted(theme, mode, label(MODE_NAMES[mode], "body_strong", "on_surface"), grid);
+  });
   const described = el(
     "dl",
     "page-list",
@@ -43,7 +38,7 @@ export function matrix<S extends State>(states: States<S>): HTMLElement {
   return el(
     "div",
     "page-part",
-    grid,
+    ...grids,
     subheading("What each state is"),
     described,
     ...(absent.length ? [subheading("States it doesn't have"), missing] : []),
