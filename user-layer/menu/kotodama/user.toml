@@ -9,7 +9,7 @@
 # Hide KubaOS's actions and toggles by id, and add your own actions. The ids are in
 # ~/.local/share/kubaos/defaults/kotodama/kubaos.toml.
 # [extensions.kubaos]
-# hide = ["screenshot-window", "bluetooth"]
+# hide = ["color-picker", "bluetooth"]
 # [extensions.kubaos.actions.notes]
 # title = "Open my notes"
 # run = ["ghostty", "-e", "nvim"]

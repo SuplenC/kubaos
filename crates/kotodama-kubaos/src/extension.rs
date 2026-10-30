@@ -7,8 +7,9 @@
 //! - Which Items there are under the current config, `hide` and the states applied, and what the
 //!   update check changes in the update actions.
 //! - Sending a run to the registry, a toggle, an audio device, a keyboard Item, a wallpaper set, a
-//!   user folder, a desk position, a drive, an idle setting, a shell setting, the power stop's
-//!   status, the CPU scheduler's or the Proxy's.
+//!   user folder, a desk position, a drive, an idle setting, a shell setting or the cursor, and
+//!   showing the View a registry Action names: the power stop's, the CPU scheduler's or the Proxy's
+//!   status.
 //!
 //! # Not here
 //!
@@ -16,8 +17,8 @@
 //!   [`crate::toggles`]. The keyboard layouts: [`crate::keyboard`]. The wallpaper sets:
 //!   [`crate::wallpapers`]. The user folders: [`crate::files`]. The desk positions:
 //!   [`crate::desk`]. The drives: [`crate::drives`]. The idle settings: [`crate::idle`]. The
-//!   shell's settings: [`crate::shell`]. The power stop's status and the CPU scheduler's:
-//!   [`crate::power`]. The Proxy's status: [`crate::proxy`].
+//!   shell's settings: [`crate::shell`]. The cursor: [`crate::cursor`]. The power stop's status and
+//!   the CPU scheduler's: [`crate::power`]. The Proxy's status: [`crate::proxy`].
 //! - The protocol loop and sending messages: `main.rs`.
 
 use std::collections::BTreeMap;
@@ -32,6 +33,7 @@ use kubaos_power::machine::Machine;
 use kubaos_power::settings::Settings as PowerSettings;
 
 use crate::bus::Bus;
+use crate::cursor;
 use crate::desk;
 use crate::desk::Desk;
 use crate::drives;
@@ -45,6 +47,7 @@ use crate::power;
 use crate::proxy;
 use crate::registry;
 use crate::registry::Registry;
+use crate::registry::Shows;
 use crate::run::Runner;
 use crate::shell;
 use crate::states::States;
@@ -96,8 +99,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .chain(keyboard::ids())
             .chain(idle::ids())
             .chain(shell::ids())
-            .chain(power::ids())
-            .chain(proxy::ids())
+            .chain(cursor::ids())
             .collect();
         let (registry, problems) = Registry::from_config(config, &reserved);
         self.registry = registry;
@@ -140,9 +142,8 @@ impl<B: Bus, R: Runner> Extension<B, R> {
     }
 
     /// The Items to index: the actions the states show, the toggles, the idle settings, the
-    /// shell's, the power stop's, the CPU scheduler's and the Proxy's status, the keyboard
-    /// Items, the wallpaper sets, the user folders, the desk positions and the drives `hide`
-    /// leaves in, the update actions as the update check has them.
+    /// shell's, the cursor, the keyboard Items, the wallpaper sets, the user folders, the desk
+    /// positions and the drives `hide` leaves in, the update actions as the update check has them.
     pub fn items(&self) -> impl Iterator<Item = Item> + '_ {
         let toggles = Toggle::ALL
             .into_iter()
@@ -175,16 +176,14 @@ impl<B: Bus, R: Runner> Extension<B, R> {
             .filter(|item| !self.registry.hides(&item.id));
         let idle = idle::items().into_iter().filter(|item| !self.registry.hides(&item.id));
         let shell = shell::items().into_iter().filter(|item| !self.registry.hides(&item.id));
-        let power = [power::item(), power::scheduler_item(), proxy::item()]
-            .into_iter()
-            .filter(|item| !self.registry.hides(&item.id));
+        let cursor = Some(cursor::item(self.states.cursor())).filter(|item| !self.registry.hides(&item.id));
         self.registry
             .items(&self.states)
             .filter_map(|item| self.pending.apply(item))
             .chain(toggles)
             .chain(idle)
             .chain(shell)
-            .chain(power)
+            .chain(cursor)
             .chain(keyboards)
             .chain(wallpapers)
             .chain(folders)
@@ -207,6 +206,9 @@ impl<B: Bus, R: Runner> Extension<B, R> {
         let unknown = || format!("`{}` has no Action `{action}`", item.id);
         match item.kind.name() {
             registry::KIND => {
+                if let Some(shows) = self.registry.view(&item.id, action) {
+                    return Ok(Ran::Push(view(shows)));
+                }
                 let command = self.registry.command(&item.id, action, arguments).ok_or_else(unknown)?;
                 self.launch(&command)
             }
@@ -232,19 +234,7 @@ impl<B: Bus, R: Runner> Extension<B, R> {
                 let file = shell::path().ok_or("There's no home folder to keep the setting in")?;
                 shell::run(&item.id, action, &file)
             }
-            power::KIND if action == power::SHOW && !self.registry.hides(&item.id) => {
-                Ok(Ran::Push(power::view(&power_now())))
-            }
-            power::SCHEDULER_KIND if action == power::SHOW && !self.registry.hides(&item.id) => {
-                let (settings, _) = power_settings();
-                Ok(Ran::Push(power::scheduler_view(&kubaos_power::live::scheduler(
-                    &settings,
-                    &Machine::real(),
-                ))))
-            }
-            proxy::KIND if action == proxy::SHOW && !self.registry.hides(&item.id) => {
-                Ok(Ran::Push(proxy::view(&proxy::now())))
-            }
+            cursor::KIND if !self.registry.hides(&item.id) => cursor::run(action, arguments, &self.runner),
             _ if action == registry::REMOVE => {
                 let command = identity(&item.kind)
                     .and_then(|identity| self.registry.removal(&identity))
@@ -272,6 +262,18 @@ fn identity(kind: &ItemKind) -> Option<String> {
         return None;
     };
     Some(format!("app:{desktop_id}"))
+}
+
+/// The View `shows`, read live.
+fn view(shows: Shows) -> kotodama_protocol::View {
+    match shows {
+        Shows::Proxy => proxy::view(&proxy::now()),
+        Shows::PowerStop => power::view(&power_now()),
+        Shows::CpuScheduler => {
+            let (settings, _) = power_settings();
+            power::scheduler_view(&kubaos_power::live::scheduler(&settings, &Machine::real()))
+        }
+    }
 }
 
 /// The idle settings as the file has them now, which a choice list marks; read at each list, not

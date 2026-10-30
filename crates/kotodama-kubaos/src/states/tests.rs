@@ -49,6 +49,7 @@ impl Machine {
             config_home: Some(root.join("config")),
             keep_awake: Some(root.join("run/kubaos-keep-awake.json")),
             proxy: Some(root.join("run/kubaos-proxy.json")),
+            power: Some(root.join("run/kubaos-power.json")),
             dnd: Some(root.join("run/kubaos-dnd.json")),
             preview: Some(root.join("state/kubaos/preview.json")),
             shell_state: Some(root.join("state/quickshell/kubaos.json")),
@@ -328,6 +329,86 @@ fn the_power_settings_are_read_from_their_file_with_its_defaults() {
 }
 
 #[test]
+fn the_charge_limit_is_the_power_settings_percent() {
+    let machine = Machine::new();
+
+    let defaults = machine.read();
+    machine.write("config/kubaos/desktop/power/power.toml", "charge_limit = 80\n");
+    let eighty = machine.read();
+
+    assert_eq!(defaults.get(CHARGE_LIMIT), Some(&word("100")));
+    assert_eq!(eighty.get(CHARGE_LIMIT), Some(&word("80")));
+}
+
+#[test]
+fn the_power_stop_is_the_services_and_unknown_while_no_service_runs() {
+    let machine = Machine::new();
+    let published = |pid: u32| {
+        format!(
+            r#"{{"stop":"performance","index":3,"title":"Performance","source":"ac","dropped_from":null,"quiet":false,"pid":{pid}}}"#
+        )
+    };
+
+    let missing = machine.read();
+    machine.write("run/kubaos-power.json", &published(std::process::id()));
+    let running = machine.read();
+    machine.write("run/kubaos-power.json", &published(u32::MAX));
+    let gone = machine.read();
+    machine.write("run/kubaos-power.json", r#"{"stop":"turbo","pid":0}"#);
+    let unknown = machine.read();
+
+    assert_eq!(missing.get(POWER_STOP), None);
+    assert_eq!(running.get(POWER_STOP), Some(&word("performance")));
+    assert_eq!(gone.get(POWER_STOP), None);
+    assert_eq!(unknown.get(POWER_STOP), None);
+}
+
+#[test]
+fn the_wallpaper_motion_is_the_shells_mode_else_on_ac() {
+    let machine = Machine::new();
+
+    let missing = machine.read();
+    machine.write(
+        "state/quickshell/kubaos.json",
+        r#"{"animate": "", "bluetoothUnnamed": false}"#,
+    );
+    let unset = machine.read();
+    machine.write("state/quickshell/kubaos.json", r#"{"animate": "never"}"#);
+    let never = machine.read();
+    machine.write("state/quickshell/kubaos.json", "{ not json");
+    let broken = machine.read();
+
+    assert_eq!(missing.get(MOTION), Some(&word("ac")));
+    assert_eq!(unset.get(MOTION), Some(&word("ac")));
+    assert_eq!(never.get(MOTION), Some(&word("never")));
+    assert_eq!(broken.get(MOTION), None);
+}
+
+#[test]
+fn the_cursor_is_its_settings_with_their_defaults_and_unknown_when_they_do_not_read() {
+    let machine = Machine::new();
+
+    let defaults = machine.read();
+    machine.write(
+        "config/kubaos/desktop/cursor/cursor.toml",
+        "style = \"accent\"\nsize = 32\n",
+    );
+    let set = machine.read();
+    machine.write("config/kubaos/desktop/cursor/cursor.toml", "style = \"neon\"\n");
+    let broken = machine.read();
+
+    assert_eq!(defaults.cursor(), Some(CursorSettings::default()));
+    assert_eq!(
+        set.cursor(),
+        Some(CursorSettings {
+            style: kubaos_cursor::settings::Style::Accent,
+            size: 32
+        })
+    );
+    assert_eq!(broken.cursor(), None);
+}
+
+#[test]
 fn unfree_packages_are_on_until_the_user_flakes_setting_turns_them_off() {
     let machine = Machine::new();
 
@@ -349,6 +430,7 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         config_home: None,
         keep_awake: None,
         proxy: None,
+        power: None,
         dnd: None,
         preview: None,
         shell_state: None,
@@ -371,9 +453,13 @@ fn without_a_config_home_or_runtime_dir_their_states_are_unknown() {
         DND,
         PREVIEW,
         BLUETOOTH_UNNAMED,
+        CHARGE_LIMIT,
+        POWER_STOP,
+        MOTION,
     ] {
         assert_eq!(states.get(name), None, "{name}");
     }
+    assert_eq!(states.cursor(), None);
 }
 
 #[test]
@@ -395,7 +481,9 @@ fn every_file_a_state_is_read_from_is_watched() {
         "config/kubaos/desktop/power/power.toml",
         "config/kubaos/home/kubaos.d/nixpkgs.toml",
         "config/kubaos/desktop/network/proxy.toml",
+        "config/kubaos/desktop/cursor/cursor.toml",
         "run/kubaos-keep-awake.json",
+        "run/kubaos-power.json",
         "run/kubaos-proxy.json",
         "run/kubaos-dnd.json",
         "state/kubaos/preview.json",
@@ -435,6 +523,18 @@ fn the_word_states_take_the_words_the_power_settings_have() {
 
     assert_eq!(words(SCHEDULER), schedulers);
     assert_eq!(words(LOW_BATTERY), stops);
+    assert_eq!(
+        words(POWER_STOP),
+        kubaos_power::stop::Stop::ALL.map(kubaos_power::stop::Stop::id)
+    );
+    assert_eq!(
+        words(CHARGE_LIMIT),
+        kubaos_power::settings::ChargeLimit::ALL
+            .map(|limit| limit.percent().to_string())
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]

@@ -2099,6 +2099,7 @@ dependencies = [
  "kubaos-automount",
  "kubaos-clock",
  "kubaos-core",
+ "kubaos-cursor",
  "kubaos-files",
  "kubaos-idle",
  "kubaos-phone",

@@ -272,129 +272,72 @@ keywords = ["off", "disable", "stop"]
 run = ["dot-greeting", "off"]
 primary_when = { is = true }
 
-# Wallpaper and theme (scripts/dot-theme, the shell's picker).
+# The wallpaper and its theme (scripts/dot-theme, the shell's picker): one
+# Item, whose subtitle says when a video wallpaper plays (the shell's
+# `Motion`, config/quickshell/services/Motion.qml), and Enter opens the
+# picker. The Extension itself sends one Item a wallpaper set, "Wallpaper set:
+# Shinjuku", to show it in the picker or hide it; "Show every set" shows them
+# all.
 
-[extensions.kubaos.actions.theme-next]
+[extensions.kubaos.actions.wallpaper]
+title = "Wallpaper"
+subtitle = { always = "Animated always: video wallpapers play on battery too. Battery be damned", ac = "Animated on AC: video wallpapers play only while plugged in", never = "Never animated: video wallpapers stay still. Boring, but cheap" }
+icon = "preferences-desktop-wallpaper"
+keywords = ["theme", "background", "choose wallpaper", "next theme", "previous theme", "wallpaper folder", "wallpaper set", "wallpaper sets", "every wallpaper set", "all wallpapers", "reset wallpapers", "video wallpaper", "motion", "animate wallpaper"]
+state = "wallpaper.motion"
+order = ["pick", "next", "previous", "set", "switch", "all-sets", "always", "ac", "never"]
+
+[extensions.kubaos.actions.wallpaper.actions.pick]
+title = "Pick a wallpaper"
+keywords = ["pick", "picker", "choose"]
+run = ["qs", "ipc", "call", "wallpaper", "toggle"]
+
+[extensions.kubaos.actions.wallpaper.actions.next]
 title = "Next wallpaper"
-subtitle = "The next wallpaper in the folder, and its colors"
-icon = "go-next"
-keywords = ["theme", "next theme", "background"]
+keywords = ["next"]
 run = ["dot-theme", "next"]
 
-[extensions.kubaos.actions.theme-previous]
+[extensions.kubaos.actions.wallpaper.actions.previous]
 title = "Previous wallpaper"
-subtitle = "The previous wallpaper in the folder, and its colors"
-icon = "go-previous"
-keywords = ["theme", "previous theme", "background"]
+keywords = ["previous", "prev"]
 run = ["dot-theme", "prev"]
 
-[extensions.kubaos.actions.theme-set]
-title = "Set wallpaper"
-subtitle = "An image or video by its path, and its colors"
-icon = "preferences-desktop-wallpaper"
-keywords = ["theme", "background"]
-keyword = "wallpaper"
+[extensions.kubaos.actions.wallpaper.actions.set]
+title = "Set wallpaper…"
+keywords = ["set"]
 run = ["dot-theme", "set", "{file}"]
 arguments = [{ name = "file", kind = "file", accept = ["jpg", "jpeg", "png", "webp", "mp4", "webm", "mkv", "mov"], placeholder = "~/Pictures/wallpapers/city.jpg" }]
 
-[extensions.kubaos.actions.wallpaper-folder]
-title = "Switch wallpaper folder"
-subtitle = "The next folder of wallpapers: a set, or yours"
-icon = "folder-pictures"
-keywords = ["theme", "wallpaper set"]
+# The next folder of wallpapers: a set, or yours.
+[extensions.kubaos.actions.wallpaper.actions.switch]
+title = "Switch folder"
+keywords = ["switch"]
 run = ["dot-theme", "toggle-folder"]
 
-[extensions.kubaos.actions.wallpaper-picker]
-title = "Wallpaper picker"
-subtitle = "Pick a wallpaper in the shell"
-icon = "preferences-desktop-wallpaper"
-keywords = ["theme", "background", "choose wallpaper"]
-run = ["qs", "ipc", "call", "wallpaper", "toggle"]
-
-# The Extension itself sends one Item a wallpaper set, "Wallpaper set:
-# Shinjuku", to show it in the picker or hide it; this one shows them all.
-
-[extensions.kubaos.actions.wallpaper-all-sets]
-title = "Show every wallpaper set"
-subtitle = "The picker shows every set again, all of each"
-icon = "folder-pictures"
-keywords = ["theme", "wallpaper sets", "all wallpapers", "reset wallpapers"]
+# The picker shows every set again, all of each.
+[extensions.kubaos.actions.wallpaper.actions.all-sets]
+title = "Show every set"
+keywords = ["show"]
 run = ["dot-theme", "all-sets"]
 
-[extensions.kubaos.actions.wallpaper-motion-always]
-title = "Animate wallpaper always"
-subtitle = "Video wallpapers play, on battery too. Battery be damned"
-icon = "video-x-generic"
-keywords = ["video wallpaper", "motion"]
+[extensions.kubaos.actions.wallpaper.actions.always]
+title = "Animate always"
+keywords = ["always"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "always"]
 
-[extensions.kubaos.actions.wallpaper-motion-ac]
-title = "Animate wallpaper on AC"
-subtitle = "Video wallpapers play only while plugged in"
-icon = "video-x-generic"
-keywords = ["video wallpaper", "motion", "battery"]
+[extensions.kubaos.actions.wallpaper.actions.ac]
+title = "Animate on AC"
+keywords = ["ac", "on"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "ac"]
 
-[extensions.kubaos.actions.wallpaper-motion-never]
-title = "Never animate wallpaper"
-subtitle = "Video wallpapers stay still. Boring, but cheap"
-icon = "video-x-generic"
-keywords = ["video wallpaper", "motion", "still"]
+[extensions.kubaos.actions.wallpaper.actions.never]
+title = "Never animate"
+keywords = ["never", "still", "off"]
 run = ["qs", "ipc", "call", "wallpaper", "animate", "never"]
 
-# The pointer, in the wallpaper's colours (kubaos cursor). Each applies at
-# once and is kept in ~/.config/kubaos/desktop/cursor/cursor.toml.
-
-[extensions.kubaos.actions.cursor-dark]
-title = "Dark cursor"
-subtitle = "A dark pointer with a light outline, readable on any wallpaper"
-icon = "input-mouse"
-keywords = ["cursor style", "pointer", "mouse", "theme"]
-run = ["kubaos", "cursor", "style", "dark"]
-
-[extensions.kubaos.actions.cursor-accent]
-title = "Accent cursor"
-subtitle = "The pointer in the wallpaper's accent colour"
-icon = "input-mouse"
-keywords = ["cursor style", "pointer", "mouse", "theme", "colour"]
-run = ["kubaos", "cursor", "style", "accent"]
-
-[extensions.kubaos.actions.cursor-classic]
-title = "Classic cursor"
-subtitle = "Bibata black and white, whatever the wallpaper"
-icon = "input-mouse"
-keywords = ["cursor style", "pointer", "mouse", "bibata"]
-run = ["kubaos", "cursor", "style", "classic"]
-
-[extensions.kubaos.actions.cursor-size-24]
-title = "Cursor size 24"
-subtitle = "The default pointer size"
-icon = "input-mouse"
-keywords = ["pointer size", "small cursor", "mouse"]
-run = ["kubaos", "cursor", "size", "24"]
-
-[extensions.kubaos.actions.cursor-size-32]
-title = "Cursor size 32"
-subtitle = "A larger pointer"
-icon = "input-mouse"
-keywords = ["pointer size", "bigger cursor", "mouse"]
-run = ["kubaos", "cursor", "size", "32"]
-
-[extensions.kubaos.actions.cursor-size-48]
-title = "Cursor size 48"
-subtitle = "Large pointer. Grandpa mode."
-icon = "input-mouse"
-keywords = ["pointer size", "big cursor", "large cursor", "mouse"]
-run = ["kubaos", "cursor", "size", "48"]
-
-[extensions.kubaos.actions.cursor-size]
-title = "Set cursor size"
-subtitle = "The pointer's size in pixels, 16 to 96 in steps of 4"
-icon = "input-mouse"
-keywords = ["pointer size", "mouse"]
-keyword = "cursor-size"
-run = ["kubaos", "cursor", "size", "{size}"]
-arguments = [{ name = "size", placeholder = "32" }]
+# The pointer, in the wallpaper's colours (kubaos cursor), is the Extension's
+# own Item, `cursor`: its style and size in the subtitle, an Action each. Each
+# applies at once and is kept in ~/.config/kubaos/desktop/cursor/cursor.toml.
 
 # The keyboard layouts (kubaos keyboard), kept in
 # ~/.config/kubaos/desktop/keyboard/keyboard.toml; the default also goes to
@@ -573,15 +516,18 @@ run = ["sh", "-c", "qs kill; sleep 0.5; exec qs"]
 # restarts hypridle and says what changed in a toast.
 #
 # Keep awake: nothing locks, goes dark or suspends by itself for a while, as
-# a logind idle inhibitor hypridle honours; the bar shows it while on. The
-# `idle` id is the old "Toggle idle", so a `hide` of it still works.
+# a logind idle inhibitor hypridle honours; the bar shows it while on. Until
+# turned off, for an hour or two, or as long as you say (30m, 3h, 1h30m), then
+# as before. The `idle` id is the old "Toggle idle", so a `hide` of it still
+# works.
 
 [extensions.kubaos.actions.idle]
 title = "Keep awake"
 subtitle = { true = "On: no auto-lock, screens off or suspend till you stop it (SUPER + CTRL + I)", false = "Off: lock, screens off and suspend after a time idle (SUPER + CTRL + I)" }
 icon = "preferences-desktop-screensaver"
-keywords = ["caffeine", "keep awake", "no sleep", "hypridle", "auto lock", "toggle idle", "idle"]
+keywords = ["caffeine", "keep awake", "no sleep", "hypridle", "auto lock", "toggle idle", "idle", "for 1 hour", "for 2 hours", "presentation", "movie"]
 state = "idle.keep-awake"
+order = ["on", "off", "1h", "2h", "for"]
 
 [extensions.kubaos.actions.idle.actions.on]
 title = "Keep awake until turned off"
@@ -595,26 +541,19 @@ keywords = ["off", "disable", "stop"]
 run = ["kubaos-idle", "awake", "off"]
 primary_when = { is = true }
 
-[extensions.kubaos.actions.keep-awake-1h]
+[extensions.kubaos.actions.idle.actions.1h]
 title = "Keep awake for 1 hour"
-subtitle = "No auto-lock, screens off or suspend for an hour, then as before"
-icon = "preferences-desktop-screensaver"
-keywords = ["caffeine", "keep awake", "no sleep", "presentation"]
+keywords = ["hour", "1h"]
 run = ["kubaos-idle", "awake", "1h"]
 
-[extensions.kubaos.actions.keep-awake-2h]
+[extensions.kubaos.actions.idle.actions.2h]
 title = "Keep awake for 2 hours"
-subtitle = "No auto-lock, screens off or suspend for two hours, then as before"
-icon = "preferences-desktop-screensaver"
-keywords = ["caffeine", "keep awake", "no sleep", "movie"]
+keywords = ["hours", "2h"]
 run = ["kubaos-idle", "awake", "2h"]
 
-[extensions.kubaos.actions.keep-awake-for]
+[extensions.kubaos.actions.idle.actions.for]
 title = "Keep awake for…"
-subtitle = "As long as you say: 30m, 3h, 1h30m"
-icon = "preferences-desktop-screensaver"
-keywords = ["caffeine", "keep awake", "no sleep"]
-keyword = "keep-awake"
+keywords = ["duration"]
 run = ["kubaos-idle", "awake", "for", "{duration}"]
 arguments = [{ name = "duration", placeholder = "30m" }]
 
@@ -726,35 +665,35 @@ run = ["kubaos-idle", "schedule", "cancel"]
 # Screenshots and recording (scripts/dot-hypr-screenshot, dot-hypr-record).
 # Each waits for the menu to leave the screen.
 
-[extensions.kubaos.actions.screenshot-region]
-title = "Screenshot region"
-subtitle = "Select an area; saved and copied"
+[extensions.kubaos.actions.screenshot]
+title = "Screenshot"
+subtitle = "A region, the monitor or the window, saved and copied; or a region to draw on"
 icon = "applets-screenshooter"
-keywords = ["screen capture", "print screen", "snip"]
+keywords = ["screen capture", "print screen", "snip", "edit screenshot", "satty"]
+order = ["region", "annotate", "monitor", "window"]
+
+[extensions.kubaos.actions.screenshot.actions.region]
+title = "Screenshot a region"
+keywords = ["region", "area"]
 run = ["dot-hypr-screenshot", "region"]
 delay_ms = 400
 
-[extensions.kubaos.actions.screenshot-annotate]
-title = "Screenshot region and annotate"
-subtitle = "Select an area, then draw on it in satty"
-icon = "applets-screenshooter"
-keywords = ["screen capture", "edit screenshot", "satty"]
+# Draw on it in satty.
+[extensions.kubaos.actions.screenshot.actions.annotate]
+title = "Screenshot a region and annotate"
+keywords = ["annotate", "draw"]
 run = ["dot-hypr-screenshot", "region", "--edit"]
 delay_ms = 400
 
-[extensions.kubaos.actions.screenshot-monitor]
-title = "Screenshot monitor"
-subtitle = "The focused monitor; saved and copied"
-icon = "applets-screenshooter"
-keywords = ["screen capture", "print screen", "screen"]
+[extensions.kubaos.actions.screenshot.actions.monitor]
+title = "Screenshot the monitor"
+keywords = ["monitor", "output"]
 run = ["dot-hypr-screenshot", "output"]
 delay_ms = 400
 
-[extensions.kubaos.actions.screenshot-window]
-title = "Screenshot window"
-subtitle = "The active window; saved and copied"
-icon = "applets-screenshooter"
-keywords = ["screen capture", "print screen"]
+[extensions.kubaos.actions.screenshot.actions.window]
+title = "Screenshot the window"
+keywords = ["window"]
 run = ["dot-hypr-screenshot", "window"]
 delay_ms = 400
 
@@ -766,49 +705,54 @@ keywords = ["hyprpicker", "eyedropper", "colour"]
 run = ["hyprpicker", "-a"]
 delay_ms = 400
 
-[extensions.kubaos.actions.record-region]
-title = "Record region"
-subtitle = "Select an area and record it; again to stop"
+[extensions.kubaos.actions.record]
+title = "Screen recording"
+subtitle = "A region or the monitor, with its sound or without; again to stop"
 icon = "media-record"
-keywords = ["screen recording", "video", "capture"]
+keywords = ["record", "video", "capture", "audio"]
+order = ["region", "monitor", "sound", "stop"]
+
+[extensions.kubaos.actions.record.actions.region]
+title = "Record a region"
+keywords = ["region", "area"]
 run = ["dot-hypr-record", "region"]
 delay_ms = 400
 
-[extensions.kubaos.actions.record-monitor]
-title = "Record monitor"
-subtitle = "Record the focused monitor; again to stop"
-icon = "media-record"
-keywords = ["screen recording", "video", "capture"]
+[extensions.kubaos.actions.record.actions.monitor]
+title = "Record the monitor"
+keywords = ["monitor", "output"]
 run = ["dot-hypr-record", "output"]
 delay_ms = 400
 
-[extensions.kubaos.actions.record-monitor-sound]
-title = "Record monitor with sound"
-subtitle = "Record the focused monitor and what it plays; again to stop"
-icon = "media-record"
-keywords = ["screen recording", "video", "audio", "capture"]
+# The focused monitor and what it plays.
+[extensions.kubaos.actions.record.actions.sound]
+title = "Record the monitor with sound"
+keywords = ["sound"]
 run = ["dot-hypr-record", "output", "--audio"]
 delay_ms = 400
 
-[extensions.kubaos.actions.record-stop]
+# The recording or the replay buffer.
+[extensions.kubaos.actions.record.actions.stop]
 title = "Stop recording"
-subtitle = "Stop the recording or the replay buffer"
-icon = "media-playback-stop"
-keywords = ["screen recording", "video"]
+keywords = ["stop"]
 run = ["dot-hypr-record", "stop"]
 
-[extensions.kubaos.actions.replay-toggle]
-title = "Replay buffer on/off"
+[extensions.kubaos.actions.replay]
+title = "Replay buffer"
 subtitle = "I keep the last 30 s of the screen in memory, you're welcome"
 icon = "media-record"
-keywords = ["screen recording", "instant replay", "clip"]
+keywords = ["screen recording", "instant replay", "clip", "the last 30 seconds"]
+order = ["toggle", "save"]
+
+[extensions.kubaos.actions.replay.actions.toggle]
+title = "Turn on or off"
+keywords = ["toggle"]
 run = ["dot-hypr-record", "replay", "toggle"]
 
-[extensions.kubaos.actions.replay-save]
+# The buffer, written to a video.
+[extensions.kubaos.actions.replay.actions.save]
 title = "Save the last 30 seconds"
-subtitle = "Write the replay buffer to a video"
-icon = "document-save"
-keywords = ["screen recording", "instant replay", "clip"]
+keywords = ["save"]
 run = ["dot-hypr-record", "replay", "save"]
 
 # Security keys and secrets (docs/SECRETS.md). They ask in a terminal, but for
@@ -857,17 +801,20 @@ run = ["kubaos", "bitwarden", "refresh"]
 terminal = true
 
 # The phone link: the clipboard and files shared with your phone through KDE
-# Connect (home/phone.nix, crates/kubaos-phone). It is off until "Set up a
-# phone", which opens Kōbō's "Your phone" card (kubaos-setup --card): the app
-# to get on the phone, the pairing, and a copy test both ways. The others say
-# how it went in a notification, and why when they can't.
+# Connect (home/phone.nix, crates/kubaos-phone), one Item. It is off until
+# "Set up a phone", which opens Kōbō's "Your phone" card (kubaos-setup
+# --card): the app to get on the phone, the pairing, and a copy test both
+# ways. Sending, ringing and unpairing say how it went in a notification, and
+# why when they can't; the status runs in a terminal: on or off, the name
+# phones see, and the paired phone.
 
 [extensions.kubaos.actions.phone-link]
 title = "Phone link"
 subtitle = { true = "On: the clipboard and files go both ways with your phone, through KDE Connect", false = "Off: pair an iPhone or Android with KDE Connect for the clipboard and files, both ways" }
 icon = "phone"
-keywords = ["kde connect", "kdeconnect", "iphone", "android", "pair", "phone", "clipboard", "set up a phone"]
+keywords = ["kde connect", "kdeconnect", "iphone", "android", "pair", "phone", "clipboard", "set up a phone", "the phone", "copy", "paste", "share", "photo", "transfer", "airdrop", "find my phone", "lost", "battery", "paired", "phone link status"]
 state = "phone.link"
+order = ["set-up", "off", "clipboard", "file", "ring", "status", "unpair"]
 
 [extensions.kubaos.actions.phone-link.actions.set-up]
 title = "Set up a phone"
@@ -881,42 +828,34 @@ keywords = ["off", "disable", "stop"]
 run = ["kubaos-phone", "off"]
 primary_when = { is = true }
 
-[extensions.kubaos.actions.phone-clipboard]
+# What you copied here, on the phone's clipboard.
+[extensions.kubaos.actions.phone-link.actions.clipboard]
 title = "Send the clipboard to the phone"
-subtitle = "What you copied here, on the phone's clipboard"
-icon = "edit-paste"
-keywords = ["kde connect", "iphone", "android", "copy", "paste", "clipboard"]
+keywords = ["send"]
 run = ["kubaos-phone", "send-clipboard"]
 
-[extensions.kubaos.actions.phone-file]
+[extensions.kubaos.actions.phone-link.actions.file]
 title = "Send a file to the phone…"
-subtitle = "A file by its path, to the paired phone"
-icon = "document-send"
-keywords = ["kde connect", "iphone", "android", "share", "photo", "transfer", "airdrop"]
-keyword = "send-file"
+keywords = ["file"]
 run = ["kubaos-phone", "send-file", "{path}"]
 arguments = [{ name = "path", kind = "file", placeholder = "~/Downloads/photo.jpg" }]
 
-[extensions.kubaos.actions.phone-ring]
+# Find it under the cushions: it rings even on silent.
+[extensions.kubaos.actions.phone-link.actions.ring]
 title = "Ring the phone"
-subtitle = "Find it under the cushions: it rings even on silent"
-icon = "audio-volume-high"
-keywords = ["kde connect", "find my phone", "iphone", "android", "lost"]
+keywords = ["ring"]
 run = ["kubaos-phone", "ring"]
 
-[extensions.kubaos.actions.phone-status]
-title = "Phone link status"
-subtitle = "On or off, the name phones see, and the paired phone"
-icon = "phone"
-keywords = ["kde connect", "kdeconnect", "iphone", "android", "battery", "paired"]
+[extensions.kubaos.actions.phone-link.actions.status]
+title = "Status"
+keywords = ["status"]
 run = ["kubaos-phone", "status"]
 terminal = true
 
-[extensions.kubaos.actions.phone-unpair]
+# The laptop forgets it; Set up a phone pairs one again.
+[extensions.kubaos.actions.phone-link.actions.unpair]
 title = "Unpair the phone"
-subtitle = "The laptop forgets it; Set up a phone pairs one again"
-icon = "list-remove"
-keywords = ["kde connect", "kdeconnect", "iphone", "android", "forget", "remove"]
+keywords = ["unpair"]
 run = ["kubaos-phone", "unpair"]
 confirm = true
 role = "destructive"
@@ -925,18 +864,21 @@ role = "destructive"
 # home/proxy.nix). IT's VPN (WireGuard or OpenVPN), the work DNS, the HTTP
 # proxy and the company CA, as ~/.config/kubaos/desktop/network/proxy.toml
 # names them, go up together or not at all; the control center's Proxy tile is
-# the same switch. On and off say a failure in a notification. "Proxy status"
-# is the Extension's own Item (`proxy-status`): each part, and the VPN's type,
-# server, last handshake and bytes moved, read live. The import runs in a
-# terminal, where bw asks for the master password to put the secrets in the
-# vault, and an OpenVPN config's username and password are asked for once.
+# the same switch. On and off say a failure in a notification. Its status is
+# each part, and the VPN's type, server, last handshake and bytes moved, read
+# live (crates/kotodama-kubaos/src/proxy.rs). The import runs in a terminal,
+# where bw asks for the master password to put the secrets in the vault, and
+# an OpenVPN config's username and password are asked for once; its secrets
+# go to your Bitwarden vault, the rest beside proxy.toml. The settings open
+# proxy.toml in Neovim.
 
 [extensions.kubaos.actions.proxy]
 title = "Proxy"
 subtitle = { true = "On: the work network, the VPN, work DNS, the HTTP proxy and the company CA, all together", false = "Off: every part of the work network is down, the kill switch too" }
 icon = "network-vpn"
-keywords = ["vpn", "wireguard", "openvpn", "work network", "tunnel", "office"]
+keywords = ["vpn", "wireguard", "openvpn", "work network", "tunnel", "office", "proxy", "proxy status", "proxy settings", "proxy.toml", "vpn config", "conf", "ovpn", "handshake", "kill switch", "dns", "pac", "certificate", "ca"]
 state = "proxy"
+order = ["on", "off", "status", "settings", "import"]
 
 [extensions.kubaos.actions.proxy.actions.on]
 title = "Turn on"
@@ -949,6 +891,23 @@ title = "Turn off"
 keywords = ["off", "disconnect", "disable", "stop"]
 run = ["kubaos-proxy", "off"]
 primary_when = { is = true }
+
+[extensions.kubaos.actions.proxy.actions.status]
+title = "Status"
+keywords = ["status"]
+view = "proxy"
+
+[extensions.kubaos.actions.proxy.actions.settings]
+title = "Open proxy settings"
+keywords = ["settings"]
+run = ["sh", "-c", 'dir="$(dot-config path network)" && mkdir -p "$dir" && exec ghostty -e nvim "$dir/proxy.toml"']
+
+[extensions.kubaos.actions.proxy.actions.import]
+title = "Import VPN config…"
+keywords = ["import"]
+run = ["kubaos-proxy", "import", "{path}"]
+arguments = [{ name = "path", kind = "file", accept = ["conf", "ovpn"], placeholder = "~/Downloads/work.conf" }]
+terminal = true
 
 # Whether a full tunnel's kill switch lets the network you're on through (on by
 # default): the phone link, printers, casting and SSH there. A range the
@@ -972,23 +931,6 @@ title = "Block"
 keywords = ["block", "off", "disable"]
 run = ["kubaos-proxy", "lan", "off"]
 primary_when = { is = true }
-
-[extensions.kubaos.actions.proxy-import]
-title = "Import VPN config…"
-subtitle = "IT's WireGuard .conf or OpenVPN .ovpn: its secrets go to your Bitwarden vault, the rest beside proxy.toml"
-icon = "document-import"
-keywords = ["vpn", "wireguard", "openvpn", "conf", "ovpn", "work network", "tunnel", "import", "proxy"]
-keyword = "import-vpn"
-run = ["kubaos-proxy", "import", "{path}"]
-arguments = [{ name = "path", kind = "file", accept = ["conf", "ovpn"], placeholder = "~/Downloads/work.conf" }]
-terminal = true
-
-[extensions.kubaos.actions.proxy-settings]
-title = "Open proxy settings"
-subtitle = "proxy.toml: the VPN, work DNS, the HTTP proxy and the company CA, in Neovim"
-icon = "preferences-system-network"
-keywords = ["settings", "config", "proxy", "vpn", "wireguard", "openvpn", "dns", "pac", "certificate", "ca", "proxy.toml"]
-run = ["sh", "-c", 'dir="$(dot-config path network)" && mkdir -p "$dir" && exec ghostty -e nvim "$dir/proxy.toml"']
 
 # Updates (kubaos update). They run in a terminal, where sudo asks and apt
 # and the switch show what they do. The daily check fills in what is
@@ -1409,65 +1351,67 @@ run = ["sh", "-c", 'out=$(kubaos-sysmon "$@" 2>&1) || notify-send -a "System mon
 arguments = [{ name = "setting", placeholder = "cpu-temp, ram, disk or battery-draw" }, { name = "value", placeholder = "85" }]
 
 # The power stops (crates/kubaos-power): Super Saver, Power Saver, Balanced,
-# Performance and Max Performance, the control center's slider. A stop picked
-# here is remembered for the power source you're on, battery or plugged in;
+# Performance and Max Performance, the control center's slider, as one Item
+# whose subtitle names the stop the service is on. Enter goes back to
+# Balanced, and from Balanced to Power Saver. A stop picked here is
+# remembered for the power source you're on, battery or plugged in;
 # unplugging or plugging in moves to the stop last used on the new source.
-# The ids of the middle three are the old power profile toggles', so a `hide`
-# of them still works. "Power: what this stop does" is the Extension's own
-# Item (`power-status`): every layer of the stop, as the machine has it now;
-# so is "CPU scheduler: status" (`cpu-scheduler-status`): which scheduler
-# runs, Linux's own or LAVD, and why.
-# The settings Items write ~/.config/kubaos/desktop/power/power.toml through
+# "What this stop does" lists every layer of the stop, as the machine has it
+# now (crates/kotodama-kubaos/src/power.rs); the CPU scheduler's status says
+# which scheduler runs, Linux's own or LAVD, and why.
+# The settings write ~/.config/kubaos/desktop/power/power.toml through
 # `kubaos-power`, which puts them to work at once and says so in a toast.
 
-[extensions.kubaos.actions.super-saver]
+[extensions.kubaos.actions.power]
+title = "Power profile"
+subtitle = { super-saver = "Super Saver: the least power. 60 Hz, a capped CPU, background work paused", power-saver = "Power Saver: longer battery, no CPU boost, background work paused", balanced = "Balanced: the default, boring and fine", performance = "Performance: faster, hotter, the panel at full rate", max-performance = "Max Performance: everything awake, the GPU at its peak, and the battery can go to hell" }
+icon = "power-profile-balanced"
+keywords = ["power stop", "power stops", "power profile", "battery", "eco", "power saving", "low power", "super saver", "power saver", "balanced power", "normal", "fast", "turbo", "gaming", "max power", "max performance", "power status", "what this stop does", "epp", "aspm", "vrr"]
+state = "power.stop"
+order = ["super-saver", "power-saver", "balanced", "performance", "max-performance", "status"]
+
+[extensions.kubaos.actions.power.actions.super-saver]
 title = "Super Saver"
-subtitle = "Power stop: the least power. 60 Hz, a capped CPU, background work paused. Remembered for the power source you're on"
-icon = "power-profile-power-saver"
-keywords = ["power stop", "power profile", "battery", "eco", "power saving", "max battery", "low power"]
+keywords = ["super"]
 run = ["kubaos-power", "set", "super-saver"]
 
-[extensions.kubaos.actions.power-saver]
+[extensions.kubaos.actions.power.actions.power-saver]
 title = "Power Saver"
-subtitle = "Power stop: longer battery, no CPU boost, background work paused. Remembered for the power source you're on"
-icon = "power-profile-power-saver"
-keywords = ["power stop", "power profile", "battery", "eco", "power saving"]
+keywords = ["saver"]
 run = ["kubaos-power", "set", "power-saver"]
+primary_when = { is = "balanced" }
 
-[extensions.kubaos.actions.balanced]
+[extensions.kubaos.actions.power.actions.balanced]
 title = "Balanced"
-subtitle = "Power stop: the default, boring and fine. Remembered for the power source you're on"
-icon = "power-profile-balanced"
-keywords = ["power stop", "power profile", "balanced power", "normal"]
+keywords = ["balanced", "default"]
 run = ["kubaos-power", "set", "balanced"]
+primary_when = { is_not = "balanced" }
 
-[extensions.kubaos.actions.performance]
+[extensions.kubaos.actions.power.actions.performance]
 title = "Performance"
-subtitle = "Power stop: faster, hotter, the panel at full rate. Remembered for the power source you're on"
-icon = "power-profile-performance"
-keywords = ["power stop", "power profile", "fast", "turbo"]
+keywords = ["performance"]
 run = ["kubaos-power", "set", "performance"]
 
-[extensions.kubaos.actions.max-performance]
+[extensions.kubaos.actions.power.actions.max-performance]
 title = "Max Performance"
-subtitle = "Power stop: everything awake, the GPU at its peak, and the battery can go to hell. Remembered for the power source you're on"
-icon = "power-profile-performance"
-keywords = ["power stop", "power profile", "fast", "turbo", "gaming", "full power", "max power"]
+keywords = ["max"]
 run = ["kubaos-power", "set", "max-performance"]
 
-[extensions.kubaos.actions.power-undo]
-title = "Undo the low-battery drop"
-subtitle = "Back to the stop you had on battery, until you plug in"
-icon = "battery-caution"
-keywords = ["power stop", "low battery", "undo", "power saver"]
-run = ["kubaos-power", "undo"]
+[extensions.kubaos.actions.power.actions.status]
+title = "What this stop does"
+keywords = ["status", "details"]
+view = "power"
 
+# Where the stop drops on battery at the low-battery level, or that it
+# doesn't; the Undo goes back to the stop you had on battery, until you plug
+# in; the level is from 5 to 50 %.
 [extensions.kubaos.actions.low-battery]
 title = "Low battery drop"
 subtitle = { power-saver = "To Power Saver: at the low-battery level (20 %) on battery, with an Undo; it isn't remembered as your battery stop", super-saver = "To Super Saver: at the low-battery level (20 %) on battery, all the way down, with an Undo", off = "Off: the stop stays where you put it, however low the battery goes" }
 icon = "battery-caution"
-keywords = ["power stop", "low battery", "battery saver", "automatic", "20 percent"]
+keywords = ["low battery", "low-battery", "the low-battery drop", "battery low", "automatic", "20 percent", "threshold", "percent"]
 state = "power.low-battery"
+order = ["power-saver", "super-saver", "off", "undo", "level"]
 
 [extensions.kubaos.actions.low-battery.actions.power-saver]
 title = "Drop to Power Saver"
@@ -1487,12 +1431,14 @@ keywords = ["off", "disable", "stop"]
 run = ["kubaos-power", "low-battery", "off"]
 primary_when = { is_not = "off" }
 
-[extensions.kubaos.actions.low-battery-level]
-title = "Low battery drop at…"
-subtitle = "The battery level the stop drops at, from 5 to 50 %"
-icon = "battery-caution"
-keywords = ["power stop", "low battery", "threshold", "percent"]
-keyword = "low-battery"
+[extensions.kubaos.actions.low-battery.actions.undo]
+title = "Undo the drop"
+keywords = ["undo"]
+run = ["kubaos-power", "undo"]
+
+[extensions.kubaos.actions.low-battery.actions.level]
+title = "Drop at…"
+keywords = ["at", "level"]
 run = ["kubaos-power", "low-battery", "{percent}"]
 arguments = [{ name = "percent", placeholder = "20" }]
 
@@ -1515,41 +1461,43 @@ keywords = ["off", "disable", "stop"]
 run = ["kubaos-power", "panel-power-saving", "off"]
 primary_when = { is = true }
 
-[extensions.kubaos.actions.charge-limit-80]
-title = "Charge limit: 80 %"
-subtitle = "The battery stops charging at 80 %: kinder to it on a laptop that lives plugged in"
+# How far the battery charges, and measuring its draw: the battery's average
+# draw over 2 minutes, or as long as you say in seconds, and what woke the
+# machine most, as a report. Unplug first.
+[extensions.kubaos.actions.battery]
+title = "Battery"
+subtitle = { 80 = "Charges to 80 %: kinder to the battery on a laptop that lives plugged in", 90 = "Charges to 90 %", 100 = "Charges full, for a day away from the desk" }
 icon = "battery-good-charging"
-keywords = ["charge limit", "battery health", "charging", "80 percent", "stationary"]
-run = ["kubaos-power", "charge-limit", "80"]
+keywords = ["charge limit", "charge limit: 80 %", "charge limit: 90 %", "charge limit: full", "battery health", "charging", "80 percent", "90 percent", "100 percent", "full charge", "stationary", "power draw", "battery drain", "watts", "wakeups", "powertop"]
+state = "power.charge-limit"
+order = ["80", "90", "full", "measure", "measure-for"]
 
-[extensions.kubaos.actions.charge-limit-90]
-title = "Charge limit: 90 %"
-subtitle = "The battery stops charging at 90 %"
-icon = "battery-good-charging"
-keywords = ["charge limit", "battery health", "charging", "90 percent"]
+[extensions.kubaos.actions.battery.actions.80]
+title = "Charge to 80 %"
+keywords = ["80"]
+run = ["kubaos-power", "charge-limit", "80"]
+primary_when = { is_not = "80" }
+
+[extensions.kubaos.actions.battery.actions.90]
+title = "Charge to 90 %"
+keywords = ["90"]
 run = ["kubaos-power", "charge-limit", "90"]
 
-[extensions.kubaos.actions.charge-limit-100]
-title = "Charge limit: full"
-subtitle = "The battery charges to 100 %, for a day away from the desk"
-icon = "battery-full-charging"
-keywords = ["charge limit", "battery", "charging", "full charge", "100 percent"]
+[extensions.kubaos.actions.battery.actions.full]
+title = "Charge full"
+keywords = ["full", "100"]
 run = ["kubaos-power", "charge-limit", "100"]
+primary_when = { is = "80" }
 
-[extensions.kubaos.actions.power-measure]
+[extensions.kubaos.actions.battery.actions.measure]
 title = "Measure power draw"
-subtitle = "The battery's average draw over 2 minutes and what woke the machine most, as a report. Unplug first"
-icon = "utilities-system-monitor"
-keywords = ["power draw", "battery drain", "watts", "wakeups", "powertop", "measure"]
+keywords = ["measure"]
 terminal = true
 run = ["kubaos", "power", "measure"]
 
-[extensions.kubaos.actions.power-measure-for]
+[extensions.kubaos.actions.battery.actions.measure-for]
 title = "Measure power draw for…"
-subtitle = "As long as you say, in seconds: 60, 300"
-icon = "utilities-system-monitor"
-keywords = ["power draw", "battery drain", "watts", "wakeups", "measure"]
-keyword = "measure-power"
+keywords = ["seconds"]
 terminal = true
 run = ["kubaos", "power", "measure", "--seconds", "{seconds}"]
 arguments = [{ name = "seconds", placeholder = "300" }]
@@ -1558,8 +1506,9 @@ arguments = [{ name = "seconds", placeholder = "300" }]
 title = "CPU scheduler: LAVD"
 subtitle = { lavd = "On: scx_lavd puts input, the compositor and audio first, in each power stop's mode. If it fails, Linux's own scheduler takes over by itself", kernel = "Off: Linux's own scheduler (EEVDF), as the kernel ships it" }
 icon = "cpu"
-keywords = ["cpu scheduler", "lavd", "scx", "sched_ext", "sched ext", "latency", "responsiveness", "eevdf", "default scheduler"]
+keywords = ["cpu scheduler", "scheduler status", "lavd", "scx", "sched_ext", "sched ext", "latency", "responsiveness", "eevdf", "default scheduler"]
 state = "power.scheduler"
+order = ["on", "off", "status"]
 
 [extensions.kubaos.actions.cpu-scheduler-lavd.actions.on]
 title = "Turn on"
@@ -1572,4 +1521,9 @@ title = "Turn off"
 keywords = ["off", "disable", "stop"]
 run = ["kubaos-power", "scheduler", "off"]
 primary_when = { is = "lavd" }
+
+[extensions.kubaos.actions.cpu-scheduler-lavd.actions.status]
+title = "Status"
+keywords = ["status"]
+view = "cpu-scheduler"
 

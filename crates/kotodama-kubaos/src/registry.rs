@@ -55,6 +55,10 @@
 //! `keywords` (the verbs that choose it from the query, as in `proxy off`) and its `role`: the
 //! things one thing can have done to it are its Actions, never Items of their own.
 //!
+//! In place of `run`, an Action may show one of the Extension's own Views, read live when it runs:
+//! `view = "proxy"` ([`Shows`]). The Actions come in id order, or in the order `order` lists their
+//! ids, the ones it leaves out after it.
+//!
 //! `state` names the state such an action follows: its `subtitle` may be a table of one by the
 //! state's value, and the Actions whose `primary_when` holds come first, so Enter runs what applies
 //! next. While the state can't be read there is no subtitle by state, and the Actions with a
@@ -72,12 +76,13 @@
 //!
 //! - Reading the table, and what is wrong with it, as problems in words for the user.
 //! - The actions' Items, which of them the states show, their Actions' order, and the command each
-//!   Action runs.
+//!   Action runs or the View it shows.
 //! - The Identities [`REMOVE`] is aimed at, and what it runs on each.
 //!
 //! # Not here
 //!
-//! - Starting the command: [`crate::run`]. Reading the states: [`crate::states`].
+//! - Starting the command: [`crate::run`]. Reading the states: [`crate::states`]. The Views:
+//!   [`crate::proxy`] and [`crate::power`].
 //! - The system toggles, whose ids an action may not take: [`crate::toggles`].
 
 use std::collections::BTreeMap;
@@ -123,11 +128,15 @@ const ITEM_KEYS: &[&str] = &[
     "actions",
     "identity",
     "remove",
+    "order",
 ];
 
-/// The keys of what an Action runs, which an action with one command takes beside [`ITEM_KEYS`],
+/// The keys of what an Action does, which an action with one command takes beside [`ITEM_KEYS`],
 /// and each of an action's `actions` takes beside [`ACTION_KEYS`].
-const COMMAND_KEYS: &[&str] = &["run", "arguments", "terminal", "delay_ms", "confirm", "role"];
+const COMMAND_KEYS: &[&str] = &["run", "view", "arguments", "terminal", "delay_ms", "confirm", "role"];
+
+/// The keys of [`COMMAND_KEYS`] only an Action that runs a command takes, not one with a `view`.
+const RUN_KEYS: &[&str] = &["arguments", "terminal", "delay_ms"];
 
 /// The keys each of an action's `actions` may hold, beside [`COMMAND_KEYS`].
 const ACTION_KEYS: &[&str] = &["title", "keywords", "primary_when"];
@@ -187,9 +196,44 @@ struct Verb {
     keywords: Vec<String>,
     role: ActionRole,
     confirm: bool,
-    runs: Runs,
+    does: Does,
     /// The values of the action's state in which it comes first.
     primary_when: Option<Condition>,
+}
+
+/// What an Action does: run a command, or show a View of the Extension's own.
+#[derive(Clone, Debug, PartialEq)]
+enum Does {
+    Run(Runs),
+    Show(Shows),
+}
+
+/// A View of the Extension's own an Action may show, by its name in `view`: what the module that
+/// sends it reads live when the Action runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Shows {
+    /// `proxy`: each part of the work network and whether it is up.
+    Proxy,
+    /// `power`: every layer of the power stop the machine is on.
+    PowerStop,
+    /// `cpu-scheduler`: which CPU scheduler runs, and why.
+    CpuScheduler,
+}
+
+impl Shows {
+    const ALL: [Shows; 3] = [Shows::Proxy, Shows::PowerStop, Shows::CpuScheduler];
+
+    fn name(self) -> &'static str {
+        match self {
+            Shows::Proxy => "proxy",
+            Shows::PowerStop => "power",
+            Shows::CpuScheduler => "cpu-scheduler",
+        }
+    }
+
+    fn from_name(name: &str) -> Option<Shows> {
+        Shows::ALL.into_iter().find(|shows| shows.name() == name)
+    }
 }
 
 /// What an Action runs.
@@ -321,9 +365,24 @@ impl Registry {
     /// What the Action `action` of the action `id` runs with `arguments`; `None` for an id that is
     /// no action, one `hide` names, or an Action it doesn't have.
     pub fn command(&self, id: &str, action: &str, arguments: &BTreeMap<String, String>) -> Option<Command> {
+        match &self.verb(id, action)?.does {
+            Does::Run(runs) => Some(self.command_of(runs, arguments)),
+            Does::Show(_) => None,
+        }
+    }
+
+    /// The View the Action `action` of the action `id` shows; `None` for an id that is no action,
+    /// one `hide` names, an Action it doesn't have, or one that runs a command.
+    pub fn view(&self, id: &str, action: &str) -> Option<Shows> {
+        match self.verb(id, action)?.does {
+            Does::Show(shows) => Some(shows),
+            Does::Run(_) => None,
+        }
+    }
+
+    fn verb(&self, id: &str, action: &str) -> Option<&Verb> {
         let entry = self.actions.iter().find(|entry| entry.id == id)?;
-        let verb = entry.verbs.iter().find(|verb| verb.id == action)?;
-        Some(self.command_of(&verb.runs, arguments))
+        entry.verbs.iter().find(|verb| verb.id == action)
     }
 
     /// What [`REMOVE`] runs on the thing of `identity`; `None` when no placeholder `hide` leaves
@@ -372,7 +431,7 @@ impl Entry {
             .map(|state| states::values(state).ok_or_else(|| format!("`state` names `{state}`, which is no state")))
             .transpose()?;
         let named = state.as_deref().zip(values);
-        let verbs = match table.get("actions") {
+        let mut verbs: Vec<Verb> = match table.get("actions") {
             None => vec![Verb::from_table(RUN, title.clone(), Vec::new(), table)?],
             Some(_) if table.contains_key("run") => return Err("takes `run` or `actions`, not both".to_owned()),
             Some(Value::Table(actions)) if !actions.is_empty() => {
@@ -388,6 +447,12 @@ impl Entry {
             }
             Some(_) => return Err("`actions` should be a table of at least one action, by id".to_owned()),
         };
+        if table.contains_key("order") {
+            if !table.contains_key("actions") {
+                return Err("`order` is for an item with `actions`".to_owned());
+            }
+            order(&mut verbs, &strings(table, "order")?)?;
+        }
         let identity = match table.get("identity") {
             None => None,
             Some(Value::String(identity)) if !identity.is_empty() => Some(identity.clone()),
@@ -423,7 +488,7 @@ impl Entry {
     fn item(&self, states: &States) -> Item {
         let reading = self.state.as_deref().and_then(|state| states.get(state));
         let mut verbs: Vec<&Verb> = self.verbs.iter().collect();
-        // A stable sort: the Actions that apply next keep their id order, and so do the rest.
+        // A stable sort: the Actions that apply next keep their order, and so do the rest.
         verbs.sort_by_key(|verb| !verb.applies(reading));
         Item {
             id: self.id.clone(),
@@ -519,13 +584,28 @@ impl Verb {
             Some("destructive") => ActionRole::Destructive,
             Some(_) => return Err("`role` should be `normal` or `destructive`".to_owned()),
         };
+        let does = match string(table, "view")? {
+            None => Does::Run(Runs::from_table(table)?),
+            Some(_) if table.contains_key("run") => return Err("takes `run` or `view`, not both".to_owned()),
+            Some(name) => {
+                if let Some(key) = RUN_KEYS.iter().find(|key| table.contains_key(**key)) {
+                    return Err(format!("`{key}` is a setting of an action that runs a command"));
+                }
+                let names: Vec<&str> = Shows::ALL.iter().map(|shows| shows.name()).collect();
+                let (last, rest) = names.split_last().expect("there are Views");
+                Does::Show(
+                    Shows::from_name(&name)
+                        .ok_or_else(|| format!("`view` should be one of `{}` and `{last}`", rest.join("`, `")))?,
+                )
+            }
+        };
         Ok(Verb {
             id: id.to_owned(),
             title,
             keywords,
             role,
             confirm: boolean(table, "confirm")?,
-            runs: Runs::from_table(table)?,
+            does,
             primary_when: None,
         })
     }
@@ -536,8 +616,12 @@ impl Verb {
     }
 
     fn action(&self) -> Action {
+        let arguments = match &self.does {
+            Does::Run(runs) => runs.arguments.clone(),
+            Does::Show(_) => Vec::new(),
+        };
         let mut action = Action::new(&self.id, &self.title)
-            .arguments(self.runs.arguments.clone())
+            .arguments(arguments)
             .keywords(self.keywords.clone())
             .role(self.role);
         action.confirm = self.confirm;
@@ -631,6 +715,20 @@ impl Condition {
     fn holds(&self, reading: Option<&Reading>) -> bool {
         reading.is_none_or(|reading| (*reading == self.reading) == self.equal)
     }
+}
+
+/// Puts `verbs` in the order of the ids `order` names, the rest after them in id order.
+fn order(verbs: &mut [Verb], order: &[String]) -> Result<(), String> {
+    for (n, id) in order.iter().enumerate() {
+        if !verbs.iter().any(|verb| verb.id == *id) {
+            return Err(format!("`order` names `{id}`, which is no action of it"));
+        }
+        if order[..n].contains(id) {
+            return Err(format!("`order` names `{id}` twice"));
+        }
+    }
+    verbs.sort_by_key(|verb| order.iter().position(|id| *id == verb.id).unwrap_or(order.len()));
+    Ok(())
 }
 
 /// What the state `state` of `values` may read as, for a problem.

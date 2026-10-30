@@ -16,6 +16,9 @@
 //! | `power.panel-power-saving` | on: panel power saving | `U/desktop/power/power.toml` |
 //! | `power.scheduler` | `kernel` or `lavd` | the same |
 //! | `power.low-battery` | `power-saver`, `super-saver` or `off` | the same |
+//! | `power.charge-limit` | `80`, `90` or `100` | the same |
+//! | `power.stop` | the stop the service is on: `super-saver` … `max-performance` | `$XDG_RUNTIME_DIR/kubaos-power.json` |
+//! | `wallpaper.motion` | when video wallpapers play: `always`, `ac` or `never` | `S/quickshell/kubaos.json`, `ac` without it |
 //! | `nix.unfree` | on: the user's nixpkgs takes unfree packages | `U/home/kubaos.d/nixpkgs.toml` |
 //! | `kubaos.preview` | on: the home is a live preview of a KubaOS checkout | `S/kubaos/preview.json` names one |
 //! | `bluetooth.unnamed` | on: Bluetooth lists the devices that send no name | `S/quickshell/kubaos.json` |
@@ -23,10 +26,13 @@
 //! `U` is the user layer, `~/.config/kubaos`; `S` is `XDG_STATE_HOME`, `~/.local/state`. A state
 //! whose file can't be read has no reading, and an action that names it shows whatever it declares.
 //!
+//! The cursor's settings, `U/desktop/cursor/cursor.toml`, are read whole for its Item
+//! ([`States::cursor`]): a style and a size are more than one reading says.
+//!
 //! # Owns
 //!
-//! - The state names and what each reads as ([`values`]), reading them all ([`States::read`]), and
-//!   the files they come from ([`Places::files`]).
+//! - The state names and what each reads as ([`values`]), reading them all and the cursor's
+//!   settings ([`States::read`]), and the files they come from ([`Places::files`]).
 //!
 //! # Not here
 //!
@@ -52,6 +58,9 @@ use kubaos_core::state::user_flake;
 use kubaos_core::unfree::Setting as UnfreeSetting;
 use kubaos_core::unfree::Unfree;
 use kubaos_core::update::record::SystemPaths;
+pub use kubaos_cursor::settings::Settings as CursorSettings;
+use kubaos_power::runtime::Published;
+use kubaos_power::stop::Stop;
 use kubaos_user_layer::App;
 
 /// Whether the daily Downloads tidy is on.
@@ -78,6 +87,12 @@ pub const PANEL_POWER_SAVING: &str = "power.panel-power-saving";
 pub const SCHEDULER: &str = "power.scheduler";
 /// Where the low-battery drop goes, or `off`.
 pub const LOW_BATTERY: &str = "power.low-battery";
+/// How far the battery charges, in percent.
+pub const CHARGE_LIMIT: &str = "power.charge-limit";
+/// The power stop the service is on.
+pub const POWER_STOP: &str = "power.stop";
+/// When video wallpapers play.
+pub const MOTION: &str = "wallpaper.motion";
 /// Whether the user's nixpkgs takes unfree packages.
 pub const UNFREE: &str = "nix.unfree";
 /// Whether the home is a live preview of a KubaOS checkout rather than the release.
@@ -93,6 +108,20 @@ const SCHEDULERS: &[&str] = &["kernel", "lavd"];
 /// Where the low-battery drop may go, `kubaos_power::settings::Settings::LOW_BATTERY_STOPS`' ids,
 /// then `off`.
 const LOW_BATTERY_STOPS: &[&str] = &["power-saver", "super-saver", "off"];
+/// The charge limits, `kubaos_power::settings::ChargeLimit::ALL`'s percents.
+const CHARGE_LIMITS: &[&str] = &["80", "90", "100"];
+/// The power stops, `kubaos_power::stop::Stop::ALL`'s ids.
+const POWER_STOPS: &[&str] = &[
+    "super-saver",
+    "power-saver",
+    "balanced",
+    "performance",
+    "max-performance",
+];
+/// The shell's wallpaper motion modes, `config/quickshell/services/Motion.qml`'s.
+const MOTIONS: &[&str] = &["always", "ac", "never"];
+/// The motion mode the shell takes while it remembers none, `Settings.wallpaperAnimate`.
+const DEFAULT_MOTION: &str = "ac";
 
 /// What a state reads as.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -120,6 +149,11 @@ const DND_FILE: &str = "kubaos-dnd.json";
 
 /// The key of [`BLUETOOTH_UNNAMED`] in the shell's remembered settings.
 const BLUETOOTH_UNNAMED_KEY: &str = "bluetoothUnnamed";
+/// The cursor's settings in its folder of the user layer, as `kubaos cursor` keeps them.
+const CURSOR_FILE: &str = "cursor.toml";
+
+/// The key of [`MOTION`] in the shell's remembered settings.
+const MOTION_KEY: &str = "animate";
 
 /// The file that turns the greeting off, in the zsh folder of the user layer.
 /// `scripts/dot-greeting` owns it.
@@ -134,10 +168,11 @@ pub enum Reading {
     Word(String),
 }
 
-/// The states that could be read, by name.
+/// The states that could be read, by name, and the cursor's settings.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct States {
     readings: BTreeMap<String, Reading>,
+    cursor: Option<CursorSettings>,
 }
 
 impl States {
@@ -158,13 +193,22 @@ impl States {
         if let Some(wanted) = places.proxy.as_deref().and_then(proxy_wanted) {
             states.set(PROXY, Reading::Bool(wanted));
         }
+        if let Some(stop) = places.power.as_deref().and_then(power_stop) {
+            states.set(POWER_STOP, Reading::Word(stop.id().to_owned()));
+        }
         if let Some(previewing) = places.preview.as_deref().and_then(previewing) {
             states.set(PREVIEW, Reading::Bool(previewing));
         }
-        if let Some(shown) = places.shell_state.as_deref().and_then(unnamed_shown) {
-            states.set(BLUETOOTH_UNNAMED, Reading::Bool(shown));
+        if let Some(shell) = places.shell_state.as_deref().and_then(ShellState::read) {
+            states.set(BLUETOOTH_UNNAMED, Reading::Bool(shell.unnamed_shown()));
+            states.set(MOTION, Reading::Word(shell.motion().to_owned()));
         }
         states
+    }
+
+    /// The cursor's settings, `None` when they couldn't be read.
+    pub fn cursor(&self) -> Option<CursorSettings> {
+        self.cursor
     }
 
     /// The state `name`, `None` when it couldn't be read.
@@ -176,6 +220,13 @@ impl States {
     #[must_use]
     pub fn with(mut self, name: impl Into<String>, reading: Reading) -> Self {
         self.readings.insert(name.into(), reading);
+        self
+    }
+
+    /// These states with the cursor's settings `cursor`.
+    #[must_use]
+    pub fn with_cursor(mut self, cursor: CursorSettings) -> Self {
+        self.cursor = Some(cursor);
         self
     }
 
@@ -219,7 +270,9 @@ impl States {
             self.set(SCHEDULER, Reading::Word(power.scheduler.name().to_owned()));
             let low_battery = power.low_battery_stop.map_or("off", |stop| stop.id());
             self.set(LOW_BATTERY, Reading::Word(low_battery.to_owned()));
+            self.set(CHARGE_LIMIT, Reading::Word(power.charge_limit.percent().to_string()));
         }
+        self.cursor = CursorSettings::load(&files.cursor).ok();
         if let Ok(unfree) = UnfreeSetting::read(&files.state_dir) {
             self.set(UNFREE, Reading::Bool(unfree == Unfree::Allowed));
         }
@@ -234,6 +287,9 @@ pub fn values(name: &str) -> Option<Values> {
     match name {
         SCHEDULER => Some(Values::Words(SCHEDULERS)),
         LOW_BATTERY => Some(Values::Words(LOW_BATTERY_STOPS)),
+        CHARGE_LIMIT => Some(Values::Words(CHARGE_LIMITS)),
+        POWER_STOP => Some(Values::Words(POWER_STOPS)),
+        MOTION => Some(Values::Words(MOTIONS)),
         TIDY_DAILY | AUTOMOUNT | GREETING | MAC_ACCENTS | KEEP_AWAKE | PHONE_LINK | PROXY | PROXY_LOCAL_NETWORK
         | DND | PANEL_POWER_SAVING | UNFREE | PREVIEW | BLUETOOTH_UNNAMED => Some(Values::Bool),
         _ if name.strip_prefix(PACKAGES).is_some_and(|group| !group.is_empty()) => Some(Values::Bool),
@@ -254,6 +310,8 @@ pub struct Places {
     pub keep_awake: Option<PathBuf>,
     /// The Proxy's state file in the runtime dir.
     pub proxy: Option<PathBuf>,
+    /// The power service's state file in the runtime dir, with the stop it is on.
+    pub power: Option<PathBuf>,
     /// Do not disturb's state file in the runtime dir, which the shell writes.
     pub dnd: Option<PathBuf>,
     /// The live preview's record, `~/.local/state/kubaos/preview.json`.
@@ -272,6 +330,7 @@ impl Places {
             config_home: kubaos_user_layer::config_home(),
             keep_awake: kubaos_idle::runtime_dir().map(|runtime| kubaos_idle::awake::path(&runtime)),
             proxy: kubaos_proxy::paths::Paths::from_env().map(|paths| paths.shell()),
+            power: kubaos_power::runtime::file(),
             dnd: kubaos_idle::runtime_dir().map(|runtime| runtime.join(DND_FILE)),
             preview: Paths::from_env().ok().map(|paths| paths.preview()),
             shell_state: Paths::from_env().ok().map(|paths| paths.shell_state()),
@@ -292,12 +351,14 @@ impl Places {
                 user_layer.power,
                 user_layer.state_dir.join(NIXPKGS_FILE),
                 user_layer.network.join(kubaos_proxy::paths::PROFILE),
+                user_layer.cursor,
             ]);
         }
         files.extend(
             self.keep_awake
                 .iter()
                 .chain(&self.proxy)
+                .chain(&self.power)
                 .chain(&self.dnd)
                 .chain(&self.preview)
                 .chain(&self.shell_state)
@@ -319,6 +380,7 @@ struct Files {
     state_dir: PathBuf,
     /// The network folder, `U/desktop/network`, with the Proxy's profile.
     network: PathBuf,
+    cursor: PathBuf,
 }
 
 impl Files {
@@ -332,6 +394,7 @@ impl Files {
             power: kubaos_user_layer::dir(config, App::Power).join(kubaos_power::settings::FILE),
             state_dir: user_flake(config).join(STATE_DIR),
             network: kubaos_user_layer::dir(config, App::Network),
+            cursor: kubaos_user_layer::dir(config, App::Cursor).join(CURSOR_FILE),
         }
     }
 }
@@ -363,25 +426,52 @@ fn proxy_wanted(file: &Path) -> Option<bool> {
     status.get("wanted")?.as_bool()
 }
 
+/// The stop the power service's state file says it is on; `None` without the file, or while the
+/// process it names is gone, as the file of a service killed outright stays behind.
+fn power_stop(file: &Path) -> Option<Stop> {
+    let published = Published::load(file)?;
+    if published.pid != 0 && !Path::new("/proc").join(published.pid.to_string()).exists() {
+        return None;
+    }
+    published.current()
+}
+
 /// Whether the preview file names a live preview: not while it is empty or missing, as on the
 /// release; `None` when it doesn't read.
 fn previewing(file: &Path) -> Option<bool> {
     PreviewFile::new(file).read().ok().map(|preview| preview.is_some())
 }
 
-/// Whether the shell's remembered settings list the unnamed Bluetooth devices: not without the
-/// file or the key, the shell's default, as the shell writes the file at its first start and the
-/// key at its first change; `None` when it doesn't read.
-fn unnamed_shown(file: &Path) -> Option<bool> {
-    let text = match fs::read_to_string(file) {
-        Ok(text) => text,
-        Err(err) if err.kind() == io::ErrorKind::NotFound => return Some(false),
-        Err(_) => return None,
-    };
-    let state: serde_json::Value = serde_json::from_str(&text).ok()?;
-    match state.get(BLUETOOTH_UNNAMED_KEY) {
-        None => Some(false),
-        Some(value) => value.as_bool(),
+/// What the shell's panels remember, `S/quickshell/kubaos.json`: the shell writes the file at its
+/// first start and each key at its first change, so a key left out is the shell's default.
+struct ShellState(serde_json::Value);
+
+impl ShellState {
+    /// The file's settings: none without the file, `None` when it doesn't read.
+    fn read(file: &Path) -> Option<ShellState> {
+        match fs::read_to_string(file) {
+            Ok(text) => serde_json::from_str(&text).ok().map(ShellState),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => Some(ShellState(serde_json::Value::Null)),
+            Err(_) => None,
+        }
+    }
+
+    /// Whether Bluetooth lists the devices that send no name: not by default.
+    fn unnamed_shown(&self) -> bool {
+        self.0
+            .get(BLUETOOTH_UNNAMED_KEY)
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+    }
+
+    /// When video wallpapers play: [`DEFAULT_MOTION`] for a mode the shell doesn't know, as
+    /// `config/quickshell/services/Motion.qml` takes it.
+    fn motion(&self) -> &'static str {
+        let mode = self.0.get(MOTION_KEY).and_then(serde_json::Value::as_str);
+        MOTIONS
+            .iter()
+            .find(|&&motion| Some(motion) == mode)
+            .unwrap_or(&DEFAULT_MOTION)
     }
 }
 

@@ -1,6 +1,6 @@
 # Your pointer: ~/.config/kubaos/desktop/cursor/cursor.toml, read by `kubaos cursor` at
-# every wallpaper change and login. The Command menu's "Cursor style" and "Cursor size"
-# Items change the lines below and apply at once; after a hand edit, `kubaos cursor apply`.
+# every wallpaper change and login. The Command menu's "Cursor" changes the lines below
+# and applies at once; after a hand edit, `kubaos cursor apply`.
 #
 # The look: "dark" (default), a dark body with a light outline; "accent", the wallpaper's
 # accent with a dark outline; "classic", Bibata-Modern-Classic.

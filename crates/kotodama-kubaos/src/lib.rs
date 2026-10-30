@@ -10,8 +10,9 @@
 //! - The states the registry's actions are shown in, read from their files: `states`.
 //! - The idle settings' Items and their choice lists.
 //! - The shell's settings the menu changes: the focus stutter, always showing the bell.
-//! - "Power: what this stop does", the power stop's layers read live.
-//! - "Proxy status", the work network's parts and its tunnel read live.
+//! - The cursor's Item, its style and size.
+//! - The Views of the power stop's layers and the CPU scheduler, and of the work network's parts
+//!   and its tunnel, read live.
 //! - The date answers, from the clock popup's engine.
 //! - The monitor answers (`cpu`, `ram`, `battery`) and the process search, from the system monitor.
 //! - Which events of the files it watches are changes: `watched`.
@@ -25,6 +26,7 @@
 pub mod audio;
 pub mod bus;
 pub mod clock;
+pub mod cursor;
 pub mod desk;
 pub mod drives;
 pub mod extension;

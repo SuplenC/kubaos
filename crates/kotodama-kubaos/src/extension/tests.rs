@@ -28,20 +28,19 @@ fn ids(extension: &Extension<FakeBus, FakeRunner>) -> Vec<String> {
     extension.items().map(|item| item.id).collect()
 }
 
-/// The Items the Extension always sends, in order: the toggles, the idle settings, then the
-/// power stop's status and the Proxy's.
+/// The Items the Extension always sends, in order: the toggles, the idle settings, the shell's,
+/// then the cursor.
 fn always() -> Vec<&'static str> {
     toggles::ids()
         .into_iter()
         .chain(crate::idle::ids())
         .chain(crate::shell::ids())
-        .chain(crate::power::ids())
-        .chain(crate::proxy::ids())
+        .chain(crate::cursor::ids())
         .collect()
 }
 
 #[test]
-fn without_a_config_there_are_the_toggles_the_idle_settings_and_the_power_status() {
+fn without_a_config_there_are_the_toggles_the_idle_settings_and_the_cursor() {
     let extension = Extension::new(FakeBus::default(), FakeRunner::default());
 
     assert_eq!(ids(&extension), always());
@@ -56,26 +55,57 @@ fn the_actions_come_before_the_toggles() {
 }
 
 #[test]
-fn hide_takes_out_the_power_status_too() {
-    let extension = configured(r#"hide = ["power-status"]"#);
+fn hide_takes_out_the_cursor_too() {
+    let extension = configured(r#"hide = ["cursor"]"#);
 
-    assert!(!ids(&extension).contains(&"power-status".to_owned()));
+    assert!(!ids(&extension).contains(&"cursor".to_owned()));
 }
 
 #[test]
-fn hide_takes_out_the_proxy_status_too() {
-    let extension = configured(r#"hide = ["proxy-status"]"#);
+fn the_cursor_follows_its_settings_and_runs_its_actions() {
+    let mut extension = configured("");
+    extension.set_states(States::default().with_cursor(crate::states::CursorSettings {
+        style: kubaos_cursor::settings::Style::Classic,
+        size: 48,
+    }));
 
-    assert!(!ids(&extension).contains(&"proxy-status".to_owned()));
-    assert!(ids(&extension).contains(&"power-status".to_owned()));
+    let cursor = extension.items().find(|item| item.id == "cursor").expect("the cursor");
+    let ran = extension.run("accent", &item(crate::cursor::KIND, "cursor"), &BTreeMap::new());
+
+    assert!(
+        cursor
+            .subtitle
+            .as_deref()
+            .is_some_and(|subtitle| subtitle.starts_with("Classic, 48 px"))
+    );
+    assert_eq!(ran, Ok(Ran::Close));
+    assert_eq!(
+        extension.runner.launched.borrow()[0].0,
+        ["kubaos", "cursor", "style", "accent"]
+    );
 }
 
 #[test]
-fn hide_takes_out_the_cpu_scheduler_status_alone() {
-    let extension = configured(r#"hide = ["cpu-scheduler-status"]"#);
+fn a_registry_action_with_a_view_pushes_it() {
+    let mut extension = configured(
+        r#"
+        [actions.lavd]
+        title = "CPU scheduler: LAVD"
 
-    assert!(!ids(&extension).contains(&"cpu-scheduler-status".to_owned()));
-    assert!(ids(&extension).contains(&"power-status".to_owned()));
+        [actions.lavd.actions.status]
+        title = "Status"
+        keywords = ["status"]
+        view = "cpu-scheduler"
+        "#,
+    );
+
+    let ran = extension.run("status", &item(registry::KIND, "lavd"), &BTreeMap::new());
+
+    let Ok(Ran::Push(view)) = ran else {
+        panic!("no View: {ran:?}");
+    };
+    assert_eq!(view.id, crate::power::SCHEDULER_VIEW_ID);
+    assert!(extension.runner.launched.borrow().is_empty());
 }
 
 #[test]
@@ -409,4 +439,131 @@ fn remove_is_aimed_at_what_the_states_say_is_installed() {
 
     assert_eq!(missing, Vec::<String>::new());
     assert_eq!(installed, ["app:google-chrome.desktop"]);
+}
+
+/// The Extension under the Defaults' `[extensions.kubaos]`.
+fn shipped() -> Extension<FakeBus, FakeRunner> {
+    let defaults: toml::Table =
+        toml::from_str(include_str!("../../../../config/kotodama/kubaos.toml")).expect("kubaos.toml");
+    let kubaos = &defaults["extensions"]["kubaos"];
+    let mut extension = Extension::new(FakeBus::default(), FakeRunner::default());
+    let problems = extension.configure(&toml::from_str(&toml::to_string(kubaos).unwrap()).unwrap());
+    assert!(problems.is_empty(), "{problems:?}");
+    extension
+}
+
+/// The keywords the query word `word` names, as Kotodama's verbs table has them: the whole
+/// keyword, or every one it starts with three letters or more.
+fn named<'a>(verbs: &'a [String], word: &str) -> Vec<&'a str> {
+    verbs
+        .iter()
+        .filter(|verb| **verb == word || (word.chars().count() >= 3 && verb.starts_with(word)))
+        .map(String::as_str)
+        .collect()
+}
+
+/// Whether every word of `words` is in `text` as Kotodama finds a word of a query: a single letter
+/// at a word's start, a longer one anywhere, its letters in order.
+fn found_in(text: &str, words: &[String]) -> bool {
+    let text = text.to_lowercase();
+    words.iter().all(|word| {
+        let mut letters = word.chars();
+        if let (Some(letter), None) = (letters.clone().next(), letters.clone().nth(1)) {
+            return text.char_indices().any(|(at, c)| {
+                c == letter && text[..at].chars().last().is_none_or(|before| !before.is_alphanumeric())
+            });
+        }
+        let mut rest = text.chars();
+        letters.all(|c| rest.any(|t| t == c))
+    })
+}
+
+#[test]
+fn a_former_items_title_finds_its_subject_with_that_action_chosen() {
+    let extension = shipped();
+    let items: Vec<Item> = extension.items().collect();
+    let verbs: Vec<String> = items
+        .iter()
+        .flat_map(|item| &item.actions)
+        .flat_map(|action| &action.keywords)
+        .filter(|keyword| !keyword.contains(char::is_whitespace))
+        .map(|keyword| keyword.to_lowercase())
+        .chain(["remove", "uninstall", "delete"].map(str::to_owned))
+        .collect();
+
+    // A title is typed as it reads, but for the "…" no one types.
+    for (title, subject, action) in [
+        ("Ring the phone", "phone-link", "ring"),
+        ("Send the clipboard to the phone", "phone-link", "clipboard"),
+        ("Phone link status", "phone-link", "status"),
+        ("Unpair the phone", "phone-link", "unpair"),
+        ("Proxy status", "proxy", "status"),
+        ("Open proxy settings", "proxy", "settings"),
+        ("Import VPN config", "proxy", "import"),
+        ("Screenshot region", "screenshot", "region"),
+        ("Screenshot monitor", "screenshot", "monitor"),
+        ("Screenshot window", "screenshot", "window"),
+        ("Record region", "record", "region"),
+        ("Record monitor", "record", "monitor"),
+        ("Stop recording", "record", "stop"),
+        ("Save the last 30 seconds", "replay", "save"),
+        ("Keep awake for 1 hour", "idle", "1h"),
+        ("Keep awake for 2 hours", "idle", "2h"),
+        ("Super Saver", "power", "super-saver"),
+        ("Power Saver", "power", "power-saver"),
+        ("Max Performance", "power", "max-performance"),
+        ("Undo the low-battery drop", "low-battery", "undo"),
+        ("Dark cursor", "cursor", "dark"),
+        ("Accent cursor", "cursor", "accent"),
+        ("Classic cursor", "cursor", "classic"),
+        ("Cursor size 24", "cursor", "size-24"),
+        ("Cursor size 32", "cursor", "size-32"),
+        ("Cursor size 48", "cursor", "size-48"),
+        ("Set cursor size", "cursor", "size"),
+        ("Charge limit: 80 %", "battery", "80"),
+        ("Charge limit: 90 %", "battery", "90"),
+        ("Charge limit: full", "battery", "full"),
+        ("Measure power draw", "battery", "measure"),
+        ("CPU scheduler: status", "cpu-scheduler-lavd", "status"),
+        ("Next wallpaper", "wallpaper", "next"),
+        ("Previous wallpaper", "wallpaper", "previous"),
+        ("Set wallpaper", "wallpaper", "set"),
+        ("Switch wallpaper folder", "wallpaper", "switch"),
+        ("Wallpaper picker", "wallpaper", "pick"),
+        ("Show every wallpaper set", "wallpaper", "all-sets"),
+        ("Animate wallpaper always", "wallpaper", "always"),
+        ("Animate wallpaper on AC", "wallpaper", "ac"),
+        ("Never animate wallpaper", "wallpaper", "never"),
+    ] {
+        let words: Vec<String> = title.split_whitespace().map(str::to_lowercase).collect();
+        let (at, verb) = words
+            .iter()
+            .enumerate()
+            .find_map(|(at, word)| Some((at, named(&verbs, word))).filter(|(_, verb)| !verb.is_empty()))
+            .unwrap_or_else(|| panic!("no word of {title:?} is a verb"));
+        let rest: Vec<String> = words
+            .iter()
+            .enumerate()
+            .filter(|&(n, _)| n != at)
+            .map(|(_, word)| word.clone())
+            .collect();
+        let item = items
+            .iter()
+            .find(|item| item.id == subject)
+            .unwrap_or_else(|| panic!("no Item `{subject}`"));
+        let chosen = item
+            .actions
+            .iter()
+            .find(|each| each.keywords.iter().any(|keyword| verb.contains(&keyword.as_str())));
+
+        assert!(
+            found_in(&item.title, &rest) || found_in(&item.keywords.join("\u{1f}"), &rest),
+            "{title:?}: `{subject}` isn't found by {rest:?}"
+        );
+        assert_eq!(
+            chosen.map(|each| each.id.as_str()),
+            Some(action),
+            "{title:?} names {verb:?}"
+        );
+    }
 }

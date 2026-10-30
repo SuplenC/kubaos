@@ -457,15 +457,12 @@ fn every_path_kubaos_toml_asks_for_is_a_file_or_a_folder_field() {
     let files = |kinds: &[&str]| (ArgumentKind::File, kinds.iter().map(|&kind| kind.to_owned()).collect());
     let folder = (ArgumentKind::Folder, Vec::new());
 
+    assert_eq!(shipped_argument(&registry, "proxy", "path"), files(&["conf", "ovpn"]));
     assert_eq!(
-        shipped_argument(&registry, "proxy-import", "path"),
-        files(&["conf", "ovpn"])
-    );
-    assert_eq!(
-        shipped_argument(&registry, "theme-set", "file"),
+        shipped_argument(&registry, "wallpaper", "file"),
         files(&["jpg", "jpeg", "png", "webp", "mp4", "webm", "mkv", "mov"])
     );
-    assert_eq!(shipped_argument(&registry, "phone-file", "path"), files(&[]));
+    assert_eq!(shipped_argument(&registry, "phone-link", "path"), files(&[]));
     assert_eq!(shipped_argument(&registry, "files-open", "path"), folder);
     assert_eq!(shipped_argument(&registry, "pin", "folder"), folder);
     assert_eq!(shipped_argument(&registry, "unpin", "folder"), folder);
@@ -771,6 +768,144 @@ fn an_action_with_one_command_answers_only_to_run() {
 }
 
 #[test]
+fn an_action_may_show_one_of_the_extensions_views_in_place_of_a_command() {
+    let registry = loaded(
+        r#"
+        [actions.proxy]
+        title = "Proxy"
+
+        [actions.proxy.actions.on]
+        title = "Turn on"
+        keywords = ["on"]
+        run = ["kubaos-proxy", "on"]
+
+        [actions.proxy.actions.status]
+        title = "Status"
+        keywords = ["status"]
+        view = "proxy"
+        "#,
+    );
+
+    assert_eq!(registry.view("proxy", "status"), Some(Shows::Proxy));
+    assert!(registry.command("proxy", "status", &BTreeMap::new()).is_none());
+    assert_eq!(registry.view("proxy", "on"), None);
+    assert!(registry.command("proxy", "on", &BTreeMap::new()).is_some());
+}
+
+#[test]
+fn every_view_an_action_may_show_is_known_by_its_name() {
+    for (name, shows) in [
+        ("proxy", Shows::Proxy),
+        ("power", Shows::PowerStop),
+        ("cpu-scheduler", Shows::CpuScheduler),
+    ] {
+        let registry = loaded(&format!("[actions.a]\ntitle = \"A\"\nview = \"{name}\""));
+
+        assert_eq!(registry.view("a", RUN), Some(shows), "{name}");
+    }
+}
+
+#[test]
+fn a_view_of_the_wrong_shape_is_a_problem() {
+    for (text, problem) in [
+        (
+            "view = \"nothing\"",
+            "`view` should be one of `proxy`, `power` and `cpu-scheduler`",
+        ),
+        ("view = \"proxy\"\nrun = [\"true\"]", "takes `run` or `view`, not both"),
+        (
+            "view = \"proxy\"\nterminal = true",
+            "`terminal` is a setting of an action that runs a command",
+        ),
+    ] {
+        let (registry, problems) = Registry::from_config(&config(&format!("[actions.a]\ntitle = \"A\"\n{text}")), &[]);
+
+        assert_eq!(problems, [format!("`actions.a`: {problem}")], "{text}");
+        assert_eq!(registry.items(&States::default()).count(), 0, "{text}");
+    }
+}
+
+const ORDERED: &str = r#"
+    [actions.limit]
+    title = "Battery"
+    state = "power.charge-limit"
+    subtitle = { 80 = "80", 90 = "90", 100 = "100" }
+    order = ["80", "90", "full"]
+
+    [actions.limit.actions.full]
+    title = "Full"
+    keywords = ["full"]
+    run = ["kubaos-power", "charge-limit", "100"]
+    primary_when = { is = "80" }
+
+    [actions.limit.actions.80]
+    title = "80 %"
+    keywords = ["80"]
+    run = ["kubaos-power", "charge-limit", "80"]
+    primary_when = { is_not = "80" }
+
+    [actions.limit.actions.90]
+    title = "90 %"
+    keywords = ["90"]
+    run = ["kubaos-power", "charge-limit", "90"]
+
+    [actions.limit.actions.measure]
+    title = "Measure"
+    keywords = ["measure"]
+    run = ["kubaos", "power", "measure"]
+    "#;
+
+fn limit(percent: &str) -> States {
+    States::default().with("power.charge-limit", Reading::Word(percent.to_owned()))
+}
+
+#[test]
+fn order_puts_the_actions_in_its_order_and_the_rest_after_by_id() {
+    let registry = loaded(ORDERED);
+
+    let item = registry.items(&limit("90")).next().expect("the item");
+
+    assert_eq!(action_ids(&item), ["80", "90", "full", "measure"]);
+}
+
+#[test]
+fn the_action_that_applies_next_still_comes_first_of_an_ordered_item() {
+    let registry = loaded(ORDERED);
+
+    let item = registry.items(&limit("80")).next().expect("the item");
+
+    assert_eq!(action_ids(&item), ["full", "80", "90", "measure"]);
+}
+
+#[test]
+fn an_order_of_the_wrong_shape_is_a_problem() {
+    let actions = "[actions.a.actions.on]\ntitle = \"On\"\nrun = [\"true\"]";
+    for (text, problem) in [
+        (
+            format!("order = [\"off\"]\n{actions}"),
+            "`order` names `off`, which is no action of it",
+        ),
+        (
+            format!("order = [\"on\", \"on\"]\n{actions}"),
+            "`order` names `on` twice",
+        ),
+        (
+            format!("order = \"on\"\n{actions}"),
+            "`order` should be a list of strings",
+        ),
+        (
+            "order = [\"run\"]\nrun = [\"true\"]".to_owned(),
+            "`order` is for an item with `actions`",
+        ),
+    ] {
+        let (registry, problems) = Registry::from_config(&config(&format!("[actions.a]\ntitle = \"A\"\n{text}")), &[]);
+
+        assert_eq!(problems, [format!("`actions.a`: {problem}")], "{text}");
+        assert_eq!(registry.items(&States::default()).count(), 0, "{text}");
+    }
+}
+
+#[test]
 fn a_destructive_action_says_so() {
     let registry = loaded(
         r#"
@@ -987,6 +1122,8 @@ fn every_item_of_kubaos_toml_with_a_state_says_it_and_offers_what_applies_next_f
     assert!(stateful.len() >= 18, "{}", stateful.len());
     for entry in stateful {
         let state = entry.state.clone().expect("a state");
+        // An Item whose state is one part of it, as the wallpaper's motion, only says it.
+        let follows = entry.verbs.len() > 1 && entry.verbs.iter().any(|verb| verb.primary_when.is_some());
         let mut firsts = BTreeSet::new();
         for reading in readings(&state) {
             let states = States::default().with(state.clone(), reading.clone());
@@ -1003,7 +1140,7 @@ fn every_item_of_kubaos_toml_with_a_state_says_it_and_offers_what_applies_next_f
                 entry.id
             );
             assert!(
-                entry.verbs.len() == 1 || first.applies(Some(&reading)),
+                !follows || first.applies(Some(&reading)),
                 "`{}` offers `{}` first with {state} {reading:?}",
                 entry.id,
                 first.id
@@ -1011,7 +1148,7 @@ fn every_item_of_kubaos_toml_with_a_state_says_it_and_offers_what_applies_next_f
             firsts.insert(first.id.clone());
         }
         assert!(
-            entry.verbs.len() == 1 || firsts.len() > 1,
+            !follows || firsts.len() > 1,
             "`{}` offers `{firsts:?}` first in every state",
             entry.id
         );
@@ -1049,10 +1186,10 @@ fn every_package_removal_of_kubaos_toml_is_destructive_and_asks_first() {
 
     for item in registry.items(&States::default()) {
         for action in &item.actions {
-            let argv = registry
-                .command(&item.id, &action.id, &BTreeMap::new())
-                .expect("a command")
-                .argv;
+            let Some(command) = registry.command(&item.id, &action.id, &BTreeMap::new()) else {
+                continue;
+            };
+            let argv = command.argv;
             if tail(&argv, 4).starts_with(&["kubaos".to_owned(), "packages".to_owned(), "disable".to_owned()]) {
                 removals += 1;
                 assert_eq!(action.role, ActionRole::Destructive, "`{}`'s `{}`", item.id, action.id);
@@ -1129,7 +1266,8 @@ fn tail(argv: &[String], n: usize) -> &[String] {
     &argv[argv.len().saturating_sub(n)..]
 }
 
-/// What every Action of every Item runs, each Argument given as `x`.
+/// What every Action of every Item runs, each Argument given as `x`; an Action that shows a View
+/// runs nothing.
 fn every_command(registry: &Registry) -> Vec<Vec<String>> {
     let mut argvs = Vec::new();
     for item in registry.items(&States::default()) {
@@ -1139,8 +1277,15 @@ fn every_command(registry: &Registry) -> Vec<Vec<String>> {
                 .iter()
                 .map(|argument| (argument.name.clone(), "x".to_owned()))
                 .collect();
-            let command = registry.command(&item.id, &action.id, &given).expect("a command");
-            argvs.push(command.argv);
+            match registry.command(&item.id, &action.id, &given) {
+                Some(command) => argvs.push(command.argv),
+                None => assert!(
+                    registry.view(&item.id, &action.id).is_some(),
+                    "`{}`'s `{}` neither runs nor shows anything",
+                    item.id,
+                    action.id
+                ),
+            }
         }
     }
     argvs

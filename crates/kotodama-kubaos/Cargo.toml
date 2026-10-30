@@ -12,6 +12,7 @@ kotodama-protocol.workspace = true
 kubaos-automount.workspace = true
 kubaos-clock.workspace = true
 kubaos-core.workspace = true
+kubaos-cursor.workspace = true
 kubaos-files.workspace = true
 kubaos-idle.workspace = true
 kubaos-phone.workspace = true

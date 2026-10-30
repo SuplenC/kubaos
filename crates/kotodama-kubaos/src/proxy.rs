@@ -1,16 +1,17 @@
-//! "Proxy status" in the menu: the work network's switch, each part of the profile and whether it
-//! is up, and the VPN's type, server, last handshake and bytes moved, read live when the Item runs.
+//! The Proxy's status, as a View read live when it is shown: the work network's switch, each part
+//! of the profile and whether it is up, and the VPN's type, server, last handshake and bytes moved.
+//! The Proxy's Item shows it (`view = "proxy"`).
 //!
 //! # Owns
 //!
-//! - The Item and its View.
+//! - The View, and reading its rows from the machine.
 //!
 //! # Not here
 //!
-//! - The rows: `kubaos_proxy::status`. Proxy on and off, importing IT's VPN config and opening the
-//!   profile: actions of the registry (`config/kotodama/kubaos.toml`), which run `kubaos-proxy`.
+//! - The rows: `kubaos_proxy::status`. The Proxy's Item, with on and off, importing IT's VPN config
+//!   and opening the profile: an action of the registry (`config/kotodama/kubaos.toml`), which runs
+//!   `kubaos-proxy`.
 
-use kotodama_protocol::Action;
 use kotodama_protocol::Item;
 use kotodama_protocol::ItemKind;
 use kotodama_protocol::NamespacedKind;
@@ -18,52 +19,12 @@ use kotodama_protocol::View;
 use kotodama_protocol::ViewContent;
 use kubaos_proxy::status::Row;
 
-/// The Item kind of "Proxy status".
-pub const KIND: &str = "kubaos.proxy";
-/// The Item kind of a row in its View.
+/// The Item kind of a row in the View.
 pub const ROW_KIND: &str = "kubaos.proxy-row";
-/// The Item's id, which `hide` names it by.
-pub const ID: &str = "proxy-status";
-/// Its one Action.
-pub const SHOW: &str = "show";
+/// The View's id.
+pub const VIEW_ID: &str = "proxy-status";
 
 const ICON: &str = "network-vpn";
-
-/// The Item.
-pub fn item() -> Item {
-    Item {
-        id: ID.to_owned(),
-        kind: kind(KIND),
-        identity: None,
-        title: "Proxy status".to_owned(),
-        subtitle: Some("The work network: each part, whether it is up, and the VPN's last handshake".to_owned()),
-        icon: Some(ICON.to_owned()),
-        keyword: None,
-        keywords: [
-            "proxy",
-            "vpn",
-            "wireguard",
-            "openvpn",
-            "work network",
-            "tunnel",
-            "handshake",
-            "kill switch",
-            "dns",
-        ]
-        .map(str::to_owned)
-        .to_vec(),
-        hidden: false,
-        app_only: false,
-        weak_keywords: Vec::new(),
-        yields: false,
-        actions: vec![Action::new(SHOW, "Show")],
-    }
-}
-
-/// Every id of an Item this module sends, which no action of the registry may take.
-pub fn ids() -> [&'static str; 1] {
-    [ID]
-}
 
 /// The View of `rows`, the state first: a row each, its label the title and its value the
 /// subtitle.
@@ -72,7 +33,7 @@ pub fn view(rows: &[Row]) -> View {
         .iter()
         .enumerate()
         .map(|(index, row)| Item {
-            id: format!("{ID}:{index}"),
+            id: format!("{VIEW_ID}:{index}"),
             kind: kind(ROW_KIND),
             identity: None,
             title: row.label.to_owned(),
@@ -91,7 +52,7 @@ pub fn view(rows: &[Row]) -> View {
         .first()
         .map_or_else(|| "Proxy".to_owned(), |state| format!("Proxy: {}", state.value));
     View {
-        id: ID.to_owned(),
+        id: VIEW_ID.to_owned(),
         title,
         content: ViewContent::List {
             items,

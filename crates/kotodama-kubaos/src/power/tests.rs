@@ -30,15 +30,6 @@ fn now() -> Now {
 }
 
 #[test]
-fn the_item_is_found_by_what_people_type() {
-    let item = item();
-
-    assert_eq!(item.id, ID);
-    assert_eq!(item.title, "Power: what this stop does");
-    assert!(item.keywords.contains(&"super saver".to_owned()));
-}
-
-#[test]
 fn each_row_says_what_the_stop_wants_and_what_the_machine_has() {
     let view = view(&now());
 
@@ -58,17 +49,6 @@ fn each_row_says_what_the_stop_wants_and_what_the_machine_has() {
             ("Charge limit: 100 %", "Not on this machine"),
         ]
     );
-}
-
-#[test]
-fn the_scheduler_item_is_found_by_its_names() {
-    let item = scheduler_item();
-
-    assert_eq!(item.id, SCHEDULER_ID);
-    assert_eq!(item.title, "CPU scheduler: status");
-    assert!(item.keywords.contains(&"lavd".to_owned()));
-    assert!(item.keywords.contains(&"eevdf".to_owned()));
-    assert_eq!(ids(), [ID, SCHEDULER_ID]);
 }
 
 #[test]
