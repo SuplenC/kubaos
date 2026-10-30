@@ -104,7 +104,7 @@ function placedInside(): HTMLElement {
 
 /** The focus tube at its control's corner, its glow concentric with it. */
 function focusCorners(): HTMLElement {
-  return row("s32", "start", button({ label: "Continue", kind: "Filled", size: "Md", pinned: "focused" }), button({ label: "Save log", kind: "Tonal", size: "Md", pinned: "focused" }));
+  return row("s32", "start", button({ label: "Continue", kind: "Filled", size: "Md", pinned: "lit" }), button({ label: "Save log", kind: "Tonal", size: "Md", pinned: "lit" }));
 }
 
 /** Each radius in device pixels at every scale. */

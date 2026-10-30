@@ -1,10 +1,11 @@
-// The Button page: `docs/design/components/button.md`, as the specimens draw it today.
+// The Button page: `docs/design/components/button.md`, in the state model (`docs/DESIGN.md`,
+// "States"): rest, lit, pressed and disabled, for six kinds by night and by day.
 
-import { button, contentInTone, filledWithTone, KINDS, type Kind, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
+import { button, filled, KINDS, type Kind, labelGlow, type Pinned, type Size, SIZES, TONES } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { row } from "../../lib/layout.ts";
 import { el, label } from "../../site/dom.ts";
-import { type Curve, type Duration, doesntApply, type Easing, type NonEmpty, nonEmpty, page, type Track, type Value } from "../../site/page.ts";
+import { doesntApply, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
 import { type ColourPath, paintBetween, paintGlass, palette, paletteName, themeName } from "../../site/recolour.ts";
 import { themeChange, toDark, toLight } from "../../site/sequences.ts";
 import { type Mode, settings } from "../../site/settings.ts";
@@ -15,6 +16,8 @@ const SAMPLES: Record<Kind, { words: Words; icon: string; trailing: boolean }> =
   Tonal: { words: { short: "Save log", long: "Save the installation log" }, icon: "save", trailing: false },
   Text: { words: { short: "Back", long: "Back to the keyboard layout" }, icon: "arrow_back", trailing: false },
   Danger: { words: { short: "Erase disk", long: "Erase the disk and install" }, icon: "warning", trailing: false },
+  Success: { words: { short: "Finish", long: "Finish and restart the computer" }, icon: "check", trailing: false },
+  Warning: { words: { short: "Restart now", long: "Restart now and lose the open windows" }, icon: "warning", trailing: false },
 };
 
 function sample(kind: Kind, size: Size, state: Pinned | "rest" | "disabled" = "rest"): HTMLButtonElement {
@@ -31,10 +34,14 @@ function sample(kind: Kind, size: Size, state: Pinned | "rest" | "disabled" = "r
 }
 
 const FOR: Record<Kind, string> = {
-  Filled: "The one thing to do next on a screen: `primary` filled, `on_primary` content. One per screen, so the next step is never in doubt.",
-  Tonal: "An alternative to the filled one: `secondary_container` filled, `on_secondary_container` content.",
-  Text: "Back, Skip, Cancel, Show log: no fill, `primary` content, and less padding, since it has no edge to keep the label from.",
-  Danger: "The action that destroys something, after a confirmation: `error` filled, `on_error` content, naming the action (Erase and install).",
+  Filled:
+    "The one main action on a screen, the next step: the most emphasis. One per screen, so the next step is never in doubt. At night its fill rests unlit (`primary_fill`, the accent at 60% of its lightness and 1.2 times its chroma) and its letters light: near white, tinted 18% with the tone (`on_primary_fill`). By day the fill is the accent lifted to lightness 0.80 with a dark label.",
+  Tonal: "Medium emphasis, the accent's quieter sibling: `secondary_container` with its label, dimmed at night at rest (`on_secondary_container_rest`) and full lit.",
+  Text: "Minor actions, Back, Skip, Cancel, Show log: no fill, a label in the tone, and less padding, since it has no edge to keep the label from. At night it rests unlit (`primary_rest`) and burns lit (`primary_lit`, the core).",
+  Danger:
+    "The action that destroys something, after a confirmation, naming it (Erase and install). It carries a meaning, not an emphasis, and burns: always lit, its own bright red (`burn_danger`) with a dark label (`on_burn_danger`), so it can't be taken for any wallpaper's accent.",
+  Success: "The action that completes something good, naming it (Finish). It burns in its own bright green (`burn_success`) with a dark label (`on_burn_success`).",
+  Warning: "The action with a cost the user should weigh, naming it (Restart now). It burns in its own bright amber (`burn_warning`) with a dark label (`on_burn_warning`).",
 };
 
 const SIZE_FOR: Record<Size, string> = {
@@ -48,9 +55,9 @@ function kinds(): HTMLElement {
   return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md")));
 }
 
-/** Every kind at md, focused: the lights a sequence dims and strikes. */
-function focusedKinds(): HTMLElement {
-  return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md", "focused")));
+/** Every kind at md, lit: what a press plays on, and the lights a sequence flickers and strikes. */
+function litKinds(): HTMLElement {
+  return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md", "lit")));
 }
 
 /** The state matrix's rows: every kind at every size. */
@@ -63,15 +70,15 @@ interface Painted {
 }
 
 /**
- * A scene on its own surface, painted on the way from `from` to `to` along `path`, its focused
- * kinds lit as `from`'s mode lights them: what a theme change or a switch plays on. A palette
+ * A scene on its own surface, painted on the way from `from` to `to` along `path`, its lit kinds
+ * as `from`'s mode shows them: what a theme change or a switch plays on. A palette
  * without a mode is in the mode picked when the scene is drawn.
  */
 function scene(from: Painted | string, to: Painted | string, path: ColourPath): () => Element {
   return () => {
     const mode = settings().mode;
     const [a, b] = [from, to].map((each) => (typeof each === "string" ? { theme: each, mode } : each)) as [Painted, Painted];
-    const painted = el("div", "page-scene", label("Every light and every colour, on one clock", "body_strong", "on_surface"), focusedKinds());
+    const painted = el("div", "page-scene", label("Every light and every colour, on one clock", "body_strong", "on_surface"), litKinds());
     painted.dataset.mode = a.mode;
     paintBetween(painted, path, palette(a.theme, a.mode), palette(b.theme, b.mode));
     if (a.mode === "dark" && b.mode === "light") paintGlass(painted, palette(b.theme, b.mode), b.mode);
@@ -87,72 +94,41 @@ function themeMove(from: string, to: string): ReturnType<typeof themeChange> {
 
 /** The kinds of a list, as the recipe says them. */
 function on(list: readonly Kind[]): string {
-  return list.length === KINDS.length ? "every kind" : list.join(" and ");
-}
-
-const FILLED = KINDS.filter(filledWithTone);
-const EDGED = KINDS.filter((kind) => !filledWithTone(kind));
-const LIT_CONTENT = KINDS.filter(contentInTone);
-
-/**
- * The neon's parts from `from` to `to`: the glow on every kind, the tube inside the edge of a kind
- * not filled with its tone, the core inside the fill's edge of one that is, and the label of one
- * whose content is drawn in its tone, core-hot with its own glow.
- */
-function neon<C extends Curve>(from: number, to: number, duration: Duration, curve: C): NonEmpty<Track<C>> {
-  const part = (name: string, list: readonly Kind[], target: string): Track<C> => ({
-    part: name,
-    on: on(list),
-    target,
-    property: "opacity",
-    from,
-    to,
-    duration,
-    curve,
-  });
-  return [
-    part("glow", KINDS, ".k-glow"),
-    part("tube", EDGED, ".k-ring:not([data-filled]) > .k-tube"),
-    part("core", FILLED, ".k-ring[data-filled] > .k-tube"),
-    part("label", LIT_CONTENT, ".k-lit"),
-  ];
+  return list.length === KINDS.length ? "every kind" : list.join(", ");
 }
 
 /**
- * In daylight the neon is off: the unlit glass of the tube and of the core comes and goes over
- * `short`, never struck. The glow and the lit label keep their tracks, so the player is the same in
- * both modes, but daylight puts them out.
+ * A button lighting up or going back to rest, `--lit` from `from` to `to` over `short`: its fill,
+ * label, line and glow all follow it, each from its rest colour to its lit one. A fade, never the
+ * stutter.
  */
-function glass(from: number, to: number): NonEmpty<Track<Easing>> {
-  const unseen: Record<string, string> = {
-    glow: "every kind, unseen: daylight puts the glow out",
-    label: `${on(LIT_CONTENT)}, unseen: daylight leaves the label its own tone`,
-  };
-  const [first, ...rest] = neon(from, to, "short", "standard").map((track) => ({ ...track, on: unseen[track.part] ?? track.on }));
-  return [first!, ...rest];
+function lights(from: 0 | 1, to: 0 | 1): NonEmpty<Track<"standard">> {
+  return [{ part: "lit", on: on(KINDS), target: ".k-button", property: "--lit", from, to, duration: "short", curve: "standard" }];
 }
 
-/** The state layer from `from` to `to` over `micro`. */
-function layer(from: Value, to: Value): NonEmpty<Track<"standard">> {
-  return [{ part: "state layer", on: on(KINDS), target: ".k-layer", property: "opacity", from, to, duration: "micro", curve: "standard" }];
+/** A lit button pressed, `--press` from 0 to 1 over `micro`. */
+function press(): NonEmpty<Track<"standard">> {
+  return [{ part: "pressed", on: on(KINDS), target: ".k-button", property: "--press", from: 0, to: 1, duration: "micro", curve: "standard" }];
 }
 
 export default page({
   level: "atoms",
   slug: "button",
   title: "Button",
-  summary: "A button with a label: four kinds by what it is for, in three sizes, with an icon before or after the label or none.",
+  summary: "A button with a label: six kinds by what it is for, in three sizes, with an icon before or after the label or none. Its states follow the neon: it rests, lights up when hovered or focused, and is pressed.",
   live: () => sample("Filled", "Md"),
   description: [
     "A button names its action in sentence case, as the user would say it: Erase and install, never OK. Its label is its size's button style on a line as tall as the button's content box, so the label sits in the middle of the button on the grid, with the size's padding at its sides.",
     "Its corners take the control radius (`radius.control`); an icon-only button is an `IconButton`, a circle. An optional icon leads the label, or trails it on a button that goes forward (Continue →). The icon is the label's style's icon size, in a box the label's line tall, centred on a whole device pixel, so an icon never changes a button's height.",
-    "Hovering it lays its content colour over the fill at `opacity.hover`, pressing it at `opacity.press`, each fading over `micro`. Focused from the keyboard, its edge lights as the neon tube with its glow outside it, in the kind's tone: red (`error`) on Danger, the accent on the others. A Filled or a Danger button is filled with its tone's colour, so its fill is the tube and the tone's hot core (`primary_core`, `error_core`) is the line inside the fill's edge, the thin stroke wide, at the button's corner. A Text button's label and icon are drawn in its tone with nothing under them, so they light as a tube too: `primary_core` letters and icon with a faint near glow round them in the tone, over `focus.content_near` from `focus.content_glow`, and no far glow, the same at every size, burning, striking and going out with the line. Nothing but the glow reaches past the button's box, so its shape never seems to grow. That is its lit look; its unlit look is the same line as unlit glass (the tone's `_unlit`, 35% toward black; on Tonal and Text at `focus.glass` over the button's own container), with no glow, and a Text button's label its own `primary`. Light mode is always unlit, and dark mode is unlit while a sequence has the lights out: the scene picks the look, never the user. Disabled, it has no action: its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
+    "Its states follow the neon (`docs/DESIGN.md`, \"States\"): rest, lit, pressed and disabled. Hovering it and focusing it from the keyboard are one state, lit: the same look whether the pointer or the keyboard got there. At night a button rests unlit and lights up: the line inside its edge burns (the tone's core on a fill, the tube elsewhere) with the glow outside it, and its label brightens. Pressed, it is overdriven: its fill goes a touch brighter and its glow a touch stronger. Every colour is a role computed from the live tone, and every label holds at least 4.5:1 on every fill it sits on, on any wallpaper. Nothing but the glow reaches past the button's box, so its shape never seems to grow. Lighting up, going back to rest and pressing are fades; the neon's stutter is for power changes only.",
+    "The kinds make an emphasis ladder: Filled is the one main action, Tonal medium emphasis, Text minor actions. Danger, Success and Warning carry a meaning, not an emphasis, and burn: always lit, on their own fixed bright tones with dark labels, so none can be taken for a wallpaper's accent, even one of the same hue.",
+    "Disabled, it has no action: grey, with no tone, no line and no glow. Its content dims to `opacity.disabled_content` of `on_surface`, its fill to `opacity.disabled_container`, and it takes no pointer and no focus.",
     "A held button (`Button::on_hold`) is pressed for a while instead of clicked, and a timed bar beside it shows how far along the hold is: Kōbō's Install, held with the mouse or Enter. It looks like any button of its kind.",
   ],
   variants: nonEmpty(KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") }))),
   sizes: nonEmpty(SIZES.map((size) => ({ name: size.toLowerCase(), for: SIZE_FOR[size], sample: () => sample("Filled", size) }))),
   states: {
-    shown: ["rest", "hovered", "pressed", "focused", "disabled"],
+    shown: ["rest", "lit", "pressed", "disabled"],
     absent: {
       selected: "a button acts and holds no choice; a choice that stays on is a `Switch`, a `Chip` or a `Tile`.",
       loading: "a button doesn't wait: what it starts shows its own progress (a `ProgressBar`, a `Spinner`), and a held button's timed bar sits beside it.",
@@ -162,25 +138,19 @@ export default page({
     rows: nonEmpty(
       ROWS.map(({ kind, size }) => ({
         name: `${kind} ${size.toLowerCase()}`,
-        cell: (state: "rest" | "hovered" | "pressed" | "focused" | "disabled") => sample(kind, size, state),
+        cell: (state: "rest" | "lit" | "pressed" | "disabled") => sample(kind, size, state),
       })),
     ),
     described: {
-      rest: "Its fill and content, nothing over them.",
-      hovered: "The content colour over the fill at `opacity.hover`, faded in over `micro`.",
-      pressed: "The content colour at `opacity.press`, over `micro`.",
-      focused: "Focused from the keyboard, in the look the scene gives it, never one the user picks: lit in dark mode at rest, unlit in light mode and in dark mode while a sequence has the lights out (the next column). Lit: the neon tube inside its edge in the kind's tone, `focus.tube` wide rounded half up to device pixels, and the glow outside it in the same tone: the near glow over `focus.near`, the far one over `focus.far`. On Filled and Danger, the fill is the tube: the tone's core (`primary_core`, `error_core`, half way to white) is the line inside the fill's edge, `stroke.thin` wide, and the glow is outside. Danger's is red. On Text, the label and icon are a tube too: `primary_core`, with a faint near glow round them over `focus.content_near` from `focus.content_glow`, and no far glow, the same at every size. In light mode this column is the unlit look. Hover and press still lay their layer under it.",
-      disabled: "Content at `opacity.disabled_content` of `on_surface`, fill at `opacity.disabled_container` of it (none on Text); no layer, no focus, no action.",
+      rest: "Unlit at night. Filled: the deep unlit fill, `primary_fill`, the accent at 60% of its OKLCH lightness and 1.2 times its chroma, lowered in chroma alone until sRGB holds it, so its hue never shifts; its label `on_primary_fill`, near white tinted 18% with the tone. Tonal: `secondary_container`, its label dimmed, `on_secondary_container_rest`. Text: no fill, its label the tone unlit, `primary_rest`, the accent's `_unlit` lifted only as far as it holds 4.5:1 on every surface. Danger, Success and Warning burn even at rest: the bright fixed tone (`burn_danger`, `burn_success`, `burn_warning`) with a dark label, the tone at a quarter of its lightness, darker still where it must be to hold on every fill.",
+      lit: "Hovered or focused from the keyboard, one state. The line inside the edge burns and the glow is outside it in the kind's tone: the near glow over `focus.near`, the far one over `focus.far`. Filled: the fill stays unlit; the core (`primary_fill_line`, the accent half way to white) is the line, `stroke.thin` wide, and the label brightens to `on_primary_fill_lit`, tinted 8%, with a tiny glow, the tone at `focus.label_glow` over `focus.label_near`. Tonal: the tube, `primary` at `focus.tube`, and the label full, `on_secondary_container`. Text: the tube, and the label burns as the core, `primary_lit`, with a faint near glow (`focus.content_glow` over `focus.content_near`). The burning kinds: the fill moves half way to the core (`burn_danger_lit` and the rest), with the core inside the edge; the label doesn't change.",
+      pressed: "Overdriven, under the pointer or Space and Enter, so always lit as well. The glow is `focus.pressed_glow` times the lit one. Filled: the fill lifts 0.035 in lightness (`primary_fill_pressed`); its label and the label's glow don't change. Tonal: the container lifts 0.035 (`secondary_container_pressed`). Text: the tube runs white-hot, to the core. The burning kinds: the lit fill 8% further toward white (`burn_danger_pressed` and the rest).",
+      disabled: "Grey, with no tone, no line and no glow: content at `opacity.disabled_content` of `on_surface`, fill at `opacity.disabled_container` of it (none on Text); no action, no focus.",
     },
   },
   focus: {
-    tubes: nonEmpty(KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filledWithTone(kind), content: contentInTone(kind) }))),
-    looks: {
-      lit: "The neon burning, in dark mode at rest: the tube inside the edge in the kind's tone, or on Filled and Danger the tone's core half way to white inside the fill's edge, with the glow outside. On Text the label and icon burn too: `primary_core`, with the glow round them.",
-      unlit:
-        "The same line as unlit glass, with no glow: on Filled and Danger the tone's `_unlit` core (35% toward black) inside the fill's edge, `stroke.thin` wide; on Tonal and Text, `primary_unlit` at `focus.glass` over the button's own container, `focus.tube` wide; a Text button's label is its own `primary`, with no glow. Light mode is always this look, so there this column is the same as Focused; dark mode shows it while a sequence has the lights out (the theme change, the switch to light or dark), in the dark palette's `_unlit`. Nothing the user does picks it: the scene does.",
-    },
-    unlit: (index: number) => sample(ROWS[index]!.kind, ROWS[index]!.size, "unlit"),
+    tubes: nonEmpty(KINDS.map((kind) => ({ name: kind, tone: TONES[kind], filled: filled(kind), content: labelGlow(kind) === "content" }))),
+    lit: "A button lights when it is hovered or focused, one state. At night its line burns inside its edge, the tone's core on a fill, the tube elsewhere, with the glow outside it, and only the glow reaches past the box. Each kind's line is its own colour role (`primary_fill_line`, `primary`, `burn_danger_line` and the rest), and the glow is its tone: the accent on Filled, Tonal and Text, the fixed tone on the burning kinds. A sequence that turns the lights out flickers a lit button down to its rest look and strikes it back: a control is always lit or at rest.",
   },
   content: {
     text: KINDS.map((kind) => ({
@@ -202,39 +172,28 @@ export default page({
     leaves: doesntApply("a button goes with the surface or the page it is on."),
     between: [
       {
-        name: "Hover",
-        what: "The state layer, the content colour over the fill, fades in as the pointer comes onto the button, and out as it leaves.",
-        tracks: layer(0, { opacity: "hover" }),
-        reduced: "same",
-        back: "plays",
-        sample: kinds,
-      },
-      {
-        name: "Press",
-        what: "The layer deepens from hover's to `opacity.press` as the button goes down under the pointer, and back as it comes up.",
-        tracks: layer({ opacity: "hover" }, { opacity: "press" }),
-        reduced: "same",
-        back: "plays",
-        sample: kinds,
-      },
-      {
         name: "Focus arrives",
-        what: "The tube strikes on in the kind's tone as the boot sign's tubes do, `neon.strike`'s steps over `medium`, and the glow with it: red on Danger, the accent on the others. On Filled and Danger the fill is the tube, so the core strikes inside the fill's edge; on Text the label strikes with the tube, core-hot with its glow. In light mode the neon is off: the unlit glass fades in over `short`, never struck, and the glow and the lit label stay out.",
-        tracks: neon(0, 1, "medium", "neon.strike"),
-        reduced: neon(0, 1, "short", "standard"),
-        unstuttered: neon(0, 1, "short", "standard"),
-        daylight: glass(0, 1),
+        what: "Hovered or focused, the button lights up: a fade over `short` on `standard`, never the stutter, which is for power changes. Its fill, label, line and glow move together from their rest colours to their lit ones, as `--lit` goes from 0 to 1: on Filled the core and the glow fade in and the letters brighten, on Text the label burns up to the core, on the burning kinds the fill moves half way to the core.",
+        tracks: lights(0, 1),
+        reduced: "same",
         back: "cuts",
         sample: kinds,
       },
       {
         name: "Focus leaves",
-        what: "The tube, the core, the glow and Text's lit label fade out together, the label back to its own `primary`; in light mode the unlit glass alone.",
-        tracks: neon(1, 0, "short", "standard"),
+        what: "The pointer leaves or focus moves on: the button fades back to rest over `short` on `standard`, every colour back to its rest one and the line and glow out.",
+        tracks: lights(1, 0),
         reduced: "same",
-        daylight: glass(1, 0),
         back: "cuts",
-        sample: kinds,
+        sample: litKinds,
+      },
+      {
+        name: "Press",
+        what: "A lit button goes down under the pointer, or with Space or Enter, over `micro`, and back as it comes up: Filled's fill lifts 0.035 and the burning kinds' 8% further toward white, Tonal's container lifts, Text's tube runs white-hot, and every glow grows to `focus.pressed_glow` times the lit one.",
+        tracks: press(),
+        reduced: "same",
+        back: "plays",
+        sample: litKinds,
       },
       themeMove("neon", "rose"),
       themeMove("rose", "lagoon"),
@@ -253,9 +212,9 @@ export default page({
       { keys: ["Tab", "Shift+Tab"], does: "Focus to the button, or on to the next or previous control, in reading order." },
       { keys: ["Enter"], does: "Presses the focused button, once per press, never on key repeat. With no control focused that takes Enter, it is the screen's Filled action. On a held button, Enter held is the hold." },
       { keys: ["Space"], does: "Presses the focused button." },
-      { keys: ["Esc"], does: "Nothing of the button's: it goes back one step, as the surface says, and never presses a Danger button." },
+      { keys: ["Esc"], does: "Nothing of the button's: it goes back one step, as the surface says, and never presses a Danger, Success or Warning button." },
     ],
-    order: "A button is one stop in the surface's reading order; a disabled one is skipped. Focus moving to it or away never moves anything: the tube and the glow take no room.",
+    order: "A button is one stop in the surface's reading order; a disabled one is skipped. Focus moving to it or away never moves anything: the line and the glow take no room, and focus lights it as hovering does.",
     lands: "A button takes focus when the surface gives it: a screen with no field starts on its Filled button, a dialog on its last action, a Danger dialog on Cancel, so Enter twice never destroys anything.",
   },
   measures: {
@@ -277,11 +236,12 @@ export default page({
       { what: "md's padding.", token: "space-s24" },
       { what: "lg's padding.", token: "space-s32" },
       { what: "The corners.", token: "radius-control" },
-      { what: "The focus tube, rounded half up to device pixels.", token: "focus-tube" },
-      { what: "The core inside a Filled or Danger button's fill's edge, rounded half up.", token: "stroke-thin" },
+      { what: "The lit tube on Tonal and Text, rounded half up to device pixels.", token: "focus-tube" },
+      { what: "The lit line inside a filled kind's edge (Filled, Danger, Success, Warning), rounded half up.", token: "stroke-thin" },
       { what: "The near glow's reach.", token: "focus-near" },
       { what: "The far glow's reach.", token: "focus-far" },
       { what: "A Text button's lit label's near glow's reach.", token: "focus-content_near" },
+      { what: "A Filled button's lit label's tiny glow's reach.", token: "focus-label_near" },
     ],
     reflow: doesntApply("a button is as wide as its label and paddings at every window size: it never stretches or wraps, and a layout that wants it wider gives it room around it."),
   },

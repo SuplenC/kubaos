@@ -79,40 +79,52 @@
   height: var(--height);
   padding: calc((var(--height) - var(--line)) / 2) var(--padding);
   border-radius: var(--radius-control);
-  background: var(--fill);
-  --shown: var(--content);
   cursor: pointer;
+  /* Its states, as numbers: `--lit`, hovered or focused, and `--press`. `--on` is how lit it shows:
+     at night only while the lights burn (`--before`, `--after`), so a sequence flickers a lit
+     button down to its rest look and back; by day always, since nothing there is a light. */
+  --lit: 0;
+  --press: 0;
+  --on: calc(var(--lit) * max(var(--before), var(--after), var(--day)));
+  background: color-mix(
+    in srgb,
+    color-mix(in srgb, var(--fill), var(--fill-lit) calc(var(--on) * 100%)),
+    var(--fill-pressed) calc(var(--press) * 100%)
+  );
+  --shown: color-mix(in srgb, var(--label), var(--label-lit) calc(var(--on) * 100%));
+  /* Hover, focus and press light up: a fade, never the stutter, which is for power changes. */
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-button:not(:disabled):is(:hover, :focus-visible, [data-pinned]) {
+  --lit: 1;
+}
+
+.k-button:not(:disabled):is(:active, [data-pinned="pressed"]) {
+  --press: 1;
+}
+
+/* A Text button pressed by day: its tone as a faint tint under it. By night it has no fill. */
+.k-button[data-kind="Text"] {
+  background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
+}
+
+/* Pinned or in a sequence, a state shows at once: nothing moved, or the sequence's clock moves it. */
+.k-button[data-pinned],
+[data-sequence] .k-button {
+  transition: none;
 }
 
 .k-button:disabled {
   cursor: default;
   --shown: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
-}
-
-.k-button:disabled:not([data-kind="Text"]) {
   background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
 }
 
-/* The state layer: the content colour over the fill as the pointer comes onto it or presses it,
-   fading over `micro` (`kubaos_ui::component::layered`). A disabled control has none. */
-.k-layer {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--content);
-  opacity: 0;
-  transition: opacity var(--motion-micro) var(--easing-standard);
-  pointer-events: none;
-}
-
-.k-button:not(:disabled):hover > .k-layer,
-.k-button:not(:disabled)[data-pinned="hovered"] > .k-layer {
-  opacity: var(--opacity-hover);
-}
-
-.k-button:not(:disabled):active > .k-layer,
-.k-button:not(:disabled)[data-pinned="pressed"] > .k-layer {
-  opacity: var(--opacity-press);
+.k-button:disabled[data-kind="Text"] {
+  background: none;
 }
 
 /* The focus ring. It lights as focus arrives: struck on through the neon sign's stutter over
@@ -150,8 +162,8 @@
   --line: max(1px, round(nearest, var(--stroke-thin), 1px));
 }
 
-:not(:disabled):focus-visible > .k-ring,
-:not(:disabled)[data-pinned="focused"] > .k-ring {
+:not(.k-button, :disabled):focus-visible > .k-ring,
+:not(.k-button, :disabled)[data-pinned="focused"] > .k-ring {
   --lit: max(var(--before), var(--after));
   --glass: 1;
 }
@@ -163,7 +175,7 @@
   --unlit: 1;
 }
 
-[data-stutter] :not(:disabled):focus-visible > .k-ring {
+[data-stutter] :not(.k-button, :disabled):focus-visible > .k-ring {
   animation: k-strike var(--motion-medium) step-end;
 }
 
@@ -174,7 +186,7 @@
 }
 
 /* During a theme change, a control focused mid-way waits for the strike with the rest. */
-[data-sequence] :not(:disabled):focus-visible > .k-ring {
+[data-sequence] :not(.k-button, :disabled):focus-visible > .k-ring {
   animation: none;
 }
 
@@ -238,6 +250,34 @@
   position: absolute;
   background: var(--tube-lit);
   mask-size: 100% 100%;
+}
+
+/* A button's line and glow (`lib/focus.ts`'s ring): the line inside its edge in its kind's colour
+   for the state, at `--on`, and the glow outside at night, a pressed glow `focus.pressed_glow` times
+   the lit one (the mask holds the pressed glow; lit shows it at its share). A label that glows lit
+   (Filled's, Text's) keeps its own colour: only the glow round it shows, at night. */
+.k-button > .k-ring > .k-tube {
+  border-color: var(--edge);
+  opacity: var(--on);
+}
+
+.k-button > .k-ring > .k-glow {
+  opacity: calc(var(--on) * (1 - var(--day)) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)) / var(--focus-pressed_glow));
+  filter: none;
+}
+
+.k-button > .k-ring > .k-lit {
+  opacity: calc(var(--on) * (1 - var(--day)));
+  filter: none;
+}
+
+.k-button > .k-ring > .k-lit > :not(.k-lit-glow) {
+  visibility: hidden;
+}
+
+/* A Text button pressed by night: its tube runs white-hot, to the core. */
+.k-button[data-kind="Text"] > .k-ring > .k-tube {
+  border-color: color-mix(in srgb, var(--color-primary_core) calc(var(--press) * (1 - var(--day)) * 100%), var(--edge));
 }
 
 /* An active window's tube (`windowRing` in `lib/focus.ts`, `config/hypr/focus.lua`): the window's

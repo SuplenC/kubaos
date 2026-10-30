@@ -56,9 +56,8 @@ export interface Variant {
 /** Every state the mockup skill names. */
 export const STATES = [
   "rest",
-  "hovered",
+  "lit",
   "pressed",
-  "focused",
   "disabled",
   "selected",
   "loading",
@@ -68,10 +67,9 @@ export const STATES = [
 export type State = (typeof STATES)[number];
 
 export const STATE_NAMES: Record<State, string> = {
-  rest: "Resting",
-  hovered: "Hovered",
+  rest: "Rest",
+  lit: "Lit",
   pressed: "Pressed",
-  focused: "Focused",
   disabled: "Disabled",
   selected: "Selected",
   loading: "Loading",
@@ -80,54 +78,37 @@ export const STATE_NAMES: Record<State, string> = {
 };
 
 /**
- * The state matrix: a row per variant, a column per state it has, each cell live. Every state
- * the page doesn't show is in `absent` with why, which the types hold to the list.
+ * The state matrix: a row per variant, a column per state it has in each mode, night then
+ * daylight, each cell live in that mode. Every state the page doesn't show is in `absent` with
+ * why, which the types hold to the list.
  */
 export interface States<S extends State> {
   readonly shown: readonly S[];
   readonly absent: Record<Exclude<State, S>, string>;
   readonly rows: NonEmpty<{ readonly name: string; readonly cell: (state: S) => Element }>;
-  /** What each state looks like and does, in words. */
+  /** What each state looks like and does, in words, by night and by day. */
   readonly described: Record<S, string>;
 }
 
 /**
- * A focus tube the part lights, and its tone: the part's own, or the accent for a part with none
- * (`docs/DESIGN.md`, "Focus"). A page names each, so no tube's colour is left to a default.
+ * The line and glow a part lights, and its tone: the part's own, or the accent for a part with
+ * none (`docs/DESIGN.md`, "States"). A page names each, so no line's colour is left to a default.
  */
 export interface Tube {
   /** The variant or state it lights on. */
   readonly name: string;
   readonly tone: Tone;
-  /** Filled with its tone's colour: the fill is the tube, and the tone's core rides outside it. */
+  /** It has a fill: the line inside the fill's edge is the tone's core by night. */
   readonly filled: boolean;
-  /** Its content is drawn in its tone, so lit, the content is a tube too: core-hot, with the glow. */
+  /** Its content is drawn in its tone, so lit at night, the content burns as a tube too. */
   readonly content: boolean;
 }
 
-/**
- * The looks of the focused state. Nothing the user does picks one; the scene does: `lit` is the
- * neon burning, in dark mode at rest; `unlit` is the same line as unlit glass with no glow, in
- * light mode always and in dark mode while a sequence has the lights out (`docs/DESIGN.md`, "Focus").
- */
-export const LOOKS = ["lit", "unlit"] as const;
-export type Look = (typeof LOOKS)[number];
-
-export const LOOK_NAMES: Record<Look, string> = {
-  lit: "Lit",
-  unlit: "Unlit",
-};
-
-/**
- * The focus line a part lights: every tube in its tone, what each look makes of the line, and the
- * state matrix's "focused · unlit" column, pinned as "focused" is.
- */
+/** The line a part lights when it is lit: every line in its tone, and what lit makes of it. */
 export interface Focus {
   readonly tubes: NonEmpty<Tube>;
-  /** What the tube, the core or the knob is in each look, in words. */
-  readonly looks: Record<Look, string>;
-  /** The matrix's row at `index`, focused in its unlit look. */
-  readonly unlit: (index: number) => Element;
+  /** What the line, the glow and the content are lit, by night and by day, in words. */
+  readonly lit: string;
 }
 
 /** The content extremes the mockup skill names. */

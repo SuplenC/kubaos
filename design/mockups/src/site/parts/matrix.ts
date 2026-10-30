@@ -1,32 +1,35 @@
-// The state matrix: a row per variant, a column per state, every cell live, then what each state
-// is and which states don't apply, with why. A part with a focus line has a column after Focused
-// for its unlit look, pinned as Focused is. Wider than the page, the columns wrap onto bands.
+// The state matrix: a row per variant, a column per state in each mode, night then daylight, every
+// cell live and painted in its mode in the theme picked, then what each state is and which states
+// don't apply, with why. Wider than the page, the columns wrap onto bands.
 
-import { applies, type DoesntApply, type Focus, STATE_NAMES, type State, type States } from "../page.ts";
 import { el, label, mockCell, prose } from "../dom.ts";
+import { STATE_NAMES, type State, type States } from "../page.ts";
+import { type Mode, settings } from "../settings.ts";
 import { bandedGrid } from "./bands.ts";
 import { subheading } from "./section.ts";
+import { painted } from "./swatches.ts";
 
-const UNLIT = "Focused · unlit";
+const MODES: readonly Mode[] = ["dark"];
+const MODE_NAMES: Record<Mode, string> = { dark: "night", light: "day" };
 
-export function matrix<S extends State>(states: States<S>, focus: Focus | DoesntApply): HTMLElement {
-  const unlit = applies(focus) && (states.shown as readonly State[]).includes("focused") ? focus : null;
-  const columns = states.shown.flatMap((state): (S | "unlit")[] => (unlit && state === "focused" ? [state, "unlit"] : [state]));
-  const name = (column: S | "unlit") => (column === "unlit" ? UNLIT : STATE_NAMES[column]);
+export function matrix<S extends State>(states: States<S>): HTMLElement {
+  const theme = settings().theme;
+  const columns = MODES.flatMap((mode) => states.shown.map((state) => ({ state, mode })));
   const grid = bandedGrid(
-    columns.map(name),
-    states.rows.map((row, index) => ({
+    columns.map(({ state, mode }) => `${STATE_NAMES[state]} · ${MODE_NAMES[mode]}`),
+    states.rows.map((row) => ({
       name: row.name,
-      cells: columns.map((column) => mockCell(column === "unlit" ? unlit!.unlit(index) : row.cell(column))),
+      cells: columns.map(({ state, mode }) => {
+        const cell = mockCell(painted(theme, mode, row.cell(state)));
+        cell.dataset.mode = mode;
+        return cell;
+      }),
     })),
   );
   const described = el(
     "dl",
     "page-list",
-    ...columns.flatMap((column) => [
-      el("dt", "", label(name(column), "body_strong", "on_surface")),
-      el("dd", "", prose(column === "unlit" ? unlit!.looks.unlit : states.described[column])),
-    ]),
+    ...states.shown.flatMap((state) => [el("dt", "", label(STATE_NAMES[state], "body_strong", "on_surface")), el("dd", "", prose(states.described[state]))]),
   );
   const absent = Object.entries(states.absent) as [State, string][];
   const missing = el(

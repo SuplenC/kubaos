@@ -127,7 +127,7 @@ function scene(): HTMLElement {
     row(
       "s8",
       "start",
-      button({ label: "Connect", kind: "Filled", size: "Md", pinned: "focused" }),
+      button({ label: "Connect", kind: "Filled", size: "Md", pinned: "lit" }),
       button({ label: "Forget", kind: "Tonal", size: "Md" }),
       button({ label: "Details", kind: "Text", size: "Md" }),
     ),
@@ -324,7 +324,7 @@ function stateLayers(): HTMLElement {
       kind,
       size: "Md",
       disabled: state === "Disabled",
-      ...(state === "Hovered" ? { pinned: "hovered" as const } : state === "Pressed" ? { pinned: "pressed" as const } : {}),
+      ...(state === "Hovered" ? { pinned: "lit" as const } : state === "Pressed" ? { pinned: "pressed" as const } : {}),
     });
   return bandedGrid(
     [...states],
