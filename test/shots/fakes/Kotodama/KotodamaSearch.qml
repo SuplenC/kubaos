@@ -200,7 +200,8 @@ ListModel {
                 icon: r.icon,
                 extension: r.extension,
                 alias: r.alias ?? "",
-                unavailable: r.unavailable ?? ""
+                unavailable: r.unavailable ?? "",
+                primaryChosen: false
             });
     }
 
@@ -267,6 +268,10 @@ ListModel {
     }
 
     function runAction(row: int, n: int): bool {
+        return true;
+    }
+
+    function runListed(row: int, group: string, id: string): bool {
         return true;
     }
 
