@@ -171,7 +171,6 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.var("focus-label_glow", number(focus.label_glow));
     out.var("focus-pressed_glow", number(focus.pressed_glow));
     out.length("focus-offset", focus.offset);
-    out.var("focus-glass", number(focus.glass));
     for (name, shadow) in &tokens.shadow {
         out.length(&format!("shadow-{name}-y"), shadow.y);
         out.length(&format!("shadow-{name}-blur"), shadow.blur);

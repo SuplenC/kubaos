@@ -76,7 +76,7 @@ export default page({
     ],
     looks: {
       lit: "At night at rest, the signs burn on the disc: not picked, the tube over its outline; picked, the core inside the fill's edge; the glow outside either, all that reaches past the disc. A picked dot brightens to `on_primary_fill_lit`; the label stays.",
-      signsOff: "The same radio still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. Not picked, the tube is unlit glass, `primary_unlit` at `focus.glass` over the disc; picked, the line inside the fill's edge is `primary_fill_glass`. No glow, and the dot at its rest colour.",
+      signsOff: "The same radio still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. Not picked, the tube is solid unlit glass, `primary_glass`, as a Tonal or Text button's; picked, the line inside the fill's edge is `primary_fill_glass`. No glow, and the dot at its rest colour.",
     },
     signsOff: (index: number) => sample(VALUES[index]!.checked, "signs-off"),
   },

@@ -3,8 +3,8 @@
 // its tone's colour, the tone's core inside the fill's edge. The glow outside is that tone too, and
 // it is all that reaches past the box. Lit has two looks, which the scene picks: signs on, the
 // neon burning with its core half way to white, at night while the lights burn; and signs off, the
-// line as unlit glass (`_unlit`, the tone at 60% of its lightness) with no glow, by day always and
-// at night while a power change has the lights out.
+// line as solid unlit glass (`_glass`, by night the tone at 60% of its lightness) with no glow, by
+// day always and at night while a power change has the lights out.
 // The glow is `glow` at the middle of every device pixel out from the edge, as
 // `kubaos_ui::focus::rings` lays its bands to give. Nothing of it takes layout room.
 //
@@ -294,8 +294,8 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
   const colour = toneColour(tone);
   ring.style.setProperty("--tube-lit", `var(--color-${colour})`);
   ring.style.setProperty("--core-lit", `var(--color-${colour}_core)`);
-  // Unlit glass over the control's own container: on a fill, the unlit core is the line itself.
-  ring.style.setProperty("--tube-unlit", `rgb(from var(--color-${colour}_unlit) r g b / var(--focus-glass))`);
+  // Solid glass, as a Tonal or Text button's: on a fill, the unlit core is the line itself.
+  ring.style.setProperty("--tube-unlit", `var(--color-${colour}_glass)`);
   ring.style.setProperty("--core-unlit", `var(--color-${colour}_unlit)`);
   ring.setAttribute("aria-hidden", "true");
   const glowing = document.createElement("span");

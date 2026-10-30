@@ -65,8 +65,10 @@
 }
 
 .k-row[data-align="start"] { align-items: flex-start; }
+.k-row[data-align="centre"] { align-items: center; }
 .k-row[data-align="end"] { align-items: flex-end; }
 .k-stack[data-align="start"] { align-items: flex-start; }
+.k-stack[data-align="centre"] { align-items: center; }
 .k-stack[data-align="end"] { align-items: flex-end; }
 
 /* A button: its height, its label's line in the middle of it, its padding at the sides. */
@@ -306,7 +308,7 @@
   --edge: color-mix(in srgb, var(--color-primary), var(--color-primary_fill_line) calc(var(--checked) * 100%));
   --edge-off: color-mix(
     in srgb,
-    rgb(from var(--color-primary_unlit) r g b / var(--focus-glass)),
+    var(--color-primary_glass),
     var(--color-primary_fill_glass) calc(var(--checked) * 100%)
   );
 }
@@ -364,7 +366,7 @@
   --edge: color-mix(in srgb, var(--color-primary), var(--color-primary_fill_line) calc(var(--checked) * 100%));
   --edge-off: color-mix(
     in srgb,
-    rgb(from var(--color-primary_unlit) r g b / var(--focus-glass)),
+    var(--color-primary_glass),
     var(--color-primary_fill_glass) calc(var(--checked) * 100%)
   );
 }
@@ -462,10 +464,6 @@
   --tint: rgb(from var(--tone) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
 }
 
-.k-chip > .k-row {
-  align-items: center;
-}
-
 .k-chip[data-icon] {
   padding-left: var(--space-s8);
 }
@@ -513,11 +511,6 @@
 .k-chip.k-control:has(.k-chip-close:is(:hover, :active)):not(:focus-visible, [data-pinned]) {
   --lit: 0;
   --press: 0;
-}
-
-/* The same in the check's row, so a label and its box are centred on each other. */
-.k-check > .k-row {
-  align-items: center;
 }
 
 /* A control painted in its kind's roles (a button, an icon button, a chip): its fill and label at
@@ -587,7 +580,7 @@
    signs on, a pressed glow `focus.pressed_glow` times the lit one (the mask holds the pressed glow;
    lit shows it at its share). A control names its line's two colours (`--edge`, `--edge-off`) when
    they are roles of its own (a filled one's core and glass); otherwise the line is the ring's tube
-   and its glass, the tone's `_unlit` at `focus.glass`. A label that glows lit (a Filled button's, a
+   and its glass, the tone's solid `_glass`. A label that glows lit (a Filled button's, a
    Text button's) keeps its own colour: only the glow round it shows, with the signs on. */
 .k-control .k-ring > .k-tube {
   border-color: color-mix(in srgb, var(--edge-off, var(--tube-unlit)), var(--edge, var(--tube-lit)) calc(var(--signs) * 100%));

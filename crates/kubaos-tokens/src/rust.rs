@@ -169,9 +169,6 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
     out.line("/// it reaches past its box as far as the far glow.");
     out.line(format!("pub const FOCUS_OFFSET: u16 = {};", focus.offset));
     out.blank();
-    out.line("/// In daylight, the opacity of an unlit tube's glass over its control's container.");
-    out.line(format!("pub const FOCUS_GLASS: f32 = {:?};", focus.glass));
-    out.blank();
     out.line("/// A neon tube striking: its brightness, 0 to 1, through even steps over `medium`.");
     out.line(format!(
         "pub const NEON_STRIKE: [f32; {}] = [{}];",
