@@ -36,7 +36,7 @@ Flickable {
             font.pixelSize: K.Tokens.type.body.size
         }
 
-        K.Grid {
+        K.Split {
             visible: view.metadata.length > 0
             weights: [1, 3]
             centred: true
