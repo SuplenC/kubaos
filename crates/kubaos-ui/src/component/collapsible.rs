@@ -45,7 +45,8 @@ use crate::tokens::Type;
 /// `content` under a header reading `title`, shown while `open`, in line with the title. A press on
 /// the header sends `on_toggle`; while it has the keyboard (`focused`) the focus tube lights the
 /// header. Without `on_toggle` it is disabled: the header's title and chevron at the disabled
-/// opacity, no hover, no press and no focus. What it holds is the caller's to disable with it.
+/// opacity, no hover, no press and no focus. What it holds is the caller's to disable and dim
+/// with it.
 pub fn collapsible<'a, M: Clone + 'a>(
     look: &Look,
     title: impl Into<String>,

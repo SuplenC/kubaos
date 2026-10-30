@@ -48,7 +48,7 @@ K.Pressable {
             return K.Look.alpha(c.surface_container_low, Tokens.opacity.well);
         }
         border.width: K.Look.hairline(root.dpr)
-        border.color: root.checked ? Tokens.color.primary : Tokens.color.outline_variant
+        border.color: root.checked && root.enabled ? Tokens.color.primary : Tokens.color.outline_variant
 
         Behavior on color {
             ColorAnimation {
