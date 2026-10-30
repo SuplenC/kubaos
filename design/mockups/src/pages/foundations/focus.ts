@@ -5,7 +5,7 @@
 // The controls other than the button are their shapes alone, drawn for their focus line: each
 // gets its own page, and its own mock, at its level.
 
-import { button, contentInTone, filledWithTone, type Kind, type Size, SIZES, TONES } from "../../lib/button.ts";
+import { button, filled, labelGlow, type Kind, type Size, SIZES, TONES } from "../../lib/button.ts";
 import { shown, type Words } from "../../lib/content.ts";
 import { focusRing, glow, type Tone, toneColour, windowRing } from "../../lib/focus.ts";
 import { icon } from "../../lib/icon.ts";
@@ -39,15 +39,20 @@ interface Control {
 }
 
 /** The words each kind of button shows here. */
-const BUTTON_WORDS: Record<Kind, string> = { Filled: "Continue", Tonal: "Save log", Text: "Back", Danger: "Erase disk" };
+const BUTTON_WORDS: Record<Kind, string> = { Filled: "Continue", Tonal: "Save log", Text: "Back", Danger: "Erase disk", Success: "Finish", Warning: "Restart now" };
+
+/** A button's pinned state for what this page shows: its states have no unlit focus, only rest. */
+function pinnedButton(shown: Shown): { pinned?: "lit" } {
+  return shown === "focused" ? { pinned: "lit" } : {};
+}
 
 function buttonControl(kind: Kind, size: Size = "Md"): Control {
   return {
     name: `${kind} button`,
     tone: TONES[kind],
-    filled: filledWithTone(kind),
-    content: contentInTone(kind),
-    draw: (shown) => button({ label: BUTTON_WORDS[kind], kind, size, ...(shown === "rest" ? {} : { pinned: shown }) }),
+    filled: filled(kind),
+    content: labelGlow(kind) === "content",
+    draw: (shown) => button({ label: BUTTON_WORDS[kind], kind, size, ...pinnedButton(shown) }),
   };
 }
 
@@ -125,7 +130,17 @@ const CARD: ShapeSpec = {
 };
 
 /** The role a symbol is drawn in on a fill of each tone: its `on_` role, or for a fixed role, which has none, the surface. */
-const ON_TONE: Record<Tone, string> = { accent: "on_primary", cold: "on_cold", error: "on_error", success: "surface", warning: "surface", sharing: "surface" };
+const ON_TONE: Record<Tone, string> = {
+  accent: "on_primary",
+  cold: "on_cold",
+  error: "on_error",
+  success: "surface",
+  warning: "surface",
+  sharing: "surface",
+  burn_danger: "on_burn_danger",
+  burn_success: "on_burn_success",
+  burn_warning: "on_burn_warning",
+};
 
 /** A tile that is on, filled with its tone, its symbol on it. */
 function tileOn(tone: Tone): ShapeSpec {
@@ -243,6 +258,9 @@ const TONE_LIGHTS: Record<Tone, string> = {
   success: "A control in the success tone.",
   warning: "A control in the warning tone.",
   sharing: "A control marking what is shared off the machine.",
+  burn_danger: "A Danger button, burning.",
+  burn_success: "A Success button, burning.",
+  burn_warning: "A Warning button, burning.",
 };
 
 /** Every tone's tube, its lit core and its unlit core, in the theme and mode picked. */
@@ -351,7 +369,7 @@ function textButtons(words: string, shown: Shown): HTMLElement {
   return el(
     "div",
     "f-row",
-    ...SIZES.map((size) => cell(size.toLowerCase(), button({ label: words, kind: "Text", size, icon: "arrow_back", ...(shown === "rest" ? {} : { pinned: shown }) }))),
+    ...SIZES.map((size) => cell(size.toLowerCase(), button({ label: words, kind: "Text", size, icon: "arrow_back", ...pinnedButton(shown) }))),
   );
 }
 
@@ -364,7 +382,7 @@ function litContent(): HTMLElement {
     cell("Dark · lit", room(theme, "dark", textButtons("Back", "focused"))),
     cell("Dark · unlit", room(theme, "dark", textButtons("Back", "unlit"))),
     cell("Light · unlit", room(theme, "light", textButtons("Back", "focused"))),
-    atScale(2, room(theme, "dark", button({ label: "Back", kind: "Text", size: "Md", icon: "arrow_back", pinned: "focused" }))),
+    atScale(2, room(theme, "dark", button({ label: "Back", kind: "Text", size: "Md", icon: "arrow_back", pinned: "lit" }))),
   );
 }
 
@@ -377,7 +395,7 @@ function cuts(): HTMLElement {
     inside.toggleAttribute("data-scrolled", scrolled);
     return el("div", "f-cut-panel", inside);
   };
-  const card = el("div", "f-cut-card", button({ label: "Erase disk", kind: "Danger", size: "Md", pinned: "focused" }), text("Everything on the disk goes.", "small", "on_surface_variant"));
+  const card = el("div", "f-cut-card", button({ label: "Erase disk", kind: "Danger", size: "Md", pinned: "lit" }), text("Everything on the disk goes.", "small", "on_surface_variant"));
   const tile = (shown: Shown) => shape({ shape: "tile", corner: "control", width: "var(--size-control_lg)", height: "var(--size-control_lg)", fill: "var(--color-surface_container_highest)" }, "accent", false, shown);
   return el(
     "div",

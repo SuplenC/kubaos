@@ -215,7 +215,7 @@ function scene(from: Painted | string, to: Painted | string, path: ColourPath): 
       "div",
       "page-scene",
       label("Every light and every colour, on one clock", "body_strong", "on_surface"),
-      row("s16", "start", ...KINDS.map((kind) => button({ label: kind, kind, size: "Md", pinned: "focused" }))),
+      row("s16", "start", ...KINDS.map((kind) => button({ label: kind, kind, size: "Md", pinned: "lit" }))),
       rail(),
     );
     painted.dataset.mode = a.mode;
