@@ -557,3 +557,14 @@ body {
   border-radius: var(--radius-surface);
   overflow: hidden;
 }
+
+/* A theme change's or a switch's scene: its own surface, painted in its palettes, so the page
+   around it keeps the toolbar's. */
+.page-scene {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+  padding: var(--space-s24);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+}

@@ -117,32 +117,51 @@
 
 /* The focus ring. It lights as focus arrives: struck on through the neon sign's stutter over
    `medium`, or faded in over `short` with the stutter off or motion reduced; it fades out over
-   `short`. A control pinned focused is lit at once, since nothing moved. */
+   `short`. A control pinned focused is lit at once, since nothing moved.
+
+   At night (`--day` 0) the neon is lit: the tube or the core in its lit colour, the glow outside.
+   In daylight (`--day` 1) it is off: the tube is unlit glass, which never strikes, and there is no
+   glow. `--lit` is how brightly the neon burns, `--glass` how much the unlit glass shows. A focused
+   ring burns as brightly as the lights before a theme change (`--before`) or after it (`--after`),
+   so a sequence on the page's one clock dims and strikes every focused ring together. */
 .k-ring {
   position: absolute;
   inset: 0;
   border-radius: var(--corner);
   pointer-events: none;
   --lit: 0;
-  --inset: 0px;
-  transition: --lit var(--motion-short) var(--easing-standard);
+  --glass: 0;
+  --line: max(1px, round(nearest, var(--focus-tube), 1px));
+  --tube: color-mix(in srgb, var(--tube-unlit) calc(var(--day) * 100%), var(--tube-lit));
+  --core: color-mix(in srgb, var(--core-unlit) calc(var(--day) * 100%), var(--core-lit));
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --glass var(--motion-short) var(--easing-standard);
 }
 
+/* On a fill, the line inside the fill's edge is the core, the thin stroke wide. */
 .k-ring[data-filled] {
-  --inset: max(1px, round(nearest, var(--stroke-thin), 1px));
+  --line: max(1px, round(nearest, var(--stroke-thin), 1px));
 }
 
-:not(:disabled):focus-visible > .k-ring {
-  --lit: 1;
+:not(:disabled):focus-visible > .k-ring,
+:not(:disabled)[data-pinned="focused"] > .k-ring {
+  --lit: max(var(--before), var(--after));
+  --glass: 1;
 }
 
 [data-stutter] :not(:disabled):focus-visible > .k-ring {
   animation: k-strike var(--motion-medium) step-end;
 }
 
-:not(:disabled)[data-pinned="focused"] > .k-ring {
-  --lit: 1;
+:not(:disabled)[data-pinned="focused"] > .k-ring,
+[data-sequence] .k-ring {
   transition: none;
+}
+
+/* During a theme change, a control focused mid-way waits for the strike with the rest. */
+[data-sequence] :not(:disabled):focus-visible > .k-ring {
+  animation: none;
 }
 
 @keyframes k-strike {
@@ -159,28 +178,29 @@
   100% { --lit: 1; }
 }
 
-/* The glow: the tube's tone through its mask, which `lib/focus.ts` works out per device pixel. */
+/* The glow: the tone through its mask, which `lib/focus.ts` works out per device pixel. It is
+   only ever outside the control's box. Daylight puts it out, even where a player moves its
+   opacity. */
 .k-glow {
   position: absolute;
-  inset: calc(-1 * (var(--inset) + var(--glow-reach)));
+  inset: calc(-1 * var(--glow-reach));
   --glow-reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
-  background: var(--tube);
+  background: var(--tube-lit);
   opacity: var(--lit);
+  filter: opacity(calc(1 - var(--day)));
   mask-size: 100% 100%;
 }
 
-/* The tube on the control's edge; on a fill, the core just outside it. Each lights by its
-   opacity, as the glow does, so a motion player moves each part by its own. */
+/* The line inside the control's edge, at its corner: the tube, or on a fill the core. It lights by
+   its opacity, as the glow does, so a motion player moves each part by its own. */
 .k-tube {
   position: absolute;
   inset: 0;
-  border: max(1px, round(nearest, var(--focus-tube), 1px)) solid var(--tube);
+  border: var(--line) solid var(--tube);
   border-radius: var(--corner);
-  opacity: var(--lit);
+  opacity: max(calc(var(--lit) * (1 - var(--day))), calc(var(--glass) * var(--day)));
 }
 
 .k-ring[data-filled] > .k-tube {
-  inset: calc(-1 * var(--inset));
-  border: var(--inset) solid var(--core);
-  border-radius: calc(var(--corner) + var(--inset));
+  border-color: var(--core);
 }

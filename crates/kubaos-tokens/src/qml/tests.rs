@@ -164,3 +164,13 @@ fn a_core_is_bound_to_its_tone_not_fixed() {
     assert!(singleton.contains("function towardWhite(c: color, t: real): color {"));
     assert!(!singleton.contains("primary_core: \"#"), "no palette holds a fixed core");
 }
+
+#[test]
+fn an_unlit_core_is_bound_to_its_tone_toward_black() {
+    let singleton = render(&QmlTokens);
+
+    assert!(singleton.contains(
+        "readonly property color primary_unlit: tokens.towardBlack(tokens.color.primary, 0.35)"
+    ));
+    assert!(singleton.contains("function towardBlack(c: color, t: real): color {"));
+}

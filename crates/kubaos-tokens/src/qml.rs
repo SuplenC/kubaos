@@ -23,6 +23,7 @@ use std::path::Path;
 use crate::model::Family;
 use crate::model::Rgb;
 use crate::model::Tokens;
+use crate::model::Toward;
 use crate::model::Weight;
 use crate::rust::wrap;
 use crate::target::BUILT_HEADER;
@@ -265,6 +266,8 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
                 "The band a picture keeps round itself inside its own box where its neighbours leave no more room (a wallpaper thumbnail in its grid cell), in logical pixels. A scroll is not held to it: it reaches past its box as far as the far glow.",
             );
             out.line(format!("        readonly property int offset: {}", focus.offset));
+            out.line("        // In daylight, the opacity of an unlit tube's glass over its control's container.");
+            out.line(format!("        readonly property real glass: {}", number(focus.glass)));
         },
     );
     out.group("    ", None, "neon", |out| {
@@ -556,15 +559,21 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
                 out.line(format!("        readonly property color {role}: tokens.role({role:?})"));
             }
             for (role, derived) in &colors.derived {
+                let Some((toward, t)) = derived.toward() else { continue };
+                let function = match toward {
+                    Toward::White => "towardWhite",
+                    Toward::Black => "towardBlack",
+                };
                 out.line(format!(
-                    "        // `{}` taken {} of the way to white, whatever its colour.",
+                    "        // `{}` taken {} of the way to {}, whatever its colour.",
                     derived.mix,
-                    number(derived.white)
+                    number(t),
+                    toward.name()
                 ));
                 out.line(format!(
-                    "        readonly property color {role}: tokens.towardWhite(tokens.color.{}, {})",
+                    "        readonly property color {role}: tokens.{function}(tokens.color.{}, {})",
                     derived.mix,
-                    number(derived.white)
+                    number(t)
                 ));
             }
         },
@@ -598,6 +607,12 @@ fn colors(out: &mut Writer, tokens: &Tokens) {
     out.line("            const byte = Math.round(v * 255);");
     out.line("            return Math.floor(byte + (255 - byte) * t + 0.5) / 255;");
     out.line("        };");
+    out.line("        return Qt.rgba(mixed(c.r), mixed(c.g), mixed(c.b), 1);");
+    out.line("    }");
+    out.blank();
+    out.line("    // `c` taken `t` of the way to black, each 8-bit channel rounded half up, as the tokens compute it.");
+    out.line("    function towardBlack(c: color, t: real): color {");
+    out.line("        const mixed = v => Math.floor(Math.round(v * 255) * (1 - t) + 0.5) / 255;");
     out.line("        return Qt.rgba(mixed(c.r), mixed(c.g), mixed(c.b), 1);");
     out.line("    }");
 }

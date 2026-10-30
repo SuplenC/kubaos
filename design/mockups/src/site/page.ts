@@ -6,6 +6,7 @@
 
 import type { Words } from "../lib/content.ts";
 import type { Tone } from "../lib/focus.ts";
+import type { ColourPath } from "./recolour.ts";
 
 /** A part that doesn't apply to this page, and why. */
 export interface DoesntApply {
@@ -111,7 +112,7 @@ export interface Content {
 }
 
 /** A duration token's name. */
-export type Duration = "instant" | "micro" | "short" | "medium" | "long" | "slow" | "scene";
+export type Duration = "instant" | "micro" | "short" | "medium" | "long" | "slow" | "scene" | "recolour" | "settle" | "strike";
 /** An easing token's name. */
 export type Easing =
   | "standard"
@@ -121,13 +122,17 @@ export type Easing =
   | "emphasized_accel"
   | "linear"
   | "pop"
-  | "spring";
+  | "spring"
+  | "gather";
 
 /**
- * How a move runs over its duration: an easing curve, or the neon sign's stutter, `neon.strike`'s
- * steps.
+ * The neon sign's stutter: `neon.strike`'s steps, a tube switching on, or the same steps played
+ * backwards, a tube switching off.
  */
-export type Curve = Easing | "neon.strike";
+export type Strike = "neon.strike" | "neon.strike.reversed";
+
+/** How a move runs over its duration: an easing curve, or the neon sign's stutter. */
+export type Curve = Easing | Strike;
 
 /**
  * A value an animated property takes: a plain number, or a token's, named so a library reads the
@@ -148,9 +153,25 @@ export interface Track<C extends Curve = Curve> {
   readonly from: Value;
   readonly to: Value;
   readonly duration: Duration;
-  /** How long after the move starts this part does; a part with none starts with it. */
-  readonly cue?: Duration;
+  /**
+   * How long after the move starts this part does, a duration or the sum of several, one per
+   * phase before it; a part with none starts with it.
+   */
+  readonly cue?: Duration | NonEmpty<Duration>;
   readonly curve: C;
+  /**
+   * For a track that moves every colour role from one palette to another (`--recolour`, 0 to 1):
+   * the path each role takes between its two colours, and the palettes the sample goes between.
+   */
+  readonly colours?: Recolour;
+}
+
+/** Every colour role moving from one palette to another along a path. */
+export interface Recolour {
+  readonly path: ColourPath;
+  /** The palette it starts in and the one it ends in, by name: Neon sign, dark. */
+  readonly from: string;
+  readonly to: string;
 }
 
 /**
@@ -165,6 +186,13 @@ interface MoveWords {
   readonly what: string;
   /** The sample the move plays on, at rest: the player moves its parts. */
   readonly sample: () => Element;
+  /** A still beat at the move's end, after its last part, that belongs to the move. */
+  readonly tail?: Duration;
+  /**
+   * What plays in light mode, where the neon is off, when that differs. Nothing in it strikes, so
+   * the stutter doesn't change it; reduced motion's own tracks still win.
+   */
+  readonly daylight?: NonEmpty<Track<Easing>>;
 }
 
 /** A move on easing curves alone. */

@@ -3,7 +3,8 @@
 // come from the page's `Move`, so what plays and what is written down are one thing.
 
 import { cubic, length, number, raw } from "../lib/tokens.ts";
-import type { Duration, Easing, Move, NonEmpty, Track, Value } from "./page.ts";
+import type { Curve, Duration, Easing, Move, NonEmpty, Strike, Track, Value } from "./page.ts";
+import { PATHS } from "./recolour.ts";
 import { settings } from "./settings.ts";
 
 /** One frame at 60 Hz, in milliseconds: the step the plot's arrow keys take. */
@@ -76,6 +77,34 @@ export function strikeSteps(): number[] {
   return Array.from({ length: count }, (_, i) => number(`neon-strike-${i}`));
 }
 
+/** Whether a curve is the neon sign's stutter, either way. */
+export function struck(curve: Curve): curve is Strike {
+  return curve === "neon.strike" || curve === "neon.strike.reversed";
+}
+
+/**
+ * A stuttering track's progress from its `from` (0) to its `to` (1) at each even step: a strike's
+ * brightness, or for one switching off, the strike's steps played backwards, the tube's brightness
+ * at each step then `1 - progress`.
+ */
+export function stepsOf(curve: Strike): number[] {
+  const values = strikeSteps();
+  return curve === "neon.strike" ? values : values.map((_, i) => 1 - values[values.length - 1 - i]!);
+}
+
+/** A track's cue in milliseconds at speed 1: the sum of its phases. */
+export function cueOf(track: Track): number {
+  if (!track.cue) return 0;
+  const phases: readonly Duration[] = typeof track.cue === "string" ? [track.cue] : track.cue;
+  return phases.reduce((sum, phase) => sum + milliseconds(phase), 0);
+}
+
+/** A track's cue as its phases' tokens, empty for one that starts with the move. */
+export function cuePhases(track: Track): readonly Duration[] {
+  if (!track.cue) return [];
+  return typeof track.cue === "string" ? [track.cue] : track.cue;
+}
+
 /** A value's token, as the tokens name it, or null for a plain number. */
 export function tokenOf(value: Value): string | null {
   if (typeof value === "number") return null;
@@ -102,20 +131,26 @@ export function between(track: Track, part: number): number {
   return from + (to - from) * part;
 }
 
-/** Which of a move's track lists plays: its own, reduced motion's, or the stutter's off one. */
-export type TrackSet = "tracks" | "reduced" | "unstuttered";
+/**
+ * Which of a move's track lists plays: its own, reduced motion's, light mode's, or the stutter's
+ * off one.
+ */
+export type TrackSet = "tracks" | "reduced" | "daylight" | "unstuttered";
 
 /** The tracks of `set` in `move`. */
 export function tracksOf(move: Move, set: TrackSet): NonEmpty<Track> | null {
   if (set === "tracks") return move.tracks;
   if (set === "reduced") return move.reduced === "same" ? null : move.reduced;
+  if (set === "daylight") return move.daylight ?? null;
   return move.unstuttered ?? null;
 }
 
-/** The set the settings picked play. */
+/** The set the settings picked play: reduced motion's first, then light mode's, then the stutter's. */
 export function playing(move: Move): TrackSet {
-  const { reduced, stutter } = settings();
-  if (reduced) return move.reduced === "same" ? "tracks" : "reduced";
+  const { reduced, stutter, mode } = settings();
+  if (reduced && move.reduced !== "same") return "reduced";
+  if (mode === "light" && move.daylight) return "daylight";
+  if (reduced) return "tracks";
   if (!stutter && move.unstuttered) return "unstuttered";
   return "tracks";
 }
@@ -150,10 +185,13 @@ export function loop(move: Move): Loop {
   const hold = milliseconds(HOLD);
   const timing = tracks.map((track) => ({
     track,
-    cue: track.cue ? milliseconds(track.cue) / speed : 0,
+    cue: cueOf(track) / speed,
     duration: milliseconds(track.duration) / speed,
   }));
-  const length = Math.max(...timing.map((t) => t.cue + t.duration));
+  const parts = Math.max(...timing.map((t) => t.cue + t.duration));
+  // The closing beat belongs to the move, but reduced motion's moves have none: they are done at once.
+  const tail = move.tail && set !== "reduced" ? milliseconds(move.tail) / speed : 0;
+  const length = parts + tail;
   const backStart = hold + length + hold;
   const plays = move.back === "plays";
   const total = plays ? backStart + length : backStart;
@@ -164,7 +202,8 @@ export function loop(move: Move): Loop {
   }));
   const phases = [
     { name: "Hold the first state", span: { start: 0, end: hold } },
-    { name: "The move", span: { start: hold, end: hold + length } },
+    { name: "The move", span: { start: hold, end: hold + parts } },
+    ...(tail > 0 ? [{ name: `The closing beat, \`duration.${move.tail}\``, span: { start: hold + parts, end: hold + length } }] : []),
     { name: "Hold the last state", span: { start: hold + length, end: backStart } },
     ...(plays ? [{ name: "The move back", span: { start: backStart, end: total } }] : []),
   ];
@@ -174,7 +213,7 @@ export function loop(move: Move): Loop {
 /** The moments a track changes value: each step of a strike, or its start and end. */
 export function steps(timed: Timed): Span[] {
   const spans = [timed.forward, ...(timed.back ? [timed.back] : [])];
-  if (timed.track.curve !== "neon.strike") return spans;
+  if (!struck(timed.track.curve)) return spans;
   const count = strikeSteps().length;
   return spans.flatMap((span) => {
     const step = (span.end - span.start) / count;
@@ -192,13 +231,13 @@ export function progress(timed: Timed, t: number): number {
   const { track, forward, back } = timed;
   if (t < forward.start) return 0;
   if (t < forward.end) {
-    if (track.curve !== "neon.strike") return eased(track.curve, along(forward));
-    const values = strikeSteps();
+    if (!struck(track.curve)) return eased(track.curve, along(forward));
+    const values = stepsOf(track.curve);
     return values[Math.min(values.length - 1, Math.floor(along(forward) * values.length))]!;
   }
   if (!back || t < back.start) return 1;
   // A move that plays back is eased, never struck (`page.ts`, `Struck`).
-  if (t < back.end && track.curve !== "neon.strike") return 1 - eased(track.curve, along(back));
+  if (t < back.end && !struck(track.curve)) return 1 - eased(track.curve, along(back));
   return 0;
 }
 
@@ -212,10 +251,10 @@ export function keyframes(timed: Timed, total: number): Keyframe[] {
   // A strike only ever plays forward: a move that strikes cuts back (`page.ts`, `Struck`).
   const segment = (span: Span, a: number | string, b: number | string) => {
     at(span.start, a);
-    if (track.curve === "neon.strike") {
-      const count = strikeSteps().length;
-      strikeSteps().forEach((step, i) => {
-        at(span.start + (i * (span.end - span.start)) / count, between(track, step), "step-end");
+    if (struck(track.curve)) {
+      const values = stepsOf(track.curve);
+      values.forEach((step, i) => {
+        at(span.start + (i * (span.end - span.start)) / values.length, between(track, step), "step-end");
       });
     } else {
       at(span.start, a, `cubic-bezier(${bezier(track.curve).join(", ")})`);
@@ -244,17 +283,18 @@ function valueJson(value: Value): Record<string, unknown> {
 
 function trackJson(track: Track): Record<string, unknown> {
   const duration = milliseconds(track.duration);
-  const curve =
-    track.curve === "neon.strike"
-      ? {
-          token: "neon.strike",
-          keyframes: [
-            ...strikeSteps().map((step, i, all) => ({ ms: (i * duration) / all.length, value: between(track, step) })),
-            { ms: duration, value: between(track, 1) },
-          ],
-          stepped: "each value holds until the next",
-        }
-      : { token: `easing.${track.curve}`, cubicBezier: bezier(track.curve) };
+  const curve = struck(track.curve)
+    ? {
+        token: "neon.strike",
+        ...(track.curve === "neon.strike.reversed" ? { reversed: "its steps played backwards: a tube switching off" } : {}),
+        keyframes: [
+          ...stepsOf(track.curve).map((step, i, all) => ({ ms: (i * duration) / all.length, value: between(track, step) })),
+          { ms: duration, value: between(track, 1) },
+        ],
+        stepped: "each value holds until the next",
+      }
+    : { token: `easing.${track.curve}`, cubicBezier: bezier(track.curve) };
+  const phases = cuePhases(track);
   return {
     part: track.part,
     on: track.on,
@@ -262,8 +302,19 @@ function trackJson(track: Track): Record<string, unknown> {
     from: valueJson(track.from),
     to: valueJson(track.to),
     duration: { token: `duration.${track.duration}`, ms: duration },
-    cue: track.cue ? { token: `duration.${track.cue}`, ms: milliseconds(track.cue) } : { ms: 0 },
+    cue: phases.length > 0 ? { phases: phases.map((phase) => ({ token: `duration.${phase}`, ms: milliseconds(phase) })), ms: cueOf(track) } : { ms: 0 },
     curve,
+    ...(track.colours
+      ? {
+          colours: {
+            roles: "every colour role, each from its value in `from` to its value in `to`, in OKLCH; the derived roles follow their tone",
+            from: track.colours.from,
+            to: track.colours.to,
+            path: { name: track.colours.path, ...PATHS[track.colours.path] },
+            progress: "the property, eased on the curve, is how far along the path every role is",
+          },
+        }
+      : {}),
   };
 }
 
@@ -273,9 +324,11 @@ export function recipe(move: Move): Record<string, unknown> {
     name: move.name,
     what: move.what,
     tracks: move.tracks.map(trackJson),
+    ...(move.tail ? { tail: { token: `duration.${move.tail}`, ms: milliseconds(move.tail), what: "a still beat after the last part, part of the move" } } : {}),
     reduced: move.reduced === "same" ? "same" : move.reduced.map(trackJson),
+    ...(move.daylight ? { daylight: move.daylight.map(trackJson) } : {}),
     ...(move.unstuttered ? { unstuttered: move.unstuttered.map(trackJson) } : {}),
-    speed: "every duration and cue divided by the speed setting, 0.5 to 2",
+    speed: "every duration, cue and beat divided by the speed setting, 0.5 to 2",
     player: {
       hold: { token: `duration.${HOLD}`, ms: milliseconds(HOLD) },
       loop: "hold the first state, the move, hold the last state, then back",

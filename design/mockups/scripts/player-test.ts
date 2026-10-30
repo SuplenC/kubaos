@@ -1,7 +1,7 @@
 // Drives the motion players of the built site (`dist/`) in headless Chromium and holds them to
 // their recipes: seeking on the plot holds the exact frame, and each track's ball sits on its
 // curve at the progress the browser is playing, for every easing and each of `neon.strike`'s
-// steps, with the move's own tracks, reduced motion's and the stutter off's. Each part alone moves
+// steps, with the move's own tracks, reduced motion's, light mode's and the stutter off's. Each part alone moves
 // with the whole, a mark seeks to its moment, and the arrow keys step a 60 Hz frame.
 //
 //   node scripts/player-test.ts [PAGE...]
@@ -60,6 +60,7 @@ async function held(page: Page, index: number): Promise<Held> {
     };
     const balls = [...plot.querySelectorAll<SVGCircleElement>(".page-plot-ball")].map((ball, i) => {
       const target = ball.dataset.target!;
+      const property = ball.dataset.property!;
       const progress = Number(ball.dataset.progress);
       const centre = new DOMPoint(Number(ball.getAttribute("cx")), Number(ball.getAttribute("cy")));
       return {
@@ -70,8 +71,8 @@ async function held(page: Page, index: number): Promise<Held> {
         // On the curve as drawn, not only where the plot's formula says: on its whole stroke, a
         // dash of it or a gap between two.
         onCurve: undashed(curves[i]!, (curve) => curve.isPointInStroke(centre)),
-        played: [...stage.querySelectorAll(target)].map((element) => value(element, "opacity")),
-        alone: alone[i] ? [...alone[i]!.querySelectorAll(target)].map((element) => value(element, "opacity")) : [],
+        played: [...stage.querySelectorAll(target)].map((element) => value(element, property)),
+        alone: alone[i] ? [...alone[i]!.querySelectorAll(target)].map((element) => value(element, property)) : [],
       };
     });
     const head = Number(plot.querySelector(".page-plot-head")!.getAttribute("x1"));
@@ -98,7 +99,9 @@ async function seek(page: Page, index: number, t: number): Promise<void> {
 async function moments(page: Page, index: number): Promise<number[]> {
   return page.evaluate((index) => {
     const player = document.querySelectorAll<HTMLElement>(".page-player")[index]!;
-    const marks = [...player.querySelectorAll(".page-plot-mark")].map((mark) => Number(mark.getAttribute("data-at"))).sort((a, b) => a - b);
+    const plot = player.querySelector<HTMLElement>(".page-plot")!;
+    // The loop's ends too, so a move done at once, with one mark, is sampled either side of it.
+    const marks = [0, Number(plot.dataset.total), ...[...player.querySelectorAll(".page-plot-mark")].map((mark) => Number(mark.getAttribute("data-at")))].sort((a, b) => a - b);
     // Between each two marks: a quarter, half and three quarters of the way, so each eased span and
     // each strike step is sampled away from the keyframes' edges.
     const times: number[] = [];
@@ -115,11 +118,12 @@ async function ranges(page: Page): Promise<Map<string, { from: number; to: numbe
   const found = new Map<string, { from: number; to: number }[]>();
   for (const list of Object.values(recipes ?? {})) {
     if (!Array.isArray(list)) continue;
-    for (const move of list as { name: string; tracks: unknown; reduced: unknown; unstuttered?: unknown }[]) {
+    for (const move of list as { name: string; tracks: unknown; reduced: unknown; daylight?: unknown; unstuttered?: unknown }[]) {
       const of = (tracks: unknown) =>
         (tracks as { from: { value: number }; to: { value: number } }[]).map((track) => ({ from: track.from.value, to: track.to.value }));
       found.set(`${move.name}|tracks`, of(move.tracks));
       if (move.reduced !== "same") found.set(`${move.name}|reduced`, of(move.reduced));
+      if (move.daylight) found.set(`${move.name}|daylight`, of(move.daylight));
       if (move.unstuttered) found.set(`${move.name}|unstuttered`, of(move.unstuttered));
     }
   }
@@ -162,7 +166,8 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     check(checked > 0, `${where}: nothing checked`);
 
     // A mark goes to its exact moment, and → steps one frame from there.
-    const mark = page.locator(".page-player").nth(index).locator(".page-plot-mark").nth(1);
+    const ticks = page.locator(".page-player").nth(index).locator(".page-plot-mark");
+    const mark = ticks.nth(Math.min(1, (await ticks.count()) - 1));
     const at = Number(await mark.getAttribute("data-at"));
     await mark.locator("rect").dispatchEvent("pointerdown", { pointerId: 1, button: 0, isPrimary: true });
     const marked = await held(page, index);
@@ -258,7 +263,7 @@ async function main(): Promise<void> {
     for (const { level, slug } of pages) {
       for (const [settings, set] of [
         ["mode=dark&scale=1&speed=1&reduced=off&stutter=on", "tracks"],
-        ["mode=light&scale=1.5&speed=1&reduced=off&stutter=on", "tracks"],
+        ["mode=light&scale=1.5&speed=1&reduced=off&stutter=on", "daylight"],
         ["mode=dark&scale=1&speed=2&reduced=off&stutter=on", "tracks"],
         ["mode=dark&scale=1&speed=1&reduced=on&stutter=on", "reduced"],
         ["mode=dark&scale=1&speed=1&reduced=off&stutter=off", "unstuttered"],

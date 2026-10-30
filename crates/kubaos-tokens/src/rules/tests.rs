@@ -637,3 +637,43 @@ fn a_core_of_a_role_that_doesnt_exist_is_refused() {
         "{found:?}"
     );
 }
+
+#[test]
+fn every_unlit_core_is_its_tone_35_percent_toward_black() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+    let light = tokens.color.with_derived(&tokens.color.light);
+
+    for (role, core) in [("primary_unlit", "#5a3100"), ("error_unlit", "#791111"), ("cold_unlit", "#00405a")] {
+        assert_eq!(format!("{:?}", light[role]), core, "{role}");
+    }
+}
+
+#[test]
+fn an_unlit_core_follows_a_primary_the_wallpaper_set() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+    let mut live = tokens.color.light.clone();
+    live.insert("primary".into(), crate::model::Rgb::parse("#3a7bd5").expect("a colour"));
+
+    let core = tokens.color.with_derived(&live)["primary_unlit"];
+
+    assert_eq!(format!("{core:?}"), "#26508a");
+}
+
+#[test]
+fn a_derived_role_with_both_ways_or_neither_is_refused() {
+    for ways in [&["white", "black"][..], &[][..]] {
+        let found = violations(|t| {
+            let mut core = toml::Table::new();
+            core.insert("mix".into(), "primary".into());
+            for way in ways {
+                core.insert((*way).into(), 0.5.into());
+            }
+            set(t, &["color", "derived"], "primary_core", core);
+        });
+
+        assert!(
+            matches!(found.as_slice(), [Violation::DerivedWay { role }] if role == "primary_core"),
+            "{ways:?}: {found:?}"
+        );
+    }
+}

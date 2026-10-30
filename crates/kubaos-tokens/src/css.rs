@@ -157,6 +157,7 @@ fn lengths(out: &mut Css, tokens: &Tokens) {
     out.length("focus-far", focus.far);
     out.var("focus-far_opacity", number(focus.far_opacity));
     out.length("focus-offset", focus.offset);
+    out.var("focus-glass", number(focus.glass));
     for (name, shadow) in &tokens.shadow {
         out.length(&format!("shadow-{name}-y"), shadow.y);
         out.length(&format!("shadow-{name}-blur"), shadow.blur);
@@ -231,10 +232,11 @@ fn mode(out: &mut Css, tokens: &Tokens, palette: &BTreeMap<String, Rgb>, light: 
     }
     out.comment("The derived roles, computed from their tone wherever it is set, so they follow it.");
     for (role, derived) in &tokens.color.derived {
-        let percent = number(derived.white * 100.0);
+        let Some((toward, t)) = derived.toward() else { continue };
+        let percent = number(t * 100.0);
         out.var(
             &format!("color-{role}"),
-            format!("color-mix(in srgb, var(--color-{}), white {percent}%)", derived.mix),
+            format!("color-mix(in srgb, var(--color-{}), {} {percent}%)", derived.mix, toward.name()),
         );
     }
     out.comment("The `shadow` role's opacity for each shadow.");

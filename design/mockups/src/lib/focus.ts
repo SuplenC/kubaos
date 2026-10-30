@@ -1,6 +1,8 @@
-// The neon focus on a control: `kubaos-ui`'s `focus_ring` and `focus_ring_on_fill`. The tube is the
-// control's own edge, drawn inside its box, in the control's tone, and the glow is that tone too; a
-// control filled with its tone's colour shows the tone's hot core just outside its fill instead.
+// The neon focus on a control: `kubaos-ui`'s `focus_ring` and `focus_ring_on_fill`. One line inside
+// the control's edge, at its corner: the tube in the control's tone, or on a control filled with
+// its tone's colour, the tone's core inside the fill's edge. The glow outside is that tone too, and
+// it is all that reaches past the box. At night the neon is lit, its core half way to white; in
+// daylight it is off, the line unlit glass (`_unlit`, the tone toward black) and no glow.
 // The glow is `glow` at the middle of every device pixel out from the edge, as
 // `kubaos_ui::focus::rings` lays its bands to give. Nothing of it takes layout room.
 //
@@ -20,7 +22,10 @@ const rings = new Set<HTMLElement>();
  */
 export type Tone = "accent" | "cold" | "error" | "success" | "warning" | "sharing";
 
-/** The colour role a tone's tube and glow are drawn in; its core is the role's `_core`. */
+/**
+ * The colour role a tone's tube and glow are drawn in; its core is the role's `_core` at night,
+ * `_unlit` in daylight.
+ */
 export function toneColour(tone: Tone): string {
   return tone === "accent" ? "primary" : tone;
 }
@@ -65,10 +70,9 @@ function mask(width: number, height: number, corner: number, scale: number): str
 function draw(ring: HTMLElement, scale: number): void {
   const glowing = ring.querySelector<HTMLElement>(".k-glow");
   if (!glowing || !ring.isConnected) return;
-  const inset = ring.hasAttribute("data-filled") ? Math.max(1, Math.round(length("stroke-thin") * scale)) : 0;
-  const width = ring.offsetWidth + 2 * inset;
-  const height = ring.offsetHeight + 2 * inset;
-  const corner = Number.parseFloat(getComputedStyle(ring).borderTopLeftRadius) + inset;
+  const width = ring.offsetWidth;
+  const height = ring.offsetHeight;
+  const corner = Number.parseFloat(getComputedStyle(ring).borderTopLeftRadius);
   const key = `${width}x${height}r${corner}@${scale}`;
   if (glowing.dataset.drawn === key) return;
   glowing.dataset.drawn = key;
@@ -84,8 +88,12 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
   ring.className = "k-ring";
   ring.toggleAttribute("data-filled", filled);
   ring.style.setProperty("--corner", `var(--radius-${corner})`);
-  ring.style.setProperty("--tube", `var(--color-${toneColour(tone)})`);
-  ring.style.setProperty("--core", `var(--color-${toneColour(tone)}_core)`);
+  const colour = toneColour(tone);
+  ring.style.setProperty("--tube-lit", `var(--color-${colour})`);
+  ring.style.setProperty("--core-lit", `var(--color-${colour}_core)`);
+  // Unlit glass over the control's own container: on a fill, the unlit core is the line itself.
+  ring.style.setProperty("--tube-unlit", `rgb(from var(--color-${colour}_unlit) r g b / var(--focus-glass))`);
+  ring.style.setProperty("--core-unlit", `var(--color-${colour}_unlit)`);
   ring.setAttribute("aria-hidden", "true");
   const glowing = document.createElement("span");
   glowing.className = "k-glow";
