@@ -4,7 +4,7 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 ## `Pill`
 
-QML `Pill`; *QML only: the bar is the shell's, and no app has one. It is in neither specimen, so the parity check leaves it out.*
+QML `Pill`; *QML only: the bar is the shell's, and no app has one. It is on the QML specimen's "Shell only" page, which the parity check leaves out.*
 
 A group in the bar: a pill a small control tall (`control_sm`, 32), on `surface_container`, its content a row 8 apart (`spacing`) centred on device pixels, with 12 at each end between the curve and the content (`padding`; 8 for a lone symbol, the bell, the proxy, the updates). A pill of its own tone takes `color` and `ink` together: the recording pill's `error_container` with `on_error_container`, the preview pill's `cold` tint with `cold`.
 
