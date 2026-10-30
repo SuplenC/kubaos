@@ -6,7 +6,7 @@ import "samples.js" as Samples
 // `crates/kubaos-specimen/src/pages/components/media.rs` draws with `kubaos-ui`, box for box.
 K.Section {
     title: "Media"
-    description: "Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then two pictures to pick, picked with its name under it and focused with its name over its foot."
+    description: "Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then pictures to pick: picked with its name under it, focused with its name over its foot, and disabled."
 
     K.Grid {
         columns: 4
@@ -34,6 +34,12 @@ K.Section {
             badgeIcon: "play_arrow"
             badgeText: "Video"
             focused: true
+        }
+
+        K.PictureChoice {
+            source: Samples.picture(K.Tokens.color.primary, K.Tokens.color.cold)
+            name: "Omoide Yokocho"
+            enabled: false
         }
     }
 }

@@ -92,7 +92,16 @@ K.Stack {
                 S.IconButtons {
                 }
 
+                S.Hints {
+                }
+
                 S.Fields {
+                }
+
+                S.Notes {
+                }
+
+                S.FocusRings {
                 }
 
                 S.Toggles {
@@ -117,6 +126,9 @@ K.Stack {
                 }
 
                 S.PageScroll {
+                }
+
+                S.Layouts {
                 }
 
                 S.Chips {

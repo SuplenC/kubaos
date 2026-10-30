@@ -5,7 +5,7 @@ import KubaOS.Components as K
 // `crates/kubaos-specimen/src/pages/components/tabs.rs` draws with `kubaos-ui`, box for box.
 K.Section {
     title: "Tabs"
-    description: "One of a few views or values, picked from small buttons: the picked one tonal. The same row is a setting's segmented control."
+    description: "One of a few views or values, picked from small buttons: the picked one tonal. The same row is a setting's segmented control; the last is disabled."
 
     K.Row {
         gap: K.Tokens.space.s32
@@ -26,6 +26,12 @@ K.Section {
         K.Tabs {
             labels: ["Always", "On AC", "Never"]
             currentIndex: 1
+        }
+
+        K.Tabs {
+            labels: ["Always", "On AC", "Never"]
+            currentIndex: 0
+            enabled: false
         }
     }
 }
