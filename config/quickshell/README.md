@@ -108,10 +108,10 @@ modules/
   bar/                  Bar, Workspaces, ActiveWindow, Clock, Tray, SysmonPill, Bell, Status, RecordingIndicator,
                         IdleIndicator
   menu/                 Menu: the Command menu on KotodamaSearch, built from KubaOS.Components (its
-                        sizes for the screen, its motion). ResultRow, DetailPane + PaneContent,
-                        ActionPanel, FormView, DetailView, IntroCard, Label (the rows' text
-                        that changes with every key), words.js (glyphs, kinds, shortcuts),
-                        Probe (test-only timing and state lines)
+                        sizes for the screen, its motion; its Results are K.ListRows),
+                        DetailPane + PaneContent, ActionPanel, FormView, DetailView, IntroCard,
+                        words.js (glyphs, kinds, shortcuts), Probe (test-only timing and state
+                        lines)
   controlcenter/        ControlCenter, QuickToggles (K.Tile), CaptureRow, Sliders, Wi-Fi/Bluetooth/Output lists in a K.ScrollingList,
                         KeyboardList + KeyboardAddView (its search, a KotodamaSearch in the layouts app),
                         ScanPulse (when a radio's tab scans for what is in range)

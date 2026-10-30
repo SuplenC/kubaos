@@ -13,7 +13,8 @@ import "words.js" as Words
 // entry Enter runs in view, with its Extension's name when it is the first under it; the pointer
 // never scrolls it, so the entry it is on stays under it.
 //
-// Its rows are drawn as `ResultRow` draws one, for the same reason: Ctrl+K opens it at once.
+// Its rows are placed with token arithmetic, as `K.ListRow` places the Results', for the same
+// reason: Ctrl+K opens it at once.
 Item {
     id: panel
 

@@ -5,6 +5,7 @@ import Kotodama
 import KubaOS.Components as K
 import qs.services
 import qs.settings
+import "words.js" as Words
 
 // The Command menu: KubaOS's own front end on Kotodama's `KotodamaSearch`, built from
 // `KubaOS.Components`. A search field over the Daemon's Results, a detail pane beside them when
@@ -16,7 +17,7 @@ import qs.settings
 // `kotodama` layer, config/hypr/rules.lua), and leaves its motion to it.
 //
 // Speed comes first: a keystroke's Results reach the screen in the frame they arrive. Nothing waits
-// on an animation, the rows are cheap (ResultRow.qml), and the detail pane updates only once a
+// on an animation, the rows are cheap (`K.ListRow`), and the detail pane updates only once a
 // frame with the Results is on screen and typing has paused. The panel's frame (the field, the
 // footer, the cards) is the library's components on its layout primitives, laid out while the menu
 // is built; what changes with every key is placed with token arithmetic, which costs a keystroke
@@ -92,8 +93,8 @@ PanelWindow {
         const row = list.currentItem;
         if (menu.paneShown || !row || !menu.listing)
             return "";
-        row.markup;
-        row.unavailable;
+        row.model.markup;
+        row.model.unavailable;
         return search.hints(list.currentIndex);
     }
     // What Esc does now, as the footer names it.
@@ -115,7 +116,7 @@ PanelWindow {
     // The selected row, by what it is: a new key is a new selection, which the pane crossfades to.
     readonly property string selectedKey: {
         const row = list.currentItem;
-        return row && menu.listing ? `${row.extension}\n${row.title}\n${row.subtitle}` : "";
+        return row && menu.listing ? `${row.model.extension}\n${row.model.title}\n${row.model.subtitle}` : "";
     }
     // The pane is behind the selection, until the next frame is on screen.
     property bool paneStale: true
@@ -240,12 +241,12 @@ PanelWindow {
             return null;
         return {
             key: menu.selectedKey,
-            title: row.title,
-            subtitle: row.subtitle,
-            icon: row.icon,
-            extension: row.extension,
-            alias: row.alias,
-            unavailable: row.unavailable,
+            title: row.model.title,
+            subtitle: row.model.subtitle,
+            icon: row.model.icon,
+            extension: row.model.extension,
+            alias: row.model.alias,
+            unavailable: row.model.unavailable,
             actions: search.actions(list.currentIndex),
             hints: search.hints(list.currentIndex)
         };
@@ -898,11 +899,35 @@ PanelWindow {
                         }
                     }
 
-                    delegate: ResultRow {
+                    // Every row is 56 tall on a regular tile, a title alone included, so the words
+                    // start in one column; the list draws the selection behind them, so it slides.
+                    // A Result that can't run says why in its subtitle's place, dimmed.
+                    delegate: K.ListRow {
                         id: row
 
+                        required property int index
+                        required property var model
+                        readonly property string appIcon: row.model.icon
+
+                        width: ListView.view.width
+                        title: row.model.title
+                        markup: row.model.markup
+                        subtitle: row.model.unavailable === "" ? row.model.subtitle : row.model.unavailable
+                        detail: row.model.alias
+                        // Items without an icon of their own, such as a sum or a bind, show their
+                        // Extension's symbol.
+                        icon: Words.glyph(row.model.extension)
+                        source: row.appIcon === "" ? "" : row.appIcon.startsWith("/") ? `file://${row.appIcon}` : Quickshell.iconPath(row.appIcon, true)
+                        tile: true
+                        tall: true
+                        clear: true
+                        tight: true
+                        fills: false
+                        hoverLayer: false
+                        available: row.model.unavailable === ""
+                        selected: ListView.isCurrentItem
                         onPointed: (x, y) => list.hover(row.index, row, x, y)
-                        onPicked: {
+                        onActivated: {
                             menu.failure = "";
                             search.run(row.index);
                         }
