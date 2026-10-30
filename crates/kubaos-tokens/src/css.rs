@@ -5,7 +5,9 @@
 //! is read in. The lengths are declared on `:root` and again on every `.mock`, so a box drawn at
 //! another scale sets its own `--scale` and every length inside it follows; so do the durations,
 //! as `--motion-*`, under the box's motion settings. The colours and the shadows' opacities follow
-//! `data-mode` on the box they are read in: dark by default.
+//! `data-mode` on the box they are read in: dark by default. What the tokens say in words, and the
+//! lists the foundations pages draw from (where each colour role comes from, the contrast pairs),
+//! are strings on `:root`.
 //!
 //! # Owns
 //!
@@ -21,6 +23,7 @@ use std::io;
 use std::path::Path;
 
 use crate::model::Family;
+use crate::model::Need;
 use crate::model::Rgb;
 use crate::model::Tokens;
 use crate::model::Weight;
@@ -72,6 +75,10 @@ impl Target for CssTokens {
         out.blank();
         out.open("[data-mode=\"light\"]");
         mode(&mut out, tokens, &tokens.color.light, true);
+        out.close();
+        out.blank();
+        out.open(":root");
+        words(&mut out, tokens);
         out.close();
         Ok(out.text)
     }
@@ -250,6 +257,53 @@ fn mode(out: &mut Css, tokens: &Tokens, palette: &BTreeMap<String, Rgb>, light: 
         };
         out.var(&format!("shadow-{name}-opacity"), number(opacity));
     }
+}
+
+/// What each type style, duration and curve is for, where each colour role comes from, and every
+/// contrast pair: strings and lists, read by the foundations pages rather than drawn with.
+fn words(out: &mut Css, tokens: &Tokens) {
+    out.comment("What each type style, duration and curve is for.");
+    for (name, style) in &tokens.types {
+        out.var(&format!("type-{name}-use"), string(&style.purpose));
+    }
+    for (name, duration) in &tokens.duration {
+        out.var(&format!("duration-{name}-use"), string(&duration.purpose));
+    }
+    for (name, easing) in &tokens.easing {
+        out.var(&format!("easing-{name}-use"), string(&easing.purpose));
+    }
+    out.comment("The matugen colour each role is read from at runtime; empty for a role of our own.");
+    for (role, source) in &tokens.color.source {
+        out.var(&format!("source-{role}"), string(source));
+    }
+    out.comment("Every foreground drawn on a background, at its opacity, and the ratio it needs.");
+    for (index, pair) in tokens.contrast.pairs.iter().enumerate() {
+        out.var(&format!("contrast-{index}-fg"), string(&pair.fg));
+        out.var(&format!("contrast-{index}-bg"), string(&pair.bg));
+        out.var(&format!("contrast-{index}-need"), string(need(pair.need)));
+        out.var(&format!("contrast-{index}-minimum"), number(pair.need.minimum()));
+        out.var(
+            &format!("contrast-{index}-opacity"),
+            string(pair.opacity.as_deref().unwrap_or("")),
+        );
+        out.var(&format!("contrast-{index}-use"), string(&pair.purpose));
+    }
+    out.var("contrast-pairs", tokens.contrast.pairs.len().to_string());
+    out.comment("The roles drawn only as decoration, which need no contrast.");
+    out.var("contrast-decorative", string(&tokens.contrast.decorative.join(" ")));
+}
+
+fn need(need: Need) -> &'static str {
+    match need {
+        Need::Text => "text",
+        Need::LargeText => "large_text",
+        Need::Graphic => "graphic",
+    }
+}
+
+/// `text` as a CSS string, which a script reads back as JSON.
+fn string(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
 #[cfg(test)]
