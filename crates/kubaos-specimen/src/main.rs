@@ -8,12 +8,13 @@
 //! kubaos-specimen pages            the pages' names, one a line
 //! kubaos-specimen check [DIR]      the same pages held to the geometry rules; DIR gets their frames
 //! kubaos-specimen parity DIR       the QML specimen's frames in DIR held to the components page's
+//! kubaos-specimen mockup DIR       the mockup site's frames in DIR held to the specimen's components
 //! ```
 //!
 //! # Owns
 //!
 //! - The command line and its exit codes: 2 for a usage error, 1 when the window or a screenshot
-//!   fails, or a page breaks a geometry rule.
+//!   fails, a page breaks a geometry rule, or a mockup's component differs from the specimen's.
 //!
 //! # Not here
 //!
@@ -43,6 +44,7 @@ usage: kubaos-specimen
        kubaos-specimen pages
        kubaos-specimen check [DIR]
        kubaos-specimen parity DIR
+       kubaos-specimen mockup DIR
 
 With no arguments, the live specimen opens in a window: Tab or the arrows move between pages,
 M switches light and dark, Esc closes it.
@@ -56,7 +58,12 @@ check  the same pages, light and dark at every scale, held to the geometry rules
        PAGE-MODE-SCALE.json, the input `kubaos-design geometry` reads
 parity the components page as `KubaOS.Components` draws it (qml/specimen/), read from DIR as
        components-MODE-SCALEx.json for both modes at every scale: each frame held to the geometry
-       rules and to the iced page's boxes, node for node; exit 1 on any difference";
+       rules and to the iced page's boxes, node for node; exit 1 on any difference
+mockup the mockup site's frames in DIR (PAGE-MODE-SCALEx.json, from design/mockups'
+       scripts/render.ts), each held to the geometry rules, and each of its components to its twin
+       on the specimen's pages, of the same name, variant and words at the same mode and scale,
+       wherever each page puts it; exit 1 on any difference or finding, or when no component had a
+       twin";
 
 /// How many of a screenshot's off-grid boxes are listed; the count says how many there are.
 const AUDIT_SHOWN: usize = 5;
@@ -92,6 +99,7 @@ fn main() -> ExitCode {
         ["check"] => check(None),
         ["check", dir] => check(Some(Path::new(dir))),
         ["parity", dir] => parity(Path::new(dir)),
+        ["mockup", dir] => mockup(Path::new(dir)),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::from(2)
@@ -211,6 +219,41 @@ fn parity(dir: &Path) -> ExitCode {
                 report.frames, report.differences, report.findings
             );
             if report.differences == 0 && report.findings == 0 {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            }
+        }
+        Err(err) => {
+            eprintln!("kubaos-specimen: {err}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+#[expect(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    reason = "The differences and the verdict are the check's output, for the developer or the CI log."
+)]
+fn mockup(dir: &Path) -> ExitCode {
+    shot::load_fonts();
+    match geometry::mockup(dir) {
+        Ok(report) => {
+            for line in &report.lines {
+                println!("{line}");
+            }
+            if !report.unmatched.is_empty() {
+                println!("with no twin in the specimen, held to the geometry rules alone:");
+                for component in &report.unmatched {
+                    println!("  {component}");
+                }
+            }
+            eprintln!(
+                "kubaos-specimen mockup: {} frame(s), {} component(s) compared, {} difference(s), {} finding(s)",
+                report.frames, report.compared, report.differences, report.findings
+            );
+            if report.compared > 0 && report.differences == 0 && report.findings == 0 {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::FAILURE
