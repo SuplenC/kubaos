@@ -1,18 +1,20 @@
-// The motion player's plot: the whole loop on x, in milliseconds, and each track's progress from
-// its `from` (0) to its `to` (1) on y, one curve per track drawn from its easing token's cubic
-// Bézier or `neon.strike`'s steps, with a ball riding each curve at the playhead. Drawn as SVG in
-// the page's device pixels, so its hairlines land on whole pixels at every scale.
+// The motion player's plot: the whole loop on x, in milliseconds, and on y what each track does:
+// a track between two numbers plots its value, so a fade-out falls from 1 to 0, and one whose
+// values aren't numbers (colours, a palette's path) plots its progress from its `from` (0) to its
+// `to` (1), which the legend says. One curve per track, drawn from its easing token's cubic Bézier
+// or `neon.strike`'s steps, with a ball riding each curve at the playhead. Drawn as SVG in the
+// page's device pixels, so its hairlines land on whole pixels at every scale.
 
 import { length } from "../../lib/tokens.ts";
 import { advance } from "../../lib/text.ts";
 import { el, label } from "../dom.ts";
 import type { Track } from "../page.ts";
-import { bezier, type Loop, progress, reach, type Span, steps, stepsOf, struck, type Timed } from "../recipe.ts";
+import { bezier, css, type Loop, progress, reach, type Span, steps, stepsOf, struck, type Timed } from "../recipe.ts";
 import { settings } from "../settings.ts";
 
 const SVG = "http://www.w3.org/2000/svg";
 
-/** The y axis's step: a quarter of the way from `from` to `to`. */
+/** The y axis's step: a quarter of a value's 0 to 1, or of the way from `from` to `to`. */
 const Y_STEP = 0.25;
 
 /** The x axis's steps to choose from, in milliseconds: the smallest that leaves its labels room. */
@@ -43,6 +45,31 @@ function look(element: Element, index: number): void {
   element.setAttribute("data-track", String(index % BALLS.length));
 }
 
+/**
+ * Where `track` is drawn on y: `from` at progress 0 and `to` at 1. Its values where both are
+ * numbers; a colour, or a palette's path (a number that stands for the way between two palettes),
+ * plots its progress, 0 to 1.
+ */
+export function plotted(track: Track): { readonly from: number; readonly to: number; readonly value: boolean } {
+  const from = css(track.from);
+  const to = css(track.to);
+  if (track.colours || typeof from !== "number" || typeof to !== "number") return { from: 0, to: 1, value: false };
+  return { from, to, value: true };
+}
+
+/** The progress `timed` reaches over the loop, low and high: past 1 or below 0 where it overshoots. */
+function span(timed: Timed): { low: number; high: number } {
+  const { track, back } = timed;
+  if (struck(track.curve)) {
+    const values = stepsOf(track.curve);
+    return { low: Math.min(0, ...values), high: Math.max(1, ...values) };
+  }
+  const range = reach(track.curve);
+  // Played back, the curve runs from 1 to 0: an overshoot past 1 dips below 0.
+  if (!back) return range;
+  return { low: Math.min(range.low, 1 - range.high), high: Math.max(range.high, 1 - range.low) };
+}
+
 /** A short line in the track's colour and dash: its key in the legend and in the recipe's rows. */
 export function swatch(index: number): HTMLElement {
   const box = el("span", "page-plot-swatch");
@@ -67,9 +94,13 @@ export function together(playing: Loop): number[][] {
   return [...groups.values()];
 }
 
+/** A track as the legend and its part alone name it: its part, and what its curve plots if not its value. */
+export function named(track: Track): string {
+  return `${track.part} (${track.on})${plotted(track).value ? "" : ", its progress from 0 to 1"}`;
+}
+
 /** The legend under the plot: each track's swatch and its part, as the recipe's rows name it. */
 export function legend(playing: Loop): HTMLElement {
-  const name = (track: Track) => `${track.part} (${track.on})`;
   const shared = together(playing)
     .filter((group) => group.length > 1)
     .map((group) => {
@@ -80,7 +111,7 @@ export function legend(playing: Loop): HTMLElement {
   return el(
     "div",
     "page-plot-legend",
-    ...playing.timed.map((timed, i) => el("span", "page-plot-key", swatch(i), label(name(timed.track), "small", "on_surface"))),
+    ...playing.timed.map((timed, i) => el("span", "page-plot-key", swatch(i), label(named(timed.track), "small", "on_surface"))),
     ...shared.map((words) => label(words, "small", "on_surface_variant")),
   );
 }
@@ -135,18 +166,16 @@ export class Plot {
     const hairline = 1;
     const thin = Math.max(1, Math.round(px("stroke-thin")));
     this.thin = thin;
-    // How far the curves reach: past 1 for an overshooting curve, below 0 for one that dips.
+    // How far the curves reach, in what they plot: 0 to 1 at least, and past either end where a
+    // curve overshoots.
     let low = 0;
     let high = 1;
-    for (const { track, back } of playing.timed) {
-      if (struck(track.curve)) continue;
-      const range = reach(track.curve);
-      low = Math.min(low, range.low);
-      high = Math.max(high, range.high);
-      // Played back, the curve runs from 1 to 0: an overshoot past 1 dips below 0.
-      if (back) {
-        low = Math.min(low, 1 - range.high);
-        high = Math.max(high, 1 - range.low);
+    for (const timed of playing.timed) {
+      const { from, to } = plotted(timed.track);
+      const range = span(timed);
+      for (const p of [range.low, range.high]) {
+        low = Math.min(low, from + (to - from) * p);
+        high = Math.max(high, from + (to - from) * p);
       }
     }
     const bottomValue = Math.floor(low / Y_STEP) * Y_STEP;
@@ -167,8 +196,9 @@ export class Plot {
     this.element.setAttribute("width", String(width));
     this.element.setAttribute("height", String(height));
     this.element.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    // Where 0 ms and the loop's end, and a progress of 0 and 1, are drawn: for the player's test.
-    for (const [name, value] of Object.entries({ x0: left, x1: right, total: playing.total, y0: y(0), y1: y(1) })) {
+    // Where 0 ms and the loop's end are drawn: for the player's test, which finds each ball's
+    // progress of 0 and 1 on the ball.
+    for (const [name, value] of Object.entries({ x0: left, x1: right, total: playing.total })) {
       this.element.dataset[name] = String(value);
     }
     const grid = svg("g", "page-plot-grid");
@@ -222,7 +252,8 @@ export class Plot {
     const turns = new Map<number, { place: number; of: number }>();
     for (const group of together(playing)) group.forEach((i, place) => turns.set(i, { place, of: group.length }));
     const hits = playing.timed.map((timed, i) => {
-      const d = path(timed, playing.total, (t) => crisp(x(t), thin), (v) => crisp(y(v), thin));
+      const { from, to } = plotted(timed.track);
+      const d = path(timed, playing.total, (t) => crisp(x(t), thin), (p) => crisp(y(from + (to - from) * p), thin));
       const curve = svg("path", "page-plot-curve", { d, "stroke-width": thin, "data-pick": i });
       look(curve, i);
       const shared = turns.get(i)!;
@@ -238,11 +269,14 @@ export class Plot {
     this.head.setAttribute("y1", String(top));
     this.head.setAttribute("y2", String(bottom));
     this.head.setAttribute("stroke-width", String(thin));
-    this.balls = playing.timed.map((_, i) => {
+    this.balls = playing.timed.map(({ track }, i) => {
+      const { from, to } = plotted(track);
       const ball = svg("circle", "page-plot-ball", {
         r: px(BALLS[i % BALLS.length]!) / 2,
-        "data-target": playing.timed[i]!.track.target,
-        "data-property": playing.timed[i]!.track.property,
+        "data-target": track.target,
+        "data-property": track.property,
+        "data-y0": y(from),
+        "data-y1": y(to),
       });
       look(ball, i);
       return ball;
@@ -262,10 +296,11 @@ export class Plot {
     this.playing.timed.forEach((timed, i) => {
       const ball = this.balls[i];
       if (!ball) return;
-      const value = progress(timed, t);
+      const along = progress(timed, t);
+      const { from, to } = plotted(timed.track);
       ball.setAttribute("cx", String(x(t)));
-      ball.setAttribute("cy", String(y(value)));
-      ball.dataset.progress = String(value);
+      ball.setAttribute("cy", String(y(from + (to - from) * along)));
+      ball.dataset.progress = String(along);
     });
   }
 }
@@ -274,8 +309,9 @@ export class Plot {
  * `timed`'s curve over the loop as path data: at 0, then its easing as the very cubic Bézier the
  * browser eases along, laid on the track's span (a Bézier stays one under an affine map), or
  * `neon.strike`'s steps, held, then back along the same curve, or cut back at the loop's end.
- * `x` and `y` put it on device pixels, so its straight runs are crisp; a ball is drawn unrounded,
- * a fraction of a pixel off them at most.
+ * `y` takes a progress, 0 to 1, to where the track's value at it is drawn. `x` and `y` put it on
+ * device pixels, so its straight runs are crisp; a ball is drawn unrounded, a fraction of a pixel
+ * off them at most.
  */
 function path(timed: Timed, total: number, x: (t: number) => number, y: (v: number) => number): string {
   const { track } = timed;

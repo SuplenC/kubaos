@@ -6,7 +6,8 @@
 // Web Animations API from the move's own data (`site/recipe.ts`), so a frame seeked to is exactly
 // the frame that plays, and the recipe shown is what plays.
 
-import { number } from "../../lib/tokens.ts";
+import { type Align, probe } from "../../lib/probe.ts";
+import { length, number } from "../../lib/tokens.ts";
 import { el, label, prose } from "../dom.ts";
 import type { DoesntApply, Motion, Move, Track, Value } from "../page.ts";
 import { applies } from "../page.ts";
@@ -34,7 +35,7 @@ import {
   tracksOf,
 } from "../recipe.ts";
 import { CHROME, onChange } from "../settings.ts";
-import { legend, type Mark, Plot, swatch } from "./plot.ts";
+import { legend, type Mark, named, Plot, swatch } from "./plot.ts";
 import { partOr, subheading } from "./section.ts";
 
 /** How many times slower slow motion plays. */
@@ -232,8 +233,36 @@ function marks(playing: Loop): Mark[] {
   return [...found.values()].map((mark) => ({ ...mark, words: `${shown(mark.at)} ms: ${[...new Set(mark.words)].join(", ")}` }));
 }
 
+/**
+ * The gap between a player's controls: the first space token past twice the focus glow's reach
+ * (`focus.far`, 20), so each control's whole glow ends clear of its neighbour's and a picked
+ * part's outlines never touch; at `s40`, exactly twice the reach, they would meet.
+ */
+const SPREAD = "s48";
+
+/**
+ * Lays each layout in `sample` (itself included) whose children carry a focus ring out as a grid,
+ * `SPREAD` apart both ways: a row as one row of columns, a stack as one column. A layout inside a
+ * control keeps its own gap.
+ */
+function spread(sample: Element): void {
+  const layouts = [sample, ...sample.querySelectorAll("[data-layout]")].filter(
+    (layout): layout is HTMLElement => layout instanceof HTMLElement && layout.matches("[data-layout]:has(> * > .k-ring)"),
+  );
+  for (const layout of layouts) {
+    const columns = layout.classList.contains("k-row") ? layout.children.length : 1;
+    // `layout()` writes its align as one of `Align`'s words.
+    const align = (layout.dataset.align ?? "start") as Align;
+    layout.dataset.playerGrid = "";
+    layout.style.setProperty("--gap", `var(--space-${SPREAD})`);
+    layout.style.setProperty("--columns", String(columns));
+    probe(layout, { role: "grid", columns, gap: length(`space-${SPREAD}`), align });
+  }
+}
+
 function player(move: Move): HTMLElement {
   const sample = move.sample();
+  spread(sample);
   const stage = el("div", "page-player-stage mock", sample);
   const whole = el("div", "page-player");
   let playing = loop(move);
@@ -409,12 +438,13 @@ function player(move: Move): HTMLElement {
             if (!child.matches(target) && !child.querySelector(target)) child.remove();
           }
         }
+        spread(alone);
         added.push(...animate(alone, timed));
         const box = el("div", "page-part-stage mock", alone);
         // A picture of the part, not more controls: no focus, no hover, nothing read out twice.
         box.inert = true;
         box.setAttribute("aria-hidden", "true");
-        const part = el("div", "page-part-alone", el("span", "page-plot-key", swatch(i), label(`${timed.track.part} (${timed.track.on})`, "small", "on_surface")), box);
+        const part = el("div", "page-part-alone", el("span", "page-plot-key", swatch(i), label(named(timed.track), "small", "on_surface")), box);
         pickable(part, i);
         return part;
       }),
@@ -530,7 +560,7 @@ function player(move: Move): HTMLElement {
     key,
     parts,
     prose(
-      "The loop across, in milliseconds, holds included; each part's progress from its `from` (0) to its `to` (1) up, along its curve, a ball on it at the playhead. Drag or click the plot to hold a moment; ← and → step a frame, with Shift ten. The ticks under it are each part's start and end, and each keyframe: click one to go to it. Under the legend, a move of more than one part plays each alone on the same clock, one under another in the legend's order, the sample with the other parts hidden; pointing at a part's row, curve or stage picks it everywhere, outlined on the whole.",
+      "The loop across, in milliseconds, holds included; each part's value up, along its curve (a fade-out falls from 1 to 0; a part whose values aren't numbers, a colour or a palette's path, rises from its `from`, 0, to its `to`, 1, as the legend says), a ball on it at the playhead. Drag or click the plot to hold a moment; ← and → step a frame, with Shift ten. The ticks under it are each part's start and end, and each keyframe: click one to go to it. Under the legend, a move of more than one part plays each alone on the same clock, one under another in the legend's order, the sample with the other parts hidden; pointing at a part's row, curve or stage picks it everywhere, outlined on the whole.",
       "small",
       "on_surface_variant",
     ),

@@ -45,7 +45,6 @@ async function held(page: Page, index: number): Promise<Held> {
   return page.evaluate((index) => {
     const player = document.querySelectorAll<HTMLElement>(".page-player")[index]!;
     const plot = player.querySelector<SVGSVGElement>(".page-plot")!;
-    const { y0, y1 } = plot.dataset;
     const stage = player.querySelector(".page-player-stage")!;
     const alone = [...player.querySelectorAll(".page-part-stage")];
     const time = Number(player.querySelector(".page-player-stage")!.getAnimations({ subtree: true })[0]?.currentTime ?? 0);
@@ -67,7 +66,8 @@ async function held(page: Page, index: number): Promise<Held> {
         part: target,
         progress,
         cy: Number(ball.getAttribute("cy")),
-        want: Number(y0) + (Number(y1) - Number(y0)) * progress,
+        // Where the ball's progress of 0 and 1 are drawn: its track's `from` and `to`.
+        want: Number(ball.dataset.y0) + (Number(ball.dataset.y1) - Number(ball.dataset.y0)) * progress,
         // On the curve as drawn, not only where the plot's formula says: on its whole stroke, a
         // dash of it or a gap between two.
         onCurve: undashed(curves[i]!, (curve) => curve.isPointInStroke(centre)),
@@ -226,7 +226,8 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     }
     // A curve is found by the pointer too: the last track's, drawn over any it shares a curve with.
     if ((await alone.count()) > 0) {
-      await player.locator(".page-plot").scrollIntoViewIfNeeded();
+      // In the middle of the window, clear of the site's toolbar, which stays at its top.
+      await player.locator(".page-plot").evaluate((plot) => plot.scrollIntoView({ block: "center" }));
       const spot = await player.evaluate((element) => {
         const hit = [...element.querySelectorAll<SVGPathElement>(".page-plot-curve-hit")].at(-1)!;
         const plot = hit.ownerSVGElement!;
