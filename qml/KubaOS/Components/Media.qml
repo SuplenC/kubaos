@@ -98,6 +98,5 @@ Item {
         id: slot
 
         anchors.fill: parent
-        opacity: root.dimmed ? Tokens.opacity.disabled_content : 1
     }
 }

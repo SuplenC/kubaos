@@ -12,7 +12,7 @@ K.Section {
 
         K.Pill {
             K.Text {
-                text: "Tue 27 Oct  21:47"
+                text: "Tue 27 Oct 21:47"
                 style: K.Tokens.type.label
             }
         }
@@ -23,17 +23,17 @@ K.Section {
 
             K.Icon {
                 name: "wifi"
-                size: K.Tokens.icon.s16
+                size: K.Tokens.type.label.icon
             }
 
             K.Icon {
                 name: "volume_up"
-                size: K.Tokens.icon.s16
+                size: K.Tokens.type.label.icon
             }
 
             K.Icon {
                 name: "battery_full"
-                size: K.Tokens.icon.s16
+                size: K.Tokens.type.label.icon
             }
         }
 

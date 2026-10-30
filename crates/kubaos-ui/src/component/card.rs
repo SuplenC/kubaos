@@ -86,7 +86,11 @@ pub fn choice_card<'a, M: Clone + 'a>(
                 background: Some(Background::Color(fill)),
                 text_color: c.on_surface,
                 border: Border {
-                    color: if picked { c.primary } else { c.outline_variant },
+                    color: if picked && enabled {
+                        c.primary
+                    } else {
+                        c.outline_variant
+                    },
                     width: hairline,
                     radius: radius(CARD_RADIUS).into(),
                 },
