@@ -1,11 +1,13 @@
 // What is laid out in script once the page's CSS has laid it out: the page's padding for its
-// width, each mock centred down its row on a whole device pixel, the focus rings' glows for their
-// controls' sizes, then the measures overlays drawn over the result. CSS centres by half the spare
-// room, which is half a device pixel whenever that is odd; a mock is placed as the builds place a
-// child, the odd device pixel after it (`kubaos-ui`'s `centre`).
+// width, the sample grids' bands for it, each mock centred down its row on a whole device pixel,
+// the focus rings' glows for their controls' sizes, then the measures overlays drawn over the
+// result. CSS centres by half the spare room, which is half a device pixel whenever that is odd; a
+// mock is placed as the builds place a child, the odd device pixel after it (`kubaos-ui`'s
+// `centre`).
 
 import { redrawRings } from "../lib/focus.ts";
 import { raw } from "../lib/tokens.ts";
+import { reflowBands } from "./parts/bands.ts";
 import { redrawOverlays } from "./parts/measures.ts";
 import { settings } from "./settings.ts";
 
@@ -43,6 +45,7 @@ function padPage(page: HTMLElement): void {
 /** Lays out what script lays out on `page`, after its CSS has. */
 export function settle(page: HTMLElement): void {
   padPage(page);
+  reflowBands(page);
   centreMocks(page);
   redrawRings();
   // An overlay that took another line of names above its sample is taller: centre again.
