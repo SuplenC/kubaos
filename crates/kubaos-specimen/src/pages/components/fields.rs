@@ -87,5 +87,15 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
             field("kuba", "").icon(Icon::Lock).state(State::Locked).view(look),
             Some(note(look, "Set when you installed; read-only here.", false)),
         ))
+        .push(labelled(
+            look,
+            "Proxy",
+            None,
+            field("", "proxy.example.com:3128")
+                .icon(Icon::Lan)
+                .state(State::Disabled)
+                .view(look),
+            Some(note(look, "Disabled: turn the proxy on to set it.", false)),
+        ))
         .into()
 }

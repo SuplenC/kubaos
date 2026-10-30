@@ -28,7 +28,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Media",
     lede: Some(
-        "Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then two pictures to pick, picked with its name under it and focused with its name over its foot.",
+        "Pictures in a box of a fixed aspect, reserved before they load, so nothing moves when they arrive: the placeholder, the picture, then pictures to pick: picked with its name under it, focused with its name over its foot, and disabled.",
     ),
     view,
 };
@@ -47,11 +47,17 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
                 .view(look),
         )
         .push(
-            picture_choice(Some(picture), Aspect::Wallpaper, "Golden Gai")
+            picture_choice(Some(picture.clone()), Aspect::Wallpaper, "Golden Gai")
                 .name(NamePlace::Over)
                 .badge(Icon::PlayArrow, "Video")
                 .focused(true)
                 .on_press(Message::Sample)
+                .view(look),
+        )
+        .push(
+            picture_choice(Some(picture), Aspect::Wallpaper, "Omoide Yokocho")
+                .on_press(Message::Sample)
+                .disabled(true)
                 .view(look),
         )
         .into()

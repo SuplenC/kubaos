@@ -5,7 +5,7 @@ import KubaOS.Components as K
 // `crates/kubaos-specimen/src/pages/components/cards.rs` draws with `kubaos-ui`, box for box.
 K.Section {
     title: "Cards"
-    description: "Picked cards take the accent, so their focus tube is the cold one."
+    description: "Picked cards take the accent, so their focus tube is the cold one. A card that can't be picked now is disabled."
 
     K.Grid {
         columns: 4
@@ -41,6 +41,15 @@ K.Section {
             CardText {
                 title: "Focused, picked"
                 body: "The cold tube."
+            }
+        }
+
+        K.ChoiceCard {
+            enabled: false
+
+            CardText {
+                title: "Keep it as it is"
+                body: "No room left on this disk."
             }
         }
     }

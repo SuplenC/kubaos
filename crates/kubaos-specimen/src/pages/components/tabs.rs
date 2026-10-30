@@ -22,7 +22,7 @@ use crate::specimen::Message;
 pub const SECTION: Section = Section {
     title: "Tabs",
     lede: Some(
-        "One of a few views or values, picked from small buttons: the picked one tonal. The same row is a setting's segmented control.",
+        "One of a few views or values, picked from small buttons: the picked one tonal. The same row is a setting's segmented control; the last is disabled.",
     ),
     view,
 };
@@ -41,5 +41,6 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
         .push(tabs(&views, 0, |_| Message::Sample).view(look))
         .push(tabs(&tools, 1, |_| Message::Sample).focused(true).view(look))
         .push(tabs(&motion, 1, |_| Message::Sample).view(look))
+        .push(tabs(&motion, 0, |_| Message::Sample).disabled(true).view(look))
         .into()
 }

@@ -55,6 +55,13 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
                 .icon(Icon::Check)
                 .on_remove(Message::Sample)
                 .view(look),
+        )
+        .push(
+            chip(ChipKind::Neutral, "German")
+                .on_press(Message::Sample)
+                .on_remove(Message::Sample)
+                .disabled(true)
+                .view(look),
         );
     line.into()
 }
