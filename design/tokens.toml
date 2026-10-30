@@ -95,10 +95,6 @@ pressed_glow = 1.25
 # its own reaches past its box as far as the glow (`far`), or up to the part
 # of the page beside it, so it never cuts a resting control's glow.
 offset = 4
-# Unlit glass: a tone's unlit core (`primary_unlit`) at this opacity over a
-# control's own container. The Focus foundation page draws a field's unlit
-# tube with it; a control's states don't use it.
-glass = 0.55
 
 # The spacing scale: gaps, paddings and insets.
 [space]
@@ -963,9 +959,15 @@ secondary_container_pressed = { dark = { from = "secondary_container", lighter =
 # `_unlit` lifted only as far as it reads, and lights to the core; by day it is
 # the tone itself. Both hold on every surface a Text button sits on.
 primary_rest = { dark = { from = "primary_unlit", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "primary", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
-# Tonal's and Text's tube with the signs off: the tone unlit, the tone's own
-# line by day.
+# A tube's line with the signs off, on every control not filled with its tone
+# (a Tonal or Text button, an empty checkbox, a switch that is off, a chip):
+# solid glass, the tone unlit, and by day the tone's own line.
 primary_glass = { dark = { from = "primary_unlit" }, light = { from = "primary" } }
+cold_glass = { dark = { from = "cold_unlit" }, light = { from = "cold" } }
+error_glass = { dark = { from = "error_unlit" }, light = { from = "error" } }
+success_glass = { dark = { from = "success_unlit" }, light = { from = "success" } }
+warning_glass = { dark = { from = "warning_unlit" }, light = { from = "warning" } }
+sharing_glass = { dark = { from = "sharing_unlit" }, light = { from = "sharing" } }
 primary_lit = { dark = { from = "primary_core", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] }, light = { from = "primary", text_on = ["surface", "surface_container_low", "surface_container", "surface_container_high"] } }
 
 # The burning kinds, Danger, Success and Warning: always lit, the bright fixed
@@ -1144,10 +1146,10 @@ pairs = [
 # focus core, the line inside a filled control's edge; the unlit tones
 # (`primary_unlit` and the rest), a tube at rest; and a lit control's line by
 # day and night, signs on or off (`primary_fill_line`, `primary_fill_glass`,
-# `primary_glass`, `burn_error_line`, `burn_error_glass` and the rest), which
+# `primary_glass`, `cold_glass`, `burn_error_line`, `burn_error_glass` and the rest), which
 # marks the state its fill and label already show. `kubaos-design contrast`
 # fails on a role drawn with that is in no pair and not here.
-decorative = ["burn_error_glass", "burn_error_line", "burn_success_glass", "burn_success_line", "burn_warning_glass", "burn_warning_line", "cold_container", "cold_core", "cold_unlit", "error_core", "error_unlit", "logo_core_cold", "logo_core_warm", "microphone_core", "microphone_unlit", "outline_variant", "primary_core", "primary_fill_glass", "primary_fill_line", "primary_glass", "primary_unlit", "recording_core", "recording_unlit", "scrim", "shadow", "sharing_core", "sharing_unlit", "success_core", "success_unlit", "surface_bright", "warning_core", "warning_unlit"]
+decorative = ["burn_error_glass", "burn_error_line", "burn_success_glass", "burn_success_line", "burn_warning_glass", "burn_warning_line", "cold_container", "cold_core", "cold_glass", "cold_unlit", "error_core", "error_glass", "error_unlit", "logo_core_cold", "logo_core_warm", "microphone_core", "microphone_unlit", "outline_variant", "primary_core", "primary_fill_glass", "primary_fill_line", "primary_glass", "primary_unlit", "recording_core", "recording_unlit", "scrim", "shadow", "sharing_core", "sharing_glass", "sharing_unlit", "success_core", "success_glass", "success_unlit", "surface_bright", "warning_core", "warning_glass", "warning_unlit"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes

@@ -66,7 +66,7 @@ export default page({
     ],
     looks: {
       lit: "At night at rest, the signs burn on the box: empty, the tube over its outline; picked, the core inside the fill's edge; the glow outside either, all that reaches past the box. A picked mark brightens to `on_primary_fill_lit`; the label stays.",
-      signsOff: "The same checkbox still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. Empty, the tube is unlit glass, `primary_unlit` at `focus.glass` over the box, as a field's; picked, the line inside the fill's edge is `primary_fill_glass`, the unlit fill lifted 0.12. No glow, and the mark at its rest colour.",
+      signsOff: "The same checkbox still hovered or focused with the neon unpowered: by day always, and at night while a theme change or dark ⇄ light has the lights out. Empty, the tube is solid unlit glass, `primary_glass`, as a Tonal or Text button's; picked, the line inside the fill's edge is `primary_fill_glass`, the unlit fill lifted 0.12. No glow, and the mark at its rest colour.",
     },
     signsOff: (index: number) => sample(TICKS[index]!, "signs-off"),
   },

@@ -266,8 +266,6 @@ fn rules(out: &mut Writer, tokens: &Tokens) {
                 "The band a picture keeps round itself inside its own box where its neighbours leave no more room (a wallpaper thumbnail in its grid cell), in logical pixels. A scroll is not held to it: it reaches past its box as far as the far glow.",
             );
             out.line(format!("        readonly property int offset: {}", focus.offset));
-            out.line("        // In daylight, the opacity of an unlit tube's glass over its control's container.");
-            out.line(format!("        readonly property real glass: {}", number(focus.glass)));
         },
     );
     out.group("    ", None, "neon", |out| {

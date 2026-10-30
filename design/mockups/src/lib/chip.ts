@@ -46,7 +46,7 @@ export const CHIP_COLOURS: Record<ChipKind, Colours> = {
   Selected: {
     fill: role("secondary_container"),
     fillPressed: role("secondary_container_pressed"),
-    label: role("on_secondary_container_rest"),
+    label: role("on_secondary_container"),
     labelLit: role("on_secondary_container"),
   },
   Accent: { fill: tint("primary"), fillPressed: tint("primary"), label: role("primary"), labelLit: role("primary") },
