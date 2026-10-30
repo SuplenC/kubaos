@@ -1,10 +1,10 @@
 // The neon focus on a control: `kubaos-ui`'s `focus_ring` and `focus_ring_on_fill`. One line inside
 // the control's edge, at its corner: the tube in the control's tone, or on a control filled with
 // its tone's colour, the tone's core inside the fill's edge. The glow outside is that tone too, and
-// it is all that reaches past the box. Focused has two looks, which the scene picks: lit, the neon
-// burning with its core half way to white, at night at rest; and unlit, the line as unlit glass
-// (`_unlit`, the tone toward black) with no glow, in daylight always and at night while a sequence
-// has the lights out.
+// it is all that reaches past the box. Lit has two looks, which the scene picks: signs on, the
+// neon burning with its core half way to white, at night while the lights burn; and signs off, the
+// line as unlit glass (`_unlit`, the tone at 60% of its lightness) with no glow, by day always and
+// at night while a power change has the lights out.
 // The glow is `glow` at the middle of every device pixel out from the edge, as
 // `kubaos_ui::focus::rings` lays its bands to give. Nothing of it takes layout room.
 //
@@ -16,8 +16,8 @@
 // A control whose content is drawn in its own tone (a Text button's label and icon) lights that
 // content as a tube too: a copy of it in the tone's core over it, with a faint near glow round its
 // letters and strokes (`focus.content_near`, `focus.content_glow`) and no far one, the same at
-// every size. It burns on the ring's own `--lit`, so it lights, strikes and goes out with the line;
-// unlit, the copy is out and the content is its own tone. Its glow is a mask worked out per device
+// every size. It burns on the ring's own `--lit`, so it lights and goes out with the line; with
+// the signs off, the copy is out and the content is its own tone. Its glow is a mask worked out per device
 // pixel from a distance field of the content drawn on a canvas.
 
 import { settings } from "../site/settings.ts";
@@ -32,8 +32,8 @@ const rings = new Set<HTMLElement>();
 export type Tone = "accent" | "cold" | "error" | "success" | "warning" | "sharing" | "burn_danger" | "burn_success" | "burn_warning";
 
 /**
- * The colour role a tone's tube and glow are drawn in; its core is the role's `_core` at night,
- * `_unlit` in daylight.
+ * The colour role a tone's tube and glow are drawn in; its core is the role's `_core` with the signs
+ * on, `_unlit` with them off.
  */
 export function toneColour(tone: Tone): string {
   return tone === "accent" ? "primary" : tone;

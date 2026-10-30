@@ -100,7 +100,7 @@
   );
   --lit-label: color-mix(in srgb, var(--label-off), var(--label-lit) calc(var(--signs) * 100%));
   --shown: color-mix(in srgb, var(--label), var(--lit-label) calc(var(--lit) * 100%));
-  /* Hover, focus and press light up: a fade, never the stutter, which is for power changes. */
+  /* Hover, focus and press light up: a fade, never the flicker, which is for power changes. */
   transition:
     --lit var(--motion-short) var(--easing-standard),
     --press var(--motion-micro) var(--easing-standard);
@@ -140,34 +140,29 @@
   background: none;
 }
 
-/* The focus ring. It lights as focus arrives: struck on through the neon sign's stutter over
-   `medium`, or faded in over `short` with the stutter off or motion reduced; it fades out over
-   `short`. A control pinned focused, lit or unlit, shows at once, since nothing moved.
+/* The focus ring. A control lights up as focus arrives, a fade over `short`, and goes back to rest
+   over `short`; the flicker is for power changes only. A control pinned lit shows at once, since
+   nothing moved.
 
-   At night (`--day` 0) the neon is lit: the tube or the core in its lit colour, the glow outside.
-   In daylight (`--day` 1) it is off: the tube is unlit glass, which never strikes, and there is no
-   glow. `--lit` is how brightly the neon burns, `--glass` how much the unlit glass shows. A focused
-   ring burns as brightly as the lights before a theme change (`--before`) or after it (`--after`),
-   so a sequence on the page's one clock dims and strikes every focused ring together.
-
-   Focused has two looks: lit, the neon and its glow, and unlit, the same line as unlit glass with
-   no glow. The line is the two crossfaded by `--unlit`, how much of it is glass: daylight is all
-   glass, and every sequence moves `--unlit` on the lights' own steps, so as each step dims the neon
-   the glass takes its place, and the line is never gone. */
+   Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while the lights
+   do (`--before`, `--after`), never by day. Signs on, the line is the tube or the core in its lit
+   colour with the glow outside; signs off, the same line is unlit glass and nothing glows. So a
+   sequence flickers a lit ring down to its signs-off look and strikes it back, and its line is
+   never gone. A button works out its own `--signs` (`.k-button`), which its ring keeps. */
 .k-ring {
   position: absolute;
   inset: 0;
   border-radius: var(--corner);
   pointer-events: none;
   --lit: 0;
-  --glass: 0;
   --line: max(1px, round(nearest, var(--focus-tube), 1px));
-  --neon: calc(var(--lit) * (1 - var(--day)));
-  --tube: color-mix(in srgb, var(--tube-unlit) calc(var(--unlit) * 100%), var(--tube-lit));
-  --core: color-mix(in srgb, var(--core-unlit) calc(var(--unlit) * 100%), var(--core-lit));
-  transition:
-    --lit var(--motion-short) var(--easing-standard),
-    --glass var(--motion-short) var(--easing-standard);
+  transition: --lit var(--motion-short) var(--easing-standard);
+}
+
+:not(.k-button) > .k-ring {
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --tube: color-mix(in srgb, var(--tube-unlit), var(--tube-lit) calc(var(--signs) * 100%));
+  --core: color-mix(in srgb, var(--core-unlit), var(--core-lit) calc(var(--signs) * 100%));
 }
 
 /* On a fill, the line inside the fill's edge is the core, the thin stroke wide. */
@@ -175,58 +170,30 @@
   --line: max(1px, round(nearest, var(--stroke-thin), 1px));
 }
 
-:not(.k-button, :disabled):focus-visible > .k-ring,
-:not(.k-button, :disabled)[data-pinned="focused"] > .k-ring {
-  --lit: max(var(--before), var(--after));
-  --glass: 1;
+:not(.k-button, :disabled):is(:focus-visible, [data-pinned]) > .k-ring {
+  --lit: 1;
 }
 
-/* Focused in its unlit look, whatever the scene: the line all glass, the neon and its glow out. */
-:not(:disabled)[data-pinned="unlit"] > .k-ring {
-  --lit: 0;
-  --glass: 1;
-  --unlit: 1;
+/* Lit with the signs off, whatever the scene: the line glass, the neon and its glow out. */
+:not(.k-button, :disabled)[data-pinned="signs-off"] > .k-ring {
+  --signs: 0;
 }
 
-[data-stutter] :not(.k-button, :disabled):focus-visible > .k-ring {
-  animation: k-strike var(--motion-medium) step-end;
-}
-
-:not(:disabled)[data-pinned="focused"] > .k-ring,
-:not(:disabled)[data-pinned="unlit"] > .k-ring,
+:not(.k-button)[data-pinned] > .k-ring,
 [data-sequence] .k-ring {
   transition: none;
 }
 
-/* During a theme change, a control focused mid-way waits for the strike with the rest. */
-[data-sequence] :not(.k-button, :disabled):focus-visible > .k-ring {
-  animation: none;
-}
-
-@keyframes k-strike {
-  0% { --lit: var(--neon-strike-0); }
-  10% { --lit: var(--neon-strike-1); }
-  20% { --lit: var(--neon-strike-2); }
-  30% { --lit: var(--neon-strike-3); }
-  40% { --lit: var(--neon-strike-4); }
-  50% { --lit: var(--neon-strike-5); }
-  60% { --lit: var(--neon-strike-6); }
-  70% { --lit: var(--neon-strike-7); }
-  80% { --lit: var(--neon-strike-8); }
-  90% { --lit: var(--neon-strike-9); }
-  100% { --lit: 1; }
-}
-
 /* The glow: the tone through its mask, which `lib/focus.ts` works out per device pixel. It is
-   only ever outside the control's box. Daylight puts it out, even where a player moves its
-   opacity. */
+   only ever outside the control's box. With the signs off it is out, even where a player moves
+   its opacity. */
 .k-glow {
   position: absolute;
   inset: calc(-1 * var(--glow-reach));
   --glow-reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
   background: var(--tube-lit);
   opacity: var(--lit);
-  filter: opacity(calc(1 - var(--day)));
+  filter: opacity(var(--signs));
   mask-size: 100% 100%;
 }
 
@@ -237,7 +204,7 @@
   inset: 0;
   border: var(--line) solid var(--tube);
   border-radius: var(--corner);
-  opacity: min(1, calc(var(--neon) + var(--glass) * var(--unlit)));
+  opacity: var(--lit);
 }
 
 .k-ring[data-filled] > .k-tube {
@@ -246,8 +213,9 @@
 
 /* Content drawn in the control's tone, lit as a tube (a Text button's label and icon): a copy of
    it in the tone's core over it, with a faint near glow round its letters and no far one, burning
-   on the ring's `--lit` as the glow does. Unlit, it is out and the content below is its own tone. It sits where the
-   content does: the content is centred in the control, between equal paddings. */
+   on the ring's `--lit` as the glow does. With the signs off, it is out and the content below is
+   its own tone. It sits where the content does: the content is centred in the control, between
+   equal paddings. */
 .k-lit {
   position: absolute;
   inset: 0;
@@ -256,7 +224,7 @@
   justify-content: center;
   --shown: var(--core-lit);
   opacity: var(--lit);
-  filter: opacity(calc(1 - var(--day)));
+  filter: opacity(var(--signs));
 }
 
 .k-lit-glow {
@@ -301,7 +269,8 @@
 /* An active window's tube (`windowRing` in `lib/focus.ts`, `config/hypr/focus.lua`): the window's
    neutral border under the tube, and its neutral shadow, `shadow` at `opacity.window_shadow` at the
    edge falling off as the glow does, under the glow. The lit tube is laid over the border as
-   Hyprland blends them; the shadow gives way as the glow comes, so lit, only the glow is left. */
+   Hyprland blends them; the shadow gives way as the glow comes, so lit with the signs on, only the
+   glow is left. */
 .k-ring[data-window] > .k-border {
   position: absolute;
   inset: 0;
@@ -315,7 +284,7 @@
   --glow-reach: round(up, calc(var(--focus-far) - 0.001px), 1px);
   --edge: calc(1 - (1 - var(--focus-near_opacity)) * (1 - var(--focus-far_opacity)));
   background: rgb(from var(--color-shadow) r g b / calc(var(--opacity-window_shadow) / var(--edge)));
-  opacity: calc(1 - var(--neon));
+  opacity: calc(1 - var(--lit) * var(--signs));
   mask-size: 100% 100%;
 }
 

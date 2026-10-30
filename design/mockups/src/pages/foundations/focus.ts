@@ -1,6 +1,6 @@
 // The Focus foundation: the neon tube and its glow, the line inside the edge of every kind of
-// control, the lit and unlit looks, content lit in its tone, the stutter, where a glow is cut and
-// the active window's tube (`docs/DESIGN.md`, "States").
+// control, lit with the signs on and off, content lit in its tone, the flicker, where a glow is
+// cut and the active window's tube (`docs/DESIGN.md`, "States").
 //
 // The controls other than the button are their shapes alone, drawn for their focus line: each
 // gets its own page, and its own mock, at its level.
@@ -14,15 +14,18 @@ import { nested, role } from "../../lib/radius.ts";
 import { text } from "../../lib/text.ts";
 import { length, names, number, raw } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
-import { type Curve, type Duration, type Easing, foundation, type Move, type NonEmpty, nonEmpty, type Track } from "../../site/page.ts";
+import { type Curve, type Duration, type Easing, foundation, type Move, type NonEmpty, type Track } from "../../site/page.ts";
 import { atScale, MODES, modeName, painted, swatch, table, themes, token } from "../../site/parts/swatches.ts";
-import { type ColourPath, paintBetween, paintGlass, palette, paletteName, themeName } from "../../site/recolour.ts";
+import { type ColourPath, paintBetween, palette, paletteName, themeName } from "../../site/recolour.ts";
 import { strikeSteps, milliseconds } from "../../site/recipe.ts";
 import { themeChange, toDark, toLight } from "../../site/sequences.ts";
 import { type Mode, SCALES, settings } from "../../site/settings.ts";
 
-/** How a control is shown: resting, focused in the look the scene gives it, or focused unlit. */
-type Shown = "rest" | "focused" | "unlit";
+/**
+ * How a control is shown: at rest, lit in the look the scene gives it, or lit with the signs off
+ * whatever the scene. These are the pinned states the button takes too.
+ */
+type Shown = "rest" | "lit" | "signs-off";
 
 /** Every tone a focus line lights in. */
 const ALL_TONES: readonly Tone[] = ["accent", "cold", "error", "success", "warning", "sharing"];
@@ -41,9 +44,9 @@ interface Control {
 /** The words each kind of button shows here. */
 const BUTTON_WORDS: Record<Kind, string> = { Filled: "Continue", Tonal: "Save log", Text: "Back", Danger: "Erase disk", Success: "Finish", Warning: "Restart now" };
 
-/** A button's pinned state for what this page shows: unlit is lit with the signs off. */
+/** A button pinned as this page shows it. */
 function pinnedButton(shown: Shown): { pinned?: "lit" | "signs-off" } {
-  return shown === "rest" ? {} : { pinned: shown === "focused" ? "lit" : "signs-off" };
+  return shown === "rest" ? {} : { pinned: shown };
 }
 
 function buttonControl(kind: Kind, size: Size = "Md"): Control {
@@ -230,7 +233,10 @@ const FOCUS_FOR: Record<string, string> = {
   "focus-content_near": "How far the faint glow round lit content (a Text button's label and icon) reaches, the same at every size.",
   "focus-content_glow": "That glow's opacity at the letters' and strokes' edge.",
   "focus-offset": "The band a picture keeps round itself inside its own box where its neighbours leave no more room: a wallpaper thumbnail, the boot prompt's field. A focused one's glow is cut past it.",
-  "focus-glass": "In daylight, a tube on a control not filled with its tone is unlit glass: the tone's `_unlit` at this opacity over the control's own container.",
+  "focus-label_near": "How far the tiny glow round a lit label on a fill (a Filled button's, at night) reaches.",
+  "focus-label_glow": "That glow's opacity at the letters' edge.",
+  "focus-pressed_glow": "A pressed control's glow: the lit glow this many times brighter.",
+  "focus-glass": "The signs-off tube of a control not filled with its tone and with no glass role of its own (a field, a checkbox, a chip): the tone's `_unlit` at this opacity over the control's own container. A button's glass is a solid role of its kind (`primary_glass`, `primary_fill_glass`, `burn_danger_glass`).",
 };
 
 /** A focus token's value as the tokens write it: a length in logical pixels, or a number. */
@@ -263,10 +269,10 @@ const TONE_LIGHTS: Record<Tone, string> = {
   burn_warning: "A Warning button, burning.",
 };
 
-/** Every tone's tube, its lit core and its unlit core, in the theme and mode picked. */
+/** Every tone's tube, its core and its unlit tone, in the theme and mode picked. */
 function toneTable(): HTMLElement {
   return table(
-    ["Tone", "Tube and glow", "Core, lit", "Core, unlit", "Lights"],
+    ["Tone", "Tube and glow", "Core, signs on", "Unlit, signs off", "Lights"],
     ALL_TONES.map((tone) => {
       const colour = toneColour(tone);
       return [
@@ -321,7 +327,7 @@ function strikeBars(): HTMLElement {
   );
 }
 
-/** Every control, focused in the look the mode gives it, each in a box drawn round its own. */
+/** Every control, lit in the look the mode gives it, each in a box drawn round its own. */
 function everyControl(mode: Mode): HTMLElement {
   return room(
     settings().theme,
@@ -331,7 +337,7 @@ function everyControl(mode: Mode): HTMLElement {
       "f-row",
       ...CONTROLS.map((control) => {
         const boxed = el("div", "f-swatch-cell", label(`${control.name}: ${lineWords(control)}`, "label"));
-        const holder = el("div", "", control.draw("focused"));
+        const holder = el("div", "", control.draw("lit"));
         holder.dataset.boxed = "";
         boxed.append(holder);
         return boxed;
@@ -340,27 +346,27 @@ function everyControl(mode: Mode): HTMLElement {
   );
 }
 
-/** A row per control: dark lit, dark unlit and light, each a painted box. */
+/** A row per control: lit at night with the signs on and off, and by day, each a painted box. */
 function looks(): HTMLElement {
   const theme = settings().theme;
   return table(
-    ["Control", "Dark · lit", "Dark · unlit", "Light · unlit"],
+    ["Control", "Dark · signs on", "Dark · signs off", "Light · signs off"],
     CONTROLS.map((control) => [
       label(control.name, "body_strong", "on_surface"),
-      room(theme, "dark", control.draw("focused")),
-      room(theme, "dark", control.draw("unlit")),
-      room(theme, "light", control.draw("focused")),
+      room(theme, "dark", control.draw("lit")),
+      room(theme, "dark", control.draw("signs-off")),
+      room(theme, "light", control.draw("lit")),
     ]),
   );
 }
 
-/** Every tone on a tile that is off and on one filled with it, lit, unlit at night, and by day. */
+/** Every tone on a tile that is off and on one filled with it, lit with the signs on and off at night, and by day. */
 function toneLooks(): HTMLElement {
   const theme = settings().theme;
   const pair = (tone: Tone, mode: Mode, shown: Shown) => room(theme, mode, row("s16", "start", shape(TILE_OFF, tone, false, shown), shape(tileOn(tone), tone, true, shown)));
   return table(
-    ["Tone", "Dark · lit", "Dark · unlit", "Light · unlit"],
-    ALL_TONES.map((tone) => [label(tone, "body_strong", "on_surface"), pair(tone, "dark", "focused"), pair(tone, "dark", "unlit"), pair(tone, "light", "focused")]),
+    ["Tone", "Dark · signs on", "Dark · signs off", "Light · signs off"],
+    ALL_TONES.map((tone) => [label(tone, "body_strong", "on_surface"), pair(tone, "dark", "lit"), pair(tone, "dark", "signs-off"), pair(tone, "light", "lit")]),
   );
 }
 
@@ -373,15 +379,15 @@ function textButtons(words: string, shown: Shown): HTMLElement {
   );
 }
 
-/** Content lit as a tube: a Text button lit and unlit, at the page's scale and at 2. */
+/** Content lit as a tube: a Text button lit with the signs on and off, at the page's scale and at 2. */
 function litContent(): HTMLElement {
   const theme = settings().theme;
   return el(
     "div",
     "f-row",
-    cell("Dark · lit", room(theme, "dark", textButtons("Back", "focused"))),
-    cell("Dark · unlit", room(theme, "dark", textButtons("Back", "unlit"))),
-    cell("Light · unlit", room(theme, "light", textButtons("Back", "focused"))),
+    cell("Dark · signs on", room(theme, "dark", textButtons("Back", "lit"))),
+    cell("Dark · signs off", room(theme, "dark", textButtons("Back", "signs-off"))),
+    cell("Light · signs off", room(theme, "light", textButtons("Back", "lit"))),
     atScale(2, room(theme, "dark", button({ label: "Back", kind: "Text", size: "Md", icon: "arrow_back", pinned: "lit" }))),
   );
 }
@@ -391,7 +397,7 @@ function cuts(): HTMLElement {
   const { theme, mode } = settings();
   const field = (shown: Shown) => shape(FIELD, "accent", false, shown);
   const scroll = (scrolled: boolean) => {
-    const inside = el("div", "f-cut-scroll", field("focused"), field("rest"), field("rest"));
+    const inside = el("div", "f-cut-scroll", field("lit"), field("rest"), field("rest"));
     inside.toggleAttribute("data-scrolled", scrolled);
     return el("div", "f-cut-panel", inside);
   };
@@ -403,7 +409,7 @@ function cuts(): HTMLElement {
     cell("A scroll with no edge of its own", room(theme, mode, scroll(false))),
     cell("A field scrolled half out of it", room(theme, mode, scroll(true))),
     cell("A card's edge", room(theme, mode, card)),
-    cell("Tiles drawn in order", room(theme, mode, row("s8", "centre", tile("rest"), tile("focused"), tile("rest")))),
+    cell("Tiles drawn in order", room(theme, mode, row("s8", "centre", tile("rest"), tile("lit"), tile("rest")))),
   );
 }
 
@@ -423,7 +429,7 @@ function appWindow(title: string, active: Shown, which?: string): HTMLElement {
 }
 
 /** Two windows on the desktop, the first active. */
-function desktop(theme: string, mode: Mode, active: Shown = "focused"): HTMLElement {
+function desktop(theme: string, mode: Mode, active: Shown = "lit"): HTMLElement {
   const box = painted(theme, mode, el("div", "f-desktop", appWindow("Files", active, "from"), appWindow("Terminal", "rest", "to")));
   box.dataset.room = "";
   return box;
@@ -460,7 +466,7 @@ function live(): HTMLElement {
     stack(
       "s16",
       "start",
-      prose("Tab through these: each strikes on as focus arrives.", "small", "on_surface_variant"),
+      prose("Tab through these: each lights up as focus arrives, a fade, and goes back to rest as it leaves.", "small", "on_surface_variant"),
       ...LIVE_ROWS.map((names) => row("s16", "start", ...names.map((name) => byName(name).draw("rest")))),
     ),
   );
@@ -486,97 +492,80 @@ function neon<C extends Curve>(from: number, to: number, duration: Duration, cur
   ];
 }
 
-/** In daylight the neon is off: the glass comes and goes over `short`, the glow and label out. */
+/** By day the signs are off: the glass comes and goes over `short`, the glow and label out. */
 function glass(from: number, to: number): NonEmpty<Track<Easing>> {
   const unseen: Record<string, string> = {
-    glow: `${on(MOVING)}, unseen: daylight puts the glow out`,
-    label: `${on(LIT)}, unseen: daylight leaves the label its own tone`,
+    glow: `${on(MOVING)}, unseen: by day the signs are off`,
+    label: `${on(LIT)}, unseen: with the signs off the label is its own tone`,
   };
   const [first, ...rest] = neon(from, to, "short", "standard").map((track) => ({ ...track, on: unseen[track.part] ?? track.on }));
   return [first!, ...rest];
 }
 
-const moving = () => controlsRow(MOVING, "focused");
+const moving = () => controlsRow(MOVING, "lit");
 
-/** Focus moving from one field to the next: the tube fading out of one as it strikes on the next. */
+/** Focus moving from one field to the next: the line and glow fading out of one as they light the next. */
 function focusMoves(): Move {
   const two = () => {
-    const [a, b] = [shape(FIELD, "accent", false, "focused"), shape(FIELD, "accent", false, "focused")];
+    const [a, b] = [shape(FIELD, "accent", false, "lit"), shape(FIELD, "accent", false, "lit")];
     a.dataset.focus = "from";
     b.dataset.focus = "to";
     return row("s16", "centre", a, b);
   };
-  const leaving = (part: string, target: string, curve: Easing, duration: Duration): Track<Easing> => ({
-    part: `${part}, leaving`,
-    on: "the field focus leaves",
-    target: `[data-focus="from"] ${target}`,
+  const track = (part: string, which: "from" | "to", target: string, from: number, to: number): Track<Easing> => ({
+    part: `${part}, ${which === "from" ? "leaving" : "arriving"}`,
+    on: which === "from" ? "the field focus leaves" : "the field focus arrives on",
+    target: `[data-focus="${which}"] ${target}`,
     property: "opacity",
-    from: 1,
-    to: 0,
-    duration,
-    curve,
+    from,
+    to,
+    duration: "short",
+    curve: "standard",
   });
-  const arriving = <C extends Curve>(part: string, target: string, curve: C, duration: Duration): Track<C> => ({
-    part: `${part}, arriving`,
-    on: "the field focus arrives on",
-    target: `[data-focus="to"] ${target}`,
-    property: "opacity",
-    from: 0,
-    to: 1,
-    duration,
-    curve,
-  });
-  const faded: NonEmpty<Track<Easing>> = [
-    leaving("tube", ".k-tube", "standard", "short"),
-    leaving("glow", ".k-glow", "standard", "short"),
-    arriving("tube", ".k-tube", "standard", "short"),
-    arriving("glow", ".k-glow", "standard", "short"),
-  ];
   return {
     name: "Focus moves",
-    what: "Tab from one field to the next: the tube and glow fade out of the field focus leaves over `short` on `standard`, while on the next they strike on through `neon.strike`'s steps over `medium`. With the stutter off or motion reduced, both fade over `short`. In light mode only the unlit glass moves, over `short`, the glow out.",
-    tracks: [leaving("tube", ".k-tube", "standard", "short"), leaving("glow", ".k-glow", "standard", "short"), arriving("tube", ".k-tube", "neon.strike", "medium"), arriving("glow", ".k-glow", "neon.strike", "medium")],
-    reduced: faded,
-    unstuttered: faded,
-    daylight: [leaving("tube", ".k-tube", "standard", "short"), arriving("tube", ".k-tube", "standard", "short")],
+    what: "Tab from one field to the next: the field focus leaves goes back to rest as the next lights up, both fades over `short` on `standard`, so for a moment both are half lit. Focus moving is never a power change, so nothing flickers. By day only the glass moves, the glow out.",
+    tracks: [
+      track("tube", "from", ".k-tube", 1, 0),
+      track("glow", "from", ".k-glow", 1, 0),
+      track("tube", "to", ".k-tube", 0, 1),
+      track("glow", "to", ".k-glow", 0, 1),
+    ],
+    reduced: "same",
+    daylight: [track("tube", "from", ".k-tube", 1, 0), track("tube", "to", ".k-tube", 0, 1)],
     back: "cuts",
     sample: two,
   };
 }
 
-/** Focus moving to another window: the one that had it drops at once, the other strikes on. */
-function windowStrikes(): Move {
-  const two = () => el("div", "f-desktop", appWindow("Files", "focused", "from"), appWindow("Terminal", "focused", "to"));
+/** Focus moving to another open window: the one that had it goes back to rest as the other lights up. */
+function windowLights(): Move {
+  const two = () => el("div", "f-desktop", appWindow("Files", "lit", "from"), appWindow("Terminal", "lit", "to"));
   const lit = (which: string) => `[data-window="${which}"] > .k-ring > :is(.k-tube, .k-glow)`;
   const shade = (which: string) => `[data-window="${which}"] > .k-ring > .k-shade`;
-  const track = <C extends Curve>(part: string, on: string, target: string, from: number, to: number, duration: Duration, curve: C): Track<C> => ({
+  const track = (part: string, on: string, target: string, from: number, to: number): Track<Easing> => ({
     part,
     on,
     target,
     property: "opacity",
     from,
     to,
-    duration,
-    curve,
+    duration: "short",
+    curve: "standard",
   });
-  const leaving = (duration: Duration, curve: Easing): Track<Easing>[] => [
-    track("tube and glow, leaving", "the window focus leaves: its border's tube and the glow its shadow draws", lit("from"), 1, 0, duration, curve),
-    track("neutral shadow, back", "the window focus leaves: its shadow in `shadow` at `opacity.window_shadow`", shade("from"), 0, 1, duration, curve),
-  ];
-  const arriving = <C extends Curve>(duration: Duration, curve: C): Track<C>[] => [
-    track("tube and glow, arriving", "the window focus moves to: its border's tube over the neutral border, its shadow's glow", lit("to"), 0, 1, duration, curve),
-    track("neutral shadow, going", "the window focus moves to: the neutral shadow the glow takes the place of", shade("to"), 1, 0, duration, curve),
-  ];
-  const faded = (duration: Duration) => nonEmpty([...leaving(duration, "standard"), ...arriving(duration, "standard")]);
   return {
-    name: "The active window strikes",
-    what: "Focus moving to another window: the window that had it drops to its inactive look at once (its neutral border, `surface_container_highest` at `opacity.window_border`, and its neutral shadow, `shadow` at `opacity.window_shadow`), while the border of the one it moves to strikes on as the tube, `primary`, through `neon.strike`'s steps over `medium`, its shadow becoming the glow in `primary` with it. The window's content never dims. With the stutter off, Hyprland's own border and shadow fades run instead: the old fades out and the new in over `medium`. A workspace switch, a special workspace, a new window and focus coming back after a lock or a closed menu don't strike.",
-    tracks: nonEmpty<Track>([...leaving("instant", "linear"), ...arriving("medium", "neon.strike")]),
-    reduced: faded("short"),
-    unstuttered: faded("medium"),
+    name: "The active window lights up",
+    what: "Focus moving to another window that is already open: a light-up, not a power change, so it fades as focus between controls does. The window that had it goes back to its inactive look over `short` on `standard` (its neutral border, `surface_container_highest` at `opacity.window_border`, and its neutral shadow, `shadow` at `opacity.window_shadow`), while the border of the one it moves to lights up as the tube, `primary`, its shadow becoming the glow in `primary` with it. The window's content never dims. Only a window appearing strikes its tube on, and a window closing goes off for good, through `neon.strike`. By day only the border's glass moves, the glow out.",
+    tracks: [
+      track("tube and glow, leaving", "the window focus leaves: its border's tube and the glow its shadow draws", lit("from"), 1, 0),
+      track("neutral shadow, back", "the window focus leaves: its shadow in `shadow` at `opacity.window_shadow`", shade("from"), 0, 1),
+      track("tube and glow, arriving", "the window focus moves to: its border's tube over the neutral border, its shadow's glow", lit("to"), 0, 1),
+      track("neutral shadow, going", "the window focus moves to: the neutral shadow the glow takes the place of", shade("to"), 1, 0),
+    ],
+    reduced: "same",
     daylight: [
-      track("tube and glow, leaving", "the window focus leaves: its border's unlit glass, the glow unseen: daylight puts it out", lit("from"), 1, 0, "instant", "linear"),
-      track("tube and glow, arriving", "the window focus moves to: its border's unlit glass, which never strikes, the glow unseen", lit("to"), 0, 1, "short", "standard"),
+      track("tube and glow, leaving", "the window focus leaves: its border's glass, the glow unseen: by day the signs are off", lit("from"), 1, 0),
+      track("tube and glow, arriving", "the window focus moves to: its border's glass, the glow unseen", lit("to"), 0, 1),
     ],
     back: "cuts",
     sample: two,
@@ -590,7 +579,7 @@ interface Painted {
 }
 
 /**
- * The scene a sequence plays on: every kind of line focused and an active window, on its own
+ * The scene a sequence plays on: every kind of line lit and an active window, on its own
  * surface painted on its way from `from` to `to` along `path`.
  */
 function scene(from: Painted | string, to: Painted | string, path: ColourPath): () => Element {
@@ -600,13 +589,12 @@ function scene(from: Painted | string, to: Painted | string, path: ColourPath): 
     const painted = el(
       "div",
       "page-scene",
-      label("Every focus line and the active window, on one clock", "body_strong", "on_surface"),
-      controlsRow(MOVING, "focused"),
-      el("div", "f-desktop", appWindow("Files", "focused"), appWindow("Terminal", "rest")),
+      label("Every lit line and the active window, on one clock", "body_strong", "on_surface"),
+      controlsRow(MOVING, "lit"),
+      el("div", "f-desktop", appWindow("Files", "lit"), appWindow("Terminal", "rest")),
     );
     painted.dataset.mode = a.mode;
     paintBetween(painted, path, palette(a.theme, a.mode), palette(b.theme, b.mode));
-    if (a.mode === "dark" && b.mode === "light") paintGlass(painted, palette(b.theme, b.mode), b.mode);
     return el("div", "page-scene-box", painted);
   };
 }
@@ -636,19 +624,19 @@ export default foundation({
   level: "foundations",
   slug: "focus",
   title: "Focus",
-  summary: "The keyboard's focus is a neon tube inside the control's edge, in the control's tone, with a glow outside it: lit at night, unlit glass by day, striking on as a sign does.",
+  summary: "Hovered or focused, a control is lit: a neon line inside its edge, in its tone, with a glow outside it while the signs are on, and the same line as unlit glass while they're off. It lights up with a fade; only a power change flickers.",
   live,
   description: [
-    "Focus from the keyboard is always seen: the focused control's edge is a neon tube. The line is drawn inside the control's box, at its own corner, so nothing on it reaches past the box but the glow, and its shape never seems to grow. On a control not filled with its tone the line is the tube, `focus.tube` wide rounded half up to device pixels, over the control's own outline, so a field, a checkbox or a card has one line, recoloured. A control filled with its tone (a Filled or Danger button, a tile or a switch that is on) can't show a tube of its own colour, so its fill is the tube and the line inside the fill's edge is the tone's core, `stroke.thin` wide.",
-    "Focused has two looks, and the scene picks one, never the user. Lit is the neon burning, in dark mode at rest: the tube in its tone, the core half way to white (`_core`), and the glow outside, a near one over `focus.near` and a faint far one over `focus.far`. Unlit is the same line as unlit glass with no glow, in light mode always and in dark mode while a sequence has the lights out: on a fill the tone's `_unlit` (35% toward black), elsewhere that colour at `focus.glass` over the control's own container. A focus line is always lit neon or unlit glass, never gone.",
-    "The neon takes the control's tone: a Danger button's tube and glow are red, a Cold chip's the cold accent, a control with no tone of its own the accent. Content drawn in the control's own tone with nothing under it (a Text button's label and icon) lights with the line: lit, its letters and strokes are the tone's core with a faint glow round them over `focus.content_near` from `focus.content_glow`; unlit, they are their own tone.",
-    "As focus arrives the tube strikes on as the boot sign's tubes do, `neon.strike`'s ten steps over `medium`; with the stutter off or motion reduced it fades in over `short`, and it fades out over `short` as focus leaves. By day the glass never strikes: it fades. The glow is the control's, so whatever clips the control clips it, but it is cut only at an edge you can see. The active window is in the same family: Hyprland draws its border as the tube and its shadow as the glow.",
+    "Hovering a control and focusing it from the keyboard are one state, lit, so focus is always seen: the lit control's edge is a neon line. The line is drawn inside the control's box, at its own corner, so nothing on it reaches past the box but the glow, and its shape never seems to grow. On a control not filled with its tone the line is the tube, `focus.tube` wide rounded half up to device pixels, over the control's own outline, so a field, a checkbox or a card has one line, recoloured. A control filled with its tone (a Filled or Danger button, a tile or a switch that is on) can't show a tube of its own colour, so the line inside the fill's edge is the tone's core, `stroke.thin` wide.",
+    "Lit has two looks, and the scene picks one, never the user. Signs on is the neon burning, at night while the lights burn: the tube in its tone, the core half way to white (`_core`), and the glow outside, a near one over `focus.near` and a faint far one over `focus.far`. Signs off is the same line as unlit glass with no glow, by day always and at night while a power change has the lights out. The glass is the tone unlit (`_unlit`, its OKLCH lightness × 0.6 and chroma × 1.2, fitted into sRGB by its chroma alone): a button's is a solid role of its kind (Filled's the unlit fill lifted 0.12 in lightness, Tonal's and Text's the accent unlit, the burning kinds' the tone unlit on their lit fill), and a control with no glass role of its own takes the `_unlit` at `focus.glass` over its container. A lit control is lit with the signs on or off, never gone.",
+    "The neon takes the control's tone: a Danger button's line and glow are its burning red, a Cold chip's the cold accent, a control with no tone of its own the accent. Content drawn in the control's own tone with nothing under it (a Text button's label and icon) lights with the line while the signs are on: its letters and strokes are the tone's core with a faint glow round them over `focus.content_near` from `focus.content_glow`; with the signs off, they are their own tone.",
+    "A control lights up as focus arrives, a fade over `short` on `standard`, and goes back to rest over `short` as it leaves; focus moving from one control to the next, or to another open window, is the same fade on both. The flicker, `neon.strike`, is for power changes only: the theme change, dark ⇄ light, a surface appearing and a definite off. In those, a lit control flickers down to its signs-off look and strikes back, while a control at rest just recolours. The glow is the control's, so whatever clips the control clips it, but it is cut only at an edge you can see. The active window is in the same family: Hyprland draws its border as the tube and its shadow as the glow.",
   ],
   tokens: [
     { name: "The focus tokens", described: "Every token of the family, its value as the tokens write it, and what it is for.", sample: focusTokens },
     {
       name: "The tones and their cores",
-      described: "Each tone's tube and glow, its lit core (the tone 50% toward white) and its unlit core (35% toward black), in the theme and mode picked: formulas of the live tone, never values. What lights in each.",
+      described: "Each tone's tube and glow, its core with the signs on (the tone 50% toward white) and its unlit tone with them off (OKLCH lightness × 0.6, chroma × 1.2, gamut fitted), in the theme and mode picked: formulas of the live tone, never values. What lights in each.",
       sample: toneTable,
     },
     {
@@ -657,25 +645,25 @@ export default foundation({
       sample: glowStrip,
     },
     {
-      name: "The stutter: neon.strike",
-      described: "A tube striking: its brightness through ten even steps over `medium`, each held until the next. It stutters, then catches. Focus arriving, the active window and the theme change's lights all strike through the same steps; the theme change's flicker out plays them backwards.",
+      name: "The flicker: neon.strike",
+      described: "A sign switching on: its brightness through ten even steps over `medium`, each held until the next. It stutters, then catches. Only a power change plays it: the theme change's and dark ⇄ light's lights striking on (their flicker out plays the steps backwards), a surface or window appearing, and a definite off. Hover, focus, press and focus moving never flicker: they light up with a fade.",
       sample: strikeBars,
     },
   ],
   rules: [
     {
       name: "One line, inside the edge, on every kind of control",
-      described: "Every kind of control focused and lit, its own box drawn dashed: the tube inside the edge of an unfilled one (Tonal and Text buttons, a field, an invalid field in red, a checkbox, a radio, a Cold chip, a picked card), the core inside the fill's edge of one filled with its tone (Filled and Danger buttons, a tile and a switch that are on). Nothing but the glow is past the dashed box. Tab through the controls in the description to strike them live.",
+      described: "Every kind of control lit, in the look the mode picked gives it, its own box drawn dashed: the tube inside the edge of an unfilled one (Tonal and Text buttons, a field, an invalid field in red, a checkbox, a radio, a Cold chip, a picked card), the core inside the fill's edge of one filled with its tone (Filled and Danger buttons, a tile and a switch that are on). Nothing but the glow is past the dashed box. Tab through the controls in the description to light them live.",
       sample: () => everyControl("dark"),
     },
     {
       name: "The neon takes the control's tone",
-      described: "Each tone on a tile that is off (its tube) and on one filled with it (its core): the tube and glow in the tone, the core its tone half way to white; unlit, the tube is the tone's `_unlit` at `focus.glass` over the tile and the core the `_unlit` itself, with no glow.",
+      described: "Each tone on a tile that is off (its tube) and on one filled with it (its core): with the signs on, the tube and glow in the tone, the core its tone half way to white; with them off, the tube is the tone's `_unlit` at `focus.glass` over the tile and the core the `_unlit` itself, with no glow.",
       sample: toneLooks,
     },
     {
       name: "Content in its tone lights as a tube",
-      described: "A Text button at sm, md and lg. Lit, its label and icon are `primary_core` with a faint near glow round them, `focus.content_near` from `focus.content_glow`, the same at every size, and no far glow; unlit, they are their own `primary`. At 2, the glow's three logical pixels are six device pixels round every letter. Content on a fill or a container (Filled, Danger, Tonal) never lights.",
+      described: "A Text button at sm, md and lg. Lit with the signs on, its label and icon burn as `primary_core` under a faint near glow, `focus.content_near` from `focus.content_glow`, the same at every size, and no far glow; with the signs off, they are its rest label, `primary_rest`, and by day `primary`. At 2, the glow's three logical pixels are six device pixels round every letter. A Filled button's label takes only a tiny glow (`focus.label_near` from `focus.label_glow`); Tonal's and the burning kinds' labels don't glow.",
       sample: litContent,
     },
     {
@@ -691,15 +679,15 @@ export default foundation({
   ],
   modes: [
     {
-      name: "Lit and unlit, in dark and light",
-      described: "Every kind of control focused: dark at rest is lit; dark while a sequence has the lights out is unlit; light is always unlit. The geometry is the same in every look.",
+      name: "Signs on and off, in dark and light",
+      described: "Every kind of control lit: at night the signs are on while the lights burn and off while a power change has them out; by day they are always off. The geometry is the same in every look.",
       sample: looks,
     },
   ],
   themes: [
     {
       name: "The lines in every theme",
-      described: "One of each kind of line in each theme the toolbar paints in, in the mode picked: the tube, the lit label, the core on a fill, a red Danger, a cold chip. Every core is a formula of the theme's tone.",
+      described: "One of each kind of line in each theme the toolbar paints in, in the mode picked: the tube, the lit label, the core on a fill, a burning Danger, a cold chip. Every core is a formula of the theme's tone.",
       sample: () =>
         el(
           "div",
@@ -710,8 +698,8 @@ export default foundation({
               room(
                 theme.slug,
                 settings().mode,
-                el("div", "f-row", ...["Tonal button", "Text button", "Field", "Filled button", "Danger button"].map((name) => byName(name).draw("focused"))),
-                el("div", "f-row", ...["Cold chip", "Switch, on"].map((name) => byName(name).draw("focused"))),
+                el("div", "f-row", ...["Tonal button", "Text button", "Field", "Filled button", "Danger button"].map((name) => byName(name).draw("lit"))),
+                el("div", "f-row", ...["Cold chip", "Switch, on"].map((name) => byName(name).draw("lit"))),
               ),
             ),
           ),
@@ -731,12 +719,12 @@ export default foundation({
     },
     {
       name: "The line at every scale",
-      described: "Each box is drawn at its own scale, whatever the toolbar's: the tube, the core and the lit label, lit.",
+      described: "Each box is drawn at its own scale, whatever the toolbar's: the tube, the core and the lit label, with the signs on.",
       sample: () =>
         el(
           "div",
           "f-scroll",
-          el("div", "f-row", ...SCALES.map((scale) => atScale(scale, room(settings().theme, "dark", controlsRow([CONTROLS[0]!, CONTROLS[1]!, CONTROLS[8]!], "focused"))))),
+          el("div", "f-row", ...SCALES.map((scale) => atScale(scale, room(settings().theme, "dark", controlsRow([CONTROLS[0]!, CONTROLS[1]!, CONTROLS[8]!], "lit"))))),
         ),
     },
   ],
@@ -744,24 +732,14 @@ export default foundation({
     {
       name: "Long words, lit",
       described: "A Text button's lit label in the toolbar's text length: the glow follows every letter, however many, and the tube keeps to the button's box as it grows. Pick long or translated in the toolbar.",
-      sample: () => cell("Dark · lit", room(settings().theme, "dark", textButtons(shown(LONG), "focused"))),
+      sample: () => cell("Dark · signs on", room(settings().theme, "dark", textButtons(shown(LONG), "lit"))),
     },
   ],
   motion: {
     arrives: [
       {
         name: "Focus arrives",
-        what: "The tube strikes on in the control's tone as the boot sign's tubes do, `neon.strike`'s steps over `medium`, and the glow with it. On a fill the core strikes inside the fill's edge; on a Text button the label strikes with the tube, core-hot with its glow. In light mode the neon is off: the unlit glass fades in over `short`, never struck, and the glow and the lit label stay out.",
-        tracks: neon(0, 1, "medium", "neon.strike"),
-        reduced: neon(0, 1, "short", "standard"),
-        unstuttered: neon(0, 1, "short", "standard"),
-        daylight: glass(0, 1),
-        back: "cuts",
-        sample: moving,
-      },
-      {
-        name: "Focus arrives, the stutter off",
-        what: "With `focusStutter` off, or with reduce motion on, the tube, the core, the glow and the lit label fade in together over `short` on `standard`. This player shows it whatever the toolbar's stutter; the one above follows it.",
+        what: "Hovered or focused, the control lights up: a fade over `short` on `standard`, never the flicker, which is for power changes. The tube, the core, the glow and the lit label fade in together: on a fill the core inside the fill's edge, on a Text button the label burning up to the core with its glow. By day the signs are off: only the glass fades in, and the glow and the lit label stay out.",
         tracks: neon(0, 1, "short", "standard"),
         reduced: "same",
         daylight: glass(0, 1),
@@ -772,7 +750,7 @@ export default foundation({
     leaves: [
       {
         name: "Focus leaves",
-        what: "The tube, the core, the glow and the lit label fade out together over `short`, the label back to its own tone; in light mode the unlit glass alone.",
+        what: "The pointer leaves or focus moves on: the tube, the core, the glow and the lit label fade out together over `short` on `standard`, the label back to its own tone; by day the glass alone.",
         tracks: neon(1, 0, "short", "standard"),
         reduced: "same",
         daylight: glass(1, 0),
@@ -782,7 +760,7 @@ export default foundation({
     ],
     between: [
       focusMoves(),
-      windowStrikes(),
+      windowLights(),
       themeMove("neon", "rose"),
       themeMove("lagoon", "moss"),
       toLight({ from: paletteName("neon", "dark"), to: paletteName("neon", "light") }, scene({ theme: "neon", mode: "dark" }, { theme: "neon", mode: "light" }, "dawn")),
@@ -792,7 +770,7 @@ export default foundation({
   checks: [
     { check: "The contrast check", holds: "Holds the tube against every surface it is drawn on (the page, a well, a panel, a card or a dialog, a field's fill, a picked card's), in the accent, the cold accent and the error colour (`[contrast]`)." },
     { check: "The geometry check", holds: "Compares a focused control's box with its resting one: the tube and the glow take no room, so focus never moves layout." },
-    { check: "kubaos-tokens", holds: "Derives every `_core` and `_unlit` from its live tone, and refuses a derived role that names both white and black or neither." },
-    { check: "kubaos-ui and KubaOS.Components", holds: "Draw the glow as bands from the formula, one device pixel apart. Not built yet: the libraries still draw the core outside a fill, light the neon in both modes, light Danger in the accent and leave a Text button's label as it is; the mockups draw the rule, and the libraries take it with the rest of the neon change." },
+    { check: "kubaos-tokens", holds: "Derives every `_core`, `_unlit` and `_glass` from its live tone." },
+    { check: "kubaos-ui and KubaOS.Components", holds: "Draw the glow as bands from the formula, one device pixel apart. Not built yet: the libraries still strike focus through `neon.strike`, draw the core outside a fill, light the neon in both modes, light Danger in the accent and leave a Text button's label as it is, and Hyprland strikes the active window's border; the mockups draw the rule, and the libraries take it with the rest of the neon change." },
   ],
 });

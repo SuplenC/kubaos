@@ -225,7 +225,7 @@ hanko = 120
 # as tall as a large control so a graph and the buttons beside it line up.
 sparkline = 48
 # The mockups' motion player: its plot's height for a progress from 0 to 1, room enough to read a
-# curve's shape and the stutter's steps, with an overshoot drawn above it.
+# curve's shape and the flicker's steps, with an overshoot drawn above it.
 motion_plot = 160
 
 # A page's or a panel's body: its padding on every side, by its own width.
@@ -653,9 +653,10 @@ opacity = 0.55
 # are the same sign.
 [neon]
 # A tube striking: its brightness through ten even steps over `medium`. It
-# stutters, then catches. The focus tube strikes the same way as focus
-# arrives, on a control and on the active window's border, unless the user
-# turns the stutter off.
+# stutters, then catches. Only a power change flickers this way: the theme
+# change and dark and light switching their lights, a surface or a window
+# appearing, a definite off. Hover, focus and focus moving light up with a
+# fade instead.
 strike = [0.6, 0.0, 0.9, 0.2, 0.0, 1.0, 0.4, 1.0, 0.8, 1.0]
 
 # The クバ mark: its strokes in the order a hand writes them (ク's tick and

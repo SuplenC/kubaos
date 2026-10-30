@@ -9,7 +9,7 @@ import { el, label, prose } from "../../site/dom.ts";
 import { type Duration, doesntApply, type Easing, foundation, type Move, nonEmpty } from "../../site/page.ts";
 import { table, token } from "../../site/parts/swatches.ts";
 import { bezier, eased, milliseconds, reach } from "../../site/recipe.ts";
-import { type ColourPath, paintBetween, paintGlass, palette, paletteName, themeName } from "../../site/recolour.ts";
+import { type ColourPath, paintBetween, palette, paletteName, themeName } from "../../site/recolour.ts";
 import { themeChange, toDark, toLight } from "../../site/sequences.ts";
 import { type Mode, SPEEDS, settings } from "../../site/settings.ts";
 
@@ -118,8 +118,8 @@ function curveTable(): HTMLElement {
 
 /** What moves on which duration and curve, by what it is (`docs/DESIGN.md`, "Motion"). */
 const BY_WHAT: readonly { readonly what: string; readonly duration: Duration | null; readonly curve: Easing | "neon.strike" }[] = [
-  { what: "A hover or press state layer, a colour change under the pointer", duration: "micro", curve: "standard" },
-  { what: "A switch's knob, a check mark, focus moving", duration: "short", curve: "standard" },
+  { what: "A control pressed, a colour change under the pointer", duration: "micro", curve: "standard" },
+  { what: "A control lighting up or going back to rest, hovered or focused; focus moving, between controls or windows; a switch's knob, a check mark", duration: "short", curve: "standard" },
   { what: "A slider settling on its step", duration: "short", curve: "standard_decel" },
   { what: "A slider's anchor dot popping in", duration: "short", curve: "pop" },
   { what: "A list reordering, a live list's row opening its room", duration: "medium", curve: "standard_decel" },
@@ -127,7 +127,7 @@ const BY_WHAT: readonly { readonly what: string; readonly duration: Duration | n
   { what: "A panel or dialog arriving, a page sliding in, the log opening", duration: "long", curve: "emphasized_decel" },
   { what: "A panel or dialog leaving", duration: "medium", curve: "emphasized_accel" },
   { what: "The wallpaper carousel's step", duration: "long", curve: "spring" },
-  { what: "A neon tube striking on, the focus tube too", duration: "medium", curve: "neon.strike" },
+  { what: "A power change's lights: a surface or window appearing, a definite off, the theme change and dark ⇄ light. Never focus or hover", duration: "medium", curve: "neon.strike" },
   { what: "Every colour role in a theme change or the dark ⇄ light switch", duration: "recolour", curve: "gather" },
   { what: "Progress that tracks a real quantity, a spinner", duration: null, curve: "linear" },
 ];
@@ -206,7 +206,7 @@ interface Painted {
   readonly mode: Mode;
 }
 
-/** The scene a sequence plays on: every kind of button focused, on its way between two palettes. */
+/** The scene a sequence plays on: every kind of button lit, on its way between two palettes. */
 function scene(from: Painted | string, to: Painted | string, path: ColourPath): () => Element {
   return () => {
     const mode = settings().mode;
@@ -220,7 +220,6 @@ function scene(from: Painted | string, to: Painted | string, path: ColourPath): 
     );
     painted.dataset.mode = a.mode;
     paintBetween(painted, path, palette(a.theme, a.mode), palette(b.theme, b.mode));
-    if (a.mode === "dark" && b.mode === "light") paintGlass(painted, palette(b.theme, b.mode), b.mode);
     return el("div", "page-scene-box", painted);
   };
 }
@@ -240,7 +239,7 @@ export default foundation({
     "Beautiful and fast. Every move takes a duration token and a curve token by what it is: a state layer `micro` on `standard`, a panel arriving `long` on `emphasized_decel` and leaving `medium` on `emphasized_accel`. Beside it, every duration races from one start, each bar its length at speed 1, `space.s16` for every 100 ms, filling at the speed the toolbar picks.",
     "Arriving is slower than leaving: you look at what arrives, and what leaves is already done with. A surface a key summons to act and go is a step quicker, since it opens and closes many times an hour.",
     "The speed setting, 0.5× to 2×, divides every duration, cue and beat. Reduce motion caps every duration at `short` and turns moves into fades, or into nothing; the theme change and the dark ⇄ light switch swap their colours at once. Both are the toolbar's, so every player on every page plays what they make of its move.",
-    "The theme change and the dark ⇄ light switch are one sequence each, on one clock for every light and colour on every screen, played below from the same recipes the Button page and the toolbar play. The neon's stutter, `neon.strike`, is on the Focus page.",
+    "The theme change and the dark ⇄ light switch are one sequence each, on one clock for every light and colour on every screen, played below from the same recipes the Button page and the toolbar play. The neon's flicker, `neon.strike`, is on the Focus page: it plays only for power changes.",
     "What never animates: typed text and the caret, layout around focus, a window's size or place, and anything while the user drags it. Every animation runs at the display's full refresh rate; one that drops a frame is a bug, measured with the frame times, not judged by eye.",
   ],
   tokens: [
@@ -287,7 +286,7 @@ export default foundation({
   checks: [
     { check: "kubaos-tokens", holds: "Generates every duration and curve for every toolkit from `design/tokens.toml`, so a move names a token, never a number." },
     { check: "kubaos-design lint", holds: "Fails on a duration or a curve written out in QML or Rust UI code." },
-    { check: "The players' check", holds: "`just mockups-check` seeks every player on every page and holds each ball to the progress the browser plays, with its own tracks, reduced motion's, light mode's, the stutter off's and at speed 2." },
+    { check: "The players' check", holds: "`just mockups-check` seeks every player on every page and holds each ball to the progress the browser plays, with its own tracks, reduced motion's, light mode's, the flicker off's and at speed 2." },
     { check: "Not enforced yet", holds: "Neither library reads the speed setting or reduce motion yet, nothing measures frame times, and nothing moves on `spring` or `gather` outside the mockups." },
   ],
 });

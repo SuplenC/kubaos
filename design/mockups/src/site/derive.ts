@@ -171,3 +171,31 @@ export function derived(palette: Palette, mode: Mode): Palette {
   for (const name of Object.keys(all)) role(name);
   return Object.fromEntries(Object.entries(out).filter(([name]) => !all[name]!.formula));
 }
+
+/** A derived role as the Colour page lists it: the role it starts from, and its recipe in words. */
+export interface Described {
+  readonly role: string;
+  /** The role it is computed from: a tone, or another derived role. */
+  readonly tone: string;
+  /** The roles it is text on, fitted to hold 4.5:1 on each; empty for a role that isn't text. */
+  readonly textOn: readonly string[];
+  readonly words: string;
+}
+
+/** Every derived role of `mode`, its recipe in words, as `kubaos-tokens` computes it. */
+export function described(mode: Mode): Described[] {
+  return Object.entries(recipesOf(mode)).map(([role, recipe]) => {
+    const tone = recipe.mix ?? recipe.from ?? "";
+    const start = recipe.mix === undefined ? `\`${tone}\`` : `\`${tone}\` ${Math.round((recipe.white ?? recipe.black ?? 0) * 1000) / 10}% toward ${recipe.white !== undefined ? "white" : "black"}`;
+    const moves = [
+      ...(recipe.at_lightness !== undefined ? [`at OKLCH lightness ${recipe.at_lightness}`] : []),
+      ...(recipe.lightness !== undefined ? [`lightness × ${recipe.lightness}`] : []),
+      ...(recipe.lighter !== undefined ? [`lightness + ${recipe.lighter}`] : []),
+      ...(recipe.darker !== undefined ? [`lightness − ${recipe.darker}`] : []),
+      ...(recipe.chroma !== undefined ? [`chroma × ${recipe.chroma}`] : []),
+    ];
+    const fitted = moves.length > 0 ? [`${moves.join(", ")}, fitted into sRGB by its chroma alone`] : [];
+    const text = recipe.text_on ? [`its lightness fitted to hold 4.5:1 on ${recipe.text_on.map((each) => `\`${each}\``).join(", ")}`] : [];
+    return { role, tone, textOn: recipe.text_on ?? [], words: [start, ...fitted, ...text].join("; ") };
+  });
+}
