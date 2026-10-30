@@ -80,18 +80,6 @@
   padding: calc((var(--height) - var(--line)) / 2) var(--padding);
   border-radius: var(--radius-control);
   cursor: pointer;
-  /* Its states, as numbers: `--lit`, hovered or focused, and `--press`. Lit has two looks, picked
-     by `--signs`, how brightly the signs burn: at night while the lights do (`--before`, `--after`),
-     never by day. Signs on, the neon burns; signs off, the line is glass and nothing glows. So a
-     sequence flickers a lit button down to its signs-off look and strikes it back, and its line is
-     never gone. `--on` is how much of the neon shows. */
-  --lit: 0;
-  --press: 0;
-  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
-  --on: calc(var(--lit) * var(--signs));
-  /* The line's share of the lit state, worked out here: the ring under the button keeps a `--lit`
-     of its own for other controls, which would hide the button's. */
-  --line-shown: var(--lit);
   --lit-fill: color-mix(in srgb, var(--fill-off), var(--fill-lit) calc(var(--signs) * 100%));
   background: color-mix(
     in srgb,
@@ -100,34 +88,33 @@
   );
   --lit-label: color-mix(in srgb, var(--label-off), var(--label-lit) calc(var(--signs) * 100%));
   --shown: color-mix(in srgb, var(--label), var(--lit-label) calc(var(--lit) * 100%));
-  /* Hover, focus and press light up: a fade, never the flicker, which is for power changes. */
-  transition:
-    --lit var(--motion-short) var(--easing-standard),
-    --press var(--motion-micro) var(--easing-standard);
 }
 
-.k-button:not(:disabled):is(:hover, :focus-visible, [data-pinned]) {
-  --lit: 1;
+/* An icon button: a circle as tall as the label button of its size, its symbol centred on a whole
+   device pixel. */
+.k-button[data-icon-only] {
+  width: var(--height);
+  padding: 0;
+  border-radius: var(--radius-full);
 }
 
-.k-button:not(:disabled):is(:active, [data-pinned="pressed"]) {
-  --press: 1;
+.k-icon-slot {
+  display: block;
+  flex: none;
+  position: relative;
+  width: var(--height);
+  height: var(--height);
 }
 
-/* Lit with the signs off, whatever the scene: the line glass, the neon and its glow out. */
-.k-button:not(:disabled)[data-pinned="signs-off"] {
-  --signs: 0;
+.k-icon-slot > .k-icon {
+  position: absolute;
+  left: round(nearest, calc((var(--height) - var(--icon-size)) / 2), 1px);
+  top: round(nearest, calc((var(--height) - var(--icon-size)) / 2), 1px);
 }
 
 /* A Text button pressed by day: its tone as a faint tint under it. By night it has no fill. */
 .k-button[data-kind="Text"] {
   background: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press)));
-}
-
-/* Pinned or in a sequence, a state shows at once: nothing moved, or the sequence's clock moves it. */
-.k-button[data-pinned],
-[data-sequence] .k-button {
-  transition: none;
 }
 
 .k-button:disabled {
@@ -148,7 +135,7 @@
    do (`--before`, `--after`), never by day. Signs on, the line is the tube or the core in its lit
    colour with the glow outside; signs off, the same line is unlit glass and nothing glows. So a
    sequence flickers a lit ring down to its signs-off look and strikes it back, and its line is
-   never gone. A button works out its own `--signs` (`.k-button`), which its ring keeps. */
+   never gone. A ring inside a control (`.k-control`) keeps the control's states. */
 .k-ring {
   position: absolute;
   inset: 0;
@@ -159,7 +146,7 @@
   transition: --lit var(--motion-short) var(--easing-standard);
 }
 
-:not(.k-button) > .k-ring {
+:not(.k-control, .k-control *) > .k-ring {
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --tube: color-mix(in srgb, var(--tube-unlit), var(--tube-lit) calc(var(--signs) * 100%));
   --core: color-mix(in srgb, var(--core-unlit), var(--core-lit) calc(var(--signs) * 100%));
@@ -170,16 +157,16 @@
   --line: max(1px, round(nearest, var(--stroke-thin), 1px));
 }
 
-:not(.k-button, :disabled):is(:focus-visible, [data-pinned]) > .k-ring {
+:not(.k-control, :disabled):is(:focus-visible, [data-pinned]) > .k-ring {
   --lit: 1;
 }
 
 /* Lit with the signs off, whatever the scene: the line glass, the neon and its glow out. */
-:not(.k-button, :disabled)[data-pinned="signs-off"] > .k-ring {
+:not(.k-control, :disabled)[data-pinned="signs-off"] > .k-ring {
   --signs: 0;
 }
 
-:not(.k-button)[data-pinned] > .k-ring,
+:not(.k-control)[data-pinned] > .k-ring,
 [data-sequence] .k-ring {
   transition: none;
 }
@@ -237,36 +224,137 @@
   mask-size: 100% 100%;
 }
 
-/* A button's line and glow (`lib/focus.ts`'s ring): the line inside its edge whenever it is lit,
-   in its kind's colour with the signs on and as glass with them off; the glow outside only with
-   the signs on, a pressed glow `focus.pressed_glow` times the lit one (the mask holds the pressed
-   glow; lit shows it at its share). A label that glows lit (Filled's, Text's) keeps its own colour:
-   only the glow round it shows, with the signs on. */
-.k-button > .k-ring > .k-tube {
-  border-color: color-mix(in srgb, var(--edge-off), var(--edge) calc(var(--signs) * 100%));
+/* A hint (`lib/hint.ts`): the bubble floats `space.s8` under its control, centred on it on a whole
+   device pixel, as wide as its words rounded up to a device pixel and its padding. It shows while
+   the pointer is over the control, or the control is lit from the keyboard or pinned lit, and
+   fades in and out over `short`. The pointer never takes it. */
+.k-hint {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + var(--space-s8));
+  --width: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s8));
+  left: round(nearest, calc((100% - var(--width)) / 2), 1px);
+  display: block;
+  box-sizing: border-box;
+  width: var(--width);
+  padding: var(--space-s4) var(--space-s8);
+  border-radius: var(--radius-small);
+  background: var(--color-on_surface);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--motion-short) var(--easing-standard);
+}
+
+/* A bubble on its own, shown as itself: in the flow, where its sample puts it. */
+:not(.k-hinted) > .k-hint {
+  position: relative;
+  top: auto;
+  left: auto;
+}
+
+/* A control at the window's end: its bubble is held inside the window, its end on the window's. */
+.k-hint[data-held="end"] {
+  left: auto;
+  right: 0;
+}
+
+.k-hinted:is(:hover, :focus-visible, [data-pinned]) > .k-hint,
+.k-hint[data-shown] {
+  opacity: 1;
+}
+
+.k-hinted[data-pinned] > .k-hint,
+.k-hint[data-shown] {
+  transition: none;
+}
+
+/* A sample's room for its control's hint, which floats and takes none of its own: below the
+   control, and as wide as the bubble where it is wider, the control in the middle on a whole
+   device pixel. */
+.k-hint-room {
+  --bubble: calc(round(up, calc(var(--natural) * var(--px) - 0.001px), 1px) + 2 * var(--space-s8));
+  display: block;
+  width: max(var(--side), var(--bubble));
+  padding-bottom: calc(var(--space-s8) + var(--type-label-line) + 2 * var(--space-s4));
+}
+
+.k-hint-room > * {
+  margin-left: max(0px, round(down, calc((var(--bubble) - var(--side)) / 2), 1px));
+}
+
+/* A control in the state model (`docs/DESIGN.md`, "States"): a button, an icon button, a switch,
+   a checkbox, a radio, a pressable chip. Its states are numbers: `--lit`, hovered or focused, and
+   `--press`. Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while
+   the lights do (`--before`, `--after`), never by day. Signs on, the neon burns; signs off, the
+   line is glass and nothing glows. So a sequence flickers a lit control down to its signs-off look
+   and strikes it back, and its line is never gone. `--on` is how much of the neon shows. Each is
+   worked out here, on the control, so a ring anywhere inside it (a checkbox's on its box) keeps
+   them: a ring's own `--lit` is for a bare one. Placed after every control's own rule, whose
+   `all: unset` would throw out its transition. */
+.k-control {
+  --lit: 0;
+  --press: 0;
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --on: calc(var(--lit) * var(--signs));
+  --line-shown: var(--lit);
+  /* Hover, focus and press light up: a fade, never the flicker, which is for power changes. */
+  transition:
+    --lit var(--motion-short) var(--easing-standard),
+    --press var(--motion-micro) var(--easing-standard);
+}
+
+.k-control:not(:disabled, [aria-disabled="true"]):is(:hover, :focus-visible, [data-pinned]) {
+  --lit: 1;
+}
+
+.k-control:not(:disabled, [aria-disabled="true"]):is(:active, [data-pinned="pressed"]) {
+  --press: 1;
+}
+
+/* Lit with the signs off, whatever the scene: the line glass, the neon and its glow out. */
+.k-control:not(:disabled, [aria-disabled="true"])[data-pinned="signs-off"] {
+  --signs: 0;
+}
+
+/* Pinned or in a sequence, a state shows at once: nothing moved, or the sequence's clock moves it. */
+.k-control[data-pinned],
+[data-sequence] .k-control {
+  transition: none;
+}
+
+/* A control's line and glow (`lib/focus.ts`'s ring): the line inside its edge whenever it is lit,
+   with the signs on in its lit colour and with them off as glass; the glow outside only with the
+   signs on, a pressed glow `focus.pressed_glow` times the lit one (the mask holds the pressed glow;
+   lit shows it at its share). A control names its line's two colours (`--edge`, `--edge-off`) when
+   they are roles of its own (a filled one's core and glass); otherwise the line is the ring's tube
+   and its glass, the tone's `_unlit` at `focus.glass`. A label that glows lit (a Filled button's, a
+   Text button's) keeps its own colour: only the glow round it shows, with the signs on. */
+.k-control .k-ring > .k-tube {
+  border-color: color-mix(in srgb, var(--edge-off, var(--tube-unlit)), var(--edge, var(--tube-lit)) calc(var(--signs) * 100%));
   opacity: var(--line-shown);
 }
 
-.k-button > .k-ring > .k-glow {
+.k-control .k-ring > .k-glow {
   opacity: calc(var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)) / var(--focus-pressed_glow));
   filter: none;
 }
 
-.k-button > .k-ring > .k-lit {
+.k-control .k-ring > .k-lit {
   opacity: var(--on);
   filter: none;
 }
 
-.k-button > .k-ring > .k-lit > :not(.k-lit-glow) {
+.k-control .k-ring > .k-lit > :not(.k-lit-glow) {
   visibility: hidden;
 }
 
-/* A Text button pressed with the signs on: its tube runs white-hot, to the core. */
-.k-button[data-kind="Text"] > .k-ring > .k-tube {
+/* A control whose line is a tube with nothing filled under it (a Text button, a switch that is
+   off, an empty checkbox), pressed with the signs on: its tube runs white-hot, to the core. */
+.k-control[data-hot] .k-ring > .k-tube {
   border-color: color-mix(
     in srgb,
-    var(--color-primary_core) calc(var(--press) * var(--signs) * 100%),
-    color-mix(in srgb, var(--edge-off), var(--edge) calc(var(--signs) * 100%))
+    var(--core-lit) calc(var(--press) * var(--signs) * 100%),
+    color-mix(in srgb, var(--edge-off, var(--tube-unlit)), var(--edge, var(--tube-lit)) calc(var(--signs) * 100%))
   );
 }
 
