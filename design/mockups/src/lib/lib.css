@@ -286,6 +286,70 @@
   margin-left: max(0px, calc(var(--bubble) - var(--side)));
 }
 
+/* A switch (`lib/switch.ts`): its track, a circle at each end, and its knob, both following
+   `--checked` from off to on. Off, the track is the highest container with a hairline of `outline`
+   inside its edge and a knob of `outline`, which brightens to `on_surface_variant` while lit with
+   the signs on. On, it is filled with the accent: at night the unlit fill (`primary_fill`) with a
+   knob of `on_primary_fill`, which brightens to `on_primary_fill_lit` with the signs on, as a
+   Filled button's label does; pressed, the fill lifts. Off and pressed by day, the tone tints the
+   track, as under a Text button. Its line is the tube off and the core on (`--edge`). */
+.k-switch {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  flex: none;
+  width: var(--size-switch_width);
+  height: var(--size-switch_height);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  --track-on: color-mix(in srgb, var(--color-primary_fill), var(--color-primary_fill_pressed) calc(var(--press) * 100%));
+  --tint: rgb(from var(--color-primary) r g b / calc(var(--opacity-press_tint) * var(--day) * var(--press) * (1 - var(--checked))));
+  background:
+    linear-gradient(var(--tint), var(--tint)),
+    color-mix(in srgb, var(--color-surface_container_highest), var(--track-on) calc(var(--checked) * 100%));
+  --knob-off: color-mix(in srgb, var(--color-outline), var(--color-on_surface_variant) calc(var(--on) * 100%));
+  --knob-on: color-mix(in srgb, var(--color-on_primary_fill), var(--color-on_primary_fill_lit) calc(var(--on) * 100%));
+  --knob: color-mix(in srgb, var(--knob-off), var(--knob-on) calc(var(--checked) * 100%));
+  --edge: color-mix(in srgb, var(--color-primary), var(--color-primary_fill_line) calc(var(--checked) * 100%));
+  --edge-off: color-mix(
+    in srgb,
+    rgb(from var(--color-primary_unlit) r g b / var(--focus-glass)),
+    var(--color-primary_fill_glass) calc(var(--checked) * 100%)
+  );
+}
+
+/* The hairline inside the track's edge while off, fading as it turns on. */
+.k-switch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: var(--stroke-hairline_device_px) solid var(--color-outline);
+  border-radius: inherit;
+  opacity: calc(1 - var(--checked));
+}
+
+.k-switch-knob {
+  position: absolute;
+  --diameter: calc(var(--size-switch_knob_off) + (var(--size-switch_knob_on) - var(--size-switch_knob_off)) * var(--checked));
+  left: calc(var(--size-switch_height) / 2 + (var(--size-switch_width) - var(--size-switch_height)) * var(--checked) - var(--diameter) / 2);
+  top: calc((var(--size-switch_height) - var(--diameter)) / 2);
+  width: var(--diameter);
+  height: var(--diameter);
+  border-radius: var(--radius-full);
+  background: var(--knob);
+}
+
+.k-switch:disabled {
+  cursor: default;
+  background: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_container));
+  --knob: rgb(from var(--color-on_surface) r g b / var(--opacity-disabled_content));
+}
+
+.k-switch:disabled::before {
+  opacity: 0;
+}
+
 /* A control in the state model (`docs/DESIGN.md`, "States"): a button, an icon button, a switch,
    a checkbox, a radio, a pressable chip. Its states are numbers: `--lit`, hovered or focused, and
    `--press`. Lit has two looks, picked by `--signs`, how brightly the signs burn: at night while
@@ -301,10 +365,12 @@
   --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
   --on: calc(var(--lit) * var(--signs));
   --line-shown: var(--lit);
-  /* Hover, focus and press light up: a fade, never the flicker, which is for power changes. */
+  /* Hover, focus, press and turning on or picking are fades, never the flicker, which is for power
+     changes. */
   transition:
     --lit var(--motion-short) var(--easing-standard),
-    --press var(--motion-micro) var(--easing-standard);
+    --press var(--motion-micro) var(--easing-standard),
+    --checked var(--motion-short) var(--easing-standard);
 }
 
 .k-control:not(:disabled, [aria-disabled="true"]):is(:hover, :focus-visible, [data-pinned]) {
