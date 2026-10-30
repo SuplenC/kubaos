@@ -118,7 +118,7 @@ A single-line control's label takes the control's content box as its line height
 
 ### Icons by type
 
-Every style names the icon that sits beside it on its line (`icon` in `[type.*]`, `Type::icon()` in Rust, `Tokens.type.<style>.icon` in QML). A component takes its icon's size from its text's style, never a size of its own: a `ListRow`'s symbol is `body_strong`'s, a `Chip`'s `label`'s, a `Md` button's `button`'s. An icon picked by a free number is how icons came to scale badly against the text beside them.
+Every style names the icon that sits beside it on its line (`icon` in `[type.*]`, `Type::icon()` in Rust, `Tokens.type.<style>.icon` in QML). A component takes its icon's size from its text's style, never a size of its own: a `ListRow`'s symbol is `body_strong`'s, a `Chip`'s `label`'s, an md button's `button`'s. An icon picked by a free number is how icons came to scale badly against the text beside them.
 
 | Icon | Beside |
 |---|---|
@@ -441,7 +441,7 @@ A search over a list in the shell is a `KotodamaSearch` over a Kotodama app's It
 - **A group of controls that belong together but aren't a list** (Capture's buttons beside what they do, a proxy's details) sits in a `Card`: 16 inside.
 - **The panel's own controls** (its header, the quick toggles, the sliders) sit on the panel, with nothing around them: wrapping them would put a box round the whole panel.
 - A card or a well is never inside another; the container padding is the only padding around them.
-- **A form takes its list's place.** Connecting to an item of a list (a Wi-Fi network's password, a Bluetooth pairing) turns the list's well into the form, the two cross-fading over `short` (`standard`), so nothing floats over the list. The form is centred in the well: the item's `Lg` icon tile, its name in `headline` 12 under it, a `small` line under that (Secured · WPA2, what to do on the device), then 16 under it what it asks for (a `Field`, or a pairing code in `headline`), a `small` status line under that (Connecting…, or the error, which keeps the form open), and the buttons 16 under it: Cancel (`Text`) on the left, the action (`Filled`) on the right. Enter does the action and Esc cancels, with no key hints; Tab goes field, Cancel, action. Success goes back to the list. Wi-Fi and Bluetooth share it (`modules/controlcenter/ConnectForm.qml`).
+- **A form takes its list's place.** Connecting to an item of a list (a Wi-Fi network's password, a Bluetooth pairing) turns the list's well into the form, the two cross-fading over `short` (`standard`), so nothing floats over the list. The form is centred in the well: the item's lg icon tile, its name in `headline` 12 under it, a `small` line under that (Secured · WPA2, what to do on the device), then 16 under it what it asks for (a `Field`, or a pairing code in `headline`), a `small` status line under that (Connecting…, or the error, which keeps the form open), and the buttons 16 under it: Cancel (`Text`) on the left, the action (`Filled`) on the right. Enter does the action and Esc cancels, with no key hints; Tab goes field, Cancel, action. Success goes back to the list. Wi-Fi and Bluetooth share it (`modules/controlcenter/ConnectForm.qml`).
 - **What scrolls in a well or a card is cut by its own shape**, not by a rectangle inside its padding: the rows scroll right up to the well's rounded edge, and the padding is the scroll's padding, the room above the first row and below the last. In the shell the well clips to its rounded shape (`ScrollingList`). iced 0.14 clips only to rectangles, so `kubaos-ui`'s scrolling list cuts at the well's own rectangle, with the padding inside the scroll; at its rounded corners a row passing the curve, and the thumb at either end of its rail, show past it until iced clips to shapes. In both, the well's hairline and focus tube are drawn over the rows, so a row scrolled to the edge never covers them. A grid of pictures scrolls a whole row at a time, so no picture is ever cut.
 
 Rules the feedback components carry:
@@ -545,6 +545,7 @@ What can't use the libraries still follows the tokens as far as it can go:
 The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a person reads. What it means for UI copy:
 
 - **Sentence case** everywhere: titles, buttons, labels, menu Items. "Save log", never "Save Log".
+- **Sizes are lowercase abbreviations** in anything a person reads: sm, md, lg (and xs, xl), never "Sm" or "Lg", in labels, headings, descriptions and docs alike. An identifier keeps its language's case (`ButtonSize::Lg` in Rust, `size: "Lg"` in QML).
 - **A label stays a label.** Field names, settings' titles and buttons that only say what they do are plain; the attitude goes in messages and subtitles (BRAND.md rule 2).
 - **Name things with `GLOSSARY.md`'s terms**: a Suite, the User layer, Kōbō, never a synonym.
 - **An error says the cause and the next action**: "Fuck. The disk is in use, so nothing got written. Free it and try again." The `ErrorBlock`'s message is the cause, its hint the next action.

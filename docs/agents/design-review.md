@@ -11,6 +11,7 @@ What Kuba checks in every UI change. A design brief includes this list, and a PR
 - **Focus glow is for the keyboard.** A pointer click selects quietly (a filled background); the focus ring shows only when the keyboard has focus.
 - **An app is a window.** A surface you work in for a while (Settings, a tool) is a normal window: it tiles, drags, resizes and closes with Super+Q like any other app, at a generous default size and never a fixed one. Overlays are for glances: the Command menu, panels, notifications.
 - **Key hints are keycaps,** one cap per key, never text on text.
+- **Sizes are written lowercase.** A label, heading, description or doc says sm, md, lg, never "Sm" or "Lg"; only code keeps its identifiers' case (`ButtonSize::Lg`).
 - **Icons are sized to the text beside them** and stay crisp at every scale. Where rows carry icons of different shapes, each icon sits on a tinted tile, so every row reads the same size.
 - **Readable in both modes.** Logos, the lock screen and the tray read in light and in dark.
 - **Danger looks dangerous.** A destructive step is a properly red card. Its action sits inside that card, held to confirm, so it can't be pressed by accident.
