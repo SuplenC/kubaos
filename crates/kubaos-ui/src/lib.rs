@@ -17,6 +17,7 @@
 //! - Layout on the grid ([`layout`], [`grid`], [`scroll`]), the focus tube ([`focus`]) and the
 //!   components ([`component`]).
 //! - What each box is, for the geometry check ([`probe`]).
+//! - Templates, a screen's layout before an app fills it ([`template`]).
 //!
 //! # Not here
 //!
@@ -35,6 +36,7 @@ pub mod probe;
 pub mod scale;
 pub mod scroll;
 pub mod snap;
+pub mod template;
 pub mod text;
 #[rustfmt::skip]
 #[expect(
