@@ -1,6 +1,6 @@
 // The motion player: each move live on its sample, looping (its first state held, the move, its
-// last state held, then back), with pause, restart and slow motion, a scrubber to seek it frame by
-// frame, and its recipe beside it: every part, property, value, timing, curve and keyframe, what
+// last state held, then back), with pause, restart and slow motion, a plot of its tracks' curves
+// over the loop to seek it on frame by frame, and its recipe beside it: every part, property, value, timing, curve and keyframe, what
 // reduced motion and the speed make of it, as tables and as JSON. The sample is animated with the
 // Web Animations API from the move's own data (`site/recipe.ts`), so a frame seeked to is exactly
 // the frame that plays, and the recipe shown is what plays.
@@ -23,11 +23,14 @@ import {
   type TrackSet,
   type Span,
   steps,
+  type Timed,
   strikeSteps,
   tokenOf,
   tracksOf,
 } from "../recipe.ts";
+import { redrawRings } from "../../lib/focus.ts";
 import { CHROME, onChange } from "../settings.ts";
+import { legend, type Mark, Plot, swatch } from "./plot.ts";
 import { partOr, subheading } from "./section.ts";
 
 /** How many times slower slow motion plays. */
@@ -81,6 +84,13 @@ interface Lit {
   readonly lit: (t: number, playing: Loop) => boolean;
 }
 
+/** A track's row in the recipe: its set and its place in it, which the player picks it by. */
+interface Row {
+  readonly row: HTMLElement;
+  readonly set: TrackSet;
+  readonly index: number;
+}
+
 function table(heads: readonly string[], rows: readonly HTMLElement[]): HTMLElement {
   return el("table", "page-table", el("thead", "", el("tr", "", ...heads.map((h) => cell(h, true)))), el("tbody", "", ...rows));
 }
@@ -91,12 +101,14 @@ function within(t: number, spans: readonly Span[]): boolean {
 }
 
 /** The table of `set`'s tracks, each row lit while its part moves. */
-function tracksTable(tracks: readonly Track[], set: TrackSet, lits: Lit[]): HTMLElement {
-  const rows = tracks.map((track) => {
+function tracksTable(tracks: readonly Track[], set: TrackSet, lits: Lit[], picks: Row[]): HTMLElement {
+  const rows = tracks.map((track, i) => {
+    // The row's swatch is its curve's on the plot, when this set plays.
+    const part = el("td", "", el("span", "page-plot-key", swatch(i), label(track.part, "small", "on_surface")));
     const row = el(
       "tr",
       "",
-      cell(track.part),
+      part,
       cell(track.on),
       cell(`\`${track.property}\``),
       cell(valueWords(track.from)),
@@ -105,6 +117,7 @@ function tracksTable(tracks: readonly Track[], set: TrackSet, lits: Lit[]): HTML
       cell(track.cue ? `\`duration.${track.cue}\` ${milliseconds(track.cue)} ms after the start` : "at the start"),
       cell(curveWords(track)),
     );
+    picks.push({ row, set, index: i });
     lits.push({
       row,
       lit: (t, playing) => {
@@ -145,11 +158,11 @@ function keyframeTables(tracks: readonly Track[], set: TrackSet, lits: Lit[]): H
 }
 
 /** The recipe of `move`: its tracks, their keyframes, reduced motion, the stutter off, speed. */
-function recipeOf(move: Move, lits: Lit[]): HTMLElement {
+function recipeOf(move: Move, lits: Lit[], picks: Row[]): HTMLElement {
   const of = (set: TrackSet, words: string): Element[] => {
     const tracks = tracksOf(move, set);
     if (!tracks) return [];
-    return [label(words, "body_strong", "on_surface"), tracksTable(tracks, set, lits), ...keyframeTables(tracks, set, lits)];
+    return [label(words, "body_strong", "on_surface"), tracksTable(tracks, set, lits, picks), ...keyframeTables(tracks, set, lits)];
   };
   return el(
     "div",
@@ -180,8 +193,8 @@ function loopTable(playing: Loop, lits: Lit[]): HTMLElement {
   );
 }
 
-/** The marks on the scrubber: each part's start and end, and each keyframe. */
-function marks(playing: Loop): { at: number; kind: "part" | "key"; words: string }[] {
+/** The marks under the plot: each part's start and end, and each keyframe. */
+function marks(playing: Loop): Mark[] {
   const found = new Map<number, { at: number; kind: "part" | "key"; words: string[] }>();
   const add = (at: number, kind: "part" | "key", words: string) => {
     const key = Math.round(at * 100);
@@ -205,6 +218,7 @@ function marks(playing: Loop): { at: number; kind: "part" | "key"; words: string
 function player(move: Move): HTMLElement {
   const sample = move.sample();
   const stage = el("div", "page-player-stage mock", sample);
+  const whole = el("div", "page-player");
   let playing = loop(move);
   let animations: Animation[] = [];
   let running = CHROME;
@@ -214,17 +228,58 @@ function player(move: Move): HTMLElement {
   let frame = 0;
 
   const lits: Lit[] = [];
-  const recipePart = recipeOf(move, lits);
+  const picks: Row[] = [];
+  const recipePart = recipeOf(move, lits, picks);
   const loopPart = el("div", "");
   let loopLits: Lit[] = [];
 
-  const head = el("div", "page-scrubber-head");
-  const marksBox = el("div", "page-scrubber-marks");
-  const bar = el("div", "page-scrubber", el("div", "page-scrubber-rail"), marksBox, head);
+  const plot = new Plot();
+  const bar = el("div", "page-plot-box", plot.element);
   bar.tabIndex = 0;
   bar.setAttribute("role", "slider");
   bar.setAttribute("aria-label", `${move.name}: where the playhead is`);
-  const readout = el("div", "page-scrubber-time");
+  const key = el("div", "");
+  const readout = el("div", "page-plot-time");
+  const parts = el("div", "page-parts");
+  const outlines = el("div", "page-player-outlines");
+  stage.append(outlines);
+
+  /**
+   * Picks the playing track `i`, or none: its row, curve, legend key and stage light, and its
+   * layers are outlined on the whole sample.
+   */
+  function pick(i: number | null): void {
+    const track = i === null ? null : (playing.timed[i]?.track ?? null);
+    whole.toggleAttribute("data-picking", track !== null);
+    for (const item of whole.querySelectorAll("[data-pick]")) {
+      const set = item.getAttribute("data-pick-set");
+      item.toggleAttribute("data-picked", track !== null && item.getAttribute("data-pick") === String(i) && (set === null || set === playing.set));
+    }
+    outlines.replaceChildren();
+    if (!track) return;
+    const origin = stage.getBoundingClientRect();
+    const zoom = stage.offsetWidth / origin.width || 1;
+    for (const layer of stage.querySelectorAll(track.target)) {
+      const box = layer.getBoundingClientRect();
+      const outline = el("div", "page-player-outline");
+      outline.style.left = `${(box.left - origin.left) * zoom}px`;
+      outline.style.top = `${(box.top - origin.top) * zoom}px`;
+      outline.style.width = `${box.width * zoom}px`;
+      outline.style.height = `${box.height * zoom}px`;
+      outlines.append(outline);
+    }
+  }
+
+  /**
+   * Makes `item` pick track `i` while the pointer is on it: of the tracks playing, or of `set`'s,
+   * a recipe row's, only while that set plays.
+   */
+  function pickable(item: Element, i: number, set?: TrackSet): void {
+    item.setAttribute("data-pick", String(i));
+    if (set) item.setAttribute("data-pick-set", set);
+    item.addEventListener("pointerenter", () => pick(set === undefined || set === playing.set ? i : null));
+    item.addEventListener("pointerleave", () => pick(null));
+  }
 
   const rate = () => (slow ? 1 / SLOW : 1);
   const now = () => Number(document.timeline.currentTime ?? 0);
@@ -244,7 +299,7 @@ function player(move: Move): HTMLElement {
 
   function show(t: number): void {
     const at = frameOf(t);
-    head.style.setProperty("--at", String(t / playing.total));
+    plot.at(t);
     readout.textContent = `${Math.round(t)} ms · frame ${at + 1} of ${lastFrame() + 1} · a frame is ${shown(FRAME)} ms (60 Hz)`;
     bar.setAttribute("aria-valuemin", "0");
     bar.setAttribute("aria-valuemax", String(Math.round(playing.total)));
@@ -287,39 +342,75 @@ function player(move: Move): HTMLElement {
     else hold(t);
   }
 
+  /** `timed`'s animations on its targets inside `root`, paused, from the move's own keyframes. */
+  function animate(root: Element, timed: Timed): Animation[] {
+    const targets = [...root.querySelectorAll<HTMLElement>(timed.track.target)];
+    if (targets.length === 0) throw new Error(`${move.name}: no ${timed.track.target} in its sample`);
+    if (!CHROME) {
+      // A shot holds the first state. It is set from the move's data rather than animated, since
+      // a screenshot cancels every animation that never ends.
+      for (const target of targets) target.style.setProperty(timed.track.property, String(css(timed.track.from)));
+      return [];
+    }
+    const frames = keyframes(timed, playing.total);
+    return targets.map((target) => {
+      const animation = target.animate(frames, { duration: playing.total, iterations: Number.POSITIVE_INFINITY, fill: "both" });
+      animation.pause();
+      return animation;
+    });
+  }
+
+  /**
+   * Each part alone, for a move of more than one: the sample drawn again with the other parts'
+   * layers hidden and only the controls the part is on, its layer animated by the same keyframes
+   * on the player's one clock, so the part and the whole never disagree.
+   */
+  function drawParts(): Animation[] {
+    if (playing.timed.length < 2) {
+      parts.replaceChildren();
+      return [];
+    }
+    const added: Animation[] = [];
+    parts.replaceChildren(
+      ...playing.timed.map((timed, i) => {
+        const alone = move.sample();
+        const target = timed.track.target;
+        for (const other of playing.timed) {
+          for (const layer of alone.querySelectorAll<HTMLElement>(other.track.target)) {
+            if (!layer.matches(target)) layer.style.visibility = "hidden";
+          }
+        }
+        if (alone.hasAttribute("data-layout")) {
+          for (const child of [...alone.children]) {
+            if (!child.matches(target) && !child.querySelector(target)) child.remove();
+          }
+        }
+        added.push(...animate(alone, timed));
+        const box = el("div", "page-part-stage mock", alone);
+        const part = el("div", "page-part-alone", el("span", "page-plot-key", swatch(i), label(`${timed.track.part} (${timed.track.on})`, "small", "on_surface")), box);
+        pickable(part, i);
+        return part;
+      }),
+    );
+    redrawRings();
+    return added;
+  }
+
   /** Builds the animations from the move's data, for the settings picked, and goes on at `t`. */
   function build(t: number): void {
     for (const animation of animations) animation.cancel();
+    pick(null);
     playing = loop(move);
-    animations = playing.timed.flatMap((timed) => {
-      const targets = [...stage.querySelectorAll<HTMLElement>(timed.track.target)];
-      if (targets.length === 0) throw new Error(`${move.name}: no ${timed.track.target} in its sample`);
-      if (!CHROME) {
-        // A shot holds the first state. It is set from the move's data rather than animated, since
-        // a screenshot cancels every animation that never ends.
-        for (const target of targets) target.style.setProperty(timed.track.property, String(css(timed.track.from)));
-        return [];
-      }
-      const frames = keyframes(timed, playing.total);
-      return targets.map((target) => {
-        const animation = target.animate(frames, { duration: playing.total, iterations: Number.POSITIVE_INFINITY, fill: "both" });
-        animation.pause();
-        return animation;
-      });
-    });
+    animations = playing.timed.flatMap((timed) => animate(stage, timed));
+    animations.push(...drawParts());
     loopLits = [];
     loopPart.replaceChildren(loopTable(playing, loopLits));
-    marksBox.replaceChildren(
-      ...marks(playing).map((mark) => {
-        const element = el("span", "page-scrubber-mark");
-        element.dataset.kind = mark.kind;
-        element.title = mark.words;
-        element.style.setProperty("--at", String(mark.at / playing.total));
-        element.dataset.at = String(mark.at);
-        return element;
-      }),
-    );
-    go(Math.min(t, playing.total - 1e-3));
+    key.replaceChildren(legend(playing.timed.map((timed) => timed.track)));
+    for (const [i, item] of [...key.querySelectorAll(".page-plot-key")].entries()) pickable(item, i);
+    const at = Math.min(t, playing.total - 1e-3);
+    plot.draw(playing, marks(playing), at);
+    for (const [i, curve] of plot.hits().entries()) pickable(curve, i);
+    go(at);
   }
 
   const playControl = control("Pause", null, () => {
@@ -329,7 +420,7 @@ function player(move: Move): HTMLElement {
   });
   if (!running) playControl.textContent = "Play";
 
-  /** Stops the player at `t`, as the scrubber does. */
+  /** Stops the player at `t`, as seeking on the plot does. */
   function pause(t: number): void {
     running = false;
     playControl.textContent = "Play";
@@ -356,15 +447,13 @@ function player(move: Move): HTMLElement {
     });
   });
 
-  const seekTo = (event: PointerEvent) => {
-    const box = bar.getBoundingClientRect();
-    pause(((event.clientX - box.left) / box.width) * playing.total);
-  };
+  const seekTo = (event: PointerEvent) => pause(plot.timeAt(event.clientX));
   bar.addEventListener("pointerdown", (event) => {
     bar.setPointerCapture(event.pointerId);
-    // A mark pressed is its exact moment, wherever on its width the pointer is.
-    const mark = event.target instanceof HTMLElement ? event.target.closest<HTMLElement>(".page-scrubber-mark") : null;
-    if (mark?.dataset.at) pause(Number(mark.dataset.at));
+    // A mark pressed is its exact moment, wherever on its target the pointer is.
+    const mark = event.target instanceof Element ? event.target.closest(".page-plot-mark") : null;
+    const at = mark?.getAttribute("data-at");
+    if (at) pause(Number(at));
     else seekTo(event);
   });
   bar.addEventListener("pointermove", (event) => {
@@ -387,21 +476,35 @@ function player(move: Move): HTMLElement {
 
   const forget = onChange((_, changed) => {
     if (changed.has("reduced") || changed.has("speed") || changed.has("stutter")) build(current());
+    else if (changed.has("scale")) plot.draw(playing, marks(playing), current());
   });
+  for (const { row, set, index } of picks) pickable(row, index, set);
   build(0);
 
-  const whole = el(
-    "div",
-    "page-player",
+  whole.append(
     el("div", "page-player-words", label(move.name, "body_strong", "on_surface"), prose(move.what)),
     stage,
     el("div", "page-player-controls", playControl, restart, slowControl, copy),
     bar,
     readout,
-    prose("Drag or click the bar to hold a moment; ← and → step a frame, with Shift ten. The marks are each part's start and end and each keyframe.", "small", "on_surface_variant"),
+    key,
+    parts,
+    prose(
+      "The loop across, in milliseconds, holds included; each part's progress from its `from` (0) to its `to` (1) up, along its curve, a ball on it at the playhead. Drag or click the plot to hold a moment; ← and → step a frame, with Shift ten. The ticks under it are each part's start and end, and each keyframe: click one to go to it. Under the legend, a move of more than one part plays each alone on the same clock, the sample with the other parts hidden; pointing at a part's row, curve or stage picks it everywhere, outlined on the whole.",
+      "small",
+      "on_surface_variant",
+    ),
     recipePart,
     loopPart,
   );
+  // The plot is as wide as the player: drawn again when that changes.
+  let drawnWidth = 0;
+  const resize = new ResizeObserver(() => {
+    if (bar.clientWidth === drawnWidth) return;
+    drawnWidth = bar.clientWidth;
+    plot.draw(playing, marks(playing), current());
+  });
+  resize.observe(bar);
   // Only a player on screen runs: one scrolled away holds where it is.
   const watch = new IntersectionObserver(([entry]) => {
     visible = entry?.isIntersecting ?? false;
@@ -411,6 +514,7 @@ function player(move: Move): HTMLElement {
   players.add(() => {
     forget();
     watch.disconnect();
+    resize.disconnect();
     cancelAnimationFrame(frame);
     for (const animation of animations) animation.cancel();
   });

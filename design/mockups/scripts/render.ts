@@ -12,52 +12,19 @@
 // The browser is nixpkgs' Playwright Chromium (`PLAYWRIGHT_BROWSERS_PATH`, set by `nix develop`
 // and `just shots`). An error the page throws or logs fails the run.
 
-import { createReadStream, existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { createServer } from "node:http";
-import type { AddressInfo } from "node:net";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright-core";
+import { chromiumPath, serve } from "./browser.ts";
 
 const WIDTH = 1280;
 const SCALES = ["1", "1.25", "1.5", "2"];
 const MODES = ["dark", "light"];
-const TYPES: Record<string, string> = {
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".ttf": "font/ttf",
-  ".svg": "image/svg+xml",
-};
 
 function usage(): never {
   process.stderr.write("usage: node scripts/render.ts OUT [--shots] [--frames] [--scales 1,1.5] [--modes dark,light] [--motion] [PAGE...]\n");
   process.exit(2);
-}
-
-function chromiumPath(): string {
-  const browsers = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  if (!browsers) throw new Error("PLAYWRIGHT_BROWSERS_PATH is unset: run me in `nix develop`");
-  const dir = readdirSync(browsers).find((name) => name.startsWith("chromium-"));
-  if (!dir) throw new Error(`no Chromium in ${browsers}`);
-  return path.join(browsers, dir, "chrome-linux64", "chrome");
-}
-
-/** Serves `root` on a free local port, for as long as the process runs. */
-async function serve(root: string): Promise<string> {
-  const server = createServer((request, response) => {
-    const url = new URL(request.url ?? "/", "http://localhost");
-    const file = path.join(root, decodeURIComponent(url.pathname === "/" ? "/index.html" : url.pathname));
-    if (!file.startsWith(root) || !existsSync(file) || !statSync(file).isFile()) {
-      response.writeHead(404).end();
-      return;
-    }
-    response.writeHead(200, { "content-type": TYPES[path.extname(file)] ?? "application/octet-stream" });
-    createReadStream(file).pipe(response);
-  });
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
-  server.unref();
-  return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
 
 async function main(): Promise<void> {

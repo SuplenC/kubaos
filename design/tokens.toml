@@ -205,6 +205,9 @@ hanko = 120
 # A sparkline in a panel: the system monitor's graphs, the last minute of a reading at a glance,
 # as tall as a large control so a graph and the buttons beside it line up.
 sparkline = 48
+# The mockups' motion player: its plot's height for a progress from 0 to 1, room enough to read a
+# curve's shape and the stutter's steps, with an overshoot drawn above it.
+motion_plot = 160
 
 # A page's or a panel's body: its padding on every side, by its own width.
 # Tailwind's container, `px-4 sm:px-6 lg:px-8`, on Tailwind's default

@@ -132,7 +132,7 @@ mockups *args: _mockups-deps
 mockups-build: _mockups-deps
     cd design/mockups && npm run -s build
 
-# The mockups' pages laid out in headless Chromium at every scale, light and dark, each held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`): the same boxes as the build, wherever each page puts it.
+# The mockups' pages laid out in headless Chromium at every scale, light and dark, each held to the geometry rules, and each mocked component to its twin on the specimen's pages (`kubaos-specimen mockup`): the same boxes as the build, wherever each page puts it. Then every motion player seeked and held to its recipe (`scripts/player-test.ts`).
 mockups-check: mockups-build
     #!/usr/bin/env bash
     set -euo pipefail
@@ -140,6 +140,7 @@ mockups-check: mockups-build
     trap 'rm -rf "$frames"' EXIT
     (cd design/mockups && node scripts/render.ts "$frames" --frames)
     cargo run -q -p kubaos-specimen -- mockup "$frames"
+    (cd design/mockups && node scripts/player-test.ts)
 
 # The mockup site's npm dependencies, from its package-lock.json, when node_modules is missing or older than the lock.
 _mockups-deps:
