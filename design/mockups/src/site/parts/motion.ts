@@ -173,7 +173,7 @@ function keyframeTables(tracks: readonly Track[], set: TrackSet, lits: Lit[]): H
   });
 }
 
-/** The recipe of `move`: its tracks, their keyframes, reduced motion, the stutter off, speed. */
+/** The recipe of `move`: its tracks, their keyframes, reduced motion, the flicker off, speed. */
 function recipeOf(move: Move, lits: Lit[], picks: Row[]): HTMLElement {
   const of = (set: TrackSet, words: string): Element[] => {
     const tracks = tracksOf(move, set);
@@ -188,7 +188,7 @@ function recipeOf(move: Move, lits: Lit[], picks: Row[]): HTMLElement {
       ? [label("Reduced motion", "body_strong", "on_surface"), prose("The same: every duration is within the `short` that reduced motion caps durations at.", "small")]
       : of("reduced", "Reduced motion")),
     ...of("daylight", "In light mode, where the neon is off"),
-    ...of("unstuttered", "With the stutter off"),
+    ...of("unflickered", "With the flicker off"),
     ...(move.tail
       ? [label("The closing beat", "body_strong", "on_surface"), prose(`After the last part, a still \`duration.${move.tail}\`, ${milliseconds(move.tail)} ms, that belongs to the move; reduced motion's move has none.`, "small")]
       : []),
@@ -594,7 +594,7 @@ function player(move: Move): HTMLElement {
   });
 
   const forget = onChange((_, changed) => {
-    if (changed.has("reduced") || changed.has("speed") || changed.has("stutter")) build(current());
+    if (changed.has("reduced") || changed.has("speed") || changed.has("flicker")) build(current());
     else if (changed.has("scale")) plot.draw(playing, marks(playing), current());
   });
   for (const { row, set, index } of picks) pickable(row, index, set);

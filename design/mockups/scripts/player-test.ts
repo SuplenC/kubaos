@@ -1,7 +1,7 @@
 // Drives the motion players of the built site (`dist/`) in headless Chromium and holds them to
 // their recipes: seeking on the plot holds the exact frame, and each track's ball sits on its
 // curve at the progress the browser is playing, for every easing and each of `neon.strike`'s
-// steps, with the move's own tracks, reduced motion's, light mode's and the stutter off's. Each
+// steps, with the move's own tracks, reduced motion's, light mode's and the flicker off's. Each
 // part alone moves with the whole, or with its own ball where a later track on its property wins
 // the whole, a mark seeks to its moment, and the arrow keys step a 60 Hz frame.
 //
@@ -124,13 +124,13 @@ async function ranges(page: Page): Promise<Map<string, { from: number; to: numbe
   const found = new Map<string, { from: number; to: number }[]>();
   for (const list of Object.values(recipes ?? {})) {
     if (!Array.isArray(list)) continue;
-    for (const move of list as { name: string; tracks: unknown; reduced: unknown; daylight?: unknown; unstuttered?: unknown }[]) {
+    for (const move of list as { name: string; tracks: unknown; reduced: unknown; daylight?: unknown; unflickered?: unknown }[]) {
       const of = (tracks: unknown) =>
         (tracks as { from: { value: number }; to: { value: number } }[]).map((track) => ({ from: track.from.value, to: track.to.value }));
       found.set(`${move.name}|tracks`, of(move.tracks));
       if (move.reduced !== "same") found.set(`${move.name}|reduced`, of(move.reduced));
       if (move.daylight) found.set(`${move.name}|daylight`, of(move.daylight));
-      if (move.unstuttered) found.set(`${move.name}|unstuttered`, of(move.unstuttered));
+      if (move.unflickered) found.set(`${move.name}|unflickered`, of(move.unflickered));
     }
   }
   return found;
@@ -274,16 +274,16 @@ async function main(): Promise<void> {
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     const base = "text=short&window=Default";
-    await page.goto(`${origin}/index.html?${base}&mode=dark&scale=1&speed=1&reduced=off&stutter=on`);
+    await page.goto(`${origin}/index.html?${base}&mode=dark&scale=1&speed=1&reduced=off&flicker=on`);
     await page.evaluate(() => window.kubaos.ready);
     const pages = (await page.evaluate(() => window.kubaos.pages)).filter((p) => named.length === 0 || named.includes(p.slug));
     for (const { level, slug } of pages) {
       for (const [settings, set] of [
-        ["mode=dark&scale=1&speed=1&reduced=off&stutter=on", "tracks"],
-        ["mode=light&scale=1.5&speed=1&reduced=off&stutter=on", "daylight"],
-        ["mode=dark&scale=1&speed=2&reduced=off&stutter=on", "tracks"],
-        ["mode=dark&scale=1&speed=1&reduced=on&stutter=on", "reduced"],
-        ["mode=dark&scale=1&speed=1&reduced=off&stutter=off", "unstuttered"],
+        ["mode=dark&scale=1&speed=1&reduced=off&flicker=on", "tracks"],
+        ["mode=light&scale=1.5&speed=1&reduced=off&flicker=on", "daylight"],
+        ["mode=dark&scale=1&speed=2&reduced=off&flicker=on", "tracks"],
+        ["mode=dark&scale=1&speed=1&reduced=on&flicker=on", "reduced"],
+        ["mode=dark&scale=1&speed=1&reduced=off&flicker=off", "unflickered"],
       ] as const) {
         await testPage(page, origin, level, slug, `${base}&${settings}`, set);
       }

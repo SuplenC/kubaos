@@ -75,7 +75,7 @@ async function main(): Promise<void> {
         const failOnErrors = () => {
           if (errors.length > 0) throw new Error(`the page failed: ${errors.join("; ")}`);
         };
-        const query = `chrome=off&mode=${mode}&scale=${scale}&text=short&reduced=off&speed=1&stutter=on&window=Default`;
+        const query = `chrome=off&mode=${mode}&scale=${scale}&text=short&reduced=off&speed=1&flicker=on&window=Default`;
         await page.goto(`${origin}/index.html?${query}`);
         await page.evaluate(() => window.kubaos.ready);
         failOnErrors();

@@ -52,7 +52,7 @@ export interface Settings {
   scale: Scale;
   reduced: boolean;
   speed: Speed;
-  stutter: boolean;
+  flicker: boolean;
   text: TextLength;
   window: string;
 }
@@ -63,7 +63,7 @@ const DEFAULTS: Settings = {
   scale: 1,
   reduced: false,
   speed: 1,
-  stutter: true,
+  flicker: true,
   text: "short",
   window: "Default",
 };
@@ -81,7 +81,7 @@ function parsed(raw: Record<string, string | null | undefined>): Partial<Setting
   if (raw.reduced === "on" || raw.reduced === "off") found.reduced = raw.reduced === "on";
   const speed = SPEEDS.find((s) => String(s) === raw.speed);
   if (speed !== undefined) found.speed = speed;
-  if (raw.stutter === "on" || raw.stutter === "off") found.stutter = raw.stutter === "on";
+  if (raw.flicker === "on" || raw.flicker === "off") found.flicker = raw.flicker === "on";
   if (raw.text === "short" || raw.text === "long" || raw.text === "translated") found.text = raw.text;
   if (WINDOWS.some((w) => w.name === raw.window) && raw.window) found.window = raw.window;
   return found;
@@ -107,7 +107,7 @@ function serialised(settings: Settings): Record<string, string> {
     scale: String(settings.scale),
     reduced: settings.reduced ? "on" : "off",
     speed: String(settings.speed),
-    stutter: settings.stutter ? "on" : "off",
+    flicker: settings.flicker ? "on" : "off",
     text: settings.text,
     window: settings.window,
   };
@@ -156,7 +156,7 @@ export function apply(page: HTMLElement): void {
   page.style.setProperty("--scale", String(current.scale));
   page.style.setProperty("--speed", String(current.speed));
   page.toggleAttribute("data-reduced", current.reduced);
-  page.toggleAttribute("data-stutter", current.stutter && !current.reduced);
+  page.toggleAttribute("data-flicker", current.flicker && !current.reduced);
 }
 
 /** The window size picked, by its name. */
