@@ -55,3 +55,10 @@ export const MODES: readonly Mode[] = ["dark", "light"];
 export function modeName(mode: Mode): string {
   return mode === "dark" ? "Dark" : "Light";
 }
+
+/** `children` drawn at `scale`, whatever the page's: a box of its own whose lengths follow it. */
+export function atScale(scale: number, ...children: Element[]): HTMLElement {
+  const box = el("div", "mock f-at-scale", ...children);
+  box.style.setProperty("--scale", String(scale));
+  return el("div", "f-swatch-cell", label(`${scale}×`, "label"), box);
+}
