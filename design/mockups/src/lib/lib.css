@@ -123,7 +123,11 @@
    In daylight (`--day` 1) it is off: the tube is unlit glass, which never strikes, and there is no
    glow. `--lit` is how brightly the neon burns, `--glass` how much the unlit glass shows. A focused
    ring burns as brightly as the lights before a theme change (`--before`) or after it (`--after`),
-   so a sequence on the page's one clock dims and strikes every focused ring together. */
+   so a sequence on the page's one clock dims and strikes every focused ring together.
+
+   The line is the neon and the glass crossfaded by `--unlit`, how much of it is glass: the switch
+   between dark and light moves `--unlit` on the lights' own steps, so as each step dims the neon
+   the glass takes its place, and the line is never gone. */
 .k-ring {
   position: absolute;
   inset: 0;
@@ -132,8 +136,9 @@
   --lit: 0;
   --glass: 0;
   --line: max(1px, round(nearest, var(--focus-tube), 1px));
-  --tube: color-mix(in srgb, var(--tube-unlit) calc(var(--day) * 100%), var(--tube-lit));
-  --core: color-mix(in srgb, var(--core-unlit) calc(var(--day) * 100%), var(--core-lit));
+  --neon: calc(var(--lit) * (1 - var(--day)));
+  --tube: color-mix(in srgb, var(--tube-unlit) calc(var(--unlit) * 100%), var(--tube-lit));
+  --core: color-mix(in srgb, var(--core-unlit) calc(var(--unlit) * 100%), var(--core-lit));
   transition:
     --lit var(--motion-short) var(--easing-standard),
     --glass var(--motion-short) var(--easing-standard);
@@ -198,7 +203,7 @@
   inset: 0;
   border: var(--line) solid var(--tube);
   border-radius: var(--corner);
-  opacity: max(calc(var(--lit) * (1 - var(--day))), calc(var(--glass) * var(--day)));
+  opacity: min(1, calc(var(--neon) + var(--glass) * var(--unlit)));
 }
 
 .k-ring[data-filled] > .k-tube {
