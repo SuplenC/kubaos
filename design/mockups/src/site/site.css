@@ -812,3 +812,68 @@ body {
   width: var(--size-rail);
   outline: var(--stroke-hairline_device_px) dashed var(--color-outline_variant);
 }
+
+/* A padding, shaded as the measures overlay shades one, round content tinted as a component is. */
+.f-pad {
+  align-self: flex-start;
+  padding: var(--pad-block, 0) var(--pad-inline, 0);
+  background: rgb(from var(--color-warning) r g b / var(--opacity-press));
+}
+
+.f-content {
+  display: flex;
+  background: rgb(from var(--color-cold) r g b / var(--opacity-tint));
+}
+
+/* A length drawn along a line, or as a square on a side: exact, with no rounded ends. */
+.f-bar {
+  width: var(--length);
+  height: var(--space-s8);
+  background: var(--color-primary);
+}
+
+.f-square {
+  width: var(--length);
+  height: var(--length);
+  background: var(--color-primary);
+}
+
+/* Something wider than the page at a large scale scrolls on its own, rather than the page. */
+.f-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.f-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s24);
+}
+
+/* Rows of a list at their natural height, a hairline between them. */
+.f-rows {
+  display: flex;
+  flex-direction: column;
+  width: var(--size-panel);
+  background: var(--color-surface_container_low);
+}
+
+.f-row-box {
+  display: flex;
+  align-items: center;
+  height: var(--height);
+  padding-inline: var(--space-s16);
+  border-bottom: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.f-row-box:last-child {
+  border-bottom: none;
+}
+
+.f-card-box {
+  display: flex;
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_high);
+}

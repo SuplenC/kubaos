@@ -9,7 +9,7 @@ import { type TypeStyle, text, typeset } from "../../lib/text.ts";
 import { length, names, raw, words } from "../../lib/tokens.ts";
 import { el, label, prose } from "../../site/dom.ts";
 import { doesntApply, foundation } from "../../site/page.ts";
-import { MODES, modeName, painted, table, token } from "../../site/parts/swatches.ts";
+import { atScale, MODES, modeName, painted, table, token } from "../../site/parts/swatches.ts";
 import { SCALES, settings } from "../../site/settings.ts";
 
 /** Every type style, largest first, then by its line. */
@@ -172,13 +172,6 @@ function deviceLengths(): HTMLElement {
       }),
     ]),
   );
-}
-
-/** A sample drawn at `scale`, whatever the page's: a box of its own whose lengths follow its scale. */
-function atScale(scale: number, ...children: Element[]): HTMLElement {
-  const box = el("div", "mock f-at-scale", ...children);
-  box.style.setProperty("--scale", String(scale));
-  return el("div", "f-swatch-cell", label(`${scale}×`, "label"), box);
 }
 
 /** A title and a paragraph in a panel's width, English beside its translation. */
