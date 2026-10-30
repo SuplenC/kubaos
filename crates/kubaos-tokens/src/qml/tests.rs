@@ -80,16 +80,16 @@ fn the_fixed_roles_are_written_in_both_palettes() {
     let singleton = render(&QmlTokens);
 
     for role in [
-        "sharing: \"#c9a7ff\"",
-        "sharing: \"#6b3fc4\"",
+        "sharing: \"#b484ff\"",
+        "sharing: \"#8038d1\"",
         "logo_core_warm: \"#ffe6cf\"",
         "logo_core_cold: \"#dcf1ff\"",
-        "microphone: \"#ff9f45\"",
-        "microphone: \"#a04a00\"",
-        "camera: \"#5fd27a\"",
-        "camera: \"#1b7131\"",
-        "success: \"#5fd27a\"",
-        "success: \"#1b7131\"",
+        "microphone: \"#ff8505\"",
+        "microphone: \"#9e5000\"",
+        "recording: \"#ff6d78\"",
+        "recording: \"#cb003a\"",
+        "success: \"#3cc96a\"",
+        "success: \"#007533\"",
         "readonly property color sharing: tokens.role(\"sharing\")",
     ] {
         assert!(singleton.contains(role), "{role}");
