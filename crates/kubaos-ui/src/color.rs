@@ -12,6 +12,7 @@
 use iced::Color;
 
 use crate::tokens;
+use crate::tokens::Derived;
 use crate::tokens::Mode;
 use crate::tokens::Palette;
 use crate::tokens::Rgb;
@@ -26,6 +27,18 @@ pub fn colors(mode: Mode) -> Colors {
 
 pub fn rgb(c: Rgb) -> Color {
     Color::from_rgb8(c.r, c.g, c.b)
+}
+
+/// The derived role `role` in `colors`: its tone there taken `role.white` of the way to white,
+/// each 8-bit channel rounded half up as the tokens compute it, so it follows whichever palette is
+/// drawn.
+pub fn derived(colors: &Colors, role: Derived) -> Color {
+    let tone = role.tone.of(colors);
+    let channel = |c: f32| {
+        let byte = (c * 255.0).round();
+        (byte + (255.0 - byte) * role.white + 0.5).floor() / 255.0
+    };
+    Color::from_rgb(channel(tone.r), channel(tone.g), channel(tone.b))
 }
 
 /// `c` with its alpha multiplied by `a`.

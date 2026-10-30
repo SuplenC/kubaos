@@ -104,7 +104,8 @@ fn the_fixed_roles_are_written_in_both_palettes() {
     for role in [
         "sharing: Rgb { r: 0xc9, g: 0xa7, b: 0xff },",
         "sharing: Rgb { r: 0x6b, g: 0x3f, b: 0xc4 },",
-        "sharing_core: Rgb { r: 0xe9, g: 0xdb, b: 0xff },",
+        "logo_core_warm: Rgb { r: 0xff, g: 0xe6, b: 0xcf },",
+        "logo_core_cold: Rgb { r: 0xdc, g: 0xf1, b: 0xff },",
         "microphone: Rgb { r: 0xff, g: 0x9f, b: 0x45 },",
         "microphone: Rgb { r: 0xa0, g: 0x4a, b: 0x00 },",
         "camera: Rgb { r: 0x5f, g: 0xd2, b: 0x7a },",
@@ -135,4 +136,12 @@ fn an_app_window_has_a_default_and_a_minimum_size() {
     ] {
         assert!(module.contains(size), "{size}");
     }
+}
+
+#[test]
+fn a_core_is_written_as_its_tone_and_how_far_to_white() {
+    let module = module();
+
+    assert!(module.contains("pub const PRIMARY_CORE: Derived = Derived { tone: Role::Primary, white: 0.5 };"));
+    assert!(!module.contains("    primary_core: "), "no palette holds a fixed core");
 }

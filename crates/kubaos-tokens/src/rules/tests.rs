@@ -584,3 +584,56 @@ fn a_darker_scrim_moves_the_frame_blur_cut_off_up_with_it() {
         "{found:?}"
     );
 }
+
+#[test]
+fn every_core_is_its_tone_half_way_to_white() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+    let dark = tokens.color.with_derived(&tokens.color.dark);
+
+    for (role, core) in [
+        ("primary_core", "#ffdbbc"),
+        ("cold_core", "#c2e7ff"),
+        ("error_core", "#ffdad5"),
+        ("success_core", "#afe9bd"),
+        ("warning_core", "#f9e0a7"),
+        ("sharing_core", "#e4d3ff"),
+    ] {
+        assert_eq!(format!("{:?}", dark[role]), core, "{role}");
+    }
+}
+
+#[test]
+fn a_core_follows_a_primary_the_wallpaper_set() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+    let mut live = tokens.color.dark.clone();
+    live.insert("primary".into(), crate::model::Rgb::parse("#3a7bd5").expect("a colour"));
+
+    let core = tokens.color.with_derived(&live)["primary_core"];
+
+    assert_eq!(format!("{core:?}"), "#9dbdea");
+}
+
+#[test]
+fn the_logo_keeps_its_own_fixed_cores() {
+    let tokens = tokens_with(|_| {}).expect("the repo's tokens hold");
+
+    for palette in [&tokens.color.dark, &tokens.color.light] {
+        assert_eq!(format!("{:?}", palette["logo_core_warm"]), "#ffe6cf");
+        assert_eq!(format!("{:?}", palette["logo_core_cold"]), "#dcf1ff");
+    }
+}
+
+#[test]
+fn a_core_of_a_role_that_doesnt_exist_is_refused() {
+    let found = violations(|t| {
+        let mut core = toml::Table::new();
+        core.insert("mix".into(), "nowhere".into());
+        core.insert("white".into(), 0.5.into());
+        set(t, &["color", "derived"], "primary_core", core);
+    });
+
+    assert!(
+        matches!(found.as_slice(), [Violation::UnknownName { name, .. }] if name == "nowhere"),
+        "{found:?}"
+    );
+}

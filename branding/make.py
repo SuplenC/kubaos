@@ -25,9 +25,9 @@ DEEP = DARK["surface_container_lowest"]
 # second neon tube on the same sign.
 WARM = [s["path"] for s in MARK["strokes"] if s["tone"] == "warm"]
 DAKUTEN = [s["path"] for s in MARK["strokes"] if s["tone"] == "cold"]
-# Lit core of the neon tube.
-CORE_AMBER = DARK["primary_core"]
-CORE_CYAN = DARK["cold_core"]
+# Lit core of the neon tube: the logo's own, paler than a control's.
+CORE_AMBER = DARK["logo_core_warm"]
+CORE_CYAN = DARK["logo_core_cold"]
 
 
 def strokes(paths, color, width):

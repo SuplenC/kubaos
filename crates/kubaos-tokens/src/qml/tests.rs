@@ -82,7 +82,8 @@ fn the_fixed_roles_are_written_in_both_palettes() {
     for role in [
         "sharing: \"#c9a7ff\"",
         "sharing: \"#6b3fc4\"",
-        "sharing_core: \"#e9dbff\"",
+        "logo_core_warm: \"#ffe6cf\"",
+        "logo_core_cold: \"#dcf1ff\"",
         "microphone: \"#ff9f45\"",
         "microphone: \"#a04a00\"",
         "camera: \"#5fd27a\"",
@@ -151,4 +152,15 @@ fn a_drawing_without_exactly_one_stroke_and_a_colour_is_refused() {
     assert!(recolourable(no_stroke).is_err());
     assert!(recolourable(two_strokes).is_err());
     assert!(recolourable(no_colour).is_err());
+}
+
+#[test]
+fn a_core_is_bound_to_its_tone_not_fixed() {
+    let singleton = render(&QmlTokens);
+
+    assert!(singleton.contains(
+        "readonly property color primary_core: tokens.towardWhite(tokens.color.primary, 0.5)"
+    ));
+    assert!(singleton.contains("function towardWhite(c: color, t: real): color {"));
+    assert!(!singleton.contains("primary_core: \"#"), "no palette holds a fixed core");
 }

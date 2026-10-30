@@ -620,8 +620,8 @@ strike = [0.6, 0.0, 0.9, 0.2, 0.0, 1.0, 0.4, 1.0, 0.8, 1.0]
 # The クバ mark: its strokes in the order a hand writes them (ク's tick and
 # sweep, バ's two strokes, the dakuten), as SVG path data of absolute M, L, H
 # and Q commands in a drawing `units` square with the strokes `margin` inside
-# it. A warm tube is `primary` with `primary_core` along its middle, a cold one
-# `cold` with `cold_core`. The logo's SVGs (branding/make.py) and Kōbō's done
+# it. A warm tube is `primary` with `logo_core_warm` along its middle, a cold
+# one `cold` with `logo_core_cold`. The logo's SVGs (branding/make.py) and Kōbō's done
 # screen draw it from here.
 [neon.mark]
 units = 120
@@ -706,21 +706,14 @@ inverse_primary = "inverse_primary"
 # Amber, between fine and the error colour: a reading close to its limit.
 # Material 3 has no such role.
 warning = ""
-# The white-hot core along the middle of a lit neon tube, in `primary` and in `cold`: the
-# logo's own (branding/make.py). Light is emitted, so it is the same in both modes.
-primary_core = ""
-cold_core = ""
-# The cores of the tubes in the other tones, which a focus tube takes on a control of that
-# tone: each its tone's dark value 65% of the way to white, as `primary_core` is of the dark
-# `primary`, so every core is as white-hot as the logo's.
-error_core = ""
-success_core = ""
-warning_core = ""
 # Violet: anything shared off the machine, the screen above all. Its tube marks
 # what is being shared, with `sharing_core` along its middle as `primary_core`
 # runs along the accent's.
 sharing = ""
-sharing_core = ""
+# The logo's own cores, along the middles of the クバ mark's warm and cold tubes
+# (`[neon.mark]`): brand art, paler than a control's, and the same in both modes.
+logo_core_warm = ""
+logo_core_cold = ""
 # The privacy dots: a microphone that is listening, a camera that is watching.
 # Each keeps its colour whatever the wallpaper, so the dot means the same on
 # every desktop.
@@ -769,13 +762,9 @@ inverse_surface = "#f0dfd4"
 inverse_on_surface = "#382f27"
 inverse_primary = "#8e4e00"
 warning = "#f2c14e"
-primary_core = "#ffe6cf"
-cold_core = "#dcf1ff"
-error_core = "#ffe5e2"
-success_core = "#c7efd0"
-warning_core = "#fae9c1"
 sharing = "#c9a7ff"
-sharing_core = "#e9dbff"
+logo_core_warm = "#ffe6cf"
+logo_core_cold = "#dcf1ff"
 microphone = "#ff9f45"
 camera = "#5fd27a"
 success = "#5fd27a"
@@ -821,18 +810,27 @@ inverse_on_surface = "#ffeee2"
 inverse_primary = "#ffb779"
 # Amber dark enough for text on the light surfaces (6.1:1 on `surface`).
 warning = "#7a5900"
-primary_core = "#ffe6cf"
-cold_core = "#dcf1ff"
-error_core = "#ffe5e2"
-success_core = "#c7efd0"
-warning_core = "#fae9c1"
 # Dark enough for text on every light surface, the highest container the
 # narrowest: sharing 5.2:1 there, microphone and camera 4.7:1.
 sharing = "#6b3fc4"
-sharing_core = "#e9dbff"
+logo_core_warm = "#ffe6cf"
+logo_core_cold = "#dcf1ff"
 microphone = "#a04a00"
 camera = "#1b7131"
 success = "#1b7131"
+
+# The white-hot core along the middle of a lit neon tube, which a focus tube
+# takes on a control of that tone: its tone `mix` taken `white` of the way to
+# white, each channel rounded half up. A core is never a fixed value: every
+# output computes it from its tone's value there, the live tone where the
+# wallpaper sets one, in either mode, so the core follows the theme.
+[color.derived]
+primary_core = { mix = "primary", white = 0.5 }
+cold_core = { mix = "cold", white = 0.5 }
+error_core = { mix = "error", white = 0.5 }
+success_core = { mix = "success", white = 0.5 }
+warning_core = { mix = "warning", white = 0.5 }
+sharing_core = { mix = "sharing", white = 0.5 }
 
 # Every foreground role the front ends draw on a background role, and the
 # contrast it needs (WCAG 2.1 AA): `text` 4.5:1; `large_text` 3:1, for 24 px
@@ -959,11 +957,11 @@ pairs = [
 # `shadow` and `scrim`;
 # `cold_container` and `surface_bright`, the segments of Kōbō's partition bar,
 # which its legend names; the cores (`primary_core`, `cold_core`, `sharing_core`,
-# `error_core`, `success_core`, `warning_core`), the hot middle of a neon tube,
-# drawn on the tube, and the focus core outside a filled control, beside the fill
-# it lights. `kubaos-design contrast` fails on
+# `error_core`, `success_core`, `warning_core`, `logo_core_warm`,
+# `logo_core_cold`), the hot middle of a neon tube, drawn on the tube, and the
+# focus core outside a filled control, beside the fill it lights. `kubaos-design contrast` fails on
 # a role drawn with that is in no pair and not here.
-decorative = ["cold_container", "cold_core", "error_core", "outline_variant", "primary_core", "scrim", "shadow", "sharing_core", "success_core", "surface_bright", "warning_core"]
+decorative = ["cold_container", "cold_core", "error_core", "logo_core_cold", "logo_core_warm", "outline_variant", "primary_core", "scrim", "shadow", "sharing_core", "success_core", "surface_bright", "warning_core"]
 
 # The terminals, Ghostty and foot, and every TUI drawn in them: tmux, Neovim,
 # btop, lazygit, bat, fzf, oh-my-posh, fastfetch. `kubaos-tokens` writes
