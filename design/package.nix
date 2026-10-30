@@ -2,7 +2,8 @@
 # written by `kubaos-tokens build` at their paths in the repo. KubaOS.Components
 # takes its Tokens.qml and Symbols.qml (qml/package.nix), and the home links the
 # configs, the matugen templates and Hyprland's tokens.lua beside config/'s own
-# files (home/links.nix).
+# files (home/links.nix). The mockups' tokens.css is built too, though only a
+# checkout's mockup site reads it.
 #
 # The source is the tokens and the files the outputs read: oh-my-posh's
 # template, Geist Mono for the terminals' line and KubaOS Symbols' drawings. An

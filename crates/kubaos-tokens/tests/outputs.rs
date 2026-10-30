@@ -20,14 +20,18 @@ fn the_checked_in_outputs_match_the_tokens() {
 }
 
 /// The home links every `/config/` line of `.gitignore` as a built output, and the e2e checks
-/// each one, so the list must be the built outputs exactly, both ways.
+/// each one, so the list must be the built outputs exactly, both ways; the mockups' CSS is one too.
 #[test]
 fn git_ignores_the_built_outputs_and_no_other() {
     let ignore = fs::read_to_string(root().join(".gitignore")).expect("read .gitignore");
     let ignored: BTreeSet<&str> = ignore
         .lines()
         .filter_map(|line| line.strip_prefix('/'))
-        .filter(|path| path.starts_with("config/") || path.starts_with("qml/"))
+        .filter(|path| {
+            ["config/", "qml/", "design/mockups/src/"]
+                .iter()
+                .any(|dir| path.starts_with(dir))
+        })
         .collect();
     let built: BTreeSet<&str> = kubaos_tokens::target::targets()
         .filter(|target| target.kept() == Kept::Built)
@@ -36,6 +40,6 @@ fn git_ignores_the_built_outputs_and_no_other() {
 
     assert_eq!(
         ignored, built,
-        "the /config/ and /qml/ lines of .gitignore are the built outputs, each as `/PATH`"
+        "the /config/, /qml/ and /design/mockups/src/ lines of .gitignore are the built outputs, each as `/PATH`"
     );
 }
