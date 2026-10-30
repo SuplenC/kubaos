@@ -6,6 +6,8 @@ Part of the closed set of components: [DESIGN.md, "Components"](../../DESIGN.md#
 
 Rust `button::icon_button(glyph, label)`; QML `IconButton`.
 
+**States:** resting, hovered, pressed, focused and disabled, in every kind and size; its hint shows while the pointer or the keyboard is on it.
+
 ## `Hint`
 
 Rust `hint::hint`; QML `Hint`.

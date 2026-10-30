@@ -13,3 +13,5 @@ A group in the bar: a pill a small control tall (`control_sm`, 32), on `surface_
 On an `interactive` pill, `tooltip` shows in a `Hint` under it while the pointer is on it, moved sideways as far as keeps it whole inside the window, 8 from its edge, and kept there as its words change (the status pill's).
 
 When its content changes width, the pill eases to the new width over `medium` on `standard_decel`, as a list reorders, and cuts its content at its own edge meanwhile, so nothing draws over its neighbours. Content that animates its own width every frame isn't put in a pill, whose ease would trail behind it: the workspaces draw a pill of their own.
+
+**States:** resting; an interactive one hovered and pressed, its tooltip in a hint while the pointer is on it. It is never focused: no Tab stop in the bar.
