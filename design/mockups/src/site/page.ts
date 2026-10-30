@@ -1,8 +1,9 @@
 // A mockup page: what a component, template or screen shows, part by part, in the order the
-// mockup skill lists them (`.claude/skills/mockup/SKILL.md`). Every part is required: a part that
-// doesn't apply says so with `doesntApply(why)`, so no page can leave one out unnoticed.
+// mockup skill lists them (`.claude/skills/mockup/SKILL.md`); or a foundation, one family of
+// tokens shown as it is used. Every part is required: a part that doesn't apply says so with
+// `doesntApply(why)`, so no page can leave one out unnoticed.
 //
-// A page only says what it shows; `site/render.ts` draws every page the same way.
+// A page only says what it shows; `site/render.ts` draws every page of a kind the same way.
 
 import type { Words } from "../lib/content.ts";
 import type { Tone } from "../lib/focus.ts";
@@ -282,7 +283,7 @@ export interface Measures {
 }
 
 export interface Page<S extends State = State> {
-  readonly level: Level;
+  readonly level: Exclude<Level, "foundations">;
   /** The page's address and its shots' name: `button`. */
   readonly slug: string;
   readonly title: string;
@@ -313,4 +314,63 @@ export interface Page<S extends State = State> {
  */
 export function page<S extends State>(spec: Page<S>): Page {
   return spec as unknown as Page;
+}
+
+/** A part of a foundation: its name, what it shows in words, and the thing itself, live. */
+export interface Shown {
+  readonly name: string;
+  readonly described: string;
+  readonly sample: Sample;
+}
+
+/** What holds a family of tokens to its rules, and how. */
+export interface Check {
+  readonly check: string;
+  readonly holds: string;
+}
+
+/**
+ * A foundation: one family of tokens (colour, type, space, radii, elevation), every token shown
+ * as it is used. It isn't a component, so it has no states, keyboard or focus line of its own;
+ * every part it does have is required, as a component page's are, and one that doesn't apply says
+ * why.
+ */
+export interface Foundation {
+  readonly level: "foundations";
+  readonly slug: string;
+  readonly title: string;
+  /** One sentence: what the family is. */
+  readonly summary: string;
+  /** The family in use, live, which the description sits beside. */
+  readonly live: Sample;
+  /** What the family is for and how it is picked, a paragraph each. */
+  readonly description: NonEmpty<string>;
+  /** Every token of the family, live, by its token, with its value and what it is for. */
+  readonly tokens: NonEmpty<Shown>;
+  /** The rules the values keep, each with a worked example, live. */
+  readonly rules: NonEmpty<Shown>;
+  /** The family in light and in dark, side by side. */
+  readonly modes: NonEmpty<Shown> | DoesntApply;
+  /** The family in every theme the toolbar paints in, so it is never judged in one accent alone. */
+  readonly themes: NonEmpty<Shown> | DoesntApply;
+  /** The family at 1, 1.25, 1.5 and 2, in device pixels. */
+  readonly scales: NonEmpty<Shown> | DoesntApply;
+  /** The content extremes: the longest word, a translation 40% longer. */
+  readonly content: NonEmpty<Shown> | DoesntApply;
+  /** How the family moves, as moves of data. */
+  readonly motion: Motion | DoesntApply;
+  /** What holds the family to its rules. */
+  readonly checks: NonEmpty<Check>;
+}
+
+/** A foundation's page. */
+export function foundation(spec: Foundation): Foundation {
+  return spec;
+}
+
+/** Any page of the site. */
+export type AnyPage = Page | Foundation;
+
+export function isFoundation(page: AnyPage): page is Foundation {
+  return page.level === "foundations";
 }

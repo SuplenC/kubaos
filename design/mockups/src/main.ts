@@ -17,8 +17,7 @@ import { PAGES } from "./pages/index.ts";
 import { el } from "./site/dom.ts";
 import { type Frame, frame } from "./site/frame.ts";
 import { nav } from "./site/nav.ts";
-import type { Page } from "./site/page.ts";
-import { applies } from "./site/page.ts";
+import { type AnyPage, applies, isFoundation } from "./site/page.ts";
 import { recipes, stopPlayers } from "./site/parts/motion.ts";
 import { render } from "./site/render.ts";
 import { apply, CHROME, onChange, settings } from "./site/settings.ts";
@@ -40,7 +39,7 @@ const site = document.getElementById("site")!;
 const pageBox = el("main", "page mock");
 pageBox.id = "page";
 
-function picked(): Page | undefined {
+function picked(): AnyPage | undefined {
   const [, level, slug] = location.hash.split("/");
   return PAGES.find((page) => page.level === level && page.slug === slug) ?? PAGES[0];
 }
@@ -75,7 +74,7 @@ function draw(): void {
   stopPlayers();
   pageBox.replaceChildren(...(page ? render(page) : [el("p", "page-prose", "No pages yet.")]));
   if (CHROME) {
-    const hasWindow = page !== undefined && applies(page.measures.reflow);
+    const hasWindow = page !== undefined && !isFoundation(page) && applies(page.measures.reflow);
     const bar = toolbar(hasWindow);
     site.replaceChildren(bar, el("div", "site-body", nav(page), pageBox));
     toolbarHeight.disconnect();
@@ -134,7 +133,7 @@ window.kubaos = {
   frame: () => frame(pageBox, picked()?.slug ?? "", settings().mode, settings().scale),
   motion: () => {
     const page = picked();
-    return page ? recipes(page.motion) : null;
+    return page && applies(page.motion) ? recipes(page.motion) : null;
   },
   pages: PAGES.map((page) => ({ level: page.level, slug: page.slug })),
 };
