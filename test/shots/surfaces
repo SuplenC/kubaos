@@ -60,3 +60,4 @@ mockups/space       design/mockups/src/pages/foundations/space.ts
 mockups/radii       design/mockups/src/pages/foundations/radii.ts
 mockups/elevation   design/mockups/src/pages/foundations/elevation.ts
 mockups/focus       design/mockups/src/pages/foundations/focus.ts
+mockups/motion      design/mockups/src/pages/foundations/motion.ts

@@ -1260,3 +1260,84 @@ body {
 .f-glow-strip > div:first-child {
   background: var(--color-primary);
 }
+
+/* Every duration racing from one start: `--race` runs the same for every row, over twice
+   `duration.scene`, and each row's fill is how far its duration, at the speed picked and capped by
+   reduce motion (`--motion-*`), has come. The track is the duration at speed 1, `space.s16` for
+   every 100 ms. */
+@property --race {
+  syntax: "<time>";
+  inherits: true;
+  initial-value: 0s;
+}
+
+@keyframes f-race {
+  to { --race: calc(2 * var(--duration-scene)); }
+}
+
+.f-race {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  align-items: center;
+  gap: var(--space-s8) var(--space-s16);
+  animation: f-race calc(2 * var(--duration-scene)) linear infinite;
+}
+
+.f-race-track {
+  height: var(--space-s8);
+  width: calc(var(--d) / 100ms * var(--space-s16));
+  box-shadow: inset 0 0 0 var(--stroke-hairline_device_px) var(--color-outline_variant);
+}
+
+.f-race-fill {
+  height: 100%;
+  width: calc(clamp(0, var(--race) / var(--motion), 1) * var(--motion) / 100ms * var(--space-s16));
+  background: var(--color-primary);
+}
+
+/* A curve's rail: the ball rides it from one end to the other as `--along` goes 0 to 1, past the
+   end and back on a curve that overshoots. */
+@property --along {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+.f-rail {
+  position: relative;
+  width: var(--size-panel);
+  height: var(--space-s16);
+  border-radius: var(--radius-full);
+  background: var(--color-surface_container_highest);
+}
+
+.f-ball {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--space-s16);
+  height: var(--space-s16);
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  translate: calc(var(--along) * (var(--size-panel) - var(--space-s16))) 0;
+}
+
+/* A curve drawn small: its progress over its duration, the room past 0 and 1 where it overshoots. */
+.f-curve {
+  display: block;
+  width: var(--size-motion_plot);
+  height: var(--size-motion_plot);
+  background: var(--color-surface_container_low);
+}
+
+.f-curve line {
+  stroke: var(--color-outline_variant);
+  stroke-width: var(--stroke-hairline_device_px);
+}
+
+.f-curve path {
+  fill: none;
+  stroke: var(--color-primary);
+  stroke-width: max(1px, round(nearest, var(--stroke-thin), 1px));
+  stroke-linejoin: round;
+}
