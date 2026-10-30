@@ -7,7 +7,7 @@ K.Section {
     title: "Steps"
     description: "To do, done and waiting on an action each look their own, and the action carries the accent. A description wraps; a rail marks the state instead."
 
-    K.Grid {
+    K.Split {
         weights: [2, 1]
         gap: K.Tokens.space.s24
 
