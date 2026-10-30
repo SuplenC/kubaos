@@ -513,7 +513,7 @@ function player(move: Move): HTMLElement {
     key,
     parts,
     prose(
-      "The loop across, in milliseconds, holds included; each part's progress from its `from` (0) to its `to` (1) up, along its curve, a ball on it at the playhead. Drag or click the plot to hold a moment; ← and → step a frame, with Shift ten. The ticks under it are each part's start and end, and each keyframe: click one to go to it. Under the legend, a move of more than one part plays each alone on the same clock, the sample with the other parts hidden; pointing at a part's row, curve or stage picks it everywhere, outlined on the whole.",
+      "The loop across, in milliseconds, holds included; each part's progress from its `from` (0) to its `to` (1) up, along its curve, a ball on it at the playhead. Drag or click the plot to hold a moment; ← and → step a frame, with Shift ten. The ticks under it are each part's start and end, and each keyframe: click one to go to it. Under the legend, a move of more than one part plays each alone on the same clock, one under another in the legend's order, the sample with the other parts hidden; pointing at a part's row, curve or stage picks it everywhere, outlined on the whole.",
       "small",
       "on_surface_variant",
     ),

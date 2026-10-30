@@ -284,10 +284,11 @@ body {
   outline: var(--stroke-hairline_device_px) dashed var(--color-on_surface);
 }
 
-/* Each part alone, in a row under the legend, each on its own stage at the page's scale. */
+/* Each part alone under the legend, one full row each in the legend's order, each on its own
+   stage at the page's scale. */
 .page-parts {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: var(--space-s16);
 }
 
