@@ -152,6 +152,6 @@ fn what_the_tokens_say_in_words_is_a_string_a_script_reads_back() {
     assert!(words.contains("--source-warning: \"\";"));
     assert!(words.contains("--contrast-0-fg: \"on_surface\";"));
     assert!(words.contains("--contrast-0-minimum: 4.5;"));
-    assert!(words.contains("--contrast-decorative: \"burn_danger_line "));
+    assert!(words.contains("--contrast-decorative: \"burn_danger_glass "));
     assert!(words.contains("\\\"+N more\\\""));
 }

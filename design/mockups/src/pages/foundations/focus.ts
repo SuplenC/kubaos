@@ -41,9 +41,9 @@ interface Control {
 /** The words each kind of button shows here. */
 const BUTTON_WORDS: Record<Kind, string> = { Filled: "Continue", Tonal: "Save log", Text: "Back", Danger: "Erase disk", Success: "Finish", Warning: "Restart now" };
 
-/** A button's pinned state for what this page shows: its states have no unlit focus, only rest. */
-function pinnedButton(shown: Shown): { pinned?: "lit" } {
-  return shown === "focused" ? { pinned: "lit" } : {};
+/** A button's pinned state for what this page shows: unlit is lit with the signs off. */
+function pinnedButton(shown: Shown): { pinned?: "lit" | "signs-off" } {
+  return shown === "rest" ? {} : { pinned: shown === "focused" ? "lit" : "signs-off" };
 }
 
 function buttonControl(kind: Kind, size: Size = "Md"): Control {

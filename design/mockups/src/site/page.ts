@@ -104,11 +104,30 @@ export interface Tube {
   readonly content: boolean;
 }
 
-/** The line a part lights when it is lit: every line in its tone, and what lit makes of it. */
+/**
+ * The looks of the lit state. Nothing the user does picks one; the scene does: `lit` is the signs
+ * on, the neon burning, at night at rest; `signsOff` is the same control still lit with the neon
+ * unpowered, its line unlit glass with no glow, by day always and at night while a power change has
+ * the lights out (`docs/DESIGN.md`, "States").
+ */
+export const LOOKS = ["lit", "signsOff"] as const;
+export type Look = (typeof LOOKS)[number];
+
+export const LOOK_NAMES: Record<Look, string> = {
+  lit: "Lit · signs on",
+  signsOff: "Lit · signs off",
+};
+
+/**
+ * The line a part lights when it is lit: every line in its tone, what each look makes of it, and
+ * the state matrix's "Lit · signs off" column at night, pinned as "Lit" is.
+ */
 export interface Focus {
   readonly tubes: NonEmpty<Tube>;
-  /** What the line, the glow and the content are lit, by night and by day, in words. */
-  readonly lit: string;
+  /** What the line, the glow and the content are in each look, in words. */
+  readonly looks: Record<Look, string>;
+  /** The matrix's row at `index`, lit with the signs off. */
+  readonly signsOff: (index: number) => Element;
 }
 
 /** The content extremes the mockup skill names. */
