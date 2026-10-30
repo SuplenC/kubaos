@@ -9,7 +9,7 @@ K.Layout {
     id: root
 
     property int columns: 1
-    // Each column's share of the width, which `Split` sets; equal columns when empty.
+    // Each column's share of the width: a `Split`'s. Equal columns when empty.
     property list<int> weights: []
     property int gap: 0
     // Each row's cells centred down it, on whole device pixels.

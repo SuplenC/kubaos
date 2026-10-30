@@ -6,8 +6,8 @@ import KubaOS.Components as K
 // while open. Open, the content sits 8 under it, revealed over `medium` as a list reordering
 // settles (`standard_decel`); closing hides it over `short`. Enter, Space or a click on the header
 // toggles it (`toggled`); the owner keeps `open`. Disabled (`enabled: false`), the header's title
-// and chevron are at the disabled opacity, and it takes no hover, press or focus; what it holds is
-// the owner's to disable with it.
+// and chevron are at the disabled opacity, and it takes no hover, press or focus. What it holds
+// takes no input either, since Qt's `enabled` passes down, but keeps its look: the owner dims it.
 Item {
     id: root
 

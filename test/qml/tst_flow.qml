@@ -44,6 +44,33 @@ TestCase {
         }
     }
 
+    K.Stack {
+        id: narrowPage
+
+        y: suite.height / 2
+        // design-allow(size): a test's fixture, not a design value.
+        width: 80
+        fill: true
+
+        K.Grid {
+            id: narrowCell
+
+            columns: 1
+
+            K.Flow {
+                id: narrow
+
+                gap: K.Tokens.space.s8
+
+                K.Chip {
+                    id: wide
+
+                    text: "Portuguese (Brazil)"
+                }
+            }
+        }
+    }
+
     function chips(): list<Item> {
         return Array.from(flow.children).filter(kid => kid.text !== undefined);
     }
@@ -75,5 +102,12 @@ TestCase {
         compare(flow.width, right);
         compare(flow.height, bottom);
         verify(flow.width <= cell.width);
+    }
+
+    function test_a_child_wider_than_the_room_is_held_to_it() {
+        narrowPage.relayout();
+
+        compare(wide.width, narrowCell.width);
+        compare(narrow.width, narrowCell.width);
     }
 }

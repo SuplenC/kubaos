@@ -3,7 +3,8 @@ import KubaOS.Components as K
 
 // Children side by side, `gap` apart both ways, a new line started where the next one doesn't fit:
 // chips, tags. `kubaos-ui`'s `layout::flow`, laid out as iced's wrapping row is: each child is
-// measured in the whole room, and goes on the line it fits after the ones before it. Each box is
+// measured in the whole room, no wider than it, and goes on the line it fits after the ones before
+// it. Each box is
 // rounded up to whole device pixels, so every child starts on one. As wide as its widest line; the
 // lines tell the geometry check nothing, and each child still says what it is.
 K.Layout {
@@ -21,6 +22,7 @@ K.Layout {
         let widest = 0;
         for (const kid of kids) {
             root.fit(kid, room, NaN);
+            kid.width = Math.min(kid.width, room);
             kid.height = snapUp(kid.implicitHeight);
             if (x > 0 && x + kid.width > room) {
                 widest = Math.max(widest, x - root.gap);
@@ -35,7 +37,7 @@ K.Layout {
         }
         if (x > 0)
             widest = Math.max(widest, x - root.gap);
-        root.implicitWidth = snapUp(root.leftPadding + widest + root.rightPadding);
+        root.implicitWidth = snapUp(root.leftPadding + Math.min(widest, room) + root.rightPadding);
         root.implicitHeight = snapUp(root.topPadding + y + line + root.bottomPadding);
     }
 }

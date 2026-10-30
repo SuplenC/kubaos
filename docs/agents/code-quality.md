@@ -129,7 +129,7 @@ New KubaOS components are written for speed and memory first. On a hot path (any
 
 - **Generic spelling by shape**: `impl Trait` for a simple, single-use bound; a named parameter when a caller may turbofish it or it repeats; a `where` clause once bounds no longer fit on the line.
 - **String arguments: `impl AsRef<str>` when the function only reads**; `impl Into<String>` only when it keeps the string.
-- **An on/off tunable is a pair of setters, `x()` and `no_x()`**, never a `bool` argument.
+- **An on/off tunable is a pair of setters, `x()` and `no_x()`**, never a `bool` argument. A state the app works out each frame (`focused`, `picked`, `disabled`) is one setter taking the `bool` it worked out.
 - **A builder method returns `Self` and is `#[must_use]`**, and so is every constructor. Source: C-BUILDER.
 - **Every public type implements `Debug`.** A type holding a secret (a password, a LUKS passphrase, a token) writes `Debug` by hand and prints `<redacted>`. Source: M-PUBLIC-DEBUG, C-DEBUG.
 - **Clone an `Arc` as `Arc::clone(&x)`.** Clippy `clone_on_ref_ptr`.
