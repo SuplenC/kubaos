@@ -80,18 +80,23 @@
   padding: calc((var(--height) - var(--line)) / 2) var(--padding);
   border-radius: var(--radius-control);
   cursor: pointer;
-  /* Its states, as numbers: `--lit`, hovered or focused, and `--press`. `--on` is how lit it shows:
-     at night only while the lights burn (`--before`, `--after`), so a sequence flickers a lit
-     button down to its rest look and back; by day always, since nothing there is a light. */
+  /* Its states, as numbers: `--lit`, hovered or focused, and `--press`. Lit has two looks, picked
+     by `--signs`, how brightly the signs burn: at night while the lights do (`--before`, `--after`),
+     never by day. Signs on, the neon burns; signs off, the line is glass and nothing glows. So a
+     sequence flickers a lit button down to its signs-off look and strikes it back, and its line is
+     never gone. `--on` is how much of the neon shows. */
   --lit: 0;
   --press: 0;
-  --on: calc(var(--lit) * max(var(--before), var(--after), var(--day)));
+  --signs: calc(max(var(--before), var(--after)) * (1 - var(--day)));
+  --on: calc(var(--lit) * var(--signs));
+  --lit-fill: color-mix(in srgb, var(--fill-off), var(--fill-lit) calc(var(--signs) * 100%));
   background: color-mix(
     in srgb,
-    color-mix(in srgb, var(--fill), var(--fill-lit) calc(var(--on) * 100%)),
+    color-mix(in srgb, var(--fill), var(--lit-fill) calc(var(--lit) * 100%)),
     var(--fill-pressed) calc(var(--press) * 100%)
   );
-  --shown: color-mix(in srgb, var(--label), var(--label-lit) calc(var(--on) * 100%));
+  --lit-label: color-mix(in srgb, var(--label-off), var(--label-lit) calc(var(--signs) * 100%));
+  --shown: color-mix(in srgb, var(--label), var(--lit-label) calc(var(--lit) * 100%));
   /* Hover, focus and press light up: a fade, never the stutter, which is for power changes. */
   transition:
     --lit var(--motion-short) var(--easing-standard),
@@ -104,6 +109,11 @@
 
 .k-button:not(:disabled):is(:active, [data-pinned="pressed"]) {
   --press: 1;
+}
+
+/* Lit with the signs off, whatever the scene: the line glass, the neon and its glow out. */
+.k-button:not(:disabled)[data-pinned="signs-off"] {
+  --signs: 0;
 }
 
 /* A Text button pressed by day: its tone as a faint tint under it. By night it has no fill. */
@@ -252,22 +262,23 @@
   mask-size: 100% 100%;
 }
 
-/* A button's line and glow (`lib/focus.ts`'s ring): the line inside its edge in its kind's colour
-   for the state, at `--on`, and the glow outside at night, a pressed glow `focus.pressed_glow` times
-   the lit one (the mask holds the pressed glow; lit shows it at its share). A label that glows lit
-   (Filled's, Text's) keeps its own colour: only the glow round it shows, at night. */
+/* A button's line and glow (`lib/focus.ts`'s ring): the line inside its edge whenever it is lit,
+   in its kind's colour with the signs on and as glass with them off; the glow outside only with
+   the signs on, a pressed glow `focus.pressed_glow` times the lit one (the mask holds the pressed
+   glow; lit shows it at its share). A label that glows lit (Filled's, Text's) keeps its own colour:
+   only the glow round it shows, with the signs on. */
 .k-button > .k-ring > .k-tube {
-  border-color: var(--edge);
-  opacity: var(--on);
+  border-color: color-mix(in srgb, var(--edge-off), var(--edge) calc(var(--signs) * 100%));
+  opacity: var(--lit);
 }
 
 .k-button > .k-ring > .k-glow {
-  opacity: calc(var(--on) * (1 - var(--day)) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)) / var(--focus-pressed_glow));
+  opacity: calc(var(--on) * (1 + (var(--focus-pressed_glow) - 1) * var(--press)) / var(--focus-pressed_glow));
   filter: none;
 }
 
 .k-button > .k-ring > .k-lit {
-  opacity: calc(var(--on) * (1 - var(--day)));
+  opacity: var(--on);
   filter: none;
 }
 
@@ -275,9 +286,13 @@
   visibility: hidden;
 }
 
-/* A Text button pressed by night: its tube runs white-hot, to the core. */
+/* A Text button pressed with the signs on: its tube runs white-hot, to the core. */
 .k-button[data-kind="Text"] > .k-ring > .k-tube {
-  border-color: color-mix(in srgb, var(--color-primary_core) calc(var(--press) * (1 - var(--day)) * 100%), var(--edge));
+  border-color: color-mix(
+    in srgb,
+    var(--color-primary_core) calc(var(--press) * var(--signs) * 100%),
+    color-mix(in srgb, var(--edge-off), var(--edge) calc(var(--signs) * 100%))
+  );
 }
 
 /* An active window's tube (`windowRing` in `lib/focus.ts`, `config/hypr/focus.lua`): the window's
