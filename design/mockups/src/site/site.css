@@ -339,6 +339,14 @@ body {
   display: block;
 }
 
+/* Only the curves and the marks answer the pointer; the rest of the plot is the seek. */
+.page-plot-grid,
+.page-plot-labels,
+.page-plot-head,
+.page-plot-ball {
+  pointer-events: none;
+}
+
 .page-plot-grid line {
   stroke: var(--color-outline_variant);
   stroke-width: var(--stroke-hairline_device_px);
@@ -474,13 +482,13 @@ body {
 }
 
 /* The measures overlay: a hairline round every probed box, coloured by what it is. */
-/* Room above for the bands' token names, as many lines as they take, and below for the box's
-   size. The room above is padding, so it is part of the mock its cell centres. */
+/* Room above for the bands' token names, as many lines as they take, and as much below, where
+   the box's size is written: the room is part of the mock its cell centres, and the same on both
+   sides keeps the measured box on its row's middle, beside the row's name. */
 .page-measured {
   position: relative;
   display: flex;
-  padding-top: calc(var(--lines, 1) * (var(--type-mono-line) + var(--space-s4)));
-  margin-bottom: var(--space-s24);
+  padding-block: calc(var(--lines, 1) * (var(--type-mono-line) + var(--space-s4)));
 }
 
 .page-overlay {

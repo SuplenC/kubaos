@@ -28,6 +28,11 @@ function svg<K extends keyof SVGElementTagNameMap>(tag: K, className: string, at
   return element;
 }
 
+/** A number as the plot writes it: at most two decimals. */
+function shown(n: number): string {
+  return String(Math.round(n * 100) / 100);
+}
+
 /** A token's length in the page's device pixels, at the scale picked. */
 function px(token: string): number {
   return length(token) * settings().scale;
@@ -49,12 +54,34 @@ export function swatch(index: number): HTMLElement {
   return box;
 }
 
+/**
+ * The tracks of `playing` that run on one curve, by place: the same span, back and curve. Their
+ * curves are drawn in turns along it, so each colour shows.
+ */
+export function together(playing: Loop): number[][] {
+  const groups = new Map<string, number[]>();
+  playing.timed.forEach((timed, i) => {
+    const key = JSON.stringify([timed.forward, timed.back, timed.track.curve]);
+    groups.set(key, [...(groups.get(key) ?? []), i]);
+  });
+  return [...groups.values()];
+}
+
 /** The legend under the plot: each track's swatch and its part, as the recipe's rows name it. */
-export function legend(tracks: readonly Track[]): HTMLElement {
+export function legend(playing: Loop): HTMLElement {
+  const name = (track: Track) => `${track.part} (${track.on})`;
+  const shared = together(playing)
+    .filter((group) => group.length > 1)
+    .map((group) => {
+      const parts = group.map((i) => `the ${playing.timed[i]!.track.part}`);
+      const words = `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)} run on one curve, drawn in their colours in turn.`;
+      return words.charAt(0).toUpperCase() + words.slice(1);
+    });
   return el(
     "div",
     "page-plot-legend",
-    ...tracks.map((track, i) => el("span", "page-plot-key", swatch(i), label(`${track.part} (${track.on})`, "small", "on_surface"))),
+    ...playing.timed.map((timed, i) => el("span", "page-plot-key", swatch(i), label(name(timed.track), "small", "on_surface"))),
+    ...shared.map((words) => label(words, "small", "on_surface_variant")),
   );
 }
 
@@ -82,7 +109,6 @@ export class Plot {
   private frame: Frame | null = null;
   private readonly head = svg("line", "page-plot-head");
   private balls: SVGCircleElement[] = [];
-  private targets: SVGPathElement[] = [];
   /** The thin stroke the curves and playhead are drawn with, rounded to device pixels. */
   private thin = 1;
 
@@ -102,20 +128,26 @@ export class Plot {
 
   /** Draws `playing`'s curves and `marks` at the plot's width, the playhead and balls at `t`. */
   draw(playing: Loop, marks: readonly Mark[], t: number): void {
-    this.playing = playing;
     const width = this.element.parentElement?.clientWidth ?? 0;
+    // Not laid out yet: drawn once it is, when its box gets a width.
+    this.playing = width === 0 ? null : playing;
     if (width === 0) return;
     const hairline = 1;
-    const thin = Math.round(px("stroke-thin"));
+    const thin = Math.max(1, Math.round(px("stroke-thin")));
     this.thin = thin;
     // How far the curves reach: past 1 for an overshooting curve, below 0 for one that dips.
     let low = 0;
     let high = 1;
-    for (const { track } of playing.timed) {
+    for (const { track, back } of playing.timed) {
       if (track.curve === "neon.strike") continue;
       const range = reach(track.curve);
       low = Math.min(low, range.low);
       high = Math.max(high, range.high);
+      // Played back, the curve runs from 1 to 0: an overshoot past 1 dips below 0.
+      if (back) {
+        low = Math.min(low, 1 - range.high);
+        high = Math.max(high, 1 - range.low);
+      }
     }
     const bottomValue = Math.floor(low / Y_STEP) * Y_STEP;
     const topValue = Math.ceil(high / Y_STEP - 1e-9) * Y_STEP;
@@ -145,23 +177,34 @@ export class Plot {
       const at = crisp(y(v), hairline);
       grid.append(svg("line", "", { x1: left, x2: right, y1: at, y2: at }));
       labels.append(svg("text", "page-plot-text", { x: left - px("space-s16"), y: y(v), "text-anchor": "end", "dominant-baseline": "central" }));
-      labels.lastChild!.textContent = String(Math.round(v * 100) / 100);
+      labels.lastChild!.textContent = String(Math.round(v * 100) / 100).replace("-", "\u2212");
     }
     const room = px("space-s64");
     const step = X_STEPS.find((s) => (s / playing.total) * (right - left) >= room) ?? X_STEPS.at(-1)!;
+    const below = bottom + px("space-s12") + line / 2;
+    const wide = (words: string) => advance("mono", words) * settings().scale;
+    // The loop's end is always named, at the plot's right edge.
+    const end = `${shown(playing.total)} ms`;
+    const endsAt = right - wide(end) - px("space-s8");
+    labels.append(svg("text", "page-plot-text", { x: right, y: below, "text-anchor": "end", "dominant-baseline": "central" }));
+    labels.lastChild!.textContent = end;
     for (let ms = 0; ms <= playing.total + 1e-9; ms += step) {
       const at = crisp(x(ms), hairline);
       grid.append(svg("line", "", { x1: at, x2: at, y1: top, y2: bottom }));
       const words = ms === 0 ? "0 ms" : String(ms);
-      // A label that would run past the plot's edge is left out; its grid line stays.
-      if (x(ms) + (advance("mono", words) * settings().scale) / 2 > width) continue;
-      labels.append(svg("text", "page-plot-text", { x: x(ms), y: bottom + px("space-s12") + line / 2, "text-anchor": ms === 0 ? "start" : "middle", "dominant-baseline": "central" }));
+      // A label that would run into the end's is left out; its grid line stays.
+      if (ms > 0 && x(ms) + wide(words) / 2 > endsAt) continue;
+      labels.append(svg("text", "page-plot-text", { x: x(ms), y: below, "text-anchor": ms === 0 ? "start" : "middle", "dominant-baseline": "central" }));
       labels.lastChild!.textContent = words;
     }
 
     const ticks = svg("g", "page-plot-marks");
+    const sorted = marks.map((mark) => x(mark.at)).sort((a, b) => a - b);
     for (const mark of marks) {
       const at = crisp(x(mark.at), hairline);
+      // A target reaches halfway to its neighbours at most, so two never overlap.
+      const near = Math.min(...sorted.filter((other) => other !== x(mark.at)).map((other) => Math.abs(other - x(mark.at))));
+      const reachOut = Math.min(px("space-s4"), near / 2);
       const tick = svg("g", "page-plot-mark", { "data-at": mark.at, "data-kind": mark.kind });
       const title = svg("title", "");
       title.textContent = mark.words;
@@ -169,37 +212,40 @@ export class Plot {
         title,
         svg("line", "", { x1: at, x2: at, y1: bottom, y2: bottom + px(mark.kind === "part" ? "space-s8" : "space-s4") }),
         // The mark's target is wider than its line, so a pointer finds it.
-        svg("rect", "page-plot-hit", { x: x(mark.at) - px("space-s4"), y: bottom, width: px("space-s8"), height: px("space-s8") }),
+        svg("rect", "page-plot-hit", { x: x(mark.at) - reachOut, y: bottom, width: 2 * reachOut, height: px("space-s8") }),
       );
       ticks.append(tick);
     }
 
     const curves = svg("g", "");
-    this.targets = playing.timed.map((timed, i) => {
+    const turn = px("space-s8");
+    const turns = new Map<number, { place: number; of: number }>();
+    for (const group of together(playing)) group.forEach((i, place) => turns.set(i, { place, of: group.length }));
+    const hits = playing.timed.map((timed, i) => {
       const d = path(timed, playing.total, (t) => crisp(x(t), thin), (v) => crisp(y(v), thin));
-      const curve = svg("path", "page-plot-curve", { d, "stroke-width": thin });
+      const curve = svg("path", "page-plot-curve", { d, "stroke-width": thin, "data-pick": i });
       look(curve, i);
-      curve.setAttribute("data-pick", String(i));
+      const shared = turns.get(i)!;
+      if (shared.of > 1) {
+        // Tracks on one curve take turns along it, a dash each, so every colour shows.
+        curve.style.strokeDasharray = `${turn} ${(shared.of - 1) * turn}`;
+        curve.style.strokeDashoffset = String(-shared.place * turn);
+      }
       curves.append(curve);
       // A wider, unpainted line along the curve, for the pointer to find it by.
-      return svg("path", "page-plot-curve-hit", { d, "stroke-width": px("space-s12") });
+      return svg("path", "page-plot-curve-hit", { d, "stroke-width": px("space-s12"), "data-pick": i });
     });
     this.head.setAttribute("y1", String(top));
     this.head.setAttribute("y2", String(bottom));
     this.head.setAttribute("stroke-width", String(thin));
     this.balls = playing.timed.map((_, i) => {
-      const ball = svg("circle", "page-plot-ball", { r: px(BALLS[Math.min(i, BALLS.length - 1)]!) / 2, "data-target": playing.timed[i]!.track.target });
+      const ball = svg("circle", "page-plot-ball", { r: px(BALLS[i % BALLS.length]!) / 2, "data-target": playing.timed[i]!.track.target });
       look(ball, i);
       return ball;
     });
     this.balls.forEach((ball, i) => ball.setAttribute("data-pick", String(i)));
-    this.element.replaceChildren(grid, labels, ticks, curves, ...this.targets, this.head, ...this.balls);
+    this.element.replaceChildren(grid, labels, ticks, curves, ...hits, this.head, ...this.balls);
     this.at(t);
-  }
-
-  /** Each curve's target for the pointer, by the track's place. */
-  hits(): readonly SVGPathElement[] {
-    return this.targets;
   }
 
   /** Moves the playhead to `t`, and each track's ball onto its curve there. */
