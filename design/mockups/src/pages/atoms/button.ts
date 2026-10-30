@@ -6,7 +6,7 @@ import { shown, type Words } from "../../lib/content.ts";
 import { row } from "../../lib/layout.ts";
 import { el, label } from "../../site/dom.ts";
 import { doesntApply, type NonEmpty, nonEmpty, page, type Track } from "../../site/page.ts";
-import { type ColourPath, paintBetween, paintGlass, palette, paletteName, themeName } from "../../site/recolour.ts";
+import { type ColourPath, paintBetween, palette, paletteName, themeName } from "../../site/recolour.ts";
 import { themeChange, toDark, toLight } from "../../site/sequences.ts";
 import { type Mode, settings } from "../../site/settings.ts";
 
@@ -81,7 +81,6 @@ function scene(from: Painted | string, to: Painted | string, path: ColourPath): 
     const painted = el("div", "page-scene", label("Every light and every colour, on one clock", "body_strong", "on_surface"), litKinds());
     painted.dataset.mode = a.mode;
     paintBetween(painted, path, palette(a.theme, a.mode), palette(b.theme, b.mode));
-    if (a.mode === "dark" && b.mode === "light") paintGlass(painted, palette(b.theme, b.mode), b.mode);
     return el("div", "page-scene-box", painted);
   };
 }

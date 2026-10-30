@@ -188,7 +188,7 @@ function recipeOf(move: Move, lits: Lit[], picks: Row[]): HTMLElement {
       ? [label("Reduced motion", "body_strong", "on_surface"), prose("The same: every duration is within the `short` that reduced motion caps durations at.", "small")]
       : of("reduced", "Reduced motion")),
     ...of("daylight", "In light mode, where the neon is off"),
-    ...of("unstuttered", "With the focus stutter off"),
+    ...of("unstuttered", "With the stutter off"),
     ...(move.tail
       ? [label("The closing beat", "body_strong", "on_surface"), prose(`After the last part, a still \`duration.${move.tail}\`, ${milliseconds(move.tail)} ms, that belongs to the move; reduced motion's move has none.`, "small")]
       : []),
