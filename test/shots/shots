@@ -15,6 +15,8 @@
 #   shots specimen [FLAGS] the same for the specimen's pages (kubaos-specimen and qml-specimen);
 #                          specimen/PAGE for one of them: type, colour, space, components, icons,
 #                          motion, or qml (qml-specimen's components page)
+#   shots mockups [FLAGS]  the same for the mockup site's pages (design/mockups, in headless
+#                          Chromium); mockups/PAGE for one of them, as `button`
 #   shots terminals [FLAGS] the same for the terminals and the TUIs (test/shots/terminals)
 #   shots plymouth|grub|cursor [FLAGS]
 #                          the same for the boot splash and the disk prompt (plymouthd), the GRUB
@@ -29,7 +31,8 @@
 # `--all` renders every one, whatever changed. They are drawn at 1× and 1.5×, dark; `--full`
 # makes it 1, 1.25, 1.5 and 2, light and dark, unless --scales or --modes say otherwise. SURFACE
 # is a surface in `scenarios` (controlcenter, menu, lock, ...), kobo, specimen or specimen/PAGE,
-# terminals, plymouth, grub or cursor. Kōbō's, the specimen's and the boot screens' renderers draw
+# mockups or mockups/PAGE, terminals, plymouth, grub or cursor. Kōbō's, the specimen's, the
+# mockups' and the boot screens' renderers draw
 # every scale and mode they have; the rest are dropped. The boot screens are always dark, at 1 (a
 # 1080p screen) and 2 (the laptop's 2880x1800); the pointer is drawn on dark and light, at every
 # scale.
@@ -298,6 +301,29 @@ specimen_tour() {
   if ((qml)); then touch "$dir/.specimen-qml-done"; fi
 }
 
+# mockups_tour SIDE TREE DIR: the pages in `picked_mockups` that DIR has no shots of yet, drawn
+# from TREE's mockup site into DIR as mockups-PAGE-*.png, each marked done. A tree with no site
+# marks them done with no shot, as new. The BEFORE side builds the tokens' generator in the target
+# dir iced's BEFORE uses.
+mockups_tour() {
+  local side=$1 tree=$2 dir=$3 page run=(env)
+  [[ $side == before ]] && run=(env CARGO_TARGET_DIR="$cache/target")
+  local -a pages=()
+  for page in "${picked_mockups[@]}"; do
+    [[ -e $dir/.mockups-$page-done ]] || pages+=("$page")
+  done
+  ((${#pages[@]})) || return 0
+  echo "shots: mockups ${pages[*]}, $side" >&2
+  local log=$out/logs/mockups-$side.log
+  raw=$work/raw
+  rm -rf "$raw"
+  mkdir -p "$raw" "$dir" "$out/logs"
+  "${run[@]}" FONTCONFIG_FILE="$KUBAOS_SHOTS_FONTS" PLAYWRIGHT_BROWSERS_PATH="$KUBAOS_SHOTS_PLAYWRIGHT" \
+    bash "$here/mockups" "$tree" "$raw/mockups" "${pages[@]}" >"$log" 2>&1 || die "mockups failed: $log"
+  collect "$dir"
+  for page in "${pages[@]}"; do touch "$dir/.mockups-$page-done"; done
+}
+
 # iced SIDE TREE DIR: Kōbō's and the specimen's shots of TREE into DIR, as `kobo` and
 # `picked_pages` ask. The BEFORE side builds in a target dir of its own, shared across revs.
 iced() {
@@ -543,7 +569,7 @@ main() {
   fi
   local shell_all
   shell_all=$(scenario_surfaces "$here/scenarios" | tr '\n' ' ')
-  shell=() picked_pages=() boot_surfaces=() kobo=0
+  shell=() picked_pages=() picked_mockups=() boot_surfaces=() kobo=0
   local s terminals=0
   for s in "${picked[@]}"; do
     case $s in
@@ -553,16 +579,24 @@ main() {
       [[ " $every " == *" $s "* ]] || die "no page ${s#specimen/}: one of $(specimen_pages "$here/surfaces" | tr '\n' ' ')"
       picked_pages+=("${s#specimen/}")
       ;;
+    mockups) mapfile -t -O "${#picked_mockups[@]}" picked_mockups < <(mockup_pages "$here/surfaces" | sed 's#^mockups/##') ;;
+    mockups/*)
+      [[ " $every " == *" $s "* ]] || die "no page ${s#mockups/}: one of $(mockup_pages "$here/surfaces" | tr '\n' ' ')"
+      picked_mockups+=("${s#mockups/}")
+      ;;
     terminals) terminals=1 ;;
     plymouth | grub | cursor) boot_surfaces+=("$s") ;;
     *)
-      [[ " $shell_all " == *" $s "* ]] || die "no surface $s: one of ${shell_all}kobo specimen terminals plymouth grub cursor"
+      [[ " $shell_all " == *" $s "* ]] || die "no surface $s: one of ${shell_all}kobo specimen mockups terminals plymouth grub cursor"
       shell+=("$s")
       ;;
     esac
   done
   if ((${#picked_pages[@]})); then
     mapfile -t picked_pages < <(printf '%s\n' "${picked_pages[@]}" | sort -u)
+  fi
+  if ((${#picked_mockups[@]})); then
+    mapfile -t picked_mockups < <(printf '%s\n' "${picked_mockups[@]}" | sort -u)
   fi
 
   hold_base "$cache/$base"
@@ -603,6 +637,17 @@ main() {
     local f
     shopt -s nullglob
     for f in "$iced_before"/*.png; do ln -sf "$f" "$before_dir/$(basename "$f")"; done
+    shopt -u nullglob
+  fi
+  if ((${#picked_mockups[@]})); then
+    # Like Kōbō's and the specimen's, the mockups' BEFORE depends on the rev alone.
+    local mockups_before=$cache/$base/mockups
+    extract "$base" "$cache/$base/tree"
+    mockups_tour after "$repo" "$out/after"
+    mockups_tour before "$cache/$base/tree" "$mockups_before"
+    local m
+    shopt -s nullglob
+    for m in "$mockups_before"/*.png; do ln -sf "$m" "$before_dir/$(basename "$m")"; done
     shopt -u nullglob
   fi
   if ((${#boot_surfaces[@]})); then

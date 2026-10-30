@@ -7,7 +7,7 @@
 #   `prune` drops the trees no run holds, past the last few bases. The shared `target/` stays.
 
 # The surfaces drawn by renderers of their own, not by a line in `scenarios`. The specimen's
-# pages are the table's `specimen/PAGE` lines.
+# pages are the table's `specimen/PAGE` lines, and the mockups' its `mockups/PAGE` lines.
 own_surfaces=(kobo terminals plymouth grub cursor)
 
 # The before-trees of this many base commits are kept. Each agent renders against the main it
@@ -29,12 +29,18 @@ specimen_pages() {
   awk '$1 ~ /^specimen\// { print $1 }' "$1" | sort -u
 }
 
+# mockup_pages TABLE: the mockup site's pages, as `mockups/PAGE` lines.
+mockup_pages() {
+  awk '$1 ~ /^mockups\// { print $1 }' "$1" | sort -u
+}
+
 # every_surface TABLE SCENARIOS: every surface `shots` can render, one per line.
 every_surface() {
   {
     scenario_surfaces "$2"
     printf '%s\n' "${own_surfaces[@]}"
     specimen_pages "$1"
+    mockup_pages "$1"
   } | sort -u
 }
 
@@ -49,7 +55,8 @@ changed_paths() {
 # counts for the lines of TABLE that list its most specific match, so a page's own file renders
 # that page alone, and the rest of its renderer every page. A line's SURFACE may join several
 # with `+`. `*` is every surface, `shell` every shell surface, `specimen` every page of the
-# specimen and `iced` every page of kubaos-specimen's (all but `specimen/qml`).
+# specimen, `iced` every page of kubaos-specimen's (all but `specimen/qml`) and `mockups` every page
+# of the mockup site.
 surfaces_touched() {
   local table=$1 scenarios=$2 names name
   local -a parts
@@ -61,6 +68,7 @@ surfaces_touched() {
       shell) scenario_surfaces "$scenarios" ;;
       specimen) specimen_pages "$table" ;;
       iced) specimen_pages "$table" | grep -vx specimen/qml ;;
+      mockups) mockup_pages "$table" ;;
       *) echo "$name" ;;
       esac
     done
@@ -97,7 +105,7 @@ table_problems() {
     BEGIN {
       n = split(known, k, " ")
       for (i = 1; i <= n; i++) ok[k[i]] = 1
-      ok["*"] = ok["shell"] = ok["specimen"] = ok["iced"] = 1
+      ok["*"] = ok["shell"] = ok["specimen"] = ok["iced"] = ok["mockups"] = 1
     }
     $1 !~ /^#/ && NF >= 1 {
       m = split($1, part, "+")
