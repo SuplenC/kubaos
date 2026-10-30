@@ -545,7 +545,7 @@ What can't use the libraries still follows the tokens as far as it can go:
 The words are `docs/BRAND.md`'s: read its "Voice" before writing anything a person reads. What it means for UI copy:
 
 - **Sentence case** everywhere: titles, buttons, labels, menu Items. "Save log", never "Save Log".
-- **Sizes are lowercase abbreviations** in anything a person reads: sm, md, lg (and xs, xl), never "Sm" or "Lg", in labels, headings, descriptions and docs alike. An identifier keeps its language's case (`ButtonSize::Lg` in Rust, `size: "Lg"` in QML).
+- **Sizes are lowercase abbreviations** in anything a person reads: sm, md, lg (and xs, xl), never "Sm" or "Lg", in labels, headings, descriptions and docs alike, even at the start of a label or a sentence ("md's padding"). An identifier keeps its language's case: `ButtonSize::Lg` in Rust, `size: "Lg"` in QML, and the probes' variant words (`Filled Md`) in the variants table below.
 - **A label stays a label.** Field names, settings' titles and buttons that only say what they do are plain; the attitude goes in messages and subtitles (BRAND.md rule 2).
 - **Name things with `GLOSSARY.md`'s terms**: a Suite, the User layer, Kōbō, never a synonym.
 - **An error says the cause and the next action**: "Fuck. The disk is in use, so nothing got written. Free it and try again." The `ErrorBlock`'s message is the cause, its hint the next action.
