@@ -604,3 +604,153 @@ body {
   border-radius: var(--radius-surface);
   background: var(--color-surface);
 }
+
+/* A foundation's shown thing, under its words, as wide as the page: a grid of bands needs the
+   room to know how many bands it takes, and a table keeps to its own width at the left. */
+.page-shown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s16);
+}
+
+/* A box in a theme's palette in a mode, whatever the toolbar picks; in a table, a tight one. */
+.f-painted {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s16);
+  padding: var(--space-s16);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+  color: var(--color-on_surface);
+}
+
+.f-painted[data-tight] {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-s8);
+  padding: var(--space-s8);
+  border-radius: var(--radius-control);
+}
+
+/* Things side by side, wrapping onto lines in a narrow window. */
+.f-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-s16);
+}
+
+.f-swatch {
+  flex: none;
+  width: var(--size-control_lg);
+  height: var(--size-control_lg);
+  border-radius: var(--radius-control);
+  background: var(--swatch);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+.f-swatch-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s4);
+}
+
+/* A control filled with a tone, the line inside its fill's edge in a colour derived from it: how
+   a focused Filled button draws its core, lit or unlit. */
+.f-filled {
+  flex: none;
+  width: var(--size-control_lg);
+  height: var(--size-control_sm);
+  border-radius: var(--radius-control);
+  background: var(--tone);
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--line-colour);
+}
+
+/* A role at an opacity over the background it is drawn on. */
+.f-layer {
+  flex: none;
+  display: flex;
+  width: var(--size-control_lg);
+  height: var(--size-control_lg);
+  padding: var(--space-s8);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
+}
+
+/* The layer fills the box less its inset, so its corner is nested: the box's less the inset. */
+.f-layer > div {
+  flex: 1;
+  border-radius: calc(var(--radius-control) - var(--space-s8));
+  background: var(--under);
+}
+
+.f-layer > div > div {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: rgb(from var(--over) r g b / var(--alpha));
+}
+
+/* A card in a scene: the highest surface but one, holding words and buttons. */
+.f-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-s16);
+  padding: var(--space-s24);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_high);
+}
+
+/* A ratio under its pair's minimum. */
+.f-fails {
+  color: var(--color-error);
+}
+
+/* A foreground on the background it is drawn on, in a contrast pair. */
+.f-ground {
+  display: flex;
+  padding: var(--space-s8);
+  border-radius: var(--radius-control);
+  background: var(--ground);
+}
+
+/* A lit tube of a tone with its core along the middle, the core centred on a whole device pixel. */
+.f-tube {
+  position: relative;
+  flex: none;
+  width: var(--size-control_lg);
+  height: var(--space-s8);
+  border-radius: var(--radius-full);
+  background: var(--tone);
+  --core-line: max(1px, round(nearest, var(--stroke-thin), 1px));
+}
+
+.f-tube::after {
+  content: "";
+  position: absolute;
+  left: var(--space-s4);
+  right: var(--space-s4);
+  top: round(down, calc((var(--space-s8) - var(--core-line)) / 2), 1px);
+  height: var(--core-line);
+  border-radius: var(--radius-full);
+  background: var(--core);
+}
+
+/* A colour role as a tile: filled with the role and the role drawn on it named on it, or a role
+   alone as a swatch beside its name. As wide as a menu, so tiles line up in a column. */
+.f-tile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s12);
+  width: var(--size-menu);
+  padding: var(--space-s12);
+  border-radius: var(--radius-control);
+}
+
+.f-tile[data-filled] {
+  background: var(--tile);
+}

@@ -1,10 +1,10 @@
 // The navigation: every level in order, its pages under it, and a line for a level with none yet.
 
 import { pagesOf } from "../pages/index.ts";
-import { LEVELS, type Page } from "./page.ts";
+import { type AnyPage, LEVELS } from "./page.ts";
 import { el } from "./dom.ts";
 
-export function nav(current: Page | undefined): HTMLElement {
+export function nav(current: AnyPage | undefined): HTMLElement {
   const list = el("nav", "site-nav");
   for (const level of LEVELS) {
     const pages = pagesOf(level.slug);
