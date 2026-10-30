@@ -39,7 +39,7 @@ const SIZE_FOR: Record<Size, string> = {
   Lg: "`size.control_lg` tall, a `button_large` label and its icon, `space.s8` between them, `space.s32` at the sides (`space.s16` on Text): the one main action of a big page, Kōbō's Install.",
 };
 
-/** Every kind side by side at Md, at rest: what each move plays on, so each kind's tone shows. */
+/** Every kind side by side at md, at rest: what each move plays on, so each kind's tone shows. */
 function kinds(): HTMLElement {
   return row("s16", "start", ...KINDS.map((kind) => sample(kind, "Md")));
 }
@@ -92,7 +92,7 @@ export default page({
     "A held button (`Button::on_hold`) is pressed for a while instead of clicked, and a timed bar beside it shows how far along the hold is: Kōbō's Install, held with the mouse or Enter. It looks like any button of its kind.",
   ],
   variants: nonEmpty(KINDS.map((kind) => ({ name: kind, for: FOR[kind], sample: () => sample(kind, "Md") }))),
-  sizes: nonEmpty(SIZES.map((size) => ({ name: size, for: SIZE_FOR[size], sample: () => sample("Filled", size) }))),
+  sizes: nonEmpty(SIZES.map((size) => ({ name: size.toLowerCase(), for: SIZE_FOR[size], sample: () => sample("Filled", size) }))),
   states: {
     shown: ["rest", "hovered", "pressed", "focused", "disabled"],
     absent: {
@@ -104,7 +104,7 @@ export default page({
     rows: nonEmpty(
       SIZES.flatMap((size) =>
         KINDS.map((kind) => ({
-          name: `${kind} ${size}`,
+          name: `${kind} ${size.toLowerCase()}`,
           cell: (state: "rest" | "hovered" | "pressed" | "focused" | "disabled") => sample(kind, size, state),
         })),
       ),
@@ -183,23 +183,23 @@ export default page({
     lands: "A button takes focus when the surface gives it: a screen with no field starts on its Filled button, a dialog on its last action, a Danger dialog on Cancel, so Enter twice never destroys anything.",
   },
   measures: {
-    samples: nonEmpty(SIZES.map((size) => ({ name: size, for: SIZE_FOR[size], sample: () => sample("Filled", size) }))),
+    samples: nonEmpty(SIZES.map((size) => ({ name: size.toLowerCase(), for: SIZE_FOR[size], sample: () => sample("Filled", size) }))),
     measures: [
-      { what: "Sm's height.", token: "size-control_sm" },
-      { what: "Md's height, a field's too.", token: "size-control_md" },
-      { what: "Lg's height.", token: "size-control_lg" },
-      { what: "Sm's label line, which is its content box; the rest of the height is split above and below.", token: "type-button_small-line" },
-      { what: "Md's label line.", token: "type-button-line" },
-      { what: "Lg's label line.", token: "type-button_large-line" },
-      { what: "Sm's icon.", token: "type-button_small-icon" },
-      { what: "Md's icon.", token: "type-button-icon" },
-      { what: "Lg's icon.", token: "type-button_large-icon" },
-      { what: "Sm's gap between icon and label.", token: "space-s4" },
-      { what: "Md's and Lg's gap.", token: "space-s8" },
-      { what: "Sm's padding at the sides, Text's at Sm and Md.", token: "space-s12" },
-      { what: "Lg's Text padding.", token: "space-s16" },
-      { what: "Md's padding.", token: "space-s24" },
-      { what: "Lg's padding.", token: "space-s32" },
+      { what: "sm's height.", token: "size-control_sm" },
+      { what: "md's height, a field's too.", token: "size-control_md" },
+      { what: "lg's height.", token: "size-control_lg" },
+      { what: "sm's label line, which is its content box; the rest of the height is split above and below.", token: "type-button_small-line" },
+      { what: "md's label line.", token: "type-button-line" },
+      { what: "lg's label line.", token: "type-button_large-line" },
+      { what: "sm's icon.", token: "type-button_small-icon" },
+      { what: "md's icon.", token: "type-button-icon" },
+      { what: "lg's icon.", token: "type-button_large-icon" },
+      { what: "sm's gap between icon and label.", token: "space-s4" },
+      { what: "md's and lg's gap.", token: "space-s8" },
+      { what: "sm's padding at the sides, Text's at sm and md.", token: "space-s12" },
+      { what: "lg's Text padding.", token: "space-s16" },
+      { what: "md's padding.", token: "space-s24" },
+      { what: "lg's padding.", token: "space-s32" },
       { what: "The corners.", token: "radius-control" },
       { what: "The focus tube, rounded half up to device pixels.", token: "focus-tube" },
       { what: "The core outside a Filled or Danger button's fill, rounded half up.", token: "stroke-thin" },
