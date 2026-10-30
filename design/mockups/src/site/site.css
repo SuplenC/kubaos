@@ -197,6 +197,13 @@ body {
 
 /* A grid of samples: the names' column, then a column per state or length, as wide as their
    widest cell, so every cell starts on a whole device pixel. */
+/* A grid's bands, when its columns are wider than the page: one under another, a band apart. */
+.page-bands {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s32);
+}
+
 .page-matrix {
   display: grid;
   grid-template-columns: repeat(calc(var(--columns) + 1), max-content);
