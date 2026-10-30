@@ -1,5 +1,5 @@
 // The toolbar every page has: light or dark, the theme, the scale, reduce motion, the speed and the focus
-// stutter, the text's length, and the window size a template or a screen is shown in.
+// flicker of the power changes, the text's length, and the window size a template or a screen is shown in.
 
 import { change, SCALES, type Settings, settings, SPEEDS, WINDOWS } from "./settings.ts";
 import { el } from "./dom.ts";
@@ -71,7 +71,7 @@ export function toolbar(hasWindow: boolean): HTMLElement {
     choice("Scale", "scale", SCALES.map((s) => ({ value: s, words: `${s}×` }))),
     choice("Reduce motion", "reduced", onOff),
     choice("Speed", "speed", SPEEDS.map((s) => ({ value: s, words: `${s}×` }))),
-    choice("Stutter", "stutter", onOff),
+    choice("Flicker", "flicker", onOff),
     choice("Text", "text", [
       { value: "short", words: "Short" },
       { value: "long", words: "Long" },
