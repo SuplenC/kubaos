@@ -9,6 +9,9 @@ import KubaOS.Components as K
 // WIDTH is the page's width in logical pixels, MODE `dark` or `light`; the scale is the
 // display's (`QT_SCALE_FACTOR`). Once the layout has settled, the page's geometry frame is printed
 // as one line starting `frame `, the screenshot written to PNG when given, and the runner quits.
+//
+// The "Shell only" page (`ShellOnly.qml`) is laid out under the components page and is in the
+// screenshot, but not in the frame: its parts have no iced twin for parity to hold them to.
 Window {
     id: window
 
@@ -17,7 +20,7 @@ Window {
     readonly property string shot: window.arguments[2] ?? ""
 
     width: window.pageWidth
-    height: specimen.height
+    height: specimen.height + shellOnly.height
     visible: true
     color: K.Tokens.color.surface
 
@@ -84,7 +87,7 @@ Window {
         id: page
 
         width: window.width
-        height: specimen.height
+        height: specimen.height + shellOnly.height
         color: K.Tokens.color.surface
 
         Components {
@@ -92,6 +95,14 @@ Window {
 
             width: window.width
             shownScale: window.devicePixelRatio
+        }
+
+        ShellOnly {
+            id: shellOnly
+
+            y: specimen.height
+            width: window.width
+            height: shellOnly.implicitHeight
         }
     }
 
@@ -129,12 +140,14 @@ Window {
         running: true
         onTriggered: {
             specimen.relayout();
+            shellOnly.relayout();
             const frame = window.frame();
             if (frame === null) {
                 Qt.exit(1);
                 return;
             }
-            const report = JSON.stringify(frame);
+            // The "Shell only" page settles with the frame: its height is in what is compared.
+            const report = `${JSON.stringify(frame)} ${shellOnly.height}`;
             if (report !== last) {
                 last = report;
                 return;
@@ -146,7 +159,7 @@ Window {
                 return;
             }
             running = false;
-            console.log(`frame ${report}`);
+            console.log(`frame ${JSON.stringify(frame)}`);
             if (window.shot === "") {
                 Qt.quit();
                 return;
