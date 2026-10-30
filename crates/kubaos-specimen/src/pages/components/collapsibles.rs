@@ -22,7 +22,7 @@ use crate::specimen::Message;
 
 pub const SECTION: Section = Section {
     title: "Collapsibles",
-    lede: Some("A titled part that opens to show more."),
+    lede: Some("A titled part that opens to show more; the last is disabled."),
     view,
 };
 
@@ -53,6 +53,14 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
             false,
             Some(Message::Sample),
             true,
+            text("Hidden while closed.", Type::Small, c.on_surface_variant),
+        ))
+        .push(collapsible(
+            look,
+            "systemd · pid 1",
+            false,
+            None,
+            false,
             text("Hidden while closed.", Type::Small, c.on_surface_variant),
         ))
         .into()

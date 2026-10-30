@@ -5,7 +5,7 @@ import KubaOS.Components as K
 // `crates/kubaos-specimen/src/pages/components/collapsibles.rs` draws with `kubaos-ui`, box for box.
 K.Section {
     title: "Collapsibles"
-    description: "A titled part that opens to show more."
+    description: "A titled part that opens to show more; the last is disabled."
 
     K.Grid {
         columns: 2
@@ -35,6 +35,17 @@ K.Section {
         K.Collapsible {
             title: "Hyprland · pid 1203"
             focused: true
+
+            K.Text {
+                text: "Hidden while closed."
+                style: K.Tokens.type.small
+                color: K.Tokens.color.on_surface_variant
+            }
+        }
+
+        K.Collapsible {
+            title: "systemd · pid 1"
+            enabled: false
 
             K.Text {
                 text: "Hidden while closed."

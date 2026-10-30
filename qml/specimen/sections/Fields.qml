@@ -80,5 +80,16 @@ K.Section {
                 status: "Locked"
             }
         }
+
+        K.Labelled {
+            label: "Proxy"
+            note: "Disabled: turn the proxy on to set it."
+
+            K.Field {
+                placeholder: "proxy.example.com:3128"
+                icon: "lan"
+                status: "Disabled"
+            }
+        }
     }
 }
