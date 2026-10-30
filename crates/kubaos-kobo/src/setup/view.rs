@@ -85,7 +85,7 @@ pub fn view(s: &Setup) -> El<'_> {
     let mut layers = widget::stack![panel(s, &look)].width(Length::Fill).height(Length::Fill);
     if s.backend.is_demo() {
         layers = layers.push(
-            widget::container(chip(&look, ChipKind::Cold, "Demo", Some(Icon::Bolt), None, None))
+            widget::container(chip(ChipKind::Cold, "Demo").icon(Icon::Bolt).view(&look))
                 .width(Length::Fill)
                 .align_right(Length::Fill)
                 .padding(Inset::all(Space::S16).padding()),
@@ -131,7 +131,7 @@ fn state_chip<'a>(look: &Look, st: State) -> El<'a> {
         State::Waiting => (ChipKind::Neutral, Some(Icon::Schedule), "Waiting"),
         State::Absent => (ChipKind::Neutral, None, "Not here"),
     };
-    chip(look, kind, word, glyph, None, None)
+    chip(kind, word).icon_maybe(glyph).view(look)
 }
 
 fn left<'a>(s: &'a Setup, look: &Look) -> El<'a> {
@@ -235,15 +235,13 @@ fn left_cards<'a>(s: &'a Setup, seconds: f32, look: &Look) -> El<'a> {
 /// Whether the machine is online, once detection has said.
 fn left_online<'a>(s: &'a Setup, look: &Look) -> El<'a> {
     match &s.status {
-        Some(st) if st.online => chip(look, ChipKind::Neutral, "Online", Some(Icon::Wifi), None, None),
+        Some(st) if st.online => chip(ChipKind::Neutral, "Online").icon(Icon::Wifi).view(look),
         Some(_) => chip(
-            look,
             ChipKind::Neutral,
             "Offline: drivers, fprintd and Bitwarden need the internet",
-            Some(Icon::WifiOff),
-            None,
-            None,
-        ),
+        )
+        .icon(Icon::WifiOff)
+        .view(look),
         None => widget::Space::new().into(),
     }
 }

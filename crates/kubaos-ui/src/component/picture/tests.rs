@@ -69,3 +69,32 @@ fn picking_or_loading_moves_nothing() {
         assert_eq!(resting, tile(Some(picture()), true), "{scale:?}");
     }
 }
+
+#[test]
+fn a_disabled_picture_takes_no_press_and_moves_nothing() {
+    let look = Look::new(Mode::Dark, Scale::X1);
+    let tile = |disabled: bool| {
+        picture_choice(Some(picture()), Aspect::Wallpaper, "Shinjuku")
+            .on_press("pick")
+            .disabled(disabled)
+            .view(&look)
+    };
+    let page = |view: Element<'static, &'static str>| widget::container(view).width(256.0);
+    let mut ui = Simulator::with_size(settings(), Size::new(800.0, 800.0), page(tile(true)));
+    let on = iced::Point::new(100.0, 80.0);
+
+    ui.point_at(on);
+    let _ = ui.simulate([
+        iced::Event::Mouse(iced::mouse::Event::CursorMoved { position: on }),
+        iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+        iced::Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)),
+    ]);
+
+    assert_eq!(ui.into_messages().count(), 0);
+    let sized = |disabled: bool| {
+        let probe = widget::container(tile(disabled)).width(256.0).id("probe");
+        let mut ui = Simulator::with_size(settings(), Size::new(800.0, 800.0), probe);
+        ui.find(selector::id("probe")).expect("probe").bounds()
+    };
+    assert_eq!(sized(true), sized(false));
+}

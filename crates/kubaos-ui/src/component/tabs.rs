@@ -51,6 +51,7 @@ pub struct Tabs<'a, 'c, F> {
     picked: usize,
     on_pick: F,
     focused: bool,
+    disabled: bool,
 }
 
 /// `choices` side by side, 4 apart, as small buttons: the `picked` one tonal, the rest text. A
@@ -62,6 +63,7 @@ pub fn tabs<'a, 'c, M, F: Fn(usize) -> M>(choices: &'c [Tab<'a>], picked: usize,
         picked,
         on_pick,
         focused: false,
+        disabled: false,
     }
 }
 
@@ -72,6 +74,13 @@ impl<'a, M: Clone + 'a, F: Fn(usize) -> M> Tabs<'a, '_, F> {
         Tabs { focused, ..self }
     }
 
+    /// Whether the row can't be used now: every choice dimmed, none taking a press or the
+    /// keyboard, the picked one still tonal.
+    #[must_use]
+    pub fn disabled(self, disabled: bool) -> Self {
+        Tabs { disabled, ..self }
+    }
+
     pub fn view(self, look: &Look) -> Element<'a, M> {
         let buttons = self.choices.iter().enumerate().map(|(index, choice)| {
             let current = index == self.picked;
@@ -79,8 +88,8 @@ impl<'a, M: Clone + 'a, F: Fn(usize) -> M> Tabs<'a, '_, F> {
             let b = button(choice.label)
                 .kind(kind)
                 .size(ButtonSize::Sm)
-                .on_press((self.on_pick)(index))
-                .focused(self.focused && current);
+                .on_press_maybe((!self.disabled).then(|| (self.on_pick)(index)))
+                .focused(self.focused && current && !self.disabled);
             match choice.icon {
                 Some(glyph) => b.icon(glyph),
                 None => b,

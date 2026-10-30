@@ -33,7 +33,7 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
             look,
             "firefox · pid 4127",
             true,
-            Message::Sample,
+            Some(Message::Sample),
             false,
             stack(look, Space::S4)
                 .push(text(
@@ -51,7 +51,7 @@ fn view<'a>(look: &Look) -> Element<'a, Message> {
             look,
             "Hyprland · pid 1203",
             false,
-            Message::Sample,
+            Some(Message::Sample),
             true,
             text("Hidden while closed.", Type::Small, c.on_surface_variant),
         ))

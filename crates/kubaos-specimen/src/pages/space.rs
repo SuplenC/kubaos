@@ -131,7 +131,7 @@ fn scroll_demo<'a>(look: &Look) -> Element<'a, Message> {
         "Spanish",
         "Portuguese (Brazil)",
     ]
-    .map(|label| chip(look, ChipKind::Neutral, label, None, None, None::<Message>));
+    .map(|label| chip::<Message>(ChipKind::Neutral, label).view(look));
     grid(look, 2, Space::S24)
         .push(scrolling_list(rows, false).height(Extent::Fixed(Size::Log)).view(look))
         .push(flow(look, Space::S8, chips))
