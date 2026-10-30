@@ -5,7 +5,7 @@
 
 import type { Track } from "./page.ts";
 import { between, bezier, cueOf, leads, milliseconds, playing, stepsOf, struck, tracksOf } from "./recipe.ts";
-import { paint, paintBetween, paintGlass, palette, unpaint } from "./recolour.ts";
+import { paint, paintBetween, palette, unpaint } from "./recolour.ts";
 import { themeChange, toDark, toLight } from "./sequences.ts";
 import { type Mode, settings } from "./settings.ts";
 import { THEMES } from "./themes.ts";
@@ -67,7 +67,6 @@ export function playChange(roots: readonly HTMLElement[], from: Painted, to: Pai
   const animations: Animation[] = [];
   for (const root of roots) {
     paintBetween(root, path, palette(from.theme, from.mode), palette(to.theme, to.mode));
-    if (switched && to.mode === "light") paintGlass(root, palette(to.theme, to.mode), to.mode);
     // The mode's attribute changes at once: the lights before the change are the old mode's.
     if (switched) root.style.setProperty("--before", from.mode === "dark" ? "1" : "0");
     root.setAttribute("data-sequence", "");
