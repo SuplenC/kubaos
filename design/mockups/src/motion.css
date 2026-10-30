@@ -1,6 +1,13 @@
 /* What the motion settings do besides the durations the tokens' CSS works out: reduce motion caps
-   them at `short`, and `--lit`, how brightly a focus tube shows, animates as a number. */
+   them at `short`, and `--lit`, how lit a control or a focus tube is, and `--press`, how far a
+   control is pressed, animate as numbers. */
 @property --lit {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --press {
   syntax: "<number>";
   inherits: true;
   initial-value: 0;

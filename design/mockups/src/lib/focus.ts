@@ -26,10 +26,10 @@ import { length, number } from "./tokens.ts";
 const rings = new Set<HTMLElement>();
 
 /**
- * The tone a focus tube lights in: the control's own, or the accent for one with none
- * (`docs/DESIGN.md`, "Focus").
+ * The tone a focus tube lights in: the control's own, or the accent for one with none; a burning
+ * kind's is its fixed tone (`docs/DESIGN.md`, "States").
  */
-export type Tone = "accent" | "cold" | "error" | "success" | "warning" | "sharing";
+export type Tone = "accent" | "cold" | "error" | "success" | "warning" | "sharing" | "burn_danger" | "burn_success" | "burn_warning";
 
 /**
  * The colour role a tone's tube and glow are drawn in; its core is the role's `_core` at night,
@@ -47,10 +47,13 @@ export function glow(d: number): number {
   return 1 - (1 - near) * (1 - far);
 }
 
-/** Lit content's glow `d` logical pixels outside it: a faint near glow only. */
-function contentGlow(d: number): number {
-  const reach = length("focus-content_near");
-  return d >= reach ? 0 : number("focus-content_glow") * (1 - d / reach) ** 2;
+/**
+ * Lit content's glow `d` logical pixels outside it: a faint near glow only, the content glow's
+ * round content drawn in its tone, or the tiny one round a label on a fill.
+ */
+function contentGlow(d: number, which: ContentGlow): number {
+  const reach = length(`focus-${which}_near`);
+  return d >= reach ? 0 : number(`focus-${which}_glow`) * (1 - d / reach) ** 2;
 }
 
 /** A device pixel's distance outside a rounded box of half sides `hw`, `hh` and corner `r`. */
@@ -60,8 +63,12 @@ function outside(x: number, y: number, hw: number, hh: number, r: number): numbe
   return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
 }
 
-/** The glow's mask round a box `width` by `height` device pixels with corner `corner`, at `scale`. */
-function mask(width: number, height: number, corner: number, scale: number): string {
+/**
+ * The glow's mask round a box `width` by `height` device pixels with corner `corner`, at `scale`,
+ * `boost` times as strong: a pressable control's mask holds its pressed glow, and its lit glow
+ * shows it at `1 / boost`.
+ */
+function mask(width: number, height: number, corner: number, scale: number, boost: number): string {
   const reach = Math.max(0, Math.ceil(length("focus-far") * scale - 1e-3));
   const canvas = document.createElement("canvas");
   canvas.width = width + 2 * reach;
@@ -74,7 +81,7 @@ function mask(width: number, height: number, corner: number, scale: number): str
     for (let px = 0; px < canvas.width; px++) {
       const d = outside(px + 0.5 - canvas.width / 2, py + 0.5 - canvas.height / 2, width / 2, height / 2, r);
       if (d <= 0) continue;
-      image.data[(py * canvas.width + px) * 4 + 3] = Math.round(glow(d / scale) * 255);
+      image.data[(py * canvas.width + px) * 4 + 3] = Math.round(Math.min(1, glow(d / scale) * boost) * 255);
     }
   }
   context.putImageData(image, 0, 0);
@@ -169,7 +176,7 @@ async function rasterise(lit: HTMLElement, context: CanvasRenderingContext2D, re
  * `scale`: each pixel's glow at its distance from the nearest pixel the content covers, less half
  * a pixel to that pixel's edge.
  */
-async function contentMask(lit: HTMLElement, reach: number, scale: number): Promise<string> {
+async function contentMask(lit: HTMLElement, reach: number, scale: number, which: ContentGlow): Promise<string> {
   const canvas = document.createElement("canvas");
   canvas.width = lit.offsetWidth + 2 * reach;
   canvas.height = lit.offsetHeight + 2 * reach;
@@ -191,7 +198,7 @@ async function contentMask(lit: HTMLElement, reach: number, scale: number): Prom
   for (let i = 0; i < field.length; i++) {
     if (field[i] === 0) continue;
     const d = Math.sqrt(field[i]!) - 0.5;
-    image.data[i * 4 + 3] = Math.round(contentGlow(d / scale) * 255);
+    image.data[i * 4 + 3] = Math.round(contentGlow(d / scale, which) * 255);
   }
   context.putImageData(image, 0, 0);
   return `url(${canvas.toDataURL()})`;
@@ -202,12 +209,13 @@ function drawContent(ring: HTMLElement, scale: number): void {
   const lit = ring.querySelector<HTMLElement>(".k-lit");
   const glowing = lit?.querySelector<HTMLElement>(".k-lit-glow");
   if (!lit || !glowing) return;
-  const reach = Math.max(0, Math.ceil(length("focus-content_near") * scale - 1e-3));
+  const which: ContentGlow = lit.dataset.glow === "label" ? "label" : "content";
+  const reach = Math.max(0, Math.ceil(length(`focus-${which}_near`) * scale - 1e-3));
   const key = `${lit.offsetWidth}x${lit.offsetHeight}+${reach}@${scale}`;
   if (glowing.dataset.drawn === key) return;
   glowing.dataset.drawn = key;
   glowing.style.inset = `${-reach}px`;
-  void contentMask(lit, reach, scale).then((made) => {
+  void contentMask(lit, reach, scale, which).then((made) => {
     if (glowing.dataset.drawn === key) glowing.style.maskImage = made;
   });
 }
@@ -223,10 +231,11 @@ function draw(ring: HTMLElement, scale: number): void {
   const width = ring.offsetWidth;
   const height = ring.offsetHeight;
   const corner = Number.parseFloat(getComputedStyle(ring).borderTopLeftRadius);
-  const key = `${width}x${height}r${corner}@${scale}`;
+  const boost = ring.hasAttribute("data-pressable") ? number("focus-pressed_glow") : 1;
+  const key = `${width}x${height}r${corner}@${scale}x${boost}`;
   if (glowing.dataset.drawn === key) return;
   glowing.dataset.drawn = key;
-  const made = mask(width, height, corner, scale);
+  const made = mask(width, height, corner, scale, boost);
   glowing.style.maskImage = made;
   const shade = ring.querySelector<HTMLElement>(".k-shade");
   if (shade) shade.style.maskImage = made;
@@ -257,9 +266,16 @@ export function windowRing(ring: HTMLElement, width: string, corner: string): vo
   ring.prepend(shade, border);
 }
 
-/** A control's content drawn in its own tone, which lights as a tube with the line. */
+/** Which glow lit content takes: the content glow, or the tiny one round a label on a fill. */
+export type ContentGlow = "content" | "label";
+
+/**
+ * A control's content that glows when it is lit: drawn in its own tone, it lights as a tube with
+ * the line (`content`); on a fill, its letters take a tiny glow (`label`).
+ */
 export interface LitContent {
   readonly content: HTMLElement;
+  readonly glow?: ContentGlow;
 }
 
 /**
@@ -290,6 +306,7 @@ export function focusRing(control: HTMLElement, corner: string, tone: Tone, fill
     for (const each of [copy, ...copy.querySelectorAll<HTMLElement>("[data-probe]")]) delete each.dataset.probe;
     const burning = document.createElement("span");
     burning.className = "k-lit";
+    burning.dataset.glow = lit.glow ?? "content";
     const around = document.createElement("span");
     around.className = "k-lit-glow";
     burning.append(around, copy);
