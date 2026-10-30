@@ -184,7 +184,9 @@ async function testPage(page: Page, origin: string, level: string, slug: string,
     const stacked = await player.evaluate((element) => {
       const keys = [...element.querySelectorAll(".page-plot-legend .page-plot-key")].map((key) => key.textContent);
       const rows = [...element.querySelectorAll<HTMLElement>(".page-part-alone")];
-      const width = element.querySelector<HTMLElement>(".page-parts")?.getBoundingClientRect().width ?? 0;
+      // A move of one part has no parts alone; a move of more has one per legend key.
+      if (rows.length !== (keys.length > 1 ? keys.length : 0)) return false;
+      const width = element.querySelector<HTMLElement>(".page-plot-box")?.getBoundingClientRect().width ?? 0;
       return rows.every((row, i) => {
         const box = row.getBoundingClientRect();
         const above = rows[i - 1]?.getBoundingClientRect();
