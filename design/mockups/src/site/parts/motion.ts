@@ -401,8 +401,9 @@ function player(move: Move): HTMLElement {
     if (targets.length === 0) throw new Error(`${move.name}: no ${timed.track.target} in its sample`);
     if (!CHROME) {
       // A shot holds the first state. It is set from the move's data rather than animated, since
-      // a screenshot cancels every animation that never ends.
-      for (const target of targets) target.style.setProperty(timed.track.property, String(css(timed.track.from)));
+      // a screenshot cancels every animation that never ends. A track that follows another on the
+      // property leaves the first state to it.
+      if (!timed.lead) for (const target of targets) target.style.setProperty(timed.track.property, String(css(timed.track.from)));
       return [];
     }
     const frames = keyframes(timed, playing.total);
