@@ -5,8 +5,7 @@
 // layout, and it never takes the pointer.
 
 import { probe } from "./probe.ts";
-import { advance } from "./text.ts";
-import { text } from "./text.ts";
+import { advance, text } from "./text.ts";
 
 /** Where a bubble sits across its control: centred, or held inside the window at its end. */
 export type Held = "centred" | "end";
@@ -42,11 +41,13 @@ export function withHint<E extends HTMLElement>(control: E, words: string, optio
 /**
  * `control`, `side` wide (a length's custom property), in a box with the room its hint, `words`,
  * floats in: below it, and to each side where the bubble is wider than the control, so a sample's
- * bubble never covers its neighbours. The control keeps a whole device pixel.
+ * bubble never covers its neighbours; held at the window's end, the room's end is the window's.
+ * The control keeps a whole device pixel.
  */
-export function hintRoom(control: Element, words: string, side: string): HTMLElement {
+export function hintRoom(control: Element, words: string, side: string, held: Held = "centred"): HTMLElement {
   const room = document.createElement("span");
   room.className = "k-hint-room";
+  if (held === "end") room.dataset.held = "end";
   room.style.setProperty("--natural", String(advance("label", words)));
   room.style.setProperty("--side", side);
   room.append(control);
