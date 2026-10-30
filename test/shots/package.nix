@@ -14,6 +14,9 @@
 # font before they took the tokens'), Noto Color Emoji and DejaVu; and fuzzel's icons, the curated
 # Colloid and Papirus, the icon theme before it.
 #
+# The mockups (test/shots/mockups) are drawn by headless Chromium, nixpkgs' Playwright build, which
+# the site's playwright-core of the same version drives, with Node to build and run them.
+#
 # The boot screens (test/shots/boot) take plymouthd with its X11 renderer in Xvfb, sandboxed by
 # bubblewrap; GRUB under OVMF in QEMU; and Bibata's sources at the release `home/theme.nix` pins,
 # for the pointer.
@@ -76,6 +79,8 @@
   colloid-orange,
   papirus-icon-theme,
   hicolor-icon-theme,
+  nodejs_24,
+  playwright-driver,
   ...
 }:
 let
@@ -183,6 +188,7 @@ let
     ncurses
     procps
     util-linux
+    nodejs_24
   ];
 in
 writeShellApplication {
@@ -233,6 +239,7 @@ writeShellApplication {
     export KUBAOS_SHOTS_GRUB=${grub2_efi}
     export KUBAOS_SHOTS_OVMF=${OVMF.fd}/FV/OVMF.fd
     export KUBAOS_SHOTS_BIBATA=${bibata}
+    export KUBAOS_SHOTS_PLAYWRIGHT=${playwright-driver.browsers-chromium}
     repo=$(git rev-parse --show-toplevel 2>/dev/null) || {
       echo "kubaos-shots: run me inside a KubaOS checkout" >&2
       exit 2

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# mockups: the mockup site of a tree (design/mockups) built and its pages rendered, for `shots`.
+#
+#   mockups TREE OUT [PAGE...]
+#
+# Installs the site's locked npm dependencies when the tree has none, builds it (its Vite build
+# writes the tokens' CSS with the cargo on PATH), then draws every page, or the PAGEs, in light and
+# dark at 1, 1.25, 1.5 and 2 into OUT as PAGE-MODE-SCALEx.png, with the Chromium of nixpkgs'
+# Playwright (`PLAYWRIGHT_BROWSERS_PATH`, which `just shots` sets). A tree with no mockup site
+# draws nothing and succeeds: its pages are new.
+set -euo pipefail
+
+(($# >= 2)) || {
+  sed -n '2,/^set -euo/p' "${BASH_SOURCE[0]}" | sed '$d; s/^# \{0,1\}//' >&2
+  exit 2
+}
+tree=$1 out=$2
+shift 2
+site=$tree/design/mockups
+[[ -f $site/package.json ]] || exit 0
+cd "$site"
+if [[ ! node_modules/.package-lock.json -nt package-lock.json ]]; then
+  npm ci --no-audit --no-fund
+fi
+npx vite build --logLevel warn
+node scripts/render.ts "$out" --shots "$@"
