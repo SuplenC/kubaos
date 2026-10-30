@@ -1,4 +1,4 @@
-// The Colour foundation: every colour role in both modes and every theme, the fixed roles, the
+// The Colour foundation: every colour role in both modes and every theme, the fixed palette, the
 // derived roles as their recipes, the opacities and state layers, and every contrast pair with
 // its ratio in the palette picked (`docs/DESIGN.md`, "Colour").
 
@@ -31,16 +31,80 @@ function fixed(): string[] {
     .map((name) => name.slice("source-".length));
 }
 
-/** What each fixed role is for, and words it shows them with. */
+/**
+ * The fixed palette, a meaning a row: its burning tone, the text role fitted from it, its core and
+ * its unlit form, what it is for and words it shows them with. The error family's labels and
+ * container come from its tone too.
+ */
+const PALETTE: readonly {
+  meaning: string;
+  tone: string;
+  text: string;
+  core: string;
+  unlit: string;
+  tiles?: readonly (readonly [string, string])[];
+  for: string;
+  shows: string;
+}[] = [
+  {
+    meaning: "Error",
+    tone: "burn_error",
+    text: "error",
+    core: "error_core",
+    unlit: "error_unlit",
+    tiles: [["error", "on_error"], ["error_container", "on_error_container"]],
+    for: "Red: something failed, and the action that destroys something. A Danger button burns on the tone; `error` is the words and marks of a failure; `error_container` a critical notification's surface, deep at night and pale by day.",
+    shows: "Wrong password",
+  },
+  {
+    meaning: "Success",
+    tone: "burn_success",
+    text: "success",
+    core: "success_core",
+    unlit: "success_unlit",
+    for: "Green: done and installed. A Success button burns on the tone; `success` is a done mark and the words saying something is installed.",
+    shows: "Installed",
+  },
+  {
+    meaning: "Warning",
+    tone: "burn_warning",
+    text: "warning",
+    core: "warning_core",
+    unlit: "warning_unlit",
+    for: "Amber, between fine and an error: a reading close to its limit. A Warning button, an action with a cost, burns on the tone.",
+    shows: "Battery at 9%",
+  },
+  {
+    meaning: "Sharing",
+    tone: "burn_sharing",
+    text: "sharing",
+    core: "sharing_core",
+    unlit: "sharing_unlit",
+    for: "Violet: anything shared off the machine, the screen above all. Its tube marks what is shared, with `sharing_core` along its middle.",
+    shows: "Sharing your screen",
+  },
+  {
+    meaning: "Microphone",
+    tone: "burn_microphone",
+    text: "microphone",
+    core: "microphone_core",
+    unlit: "microphone_unlit",
+    for: "Orange, clear of the warning's amber and the error's red: the privacy dot of a microphone that is listening, and its words.",
+    shows: "Microphone on",
+  },
+  {
+    meaning: "Camera",
+    tone: "burn_success",
+    text: "camera",
+    core: "success_core",
+    unlit: "success_unlit",
+    for: "The privacy dot of a camera that is watching, and its words: done's green, one green for the palette.",
+    shows: "Camera on",
+  },
+];
+
+/** What each fixed role outside the palette is for, and words it shows them with. */
 const FIXED_FOR: Record<string, { for: string; shows: string }> = {
-  warning: { for: "Amber, between fine and the error colour: a reading close to its limit. Its tube has `warning_core` along its middle.", shows: "Battery at 9%" },
-  success: { for: "Done and installed: a done mark, words saying something is installed. The camera's green. Its tube has `success_core` along its middle.", shows: "Installed" },
-  sharing: { for: "Violet: anything shared off the machine, the screen above all. Its tube marks what is shared, with `sharing_core` along its middle.", shows: "Sharing your screen" },
-  microphone: { for: "The privacy dot of a microphone that is listening, and its words.", shows: "Microphone on" },
-  camera: { for: "The privacy dot of a camera that is watching, and its words.", shows: "Camera on" },
-  burn_danger: { for: "A Danger button's fill: bright neon red, always lit, so the one action that destroys something can't be taken for any wallpaper's accent. Its label is `on_burn_danger`, fitted to it.", shows: "Erase disk" },
-  burn_success: { for: "A Success button's fill: bright neon green, always lit. Its label is `on_burn_success`, fitted to it.", shows: "Finish" },
-  burn_warning: { for: "A Warning button's fill: bright neon amber, always lit. Its label is `on_burn_warning`, fitted to it.", shows: "Restart now" },
   logo_core_warm: { for: "The logo's own core along the middle of the クバ mark's warm tubes: brand art, paler than a control's, the same in both modes. No control takes it.", shows: "クバ" },
   logo_core_cold: { for: "The logo's own core along the middle of the mark's cold tube, the dakuten. No control takes it.", shows: "クバ" },
 };
@@ -136,7 +200,6 @@ const FAMILIES: readonly { name: string; tiles: readonly (readonly [string, stri
   { name: "Secondary", tiles: [["secondary", "on_secondary"], ["secondary_container", "on_secondary_container"]] },
   { name: "Tertiary", tiles: [["tertiary", "on_tertiary"], ["tertiary_container", "on_tertiary_container"]] },
   { name: "Cold", tiles: [["cold", "on_cold"], ["cold_container", "on_cold_container"]] },
-  { name: "Error", tiles: [["error", "on_error"], ["error_container", "on_error_container"]] },
   {
     name: "Surfaces",
     tiles: [
@@ -213,11 +276,34 @@ function sources(): HTMLElement {
   );
 }
 
-/** The fixed roles, a row each: their value in each mode and their words as they are drawn. */
+/** `role` as a swatch over its name and its value in `colours`. */
+function named(role: string, colours: Readonly<Record<string, string>>): HTMLElement {
+  return swatchWith(role, `${role} ${colours[role] ?? ""}`);
+}
+
+/** The fixed palette, a meaning a row: its tone, text role, core and unlit form in each mode. */
+function fixedPalette(): HTMLElement {
+  return table(
+    ["Meaning", ...MODES.map(modeName), "For"],
+    PALETTE.map((each) => [
+      label(each.meaning, "body_strong", "on_surface"),
+      ...MODES.map((mode) => {
+        const { theme, palette: colours } = picked(mode);
+        const roles = el("div", "f-row", ...[each.tone, each.text, each.core, each.unlit].map((role) => named(role, colours)));
+        const tiles = (each.tiles ?? []).map(([bg, fg]) => tile(bg, fg, colours));
+        return painted(theme, mode, roles, text(each.shows, "body_strong", each.text), ...tiles);
+      }),
+      prose(each.for, "body", "on_surface"),
+    ]),
+  );
+}
+
+/** The fixed roles outside the palette, a row each: their value in each mode and how they are drawn. */
 function fixedRoles(): HTMLElement {
+  const inPalette = new Set(PALETTE.flatMap((each) => [each.tone, each.text, each.core, each.unlit, ...(each.tiles ?? []).flat()]));
   return table(
     ["Role", ...MODES.map(modeName), "For"],
-    fixed().map((role) => [
+    fixed().filter((role) => !inPalette.has(role)).map((role) => [
       token(role),
       ...MODES.map((mode) => {
         const { theme, palette: colours } = picked(mode);
@@ -382,7 +468,8 @@ function moving(from: { theme: string; mode: Mode } | string, to: { theme: strin
   return () => {
     const mode = settings().mode;
     const [a, b] = [from, to].map((each) => (typeof each === "string" ? { theme: each, mode } : each)) as [{ theme: string; mode: Mode }, { theme: string; mode: Mode }];
-    const roles = el("div", "f-row", ...[...sourced().map((each) => each.role), ...fixed(), ...described(a.mode).map((each) => each.role)].map((role) => swatch(role)));
+    const every = new Set([...sourced().map((each) => each.role), ...fixed(), ...described(a.mode).map((each) => each.role)]);
+    const roles = el("div", "f-row", ...[...every].map((role) => swatch(role)));
     const playing = el("div", "page-scene", label("Every colour role, on one clock", "body_strong", "on_surface"), scene(), roles);
     playing.dataset.mode = a.mode;
     paintBetween(playing, path, palette(a.theme, a.mode), palette(b.theme, b.mode));
@@ -394,11 +481,11 @@ export default foundation({
   level: "foundations",
   slug: "colour",
   title: "Colour",
-  summary: "Every colour is a role: matugen's from the wallpaper, a few fixed roles of our own, and roles derived from their tones by recipe, held to a contrast minimum in every pair.",
+  summary: "Every colour is a role: matugen's from the wallpaper, a fixed palette of our own for the meanings, and roles derived from their tones by recipe, held to a contrast minimum in every pair.",
   live: () => painted(settings().theme, settings().mode, scene()),
   description: [
-    "Code names a role (`primary`, `on_surface`, `surface_container_high`), never a colour. Matugen sets every role it has a source for from the wallpaper (`scheme-fidelity`), so `primary`, `cold` and `error` and everything around them are dynamic: the hex values here are a theme's, never the role's. The tokens' palettes are matugen's for the default wallpaper, the Neon sign theme; the toolbar paints the page in three others matugen made from seed colours, so nothing is judged in one accent alone.",
-    "The fixed roles are ours and keep their value whatever the wallpaper, so they mean the same on every desktop: `warning`, `success`, `sharing`, `microphone` and `camera`, each drawn as text or a mark straight on the surfaces, and the logo's own cores. Each has a value per mode and no `on_` or container role.",
+    "Code names a role (`primary`, `on_surface`, `surface_container_high`), never a colour. Matugen sets every role it has a source for from the wallpaper (`scheme-fidelity`), so `primary` and `cold` and everything around them are dynamic: the hex values here are a theme's, never the role's. The tokens' palettes are matugen's for the default wallpaper, the Neon sign theme; the toolbar paints the page in three others matugen made from seed colours, so nothing is judged in one accent alone.",
+    "The fixed palette is ours and keeps its colours whatever the wallpaper, so a meaning has one colour on every desktop: error, success, warning, sharing, the microphone and the camera. Each meaning has a burning tone, decided in OKLCH and fitted into sRGB at its hue and lightness, neon-bright at night and deeper by day, and the Danger, Success and Warning buttons burn on theirs. Every role carrying the meaning is a recipe over the tone: its text role (`error`, `success` and the rest) the tone with its lightness moved only as far as it takes to hold 4.5:1 on every surface, its core (`_core`) and its unlit form (`_unlit`). The error family's labels and container follow from its tone too, so Material 3's pastel error, the same for every wallpaper, never reaches the screen. The camera's green is success's. The logo keeps its own cores, fixed values only its mark draws.",
     "Everything that follows from a tone is a derived role (`[color.derived]`), a recipe over the live tone, never a value, so it follows the wallpaper. A lit tube's core is its tone 50% toward white (`_core`); the tone unlit is its OKLCH lightness × 0.6 and chroma × 1.2 (`_unlit`), a deep, rich colour, not a greyed one. Each button kind's fills, labels and lines build on them: Filled's unlit fill is `primary_unlit`, its pressed fill 0.035 lighter, its signs-off glass 0.12 lighter; by day its fill is the tone at lightness 0.80. A recipe that moves lightness or chroma is fitted back into sRGB by lowering its chroma alone, so the hue and lightness hold, and a label's recipe fits its lightness until it holds 4.5:1 on every fill it sits on. `primary`, and so every role built on it, comes from the wallpaper: here each is drawn in every theme the toolbar paints in.",
     "An opacity lays a role over another: the state layers, disabled content, scrims, glass. A component never picks its own alpha. Every foreground drawn on a background is a listed pair that holds WCAG 2.1 AA: 4.5:1 for text, 3:1 for large text and for marks that carry meaning.",
   ],
@@ -414,8 +501,13 @@ export default foundation({
       sample: sources,
     },
     {
-      name: "Fixed roles",
-      described: "Ours, one value per mode whatever the wallpaper, each drawn as it is used: words in the role on the surface, or a logo core along its tube.",
+      name: "The fixed palette",
+      described: "Each meaning in the theme the toolbar picks, dark and light: its burning tone, its text role, its core and its unlit form, each with its value, then words in the text role. The tones are the same in every theme; the text roles are fitted to that theme's surfaces.",
+      sample: fixedPalette,
+    },
+    {
+      name: "The logo's cores",
+      described: "Fixed values of our own outside the palette, one per mode whatever the wallpaper, drawn along the logo's tubes.",
       sample: fixedRoles,
     },
     {
@@ -461,12 +553,12 @@ export default foundation({
   themes: [
     {
       name: "The scene in every theme",
-      described: "The same card in each theme the toolbar paints in, in the mode picked. The fixed roles' words keep their colour; everything else follows the wallpaper.",
+      described: "The same card in each theme the toolbar paints in, in the mode picked. The fixed palette's words keep their tone, fitted to each theme's surfaces; everything else follows the wallpaper.",
       sample: () => el("div", "f-row", ...themes().map((theme) => sceneIn(theme.slug, settings().mode))),
     },
     {
       name: "Every role in every theme",
-      described: "Each matugen role's value in each theme and mode: what `primary`, `cold` and `error` are depends on the wallpaper, so no page is right in one alone.",
+      described: "Each matugen role's value in each theme and mode: what `primary` and `cold` are depends on the wallpaper, so no page is right in one alone.",
       sample: sourcedEverywhere,
     },
   ],
