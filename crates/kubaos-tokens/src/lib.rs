@@ -73,9 +73,10 @@ pub enum Error {
 /// [`Error::Parse`] when `text` isn't the tokens' shape, [`Error::Invalid`] with every broken rule
 /// when it is but breaks some.
 pub fn parse(text: &str) -> Result<Tokens, Error> {
-    let tokens: Tokens = toml::from_str(text).map_err(Error::Parse)?;
+    let mut tokens: Tokens = toml::from_str(text).map_err(Error::Parse)?;
     let violations = rules::check(&tokens);
     if violations.is_empty() {
+        tokens.color.fill_recipes();
         Ok(tokens)
     } else {
         Err(Error::Invalid(violations))

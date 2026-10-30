@@ -43,7 +43,7 @@ pub enum Violation {
     OpacityOutOfRange { token: String, value: f32 },
     /// A colour role missing from one of `source`, `dark` and `light`.
     RoleMissing { role: String, table: &'static str },
-    /// A role both derived and given values of its own.
+    /// A role both derived and given values of its own, or derived and read from matugen.
     RoleTwice { role: String },
     /// A derived role that names both `white` and `black`, or neither.
     DerivedWay { role: String },
@@ -122,7 +122,10 @@ impl fmt::Display for Violation {
                 write!(f, "colour role {role} is missing from color.{table}")
             }
             Violation::RoleTwice { role } => {
-                write!(f, "colour role {role} is in color.derived and in color.source")
+                write!(
+                    f,
+                    "colour role {role} is in color.derived and has a matugen source or a value"
+                )
             }
             Violation::DerivedWay { role } => {
                 write!(f, "color.derived.{role} needs exactly one of `white` and `black`")
@@ -548,7 +551,8 @@ fn check_colors(tokens: &Tokens, found: &mut Vec<Violation>) {
     let every: BTreeSet<&String> = tables.iter().flat_map(|(_, roles)| roles.iter().copied()).collect();
     for role in every {
         for (table, roles) in &tables {
-            if !roles.contains(role) {
+            let given = *table != "source" && colors.by_recipe(role);
+            if !roles.contains(role) && !given {
                 found.push(Violation::RoleMissing {
                     role: role.clone(),
                     table,
@@ -557,7 +561,8 @@ fn check_colors(tokens: &Tokens, found: &mut Vec<Violation>) {
         }
     }
     for (role, derived) in &colors.derived {
-        if colors.source.contains_key(role) {
+        let valued = colors.dark.contains_key(role) || colors.light.contains_key(role);
+        if colors.source.get(role).is_some_and(|source| !source.is_empty()) || valued {
             found.push(Violation::RoleTwice { role: role.clone() });
         }
         check_derived(tokens, role, derived, found);
