@@ -26,6 +26,9 @@ Item {
     // Why the Result can't run, shown in place of its subtitle, with the rest of the row dimmed.
     // Empty when it can run.
     required property string unavailable
+    // Whether a verb in the query chose the Action Enter would run, in place of the Item's own
+    // first; the menu keeps to the Item's own first (enter.js).
+    required property bool primaryChosen
 
     readonly property bool selected: ListView.isCurrentItem
     readonly property bool runs: unavailable === ""

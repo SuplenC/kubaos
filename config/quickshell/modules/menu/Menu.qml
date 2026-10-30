@@ -7,6 +7,7 @@ import KubaOS.Components as K
 import qs.components
 import qs.services
 import qs.settings
+import "enter.js" as Enter
 
 // The Command menu: KubaOS's own front end on Kotodama's `KotodamaSearch`, built from
 // `KubaOS.Components`. A search field over the Daemon's Results, a detail pane beside them when
@@ -106,7 +107,8 @@ PanelWindow {
             return "";
         row.markup;
         row.unavailable;
-        return search.hints(list.currentIndex);
+        const hints = search.hints(list.currentIndex);
+        return row.primaryChosen ? Enter.hints(hints, search.actions(list.currentIndex), true) : hints;
     }
     // What Esc does now, as the footer names it.
     readonly property string escapeHint: {
@@ -253,8 +255,30 @@ PanelWindow {
         return viewKeys.activeFocus ? "view" : "";
     }
 
+    // Whether a verb in the query chose the Action kotodama-qml would run on row `n` (enter.js).
+    function chosen(n: int): bool {
+        return list.itemAtIndex(n)?.primaryChosen ?? false;
+    }
+
+    // Row `n`'s Action panel, the Item's own first Action first (enter.js).
+    function actionsOf(n: int): var {
+        return Enter.unchosen(search.actions(n), menu.chosen(n));
+    }
+
+    // Runs what Enter runs on row `n`: the Item's own first Action (enter.js).
+    function runRow(n: int): void {
+        if (!menu.chosen(n)) {
+            search.run(n);
+            return;
+        }
+        const actions = search.actions(n);
+        const first = Enter.usual(actions, true);
+        if (first >= 0)
+            search.runListed(n, actions[first].group, actions[first].id);
+    }
+
     function openActions(): void {
-        const actions = search.actions(list.currentIndex);
+        const actions = menu.actionsOf(list.currentIndex);
         if (actions.length > 0) {
             actionPanel.row = list.currentIndex;
             actionPanel.current = 0;
@@ -273,7 +297,7 @@ PanelWindow {
     function runAction(n: int): void {
         menu.failure = "";
         menu.hold();
-        search.runAction(actionPanel.row, n);
+        search.runListed(actionPanel.row, menu.actions[n].group, menu.actions[n].id);
         if (!menu.holding)
             menu.closeActions();
     }
@@ -300,8 +324,8 @@ PanelWindow {
             extension: row.extension,
             alias: row.alias,
             unavailable: row.unavailable,
-            actions: search.actions(list.currentIndex),
-            hints: search.hints(list.currentIndex)
+            actions: menu.actionsOf(list.currentIndex),
+            hints: row.primaryChosen ? Enter.hints(search.hints(list.currentIndex), search.actions(list.currentIndex), true) : search.hints(list.currentIndex)
         };
     }
 
@@ -387,7 +411,7 @@ PanelWindow {
         } else if (enter) {
             menu.failure = "";
             menu.hold();
-            search.run(list.currentIndex);
+            menu.runRow(list.currentIndex);
         } else if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_N)) {
             list.incrementCurrentIndex();
         } else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_P)) {
@@ -1028,7 +1052,7 @@ PanelWindow {
                         onPicked: {
                             menu.failure = "";
                             menu.hold();
-                            search.run(row.index);
+                            menu.runRow(row.index);
                         }
                     }
                 }
