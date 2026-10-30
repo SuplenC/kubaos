@@ -680,10 +680,11 @@ body {
   outline: var(--stroke-hairline_device_px) solid var(--color-outline_variant);
 }
 
-/* The layer fills the box less its inset, so its corner is nested: the box's less the inset. */
+/* The layer fills the box less its inset, so its corner is nested (`lib/radius.ts`), set by the
+   page. */
 .f-layer > div {
   flex: 1;
-  border-radius: calc(var(--radius-control) - var(--space-s8));
+  border-radius: var(--nested);
   background: var(--under);
 }
 
@@ -872,8 +873,94 @@ body {
 }
 
 .f-card-box {
+  align-self: flex-start;
   display: flex;
   padding: var(--space-s16);
   border-radius: var(--radius-surface);
   background: var(--color-surface_container_high);
+}
+
+/* A plain shape with a corner, at the sizes the radii page draws it. */
+.f-shape {
+  flex: none;
+  border-radius: var(--corner);
+  background: var(--color-secondary_container);
+}
+
+.f-shape-wide {
+  width: var(--size-thumbnail_height);
+  height: var(--size-row_two_line);
+}
+
+.f-shape-check {
+  width: var(--size-check);
+  height: var(--size-check);
+  background: none;
+  box-shadow: inset 0 0 0 max(1px, round(nearest, var(--stroke-thin), 1px)) var(--color-outline);
+}
+
+.f-shape-switch {
+  width: var(--size-switch_width);
+  height: var(--size-switch_height);
+  background: var(--color-primary);
+}
+
+/* A shape filling another less an inset, both outlined, and the centre their corners share. */
+.f-nest-cell {
+  width: var(--size-thumbnail_width);
+}
+
+.f-nest {
+  position: relative;
+  width: var(--size-thumbnail_width);
+  height: var(--size-thumbnail_height);
+  padding: var(--inset);
+  border-radius: var(--outer);
+  background: var(--color-surface_container_high);
+  outline: var(--stroke-hairline_device_px) solid var(--color-outline);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.f-nest-inner {
+  height: 100%;
+  border-radius: var(--inner);
+  background: var(--color-secondary_container);
+  outline: var(--stroke-hairline_device_px) solid var(--color-on_secondary_container);
+  outline-offset: calc(-1 * var(--stroke-hairline_device_px));
+}
+
+.f-nest[data-refused] > .f-nest-inner {
+  outline-color: var(--color-error);
+}
+
+.f-centre {
+  position: absolute;
+  left: calc(var(--centre) - var(--size-badge_dot) / 2);
+  top: calc(var(--centre) - var(--size-badge_dot) / 2);
+  width: var(--size-badge_dot);
+  height: var(--size-badge_dot);
+  border-radius: var(--radius-full);
+  background: var(--color-cold);
+}
+
+/* A list well: a surface with its rows 12 in, their corners nested from it. */
+.f-well {
+  display: flex;
+  flex-direction: column;
+  width: var(--size-panel);
+  padding: var(--space-s12);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface_container_low);
+}
+
+.f-well-row {
+  display: flex;
+  align-items: center;
+  height: var(--size-row);
+  padding-inline: var(--space-s12);
+  border-radius: var(--corner);
+}
+
+.f-well-row[data-selected] {
+  background: var(--color-secondary_container);
 }
