@@ -5,7 +5,7 @@
 import { cubic, length, number, raw } from "../lib/tokens.ts";
 import type { Curve, Duration, Easing, Move, NonEmpty, Strike, Track, Value } from "./page.ts";
 import { PATHS } from "./recolour.ts";
-import { settings } from "./settings.ts";
+import { type Mode, settings } from "./settings.ts";
 
 /** One frame at 60 Hz, in milliseconds: the step the plot's arrow keys take. */
 export const FRAME = 1000 / 60;
@@ -145,9 +145,12 @@ export function tracksOf(move: Move, set: TrackSet): NonEmpty<Track> | null {
   return move.unstuttered ?? null;
 }
 
-/** The set the settings picked play: reduced motion's first, then light mode's, then the stutter's. */
-export function playing(move: Move): TrackSet {
-  const { reduced, stutter, mode } = settings();
+/**
+ * The set the settings picked play, in `mode`, the one picked by default: reduced motion's first,
+ * then light mode's, then the stutter's.
+ */
+export function playing(move: Move, mode: Mode = settings().mode): TrackSet {
+  const { reduced, stutter } = settings();
   if (reduced && move.reduced !== "same") return "reduced";
   if (mode === "light" && move.daylight) return "daylight";
   if (reduced) return "tracks";
@@ -193,7 +196,7 @@ export interface Timed {
   readonly lead: Timed | null;
 }
 
-/** The player's loop of a move at the settings picked: hold, move, hold, back. */
+/** The player's loop of a move at the settings picked, in `mode`: hold, move, hold, back. */
 export interface Loop {
   readonly set: TrackSet;
   readonly total: number;
@@ -201,8 +204,8 @@ export interface Loop {
   readonly timed: readonly Timed[];
 }
 
-export function loop(move: Move): Loop {
-  const set = playing(move);
+export function loop(move: Move, mode: Mode = settings().mode): Loop {
+  const set = playing(move, mode);
   const tracks = tracksOf(move, set) ?? move.tracks;
   // The speed setting divides every duration and cue, as `kubaos_ui::motion::Motion` does; a hold
   // is no motion, so it stays.

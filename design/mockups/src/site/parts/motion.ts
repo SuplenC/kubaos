@@ -34,7 +34,7 @@ import {
   tokenOf,
   tracksOf,
 } from "../recipe.ts";
-import { CHROME, onChange } from "../settings.ts";
+import { CHROME, onChange, settings } from "../settings.ts";
 import { legend, type Mark, named, Plot, swatch } from "./plot.ts";
 import { partOr, subheading } from "./section.ts";
 
@@ -284,7 +284,7 @@ function player(move: Move): HTMLElement {
   bar.tabIndex = 0;
   bar.setAttribute("role", "slider");
   bar.setAttribute("aria-label", `${move.name}: where the playhead is`);
-  const key = el("div", "");
+  const key = el("div", "page-plot-keys");
   const readout = el("div", "page-plot-time");
   const parts = el("div", "page-parts");
   const outlines = el("div", "page-player-outlines");
@@ -420,7 +420,8 @@ function player(move: Move): HTMLElement {
    * on the player's one clock, so the part and the whole never disagree.
    */
   function drawParts(): Animation[] {
-    if (playing.timed.length < 2) {
+    const resting = restingInDaylight();
+    if (playing.timed.length + resting.length < 2) {
       parts.replaceChildren();
       return [];
     }
@@ -449,9 +450,51 @@ function player(move: Move): HTMLElement {
         pickable(part, i);
         return part;
       }),
+      ...resting.map(restingPart),
     );
     // Their rings' glows are drawn by the page's settle, which follows every build.
     return added;
+  }
+
+  /**
+   * The move's own tracks that light mode's tracks leave out, while those play: each keeps its row
+   * among the parts, so the page is as tall in either mode.
+   */
+  function restingInDaylight(): Track[] {
+    if (playing.set !== "daylight") return [];
+    const key = (track: Track) => `${track.part}\u0000${track.property}`;
+    const left = playing.timed.map((timed) => key(timed.track));
+    return move.tracks.filter((track) => {
+      const at = left.indexOf(key(track));
+      if (at < 0) return true;
+      left.splice(at, 1);
+      return false;
+    });
+  }
+
+  /** A part that doesn't play in light mode: its sample still, under a line saying why. */
+  function restingPart(track: Track): HTMLElement {
+    const alone = move.sample();
+    spread(alone);
+    const box = el("div", "page-part-stage mock", alone);
+    box.inert = true;
+    box.setAttribute("aria-hidden", "true");
+    // Its part's name alone: with what it's on, as the legend says it, the line runs past the page.
+    const words = `${track.part}: doesn't play in light mode, where the neon is off`;
+    return el("div", "page-part-resting", el("span", "page-plot-key", label(words, "small", "on_surface_variant")), box);
+  }
+
+  /**
+   * The legend the other mode plays, unseen under the one playing, so the legend takes the room of
+   * the taller of the two and the page is as tall in either mode.
+   */
+  function legendRoom(): HTMLElement[] {
+    const other = loop(move, settings().mode === "light" ? "dark" : "light");
+    if (other.set === playing.set) return [];
+    const room = legend(other);
+    room.className = "page-plot-legend-room";
+    room.setAttribute("aria-hidden", "true");
+    return [room];
   }
 
   /** Builds the animations from the move's data, for the settings picked, and goes on at `t`. */
@@ -463,8 +506,8 @@ function player(move: Move): HTMLElement {
     animations.push(...drawParts());
     loopLits = [];
     loopPart.replaceChildren(loopTable(playing, loopLits));
-    key.replaceChildren(legend(playing));
-    for (const [i, item] of [...key.querySelectorAll(".page-plot-key")].entries()) pickable(item, i);
+    key.replaceChildren(legend(playing), ...legendRoom());
+    for (const [i, item] of [...key.querySelectorAll(".page-plot-legend .page-plot-key")].entries()) pickable(item, i);
     const at = Math.min(t, playing.total - 1e-3);
     plot.draw(playing, marks(playing), at);
     go(at);
